@@ -1,0 +1,85 @@
+WP-A (Foundation) — result, 2026-09-29
+=====================================
+
+Files
+  src/lib/concord/core/{types,camera-x,field,bands,index}.ts   frozen API (plan §4 WP-A) + additive helpers
+  src/lib/concord/core/core.check.ts                          npx tsx src/lib/concord/core/core.check.ts
+  scripts/concord/lib.ts                                       eval library (import from here)
+  scripts/concord/eval.ts                                      CLI; re-exports lib.ts
+  tools/concord/pins/PROTOCOL.txt                              frozen per-photo split + blind clicking protocol
+  tools/concord/pins/interior-pins.json                        schema, points: [] (control-points are converted on the fly, not duplicated)
+  tools/concord/pins/candidates.mts                            OSM candidate generator + click helper
+  out/concord/eval/*.json, out/concord/eval/cache/             eval runs, horizon cache
+  out/concord/pins/{candidates.json,candidates-predicted.json,click.html,osm/}
+
+API notes (additive only; nothing removed or renamed)
+  - Intrinsics.k1 convention: distorted = ideal·(1 + k1·r²) in focal-normalised coords (the audit's
+    convention, where pins favour k1 ≈ +0.04). The plan comment said "division model"; the plan also
+    specified an iterative undistort, which only makes sense for this forward-polynomial model.
+  - undistortUV uses 5 Newton iterations on the radius, not the plain fixed point: the plain
+    fixed point reached only 2.3e-4 uv at wide-FOV corners, which fails the 1e-6 acceptance.
+  - Additive exports: DISTANCE_BANDS, RADIUS_BANDS, BandStat, radiusFrac, sampleFieldSigma,
+    decodeFieldRGBA8. invertField defaults to 8 iterations.
+  - RGBA8 encoding: R,G = du hi,lo; B,A = dv hi,lo; value = (code/65535·2−1)·scale.
+  - Pin basis: x,y are in the 1600-WIDTH basis (the control-points.json/engine.ts convention;
+    portrait = 1600×2133). Residual px are reported at the long-side-1600 basis (the audit's "px @1600").
+  - Scene frame for eval: ENU at the GT lat/lon, z = alt − GT eye with the d²/(2R_eff) drop folded in.
+    GT cam has eye [0,0,0]; candidates move the eye via cam.eye.
+  - Radius band = hypot((u−.5)·aspect, v−.5) / half-diagonal (the audit's rnorm was a different norm).
+
+Lib API (scripts/concord/lib.ts)
+  baselineCam(photo, "gt"|"app"): "gt" (default) = GT pose + GT eye from ground-truth.json (the pose the
+    audit measured). "app" = scripts/eval.ts default path (photoContext prior, eye = max(GPS, DEM+1.6)
+    on Terrarium, detectSkyline at 800 px, then solvePose), with the eye placed in the GT scene frame.
+  loadPins({photos, split: "dev"|"holdout"|"all", sources}), scorePins(cam, pins, field?),
+  bandTable(res), concordReport, auditBands, skylineRms(photo, cam), looScore(fit, pins, base),
+  builtinFit("rot"|"rotf"), readCandidate(file), loadScene(photo), enuOf, gtCam, appSolve,
+  mapterhornHeight, loadSplit, pinUV.
+  Candidate file format: {cam: CameraX, field?: ResidualField (arrays OK)}. The field is applied as
+    drawn = r + W⁻¹(r). The skyline score ignores the field.
+
+Tests (actual output)
+  core.check.ts: all PASS
+    projectX≡projectPoint (identity, 10k): 0 mismatches (333 behind-camera nulls also equal); unprojectDirX≡unprojectDir: 0 mismatches
+    distort∘undistort: max |Δuv| 3.4e-16 (|k1| ≤ 0.08, fScale 0.97–1.03, pp ±0.01, vfov 30–75°)
+    projectX∘unprojectDirX: 8.3e-16
+    field inverse round trip: 0.0037 px max (|W| max 15.6 px, 96×72 grid)
+    RGBA8 16-bit: 2.4e-4 px
+  eval --baseline --split all (GT pose, 48 control-point pins, 14 photos):
+    all 48 per-pin residuals are bit-identical to the audit pinTable (max |Δ| 0.00 px)
+    <6.5 km median 3.74 px (n=12); >15 km 1.68 px (n=18); waterline 2.8 (n=4)
+    Gap versus the plan's "≈4.9": the audit's own pin table gives 3.74 for <6.5 km. The 4.9 figure
+    matches the 2–5 km band (n=5, median 4.94) and also the dev-only <6.5 km subset (n=9, 4.94).
+    It looks like a mislabel in the synthesis; >15 km 1.68 ≈ 1.7 reproduces.
+  eval --baseline (GT, dev, 34 pins / 10 photos): median 3.0, p90 6.7. Bands: <0.5 km 0.1 (1),
+    0.5–2 km 0.4 (1), 2–5 km 5.5 (4), 5–15 km 3.0 (16), >15 km 3.1 (12).
+    Skyline medAbs at GT: 2.2–4.2 px on the good photos; 15–19 px on 5495/7059/7063 (approx GT).
+  eval --baseline --pose app (dev): 5/10 accepted (5495, 7059, 7063, 7068 and 7155 rejected).
+    Median 12.3, p90 159 px (5495 and 7155 are 160–170 px off). Accepted photos: 5.4–12.6 px median.
+  eval --loo builtin:rot (dev): median 4.3, p90 9.1. Photos with ≤ 2 pins cannot be refit, so their LOO
+    falls back to the GT pose and stays in-sample (5495, 7063, 7068, 7155).
+  candidates mode: smoke test with a +5 px field gives dx −5 px, as expected.
+  DEM ground at the GT eye (Mapterhorn z17 − GT demGround): +81.3 (7059), +87.2 (7063), +46.9 (7053),
+    +44.3 (7068), +51.9 (7155), +25.8 (6019), +20.3 (7086); ≤ 2.2 m elsewhere. The current Terrarium
+    cache equals GT demGround exactly. This confirms the stale-datum warning in the plan; GT was not edited.
+
+Acceptance
+  core.check (bitwise identity, round trips): PASS
+  eval --baseline reproduces the audit medians within ±0.3 px: PASS for the audit's actual pin table
+    (bit-exact: 3.74 / 1.68). The plan's 4.9 label does not match the audit table (see above).
+  Pin set (≥ 8 interior pins/photo on ≥ 10 photos): PENDING. It needs the user's blind clicks.
+    Candidates exist for 10 of 14 photos (96 in total).
+  Split frozen before other WPs report: DONE (PROTOCOL.txt; holdout = 6019, 6958, 7086, 7130).
+
+Known issues
+  - Overpass main was overloaded (504/429) during the run:
+      * 7131 and 7155 got no candidates.
+      * The bridge/pier ("lines") or shore ("water") queries failed for the 6958, 7068, 7086, 7130
+        and Niederhorn locations.
+      * Failed queries are not cached; rerun candidates.mts later to fill them in (successful ones are cached).
+  - Summit photos looking at far scenery (6019, 7068, 7086, and 7053 partly) have 0–7 in-frame
+    features within 0.3–5 km, so ≥ 8 pins may be impossible there. The candidate check uses Terrarium
+    line of sight: no trees or buildings, and coarse near the eye.
+  - click.html records point pins only; waterline pins are added by hand. localStorage keeps clicks per browser.
+  - Mapterhorn eye-ground tiles are fetched once into .cache/dem-mapterhorn. CONCORD_OFFLINE=1 skips them.
+  - The control-points pins are the constraints the GT was fitted to, so GT-pose numbers on them are in-sample.

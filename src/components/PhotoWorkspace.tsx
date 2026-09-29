@@ -533,6 +533,24 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		engineRef.current?.setSettings(settings);
 	}, [settings]);
 
+	// uploads fetch their hiking paths from Overpass only once the layer is switched on
+	const trailsOn = settings.trails;
+	useEffect(() => {
+		if (!trailsOn || !photo.region.startsWith("local-")) return;
+		const ctl = new AbortController();
+		import("#/lib/upload/region")
+			.then((m) => m.fetchRegionTrails(photo.region, { signal: ctl.signal }))
+			.then((trails) => {
+				// an engine still initialising keeps them until its region arrives
+				if (trails && !ctl.signal.aborted)
+					engineRef.current?.setTrails?.(trails);
+			})
+			.catch((e) => {
+				if (!ctl.signal.aborted) console.warn("[trails]", e);
+			});
+		return () => ctl.abort();
+	}, [trailsOn, photo.region]);
+
 	// the engine re-renders (and re-emits labels) on a style change; DeckEngine has no setStyle yet
 	useEffect(() => {
 		engineRef.current?.setStyle?.(viewStyle);

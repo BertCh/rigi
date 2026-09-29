@@ -19,7 +19,7 @@ import type { EnuFrame } from "./geodesy";
 import type { Unknowns } from "./integration/unknown-pose";
 import type { NearFieldSample } from "./nearfield/measure";
 import type { NearFieldScene, NearFieldViewOpts } from "./nearfield/types";
-import type { PhotoMeta, RegionData } from "./photos";
+import type { PhotoMeta, RegionData, RegionTrail } from "./photos";
 import type { RevealUniforms } from "./reveal/config";
 import type { ViewStyle } from "./style/types";
 
@@ -69,6 +69,8 @@ export interface Renderer {
 	setStyle?(s: ViewStyle): void;
 	/** The photo's P(sky) (#/lib/sky segmentSky, row 0 = top), for the fitted haze. Both engines. */
 	setSkyMask?(m: FgMask | null): void;
+	/** Replace the region's hiking paths (loaded on demand when the trails layer is switched on). */
+	setTrails?(trails: RegionTrail[]): void;
 	/** One frame of the overlay reveal (src/lib/reveal); null = off (the classic composite, untouched). */
 	setReveal?(r: RevealUniforms | null): void;
 	/**

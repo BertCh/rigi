@@ -1,0 +1,23 @@
+{
+	"version": 1,
+	"schema": {
+		"type": "InteriorPin (src/lib/concord/core/types.ts)",
+		"photo": "IMG_xxxx (must have a GT pose in data/ground-truth.json)",
+		"id": "unique string, e.g. ip:IMG_7033:church-hilterfingen",
+		"x": "px, 1600 basis = image WIDTH 1600 (control-points.json convention; portrait = 1600 x 2133)",
+		"y": "px, v down",
+		"basis": 1600,
+		"lat": "WGS84 degrees of the feature (from the map, never from an overlay)",
+		"lon": "WGS84 degrees",
+		"h": "optional absolute elevation (m); absent => DEM (Mapterhorn z17) at lat/lon + hAbove",
+		"hAbove": "optional metres above ground of the clicked point (0 = ground contact)",
+		"level": "optional { lakeM } for elevation-only waterline pins",
+		"kind": "shore | waterline | building | junction | bridge | notch | summit | other",
+		"source": "osm | swisstopo | manual",
+		"split": "dev | holdout, copied from the photo's line in PROTOCOL.txt",
+		"sigmaPx": "optional click uncertainty (default 2)",
+		"note": "optional"
+	},
+	"notes": "Peaks, DEM notches and waterlines from data/control-points.json are converted automatically by scripts/concord/lib.ts (controlPointPins) and are NOT duplicated here. Add only blind-clicked interior pins (PROTOCOL.txt section 2).",
+	"points": []
+}

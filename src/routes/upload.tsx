@@ -156,7 +156,7 @@ function UploadPage() {
 		setRegion({ kind: "loading", stage: "checking cache" });
 		const stageText = {
 			cache: "checking cache",
-			peaks: "peaks + trails from Overpass",
+			peaks: "peaks from Overpass",
 			trails: "trails",
 			water: "lakes",
 			done: "done",
@@ -869,9 +869,7 @@ function RegionPanel({
 				<div className="text-xs">
 					<p className="text-white/70" data-testid="region-summary">
 						<b className="text-white">{state.region.peaks.length}</b> named
-						peaks within 60 km ·{" "}
-						<b className="text-white">{state.region.trails.length}</b> paths
-						within 12 km
+						peaks within 60 km
 						{state.region.waterNames.length
 							? ` · ${state.region.waterNames.length} lakes`
 							: ""}

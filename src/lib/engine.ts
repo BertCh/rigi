@@ -87,7 +87,7 @@ import {
 	type NearFieldViewOpts,
 	PixelClass,
 } from "./nearfield/types";
-import type { PhotoMeta, RegionData } from "./photos";
+import type { PhotoMeta, RegionData, RegionTrail } from "./photos";
 import { applyPose, projectPoint, unprojectDir } from "./pose";
 import type { RevealUniforms } from "./reveal/config";
 import { REVEAL_GLSL } from "./reveal/glsl";
@@ -165,7 +165,8 @@ export const defaultSettings: Settings = {
 	layerOpacity: 0.9,
 	ridges: 0.8,
 	depthTint: 0,
-	trails: true,
+	// off by default: uploads fetch their paths from Overpass only when switched on
+	trails: false,
 	mapStyle: "satellite",
 	method: "lens",
 	swipe: 0.5,
@@ -748,8 +749,11 @@ export class PhotoEngine {
 		this.updateRelief();
 
 		// usually resolved long ago: its latency overlapped the photo decode and the tile phase
-		const regionData = await region;
+		let regionData = await region;
 		if (this.disposed) return;
+		if (regionData && this.pendingTrails)
+			regionData = { ...regionData, trails: this.pendingTrails };
+		this.pendingTrails = undefined;
 		this.region = regionData;
 		if (regionData) {
 			onProgress?.("Placing peaks and trails", 1);
@@ -854,6 +858,28 @@ export class PhotoEngine {
 		this.trails = new LineSegments2(geo, this.trailMat);
 		this.trails.frustumCulled = false;
 		this.scene.add(this.trails);
+	}
+
+	private pendingTrails?: RegionTrail[];
+
+	setTrails(trails: RegionTrail[]) {
+		if (!this.region || !this.terrain) {
+			this.pendingTrails = trails; // init() applies them once the region arrives
+			return;
+		}
+		this.region = { ...this.region, trails };
+		if (this.trails) {
+			this.scene.remove(this.trails);
+			this.trails.geometry.dispose();
+			this.trailMat?.dispose();
+		}
+		this.buildTrails(this.region);
+		this.trailMat?.resolution.set(
+			this.renderer.domElement.width,
+			this.renderer.domElement.height,
+		);
+		if (this.trails) this.trails.visible = this.settings.trails;
+		this.requestRender();
 	}
 
 	/** Re-colour the trail segments from style.trails.colors (no re-sampling of heights). */

@@ -1,0 +1,460 @@
+WP-E display warp: integration hooks for the shared renderer files (NOT applied; for the integration agent).
+Generated 2026-09-29 as a unified diff against the working-tree versions of:
+  src/lib/engine.ts, src/lib/deck/composite-shader.ts, src/lib/deck/composite.ts, src/lib/deck/engine.ts,
+  src/lib/renderer.ts
+Apply:  git apply tools/concord/field/hooks.patch.txt   (verified with git apply --check at generation time;
+        the leading notes are ignored by git apply)
+
+What it does
+  - Both composites: declare the warp texture + scale + on uniforms, include WARP_GLSL (concord/field/glsl.ts),
+    compute  vec2 uvG = warpUV(tex, scale, on, vUv)  once, and use uvG for ALL render-space reads: tLayer /
+    layerTex (incl. layerAt under LOOK_REFINE), tGeo / geoTex (range, lr() silhouettes, isSkyline), inkLines()
+    and revealAt() (both reconstruct render-space rays / ranges). tPhoto, tFg, tBrush, MASK() (refined masks
+    are photo-space), swipe / lens / brush masks stay at vUv / uvT.
+  - uWarpOn / warpOn = 0 (the default, and whenever setWarp(null)) ⇒ warpUV returns vUv itself ⇒ every
+    texture read and the output are bit-identical to the current composite. Verified for the snippet on
+    WebGL2 (tools/concord/field/glsl-check.mts: warpOn=0 ⇒ uvG ≡ vUv bitwise, three and deck dialects).
+  - three: tWarp is a THREE.DataTexture (RGBA8, flipY=false, NEAREST, no mipmaps), row 0 = top;
+    deck: warpTex via device.createTexture({data}) (row 0 = top, nearest), set through the compositor's
+    setWarp → bump() → DeckEngine.updateComposite (composite-only change; terrain layers not rebuilt).
+    Both sample it at (vUv.x, 1 − vUv.y) and flip dv, so the same field gives the same uvG in both engines
+    (three-vs-deck dialect output bitwise equal in glsl-check).
+  - Renderer.setWarp?(field | null) and renderUVOf?(u, v) (optional, additive). Callers MUST get the field
+    from concord/field displayField(confidence, …), which returns null at LOW confidence (unit-tested).
+  - Peak labels (three peakLabels; deck peakLabels) are moved to where their render point is SHOWN:
+    WarpState.photoOf (grid inverse + 4 forward fixed-point steps). Visibility tests stay in render space
+    (sampleAt at the unwarped projection); the people test uses the warped position. exportImage draws
+    peakLabels, so exported IMAGES carry the warped labels (display), nothing else.
+
+Deliberately NOT warped (plan §5: warps never feed pose, confidence, benchmarks or measurement exports)
+  - engine.ts pinError (~L1950) and peaksInFrame (~L1885, candidates for pinning): pose inputs.
+  - sampleAt(): it is a render-space query used internally (label occlusion, nearFieldDemRange). For a
+    hover readout at a PHOTO pixel, call sampleAt(...renderer.renderUVOf(u, v)) at the UI call site.
+  - skyline() (export label layout helper) stays render-space (≤ 12 px offset; cosmetic).
+  - materials.ts uPhotoViewProj / deck world-view drape (plan: second PR; use WarpState.photoOf / the
+    inverse texture), Step Inside splats, XMP/KML/pose exports.
+Known caveat
+  - Under LOOK_INK with comp_refine, inkLines(uvG) also reads MASK at uvG inside refinedSkyline(); the
+    refined skyline is photo-snapped, so with the warp on it moves by W there. Owner of look/glsl may
+    prefer to pass vUv for that term; harmless with the warp off.
+  - deck peakLabels: placePeakLabels declutters in render space, then labels are moved (≤ 12 px).
+
+Parity acceptance still to run by the integration agent (render lock): scripts/style-baseline.mjs 16/16
+exact with the flag off, deck-vs-three composite < 1 LSB with the same field.
+------------------------------------------------------------------------------------------------------------
+--- a/src/lib/engine.ts
++++ b/src/lib/engine.ts
+@@ -19,6 +19,8 @@
+ 	solvePins,
+ } from "./align";
+ import type { Pose } from "./camera";
++import type { ResidualField } from "./concord/core";
++import { WARP_GLSL, WarpState } from "./concord/field";
+ import { distanceM, EnuFrame } from "./geodesy";
+ import { autoAlignAsync, warmAlignGpu } from "./gpu/align";
+ import { lookIdle } from "./gpu/look/opt-in";
+@@ -258,10 +260,15 @@
+ uniform float uDepthRampD[RAMP_MAX];
+ uniform float uDepthRampE[RAMP_MAX];
+ uniform int uDepthRampN;
++// concord display warp (?concord=warp; src/lib/concord/field): off (uWarpOn = 0) ⇒ uvG == vUv exactly
++uniform sampler2D tWarp;
++uniform float uWarpScale;
++uniform float uWarpOn;
+ varying vec2 vUv;
+ 
+ ${TURBO_GLSL}
+ ${REVEAL_GLSL}
++${WARP_GLSL}
+ ${compositeChunk(`uniform sampler2D tCompMask;
+ uniform sampler2D tCompNormal;
+ #define GEO_RANGE(p) texelFetch(tGeo, p, 0).a
+@@ -279,12 +286,14 @@
+ 
+ void main() {
+   vec4 photo = texture2D(tPhoto, vUv);
++  // render-space reads (tLayer, tGeo) at uvG; photo-space reads (tPhoto, tFg, tBrush, masks) at vUv
++  vec2 uvG = warpUV(tWarp, uWarpScale, uWarpOn, vUv);
+ #ifdef LOOK_REFINE
+-  vec4 layer = layerAt(vUv);
++  vec4 layer = layerAt(uvG);
+ #else
+-  vec4 layer = texture2D(tLayer, vUv);
++  vec4 layer = texture2D(tLayer, uvG);
+ #endif
+-  float range = texture2D(tGeo, vUv).a;
++  float range = texture2D(tGeo, uvG).a;
+   vec3 col = photo.rgb;
+   // people & other foreground: keep the photo untouched there
+   float fg = uFgOn * texture2D(tFg, vUv).r;
+@@ -299,22 +308,22 @@
+ #endif
+ 
+   // silhouettes: discontinuities in log-range
+-  float c = lr(vUv);
++  float c = lr(uvG);
+   vec2 o = uGeoTexel * 1.25;
+-  float e = max(max(abs(c - lr(vUv + vec2(o.x, 0.0))), abs(c - lr(vUv - vec2(o.x, 0.0)))),
+-                max(abs(c - lr(vUv + vec2(0.0, o.y))), abs(c - lr(vUv - vec2(0.0, o.y)))));
+-  float isSkyline = (range > 0.0 && texture2D(tGeo, vUv + vec2(0.0, o.y)).a == 0.0) ? 1.0 : 0.0;
++  float e = max(max(abs(c - lr(uvG + vec2(o.x, 0.0))), abs(c - lr(uvG - vec2(o.x, 0.0)))),
++                max(abs(c - lr(uvG + vec2(0.0, o.y))), abs(c - lr(uvG - vec2(0.0, o.y)))));
++  float isSkyline = (range > 0.0 && texture2D(tGeo, uvG + vec2(0.0, o.y)).a == 0.0) ? 1.0 : 0.0;
+   float ridge = smoothstep(uRidgeThr.x, uRidgeThr.y, e);
+   if (uNearFade > 0.0) ridge *= range > 0.0 ? smoothstep(uNearFade * 0.5, uNearFade, range) : 1.0;
+ #ifdef LOOK_INK
+-  vec2 ink = inkLines(vUv, range, uNearFade, cov);
++  vec2 ink = inkLines(uvG, range, uNearFade, cov);
+ #endif
+ #ifdef LOOK_OUTPUT
+   float grainA = 0.0;
+ #endif
+   // reveal: x = overlay alpha, y = light band, z = ridge alpha (1, 0, 1 when off)
+   vec3 rv = vec3(1.0, 0.0, 1.0);
+-  if (uReveal.w > 0.0) rv = revealAt(vUv, range, uReveal, uRevealWin, uRevealQD, uRevealQE, uRevealShape, uRevealFocus, uRevealF, uRevealR, uRevealU, uAspect);
++  if (uReveal.w > 0.0) rv = revealAt(uvG, range, uReveal, uRevealWin, uRevealQD, uRevealQE, uRevealShape, uRevealFocus, uRevealF, uRevealR, uRevealU, uAspect);
+ 
+   if (uMode == 0) {
+     if (uDepthTint > 0.0 && range > 0.0 && fg < 0.5) {
+@@ -613,6 +622,9 @@
+ 					uRevealF: { value: new THREE.Vector3() },
+ 					uRevealR: { value: new THREE.Vector3() },
+ 					uRevealU: { value: new THREE.Vector3() },
++					tWarp: { value: blankTexture() },
++					uWarpScale: { value: 0 },
++					uWarpOn: { value: 0 },
+ 					...makeCompositeStyleUniforms(),
+ 					// the look composite (read only under its LOOK_* defines)
+ 					...COMP_BLOCK.threeUniforms(),
+@@ -627,6 +639,44 @@
+ 		this.scene.background = null;
+ 		// Step Inside splats live on their own layer: only the world / step camera draws them
+ 		this.worldCam.layers.enable(NEARFIELD_LAYER);
++	}
++
++	/** concord display warp (src/lib/concord/field WarpState); null = off. */
++	private warp: WarpState | null = null;
++
++	/**
++	 * Display-only residual warp (?concord=warp): render-space composite reads and peak labels move by
++	 * W; nothing else (pose, pins, exports of measurements) sees it. null = off: the composite is
++	 * bit-identical to no warp. Callers get the field from concord/field displayField (null at LOW).
++	 */
++	setWarp(field: ResidualField | null) {
++		const u = this.composite.material.uniforms;
++		if (!field && !this.warp) return;
++		const old = u.tWarp.value as THREE.Texture;
++		if (!field) {
++			this.warp = null;
++			u.tWarp.value = blankTexture();
++			u.uWarpScale.value = 0;
++			u.uWarpOn.value = 0;
++		} else {
++			this.warp = new WarpState(field);
++			const t = this.warp.texture;
++			const tex = new THREE.DataTexture(t.data, t.width, t.height);
++			tex.flipY = false; // row 0 = top; warpUV samples at (x, 1 − y)
++			tex.minFilter = tex.magFilter = THREE.NearestFilter;
++			tex.generateMipmaps = false;
++			tex.needsUpdate = true;
++			u.tWarp.value = tex;
++			u.uWarpScale.value = t.scale;
++			u.uWarpOn.value = 1;
++		}
++		old.dispose();
++		this.requestRender();
++	}
++
++	/** Photo uv (as shown) → the render uv whose terrain is drawn there (hover / geo readback). */
++	renderUVOf(u: number, v: number): [number, number] {
++		return this.warp ? this.warp.renderOf(u, v) : [u, v];
+ 	}
+ 
+ 	/** One frame of the overlay reveal (src/lib/reveal); null = off. */
+@@ -1833,7 +1883,9 @@
+ 				this.peakVis.set(p, visible);
+ 			} else visible = this.peakVis.get(p);
+ 			if (visible === undefined) continue; // unknown: no buffer for this pose has tested it yet
+-			if (this.settings.protectPeople && this.isForeground(pr.u, pr.v))
++			// display warp: the label goes where the render point is SHOWN (visibility stays in render space)
++			const [lu, lv] = this.warp ? this.warp.photoOf(pr.u, pr.v) : [pr.u, pr.v];
++			if (this.settings.protectPeople && this.isForeground(lu, lv))
+ 				visible = false;
+ 			if (!visible) continue;
+ 			const rank = peakRank(p.prominence, p.ele, range);
+@@ -1841,8 +1893,8 @@
+ 				name: p.name,
+ 				ele: p.ele,
+ 				prominence: p.prominence,
+-				u: pr.u,
+-				v: pr.v,
++				u: lu,
++				v: lv,
+ 				distKm: range / 1000,
+ 				rank,
+ 				visible,
+--- a/src/lib/deck/composite-shader.ts
++++ b/src/lib/deck/composite-shader.ts
+@@ -9,6 +9,7 @@
+ import type { ShaderModule } from "@luma.gl/shadertools";
+ import { TURBO_GLSL } from "../look/glsl/common";
+ import { COMP_BLOCK, compositeChunk, HARM_BLOCK } from "../look/glsl/composite";
++import { WARP_GLSL } from "../concord/field/glsl";
+ import { REVEAL_GLSL } from "../reveal/glsl";
+ 
+ const uniformBlock = /* glsl */ `\
+@@ -56,6 +57,9 @@
+   vec4 revealF;
+   vec4 revealR;
+   vec4 revealU;
++  // concord display warp (?concord=warp): warpOn 0 ⇒ uvG == vUv exactly
++  float warpScale;
++  float warpOn;
+ } composite;
+ `;
+ 
+@@ -103,11 +107,15 @@
+ 	revealF: number[];
+ 	revealR: number[];
+ 	revealU: number[];
++	warpScale: number;
++	warpOn: number;
+ 	photoTex: Texture;
+ 	layerTex: Texture;
+ 	geoTex: Texture;
+ 	brushTex: Texture;
+ 	fgTex: Texture;
++	/** RGBA8 warp (concord/field packWarpTexture), row 0 = top, nearest; the 1×1 empty when off. */
++	warpTex: Texture;
+ };
+ 
+ export const compositeModule = {
+@@ -156,6 +164,8 @@
+ 		revealF: "vec4<f32>",
+ 		revealR: "vec4<f32>",
+ 		revealU: "vec4<f32>",
++		warpScale: "f32",
++		warpOn: "f32",
+ 	},
+ } as const satisfies ShaderModule;
+ 
+@@ -183,6 +193,7 @@
+ uniform sampler2D geoTex;
+ uniform sampler2D brushTex;
+ uniform sampler2D fgTex;
++uniform sampler2D warpTex;
+ in vec2 vUv;
+ out vec4 fragColor;
+ 
+@@ -196,6 +207,7 @@
+ 
+ ${TURBO_GLSL}
+ ${REVEAL_GLSL}
++${WARP_GLSL}
+ ${compositeChunk(`uniform sampler2D maskTex;
+ uniform sampler2D normalTex;
+ #define GEO_RANGE(p) texelFetch(geoTex, p, 0).r
+@@ -234,12 +246,14 @@
+ void main() {
+   vec2 uvT = vec2(vUv.x, 1.0 - vUv.y);
+   vec3 col = composite.hasPhoto > 0.5 ? srgbDecode(texture(photoTex, uvT).rgb) : vec3(0.0);
++  // render-space reads (layerTex, geoTex) at uvG; photo-space reads (photo, fg, brush, masks) unchanged
++  vec2 uvG = warpUV(warpTex, composite.warpScale, composite.warpOn, vUv);
+ #ifdef LOOK_REFINE
+-  vec4 layer = layerAt(vUv);
++  vec4 layer = layerAt(uvG);
+ #else
+-  vec4 layer = texture(layerTex, vUv);
++  vec4 layer = texture(layerTex, uvG);
+ #endif
+-  float range = texture(geoTex, vUv).r;
++  float range = texture(geoTex, uvG).r;
+   // people & other foreground: keep the photo untouched there
+   float fg = composite.fgOn * texture(fgTex, uvT).r;
+   // terrain coverage (look composite: snapped to the photo's edges while the refined masks are fresh)
+@@ -253,22 +267,22 @@
+ #endif
+ 
+   // silhouettes: discontinuities in log-range
+-  float c = lr(vUv);
++  float c = lr(uvG);
+   vec2 o = composite.geoTexel * 1.25;
+-  float e = max(max(abs(c - lr(vUv + vec2(o.x, 0.0))), abs(c - lr(vUv - vec2(o.x, 0.0)))),
+-                max(abs(c - lr(vUv + vec2(0.0, o.y))), abs(c - lr(vUv - vec2(0.0, o.y)))));
+-  float isSkyline = (range > 0.0 && texture(geoTex, vUv + vec2(0.0, o.y)).r == 0.0) ? 1.0 : 0.0;
++  float e = max(max(abs(c - lr(uvG + vec2(o.x, 0.0))), abs(c - lr(uvG - vec2(o.x, 0.0)))),
++                max(abs(c - lr(uvG + vec2(0.0, o.y))), abs(c - lr(uvG - vec2(0.0, o.y)))));
++  float isSkyline = (range > 0.0 && texture(geoTex, uvG + vec2(0.0, o.y)).r == 0.0) ? 1.0 : 0.0;
+   float ridge = smoothstep(composite.ridgeThr.x, composite.ridgeThr.y, e);
+   if (composite.nearFade > 0.0) ridge *= range > 0.0 ? smoothstep(composite.nearFade * 0.5, composite.nearFade, range) : 1.0;
+ #ifdef LOOK_INK
+-  vec2 ink = inkLines(vUv, range, composite.nearFade, cov);
++  vec2 ink = inkLines(uvG, range, composite.nearFade, cov);
+ #endif
+ #ifdef LOOK_OUTPUT
+   float grainA = 0.0;
+ #endif
+   // reveal: x = overlay alpha, y = light band, z = ridge alpha (1, 0, 1 when off)
+   vec3 rv = vec3(1.0, 0.0, 1.0);
+-  if (composite.reveal.w > 0.0) rv = revealAt(vUv, range, composite.reveal, composite.revealWin, composite.revealQD, composite.revealQE, composite.revealShape, composite.revealFocus, composite.revealF.xyz, composite.revealR.xyz, composite.revealU.xyz, composite.aspect);
++  if (composite.reveal.w > 0.0) rv = revealAt(uvG, range, composite.reveal, composite.revealWin, composite.revealQD, composite.revealQE, composite.revealShape, composite.revealFocus, composite.revealF.xyz, composite.revealR.xyz, composite.revealU.xyz, composite.aspect);
+ 
+   if (composite.mode < 0.5) {
+     if (composite.depthTint > 0.0 && range > 0.0 && fg < 0.5) {
+--- a/src/lib/deck/composite.ts
++++ b/src/lib/deck/composite.ts
+@@ -26,6 +26,7 @@
+ import { Geometry, Model } from "@luma.gl/engine";
+ import type { ShaderModule } from "@luma.gl/shadertools";
+ import type { Pose } from "../camera";
++import type { WarpState } from "../concord/field";
+ import type { compositeValues, harmonizeValues } from "../look/composite";
+ import { COMP_BLOCK, HARM_BLOCK } from "../look/glsl/composite";
+ import type { LookDefine } from "../look/look-key";
+@@ -174,6 +175,10 @@
+ 	private photoTex?: Texture;
+ 	private photoSrc: HTMLImageElement | ImageBitmap | null = null;
+ 	private fgTex?: Texture;
++	/** concord display warp (setWarp); null = off. */
++	private warp: WarpState | null = null;
++	private warpTex?: Texture;
++	private warpDirty = false;
+ 	private fgMask: { width: number; height: number; data: Uint8Array } | null =
+ 		null;
+ 	private fgDirty = false;
+@@ -243,6 +248,14 @@
+ 
+ 	get hasForeground() {
+ 		return !!this.fgMask;
++	}
++
++	/** concord display warp (composite-only change); null = off: the composite is bit-identical. */
++	setWarp(w: WarpState | null) {
++		if (!w && !this.warp) return;
++		this.warp = w;
++		this.warpDirty = true;
++		this.bump();
+ 	}
+ 
+ 	/** engine.ts paint(): into the brush mask (normalised coords, v down). */
+@@ -844,6 +857,8 @@
+ 		this.photoTex?.destroy();
+ 		this.fgTex?.destroy();
+ 		this.brushTex?.destroy();
++		this.warpTex?.destroy();
++		this.warpTex = undefined;
+ 		this.empty = this.photoTex = this.fgTex = this.brushTex = undefined;
+ 		this.fgDirty = !!this.fgMask;
+ 		this.brushDirty = true;
+@@ -891,6 +906,25 @@
+ 			this.fgTex = this.fgMask ? maskTexture(device, this.fgMask) : undefined;
+ 			this.fgDirty = false;
+ 		}
++		if (this.warpDirty) {
++			this.warpTex?.destroy();
++			const t = this.warp?.texture;
++			// row 0 = top, sampled at (x, 1 − y) like fgTex; nearest: warpUV filters manually
++			this.warpTex = t
++				? device.createTexture({
++						data: t.data,
++						width: t.width,
++						height: t.height,
++						sampler: {
++							minFilter: "nearest",
++							magFilter: "nearest",
++							addressModeU: "clamp-to-edge",
++							addressModeV: "clamp-to-edge",
++						},
++					})
++				: undefined;
++			this.warpDirty = false;
++		}
+ 		if (this.brushDirty) {
+ 			if (!this.brushTex)
+ 				this.brushTex = device.createTexture({
+@@ -946,6 +980,9 @@
+ 			geoTex: geo.texture,
+ 			brushTex: this.brushTex ?? empty,
+ 			fgTex: this.fgTex ?? empty,
++			warpTex: this.warpTex ?? empty,
++			warpScale: this.warpTex ? (this.warp?.texture.scale ?? 0) : 0,
++			warpOn: this.warpTex ? 1 : 0,
+ 			...revealProps(this.reveal),
+ 		};
+ 	}
+--- a/src/lib/deck/engine.ts
++++ b/src/lib/deck/engine.ts
+@@ -27,6 +27,8 @@
+ 	solvePins,
+ } from "../align";
+ import type { Pose } from "../camera";
++import type { ResidualField } from "../concord/core";
++import { WarpState } from "../concord/field";
+ import { tileBounds } from "../dem";
+ import {
+ 	defaultSettings,
+@@ -699,6 +701,18 @@
+ 	}
+ 
+ 	/** One frame of the overlay reveal (src/lib/reveal); null = off. Composite-only: no terrain pass. */
++	/** concord display warp; see engine.ts setWarp. */
++	private warp: WarpState | null = null;
++	setWarp(field: ResidualField | null) {
++		if (!field && !this.warp) return;
++		this.warp = field ? new WarpState(field) : null;
++		this.compositor.setWarp(this.warp);
++	}
++	/** Photo uv (as shown) → the render uv whose terrain is drawn there (hover / geo readback). */
++	renderUVOf(u: number, v: number): [number, number] {
++		return this.warp ? this.warp.renderOf(u, v) : [u, v];
++	}
++
+ 	setReveal(r: RevealUniforms | null) {
+ 		this.compositor.setReveal(r);
+ 	}
+@@ -1309,7 +1323,8 @@
+ 			for (const p of snapped) {
+ 				if (vis.get(p) !== true) continue;
+ 				const pr = projectPoint(this.pose, this.aspect, eyeV, p.position);
+-				if (pr && this.isForeground(pr.u, pr.v)) vis.set(p, false);
++				const q = pr && this.warp ? this.warp.photoOf(pr.u, pr.v) : pr && [pr.u, pr.v];
++				if (q && this.isForeground(q[0], q[1])) vis.set(p, false);
+ 			}
+ 		}
+ 		return placePeakLabels(snapped, vis, this.pose, this.eyeArr, this.aspect, {
+@@ -1317,6 +1332,11 @@
+ 			declutter,
+ 		})
+ 			.slice(0, max)
++			.map((l) => {
++				// display warp: labels go where the render point is SHOWN
++				const [u, v] = this.warp ? this.warp.photoOf(l.u, l.v) : [l.u, l.v];
++				return { ...l, u, v };
++			})
+ 			.map((l) => ({
+ 				name: l.name,
+ 				ele: l.ele,
+--- a/src/lib/renderer.ts
++++ b/src/lib/renderer.ts
+@@ -14,6 +14,7 @@
+ 
+ import type { AlignResult, Pin } from "./align";
+ import type { Pose } from "./camera";
++import type { ResidualField } from "./concord/core";
+ import type { PeakLabel, Sample, Settings } from "./engine";
+ import type { EnuFrame } from "./geodesy";
+ import type { Unknowns } from "./integration/unknown-pose";
+@@ -72,6 +73,13 @@
+ 	/** One frame of the overlay reveal (src/lib/reveal); null = off (the classic composite, untouched). */
+ 	setReveal?(r: RevealUniforms | null): void;
+ 	/**
++	 * concord display warp (?concord=warp, src/lib/concord/field): display-only residual field; null =
++	 * off (bit-identical composite). Get the field from displayField (null at LOW confidence).
++	 */
++	setWarp?(field: ResidualField | null): void;
++	/** Photo uv (as shown) → render uv under the display warp (identity when off). */
++	renderUVOf?(u: number, v: number): [number, number];
++	/**
+ 	 * Step Inside (src/lib/nearfield): show a near-field scene (null = remove). Splats draw in the world
+ 	 * view / step-inside camera (deck: also the photo view); the world drape skips the scene's Object pixels.
+ 	 */

@@ -38,6 +38,7 @@ export {
 } from "./exif";
 export {
 	fetchRegion,
+	fetchRegionTrails,
 	isLocalRegionId,
 	type LocalRegion,
 	regionIdFor,

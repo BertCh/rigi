@@ -1,0 +1,143 @@
+WP-C (Interior cue extraction) — result, 2026-09-29
+=====================================================
+
+Files (all new; no shared files edited)
+  src/lib/concord/cues/types.ts      GeomBuffer, PhotoEdges (plan shapes) + MatchedCue, EdgeCue, RayHit
+  src/lib/concord/cues/raycast.ts    buildGeomBuffer: CPU DEM ray cast into photo space (per-azimuth
+                                     height profiles + prefix-max, binary search, linear hit refine)
+  src/lib/concord/cues/contours.ts   occludingContourCues (+ occludingContourCuesX with the boundary mask),
+                                     focal1600
+  src/lib/concord/cues/edge-dt.ts    photoEdgesFromRGBA (CPU port of align.ts buildEdgeMap maths as a Di
+                                     Zenzo tensor with orientation), photoEdgesFromEdgeMap (read-only reuse of
+                                     an app EdgeMap), maskEdges, thinEdges (NMS), orientedDT + chamferAt
+                                     (oriented truncated EDT), searchAlongNormal, matchEdgeCues
+  src/lib/concord/cues/water.ts      lakesFromOverpass / stitchRings, LakeRaster, shoreDistance, lakeLevel,
+                                     predictWaterline, mirrorAxis, waterCues (+ waterCuesX)
+  src/lib/concord/cues/extract.ts    extractCues (contours → match → confidence → neighbour consistency;
+                                     water), consistencyFilter
+  src/lib/concord/cues/index.ts
+  src/lib/concord/cues/cues.check.ts synthetic checks:  npx tsx src/lib/concord/cues/cues.check.ts
+  tools/concord/cues/dump.mts        audit + acceptance:  npx tsx tools/concord/cues/dump.mts [--pose gt|app]
+                                     [--png N] [--zoom N] [--mirror PX] [IMG_...]   (dev photos by default;
+                                     holdout refused unless CONCORD_HOLDOUT=final)
+  tools/concord/cues/fg-audit.mts    false-cue box count used for the visual audit below
+  out/concord/cues/gt/               per-photo JSON + overview PNGs (10 dev) + 1:1 zoom PNGs (5), summary.json
+  out/concord/cues/app/              per-photo JSON + summary.json at the app pose (no PNGs), 12 MB total
+
+API vs plan (additive / clarifying only)
+  - Signatures of occludingContourCues, matchEdgeCues, waterCues and the GeomBuffer / PhotoEdges shapes
+    are as in the plan. Extra optional fields: GeomBuffer.eye, .frame {alt0, rEff}, .cast(u,v) (sub-pixel
+    refinement); PhotoEdges.lum. Extra optional options on every function.
+  - matchEdgeCues returns an extra `pol` per cue; MatchOpts.polarity accepts "auto".
+  - waterCues takes an optional 5th arg opts; with photoWater = null it NEEDS opts.edges (the plan
+    signature has no edges argument, so "use photo edges" requires this addition).
+  - Lake convention (plan left it open): polygon = SCENE-frame [e, n] metres; levelM = ABSOLUTE altitude.
+    GeomBuffer.frame converts it (z = alt − alt0 − d²/2R_eff, the scripts/concord/lib.ts eval frame).
+  - Cue conventions: edge normal (nu, nv) is a unit vector in isotropic pixels (x right, y down) pointing
+    from the occluder into the farther side; depthM = horizontal distance from the eye (as pin distM);
+    residualPx = predicted − observed along the normal, px @1600 (long side 1600). Level/shore cues:
+    u, v = OBSERVED pixel; el = target elevation angle (deg) of the lake-level shore point;
+    residualPx = f·(el(observed ray) − el(target)), exactly how scorePins scores level pins. Water cues
+    also carry lakeM, world (lake-level shore point), predV (predicted row). shoreDist is signed
+    (negative inside the water).
+  - Deviations from the plan's data sources:
+      * tools/research/tm/c0_cache only covers the wild-set wc_* photos, not the 14 GT photos, so
+        dump.mts ray-casts the eval scene's Terrarium DEM on the CPU (raycast.ts, 2–3 s per photo at 800
+        px). Frame/curvature identical to the eval pins.
+      * align.ts buildEdgeMap needs a DOM canvas, so the CPU path re-implements its per-pixel maths;
+        photoEdgesFromEdgeMap is the read-only reuse path for the app (type-only import of align.ts).
+      * Lakes come from the cached Overpass water queries of WP-A (out/concord/pins/osm/*_water.json:
+        natural=water ways + multipolygon relations with member geometry, the region.ts query shape).
+        lakesFromOverpass takes region.ts's water elements directly. No network was used.
+  - Lake level = median Terrarium DEM inside the polygon (≤ 30 km): Thunersee 557.0 m (real ~557.7–558),
+    Vierwaldstättersee 430.0 m (real ~433.6). The Terrarium lake surface is 0.7–3.6 m low.
+
+Method notes / rejections added during dev tuning (dev photos only)
+  - Grazing-surface rejection: a lake or flat valley at grazing incidence shows log-range jumps > log 1.3
+    between adjacent pixels without any occlusion (IMG_6971: the lake surface near the horizon). A cue is
+    kept only if the range jump survives the sub-pixel bisection (ratio > √1.3 at 1/1000 px).
+  - Photo clutter: conf = uniqueness × strength × (share of thin edges in the search band that belong to
+    the chosen edge); per-photo auto polarity; neighbour-consistency filter (≥ 2 same-kind neighbours
+    within 32 px, residual within 2 px of their median). These removed most matches on faces and trees.
+  - Mirror-axis waterline (calm-water reflections): implemented but OFF by default. On the 4 dev lake
+    photos it was 2–3× rougher along the shore (median 2nd difference 0.8–1.4 vs 0.25–0.7 px) and worse
+    against the 6971 hand pins (0.21° vs 0.02°) than the edge search. The edge search sometimes locks on
+    the lower rim of a reflection (seen on 7033's right shore).
+
+Tests (actual output)
+  cues.check.ts: all PASS (11 checks)
+    raycast vs analytic plane: rel err 9.7e-8; reprojection of xyz 0.0001 px @1600
+    block-ridge contour: 100 cues, median |Δv| 0.034 px, normals all up
+    edge match on a synthetic photo shifted +3 px: 100/100 matched, median residual 2.97 px
+    oriented EDT vs brute force: max 0.079 px (quantisation)
+    synthetic lake: predicted waterline ≤ 0.26 px, level residual −1.93 px (−2 expected), el err 0.0000°,
+      auto polarity +1; shoreDist at the predicted shore ≤ 0.25 m; ring stitching; mirrorAxis;
+      maskEdges.
+  dump.mts, 10 DEV photos (≈ 4–5 s per photo CPU):
+    GT pose: contours 237–484 predicted per photo → 110–324 matched → 13–122 kept; water cues on
+      6971/7018/7033/7053 (33–98 per photo).
+      All kept cues by band (n, median residual, median |residual|, px @1600):
+        <0.5 km 30, −2.27, 2.27 | 0.5–2 km 71, −1.93, 3.14 | 2–5 km 202, −2.60, 3.34 |
+        5–15 km 320, −1.51, 2.35 | >15 km 120, −2.65, 3.15
+      Level cues (far shores) at GT: median −1.3 (7053), −2.0 (6971), −3.4 (7033), −4.0 (7018) px, i.e.
+      the photo waterline sits 1–4 px below the prediction (the audit found 3–5 px on 7018/7033).
+    App pose: same band table at 6 / 60 / 168 / 273 / 82 cues (medians −1.9 / −3.2 / −2.4 / −1.2 / −1.8).
+
+Acceptance (plan §4 WP-C)
+  1. Cue residual sign agrees with dev-pin residuals in the same band in ≥ 75% of pins.  FAIL (narrow)
+     Test: for each dev pin, same-photo same-band cues vote sign(cue residual)·sign(pin residual along
+     the cue normal), weighted by conf·exp(−image distance/400 px); pairs with |pin component| < 0.5 px
+     are skipped.
+       app pose (the plan's "--baseline" = the app skyline pose): 23/31 = 74.2% (3 pins had no cue).
+         By band: 5–15 km 14/16, >15 km 6/11, 2–5 km 1/2, 0.5–2 km 1/1, <0.5 km 1/1.
+         Sensitivity: pins inside the ±24 px cue search range 17/25 (68%); pin component ≥ 2 px 22/30;
+         both 16/24. Three "agreements" are on 5495/7155, whose pins are 160–180 px off: that is beyond
+         the 12 px search, so those votes are chance.
+       GT pose (WP-A default baseline): 9/22 = 40.9%, i.e. chance. At GT the pins are in-sample and small
+         (median 3 px), and the cues carry a systematic −1.5 to −2.7 px bias (below), so signs are noise.
+     Not tuned further on these pins, because the same 34 pins would then be both tuning and test.
+  2. 6958/6971 waterline cue elevation within 0.2° of the hand pins.  PASS for 6971; 6958 PENDING.
+       6971 (dev, GT pose). Observed waterline, line-fit through the water cues within ±120 px of the pin
+       column, compared with the pin pixel's elevation:
+         L (450 m): +0.024° (−0.58 px)
+         R (1 km):  −0.023° (+0.56 px); the nearest single cue gives −0.017°
+       Target elevation from DEM lake level + shore distance, compared with the pin's stated el:
+         L: +0.10°. The cue uses eye − lake = 1.6 m (GT eye 558.6 minus Terrarium 557.0); the hand pin
+           used 2.5 m.
+         R: +0.037°
+       At the app pose, R: observed −0.017°. L has no cue there: the app pose is 0.7° off at that pixel.
+       6958 is a HOLDOUT photo (PROTOCOL.txt) and was not run. It is reserved for the once-only final
+       report (CONCORD_HOLDOUT=final).
+  3. False-cue rate < 15% on 5 dev photos (visual audit PNGs).  PASS (provisional, agent audit).
+       Photos: 5495, 6971, 7018, 7033, 7053; 593 kept cues at the GT pose.
+       Counted method: tools/concord/cues/fg-audit.mts counts cues inside foreground-object boxes that I drew
+         by eye (people, boat, near cliff/fence/trees). Result: 42 cues = 7.1%, plus 10 = 1.7% in an
+         ambiguous snow-bank/forest edge on 5495.
+       Estimated method: 1:1 crops of the zoom PNGs suggest a further ~2–5% of cues sit on the wrong
+         physical edge, e.g. meadow texture on 7033 or a cliff tick on 7053. Most ridge-silhouette and
+         waterline cues sit on the right feature.
+       Estimated total ≈ 11–14%. This is not a blind human audit; the user should confirm on
+         out/concord/cues/gt/*_zoom.png.
+       Largest failure class: waterline/contour predictions that cross a person. No person mask exists on
+         the CPU path. In the app, photoEdgesFromEdgeMap inherits align.ts's fg suppression, and
+         maskEdges takes any fg mask.
+
+Known issues
+  - SYSTEMATIC BIAS: at the GT pose, edge-cue residuals are negative in every band (median −1.5 to −2.7 px).
+    The photo silhouette lies beyond (usually above) the Terrarium DTM silhouette. This is consistent
+    with forest canopy on ridges and Terrarium smoothing crests, i.e. DTM vs DSM (the plan's error budget:
+    ~4 px on an 8.5 km forested ridge).
+    WP-D must not read this as pose. Options: a per-photo edge-cue bias nuisance term, down-weighting
+    forested silhouettes, or DSM range from WP-F.
+    Water level cues have their own −1 to −4 px offset: observed waterline below predicted. Candidate
+    causes are eye height, the 0.7–3.6 m low Terrarium lake level, or reflections.
+  - DEM: Terrarium z13 (<4 km) / z11 (<40 km) / z10, matching the eval pins. Near-field contours are
+    coarse. GT eye heights are stale by up to +87 m against Mapterhorn on Niederhorn (WP-A). The
+    predicted 7053 waterline crosses the foreground cliff for this reason.
+  - Search range is ±12 px (edges) / ±10 px (water) at the given pose. Larger pose errors (app pose on
+    5495/7155, 160–180 px) produce chance matches, so re-extract after each solver iteration.
+  - No person/foreground mask on the CPU path (see audit). Reflections can bias waterlines by a few px.
+  - Photos without GPS-lake overlap (5495 in the US; 7131/7155, where Vierwaldstättersee is out of view)
+    get no water cues. 7155 has no WP-A OSM cache of its own; the merged cache covered its lake.
+  - Interior pins clicked by the user do not exist yet (WP-A PENDING). The sign test therefore used only
+    the 34 control-point dev pins, mostly far summits.

@@ -1,0 +1,154 @@
+WP-F — DSM streaming + occluder range. MODULE ONLY. Written 2026-09-29.
+
+FILES
+  src/lib/concord/occl/swiss-cog.ts   STAC resolve, WGS84<->LV95 (swisstopo approximate formulas), minimal COG reader:
+                                      TIFF + BigTIFF IFDs, tiles/strips, LZW / Deflate (DecompressionStream) / none,
+                                      predictors 1/2/3, range fetches merged per contiguous tile run
+  src/lib/concord/occl/ndsm.ts        loadNearDsm (frozen signature + optional 5th arg), nearHeightAt, ndsmAt,
+                                      enuToLv95Affine, eyeAltitudeOver
+  src/lib/concord/occl/occluder.ts    occluderRange (frozen signature + optional 6th arg), objectHitRange,
+                                      OCCL_RULE / occludedBy / OCCL_GLSL, occlTexture, GeomBuffer type (WP-C shape)
+  src/lib/concord/occl/occl.check.ts  offline self-check (+ --live)
+  tools/concord/occl/probe.mts        bytes / latency per photo and config -> out/concord/occl/probe*.json
+  tools/concord/occl/smear-eval.mts   CPU smear evaluation on DEV photos -> out/concord/occl/smear-*.{txt,json}, viz/
+  tools/concord/occl/node-io.mts      disk-caching fetchers (cache: tools/concord/occl/cache, 36 MB, cap 50 MiB)
+  tools/concord/occl/wedge.mts        view wedge of a GT photo
+  tools/concord/occl/hooks.patch.txt  engine / materials / deck hooks for the integration agent (not applied)
+  No shared file edited. No npm dependency added: geotiff is not installed, and it is not needed.
+
+API DEVIATIONS (all additive)
+  - loadNearDsm(lat, lon, radiusM = 2000, resM = 2, opts?): opts = { fetcher, json, signal, wedge {yawDeg, halfDeg},
+    dtmRes 4|2 (default 4 = swissALTI3D 4 m overview), maxTiles, maxBytes (default 4.5e6) }.
+    Default maxBytes means a 2 km radius is not always fully covered: km tiles are kept nearest-first while the
+    planned DSM + DTM bytes fit. Pass maxBytes: Infinity for full coverage.
+  - NearDsm has extra fields: e0, n0 (ENU of the centre of cell (0,0), the NW corner), radiusM, stats
+    {requests, bytes, stacRequests, stacBytes, ms, fetchMs, tiles, dtmRes}, years {dsm[], dtm[]}.
+    Grid: cell (i,j) sits at e = e0 + i*res, n = n0 - j*res. Heights are absolute (not curvature-dropped).
+    Frame = EnuFrame(lat, lon, 0), which is the engine's frame.
+  - occluderRange(g, cam, dsm, objects?, people?, opts?): opts {minObjM 2.5, nearSkipM 15, stepFrac 0.5, eyeZ}.
+    cam.eye must be engine world coordinates [0, 0, eyeAlt]. Output rows run top to bottom, in metres;
+    Infinity means nothing occludes; people -> 0.
+  - GeomBuffer is declared locally in occluder.ts with WP-C's exact shape (WP-C's cues package does not exist yet).
+    The integration agent can switch it to an import.
+
+DATA / TRANSPORT FACTS, verified today with real requests
+  - STAC: data.geo.admin.ch/api/stac/v0.9. Collections ch.swisstopo.swisssurface3d-raster (0.5 m DSM, one year
+    per km tile, 2019-2024 seen) and ch.swisstopo.swissalti3d (0.5 m and 2 m assets; several editions per tile,
+    e.g. 2019 + 2025. The newest is used). Responses carry Access-Control-Allow-Origin: *.
+  - COG range reads: GET with Range returns 206 and ACAO *. The OPTIONS preflight for the range header returns
+    204 with access-control-allow-headers: range. So the reads work from the browser as-is.
+  - swissSURFACE3D COG: 2000x2000 float32, LZW, predictor 1 (so essentially uncompressed), 512² tiles,
+    overviews at 1 m (1000²) and 2 m (500²), nodata -9999, LV95.
+    The 2 m level of one km tile is a single 512² tile of about 1.0-1.1 MB, so it cannot be partially read.
+    Measured cost: ~1 MB per km² at 2 m, ~4 MB per km² at 1 m.
+  - swissALTI3D 2 m COG: 500² float32 LZW, 128² tiles, 4 m overview. The overview costs ~0.26 MB/km²;
+    the full 2 m level costs ~1 MB/km².
+  - Decoder verified on a real tile: min/max/mean 862.502 / 1713.922 / 1255.831 m. These match the file's own
+    GDAL statistics metadata exactly.
+  - DSM overview vs DTM grids align: open ground gives nDSM ≈ 0 (q25 0.01 m with the 2 m DTM, -0.30 m with the
+    4 m DTM). Epoch mismatch is real: DSM 2019-2024 vs DTM 2025/2026 on the same tiles.
+
+TESTS RUN
+  npx tsx src/lib/concord/occl/occl.check.ts --live  -> all checks passed:
+    LZW round trip vs a reference TIFF-LZW encoder (random 20k with clear codes, runs/KwKwK, float terrain,
+      tiny): 0 mismatches
+    synthetic 2-level COGs (LZW/Deflate/none x predictor 1/2/3, classic + BigTIFF): windowed read and overview
+      read, 0 mismatches
+    LV95 worked example (swisstopo): 2699999.76 / 1099999.97, exact to the 2 decimals. Inverse round trip
+      0.45 m. ENU->LV95 affine vs exact at 3 km: 0.003 m
+    occluder on a synthetic DSM: hut at 100 m hit at 98.25 m (one 2 m cell of bilinear edge). Rays over the
+      hut, beyond maxT, into rising ground, and at a tree within nearSkip all return Infinity. People -> 0,
+      objects -> their range.
+    parity: dsm = null reproduces the DEM range exactly and dims nothing
+    320x240 on the synthetic DSM: 130 ms. On real dev photos: 170-225 ms at 320x240, 40-55 ms at 160x120.
+    live: IMG_7018, 700 m, no cap: 6 tiles, 5.81 MB, 3.8 s. A US position returns null with no request.
+  npx tsc: no errors in concord/occl files. The .mts files are outside tsconfig/biome includes (as WP-A's
+    candidates.mts is). Checked separately with tsc --moduleResolution bundler --strict: clean.
+    Formatted with biome.
+
+ACCEPTANCE
+  1. Per-photo fetch < 5 MB, < 1.5 s  ->  BYTES PASS; LATENCY PASS on median, FAIL on tail.
+     probe.mts, all 12 GT photos inside CH (IMG_5495 US and IMG_6019 La Palma return null, 0 bytes).
+     Product config P (2 km, view wedge ±(hfov/2+10°), DTM 4 m, maxBytes 4.5e6):
+       - Bytes: 2.06-4.03 MB including STAC JSON, 3 km tiles typical (4-8 near lakes), 12/12 < 5 MB.
+       - Wall time run 1: median 313 ms, max 695 ms, 12/12 < 1.5 s.
+       - Wall time run 2 (same edge-warm tiles): median 327 ms, but 6.9 s and 4.0 s outliers, 10/12 < 1.5 s.
+       - Earlier CloudFront-cold runs: 1.7-5.8 s on 3 photos.
+       - About 100 ms of each number is the CPU resample to ENU.
+       - Measured from this machine through the CloudFront POP BOS50 (US). Latency from Switzerland will differ.
+     Without the budget:
+       - 2 km full circle: not measured (estimate 13-16 km tiles ≈ 15-20 MB).
+       - 2 km wedge (config B): median 9.9 MB, max 14.9.
+       - 1 km wedge (config C): median 4.9 MB, max 7.1.
+     Latency tail is network-bound. The only lever left is the DSM overview size, ~1 MB per km tile.
+  2. Step Inside smear labels (dev only) improve from 4-15% to ≥ 40%  ->  PASS pooled (non-person class), with caveats.
+     Evaluation setup:
+       - CPU only, on the stored measurement grids tools/nearfield/smear/grid-*.json.gz (app range, drape masks at
+         the GT pose) and the blind labels.json.
+       - DEV photos only: 5495 6971 7018 7033 7053 7059 7063 7068 7131 7155. Holdout 6958/7086/7130/6019 are
+         never read.
+       - Eye = engine rule max(GPS alt, swissALTI3D ground + 1.6).
+       - Frame sanity: a DTM-only ray march vs the app range buffer (three) agrees to a median relative error of
+         0.2-0.7% on 6 photos. It is 6.6% on 6971 and 47% on 7068 (budget-trimmed tiles near the eye).
+     Removal vs the classic drape, confident labels, pooled cells, product config:
+                         three: occl alone | + Step Inside (product gating) || deck: occl alone | + Step Inside
+       non-person          53.6% | 54.4%          (baseline Step Inside alone 4.4%)  ||  46.1% | 59.3%  (baseline 15.0%)
+       tree                73.0% | 73.8%                                            ||  69.9% | 73.2%
+       building             0.0% |  0.0%                                            ||   1.7% |  1.7%
+       person+building      1.6% |  4.7%                                            ||   0.7% | 23.7%
+       all labels incl. unsure, non-person: three 40.5% / 48.4%, deck 34.6% / 50.3%
+       collateral (unlabelled draped cells > 0.02 from any label, now masked): three 5.5%, deck 7.7%
+       (Step Inside alone: 1.3% / 1.4%)
+     Caveats (important):
+       - The pooled number is dominated by two lakeside tree photos. IMG_7033 has 19.0k of 35.4k smear cells
+         (73.9% removed); IMG_7018 has 5.5k (70.0% removed). Other photos:
+             7068   41.0%
+             7155   10.1%
+             7053    7.2%
+             7131    7.1%
+             5495    0%  (outside CH, no DSM)
+         Photo-level median ≈ 10%.
+       - Poles, fence posts, signboards and people are not in a 2 m DSM. Pole removal is 10%, structure 10%.
+         Step Inside handles those better, so the combination is the best overall (73.3% forced).
+       - Buildings: 0%. The only confident dev building with smear is the IMG_7131 house.
+         Diagnosed: the app's eye there is the GPS altitude, 14.7 m above the swissALTI3D ground. From that eye
+         the render sees 3 km terrain through that pixel, and the 9 m house in the DSM lies below the ray.
+         This is an eye-height error (the WP-B/D territory), not a DSM gap. The same eye error drives the 23.5%
+         "collateral" on 7131: a meadow rendered as distant terrain, with trees at 650 m standing in front.
+       - "Collateral" is mostly real, unlabelled distant forest. The labels only cover near-field objects, and
+         masking forest at 0.5-2 km in front of 4 km terrain is the intended behaviour. It is not proven harmless.
+         See out/concord/occl/viz/three-IMG_6971.jpg (shore forest band) and three-IMG_7131.jpg (the eye-error case).
+       - Parameters were fixed a priori, not tuned on this set: minObj 2.5 m (split.ts object rule),
+         nearSkip 15 m (GPS error), rule 1.05·o + 3 m (plan).
+         Sensitivity, three, non-person occl alone:
+           nearSkip 5 m    67.3%  (collateral 11.5%)
+           nearSkip 30 m   53.7%
+           minObj 1.5 m    53.8%
+           minObj 4 m      53.2%
+           DTM 2 m         54.9%  (collateral 3.4%, but +~1 MB)
+           no byte cap     53.7%
+  3. 7018/7033/7086: trail + contour pixels over labelled trees/huts drop ≥ 50%  ->  PENDING.
+     - The hand-labelled trail/contour masks do not exist, and trail rendering needs the engine hook plus the render lock.
+     - Proxy on the Step Inside tree labels: of the terrain-draped cells inside confident tree labels, the share the
+       occluder dims (where contours/trails would be drawn) is 70.0% on 7018 and 73.9% on 7033.
+     - IMG_7086 is a frozen HOLDOUT photo and was not evaluated.
+  4. Parity when off  ->  PASS at module level. occl.check: dsm = null gives the DEM range and nothing dims.
+     The engine-level parity check is pending the hooks (hooks.patch.txt: uOcclOn = 0 and no texture unless ?concord=occl).
+
+KNOWN ISSUES
+  - The 2 m DSM level is one ~1 MB tile per km², so byte cost is quantised per km tile. Under the 4.5 MB budget
+    typically 3 tiles are covered, nearest first. Distant forest silhouettes beyond them are not occluders.
+  - Swiss only. Outside CH it returns null; CHMv2 / OSM buildings are Phase 2.
+  - Inherits the pose and eye errors: see IMG_7131 (GPS altitude 15 m high).
+  - Epoch mismatch: DSM 2019-2024 vs DTM 2025/26. Felled or new trees and huts are wrong by up to 5-7 years.
+  - The LV95 approximate formulas are good to ~1 m. That is negligible against GPS error, but not survey grade.
+  - Latency tail (CloudFront miss) 2-7 s from this machine. The integration should load asynchronously and
+    apply the texture when ready, never blocking first paint.
+  - occluderRange is 170-225 ms at 320x240 on CPU. Use 160x120 or a worker.
+  - Cache: tools/concord/occl/cache holds 36 MB (product config for the dev photos + the DTM 2 m variant).
+    Delete it freely; the scripts refetch.
+
+REPRODUCE
+  npx tsx src/lib/concord/occl/occl.check.ts [--live]
+  npx tsx tools/concord/occl/probe.mts [--configs=P,B,C,F] [--photos=...]
+  npx tsx tools/concord/occl/smear-eval.mts [--renderer=deck] [--dtm=2] [--near=5] [--maxBytes=inf] [--viz]

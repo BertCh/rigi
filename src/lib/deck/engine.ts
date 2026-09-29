@@ -81,7 +81,7 @@ import {
 	type NearFieldViewOpts,
 	PixelClass,
 } from "../nearfield/types";
-import type { PhotoMeta, RegionData } from "../photos";
+import type { PhotoMeta, RegionData, RegionTrail } from "../photos";
 import { projectPoint, unprojectDir } from "../pose";
 import type { FgMask, Renderer } from "../renderer";
 import type { RevealUniforms } from "../reveal/config";
@@ -435,8 +435,11 @@ export class DeckEngine implements Renderer {
 		// the first geometry buffer (resolves readback() calls made before the terrain existed)
 		this.invalidateGeometry();
 
-		const regionData = await region;
+		let regionData = await region;
 		if (this.disposed) return;
+		if (regionData && this.pendingTrails)
+			regionData = { ...regionData, trails: this.pendingTrails };
+		this.pendingTrails = undefined;
 		if (regionData) {
 			onProgress?.("Placing peaks and trails", 1);
 			this.region = regionData;
@@ -509,6 +512,18 @@ export class DeckEngine implements Renderer {
 		this.profiles = undefined;
 		if (this.geoSrcKind === "cpu") this.dropGeometrySources();
 		this.buildTrails();
+	}
+
+	private pendingTrails?: RegionTrail[];
+
+	setTrails(trails: RegionTrail[]) {
+		if (!this.region || !this.terrain) {
+			this.pendingTrails = trails; // init() applies them once the region arrives
+			return;
+		}
+		this.region = { ...this.region, trails };
+		this.buildTrails();
+		this.updateLayers();
 	}
 
 	/** engine.ts buildTrails on the query terrain. */

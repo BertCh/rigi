@@ -1,0 +1,99 @@
+# What didn't work
+
+*Consolidated 2026-09-29. One line per experiment: what was tried, the key numbers, and why it was dropped. Follow the source for detail. "Removed" sources were deleted in the 2026-09-29 doc consolidation; to read one, run `git show 384df44:<path>`.*
+
+Don't re-run anything here without a new reason. Most entries were measured on small dev sets, so "dropped" means "not worth it at current evidence", not "impossible".
+
+## Registration: app pipeline
+
+| Tried | Result | Source |
+|---|---|---|
+| `?pipeline=` variants `cascade` / `skyfirst` / `wide` vs `current` | cascade median 0.228→0.376°; skyfirst +0.084° and t-final 11.2 s; wide identical. Variants and `pose-policy.ts` removed | [pipeline-ab.md](pipeline-ab.md) |
+| Agreement gates (2-of-3 methods) | None beat cascade alone; 2.3× cost, +1 escalation | [leaderboard.md](leaderboard.md) |
+| Raising the app auto-align confidence bar | Didn't fix IMG_7130 | leaderboard.md |
+| CPU ONNX sky mask + solvePose | False accept IMG_7053 at −5.61°; full U²-Net (176 MB) no better | leaderboard.md, `src/lib/sky/README.md` |
+| Cascade on Terrarium DEM | 14 correct vs 25 on Mapterhorn (wild set) | [bench-wild.md](bench-wild.md) |
+| 360° cascade at the 0.5 bar | IMG_7053 false accept at −123.7°; margin rule recovered 0 photos. Hence the 0.75 unknown-yaw bar | [bench-ablation.md](bench-ablation.md) |
+| App auto-align with no heading | 3/11 correct, 7 false accepts | [bench-ablation.md](bench-ablation.md) |
+| Looser accept rule HIGH ∧ (EXIF ∨ gap ≥ 0.20) | 22/34 recall, not adopted | rigi_internal_audit.md (removed) |
+
+## Registration: render-and-match and fusion
+
+| Tried | Result | Source |
+|---|---|---|
+| Hillshade renders for matching | ALIKED 8/11, DISK 5/11; 6-DoF off by up to 145°; sat+hill blend only +8%. Satellite renders kept | matcher.md (removed), [stage1.md](stage1.md) |
+| 6-DoF PnP / P4Pf instead of rotation-only | Worse pitch (0.22–0.42° vs 0.07°), spurious centre shifts | matcher.md (removed) |
+| RoMa v1, DISK | RoMa 25–40 s/pair, no better; DISK 10.4° miss, 19/24 at oracle | matcher.md (removed), stage1.md |
+| Fusion variants (λ sweep, per-direction residuals, adaptive σ) | Flat over λ 0.25–4; per-direction drifted tens of degrees; adaptive σ picked wrong poses | [fusion.md](fusion.md) |
+| LightGlue on Apple MPS | Nondeterministic (0/2/13 matches); moved to CPU | [matcher-service.md](matcher-service.md) |
+| SWEEP_KP 2048 | wc_0009, wc_0006 go wrong for negligible time; reverted to 4096 | matcher-service.md |
+| 360° drape to 120 km | 90 s cold page; capped at 40 km | [bench-ablation.md](bench-ablation.md) |
+| Render-match at hfov ≲ 10° | 0–10 inliers, always LOW | [bench-ablation.md](bench-ablation.md) |
+| T5 pose6 position refinement (test arm C) | No near-miss converted; HIGH precision 0.56 vs 0.85 target; false HIGH wc_0019 (support inflated 0.13→0.73); test recall 9 vs 11. Stays opt-in | position.md (removed), [test-results.md](test-results.md) |
+| Skyline-only basin gap, coarser grid | Separates worse; gap 0.21→0.12 | position.md (removed) |
+| T6 two-stage as default (test arm B) | 30/50 but HIGH 22/24; wc_0038 wrong post hoc → EXIF HIGH precision 0.90. v034 stays default | [test-addendum.md](test-addendum.md) |
+| T6 same-basin selection swap | GT median yaw 0.146→0.196°; not applied | stage1.md |
+| Skyline global search as a candidate generator | 2 picks, 1 correct | stage1.md |
+
+## Registration: matching v2 and the terrain-matching (TM) programme
+
+| Tried | Result | Source |
+|---|---|---|
+| Eye-position fallback | 0 correct HIGH, 1 gross (wc_0086), 196 s vs 85 s; 15/30 photos have zero support at any eye. Suggestion only | [matching-v2.md](matching-v2.md) |
+| Skyline score / sweep support as an eye locator | True eye ranks 43rd of 113; a wrong eye 127 m away wins on wc_0054 | matching-v2.md |
+| GeoCalib / AnyCalib gravity + FOV priors | Pitch fan loses 4 hits; snapped fan ≈ 0 s net after 4.7 s cost; roll r = 0.00. Off | `tools/matcher/v2/calib/REPORT.md` |
+| LoMa as drop-in matcher | wc_0069 becomes a gross HIGH (19/0 → 18/1), 1.6× slower; CPU 33 s/pair | `tools/matcher/v2/loma/REPORT.md` |
+| X1 learned yaw features (DINOv2 column-pooled, DINOv3, ring) | Column-pooled 12 vs 21 hits; DINOv3 worse; 8×45° ring 12/16 | `tools/research/tm/x1_yawcorr/REPORT.md` |
+| X2 monocular depth as prior or veto | FOV off +20.7° (MoGe) / 7.4° (DA3) vs 0.55° EXIF; DA3 false-vetoes 2/19; blind to near-miss eyes | `tools/research/tm/x2_geom/REPORT.md` |
+| X3 render modalities (snow, haze, normals, edges; XoFTR-on-depth) | No gain; edges fail with every matcher; XoFTR loses 5 successes. MatchAnything, MASt3R, RoMa v2, MINIMA-LG ruled out on licence | `tools/research/tm/x3_modality/REPORT.md` |
+| X4 branch-and-bound skyline search | 20 vs 23 top-4 hits, 2–5× slower; certified gap useless | `tools/research/tm/x4_bnb/REPORT.md` |
+| X5 learned negative-evidence verifier | Hard-wrong AUROC 0.40–0.69; vetoes kill 3–19 correct HIGHs | `tools/research/tm/x5_verifier/REPORT.txt` |
+| P1 title-geocode position triage | Precision 0.25, recall 0.33, flags 6/30 solved photos | `tools/research/tm/p1_position/REPORT.txt` |
+| H1 S5 masked-basin rerun (negative mining) | Stage-2 fan pulls seeds back to the true basin; only 3 negatives | `tools/research/tm/h1_mine/REPORT.txt` |
+| v1 verification with Terrarium overlays | Wrong numbers (precision 0.72) and a wrong "GPS parallax" story; protocol rebuilt on Mapterhorn | bench-wild.md |
+
+## Step Inside and near-field 3D
+
+| Tried | Result | Source |
+|---|---|---|
+| MoGe-2 metric scale for placement | DEM/model ratio 0.98 at 15–30 m, 2.9 at 100–300 m, 6.6 at 0.3–1 km; FOV ×1.56. Replaced by per-photo DEM curve + grounding (0.34→0.13 log error) | `tools/nearfield/spike/{SUMMARY,PLACEMENT}.txt` |
+| Single-scale / affine / mode-of-log anchors | 0.217 / 0.11 vs < 0.10 gate; mode-of-log put wc_0076 14× too far | spike/SUMMARY.txt |
+| Range-binned and default depth splits | False Object on distant ranges (10/16 clean photos); flags meadows, snow, shores | spike, PLACEMENT |
+| Depth-only object split (P1 smear gate ≥ 80%) | 4.4% (three) / 15.0% (deck). Huts, trees at 100–300 m classed Far; nearRadius 300/500 reaches 47% with 3–18% collateral | `tools/nearfield/smear/REPORT.txt` |
+| Anchor fit as a pose verifier | AUC 0.73 vs wrong basins, 0.55 at ±2°. Trust label only | [step-inside-results.md](step-inside-results.md) |
+| Anchor quality gate ≥ 0.2–0.35 | Removes every object-rich photo; lowered to 0.15 as a label | spike |
+| Unifying both renderers on near-DEM z16 | IMG_7059 anchor 0.95 → 0.00 (demo photo regression) | smear/REPORT.txt |
+| LingBot-Depth-DC with a DEM prompt | Terrain interpolates well; wc_0020 collapses; raw-metre prompt breaks beyond 50 m; objects within ×1.25: 53% vs 87% grounding | `tools/nearfield/depthprompt/NOTES.txt` |
+| P2 multi-view fusion at roll spots (Brush, DA3) | LOO near-field coverage 0–7%; GPS eyes off 7–37 m; floaters. Dropped as a product goal | step-inside-results.md |
+| Eye refinement for roll spots | Spec variant passes 0 pairs; metric variant 1 pair, gain confounded with absolute placement. Default off | `tools/nearfield/eyes/REPORT.txt` |
+| DA3 /multiview and essential matrix for propagation | DA3 median 3.65°, 43° on non-overlap, no confidence; E-matrix degenerate under rotation (up to 179.9°) | `tools/nearfield/propagate/REPORT.txt` |
+| LaMa on large out-of-frame areas (P3) | Smears, ghost backpacks. Thin disocclusions only | `tools/nearfield/generate/NOTES.txt` |
+| Hosted world models (LingBot-World v2, Lyra 2, FlashWorld, HunyuanWorld/Voyager, WorldSplat), VGGT-1B, DA3 GS head | Non-commercial, EU-excluded, or no weights | `research_notes/step_inside_models_2026-09.md` |
+
+## Concordance (whole-image fit)
+
+| Tried | Result | Source |
+|---|---|---|
+| Display warp field | 0.00 px LOO gain on existing (mostly > 5 km) pins | [concordance-research.md](concordance-research.md) (session f3) |
+| Altitude-contour eye rule | Failed on holdout | concordance (session f3) |
+
+## GPU and performance
+
+| Tried | Result | Source |
+|---|---|---|
+| GPU silhouette re-rank | 3–10 ms saved; not worth it | `research_notes/gpu_compute_plan_2026-09.md` |
+| GPU horizon for unknown-pose | ~120 ms saved; stays opt-in (`?unknownGpu=1`) | gpu_compute_plan |
+| TS port of the skyglobal polish | Flips 3/50 results; stays in numpy | gpu_compute_plan |
+
+## Rejected directions (strategy)
+
+- **Mono depth or single-image splats as the geometry source**: learned single-photo geometry was the weak link in every experiment. Geometry comes from the DEM and pose.
+- **World models as a platform**: licences plus a mismatch (plausible ≠ correct). Inverted into "Rigi supplies the 3D cache" (GEN3C test, [roadmap.md](roadmap.md)).
+- **Google Photorealistic 3D Tiles as a geometry or measurement source**: confirmed forbidden on 2026-09-29 ([step-inside-google-3d-tiles.md](step-inside-google-3d-tiles.md)).
+  - The ToS allows visualisation only: no anchoring, split, readout logging, alignment, ML, exports or persistent cache.
+  - EEA billing accounts get a 403.
+  - A display-only backdrop remains possible but blocked on the global ToS "with or near a non-Google Map" clause.
+  - The same benefits come licence-clean from swisstopo 3D Tiles and the nDSM (roadmap S3, C4).
+- **FABDEM, SegFormer, UniDepth, Depth Pro, Perspective Fields**: non-commercial licences.
+- **OrienterNet-style BEV localisers**: wrong domain for summit photos.
+- **Consumer subscription against PeakVisor, racing AI identifier apps, Strava/Komoot feeds, law-enforcement sales**: avoided per the [competitive roadmap](<Rigi competitive landscape and roadmap.md>).

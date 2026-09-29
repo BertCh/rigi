@@ -1,6 +1,8 @@
 # Step Inside: a design for georeferenced 3D photos
 
-Status: BUILT 2026-09-29. Results and the gate outcomes are in [step-inside-results.md](step-inside-results.md).
+Status: BUILT 2026-09-29. Results and the gate outcomes are in [step-inside-results.md](step-inside-results.md); the follow-on plan is in [roadmap.md](roadmap.md).
+
+> **Corrections since this was written:** the splat renderer is dependency-free (Spark was never added); the SHARP and VGGT licence questions are resolved (`research_notes/step_inside_models_2026-09.md`); the "people/huts on 8/12" P0 gate could not be tested, because the set has no people.
 
 ## Thesis
 

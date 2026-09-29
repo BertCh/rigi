@@ -1,0 +1,127 @@
+Rigi whole-image concordance: interior pin protocol and frozen photo split
+==========================================================================
+Frozen 2026-09-29 by WP-A, BEFORE any other work package reported a number. Do not edit the
+SPLIT lines. Any change needs a new file version and a note explaining why (see "Changes" below).
+scripts/concord/lib.ts parses the "SPLIT <photo> dev|holdout" lines of this file.
+
+1. Photo-level dev / holdout split
+----------------------------------
+Unit: PHOTO (all pins of a photo share its split). Only the 14 photos with a GT pose in
+data/ground-truth.json take part.
+
+Rule (deterministic, reproducible):
+  - Strata by region (the photos in a stratum share terrain, lighting, lakes and often an eye):
+      thun-shore  : lake-shore photos on Lake Thun (lake in frame, eye 1.6-3 m over water)
+      niederhorn  : Niederhorn summit area (Justistal / Stockhorn chain / Bernese Alps)
+      stoos       : Stoos / Klingenstock (canton Schwyz)
+      non-ch      : outside Switzerland (Maine, La Palma)
+  - In each stratum, sort the photos by sha1("<photo>:concord-v1") (hex, ascending).
+  - The first max(1, floor(0.3 * n)) photos of each stratum are HOLDOUT; the rest are DEV.
+  Result: 10 dev / 4 holdout (29% holdout); every stratum has exactly one holdout photo.
+  Lake presence is covered: one of the four lake-shore photos is holdout; 7053 (lake far below,
+  dev) and 7086 (lake far below, holdout) cover the summit-with-lake case.
+
+  stratum      photo     sha1[:8]  split
+  thun-shore   IMG_6958  133c73e3  holdout
+  thun-shore   IMG_7018  3b24a7af  dev
+  thun-shore   IMG_7033  85f54bfd  dev
+  thun-shore   IMG_6971  c13ad572  dev
+  niederhorn   IMG_7086  1189db18  holdout
+  niederhorn   IMG_7053  6511db7b  dev
+  niederhorn   IMG_7068  6a0ab8ba  dev
+  niederhorn   IMG_7059  d02ee232  dev
+  niederhorn   IMG_7063  dbc05456  dev
+  stoos        IMG_7130  24c9aa21  holdout
+  stoos        IMG_7131  da6dfd01  dev
+  stoos        IMG_7155  ff1329c4  dev
+  non-ch       IMG_6019  2c02ee9e  holdout
+  non-ch       IMG_5495  a49ffbb3  dev
+
+SPLIT IMG_5495 dev
+SPLIT IMG_6019 holdout
+SPLIT IMG_6958 holdout
+SPLIT IMG_6971 dev
+SPLIT IMG_7018 dev
+SPLIT IMG_7033 dev
+SPLIT IMG_7053 dev
+SPLIT IMG_7059 dev
+SPLIT IMG_7063 dev
+SPLIT IMG_7068 dev
+SPLIT IMG_7086 holdout
+SPLIT IMG_7130 holdout
+SPLIT IMG_7131 dev
+SPLIT IMG_7155 dev
+
+Photos without a GT pose (IMG_3304, IMG_4527, IMG_4703, IMG_6326, IMG_7108) are not part of
+the evaluation. Never use data_v3 or the spent wild test set for anything in this programme.
+
+Rules of use:
+  - Tune (kernel lengths, sigmas, gate thresholds, which cues to use) on DEV photos only, and on
+    dev pins only through leave-one-out (scripts/concord/eval.ts --loo).
+  - HOLDOUT photos are scored ONCE per package, for the final report, with the configuration
+    frozen beforehand. Do not iterate on holdout numbers. eval.ts refuses --split holdout unless
+    CONCORD_HOLDOUT=final is set.
+  - Report every number with n and the split it came from. Report failures.
+  - Caveat: the control-points.json pins are the constraints the GT poses were fitted to, so at
+    the GT pose they are IN-SAMPLE. They measure GT self-consistency, not accuracy. Only the
+    blind interior pins (section 2) measure interior concordance.
+
+2. Blind clicking protocol (for the user)
+-----------------------------------------
+Goal: >= 8 interior pins per photo (>= 3 closer than 2 km where such features are visible), on
+>= 10 of the 14 GT photos, including the holdout photos.
+
+What an interior pin is: a small, sharp, identifiable world feature BELOW the skyline whose map
+coordinates are known independently of the photo: a church tower base or spire, a cable-car or
+rail station building corner, a bridge end, a lake-shore point (harbour mole tip, jetty end, a
+distinct shoreline corner), a road/path junction, a hut, a pylon. Not peaks or skyline notches
+(those are already covered by control-points.json).
+
+BLIND means: you never see any overlay, projected label, rendered DEM, or predicted position
+while clicking. Use only the plain photo and an ordinary map (swisstopo / OSM).
+
+Procedure:
+  1. Run:  npx tsx tools/concord/pins/candidates.mts            (all 14 photos, needs network once)
+     It writes out/concord/pins/candidates.json (feature names, kinds, map coordinates, a map
+     link; NO image positions) and out/concord/pins/click.html (the clicking helper).
+     It also writes out/concord/pins/candidates-predicted.json with the GT-pose projections used
+     to pre-filter candidates to the frame. DO NOT OPEN that file (or any overlay of it) before
+     you have finished clicking a photo.
+  2. Open out/concord/pins/click.html in a browser. Pick a photo; the page shows the plain photo
+     at the 1600 basis and the candidate list (name, kind, distance, map link). No overlays.
+  3. For each candidate: open its map link, find the feature in the photo by your own reading of
+     the landscape. If you can identify it confidently to within ~3 px, click it; otherwise press
+     "skip". Never guess: a skipped pin costs nothing, a wrong pin poisons the evaluation.
+       - Point features (towers, station corners, bridge ends): click the exact ground contact
+         point if visible, else the top, and choose "base"/"top" (the helper records hAbove = 0
+         for base; for a top, enter the height above ground if known, otherwise skip).
+       - Shore points: click where water meets land at the named point; the helper records it as
+         kind "shore" with the map coordinates of that point.
+       - Waterlines (elevation-only): a click anywhere on the far waterline of a lake whose level
+         you know (lake level in m from swisstopo or the BAFU gauge on that day): kind "waterline",
+         level.lakeM. (click.html does not create waterline pins; add them by hand.)
+     You may add your own features (kind "other") with coordinates read off swisstopo
+     (map.geo.admin.ch, right-click → coordinates, height from swissALTI3D).
+  4. Aim for spread: left/centre/right, near/far, and at least one pin in a corner region if a
+     feature exists there (the corners carry the focal/k1 signal).
+  5. Click each photo in one sitting; do not revisit a photo after you have seen any overlay of it.
+  6. "Export" in the helper copies JSON; paste the points into tools/concord/pins/interior-pins.json
+     ("points" array). Every pin carries the photo's split from section 1 (the helper fills it).
+  7. Note in "note" anything uncertain (partly hidden, snow, haze). Set sigmaPx if you think your
+     click is worse than 2 px (default).
+
+Pin schema: src/lib/concord/core/types.ts InteriorPin (basis 1600, v down, lat/lon WGS84,
+h absolute metres or absent → DEM at lat/lon + hAbove; level.lakeM for waterlines).
+
+3. Evaluation
+-------------
+  npx tsx scripts/concord/eval.ts --baseline                 (GT pose, dev photos)
+  npx tsx scripts/concord/eval.ts --baseline --pose app      (the app's automatic skyline solve)
+  npx tsx scripts/concord/eval.ts --candidate out/concord/<pkg>/   (per-photo <photo>.json files)
+  npx tsx scripts/concord/eval.ts --loo builtin:rot | <module exporting fitWithout>
+Distance bands: <0.5km, 0.5-2km, 2-5km, 5-15km, >15km. Radius bands (fraction of half-diagonal):
+centre < 0.35 <= mid < 0.7 <= corner. Pixels at the 1600 basis.
+
+Changes
+-------
+(none)

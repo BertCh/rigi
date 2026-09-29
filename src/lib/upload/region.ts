@@ -1,7 +1,9 @@
-// OSM region data for an uploaded photo: named peaks within PEAK_RADIUS_KM and hiking paths /
-// named lakes within TRAIL_RADIUS_KM, fetched from Overpass exactly like scripts/ingest.mjs and
-// shaped as RegionData (public/photos/region-*.json). Results are cached in memory and IndexedDB,
-// keyed by a snapped centre so nearby uploads share one region.
+// OSM region data for an uploaded photo: named peaks within PEAK_RADIUS_KM and named lakes
+// within TRAIL_RADIUS_KM, fetched from Overpass like scripts/ingest.mjs and shaped as RegionData
+// (public/photos/region-*.json). Hiking paths are the heaviest query (`out geom`), so they are not
+// fetched with the region: fetchRegionTrails() loads them only when the trails layer is switched on.
+// Results are cached in memory and IndexedDB, keyed by a snapped centre so nearby uploads share one
+// region.
 import { EARTH_R } from "../geodesy";
 import { type OsmElement, overpass } from "../overpass";
 import {
@@ -130,10 +132,14 @@ export type RegionProgress = (
 	info?: string,
 ) => void;
 
-/** RegionData plus `warnings` (and `partial` when trails failed, so the cache retries later). */
+/**
+ * RegionData plus `warnings`, `partial` (set by older versions when trails failed, so the cache
+ * retries later) and `trailsFetched` (fetchRegionTrails has queried this region's paths).
+ */
 export type LocalRegion = RegionData & {
 	warnings?: string[];
 	partial?: boolean;
+	trailsFetched?: boolean;
 };
 
 /**
@@ -243,8 +249,8 @@ function join(
 
 /**
  * RegionData around (lat, lon). Cached (memory → bundled region-*.json near its centre →
- * IndexedDB → Overpass). Peaks are required; trails and water degrade to empty lists (with
- * `partial` noted in the returned warnings). Aborting `signal` only detaches this caller.
+ * IndexedDB → Overpass). Peaks are required; water degrades to an empty list. Trails are left
+ * empty (see fetchRegionTrails). Aborting `signal` only detaches this caller.
  */
 export function fetchRegion(
 	lat: number,
@@ -306,25 +312,12 @@ async function fetchFromOverpass(
 	{
 		const [clat, clon] = snapCenter(lat, lon);
 		const q = regionQueries(clat, clon);
-		const warnings: string[] = [];
 		opts.onProgress?.("peaks");
-		// peaks and trails in parallel (Overpass allows 2 slots per client), water afterwards
-		const [peaks, trails] = await Promise.all([
-			overpass(q.peaks, {
-				timeoutMs: 45_000,
-				signal: opts.signal,
-				retryQuickFail: true,
-			}),
-			overpass(q.trails, {
-				timeoutMs: 45_000,
-				signal: opts.signal,
-				retryQuickFail: true,
-			}).catch((e) => {
-				if (opts.signal?.aborted) throw e;
-				warnings.push(`trails unavailable: ${(e as Error).message}`);
-				return { elements: [] as OsmElement[] };
-			}),
-		]);
+		const peaks = await overpass(q.peaks, {
+			timeoutMs: 45_000,
+			signal: opts.signal,
+			retryQuickFail: true,
+		});
 		opts.onProgress?.("water");
 		const water = await overpass(q.water, {
 			timeoutMs: 20_000,
@@ -339,7 +332,8 @@ async function fetchFromOverpass(
 			center: [clat, clon],
 			photos,
 			peaks: parsePeaks(peaks.elements),
-			trails: parseTrails(trails.elements),
+			// on demand only: fetchRegionTrails
+			trails: [],
 			waterNames: [
 				...new Set(
 					water.elements
@@ -348,10 +342,6 @@ async function fetchFromOverpass(
 				),
 			],
 		};
-		if (warnings.length) {
-			region.warnings = warnings;
-			region.partial = true;
-		}
 		await putRegion(region).catch(() => {});
 		opts.onProgress?.("done", "network");
 		return region;
@@ -376,4 +366,49 @@ export async function attachPhotoToRegion(region: RegionData, photoId: string) {
 	const { warnings: _w, ...clean } = { ...region, photos } as LocalRegion;
 	await putRegion(clean).catch(() => {});
 	return clean as LocalRegion;
+}
+
+const trailMemo = new Map<string, Promise<RegionTrail[]>>();
+
+/**
+ * Hiking paths for a stored local region, queried from Overpass the first time the trails layer
+ * is switched on and then kept in IndexedDB with the region. Bundled regions already carry theirs
+ * (returns null: use region.trails). Failed queries are not memoised, so toggling again retries.
+ */
+export function fetchRegionTrails(
+	regionId: string,
+	opts: { signal?: AbortSignal } = {},
+): Promise<RegionTrail[] | null> {
+	if (!isLocalRegionId(regionId)) return Promise.resolve(null);
+	let p = trailMemo.get(regionId);
+	if (!p) {
+		p = (async () => {
+			const region = (await getRegion(regionId).catch(
+				() => null,
+			)) as LocalRegion | null;
+			if (!region) return [];
+			// regions stored before trails went on-demand already hold their paths
+			if (region.trailsFetched || region.trails.length) return region.trails;
+			const q = regionQueries(region.center[0], region.center[1]);
+			const json = await overpass(q.trails, {
+				timeoutMs: 45_000,
+				signal: opts.signal,
+				retryQuickFail: true,
+			});
+			const trails = parseTrails(json.elements);
+			// re-read: the photo list may have changed while Overpass answered
+			const latest = ((await getRegion(regionId).catch(() => null)) ??
+				region) as LocalRegion;
+			const { partial: _p, ...rest } = latest;
+			await putRegion({
+				...rest,
+				trails,
+				trailsFetched: true,
+			} as LocalRegion).catch(() => {});
+			return trails;
+		})();
+		trailMemo.set(regionId, p);
+		p.catch(() => trailMemo.delete(regionId));
+	}
+	return p;
 }

@@ -1,5 +1,7 @@
 # Pose pipeline A/B (full-metadata photos): `?pipeline=current|cascade|skyfirst|wide`
 
+> **Frozen record (2026-09-26).** The variants lost and were removed: `?pipeline=`, `pose-policy.ts` and `eval-app-pipeline.mjs` no longer exist, and `choosePreview` now lives in `src/lib/integration/second-opinion.ts`. The "Reproduce" section doesn't run any more.
+
 Scope: photos with compass + gravity + focal, no saved pose (PhotoWorkspace's autoAlign branch and the
 background second opinion). Uploads with unknowns (resolveUnknownPose) are not affected by any variant.
 

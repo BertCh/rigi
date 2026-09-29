@@ -1,0 +1,113 @@
+WP-G (render -> re-match loop, semantic masking) — result, 2026-09-29
+=====================================================================
+
+Files
+  tools/concord/rematch/server.py   stdlib HTTP service on :8768 (POST /rematch multipart {photo, request}; GET /health)
+  tools/concord/rematch/tiles.py    CameraX in numpy (fScale/k1/cx/cy; parity with TS projectX), tile views,
+                                    exact ray-map photo->view warp, EnuFrame mirror + frame conversion, coverage
+  tools/concord/rematch/mask.py     swisstopo Light Base Map MVT (z14, CORS-open) decoder + rasteriser:
+                                    building (render_height) / forest / glacier classes per lifted keypoint
+  src/lib/concord/match/client.ts   rematch(), inliersToCues()
+  scripts/concord/rematch-eval.ts   dev-only eval (refuses holdout photos); --start-server spawns and kills the service
+  out/concord/rematch/{eval-*.json, run2.log, inliers/<photo>.json, cues/<photo>.json, vt/ (tile cache)}
+  No shared files edited; tools/matcher is imported read-only (server/core.py -> match.py, common.py) and
+  its render_worker.mjs is driven as-is in a private process group.
+
+Run
+  node scripts/gpu/with-render-lock.mjs -- npx tsx scripts/concord/rematch-eval.ts \
+    --photos IMG_7033,IMG_7131,IMG_6971,IMG_7018,IMG_7053 --pose app --iterations 3 --start-server
+  Needs the dev server on :3100. The service takes out/.render-lock per request (re-entrant when an
+  ancestor such as with-render-lock holds it), closes Chromium after each request (REMATCH_KEEP_WARM=1
+  keeps it) and exits when the eval ends. REMATCH_DEBUG_DIR=<dir> dumps each warped photo and render pair.
+
+Method
+  iter 1: render the full frame at cam.pose, warp the photo into it through the CameraX ray map,
+    ALIKED + LightGlue (CPU), lift render keypoints through the xyz buffer (>= 100 m, discontinuity filter).
+  Inliers: PoseLib 6-DoF LO-RANSAC at the known focal, 8 px @1600. It tolerates eye error, so near
+    points with parallax survive. The rotation is then refitted with the eye FIXED
+    (match.solve_rotation, soft-L1); moving the eye is left to WP-D.
+  iter k >= 2: re-render the full frame plus 6 (3x2) or 4 (2x2) narrower tile views (vfov ~ 0.6x) at
+    the refined rotation, match each one, and merge them with 3 px @1600 dedup. Stop when the median
+    change is < 0.5 px @1600 or after 3 iterations.
+  Frames: cam.eye and the output world are in frameOrigin's ENU frame (the geodesy.ts EnuFrame
+    convention). The eval passes the GT scene frame (lat/lon = GT, alt = GT eye), so
+    world_concord = world_engine - [0, 0, eyeAlt] exactly.
+
+API deviations (additive only)
+  RematchRequest adds photoId (required in v0.1: ad-hoc photos are not implemented), frameOrigin,
+    maskMode ("drop" default | "lift"), minRangeM, maxKp, url, signal.
+  RematchInlier adds depthM, liftM, iter, view.
+  RematchIteration adds nMatches, nLower, views, perView, changePx, ms, mask.
+  RematchResult adds cam (refined), renderEye, timingMs, notes, version.
+  resPx is the residual (px @1600) under the returned refined cam.
+  Plan said FastAPI; fastapi/uvicorn are not in the matcher venv, so the service uses stdlib
+    http.server (no new deps).
+
+Tests (actual output, run2.log; DEV photos only; start = app skyline pose, all five accepted)
+  Python<->TS projection parity (projectX of the returned cam vs server resPx): max 3.6e-13 px on all 5 photos.
+  tiles.py self-check: project(unproject) round trip 4.4e-16 with k1 = 0.04 / fScale 1.02 / pp offset;
+    a view at the cam pose maps to identity to 3.3e-16.
+
+  photo     iter1 n/lower/quads   iter2 n/lower/quads   iter3 n/lower/quads   med px (it1->it3)  wall ms
+  IMG_7033    50 /   0 / 2          382 /   0 / 2         394 /   0 / 2         3.8 -> 3.1         16946
+  IMG_7131   227 /  16 / 3         1114 / 129 / 4        1142 / 127 / 4         3.0 -> 2.9         18908
+  IMG_6971   191 /   0 / 1          546 /   0 / 1         557 /   0 / 2         4.0 -> 3.7         18377
+  IMG_7018     0 /   0 / 0          256 /   0 / 1         276 /   0 / 2          -  -> 4.9         20193
+  IMG_7053    10 /  10 / 1          152 / 152 / 1         157 / 157 / 1         2.8 -> 3.4         19935
+  Total inliers go up 2.9x to 15x from iter 1 to iter 3. Change converged (< 0.5-0.6 px) by iter 3,
+  except 7053 (2.5 px).
+  Latency per photo (3 iterations, 15 image pairs): page load ~4 s, renders 8.2–8.9 s, matching
+    7.6–9.6 s (LightGlue on CPU), solve < 0.4 s. Total 17–20 s. The first run's mask tile fetches
+    added 8–16 s; the tiles are cached now.
+
+  Mask check (points < 5 km; median reprojection px @1600, DTM-lifted -> semantic lift; signed dy in brackets)
+               ref       building           forest             all<5km (drop classed)
+  IMG_7033     GT        4.0 -> 6.8 (n=26)  4.7 -> 9.2 (n=55)  4.3 -> lift 5.6 / drop 4.1
+               refined   3.2 -> 5.4         3.6 -> 7.1         3.2 -> lift 3.9 / drop 2.8
+  IMG_7131     GT        7.8 -> 5.8 (n=5)   10.6 -> 5.8 (n=65) 9.8 -> lift 7.9 / drop 9.6
+               refined   4.4 -> 5.6         3.6 -> 5.7         3.6 -> lift 4.1 / drop 3.5
+  IMG_6971     GT        -     (n=0)        5.7 -> 8.0 (n=418) 5.5 -> lift 7.6 / drop 5.0
+               refined   -                  3.7 -> 8.6         3.8 -> lift 8.0 / drop 3.8
+  IMG_7018     GT        10.3 -> 10.9 (n=3) 8.2 -> 10.1 (n=10) 8.7 -> lift 9.4 / drop 9.2
+               refined   5.1 -> 6.5         7.9 -> 8.8         6.4 -> lift 6.7 / drop 6.1
+  IMG_7053     no inliers < 5 km (summit view)
+  The signed dy goes from about 0 to -4…-8 px with the lift, so the lift overcorrects. A satellite
+  match on a tree crown or roof does not correspond to the top of the object as the photo sees it
+  side-on. The service default was therefore set to maskMode "drop" (a dev-only decision). The
+  a-priori lift constants (forest 20 m, building render_height) were not tuned.
+
+Acceptance
+  Iter 2 vs iter 1, >= 25% more lower-half inliers: PASS on 7131 (+706%) and 7053 (+1420%). Not
+    measurable on 7033, 6971 and 7018: 0 lower-half inliers in both iterations, because the lower half
+    is a person, foreground grass or lake that the DEM render cannot match. FAIL as a blanket criterion.
+  >= 2 more quadrants covered: FAIL on all 5 (iter2-iter1 quadrant gains 0, +1, 0, +1, 0 for 7033, 7131, 6971, 7018, 7053).
+    7131 started with 3 of 4 quadrants, so +2 was impossible. The tiles mainly add density in
+    quadrants that are already covered.
+  Masking reduces the median lifted-point error in villages (building points; no interior dev pins
+    exist, so the reference is the GT camera, which is fitted to the control pins, plus the loop's
+    refined camera):
+    - Lift mode: FAIL. Worse in 3/3 photos with buildings under the refined reference, and in 2/3
+      under GT.
+    - Drop mode: small gains on all<5 km under the refined reference (7033 3.2 -> 2.8, 7131
+      3.6 -> 3.5, 7018 6.4 -> 6.1, 6971 3.8 -> 3.8). It is not a per-building measure, since the
+      dropped points are then absent. Weak PASS at best.
+    - PENDING the blind interior pins in villages (WP-A).
+  Feeding the cues to WP-D improves the 0.5–2 km band at least as much as WP-C cues: PENDING. WP-D
+    does not exist yet. Cues are ready in out/concord/rematch/cues/<photo>.json (WP-A Cue kind
+    "point", GT scene frame, σ 2 px, 4 px for classed points).
+  Report latency: DONE (above).
+
+Known issues
+  - Renders come from the app eye (render_worker has no eye override and was not edited). Lifting and
+    residuals use cam.eye exactly, so only render appearance/parallax differs (7053: 12.2 m, in notes).
+  - Render-match vs GT: on 7018 every inlier band sits at dx ≈ -6 px under the GT pose, and the
+    refined yaw is 159.92 vs GT 160.21. The independent :8765 matcher also finds 159.86 (results.json).
+    So this is a real imagery/GT disagreement, not a WP-G bug. WP-D should weight render-match cues
+    against the pins accordingly.
+  - 7018 and 7033 iter 1 at full frame gets few matches (10 and 73): hazy lake views. The tiles recover
+    them (256 and 382).
+  - Ad-hoc (non-bundled) photos are not supported: photoId is required.
+  - Mask classes are Swiss only (swisstopo tiles). Elsewhere the mask is a no-op (tiles = 0 in the
+    iteration mask stats). Overpass (the plan's OSM source) returned 504 throughout this session.
+  - The quadrant criterion probably needs rewording (e.g. "bands" or cells of a 4×3 grid). The
+    tiles cannot create matches in foreground/person/water regions.

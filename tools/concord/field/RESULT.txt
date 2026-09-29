@@ -1,0 +1,94 @@
+WP-E (Display residual field) — module only — result, 2026-09-29
+=================================================================
+
+Files (new; no shared file edited)
+  src/lib/concord/field/fit.ts          GP (u, v, log-range kernel) + TPS baseline, bounds, sky/people/support zero,
+                                        σ fade, provenance, LOW-confidence refusal (displayField / isLowConfidence)
+  src/lib/concord/field/glsl.ts         WARP_GLSL (warpDecode / warpAt / warpUV, GLSL ES 3, no uniforms) + warpAtCPU mirror
+  src/lib/concord/field/readback.ts     photoToRenderUV, renderToPhotoUV, packWarpTexture, WarpState, warpFlag
+  src/lib/concord/field/index.ts        re-exports
+  src/lib/concord/field/field.check.ts  unit checks (npx tsx src/lib/concord/field/field.check.ts)
+  scripts/concord/field-eval.ts         dev-only LOO evaluation (uses scripts/concord/eval.ts: scorePins, looScore,
+                                        builtinFit, loadPins)
+  tools/concord/field/glsl-check.mts    WebGL2 check of WARP_GLSL + the patched deck program (render lock)
+  tools/concord/field/hooks.patch.txt   the intended engine.ts / deck / renderer.ts patch (NOT applied; git apply --check OK)
+  out/concord/field/{field-eval-default.json, field-eval-sweep.json, geom/, cand/}
+
+API vs plan (additive / clarifying only)
+  - fitField(cues, g, cam, opts) as planned. Cue residual: FieldCue = Cue & { residualPx: number | [dx, dy]; conf }.
+    The plan typed residualPx as a number; a point needs two components, so points take [dx, dy] (px @1600,
+    predicted − observed = the eval.ts sign; cue u,v = OBSERVED photo position). Edge: scalar along its normal;
+    level / shore: scalar dy. A point with a scalar residual is rejected.
+  - GeomBuffer was not defined anywhere; defined here: { w, h, rangeM (photo-uv grid, row 0 = top, ≤0/NaN = sky),
+    people? }.
+  - Extra opts: method "gp"|"tps", priorPx, fade, supportLengths, skyMarginPx, tpsLambda, maxObs, loo, confidence.
+  - LOW refusal: displayField(confidence, …) returns null (nothing computed) unless the pose is accepted with
+    confidence ≥ 0.5 (solve.ts acceptConfidence) or tier high/medium; missing confidence = LOW (fail closed).
+    fitField(opts.confidence LOW) returns a zero field with provenance "refused:low-confidence" and never fits.
+  - renderToPhotoUV(fInv, u, v, fwd?, iters?) — optional forward-field refinement (additive). The grid inverse alone
+    has 0.12 px error next to the skyline; with refinement 0.0000 px.
+  - "W = 0 on sky" clarification: sky cells within skyMarginPx (default 1.5·maxPx = 18 px) of terrain take that
+    terrain's range, so W stays continuous across the skyline (a hard zero at the skyline would draw the rendered
+    skyline twice or cut it). Sky beyond the margin is exactly 0 (unit-tested).
+  - σ fade is applied along the principal axes of the 2×2 posterior covariance (a level/edge cue constrains one
+    direction; fading by the unconstrained axis killed it). sigmaPx stored = σ of the best-constrained direction.
+  - Defaults: ℓ = 200 px @1600, λ = 1 (ln range), bound min(12 px, 15 m at range, 1°), fade [0.6, 0.95]·s,
+    support 2ℓ (tapered from 1.5ℓ), s = clamp(RMS residual, 1.5, 12). Defaults were NOT changed after the sweep
+    (no configuration showed a real gain; see below).
+
+Tests (actual output)
+  field.check.ts: all PASS (26 checks), incl.
+    LOW / missing confidence ⇒ displayField null (8 cases), fitStats.fits unchanged; accepted 0.8 ⇒ fitted
+    GP recovery RMS 0.128 px (150 dense synthetic cues, bounds relaxed); TPS reproduces an affine field (0.0000 px)
+    |W| ≤ min(12 px, 15 m at range, 1°): max ratio 1.0000; maxAbsPx 12.00; W = 0 on sky beyond margin, on people,
+    and beyond 2ℓ of support; 15 m at 20 km = 1.09 px
+    level cue: du = 0, dv 2.91 px; edge cue: W along its normal only
+    RGBA8 16-bit + manual bilinear (GLSL mirror) ≡ sampleField: 1.56e-4 px
+    readback photo→render→photo: 0.0000 px (WarpState.photoOf), grid-inverse only 0.12 px
+  glsl-check.mts (render lock, headless Chromium WebGL2):
+    GPU warpUV vs CPU: max 2.2e-4 px (field max 10 px); GPU warpAt vs sampleField: 1.5e-4 px
+    three dialect ≡ deck dialect: bitwise; warpOn = 0 ⇒ uvG ≡ vUv bitwise (both dialects)
+    patched deck composite program (hooks.patch.txt applied to a scratch copy): compiled + linked
+  tsc on a scratch copy of src/ with hooks.patch.txt applied: no new errors (same 1 pre-existing error as unpatched,
+    a missing data/ json in the copy). tsc on the repo: 0 errors in concord/field files.
+
+LOO evaluation (DEV photos only: 10 photos, 34 control-point pins: 5495:2 6971:4 7018:7 7033:5 7053:3 7059:3
+7063:2 7068:2 7131:4 7155:2; no interior pins exist yet). For each pin i the field is fitted from the residuals
+of pins \ i and pin i is drawn through it (eval.ts scorePins, drawn = r + W⁻¹(r)); gain = |r| without − with.
+Geometry: CPU DEM ray-march (Terrarium) at the base camera, 64×48.
+  base gt  (GT pose; IN-SAMPLE for these pins: the GT pose was fitted to them)
+    default gp ℓ200 λ1: median gain 0.00, mean −0.04 px, +6 / −15 pins, median 3.01 → 3.21, p90 6.67 → 6.90,
+                        band p90: <0.5 0.14→0.14, 0.5–2 0.36→0.36, 2–5 6.48→6.48, 5–15 7.49→7.49, >15 5.95→5.19
+  base rot (eval.ts builtin:rot pose refit on pins \ i, then the field on the same pins \ i)
+    default gp ℓ200 λ1: median gain 0.00, mean +0.03 px, +10 / −11, median 4.34 → 4.28, p90 9.08 → 9.08, no band worse
+  Sweep (dev only; ℓ ∈ {100,200,400,800}, λ ∈ {0.5,1,2,∞}, TPS ℓ ∈ {200,400,800}, fade and bound variants;
+  out/concord/field/field-eval-sweep.json): no configuration has median gain > 0 on either base. Best means:
+  gt: gp ℓ200 λ0.5 +0.01 px; rot: gp ℓ200 λ1 +0.03 px. Longer ℓ (400–800) and TPS are clearly worse
+  (mean −0.2…−0.7 px, several band p90s worse). Removing the metres/degree bound did not help (gt ℓ200: −0.20).
+  In-sample smoke test only (all-pin fields as eval.ts candidates, out/concord/eval/field-cand-insample-dev.json):
+  median 3.0 → 1.7 px; this is NOT an accuracy number, it only confirms sign, units and plumbing.
+
+Acceptance
+  LOO on dev pins: median gain > 0 and no band's p90 worse ........ FAIL (median gain 0.00; default: no band p90
+      worse on either base). Pinned acceptance on blind interior pins is PENDING (none clicked yet). Reasons the
+      control-point set cannot show a gain: 2–7 pins per photo, mostly > 5 km apart in the image (outside 2ℓ of each
+      other, so the held-out pin usually gets W ≈ 0), 28 of 34 pins beyond 5 km where the 15 m bound caps W at
+      ≈ 1–3 px, and under the GT pose the residuals are the in-sample leftovers of a fit to these same pins.
+  Style-baseline 16/16 exact with the flag off ...................... PENDING (integration; the snippet is
+      bitwise-identity when off, verified on WebGL2)
+  deck-vs-three composite < 1 LSB with the same field ............... PENDING for the full composites (integration,
+      render lock); the warp snippet itself is bitwise-equal across the two dialects
+  Warp never computed when confidence is LOW (unit test) ............ PASS
+  Provenance recorded on each field .................................. PASS (sources incl. method + kernel params,
+      n, looGainPx (in-field LOO over ≤ 60 cues, else null), bound {px, metres})
+
+Known issues / notes for the integration agent
+  - Recommendation: keep ?concord=warp off by default. On current evidence the field neither helps nor hurts
+    materially on dev LOO; re-evaluate with the interior pins (same script: npx tsx scripts/concord/field-eval.ts
+    --sweep) before any claim.
+  - The eval has no people mask (none available offline); the geometry is a CPU Terrarium ray-march, not the
+    renderer's geo buffer (Mapterhorn at runtime).
+  - hooks.patch.txt: see its header — label sites warped (peakLabels, hence export images), pinError /
+    peaksInFrame / sampleAt deliberately not; LOOK_INK + comp_refine refinedSkyline reads MASK at uvG; the
+    three.js composite shader was type-checked but not GLSL-compiled here (the deck one was).
+  - holdout photos were never loaded (field-eval filters split === "dev").

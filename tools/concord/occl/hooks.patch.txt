@@ -1,0 +1,93 @@
+WP-F integration hooks (for the integration agent). NOT applied: WP-F edits no shared file.
+All behaviour is behind the URL flag ?concord=occl. With the flag absent nothing below runs, no texture is
+bound (the uniform uOcclOn stays 0), so output is bit-identical (parity when off).
+
+Module API (src/lib/concord/occl):
+  loadNearDsm(lat, lon, radiusM = 2000, resM = 2, opts?) -> Promise<NearDsm | null>   // ndsm.ts
+      opts.wedge {yawDeg, halfDeg}: only km tiles in the view wedge; opts.maxBytes (default 4.5e6) caps
+      the transfer nearest-first; opts.signal for abort. null outside CH. Throws on network failure (not
+      cached; retry later). Frame = new EnuFrame(photo.lat, photo.lon, 0), the engine's own frame.
+  occluderRange(g: GeomBuffer, cam: CameraX, dsm, objects?, people?, opts?) -> Float32Array   // occluder.ts
+      photo grid, row 0 = TOP, metres, Infinity = nothing. cam.eye = engine world eye [0, 0, eyeAlt].
+  occlTexture(occl) -> Float32Array (Infinity -> 1e7) for an R32F / R16F texture.
+  OCCL_RULE {ratio 1.05, slackM 3}, occludedBy(r, o), OCCL_GLSL (GLSL1 texture2D helper occlDim).
+Cost: occluderRange 320x240 = 170-225 ms CPU on dev photos (160x120 = 40-55 ms). Run it at 160x120 on the
+main thread after each fresh geometry readback, or 320x240 in a worker; it depends on pose AND eye.
+
+------------------------------------------------------------------------------------------------ 1. engine.ts
+(three) PhotoEngine — after terrain load (where eyeAlt is set, ~line 733) and when ?concord=occl:
+
+    import { loadNearDsm, type NearDsm } from "./concord/occl/ndsm";
+    import { occluderRange, occlTexture } from "./concord/occl/occluder";
+    private nearDsm: NearDsm | null = null;
+    private occlTex?: THREE.DataTexture;           // R32F (FloatType, RedFormat), width OW, height OH
+    ...
+    if (concordFlag("occl"))
+      loadNearDsm(this.photo.lat, this.photo.lon, 2000, 2, {
+        wedge: { yawDeg: this.pose.yaw, halfDeg: hfov / 2 + 10 },   // hfov of the current pose
+        signal: this.loadAbort.signal,
+      }).then((d) => { this.nearDsm = d; this.markOcclDirty(); }).catch(() => {});
+
+  In readGeometryNow() (after geoBuf is filled for geoGen), when nearDsm && flag: build a GeomBuffer at
+  OW x OH (160x120) by sampling the readback (range = sampleAt(u, v)?.range ?? 0, sky = range == 0,
+  xyz unused), then
+      const cam = { pose: this.pose, eye: [0, 0, this.eyeAlt], aspect: this.aspect, intr: IDENTITY_INTRINSICS };
+      const o = occluderRange(g, cam, this.nearDsm, undefined, peopleMaskAt(OW, OH));
+      upload occlTexture(o) into occlTex (flipY so that row 0 = top matches tFg sampling), needsUpdate.
+  Re-run on pose change only via the existing debounced readback (no extra timer). Wedge: reload the DSM
+  when |yaw - loaded yaw| > halfDeg - hfov/2 (5 deg of slack) — rare in practice.
+
+  compositeFrag (~line 210):
+    + uniform sampler2D tOccl;
+    + uniform float uOcclOn;
+    ...
+      float fg = uFgOn * texture2D(tFg, vUv).r;
+    + // DSM occluder (trees / huts in front of the terrain this pixel shows): dim, don't hide
+    + if (uOcclOn > 0.5 && range > 0.0) {
+    +   float o = texture2D(tOccl, vUv).r;          // same orientation as tFg
+    +   if (range > o * 1.05 + 3.0) fg = max(fg, 0.8);
+    + }
+  `fg` already gates the terrain layer (trails + contours + drape colour) and the ridge lines, so trail,
+  contour and ridge fragments dim where r > occl*1.05 + 3 m (plan WP-F). 0.8 = "dim rather than hide".
+
+  peakLabels() (~line 1815), after the geoBuf visibility test:
+    + if (visible && this.occlData) {                // CPU copy of occluderRange output
+    +   const o = sampleGrid(this.occlData, OW, OH, pr.u, pr.v + 0.004);
+    +   if (range > o * 1.05 + 3) visible = false;   // occludedBy(range, o)
+    + }
+
+------------------------------------------------------------------------------------------ 2. materials.ts:474
+Drape visibility (three terrain material), inside `if (uProjectPhoto > 0.0)`:
+    float seen = texture2D(uPhotoRange, puv).a;
+    bool visible = seen > 0.0 && r < seen * 1.015 + 15.0 && r > uPhotoMinRange;
+  + // DSM-inclusive range: a tree / hut in front of this terrain point owns the photo pixel
+  + if (uOcclOn > 0.5) { float o = texture2D(uPhotoOccl, puv).r; if (r > o * 1.05 + 3.0) visible = false; }
+    if (uPhotoFgOn > 0.5 && texture2D(uPhotoFg, puv).r > 0.5) visible = false;
+  New uniforms: uPhotoOccl (the same occlTex; orientation as uPhotoFg), uOcclOn (0 unless flag).
+  This is the change the smear evaluation measured (tools/concord/occl/RESULT.txt).
+
+------------------------------------------------------------------------------------------------ 3. deck/**
+- deck/composite-shader.ts: add `occlTex` sampler (top->bottom rows, sample at uvT like fgTex) and
+  `occlOn` to compositeUniforms; after `float fg = composite.fgOn * texture(fgTex, uvT).r;`:
+      if (composite.occlOn > 0.5 && range > 0.0) {
+        float o = texture(occlTex, uvT).r;
+        if (range > o * 1.05 + 3.0) fg = max(fg, 0.8);
+      }
+- deck/terrain-layer.ts (~line 535 and 560, both drape paths): the same `visible = false` test as
+  materials.ts with a `photoOccl` sampler + `terrain.occlOn`.
+- deck/engine.ts: same data flow as three (load on terrain ready, recompute after each geometry readback
+  from the deck geometry source, upload R32F). Deck's range buffer discards terrain within nearDiscard/2 of
+  the eye (tools/nearfield/smear/REPORT.txt point 4); the occluder only ever LOWERS the range, so it is
+  safe there, but the three/deck smear numbers differ for that reason.
+- Peak-label occlusion in deck reads the same CPU occl grid.
+
+------------------------------------------------------------------------------------------ 4. package.json
+Nothing. geotiff is NOT needed: swiss-cog.ts reads the COGs itself (TIFF/BigTIFF IFDs, LZW, Deflate via
+DecompressionStream, predictors 1/2/3). No new dependency.
+
+------------------------------------------------------------------------------------------ 5. gating / honesty
+- Off when pose confidence is LOW (plan ground rule): skip loadNearDsm / leave uOcclOn = 0.
+- The occluder is display-only: it never feeds pose, confidence, benchmarks or exports' measurements.
+- Attribution when on: "Surface model © swisstopo (swissSURFACE3D, swissALTI3D)".
+- Outside Switzerland loadNearDsm returns null without a request; occluderRange(dsm = null) then equals the
+  DEM range (+ objects / people) and nothing dims beyond today's behaviour.

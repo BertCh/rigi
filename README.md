@@ -27,6 +27,7 @@ by `npm run generate-routes`).
 | `/upload` | Upload any photo (HEIC via libheif in a worker, EXIF via exifr). Photos with no compass, gravity or focal take the unknown-pose path |
 | `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (owned by session mt-image-fc, `src/lib/roll/**`): a whole day's photos clustered into rolls and spots, with a mosaic, per-spot panoramas, and every photo draped on one deck.gl terrain map |
 | `/baseline` | Debug UI for the CPU pipeline (`src/baseline-ui`): horizon, skyline detection, solve, peaks |
+| `/lab/splats`, `/lab/deck-splats`, `/lab/generate` | Step Inside dev benches: splats in each renderer, and P3 generation (`?nearfield=gen`, GT poses only) |
 
 **Renderers.** `src/lib/renderer.ts` is the engine interface that PhotoWorkspace and the export layer
 use. There are two backends:
@@ -76,6 +77,43 @@ renders from a headless Chromium worker), fused with the skyline cue. The app re
   check. `t6` (opt-in, `timeoutMs` ≥ 300 s) is the T6 two-stage search with a frozen confidence rule.
 - **Product accept rule** (`matchAccepted`): a match counts only when it is HIGH and either the
   EXIF GPS is trusted or it lies within 0.5° of the skyline cascade.
+
+**Step Inside** (`src/lib/nearfield`, `reports/step-inside-results.md`). Near-field Gaussian splats anchored
+to the DEM with a per-photo depth curve and object grounding, a step-in camera that starts on the photo, a
+Truth tint, a hover readout on objects, and georeferenced `.ply`/`.splat` export (generated content is
+always stripped). It is on by default in both renderers and needs the near-field service
+(`tools/nearfield/run.sh`, :8767: depth, Gaussians, multiview, inpainting). Pose propagation between
+overlapping photos (`propagate.ts`) is a library, not yet wired into the UI.
+
+**Other modules.**
+
+- `src/lib/gpu`: an optional WebGPU compute sidecar for the auto-align grid, horizon, look passes, batched deck terrain and eye search. See its README.
+- `src/lib/concord`: whole-image concordance, in progress. See `reports/concordance-research.md`.
+- `src/lib/reveal`: the overlay bloom-in on load.
+- `src/lib/cache`: the tile cache.
+- `src/lib/upload`, `src/lib/export`, `src/lib/pose6dof`: have API READMEs.
+
+**URL flags and ports**
+
+| Flag | Effect |
+|---|---|
+| `?renderer=deck` | deck.gl backend |
+| `?style=<preset>` | View style preset |
+| `?nearfield=off` | Hide Step Inside. Any value opts headless browsers in. `sharp` selects the dev-only SHARP model (research licence) |
+| `?gpu=off` | WebGPU kill switch (also localStorage `rigi.gpu`) |
+| `?gpuHorizon=0`, `?lookgpu=0` | Turn off the GPU horizon or the GPU look passes (both on by default) |
+| `?eyesearch=1\|auto`, `?unknownGpu=1` | Opt-in GPU eye search / GPU unknown-pose horizon |
+| `?terrain=tiles` | deck: per-tile terrain instead of batched |
+| `?reveal=off\|<preset>` | Load animation |
+| `?concord=warp` | Concordance display warp (in progress; more values planned) |
+
+| Port | Service |
+|---|---|
+| 3100 | Dev server (`npm run dev`) |
+| 3110 | Private Vite server for GPU and near-field browser checks (`scripts/gpu/vite.gpu.config.ts`) |
+| 8765 | Matcher (`tools/matcher/server/run.sh`) |
+| 8767 | Near-field service (`tools/nearfield/run.sh`) |
+| 8768 | Concordance re-match service (`tools/concord/rematch/server.py`) |
 
 ## The pose pipeline today
 
@@ -145,42 +183,17 @@ npx tsx scripts/test-pose6dof.ts
 tools/matcher/server/run.sh --port 8765      # env MATCHER_POLICY=v034|t6
 
 node scripts/shot.mjs <url> out.png --wait-for "[data-ready]"   # headless WebGL screenshot
+node scripts/gpu/with-render-lock.mjs -- <cmd>                # wrap every browser job: one GPU job at a time
+node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs [--renderer=deck] [--dead] <ids>
 ```
 
 **Brand.** The home page panorama (the view south from Rigi Kulm, drawn as depth-layered ridgelines, with visibility-tested OSM peaks) and the logo mark (Rigi Kulm summit contours) are generated from the same DEM. To regenerate them, run `npx tsx scripts/brand/rigi.ts` (add `--preview` to also write PNGs to `.cache/brand/`). It writes `public/brand/rigi-panorama.json`, `src/brand/rigi-mark.json` and `public/favicon.svg`.
 
-## Reports
+## Docs
 
-| Report | What it covers | Status |
-|---|---|---|
-| [pipeline-ab.md](reports/pipeline-ab.md) | A/B of the full-metadata pipeline variants | Current. Its "Reproduce" section refers to the removed `?pipeline=` code |
-| [leaderboard.md](reports/leaderboard.md) (+ `.json`) | All methods on one GT snapshot; recommends the cascade | Current for the CPU methods, but predates matcher v0.4/T6 |
-| [test-prereg.md](reports/test-prereg.md), [test-results.md](reports/test-results.md), [test-addendum.md](reports/test-addendum.md) | Preregistered held-out test on 50 frozen photos | Final (frozen) |
-| [matcher-service-v040.md](reports/matcher-service-v040.md) | v0.4.0: policy switch v034/t6, replay proof, latency | Current |
-| [matcher-service.md](reports/matcher-service.md) | v0.2–v0.3.5 changelog, API, queue, running it | Current API reference |
-| [matching-v2.md](reports/matching-v2.md) | Eye fallback, calibration priors, LoMa: not shipped | Current |
-| [stage1.md](reports/stage1.md) | T6 two-stage search and frozen rule (dev) | Current method reference |
-| [bench-wild.md](reports/bench-wild.md) | 100-photo wild benchmark, blind verification | Baseline; dev/test numbers superseded by stage1 and test-results |
-| [bench-ablation.md](reports/bench-ablation.md) | Heading/gravity removed: fused `/match` 0 false HIGH in 48 cases | Current (unknown-pose design basis) |
-| [v3-prereg.md](reports/v3-prereg.md) | Draft preregistration for the 74-photo `data_v3` set | Draft, not executed |
-| [position.md](reports/position.md) | T5 pose6 position refinement | Superseded by test-results (arm C); stays opt-in |
-| [fusion.md](reports/fusion.md), [matcher.md](reports/matcher.md) | Fusion and render-match prototypes | Superseded by the matcher service |
-| [perf-photo-load.md](reports/perf-photo-load.md) | Profile of the /photo load | Historical |
-| [Mountain photo georeferencing SoTA.md](<reports/Mountain photo georeferencing SoTA.md>) | Literature state of the art | Reference |
-| [Rigi competitive landscape and roadmap.md](<reports/Rigi competitive landscape and roadmap.md>) | Market, competitors, roadmap | Current |
-
-## Research history
-
-The research notes are kept as written. Links for the two report folders:
-[SoTA notes](<research_notes/Mountain photo georeferencing SoTA/>) and
-[landscape notes](<research_notes/Rigi competitive landscape and roadmap/>).
-
-| Note | Status |
-|---|---|
-| [implementation_summary.md](research_notes/implementation_summary.md) | Current: what the SoTA pass built (refine, horizon-fast, sky, look/) |
-| [matching_v2_research.md](research_notes/matching_v2_research.md) | Background to matching-v2.md; mostly not adopted |
-| [analysis_algorithms_sota_2026.md](research_notes/analysis_algorithms_sota_2026.md) | Superseded: input to the SoTA pass (2026-09-24) |
-| [rendering_aesthetics_sota.md](research_notes/rendering_aesthetics_sota.md) | Superseded: input to look/ and style/ |
-| [current_state_audit.md](research_notes/current_state_audit.md) | Superseded by the landscape folder's `rigi_internal_audit.md` |
+- [reports/status.md](reports/status.md): where every thread stands, and the decisions waiting on you.
+- [reports/roadmap.md](reports/roadmap.md): the plan.
+- [reports/negative-results.md](reports/negative-results.md): what didn't work.
+- [reports/README.md](reports/README.md): an index of every report and research note.
 
 Data: terrain © Mapterhorn, imagery © swisstopo / Esri, peaks & trails © OpenStreetMap contributors.
