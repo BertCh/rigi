@@ -1,0 +1,1388 @@
+{
+ "wc_0001": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 89.51797003299777,
+    "pitch": 2.198972550859357,
+    "roll": -1.7317020564804047,
+    "vfov": 17.22050597190317
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1828.7888289953705,
+    "ground0f": 1827.1888289953706,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1827.1632711540442
+   }
+  }
+ },
+ "wc_0002": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 139.11968091554536,
+    "pitch": 4.840591428524248,
+    "roll": 5.002457989593815,
+    "vfov": 56.34242255485264
+   },
+   "confidence": 0.01689241713809706,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2103.2879748173523,
+    "ground0f": 2101.6879748173524,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2101.581228186955
+   }
+  }
+ },
+ "wc_0004": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 29.999342078693644,
+    "pitch": -11.643329110445421,
+    "roll": 1.1745670258481578,
+    "vfov": 44.413598472425214
+   },
+   "confidence": 0.87534516765286,
+   "accepted": true,
+   "acceptKind": "accepted (solve)",
+   "eye": {
+    "h": 2263.5549120403844,
+    "ground0f": 2261.9549120403844,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2261.9933941909085
+   }
+  }
+ },
+ "wc_0005": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 122.62391301673068,
+    "pitch": 1.3333751777287917,
+    "roll": -1.5217865707088138,
+    "vfov": 18.112142260044443
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 814.5375,
+    "ground0f": 812.9375,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 812.9099186889362
+   }
+  }
+ },
+ "wc_0006": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 152.7612789289185,
+    "pitch": 0.5065006839843664,
+    "roll": -1.5767119519220911,
+    "vfov": 67.75466812521678
+   },
+   "confidence": 0.000017076069004145185,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2408.5708843672414,
+    "ground0f": 2406.9708843672415,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2406.9379478464316
+   }
+  }
+ },
+ "wc_0008": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 318.93392022604667,
+    "pitch": 9.242855629274471,
+    "roll": 23.89690751122471,
+    "vfov": 6.707628343717092
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 274.66913458751196,
+    "ground0f": 273.06913458751194,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 273.0626925960584
+   }
+  }
+ },
+ "wc_0009": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 166.68631398763114,
+    "pitch": -0.08581226901582752,
+    "roll": 2.8006377433584824,
+    "vfov": 18.89460567967377
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2865.3,
+    "ground0f": 2861.909520711284,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2861.9218882590094
+   }
+  }
+ },
+ "wc_0010": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 79.71295556666274,
+    "pitch": 5.106021598831317,
+    "roll": -8.90351744822867,
+    "vfov": 61.13219578356737
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1160.806974488096,
+    "ground0f": 1159.2069744880962,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1159.1515991590081
+   }
+  }
+ },
+ "wc_0011": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 174.99159942529502,
+    "pitch": 14.76859950686039,
+    "roll": 1.8098219749503204,
+    "vfov": 21.253194430891455
+   },
+   "confidence": 0.8216511344054324,
+   "accepted": true,
+   "acceptKind": "accepted (solve)",
+   "eye": {
+    "h": 1687.0404063750989,
+    "ground0f": 1685.440406375099,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1685.4407003084198
+   }
+  }
+ },
+ "wc_0014": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 42.12607290674407,
+    "pitch": 5.345901066671897,
+    "roll": -24.171432186881784,
+    "vfov": 8.777140937387788
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2394.0974371445377,
+    "ground0f": 2392.497437144538,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2392.6117332958565
+   }
+  }
+ },
+ "wc_0015": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 22.887770051429982,
+    "pitch": 1.8923296041429376,
+    "roll": 16.433397364615303,
+    "vfov": 27.256133801899942
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1568.8584584371595,
+    "ground0f": 1567.2584584371596,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1567.2109628863925
+   }
+  }
+ },
+ "wc_0017": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 316.275840806705,
+    "pitch": 13.378421398417775,
+    "roll": -10.417471762095992,
+    "vfov": 13.823903017115105
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2437.6236409135036,
+    "ground0f": 2436.0236409135036,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2436.0030485682655
+   }
+  }
+ },
+ "wc_0018": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 349.36040427040734,
+    "pitch": 22.862874106214164,
+    "roll": -38.06244241729384,
+    "vfov": 47.568749028369126
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 481.90914130605836,
+    "ground0f": 480.30914130605834,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 480.3299987868495
+   }
+  }
+ },
+ "wc_0023": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 204.60930986632343,
+    "pitch": 1.4878965748202388,
+    "roll": 15.93949661289037,
+    "vfov": 6.564099843536783
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2124.5957312295245,
+    "ground0f": 2122.9957312295246,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2122.996462626441
+   }
+  }
+ },
+ "wc_0024": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 338.3378846066368,
+    "pitch": 2.6561422938827235,
+    "roll": 0.3035079882247695,
+    "vfov": 47.611534335249985
+   },
+   "confidence": 0.9703479576399395,
+   "accepted": true,
+   "acceptKind": "accepted (solve)",
+   "eye": {
+    "h": 1622.0375,
+    "ground0f": 1620.4375,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1620.4375
+   }
+  }
+ },
+ "wc_0031": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 238.69043908192918,
+    "pitch": 2.7739303794238674,
+    "roll": 2.188453145091323,
+    "vfov": 36.68476383555402
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1786.9611030471726,
+    "ground0f": 1785.3611030471727,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1785.3441368389758
+   }
+  }
+ },
+ "wc_0033": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 205.8470489772385,
+    "pitch": 2.794144848880473,
+    "roll": -15.23510566489313,
+    "vfov": 49.70413164406503
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1446.421390991739,
+    "ground0f": 1444.821390991739,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1444.813643643661
+   }
+  }
+ },
+ "wc_0034": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 1.9943995863401938,
+    "pitch": 12.041762737389515,
+    "roll": 5.986692660515261,
+    "vfov": 7.625840473345981
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1293.8548194222617,
+    "ground0f": 1292.2548194222618,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1292.2391944222618
+   }
+  }
+ },
+ "wc_0035": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 73.01304138840061,
+    "pitch": -8.060385783889256,
+    "roll": -1.1153354153229535,
+    "vfov": 30.508923970673568
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1085.3305248538031,
+    "ground0f": 1083.7305248538032,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1083.735496919299
+   }
+  }
+ },
+ "wc_0037": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 163.11526314793775,
+    "pitch": 17.4243848029265,
+    "roll": -22.36222639190472,
+    "vfov": 17.879368717008127
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1406.725,
+    "ground0f": 1405.125,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1405.1285282444442
+   }
+  }
+ },
+ "wc_0038": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 53.307235826759495,
+    "pitch": 11.07879673587869,
+    "roll": 1.0702433497869022,
+    "vfov": 48.221181772545926
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1653.0679135217595,
+    "ground0f": 1651.4679135217596,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1651.5804312295168
+   }
+  }
+ },
+ "wc_0039": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 167.92163735890324,
+    "pitch": 12.384655275805702,
+    "roll": 16.68798578477988,
+    "vfov": 12.592015827925861
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2031.2773655663912,
+    "ground0f": 2029.6773655663912,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2030.1209305003772
+   }
+  }
+ },
+ "wc_0040": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 295.9574631127141,
+    "pitch": -2.52744884987208,
+    "roll": 0.20494414654765813,
+    "vfov": 16.408119607747132
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 806.1937046891993,
+    "ground0f": 804.5937046891993,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 804.6301663656917
+   }
+  }
+ },
+ "wc_0042": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 266.98202447219956,
+    "pitch": 4.732437020970123,
+    "roll": -3.778522901510018,
+    "vfov": 47.387785276869494
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 875.8583233724447,
+    "ground0f": 874.2583233724447,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 874.2500178590417
+   }
+  }
+ },
+ "wc_0044": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 4.439726837769399,
+    "pitch": -4.042470123075956,
+    "roll": 4.1080966025937675,
+    "vfov": 29.756749160182796
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2062.6700613788694,
+    "ground0f": 2061.0700613788695,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2061.0465517726298
+   }
+  }
+ },
+ "wc_0045": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 14.964774168164695,
+    "pitch": 14.667435058805712,
+    "roll": 1.5783317625419147,
+    "vfov": 9.987075727377771
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2384.4,
+    "ground0f": 2327.55821971735,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2327.560359858675
+   }
+  }
+ },
+ "wc_0046": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 79.30976628146743,
+    "pitch": -6.18057640989172,
+    "roll": -19.317501306833613,
+    "vfov": 27.18691010656648
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1454.4800508459825,
+    "ground0f": 1452.8800508459826,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1452.9055291589757
+   }
+  }
+ },
+ "wc_0048": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 102.60054969737246,
+    "pitch": 8.62750328250331,
+    "roll": 12.200793779206508,
+    "vfov": 8.855687795759575
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2185.6765909489113,
+    "ground0f": 2184.0765909489114,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2184.079445785843
+   }
+  }
+ },
+ "wc_0049": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 92.6304135331502,
+    "pitch": 9.004743390800506,
+    "roll": -15.204838781581357,
+    "vfov": 19.234811266736514
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1360.6642514294012,
+    "ground0f": 1359.0642514294013,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1359.0908993111439
+   }
+  }
+ },
+ "wc_0050": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 271.12309186306084,
+    "pitch": -20.786502855929506,
+    "roll": 1.9064289376296601,
+    "vfov": 51.162864040495215
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1745.2856057090107,
+    "ground0f": 1743.6856057090108,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1743.6817965606037
+   }
+  }
+ },
+ "wc_0052": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 73.40205257510388,
+    "pitch": 5.351056314349519,
+    "roll": -0.4834159071120778,
+    "vfov": 49.349633935586084
+   },
+   "confidence": 1,
+   "accepted": true,
+   "acceptKind": "accepted (solve)",
+   "eye": {
+    "h": 847.5769206287149,
+    "ground0f": 845.9769206287149,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 845.9632524646618
+   }
+  }
+ },
+ "wc_0053": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 280.65857217641405,
+    "pitch": 5.361875639267745,
+    "roll": -19.924847168501362,
+    "vfov": 37.66443131635725
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1714.3819312833389,
+    "ground0f": 1712.781931283339,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1712.7578981730703
+   }
+  }
+ },
+ "wc_0055": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 254.41580168755138,
+    "pitch": 11.83695008072223,
+    "roll": 0.7482331051800615,
+    "vfov": 47.76463844822052
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 813.9,
+    "ground0f": 762.907270727607,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 763.0724291026293
+   }
+  }
+ },
+ "wc_0056": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 60.65300786345381,
+    "pitch": 13.270060108005135,
+    "roll": 5.174734071410142,
+    "vfov": 6.725427233797741
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2010.9698975997985,
+    "ground0f": 2009.3698975997986,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2009.3541096083372
+   }
+  }
+ },
+ "wc_0058": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 98.7481344507961,
+    "pitch": 9.019442891833444,
+    "roll": -7.866498099824883,
+    "vfov": 45.3012205871177
+   },
+   "confidence": 0.0005474296494731367,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 463.2875,
+    "ground0f": 461.6875,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 461.6875
+   }
+  }
+ },
+ "wc_0059": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 45.27130287476621,
+    "pitch": 16.844234844034723,
+    "roll": -1.6660451267421845,
+    "vfov": 25.258376886811206
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2131.2830570048086,
+    "ground0f": 2129.6830570048087,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2129.6778044332555
+   }
+  }
+ },
+ "wc_0060": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 328.73277582422634,
+    "pitch": 13.149214542799122,
+    "roll": 15.928388261625381,
+    "vfov": 17.982778324113227
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2006.2572413869084,
+    "ground0f": 2004.6572413869085,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2004.6748127804603
+   }
+  }
+ },
+ "wc_0061": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 9.10644075898108,
+    "pitch": -10.649912171235634,
+    "roll": 4.9077054428704505,
+    "vfov": 42.835475370607796
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2046.479603952179,
+    "ground0f": 2044.8796039521792,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2044.90625
+   }
+  }
+ },
+ "wc_0062": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 116.0314946221107,
+    "pitch": 7.083614875566598,
+    "roll": -20.91497731068632,
+    "vfov": 50.23879450613409
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1767.810188305967,
+    "ground0f": 1766.210188305967,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1766.0281515270751
+   }
+  }
+ },
+ "wc_0063": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 37.72473185969409,
+    "pitch": -2.8927603299426683,
+    "roll": 20.22771316995981,
+    "vfov": 40.08353924873719
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2055.492734766996,
+    "ground0f": 2053.892734766996,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2053.8886002682466
+   }
+  }
+ },
+ "wc_0064": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 176.69524227760166,
+    "pitch": -3.488645503687825,
+    "roll": 1.4759815666351286,
+    "vfov": 45.919378827559285
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2295.6,
+    "ground0f": 2291.466754219267,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2291.502818594639
+   }
+  }
+ },
+ "wc_0065": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 327.26478843859536,
+    "pitch": 4.013658001967399,
+    "roll": 8.009638735705655,
+    "vfov": 34.549523372278166
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 3136.3,
+    "ground0f": 3133.413567932921,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 3133.561209469488
+   }
+  }
+ },
+ "wc_0066": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 207.56648448682608,
+    "pitch": -1.9651030521955875,
+    "roll": -0.1485734600148264,
+    "vfov": 25.687140582928947
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1910.7245813391337,
+    "ground0f": 1909.1245813391338,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1909.1423945995048
+   }
+  }
+ },
+ "wc_0067": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 75.0788496964758,
+    "pitch": 8.182707792159992,
+    "roll": -12.512327474591713,
+    "vfov": 27.205902427544846
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1180.1,
+    "ground0f": 1168.189797698753,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1168.2423878147965
+   }
+  }
+ },
+ "wc_0068": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 186.87713080032233,
+    "pitch": -2.205015171558683,
+    "roll": 0.9989866588846931,
+    "vfov": 41.82525897051502
+   },
+   "confidence": 0.5850533807829182,
+   "accepted": true,
+   "acceptKind": "accepted (solve)",
+   "eye": {
+    "h": 3451.324517298314,
+    "ground0f": 3449.724517298314,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 3449.667843061919
+   }
+  }
+ },
+ "wc_0069": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 268.9850102055266,
+    "pitch": 0.35204485698463067,
+    "roll": 2.0275521496221582,
+    "vfov": 27.268342913862508
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1334.951593673462,
+    "ground0f": 1333.351593673462,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1333.3509211527135
+   }
+  }
+ },
+ "wc_0070": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 319.2277842921742,
+    "pitch": 1.4263752686135907,
+    "roll": 1.4995514210417078,
+    "vfov": 41.57492278598479
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2193,
+    "ground0f": 2160.547359038774,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2160.535293978997
+   }
+  }
+ },
+ "wc_0071": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 11.269779124018271,
+    "pitch": -4.5035165102702255,
+    "roll": 0.1664006618710129,
+    "vfov": 48.211558917506615
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2268.6,
+    "ground0f": 2234.25,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2234.25
+   }
+  }
+ },
+ "wc_0072": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 231.15768282066938,
+    "pitch": 3.285708868833647,
+    "roll": -21.28271969729192,
+    "vfov": 27.71444402628114
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 637.4349203951034,
+    "ground0f": 635.8349203951034,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 635.7278061223874
+   }
+  }
+ },
+ "wc_0073": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 93.9990954541226,
+    "pitch": 21.11728509930304,
+    "roll": -12.31624345878441,
+    "vfov": 48.836446478887105
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 490.05154992397877,
+    "ground0f": 488.45154992397875,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 488.4619138124866
+   }
+  }
+ },
+ "wc_0074": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 300.8314764157212,
+    "pitch": 31.80525771472099,
+    "roll": -25.726369107160355,
+    "vfov": 23.130714773317674
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2043.6238209092426,
+    "ground0f": 2042.0238209092427,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2042.6216415982626
+   }
+  }
+ },
+ "wc_0075": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 105.87045664253145,
+    "pitch": -12.751669707871573,
+    "roll": 8.93694606359176,
+    "vfov": 52.76079769562217
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2308.783470208605,
+    "ground0f": 2307.1834702086053,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2307.1265142809134
+   }
+  }
+ },
+ "wc_0077": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 221.4867731006475,
+    "pitch": 5.992428571323035,
+    "roll": 17.88820388685022,
+    "vfov": 29.35335533754274
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1774.736409029012,
+    "ground0f": 1773.1364090290122,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1773.193187134226
+   }
+  }
+ },
+ "wc_0078": {
+  "C": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 268.7425166130346,
+    "pitch": -2.9666596616385705,
+    "roll": -5.8988646429301745,
+    "vfov": 30.345754270060713
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2945.6594425896496,
+    "ground0f": 2944.0594425896497,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2943.9922614268553
+   }
+  }
+ },
+ "wc_0079": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 86.46331798857005,
+    "pitch": 13.977300998595181,
+    "roll": 17.09192897661989,
+    "vfov": 52.63595387627603
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1871.6504442587761,
+    "ground0f": 1870.0504442587762,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1870.1857094693282
+   }
+  }
+ },
+ "wc_0083": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 217.16061506800486,
+    "pitch": 11.686268027949051,
+    "roll": -8.225161193396643,
+    "vfov": 25.81740077578438
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2270.5089566804977,
+    "ground0f": 2268.908956680498,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2268.800129158321
+   }
+  }
+ },
+ "wc_0084": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 265.3987329001661,
+    "pitch": 6.281336577572477,
+    "roll": -3.755361306063544,
+    "vfov": 28.549366477597587
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 553.119695133924,
+    "ground0f": 551.519695133924,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 551.6134532754804
+   }
+  }
+ },
+ "wc_0086": {
+  "B": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 45.78416625760707,
+    "pitch": 6.990705289481972,
+    "roll": -2.440374536736143,
+    "vfov": 39.654219528801505
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 902.6378411951979,
+    "ground0f": 901.0378411951979,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 900.7672094071067
+   }
+  }
+ },
+ "wc_0087": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 46.57821629277993,
+    "pitch": 4.178006620361866,
+    "roll": 4.548559656439437,
+    "vfov": 32.926349607614995
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1656.2568147514673,
+    "ground0f": 1654.6568147514674,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1654.5943147514674
+   }
+  }
+ },
+ "wc_0089": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 8.950376905940232,
+    "pitch": 3.9141536255015925,
+    "roll": 2.309178201008174,
+    "vfov": 36.524358382512204
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 592.4754829719546,
+    "ground0f": 590.8754829719546,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 590.8972074634353
+   }
+  }
+ },
+ "wc_0091": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 72.24472031293072,
+    "pitch": 4.89671790001008,
+    "roll": 9.923754365579626,
+    "vfov": 34.0515042977331
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1502.4222060694824,
+    "ground0f": 1500.8222060694825,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1500.8241389551642
+   }
+  }
+ },
+ "wc_0094": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 208.6744871167656,
+    "pitch": 2.054175004971997,
+    "roll": -23.003391307296702,
+    "vfov": 35.20777519283567
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2474.4,
+    "ground0f": 2447.96320056553,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2447.9779825836004
+   }
+  }
+ },
+ "wc_0095": {
+  "D": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 294.3501563866897,
+    "pitch": 6.67274084159875,
+    "roll": -4.831443245274902,
+    "vfov": 34.19050685713889
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 2550.699446668482,
+    "ground0f": 2549.099446668482,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 2549.1866414857277
+   }
+  }
+ },
+ "wc_0097": {
+  "E": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 149.7475945500505,
+    "pitch": 8.534185155795532,
+    "roll": 2.048055610697625,
+    "vfov": 36.25215374314072
+   },
+   "confidence": 0.5874767319010819,
+   "accepted": true,
+   "acceptKind": "accepted (solve)",
+   "eye": {
+    "h": 1971,
+    "ground0f": 1915.4216102894952,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1915.4196875948198
+   }
+  }
+ },
+ "wc_0098": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 232.33201674407997,
+    "pitch": 8.893915198756531,
+    "roll": 20.459590103021664,
+    "vfov": 31.786874215121422
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 1669.3392344673541,
+    "ground0f": 1667.7392344673542,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 1667.8590471578004
+   }
+  }
+ },
+ "wc_0099": {
+  "A": {
+   "method": "cascade (Mapterhorn, 0f loader)",
+   "pose": {
+    "yaw": 359.3322186155423,
+    "pitch": 1.2159567056753275,
+    "roll": 1.1131938587872816,
+    "vfov": 52.278340721519946
+   },
+   "confidence": 0,
+   "accepted": false,
+   "acceptKind": "rejected (refine)",
+   "eye": {
+    "h": 435.1625,
+    "ground0f": 433.5625,
+    "dem": "mapterhorn-0f",
+    "overlayDem": "mapterhorn",
+    "overlayGround": 433.5625
+   }
+  }
+ }
+}

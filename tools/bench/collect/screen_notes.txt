@@ -1,0 +1,146 @@
+# idx season weather skyline foreground hard notes   (weather: clear|cloudy|cos=clouds on skyline)
+0 summer cloudy near rock 0 Alpstein ridge, cumulus above
+2 winter clear far trees 0 larch foreground, snowy range
+4 summer clear near none 0 grassy ridge, wide
+6 summer clear far trees 1 hazy distant Alps (Mont Blanc outside CH) seen across plateau
+10 summer clear far none 0 Alpstein seen from afar
+11 summer clear far water 0 lake foreground, Schreckhorn
+12 winter clear near snow 0 rocky crest over snowfield
+13 summer cloudy far trees 1 dusk, trees framing, distant Alps
+14 summer cloudy near none 0 ultrawide ridge
+15 summer clear far none 0 tele glaciated massif
+17 summer cloudy near water 1 hazy flat light, lake
+18 summer cloudy near none 0 dark summit pyramid, clouds
+20 winter clear near water 1 mirror reflection in lake, portrait
+21 summer cos near none 0 limestone wall, clouds clinging
+22 winter clear near none 1 sunset alpenglow, orange sky
+23 summer clear near trees 0 portrait big rock face
+25 summer cos near none 1 overcast, cloud on peaks, hazy
+26 winter clear near snow 1 sea of fog, low-contrast snowy ridge
+27 summer cloudy near water 1 heavy haze low contrast
+28 summer cos far none 0 snowy range, cloud on right peak
+29 summer clear far buildings 0 vineyard wall/railway foreground, lake
+31 summer clear near none 0 tele rock peak, cloud edge
+32 winter clear near snow 0 portrait snowy summit
+33 summer cos near buildings 1 cloud band hides mid-slope, farm buildings foreground, portrait
+34 summer clear far buildings,wires 1 valley floor, road, overhead catenary wires
+35 summer clear near none 0 tele cirque
+37 summer cloudy near water 0 lake, big clouds
+38 summer cos far none 0 tele snow massif, cloud around base
+41 summer cloudy near none 0 tele north face, only upper skyline
+42 summer cloudy near none 0 overcast ridge
+44 summer clear far water,trees 0 lake & trees foreground
+45 summer cos near none 0 cumulus on skyline
+46 winter clear far trees 1 dusk, thin distant Alps line seen from Jura
+47 summer cloudy near water 1 heavy haze, lake, low contrast
+48 summer clear near grass 0 tele glaciated massif
+51 summer cos near water 1 reflection in tarn, cloud on summit
+53 summer clear far rock 1 elevated view over lake, faint distant Alps
+55 summer clear near trees 0 autumn larches, valley
+56 winter cloudy far water 1 600mm across lake, haze
+57 summer cloudy near water,buildings 0 lake, village
+58 winter cos near snow 0 tele, lenticular clouds
+60 winter clear near snow 0 sea of fog, snowy ridge
+61 summer clear near none 0 tele portrait icy summit
+62 winter clear far trees 1 dusk, Alps line above sea of fog
+63 summer clear far trees 1 haze, trees framing
+68 summer clear far none 0 tele massif, dark shadowed foreground slope
+69 summer cloudy near trees 1 dark forested ridge silhouette under grey clouds
+70 summer clear near grass 0 grass stems in foreground, valley with lake
+72 summer clear far trees 1 low-relief rolling hills, hazy horizon
+73 summer cos far water,buildings,trees 0 lake/harbour foreground, clouds near summits
+75 winter cloudy near trees 0 snow-dusted range above forest
+77 summer clear far fence,grass 0 fence post in foreground, hazy distant ranges
+78 winter cos near trees 1 cumulus hiding parts of massif, branch at edge
+79 winter clear near buildings,people 1 village street foreground, peak above rooftops
+80 summer cloudy near water,trees 0 valley lake, overcast
+81 summer cos near trees 0 dark valley, glacier and cloud above
+82 summer clear near trees 0 forest foreground
+84 summer cos near none 0 clouds on peaks, soft light
+88 summer clear near water 0 reservoir, snow peaks
+89 summer clear near water 1 backlit haze, lake, sailboat
+90 summer cloudy near grass,trees 0 valley meadow, overcast
+91 summer cos near wires,glass 1 shot through window, cables and reflections
+92 winter cos near none 0 tele fresh snow, clouds on crest
+93 summer clear far trees 1 sea of fog, spruces silhouetted, distant Alps
+95 summer cloudy near grass 0 broad valley, wide
+97 summer cloudy near water 0 lake, gentle forested hills
+98 winter cos near snow 0 tele, lenticular cloud over range
+99 winter clear near trees 0 tele portrait, snowy pyramid
+100 winter clear far trees,snow 1 pine branches framing, valley view
+101 summer clear near grass,trees 0 alpine pasture, big north face
+103 summer cos far none 1 elevated over lake, hazy distant skyline
+104 summer clear near water 1 sun in frame, backlit haze
+105 winter clear near trees 0 snowy massif over forest
+107 summer cloudy far plants,buildings 0 over lake, town below
+108 summer clear near trees 0 golden larch in foreground
+111 summer clear near grass,wires 0 overhead wires cross sky
+113 winter cos near buildings,cars 1 parking lot, roof edge, cars
+115 summer clear near rock 0 twin rocky summit, wide
+117 summer clear near water,buildings 0 wooded peak above lakeside town
+118 summer cos near none 1 clouds boiling over ridge
+119 summer clear near trees 0 half the frame in shadow
+121 summer clear near buildings,grass 0 hut, lift pylon, trail
+124 summer cos near none 1 thick cloud veiling summits and base
+125 winter cloudy near train,wires 1 train and catenary in foreground
+127 winter clear far trees,snow 0 bare larches, snowy range
+128 summer clear near tent,grass 1 dusk, lit tent, very dark terrain
+129 winter clear far snow 0 elevated winter view over lake
+130 summer cos near grass 0 cloud on summit, classic triple peaks
+133 summer clear near flowers,water 0 cotton-grass tarn foreground
+134 summer cloudy near water,road 0 reservoir, overcast
+135 summer clear far water,grass 0 tarn foreground, distant range
+136 summer cos near people,buildings 1 crowded viewing platform, observatory domes
+137 winter cloudy near skilift,people 1 dark storm sky, ski lift
+138 winter clear near tree,snow 0 lone tree in deep snow
+139 summer clear near buildings,trees 0 village rooftops below rock wall
+140 winter clear near people,rock 0 hikers in foreground
+141 summer cloudy far water,buildings 1 hazy lake panorama, backlit
+142 summer clear near water,snow 0 snow patch and tarn
+143 winter cos near water,snow 0 ice-covered lake shore
+144 summer clear near water,trees 0 wide, mountain lake
+145 summer clear near rock 0 glacier, big snow massif
+147 summer clear far trees,buildings 1 bare branches, hazy distant Alps, village
+149 winter clear far snow,rock 0 wide, spring snow, far ranges
+150 summer clear near water,boat 0 lake and steamer
+151 summer clear far grass 0 elevated ridge view, lakes
+152 winter cloudy near pole,snow 1 power pole, flat light, snow everywhere
+154 summer cos near ice 0 glacier, cumulus towering over peaks
+155 summer cloudy near wires,grass 0 pylon and wires, prealps
+156 summer clear near rock,grass 0 limestone chain, hazy
+157 summer clear far none 0 classic triple peaks across valley
+158 winter cloudy near snow,trees 1 white overcast sky, low sky contrast
+159 winter clear far roof,snow 1 snowy roof in foreground, far skyline
+161 summer clear near none 0 sun flare streak, icy peaks
+166 summer clear far rock,structure 0 summit station edge in foreground, big range
+186 summer clear far trees,buildings 0 village and forest foreground, lake valley
+198 winter clear near water,snow 1 reflection in tarn, spring snow
+213 summer cos far water,buildings 0 lake, clouds on crest, town foreground
+249 winter clear far snow 0 sea of fog, snowy summit
+250 summer clear near people,trees 0 viewpoint platform with people, lake fjord
+254 winter clear far water 1 portrait, sea of fog, dark shadow corner
+337 summer clear far rock,water 0 strong processing, lakes, jagged range
+352 summer clear far none 0 elevated over lake, row of distant peaks
+368 summer cos near grass,buildings 1 cloud cap hiding summit, meadow
+374 summer cloudy near buildings,water 0 lakeside town, reflections
+375 summer clear near buildings,trees 1 stone roofs and bell tower foreground
+385 summer clear near rock 0 jagged gneiss ridge
+395 summer cos near water,rock 0 high valley with lake
+399 summer cloudy far rock,grass 0 distant range beyond valley
+417 summer clear far signpost,person 0 signpost and person, far range
+419 summer clear near trees,water 0 dark tree silhouettes foreground, lake valley
+421 summer cos near buildings,trees 0 village rooftops, glacier peaks
+424 summer clear near grass 0 flat valley floor
+443 summer cloudy near water,road 0 glacier and pass road
+445 summer clear near ice,rock 0 glacier basin
+460 summer clear near trees 0 spruce foreground
+467 summer cos near trees,pole 0 cloud streaming off towers
+479 summer cos near buildings,road 0 cloud at base of twin peaks
+483 summer clear far trees 1 dusk silhouette over sea of fog
+495 summer cloudy near grass,trees 0 overcast valley head
+499 summer cloudy far grass 0 valley, distant snowy range
+512 winter clear near trees 0 spruce framing, snowy peaks
+527 winter clear far water 0 portrait, mostly water, low skyline
+529 summer cos near wall 0 dam wall foreground, cloud bands
+609 winter clear far snow,person 0 ski tourer, distant range
+632 summer cloudy near trees 0 portrait, glacier cirque

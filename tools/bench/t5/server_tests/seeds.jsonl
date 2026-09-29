@@ -1,0 +1,6 @@
+{"id": "IMG_7155", "case": "no seed", "sec": 34.1, "stage1Ms": 23299, "level": "high", "dYawVsFused": -0.007, "stages": [["match-sweep", true]]}
+{"id": "IMG_7155", "case": "yawSeeds=[fused+4\u00b0]", "sec": 27.1, "stage1Ms": 14909, "level": "high", "dYawVsFused": -0.004, "stages": [["hint-seeds", true]]}
+{"id": "IMG_7155", "case": "yawSeeds=[fused+90\u00b0]", "sec": 60.5, "stage1Ms": 50674, "level": "high", "dYawVsFused": -0.007, "stages": [["hint-seeds", false], ["match-sweep", true]]}
+{"id": "IMG_7068", "case": "no seed", "sec": 61.6, "stage1Ms": 50628, "level": "high", "dYawVsFused": -0.011, "stages": [["match-sweep", true]]}
+{"id": "IMG_7068", "case": "yawSeeds=[fused+4\u00b0]", "sec": 46.1, "stage1Ms": 36086, "level": "high", "dYawVsFused": -0.02, "stages": [["hint-seeds", true]]}
+{"id": "IMG_7068", "case": "yawSeeds=[fused+90\u00b0]", "sec": 103.5, "stage1Ms": 93021, "level": "high", "dYawVsFused": -0.011, "stages": [["hint-seeds", false], ["match-sweep", true]]}

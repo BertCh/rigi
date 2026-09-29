@@ -1,0 +1,100 @@
+{
+ "fov": {
+  "moge_l": {
+   "vs_correct_ref": {
+    "n": 30,
+    "median_err": 20.712003035118105,
+    "median_abs": 20.712003035118105,
+    "within5deg": 1,
+    "within10pct_rel": null
+   },
+   "vs_manifest_focal_known": {
+    "n": 38,
+    "median_err": 20.44631339783386,
+    "median_abs": 20.44631339783386,
+    "within5deg": 1,
+    "within10pct_rel": null
+   },
+   "vs_manifest_focal_unknown": {
+    "n": 12,
+    "median_err": 32.50665283203125,
+    "median_abs": 32.50665283203125,
+    "within5deg": 1,
+    "within10pct_rel": null
+   }
+  },
+  "moge_b": {
+   "vs_correct_ref": {
+    "n": 30,
+    "median_err": 27.860467699806982,
+    "median_abs": 27.860467699806982,
+    "within5deg": 0,
+    "within10pct_rel": null
+   },
+   "vs_manifest_focal_known": {
+    "n": 38,
+    "median_err": 26.549157218324893,
+    "median_abs": 26.549157218324893,
+    "within5deg": 1,
+    "within10pct_rel": null
+   },
+   "vs_manifest_focal_unknown": {
+    "n": 12,
+    "median_err": 29.951812744140625,
+    "median_abs": 29.951812744140625,
+    "within5deg": 1,
+    "within10pct_rel": null
+   }
+  },
+  "da3_b": {
+   "vs_correct_ref": {
+    "n": 30,
+    "median_err": 3.391071632630652,
+    "median_abs": 7.438759034188166,
+    "within5deg": 8,
+    "within10pct_rel": null
+   },
+   "vs_manifest_focal_known": {
+    "n": 38,
+    "median_err": 2.961477279519304,
+    "median_abs": 9.157643709303567,
+    "within5deg": 12,
+    "within10pct_rel": null
+   },
+   "vs_manifest_focal_unknown": {
+    "n": 12,
+    "median_err": 6.51640701293945,
+    "median_abs": 8.273488998413072,
+    "within5deg": 4,
+    "within10pct_rel": null
+   }
+  }
+ },
+ "fov_manifest_known_vs_ref": {
+  "n": 23,
+  "median_abs": 0.5505669091011853
+ },
+ "pano_check": {
+  "n_refs_at_stated_eye": 104,
+  "median_medAbsLogD": 0.0012999171401660847,
+  "median_skyAgree": 0.9987873528076758,
+  "min_skyAgree": 0.9941906905816571,
+  "median_ref_cover": 0.6863625919117647
+ },
+ "runtime": {
+  "moge_l": {
+   "mps_median_s": 4.173,
+   "mps_p90_s": 24.978600000000004
+  },
+  "moge_b": {
+   "mps_median_s": 0.976,
+   "mps_p90_s": 2.7204
+  },
+  "da3_b": {
+   "mps_median_s": 0.833,
+   "mps_p90_s": 1.9632
+  },
+  "cpu_note": "CPU fp32, 3 photos, load avg ~8-14: moge_l 9.7-11.5 s, moge_b 5.7-7.1 s, da3_b 11.3-15.2 s",
+  "eval_s_per_photo_median": 75.3
+ }
+}

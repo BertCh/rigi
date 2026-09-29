@@ -1,0 +1,53 @@
+{"photos": {
+"wc_0002": {"photoTags": ["foreground-occlusion"], "better": "A", "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Line follows the whole skyline, including the Foostock bump and the rising right ridge to Gross Schiben."},
+  "B": {"verdict": "wrong", "tags": ["fov-scale", "yaw-shift"], "note": "Line runs below the Foostock summit in the centre and climbs well into the sky on the right (Piz Sardona); the scale and shape don't match."}}},
+"wc_0010": {"photoTags": ["water-reflection", "near-field-terrain", "low-light"], "better": "same", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["near-field-terrain", "parallax-mismatch"], "note": "Left ridge fits, but the central Rossmahd bump sits in clear sky above the Saentis summit and the right side runs about 4-5% above the real ridge."},
+  "B": {"verdict": "wrong", "tags": ["near-field-terrain", "parallax-mismatch"], "note": "Almost the same as A. The central bump is in the sky, and the right half sits above the real ridge."}}},
+"wc_0015": {"photoTags": ["fog-haze", "near-field-terrain"], "better": "B", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["pitch-offset", "wrong-direction"], "note": "Line is entirely in the sky, far above the distant Alps and the near ridge, and then rises steeply off the frame."},
+  "B": {"verdict": "wrong", "tags": ["pitch-offset", "near-field-terrain"], "note": "Left half is in the sky; only the right part is near the level of the distant Alps over the fog."}}},
+"wc_0023": {"photoTags": ["cloud", "near-field-terrain"], "better": "neither", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["wrong-direction", "narrow-fov"], "note": "Line runs across the lower mid-ground and misses the big massif and the near green slope."},
+  "B": {"verdict": "wrong", "tags": ["wrong-direction", "narrow-fov"], "note": "Roughly follows the near green slope on the right but misses the main massif completely; the line is far below it."}}},
+"wc_0027": {"photoTags": ["water-reflection", "cloud"], "better": "B", "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Right ridge fits tightly and the Bietschhorn shape matches; the left flank sits about 1% above the rock."},
+  "B": {"verdict": "correct", "tags": [], "note": "Hugs both the right ridge and the Bietschhorn left flank slightly more closely than A."}}},
+"wc_0034": {"photoTags": ["near-field-terrain", "featureless-skyline"], "better": "same", "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Forested ridge profile and saddle match; the line sits at the treetops."},
+  "B": {"verdict": "correct", "tags": [], "note": "Essentially the same as A; the ridge and saddle match."}}},
+"wc_0035": {"photoTags": ["fog-haze", "featureless-skyline"], "better": "B", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["near-field-terrain", "parallax-mismatch", "fog-haze"], "note": "The Homberg bump (1.6 km) on the left sits in empty haze, and the line runs below the top of the central forested hill."},
+  "B": {"verdict": "unsure", "tags": ["fog-haze", "featureless-skyline"], "note": "Flat line at the level of the hidden distant Alps; the central hill top sits roughly on it. The distant skyline is lost in haze, so the shape can't be checked."}}},
+"wc_0047": {"photoTags": ["cloud"], "better": "same", "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Piz Vadret, Piz Muragl, the notch and the right ridge all match; the far right is covered by cloud."},
+  "B": {"verdict": "correct", "tags": [], "note": "Virtually the same as A; a good fit throughout."}}},
+"wc_0052": {"photoTags": ["fog-haze", "low-light", "water-reflection"], "better": "B", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["yaw-shift", "near-field-terrain"], "note": "Left slope is roughly right, but the right-hand mountains rise far above the line, which stays low until the far right."},
+  "B": {"verdict": "wrong", "tags": ["near-field-terrain", "parallax-mismatch"], "note": "Left slope and centre fit well, but the right-hand hazy mountain face is far above the line, and a spurious vertical rise appears at the far right."}}},
+"wc_0058": {"photoTags": ["cloud"], "better": "B", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["cloud", "yaw-shift"], "note": "Line cuts below visible cliff rock around x 400-550 and then rises steeply into cloud and sky."},
+  "B": {"verdict": "unsure", "tags": ["cloud"], "note": "Line follows the top of the cliff wall where rock shows and looks plausible, but most of the crest is in cloud."}}},
+"wc_0070": {"photoTags": ["near-field-terrain"], "better": "A", "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Main peak, notch and Gandstock match closely. The distant left section (Rad/Baechistock, about 18% of the width) sits in empty sky above the real slope."},
+  "B": {"verdict": "wrong", "tags": ["roll", "near-miss"], "note": "Right shape, but the line is above the Gandstock rock yet below the main summit, which points to a roll error; the left distant section is also in the sky."}}},
+"wc_0071": {"photoTags": ["water-reflection"], "better": "A", "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Sassalb peak, the moraine ridge and the big right slope all match; the line is about 1-1.5% above the slope."},
+  "B": {"verdict": "correct", "tags": [], "note": "Similar to A but slightly higher over Sassalb and the right slope (about 1%)."}}},
+"wc_0072": {"photoTags": ["foreground-occlusion"], "better": "B", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["pitch-offset", "roll"], "note": "Line is high in the sky among the branches, well above the snowy Raetikon skyline."},
+  "B": {"verdict": "wrong", "tags": ["pitch-offset", "near-field-terrain"], "note": "Line is in the sky about 50 px or more above the real snowy skyline, and the left part climbs off the frame."}}},
+"wc_0076": {"photoTags": ["cloud", "foreground-occlusion"], "better": "same", "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Les Millets summit, the right ridge and the forested middle ridge match; the left Vanil Noir section is hidden in cloud."},
+  "B": {"verdict": "correct", "tags": [], "note": "Practically the same as A."}}},
+"wc_0087": {"photoTags": ["fog-haze"], "better": "A", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["parallax-mismatch", "near-field-terrain"], "note": "Right ridge (x 800-1400) fits, but the line goes under the distinctive left summit and floats in the sky on the far left."},
+  "B": {"verdict": "wrong", "tags": ["wrong-direction", "fov-scale"], "note": "Only the central summit matches roughly; the left and right sections are 50-200 px up in the sky."}}},
+"wc_0095": {"photoTags": ["none"], "better": "neither", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["near-field-terrain", "pitch-offset"], "note": "Line runs across the top of the frame in the sky, far above the Alps skyline."},
+  "B": {"verdict": "wrong", "tags": ["near-field-terrain", "pitch-offset"], "note": "Line is in the sky at the top of the frame; no match to the Alps skyline."}}},
+"wc_0098": {"photoTags": ["foreground-occlusion", "near-field-terrain"], "better": "A", "candidates": {
+  "A": {"verdict": "wrong", "tags": ["near-miss", "near-field-terrain"], "note": "Right crest fits roughly, but the line bypasses the pinnacle and floats about 3-5% above the snow slope on its left."},
+  "B": {"verdict": "wrong", "tags": ["pitch-offset", "roll"], "note": "Line cuts through the pinnacle and runs well above the right crest; the shape and tilt don't match."}}}
+}}

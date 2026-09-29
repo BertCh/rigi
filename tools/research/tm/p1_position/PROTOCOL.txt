@@ -1,0 +1,101 @@
+P1 - position triage before matching - PRE-REGISTERED PROTOCOL
+Written 2026-09-28T17:48Z (UTC), before any title was parsed, any gazetteer was fetched or any flag was computed.
+Author: TM program subagent (session mt-image-58). Anything changed after this timestamp is labelled POST HOC in REPORT.txt.
+
+Prior knowledge disclosure (not blind): I have read F1 (REPORT.md, taxonomy.json), which names a few titles/causes
+(wc_0073 "Matthorn from pilatus", wc_0069 "... from Fronalpstock", wc_0002 "Gandstock, Plattengrat, Guldergrat",
+wc_0006 "Heubuetzlipass Fahnenstock", wc_0001 "Larch in Guarda"). I have NOT looked at the other dev titles. The rules
+below are written generically, not tuned to those examples.
+
+SCOPE
+- The 50 dev ids of tools/bench/split.json only (manifest rows filtered by that list). No test ids, no data_v3.
+- Inputs per photo: manifest title, lat, lon, positionSource, altitudeM, headingDeg; DEM = Mapterhorn via
+  tools/matcher/dem.py (tile cache); OSM via Overpass; Nominatim only as a fallback (below). No images, no rendering,
+  no matching, no LLM judgement.
+
+0. STATED EYE (as the pipeline computes it)
+- src/lib/geo/pipeline.ts: eye = max(alt ?? ground, ground + 1.6), alt = manifest altitudeM (EXIF GPS alt) if present.
+- ground = Mapterhorn DEM bilinear at (lat, lon) at z14. I recompute this and cross-check it against the C0 cache
+  meta.json eye (render engine value); report the max difference.
+
+1a. TITLE PARSING (deterministic)
+- Normalise title: drop "File:" and the extension; "_" -> " "; drop tokens that are pure digits, dates, or camera
+  file stems (IMG, DSC, DSCF, P\d+, etc.); collapse whitespace.
+- Viewpoint phrases: a VP cue followed by a capture span. The capture span runs from after the cue to the first
+  delimiter: , ; ( ) [ ] . : " - " " – " " — " digit, or a cue word (to|towards|toward|onto|over|across|with|and|und|
+  nach|gegen|richtung|auf|mit|vers|sur|et|avec|verso|su|con|e|with|in|im|bei|near|at) or end of title.
+  VP cues (case-insensitive, word-bounded):
+    en: "view from", "seen from", "as seen from", "looking \w+ from", "from the summit of", "from the top of",
+        "from", "summit of", "top of", "on top of", "at the summit of"
+    de: "Blick vom|von der|von", "Aussicht vom|von der|von", "Sicht vom|von der", "Panorama vom|von der",
+        "Gipfelpanorama (vom|von der)?", "Gipfelblick (vom|von der)?", "vom", "von der", "von den", "ab dem", "ab der",
+        "ab", "auf dem", "auf der" (the last two only when NOT preceded by blick|sicht|aussicht|panorama), and
+        "X aus" / "X gesehen" after "von" (i.e. "von X aus", "von X gesehen")
+    fr: "depuis (le|la|l'|les)?", "vu(e)? depuis", "vu du|de la|de l'|des", "sommet du|de la", "au sommet du|de la"
+    it: "da|dal|dalla|dallo|dall'|dai|dagli|dalle", "visto|vista|veduta da|dal|dalla|dallo|dall'",
+        "panorama da|dal|dalla", "cima del|della"
+    rm: "da|dad" (same as it "da")
+    suffix form: title starting "X - view|Aussicht|Blick|Panorama|vue|vista" or "X view|X summit view|
+        X Gipfelpanorama|X Gipfelaussicht" -> X is a viewpoint phrase.
+  Generic words stripped from the end of a capture before lookup: gipfel, summit, sommet, vetta, kulm (kept as an
+  alternative lookup: first try the full capture, then the stripped one).
+- Target names: every gazetteer PEAK name (natural=peak|volcano) found anywhere in the normalised title outside the
+  viewpoint span(s) (longest match first, non-overlapping, word-bounded). Also target cues ("Blick auf", "view of|to|
+  towards", "vue sur", "vers", "Richtung", "verso", "vista su") are recorded, but targets are defined by gazetteer
+  matches, not by cues.
+
+1b. GAZETTEER
+- Overpass, around:40000 m of the stated position, features with a name and any of: natural=peak|volcano|saddle|
+  ridge; tourism=viewpoint|alpine_hut|wilderness_hut; amenity=shelter (only with shelter_type=basic_hut|lean_to not
+  required: include all named shelters); place=* ; railway=station|halt; aerialway=station. Nodes; ways/relations via
+  "out center". Names used: name, name:de/fr/it/rm/en, alt_name, short_name, official_name, loc_name.
+- Normalisation: NFKD, strip accents, lower-case, ß->ss, ae/oe/ue kept as typed but also umlaut-folded (ä->a and
+  ä->ae both indexed), punctuation/hyphens/apostrophes -> space, collapse spaces. Each name also indexed:
+  (i) with all spaces removed ("fronalp stock" == "fronalpstock"); (ii) with a leading generic token removed
+  (piz, pizzo, pic, pointe, punta, mont, monte, mount, mt, munt, cima, dent, aiguille, grand, gross, grosser,
+  grosse, klein, kleiner, le, la, les, il, der, die, das, the) - only if the remainder is >= 4 chars.
+- A viewpoint capture matches a feature if, after normalisation, the capture's leading 1..5 tokens (longest first)
+  equal an indexed name variant, OR (prefix rule) the capture equals the first token(s) of a feature name and the
+  capture is >= 5 chars (e.g. "pilatus" -> "Pilatus Kulm"). Exact matches beat prefix matches.
+- Among matching features pick the NEAREST to the stated position (task rule). For a viewpoint, if several types
+  tie on name, still the nearest.
+- Fallback if no gazetteer hit for a viewpoint capture: Nominatim search (q = capture, viewbox = stated +- 40 km,
+  bounded=1, limit=10), nearest result within 40 km. Labelled "nominatim" in the output.
+- Politeness: User-Agent "mt-image-research-P1/0.1 (position triage study; contact rgc via repo owner)", >= 1.1 s
+  between requests, every response cached in p1_position/cache/ (keyed by query hash), never re-requested.
+
+1c. FLAGS
+- Elevation of a named feature: z_feat = max DEM over a 30 m radius disc around the node (summit nodes are often a
+  few metres off the DEM top), from Mapterhorn z14.
+- F-far: a resolved viewpoint lies > 400 m (haversine) from the stated position.
+- F-low: a resolved viewpoint lies <= 1000 m from the stated position AND stated eye < z_feat(viewpoint) - 150 m.
+- F-vis: for any resolved TARGET peak (not also the viewpoint, 200 m .. 40 km from the eye):
+    (los) not line-of-sight visible from the stated eye: along the eye->summit segment (summit at z_feat + 0 m),
+          sampled every max(5 m, 0.25 % of distance), excluding the first 30 m and last 60 m, terrain height
+          (DEM minus (1-k)d^2/(2R), k=0.13, same as dem.py / peaks.ts) exceeds the sight line by > 20 m anywhere;
+          DEM band by distance from the eye as in dem.py (z14 < 3 km, z12 < 15 km, z10 beyond);
+    (hdg) OR headingDeg known and |bearing(eye->target) - headingDeg| > 60 deg.
+  F-vis fires if ANY target fails; the sub-reason (los / hdg) is recorded.
+- F-exif (secondary, not part of the primary suspect flag): altitudeM present and |altitudeM - ground| > 150 m.
+- PRIMARY "position suspect" = F-far OR F-low OR F-vis. Secondary variants reported: without F-vis; with F-exif.
+- A photo with no viewpoint phrase and no target gets no flag (abstains = not flagged).
+
+1d. OUTPUT per photo (flags.json): parsed phrases, resolved features (name, type, lat, lon, source, distance m,
+  z_feat), flags + reasons, stated eye, candidate eyes. Candidate eye = viewpoint (F-far or F-low) at lat/lon of the
+  feature, h = z_feat + 2 m (for a peak = summit + 2 m). proposals.json = [{pid, eye{lat,lon,h}, reason}] for every
+  flagged photo that has a candidate eye (F-vis alone gives no candidate eye).
+
+2. EVALUATION (dev 50)
+- Positive label A (primary): F1 taxonomy stage == "position" (9 photos: 0035 0069 0073 0087 0095 0010 0070 0074 0086).
+- Positive label B: F1 cause "a_big" present (5 photos). Also reported: any photo whose F1 causes include a_big or
+  a_small.
+- Everything else (41) is negative for A. Report TP/FP/FN/TN, precision, recall.
+- COST: number of flagged photos among dev photos with >= 1 verified-correct ref (refs.correct_refs; the refs are all
+  at the stated lat/lon, so "correct at the stated eye"). Each such flag is a false alarm on an already-solvable photo.
+- Candidate-eye check: refs are at the stated lat/lon (only eye h varies), so for a flagged photo with a correct ref
+  the proposal's distance to the correct eye = distance from the stated position (+ height delta to the ref eyeH).
+  For position-failure photos without a correct ref, compare with F1's evidence text qualitatively only.
+
+3. No matching, no rendering. 4. GT-12 (data/ground-truth.json): only F-exif can apply (no titles); computed if the
+  file has gpsAltitude + demGround / lat-lon, reported separately, not mixed with dev metrics.
+Constants frozen: 400 m, 150 m, 1000 m, 20 m, 60 deg, 40 km, 30 m disc, +2 m eye, 150 m EXIF.

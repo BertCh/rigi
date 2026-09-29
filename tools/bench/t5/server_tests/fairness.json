@@ -1,0 +1,187 @@
+{
+ "log": [
+  {
+   "t": 8.0,
+   "client": "honour#0",
+   "status": 503,
+   "retryAfter": "12",
+   "ticket": "1",
+   "sentTicket": null,
+   "body.ticket": "1"
+  },
+  {
+   "t": 22.2,
+   "client": "greedy",
+   "status": 200
+  },
+  {
+   "t": 27.2,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 33.2,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 39.2,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 42.7,
+   "client": "honour#0",
+   "status": 200,
+   "retryAfter": null,
+   "ticket": null,
+   "sentTicket": "1",
+   "body.ticket": null
+  },
+  {
+   "t": 49.7,
+   "client": "honour#1",
+   "status": 503,
+   "retryAfter": "17",
+   "ticket": "5",
+   "sentTicket": null,
+   "body.ticket": "5"
+  },
+  {
+   "t": 63.3,
+   "client": "greedy",
+   "status": 200
+  },
+  {
+   "t": 71.7,
+   "client": "honour#1",
+   "status": 503,
+   "retryAfter": "11",
+   "ticket": "5",
+   "sentTicket": "5",
+   "body.ticket": "5"
+  },
+  {
+   "t": 79.4,
+   "client": "greedy",
+   "status": 200
+  },
+  {
+   "t": 79.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 80.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 81.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 82.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 88.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 94.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 100.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 106.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 107.0,
+   "client": "honour#1",
+   "status": 200,
+   "retryAfter": null,
+   "ticket": null,
+   "sentTicket": "5",
+   "body.ticket": null
+  },
+  {
+   "t": 114.0,
+   "client": "honour#2",
+   "status": 503,
+   "retryAfter": "13",
+   "ticket": "14",
+   "sentTicket": null,
+   "body.ticket": "14"
+  },
+  {
+   "t": 128.4,
+   "client": "greedy",
+   "status": 200
+  },
+  {
+   "t": 133.4,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 139.5,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 145.5,
+   "client": "greedy",
+   "status": 503
+  },
+  {
+   "t": 147.2,
+   "client": "honour#2",
+   "status": 200,
+   "retryAfter": null,
+   "ticket": null,
+   "sentTicket": "14",
+   "body.ticket": null
+  },
+  {
+   "t": 194.0,
+   "client": "greedy",
+   "status": 200
+  }
+ ],
+ "retryCyclesPerHonouringRequest": [
+  1,
+  2,
+  1
+ ],
+ "greedy200s": 5,
+ "statuses": [
+  [
+   "greedy",
+   200
+  ],
+  [
+   "greedy",
+   503
+  ],
+  [
+   "honour",
+   200
+  ],
+  [
+   "honour",
+   503
+  ]
+ ],
+ "PASS": true
+}

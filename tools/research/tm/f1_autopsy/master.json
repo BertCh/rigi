@@ -1,0 +1,8112 @@
+{
+ "wc_0001": {
+  "id": "wc_0001",
+  "title": "File:Larch in Guarda.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 70.0,
+  "heading": 89.1,
+  "date": "2021-03-19T12:44:14",
+  "camera": "NIKON CORPORATION NIKON D850",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "far",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "trees"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "larch foreground, snowy range"
+  },
+  "verdictTags": [
+   "cloud",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 151.0,
+    "pitch": 7
+   },
+   {
+    "label": "B",
+    "yaw": 101.8,
+    "pitch": 4.1
+   },
+   {
+    "label": "C",
+    "yaw": 91.4,
+    "pitch": 1.2
+   },
+   {
+    "label": "CMT",
+    "yaw": 89.5,
+    "pitch": 2.2
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 3.741,
+    "skylineMedPx": 6.985,
+    "matchSupport": 0.597,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 911,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 101.81,
+    "pitch": 4.1,
+    "roll": 2.07,
+    "vfov": 16.73
+   },
+   "sweepBest": 207,
+   "vfov0": 17.231148932913637,
+   "hfov0": 30.150562550224098,
+   "focalKnown": true,
+   "stage": "verify[5]:appseeds"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 101.8,
+    "pitch": 4.1,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 911,
+    "sup": 0.597,
+    "agree": 3.741,
+    "skyPx": 6.985,
+    "s1inl": 207
+   },
+   {
+    "src": "sky",
+    "yaw": 101.9,
+    "pitch": 4.1,
+    "dCorrect": null,
+    "dWrong": 0.1,
+    "inl": 691,
+    "sup": 0.571,
+    "agree": 24.075,
+    "skyPx": 7.531,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 315.1,
+    "pitch": 12.2,
+    "dCorrect": null,
+    "dWrong": 144.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.602,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 223.7,
+    "pitch": 2.1,
+    "dCorrect": null,
+    "dWrong": 77.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.958,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 193.6,
+    "pitch": 5.7,
+    "dCorrect": null,
+    "dWrong": 43.9,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.9,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 150.7,
+    "pitch": 7.1,
+    "dCorrect": null,
+    "dWrong": 0.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 102.622,
+    "skyPx": 9.448,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   420,
+   563,
+   128,
+   390,
+   371,
+   363
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 1277,
+   "sup": 0.44,
+   "pose": {
+    "yaw": 101.77,
+    "pitch": 4.16,
+    "roll": 2.41,
+    "vfov": 16.9
+   },
+   "dCorrect": null,
+   "dWrong": 0.1212720357551742,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0002": {
+  "id": "wc_0002",
+  "title": "File:Gandstock, Plattengrat, Guldergrat.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 23.0,
+  "heading": 33.0,
+  "date": "2023-08-19T13:38:11",
+  "camera": "samsung Galaxy S23",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [],
+   "hard": false,
+   "region": "glarus",
+   "notes": "grassy ridge, wide"
+  },
+  "verdictTags": [],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 3,
+  "correctRefs": [
+   {
+    "label": "C",
+    "yaw": 28.5,
+    "pitch": -8.3,
+    "vfov": 58.8
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 37.1,
+    "pitch": -6.2
+   },
+   {
+    "label": "B",
+    "yaw": 224.3,
+    "pitch": 7.6
+   },
+   {
+    "label": "CMT",
+    "yaw": 139.1,
+    "pitch": 4.8
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 6.829,
+    "skylineMedPx": 9.651,
+    "matchSupport": 0.125,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 483,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 37.07,
+    "pitch": -6.2,
+    "roll": -1.16,
+    "vfov": 56.48
+   },
+   "sweepBest": 176,
+   "vfov0": 58.91699203829191,
+   "hfov0": 73.89437651094458,
+   "focalKnown": true,
+   "stage": "verify[5]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 37.1,
+    "pitch": -6.2,
+    "dCorrect": 10.7,
+    "dWrong": 0.0,
+    "inl": 483,
+    "sup": 0.125,
+    "agree": 6.829,
+    "skyPx": 9.651,
+    "s1inl": 176
+   },
+   {
+    "src": "sky",
+    "yaw": 37.7,
+    "pitch": -6.2,
+    "dCorrect": 11.4,
+    "dWrong": 0.6,
+    "inl": 483,
+    "sup": 0.158,
+    "agree": 37.778,
+    "skyPx": 10.012,
+    "s1inl": null
+   },
+   {
+    "src": "sweepfine",
+    "yaw": 37.2,
+    "pitch": -6.2,
+    "dCorrect": 10.8,
+    "dWrong": 0.1,
+    "inl": 485,
+    "sup": 0.122,
+    "agree": 7.074,
+    "skyPx": 9.679,
+    "s1inl": 25
+   },
+   {
+    "src": "sky",
+    "yaw": 37.4,
+    "pitch": -6.2,
+    "dCorrect": 11.0,
+    "dWrong": 0.3,
+    "inl": 498,
+    "sup": 0.124,
+    "agree": 7.597,
+    "skyPx": 9.847,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 31.2,
+    "pitch": -7.1,
+    "dCorrect": 3.9,
+    "dWrong": 6.8,
+    "inl": 66,
+    "sup": 0.058,
+    "agree": 47.494,
+    "skyPx": 9.565,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 38.4,
+    "pitch": -6.1,
+    "dCorrect": 12.1,
+    "dWrong": 1.4,
+    "inl": 61,
+    "sup": 0.246,
+    "agree": 85.183,
+    "skyPx": 11.237,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 28.5,
+    "pitch": -8.3,
+    "dCorrect": 0.0,
+    "dWrong": 10.7,
+    "inl": null,
+    "sup": null,
+    "agree": null,
+    "skyPx": null,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   155,
+   192,
+   142,
+   224,
+   195,
+   155
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 116,
+   "sup": 0.02,
+   "pose": {
+    "yaw": 30.74,
+    "pitch": -7.45,
+    "roll": -0.89,
+    "vfov": 58.28
+   },
+   "dCorrect": 3.1286495338460476,
+   "dWrong": 7.601966201267577,
+   "verdict": "pending"
+  }
+ },
+ "wc_0004": {
+  "id": "wc_0004",
+  "title": "File:Alpstein from Fr\u00fcmsel.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": 30.0,
+  "date": "2014-07-06T11:47:53",
+  "camera": "Canon Canon EOS 600D",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [],
+   "hard": false,
+   "region": "appenzell",
+   "notes": "Alpstein seen from afar"
+  },
+  "verdictTags": [
+   "fog-haze"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 2,
+  "nWrongRefs": 1,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 30.6,
+    "pitch": -11.8,
+    "vfov": 44.1
+   },
+   {
+    "label": "CMT",
+    "yaw": 30.0,
+    "pitch": -11.6,
+    "vfov": 44.4
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "B",
+    "yaw": 31.9,
+    "pitch": -8.8
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 1.676,
+    "skylineMedPx": 6.375,
+    "matchSupport": 0.933,
+    "apriori": false,
+    "matchDominant": true,
+    "basinGap": 0.2125287898712541,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 7201,
+    "unmet": [
+     "apriori"
+    ]
+   },
+   "pose": {
+    "yaw": 30.59,
+    "pitch": -11.81,
+    "roll": -0.7,
+    "vfov": 44.08
+   },
+   "sweepBest": 1798,
+   "vfov0": 34.53005830924895,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "verify[5]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 30.6,
+    "pitch": -11.8,
+    "dCorrect": 0.0,
+    "dWrong": 4.3,
+    "inl": 7201,
+    "sup": 0.933,
+    "agree": 1.676,
+    "skyPx": 6.375,
+    "s1inl": 1798
+   },
+   {
+    "src": "sky",
+    "yaw": 30.7,
+    "pitch": -10.6,
+    "dCorrect": 1.3,
+    "dWrong": 3.0,
+    "inl": 222,
+    "sup": 0.034,
+    "agree": 1.851,
+    "skyPx": 6.016,
+    "s1inl": null
+   },
+   {
+    "src": "sweepfine",
+    "yaw": 137.9,
+    "pitch": -12.9,
+    "dCorrect": 108.4,
+    "dWrong": 110.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 21.638,
+    "skyPx": 7.236,
+    "s1inl": 18
+   },
+   {
+    "src": "sky",
+    "yaw": 82.6,
+    "pitch": -5.6,
+    "dCorrect": 58.2,
+    "dWrong": 54.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 41.132,
+    "skyPx": 5.778,
+    "s1inl": null
+   },
+   {
+    "src": "sweepfine",
+    "yaw": 303.0,
+    "pitch": -7.5,
+    "dCorrect": 91.1,
+    "dWrong": 90.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 6.985,
+    "skyPx": 7.073,
+    "s1inl": 16
+   },
+   {
+    "src": "sky",
+    "yaw": 162.0,
+    "pitch": -8.6,
+    "dCorrect": 134.6,
+    "dWrong": 130.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.3,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 351.2,
+    "pitch": -9.9,
+    "dCorrect": 40.6,
+    "dWrong": 41.7,
+    "inl": null,
+    "sup": null,
+    "agree": null,
+    "skyPx": null,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 8123,
+   "sup": 0.837,
+   "pose": {
+    "yaw": 30.58,
+    "pitch": -11.78,
+    "roll": -0.62,
+    "vfov": 44.04
+   },
+   "dCorrect": 0.03490880976254651,
+   "dWrong": 4.240558056241348,
+   "verdict": "correct"
+  }
+ },
+ "wc_0005": {
+  "id": "wc_0005",
+  "title": "File:Evening view from the Uetliberg.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 70.0,
+  "heading": 192.2,
+  "date": "2025-11-19T16:27:29",
+  "camera": "RICOH IMAGING COMPANY, LTD. PENTAX K-1 Mark II",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "trees"
+   ],
+   "hard": true,
+   "region": "central",
+   "notes": "dusk, trees framing, distant Alps"
+  },
+  "verdictTags": [
+   "foreground-occlusion",
+   "low-light"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 3,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 191.3,
+    "pitch": -0.7
+   },
+   {
+    "label": "B",
+    "yaw": 127.0,
+    "pitch": 0.9
+   },
+   {
+    "label": "CMT",
+    "yaw": 122.6,
+    "pitch": 1.3
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": 11.996,
+    "skylineMedPx": 5.641,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 191.21,
+    "pitch": -0.75,
+    "roll": -0.05,
+    "vfov": 17.97
+   },
+   "sweepBest": 0,
+   "vfov0": 18.12438961184455,
+   "hfov0": 29.653267873555723,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 191.2,
+    "pitch": -0.7,
+    "dCorrect": null,
+    "dWrong": 0.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 11.996,
+    "skyPx": 5.641,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 192.1,
+    "pitch": -4.6,
+    "dCorrect": null,
+    "dWrong": 4.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.871,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 121.5,
+    "pitch": 4.3,
+    "dCorrect": null,
+    "dWrong": 4.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.409,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 165.6,
+    "pitch": -4.3,
+    "dCorrect": null,
+    "dWrong": 29.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.383,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 100.5,
+    "pitch": 6.6,
+    "dCorrect": null,
+    "dWrong": 27.3,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 8.225,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 404,
+   "sup": 0.406,
+   "pose": {
+    "yaw": 190.86,
+    "pitch": -1.43,
+    "roll": -0.15,
+    "vfov": 17.15
+   },
+   "dCorrect": null,
+   "dWrong": 1.1199272447367825,
+   "verdict": "pending"
+  }
+ },
+ "wc_0006": {
+  "id": "wc_0006",
+  "title": "File:Heub\u00fctzlipass Fahnenstock.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 13.0,
+  "heading": 147.0,
+  "date": "2020-08-23T14:56:41",
+  "camera": "samsung SM-G970F",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [],
+   "hard": false,
+   "region": "glarus",
+   "notes": "ultrawide ridge"
+  },
+  "verdictTags": [
+   "cloud",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 2,
+  "nWrongRefs": 4,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 152.3,
+    "pitch": 1.5,
+    "vfov": 61.7
+   },
+   {
+    "label": "KP4096",
+    "yaw": 153.1,
+    "pitch": 1.5,
+    "vfov": 62.6
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 149.3,
+    "pitch": -0.3
+   },
+   {
+    "label": "C",
+    "yaw": 149.3,
+    "pitch": 7.9
+   },
+   {
+    "label": "CMT",
+    "yaw": 152.8,
+    "pitch": 0.5
+   },
+   {
+    "label": "CPU",
+    "yaw": 158.4,
+    "pitch": 2.2
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "correct",
+   "source": "sky",
+   "checks": {
+    "cueAgreeDeg": 3.766,
+    "skylineMedPx": 1.604,
+    "matchSupport": 0.707,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": 2.313538751801847,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1935,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 152.85,
+    "pitch": 1.65,
+    "roll": -2.34,
+    "vfov": 60.03
+   },
+   "sweepBest": 327,
+   "vfov0": 70.97127905303564,
+   "hfov0": 112.74855068931089,
+   "focalKnown": true,
+   "stage": "verify[5]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 153.1,
+    "pitch": 1.5,
+    "dCorrect": 0.0,
+    "dWrong": 1.3,
+    "inl": 493,
+    "sup": 0.193,
+    "agree": 6.889,
+    "skyPx": 3.193,
+    "s1inl": 327
+   },
+   {
+    "src": "sky",
+    "yaw": 152.8,
+    "pitch": 1.6,
+    "dCorrect": 0.4,
+    "dWrong": 1.2,
+    "inl": 1935,
+    "sup": 0.707,
+    "agree": 3.766,
+    "skyPx": 1.604,
+    "s1inl": null
+   },
+   {
+    "src": "sweepfine",
+    "yaw": 158.2,
+    "pitch": 2.2,
+    "dCorrect": 5.8,
+    "dWrong": 0.2,
+    "inl": 480,
+    "sup": 0.188,
+    "agree": 3.177,
+    "skyPx": 9.713,
+    "s1inl": 111
+   },
+   {
+    "src": "sky",
+    "yaw": 277.5,
+    "pitch": -10.8,
+    "dCorrect": 136.8,
+    "dWrong": 132.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.734,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 158.6,
+    "pitch": 3.0,
+    "dCorrect": 7.0,
+    "dWrong": 1.1,
+    "inl": 440,
+    "sup": 0.389,
+    "agree": 96.587,
+    "skyPx": 11.362,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 310.8,
+    "pitch": -3.7,
+    "dCorrect": 162.8,
+    "dWrong": 158.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.821,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   68,
+   226,
+   30,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 2814,
+   "sup": 0.652,
+   "pose": {
+    "yaw": 152.79,
+    "pitch": 1.6,
+    "roll": -2.38,
+    "vfov": 60.16
+   },
+   "dCorrect": 0.43428515603182416,
+   "dWrong": 1.1211248607689621,
+   "verdict": "correct"
+  }
+ },
+ "wc_0009": {
+  "id": "wc_0009",
+  "title": "File:Eggishorn Matterhorn.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 78.0,
+  "heading": 220.1,
+  "date": "2026-06-23T12:46:58",
+  "camera": "Apple iPhone 16 Plus",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [],
+   "hard": false,
+   "region": "valais",
+   "notes": "dark summit pyramid, clouds"
+  },
+  "verdictTags": [
+   "cloud",
+   "fog-haze",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 3,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 222.0,
+    "pitch": 0.1,
+    "vfov": 19.1
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "B",
+    "yaw": 13.2,
+    "pitch": 8.3
+   },
+   {
+    "label": "C",
+    "yaw": 4.2,
+    "pitch": 5.9
+   },
+   {
+    "label": "CMT",
+    "yaw": 166.7,
+    "pitch": -0.1
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 3.137,
+    "skylineMedPx": 11.616,
+    "matchSupport": 0.765,
+    "apriori": false,
+    "matchDominant": true,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 2177,
+    "unmet": [
+     "apriori"
+    ]
+   },
+   "pose": {
+    "yaw": 222.04,
+    "pitch": 0.08,
+    "roll": 0.35,
+    "vfov": 19.08
+   },
+   "sweepBest": 32,
+   "vfov0": 18.896026306449137,
+   "hfov0": 25.020242381579653,
+   "focalKnown": true,
+   "stage": "verify[5]:appseeds"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 222.0,
+    "pitch": 0.1,
+    "dCorrect": 0.0,
+    "dWrong": 55.5,
+    "inl": 2177,
+    "sup": 0.765,
+    "agree": 3.137,
+    "skyPx": 11.616,
+    "s1inl": 32
+   },
+   {
+    "src": "sky",
+    "yaw": 222.1,
+    "pitch": 0.1,
+    "dCorrect": 0.1,
+    "dWrong": 55.6,
+    "inl": 263,
+    "sup": 0.848,
+    "agree": 30.607,
+    "skyPx": 11.351,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 33.4,
+    "pitch": 8.0,
+    "dCorrect": 179.3,
+    "dWrong": 20.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.205,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 334.0,
+    "pitch": 0.1,
+    "dCorrect": 112.0,
+    "dWrong": 36.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.354,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 160.7,
+    "pitch": 1.2,
+    "dCorrect": 62.4,
+    "dWrong": 7.2,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 10.249,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 13.2,
+    "pitch": 8.2,
+    "dCorrect": 159.3,
+    "dWrong": 0.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.733,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 2306,
+   "sup": 0.641,
+   "pose": {
+    "yaw": 221.97,
+    "pitch": 0.07,
+    "roll": 0.28,
+    "vfov": 18.89
+   },
+   "dCorrect": 0.08581559293895429,
+   "dWrong": 55.431024780272594,
+   "verdict": "correct"
+  }
+ },
+ "wc_0010": {
+  "id": "wc_0010",
+  "title": "File:Wasserauen, Schweiz (Unsplash).jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 29.0,
+  "heading": 241.4,
+  "date": "2016-03-27T07:52:33",
+  "camera": "Apple iPhone 6s",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "water"
+   ],
+   "hard": true,
+   "region": "appenzell",
+   "notes": "mirror reflection in lake, portrait"
+  },
+  "verdictTags": [
+   "water-reflection"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 237.3,
+    "pitch": 4.8
+   },
+   {
+    "label": "B",
+    "yaw": 208.9,
+    "pitch": 13.2
+   },
+   {
+    "label": "C",
+    "yaw": 236.5,
+    "pitch": 4.6
+   },
+   {
+    "label": "CMT",
+    "yaw": 79.7,
+    "pitch": 5.1
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 6.555,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 236.51,
+    "pitch": 4.57,
+    "roll": 2.49,
+    "vfov": 60.69
+   },
+   "sweepBest": 0,
+   "vfov0": 61.65587350853944,
+   "hfov0": 48.22519609116571,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 236.5,
+    "pitch": 4.6,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.555,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 233.3,
+    "pitch": 5.2,
+    "dCorrect": null,
+    "dWrong": 3.9,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.606,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 35.1,
+    "pitch": -0.2,
+    "dCorrect": null,
+    "dWrong": 49.9,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.179,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 256.1,
+    "pitch": 6.8,
+    "dCorrect": null,
+    "dWrong": 20.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.631,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 273.7,
+    "pitch": 12.0,
+    "dCorrect": null,
+    "dWrong": 43.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.619,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 12,
+   "sup": 0.8,
+   "pose": {
+    "yaw": 246.86,
+    "pitch": 5.54,
+    "roll": -8.57,
+    "vfov": 60.87
+   },
+   "dCorrect": null,
+   "dWrong": 10.262592529870798,
+   "verdict": "pending"
+  }
+ },
+ "wc_0011": {
+  "id": "wc_0011",
+  "title": "File:Kandersteg rock avalanche.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 72.0,
+  "heading": 200.0,
+  "date": "2025-07-31T10:37:44",
+  "camera": "samsung SM-G998B",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clouds_on_skyline",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [],
+   "hard": false,
+   "region": "bernese",
+   "notes": "limestone wall, clouds clinging"
+  },
+  "verdictTags": [
+   "cloud",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "CMT",
+    "yaw": 175.0,
+    "pitch": 14.8,
+    "vfov": 21.3
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 286.2,
+    "pitch": 1.6
+   },
+   {
+    "label": "B",
+    "yaw": 28.2,
+    "pitch": 27.2
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweepfine",
+   "checks": {
+    "cueAgreeDeg": 0.254,
+    "skylineMedPx": 0.916,
+    "matchSupport": 0.862,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1835,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 174.99,
+    "pitch": 14.76,
+    "roll": 1.93,
+    "vfov": 21.47
+   },
+   "sweepBest": 19,
+   "vfov0": 20.43874715134656,
+   "hfov0": 27.031552903727594,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 286.3,
+    "pitch": 1.6,
+    "dCorrect": 124.5,
+    "dWrong": 0.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 9.898,
+    "skyPx": 8.024,
+    "s1inl": null
+   },
+   {
+    "src": "sweepfine",
+    "yaw": 175.0,
+    "pitch": 14.8,
+    "dCorrect": 0.0,
+    "dWrong": 124.3,
+    "inl": 1835,
+    "sup": 0.862,
+    "agree": 0.254,
+    "skyPx": 0.916,
+    "s1inl": 19
+   },
+   {
+    "src": "sky",
+    "yaw": 334.1,
+    "pitch": 12.2,
+    "dCorrect": 161.7,
+    "dWrong": 58.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.438,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 175.0,
+    "pitch": 14.8,
+    "dCorrect": 0.0,
+    "dWrong": 124.3,
+    "inl": 980,
+    "sup": 0.824,
+    "agree": 0.066,
+    "skyPx": 1.103,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 3804,
+   "sup": 0.727,
+   "pose": {
+    "yaw": 174.98,
+    "pitch": 14.77,
+    "roll": 1.93,
+    "vfov": 21.45
+   },
+   "dCorrect": 0.010441636348442529,
+   "dWrong": 124.35583532145247,
+   "verdict": "correct"
+  }
+ },
+ "wc_0013": {
+  "id": "wc_0013",
+  "title": "File:00 3688 Huetstock - Engelberg (Schweiz).jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 90.0,
+  "heading": 255.9,
+  "date": "2021-09-14T11:42:40",
+  "camera": "Apple iPhone 11 Pro Max",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "trees"
+   ],
+   "hard": false,
+   "region": "central",
+   "notes": "portrait big rock face"
+  },
+  "verdictTags": [],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 266.2,
+    "pitch": 8.1
+   },
+   {
+    "label": "B",
+    "yaw": 82.2,
+    "pitch": 14.3
+   },
+   {
+    "label": "C",
+    "yaw": 266.1,
+    "pitch": 8.6
+   },
+   {
+    "label": "CPU",
+    "yaw": 43.7,
+    "pitch": 7.5
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": 38.221,
+    "skylineMedPx": 6.67,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 43.72,
+    "pitch": 7.51,
+    "roll": 2.1,
+    "vfov": 21.66
+   },
+   "sweepBest": 0,
+   "vfov0": 21.76976204990744,
+   "hfov0": 16.413448420824164,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 43.7,
+    "pitch": 7.5,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 38.221,
+    "skyPx": 6.67,
+    "s1inl": 0
+   },
+   {
+    "src": "sky",
+    "yaw": 266.1,
+    "pitch": 8.8,
+    "dCorrect": null,
+    "dWrong": 0.3,
+    "inl": 19,
+    "sup": 0.136,
+    "agree": 1.018,
+    "skyPx": 7.353,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 82.0,
+    "pitch": 14.6,
+    "dCorrect": null,
+    "dWrong": 0.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 11.716,
+    "skyPx": 8.356,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 290.7,
+    "pitch": 6.7,
+    "dCorrect": null,
+    "dWrong": 25.9,
+    "inl": 7,
+    "sup": 0.025,
+    "agree": 68.644,
+    "skyPx": 8.453,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 72.9,
+    "pitch": 8.4,
+    "dCorrect": null,
+    "dWrong": 15.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 10.808,
+    "skyPx": 5.494,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 58,
+   "sup": 0.012,
+   "pose": {
+    "yaw": 266.2,
+    "pitch": 8.34,
+    "roll": 0.58,
+    "vfov": 20.7
+   },
+   "dCorrect": null,
+   "dWrong": 0.31854330916839935,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0014": {
+  "id": "wc_0014",
+  "title": "File:L\u00e4gh da l'Albigna as seen from Piz Blanch.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 160.0,
+  "heading": 180.0,
+  "date": "2017-07-23T12:05:27",
+  "camera": "Panasonic DC-TZ91",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clouds_on_skyline",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [],
+   "hard": true,
+   "region": "graubuenden",
+   "notes": "overcast, cloud on peaks, hazy"
+  },
+  "verdictTags": [
+   "cloud",
+   "fog-haze"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 178.8,
+    "pitch": -0.2,
+    "vfov": 8.9
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 208.9,
+    "pitch": 2.5
+   },
+   {
+    "label": "CMT",
+    "yaw": 42.1,
+    "pitch": 5.3
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": 0.274,
+    "skylineMedPx": 2.7,
+    "matchSupport": 0.672,
+    "apriori": true,
+    "matchDominant": false,
+    "basinGap": 0.8899688639554313,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 2127,
+    "unmet": [
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 178.78,
+    "pitch": -0.15,
+    "roll": -0.23,
+    "vfov": 8.96
+   },
+   "sweepBest": 285,
+   "vfov0": 9.275912473374119,
+   "hfov0": 12.346964067441101,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 178.8,
+    "pitch": -0.1,
+    "dCorrect": 0.0,
+    "dWrong": 32.7,
+    "inl": 2127,
+    "sup": 0.672,
+    "agree": 0.274,
+    "skyPx": 2.7,
+    "s1inl": 285
+   },
+   {
+    "src": "sky",
+    "yaw": 297.6,
+    "pitch": 7.0,
+    "dCorrect": 126.0,
+    "dWrong": 93.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.219,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 329.3,
+    "pitch": 2.1,
+    "dCorrect": 152.8,
+    "dWrong": 76.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 10.48,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 119.0,
+    "pitch": 1.1,
+    "dCorrect": 61.1,
+    "dWrong": 81.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.369,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 3554,
+   "sup": 0.587,
+   "pose": {
+    "yaw": 178.79,
+    "pitch": -0.15,
+    "roll": -0.29,
+    "vfov": 8.98
+   },
+   "dCorrect": 0.010857781965664531,
+   "dWrong": 32.74222156723406,
+   "verdict": "correct"
+  }
+ },
+ "wc_0015": {
+  "id": "wc_0015",
+  "title": "File:Chasseral, vue vers le sud-ouest en hiver.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": 225.0,
+  "date": "2006-02-04T12:46:29",
+  "camera": "Canon Canon EOS 350D DIGITAL",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "snow"
+   ],
+   "hard": true,
+   "region": "jura",
+   "notes": "sea of fog, low-contrast snowy ridge"
+  },
+  "verdictTags": [
+   "featureless-skyline",
+   "fog-haze",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 58.8,
+    "pitch": -8.3
+   },
+   {
+    "label": "B",
+    "yaw": 71.7,
+    "pitch": -2.4
+   },
+   {
+    "label": "C",
+    "yaw": 165.1,
+    "pitch": -8.1
+   },
+   {
+    "label": "CMT",
+    "yaw": 22.9,
+    "pitch": 1.9
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 6.658,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 58.76,
+    "pitch": -8.35,
+    "roll": 2.18,
+    "vfov": 34.67
+   },
+   "sweepBest": 0,
+   "vfov0": 34.53005830924895,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 58.8,
+    "pitch": -8.3,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.658,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 342.6,
+    "pitch": 1.7,
+    "dCorrect": null,
+    "dWrong": 40.5,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 4.636,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 356.0,
+    "pitch": -9.4,
+    "dCorrect": null,
+    "dWrong": 38.2,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 3.521,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 303.9,
+    "pitch": -6.1,
+    "dCorrect": null,
+    "dWrong": 87.0,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 3.924,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 187.2,
+    "pitch": -11.5,
+    "dCorrect": null,
+    "dWrong": 25.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 26.515,
+    "skyPx": 5.37,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 0,
+   "sup": 0.0,
+   "pose": {
+    "yaw": 58.76,
+    "pitch": -8.35,
+    "roll": 2.18,
+    "vfov": 34.67
+   },
+   "dCorrect": null,
+   "dWrong": 0.0,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0017": {
+  "id": "wc_0017",
+  "title": "File:Bellwald- Aussicht.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 107.0,
+  "heading": 225.0,
+  "date": "2005-08-05T10:23:39",
+  "camera": "PENTAX Corporation PENTAX Optio S50",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clouds_on_skyline",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [],
+   "hard": false,
+   "region": "valais",
+   "notes": "snowy range, cloud on right peak"
+  },
+  "verdictTags": [
+   "cloud"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 217.1,
+    "pitch": 0.5,
+    "vfov": 14.1
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 322.5,
+    "pitch": 12.6
+   },
+   {
+    "label": "CMT",
+    "yaw": 316.3,
+    "pitch": 13.4
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": 0.15,
+    "skylineMedPx": 2.872,
+    "matchSupport": 0.523,
+    "apriori": true,
+    "matchDominant": false,
+    "basinGap": 0.49035388071600255,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 2168,
+    "unmet": [
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 217.12,
+    "pitch": 0.55,
+    "roll": -1.24,
+    "vfov": 14.15
+   },
+   "sweepBest": 439,
+   "vfov0": 13.833307257483765,
+   "hfov0": 18.375393330100692,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 217.1,
+    "pitch": 0.5,
+    "dCorrect": 0.1,
+    "dWrong": 112.0,
+    "inl": 2168,
+    "sup": 0.523,
+    "agree": 0.15,
+    "skyPx": 2.872,
+    "s1inl": 439
+   },
+   {
+    "src": "sky",
+    "yaw": 217.1,
+    "pitch": 0.6,
+    "dCorrect": 0.0,
+    "dWrong": 112.0,
+    "inl": 1691,
+    "sup": 0.565,
+    "agree": 0.177,
+    "skyPx": 2.717,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 254.6,
+    "pitch": 3.1,
+    "dCorrect": 40.1,
+    "dWrong": 71.9,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.997,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 206.3,
+    "pitch": 1.0,
+    "dCorrect": 11.3,
+    "dWrong": 122.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.477,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 2790,
+   "sup": 0.444,
+   "pose": {
+    "yaw": 217.13,
+    "pitch": 0.55,
+    "roll": -1.43,
+    "vfov": 14.23
+   },
+   "dCorrect": 0.06954039771429354,
+   "dWrong": 111.98038093129945,
+   "verdict": "correct"
+  }
+ },
+ "wc_0019": {
+  "id": "wc_0019",
+  "title": "File:Sackhorn.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 135.0,
+  "heading": 90.0,
+  "date": "2014-08-28T15:39:25",
+  "camera": "NIKON COOLPIX P7800",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [],
+   "hard": false,
+   "region": "bernese",
+   "notes": "tele rock peak, cloud edge"
+  },
+  "verdictTags": [
+   "cloud",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 1,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 82.5,
+    "pitch": 13.5,
+    "vfov": 10.9
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "B",
+    "yaw": 90,
+    "pitch": 0
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": 0.352,
+    "skylineMedPx": 1.892,
+    "matchSupport": 0.742,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": 0.9921241713665988,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 3275,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 82.48,
+    "pitch": 13.55,
+    "roll": 0.31,
+    "vfov": 10.89
+   },
+   "sweepBest": 148,
+   "vfov0": 10.9839853310471,
+   "hfov0": 14.610640283400732,
+   "focalKnown": true,
+   "stage": "basinGap[3]"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 82.5,
+    "pitch": 13.6,
+    "dCorrect": 0.0,
+    "dWrong": 21.1,
+    "inl": 3275,
+    "sup": 0.742,
+    "agree": 0.352,
+    "skyPx": 1.892,
+    "s1inl": 148
+   },
+   {
+    "src": "sky",
+    "yaw": 0.4,
+    "pitch": 12.5,
+    "dCorrect": 83.1,
+    "dWrong": 102.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.24,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 48.2,
+    "pitch": 0.9,
+    "dCorrect": 46.9,
+    "dWrong": 42.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 11.005,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 82.4,
+    "pitch": 13.6,
+    "dCorrect": 0.1,
+    "dWrong": 21.1,
+    "inl": 1591,
+    "sup": 0.834,
+    "agree": 13.137,
+    "skyPx": 3.04,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 3882,
+   "sup": 0.591,
+   "pose": {
+    "yaw": 82.48,
+    "pitch": 13.55,
+    "roll": 0.33,
+    "vfov": 10.9
+   },
+   "dCorrect": 0.040827819401389576,
+   "dWrong": 21.064671579383813,
+   "verdict": "correct"
+  }
+ },
+ "wc_0020": {
+  "id": "wc_0020",
+  "title": "File:Le Weisshorn et le Bishorn depuis Bella Tola.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 72.0,
+  "heading": 80.0,
+  "date": "2020-02-18T14:51:23",
+  "camera": "NIKON CORPORATION NIKON D7500",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "snow"
+   ],
+   "hard": false,
+   "region": "valais",
+   "notes": "portrait snowy summit"
+  },
+  "verdictTags": [],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 0,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 163.1,
+    "pitch": -1.8,
+    "vfov": 27.7
+   }
+  ],
+  "wrongRefs": [],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": 0.327,
+    "skylineMedPx": 0.891,
+    "matchSupport": 0.794,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": 1.2580093724115147,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 2087,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 163.1,
+    "pitch": -1.76,
+    "roll": -0.31,
+    "vfov": 27.75
+   },
+   "sweepBest": 669,
+   "vfov0": 28.07450281385485,
+   "hfov0": 18.921496667479193,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 163.1,
+    "pitch": -1.8,
+    "dCorrect": 0.0,
+    "dWrong": null,
+    "inl": 2087,
+    "sup": 0.794,
+    "agree": 0.327,
+    "skyPx": 0.891,
+    "s1inl": 669
+   },
+   {
+    "src": "sky",
+    "yaw": 108.0,
+    "pitch": 0.5,
+    "dCorrect": 57.3,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 4.597,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 191.4,
+    "pitch": -3.5,
+    "dCorrect": 30.0,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.868,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 163.1,
+    "pitch": -1.8,
+    "dCorrect": 0.0,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 33.934,
+    "skyPx": 0.721,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 2320,
+   "sup": 0.643,
+   "pose": {
+    "yaw": 163.09,
+    "pitch": -1.78,
+    "roll": -0.3,
+    "vfov": 27.77
+   },
+   "dCorrect": 0.047917447515557265,
+   "dWrong": null,
+   "verdict": "correct"
+  }
+ },
+ "wc_0023": {
+  "id": "wc_0023",
+  "title": "File:Dom of Mischabel.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 200.0,
+  "heading": 202.5,
+  "date": "2014-06-20T09:23:54",
+  "camera": "NIKON COOLPIX P7800",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clouds_on_skyline",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [],
+   "hard": false,
+   "region": "valais",
+   "notes": "tele snow massif, cloud around base"
+  },
+  "verdictTags": [
+   "cloud",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 3,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 202.1,
+    "pitch": 4.9
+   },
+   {
+    "label": "B",
+    "yaw": 157.3,
+    "pitch": 1.3
+   },
+   {
+    "label": "CMT",
+    "yaw": 204.6,
+    "pitch": 1.5
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": 6.763,
+    "skylineMedPx": 6.523,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 202.09,
+    "pitch": 4.86,
+    "roll": 3.07,
+    "vfov": 6.83
+   },
+   "sweepBest": 62,
+   "vfov0": 6.869573636629229,
+   "hfov0": 10.283988451302976,
+   "focalKnown": true,
+   "stage": "verify[5]:appseeds"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 202.1,
+    "pitch": 4.9,
+    "dCorrect": null,
+    "dWrong": 0.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 6.763,
+    "skyPx": 6.523,
+    "s1inl": 62
+   },
+   {
+    "src": "sky",
+    "yaw": 242.8,
+    "pitch": 14.4,
+    "dCorrect": null,
+    "dWrong": 50.2,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 3.78,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 239.9,
+    "pitch": 13.0,
+    "dCorrect": null,
+    "dWrong": 45.8,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 3.404,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 196.7,
+    "pitch": 1.5,
+    "dCorrect": null,
+    "dWrong": 7.9,
+    "inl": 77,
+    "sup": 0.318,
+    "agree": 6.584,
+    "skyPx": 9.53,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 233.8,
+    "pitch": 10.5,
+    "dCorrect": null,
+    "dWrong": 37.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 4.877,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 202.1,
+    "pitch": 4.9,
+    "dCorrect": null,
+    "dWrong": 0.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.666,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": null
+ },
+ "wc_0027": {
+  "id": "wc_0027",
+  "title": "File:Bietschhorn from L\u00f6tschen Pass.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 92.0,
+  "heading": 90.0,
+  "date": "2014-08-28T12:41:35",
+  "camera": "NIKON COOLPIX P7800",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clouds_on_skyline",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "water"
+   ],
+   "hard": true,
+   "region": "bernese",
+   "notes": "reflection in tarn, cloud on summit"
+  },
+  "verdictTags": [
+   "cloud",
+   "water-reflection"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 0,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 106.1,
+    "pitch": 0.1,
+    "vfov": 15.2
+   }
+  ],
+  "wrongRefs": [],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": 0.206,
+    "skylineMedPx": 1.749,
+    "matchSupport": 0.876,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": 0.217668499124085,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 2682,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 106.08,
+    "pitch": 0.26,
+    "roll": 0.57,
+    "vfov": 14.85
+   },
+   "sweepBest": 510,
+   "vfov0": 15.559392192845348,
+   "hfov0": 21.668840427899248,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 106.1,
+    "pitch": 0.3,
+    "dCorrect": 0.2,
+    "dWrong": null,
+    "inl": 2682,
+    "sup": 0.876,
+    "agree": 0.206,
+    "skyPx": 1.749,
+    "s1inl": 510
+   },
+   {
+    "src": "sky",
+    "yaw": 325.6,
+    "pitch": 4.5,
+    "dCorrect": 144.9,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 3.178,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 14.5,
+    "pitch": 9.7,
+    "dCorrect": 101.3,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 4.558,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 61.2,
+    "pitch": 1.3,
+    "dCorrect": 46.2,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.857,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 2776,
+   "sup": 0.674,
+   "pose": {
+    "yaw": 106.05,
+    "pitch": 0.25,
+    "roll": 0.44,
+    "vfov": 14.86
+   },
+   "dCorrect": 0.2541489006005087,
+   "dWrong": null,
+   "verdict": "correct"
+  }
+ },
+ "wc_0028": {
+  "id": "wc_0028",
+  "title": "File:Vierwaldst\u00e4ttersee7.JPG",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": 67.6,
+  "date": "2012-06-16T12:54:23",
+  "camera": "Apple iPhone 4",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "rock"
+   ],
+   "hard": true,
+   "region": "central",
+   "notes": "elevated view over lake, faint distant Alps"
+  },
+  "verdictTags": [
+   "featureless-skyline",
+   "fog-haze",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 3,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 73.2,
+    "pitch": -6.9,
+    "vfov": 51.2
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 314.3,
+    "pitch": -4.7
+   },
+   {
+    "label": "C",
+    "yaw": 304.7,
+    "pitch": -5.8
+   },
+   {
+    "label": "T6A",
+    "yaw": 72.6,
+    "pitch": -5.8
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.773,
+    "skylineMedPx": 4.254,
+    "matchSupport": 0.218,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 667,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 72.64,
+    "pitch": -5.82,
+    "roll": 1.94,
+    "vfov": 43.58
+   },
+   "sweepBest": 138,
+   "vfov0": 38.41305670843248,
+   "hfov0": 50.00000000000001,
+   "focalKnown": false,
+   "stage": "verify[5]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 72.6,
+    "pitch": -5.8,
+    "dCorrect": 1.7,
+    "dWrong": 0.0,
+    "inl": 667,
+    "sup": 0.218,
+    "agree": 0.773,
+    "skyPx": 4.254,
+    "s1inl": 138
+   },
+   {
+    "src": "sky",
+    "yaw": 15.4,
+    "pitch": -9.2,
+    "dCorrect": 60.1,
+    "dWrong": 60.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 64.337,
+    "skyPx": 2.997,
+    "s1inl": null
+   },
+   {
+    "src": "sweepfine",
+    "yaw": 72.6,
+    "pitch": -5.9,
+    "dCorrect": 1.6,
+    "dWrong": 0.1,
+    "inl": 649,
+    "sup": 0.21,
+    "agree": 5.015,
+    "skyPx": 4.482,
+    "s1inl": 82
+   },
+   {
+    "src": "sky",
+    "yaw": 74.7,
+    "pitch": -7.2,
+    "dCorrect": 1.8,
+    "dWrong": 3.4,
+    "inl": 23,
+    "sup": 0.008,
+    "agree": 8.468,
+    "skyPx": 7.464,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 105.6,
+    "pitch": -7.4,
+    "dCorrect": 32.9,
+    "dWrong": 34.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 25.713,
+    "skyPx": 3.325,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 287.4,
+    "pitch": -9.1,
+    "dCorrect": 148.0,
+    "dWrong": 20.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 21.15,
+    "skyPx": 3.507,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 305.2,
+    "pitch": -5.8,
+    "dCorrect": 129.1,
+    "dWrong": 0.5,
+    "inl": null,
+    "sup": null,
+    "agree": null,
+    "skyPx": null,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   225,
+   251,
+   183,
+   245,
+   129,
+   217
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 817,
+   "sup": 0.154,
+   "pose": {
+    "yaw": 72.6,
+    "pitch": -5.79,
+    "roll": 1.87,
+    "vfov": 43.36
+   },
+   "dCorrect": 1.7397067241653117,
+   "dWrong": 0.06817798821073495,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0033": {
+  "id": "wc_0033",
+  "title": "File:View from Pilatus Railway heading up Mount Pilatus.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 28.0,
+  "heading": 221.7,
+  "date": "2022-07-15T12:41:58",
+  "camera": "Apple iPhone SE (2nd generation)",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "trees"
+   ],
+   "hard": true,
+   "region": "central",
+   "notes": "haze, trees framing"
+  },
+  "verdictTags": [
+   "fog-haze",
+   "foreground-occlusion",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 25.2,
+    "pitch": 6.3
+   },
+   {
+    "label": "B",
+    "yaw": 23.8,
+    "pitch": 6.9
+   },
+   {
+    "label": "C",
+    "yaw": 222.1,
+    "pitch": 23.3
+   },
+   {
+    "label": "CMT",
+    "yaw": 205.8,
+    "pitch": 2.8
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": 28.683,
+    "skylineMedPx": 10.237,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 25.25,
+    "pitch": 6.27,
+    "roll": 0.53,
+    "vfov": 50.21
+   },
+   "sweepBest": 18,
+   "vfov0": 49.74211580704502,
+   "hfov0": 63.439948466023864,
+   "focalKnown": true,
+   "stage": "verify[5]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 25.2,
+    "pitch": 6.3,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 28.683,
+    "skyPx": 10.237,
+    "s1inl": null
+   },
+   {
+    "src": "sweepfine",
+    "yaw": 52.1,
+    "pitch": -3.0,
+    "dCorrect": null,
+    "dWrong": 36.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 10.622,
+    "skyPx": 11.288,
+    "s1inl": 18
+   },
+   {
+    "src": "sky",
+    "yaw": 359.3,
+    "pitch": 15.7,
+    "dCorrect": null,
+    "dWrong": 33.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.781,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 36.7,
+    "pitch": 0.7,
+    "dCorrect": null,
+    "dWrong": 17.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 25.805,
+    "skyPx": 11.069,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 24.7,
+    "pitch": 6.5,
+    "dCorrect": null,
+    "dWrong": 0.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.835,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 85.7,
+    "pitch": -3.7,
+    "dCorrect": null,
+    "dWrong": 70.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 26.808,
+    "skyPx": 11.104,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 1219,
+   "sup": 0.524,
+   "pose": {
+    "yaw": 61.01,
+    "pitch": -5.79,
+    "roll": -4.57,
+    "vfov": 50.13
+   },
+   "dCorrect": null,
+   "dWrong": 47.82201628374236,
+   "verdict": "pending"
+  }
+ },
+ "wc_0034": {
+  "id": "wc_0034",
+  "title": "File:Forest clearing on a hill (Unsplash).jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 180.0,
+  "heading": null,
+  "date": "2014-08-27T18:33:50",
+  "camera": "NIKON CORPORATION NIKON D800",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "trees"
+   ],
+   "hard": true,
+   "region": "vaud",
+   "notes": "dark forested ridge silhouette under grey clouds"
+  },
+  "verdictTags": [
+   "cloud",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 127.3,
+    "pitch": 6.9,
+    "vfov": 7.8
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 20.8,
+    "pitch": 13.2
+   },
+   {
+    "label": "CMT",
+    "yaw": 2.0,
+    "pitch": 12.0
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "correct",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 4.747,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 127.34,
+    "pitch": 6.95,
+    "roll": 0.01,
+    "vfov": 7.7
+   },
+   "sweepBest": 0,
+   "vfov0": 7.634570869456875,
+   "hfov0": 11.41692059301801,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 127.3,
+    "pitch": 6.9,
+    "dCorrect": 0.0,
+    "dWrong": 112.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 4.747,
+    "s1inl": 0
+   },
+   {
+    "src": "sky",
+    "yaw": 203.3,
+    "pitch": 2.6,
+    "dCorrect": 80.4,
+    "dWrong": 168.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 4.874,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 185.4,
+    "pitch": 2.5,
+    "dCorrect": 62.5,
+    "dWrong": 175.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 17.514,
+    "skyPx": 6.466,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 48.7,
+    "pitch": 3.9,
+    "dCorrect": 81.7,
+    "dWrong": 37.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 10.551,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 268,
+   "sup": 0.256,
+   "pose": {
+    "yaw": 127.29,
+    "pitch": 6.98,
+    "roll": 0.46,
+    "vfov": 7.55
+   },
+   "dCorrect": 0.046053539335298765,
+   "dWrong": 112.7237375623857,
+   "verdict": "correct"
+  }
+ },
+ "wc_0035": {
+  "id": "wc_0035",
+  "title": "File:Wisenberg von der Belchenflue.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": 75.0,
+  "date": "2020-01-06T15:17:08",
+  "camera": "Canon Canon PowerShot G15",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "trees"
+   ],
+   "hard": true,
+   "region": "jura",
+   "notes": "low-relief rolling hills, hazy horizon"
+  },
+  "verdictTags": [
+   "featureless-skyline",
+   "fog-haze"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 2,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 114.1,
+    "pitch": -7.9
+   },
+   {
+    "label": "CMT",
+    "yaw": 73.0,
+    "pitch": -8.1
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": 43.084,
+    "skylineMedPx": 4.933,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 114.04,
+    "pitch": -7.76,
+    "roll": -1.23,
+    "vfov": 38.87
+   },
+   "sweepBest": 0,
+   "vfov0": 38.55260281805282,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 114.0,
+    "pitch": -7.8,
+    "dCorrect": null,
+    "dWrong": 0.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 43.084,
+    "skyPx": 4.933,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 203.1,
+    "pitch": -10.3,
+    "dCorrect": null,
+    "dWrong": 91.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.27,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 116.1,
+    "pitch": -10.6,
+    "dCorrect": null,
+    "dWrong": 4.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.336,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 163.5,
+    "pitch": -12.5,
+    "dCorrect": null,
+    "dWrong": 54.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 19.925,
+    "skyPx": 6.369,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 160.6,
+    "pitch": -9.7,
+    "dCorrect": null,
+    "dWrong": 48.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 7.73,
+    "skyPx": 7.791,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 0,
+   "sup": 0.0,
+   "pose": {
+    "yaw": 114.04,
+    "pitch": -7.76,
+    "roll": -1.23,
+    "vfov": 38.87
+   },
+   "dCorrect": null,
+   "dWrong": 0.24149428077974644,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0037": {
+  "id": "wc_0037",
+  "title": "File:Piz Lad as seen from Santa Maria.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 75.0,
+  "heading": 180.0,
+  "date": "2018-04-30T19:31:49",
+  "camera": "SONY ILCE-6000",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "cloudy",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "trees"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "snow-dusted range above forest"
+  },
+  "verdictTags": [
+   "cloud",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 247.8,
+    "pitch": 10.7
+   },
+   {
+    "label": "B",
+    "yaw": 247.0,
+    "pitch": 10.9
+   },
+   {
+    "label": "C",
+    "yaw": 244.3,
+    "pitch": 10.7
+   },
+   {
+    "label": "CMT",
+    "yaw": 163.1,
+    "pitch": 17.4
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 9.363,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 246.99,
+    "pitch": 10.87,
+    "roll": -1.27,
+    "vfov": 18.62
+   },
+   "sweepBest": 0,
+   "vfov0": 18.177525587447874,
+   "hfov0": 26.99341077134229,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 247.0,
+    "pitch": 10.9,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 9.363,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 245.3,
+    "pitch": 11.0,
+    "dCorrect": null,
+    "dWrong": 1.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.586,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 122.9,
+    "pitch": 15.0,
+    "dCorrect": null,
+    "dWrong": 42.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 17.685,
+    "skyPx": 8.034,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 251.0,
+    "pitch": 10.7,
+    "dCorrect": null,
+    "dWrong": 3.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 8.531,
+    "skyPx": 7.235,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 76.0,
+    "pitch": 9.0,
+    "dCorrect": null,
+    "dWrong": 95.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.87,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 0,
+   "sup": 0.0,
+   "pose": {
+    "yaw": 246.99,
+    "pitch": 10.87,
+    "roll": -1.27,
+    "vfov": 18.62
+   },
+   "dCorrect": null,
+   "dWrong": 2.842170943040401e-14,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0040": {
+  "id": "wc_0040",
+  "title": "File:Gruy\u00e8re DSC 4352 (6478390647).jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 82.0,
+  "heading": null,
+  "date": "2011-12-08T11:26:09",
+  "camera": "NIKON CORPORATION NIKON D7000",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "buildings",
+    "people"
+   ],
+   "hard": true,
+   "region": "vaud",
+   "notes": "village street foreground, peak above rooftops"
+  },
+  "verdictTags": [
+   "cloud",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 189.6,
+    "pitch": 1.8
+   },
+   {
+    "label": "B",
+    "yaw": 123.0,
+    "pitch": 7.7
+   },
+   {
+    "label": "C",
+    "yaw": 124.3,
+    "pitch": 7.5
+   },
+   {
+    "label": "CMT",
+    "yaw": 296.0,
+    "pitch": -2.5
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 7.366,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 124.51,
+    "pitch": 7.5,
+    "roll": -0.26,
+    "vfov": 16.54
+   },
+   "sweepBest": 0,
+   "vfov0": 16.573342822884214,
+   "hfov0": 24.81196300271524,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 124.5,
+    "pitch": 7.5,
+    "dCorrect": null,
+    "dWrong": 0.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.366,
+    "s1inl": 0
+   },
+   {
+    "src": "sky",
+    "yaw": 63.9,
+    "pitch": -0.7,
+    "dCorrect": null,
+    "dWrong": 67.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.5,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 76.5,
+    "pitch": 3.6,
+    "dCorrect": null,
+    "dWrong": 50.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.295,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 337.1,
+    "pitch": -5.1,
+    "dCorrect": null,
+    "dWrong": 43.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.977,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 29.2,
+    "pitch": -3.6,
+    "dCorrect": null,
+    "dWrong": 94.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.405,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 0,
+   "sup": 0.0,
+   "pose": {
+    "yaw": 124.51,
+    "pitch": 7.5,
+    "roll": -0.26,
+    "vfov": 16.54
+   },
+   "dCorrect": null,
+   "dWrong": 0.2601164645360976,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0046": {
+  "id": "wc_0046",
+  "title": "File:Rigi-First.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": 178.8,
+  "date": "2011-10-17T13:10:13",
+  "camera": "CASIO COMPUTER CO.,LTD. EX-Z75",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "trees"
+   ],
+   "hard": true,
+   "region": "central",
+   "notes": "sea of fog, spruces silhouetted, distant Alps"
+  },
+  "verdictTags": [
+   "fog-haze",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 3,
+  "correctRefs": [
+   {
+    "label": "T6A",
+    "yaw": 177.8,
+    "pitch": -2.8,
+    "vfov": 33.0
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 111.3,
+    "pitch": 5.9
+   },
+   {
+    "label": "B",
+    "yaw": 170.1,
+    "pitch": 0.1
+   },
+   {
+    "label": "CMT",
+    "yaw": 79.3,
+    "pitch": -6.2
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "correct",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": 7.912,
+    "skylineMedPx": 2.864,
+    "matchSupport": 0.821,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 96,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 177.81,
+    "pitch": -2.84,
+    "roll": 1.5,
+    "vfov": 32.97
+   },
+   "sweepBest": 33,
+   "vfov0": 34.53005830924895,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "verify[5]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 177.8,
+    "pitch": -2.8,
+    "dCorrect": 0.0,
+    "dWrong": 10.7,
+    "inl": 96,
+    "sup": 0.821,
+    "agree": 7.912,
+    "skyPx": 2.864,
+    "s1inl": null
+   },
+   {
+    "src": "sweepfine",
+    "yaw": 177.7,
+    "pitch": -2.7,
+    "dCorrect": 0.2,
+    "dWrong": 10.5,
+    "inl": 85,
+    "sup": 0.802,
+    "agree": 0.134,
+    "skyPx": 4.14,
+    "s1inl": 33
+   },
+   {
+    "src": "sky",
+    "yaw": 185.1,
+    "pitch": -2.6,
+    "dCorrect": 7.5,
+    "dWrong": 17.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 3.694,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 213.3,
+    "pitch": -0.8,
+    "dCorrect": 37.6,
+    "dWrong": 44.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 34.197,
+    "skyPx": 4.309,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 175.3,
+    "pitch": 0.7,
+    "dCorrect": 6.1,
+    "dWrong": 5.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 4.047,
+    "skyPx": 4.108,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 27.8,
+    "pitch": 4.0,
+    "dCorrect": 156.8,
+    "dWrong": 61.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 3.1,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   26,
+   37,
+   36,
+   68,
+   31
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 967,
+   "sup": 0.813,
+   "pose": {
+    "yaw": 177.61,
+    "pitch": -2.74,
+    "roll": 1.3,
+    "vfov": 32.64
+   },
+   "dCorrect": 0.29639226607144975,
+   "dWrong": 10.366966908190129,
+   "verdict": "correct"
+  }
+ },
+ "wc_0047": {
+  "id": "wc_0047",
+  "title": "File:Piz Cl\u00fcx, Piz Muragl, Las Sours and Munt da la B\u00eas-cha as seen from Muottas Muragl.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 28.0,
+  "heading": 135.0,
+  "date": "2017-09-07T10:51:37",
+  "camera": "SONY DSC-RX100",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "grass"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "broad valley, wide"
+  },
+  "verdictTags": [],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 0,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 139.3,
+    "pitch": 7.8,
+    "vfov": 44.8
+   }
+  ],
+  "wrongRefs": [],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.9,
+    "skylineMedPx": 1.176,
+    "matchSupport": 0.374,
+    "apriori": true,
+    "matchDominant": false,
+    "basinGap": 0.7177544296570508,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 2043,
+    "unmet": [
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 139.15,
+    "pitch": 7.91,
+    "roll": -0.89,
+    "vfov": 44.87
+   },
+   "sweepBest": 663,
+   "vfov0": 46.390152711979425,
+   "hfov0": 65.4743495977051,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 139.1,
+    "pitch": 7.9,
+    "dCorrect": 0.2,
+    "dWrong": null,
+    "inl": 2043,
+    "sup": 0.374,
+    "agree": 0.9,
+    "skyPx": 1.176,
+    "s1inl": 663
+   },
+   {
+    "src": "sky",
+    "yaw": 139.0,
+    "pitch": 8.0,
+    "dCorrect": 0.5,
+    "dWrong": null,
+    "inl": 169,
+    "sup": 0.581,
+    "agree": 72.995,
+    "skyPx": 3.118,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 274.3,
+    "pitch": 3.3,
+    "dCorrect": 139.5,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 7.766,
+    "skyPx": 6.791,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 18.0,
+    "pitch": 8.4,
+    "dCorrect": 121.9,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.049,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 2803,
+   "sup": 0.348,
+   "pose": {
+    "yaw": 139.22,
+    "pitch": 7.91,
+    "roll": -0.9,
+    "vfov": 44.93
+   },
+   "dCorrect": 0.1778188245871224,
+   "dWrong": null,
+   "verdict": "correct"
+  }
+ },
+ "wc_0048": {
+  "id": "wc_0048",
+  "title": "File:Weisshorn & Bishorn.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 127.0,
+  "heading": 150.0,
+  "date": "2020-02-17T12:59:14",
+  "camera": "NIKON CORPORATION NIKON D7500",
+  "tags": {
+   "focalClass": "tele",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clouds_on_skyline",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "snow"
+   ],
+   "hard": false,
+   "region": "valais",
+   "notes": "tele, lenticular cloud over range"
+  },
+  "verdictTags": [
+   "cloud"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 146.4,
+    "pitch": 7.8,
+    "vfov": 8.2
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 103.2,
+    "pitch": 8.1
+   },
+   {
+    "label": "CMT",
+    "yaw": 102.6,
+    "pitch": 8.6
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "narrow",
+   "checks": {
+    "cueAgreeDeg": 0.321,
+    "skylineMedPx": 1.679,
+    "matchSupport": 0.871,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": 2.0704744957939982,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 3751,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 146.4,
+    "pitch": 7.77,
+    "roll": 2.66,
+    "vfov": 8.17
+   },
+   "sweepBest": 221,
+   "vfov0": 8.840720226314495,
+   "hfov0": 17.26209752113315,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "narrow",
+    "yaw": 146.4,
+    "pitch": 7.8,
+    "dCorrect": 0.1,
+    "dWrong": 43.5,
+    "inl": 3751,
+    "sup": 0.871,
+    "agree": 0.321,
+    "skyPx": 1.679,
+    "s1inl": 221
+   },
+   {
+    "src": "sky",
+    "yaw": 203.8,
+    "pitch": 0.8,
+    "dCorrect": 64.3,
+    "dWrong": 107.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 11.076,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 342.0,
+    "pitch": 9.1,
+    "dCorrect": 165.8,
+    "dWrong": 121.1,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 6.785,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 320.0,
+    "pitch": 1.4,
+    "dCorrect": 180.0,
+    "dWrong": 149.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.994,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 301.8,
+    "pitch": -1.0,
+    "dCorrect": 164.1,
+    "dWrong": 170.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.817,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 4307,
+   "sup": 0.756,
+   "pose": {
+    "yaw": 146.39,
+    "pitch": 7.77,
+    "roll": 2.69,
+    "vfov": 8.16
+   },
+   "dCorrect": 0.07947489311011058,
+   "dWrong": 43.477591084908994,
+   "verdict": "correct"
+  }
+ },
+ "wc_0052": {
+  "id": "wc_0052",
+  "title": "File:Kl\u00f6ntalersee in Richtung Osten.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": null,
+  "date": "2014-07-17T07:29:37",
+  "camera": "Canon Canon EOS 5D Mark III",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "water"
+   ],
+   "hard": true,
+   "region": "glarus",
+   "notes": "sun in frame, backlit haze"
+  },
+  "verdictTags": [
+   "fog-haze",
+   "low-light",
+   "water-reflection"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 3,
+  "correctRefs": [
+   {
+    "label": "CMT",
+    "yaw": 73.4,
+    "pitch": 5.4,
+    "vfov": 49.3
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 67.3,
+    "pitch": 7.2
+   },
+   {
+    "label": "B",
+    "yaw": 271.7,
+    "pitch": 8.9
+   },
+   {
+    "label": "C",
+    "yaw": 69.3,
+    "pitch": 8.0
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 5.383,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 67.42,
+    "pitch": 7.23,
+    "roll": -0.86,
+    "vfov": 34.6
+   },
+   "sweepBest": 0,
+   "vfov0": 34.53005830924895,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 67.4,
+    "pitch": 7.2,
+    "dCorrect": 7.9,
+    "dWrong": 0.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.383,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 73.2,
+    "pitch": 8.3,
+    "dCorrect": 3.2,
+    "dWrong": 4.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 27.829,
+    "skyPx": 8.054,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 58.1,
+    "pitch": 12.4,
+    "dCorrect": 22.4,
+    "dWrong": 14.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.691,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 270.6,
+    "pitch": 11.6,
+    "dCorrect": 169.1,
+    "dWrong": 3.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.449,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 27.9,
+    "pitch": 25.7,
+    "dCorrect": 65.9,
+    "dWrong": 57.9,
+    "inl": 7,
+    "sup": 0.184,
+    "agree": 36.978,
+    "skyPx": 9.912,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 225,
+   "sup": 0.487,
+   "pose": {
+    "yaw": 73.5,
+    "pitch": 5.45,
+    "roll": -0.42,
+    "vfov": 50.08
+   },
+   "dCorrect": 0.19621911022142058,
+   "dWrong": 6.6954622976614635,
+   "verdict": "correct"
+  }
+ },
+ "wc_0053": {
+  "id": "wc_0053",
+  "title": "File:Piz Mezdi as seen from Samedan.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 25.0,
+  "heading": 202.5,
+  "date": "2021-05-09T07:29:55",
+  "camera": "samsung SM-N986B",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "trees"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "snowy massif over forest"
+  },
+  "verdictTags": [
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 76.2,
+    "pitch": 6.9
+   },
+   {
+    "label": "B",
+    "yaw": 299.2,
+    "pitch": 5.9
+   },
+   {
+    "label": "C",
+    "yaw": 296.6,
+    "pitch": 7
+   },
+   {
+    "label": "CMT",
+    "yaw": 280.7,
+    "pitch": 5.4
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 5.397,
+    "matchSupport": 0.042,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 299.18,
+    "pitch": 5.91,
+    "roll": 5.21,
+    "vfov": 36.23
+   },
+   "sweepBest": 0,
+   "vfov0": 37.283198114090254,
+   "hfov0": 77.10038607005235,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 299.2,
+    "pitch": 5.9,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 1,
+    "sup": 0.042,
+    "agree": null,
+    "skyPx": 5.397,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 198.8,
+    "pitch": -2.4,
+    "dCorrect": null,
+    "dWrong": 89.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.069,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 299.7,
+    "pitch": 5.4,
+    "dCorrect": null,
+    "dWrong": 1.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.53,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 260.5,
+    "pitch": -2.7,
+    "dCorrect": null,
+    "dWrong": 28.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.57,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 346.7,
+    "pitch": 0.6,
+    "dCorrect": null,
+    "dWrong": 52.9,
+    "inl": 1,
+    "sup": 0.029,
+    "agree": null,
+    "skyPx": 4.546,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 0,
+   "sup": 0.0,
+   "pose": {
+    "yaw": 299.16,
+    "pitch": 5.98,
+    "roll": 5.1,
+    "vfov": 36.21
+   },
+   "dCorrect": null,
+   "dWrong": 0.08826039679647746,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0054": {
+  "id": "wc_0054",
+  "title": "File:Lake Lugano october 2024.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 25.0,
+  "heading": 48.5,
+  "date": "2024-10-14T13:24:10",
+  "camera": "Apple iPhone 12 Pro Max",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "buildings",
+    "plants"
+   ],
+   "hard": false,
+   "region": "ticino",
+   "notes": "over lake, town below"
+  },
+  "verdictTags": [
+   "cloud",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 0,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 50.7,
+    "pitch": -9.6,
+    "vfov": 53.0
+   }
+  ],
+  "wrongRefs": [],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.379,
+    "skylineMedPx": 2.519,
+    "matchSupport": 0.915,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 3429,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 50.76,
+    "pitch": -9.63,
+    "roll": -1.63,
+    "vfov": 52.44
+   },
+   "sweepBest": 407,
+   "vfov0": 54.876606485252545,
+   "hfov0": 69.3870463641785,
+   "focalKnown": true,
+   "stage": "verify[4]:appseeds"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 50.8,
+    "pitch": -9.6,
+    "dCorrect": 0.1,
+    "dWrong": null,
+    "inl": 3429,
+    "sup": 0.915,
+    "agree": 0.379,
+    "skyPx": 2.519,
+    "s1inl": 407
+   },
+   {
+    "src": "sky",
+    "yaw": 51.0,
+    "pitch": -9.6,
+    "dCorrect": 0.4,
+    "dWrong": null,
+    "inl": 325,
+    "sup": 0.669,
+    "agree": 65.792,
+    "skyPx": 2.536,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 264.7,
+    "pitch": -6.4,
+    "dCorrect": 149.2,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.562,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 50.6,
+    "pitch": -9.6,
+    "dCorrect": 0.1,
+    "dWrong": null,
+    "inl": 880,
+    "sup": 0.885,
+    "agree": 54.112,
+    "skyPx": 3.447,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 50.8,
+    "pitch": -9.6,
+    "dCorrect": 0.1,
+    "dWrong": null,
+    "inl": 3389,
+    "sup": 0.9,
+    "agree": 0.225,
+    "skyPx": 2.085,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 3580,
+   "sup": 0.83,
+   "pose": {
+    "yaw": 50.79,
+    "pitch": -9.6,
+    "roll": -1.81,
+    "vfov": 52.53
+   },
+   "dCorrect": 0.15697852293345882,
+   "dWrong": null,
+   "verdict": "correct"
+  }
+ },
+ "wc_0055": {
+  "id": "wc_0055",
+  "title": "File:Apriltag.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 24.0,
+  "heading": 111.0,
+  "date": "2024-04-18T16:35:49",
+  "camera": "Google Pixel 6 Pro",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clouds_on_skyline",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "buildings",
+    "cars"
+   ],
+   "hard": true,
+   "region": "central",
+   "notes": "parking lot, roof edge, cars"
+  },
+  "verdictTags": [
+   "foreground-occlusion",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 1,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 254.7,
+    "pitch": 9.3,
+    "vfov": 48.3
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 252.4,
+    "pitch": 10.0
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "correct",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": 16.778,
+    "skylineMedPx": 4.549,
+    "matchSupport": 0.011,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 254.72,
+    "pitch": 9.13,
+    "roll": 2.22,
+    "vfov": 48.28
+   },
+   "sweepBest": 0,
+   "vfov0": 47.682742550484456,
+   "hfov0": 76.3082894485983,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 254.7,
+    "pitch": 9.1,
+    "dCorrect": 0.2,
+    "dWrong": 3.2,
+    "inl": 1,
+    "sup": 0.011,
+    "agree": 16.778,
+    "skyPx": 4.549,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 43.6,
+    "pitch": -6.6,
+    "dCorrect": 164.8,
+    "dWrong": 167.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 14.491,
+    "skyPx": 9.123,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 308.6,
+    "pitch": -6.1,
+    "dCorrect": 69.3,
+    "dWrong": 72.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 34.508,
+    "skyPx": 7.04,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 220.8,
+    "pitch": 12.6,
+    "dCorrect": 37.2,
+    "dWrong": 34.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 32.976,
+    "skyPx": 6.572,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 14,
+   "sup": 0.28,
+   "pose": {
+    "yaw": 255.57,
+    "pitch": 9.16,
+    "roll": 1.81,
+    "vfov": 48.21
+   },
+   "dCorrect": 1.0423233541717387,
+   "dWrong": 3.997258371168309,
+   "verdict": "pending"
+  }
+ },
+ "wc_0058": {
+  "id": "wc_0058",
+  "title": "File:Fog Rolls Over Netstal (Unsplash).jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": null,
+  "date": "2014-08-26T10:24:47",
+  "camera": "Canon Canon EOS 5D Mark II",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clouds_on_skyline",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [],
+   "hard": true,
+   "region": "glarus",
+   "notes": "thick cloud veiling summits and base"
+  },
+  "verdictTags": [
+   "cloud"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 2,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 282.0,
+    "pitch": 32.5
+   },
+   {
+    "label": "C",
+    "yaw": 198.8,
+    "pitch": 8.1
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "unsure",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": 25.442,
+    "skylineMedPx": 9.96,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 156.07,
+    "pitch": -0.24,
+    "roll": -0.67,
+    "vfov": 35.07
+   },
+   "sweepBest": 0,
+   "vfov0": 34.53005830924895,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 156.1,
+    "pitch": -0.2,
+    "dCorrect": null,
+    "dWrong": 51.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 25.442,
+    "skyPx": 9.96,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 179.0,
+    "pitch": 3.2,
+    "dCorrect": null,
+    "dWrong": 24.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.18,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 10.7,
+    "pitch": -8.6,
+    "dCorrect": null,
+    "dWrong": 129.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.366,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 81.3,
+    "pitch": 11.7,
+    "dCorrect": null,
+    "dWrong": 121.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.479,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 113.3,
+    "pitch": 12.3,
+    "dCorrect": null,
+    "dWrong": 89.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.894,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   15,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 11,
+   "sup": 0.367,
+   "pose": {
+    "yaw": 192.95,
+    "pitch": 9.68,
+    "roll": -10.9,
+    "vfov": 35.31
+   },
+   "dCorrect": null,
+   "dWrong": 7.379510063473036,
+   "verdict": "pending"
+  }
+ },
+ "wc_0059": {
+  "id": "wc_0059",
+  "title": "File:Berninabahn zwischen Lagalb und Ospizio Bernina im Winter.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": 30.0,
+  "date": "2007-03-21T14:34:50",
+  "camera": "Canon Canon EOS 350D DIGITAL",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "cloudy",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "train",
+    "wires"
+   ],
+   "hard": true,
+   "region": "graubuenden",
+   "notes": "train and catenary in foreground"
+  },
+  "verdictTags": [
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 30.1,
+    "pitch": 6.0,
+    "vfov": 39.9
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 27.2,
+    "pitch": 14.8
+   },
+   {
+    "label": "CMT",
+    "yaw": 45.3,
+    "pitch": 16.8
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.098,
+    "skylineMedPx": 1.473,
+    "matchSupport": 0.772,
+    "apriori": true,
+    "matchDominant": false,
+    "basinGap": 1.001079881244253,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 865,
+    "unmet": [
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 30.08,
+    "pitch": 6.07,
+    "roll": -0.37,
+    "vfov": 39.76
+   },
+   "sweepBest": 135,
+   "vfov0": 32.039258870884865,
+   "hfov0": 50.00000000000002,
+   "focalKnown": false,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 30.1,
+    "pitch": 6.1,
+    "dCorrect": 0.1,
+    "dWrong": 11.6,
+    "inl": 865,
+    "sup": 0.772,
+    "agree": 0.098,
+    "skyPx": 1.473,
+    "s1inl": 135
+   },
+   {
+    "src": "sky",
+    "yaw": 151.5,
+    "pitch": -1.4,
+    "dCorrect": 128.8,
+    "dWrong": 124.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 4.782,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 181.8,
+    "pitch": 6.0,
+    "dCorrect": 151.7,
+    "dWrong": 147.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 65.568,
+    "skyPx": 6.426,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 280.6,
+    "pitch": 8.9,
+    "dCorrect": 112.5,
+    "dWrong": 112.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.538,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 2681,
+   "sup": 0.742,
+   "pose": {
+    "yaw": 30.09,
+    "pitch": 6.05,
+    "roll": -0.34,
+    "vfov": 39.8
+   },
+   "dCorrect": 0.06218308717455212,
+   "dWrong": 11.627229553896491,
+   "verdict": "correct"
+  }
+ },
+ "wc_0063": {
+  "id": "wc_0063",
+  "title": "File:Am Ch\u00fcebodensee bei Elm.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 33.0,
+  "heading": null,
+  "date": "2007-08-01T14:56:02",
+  "camera": "NIKON CORPORATION NIKON D80",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "flowers",
+    "water"
+   ],
+   "hard": false,
+   "region": "glarus",
+   "notes": "cotton-grass tarn foreground"
+  },
+  "verdictTags": [
+   "near-field-terrain",
+   "water-reflection"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 118.7,
+    "pitch": -0.1,
+    "vfov": 40.0
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "B",
+    "yaw": 236.4,
+    "pitch": 10.1
+   },
+   {
+    "label": "CMT",
+    "yaw": 37.7,
+    "pitch": -2.9
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.073,
+    "skylineMedPx": 1.504,
+    "matchSupport": 0.913,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": 0.18184523541687972,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 1188,
+    "unmet": [
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 118.73,
+    "pitch": -0.14,
+    "roll": 0.35,
+    "vfov": 40.01
+   },
+   "sweepBest": 361,
+   "vfov0": 40.127376610377546,
+   "hfov0": 57.1267516129153,
+   "focalKnown": true,
+   "stage": "basinGap[3]"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 118.7,
+    "pitch": -0.1,
+    "dCorrect": 0.0,
+    "dWrong": 83.8,
+    "inl": 1188,
+    "sup": 0.913,
+    "agree": 0.073,
+    "skyPx": 1.504,
+    "s1inl": 361
+   },
+   {
+    "src": "sky",
+    "yaw": 118.8,
+    "pitch": -0.1,
+    "dCorrect": 0.0,
+    "dWrong": 83.8,
+    "inl": 372,
+    "sup": 0.861,
+    "agree": 46.215,
+    "skyPx": 1.614,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 243.0,
+    "pitch": 13.8,
+    "dCorrect": 138.2,
+    "dWrong": 10.3,
+    "inl": 0,
+    "sup": null,
+    "agree": null,
+    "skyPx": 8.825,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 118.7,
+    "pitch": -0.1,
+    "dCorrect": 0.0,
+    "dWrong": 83.7,
+    "inl": 428,
+    "sup": 0.957,
+    "agree": 30.473,
+    "skyPx": 1.563,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   363,
+   263,
+   253,
+   263,
+   237,
+   142
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 2651,
+   "sup": 0.933,
+   "pose": {
+    "yaw": 118.74,
+    "pitch": -0.14,
+    "roll": 0.23,
+    "vfov": 40.06
+   },
+   "dCorrect": 0.01914894570130954,
+   "dWrong": 83.76539732817245,
+   "verdict": "correct"
+  }
+ },
+ "wc_0067": {
+  "id": "wc_0067",
+  "title": "File:Looking from Schwendisee towards S\u00e4ntis.JPG",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": null,
+  "date": "2014-01-26T15:22:58",
+  "camera": "Canon Canon EOS 7D",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "snow",
+    "tree"
+   ],
+   "hard": false,
+   "region": "appenzell",
+   "notes": "lone tree in deep snow"
+  },
+  "verdictTags": [
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 354.6,
+    "pitch": 1.6,
+    "vfov": 37.0
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "B",
+    "yaw": 67.8,
+    "pitch": 7.5
+   },
+   {
+    "label": "CMT",
+    "yaw": 75.1,
+    "pitch": 8.2
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.101,
+    "skylineMedPx": 1.206,
+    "matchSupport": 0.792,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1671,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 354.62,
+    "pitch": 1.58,
+    "roll": -2.27,
+    "vfov": 37.13
+   },
+   "sweepBest": 306,
+   "vfov0": 34.53005830924895,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 354.6,
+    "pitch": 1.6,
+    "dCorrect": 0.0,
+    "dWrong": 79.1,
+    "inl": 1671,
+    "sup": 0.792,
+    "agree": 0.101,
+    "skyPx": 1.206,
+    "s1inl": 306
+   },
+   {
+    "src": "sky",
+    "yaw": 282.3,
+    "pitch": -5.5,
+    "dCorrect": 79.5,
+    "dWrong": 158.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 174.957,
+    "skyPx": 7.325,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 110.0,
+    "pitch": 6.3,
+    "dCorrect": 120.1,
+    "dWrong": 36.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.72,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 300.8,
+    "pitch": -3.3,
+    "dCorrect": 58.7,
+    "dWrong": 137.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 28.514,
+    "skyPx": 6.178,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 4312,
+   "sup": 0.804,
+   "pose": {
+    "yaw": 354.64,
+    "pitch": 1.62,
+    "roll": -2.25,
+    "vfov": 37.1
+   },
+   "dCorrect": 0.02032821461565315,
+   "dWrong": 79.06249853378534,
+   "verdict": "correct"
+  }
+ },
+ "wc_0069": {
+  "id": "wc_0069",
+  "title": "File:Vierwaldst\u00e4ttersee from Fronalpstock.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": 285.0,
+  "date": "2015-11-07T17:26:06",
+  "camera": "Canon Canon EOS 60D",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "buildings",
+    "water"
+   ],
+   "hard": true,
+   "region": "central",
+   "notes": "hazy lake panorama, backlit"
+  },
+  "verdictTags": [
+   "fog-haze"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 280.7,
+    "pitch": -8.7
+   },
+   {
+    "label": "B",
+    "yaw": 125.3,
+    "pitch": 22.6
+   },
+   {
+    "label": "C",
+    "yaw": 83.2,
+    "pitch": -9
+   },
+   {
+    "label": "CMT",
+    "yaw": 269.0,
+    "pitch": 0.4
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.632,
+    "skylineMedPx": 2.859,
+    "matchSupport": 0.931,
+    "apriori": true,
+    "matchDominant": false,
+    "basinGap": 0.22293068344400502,
+    "gapOK": true,
+    "ambiguity": 1,
+    "inliers": 470,
+    "unmet": [
+     "matchDominant",
+     "ambiguity"
+    ]
+   },
+   "pose": {
+    "yaw": 280.69,
+    "pitch": -8.81,
+    "roll": 0.19,
+    "vfov": 40.73
+   },
+   "sweepBest": 304,
+   "vfov0": 34.53005830924895,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "basinGap[5]"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 280.7,
+    "pitch": -8.8,
+    "dCorrect": null,
+    "dWrong": 0.1,
+    "inl": 470,
+    "sup": 0.931,
+    "agree": 0.632,
+    "skyPx": 2.859,
+    "s1inl": 304
+   },
+   {
+    "src": "sky",
+    "yaw": 27.6,
+    "pitch": -9.7,
+    "dCorrect": null,
+    "dWrong": 56.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 3.339,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 82.0,
+    "pitch": -8.0,
+    "dCorrect": null,
+    "dWrong": 2.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 3.69,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 173.3,
+    "pitch": 8.3,
+    "dCorrect": null,
+    "dWrong": 62.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 11.025,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 27.7,
+    "pitch": -9.7,
+    "dCorrect": null,
+    "dWrong": 56.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 3.151,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 283.0,
+    "pitch": -7.6,
+    "dCorrect": null,
+    "dWrong": 3.3,
+    "inl": 340,
+    "sup": 0.648,
+    "agree": 1.479,
+    "skyPx": 4.939,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   629,
+   380,
+   578,
+   351,
+   499,
+   379
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 943,
+   "sup": 0.934,
+   "pose": {
+    "yaw": 280.96,
+    "pitch": -8.59,
+    "roll": 0.4,
+    "vfov": 40.12
+   },
+   "dCorrect": null,
+   "dWrong": 0.36603127519371803,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0070": {
+  "id": "wc_0070",
+  "title": "File:Berglimattsee Gandstock.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 28.0,
+  "heading": null,
+  "date": "2017-06-18T14:22:58",
+  "camera": "samsung SM-G920F",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "snow",
+    "water"
+   ],
+   "hard": false,
+   "region": "glarus",
+   "notes": "snow patch and tarn"
+  },
+  "verdictTags": [
+   "near-field-terrain",
+   "water-reflection"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 320.3,
+    "pitch": 0.8
+   },
+   {
+    "label": "B",
+    "yaw": 304.7,
+    "pitch": -12.3
+   },
+   {
+    "label": "C",
+    "yaw": 320.4,
+    "pitch": -1.2
+   },
+   {
+    "label": "CMT",
+    "yaw": 319.2,
+    "pitch": 1.4
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 3.524,
+    "skylineMedPx": 7.242,
+    "matchSupport": 0.574,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 330,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 320.48,
+    "pitch": -0.93,
+    "roll": -3.5,
+    "vfov": 41.72
+   },
+   "sweepBest": 144,
+   "vfov0": 41.491830811959375,
+   "hfov0": 67.91224118542618,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 320.5,
+    "pitch": -0.9,
+    "dCorrect": null,
+    "dWrong": 0.4,
+    "inl": 330,
+    "sup": 0.574,
+    "agree": 3.524,
+    "skyPx": 7.242,
+    "s1inl": 144
+   },
+   {
+    "src": "sky",
+    "yaw": 99.4,
+    "pitch": -3.5,
+    "dCorrect": null,
+    "dWrong": 141.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 11.007,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 320.5,
+    "pitch": -0.9,
+    "dCorrect": null,
+    "dWrong": 0.4,
+    "inl": 276,
+    "sup": 0.58,
+    "agree": 4.731,
+    "skyPx": 7.427,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 189.0,
+    "pitch": -2.4,
+    "dCorrect": null,
+    "dWrong": 125.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 22.386,
+    "skyPx": 7.592,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 840,
+   "sup": 0.319,
+   "pose": {
+    "yaw": 320.25,
+    "pitch": -1.46,
+    "roll": -4.19,
+    "vfov": 42.23
+   },
+   "dCorrect": null,
+   "dWrong": 0.3829499907140652,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0071": {
+  "id": "wc_0071",
+  "title": "File:Poschiavo, Switzerland - panoramio.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 29.0,
+  "heading": 335.5,
+  "date": "2015-05-14T13:27:51",
+  "camera": "Apple iPhone 5s",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clouds_on_skyline",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "snow",
+    "water"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "ice-covered lake shore"
+  },
+  "verdictTags": [
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 3,
+  "correctRefs": [
+   {
+    "label": "C",
+    "yaw": 158.5,
+    "pitch": -4.0,
+    "vfov": 47.8
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 11.4,
+    "pitch": -9.6
+   },
+   {
+    "label": "B",
+    "yaw": 8.3,
+    "pitch": -3.8
+   },
+   {
+    "label": "CMT",
+    "yaw": 11.3,
+    "pitch": -4.5
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 1.141,
+    "skylineMedPx": 9.205,
+    "matchSupport": 0.374,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 422,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 158.72,
+    "pitch": -4.2,
+    "roll": 2.46,
+    "vfov": 47.45
+   },
+   "sweepBest": 187,
+   "vfov0": 48.225196091165714,
+   "hfov0": 61.65587350853944,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 158.7,
+    "pitch": -4.2,
+    "dCorrect": 0.4,
+    "dWrong": 147.8,
+    "inl": 422,
+    "sup": 0.374,
+    "agree": 1.141,
+    "skyPx": 9.205,
+    "s1inl": 187
+   },
+   {
+    "src": "sky",
+    "yaw": 312.0,
+    "pitch": -12.9,
+    "dCorrect": 162.5,
+    "dWrong": 62.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.824,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 11.0,
+    "pitch": -9.4,
+    "dCorrect": 153.0,
+    "dWrong": 0.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.525,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 158.8,
+    "pitch": -4.5,
+    "dCorrect": 0.9,
+    "dWrong": 147.6,
+    "inl": 181,
+    "sup": 0.465,
+    "agree": 40.616,
+    "skyPx": 11.171,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 157.8,
+    "pitch": -4.0,
+    "dCorrect": 0.8,
+    "dWrong": 147.0,
+    "inl": 7,
+    "sup": 0.143,
+    "agree": 65.549,
+    "skyPx": 7.963,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   66,
+   0,
+   0,
+   45,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 753,
+   "sup": 0.244,
+   "pose": {
+    "yaw": 158.67,
+    "pitch": -4.03,
+    "roll": 2.43,
+    "vfov": 47.3
+   },
+   "dCorrect": 0.2009967590102213,
+   "dWrong": 147.87361625337203,
+   "verdict": "correct"
+  }
+ },
+ "wc_0072": {
+  "id": "wc_0072",
+  "title": "File:Fr\u00fcmsenSG1.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": null,
+  "date": "2008-01-24T12:59:16",
+  "camera": "Canon Canon EOS 400D DIGITAL",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "buildings",
+    "trees"
+   ],
+   "hard": true,
+   "region": "appenzell",
+   "notes": "bare branches, hazy distant Alps, village"
+  },
+  "verdictTags": [
+   "fog-haze",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 4,
+  "correctRefs": [
+   {
+    "label": "T6A",
+    "yaw": 76.8,
+    "pitch": -3.4,
+    "vfov": 25.7
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 188,
+    "pitch": -8.0
+   },
+   {
+    "label": "B",
+    "yaw": 5.2,
+    "pitch": 13.4
+   },
+   {
+    "label": "C",
+    "yaw": 49.3,
+    "pitch": -9.5
+   },
+   {
+    "label": "CMT",
+    "yaw": 231.2,
+    "pitch": 3.3
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 1.822,
+    "skylineMedPx": 5.504,
+    "matchSupport": 0.502,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": 0.05731391529545991,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 130,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 76.82,
+    "pitch": -3.4,
+    "roll": 2.34,
+    "vfov": 25.75
+   },
+   "sweepBest": 35,
+   "vfov0": 35.78673905136595,
+   "hfov0": 50.00000000000002,
+   "focalKnown": false,
+   "stage": "verify[5]:appseeds"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 76.8,
+    "pitch": -3.4,
+    "dCorrect": 0.0,
+    "dWrong": 33.7,
+    "inl": 130,
+    "sup": 0.502,
+    "agree": 1.822,
+    "skyPx": 5.504,
+    "s1inl": 35
+   },
+   {
+    "src": "sky",
+    "yaw": 52.4,
+    "pitch": -13.0,
+    "dCorrect": 34.0,
+    "dWrong": 6.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 30.993,
+    "skyPx": 3.783,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 354.6,
+    "pitch": 8.2,
+    "dCorrect": 93.8,
+    "dWrong": 15.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.236,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 159.0,
+    "pitch": -9.8,
+    "dCorrect": 88.5,
+    "dWrong": 30.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.609,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 227.0,
+    "pitch": -2.0,
+    "dCorrect": 151.5,
+    "dWrong": 9.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.209,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 49.3,
+    "pitch": -9.5,
+    "dCorrect": 33.7,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 30.64,
+    "skyPx": 6.339,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   75,
+   74,
+   59,
+   76,
+   60,
+   58
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 637,
+   "sup": 0.494,
+   "pose": {
+    "yaw": 76.87,
+    "pitch": -3.42,
+    "roll": 2.01,
+    "vfov": 25.86
+   },
+   "dCorrect": 0.06953514177160258,
+   "dWrong": 33.691974471880705,
+   "verdict": "correct"
+  }
+ },
+ "wc_0073": {
+  "id": "wc_0073",
+  "title": "File:Matthorn from pilatus.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 27.0,
+  "heading": null,
+  "date": "2022-03-26T13:56:05",
+  "camera": "OPPO OPPO Find X3 Lite 5G",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "far",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "rock",
+    "snow"
+   ],
+   "hard": false,
+   "region": "bernese",
+   "notes": "wide, spring snow, far ranges"
+  },
+  "verdictTags": [
+   "fog-haze"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 94.1,
+    "pitch": 20.5
+   },
+   {
+    "label": "B",
+    "yaw": 307.3,
+    "pitch": 8.1
+   },
+   {
+    "label": "C",
+    "yaw": 306.4,
+    "pitch": 8.3
+   },
+   {
+    "label": "CMT",
+    "yaw": 94.0,
+    "pitch": 21.1
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 7.949,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 306.41,
+    "pitch": 8.32,
+    "roll": -1.91,
+    "vfov": 51.42
+   },
+   "sweepBest": 0,
+   "vfov0": 51.35091060062065,
+   "hfov0": 65.31865996902077,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 306.4,
+    "pitch": 8.3,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.949,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 348.2,
+    "pitch": 6.9,
+    "dCorrect": null,
+    "dWrong": 42.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.47,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 324.2,
+    "pitch": 8.4,
+    "dCorrect": null,
+    "dWrong": 17.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 9.291,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 17.1,
+    "pitch": 4.3,
+    "dCorrect": null,
+    "dWrong": 73.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.988,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 0,
+   "sup": 0.0,
+   "pose": {
+    "yaw": 306.41,
+    "pitch": 8.32,
+    "roll": -1.91,
+    "vfov": 51.42
+   },
+   "dCorrect": null,
+   "dWrong": 0.0,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0074": {
+  "id": "wc_0074",
+  "title": "File:Blick vom Leistcamm.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": null,
+  "heading": null,
+  "date": "2015-08-22T07:46:02",
+  "camera": "Canon Canon EOS 700D",
+  "tags": {
+   "focalClass": "unknown",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": false,
+   "foreground": [
+    "grass"
+   ],
+   "hard": false,
+   "region": "glarus",
+   "notes": "elevated ridge view, lakes"
+  },
+  "verdictTags": [
+   "fog-haze"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 261.4,
+    "pitch": -10.6
+   },
+   {
+    "label": "B",
+    "yaw": 1.9,
+    "pitch": -8.7
+   },
+   {
+    "label": "C",
+    "yaw": 339.6,
+    "pitch": 4.8
+   },
+   {
+    "label": "CMT",
+    "yaw": 300.8,
+    "pitch": 31.8
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.421,
+    "skylineMedPx": 4.137,
+    "matchSupport": 0.539,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": 0.07647996842949224,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 1798,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 261.37,
+    "pitch": -10.59,
+    "roll": -0.92,
+    "vfov": 37.98
+   },
+   "sweepBest": 356,
+   "vfov0": 29.39495760413827,
+   "hfov0": 50.0,
+   "focalKnown": false,
+   "stage": "verify[5]:appseeds"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 261.4,
+    "pitch": -10.6,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 1798,
+    "sup": 0.539,
+    "agree": 0.421,
+    "skyPx": 4.137,
+    "s1inl": 356
+   },
+   {
+    "src": "sky",
+    "yaw": 356.1,
+    "pitch": -6.3,
+    "dCorrect": null,
+    "dWrong": 8.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 2.807,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 260.7,
+    "pitch": -10.9,
+    "dCorrect": null,
+    "dWrong": 0.9,
+    "inl": 530,
+    "sup": 0.488,
+    "agree": 49.013,
+    "skyPx": 4.043,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 324.2,
+    "pitch": -6.3,
+    "dCorrect": null,
+    "dWrong": 26.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 50.123,
+    "skyPx": 2.657,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 174.1,
+    "pitch": -11.7,
+    "dCorrect": null,
+    "dWrong": 88.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 34.154,
+    "skyPx": 3.787,
+    "s1inl": null
+   },
+   {
+    "src": "appseeds",
+    "yaw": 1.7,
+    "pitch": -8.7,
+    "dCorrect": null,
+    "dWrong": 0.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 21.753,
+    "skyPx": 2.949,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   1689,
+   310,
+   777,
+   1447
+  ],
+  "eyeMovedRuns": 2,
+  "loma": {
+   "level": "LOW",
+   "inl": 2435,
+   "sup": 0.525,
+   "pose": {
+    "yaw": 261.33,
+    "pitch": -10.57,
+    "roll": -0.8,
+    "vfov": 37.97
+   },
+   "dCorrect": null,
+   "dWrong": 0.055036496191981144,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0076": {
+  "id": "wc_0076",
+  "title": "File:Schweiz Unterwegs 160DSC 0215 (48437096132).jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 27.0,
+  "heading": null,
+  "date": "2019-05-13T17:03:08",
+  "camera": "NIKON CORPORATION NIKON D3300",
+  "tags": {
+   "focalClass": "wide",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "grass",
+    "wires"
+   ],
+   "hard": false,
+   "region": "vaud",
+   "notes": "pylon and wires, prealps"
+  },
+  "verdictTags": [
+   "cloud",
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 0,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 112.7,
+    "pitch": 8.2,
+    "vfov": 49.0
+   }
+  ],
+  "wrongRefs": [],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "unsure",
+   "source": "sky",
+   "checks": {
+    "cueAgreeDeg": 16.267,
+    "skylineMedPx": 2.713,
+    "matchSupport": 0.71,
+    "apriori": false,
+    "matchDominant": true,
+    "basinGap": 0.8046966416488469,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1915,
+    "unmet": [
+     "apriori"
+    ]
+   },
+   "pose": {
+    "yaw": 113.4,
+    "pitch": 8.46,
+    "roll": -0.45,
+    "vfov": 47.77
+   },
+   "sweepBest": 690,
+   "vfov0": 47.988573744584876,
+   "hfov0": 67.3449042973138,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 113.4,
+    "pitch": 8.6,
+    "dCorrect": 1.0,
+    "dWrong": null,
+    "inl": 1502,
+    "sup": 0.645,
+    "agree": 1.061,
+    "skyPx": 2.312,
+    "s1inl": 690
+   },
+   {
+    "src": "sky",
+    "yaw": 306.3,
+    "pitch": 14.6,
+    "dCorrect": 172.8,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.06,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 113.4,
+    "pitch": 8.5,
+    "dCorrect": 0.9,
+    "dWrong": null,
+    "inl": 1915,
+    "sup": 0.71,
+    "agree": 16.267,
+    "skyPx": 2.713,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 27.1,
+    "pitch": -4.8,
+    "dCorrect": 98.7,
+    "dWrong": null,
+    "inl": 1,
+    "sup": 0.021,
+    "agree": null,
+    "skyPx": 6.63,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 3702,
+   "sup": 0.607,
+   "pose": {
+    "yaw": 113.6,
+    "pitch": 8.65,
+    "roll": -0.3,
+    "vfov": 47.34
+   },
+   "dCorrect": 1.2874964185947366,
+   "dWrong": null,
+   "verdict": "pending"
+  }
+ },
+ "wc_0077": {
+  "id": "wc_0077",
+  "title": "File:F\u00e4lensee Altmann S\u00e4ntis.JPG",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 45.0,
+  "heading": null,
+  "date": "2010-07-16T11:13:28",
+  "camera": "SONY  DSLR-A700",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "grass",
+    "rock"
+   ],
+   "hard": false,
+   "region": "appenzell",
+   "notes": "limestone chain, hazy"
+  },
+  "verdictTags": [
+   "fog-haze"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 255.2,
+    "pitch": 1.0,
+    "vfov": 26.9
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "B",
+    "yaw": 240.6,
+    "pitch": 1.6
+   },
+   {
+    "label": "CMT",
+    "yaw": 221.5,
+    "pitch": 6.0
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.918,
+    "skylineMedPx": 1.327,
+    "matchSupport": 0.821,
+    "apriori": true,
+    "matchDominant": false,
+    "basinGap": 1.7453395689711477,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 5332,
+    "unmet": [
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 255.24,
+    "pitch": 0.98,
+    "roll": 2.67,
+    "vfov": 26.97
+   },
+   "sweepBest": 149,
+   "vfov0": 29.858001681017253,
+   "hfov0": 43.605773259198436,
+   "focalKnown": true,
+   "stage": "basinGap[3]"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 255.2,
+    "pitch": 1.0,
+    "dCorrect": 0.0,
+    "dWrong": 15.3,
+    "inl": 5332,
+    "sup": 0.821,
+    "agree": 0.918,
+    "skyPx": 1.327,
+    "s1inl": 149
+   },
+   {
+    "src": "sky",
+    "yaw": 254.9,
+    "pitch": 0.9,
+    "dCorrect": 0.4,
+    "dWrong": 15.1,
+    "inl": 86,
+    "sup": 0.439,
+    "agree": 61.129,
+    "skyPx": 4.752,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 339.9,
+    "pitch": -4.7,
+    "dCorrect": 90.4,
+    "dWrong": 105.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.999,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 255.1,
+    "pitch": 1.0,
+    "dCorrect": 0.2,
+    "dWrong": 15.1,
+    "inl": 659,
+    "sup": 0.729,
+    "agree": 55.88,
+    "skyPx": 4.332,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 5830,
+   "sup": 0.735,
+   "pose": {
+    "yaw": 255.24,
+    "pitch": 0.98,
+    "roll": 2.67,
+    "vfov": 26.97
+   },
+   "dCorrect": 0.021610783430061176,
+   "dWrong": 15.2763654916661,
+   "verdict": "correct"
+  }
+ },
+ "wc_0082": {
+  "id": "wc_0082",
+  "title": "File:Maloja mit Silsersee und Maloja Palace.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 33.0,
+  "heading": 52.6,
+  "date": "2013-09-20T11:21:43",
+  "camera": "Apple iPhone 5",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "buildings",
+    "trees"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "village and forest foreground, lake valley"
+  },
+  "verdictTags": [],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 0,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 52.9,
+    "pitch": -3.3,
+    "vfov": 44.0
+   }
+  ],
+  "wrongRefs": [],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.226,
+    "skylineMedPx": 0.727,
+    "matchSupport": 0.704,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 2441,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 52.83,
+    "pitch": -3.16,
+    "roll": 1.79,
+    "vfov": 44.05
+   },
+   "sweepBest": 628,
+   "vfov0": 42.942676503397074,
+   "hfov0": 55.34895508267558,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 52.8,
+    "pitch": -3.2,
+    "dCorrect": 0.2,
+    "dWrong": null,
+    "inl": 2441,
+    "sup": 0.704,
+    "agree": 0.226,
+    "skyPx": 0.727,
+    "s1inl": 628
+   },
+   {
+    "src": "sky",
+    "yaw": 226.0,
+    "pitch": -4.7,
+    "dCorrect": 174.6,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.968,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 153.4,
+    "pitch": 1.8,
+    "dCorrect": 105.6,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 12.438,
+    "skyPx": 7.912,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 326.1,
+    "pitch": 14.2,
+    "dCorrect": 104.3,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 10.494,
+    "skyPx": 11.125,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 3313,
+   "sup": 0.614,
+   "pose": {
+    "yaw": 52.84,
+    "pitch": -3.17,
+    "roll": 1.76,
+    "vfov": 44.09
+   },
+   "dCorrect": 0.15321510006918881,
+   "dWrong": null,
+   "verdict": "correct"
+  }
+ },
+ "wc_0085": {
+  "id": "wc_0085",
+  "title": "File:Aussicht vom Parpaner Rothorn.JPG",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 35.0,
+  "heading": 3.1,
+  "date": "2013-01-25T12:08:29",
+  "camera": "Apple iPhone 4S",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "far",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "snow"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "sea of fog, snowy summit"
+  },
+  "verdictTags": [
+   "cloud",
+   "featureless-skyline",
+   "fog-haze"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "C",
+    "yaw": 14.1,
+    "pitch": -1.9,
+    "vfov": 42.7
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 3.1,
+    "pitch": 0
+   },
+   {
+    "label": "B",
+    "yaw": 39.2,
+    "pitch": -1.8
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 1.571,
+    "skylineMedPx": 6.376,
+    "matchSupport": 0.789,
+    "apriori": false,
+    "matchDominant": true,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1255,
+    "unmet": [
+     "apriori"
+    ]
+   },
+   "pose": {
+    "yaw": 14.12,
+    "pitch": -1.87,
+    "roll": -0.32,
+    "vfov": 42.67
+   },
+   "sweepBest": 279,
+   "vfov0": 40.695259744458205,
+   "hfov0": 52.622528613016726,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 14.1,
+    "pitch": -1.9,
+    "dCorrect": 0.0,
+    "dWrong": 12.9,
+    "inl": 1255,
+    "sup": 0.789,
+    "agree": 1.571,
+    "skyPx": 6.376,
+    "s1inl": 279
+   },
+   {
+    "src": "sky",
+    "yaw": 14.2,
+    "pitch": -1.9,
+    "dCorrect": 0.1,
+    "dWrong": 13.0,
+    "inl": 613,
+    "sup": 0.709,
+    "agree": 25.075,
+    "skyPx": 5.875,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 14.0,
+    "pitch": -1.8,
+    "dCorrect": 0.1,
+    "dWrong": 12.8,
+    "inl": 478,
+    "sup": 0.768,
+    "agree": 29.638,
+    "skyPx": 6.572,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 14.2,
+    "pitch": -1.9,
+    "dCorrect": 0.1,
+    "dWrong": 13.0,
+    "inl": 453,
+    "sup": 0.733,
+    "agree": 30.347,
+    "skyPx": 5.869,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 3113,
+   "sup": 0.788,
+   "pose": {
+    "yaw": 14.1,
+    "pitch": -1.91,
+    "roll": -0.15,
+    "vfov": 42.82
+   },
+   "dCorrect": 0.04436756515864326,
+   "dWrong": 12.911535274930953,
+   "verdict": "correct"
+  }
+ },
+ "wc_0086": {
+  "id": "wc_0086",
+  "title": "File:From mount San Salvatore - panoramio.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 36.0,
+  "heading": null,
+  "date": "2007-09-23T13:54:34",
+  "camera": "EASTMAN KODAK COMPANY KODAK EASYSHARE C643 ZOOM DIGITAL CAMERA",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "near",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "people",
+    "trees"
+   ],
+   "hard": false,
+   "region": "ticino",
+   "notes": "viewpoint platform with people, lake fjord"
+  },
+  "verdictTags": [
+   "fog-haze",
+   "foreground-occlusion",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 354.6,
+    "pitch": 8.5
+   },
+   {
+    "label": "B",
+    "yaw": 125.8,
+    "pitch": -9.4
+   },
+   {
+    "label": "C",
+    "yaw": 353.4,
+    "pitch": 8.5
+   },
+   {
+    "label": "CMT",
+    "yaw": 45.8,
+    "pitch": 7.0
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 7.947,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 354.59,
+    "pitch": 8.49,
+    "roll": -4.41,
+    "vfov": 39.49
+   },
+   "sweepBest": 0,
+   "vfov0": 39.63880356406597,
+   "hfov0": 51.36139803217339,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 354.6,
+    "pitch": 8.5,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.947,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 263.0,
+    "pitch": -15.1,
+    "dCorrect": null,
+    "dWrong": 114.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 3.566,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 148.1,
+    "pitch": -14.6,
+    "dCorrect": null,
+    "dWrong": 27.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.15,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 217.2,
+    "pitch": -16.1,
+    "dCorrect": null,
+    "dWrong": 98.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 54.55,
+    "skyPx": 5.175,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 287.8,
+    "pitch": -15.6,
+    "dCorrect": null,
+    "dWrong": 89.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.568,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   568,
+   539,
+   781,
+   1611
+  ],
+  "eyeMovedRuns": 2,
+  "loma": {
+   "level": "LOW",
+   "inl": 0,
+   "sup": 0.0,
+   "pose": {
+    "yaw": 354.59,
+    "pitch": 8.49,
+    "roll": -4.41,
+    "vfov": 39.49
+   },
+   "dCorrect": null,
+   "dWrong": 0.0,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0087": {
+  "id": "wc_0087",
+  "title": "File:Dent de Val\u00e8re et Dents du midi.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 50.0,
+  "heading": null,
+  "date": "2011-01-02T10:13:43",
+  "camera": "SONY DSLR-A900",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "far",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "water"
+   ],
+   "hard": true,
+   "region": "vaud",
+   "notes": "portrait, sea of fog, dark shadow corner"
+  },
+  "verdictTags": [
+   "fog-haze"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 167.0,
+    "pitch": -1.1
+   },
+   {
+    "label": "B",
+    "yaw": 307.6,
+    "pitch": 20.1
+   },
+   {
+    "label": "CMT",
+    "yaw": 46.6,
+    "pitch": 4.2
+   },
+   {
+    "label": "T6A",
+    "yaw": 167.0,
+    "pitch": -0.1
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 11.478,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 167.04,
+    "pitch": -0.1,
+    "roll": -8.16,
+    "vfov": 32.93
+   },
+   "sweepBest": 0,
+   "vfov0": 32.95149329103135,
+   "hfov0": 35.05228725609276,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 167.0,
+    "pitch": -0.1,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 11.478,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 206.6,
+    "pitch": -1.1,
+    "dCorrect": null,
+    "dWrong": 39.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 29.397,
+    "skyPx": 7.768,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 54.0,
+    "pitch": 8.5,
+    "dCorrect": null,
+    "dWrong": 11.7,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 11.012,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 136.9,
+    "pitch": 2.7,
+    "dCorrect": null,
+    "dWrong": 32.9,
+    "inl": 2,
+    "sup": 0.02,
+    "agree": null,
+    "skyPx": 9.537,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 33.0,
+    "pitch": 14.4,
+    "dCorrect": null,
+    "dWrong": 23.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 11.136,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 0,
+   "sup": 0.0,
+   "pose": {
+    "yaw": 167.04,
+    "pitch": -0.1,
+    "roll": -8.16,
+    "vfov": 32.93
+   },
+   "dCorrect": null,
+   "dWrong": 0.0,
+   "verdict": "wrong"
+  }
+ },
+ "wc_0088": {
+  "id": "wc_0088",
+  "title": "File:MelchseeFruttVonHochstollen.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 57.0,
+  "heading": 89.5,
+  "date": "2018-10-14T11:29:29",
+  "camera": "Apple iPhone 8 Plus",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "rock",
+    "water"
+   ],
+   "hard": false,
+   "region": "central",
+   "notes": "strong processing, lakes, jagged range"
+  },
+  "verdictTags": [
+   "fog-haze"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 0,
+  "correctRefs": [
+   {
+    "label": "A",
+    "yaw": 92.1,
+    "pitch": -6.9,
+    "vfov": 25.9
+   }
+  ],
+  "wrongRefs": [],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.156,
+    "skylineMedPx": 1.263,
+    "matchSupport": 0.873,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 4706,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 92.1,
+    "pitch": -6.85,
+    "roll": -0.8,
+    "vfov": 26.18
+   },
+   "sweepBest": 829,
+   "vfov0": 25.65714904905341,
+   "hfov0": 33.77923061594962,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 92.1,
+    "pitch": -6.9,
+    "dCorrect": 0.1,
+    "dWrong": null,
+    "inl": 4706,
+    "sup": 0.873,
+    "agree": 0.156,
+    "skyPx": 1.263,
+    "s1inl": 829
+   },
+   {
+    "src": "sky",
+    "yaw": 213.5,
+    "pitch": -5.5,
+    "dCorrect": 122.8,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 12.572,
+    "skyPx": 6.831,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 321.4,
+    "pitch": -10.4,
+    "dCorrect": 134.2,
+    "dWrong": null,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.198,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 92.1,
+    "pitch": -6.9,
+    "dCorrect": 0.0,
+    "dWrong": null,
+    "inl": 2077,
+    "sup": 0.882,
+    "agree": 30.606,
+    "skyPx": 1.933,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 4266,
+   "sup": 0.64,
+   "pose": {
+    "yaw": 92.14,
+    "pitch": -6.84,
+    "roll": -0.88,
+    "vfov": 26.12
+   },
+   "dCorrect": 0.12993325049925009,
+   "dWrong": null,
+   "verdict": "correct"
+  }
+ },
+ "wc_0094": {
+  "id": "wc_0094",
+  "title": "File:2020-08-24 11-44-27 Schweiz Ospizio Bernina Bernina Hospiz 2474.4.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 38.0,
+  "heading": null,
+  "date": "2020-08-24T11:44:27",
+  "camera": "NIKON CORPORATION NIKON D850",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "cloudy",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "grass",
+    "rock"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "distant range beyond valley"
+  },
+  "verdictTags": [
+   "cloud",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 4,
+  "correctRefs": [
+   {
+    "label": "T6A",
+    "yaw": 145.3,
+    "pitch": -5.1,
+    "vfov": 35.0
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 256.7,
+    "pitch": 14.2
+   },
+   {
+    "label": "B",
+    "yaw": 50.3,
+    "pitch": 8.5
+   },
+   {
+    "label": "C",
+    "yaw": 49.4,
+    "pitch": 8.7
+   },
+   {
+    "label": "CMT",
+    "yaw": 208.7,
+    "pitch": 2.1
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.12,
+    "skylineMedPx": 1.071,
+    "matchSupport": 0.411,
+    "apriori": true,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1817,
+    "unmet": [
+     "matchDominant"
+    ]
+   },
+   "pose": {
+    "yaw": 145.29,
+    "pitch": -5.11,
+    "roll": -1.22,
+    "vfov": 35.03
+   },
+   "sweepBest": 603,
+   "vfov0": 35.04556271443482,
+   "hfov0": 50.69566642169411,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 145.3,
+    "pitch": -5.1,
+    "dCorrect": 0.0,
+    "dWrong": 70.5,
+    "inl": 1817,
+    "sup": 0.411,
+    "agree": 0.12,
+    "skyPx": 1.071,
+    "s1inl": 603
+   },
+   {
+    "src": "sky",
+    "yaw": 145.2,
+    "pitch": -5.1,
+    "dCorrect": 0.1,
+    "dWrong": 70.6,
+    "inl": 1664,
+    "sup": 0.582,
+    "agree": 21.209,
+    "skyPx": 1.811,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 337.4,
+    "pitch": 14.3,
+    "dCorrect": 187.2,
+    "dWrong": 77.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 13.719,
+    "skyPx": 7.859,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 145.5,
+    "pitch": -5.2,
+    "dCorrect": 0.3,
+    "dWrong": 70.5,
+    "inl": 12,
+    "sup": 0.132,
+    "agree": 87.099,
+    "skyPx": 2.481,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 50.5,
+    "pitch": 8.5,
+    "dCorrect": 108.5,
+    "dWrong": 0.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.892,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 2088,
+   "sup": 0.412,
+   "pose": {
+    "yaw": 145.29,
+    "pitch": -5.11,
+    "roll": -1.2,
+    "vfov": 35.03
+   },
+   "dCorrect": 0.0053540994417300425,
+   "dWrong": 70.54918801543143,
+   "verdict": "correct"
+  }
+ },
+ "wc_0095": {
+  "id": "wc_0095",
+  "title": "File:Ausblick geniessen.jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 39.0,
+  "heading": 7.0,
+  "date": "2020-10-31T13:42:57",
+  "camera": "SONY ILCA-77M2",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "far",
+   "season": "summer",
+   "weather": "clear",
+   "headingKnown": true,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "people",
+    "signpost"
+   ],
+   "hard": false,
+   "region": "valais",
+   "notes": "signpost and person, far range"
+  },
+  "verdictTags": [
+   "foreground-occlusion",
+   "near-field-terrain"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 4,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 162.5,
+    "pitch": -8.2
+   },
+   {
+    "label": "B",
+    "yaw": 44.5,
+    "pitch": 15.2
+   },
+   {
+    "label": "C",
+    "yaw": 241.5,
+    "pitch": 9.2
+   },
+   {
+    "label": "CMT",
+    "yaw": 294.4,
+    "pitch": 6.7
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": 19.209,
+    "skylineMedPx": 7.574,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 162.49,
+    "pitch": -8.18,
+    "roll": -1.65,
+    "vfov": 34.47
+   },
+   "sweepBest": 0,
+   "vfov0": 34.200001785627855,
+   "hfov0": 49.55354093143251,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 162.5,
+    "pitch": -8.2,
+    "dCorrect": null,
+    "dWrong": 0.0,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": 19.209,
+    "skyPx": 7.574,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 261.5,
+    "pitch": 13.7,
+    "dCorrect": null,
+    "dWrong": 24.5,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.031,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 126.8,
+    "pitch": -6.7,
+    "dCorrect": null,
+    "dWrong": 37.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.694,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 92.8,
+    "pitch": 12.1,
+    "dCorrect": null,
+    "dWrong": 51.3,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.733,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 221.4,
+    "pitch": 7.2,
+    "dCorrect": null,
+    "dWrong": 22.1,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.138,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": null
+ },
+ "wc_0098": {
+  "id": "wc_0098",
+  "title": "File:Bruschghorn - panoramio (2).jpg",
+  "posSrc": "manual",
+  "coordType": "camera",
+  "focal35": 38.0,
+  "heading": null,
+  "date": "2012-01-03T16:01:19",
+  "camera": "CASIO COMPUTER CO.,LTD. EX-Z75",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "near",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "trees"
+   ],
+   "hard": false,
+   "region": "graubuenden",
+   "notes": "spruce framing, snowy peaks"
+  },
+  "verdictTags": [
+   "foreground-occlusion"
+  ],
+  "anyCorrectWild": false,
+  "nCorrectRefs": 0,
+  "nWrongRefs": 3,
+  "correctRefs": [],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 49.0,
+    "pitch": 6.8
+   },
+   {
+    "label": "B",
+    "yaw": 236.6,
+    "pitch": 7.7
+   },
+   {
+    "label": "CMT",
+    "yaw": 232.3,
+    "pitch": 8.9
+   }
+  ],
+  "t6": {
+   "level": "LOW",
+   "verdict": "wrong",
+   "source": "appseeds",
+   "checks": {
+    "cueAgreeDeg": null,
+    "skylineMedPx": 7.536,
+    "matchSupport": 0.0,
+    "apriori": false,
+    "matchDominant": false,
+    "basinGap": null,
+    "gapOK": false,
+    "ambiguity": 0,
+    "inliers": 0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "pose": {
+    "yaw": 49.06,
+    "pitch": 6.62,
+    "roll": -1.98,
+    "vfov": 32.53
+   },
+   "sweepBest": 0,
+   "vfov0": 32.487422420230516,
+   "hfov0": 52.12588362853704,
+   "focalKnown": true,
+   "stage": "verify[4]:sky"
+  },
+  "cands": [
+   {
+    "src": "appseeds",
+    "yaw": 49.1,
+    "pitch": 6.6,
+    "dCorrect": null,
+    "dWrong": 0.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.536,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 61.0,
+    "pitch": 10.5,
+    "dCorrect": null,
+    "dWrong": 15.8,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 7.363,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 197.0,
+    "pitch": 12.2,
+    "dCorrect": null,
+    "dWrong": 38.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 8.507,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 25.7,
+    "pitch": -2.1,
+    "dCorrect": null,
+    "dWrong": 32.1,
+    "inl": 6,
+    "sup": 0.176,
+    "agree": 13.386,
+    "skyPx": 11.156,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 324.8,
+    "pitch": 9.4,
+    "dCorrect": null,
+    "dWrong": 86.9,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 4.75,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "LOW",
+   "inl": 38,
+   "sup": 0.328,
+   "pose": {
+    "yaw": 102.44,
+    "pitch": 23.86,
+    "roll": 4.38,
+    "vfov": 31.83
+   },
+   "dCorrect": null,
+   "dWrong": 70.58674400957042,
+   "verdict": "pending"
+  }
+ },
+ "wc_0099": {
+  "id": "wc_0099",
+  "title": "File:Lake of the four Cantons.jpg",
+  "posSrc": "exif-gps",
+  "coordType": "camera",
+  "focal35": 35.0,
+  "heading": null,
+  "date": "2013-12-27T13:42:12",
+  "camera": "Apple iPhone 4S",
+  "tags": {
+   "focalClass": "normal",
+   "skylineDist": "far",
+   "season": "winter",
+   "weather": "clear",
+   "headingKnown": false,
+   "focalKnown": true,
+   "focal35Known": true,
+   "foreground": [
+    "water"
+   ],
+   "hard": false,
+   "region": "central",
+   "notes": "portrait, mostly water, low skyline"
+  },
+  "verdictTags": [
+   "water-reflection"
+  ],
+  "anyCorrectWild": true,
+  "nCorrectRefs": 1,
+  "nWrongRefs": 2,
+  "correctRefs": [
+   {
+    "label": "B",
+    "yaw": 107.3,
+    "pitch": 0.7,
+    "vfov": 54.8
+   }
+  ],
+  "wrongRefs": [
+   {
+    "label": "A",
+    "yaw": 9.9,
+    "pitch": -0.7
+   },
+   {
+    "label": "CMT",
+    "yaw": 359.3,
+    "pitch": 1.2
+   }
+  ],
+  "t6": {
+   "level": "HIGH",
+   "verdict": "correct",
+   "source": "sweep40",
+   "checks": {
+    "cueAgreeDeg": 0.382,
+    "skylineMedPx": 1.083,
+    "matchSupport": 0.896,
+    "apriori": true,
+    "matchDominant": true,
+    "basinGap": null,
+    "gapOK": true,
+    "ambiguity": 0,
+    "inliers": 1168,
+    "unmet": []
+   },
+   "pose": {
+    "yaw": 107.33,
+    "pitch": 0.55,
+    "roll": 0.48,
+    "vfov": 55.67
+   },
+   "sweepBest": 76,
+   "vfov0": 52.62252861301673,
+   "hfov0": 40.69525974445821,
+   "focalKnown": true,
+   "stage": "verify[3]:sky"
+  },
+  "cands": [
+   {
+    "src": "sweep40",
+    "yaw": 107.3,
+    "pitch": 0.5,
+    "dCorrect": 0.1,
+    "dWrong": 98.6,
+    "inl": 1168,
+    "sup": 0.896,
+    "agree": 0.382,
+    "skyPx": 1.083,
+    "s1inl": 76
+   },
+   {
+    "src": "sky",
+    "yaw": 262.5,
+    "pitch": -1.2,
+    "dCorrect": 157.0,
+    "dWrong": 99.2,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.369,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 213.0,
+    "pitch": 1.1,
+    "dCorrect": 106.2,
+    "dWrong": 146.4,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 6.075,
+    "s1inl": null
+   },
+   {
+    "src": "sky",
+    "yaw": 0.8,
+    "pitch": 1.4,
+    "dCorrect": 107.3,
+    "dWrong": 1.6,
+    "inl": 0,
+    "sup": 0.0,
+    "agree": null,
+    "skyPx": 5.959,
+    "s1inl": null
+   }
+  ],
+  "eyeProbeBest": [],
+  "eyeMovedRuns": 0,
+  "loma": {
+   "level": "HIGH",
+   "inl": 2827,
+   "sup": 0.952,
+   "pose": {
+    "yaw": 107.3,
+    "pitch": 0.56,
+    "roll": 0.54,
+    "vfov": 55.61
+   },
+   "dCorrect": 0.1149790590634584,
+   "dWrong": 98.6267886794419,
+   "verdict": "correct"
+  }
+ }
+}

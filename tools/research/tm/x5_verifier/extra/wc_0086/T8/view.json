@@ -1,0 +1,75 @@
+{
+ "tag": "T8",
+ "kind": "extra",
+ "pose": {
+  "yaw": 70.53483168126394,
+  "pitch": -15.687977322727106,
+  "roll": -2.0641190621650627,
+  "vfov": 40.016849012734944
+ },
+ "eye": [
+  0,
+  0,
+  902.1166732895856
+ ],
+ "candEye": {
+  "lat": 45.976924,
+  "lon": 8.946991,
+  "h": 902.1166732895856
+ },
+ "kind0": "v2pose@stated-eye",
+ "empty": false,
+ "W": 1024,
+ "H": 768,
+ "intrinsics": {
+  "fx": 1053.8622994214481,
+  "fy": 1054.548854665371,
+  "cx": 512.0,
+  "cy": 384.0,
+  "vfov": 40.016849012734944,
+  "hfov": 51.82392717617411,
+  "aspectEngine": 1.3342019543973942
+ },
+ "files": {
+  "rgb": {
+   "path": "rgb.jpg",
+   "W": 1024,
+   "H": 768,
+   "scale": 1.0
+  },
+  "hill": {
+   "path": "hill.png",
+   "W": 1024,
+   "H": 768,
+   "scale": 1.0
+  },
+  "xyz": {
+   "path": "xyz.npz",
+   "W": 512,
+   "H": 384,
+   "stride": 2
+  }
+ },
+ "terrainFrac": 1.0,
+ "selfTest": {
+  "n": 400,
+  "medPx": 0.1021,
+  "p95Px": 0.1885,
+  "maxPx": 0.2582,
+  "medAngDeg": 0.00513,
+  "p95AngDeg": 0.00955
+ },
+ "timing": {
+  "loadMs": 9957,
+  "fullTerrainMs": 557,
+  "imageryMs": 2858,
+  "skylineMs": 0,
+  "renderMs": 898,
+  "warmPage": false,
+  "draped": true,
+  "emptyViewRetries": 0,
+  "imageryRetries": 0,
+  "imageryMissing": 0,
+  "imageryTiles": 238
+ }
+}

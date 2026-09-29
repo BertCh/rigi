@@ -1,0 +1,5143 @@
+{
+ "about": "DEV-ONLY extract of v2 blind verdicts (tools/bench/split.json dev ids). Use this, never the full verdict/key files, which include test photos. | cascadeMapterhorn: 0f-loader Mapterhorn cascade re-run (verdict inherited from a v2 cluster within 0.5\u00b0/2 m eye, or blind-verified); acc = 0.5 rule, acc75 = app 0.75 yaw-unknown gate.",
+ "photos": {
+  "wc_0001": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.7533457526665154,
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 150.98749999999995,
+      "pitch": 7,
+      "roll": -0.2,
+      "vfov": 17.220379464830568
+     },
+     "eye": {
+      "h": 1828.9632711540442,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1827.1632711540442
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 101.82978763555633,
+      "pitch": 4.097261775368787,
+      "roll": 2.029016278224577,
+      "vfov": 16.733309279575614
+     },
+     "eye": {
+      "h": 1828.9632711540442,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1827.1632711540442
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 91.38911518912892,
+      "pitch": 1.1621731748958242,
+      "roll": 0.7270350223738018,
+      "vfov": 17.229689168837552
+     },
+     "eye": {
+      "h": 1828.763271154044,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1827.1632711540442,
+      "cascadeSolvedEye": 1828.0855671997185,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0002": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "pitch-offset",
+      "yaw-shift"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.10239561823892909,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 37.08981854663324,
+      "pitch": -6.196702811519592,
+      "roll": -1.160919158421553,
+      "vfov": 56.48864336461734
+     },
+     "eye": {
+      "h": 2102.990456138288,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2101.581228186955
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "yaw-shift"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 224.2525361950153,
+      "pitch": 7.576853172458464,
+      "roll": 26.065975718661385,
+      "vfov": 56.57452829148587
+     },
+     "eye": {
+      "h": 2103.1812281869547,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2101.581228186955,
+      "cascadeSolvedEye": 2076.687992478762,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 28.475000000000023,
+      "pitch": -8.3125,
+      "roll": 0,
+      "vfov": 58.76969955819618
+     },
+     "eye": {
+      "h": 2102.990456138288,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2101.581228186955
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0.01689241713809706,
+    "cmtCluster": null
+   }
+  },
+  "wc_0004": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": []
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.13601903768959095,
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.5945676322059793,
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 30.592009069492462,
+      "pitch": -11.807534509932374,
+      "roll": -0.6938092499148191,
+      "vfov": 44.08108753655839
+     },
+     "eye": {
+      "h": 2263.45607328227,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2261.9933941909085
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    },
+    "B": {
+     "pose": {
+      "yaw": 31.865837639150982,
+      "pitch": -8.82886403261204,
+      "roll": 0.33253238157226817,
+      "vfov": 34.91416961447929
+     },
+     "eye": {
+      "h": 2263.45607328227,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2261.9933941909085,
+      "note": "merged methods with different eyes (app 2263.5 m, cascade 2123.9 m); drawn at the app eye"
+     },
+     "methods": [
+      "app",
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "blind",
+    "acc": true,
+    "acc75": true,
+    "conf": 0.87534516765286,
+    "cmtCluster": null
+   }
+  },
+  "wc_0005": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion",
+    "low-light"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.08750403263456676,
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ]
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 191.26837563047616,
+      "pitch": -0.7249265661129118,
+      "roll": -0.21222708964703843,
+      "vfov": 18.011795734406356
+     },
+     "eye": {
+      "h": 814.6,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 812.9099186889362
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 127.00835198678374,
+      "pitch": 0.8623813949821718,
+      "roll": 12.022105596910412,
+      "vfov": 18.100978109501117
+     },
+     "eye": {
+      "h": 814.5099186889362,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 812.9099186889362,
+      "cascadeSolvedEye": 800.9086637867299,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0006": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 1,
+     "tags": [
+      "near-field-terrain",
+      "near-miss"
+     ]
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 149.2625,
+      "pitch": -0.3,
+      "roll": 0.4,
+      "vfov": 68.84214068144456
+     },
+     "eye": {
+      "h": 2408.8120303494043,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2406.9379478464316
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "near-miss"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 152.2580298443428,
+      "pitch": 1.4684610258597808,
+      "roll": -2.386514933780355,
+      "vfov": 61.685306106098295
+     },
+     "eye": {
+      "h": 2408.8120303494043,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2406.9379478464316
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    },
+    "C": {
+     "pose": {
+      "yaw": 149.27193950764217,
+      "pitch": 7.911824054904525,
+      "roll": -4.700385817928039,
+      "vfov": 68.70203837597029
+     },
+     "eye": {
+      "h": 2408.5379478464315,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2406.9379478464316,
+      "cascadeSolvedEye": 2379.27894421041,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 1.7076069004145185e-05,
+    "cmtCluster": null
+   }
+  },
+  "wc_0009": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "cloud",
+      "fog-haze"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.00425352656635869,
+     "tags": [
+      "near-field-terrain",
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 222.039226301427,
+      "pitch": 0.07811579039986638,
+      "roll": 0.3555916892288786,
+      "vfov": 19.07570169043303
+     },
+     "eye": {
+      "h": 2865.3,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2861.9218882590094
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": [
+      "cloud",
+      "fog-haze"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 13.25,
+      "pitch": 8.35,
+      "roll": -1.45,
+      "vfov": 18.94326637221526
+     },
+     "eye": {
+      "h": 2865.3,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2861.9218882590094
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 4.155972619569809,
+      "pitch": 5.916362484027985,
+      "roll": 5.76781661887105,
+      "vfov": 19.270548862274307
+     },
+     "eye": {
+      "h": 2865.3,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2861.9218882590094,
+      "cascadeSolvedEye": 2865.3,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0010": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "water-reflection"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.06614545826314108,
+     "tags": [
+      "parallax-mismatch"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "parallax-mismatch"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 237.30000000000007,
+      "pitch": 4.8374999999999995,
+      "roll": 0.9,
+      "vfov": 60.42275603836866
+     },
+     "eye": {
+      "h": 1160.895212978731,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1159.1515991590081
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 208.8924051839101,
+      "pitch": 13.22760671182149,
+      "roll": 31.18342815279001,
+      "vfov": 60.78976848472363
+     },
+     "eye": {
+      "h": 1160.751599159008,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1159.1515991590081,
+      "cascadeSolvedEye": 1152.0729066613162,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 236.50514067780557,
+      "pitch": 4.574538101610447,
+      "roll": 2.491424491097656,
+      "vfov": 60.69397374911277
+     },
+     "eye": {
+      "h": 1160.895212978731,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1159.1515991590081
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0011": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.023394953591463555,
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ]
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 286.1515407367458,
+      "pitch": 1.582273891183948,
+      "roll": -7.28884784193159,
+      "vfov": 19.98227078124286
+     },
+     "eye": {
+      "h": 1687.2252792892436,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1685.4407003084198
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 28.186998911397893,
+      "pitch": 27.19555793700912,
+      "roll": 11.835989890003269,
+      "vfov": 19.52673078876107
+     },
+     "eye": {
+      "h": 1687.0407003084197,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1685.4407003084198,
+      "cascadeSolvedEye": 1688.8256647812989,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "blind",
+    "acc": true,
+    "acc75": true,
+    "conf": 0.8216511344054324,
+    "cmtCluster": null
+   }
+  },
+  "wc_0013": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.864290736895501,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-miss",
+      "parallax-mismatch"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 266.17499999999995,
+      "pitch": 8.05,
+      "roll": -1.0000000000000002,
+      "vfov": 21.17109359353498
+     },
+     "eye": {
+      "h": 1009.3053830661773,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1007.8577964237854
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 82.15382172426877,
+      "pitch": 14.341371949550087,
+      "roll": -16.875990659972807,
+      "vfov": 21.76688829721455
+     },
+     "eye": {
+      "h": 1009.4577964237855,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1007.8577964237854,
+      "cascadeSolvedEye": 1008.8043393949299,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 266.08260132832174,
+      "pitch": 8.590178950868568,
+      "roll": -2.9919716284944,
+      "vfov": 20.580887069082248
+     },
+     "eye": {
+      "h": 1009.3053830661773,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1007.8577964237854
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "parallax-mismatch"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "inherit",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0014": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "fog-haze"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 1,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 208.86445317911034,
+      "pitch": 2.5152982678922684,
+      "roll": -23.429017105953402,
+      "vfov": 8.800962914283632
+     },
+     "eye": {
+      "h": 2394.2117332958564,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2392.6117332958565,
+      "cascadeSolvedEye": 2351.7123594078307,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 178.78816158192774,
+      "pitch": -0.1555074354532856,
+      "roll": -0.35445412816048877,
+      "vfov": 8.94577861068719
+     },
+     "eye": {
+      "h": 2394.018425736481,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2392.6117332958565
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0015": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "featureless-skyline",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "near-field-terrain",
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.1363401946869451,
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 58.7627085837413,
+      "pitch": -8.347122334564002,
+      "roll": 2.1836983896156803,
+      "vfov": 34.67026094423168
+     },
+     "eye": {
+      "h": 1569.1398874128965,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1567.2109628863925
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 71.67342675126127,
+      "pitch": -2.3892843672148567,
+      "roll": 20.177899259055962,
+      "vfov": 27.084194374757228
+     },
+     "eye": {
+      "h": 1568.8109628863924,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1567.2109628863925,
+      "cascadeSolvedEye": 1563.5519793366898,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 165.10000000000002,
+      "pitch": -8.1,
+      "roll": -3.3499999999999996,
+      "vfov": 27.27166754206444
+     },
+     "eye": {
+      "h": 1569.1398874128965,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1567.2109628863925
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0017": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.6479865291081665,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 322.45030417396447,
+      "pitch": 12.559085245220324,
+      "roll": -9.439054212367614,
+      "vfov": 13.82378750530586
+     },
+     "eye": {
+      "h": 2437.6030485682654,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2436.0030485682655,
+      "cascadeSolvedEye": 2442.0995624649513,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 217.06469912715124,
+      "pitch": 0.5396417489577796,
+      "roll": -1.3692090379051853,
+      "vfov": 14.122714714791606
+     },
+     "eye": {
+      "h": 2437.8212223592795,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2436.0030485682655
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0019": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.831884537004136,
+     "tags": [
+      "near-field-terrain"
+     ]
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-field-terrain"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 82.50851414816566,
+      "pitch": 13.532357908148082,
+      "roll": 0.26077697286912027,
+      "vfov": 10.900128301784648
+     },
+     "eye": {
+      "h": 1998.4304383213325,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1996.6147230169154
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": [
+      "near-field-terrain"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 90,
+      "pitch": 0,
+      "roll": 0,
+      "vfov": 10.9839853310471
+     },
+     "eye": {
+      "h": 1998.2147230169153,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1996.6147230169154,
+      "cascadeSolvedEye": 1989.7915621543223,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "inherit",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": "B"
+   }
+  },
+  "wc_0020": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 1,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 163.10971575504345,
+      "pitch": -1.802219834692498,
+      "roll": -0.22500414135389132,
+      "vfov": 27.654675142845893
+     },
+     "eye": {
+      "h": 2928.4461431405807,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2926.6568727512717,
+      "note": "merged methods with different eyes (app 2928.4 m, cascade 2931.3 m, fused 2928.4 m); drawn at the fused eye"
+     },
+     "methods": [
+      "app",
+      "cascade",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "inherit",
+    "acc": true,
+    "acc75": true,
+    "conf": 0.8259259259259258,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0023": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.2119178918602862,
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 202.10953122084254,
+      "pitch": 4.924803707444616,
+      "roll": 2.690559540641352,
+      "vfov": 6.926475159153066
+     },
+     "eye": {
+      "h": 2124.882630513244,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2122.996462626441
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 157.34923461708445,
+      "pitch": 1.2768715239105255,
+      "roll": 25.128470845572444,
+      "vfov": 6.950130849176821
+     },
+     "eye": {
+      "h": 2124.596462626441,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2122.996462626441,
+      "cascadeSolvedEye": 2125.6842845717074,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0027": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.4129504905016535,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.5933682251676418,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 106.12749839834743,
+      "pitch": 0.07695330909999763,
+      "roll": 0.45822502732558407,
+      "vfov": 15.247593074095947
+     },
+     "eye": {
+      "h": 2658.8326038803452,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2656.9848053691676,
+      "note": "merged methods with different eyes (app 2658.8 m, cascade 2662.8 m, fused 2658.8 m); drawn at the fused eye"
+     },
+     "methods": [
+      "app",
+      "cascade",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "inherit",
+    "acc": true,
+    "acc75": true,
+    "conf": 0.9514018691588785,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0028": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "featureless-skyline",
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.06980063171918544,
+     "tags": [
+      "fog-haze"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 314.2861854264645,
+      "pitch": -4.736923718834967,
+      "roll": 3.980935946382299,
+      "vfov": 29.78289416270321
+     },
+     "eye": {
+      "h": 1808.1,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1237.6505333419086,
+      "cascadeSolvedEye": 1808.1,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 73.22500000000002,
+      "pitch": -6.9125,
+      "roll": 1.6999999999999997,
+      "vfov": 51.15745788924117
+     },
+     "eye": {
+      "h": 1808.1,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1237.6505333419086
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 304.6720108852537,
+      "pitch": -5.8110525716407455,
+      "roll": 4.103885258482728,
+      "vfov": 38.6329622734317
+     },
+     "eye": {
+      "h": 1808.1,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1237.6505333419086
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "inherit",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0033": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.12403331603975606,
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 25.245266329425704,
+      "pitch": 6.267901678582496,
+      "roll": 0.5344660476231622,
+      "vfov": 50.21062382086866
+     },
+     "eye": {
+      "h": 1446.2466421296353,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1444.813643643661
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 23.80000000000001,
+      "pitch": 6.9,
+      "roll": 0.675,
+      "vfov": 50.146270497977255
+     },
+     "eye": {
+      "h": 1446.2466421296353,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1444.813643643661
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 222.09322312653342,
+      "pitch": 23.3492945272049,
+      "roll": -14.678278267832471,
+      "vfov": 49.731552062627536
+     },
+     "eye": {
+      "h": 1446.4136436436609,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1444.813643643661,
+      "cascadeSolvedEye": 1447.4250169034926,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0034": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9035886677718852,
+     "tags": [
+      "foreground-occlusion"
+     ]
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "foreground-occlusion"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 20.836073826491315,
+      "pitch": 13.249171639416309,
+      "roll": 21.40755782328109,
+      "vfov": 7.623558274987193
+     },
+     "eye": {
+      "h": 1293.8391944222617,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1292.2391944222618,
+      "cascadeSolvedEye": 1309.3560435323648,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 127.30244495318556,
+      "pitch": 6.94575166438953,
+      "roll": -0.02703216567918646,
+      "vfov": 7.783242328180592
+     },
+     "eye": {
+      "h": 1294.0952641512383,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1292.2391944222618
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": [
+      "foreground-occlusion"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0035": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "featureless-skyline",
+    "fog-haze"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.1608219812922276,
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "unsure",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "featureless-skyline",
+      "fog-haze",
+      "near-field-terrain"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 114.13921779787353,
+      "pitch": -7.906787921346737,
+      "roll": -1.4641320299498828,
+      "vfov": 38.711453414254215
+     },
+     "eye": {
+      "h": 1085.4804505488835,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1083.735496919299
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 27.122087102081593,
+      "pitch": -7.482386750398358,
+      "roll": 0.7956651055444012,
+      "vfov": 30.36274598315101
+     },
+     "eye": {
+      "h": 1085.335496919299,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1083.735496919299,
+      "cascadeSolvedEye": 1061.3907857270383,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "unsure",
+     "tags": [
+      "featureless-skyline",
+      "fog-haze",
+      "near-field-terrain"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0037": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.5457232872541148,
+     "tags": [
+      "parallax-mismatch",
+      "yaw-shift"
+     ]
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "parallax-mismatch",
+      "yaw-shift"
+     ]
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.61875,
+     "tags": [
+      "roll",
+      "yaw-shift"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 247.75,
+      "pitch": 10.6875,
+      "roll": 0.2500000000000003,
+      "vfov": 18.677407541102696
+     },
+     "eye": {
+      "h": 1406.9159369582355,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1405.1285282444442
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "yaw-shift"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 246.9911351369591,
+      "pitch": 10.871712639683755,
+      "roll": -1.2713163317715843,
+      "vfov": 18.618771094707785
+     },
+     "eye": {
+      "h": 1406.9159369582355,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1405.1285282444442
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "yaw-shift"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 244.31384510265423,
+      "pitch": 10.667259943227098,
+      "roll": -3.782431006161521,
+      "vfov": 18.54451008084265
+     },
+     "eye": {
+      "h": 1406.728528244444,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1405.1285282444442,
+      "cascadeSolvedEye": 1406.910546852799,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "yaw-shift"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0040": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.20594507606857693,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 189.61747344783498,
+      "pitch": 1.8186213129532667,
+      "roll": -6.467669579959572,
+      "vfov": 16.46611877989304
+     },
+     "eye": {
+      "h": 806.2301663656917,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 804.6301663656917,
+      "cascadeSolvedEye": 803.6741302837825,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 122.96249999999998,
+      "pitch": 7.7,
+      "roll": 0.8,
+      "vfov": 16.54226780509131
+     },
+     "eye": {
+      "h": 806.3470893009439,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 804.6301663656917
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 124.27384200871114,
+      "pitch": 7.515742734592754,
+      "roll": -0.16243054178263142,
+      "vfov": 16.530927981609228
+     },
+     "eye": {
+      "h": 806.3470893009439,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 804.6301663656917
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0046": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.07453257630104163,
+     "tags": [
+      "pitch-offset"
+     ]
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "pitch-offset"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 111.3444980923378,
+      "pitch": 5.927551314284182,
+      "roll": -14.278200340379003,
+      "vfov": 27.03548849972736
+     },
+     "eye": {
+      "h": 1454.5055291589756,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1452.9055291589757,
+      "cascadeSolvedEye": 1453.9,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 170.12395874071922,
+      "pitch": 0.14056298649008897,
+      "roll": 0.14510449314797597,
+      "vfov": 34.56734974297811
+     },
+     "eye": {
+      "h": 1454.5107396474937,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1452.9055291589757
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0047": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 1,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9666666666666667,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 139.3031599544106,
+      "pitch": 7.815228031817426,
+      "roll": -0.795006918983279,
+      "vfov": 44.82240294828827
+     },
+     "eye": {
+      "h": 2449.8239342481365,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2448.8045650111435,
+      "note": "merged methods with different eyes (app 2449.8 m, cascade 2434.7 m, fused 2449.8 m); drawn at the fused eye"
+     },
+     "methods": [
+      "app",
+      "cascade",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "inherit",
+    "acc": true,
+    "acc75": true,
+    "conf": 1,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0048": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.0007313614937758724,
+     "tags": [
+      "pitch-offset",
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.6537193195435809,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 103.23238604014563,
+      "pitch": 8.086612753821184,
+      "roll": 13.102378441411355,
+      "vfov": 8.84040167208178
+     },
+     "eye": {
+      "h": 2185.6794457858427,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2184.079445785843,
+      "cascadeSolvedEye": 2179.563921972878,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 146.4364585110646,
+      "pitch": 7.800675087786495,
+      "roll": 2.3688857073819882,
+      "vfov": 8.226644884140587
+     },
+     "eye": {
+      "h": 2185.912536959815,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2184.079445785843
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0052": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "low-light",
+    "water-reflection"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "fov-scale",
+      "other",
+      "parallax-mismatch"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.4580531983645485,
+     "tags": [
+      "fov-scale",
+      "near-miss",
+      "other",
+      "parallax-mismatch"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 67.26364682994608,
+      "pitch": 7.159406407031302,
+      "roll": -1.1375316928630557,
+      "vfov": 35.33914079433976
+     },
+     "eye": {
+      "h": 847.7311900443863,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 845.9632524646618
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "other",
+      "parallax-mismatch"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 271.6973755025492,
+      "pitch": 8.938080849345718,
+      "roll": 11.789355795574007,
+      "vfov": 27.277509344190275
+     },
+     "eye": {
+      "h": 847.5632524646618,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 845.9632524646618,
+      "cascadeSolvedEye": 839.5923391972906,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 69.30000000000001,
+      "pitch": 7.95,
+      "roll": -0.45,
+      "vfov": 45.84055838849994
+     },
+     "eye": {
+      "h": 847.7311900443863,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 845.9632524646618
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "near-miss",
+      "other",
+      "parallax-mismatch"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "blind",
+    "acc": true,
+    "acc75": true,
+    "conf": 1,
+    "cmtCluster": null
+   }
+  },
+  "wc_0053": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-miss",
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.12413022195262421,
+     "tags": [
+      "fov-scale",
+      "near-miss",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 76.23793024119675,
+      "pitch": 6.933651903422257,
+      "roll": -20.804211717599088,
+      "vfov": 37.04632957507685
+     },
+     "eye": {
+      "h": 1714.3578981730702,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1712.7578981730703,
+      "cascadeSolvedEye": 1710.4445023321969,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 299.1758628610803,
+      "pitch": 5.909903775510944,
+      "roll": 5.2060592959963685,
+      "vfov": 36.226408227919094
+     },
+     "eye": {
+      "h": 1714.6068711049033,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1712.7578981730703
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 296.63749999999993,
+      "pitch": 7,
+      "roll": 1.5999999999999999,
+      "vfov": 36.25791016595277
+     },
+     "eye": {
+      "h": 1714.6068711049033,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1712.7578981730703
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "near-miss",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0054": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.44045680811930843,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.7431053833519567,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 50.67879604666308,
+      "pitch": -9.644514713552322,
+      "roll": -1.6258231114141493,
+      "vfov": 53.02940610186044
+     },
+     "eye": {
+      "h": 910.2983328262185,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 908.5598887335792,
+      "note": "merged methods with different eyes (app 910.3 m, cascade 904.8 m, fused 910.3 m); drawn at the fused eye"
+     },
+     "methods": [
+      "app",
+      "cascade",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "inherit",
+    "acc": true,
+    "acc75": true,
+    "conf": 0.950642487315712,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0055": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.6722345462423788,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 252.37774044854086,
+      "pitch": 9.964995639912539,
+      "roll": 0.052328998524664015,
+      "vfov": 47.15950473865972
+     },
+     "eye": {
+      "h": 813.9,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 763.0724291026293,
+      "cascadeSolvedEye": 813.9,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 254.65789241017444,
+      "pitch": 9.290212584549547,
+      "roll": 2.059826592971215,
+      "vfov": 48.25091639854894
+     },
+     "eye": {
+      "h": 813.9,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 763.0724291026293
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "unsure",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0058": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "unsure",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "cloud"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.01854546892995515,
+     "tags": [
+      "cloud",
+      "other"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 282.00614112008634,
+      "pitch": 32.47787011063287,
+      "roll": -8.703005350712239,
+      "vfov": 27.266022448503968
+     },
+     "eye": {
+      "h": 463.2875,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 461.6875,
+      "cascadeSolvedEye": 461.7164130536845,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 156.07274849341002,
+      "pitch": -0.24061478725346025,
+      "roll": -0.6676556764578813,
+      "vfov": 35.071146299693154
+     },
+     "eye": {
+      "h": 463.47119179706914,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 461.6875
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "unsure",
+     "tags": [
+      "cloud"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 198.75,
+      "pitch": 8.1,
+      "roll": -0.1,
+      "vfov": 46.01310754178162
+     },
+     "eye": {
+      "h": 463.47119179706914,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 461.6875
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "cloud",
+      "other"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "unsure",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0.0005474296494731367,
+    "cmtCluster": null
+   }
+  },
+  "wc_0059": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 1,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 27.228375039346588,
+      "pitch": 14.816031259669431,
+      "roll": -7.329342421260572,
+      "vfov": 25.25733286690861
+     },
+     "eye": {
+      "h": 2131.2778044332554,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2129.6778044332555,
+      "cascadeSolvedEye": 2135.720019574645,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 30.139394240144952,
+      "pitch": 6.037637819396753,
+      "roll": -0.4328787827591914,
+      "vfov": 39.893461437414054
+     },
+     "eye": {
+      "h": 2131.4599849992733,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2129.6778044332555
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0063": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 1,
+     "tags": [
+      "near-field-terrain"
+     ]
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": [
+      "near-field-terrain"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 118.72246586500114,
+      "pitch": -0.1442459527785797,
+      "roll": 0.3252126953055498,
+      "vfov": 39.97407825352582
+     },
+     "eye": {
+      "h": 2055.6957888236743,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2053.8886002682466
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": [
+      "near-field-terrain"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 236.35118964105118,
+      "pitch": 10.100299833207586,
+      "roll": 17.06008543153718,
+      "vfov": 38.25562617029917
+     },
+     "eye": {
+      "h": 2055.4886002682465,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2053.8886002682466,
+      "cascadeSolvedEye": 2060.9733378521873,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0067": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.3169963254861469,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 354.62548300114213,
+      "pitch": 1.6175787215838224,
+      "roll": -2.2234010873781624,
+      "vfov": 37.00851664359631
+     },
+     "eye": {
+      "h": 1180.1,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1168.2423878147965
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    },
+    "B": {
+     "pose": {
+      "yaw": 67.78527061428224,
+      "pitch": 7.536728729830588,
+      "roll": -14.255412617050078,
+      "vfov": 27.203098173363134
+     },
+     "eye": {
+      "h": 1180.1,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1168.2423878147965,
+      "cascadeSolvedEye": 1180.1,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0069": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.6323019371992344,
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 280.7341431079184,
+      "pitch": -8.727930730552645,
+      "roll": 0.31475537280959803,
+      "vfov": 40.60388515710916
+     },
+     "eye": {
+      "h": 1335.1067008927464,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1333.3509211527135
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 125.27656605995185,
+      "pitch": 22.60211236085876,
+      "roll": -15.995062400732357,
+      "vfov": 27.242177973545004
+     },
+     "eye": {
+      "h": 1334.9509211527134,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1333.3509211527135,
+      "cascadeSolvedEye": 1275.4328585858339,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 83.22500000000002,
+      "pitch": -9,
+      "roll": 1.2000000000000002,
+      "vfov": 26.658055022367993
+     },
+     "eye": {
+      "h": 1335.1067008927464,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 1333.3509211527135
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0070": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.8936775093326915,
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-field-terrain",
+      "near-miss",
+      "parallax-mismatch"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 320.26250000000005,
+      "pitch": 0.8,
+      "roll": 1.1250000000000002,
+      "vfov": 41.2584392636421
+     },
+     "eye": {
+      "h": 2193,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2160.535293978997
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 304.6541856665642,
+      "pitch": -12.270110539004628,
+      "roll": 22.1193822678651,
+      "vfov": 40.37601985218845
+     },
+     "eye": {
+      "h": 2193,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2160.535293978997,
+      "cascadeSolvedEye": 2193,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 320.373085046798,
+      "pitch": -1.1974035850831186,
+      "roll": -3.940548056937461,
+      "vfov": 41.93454093997585
+     },
+     "eye": {
+      "h": 2193,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2160.535293978997
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "near-miss",
+      "parallax-mismatch"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0071": {
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.29149398238325125,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 11.412500000000023,
+      "pitch": -9.625,
+      "roll": 1.775,
+      "vfov": 47.501818149798225
+     },
+     "eye": {
+      "h": 2268.6,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2234.25
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 8.32454605699678,
+      "pitch": -3.8410384172138254,
+      "roll": -12.083730909355934,
+      "vfov": 48.20611614188627
+     },
+     "eye": {
+      "h": 2268.6,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2234.25,
+      "cascadeSolvedEye": 2268.6,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 158.5380900277587,
+      "pitch": -3.96140582504122,
+      "roll": 3.0507971362192325,
+      "vfov": 47.75915540289387
+     },
+     "eye": {
+      "h": 2268.6,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2234.25
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0072": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.29541509776265995,
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 188,
+      "pitch": -7.999999999999999,
+      "roll": -0.40000000000000013,
+      "vfov": 47.48520525571387
+     },
+     "eye": {
+      "h": 637.6467347155898,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 635.7278061223874
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 5.2091994043948375,
+      "pitch": 13.39510553839248,
+      "roll": 30.4014386259545,
+      "vfov": 28.39177883126391
+     },
+     "eye": {
+      "h": 637.3278061223874,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 635.7278061223874,
+      "cascadeSolvedEye": 631.5095445828765,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 49.29905625811227,
+      "pitch": -9.547286626237295,
+      "roll": -4.020985628670733,
+      "vfov": 35.969246340941524
+     },
+     "eye": {
+      "h": 637.6467347155898,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 635.7278061223874
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0073": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.10753947878720169,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 94.06321548769824,
+      "pitch": 20.502237556130407,
+      "roll": -11.33003936731328,
+      "vfov": 48.73907421892974
+     },
+     "eye": {
+      "h": 490.06191381248664,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 488.4619138124866,
+      "cascadeSolvedEye": 489.9512594750537,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 307.2750000000001,
+      "pitch": 8.100000000000001,
+      "roll": -1.1750000000000003,
+      "vfov": 51.5113821962476
+     },
+     "eye": {
+      "h": 490.41522127619254,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 488.4619138124866
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 306.4098880880849,
+      "pitch": 8.320097765077179,
+      "roll": -1.9101961311602265,
+      "vfov": 51.417041585403034
+     },
+     "eye": {
+      "h": 490.41522127619254,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 488.4619138124866
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0074": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.11048420839321624,
+     "tags": [
+      "other"
+     ]
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "other"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 261.3727520233433,
+      "pitch": -10.580089039288666,
+      "roll": -0.8998490964144179,
+      "vfov": 37.97385048627201
+     },
+     "eye": {
+      "h": 2043.559047788076,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2042.6216415982626
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 1.8999999999999773,
+      "pitch": -8.675,
+      "roll": -3.0000000000000004,
+      "vfov": 28.954033240076196
+     },
+     "eye": {
+      "h": 2043.559047788076,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2042.6216415982626
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 339.56940381788945,
+      "pitch": 4.795780341734568,
+      "roll": -2.862318231459328,
+      "vfov": 23.139157820090794
+     },
+     "eye": {
+      "h": 2044.2216415982625,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2042.6216415982626,
+      "cascadeSolvedEye": 1930.4596271745572,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0076": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "unsure",
+     "accepted": true,
+     "confidence": 0.836911092300973,
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.3445687865708383,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 113.24771979939408,
+      "pitch": 8.120541146499082,
+      "roll": -0.4554519890273472,
+      "vfov": 47.96542665280314
+     },
+     "eye": {
+      "h": 770.6492588146382,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 769.0492588146382,
+      "cascadeSolvedEye": 766.9689573433262,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "unsure",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 112.72062696156956,
+      "pitch": 8.247824576118724,
+      "roll": -0.6083037535486064,
+      "vfov": 49.03007774568867
+     },
+     "eye": {
+      "h": 770.8140144522322,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 769.0492588146382
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "inherit",
+    "acc": true,
+    "acc75": true,
+    "conf": 0.8863546931616085,
+    "cmtCluster": "B"
+   }
+  },
+  "wc_0077": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 1,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "wrong-direction",
+      "yaw-shift"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 255.2246817045659,
+      "pitch": 0.97877978137523,
+      "roll": 2.7017655444166406,
+      "vfov": 26.9459127928156
+     },
+     "eye": {
+      "h": 1774.7856177776289,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1773.193187134226
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    },
+    "B": {
+     "pose": {
+      "yaw": 240.57602695618175,
+      "pitch": 1.5927485516225832,
+      "roll": 2.1970026737716646,
+      "vfov": 28.967050058622977
+     },
+     "eye": {
+      "h": 1774.793187134226,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1773.193187134226,
+      "cascadeSolvedEye": 1735.3241816236036,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "yaw-shift"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0082": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 1,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.6354497354497354,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 52.882930475901446,
+      "pitch": -3.2728839584443676,
+      "roll": 1.465426244438212,
+      "vfov": 43.98111762266183
+     },
+     "eye": {
+      "h": 1873.1,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1859.7858289329251
+     },
+     "methods": [
+      "app",
+      "cascade",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "inherit",
+    "acc": true,
+    "acc75": true,
+    "conf": 0.9507102944135664,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0085": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "featureless-skyline",
+    "fog-haze"
+   ],
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "yaw-shift"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.0867902452590466,
+     "tags": [
+      "yaw-shift"
+     ]
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "correct",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "cloud",
+      "fog-haze"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 3.1000000000000227,
+      "pitch": 0,
+      "roll": 0,
+      "vfov": 40.695259744458205
+     },
+     "eye": {
+      "h": 2851.819122348099,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2850.219122348099,
+      "cascadeSolvedEye": 2848,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "yaw-shift"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 39.22500000000002,
+      "pitch": -1.8249999999999997,
+      "roll": -0.12500000000000003,
+      "vfov": 40.49178344573591
+     },
+     "eye": {
+      "h": 2851.9753627258015,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2850.219122348099
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "yaw-shift"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 14.108701909943363,
+      "pitch": -1.8666790535545839,
+      "roll": -0.3031582047214395,
+      "vfov": 42.72531219746299
+     },
+     "eye": {
+      "h": 2851.9753627258015,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2850.219122348099
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": [
+      "cloud",
+      "fog-haze"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "inherit",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0086": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.21326980177352564,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 354.5867533771873,
+      "pitch": 8.48902699509787,
+      "roll": -4.4054402865636,
+      "vfov": 39.490437332619706
+     },
+     "eye": {
+      "h": 902.1166732895856,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 900.7672094071067
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 125.75124455724898,
+      "pitch": -9.362139431419347,
+      "roll": 16.61821129059585,
+      "vfov": 38.90685241122617
+     },
+     "eye": {
+      "h": 902.3672094071068,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 900.7672094071067,
+      "cascadeSolvedEye": 875.195151141787,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 353.3625,
+      "pitch": 8.5125,
+      "roll": -0.10000000000000003,
+      "vfov": 39.66357781629351
+     },
+     "eye": {
+      "h": 902.1166732895856,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 900.7672094071067
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0087": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.19308855722106238,
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 167.04241785494662,
+      "pitch": -1.0868066604021605,
+      "roll": -1.6355898124746697,
+      "vfov": 32.92380662226141
+     },
+     "eye": {
+      "h": 1656.641345611836,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1654.5943147514674
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 307.62407687546056,
+      "pitch": 20.14894993344271,
+      "roll": -3.3225244784500982,
+      "vfov": 32.5729727660837
+     },
+     "eye": {
+      "h": 1656.1943147514673,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1654.5943147514674,
+      "cascadeSolvedEye": 1661.7553123759951,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0088": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 1,
+     "tags": []
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.7272490221642763,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 92.05178532123688,
+      "pitch": -6.881315164044651,
+      "roll": -0.6107990652515077,
+      "vfov": 25.936455149289483
+     },
+     "eye": {
+      "h": 2402.9240172635496,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2401.4477229467166,
+      "note": "merged methods with different eyes (app 2402.9 m, cascade 2401.2 m, fused 2402.9 m); drawn at the fused eye"
+     },
+     "methods": [
+      "app",
+      "cascade",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "correct",
+    "src": "inherit",
+    "acc": true,
+    "acc75": true,
+    "conf": 1,
+    "cmtCluster": "A"
+   }
+  },
+  "wc_0094": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.1638764433846475,
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 256.73806244570983,
+      "pitch": 14.214499314279323,
+      "roll": -13.631578816572455,
+      "vfov": 34.69388010969301
+     },
+     "eye": {
+      "h": 2474.4,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2447.9779825836004,
+      "cascadeSolvedEye": 2474.4,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 50.263870103968884,
+      "pitch": 8.475984765085098,
+      "roll": -1.1627102588815936,
+      "vfov": 34.37912089604221
+     },
+     "eye": {
+      "h": 2474.4,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2447.9779825836004
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 49.375,
+      "pitch": 8.65,
+      "roll": 0.22499999999999998,
+      "vfov": 35.176983574613956
+     },
+     "eye": {
+      "h": 2474.4,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2447.9779825836004
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0095": {
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.011113896524635021,
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 162.4907507692575,
+      "pitch": -8.182434082293428,
+      "roll": -1.6504170457333958,
+      "vfov": 34.46620009307187
+     },
+     "eye": {
+      "h": 2550.8579727319075,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 2549.1866414857277
+     },
+     "methods": [
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 44.546524652226594,
+      "pitch": 15.155011305663766,
+      "roll": 5.034676037529313,
+      "vfov": 34.18621490039689
+     },
+     "eye": {
+      "h": 2550.7866414857276,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 2549.1866414857277,
+      "cascadeSolvedEye": 2545.2506903479725,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ]
+    },
+    "C": {
+     "pose": {
+      "yaw": 241.5,
+      "pitch": 9.174999999999999,
+      "roll": 0.7250000000000001,
+      "vfov": 33.451876746567244
+     },
+     "eye": {
+      "h": 2550.8579727319075,
+      "from": "app row eye",
+      "dem": "mapterhorn",
+      "ground": 2549.1866414857277
+     },
+     "methods": [
+      "app"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0098": {
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": true,
+     "confidence": 0.3451566479087971,
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0.2,
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "roll"
+     ]
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 48.9610056549148,
+      "pitch": 6.752704777475342,
+      "roll": -1.4439163121971699,
+      "vfov": 32.559072026750584
+     },
+     "eye": {
+      "h": 1669.49340161852,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 1667.8590471578004
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 236.55957632105833,
+      "pitch": 7.694883740575248,
+      "roll": 31.113349420048387,
+      "vfov": 32.32550862162196
+     },
+     "eye": {
+      "h": 1669.4590471578003,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 1667.8590471578004,
+      "cascadeSolvedEye": 1679.7653753262855,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ]
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  },
+  "wc_0099": {
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "water-reflection"
+   ],
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "accepted": false,
+     "confidence": 0,
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ]
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.5702916891475265,
+     "tags": []
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "accepted": true,
+     "confidence": 0.9,
+     "tags": []
+    }
+   },
+   "clusters": {
+    "A": {
+     "pose": {
+      "yaw": 9.887053080755095,
+      "pitch": -0.6567984308922146,
+      "roll": -1.807540810303821,
+      "vfov": 52.09865230051302
+     },
+     "eye": {
+      "h": 435.1625,
+      "from": "cascade rule max(GPS, DEM+1.6) re-applied on Mapterhorn",
+      "dem": "mapterhorn",
+      "ground": 433.5625,
+      "cascadeSolvedEye": 431.6,
+      "cascadeSolvedDem": "terrarium"
+     },
+     "methods": [
+      "cascade"
+     ],
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ]
+    },
+    "B": {
+     "pose": {
+      "yaw": 107.31961854628543,
+      "pitch": 0.6524038420828102,
+      "roll": 0.46794401484933906,
+      "vfov": 54.82965217673791
+     },
+     "eye": {
+      "h": 435.1,
+      "from": "fused row eye",
+      "dem": "mapterhorn",
+      "ground": 433.5625
+     },
+     "methods": [
+      "app",
+      "fused"
+     ],
+     "verdict": "correct",
+     "tags": []
+    }
+   },
+   "cascadeMapterhorn": {
+    "verdict": "wrong",
+    "src": "blind",
+    "acc": false,
+    "acc75": false,
+    "conf": 0,
+    "cmtCluster": null
+   }
+  }
+ }
+}

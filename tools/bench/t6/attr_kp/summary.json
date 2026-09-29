@@ -1,0 +1,106 @@
+{
+ "wc_0006": {
+  "kp4096": {
+   "pose": {
+    "yaw": 153.10548380808547,
+    "pitch": 1.485529406160675,
+    "roll": -1.9886685146085392,
+    "vfov": 62.64732864008545
+   },
+   "eyeH": 2408.8120303494043,
+   "verdict": "pending",
+   "cluster": null,
+   "level": "low",
+   "stages": [
+    {
+     "stage": "match-sweep",
+     "inliers": 327,
+     "used": true,
+     "ms": 16747
+    }
+   ],
+   "stage1Ms": 16747,
+   "serverTotalMs": 33500
+  },
+  "kp2048": {
+   "pose": {
+    "yaw": 158.38498098183695,
+    "pitch": 2.1792011975728673,
+    "roll": -2.2772201178608142,
+    "vfov": 70.00751394764079
+   },
+   "eyeH": 2408.8120303494043,
+   "verdict": "pending",
+   "cluster": null,
+   "level": "low",
+   "stages": [
+    {
+     "stage": "match-sweep",
+     "inliers": 177,
+     "used": true,
+     "ms": 17087
+    }
+   ],
+   "stage1Ms": 17087,
+   "serverTotalMs": 35191
+  },
+  "partialBaselinePose": {
+   "yaw": 158.38498098183695,
+   "pitch": 2.1792011975728673,
+   "roll": -2.2772201178608142,
+   "vfov": 70.00751394764079
+  }
+ },
+ "wc_0009": {
+  "kp4096": {
+   "pose": {
+    "yaw": 222.0410550818018,
+    "pitch": 0.07834995028499112,
+    "roll": 0.3547283487433118,
+    "vfov": 19.083161324241367
+   },
+   "eyeH": 2865.3,
+   "verdict": "correct",
+   "cluster": "A",
+   "level": "low",
+   "stages": [
+    {
+     "stage": "match-sweep",
+     "inliers": 32,
+     "used": true,
+     "ms": 26033
+    }
+   ],
+   "stage1Ms": 26033,
+   "serverTotalMs": 40536
+  },
+  "kp2048": {
+   "pose": {
+    "yaw": 13.247091596610908,
+    "pitch": 8.215086505303148,
+    "roll": -3.1796466859100354,
+    "vfov": 18.764673715687096
+   },
+   "eyeH": 2865.3,
+   "verdict": "wrong",
+   "cluster": "B",
+   "level": "low",
+   "stages": [
+    {
+     "stage": "match-sweep",
+     "inliers": 19,
+     "used": false,
+     "ms": 13880
+    },
+    {
+     "stage": "skyline-seeds",
+     "inliers": null,
+     "used": true,
+     "ms": 2390
+    }
+   ],
+   "stage1Ms": 16270,
+   "serverTotalMs": 23171
+  }
+ }
+}

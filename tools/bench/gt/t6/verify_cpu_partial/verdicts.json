@@ -1,0 +1,4 @@
+{"photos": {
+  "wc_0006": {"verdict": "wrong", "tags": ["partial-match"], "note": "Left cirque ridge (Plattenfirst to Ringelspitz label, ~55% of width) fits well, but on the right the line climbs to a summit in open sky left of the real peak, then runs across the rock face ~10-13% of image height below the true skyline. Right side fails C1, C2 and C3."},
+  "wc_0013": {"verdict": "wrong", "tags": [], "note": "The line roughly traces the main summit block top (x~200-800), but from x~800 rightward it floats in open sky (y~240-420) while the real ridge drops steeply to ~y940 at the right edge. The skyline shape does not match for more than half the width."}
+}}

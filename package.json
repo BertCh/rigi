@@ -1,0 +1,62 @@
+{
+	"name": "rigi",
+	"private": true,
+	"type": "module",
+	"imports": {
+		"#/*": "./src/*"
+	},
+	"scripts": {
+		"dev": "vite dev --port 3100",
+		"generate-routes": "tsr generate",
+		"build": "vite build",
+		"preview": "vite preview",
+		"format": "biome format",
+		"lint": "biome lint",
+		"check": "biome check",
+		"baseline": "tsx scripts/baseline.ts",
+		"baseline:eval": "tsx scripts/eval.ts",
+		"baseline:synth": "tsx scripts/baseline-solve-synth.ts",
+		"ingest": "tsx scripts/ingest.mjs"
+	},
+	"dependencies": {
+		"@deck.gl/react": "^9.4.0",
+		"@luma.gl/core": "9.4.2",
+		"@luma.gl/engine": "9.4.2",
+		"@luma.gl/gpgpu": "9.4.2",
+		"@luma.gl/shadertools": "9.4.2",
+		"@luma.gl/webgpu": "9.4.2",
+		"@math.gl/core": "^4.1.0",
+		"@mediapipe/tasks-vision": "1.0.1",
+		"@tailwindcss/vite": "^4.1.18",
+		"@tanstack/react-router": "^1.170.39",
+		"@tanstack/react-start": "^1.168.58",
+		"clsx": "^2.1.1",
+		"deck.gl": "^9.4.0",
+		"exifr": "^7.1.3",
+		"libheif-js": "^1.23.2",
+		"lucide-react": "^0.577.0",
+		"nitro": "3.0.260610-beta",
+		"onnxruntime-web": "^1.30.0",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0",
+		"tailwind-merge": "^3.0.2",
+		"tailwindcss": "^4.1.18",
+		"three": "^0.186.1",
+		"tw-animate-css": "^1.3.6"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.5",
+		"@napi-rs/canvas": "^1.0.9",
+		"@tailwindcss/typography": "^0.5.16",
+		"@tanstack/router-cli": "^1.132.0",
+		"@types/node": "^22.10.2",
+		"@types/react": "^19.2.0",
+		"@types/react-dom": "^19.2.0",
+		"@types/three": "^0.186.0",
+		"@vitejs/plugin-react": "^6.0.1",
+		"playwright": "^1.63.0",
+		"tsx": "^4.23.15",
+		"typescript": "^6.0.2",
+		"vite": "^8.0.0"
+	}
+}

@@ -1,0 +1,164 @@
+[
+ {
+  "id": "wc_0001",
+  "level": "low",
+  "inherit": [
+   "B",
+   "wrong"
+  ],
+  "gpu_verdict": "wrong",
+  "gpu_high": false,
+  "exif": true,
+  "cascade": null,
+  "fusedCluster": "B",
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0002",
+  "level": "low",
+  "inherit": [
+   "A",
+   "wrong"
+  ],
+  "gpu_verdict": "wrong",
+  "gpu_high": false,
+  "exif": false,
+  "cascade": null,
+  "fusedCluster": "A",
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0004",
+  "level": "low",
+  "inherit": [
+   "A",
+   "correct"
+  ],
+  "gpu_verdict": "correct",
+  "gpu_high": false,
+  "exif": false,
+  "cascade": null,
+  "fusedCluster": "A",
+  "cpu_verdict": "correct"
+ },
+ {
+  "id": "wc_0005",
+  "level": "low",
+  "inherit": [
+   "A",
+   "wrong"
+  ],
+  "gpu_verdict": "wrong",
+  "gpu_high": false,
+  "exif": true,
+  "cascade": null,
+  "fusedCluster": "A",
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0006",
+  "level": "low",
+  "inherit": null,
+  "gpu_verdict": "correct",
+  "gpu_high": false,
+  "exif": false,
+  "cascade": null,
+  "fusedCluster": null,
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0009",
+  "level": "low",
+  "inherit": [
+   "B",
+   "wrong"
+  ],
+  "gpu_verdict": "correct",
+  "gpu_high": false,
+  "exif": true,
+  "cascade": null,
+  "fusedCluster": "B",
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0010",
+  "level": "low",
+  "inherit": [
+   "C",
+   "wrong"
+  ],
+  "gpu_verdict": "wrong",
+  "gpu_high": false,
+  "exif": true,
+  "cascade": null,
+  "fusedCluster": "C",
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0011",
+  "level": "low",
+  "inherit": [
+   "A",
+   "wrong"
+  ],
+  "gpu_verdict": "wrong",
+  "gpu_high": false,
+  "exif": true,
+  "cascade": null,
+  "fusedCluster": "A",
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0013",
+  "level": "low",
+  "inherit": null,
+  "gpu_verdict": "wrong",
+  "gpu_high": false,
+  "exif": true,
+  "cascade": "A",
+  "fusedCluster": null,
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0014",
+  "level": "high",
+  "inherit": [
+   "B",
+   "correct"
+  ],
+  "gpu_verdict": "correct",
+  "gpu_high": true,
+  "exif": false,
+  "cascade": null,
+  "fusedCluster": "B",
+  "cpu_verdict": "correct"
+ },
+ {
+  "id": "wc_0015",
+  "level": "low",
+  "inherit": [
+   "A",
+   "wrong"
+  ],
+  "gpu_verdict": "wrong",
+  "gpu_high": false,
+  "exif": false,
+  "cascade": null,
+  "fusedCluster": "A",
+  "cpu_verdict": "wrong"
+ },
+ {
+  "id": "wc_0017",
+  "level": "high",
+  "inherit": [
+   "B",
+   "correct"
+  ],
+  "gpu_verdict": "correct",
+  "gpu_high": true,
+  "exif": false,
+  "cascade": null,
+  "fusedCluster": "B",
+  "cpu_verdict": "correct"
+ }
+]

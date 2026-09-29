@@ -1,0 +1,600 @@
+{
+ "verifier": 4,
+ "photos": {
+  "wc_0006": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0009": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0012": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0016": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0018": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0019": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0029": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0031": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0036": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0038": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0040": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0044": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0053": {
+   "photoTags": [],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "not-seen"
+     ],
+     "note": "Overlay image never rendered (media removed after retries)."
+    }
+   }
+  },
+  "wc_0054": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Monte Boglia cone, middle peaks and right ridge align closely."
+    }
+   }
+  },
+  "wc_0055": {
+   "photoTags": [
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "note": "Ridge shape right but line ~4% right/above crest."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Hugs forested ridge, cliff and slope; right end hidden by roof."
+    }
+   }
+  },
+  "wc_0056": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line crosses lower ridges below pyramid; pyramid peak unmatched."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line crosses faces and sky; misses pyramid summit."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Diagonal line through lower ridges and cloud; no match."
+    }
+   }
+  },
+  "wc_0071": {
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line far up in sky/header; no match."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line floats in sky left, cuts slope right."
+    },
+    "C": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Left ridge, Sassalb pyramid, valley notch and right slope traced closely."
+    }
+   }
+  },
+  "wc_0073": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Tilted line crossing distant range; misses Tomlishorn ridge."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line floats in sky above hazy horizon."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line floats in sky above distant range."
+    }
+   }
+  },
+  "wc_0076": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Les Millets shape matches; line ~1% high, within tolerance."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Les Millets summits and ridge traced tightly; left distant peaks cloud-hidden."
+    }
+   }
+  },
+  "wc_0078": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Eiger, Mönch, Jungfrau, saddles all traced precisely."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line cuts across faces, misses Eiger/Mönch summits."
+    }
+   }
+  },
+  "wc_0086": {
+   "photoTags": [
+    "near-field-terrain",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line across lake/viewpoint; real skyline at top edge."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Steep line dips into valley; no match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line across lake/viewpoint, far below real skyline."
+    }
+   }
+  },
+  "wc_0090": {
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Piz Nair ridge, saddle and right Kesch range traced well."
+    }
+   }
+  },
+  "wc_0091": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line cuts below main summit; left rises into empty sky."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Same as A: below main summit, empty sky left."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "note": "Main peak roughly traced; right runs over forest below snowy range."
+    }
+   }
+  },
+  "wc_0096": {
+   "photoTags": [
+    "low-light",
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "yaw-shift",
+      "near-miss"
+     ],
+     "note": "Left fits; pyramid ~3% left of real; right rises into sky."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line floats high in sky, no match."
+    }
+   }
+  },
+  "wc_0097": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Left cliff, valley notch, right Rothorn ridge align; distant peaks cloud-hidden."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line misses left cliff and right peaks."
+    }
+   }
+  },
+  "wc_0098": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line crosses peak faces; misses pyramid and right crest."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "note": "Steep diagonal line through sky/tree."
+    }
+   }
+  }
+ }
+}

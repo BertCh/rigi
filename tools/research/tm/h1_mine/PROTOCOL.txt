@@ -1,0 +1,107 @@
+H1 — hard-negative mining on DEV (TM program)                         FROZEN 2026-09-28T17:51:23Z (UTC)
+Written before any candidate was generated, scored or rendered, and before any verdict exists.
+Folds in the main-session amendment (label-by-construction, S5 masked-basin rerun, 3-way count split),
+received before this file was frozen.
+
+SCOPE / RULES
+- DEV ids only (tools/bench/split.json "dev", via tools/matcher/v2/refs.py). No test id, nothing in tools/bench/data_v3.
+- Read-only outside tools/research/tm/h1_mine. No edit to tools/matcher/**; thin wrappers live in h1_mine/.
+- One stage-1 worker (vendored worker.mjs) on port 8793, only while holding tm_common.render_lock();
+  LoMa (MPS) only while holding tm_common.gpu_lock(). Never call :8765/:8766/:3000.
+- The mining session does NOT judge correctness and does not look at overlays. Verdicts come only from blind verifiers
+  run later by the main session.
+
+PRODUCTION PATH ("T6+LoMa")
+- stage1/pipeline.py (T6, code stamp c2d406ea3c557e6e, rule sha1 292fb74f…) with every s1.correspond routed through
+  v2/loma/matcher.correspond_loma exactly as run_v2.use_loma() does (LoMa-B, 4096 kp, MPS fp32, filter 0.1).
+- "Stage 2" = pipeline.stage2 (5-view fan, APP.assemble fused solve). "Full T6" = pipeline.run_photo (MAX_VERIFY 6).
+- h1 wrappers only (a) monkeypatch pipeline.stage2 to also save the fused 2D-3D correspondences it used, and
+  (b) for S5 only, run pipeline.run_photo's own source with one inserted line that drops stage-1 candidates before
+  dedupe (seed filter). Nothing else changes.
+
+CANDIDATE SOURCES (order of work: S0 -> S1 -> S2 -> S5 -> S3 -> S4)
+- S0 harvest (no new matching):
+  a. tools/matcher/v2/out/dev/raw: T6 (ALIKED) stated-eye records and v2 moved-eye full-T6 records: every verified
+     candidate with a fused pose (native: fused inliers, level, checks, sweepSup) and every unverified stage-1 hypothesis
+     (native: stage-1 inliers).
+  b. tools/research/tm/x3_modality/results_final.json views aliked/sat and loma/sat: single-view rotation solves on the
+     ring and ref renders at the cached stated eye (native: single-view solve inliers).
+  c. tools/matcher/v2/.cache/eyeprobe: ALIKED fine-sweep hypotheses at v2 viewpoint candidates (native: window inliers).
+  (x5 raw has no solved candidate poses beyond refs/perturbations/N7, which are constructed or already verified: not harvested.)
+- S1 T6+LoMa at the stated eye: tools/matcher/v2/out/dev_loma/raw (produced by exactly this path, same code stamp,
+  all 50 dev ids). Harvested, not re-run: every verified candidate (fused) + every unverified stage-1 hypothesis.
+- S2 X1 feature hypotheses: tools/research/tm/x1_yawcorr/results/final_v2Breg.json cfg "main" "rawFine" top-2 per
+  photo (frozen DINOv2-B-reg config), each used as a stage-2 prior at the stated eye (T6+LoMa stage 2). All 50 photos.
+- S5 masked-basin rerun: every photo with a verified-correct ref whose eye is within 2 m of the stated eye: full
+  T6+LoMa at the stated eye with every stage-1 candidate whose yaw is within +-10 deg of ANY such correct ref dropped
+  before dedupe/verification. All resulting candidates kept (subject to the pool rule).
+- S3 eye search: photos whose S1 (T6+LoMa stated) result is not HIGH under the frozen rule (the photos production
+  would send to the fallback). viewpoints.candidates(lat, lon) minus the stated eye (open / high100 / high250 /
+  summit, <= 400 m); LoMa fine-sweep probe at each (run_v2.probe_eyes path); full T6+LoMa (positionSource "moved") at
+  the top-2 eyes by probe best inliers with best >= 100 (no 3x ratio, margin or ambiguity gate: we mine, not accept).
+  Probe hypotheses are also candidates (native: window inliers). Pass 1 = top-1 eye for every S3 photo, pass 2 = eye #2.
+- S4 displaced-eye pilot (separate cap, label = pilot): up to 20 photos with a verified-correct ref at the stated eye,
+  EXIF-GPS photos first then manual, each in dev-id order. Eyes: distance 300, 800, 2000 m x 2 bearings
+  (theta and theta+180 deg, theta drawn per photo from the seeded RNG), eye h = DEM ground (tools/matcher/dem.py) + 2 m;
+  rejected if the DEM has no value there. Plus the nearest named OSM natural=peak or tourism=viewpoint within 3 km
+  (Overpass; skipped if the query fails). Solve at each eye with the reduced T6+LoMa path: LoMa fine sweep
+  (pipeline.fine_sweep) -> stage 2 on its top-2 distinct hypotheses. S4 is cut first if the run heads past ~8 h.
+- Budget order if the run heads past ~8 h: cut S4 first, then S3 pass 2, then S3 pass-1 photos (last ids first).
+  Timings logged per stage in logs/.
+
+COMMON SUPPORT (every candidate that passes the pre-screen)
+- Render ONE sat view at the candidate pose (yaw, pitch, roll, vfov) at the candidate's own eye (lat, lon, h;
+  adhoc alt = round(h, 2) unless within 0.05 m of the stated-eye page's eye), render size = the worker's (1024 long
+  side, photo aspect). LoMa-B (4096 kp, MPS fp32, filter 0.1) photo <-> that view via correspond_loma (service lift).
+- common_inl = number of lifted matches whose reprojection residual under the candidate pose at the achieved eye
+  is < 6.0 px (fusion.SUPPORT_PX = the service solve threshold). Also stored: lifted count, a rotation solve
+  (s1.solve, prior = candidate pose) -> solve inliers, solved pose, drift (deg). If the achieved eye differs from
+  the candidate eye by > 0.5 m it is flagged.
+- Pre-screen (compute bound): common support is computed for every candidate with a pose EXCEPT
+  (i) single-view solves / stage-1-only / probe hypotheses with native inliers < 30, (ii) T6-family verified
+  candidates matched with LoMa whose fused inliers < 30, (iii) sky-only unverified hypotheses (no support number).
+  Skipped candidates stay in pool.json with status "not-screened".
+
+POOL RULE (as given by the main session, verbatim intent)
+- Keep candidates with common support >= 100 OR native T6 fused support >= 100.
+- Merge within a photo: yaw & pitch within 0.5 deg AND eye within 2 m 3-D -> one candidate (keep all provenance).
+  Merge happens before common support; the representative pose is the member from the highest-priority source
+  (S1 > S5 > S2 > S3 > S4 > S0), ties by native support.
+- Inherit: a candidate within 0.5 deg yaw/pitch and 2 m eye of an existing blind verdict (refs.correct_refs /
+  wrong_refs at the manifest lat/lon + eyeH, and tools/matcher/v2/verify verdicts.json + the round-1 stated-eye T8
+  verdict) inherits it and is not re-verified. Only "correct"/"wrong" verdicts are inherited; "unsure" is not.
+- Wrong by construction (amendment 1): a non-inherited candidate whose eye is within 2 m of the eye of a verified-
+  CORRECT ref of the same photo and whose yaw or pitch differs by > 3 deg from EVERY such correct ref is
+  label = "wrong-construct". It does not count toward the cap. A seeded random 20% of them (at least 5) go into the
+  blind pack as a label-noise check.
+- Cap per photo: at most 6 new (non-inherited, non-construct) candidates, chosen by common support (ties: native)
+  after a 3 deg yaw NMS among candidates whose eyes are within 2 m of each other. S4 pilot candidates counted
+  separately: max 3 per photo. Candidates beyond the cap stay in pool.json with status "capped".
+- pool.json per candidate: pid, cid, sources (all provenance), pose, eye{lat,lon,h}, eyeDisplacementM vs stated,
+  common_inl (+ solve fields), native support fields, inherit verdict or null, label (null | wrong-construct |
+  pilot), status (blind | inherited | wrong-construct | capped | below-threshold | not-screened).
+
+CORRESPONDENCES (for later verifier panels; corr/<pid>/<cid>__*.npz, compressed)
+- fused: the 5-view 2D-3D correspondences stage 2 used (x2d, X, per-view counts, eye, prior, W, H). Captured live for
+  S2-S5; for S0/S1 pool members re-created by replaying pipeline.stage2 at the candidate's recorded stage-2 prior with
+  its native matcher (replay fused pose / inliers stored next to the recorded ones). Single-view-solve S0 candidates
+  have no fused set.
+- single: the common-support LoMa matches with lifted xyz (x2d, X, residual).
+
+BLIND PACK
+- Builder: copy of tools/matcher/v2/verify/build_pack.ts in h1_mine (Mapterhorn overlay at the EXACT candidate eye,
+  PACK_PAD=1, neutral header "candidate XX", no pose / eye / source / id), changed only to (a) write each photo into
+  pack/<hashed folder>/ (sha256(salt + pid)[:10], salt in the key), (b) write the key to key/key.json, (c) take the
+  label RNG seed from env, (d) two-letter+digit labels.
+- Contents: all status=blind candidates and S4 pilot picks, plus controls: duplicates ~10% of blind candidates
+  (>= 5, re-rendered at a different width), >= 6 yaw decoys from correct refs (+-3 deg if hfov < 25 deg else
+  +-5 deg, sign seeded), >= 4 positive controls (verified-correct refs), 20% (>= 5) wrong-construct noise checks.
+- Seed for every random choice in H1: 20260928. Folder list (no key info) in pack_index.json with a suggested
+  batching of ~12-15 folders per batch, all candidates of a photo in one folder/batch.
+- Suggested decision rule for the verifier session (theirs to confirm): same as tools/matcher/v2/verify/PROTOCOL.md
+  (2 fresh verifiers per batch, C1-C4 checklist, near-miss = wrong, correct iff both say correct, wrong if either says
+  wrong, duplicate disagreement -> unsure, flag a verifier failing a positive control or accepting a decoy).
+
+REPORTING
+- Counts per source and per photo; inherited vs wrong-by-construction vs blind-to-verify; common-support distribution;
+  runtime; failures. Anything decided after seeing candidate data is labelled post hoc.

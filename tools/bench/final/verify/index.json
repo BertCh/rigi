@@ -1,0 +1,149 @@
+{
+ "about": "Blinded candidates, one overlay each (DEM skyline + peaks at a candidate pose). Arms, confidence and decoy status are hidden.",
+ "candidates": {
+  "t0c6ce5": {
+   "photo": "../../data/photos/wc_0061.jpg",
+   "overlay": "t0c6ce5.jpg"
+  },
+  "t2dbffb": {
+   "photo": "../../data/photos/wc_0057.jpg",
+   "overlay": "t2dbffb.jpg"
+  },
+  "t5b73cf": {
+   "photo": "../../data/photos/wc_0051.jpg",
+   "overlay": "t5b73cf.jpg"
+  },
+  "tc0f511": {
+   "photo": "../../data/photos/wc_0097.jpg",
+   "overlay": "tc0f511.jpg"
+  },
+  "tf79b57": {
+   "photo": "../../data/photos/wc_0081.jpg",
+   "overlay": "tf79b57.jpg"
+  },
+  "t5989ab": {
+   "photo": "../../data/photos/wc_0003.jpg",
+   "overlay": "t5989ab.jpg"
+  },
+  "td363ae": {
+   "photo": "../../data/photos/wc_0003.jpg",
+   "overlay": "td363ae.jpg"
+  },
+  "t36fbcb": {
+   "photo": "../../data/photos/wc_0029.jpg",
+   "overlay": "t36fbcb.jpg"
+  },
+  "t4ca235": {
+   "photo": "../../data/photos/wc_0080.jpg",
+   "overlay": "t4ca235.jpg"
+  },
+  "tccad1e": {
+   "photo": "../../data/photos/wc_0032.jpg",
+   "overlay": "tccad1e.jpg"
+  },
+  "t4f666e": {
+   "photo": "../../data/photos/wc_0041.jpg",
+   "overlay": "t4f666e.jpg"
+  },
+  "t504ad2": {
+   "photo": "../../data/photos/wc_0039.jpg",
+   "overlay": "t504ad2.jpg"
+  },
+  "t59cf93": {
+   "photo": "../../data/photos/wc_0064.jpg",
+   "overlay": "t59cf93.jpg"
+  },
+  "t61a210": {
+   "photo": "../../data/photos/wc_0024.jpg",
+   "overlay": "t61a210.jpg"
+  },
+  "t29aab3": {
+   "photo": "../../data/photos/wc_0096.jpg",
+   "overlay": "t29aab3.jpg"
+  },
+  "tbbdac1": {
+   "photo": "../../data/photos/wc_0051.jpg",
+   "overlay": "tbbdac1.jpg"
+  },
+  "t14c08a": {
+   "photo": "../../data/photos/wc_0030.jpg",
+   "overlay": "t14c08a.jpg"
+  },
+  "t1f1047": {
+   "photo": "../../data/photos/wc_0026.jpg",
+   "overlay": "t1f1047.jpg"
+  },
+  "tecbfe2": {
+   "photo": "../../data/photos/wc_0038.jpg",
+   "overlay": "tecbfe2.jpg"
+  },
+  "t76eca3": {
+   "photo": "../../data/photos/wc_0042.jpg",
+   "overlay": "t76eca3.jpg"
+  },
+  "t8ad13b": {
+   "photo": "../../data/photos/wc_0062.jpg",
+   "overlay": "t8ad13b.jpg"
+  },
+  "t9966aa": {
+   "photo": "../../data/photos/wc_0003.jpg",
+   "overlay": "t9966aa.jpg"
+  },
+  "tdba5e4": {
+   "photo": "../../data/photos/wc_0025.jpg",
+   "overlay": "tdba5e4.jpg"
+  },
+  "t13fbd1": {
+   "photo": "../../data/photos/wc_0021.jpg",
+   "overlay": "t13fbd1.jpg"
+  },
+  "t37daae": {
+   "photo": "../../data/photos/wc_0066.jpg",
+   "overlay": "t37daae.jpg"
+  },
+  "t411a6a": {
+   "photo": "../../data/photos/wc_0029.jpg",
+   "overlay": "t411a6a.jpg"
+  },
+  "tb34441": {
+   "photo": "../../data/photos/wc_0091.jpg",
+   "overlay": "tb34441.jpg"
+  },
+  "t34a881": {
+   "photo": "../../data/photos/wc_0090.jpg",
+   "overlay": "t34a881.jpg"
+  },
+  "t3c3ef5": {
+   "photo": "../../data/photos/wc_0039.jpg",
+   "overlay": "t3c3ef5.jpg"
+  },
+  "t1e7f10": {
+   "photo": "../../data/photos/wc_0079.jpg",
+   "overlay": "t1e7f10.jpg"
+  },
+  "t716a52": {
+   "photo": "../../data/photos/wc_0036.jpg",
+   "overlay": "t716a52.jpg"
+  },
+  "t6fb243": {
+   "photo": "../../data/photos/wc_0078.jpg",
+   "overlay": "t6fb243.jpg"
+  },
+  "te9190c": {
+   "photo": "../../data/photos/wc_0039.jpg",
+   "overlay": "te9190c.jpg"
+  },
+  "tcad848": {
+   "photo": "../../data/photos/wc_0021.jpg",
+   "overlay": "tcad848.jpg"
+  },
+  "t262894": {
+   "photo": "../../data/photos/wc_0016.jpg",
+   "overlay": "t262894.jpg"
+  },
+  "t47aaa9": {
+   "photo": "../../data/photos/wc_0003.jpg",
+   "overlay": "t47aaa9.jpg"
+  }
+ }
+}

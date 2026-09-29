@@ -1,0 +1,2102 @@
+[
+ {
+  "pid": "wc_0001",
+  "title": "File:Larch in Guarda.jpg",
+  "titleNorm": "Larch in Guarda",
+  "lat": 46.781325,
+  "lon": 10.150078,
+  "positionSource": "exif-gps",
+  "headingDeg": 89.1,
+  "altitudeM": null,
+  "ground": 1827.2,
+  "eye": 1828.8,
+  "cacheEye": 1828.9632711540442,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0002",
+  "title": "File:Gandstock, Plattengrat, Guldergrat.jpg",
+  "titleNorm": "Gandstock, Plattengrat, Guldergrat",
+  "lat": 46.90117,
+  "lon": 9.17801,
+  "positionSource": "manual",
+  "headingDeg": 33.0,
+  "altitudeM": null,
+  "ground": 2101.2,
+  "eye": 2102.8,
+  "cacheEye": 2102.990456138288,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "gandstock",
+    "feature": {
+     "osm": "node/8294195047",
+     "name": "Gandstock",
+     "type": "natural=peak",
+     "lat": 46.9016624,
+     "lon": 9.1789059,
+     "peak": true,
+     "how": "target:gandstock",
+     "nMatches": 2,
+     "distM": 87.4
+    }
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0004",
+  "title": "File:Alpstein from Frümsel.jpg",
+  "titleNorm": "Alpstein from Frümsel",
+  "lat": 47.15232,
+  "lon": 9.26597,
+  "positionSource": "manual",
+  "headingDeg": 30.0,
+  "altitudeM": null,
+  "ground": 2261.7,
+  "eye": 2263.3,
+  "cacheEye": 2263.45607328227,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "from",
+    "text": "frumsel",
+    "span": [
+     9,
+     21
+    ],
+    "feature": {
+     "osm": "node/452385867",
+     "name": "Frümsel",
+     "type": "natural=peak",
+     "lat": 47.1523229,
+     "lon": 9.2660518,
+     "peak": true,
+     "how": "posthoc",
+     "nMatches": 1,
+     "distM": 6.2,
+     "zFeat": 2265.1
+    }
+   }
+  ],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0005",
+  "title": "File:Evening view from the Uetliberg.jpg",
+  "titleNorm": "Evening view from the Uetliberg",
+  "lat": 47.351668,
+  "lon": 8.487503,
+  "positionSource": "exif-gps",
+  "headingDeg": 192.2,
+  "altitudeM": 798.9,
+  "ground": 813.0,
+  "eye": 814.6,
+  "cacheEye": 814.6,
+  "exifMinusGround": -14.1,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "view from",
+    "text": "the uetliberg",
+    "span": [
+     8,
+     31
+    ],
+    "feature": {
+     "osm": "node/1262086033",
+     "name": "Uetliberg",
+     "type": "railway=station",
+     "lat": 47.3518692,
+     "lon": 8.4874187,
+     "peak": false,
+     "how": "posthoc",
+     "nMatches": 2,
+     "distM": 23.3,
+     "zFeat": 818.6
+    }
+   },
+   {
+    "cue": "suffix-view",
+    "text": "evening",
+    "span": [
+     0,
+     12
+    ],
+    "feature": null
+   }
+  ],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0006",
+  "title": "File:Heubützlipass Fahnenstock.jpg",
+  "titleNorm": "Heubützlipass Fahnenstock",
+  "lat": 46.94556,
+  "lon": 9.29333,
+  "positionSource": "manual",
+  "headingDeg": 147.0,
+  "altitudeM": null,
+  "ground": 2407.0,
+  "eye": 2408.6,
+  "cacheEye": 2408.8120303494043,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "fahnenstock",
+    "feature": {
+     "osm": "node/7803106646",
+     "name": "Fahnenstock",
+     "type": "natural=peak",
+     "lat": 46.9422033,
+     "lon": 9.29315,
+     "peak": true,
+     "how": "target:fahnenstock",
+     "nMatches": 1,
+     "distM": 373.5
+    },
+    "zFeat": 2611.5,
+    "visible": true,
+    "excessM": -11.7,
+    "blockAtM": 310,
+    "bearing": 182.1,
+    "offHeading": 35.1
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0009",
+  "title": "File:Eggishorn Matterhorn.jpg",
+  "titleNorm": "Eggishorn Matterhorn",
+  "lat": 46.427772,
+  "lon": 8.093003,
+  "positionSource": "exif-gps",
+  "headingDeg": 220.1,
+  "altitudeM": 2865.3,
+  "ground": 2861.9,
+  "eye": 2865.3,
+  "cacheEye": 2865.3,
+  "exifMinusGround": 3.4,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "eggishorn",
+    "feature": {
+     "osm": "node/26862818",
+     "name": "Eggishorn",
+     "type": "natural=peak",
+     "lat": 46.4313539,
+     "lon": 8.0942332,
+     "peak": true,
+     "how": "target:eggishorn",
+     "nMatches": 1,
+     "distM": 409.3
+    },
+    "zFeat": 2926.2,
+    "visible": true,
+    "excessM": -5.5,
+    "blockAtM": 35,
+    "bearing": 13.3,
+    "offHeading": 153.2
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [
+   "target Eggishorn bearing 13 is 153 deg off heading"
+  ],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0010",
+  "title": "File:Wasserauen, Schweiz (Unsplash).jpg",
+  "titleNorm": "Wasserauen, Schweiz (Unsplash)",
+  "lat": 47.269658,
+  "lon": 9.404736,
+  "positionSource": "exif-gps",
+  "headingDeg": 241.4,
+  "altitudeM": 1150.3,
+  "ground": 1159.3,
+  "eye": 1160.9,
+  "cacheEye": 1160.895212978731,
+  "exifMinusGround": -9.0,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0011",
+  "title": "File:Kandersteg rock avalanche.jpg",
+  "titleNorm": "Kandersteg rock avalanche",
+  "lat": 46.501763,
+  "lon": 7.697634,
+  "positionSource": "exif-gps",
+  "headingDeg": 200.0,
+  "altitudeM": null,
+  "ground": 1685.4,
+  "eye": 1687.0,
+  "cacheEye": 1687.2252792892436,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0013",
+  "title": "File:00 3688 Huetstock - Engelberg (Schweiz).jpg",
+  "titleNorm": "00 3688 Huetstock - Engelberg (Schweiz)",
+  "lat": 46.8168,
+  "lon": 8.407122,
+  "positionSource": "exif-gps",
+  "headingDeg": 255.9,
+  "altitudeM": 1007.5,
+  "ground": 1007.7,
+  "eye": 1009.3,
+  "cacheEye": 1009.3053830661773,
+  "exifMinusGround": -0.2,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "huetstock",
+    "feature": {
+     "osm": "node/1244934819",
+     "name": "Huetstock",
+     "type": "natural=peak",
+     "lat": 46.8114923,
+     "lon": 8.3319318,
+     "peak": true,
+     "how": "target:huetstock",
+     "nMatches": 1,
+     "distM": 5752.2
+    },
+    "zFeat": 2675.5,
+    "visible": true,
+    "excessM": -13.0,
+    "blockAtM": 30,
+    "bearing": 264.1,
+    "offHeading": 8.2
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0014",
+  "title": "File:Lägh da l'Albigna as seen from Piz Blanch.jpg",
+  "titleNorm": "Lägh da l'Albigna as seen from Piz Blanch",
+  "lat": 46.40315,
+  "lon": 9.64424,
+  "positionSource": "manual",
+  "headingDeg": 180.0,
+  "altitudeM": null,
+  "ground": 2392.2,
+  "eye": 2393.8,
+  "cacheEye": 2394.018425736481,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "da",
+    "text": "l albigna as seen from piz blanch",
+    "span": [
+     5,
+     41
+    ],
+    "feature": null
+   },
+   {
+    "cue": "as seen from",
+    "text": "piz blanch",
+    "span": [
+     18,
+     41
+    ],
+    "feature": {
+     "osm": "node/12040711097",
+     "name": "Piz Blanch",
+     "type": "natural=peak",
+     "lat": 46.4031452,
+     "lon": 9.6442617,
+     "peak": true,
+     "how": "posthoc",
+     "nMatches": 1,
+     "distM": 1.7,
+     "zFeat": 2392.4
+    }
+   }
+  ],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0015",
+  "title": "File:Chasseral, vue vers le sud-ouest en hiver.jpg",
+  "titleNorm": "Chasseral, vue vers le sud-ouest en hiver",
+  "lat": 47.129722,
+  "lon": 7.050843,
+  "positionSource": "manual",
+  "headingDeg": 225.0,
+  "altitudeM": null,
+  "ground": 1567.3,
+  "eye": 1568.9,
+  "cacheEye": 1569.1398874128965,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "suffix-view",
+    "text": "chasseral",
+    "span": [
+     0,
+     14
+    ],
+    "feature": {
+     "osm": "node/283463291",
+     "name": "Chasseral",
+     "type": "natural=peak",
+     "lat": 47.132993,
+     "lon": 7.0592994,
+     "peak": true,
+     "how": "posthoc",
+     "nMatches": 3,
+     "distM": 735.9,
+     "zFeat": 1606.2
+    }
+   }
+  ],
+  "targets": [],
+  "flags": [
+   "F-far"
+  ],
+  "suspect": true,
+  "reasons": [
+   "viewpoint 'chasseral' -> Chasseral (natural=peak) 736 m away"
+  ],
+  "candidates": [
+   {
+    "lat": 47.132993,
+    "lon": 7.0592994,
+    "h": 1608.2,
+    "reason": "F-far: Chasseral 736 m"
+   }
+  ]
+ },
+ {
+  "pid": "wc_0017",
+  "title": "File:Bellwald- Aussicht.jpg",
+  "titleNorm": "Bellwald- Aussicht",
+  "lat": 46.4487,
+  "lon": 8.1642,
+  "positionSource": "manual",
+  "headingDeg": 225.0,
+  "altitudeM": null,
+  "ground": 2436.0,
+  "eye": 2437.6,
+  "cacheEye": 2437.8212223592795,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "suffix-view",
+    "text": "bellwald",
+    "span": [
+     0,
+     18
+    ],
+    "feature": {
+     "osm": "node/435510853",
+     "name": "Bellwald",
+     "type": "aerialway=station",
+     "lat": 46.4289729,
+     "lon": 8.1617848,
+     "peak": false,
+     "how": "posthoc",
+     "nMatches": 2,
+     "distM": 2201.3,
+     "zFeat": 1624.7
+    }
+   }
+  ],
+  "targets": [],
+  "flags": [
+   "F-far"
+  ],
+  "suspect": true,
+  "reasons": [
+   "viewpoint 'bellwald' -> Bellwald (aerialway=station) 2201 m away"
+  ],
+  "candidates": [
+   {
+    "lat": 46.4289729,
+    "lon": 8.1617848,
+    "h": 1626.7,
+    "reason": "F-far: Bellwald 2201 m"
+   }
+  ]
+ },
+ {
+  "pid": "wc_0019",
+  "title": "File:Sackhorn.jpg",
+  "titleNorm": "Sackhorn",
+  "lat": 46.435833,
+  "lon": 7.718611,
+  "positionSource": "manual",
+  "headingDeg": 90.0,
+  "altitudeM": null,
+  "ground": 1996.6,
+  "eye": 1998.2,
+  "cacheEye": 1998.4304383213325,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "sackhorn",
+    "feature": {
+     "osm": "node/3009071331",
+     "name": "Sackhorn",
+     "type": "natural=peak",
+     "lat": 46.4396764,
+     "lon": 7.7667812,
+     "peak": true,
+     "how": "target:sackhorn",
+     "nMatches": 1,
+     "distM": 3715.9
+    },
+    "zFeat": 3203.0,
+    "visible": true,
+    "excessM": 7.0,
+    "blockAtM": 3616,
+    "bearing": 83.4,
+    "offHeading": 6.6
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0020",
+  "title": "File:Le Weisshorn et le Bishorn depuis Bella Tola.jpg",
+  "titleNorm": "Le Weisshorn et le Bishorn depuis Bella Tola",
+  "lat": 46.238318,
+  "lon": 7.65562,
+  "positionSource": "manual",
+  "headingDeg": 80.0,
+  "altitudeM": null,
+  "ground": 2926.6,
+  "eye": 2928.2,
+  "cacheEye": 2928.4461431405807,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "depuis",
+    "text": "bella tola",
+    "span": [
+     27,
+     44
+    ],
+    "feature": {
+     "osm": "node/911155369",
+     "name": "Bella Tola",
+     "type": "natural=peak",
+     "lat": 46.2390473,
+     "lon": 7.6536086,
+     "peak": true,
+     "how": "posthoc",
+     "nMatches": 1,
+     "distM": 174.7,
+     "zFeat": 3024.0
+    }
+   }
+  ],
+  "targets": [
+   {
+    "q": "le weisshorn",
+    "feature": {
+     "osm": "node/13135951441",
+     "name": "Weisshorn",
+     "type": "natural=peak",
+     "lat": 46.1012342,
+     "lon": 7.7161466,
+     "peak": true,
+     "how": "target:le weisshorn",
+     "nMatches": 1,
+     "distM": 15939.7
+    },
+    "zFeat": 4503.4,
+    "visible": true,
+    "excessM": -5.0,
+    "blockAtM": 30,
+    "bearing": 163.0,
+    "offHeading": 83.0
+   },
+   {
+    "q": "le bishorn",
+    "feature": {
+     "osm": "node/512050064",
+     "name": "Bishorn",
+     "type": "natural=peak",
+     "lat": 46.1179218,
+     "lon": 7.7149611,
+     "peak": true,
+     "how": "target:le bishorn",
+     "nMatches": 1,
+     "distM": 14145.6
+    },
+    "zFeat": 4148.6,
+    "visible": true,
+    "excessM": -5.0,
+    "blockAtM": 30,
+    "bearing": 161.2,
+    "offHeading": 81.2
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [
+   "target Weisshorn bearing 163 is 83 deg off heading",
+   "target Bishorn bearing 161 is 81 deg off heading"
+  ],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0023",
+  "title": "File:Dom of Mischabel.jpg",
+  "titleNorm": "Dom of Mischabel",
+  "lat": 46.374722,
+  "lon": 7.977222,
+  "positionSource": "manual",
+  "headingDeg": 202.5,
+  "altitudeM": null,
+  "ground": 2123.1,
+  "eye": 2124.7,
+  "cacheEye": 2124.882630513244,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0027",
+  "title": "File:Bietschhorn from Lötschen Pass.jpg",
+  "titleNorm": "Bietschhorn from Lötschen Pass",
+  "lat": 46.414444,
+  "lon": 7.719444,
+  "positionSource": "manual",
+  "headingDeg": 90.0,
+  "altitudeM": null,
+  "ground": 2657.0,
+  "eye": 2658.6,
+  "cacheEye": 2658.8326038803452,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "from",
+    "text": "lotschen pass",
+    "span": [
+     12,
+     30
+    ],
+    "feature": {
+     "osm": "node/6753681894",
+     "name": "Lötschenpass",
+     "type": "natural=saddle",
+     "lat": 46.4162535,
+     "lon": 7.7167206,
+     "peak": false,
+     "how": "posthoc",
+     "nMatches": 1,
+     "distM": 290.0,
+     "zFeat": 2690.4
+    }
+   }
+  ],
+  "targets": [
+   {
+    "q": "bietschhorn",
+    "feature": {
+     "osm": "node/26862559",
+     "name": "Bietschhorn",
+     "type": "natural=peak",
+     "lat": 46.3915722,
+     "lon": 7.8508198,
+     "peak": true,
+     "how": "target:bietschhorn",
+     "nMatches": 1,
+     "distM": 10389.7
+    },
+    "zFeat": 3932.4,
+    "visible": true,
+    "excessM": -6.0,
+    "blockAtM": 30,
+    "bearing": 104.2,
+    "offHeading": 14.2
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0028",
+  "title": "File:Vierwaldstättersee7.JPG",
+  "titleNorm": "Vierwaldstättersee7",
+  "lat": 46.990667,
+  "lon": 8.264,
+  "positionSource": "exif-gps",
+  "headingDeg": 67.6,
+  "altitudeM": 1808.1,
+  "ground": 1238.0,
+  "eye": 1808.1,
+  "cacheEye": 1808.1,
+  "exifMinusGround": 570.1,
+  "fExif": true,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [
+   "EXIF alt 1808 vs DEM 1238 (+570 m)"
+  ],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0033",
+  "title": "File:View from Pilatus Railway heading up Mount Pilatus.jpg",
+  "titleNorm": "View from Pilatus Railway heading up Mount Pilatus",
+  "lat": 46.970447,
+  "lon": 8.267675,
+  "positionSource": "exif-gps",
+  "headingDeg": 221.7,
+  "altitudeM": 1405.2,
+  "ground": 1444.6,
+  "eye": 1446.2,
+  "cacheEye": 1446.2466421296353,
+  "exifMinusGround": -39.4,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "view from",
+    "text": "pilatus railway heading up mount pilatus",
+    "span": [
+     0,
+     50
+    ],
+    "feature": null
+   }
+  ],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0034",
+  "title": "File:Forest clearing on a hill (Unsplash).jpg",
+  "titleNorm": "Forest clearing on a hill (Unsplash)",
+  "lat": 46.343563,
+  "lon": 7.012033,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 1292.3,
+  "eye": 1293.9,
+  "cacheEye": 1294.0952641512383,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0035",
+  "title": "File:Wisenberg von der Belchenflue.jpg",
+  "titleNorm": "Wisenberg von der Belchenflue",
+  "lat": 47.362778,
+  "lon": 7.810556,
+  "positionSource": "manual",
+  "headingDeg": 75.0,
+  "altitudeM": null,
+  "ground": 1083.7,
+  "eye": 1085.3,
+  "cacheEye": 1085.4804505488835,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "von der",
+    "text": "belchenflue",
+    "span": [
+     10,
+     29
+    ],
+    "feature": {
+     "osm": "node/31241113",
+     "name": "Belchenflue",
+     "type": "natural=peak",
+     "lat": 47.3628979,
+     "lon": 7.8104669,
+     "peak": true,
+     "how": "posthoc",
+     "nMatches": 1,
+     "distM": 14.9,
+     "zFeat": 1097.6
+    }
+   }
+  ],
+  "targets": [
+   {
+    "q": "wisenberg",
+    "feature": {
+     "osm": "node/340461052",
+     "name": "Wisenberg",
+     "type": "natural=peak",
+     "lat": 47.4024399,
+     "lon": 7.8818684,
+     "peak": true,
+     "how": "target:wisenberg",
+     "nMatches": 1,
+     "distM": 6948.2
+    },
+    "zFeat": 1001.0,
+    "visible": true,
+    "excessM": -13.6,
+    "blockAtM": 30,
+    "bearing": 50.6,
+    "offHeading": 24.4
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0037",
+  "title": "File:Piz Lad as seen from Santa Maria.jpg",
+  "titleNorm": "Piz Lad as seen from Santa Maria",
+  "lat": 46.600296,
+  "lon": 10.417307,
+  "positionSource": "manual",
+  "headingDeg": 180.0,
+  "altitudeM": null,
+  "ground": 1405.1,
+  "eye": 1406.7,
+  "cacheEye": 1406.9159369582355,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "as seen from",
+    "text": "santa maria",
+    "span": [
+     8,
+     32
+    ],
+    "feature": null
+   }
+  ],
+  "targets": [
+   {
+    "q": "piz lad",
+    "feature": {
+     "osm": "node/950673893",
+     "name": "Piz Lad",
+     "type": "natural=peak",
+     "lat": 46.5710467,
+     "lon": 10.4096457,
+     "peak": true,
+     "how": "target:piz lad",
+     "nMatches": 2,
+     "distM": 3304.7
+    },
+    "zFeat": 2881.5,
+    "visible": true,
+    "excessM": -6.0,
+    "blockAtM": 3244,
+    "bearing": 190.2,
+    "offHeading": 10.2
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0040",
+  "title": "File:Gruyère DSC 4352 (6478390647).jpg",
+  "titleNorm": "Gruyère (6478390647)",
+  "lat": 46.583668,
+  "lon": 7.081074,
+  "positionSource": "exif-gps",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 804.5,
+  "eye": 806.1,
+  "cacheEye": 806.3470893009439,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0046",
+  "title": "File:Rigi-First.jpg",
+  "titleNorm": "Rigi-First",
+  "lat": 47.040085,
+  "lon": 8.478834,
+  "positionSource": "exif-gps",
+  "headingDeg": 178.8,
+  "altitudeM": 1453.9,
+  "ground": 1452.9,
+  "eye": 1454.5,
+  "cacheEye": 1454.5107396474937,
+  "exifMinusGround": 1.0,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "rigi",
+    "feature": {
+     "osm": "node/26864447",
+     "name": "Rigi",
+     "type": "natural=peak",
+     "lat": 47.0566777,
+     "lon": 8.4852649,
+     "peak": true,
+     "how": "target:rigi",
+     "nMatches": 1,
+     "distM": 1908.3
+    },
+    "zFeat": 1797.1,
+    "visible": true,
+    "excessM": -0.7,
+    "blockAtM": 1845,
+    "bearing": 14.8,
+    "offHeading": 164.0
+   },
+   {
+    "q": "first",
+    "feature": {
+     "osm": "node/5381458579",
+     "name": "First",
+     "type": "natural=peak",
+     "lat": 46.9518722,
+     "lon": 8.1659582,
+     "peak": true,
+     "how": "target:first",
+     "nMatches": 3,
+     "distM": 25676.1
+    },
+    "zFeat": 1681.6,
+    "visible": false,
+    "excessM": 456.0,
+    "blockAtM": 19530,
+    "bearing": 247.5,
+    "offHeading": 68.7
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [
+   "target Rigi bearing 15 is 164 deg off heading",
+   "target First (25.7 km) blocked by 456 m at 19530 m",
+   "target First bearing 248 is 69 deg off heading"
+  ],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0047",
+  "title": "File:Piz Clüx, Piz Muragl, Las Sours and Munt da la Bês-cha as seen from Muottas Muragl.jpg",
+  "titleNorm": "Piz Clüx, Piz Muragl, Las Sours and Munt da la Bês-cha as seen from Muottas Muragl",
+  "lat": 46.52155,
+  "lon": 9.90202,
+  "positionSource": "manual",
+  "headingDeg": 135.0,
+  "altitudeM": null,
+  "ground": 2448.0,
+  "eye": 2449.6,
+  "cacheEye": 2449.8239342481365,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "da",
+    "text": "la bes cha as seen from muottas muragl",
+    "span": [
+     41,
+     82
+    ],
+    "feature": null
+   },
+   {
+    "cue": "as seen from",
+    "text": "muottas muragl",
+    "span": [
+     55,
+     82
+    ],
+    "feature": {
+     "osm": "node/346921247",
+     "name": "Muottas Muragl",
+     "type": "railway=halt",
+     "lat": 46.5216568,
+     "lon": 9.9018419,
+     "peak": false,
+     "how": "posthoc",
+     "nMatches": 2,
+     "distM": 18.1,
+     "zFeat": 2452.0
+    }
+   }
+  ],
+  "targets": [
+   {
+    "q": "munt da la bes cha",
+    "feature": {
+     "osm": "node/9807433613",
+     "name": "Munt da la Bês-cha",
+     "type": "natural=peak",
+     "lat": 46.5053424,
+     "lon": 9.9179541,
+     "peak": true,
+     "how": "target:munt da la bes cha",
+     "nMatches": 2,
+     "distM": 2175.9
+    },
+    "zFeat": 2765.1,
+    "visible": true,
+    "excessM": -4.0,
+    "blockAtM": 2113,
+    "bearing": 145.9,
+    "offHeading": 10.9
+   },
+   {
+    "q": "piz clux",
+    "feature": {
+     "osm": "node/9504626968",
+     "name": "Piz Clüx",
+     "type": "natural=peak",
+     "lat": 46.4955556,
+     "lon": 9.9435834,
+     "peak": true,
+     "how": "target:piz clux",
+     "nMatches": 1,
+     "distM": 4298.0
+    },
+    "zFeat": 3128.7,
+    "visible": true,
+    "excessM": -3.3,
+    "blockAtM": 3855,
+    "bearing": 132.3,
+    "offHeading": 2.7
+   },
+   {
+    "q": "piz muragl",
+    "feature": {
+     "osm": "node/2715135777",
+     "name": "Piz Muragl",
+     "type": "natural=peak",
+     "lat": 46.4978278,
+     "lon": 9.9373527,
+     "peak": true,
+     "how": "target:piz muragl",
+     "nMatches": 1,
+     "distM": 3777.5
+    },
+    "zFeat": 3156.3,
+    "visible": true,
+    "excessM": -0.1,
+    "blockAtM": 3684,
+    "bearing": 134.3,
+    "offHeading": 0.7
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0048",
+  "title": "File:Weisshorn & Bishorn.jpg",
+  "titleNorm": "Weisshorn & Bishorn",
+  "lat": 46.229335,
+  "lon": 7.609819,
+  "positionSource": "manual",
+  "headingDeg": 150.0,
+  "altitudeM": null,
+  "ground": 2184.1,
+  "eye": 2185.7,
+  "cacheEye": 2185.912536959815,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "weisshorn",
+    "feature": {
+     "osm": "node/13135951441",
+     "name": "Weisshorn",
+     "type": "natural=peak",
+     "lat": 46.10125,
+     "lon": 7.71607,
+     "peak": true,
+     "how": "target:weisshorn",
+     "nMatches": 1,
+     "distM": 16425.6
+    },
+    "zFeat": 4503.8,
+    "visible": true,
+    "excessM": -8.6,
+    "blockAtM": 30,
+    "bearing": 150.2,
+    "offHeading": 0.2
+   },
+   {
+    "q": "bishorn",
+    "feature": {
+     "osm": "node/512050064",
+     "name": "Bishorn",
+     "type": "natural=peak",
+     "lat": 46.1179218,
+     "lon": 7.7149611,
+     "peak": true,
+     "how": "target:bishorn",
+     "nMatches": 1,
+     "distM": 14799.4
+    },
+    "zFeat": 4148.6,
+    "visible": true,
+    "excessM": -8.3,
+    "blockAtM": 30,
+    "bearing": 146.9,
+    "offHeading": 3.1
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0052",
+  "title": "File:Klöntalersee in Richtung Osten.jpg",
+  "titleNorm": "Klöntalersee in Richtung Osten",
+  "lat": 47.020972,
+  "lon": 8.952639,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 845.9,
+  "eye": 847.5,
+  "cacheEye": 847.7311900443863,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0053",
+  "title": "File:Piz Mezdi as seen from Samedan.jpg",
+  "titleNorm": "Piz Mezdi as seen from Samedan",
+  "lat": 46.52211,
+  "lon": 9.874626,
+  "positionSource": "exif-gps",
+  "headingDeg": 202.5,
+  "altitudeM": null,
+  "ground": 1712.8,
+  "eye": 1714.4,
+  "cacheEye": 1714.6068711049033,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "as seen from",
+    "text": "samedan",
+    "span": [
+     10,
+     30
+    ],
+    "feature": {
+     "osm": "node/2627301865",
+     "name": "Samedan",
+     "type": "railway=station",
+     "lat": 46.5338121,
+     "lon": 9.8732564,
+     "peak": false,
+     "how": "posthoc",
+     "nMatches": 1,
+     "distM": 1305.4,
+     "zFeat": 1705.9
+    }
+   }
+  ],
+  "targets": [
+   {
+    "q": "piz mezdi",
+    "feature": {
+     "osm": "node/830989395",
+     "name": "Piz Mezdi",
+     "type": "natural=peak",
+     "lat": 46.4701199,
+     "lon": 9.8632899,
+     "peak": true,
+     "how": "target:piz mezdi",
+     "nMatches": 3,
+     "distM": 5845.8
+    },
+    "zFeat": 2993.0,
+    "visible": true,
+    "excessM": -0.4,
+    "blockAtM": 5671,
+    "bearing": 188.5,
+    "offHeading": 14.0
+   }
+  ],
+  "flags": [
+   "F-far"
+  ],
+  "suspect": true,
+  "reasons": [
+   "viewpoint 'samedan' -> Samedan (railway=station) 1305 m away"
+  ],
+  "candidates": [
+   {
+    "lat": 46.5338121,
+    "lon": 9.8732564,
+    "h": 1707.9,
+    "reason": "F-far: Samedan 1305 m"
+   }
+  ]
+ },
+ {
+  "pid": "wc_0054",
+  "title": "File:Lake Lugano october 2024.jpg",
+  "titleNorm": "Lake Lugano october 2024",
+  "lat": 45.977158,
+  "lon": 8.947661,
+  "positionSource": "exif-gps",
+  "headingDeg": 48.5,
+  "altitudeM": 904.8,
+  "ground": 908.7,
+  "eye": 910.3,
+  "cacheEye": 910.2983328262185,
+  "exifMinusGround": -3.9,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0055",
+  "title": "File:Apriltag.jpg",
+  "titleNorm": "Apriltag",
+  "lat": 47.039994,
+  "lon": 8.530356,
+  "positionSource": "exif-gps",
+  "headingDeg": 111.0,
+  "altitudeM": 813.9,
+  "ground": 762.8,
+  "eye": 813.9,
+  "cacheEye": 813.9,
+  "exifMinusGround": 51.1,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0058",
+  "title": "File:Fog Rolls Over Netstal (Unsplash).jpg",
+  "titleNorm": "Fog Rolls Over Netstal (Unsplash)",
+  "lat": 47.06337,
+  "lon": 9.05504,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 461.7,
+  "eye": 463.3,
+  "cacheEye": 463.47119179706914,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0059",
+  "title": "File:Berninabahn zwischen Lagalb und Ospizio Bernina im Winter.jpg",
+  "titleNorm": "Berninabahn zwischen Lagalb und Ospizio Bernina im Winter",
+  "lat": 46.427626,
+  "lon": 9.995344,
+  "positionSource": "manual",
+  "headingDeg": 30.0,
+  "altitudeM": null,
+  "ground": 2129.7,
+  "eye": 2131.3,
+  "cacheEye": 2131.4599849992733,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "lagalb",
+    "feature": {
+     "osm": "node/1820763442",
+     "name": "Piz Lagalb",
+     "type": "natural=peak",
+     "lat": 46.4315785,
+     "lon": 10.0235884,
+     "peak": true,
+     "how": "target:lagalb",
+     "nMatches": 1,
+     "distM": 2208.8
+    },
+    "zFeat": 2958.2,
+    "visible": true,
+    "excessM": -3.7,
+    "blockAtM": 1466,
+    "bearing": 78.5,
+    "offHeading": 48.5
+   },
+   {
+    "q": "bernina",
+    "feature": {
+     "osm": "node/26864284",
+     "name": "Piz Bernina",
+     "type": "natural=peak",
+     "lat": 46.3824278,
+     "lon": 9.9080521,
+     "peak": true,
+     "how": "target:bernina",
+     "nMatches": 1,
+     "distM": 8370.0
+    },
+    "zFeat": 4047.7,
+    "visible": false,
+    "excessM": 228.0,
+    "blockAtM": 2059,
+    "bearing": 233.1,
+    "offHeading": 156.9
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [
+   "target Piz Bernina (8.4 km) blocked by 228 m at 2059 m",
+   "target Piz Bernina bearing 233 is 157 deg off heading"
+  ],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0063",
+  "title": "File:Am Chüebodensee bei Elm.jpg",
+  "titleNorm": "Am Chüebodensee bei Elm",
+  "lat": 46.934514,
+  "lon": 9.135194,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 2053.9,
+  "eye": 2055.5,
+  "cacheEye": 2055.6957888236743,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0067",
+  "title": "File:Looking from Schwendisee towards Säntis.JPG",
+  "titleNorm": "Looking from Schwendisee towards Säntis",
+  "lat": 47.185453,
+  "lon": 9.332547,
+  "positionSource": "exif-gps",
+  "headingDeg": null,
+  "altitudeM": 1180.1,
+  "ground": 1168.2,
+  "eye": 1180.1,
+  "cacheEye": 1180.1,
+  "exifMinusGround": 11.9,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "from",
+    "text": "schwendisee",
+    "span": [
+     8,
+     24
+    ],
+    "feature": null
+   }
+  ],
+  "targets": [
+   {
+    "q": "santis",
+    "feature": {
+     "osm": "node/26864510",
+     "name": "Säntis",
+     "type": "natural=peak",
+     "lat": 47.249444,
+     "lon": 9.343241,
+     "peak": true,
+     "how": "target:santis",
+     "nMatches": 1,
+     "distM": 7161.2
+    },
+    "zFeat": 2501.9,
+    "visible": true,
+    "excessM": -19.5,
+    "blockAtM": 30,
+    "bearing": 6.5
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0069",
+  "title": "File:Vierwaldstättersee from Fronalpstock.jpg",
+  "titleNorm": "Vierwaldstättersee from Fronalpstock",
+  "lat": 46.979063,
+  "lon": 8.634782,
+  "positionSource": "manual",
+  "headingDeg": 285.0,
+  "altitudeM": null,
+  "ground": 1333.3,
+  "eye": 1334.9,
+  "cacheEye": 1335.1067008927464,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "from",
+    "text": "fronalpstock",
+    "span": [
+     19,
+     36
+    ],
+    "feature": {
+     "osm": "node/30440606",
+     "name": "Fronalpstock",
+     "type": "aerialway=station",
+     "lat": 46.9694971,
+     "lon": 8.6371706,
+     "peak": false,
+     "how": "posthoc",
+     "nMatches": 3,
+     "distM": 1079.0,
+     "zFeat": 1909.5
+    }
+   }
+  ],
+  "targets": [],
+  "flags": [
+   "F-far"
+  ],
+  "suspect": true,
+  "reasons": [
+   "viewpoint 'fronalpstock' -> Fronalpstock (aerialway=station) 1079 m away"
+  ],
+  "candidates": [
+   {
+    "lat": 46.9694971,
+    "lon": 8.6371706,
+    "h": 1911.5,
+    "reason": "F-far: Fronalpstock 1079 m"
+   }
+  ]
+ },
+ {
+  "pid": "wc_0070",
+  "title": "File:Berglimattsee Gandstock.jpg",
+  "titleNorm": "Berglimattsee Gandstock",
+  "lat": 46.960278,
+  "lon": 9.120833,
+  "positionSource": "exif-gps",
+  "headingDeg": null,
+  "altitudeM": 2193.0,
+  "ground": 2160.6,
+  "eye": 2193.0,
+  "cacheEye": 2193,
+  "exifMinusGround": 32.4,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "gandstock",
+    "feature": {
+     "osm": "node/2510193999",
+     "name": "Gandstock",
+     "type": "natural=peak",
+     "lat": 46.9653587,
+     "lon": 9.1169695,
+     "peak": true,
+     "how": "target:gandstock",
+     "nMatches": 2,
+     "distM": 636.5
+    },
+    "zFeat": 2314.4,
+    "visible": true,
+    "excessM": -41.1,
+    "blockAtM": 30,
+    "bearing": 332.6
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0071",
+  "title": "File:Poschiavo, Switzerland - panoramio.jpg",
+  "titleNorm": "Poschiavo, Switzerland - panoramio",
+  "lat": 46.408169,
+  "lon": 10.018936,
+  "positionSource": "exif-gps",
+  "headingDeg": 335.5,
+  "altitudeM": 2268.6,
+  "ground": 2234.2,
+  "eye": 2268.6,
+  "cacheEye": 2268.6,
+  "exifMinusGround": 34.3,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0072",
+  "title": "File:FrümsenSG1.jpg",
+  "titleNorm": "FrümsenSG1",
+  "lat": 47.239778,
+  "lon": 9.453075,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 635.8,
+  "eye": 637.4,
+  "cacheEye": 637.6467347155898,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0073",
+  "title": "File:Matthorn from pilatus.jpg",
+  "titleNorm": "Matthorn from pilatus",
+  "lat": 46.831903,
+  "lon": 8.176028,
+  "positionSource": "exif-gps",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 488.6,
+  "eye": 490.2,
+  "cacheEye": 490.41522127619254,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "from",
+    "text": "pilatus",
+    "span": [
+     9,
+     21
+    ],
+    "feature": {
+     "osm": "node/11184000039",
+     "name": "Pilatus Kulm",
+     "type": "railway=station",
+     "lat": 46.979264,
+     "lon": 8.2556443,
+     "peak": false,
+     "how": "posthoc",
+     "nMatches": 2,
+     "distM": 17466.5,
+     "zFeat": 2110.8
+    }
+   }
+  ],
+  "targets": [
+   {
+    "q": "matthorn",
+    "feature": {
+     "osm": "node/1953255389",
+     "name": "Matthorn",
+     "type": "natural=peak",
+     "lat": 46.9706409,
+     "lon": 8.25308,
+     "peak": true,
+     "how": "target:matthorn",
+     "nMatches": 1,
+     "distM": 16500.3
+    },
+    "zFeat": 2039.5,
+    "visible": true,
+    "excessM": -3.4,
+    "blockAtM": 30,
+    "bearing": 20.8
+   }
+  ],
+  "flags": [
+   "F-far"
+  ],
+  "suspect": true,
+  "reasons": [
+   "viewpoint 'pilatus' -> Pilatus Kulm (railway=station) 17466 m away"
+  ],
+  "candidates": [
+   {
+    "lat": 46.979264,
+    "lon": 8.2556443,
+    "h": 2112.8,
+    "reason": "F-far: Pilatus Kulm 17466 m"
+   }
+  ]
+ },
+ {
+  "pid": "wc_0074",
+  "title": "File:Blick vom Leistcamm.jpg",
+  "titleNorm": "Blick vom Leistcamm",
+  "lat": 47.145832,
+  "lon": 9.214307,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 2041.8,
+  "eye": 2043.4,
+  "cacheEye": 2043.559047788076,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "blick vom",
+    "text": "leistcamm",
+    "span": [
+     0,
+     19
+    ],
+    "feature": null
+   }
+  ],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0076",
+  "title": "File:Schweiz Unterwegs 160DSC 0215 (48437096132).jpg",
+  "titleNorm": "Schweiz Unterwegs 160DSC 0215 (48437096132)",
+  "lat": 46.52297,
+  "lon": 7.05917,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 769.0,
+  "eye": 770.6,
+  "cacheEye": 770.8140144522322,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0077",
+  "title": "File:Fälensee Altmann Säntis.JPG",
+  "titleNorm": "Fälensee Altmann Säntis",
+  "lat": 47.260708,
+  "lon": 9.451503,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 1773.0,
+  "eye": 1774.6,
+  "cacheEye": 1774.7856177776289,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "altmann",
+    "feature": {
+     "osm": "node/420436274",
+     "name": "Altmann",
+     "type": "natural=peak",
+     "lat": 47.239538,
+     "lon": 9.3715741,
+     "peak": true,
+     "how": "target:altmann",
+     "nMatches": 1,
+     "distM": 6476.0
+    },
+    "zFeat": 2434.7,
+    "visible": true,
+    "excessM": -19.5,
+    "blockAtM": 30,
+    "bearing": 248.7
+   },
+   {
+    "q": "santis",
+    "feature": {
+     "osm": "node/26864510",
+     "name": "Säntis",
+     "type": "natural=peak",
+     "lat": 47.249444,
+     "lon": 9.343241,
+     "peak": true,
+     "how": "target:santis",
+     "nMatches": 1,
+     "distM": 8266.2
+    },
+    "zFeat": 2501.9,
+    "visible": true,
+    "excessM": -21.9,
+    "blockAtM": 30,
+    "bearing": 261.3
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0082",
+  "title": "File:Maloja mit Silsersee und Maloja Palace.jpg",
+  "titleNorm": "Maloja mit Silsersee und Maloja Palace",
+  "lat": 46.401489,
+  "lon": 9.690803,
+  "positionSource": "exif-gps",
+  "headingDeg": 52.6,
+  "altitudeM": 1873.1,
+  "ground": 1859.7,
+  "eye": 1873.1,
+  "cacheEye": 1873.1,
+  "exifMinusGround": 13.4,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0085",
+  "title": "File:Aussicht vom Parpaner Rothorn.JPG",
+  "titleNorm": "Aussicht vom Parpaner Rothorn",
+  "lat": 46.742667,
+  "lon": 9.597667,
+  "positionSource": "exif-gps",
+  "headingDeg": 3.1,
+  "altitudeM": 2848.0,
+  "ground": 2850.4,
+  "eye": 2852.0,
+  "cacheEye": 2851.9753627258015,
+  "exifMinusGround": -2.4,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "aussicht vom",
+    "text": "parpaner rothorn",
+    "span": [
+     0,
+     29
+    ],
+    "feature": {
+     "osm": "node/262875534",
+     "name": "Parpaner Rothorn",
+     "type": "natural=peak",
+     "lat": 46.7429325,
+     "lon": 9.5970634,
+     "peak": true,
+     "how": "posthoc",
+     "nMatches": 2,
+     "distM": 54.7,
+     "zFeat": 2858.1
+    }
+   }
+  ],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0086",
+  "title": "File:From mount San Salvatore - panoramio.jpg",
+  "titleNorm": "From mount San Salvatore - panoramio",
+  "lat": 45.976924,
+  "lon": 8.946991,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 900.3,
+  "eye": 901.9,
+  "cacheEye": 902.1166732895856,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "from",
+    "text": "mount san salvatore",
+    "span": [
+     0,
+     24
+    ],
+    "feature": {
+     "osm": "node/26863960",
+     "name": "Monte San Salvatore",
+     "type": "natural=peak",
+     "lat": 45.977112,
+     "lon": 8.9473021,
+     "peak": true,
+     "how": "posthoc",
+     "nMatches": 3,
+     "distM": 31.9,
+     "zFeat": 913.2
+    }
+   }
+  ],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0087",
+  "title": "File:Dent de Valère et Dents du midi.jpg",
+  "titleNorm": "Dent de Valère et Dents du midi",
+  "lat": 46.38295,
+  "lon": 7.0712,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 1654.8,
+  "eye": 1656.4,
+  "cacheEye": 1656.641345611836,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "dent de valere",
+    "feature": {
+     "osm": "node/469396673",
+     "name": "Dent de Valère",
+     "type": "natural=peak",
+     "lat": 46.1951119,
+     "lon": 6.9402158,
+     "peak": true,
+     "how": "target:dent de valere",
+     "nMatches": 1,
+     "distM": 23185.1
+    },
+    "zFeat": 2266.4,
+    "visible": true,
+    "excessM": -5.6,
+    "blockAtM": 30,
+    "bearing": 205.7
+   },
+   {
+    "q": "du midi",
+    "feature": {
+     "osm": "node/12040710363",
+     "name": "Pointe du Midi",
+     "type": "natural=peak",
+     "lat": 46.244899,
+     "lon": 6.8378398,
+     "peak": true,
+     "how": "target:du midi",
+     "nMatches": 1,
+     "distM": 23598.0
+    },
+    "zFeat": 1850.5,
+    "visible": false,
+    "excessM": 29.9,
+    "blockAtM": 21017,
+    "bearing": 229.4
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [
+   "target Pointe du Midi (23.6 km) blocked by 30 m at 21017 m"
+  ],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0088",
+  "title": "File:MelchseeFruttVonHochstollen.jpg",
+  "titleNorm": "MelchseeFruttVonHochstollen",
+  "lat": 46.770869,
+  "lon": 8.238139,
+  "positionSource": "exif-gps",
+  "headingDeg": 89.5,
+  "altitudeM": 2401.2,
+  "ground": 2401.3,
+  "eye": 2402.9,
+  "cacheEye": 2402.9240172635496,
+  "exifMinusGround": -0.1,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0094",
+  "title": "File:2020-08-24 11-44-27 Schweiz Ospizio Bernina Bernina Hospiz 2474.4.jpg",
+  "titleNorm": "11-44-27 Schweiz Ospizio Bernina Bernina Hospiz 2474.4",
+  "lat": 46.428549,
+  "lon": 10.035843,
+  "positionSource": "exif-gps",
+  "headingDeg": null,
+  "altitudeM": 2474.4,
+  "ground": 2448.0,
+  "eye": 2474.4,
+  "cacheEye": 2474.4,
+  "exifMinusGround": 26.4,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "bernina",
+    "feature": {
+     "osm": "node/26864284",
+     "name": "Piz Bernina",
+     "type": "natural=peak",
+     "lat": 46.3824278,
+     "lon": 9.9080521,
+     "peak": true,
+     "how": "target:bernina",
+     "nMatches": 1,
+     "distM": 11059.3
+    },
+    "zFeat": 4047.7,
+    "visible": false,
+    "excessM": 55.3,
+    "blockAtM": 528,
+    "bearing": 242.4
+   },
+   {
+    "q": "bernina",
+    "feature": {
+     "osm": "node/26864284",
+     "name": "Piz Bernina",
+     "type": "natural=peak",
+     "lat": 46.3824278,
+     "lon": 9.9080521,
+     "peak": true,
+     "how": "target:bernina",
+     "nMatches": 1,
+     "distM": 11059.3
+    },
+    "zFeat": 4047.7,
+    "visible": false,
+    "excessM": 55.3,
+    "blockAtM": 528,
+    "bearing": 242.4
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [
+   "target Piz Bernina (11.1 km) blocked by 55 m at 528 m",
+   "target Piz Bernina (11.1 km) blocked by 55 m at 528 m"
+  ],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0095",
+  "title": "File:Ausblick geniessen.jpg",
+  "titleNorm": "Ausblick geniessen",
+  "lat": 46.43,
+  "lon": 7.78897,
+  "positionSource": "manual",
+  "headingDeg": 7.0,
+  "altitudeM": null,
+  "ground": 2549.1,
+  "eye": 2550.7,
+  "cacheEye": 2550.8579727319075,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [
+   {
+    "cue": "suffix-view",
+    "text": "aus",
+    "span": [
+     0,
+     8
+    ],
+    "feature": null
+   }
+  ],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0098",
+  "title": "File:Bruschghorn - panoramio (2).jpg",
+  "titleNorm": "Bruschghorn - panoramio (2)",
+  "lat": 46.644661,
+  "lon": 9.278875,
+  "positionSource": "manual",
+  "headingDeg": null,
+  "altitudeM": null,
+  "ground": 1667.7,
+  "eye": 1669.3,
+  "cacheEye": 1669.49340161852,
+  "exifMinusGround": null,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [
+   {
+    "q": "bruschghorn",
+    "feature": {
+     "osm": "node/1500747211",
+     "name": "Bruschghorn",
+     "type": "natural=peak",
+     "lat": 46.6327157,
+     "lon": 9.3060763,
+     "peak": true,
+     "how": "target:bruschghorn",
+     "nMatches": 1,
+     "distM": 2465.2
+    },
+    "zFeat": 3042.8,
+    "visible": true,
+    "excessM": -17.5,
+    "blockAtM": 2403,
+    "bearing": 122.6
+   }
+  ],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ },
+ {
+  "pid": "wc_0099",
+  "title": "File:Lake of the four Cantons.jpg",
+  "titleNorm": "Lake of the four Cantons",
+  "lat": 47.025561,
+  "lon": 8.401447,
+  "positionSource": "exif-gps",
+  "headingDeg": null,
+  "altitudeM": 413.0,
+  "ground": 433.5,
+  "eye": 435.1,
+  "cacheEye": 435.1,
+  "exifMinusGround": -20.5,
+  "fExif": false,
+  "viewpoints": [],
+  "targets": [],
+  "flags": [],
+  "suspect": false,
+  "reasons": [],
+  "candidates": []
+ }
+]

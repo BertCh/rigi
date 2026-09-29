@@ -1,0 +1,342 @@
+{
+ "verifier": 2,
+ "photos": {
+  "wc_0002": {
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "note": "Line roughly at skyline height but shape does not match: line bumps at x~620 and dips at 800 where real skyline has the Piz-like block peak at ~820; left peaks misaligned; smooth line not tracking notches"
+    }
+   }
+  },
+  "wc_0006": {
+   "photoTags": [
+    "near-field-terrain",
+    "cloud"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "note": "Cirque shape broadly right and middle section fits, but left peaks sit ~3% above the line, line's local peak doesn't match real summits, and on the big near peak line runs in sky on left flank and below the ridge on right"
+    }
+   }
+  },
+  "wc_0010": {
+   "photoTags": [
+    "water-reflection",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Line cuts through left slopes and the prominent tilted peak, goes below Saentis summit; strong spurious roll (-8.9), shape unrelated to the V-valley skyline"
+    }
+   }
+  },
+  "wc_0015": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Line crosses the hazy hills on left and rises steeply into sky on right, far above the near summit ridge; roll 16 deg spurious; no correspondence with skyline"
+    }
+   }
+  },
+  "wc_0023": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Line cuts diagonally through the massif from lower left into the sky upper right; roll ~16 deg spurious; no relation to the summit skyline"
+    }
+   }
+  },
+  "wc_0033": {
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "other"
+     ],
+     "note": "No yellow skyline visible anywhere in frame (DEM skyline falls outside view); pose has -15 deg roll while photo horizon is level; Rigi/Buergenstock skyline unmatched"
+    }
+   }
+  },
+  "wc_0037": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "parallax-mismatch"
+     ],
+     "note": "Line floats in sky above the ridge along most of width (left ~5-7% of height above); only near the main summit is it close; shape of left and right shoulders not matched"
+    }
+   }
+  },
+  "wc_0040": {
+   "photoTags": [
+    "foreground-occlusion",
+    "cloud"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "parallax-mismatch"
+     ],
+     "note": "Nearly straight line crossing Mol\u00e9son massif and hills; does not follow the prominent snowy peak or foothill skylines; Chasseron label (Jura, 51 km) implies wrong direction"
+    }
+   }
+  },
+  "wc_0045": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "parallax-mismatch"
+     ],
+     "note": "Line is a V shape crossing the snow face and rising into sky at left; completely unrelated to the peak's skyline"
+    }
+   }
+  },
+  "wc_0049": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "roll"
+     ],
+     "note": "Line runs along the forested midground ridge and across the snow slope, far below the dominant snowy summit skyline; the peak (true skyline) is entirely unmatched; roll -15 spurious"
+    }
+   }
+  },
+  "wc_0053": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Line near summit plateau in middle but climbs into sky on left where real skyline descends, and runs above the right shoulder (right sub-peak unmatched); roll -20 deg spurious"
+    }
+   }
+  },
+  "wc_0058": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "cloud"
+     ],
+     "note": "Wall top is mostly hidden in cloud; line sits plausibly at/just above the partly visible wall crest in the middle, left portion is over pure cloud, right descent unverifiable; -7.9 roll cannot be confirmed or refuted"
+    }
+   }
+  },
+  "wc_0061": {
+   "photoTags": [
+    "low-light",
+    "water-reflection"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line lies entirely in the sky well above the lake-horizon and right-side peak; shape (big hump at centre) unrelated to real skyline"
+    }
+   }
+  },
+  "wc_0064": {
+   "photoTags": [
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "near-miss"
+     ],
+     "note": "Line runs roughly along the distant range but mostly 2-4% above it; its humps (x~40%, 67%) don't match real summits/notches, and on right it sits above the green near ridge; general height right, detail wrong"
+    }
+   }
+  },
+  "wc_0067": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Smooth line cuts across the snowy mountain faces well below the Saentis/Altmann skyline; no summits matched; roll -12.5 spurious"
+    }
+   }
+  },
+  "wc_0070": {
+   "photoTags": [
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "note": "Topology similar (two peaks with notch ~x55%) and right rock peak roughly fits, but left grassy summit is ~9% of height above the line and its left ridge is well above the line; left peak shape wrong"
+    }
+   }
+  },
+  "wc_0073": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Real skyline is the distant Alps horizon at ~y50%; line crosses the distant ranges and the near peak without matching; only coincidental touch at near summit; eye 490 m implausible for Pilatus-like vantage; roll -12"
+    }
+   }
+  },
+  "wc_0077": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line slopes diagonally through the sky from top-left to right edge, touching terrain only at far right; roll ~18 deg spurious; Alpstein skyline completely unmatched"
+    }
+   }
+  },
+  "wc_0083": {
+   "photoTags": [
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line cuts through the Schreckhorn massif and runs below the Schreckhorn summit and across faces; Finsteraarhorn-like peaks unmatched; roll -8 spurious"
+    }
+   }
+  },
+  "wc_0087": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "note": "Smooth descending line entirely in empty sky far above the Dents du Midi skyline; likely a near hillside rendered; no match"
+    }
+   }
+  },
+  "wc_0094": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Left third roughly near the distant range top but line misses sharp peaks; right half runs through cloud/sky well above the ridges (right peak at y~290 vs line ~240); roll -23 spurious"
+    }
+   }
+  },
+  "wc_0098": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line runs diagonally up through the sky/tree on the left and exits the frame top; the pyramidal peak and right wall skyline are entirely unmatched; roll 20 deg spurious"
+    }
+   }
+  }
+ }
+}

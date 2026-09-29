@@ -1,0 +1,9 @@
+{"pid": "wc_0004", "model": "moge_l", "device": "cpu", "s": 11.098}
+{"pid": "wc_0004", "model": "moge_b", "device": "cpu", "s": 7.133}
+{"pid": "wc_0004", "model": "da3_b", "device": "cpu", "s": 11.33}
+{"pid": "wc_0009", "model": "moge_l", "device": "cpu", "s": 9.658}
+{"pid": "wc_0009", "model": "moge_b", "device": "cpu", "s": 5.82}
+{"pid": "wc_0009", "model": "da3_b", "device": "cpu", "s": 11.722}
+{"pid": "wc_0020", "model": "moge_l", "device": "cpu", "s": 11.466}
+{"pid": "wc_0020", "model": "moge_b", "device": "cpu", "s": 5.708}
+{"pid": "wc_0020", "model": "da3_b", "device": "cpu", "s": 15.191}

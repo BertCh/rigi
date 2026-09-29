@@ -1,0 +1,348 @@
+{
+ "verifier": "4b",
+ "photos": {
+  "wc_0006": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "near-field-terrain"
+     ],
+     "note": "Saddle and Fahnenstock summit match, but left ridge (Plattenfirst side, ~40% of width) line sits ~5-6% below real skyline and its summit bump is shifted right."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line tracks left ridge, central saddle, Fahnenstock summit and right shoulder closely; tilt matches."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "note": "Line runs far below skyline across the rock faces (~8-15% low), Fahnenstock mark well below true summit; tilt off."
+    }
+   }
+  },
+  "wc_0009": {
+   "photoTags": [
+    "cloud",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "note": "Distant skyline line matches Matterhorn and Weisshorn tips horizontally and within ~1% vertically; distant range right of centre followed; near ridge sits below far horizon so not drawn. Hazy, snowy summits partly in cloud base."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line traces an unrelated profile (0.4 km Eggishorn-type near terrain), dips to lower right through valley slope; does not follow distant Matterhorn/Weisshorn skyline."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line floats in clouds well above real skyline, slanted; unrelated shape."
+    }
+   }
+  },
+  "wc_0012": {
+   "photoTags": [
+    "low-light"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line follows full skyline: left massif, small snowy peak and notch, Schibenstoll block, notch, Saentis summit (antenna), Hinterrugg and right plateau, within ~1% vertically; labels plausible."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line only appears in top-left corner in the sky; no match to skyline."
+    }
+   }
+  },
+  "wc_0016": {
+   "photoTags": [
+    "fog-haze",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "note": "Line follows left ridge, notch, main summit, pointed peak, distant hazy ridge with its peak, and the right-hand V dip closely (~1% vertical); tilt matches."
+    }
+   }
+  },
+  "wc_0018": {
+   "photoTags": [
+    "foreground-occlusion",
+    "fog-haze",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "roll"
+     ],
+     "note": "Right shape broadly right, but tilt too shallow: line ~3% above the left flank of the right-hand massif and ~2% below the snowy peaks on the right. Left/centre part fits."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "On zoom, line hugs the massif flank, the snowy ridge tops on the right, the distant snow peaks in the centre and the Tour d'Ai skyline on the left; tilt matches."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line is a straight slant through the open sky, unrelated to the terrain."
+    }
+   }
+  },
+  "wc_0019": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [
+      "near-field-terrain"
+     ],
+     "note": "Line traces main summit, left ridge, left notch, second spire and right jagged ridge with matching shape; sits ~1-1.4% above the rock edge throughout (borderline but within tolerance); tilt matches."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "note": "No yellow skyline visible anywhere in the frame; does not match."
+    }
+   }
+  },
+  "wc_0029": {
+   "photoTags": [
+    "cloud",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Nearly flat line runs along the sea-of-fog/foreground level near the bottom; ignores the Dents du Midi skyline entirely."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Nearly flat line crosses the middle of the forested ridges; no match to the jagged snowy skyline above."
+    }
+   }
+  },
+  "wc_0031": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "note": "Line is broadly at skyline height with bumps near the right peaks, but on zoom it sits ~2-2.5% below the Stauberen tower top, the rounded snowy peak and the Altmann-type peak on the right; too flat."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Flat line through the middle of the frame across the fog sea and slopes; no match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "note": "Similar to A but slightly higher; still ~1.6-2% below the tower top, rounded peak and right peak on zoom. Shape roughly matches."
+    }
+   }
+  },
+  "wc_0036": {
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line follows the forest ridge on the left, the Stanserhorn cone and right flank, the saddle and the right-hand peaks; sits ~1-1.3% above the summit (borderline but within tolerance), shape and horizontal position match, level."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line runs along the valley floor/lake shore and forest base; unrelated to the Stanserhorn skyline."
+    }
+   }
+  },
+  "wc_0038": {
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "fog-haze",
+      "pitch-offset"
+     ],
+     "note": "Near-flat line lies below the visible hazy distant range (~3-4% under its central peaks) and does not reproduce its left-low / central-peak shape; right part hidden by the grass slope."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "note": "Steep diagonal line (large roll) across valley and slopes; no match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Gently slanted featureless line; roughly crosses the distant range near its centre but misses its shape (too high on left, no central peak); flat-plain labels."
+    }
+   }
+  },
+  "wc_0040": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Strongly tilted line from top-left to right; crosses sky, peak face and hills; does not follow the snowy peak or the hill skylines."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line cuts across the base of the big snowy peak and through hillsides; peak outline far above the line; left hill line misaligned."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Very similar to B: line runs across the lower part of the snowy peak and hillsides, missing the dominant summit skyline entirely."
+    }
+   }
+  },
+  "wc_0044": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line traces left Eiger ridge, shoulder, notch, Moench summit and right flank down to the Jungfraujoch/Sphinx saddle within ~1%; labels (Moench, Sphinx) plausible. Right end near cloud."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Left portion loosely near left ridge but line cuts across the Moench face well below its summit; unrelated profile."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Coincidental bump near Moench summit, but line lies across the left ridge faces and through open sky on the right; label is a 1.9 km hill; unrelated profile."
+    }
+   }
+  },
+  "wc_0053": {
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Right flank descent loosely echoes the mountain, but left half runs straight across the sky high above the left ridge; large roll."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line hovers above the left flank, and right of centre it climbs into open sky while the real ridge descends; profile does not match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Near the summit the line lies close, but it cuts across the left face below the left shoulder and climbs into empty sky on the right where the real ridge drops; wrong profile."
+    }
+   }
+  }
+ }
+}

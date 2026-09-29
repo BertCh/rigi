@@ -1,0 +1,187 @@
+P1 - POSITION TRIAGE BEFORE MATCHING (TM program, dev only)            2026-09-28, session mt-image-58 subagent
+=====================================================================================================================
+Question: using only metadata (Commons title, stated lat/lon, EXIF altitude, heading) + Mapterhorn DEM + OSM, can we
+flag "position suspect" before matching and propose candidate eyes, cheaply?
+Rules: PROTOCOL.txt (written 17:48Z before any flag was computed). No rendering, no matching, no live services.
+Files: p1.py (flags), fetch_gaz.py + net.py (cached Overpass/Nominatim), evaluate_p1.py (scoring -> eval.txt),
+posthoc.py (POST HOC variant -> flags_posthoc.json), flags.json, proposals.json, cache/ (86 cached responses, 79 MB).
+
+HEADLINE
+- Titles carry usable position text for a minority of photos: 19/50 have a viewpoint phrase, 16 resolve to an OSM
+  feature; 21 name a target peak in the 40 km gazetteer; 29/50 have either. 21/50 give the triage nothing to work with.
+- Pre-registered primary flag (F-far | F-low | F-vis): 12 flagged. Against F1's 9 position-stage failures:
+  TP 3 / FP 9 / FN 6 (precision 0.25, recall 0.33). Against the 5 a_big (>400 m) cases: TP 3 / FN 2 (recall 0.60).
+  COST: 6 of the 12 flags land on photos that already have a verified-correct pose at the stated eye
+  (0009, 0017, 0020, 0046, 0059, 0094) - i.e. 6/30 (20%) of the solvable photos would be falsely called suspect.
+- The flag that works is F-far (viewpoint phrase geocodes > 400 m away): 6 flagged, catches the two headline cases
+  (wc_0069 Fronalpstock 1.08 km, eye 575 m too low - F1 estimated ~600 m; wc_0073 Pilatus Kulm 17.5 km, eye 1621 m too
+  low - F1 estimated ~16 km) with only 1 flag on a solved photo (wc_0017 "Bellwald- Aussicht": the named village's
+  aerialway station 2.2 km away and 813 m BELOW the verified eye).
+- F-vis (target peak not LOS-visible or > 60 deg off heading) is net harmful: 6 flags, 1 TP (wc_0087, by a partial
+  name match "du midi" -> Pointe du Midi), 5 on solved photos. Causes: toponyms that are pass/railway names, not
+  targets ("Ospizio Bernina", "Berninabahn" -> Piz Bernina hidden), the "Viewpoint Target" title convention
+  ("Eggishorn Matterhorn": Eggishorn treated as a target, 153 deg behind the camera), generic names ("First" 25 km),
+  and manifest headings that disagree with the named targets (wc_0020: 83 deg).
+- F-low never fired (no viewpoint within 1 km sat > 150 m above the eye). F-exif fired once (wc_0028, EXIF alt 570 m
+  above the DEM) - on a photo whose verified ref uses exactly that EXIF eye (1808 m), so it is a real inconsistency
+  (lat/lon probably off, altitude right) but not a failure.
+- POST HOC (designed after seeing the results; n = 2 positives; treat as a hypothesis for the next frozen test):
+  "F-far-up" = F-far AND the named viewpoint is >= 150 m ABOVE the stated eye. On flags.json it flags exactly
+  {0037, 0069, 0073}: 2 TP, 1 FP (0037, a same-name hamlet 22 km away), 0 flags on solved photos. With the post hoc
+  resolver (no place=* as viewpoints, nearest over exact+prefix) it flags {0069, 0073} only. Rationale: people name
+  the high vantage ("from Pilatus"); a named village/valley station below the stated eye (0017, 0053) is not evidence
+  of a bad pin. Also post hoc: dropping F-vis entirely removes 5 of the 6 costly flags.
+
+1. SETUP
+- 50 dev ids (split.json), manifest title/lat/lon/altitudeM/headingDeg/positionSource. Stated eye recomputed as
+  max(alt ?? ground, ground + 1.6) (src/lib/geo/pipeline.ts) from Mapterhorn z14; matches the C0 cache meta.eye to
+  <= 0.25 m on all 50.
+- Gazetteer: OSM within 40 km (peaks/volcanoes/saddles/ridges, viewpoints, alpine/wilderness huts, shelters, place
+  nodes, railway stations/halts, aerialway stations), 4.4k-18.8k named features per photo.
+- Name matching: accent/umlaut folding, spaces removed variant, one generic leading token (Piz/Monte/Mount/...), exact
+  match on the capture's leading 1-5 tokens, then prefix match (>= 5 chars), nearest feature wins; Nominatim fallback
+  used once (wc_0067 "Schwendisee" -> Vorderer Schwendisee 223 m).
+- LOS: eye -> summit (DEM max in a 30 m disc, +0 m), curvature + refraction k = 0.13, z14/z12/z10 bands as dem.py,
+  obstruction tolerance 20 m.
+
+2. METRICS (eval.txt has all variants)
+                                    flagged  TP  FP  FN   prec  rec   flags on 30 solved photos
+  label A: F1 stage=position (9)
+    primary far|low|vis               12      3   9   6   0.25  0.33   6
+    far|low only (= F-far)             6      2   4   7   0.33  0.22   1
+    F-vis alone                        6      1   5   8   0.17  0.11   5
+    primary + F-exif                  13      3  10   6   0.23  0.33   7
+  label B: F1 a_big (5: 0035 0069 0073 0087 0095)
+    primary                           12      3   9   2   0.25  0.60   6
+    F-far                              6      2   4   3   0.33  0.40   1
+  label C: any a_big|a_small (13)
+    primary                           12      4   8   9   0.33  0.31   6
+  POST HOC F-far-up (flags.json)       3      2   1   7(A)/3(B)          0
+  Chance baseline for label A: 9/50 = 0.18 precision.
+
+  Misses (label A): wc_0010, 0070, 0074, 0086 are small eye errors (< 400 m, water level / shoreline / 25 m off the
+  San Salvatore high point) - out of reach of title geocoding by design; wc_0074's title has a typo ("Leistcamm")
+  and does not resolve; wc_0086 "From mount San Salvatore" resolves to the summit 32 m away (correct place, the error
+  is the last 25 m + height, which F-low's 150 m threshold cannot see). wc_0095 "Ausblick geniessen" names no place.
+  wc_0035 "Wisenberg von der Belchenflue": the Belchenflue peak node is 15 m from the stated position, target Wisenberg
+  is LOS-visible and 24 deg off the heading - the metadata is self-consistent. Either F1's "~1 km W" estimate (not
+  measured) is wrong or the photographer was elsewhere on the ridge; the triage cannot tell.
+
+3. CANDIDATE EYES (proposals.json, 6 rows: every F-far flag; F-vis gives no eye)
+  pid      proposal                                        stated eye   verdict vs evidence
+  wc_0069  Fronalpstock top station 1079 m away, h 1912    1335         matches F1 (eye ~600 m too low): credible
+  wc_0073  Pilatus Kulm station 17.5 km away, h 2113       490          matches F1 (EXIF ~16 km off, Pilatus): credible
+  wc_0015  Chasseral summit 736 m away, h 1608 (+39 m)     1569         no verified ref; F1 blames fog/near field
+  wc_0053  Samedan railway station 1.3 km, h 1708 (-8 m)   1714         EXIF position; village-level name: not credible
+  wc_0037  "Santa Maria" hamlet 21.9 km away               1407         WRONG feature: the stated point is IN Santa Maria
+                                                                        Val Muestair (exact-name hamlet beat the
+                                                                        prefix match; nearest-only rule)
+  wc_0017  Bellwald valley aerialway station 2.2 km, -811 m 2438        HARMFUL: a verified-correct pose exists at the
+                                                                        stated eye; the proposal is 2.2 km / 811 m away
+  Verified refs all sit at the stated lat/lon (only eye h varies), so for the one flagged photo with a verified ref
+  (wc_0017; the F-vis ones have no proposal) the proposal moves AWAY from the correct eye by 2201 m horizontally.
+  For 0069 and 0073 there is no verified ref yet: these two are the proposals worth running T6 at.
+  Caveat: the proposal is the OSM feature point + 2 m; the real camera is usually tens to hundreds of metres from it
+  (terrace, ridge, platform), so it should seed the existing <= 400 m eye search, not replace it.
+
+4. GT photos (data/ground-truth.json, 19 entries): IMG_xxxx names, no titles -> only F-exif applies. |GPS alt - DEM|
+  <= 69 m on all 18 with an altitude (Niederhorn 69 m, i.e. under the 150 m threshold); no flags. Not mixed into dev.
+
+5. DEVIATIONS / IMPLEMENTATION NOTES (honest log)
+  - Gazetteer query: the protocol's per-photo query (incl. place=* ways/relations) took 2-10 min each on the public
+    Overpass (429/504s). After 21 photos had been fetched with the full query, the remaining 29 used place=* NODES only;
+    for uniformity place ways/relations were dropped from all 50 (gazetteer() in fetch_gaz.py). This change was made
+    after a debug run on 9 photos (none of them flagged by F-far/F-low) and before the full results; it is a
+    data-source change, not a threshold change. A few responses came from a mirror with an older OSM base date
+    (2026-05/07).
+  - Bug fixed before the full run: the viewpoint span used to extend past the stop word (hiding targets after
+    "auf den ...").
+  - Known parser weaknesses left as-is (frozen): a "da" cue inside "Lägh da l'Albigna as seen from Piz Blanch" captures
+    a junk phrase (unresolved, harmless); "Ausblick" matches the suffix-view rule with X="aus" (unresolved); "Evening
+    view from ..." yields a junk "evening" capture (unresolved). Nominatim was queried for unresolved junk (cached).
+  - All post hoc numbers are labelled; the primary numbers above are the pre-registered ones.
+
+6. LIMITATIONS
+  - n is tiny: 5 a_big positives, 2 of which drive every positive result. F1 labels are unblinded visual judgements
+    (+-2-3 photos), and "position" for wc_0035/0087/0095 is an estimate.
+  - Title text is Commons-specific. App uploads have no title at all; there the only inputs would be EXIF GPS/alt,
+    heading, and whatever the user types.
+  - Nearest-match disambiguation is fragile for common names (Santa Maria, First, Rothorn, Bernina) and for
+    pass/railway names containing a peak name.
+  - LOS at z10 beyond 15 km smooths ridges; +0 m target with 20 m tolerance is a coarse test; targets > 40 km are not in
+    the gazetteer (e.g. Matterhorn from Eggishorn), so the check is silent for exactly the long-range photos.
+  - Headings in the manifest are partly template values of unknown quality; the 60 deg rule punished them.
+
+7. WHAT A PRODUCTION VERSION (app upload path) WOULD NEED
+  - Inputs: EXIF GPS + altitude + direction when present; an optional free-text "taken from" field or the user's
+    caption; for Commons-like imports, the title/description. Cache a regional gazetteer offline (Overpass extract or a
+    pre-built peak/viewpoint/station/hut table per region) - the public Overpass is far too slow (2-10 min/query) for an
+    upload path; Nominatim only as a rare fallback with its usage policy (1 req/s, caching, UA).
+  - Use ONLY the up-hill far check (F-far-up, to be re-validated on a frozen split before use): viewpoint phrase ->
+    feature >= 400 m away AND >= 150 m above the stated eye -> "position suspect" + candidate eye at the feature
+    (summit/top station + 2 m) fed to the existing <= 400 m eye search and the T6 matcher, reporting both results
+    rather than silently moving the eye. Do not ship F-vis in this form; if kept, require an explicit target cue
+    ("Blick auf", "view of", "vers") and disable the heading clause unless the heading came from EXIF.
+  - Disambiguation: prefer peaks/viewpoints/top stations over places; choose among exact+prefix matches jointly;
+    reject same-name features > 15-20 km away unless nothing closer exists.
+  - An EXIF sanity readout (|GPS alt - DEM| > 150 m) is cheap and worth surfacing (wc_0028: +570 m) but it is an
+    inconsistency indicator, not a failure predictor.
+  - Expected value on this dev set: at best 2 photos (0069, 0073) move from "hopeless at the stated eye" to "worth a
+    T6 run at a proposed eye"; the triage cannot touch the 4 small-eye-error cases, which need the parallax /
+    PnP-shift eye refinement from X5/F1 instead.
+
+8. PER-PHOTO TABLE (from evaluate_p1.py; F1 = F1 stage[/position causes], ok-HIGH = not in F1's failure list;
+   ref Y = has a verified-correct pose at the stated eye; exif-dem = EXIF alt - DEM ground;
+   targets: (dist km, v = LOS visible / X = blocked, deg off heading))
+pid      F1         ref src    flags            exif-dem  viewpoint -> feature (dist m)  | targets (dist km, vis, offHdg)
+wc_0001  match/a_small -   exif-g -                       -  - | -
+wc_0002  match/a_small Y   manual -                       -  - | Gandstock(0.1,-,-)
+wc_0004  ok-HIGH    Y   manual -                       -  'frumsel'->Frümsel(6) | -
+wc_0005  match      -   exif-g -                     -14  'the uetliberg'->Uetliberg(23); 'evening'->unresolved | -
+wc_0006  decis      Y   manual -                       -  - | Fahnenstock(0.4,v,35.1)
+wc_0009  ok-HIGH    Y   exif-g F-vis                  +3  - | Eggishorn(0.4,v,153.2)
+wc_0010  posit/a_small -   exif-g -                      -9  - | -
+wc_0011  ok-HIGH    Y   exif-g -                       -  - | -
+wc_0013  match      -   exif-g -                      -0  - | Huetstock(5.8,v,8.2)
+wc_0014  ok-HIGH    Y   manual -                       -  'l albigna as seen from piz blanch'->unresolved; 'piz blanch'->Piz Blanch(2) | -
+wc_0015  searc      -   manual F-far                   -  'chasseral'->Chasseral(736) | -
+wc_0017  ok-HIGH    Y   manual F-far                   -  'bellwald'->Bellwald(2201) | -
+wc_0019  ok-HIGH    Y   manual -                       -  - | Sackhorn(3.7,v,6.6)
+wc_0020  ok-HIGH    Y   manual F-vis                   -  'bella tola'->Bella Tola(175) | Weisshorn(15.9,v,83.0); Bishorn(14.1,v,81.2)
+wc_0023  searc      -   manual -                       -  - | -
+wc_0027  ok-HIGH    Y   manual -                       -  'lotschen pass'->Lötschenpass(290) | Bietschhorn(10.4,v,14.2)
+wc_0028  refin      Y   exif-g -                    +570  - | -
+wc_0033  match      -   exif-g -                     -39  'pilatus railway heading up mount pilatus'->unresolved | -
+wc_0034  match      Y   manual -                       -  - | -
+wc_0035  posit/a_big -   manual -                       -  'belchenflue'->Belchenflue(15) | Wisenberg(6.9,v,24.4)
+wc_0037  match/a_small -   manual F-far                   -  'santa maria'->Santa Maria(21925) | Piz Lad(3.3,v,10.2)
+wc_0040  searc      -   exif-g -                       -  - | -
+wc_0046  decis      Y   exif-g F-vis                  +1  - | Rigi(1.9,v,164.0); First(25.7,X,68.7)
+wc_0047  ok-HIGH    Y   manual -                       -  'la bes cha as seen from muottas muragl'->unresolved; 'muottas muragl'->Muottas Muragl(18) | Munt da la Bês-cha(2.2,v,10.9); Piz Clüx(4.3,v,2.7); Piz Muragl(3.8,v,0.7)
+wc_0048  ok-HIGH    Y   manual -                       -  - | Weisshorn(16.4,v,0.2); Bishorn(14.8,v,3.1)
+wc_0052  match      Y   manual -                       -  - | -
+wc_0053  match      -   exif-g F-far                   -  'samedan'->Samedan(1305) | Piz Mezdi(5.8,v,14.0)
+wc_0054  ok-HIGH    Y   exif-g -                      -4  - | -
+wc_0055  match      Y   exif-g -                     +51  - | -
+wc_0058  match/a_small -   manual -                       -  - | -
+wc_0059  ok-HIGH    Y   manual F-vis                   -  - | Piz Lagalb(2.2,v,48.5); Piz Bernina(8.4,X,156.9)
+wc_0063  decis      Y   manual -                       -  - | -
+wc_0067  ok-HIGH    Y   exif-g -                     +12  'schwendisee'->Vorderer Schwendisee(223) | Säntis(7.2,v,-)
+wc_0069  posit/a_big -   manual F-far                   -  'fronalpstock'->Fronalpstock(1079) | -
+wc_0070  posit/a_small -   exif-g -                     +32  - | Gandstock(0.6,v,-)
+wc_0071  decis      Y   exif-g -                     +34  - | -
+wc_0072  decis      Y   manual -                       -  - | -
+wc_0073  posit/a_big -   exif-g F-far                   -  'pilatus'->Pilatus Kulm(17466) | Matthorn(16.5,v,-)
+wc_0074  posit/a_small -   manual -                       -  'leistcamm'->unresolved | -
+wc_0076  verif      Y   manual -                       -  - | -
+wc_0077  ok-HIGH    Y   manual -                       -  - | Altmann(6.5,v,-); Säntis(8.3,v,-)
+wc_0082  ok-HIGH    Y   exif-g -                     +13  - | -
+wc_0085  ok-HIGH    Y   exif-g -                      -2  'parpaner rothorn'->Parpaner Rothorn(55) | -
+wc_0086  posit/a_small -   manual -                       -  'mount san salvatore'->Monte San Salvatore(32) | -
+wc_0087  posit/a_big -   manual F-vis                   -  - | Dent de Valère(23.2,v,-); Pointe du Midi(23.6,X,-)
+wc_0088  ok-HIGH    Y   exif-g -                      -0  - | -
+wc_0094  ok-HIGH    Y   exif-g F-vis                 +26  - | Piz Bernina(11.1,X,-); Piz Bernina(11.1,X,-)
+wc_0095  posit/a_big -   manual -                       -  'aus'->unresolved | -
+wc_0098  match      -   manual -                       -  - | Bruschghorn(2.5,v,-)
+wc_0099  ok-HIGH    Y   exif-g -                     -20  - | -
+

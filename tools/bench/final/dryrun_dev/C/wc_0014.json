@@ -1,0 +1,177 @@
+{
+ "id": "wc_0014",
+ "arm": "C",
+ "codeStamp": {
+  "sha1": "fb97fbed958a7173",
+  "env": {
+   "MATCHER_LG_DEVICE": "cpu",
+   "MATCHER_SWEEP_KP": null,
+   "MATCHER_BASIN_GAP_MIN": null,
+   "STAGE1_LG_PRUNE": null,
+   "FINAL_WALL_S": "600",
+   "FINAL_C_LG": null
+  },
+  "files": {
+   "tools/bench/final/final.py": "8ea3146981d4",
+   "tools/bench/final/run_arm.sh": "4c1a3ff4df31",
+   "tools/matcher/match.py": "67256a62346e",
+   "tools/matcher/common.py": "d205e29f8266",
+   "tools/matcher/fusion.py": "b6f93654b649",
+   "tools/matcher/pose6.py": "f31f601f1fc0",
+   "tools/matcher/pose6_inputs.py": "ed963a79f344",
+   "tools/matcher/dem.py": "a2447923ae67",
+   "tools/matcher/worker_client.py": "84e4af3d1b83",
+   "tools/matcher/stage1/vendor_v03/render_worker.mjs": "437e331e9a6f"
+  }
+ },
+ "wallSec": 144.3,
+ "wallCapSec": 600,
+ "timeout": false,
+ "exitCode": 0,
+ "status": "ok",
+ "failureClass": null,
+ "pose": {
+  "yaw": 178.78750509355228,
+  "pitch": -0.14420306997307686,
+  "roll": -0.26266675041339943,
+  "vfov": 8.961496411702067
+ },
+ "eye": {
+  "lat": 46.403154023116265,
+  "lon": 9.644248359639208,
+  "h": 2393.8337292528995
+ },
+ "confidenceLevel": "HIGH",
+ "checks": {
+  "d_agree": 0.2715629603815584,
+  "sky_med": 2.2758823450708405,
+  "match_support": 0.7025513378967019,
+  "agl": 1.5,
+  "cap": 10.0,
+  "onCap": false,
+  "shiftM": 0.7816667166287511,
+  "shiftSigma": 0.0019541667915718777,
+  "basinGap": 0.9264318005208783,
+  "confirmSkyMedPx": 2.344635612038566,
+  "failed": []
+ },
+ "basinGap": 0.9264318005208783,
+ "start": {
+  "arm": "B",
+  "pose": {
+   "yaw": 178.77931868637648,
+   "pitch": -0.14945940747193495,
+   "roll": -0.22845518555575411,
+   "vfov": 8.96462293405925
+  },
+  "eyeH": 2394.018425736481,
+  "confidenceLevel": "HIGH",
+  "codeStamp": "a5d380c36fcb0497"
+ },
+ "startEyeDiffM": 0.0,
+ "keptStart": null,
+ "regime": "manual",
+ "t5Rule": {
+  "ruleTextIdentical": true,
+  "frozenFileSha1": "1ad03962d54363bab16a693e467619bcff45302d",
+  "currentFileSha1": "f31f601f1fc04d2fc00ab60a3cdac865b56a0991",
+  "constants": {
+   "BASIN_GAP": "0.15",
+   "CONFIRM_PX": "4.0",
+   "MIN_GAIN": "5.0  # comparable-cost units (N_EFF-scaled); eye.ts review suggested minGain 5\u201310"
+  }
+ },
+ "raw": {
+  "id": "wc_0014",
+  "regime": "manual",
+  "sigma": {
+   "sky": 2.6149547570935416,
+   "match": 2.964242419866081
+  },
+  "start": {
+   "pose": {
+    "yaw": 178.77931868637648,
+    "pitch": -0.14945940747193495,
+    "roll": -0.22845518555575411,
+    "vfov": 8.96462293405925
+   },
+   "eyeEnu": [
+    0.0,
+    0.0,
+    2394.018425736481
+   ],
+   "agl": 1.800000000000182
+  },
+  "costStart": 318.25679218032496,
+  "costRotOnly": 319.3070142501633,
+  "pose": {
+   "yaw": 178.78750509355228,
+   "pitch": -0.14420306997307686,
+   "roll": -0.26266675041339943,
+   "vfov": 8.961496411702067
+  },
+  "eye": {
+   "lat": 46.403154023116265,
+   "lon": 9.644248359639208,
+   "h": 2393.8337292528995
+  },
+  "eyeEnu": [
+   0.6409993562204102,
+   0.44735073623521837,
+   2393.8337292528995
+  ],
+  "confidenceLevel": "HIGH",
+  "checks": {
+   "d_agree": 0.2715629603815584,
+   "sky_med": 2.2758823450708405,
+   "match_support": 0.7025513378967019,
+   "agl": 1.5,
+   "cap": 10.0,
+   "onCap": false,
+   "shiftM": 0.7816667166287511,
+   "shiftSigma": 0.0019541667915718777,
+   "basinGap": 0.9264318005208783,
+   "confirmSkyMedPx": 2.344635612038566,
+   "failed": []
+  },
+  "cost": 312.69879587183,
+  "horizons": 283,
+  "sec": 121.25211906433105
+ },
+ "gridSummary": {
+  "step": 250.0,
+  "gap": 0.9264318005208783,
+  "best": {
+   "E": 0.0,
+   "N": 0.0,
+   "cost": 319.34385371617367
+  },
+  "second": {
+   "E": 0.0,
+   "N": 1000.0,
+   "cost": 615.1941550997244
+  }
+ },
+ "ruleSha1": {
+  "t5": "1ad03962d54363bab16a693e467619bcff45302d",
+  "t6Start": "292fb74f35f6f402b5e81f1b832bac565edd6807"
+ },
+ "cascadeAgreementInputs": {
+  "pose": {
+   "yaw": 178.78750509355228,
+   "pitch": -0.14420306997307686,
+   "roll": -0.26266675041339943,
+   "vfov": 8.961496411702067
+  },
+  "eyeH": 2393.8337292528995,
+  "positionSource": "manual",
+  "exif": false,
+  "tolerance": {
+   "yawPitchDeg": 0.5,
+   "eyeM": 2.0,
+   "cascadeGate": "accepted \u2227 confidence \u2265 0.75 (acc75)"
+  }
+ },
+ "history": [],
+ "finishedAt": "2026-09-26T05:07:56"
+}

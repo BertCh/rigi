@@ -1,0 +1,643 @@
+{
+ "verifier": 5,
+ "photos": {
+  "wc_0005": {
+   "photoTags": [
+    "foreground-occlusion",
+    "low-light"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "note": "Follows Alps trend but ~3-4% below snowy crest along the width"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "12° roll; line along top edge, unrelated"
+    }
+   }
+  },
+  "wc_0007": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Bernina, Scerscen, left notch and right saddle traced within ~1%"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "7.6° roll; line crosses faces and glacier"
+    }
+   }
+  },
+  "wc_0008": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Left mountain, middle notch and San Salvatore summit match; left ~1% high"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "note": "Line floats above left mountain, 3° roll"
+    }
+   }
+  },
+  "wc_0009": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [
+      "cloud"
+     ],
+     "note": "Matterhorn and Weisshorn above near ridge align; distant range ~1-1.5% high"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "note": "Right flank fits but line below ridge crest centre and wrong at both ends"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line floats in clouds far above terrain"
+    }
+   }
+  },
+  "wc_0010": {
+   "photoTags": [
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch"
+     ],
+     "note": "Side ridges fit but DEM bump sits in sky over Säntis; Säntis not traced"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "31° roll; line in sky"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch"
+     ],
+     "note": "Same as A: centre bump in sky, Säntis not traced"
+    }
+   }
+  },
+  "wc_0012": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Zuestoll, notch, Schibenstoll, Säntis, Hinterrugg all traced within ~1%"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line only in top-left corner"
+    }
+   }
+  },
+  "wc_0013": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "note": "Line ~2-3% above summit and right ridge; far right ~6% high"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "17° roll; line floats far above summit"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "parallax-mismatch"
+     ],
+     "note": "Summit and upper right ridge fit; left end and far-right dip ~3-4% high"
+    }
+   }
+  },
+  "wc_0020": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Weisshorn, Bishorn, left ridge and right Moming peaks traced precisely"
+    }
+   }
+  },
+  "wc_0026": {
+   "photoTags": [
+    "fog-haze",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Layered ridges, Pizzoni peak, valley notch and right Pinzernone shoulder align closely"
+    }
+   }
+  },
+  "wc_0028": {
+   "photoTags": [
+    "fog-haze",
+    "featureless-skyline",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Horizon height ok but Jura labels; Rigi and Alps not modelled"
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "note": "Rigi marker on Rigi summit, hazy horizon and snowy Alps on right match"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Jura-direction pose; only featureless haze horizon coincides"
+    }
+   }
+  },
+  "wc_0031": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "note": "Distant range fits but tower pokes above line; bump sits right of it"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Flat line across cloud sea and slopes, no skyline match"
+    },
+    "C": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Tower, snow dome, right peaks and saddle traced within ~1%; distant left range fits"
+    }
+   }
+  },
+  "wc_0034": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "21° roll; line crosses forest and sky, no match"
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [
+      "foreground-occlusion"
+     ],
+     "note": "Forested ridge V-notch, left hump and right shoulder hug treeline closely"
+    }
+   }
+  },
+  "wc_0042": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "cloud",
+      "yaw-shift"
+     ],
+     "note": "Ruchen peak and right ridge fit; left peak ~3% sideways; much skyline in cloud"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Sloping line through clouds, shape unrelated"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "13.6° roll; V-shaped line in sky"
+    }
+   }
+  },
+  "wc_0047": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Piz Vadret, twin pinnacles, right rounded summit and distant right ridge align"
+    }
+   }
+  },
+  "wc_0051": {
+   "photoTags": [
+    "fog-haze",
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Flat line at lake/shore level; Pilatus and hills far above"
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "note": "Pilatus summits, notch and right descent match; left Alps hidden in haze"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line along lake-level hills; Pilatus and skyline far above"
+    }
+   }
+  },
+  "wc_0054": {
+   "photoTags": [
+    "foreground-occlusion",
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Monte Brè/Boglia summit, left ridge, distant valley peaks and right slope align"
+    }
+   }
+  },
+  "wc_0056": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line across mid-slopes; pyramid summit far above line"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line crosses pyramid face and clouds, shape unrelated"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Rising line across slopes, misses pyramid peak"
+    }
+   }
+  },
+  "wc_0065": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "10° roll; Breithorn labels on Matterhorn, line crosses left glacier"
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [
+      "cloud"
+     ],
+     "note": "Matterhorn summit/ridges and right Dent Blanche skyline exact; left along cloud top"
+    }
+   }
+  },
+  "wc_0069": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "note": "Right Hochflue massif fits; left 60% line flies to top edge over clear skyline"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "16° roll; line wanders through sky, no match"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line along top edge in sky"
+    }
+   }
+  },
+  "wc_0075": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Left Sassalb peak, distant valley range and right flank traced closely"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line floats in sky well above all terrain"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "13° roll; line in sky then across right slope"
+    }
+   }
+  },
+  "wc_0079": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "note": "7° roll on level scene; line crosses summit rock, notch fits only roughly"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "26° roll; line along top edge in fog"
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "fog-haze",
+      "near-field-terrain"
+     ],
+     "note": "Summit, notch and second peak fit; rest of line in fog, uncheckable"
+    }
+   }
+  },
+  "wc_0082": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Piz Lagrev ridge, valley notch, Surlej and right peaks traced within ~1%"
+    }
+   }
+  },
+  "wc_0084": {
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "7° roll; line at top edge in sky"
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [
+      "cloud"
+     ],
+     "note": "Massif left slope and right Cornettes ridge fit; summits in cloud"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Right end dips ~4% below clear ridge crest; rest in cloud"
+    }
+   }
+  },
+  "wc_0085": {
+   "photoTags": [
+    "cloud",
+    "featureless-skyline"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "note": "Line ~5% below cloud-sea horizon, crosses near massif"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "yaw-shift"
+     ],
+     "note": "Horizon height ok but distant peak islands not matched by bumps"
+    },
+    "C": {
+     "verdict": "correct",
+     "tags": [
+      "cloud"
+     ],
+     "note": "Distant peak islands above cloud sea match Schesaplana/Drusenfluh bumps"
+    }
+   }
+  },
+  "wc_0086": {
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line across lake and viewpoint, far below skyline"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "17° roll; line dives across valley"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line across lake and foreground, far below skyline"
+    }
+   }
+  },
+  "wc_0100": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Dent Blanche, Matterhorn, Dent d'Herens peaks align within ~1.5%"
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "near-field-terrain"
+     ],
+     "note": "Line sweeps from near glacier up across faces"
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift",
+      "fov-scale"
+     ],
+     "note": "Shape right but Matterhorn/Dent d'Herens left of real peaks, growing rightward"
+    }
+   }
+  }
+ }
+}

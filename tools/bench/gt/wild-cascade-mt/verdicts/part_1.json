@@ -1,0 +1,341 @@
+{
+ "verifier": 1,
+ "photos": {
+  "wc_0001": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "note": "Line runs through open sky on left half (far above ridge); on right it sits ~50px below main summit crest and doesn't follow the peaks."
+    }
+   }
+  },
+  "wc_0005": {
+   "photoTags": [
+    "foreground-occlusion",
+    "fog-haze"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset"
+     ],
+     "note": "Line at very top of frame in sky (near-field Uetliberg horizon), nowhere near the Alpine skyline at ~y=275/844."
+    }
+   }
+  },
+  "wc_0009": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "other"
+     ],
+     "note": "Line entirely in sky/clouds ~200px above both the near ridge and distant Alps; shape unrelated."
+    }
+   }
+  },
+  "wc_0014": {
+   "photoTags": [
+    "cloud",
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "other"
+     ],
+     "note": "Line only on right third, crossing mountain faces below summits; roll -24 deg implausible; does not trace skyline."
+    }
+   }
+  },
+  "wc_0018": {
+   "photoTags": [
+    "water-reflection",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "near-field-terrain"
+     ],
+     "note": "Diagonal line (roll -38 deg) cutting across lake and vineyard; does not follow the mountain skyline at all."
+    }
+   }
+  },
+  "wc_0031": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "note": "Line crosses sea of fog on left and cuts diagonally across the peaks on right; no match to distant range or Stauberen-like summit skyline."
+    }
+   }
+  },
+  "wc_0035": {
+   "photoTags": [
+    "fog-haze",
+    "featureless-skyline"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ],
+     "note": "Left ~30% of line climbs steeply through clear sky where no terrain exists; remainder is flat along haze-top horizon, which is featureless and can't confirm fit."
+    }
+   }
+  },
+  "wc_0039": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "note": "Line cuts through the main summit and face (summit at ~y=325 while line ~y=370-450, dips where the real ridge rises); shape does not match visible crest."
+    }
+   }
+  },
+  "wc_0044": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line floats in sky above the Moench-like massif and its shape doesn't match; labels (Faulhorn/Reeti) suggest looking north, away from the big glaciated peaks."
+    }
+   }
+  },
+  "wc_0048": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "other"
+     ],
+     "note": "Line almost entirely in sky well above the peaks (e.g. ~130px above the pyramid summit); shape unrelated."
+    }
+   }
+  },
+  "wc_0052": {
+   "photoTags": [
+    "fog-haze",
+    "water-reflection"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line hugs left forested ridge closely, sits on faint hazy distant ridge at valley end, and follows hazy right cliff edge up to top-right; roll matches. Kl\u00f6ntal/Gl\u00e4rnisch labels plausible."
+    }
+   }
+  },
+  "wc_0056": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "note": "Line ignores the prominent pyramid summit (~y=320) and cuts across mid-slopes/foreground crest; only touches the left shoulder."
+    }
+   }
+  },
+  "wc_0060": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ],
+     "note": "Arched line cuts across the glaciated range faces far below the jagged skyline; near-field hill (Staldhorn 1.5 km) not present in photo."
+    }
+   }
+  },
+  "wc_0063": {
+   "photoTags": [
+    "water-reflection",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "other"
+     ],
+     "note": "Only a short left stretch near the range crest; line then climbs diagonally through open sky (roll ~20 deg) and misses right cliff and main summit."
+    }
+   }
+  },
+  "wc_0066": {
+   "photoTags": [
+    "cloud",
+    "low-light"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ],
+     "note": "Line runs through dark cloudy sky at top right only; far above the Dents du Midi-like range skyline at ~y=240."
+    }
+   }
+  },
+  "wc_0069": {
+   "photoTags": [
+    "fog-haze",
+    "water-reflection"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset"
+     ],
+     "note": "Line runs through sky well above the Pilatus/left ridges and cuts across the right massif; no match to skyline shape."
+    }
+   }
+  },
+  "wc_0072": {
+   "photoTags": [
+    "foreground-occlusion",
+    "fog-haze"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "other"
+     ],
+     "note": "Line only briefly touches the range around x=450-600; elsewhere runs through open sky on the left and dives to the valley floor on the right (roll -21 deg)."
+    }
+   }
+  },
+  "wc_0075": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "other"
+     ],
+     "note": "Left half of line floats in cloudy sky ~100px above the valley-end ridges; only near the right peak's flank does it approach terrain."
+    }
+   }
+  },
+  "wc_0079": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "note": "Line only in top-left corner in empty foggy sky; nothing along the rock tower/ridge skyline."
+    }
+   }
+  },
+  "wc_0086": {
+   "photoTags": [
+    "water-reflection",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ],
+     "note": "Line crosses the lake diagonally and climbs through mountain faces to above the frame top; real skyline (distant peaks near y~60-100) not traced."
+    }
+   }
+  },
+  "wc_0091": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "other"
+     ],
+     "note": "Line entirely in sky ~120-170px above the peaks; its summit/notch pattern doesn't match the photo's pyramid peak."
+    }
+   }
+  },
+  "wc_0097": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "note": "Line cuts across left mountain faces below the cliff crest, through the distant snowy range, and along right slopes ~50-70px below the real right skyline; shape doesn't align."
+    }
+   }
+  }
+ }
+}

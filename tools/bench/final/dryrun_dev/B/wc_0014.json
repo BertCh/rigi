@@ -1,0 +1,502 @@
+{
+ "id": "wc_0014",
+ "arm": "B",
+ "codeStamp": {
+  "sha1": "a5d380c36fcb0497",
+  "env": {
+   "MATCHER_LG_DEVICE": "cpu",
+   "MATCHER_SWEEP_KP": null,
+   "MATCHER_BASIN_GAP_MIN": null,
+   "STAGE1_LG_PRUNE": null,
+   "FINAL_WALL_S": "600",
+   "FINAL_C_LG": null
+  },
+  "files": {
+   "tools/bench/final/final.py": "8ea3146981d4",
+   "tools/bench/final/run_arm.sh": "4c1a3ff4df31",
+   "tools/matcher/match.py": "67256a62346e",
+   "tools/matcher/common.py": "d205e29f8266",
+   "tools/matcher/fusion.py": "b6f93654b649",
+   "tools/matcher/stage1/pipeline.py": "7474496c42d8",
+   "tools/matcher/stage1/s1.py": "a29a49a80429",
+   "tools/matcher/stage1/skyglobal.py": "87b64a3397c8",
+   "tools/matcher/stage1/rule.py": "9cfca8821694",
+   "tools/matcher/stage1/policy.py": "c686dfac7464",
+   "tools/matcher/stage1/finalize.py": "8c1f33c0f291",
+   "tools/matcher/pose6.py": "f31f601f1fc0",
+   "tools/matcher/dem.py": "a2447923ae67",
+   "tools/matcher/stage1/vendor/SNAPSHOT.sha1": "ee687f7c29cb",
+   "tools/matcher/stage1/vendor/app_snapshot.py": "91c49d769bc7",
+   "tools/matcher/stage1/vendor/core.py": "85a25a43377b",
+   "tools/matcher/stage1/vendor/fuse.py": "e3c8f8413ec3",
+   "tools/matcher/stage1/vendor/worker.mjs": "f74ce8656271"
+  }
+ },
+ "wallSec": 92.7,
+ "wallCapSec": 600,
+ "timeout": false,
+ "exitCode": 0,
+ "status": "ok",
+ "failureClass": null,
+ "pose": {
+  "yaw": 178.77931868637648,
+  "pitch": -0.14945940747193495,
+  "roll": -0.22845518555575411,
+  "vfov": 8.96462293405925
+ },
+ "eye": {
+  "lat": 46.40315,
+  "lon": 9.64424,
+  "h": 2394.018425736481
+ },
+ "confidenceLevel": "HIGH",
+ "checks": {
+  "cueAgreeDeg": 0.274,
+  "skylineMedPx": 2.7,
+  "matchSupport": 0.672,
+  "apriori": true,
+  "matchDominant": false,
+  "basinGap": 0.8899688639554313,
+  "gapOK": 1.0,
+  "ambiguity": 0,
+  "inliers": 2127,
+  "unmet": [
+   "matchDominant"
+  ]
+ },
+ "basinGap": 0.8899688639554313,
+ "source": "narrow",
+ "baseline": {
+  "pose": {
+   "yaw": 178.77931868637648,
+   "pitch": -0.14945940747193495,
+   "roll": -0.22845518555575411,
+   "vfov": 8.96462293405925
+  },
+  "confidenceLevelApriori": "HIGH",
+  "seed": "narrow"
+ },
+ "fusedLevelApriori": "HIGH",
+ "stage1": {
+  "nCandidates": 4,
+  "verified": 4,
+  "sources": [
+   "narrow",
+   "sky"
+  ],
+  "positionSource": "manual",
+  "focalKnown": true,
+  "hfov0": 12.346964067441101
+ },
+ "timingMs": {
+  "sky": 16457,
+  "sweep40": 0,
+  "appseeds": 35788,
+  "sweepfine": 0,
+  "verify": 39245,
+  "total": 91503
+ },
+ "ruleSha1": {
+  "t6": "292fb74f35f6f402b5e81f1b832bac565edd6807"
+ },
+ "t6CodeStamp": "c2d406ea3c557e6e",
+ "raw": {
+  "id": "wc_0014",
+  "focalKnown": true,
+  "vfov0": 9.275912473374119,
+  "hfov0": 12.346964067441101,
+  "narrow": {
+   "seeds": [
+    {
+     "yaw": 180.0,
+     "pitch": 0.0,
+     "roll": 0.0,
+     "source": "yaw-hint"
+    },
+    {
+     "yaw": 296.1,
+     "pitch": 6.1,
+     "roll": 0.6250000000000002,
+     "source": "app-skyline"
+    },
+    {
+     "yaw": 0.3,
+     "pitch": 6.675000000000001,
+     "roll": -1.85,
+     "source": "app-skyline"
+    },
+    {
+     "yaw": 118.83749999999999,
+     "pitch": 1.1,
+     "roll": -1.75,
+     "source": "app-skyline"
+    }
+   ],
+   "tried": [
+    {
+     "seed": {
+      "yaw": 180.0,
+      "pitch": 0.0,
+      "roll": 0.0,
+      "source": "yaw-hint"
+     },
+     "pose": {
+      "yaw": 178.73816715767234,
+      "pitch": -0.11862833711215949,
+      "roll": -0.08637409199349605,
+      "vfov": 9.275912473374119
+     },
+     "inliers": 285
+    },
+    {
+     "seed": {
+      "yaw": 296.1,
+      "pitch": 6.1,
+      "roll": 0.6250000000000002,
+      "source": "app-skyline"
+     },
+     "pose": null,
+     "inliers": 0
+    },
+    {
+     "seed": {
+      "yaw": 0.3,
+      "pitch": 6.675000000000001,
+      "roll": -1.85,
+      "source": "app-skyline"
+     },
+     "pose": null,
+     "inliers": 0
+    },
+    {
+     "seed": {
+      "yaw": 118.83749999999999,
+      "pitch": 1.1,
+      "roll": -1.75,
+      "source": "app-skyline"
+     },
+     "pose": null,
+     "inliers": 0
+    }
+   ],
+   "used": "yaw-hint"
+  },
+  "positionSource": "manual",
+  "lat": 46.40315,
+  "lon": 9.64424,
+  "stage": "verify[3]:sky",
+  "codeStamp": {
+   "sha1": "c2d406ea3c557e6e",
+   "env": {
+    "MATCHER_LG_DEVICE": "cpu",
+    "SWEEP_KP": 4096,
+    "STAGE1_LG_PRUNE": "0",
+    "SERVICE_SNAPSHOT": "bef98c970614"
+   },
+   "files": [
+    "pipeline.py",
+    "s1.py",
+    "skyglobal.py",
+    "app_snapshot.py",
+    "core.py",
+    "fuse.py",
+    "worker.mjs"
+   ]
+  },
+  "eye": [
+   0,
+   0,
+   2394.018425736481
+  ],
+  "horizonDirs": 8192,
+  "sky": {
+   "gridMs": 6259,
+   "refineMs": 440,
+   "grid": {
+    "vfovs": [
+     8.71935772497167,
+     9.275912473374119,
+     9.832467221776566
+    ],
+    "pitches": [
+     -15.0,
+     15.0,
+     0.5
+    ],
+    "rolls": [
+     -9.0,
+     9.0,
+     1.5
+    ],
+    "astep": 0.10904212107284693
+   }
+  },
+  "baselineSeed": "narrow",
+  "nCandidates": 4,
+  "candidates": [
+   {
+    "pose": {
+     "yaw": 178.73816715767234,
+     "pitch": -0.11862833711215949,
+     "roll": -0.08637409199349605,
+     "vfov": 9.275912473374119
+    },
+    "inliers": 285,
+    "source": "narrow",
+    "alsoFrom": [
+     "sky",
+     "appseeds"
+    ],
+    "fused": {
+     "pose": {
+      "yaw": 178.77931868637648,
+      "pitch": -0.14945940747193495,
+      "roll": -0.22845518555575411,
+      "vfov": 8.96462293405925
+     },
+     "level": "high",
+     "method": "fused",
+     "checks": {
+      "cueAgreeDeg": 0.274,
+      "skylineMedPx": 2.7,
+      "matchSupport": 0.672
+     },
+     "fusionScore": 0.387,
+     "inliers": 2127,
+     "inlierFrac": 0.6718,
+     "nLifted": 3166,
+     "fusedFrom": "match",
+     "cues": {
+      "skyline": {
+       "pose": {
+        "yaw": 178.8006671576723,
+        "pitch": -0.2061283371121595,
+        "roll": -0.28637409199349606,
+        "vfov": 9.078799333314917
+       },
+       "residualPx": 2.431,
+       "appConfidence": 1.0,
+       "accepted": "confident"
+      },
+      "match": {
+       "pose": {
+        "yaw": 178.78312525689563,
+        "pitch": -0.14123717096192007,
+        "roll": -0.020209244875479353,
+        "vfov": 8.98015456450199
+       },
+       "inliers": 875,
+       "residualPx": 3.944
+      }
+     },
+     "eye": [
+      0,
+      0,
+      2394.018425736481
+     ],
+     "skyScore": 1.0757207573784722,
+     "sweepSup": null,
+     "basinGap": {
+      "gap": 0.8899688639554313,
+      "ms": 11178,
+      "regime": "manual"
+     }
+    },
+    "ms": 20451
+   },
+   {
+    "source": "sky",
+    "rank": 1,
+    "pose": {
+     "yaw": 297.60999052887223,
+     "pitch": 6.975,
+     "roll": -9.949999999999998,
+     "vfov": 9.264317394495011
+    },
+    "skyScore0": 0.7708974775831983,
+    "fused": {
+     "pose": {
+      "yaw": 297.64613277752403,
+      "pitch": 6.986645829648792,
+      "roll": -10.11981271889045,
+      "vfov": 9.265205040562684
+     },
+     "level": "low",
+     "method": "fused",
+     "checks": {
+      "cueAgreeDeg": null,
+      "skylineMedPx": 7.219,
+      "matchSupport": 0.0
+     },
+     "fusionScore": 0.0,
+     "inliers": 0,
+     "inlierFrac": 0.0,
+     "nLifted": 54,
+     "fusedFrom": "skyline",
+     "cues": {
+      "skyline": {
+       "pose": {
+        "yaw": 297.6224905288723,
+        "pitch": 6.975,
+        "roll": -9.874999999999998,
+        "vfov": 9.25852719612345
+       },
+       "residualPx": 7.336,
+       "appConfidence": 0.752,
+       "accepted": "confident"
+      },
+      "match": null
+     },
+     "eye": [
+      0,
+      0,
+      2394.018425736481
+     ],
+     "skyScore": 0.7630882701654543,
+     "sweepSup": null
+    },
+    "ms": 6213
+   },
+   {
+    "source": "sky",
+    "rank": 2,
+    "pose": {
+     "yaw": 330.40720563999764,
+     "pitch": 2.025,
+     "roll": -0.2750000000000001,
+     "vfov": 9.436157202953101
+    },
+    "skyScore0": 0.7235615680165888,
+    "fused": {
+     "pose": {
+      "yaw": 329.28317344731914,
+      "pitch": 2.112671040324964,
+      "roll": 1.3325218923155648,
+      "vfov": 9.448757485236834
+     },
+     "level": "low",
+     "method": "fused",
+     "checks": {
+      "cueAgreeDeg": null,
+      "skylineMedPx": 10.48,
+      "matchSupport": 0.0
+     },
+     "fusionScore": 0.0,
+     "inliers": 0,
+     "inlierFrac": 0.0,
+     "nLifted": 68,
+     "fusedFrom": "skyline",
+     "cues": {
+      "skyline": {
+       "pose": {
+        "yaw": 329.90720563999764,
+        "pitch": 2.05,
+        "roll": -0.4000000000000001,
+        "vfov": 9.501030783723404
+       },
+       "residualPx": 9.205,
+       "appConfidence": 0.53,
+       "accepted": "confident"
+      },
+      "match": null
+     },
+     "eye": [
+      0,
+      0,
+      2394.018425736481
+     ],
+     "skyScore": 0.6588216222318491,
+     "sweepSup": null
+    },
+    "ms": 6150
+   },
+   {
+    "source": "sky",
+    "rank": 3,
+    "pose": {
+     "yaw": 119.01841196940316,
+     "pitch": 1.1125,
+     "roll": -2.5,
+     "vfov": 9.580663742557169
+    },
+    "skyScore0": 0.7194578519195044,
+    "fused": {
+     "pose": {
+      "yaw": 118.9983583887223,
+      "pitch": 1.1067310071450207,
+      "roll": -2.6348381256110045,
+      "vfov": 9.585977427607393
+     },
+     "level": "low",
+     "method": "fused",
+     "checks": {
+      "cueAgreeDeg": null,
+      "skylineMedPx": 8.369,
+      "matchSupport": 0.0
+     },
+     "fusionScore": 0.0,
+     "inliers": 0,
+     "inlierFrac": 0.0,
+     "nLifted": 94,
+     "fusedFrom": "skyline",
+     "cues": {
+      "skyline": {
+       "pose": {
+        "yaw": 119.01841196940318,
+        "pitch": 1.1125,
+        "roll": -2.4499999999999993,
+        "vfov": 9.568687912878971
+       },
+       "residualPx": 8.249,
+       "appConfidence": 0.388,
+       "accepted": "confident"
+      },
+      "match": null
+     },
+     "eye": [
+      0,
+      0,
+      2394.018425736481
+     ],
+     "skyScore": 0.727730735995416,
+     "sweepSup": null
+    },
+    "ms": 6427
+   }
+  ],
+  "hmrReopens": 0,
+  "matchRetries": [],
+  "timingMs": {
+   "sky": 16457,
+   "sweep40": 0,
+   "appseeds": 35788,
+   "sweepfine": 0,
+   "verify": 39245,
+   "total": 91503
+  },
+  "attempt": 1
+ },
+ "fusedChecks": {
+  "cueAgreeDeg": 0.274,
+  "skylineMedPx": 2.7,
+  "matchSupport": 0.672
+ },
+ "cascadeAgreementInputs": {
+  "pose": {
+   "yaw": 178.77931868637648,
+   "pitch": -0.14945940747193495,
+   "roll": -0.22845518555575411,
+   "vfov": 8.96462293405925
+  },
+  "eyeH": 2394.018425736481,
+  "positionSource": "manual",
+  "exif": false,
+  "tolerance": {
+   "yawPitchDeg": 0.5,
+   "eyeM": 2.0,
+   "cascadeGate": "accepted \u2227 confidence \u2265 0.75 (acc75)"
+  }
+ },
+ "history": [],
+ "finishedAt": "2026-09-26T05:03:56"
+}

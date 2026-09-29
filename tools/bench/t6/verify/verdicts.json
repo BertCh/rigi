@@ -1,0 +1,71 @@
+{
+ "photos": {
+  "wc_0028": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "roll"
+     ],
+     "note": "Shape broadly right (Rigi, snow-massif step) but line sits ~0.6% above Rigi on left and ~1.5-2% below the snowy Alps crest on right; Rigi peak shifted ~1% left; implies ~1.5-2 deg roll error."
+    }
+   }
+  },
+  "wc_0046": {
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line traces the Uri Alps crest along full width; Urirotstock, Wissigstock notches and peaks align within a few px; no visible tilt or offset."
+    }
+   }
+  },
+  "wc_0072": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line lies on Bregenzerwald/Raetikon crest from left edge through Hoher Freschen snow massif and Glatthorn, within ~0.5%; right third behind branches fits within ~1% (hump near Taelispitze maybe slightly high but largely occluded)."
+    }
+   }
+  },
+  "wc_0087": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line floats in sky over the left half (~10-15% above the real ridge at left edge), cuts through the main massif, and descends far above the right-hand ridge; summit shapes (main peak + serrated towers) do not match; large roll."
+    }
+   }
+  },
+  "wc_0094": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line hugs the skyline across the full width: left ridge, sharp Piz dal Teo spire, Piz Sena summit, Sassalb notch and right-hand Piz Campasc ridge all align within ~0.5%; no tilt."
+    }
+   }
+  }
+ }
+}

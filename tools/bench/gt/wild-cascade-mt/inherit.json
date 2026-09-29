@@ -1,0 +1,809 @@
+{
+ "about": "new cascade (Mapterhorn, 0f loader) pose → verify_v2 cluster label it inherits (|Δyaw|,|Δpitch| ≤ 0.5°, |Δeye| ≤ 2 m), else null → see verify/",
+ "tolerance": {
+  "deg": 0.5,
+  "eyeM": 2
+ },
+ "photos": {
+  "wc_0001": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0002": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0.01689241713809706
+  },
+  "wc_0003": {
+   "inherits": "B",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": -0.12775630261739934,
+   "dPitch": -0.03990004510515632,
+   "dEyeM": 0.019029382383450866,
+   "accepted": false,
+   "confidence": 0.0023950701978387844
+  },
+  "wc_0004": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": true,
+   "confidence": 0.87534516765286
+  },
+  "wc_0005": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0006": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0.000017076069004145185
+  },
+  "wc_0007": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "fused"
+   ],
+   "dYaw": -0.07345889711154996,
+   "dPitch": 0.09999516352006577,
+   "dEyeM": -0.14041287620602816,
+   "accepted": true,
+   "confidence": 0.5685393258426966
+  },
+  "wc_0008": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0009": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0010": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0011": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": true,
+   "confidence": 0.8216511344054324
+  },
+  "wc_0012": {
+   "inherits": "B",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": 0.007211736170120275,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0013": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app"
+   ],
+   "dYaw": -0.1330354572203305,
+   "dPitch": 0.23072447131503893,
+   "dEyeM": 0.1331685366186548,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0014": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0015": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0016": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": -0.0489362062166947,
+   "dPitch": 0.02095169535785324,
+   "dEyeM": 0,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0017": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0018": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0019": {
+   "inherits": "B",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": 0.047814161728865656,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0020": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": -0.003148468202539334,
+   "dPitch": -0.04340933514569878,
+   "dEyeM": -0.22337447173367764,
+   "accepted": true,
+   "confidence": 0.8259259259259258
+  },
+  "wc_0021": {
+   "inherits": "A",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": 0.0035403806338081267,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0022": {
+   "inherits": "B",
+   "clusterMethods": [
+    "app",
+    "cascade"
+   ],
+   "dYaw": 0.022741560669828687,
+   "dPitch": 0.11169703380389073,
+   "dEyeM": -0.23258289804209653,
+   "accepted": true,
+   "confidence": 0.7834206288040573
+  },
+  "wc_0023": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0024": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": true,
+   "confidence": 0.9703479576399395
+  },
+  "wc_0025": {
+   "inherits": "C",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": 0.020111735286263865,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0026": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": -0.08643439391835273,
+   "dPitch": -0.0192721491447454,
+   "dEyeM": 0,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0027": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": -0.03602031169248221,
+   "dPitch": 0.09131343226421161,
+   "dEyeM": -0.23217351117773433,
+   "accepted": true,
+   "confidence": 0.9514018691588785
+  },
+  "wc_0028": {
+   "inherits": "A",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": -0.005716220836916364,
+   "dPitch": 0.002388738626385667,
+   "dEyeM": 0,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0029": {
+   "inherits": "A",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": 0.020111735286263865,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0030": {
+   "inherits": "B",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0.15429909854594825,
+   "dPitch": 0.2328044885657765,
+   "dEyeM": -0.034104082424619264,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0031": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0032": {
+   "inherits": "B",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": -0.004972065495849165,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0033": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0034": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0035": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0036": {
+   "inherits": "A",
+   "clusterMethods": [
+    "cascade",
+    "fused"
+   ],
+   "dYaw": 0.11088673458175435,
+   "dPitch": 0.2265861570978358,
+   "dEyeM": -0.021406615029775367,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0037": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0038": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0039": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0040": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0041": {
+   "inherits": "B",
+   "clusterMethods": [
+    "app",
+    "fused"
+   ],
+   "dYaw": -0.06310345937060902,
+   "dPitch": 0.01522597858365149,
+   "dEyeM": -0.04821223991450552,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0042": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0043": {
+   "inherits": "B",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0.21575726494415903,
+   "dPitch": 0.25737016296686166,
+   "dEyeM": 0.017135288388374192,
+   "accepted": true,
+   "confidence": 0.7187911437376213
+  },
+  "wc_0044": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0045": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0046": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0047": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": 0.18639446345582655,
+   "dPitch": -0.015960410988206775,
+   "dEyeM": 0.38558883435189273,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0048": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0049": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0050": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0051": {
+   "inherits": "C",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": 0,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0052": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0053": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0054": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": 0.03257406135526253,
+   "dPitch": 0.08674219482926304,
+   "dEyeM": -0.006021257144993797,
+   "accepted": true,
+   "confidence": 0.950642487315712
+  },
+  "wc_0055": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0056": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0057": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": 0.1339070077586939,
+   "dPitch": 0.10230134170836891,
+   "dEyeM": -0.2540122461170995,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0058": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0.0005474296494731367
+  },
+  "wc_0059": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0060": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0061": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0062": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0063": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0064": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0065": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0066": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0067": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0068": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": true,
+   "confidence": 0.5850533807829182
+  },
+  "wc_0069": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0070": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0071": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0072": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0073": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0074": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0075": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0076": {
+   "inherits": "B",
+   "clusterMethods": [
+    "app",
+    "fused"
+   ],
+   "dYaw": 0.14607926084761402,
+   "dPitch": 0.03833059781053372,
+   "dEyeM": -0.1723702300126888,
+   "accepted": true,
+   "confidence": 0.8863546931616085
+  },
+  "wc_0077": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0078": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0079": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0080": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": -0.08142173686894694,
+   "dPitch": 0.02762825112053502,
+   "dEyeM": 0,
+   "accepted": true,
+   "confidence": 0.5910042398369604
+  },
+  "wc_0081": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": -0.0012783453079237006,
+   "dPitch": 0.21013358637206636,
+   "dEyeM": 0,
+   "accepted": true,
+   "confidence": 0.8183093981672106
+  },
+  "wc_0082": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": -0.1479249981287012,
+   "dPitch": 0.10553236180979031,
+   "dEyeM": 0,
+   "accepted": true,
+   "confidence": 0.9507102944135664
+  },
+  "wc_0083": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0084": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0085": {
+   "inherits": "A",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": 0.07518302090466022,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0086": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0087": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0088": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": 0.1415733797809935,
+   "dPitch": 0.014266631710420086,
+   "dEyeM": 0.0553117542108339,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0089": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0090": {
+   "inherits": "A",
+   "clusterMethods": [
+    "app",
+    "cascade",
+    "fused"
+   ],
+   "dYaw": -0.18304575096476583,
+   "dPitch": 0.1421454029387763,
+   "dEyeM": -0.20931319265037018,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0091": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0092": {
+   "inherits": "B",
+   "clusterMethods": [
+    "app",
+    "fused"
+   ],
+   "dYaw": 0.012622401962062213,
+   "dPitch": -0.0971244205437456,
+   "dEyeM": 0.02201195453380933,
+   "accepted": true,
+   "confidence": 0.9108657812266568
+  },
+  "wc_0093": {
+   "inherits": "B",
+   "clusterMethods": [
+    "fused"
+   ],
+   "dYaw": 0.28269375106538064,
+   "dPitch": 0.1279216435616508,
+   "dEyeM": 0.02201195453380933,
+   "accepted": true,
+   "confidence": 1
+  },
+  "wc_0094": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0095": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0096": {
+   "inherits": "B",
+   "clusterMethods": [
+    "cascade"
+   ],
+   "dYaw": 0,
+   "dPitch": 0,
+   "dEyeM": -0.00016842804325278848,
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0097": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": true,
+   "confidence": 0.5874767319010819
+  },
+  "wc_0098": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0099": {
+   "inherits": null,
+   "reason": "no v2 cluster within 0.5°/0.5°/2 m",
+   "accepted": false,
+   "confidence": 0
+  },
+  "wc_0100": {
+   "inherits": "A",
+   "clusterMethods": [
+    "fused"
+   ],
+   "dYaw": 0.02078529400341722,
+   "dPitch": 0.01885601155998362,
+   "dEyeM": -0.02085671900658781,
+   "accepted": true,
+   "confidence": 0.7674821294141879
+  }
+ }
+}

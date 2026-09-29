@@ -1,0 +1,203 @@
+X5 — negative-evidence pose verifier (TM program)            2026-09-28, DEV ids only, post-hoc items labelled
+==========================================================================================================================
+
+QUESTION
+Can negative evidence (structure the render predicts that the photo lacks, or geometric inconsistency across depth)
+reject wrong-basin / wrong-eye poses that positive evidence accepts, without rejecting correct poses?
+
+SHORT ANSWER
+Partly. No single negative-evidence family is a safe general verifier on this data. One geometric check does work on
+the eye-error traps. It was found post hoc, so it needs pre-registered confirmation:
+  * PARALLAX / FREE-CENTRE CHECK (pnp_rel, POST HOC): solve 6-DoF PnP on the lifted matches (hypothesis focal) and
+    measure how far it wants to move the camera centre, divided by the median depth of its inliers.
+    - Every correct ref with >= 100 inliers: pnp_rel <= 0.032.
+    - Caught: wc_0001 B 0.049, wc_0070 A 0.068 / C 0.052, wc_0002 A 0.094, wc_0028 T6A 0.18, wc_0006 CPU 0.048.
+    - Not caught: wc_0069 A 0.013 and wc_0074 A 0.013 (inside the correct range), and wc_0086 N7 0.031 (borderline).
+  * X2's mono-geometry score (EXTERNAL) catches exactly the other pair (wc_0069 A, wc_0074 A) and misses wc_0001 B and
+    wc_0070 A. The two checks are complementary.
+    - OR-veto, population inl >= 100: 6/7 hard wrongs caught, 2/22 correct refs lost (wc_0047 A, wc_0085 C, both
+      correct v2 HIGHs). Missed: wc_0086 N7 (no X2 score).
+    - The operating point is fragile. With a population of inl >= 30, one weakly-matched correct ref (wc_0071 C,
+      85 inliers, pnp_rel 0.055) raises the LOPO threshold, and wc_0001 B is no longer caught.
+  * The pre-specified candidates are weak on the hard wrongs (n = 7): contour coverage, skyline residual, ring hypothesis
+    spread, re-match gain and NFA. Hard-wrong AUROC is 0.40–0.69, except the app skyline score (sg_score / sky_edge,
+    0.78–0.86).
+  * Far-solve -> near/mid band consistency separates perfectly where it can be computed (rot_far_near, res_far_near
+    AUROC 1.0). It exists for only 6 correct refs and 1 wrong: fixed km bands rarely hold >= 12 matches in both bands
+    for a single ALIKED view. It is a sparse-data result, not a verifier.
+  * wc_0070 A and wc_0001 B (the main session's question): caught by pnp_rel, not by X2 or X4. But wc_0070 A has only
+    30 single-view ALIKED inliers here, versus 330 fused in T6, so it is a weak case either way.
+  * Veto on top of T6/v2: no LR model is usable as a veto at "zero wrong accepted". They veto 3–19 of the 19 correct
+    HIGHs. Only the single-feature LOPO vetoes spare the HIGHs: pnp_rel loses 1 correct HIGH (wc_0047), X2 loses 1
+    (wc_0085). None of them vetoes wc_0086 N7, except pnp_up_abs (which loses wc_0027) and the X2-containing LR (via
+    median imputation, which does not count).
+
+DATA (n)
+  Positives: 32 correct refs over 30 photos.
+  Negatives: 128 wrong refs over 43 photos, plus wc_0086 N7 (the v2 moved-eye HIGH, verified wrong near-miss).
+    - N7 was rendered by render_extra.py under render_lock on port 8791. Eye matches key.json exactly.
+    - The same pose at the stated eye (T8) renders into a slope: 0 matches, unlabelled, excluded.
+  "Hard" wrongs = wrong refs with >= 100 hypothesis inliers: 7. These are wc_0001 B, 0002 A, 0006 CPU, 0028 T6A,
+    0069 A, 0074 A and 0086 N7. wc_0070 A/C have 30/64. All other wrongs have < 30 single-view inliers, so positive
+    evidence alone kills them.
+  Perturb: 360 views (30 photos × 12 offsets), scored and never used for training.
+  Per-photo ranking uses the 23 photos that have both a correct and a wrong ref.
+  LEAKAGE WARNING: the hard wrongs come from 7 photos. Every CV below is leave-one-photo-out (LOPO). The key trap
+  results are single cases and carry no statistical weight.
+
+METHOD
+  Matcher
+    - ALIKED (4096 kp, det 0.01) + LightGlue on CPU (core.lg_match), with s1.correspond conventions: photo resized to the
+      render size, one view per pose.
+    - Lifting through the cached half-res xyz, with match.lift checks: sky, < 250 m, 5×5 range spread (at stride 2 this
+      is ±4 native px).
+    - Matches: 1,715 pairs (refs, perturb, 12-view ring at 30° steps, extra), stored in raw/.
+    - The ring was cut from 24 to 12 views because of CPU load from concurrent studies.
+    - LoMa comparison NOT done: the GPU was shared and time was limited.
+  Features: all at the hypothesis P (its render, eye and intrinsics). THR = 6 px native.
+    - Positive: inliers, fraction, 4×3 coverage, rmse, drift, a-contrario log10 NFA (fixed hypothesis, uniform
+      background, Chernoff bound on underflow).
+    - (1) Depth bands, near < 1 km / mid 1–5 km / far > 5 km: per-band RANSAC rotation, transfer ratio (the far
+      rotation's inlier rate on mid/near relative to their own best), inter-band rotation angle, and median residual.
+      Variant q_* splits at the median inlier depth, so it is always available.
+    - (1b, POST HOC, added after the first band results) PnP free centre: pnp_shift/up/dist/gain, and
+      pnp_rel = |C| / median inlier depth (pnp_rel10 uses the 10th percentile).
+    - (2) Occluding contours from xyz: |Δ log depth| > 0.3, near side >= 300 m, skyline band excluded.
+      Coverage = the jump-weighted fraction with a multi-scale Canny edge within 2 grid px and orientation within
+      about ±34°, minus a chance level from 8 shifted edge maps. Also near/far splits, and the converse
+      (edge_explained). TEED NOT used: Canny is permitted, and no weights were downloaded.
+    - (3) Skyline: rendered skyline vs the photo P(sky) boundary (app pose-free sky model), giving sky_med and
+      sky_frac3. sky_edge = Canny support along the rendered skyline. sg_score = the app's skyline score at P.
+    - (4) Ring spread: per-ring-view rotation (+focal) solve.
+      - ring_comp_ratio = best other-basin support (> 20° away) vs own-basin support (<= 10°).
+      - hyp_vs_comp = hypothesis inliers vs best other basin.
+      - SUE dispersion.
+    - (5) rematch_gain = hypothesis-render inliers vs nearest-basin ring support (ring at the stated eye).
+  Models: L2 logistic regression with <= 4 features and median imputation (both fitted in-fold).
+    - Thresholds for "zero wrong accepted" (nested):
+      - Each held-out photo is judged against the maximum training-wrong score of its fold.
+      - "oracle" = the threshold picked on the pooled out-of-fold scores (optimistic).
+    - M4 = forward selection nested inside each LOPO fold (inner: grouped 5-fold).
+
+RESULTS 1 — per-feature AUROC (higher = correct; direction declared a priori)
+  AUC all: correct vs all wrongs. AUC hard: correct vs the 7 hard wrongs. rank: photos where every correct beats every
+  wrong. vs pert±4/8: correct vs yaw ±4/±8 perturbs.
+  feature           AUC all  AUC hard  n(pos/neg)  rank    vs pert±4/8
+  log_inl            0.922    0.513     32/129    17/23   0.952
+  cov_hyp            0.899    0.592     32/129    17/23   0.922
+  log10_nfa          0.922    0.513     32/129    17/23   0.952   (= inlier count; no structured-doppelganger power)
+  hyp_drift          0.787    0.357     30/26     18/23   0.934
+  rot_far_mid        0.844    0.850     15/6       9/23   0.618
+  rot_far_near       1.000    1.000      6/1       3/23   0.517   (n tiny)
+  res_far_near       1.000    1.000      6/1       3/23   0.525   (n tiny)
+  xfer_mid_near      0.944    0.944      9/3       5/23   0.608
+  q_rot_far_near     0.688    0.687     26/9      17/23   n/a
+  pnp_up_abs  (p.h.) 0.843    0.871     30/30     19/23   0.562
+  pnp_rel     (p.h.) 0.903    0.795     30/30     20/23   0.533
+  ctr_lift           0.794    0.401     27/89     16/23   0.819
+  ctr_lift_near      0.745    0.690     21/71     11/23   0.713
+  edge_explained     0.762    0.599     27/89     15/23   0.749
+  sky_frac3          0.774    0.683     32/125    15/23   0.814
+  sky_edge           0.887    0.862     32/125    18/23   0.933
+  sg_score           0.840    0.781     32/129    16/23   0.865
+  ring_comp_ratio    0.865    0.498     32/129    10/23   0.530
+  hyp_vs_comp        0.935    0.513     32/129    17/23   0.952
+  sue_disp           0.457    0.438     24/55      0/23   0.506   (per-photo constant)
+  rematch_gain       0.695    0.531     32/129    16/23   0.899
+  EXT X2 combo_int.z 0.913    0.839     30/111    16/23   n/a     (X2, moge_l terrain-internal, null-z)
+  Kill criterion from R1 (AUROC < 0.65 on wrong-basin negatives): ctr_* (hard 0.40–0.69), ring spread, SUE and NFA
+  fail it on the hard set.
+
+  Perturbs: pose-anchored features reject every perturb (inl_hyp, drift, rate_hyp_far vs perturb: 0.93–1.0).
+    - Even ±1° gives ≈ 0 inliers at 6 px, so perturb decoys are trivial for positive evidence. Every model accepted
+      0/30 of every perturb tag at nested@0.
+    - Refinement-invariant features (bands, PnP, ring) score perturbs like the correct basin (AUC ≈ 0.5), as they
+      should: a perturb refines back to the correct pose.
+
+RESULTS 2 — models (LOPO, n = 32 correct / 129 wrong)
+  model                                              AUROC  hard  oracle@0 oracle@1 nested@0 (correct,wrong)  rank
+  M0 log_inl                                          0.881 0.487    3        8        4, 1                 17/23
+  M1 positive (log_inl,frac,cov,sg_score)             0.951 0.616    7       16       12, 1                 21/23
+  M2 a-priori neg (log_inl,q_rot,ctr_lift,hyp_vs_comp) 0.913 0.455   0        6        0, 1                 19/23
+  M3 neg-only (q_rot,ctr_lift,sky_frac3,ring_comp)    0.901 0.379    1        7        9, 3                 17/23
+  M4 nested forward selection (<= 4)                  0.930  -       -        -       20, 5                 20/23
+     (picked sg_score, sky_edge, xfer_mid_near (sparse, imputed), hyp_vs_comp)
+  EXT M6 log_inl + X2                                 0.930 0.710   17       19       17, 1                 19/23
+  EXT M7 log_inl,pnp_dist,hyp_vs_comp,X2              0.938 0.701   16       20       20, 1                 19/23
+  None reaches zero wrong at useful retention. The accepted wrong is always wc_0086 N7 (883 inliers, the strongest
+  hard wrong; it has no X2 score and is median-imputed). The pre-registered negative-evidence LR (M2) is worse than
+  positive-only (M1).
+
+RESULTS 3 — traps and rule-rejected correct poses
+  pose        inl  pnp_rel  q_rot  ctr_lift sg_score X2 z   X4 strips(top hyp)  caught by (LOPO single veto, inl>=100 pop.)
+  0001 B      325  0.049    0.27   0.01     0.10     1.32   abstain (0)          pnp_rel, pnp_up_abs, q_xfer, ctr_lift_far, X2 (<LOPO min)
+  0069 A      147  0.013    0.54   0.40     0.60    -1.49   abstain (0)          log_inl, hyp_vs_comp, X2
+  0070 A       30  0.068    0.28   0.01     0.79     1.15   no abstain (2)       (outside inl>=100 population) pnp_rel if inl>=30 w/o 0071C
+  0070 C       64  0.052    2.21   0.06     0.80     1.85   no abstain (2)       pnp_rel (same caveat)
+  0074 A      493  0.013    0.32   0.12     0.79    -0.51   abstain (0)          pnp_up_abs, rot_far_near/mid_near/res_far_near, X2
+  0086 N7     883  0.031    0.87   0.64     0.00     -      n/a                  pnp_up_abs only (loses wc_0027 A)
+  0063 A corr 262  0.009    0.30    -       0.86     3.20   no abstain           kept by all single vetoes; LR: accepted only by M4, M6, M7
+  0006 B corr  36  0.026    2.50    -       1.12     3.77   no abstain           too few single-view inliers; LR rejects except M3/M4
+  0006 KP corr 86  0.033    4.01    -       1.01     3.95
+  Notes:
+    - wc_0006: the single-view ALIKED inliers at the correct refs (36/86) are fewer than at the wrong ref CPU (164).
+      T6's 1935 are fused over many views.
+    - With X2's own tau (0.37), X2 vetoes 0069 A and 0074 A (as X2 reported). The LOPO-min tau used here is stricter,
+      so it also catches 0001 B (1.32 < min of other correct refs; the lowest correct is 1.40).
+
+RESULTS 4 — simulated veto on top of T6/v2 (21 v2 HIGHs: 19 correct, wc_0076 unsure, wc_0086 wrong)
+  The final pose of every correct HIGH is within 0.2° of a cached correct ref; that ref's features were used.
+  wc_0086 uses N7.
+  Single-feature veto (tau = LOPO extreme over other photos' correct refs, population inl >= 100):
+    pnp_rel             -> vetoes 1 correct HIGH (wc_0047), not wc_0086
+    X2 (ext)            -> vetoes 1 correct HIGH (wc_0085), not wc_0086
+    pnp_rel OR X2       -> vetoes 2 correct HIGHs (wc_0047, wc_0085), not wc_0086
+    pnp_up_abs          -> vetoes wc_0086, and 1 correct HIGH (wc_0027)
+    pnp_up_abs OR X2    -> vetoes wc_0086, and 2 correct HIGHs (wc_0027, wc_0085)
+  LR models at the nested zero-wrong threshold veto 3–19 correct HIGHs, so they are unusable as a veto.
+  Verdict: every veto that catches something costs at least 1 of 19 correct HIGHs on dev. The T6 frozen rule already
+  has 0 wrong HIGH at the stated eye, so a veto only pays if it enables a looser rule, LoMa or eye search. The looser
+  rule is where these traps would appear.
+
+INTERPRETATION
+  1. Why contours and skyline fail on the traps: the traps are near-miss eyes and similar-looking basins, and their
+     rendered structure largely exists in the photo.
+     - wc_0086 N7 has the best contour lift of all poses (0.64).
+     - wc_0069 A has 0.40 (correct median about 0.2).
+     - Canny cannot tell "missing" from "hazy/low-contrast", and correct refs of hazy photos score as low as the traps.
+  2. Why fixed depth bands fail: single-view ALIKED matches rarely populate two bands. Median-split bands (q_*) are
+     always available, but they are weak (0.69).
+  3. What works: asking the geometry directly whether a different centre explains the matches better, with the
+     answer normalised by depth.
+     - This is the "parallax-based wrong-eye veto" that F1 proposed, done as a free-centre PnP rather than as bands.
+     - It sees eye errors (0001, 0070, 0002, 0028) and cannot see wrong basins at the right eye (0069) or eye errors
+       masked by far-only inliers (0074: +83 m up, but at a 6.9 km median depth).
+     - Mono-depth ordinal geometry (X2) sees the latter and not the former.
+  4. The ring hypothesis spread (SUE/basin competitor) is dominated by inlier count, and the 12-view ring is coarse.
+     No value beyond log_inl.
+
+CAVEATS
+  - Hard wrongs: n = 7 (+2 at 30–64 inliers), 7 photos. Every trap statement is n = 1.
+  - pnp_rel was designed after seeing pnp_dist values (post hoc). It needs a pre-registered test on new negatives
+    (mined skyline top-k, the LoMa arm's wrong finals) before any use.
+  - Single-view ALIKED is weaker than T6's fused multi-view matches: many correct refs have < 100 single-view
+    inliers (wc_0002 C 1, 0034/0052/0055 0), so they are unrecoverable by any matching-based verifier here.
+  - The X2 score is missing for N7, 1 correct ref (0027 A) and 17 wrong refs. Where X2 enters an LR, missing values are
+    median-imputed.
+  - Ring cut to 12 views (30°). The ring is at the stated eye only.
+
+RECOMMENDATION
+  - Do not deploy a learned veto from this dev data.
+  - Pre-register a two-part geometric veto for the next arm: pnp_rel (> ~0.035 at >= 100 inliers) OR X2 combo_int.z
+    (< X2's tau). Test it on mined negatives: LoMa and eye-search finals, and skyline top-k minus the correct pose.
+    Expected dev cost: 1–2 of 19 correct HIGHs.
+  - Compute pnp_rel on the fused multi-view T6/LoMa correspondences, not single views. Also report the PnP
+    centre-shift vector: it doubles as an eye-refinement proposal (wc_0074: +83 m up; wc_0086: +79 m up).
+
+FILES (tools/research/tm/x5_verifier/)
+  match_all.py      raw ALIKED+LG matches → raw/<pid>/<group>__<tag>.npz
+  render_extra.py   wc_0086 N7/T8 renders (render lock, port 8791) → extra/
+  features.py       per-pose features → features.json (520 poses + ring-derived)
+  merge_ext.py      + X2 score (EXTERNAL, labelled ext_*) → features_ext.json
+  evaluate.py       AUROC / LR-LOPO / traps / veto → eval.json (X5_EXT=1 → eval_ext.json); logs/eval*.log
+  combo_veto.py     post-hoc OR-veto pnp_rel|X2 → combo_veto.json

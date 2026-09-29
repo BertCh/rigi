@@ -1,0 +1,56 @@
+[
+ {
+  "pid": "wc_0015",
+  "eye": {
+   "lat": 47.132993,
+   "lon": 7.0592994,
+   "h": 1608.2
+  },
+  "reason": "F-far: Chasseral 736 m"
+ },
+ {
+  "pid": "wc_0017",
+  "eye": {
+   "lat": 46.4289729,
+   "lon": 8.1617848,
+   "h": 1626.7
+  },
+  "reason": "F-far: Bellwald 2201 m"
+ },
+ {
+  "pid": "wc_0037",
+  "eye": {
+   "lat": 46.5455891,
+   "lon": 10.141743,
+   "h": 1811.8
+  },
+  "reason": "F-far: Santa Maria 21925 m"
+ },
+ {
+  "pid": "wc_0053",
+  "eye": {
+   "lat": 46.5338121,
+   "lon": 9.8732564,
+   "h": 1707.9
+  },
+  "reason": "F-far: Samedan 1305 m"
+ },
+ {
+  "pid": "wc_0069",
+  "eye": {
+   "lat": 46.9694971,
+   "lon": 8.6371706,
+   "h": 1911.5
+  },
+  "reason": "F-far: Fronalpstock 1079 m"
+ },
+ {
+  "pid": "wc_0073",
+  "eye": {
+   "lat": 46.979264,
+   "lon": 8.2556443,
+   "h": 2112.8
+  },
+  "reason": "F-far: Pilatus Kulm 17466 m"
+ }
+]

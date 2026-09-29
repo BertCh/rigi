@@ -1,0 +1,4611 @@
+{
+ "strata": {
+  "all": {
+   "n": 100,
+   "oracle": 53,
+   "app": {
+    "correct": 39,
+    "wrong": 57,
+    "unsure": 4,
+    "accepted": 60,
+    "acceptedCorrect": 37,
+    "acceptedWrong": 21,
+    "acceptedUnsure": 2,
+    "precision": 0.638,
+    "acceptedGross": 19,
+    "nearMiss": 9,
+    "rejectedCorrect": 2
+   },
+   "cascade": {
+    "correct": 14,
+    "wrong": 83,
+    "unsure": 3,
+    "accepted": 17,
+    "acceptedCorrect": 12,
+    "acceptedWrong": 4,
+    "acceptedUnsure": 1,
+    "precision": 0.75,
+    "acceptedGross": 3,
+    "nearMiss": 4,
+    "rejectedCorrect": 2
+   },
+   "fused": {
+    "correct": 50,
+    "wrong": 45,
+    "unsure": 5,
+    "accepted": 31,
+    "acceptedCorrect": 30,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 0,
+    "precision": 0.968,
+    "acceptedGross": 1,
+    "nearMiss": 7,
+    "rejectedCorrect": 20
+   }
+  },
+  "positionSource=exif-gps": {
+   "n": 43,
+   "oracle": 24,
+   "app": {
+    "correct": 17,
+    "wrong": 24,
+    "unsure": 2,
+    "accepted": 24,
+    "acceptedCorrect": 16,
+    "acceptedWrong": 7,
+    "acceptedUnsure": 1,
+    "precision": 0.696,
+    "acceptedGross": 7,
+    "nearMiss": 3,
+    "rejectedCorrect": 1
+   },
+   "cascade": {
+    "correct": 8,
+    "wrong": 34,
+    "unsure": 1,
+    "accepted": 8,
+    "acceptedCorrect": 7,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 0,
+    "precision": 0.875,
+    "acceptedGross": 0,
+    "nearMiss": 2,
+    "rejectedCorrect": 1
+   },
+   "fused": {
+    "correct": 23,
+    "wrong": 19,
+    "unsure": 1,
+    "accepted": 12,
+    "acceptedCorrect": 12,
+    "acceptedWrong": 0,
+    "acceptedUnsure": 0,
+    "precision": 1.0,
+    "acceptedGross": 0,
+    "nearMiss": 4,
+    "rejectedCorrect": 11
+   }
+  },
+  "positionSource=manual": {
+   "n": 57,
+   "oracle": 29,
+   "app": {
+    "correct": 22,
+    "wrong": 33,
+    "unsure": 2,
+    "accepted": 36,
+    "acceptedCorrect": 21,
+    "acceptedWrong": 14,
+    "acceptedUnsure": 1,
+    "precision": 0.6,
+    "acceptedGross": 12,
+    "nearMiss": 6,
+    "rejectedCorrect": 1
+   },
+   "cascade": {
+    "correct": 6,
+    "wrong": 49,
+    "unsure": 2,
+    "accepted": 9,
+    "acceptedCorrect": 5,
+    "acceptedWrong": 3,
+    "acceptedUnsure": 1,
+    "precision": 0.625,
+    "acceptedGross": 3,
+    "nearMiss": 2,
+    "rejectedCorrect": 1
+   },
+   "fused": {
+    "correct": 27,
+    "wrong": 26,
+    "unsure": 4,
+    "accepted": 19,
+    "acceptedCorrect": 18,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 0,
+    "precision": 0.947,
+    "acceptedGross": 1,
+    "nearMiss": 3,
+    "rejectedCorrect": 9
+   }
+  },
+  "skylineDist=far": {
+   "n": 43,
+   "oracle": 22,
+   "app": {
+    "correct": 14,
+    "wrong": 28,
+    "unsure": 1,
+    "accepted": 20,
+    "acceptedCorrect": 13,
+    "acceptedWrong": 7,
+    "acceptedUnsure": 0,
+    "precision": 0.65,
+    "acceptedGross": 7,
+    "nearMiss": 4,
+    "rejectedCorrect": 1
+   },
+   "cascade": {
+    "correct": 7,
+    "wrong": 34,
+    "unsure": 2,
+    "accepted": 7,
+    "acceptedCorrect": 6,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 0,
+    "precision": 0.857,
+    "acceptedGross": 1,
+    "nearMiss": 0,
+    "rejectedCorrect": 1
+   },
+   "fused": {
+    "correct": 20,
+    "wrong": 22,
+    "unsure": 1,
+    "accepted": 13,
+    "acceptedCorrect": 12,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 0,
+    "precision": 0.923,
+    "acceptedGross": 1,
+    "nearMiss": 3,
+    "rejectedCorrect": 8
+   }
+  },
+  "skylineDist=near": {
+   "n": 57,
+   "oracle": 31,
+   "app": {
+    "correct": 25,
+    "wrong": 29,
+    "unsure": 3,
+    "accepted": 40,
+    "acceptedCorrect": 24,
+    "acceptedWrong": 14,
+    "acceptedUnsure": 2,
+    "precision": 0.632,
+    "acceptedGross": 12,
+    "nearMiss": 5,
+    "rejectedCorrect": 1
+   },
+   "cascade": {
+    "correct": 7,
+    "wrong": 49,
+    "unsure": 1,
+    "accepted": 10,
+    "acceptedCorrect": 6,
+    "acceptedWrong": 3,
+    "acceptedUnsure": 1,
+    "precision": 0.667,
+    "acceptedGross": 2,
+    "nearMiss": 4,
+    "rejectedCorrect": 1
+   },
+   "fused": {
+    "correct": 30,
+    "wrong": 23,
+    "unsure": 4,
+    "accepted": 18,
+    "acceptedCorrect": 18,
+    "acceptedWrong": 0,
+    "acceptedUnsure": 0,
+    "precision": 1.0,
+    "acceptedGross": 0,
+    "nearMiss": 4,
+    "rejectedCorrect": 12
+   }
+  },
+  "headingKnown=False": {
+   "n": 42,
+   "oracle": 16,
+   "app": {
+    "correct": 12,
+    "wrong": 27,
+    "unsure": 3,
+    "accepted": 26,
+    "acceptedCorrect": 12,
+    "acceptedWrong": 12,
+    "acceptedUnsure": 2,
+    "precision": 0.5,
+    "acceptedGross": 11,
+    "nearMiss": 5,
+    "rejectedCorrect": 0
+   },
+   "cascade": {
+    "correct": 3,
+    "wrong": 37,
+    "unsure": 2,
+    "accepted": 6,
+    "acceptedCorrect": 3,
+    "acceptedWrong": 2,
+    "acceptedUnsure": 1,
+    "precision": 0.6,
+    "acceptedGross": 1,
+    "nearMiss": 2,
+    "rejectedCorrect": 0
+   },
+   "fused": {
+    "correct": 15,
+    "wrong": 23,
+    "unsure": 4,
+    "accepted": 9,
+    "acceptedCorrect": 9,
+    "acceptedWrong": 0,
+    "acceptedUnsure": 0,
+    "precision": 1.0,
+    "acceptedGross": 0,
+    "nearMiss": 3,
+    "rejectedCorrect": 6
+   }
+  },
+  "headingKnown=True": {
+   "n": 58,
+   "oracle": 37,
+   "app": {
+    "correct": 27,
+    "wrong": 30,
+    "unsure": 1,
+    "accepted": 34,
+    "acceptedCorrect": 25,
+    "acceptedWrong": 9,
+    "acceptedUnsure": 0,
+    "precision": 0.735,
+    "acceptedGross": 8,
+    "nearMiss": 4,
+    "rejectedCorrect": 2
+   },
+   "cascade": {
+    "correct": 11,
+    "wrong": 46,
+    "unsure": 1,
+    "accepted": 11,
+    "acceptedCorrect": 9,
+    "acceptedWrong": 2,
+    "acceptedUnsure": 0,
+    "precision": 0.818,
+    "acceptedGross": 2,
+    "nearMiss": 2,
+    "rejectedCorrect": 2
+   },
+   "fused": {
+    "correct": 35,
+    "wrong": 22,
+    "unsure": 1,
+    "accepted": 22,
+    "acceptedCorrect": 21,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 0,
+    "precision": 0.955,
+    "acceptedGross": 1,
+    "nearMiss": 4,
+    "rejectedCorrect": 14
+   }
+  },
+  "fusedSeed=direct": {
+   "n": 1,
+   "oracle": 0,
+   "app": {
+    "correct": 0,
+    "wrong": 1,
+    "unsure": 0,
+    "accepted": 1,
+    "acceptedCorrect": 0,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 0,
+    "precision": 0.0,
+    "acceptedGross": 1,
+    "nearMiss": 0,
+    "rejectedCorrect": 0
+   },
+   "cascade": {
+    "correct": 0,
+    "wrong": 1,
+    "unsure": 0,
+    "accepted": 0,
+    "acceptedCorrect": 0,
+    "acceptedWrong": 0,
+    "acceptedUnsure": 0,
+    "precision": null,
+    "acceptedGross": 0,
+    "nearMiss": 0,
+    "rejectedCorrect": 0
+   },
+   "fused": {
+    "correct": 0,
+    "wrong": 1,
+    "unsure": 0,
+    "accepted": 0,
+    "acceptedCorrect": 0,
+    "acceptedWrong": 0,
+    "acceptedUnsure": 0,
+    "precision": null,
+    "acceptedGross": 0,
+    "nearMiss": 0,
+    "rejectedCorrect": 0
+   }
+  },
+  "fusedSeed=match-sweep": {
+   "n": 38,
+   "oracle": 33,
+   "app": {
+    "correct": 21,
+    "wrong": 16,
+    "unsure": 1,
+    "accepted": 27,
+    "acceptedCorrect": 20,
+    "acceptedWrong": 6,
+    "acceptedUnsure": 1,
+    "precision": 0.769,
+    "acceptedGross": 5,
+    "nearMiss": 2,
+    "rejectedCorrect": 1
+   },
+   "cascade": {
+    "correct": 9,
+    "wrong": 28,
+    "unsure": 1,
+    "accepted": 9,
+    "acceptedCorrect": 7,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 1,
+    "precision": 0.875,
+    "acceptedGross": 1,
+    "nearMiss": 1,
+    "rejectedCorrect": 2
+   },
+   "fused": {
+    "correct": 32,
+    "wrong": 5,
+    "unsure": 1,
+    "accepted": 21,
+    "acceptedCorrect": 20,
+    "acceptedWrong": 1,
+    "acceptedUnsure": 0,
+    "precision": 0.952,
+    "acceptedGross": 1,
+    "nearMiss": 1,
+    "rejectedCorrect": 12
+   }
+  },
+  "fusedSeed=skyline-seeds": {
+   "n": 61,
+   "oracle": 20,
+   "app": {
+    "correct": 18,
+    "wrong": 40,
+    "unsure": 3,
+    "accepted": 32,
+    "acceptedCorrect": 17,
+    "acceptedWrong": 14,
+    "acceptedUnsure": 1,
+    "precision": 0.548,
+    "acceptedGross": 13,
+    "nearMiss": 7,
+    "rejectedCorrect": 1
+   },
+   "cascade": {
+    "correct": 5,
+    "wrong": 54,
+    "unsure": 2,
+    "accepted": 8,
+    "acceptedCorrect": 5,
+    "acceptedWrong": 3,
+    "acceptedUnsure": 0,
+    "precision": 0.625,
+    "acceptedGross": 2,
+    "nearMiss": 3,
+    "rejectedCorrect": 0
+   },
+   "fused": {
+    "correct": 18,
+    "wrong": 39,
+    "unsure": 4,
+    "accepted": 10,
+    "acceptedCorrect": 10,
+    "acceptedWrong": 0,
+    "acceptedUnsure": 0,
+    "precision": 1.0,
+    "acceptedGross": 0,
+    "nearMiss": 6,
+    "rejectedCorrect": 8
+   }
+  }
+ },
+ "interRater": {
+  "pairs": 71,
+  "agree": 67,
+  "correctWrongFlips": 2
+ },
+ "failureTaxonomy": {
+  "wrong-direction": 40,
+  "roll": 33,
+  "pitch-offset": 29,
+  "manual-position": 28,
+  "fog-haze": 21,
+  "near-field-terrain": 21,
+  "foreground-occlusion": 20,
+  "cloud": 18,
+  "parallax-mismatch": 11,
+  "near-miss": 10,
+  "low-light": 8,
+  "other": 6,
+  "yaw-shift": 6,
+  "water-reflection": 5,
+  "fov-scale": 5,
+  "featureless-skyline": 4
+ },
+ "nFail": 47,
+ "rows": [
+  {
+   "id": "wc_0001",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.7533457526665154
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0002",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.10239561823892909
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0003",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.17738606606879154
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.0002552885177712464
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0004",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.13601903768959095
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ],
+     "accepted": true,
+     "confidence": 0.5945676322059793
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0005",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion",
+    "low-light"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.08750403263456676
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0006",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "near-miss"
+     ],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0007",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.24475571429475923
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0008",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0009",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [
+      "cloud",
+      "fog-haze"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.00425352656635869
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0010",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "water-reflection"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0.06614545826314108
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0011",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ],
+     "accepted": false,
+     "confidence": 0.023394953591463555
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0012",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "low-light"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0013",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": true,
+     "confidence": 0.864290736895501
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0014",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "fog-haze"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0015",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "featureless-skyline",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.1363401946869451
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0016",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "water-reflection"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "accepted": true,
+     "confidence": 0.9349999999999999
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0017",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.6479865291081665
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0018",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0.0854018603414437
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0019",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [
+      "near-field-terrain"
+     ],
+     "accepted": true,
+     "confidence": 0.831884537004136
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [
+      "near-field-terrain"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0020",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0021",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0022",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0023",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.2119178918602862
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0024",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion",
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.26624232614664306
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0025",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "low-light"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "other",
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.06875790825266494
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "other",
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0026",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "water-reflection"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.8502762430939227
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0027",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.4129504905016535
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.5933682251676418
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0028",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "featureless-skyline",
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "accepted": false,
+     "confidence": 0.06980063171918544
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0029",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.3503810764708052
+    },
+    "fused": {
+     "cluster": null,
+     "verdict": "no-pose",
+     "tags": [],
+     "accepted": false,
+     "confidence": null
+    }
+   },
+   "fusedSeed": "direct",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0030",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.5428353541187102
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "near-miss"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0031",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "fog-haze"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.08795862222799519
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "unsure",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0032",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "featureless-skyline",
+    "fog-haze",
+    "foreground-occlusion",
+    "low-light"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "unsure",
+     "tags": [
+      "featureless-skyline",
+      "fov-scale",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.02706815734928993
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "unsure",
+     "tags": [
+      "featureless-skyline",
+      "fov-scale",
+      "near-miss"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0033",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.12403331603975606
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0034",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [
+      "foreground-occlusion"
+     ],
+     "accepted": true,
+     "confidence": 0.9035886677718852
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [
+      "foreground-occlusion"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0035",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "featureless-skyline",
+    "fog-haze"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.1608219812922276
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "unsure",
+     "tags": [
+      "featureless-skyline",
+      "fog-haze",
+      "near-field-terrain"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0036",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion",
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.07755532919331014
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0037",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "yaw-shift"
+     ],
+     "accepted": true,
+     "confidence": 0.5457232872541148
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "yaw-shift"
+     ],
+     "accepted": true,
+     "confidence": 0.61875
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0038",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "fog-haze",
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.05552724831754409
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0039",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.08544494793545093
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0040",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.20594507606857693
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0041",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0042",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud"
+   ],
+   "hard": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "unsure",
+     "tags": [
+      "cloud",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.11088128074667644
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0043",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "low-light"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "accepted": true,
+     "confidence": 0.5686258328258776
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "accepted": true,
+     "confidence": 0.7024839431937622
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0044",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.09453855762294812
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0045",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.14760210245320263
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0046",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.07453257630104163
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0047",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9666666666666667
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0048",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.0007313614937758724
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.6537193195435809
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0049",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "other",
+      "parallax-mismatch",
+      "pitch-offset"
+     ],
+     "accepted": true,
+     "confidence": 0.7395308645947075
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "other",
+      "parallax-mismatch",
+      "pitch-offset"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0050",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.12112104804259234
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0051",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "fog-haze"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.036287176033325375
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [
+      "fog-haze"
+     ],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0052",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "low-light",
+    "water-reflection"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "other",
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "near-miss",
+      "other",
+      "parallax-mismatch"
+     ],
+     "accepted": true,
+     "confidence": 0.4580531983645485
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0053",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "near-miss",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.12413022195262421
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0054",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.44045680811930843
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.7431053833519567
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0055",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.6722345462423788
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0056",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.21674235796682692
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0057",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.8474226804123711
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0058",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "unsure",
+     "tags": [
+      "cloud"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "cloud",
+      "other"
+     ],
+     "accepted": false,
+     "confidence": 0.01854546892995515
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0059",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0060",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0061",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "low-light",
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.01620559903613111
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.7637901861252115
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0062",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.03579550171817112
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "unsure",
+     "tags": [
+      "featureless-skyline",
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0.00019252280009627126
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0063",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [
+      "near-field-terrain"
+     ],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [
+      "near-field-terrain"
+     ],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0064",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.41577019993871794
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0065",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [
+      "cloud"
+     ],
+     "accepted": true,
+     "confidence": 0.8280274069469684
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [
+      "cloud"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0066",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "low-light"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.06555379441539995
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0067",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.3169963254861469
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0068",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.059819290322071214
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0069",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.6323019371992344
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0070",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "accepted": true,
+     "confidence": 0.8936775093326915
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "near-miss",
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0071",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.29149398238325125
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0072",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.29541509776265995
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0073",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.10753947878720169
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0074",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "accepted": false,
+     "confidence": 0.11048420839321624
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0075",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.038850771667769256
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0076",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "unsure",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "accepted": true,
+     "confidence": 0.836911092300973
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.3445687865708383
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0077",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0078",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.794296870898789
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0079",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "hard": true,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "unsure",
+     "tags": [
+      "fog-haze",
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "accepted": true,
+     "confidence": 0.7598241216528195
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0080",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion",
+    "low-light"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.5680273710737631
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.3168277776017523
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0081",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.8555149522844654
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.7256534654677809
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0082",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.6354497354497354
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0083",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": true,
+   "photoTags": [
+    "water-reflection"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0084",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [
+      "cloud"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.24466984159733055
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0085",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "cloud",
+    "featureless-skyline",
+    "fog-haze"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.0867902452590466
+    },
+    "fused": {
+     "cluster": "C",
+     "verdict": "correct",
+     "tags": [
+      "cloud",
+      "fog-haze"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0086",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.21326980177352564
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0087",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.19308855722106238
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0088",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "fog-haze"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.7272490221642763
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0089",
+   "positionSource": "exif-gps",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "unsure",
+     "tags": [
+      "cloud",
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0.11297110833306243
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "unsure",
+     "tags": [
+      "cloud",
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0090",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "cascade": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 1
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0091",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.5542203177517379
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0092",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.8490289201356804
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0093",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "unsure",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "accepted": true,
+     "confidence": 1
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0094",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.1638764433846475
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0095",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": true,
+   "photoTags": [
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "hard": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.011113896524635021
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0096",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "low-light"
+   ],
+   "hard": true,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.04633730919083028
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0097",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "cloud"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9714559645965644
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "match-sweep",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0098",
+   "positionSource": "manual",
+   "skylineDist": "near",
+   "headingKnown": false,
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "app": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": true,
+     "confidence": 0.3451566479087971
+    },
+    "fused": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "accepted": false,
+     "confidence": 0
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": false
+  },
+  {
+   "id": "wc_0099",
+   "positionSource": "exif-gps",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "water-reflection"
+   ],
+   "hard": false,
+   "methods": {
+    "cascade": {
+     "cluster": "A",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.5702916891475265
+    },
+    "fused": {
+     "cluster": "B",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": true,
+     "confidence": 0.9
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  },
+  {
+   "id": "wc_0100",
+   "positionSource": "manual",
+   "skylineDist": "far",
+   "headingKnown": false,
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "hard": false,
+   "methods": {
+    "fused": {
+     "cluster": "A",
+     "verdict": "correct",
+     "tags": [],
+     "accepted": false,
+     "confidence": 0.2
+    },
+    "cascade": {
+     "cluster": "B",
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "accepted": false,
+     "confidence": 0
+    },
+    "app": {
+     "cluster": "C",
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "near-miss",
+      "yaw-shift"
+     ],
+     "accepted": false,
+     "confidence": 0.06129393243951995
+    }
+   },
+   "fusedSeed": "skyline-seeds",
+   "anyCorrect": true
+  }
+ ]
+}

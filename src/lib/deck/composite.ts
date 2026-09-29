@@ -1,0 +1,994 @@
+// Photo-view compositing for the deck backend: the deck.gl counterpart of engine.ts's
+// geometry pass → layer pass → composite (see composite-shader.ts for the shader port).
+//
+//   PhotoCompositor (a deck Effect): in preRender, for the photo viewport, draws the Deck's terrain
+//     tiles twice offscreen — the geometry pass (range, r32float, 1024 px long side like geoRT) and
+//     the colour pass (the layer's style, linear rgb + straight alpha, rgba16float at canvas size
+//     like layerRT). Terrain layers opt in with `offscreen: true` so they skip the canvas pass.
+//   PhotoCompositeLayer: one full-screen triangle that mixes photo + colour + ridges/skyline +
+//     distance tint + blend masks + people mask in linear light and writes sRGB. Put it first in
+//     the screen view (under labels / markers).
+//
+// deck's own post-process path (PostProcessEffect) renders layers into colour-only buffers with no
+// depth attachment, which breaks the log-depth terrain; hence an Effect that only pre-renders and
+// a layer that draws the result.
+import {
+	type Effect,
+	type EffectContext,
+	Layer,
+	type LayerProps,
+	type PreRenderOptions,
+	project32,
+	type UpdateParameters,
+	type Viewport,
+} from "@deck.gl/core";
+import type { Buffer, Device, Framebuffer, Texture } from "@luma.gl/core";
+import { Geometry, Model } from "@luma.gl/engine";
+import type { ShaderModule } from "@luma.gl/shadertools";
+import type { Pose } from "../camera";
+import type { compositeValues, harmonizeValues } from "../look/composite";
+import { COMP_BLOCK, HARM_BLOCK } from "../look/glsl/composite";
+import type { LookDefine } from "../look/look-key";
+import type { RevealUniforms } from "../reveal/config";
+import {
+	type DeckCompositeStyle,
+	deckCompositeStyle,
+} from "../style/deck-apply";
+import { CLASSIC } from "../style/defaults";
+import {
+	type CompositeModuleProps,
+	compositeFs,
+	compositeModule,
+	compositeVs,
+	LOOK_COMPOSITE_MODULES,
+} from "./composite-shader";
+import {
+	GeometryTarget,
+	geometrySize,
+	gpuDone,
+	readbackBuffer,
+	TerrainPassRenderer,
+} from "./geometry-pass";
+import type { PhotoViewport } from "./photo-view";
+import { isTerrainTile, makeTexture, maskTexture } from "./terrain-layer";
+import { isTrailLayer } from "./trail-layer";
+
+export type BlendMethod = "swipe" | "lens" | "range" | "brush";
+
+/** The composite's share of engine.ts Settings (same names and defaults). */
+export type CompositeSettings = {
+	/** overlay = contours/bands over the photo; replace = a rendered map blended in by `method`. */
+	mode: "overlay" | "replace";
+	layerOpacity: number;
+	ridges: number;
+	depthTint: number;
+	method: BlendMethod;
+	swipe: number;
+	/** Lens centre, u right / v DOWN (0..1). */
+	lens: [number, number];
+	lensR: number;
+	rangeKm: number;
+	keepSky: boolean;
+	feather: number;
+	/** Ridge lines fade over terrain closer than this (m). 0 = off. */
+	nearFade: number;
+	protectPeople: boolean;
+};
+
+export const defaultCompositeSettings: CompositeSettings = {
+	mode: "overlay",
+	layerOpacity: 0.9,
+	ridges: 0.8,
+	depthTint: 0,
+	method: "lens",
+	swipe: 0.5,
+	lens: [0.5, 0.4],
+	lensR: 0.18,
+	rangeKm: 3,
+	keepSky: true,
+	feather: 0.03,
+	nearFade: 60,
+	protectPeople: true,
+};
+
+const METHOD = { swipe: 0, lens: 1, range: 2, brush: 3 } as const;
+
+export type CompositeTiming = {
+	/** CPU time to encode the geometry / colour passes (ms); GPU time only with `benchmark`. */
+	geometryMs: number;
+	colorMs: number;
+	/** Whether the geometry pass was skipped (pose, eye and tiles unchanged). */
+	geometryCached: boolean;
+	/** With `benchmark = true` the passes are gl.finish()ed, so the times include the GPU. */
+	synced: boolean;
+};
+
+type GL = WebGL2RenderingContext;
+
+/** The look composite (look/glsl/composite.ts) as the engine hands it over; defines [] = classic. */
+export type DeckCompositeLook = {
+	/** the composite LOOK_* defines: a change rebuilds the composite program */
+	defines: LookDefine[];
+	/** COMP_BLOCK values for an output size (px) */
+	values:
+		| ((width: number, height: number) => ReturnType<typeof compositeValues>)
+		| null;
+	harmonize: ReturnType<typeof harmonizeValues> | null;
+	/** refined masks (RGBA8, row 0 = top), look/composite.ts */
+	mask: { w: number; h: number; data: Uint8Array } | null;
+	/** the terrain's normal pass (ink creases): drawn once per new value (a settled geometry generation), null = none */
+	normal: number | null;
+};
+
+const NO_LOOK: DeckCompositeLook = {
+	defines: [],
+	values: null,
+	harmonize: null,
+	mask: null,
+	normal: null,
+};
+
+/** The composite program's shaders for a look (classic: no look modules, no defines). */
+function compositeShaders(defines: LookDefine[], modules: ShaderModule[]) {
+	return defines.length
+		? {
+				vs: compositeVs,
+				fs: compositeFs,
+				modules: [...modules, ...LOOK_COMPOSITE_MODULES],
+				defines: Object.fromEntries(defines.map((d) => [d, true])),
+			}
+		: { vs: compositeVs, fs: compositeFs, modules };
+}
+
+export class PhotoCompositor implements Effect {
+	id = "photo-composite";
+	props = {};
+	/** Which deck viewport is the photo camera. */
+	viewId = "photo";
+	enabled = true;
+	/** gl.finish() after each pass so `timing` includes GPU time (debug only: stalls the frame). */
+	benchmark = false;
+	settings: CompositeSettings = { ...defaultCompositeSettings };
+	/** The view style's composite uniforms (ridges, hairline, depth tint); see setStyle. */
+	style: DeckCompositeStyle = deckCompositeStyle(CLASSIC);
+	timing: CompositeTiming | null = null;
+	/** The overlay reveal's uniforms (src/lib/reveal); null = off. */
+	reveal: RevealUniforms | null = null;
+	/** The look composite (setLook). */
+	look: DeckCompositeLook = NO_LOOK;
+	readonly brushCanvas: HTMLCanvasElement;
+	/** Bumped on every change the canvas can't see (brush, mask, photo): feed it to the layer. */
+	version = 0;
+	onChange?: () => void;
+
+	private device?: Device;
+	private renderer?: TerrainPassRenderer;
+	private geo?: GeometryTarget;
+	private color?: Framebuffer;
+	private empty?: Texture;
+	private photoTex?: Texture;
+	private photoSrc: HTMLImageElement | ImageBitmap | null = null;
+	private fgTex?: Texture;
+	private fgMask: { width: number; height: number; data: Uint8Array } | null =
+		null;
+	private fgDirty = false;
+	private brushTex?: Texture;
+	private brushDirty = true;
+	private geoKey: unknown[] = [];
+	private normal?: Framebuffer;
+	private normalKey: number | null = null;
+	private maskTex?: Texture;
+	private maskSrc: Uint8Array | null = null;
+	private colorKey: unknown[] = [];
+	/** True once the colour + geometry targets hold a frame for the current viewport. */
+	ready = false;
+
+	constructor(aspect = 4 / 3) {
+		this.brushCanvas = document.createElement("canvas");
+		this.brushCanvas.width = 512;
+		this.brushCanvas.height = Math.max(1, Math.round(512 / aspect));
+	}
+
+	setup({ device }: EffectContext) {
+		this.device = device;
+	}
+
+	setSettings(s: Partial<CompositeSettings>) {
+		this.settings = { ...this.settings, ...s };
+	}
+
+	/** Ridge / skyline / hairline / depth-tint look (src/lib/style/deck-apply.ts deckCompositeStyle). */
+	setStyle(style: DeckCompositeStyle) {
+		if (style === this.style) return;
+		this.style = style;
+		this.bump();
+	}
+
+	setReveal(r: RevealUniforms | null) {
+		if (!r && !this.reveal) return;
+		this.reveal = r;
+		this.bump();
+	}
+
+	/** The look composite: defines, values, masks (see DeckCompositeLook). */
+	setLook(look: DeckCompositeLook) {
+		this.look = look;
+		this.bump();
+	}
+
+	setPhoto(img: HTMLImageElement | ImageBitmap | null) {
+		if (img === this.photoSrc) return;
+		this.photoSrc = img;
+		this.photoTex?.destroy();
+		this.photoTex = undefined;
+		this.bump();
+	}
+
+	/** People mask from segmentForeground (row 0 = top); null clears it. */
+	setForegroundMask(
+		mask: { width: number; height: number; data: Uint8Array } | null,
+	) {
+		this.fgMask = mask;
+		this.fgDirty = true;
+		this.bump();
+	}
+
+	get hasForeground() {
+		return !!this.fgMask;
+	}
+
+	/** engine.ts paint(): into the brush mask (normalised coords, v down). */
+	paint(u: number, v: number, radius: number, erase: boolean) {
+		const ctx = this.brushCanvas.getContext("2d") as CanvasRenderingContext2D;
+		const x = u * this.brushCanvas.width;
+		const y = v * this.brushCanvas.height;
+		const r = radius * this.brushCanvas.width;
+		const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+		const c = erase ? "0,0,0" : "255,255,255";
+		g.addColorStop(0, `rgba(${c},0.9)`);
+		g.addColorStop(0.6, `rgba(${c},0.5)`);
+		g.addColorStop(1, `rgba(${c},0)`);
+		ctx.fillStyle = g;
+		ctx.beginPath();
+		ctx.arc(x, y, r, 0, Math.PI * 2);
+		ctx.fill();
+		this.brushDirty = true;
+		this.bump();
+	}
+
+	clearBrush(fill = false) {
+		const ctx = this.brushCanvas.getContext("2d") as CanvasRenderingContext2D;
+		ctx.fillStyle = fill ? "#fff" : "#000";
+		ctx.fillRect(0, 0, this.brushCanvas.width, this.brushCanvas.height);
+		this.brushDirty = true;
+		this.bump();
+	}
+
+	private bump() {
+		this.version++;
+		this.onChange?.();
+	}
+
+	/** The layer that puts the composite on screen (id must pass the app's layerFilter). */
+	layer(id = "screen-composite") {
+		return new PhotoCompositeLayer({
+			id,
+			compositor: this,
+			version: this.version,
+			settings: this.settings,
+			defines: this.look.defines,
+			pickable: false,
+			parameters: {
+				depthCompare: "always",
+				depthWriteEnabled: false,
+				blend: false,
+			},
+		});
+	}
+
+	// ---------- Effect ----------
+
+	preRender(opts: PreRenderOptions) {
+		const device = this.device;
+		if (!this.enabled || !device || opts.isPicking) return;
+		const vp = opts.viewports.find((v: Viewport) => v.id === this.viewId) as
+			| (Viewport & Partial<PhotoViewport>)
+			| undefined;
+		if (!vp?.pose || !vp.eye) return;
+		this.renderer ??= new TerrainPassRenderer(device);
+		const pose: Pose = vp.pose;
+		const eye = vp.eye;
+		const dpr = device.canvasContext?.cssToDeviceRatio() ?? 1;
+		const cw = Math.max(1, Math.round(vp.width * dpr));
+		const ch = Math.max(1, Math.round(vp.height * dpr));
+		const gs = geometrySize(vp.width / vp.height);
+		if (!this.geo) this.geo = new GeometryTarget(device, gs.width, gs.height);
+		else this.geo.resize(gs.width, gs.height);
+		if (!this.color || this.color.width !== cw || this.color.height !== ch) {
+			this.destroyColor();
+			this.color = device.createFramebuffer({
+				id: "composite-color",
+				width: cw,
+				height: ch,
+				colorAttachments: [
+					device.createTexture({
+						id: "composite-color-tex",
+						format: "rgba16float",
+						width: cw,
+						height: ch,
+						sampler: {
+							minFilter: "nearest",
+							magFilter: "nearest",
+							addressModeU: "clamp-to-edge",
+							addressModeV: "clamp-to-edge",
+						},
+					}),
+				],
+				depthStencilAttachment: "depth24plus",
+			});
+			this.colorKey = [];
+		}
+		const layers = opts.layers.filter((l) => isTerrainTile(l));
+		// the colour pass also draws the trails (after the tiles, depth-tested against them)
+		const colorLayers = opts.layers.filter(
+			(l) => isTerrainTile(l) || isTrailLayer(l),
+		);
+		const gl = (device as unknown as { gl: GL }).gl;
+		// geometry: pose, eye, size and the tile meshes (not their styling)
+		const geoKey = [
+			pose.yaw,
+			pose.pitch,
+			pose.roll,
+			pose.vfov,
+			...eye,
+			gs.width,
+			gs.height,
+			...layers.map((l) => (l.props as { mesh?: unknown }).mesh),
+		];
+		const t0 = performance.now();
+		const geoCached = sameKey(geoKey, this.geoKey);
+		if (!geoCached) {
+			this.renderer.render("geometry", layers, this.geo.fbo, pose, eye);
+			this.geoKey = geoKey;
+			if (this.benchmark) gl.finish();
+		}
+		// the normal pass for the ink creases, once the pose settles (not per drag frame)
+		const nk = this.look.normal;
+		if (nk != null && nk !== this.normalKey) {
+			this.normal = this.floatTarget(
+				this.normal,
+				gs.width,
+				gs.height,
+				"rgba16float",
+			);
+			this.renderer.render("normal", layers, this.normal, pose, eye);
+			this.normalKey = nk;
+		}
+		const t1 = performance.now();
+		// colour: any prop change re-creates the tile layer instances
+		const colorKey = [
+			pose.yaw,
+			pose.pitch,
+			pose.roll,
+			pose.vfov,
+			...eye,
+			cw,
+			ch,
+			...colorLayers,
+		];
+		if (!sameKey(colorKey, this.colorKey)) {
+			this.renderColor(colorLayers, this.color, pose, eye);
+			this.colorKey = colorKey;
+			if (this.benchmark) gl.finish();
+		}
+		const t2 = performance.now();
+		this.timing = {
+			geometryMs: t1 - t0,
+			colorMs: t2 - t1,
+			geometryCached: geoCached,
+			synced: this.benchmark,
+		};
+		this.ready = true;
+	}
+
+	/** A float colour + depth target of this size (`fbo` reused when it matches). */
+	private floatTarget(
+		fbo: Framebuffer | undefined,
+		width: number,
+		height: number,
+		format: "rgba16float" | "rgba32float",
+	): Framebuffer {
+		if (fbo?.width === width && fbo.height === height) return fbo;
+		if (fbo) destroyTarget(fbo);
+		const device = this.device as Device;
+		return device.createFramebuffer({
+			width,
+			height,
+			colorAttachments: [
+				device.createTexture({
+					format,
+					width,
+					height,
+					sampler: {
+						minFilter: "nearest",
+						magFilter: "nearest",
+						addressModeU: "clamp-to-edge",
+						addressModeV: "clamp-to-edge",
+					},
+				}),
+			],
+			depthStencilAttachment: "depth24plus",
+		});
+	}
+
+	/**
+	 * The colour pass of `layers` through `pose` at width × height, read back (linear RGBA floats,
+	 * GL rows): the band stats' layer (look/composite.ts, LOOK_HARMONIZE). Synchronous, ≤ 256 px.
+	 */
+	readLayer(
+		layers: Layer[],
+		pose: Pose,
+		eye: [number, number, number],
+		width: number,
+		height: number,
+	): Float32Array | null {
+		const device = this.device;
+		if (!device) return null;
+		this.renderer ??= new TerrainPassRenderer(device);
+		const fbo = this.floatTarget(undefined, width, height, "rgba32float");
+		try {
+			this.renderer.render(
+				"color",
+				layers.filter((l) => isTerrainTile(l)),
+				fbo,
+				pose,
+				eye,
+			);
+			// synchronous on purpose: the caller (deck/engine.ts scheduleStats) applies the stats in the
+			// same task, so the next frame already shows them; an async read would let a frame through
+			// without them and let a second stats pass start before this one lands
+			const data = fbo.colorAttachments[0].texture.readDataSyncWebGL();
+			return new Float32Array(data as ArrayBuffer);
+		} finally {
+			destroyTarget(fbo);
+		}
+	}
+
+	/** The look composite's module props (blocks + mask / normal textures) at an output size. */
+	private lookProps(device: Device, width: number, height: number) {
+		const L = this.look;
+		if (!L.defines.length || !L.values) return null;
+		if (L.mask?.data !== this.maskSrc) {
+			this.maskTex?.destroy();
+			this.maskTex = undefined;
+			this.maskSrc = L.mask?.data ?? null;
+			if (L.mask)
+				this.maskTex = device.createTexture({
+					data: L.mask.data,
+					width: L.mask.w,
+					height: L.mask.h,
+					sampler: {
+						minFilter: "linear",
+						magFilter: "linear",
+						addressModeU: "clamp-to-edge",
+						addressModeV: "clamp-to-edge",
+					},
+				});
+		}
+		const empty = this.empty as Texture;
+		return {
+			[COMP_BLOCK.name]: {
+				...COMP_BLOCK.pack(L.values(width, height)),
+				maskTex: this.maskTex ?? empty,
+				normalTex:
+					(L.normal != null && this.normal?.colorAttachments[0].texture) ||
+					empty,
+			},
+			[HARM_BLOCK.name]: HARM_BLOCK.pack(L.harmonize ?? {}),
+		};
+	}
+
+	/** MSAA samples for the colour pass (three: layerRT samples 4); 0 = off. */
+	msaaSamples = 4;
+	private msaa?: {
+		fbo: WebGLFramebuffer;
+		color: WebGLRenderbuffer;
+		depth: WebGLRenderbuffer;
+		width: number;
+		height: number;
+		samples: number;
+	} | null;
+
+	/**
+	 * The colour pass into `target`, multisampled when possible: rendered into an MSAA
+	 * RGBA16F + depth renderbuffer pair, then resolved (blit) into target's texture, like three's
+	 * layerRT (samples: 4). Falls back to drawing into `target` directly.
+	 */
+	private renderColor(
+		layers: Layer[],
+		target: Framebuffer,
+		pose: Pose,
+		eye: [number, number, number],
+	) {
+		const renderer = this.renderer as TerrainPassRenderer;
+		const ms = this.ensureMsaa(target.width, target.height);
+		if (!ms) {
+			renderer.render("color", layers, target, pose, eye);
+			return;
+		}
+		const gl = (this.device as unknown as { gl: GL }).gl;
+		// a stand-in luma Framebuffer: the render pass only binds `handle` and reads the size
+		const proxy = {
+			id: "composite-color-msaa",
+			handle: ms.fbo,
+			width: ms.width,
+			height: ms.height,
+			colorAttachments: target.colorAttachments,
+			depthStencilAttachment: null,
+		} as unknown as Framebuffer;
+		renderer.render("color", layers, proxy, pose, eye);
+		const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+		const prevDraw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
+		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, ms.fbo);
+		gl.bindFramebuffer(
+			gl.DRAW_FRAMEBUFFER,
+			(target as unknown as { handle: WebGLFramebuffer }).handle,
+		);
+		gl.blitFramebuffer(
+			0,
+			0,
+			ms.width,
+			ms.height,
+			0,
+			0,
+			ms.width,
+			ms.height,
+			gl.COLOR_BUFFER_BIT,
+			gl.NEAREST,
+		);
+		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
+		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prevDraw);
+	}
+
+	private ensureMsaa(width: number, height: number) {
+		if (this.msaa === null || !this.device || this.msaaSamples < 2) return null;
+		const m = this.msaa;
+		if (m && m.width === width && m.height === height) return m;
+		const gl = (this.device as unknown as { gl: GL }).gl;
+		this.destroyMsaa();
+		const samples = Math.min(
+			this.msaaSamples,
+			gl.getParameter(gl.MAX_SAMPLES) as number,
+		);
+		if (samples < 2) {
+			this.msaa = null;
+			return null;
+		}
+		const prevFb = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+		const prevRb = gl.getParameter(gl.RENDERBUFFER_BINDING);
+		const fbo = gl.createFramebuffer() as WebGLFramebuffer;
+		const color = gl.createRenderbuffer() as WebGLRenderbuffer;
+		const depth = gl.createRenderbuffer() as WebGLRenderbuffer;
+		gl.bindRenderbuffer(gl.RENDERBUFFER, color);
+		gl.renderbufferStorageMultisample(
+			gl.RENDERBUFFER,
+			samples,
+			gl.RGBA16F,
+			width,
+			height,
+		);
+		gl.bindRenderbuffer(gl.RENDERBUFFER, depth);
+		gl.renderbufferStorageMultisample(
+			gl.RENDERBUFFER,
+			samples,
+			gl.DEPTH_COMPONENT24,
+			width,
+			height,
+		);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+		gl.framebufferRenderbuffer(
+			gl.FRAMEBUFFER,
+			gl.COLOR_ATTACHMENT0,
+			gl.RENDERBUFFER,
+			color,
+		);
+		gl.framebufferRenderbuffer(
+			gl.FRAMEBUFFER,
+			gl.DEPTH_ATTACHMENT,
+			gl.RENDERBUFFER,
+			depth,
+		);
+		const ok =
+			gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+		gl.bindFramebuffer(gl.FRAMEBUFFER, prevFb);
+		gl.bindRenderbuffer(gl.RENDERBUFFER, prevRb);
+		if (!ok) {
+			gl.deleteFramebuffer(fbo);
+			gl.deleteRenderbuffer(color);
+			gl.deleteRenderbuffer(depth);
+			console.warn(
+				"[composite] MSAA colour target unsupported; drawing without AA",
+			);
+			this.msaa = null;
+			return null;
+		}
+		this.msaa = { fbo, color, depth, width, height, samples };
+		return this.msaa;
+	}
+
+	private destroyMsaa() {
+		const m = this.msaa;
+		if (!m || !this.device) return;
+		const gl = (this.device as unknown as { gl: GL }).gl;
+		gl.deleteFramebuffer(m.fbo);
+		gl.deleteRenderbuffer(m.color);
+		gl.deleteRenderbuffer(m.depth);
+		this.msaa = undefined;
+	}
+
+	/**
+	 * engine.ts exportImage's render: the composite of `layers` (terrain tiles + trails) through
+	 * `pose` at width × height (the photo's full size), offscreen. The geometry pass keeps its
+	 * 1024 px long side (three's geoRT is not resized for export either). Returns sRGB RGBA8
+	 * bytes, row 0 = top, or null if the compositor isn't set up. The GPU work is encoded and every
+	 * target freed synchronously; only the pixel readback is awaited (PBO + fence, no stall).
+	 */
+	async renderImage(
+		layers: Layer[],
+		pose: Pose,
+		eye: [number, number, number],
+		width: number,
+		height: number,
+	): Promise<Uint8Array | null> {
+		const device = this.device;
+		if (!device) return null;
+		const buf = this.encodeImage(device, layers, pose, eye, width, height);
+		if (!buf) return null;
+		try {
+			if (!(await gpuDone(device))) return null;
+			const px = await buf.readAsync(0, width * height * 4);
+			// GL rows are bottom-up
+			const row = width * 4;
+			const flipped = new Uint8Array(px.length);
+			for (let y = 0; y < height; y++)
+				flipped.set(
+					px.subarray((height - 1 - y) * row, (height - y) * row),
+					y * row,
+				);
+			return flipped;
+		} finally {
+			buf.destroy();
+		}
+	}
+
+	/** renderImage's GPU part: draws the export and queues its readback into a new Buffer. */
+	private encodeImage(
+		device: Device,
+		layers: Layer[],
+		pose: Pose,
+		eye: [number, number, number],
+		width: number,
+		height: number,
+	): Buffer | null {
+		this.renderer ??= new TerrainPassRenderer(device);
+		const tiles = layers.filter((l) => isTerrainTile(l));
+		const colorLayers = layers.filter(
+			(l) => isTerrainTile(l) || isTrailLayer(l),
+		);
+		const gs = geometrySize(width / height);
+		const geo = new GeometryTarget(device, gs.width, gs.height);
+		const colorTex = device.createTexture({
+			id: "export-color-tex",
+			format: "rgba16float",
+			width,
+			height,
+			sampler: {
+				minFilter: "nearest",
+				magFilter: "nearest",
+				addressModeU: "clamp-to-edge",
+				addressModeV: "clamp-to-edge",
+			},
+		});
+		const color = device.createFramebuffer({
+			id: "export-color",
+			width,
+			height,
+			colorAttachments: [colorTex],
+			depthStencilAttachment: "depth24plus",
+		});
+		const outTex = device.createTexture({
+			id: "export-out-tex",
+			format: "rgba8unorm",
+			width,
+			height,
+		});
+		const out = device.createFramebuffer({
+			id: "export-out",
+			width,
+			height,
+			colorAttachments: [outTex],
+		});
+		const model = new Model(device, {
+			id: "export-composite",
+			...compositeShaders(this.look.defines, [compositeModule]),
+			geometry: new Geometry({
+				topology: "triangle-list",
+				attributes: {
+					positions: {
+						size: 2,
+						value: new Float32Array([-1, -1, 3, -1, -1, 3]),
+					},
+				},
+			}),
+			bufferLayout: [],
+			parameters: {
+				depthCompare: "always",
+				depthWriteEnabled: false,
+				blend: false,
+			},
+		});
+		try {
+			this.renderer.render("geometry", tiles, geo.fbo, pose, eye);
+			this.renderColor(colorLayers, color, pose, eye);
+			if (this.look.normal != null) {
+				this.normal = this.floatTarget(
+					this.normal,
+					gs.width,
+					gs.height,
+					"rgba16float",
+				);
+				this.renderer.render("normal", tiles, this.normal, pose, eye);
+			}
+			const props = this.propsFor(device, geo, colorTex, width, height);
+			if (!props) return null;
+			model.shaderInputs.setProps({
+				composite: props,
+				...this.lookProps(device, width, height),
+			});
+			const pass = device.beginRenderPass({
+				framebuffer: out,
+				clearColor: [0, 0, 0, 1],
+				clearDepth: false,
+			});
+			model.draw(pass);
+			pass.end();
+			// the readPixels into the PBO is queued now; the targets below can go right away
+			const buf = readbackBuffer(device, width * height * 4, "export-readback");
+			outTex.readBuffer({}, buf);
+			return buf;
+		} finally {
+			model.destroy();
+			out.destroy();
+			outTex.destroy();
+			color.depthStencilAttachment?.texture.destroy();
+			color.destroy();
+			colorTex.destroy();
+			geo.destroy();
+			// the MSAA buffers were sized for the export (hundreds of MB at 12 MP): free them now;
+			// the next frame rebuilds the on-screen ones and redraws the colour pass
+			this.destroyMsaa();
+			this.colorKey = [];
+			// the normal pass was drawn for the export's pose: redraw it with the next frame
+			this.normalKey = null;
+		}
+	}
+
+	cleanup() {
+		this.destroyMsaa();
+		if (this.normal) destroyTarget(this.normal);
+		this.maskTex?.destroy();
+		this.normal = this.maskTex = undefined;
+		this.normalKey = null;
+		this.maskSrc = null;
+		this.geo?.destroy();
+		this.geo = undefined;
+		this.destroyColor();
+		this.empty?.destroy();
+		this.photoTex?.destroy();
+		this.fgTex?.destroy();
+		this.brushTex?.destroy();
+		this.empty = this.photoTex = this.fgTex = this.brushTex = undefined;
+		this.fgDirty = !!this.fgMask;
+		this.brushDirty = true;
+		this.ready = false;
+	}
+
+	private destroyColor() {
+		if (!this.color) return;
+		this.color.colorAttachments[0].texture.destroy();
+		this.color.depthStencilAttachment?.texture.destroy();
+		this.color.destroy();
+		this.color = undefined;
+	}
+
+	/** Uniforms + textures for the composite layer's draw (the look's blocks too, under its defines). */
+	moduleProps(device: Device) {
+		if (!this.ready || !this.geo || !this.color) return null;
+		const { width, height } = this.color;
+		const composite = this.propsFor(
+			device,
+			this.geo,
+			this.color.colorAttachments[0].texture,
+			width,
+			height,
+		);
+		return composite && { composite, ...this.lookProps(device, width, height) };
+	}
+
+	private propsFor(
+		device: Device,
+		geo: GeometryTarget,
+		layerTex: Texture,
+		width: number,
+		height: number,
+	): CompositeModuleProps | null {
+		this.empty ??= device.createTexture({
+			data: new Uint8Array(4),
+			width: 1,
+			height: 1,
+		});
+		if (!this.photoTex && this.photoSrc)
+			this.photoTex = makeTexture(device, this.photoSrc, true);
+		if (this.fgDirty) {
+			this.fgTex?.destroy();
+			this.fgTex = this.fgMask ? maskTexture(device, this.fgMask) : undefined;
+			this.fgDirty = false;
+		}
+		if (this.brushDirty) {
+			if (!this.brushTex)
+				this.brushTex = device.createTexture({
+					width: this.brushCanvas.width,
+					height: this.brushCanvas.height,
+					sampler: {
+						minFilter: "linear",
+						magFilter: "linear",
+						addressModeU: "clamp-to-edge",
+						addressModeV: "clamp-to-edge",
+					},
+				});
+			this.brushTex.copyExternalImage({ image: this.brushCanvas });
+			this.brushDirty = false;
+		}
+		const s = this.settings;
+		const st = this.style;
+		const empty = this.empty;
+		return {
+			depthC0: st.depthRamp.c0,
+			depthC1: st.depthRamp.c1,
+			depthDE: st.depthRamp.de,
+			depthN: st.depthRamp.n,
+			depthRampKind: st.depthRampKind,
+			depthLog: st.depthLog,
+			depthGain: st.depthGain,
+			depthLuma: st.depthLuma,
+			ridgeInner: [...st.ridgeInner, 1],
+			ridgeSky: [...st.ridgeSky, 1],
+			ridgeInnerR: [...st.ridgeInnerR, 1],
+			ridgeThr: st.ridgeThr,
+			ridgeGainO: st.ridgeGainO,
+			ridgeGainR: st.ridgeGainR,
+			hair: st.hair,
+			geoTexel: [1 / geo.width, 1 / geo.height],
+			lens: s.lens,
+			mode: s.mode === "overlay" ? 0 : 1,
+			layerOpacity: s.layerOpacity,
+			ridges: s.ridges,
+			depthTint: s.depthTint,
+			method: METHOD[s.method],
+			swipe: s.swipe,
+			lensR: s.lensR,
+			rangeM: s.rangeKm * 1000,
+			keepSky: s.keepSky ? 1 : 0,
+			feather: s.feather,
+			aspect: width / height,
+			nearFade: s.nearFade,
+			fgOn: s.protectPeople && this.fgTex ? 1 : 0,
+			hasPhoto: this.photoTex ? 1 : 0,
+			photoTex: this.photoTex ?? empty,
+			layerTex,
+			geoTex: geo.texture,
+			brushTex: this.brushTex ?? empty,
+			fgTex: this.fgTex ?? empty,
+			...revealProps(this.reveal),
+		};
+	}
+}
+
+const V0 = [0, 0, 0, 0];
+function revealProps(r: RevealUniforms | null) {
+	if (!r)
+		return {
+			reveal: V0,
+			revealWin: V0,
+			revealQD: V0,
+			revealQE: V0,
+			revealShape: V0,
+			revealFocus: V0,
+			revealGlow: V0,
+			revealF: V0,
+			revealR: V0,
+			revealU: V0,
+		};
+	return {
+		reveal: r.a,
+		revealWin: r.win,
+		revealQD: r.qD,
+		revealQE: r.qE,
+		revealShape: r.shape,
+		revealFocus: r.focus,
+		revealGlow: r.glow,
+		revealF: [...r.F, 0],
+		revealR: [...r.R, 0],
+		revealU: [...r.U, 0],
+	};
+}
+
+function destroyTarget(fbo: Framebuffer) {
+	fbo.colorAttachments[0].texture.destroy();
+	fbo.depthStencilAttachment?.texture.destroy();
+	fbo.destroy();
+}
+
+function sameKey(a: unknown[], b: unknown[]) {
+	return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+type CompositeLayerProps = LayerProps & {
+	compositor: PhotoCompositor;
+	/** Change triggers only: the compositor holds the state. */
+	version: number;
+	settings: CompositeSettings;
+	/** The look's composite defines: a change rebuilds the program. */
+	defines: LookDefine[];
+};
+
+/** Full-screen composite of photo + terrain (see PhotoCompositor). */
+export class PhotoCompositeLayer extends Layer<CompositeLayerProps> {
+	static layerName = "PhotoCompositeLayer";
+	declare state: { model?: Model };
+
+	getShaders() {
+		return super.getShaders(
+			compositeShaders(this.props.defines, [project32, compositeModule]),
+		);
+	}
+
+	initializeState() {
+		this.setState({ model: this.makeModel() });
+	}
+
+	updateState({ props, oldProps }: UpdateParameters<this>) {
+		if (oldProps.defines && props.defines.join() !== oldProps.defines.join()) {
+			this.state.model?.destroy();
+			this.setState({ model: this.makeModel() });
+		}
+	}
+
+	private makeModel() {
+		const geometry = new Geometry({
+			topology: "triangle-list",
+			attributes: {
+				positions: { size: 2, value: new Float32Array([-1, -1, 3, -1, -1, 3]) },
+			},
+		});
+		return new Model(this.context.device, {
+			...this.getShaders(),
+			id: this.props.id,
+			geometry,
+			bufferLayout: [],
+		});
+	}
+
+	finalizeState(context: Parameters<Layer["finalizeState"]>[0]) {
+		super.finalizeState(context);
+		this.state.model?.destroy();
+	}
+
+	draw() {
+		const { model } = this.state;
+		const props = this.props.compositor.moduleProps(this.context.device);
+		if (!model || !props) return;
+		model.shaderInputs.setProps(props);
+		model.draw(this.context.renderPass);
+	}
+}

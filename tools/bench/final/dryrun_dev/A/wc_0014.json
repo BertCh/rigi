@@ -1,0 +1,300 @@
+{
+ "id": "wc_0014",
+ "arm": "A",
+ "codeStamp": {
+  "sha1": "a63228f452fdbb75",
+  "env": {
+   "MATCHER_LG_DEVICE": "cpu",
+   "MATCHER_SWEEP_KP": null,
+   "MATCHER_BASIN_GAP_MIN": null,
+   "STAGE1_LG_PRUNE": null,
+   "FINAL_WALL_S": "600",
+   "FINAL_C_LG": null
+  },
+  "files": {
+   "tools/bench/final/final.py": "8ea3146981d4",
+   "tools/bench/final/run_arm.sh": "4c1a3ff4df31",
+   "tools/matcher/match.py": "67256a62346e",
+   "tools/matcher/common.py": "d205e29f8266",
+   "tools/matcher/fusion.py": "b6f93654b649",
+   "tools/matcher/stage1/pipeline.py": "7474496c42d8",
+   "tools/matcher/stage1/s1.py": "a29a49a80429",
+   "tools/matcher/stage1/skyglobal.py": "87b64a3397c8",
+   "tools/matcher/pose6.py": "f31f601f1fc0",
+   "tools/matcher/dem.py": "a2447923ae67",
+   "tools/matcher/stage1/vendor/SNAPSHOT.sha1": "ee687f7c29cb",
+   "tools/matcher/stage1/vendor/app_snapshot.py": "91c49d769bc7",
+   "tools/matcher/stage1/vendor/core.py": "85a25a43377b",
+   "tools/matcher/stage1/vendor/fuse.py": "e3c8f8413ec3",
+   "tools/matcher/stage1/vendor/worker.mjs": "f74ce8656271"
+  }
+ },
+ "wallSec": 65.2,
+ "wallCapSec": 600,
+ "timeout": false,
+ "exitCode": 0,
+ "status": "ok",
+ "failureClass": null,
+ "pose": {
+  "yaw": 178.77931868637648,
+  "pitch": -0.14945940747193495,
+  "roll": -0.22845518555575411,
+  "vfov": 8.96462293405925
+ },
+ "eye": {
+  "lat": 46.40315,
+  "lon": 9.64424,
+  "h": 2394.018425736481
+ },
+ "eyeEnu": [
+  0,
+  0,
+  2394.018425736481
+ ],
+ "confidenceLevel": "HIGH",
+ "confidenceLevelApriori": "HIGH",
+ "checks": {
+  "cueAgreeDeg": 0.274,
+  "skylineMedPx": 2.7,
+  "matchSupport": 0.672
+ },
+ "basinGap": 0.8899688639554313,
+ "basinGapMin": 0.2,
+ "source": "narrow",
+ "stage1Seed": "narrow",
+ "stage1": {
+  "sweep40Inliers": null,
+  "narrow": true,
+  "focalKnown": true,
+  "hfov0": 12.346964067441101
+ },
+ "timingMs": {
+  "sky": 8682,
+  "sweep40": 0,
+  "appseeds": 35135,
+  "sweepfine": 0,
+  "verify": 20165,
+  "total": 63994
+ },
+ "t6CodeStamp": "c2d406ea3c557e6e",
+ "raw": {
+  "id": "wc_0014",
+  "focalKnown": true,
+  "vfov0": 9.275912473374119,
+  "hfov0": 12.346964067441101,
+  "narrow": {
+   "seeds": [
+    {
+     "yaw": 180.0,
+     "pitch": 0.0,
+     "roll": 0.0,
+     "source": "yaw-hint"
+    },
+    {
+     "yaw": 296.1,
+     "pitch": 6.1,
+     "roll": 0.6250000000000002,
+     "source": "app-skyline"
+    },
+    {
+     "yaw": 0.3,
+     "pitch": 6.675000000000001,
+     "roll": -1.85,
+     "source": "app-skyline"
+    },
+    {
+     "yaw": 118.83749999999999,
+     "pitch": 1.1,
+     "roll": -1.75,
+     "source": "app-skyline"
+    }
+   ],
+   "tried": [
+    {
+     "seed": {
+      "yaw": 180.0,
+      "pitch": 0.0,
+      "roll": 0.0,
+      "source": "yaw-hint"
+     },
+     "pose": {
+      "yaw": 178.73816715767234,
+      "pitch": -0.11862833711215949,
+      "roll": -0.08637409199349605,
+      "vfov": 9.275912473374119
+     },
+     "inliers": 285
+    },
+    {
+     "seed": {
+      "yaw": 296.1,
+      "pitch": 6.1,
+      "roll": 0.6250000000000002,
+      "source": "app-skyline"
+     },
+     "pose": null,
+     "inliers": 0
+    },
+    {
+     "seed": {
+      "yaw": 0.3,
+      "pitch": 6.675000000000001,
+      "roll": -1.85,
+      "source": "app-skyline"
+     },
+     "pose": null,
+     "inliers": 0
+    },
+    {
+     "seed": {
+      "yaw": 118.83749999999999,
+      "pitch": 1.1,
+      "roll": -1.75,
+      "source": "app-skyline"
+     },
+     "pose": null,
+     "inliers": 0
+    }
+   ],
+   "used": "yaw-hint"
+  },
+  "positionSource": "manual",
+  "lat": 46.40315,
+  "lon": 9.64424,
+  "stage": "basinGap[0]",
+  "codeStamp": {
+   "sha1": "c2d406ea3c557e6e",
+   "env": {
+    "MATCHER_LG_DEVICE": "cpu",
+    "SWEEP_KP": 4096,
+    "STAGE1_LG_PRUNE": "0",
+    "SERVICE_SNAPSHOT": "bef98c970614"
+   },
+   "files": [
+    "pipeline.py",
+    "s1.py",
+    "skyglobal.py",
+    "app_snapshot.py",
+    "core.py",
+    "fuse.py",
+    "worker.mjs"
+   ]
+  },
+  "eye": [
+   0,
+   0,
+   2394.018425736481
+  ],
+  "horizonDirs": 8192,
+  "sky": {
+   "gridMs": 0,
+   "refineMs": 0,
+   "grid": null
+  },
+  "baselineSeed": "narrow",
+  "nCandidates": 1,
+  "candidates": [
+   {
+    "pose": {
+     "yaw": 178.73816715767234,
+     "pitch": -0.11862833711215949,
+     "roll": -0.08637409199349605,
+     "vfov": 9.275912473374119
+    },
+    "inliers": 285,
+    "source": "narrow",
+    "alsoFrom": [
+     "appseeds"
+    ],
+    "fused": {
+     "pose": {
+      "yaw": 178.77931868637648,
+      "pitch": -0.14945940747193495,
+      "roll": -0.22845518555575411,
+      "vfov": 8.96462293405925
+     },
+     "level": "high",
+     "method": "fused",
+     "checks": {
+      "cueAgreeDeg": 0.274,
+      "skylineMedPx": 2.7,
+      "matchSupport": 0.672
+     },
+     "fusionScore": 0.387,
+     "inliers": 2127,
+     "inlierFrac": 0.6718,
+     "nLifted": 3166,
+     "fusedFrom": "match",
+     "cues": {
+      "skyline": {
+       "pose": {
+        "yaw": 178.8006671576723,
+        "pitch": -0.2061283371121595,
+        "roll": -0.28637409199349606,
+        "vfov": 9.078799333314917
+       },
+       "residualPx": 2.431,
+       "appConfidence": 1.0,
+       "accepted": "confident"
+      },
+      "match": {
+       "pose": {
+        "yaw": 178.78312525689563,
+        "pitch": -0.14123717096192007,
+        "roll": -0.020209244875479353,
+        "vfov": 8.98015456450199
+       },
+       "inliers": 875,
+       "residualPx": 3.944
+      }
+     },
+     "eye": [
+      0,
+      0,
+      2394.018425736481
+     ],
+     "skyScore": 1.0757207573784722,
+     "sweepSup": null,
+     "basinGap": {
+      "gap": 0.8899688639554313,
+      "ms": 10934,
+      "regime": "manual"
+     }
+    },
+    "ms": 20164
+   }
+  ],
+  "hmrReopens": 0,
+  "matchRetries": [],
+  "timingMs": {
+   "sky": 8682,
+   "sweep40": 0,
+   "appseeds": 35135,
+   "sweepfine": 0,
+   "verify": 20165,
+   "total": 63994
+  },
+  "attempt": 1
+ },
+ "ruleSha1": {
+  "service": "v0.3.4 a-priori + basin gap \u2265 MATCHER_BASIN_GAP_MIN"
+ },
+ "cascadeAgreementInputs": {
+  "pose": {
+   "yaw": 178.77931868637648,
+   "pitch": -0.14945940747193495,
+   "roll": -0.22845518555575411,
+   "vfov": 8.96462293405925
+  },
+  "eyeH": 2394.018425736481,
+  "positionSource": "manual",
+  "exif": false,
+  "tolerance": {
+   "yawPitchDeg": 0.5,
+   "eyeM": 2.0,
+   "cascadeGate": "accepted \u2227 confidence \u2265 0.75 (acc75)"
+  }
+ },
+ "history": [],
+ "finishedAt": "2026-09-26T05:01:30"
+}

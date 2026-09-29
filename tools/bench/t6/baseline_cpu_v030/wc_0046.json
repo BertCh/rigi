@@ -1,0 +1,218 @@
+{
+ "ok": true,
+ "nLifted": 117,
+ "perView": [
+  {
+   "tag": "y-20",
+   "matches": 91,
+   "lifted": 24,
+   "keypoints": 3976,
+   "terrainFrac": 0.628,
+   "rgbStd": 33.3
+  },
+  {
+   "tag": "y-10",
+   "matches": 77,
+   "lifted": 16,
+   "keypoints": 4096,
+   "terrainFrac": 0.584,
+   "rgbStd": 31.6
+  },
+  {
+   "tag": "y+0",
+   "matches": 146,
+   "lifted": 31,
+   "keypoints": 4096,
+   "terrainFrac": 0.579,
+   "rgbStd": 29.8
+  },
+  {
+   "tag": "y+10",
+   "matches": 146,
+   "lifted": 27,
+   "keypoints": 4096,
+   "terrainFrac": 0.58,
+   "rgbStd": 27.7
+  },
+  {
+   "tag": "y+20",
+   "matches": 90,
+   "lifted": 19,
+   "keypoints": 4096,
+   "terrainFrac": 0.576,
+   "rgbStd": 26.8
+  }
+ ],
+ "inliers": 96,
+ "inlierFrac": 0.8205,
+ "residualPx": 2.975,
+ "coverage": 0.417,
+ "pose": {
+  "yaw": 177.80893409551436,
+  "pitch": -2.8378208329763472,
+  "roll": 1.5036149526645772,
+  "vfov": 32.967717538552655
+ },
+ "method": "fused",
+ "confidence": 0.2,
+ "confidenceLevel": "low",
+ "confidenceChecks": {
+  "cueAgreeDeg": 7.912,
+  "skylineMedPx": 2.864,
+  "matchSupport": 0.821
+ },
+ "cues": {
+  "skyline": {
+   "pose": {
+    "yaw": 170.64999999999998,
+    "pitch": 0.17500000000000002,
+    "roll": 0.30000000000000004,
+    "vfov": 34.809967594418296
+   },
+   "residualPx": 4.628,
+   "appConfidence": 0.74,
+   "accepted": "confident"
+  },
+  "match": {
+   "pose": {
+    "yaw": 177.80079836581828,
+    "pitch": -2.8621201422378704,
+    "roll": 1.6426163161970615,
+    "vfov": 32.97757598058957
+   },
+   "inliers": 65,
+   "residualPx": 3.628
+  }
+ },
+ "fusionScore": 0.0,
+ "matchConfidence": 0.505,
+ "fusedFrom": "match",
+ "deltaYawFromPrior": 8.021,
+ "focalPx": 1154.08,
+ "size": {
+  "W": 1024,
+  "H": 683
+ },
+ "timingMs": {
+  "stage1": 101257,
+  "render": 10736,
+  "loadMs": 0,
+  "fullTerrainMs": 0,
+  "imageryMs": 1,
+  "skylineMs": 161,
+  "renderMs": 820,
+  "warmPage": true,
+  "draped": false,
+  "imageryRetries": 0,
+  "imageryMissing": 0,
+  "imageryTiles": 221,
+  "match": 6030,
+  "solve": 72,
+  "fusion": 3619,
+  "total": 112251
+ },
+ "eye": [
+  0,
+  0,
+  1454.5107396474937
+ ],
+ "adhoc": {
+  "id": "adhoc-c245a0a6c3d4",
+  "size": {
+   "W": 2048,
+   "H": 1365
+  },
+  "yawKnown": false,
+  "gravityKnown": false,
+  "focalKnown": false,
+  "priorUsed": {
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "roll": 0.0,
+   "vfov": 34.53005830924895
+  },
+  "yaw360": true,
+  "twoStage": true,
+  "defaultHfov": 50.0,
+  "hfov": 50.0,
+  "narrow": false,
+  "stage2Prior": {
+   "yaw": 169.78749999999997,
+   "pitch": 0.15000000000000002,
+   "roll": 0,
+   "vfov": 34.465314449919106
+  },
+  "stages": [
+   {
+    "stage": "match-sweep",
+    "offsets": [
+     0,
+     40,
+     80,
+     120,
+     160,
+     200,
+     240,
+     280,
+     320
+    ],
+    "pose": {
+     "yaw": 177.6425327369823,
+     "pitch": -2.80039587245522,
+     "roll": 1.758341618758964,
+     "vfov": 32.398051429839455
+    },
+    "inliers": 15,
+    "inlierFrac": 0.3659,
+    "residualPx": 2.714,
+    "used": false,
+    "ms": 97811,
+    "renderTiming": {
+     "loadMs": 87907,
+     "fullTerrainMs": 158,
+     "imageryMs": 1663,
+     "skylineMs": 0,
+     "renderMs": 1332,
+     "warmPage": false,
+     "draped": true,
+     "imageryRetries": 0,
+     "imageryMissing": 0,
+     "imageryTiles": 221
+    }
+   },
+   {
+    "stage": "skyline-seeds",
+    "seeds": 27,
+    "pose": {
+     "yaw": 169.78749999999997,
+     "pitch": 0.15000000000000002,
+     "roll": 0,
+     "vfov": 34.465314449919106
+    },
+    "score": 0.6703118718434069,
+    "used": true,
+    "ms": 3446
+   }
+  ]
+ },
+ "version": "matcher-service/0.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16+lightglue on sat renders, LightGlue flash off on MPS; basin-gap LOW trigger for untrusted positions)",
+ "id": "wc_0046",
+ "request": {
+  "photoPath": "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/photos/wc_0046.jpg",
+  "meta": {
+   "lat": 47.040085,
+   "lon": 8.478834,
+   "altitudeM": 1453.9,
+   "positionSource": "exif-gps"
+  },
+  "prior": {
+   "yaw": null,
+   "pitch": null,
+   "roll": null
+  },
+  "region": null,
+  "timeoutMs": 600000,
+  "yawHint": 178.8
+ },
+ "wallMs": 112254
+}

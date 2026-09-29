@@ -1,0 +1,110 @@
+{
+ "verifier": 3,
+ "candidates": {
+  "t14c08a": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction"
+   ],
+   "note": "Line cuts across sky from top; misses left peaks and main summit profile entirely."
+  },
+  "t262894": {
+   "verdict": "correct",
+   "tags": [
+    "fog-haze"
+   ],
+   "note": "Line hugs full skyline incl. pinnacle and far valley ridge; no offset or roll."
+  },
+  "t29aab3": {
+   "verdict": "correct",
+   "tags": [
+    "low-light"
+   ],
+   "note": "Line tracks full distant skyline, summits and notches aligned, no visible offset."
+  },
+  "t3c3ef5": {
+   "verdict": "correct",
+   "tags": [
+    "cloud"
+   ],
+   "note": "Visible ridge from summit to right shoulder and notch matches tightly; left part in cloud."
+  },
+  "t411a6a": {
+   "verdict": "wrong",
+   "tags": [
+    "roll",
+    "wrong-direction"
+   ],
+   "note": "Smooth tilted line crosses the peaks; no match to jagged skyline, roll ~7 deg."
+  },
+  "t47aaa9": {
+   "verdict": "correct",
+   "tags": [
+    "fog-haze"
+   ],
+   "note": "Line traces Mont Blanc massif and Chablais ridge; minor local deviations under 1.5%."
+  },
+  "t9966aa": {
+   "verdict": "correct",
+   "tags": [
+    "fog-haze"
+   ],
+   "note": "Same pose as t47aaa9; line traces Mont Blanc massif and Chablais ridge closely."
+  },
+  "t4ca235": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line follows entire distant skyline, peaks aligned, no offset or tilt."
+  },
+  "t4f666e": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line follows Generoso ridge and summits within ~1%; shapes aligned, no tilt."
+  },
+  "t59cf93": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line tracks jagged distant skyline and near right ridge; Rheinwaldhorn peak aligned."
+  },
+  "t716a52": {
+   "verdict": "wrong",
+   "tags": [
+    "near-miss",
+    "fov-scale",
+    "pitch-offset"
+   ],
+   "note": "Line ~3% above Stanserhorn and right ridges, profile too broad; left end roughly fits."
+  },
+  "t8ad13b": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction"
+   ],
+   "note": "Line crosses skyline, misses main right massif, rises into sky at right; shapes don't match."
+  },
+  "tb34441": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction"
+   ],
+   "note": "Line cuts across peak face; summit shape and left slope not matched."
+  },
+  "tc0f511": {
+   "verdict": "correct",
+   "tags": [
+    "cloud"
+   ],
+   "note": "Left cliff, right ridge and Rothorn notch aligned; distant peaks partly clouded but consistent."
+  },
+  "tcad848": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line hugs full peak outline incl. summit, plateau step and both slopes; negligible offset."
+  },
+  "tf79b57": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Eiger, Moench, Jungfrau and Wetterhorn summits match exactly; full skyline traced."
+  }
+ }
+}

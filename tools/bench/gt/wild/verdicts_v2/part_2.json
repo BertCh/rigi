@@ -1,0 +1,647 @@
+{
+ "verifier": 2,
+ "photos": {
+  "wc_0003": {
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line runs across mid-ground hills/trees, far below Alpine skyline."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Smooth line near Alps but doesn't follow Mont Blanc profile; lowland labels on Alps."
+    }
+   }
+  },
+  "wc_0011": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "other"
+     ],
+     "note": "Follows right plateau partly but bridges notch, rises into clear sky left of left summit."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "note": "Line crosses rock face well below summits."
+    }
+   }
+  },
+  "wc_0014": {
+   "photoTags": [
+    "cloud",
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Huge roll; line cuts across faces vertically."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Notch, Zocca peaks and Ferro ridge align closely; summits partly in cloud."
+    }
+   }
+  },
+  "wc_0015": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain",
+    "featureless-skyline"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset"
+     ],
+     "note": "Line floats in sky above everything, no correspondence."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "near-field-terrain"
+     ],
+     "note": "Steep tilted line crossing slopes; no match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Alpine line drawn in sky over sea of fog; nothing there."
+    }
+   }
+  },
+  "wc_0017": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "note": "Line floats in empty sky well above peaks."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Dom, Matterhorn, Weisshorn profiles align within a few pixels."
+    }
+   }
+  },
+  "wc_0021": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "note": "No yellow skyline visible in frame at all."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Hahnen summit block and both flanks traced; small gap at far-left edge only."
+    }
+   }
+  },
+  "wc_0030": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Smooth line slices across Bishorn and Weisshorn faces; no shape match."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "fov-scale"
+     ],
+     "note": "Weisshorn apex and right ridge match; left massif line ~5% above real skyline."
+    }
+   }
+  },
+  "wc_0032": {
+   "photoTags": [
+    "fog-haze",
+    "low-light"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "unsure",
+     "tags": [
+      "featureless-skyline",
+      "fov-scale"
+     ],
+     "note": "Line hugs distant Alps skyline; dense serrations make summit-level alignment uncertain."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "note": "Line lies in sea of fog far below Alpine skyline."
+    },
+    "C": {
+     "verdict": "unsure",
+     "tags": [
+      "featureless-skyline",
+      "fov-scale"
+     ],
+     "note": "Line on skyline height; some prominent central peaks poke above, match unclear."
+    }
+   }
+  },
+  "wc_0033": {
+   "photoTags": [
+    "foreground-occlusion",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "note": "Line tracks nearby slope then crosses lake; misses Rigi skyline entirely."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "note": "Same as A: cuts across lake below Rigi; distant skyline absent."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "note": "Line floats in empty sky."
+    }
+   }
+  },
+  "wc_0035": {
+   "photoTags": [
+    "fog-haze",
+    "featureless-skyline"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "near-field-terrain"
+     ],
+     "note": "Line drawn above near hill in hazy sky; Alps labels where only fog horizon exists."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "featureless-skyline",
+      "fog-haze"
+     ],
+     "note": "Flat line near faint haze horizon; spurious vertical spike right; nothing to verify shape."
+    }
+   }
+  },
+  "wc_0039": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "note": "Line in blue sky/cloud far above visible summits."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "note": "Strong roll; line cuts across face and cloud, not matching summit ridge."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "note": "Line far above ridge, through clear sky on right."
+    }
+   }
+  },
+  "wc_0043": {
+   "photoTags": [
+    "fog-haze",
+    "low-light"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset"
+     ],
+     "note": "Line mostly above frame top/header; only far right touches ridge."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "near-miss"
+     ],
+     "note": "Line largely in header above real ridge; right descent ~6% above cliff edge."
+    }
+   }
+  },
+  "wc_0048": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "pitch-offset"
+     ],
+     "note": "Tilted line floats in sky/cloud above ridges."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Hirsihorn, Bishorn, Weisshorn, Diablons all traced precisely."
+    }
+   }
+  },
+  "wc_0049": {
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "pitch-offset"
+     ],
+     "note": "Tilted line across snow slopes well below summit skyline."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "pitch-offset"
+     ],
+     "note": "Flanks roughly fit but summit pyramid rises ~7% above line."
+    }
+   }
+  },
+  "wc_0052": {
+   "photoTags": [
+    "fog-haze",
+    "low-light",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "fov-scale",
+      "parallax-mismatch"
+     ],
+     "note": "Left slope and valley notch fit; right cliffs far above line."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Tilted line crosses left slope and sky; no match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "fov-scale"
+     ],
+     "note": "Left slope and notch fit well; right side line below cliff top by several %."
+    }
+   }
+  },
+  "wc_0058": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "pitch-offset"
+     ],
+     "note": "Tilted jagged line high in cloud, far from visible wall top."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "cloud"
+     ],
+     "note": "Line hugs cloud-hidden wall top; left portion floats high; unverifiable."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "cloud",
+      "other"
+     ],
+     "note": "Left ridge rocks rise above line at left; rest in cloud; misfit."
+    }
+   }
+  },
+  "wc_0060": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "pitch-offset"
+     ],
+     "note": "Tilted arc cuts across glaciers and faces."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Aletschhorn, Fiescherhorn, Finsteraarhorn skyline matched closely across frame."
+    }
+   }
+  },
+  "wc_0061": {
+   "photoTags": [
+    "low-light",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Bumpy alpine line over flat sunset horizon; misses right peak silhouette."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Same as A; peaks where horizon is flat, below right peak."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line crosses lake and dark slopes, far below horizon."
+    }
+   }
+  },
+  "wc_0066": {
+   "photoTags": [
+    "cloud",
+    "low-light"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line only in dark cloud top-left; skyline not traced."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "wrong-direction"
+     ],
+     "note": "Line runs down near ski slope and snowfield, not Dents du Midi skyline."
+    }
+   }
+  },
+  "wc_0067": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Säntis antenna, Schafberg peak, left crags and dips align; tree occludes middle."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "pitch-offset"
+     ],
+     "note": "Tilted smooth line crosses mountain faces."
+    }
+   }
+  },
+  "wc_0070": {
+   "photoTags": [
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "parallax-mismatch"
+     ],
+     "note": "Shape similar but line ~7% below main summit, above right block."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "note": "Strongly tilted line on left slope only; no match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "parallax-mismatch",
+      "near-field-terrain"
+     ],
+     "note": "Main peak and right block fit; left quarter line floats up to 10% above slope."
+    }
+   }
+  },
+  "wc_0088": {
+   "photoTags": [
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Titlis, Spannort towers, dips all line up; slight upward bias ~1%, within tolerance."
+    }
+   }
+  },
+  "wc_0089": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "pitch-offset"
+     ],
+     "note": "Tilted line crosses forested mountain face; no match."
+    },
+    "B": {
+     "verdict": "unsure",
+     "tags": [
+      "cloud",
+      "parallax-mismatch"
+     ],
+     "note": "Summit in cloud; line up to ~4% above lower left flank; can't confirm shape."
+    }
+   }
+  },
+  "wc_0092": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "yaw-shift",
+      "roll"
+     ],
+     "note": "Line runs across faces left, into sky right; summits misaligned."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Every pointed summit and notch traced precisely across full width."
+    }
+   }
+  },
+  "wc_0095": {
+   "photoTags": [
+    "near-field-terrain",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line in clouds far above the Alpine skyline."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Steep diagonal line crossing sky, mountains and meadow."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line across meadow/near ridge, far below Alpine skyline."
+    }
+   }
+  },
+  "wc_0099": {
+   "photoTags": [
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "yaw-shift",
+      "fov-scale"
+     ],
+     "note": "Line floats above left mountain and cuts peaks; shape mismatched."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Rigi flank, Vitznauerstock pyramid, distant Alps and Niederbauen all traced."
+    }
+   }
+  }
+ }
+}

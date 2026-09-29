@@ -1,0 +1,650 @@
+{
+ "verifier": 4,
+ "photos": {
+  "wc_0006": {
+   "photoTags": [
+    "near-field-terrain",
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "pitch-offset"
+     ],
+     "note": "Line cuts across near peak face well below summit; left ridge line ~9% too low."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-field-terrain",
+      "roll"
+     ],
+     "note": "Near summit missed by ~13% height; left ridge offset; right side too low."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll",
+      "near-field-terrain"
+     ],
+     "note": "Line far below real skyline everywhere."
+    }
+   }
+  },
+  "wc_0009": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line runs across the dark foreground peak face; unrelated skyline."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Distant Matterhorn and Weisshorn peaks match; line follows distant skyline across width."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line in sky/clouds, does not follow either skyline."
+    }
+   }
+  },
+  "wc_0012": {
+   "photoTags": [
+    "low-light"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line only in top-left sky corner."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch"
+     ],
+     "note": "Saentis and right ridge fit; left peaks (Schibenstoll block, left edge) off by 5-12%."
+    }
+   }
+  },
+  "wc_0016": {
+   "photoTags": [
+    "fog-haze",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Main peak, dips, distant peak and right slope align; small sharp horn slightly undershot."
+    }
+   }
+  },
+  "wc_0018": {
+   "photoTags": [
+    "foreground-occlusion",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Follows right-hand massif ridge, slope, and distant snow peaks closely."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Straight line through sky, unrelated to skyline."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "note": "Similar shape but shifted: above the left slope, right peaks poke above line."
+    }
+   }
+  },
+  "wc_0019": {
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "pitch-offset"
+     ],
+     "note": "Shape roughly right but ~4% low; misses summit and sharp right peak."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "other"
+     ],
+     "note": "No skyline line drawn in frame."
+    }
+   }
+  },
+  "wc_0029": {
+   "photoTags": [
+    "cloud",
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Flat line through mid-slope forest; distinctive peaks not traced."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line along foreground/fog, far below the mountains."
+    }
+   }
+  },
+  "wc_0031": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line mostly in sky above header; right fragment off real peaks."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Same as A: line in sky, not on skyline."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line arcs through sky, unrelated."
+    }
+   }
+  },
+  "wc_0036": {
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line across valley floor, far below skyline."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Stanserhorn-like peak, dip and right range align within ~1.5%."
+    }
+   }
+  },
+  "wc_0038": {
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "fog-haze",
+      "other"
+     ],
+     "note": "Smooth line crosses hazy skyline; peaks not traced; labels point to plains."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll"
+     ],
+     "note": "Steeply tilted line, ~29 deg roll."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "fog-haze",
+      "other"
+     ],
+     "note": "Smooth line well below main distant peak; shape does not match."
+    }
+   }
+  },
+  "wc_0040": {
+   "photoTags": [
+    "foreground-occlusion",
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Diagonal line across the snowy peak face."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Flat line through the peak; misses summit."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Flat line through the peak; misses summit."
+    }
+   }
+  },
+  "wc_0044": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line cuts diagonally across the Moench face; no match."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line crosses the massif below summit; shape unrelated."
+    },
+    "C": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Traces Eiger flank, Moench summit and right ridge closely."
+    }
+   }
+  },
+  "wc_0053": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Summit roughly right but flank misfit and right half runs into sky."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line above massif in sky; heavy roll."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch"
+     ],
+     "note": "Left and summit fit; right third rises into sky while real ridge descends."
+    }
+   }
+  },
+  "wc_0054": {
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Main peak, distant ridges and right slopes align closely."
+    }
+   }
+  },
+  "wc_0055": {
+   "photoTags": [
+    "near-field-terrain",
+    "foreground-occlusion",
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Follows near forested ridge and cliff; right end in cloud/roof unverifiable."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "note": "Same shape but ~2.5% above the forested slope."
+    }
+   }
+  },
+  "wc_0056": {
+   "photoTags": [
+    "cloud",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Misses dominant pyramid peak; line crosses rock faces."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Smooth arc below peaks; no feature match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Smooth arc through the mountain; pyramid not traced."
+    }
+   }
+  },
+  "wc_0071": {
+   "photoTags": [
+    "near-field-terrain",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line in sky over left, crosses right slope face; ~12 deg roll."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line mostly off top of frame, in sky."
+    },
+    "C": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Left ridge, distant peak, valley gap and right near slope all traced."
+    }
+   }
+  },
+  "wc_0073": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line cuts through distant range and near peak; tilted, no feature match."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line floats in sky above distant Alps."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line floats in sky above distant Alps."
+    }
+   }
+  },
+  "wc_0076": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Right massif summits and forest ridge match; far left hidden by cloud."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Nearly identical to A; right massif and forested ridge fit."
+    }
+   }
+  },
+  "wc_0078": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Eiger, Moench, Jungfrau summits and saddles align closely."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "roll"
+     ],
+     "note": "Line crosses faces below summits; unrelated shape."
+    }
+   }
+  },
+  "wc_0086": {
+   "photoTags": [
+    "foreground-occlusion",
+    "water-reflection",
+    "fog-haze"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line across lake and viewpoint, far below skyline at top of frame."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Tilted line across lake and slopes; ~17 deg roll."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line across lake level, far below real skyline."
+    }
+   }
+  },
+  "wc_0090": {
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Long flank, notch and distant right peaks align closely."
+    }
+   }
+  },
+  "wc_0091": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "pitch-offset"
+     ],
+     "note": "Right side ok but line ~5% below main summit, above left ridge."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Smooth arc cutting through peak and forest; no match."
+    },
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "pitch-offset"
+     ],
+     "note": "Same as A: main summit well above line."
+    }
+   }
+  },
+  "wc_0096": {
+   "photoTags": [
+    "low-light",
+    "fog-haze",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "near-miss",
+      "yaw-shift"
+     ],
+     "note": "Left range fits, but pyramid peak offset left ~3.5% width; right end rises into sky."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Smooth arc high in sky; unrelated."
+    }
+   }
+  },
+  "wc_0097": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Line crosses slopes; right ridge not traced; heavy roll."
+    },
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Left cliff, ridge and right Rothorn ridge align; distant peaks partly cloud."
+    }
+   }
+  },
+  "wc_0098": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line cuts through the sharp peak and massif; shape differs."
+    },
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Steep diagonal line, ~31 deg roll."
+    }
+   }
+  }
+ }
+}

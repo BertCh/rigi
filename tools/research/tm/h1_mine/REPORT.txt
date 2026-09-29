@@ -1,0 +1,152 @@
+H1 — hard-negative mining on DEV (TM program)                      2026-09-28/29, DEV ids only
+=====================================================================================================
+
+WHAT THIS IS
+  A pool of candidate poses drawn from the production path T6+LoMa (plus a harvest of older records). Each
+  candidate carries a common support measure (LoMa-B single-view inliers at its own render) and its native support
+  numbers. There is also a blind verification pack for the main session. This session judged no candidate: no
+  overlay was opened and no verdict was assigned by eye. The only labels come from mechanical rules fixed in
+  PROTOCOL.txt before any generation (frozen 2026-09-28T17:51:23Z, amendment folded in before freezing):
+  inheritance from existing blind verdicts, and wrong-by-construction.
+
+HEADLINE COUNTS (kept = common >= 100 OR native T6 fused >= 100)
+  628 merged candidates (from 1,949 raw scored poses); 421 were pre-screened in and scored for common support.
+  166 kept:
+    - 95 blind-to-verify, all in the pack, across 27 photos
+    - 10 wrong-by-construction (5 also packed as a label-noise check)
+    - 36 inherited: 8 wrong, 28 correct
+    - 25 capped: beyond 6 per photo after the 3-deg yaw NMS; not packed
+  Hard-negative split the main session asked for:
+    - blind-to-verify 95 (unknown truth)
+    - wrong-by-construction 10
+    - inherited-wrong 8. This is the old hard set re-found: wc_0001, 0002, 0006, 0028, 0069, 0070, 0074, 0086.
+  Structure of the 95 blind candidates:
+    - 76 sit at a moved eye (2–450 m from the stated eye: 30 at <150 m, 27 at 150–300 m, 19 at 300–450 m).
+    - 19 sit at the stated eye.
+    - 11 of the 95 are within 3 deg of a correct ref at the same eye, i.e. near-miss/refinement variants.
+    - 27 of the 95 also have native T6 fused support >= 100.
+  Whether this reaches the 30+ hard wrongs the veto work needs is decided by the verifiers, not here. If most
+  moved-eye candidates in photos that already have a correct stated-eye ref come back wrong, it will; they are the
+  most likely source.
+
+PER SOURCE (clusters containing the source: all / kept / blind / construct / inherited-wrong / inherited-correct / capped)
+  S0 harvest (v2 ALIKED T6 + moved eyes, X3 ring/ref solves, v2 eyeprobe)  328 / 89 / 34 / 8 / 8 / 28 / 11
+  S1 T6+LoMa stated eye (out/dev_loma, all candidates) 204 / 47 / 8 / 4 / 6 / 26 / 3
+  S2 X1 feature top-2 -> T6+LoMa stage 2                88 / 35 / 6 / 1 / 3 / 22 / 3
+  S5 masked-basin rerun (+-10 deg of correct refs)      89 / 20 / 2 / 3 / 0 / 14 / 1
+  S3 eye search (LoMa probe + full T6+LoMa at top eye) 223 / 78 / 66 / 0 / 1 / 1 / 10
+  S4 displaced-eye pilot                               NOT RUN (cut by the budget rule, see RUNTIME)
+  Kept clusters reachable ONLY from the new runs: 68 S3-only, 4 S2-only. S5 and S1 add almost nothing new at the
+  stated eye beyond S0 (clusters merge across sources; one cluster counts for every source it contains).
+
+S5 (masked-basin rerun) — the amendment's question
+  - Scope: 30 photos with a verified-correct ref at the stated eye. Stage-1 candidates within +-10 deg yaw of every
+    such ref were dropped before dedupe.
+  - 97 fused candidates -> 20 kept clusters.
+  - 17 of the 20 clear 100 common inliers; all 20 clear 100 native fused inliers.
+  - Status of the 20: 14 inherited-CORRECT, 3 wrong-by-construction, 2 blind, 1 capped.
+  - Negative result: masking the stage-1 seeds does not keep T6+LoMa out of the correct basin. Stage 2's 5-view fan
+    (+-20 deg, or +-hfov/2) plus the fused solve pulls seeds 10–30 deg away back onto the true pose.
+  - So S5 yields only 3 production-distribution wrong-by-construction negatives plus 2 unknowns. Masking at stage 2
+    (the fused pose) would be needed to force wrong basins; that is not what production does.
+
+WRONG-BY-CONSTRUCTION (amendment rule 1)
+  - 10 candidates in 4 photos: wc_0002 (2), wc_0006 (4), wc_0028 (3), wc_0067 (1).
+  - Common support: median 132, range 42–278. 8 have common >= 100 and 5 have native fused >= 100.
+  - 5 of them (seeded 20%, min 5) are in the pack as a noise check.
+  - Caveat: wc_0006's refs have a focal-driven multi-basin structure (X3 caveat). wc_0002 and wc_0028 have refs that
+    no matcher reproduces (X3). These photos were already known to be odd.
+
+COMMON SUPPORT DISTRIBUTION (LoMa-B single view, residual < 6 px under the candidate pose)
+  - All 421 scored: median 28, p75 180, p90 407, max 1883. >= 100: 151; >= 300: 53; >= 1000: 10.
+  - By status:
+      blind 95: median 201 (69–1104)
+      construct 10: median 132
+      inherited-correct 28: median 782
+      inherited-wrong 8: 175, 197, 213, 227, 317, 473, 667, 759
+      capped 25: median 122
+  - Blind candidates with common < 100 are kept on native fused >= 100 (15 kept clusters are native-only).
+  - Achieved render eye vs candidate eye: 0 flagged (> 0.5 m).
+
+CORRESPONDENCES (corr/<pid>/, 14 MB)
+  - <cid>__single.npz: the common-support LoMa matches for every scored cluster (421). Arrays x2d, lifted xyz X,
+    residual, eye, pose, W, H, focalKnown.
+  - <tag>__fused.npz: the 5-view stage-2 set T6 used, captured live for every S1(wc_0023)/S2/S5/S3 verification.
+    Arrays x2d, X, W, H, eye, prior, per-view lifted counts; meta holds the per-view detail, the fused pose and the
+    inliers.
+  - <cid>_replay__fused.npz: 23 kept S0/S1 clusters had no captured set, so it was replayed with pipeline.stage2
+    at the recorded prior and the native matcher. 23/23 reproduced the recorded fused pose (< 0.1 deg) and inliers
+    (median ratio 1.00; wc_0074 k017 got 156 vs 160).
+  - 81 of the 166 kept clusters have a fused set. The rest are kept on common support alone: single-view X3 solves
+    and S3 probe hypotheses, which never went through stage 2. pool.json points at the files (corrFused, corrSingle).
+    Paths are relative to h1_mine/.
+
+RUNTIME (all serial; one worker on port 8793 under render_lock, LoMa MPS under gpu_lock)
+  S2 27 min (median 32 s per photo) · S5 53 min (100 s) · S3a 3 h 25 min (355 s; probe ~37 s per eye, 4–6 eyes)
+  S1 rerun of wc_0023 3 min · common support 50 min (421 clusters) · fused replay 10 min
+  Pack overlays 32 min (Overpass prefetch of new bboxes dominated).
+  Wall clock: 2026-09-28T17:51Z (protocol) -> 2026-09-29T00:41Z (6 h 50 min). The budget rule in PROTOCOL.txt was applied at
+  22:34Z, when the run was heading past ~8 h. It cut S4 (displaced-eye pilot) entirely and then S3 pass 2 (eye #2).
+  S4 is therefore NOT measured: the "wrong by construction via displaced eye" label question stays open.
+  gen.py S4 is written and untested end to end.
+
+FAILURES / DEVIATIONS (honest list)
+  - wc_0023: the out/dev_loma stated-eye record had failed (worker navigation error). It was re-run once with the
+    same T6+LoMa path (runs/S1/wc_0023.json).
+  - S3a wc_0074: the probe at one "open" eye failed 3x with ENOSPC (disk momentarily full, machine-wide). That eye
+    has best = 0, so it could not be chosen. All other probes ran.
+  - S3 ran only on the 31 photos whose T6+LoMa stated result is not HIGH (the production fallback trigger), top-1
+    eye only.
+  - The mining gates dropped v2's 3x ratio / margin / ambiguity gates: we mine, we do not accept.
+  - Pack overlays: the first test of the copied builder wrote one Overpass cache file into
+    tools/bench/harness/out/cache/overpass (bbox_45.53_8.74_47.33_11.34.json, created 14:08 local). I deleted it at
+    once, so that directory is back to its previous state. The builder now uses copies of overlay.ts/geo.ts in
+    h1_mine/harness/ with the cache redirected to h1_mine/harness/cache (seeded by copying the existing overpass
+    files) and Mapterhorn tiles in the session scratchpad.
+  - x5 raw contributed nothing new: its solved poses are refs, perturbations and N7, which are either constructed
+    or already verified.
+  - Not screened (207 clusters): single-view / stage-1 / probe poses with native < 30 inliers, and LoMa fused
+    candidates with < 30 fused inliers. They stay in pool.json with status "not-screened".
+  - Post hoc: nothing tuned. The S5 interpretation above (the stage-2 fan re-captures the correct basin) is an
+    observation made after seeing the data.
+
+FILES (tools/research/tm/h1_mine/)
+  PROTOCOL.txt             frozen rules (UTC timestamp at the top)
+  pool.json                all 628 merged candidates: pid, cid, sources, pose, eye, eyeDisplacementM, common_inl
+                           (+ solve fields), nativeFusedMax + per-member native fields, inherit, label, status, keep,
+                           corr paths
+  key/key.json             label -> {pid, kind (candidate | pilot | duplicate | decoy-yaw±N | positive-control |
+                           construct-check), cid or ref, pose, eye, width, folder}; seed and salt; batches
+  key/render_meta.json     builder's per-label render metadata (rendered eye, DEM, peak labels)
+  key/pack_cands.json      builder input (contains pids; keep it out of verifier hands)
+  pack/<pXXXXXXXXXX>/      photo.jpg + candidate_XX.jpg; the folder name is sha256(salt:pid)[:10]
+  pack_index.json          folder list + suggested batches (no key info)
+  corr/                    correspondences (see above)
+  runs/                    S1/S2/S5/S3a records, candidates_raw.json, clusters.json, common/, replay/, kept_cids.json
+  h1lib.py gen.py harvest.py score.py pool.py make_pack.py build_pack.ts harness/ stats.py run_chain.sh; logs/
+  Re-run the numbers: python stats.py
+
+PACK
+  - 120 overlays in 27 hashed folders (54 MB), all rendered.
+    Contents: 95 candidates, 10 duplicates (re-rendered at a different width), 6 yaw decoys (+-3 deg if narrow,
+    else +-5 deg from correct refs), 4 positive controls (correct refs), 5 wrong-by-construction noise checks.
+  - Every rendered eye matches its key eye (< 0.5 m).
+  - Builder: 2026-09-29T00:08Z–00:40Z, about 20 min of it Overpass peak prefetch.
+  - PACK_PAD=1; neutral "candidate XX" header; labels are two letters + a digit, seeded (20260928).
+  - Suggested batches: 14 + 13 folders (pack_index.json).
+
+HOW TO RUN THE VERIFIERS (main session)
+  1. Batches are listed in pack_index.json "suggestedBatches" (2 batches of 13–14 folders). All candidates of a photo
+     are in one folder, so they always land in the same batch.
+  2. Per batch: 2 fresh general-purpose verifier agents. Each gets its own scratch dir holding only a copy of that
+     batch's pack/<folder>/ dirs. Never give them key/, pool.json, runs/ or this report.
+     Instructions: the C1–C4 checklist of reports/bench-wild.md; near-miss = wrong; "unsure" only for unjudgeable
+     skylines; one verdict per candidate_XX.jpg, returned as JSON {folder: {label: {verdict, tags}}}.
+  3. Decision rule (as in tools/matcher/v2/verify/PROTOCOL.md): correct iff both say correct; wrong if either says
+     wrong; otherwise unsure. If one verifier's duplicate pair (same cid, different width) disagrees, that verifier's
+     verdict on that cid is unsure. Flag, but still report, a verifier who fails a positive control or accepts a
+     decoy.
+  4. Scoring: map labels via key/key.json candidates[label] (cid -> pool.json). Report construct-check agreement
+     (expected: wrong) as the label-noise estimate for wrong-by-construction.
+     Hard negative = verified wrong AND kept (common >= 100 or native fused >= 100). Add the 10 wrong-construct
+     (subject to the noise check) and the 8 inherited-wrong.

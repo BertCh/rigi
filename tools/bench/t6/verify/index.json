@@ -1,0 +1,35 @@
+{
+ "about": "Blinded candidates (T6, dev photos only). Each overlay draws the Mapterhorn DEM skyline (yellow) and occlusion-tested OSM peak labels for one candidate camera (pose + eye). Judge each candidate on its own: does its line lie on the photo's real skyline (checklist C1 coverage ≥ 70 %, C2 vertical fit within 1.5 % of height, C3 feature alignment, C4 tilt)? Verdict correct / wrong / unsure, near-miss tag allowed.",
+ "photos": {
+  "wc_0028": {
+   "photo": "../../data/photos/wc_0028.jpg",
+   "candidates": {
+    "A": "wc_0028_A.jpg"
+   }
+  },
+  "wc_0046": {
+   "photo": "../../data/photos/wc_0046.jpg",
+   "candidates": {
+    "A": "wc_0046_A.jpg"
+   }
+  },
+  "wc_0072": {
+   "photo": "../../data/photos/wc_0072.jpg",
+   "candidates": {
+    "A": "wc_0072_A.jpg"
+   }
+  },
+  "wc_0087": {
+   "photo": "../../data/photos/wc_0087.jpg",
+   "candidates": {
+    "A": "wc_0087_A.jpg"
+   }
+  },
+  "wc_0094": {
+   "photo": "../../data/photos/wc_0094.jpg",
+   "candidates": {
+    "A": "wc_0094_A.jpg"
+   }
+  }
+ }
+}

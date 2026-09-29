@@ -1,0 +1,1802 @@
+{
+ "about": "F1: hand-coded per-photo failure taxonomy (judgements from sheets/ + records) merged with record facts from master.json.\nCause codes: a_big = stated position wrong > 400 m / wrong vantage; a_small = eye error < 400 m (parallax on a right basin);\nb clouds/fog/absent skyline; c near-field / non-DEM foreground; d appearance gap; e narrow FOV; f focal unknown/wrong;\ng DEM/drape limitation (near-field ortho blur < ~300 m, smeared steep faces, far drape); h not a clean terrain view\n(reflection, crop, grading); i right answer rejected by the rule; j other (GT/verification ambiguity).\nstage: search | matching | refine | decision | position | verification.  fix: rule | matcher | matcher+rule | eye-refine |\nposition-prior | search | none-near-term.  conf: confidence in the primary attribution (high/med/low).",
+ "photos": {
+  "wc_0002": {
+   "causes": [
+    "a_small",
+    "c",
+    "g"
+   ],
+   "stage": "matching",
+   "fix": "eye-refine",
+   "conf": "med",
+   "evidence": "Correct ref C (28.5,-8.3) was proposed (appseeds) but T6 chose sweep40 at 37.1 (483 inl, support 0.13). At the ref, every matcher's fan solve lands 10 deg away (loma/REPORT) -> a pure rotation cannot fit both the near ridge (32% of frame < 300 m in the DEM) and the far skyline: eye/parallax. Near ridge renders as a blurred untextured hump (refpair_a). Eye probe finds similar support at other eyes (155 vs 224).",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 483,
+    "support": 0.125,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    155,
+    192,
+    142,
+    224,
+    195,
+    155
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 116,
+    "verdict": "pending"
+   },
+   "demDepthAtRef": {
+    "sky": 0.329,
+    "lt300": 0.316,
+    "m300_1k": 0.0,
+    "k1_5": 0.246,
+    "gt5k": 0.109,
+    "medKm": 2.151
+   },
+   "tags": {
+    "focalClass": "wide",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [],
+    "hard": false,
+    "region": "glarus",
+    "notes": "grassy ridge, wide"
+   },
+   "title": "File:Gandstock, Plattengrat, Guldergrat.jpg",
+   "sheets": [
+    "sheets/wc_0002_ring.jpg"
+   ]
+  },
+  "wc_0006": {
+   "causes": [
+    "i",
+    "c",
+    "g"
+   ],
+   "stage": "decision",
+   "fix": "rule",
+   "conf": "high",
+   "evidence": "T6 pose correct; sky candidate 1935 inl, support 0.707, basin gap 2.3, but matchDominant fails on the 0.3 deg fused-vs-match-only condition and apriori fails on cueAgree 3.8 deg. 49% of frame is DEM terrain < 300 m (ultrawide ridge).",
+   "t6": {
+    "level": "LOW",
+    "verdict": "correct",
+    "inliers": 1935,
+    "support": 0.707,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    68,
+    226,
+    30,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 2814,
+    "verdict": "correct"
+   },
+   "demDepthAtRef": {
+    "sky": 0.268,
+    "lt300": 0.491,
+    "m300_1k": 0.241,
+    "k1_5": 0.0,
+    "gt5k": 0.0,
+    "medKm": 0.007
+   },
+   "tags": {
+    "focalClass": "wide",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "cloudy",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [],
+    "hard": false,
+    "region": "glarus",
+    "notes": "ultrawide ridge"
+   },
+   "title": "File:Heub\u00fctzlipass Fahnenstock.jpg",
+   "sheets": [
+    "sheets/wc_0006_ring.jpg"
+   ]
+  },
+  "wc_0028": {
+   "causes": [
+    "f",
+    "c",
+    "d"
+   ],
+   "stage": "refine",
+   "fix": "matcher+rule",
+   "conf": "med",
+   "evidence": "Right basin found (T6 1.7 deg from ref, blind verdict near-miss: roll 1.5-2 deg). Focal unknown (iPhone 4, hfov guessed 50), near rock at both edges not in DEM, haze. All matchers solve ~6.5 deg from the ref at the oracle (possible ref/lens issue).",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 667,
+    "support": 0.218,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    225,
+    251,
+    183,
+    245,
+    129,
+    217
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 817,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": {
+    "sky": 0.376,
+    "lt300": 0.0,
+    "m300_1k": 0.0,
+    "k1_5": 0.319,
+    "gt5k": 0.305,
+    "medKm": 4.92
+   },
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [
+     "rock"
+    ],
+    "hard": true,
+    "region": "central",
+    "notes": "elevated view over lake, faint distant Alps"
+   },
+   "title": "File:Vierwaldst\u00e4ttersee7.JPG",
+   "sheets": [
+    "sheets/wc_0028_ring.jpg"
+   ]
+  },
+  "wc_0034": {
+   "causes": [
+    "d",
+    "e",
+    "c"
+   ],
+   "stage": "matching",
+   "fix": "matcher+rule",
+   "conf": "high",
+   "evidence": "T6 pose correct (narrow/app-skyline seed) but ALIKED gets 0 inliers even at the oracle; LoMa 268 inl, correct, still LOW. Backlit dark forest silhouette, 180 mm tele; render at ref matches the ridge shape exactly (refpair_a).",
+   "t6": {
+    "level": "LOW",
+    "verdict": "correct",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 268,
+    "verdict": "correct"
+   },
+   "demDepthAtRef": {
+    "sky": 0.42,
+    "lt300": 0.0,
+    "m300_1k": 0.0,
+    "k1_5": 0.58,
+    "gt5k": 0.0,
+    "medKm": 3.925
+   },
+   "tags": {
+    "focalClass": "tele",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "cloudy",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "trees"
+    ],
+    "hard": true,
+    "region": "vaud",
+    "notes": "dark forested ridge silhouette under grey clouds"
+   },
+   "title": "File:Forest clearing on a hill (Unsplash).jpg",
+   "sheets": []
+  },
+  "wc_0046": {
+   "causes": [
+    "b",
+    "c",
+    "d"
+   ],
+   "stage": "decision",
+   "fix": "matcher+rule",
+   "conf": "high",
+   "evidence": "T6 pose correct but 96 inl; sea of fog hides the lake/mid-field that dominate the render (refpair_b), trees in front. sweepfine candidate had agree 0.13 deg, skyPx 4.14 (limit 4.0), support 0.80: missed apriori by 0.14 px. LoMa 967 inl correct, LOW.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "correct",
+    "inliers": 96,
+    "support": 0.821,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    26,
+    37,
+    36,
+    68,
+    31
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 967,
+    "verdict": "correct"
+   },
+   "demDepthAtRef": {
+    "sky": 0.328,
+    "lt300": 0.281,
+    "m300_1k": 0.0,
+    "k1_5": 0.044,
+    "gt5k": 0.347,
+    "medKm": 5.616
+   },
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [
+     "trees"
+    ],
+    "hard": true,
+    "region": "central",
+    "notes": "sea of fog, spruces silhouetted, distant Alps"
+   },
+   "title": "File:Rigi-First.jpg",
+   "sheets": []
+  },
+  "wc_0052": {
+   "causes": [
+    "d",
+    "c"
+   ],
+   "stage": "matching",
+   "fix": "matcher",
+   "conf": "high",
+   "evidence": "Sun in frame, backlit haze. ALIKED 0 inliers at the oracle; LoMa 225 inl -> HIGH correct in the LoMa T6 arm. Sky candidate 3.2 deg from the ref existed with 0 inliers (search OK).",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "HIGH",
+    "inl": 225,
+    "verdict": "correct"
+   },
+   "demDepthAtRef": {
+    "sky": 0.315,
+    "lt300": 0.373,
+    "m300_1k": 0.056,
+    "k1_5": 0.241,
+    "gt5k": 0.016,
+    "medKm": 0.126
+   },
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [
+     "water"
+    ],
+    "hard": true,
+    "region": "glarus",
+    "notes": "sun in frame, backlit haze"
+   },
+   "title": "File:Kl\u00f6ntalersee in Richtung Osten.jpg",
+   "sheets": []
+  },
+  "wc_0055": {
+   "causes": [
+    "c",
+    "d",
+    "g"
+   ],
+   "stage": "matching",
+   "fix": "none-near-term",
+   "conf": "high",
+   "evidence": "T6 pose correct via app skyline, 1 inlier; every matcher <= 20 inl at the oracle. Parking lot/van/roof ~40% of frame, fresh snow on a forested cliff; the cliff renders as smeared vertical drape (refpair_b).",
+   "t6": {
+    "level": "LOW",
+    "verdict": "correct",
+    "inliers": 1,
+    "support": 0.011,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 14,
+    "verdict": "pending"
+   },
+   "demDepthAtRef": {
+    "sky": 0.226,
+    "lt300": 0.187,
+    "m300_1k": 0.507,
+    "k1_5": 0.08,
+    "gt5k": 0.0,
+    "medKm": 0.445
+   },
+   "tags": {
+    "focalClass": "wide",
+    "skylineDist": "near",
+    "season": "winter",
+    "weather": "clouds_on_skyline",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "buildings",
+     "cars"
+    ],
+    "hard": true,
+    "region": "central",
+    "notes": "parking lot, roof edge, cars"
+   },
+   "title": "File:Apriltag.jpg",
+   "sheets": []
+  },
+  "wc_0063": {
+   "causes": [
+    "i",
+    "c"
+   ],
+   "stage": "decision",
+   "fix": "rule",
+   "conf": "high",
+   "evidence": "T6 pose correct, apriori AND matchDominant true (1188 inl, support 0.91, agree 0.07 deg) - rejected only by basin gap 0.182 < 0.20 on a hand-placed position. LoMa arm: HIGH correct.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "correct",
+    "inliers": 1188,
+    "support": 0.913,
+    "unmet": [
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    363,
+    263,
+    253,
+    263,
+    237,
+    142
+   ],
+   "loma": {
+    "level": "HIGH",
+    "inl": 2651,
+    "verdict": "correct"
+   },
+   "demDepthAtRef": {
+    "sky": 0.249,
+    "lt300": 0.66,
+    "m300_1k": 0.0,
+    "k1_5": 0.0,
+    "gt5k": 0.091,
+    "medKm": 0.024
+   },
+   "tags": {
+    "focalClass": "normal",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "flowers",
+     "water"
+    ],
+    "hard": false,
+    "region": "glarus",
+    "notes": "cotton-grass tarn foreground"
+   },
+   "title": "File:Am Ch\u00fcebodensee bei Elm.jpg",
+   "sheets": []
+  },
+  "wc_0071": {
+   "causes": [
+    "d",
+    "c"
+   ],
+   "stage": "decision",
+   "fix": "matcher+rule",
+   "conf": "med",
+   "evidence": "T6 pose correct, 422 inl but support 0.37, skyPx 9.2. Snow-covered mountain vs summer drape, ice/lake foreground (45% of DEM frame < 300 m). LoMa 753 inl, support 0.24, still LOW.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "correct",
+    "inliers": 422,
+    "support": 0.374,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    66,
+    0,
+    0,
+    45,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 753,
+    "verdict": "correct"
+   },
+   "demDepthAtRef": {
+    "sky": 0.269,
+    "lt300": 0.447,
+    "m300_1k": 0.141,
+    "k1_5": 0.133,
+    "gt5k": 0.009,
+    "medKm": 0.187
+   },
+   "tags": {
+    "focalClass": "normal",
+    "skylineDist": "near",
+    "season": "winter",
+    "weather": "clouds_on_skyline",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "snow",
+     "water"
+    ],
+    "hard": false,
+    "region": "graubuenden",
+    "notes": "ice-covered lake shore"
+   },
+   "title": "File:Poschiavo, Switzerland - panoramio.jpg",
+   "sheets": []
+  },
+  "wc_0072": {
+   "causes": [
+    "d",
+    "c"
+   ],
+   "stage": "decision",
+   "fix": "matcher+rule",
+   "conf": "med",
+   "evidence": "T6 pose correct, 130 inl, support 0.50, basin gap 0.057 (hand-placed). Haze, leaf-off branches over the frame, snowy distant crest vs snowless render. LoMa 637 inl correct, LOW.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "correct",
+    "inliers": 130,
+    "support": 0.502,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    75,
+    74,
+    59,
+    76,
+    60,
+    58
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 637,
+    "verdict": "correct"
+   },
+   "demDepthAtRef": {
+    "sky": 0.274,
+    "lt300": 0.094,
+    "m300_1k": 0.148,
+    "k1_5": 0.296,
+    "gt5k": 0.188,
+    "medKm": 1.579
+   },
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [
+     "buildings",
+     "trees"
+    ],
+    "hard": true,
+    "region": "appenzell",
+    "notes": "bare branches, hazy distant Alps, village"
+   },
+   "title": "File:Fr\u00fcmsenSG1.jpg",
+   "sheets": []
+  },
+  "wc_0076": {
+   "causes": [
+    "j"
+   ],
+   "stage": "verification",
+   "fix": "none-near-term",
+   "conf": "high",
+   "evidence": "T6 HIGH (matchDominant, 1915 inl, gap 0.80); pose within 1 deg of the correct ref B but its own cluster verdict is 'unsure'. A GT/verification ambiguity, not a pipeline failure.",
+   "t6": {
+    "level": "HIGH",
+    "verdict": "unsure",
+    "inliers": 1915,
+    "support": 0.71,
+    "unmet": [
+     "apriori"
+    ]
+   },
+   "hasCorrectRef": true,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [],
+   "loma": {
+    "level": "LOW",
+    "inl": 3702,
+    "verdict": "pending"
+   },
+   "demDepthAtRef": {
+    "sky": 0.341,
+    "lt300": 0.291,
+    "m300_1k": 0.09,
+    "k1_5": 0.269,
+    "gt5k": 0.009,
+    "medKm": 0.809
+   },
+   "tags": {
+    "focalClass": "wide",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "cloudy",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "grass",
+     "wires"
+    ],
+    "hard": false,
+    "region": "vaud",
+    "notes": "pylon and wires, prealps"
+   },
+   "title": "File:Schweiz Unterwegs 160DSC 0215 (48437096132).jpg",
+   "sheets": []
+  },
+  "wc_0001": {
+   "causes": [
+    "a_small",
+    "d",
+    "c"
+   ],
+   "stage": "matching",
+   "fix": "eye-refine",
+   "conf": "low",
+   "evidence": "EXIF GPS. T6 LOW-wrong at 101.8 (911 inl, support 0.60; verdict pitch-offset+roll) - roughly the right direction (manifest heading 89). Ring: stated eye on a slope with terrain blocking 0-95 deg; the range in the photo is taller than any range in the ring near 100 deg. Eye probe: 563 inl at another eye vs 207 (2.7x). Winter snow vs summer drape, larch + snow-slope foreground.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 911,
+    "support": 0.597,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    420,
+    563,
+    128,
+    390,
+    371,
+    363
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 1277,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "tele",
+    "skylineDist": "far",
+    "season": "winter",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "trees"
+    ],
+    "hard": false,
+    "region": "graubuenden",
+    "notes": "larch foreground, snowy range"
+   },
+   "title": "File:Larch in Guarda.jpg",
+   "sheets": [
+    "sheets/wc_0001_ring.jpg"
+   ]
+  },
+  "wc_0005": {
+   "causes": [
+    "c",
+    "d",
+    "g"
+   ],
+   "stage": "matching",
+   "fix": "matcher+rule",
+   "conf": "med",
+   "evidence": "EXIF GPS. All methods land at yaw ~191 (verdict near-miss, pitch-offset); LoMa 404 inl there. Ring confirms Alps visible only through 180-200 deg, 40-90 km away. Trees frame ~60% of the photo, dusk light, skyline beyond the 40 km drape radius for non-narrow photos. Stated eye sits below the Uetliberg crest (near hill blocks 20-150 deg); possibly the tower/viewpoint height.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 404,
+    "verdict": "pending"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "tele",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "cloudy",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "trees"
+    ],
+    "hard": true,
+    "region": "central",
+    "notes": "dusk, trees framing, distant Alps"
+   },
+   "title": "File:Evening view from the Uetliberg.jpg",
+   "sheets": [
+    "sheets/wc_0005_ring.jpg"
+   ]
+  },
+  "wc_0010": {
+   "causes": [
+    "a_small",
+    "h",
+    "d"
+   ],
+   "stage": "position",
+   "fix": "eye-refine",
+   "conf": "med",
+   "evidence": "EXIF (Unsplash import). Right basin: fused 236.5 verdict parallax-mismatch/near-miss (Saentis labelled). Photo is at water level (reflection axis = horizon), ring shows the stated eye ~20 m above Seealpsee on the slope (lake well below horizon). Half the frame is a mirror reflection; strong colour grading; winter snow.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 12,
+    "verdict": "pending"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "normal",
+    "skylineDist": "near",
+    "season": "winter",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "water"
+    ],
+    "hard": true,
+    "region": "appenzell",
+    "notes": "mirror reflection in lake, portrait"
+   },
+   "title": "File:Wasserauen, Schweiz (Unsplash).jpg",
+   "sheets": [
+    "sheets/wc_0010_ring.jpg"
+   ]
+  },
+  "wc_0013": {
+   "causes": [
+    "e",
+    "g",
+    "d"
+   ],
+   "stage": "matching",
+   "fix": "none-near-term",
+   "conf": "med",
+   "evidence": "EXIF. Right basin: fused 266.1 near-miss/parallax with Huetstock (3.8 km) on the skyline (ov_parallax). 16 deg portrait tele of a sheer limestone face; in the ring that face renders as vertically smeared ortho texture. 0 inliers at every eye.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 58,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "tele",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "trees"
+    ],
+    "hard": false,
+    "region": "central",
+    "notes": "portrait big rock face"
+   },
+   "title": "File:00 3688 Huetstock - Engelberg (Schweiz).jpg",
+   "sheets": [
+    "sheets/wc_0013_ring.jpg"
+   ]
+  },
+  "wc_0015": {
+   "causes": [
+    "b",
+    "c",
+    "d"
+   ],
+   "stage": "search",
+   "fix": "none-near-term",
+   "conf": "med",
+   "evidence": "Hand-placed. Ring at ~215-240 deg shows a slope rising to the right with lower Jura ridges left, consistent with the photo, but no candidate was proposed there (T6 candidates 59/343/356/304/187). Fog sea gives a fake flat horizon, ~70% of frame is near snow slope, winter snow vs summer drape; 0 inliers everywhere.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 0,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "near",
+    "season": "winter",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [
+     "snow"
+    ],
+    "hard": true,
+    "region": "jura",
+    "notes": "sea of fog, low-contrast snowy ridge"
+   },
+   "title": "File:Chasseral, vue vers le sud-ouest en hiver.jpg",
+   "sheets": [
+    "sheets/wc_0015_ring.jpg"
+   ]
+  },
+  "wc_0023": {
+   "causes": [
+    "e",
+    "b",
+    "d"
+   ],
+   "stage": "search",
+   "fix": "matcher",
+   "conf": "low",
+   "evidence": "Hand-placed, 200 mm (hfov 10). Ring shows a snowy peak at ~190 deg just above a green slope rising to the right - the photo's layout; T6 chose 202 (wrong-direction). A sky candidate at 196.7 had 77 inl/support 0.32 (unverified). Clouds around the massif base. LoMa arm has no record for this photo.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": null,
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "tele",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "clouds_on_skyline",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [],
+    "hard": false,
+    "region": "valais",
+    "notes": "tele snow massif, cloud around base"
+   },
+   "title": "File:Dom of Mischabel.jpg",
+   "sheets": [
+    "sheets/wc_0023_ring.jpg"
+   ]
+  },
+  "wc_0033": {
+   "causes": [
+    "d",
+    "c"
+   ],
+   "stage": "matching",
+   "fix": "matcher",
+   "conf": "med",
+   "evidence": "EXIF (train). ALIKED 0 inliers everywhere; LoMa found 1219 inl at yaw 61, pitch -5.8 (LOW, unverified). Ring at 30-95 deg shows forested slope -> lake -> Buergenstock-like peninsula, matching the photo layout; T6's 25 deg is wrong. Haze, trees ~50% of frame. Needs blind verification of the LoMa pose.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 1219,
+    "verdict": "pending"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "wide",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "trees"
+    ],
+    "hard": true,
+    "region": "central",
+    "notes": "haze, trees framing"
+   },
+   "title": "File:View from Pilatus Railway heading up Mount Pilatus.jpg",
+   "sheets": [
+    "sheets/wc_0033_ring.jpg"
+   ]
+  },
+  "wc_0035": {
+   "causes": [
+    "a_big",
+    "d"
+   ],
+   "stage": "position",
+   "fix": "position-prior",
+   "conf": "med",
+   "evidence": "Hand-placed. Ring: from the stated eye a hillside rises to +15 deg over 0-80 deg, i.e. exactly where the photo (heading 75, Wisenberg) shows an open elevated view. Title 'von der Belchenflue'; the stated point appears to be off the summit (my estimate ~1 km W; not measured). 0 support at all eyes <= 400 m. Haze, winter-brown meadows.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 0,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [
+     "trees"
+    ],
+    "hard": true,
+    "region": "jura",
+    "notes": "low-relief rolling hills, hazy horizon"
+   },
+   "title": "File:Wisenberg von der Belchenflue.jpg",
+   "sheets": [
+    "sheets/wc_0035_ring.jpg"
+   ]
+  },
+  "wc_0037": {
+   "causes": [
+    "a_small",
+    "d",
+    "c"
+   ],
+   "stage": "matching",
+   "fix": "eye-refine",
+   "conf": "low",
+   "evidence": "Hand-placed at a valley road. App, fused and cascade all land at 244-248 deg with parallax-mismatch/yaw-shift verdicts (ov_parallax): right massif, eye likely off. Evening light (19:31), fresh spring snow above larch forest vs summer drape; 0 inliers at all eyes <= 400 m.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 0,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "tele",
+    "skylineDist": "near",
+    "season": "winter",
+    "weather": "cloudy",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "trees"
+    ],
+    "hard": false,
+    "region": "graubuenden",
+    "notes": "snow-dusted range above forest"
+   },
+   "title": "File:Piz Lad as seen from Santa Maria.jpg",
+   "sheets": [
+    "sheets/wc_0037_ring.jpg"
+   ]
+  },
+  "wc_0040": {
+   "causes": [
+    "c",
+    "d",
+    "e"
+   ],
+   "stage": "search",
+   "fix": "search",
+   "conf": "high",
+   "evidence": "EXIF, position fine (Gruyeres old town). Ring shows Moleson at ~225-235 deg; no T6 candidate within 90 deg of it (124/64/77/337/29). Buildings form the skyline on both sides (~65% of frame), snowy Moleson; hfov 25 routes to the narrow path whose app-skyline seeds were wrong.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 0,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "tele",
+    "skylineDist": "near",
+    "season": "winter",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "buildings",
+     "people"
+    ],
+    "hard": true,
+    "region": "vaud",
+    "notes": "village street foreground, peak above rooftops"
+   },
+   "title": "File:Gruy\u00e8re DSC 4352 (6478390647).jpg",
+   "sheets": [
+    "sheets/wc_0040_ring.jpg"
+   ]
+  },
+  "wc_0053": {
+   "causes": [
+    "d",
+    "h"
+   ],
+   "stage": "matching",
+   "fix": "none-near-term",
+   "conf": "med",
+   "evidence": "EXIF. Right basin: app/fused at 297-299 deg near-miss (Piz Padella 3.2 km, ov_parallax). Fully snow-covered massif at 07:30 vs summer drape; panoramic crop (2.36:1). 0 inliers for every matcher at every eye.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 1,
+    "support": 0.042,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 0,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "wide",
+    "skylineDist": "near",
+    "season": "winter",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "trees"
+    ],
+    "hard": false,
+    "region": "graubuenden",
+    "notes": "snowy massif over forest"
+   },
+   "title": "File:Piz Mezdi as seen from Samedan.jpg",
+   "sheets": [
+    "sheets/wc_0053_ring.jpg"
+   ]
+  },
+  "wc_0058": {
+   "causes": [
+    "b",
+    "g",
+    "a_small"
+   ],
+   "stage": "matching",
+   "fix": "none-near-term",
+   "conf": "low",
+   "evidence": "Unsplash import, position = Netstal town. Cloud hides skyline and base; the visible face is layered limestone that renders as smeared drape in the ring. Fog below the camera suggests an elevated vantage vs the valley-floor eye (uncertain). Fused pose verdict unsure.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "unsure",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    15,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 11,
+    "verdict": "pending"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "clouds_on_skyline",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [],
+    "hard": true,
+    "region": "glarus",
+    "notes": "thick cloud veiling summits and base"
+   },
+   "title": "File:Fog Rolls Over Netstal (Unsplash).jpg",
+   "sheets": [
+    "sheets/wc_0058_ring.jpg"
+   ]
+  },
+  "wc_0069": {
+   "causes": [
+    "a_big",
+    "d"
+   ],
+   "stage": "position",
+   "fix": "position-prior",
+   "conf": "high",
+   "evidence": "Hand-placed at Stoos (eye 1335 m); title 'from Fronalpstock' (summit ~1920 m). Ring: 180-290 deg (the whole lake view) is blocked by the Fronalpstock slope; the photo looks down on the lake. Wrong-ref overlay shows the DEM skyline far above the photo's. T6/LoMa lock onto a strong wrong basin at 281 (the known gross-error trap).",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 470,
+    "support": 0.931,
+    "unmet": [
+     "matchDominant",
+     "ambiguity"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    629,
+    380,
+    578,
+    351,
+    499,
+    379
+   ],
+   "loma": {
+    "level": "HIGH",
+    "inl": 943,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "cloudy",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [
+     "buildings",
+     "water"
+    ],
+    "hard": true,
+    "region": "central",
+    "notes": "hazy lake panorama, backlit"
+   },
+   "title": "File:Vierwaldst\u00e4ttersee from Fronalpstock.jpg",
+   "sheets": [
+    "sheets/wc_0069_ring.jpg"
+   ]
+  },
+  "wc_0070": {
+   "causes": [
+    "a_small",
+    "c"
+   ],
+   "stage": "position",
+   "fix": "eye-refine",
+   "conf": "med",
+   "evidence": "EXIF. Ring at 300-330 deg shows the same grassy peak + rocky Gandstock pair, smaller/shifted: right basin, parallax. Fused 320.4 near-miss/parallax-mismatch; peaks at 0.6 km so a tens-of-metres eye error matters; photographer at the tarn shore. Eye-probe candidates (high/open points) all got 0.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 330,
+    "support": 0.574,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 840,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "wide",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "snow",
+     "water"
+    ],
+    "hard": false,
+    "region": "glarus",
+    "notes": "snow patch and tarn"
+   },
+   "title": "File:Berglimattsee Gandstock.jpg",
+   "sheets": [
+    "sheets/wc_0070_ring.jpg"
+   ]
+  },
+  "wc_0073": {
+   "causes": [
+    "a_big",
+    "d"
+   ],
+   "stage": "position",
+   "fix": "position-prior",
+   "conf": "high",
+   "evidence": "EXIF GPS is ~16 km off: stated eye at 490 m near a lake shore; title 'Matthorn from pilatus', photo taken from the Pilatus summit (~2100 m). Nothing in the ring resembles the photo.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "exif-gps",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 0,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "wide",
+    "skylineDist": "far",
+    "season": "winter",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "rock",
+     "snow"
+    ],
+    "hard": false,
+    "region": "bernese",
+    "notes": "wide, spring snow, far ranges"
+   },
+   "title": "File:Matthorn from pilatus.jpg",
+   "sheets": [
+    "sheets/wc_0073_ring.jpg"
+   ]
+  },
+  "wc_0074": {
+   "causes": [
+    "a_small"
+   ],
+   "stage": "position",
+   "fix": "eye-refine",
+   "conf": "high",
+   "evidence": "Hand-placed. v2 moved the eye 225 m and both blind verifiers called the moved-eye pose correct; the same rotation at the stated eye is a known-wrong ref. T6 at the stated eye: 1798 inl, support 0.54 on a wrong pose. Not in refs.correct_refs (moved-eye verdicts are not inherited).",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 1798,
+    "support": 0.539,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    1689,
+    310,
+    777,
+    1447
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 2435,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "unknown",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": false,
+    "foreground": [
+     "grass"
+    ],
+    "hard": false,
+    "region": "glarus",
+    "notes": "elevated ridge view, lakes"
+   },
+   "title": "File:Blick vom Leistcamm.jpg",
+   "sheets": [
+    "sheets/wc_0074_ring.jpg"
+   ]
+  },
+  "wc_0086": {
+   "causes": [
+    "a_small",
+    "c"
+   ],
+   "stage": "position",
+   "fix": "eye-refine",
+   "conf": "high",
+   "evidence": "Panoramio. Stated eye is below the San Salvatore summit dome: ring blocked 0-150 deg. Moving 25 m to the high point gives 1611 inl and a HIGH that verifiers split correct / near-miss (right ridge 1.75% high). Viewing platform + people in foreground.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    568,
+    539,
+    781,
+    1611
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 0,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "normal",
+    "skylineDist": "near",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "people",
+     "trees"
+    ],
+    "hard": false,
+    "region": "ticino",
+    "notes": "viewpoint platform with people, lake fjord"
+   },
+   "title": "File:From mount San Salvatore - panoramio.jpg",
+   "sheets": [
+    "sheets/wc_0086_ring.jpg"
+   ]
+  },
+  "wc_0087": {
+   "causes": [
+    "a_big",
+    "b",
+    "d"
+   ],
+   "stage": "position",
+   "fix": "position-prior",
+   "conf": "med",
+   "evidence": "Hand-placed. Dents du Midi spans ~20 deg and rises ~8 deg above the fog in the photo; from the stated eye the only candidate serrated range (~190-200 deg) is ~1-2 deg tall -> camera several times closer than stated (order 10 km vs 27 km, estimate). Sea of fog, winter.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 0,
+    "verdict": "wrong"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "normal",
+    "skylineDist": "far",
+    "season": "winter",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "water"
+    ],
+    "hard": true,
+    "region": "vaud",
+    "notes": "portrait, sea of fog, dark shadow corner"
+   },
+   "title": "File:Dent de Val\u00e8re et Dents du midi.jpg",
+   "sheets": [
+    "sheets/wc_0087_ring.jpg"
+   ]
+  },
+  "wc_0095": {
+   "causes": [
+    "a_big",
+    "c"
+   ],
+   "stage": "position",
+   "fix": "position-prior",
+   "conf": "high",
+   "evidence": "Hand-placed with 2-decimal coords (46.43, 7.789 -> +-500 m). Ring from the stated eye: a steep slope and a nearby big range (Bietschhorn-like pyramid ~5-8 km) fill the view; the photo is a distant 4000 m panorama seen across a deep valley from a gentle grassy knoll. Title 'Ausblick geniessen' names no place; person + signpost foreground.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": null,
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "normal",
+    "skylineDist": "far",
+    "season": "summer",
+    "weather": "clear",
+    "headingKnown": true,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "people",
+     "signpost"
+    ],
+    "hard": false,
+    "region": "valais",
+    "notes": "signpost and person, far range"
+   },
+   "title": "File:Ausblick geniessen.jpg",
+   "sheets": [
+    "sheets/wc_0095_ring.jpg"
+   ]
+  },
+  "wc_0098": {
+   "causes": [
+    "d",
+    "g",
+    "c"
+   ],
+   "stage": "matching",
+   "fix": "none-near-term",
+   "conf": "low",
+   "evidence": "Panoramio, valley floor (Safiental area). Heavy winter snow, spruce framing, looking steeply up at a horn; ring shows enclosed steep faces that render as smeared drape (and are clipped by the ring's vfov). LoMa 38 inl at pitch 24 (unverified). Position unverifiable from the ring.",
+   "t6": {
+    "level": "LOW",
+    "verdict": "wrong",
+    "inliers": 0,
+    "support": 0.0,
+    "unmet": [
+     "apriori",
+     "matchDominant",
+     "basinGap"
+    ]
+   },
+   "hasCorrectRef": false,
+   "positionSource": "manual",
+   "positionNote": null,
+   "eyeProbeBest": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "loma": {
+    "level": "LOW",
+    "inl": 38,
+    "verdict": "pending"
+   },
+   "demDepthAtRef": null,
+   "tags": {
+    "focalClass": "normal",
+    "skylineDist": "near",
+    "season": "winter",
+    "weather": "clear",
+    "headingKnown": false,
+    "focalKnown": true,
+    "focal35Known": true,
+    "foreground": [
+     "trees"
+    ],
+    "hard": false,
+    "region": "graubuenden",
+    "notes": "spruce framing, snowy peaks"
+   },
+   "title": "File:Bruschghorn - panoramio (2).jpg",
+   "sheets": [
+    "sheets/wc_0098_ring.jpg"
+   ]
+  }
+ }
+}

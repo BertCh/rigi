@@ -1,0 +1,767 @@
+{
+ "wc_0002": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 32.09232662504779,
+     "pitch": -5.971601441202677,
+     "roll": -0.316749472459876,
+     "vfov": 46.996408778916496
+    },
+    "eye": {
+     "lat": 46.89887423134277,
+     "lon": 9.178036094248256,
+     "h": 2122.090597718689,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 2119.8244557812113
+    },
+    "confidenceLevel": "LOW"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 37.08981854663326,
+     "pitch": -6.196702811519592,
+     "roll": -1.160919158421553,
+     "vfov": 56.48864336461734
+    },
+    "eye": {
+     "lat": 46.90117,
+     "lon": 9.17801,
+     "h": 2102.990456138288,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 2101.581228186955
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": -4.9974919215854925,
+   "pitch": 0.22510137031691535
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0010": {
+  "candidates": {
+   "A": {
+    "method": "fused",
+    "pose": {
+     "yaw": 236.50514067780557,
+     "pitch": 4.574538101610447,
+     "roll": 2.491424491097656,
+     "vfov": 60.69397374911277
+    },
+    "eye": {
+     "lat": 47.269658,
+     "lon": 9.404736,
+     "h": 1160.895212978731,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 1159.1515991590081
+    },
+    "confidenceLevel": null
+   },
+   "B": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 235.73485576935133,
+     "pitch": 4.2335444299813,
+     "roll": 2.5757860664360113,
+     "vfov": 62.25134044584299
+    },
+    "eye": {
+     "lat": 47.269751072797476,
+     "lon": 9.404590424017531,
+     "h": 1164.4279573377464,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 1161.676349543467
+    },
+    "confidenceLevel": "LOW"
+   }
+  },
+  "diff": {
+   "yaw": -0.7702849084541867,
+   "pitch": -0.34099367162914707
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0015": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 42.98793231288114,
+     "pitch": -4.621025258348522,
+     "roll": -1.2197923151270107,
+     "vfov": 30.62391154573279
+    },
+    "eye": {
+     "lat": 47.13872150760878,
+     "lon": 7.0508466543941735,
+     "h": 1442.9057994470732,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 1440.7544694365042
+    },
+    "confidenceLevel": "LOW"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 58.7627085837413,
+     "pitch": -8.347122334564002,
+     "roll": 2.1836983896156803,
+     "vfov": 34.67026094423168
+    },
+    "eye": {
+     "lat": 47.129722,
+     "lon": 7.050843,
+     "h": 1569.1398874128965,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 1567.2109628863925
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": -15.774776270860116,
+   "pitch": 3.7260970762154804
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0023": {
+  "candidates": {
+   "A": {
+    "method": "fused",
+    "pose": {
+     "yaw": 202.09406244168517,
+     "pitch": 4.887107414889233,
+     "roll": 3.531119081282704,
+     "vfov": 6.850278692467212
+    },
+    "eye": {
+     "lat": 46.374722,
+     "lon": 7.977222,
+     "h": 2124.882630513244,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 2122.996462626441
+    },
+    "confidenceLevel": null
+   },
+   "B": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 203.50067536365933,
+     "pitch": 4.631936265364954,
+     "roll": 3.315550674844538,
+     "vfov": 6.872711891582043
+    },
+    "eye": {
+     "lat": 46.37924681610636,
+     "lon": 7.970704614119104,
+     "h": 2287.4756687516297,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 2284.74951173328
+    },
+    "confidenceLevel": "LOW"
+   }
+  },
+  "diff": {
+   "yaw": 1.4066129219741015,
+   "pitch": -0.255171149524279
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0027": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 107.54274581452385,
+     "pitch": -0.09834362327371791,
+     "roll": 0.683320609682883,
+     "vfov": 15.025508149427028
+    },
+    "eye": {
+     "lat": 46.416672436953654,
+     "lon": 7.719443116021195,
+     "h": 2706.2786830237474,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 2704.0220837204292
+    },
+    "confidenceLevel": "HIGH"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 106.07917954826983,
+     "pitch": 0.24736365555380968,
+     "roll": 0.551201140200297,
+     "vfov": 14.874763239139527
+    },
+    "eye": {
+     "lat": 46.414444,
+     "lon": 7.719444,
+     "h": 2658.8326038803452,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 2656.9848053691676
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": 1.4635662662540199,
+   "pitch": -0.3457072788275276
+  },
+  "t5ConfidenceLevel": "HIGH"
+ },
+ "wc_0034": {
+  "candidates": {
+   "A": {
+    "method": "fused",
+    "pose": {
+     "yaw": 127.30488990637114,
+     "pitch": 6.94150332877906,
+     "roll": -0.02906433135837291,
+     "vfov": 7.822166830655866
+    },
+    "eye": {
+     "lat": 46.343563,
+     "lon": 7.012033,
+     "h": 1294.0952641512383,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 1292.2391944222618
+    },
+    "confidenceLevel": null
+   },
+   "B": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 129.9272835124098,
+     "pitch": 5.780275962614493,
+     "roll": 0.6132967445218056,
+     "vfov": 8.017947886142593
+    },
+    "eye": {
+     "lat": 46.345841436448495,
+     "lon": 7.012002907458796,
+     "h": 1365.0073423308281,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 1362.7116075205279
+    },
+    "confidenceLevel": "LOW"
+   }
+  },
+  "diff": {
+   "yaw": 2.6223936060385995,
+   "pitch": -1.1612273661645673
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0035": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 125.16477912262854,
+     "pitch": -7.240053333289415,
+     "roll": 0.3723756182552132,
+     "vfov": 39.93622637097607
+    },
+    "eye": {
+     "lat": 47.362989503039685,
+     "lon": 7.821347001600077,
+     "h": 919.3077649648383,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 917.528433989447
+    },
+    "confidenceLevel": "LOW"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 114.04093559574703,
+     "pitch": -7.7635758426934744,
+     "roll": -1.2282640598997652,
+     "vfov": 38.87030401045561
+    },
+    "eye": {
+     "lat": 47.362778,
+     "lon": 7.810556,
+     "h": 1085.4804505488835,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 1083.735496919299
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": 11.123843526881501,
+   "pitch": 0.5235225094040592
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0047": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 139.99652713706342,
+     "pitch": 7.911999619771048,
+     "roll": -0.8618324054772526,
+     "vfov": 45.76367569655645
+    },
+    "eye": {
+     "lat": 46.52164498996609,
+     "lon": 9.90241855333554,
+     "h": 2452.1499998794657,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 2450.436681083759
+    },
+    "confidenceLevel": "HIGH"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 139.17565224017412,
+     "pitch": 7.908405527947943,
+     "roll": -0.9022155801160417,
+     "vfov": 44.77712895876896
+    },
+    "eye": {
+     "lat": 46.52155,
+     "lon": 9.90202,
+     "h": 2449.8239342481365,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 2448.8045650111435
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": 0.820874896889336,
+   "pitch": 0.0035940918231043284
+  },
+  "t5ConfidenceLevel": "HIGH"
+ },
+ "wc_0052": {
+  "candidates": {
+   "A": {
+    "method": "fused",
+    "pose": {
+     "yaw": 67.26364682994611,
+     "pitch": 7.159406407031302,
+     "roll": -1.1375316928630557,
+     "vfov": 35.33914079433976
+    },
+    "eye": {
+     "lat": 47.020972,
+     "lon": 8.952639,
+     "h": 847.7311900443863,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 845.9632524646618
+    },
+    "confidenceLevel": null
+   },
+   "B": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 57.57504962045058,
+     "pitch": 6.145105998472469,
+     "roll": -3.2973651018453705,
+     "vfov": 35.283409143519656
+    },
+    "eye": {
+     "lat": 47.018722369182115,
+     "lon": 8.96582114465395,
+     "h": 872.9826219335,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 868.6818479759235
+    },
+    "confidenceLevel": "LOW"
+   }
+  },
+  "diff": {
+   "yaw": -9.688597209495583,
+   "pitch": -1.0143004085588325
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0058": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 165.9442937210032,
+     "pitch": 1.2366715489158855,
+     "roll": 3.0077141571444446,
+     "vfov": 37.60085753594402
+    },
+    "eye": {
+     "lat": 47.05405200126258,
+     "lon": 9.045325149287457,
+     "h": 523.4806179518197,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 522.0994139636168
+    },
+    "confidenceLevel": "LOW"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 156.07274849340996,
+     "pitch": -0.24061478725346025,
+     "roll": -0.6676556764578813,
+     "vfov": 35.071146299693154
+    },
+    "eye": {
+     "lat": 47.06337,
+     "lon": 9.05504,
+     "h": 463.47119179706914,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 461.6875
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": 9.871545227593288,
+   "pitch": 1.4772863361693458
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0070": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 320.47482285660993,
+     "pitch": -0.44502907888420795,
+     "roll": -2.16349424480657,
+     "vfov": 45.05835043650294
+    },
+    "eye": {
+     "lat": 46.960517290600926,
+     "lon": 9.120479835127849,
+     "h": 2189.977909016576,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 2157.625
+    },
+    "confidenceLevel": "LOW"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 320.37308504679794,
+     "pitch": -1.1974035850831186,
+     "roll": -3.940548056937461,
+     "vfov": 41.93454093997585
+    },
+    "eye": {
+     "lat": 46.960278,
+     "lon": 9.120833,
+     "h": 2193,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 2160.535293978997
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": 0.10173780981199343,
+   "pitch": 0.7523745061989107
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0071": {
+  "candidates": {
+   "A": {
+    "method": "fused",
+    "pose": {
+     "yaw": 158.53809002775873,
+     "pitch": -3.96140582504122,
+     "roll": 3.0507971362192325,
+     "vfov": 47.75915540289387
+    },
+    "eye": {
+     "lat": 46.408169,
+     "lon": 10.018936,
+     "h": 2268.6,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 2234.25
+    },
+    "confidenceLevel": null
+   },
+   "B": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 158.01515119486808,
+     "pitch": -3.9460807977925563,
+     "roll": 2.444919899410353,
+     "vfov": 47.168986902571824
+    },
+    "eye": {
+     "lat": 46.40781601676274,
+     "lon": 10.018735472258403,
+     "h": 2268.5998786739096,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 2234.25
+    },
+    "confidenceLevel": "LOW"
+   }
+  },
+  "diff": {
+   "yaw": -0.5229388328906452,
+   "pitch": 0.01532502724866358
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0072": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 50.94063568987575,
+     "pitch": -11.76945323619391,
+     "roll": -8.398509368628071,
+     "vfov": 37.34347932427409
+    },
+    "eye": {
+     "lat": 47.24203039370309,
+     "lon": 9.446466563941021,
+     "h": 775.8502656899092,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 773.7746213386151
+    },
+    "confidenceLevel": "LOW"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 49.29905625811227,
+     "pitch": -9.547286626237295,
+     "roll": -4.020985628670733,
+     "vfov": 35.969246340941524
+    },
+    "eye": {
+     "lat": 47.239778,
+     "lon": 9.453075,
+     "h": 637.6467347155898,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 635.7278061223874
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": 1.641579431763489,
+   "pitch": -2.2221666099566146
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0076": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 112.52708394277951,
+     "pitch": 8.800761589524377,
+     "roll": -0.35128233988445223,
+     "vfov": 48.867062951670675
+    },
+    "eye": {
+     "lat": 46.52251797819096,
+     "lon": 7.05962347721927,
+     "h": 769.7497453169186,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 768.2472719070857
+    },
+    "confidenceLevel": "HIGH"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 112.96625392313915,
+     "pitch": 8.370649152237444,
+     "roll": -0.516607507097213,
+     "vfov": 48.69191025163564
+    },
+    "eye": {
+     "lat": 46.52297,
+     "lon": 7.05917,
+     "h": 770.8140144522322,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 769.0492588146382
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": -0.43916998035967936,
+   "pitch": 0.43011243728693316
+  },
+  "t5ConfidenceLevel": "HIGH"
+ },
+ "wc_0087": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 183.1447747062158,
+     "pitch": 2.289761626106804,
+     "roll": -5.520960052548895,
+     "vfov": 29.50030112156088
+    },
+    "eye": {
+     "lat": 46.37615791431524,
+     "lon": 7.0645280930363334,
+     "h": 1449.0500493819393,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 1447.7494937140923
+    },
+    "confidenceLevel": "LOW"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 166.9598357098933,
+     "pitch": -0.9986133208043207,
+     "roll": -1.6711796249493394,
+     "vfov": 32.97849868671905
+    },
+    "eye": {
+     "lat": 46.38295,
+     "lon": 7.0712,
+     "h": 1656.641345611836,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 1654.5943147514674
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": 16.184938996322444,
+   "pitch": 3.2883749469111248
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0095": {
+  "candidates": {
+   "A": {
+    "method": "fused",
+    "pose": {
+     "yaw": 162.49075076925746,
+     "pitch": -8.182434082293428,
+     "roll": -1.6504170457333958,
+     "vfov": 34.46620009307187
+    },
+    "eye": {
+     "lat": 46.43,
+     "lon": 7.78897,
+     "h": 2550.8579727319075,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 2549.1866414857277
+    },
+    "confidenceLevel": null
+   },
+   "B": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 162.36875610361312,
+     "pitch": -12.98126532867102,
+     "roll": -0.08462899902829926,
+     "vfov": 38.15806944747169
+    },
+    "eye": {
+     "lat": 46.43715544284206,
+     "lon": 7.78230269399731,
+     "h": 2803.463875964322,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 2802.110011958517
+    },
+    "confidenceLevel": "LOW"
+   }
+  },
+  "diff": {
+   "yaw": -0.12199466564436534,
+   "pitch": -4.798831246377592
+  },
+  "t5ConfidenceLevel": "LOW"
+ },
+ "wc_0098": {
+  "candidates": {
+   "A": {
+    "method": "pose6",
+    "pose": {
+     "yaw": 52.343271554147336,
+     "pitch": 10.154959675265184,
+     "roll": -6.2564705896859225,
+     "vfov": 31.82165410299407
+    },
+    "eye": {
+     "lat": 46.64306491002634,
+     "lon": 9.27992519616578,
+     "h": 1664.238304558306,
+     "source": "t5 eye (pose6 solved eye)",
+     "dem": "mapterhorn",
+     "ground": 1662.1299404946249
+    },
+    "confidenceLevel": "LOW"
+   },
+   "B": {
+    "method": "fused",
+    "pose": {
+     "yaw": 48.75951130982954,
+     "pitch": 6.6179095549506854,
+     "roll": -1.3378326243943397,
+     "vfov": 32.54950307722008
+    },
+    "eye": {
+     "lat": 46.644661,
+     "lon": 9.278875,
+     "h": 1669.49340161852,
+     "source": "t5 start.eyeEnu (fused / engine eye)",
+     "dem": "mapterhorn",
+     "ground": 1667.8590471578004
+    },
+    "confidenceLevel": null
+   }
+  },
+  "diff": {
+   "yaw": 3.583760244317773,
+   "pitch": 3.5370501203144986
+  },
+  "t5ConfidenceLevel": "LOW"
+ }
+}

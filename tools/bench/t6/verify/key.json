@@ -1,0 +1,137 @@
+{
+ "wc_0028": {
+  "candidates": {
+   "A": {
+    "pose": {
+     "yaw": 72.64337168967577,
+     "pitch": -5.8225995743697,
+     "roll": 1.940726831234606,
+     "vfov": 43.57978494841898
+    },
+    "eye": {
+     "lat": 46.990667,
+     "lon": 8.264,
+     "h": 1808.1,
+     "dem": "mapterhorn",
+     "ground": 1237.6505333419086
+    },
+    "labels": [
+     "baseline_cpu_replay",
+     "t6_selected"
+    ],
+    "high": false,
+    "source": "sweep40",
+    "codeStamp": "c2d406ea3c557e6e",
+    "ruleSha1": "292fb74f35f6f402b5e81f1b832bac565edd6807"
+   }
+  }
+ },
+ "wc_0046": {
+  "candidates": {
+   "A": {
+    "pose": {
+     "yaw": 177.80893409551436,
+     "pitch": -2.8378208329763472,
+     "roll": 1.5036149526645772,
+     "vfov": 32.967717538552655
+    },
+    "eye": {
+     "lat": 47.040085,
+     "lon": 8.478834,
+     "h": 1454.5107396474937,
+     "dem": "mapterhorn",
+     "ground": 1452.9055291589757
+    },
+    "labels": [
+     "baseline_cpu_replay",
+     "t6_selected"
+    ],
+    "high": false,
+    "source": "appseeds",
+    "codeStamp": "c2d406ea3c557e6e",
+    "ruleSha1": "292fb74f35f6f402b5e81f1b832bac565edd6807"
+   }
+  }
+ },
+ "wc_0072": {
+  "candidates": {
+   "A": {
+    "pose": {
+     "yaw": 76.82091038286256,
+     "pitch": -3.4027714096378925,
+     "roll": 2.342085668711619,
+     "vfov": 25.749238929298688
+    },
+    "eye": {
+     "lat": 47.239778,
+     "lon": 9.453075,
+     "h": 637.6467347155898,
+     "dem": "mapterhorn",
+     "ground": 635.7278061223874
+    },
+    "labels": [
+     "baseline_cpu_replay",
+     "t6_selected"
+    ],
+    "high": false,
+    "source": "sweep40",
+    "codeStamp": "c2d406ea3c557e6e",
+    "ruleSha1": "292fb74f35f6f402b5e81f1b832bac565edd6807"
+   }
+  }
+ },
+ "wc_0087": {
+  "candidates": {
+   "A": {
+    "pose": {
+     "yaw": 167.04329403257492,
+     "pitch": -0.09782068362548856,
+     "roll": -8.164149628342978,
+     "vfov": 32.92879096228618
+    },
+    "eye": {
+     "lat": 46.38295,
+     "lon": 7.0712,
+     "h": 1656.641345611836,
+     "dem": "mapterhorn",
+     "ground": 1654.5943147514674
+    },
+    "labels": [
+     "baseline_cpu_replay",
+     "t6_selected"
+    ],
+    "high": false,
+    "source": "appseeds",
+    "codeStamp": "c2d406ea3c557e6e",
+    "ruleSha1": "292fb74f35f6f402b5e81f1b832bac565edd6807"
+   }
+  }
+ },
+ "wc_0094": {
+  "candidates": {
+   "A": {
+    "pose": {
+     "yaw": 145.29473540903922,
+     "pitch": -5.109907203291326,
+     "roll": -1.2242557460833312,
+     "vfov": 35.02662973912778
+    },
+    "eye": {
+     "lat": 46.428549,
+     "lon": 10.035843,
+     "h": 2474.4,
+     "dem": "mapterhorn",
+     "ground": 2447.9779825836004
+    },
+    "labels": [
+     "baseline_cpu_replay",
+     "t6_selected"
+    ],
+    "high": true,
+    "source": "sweep40",
+    "codeStamp": "c2d406ea3c557e6e",
+    "ruleSha1": "292fb74f35f6f402b5e81f1b832bac565edd6807"
+   }
+  }
+ }
+}

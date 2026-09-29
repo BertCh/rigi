@@ -1,0 +1,130 @@
+subset=even photos=23
+(A) refs: key  AUROC  pairwin  best_correct_wins/photos_both   [n_pos/n_neg]
+  moge_l.sky_miou          0.934  0.944  10/11 [18/56]
+  moge_l.sky_miou.z        0.524  0.778  7/11 [18/54]
+  moge_l.rank_t            0.85   0.861  8/11 [18/54]
+  moge_l.rank_t.z          0.759  0.667  4/11 [18/52]
+  moge_l.rank_all          0.934  0.917  9/11 [18/56]
+  moge_l.rank_all.z        0.583  0.639  3/11 [18/52]
+  moge_l.ord_local         0.94   0.917  9/11 [18/56]
+  moge_l.ord_local.z       0.708  0.75   5/11 [18/51]
+  moge_l.ord_global        0.912  0.944  10/11 [18/56]
+  moge_l.ord_global.z      0.571  0.686  4/11 [18/50]
+  moge_l.edge_int          0.912  0.871  7/10 [17/49]
+  moge_l.edge_int.z        0.841  0.71   5/10 [17/46]
+  moge_l.edge_all          0.95   0.886  8/11 [18/53]
+  moge_l.edge_all.z        0.854  0.8    6/11 [18/50]
+  moge_l.normal_cos        0.742  0.833  7/11 [18/53]
+  moge_l.normal_cos.z      0.686  0.639  4/11 [18/51]
+  moge_l.combo.z           0.848  0.886  8/11 [18/50]
+  moge_l.combo_int.z       0.861  0.871  6/10 [17/46]
+  moge_b.sky_miou          0.917  0.944  10/11 [18/56]
+  moge_b.sky_miou.z        None   None   0/0 [0/0]
+  moge_b.rank_t            0.842  0.861  8/11 [18/54]
+  moge_b.rank_t.z          None   None   0/0 [0/0]
+  moge_b.rank_all          0.907  0.972  10/11 [18/56]
+  moge_b.rank_all.z        None   None   0/0 [0/0]
+  moge_b.ord_local         0.911  0.917  9/11 [18/56]
+  moge_b.ord_local.z       None   None   0/0 [0/0]
+  moge_b.ord_global        0.89   0.917  9/11 [18/56]
+  moge_b.ord_global.z      None   None   0/0 [0/0]
+  moge_b.edge_int          0.912  0.871  7/10 [17/49]
+  moge_b.edge_int.z        None   None   0/0 [0/0]
+  moge_b.edge_all          0.935  0.914  9/11 [18/53]
+  moge_b.edge_all.z        None   None   0/0 [0/0]
+  moge_b.normal_cos        0.752  0.806  6/11 [18/53]
+  moge_b.normal_cos.z      None   None   0/0 [0/0]
+  moge_b.combo.z           None   None   0/0 [0/0]
+  moge_b.combo_int.z       None   None   0/0 [0/0]
+  da3_b.sky_miou           0.934  0.944  10/11 [18/56]
+  da3_b.sky_miou.z         0.524  0.778  7/11 [18/54]
+  da3_b.rank_t             0.752  0.694  5/11 [18/54]
+  da3_b.rank_t.z           0.733  0.639  4/11 [18/52]
+  da3_b.rank_all           0.904  0.972  10/11 [18/56]
+  da3_b.rank_all.z         0.567  0.667  3/11 [18/52]
+  da3_b.ord_local          0.844  0.861  9/11 [18/56]
+  da3_b.ord_local.z        0.681  0.771  6/11 [18/50]
+  da3_b.ord_global         0.871  0.889  8/11 [18/56]
+  da3_b.ord_global.z       0.54   0.629  4/11 [18/50]
+  da3_b.edge_int           0.885  0.871  8/10 [17/49]
+  da3_b.edge_int.z         0.852  0.767  7/10 [17/46]
+  da3_b.edge_all           0.954  0.943  10/11 [18/53]
+  da3_b.edge_all.z         0.872  0.882  7/11 [18/49]
+  da3_b.normal_cos         None   None   0/0 [0/0]
+  da3_b.normal_cos.z       None   None   0/0 [0/0]
+  da3_b.combo.z            0.848  0.882  7/11 [18/49]
+  da3_b.combo_int.z        0.877  0.833  7/10 [17/46]
+(B) localisation
+  moge_l.sky_miou        yawmax 14/16 pitchmax 16/16 drop±1 0.078 0.082 ±8 0.363 0.520 | scan ≤2° 14/16 ≤10° 15 top3 16 fwhm 30.0
+  moge_l.rank_t          yawmax 8/16 pitchmax 12/16 drop±1 0.023 0.043 ±8 0.449 0.525 | scan ≤2° 9/16 ≤10° 10 top3 13 fwhm 16.5
+  moge_l.rank_all        yawmax 14/16 pitchmax 16/16 drop±1 0.050 0.064 ±8 0.539 0.535 | scan ≤2° 14/16 ≤10° 14 top3 15 fwhm 24.5
+  moge_l.ord_local       yawmax 13/16 pitchmax 13/16 drop±1 0.252 0.202 ±8 1.155 0.911 | scan ≤2° 9/16 ≤10° 10 top3 10 fwhm 12.0
+  moge_l.ord_global      yawmax 14/16 pitchmax 14/16 drop±1 0.071 0.081 ±8 0.677 0.618 | scan ≤2° 11/16 ≤10° 12 top3 14 fwhm 16.0
+  moge_l.edge_int        yawmax 10/15 pitchmax 12/15 drop±1 0.780 0.550 ±8 2.703 3.896 | scan ≤2° 10/15 ≤10° 12 top3 13 fwhm 8.0
+  moge_l.edge_all        yawmax 14/16 pitchmax 16/16 drop±1 0.799 0.777 ±8 3.987 3.905 | scan ≤2° 15/16 ≤10° 16 top3 16 fwhm 8.5
+  moge_l.normal_cos      yawmax 11/16 pitchmax 9/16 drop±1 0.221 0.337 ±8 0.838 0.767 | scan ≤2° 8/16 ≤10° 8 top3 11 fwhm 9.5
+  moge_b.sky_miou        yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+  moge_b.rank_t          yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+  moge_b.rank_all        yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+  moge_b.ord_local       yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+  moge_b.ord_global      yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+  moge_b.edge_int        yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+  moge_b.edge_all        yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+  moge_b.normal_cos      yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+  da3_b.sky_miou         yawmax 14/16 pitchmax 16/16 drop±1 0.078 0.082 ±8 0.363 0.520 | scan ≤2° 14/16 ≤10° 15 top3 16 fwhm 30.0
+  da3_b.rank_t           yawmax 8/16 pitchmax 11/16 drop±1 0.004 0.038 ±8 0.234 0.458 | scan ≤2° 7/16 ≤10° 9 top3 11 fwhm 15.5
+  da3_b.rank_all         yawmax 13/16 pitchmax 15/16 drop±1 0.042 0.064 ±8 0.565 0.491 | scan ≤2° 14/16 ≤10° 14 top3 15 fwhm 31.5
+  da3_b.ord_local        yawmax 11/16 pitchmax 11/16 drop±1 0.162 0.227 ±8 1.193 1.000 | scan ≤2° 11/16 ≤10° 11 top3 11 fwhm 11.0
+  da3_b.ord_global       yawmax 12/16 pitchmax 12/16 drop±1 0.052 0.073 ±8 0.503 0.588 | scan ≤2° 9/16 ≤10° 10 top3 12 fwhm 17.0
+  da3_b.edge_int         yawmax 7/15 pitchmax 10/15 drop±1 0.633 0.870 ±8 2.463 2.943 | scan ≤2° 7/15 ≤10° 9 top3 10 fwhm 6.0
+  da3_b.edge_all         yawmax 12/16 pitchmax 15/16 drop±1 0.832 0.967 ±8 4.098 4.870 | scan ≤2° 12/16 ≤10° 15 top3 16 fwhm 6.0
+  da3_b.normal_cos       yawmax 0/0 pitchmax 0/0 drop±1 None None ±8 None None | scan ≤2° 0/0 ≤10° 0 top3 0 fwhm None
+(C) matcher poses ≥100 inl: AUROC correct vs gross
+  moge_l.rank_all          0.851  n=41/10
+  moge_l.rank_all.z        0.58   n=41/10
+  moge_l.rank_t            0.883  n=41/10
+  moge_l.rank_t.z          0.678  n=41/10
+  moge_l.ord_local         0.976  n=41/10
+  moge_l.ord_local.z       0.607  n=41/10
+  moge_l.edge_all          0.824  n=41/10
+  moge_l.edge_all.z        0.661  n=41/10
+  moge_l.edge_int          0.88   n=40/10
+  moge_l.edge_int.z        0.868  n=40/10
+  moge_l.normal_cos        0.815  n=41/10
+  moge_l.normal_cos.z      0.766  n=41/10
+  moge_l.sky_miou          0.773  n=41/10
+  moge_l.sky_miou.z        0.551  n=41/10
+  moge_l.combo.z           0.688  n=41/10
+  moge_l.combo_int.z       0.82   n=40/10
+  moge_b.rank_all          None   n=0/0
+  moge_b.rank_all.z        None   n=0/0
+  moge_b.rank_t            None   n=0/0
+  moge_b.rank_t.z          None   n=0/0
+  moge_b.ord_local         None   n=0/0
+  moge_b.ord_local.z       None   n=0/0
+  moge_b.edge_all          None   n=0/0
+  moge_b.edge_all.z        None   n=0/0
+  moge_b.edge_int          None   n=0/0
+  moge_b.edge_int.z        None   n=0/0
+  moge_b.normal_cos        None   n=0/0
+  moge_b.normal_cos.z      None   n=0/0
+  moge_b.sky_miou          None   n=0/0
+  moge_b.sky_miou.z        None   n=0/0
+  moge_b.combo.z           None   n=0/0
+  moge_b.combo_int.z       None   n=0/0
+  da3_b.rank_all           0.846  n=41/10
+  da3_b.rank_all.z         0.578  n=41/10
+  da3_b.rank_t             0.763  n=41/10
+  da3_b.rank_t.z           0.646  n=41/10
+  da3_b.ord_local          0.82   n=41/10
+  da3_b.ord_local.z        0.622  n=41/10
+  da3_b.edge_all           0.632  n=41/10
+  da3_b.edge_all.z         0.563  n=41/10
+  da3_b.edge_int           0.795  n=40/10
+  da3_b.edge_int.z         0.757  n=40/10
+  da3_b.normal_cos         None   n=0/0
+  da3_b.normal_cos.z       None   n=0/0
+  da3_b.sky_miou           0.773  n=41/10
+  da3_b.sky_miou.z         0.551  n=41/10
+  da3_b.combo.z            0.602  n=41/10
+  da3_b.combo_int.z        0.79   n=40/10

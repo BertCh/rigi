@@ -1,0 +1,64 @@
+{
+ "id": "wc_0005",
+ "regime": "exif",
+ "sigma": {
+  "sky": 8.37013031946484,
+  "match": 1.0
+ },
+ "start": {
+  "pose": {
+   "yaw": 191.21175126095227,
+   "pitch": -0.7498531322258238,
+   "roll": -0.04945417929407679,
+   "vfov": 17.967168318012583
+  },
+  "eyeEnu": [
+   0.0,
+   0.0,
+   814.6
+  ],
+  "agl": 1.6000000000000227
+ },
+ "costStart": 757.6179514870698,
+ "costRotOnly": 848.1446313928906,
+ "keptStart": true,
+ "pose": {
+  "yaw": 191.21175126095227,
+  "pitch": -0.7498531322258238,
+  "roll": -0.04945417929407679,
+  "vfov": 17.967168318012583
+ },
+ "eye": {
+  "lat": 47.351668,
+  "lon": 8.487503,
+  "h": 814.6
+ },
+ "eyeEnu": [
+  0.0,
+  0.0,
+  814.6
+ ],
+ "confidenceLevel": "LOW",
+ "checks": {
+  "d_agree": null,
+  "sky_med": 5.56789819019167,
+  "match_support": 0.0,
+  "agl": 1.6000000000000227,
+  "cap": 10.0,
+  "onCap": false,
+  "shiftM": 0.0,
+  "shiftSigma": 0.0,
+  "basinGap": null,
+  "confirmSkyMedPx": null,
+  "failed": [
+   "agree<1",
+   "skyMed<4",
+   "support>=0.3"
+  ]
+ },
+ "cost": 757.6179514870698,
+ "grid": null,
+ "horizons": 183,
+ "sec": 43.62038207054138,
+ "wallSec": 83.57704401016235
+}

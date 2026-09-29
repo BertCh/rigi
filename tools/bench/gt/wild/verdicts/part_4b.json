@@ -1,0 +1,29 @@
+{"verifier": "4b", "photos": {
+ "wc_0006": {"photoTags": ["near-field-terrain", "cloud"], "candidates": {
+  "A": {"verdict": "wrong", "tags": ["near-field-terrain", "pitch-offset"], "note": "Line far below near summit and left ridge; smooth curve cuts through mountain."},
+  "B": {"verdict": "wrong", "tags": ["near-field-terrain", "near-miss"], "note": "Left/col close, but line well below main summit and right shoulder."},
+  "C": {"verdict": "wrong", "tags": ["pitch-offset", "roll"], "note": "Line runs well below the skyline everywhere."}}},
+ "wc_0009": {"photoTags": ["cloud", "fog-haze"], "candidates": {
+  "A": {"verdict": "wrong", "tags": ["wrong-direction"], "note": "Line cuts diagonally through the near peak; no match."},
+  "B": {"verdict": "correct", "tags": [], "note": "Far skyline incl. Weisshorn and Matterhorn peaks matched closely across width."},
+  "C": {"verdict": "wrong", "tags": ["wrong-direction", "roll"], "note": "Line floats in sky/clouds, does not follow any ridge."}}},
+ "wc_0012": {"photoTags": ["none"], "candidates": {
+  "A": {"verdict": "wrong", "tags": ["wrong-direction", "pitch-offset"], "note": "Line only in top-left sky corner; nowhere near skyline."},
+  "B": {"verdict": "wrong", "tags": ["parallax-mismatch", "yaw-shift"], "note": "Right half fits; left half misses Zuestoll and Schibenstoll block shapes."}}},
+ "wc_0016": {"photoTags": ["fog-haze", "water-reflection"], "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Hugs ridges and far peaks well; only small pinnacle missed (DEM smoothing)."}}},
+ "wc_0018": {"photoTags": ["foreground-occlusion", "fog-haze"], "candidates": {
+  "A": {"verdict": "correct", "tags": [], "note": "Dents du Midi and right-shore ridge traced closely end to end."},
+  "B": {"verdict": "wrong", "tags": ["wrong-direction"], "note": "Straight line through sky, unrelated to skyline."},
+  "C": {"verdict": "wrong", "tags": ["yaw-shift", "near-miss"], "note": "Sideways shifted: slope rise early, right peaks above line."}}},
+ "wc_0019": {"photoTags": ["near-field-terrain", "cloud"], "candidates": {
+  "A": {"verdict": "wrong", "tags": ["pitch-offset", "fov-scale"], "note": "Line inside mountain, below summit and left flank; shape roughly similar."},
+  "B": {"verdict": "wrong", "tags": ["pitch-offset"], "note": "No yellow line visible in frame at all."}}},
+ "wc_0029": {"photoTags": ["fog-haze", "cloud"], "candidates": {
+  "A": {"verdict": "wrong", "tags": ["pitch-offset", "wrong-direction"], "note": "Flat line across mid-range, far below Dents du Midi skyline."},
+  "B": {"verdict": "wrong", "tags": ["wrong-direction", "pitch-offset"], "note": "Line along fog/foreground bottom; unrelated to skyline."}}},
+ "wc_0031": {"photoTags": ["fog-haze", "near-field-terrain"], "candidates": {
+  "A": {"verdict": "wrong", "tags": ["pitch-offset", "wrong-direction"], "note": "Line mostly in sky above skyline; only brief touch on right."},
+  "B": {"verdict": "wrong", "tags": ["pitch-offset", "wrong-direction"], "note": "Same as other: line in sky, not on ridges."},
+  "C": {"verdict": "wrong", "tags": ["wrong-direction"], "note": "Arcs through sky; unrelated to skyline."}}}
+}}

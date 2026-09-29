@@ -1,0 +1,78 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+__unconfig*
+todos.json
+
+# pipeline outputs
+.cache
+out
+
+# local tool venvs / weights (f0)
+tools/**/.venv
+tools/**/weights
+tools/**/out
+
+# python / local build junk
+__pycache__/
+*.pyc
+.venv/
+*.lock
+!package-lock.json
+*.log
+
+# personal photos & input data
+img/
+data/
+public/photos/
+public/baseline/
+tools/bench/data/photos/
+tools/bench/data_v3/photos/
+tools/bench/collect*/work/
+
+# model weights & binary artifacts
+weights/
+public/models/
+*.onnx
+*.pt
+*.pth
+*.tar
+*.safetensors
+*.npz
+*.npy
+*.so
+*.zip
+*.HEIC
+*.heic
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.tif
+*.tiff
+
+# caches / generated outputs
+cache/
+!src/lib/cache/
+*_cache/
+.curves/
+raw/
+out/
+runs/
+corr/
+tools/research/tm/.pylib*/
+
+# bulky research experiment outputs (regenerable)
+tools/research/tm/*/results/
+tools/research/tm/x5_verifier/features*.json
+tools/research/tm/h1_mine/pool.json
+tools/research/tm/x3_modality/results_*.json
+.infer_done

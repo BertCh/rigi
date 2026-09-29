@@ -1,0 +1,287 @@
+{
+ "ok": true,
+ "nLifted": 4125,
+ "perView": [
+  {
+   "tag": "y-9.1877",
+   "matches": 890,
+   "lifted": 693,
+   "keypoints": 4096,
+   "terrainFrac": 0.59,
+   "rgbStd": 34.5
+  },
+  {
+   "tag": "y-4.5938",
+   "matches": 1289,
+   "lifted": 979,
+   "keypoints": 4096,
+   "terrainFrac": 0.572,
+   "rgbStd": 33.7
+  },
+  {
+   "tag": "y+0",
+   "matches": 1587,
+   "lifted": 1250,
+   "keypoints": 4096,
+   "terrainFrac": 0.57,
+   "rgbStd": 32.8
+  },
+  {
+   "tag": "y+4.5938",
+   "matches": 1026,
+   "lifted": 825,
+   "keypoints": 4096,
+   "terrainFrac": 0.551,
+   "rgbStd": 30.1
+  },
+  {
+   "tag": "y+9.1877",
+   "matches": 479,
+   "lifted": 378,
+   "keypoints": 4096,
+   "terrainFrac": 0.536,
+   "rgbStd": 29.0
+  }
+ ],
+ "inliers": 2174,
+ "inlierFrac": 0.527,
+ "residualPx": 3.538,
+ "coverage": 0.667,
+ "pose": {
+  "yaw": 217.12548545419537,
+  "pitch": 0.5455525012695899,
+  "roll": -1.2416846956364678,
+  "vfov": 14.1567537103373
+ },
+ "method": "fused",
+ "confidence": 0.9,
+ "confidenceLevel": "high",
+ "confidenceChecks": {
+  "cueAgreeDeg": 0.345,
+  "skylineMedPx": 2.895,
+  "matchSupport": 0.527,
+  "positionTrusted": false,
+  "basinGrid": {
+   "step": 250.0,
+   "best": {
+    "E": 0.0,
+    "N": 250.0,
+    "cost": 445.59016107565714
+   },
+   "second": {
+    "E": -250.0,
+    "N": -250.0,
+    "cost": 658.2265067488858
+   }
+  },
+  "basinGap": 0.4772
+ },
+ "cues": {
+  "skyline": {
+   "pose": {
+    "yaw": 217.003714190209,
+    "pitch": 0.5353440490734014,
+    "roll": -1.4993531429172446,
+    "vfov": 14.092681768561587
+   },
+   "residualPx": 2.07,
+   "appConfidence": 0.514,
+   "accepted": "confident"
+  },
+  "match": {
+   "pose": {
+    "yaw": 217.154223446923,
+    "pitch": 0.5544002500744651,
+    "roll": -1.1885128342946214,
+    "vfov": 14.142033545415135
+   },
+   "inliers": 1594,
+   "residualPx": 3.545
+  }
+ },
+ "fusionScore": 0.344,
+ "matchConfidence": 0.53,
+ "fusedFrom": "skyline",
+ "deltaYawFromPrior": 0.072,
+ "focalPx": 3092.45,
+ "size": {
+  "W": 1024,
+  "H": 768
+ },
+ "timingMs": {
+  "stage1": 34341,
+  "render": 27251,
+  "loadMs": 0,
+  "fullTerrainMs": 0,
+  "imageryMs": 2,
+  "skylineMs": 221,
+  "renderMs": 1052,
+  "warmPage": true,
+  "draped": false,
+  "imageryRetries": 0,
+  "imageryMissing": 0,
+  "imageryTiles": 343,
+  "match": 11194,
+  "solve": 962,
+  "fusion": 1646,
+  "basinGap": 12103,
+  "total": 62069
+ },
+ "eye": [
+  0,
+  0,
+  2437.8212223592795
+ ],
+ "adhoc": {
+  "id": "adhoc-9b821461c831",
+  "size": {
+   "W": 2048,
+   "H": 1536
+  },
+  "yawKnown": false,
+  "gravityKnown": false,
+  "focalKnown": true,
+  "priorUsed": {
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "roll": 0.0,
+   "vfov": 13.833307257483765
+  },
+  "yaw360": true,
+  "twoStage": true,
+  "defaultHfov": null,
+  "hfov": 18.375,
+  "narrow": true,
+  "stage2Prior": {
+   "yaw": 217.05371419020898,
+   "pitch": 0.5353440490734015,
+   "roll": -1.0993531429172452,
+   "vfov": 13.833307257483765
+  },
+  "stages": [
+   {
+    "stage": "narrow-seeds",
+    "seeds": [
+     {
+      "yaw": 225.0,
+      "pitch": 0.0,
+      "roll": 0.0,
+      "source": "yaw-hint"
+     },
+     {
+      "yaw": 166.5,
+      "pitch": 1.075,
+      "roll": -1.1500000000000006,
+      "source": "app-skyline"
+     },
+     {
+      "yaw": 12.299999999999999,
+      "pitch": 10.525,
+      "roll": 1.0000000000000002,
+      "source": "app-skyline"
+     },
+     {
+      "yaw": 76.85,
+      "pitch": 7.6,
+      "roll": -0.29999999999999993,
+      "source": "app-skyline"
+     }
+    ],
+    "ms": 9837
+   },
+   {
+    "stage": "narrow-match",
+    "tried": [
+     {
+      "source": "yaw-hint",
+      "seed": {
+       "yaw": 225.0,
+       "pitch": 0.0,
+       "roll": 0.0
+      },
+      "pose": {
+       "yaw": 217.05371419020898,
+       "pitch": 0.5353440490734015,
+       "roll": -1.0993531429172452,
+       "vfov": 13.833307257483767
+      },
+      "inliers": 177,
+      "nLifted": 618,
+      "residualPx": 3.526,
+      "ms": 9664
+     },
+     {
+      "source": "app-skyline",
+      "seed": {
+       "yaw": 166.5,
+       "pitch": 1.075,
+       "roll": -1.1500000000000006
+      },
+      "pose": null,
+      "inliers": 0,
+      "nLifted": 17,
+      "residualPx": null,
+      "ms": 5368
+     },
+     {
+      "source": "app-skyline",
+      "seed": {
+       "yaw": 12.299999999999999,
+       "pitch": 10.525,
+       "roll": 1.0000000000000002
+      },
+      "pose": null,
+      "inliers": 0,
+      "nLifted": 0,
+      "residualPx": null,
+      "ms": 4603
+     },
+     {
+      "source": "app-skyline",
+      "seed": {
+       "yaw": 76.85,
+       "pitch": 7.6,
+       "roll": -0.29999999999999993
+      },
+      "pose": null,
+      "inliers": 0,
+      "nLifted": 0,
+      "residualPx": null,
+      "ms": 4869
+     }
+    ],
+    "used": true,
+    "seedSource": "yaw-hint",
+    "pose": {
+     "yaw": 217.05371419020898,
+     "pitch": 0.5353440490734015,
+     "roll": -1.0993531429172452,
+     "vfov": 13.833307257483767
+    },
+    "inliers": 177,
+    "ms": 24504
+   }
+  ]
+ },
+ "version": "matcher-service/0.3.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16 on MPS + lightglue on CPU; basin-gap LOW trigger for untrusted positions; bounded queue, client-cancel)",
+ "id": "wc_0017",
+ "request": {
+  "photoPath": "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/photos/wc_0017.jpg",
+  "meta": {
+   "lat": 46.4487,
+   "lon": 8.1642,
+   "altitudeM": null,
+   "positionSource": "manual"
+  },
+  "prior": {
+   "yaw": null,
+   "pitch": null,
+   "roll": null,
+   "vfov": 13.833307257483765
+  },
+  "region": null,
+  "timeoutMs": 600000,
+  "yawHint": 225.0
+ },
+ "wallMs": 62071
+}

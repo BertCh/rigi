@@ -1,0 +1,206 @@
+{
+ "ok": true,
+ "nLifted": 1525,
+ "perView": [
+  {
+   "tag": "y-20",
+   "matches": 14,
+   "lifted": 5,
+   "keypoints": 4096,
+   "terrainFrac": 0.707,
+   "rgbStd": 30.4
+  },
+  {
+   "tag": "y-10",
+   "matches": 36,
+   "lifted": 34,
+   "keypoints": 4096,
+   "terrainFrac": 0.616,
+   "rgbStd": 35.5
+  },
+  {
+   "tag": "y+0",
+   "matches": 645,
+   "lifted": 563,
+   "keypoints": 4096,
+   "terrainFrac": 0.587,
+   "rgbStd": 38.5
+  },
+  {
+   "tag": "y+10",
+   "matches": 641,
+   "lifted": 566,
+   "keypoints": 4096,
+   "terrainFrac": 0.604,
+   "rgbStd": 37.5
+  },
+  {
+   "tag": "y+20",
+   "matches": 398,
+   "lifted": 357,
+   "keypoints": 4096,
+   "terrainFrac": 0.647,
+   "rgbStd": 33.1
+  }
+ ],
+ "inliers": 911,
+ "inlierFrac": 0.5974,
+ "residualPx": 3.739,
+ "coverage": 0.25,
+ "pose": {
+  "yaw": 101.80591579715198,
+  "pitch": 4.1019039177018035,
+  "roll": 2.0676946730553007,
+  "vfov": 16.731379237649602
+ },
+ "method": "fused",
+ "confidence": 0.2,
+ "confidenceLevel": "low",
+ "confidenceChecks": {
+  "cueAgreeDeg": 3.741,
+  "skylineMedPx": 6.985,
+  "matchSupport": 0.597
+ },
+ "cues": {
+  "skyline": {
+   "pose": {
+    "yaw": 105.39887954812588,
+    "pitch": 3.1536466715404052,
+    "roll": 2.0598486489330816,
+    "vfov": 17.058837443584498
+   },
+   "residualPx": 9.313,
+   "appConfidence": 0.039,
+   "accepted": "near-compass"
+  },
+  "match": {
+   "pose": {
+    "yaw": 101.78329689626287,
+    "pitch": 4.105249570474052,
+    "roll": 2.099249839357276,
+    "vfov": 16.766289406572827
+   },
+   "inliers": 686,
+   "residualPx": 3.689
+  }
+ },
+ "fusionScore": 0.004,
+ "matchConfidence": 0.445,
+ "fusedFrom": "match",
+ "deltaYawFromPrior": 0.257,
+ "focalPx": 1958.45,
+ "size": {
+  "W": 1024,
+  "H": 576
+ },
+ "timingMs": {
+  "stage1": 166302,
+  "render": 8525,
+  "loadMs": 0,
+  "fullTerrainMs": 0,
+  "imageryMs": 1,
+  "skylineMs": 159,
+  "renderMs": 594,
+  "warmPage": true,
+  "draped": false,
+  "imageryRetries": 0,
+  "imageryMissing": 0,
+  "imageryTiles": 237,
+  "match": 6144,
+  "solve": 179,
+  "fusion": 1428,
+  "total": 175045
+ },
+ "eye": [
+  0,
+  0,
+  1828.9632711540442
+ ],
+ "adhoc": {
+  "id": "adhoc-7f835f9f0f93",
+  "size": {
+   "W": 2048,
+   "H": 1152
+  },
+  "yawKnown": false,
+  "gravityKnown": false,
+  "focalKnown": true,
+  "priorUsed": {
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "roll": 0.0,
+   "vfov": 17.231148932913637
+  },
+  "yaw360": true,
+  "twoStage": true,
+  "defaultHfov": null,
+  "hfov": 30.151,
+  "narrow": false,
+  "stage2Prior": {
+   "yaw": 101.54887954812587,
+   "pitch": 4.041146671540405,
+   "roll": 1.8848486489330813,
+   "vfov": 17.231148932913637
+  },
+  "stages": [
+   {
+    "stage": "match-sweep",
+    "offsets": [
+     0,
+     40,
+     80,
+     120,
+     160,
+     200,
+     240,
+     280,
+     320
+    ],
+    "pose": {
+     "yaw": 101.54887954812587,
+     "pitch": 4.041146671540405,
+     "roll": 1.8848486489330813,
+     "vfov": 17.231148932913637
+    },
+    "inliers": 207,
+    "inlierFrac": 0.4461,
+    "residualPx": 3.617,
+    "used": true,
+    "ms": 166302,
+    "renderTiming": {
+     "loadMs": 154052,
+     "fullTerrainMs": 168,
+     "imageryMs": 2972,
+     "skylineMs": 0,
+     "renderMs": 1122,
+     "warmPage": false,
+     "draped": true,
+     "imageryRetries": 0,
+     "imageryMissing": 0,
+     "imageryTiles": 237
+    }
+   }
+  ]
+ },
+ "version": "matcher-service/0.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16+lightglue on sat renders, LightGlue flash off on MPS; basin-gap LOW trigger for untrusted positions)",
+ "id": "wc_0001",
+ "request": {
+  "photoPath": "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/photos/wc_0001.jpg",
+  "meta": {
+   "lat": 46.781325,
+   "lon": 10.150078,
+   "altitudeM": null,
+   "positionSource": "exif-gps"
+  },
+  "prior": {
+   "yaw": null,
+   "pitch": null,
+   "roll": null,
+   "vfov": 17.231148932913637
+  },
+  "region": null,
+  "timeoutMs": 600000,
+  "yawHint": 89.1
+ },
+ "wallMs": 418452
+}

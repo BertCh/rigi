@@ -1,0 +1,159 @@
+{
+ "about": "Blinded candidates (dev photos only). Each overlay draws the Mapterhorn DEM skyline (yellow) and occlusion-tested OSM peak labels for one candidate camera (pose + eye); judge which candidate's line lies on the photo's real skyline.",
+ "photos": {
+  "wc_0002": {
+   "photo": "../../data/photos/wc_0002.jpg",
+   "candidates": {
+    "A": "wc_0002_A.jpg",
+    "B": "wc_0002_B.jpg"
+   }
+  },
+  "wc_0010": {
+   "photo": "../../data/photos/wc_0010.jpg",
+   "candidates": {
+    "A": "wc_0010_A.jpg",
+    "B": "wc_0010_B.jpg"
+   }
+  },
+  "wc_0015": {
+   "photo": "../../data/photos/wc_0015.jpg",
+   "candidates": {
+    "A": "wc_0015_A.jpg",
+    "B": "wc_0015_B.jpg"
+   }
+  },
+  "wc_0023": {
+   "photo": "../../data/photos/wc_0023.jpg",
+   "candidates": {
+    "A": "wc_0023_A.jpg",
+    "B": "wc_0023_B.jpg"
+   }
+  },
+  "wc_0027": {
+   "photo": "../../data/photos/wc_0027.jpg",
+   "candidates": {
+    "A": "wc_0027_A.jpg",
+    "B": "wc_0027_B.jpg"
+   }
+  },
+  "wc_0034": {
+   "photo": "../../data/photos/wc_0034.jpg",
+   "candidates": {
+    "A": "wc_0034_A.jpg",
+    "B": "wc_0034_B.jpg"
+   }
+  },
+  "wc_0035": {
+   "photo": "../../data/photos/wc_0035.jpg",
+   "candidates": {
+    "A": "wc_0035_A.jpg",
+    "B": "wc_0035_B.jpg"
+   }
+  },
+  "wc_0047": {
+   "photo": "../../data/photos/wc_0047.jpg",
+   "candidates": {
+    "A": "wc_0047_A.jpg",
+    "B": "wc_0047_B.jpg"
+   }
+  },
+  "wc_0052": {
+   "photo": "../../data/photos/wc_0052.jpg",
+   "candidates": {
+    "A": "wc_0052_A.jpg",
+    "B": "wc_0052_B.jpg"
+   }
+  },
+  "wc_0058": {
+   "photo": "../../data/photos/wc_0058.jpg",
+   "candidates": {
+    "A": "wc_0058_A.jpg",
+    "B": "wc_0058_B.jpg"
+   }
+  },
+  "wc_0070": {
+   "photo": "../../data/photos/wc_0070.jpg",
+   "candidates": {
+    "A": "wc_0070_A.jpg",
+    "B": "wc_0070_B.jpg"
+   }
+  },
+  "wc_0071": {
+   "photo": "../../data/photos/wc_0071.jpg",
+   "candidates": {
+    "A": "wc_0071_A.jpg",
+    "B": "wc_0071_B.jpg"
+   }
+  },
+  "wc_0072": {
+   "photo": "../../data/photos/wc_0072.jpg",
+   "candidates": {
+    "A": "wc_0072_A.jpg",
+    "B": "wc_0072_B.jpg"
+   }
+  },
+  "wc_0076": {
+   "photo": "../../data/photos/wc_0076.jpg",
+   "candidates": {
+    "A": "wc_0076_A.jpg",
+    "B": "wc_0076_B.jpg"
+   }
+  },
+  "wc_0087": {
+   "photo": "../../data/photos/wc_0087.jpg",
+   "candidates": {
+    "A": "wc_0087_A.jpg",
+    "B": "wc_0087_B.jpg"
+   }
+  },
+  "wc_0095": {
+   "photo": "../../data/photos/wc_0095.jpg",
+   "candidates": {
+    "A": "wc_0095_A.jpg",
+    "B": "wc_0095_B.jpg"
+   }
+  },
+  "wc_0098": {
+   "photo": "../../data/photos/wc_0098.jpg",
+   "candidates": {
+    "A": "wc_0098_A.jpg",
+    "B": "wc_0098_B.jpg"
+   }
+  }
+ },
+ "skipped": {
+  "wc_0001": "fused and pose6 within 0.3° (Δyaw 0.17, Δpitch -0.07)",
+  "wc_0004": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0005": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0006": "fused and pose6 within 0.3° (Δyaw 0.30, Δpitch -0.12)",
+  "wc_0009": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0011": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0013": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0014": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0017": "fused and pose6 within 0.3° (Δyaw -0.10, Δpitch -0.06)",
+  "wc_0019": "fused and pose6 within 0.3° (Δyaw 0.04, Δpitch -0.02)",
+  "wc_0020": "fused and pose6 within 0.3° (Δyaw -0.03, Δpitch -0.04)",
+  "wc_0028": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0033": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0037": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0040": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0046": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0048": "fused and pose6 within 0.3° (Δyaw -0.03, Δpitch -0.01)",
+  "wc_0053": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0054": "fused and pose6 within 0.3° (Δyaw 0.15, Δpitch 0.11)",
+  "wc_0055": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0059": "fused and pose6 within 0.3° (Δyaw -0.09, Δpitch -0.08)",
+  "wc_0063": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0067": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0069": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0073": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0074": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0077": "fused and pose6 within 0.3° (Δyaw -0.20, Δpitch 0.00)",
+  "wc_0082": "fused and pose6 within 0.3° (Δyaw -0.02, Δpitch -0.01)",
+  "wc_0085": "fused and pose6 within 0.3° (Δyaw 0.06, Δpitch -0.23)",
+  "wc_0086": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0088": "fused and pose6 within 0.3° (Δyaw 0.13, Δpitch -0.01)",
+  "wc_0094": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)",
+  "wc_0099": "fused and pose6 within 0.3° (Δyaw 0.00, Δpitch 0.00)"
+ }
+}

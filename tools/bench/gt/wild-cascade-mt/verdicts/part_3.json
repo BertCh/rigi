@@ -1,0 +1,341 @@
+{
+ "verifier": 3,
+ "photos": {
+  "wc_0004": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line tracks Santis/Altmann massif skyline closely incl. summits and notches; left flat horizon matches."
+    }
+   }
+  },
+  "wc_0008": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch",
+      "pitch-offset"
+     ],
+     "note": "Line floats in sky over left mountains and gap (valley notch missing); only touches Monte San Salvatore-like summit; roll 23.9 implausible."
+    }
+   }
+  },
+  "wc_0011": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Line hugs both summits, central notch, right tower and right shoulder; left segment passes through cloud where terrain hidden."
+    }
+   }
+  },
+  "wc_0017": {
+   "photoTags": [
+    "cloud"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Line runs in sky above Mischabel/Matterhorn/Weisshorn with unrelated shape; Matterhorn spike not matched; roll -10.4 looks wrong."
+    }
+   }
+  },
+  "wc_0024": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion",
+    "water-reflection"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "correct",
+     "tags": [],
+     "note": "Pyramid peak, Glarnisch massif edge, valley gap and right mountain all match; far-left top in cloud."
+    }
+   }
+  },
+  "wc_0034": {
+   "photoTags": [
+    "near-field-terrain",
+    "cloud"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "wrong",
+     "tags": [
+      "other",
+      "pitch-offset"
+     ],
+     "note": "No yellow skyline visible anywhere in frame; clear forested ridge skyline uncovered, so C1 fails."
+    }
+   }
+  },
+  "wc_0038": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line far up in sky, rising left-to-right, unrelated to hazy distant skyline; large pitch/direction error."
+    }
+   }
+  },
+  "wc_0042": {
+   "photoTags": [
+    "cloud",
+    "fog-haze"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line climbs off top of frame into sky, V-shape unrelated to cloud-capped cliff skyline; clearly wrong."
+    }
+   }
+  },
+  "wc_0046": {
+   "photoTags": [
+    "fog-haze",
+    "foreground-occlusion",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Steep diagonal line across sky (roll -19); does not follow the jagged Alpine skyline except a brief touch at right."
+    }
+   }
+  },
+  "wc_0050": {
+   "photoTags": [
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line at very top of frame (in header/branches), ~35% of height above the snowy Alpine skyline; no match."
+    }
+   }
+  },
+  "wc_0055": {
+   "photoTags": [
+    "near-field-terrain",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "correct",
+     "tags": [
+      "near-field-terrain"
+     ],
+     "note": "Shape matches ridge exactly (cliff-top kink, descending slope, saddle at right); line sits ~2-3% below forested skyline, consistent with ~25-30m tree canopy on near ridge (DEM bare earth). Right end hidden by roof."
+    }
+   }
+  },
+  "wc_0059": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "wrong-direction"
+     ],
+     "note": "Line runs across lower valley/train, far below the prominent peak and ridge skyline; no match."
+    }
+   }
+  },
+  "wc_0062": {
+   "photoTags": [
+    "none"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "parallax-mismatch"
+     ],
+     "note": "Line cuts across mountains (below skyline at left-centre, above at right), no summit correspondence; roll -20.9 implausible."
+    }
+   }
+  },
+  "wc_0065": {
+   "photoTags": [
+    "cloud",
+    "foreground-occlusion"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "roll",
+      "wrong-direction"
+     ],
+     "note": "Matterhorn summit left well above line; line cuts across terrain and cloud with unrelated shape; labels (Weisshorn etc.) implausible for this Matterhorn view; roll 8."
+    }
+   }
+  },
+  "wc_0068": {
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "correct",
+     "tags": [
+      "parallax-mismatch",
+      "near-field-terrain"
+     ],
+     "note": "Matterhorn summit, Testa del Leone notch, col and Dent d'Herens all fit closely (~73% of width). Right ~27%: line climbs off-frame well above the near right ridge (near-field parallax), so borderline on C1."
+    }
+   }
+  },
+  "wc_0071": {
+   "photoTags": [
+    "near-field-terrain",
+    "foreground-occlusion",
+    "water-reflection"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line arcs through sky across left/centre and crosses the right snow mountain face; skyline (low left ridge, distant peak, right slope) not followed."
+    }
+   }
+  },
+  "wc_0074": {
+   "photoTags": [
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "B": {
+     "verdict": "wrong",
+     "tags": [
+      "pitch-offset",
+      "roll"
+     ],
+     "note": "No yellow line visible in frame (only a label at top); jagged distant skyline uncovered; pitch 31.8/roll -25.7 implausible."
+    }
+   }
+  },
+  "wc_0078": {
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "C": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction"
+     ],
+     "note": "Line only in upper-left, diagonal off frame; Eiger/Monch/Jungfrau skyline entirely uncovered; label La Tarent 56 km wrong."
+    }
+   }
+  },
+  "wc_0084": {
+   "photoTags": [
+    "cloud",
+    "water-reflection"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "other"
+     ],
+     "note": "Mountain tops in cloud so upper line unverifiable, but visible left skyline (distant hills near lake level) is crossed by a steep diagonal line dropping into the lake; boxy flat shape implausible."
+    }
+   }
+  },
+  "wc_0089": {
+   "photoTags": [
+    "cloud",
+    "fog-haze",
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "E": {
+     "verdict": "unsure",
+     "tags": [
+      "cloud",
+      "fog-haze"
+     ],
+     "note": "Summit hidden in cloud. Left flank and right near hill roughly follow (within ~2-3%), but faint hazy mountains at far left rise ~5-9% above the line and are not traced; not enough clear skyline to confirm."
+    }
+   }
+  },
+  "wc_0095": {
+   "photoTags": [
+    "near-field-terrain"
+   ],
+   "candidates": {
+    "D": {
+     "verdict": "wrong",
+     "tags": [
+      "wrong-direction",
+      "pitch-offset"
+     ],
+     "note": "Line rises diagonally through the sky far above the clear snowy Alpine skyline; no correspondence."
+    }
+   }
+  },
+  "wc_0099": {
+   "photoTags": [
+    "water-reflection"
+   ],
+   "candidates": {
+    "A": {
+     "verdict": "wrong",
+     "tags": [
+      "parallax-mismatch",
+      "yaw-shift"
+     ],
+     "note": "Line floats above left mountain, cuts under the prominent central peak (peak not represented), and runs flat across the right distant snowy peaks; shape does not match."
+    }
+   }
+  }
+ }
+}

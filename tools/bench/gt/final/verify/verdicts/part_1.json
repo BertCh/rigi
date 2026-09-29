@@ -1,0 +1,119 @@
+{
+ "verifier": 1,
+ "candidates": {
+  "t14c08a": {
+   "verdict": "wrong",
+   "tags": [
+    "other"
+   ],
+   "note": "Line follows only right ridge of main peak; rest leaves frame, misses left massif."
+  },
+  "t1e7f10": {
+   "verdict": "wrong",
+   "tags": [
+    "fog-haze",
+    "other"
+   ],
+   "note": "Line near summit only; right half far above visible ridge (Titlis in fog); notch mismatched."
+  },
+  "t1f1047": {
+   "verdict": "correct",
+   "tags": [
+    "fog-haze"
+   ],
+   "note": "Line tracks all ridges and distant hazy peaks closely; no offset or tilt."
+  },
+  "t4f666e": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line hugs whole ridge from left to right peak; offsets under 1%."
+  },
+  "t504ad2": {
+   "verdict": "wrong",
+   "tags": [
+    "cloud",
+    "other"
+   ],
+   "note": "Line is a diagonal through sky/cloud, unrelated to visible massif skyline."
+  },
+  "t5989ab": {
+   "verdict": "wrong",
+   "tags": [
+    "near-field-terrain",
+    "other"
+   ],
+   "note": "Line is a smooth near-ridge through plain; Alps skyline far above not traced."
+  },
+  "t5b73cf": {
+   "verdict": "correct",
+   "tags": [
+    "fog-haze"
+   ],
+   "note": "Pilatus summit and right skyline match closely; far-left hazy Alps slightly above faint ridges."
+  },
+  "tbbdac1": {
+   "verdict": "correct",
+   "tags": [
+    "fog-haze"
+   ],
+   "note": "Pilatus summit and right skyline match closely; far-left hazy Alps slightly above faint ridges."
+  },
+  "t61a210": {
+   "verdict": "wrong",
+   "tags": [
+    "pitch-offset",
+    "other"
+   ],
+   "note": "Line runs through sky far above all visible ridges; shape doesn't match."
+  },
+  "t6fb243": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Eiger, Moench, Jungfrau summits and ridges traced tightly across full width."
+  },
+  "t716a52": {
+   "verdict": "wrong",
+   "tags": [
+    "near-miss",
+    "pitch-offset",
+    "fov-scale"
+   ],
+   "note": "Shape resembles skyline but ~3-4% too high over Stanserhorn and right ridges; peak broader."
+  },
+  "t76eca3": {
+   "verdict": "correct",
+   "tags": [
+    "cloud"
+   ],
+   "note": "Visible summits (left, Ruchen, right slope) sit on line; middle cloud-hidden but consistent."
+  },
+  "tcad848": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line hugs entire peak silhouette, summit and both flanks, tightly."
+  },
+  "td363ae": {
+   "verdict": "wrong",
+   "tags": [
+    "near-field-terrain",
+    "other"
+   ],
+   "note": "Line is a smooth near-ridge through plain; Alps skyline far above not traced."
+  },
+  "te9190c": {
+   "verdict": "correct",
+   "tags": [
+    "cloud"
+   ],
+   "note": "Summit, notch and right ridges match; left portion cloud-hidden; small near-hill mismatch far left."
+  },
+  "tecbfe2": {
+   "verdict": "unsure",
+   "tags": [
+    "fog-haze",
+    "featureless-skyline"
+   ],
+   "note": "Line lies in haze band; Tamaro bump plausibly matches, but far skyline too faint to verify."
+  }
+ }
+}

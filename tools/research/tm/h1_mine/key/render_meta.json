@@ -1,0 +1,3303 @@
+{
+ "candidates": {
+  "QW5": {
+   "pid": "wc_0002",
+   "folder": "p02ffe42da7",
+   "label": "QW5",
+   "width": 1320,
+   "pose": {
+    "yaw": 37.76932973578775,
+    "pitch": -6.203614733709478,
+    "roll": -1.2140347669620895,
+    "vfov": 57.5345045340243
+   },
+   "eye": {
+    "lat": 46.90117,
+    "lon": 9.17801,
+    "h": 2102.990456138288
+   },
+   "eyeRendered": 2102.990456138288,
+   "dem": "mapterhorn",
+   "labels": [
+    "Huet",
+    "Gulderstock",
+    "Spitzmeilen",
+    "Grüenenspitz",
+    "Foostock",
+    "Gandstock",
+    "Chli Schiben",
+    "Piz Sardona"
+   ]
+  },
+  "PE9": {
+   "pid": "wc_0074",
+   "folder": "p3c84a1e45c",
+   "label": "PE9",
+   "width": 1240,
+   "pose": {
+    "yaw": 261.12955036409767,
+    "pitch": -10.56804728700238,
+    "roll": 0.3277838415485717,
+    "vfov": 36.62425397140732
+   },
+   "eye": {
+    "lat": 47.145832,
+    "lon": 9.215959835084394,
+    "h": 2041.8367463688692
+   },
+   "eyeRendered": 2041.8367463688692,
+   "dem": "mapterhorn",
+   "labels": [
+    "Näbelchäppler",
+    "Klein Titlis",
+    "Rautispitz",
+    "Hoh Brisen",
+    "Brünnelistock",
+    "Matthorn",
+    "Rigi",
+    "Planggenstock"
+   ]
+  },
+  "JX8": {
+   "pid": "wc_0070",
+   "folder": "p46520b2091",
+   "label": "JX8",
+   "width": 1240,
+   "pose": {
+    "yaw": 312.56216216545323,
+    "pitch": -2.6861043612521565,
+    "roll": -2.5872014006295987,
+    "vfov": 41.80005297891963
+   },
+   "eye": {
+    "lat": 46.960278,
+    "lon": 9.122150675419599,
+    "h": 2211.1833775816117
+   },
+   "eyeRendered": 2211.1833775816117,
+   "dem": "mapterhorn",
+   "labels": [
+    "Rad",
+    "Bächistock",
+    "Gandstock",
+    "Schnebelhorn"
+   ]
+  },
+  "PN2": {
+   "pid": "wc_0069",
+   "folder": "paa33cd2a72",
+   "label": "PN2",
+   "width": 1480,
+   "pose": {
+    "yaw": 283.11738290473573,
+    "pitch": -7.596472860721903,
+    "roll": 0.4360622561305177,
+    "vfov": 35.88688487130364
+   },
+   "eye": {
+    "lat": 46.979063,
+    "lon": 8.634782,
+    "h": 1335.1067008927464
+   },
+   "eyeRendered": 1335.1067008927464,
+   "dem": "mapterhorn",
+   "labels": [
+    "Dossen",
+    "Rigi Hochflue",
+    "Rigi"
+   ]
+  },
+  "RY9": {
+   "pid": "wc_0033",
+   "folder": "p3c8e43e33e",
+   "label": "RY9",
+   "width": 1480,
+   "pose": {
+    "yaw": 60.80105453774234,
+    "pitch": -7.391181265481822,
+    "roll": -4.5926934480246455,
+    "vfov": 49.74211580704502
+   },
+   "eye": {
+    "lat": 46.96977250972721,
+    "lon": 8.262732777768212,
+    "h": 1682.2037875426333
+   },
+   "eyeRendered": 1682.2037875426333,
+   "dem": "mapterhorn",
+   "labels": [
+    "Windegg",
+    "Schnebelhorn",
+    "Rigi",
+    "Dossen",
+    "Schiberg",
+    "Mutteristock",
+    "Bächistock",
+    "Huser Stock"
+   ]
+  },
+  "YR9": {
+   "pid": "wc_0040",
+   "folder": "pe3ca2be41d",
+   "label": "YR9",
+   "width": 1480,
+   "pose": {
+    "yaw": 230.9232347372623,
+    "pitch": 3.9151551540909075,
+    "roll": -0.05158736900645791,
+    "vfov": 16.8902583622363
+   },
+   "eye": {
+    "lat": 46.583668,
+    "lon": 7.081074,
+    "h": 806.3470893009439
+   },
+   "eyeRendered": 806.3470893009439,
+   "dem": "mapterhorn",
+   "labels": [
+    "Le Moléson"
+   ]
+  },
+  "VU7": {
+   "pid": "wc_0046",
+   "folder": "pd719785867",
+   "label": "VU7",
+   "width": 1320,
+   "pose": {
+    "yaw": 178.29300149086404,
+    "pitch": -3.019911231835676,
+    "roll": 1.3764933252728941,
+    "vfov": 32.99969849352607
+   },
+   "eye": {
+    "lat": 47.03873601945441,
+    "lon": 8.481473290222423,
+    "h": 1516.0575683220054
+   },
+   "eyeRendered": 1516.0575683220054,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gitschen",
+    "Rot Gitschen",
+    "Urirotstock",
+    "Wissigstock",
+    "Ruchstock",
+    "Titlis",
+    "Gross Walenstock",
+    "Rotsandnollen"
+   ]
+  },
+  "YR6": {
+   "pid": "wc_0072",
+   "folder": "pa2d7169a87",
+   "label": "YR6",
+   "width": 1400,
+   "pose": {
+    "yaw": 77.54122930485833,
+    "pitch": -3.5943805352493228,
+    "roll": 1.8169109025715906,
+    "vfov": 25.436609027864304
+   },
+   "eye": {
+    "lat": 47.241351810636516,
+    "lon": 9.448438861973504,
+    "h": 733.7389189181283
+   },
+   "eyeRendered": 733.7389189181283,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hohe Kugel",
+    "Falben",
+    "Hoher Freschen",
+    "Matona",
+    "Falben",
+    "Glatthorn",
+    "Tälispitze",
+    "Westlicher Johanneskopf"
+   ]
+  },
+  "WT5": {
+   "pid": "wc_0070",
+   "folder": "p46520b2091",
+   "label": "WT5",
+   "width": 1320,
+   "pose": {
+    "yaw": 310.9711133587397,
+    "pitch": -3.496202800659478,
+    "roll": -2.774154362095574,
+    "vfov": 41.491830811959375
+   },
+   "eye": {
+    "lat": 46.960278,
+    "lon": 9.1224800942745,
+    "h": 2219.1227485689183
+   },
+   "eyeRendered": 2219.1227485689183,
+   "dem": "mapterhorn",
+   "labels": [
+    "Rad",
+    "Bächistock",
+    "Gandstock",
+    "Höchhand"
+   ]
+  },
+  "UY2": {
+   "pid": "wc_0027",
+   "folder": "p0af5190fc0",
+   "label": "UY2",
+   "width": 1400,
+   "pose": {
+    "yaw": 107.59930429875567,
+    "pitch": -0.19166273929043195,
+    "roll": 0.3993628111260724,
+    "vfov": 15.55939219284535
+   },
+   "eye": {
+    "lat": 46.41669230090931,
+    "lon": 7.719444,
+    "h": 2706.805027347517
+   },
+   "eyeRendered": 2706.805027347517,
+   "dem": "mapterhorn",
+   "labels": [
+    "Jägihorn",
+    "Kleines Nesthorn",
+    "Bietschhorn",
+    "Schafbärg",
+    "Schwarzhorn"
+   ]
+  },
+  "TU9": {
+   "pid": "wc_0001",
+   "folder": "p3acb334b0b",
+   "label": "TU9",
+   "width": 1400,
+   "pose": {
+    "yaw": 102.97644376416113,
+    "pitch": 3.763375880840909,
+    "roll": 2.1165266136734466,
+    "vfov": 17.231148932913637
+   },
+   "eye": {
+    "lat": 46.78312364072745,
+    "lon": 10.152047933915197,
+    "h": 1888.563170066406
+   },
+   "eyeRendered": 1888.563170066406,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz San Jon Dadaint",
+    "Piz Lavetscha",
+    "Piz Clemgia",
+    "Piz Pisoc",
+    "Motta Jüda"
+   ]
+  },
+  "ZC8": {
+   "pid": "wc_0013",
+   "folder": "pc068789a0d",
+   "label": "ZC8",
+   "width": 1400,
+   "pose": {
+    "yaw": 266.06792347730817,
+    "pitch": 9.241595088475512,
+    "roll": -3.1408148392990554,
+    "vfov": 18.67220045023988
+   },
+   "eye": {
+    "lat": 46.8168,
+    "lon": 8.407122,
+    "h": 1009.3053830661773
+   },
+   "eyeRendered": 1009.3053830661773,
+   "dem": "mapterhorn",
+   "labels": [
+    "Huetstock",
+    "Zahm Geissberg"
+   ]
+  },
+  "JZ7": {
+   "pid": "wc_0086",
+   "folder": "p0de9b31c2c",
+   "label": "JZ7",
+   "width": 1240,
+   "pose": {
+    "yaw": 74.27531210465713,
+    "pitch": -14.799480840110352,
+    "roll": -4.109299481431398,
+    "vfov": 39.63880356406596
+   },
+   "eye": {
+    "lat": 45.97849781063651,
+    "lon": 8.94828508290287,
+    "h": 850.3350129883041
+   },
+   "eyeRendered": 850.3350129883041,
+   "dem": "mapterhorn",
+   "labels": [
+    "Monte Pradè",
+    "Motto d'Ailgua",
+    "Monte Bregagno",
+    "Monte Bregagnino",
+    "Monte Grona",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Termine Quadro"
+   ]
+  },
+  "BF3": {
+   "pid": "wc_0027",
+   "folder": "p0af5190fc0",
+   "label": "BF3",
+   "width": 1320,
+   "pose": {
+    "yaw": 104.28448752827893,
+    "pitch": 0.2621527284028264,
+    "roll": 0.1497739157097489,
+    "vfov": 15.55939219284535
+   },
+   "eye": {
+    "lat": 46.41174603890883,
+    "lon": 7.721726747697752,
+    "h": 2652.4408662874184
+   },
+   "eyeRendered": 2652.4408662874184,
+   "dem": "mapterhorn",
+   "labels": [
+    "Älwe Rigg",
+    "Jägihorn",
+    "Kleines Nesthorn",
+    "Bietschhorn",
+    "Schafbärg",
+    "Schwarzhorn"
+   ]
+  },
+  "PV6": {
+   "pid": "wc_0054",
+   "folder": "pc7c77fd843",
+   "label": "PV6",
+   "width": 1480,
+   "pose": {
+    "yaw": 52.12610604686316,
+    "pitch": -9.405643107470432,
+    "roll": -2.0126423846124237,
+    "vfov": 54.876606485252545
+   },
+   "eye": {
+    "lat": 45.97828215045466,
+    "lon": 8.94798452209285,
+    "h": 873.8937604771731
+   },
+   "eyeRendered": 873.8937604771731,
+   "dem": "mapterhorn",
+   "labels": [
+    "Monte Bar",
+    "Camoghè",
+    "Monte Boglia",
+    "Il Torrione",
+    "Monte Bregagno",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Tremezzo"
+   ]
+  },
+  "AV9": {
+   "pid": "wc_0040",
+   "folder": "pe3ca2be41d",
+   "label": "AV9",
+   "width": 1240,
+   "pose": {
+    "yaw": 231.14486384581738,
+    "pitch": 3.380053405458404,
+    "roll": -0.03774651220995695,
+    "vfov": 16.573342822884214
+   },
+   "eye": {
+    "lat": 46.58479215045466,
+    "lon": 7.083690986589372,
+    "h": 831.5141621169521
+   },
+   "eyeRendered": 831.5141621169521,
+   "dem": "mapterhorn",
+   "labels": [
+    "Le Moléson"
+   ]
+  },
+  "ZJ8": {
+   "pid": "wc_0004",
+   "folder": "pa0f536598b",
+   "label": "ZJ8",
+   "width": 1480,
+   "pose": {
+    "yaw": 30.147049589697318,
+    "pitch": -10.326709117223725,
+    "roll": -1.066768657317485,
+    "vfov": 40.57056292600754
+   },
+   "eye": {
+    "lat": 47.15142067963628,
+    "lon": 9.26365574840536,
+    "h": 2188.8692225242976
+   },
+   "eyeRendered": 2188.8692225242976,
+   "dem": "mapterhorn",
+   "labels": [
+    "Amalienhöhe",
+    "Höchsten",
+    "Stöllen"
+   ]
+  },
+  "LT7": {
+   "pid": "wc_0046",
+   "folder": "pd719785867",
+   "label": "LT7",
+   "width": 1400,
+   "pose": {
+    "yaw": 177.62486521063687,
+    "pitch": -2.741144560140561,
+    "roll": 1.3094421375752272,
+    "vfov": 32.24236287917608
+   },
+   "eye": {
+    "lat": 47.04098432036372,
+    "lon": 8.478834,
+    "h": 1465.525937592399
+   },
+   "eyeRendered": 1465.525937592399,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gitschen",
+    "Rot Gitschen",
+    "Urirotstock",
+    "Wissigstock",
+    "Ruchstock",
+    "Titlis",
+    "Gross Walenstock",
+    "Rotsandnollen"
+   ]
+  },
+  "HL8": {
+   "pid": "wc_0002",
+   "folder": "p02ffe42da7",
+   "label": "HL8",
+   "width": 1240,
+   "pose": {
+    "yaw": 39.575671482126324,
+    "pitch": -6.99449227211336,
+    "roll": -2.5217859475892666,
+    "vfov": 58.91699203829191
+   },
+   "eye": {
+    "lat": 46.89824720881789,
+    "lon": 9.176035666964731,
+    "h": 2279.240973018601
+   },
+   "eyeRendered": 2279.240973018601,
+   "dem": "mapterhorn",
+   "labels": [
+    "Huet",
+    "Gulderstock",
+    "Spitzmeilen",
+    "Wissgandstöckli",
+    "Foostock",
+    "Chli Schiben",
+    "Piz Sardona",
+    "Mörderhoren"
+   ]
+  },
+  "TK4": {
+   "pid": "wc_0071",
+   "folder": "p478e6308b7",
+   "label": "TK4",
+   "width": 1400,
+   "pose": {
+    "yaw": 153.27422660908016,
+    "pitch": -3.484961232713211,
+    "roll": 0.6822135742357824,
+    "vfov": 48.225196091165714
+   },
+   "eye": {
+    "lat": 46.40771933981814,
+    "lon": 10.016979584219033,
+    "h": 2236.05
+   },
+   "eyeRendered": 2236.05,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz Sena",
+    "Cima di Rosso",
+    "Sassalb",
+    "Cornasc"
+   ]
+  },
+  "ZV2": {
+   "pid": "wc_0076",
+   "folder": "p0f514e7787",
+   "label": "ZV2",
+   "width": 1320,
+   "pose": {
+    "yaw": 112.73099042874789,
+    "pitch": 7.956917011059128,
+    "roll": -0.06355151006580613,
+    "vfov": 47.98857374458488
+   },
+   "eye": {
+    "lat": 46.523644490272794,
+    "lon": 7.05786296935374,
+    "h": 773.2612851344975
+   },
+   "eyeRendered": 773.2612851344975,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tête de l'Herbette",
+    "Vanil Noir",
+    "Pointe de Paray",
+    "Les Millets",
+    "Les Millets (Sommet ouest)"
+   ]
+  },
+  "GU7": {
+   "pid": "wc_0054",
+   "folder": "pc7c77fd843",
+   "label": "GU7",
+   "width": 1480,
+   "pose": {
+    "yaw": 51.34981258153361,
+    "pitch": -9.725973843519384,
+    "roll": -2.0627622059244506,
+    "vfov": 54.876606485252545
+   },
+   "eye": {
+    "lat": 45.977158,
+    "lon": 8.947661,
+    "h": 910.4983328262184
+   },
+   "eyeRendered": 910.4983328262184,
+   "dem": "mapterhorn",
+   "labels": [
+    "Monte Bar",
+    "Camoghè",
+    "Monte Boglia",
+    "Il Torrione",
+    "Monte Disgrazia",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Tremezzo"
+   ]
+  },
+  "LW2": {
+   "pid": "wc_0076",
+   "folder": "p0f514e7787",
+   "label": "LW2",
+   "width": 1320,
+   "pose": {
+    "yaw": 111.81534538375085,
+    "pitch": 9.357557562351174,
+    "roll": -0.09861461244490578,
+    "vfov": 47.98857374458488
+   },
+   "eye": {
+    "lat": 46.52207067963628,
+    "lon": 7.060150272984695,
+    "h": 769.8
+   },
+   "eyeRendered": 769.8,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tête de l'Herbette",
+    "Vanil Noir",
+    "Les Millets (Sommet est)",
+    "Les Millets",
+    "Les Millets (Sommet ouest)"
+   ]
+  },
+  "XK2": {
+   "pid": "wc_0001",
+   "folder": "p3acb334b0b",
+   "label": "XK2",
+   "width": 1400,
+   "pose": {
+    "yaw": 103.98550543402536,
+    "pitch": 3.5513750124212464,
+    "roll": 2.620288940367745,
+    "vfov": 17.231148932913637
+   },
+   "eye": {
+    "lat": 46.78469745136397,
+    "lon": 10.151719611595997,
+    "h": 1933.4070336016064
+   },
+   "eyeRendered": 1933.4070336016064,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz Lavetscha",
+    "Piz Clemgia",
+    "Piz Pisoc",
+    "Piz dals Vadès"
+   ]
+  },
+  "DF9": {
+   "pid": "wc_0005",
+   "folder": "pdfe17cd088",
+   "label": "DF9",
+   "width": 1320,
+   "pose": {
+    "yaw": 191.6314298708542,
+    "pitch": -1.5782000291225342,
+    "roll": 0.18248999442756336,
+    "vfov": 17.91068369004687
+   },
+   "eye": {
+    "lat": 47.351668,
+    "lon": 8.488830416664502,
+    "h": 839.7100553970596
+   },
+   "eyeRendered": 839.7100553970596,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gross Spannort",
+    "Rigi",
+    "Titlis",
+    "Reissend Nollen",
+    "Gwächtenhorn",
+    "Huetstock",
+    "Glogghüs",
+    "Esel"
+   ]
+  },
+  "VE6": {
+   "pid": "wc_0076",
+   "folder": "p0f514e7787",
+   "label": "VE6",
+   "width": 1400,
+   "pose": {
+    "yaw": 111.3015757536857,
+    "pitch": 7.338052984680751,
+    "roll": 0.3752949565661361,
+    "vfov": 47.98857374458488
+   },
+   "eye": {
+    "lat": 46.52386932036372,
+    "lon": 7.056229181045914,
+    "h": 785.2789012362016
+   },
+   "eyeRendered": 785.2789012362016,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tête de l'Herbette",
+    "Vanil Noir",
+    "Pointe de Paray",
+    "Les Millets",
+    "Les Millets (Sommet ouest)"
+   ]
+  },
+  "VT6": {
+   "pid": "wc_0076",
+   "folder": "p0f514e7787",
+   "label": "VT6",
+   "width": 1400,
+   "pose": {
+    "yaw": 110.58173834575082,
+    "pitch": 8.11447579454992,
+    "roll": -0.7881405619489076,
+    "vfov": 47.98857374458488
+   },
+   "eye": {
+    "lat": 46.52229550972721,
+    "lon": 7.05786296935374,
+    "h": 776.3088633851506
+   },
+   "eyeRendered": 776.3088633851506,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tête de l'Herbette",
+    "Vanil Noir",
+    "Pointe de Paray",
+    "Les Millets",
+    "Les Millets (Sommet ouest)"
+   ]
+  },
+  "UM9": {
+   "pid": "wc_0009",
+   "folder": "pfe96040a8f",
+   "label": "UM9",
+   "width": 1320,
+   "pose": {
+    "yaw": 221.78186146297006,
+    "pitch": 0.23881610907678136,
+    "roll": 1.1862310007302588,
+    "vfov": 18.896026306449137
+   },
+   "eye": {
+    "lat": 46.428896150454655,
+    "lon": 8.093655373082793,
+    "h": 2859.8481638487538
+   },
+   "eyeRendered": 2859.8481638487538,
+   "dem": "mapterhorn",
+   "labels": [
+    "Les Diablons",
+    "Schwarzhorn",
+    "Aiguilles Rouges d'Arolla",
+    "Sasseneire"
+   ]
+  },
+  "AF4": {
+   "pid": "wc_0009",
+   "folder": "pfe96040a8f",
+   "label": "AF4",
+   "width": 1240,
+   "pose": {
+    "yaw": 221.9829165390525,
+    "pitch": 0.11114207195499637,
+    "roll": 0.5565196269607667,
+    "vfov": 18.896026306449137
+   },
+   "eye": {
+    "lat": 46.427996830090926,
+    "lon": 8.093655373082793,
+    "h": 2875.6618515081714
+   },
+   "eyeRendered": 2875.6618515081714,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gugla",
+    "Matterhorn",
+    "Dent d'Hérens",
+    "Weisshorn",
+    "Grand Cornier",
+    "Pointe de Bricolla",
+    "Les Diablons",
+    "Schwarzhorn"
+   ]
+  },
+  "RM9": {
+   "pid": "wc_0046",
+   "folder": "pd719785867",
+   "label": "RM9",
+   "width": 1240,
+   "pose": {
+    "yaw": 177.14028075418238,
+    "pitch": -2.911006720259292,
+    "roll": 1.4592495240528023,
+    "vfov": 31.945268882239123
+   },
+   "eye": {
+    "lat": 47.04278296109117,
+    "lon": 8.476854532333185,
+    "h": 1514.8634011453298
+   },
+   "eyeRendered": 1514.8634011453298,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gitschen",
+    "Rot Gitschen",
+    "Urirotstock",
+    "Wissigstock",
+    "Fleckistock",
+    "Ruchstock",
+    "Titlis",
+    "Gross Walenstock"
+   ]
+  },
+  "RB3": {
+   "pid": "wc_0006",
+   "folder": "p49b99f59b4",
+   "label": "RB3",
+   "width": 1480,
+   "pose": {
+    "yaw": 157.2072,
+    "pitch": 1.4263,
+    "roll": -2.1736,
+    "vfov": 67.7547
+   },
+   "eye": {
+    "lat": 46.94556,
+    "lon": 9.29333,
+    "h": 2408.612030349404
+   },
+   "eyeRendered": 2408.612030349404,
+   "dem": "mapterhorn",
+   "labels": [
+    "Plattenfirst",
+    "Ringelspitz",
+    "Fahnenstock"
+   ]
+  },
+  "GU3": {
+   "pid": "wc_0001",
+   "folder": "p3acb334b0b",
+   "label": "GU3",
+   "width": 1240,
+   "pose": {
+    "yaw": 103.98550543402536,
+    "pitch": 3.5513750124212464,
+    "roll": 2.620288940367745,
+    "vfov": 17.231148932913637
+   },
+   "eye": {
+    "lat": 46.78469745136397,
+    "lon": 10.151719611595997,
+    "h": 1933.4070336016064
+   },
+   "eyeRendered": 1933.4070336016064,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz Lavetscha",
+    "Piz Clemgia",
+    "Piz Pisoc",
+    "Piz dals Vadès"
+   ]
+  },
+  "TL5": {
+   "pid": "wc_0002",
+   "folder": "p02ffe42da7",
+   "label": "TL5",
+   "width": 1240,
+   "pose": {
+    "yaw": 39.75903053166224,
+    "pitch": -5.5915545513256495,
+    "roll": -3.8545329334056304,
+    "vfov": 58.91699203829191
+   },
+   "eye": {
+    "lat": 46.89937135927255,
+    "lon": 9.176035666964731,
+    "h": 2211.9385562894286
+   },
+   "eyeRendered": 2211.9385562894286,
+   "dem": "mapterhorn",
+   "labels": [
+    "Huet",
+    "Gulderstock",
+    "Spitzmeilen",
+    "Grüenenspitz",
+    "Foostock",
+    "Chli Schiben",
+    "Piz Sardona",
+    "Mörderhoren"
+   ]
+  },
+  "EE5": {
+   "pid": "wc_0071",
+   "folder": "p478e6308b7",
+   "label": "EE5",
+   "width": 1240,
+   "pose": {
+    "yaw": 158.835285081637,
+    "pitch": -4.543938819495151,
+    "roll": 1.9697928630343537,
+    "vfov": 47.608120679974114
+   },
+   "eye": {
+    "lat": 46.408169,
+    "lon": 10.018936,
+    "h": 2268.6
+   },
+   "eyeRendered": 2268.6,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz Sena",
+    "Cima di Rosso",
+    "Sassalb",
+    "Cornasc",
+    "Monte Sessa"
+   ]
+  },
+  "HU7": {
+   "pid": "wc_0072",
+   "folder": "pa2d7169a87",
+   "label": "HU7",
+   "width": 1480,
+   "pose": {
+    "yaw": 76.9263236556893,
+    "pitch": -3.4213121848388486,
+    "roll": 1.9043131078853,
+    "vfov": 25.674732106380567
+   },
+   "eye": {
+    "lat": 47.239778,
+    "lon": 9.451750389135286,
+    "h": 653.1711218597245
+   },
+   "eyeRendered": 653.1711218597245,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hohe Kugel",
+    "Falben",
+    "Hoher Freschen",
+    "Matona",
+    "Falben",
+    "Glatthorn",
+    "Tälispitze",
+    "Westlicher Johanneskopf"
+   ]
+  },
+  "SG2": {
+   "pid": "wc_0027",
+   "folder": "p0af5190fc0",
+   "label": "SG2",
+   "width": 1320,
+   "pose": {
+    "yaw": 106.43050411837076,
+    "pitch": -0.08150964241118974,
+    "roll": 1.326487907270471,
+    "vfov": 15.55939219284535
+   },
+   "eye": {
+    "lat": 46.415118490272796,
+    "lon": 7.718139572744143,
+    "h": 2677.0307667245474
+   },
+   "eyeRendered": 2677.0307667245474,
+   "dem": "mapterhorn",
+   "labels": [
+    "Älwe Rigg",
+    "Kleines Nesthorn",
+    "Bietschhorn",
+    "Schafbärg",
+    "Schwarzhorn"
+   ]
+  },
+  "VM9": {
+   "pid": "wc_0001",
+   "folder": "p3acb334b0b",
+   "label": "VM9",
+   "width": 1400,
+   "pose": {
+    "yaw": 101.6499473311052,
+    "pitch": 4.223879340028411,
+    "roll": 2.4311559345069216,
+    "vfov": 17.231148932913637
+   },
+   "eye": {
+    "lat": 46.78087533981814,
+    "lon": 10.151719611595997,
+    "h": 1826.0384964041734
+   },
+   "eyeRendered": 1826.0384964041734,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tuor Cotschna",
+    "Piz Lischana",
+    "Piz San Jon Dadora",
+    "Piz San Jon Dadaint",
+    "Piz Lavetscha",
+    "Piz Clemgia",
+    "Piz Pisoc"
+   ]
+  },
+  "UU6": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "UU6",
+   "width": 1480,
+   "pose": {
+    "yaw": 72.91558774811183,
+    "pitch": -3.8985675205634367,
+    "roll": 3.013811947467421,
+    "vfov": 43.85955776874577
+   },
+   "eye": {
+    "lat": 46.99179115045466,
+    "lon": 8.263340787777059,
+    "h": 1264.8518761106218
+   },
+   "eyeRendered": 1264.8518761106218,
+   "dem": "mapterhorn",
+   "labels": [
+    "Wildspitz",
+    "Rigi",
+    "Dossen",
+    "Rigi Hochflue",
+    "Bächistock",
+    "Grisset",
+    "Gross Chilchberg",
+    "Chaiserstock"
+   ]
+  },
+  "ZV3": {
+   "pid": "wc_0040",
+   "folder": "pe3ca2be41d",
+   "label": "ZV3",
+   "width": 1400,
+   "pose": {
+    "yaw": 230.9232347372623,
+    "pitch": 3.9151551540909075,
+    "roll": -0.05158736900645791,
+    "vfov": 16.8902583622363
+   },
+   "eye": {
+    "lat": 46.583668,
+    "lon": 7.081074,
+    "h": 806.3470893009439
+   },
+   "eyeRendered": 806.3470893009439,
+   "dem": "mapterhorn",
+   "labels": [
+    "Le Moléson"
+   ]
+  },
+  "CS4": {
+   "pid": "wc_0046",
+   "folder": "pd719785867",
+   "label": "CS4",
+   "width": 1400,
+   "pose": {
+    "yaw": 177.33693406801228,
+    "pitch": -2.8157716690134102,
+    "roll": 1.4835114797731985,
+    "vfov": 32.126330329556254
+   },
+   "eye": {
+    "lat": 47.041433980545584,
+    "lon": 8.477844266166592,
+    "h": 1483.8493565767699
+   },
+   "eyeRendered": 1483.8493565767699,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gitschen",
+    "Rot Gitschen",
+    "Urirotstock",
+    "Wissigstock",
+    "Fleckistock",
+    "Ruchstock",
+    "Titlis",
+    "Gross Walenstock"
+   ]
+  },
+  "PN3": {
+   "pid": "wc_0006",
+   "folder": "p49b99f59b4",
+   "label": "PN3",
+   "width": 1400,
+   "pose": {
+    "yaw": 143.13758966193737,
+    "pitch": -2.6441358491185634,
+    "roll": -3.399013788670337,
+    "vfov": 70.66668303601776
+   },
+   "eye": {
+    "lat": 46.943986189363486,
+    "lon": 9.293659328272545,
+    "h": 2449.6607923243782
+   },
+   "eyeRendered": 2449.6607923243782,
+   "dem": "mapterhorn",
+   "labels": [
+    "Plattenfirst",
+    "Vorder Ringel"
+   ]
+  },
+  "XW3": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "XW3",
+   "width": 1400,
+   "pose": {
+    "yaw": 72.27283755072237,
+    "pitch": -3.859537221787577,
+    "roll": 3.008923408907371,
+    "vfov": 44.46713544047725
+   },
+   "eye": {
+    "lat": 46.990667,
+    "lon": 8.266307242780293,
+    "h": 1240.0686616015623
+   },
+   "eyeRendered": 1240.0686616015623,
+   "dem": "mapterhorn",
+   "labels": [
+    "Wildspitz",
+    "Rigi",
+    "Dossen",
+    "Rigi Hochflue",
+    "Bächistock",
+    "Grisset",
+    "Gross Kärpf",
+    "Chaiserstock"
+   ]
+  },
+  "WW7": {
+   "pid": "wc_0094",
+   "folder": "pb2f8b95e68",
+   "label": "WW7",
+   "width": 1320,
+   "pose": {
+    "yaw": 144.4266,
+    "pitch": -6.3745,
+    "roll": -0.5102,
+    "vfov": 35.0266
+   },
+   "eye": {
+    "lat": 46.428549,
+    "lon": 10.035843,
+    "h": 2474.4
+   },
+   "eyeRendered": 2474.4,
+   "dem": "mapterhorn",
+   "labels": [
+    "Corn da Mürasciola",
+    "Scima da Rügiul",
+    "Piz dal Teo",
+    "Motal",
+    "Piz Sena",
+    "Sassalb",
+    "Monte Telenek",
+    "Piz Campasc"
+   ]
+  },
+  "DS9": {
+   "pid": "wc_0002",
+   "folder": "p02ffe42da7",
+   "label": "DS9",
+   "width": 1480,
+   "pose": {
+    "yaw": 38.39299683672627,
+    "pitch": -6.146193552769621,
+    "roll": -1.320144254250672,
+    "vfov": 58.33573706875444
+   },
+   "eye": {
+    "lat": 46.90117,
+    "lon": 9.17801,
+    "h": 2102.990456138288
+   },
+   "eyeRendered": 2102.990456138288,
+   "dem": "mapterhorn",
+   "labels": [
+    "Huet",
+    "Gulderstock",
+    "Spitzmeilen",
+    "Grüenenspitz",
+    "Foostock",
+    "Gandstock",
+    "Chli Schiben",
+    "Piz Sardona"
+   ]
+  },
+  "WV8": {
+   "pid": "wc_0067",
+   "folder": "pa460cc56a0",
+   "label": "WV8",
+   "width": 1400,
+   "pose": {
+    "yaw": 351.676118965944,
+    "pitch": 1.98820522428156,
+    "roll": -2.0388605570855995,
+    "vfov": 31.822776867734394
+   },
+   "eye": {
+    "lat": 47.185453,
+    "lon": 9.332547,
+    "h": 1180.1
+   },
+   "eyeRendered": 1180.1,
+   "dem": "mapterhorn",
+   "labels": [
+    "Schofwisspitz",
+    "Schwarzchopf",
+    "Stoss",
+    "Grüehorn",
+    "Grenzchopf",
+    "Spitzbergli",
+    "Säntis"
+   ]
+  },
+  "ES3": {
+   "pid": "wc_0067",
+   "folder": "pa460cc56a0",
+   "label": "ES3",
+   "width": 1240,
+   "pose": {
+    "yaw": 351.676118965944,
+    "pitch": 1.98820522428156,
+    "roll": -2.0388605570855995,
+    "vfov": 31.822776867734394
+   },
+   "eye": {
+    "lat": 47.185453,
+    "lon": 9.332547,
+    "h": 1180.1
+   },
+   "eyeRendered": 1180.1,
+   "dem": "mapterhorn",
+   "labels": [
+    "Schofwisspitz",
+    "Schwarzchopf",
+    "Stoss",
+    "Grüehorn",
+    "Grenzchopf",
+    "Spitzbergli",
+    "Säntis"
+   ]
+  },
+  "KS3": {
+   "pid": "wc_0001",
+   "folder": "p3acb334b0b",
+   "label": "KS3",
+   "width": 1320,
+   "pose": {
+    "yaw": 102.97644376416113,
+    "pitch": 3.763375880840909,
+    "roll": 2.1165266136734466,
+    "vfov": 17.231148932913637
+   },
+   "eye": {
+    "lat": 46.78312364072745,
+    "lon": 10.152047933915197,
+    "h": 1888.563170066406
+   },
+   "eyeRendered": 1888.563170066406,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz San Jon Dadaint",
+    "Piz Lavetscha",
+    "Piz Clemgia",
+    "Piz Pisoc",
+    "Motta Jüda"
+   ]
+  },
+  "WP2": {
+   "pid": "wc_0027",
+   "folder": "p0af5190fc0",
+   "label": "WP2",
+   "width": 1400,
+   "pose": {
+    "yaw": 109.12749839834743,
+    "pitch": 0.07695330909999763,
+    "roll": 0.45822502732558407,
+    "vfov": 15.247593074095947
+   },
+   "eye": {
+    "lat": 46.414444,
+    "lon": 7.719444,
+    "h": 2658.8326038803452
+   },
+   "eyeRendered": 2658.8326038803452,
+   "dem": "mapterhorn",
+   "labels": [
+    "Kleines Nesthorn",
+    "Bietschhorn",
+    "Schafbärg",
+    "Schwarzhorn",
+    "Wilerhorn"
+   ]
+  },
+  "AR5": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "AR5",
+   "width": 1320,
+   "pose": {
+    "yaw": 74.4932,
+    "pitch": -5.4336,
+    "roll": -0.9341,
+    "vfov": 52.6609
+   },
+   "eye": {
+    "lat": 46.990667,
+    "lon": 8.264,
+    "h": 1808.1
+   },
+   "eyeRendered": 1808.1,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tweralpspitz",
+    "Rigi",
+    "Brisi",
+    "Mutteristock",
+    "Bächistock",
+    "Höch Turm",
+    "Hausstock",
+    "Schächentaler Windgällen"
+   ]
+  },
+  "PX2": {
+   "pid": "wc_0088",
+   "folder": "p27e34405dd",
+   "label": "PX2",
+   "width": 1240,
+   "pose": {
+    "yaw": 93.22523931709065,
+    "pitch": -6.587030123255186,
+    "roll": -1.388111051958428,
+    "vfov": 25.657149049053412
+   },
+   "eye": {
+    "lat": 46.77289247081838,
+    "lon": 8.240108551447406,
+    "h": 2392.6794255608797
+   },
+   "eyeRendered": 2392.6794255608797,
+   "dem": "mapterhorn",
+   "labels": [
+    "Vorder Schlossberg",
+    "Schlossberg",
+    "Gross Spannort",
+    "Titlis",
+    "Reissend Nollen",
+    "Chlyn Wendestock",
+    "Pfaffenhuet",
+    "Stucklistock"
+   ]
+  },
+  "LJ6": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "LJ6",
+   "width": 1320,
+   "pose": {
+    "yaw": 79.044,
+    "pitch": -4.1426,
+    "roll": -0.5185,
+    "vfov": 52.7914
+   },
+   "eye": {
+    "lat": 46.990667,
+    "lon": 8.264,
+    "h": 1808.1
+   },
+   "eyeRendered": 1808.1,
+   "dem": "mapterhorn",
+   "labels": [
+    "Rigi",
+    "Brisi",
+    "Mutteristock",
+    "Bächistock",
+    "Piz Sardona",
+    "Chaiserstock",
+    "Schächentaler Windgällen",
+    "Tödi"
+   ]
+  },
+  "HZ6": {
+   "pid": "wc_0070",
+   "folder": "p46520b2091",
+   "label": "HZ6",
+   "width": 1320,
+   "pose": {
+    "yaw": 320.3339,
+    "pitch": -0.1665,
+    "roll": -0.792,
+    "vfov": 41.4918
+   },
+   "eye": {
+    "lat": 46.960278,
+    "lon": 9.120833,
+    "h": 2193
+   },
+   "eyeRendered": 2193,
+   "dem": "mapterhorn",
+   "labels": [
+    "Bächistock",
+    "Spitzisteinturm",
+    "Gandstock",
+    "Schlafstein"
+   ]
+  },
+  "WD7": {
+   "pid": "wc_0072",
+   "folder": "pa2d7169a87",
+   "label": "WD7",
+   "width": 1240,
+   "pose": {
+    "yaw": 76.37101717949011,
+    "pitch": -3.3341151414678762,
+    "roll": 1.9643177388397817,
+    "vfov": 25.81149477315407
+   },
+   "eye": {
+    "lat": 47.238204189363486,
+    "lon": 9.454068458148535,
+    "h": 613.7952558332408
+   },
+   "eyeRendered": 613.7952558332408,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hohe Kugel",
+    "Falben",
+    "Hoher Freschen",
+    "Matona",
+    "Falben",
+    "Glatthorn",
+    "Tälispitze",
+    "Westlicher Johanneskopf"
+   ]
+  },
+  "XX8": {
+   "pid": "wc_0088",
+   "folder": "p27e34405dd",
+   "label": "XX8",
+   "width": 1400,
+   "pose": {
+    "yaw": 94.51910122093452,
+    "pitch": -7.217427511392595,
+    "roll": -1.5216003783447378,
+    "vfov": 25.657149049053412
+   },
+   "eye": {
+    "lat": 46.77244281063651,
+    "lon": 8.238139,
+    "h": 2433.304818445571
+   },
+   "eyeRendered": 2433.304818445571,
+   "dem": "mapterhorn",
+   "labels": [
+    "Schlossberg",
+    "Gross Spannort",
+    "Titlis",
+    "Reissend Nollen",
+    "Chlyn Wendestock",
+    "Pfaffenhuet",
+    "Gross Griessenhorn",
+    "Fleckistock"
+   ]
+  },
+  "DH9": {
+   "pid": "wc_0070",
+   "folder": "p46520b2091",
+   "label": "DH9",
+   "width": 1480,
+   "pose": {
+    "yaw": 310.9711133587397,
+    "pitch": -3.496202800659478,
+    "roll": -2.774154362095574,
+    "vfov": 41.491830811959375
+   },
+   "eye": {
+    "lat": 46.960278,
+    "lon": 9.1224800942745,
+    "h": 2219.1227485689183
+   },
+   "eyeRendered": 2219.1227485689183,
+   "dem": "mapterhorn",
+   "labels": [
+    "Rad",
+    "Bächistock",
+    "Gandstock",
+    "Höchhand"
+   ]
+  },
+  "WT9": {
+   "pid": "wc_0001",
+   "folder": "p3acb334b0b",
+   "label": "WT9",
+   "width": 1240,
+   "pose": {
+    "yaw": 101.1099017800163,
+    "pitch": 4.010444321046208,
+    "roll": 1.4455848889502492,
+    "vfov": 17.231148932913637
+   },
+   "eye": {
+    "lat": 46.781100169909074,
+    "lon": 10.148436388404004,
+    "h": 1813.2674955172804
+   },
+   "eyeRendered": 1813.2674955172804,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz Lischana",
+    "Piz San Jon Dadora",
+    "Piz San Jon Dadaint",
+    "Piz Lavetscha",
+    "Piz Clemgia",
+    "Piz Pisoc"
+   ]
+  },
+  "MS2": {
+   "pid": "wc_0072",
+   "folder": "pa2d7169a87",
+   "label": "MS2",
+   "width": 1480,
+   "pose": {
+    "yaw": 76.82091038286256,
+    "pitch": -3.4027714096378925,
+    "roll": 2.342085668711619,
+    "vfov": 25.749238929298688
+   },
+   "eye": {
+    "lat": 47.239778,
+    "lon": 9.453075,
+    "h": 637.6467347155898
+   },
+   "eyeRendered": 637.6467347155898,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hohe Kugel",
+    "Falben",
+    "Hoher Freschen",
+    "Matona",
+    "Falben",
+    "Glatthorn",
+    "Tälispitze",
+    "Westlicher Johanneskopf"
+   ]
+  },
+  "FY8": {
+   "pid": "wc_0085",
+   "folder": "p0fd59877e5",
+   "label": "FY8",
+   "width": 1240,
+   "pose": {
+    "yaw": 14.8892,
+    "pitch": -1.9191,
+    "roll": 0.3706,
+    "vfov": 40.4918
+   },
+   "eye": {
+    "lat": 46.742667,
+    "lon": 9.597667,
+    "h": 2851.9753627258015
+   },
+   "eyeRendered": 2851.9753627258015,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hinter Grauspitz",
+    "Schafberg",
+    "Schesaplana",
+    "Zimba",
+    "Drusenfluh",
+    "Rote Wand",
+    "Spullerschafberg",
+    "Untere Wildgrubenspitze"
+   ]
+  },
+  "DL7": {
+   "pid": "wc_0033",
+   "folder": "p3c8e43e33e",
+   "label": "DL7",
+   "width": 1320,
+   "pose": {
+    "yaw": 60.629048757374704,
+    "pitch": -5.787318566606601,
+    "roll": -4.399566722603828,
+    "vfov": 49.74211580704502
+   },
+   "eye": {
+    "lat": 46.969997339818136,
+    "lon": 8.269322407410597,
+    "h": 1433.5367898615393
+   },
+   "eyeRendered": 1433.5367898615393,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hörnli",
+    "Schnebelhorn",
+    "Rigi",
+    "Dossen",
+    "Plattenberg",
+    "Mutteristock",
+    "Bächistock",
+    "Huser Stock"
+   ]
+  },
+  "EC8": {
+   "pid": "wc_0009",
+   "folder": "pfe96040a8f",
+   "label": "EC8",
+   "width": 1240,
+   "pose": {
+    "yaw": 221.75827070767093,
+    "pitch": 0.03769774268746997,
+    "roll": 0.5223877416905396,
+    "vfov": 18.896026306449137
+   },
+   "eye": {
+    "lat": 46.43114445136396,
+    "lon": 8.094307746165587,
+    "h": 2915.280115065584
+   },
+   "eyeRendered": 2915.280115065584,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gugla",
+    "Matterhorn",
+    "Dent d'Hérens",
+    "Weisshorn",
+    "Grand Cornier",
+    "Pointe de Bricolla",
+    "Les Diablons",
+    "Aiguilles Rouges d'Arolla"
+   ]
+  },
+  "EP7": {
+   "pid": "wc_0088",
+   "folder": "p27e34405dd",
+   "label": "EP7",
+   "width": 1240,
+   "pose": {
+    "yaw": 92.05178532123688,
+    "pitch": -6.881315164044651,
+    "roll": -0.6107990652515077,
+    "vfov": 25.936455149289483
+   },
+   "eye": {
+    "lat": 46.770869,
+    "lon": 8.238139,
+    "h": 2402.9240172635496
+   },
+   "eyeRendered": 2402.9240172635496,
+   "dem": "mapterhorn",
+   "labels": [
+    "Schlossberg",
+    "Gross Spannort",
+    "Titlis",
+    "Reissend Nollen",
+    "Chlyn Wendestock",
+    "Pfaffenhuet",
+    "Chli Griessenhorn",
+    "Stucklistock"
+   ]
+  },
+  "GZ2": {
+   "pid": "wc_0027",
+   "folder": "p0af5190fc0",
+   "label": "GZ2",
+   "width": 1240,
+   "pose": {
+    "yaw": 105.99595620852091,
+    "pitch": -0.06974280130660865,
+    "roll": 1.4867244071115928,
+    "vfov": 15.55939219284535
+   },
+   "eye": {
+    "lat": 46.414444,
+    "lon": 7.718139572744143,
+    "h": 2674.3031821138075
+   },
+   "eyeRendered": 2674.3031821138075,
+   "dem": "mapterhorn",
+   "labels": [
+    "Älwe Rigg",
+    "Kleines Nesthorn",
+    "Bietschhorn",
+    "Schafbärg",
+    "Schwarzhorn"
+   ]
+  },
+  "SU2": {
+   "pid": "wc_0023",
+   "folder": "pbbb600bdcd",
+   "label": "SU2",
+   "width": 1400,
+   "pose": {
+    "yaw": 196.65938339933788,
+    "pitch": 1.4918787323608549,
+    "roll": 1.3805980743467419,
+    "vfov": 6.144618044082493
+   },
+   "eye": {
+    "lat": 46.374722,
+    "lon": 7.977222,
+    "h": 2124.882630513244
+   },
+   "eyeRendered": 2124.882630513244,
+   "dem": "mapterhorn",
+   "labels": [
+    "Liskamm Ostgipfel",
+    "Alphubel",
+    "Schilthorn",
+    "Lenzspitze",
+    "Dom",
+    "Stecknadelhorn",
+    "Hohberghorn",
+    "Dirruhorn"
+   ]
+  },
+  "TH8": {
+   "pid": "wc_0067",
+   "folder": "pa460cc56a0",
+   "label": "TH8",
+   "width": 1480,
+   "pose": {
+    "yaw": 349.62548300114213,
+    "pitch": 1.6175787215838224,
+    "roll": -2.2234010873781624,
+    "vfov": 37.00851664359631
+   },
+   "eye": {
+    "lat": 47.185453,
+    "lon": 9.332547,
+    "h": 1180.1
+   },
+   "eyeRendered": 1180.1,
+   "dem": "mapterhorn",
+   "labels": [
+    "Stöllen",
+    "Schwarzchopf",
+    "Stoss",
+    "Grenzchopf",
+    "Spitzbergli",
+    "Säntis"
+   ]
+  },
+  "SZ9": {
+   "pid": "wc_0033",
+   "folder": "p3c8e43e33e",
+   "label": "SZ9",
+   "width": 1240,
+   "pose": {
+    "yaw": 60.629048757374704,
+    "pitch": -5.787318566606601,
+    "roll": -4.399566722603828,
+    "vfov": 49.74211580704502
+   },
+   "eye": {
+    "lat": 46.969997339818136,
+    "lon": 8.269322407410597,
+    "h": 1433.5367898615393
+   },
+   "eyeRendered": 1433.5367898615393,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hörnli",
+    "Schnebelhorn",
+    "Rigi",
+    "Dossen",
+    "Plattenberg",
+    "Mutteristock",
+    "Bächistock",
+    "Huser Stock"
+   ]
+  },
+  "HG9": {
+   "pid": "wc_0047",
+   "folder": "p844db34cf1",
+   "label": "HG9",
+   "width": 1480,
+   "pose": {
+    "yaw": 138.5387,
+    "pitch": 7.8217,
+    "roll": -0.4804,
+    "vfov": 44.8224
+   },
+   "eye": {
+    "lat": 46.52155,
+    "lon": 9.90202,
+    "h": 2449.8239342481365
+   },
+   "eyeRendered": 2449.8239342481365,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz da las Sterlas",
+    "Piz Vadret",
+    "Piz Muragl",
+    "Las Sours - Westgpifel",
+    "Munt da la Bês-cha",
+    "Pizzo Palù Centrale",
+    "Fortezza"
+   ]
+  },
+  "QG8": {
+   "pid": "wc_0088",
+   "folder": "p27e34405dd",
+   "label": "QG8",
+   "width": 1240,
+   "pose": {
+    "yaw": 93.67091173610137,
+    "pitch": -7.03021862787721,
+    "roll": -1.8600238340165605,
+    "vfov": 25.657149049053412
+   },
+   "eye": {
+    "lat": 46.77334213100024,
+    "lon": 8.238467258574568,
+    "h": 2480.1326195183146
+   },
+   "eyeRendered": 2480.1326195183146,
+   "dem": "mapterhorn",
+   "labels": [
+    "Schlossberg",
+    "Gross Spannort",
+    "Titlis",
+    "Reissend Nollen",
+    "Chlyn Wendestock",
+    "Pfaffenhuet",
+    "Chli Griessenhorn",
+    "Stucklistock"
+   ]
+  },
+  "GX3": {
+   "pid": "wc_0001",
+   "folder": "p3acb334b0b",
+   "label": "GX3",
+   "width": 1320,
+   "pose": {
+    "yaw": 102.15677908706553,
+    "pitch": 4.001354732561467,
+    "roll": 2.0694479733681437,
+    "vfov": 17.231148932913637
+   },
+   "eye": {
+    "lat": 46.781999490272796,
+    "lon": 10.1507346446384,
+    "h": 1847.155812477083
+   },
+   "eyeRendered": 1847.155812477083,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz San Jon Dadora",
+    "Piz San Jon Dadaint",
+    "Piz Lavetscha",
+    "Piz Clemgia",
+    "Piz Pisoc",
+    "Motta Jüda"
+   ]
+  },
+  "BS5": {
+   "pid": "wc_0006",
+   "folder": "p49b99f59b4",
+   "label": "BS5",
+   "width": 1320,
+   "pose": {
+    "yaw": 153.837,
+    "pitch": 1.6565,
+    "roll": -2.346,
+    "vfov": 61.6853
+   },
+   "eye": {
+    "lat": 46.94556,
+    "lon": 9.29333,
+    "h": 2408.8120303494043
+   },
+   "eyeRendered": 2408.8120303494043,
+   "dem": "mapterhorn",
+   "labels": [
+    "Plattenfirst",
+    "Ringelspitz",
+    "Fahnenstock"
+   ]
+  },
+  "AC8": {
+   "pid": "wc_0009",
+   "folder": "pfe96040a8f",
+   "label": "AC8",
+   "width": 1320,
+   "pose": {
+    "yaw": 227.039226301427,
+    "pitch": 0.07811579039986638,
+    "roll": 0.3555916892288786,
+    "vfov": 19.07570169043303
+   },
+   "eye": {
+    "lat": 46.427772,
+    "lon": 8.093003,
+    "h": 2865.3
+   },
+   "eyeRendered": 2865.3,
+   "dem": "mapterhorn",
+   "labels": [
+    "Testa del Leone",
+    "Dent d'Hérens",
+    "Weisshorn",
+    "Grand Cornier",
+    "Pointe de Bricolla",
+    "Les Diablons",
+    "Schwarzhorn",
+    "Aiguilles Rouges d'Arolla"
+   ]
+  },
+  "GN7": {
+   "pid": "wc_0027",
+   "folder": "p0af5190fc0",
+   "label": "GN7",
+   "width": 1400,
+   "pose": {
+    "yaw": 108.42554933828572,
+    "pitch": -0.3390582134293306,
+    "roll": 0.8308116456087825,
+    "vfov": 15.259397087550973
+   },
+   "eye": {
+    "lat": 46.41781645136397,
+    "lon": 7.720422320441894,
+    "h": 2736.9329298607513
+   },
+   "eyeRendered": 2736.9329298607513,
+   "dem": "mapterhorn",
+   "labels": [
+    "Jägihorn",
+    "Kleines Nesthorn",
+    "Bietschhorn",
+    "Schafbärg",
+    "Schwarzhorn"
+   ]
+  },
+  "PG9": {
+   "pid": "wc_0033",
+   "folder": "p3c8e43e33e",
+   "label": "PG9",
+   "width": 1480,
+   "pose": {
+    "yaw": 61.23300723083524,
+    "pitch": -6.2042633731015835,
+    "roll": -4.137110083428775,
+    "vfov": 49.36304893198074
+   },
+   "eye": {
+    "lat": 46.97022216990907,
+    "lon": 8.266686555553642,
+    "h": 1520.0732233299589
+   },
+   "eyeRendered": 1520.0732233299589,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hörnli",
+    "Schnebelhorn",
+    "Rigi",
+    "Dossen",
+    "Plattenberg",
+    "Mutteristock",
+    "Bächistock",
+    "Huser Stock"
+   ]
+  },
+  "SX2": {
+   "pid": "wc_0088",
+   "folder": "p27e34405dd",
+   "label": "SX2",
+   "width": 1400,
+   "pose": {
+    "yaw": 93.22523931709065,
+    "pitch": -6.587030123255186,
+    "roll": -1.388111051958428,
+    "vfov": 25.657149049053412
+   },
+   "eye": {
+    "lat": 46.77289247081838,
+    "lon": 8.240108551447406,
+    "h": 2392.6794255608797
+   },
+   "eyeRendered": 2392.6794255608797,
+   "dem": "mapterhorn",
+   "labels": [
+    "Vorder Schlossberg",
+    "Schlossberg",
+    "Gross Spannort",
+    "Titlis",
+    "Reissend Nollen",
+    "Chlyn Wendestock",
+    "Pfaffenhuet",
+    "Stucklistock"
+   ]
+  },
+  "JG7": {
+   "pid": "wc_0072",
+   "folder": "pa2d7169a87",
+   "label": "JG7",
+   "width": 1320,
+   "pose": {
+    "yaw": 76.82665911676688,
+    "pitch": -3.5182038832618496,
+    "roll": 1.8605515896492284,
+    "vfov": 25.563813877054663
+   },
+   "eye": {
+    "lat": 47.23910350972721,
+    "lon": 9.450094625554396,
+    "h": 693.4736842461322
+   },
+   "eyeRendered": 693.4736842461322,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hohe Kugel",
+    "Falben",
+    "Hoher Freschen",
+    "Matona",
+    "Falben",
+    "Glatthorn",
+    "Tälispitze",
+    "Westlicher Johanneskopf"
+   ]
+  },
+  "VB7": {
+   "pid": "wc_0004",
+   "folder": "pa0f536598b",
+   "label": "VB7",
+   "width": 1400,
+   "pose": {
+    "yaw": 28.804277240156907,
+    "pitch": -10.90001412292758,
+    "roll": -1.5373655745870147,
+    "vfov": 40.47828977188761
+   },
+   "eye": {
+    "lat": 47.15232,
+    "lon": 9.26597,
+    "h": 2263.45607328227
+   },
+   "eyeRendered": 2263.45607328227,
+   "dem": "mapterhorn",
+   "labels": [
+    "Höchsten",
+    "Berg",
+    "Grenzchopf",
+    "Säntis",
+    "Altmann",
+    "Chreialpfirst",
+    "Salmaser Höhe",
+    "Eckhaldekopf"
+   ]
+  },
+  "VH7": {
+   "pid": "wc_0076",
+   "folder": "p0f514e7787",
+   "label": "VH7",
+   "width": 1400,
+   "pose": {
+    "yaw": 112.72062696156956,
+    "pitch": 8.247824576118724,
+    "roll": -0.6083037535486064,
+    "vfov": 49.03007774568867
+   },
+   "eye": {
+    "lat": 46.52297,
+    "lon": 7.05917,
+    "h": 770.8140144522322
+   },
+   "eyeRendered": 770.8140144522322,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tête de l'Herbette",
+    "Vanil Noir",
+    "Pointe de Paray",
+    "Les Millets",
+    "Les Millets (Sommet ouest)"
+   ]
+  },
+  "XR7": {
+   "pid": "wc_0071",
+   "folder": "p478e6308b7",
+   "label": "XR7",
+   "width": 1480,
+   "pose": {
+    "yaw": 160.92125569807152,
+    "pitch": -3.6299771036695447,
+    "roll": 4.284276856922658,
+    "vfov": 47.924326642352035
+   },
+   "eye": {
+    "lat": 46.408618660181865,
+    "lon": 10.019914207890483,
+    "h": 2255.3707635369037
+   },
+   "eyeRendered": 2255.3707635369037,
+   "dem": "mapterhorn",
+   "labels": [
+    "Cornasc",
+    "Monte Sessa"
+   ]
+  },
+  "QE4": {
+   "pid": "wc_0002",
+   "folder": "p02ffe42da7",
+   "label": "QE4",
+   "width": 1400,
+   "pose": {
+    "yaw": 38.91020036179977,
+    "pitch": -6.102185893549414,
+    "roll": -1.941057041873323,
+    "vfov": 58.91699203829191
+   },
+   "eye": {
+    "lat": 46.90049550972721,
+    "lon": 9.177351888988245,
+    "h": 2131.0060899468435
+   },
+   "eyeRendered": 2131.0060899468435,
+   "dem": "mapterhorn",
+   "labels": [
+    "Huet",
+    "Gulderstock",
+    "Spitzmeilen",
+    "Grüenenspitz",
+    "Foostock",
+    "Chli Schiben",
+    "Piz Sardona",
+    "Mörderhoren"
+   ]
+  },
+  "RA5": {
+   "pid": "wc_0086",
+   "folder": "p0de9b31c2c",
+   "label": "RA5",
+   "width": 1480,
+   "pose": {
+    "yaw": 71.72891205953353,
+    "pitch": -15.230192794812284,
+    "roll": -2.0194533210411634,
+    "vfov": 39.63880356406596
+   },
+   "eye": {
+    "lat": 45.980071621273034,
+    "lon": 8.948932124354306,
+    "h": 852.0227991023312
+   },
+   "eyeRendered": 852.0227991023312,
+   "dem": "mapterhorn",
+   "labels": [
+    "Il Torrione",
+    "Motto d'Ailgua",
+    "Monte Bregagno",
+    "Monte Bregagnino",
+    "Monte Grona",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Termine Quadro"
+   ]
+  },
+  "BL4": {
+   "pid": "wc_0001",
+   "folder": "p3acb334b0b",
+   "label": "BL4",
+   "width": 1400,
+   "pose": {
+    "yaw": 101.46158427343198,
+    "pitch": 4.194875752666047,
+    "roll": 2.1427693003398733,
+    "vfov": 17.138192750173115
+   },
+   "eye": {
+    "lat": 46.780200849545345,
+    "lon": 10.153361223191995,
+    "h": 1837.771654413762
+   },
+   "eyeRendered": 1837.771654413762,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz Ajüz",
+    "Piz Lischana",
+    "Piz San Jon Dadora",
+    "Piz San Jon Dadaint",
+    "Piz Lavetscha",
+    "Piz Clemgia",
+    "Piz Pisoc",
+    "Motta Jüda"
+   ]
+  },
+  "GA3": {
+   "pid": "wc_0033",
+   "folder": "p3c8e43e33e",
+   "label": "GA3",
+   "width": 1480,
+   "pose": {
+    "yaw": 60.96748269259731,
+    "pitch": -6.712518694566849,
+    "roll": -4.226474155241069,
+    "vfov": 49.74211580704502
+   },
+   "eye": {
+    "lat": 46.969997339818136,
+    "lon": 8.264709666660927,
+    "h": 1598.651518150231
+   },
+   "eyeRendered": 1598.651518150231,
+   "dem": "mapterhorn",
+   "labels": [
+    "Windegg",
+    "Schnebelhorn",
+    "Rigi",
+    "Dossen",
+    "Schiberg",
+    "Mutteristock",
+    "Bächistock",
+    "Huser Stock"
+   ]
+  },
+  "LK4": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "LK4",
+   "width": 1240,
+   "pose": {
+    "yaw": 76.9728,
+    "pitch": -5.5829,
+    "roll": 0.1449,
+    "vfov": 46.7277
+   },
+   "eye": {
+    "lat": 46.990667,
+    "lon": 8.264,
+    "h": 1808.1
+   },
+   "eyeRendered": 1808.1,
+   "dem": "mapterhorn",
+   "labels": [
+    "Rigi",
+    "Speer",
+    "Schiberg",
+    "Mutteristock",
+    "Bächistock",
+    "Ortstock",
+    "Hausstock",
+    "Schächentaler Windgällen"
+   ]
+  },
+  "KA8": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "KA8",
+   "width": 1240,
+   "pose": {
+    "yaw": 72.20208199348943,
+    "pitch": -3.868176263553934,
+    "roll": 2.884082687379736,
+    "vfov": 44.01144636083675
+   },
+   "eye": {
+    "lat": 46.98976767963628,
+    "lon": 8.263011181665588,
+    "h": 1253.662624388188
+   },
+   "eyeRendered": 1253.662624388188,
+   "dem": "mapterhorn",
+   "labels": [
+    "Schnebelhorn",
+    "Wildspitz",
+    "Rigi",
+    "Dossen",
+    "Rigi Hochflue",
+    "Bächistock",
+    "Grisset",
+    "Chronenstock"
+   ]
+  },
+  "AL9": {
+   "pid": "wc_0086",
+   "folder": "p0de9b31c2c",
+   "label": "AL9",
+   "width": 1480,
+   "pose": {
+    "yaw": 69.76909147858007,
+    "pitch": -14.780396391953726,
+    "roll": -2.3199481829664292,
+    "vfov": 39.63880356406596
+   },
+   "eye": {
+    "lat": 45.976249509727204,
+    "lon": 8.945373396371414,
+    "h": 875.3568522631123
+   },
+   "eyeRendered": 875.3568522631123,
+   "dem": "mapterhorn",
+   "labels": [
+    "Monte Galbiga",
+    "Monte di Lenno"
+   ]
+  },
+  "ME8": {
+   "pid": "wc_0002",
+   "folder": "p02ffe42da7",
+   "label": "ME8",
+   "width": 1240,
+   "pose": {
+    "yaw": 40.38821352283744,
+    "pitch": -3.095174021640809,
+    "roll": -6.872954799366856,
+    "vfov": 58.91699203829191
+   },
+   "eye": {
+    "lat": 46.90049550972721,
+    "lon": 9.175377555952975,
+    "h": 2132.831469258652
+   },
+   "eyeRendered": 2132.831469258652,
+   "dem": "mapterhorn",
+   "labels": [
+    "Huet",
+    "Gulderstock",
+    "Spitzmeilen",
+    "Grüenenspitz",
+    "Foostock",
+    "Chli Schiben",
+    "Piz Sardona",
+    "Mörderhoren"
+   ]
+  },
+  "WU6": {
+   "pid": "wc_0002",
+   "folder": "p02ffe42da7",
+   "label": "WU6",
+   "width": 1400,
+   "pose": {
+    "yaw": 37.32477734044252,
+    "pitch": -3.5321876213156274,
+    "roll": -0.8410256355721504,
+    "vfov": 58.91699203829191
+   },
+   "eye": {
+    "lat": 46.90251898054559,
+    "lon": 9.178997166517634,
+    "h": 2024.829225762324
+   },
+   "eyeRendered": 2024.829225762324,
+   "dem": "mapterhorn",
+   "labels": [
+    "Heustock",
+    "Gulderstock",
+    "Fanenstock",
+    "Grüenenspitz",
+    "Foostock",
+    "Chli Schiben",
+    "Piz Sardona",
+    "Biflenhorn"
+   ]
+  },
+  "QL4": {
+   "pid": "wc_0074",
+   "folder": "p3c84a1e45c",
+   "label": "QL4",
+   "width": 1400,
+   "pose": {
+    "yaw": 261.07197221037654,
+    "pitch": -11.08338761599811,
+    "roll": -0.5487961908745711,
+    "vfov": 38.35537621712795
+   },
+   "eye": {
+    "lat": 47.14605683009093,
+    "lon": 9.213315298949363,
+    "h": 2102.5108143228113
+   },
+   "eyeRendered": 2102.5108143228113,
+   "dem": "mapterhorn",
+   "labels": [
+    "Usser Fürberg",
+    "Schlossberg",
+    "Rautispitz",
+    "Hoh Brisen",
+    "Brünnelistock",
+    "Haggenspitz",
+    "Rigi",
+    "Federispitz"
+   ]
+  },
+  "SC4": {
+   "pid": "wc_0054",
+   "folder": "pc7c77fd843",
+   "label": "SC4",
+   "width": 1480,
+   "pose": {
+    "yaw": 53.25815469406799,
+    "pitch": -9.304348163658215,
+    "roll": -2.46467051763357,
+    "vfov": 54.876606485252545
+   },
+   "eye": {
+    "lat": 45.98008079118211,
+    "lon": 8.948955088371402,
+    "h": 851.9075771150306
+   },
+   "eyeRendered": 851.9075771150306,
+   "dem": "mapterhorn",
+   "labels": [
+    "Monte Bar",
+    "Camoghè",
+    "Monte Boglia",
+    "Il Torrione",
+    "Monte Bregagno",
+    "Monte Legnone",
+    "Monte Galbiga"
+   ]
+  },
+  "WV9": {
+   "pid": "wc_0004",
+   "folder": "pa0f536598b",
+   "label": "WV9",
+   "width": 1320,
+   "pose": {
+    "yaw": 30.68427286167969,
+    "pitch": -11.37294176319939,
+    "roll": -0.1134608617271284,
+    "vfov": 44.38370788769492
+   },
+   "eye": {
+    "lat": 47.15344415045466,
+    "lon": 9.266300607370662,
+    "h": 2184.970529153245
+   },
+   "eyeRendered": 2184.970529153245,
+   "dem": "mapterhorn",
+   "labels": [
+    "Höchsten",
+    "Stöllen",
+    "Grenzchopf",
+    "Säntis",
+    "Altmann",
+    "Chreialpfirst",
+    "Salmaser Höhe",
+    "Hochgrat"
+   ]
+  },
+  "GK8": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "GK8",
+   "width": 1240,
+   "pose": {
+    "yaw": 73.4016910518051,
+    "pitch": -3.91500920202294,
+    "roll": 2.804077544221858,
+    "vfov": 42.98849029869777
+   },
+   "eye": {
+    "lat": 46.99224081063652,
+    "lon": 8.259385514439412,
+    "h": 1292.4838305827939
+   },
+   "eyeRendered": 1292.4838305827939,
+   "dem": "mapterhorn",
+   "labels": [
+    "Wildspitz",
+    "Rigi",
+    "Dossen",
+    "Grosser Mythen",
+    "Bächistock",
+    "Grisset",
+    "Höch Turm",
+    "Chaiserstock"
+   ]
+  },
+  "EN9": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "EN9",
+   "width": 1480,
+   "pose": {
+    "yaw": 72.5476978401021,
+    "pitch": -3.8691505603574394,
+    "roll": 2.9038575911620867,
+    "vfov": 43.869021879157614
+   },
+   "eye": {
+    "lat": 46.990667,
+    "lon": 8.262681575554117,
+    "h": 1258.133331798669
+   },
+   "eyeRendered": 1258.133331798669,
+   "dem": "mapterhorn",
+   "labels": [
+    "Wildspitz",
+    "Rigi",
+    "Dossen",
+    "Rigi Hochflue",
+    "Bächistock",
+    "Grisset",
+    "Gross Kärpf",
+    "Chaiserstock"
+   ]
+  },
+  "RC9": {
+   "pid": "wc_0009",
+   "folder": "pfe96040a8f",
+   "label": "RC9",
+   "width": 1320,
+   "pose": {
+    "yaw": 222.10770946677974,
+    "pitch": 0.0626935841659655,
+    "roll": 0.5515675059747172,
+    "vfov": 18.896026306449137
+   },
+   "eye": {
+    "lat": 46.42664784954534,
+    "lon": 8.092676813458603,
+    "h": 2891.0778087796834
+   },
+   "eyeRendered": 2891.0778087796834,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gugla",
+    "Matterhorn",
+    "Dent d'Hérens",
+    "Weisshorn",
+    "Grand Cornier",
+    "Pointe de Bricolla",
+    "Les Diablons",
+    "Schwarzhorn"
+   ]
+  },
+  "VA7": {
+   "pid": "wc_0072",
+   "folder": "pa2d7169a87",
+   "label": "VA7",
+   "width": 1240,
+   "pose": {
+    "yaw": 76.33356888329328,
+    "pitch": -3.4271617610682106,
+    "roll": 1.9925653713167322,
+    "vfov": 25.71285026747721
+   },
+   "eye": {
+    "lat": 47.23775452918162,
+    "lon": 9.452081541851465,
+    "h": 649.6928497412164
+   },
+   "eyeRendered": 649.6928497412164,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hohe Kugel",
+    "Falben",
+    "Hoher Freschen",
+    "Matona",
+    "Falben",
+    "Glatthorn",
+    "Tälispitze",
+    "Westlicher Johanneskopf"
+   ]
+  },
+  "PF6": {
+   "pid": "wc_0047",
+   "folder": "p844db34cf1",
+   "label": "PF6",
+   "width": 1480,
+   "pose": {
+    "yaw": 134.3031599544106,
+    "pitch": 7.815228031817426,
+    "roll": -0.795006918983279,
+    "vfov": 44.82240294828827
+   },
+   "eye": {
+    "lat": 46.52155,
+    "lon": 9.90202,
+    "h": 2449.8239342481365
+   },
+   "eyeRendered": 2449.8239342481365,
+   "dem": "mapterhorn",
+   "labels": [
+    "Piz da las Sterlas",
+    "Piz Vadret",
+    "Piz Muragl",
+    "Las Sours - Westgpifel",
+    "Munt da la Bês-cha",
+    "Pizzo Palù Centrale"
+   ]
+  },
+  "QX8": {
+   "pid": "wc_0072",
+   "folder": "pa2d7169a87",
+   "label": "QX8",
+   "width": 1400,
+   "pose": {
+    "yaw": 77.39449415005147,
+    "pitch": -3.8147636587232787,
+    "roll": 2.1314890851147457,
+    "vfov": 27.259910861528507
+   },
+   "eye": {
+    "lat": 47.24067732036372,
+    "lon": 9.451419236419108,
+    "h": 668.7007971531245
+   },
+   "eyeRendered": 668.7007971531245,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hohe Kugel",
+    "Falben",
+    "Hoher Freschen",
+    "Matona",
+    "Falben",
+    "Glatthorn",
+    "Tälispitze",
+    "Westlicher Johanneskopf"
+   ]
+  },
+  "ZZ4": {
+   "pid": "wc_0004",
+   "folder": "pa0f536598b",
+   "label": "ZZ4",
+   "width": 1240,
+   "pose": {
+    "yaw": 29.244915078989294,
+    "pitch": -10.602749887170917,
+    "roll": 0.5429938123454596,
+    "vfov": 44.34942574932518
+   },
+   "eye": {
+    "lat": 47.151195849545346,
+    "lon": 9.267953644223976,
+    "h": 2051.5393721755386
+   },
+   "eyeRendered": 2051.5393721755386,
+   "dem": "mapterhorn",
+   "labels": [
+    "Ramsberg",
+    "Amalienhöhe",
+    "Lütispitz",
+    "Schofwisspitz",
+    "Grenzchopf",
+    "Säntis",
+    "Altmann"
+   ]
+  },
+  "BN6": {
+   "pid": "wc_0046",
+   "folder": "pd719785867",
+   "label": "BN6",
+   "width": 1480,
+   "pose": {
+    "yaw": 178.54897433205028,
+    "pitch": -3.127232023083981,
+    "roll": 1.56443621396992,
+    "vfov": 33.01053616373291
+   },
+   "eye": {
+    "lat": 47.03851118936348,
+    "lon": 8.482792935333634,
+    "h": 1548.1770401177157
+   },
+   "eyeRendered": 1548.1770401177157,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gitschen",
+    "Rot Gitschen",
+    "Urirotstock",
+    "Wissigstock",
+    "Ruchstock",
+    "Titlis",
+    "Gross Walenstock",
+    "Rotsandnollen"
+   ]
+  },
+  "NT9": {
+   "pid": "wc_0002",
+   "folder": "p02ffe42da7",
+   "label": "NT9",
+   "width": 1320,
+   "pose": {
+    "yaw": 39.55553912578993,
+    "pitch": -7.269444067854987,
+    "roll": -2.182092485760679,
+    "vfov": 58.91699203829191
+   },
+   "eye": {
+    "lat": 46.898022378726964,
+    "lon": 9.176035666964731,
+    "h": 2288.052183568248
+   },
+   "eyeRendered": 2288.052183568248,
+   "dem": "mapterhorn",
+   "labels": [
+    "Huet",
+    "Gulderstock",
+    "Spitzmeilen",
+    "Wissgandstöckli",
+    "Foostock",
+    "Chli Schiben",
+    "Piz Sardona",
+    "Mörderhoren"
+   ]
+  },
+  "WS9": {
+   "pid": "wc_0009",
+   "folder": "pfe96040a8f",
+   "label": "WS9",
+   "width": 1400,
+   "pose": {
+    "yaw": 222.12405337274032,
+    "pitch": 0.06896112463440189,
+    "roll": 0.5188874674427972,
+    "vfov": 18.896026306449137
+   },
+   "eye": {
+    "lat": 46.42642301945441,
+    "lon": 8.092676813458603,
+    "h": 2889.5620924291525
+   },
+   "eyeRendered": 2889.5620924291525,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gugla",
+    "Matterhorn",
+    "Dent d'Hérens",
+    "Weisshorn",
+    "Grand Cornier",
+    "Pointe de Bricolla",
+    "Les Diablons",
+    "Schwarzhorn"
+   ]
+  },
+  "LE2": {
+   "pid": "wc_0086",
+   "folder": "p0de9b31c2c",
+   "label": "LE2",
+   "width": 1320,
+   "pose": {
+    "yaw": 78.17527994198014,
+    "pitch": -15.532982064221013,
+    "roll": -6.598296694118518,
+    "vfov": 39.63880356406596
+   },
+   "eye": {
+    "lat": 45.980071621273034,
+    "lon": 8.948932124354306,
+    "h": 852.0227991023312
+   },
+   "eyeRendered": 852.0227991023312,
+   "dem": "mapterhorn",
+   "labels": [
+    "Monte Marnotto",
+    "Monte Bregagno",
+    "Monte Bregagnino",
+    "Monte Grona",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Termine Quadro",
+    "Cima Val Rovina"
+   ]
+  },
+  "UY7": {
+   "pid": "wc_0033",
+   "folder": "p3c8e43e33e",
+   "label": "UY7",
+   "width": 1320,
+   "pose": {
+    "yaw": 61.012508027816544,
+    "pitch": -5.786872906769015,
+    "roll": -4.565201192770602,
+    "vfov": 50.125305120809685
+   },
+   "eye": {
+    "lat": 46.970447,
+    "lon": 8.267675,
+    "h": 1446.2466421296353
+   },
+   "eyeRendered": 1446.2466421296353,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hörnli",
+    "Schnebelhorn",
+    "Rigi",
+    "Dossen",
+    "Haggenspitz",
+    "Mutteristock",
+    "Bächistock",
+    "Huser Stock"
+   ]
+  },
+  "KJ7": {
+   "pid": "wc_0088",
+   "folder": "p27e34405dd",
+   "label": "KJ7",
+   "width": 1480,
+   "pose": {
+    "yaw": 93.8520938956495,
+    "pitch": -6.962380464482353,
+    "roll": -1.9762566386579457,
+    "vfov": 25.657149049053412
+   },
+   "eye": {
+    "lat": 46.77356696109117,
+    "lon": 8.237810741425433,
+    "h": 2473.4422227775735
+   },
+   "eyeRendered": 2473.4422227775735,
+   "dem": "mapterhorn",
+   "labels": [
+    "Vorder Schlossberg",
+    "Schlossberg",
+    "Gross Spannort",
+    "Titlis"
+   ]
+  },
+  "HH5": {
+   "pid": "wc_0027",
+   "folder": "p0af5190fc0",
+   "label": "HH5",
+   "width": 1320,
+   "pose": {
+    "yaw": 105.94731659719629,
+    "pitch": 0.07735431991345677,
+    "roll": 0.8057257253117506,
+    "vfov": 15.55939219284535
+   },
+   "eye": {
+    "lat": 46.41376950972721,
+    "lon": 7.720748427255858,
+    "h": 2663.7246155809926
+   },
+   "eyeRendered": 2663.7246155809926,
+   "dem": "mapterhorn",
+   "labels": [
+    "Jägihorn",
+    "Kleines Nesthorn",
+    "Bietschhorn",
+    "Schafbärg",
+    "Schwarzhorn"
+   ]
+  },
+  "JB5": {
+   "pid": "wc_0028",
+   "folder": "pbf65f943a7",
+   "label": "JB5",
+   "width": 1480,
+   "pose": {
+    "yaw": 73.22500000000002,
+    "pitch": -6.9125,
+    "roll": 1.6999999999999997,
+    "vfov": 51.15745788924117
+   },
+   "eye": {
+    "lat": 46.990667,
+    "lon": 8.264,
+    "h": 1808.1
+   },
+   "eyeRendered": 1808.1,
+   "dem": "mapterhorn",
+   "labels": [
+    "Rigi",
+    "Federispitz",
+    "Schiberg",
+    "Mutteristock",
+    "Bächistock",
+    "Höch Turm",
+    "Hausstock",
+    "Schächentaler Windgällen"
+   ]
+  },
+  "PG8": {
+   "pid": "wc_0086",
+   "folder": "p0de9b31c2c",
+   "label": "PG8",
+   "width": 1480,
+   "pose": {
+    "yaw": 71.04228691225431,
+    "pitch": -16.063278663106463,
+    "roll": -2.0592049619633346,
+    "vfov": 41.3499369532545
+   },
+   "eye": {
+    "lat": 45.976924,
+    "lon": 8.947314520725717,
+    "h": 914.8519687044586
+   },
+   "eyeRendered": 914.8519687044586,
+   "dem": "mapterhorn",
+   "labels": [
+    "Il Torrione",
+    "Monte Tabor",
+    "Monte Bregagno",
+    "Monte Disgrazia",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Tremezzo",
+    "Cima Val Rovina"
+   ]
+  },
+  "VV3": {
+   "pid": "wc_0006",
+   "folder": "p49b99f59b4",
+   "label": "VV3",
+   "width": 1240,
+   "pose": {
+    "yaw": 162.02051287799392,
+    "pitch": 0.04448534807006978,
+    "roll": -4.363092061210805,
+    "vfov": 70.97127905303564
+   },
+   "eye": {
+    "lat": 46.946009660181865,
+    "lon": 9.293000671727453,
+    "h": 2434.3395353420383
+   },
+   "eyeRendered": 2434.3395353420383,
+   "dem": "mapterhorn",
+   "labels": [
+    "Plattenfirst",
+    "Vorder Panärahorn",
+    "Ringelspitz",
+    "Fahnenstock"
+   ]
+  },
+  "RX5": {
+   "pid": "wc_0076",
+   "folder": "p0f514e7787",
+   "label": "RX5",
+   "width": 1400,
+   "pose": {
+    "yaw": 112.4523177048599,
+    "pitch": 8.137934331580158,
+    "roll": -0.748402465355386,
+    "vfov": 46.4009701785169
+   },
+   "eye": {
+    "lat": 46.52297,
+    "lon": 7.05786296935374,
+    "h": 774.8162333799792
+   },
+   "eyeRendered": 774.8162333799792,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tête de l'Herbette",
+    "Vanil Noir",
+    "Pointe de Paray",
+    "Les Millets",
+    "Les Millets (Sommet ouest)"
+   ]
+  },
+  "YL9": {
+   "pid": "wc_0074",
+   "folder": "p3c84a1e45c",
+   "label": "YL9",
+   "width": 1400,
+   "pose": {
+    "yaw": 258.42996142378905,
+    "pitch": -12.160389384538567,
+    "roll": -1.6907599628989214,
+    "vfov": 44.05637438153843
+   },
+   "eye": {
+    "lat": 47.145832,
+    "lon": 9.211331896848089,
+    "h": 2040.6468875194735
+   },
+   "eyeRendered": 2040.6468875194735,
+   "dem": "mapterhorn",
+   "labels": [
+    "Vrenelisgärtli",
+    "Usser Fürberg",
+    "Rautispitz",
+    "Brünnelistock",
+    "Rigi",
+    "Hundwileren",
+    "Wildspitz",
+    "Federispitz"
+   ]
+  },
+  "BV5": {
+   "pid": "wc_0074",
+   "folder": "p3c84a1e45c",
+   "label": "BV5",
+   "width": 1480,
+   "pose": {
+    "yaw": 260.7222567741838,
+    "pitch": -10.863350270504526,
+    "roll": -1.2946541659474242,
+    "vfov": 39.2774753985226
+   },
+   "eye": {
+    "lat": 47.145832,
+    "lon": 9.214307,
+    "h": 2043.559047788076
+   },
+   "eyeRendered": 2043.559047788076,
+   "dem": "mapterhorn",
+   "labels": [
+    "Usser Fürberg",
+    "Titlis",
+    "Rautispitz",
+    "Hoh Brisen",
+    "Brünnelistock",
+    "Hörnli",
+    "Rigi"
+   ]
+  },
+  "ZN3": {
+   "pid": "wc_0004",
+   "folder": "pa0f536598b",
+   "label": "ZN3",
+   "width": 1480,
+   "pose": {
+    "yaw": 25.592009069492462,
+    "pitch": -11.807534509932374,
+    "roll": -0.6938092499148191,
+    "vfov": 44.08108753655839
+   },
+   "eye": {
+    "lat": 47.15232,
+    "lon": 9.26597,
+    "h": 2263.45607328227
+   },
+   "eyeRendered": 2263.45607328227,
+   "dem": "mapterhorn",
+   "labels": [
+    "Amalienhöhe",
+    "Höchsten",
+    "Stöllen",
+    "Grenzchopf",
+    "Säntis",
+    "Altmann",
+    "Chreialpfirst",
+    "Salmaser Höhe"
+   ]
+  },
+  "XP4": {
+   "pid": "wc_0005",
+   "folder": "pdfe17cd088",
+   "label": "XP4",
+   "width": 1240,
+   "pose": {
+    "yaw": 190.88435738546767,
+    "pitch": -1.4187098036014083,
+    "roll": 0.07391341083476699,
+    "vfov": 16.986503415240147
+   },
+   "eye": {
+    "lat": 47.351668,
+    "lon": 8.487503,
+    "h": 814.6
+   },
+   "eyeRendered": 814.6,
+   "dem": "mapterhorn",
+   "labels": [
+    "Schlossberg",
+    "Rigi",
+    "Titlis",
+    "Reissend Nollen",
+    "Gwächtenhorn",
+    "Huetstock",
+    "Glogghüs",
+    "Esel"
+   ]
+  },
+  "ZY3": {
+   "pid": "wc_0086",
+   "folder": "p0de9b31c2c",
+   "label": "ZY3",
+   "width": 1480,
+   "pose": {
+    "yaw": 70.97715296301881,
+    "pitch": -15.370676226593224,
+    "roll": -0.9185272742041972,
+    "vfov": 39.63880356406596
+   },
+   "eye": {
+    "lat": 45.97849781063651,
+    "lon": 8.94828508290287,
+    "h": 850.3350129883041
+   },
+   "eyeRendered": 850.3350129883041,
+   "dem": "mapterhorn",
+   "labels": [
+    "Il Torrione",
+    "Monte Tabor",
+    "Monte Bregagno",
+    "Monte Bregagnino",
+    "Monte Grona",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Termine Quadro"
+   ]
+  },
+  "FW5": {
+   "pid": "wc_0076",
+   "folder": "p0f514e7787",
+   "label": "FW5",
+   "width": 1480,
+   "pose": {
+    "yaw": 113.60024373937122,
+    "pitch": 8.712110912523995,
+    "roll": -0.16850170470530712,
+    "vfov": 47.29684022496911
+   },
+   "eye": {
+    "lat": 46.52297,
+    "lon": 7.05917,
+    "h": 770.8140144522322
+   },
+   "eyeRendered": 770.8140144522322,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tête de l'Herbette",
+    "Vanil Noir",
+    "Pointe de Paray",
+    "Les Millets (Sommet est)",
+    "Les Millets",
+    "Les Millets (Sommet ouest)"
+   ]
+  },
+  "BD9": {
+   "pid": "wc_0074",
+   "folder": "p3c84a1e45c",
+   "label": "BD9",
+   "width": 1240,
+   "pose": {
+    "yaw": 260.635343039866,
+    "pitch": -9.471499005476485,
+    "roll": -2.354422148229974,
+    "vfov": 35.08316808023896
+   },
+   "eye": {
+    "lat": 47.14560716990907,
+    "lon": 9.217943237185668,
+    "h": 2093.4354139901466
+   },
+   "eyeRendered": 2093.4354139901466,
+   "dem": "mapterhorn",
+   "labels": [
+    "Näbelchäppler",
+    "Klein Titlis",
+    "Rautispitz",
+    "Hoh Brisen",
+    "Brünnelistock",
+    "Matthorn",
+    "Rigi",
+    "Leistchamm"
+   ]
+  },
+  "YH3": {
+   "pid": "wc_0074",
+   "folder": "p3c84a1e45c",
+   "label": "YH3",
+   "width": 1320,
+   "pose": {
+    "yaw": 255.90384191759847,
+    "pitch": -13.00958003412207,
+    "roll": -1.53097728153051,
+    "vfov": 47.060963465056155
+   },
+   "eye": {
+    "lat": 47.14605683009093,
+    "lon": 9.213315298949363,
+    "h": 2102.5108143228113
+   },
+   "eyeRendered": 2102.5108143228113,
+   "dem": "mapterhorn",
+   "labels": [
+    "Gross-Schärhorn",
+    "Vrenelisgärtli",
+    "Usser Fürberg",
+    "Rautispitz",
+    "Brünnelistock",
+    "Rigi",
+    "Wildspitz",
+    "Federispitz"
+   ]
+  },
+  "QN3": {
+   "pid": "wc_0076",
+   "folder": "p0f514e7787",
+   "label": "QN3",
+   "width": 1480,
+   "pose": {
+    "yaw": 112.73099042874789,
+    "pitch": 7.956917011059128,
+    "roll": -0.06355151006580613,
+    "vfov": 47.98857374458488
+   },
+   "eye": {
+    "lat": 46.523644490272794,
+    "lon": 7.05786296935374,
+    "h": 773.2612851344975
+   },
+   "eyeRendered": 773.2612851344975,
+   "dem": "mapterhorn",
+   "labels": [
+    "Tête de l'Herbette",
+    "Vanil Noir",
+    "Pointe de Paray",
+    "Les Millets",
+    "Les Millets (Sommet ouest)"
+   ]
+  },
+  "AD7": {
+   "pid": "wc_0072",
+   "folder": "pa2d7169a87",
+   "label": "AD7",
+   "width": 1240,
+   "pose": {
+    "yaw": 76.9263236556893,
+    "pitch": -3.4213121848388486,
+    "roll": 1.9043131078853,
+    "vfov": 25.674732106380567
+   },
+   "eye": {
+    "lat": 47.239778,
+    "lon": 9.451750389135286,
+    "h": 653.1711218597245
+   },
+   "eyeRendered": 653.1711218597245,
+   "dem": "mapterhorn",
+   "labels": [
+    "Hohe Kugel",
+    "Falben",
+    "Hoher Freschen",
+    "Matona",
+    "Falben",
+    "Glatthorn",
+    "Tälispitze",
+    "Westlicher Johanneskopf"
+   ]
+  },
+  "LG4": {
+   "pid": "wc_0009",
+   "folder": "pfe96040a8f",
+   "label": "LG4",
+   "width": 1400,
+   "pose": {
+    "yaw": 221.78186146297006,
+    "pitch": 0.23881610907678136,
+    "roll": 1.1862310007302588,
+    "vfov": 18.896026306449137
+   },
+   "eye": {
+    "lat": 46.428896150454655,
+    "lon": 8.093655373082793,
+    "h": 2859.8481638487538
+   },
+   "eyeRendered": 2859.8481638487538,
+   "dem": "mapterhorn",
+   "labels": [
+    "Les Diablons",
+    "Schwarzhorn",
+    "Aiguilles Rouges d'Arolla",
+    "Sasseneire"
+   ]
+  },
+  "US5": {
+   "pid": "wc_0098",
+   "folder": "pd1edf2b4b5",
+   "label": "US5",
+   "width": 1240,
+   "pose": {
+    "yaw": 100.48621943745421,
+    "pitch": 23.47861710932678,
+    "roll": 1.6370823759932218,
+    "vfov": 31.528078685788262
+   },
+   "eye": {
+    "lat": 46.644661,
+    "lon": 9.278875,
+    "h": 1669.49340161852
+   },
+   "eyeRendered": 1669.49340161852,
+   "dem": "mapterhorn",
+   "labels": [
+    "Carnausahora",
+    "Bruschgspitz",
+    "Bruschghorn"
+   ]
+  },
+  "JY4": {
+   "pid": "wc_0054",
+   "folder": "pc7c77fd843",
+   "label": "JY4",
+   "width": 1320,
+   "pose": {
+    "yaw": 55.67879604666308,
+    "pitch": -9.644514713552322,
+    "roll": -1.6258231114141493,
+    "vfov": 53.02940610186044
+   },
+   "eye": {
+    "lat": 45.977158,
+    "lon": 8.947661,
+    "h": 910.2983328262185
+   },
+   "eyeRendered": 910.2983328262185,
+   "dem": "mapterhorn",
+   "labels": [
+    "Camoghè",
+    "Monte Gazzirola",
+    "Monte Boglia",
+    "Il Torrione",
+    "Monte Disgrazia",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Tremezzo"
+   ]
+  }
+ }
+}

@@ -1,0 +1,707 @@
+[
+ {
+  "id": "wc_0001",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 1828.9632711540442,
+  "overlayEye": 1828.0855671997185,
+  "dh": -0.8777039543256251,
+  "skyDistM": 10636.336299879205,
+  "vfov": 16.733309279575614,
+  "predShiftPctH": 0.028255096043371456
+ },
+ {
+  "id": "wc_0002",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss",
+   "yaw-shift"
+  ],
+  "solverEye": 2102.990456138288,
+  "overlayEye": 2076.687992478762,
+  "dh": -26.302463659525984,
+  "skyDistM": 6614.244367108906,
+  "vfov": 56.48864336461734,
+  "predShiftPctH": 0.40334380545833953
+ },
+ {
+  "id": "wc_0004",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "fov-scale",
+   "pitch-offset"
+  ],
+  "solverEye": 2263.45607328227,
+  "overlayEye": 2123.880330959466,
+  "dh": -139.57574232280422,
+  "skyDistM": 70281.04641174036,
+  "vfov": 44.08108753655839,
+  "predShiftPctH": 0.2581317870859841
+ },
+ {
+  "id": "wc_0005",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "pitch-offset"
+  ],
+  "solverEye": 814.6,
+  "overlayEye": 800.9086637867299,
+  "dh": -13.69133621327012,
+  "skyDistM": 71697.95737730245,
+  "vfov": 17.967168318012583,
+  "predShiftPctH": 0.060895057248121234
+ },
+ {
+  "id": "wc_0006",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "near-field-terrain",
+   "near-miss"
+  ],
+  "solverEye": 2408.8120303494043,
+  "overlayEye": 2379.27894421041,
+  "dh": -29.53308613899435,
+  "skyDistM": 557.0,
+  "vfov": 61.685306106098295,
+  "predShiftPctH": 4.92026011271487
+ },
+ {
+  "id": "wc_0009",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 2865.3,
+  "overlayEye": 2865.3,
+  "dh": 0.0,
+  "skyDistM": 46401.50714874029,
+  "vfov": 19.07570169043303,
+  "predShiftPctH": -0.0
+ },
+ {
+  "id": "wc_0010",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "parallax-mismatch"
+  ],
+  "solverEye": 1160.895212978731,
+  "overlayEye": 1152.0729066613162,
+  "dh": -8.822306317414814,
+  "skyDistM": 3024.63188144964,
+  "vfov": 60.69397374911277,
+  "predShiftPctH": 0.27535022484590477
+ },
+ {
+  "id": "wc_0011",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "roll",
+   "yaw-shift"
+  ],
+  "solverEye": 1687.2252792892436,
+  "overlayEye": 1688.8256647812989,
+  "dh": 1.6003854920552385,
+  "skyDistM": 4212.798515437597,
+  "vfov": 19.934569354166097,
+  "predShiftPctH": -0.10918668244243548
+ },
+ {
+  "id": "wc_0013",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "parallax-mismatch",
+   "pitch-offset"
+  ],
+  "solverEye": 1009.3053830661773,
+  "overlayEye": 1008.8043393949299,
+  "dh": -0.5010436712474302,
+  "skyDistM": 5797.859854931482,
+  "vfov": 20.580887069082248,
+  "predShiftPctH": 0.024058381600665014
+ },
+ {
+  "id": "wc_0014",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "cloud",
+   "near-miss",
+   "pitch-offset",
+   "yaw-shift"
+  ],
+  "solverEye": 2394.018425736481,
+  "overlayEye": 2351.7123594078307,
+  "dh": -42.306066328650104,
+  "skyDistM": 12729.435264651598,
+  "vfov": 8.95189657516008,
+  "predShiftPctH": 2.127156712686239
+ },
+ {
+  "id": "wc_0015",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "pitch-offset",
+   "wrong-direction"
+  ],
+  "solverEye": 1569.1398874128965,
+  "overlayEye": 1563.5519793366898,
+  "dh": -5.587908076206759,
+  "skyDistM": 565.0,
+  "vfov": 34.67026094423168,
+  "predShiftPctH": 1.6343767212358549
+ },
+ {
+  "id": "wc_0017",
+  "src": "manual",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 2437.8212223592795,
+  "overlayEye": 2442.0995624649513,
+  "dh": 4.278340105671759,
+  "skyDistM": 47336.99128926491,
+  "vfov": 14.161393478057555,
+  "predShiftPctH": -0.03656716539142097
+ },
+ {
+  "id": "wc_0019",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "fov-scale",
+   "parallax-mismatch",
+   "pitch-offset"
+  ],
+  "solverEye": 1998.4304383213325,
+  "overlayEye": 1989.7915621543223,
+  "dh": -8.638876167010267,
+  "skyDistM": 3605.420212898216,
+  "vfov": 10.836866245017909,
+  "predShiftPctH": 1.2668332329648595
+ },
+ {
+  "id": "wc_0020",
+  "src": "manual",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 2928.4461431405807,
+  "overlayEye": 2931.343008246992,
+  "dh": 2.8968651064114965,
+  "skyDistM": 14348.963176901545,
+  "vfov": 27.749978793622827,
+  "predShiftPctH": -0.04168384021317337
+ },
+ {
+  "id": "wc_0023",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "wrong-direction"
+  ],
+  "solverEye": 2124.882630513244,
+  "overlayEye": 2125.6842845717074,
+  "dh": 0.801654058463555,
+  "skyDistM": 4096.705067238293,
+  "vfov": 6.850278692467212,
+  "predShiftPctH": -0.16366909573668484
+ },
+ {
+  "id": "wc_0027",
+  "src": "manual",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 2658.8326038803452,
+  "overlayEye": 2662.7646151398862,
+  "dh": 3.9320112595410137,
+  "skyDistM": 10018.12320132782,
+  "vfov": 14.874763239139527,
+  "predShiftPctH": -0.15118229465730304
+ },
+ {
+  "id": "wc_0028",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "wrong-direction"
+  ],
+  "solverEye": 1808.1,
+  "overlayEye": 1808.1,
+  "dh": 0.0,
+  "skyDistM": 64887.93642482436,
+  "vfov": 38.6329622734317,
+  "predShiftPctH": -0.0
+ },
+ {
+  "id": "wc_0033",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "near-field-terrain",
+   "wrong-direction"
+  ],
+  "solverEye": 1446.2466421296353,
+  "overlayEye": 1447.4250169034926,
+  "dh": 1.1783747738572856,
+  "skyDistM": 985.0,
+  "vfov": 50.21062382086866,
+  "predShiftPctH": -0.13651300112106837
+ },
+ {
+  "id": "wc_0034",
+  "src": "manual",
+  "verdict": "unsure",
+  "tags": [
+   "featureless-skyline",
+   "foreground-occlusion",
+   "near-field-terrain",
+   "near-miss"
+  ],
+  "solverEye": 1294.0952641512383,
+  "overlayEye": 1309.3560435323648,
+  "dh": 15.26077938112644,
+  "skyDistM": 4332.181848677099,
+  "vfov": 7.822166830655866,
+  "predShiftPctH": -2.5802619453286906
+ },
+ {
+  "id": "wc_0035",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "fog-haze",
+   "pitch-offset",
+   "wrong-direction"
+  ],
+  "solverEye": 1085.4804505488835,
+  "overlayEye": 1061.3907857270383,
+  "dh": -24.08966482184519,
+  "skyDistM": 95191.98707506584,
+  "vfov": 38.87030401045561,
+  "predShiftPctH": 0.037302251908587394
+ },
+ {
+  "id": "wc_0037",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss",
+   "parallax-mismatch"
+  ],
+  "solverEye": 1406.9159369582355,
+  "overlayEye": 1406.910546852799,
+  "dh": -0.005390105436617887,
+  "skyDistM": 4581.193730565339,
+  "vfov": 18.618771094707785,
+  "predShiftPctH": 0.0003620680663692918
+ },
+ {
+  "id": "wc_0040",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "wrong-direction"
+  ],
+  "solverEye": 806.3470893009439,
+  "overlayEye": 803.6741302837825,
+  "dh": -2.6729590171614745,
+  "skyDistM": 4729.860806091274,
+  "vfov": 16.530927981609228,
+  "predShiftPctH": 0.1958706173669823
+ },
+ {
+  "id": "wc_0046",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "pitch-offset"
+  ],
+  "solverEye": 1454.5107396474937,
+  "overlayEye": 1453.9,
+  "dh": -0.610739647493574,
+  "skyDistM": 20882.83827424683,
+  "vfov": 34.56147860382071,
+  "predShiftPctH": 0.004848382858576375
+ },
+ {
+  "id": "wc_0047",
+  "src": "manual",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 2449.8239342481365,
+  "overlayEye": 2434.6566133305514,
+  "dh": -15.16732091758513,
+  "skyDistM": 3905.0818885278222,
+  "vfov": 44.77712895876896,
+  "predShiftPctH": 0.4969846043098682
+ },
+ {
+  "id": "wc_0048",
+  "src": "manual",
+  "verdict": "unsure",
+  "tags": [
+   "near-miss",
+   "parallax-mismatch"
+  ],
+  "solverEye": 2185.912536959815,
+  "overlayEye": 2179.563921972878,
+  "dh": -6.348614986937264,
+  "skyDistM": 10426.138658440173,
+  "vfov": 8.148538205686986,
+  "predShiftPctH": 0.4281523836608696
+ },
+ {
+  "id": "wc_0052",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "fov-scale",
+   "parallax-mismatch"
+  ],
+  "solverEye": 847.7311900443863,
+  "overlayEye": 839.5923391972906,
+  "dh": -8.138850847095682,
+  "skyDistM": 4654.933798810899,
+  "vfov": 35.33914079433976,
+  "predShiftPctH": 0.2834756660223809
+ },
+ {
+  "id": "wc_0053",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "fov-scale",
+   "parallax-mismatch",
+   "roll"
+  ],
+  "solverEye": 1714.6068711049033,
+  "overlayEye": 1710.4445023321969,
+  "dh": -4.162368772706486,
+  "skyDistM": 3198.486373972604,
+  "vfov": 36.226408227919094,
+  "predShiftPctH": 0.20582264751038246
+ },
+ {
+  "id": "wc_0054",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 910.2983328262185,
+  "overlayEye": 904.8,
+  "dh": -5.49833282621853,
+  "skyDistM": 18599.953293884035,
+  "vfov": 52.56126962485152,
+  "predShiftPctH": 0.032223739950244794
+ },
+ {
+  "id": "wc_0055",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 813.9,
+  "overlayEye": 813.9,
+  "dh": 0.0,
+  "skyDistM": 993.0,
+  "vfov": 48.28265939292048,
+  "predShiftPctH": -0.0
+ },
+ {
+  "id": "wc_0058",
+  "src": "manual",
+  "verdict": "unsure",
+  "tags": [
+   "cloud"
+  ],
+  "solverEye": 463.47119179706914,
+  "overlayEye": 461.7164130536845,
+  "dh": -1.7547787433846338,
+  "skyDistM": 11247.708169976933,
+  "vfov": 35.071146299693154,
+  "predShiftPctH": 0.025487720327677398
+ },
+ {
+  "id": "wc_0059",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss",
+   "parallax-mismatch"
+  ],
+  "solverEye": 2131.4599849992733,
+  "overlayEye": 2135.720019574645,
+  "dh": 4.260034575371719,
+  "skyDistM": 2389.920584365156,
+  "vfov": 39.73522337752036,
+  "predShiftPctH": -0.2570254734100217
+ },
+ {
+  "id": "wc_0063",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "near-field-terrain",
+   "parallax-mismatch"
+  ],
+  "solverEye": 2055.6957888236743,
+  "overlayEye": 2060.9733378521873,
+  "dh": 5.277549028513022,
+  "skyDistM": 8471.697311323142,
+  "vfov": 40.02141677972597,
+  "predShiftPctH": -0.08918503019806678
+ },
+ {
+  "id": "wc_0067",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss",
+   "pitch-offset"
+  ],
+  "solverEye": 1180.1,
+  "overlayEye": 1180.1,
+  "dh": 0.0,
+  "skyDistM": 5615.6238644279465,
+  "vfov": 37.13461475562609,
+  "predShiftPctH": -0.0
+ },
+ {
+  "id": "wc_0069",
+  "src": "manual",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 1335.1067008927464,
+  "overlayEye": 1275.4328585858339,
+  "dh": -59.67384230691255,
+  "skyDistM": 13.0,
+  "vfov": 40.60388515710916,
+  "predShiftPctH": 191.38583418760672
+ },
+ {
+  "id": "wc_0070",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "near-field-terrain",
+   "parallax-mismatch"
+  ],
+  "solverEye": 2193.0,
+  "overlayEye": 2193,
+  "dh": 0.0,
+  "skyDistM": 609.0,
+  "vfov": 41.93454093997585,
+  "predShiftPctH": -0.0
+ },
+ {
+  "id": "wc_0071",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 2268.6,
+  "overlayEye": 2268.6,
+  "dh": 0.0,
+  "skyDistM": 2206.5268355588955,
+  "vfov": 47.75915540289387,
+  "predShiftPctH": -0.0
+ },
+ {
+  "id": "wc_0072",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "pitch-offset",
+   "wrong-direction"
+  ],
+  "solverEye": 637.6467347155898,
+  "overlayEye": 631.5095445828765,
+  "dh": -6.137190132713272,
+  "skyDistM": 5638.086359885659,
+  "vfov": 35.969246340941524,
+  "predShiftPctH": 0.17339196845914878
+ },
+ {
+  "id": "wc_0073",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "pitch-offset",
+   "wrong-direction"
+  ],
+  "solverEye": 490.41522127619254,
+  "overlayEye": 489.9512594750537,
+  "dh": -0.46396180113885066,
+  "skyDistM": 5962.161051060563,
+  "vfov": 51.417041585403034,
+  "predShiftPctH": 0.008671496824876383
+ },
+ {
+  "id": "wc_0074",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "pitch-offset",
+   "wrong-direction"
+  ],
+  "solverEye": 2043.559047788076,
+  "overlayEye": 1930.4596271745572,
+  "dh": -113.09942061351876,
+  "skyDistM": 19357.4872444015,
+  "vfov": 37.97385048627201,
+  "predShiftPctH": 0.8815449317968741
+ },
+ {
+  "id": "wc_0076",
+  "src": "manual",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 770.8140144522322,
+  "overlayEye": 766.9689573433262,
+  "dh": -3.845057108905962,
+  "skyDistM": 3012.581555228725,
+  "vfov": 48.69191025163564,
+  "predShiftPctH": 0.15018603974253983
+ },
+ {
+  "id": "wc_0077",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss",
+   "parallax-mismatch"
+  ],
+  "solverEye": 1774.7856177776289,
+  "overlayEye": 1735.3241816236036,
+  "dh": -39.46143615402525,
+  "skyDistM": 6380.824808937666,
+  "vfov": 26.944979068513135,
+  "predShiftPctH": 1.315028942073446
+ },
+ {
+  "id": "wc_0082",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 1873.1,
+  "overlayEye": 1873.1,
+  "dh": 0.0,
+  "skyDistM": 10098.428476909665,
+  "vfov": 44.032662012803684,
+  "predShiftPctH": -0.0
+ },
+ {
+  "id": "wc_0085",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 2851.9753627258015,
+  "overlayEye": 2848,
+  "dh": -3.9753627258014603,
+  "skyDistM": 35653.899956422385,
+  "vfov": 42.72531219746299,
+  "predShiftPctH": 0.014952269134935943
+ },
+ {
+  "id": "wc_0086",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "pitch-offset",
+   "roll",
+   "wrong-direction"
+  ],
+  "solverEye": 902.1166732895856,
+  "overlayEye": 875.195151141787,
+  "dh": -26.921522147798555,
+  "skyDistM": 5.0,
+  "vfov": 39.490437332619706,
+  "predShiftPctH": 201.26042410207668
+ },
+ {
+  "id": "wc_0087",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "fov-scale",
+   "wrong-direction"
+  ],
+  "solverEye": 1656.641345611836,
+  "overlayEye": 1661.7553123759951,
+  "dh": 5.113966764159159,
+  "skyDistM": 16900.62425082706,
+  "vfov": 32.97849868671905,
+  "predShiftPctH": -0.052571079283899626
+ },
+ {
+  "id": "wc_0088",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 2402.9240172635496,
+  "overlayEye": 2401.2,
+  "dh": -1.7240172635497402,
+  "skyDistM": 15053.06977790139,
+  "vfov": 26.140008671600047,
+  "predShiftPctH": 0.025103451589915067
+ },
+ {
+  "id": "wc_0094",
+  "src": "exif-gps",
+  "verdict": "wrong",
+  "tags": [
+   "near-field-terrain",
+   "parallax-mismatch"
+  ],
+  "solverEye": 2474.4,
+  "overlayEye": 2474.4,
+  "dh": 0.0,
+  "skyDistM": 3450.5239666046955,
+  "vfov": 34.37912089604221,
+  "predShiftPctH": -0.0
+ },
+ {
+  "id": "wc_0095",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "pitch-offset",
+   "wrong-direction"
+  ],
+  "solverEye": 2550.8579727319075,
+  "overlayEye": 2545.2506903479725,
+  "dh": -5.607282383934944,
+  "skyDistM": 5938.407421375063,
+  "vfov": 34.46620009307187,
+  "predShiftPctH": 0.1569681485902931
+ },
+ {
+  "id": "wc_0098",
+  "src": "manual",
+  "verdict": "wrong",
+  "tags": [
+   "wrong-direction"
+  ],
+  "solverEye": 1669.49340161852,
+  "overlayEye": 1679.7653753262855,
+  "dh": 10.271973707765483,
+  "skyDistM": 2447.855327620505,
+  "vfov": 32.54950307722008,
+  "predShiftPctH": -0.7386587945352374
+ },
+ {
+  "id": "wc_0099",
+  "src": "exif-gps",
+  "verdict": "correct",
+  "tags": [],
+  "solverEye": 435.1,
+  "overlayEye": 431.6,
+  "dh": -3.5,
+  "skyDistM": 8539.606436970707,
+  "vfov": 55.78699068589993,
+  "predShiftPctH": 0.04209396751873179
+ }
+]

@@ -1,0 +1,8 @@
+{"verifier": "v2", "candidates": {
+ "Q9": {"verdict": "wrong", "tags": ["pitch-offset", "other"], "c1": "fail", "c2": "fail", "c3": "fail", "c4": "pass",
+  "note": "Line is a low-amplitude profile that floats in the sky above the left-half ridges (~3-4% of image height too high) and slices across the Mont Blanc snow mass without showing its prominent summit. Peak labels (Chablais peaks at 64-66 km) land on featureless blue slopes, not summits; only the far-right portion roughly touches the ridge."},
+ "R2": {"verdict": "wrong", "tags": ["roll", "wrong-direction"], "c1": "fail", "c2": "fail", "c3": "fail", "c4": "fail",
+  "note": "Line climbs steadily from the lower-left to the top-right and runs through open sky over most of the width, so it does not follow the real skyline. No features match, and labels such as Mont Vuarat and Les Pleiades sit in the haze band."},
+ "T5": {"verdict": "wrong", "tags": ["pitch-offset", "other"], "c1": "fail", "c2": "fail", "c3": "fail", "c4": "pass",
+  "note": "Nearly the same as Q9: the flat line sits above the real left/central skyline and cuts through Mont Blanc below its summit without matching its shape. Labels do not sit on visible summits."}},
+ "photoNote": "Telephoto view from the Jura over the Swiss plateau/Leman basin toward the Chablais and Mont Blanc massif. The skyline is clear and sharp, with Mont Blanc as the dominant snowy peak at center and the Aiguilles and Dents du Midi-type peaks at left. None of the candidates reproduce Mont Blanc's shape."}

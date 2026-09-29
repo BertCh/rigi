@@ -1,0 +1,219 @@
+{
+ "ok": true,
+ "nLifted": 65,
+ "perView": [
+  {
+   "tag": "y-20",
+   "matches": 13,
+   "lifted": 12,
+   "keypoints": 4096,
+   "terrainFrac": 0.653,
+   "rgbStd": 39.2
+  },
+  {
+   "tag": "y-10",
+   "matches": 4,
+   "lifted": 4,
+   "keypoints": 4096,
+   "terrainFrac": 0.565,
+   "rgbStd": 38.8
+  },
+  {
+   "tag": "y+0",
+   "matches": 15,
+   "lifted": 13,
+   "keypoints": 4096,
+   "terrainFrac": 0.494,
+   "rgbStd": 36.5
+  },
+  {
+   "tag": "y+10",
+   "matches": 20,
+   "lifted": 19,
+   "keypoints": 4096,
+   "terrainFrac": 0.449,
+   "rgbStd": 34.4
+  },
+  {
+   "tag": "y+20",
+   "matches": 21,
+   "lifted": 17,
+   "keypoints": 4096,
+   "terrainFrac": 0.408,
+   "rgbStd": 30.8
+  }
+ ],
+ "inliers": 0,
+ "inlierFrac": 0.0,
+ "residualPx": null,
+ "coverage": 0.0,
+ "pose": {
+  "yaw": 25.245266329425704,
+  "pitch": 6.267901678582496,
+  "roll": 0.5344660476231622,
+  "vfov": 50.21062382086866
+ },
+ "method": "fused",
+ "confidence": 0.2,
+ "confidenceLevel": "low",
+ "confidenceChecks": {
+  "cueAgreeDeg": 28.683,
+  "skylineMedPx": 10.237,
+  "matchSupport": 0.0
+ },
+ "cues": {
+  "skyline": {
+   "pose": {
+    "yaw": 24.1375,
+    "pitch": 6.6125,
+    "roll": 1.6,
+    "vfov": 50.39672982327133
+   },
+   "residualPx": 8.515,
+   "appConfidence": 1.0,
+   "accepted": "confident"
+  },
+  "match": {
+   "pose": {
+    "yaw": 32.00579965504356,
+    "pitch": -5.66717492730042,
+    "roll": 26.435977702032076,
+    "vfov": 50.404301984568534
+   },
+   "inliers": 8,
+   "residualPx": 2.727
+  }
+ },
+ "fusionScore": 0.0,
+ "matchConfidence": 0.002,
+ "fusedFrom": "skyline",
+ "deltaYawFromPrior": 1.458,
+ "focalPx": 819.55,
+ "size": {
+  "W": 1024,
+  "H": 768
+ },
+ "timingMs": {
+  "stage1": 67943,
+  "render": 8294,
+  "loadMs": 0,
+  "fullTerrainMs": 0,
+  "imageryMs": 0,
+  "skylineMs": 169,
+  "renderMs": 807,
+  "warmPage": true,
+  "draped": false,
+  "imageryRetries": 0,
+  "imageryMissing": 0,
+  "imageryTiles": 229,
+  "match": 3808,
+  "solve": 11,
+  "fusion": 3473,
+  "total": 76428
+ },
+ "eye": [
+  0,
+  0,
+  1446.2466421296353
+ ],
+ "adhoc": {
+  "id": "adhoc-54ce1cc35606",
+  "size": {
+   "W": 2048,
+   "H": 1536
+  },
+  "yawKnown": false,
+  "gravityKnown": false,
+  "focalKnown": true,
+  "priorUsed": {
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "roll": 0.0,
+   "vfov": 49.74211580704502
+  },
+  "yaw360": true,
+  "twoStage": true,
+  "defaultHfov": null,
+  "hfov": 63.44,
+  "narrow": false,
+  "stage2Prior": {
+   "yaw": 23.7875,
+   "pitch": 7,
+   "roll": 1.125,
+   "vfov": 50.20844814273607
+  },
+  "stages": [
+   {
+    "stage": "match-sweep",
+    "offsets": [
+     0,
+     40,
+     80,
+     120,
+     160,
+     200,
+     240,
+     280,
+     320
+    ],
+    "pose": {
+     "yaw": 61.09946399161601,
+     "pitch": -5.955065709250821,
+     "roll": -5.012772729938274,
+     "vfov": 49.74211580704502
+    },
+    "inliers": 10,
+    "inlierFrac": 0.2326,
+    "residualPx": 3.069,
+    "used": false,
+    "ms": 65092,
+    "renderTiming": {
+     "loadMs": 55943,
+     "fullTerrainMs": 145,
+     "imageryMs": 1755,
+     "skylineMs": 0,
+     "renderMs": 1518,
+     "warmPage": false,
+     "draped": true,
+     "imageryRetries": 0,
+     "imageryMissing": 0,
+     "imageryTiles": 229
+    }
+   },
+   {
+    "stage": "skyline-seeds",
+    "seeds": 27,
+    "pose": {
+     "yaw": 23.7875,
+     "pitch": 7,
+     "roll": 1.125,
+     "vfov": 50.20844814273607
+    },
+    "score": 0.611849342421051,
+    "used": true,
+    "ms": 2851
+   }
+  ]
+ },
+ "version": "matcher-service/0.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16+lightglue on sat renders, LightGlue flash off on MPS; basin-gap LOW trigger for untrusted positions)",
+ "id": "wc_0033",
+ "request": {
+  "photoPath": "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/photos/wc_0033.jpg",
+  "meta": {
+   "lat": 46.970447,
+   "lon": 8.267675,
+   "altitudeM": 1405.2,
+   "positionSource": "exif-gps"
+  },
+  "prior": {
+   "yaw": null,
+   "pitch": null,
+   "roll": null,
+   "vfov": 49.74211580704502
+  },
+  "region": null,
+  "timeoutMs": 600000,
+  "yawHint": 221.7
+ },
+ "wallMs": 76429
+}

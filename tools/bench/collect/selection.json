@@ -1,0 +1,1210 @@
+[
+ {
+  "idx": 2,
+  "title": "File:Larch in Guarda.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "larch foreground, snowy range"
+ },
+ {
+  "idx": 4,
+  "title": "File:Gandstock, Plattengrat, Guldergrat.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "grassy ridge, wide"
+ },
+ {
+  "idx": 6,
+  "title": "File:View from Creux du Van toward Mont Blanc (51096576317).jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "hazy distant Alps (Mont Blanc outside CH) seen across plateau"
+ },
+ {
+  "idx": 10,
+  "title": "File:Alpstein from Frümsel.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [],
+  "hard": false,
+  "notes": "Alpstein seen from afar"
+ },
+ {
+  "idx": 13,
+  "title": "File:Evening view from the Uetliberg.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "dusk, trees framing, distant Alps"
+ },
+ {
+  "idx": 14,
+  "title": "File:Heubützlipass Fahnenstock.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "ultrawide ridge"
+ },
+ {
+  "idx": 15,
+  "title": "File:Bernina-NW.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [],
+  "hard": false,
+  "notes": "tele glaciated massif"
+ },
+ {
+  "idx": 17,
+  "title": "File:View of Monte San Salvatore from Capolago Lago.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "hazy flat light, lake"
+ },
+ {
+  "idx": 18,
+  "title": "File:Eggishorn Matterhorn.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "dark summit pyramid, clouds"
+ },
+ {
+  "idx": 20,
+  "title": "File:Wasserauen, Schweiz (Unsplash).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "mirror reflection in lake, portrait"
+ },
+ {
+  "idx": 21,
+  "title": "File:Kandersteg rock avalanche.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "limestone wall, clouds clinging"
+ },
+ {
+  "idx": 22,
+  "title": "File:Säntis at sunset (48454540816).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [],
+  "hard": true,
+  "notes": "sunset alpenglow, orange sky"
+ },
+ {
+  "idx": 23,
+  "title": "File:00 3688 Huetstock - Engelberg (Schweiz).jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "portrait big rock face"
+ },
+ {
+  "idx": 25,
+  "title": "File:Lägh da l'Albigna as seen from Piz Blanch.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [],
+  "hard": true,
+  "notes": "overcast, cloud on peaks, hazy"
+ },
+ {
+  "idx": 26,
+  "title": "File:Chasseral, vue vers le sud-ouest en hiver.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": true,
+  "notes": "sea of fog, low-contrast snowy ridge"
+ },
+ {
+  "idx": 27,
+  "title": "File:Lake Lugano39.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "heavy haze low contrast"
+ },
+ {
+  "idx": 28,
+  "title": "File:Bellwald- Aussicht.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [],
+  "hard": false,
+  "notes": "snowy range, cloud on right peak"
+ },
+ {
+  "idx": 29,
+  "title": "File:Vignoble du Lavaux - aux environs de Cully.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "buildings"
+  ],
+  "hard": false,
+  "notes": "vineyard wall/railway foreground, lake"
+ },
+ {
+  "idx": 31,
+  "title": "File:Sackhorn.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "tele rock peak, cloud edge"
+ },
+ {
+  "idx": 32,
+  "title": "File:Le Weisshorn et le Bishorn depuis Bella Tola.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "portrait snowy summit"
+ },
+ {
+  "idx": 33,
+  "title": "File:Engelberg 01.JPG",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "buildings"
+  ],
+  "hard": true,
+  "notes": "cloud band hides mid-slope, farm buildings foreground, portrait"
+ },
+ {
+  "idx": 34,
+  "title": "File:Approaching Linthal - panoramio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "buildings",
+   "wires"
+  ],
+  "hard": true,
+  "notes": "valley floor, road, overhead catenary wires"
+ },
+ {
+  "idx": 38,
+  "title": "File:Dom of Mischabel.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [],
+  "hard": false,
+  "notes": "tele snow massif, cloud around base"
+ },
+ {
+  "idx": 44,
+  "title": "File:Stausee Garichti Glarus Süd.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "water",
+   "trees"
+  ],
+  "hard": false,
+  "notes": "lake & trees foreground"
+ },
+ {
+  "idx": 46,
+  "title": "File:034 Creux du Van and Swiss Alps with snow at Sunset Photo by Giles Laurent.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "dusk, thin distant Alps line seen from Jura"
+ },
+ {
+  "idx": 47,
+  "title": "File:Lake Lugano36.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "heavy haze, lake, low contrast"
+ },
+ {
+  "idx": 51,
+  "title": "File:Bietschhorn from Lötschen Pass.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "reflection in tarn, cloud on summit"
+ },
+ {
+  "idx": 53,
+  "title": "File:Vierwaldstättersee7.JPG",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "rock"
+  ],
+  "hard": true,
+  "notes": "elevated view over lake, faint distant Alps"
+ },
+ {
+  "idx": 56,
+  "title": "File:035 Grand Muveran, Dent de Favre, Dent de Morcles, Tour d’Aï, Tour de Mayen, Rochers de Naye, Dent de Jaman seen from Creux du Van at Sunset Photo by Giles Laurent.jpg",
+  "season": "winter",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "600mm across lake, haze"
+ },
+ {
+  "idx": 58,
+  "title": "File:Weisshorn north face.jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "tele, lenticular clouds"
+ },
+ {
+  "idx": 60,
+  "title": "File:Alps in Appenzell (10999130024).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "sea of fog, snowy ridge"
+ },
+ {
+  "idx": 62,
+  "title": "File:Fernsicht von der Belchenflue.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "dusk, Alps line above sea of fog"
+ },
+ {
+  "idx": 63,
+  "title": "File:View from Pilatus Railway heading up Mount Pilatus.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "haze, trees framing"
+ },
+ {
+  "idx": 69,
+  "title": "File:Forest clearing on a hill (Unsplash).jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "dark forested ridge silhouette under grey clouds"
+ },
+ {
+  "idx": 72,
+  "title": "File:Wisenberg von der Belchenflue.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "low-relief rolling hills, hazy horizon"
+ },
+ {
+  "idx": 73,
+  "title": "File:Stanserhorn beyond Alpancher See.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [
+   "water",
+   "buildings",
+   "trees"
+  ],
+  "hard": false,
+  "notes": "lake/harbour foreground, clouds near summits"
+ },
+ {
+  "idx": 75,
+  "title": "File:Piz Lad as seen from Santa Maria.jpg",
+  "season": "winter",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "snow-dusted range above forest"
+ },
+ {
+  "idx": 77,
+  "title": "File:Vista NO, Monte Generoso.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "fence",
+   "grass"
+  ],
+  "hard": false,
+  "notes": "fence post in foreground, hazy distant ranges"
+ },
+ {
+  "idx": 78,
+  "title": "File:Fletschhorn mit Rossbodegletscher (Walliser Alpen).jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "cumulus hiding parts of massif, branch at edge"
+ },
+ {
+  "idx": 79,
+  "title": "File:Gruyère DSC 4352 (6478390647).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "buildings",
+   "people"
+  ],
+  "hard": true,
+  "notes": "village street foreground, peak above rooftops"
+ },
+ {
+  "idx": 82,
+  "title": "File:M.te Generoso visto da Meride - panoramio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "forest foreground"
+ },
+ {
+  "idx": 84,
+  "title": "File:MONTAÑAS EN EL KLONTALSEE - panoramio.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "clouds on peaks, soft light"
+ },
+ {
+  "idx": 89,
+  "title": "File:Lac Léman on sunset.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "backlit haze, lake, sailboat"
+ },
+ {
+  "idx": 91,
+  "title": "File:5089 - Kleine Scheidegg - View from Jungfraubahn.JPG",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "wires",
+   "glass"
+  ],
+  "hard": true,
+  "notes": "shot through window, cables and reflections"
+ },
+ {
+  "idx": 92,
+  "title": "File:Piz Palü Ostgipfel in August 2021.jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "tele fresh snow, clouds on crest"
+ },
+ {
+  "idx": 93,
+  "title": "File:Rigi-First.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "sea of fog, spruces silhouetted, distant Alps"
+ },
+ {
+  "idx": 95,
+  "title": "File:Piz Clüx, Piz Muragl, Las Sours and Munt da la Bês-cha as seen from Muottas Muragl.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "grass"
+  ],
+  "hard": false,
+  "notes": "broad valley, wide"
+ },
+ {
+  "idx": 98,
+  "title": "File:Weisshorn & Bishorn.jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "tele, lenticular cloud over range"
+ },
+ {
+  "idx": 99,
+  "title": "File:Dent de Lys.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "tele portrait, snowy pyramid"
+ },
+ {
+  "idx": 100,
+  "title": "File:Stauberenfirst oberes Rheintal.JPG",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees",
+   "snow"
+  ],
+  "hard": true,
+  "notes": "pine branches framing, valley view"
+ },
+ {
+  "idx": 103,
+  "title": "File:Vierwaldstättersee from Rigi.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [],
+  "hard": true,
+  "notes": "elevated over lake, hazy distant skyline"
+ },
+ {
+  "idx": 104,
+  "title": "File:Klöntalersee in Richtung Osten.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "sun in frame, backlit haze"
+ },
+ {
+  "idx": 105,
+  "title": "File:Piz Mezdi as seen from Samedan.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "snowy massif over forest"
+ },
+ {
+  "idx": 107,
+  "title": "File:Lake Lugano october 2024.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "plants",
+   "buildings"
+  ],
+  "hard": false,
+  "notes": "over lake, town below"
+ },
+ {
+  "idx": 113,
+  "title": "File:Apriltag.jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "buildings",
+   "cars"
+  ],
+  "hard": true,
+  "notes": "parking lot, roof edge, cars"
+ },
+ {
+  "idx": 118,
+  "title": "File:Wasenhorn, Lepontinische Alpen.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [],
+  "hard": true,
+  "notes": "clouds boiling over ridge"
+ },
+ {
+  "idx": 119,
+  "title": "File:Schweiz Unterwegs 201DSC 0017 (48456610576).jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "half the frame in shadow"
+ },
+ {
+  "idx": 124,
+  "title": "File:Fog Rolls Over Netstal (Unsplash).jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [],
+  "hard": true,
+  "notes": "thick cloud veiling summits and base"
+ },
+ {
+  "idx": 125,
+  "title": "File:Berninabahn zwischen Lagalb und Ospizio Bernina im Winter.jpg",
+  "season": "winter",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "train",
+   "wires"
+  ],
+  "hard": true,
+  "notes": "train and catenary in foreground"
+ },
+ {
+  "idx": 127,
+  "title": "File:Berner Alpen vom Simplonpass.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees",
+   "snow"
+  ],
+  "hard": false,
+  "notes": "bare larches, snowy range"
+ },
+ {
+  "idx": 128,
+  "title": "File:View from Berneuse on Lac Léman with a tent.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "tent",
+   "grass"
+  ],
+  "hard": true,
+  "notes": "dusk, lit tent, very dark terrain"
+ },
+ {
+  "idx": 129,
+  "title": "File:Walensee vom Frümseltal aus 0434.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "elevated winter view over lake"
+ },
+ {
+  "idx": 133,
+  "title": "File:Am Chüebodensee bei Elm.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "flowers",
+   "water"
+  ],
+  "hard": false,
+  "notes": "cotton-grass tarn foreground"
+ },
+ {
+  "idx": 135,
+  "title": "File:Bergsee oberhalb des Lago Luzzone bei Campo Blenio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "water",
+   "grass"
+  ],
+  "hard": false,
+  "notes": "tarn foreground, distant range"
+ },
+ {
+  "idx": 136,
+  "title": "File:Gornergrat images 2021 06.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "people",
+   "buildings"
+  ],
+  "hard": true,
+  "notes": "crowded viewing platform, observatory domes"
+ },
+ {
+  "idx": 137,
+  "title": "File:Switzerland 2014-02-08 (12535427855).jpg",
+  "season": "winter",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "skilift",
+   "people"
+  ],
+  "hard": true,
+  "notes": "dark storm sky, ski lift"
+ },
+ {
+  "idx": 138,
+  "title": "File:Looking from Schwendisee towards Säntis.JPG",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "tree",
+   "snow"
+  ],
+  "hard": false,
+  "notes": "lone tree in deep snow"
+ },
+ {
+  "idx": 140,
+  "title": "File:Col Durand.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "people",
+   "rock"
+  ],
+  "hard": false,
+  "notes": "hikers in foreground"
+ },
+ {
+  "idx": 141,
+  "title": "File:Vierwaldstättersee from Fronalpstock.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "water",
+   "buildings"
+  ],
+  "hard": true,
+  "notes": "hazy lake panorama, backlit"
+ },
+ {
+  "idx": 142,
+  "title": "File:Berglimattsee Gandstock.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "snow"
+  ],
+  "hard": false,
+  "notes": "snow patch and tarn"
+ },
+ {
+  "idx": 143,
+  "title": "File:Poschiavo, Switzerland - panoramio.jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "snow"
+  ],
+  "hard": false,
+  "notes": "ice-covered lake shore"
+ },
+ {
+  "idx": 147,
+  "title": "File:FrümsenSG1.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees",
+   "buildings"
+  ],
+  "hard": true,
+  "notes": "bare branches, hazy distant Alps, village"
+ },
+ {
+  "idx": 149,
+  "title": "File:Matthorn from pilatus.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "snow",
+   "rock"
+  ],
+  "hard": false,
+  "notes": "wide, spring snow, far ranges"
+ },
+ {
+  "idx": 151,
+  "title": "File:Blick vom Leistcamm.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "grass"
+  ],
+  "hard": false,
+  "notes": "elevated ridge view, lakes"
+ },
+ {
+  "idx": 152,
+  "title": "File:Lago Bianco, zugefroren.jpg",
+  "season": "winter",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "pole",
+   "snow"
+  ],
+  "hard": true,
+  "notes": "power pole, flat light, snow everywhere"
+ },
+ {
+  "idx": 155,
+  "title": "File:Schweiz Unterwegs 160DSC 0215 (48437096132).jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "wires",
+   "grass"
+  ],
+  "hard": false,
+  "notes": "pylon and wires, prealps"
+ },
+ {
+  "idx": 156,
+  "title": "File:Fälensee Altmann Säntis.JPG",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "rock",
+   "grass"
+  ],
+  "hard": false,
+  "notes": "limestone chain, hazy"
+ },
+ {
+  "idx": 157,
+  "title": "File:Schiltorn - Pic Gloria à 2970m - Vue de l'Eiger, le Munch, la Jungfrau.JPG",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [],
+  "hard": false,
+  "notes": "classic triple peaks across valley"
+ },
+ {
+  "idx": 158,
+  "title": "File:Snowy ridge, Ristis, Engelberg, Switzerland julesvernex2.jpg",
+  "season": "winter",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "snow",
+   "trees"
+  ],
+  "hard": true,
+  "notes": "white overcast sky, low sky contrast"
+ },
+ {
+  "idx": 159,
+  "title": "File:Verwindeter Schnee.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "roof",
+   "snow"
+  ],
+  "hard": true,
+  "notes": "snowy roof in foreground, far skyline"
+ },
+ {
+  "idx": 166,
+  "title": "File:Schilthorn-O.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "rock",
+   "structure"
+  ],
+  "hard": false,
+  "notes": "summit station edge in foreground, big range"
+ },
+ {
+  "idx": 186,
+  "title": "File:Maloja mit Silsersee und Maloja Palace.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees",
+   "buildings"
+  ],
+  "hard": false,
+  "notes": "village and forest foreground, lake valley"
+ },
+ {
+  "idx": 198,
+  "title": "File:2258-Bachsee.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "snow"
+  ],
+  "hard": true,
+  "notes": "reflection in tarn, spring snow"
+ },
+ {
+  "idx": 213,
+  "title": "File:Grandvaux, Bourg-en-Lavaux, Switzerland - panoramio (1).jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [
+   "water",
+   "buildings"
+  ],
+  "hard": false,
+  "notes": "lake, clouds on crest, town foreground"
+ },
+ {
+  "idx": 249,
+  "title": "File:Aussicht vom Parpaner Rothorn.JPG",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "sea of fog, snowy summit"
+ },
+ {
+  "idx": 250,
+  "title": "File:From mount San Salvatore - panoramio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "people",
+   "trees"
+  ],
+  "hard": false,
+  "notes": "viewpoint platform with people, lake fjord"
+ },
+ {
+  "idx": 254,
+  "title": "File:Dent de Valère et Dents du midi.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "portrait, sea of fog, dark shadow corner"
+ },
+ {
+  "idx": 337,
+  "title": "File:MelchseeFruttVonHochstollen.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "rock",
+   "water"
+  ],
+  "hard": false,
+  "notes": "strong processing, lakes, jagged range"
+ },
+ {
+  "idx": 368,
+  "title": "File:20180617 S-Bahn 4794 (48401090582).jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "grass",
+   "buildings"
+  ],
+  "hard": true,
+  "notes": "cloud cap hiding summit, meadow"
+ },
+ {
+  "idx": 374,
+  "title": "File:Lake St. Moritz - panoramio.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "buildings",
+   "water"
+  ],
+  "hard": false,
+  "notes": "lakeside town, reflections"
+ },
+ {
+  "idx": 375,
+  "title": "File:Bosco Gurin cassinam 90.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "buildings",
+   "trees"
+  ],
+  "hard": true,
+  "notes": "stone roofs and bell tower foreground"
+ },
+ {
+  "idx": 385,
+  "title": "File:Piz Blas from Pizzo Tandeda.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "rock"
+  ],
+  "hard": false,
+  "notes": "jagged gneiss ridge"
+ },
+ {
+  "idx": 395,
+  "title": "File:Val Cadlimo from Pizzo Tandeda.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "rock"
+  ],
+  "hard": false,
+  "notes": "high valley with lake"
+ },
+ {
+  "idx": 399,
+  "title": "File:2020-08-24 11-44-27 Schweiz Ospizio Bernina Bernina Hospiz 2474.4.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "rock",
+   "grass"
+  ],
+  "hard": false,
+  "notes": "distant range beyond valley"
+ },
+ {
+  "idx": 417,
+  "title": "File:Ausblick geniessen.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "signpost",
+   "person"
+  ],
+  "hard": false,
+  "notes": "signpost and person, far range"
+ },
+ {
+  "idx": 483,
+  "title": "File:Ibergeregg, Vorwinter-Panorama - panoramio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "dusk silhouette over sea of fog"
+ },
+ {
+  "idx": 499,
+  "title": "File:Gental 2018 (16).jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "grass"
+  ],
+  "hard": false,
+  "notes": "valley, distant snowy range"
+ },
+ {
+  "idx": 512,
+  "title": "File:Bruschghorn - panoramio (2).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "spruce framing, snowy peaks"
+ },
+ {
+  "idx": 527,
+  "title": "File:Lake of the four Cantons.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "water"
+  ],
+  "hard": false,
+  "notes": "portrait, mostly water, low skyline"
+ },
+ {
+  "idx": 609,
+  "title": "File:Pointe de Vouasson panorama.JPG",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "snow",
+   "person"
+  ],
+  "hard": false,
+  "notes": "ski tourer, distant range"
+ }
+]

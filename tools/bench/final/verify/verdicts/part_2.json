@@ -1,0 +1,111 @@
+{
+ "verifier": 2,
+ "candidates": {
+  "t0c6ce5": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction",
+    "low-light"
+   ],
+   "note": "Line floats in sky over lake horizon; misses right-hand ridge entirely."
+  },
+  "t13fbd1": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line hugs Hahnen summit ridge closely across full width; shape and tilt match."
+  },
+  "t2dbffb": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line tracks snowy ridge, Tour d'Ai cliff step and left hill closely."
+  },
+  "t34a881": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Line hugs left ridge slope and distant peaks/notch on right precisely."
+  },
+  "t36fbcb": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction"
+   ],
+   "note": "Nearly flat line cuts across mid-mountains; ignores Dents du Midi skyline entirely."
+  },
+  "t411a6a": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction",
+    "roll"
+   ],
+   "note": "Steep diagonal line slices through peaks; no correspondence with skyline."
+  },
+  "t37daae": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction"
+   ],
+   "note": "Line runs across snowy slopes low in frame; misses Dents du Midi skyline far above."
+  },
+  "t5989ab": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction"
+   ],
+   "note": "Sloping line crosses plain and treeline; Mont Blanc skyline untouched."
+  },
+  "t9966aa": {
+   "verdict": "wrong",
+   "tags": [
+    "fog-haze",
+    "parallax-mismatch"
+   ],
+   "note": "Line crosses Mont Blanc massif mid-body; wiggles don't match ridge peaks in haze."
+  },
+  "td363ae": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction"
+   ],
+   "note": "Sloping line crosses plain and treeline; Mont Blanc skyline untouched."
+  },
+  "tbbdac1": {
+   "verdict": "correct",
+   "tags": [
+    "fog-haze"
+   ],
+   "note": "Pilatus summits and right horizon align; left far Alps hidden in haze."
+  },
+  "tc0f511": {
+   "verdict": "correct",
+   "tags": [
+    "cloud"
+   ],
+   "note": "Right ridge, notch, left cliff and distant peaks align; some central peaks in cloud."
+  },
+  "tccad1e": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Zoomed: line peaks match Bernese Alps summits horizontally, <0.5% vertical offset."
+  },
+  "tdba5e4": {
+   "verdict": "wrong",
+   "tags": [
+    "wrong-direction",
+    "near-field-terrain"
+   ],
+   "note": "Smooth hump line ignores jagged Alps; peaks poke above line at right, gap in middle."
+  },
+  "te9190c": {
+   "verdict": "correct",
+   "tags": [
+    "cloud"
+   ],
+   "note": "Fletschhorn summit, notches and right shoulder align; left section in cloud."
+  },
+  "tf79b57": {
+   "verdict": "correct",
+   "tags": [],
+   "note": "Eiger, Moench, Jungfrau and Wetterhorn summits line up precisely in position and height."
+  }
+ }
+}

@@ -1,0 +1,94 @@
+dev n=50  F1 position-stage=9 ['wc_0010', 'wc_0035', 'wc_0069', 'wc_0070', 'wc_0073', 'wc_0074', 'wc_0086', 'wc_0087', 'wc_0095']  a_big=5  a_any=13  with correct ref=30
+-- label A position-stage
+primary (far|low|vis)              flagged=12 TP=3 FP=9 FN=6 TN=32 prec=0.25 rec=0.33 | flags on photos with a correct ref: 6 ['wc_0009', 'wc_0017', 'wc_0020', 'wc_0046', 'wc_0059', 'wc_0094']
+far|low only                       flagged= 6 TP=2 FP=4 FN=7 TN=37 prec=0.33 rec=0.22 | flags on photos with a correct ref: 1 ['wc_0017']
+primary + F-exif                   flagged=13 TP=3 FP=10 FN=6 TN=31 prec=0.23 rec=0.33 | flags on photos with a correct ref: 7 ['wc_0009', 'wc_0017', 'wc_0020', 'wc_0028', 'wc_0046', 'wc_0059', 'wc_0094']
+  F-far alone                      flagged= 6 TP=2 FP=4 FN=7 TN=37 prec=0.33 rec=0.22 | flags on photos with a correct ref: 1 ['wc_0017']
+  F-low alone                      flagged= 0 TP=0 FP=0 FN=9 TN=41 prec=0.00 rec=0.00 | flags on photos with a correct ref: 0 []
+  F-vis alone                      flagged= 6 TP=1 FP=5 FN=8 TN=36 prec=0.17 rec=0.11 | flags on photos with a correct ref: 5 ['wc_0009', 'wc_0020', 'wc_0046', 'wc_0059', 'wc_0094']
+  F-exif alone                     flagged= 1 TP=0 FP=1 FN=9 TN=40 prec=0.00 rec=0.00 | flags on photos with a correct ref: 1 ['wc_0028']
+-- label B a_big
+primary (far|low|vis)              flagged=12 TP=3 FP=9 FN=2 TN=36 prec=0.25 rec=0.60 | flags on photos with a correct ref: 6 ['wc_0009', 'wc_0017', 'wc_0020', 'wc_0046', 'wc_0059', 'wc_0094']
+far|low only                       flagged= 6 TP=2 FP=4 FN=3 TN=41 prec=0.33 rec=0.40 | flags on photos with a correct ref: 1 ['wc_0017']
+primary + F-exif                   flagged=13 TP=3 FP=10 FN=2 TN=35 prec=0.23 rec=0.60 | flags on photos with a correct ref: 7 ['wc_0009', 'wc_0017', 'wc_0020', 'wc_0028', 'wc_0046', 'wc_0059', 'wc_0094']
+  F-far alone                      flagged= 6 TP=2 FP=4 FN=3 TN=41 prec=0.33 rec=0.40 | flags on photos with a correct ref: 1 ['wc_0017']
+  F-low alone                      flagged= 0 TP=0 FP=0 FN=5 TN=45 prec=0.00 rec=0.00 | flags on photos with a correct ref: 0 []
+  F-vis alone                      flagged= 6 TP=1 FP=5 FN=4 TN=40 prec=0.17 rec=0.20 | flags on photos with a correct ref: 5 ['wc_0009', 'wc_0020', 'wc_0046', 'wc_0059', 'wc_0094']
+  F-exif alone                     flagged= 1 TP=0 FP=1 FN=5 TN=44 prec=0.00 rec=0.00 | flags on photos with a correct ref: 1 ['wc_0028']
+-- label C a_big|a_small
+primary (far|low|vis)              flagged=12 TP=4 FP=8 FN=9 TN=29 prec=0.33 rec=0.31 | flags on photos with a correct ref: 6 ['wc_0009', 'wc_0017', 'wc_0020', 'wc_0046', 'wc_0059', 'wc_0094']
+far|low only                       flagged= 6 TP=3 FP=3 FN=10 TN=34 prec=0.50 rec=0.23 | flags on photos with a correct ref: 1 ['wc_0017']
+primary + F-exif                   flagged=13 TP=4 FP=9 FN=9 TN=28 prec=0.31 rec=0.31 | flags on photos with a correct ref: 7 ['wc_0009', 'wc_0017', 'wc_0020', 'wc_0028', 'wc_0046', 'wc_0059', 'wc_0094']
+  F-far alone                      flagged= 6 TP=3 FP=3 FN=10 TN=34 prec=0.50 rec=0.23 | flags on photos with a correct ref: 1 ['wc_0017']
+  F-low alone                      flagged= 0 TP=0 FP=0 FN=13 TN=37 prec=0.00 rec=0.00 | flags on photos with a correct ref: 0 []
+  F-vis alone                      flagged= 6 TP=1 FP=5 FN=12 TN=32 prec=0.17 rec=0.08 | flags on photos with a correct ref: 5 ['wc_0009', 'wc_0020', 'wc_0046', 'wc_0059', 'wc_0094']
+  F-exif alone                     flagged= 1 TP=0 FP=1 FN=13 TN=36 prec=0.00 rec=0.00 | flags on photos with a correct ref: 1 ['wc_0028']
+
+Per photo
+pid      F1         ref src    flags            exif-dem  viewpoint -> feature (dist m)  | targets (dist km, vis, offHdg)
+wc_0001  match/a_small -   exif-g -                       -  - | -
+wc_0002  match/a_small Y   manual -                       -  - | Gandstock(0.1,-,-)
+wc_0004  ok-HIGH    Y   manual -                       -  'frumsel'->Frümsel(6) | -
+wc_0005  match      -   exif-g -                     -14  'the uetliberg'->Uetliberg(23); 'evening'->unresolved | -
+wc_0006  decis      Y   manual -                       -  - | Fahnenstock(0.4,v,35.1)
+wc_0009  ok-HIGH    Y   exif-g F-vis                  +3  - | Eggishorn(0.4,v,153.2)
+wc_0010  posit/a_small -   exif-g -                      -9  - | -
+wc_0011  ok-HIGH    Y   exif-g -                       -  - | -
+wc_0013  match      -   exif-g -                      -0  - | Huetstock(5.8,v,8.2)
+wc_0014  ok-HIGH    Y   manual -                       -  'l albigna as seen from piz blanch'->unresolved; 'piz blanch'->Piz Blanch(2) | -
+wc_0015  searc      -   manual F-far                   -  'chasseral'->Chasseral(736) | -
+wc_0017  ok-HIGH    Y   manual F-far                   -  'bellwald'->Bellwald(2201) | -
+wc_0019  ok-HIGH    Y   manual -                       -  - | Sackhorn(3.7,v,6.6)
+wc_0020  ok-HIGH    Y   manual F-vis                   -  'bella tola'->Bella Tola(175) | Weisshorn(15.9,v,83.0); Bishorn(14.1,v,81.2)
+wc_0023  searc      -   manual -                       -  - | -
+wc_0027  ok-HIGH    Y   manual -                       -  'lotschen pass'->Lötschenpass(290) | Bietschhorn(10.4,v,14.2)
+wc_0028  refin      Y   exif-g -                    +570  - | -
+wc_0033  match      -   exif-g -                     -39  'pilatus railway heading up mount pilatus'->unresolved | -
+wc_0034  match      Y   manual -                       -  - | -
+wc_0035  posit/a_big -   manual -                       -  'belchenflue'->Belchenflue(15) | Wisenberg(6.9,v,24.4)
+wc_0037  match/a_small -   manual F-far                   -  'santa maria'->Santa Maria(21925) | Piz Lad(3.3,v,10.2)
+wc_0040  searc      -   exif-g -                       -  - | -
+wc_0046  decis      Y   exif-g F-vis                  +1  - | Rigi(1.9,v,164.0); First(25.7,X,68.7)
+wc_0047  ok-HIGH    Y   manual -                       -  'la bes cha as seen from muottas muragl'->unresolved; 'muottas muragl'->Muottas Muragl(18) | Munt da la Bês-cha(2.2,v,10.9); Piz Clüx(4.3,v,2.7); Piz Muragl(3.8,v,0.7)
+wc_0048  ok-HIGH    Y   manual -                       -  - | Weisshorn(16.4,v,0.2); Bishorn(14.8,v,3.1)
+wc_0052  match      Y   manual -                       -  - | -
+wc_0053  match      -   exif-g F-far                   -  'samedan'->Samedan(1305) | Piz Mezdi(5.8,v,14.0)
+wc_0054  ok-HIGH    Y   exif-g -                      -4  - | -
+wc_0055  match      Y   exif-g -                     +51  - | -
+wc_0058  match/a_small -   manual -                       -  - | -
+wc_0059  ok-HIGH    Y   manual F-vis                   -  - | Piz Lagalb(2.2,v,48.5); Piz Bernina(8.4,X,156.9)
+wc_0063  decis      Y   manual -                       -  - | -
+wc_0067  ok-HIGH    Y   exif-g -                     +12  'schwendisee'->Vorderer Schwendisee(223) | Säntis(7.2,v,-)
+wc_0069  posit/a_big -   manual F-far                   -  'fronalpstock'->Fronalpstock(1079) | -
+wc_0070  posit/a_small -   exif-g -                     +32  - | Gandstock(0.6,v,-)
+wc_0071  decis      Y   exif-g -                     +34  - | -
+wc_0072  decis      Y   manual -                       -  - | -
+wc_0073  posit/a_big -   exif-g F-far                   -  'pilatus'->Pilatus Kulm(17466) | Matthorn(16.5,v,-)
+wc_0074  posit/a_small -   manual -                       -  'leistcamm'->unresolved | -
+wc_0076  verif      Y   manual -                       -  - | -
+wc_0077  ok-HIGH    Y   manual -                       -  - | Altmann(6.5,v,-); Säntis(8.3,v,-)
+wc_0082  ok-HIGH    Y   exif-g -                     +13  - | -
+wc_0085  ok-HIGH    Y   exif-g -                      -2  'parpaner rothorn'->Parpaner Rothorn(55) | -
+wc_0086  posit/a_small -   manual -                       -  'mount san salvatore'->Monte San Salvatore(32) | -
+wc_0087  posit/a_big -   manual F-vis                   -  - | Dent de Valère(23.2,v,-); Pointe du Midi(23.6,X,-)
+wc_0088  ok-HIGH    Y   exif-g -                      -0  - | -
+wc_0094  ok-HIGH    Y   exif-g F-vis                 +26  - | Piz Bernina(11.1,X,-); Piz Bernina(11.1,X,-)
+wc_0095  posit/a_big -   manual -                       -  'aus'->unresolved | -
+wc_0098  match      -   manual -                       -  - | Bruschghorn(2.5,v,-)
+wc_0099  ok-HIGH    Y   exif-g -                     -20  - | -
+
+Candidate-eye check (flagged photos)
+wc_0009 ['F-vis'] no candidate eye | has correct ref
+wc_0015 F-far: Chasseral 736 m                   -> eye (47.13299,7.05930,1608) | stated eye h=1569 | no verified ref
+wc_0017 F-far: Bellwald 2201 m                   -> eye (46.42897,8.16178,1627) | stated eye h=2438 | correct ref eye(s) at stated lat/lon h=[2437.8] -> proposal is 2201 m horiz, dh=-811 m from the verified eye (proposal moves AWAY)
+wc_0020 ['F-vis'] no candidate eye | has correct ref
+wc_0037 F-far: Santa Maria 21925 m               -> eye (46.54559,10.14174,1812) | stated eye h=1407 | no verified ref
+wc_0046 ['F-vis'] no candidate eye | has correct ref
+wc_0053 F-far: Samedan 1305 m                    -> eye (46.53381,9.87326,1708) | stated eye h=1714 | no verified ref
+wc_0059 ['F-vis'] no candidate eye | has correct ref
+wc_0069 F-far: Fronalpstock 1079 m               -> eye (46.96950,8.63717,1912) | stated eye h=1335 | no verified ref
+wc_0073 F-far: Pilatus Kulm 17466 m              -> eye (46.97926,8.25564,2113) | stated eye h=490 | no verified ref
+wc_0087 ['F-vis'] no candidate eye | no ref
+wc_0094 ['F-vis'] no candidate eye | has correct ref
+
+stated-eye recompute vs C0 cache meta.eye: max |diff| = 0.25 m

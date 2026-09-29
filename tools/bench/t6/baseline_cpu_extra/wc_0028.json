@@ -1,0 +1,205 @@
+{
+ "ok": true,
+ "nLifted": 3054,
+ "perView": [
+  {
+   "tag": "y-20",
+   "matches": 496,
+   "lifted": 441,
+   "keypoints": 4096,
+   "terrainFrac": 0.613,
+   "rgbStd": 25.0
+  },
+  {
+   "tag": "y-10",
+   "matches": 756,
+   "lifted": 636,
+   "keypoints": 4096,
+   "terrainFrac": 0.619,
+   "rgbStd": 24.5
+  },
+  {
+   "tag": "y+0",
+   "matches": 918,
+   "lifted": 761,
+   "keypoints": 4096,
+   "terrainFrac": 0.625,
+   "rgbStd": 24.3
+  },
+  {
+   "tag": "y+10",
+   "matches": 840,
+   "lifted": 678,
+   "keypoints": 4096,
+   "terrainFrac": 0.634,
+   "rgbStd": 25.1
+  },
+  {
+   "tag": "y+20",
+   "matches": 666,
+   "lifted": 538,
+   "keypoints": 4096,
+   "terrainFrac": 0.643,
+   "rgbStd": 25.8
+  }
+ ],
+ "inliers": 671,
+ "inlierFrac": 0.2197,
+ "residualPx": 3.117,
+ "coverage": 0.25,
+ "pose": {
+  "yaw": 72.64373330690638,
+  "pitch": -5.8139698963971655,
+  "roll": 1.90998367851568,
+  "vfov": 43.435996328040126
+ },
+ "method": "fused",
+ "confidence": 0.2,
+ "confidenceLevel": "low",
+ "confidenceChecks": {
+  "cueAgreeDeg": 0.714,
+  "skylineMedPx": 4.095,
+  "matchSupport": 0.22
+ },
+ "cues": {
+  "skyline": {
+   "pose": {
+    "yaw": 71.96044515416776,
+    "pitch": -5.659318931976109,
+    "roll": 1.9364603541297896,
+    "vfov": 42.47570903203578
+   },
+   "residualPx": 4.426,
+   "appConfidence": 0.081,
+   "accepted": "near-compass"
+  },
+  "match": {
+   "pose": {
+    "yaw": 72.65819390241253,
+    "pitch": -5.803308088770143,
+    "roll": 1.947864761845901,
+    "vfov": 43.38665998027685
+   },
+   "inliers": 593,
+   "residualPx": 3.404
+  }
+ },
+ "fusionScore": 0.129,
+ "matchConfidence": 0.232,
+ "fusedFrom": "match",
+ "deltaYawFromPrior": -0.067,
+ "focalPx": 960.3,
+ "size": {
+  "W": 1024,
+  "H": 765
+ },
+ "timingMs": {
+  "stage1": 17599,
+  "render": 18553,
+  "loadMs": 0,
+  "fullTerrainMs": 0,
+  "imageryMs": 1,
+  "skylineMs": 227,
+  "renderMs": 843,
+  "warmPage": true,
+  "draped": false,
+  "imageryRetries": 0,
+  "imageryMissing": 0,
+  "imageryTiles": 228,
+  "match": 9073,
+  "solve": 4849,
+  "fusion": 3534,
+  "total": 36333
+ },
+ "eye": [
+  0,
+  0,
+  1808.1
+ ],
+ "adhoc": {
+  "id": "adhoc-d155d2058248",
+  "size": {
+   "W": 2048,
+   "H": 1530
+  },
+  "yawKnown": false,
+  "gravityKnown": false,
+  "focalKnown": false,
+  "priorUsed": {
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "roll": 0.0,
+   "vfov": 38.41305670843248
+  },
+  "yaw360": true,
+  "twoStage": true,
+  "defaultHfov": 50.0,
+  "hfov": 50.0,
+  "narrow": false,
+  "stage2Prior": {
+   "yaw": 72.71044515416776,
+   "pitch": -5.784318931976109,
+   "roll": 1.9864603541297896,
+   "vfov": 42.68915480606611
+  },
+  "stages": [
+   {
+    "stage": "match-sweep",
+    "offsets": [
+     0,
+     40,
+     80,
+     120,
+     160,
+     200,
+     240,
+     280,
+     320
+    ],
+    "pose": {
+     "yaw": 72.71044515416776,
+     "pitch": -5.784318931976109,
+     "roll": 1.9864603541297896,
+     "vfov": 42.68915480606611
+    },
+    "inliers": 53,
+    "inlierFrac": 0.1721,
+    "residualPx": 3.345,
+    "used": true,
+    "ms": 17599,
+    "renderTiming": {
+     "loadMs": 9370,
+     "fullTerrainMs": 156,
+     "imageryMs": 1711,
+     "skylineMs": 0,
+     "renderMs": 1490,
+     "warmPage": false,
+     "draped": true,
+     "imageryRetries": 0,
+     "imageryMissing": 0,
+     "imageryTiles": 228
+    }
+   }
+  ]
+ },
+ "version": "matcher-service/0.3.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16 on MPS + lightglue on CPU; basin-gap LOW trigger for untrusted positions; bounded queue, client-cancel)",
+ "id": "wc_0028",
+ "request": {
+  "photoPath": "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/photos/wc_0028.jpg",
+  "meta": {
+   "lat": 46.990667,
+   "lon": 8.264,
+   "altitudeM": 1808.1,
+   "positionSource": "exif-gps"
+  },
+  "prior": {
+   "yaw": null,
+   "pitch": null,
+   "roll": null
+  },
+  "region": null,
+  "timeoutMs": 600000,
+  "yawHint": 67.6
+ },
+ "wallMs": 36334
+}

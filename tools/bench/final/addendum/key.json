@@ -1,0 +1,177 @@
+{
+ "seed": "f9f318873e80b417",
+ "perturbYawDeg": {
+  "wc_0003": 3,
+  "wc_0038": 5
+ },
+ "candidates": {
+  "R2": {
+   "pid": "wc_0003",
+   "kind": "wrong-decoy",
+   "pose": {
+    "yaw": 171.36920060965264,
+    "pitch": -2.0398915441926153,
+    "roll": 1.272193452071754,
+    "vfov": 8.302917324221161
+   },
+   "eye": {
+    "lat": 46.928502,
+    "lon": 6.724747,
+    "h": 1462.542025252384
+   },
+   "eyeRendered": 1462.542025252384,
+   "dem": "mapterhorn",
+   "width": 1400,
+   "labels": [
+    "Les Pléiades",
+    "Mont Vuarat",
+    "Pointe de Bellevue",
+    "Tour de Don",
+    "Alamont",
+    "Grande Jumelle",
+    "Les Cornettes de Bise",
+    "Pointe de Bénévent"
+   ]
+  },
+  "Q9": {
+   "pid": "wc_0003",
+   "kind": "B",
+   "pose": {
+    "yaw": 174.36920060965264,
+    "pitch": -2.0398915441926153,
+    "roll": 1.272193452071754,
+    "vfov": 8.302917324221161
+   },
+   "eye": {
+    "lat": 46.928502,
+    "lon": 6.724747,
+    "h": 1462.542025252384
+   },
+   "eyeRendered": 1462.542025252384,
+   "dem": "mapterhorn",
+   "width": 1440,
+   "labels": [
+    "Pointe de Bellevue",
+    "Tour de Don",
+    "Alamont",
+    "Grande Jumelle",
+    "Les Cornettes de Bise",
+    "Pointe de Bénévent",
+    "Dent d'Oche",
+    "Roc de Tavaneuse"
+   ]
+  },
+  "T5": {
+   "pid": "wc_0003",
+   "kind": "B-duplicate",
+   "pose": {
+    "yaw": 174.36920060965264,
+    "pitch": -2.0398915441926153,
+    "roll": 1.272193452071754,
+    "vfov": 8.302917324221161
+   },
+   "eye": {
+    "lat": 46.928502,
+    "lon": 6.724747,
+    "h": 1462.542025252384
+   },
+   "eyeRendered": 1462.542025252384,
+   "dem": "mapterhorn",
+   "width": 1360,
+   "labels": [
+    "Pointe de Bellevue",
+    "Tour de Don",
+    "Alamont",
+    "Grande Jumelle",
+    "Les Cornettes de Bise",
+    "Pointe de Bénévent",
+    "Dent d'Oche",
+    "Roc de Tavaneuse"
+   ]
+  },
+  "U2": {
+   "pid": "wc_0038",
+   "kind": "B-duplicate",
+   "pose": {
+    "yaw": 331.9883718208237,
+    "pitch": -10.634346784501002,
+    "roll": 3.570825972296777,
+    "vfov": 47.06030079055923
+   },
+   "eye": {
+    "lat": 45.929767,
+    "lon": 9.019178,
+    "h": 1653.1248278841608
+   },
+   "eyeRendered": 1653.1248278841608,
+   "dem": "mapterhorn",
+   "width": 1440,
+   "labels": [
+    "Monte Limidario",
+    "Blinnenhorn / Corno cieco",
+    "Basòdino",
+    "Monte Tamaro",
+    "Pizzo Campo Tencia",
+    "Pizzo Vogorno",
+    "Cima dell'Uomo",
+    "Adula - Rheinwaldhorn"
+   ]
+  },
+  "J8": {
+   "pid": "wc_0038",
+   "kind": "B",
+   "pose": {
+    "yaw": 331.9883718208237,
+    "pitch": -10.634346784501002,
+    "roll": 3.570825972296777,
+    "vfov": 47.06030079055923
+   },
+   "eye": {
+    "lat": 45.929767,
+    "lon": 9.019178,
+    "h": 1653.1248278841608
+   },
+   "eyeRendered": 1653.1248278841608,
+   "dem": "mapterhorn",
+   "width": 1360,
+   "labels": [
+    "Monte Limidario",
+    "Blinnenhorn / Corno cieco",
+    "Basòdino",
+    "Monte Tamaro",
+    "Pizzo Campo Tencia",
+    "Pizzo Vogorno",
+    "Cima dell'Uomo",
+    "Adula - Rheinwaldhorn"
+   ]
+  },
+  "V7": {
+   "pid": "wc_0038",
+   "kind": "wrong-decoy",
+   "pose": {
+    "yaw": 336.9883718208237,
+    "pitch": -10.634346784501002,
+    "roll": 3.570825972296777,
+    "vfov": 47.06030079055923
+   },
+   "eye": {
+    "lat": 45.929767,
+    "lon": 9.019178,
+    "h": 1653.1248278841608
+   },
+   "eyeRendered": 1653.1248278841608,
+   "dem": "mapterhorn",
+   "width": 1400,
+   "labels": [
+    "Blinnenhorn / Corno cieco",
+    "Basòdino",
+    "Monte Tamaro",
+    "Pizzo Campo Tencia",
+    "Pizzo Vogorno",
+    "Cima dell'Uomo",
+    "Piz Medel",
+    "Adula - Rheinwaldhorn"
+   ]
+  }
+ }
+}

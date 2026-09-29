@@ -1,0 +1,37 @@
+score                      tau | correct refs vetoed odd/even | wrong refs vetoed all | traps (0001B 0069A 0070A 0074A) | matcher: correct vetoed, gross vetoed
+moge_l.sky_miou          0.839 |   0/14   0/18 |  90/128 | . V . V |  14/79   7/18
+moge_l.rank_all          0.799 |   0/14   0/18 |  54/128 | . V . V |   5/79   7/18
+moge_l.rank_t            0.692 |   0/14   2/18 |  56/126 | . V V V |   7/79   7/18
+moge_l.ord_local         0.934 |   0/14   1/18 |  85/128 | . . V V |   6/79   7/18
+moge_l.edge_all          0.461 |   0/14   1/18 | 108/124 | V V . . |   9/79   9/18
+moge_l.edge_int          0.034 |   0/13   0/17 |  21/116 | . . . . |   1/78   0/18
+moge_l.normal_cos        0.761 |   0/14   1/18 |  32/125 | . . . . |   1/79   1/18
+moge_l.combo.z           1.186 |   0/14   1/18 |  76/117 | . V . V |   5/79   7/18
+moge_l.combo_int.z       0.368 |   0/13   0/17 |  49/111 | . V . V |   1/78   7/18
+da3_b.sky_miou           0.839 |   0/14   0/18 |  90/128 | . V . V |  14/79   7/18
+da3_b.rank_all           0.797 |   0/14   0/18 |  56/128 | . V . V |   8/79   7/18
+da3_b.rank_t             0.137 |   0/14   1/18 |  24/126 | . V . . |   3/79   4/18
+da3_b.ord_local          0.846 |   0/14   3/18 |  57/128 | . . . V |   8/79   1/18
+da3_b.edge_all           0.377 |   0/14   0/18 | 102/124 | . V . . |  12/79   4/18
+da3_b.edge_int           0.011 |   0/13   0/17 |  31/116 | . . . . |   1/78   0/18
+da3_b.combo.z            1.188 |   0/14   0/18 |  65/115 | . V . V |   6/79   7/18
+da3_b.combo_int.z        0.952 |   0/12   3/17 |  74/109 | . V V V |   9/78   8/18
+moge_b.sky_miou          0.839 |   0/14   0/18 |  90/128 | . V . V |    0/0    0/0
+moge_b.rank_all          0.794 |   0/14   0/18 |  56/128 | . V . V |    0/0    0/0
+moge_b.rank_t            0.193 |   0/14   0/18 |  17/126 | . V . . |    0/0    0/0
+moge_b.ord_local         0.908 |   0/14   0/18 |  72/128 | . . V V |    0/0    0/0
+moge_b.edge_all          0.531 |   0/14   3/18 | 114/124 | V V V V |    0/0    0/0
+moge_b.edge_int          0.063 |   0/13   0/17 |  37/116 | . V . . |    0/0    0/0
+moge_b.normal_cos        0.759 |   0/14   1/18 |  39/125 | . . . . |    0/0    0/0
+t6_final   moge_l.rank_all      correct HIGH vetoed 0/19  wrong HIGH vetoed 0/0
+t6_final   moge_l.rank_t        correct HIGH vetoed 0/19  wrong HIGH vetoed 0/0
+t6_final   moge_l.combo.z       correct HIGH vetoed 0/19  wrong HIGH vetoed 0/0
+t6_final   moge_l.combo_int.z   correct HIGH vetoed 0/19  wrong HIGH vetoed 0/0
+t6_final   da3_b.combo.z        correct HIGH vetoed 2/19  wrong HIGH vetoed 0/0
+t6_final   da3_b.combo_int.z    correct HIGH vetoed 2/19  wrong HIGH vetoed 0/0
+loma_final moge_l.rank_all      correct HIGH vetoed 0/18  wrong HIGH vetoed 1/1
+loma_final moge_l.rank_t        correct HIGH vetoed 1/18  wrong HIGH vetoed 1/1
+loma_final moge_l.combo.z       correct HIGH vetoed 0/18  wrong HIGH vetoed 1/1
+loma_final moge_l.combo_int.z   correct HIGH vetoed 0/18  wrong HIGH vetoed 1/1
+loma_final da3_b.combo.z        correct HIGH vetoed 2/18  wrong HIGH vetoed 1/1
+loma_final da3_b.combo_int.z    correct HIGH vetoed 1/18  wrong HIGH vetoed 1/1

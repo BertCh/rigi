@@ -1,0 +1,17 @@
+1ad03962d54363bab16a693e467619bcff45302d  pose6.py
+Fri Sep 25 08:26:11 UTC 2026
+CONFIDENCE RULE — fixed on 2026-09-25 BEFORE looking at any dev verdict/overlay outcome of new poses:
+  HIGH iff all hold, else LOW:
+   1. fusion checks at the final eye: d_agree (skyline-only vs match-only rotation, both re-solved at
+      the final eye) < 1°, skyline median |r| < 4 px, match support (share of lifted matches within 6 px)
+      ≥ 0.3  — the thresholds of reports/fusion.md, unchanged;
+   2. eye not pushed onto the height cap: NOT (final AGL ≥ cap − 0.5 m and final AGL > start AGL + 0.5 m)
+      [amended after the GT-12 run, before any dev run: as first written, an eye whose GPS altitude
+      already sits > 10 m above the DEM (cap = start AGL) was "on the cap" without moving: IMG_7130/7131];
+   3. horizontal shift ≤ 3 σ_H (90 m EXIF, 1200 m hand-placed);
+   4. regime B: basin gap (c2 − c1)/c1 ≥ 0.15, c1 the best grid node cost, c2 the best node ≥ 2 spacings
+      away;
+   5. if the eye moved > 10 m horizontally (always in regime B): re-render confirmation — the app's own
+      horizon at the final eye (render_worker at the new lat/lon/alt) gives skyline median |r| < 4 px
+      at the final pose.
+"""

@@ -1,0 +1,299 @@
+[
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "A6",
+  "pid": "wc_0074",
+  "kind": "known-wrong-refA@stated",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "T9",
+  "pid": "wc_0074",
+  "kind": "decoy-yaw-5@moved",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss"
+  ]
+ },
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "X7",
+  "pid": "wc_0074",
+  "kind": "v2-suggestion-moved",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "A5",
+  "pid": "wc_0086",
+  "kind": "v2-moved-duplicate",
+  "verdict": "unsure",
+  "tags": [
+   "skyline-occluded-by-header"
+  ]
+ },
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "L9",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw+5@moved",
+  "verdict": "unsure",
+  "tags": [
+   "skyline-occluded-by-header"
+  ]
+ },
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "N7",
+  "pid": "wc_0086",
+  "kind": "v2-moved",
+  "verdict": "unsure",
+  "tags": [
+   "skyline-occluded-by-header",
+   "duplicate-of-A5"
+  ]
+ },
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "T8",
+  "pid": "wc_0086",
+  "kind": "v2pose@stated-eye",
+  "verdict": "wrong",
+  "tags": [
+   "no-visible-line"
+  ]
+ },
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "F5",
+  "pid": "wc_0004",
+  "kind": "positive-control-refA",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "va",
+  "label": "X2",
+  "pid": "wc_0004",
+  "kind": "decoy-yaw+5",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "A6",
+  "pid": "wc_0074",
+  "kind": "known-wrong-refA@stated",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "T9",
+  "pid": "wc_0074",
+  "kind": "decoy-yaw-5@moved",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss"
+  ]
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "X7",
+  "pid": "wc_0074",
+  "kind": "v2-suggestion-moved",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "A5",
+  "pid": "wc_0086",
+  "kind": "v2-moved-duplicate",
+  "verdict": "correct",
+  "tags": [
+   "skyline-mostly-under-header"
+  ]
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "L9",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw+5@moved",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "N7",
+  "pid": "wc_0086",
+  "kind": "v2-moved",
+  "verdict": "correct",
+  "tags": [
+   "skyline-mostly-under-header"
+  ]
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "T8",
+  "pid": "wc_0086",
+  "kind": "v2pose@stated-eye",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "F5",
+  "pid": "wc_0004",
+  "kind": "positive-control-refA",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "round": 1,
+  "verifier": "vb",
+  "label": "X2",
+  "pid": "wc_0004",
+  "kind": "decoy-yaw+5",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 2,
+  "verifier": "vc",
+  "label": "V4",
+  "pid": "wc_0004",
+  "kind": "decoy-yaw-4",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss"
+  ]
+ },
+ {
+  "round": 2,
+  "verifier": "vc",
+  "label": "W8",
+  "pid": "wc_0004",
+  "kind": "positive-control-refA",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "round": 2,
+  "verifier": "vc",
+  "label": "D4",
+  "pid": "wc_0086",
+  "kind": "v2pose@stated-eye",
+  "verdict": "wrong",
+  "tags": [
+   "no-line"
+  ]
+ },
+ {
+  "round": 2,
+  "verifier": "vc",
+  "label": "F6",
+  "pid": "wc_0086",
+  "kind": "v2-moved",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "round": 2,
+  "verifier": "vc",
+  "label": "L9",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw+5@moved",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 2,
+  "verifier": "vc",
+  "label": "M6",
+  "pid": "wc_0086",
+  "kind": "v2-moved-duplicate",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "round": 2,
+  "verifier": "vd",
+  "label": "V4",
+  "pid": "wc_0004",
+  "kind": "decoy-yaw-4",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 2,
+  "verifier": "vd",
+  "label": "W8",
+  "pid": "wc_0004",
+  "kind": "positive-control-refA",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "round": 2,
+  "verifier": "vd",
+  "label": "D4",
+  "pid": "wc_0086",
+  "kind": "v2pose@stated-eye",
+  "verdict": "wrong",
+  "tags": [
+   "no-line"
+  ]
+ },
+ {
+  "round": 2,
+  "verifier": "vd",
+  "label": "F6",
+  "pid": "wc_0086",
+  "kind": "v2-moved",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss"
+  ]
+ },
+ {
+  "round": 2,
+  "verifier": "vd",
+  "label": "L9",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw+5@moved",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "round": 2,
+  "verifier": "vd",
+  "label": "M6",
+  "pid": "wc_0086",
+  "kind": "v2-moved-duplicate",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss"
+  ]
+ }
+]

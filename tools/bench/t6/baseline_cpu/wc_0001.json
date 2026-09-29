@@ -1,0 +1,206 @@
+{
+ "ok": true,
+ "nLifted": 1568,
+ "perView": [
+  {
+   "tag": "y-20",
+   "matches": 7,
+   "lifted": 3,
+   "keypoints": 4096,
+   "terrainFrac": 0.705,
+   "rgbStd": 30.4
+  },
+  {
+   "tag": "y-10",
+   "matches": 35,
+   "lifted": 32,
+   "keypoints": 4096,
+   "terrainFrac": 0.614,
+   "rgbStd": 35.5
+  },
+  {
+   "tag": "y+0",
+   "matches": 653,
+   "lifted": 583,
+   "keypoints": 4096,
+   "terrainFrac": 0.585,
+   "rgbStd": 38.5
+  },
+  {
+   "tag": "y+10",
+   "matches": 650,
+   "lifted": 572,
+   "keypoints": 4096,
+   "terrainFrac": 0.602,
+   "rgbStd": 37.5
+  },
+  {
+   "tag": "y+20",
+   "matches": 422,
+   "lifted": 378,
+   "keypoints": 4096,
+   "terrainFrac": 0.644,
+   "rgbStd": 33.1
+  }
+ ],
+ "inliers": 949,
+ "inlierFrac": 0.6052,
+ "residualPx": 3.708,
+ "coverage": 0.25,
+ "pose": {
+  "yaw": 101.83658146876326,
+  "pitch": 4.0951917014358346,
+  "roll": 2.0482626364180345,
+  "vfov": 16.701788346995592
+ },
+ "method": "fused",
+ "confidence": 0.2,
+ "confidenceLevel": "low",
+ "confidenceChecks": {
+  "cueAgreeDeg": 3.77,
+  "skylineMedPx": 6.754,
+  "matchSupport": 0.605
+ },
+ "cues": {
+  "skyline": {
+   "pose": {
+    "yaw": 105.47487529233973,
+    "pitch": 3.179881273727173,
+    "roll": 2.303019442626728,
+    "vfov": 17.037298507418356
+   },
+   "residualPx": 9.328,
+   "appConfidence": 0.045,
+   "accepted": "near-compass"
+  },
+  "match": {
+   "pose": {
+    "yaw": 101.81127525723431,
+    "pitch": 4.097698728903993,
+    "roll": 2.0777182093017537,
+    "vfov": 16.741383166197302
+   },
+   "inliers": 697,
+   "residualPx": 3.746
+  }
+ },
+ "fusionScore": 0.004,
+ "matchConfidence": 0.433,
+ "fusedFrom": "match",
+ "deltaYawFromPrior": 0.312,
+ "focalPx": 1961.97,
+ "size": {
+  "W": 1024,
+  "H": 576
+ },
+ "timingMs": {
+  "stage1": 10176,
+  "render": 8780,
+  "loadMs": 0,
+  "fullTerrainMs": 0,
+  "imageryMs": 0,
+  "skylineMs": 161,
+  "renderMs": 587,
+  "warmPage": true,
+  "draped": false,
+  "imageryRetries": 0,
+  "imageryMissing": 0,
+  "imageryTiles": 237,
+  "match": 5939,
+  "solve": 200,
+  "fusion": 1867,
+  "total": 19214
+ },
+ "eye": [
+  0,
+  0,
+  1828.9632711540442
+ ],
+ "adhoc": {
+  "id": "adhoc-7f835f9f0f93",
+  "size": {
+   "W": 2048,
+   "H": 1152
+  },
+  "yawKnown": false,
+  "gravityKnown": false,
+  "focalKnown": true,
+  "priorUsed": {
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "roll": 0.0,
+   "vfov": 17.231148932913637
+  },
+  "yaw360": true,
+  "twoStage": true,
+  "defaultHfov": null,
+  "hfov": 30.151,
+  "narrow": false,
+  "stage2Prior": {
+   "yaw": 101.52487529233973,
+   "pitch": 4.079881273727173,
+   "roll": 2.103019442626728,
+   "vfov": 17.231148932913637
+  },
+  "stages": [
+   {
+    "stage": "match-sweep",
+    "offsets": [
+     0,
+     40,
+     80,
+     120,
+     160,
+     200,
+     240,
+     280,
+     320
+    ],
+    "pose": {
+     "yaw": 101.52487529233973,
+     "pitch": 4.079881273727173,
+     "roll": 2.103019442626728,
+     "vfov": 17.231148932913637
+    },
+    "inliers": 110,
+    "inlierFrac": 0.3754,
+    "residualPx": 3.76,
+    "used": true,
+    "ms": 10176,
+    "renderTiming": {
+     "loadMs": 3882,
+     "fullTerrainMs": 141,
+     "imageryMs": 1767,
+     "skylineMs": 0,
+     "renderMs": 1108,
+     "warmPage": false,
+     "draped": true,
+     "imageryRetries": 0,
+     "imageryMissing": 0,
+     "imageryTiles": 237
+    }
+   }
+  ]
+ },
+ "version": "matcher-service/0.3.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16 on MPS + lightglue on CPU; basin-gap LOW trigger for untrusted positions; bounded queue, client-cancel)",
+ "id": "wc_0001",
+ "request": {
+  "photoPath": "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/photos/wc_0001.jpg",
+  "meta": {
+   "lat": 46.781325,
+   "lon": 10.150078,
+   "altitudeM": null,
+   "positionSource": "exif-gps"
+  },
+  "prior": {
+   "yaw": null,
+   "pitch": null,
+   "roll": null,
+   "vfov": 17.231148932913637
+  },
+  "region": null,
+  "timeoutMs": 600000,
+  "yawHint": 89.1
+ },
+ "wallMs": 19215
+}

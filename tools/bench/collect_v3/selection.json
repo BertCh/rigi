@@ -1,0 +1,906 @@
+[
+ {
+  "idx": 18,
+  "title": "File:Grand Combin N.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "grass"
+  ],
+  "hard": false,
+  "notes": "tele Grand Combin glaciers"
+ },
+ {
+  "idx": 86,
+  "title": "File:View on the Alps from La Dôle - panoramio (58).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [],
+  "hard": true,
+  "notes": "tele thin distant Alps above fog/haze"
+ },
+ {
+  "idx": 188,
+  "title": "File:Blockgletscher im Valletta.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "rock"
+  ],
+  "hard": false,
+  "notes": "rock glacier, clouds"
+ },
+ {
+  "idx": 184,
+  "title": "File:Le Lac Léman depuis Sonchaux.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "trees",
+   "water"
+  ],
+  "hard": true,
+  "notes": "portrait dusk, faint far skyline"
+ },
+ {
+  "idx": 232,
+  "title": "File:Windy mountains (Unsplash).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "tele wind-blown snow (Unsplash reuse)"
+ },
+ {
+  "idx": 241,
+  "title": "File:BrienzerRothornS.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [],
+  "hard": false,
+  "notes": "elevated, far Bernese Alps"
+ },
+ {
+  "idx": 26,
+  "title": "File:Le lac et les nuages.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "trees"
+  ],
+  "hard": true,
+  "notes": "backlit low-relief Jura ridge over lake"
+ },
+ {
+  "idx": 23,
+  "title": "File:Vierwaldstättersee Perspektive Pilatus Kulm.jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [
+   "snow",
+   "water"
+  ],
+  "hard": false,
+  "notes": "lake from Pilatus, snowy rocks, clouds on far range"
+ },
+ {
+  "idx": 218,
+  "title": "File:Switzerland-02321 - Matterhorn Ahead (22384579723).jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "chairlift",
+   "wires"
+  ],
+  "hard": true,
+  "notes": "chairlift in frame"
+ },
+ {
+  "idx": 234,
+  "title": "File:Lake Lugano from Monte Bre (1).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "grass",
+   "water"
+  ],
+  "hard": false,
+  "notes": "lake fjord, dry winter"
+ },
+ {
+  "idx": 6,
+  "title": "File:Bernese Alps from Chasseral.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "grass"
+  ],
+  "hard": true,
+  "notes": "thin distant Bernese Alps line over Swiss plateau, haze"
+ },
+ {
+  "idx": 281,
+  "title": "File:Oeschinensee (Lake Oeschinen) near Kandersteg, Switzerland.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": false,
+  "notes": "portrait lake, clouds on peaks"
+ },
+ {
+  "idx": 282,
+  "title": "File:Lake Lucerne View from Rigi.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "grass"
+  ],
+  "hard": false,
+  "notes": "elevated lake view"
+ },
+ {
+  "idx": 36,
+  "title": "File:La vallée de Joux.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees",
+   "water",
+   "buildings"
+  ],
+  "hard": true,
+  "notes": "big bare tree foreground, low wooded ridge"
+ },
+ {
+  "idx": 268,
+  "title": "File:Piz Cavradi, WT3+ (8216270273).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "early winter range"
+ },
+ {
+  "idx": 20,
+  "title": "File:Kronberg Säntis.jpeg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "grass"
+  ],
+  "hard": true,
+  "notes": "hazy backlit Alpstein from Kronberg"
+ },
+ {
+  "idx": 249,
+  "title": "File:Vista sul lago Maggiore dall'alpetto Caviano - panoramio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "grass",
+   "trees"
+  ],
+  "hard": false,
+  "notes": "elevated lake view"
+ },
+ {
+  "idx": 112,
+  "title": "File:Scuol-Motta Naluns, 11-10-2024. (actm.) 17.jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": true,
+  "notes": "fresh snow, fog hiding left skyline"
+ },
+ {
+  "idx": 0,
+  "title": "File:Äscher.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "tele limestone cliff wall, skyline at top edge"
+ },
+ {
+  "idx": 145,
+  "title": "File:Cully CGN.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "water",
+   "pier"
+  ],
+  "hard": true,
+  "notes": "hazy far mountains over lake"
+ },
+ {
+  "idx": 65,
+  "title": "File:Val Roseg as seen from Pontresina.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "spring snow, glaciated valley head"
+ },
+ {
+  "idx": 38,
+  "title": "File:Le mont Blanc de Cheilon et la Serpentine.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "water"
+  ],
+  "hard": false,
+  "notes": "reservoir, glaciated peak"
+ },
+ {
+  "idx": 72,
+  "title": "File:Andiast-Breil-Brigels. 24-09-2025. (d.j.b.) 08.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "clouds on distant peaks, forest foreground"
+ },
+ {
+  "idx": 98,
+  "title": "File:Weissmies and Dom (48454621336).jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "rock"
+  ],
+  "hard": false,
+  "notes": "distant Valais 4000ers over valley"
+ },
+ {
+  "idx": 120,
+  "title": "File:Lake Switzerland.jpg",
+  "season": "winter",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "ice"
+  ],
+  "hard": true,
+  "notes": "half-frozen lake, reflection"
+ },
+ {
+  "idx": 172,
+  "title": "File:Aussicht vom Kulm - panoramio.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [],
+  "hard": false,
+  "notes": "tele wintry range"
+ },
+ {
+  "idx": 95,
+  "title": "File:Lago Bianco Piz Lagalb1.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "rock"
+  ],
+  "hard": false,
+  "notes": "lake and glaciers, cloud on peaks"
+ },
+ {
+  "idx": 242,
+  "title": "File:Bürgenstock Gipfel im Nebelmeer – Jura-Panorama im Hintergrund.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [],
+  "hard": true,
+  "notes": "tele summit in sea of fog, thin far Jura line"
+ },
+ {
+  "idx": 271,
+  "title": "File:Hockenhorngrat (26010354103).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "snowy crest, deep blue sky"
+ },
+ {
+  "idx": 56,
+  "title": "File:Sunset over the Chasseral Nature Park, Switzerland.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "rock",
+   "grass"
+  ],
+  "hard": true,
+  "notes": "dusk, fog in valley, low-relief Jura"
+ },
+ {
+  "idx": 21,
+  "title": "File:Wyssi Fra.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow"
+  ],
+  "hard": false,
+  "notes": "tele portrait icy summit"
+ },
+ {
+  "idx": 202,
+  "title": "File:Cuolm da Vi und Medel.jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "snow",
+   "pole"
+  ],
+  "hard": true,
+  "notes": "clouds and fog on snowy range"
+ },
+ {
+  "idx": 191,
+  "title": "File:2013-06-16-RochersDeNaye.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "rock",
+   "water"
+  ],
+  "hard": false,
+  "notes": "elevated over lake, far range"
+ },
+ {
+  "idx": 12,
+  "title": "File:Schweizer Nationalpark Margunet 2328m.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "grass"
+  ],
+  "hard": false,
+  "notes": "national park ridges, overcast"
+ },
+ {
+  "idx": 169,
+  "title": "File:Lavaux+Léman 1.jpeg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "water"
+  ],
+  "hard": true,
+  "notes": "heavy haze over lake"
+ },
+ {
+  "idx": 25,
+  "title": "File:Piz Materdell and Piz Fedoz as seen from Piz Barscheinz.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "tele rocky peaks"
+ },
+ {
+  "idx": 135,
+  "title": "File:Finsteraarhorn1.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [
+   "rock"
+  ],
+  "hard": false,
+  "notes": "tele clouds around high peaks"
+ },
+ {
+  "idx": 211,
+  "title": "File:Matterhorn and its reflection in the Leisee October 2020.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "people"
+  ],
+  "hard": true,
+  "notes": "Matterhorn reflection, people"
+ },
+ {
+  "idx": 264,
+  "title": "File:Lake Maggiore 1.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "ultrawide lake view"
+ },
+ {
+  "idx": 209,
+  "title": "File:Fanellhorn.JPG",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow",
+   "water"
+  ],
+  "hard": false,
+  "notes": "fresh snow, lake"
+ },
+ {
+  "idx": 143,
+  "title": "File:Lago del Sambuco von oben - panoramio.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "heavy haze valley"
+ },
+ {
+  "idx": 231,
+  "title": "File:Schöner Skitag.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "snow",
+   "pylon"
+  ],
+  "hard": true,
+  "notes": "sea of fog, lift pylon"
+ },
+ {
+  "idx": 245,
+  "title": "File:Täschhorn - Dom - Lenzspitze.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "ice"
+  ],
+  "hard": false,
+  "notes": "tele glaciers, cloud at right"
+ },
+ {
+  "idx": 47,
+  "title": "File:Lago Ceresio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "grass",
+   "water"
+  ],
+  "hard": true,
+  "notes": "hazy elevated lake view"
+ },
+ {
+  "idx": 156,
+  "title": "File:Vierwaldstättersee3.JPG",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "structure",
+   "snow"
+  ],
+  "hard": true,
+  "notes": "sun in frame, portrait, snowy rocks"
+ },
+ {
+  "idx": 107,
+  "title": "File:Lugano lake - panoramio.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "boat",
+   "water"
+  ],
+  "hard": false,
+  "notes": "tele marina, forested ridge"
+ },
+ {
+  "idx": 190,
+  "title": "File:A way to the summit.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "grass",
+   "track"
+  ],
+  "hard": false,
+  "notes": "track and far range"
+ },
+ {
+  "idx": 109,
+  "title": "File:Les Diablerets (13149248294).jpg",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "spruces foreground, clouds on range"
+ },
+ {
+  "idx": 4,
+  "title": "File:Garichti lake and Glärnisch (51097017838).jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "trees",
+   "wall"
+  ],
+  "hard": true,
+  "notes": "reservoir dam wall, mirror reflection of Glärnisch"
+ },
+ {
+  "idx": 214,
+  "title": "File:Lake Lucern - panoramio.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "water",
+   "trees"
+  ],
+  "hard": false,
+  "notes": "tele fjord-like lake"
+ },
+ {
+  "idx": 9,
+  "title": "File:Lac Léman entre Glion et Caux.JPG",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "water",
+   "trees"
+  ],
+  "hard": true,
+  "notes": "backlit Lake Geneva, faint far skyline"
+ },
+ {
+  "idx": 201,
+  "title": "File:View from Tannenheim - panoramio.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [],
+  "hard": false,
+  "notes": "alpenglow limestone peaks"
+ },
+ {
+  "idx": 73,
+  "title": "File:Engelberg 2022.JPG",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "buildings"
+  ],
+  "hard": false,
+  "notes": "village below, cumulus on peak"
+ },
+ {
+  "idx": 265,
+  "title": "File:The nice village La Forclaz 1731m from Ferpecle, with Les Diablerets and the Oldenhorn 3254m in the background (berner oberland) - panoramio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": true,
+  "notes": "tele haze"
+ },
+ {
+  "idx": 213,
+  "title": "File:Hasliberg (49604455792).jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "buildings",
+   "pylon",
+   "snow"
+  ],
+  "hard": false,
+  "notes": "hut and pylon foreground"
+ },
+ {
+  "idx": 177,
+  "title": "File:Lake Geneva view from the Tour de Gourze at sunset.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "grass",
+   "trees"
+  ],
+  "hard": true,
+  "notes": "low sun, haze"
+ },
+ {
+  "idx": 10,
+  "title": "File:Altmann from Lisengrat.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "rock"
+  ],
+  "hard": false,
+  "notes": "Altmann, cumulus on crest, rock at right edge"
+ },
+ {
+  "idx": 175,
+  "title": "File:6986 Miglieglia, Switzerland - panoramio.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [],
+  "hard": true,
+  "notes": "hazy layered hills"
+ },
+ {
+  "idx": 226,
+  "title": "File:Schneeberge.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow",
+   "trees"
+  ],
+  "hard": false,
+  "notes": "snowy cirque"
+ },
+ {
+  "idx": 121,
+  "title": "File:Dents du midi2.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "Dents du Midi, dark forest foreground"
+ },
+ {
+  "idx": 290,
+  "title": "File:Plateau d'Emparis.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "grass"
+  ],
+  "hard": false,
+  "notes": "Plateau d'Emparis, glaciated range"
+ },
+ {
+  "idx": 371,
+  "title": "File:Teide -Aussicht -view aus 3557m - panoramio.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "snow"
+  ],
+  "hard": true,
+  "notes": "looking down from Teide, far caldera rim"
+ },
+ {
+  "idx": 294,
+  "title": "File:View from Laghi Cime Bianche 2812 m to Plateau Rosa Testa Grigia 3480 m - panoramio.jpg",
+  "season": "winter",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "snow",
+   "wires"
+  ],
+  "hard": false,
+  "notes": "ski area, cables"
+ },
+ {
+  "idx": 342,
+  "title": "File:Tatres (agost 2012) - panoramio (1).jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "rock"
+  ],
+  "hard": true,
+  "notes": "Tatra, clouds on crest"
+ },
+ {
+  "idx": 308,
+  "title": "File:Would You Believe Late Spring in Glacier National Park? (27694707566).jpg",
+  "season": "winter",
+  "weather": "cloudy",
+  "skyline": "far",
+  "foreground": [
+   "snow",
+   "people"
+  ],
+  "hard": true,
+  "notes": "people in snow, flat light"
+ },
+ {
+  "idx": 341,
+  "title": "File:Výhľad na Lomnický štít zo Starého Smokovca, TANAP P35.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "tele Lomnický štít"
+ },
+ {
+  "idx": 293,
+  "title": "File:Zillertal Alps - View from Seceda.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [],
+  "hard": false,
+  "notes": "tele Zillertal Alps from Seceda"
+ },
+ {
+  "idx": 359,
+  "title": "File:View from Glacier Point.jpg",
+  "season": "summer",
+  "weather": "cloudy",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "Half Dome from Glacier Point"
+ },
+ {
+  "idx": 298,
+  "title": "File:03 Blick zum Talschluss (28862189993).jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "spruce framing"
+ },
+ {
+  "idx": 291,
+  "title": "File:Morning meditation, Plateau d'Emparis.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [
+   "water",
+   "person"
+  ],
+  "hard": true,
+  "notes": "reflection with person"
+ },
+ {
+  "idx": 348,
+  "title": "File:Parque nacional de Ordesa y Monte Perdido, Huesca, España, 2015-01-07, DD 01.JPG",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "far",
+  "foreground": [
+   "trees"
+  ],
+  "hard": false,
+  "notes": "Ordesa cliffs"
+ },
+ {
+  "idx": 311,
+  "title": "File:Monte Perdido, Ordesa.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "trees",
+   "water"
+  ],
+  "hard": false,
+  "notes": "Monte Perdido, portrait"
+ },
+ {
+  "idx": 314,
+  "title": "File:Triglav from the summit of Jalovec.jpg",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "skyline": "far",
+  "foreground": [
+   "rock"
+  ],
+  "hard": true,
+  "notes": "Triglav above sea of clouds, sun rays"
+ },
+ {
+  "idx": 355,
+  "title": "File:Frotaleza from Montana Blanca.jpg",
+  "season": "summer",
+  "weather": "clear",
+  "skyline": "near",
+  "foreground": [
+   "rock"
+  ],
+  "hard": false,
+  "notes": "Tenerife caldera rim"
+ }
+]

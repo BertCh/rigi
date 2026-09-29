@@ -1,0 +1,338 @@
+{
+ "version": "matcher-service/0.3.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16 on MPS + lightglue on CPU; basin-gap LOW trigger for untrusted positions; bounded queue, client-cancel)",
+ "eta": {
+  "totalS": 58.6,
+  "samples": [
+   {
+    "t": 1.0,
+    "stage": "render:render",
+    "etaS": 62.5,
+    "actualLeftS": 57.6
+   },
+   {
+    "t": 2.0,
+    "stage": "render:render",
+    "etaS": 61.5,
+    "actualLeftS": 56.6
+   },
+   {
+    "t": 3.0,
+    "stage": "render:render",
+    "etaS": 60.5,
+    "actualLeftS": 55.6
+   },
+   {
+    "t": 4.0,
+    "stage": "render:render",
+    "etaS": 59.5,
+    "actualLeftS": 54.6
+   },
+   {
+    "t": 5.0,
+    "stage": "render:render",
+    "etaS": 58.5,
+    "actualLeftS": 53.6
+   },
+   {
+    "t": 6.0,
+    "stage": "render:render",
+    "etaS": 57.5,
+    "actualLeftS": 52.6
+   },
+   {
+    "t": 7.0,
+    "stage": "render:render",
+    "etaS": 56.5,
+    "actualLeftS": 51.6
+   },
+   {
+    "t": 8.1,
+    "stage": "render:render",
+    "etaS": 55.5,
+    "actualLeftS": 50.5
+   },
+   {
+    "t": 9.1,
+    "stage": "render:render",
+    "etaS": 54.5,
+    "actualLeftS": 49.5
+   },
+   {
+    "t": 10.1,
+    "stage": "render:render",
+    "etaS": 53.5,
+    "actualLeftS": 48.5
+   },
+   {
+    "t": 11.1,
+    "stage": "render:render",
+    "etaS": 52.5,
+    "actualLeftS": 47.5
+   },
+   {
+    "t": 12.1,
+    "stage": "render:render",
+    "etaS": 51.5,
+    "actualLeftS": 46.5
+   },
+   {
+    "t": 13.1,
+    "stage": "render:render",
+    "etaS": 50.5,
+    "actualLeftS": 45.5
+   },
+   {
+    "t": 14.1,
+    "stage": "render:render",
+    "etaS": 49.4,
+    "actualLeftS": 44.5
+   },
+   {
+    "t": 15.4,
+    "stage": "match",
+    "etaS": 37.9,
+    "actualLeftS": 43.2
+   },
+   {
+    "t": 16.9,
+    "stage": "match",
+    "etaS": 36.6,
+    "actualLeftS": 41.7
+   },
+   {
+    "t": 17.9,
+    "stage": "match",
+    "etaS": 35.1,
+    "actualLeftS": 40.7
+   },
+   {
+    "t": 19.2,
+    "stage": "match",
+    "etaS": 34.1,
+    "actualLeftS": 39.4
+   },
+   {
+    "t": 20.3,
+    "stage": "match",
+    "etaS": 32.8,
+    "actualLeftS": 38.3
+   },
+   {
+    "t": 21.3,
+    "stage": "match",
+    "etaS": 31.8,
+    "actualLeftS": 37.3
+   },
+   {
+    "t": 22.3,
+    "stage": "match",
+    "etaS": 39.2,
+    "actualLeftS": 36.3
+   },
+   {
+    "t": 23.3,
+    "stage": "match",
+    "etaS": 40.3,
+    "actualLeftS": 35.3
+   },
+   {
+    "t": 24.3,
+    "stage": "match",
+    "etaS": 41.3,
+    "actualLeftS": 34.3
+   },
+   {
+    "t": 25.3,
+    "stage": "match",
+    "etaS": 42.3,
+    "actualLeftS": 33.3
+   },
+   {
+    "t": 26.7,
+    "stage": "match",
+    "etaS": 43.5,
+    "actualLeftS": 31.9
+   },
+   {
+    "t": 27.7,
+    "stage": "match",
+    "etaS": 44.7,
+    "actualLeftS": 30.9
+   },
+   {
+    "t": 28.7,
+    "stage": "match",
+    "etaS": 45.7,
+    "actualLeftS": 29.9
+   },
+   {
+    "t": 29.7,
+    "stage": "match",
+    "etaS": 46.7,
+    "actualLeftS": 28.9
+   },
+   {
+    "t": 30.8,
+    "stage": "match",
+    "etaS": 47.7,
+    "actualLeftS": 27.8
+   },
+   {
+    "t": 31.8,
+    "stage": "match",
+    "etaS": 48.7,
+    "actualLeftS": 26.8
+   },
+   {
+    "t": 32.8,
+    "stage": "render:render",
+    "etaS": 30.4,
+    "actualLeftS": 25.8
+   },
+   {
+    "t": 33.8,
+    "stage": "render:render",
+    "etaS": 29.4,
+    "actualLeftS": 24.8
+   },
+   {
+    "t": 34.8,
+    "stage": "render:render",
+    "etaS": 28.3,
+    "actualLeftS": 23.8
+   },
+   {
+    "t": 35.8,
+    "stage": "match",
+    "etaS": 17.7,
+    "actualLeftS": 22.8
+   },
+   {
+    "t": 36.8,
+    "stage": "match",
+    "etaS": 16.7,
+    "actualLeftS": 21.8
+   },
+   {
+    "t": 37.8,
+    "stage": "match",
+    "etaS": 15.7,
+    "actualLeftS": 20.8
+   },
+   {
+    "t": 38.8,
+    "stage": "match",
+    "etaS": 14.7,
+    "actualLeftS": 19.8
+   },
+   {
+    "t": 39.8,
+    "stage": "match",
+    "etaS": 13.6,
+    "actualLeftS": 18.8
+   },
+   {
+    "t": 40.9,
+    "stage": "match",
+    "etaS": 12.6,
+    "actualLeftS": 17.7
+   },
+   {
+    "t": 41.9,
+    "stage": "match",
+    "etaS": 19.4,
+    "actualLeftS": 16.7
+   },
+   {
+    "t": 42.9,
+    "stage": "fusion",
+    "etaS": 11.9,
+    "actualLeftS": 15.7
+   },
+   {
+    "t": 43.9,
+    "stage": "fusion",
+    "etaS": 10.9,
+    "actualLeftS": 14.7
+   },
+   {
+    "t": 44.9,
+    "stage": "fusion",
+    "etaS": 9.9,
+    "actualLeftS": 13.7
+   },
+   {
+    "t": 45.9,
+    "stage": "fusion",
+    "etaS": 12.1,
+    "actualLeftS": 12.7
+   },
+   {
+    "t": 46.9,
+    "stage": "basinGap",
+    "etaS": 8.4,
+    "actualLeftS": 11.7
+   },
+   {
+    "t": 47.9,
+    "stage": "basinGap",
+    "etaS": 7.4,
+    "actualLeftS": 10.7
+   },
+   {
+    "t": 49.1,
+    "stage": "basinGap",
+    "etaS": 6.4,
+    "actualLeftS": 9.5
+   },
+   {
+    "t": 50.1,
+    "stage": "basinGap",
+    "etaS": 5.3,
+    "actualLeftS": 8.5
+   },
+   {
+    "t": 51.1,
+    "stage": "basinGap",
+    "etaS": 4.3,
+    "actualLeftS": 7.5
+   },
+   {
+    "t": 52.1,
+    "stage": "basinGap",
+    "etaS": 3.3,
+    "actualLeftS": 6.5
+   },
+   {
+    "t": 53.1,
+    "stage": "basinGap",
+    "etaS": 2.3,
+    "actualLeftS": 5.5
+   },
+   {
+    "t": 54.1,
+    "stage": "basinGap",
+    "etaS": 1.2,
+    "actualLeftS": 4.5
+   },
+   {
+    "t": 55.1,
+    "stage": "basinGap",
+    "etaS": 9.8,
+    "actualLeftS": 3.5
+   },
+   {
+    "t": 56.2,
+    "stage": "basinGap",
+    "etaS": 10.8,
+    "actualLeftS": 2.4
+   }
+  ],
+  "underestimates>10s": 0,
+  "medianAbsErrS": 5.0
+ },
+ "basinGapCancel": {
+  "stageSeenAtS": 67.7,
+  "freedAfterS": 0.68
+ }
+}

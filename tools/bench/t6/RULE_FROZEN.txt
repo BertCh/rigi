@@ -1,0 +1,23 @@
+# ==== RULE BEGIN ====
+# Definitions, per verified candidate c (its stage-2 fused result, the service's own code path):
+#   apriori(c)   = fusion.md a-priori HIGH: cueAgreeDeg < 1 ∧ skylineMedPx < 4 ∧ matchSupport ≥ 0.3
+#   matchdom(c)  = "match-dominant": matchSupport ≥ 0.70 ∧ inliers ≥ 1000 (lifted matches within 6 px of the
+#                  fused pose, 1024-px grid) ∧ fused pose within 0.3° (|Δyaw| + |Δpitch|) of the match-only pose
+#   strong(c)    = matchSupport ≥ 0.5 ∧ inliers ≥ 300   (a competing basin with real match evidence)
+#   gapOK(c)     = EXIF-GPS position, or basin gap ≥ 0.20 (pose6 grid on the stage-2 cue + matches; the v0.3.4
+#                  service trigger, MATCHER_BASIN_GAP_MIN)
+#   high(c)      = (apriori(c) ∨ matchdom(c)) ∧ gapOK(c)
+# Selection:
+#   1. if some candidate is high: among the high ones take the largest matchSupport·inliers;
+#   2. else: the candidate with the largest matchSupport·inliers among strong ones;
+#   3. else: the service's own stage-1 choice (the baseline candidate: sweep40 if ≥ 30 inliers, else the
+#      app-skyline seed; narrow_stage1 for hfov < 25°).
+# Confidence of the selected candidate s:
+#   HIGH iff high(s) ∧ no ambiguity, where ambiguity = another verified candidate q with strong(q) whose fused
+#   pose is > 2° (|Δyaw| + |Δpitch|) from s's fused pose.  Otherwise LOW.
+AGREE_DEG, SKY_PX, SUPPORT = 1.0, 4.0, 0.3
+MD_SUPPORT, MD_INLIERS, MD_MATCH_DEG = 0.70, 1000, 0.3
+STRONG_SUPPORT, STRONG_INLIERS = 0.5, 300
+GAP_MIN = 0.20
+AMBIG_DEG = 2.0
+# ==== RULE END ====

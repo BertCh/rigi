@@ -1,0 +1,36 @@
+{
+ "wc_0086": [
+  {
+   "verdict": "wrong",
+   "note": "round 2: vc correct (borderline C2), vd wrong near-miss (1.75% high at right edge); round 1 unsure (header occlusion). Rule: either wrong -> wrong",
+   "pose": {
+    "yaw": 70.53483168126394,
+    "pitch": -15.687977322727106,
+    "roll": -2.0641190621650627,
+    "vfov": 40.016849012734944
+   },
+   "eye": {
+    "lat": 45.976924,
+    "lon": 8.947314520725717,
+    "h": 914.8519687044586
+   }
+  }
+ ],
+ "wc_0074": [
+  {
+   "verdict": "correct",
+   "note": "round 1: va correct, vb correct (suggestion, LOW)",
+   "pose": {
+    "yaw": 261.14882361320866,
+    "pitch": -10.801447075597233,
+    "roll": -1.0423439488309612,
+    "vfov": 38.95329732186297
+   },
+   "eye": {
+    "lat": 47.145832,
+    "lon": 9.211331896848089,
+    "h": 2040.6468875194735
+   }
+  }
+ ]
+}
