@@ -1,0 +1,110 @@
+STEP INSIDE P2 EXPLORATION: POSE PROPAGATION WITHIN A VIEWPOINT                          2026-09-28
+=====================================================================================================
+Question: can one photo with an accepted pose (anchor A) give a usable pose for a neighbour B taken at
+the same viewpoint, via a relative rotation?  R_B = relR . R_A  (R = world(ENU) -> OpenCV camera,
+[right; -up; forward], tools/research/tm/cache/FORMAT.md; relR maps A-camera to B-camera coordinates).
+
+Short answer: YES as a SEED/SUGGESTION when the two photos overlap, using classical matching
+(ALIKED+LightGlue, CPU) and a pure-rotation RANSAC. DA3 /multiview is NOT usable for this: it is less
+accurate, and it has no confidence signal. Evidence is thin: n = 6 real overlapping ordered pairs,
+from 1 viewpoint and 3 photos, all "approx" GT. Everything else is synthetic.
+
+Files
+  run_propagate.py   estimators + data (real viewpoint pairs, synthetic pure-rotation pairs, different-place negatives)
+  analyze.py         raw.json -> results.json (distributions, gate sweep, chosen gate per set)
+  results.json       all numbers + per-pair rows;  raw.json = full estimator outputs;  cache/ = per-pair cache
+  propagate.check.ts TS parity with Python (npx tsx tools/nearfield/propagate/propagate.check.ts -> OK)
+  wild_dev_case.json one unverified dev-split suggestion (wc_0054 -> wc_0086), see "Recall"
+  src/lib/nearfield/propagate.ts  proposePose(anchorPose, relR, targetVfov, aspects, evidence) + PROPAGATE_GATE
+
+Data (dev only; data_v3 and the test split never touched)
+  real   GT viewpoint on Niederhorn: IMG_7053, 7059, 7063, 7068, 7086 (7-208 m apart). All 20 ordered
+         pairs. Only 7059/7063/7068 actually overlap (6 ordered pairs; GT overlap 0.30-0.93). The other
+         14 pairs point 96-159 deg apart, so they are natural negatives. The anchor uses GT
+         yaw/pitch/roll/f. The target uses only its EXIF vfov (photos.json), as the app would.
+         GT quality: 7053/7086 'good', 7059/7063/7068 'approx' (notes: ~0.3-1 deg each; 7059 rms 18 px).
+  synth  120 pairs. Two virtual cameras are warped out of ONE real photo by a known pure rotation
+         (source photos: GT-12 photos except the viewpoint, and wild DEV photos with a focal). Each
+         pair has a random yaw offset of 0-1.4x hfov, pitch up to 6 deg, roll up to 8 deg, a zoom
+         ratio of 0.8-1.25, and a photometric/JPEG/blur change on B. relR is exact.
+         111 pairs overlap, 9 don't. There is no parallax and no time change, so this is an UPPER BOUND.
+  neg    60 pairs of different wild DEV photos (different places). Any propagation is wrong.
+
+Estimators
+  rot   ALIKED (2048 kp) + LightGlue on CPU, 2-point RANSAC on bearing vectors (4 px), Kabsch refinement.
+  ess   Same matches, cv2.findEssentialMat + recoverPose.
+  da3   POST /multiview (DA3-Base, processRes 504) on [A, B]; relR = c2w[1][:3,:3]^T. The median time
+        per pair was 0.31 s warm on MPS, plus the model load.
+
+Results (geodesic error of the predicted target rotation, deg; results.json "summary")
+                          n     rot median / p90 / max     ess median / p90        da3 median / p90 / max
+  real overlapping        6     2.23 / 3.59 / 3.68         2.21 / 4.86 (max 5.3)   3.65 / 7.76 / 9.01
+  real non-overlapping   14     116 (inliers <= 7)         95                      43 / 128 (one lucky 5.4)
+  synth overlapping     111     0.016 / 0.048 / 37.4 (*)   0.35 / 179.9 (**)       4.63 / 14.8 / 46.9
+  synth non-overlapping   9     31 (inliers <= 6)          38                      13.7 / 19.3
+  neg different place    60     (all wrong; inliers median 2, max 11)
+  (*)  One failure: 6 inliers at overlap 0.02, rejected by the gate.
+  (**) An essential matrix is degenerate for pure rotation. It is unusable in exactly the case that
+       matters (same viewpoint).
+  The real per-axis errors of rot were yaw -3.2..+3.6, pitch -0.0..+0.5, roll -1.4..+1.7 deg.
+
+Why real errors are ~2 deg when synthetic ones are ~0.02 deg (not resolved; n = 6):
+  - Focal is not the cause. Swapping in GT intrinsics for EXIF, or self-calibrating the target focal
+    (scale 0.85-1.15), leaves the errors at 1.4-3.6 deg.
+  - The rot estimates agree with each other. Cycle closure over 7059/7063/7068 is 0.63 / 0.99 deg,
+    and forward/backward disagreement is 0.02-0.61 deg. So the estimates are self-consistent and
+    differ from GT by a nearly systematic ~2 deg.
+  - Two explanations remain. One is the 'approx' GT: two poses each ~0.5-1 deg off, and 7059's pin is
+    ambiguous. The other is parallax from near foreground, since the cameras are 7-74 m apart. The
+    7063<->7068 pair (73 m apart) has the smallest error (1.5-1.8), which argues against parallax
+    dominating. A DEM render check at the propagated pose would separate the two. It was not done here.
+
+Confidence gate (src/lib/nearfield/propagate.ts PROPAGATE_GATE; results.json gateChosen/gateSweepAll)
+  PASS if method = rot, inliers >= 40, inlier RMS <= 3.5 px (1024 px), predicted overlap >= 0.1, and,
+  when supplied: fwd/bwd <= 1.5 deg, triplet cycle <= 1.5 deg, |pitch - gravity| <= 3 and
+  |roll - gravity| <= 3 deg, baseline <= 250 m.
+  Chosen gate, by set:
+    real overlapping 6/6 pass, all within 3.7 deg | real non-overlapping 0/14 | synth 104/111, all
+    <= 0.13 deg (the misses have 8-30 inliers at overlap <= 0.08) | synth non-overlapping 0/9 |
+    negatives 0/60. The TS check reproduces 6/6 and 0/14 on the real pairs.
+  Separation is wide. The best wrong pair had 11 inliers; any threshold from 15 to 100 gives zero
+  false passes on all 200 pairs (the sweep's only false pass is at 10 inliers with no fwd/bwd check).
+  Inliers are the signal that works. Forward/backward consistency is weak: with the same matcher, B->A
+  is almost the exact inverse of A->B even when both are wrong (0.0 deg on the wrong synthetic pairs).
+  Gravity agrees on real pairs within 2.2 deg pitch and 1.8 deg roll (7068's own GT is 2.2 deg off its
+  gravity pitch).
+  DA3 has no usable confidence. The wire carries none. Its error correlates with its disagreement
+  with rot (Spearman 0.998 on synthetic pairs), but only because rot is nearly exact there, so "agrees
+  with rot" means "use rot". When rot fails (no overlap), DA3 is also wrong (median 43 deg on real
+  non-overlapping pairs). DA3 adds no recall and is excluded by the gate (methods: ["rot"]).
+
+Recall (what this could buy; nothing here is claimed as a verified gain)
+  - GT-12: the only overlapping cluster is 7059/7063/7068. With any one of them accepted, the other two
+    get a suggestion within ~2-4 deg of GT, a useful seed for the DEM cascade/matcher (7063 is
+    currently a CPU-cascade reject after the FF35 change; memory: project-accuracy-state).
+  - Wild dev: wc_0054 (blind-verified correct) and wc_0086 (no correct pose from any method; all
+    three v2 candidates were verified wrong) are 58 m apart and do overlap (I looked at both photos:
+    same lake arm, different season). rot: 80 inliers, 2.19 px RMS, fwd/bwd 0.06 deg, predicted
+    overlap 0.41, so it PASSES the gate. The suggestion for wc_0086 is yaw 71.2, pitch -15.7, roll
+    -2.8 (EXIF vfov 39.6). It is UNVERIFIED. I did not render or judge an overlay: self-checking is
+    the known trap, and it needs a blind verifier. If it verifies, it is one wild recall item that
+    every current method misses.
+  - Co-location is rare in the Commons benchmark: 1 dev pair within 1 km. The win is for camera rolls
+    (the user's own photos, where viewpoints of 3-10 photos are common; roll.ts groups them within
+    250 m), not for single uploads.
+
+Limits / honest caveats
+  - Real evidence is 6 ordered pairs (3 unordered) from one place and one afternoon. Synthetic pairs
+    have no parallax, no lens distortion and no scene change, so they only show the machinery and the
+    negative gate.
+  - The anchor's own error (accepted poses ~0.1-0.5 deg) adds directly to the target's error.
+  - Parallax: untested beyond 74 m between overlapping cameras, and with near foreground it can
+    exceed the error seen here. The gate caps the baseline at 250 m, but that cap is a guess.
+  - Moving content (clouds, people) was not stress-tested. The negatives were static landscapes.
+  - SUGGESTION ONLY. proposePose returns kind "suggestion" and never an accept. Using it for an accept
+    needs the prereg in PREREG_DRAFT.txt and blind verification under the frozen product rule.
+
+Reproduce (service on 127.0.0.1:8767 must be up for DA3; per-pair results are cached in cache/)
+  tools/matcher/.venv/bin/python tools/nearfield/propagate/run_propagate.py --only all --synth 120 --neg 60
+  tools/matcher/.venv/bin/python tools/nearfield/propagate/analyze.py
+  npx tsx tools/nearfield/propagate/propagate.check.ts

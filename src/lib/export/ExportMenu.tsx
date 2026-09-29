@@ -15,6 +15,7 @@ import {
 	Image as ImageIcon,
 	LoaderCircle,
 	MapPinned,
+	Sparkles,
 } from "lucide-react";
 import {
 	type ComponentType,
@@ -34,6 +35,12 @@ import {
 	engineReady,
 	exportFromEngine,
 } from "./engine-export";
+import {
+	engineNearFieldScene,
+	exportSplatsFromEngine,
+	SPLAT_EXPORT_FORMATS,
+	type SplatExportKind,
+} from "./splat";
 
 export type EngineSource =
 	| PhotoEngine
@@ -58,7 +65,8 @@ export type ExportMenuProps = EngineExportOptions & {
 	align?: "left" | "right";
 	/** Called after each export (tests, toasts). */
 	onExported?: (e: {
-		kind: ExportKind;
+		/** Splat kinds appear only when the renderer has a Step Inside near-field scene. */
+		kind: ExportKind | SplatExportKind;
 		filename: string;
 		bytes: number;
 		notes: string[];
@@ -91,7 +99,9 @@ export function ExportMenu({
 	...opts
 }: ExportMenuProps) {
 	const [open, setOpen] = useState(false);
-	const [busy, setBusy] = useState<ExportKind | null>(null);
+	const [busy, setBusy] = useState<ExportKind | SplatExportKind | null>(null);
+	// Step Inside: splat exports are listed only while the renderer has a near-field scene
+	const [hasSplats, setHasSplats] = useState(false);
 	const [msg, setMsg] = useState<{ text: string; error?: boolean } | null>(
 		null,
 	);
@@ -118,10 +128,11 @@ export function ExportMenu({
 	// whether the pose is final comes from the host via `disabled`, which gates items directly.
 	useEffect(() => {
 		if (!open || ready) return;
-		const t = setInterval(
-			() => engineReady(resolve(engine)) && setReady(true),
-			250,
-		);
+		const t = setInterval(() => {
+			const eng = resolve(engine);
+			setHasSplats(!!engineNearFieldScene(eng));
+			if (engineReady(eng)) setReady(true);
+		}, 250);
 		return () => clearInterval(t);
 	}, [open, ready, engine]);
 	const canExport = ready && !disabled;
@@ -133,9 +144,40 @@ export function ExportMenu({
 		setOpen(next);
 		if (next) {
 			setReady(engineReady(resolve(engine)));
+			setHasSplats(!!engineNearFieldScene(resolve(engine)));
 			setMsg(null);
 		}
 	};
+
+	const runSplats = useCallback(
+		(kind: SplatExportKind) => {
+			const eng = resolve(engine);
+			if (disabledRef.current || !engineReady(eng)) {
+				setMsg({
+					text: "Still loading or aligning: the pose is not final yet",
+					error: true,
+				});
+				return;
+			}
+			setMsg(null);
+			try {
+				const r = exportSplatsFromEngine(eng, kind, {
+					geoidUndulation: opts.geoidUndulation,
+				});
+				downloadBlob(r.blob, r.filename);
+				setMsg({ text: [`Saved ${r.filename}`, ...r.notes].join(" · ") });
+				onExported?.({
+					kind,
+					filename: r.filename,
+					bytes: r.blob.size,
+					notes: r.notes,
+				});
+			} catch (e) {
+				setMsg({ text: `Export failed: ${(e as Error).message}`, error: true });
+			}
+		},
+		[engine, onExported, opts.geoidUndulation],
+	);
 
 	const run = useCallback(
 		async (kind: ExportKind) => {
@@ -242,6 +284,31 @@ export function ExportMenu({
 							</button>
 						);
 					})}
+					{hasSplats &&
+						SPLAT_EXPORT_FORMATS.map((f) => (
+							<button
+								key={f.kind}
+								type="button"
+								role="menuitem"
+								data-export-kind={f.kind}
+								disabled={!canExport || !!busy}
+								onClick={() => runSplats(f.kind)}
+								className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-white/8 disabled:opacity-40 disabled:hover:bg-transparent"
+							>
+								<Sparkles className="size-4 shrink-0 text-white/55" />
+								<span className="min-w-0 flex-1">
+									<span className="block text-xs font-medium text-white/90">
+										{f.label}
+									</span>
+									<span className="block truncate text-[10px] text-white/40">
+										{f.hint}
+									</span>
+								</span>
+								<span className="font-mono text-[10px] text-white/30">
+									{f.ext.split(".").pop()}
+								</span>
+							</button>
+						))}
 					{msg && (
 						<p
 							data-export-status={msg.error ? "error" : "ok"}

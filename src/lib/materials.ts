@@ -129,6 +129,11 @@ export function makeSharedUniforms(): Record<string, THREE.IUniform> {
 		uPhotoTint: { value: 0 },
 		uPhotoFg: { value: null },
 		uPhotoFgOn: { value: 0 },
+		// Step Inside "Truth" toggle (world / step view only): tint by provenance, observed drape vs DEM.
+		// 0 = off: the classic shader path, unchanged
+		uTruth: { value: 0 },
+		uTruthObs: { value: new THREE.Vector3(0, 158 / 255, 115 / 255) },
+		uTruthDem: { value: new THREE.Vector3(230 / 255, 159 / 255, 0) },
 		// ---- view style (src/lib/style, applied by style/three-apply.ts). Defaults = the classic look. ----
 		...rampUniforms("uReliefRamp", HYPSO_CLASSIC),
 		...rampUniforms("uLineRamp", COOL_CLASSIC),
@@ -247,6 +252,9 @@ uniform float uPhotoMinRange;
 uniform float uPhotoTint;
 uniform sampler2D uPhotoFg;
 uniform float uPhotoFgOn;
+uniform float uTruth;
+uniform vec3 uTruthObs;
+uniform vec3 uTruthDem;
 ${RAMP_GLSL}
 uniform vec3 uReliefRampC[RAMP_MAX];
 uniform float uReliefRampT[RAMP_MAX];
@@ -472,12 +480,31 @@ void main() {
           // grazing angles smear: weight by incidence to the photo ray
           vec3 ray = normalize(vWorld - uPhotoPos);
           float inc = clamp(-dot(ray, n) * 3.0, 0.0, 1.0);
-          float w = uProjectPhoto * mix(0.35, 1.0, inc);
+          // uProjectPhoto > 1.5: Step Inside (seen from the photo camera the drape is the photo itself)
+          float w = uProjectPhoto > 1.5 ? 1.0 : uProjectPhoto * mix(0.35, 1.0, inc);
           base = mix(base, pc, w);
           base = mix(base, base * uPhotoTintCol, uPhotoTint);
         }
       }
     }
+  }
+
+  // Step Inside "Truth" (uTruth > 0.5, world / step view only): surfaces tinted by provenance, the drape's
+  // photo pixels (the same visibility test as above) = observed, every other terrain fragment = dem.
+  // uTruth = uTruthMix (splats: three-splats.ts truth 0.65)
+  if (uTruth > 0.0) {
+    bool seenT = false;
+    vec4 clipT = uPhotoViewProj * vec4(vWorld, 1.0);
+    if (uProjectPhoto > 0.0 && clipT.w > 0.0) {
+      vec2 puvT = (clipT.xy / clipT.w) * 0.5 + 0.5;
+      if (all(greaterThan(puvT, vec2(0.0))) && all(lessThan(puvT, vec2(1.0)))) {
+        float rT = length(vWorld - uPhotoPos);
+        float seen = texture2D(uPhotoRange, puvT).a;
+        seenT = seen > 0.0 && rT < seen * 1.015 + 15.0 && rT > uPhotoMinRange;
+        if (uPhotoFgOn > 0.5 && texture2D(uPhotoFg, puvT).r > 0.5) seenT = false;
+      }
+    }
+    base = mix(base, toLinear(seenT ? uTruthObs : uTruthDem), uTruth);
   }
 
 #ifdef LOOK_ATMOSPHERE

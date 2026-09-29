@@ -1,0 +1,19 @@
+Blind verification of the pose-propagation suggestion for wc_0086 (wild DEV split; anchor wc_0054, blind-verified correct).
+Written 2026-09-28 BEFORE any overlay was rendered or any verdict collected. POST HOC, SINGLE CASE.
+
+Builder: tools/matcher/v2/verify/build_pack.ts, run read-only (not modified) with PACK_PAD=1, input cands.json, output here
+(pack/ = verifier images, key.json = hidden key). Mapterhorn overlay (tools/bench/harness/overlay.ts) at EXACTLY the eye the
+method used. The propagation is rotation-only (R_B = relR . R_A), i.e. it assumes B shares A's viewpoint, so the method's eye is
+the anchor wc_0054's accepted render eye: lat 45.977158, lon 8.947661, h 910.298 m (tools/research/tm/cache/wc_0054/meta.json).
+Neutral headers, random labels and widths.
+
+Candidates (wc_0086 unless noted), all at that eye:
+  propagated (yaw 71.20, pitch -15.72, roll -2.81, vfov 39.64 = wild_dev_case.json suggestion) and a duplicate of it;
+  decoys: yaw +8, yaw -7, wrong basin (yaw -45, looking at a different part of the lake);
+  positive control: wc_0054 verified ref A at the same eye.
+Verifiers: 3 fresh independent Claude instances (Agent tool unavailable in this subagent session; spawned as separate
+`claude -p` processes, each with its own scratch dir containing only copies of the pack images under neutral names plus the
+C1-C4 checklist). Near-miss = wrong; not-seen only for an unjudgeable skyline.
+Decision rule (same as matcher v2): propagated is CORRECT iff all verifiers who pass sanity call it correct (both copies);
+WRONG if any calls it wrong; otherwise UNSURE. Duplicate disagreement within a verifier -> that verifier is unsure. A verifier
+who fails the control or accepts any decoy is flagged and reported, and their verdict does not count.

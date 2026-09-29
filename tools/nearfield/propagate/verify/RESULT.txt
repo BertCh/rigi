@@ -1,0 +1,43 @@
+wc_0086 POSE-PROPAGATION SUGGESTION: BLIND VERIFICATION                                    2026-09-28
+POST HOC, SINGLE CASE (n = 1 target photo). Not a benchmark result or a recall claim.
+Protocol written before rendering: PROTOCOL.txt. Pack: pack/ (PACK_PAD=1, Mapterhorn, neutral headers). Key: key.json.
+Verifier prompt: raw/verifier_prompt.txt (+ explicit file list). Raw answers: raw/v1..v3.json. Keyed: verdicts_keyed.json.
+Score: python3 tools/nearfield/propagate/verify/score.py -> score.json.
+
+Eye: anchor wc_0054's accepted render eye (45.977158, 8.947661, 910.298 m), the eye the rotation-only method assumes.
+
+label  kind                         v1        v2        v3
+R6     propagated (71.20/-15.72/-2.81/39.64)  correct   correct   correct
+P2     propagated duplicate         correct   correct   correct
+E4     decoy yaw +8                 wrong nm  wrong nm  wrong
+E9     decoy yaw -7                 wrong nm  wrong nm  wrong
+D5     decoy wrong basin (yaw -45)  wrong     wrong     wrong
+T4     control wc_0054 ref A        correct   correct   correct
+(nm = near-miss tag)
+
+Agreement: 18/18 verdicts identical in class across the 3 verifiers; duplicates consistent in every verifier.
+Sanity: all 3 passed the positive control, 0/9 decoy judgements accepted.
+Decision (prereg rule): propagated pose for wc_0086 = CORRECT (3/3 sane verifiers).
+
+Caveats
+- Verifiers were 3 fresh `claude -p` processes (the Agent tool was not available to this subagent), each in its own
+  scratch dir with only the pack copies, Read-only tools. A first launch returned no verdicts (Read cannot list
+  folders; they saw only photo.jpg, no candidate); relaunched with explicit file lists. Same model family as the author.
+- v1 noted the line sits ~1-1.4 % of height above the real ridge at the ends, close to the C2 1.5 % limit.
+- Context: a near-identical pose (matcher v2 "moved", yaw 70.53 / pitch -15.69 / roll -2.06, eye ~40 m away) was
+  SPLIT in round 2 of tools/matcher/v2/verify (vc correct, vd near-miss wrong). This pose differs by ~0.7 deg yaw and
+  0.75 deg roll; the decoys here are 7-8 deg off, much coarser than the 4-5 deg decoys there, so they bound gross errors
+  only, not sub-degree ones.
+- Suggestion path only; any accept use still needs PREREG_DRAFT.txt + the frozen product rule. Dev split only.
+
+Independent review (2026-09-28, separate reviewer agent)
+- score.py re-run: reproduces score.json (3/3 sane, final correct). raw/v1..v3.json match the final JSON in each verifier's
+  own claude -p transcript; the verifiers' tool calls were Read-only and touched only their scratch copies (no key/cands access).
+- wc_0054 and wc_0086 are both in tools/bench/split.json "dev"; no test ids used.
+- Reviewer pixel check on candidate_R6 (photo band y 71..1090, h 1020): Legnone dot (668,118) vs photo pyramid ~(673,129);
+  Termine Quadro dot (1049,104) vs ridge ~116; right edge line ~84 vs ridge ~99. The line sits UNIFORMLY 11-15 px
+  (~1.1-1.5 % of height, ~0.5 deg pitch) above the real skyline across the frame: no tilt, no lateral shift, but at the C2 edge.
+  "Correct" is therefore borderline on C2, not comfortable; a stricter tolerance would flip it.
+- Design limitation (inherited from matcher v2 packs): the decoys are yaw offsets of the propagated pose and the propagated
+  pose appears twice, so the tested pose is inferable as the centre of its family. Verifiers still judge each candidate
+  against the photo, and the control passed, but the decoys only bound 7-8 deg errors.

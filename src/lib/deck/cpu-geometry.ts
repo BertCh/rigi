@@ -31,8 +31,14 @@ type Bin = {
 	max: Float32Array;
 };
 
+/** What the profiles read: an ENU frame origin + a DEM height lookup (TerrainSet, three's Terrain). */
+export type ProfileTerrain = {
+	readonly frame: Pick<TerrainSet["frame"], "lat" | "lon" | "h">;
+	heightAt(lat: number, lon: number): number | null;
+};
+
 export class TerrainProfiles {
-	readonly terrain: TerrainSet;
+	readonly terrain: ProfileTerrain;
 	readonly eyeZ: number;
 	/** Azimuth bin width (deg). */
 	readonly azStep: number;
@@ -41,7 +47,7 @@ export class TerrainProfiles {
 	private cosLat: number;
 
 	constructor(
-		terrain: TerrainSet,
+		terrain: ProfileTerrain,
 		eyeZ: number,
 		{ azStep = 0.1, maxRange = 120_000 } = {},
 	) {

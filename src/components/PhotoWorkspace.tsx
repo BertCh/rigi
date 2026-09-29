@@ -70,6 +70,8 @@ import { PRESET_OVERLAY_LAYER, useViewStyle } from "#/lib/style";
 import { cn } from "#/lib/utils";
 import { Button, Section, Segmented, Slider, Toggle } from "./controls";
 import { EyeSuggestion } from "./EyeSuggestion";
+import { StepInsidePanel } from "./nearfield/StepInsidePanel";
+import { useStepInside } from "./nearfield/useStepInside";
 import { LabelStylePanel, StylePanel, TrailStylePanel } from "./StylePanel";
 
 type Tool = "inspect" | "align" | "pin";
@@ -124,7 +126,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 	const [showPeaks, setShowPeaks] = useState(true);
 	const [tool, setTool] = useState<Tool>("inspect");
 	const [hover, setHover] = useState<
-		(Sample & { u: number; v: number }) | null
+		(Sample & { u: number; v: number; source?: "object" }) | null
 	>(null);
 	const [pins, setPins] = useState<Pin[]>([]);
 	const [pendingPeak, setPendingPeak] = useState<PeakLabel | null>(null);
@@ -564,6 +566,16 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		return () => ro.disconnect();
 	}, [aspect, settings.mode]);
 
+	// Step Inside (src/lib/nearfield): dormant and invisible unless the near-field service is running
+	const si = useStepInside({
+		engineRef,
+		ready: !status && !error,
+		photo,
+		pose,
+		alignState,
+		verify,
+	});
+
 	// ---------- pointer interaction ----------
 	const drag = useRef<{
 		x: number;
@@ -638,6 +650,21 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			if (pressed.current && settings.method === "swipe") update({ swipe: u });
 			if (pressed.current && settings.method === "brush")
 				eng.paint(u, v, 0.05, e.altKey);
+		}
+		// near-field objects (Step Inside scene of this pose): their own anchored position, not the terrain behind
+		const obj = eng.geometryReady() ? si.sampleAt(u, v) : null;
+		if (obj) {
+			setHover({
+				lat: obj.lat,
+				lon: obj.lon,
+				h: obj.elevation,
+				range: obj.range,
+				world: obj.enu,
+				u,
+				v,
+				source: "object",
+			});
+			return;
 		}
 		// a lagging geometry buffer (mid-drag) would report the previous pose's terrain under the cursor
 		const s =
@@ -853,7 +880,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 							height: stageSize.h,
 						}}
 					/>
-					{isPhotoView && (
+					{isPhotoView && !si.stepping && (
 						<div
 							className={cn("absolute touch-none select-none", cursor)}
 							style={{
@@ -1041,11 +1068,16 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 											: `${Math.round(hover.range)} m`}{" "}
 										away
 									</div>
+									{hover.source === "object" && (
+										<div className="text-cyan-200" data-hover-source="object">
+											object · near-field estimate
+										</div>
+									)}
 								</div>
 							)}
 						</div>
 					)}
-					{settings.mode === "world" && (
+					{settings.mode === "world" && !si.stepping && (
 						<div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2">
 							{flying ? (
 								<Button
@@ -1065,6 +1097,8 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 						</div>
 					)}
 				</div>
+
+				<StepInsidePanel si={si} />
 
 				{(verify === "verified" ||
 					verify === "refined" ||

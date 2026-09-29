@@ -1,0 +1,32 @@
+three start 572f71d7a5b8 23:43:47
+[three IMG_5495] q 0.252 ready forced false fresh true people true offMasked 33182 onMasked 40123
+[three IMG_6019] q 0.710 ready forced false fresh true people true offMasked 10627 onMasked 11575
+[three IMG_6958] q 0.966 ready forced false fresh true people true offMasked 193 onMasked 219
+[three IMG_6971] q 0.644 ready forced false fresh true people true offMasked 19863 onMasked 26330
+[three IMG_7018] q 0.432 ready forced false fresh true people true offMasked 14013 onMasked 16925
+[three IMG_7033] q 0.009 low-quality forced true fresh true people true offMasked 17091 onMasked 20666
+[three IMG_7053] q 0.029 low-quality forced true fresh true people true offMasked 9433 onMasked 12823
+[three IMG_7059] q 0.953 ready forced false fresh true people true offMasked 15177 onMasked 15363
+[three IMG_7063] q 0.671 ready forced false fresh true people true offMasked 19761 onMasked 20046
+[three IMG_7068] q 0.000 low-quality forced true fresh true people true offMasked 30223 onMasked 30497
+[three IMG_7086] q 0.276 ready forced false fresh true people true offMasked 7667 onMasked 9046
+[three IMG_7130] q 0.204 ready forced false fresh true people true offMasked 19390 onMasked 20215
+[three IMG_7131] q 0.229 ready forced false fresh true people true offMasked 0 onMasked 662
+[three IMG_7155] q 0.000 low-quality forced true fresh true people true offMasked 27261 onMasked 33820
+three end 572f71d7a5b8 23:45:24
+deck start 572f71d7a5b8 23:45:24
+[deck IMG_5495] q 0.211 ready forced false fresh true people true offMasked 33182 onMasked 40105
+[deck IMG_6019] q 0.759 ready forced false fresh true people true offMasked 10627 onMasked 10878
+[deck IMG_6958] q 0.966 ready forced false fresh true people true offMasked 193 onMasked 207
+[deck IMG_6971] q 0.650 ready forced false fresh true people true offMasked 19863 onMasked 26338
+[deck IMG_7018] q 0.437 ready forced false fresh true people true offMasked 14013 onMasked 16929
+[deck IMG_7033] q 0.009 low-quality forced true fresh true people true offMasked 17091 onMasked 20758
+[deck IMG_7053] q 0.566 ready forced false fresh true people true offMasked 9433 onMasked 12067
+[deck IMG_7059] q 0.000 low-quality forced true fresh true people true offMasked 15177 onMasked 15177
+[deck IMG_7063] q 0.826 ready forced false fresh true people true offMasked 19761 onMasked 20939
+[deck IMG_7068] q 0.669 ready forced false fresh true people true offMasked 30223 onMasked 30642
+[deck IMG_7086] q 0.345 ready forced false fresh true people true offMasked 7667 onMasked 9004
+[deck IMG_7130] q 0.196 ready forced false fresh true people true offMasked 19390 onMasked 20241
+[deck IMG_7131] q 0.230 ready forced false fresh true people true offMasked 0 onMasked 630
+[deck IMG_7155] q 0.185 ready forced false fresh true people true offMasked 27261 onMasked 30456
+deck end 572f71d7a5b8 23:46:57

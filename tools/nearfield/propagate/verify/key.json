@@ -1,0 +1,173 @@
+{
+ "seed": "6ce1bec7731ce8b3",
+ "candidates": {
+  "P2": {
+   "pid": "wc_0086",
+   "kind": "propagated-duplicate",
+   "pose": {
+    "yaw": 71.19964075220508,
+    "pitch": -15.724755044063146,
+    "roll": -2.810539628399898,
+    "vfov": 39.63880356406597
+   },
+   "eye": {
+    "lat": 45.977158,
+    "lon": 8.947661,
+    "h": 910.2983328262185
+   },
+   "eyeRendered": 910.2983328262185,
+   "dem": "mapterhorn",
+   "width": 1440,
+   "labels": [
+    "Il Torrione",
+    "Monte Tabor",
+    "Monte Bregagno",
+    "Monte Disgrazia",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Lenno",
+    "Termine Quadro"
+   ]
+  },
+  "E4": {
+   "pid": "wc_0086",
+   "kind": "decoy-yaw+8",
+   "pose": {
+    "yaw": 79.19964075220508,
+    "pitch": -15.724755044063146,
+    "roll": -2.810539628399898,
+    "vfov": 39.63880356406597
+   },
+   "eye": {
+    "lat": 45.977158,
+    "lon": 8.947661,
+    "h": 910.2983328262185
+   },
+   "eyeRendered": 910.2983328262185,
+   "dem": "mapterhorn",
+   "width": 1440,
+   "labels": [
+    "Monte Marnotto",
+    "Monte Bregagno",
+    "Monte Disgrazia",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Lenno",
+    "Termine Quadro",
+    "Cima Val Rovina"
+   ]
+  },
+  "T4": {
+   "pid": "wc_0054",
+   "kind": "control-verified-refA",
+   "pose": {
+    "yaw": 50.67879604666308,
+    "pitch": -9.644514713552322,
+    "roll": -1.6258231114141493,
+    "vfov": 53.02940610186044
+   },
+   "eye": {
+    "lat": 45.977158,
+    "lon": 8.947661,
+    "h": 910.2983328262185
+   },
+   "eyeRendered": 910.2983328262185,
+   "dem": "mapterhorn",
+   "width": 1440,
+   "labels": [
+    "Monte Bar",
+    "Camoghè",
+    "Monte Boglia",
+    "Il Torrione",
+    "Monte Disgrazia",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Tremezzo"
+   ]
+  },
+  "D5": {
+   "pid": "wc_0086",
+   "kind": "decoy-wrong-basin-yaw-45",
+   "pose": {
+    "yaw": 26.199640752205084,
+    "pitch": -15.724755044063146,
+    "roll": -2.810539628399898,
+    "vfov": 39.63880356406597
+   },
+   "eye": {
+    "lat": 45.977158,
+    "lon": 8.947661,
+    "h": 910.2983328262185
+   },
+   "eyeRendered": 910.2983328262185,
+   "dem": "mapterhorn",
+   "width": 1360,
+   "labels": [
+    "Gaggio",
+    "Adula - Rheinwaldhorn",
+    "Pizzo di Claro / Visagno",
+    "Monte Bar",
+    "Camoghè",
+    "Monte Gazzirola",
+    "Monte Boglia",
+    "Il Torrione"
+   ]
+  },
+  "R6": {
+   "pid": "wc_0086",
+   "kind": "propagated@anchor-eye",
+   "pose": {
+    "yaw": 71.19964075220508,
+    "pitch": -15.724755044063146,
+    "roll": -2.810539628399898,
+    "vfov": 39.63880356406597
+   },
+   "eye": {
+    "lat": 45.977158,
+    "lon": 8.947661,
+    "h": 910.2983328262185
+   },
+   "eyeRendered": 910.2983328262185,
+   "dem": "mapterhorn",
+   "width": 1360,
+   "labels": [
+    "Il Torrione",
+    "Monte Tabor",
+    "Monte Bregagno",
+    "Monte Disgrazia",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Lenno",
+    "Termine Quadro"
+   ]
+  },
+  "E9": {
+   "pid": "wc_0086",
+   "kind": "decoy-yaw-7",
+   "pose": {
+    "yaw": 64.19964075220508,
+    "pitch": -15.724755044063146,
+    "roll": -2.810539628399898,
+    "vfov": 39.63880356406597
+   },
+   "eye": {
+    "lat": 45.977158,
+    "lon": 8.947661,
+    "h": 910.2983328262185
+   },
+   "eyeRendered": 910.2983328262185,
+   "dem": "mapterhorn",
+   "width": 1440,
+   "labels": [
+    "Cima Mosè",
+    "Il Torrione",
+    "Pizzo di Sebol",
+    "Monte Bregagno",
+    "Monte Disgrazia",
+    "Monte Legnone",
+    "Monte Galbiga",
+    "Monte di Lenno"
+   ]
+  }
+ }
+}

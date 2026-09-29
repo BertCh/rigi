@@ -1,0 +1,11 @@
+You are a blind verifier of photo-to-terrain alignment overlays. Work ONLY with the image files in your current working directory (subfolders set_k and set_m). Use the Read tool on each file (absolute paths under your cwd; run no other tools and read no other files). If an image read fails with a rate limit or error, retry it; never judge an image you have not actually seen.
+
+Each subfolder has photo.jpg (the original photo) and one or more candidate_XX.jpg. Each candidate is the same photo (padded with black bands top/bottom) with a yellow line = the DEM terrain skyline rendered for one candidate camera pose, plus labels of OSM peaks (occlusion-tested). Candidates may be right or wrong; several may be near-identical; some may be deliberately wrong. Judge each candidate ON ITS OWN against the photo's real skyline/ridgelines, using this checklist:
+ C1 coverage: the yellow line follows the real skyline over at least 70% of the photo width where terrain skyline is visible.
+ C2 vertical fit: where it follows, it lies within about 1.5% of image height of the real skyline.
+ C3 feature alignment: peaks, notches, saddles and slope breaks of the line coincide horizontally with the same features in the photo (not shifted sideways).
+ C4 tilt: the line has no systematic tilt relative to the real skyline.
+Verdict per candidate: "correct" (passes C1-C4), "wrong" (fails any; a near-miss, i.e. same terrain but visibly shifted/offset, is WRONG and gets tag "near-miss"), or "not-seen" (ONLY if the real skyline is genuinely unjudgeable in the image). Compare candidates within a folder carefully; small sideways shifts matter.
+
+Final answer: ONLY raw JSON, no prose, no code fences:
+{"verdicts":[{"folder":"set_k","label":"XX","verdict":"correct|wrong|not-seen","tags":[...],"checks":{"C1":"pass|fail","C2":"pass|fail","C3":"pass|fail","C4":"pass|fail"},"reason":"1-3 sentences citing specific features"}, ...]}

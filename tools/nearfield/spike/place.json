@@ -1,0 +1,3041 @@
+{
+ "wc_0002": {
+  "n": 83117,
+  "tags": [],
+  "curve": {
+   "x": [
+    2.636747221272077,
+    3.0605017038030065,
+    3.498044262269604,
+    3.906931307882611,
+    4.111100104185238,
+    6.011308402775027
+   ],
+   "y": [
+    2.6417089848704034,
+    2.9817089848704037,
+    3.5017089848704037,
+    4.201708984870404,
+    4.361708984870404,
+    7.741708984870403
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.05101746010372654,
+   "inlierFrac": 0.7199489875717362,
+   "quality": 0.6745938648052306,
+   "residualLogAllW": 0.0612981817897702,
+   "inlierFracW": 0.7083928039082814,
+   "qualityW": 0.6448785924743277,
+   "objExplainedFrac": 0.12643622844905378,
+   "qualityObj": 0.7927243230815872
+  },
+  "slopes": [
+   0.802,
+   1.188,
+   1.712,
+   0.784,
+   1.779
+  ],
+  "objFracCurve": 0.06513291396103896,
+  "objFracMode": 0.06582284902597403,
+  "resid500": {
+   "curve": 0.032876991902774065,
+   "scale3000": 0.10641671694503166,
+   "mode3000": 0.10666201256761101,
+   "scale150": 0.10641671694503152
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.02984238132741118,
+    "50-150": 0.03544925269876915,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": 0.08944794676486109,
+    "50-150": 0.12418790921404858,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.0003652597402597403,
+  "components": [
+   {
+    "id": 0,
+    "n": 12767,
+    "bbox": [
+     0,
+     154,
+     511,
+     384
+    ],
+    "contacts": null,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 32.03885568453227,
+    "recede": 2.580258666173218,
+    "notUpright": true,
+    "placedMedRange": 32.03885568453227,
+    "demBehindMed": 2486.4401147786116
+   }
+  ],
+  "objFrac": 0.0003652597402597403
+ },
+ "wc_0004": {
+  "n": 71689,
+  "tags": [],
+  "curve": {
+   "x": [
+    4.322474955697476,
+    4.62186243970811,
+    4.8951986770903835,
+    5.409653626952812,
+    5.780122911561052
+   ],
+   "y": [
+    6.440909417162488,
+    6.700909417162488,
+    6.940909417162488,
+    7.600909417162488,
+    7.900909417162489
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.03525984910091662,
+   "inlierFrac": 0.9965266637838441,
+   "quality": 0.9660295972943862,
+   "residualLogAllW": 0.0757459379342107,
+   "inlierFracW": 0.5989780355554473,
+   "qualityW": 0.5189402498886342,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.9660295972943862
+  },
+  "slopes": [
+   0.868,
+   0.878,
+   1.283,
+   0.81
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 2.0329263927410635,
+   "scale3000": 2.063451161202188,
+   "mode3000": 2.065490341486095,
+   "scale150": null
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0006": {
+  "n": 39728,
+  "tags": [],
+  "curve": {
+   "x": [
+    3.9644707126479637,
+    4.46190206976001,
+    5.114688433406289,
+    5.695379014784891
+   ],
+   "y": [
+    4.702367182057477,
+    5.362367182057477,
+    6.022367182057478,
+    6.522367182057478
+   ],
+   "n": 39728
+  },
+  "curveQ": {
+   "residualLogAll": 0.05744950342249977,
+   "inlierFrac": 0.8290877970197342,
+   "quality": 0.7634250248682144,
+   "residualLogAllW": 0.12585491640587776,
+   "inlierFracW": 0.5989535649635223,
+   "qualityW": 0.4031052018254822,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.7634250248682144
+  },
+  "slopes": [
+   1.327,
+   1.011,
+   0.861
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 0.12109927887618929,
+   "scale3000": 0.12276418891680335,
+   "mode3000": 0.12960344922888306,
+   "scale150": 1.913779355971493
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 1.763009305121904,
+    "50-150": 0.07050032156377835,
+    "150-500": 0.12075150352259761
+   },
+   "scale3000": {
+    "15-50": 1.8845226252368454,
+    "50-150": 0.12286034836040641,
+    "150-500": 0.12103397520475637
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0009": {
+  "n": 70833,
+  "tags": [],
+  "curve": {
+   "x": [
+    3.967798121652442,
+    5.091082557328832,
+    5.32683441107709,
+    5.546360337458264
+   ],
+   "y": [
+    4.48166478697166,
+    6.80166478697166,
+    6.98166478697166,
+    7.36166478697166
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.027204749890050728,
+   "inlierFrac": 0.9564186184405574,
+   "quality": 0.9388852264558483,
+   "residualLogAllW": 0.03314357512159827,
+   "inlierFracW": 0.9701333538810325,
+   "qualityW": 0.9438536534288643,
+   "objExplainedFrac": 0.021811867349963987,
+   "qualityObj": 0.960736347533525
+  },
+  "slopes": [
+   2.065,
+   0.764,
+   1.731
+  ],
+  "objFracCurve": 0.0078582763671875,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 0.059599663072505554,
+   "scale3000": 1.0731446804973572,
+   "mode3000": 1.0685895466504751,
+   "scale150": 0.02384296512339011
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": 0.059599663072505554,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": 1.0731446804973572,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.0078582763671875,
+  "components": [
+   {
+    "id": 2,
+    "n": 1537,
+    "bbox": [
+     0,
+     292,
+     89,
+     383
+    ],
+    "contacts": 13,
+    "factor": 1.8978082510467504,
+    "contactDem": 121.31719536111741,
+    "contactModel": 63.92698936867025,
+    "contactCurve": 130.8391591450503,
+    "curveMedRange": 137.3963273107129,
+    "recede": 1.0091086250425023,
+    "notUpright": null,
+    "placedMedRange": 124.22790928841677,
+    "demBehindMed": 1370.3100755621126,
+    "topAboveContactGround": 8.223926713817946,
+    "bottomAboveContactGround": -1.7322629230930033,
+    "fracPtsWithDem": 0.977878985035784,
+    "fracBelowDem1m": 0.05854956753160346,
+    "heightAboveDemP05": -1.1206680672800302,
+    "contactPlacedOverDem": 1.0000327449650568,
+    "curveOverDemAtContact": 1.0784881628328897,
+    "scale3000OverDemAtContact": 2.8911823480992043
+   }
+  ],
+  "objFrac": 0.0078582763671875
+ },
+ "wc_0011": {
+  "n": 125991,
+  "tags": [],
+  "curve": {
+   "x": [
+    4.591873708151237,
+    4.85660516417136,
+    5.269977058419665,
+    5.543758110876334
+   ],
+   "y": [
+    7.254414227780017,
+    7.454414227780017,
+    7.794414227780017,
+    8.014414227780016
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.015218163389992156,
+   "inlierFrac": 0.9928090101673929,
+   "quality": 0.9870774405930168,
+   "residualLogAllW": 0.016746700924443303,
+   "inlierFracW": 0.9944362564480471,
+   "qualityW": 0.9874883511116548,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.9870774405930168
+  },
+  "slopes": [
+   0.755,
+   0.823,
+   0.804
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": null,
+   "scale3000": null,
+   "mode3000": null,
+   "scale150": null
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0014": {
+  "n": 35589,
+  "tags": [],
+  "curve": {
+   "x": [
+    5.072818444355516,
+    5.347831215649354
+   ],
+   "y": [
+    7.306254588382521,
+    7.526254588382521
+   ],
+   "n": 35589
+  },
+  "curveQ": {
+   "residualLogAll": 0.026432435868771975,
+   "inlierFrac": 0.9895192334710163,
+   "quality": 0.972385529170095,
+   "residualLogAllW": 0.026432435868771975,
+   "inlierFracW": 0.9895192334710163,
+   "qualityW": 0.972385529170095,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.972385529170095
+  },
+  "slopes": [
+   0.8
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": null,
+   "scale3000": null,
+   "mode3000": null,
+   "scale150": null
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0017": {
+  "n": 0,
+  "tags": [],
+  "ok": false
+ },
+ "wc_0019": {
+  "n": 62220,
+  "tags": [],
+  "curve": {
+   "x": [
+    4.250573845341817,
+    4.516407543356472,
+    5.401843233302574,
+    5.929971945532017
+   ],
+   "y": [
+    6.173707938015115,
+    6.373707938015114,
+    7.713707938015114,
+    8.113707938015114
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.15135653856439024,
+   "inlierFrac": 0.5623111539697846,
+   "quality": 0.31713745988295233,
+   "residualLogAllW": 0.022579201441308427,
+   "inlierFracW": 0.788193492201186,
+   "qualityW": 0.7782113144883259,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.31713745988295233
+  },
+  "slopes": [
+   0.752,
+   1.513,
+   0.757
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 0.014056036375379704,
+   "scale3000": 0.1593271313507471,
+   "mode3000": 0.1641208786095504,
+   "scale150": null
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": 0.014056036375379704
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": 0.1593271313507471
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0020": {
+  "n": 24303,
+  "tags": [
+   "snow"
+  ],
+  "curve": {
+   "x": [
+    3.754385232487651,
+    4.298620981715224,
+    4.754809198336505,
+    5.288308749736215
+   ],
+   "y": [
+    2.774290003151135,
+    3.434290003151135,
+    3.794290003151135,
+    4.3342900031511356
+   ],
+   "n": 24303
+  },
+  "curveQ": {
+   "residualLogAll": 3.0334878321806924,
+   "inlierFrac": 0.06920956260543966,
+   "quality": 8.515197836439737e-102,
+   "residualLogAllW": 1.9402306760431332,
+   "inlierFracW": 0.25003280179385895,
+   "qualityW": 3.353598125419296e-42,
+   "objExplainedFrac": 0.7517590420935687,
+   "qualityObj": 8.561108211748045e-05
+  },
+  "slopes": [
+   1.213,
+   0.789,
+   1.012
+  ],
+  "objFracCurve": 0.1727202119883041,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 0.5585598200925851,
+   "scale3000": 3.4418343935014524,
+   "mode3000": 4.059876245424191,
+   "scale150": 0.08871300038549262
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.5585598200925851,
+    "50-150": null,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": 3.4418343935014524,
+    "50-150": null,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [
+   {
+    "id": 0,
+    "n": 30244,
+    "bbox": [
+     0,
+     176,
+     341,
+     342
+    ],
+    "contacts": null,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 58.11526375218528,
+    "recede": 3.6598601274754397,
+    "notUpright": true,
+    "placedMedRange": 58.11526375218528,
+    "demBehindMed": 1192.2512560319856
+   }
+  ],
+  "objFrac": 0.0
+ },
+ "wc_0027": {
+  "n": 53630,
+  "tags": [
+   "water"
+  ],
+  "curve": {
+   "x": [
+    2.3389405592758794,
+    2.6174213139732116,
+    3.0979625014281695,
+    3.726800171973061,
+    4.344403735640781
+   ],
+   "y": [
+    2.673905735283976,
+    3.753905735283976,
+    4.233905735283976,
+    4.873905735283976,
+    5.433905735283976
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.21445206638362735,
+   "inlierFrac": 0.5038970725340295,
+   "quality": 0.15959347594578993,
+   "residualLogAllW": 0.18902384255212645,
+   "inlierFracW": 0.5146021899664566,
+   "qualityW": 0.210638591663284,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.15959347594578993
+  },
+  "slopes": [
+   3.878,
+   0.999,
+   1.018,
+   0.907
+  ],
+  "objFracCurve": 0.019653987363387977,
+  "objFracMode": 0.019963498975409836,
+  "resid500": {
+   "curve": 0.21445206638362715,
+   "scale3000": 0.337876846472878,
+   "mode3000": 0.38730517778292284,
+   "scale150": 0.33763090152584485
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.8493444780206136,
+    "50-150": 0.03581873692298659,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": 0.8653713806085636,
+    "50-150": 0.06738906681431325,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.019653987363387977,
+  "components": [
+   {
+    "id": 0,
+    "n": 3683,
+    "bbox": [
+     0,
+     192,
+     303,
+     217
+    ],
+    "contacts": 178,
+    "factor": 3.039572218274953,
+    "contactDem": 141.18759125591106,
+    "contactModel": 44.80063066850062,
+    "contactCurve": 140.09113920205635,
+    "curveMedRange": 140.0043440698333,
+    "recede": 1.0680689472598752,
+    "notUpright": null,
+    "placedMedRange": 136.08170815943447,
+    "demBehindMed": 8552.198339801522,
+    "topAboveContactGround": 2.59290456648705,
+    "bottomAboveContactGround": 0.0548010836037065,
+    "fracPtsWithDem": 0.6709204452891664,
+    "fracBelowDem1m": 0.0,
+    "heightAboveDemP05": 0.19062787251277769,
+    "contactPlacedOverDem": 0.9644951877842177,
+    "curveOverDemAtContact": 0.9922340763511766,
+    "scale3000OverDemAtContact": 0.9355997871480144
+   }
+  ],
+  "objFrac": 0.019653987363387977
+ },
+ "wc_0028": {
+  "n": 35938,
+  "tags": [
+   "rock"
+  ],
+  "curve": {
+   "x": [
+    1.6445708147580893,
+    1.982278115564464,
+    2.936041393663819,
+    3.2233087438194588,
+    4.382831011916445,
+    4.802761607859925
+   ],
+   "y": [
+    5.201363799462876,
+    5.521363799462876,
+    6.241363799462876,
+    6.461363799462876,
+    7.341363799462877,
+    7.921363799462877
+   ],
+   "n": 35938
+  },
+  "curveQ": {
+   "residualLogAll": 1.3754001606689736,
+   "inlierFrac": 0.22458122321776391,
+   "quality": 6.489686052448482e-22,
+   "residualLogAllW": 1.3830107619241696,
+   "inlierFracW": 0.2198018281546747,
+   "qualityW": 3.757951278724943e-22,
+   "objExplainedFrac": 0.00011130279926541142,
+   "qualityObj": 6.508997799939033e-22
+  },
+  "slopes": [
+   0.948,
+   0.755,
+   0.766,
+   0.759,
+   1.381
+  ],
+  "objFracCurve": 2.039817232375979e-05,
+  "objFracMode": 0.03422303361618799,
+  "resid500": {
+   "curve": null,
+   "scale3000": null,
+   "mode3000": null,
+   "scale150": null
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 2.039817232375979e-05,
+  "components": [],
+  "objFrac": 2.039817232375979e-05
+ },
+ "wc_0034": {
+  "n": 0,
+  "tags": [
+   "trees"
+  ],
+  "ok": false
+ },
+ "wc_0046": {
+  "n": 16915,
+  "tags": [
+   "trees"
+  ],
+  "curve": {
+   "x": [
+    2.6039886875456033,
+    2.955153769246155,
+    3.296765152356812,
+    3.5497642355164736,
+    5.391898814002374
+   ],
+   "y": [
+    2.7481126676331296,
+    3.1081126676331294,
+    3.4281126676331297,
+    3.6281126676331295,
+    5.028112667633129
+   ],
+   "n": 16915
+  },
+  "curveQ": {
+   "residualLogAll": 0.22787884825880234,
+   "inlierFrac": 0.49258054980786287,
+   "quality": 0.13448312991773964,
+   "residualLogAllW": 0.42071860752953505,
+   "inlierFracW": 0.315594510291135,
+   "qualityW": 0.0037786036108651264,
+   "objExplainedFrac": 0.00011823825007395428,
+   "qualityObj": 0.1345339649012775
+  },
+  "slopes": [
+   1.025,
+   0.937,
+   0.791,
+   0.76
+  ],
+  "objFracCurve": 0.18955021016081872,
+  "objFracMode": 0.15651841191520469,
+  "resid500": {
+   "curve": 0.22787884825880217,
+   "scale3000": 0.23723824079195904,
+   "mode3000": 0.2394296808786581,
+   "scale150": 0.23723824079195904
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.21392697164266083,
+    "50-150": 0.9222659218674832,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": 0.2280479834833709,
+    "50-150": 1.3897574220761522,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.18955021016081872,
+  "components": [
+   {
+    "id": 0,
+    "n": 24996,
+    "bbox": [
+     130,
+     73,
+     463,
+     278
+    ],
+    "contacts": 205,
+    "factor": 0.884488113129154,
+    "contactDem": 16.008992302301387,
+    "contactModel": 19.90058230300665,
+    "contactCurve": 23.13753124284083,
+    "curveMedRange": 23.779257169837756,
+    "recede": 0.9830361323287071,
+    "notUpright": null,
+    "placedMedRange": 18.123474397423912,
+    "demBehindMed": 7498.99619517992,
+    "topAboveContactGround": 5.638351434831975,
+    "bottomAboveContactGround": -17.008158252022895,
+    "fracPtsWithDem": 0.9695151224195871,
+    "fracBelowDem1m": 0.0,
+    "heightAboveDemP05": 0.05567586894113675,
+    "contactPlacedOverDem": 1.0994963429913962,
+    "curveOverDemAtContact": 1.445283426085143,
+    "scale3000OverDemAtContact": 1.4271048317724497
+   },
+   {
+    "id": 1,
+    "n": 2002,
+    "bbox": [
+     0,
+     84,
+     36,
+     187
+    ],
+    "contacts": 28,
+    "factor": 1.6194473259561937,
+    "contactDem": 58.208799116427166,
+    "contactModel": 35.87247050883833,
+    "contactCurve": 38.515810036328226,
+    "curveMedRange": 38.27007786801549,
+    "recede": 0.9902315197176162,
+    "notUpright": null,
+    "placedMedRange": 57.60637784912825,
+    "demBehindMed": 11053.489136469125,
+    "topAboveContactGround": 8.958918773209007,
+    "bottomAboveContactGround": -5.58291078996217,
+    "fracPtsWithDem": 0.986013986013986,
+    "fracBelowDem1m": 0.0010131712259371835,
+    "heightAboveDemP05": 0.268608593618967,
+    "contactPlacedOverDem": 0.9980205282157419,
+    "curveOverDemAtContact": 0.6616836392602822,
+    "scale3000OverDemAtContact": 0.7075004747777655
+   },
+   {
+    "id": 139,
+    "n": 32,
+    "bbox": [
+     356,
+     180,
+     361,
+     185
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 92.44897508258627,
+    "recede": 0.5684249910346519,
+    "notUpright": null,
+    "placedMedRange": 92.44897508258627,
+    "demBehindMed": 9616.709388956997
+   },
+   {
+    "id": 164,
+    "n": 5236,
+    "bbox": [
+     430,
+     190,
+     511,
+     283
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 114.20328133647938,
+    "recede": 1.657203466703698,
+    "notUpright": null,
+    "placedMedRange": 114.20328133647938,
+    "demBehindMed": 6503.214262640749
+   },
+   {
+    "id": 187,
+    "n": 202,
+    "bbox": [
+     250,
+     196,
+     281,
+     213
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 137.6977108526845,
+    "recede": 1.1449085123039624,
+    "notUpright": null,
+    "placedMedRange": 137.6977108526845,
+    "demBehindMed": 8753.738607791809
+   },
+   {
+    "id": 220,
+    "n": 166,
+    "bbox": [
+     296,
+     202,
+     317,
+     214
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 140.15253845286867,
+    "recede": 1.2963599090565048,
+    "notUpright": null,
+    "placedMedRange": 140.15253845286867,
+    "demBehindMed": 8622.261709314987
+   },
+   {
+    "id": 239,
+    "n": 182,
+    "bbox": [
+     101,
+     212,
+     131,
+     221
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 145.03226352050345,
+    "recede": 1.112544062412037,
+    "notUpright": null,
+    "placedMedRange": 145.03226352050345,
+    "demBehindMed": 4370.078234495531
+   }
+  ],
+  "objFrac": 0.18955021016081872
+ },
+ "wc_0047": {
+  "n": 58665,
+  "tags": [
+   "grass"
+  ],
+  "curve": {
+   "x": [
+    3.9499658950884204,
+    4.810544295649091,
+    5.4318673483025925,
+    6.5742218924355775
+   ],
+   "y": [
+    5.323344835364967,
+    6.6833448353649665,
+    7.163344835364967,
+    8.023344835364968
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.05165180360575494,
+   "inlierFrac": 0.9380891502599505,
+   "quality": 0.8775617006663657,
+   "residualLogAllW": 0.1048146970548185,
+   "inlierFracW": 0.5800229250654549,
+   "qualityW": 0.44072214084775635,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.8775617006663657
+  },
+  "slopes": [
+   1.58,
+   0.773,
+   0.753
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 1.899150732594592,
+   "scale3000": 2.2759495442000075,
+   "mode3000": 2.318898780563087,
+   "scale150": 0.19703450566426062
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 2.089790178012829,
+    "50-150": null,
+    "150-500": 0.3261189120449939
+   },
+   "scale3000": {
+    "15-50": 2.4600019105242152,
+    "50-150": null,
+    "150-500": 0.5868354010159058
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0048": {
+  "n": 0,
+  "tags": [
+   "snow"
+  ],
+  "ok": false
+ },
+ "wc_0052": {
+  "n": 82918,
+  "tags": [
+   "water"
+  ],
+  "curve": {
+   "x": [
+    2.592129048638154,
+    3.043113397538976,
+    3.805377904786045,
+    4.619330070191502,
+    5.7512538807883855,
+    6.4355591487423425
+   ],
+   "y": [
+    2.658361124079912,
+    3.738361124079912,
+    4.638361124079912,
+    5.418361124079912,
+    6.998361124079912,
+    7.8783611240799125
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.10393633420308701,
+   "inlierFrac": 0.7460382546612315,
+   "quality": 0.5694709884266174,
+   "residualLogAllW": 0.11834392417624118,
+   "inlierFracW": 0.6807061739967023,
+   "qualityW": 0.4796221664701722,
+   "objExplainedFrac": 0.04037724016498223,
+   "qualityObj": 0.6116853637573711
+  },
+  "slopes": [
+   2.395,
+   1.181,
+   0.958,
+   1.396,
+   1.286
+  ],
+  "objFracCurve": 0.019337079678362575,
+  "objFracMode": 0.0005539565058479532,
+  "resid500": {
+   "curve": 0.13126593150108384,
+   "scale3000": 0.7549072006492203,
+   "mode3000": 0.7688839894801555,
+   "scale150": 0.23468909513616026
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.18444326810818643,
+    "50-150": 0.08045505650345097,
+    "150-500": 0.15339000416044007
+   },
+   "scale3000": {
+    "15-50": 1.1465850274585252,
+    "50-150": 0.5655670035699699,
+    "150-500": 0.5003510860329603
+   }
+  },
+  "objFracFinal": 0.019337079678362575,
+  "components": [
+   {
+    "id": 0,
+    "n": 73,
+    "bbox": [
+     505,
+     83,
+     511,
+     97
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 119.75771689499317,
+    "recede": 1.0534186683544042,
+    "notUpright": null,
+    "placedMedRange": 119.75771689499317,
+    "demBehindMed": 1686.5876131227074
+   },
+   {
+    "id": 1,
+    "n": 3108,
+    "bbox": [
+     466,
+     102,
+     511,
+     213
+    ],
+    "contacts": 42,
+    "factor": 1.9164057519491522,
+    "contactDem": 101.48656065822928,
+    "contactModel": 58.559586003191455,
+    "contactCurve": 133.21815412546846,
+    "curveMedRange": 111.82166747233599,
+    "recede": 1.0427425901096237,
+    "notUpright": null,
+    "placedMedRange": 93.48420219972037,
+    "demBehindMed": 893.7367086642603,
+    "topAboveContactGround": 28.785837866707652,
+    "bottomAboveContactGround": -0.6354743481786045,
+    "fracPtsWithDem": 0.9488416988416989,
+    "fracBelowDem1m": 0.0,
+    "heightAboveDemP05": 1.6390494249503036,
+    "contactPlacedOverDem": 1.1058008737354645,
+    "curveOverDemAtContact": 1.3126679361427955,
+    "scale3000OverDemAtContact": 2.134996280211396
+   },
+   {
+    "id": 4,
+    "n": 182,
+    "bbox": [
+     296,
+     194,
+     319,
+     220
+    ],
+    "contacts": 1,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 88.82151117740942,
+    "recede": 0.9070756608957417,
+    "notUpright": null,
+    "placedMedRange": 88.82151117740942,
+    "demBehindMed": 816.3859340554287
+   }
+  ],
+  "objFrac": 0.019337079678362575
+ },
+ "wc_0054": {
+  "n": 93297,
+  "tags": [
+   "buildings",
+   "plants"
+  ],
+  "curve": {
+   "x": [
+    0.6112904925999298,
+    1.0248320777729858,
+    1.3395421049348442,
+    1.9752724330037017,
+    3.421796563454802,
+    4.648478461812266
+   ],
+   "y": [
+    4.0360854721763015,
+    4.356085472176301,
+    5.056085472176302,
+    5.656085472176302,
+    7.156085472176302,
+    8.096085472176302
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 1.0055464558399887,
+   "inlierFrac": 0.36888645937168396,
+   "quality": 3.879331574378031e-12,
+   "residualLogAllW": 0.8249727344066198,
+   "inlierFracW": 0.3628925449977581,
+   "qualityW": 1.480725134106533e-08,
+   "objExplainedFrac": 0.24027567874636913,
+   "qualityObj": 0.056972271353652536
+  },
+  "slopes": [
+   0.774,
+   2.224,
+   0.944,
+   1.037,
+   0.766
+  ],
+  "objFracCurve": 0.11401875813802083,
+  "objFracMode": 0.11660257975260417,
+  "resid500": {
+   "curve": 0.8986893146295388,
+   "scale3000": 0.7334568781620305,
+   "mode3000": 0.6949925323508673,
+   "scale150": 0.7192249860695594
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": 0.17448884219932587,
+    "150-500": 1.002368711527718
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": 0.3136921908315969,
+    "150-500": 0.8530987037918556
+   }
+  },
+  "objFracFinal": 0.11401875813802083,
+  "components": [
+   {
+    "id": 0,
+    "n": 41,
+    "bbox": [
+     50,
+     220,
+     59,
+     227
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 127.96236445332296,
+    "recede": 0.9791704077068782,
+    "notUpright": null,
+    "placedMedRange": 127.96236445332296,
+    "demBehindMed": 323.61502275889495
+   },
+   {
+    "id": 2,
+    "n": 972,
+    "bbox": [
+     27,
+     227,
+     71,
+     295
+    ],
+    "contacts": 15,
+    "factor": 63.12750248121901,
+    "contactDem": 174.26814671923157,
+    "contactModel": 2.720223958098715,
+    "contactCurve": 76.51011702739319,
+    "curveMedRange": 76.24586817969197,
+    "recede": 1.380286886280747,
+    "notUpright": null,
+    "placedMedRange": 170.9548768110236,
+    "demBehindMed": 257.32513745590904,
+    "topAboveContactGround": 23.822844669020014,
+    "bottomAboveContactGround": -6.020162642725268,
+    "fracPtsWithDem": 0.9814814814814815,
+    "fracBelowDem1m": 0.018867924528301886,
+    "heightAboveDemP05": 3.2525261602670015,
+    "contactPlacedOverDem": 0.9853834329288679,
+    "curveOverDemAtContact": 0.4390367285575192,
+    "scale3000OverDemAtContact": 0.5454224613852563
+   },
+   {
+    "id": 3,
+    "n": 10263,
+    "bbox": [
+     284,
+     230,
+     511,
+     383
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 110.72076855617632,
+    "recede": 1.0823293744300693,
+    "notUpright": null,
+    "placedMedRange": 110.72076855617632,
+    "demBehindMed": 1320.026898858723
+   },
+   {
+    "id": 15,
+    "n": 107,
+    "bbox": [
+     429,
+     249,
+     439,
+     269
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 136.0323372008595,
+    "recede": 1.029986291017868,
+    "notUpright": null,
+    "placedMedRange": 136.0323372008595,
+    "demBehindMed": 2172.003421822261
+   },
+   {
+    "id": 20,
+    "n": 602,
+    "bbox": [
+     0,
+     258,
+     29,
+     293
+    ],
+    "contacts": 4,
+    "factor": 60.551670519274666,
+    "contactDem": 168.54202909060928,
+    "contactModel": 2.7822562473954937,
+    "contactCurve": 77.85675731490855,
+    "curveMedRange": 74.11526483881644,
+    "recede": 0.9983992586911391,
+    "notUpright": null,
+    "placedMedRange": 158.08196817510736,
+    "demBehindMed": 251.24093967593342,
+    "topAboveContactGround": 23.895723495102743,
+    "bottomAboveContactGround": -7.101389699360425,
+    "fracPtsWithDem": 0.9568106312292359,
+    "fracBelowDem1m": 0.006944444444444444,
+    "heightAboveDemP05": 1.693888215011981,
+    "contactPlacedOverDem": 0.9995741982073492,
+    "curveOverDemAtContact": 0.46194268417791656,
+    "scale3000OverDemAtContact": 0.576813316944851
+   },
+   {
+    "id": 29,
+    "n": 65,
+    "bbox": [
+     422,
+     272,
+     433,
+     281
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 113.46351881738468,
+    "recede": 0.9410004907635952,
+    "notUpright": null,
+    "placedMedRange": 113.46351881738468,
+    "demBehindMed": 1936.8616379532912
+   },
+   {
+    "id": 36,
+    "n": 453,
+    "bbox": [
+     413,
+     280,
+     439,
+     323
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 123.61263310932003,
+    "recede": 1.0024329376677146,
+    "notUpright": null,
+    "placedMedRange": 123.61263310932003,
+    "demBehindMed": 1684.2358447135007
+   },
+   {
+    "id": 43,
+    "n": 2915,
+    "bbox": [
+     0,
+     292,
+     71,
+     373
+    ],
+    "contacts": 43,
+    "factor": 35.66309142559934,
+    "contactDem": 75.82131740848399,
+    "contactModel": 2.071417917729809,
+    "contactCurve": 61.96540782442129,
+    "curveMedRange": 68.91109526870444,
+    "recede": 1.0127859018501595,
+    "notUpright": null,
+    "placedMedRange": 84.74499070519333,
+    "demBehindMed": 160.24979652393472,
+    "topAboveContactGround": 9.77768019599796,
+    "bottomAboveContactGround": -14.119342970980824,
+    "fracPtsWithDem": 0.5574614065180102,
+    "fracBelowDem1m": 0.009846153846153846,
+    "heightAboveDemP05": 0.03847826822757273,
+    "contactPlacedOverDem": 0.9743060277182257,
+    "curveOverDemAtContact": 0.8172557526346502,
+    "scale3000OverDemAtContact": 0.9546029513622653
+   },
+   {
+    "id": 44,
+    "n": 3206,
+    "bbox": [
+     54,
+     292,
+     189,
+     383
+    ],
+    "contacts": 21,
+    "factor": 32.589486522758364,
+    "contactDem": 80.13880344898344,
+    "contactModel": 2.519949507121183,
+    "contactCurve": 72.11384664574521,
+    "curveMedRange": 74.23039768122678,
+    "recede": 1.016231167930974,
+    "notUpright": null,
+    "placedMedRange": 85.2520640844591,
+    "demBehindMed": 254.29981283382685,
+    "topAboveContactGround": 12.256705694211632,
+    "bottomAboveContactGround": -22.131355114003327,
+    "fracPtsWithDem": 0.7258265751715534,
+    "fracBelowDem1m": 0.06102277610657499,
+    "heightAboveDemP05": -1.1407999718934432,
+    "contactPlacedOverDem": 1.0247702357153063,
+    "curveOverDemAtContact": 0.8998617840813292,
+    "scale3000OverDemAtContact": 1.0987410624097445
+   },
+   {
+    "id": 45,
+    "n": 52,
+    "bbox": [
+     263,
+     293,
+     274,
+     305
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 143.874327712843,
+    "recede": 0.9854436984808052,
+    "notUpright": null,
+    "placedMedRange": 143.874327712843,
+    "demBehindMed": 1521.6107533388536
+   },
+   {
+    "id": 57,
+    "n": 3088,
+    "bbox": [
+     191,
+     310,
+     277,
+     383
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 48.647569725920604,
+    "recede": 0.7108615704400496,
+    "notUpright": null,
+    "placedMedRange": 48.647569725920604,
+    "demBehindMed": 399.45848285102517
+   },
+   {
+    "id": 62,
+    "n": 47,
+    "bbox": [
+     318,
+     316,
+     327,
+     323
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 140.9319583387687,
+    "recede": 0.9971088457555194,
+    "notUpright": null,
+    "placedMedRange": 140.9319583387687,
+    "demBehindMed": 1394.6394594335422
+   },
+   {
+    "id": 66,
+    "n": 59,
+    "bbox": [
+     66,
+     324,
+     81,
+     329
+    ],
+    "contacts": 2,
+    "factor": 65.14953183081823,
+    "contactDem": 192.2762094658633,
+    "contactModel": 2.953474588707759,
+    "contactCurve": 88.71484723549564,
+    "curveMedRange": 80.78948230300274,
+    "recede": 1.013817223440263,
+    "notUpright": null,
+    "placedMedRange": 184.48994681643504,
+    "demBehindMed": 186.08005338141967,
+    "topAboveContactGround": 12.565397521224213,
+    "bottomAboveContactGround": -2.2666045633754948,
+    "fracPtsWithDem": 1.0,
+    "fracBelowDem1m": 0.3220338983050847,
+    "heightAboveDemP05": -13.548573372927127,
+    "contactPlacedOverDem": 1.0007347620543285,
+    "curveOverDemAtContact": 0.46139274058887697,
+    "scale3000OverDemAtContact": 0.5367277588703578
+   },
+   {
+    "id": 80,
+    "n": 109,
+    "bbox": [
+     174,
+     342,
+     187,
+     357
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 75.338039602863,
+    "recede": 0.8592590312166383,
+    "notUpright": null,
+    "placedMedRange": 75.338039602863,
+    "demBehindMed": 312.53814281013877
+   },
+   {
+    "id": 104,
+    "n": 32,
+    "bbox": [
+     450,
+     358,
+     463,
+     365
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 143.53897188442448,
+    "recede": 1.0071128212761693,
+    "notUpright": null,
+    "placedMedRange": 143.53897188442448,
+    "demBehindMed": 1314.7768353618064
+   },
+   {
+    "id": 114,
+    "n": 94,
+    "bbox": [
+     167,
+     376,
+     181,
+     383
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 46.174487129192116,
+    "recede": 1.0007834613557929,
+    "notUpright": null,
+    "placedMedRange": 46.174487129192116,
+    "demBehindMed": 298.97231746836894
+   }
+  ],
+  "objFrac": 0.11401875813802083
+ },
+ "wc_0055": {
+  "n": 112235,
+  "tags": [
+   "buildings",
+   "cars"
+  ],
+  "curve": {
+   "x": [
+    1.9105850231861254,
+    2.1412026279373966,
+    2.8309672915954964,
+    4.770924373403248,
+    6.126756491521919
+   ],
+   "y": [
+    4.349499559198202,
+    4.589499559198202,
+    5.109499559198203,
+    6.569499559198203,
+    7.589499559198202
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.6022297241798364,
+   "inlierFrac": 0.19036842339733595,
+   "quality": 2.1970497418402245e-05,
+   "residualLogAllW": 0.6152657178207921,
+   "inlierFracW": 0.27166222900043924,
+   "qualityW": 2.1084057376440394e-05,
+   "objExplainedFrac": 0.20827727535973628,
+   "qualityObj": 0.0005348406898628181
+  },
+  "slopes": [
+   1.041,
+   0.754,
+   0.753,
+   0.752
+  ],
+  "objFracCurve": 0.2310451931423611,
+  "objFracMode": 0.3967420789930556,
+  "resid500": {
+   "curve": 0.5034132716744264,
+   "scale3000": 0.2690251825002104,
+   "mode3000": 0.30237654062424646,
+   "scale150": 1.0095981351755445
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": 0.5034132716744264
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": 0.2690251825002104
+   }
+  },
+  "objFracFinal": 0.2310451931423611,
+  "components": [
+   {
+    "id": 0,
+    "n": 33929,
+    "bbox": [
+     246,
+     0,
+     511,
+     287
+    ],
+    "contacts": 4,
+    "factor": 23.611403374051577,
+    "contactDem": 140.88348366945894,
+    "contactModel": 5.966684550838947,
+    "contactCurve": 68.38174872614182,
+    "curveMedRange": 88.7463395188086,
+    "recede": 0.935840465788621,
+    "notUpright": null,
+    "placedMedRange": 181.8659171214701,
+    "demBehindMed": 476.20198886930433,
+    "topAboveContactGround": 127.88850189662048,
+    "bottomAboveContactGround": -34.051235372737324,
+    "fracPtsWithDem": 0.10230186566064428,
+    "fracBelowDem1m": 0.04465571881302218,
+    "heightAboveDemP05": -0.8642325630253822,
+    "contactPlacedOverDem": 0.9999880189371042,
+    "curveOverDemAtContact": 0.4853780368363065,
+    "scale3000OverDemAtContact": 0.20143250757354902
+   }
+  ],
+  "objFrac": 0.2310451931423611
+ },
+ "wc_0059": {
+  "n": 102424,
+  "tags": [
+   "train",
+   "wires"
+  ],
+  "curve": {
+   "x": [
+    2.278474028583325,
+    2.9226667882259085,
+    3.590422027964279,
+    4.284650623783677,
+    5.2968095244984985,
+    6.288695896676298
+   ],
+   "y": [
+    2.708174174438995,
+    3.208174174438995,
+    4.908174174438995,
+    5.928174174438995,
+    7.128174174438995,
+    8.108174174438995
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.10071319138918877,
+   "inlierFrac": 0.6564281808951027,
+   "quality": 0.5094005375483649,
+   "residualLogAllW": 0.14419001915340157,
+   "inlierFracW": 0.5863454349724081,
+   "qualityW": 0.34867492975807496,
+   "objExplainedFrac": 0.05143325783019603,
+   "qualityObj": 0.5670746177587549
+  },
+  "slopes": [
+   0.776,
+   2.546,
+   1.469,
+   1.186,
+   0.988
+  ],
+  "objFracCurve": 0.032653035996835444,
+  "objFracMode": 0.020903382120253163,
+  "resid500": {
+   "curve": 0.1671101714424721,
+   "scale3000": 1.281388901158088,
+   "mode3000": 1.3723377685633573,
+   "scale150": 0.3466048366740309
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.21169177311351028,
+    "50-150": 0.746195184008547,
+    "150-500": 0.09878804996024433
+   },
+   "scale3000": {
+    "15-50": 1.4705321773307318,
+    "50-150": 0.7997160538049668,
+    "150-500": 0.08312678344051017
+   }
+  },
+  "objFracFinal": 0.032653035996835444,
+  "components": [
+   {
+    "id": 22,
+    "n": 5229,
+    "bbox": [
+     278,
+     157,
+     417,
+     235
+    ],
+    "contacts": 101,
+    "factor": 1.9535557014618887,
+    "contactDem": 35.59686352548174,
+    "contactModel": 18.14350403650314,
+    "contactCurve": 24.27073479622182,
+    "curveMedRange": 24.98859471181122,
+    "recede": 1.6973494266696623,
+    "notUpright": null,
+    "placedMedRange": 36.46461272162768,
+    "demBehindMed": 368.4256001904037,
+    "topAboveContactGround": 9.651017934881565,
+    "bottomAboveContactGround": -1.1219086847859217,
+    "fracPtsWithDem": 0.9269458787531076,
+    "fracBelowDem1m": 0.0,
+    "heightAboveDemP05": 0.29091627516877455,
+    "contactPlacedOverDem": 0.9957154154785277,
+    "curveOverDemAtContact": 0.6818222841135373,
+    "scale3000OverDemAtContact": 2.8545927544575846
+   }
+  ],
+  "objFrac": 0.032653035996835444
+ },
+ "wc_0063": {
+  "n": 63960,
+  "tags": [
+   "flowers",
+   "water"
+  ],
+  "curve": {
+   "x": [
+    2.377402100528114,
+    3.307168251655719,
+    4.540863575585702,
+    5.099091360315406
+   ],
+   "y": [
+    2.701821695511937,
+    3.601821695511937,
+    4.5418216955119375,
+    5.021821695511937
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.10650715618942752,
+   "inlierFrac": 0.6737179487179488,
+   "quality": 0.5073581637845247,
+   "residualLogAllW": 0.048492558372176475,
+   "inlierFracW": 0.8193077976474146,
+   "qualityW": 0.7725306073223602,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.5073581637845247
+  },
+  "slopes": [
+   0.968,
+   0.762,
+   0.86
+  ],
+  "objFracCurve": 0.03711505268895349,
+  "objFracMode": 0.03665515988372093,
+  "resid500": {
+   "curve": 0.1065071561894275,
+   "scale3000": 0.21307144951812923,
+   "mode3000": 0.21700500588014626,
+   "scale150": 0.2122962128286684
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.13085680979614572,
+    "50-150": 0.03825106280664578,
+    "150-500": 0.04091984251648059
+   },
+   "scale3000": {
+    "15-50": 0.1585760968264432,
+    "50-150": 0.34798406922502795,
+    "150-500": 0.3092740130797265
+   }
+  },
+  "objFracFinal": 0.03711505268895349,
+  "components": [
+   {
+    "id": 0,
+    "n": 43,
+    "bbox": [
+     338,
+     80,
+     344,
+     103
+    ],
+    "contacts": 2,
+    "factor": 0.9814529844355917,
+    "contactDem": 157.2146106185047,
+    "contactModel": 160.18564137197205,
+    "contactCurve": 148.7479026950074,
+    "curveMedRange": 149.3569117232704,
+    "recede": 1.0046810266233732,
+    "notUpright": null,
+    "placedMedRange": 157.96350172654667,
+    "demBehindMed": null,
+    "topAboveContactGround": 7.28466922601956,
+    "bottomAboveContactGround": -0.16747473601617457,
+    "fracPtsWithDem": 1.0,
+    "fracBelowDem1m": 0.0,
+    "heightAboveDemP05": 0.37504786679974134,
+    "contactPlacedOverDem": 1.000000414527291,
+    "curveOverDemAtContact": 0.9461455402256314,
+    "scale3000OverDemAtContact": 1.3439724794023722
+   },
+   {
+    "id": 3,
+    "n": 6464,
+    "bbox": [
+     0,
+     134,
+     195,
+     194
+    ],
+    "contacts": 115,
+    "factor": 1.4811517784762813,
+    "contactDem": 45.8694547845785,
+    "contactModel": 31.786967980603986,
+    "contactCurve": 41.16346631789788,
+    "curveMedRange": 52.1898973999945,
+    "recede": 1.4258645130330365,
+    "notUpright": null,
+    "placedMedRange": 64.28771060711725,
+    "demBehindMed": 7716.304981576911,
+    "topAboveContactGround": 11.915199403214501,
+    "bottomAboveContactGround": -0.11925708785474853,
+    "fracPtsWithDem": 0.17775371287128713,
+    "fracBelowDem1m": 0.0,
+    "heightAboveDemP05": -0.14928782827810208,
+    "contactPlacedOverDem": 1.0264199646137746,
+    "curveOverDemAtContact": 0.8974047437716047,
+    "scale3000OverDemAtContact": 0.914082137118554
+   }
+  ],
+  "objFrac": 0.03711505268895349
+ },
+ "wc_0067": {
+  "n": 84877,
+  "tags": [
+   "snow",
+   "tree"
+  ],
+  "curve": {
+   "x": [
+    1.0077295691683064,
+    1.504434450324684,
+    2.533655697051151,
+    4.051956352122837,
+    4.433185152819478
+   ],
+   "y": [
+    4.01958823135362,
+    5.219588231353621,
+    6.35958823135362,
+    7.679588231353621,
+    7.97958823135362
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.2893835547388788,
+   "inlierFrac": 0.4008035156756247,
+   "quality": 0.04939752281766774,
+   "residualLogAllW": 0.31428796072909115,
+   "inlierFracW": 0.407955918846518,
+   "qualityW": 0.03452680814741189,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.04939752281766774
+  },
+  "slopes": [
+   2.416,
+   1.108,
+   0.869,
+   0.787
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 0.29371962214188496,
+   "scale3000": 0.24920368936986076,
+   "mode3000": 0.2996467549841532,
+   "scale150": 0.3101440426192809
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": 0.27952589245495363,
+    "150-500": 0.34041683462970423
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": 0.22996015230968628,
+    "150-500": 0.258627929676154
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0071": {
+  "n": 140154,
+  "tags": [
+   "snow",
+   "water"
+  ],
+  "curve": {
+   "x": [
+    1.9204418332814865,
+    2.4971577929197006,
+    3.2523520333863543,
+    3.900530348979897,
+    5.143387831482614,
+    5.923487696454559
+   ],
+   "y": [
+    4.321647140173499,
+    4.881647140173499,
+    5.481647140173499,
+    5.981647140173499,
+    6.9216471401735,
+    7.641647140173499
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.050857582163003734,
+   "inlierFrac": 0.7752258230232458,
+   "quality": 0.7266842251463738,
+   "residualLogAllW": 0.08892795710722545,
+   "inlierFracW": 0.6507788262407017,
+   "qualityW": 0.5340370939976518,
+   "objExplainedFrac": 0.0023616878576423472,
+   "qualityObj": 0.7287397230479591
+  },
+  "slopes": [
+   0.971,
+   0.794,
+   0.771,
+   0.756,
+   0.923
+  ],
+  "objFracCurve": 0.0016835530598958333,
+  "objFracMode": 0.0008087158203125,
+  "resid500": {
+   "curve": 0.0443120174741302,
+   "scale3000": 0.06023603936302378,
+   "mode3000": 0.056368153505003724,
+   "scale150": 0.08362983772980509
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": 0.03429216070122887,
+    "150-500": 0.09809445603270775
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": 0.03981772200908471,
+    "150-500": 0.15113396823614156
+   }
+  },
+  "objFracFinal": 0.0016835530598958333,
+  "components": [
+   {
+    "id": 0,
+    "n": 312,
+    "bbox": [
+     0,
+     194,
+     39,
+     211
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 146.01827292328375,
+    "recede": 1.0253537939662654,
+    "notUpright": null,
+    "placedMedRange": 146.01827292328375,
+    "demBehindMed": 378.12200193939714
+   }
+  ],
+  "objFrac": 0.0016835530598958333
+ },
+ "wc_0072": {
+  "n": 79434,
+  "tags": [
+   "buildings",
+   "trees"
+  ],
+  "curve": {
+   "x": [
+    1.0631495950521699,
+    1.902872160351801,
+    2.136236590969115,
+    2.922330821076113,
+    3.3841124528362343,
+    4.55795104673765
+   ],
+   "y": [
+    4.870207647462279,
+    5.550207647462279,
+    5.73020764746228,
+    6.33020764746228,
+    6.690207647462279,
+    7.73020764746228
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.5374161496100167,
+   "inlierFrac": 0.3398041141073092,
+   "quality": 0.0002485692923303221,
+   "residualLogAllW": 0.7401728736543465,
+   "inlierFracW": 0.32952379989668257,
+   "qualityW": 3.712078199233379e-07,
+   "objExplainedFrac": 0.030679557871943985,
+   "qualityObj": 0.000759180027104687
+  },
+  "slopes": [
+   0.81,
+   0.771,
+   0.763,
+   0.78,
+   0.886
+  ],
+  "objFracCurve": 0.09370048415492958,
+  "objFracMode": 0.145587588028169,
+  "resid500": {
+   "curve": 0.6819140875915164,
+   "scale3000": 0.566875529031924,
+   "mode3000": 0.5440212859689773,
+   "scale150": 2.796241407313229
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 3.4054307985720547,
+    "50-150": null,
+    "150-500": 0.379651110565696
+   },
+   "scale3000": {
+    "15-50": 3.176968310673634,
+    "50-150": null,
+    "150-500": 0.38938884877704344
+   }
+  },
+  "objFracFinal": 0.09370048415492958,
+  "components": [
+   {
+    "id": 1,
+    "n": 65,
+    "bbox": [
+     186,
+     0,
+     205,
+     5
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 136.95970166374812,
+    "recede": 0.9929178404554305,
+    "notUpright": null,
+    "placedMedRange": 136.95970166374812,
+    "demBehindMed": null
+   },
+   {
+    "id": 6,
+    "n": 34,
+    "bbox": [
+     326,
+     0,
+     331,
+     9
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 136.00295831589187,
+    "recede": 1.0048145617219861,
+    "notUpright": null,
+    "placedMedRange": 136.00295831589187,
+    "demBehindMed": null
+   },
+   {
+    "id": 8,
+    "n": 14615,
+    "bbox": [
+     226,
+     0,
+     511,
+     326
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 135.08924497365717,
+    "recede": 1.177713013409802,
+    "notUpright": null,
+    "placedMedRange": 135.08924497365717,
+    "demBehindMed": 8974.422137967982
+   },
+   {
+    "id": 27,
+    "n": 104,
+    "bbox": [
+     142,
+     5,
+     193,
+     10
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 132.98865715858562,
+    "recede": 0.9991352827272199,
+    "notUpright": null,
+    "placedMedRange": 132.98865715858562,
+    "demBehindMed": null
+   },
+   {
+    "id": 49,
+    "n": 37,
+    "bbox": [
+     298,
+     8,
+     305,
+     21
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 133.32854335142588,
+    "recede": 1.0014795382007422,
+    "notUpright": null,
+    "placedMedRange": 133.32854335142588,
+    "demBehindMed": null
+   },
+   {
+    "id": 93,
+    "n": 71,
+    "bbox": [
+     472,
+     18,
+     498,
+     30
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 138.84933451187723,
+    "recede": 0.9630488195395074,
+    "notUpright": null,
+    "placedMedRange": 138.84933451187723,
+    "demBehindMed": null
+   },
+   {
+    "id": 129,
+    "n": 60,
+    "bbox": [
+     494,
+     31,
+     511,
+     40
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 139.46302533261422,
+    "recede": 0.9989757626186443,
+    "notUpright": null,
+    "placedMedRange": 139.46302533261422,
+    "demBehindMed": null
+   },
+   {
+    "id": 148,
+    "n": 43,
+    "bbox": [
+     424,
+     42,
+     435,
+     50
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 129.24564617998664,
+    "recede": 0.9858431365827348,
+    "notUpright": null,
+    "placedMedRange": 129.24564617998664,
+    "demBehindMed": null
+   },
+   {
+    "id": 307,
+    "n": 32,
+    "bbox": [
+     338,
+     98,
+     350,
+     103
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 147.6694927594457,
+    "recede": 0.9800442684382374,
+    "notUpright": null,
+    "placedMedRange": 147.6694927594457,
+    "demBehindMed": 27925.999940769667
+   },
+   {
+    "id": 311,
+    "n": 95,
+    "bbox": [
+     288,
+     136,
+     329,
+     147
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 145.17384852862975,
+    "recede": 0.9527092286837513,
+    "notUpright": null,
+    "placedMedRange": 145.17384852862975,
+    "demBehindMed": 9712.603797593838
+   },
+   {
+    "id": 325,
+    "n": 52,
+    "bbox": [
+     506,
+     177,
+     511,
+     186
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 136.6781893433477,
+    "recede": 0.9201324480460844,
+    "notUpright": null,
+    "placedMedRange": 136.6781893433477,
+    "demBehindMed": 2691.324191753918
+   },
+   {
+    "id": 331,
+    "n": 542,
+    "bbox": [
+     402,
+     190,
+     481,
+     326
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 108.46148218135698,
+    "recede": 1.2449851867473416,
+    "notUpright": null,
+    "placedMedRange": 108.46148218135698,
+    "demBehindMed": 981.4975760883815
+   },
+   {
+    "id": 332,
+    "n": 43,
+    "bbox": [
+     332,
+     193,
+     346,
+     204
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 147.05644957760444,
+    "recede": 1.0058719021780604,
+    "notUpright": null,
+    "placedMedRange": 147.05644957760444,
+    "demBehindMed": 2128.586208429241
+   },
+   {
+    "id": 346,
+    "n": 37,
+    "bbox": [
+     478,
+     309,
+     485,
+     326
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 116.68474111887028,
+    "recede": 1.168269722634999,
+    "notUpright": null,
+    "placedMedRange": 116.68474111887028,
+    "demBehindMed": 454.58650188752875
+   }
+  ],
+  "objFrac": 0.09370048415492958
+ },
+ "wc_0076": {
+  "n": 82093,
+  "tags": [
+   "grass",
+   "wires"
+  ],
+  "curve": {
+   "x": [
+    3.5395622026828404,
+    4.194124383256703,
+    4.785603864875448,
+    5.241746788501583,
+    6.232857848702749
+   ],
+   "y": [
+    2.602132014063648,
+    3.262132014063648,
+    6.142132014063648,
+    7.102132014063648,
+    7.962132014063648
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.0818995364906927,
+   "inlierFrac": 0.7707112664904437,
+   "quality": 0.6517268023133364,
+   "residualLogAllW": 0.14183094330429125,
+   "inlierFracW": 0.5664990750038732,
+   "qualityW": 0.342603922719049,
+   "objExplainedFrac": 0.022048164886165678,
+   "qualityObj": 0.6732229651348172
+  },
+  "slopes": [
+   1.008,
+   4.869,
+   2.105,
+   0.868
+  ],
+  "objFracCurve": 0.01425438596491228,
+  "objFracMode": 0.003871984649122807,
+  "resid500": {
+   "curve": 0.12139256312843,
+   "scale3000": 2.6840109904394946,
+   "mode3000": 2.6824193373287306,
+   "scale150": 0.09249071959787714
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.07687518481370478,
+    "50-150": 1.8691729331073366,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": 2.7133272249739946,
+    "50-150": 2.292209635801514,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.01425438596491228,
+  "components": [
+   {
+    "id": 0,
+    "n": 606,
+    "bbox": [
+     504,
+     2,
+     511,
+     269
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 17.608683112682538,
+    "recede": 1.776478961715991,
+    "notUpright": null,
+    "placedMedRange": 17.608683112682538,
+    "demBehindMed": 1578.4515678997727
+   },
+   {
+    "id": 3,
+    "n": 39,
+    "bbox": [
+     0,
+     109,
+     11,
+     113
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 22.73775399423148,
+    "recede": 0.8688663305042231,
+    "notUpright": null,
+    "placedMedRange": 22.73775399423148,
+    "demBehindMed": null
+   },
+   {
+    "id": 6,
+    "n": 1216,
+    "bbox": [
+     314,
+     114,
+     361,
+     272
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 9.293192864747594,
+    "recede": 1.0863776878575302,
+    "notUpright": null,
+    "placedMedRange": 9.293192864747594,
+    "demBehindMed": 1451.5136739949714
+   },
+   {
+    "id": 31,
+    "n": 31,
+    "bbox": [
+     346,
+     126,
+     352,
+     133
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 8.728484804458542,
+    "recede": 1.0757908678315735,
+    "notUpright": null,
+    "placedMedRange": 8.728484804458542,
+    "demBehindMed": 2558.831534917567
+   },
+   {
+    "id": 61,
+    "n": 74,
+    "bbox": [
+     0,
+     140,
+     13,
+     146
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 49.01244621713856,
+    "recede": 0.8437952980878298,
+    "notUpright": null,
+    "placedMedRange": 49.01244621713856,
+    "demBehindMed": 4547.263580825924
+   },
+   {
+    "id": 66,
+    "n": 36,
+    "bbox": [
+     4,
+     161,
+     29,
+     163
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 22.444274219383907,
+    "recede": 1.6322883865190547,
+    "notUpright": null,
+    "placedMedRange": 22.444274219383907,
+    "demBehindMed": 1940.86264194389
+   },
+   {
+    "id": 80,
+    "n": 135,
+    "bbox": [
+     130,
+     196,
+     135,
+     243
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 122.89277088397905,
+    "recede": 0.940616884014394,
+    "notUpright": null,
+    "placedMedRange": 122.89277088397905,
+    "demBehindMed": 796.5944521730173
+   }
+  ],
+  "objFrac": 0.01425438596491228
+ },
+ "wc_0077": {
+  "n": 77692,
+  "tags": [
+   "grass",
+   "rock"
+  ],
+  "curve": {
+   "x": [
+    4.1560002928633235,
+    4.583252003827121,
+    5.626764614330876,
+    5.907020078483307,
+    6.246336889907018
+   ],
+   "y": [
+    3.4590323283731714,
+    4.539032328373171,
+    7.619032328373171,
+    7.839032328373172,
+    8.099032328373172
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.07280963040015553,
+   "inlierFrac": 0.7441950265149565,
+   "quality": 0.6518223633263774,
+   "residualLogAllW": 0.06984208889421506,
+   "inlierFracW": 0.7360498362012468,
+   "qualityW": 0.6515472338815304,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.6518223633263774
+  },
+  "slopes": [
+   2.528,
+   2.952,
+   0.785,
+   0.766
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 3.1112394494069395,
+   "scale3000": 3.1207124776932753,
+   "mode3000": 3.1228499797277696,
+   "scale150": 0.32434155786858176
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.341579517515692,
+    "50-150": 3.148295164198725,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": 2.2249845817789957,
+    "50-150": 3.146202993065652,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0082": {
+  "n": 119982,
+  "tags": [
+   "buildings",
+   "trees"
+  ],
+  "curve": {
+   "x": [
+    3.4350330209222846,
+    3.8141053646830922,
+    4.39249274517504,
+    5.041985924117393,
+    5.793466132750754,
+    6.366399056514534
+   ],
+   "y": [
+    3.9250891962511405,
+    4.26508919625114,
+    5.48508919625114,
+    6.3850891962511405,
+    7.165089196251141,
+    7.905089196251141
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.08339441640233458,
+   "inlierFrac": 0.846110249870814,
+   "quality": 0.7110792973680065,
+   "residualLogAllW": 0.08836998074904123,
+   "inlierFracW": 0.8254870525109222,
+   "qualityW": 0.6790822412628639,
+   "objExplainedFrac": 0.00598423096797851,
+   "qualityObj": 0.7172530422026077
+  },
+  "slopes": [
+   0.897,
+   2.109,
+   1.386,
+   1.038,
+   1.292
+  ],
+  "objFracCurve": 0.0036519368489583335,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 0.0906652714137966,
+   "scale3000": 0.46891984012765,
+   "mode3000": 0.5485149186273455,
+   "scale150": 0.295861350669056
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.19482736016079538,
+    "50-150": 0.08926813559102294,
+    "150-500": 0.08463834841351708
+   },
+   "scale3000": {
+    "15-50": 0.9702600139536526,
+    "50-150": 0.7322606090144451,
+    "150-500": 0.15075660128290663
+   }
+  },
+  "objFracFinal": 0.0036519368489583335,
+  "components": [
+   {
+    "id": 0,
+    "n": 385,
+    "bbox": [
+     450,
+     274,
+     475,
+     298
+    ],
+    "contacts": 24,
+    "factor": 2.9030471470661574,
+    "contactDem": 146.1623589924696,
+    "contactModel": 50.09392664086218,
+    "contactCurve": 87.84613707293326,
+    "curveMedRange": 96.54633377264787,
+    "recede": 1.0555343541419304,
+    "notUpright": null,
+    "placedMedRange": 152.08381291912158,
+    "demBehindMed": 223.18923669965716,
+    "topAboveContactGround": 3.3065766251352215,
+    "bottomAboveContactGround": -3.222592640115863,
+    "fracPtsWithDem": 0.8571428571428571,
+    "fracBelowDem1m": 0.015151515151515152,
+    "heightAboveDemP05": -0.5967283780440766,
+    "contactPlacedOverDem": 0.9949554168565982,
+    "curveOverDemAtContact": 0.6010175101064096,
+    "scale3000OverDemAtContact": 1.2020892758015556
+   },
+   {
+    "id": 4,
+    "n": 68,
+    "bbox": [
+     33,
+     290,
+     45,
+     297
+    ],
+    "contacts": 13,
+    "factor": 1.8621037092056552,
+    "contactDem": 88.81099160388771,
+    "contactModel": 48.07203933173225,
+    "contactCurve": 80.53445519337963,
+    "curveMedRange": 81.9955387454157,
+    "recede": 1.0212909754025927,
+    "notUpright": null,
+    "placedMedRange": 90.28140671434461,
+    "demBehindMed": 175.73667423837415,
+    "topAboveContactGround": 0.7652243241789165,
+    "bottomAboveContactGround": -0.6244760986867277,
+    "fracPtsWithDem": 1.0,
+    "fracBelowDem1m": 0.0,
+    "heightAboveDemP05": 0.02438203904979446,
+    "contactPlacedOverDem": 1.0079284234090256,
+    "curveOverDemAtContact": 0.9068072964726837,
+    "scale3000OverDemAtContact": 1.8985105645328242
+   },
+   {
+    "id": 5,
+    "n": 197,
+    "bbox": [
+     0,
+     292,
+     27,
+     304
+    ],
+    "contacts": 6,
+    "factor": 2.588780145226167,
+    "contactDem": 93.49105467244274,
+    "contactModel": 36.11552979270697,
+    "contactCurve": 58.040666480231216,
+    "curveMedRange": 58.54164206717976,
+    "recede": 1.2184536763498865,
+    "notUpright": null,
+    "placedMedRange": 94.3953504978584,
+    "demBehindMed": 167.69424809834825,
+    "topAboveContactGround": 1.9150545020090703,
+    "bottomAboveContactGround": -7.123579007766466,
+    "fracPtsWithDem": 0.8071065989847716,
+    "fracBelowDem1m": 0.006289308176100629,
+    "heightAboveDemP05": -0.23714399760922333,
+    "contactPlacedOverDem": 1.000043980563227,
+    "curveOverDemAtContact": 0.6208151858333798,
+    "scale3000OverDemAtContact": 1.354912102232751
+   }
+  ],
+  "objFrac": 0.0036519368489583335
+ },
+ "wc_0085": {
+  "n": 90762,
+  "tags": [
+   "snow"
+  ],
+  "curve": {
+   "x": [
+    2.4615906062858035,
+    3.1400118460001196,
+    3.5156092076520475,
+    4.020340759090985,
+    4.863274679550181,
+    5.278995848403042
+   ],
+   "y": [
+    4.277570262905937,
+    4.897570262905937,
+    6.257570262905937,
+    6.817570262905937,
+    7.557570262905937,
+    7.8775702629059365
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.05636614674161988,
+   "inlierFrac": 0.7615742270994469,
+   "quality": 0.703423465769026,
+   "residualLogAllW": 0.0381205729179781,
+   "inlierFracW": 0.8513705062381065,
+   "qualityW": 0.8209957717499577,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.703423465769026
+  },
+  "slopes": [
+   0.914,
+   3.621,
+   1.11,
+   0.878,
+   0.77
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 0.08664446283969576,
+   "scale3000": 0.06875573088775916,
+   "mode3000": 0.059883628314618555,
+   "scale150": 0.05835718716728328
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": 0.01894981561885476,
+    "150-500": 0.27883515554807126
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": 0.05271452862756494,
+    "150-500": 0.11606644972597671
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0088": {
+  "n": 81551,
+  "tags": [
+   "rock",
+   "water"
+  ],
+  "curve": {
+   "x": [
+    2.606221276699145,
+    4.7773057944361454,
+    5.218836736294725,
+    5.537366518981931
+   ],
+   "y": [
+    5.2540359449828635,
+    7.434035944982863,
+    7.774035944982863,
+    8.014035944982863
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.21423134492822982,
+   "inlierFrac": 0.5020416671775944,
+   "quality": 0.1593824069557253,
+   "residualLogAllW": 1.4324312845238687,
+   "inlierFracW": 0.43103928049442886,
+   "qualityW": 2.27371819262517e-23,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.1593824069557253
+  },
+  "slopes": [
+   1.004,
+   0.77,
+   0.753
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": null,
+   "scale3000": null,
+   "mode3000": null,
+   "scale150": null
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": null
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0094": {
+  "n": 78903,
+  "tags": [
+   "grass",
+   "rock"
+  ],
+  "curve": {
+   "x": [
+    2.4544252144495524,
+    3.094048899129089,
+    3.777845598560257,
+    5.164592703273955,
+    6.188194143349677
+   ],
+   "y": [
+    5.4911716774302395,
+    6.23117167743024,
+    6.75117167743024,
+    8.15117167743024,
+    8.97117167743024
+   ],
+   "n": 40000
+  },
+  "curveQ": {
+   "residualLogAll": 0.2161732901308726,
+   "inlierFrac": 0.5104368655184214,
+   "quality": 0.1586966747016899,
+   "residualLogAllW": 0.21081790693900526,
+   "inlierFracW": 0.5106493590629837,
+   "qualityW": 0.16810325803072695,
+   "objExplainedFrac": 0.0,
+   "qualityObj": 0.1586966747016899
+  },
+  "slopes": [
+   1.157,
+   0.76,
+   1.01,
+   0.801
+  ],
+  "objFracCurve": 0.0,
+  "objFracMode": 0.0,
+  "resid500": {
+   "curve": 0.08588930897958189,
+   "scale3000": 0.08538921280659745,
+   "mode3000": 0.08745309758505407,
+   "scale150": null
+  },
+  "residBins": {
+   "curve": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": 0.08588930897958189
+   },
+   "scale3000": {
+    "15-50": null,
+    "50-150": null,
+    "150-500": 0.08538921280659745
+   }
+  },
+  "objFracFinal": 0.0,
+  "components": [],
+  "objFrac": 0.0
+ },
+ "wc_0099": {
+  "n": 20727,
+  "tags": [
+   "water"
+  ],
+  "curve": {
+   "x": [
+    3.9901944410207806,
+    4.592320732237098,
+    5.4812017114247436,
+    6.015490519064456,
+    6.311829236631929,
+    6.5146691642329255
+   ],
+   "y": [
+    2.719513476743816,
+    3.359513476743816,
+    4.459513476743816,
+    5.459513476743816,
+    6.6995134767438165,
+    7.759513476743816
+   ],
+   "n": 20727
+  },
+  "curveQ": {
+   "residualLogAll": 0.017635822126864653,
+   "inlierFrac": 0.9527186761229315,
+   "quality": 0.945339484964787,
+   "residualLogAllW": 0.057624623926932905,
+   "inlierFracW": 0.7157012880844802,
+   "qualityW": 0.6586866659279457,
+   "objExplainedFrac": 0.0016886187098953398,
+   "qualityObj": 0.9469797612750952
+  },
+  "slopes": [
+   1.063,
+   1.238,
+   1.872,
+   4.184,
+   5.226
+  ],
+  "objFracCurve": 0.00017801920572916666,
+  "objFracMode": 0.009796142578125,
+  "resid500": {
+   "curve": 0.016347488989341227,
+   "scale3000": 0.05892479584808287,
+   "mode3000": 0.03671892384899004,
+   "scale150": 0.058322303200677036
+  },
+  "residBins": {
+   "curve": {
+    "15-50": 0.013131160130153623,
+    "50-150": 0.03597570679655173,
+    "150-500": 0.05878089774132277
+   },
+   "scale3000": {
+    "15-50": 0.047939675902400905,
+    "50-150": 0.17688119831272103,
+    "150-500": 0.5452513065846457
+   }
+  },
+  "objFracFinal": 0.00017801920572916666,
+  "components": [
+   {
+    "id": 0,
+    "n": 35,
+    "bbox": [
+     358,
+     262,
+     383,
+     263
+    ],
+    "contacts": 0,
+    "factor": null,
+    "contactDem": null,
+    "contactModel": null,
+    "contactCurve": null,
+    "curveMedRange": 132.54499472994104,
+    "recede": 1.069238362470606,
+    "notUpright": null,
+    "placedMedRange": 132.54499472994104,
+    "demBehindMed": 275.2901129906034
+   }
+  ],
+  "objFrac": 0.00017801920572916666
+ }
+}

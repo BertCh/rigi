@@ -76,3 +76,14 @@ tools/research/tm/x5_verifier/features*.json
 tools/research/tm/h1_mine/pool.json
 tools/research/tm/x3_modality/results_*.json
 .infer_done
+
+# Step Inside (mt-image-14): near-field service caches, private pylib, splat binaries
+tools/nearfield/.pylib/
+tools/nearfield/.cache/
+tools/nearfield/shots/
+*.splat
+*.spz
+*.ksplat
+tools/nearfield/**/*.ply
+# keep the small (16 KB) blind-verifier outputs that verify/score.py reads (raw/ is ignored globally)
+!tools/nearfield/propagate/verify/raw/

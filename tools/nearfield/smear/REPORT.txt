@@ -1,0 +1,98 @@
+P1 EXIT GATE: "the split removes >= 80% of person/hut/tree drape smear". Measured 2026-09-28.
+VERDICT: NOT MET, on either renderer.
+
+Setup
+- Labels: labels.json, 99 hand polygons/boxes on the 14 posed GT photos (quality good/approx). Drawn blind
+  from gridded downscaled photos BEFORE any nearfield code was read or run (file mtime precedes all grid-*).
+  unsure=true marks objects that may be >300 m away or already in the DEM, or outlines that are rough.
+  Classes: person, building, tree, pole, structure (fences/boards/walls), vehicle (boat), animal, rock.
+- Metric (scripts/nearfield/smear-measure.mjs): taken from the drape shader's own rule (materials.ts and
+  deck terrain-layer.ts): photo pixel puv lands on terrain iff seen(puv) > minProjectRange (80 m) and
+  mask(puv) <= 0.5. seen is engine.sampleAt range, the readback of the same range buffer. The mask is the
+  texture the world drape binds: OFF = the people mask (protectPeople); ON = three nf.masks.worldFg, or deck
+  drapeMask().photoFg. Sampling is bilinear like the GPU, on a 320x240 grid of photo cells.
+  Smear = a labelled cell that is draped. It is photo-space and independent of the viewpoint; an offset
+  viewer sees a subset of it. I did not render an offset view.
+- "prod" = the product: a photo under ANCHOR_MIN_QUALITY shows no scene, so ON == OFF. "forced" = the
+  scene's mask applied anyway.
+- Code fingerprint 572f71d7a5b8 (fingerprint.sh), stable across the final three and deck runs (run-log.txt).
+  Earlier runs made while other sessions were editing scene.ts/ground.ts/near-dem.ts gave different
+  numbers. One transient deck state marked the whole 4-11 km mountainside Object on IMG_6958, with 83%
+  collateral. Treat this as a moving target.
+
+Results, confident labels, pooled cells (summary-three.txt, summary-deck.txt)
+                     smearOff  removal prod  removal forced  diag nearRadius 300 / 500 (forced)
+three  building          3370      10.9%          10.9%          19.6% / 15.4%
+three  tree             26521       4.3%          16.3%          37.9% / 35.1%
+three  pole              3206       8.2%          72.5%          77.4% / 77.9%
+three  structure         7012       0.0%          70.4%          84.0% / 86.3%
+three  non-person       40229       4.4%          29.7%          47.4% / 45.7%
+three  person            2925       6.1%          36.2%   (of 209551 labelled person cells: people mask + 80 m cut already stop 98.6%)
+deck   building          3370       7.7%           7.7%           9.2% / 13.8%
+deck   tree             27386       6.3%          18.5%          19.5% / 16.7%
+deck   pole              7752      23.8%          23.8%          80.9% / 81.2%
+deck   structure         7373      28.4%          28.4%          70.8% / 70.8%
+deck   vehicle           1145      99.1%          99.1%
+deck   non-person       47146      15.0%          22.1%          38.8% / 37.6%
+Counting unsure labels too: three non-person 9.2% prod / 25.4% forced; deck 16.0% / 20.5%.
+Collateral (unlabelled cells draped OFF and masked ON), cells more than 0.02 from any label box:
+  three 1.3%, deck 1.1% (forced); nearRadius 300: 2.9% / 12.0%; 500: 11.0% / 17.7%.
+  Within the 0.02 band it is 4.5-6.7%, mostly label imprecision plus the 3x3 dilation.
+
+Why it fails (why.mjs: split class of the labelled cells that still smear, forced)
+1. Most leftover smear is split class Far: the anchored model range is over nearRadius=150 m, or there is
+   no model depth. Examples: three tree 14419 Far vs 7811 Terrain; building 2821 Far vs 229 Terrain. Huts
+   and trees at 100-300 m (IMG_7130 chalets, IMG_7131 house, IMG_7018/7033 trees against the lake) are
+   never Object. Raising nearRadius is not enough: at 300 m non-person removal only reaches 47% (three),
+   while collateral grows. Trees also split as Terrain (about 8k cells): their model depth is too close to
+   the DEM range behind them.
+2. The quality gate hides the scene on 4/14 photos in three and 2/14 in deck. Anchor quality for the same
+   photo and pose is unstable between renderers and runs: IMG_7053 three 0.03 vs deck 0.57; 7059 0.95 vs
+   0.00; 7068 0.00 vs 0.67; 7155 0.00 vs 0.19; 7086 three 0.10 then 0.28. The 72% (three) pole and 70%
+   structure removal comes almost entirely from gated photos (7053, 7155), so the product gets none of it.
+3. Classic drape already hides most near-field smear. minProjectRange=80 m cuts every cell whose terrain
+   behind is within 80 m (three: 127k of 210k person cells, all boat and rock cells). What is left are
+   objects seen against terrain more than 80 m away, which are exactly the far huts and trees in point 1.
+4. three and deck classic drapes differ. The deck range buffer drops terrain near the eye (IMG_6958
+   bottom row: 6.8 m in three vs 31.7 m in deck; near-dem.ts comment "query buffer discards terrain within
+   nearDiscard / 2"). Near fence posts in deck therefore drape onto the far valley: IMG_7068 posts give
+   3908 smear cells in deck vs 229 in three. Deck vehicle smear (IMG_6971 boat, 1145 cells) exists only
+   because of this, and the split removes 99% of it.
+Where it works: poles and fence posts on accepted photos (5495 97%, 7053 98% forced), IMG_6971
+people/boat (94%/99%), the IMG_7086 hut (three 45%, deck 28%).
+
+Caveats: labels are coarse (about 1-2% of width), and the label edge band is reported separately. The
+person-class residual (about 1.4% of person cells) is mostly label or people-mask edge. The diagnostic
+nearRadius variants rebuild the scene in-page (scene.ts buildNearFieldScene, DEM grid via sampleAt rather
+than nearFieldDemRange); they are not the product path. Cells are photo pixels, not ground area.
+
+Files: labels.json; grid-<renderer>-<id>.json.gz (per-cell range/off/on/cls/variants); summary-*.{txt,json};
+why.mjs; viz.mjs (overlay: green = removed, red = still draped, blue = masked in both); grid.mjs (the
+labelling grid); fingerprint.sh; run-log.txt.
+Rerun: node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/smear-measure.mjs [--renderer=deck]
+  [--variants=300,500]; gzip -9 tools/nearfield/smear/grid-*.json; node scripts/nearfield/smear-report.mjs
+  [--renderer=deck]
+
+REVIEWER ADDENDUM (independent check, 2026-09-28, same fingerprint 572f71d7a5b8)
+- Reproduced: smear-report.mjs on the stored grids regenerates summary-three/deck.txt byte for byte.
+  Re-measured IMG_7053/7059/7086/5495 on both renderers (render lock, :3110, :8767 reused): all
+  range/off/on/cls arrays and quality values are bit-identical to the stored grids.
+- Metric checked against the code: materials.ts / deck terrain-layer.ts visibility rule, engine.ts
+  masks (worldFg when protectPeople, row 0 = top), deck drapeMask() and drapeRange() (built from the same
+  geoSrc that sampleAt reads). The product path does use maskDrape:true (useStepInside.ts). viz overlays
+  (7086, 7130, 7155) show the masks aligned with the photo, with no flip.
+- Gate as the design doc words it: "person and hut" smear, not all non-person classes. Confident labels:
+    three person+building: smearOff 6295 -> removal 8.7% product, 22.7% forced
+    deck  person+building: smearOff 7711 -> removal 19.8% product, 19.8% forced
+  The verdict (NOT MET) is unchanged. The headline table above leaves out the deck person row
+  (4341 cells, 29.1% product); deck classic stops 97.9% of labelled person cells, not 98.6%.
+- Correction to "anchor quality unstable between runs": at a fixed code fingerprint it is
+  deterministic (see above). The large differences are between renderers (three vs deck range buffers
+  feeding the anchor, e.g. 7059 0.95 vs 0.00) and between code versions (the 7086 0.10 -> 0.28 pair
+  spans code changes). This is a renderer-parity problem in anchoring, not run-to-run noise.
+- Blindness of labels.json cannot be verified from the filesystem. Its timestamp (23:37:00) precedes
+  the final grids, but the scripts and summaries were rewritten, and earlier runs existed. Nothing in
+  the labels looks tuned to the split output: unsure flags are conservative, and the 7130/7131 houses
+  that the split misses are labelled confident.
+- The IMG_6958 bottom-row near range is 5.5 m (three) vs 21.3 m (deck) in the final grids (minimum over
+  the row). The 6.8 / 31.7 m quoted above came from a different sample; the direction is the same.

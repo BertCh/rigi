@@ -29,6 +29,11 @@ import type { Pose } from "../camera";
 import type { compositeValues, harmonizeValues } from "../look/composite";
 import { COMP_BLOCK, HARM_BLOCK } from "../look/glsl/composite";
 import type { LookDefine } from "../look/look-key";
+import {
+	isDeckSplatLayer,
+	SplatColorPass,
+	splatDrawKey,
+} from "../nearfield/deck-splat-layer";
 import type { RevealUniforms } from "../reveal/config";
 import {
 	type DeckCompositeStyle,
@@ -180,6 +185,9 @@ export class PhotoCompositor implements Effect {
 	private maskTex?: Texture;
 	private maskSrc: Uint8Array | null = null;
 	private colorKey: unknown[] = [];
+	/** Step Inside: the splats' merge over the cached terrain colour (DeckSplatLayer pass "color"). */
+	private splatPass?: SplatColorPass;
+	private splatKey: unknown[] = [];
 	/** True once the colour + geometry targets hold a frame for the current viewport. */
 	ready = false;
 
@@ -366,7 +374,7 @@ export class PhotoCompositor implements Effect {
 		}
 		const t1 = performance.now();
 		// colour: any prop change re-creates the tile layer instances
-		const colorKey = [
+		const colorKey: unknown[] = [
 			pose.yaw,
 			pose.pitch,
 			pose.roll,
@@ -376,10 +384,34 @@ export class PhotoCompositor implements Effect {
 			ch,
 			...colorLayers,
 		];
+		// Step Inside splats (opt-in): drawn over a snapshot of the terrain colour, so a splat-only
+		// change (opacity, truth, a new sort order) skips the terrain; none → the classic path as-is
+		const splatLayers = opts.layers.filter((l) => isDeckSplatLayer(l));
+		if (splatLayers.length) colorKey.push("splats");
+		let colorDrawn = false;
 		if (!sameKey(colorKey, this.colorKey)) {
-			this.renderColor(colorLayers, this.color, pose, eye);
+			this.renderColor(
+				colorLayers,
+				this.color,
+				pose,
+				eye,
+				splatLayers.length > 0,
+			);
 			this.colorKey = colorKey;
+			colorDrawn = true;
 			if (this.benchmark) gl.finish();
+		}
+		if (splatLayers.length) {
+			const splatKey = [...colorKey, ...splatDrawKey(splatLayers)];
+			if (colorDrawn || !sameKey(splatKey, this.splatKey)) {
+				this.splatPass?.draw(splatLayers, this.color, pose, eye);
+				this.splatKey = splatKey;
+				if (this.benchmark) gl.finish();
+			}
+		} else if (this.splatPass) {
+			this.splatPass.destroy();
+			this.splatPass = undefined;
+			this.splatKey = [];
 		}
 		const t2 = performance.now();
 		this.timing = {
@@ -509,11 +541,13 @@ export class PhotoCompositor implements Effect {
 		target: Framebuffer,
 		pose: Pose,
 		eye: [number, number, number],
+		splats = false,
 	) {
 		const renderer = this.renderer as TerrainPassRenderer;
 		const ms = this.ensureMsaa(target.width, target.height);
 		if (!ms) {
 			renderer.render("color", layers, target, pose, eye);
+			if (splats) this.snapshotForSplats(target);
 			return;
 		}
 		const gl = (this.device as unknown as { gl: GL }).gl;
@@ -543,11 +577,19 @@ export class PhotoCompositor implements Effect {
 			0,
 			ms.width,
 			ms.height,
-			gl.COLOR_BUFFER_BIT,
+			// the splats depth-test against the terrain: resolve its depth too (Step Inside only)
+			splats ? gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT : gl.COLOR_BUFFER_BIT,
 			gl.NEAREST,
 		);
 		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
 		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prevDraw);
+		if (splats) this.snapshotForSplats(target);
+	}
+
+	/** Keep the terrain colour for SplatColorPass (the splats are merged over it). */
+	private snapshotForSplats(target: Framebuffer) {
+		this.splatPass ??= new SplatColorPass(this.device as Device);
+		this.splatPass.snapshot(target);
 	}
 
 	private ensureMsaa(width: number, height: number) {
@@ -675,6 +717,7 @@ export class PhotoCompositor implements Effect {
 		const colorLayers = layers.filter(
 			(l) => isTerrainTile(l) || isTrailLayer(l),
 		);
+		const splatLayers = layers.filter((l) => isDeckSplatLayer(l));
 		const gs = geometrySize(width / height);
 		const geo = new GeometryTarget(device, gs.width, gs.height);
 		const colorTex = device.createTexture({
@@ -729,7 +772,18 @@ export class PhotoCompositor implements Effect {
 		});
 		try {
 			this.renderer.render("geometry", tiles, geo.fbo, pose, eye);
-			this.renderColor(colorLayers, color, pose, eye);
+			if (splatLayers.length) {
+				// a fresh merge at the export size (the on-screen one keeps its snapshot)
+				const onScreen = this.splatPass;
+				this.splatPass = new SplatColorPass(device);
+				try {
+					this.renderColor(colorLayers, color, pose, eye, true);
+					this.splatPass.draw(splatLayers, color, pose, eye);
+				} finally {
+					this.splatPass.destroy();
+					this.splatPass = onScreen;
+				}
+			} else this.renderColor(colorLayers, color, pose, eye);
 			if (this.look.normal != null) {
 				this.normal = this.floatTarget(
 					this.normal,
@@ -775,6 +829,9 @@ export class PhotoCompositor implements Effect {
 
 	cleanup() {
 		this.destroyMsaa();
+		this.splatPass?.destroy();
+		this.splatPass = undefined;
+		this.splatKey = [];
 		if (this.normal) destroyTarget(this.normal);
 		this.maskTex?.destroy();
 		this.normal = this.maskTex = undefined;

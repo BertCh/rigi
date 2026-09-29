@@ -7,3 +7,4 @@ export * from "./xmp";
 export * from "./annotate";
 export * from "./colmap";
 export * from "./engine-export";
+export * from "./splat";

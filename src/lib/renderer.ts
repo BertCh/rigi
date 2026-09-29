@@ -17,6 +17,8 @@ import type { Pose } from "./camera";
 import type { PeakLabel, Sample, Settings } from "./engine";
 import type { EnuFrame } from "./geodesy";
 import type { Unknowns } from "./integration/unknown-pose";
+import type { NearFieldSample } from "./nearfield/measure";
+import type { NearFieldScene, NearFieldViewOpts } from "./nearfield/types";
 import type { PhotoMeta, RegionData } from "./photos";
 import type { RevealUniforms } from "./reveal/config";
 import type { ViewStyle } from "./style/types";
@@ -69,6 +71,13 @@ export interface Renderer {
 	setSkyMask?(m: FgMask | null): void;
 	/** One frame of the overlay reveal (src/lib/reveal); null = off (the classic composite, untouched). */
 	setReveal?(r: RevealUniforms | null): void;
+	/**
+	 * Step Inside (src/lib/nearfield): show a near-field scene (null = remove). Splats draw in the world
+	 * view / step-inside camera (deck: also the photo view); the world drape skips the scene's Object pixels.
+	 */
+	setNearField?(scene: NearFieldScene | null, opts?: NearFieldViewOpts): void;
+	/** Near-field object under normalised photo coords (Object pixels of the shown scene), else null. */
+	nearFieldSampleAt?(u: number, v: number): NearFieldSample | null;
 
 	// ---- queries ----
 	/** Resolves true once sampleAt / peakLabels describe the current pose (false if disposed first). */

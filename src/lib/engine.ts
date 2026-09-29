@@ -64,6 +64,29 @@ import {
 	RAMP_GLSL,
 	STYLE,
 } from "./materials";
+import {
+	buildMeasureGrid,
+	type MeasurableScene,
+	type NearFieldSample,
+	nearFieldSampleAt,
+} from "./nearfield/measure";
+import {
+	loadNearDem,
+	type NearDem,
+	nearFieldDemRangeFrom,
+} from "./nearfield/near-dem";
+import { PROVENANCE_COLORS, PROVENANCE_TINT_MIX } from "./nearfield/provenance";
+import {
+	makePhotoSky,
+	type PhotoSky,
+	StepCamera,
+} from "./nearfield/step-camera";
+import { ThreeSplats } from "./nearfield/three-splats";
+import {
+	type NearFieldScene,
+	type NearFieldViewOpts,
+	PixelClass,
+} from "./nearfield/types";
 import type { PhotoMeta, RegionData } from "./photos";
 import { applyPose, projectPoint, unprojectDir } from "./pose";
 import type { RevealUniforms } from "./reveal/config";
@@ -85,6 +108,21 @@ import type { ViewStyle } from "./style/types";
 import { heightFromTile, type ImagerySource, Terrain } from "./terrain";
 
 export type ViewMode = "overlay" | "replace" | "world";
+
+/**
+ * THREE layer of the Step Inside splats (src/lib/nearfield). Only the world / step-inside camera enables
+ * it, so the geometry, layer, normal, stats, silhouette and horizon passes (layer 0 cameras) never draw
+ * or re-sort them.
+ */
+export const NEARFIELD_LAYER = 7;
+/** The world camera's near plane (m) without a near-field scene. */
+const WORLD_NEAR = 5;
+type NearFieldMasks = {
+	worldFg: THREE.DataTexture;
+	worldObj: THREE.DataTexture;
+	step: THREE.DataTexture;
+	sky: THREE.DataTexture;
+};
 export type LayerStyle =
 	| "contours"
 	| "bands"
@@ -406,7 +444,7 @@ export class PhotoEngine {
 	private skyMesh?: ReturnType<typeof makeSkyMesh>;
 	private scene = new THREE.Scene();
 	private cam = new THREE.PerspectiveCamera(50, 1, 1, 400000);
-	private worldCam = new THREE.PerspectiveCamera(55, 1, 5, 600000);
+	private worldCam = new THREE.PerspectiveCamera(55, 1, WORLD_NEAR, 600000);
 	private controls?: OrbitControls;
 	private geoRT: THREE.WebGLRenderTarget;
 	private layerRT: THREE.WebGLRenderTarget;
@@ -474,6 +512,20 @@ export class PhotoEngine {
 	private disposed = false;
 	/** Aborted on dispose: a superseded engine (StrictMode, fast navigation) stops loading tiles. */
 	private loadAbort = new AbortController();
+	/** Step Inside (src/lib/nearfield): splats, drape masks and the step camera; all null when off. */
+	private nf: {
+		scene: NearFieldScene;
+		splats: ThreeSplats;
+		opts: NearFieldViewOpts;
+		masks: NearFieldMasks | null;
+	} | null = null;
+	private step: {
+		cam: StepCamera;
+		sky: PhotoSky;
+		fromWorld: boolean;
+	} | null = null;
+	/** The last setSkyMask() mask (P(sky) 0..255), for Step Inside's split. */
+	private skyMaskStore: SkyMask | null = null;
 	cssSize = { w: 1, h: 1 };
 
 	constructor(canvas: HTMLCanvasElement, photo: PhotoMeta) {
@@ -573,6 +625,8 @@ export class PhotoEngine {
 		this.compScene.add(this.composite);
 		this.shared.uPhotoFg.value = this.fgTex;
 		this.scene.background = null;
+		// Step Inside splats live on their own layer: only the world / step camera draws them
+		this.worldCam.layers.enable(NEARFIELD_LAYER);
 	}
 
 	/** One frame of the overlay reveal (src/lib/reveal); null = off. */
@@ -1017,6 +1071,7 @@ export class PhotoEngine {
 		const cur = this.settings;
 		this.syncDefines();
 		this.scheduleLook();
+		if (this.step && cur.mode !== prev.mode) this.exitStepInside();
 		if (cur.mode === "world" && prev.mode !== "world") this.enterWorld();
 		if (cur.mode !== "world" && prev.mode === "world") this.exitWorld();
 		const wantImagery: ImagerySource =
@@ -1299,6 +1354,7 @@ export class PhotoEngine {
 
 	/** P(sky) of the photo (#/lib/sky segmentSky, row 0 = top): the haze fit's sky. */
 	setSkyMask(mask: SkyMask | null) {
+		this.skyMaskStore = mask;
 		this.haze.setSky(mask);
 		this.look.setSky(mask);
 		this.fitHaze();
@@ -1373,7 +1429,7 @@ export class PhotoEngine {
 		if (this.geoDirty) this.renderGeometry();
 		const L = this.style.composite;
 
-		if (s.mode === "world") {
+		if (s.mode === "world" || this.step) {
 			this.renderWorld();
 		} else {
 			applyPose(this.cam, this.pose, this.aspect, this.eye);
@@ -1596,7 +1652,12 @@ export class PhotoEngine {
 		const terrain = this.terrain as Terrain;
 		const w = this.style.world;
 		let photoPlaneOpacity = w.frame.planeOpacity;
-		if (this.flight?.held) {
+		const step = this.step;
+		if (step) {
+			// Step Inside: the step camera drives worldCam; the frustum gizmo would sit on the eye
+			if (step.cam.update()) this.requestRender();
+			photoPlaneOpacity = 0;
+		} else if (this.flight?.held) {
 			photoPlaneOpacity = 0;
 		} else if (this.flight) {
 			const f = this.flight;
@@ -1643,11 +1704,38 @@ export class PhotoEngine {
 			if (this.look.version !== this.lookVersion)
 				this.applyCompositeLook(this.composite.material.uniforms);
 		}
-		u.uProjectPhoto.value = s.projectOpacity;
+		// Step Inside: the full photo on the drape, at every incidence (materials.ts: > 1.5)
+		u.uProjectPhoto.value = this.step ? 2 : s.projectOpacity;
 		u.uPhoto.value = this.photoTex;
 		u.uPhotoRange.value = this.geoRT.texture;
 		u.uPhotoMinRange.value = s.minProjectRange;
 		u.uPhotoFgOn.value = s.protectPeople ? 1 : 0;
+		const nf = this.nf;
+		if (nf?.masks && nf.opts.maskDrape !== false) {
+			// Object pixels (huts, people, trees) must not smear across the terrain behind them: the split's
+			// Object mask OR'd into the people-mask path of the drape
+			u.uPhotoFg.value = step
+				? nf.masks.step
+				: s.protectPeople
+					? nf.masks.worldFg
+					: nf.masks.worldObj;
+			u.uPhotoFgOn.value = 1;
+		}
+		// Truth toggle: the terrain tinted by provenance too (materials.ts uTruth; splats: ThreeSplats.setTruth)
+		u.uTruth.value = nf?.opts.truth ? PROVENANCE_TINT_MIX : 0;
+		if (nf?.opts.truth) {
+			const [o, d] = [PROVENANCE_COLORS.observed, PROVENANCE_COLORS.dem];
+			u.uTruthObs.value.set(o[0] / 255, o[1] / 255, o[2] / 255);
+			u.uTruthDem.value.set(d[0] / 255, d[1] / 255, d[2] / 255);
+		}
+		// splats stand metres from the eye: the world camera's 5 m near plane would cut them
+		const near = step ? 0.3 : nf ? 1 : WORLD_NEAR;
+		if (this.worldCam.near !== near) {
+			this.worldCam.near = near;
+			this.worldCam.updateProjectionMatrix();
+		}
+		// from the photo camera the near terrain drapes exactly: no grazing-angle cut-off
+		if (step) u.uPhotoMinRange.value = 1;
 		u.uPhotoPos.value.copy(this.eye);
 		applyPose(this.cam, this.pose, this.aspect, this.eye);
 		u.uPhotoViewProj.value.multiplyMatrices(
@@ -1655,6 +1743,17 @@ export class PhotoEngine {
 			this.cam.matrixWorldInverse,
 		);
 		if (this.trails) this.trails.visible = s.trails;
+		if (step) {
+			const su = step.sky.material.uniforms;
+			su.uPhoto.value = this.photoTex;
+			su.uPhotoViewProj.value.copy(u.uPhotoViewProj.value);
+			su.uPhotoPos.value.copy(this.eye);
+			su.uSkyMask.value = nf?.masks?.sky ?? null;
+			su.uSkyOn.value = nf?.masks ? 1 : 0;
+			setColor(su.uBg.value, w.sky.clear);
+			step.sky.position.copy(this.worldCam.position);
+			this.scene.add(step.sky);
+		}
 		this.renderer.setRenderTarget(null);
 		this.renderer.setClearColor(setColor(new THREE.Color(), w.sky.clear), 1);
 		if (w.sky.mode === "atmosphere") this.skyMesh ??= makeSkyMesh(this.shared);
@@ -1673,6 +1772,9 @@ export class PhotoEngine {
 		this.renderer.render(this.scene, this.worldCam);
 		this.scene.background = null;
 		if (sky) this.scene.remove(sky);
+		if (step) this.scene.remove(step.sky);
+		if (nf) u.uPhotoFg.value = this.fgTex;
+		u.uTruth.value = 0;
 		u.uProjectPhoto.value = 0;
 		u.uPhotoRange.value = null;
 	}
@@ -2007,6 +2109,7 @@ export class PhotoEngine {
 		this.fgTex.needsUpdate = true;
 		this.composite.material.uniforms.tFg.value = this.fgTex;
 		this.shared.uPhotoFg.value = this.fgTex;
+		if (this.nf) this.rebuildNearFieldMasks();
 		this.updateLook();
 		this.requestRender();
 	}
@@ -2017,7 +2120,7 @@ export class PhotoEngine {
 		if (withLabels && this.settings.mode !== "world") await this.readback();
 		// GPU look passes (gpu/look) still in flight land before the export draws
 		await lookIdle();
-		if (this.settings.mode === "world") {
+		if (this.settings.mode === "world" || this.step) {
 			this.renderNow();
 			return new Promise((res) =>
 				this.renderer.domElement.toBlob(res, "image/png"),
@@ -2095,6 +2198,8 @@ export class PhotoEngine {
 		for (const r of this.readbackWaiters) r(false);
 		this.readbackWaiters = [];
 		this.controls?.dispose();
+		this.exitStepInside();
+		this.setNearField(null);
 		this.terrain?.dispose();
 		this.skyMesh?.geometry.dispose();
 		this.skyMesh?.material.dispose();
@@ -2113,5 +2218,303 @@ export class PhotoEngine {
 
 	get photoElement() {
 		return this.photoImg;
+	}
+
+	// ---------------- Step Inside (src/lib/nearfield, reports/step-inside-design.md) ----------------
+
+	/** The people / foreground mask (row 0 = top), or null. */
+	get foregroundMask() {
+		return this.fgMask;
+	}
+
+	/** The last P(sky) mask handed to setSkyMask (0..255, row 0 = top), or null. */
+	get skyMaskData() {
+		return this.skyMaskStore;
+	}
+
+	/**
+	 * Show a near-field scene (null = remove). The splats draw only in the world view and the step-inside
+	 * camera (NEARFIELD_LAYER); in the world view the photo drape skips the scene's Object pixels.
+	 */
+	setNearField(scene: NearFieldScene | null, opts: NearFieldViewOpts = {}) {
+		const cur = this.nf;
+		if (!scene) {
+			if (!cur) return;
+			cur.splats.dispose();
+			this.disposeNearFieldMasks(cur.masks);
+			this.nf = null;
+			this.requestRender();
+			return;
+		}
+		const merged: NearFieldViewOpts = {
+			...(cur?.scene === scene ? cur.opts : {}),
+			...opts,
+		};
+		if (cur && cur.scene === scene) {
+			cur.opts = merged;
+			cur.splats.setTruth(!!merged.truth);
+			cur.splats.setOpacity(merged.opacity ?? 1);
+			this.requestRender();
+			return;
+		}
+		if (cur) {
+			cur.splats.dispose();
+			this.disposeNearFieldMasks(cur.masks);
+		}
+		const splats = new ThreeSplats(scene.splats, {
+			truth: !!merged.truth,
+			opacity: merged.opacity ?? 1,
+		});
+		splats.layers.set(NEARFIELD_LAYER);
+		// the worker sort lands asynchronously (no event): after a draw, watch a few frames for a new order
+		let polling = false;
+		splats.onAfterRender = () => {
+			if (polling) return;
+			polling = true;
+			const sorts = splats.stats.sorts;
+			let frames = 0;
+			const tick = () => {
+				if (this.disposed || this.nf?.splats !== splats) return;
+				if (splats.stats.sorts !== sorts) {
+					polling = false;
+					this.requestRender();
+				} else if (++frames < 20) requestAnimationFrame(tick);
+				else polling = false;
+			};
+			requestAnimationFrame(tick);
+		};
+		this.scene.add(splats);
+		this.nf = {
+			scene,
+			splats,
+			opts: merged,
+			masks: null,
+		};
+		this.rebuildNearFieldMasks();
+		this.requestRender();
+	}
+
+	/** The shown near-field scene (the splat export reads it), or null. */
+	get nearFieldScene(): NearFieldScene | null {
+		return this.nf?.scene ?? null;
+	}
+
+	/**
+	 * Step Inside's terrain range for the current pose (controller NearFieldHost.nearFieldDemRange): the
+	 * shared near-DEM source (nearfield/near-dem.ts, the same in deck/engine.ts), CPU terrain profiles within
+	 * NEAR_DEM_CPU_MAX, the geometry buffer (sampleAt) beyond, so the anchor, split and grounding see the same
+	 * near terrain in both renderers. Classic queries are unchanged.
+	 */
+	/** The shared near-camera DEM (nearfield/near-dem.ts), once prepareNearFieldDem() loaded it. */
+	private nearDem: NearDem | null = null;
+
+	/** Load the shared near DEM for Step Inside (controller, before it samples nearFieldDemRange). */
+	async prepareNearFieldDem() {
+		this.nearDem ??= await loadNearDem(
+			this.photo.lat,
+			this.photo.lon,
+			this.photo.alt,
+			{ signal: this.loadAbort.signal },
+		);
+	}
+
+	nearFieldDemRange(
+		width: number,
+		height: number,
+	): (u: number, v: number) => number | null {
+		return nearFieldDemRangeFrom(
+			this.nearDem ?? this.terrain,
+			{ pose: this.pose, aspect: this.aspect, eye: this.eye },
+			width,
+			height,
+			(u, v) => this.sampleAt(u, v)?.range ?? null,
+		);
+	}
+
+	/** Near-field object under normalised photo coords (Object pixels of the shown scene), else null. */
+	nearFieldSampleAt(u: number, v: number): NearFieldSample | null {
+		return nearFieldSampleAt(this.nf?.scene, u, v);
+	}
+
+	/** Near-field state for dev tools (window.__nearfield). */
+	get nearFieldInfo() {
+		const nf = this.nf;
+		return nf
+			? {
+					splats: nf.scene.splats.count,
+					drawn: nf.splats.stats.drawn,
+					sorts: nf.splats.stats.sorts,
+					opts: { ...nf.opts },
+					stepping: !!this.step,
+				}
+			: null;
+	}
+
+	/**
+	 * The scene's drape / sky masks at split resolution (row 0 = top):
+	 *   worldFg / worldObj  Object pixels (3×3 dilated), with / without the people mask: the world view
+	 *                       never smears an object across the ground (holes show the map instead)
+	 *   step                Object pixels that splats actually cover: from the photo camera the rest
+	 *                       drapes exactly, so the step view starts identical to the photo
+	 *   sky                 Sky pixels (2 cells dilated): where the photo sphere may show the photo
+	 */
+	private rebuildNearFieldMasks() {
+		const nf = this.nf;
+		if (!nf) return;
+		const { width: W, height: H, cls } = nf.scene.split;
+		const dilate = (src: Uint8Array, r: number) => {
+			const out = new Uint8Array(W * H);
+			for (let j = 0; j < H; j++)
+				for (let i = 0; i < W; i++) {
+					let hit = 0;
+					for (let dj = -r; dj <= r && !hit; dj++) {
+						const y = j + dj;
+						if (y < 0 || y >= H) continue;
+						for (let di = -r; di <= r; di++) {
+							const x = i + di;
+							if (x >= 0 && x < W && src[y * W + x]) {
+								hit = 255;
+								break;
+							}
+						}
+					}
+					out[j * W + i] = hit;
+				}
+			return out;
+		};
+		const isObj = new Uint8Array(W * H);
+		const isSky = new Uint8Array(W * H);
+		for (let k = 0; k < W * H; k++) {
+			isObj[k] = cls[k] === PixelClass.Object ? 1 : 0;
+			isSky[k] = cls[k] === PixelClass.Sky ? 1 : 0;
+		}
+		const obj = dilate(isObj, 1);
+		// splat coverage from the photo camera (the measure grid when the controller attached one)
+		const grid =
+			(nf.scene as MeasurableScene).measure ??
+			buildMeasureGrid(nf.scene, {
+				pose: this.pose,
+				aspect: this.aspect,
+				eye: this.eye,
+				frame: this.frame,
+			});
+		// a splat counts only when it stands clearly in front of the terrain there: people-mask halos and
+		// ground lifted at (or behind) the DEM surface lose the depth test, so masking them leaves holes
+		// (the shared near-DEM source, as deck-step.ts stepMasks in the deck engine)
+		const fresh = this.geometryReady();
+		const demAt = fresh ? this.nearFieldDemRange(W, H) : null;
+		const hasSplat = new Uint8Array(W * H);
+		for (let j = 0; j < H; j++)
+			for (let i = 0; i < W; i++) {
+				const k = j * W + i;
+				const r = grid.range[k];
+				if (!(r > 0)) continue;
+				const dem = demAt?.((i + 0.5) / W, (j + 0.5) / H) ?? 0;
+				hasSplat[k] = !(dem > 0) || r < dem * 0.97 - 0.5 ? 1 : 0;
+			}
+		const covered = dilate(hasSplat, 1);
+		const step = new Uint8Array(W * H);
+		for (let k = 0; k < W * H; k++) step[k] = isObj[k] && covered[k] ? 255 : 0;
+		const sky = dilate(isSky, 2);
+		const fg = this.fgMask;
+		const tex = (val: (k: number, i: number, j: number) => number) => {
+			const rgba = new Uint8Array(W * H * 4);
+			for (let j = 0; j < H; j++)
+				for (let i = 0; i < W; i++) {
+					const k = j * W + i;
+					rgba[k * 4] = val(k, i, j);
+					rgba[k * 4 + 3] = 255;
+				}
+			const t = new THREE.DataTexture(rgba, W, H);
+			t.flipY = true;
+			t.minFilter = t.magFilter = THREE.LinearFilter;
+			t.needsUpdate = true;
+			return t;
+		};
+		const fgAt = (i: number, j: number) => {
+			if (!fg) return 0;
+			const x = Math.min(fg.width - 1, Math.floor(((i + 0.5) / W) * fg.width));
+			const y = Math.min(
+				fg.height - 1,
+				Math.floor(((j + 0.5) / H) * fg.height),
+			);
+			return fg.data[y * fg.width + x];
+		};
+		this.disposeNearFieldMasks(nf.masks);
+		nf.masks = {
+			worldFg: tex((k, i, j) => obj[k] || fgAt(i, j)),
+			worldObj: tex((k) => obj[k]),
+			step: tex((k) => step[k]),
+			sky: tex((k) => sky[k]),
+		};
+	}
+
+	private disposeNearFieldMasks(m: NearFieldMasks | null) {
+		if (!m) return;
+		m.worldFg.dispose();
+		m.worldObj.dispose();
+		m.step.dispose();
+		m.sky.dispose();
+	}
+
+	/** True while the step-inside camera drives the view. */
+	get steppingInside() {
+		return !!this.step;
+	}
+
+	/** The step-inside camera (dev tools / UI), or null. */
+	get stepCamera() {
+		return this.step?.cam ?? null;
+	}
+
+	/**
+	 * Step inside the photo: a camera that starts exactly at the photo camera and may move within
+	 * `radius` metres (NearFieldScene.confidenceRadius), drawn with the drape, the near-field splats and
+	 * the photo on a far sphere. Works from any mode; `onBack` fires when backToPhoto() arrives.
+	 */
+	enterStepInside(
+		opts: { radius?: number; pivotDist?: number; onBack?: () => void } = {},
+	) {
+		if (!this.terrain || this.disposed) return;
+		this.exitStepInside();
+		applyPose(this.cam, this.pose, this.aspect, this.eye);
+		const fromWorld = this.settings.mode === "world";
+		if (this.controls) this.controls.enabled = false;
+		this.flight = undefined;
+		const cam = new StepCamera(this.worldCam, this.renderer.domElement, {
+			eye: this.eye.clone(),
+			quaternion: this.cam.quaternion.clone(),
+			vfov: this.pose.vfov,
+			aspect: this.aspect,
+			radius: opts.radius ?? this.nf?.scene.confidenceRadius ?? 10,
+			pivotDist: opts.pivotDist,
+			onChange: () => this.requestRender(),
+			onBack: opts.onBack,
+		});
+		this.step = { cam, sky: makePhotoSky(), fromWorld };
+		this.requestRender();
+	}
+
+	/** Leave the step camera. In the world view the camera stays on the photo (as after flyToPhoto). */
+	exitStepInside() {
+		const st = this.step;
+		if (!st) return;
+		this.step = null;
+		st.cam.dispose();
+		st.sky.geometry.dispose();
+		st.sky.material.dispose();
+		if (this.settings.mode === "world" && this.controls) {
+			applyPose(this.cam, this.pose, this.aspect, this.eye);
+			this.flight = {
+				t0: 0,
+				dur: 1,
+				fromPos: this.worldCam.position.clone(),
+				fromQ: this.worldCam.quaternion.clone(),
+				fromFov: this.worldCam.fov,
+				toQ: this.cam.quaternion.clone(),
+				held: true,
+			};
+		}
+		this.requestRender();
 	}
 }

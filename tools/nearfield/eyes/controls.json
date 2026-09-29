@@ -1,0 +1,149 @@
+{
+ "gps": {
+  "baselineXY": 6.88,
+  "q_IMG_7059": 0.684,
+  "q_IMG_7063": 0.778,
+  "IMG_7059<-IMG_7063": {
+   "maskFrac": 0.389,
+   "coverage": 0.0168,
+   "coveredFracOfImage": 0.0065,
+   "psnrCovered": 11.28,
+   "psnrTrivial": 15.58,
+   "ssimCovered": 0.12
+  },
+  "IMG_7063<-IMG_7059": {
+   "maskFrac": 0.073,
+   "coverage": 0.0,
+   "coveredFracOfImage": 0.0,
+   "psnrCovered": null,
+   "psnrTrivial": null,
+   "ssimCovered": null
+  }
+ },
+ "refined": {
+  "baselineXY": 0.22,
+  "q_IMG_7059": 0.984,
+  "q_IMG_7063": 0.995,
+  "IMG_7059<-IMG_7063": {
+   "maskFrac": 0.334,
+   "coverage": 0.0341,
+   "coveredFracOfImage": 0.0114,
+   "psnrCovered": 17.78,
+   "psnrTrivial": 20.65,
+   "ssimCovered": 0.117
+  },
+  "IMG_7063<-IMG_7059": {
+   "maskFrac": 0.34,
+   "coverage": 0.0748,
+   "coveredFracOfImage": 0.0255,
+   "psnrCovered": 19.96,
+   "psnrTrivial": 20.6,
+   "ssimCovered": 0.175
+  }
+ },
+ "collapsed": {
+  "baselineXY": 0.0,
+  "q_IMG_7059": 0.984,
+  "q_IMG_7063": 0.995,
+  "IMG_7059<-IMG_7063": {
+   "maskFrac": 0.335,
+   "coverage": 0.0338,
+   "coveredFracOfImage": 0.0113,
+   "psnrCovered": 17.83,
+   "psnrTrivial": 20.67,
+   "ssimCovered": 0.123
+  },
+  "IMG_7063<-IMG_7059": {
+   "maskFrac": 0.339,
+   "coverage": 0.0749,
+   "coveredFracOfImage": 0.0254,
+   "psnrCovered": 19.94,
+   "psnrTrivial": 20.57,
+   "ssimCovered": 0.177
+  }
+ },
+ "rot90": {
+  "baselineXY": 6.88,
+  "q_IMG_7059": 0.951,
+  "q_IMG_7063": 0.988,
+  "IMG_7059<-IMG_7063": {
+   "maskFrac": 0.372,
+   "coverage": 0.0454,
+   "coveredFracOfImage": 0.0169,
+   "psnrCovered": 17.4,
+   "psnrTrivial": 19.86,
+   "ssimCovered": 0.125
+  },
+  "IMG_7063<-IMG_7059": {
+   "maskFrac": 0.264,
+   "coverage": 0.0016,
+   "coveredFracOfImage": 0.0004,
+   "psnrCovered": 17.15,
+   "psnrTrivial": 19.39,
+   "ssimCovered": 0.197
+  }
+ },
+ "rot180": {
+  "baselineXY": 6.88,
+  "q_IMG_7059": 0.443,
+  "q_IMG_7063": 0.228,
+  "IMG_7059<-IMG_7063": {
+   "maskFrac": 0.096,
+   "coverage": 0.0,
+   "coveredFracOfImage": 0.0,
+   "psnrCovered": null,
+   "psnrTrivial": null,
+   "ssimCovered": null
+  },
+  "IMG_7063<-IMG_7059": {
+   "maskFrac": 0.405,
+   "coverage": 0.1392,
+   "coveredFracOfImage": 0.0564,
+   "psnrCovered": 14.46,
+   "psnrTrivial": 20.12,
+   "ssimCovered": 0.232
+  }
+ },
+ "rot270": {
+  "baselineXY": 6.88,
+  "q_IMG_7059": 0.99,
+  "q_IMG_7063": 0.006,
+  "IMG_7059<-IMG_7063": {
+   "maskFrac": 0.241,
+   "coverage": 0.0,
+   "coveredFracOfImage": 0.0,
+   "psnrCovered": null,
+   "psnrTrivial": null,
+   "ssimCovered": null
+  },
+  "IMG_7063<-IMG_7059": {
+   "maskFrac": 0.379,
+   "coverage": 0.0749,
+   "coveredFracOfImage": 0.0284,
+   "psnrCovered": 18.43,
+   "psnrTrivial": 20.42,
+   "ssimCovered": 0.211
+  }
+ },
+ "x2": {
+  "baselineXY": 13.76,
+  "q_IMG_7059": 0.446,
+  "q_IMG_7063": 0.601,
+  "IMG_7059<-IMG_7063": {
+   "maskFrac": 0.408,
+   "coverage": 0.0186,
+   "coveredFracOfImage": 0.0076,
+   "psnrCovered": 14.12,
+   "psnrTrivial": 17.42,
+   "ssimCovered": 0.137
+  },
+  "IMG_7063<-IMG_7059": {
+   "maskFrac": 0.055,
+   "coverage": 0.0,
+   "coveredFracOfImage": 0.0,
+   "psnrCovered": null,
+   "psnrTrivial": null,
+   "ssimCovered": null
+  }
+ }
+}

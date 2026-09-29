@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BaselineRouteImport } from './routes/baseline'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as LabDeckSplatsRouteImport } from './routes/lab.deck-splats'
+import { Route as LabGenerateRouteImport } from './routes/lab.generate'
+import { Route as LabSplatsRouteImport } from './routes/lab.splats'
 import { Route as PhotoIdRouteImport } from './routes/photo.$id'
 import { Route as RollIndexRouteImport } from './routes/roll.index'
 import { Route as RollIdRouteImport } from './routes/roll.$id'
@@ -30,6 +33,21 @@ const BaselineRoute = BaselineRouteImport.update({
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabDeckSplatsRoute = LabDeckSplatsRouteImport.update({
+  id: '/lab/deck-splats',
+  path: '/lab/deck-splats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabGenerateRoute = LabGenerateRouteImport.update({
+  id: '/lab/generate',
+  path: '/lab/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabSplatsRoute = LabSplatsRouteImport.update({
+  id: '/lab/splats',
+  path: '/lab/splats',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PhotoIdRoute = PhotoIdRouteImport.update({
@@ -57,6 +75,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
   '/upload': typeof UploadRoute
+  '/lab/deck-splats': typeof LabDeckSplatsRoute
+  '/lab/generate': typeof LabGenerateRoute
+  '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
@@ -66,6 +87,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
   '/upload': typeof UploadRoute
+  '/lab/deck-splats': typeof LabDeckSplatsRoute
+  '/lab/generate': typeof LabGenerateRoute
+  '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
@@ -76,6 +100,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
   '/upload': typeof UploadRoute
+  '/lab/deck-splats': typeof LabDeckSplatsRoute
+  '/lab/generate': typeof LabGenerateRoute
+  '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
@@ -87,6 +114,9 @@ export interface FileRouteTypes {
     | '/'
     | '/baseline'
     | '/upload'
+    | '/lab/deck-splats'
+    | '/lab/generate'
+    | '/lab/splats'
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
@@ -96,6 +126,9 @@ export interface FileRouteTypes {
     | '/'
     | '/baseline'
     | '/upload'
+    | '/lab/deck-splats'
+    | '/lab/generate'
+    | '/lab/splats'
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
@@ -105,6 +138,9 @@ export interface FileRouteTypes {
     | '/'
     | '/baseline'
     | '/upload'
+    | '/lab/deck-splats'
+    | '/lab/generate'
+    | '/lab/splats'
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
@@ -115,6 +151,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BaselineRoute: typeof BaselineRoute
   UploadRoute: typeof UploadRoute
+  LabDeckSplatsRoute: typeof LabDeckSplatsRoute
+  LabGenerateRoute: typeof LabGenerateRoute
+  LabSplatsRoute: typeof LabSplatsRoute
   PhotoIdRoute: typeof PhotoIdRoute
   RollIdRoute: typeof RollIdRoute
   RollImportRoute: typeof RollImportRoute
@@ -142,6 +181,27 @@ declare module '@tanstack/react-router' {
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab/deck-splats': {
+      id: '/lab/deck-splats'
+      path: '/lab/deck-splats'
+      fullPath: '/lab/deck-splats'
+      preLoaderRoute: typeof LabDeckSplatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab/generate': {
+      id: '/lab/generate'
+      path: '/lab/generate'
+      fullPath: '/lab/generate'
+      preLoaderRoute: typeof LabGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab/splats': {
+      id: '/lab/splats'
+      path: '/lab/splats'
+      fullPath: '/lab/splats'
+      preLoaderRoute: typeof LabSplatsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/photo/$id': {
@@ -179,6 +239,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BaselineRoute: BaselineRoute,
   UploadRoute: UploadRoute,
+  LabDeckSplatsRoute: LabDeckSplatsRoute,
+  LabGenerateRoute: LabGenerateRoute,
+  LabSplatsRoute: LabSplatsRoute,
   PhotoIdRoute: PhotoIdRoute,
   RollIdRoute: RollIdRoute,
   RollImportRoute: RollImportRoute,

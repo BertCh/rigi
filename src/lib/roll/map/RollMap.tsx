@@ -16,6 +16,7 @@ import {
 	Frame,
 	Loader2,
 	Maximize,
+	Shapes,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HeadingChip } from "../mosaic/badges";
@@ -61,6 +62,9 @@ export function RollMap({
 	const [viewId, setViewId] = useState<string | null>(null);
 	const [hover, setHover] = useState<RollMapHover | null>(null);
 	const hovered = useRef(false);
+	/** Step Inside roll spot (src/lib/nearfield/roll): off by default, needs the near-field service. */
+	const [spot3d, setSpot3d] = useState(false);
+	const [spotNote, setSpotNote] = useState("");
 
 	// the engine (terrain, atlases) lives as long as the roll's photo set: a reloaded roll with new
 	// poses for the same photos (the aligner) only moves the cameras (updateRoll, below)
@@ -116,6 +120,43 @@ export function RollMap({
 		if (engine && viewId && selectedId && selectedId !== engine.photoId)
 			engine.flyTo(selectedId);
 	}, [engine, viewId, selectedId]);
+
+	// Spot 3D: the fused near-field splats of the selected photo's viewpoint (opt-in, additive layer)
+	const spotVp = roll.photos.find(
+		(p) => p.meta.id === (viewId ?? selectedId),
+	)?.viewpoint;
+	useEffect(() => {
+		if (!engine || !spot3d || spotVp === undefined) {
+			engine?.setExtraLayers("spot3d", null);
+			setSpotNote("");
+			return;
+		}
+		const ac = new AbortController();
+		void import("#/lib/nearfield/roll/roll-spot").then(async (m) => {
+			const ids = m.spotPhotos(engine.roll, spotVp).map((p) => p.meta.id);
+			if (!ids.length) return setSpotNote("no posed photos here");
+			const s = await m
+				.buildRollSpot(engine, ids, {
+					signal: ac.signal,
+					onStatus: (t) => !ac.signal.aborted && setSpotNote(t),
+				})
+				.catch((e) => {
+					console.warn("[roll-map] spot 3D", e);
+					return null;
+				});
+			if (ac.signal.aborted) return;
+			if (!s) return setSpotNote((n) => n || "unavailable");
+			(window as unknown as { __rollSpotLast?: unknown }).__rollSpotLast = s;
+			engine.setExtraLayers("spot3d", [m.spotLayer(s.cloud)]);
+			setSpotNote(
+				`${s.views.filter((v) => v.splats > 0).length}/${ids.length} photos · ${s.cloud.count} splats`,
+			);
+		});
+		return () => {
+			ac.abort();
+			engine.setExtraLayers("spot3d", null);
+		};
+	}, [engine, spot3d, spotVp]);
 
 	// capture order, filtered like the page's ← → list
 	const order = useMemo(
@@ -310,6 +351,25 @@ export function RollMap({
 					title="Camera frustums"
 				>
 					<Frame className="size-3.5" /> Cameras
+				</button>
+				<button
+					type="button"
+					onClick={() => setSpot3d((v) => !v)}
+					disabled={spotVp === undefined}
+					className={`flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-white/10 disabled:opacity-40 ${spot3d ? "bg-white/15 text-white" : ""}`}
+					title="Spot 3D: fuse the near field of this viewpoint's photos into 3D splats (needs the near-field service)"
+					data-testid="roll-spot3d"
+					data-on={spot3d ? "1" : undefined}
+				>
+					<Shapes className="size-3.5" /> Spot 3D
+					{spot3d && spotNote && (
+						<span
+							className="font-mono text-[10px] text-white/55"
+							data-testid="roll-spot3d-note"
+						>
+							{spotNote}
+						</span>
+					)}
 				</button>
 				<label
 					className="flex items-center gap-1.5"

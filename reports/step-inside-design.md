@@ -1,6 +1,6 @@
 # Step Inside: a design for georeferenced 3D photos
 
-Status: DESIGN DRAFT, 2026-09-28. Nothing is built yet, and the model claims marked *unverified* have not been checked.
+Status: BUILT 2026-09-29. Results and the gate outcomes are in [step-inside-results.md](step-inside-results.md).
 
 ## Thesis
 

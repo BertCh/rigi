@@ -1,0 +1,166 @@
+[
+ {
+  "verifier": "v1",
+  "label": "T4",
+  "pid": "wc_0054",
+  "kind": "control-verified-refA",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "verifier": "v1",
+  "label": "P2",
+  "pid": "wc_0086",
+  "kind": "propagated-duplicate",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "verifier": "v1",
+  "label": "R6",
+  "pid": "wc_0086",
+  "kind": "propagated@anchor-eye",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "verifier": "v1",
+  "label": "E4",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw+8",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss"
+  ]
+ },
+ {
+  "verifier": "v1",
+  "label": "E9",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw-7",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss"
+  ]
+ },
+ {
+  "verifier": "v1",
+  "label": "D5",
+  "pid": "wc_0086",
+  "kind": "decoy-wrong-basin-yaw-45",
+  "verdict": "wrong",
+  "tags": []
+ },
+ {
+  "verifier": "v2",
+  "label": "D5",
+  "pid": "wc_0086",
+  "kind": "decoy-wrong-basin-yaw-45",
+  "verdict": "wrong",
+  "tags": [
+   "wrong-terrain",
+   "vertical-offset"
+  ]
+ },
+ {
+  "verifier": "v2",
+  "label": "E4",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw+8",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss",
+   "horizontal-shift"
+  ]
+ },
+ {
+  "verifier": "v2",
+  "label": "E9",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw-7",
+  "verdict": "wrong",
+  "tags": [
+   "near-miss",
+   "horizontal-shift"
+  ]
+ },
+ {
+  "verifier": "v2",
+  "label": "P2",
+  "pid": "wc_0086",
+  "kind": "propagated-duplicate",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "verifier": "v2",
+  "label": "R6",
+  "pid": "wc_0086",
+  "kind": "propagated@anchor-eye",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "verifier": "v2",
+  "label": "T4",
+  "pid": "wc_0054",
+  "kind": "control-verified-refA",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "verifier": "v3",
+  "label": "T4",
+  "pid": "wc_0054",
+  "kind": "control-verified-refA",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "verifier": "v3",
+  "label": "D5",
+  "pid": "wc_0086",
+  "kind": "decoy-wrong-basin-yaw-45",
+  "verdict": "wrong",
+  "tags": [
+   "offset-high"
+  ]
+ },
+ {
+  "verifier": "v3",
+  "label": "E4",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw+8",
+  "verdict": "wrong",
+  "tags": [
+   "offset",
+   "misaligned"
+  ]
+ },
+ {
+  "verifier": "v3",
+  "label": "E9",
+  "pid": "wc_0086",
+  "kind": "decoy-yaw-7",
+  "verdict": "wrong",
+  "tags": [
+   "misaligned"
+  ]
+ },
+ {
+  "verifier": "v3",
+  "label": "P2",
+  "pid": "wc_0086",
+  "kind": "propagated-duplicate",
+  "verdict": "correct",
+  "tags": []
+ },
+ {
+  "verifier": "v3",
+  "label": "R6",
+  "pid": "wc_0086",
+  "kind": "propagated@anchor-eye",
+  "verdict": "correct",
+  "tags": []
+ }
+]

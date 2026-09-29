@@ -1,0 +1,41 @@
+DEM-PROMPTED DEPTH (exploration, 2026-09-28)                                   DEV ids only, TM dev cache
+=======================================================================================================
+Model: LingBot-Depth-DC (robbyant/lingbot-depth-postrain-dc-vitl14, Apache-2.0, 1.28 GB, ViT-L/14 RGB-D, MoGe-style
+API). Code cloned (no .git/assets) into lingbot-depth/ (Apache-2.0). Weights were downloaded to weights/lingbot-dc/model.pt
+and DELETED afterwards (disk at 99 %); re-fetch:
+  curl -L -o tools/nearfield/depthprompt/weights/lingbot-dc/model.pt \
+       https://huggingface.co/robbyant/lingbot-depth-postrain-dc-vitl14/resolve/main/model.pt
+PromptDA: not tried (time/disk).
+
+Runs on MPS: yes, ~1.4 s per 768-px photo (fp32), after two shims in run_lingbot.py: xformers must look ABSENT (the
+service _env stubs it with a MagicMock), and NestedTensorBlock is patched to run the plain block per list element
+(exact for batch 1). GPU lock taken (tm_common.gpu_lock).
+
+Prompt: DEM z-depth on pixels that are Terrain under the MoGe-2 + curve split (place.py) with DEM 15-3000 m, on one half
+of a 32-px checkerboard; the other half is held out. Variants: terr (metres as is), terrN (prompt / S, S = median/3, output
+x S: the model was trained on indoor ranges), none (no prompt).
+Files: run_lingbot.py (inference -> cache/<pid>.<variant>.npz), eval.py (-> eval.json), run.log.
+
+RESULTS (27 dev photos with a DEM fit; 18 with >=150 held-out terrain px at 15-500 m)
+  terrain |log(range/DEM)| on HELD-OUT terrain px, median over photos
+                         15-500 m   15-50    50-150   150-500
+    MoGe-2 + curve        0.135      0.201    0.062    0.153
+    LingBot none + curve  0.186      0.204    0.111    0.160    (unprompted LingBot is a worse monocular model)
+    LingBot terr (raw m)  0.359      0.046    1.10     2.17     (metric-range prompt out of distribution: breaks >50 m)
+    LingBot terrN         0.017      0.023    0.014    0.022    (!)
+  CAVEAT: held-out blocks are 32 px wide and interleaved with prompted ones, so this is mostly interpolation of a smooth
+  DEM; the terrain is rendered from the DEM anyway. It does not measure what matters (objects).
+  Failures: wc_0020 terrN 3.8 (collapse), wc_0099 0.07; terr vs terrN differ by orders of magnitude on the same input,
+  so the model is brittle to the prompt's absolute range.
+
+  grounded objects (15 components, place.py): median range of the object under each depth / DEM range at its contact
+    MoGe curve only       ratio 0.91   |log| 0.354   within x1.25: 47 %
+    MoGe curve+grounding  ratio 1.02   |log| 0.040   within x1.25: 87 %   (near 1 by construction at the contact)
+    LingBot terrN         ratio 1.10   |log| 0.113   within x1.25: 53 %
+    LingBot terr / none   0.29 / 0.15  (unusable)
+
+VERDICT: not a clear win -> NOT added to the service (/depth?model=demprompt not implemented). Prompted LingBot puts
+objects closer to their contact range than MoGe+curve alone (53 % vs 47 % within x1.25) without any grounding logic,
+but explicit grounding of MoGe objects does better where there is a contact, and the range-normalisation sensitivity
+plus the wc_0020 collapse make it unsafe as a default. Worth a second look for UNGROUNDED objects (no visible contact:
+skyline trees, branches) with a proper benchmark (hand-labelled object distances) and a scale-invariant prompt scheme.

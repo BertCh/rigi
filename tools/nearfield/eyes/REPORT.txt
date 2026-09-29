@@ -1,0 +1,196 @@
+STEP INSIDE P2: RELATIVE EYE REFINEMENT FOR ROLL SPOTS                                        2026-09-29
+=====================================================================================================
+Question: P2 missed its gate. Rigi's rotations are good, but the GPS eyes are off by 7-37 m, so near fields
+from different photos don't line up. If we pull the eyes of overlapping photos into agreement using image
+matches, does the near field of one photo reproject onto the other?
+
+Short answer: we found one real, robust correction. IMG_7059 and IMG_7063 were taken from the same spot:
+the solved baseline is 0.15-0.4 m in every variant, while GPS puts them 7.1 m apart. Correcting it
+improves registration, but only a little. Coverage of the target's near-field mask goes from ~0-2 % to
+3-8 %. PSNR on the covered pixels rises by 6.5 dB. Even so, it stays BELOW a flat mean-colour predictor.
+The method as specified (rotations fixed, 2-DoF direction + anchored scale) passes NO pair on this spot.
+The implemented variant is a metric 3-DoF solve with rotation/focal nuisances. The evidence is n = 1
+usable pair at one viewpoint. The step is wired in but DEFAULT OFF.
+
+Files
+  refine_eyes.py      the study. Pair solves: pair_solve = as specified; pair_metric = the implemented one.
+                      Also the gate, triplet gate, LS, and the LOO evaluation.
+                      -> results.json (metric rot+f, the default)
+                      variants: results-calib-rot.json, results-calib-none.json, results-dir.json
+  controls.py         same mean eye, relative offset varied (collapsed / rotated / doubled) -> controls.json
+  eyes_dem.py         Mapterhorn DEM in the roll frame, plus a raymarched DEM range at any eye. Validated
+                      against the app: eye z = DEM + 1.6 matches the app's placed eyes to <= 2 cm on all 5
+                      photos, and the range buffer matches the app's to a median |log| of 0.017-0.019.
+  export_fixture.py   -> fixture_IMG_7059_IMG_7063.json (TS parity data)
+  app-check.mjs       in-app run of the wired step (real /roll map, :3110, MoGe-2) -> app-check.json
+  shots/eyes-results-<target>-from-<source>.png   target | GPS eyes | refined eyes (splats over a dimmed photo)
+  src/lib/nearfield/roll/eyes.ts        TS port: pairTranslation, eyePairGate, dropInconsistent,
+                                        solveEyeOffsets, refineEyes, REFINE_EYES_DEFAULT = false
+  src/lib/nearfield/roll/eyes.check.ts  synthetic + parity checks (npx tsx ...; all pass)
+  src/lib/nearfield/roll/spot.ts        SpotOpts.refineEyes (boolean | solver opts) + refineSpotEyes()
+  src/lib/nearfield/roll/roll-spot.ts   buildRollSpot: if refineEyes and RollSpotOpts.eyePairs are given,
+                                        the eyes are refined before /multiview poses and the range buffers,
+                                        and each range is re-rendered at the refined eye (GpuGeometrySource
+                                        on engine.deck). DEM z comes from Mapterhorn z17 tiles.
+                                        RollSpot.eyes = the solution.
+
+Data: roll region-0, viewpoint 4 (IMG_7053/7059/7063/7068/7086). GT poses (= Rigi-accepted), roll-frame
+eyes from the app, people masks from the app, MoGe-2 depth from the running service (:8767).
+ALIKED+LightGlue runs at 1024 px on CPU. People are removed from the matches: they move, and they are
+the main near-field object. Only 3 pairs have >= 30 matches: 7059/7063 (373), 7059/7068 (210) and
+7063/7068 (565). All the others have <= 29.
+
+1. AS SPECIFIED (rotations fixed, 2-DoF translation-direction RANSAC on near matches, scale = median of
+   anchored depth / unit-baseline depth)
+   7059/7063: 295 inliers at 1.36 px rms. The direction is 154 deg from the GPS vector. The scale is 0.40 m,
+   but its spread is MAD 1.71 in log, so the pair is gated out. The other two pairs fail too. Nothing is
+   refined.
+   Why:
+   (a) Almost all 7059/7063 matches are on the valley and ridge, 1-3 km away. Grass gives no features,
+       and the subject is masked. At a few-metre baseline these matches carry no translation signal.
+   (b) With the rotations AND the focal fixed, the fit reads the relative-rotation error and the ultrawide's
+       focal error as translation. A pure rotation with fixed focal explains 19/327 matches within 3 px. A
+       pure rotation with a free 7059 focal (x1.063) explains 224/327, at a median of 1.8 px. The relative
+       rotation differs from Rigi's by 1.4-2.6 deg, matching the ~2 deg in propagate/REPORT.txt.
+   (c) 7059's DEM anchor at the GPS eye is broken. The DEM puts a ridge in front of the valley, so the GPS
+       eye sits behind the crest. The anchored depths for its valley matches come out at 0.2-0.7 m.
+
+2. IMPLEMENTED: metric pair solve (pair_metric / eyes.ts pairTranslation)
+   t = eyeB - eyeA is solved in 3 DoF from the matches plus anchored depths.
+   - Each match is lifted with the LARGER of the two photos' anchored depths. A broken near-end anchor can
+     only make depth too small, so taking the larger one never invents parallax.
+   - It is reprojected into the other photo and fitted with soft-L1 at 2 px.
+   - The rotations stay Rigi's. The relative rotation of B (3 values) and the focal scales of A and B
+     (2 values, prior 3 %) are nuisance parameters.
+   - The gate requires >= 30 inliers, median <= 2.5 px and >= 20 near inliers (lifted from < 60 m).
+   - A triplet-closure gate follows (|t_AB + t_BC - t_AC| <= max(2 m, 20 % of the perimeter)).
+     pair       variant   t (m)                    |t|    GPS   inl  near  med px  nuisance         gate
+     7059/7063  rot+f     (-0.04, 0.22, -0.04)     0.23   7.14  315   55   0.81   2.14 deg, f 1.043/0.968  PASS
+     7059/7063  rot       (-0.11,-0.09,  0.04)     0.15         230   56   4.0    1.79 deg         (px)
+     7059/7063  none      ( 0.03,-0.14,  0.03)     0.15          79   40   3.4    -                (px)
+     7059/7068  rot+f     ( 0.31, 2.08,  0.06)     2.1   74.6   164    2   2.45   1.49 deg, f 1.11/1.08    no near
+     7063/7068  rot+f     (62.7, 36.8, -26.5)     77.4   73.7   505    0   0.75   1.88 deg, f 1.06/1.06    no near
+     7063/7068  none      (72.3, 25.1,  -2.0)     76.6          449    0   3.4    -                no near
+   - The 7059/7063 near inliers are the rock outcrop and the grass edge right of the subject (median lifted
+     depth 5.5 m). Their residual parallax after the rotation/focal fit bounds the baseline to well under
+     1 m. Every variant agrees on 0.15-0.4 m, including the as-specified scale of 0.40 m.
+     Interpretation: the two photos were taken 13 s apart from the same place. The 7 m GPS gap is GPS
+     noise (7059 hAccuracy 37 m).
+   - 7059/7068 is wrong. Its t is 2 m where GPS says ~70 m, which the 7063/7068 far-field solve supports.
+     It has 2 near inliers and is gated out. 7063/7068 is far-only. Its answer depends on the nuisance model:
+     26.6 deg and 26 m vertical off GPS with rot+f, 6 deg off with none. It is gated out.
+   - Triplet closure over all three pairs is 76 m on an 80 m perimeter. This is inconsistent, and the
+     7059/7068 pair drives it. After the gate only one pair is left, so NO triangle exists: closure could
+     not validate the solution. That is the main weakness of this result.
+   - The formal sd of t is mm-level (sdAxesM), which is overconfident. The LS inflates it with a model term:
+     cov += (0.25 |t|)^2 + (0.3 m)^2.
+   LS solution (the GPS mean is kept per component, weak prior of 15 m, eye z = DEM + 1.6 +- 2 m):
+     IMG_7059 offset (-0.51, +3.29, +0.94) m; IMG_7063 offset (+0.51, -3.29, -1.02) m. The z changes come
+     only from the DEM at the new xy. The other photos are unchanged.
+   TS parity (eyes.check.ts on the fixture): t, inliers 315/315, near 55/55, rotation correction 2.143 deg.
+   All identical, in 34 ms. In the app (app-check.json), the refined eyes match Python to 1.3 cm, and the
+   pair gates match (the 2 other pairs are "no near evidence"). With the step off, the eyes are the GPS eyes.
+
+3. EVALUATION: does one photo's near field reproject onto the other? (LOO, like roll/loo.py)
+   Source: the single-photo MoGe-2 near-field lift (anchored <= 150 m, people removed). The DEM range and the
+   anchor are recomputed at each condition's eyes, and the result is rendered with splatrender.py at the
+   target camera.
+   Mask: the target's DEM range <= 150 m at its own eye, minus people.
+   Metrics:
+     cov    = covered fraction of the mask
+     img    = covered fraction of the image
+     PSNR   = on the covered mask pixels
+     triv   = PSNR of a flat mean-colour predictor on the same pixels
+     SSIM   = on the covered pixels
+   Controls: the pair's mean eye is kept and only the relative offset changes. z always stays on the DEM.
+     config      baseline  anchorQ 59/63 | 7059 <- 7063: cov   img    PSNR  triv  SSIM | 7063 <- 7059: cov  img    PSNR  triv  SSIM
+     GPS          6.88 m   0.68 / 0.78   |              .017  .0065  11.3  15.6  .12  |              0    0      -     -     -
+     refined      0.22 m   0.98 / 0.995  |              .034  .0114  17.8  20.7  .12  |              .075 .0255  20.0  20.6  .18
+     collapsed    0.00 m   0.98 / 0.995  |              .034  .0113  17.8  20.7  .12  |              .075 .0254  19.9  20.6  .18
+     GPS rot 90   6.88 m   0.95 / 0.99   |              .045  .0169  17.4  19.9  .13  |              .002 .0004  17.2  19.4  .20
+     GPS rot 180  6.88 m   0.44 / 0.23   |              0     0      -     -     -    |              .139 .0564  14.5  20.1  .23
+     GPS rot 270  6.88 m   0.99 / 0.01   |              0     0      -     -     -    |              .075 .0284  18.4  20.4  .21
+     GPS x2      13.76 m   0.45 / 0.60   |              .019  .0076  14.1  17.4  .14  |              0    0      -     -     -
+   (With 7068 added as a source, fused, coverage changes by < 0.01. 7068 lands 0.6-0.8 % on 7063's mask
+   under both eye sets, and ~0 on 7059's.)
+   Reading:
+   - Refined (= collapsed) is the only configuration where BOTH directions land something AND both DEM
+     anchors fit well. The anchor quality is independent evidence, because the solve never used it: DEM vs
+     MoGe-2 agreement rises from 0.68/0.78 at the GPS eyes to 0.98/0.995 at the refined eyes. In the app it
+     rises from 0.964/0.687 to 0.970/0.990.
+   - In the panels, the source's grass now lands on the target's grass slope. With the GPS eyes it lands on
+     the far ridge, or does not land at all.
+   - Part of the effect is ABSOLUTE, not relative. Moving 7059 off its GPS eye (which sits behind the crest)
+     fixes its DEM view in most directions: rot90 and rot270 also give 7059 an anchor quality of
+     0.95-0.99. With one pair, "the relative correction is right" and "the GPS eye of 7059 was bad" cannot
+     be fully separated.
+   - It is not good enough. The covered area is 1-2.5 % of the image. PSNR on the covered pixels is below
+     the flat mean-colour predictor in every configuration, so the rendered texture does not yet register
+     at pixel level.
+   Possible remaining causes, NOT tested:
+   - the absolute eye: the mean is kept at the GPS mean, and 7059's accuracy is 37 m;
+   - Rigi's ~2 deg relative rotation and 7059's ~4-6 % focal error: fitted here as nuisances, but the
+     renders use Rigi's;
+   - the scale of the anchored near-end depth;
+   - the near-field overlap itself: a small grass/rock strip beside the subject.
+
+4. DECISION: wired, DEFAULT OFF (REFINE_EYES_DEFAULT = false).
+   The one gated pair gives a plausible, robust correction, and it improves placement in both LOO
+   directions. But n = 1, closure could not be checked, the near-field reprojection stays below trivial
+   PSNR, and there is no in-app matcher. RollSpotOpts.eyePairs must be supplied from this offline tool;
+   the service has no /match endpoint, and that is not this lane's path. P2's gate is still not met.
+   Next steps, in order of expected value:
+   (1) A /match endpoint (ALIKED+LightGlue, CPU, ~1-2 s per pair), so the step can run in the app.
+   (2) An absolute eye term from the DEM itself, e.g. maximising anchor quality or skyline agreement over
+       the component's mean xy. The controls show this term matters at least as much as the relative one.
+   (3) Apply the fitted relative rotation to the render, by rotation averaging across the spot.
+   (4) A second multi-photo GT spot with real near-field overlap before any default-on.
+
+Re-run (about 1-2 min each, CPU plus the service's MoGe-2; matches, depths and tiles are cached in cache/):
+  tools/matcher/.venv/bin/python tools/nearfield/eyes/refine_eyes.py [--calib rot+f|rot|none] [--mode metric|dir] [--out X.json]
+  tools/matcher/.venv/bin/python tools/nearfield/eyes/controls.py
+  tools/matcher/.venv/bin/python tools/nearfield/eyes/export_fixture.py && npx tsx src/lib/nearfield/roll/eyes.check.ts
+  node scripts/gpu/with-render-lock.mjs -- node tools/nearfield/eyes/app-check.mjs
+Dev data only (region-0 GT viewpoint). No test split, no data_v3, no model downloads.
+
+-----------------------------------------------------------------------------------------------------
+REVIEWER ADDENDUM (independent skeptical review, 2026-09-29)
+Re-ran: refine_eyes.py (cached; results and solution byte-identical to results.json), eyes.check.ts (all pass,
+Python parity exact), spot.check.ts (pass), tsc (0 errors), biome format (clean). app-check.json read, not re-run
+(it only feeds the Python pairs into the app's gate + LS + DEM sampler; pairTranslation parity is in eyes.check.ts).
+Protocol: region-0 dev spot only; no test-split ids, no data_v3, no downloads; 87 MB cache/ is git-ignored.
+Note: the poses here are ground-truth (meta poseSources = the roll app's pose order), and data/ground-truth.json
+marks both 7059 and 7063 "approx" (rms ~18 px, 7059 yaw +-0.5 deg, 7063 pitch/roll +-0.3 deg). So the 1.4-2.6 deg
+"relative rotation error" is a GT-pose error/lens-model effect, not specifically Rigi's. The GT note for 7059
+(13 mm ultrawide) also says a free f fit gives about -5 %, which independently agrees with the focal nuisance.
+
+Verified: EXIF times 15:36:35 and 15:36:48 (13 s apart); GPS hAccuracy is 37.2 m for 7059 and 7.0 m for 7063.
+So "same spot, 7 m gap = GPS noise" is well supported, and the ~0.2 m relative solution is credible.
+
+Not supported: "the refined eyes improve near-field registration". review_controls.py (-> review-controls.json)
+keeps the baseline at 0, like the refined solution, and moves only the ABSOLUTE position of the collapsed pair:
+  config                 q59/q63       7059<-7063 cov  PSNR/triv      7063<-7059 cov  PSNR/triv
+  refined (GPS mean)     0.98/0.995    .034   17.8/20.7              .075   20.0/20.6       (report)
+  both @ 7063 GPS        0.44/0.79     .109   17.0/18.7              .410   19.4/17.8
+  both @ hAcc-wtd mean   0.52/0.79     .118   16.9/19.0              .418   19.1/18.1
+  both @ 7059 GPS        0.67/0.23     .159   17.4/18.6              .702   17.4/18.3
+  mean + 7 m @ 90 deg    0.69/0.66     .044   20.6/19.4              .118   21.4/22.9
+  mean + 7 m @ 0/180/270 ...           see review-controls.json
+Reading:
+  - At the same (zero) relative offset, coverage ranges from 0 to 70 %, and PSNR on the covered pixels is sometimes
+    ABOVE the flat predictor. It depends only on where the pair sits. The LOO metrics, and the target mask (which
+    is recomputed per condition: 7063's mask is 7.3 % of the image at GPS and 34 % at refined), are dominated by the
+    absolute eye/DEM geometry. They cannot confirm the relative correction. The "0 -> 7.5 %" and "+6.5 dB" gains
+    are not evidence of better registration.
+  - The 0.98/0.995 anchor quality is specific to the GPS-mean point. That point is an artefact of keeping the
+    unweighted GPS mean. Weighting by hAccuracy (7 m vs 37 m) puts the pair near 7063's fix, where the anchors are
+    only 0.44-0.52 / 0.79. So "anchor quality is independent evidence" holds for the absolute position at best,
+    and the absolute position is the part the method does not estimate.
+  - The GPS-vs-refined comparison is also not held out: the evaluated pair is the pair whose matches fitted t.
+  - Not reported above: target 7068 (eye unchanged) goes from 0 to 1.3-4.8 % coverage "with refined eyes", at
+    PSNR 15 vs a flat 19-22. More coverage without registration.
+Suggested: weight the LS mean/prior by each photo's GPS hAccuracy instead of the unweighted mean; make any future
+registration metric use a fixed mask plus a baseline-0 control at the same absolute position.
+Verdict: the code is correct and consistent (TS = Python), and default-off is the right call. The relative finding
+(7059/7063 about 0.2 m apart) is credible. The claimed near-field placement improvement is confounded and should
+be read as unproven.

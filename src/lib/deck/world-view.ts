@@ -122,7 +122,7 @@ type Flight = {
 };
 
 /** Photo camera orientation as three's applyPose sets it (engine.ts this.cam). */
-function poseQuaternion(p: Pose) {
+export function poseQuaternion(p: Pose) {
 	const { forward, right, up } = poseBasis(p);
 	const m = new THREE.Matrix4().makeBasis(right, up, forward.clone().negate());
 	return new THREE.Quaternion().setFromRotationMatrix(m);

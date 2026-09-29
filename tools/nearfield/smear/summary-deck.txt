@@ -1,0 +1,49 @@
+renderer=deck  (cells of a 320-wide grid; smear = labelled cell draped onto terrain)
+
+POOLED, confident labels only
+class      labelled  noTerrain nearCut  smearOff  smearOn(prod) removal(prod)  smearOn(forced) removal(forced)  splitObject  | diag removal nearRadius 300 / 500
+person       209551     32780   66319      4341          3078         29.1%             3075           29.2%        82.3%  | 44.1% / 42.1%
+building       4432         0     315      3370          3109          7.7%             3109            7.7%        27.9%  | 9.2% / 13.8%
+tree          32859      1958    3084     27386         25656          6.3%            22310           18.5%        17.5%  | 19.5% / 16.7%
+pole           9230       140     962      7752          5905         23.8%             5905           23.8%        23.8%  | 80.9% / 81.2%
+structure     10886        12    2660      7373          5281         28.4%             5281           28.4%        33.4%  | 70.8% / 70.8%
+vehicle       14700      6781    6648      1145            10         99.1%               10           99.1%        36.5%  | 100.0% / 100.0%
+animal          120         0       0       120           120          0.0%              120            0.0%         0.0%  | 0.0% / 0.0%
+rock           2546         0    2546         0             0           -                  0             -          71.7%  | -
+non-person    74773      8891   16215     47146         40081         15.0%            36735           22.1%        26.8%  | 38.8% / 37.6%
+ALL          284324     41671   82534     51487         43159         16.2%            39810           22.7%        67.7%  | 39.3% / 37.9%
+
+POOLED, all labels incl. unsure
+class      labelled  noTerrain nearCut  smearOff  smearOn(prod) removal(prod)  smearOn(forced) removal(forced)  splitObject  | diag removal nearRadius 300 / 500
+person       209551     32780   66319      4341          3078         29.1%             3075           29.2%        82.3%  | 44.1% / 42.1%
+building       7931         0     315      6869          4774         30.5%             4774           30.5%        38.1%  | 31.4% / 33.7%
+tree          47089      2184    3192     40944         38602          5.7%            35256           13.9%        14.0%  | 14.7% / 13.3%
+pole           9230       140     962      7752          5905         23.8%             5905           23.8%        23.8%  | 80.9% / 81.2%
+structure     14665        12    3442     10353          6121         40.9%             6121           40.9%        39.3%  | 76.6% / 76.8%
+vehicle       14700      6781    6648      1145            10         99.1%               10           99.1%        36.5%  | 100.0% / 100.0%
+animal          153         0       0       153           153          0.0%              153            0.0%         0.0%  | 0.0% / 0.0%
+rock          11621         0    5162      6110          6051          1.0%             6051            1.0%        24.3%  | 2.2% / 2.4%
+non-person   105389      9117   19721     73326         61616         16.0%            58270           20.5%        24.4%  | 32.2% / 31.8%
+ALL          314940     41897   86040     77667         64694         16.7%            61345           21.0%        62.9%  | 32.9% / 32.4%
+
+COLLATERAL (unlabelled cells draped with the feature off but masked with it on)
+product  away from labels: 2638/250116 = 1.1%   within 0.02 of a label box: 4503/87716 = 5.1%
+forced   away from labels: 2638/250116 = 1.1%   within 0.02 of a label box: 4772/87716 = 5.4%
+v300     away from labels: 30132/250116 = 12.0%   within 0.02 of a label box: 12224/87716 = 13.9%
+v500     away from labels: 44163/250116 = 17.7%   within 0.02 of a label box: 11178/87716 = 12.7%
+
+PER PHOTO (confident labels; smearOff -> smearOn forced, removal; collateral forced away-from-labels)
+IMG_5495 q=0.21 | person 149->96 (35.6%); pole 115->3 (97.4%) | collateral 442/23975 1.8%
+IMG_6019 q=0.76 | person 102->80 (21.6%); pole 0->0 (  -  ); rock 0->0 (  -  ) | collateral 0/21865 0.0%
+IMG_6958 q=0.97 | person 0->0 (  -  ) | collateral 0/25792 0.0%
+IMG_6971 q=0.65 | person 198->19 (90.4%); vehicle 1145->10 (99.1%) | collateral 254/8795 2.9%
+IMG_7018 q=0.44 | person 17->5 (70.6%); tree 6387->4928 (22.8%); pole 0->0 (  -  ) | collateral 0/8371 0.0%
+IMG_7033 q=0.01 GATED | person 85->82 (3.5%); tree 18995->15649 (17.6%) | collateral 0/11576 0.0%
+IMG_7053 q=0.57 | person 271->85 (68.6%); pole 2646->1220 (53.9%) | collateral 62/12608 0.5%
+IMG_7059 q=0.00 GATED | person 1043->1043 (0.0%); structure 188->188 (0.0%) | collateral 0/16833 0.0%
+IMG_7063 q=0.83 | person 0->0 (  -  ); structure 0->0 (  -  ) | collateral 861/18716 4.6%
+IMG_7068 q=0.67 | person 899->780 (13.2%); pole 3908->3880 (0.7%); structure 409->409 (0.0%) | collateral 2/31658 0.0%
+IMG_7086 q=0.34 | person 17->0 (100.0%); building 743->538 (27.6%); pole 467->295 (36.8%) | collateral 387/29703 1.3%
+IMG_7130 q=0.20 | person 319->247 (22.6%); building 1536->1480 (3.6%); tree 2004->1733 (13.5%); pole 351->328 (6.6%) | collateral 0/10759 0.0%
+IMG_7131 q=0.23 | person 36->36 (0.0%); building 1091->1091 (0.0%); pole 176->176 (0.0%); animal 120->120 (0.0%) | collateral 630/20990 3.0%
+IMG_7155 q=0.19 | person 1205->602 (50.0%); pole 89->3 (96.6%); structure 6776->4684 (30.9%) | collateral 0/8475 0.0%

@@ -1,0 +1,922 @@
+{
+ "spot": "region-0-vp4",
+ "args": {
+  "spot": "region-0-vp4",
+  "near": 150.0,
+  "nearMax": 300.0,
+  "thrPx": 3.0,
+  "prior": 15.0,
+  "minNear": 20,
+  "iters": 1,
+  "mode": "metric",
+  "calib": "rot+f",
+  "out": "results.json"
+ },
+ "iterations": [
+  {
+   "iter": 0,
+   "anchorQuality": {
+    "IMG_7053": 0.639,
+    "IMG_7059": 0.684,
+    "IMG_7063": 0.778,
+    "IMG_7068": 0.701,
+    "IMG_7086": 0.392
+   },
+   "pairs": [
+    {
+     "A": "IMG_7053",
+     "B": "IMG_7059",
+     "mode": "metric/rot+f",
+     "matches": 17,
+     "used": 4,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7053",
+     "B": "IMG_7063",
+     "mode": "metric/rot+f",
+     "matches": 17,
+     "used": 2,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7053",
+     "B": "IMG_7068",
+     "mode": "metric/rot+f",
+     "matches": 24,
+     "used": 15,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7053",
+     "B": "IMG_7086",
+     "mode": "metric/rot+f",
+     "matches": 24,
+     "used": 4,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7059",
+     "B": "IMG_7063",
+     "mode": "metric/rot+f",
+     "matches": 373,
+     "used": 324,
+     "ok": true,
+     "t": [
+      -0.039,
+      0.22,
+      -0.036
+     ],
+     "baselineM": 0.23,
+     "gpsVec": [
+      -1.06,
+      6.8,
+      1.92
+     ],
+     "gpsDist": 7.14,
+     "info": [
+      [
+       45628.43534034975,
+       -19942.560528836402,
+       8065.38682543542
+      ],
+      [
+       -19942.560528836413,
+       18911.951448895936,
+       18955.412009891643
+      ],
+      [
+       8065.386825435447,
+       18955.412009891523,
+       67009.67725640145
+      ]
+     ],
+     "sdAxesM": [
+      0.024,
+      0.004,
+      0.004
+     ],
+     "sdAxes": [
+      [
+       0.44,
+       0.846,
+       -0.3
+      ],
+      [
+       0.896,
+       -0.434,
+       0.091
+      ],
+      [
+       0.053,
+       0.31,
+       0.949
+      ]
+     ],
+     "inliers": 315,
+     "nearInliers": 55,
+     "medPx": 0.81,
+     "relRotCorrDeg": 2.143,
+     "focalScale": [
+      1.0433,
+      0.9681
+     ],
+     "fromAFrac": 0.019,
+     "depthMedNear": 5.5,
+     "angleToGpsDeg": 24.7,
+     "gate": true,
+     "solvedMinusMeasured": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "A": "IMG_7059",
+     "B": "IMG_7068",
+     "mode": "metric/rot+f",
+     "matches": 210,
+     "used": 194,
+     "ok": true,
+     "t": [
+      0.305,
+      2.075,
+      0.057
+     ],
+     "baselineM": 2.1,
+     "gpsVec": [
+      70.53,
+      24.11,
+      2.95
+     ],
+     "gpsDist": 74.6,
+     "info": [
+      [
+       17056.798154071912,
+       -2761.247799914202,
+       -3779.3716907043354
+      ],
+      [
+       -2761.2477999141993,
+       461.00855824817984,
+       471.7161647500937
+      ],
+      [
+       -3779.3716907043636,
+       471.71616475009824,
+       12279.93749868395
+      ]
+     ],
+     "sdAxesM": [
+      0.289,
+      0.01,
+      0.007
+     ],
+     "sdAxes": [
+      [
+       -0.163,
+       -0.987,
+       -0.012
+      ],
+      [
+       0.458,
+       -0.086,
+       0.885
+      ],
+      [
+       -0.874,
+       0.138,
+       0.466
+      ]
+     ],
+     "inliers": 164,
+     "nearInliers": 2,
+     "medPx": 2.45,
+     "relRotCorrDeg": 1.486,
+     "focalScale": [
+      1.1141,
+      1.0813
+     ],
+     "fromAFrac": 0.01,
+     "depthMedNear": 23.6,
+     "angleToGpsDeg": 62.7,
+     "gate": false
+    },
+    {
+     "A": "IMG_7059",
+     "B": "IMG_7086",
+     "mode": "metric/rot+f",
+     "matches": 10,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7063",
+     "B": "IMG_7068",
+     "mode": "metric/rot+f",
+     "matches": 565,
+     "used": 508,
+     "ok": true,
+     "t": [
+      62.687,
+      36.826,
+      -26.516
+     ],
+     "baselineM": 77.39,
+     "gpsVec": [
+      71.6,
+      17.31,
+      1.03
+     ],
+     "gpsDist": 73.67,
+     "info": [
+      [
+       0.25072732918762597,
+       -0.15211395183655352,
+       -0.19591538575813616
+      ],
+      [
+       -0.15211395183630216,
+       0.14155034060208127,
+       0.16937518458709944
+      ],
+      [
+       -0.19591538576000578,
+       0.16937518458681522,
+       0.5606108825817699
+      ]
+     ],
+     "sdAxesM": [
+      5.549,
+      2.333,
+      1.165
+     ],
+     "sdAxes": [
+      [
+       -0.521,
+       -0.85,
+       0.079
+      ],
+      [
+       0.73,
+       -0.396,
+       0.557
+      ],
+      [
+       -0.442,
+       0.348,
+       0.827
+      ]
+     ],
+     "inliers": 505,
+     "nearInliers": 0,
+     "medPx": 0.75,
+     "relRotCorrDeg": 1.883,
+     "focalScale": [
+      1.0575,
+      1.0606
+     ],
+     "fromAFrac": 0.506,
+     "depthMedNear": null,
+     "angleToGpsDeg": 26.6,
+     "gate": false
+    },
+    {
+     "A": "IMG_7063",
+     "B": "IMG_7086",
+     "mode": "metric/rot+f",
+     "matches": 29,
+     "used": 5,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7068",
+     "B": "IMG_7086",
+     "mode": "metric/rot+f",
+     "matches": 22,
+     "used": 4,
+     "ok": false,
+     "gate": false
+    }
+   ],
+   "dirPairs": [
+    {
+     "A": "IMG_7053",
+     "B": "IMG_7059",
+     "matches": 17,
+     "afterPeople": 4,
+     "near": 4,
+     "far": 0,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7053",
+     "B": "IMG_7063",
+     "matches": 17,
+     "afterPeople": 2,
+     "near": 0,
+     "far": 1,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7053",
+     "B": "IMG_7068",
+     "matches": 24,
+     "afterPeople": 15,
+     "near": 7,
+     "far": 0,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7053",
+     "B": "IMG_7086",
+     "matches": 24,
+     "afterPeople": 4,
+     "near": 0,
+     "far": 4,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7059",
+     "B": "IMG_7063",
+     "matches": 373,
+     "afterPeople": 327,
+     "near": 318,
+     "far": 0,
+     "ok": true,
+     "t": [
+      0.10027558464182239,
+      -0.980511357128376,
+      0.16894462307812877
+     ],
+     "inliers": 295,
+     "cheirality": 0.99,
+     "rmsPx": 1.362,
+     "thrPx": 3.0,
+     "scale": 0.4,
+     "scaleMadLog": 1.714,
+     "scaleN": 578,
+     "dirSigmaDeg": 1.46,
+     "gpsVec": [
+      -1.06,
+      6.8,
+      1.92
+     ],
+     "gpsDist": 7.14,
+     "angleToGpsDeg": 154.5,
+     "gate": false
+    },
+    {
+     "A": "IMG_7059",
+     "B": "IMG_7068",
+     "matches": 210,
+     "afterPeople": 199,
+     "near": 190,
+     "far": 0,
+     "ok": true,
+     "t": [
+      0.5106710285807147,
+      -0.8473276450337839,
+      0.14577709878378373
+     ],
+     "inliers": 162,
+     "cheirality": 1.0,
+     "rmsPx": 0.98,
+     "thrPx": 3.0,
+     "scale": 0.453,
+     "scaleMadLog": 2.702,
+     "scaleN": 322,
+     "dirSigmaDeg": 2.59,
+     "gpsVec": [
+      70.53,
+      24.11,
+      2.95
+     ],
+     "gpsDist": 74.6,
+     "angleToGpsDeg": 77.6,
+     "gate": false
+    },
+    {
+     "A": "IMG_7059",
+     "B": "IMG_7086",
+     "matches": 10,
+     "afterPeople": 6,
+     "near": 6,
+     "far": 0,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7063",
+     "B": "IMG_7068",
+     "matches": 565,
+     "afterPeople": 515,
+     "near": 13,
+     "far": 230,
+     "farRotDiffDeg": 1.887,
+     "farRotInliers": 189,
+     "farAngleMedDeg": 1.229,
+     "ok": true,
+     "t": [
+      0.705111569217865,
+      0.6703478145705506,
+      -0.23119576651748452
+     ],
+     "inliers": 10,
+     "cheirality": 0.9,
+     "rmsPx": 1.095,
+     "thrPx": 3.0,
+     "scale": 42.334,
+     "scaleMadLog": 1.662,
+     "scaleN": 18,
+     "dirSigmaDeg": 1.44,
+     "gpsVec": [
+      71.6,
+      17.31,
+      1.03
+     ],
+     "gpsDist": 73.67,
+     "angleToGpsDeg": 32.9,
+     "gate": false
+    },
+    {
+     "A": "IMG_7063",
+     "B": "IMG_7086",
+     "matches": 29,
+     "afterPeople": 5,
+     "near": 0,
+     "far": 5,
+     "ok": false,
+     "gate": false
+    },
+    {
+     "A": "IMG_7068",
+     "B": "IMG_7086",
+     "matches": 22,
+     "afterPeople": 4,
+     "near": 3,
+     "far": 1,
+     "ok": false,
+     "gate": false
+    }
+   ],
+   "solution": {
+    "offsets": {
+     "IMG_7053": [
+      -0.0,
+      -0.0,
+      0.02
+     ],
+     "IMG_7059": [
+      -0.51,
+      3.29,
+      0.94
+     ],
+     "IMG_7063": [
+      0.51,
+      -3.29,
+      -1.02
+     ],
+     "IMG_7068": [
+      0.0,
+      0.0,
+      0.01
+     ],
+     "IMG_7086": [
+      -0.0,
+      -0.0,
+      -0.01
+     ]
+    },
+    "eyes": {
+     "IMG_7053": [
+      1379.785,
+      1039.466,
+      1935.966
+     ],
+     "IMG_7059": [
+      1366.304,
+      1086.305,
+      1946.907
+     ],
+     "IMG_7063": [
+      1366.265,
+      1086.526,
+      1946.872
+     ],
+     "IMG_7068": [
+      1437.351,
+      1107.128,
+      1948.928
+     ],
+     "IMG_7086": [
+      1571.84,
+      1119.516,
+      1944.557
+     ]
+    },
+    "components": [
+     [
+      "IMG_7053"
+     ],
+     [
+      "IMG_7059",
+      "IMG_7063"
+     ],
+     [
+      "IMG_7068"
+     ],
+     [
+      "IMG_7086"
+     ]
+    ],
+    "pairResid": [
+     -0.001,
+     0.003,
+     0.004
+    ],
+    "cost": 0.05,
+    "pairsUsed": [
+     "IMG_7059-IMG_7063"
+    ]
+   }
+  }
+ ],
+ "triplets": [],
+ "eval": {
+  "IMG_7059": {
+   "IMG_7063": {
+    "gps": {
+     "eye": [
+      1366.82,
+      1083.02,
+      1945.97
+     ],
+     "maskFrac": 0.3891,
+     "coverage": 0.0168,
+     "psnr": 12.02,
+     "psnrCovered": 11.28,
+     "psnrTrivialCovered": 15.58,
+     "ssimCovered": 0.1203,
+     "onGpsMask": {
+      "coverage": 0.0168,
+      "psnrCovered": 11.28
+     },
+     "splats": 16449
+    },
+    "refined": {
+     "eye": [
+      1366.3,
+      1086.3,
+      1946.91
+     ],
+     "maskFrac": 0.3338,
+     "coverage": 0.0341,
+     "psnr": 11.99,
+     "psnrCovered": 17.78,
+     "psnrTrivialCovered": 20.65,
+     "ssimCovered": 0.117,
+     "onGpsMask": {
+      "coverage": 0.0292,
+      "psnrCovered": 17.78
+     },
+     "splats": 11964
+    }
+   },
+   "IMG_7068": {
+    "gps": {
+     "eye": [
+      1366.82,
+      1083.02,
+      1945.97
+     ],
+     "maskFrac": 0.3891,
+     "coverage": 0.0006,
+     "psnr": 12.05,
+     "psnrCovered": 14.64,
+     "psnrTrivialCovered": 22.97,
+     "ssimCovered": 0.0256,
+     "onGpsMask": {
+      "coverage": 0.0006,
+      "psnrCovered": 14.64
+     },
+     "splats": 29377
+    },
+    "refined": {
+     "eye": [
+      1366.3,
+      1086.3,
+      1946.91
+     ],
+     "maskFrac": 0.3338,
+     "coverage": 0.0002,
+     "psnr": 11.98,
+     "psnrCovered": 15.37,
+     "psnrTrivialCovered": 21.76,
+     "ssimCovered": 0.0941,
+     "onGpsMask": {
+      "coverage": 0.0002,
+      "psnrCovered": 15.37
+     },
+     "splats": 29377
+    }
+   },
+   "IMG_7063+IMG_7068": {
+    "gps": {
+     "eye": [
+      1366.82,
+      1083.02,
+      1945.97
+     ],
+     "maskFrac": 0.3891,
+     "coverage": 0.0174,
+     "psnr": 12.02,
+     "psnrCovered": 11.35,
+     "psnrTrivialCovered": 15.38,
+     "ssimCovered": 0.1172,
+     "onGpsMask": {
+      "coverage": 0.0174,
+      "psnrCovered": 11.35
+     },
+     "splats": 45826
+    },
+    "refined": {
+     "eye": [
+      1366.3,
+      1086.3,
+      1946.91
+     ],
+     "maskFrac": 0.3338,
+     "coverage": 0.0341,
+     "psnr": 11.99,
+     "psnrCovered": 17.78,
+     "psnrTrivialCovered": 20.65,
+     "ssimCovered": 0.117,
+     "onGpsMask": {
+      "coverage": 0.0292,
+      "psnrCovered": 17.78
+     },
+     "splats": 41341
+    }
+   }
+  },
+  "IMG_7063": {
+   "IMG_7059": {
+    "gps": {
+     "eye": [
+      1365.75,
+      1089.81,
+      1947.89
+     ],
+     "maskFrac": 0.0735,
+     "coverage": 0.0,
+     "psnr": 15.55,
+     "psnrCovered": null,
+     "psnrTrivialCovered": null,
+     "ssimCovered": null,
+     "onGpsMask": {
+      "coverage": 0.0,
+      "psnrCovered": null
+     },
+     "splats": 56173
+    },
+    "refined": {
+     "eye": [
+      1366.26,
+      1086.53,
+      1946.87
+     ],
+     "maskFrac": 0.3404,
+     "coverage": 0.0748,
+     "psnr": 16.6,
+     "psnrCovered": 19.96,
+     "psnrTrivialCovered": 20.6,
+     "ssimCovered": 0.175,
+     "onGpsMask": {
+      "coverage": 0.2783,
+      "psnrCovered": 20.7
+     },
+     "splats": 17897
+    }
+   },
+   "IMG_7068": {
+    "gps": {
+     "eye": [
+      1365.75,
+      1089.81,
+      1947.89
+     ],
+     "maskFrac": 0.0735,
+     "coverage": 0.0082,
+     "psnr": 15.54,
+     "psnrCovered": 14.24,
+     "psnrTrivialCovered": 22.25,
+     "ssimCovered": 0.0718,
+     "onGpsMask": {
+      "coverage": 0.0082,
+      "psnrCovered": 14.24
+     },
+     "splats": 29377
+    },
+    "refined": {
+     "eye": [
+      1366.26,
+      1086.53,
+      1946.87
+     ],
+     "maskFrac": 0.3404,
+     "coverage": 0.0064,
+     "psnr": 16.41,
+     "psnrCovered": 15.31,
+     "psnrTrivialCovered": 24.03,
+     "ssimCovered": 0.1933,
+     "onGpsMask": {
+      "coverage": 0.0296,
+      "psnrCovered": 15.31
+     },
+     "splats": 29377
+    }
+   },
+   "IMG_7059+IMG_7068": {
+    "gps": {
+     "eye": [
+      1365.75,
+      1089.81,
+      1947.89
+     ],
+     "maskFrac": 0.0735,
+     "coverage": 0.0082,
+     "psnr": 15.54,
+     "psnrCovered": 14.24,
+     "psnrTrivialCovered": 22.25,
+     "ssimCovered": 0.0718,
+     "onGpsMask": {
+      "coverage": 0.0082,
+      "psnrCovered": 14.24
+     },
+     "splats": 85550
+    },
+    "refined": {
+     "eye": [
+      1366.26,
+      1086.53,
+      1946.87
+     ],
+     "maskFrac": 0.3404,
+     "coverage": 0.0808,
+     "psnr": 16.6,
+     "psnrCovered": 19.39,
+     "psnrTrivialCovered": 20.6,
+     "ssimCovered": 0.1749,
+     "onGpsMask": {
+      "coverage": 0.306,
+      "psnrCovered": 19.84
+     },
+     "splats": 47274
+    }
+   }
+  },
+  "IMG_7068": {
+   "IMG_7059": {
+    "gps": {
+     "eye": [
+      1437.35,
+      1107.13,
+      1948.92
+     ],
+     "maskFrac": 0.3153,
+     "coverage": 0.0,
+     "psnr": 15.51,
+     "psnrCovered": null,
+     "psnrTrivialCovered": null,
+     "ssimCovered": null,
+     "onGpsMask": {
+      "coverage": 0.0,
+      "psnrCovered": null
+     },
+     "splats": 56173
+    },
+    "refined": {
+     "eye": [
+      1437.35,
+      1107.13,
+      1948.93
+     ],
+     "maskFrac": 0.315,
+     "coverage": 0.0129,
+     "psnr": 15.5,
+     "psnrCovered": 16.07,
+     "psnrTrivialCovered": 22.14,
+     "ssimCovered": 0.4562,
+     "onGpsMask": {
+      "coverage": 0.0129,
+      "psnrCovered": 16.07
+     },
+     "splats": 17897
+    }
+   },
+   "IMG_7063": {
+    "gps": {
+     "eye": [
+      1437.35,
+      1107.13,
+      1948.92
+     ],
+     "maskFrac": 0.3153,
+     "coverage": 0.0,
+     "psnr": 15.51,
+     "psnrCovered": null,
+     "psnrTrivialCovered": null,
+     "ssimCovered": null,
+     "onGpsMask": {
+      "coverage": 0.0,
+      "psnrCovered": null
+     },
+     "splats": 16449
+    },
+    "refined": {
+     "eye": [
+      1437.35,
+      1107.13,
+      1948.93
+     ],
+     "maskFrac": 0.315,
+     "coverage": 0.0351,
+     "psnr": 15.45,
+     "psnrCovered": 14.84,
+     "psnrTrivialCovered": 19.37,
+     "ssimCovered": 0.2456,
+     "onGpsMask": {
+      "coverage": 0.0351,
+      "psnrCovered": 14.84
+     },
+     "splats": 11964
+    }
+   },
+   "IMG_7059+IMG_7063": {
+    "gps": {
+     "eye": [
+      1437.35,
+      1107.13,
+      1948.92
+     ],
+     "maskFrac": 0.3153,
+     "coverage": 0.0,
+     "psnr": 15.51,
+     "psnrCovered": null,
+     "psnrTrivialCovered": null,
+     "ssimCovered": null,
+     "onGpsMask": {
+      "coverage": 0.0,
+      "psnrCovered": null
+     },
+     "splats": 72622
+    },
+    "refined": {
+     "eye": [
+      1437.35,
+      1107.13,
+      1948.93
+     ],
+     "maskFrac": 0.315,
+     "coverage": 0.048,
+     "psnr": 15.44,
+     "psnrCovered": 15.14,
+     "psnrTrivialCovered": 19.88,
+     "ssimCovered": 0.3022,
+     "onGpsMask": {
+      "coverage": 0.048,
+      "psnrCovered": 15.14
+     },
+     "splats": 29861
+    }
+   }
+  }
+ },
+ "anchorQuality": {
+  "gps": {
+   "IMG_7053": 0.639,
+   "IMG_7059": 0.684,
+   "IMG_7063": 0.778,
+   "IMG_7068": 0.701,
+   "IMG_7086": 0.392
+  },
+  "refined": {
+   "IMG_7053": 0.623,
+   "IMG_7059": 0.984,
+   "IMG_7063": 0.995,
+   "IMG_7068": 0.698,
+   "IMG_7086": 0.39
+  }
+ },
+ "seconds": 67.0
+}

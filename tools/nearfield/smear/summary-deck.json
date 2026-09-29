@@ -1,0 +1,3226 @@
+{
+ "renderer": "deck",
+ "band": 0.02,
+ "pooled": {
+  "sure": {
+   "person": {
+    "lab": 209551,
+    "sky": 32780,
+    "nearCut": 66319,
+    "smearOff": 4341,
+    "smearOnProduct": 3078,
+    "smearOnForced": 3075,
+    "obj": 172477,
+    "v300": 2428,
+    "v500": 2513,
+    "vN": 4341
+   },
+   "building": {
+    "lab": 4432,
+    "sky": 0,
+    "nearCut": 315,
+    "smearOff": 3370,
+    "smearOnProduct": 3109,
+    "smearOnForced": 3109,
+    "obj": 1238,
+    "v300": 3061,
+    "v500": 2904,
+    "vN": 3370
+   },
+   "tree": {
+    "lab": 32859,
+    "sky": 1958,
+    "nearCut": 3084,
+    "smearOff": 27386,
+    "smearOnProduct": 25656,
+    "smearOnForced": 22310,
+    "obj": 5743,
+    "v300": 22036,
+    "v500": 22805,
+    "vN": 27386
+   },
+   "pole": {
+    "lab": 9230,
+    "sky": 140,
+    "nearCut": 962,
+    "smearOff": 7752,
+    "smearOnProduct": 5905,
+    "smearOnForced": 5905,
+    "obj": 2199,
+    "v300": 1479,
+    "v500": 1459,
+    "vN": 7752
+   },
+   "structure": {
+    "lab": 10886,
+    "sky": 12,
+    "nearCut": 2660,
+    "smearOff": 7373,
+    "smearOnProduct": 5281,
+    "smearOnForced": 5281,
+    "obj": 3636,
+    "v300": 2152,
+    "v500": 2150,
+    "vN": 7373
+   },
+   "vehicle": {
+    "lab": 14700,
+    "sky": 6781,
+    "nearCut": 6648,
+    "smearOff": 1145,
+    "smearOnProduct": 10,
+    "smearOnForced": 10,
+    "obj": 5364,
+    "v300": 0,
+    "v500": 0,
+    "vN": 1145
+   },
+   "animal": {
+    "lab": 120,
+    "sky": 0,
+    "nearCut": 0,
+    "smearOff": 120,
+    "smearOnProduct": 120,
+    "smearOnForced": 120,
+    "obj": 0,
+    "v300": 120,
+    "v500": 120,
+    "vN": 120
+   },
+   "rock": {
+    "lab": 2546,
+    "sky": 0,
+    "nearCut": 2546,
+    "smearOff": 0,
+    "smearOnProduct": 0,
+    "smearOnForced": 0,
+    "obj": 1826,
+    "v300": 0,
+    "v500": 0,
+    "vN": 0
+   }
+  },
+  "all": {
+   "person": {
+    "lab": 209551,
+    "sky": 32780,
+    "nearCut": 66319,
+    "smearOff": 4341,
+    "smearOnProduct": 3078,
+    "smearOnForced": 3075,
+    "obj": 172477,
+    "v300": 2428,
+    "v500": 2513,
+    "vN": 4341
+   },
+   "building": {
+    "lab": 7931,
+    "sky": 0,
+    "nearCut": 315,
+    "smearOff": 6869,
+    "smearOnProduct": 4774,
+    "smearOnForced": 4774,
+    "obj": 3022,
+    "v300": 4711,
+    "v500": 4554,
+    "vN": 6869
+   },
+   "tree": {
+    "lab": 47089,
+    "sky": 2184,
+    "nearCut": 3192,
+    "smearOff": 40944,
+    "smearOnProduct": 38602,
+    "smearOnForced": 35256,
+    "obj": 6590,
+    "v300": 34938,
+    "v500": 35481,
+    "vN": 40944
+   },
+   "pole": {
+    "lab": 9230,
+    "sky": 140,
+    "nearCut": 962,
+    "smearOff": 7752,
+    "smearOnProduct": 5905,
+    "smearOnForced": 5905,
+    "obj": 2199,
+    "v300": 1479,
+    "v500": 1459,
+    "vN": 7752
+   },
+   "structure": {
+    "lab": 14665,
+    "sky": 12,
+    "nearCut": 3442,
+    "smearOff": 10353,
+    "smearOnProduct": 6121,
+    "smearOnForced": 6121,
+    "obj": 5769,
+    "v300": 2426,
+    "v500": 2404,
+    "vN": 10353
+   },
+   "vehicle": {
+    "lab": 14700,
+    "sky": 6781,
+    "nearCut": 6648,
+    "smearOff": 1145,
+    "smearOnProduct": 10,
+    "smearOnForced": 10,
+    "obj": 5364,
+    "v300": 0,
+    "v500": 0,
+    "vN": 1145
+   },
+   "animal": {
+    "lab": 153,
+    "sky": 0,
+    "nearCut": 0,
+    "smearOff": 153,
+    "smearOnProduct": 153,
+    "smearOnForced": 153,
+    "obj": 0,
+    "v300": 153,
+    "v500": 153,
+    "vN": 153
+   },
+   "rock": {
+    "lab": 11621,
+    "sky": 0,
+    "nearCut": 5162,
+    "smearOff": 6110,
+    "smearOnProduct": 6051,
+    "smearOnForced": 6051,
+    "obj": 2821,
+    "v300": 5974,
+    "v500": 5964,
+    "vN": 6110
+   }
+  }
+ },
+ "collateral": {
+  "product": {
+   "draped": 250116,
+   "removed": 2638,
+   "removedBand": 4503,
+   "drapedBand": 87716
+  },
+  "forced": {
+   "draped": 250116,
+   "removed": 2638,
+   "removedBand": 4772,
+   "drapedBand": 87716
+  },
+  "v300": {
+   "draped": 250116,
+   "removed": 30132,
+   "removedBand": 12224,
+   "drapedBand": 87716
+  },
+  "v500": {
+   "draped": 250116,
+   "removed": 44163,
+   "removedBand": 11178,
+   "drapedBand": 87716
+  }
+ },
+ "perPhoto": {
+  "IMG_5495": {
+   "quality": 0.2113476849987509,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 31914,
+     "sky": 7679,
+     "nearCut": 2019,
+     "smearOff": 149,
+     "smearOnProduct": 96,
+     "smearOnForced": 96,
+     "obj": 31507,
+     "v300": 89,
+     "v500": 89,
+     "vN": 149
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 139,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 115,
+     "smearOnProduct": 3,
+     "smearOnForced": 3,
+     "obj": 135,
+     "v300": 3,
+     "v500": 1,
+     "vN": 115
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 31914,
+     "sky": 7679,
+     "nearCut": 2019,
+     "smearOff": 149,
+     "smearOnProduct": 96,
+     "smearOnForced": 96,
+     "obj": 31507,
+     "v300": 89,
+     "v500": 89,
+     "vN": 149
+    },
+    "building": {
+     "lab": 2278,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 2278,
+     "smearOnProduct": 444,
+     "smearOnForced": 444,
+     "obj": 1784,
+     "v300": 429,
+     "v500": 429,
+     "vN": 2278
+    },
+    "tree": {
+     "lab": 2091,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 2091,
+     "smearOnProduct": 2091,
+     "smearOnForced": 2091,
+     "obj": 0,
+     "v300": 2091,
+     "v500": 2090,
+     "vN": 2091
+    },
+    "pole": {
+     "lab": 139,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 115,
+     "smearOnProduct": 3,
+     "smearOnForced": 3,
+     "obj": 135,
+     "v300": 3,
+     "v500": 1,
+     "vN": 115
+    },
+    "structure": {
+     "lab": 2430,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 2430,
+     "smearOnProduct": 295,
+     "smearOnForced": 295,
+     "obj": 2083,
+     "v300": 274,
+     "v500": 254,
+     "vN": 2430
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 23975,
+     "removed": 442,
+     "removedBand": 2265,
+     "drapedBand": 12565
+    },
+    "forced": {
+     "draped": 23975,
+     "removed": 442,
+     "removedBand": 2265,
+     "drapedBand": 12565
+    }
+   }
+  },
+  "IMG_6019": {
+   "quality": 0.759245597535937,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 7102,
+     "sky": 0,
+     "nearCut": 3345,
+     "smearOff": 102,
+     "smearOnProduct": 80,
+     "smearOnForced": 80,
+     "obj": 6967,
+     "v300": 81,
+     "v500": 81,
+     "vN": 102
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 276,
+     "sky": 0,
+     "nearCut": 276,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 2546,
+     "sky": 0,
+     "nearCut": 2546,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 1826,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 7102,
+     "sky": 0,
+     "nearCut": 3345,
+     "smearOff": 102,
+     "smearOnProduct": 80,
+     "smearOnForced": 80,
+     "obj": 6967,
+     "v300": 81,
+     "v500": 81,
+     "vN": 102
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 276,
+     "sky": 0,
+     "nearCut": 276,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 4636,
+     "sky": 0,
+     "nearCut": 4029,
+     "smearOff": 492,
+     "smearOnProduct": 479,
+     "smearOnForced": 479,
+     "obj": 2545,
+     "v300": 484,
+     "v500": 484,
+     "vN": 492
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 21865,
+     "removed": 0,
+     "removedBand": 90,
+     "drapedBand": 1751
+    },
+    "forced": {
+     "draped": 21865,
+     "removed": 0,
+     "removedBand": 90,
+     "drapedBand": 1751
+    }
+   }
+  },
+  "IMG_6958": {
+   "quality": 0.9659449270500636,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 238,
+     "sky": 0,
+     "nearCut": 238,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 109,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 238,
+     "sky": 0,
+     "nearCut": 238,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 109,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 25792,
+     "removed": 0,
+     "removedBand": 0,
+     "drapedBand": 0
+    },
+    "forced": {
+     "draped": 25792,
+     "removed": 0,
+     "removedBand": 0,
+     "drapedBand": 0
+    }
+   }
+  },
+  "IMG_6971": {
+   "quality": 0.6501722847522912,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 19932,
+     "sky": 5781,
+     "nearCut": 4734,
+     "smearOff": 198,
+     "smearOnProduct": 19,
+     "smearOnForced": 19,
+     "obj": 18750,
+     "v300": 7,
+     "v500": 7,
+     "vN": 198
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 14700,
+     "sky": 6781,
+     "nearCut": 6648,
+     "smearOff": 1145,
+     "smearOnProduct": 10,
+     "smearOnForced": 10,
+     "obj": 5364,
+     "v300": 0,
+     "v500": 0,
+     "vN": 1145
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 19932,
+     "sky": 5781,
+     "nearCut": 4734,
+     "smearOff": 198,
+     "smearOnProduct": 19,
+     "smearOnForced": 19,
+     "obj": 18750,
+     "v300": 7,
+     "v500": 7,
+     "vN": 198
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 14700,
+     "sky": 6781,
+     "nearCut": 6648,
+     "smearOff": 1145,
+     "smearOnProduct": 10,
+     "smearOnForced": 10,
+     "obj": 5364,
+     "v300": 0,
+     "v500": 0,
+     "vN": 1145
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 8795,
+     "removed": 254,
+     "removedBand": 438,
+     "drapedBand": 3304
+    },
+    "forced": {
+     "draped": 8795,
+     "removed": 254,
+     "removedBand": 438,
+     "drapedBand": 3304
+    }
+   }
+  },
+  "IMG_7018": {
+   "quality": 0.4369022389202743,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 12407,
+     "sky": 197,
+     "nearCut": 7571,
+     "smearOff": 17,
+     "smearOnProduct": 5,
+     "smearOnForced": 5,
+     "obj": 12291,
+     "v300": 5,
+     "v500": 5,
+     "vN": 17
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 8045,
+     "sky": 0,
+     "nearCut": 1467,
+     "smearOff": 6387,
+     "smearOnProduct": 4928,
+     "smearOnForced": 4928,
+     "obj": 2322,
+     "v300": 2266,
+     "v500": 2080,
+     "vN": 6387
+    },
+    "pole": {
+     "lab": 16,
+     "sky": 0,
+     "nearCut": 16,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 12407,
+     "sky": 197,
+     "nearCut": 7571,
+     "smearOff": 17,
+     "smearOnProduct": 5,
+     "smearOnForced": 5,
+     "obj": 12291,
+     "v300": 5,
+     "v500": 5,
+     "vN": 17
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 9549,
+     "sky": 0,
+     "nearCut": 1575,
+     "smearOff": 7463,
+     "smearOnProduct": 5802,
+     "smearOnForced": 5802,
+     "obj": 2835,
+     "v300": 3065,
+     "v500": 2879,
+     "vN": 7463
+    },
+    "pole": {
+     "lab": 16,
+     "sky": 0,
+     "nearCut": 16,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 1349,
+     "sky": 0,
+     "nearCut": 782,
+     "smearOff": 550,
+     "smearOnProduct": 545,
+     "smearOnForced": 545,
+     "obj": 50,
+     "v300": 0,
+     "v500": 0,
+     "vN": 550
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 8371,
+     "removed": 0,
+     "removedBand": 239,
+     "drapedBand": 5342
+    },
+    "forced": {
+     "draped": 8371,
+     "removed": 0,
+     "removedBand": 239,
+     "drapedBand": 5342
+    }
+   }
+  },
+  "IMG_7033": {
+   "quality": 0.008813435849735641,
+   "gated": true,
+   "sure": {
+    "person": {
+     "lab": 15628,
+     "sky": 84,
+     "nearCut": 3418,
+     "smearOff": 85,
+     "smearOnProduct": 85,
+     "smearOnForced": 82,
+     "obj": 36,
+     "v300": 82,
+     "v500": 82,
+     "vN": 85
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 22469,
+     "sky": 1617,
+     "nearCut": 1617,
+     "smearOff": 18995,
+     "smearOnProduct": 18995,
+     "smearOnForced": 15649,
+     "obj": 3194,
+     "v300": 18984,
+     "v500": 18982,
+     "vN": 18995
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 15628,
+     "sky": 84,
+     "nearCut": 3418,
+     "smearOff": 85,
+     "smearOnProduct": 85,
+     "smearOnForced": 82,
+     "obj": 36,
+     "v300": 82,
+     "v500": 82,
+     "vN": 85
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 22469,
+     "sky": 1617,
+     "nearCut": 1617,
+     "smearOff": 18995,
+     "smearOnProduct": 18995,
+     "smearOnForced": 15649,
+     "obj": 3194,
+     "v300": 18984,
+     "v500": 18982,
+     "vN": 18995
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 11576,
+     "removed": 0,
+     "removedBand": 0,
+     "drapedBand": 8349
+    },
+    "forced": {
+     "draped": 11576,
+     "removed": 0,
+     "removedBand": 269,
+     "drapedBand": 8349
+    }
+   }
+  },
+  "IMG_7053": {
+   "quality": 0.5658806679181128,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 8370,
+     "sky": 340,
+     "nearCut": 0,
+     "smearOff": 271,
+     "smearOnProduct": 85,
+     "smearOnForced": 85,
+     "obj": 8017,
+     "v300": 71,
+     "v500": 71,
+     "vN": 271
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 2676,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 2646,
+     "smearOnProduct": 1220,
+     "smearOnForced": 1220,
+     "obj": 1410,
+     "v300": 33,
+     "v500": 33,
+     "vN": 2646
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 8370,
+     "sky": 340,
+     "nearCut": 0,
+     "smearOff": 271,
+     "smearOnProduct": 85,
+     "smearOnForced": 85,
+     "obj": 8017,
+     "v300": 71,
+     "v500": 71,
+     "vN": 271
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 1735,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 1735,
+     "smearOnProduct": 1412,
+     "smearOnForced": 1412,
+     "obj": 262,
+     "v300": 1438,
+     "v500": 1431,
+     "vN": 1735
+    },
+    "pole": {
+     "lab": 2676,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 2646,
+     "smearOnProduct": 1220,
+     "smearOnForced": 1220,
+     "obj": 1410,
+     "v300": 33,
+     "v500": 33,
+     "vN": 2646
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 12608,
+     "removed": 62,
+     "removedBand": 637,
+     "drapedBand": 10211
+    },
+    "forced": {
+     "draped": 12608,
+     "removed": 62,
+     "removedBand": 637,
+     "drapedBand": 10211
+    }
+   }
+  },
+  "IMG_7059": {
+   "quality": 0,
+   "gated": true,
+   "sure": {
+    "person": {
+     "lab": 16026,
+     "sky": 3000,
+     "nearCut": 5395,
+     "smearOff": 1043,
+     "smearOnProduct": 1043,
+     "smearOnForced": 1043,
+     "obj": 0,
+     "v300": 349,
+     "v500": 348,
+     "vN": 1043
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 243,
+     "sky": 12,
+     "nearCut": 43,
+     "smearOff": 188,
+     "smearOnProduct": 188,
+     "smearOnForced": 188,
+     "obj": 0,
+     "v300": 174,
+     "v500": 174,
+     "vN": 188
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 16026,
+     "sky": 3000,
+     "nearCut": 5395,
+     "smearOff": 1043,
+     "smearOnProduct": 1043,
+     "smearOnForced": 1043,
+     "obj": 0,
+     "v300": 349,
+     "v500": 348,
+     "vN": 1043
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 490,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 490,
+     "smearOnProduct": 490,
+     "smearOnForced": 490,
+     "obj": 0,
+     "v300": 490,
+     "v500": 490,
+     "vN": 490
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 243,
+     "sky": 12,
+     "nearCut": 43,
+     "smearOff": 188,
+     "smearOnProduct": 188,
+     "smearOnForced": 188,
+     "obj": 0,
+     "v300": 174,
+     "v500": 174,
+     "vN": 188
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 206,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 206,
+     "smearOnProduct": 206,
+     "smearOnForced": 206,
+     "obj": 0,
+     "v300": 109,
+     "v500": 104,
+     "vN": 206
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 16833,
+     "removed": 0,
+     "removedBand": 0,
+     "drapedBand": 8794
+    },
+    "forced": {
+     "draped": 16833,
+     "removed": 0,
+     "removedBand": 0,
+     "drapedBand": 8794
+    }
+   }
+  },
+  "IMG_7063": {
+   "quality": 0.8257315260733905,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 18712,
+     "sky": 6335,
+     "nearCut": 12123,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 18323,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 717,
+     "sky": 0,
+     "nearCut": 717,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 499,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 18712,
+     "sky": 6335,
+     "nearCut": 12123,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 18323,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "structure": {
+     "lab": 717,
+     "sky": 0,
+     "nearCut": 717,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 499,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 1656,
+     "sky": 0,
+     "nearCut": 1019,
+     "smearOff": 637,
+     "smearOnProduct": 619,
+     "smearOnForced": 619,
+     "obj": 13,
+     "v300": 637,
+     "v500": 632,
+     "vN": 637
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 18716,
+     "removed": 861,
+     "removedBand": 80,
+     "drapedBand": 581
+    },
+    "forced": {
+     "draped": 18716,
+     "removed": 861,
+     "removedBand": 80,
+     "drapedBand": 581
+    }
+   }
+  },
+  "IMG_7068": {
+   "quality": 0.6688203218026667,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 29330,
+     "sky": 226,
+     "nearCut": 17241,
+     "smearOff": 899,
+     "smearOnProduct": 780,
+     "smearOnForced": 780,
+     "obj": 28426,
+     "v300": 765,
+     "v500": 765,
+     "vN": 899
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 4648,
+     "sky": 0,
+     "nearCut": 609,
+     "smearOff": 3908,
+     "smearOnProduct": 3880,
+     "smearOnForced": 3880,
+     "obj": 209,
+     "v300": 817,
+     "v500": 817,
+     "vN": 3908
+    },
+    "structure": {
+     "lab": 767,
+     "sky": 0,
+     "nearCut": 358,
+     "smearOff": 409,
+     "smearOnProduct": 409,
+     "smearOnForced": 409,
+     "obj": 0,
+     "v300": 408,
+     "v500": 408,
+     "vN": 409
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 29330,
+     "sky": 226,
+     "nearCut": 17241,
+     "smearOff": 899,
+     "smearOnProduct": 780,
+     "smearOnForced": 780,
+     "obj": 28426,
+     "v300": 765,
+     "v500": 765,
+     "vN": 899
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 2375,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 2375,
+     "smearOnProduct": 2375,
+     "smearOnForced": 2375,
+     "obj": 0,
+     "v300": 2375,
+     "v500": 2375,
+     "vN": 2375
+    },
+    "pole": {
+     "lab": 4648,
+     "sky": 0,
+     "nearCut": 609,
+     "smearOff": 3908,
+     "smearOnProduct": 3880,
+     "smearOnForced": 3880,
+     "obj": 209,
+     "v300": 817,
+     "v500": 817,
+     "vN": 3908
+    },
+    "structure": {
+     "lab": 767,
+     "sky": 0,
+     "nearCut": 358,
+     "smearOff": 409,
+     "smearOnProduct": 409,
+     "smearOnForced": 409,
+     "obj": 0,
+     "v300": 408,
+     "v500": 408,
+     "vN": 409
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 2457,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 2457,
+     "smearOnProduct": 2457,
+     "smearOnForced": 2457,
+     "obj": 0,
+     "v300": 2447,
+     "v500": 2447,
+     "vN": 2457
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 31658,
+     "removed": 2,
+     "removedBand": 251,
+     "drapedBand": 12371
+    },
+    "forced": {
+     "draped": 31658,
+     "removed": 2,
+     "removedBand": 251,
+     "drapedBand": 12371
+    }
+   }
+  },
+  "IMG_7086": {
+   "quality": 0.34493455474112633,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 5679,
+     "sky": 822,
+     "nearCut": 1094,
+     "smearOff": 17,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 5631,
+     "v300": 3,
+     "v500": 2,
+     "vN": 17
+    },
+    "building": {
+     "lab": 1604,
+     "sky": 0,
+     "nearCut": 315,
+     "smearOff": 743,
+     "smearOnProduct": 538,
+     "smearOnForced": 538,
+     "obj": 1041,
+     "v300": 504,
+     "v500": 277,
+     "vN": 743
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 742,
+     "sky": 77,
+     "nearCut": 61,
+     "smearOff": 467,
+     "smearOnProduct": 295,
+     "smearOnForced": 295,
+     "obj": 265,
+     "v300": 118,
+     "v500": 112,
+     "vN": 467
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 5679,
+     "sky": 822,
+     "nearCut": 1094,
+     "smearOff": 17,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 5631,
+     "v300": 3,
+     "v500": 2,
+     "vN": 17
+    },
+    "building": {
+     "lab": 1604,
+     "sky": 0,
+     "nearCut": 315,
+     "smearOff": 743,
+     "smearOnProduct": 538,
+     "smearOnForced": 538,
+     "obj": 1041,
+     "v300": 504,
+     "v500": 277,
+     "vN": 743
+    },
+    "tree": {
+     "lab": 1849,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 1831,
+     "smearOnProduct": 1744,
+     "smearOnForced": 1744,
+     "obj": 72,
+     "v300": 1749,
+     "v500": 1726,
+     "vN": 1831
+    },
+    "pole": {
+     "lab": 742,
+     "sky": 77,
+     "nearCut": 61,
+     "smearOff": 467,
+     "smearOnProduct": 295,
+     "smearOnForced": 295,
+     "obj": 265,
+     "v300": 118,
+     "v500": 112,
+     "vN": 467
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 29703,
+     "removed": 387,
+     "removedBand": 146,
+     "drapedBand": 5496
+    },
+    "forced": {
+     "draped": 29703,
+     "removed": 387,
+     "removedBand": 146,
+     "drapedBand": 5496
+    }
+   }
+  },
+  "IMG_7130": {
+   "quality": 0.19613434209204553,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 17355,
+     "sky": 7862,
+     "nearCut": 0,
+     "smearOff": 319,
+     "smearOnProduct": 247,
+     "smearOnForced": 247,
+     "obj": 16724,
+     "v300": 228,
+     "v500": 319,
+     "vN": 319
+    },
+    "building": {
+     "lab": 1737,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 1536,
+     "smearOnProduct": 1480,
+     "smearOnForced": 1480,
+     "obj": 197,
+     "v300": 1466,
+     "v500": 1536,
+     "vN": 1536
+    },
+    "tree": {
+     "lab": 2345,
+     "sky": 341,
+     "nearCut": 0,
+     "smearOff": 2004,
+     "smearOnProduct": 1733,
+     "smearOnForced": 1733,
+     "obj": 227,
+     "v300": 786,
+     "v500": 1743,
+     "vN": 2004
+    },
+    "pole": {
+     "lab": 414,
+     "sky": 63,
+     "nearCut": 0,
+     "smearOff": 351,
+     "smearOnProduct": 328,
+     "smearOnForced": 328,
+     "obj": 43,
+     "v300": 328,
+     "v500": 316,
+     "vN": 351
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 17355,
+     "sky": 7862,
+     "nearCut": 0,
+     "smearOff": 319,
+     "smearOnProduct": 247,
+     "smearOnForced": 247,
+     "obj": 16724,
+     "v300": 228,
+     "v500": 319,
+     "vN": 319
+    },
+    "building": {
+     "lab": 2336,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 2135,
+     "smearOnProduct": 2079,
+     "smearOnForced": 2079,
+     "obj": 197,
+     "v300": 2065,
+     "v500": 2135,
+     "vN": 2135
+    },
+    "tree": {
+     "lab": 5315,
+     "sky": 567,
+     "nearCut": 0,
+     "smearOff": 4748,
+     "smearOnProduct": 4477,
+     "smearOnForced": 4477,
+     "obj": 227,
+     "v300": 3530,
+     "v500": 4292,
+     "vN": 4748
+    },
+    "pole": {
+     "lab": 414,
+     "sky": 63,
+     "nearCut": 0,
+     "smearOff": 351,
+     "smearOnProduct": 328,
+     "smearOnForced": 328,
+     "obj": 43,
+     "v300": 328,
+     "v500": 316,
+     "vN": 351
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 10759,
+     "removed": 0,
+     "removedBand": 205,
+     "drapedBand": 8579
+    },
+    "forced": {
+     "draped": 10759,
+     "removed": 0,
+     "removedBand": 205,
+     "drapedBand": 8579
+    }
+   }
+  },
+  "IMG_7131": {
+   "quality": 0.22971363883511975,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 36,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 36,
+     "smearOnProduct": 36,
+     "smearOnForced": 36,
+     "obj": 0,
+     "v300": 36,
+     "v500": 36,
+     "vN": 36
+    },
+    "building": {
+     "lab": 1091,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 1091,
+     "smearOnProduct": 1091,
+     "smearOnForced": 1091,
+     "obj": 0,
+     "v300": 1091,
+     "v500": 1091,
+     "vN": 1091
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 176,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 176,
+     "smearOnProduct": 176,
+     "smearOnForced": 176,
+     "obj": 0,
+     "v300": 176,
+     "v500": 176,
+     "vN": 176
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 120,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 120,
+     "smearOnProduct": 120,
+     "smearOnForced": 120,
+     "obj": 0,
+     "v300": 120,
+     "v500": 120,
+     "vN": 120
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 36,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 36,
+     "smearOnProduct": 36,
+     "smearOnForced": 36,
+     "obj": 0,
+     "v300": 36,
+     "v500": 36,
+     "vN": 36
+    },
+    "building": {
+     "lab": 1713,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 1713,
+     "smearOnProduct": 1713,
+     "smearOnForced": 1713,
+     "obj": 0,
+     "v300": 1713,
+     "v500": 1713,
+     "vN": 1713
+    },
+    "tree": {
+     "lab": 1216,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 1216,
+     "smearOnProduct": 1216,
+     "smearOnForced": 1216,
+     "obj": 0,
+     "v300": 1216,
+     "v500": 1216,
+     "vN": 1216
+    },
+    "pole": {
+     "lab": 176,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 176,
+     "smearOnProduct": 176,
+     "smearOnForced": 176,
+     "obj": 0,
+     "v300": 176,
+     "v500": 176,
+     "vN": 176
+    },
+    "structure": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 153,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 153,
+     "smearOnProduct": 153,
+     "smearOnForced": 153,
+     "obj": 0,
+     "v300": 153,
+     "v500": 153,
+     "vN": 153
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 20990,
+     "removed": 630,
+     "removedBand": 0,
+     "drapedBand": 5186
+    },
+    "forced": {
+     "draped": 20990,
+     "removed": 630,
+     "removedBand": 0,
+     "drapedBand": 5186
+    }
+   }
+  },
+  "IMG_7155": {
+   "quality": 0.18529349359843647,
+   "gated": false,
+   "sure": {
+    "person": {
+     "lab": 26822,
+     "sky": 454,
+     "nearCut": 9141,
+     "smearOff": 1205,
+     "smearOnProduct": 602,
+     "smearOnForced": 602,
+     "obj": 25696,
+     "v300": 712,
+     "v500": 708,
+     "vN": 1205
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 143,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 89,
+     "smearOnProduct": 3,
+     "smearOnForced": 3,
+     "obj": 137,
+     "v300": 4,
+     "v500": 4,
+     "vN": 89
+    },
+    "structure": {
+     "lab": 9159,
+     "sky": 0,
+     "nearCut": 1542,
+     "smearOff": 6776,
+     "smearOnProduct": 4684,
+     "smearOnForced": 4684,
+     "obj": 3137,
+     "v300": 1570,
+     "v500": 1568,
+     "vN": 6776
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    }
+   },
+   "all": {
+    "person": {
+     "lab": 26822,
+     "sky": 454,
+     "nearCut": 9141,
+     "smearOff": 1205,
+     "smearOnProduct": 602,
+     "smearOnForced": 602,
+     "obj": 25696,
+     "v300": 712,
+     "v500": 708,
+     "vN": 1205
+    },
+    "building": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "tree": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "pole": {
+     "lab": 143,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 89,
+     "smearOnProduct": 3,
+     "smearOnForced": 3,
+     "obj": 137,
+     "v300": 4,
+     "v500": 4,
+     "vN": 89
+    },
+    "structure": {
+     "lab": 9159,
+     "sky": 0,
+     "nearCut": 1542,
+     "smearOff": 6776,
+     "smearOnProduct": 4684,
+     "smearOnForced": 4684,
+     "obj": 3137,
+     "v300": 1570,
+     "v500": 1568,
+     "vN": 6776
+    },
+    "vehicle": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "animal": {
+     "lab": 0,
+     "sky": 0,
+     "nearCut": 0,
+     "smearOff": 0,
+     "smearOnProduct": 0,
+     "smearOnForced": 0,
+     "obj": 0,
+     "v300": 0,
+     "v500": 0,
+     "vN": 0
+    },
+    "rock": {
+     "lab": 2666,
+     "sky": 0,
+     "nearCut": 114,
+     "smearOff": 2318,
+     "smearOnProduct": 2290,
+     "smearOnForced": 2290,
+     "obj": 263,
+     "v300": 2297,
+     "v500": 2297,
+     "vN": 2318
+    }
+   },
+   "coll": {
+    "product": {
+     "draped": 8475,
+     "removed": 0,
+     "removedBand": 152,
+     "drapedBand": 5187
+    },
+    "forced": {
+     "draped": 8475,
+     "removed": 0,
+     "removedBand": 152,
+     "drapedBand": 5187
+    }
+   }
+  }
+ }
+}

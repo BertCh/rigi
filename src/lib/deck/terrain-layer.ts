@@ -26,6 +26,7 @@ import {
 import { REL_BLOCK, REL_LUMA_MODULE } from "../look/glsl/relief";
 import { type LookDefine, withSlopeLayer } from "../look/look-key";
 import type { ReliefField } from "../look/relief/field";
+import { PROVENANCE_COLORS } from "../nearfield/provenance";
 import { type DeckTerrainStyle, deckTerrainStyle } from "../style/deck-apply";
 import { CLASSIC } from "../style/defaults";
 import { BatchedTerrainTileLayer } from "./batched-terrain-layer";
@@ -122,12 +123,15 @@ layout(std140) uniform terrainUniforms {
   vec4 imgAdj;
   vec4 imgTint;
   vec4 photoTintCol;
+  vec4 truthObs;
+  vec4 truthDem;
   vec2 bandShade;
   float contourMajorMul;
   float minorAlpha;
   float majorAlpha;
   float fadeFloor;
   float contourSolid;
+  float truth;
 } terrain;
 `;
 
@@ -179,6 +183,9 @@ type TerrainModuleProps = {
 	/** linear rgb, amount */
 	imgTint: number[];
 	photoTintCol: number[];
+	/** Truth toggle tints (sRGB rgb, -): observed drape, DEM terrain. */
+	truthObs: number[];
+	truthDem: number[];
 	/** shadeMin, 1 - shadeMin */
 	bandShade: number[];
 	contourMajorMul: number;
@@ -186,6 +193,8 @@ type TerrainModuleProps = {
 	majorAlpha: number;
 	fadeFloor: number;
 	contourSolid: number;
+	/** Truth toggle: 0 = off (classic), else how much of the provenance tint replaces the colour. */
+	truth: number;
 	terrainMap: Texture;
 	photoTexture: Texture;
 	photoRange: Texture;
@@ -238,12 +247,15 @@ export const terrainModule = {
 		imgAdj: "vec4<f32>",
 		imgTint: "vec4<f32>",
 		photoTintCol: "vec4<f32>",
+		truthObs: "vec4<f32>",
+		truthDem: "vec4<f32>",
 		bandShade: "vec2<f32>",
 		contourMajorMul: "f32",
 		minorAlpha: "f32",
 		majorAlpha: "f32",
 		fadeFloor: "f32",
 		contourSolid: "f32",
+		truth: "f32",
 	},
 } as const satisfies ShaderModule;
 
@@ -525,11 +537,30 @@ void main() {
           vec3 pc = srgbDecode(textureGrad(photoTexture, puv, pdx, pdy).rgb);
           vec3 ray = normalize(vWorld - terrain.photoPos.xyz);
           float inc = clamp(-dot(ray, n) * 3.0, 0.0, 1.0);
-          base = mix(base, pc, terrain.projectPhoto * mix(0.35, 1.0, inc));
+          // projectPhoto > 1.5: Step Inside (seen from the photo camera the drape is the photo itself)
+          base = mix(base, pc, terrain.projectPhoto > 1.5 ? 1.0 : terrain.projectPhoto * mix(0.35, 1.0, inc));
           base = mix(base, base * terrain.photoTintCol.rgb, terrain.photoTint);
         }
       }
     }
+  }
+
+  // Step Inside "Truth" (terrain.truth > 0, world / step view only; materials.ts uTruth): the drape's photo
+  // pixels (the visibility test above) = observed, every other terrain fragment = dem
+  if (terrain.truth > 0.0) {
+    bool seenT = false;
+    vec4 clipT = terrain.photoViewProj * vec4(vWorld, 1.0);
+    if (terrain.projectPhoto > 0.0 && clipT.w > 0.0) {
+      vec2 puvT = clipT.xy / clipT.w * 0.5 + 0.5;
+      puvT.y = 1.0 - puvT.y;
+      if (all(greaterThan(puvT, vec2(0.0))) && all(lessThan(puvT, vec2(1.0)))) {
+        float rT = length(vWorld - terrain.photoPos.xyz);
+        float seen = textureLod(photoRange, puvT, 0.0).r;
+        seenT = seen > 0.0 && rT < seen * 1.015 + 15.0 && rT > terrain.photoPos.w;
+        if (terrain.photoFgOn > 0.5 && textureLod(photoFg, puvT, 0.0).r > 0.5) seenT = false;
+      }
+    }
+    base = mix(base, srgbDecode(seenT ? terrain.truthObs.rgb : terrain.truthDem.rgb), terrain.truth);
   }
 
 #ifdef LOOK_ATMOSPHERE
@@ -571,6 +602,8 @@ export type TerrainUniformProps = {
 	protectPeople: boolean;
 	/** The drape's band stats (world.drapeHarmonize, LOOK_HARMONIZE): look/composite.ts harmonizeValues. */
 	harmonize: ReturnType<typeof harmonizeValues> | null;
+	/** Step Inside Truth toggle (world drape only): 0 = off, else the provenance tint's mix. */
+	truth: number;
 };
 
 type TileLayerProps = LayerProps &
@@ -773,12 +806,16 @@ export function setTerrainShaderProps(
 			imgAdj: [...L.imgAdj, L.imgOn],
 			imgTint: L.imgTint,
 			photoTintCol: [...L.photoTintCol, 1],
+			truthObs: TRUTH_OBS,
+			truthDem: TRUTH_DEM,
 			bandShade: L.bandShade,
 			contourMajorMul: L.contourMajorMul,
 			minorAlpha: L.minorAlpha,
 			majorAlpha: L.majorAlpha,
 			fadeFloor: L.fadeFloor,
 			contourSolid: L.contourSolid,
+			// the world drape only (the photo view's offscreen passes stay classic)
+			truth: pass ? 0 : p.truth,
 			terrainMap: map ?? empty,
 			photoTexture: p.photoTexture ?? empty,
 			photoRange: p.photoRange ?? empty,
@@ -881,6 +918,10 @@ export type TerrainLayerProps = LayerProps &
 		offscreen?: boolean;
 	};
 
+/** Truth toggle tints (sRGB 0..1): the single palette in nearfield/provenance.ts. */
+const TRUTH_OBS = [...PROVENANCE_COLORS.observed.map((c) => c / 255), 1];
+const TRUTH_DEM = [...PROVENANCE_COLORS.dem.map((c) => c / 255), 1];
+
 const DEFAULTS: TerrainUniformProps = {
 	style: "hillshade",
 	look: deckTerrainStyle(CLASSIC, "overlay"),
@@ -896,6 +937,7 @@ const DEFAULTS: TerrainUniformProps = {
 	nearDiscard: 0,
 	protectPeople: true,
 	harmonize: null,
+	truth: 0,
 };
 
 /** sRGB hex → linear RGB triple, exactly as THREE.Color.setHex does under ColorManagement. */

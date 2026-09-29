@@ -1,0 +1,23 @@
+{
+ "per_verifier": {
+  "v1": {
+   "control_ok": true,
+   "decoys_accepted": [],
+   "propagated": "correct",
+   "sane": true
+  },
+  "v2": {
+   "control_ok": true,
+   "decoys_accepted": [],
+   "propagated": "correct",
+   "sane": true
+  },
+  "v3": {
+   "control_ok": true,
+   "decoys_accepted": [],
+   "propagated": "correct",
+   "sane": true
+  }
+ },
+ "final": "correct"
+}

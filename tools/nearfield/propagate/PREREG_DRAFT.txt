@@ -1,0 +1,76 @@
+PRE-REGISTRATION DRAFT: pose propagation within a viewpoint (Step Inside P2)
+Status: DRAFT, NOT FROZEN, NOT EXECUTED. Written 2026-09-28. Nothing in tools/bench/data_v3 has been
+opened, listed, matched or read by this work (not even the manifest). Running it spends held-out data
+and needs the user's sign-off. It must also be coordinated with reports/v3-prereg.md, because both use
+data_v3 and its blind-verification budget.
+
+1. Hypothesis
+  H1 (safety): a propagated pose that passes PROPAGATE_GATE is within 1.0 deg yaw of the target's
+     true pose AFTER the existing DEM matcher/cascade refines it from that seed, in >= 95% of gated
+     pairs. The false-suggestion rate (gated but wrong) is <= 5%.
+  H2 (raw accuracy): the unrefined propagated pose has median geodesic error <= 3 deg and 90th
+     percentile <= 5 deg (the seed radius) on gated pairs.
+  H3 (recall): among targets that the frozen arm (v034 or t6, whichever is the service default at
+     freeze) does NOT accept, propagation from an accepted anchor gives a blind-verified correct pose
+     for >= 1 target, with 0 gross errors.
+  No accept rule changes under this prereg. Propagated poses stay suggestions (LOW). A later
+  accept rule would need its own prereg.
+
+2. Frozen method (stamp at freeze: sha1 of each file)
+  - Estimator: tools/nearfield/propagate/run_propagate.py rot_ransac (ALIKED 2048 kp + LightGlue on
+    CPU, 1024 px long side, 4 px, 2000 iters, seed 0). The backward estimate (B->A) is computed for
+    fwd/bwd.
+  - Composition and gate: src/lib/nearfield/propagate.ts proposePose + PROPAGATE_GATE, as in the
+    working tree on 2026-09-28: minInliers 40, maxRmsPx 3.5, minOverlap 0.1, maxFwdBwdDeg 1.5,
+    maxCycleDeg 1.5, gravity 3/3 deg (only where gravity exists), maxBaselineM 250, methods ["rot"].
+    These constants are not re-tuned on data_v3.
+  - Anchor: ONLY photos that the frozen arm ACCEPTED under the product rule, with their own vfov.
+    Never a GT pose, and never another propagated pose (no chaining).
+  - Target intrinsics: EXIF focal only (FF35 diagonal 43.2666 mm), as the app does.
+  - Refinement (H1): the frozen matcher/cascade run from the propagated pose as seed, with a
+    +/- seedRadiusDeg (5 deg) window. Same eye and DEM (Mapterhorn) as the arm.
+  - DA3 is not part of the method (dev: no confidence signal; REPORT.txt).
+
+3. Eligibility (decided from the manifest ONLY, before any pixels are seen)
+  - Pairs (A, B) where both are in data_v3, the GPS/position distance is <= 250 m, and A is accepted
+    by the frozen arm. Order: every accepted A x every B != A.
+  - A pre-check counts eligible pairs from the manifest (lat/lon only) and logs the count before any
+    image is opened. If fewer than 10 unordered co-located pairs exist, the run is UNDERPOWERED. Stop
+    and report the count only. Do not run a partial test that would spend the set for nothing.
+    Expectation from the dev split: Commons co-location is rare (1 pair within 1 km in 50 dev photos).
+    data_v3 will most likely be underpowered for this question. In that case the recommended
+    held-out set is a NEW one: the user's own camera-roll viewpoints (groups of >= 3 photos within
+    250 m) that none of this work has seen. They get the same blind protocol and are frozen by sha1
+    before any processing.
+
+4. Ground truth: blind verification (same protocol as reports/test-prereg.md + test-addendum hardening)
+  - For each gated B, render overlays at (a) the propagated pose raw, (b) the refined pose, and (c) one
+    decoy (the propagated pose with a yaw offset of +/- 3-6 deg, random sign, seeded). Use Mapterhorn
+    at the arm's eye, pad the top (PACK_PAD=1), and hide the pose numbers in the header.
+  - 2 independent verifier agents per overlay, with a fixed checklist (C1-C4) and their own scratch
+    dirs. Retries allowed, and "not-seen" is allowed. Verdict = correct only if both say correct.
+    Split verdicts are reported as unsure and counted as NOT correct for H1/H3.
+  - Ungated pairs are also rendered at the raw propagated pose (sampled up to 20). This estimates
+    what the gate throws away (recall of the gate), not safety.
+
+5. Metrics and decision
+  - Primary (H1): verified-correct / gated after refinement, with a Wilson 95% CI. PASS if the point
+    estimate is >= 0.95 AND 0 gross errors (> 5 deg or a wrong basin) among gated-and-refined.
+  - H2: only where the refined pose is verified correct, the raw-to-refined geodesic difference is
+    used as a proxy for raw error. Report the median and p90.
+  - H3: count of targets not accepted by the arm whose refined propagated pose is verified correct.
+    Report the gross errors separately.
+  - Report per-stratum (Swiss / non-Swiss, EXIF GPS / manual) counts, even when they are tiny.
+  - Anything computed after unblinding is labelled POST HOC in an addendum.
+
+6. What does NOT change on success
+  The frozen product accept rule. A pass allows the product to SHOW the propagated pose as a
+  suggestion or seed with a "from neighbouring photo" provenance. Auto-accept needs a separate prereg.
+
+7. Known risks to write down now
+  - Anchor error adds directly to the target's error.
+  - Parallax from near foreground at 50-250 m baselines. The dev evidence covers only 7-74 m.
+  - Moving content (clouds, crowds) could produce many coherent but wrong inliers. This was not
+    stress-tested on dev.
+  - The dev evidence is n = 6 real ordered pairs from one viewpoint. The thresholds have wide margins
+    on negatives (wrong pairs had <= 11 inliers vs gate 40), but little real positive data.

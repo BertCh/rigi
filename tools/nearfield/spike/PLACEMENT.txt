@@ -1,0 +1,57 @@
+STEP INSIDE P1: SPLAT PLACEMENT (curve + grounding), offline validation            2026-09-28, DEV ids only
+=========================================================================================================
+Code: src/lib/nearfield/anchor.ts (fitCurve, curveRange, anchoredRange), ground.ts (groundObjects, placedRange,
+placedDepth), split.ts, scene.ts. Python port + validation: place.py (-> place.json, out/place/<pid>_place.png:
+photo | classes with GROUNDED components yellow + contact px cyan | log(placed/DEM) red=too far, blue=too near);
+summ.py (aggregates). TS/Python parity checked on 4 photos: max |log| difference 0.00-0.03 at m=10..320, fit ~90 ms.
+
+CURVE: monotone log-log piecewise-linear f(model ray) -> metres. Knots at octave-weighted quantiles 2..98 % (6 max,
+>= 0.2 log apart); DP on a 0.02-log grid minimising sum w*min(|log D - log f|, ln1.25), segment slopes in [0.75, 6]
+(no flat branch => objects in front of far terrain are outliers), slope-1 tie-break, sub-grid shift refinement,
+slope-1 extrapolation beyond the end knots. Candidates: DEM range 15-3000 m.
+  Terrain |log(placed/DEM)| at DEM 15-500 m, non-Object px (fixed mask = spike mode split), median over 23 photos
+                         15-500   frac<0.1   15-50   50-150  150-500
+    curve                 0.131    0.35       0.213   0.075   0.121
+    one scale (IRLS R3000) 0.338   0.17       1.309   0.331   0.259
+    mode scale (R3000)     0.387   0.17
+    scale fitted 15-150 m  0.236   0.30
+  Sweeps (not kept): no octave weights 0.151 (15-50 m 0.40); slopeMin 0.5 better residual (0.095) but objects leak into
+  the curve (wc_0004 foreground slope false Object, wc_0072 branches lost); 8 knots 0.116 but 2/16 clean photos with
+  false Object; slopeMax 4 -> 6 made wc_0076 fit its far range (quality 0 -> 0.65) with the same near residuals.
+  Still bad: the curve cannot represent MoGe smoothing depth across a ridge silhouette (a monotone map of model depth).
+
+SPLIT with the curve (objectMargin 0.5, nearRadius 150, no DEM within radius = Object) + grounding's upright drop:
+  clean photos with Object > 2 %: 0/16 (spike's mode split 1/16); OBJ photos with Object > 1 %: 6/7 (wc_0067 tree missed).
+
+QUALITY (spike formula, all candidates): >= 0.15 on 20/27 photos, >= 0.35 on 16/27; object-rich photos: only wc_0059 and
+  wc_0076 pass 0.15 (wc_0046 0.13, wc_0054/0055/0072 ~0). Objects are one-sided outliers and many object photos have a
+  genuinely bad DEM/model match near the camera (terraces, balcony, roof). Excluding candidates the split calls Object
+  did not change the pass count. An octave-weighted quality did not help either.
+
+GROUNDING: 4-connected Object components (split where model depth jumps > e^0.5); contacts = lowest cell per column in
+  the bottom band whose cell below (<= 2 rows) is Terrain with a DEM hit, model depth continuous (|log| <= 0.35) and the
+  contact terrain a curve inlier (|log(DEM/f)| <= 0.55); >= 2 contacts -> factor = median DEM/model; components that
+  recede upward (top/bottom model depth > 2) are dropped to Terrain (ridge-silhouette bands: wc_0002, wc_0020).
+  Grounded components >= 60 cells (photo, quality, DEM at contact, placed median, curve/DEM at contact, one-scale/DEM
+  at contact, top above contact ground, frac of points > 1 m below the DEM):
+    wc_0059 train+catenary  q .51  36 m -> 36 m   curve 0.68  scale 2.85  top  9.7 m  0.0     good (train ~4.5 m + wires)
+    wc_0046 spruces         q .13  16 m -> 18 m   curve 1.45  scale 1.43  top  5.6 m  0.0     plausible (partly hidden)
+    wc_0046 spruce group    q .13  58 m -> 58 m   curve 0.66  scale 0.71  top  9.0 m  0.001   plausible
+    wc_0063 shrubs/rocks    q .51  46 m -> 64 m   curve 0.90  scale 0.91  top 11.9 m  0.0
+    wc_0052 tree            q .57 101 m -> 94 m   curve 1.31  scale 2.13  top 28.8 m  0.0     plausible tree
+    wc_0009 rock/cairn      q .94 121 m -> 124 m  curve 1.08  scale 2.89  top  8.2 m  0.06
+    wc_0027 shore rocks     q .16 141 m -> 136 m  curve 0.99  scale 0.94  top  2.6 m  0.0
+    wc_0082 houses (x3)     q .71  89-146 m       curve 0.6-0.9 scale 1.2-1.9 top 0.8-3.3 m <=0.015 (houses under-tall)
+    wc_0054 plants          q .00  76-174 m (WRONG: plants ~2 m away; no near terrain in the DEM, the curve's near end
+                                  is itself contaminated, so the inlier guard passes) top 10-24 m
+    wc_0055 car-park blob   q .00 141 -> 182 m, top 128 m (WRONG; the whole snowy car park is Object)
+  Both wrong cases have anchor quality ~0 and are hidden by ANCHOR_MIN_QUALITY. On photos shown (q >= 0.15), all grounded
+  objects stand on the DEM (<= 6 % of points > 1 m below it) with plausible heights. The one-scale fit would have put
+  them 0.7x-2.9x off at the contact; the curve alone 0.6x-1.45x.
+  Missed: the wc_0076 pylon is placed by the curve at ~9 m: the DEM at its base says 18 m but the curve's near-end
+  extrapolation (slope 1 below the first knot at m=34) is 2x off, so the inlier guard rejects the contact.
+  No people in this set: the person case is covered only by the synthetic check (nearfield.check.ts: a person-box on a
+  10 % slope at 30 m, model x0.5 too near -> placed 29.6 m grounded vs 13.1 m by the curve alone).
+
+Re-run: tools/matcher/.venv/bin/python tools/nearfield/spike/place.py --png && (cd tools/nearfield/spike &&
+         ../../matcher/.venv/bin/python summ.py place.json)     (~10 s CPU)

@@ -143,6 +143,8 @@ export class RollMapEngine {
 	private rangeWorkers = 0;
 	private rangeCount = { done: 0, total: 0 };
 	private rangesStarted = false;
+	/** Extra layers added by opt-in features (setExtraLayers), drawn after the drape and frustums. */
+	private extraLayers = new Map<string, unknown[]>();
 	settings = {
 		drapeOpacity: 1,
 		sharpness: 3,
@@ -820,6 +822,7 @@ export class RollMapEngine {
 					}),
 				);
 			}
+		for (const extra of this.extraLayers.values()) layers.push(...extra);
 		// selection targets: always on top, sized in pixels
 		const hover = this.hoverId;
 		layers.push(
@@ -928,6 +931,58 @@ export class RollMapEngine {
 			}
 		}
 		return best;
+	}
+
+	// ---------------- opt-in hooks (Step Inside roll spots: src/lib/nearfield/roll) ----------------
+
+	/**
+	 * Add (or with null / [] remove) a group of deck layers under `key`, drawn after the drape and the
+	 * frustums, before the pins. Nothing changes while no group is set.
+	 */
+	setExtraLayers(key: string, layers: unknown[] | null) {
+		if (layers?.length) this.extraLayers.set(key, layers);
+		else if (!this.extraLayers.delete(key)) return;
+		this.updateLayers();
+		this.kick();
+	}
+
+	/**
+	 * A photo's camera in the roll frame and its DEM range buffer (GpuGeometrySource layout: row 0 =
+	 * top, Infinity = sky) at w × h, rendered on demand from the loaded roll terrain. Null before the
+	 * terrain is placed or for an unknown photo.
+	 */
+	async rangeMapFor(
+		id: string,
+		w: number,
+		h: number,
+	): Promise<{
+		pose: Pose;
+		eye: [number, number, number];
+		aspect: number;
+		range: Float32Array;
+	} | null> {
+		await this.ready;
+		const p = this.placed.find((x) => x.id === id);
+		if (!p || this.disposed) return null;
+		this.flushLayers();
+		const src = new GpuGeometrySource(this.deck, p.eye, w, h, { xyz: false });
+		try {
+			await src.render(p.pose);
+			if (this.disposed || !src.pose) return null;
+			return {
+				pose: { ...p.pose },
+				eye: [...p.eye] as [number, number, number],
+				aspect: p.aspect,
+				range: src.range.slice(),
+			};
+		} finally {
+			src.dispose();
+		}
+	}
+
+	/** The people mask of a photo once segmented (null = none / not yet / masks off). */
+	peopleMaskOf(id: string): ForegroundMask | null {
+		return this.masks.get(id) ?? null;
 	}
 
 	/** Test hook: the placed photos in the roll frame. */
