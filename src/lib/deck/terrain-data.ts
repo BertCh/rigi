@@ -11,6 +11,7 @@ import {
 	type TileKey,
 	tileBounds,
 	tileId,
+	tileNum,
 	tileXToLon,
 	tileYToLat,
 } from "../dem";
@@ -22,6 +23,7 @@ import {
 	type EnuFrame,
 	M_PER_DEG_LAT,
 	REFRACTION_K,
+	WGS84,
 } from "../geodesy";
 import { imageryTileUrls } from "../licences/imagery";
 import type { BatchGrid } from "./batched-terrain-grid";
@@ -87,7 +89,7 @@ async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
 export class TerrainSet {
 	readonly frame: EnuFrame;
 	readonly tiles: TileMesh[];
-	private byId = new Map<string, TileMesh>();
+	private byId = new Map<number, TileMesh>();
 	private zooms: number[];
 	/** Load diagnostics (set by TerrainStreamer). */
 	stats?: TerrainStats;
@@ -95,18 +97,21 @@ export class TerrainSet {
 	constructor(frame: EnuFrame, tiles: TileMesh[]) {
 		this.frame = frame;
 		this.tiles = tiles;
-		for (const t of tiles) this.byId.set(t.id, t);
+		for (const t of tiles) this.byId.set(tileNum(t.key.z, t.key.x, t.key.y), t);
 		this.zooms = [...new Set(tiles.map((t) => t.key.z))].sort((a, b) => b - a);
 	}
 
 	/** Metres above sea level from the finest loaded tile, or null outside coverage. */
 	heightAt(lat: number, lon: number): number | null {
+		// Mercator once (z 0), scaled by 2^z per zoom: the same values lonToTileX/latToTileY(…, z) give
+		const mx = lonToTileX(lon, 0);
+		const my = latToTileY(lat, 0);
 		for (const z of this.zooms) {
-			const fx = lonToTileX(lon, z);
-			const fy = latToTileY(lat, z);
+			const fx = mx * 2 ** z;
+			const fy = my * 2 ** z;
 			const x = Math.floor(fx);
 			const y = Math.floor(fy);
-			const t = this.byId.get(`${z}/${x}/${y}`);
+			const t = this.byId.get(tileNum(z, x, y));
 			if (t)
 				return sampleGrid(
 					t.heights,
@@ -221,13 +226,30 @@ export function buildMesh(
 	const pos = new Float32Array(vCount * 3);
 	const uv = new Float32Array(vCount * 2);
 	const elev = new Float32Array(vCount);
+	// WGS84 → ECEF → ENU as frame.fromGeo does, with the latitude terms per row and the longitude
+	// terms per column instead of per vertex (bit-identical; ../terrain.ts buildMesh)
+	const { A, E2 } = WGS84;
+	const cosLam = new Float64Array(n);
+	const sinLam = new Float64Array(n);
+	for (let i = 0; i < n; i++) {
+		const lam = tileXToLon(key.x + i / seg, key.z) * DEG;
+		cosLam[i] = Math.cos(lam);
+		sinLam[i] = Math.sin(lam);
+	}
 	const tmp = [0, 0, 0];
 	for (let j = 0; j < n; j++) {
-		const lat = tileYToLat(key.y + j / seg, key.z);
+		const phi = tileYToLat(key.y + j / seg, key.z) * DEG;
+		const sp = Math.sin(phi);
+		const N = A / Math.sqrt(1 - E2 * sp * sp);
+		const cp = Math.cos(phi);
 		for (let i = 0; i < n; i++) {
-			const lon = tileXToLon(key.x + i / seg, key.z);
 			const h = sampleGrid(heights, size, (i / seg) * size, (j / seg) * size);
-			frame.fromGeo(lat, lon, h, tmp);
+			frame.fromEcef(
+				(N + h) * cp * cosLam[i],
+				(N + h) * cp * sinLam[i],
+				(N * (1 - E2) + h) * sp,
+				tmp,
+			);
 			const k = j * n + i;
 			pos[k * 3] = tmp[0];
 			pos[k * 3 + 1] = tmp[1];
@@ -237,13 +259,6 @@ export function buildMesh(
 			elev[k] = h;
 		}
 	}
-	const index: number[] = [];
-	for (let j = 0; j < seg; j++)
-		for (let i = 0; i < seg; i++) {
-			const a = j * n + i;
-			const c = a + n;
-			index.push(a, c, a + 1, a + 1, c, c + 1);
-		}
 
 	// Grid normals by central differences (ENU is right-handed, rows run north → south).
 	const nor = new Float32Array(vCount * 3);
@@ -273,16 +288,10 @@ export function buildMesh(
 		}
 
 	// Skirts: drop a copy of each edge to hide cracks between LOD levels.
-	const edges = [
-		Array.from({ length: n }, (_, i) => i),
-		Array.from({ length: n }, (_, i) => (n - 1) * n + i),
-		Array.from({ length: n }, (_, j) => j * n),
-		Array.from({ length: n }, (_, j) => j * n + n - 1),
-	];
-	let v = n * n;
-	for (const edge of edges) {
-		const start = v;
-		for (const k of edge) {
+	for (let e = 0; e < 4; e++)
+		for (let t = 0; t < n; t++) {
+			const k = edgeVertex(e, t, n);
+			const v = n * n + e * n + t;
 			pos[v * 3] = pos[k * 3];
 			pos[v * 3 + 1] = pos[k * 3 + 1];
 			pos[v * 3 + 2] = pos[k * 3 + 2] - skirt;
@@ -292,16 +301,7 @@ export function buildMesh(
 			nor[v * 3] = nor[k * 3];
 			nor[v * 3 + 1] = nor[k * 3 + 1];
 			nor[v * 3 + 2] = nor[k * 3 + 2];
-			v++;
 		}
-		for (let i = 0; i < n - 1; i++) {
-			const a = edge[i];
-			const bb = edge[i + 1];
-			const c = start + i;
-			const d = start + i + 1;
-			index.push(a, c, bb, bb, c, d, a, bb, c, bb, d, c);
-		}
-	}
 	return {
 		id: tileId(key),
 		key,
@@ -315,8 +315,52 @@ export function buildMesh(
 		normals: nor,
 		texCoords: uv,
 		elev,
-		indices: new Uint32Array(index),
+		// shared per seg (read-only: layers upload their own copy)
+		indices: tileIndex(seg),
 	};
+}
+
+/** Vertex t (0..n-1) along tile edge e (north, south, west, east) of an n×n grid. */
+function edgeVertex(e: number, t: number, n: number) {
+	return e === 0
+		? t
+		: e === 1
+			? (n - 1) * n + t
+			: e === 2
+				? t * n
+				: t * n + n - 1;
+}
+
+const tileIndexCache = new Map<number, Uint32Array>();
+
+/** Triangle index of a (seg+1)² tile grid plus its four skirts (buildMesh's vertex layout). */
+function tileIndex(seg: number): Uint32Array {
+	const hit = tileIndexCache.get(seg);
+	if (hit) return hit;
+	const n = seg + 1;
+	const index = new Uint32Array(seg * seg * 6 + 4 * (n - 1) * 12);
+	let o = 0;
+	const push = (...v: number[]) => {
+		for (const x of v) index[o++] = x;
+	};
+	for (let j = 0; j < seg; j++)
+		for (let i = 0; i < seg; i++) {
+			const a = j * n + i;
+			const c = a + n;
+			push(a, c, a + 1, a + 1, c, c + 1);
+		}
+	for (let e = 0; e < 4; e++) {
+		const start = n * n + e * n;
+		for (let i = 0; i < n - 1; i++) {
+			const a = edgeVertex(e, i, n);
+			const b = edgeVertex(e, i + 1, n);
+			const c = start + i;
+			const d = start + i + 1;
+			push(a, c, b, b, c, d, a, b, c, b, d, c);
+		}
+	}
+	tileIndexCache.set(seg, index);
+	return index;
 }
 
 export type TileChoice = {
