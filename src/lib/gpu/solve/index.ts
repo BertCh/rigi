@@ -41,7 +41,7 @@ export {
 	type YawCost,
 } from "./cpu";
 
-const K_COARSE = defineKernel(
+export const K_COARSE = defineKernel(
 	"solve-coarse",
 	COARSE_WGSL,
 	[
@@ -79,6 +79,12 @@ export type CoarseGpuStats = {
 	/** true when the GPU could not be used for this plan and the CPU grid ran instead */
 	fellBack: boolean;
 	readBytes: number;
+	/** graph path (./graph.ts): whether this call uploaded the horizon profile (false = resident) */
+	hzUploaded?: boolean;
+	/** graph path: the GPU row fold flagged a threshold too close to call in f32; the old path ran */
+	graphFellBack?: boolean;
+	/** opts.digest: FNV-1a of the per-row (g, from, to) the selection starts from */
+	digest?: string;
 };
 
 export type CoarseGpuResult = CoarseResult & {
@@ -121,7 +127,7 @@ export function costBound(p: CoarsePlan, hz: Float32Array) {
 	return 4 * (residual + sum + 4 * u * (priorMax + p.trunc)) + 1e-12;
 }
 
-const priorYaw = (p: CoarsePlan, dy: number) =>
+export const priorYaw = (p: CoarsePlan, dy: number) =>
 	0.02 * p.trunc * (dy / p.sigmaYaw) ** 2;
 const priorPitch = (p: CoarsePlan, dp: number) =>
 	0.02 * p.trunc * (dp / p.sigmaPitch) ** 2;
@@ -132,7 +138,11 @@ export function coarseGpu(
 	p: CoarsePlan,
 	o: CoarseGpuOptions = {},
 ): Promise<CoarseGpuResult> {
-	return withLease(OWNER, () => coarseOnce(device, p, o));
+	return withLease(OWNER, async () =>
+		o.graph
+			? (await import("./graph")).coarseGraphOnce(device, p, o)
+			: coarseOnce(device, p, o),
+	);
 }
 
 export type CoarseGpuOptions = {
@@ -141,44 +151,48 @@ export type CoarseGpuOptions = {
 	 * re-score many more rows and cells, which exercises its every branch. The result stays identical.
 	 */
 	epsScale?: number;
+	/**
+	 * Run on the command-graph path (./graph.ts: GPU row fold, resident horizon profile) instead of
+	 * the single dispatch + CPU fold. Same WGSL, same selection; the result is bit-identical.
+	 */
+	graph?: boolean;
+	/** Record stats.digest (bench parity of the per-row intervals between paths). */
+	digest?: boolean;
 };
 
-async function coarseOnce(
-	device: Device,
-	p: CoarsePlan,
-	o: CoarseGpuOptions,
-): Promise<CoarseGpuResult> {
-	const t0 = performance.now();
+/** FNV-1a over the per-row (f32 minimum, band from, band to) the selection starts from. */
+export function rowsDigest(g: Float64Array, from: Int32Array, to: Int32Array) {
+	const f = new Float32Array(1);
+	const w = new Uint32Array(f.buffer);
+	let h = 0x811c9dc5;
+	const mix = (x: number) => {
+		h = Math.imul(h ^ (x >>> 0), 0x01000193) >>> 0;
+	};
+	for (let r = 0; r < g.length; r++) {
+		f[0] = g[r];
+		mix(w[0]);
+		mix(from[r]);
+		mix(to[r]);
+	}
+	return h.toString(16).padStart(8, "0");
+}
+
+/** The coarse kernel's inputs for plan `p` (shared by both paths), or null when the GPU can't serve it. */
+export function packCoarse(p: CoarsePlan, o: CoarseGpuOptions) {
 	const h = p.horizon;
 	const nH = h.elevation.length;
 	const nObs = p.az.length;
 	const nYaw = p.dys.length;
 	const nPitch = p.dps.length;
 	const nBlk = Math.ceil(nPitch / PITCH_BLOCK);
-	const stats: CoarseGpuStats = {
-		uploadMs: 0,
-		gpuMs: 0,
-		selectMs: 0,
-		nCells: nYaw * nPitch,
-		rescored: 0,
-		rescoredCells: 0,
-		eps: 0,
-		maxErr: 0,
-		fellBack: false,
-		readBytes: 0,
-	};
 	// the bin split below needs whole bins around the circle and a finite profile (NaN has no bound)
-	const fallback = () => {
-		stats.fellBack = true;
-		return { ...coarseCpu(p), ms: performance.now() - t0, stats };
-	};
 	if (
 		Math.abs(nH * h.step - 360) > 1e-6 ||
 		nYaw > MAX_ROWS ||
 		!nPitch ||
 		!h.elevation.every(Number.isFinite)
 	)
-		return fallback();
+		return null;
 
 	const hz = new Float32Array(nH + 1);
 	hz.set(h.elevation);
@@ -218,9 +232,41 @@ async function coarseOnce(
 	uU.set([nObs, nPitch, nYaw, nH]);
 	uF.set([p.trunc, p.wSum], 4);
 	uU[6] = nBlk;
-	stats.eps = costBound(p, hz) * Math.max(1, o.epsScale ?? 1);
+	const eps = costBound(p, hz) * Math.max(1, o.epsScale ?? 1);
 	// 2ε, plus 0.5ε of slack for the f32 rounding of (minimum + band), which is ≤ u·max cost ≪ ε
-	uF[7] = 2.5 * stats.eps;
+	uF[7] = 2.5 * eps;
+	return { nH, nObs, nYaw, nPitch, nBlk, hz, obU, yU, pitch, ub, eps };
+}
+
+/** The single-dispatch path (call under the "solve" lease). */
+export async function coarseOnce(
+	device: Device,
+	p: CoarsePlan,
+	o: CoarseGpuOptions,
+): Promise<CoarseGpuResult> {
+	const t0 = performance.now();
+	const nYaw = p.dys.length;
+	const nPitch = p.dps.length;
+	const stats: CoarseGpuStats = {
+		uploadMs: 0,
+		gpuMs: 0,
+		selectMs: 0,
+		nCells: nYaw * nPitch,
+		rescored: 0,
+		rescoredCells: 0,
+		eps: 0,
+		maxErr: 0,
+		fellBack: false,
+		readBytes: 0,
+	};
+	const fallback = () => {
+		stats.fellBack = true;
+		return { ...coarseCpu(p), ms: performance.now() - t0, stats };
+	};
+	const pk = packCoarse(p, o);
+	if (!pk) return fallback();
+	const { nBlk, hz, obU, yU, pitch, ub } = pk;
+	stats.eps = pk.eps;
 
 	const outBytes = nYaw * nBlk * 16;
 	const rowMin = acquire(device, key("rowMin"), outBytes, STORAGE);
@@ -264,6 +310,7 @@ async function coarseOnce(
 			from[r] = Math.min(from[r], bu[o + 1]);
 			to[r] = Math.max(to[r], bu[o + 2]);
 		}
+	if (o.digest) stats.digest = rowsDigest(g, from, to);
 	let res: CoarseResult;
 	try {
 		res = selectBounded(p, g, from, to, stats);
@@ -280,7 +327,7 @@ async function coarseOnce(
  * (then lo = hi = its exact cost). Every decision is taken only when the intervals settle it;
  * otherwise the rows involved are re-scored and the step is re-run.
  */
-function selectBounded(
+export function selectBounded(
 	p: CoarsePlan,
 	g: Float64Array,
 	from: Int32Array,
@@ -391,6 +438,8 @@ function selectBounded(
 export type SolveCoarseOptions = {
 	/** undefined: getComputeDevice(); null: the CPU grid */
 	device?: Device | null;
+	/** the command-graph path (CoarseGpuOptions.graph); default: the single-dispatch path */
+	graph?: boolean;
 };
 
 /**
@@ -410,7 +459,7 @@ export async function solveCoarse(
 	const device = o.device === undefined ? await getComputeDevice() : o.device;
 	if (device)
 		try {
-			const r = await coarseGpu(device, p);
+			const r = await coarseGpu(device, p, { graph: o.graph });
 			return { ...r, on: r.stats.fellBack ? "cpu" : "gpu" };
 		} catch (e) {
 			console.warn("[solve] GPU coarse grid failed, using the CPU", e);

@@ -66,7 +66,13 @@ try {
 				console.log(`  ${c.cond}: no skyline (${c.solveReject})`);
 				continue;
 			}
-			const ok = c.gpuVsCpu && c.stressSame && c.twinVsSolvePose && !c.fellBack;
+			const ok =
+				c.gpuVsCpu &&
+				c.stressSame &&
+				c.twinVsSolvePose &&
+				!c.fellBack &&
+				c.graph.same &&
+				c.graph.sameStress;
 			if (!ok) fail++;
 			const warm = c.gpu.slice(1).map((g) => g.ms);
 			console.log(
@@ -76,10 +82,22 @@ try {
 					`maxErr/eps ${(c.maxErr / c.eps).toExponential(1)} | CPU grid ${f(c.gridCpuMs)} ms ` +
 					`(${f(100 * c.gridFraction)}% of solvePose ${f(c.solvePoseMs)} ms) | ` +
 					`GPU cold ${f(c.gpu[0].ms)} warm ${warm.map((x) => f(x)).join("/")} ms ` +
-					`(gpu ${f(c.gpu.at(-1).gpuMs)} select ${f(c.gpu.at(-1).selectMs)})`,
+					`(gpu ${f(c.gpu.at(-1).gpuMs)} select ${f(c.gpu.at(-1).selectMs)}) | ` +
+					`graph=old ${c.graph.same} stress ${c.graph.sameStress} digest ${c.graph.digest} fellBack ${c.graph.graphFellBack} ` +
+					`hz uploads ${c.graph.hzUploads.filter(Boolean).length}/${c.graph.hzUploads.length} read ${c.graph.oldReadBytes}→${c.graph.graphReadBytes} B ` +
+					`med old ${f(c.graph.oldMedMs, 2)} graph ${f(c.graph.graphMedMs, 2)} ms`,
 			);
 		}
 	}
+	const fold = await page.evaluate(async () => {
+		const m = await import("/src/lib/gpu/solve/bench.ts");
+		return m.benchFold();
+	});
+	console.log(
+		`fold (adversarial blocks, GPU fold vs the CPU fold): ${JSON.stringify(fold)}`,
+	);
+	if (!fold.ok) fail++;
+	out.push({ fold });
 	fs.writeFileSync(
 		path.join(OUT, "solve-bench.json"),
 		JSON.stringify(out, null, 1),

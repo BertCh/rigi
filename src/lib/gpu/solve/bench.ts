@@ -18,6 +18,7 @@ import { detectSkyline } from "#/lib/geo/skyline";
 import { type SolveOptions, solvePose } from "#/lib/geo/solve";
 import { getComputeDevice } from "../core/device";
 import {
+	type CoarseGpuStats,
 	type CoarseResult,
 	coarseCpu,
 	coarseGpu,
@@ -156,6 +157,54 @@ export async function benchPhoto(e: Entry, reps = 3) {
 		const g = gpu as NonNullable<typeof gpu>;
 		// stress: ε × STRESS makes the selection decide far more from exact re-scores (same result)
 		const stress = await coarseGpu(device, plan, { epsScale: STRESS });
+		// old single-dispatch path vs the command-graph path (./graph.ts): result, per-row intervals
+		// (digest of g / band from / to) and every non-timing stat must be identical; alternate the two
+		// so both see the same warm state; median warm times.
+		const sameStats = (a: CoarseGpuStats, b: CoarseGpuStats) =>
+			a.rescored === b.rescored &&
+			a.rescoredCells === b.rescoredCells &&
+			a.eps === b.eps &&
+			a.maxErr === b.maxErr &&
+			a.fellBack === b.fellBack &&
+			a.nCells === b.nCells &&
+			a.digest === b.digest;
+		const cmp = {
+			same: true,
+			sameStress: true,
+			oldMs: [] as number[],
+			graphMs: [] as number[],
+			hzUploads: [] as boolean[],
+			graphFellBack: 0,
+			oldReadBytes: 0,
+			graphReadBytes: 0,
+			digest: "",
+		};
+		for (let r = 0; r < Math.max(reps, 5); r++) {
+			const a = await coarseGpu(device, plan, { digest: true });
+			const b = await coarseGpu(device, plan, { digest: true, graph: true });
+			cmp.same &&= same(a, b) && same(b, cpu) && sameStats(a.stats, b.stats);
+			cmp.oldMs.push(a.ms);
+			cmp.graphMs.push(b.ms);
+			cmp.hzUploads.push(!!b.stats.hzUploaded);
+			if (b.stats.graphFellBack) cmp.graphFellBack++;
+			cmp.oldReadBytes = a.stats.readBytes;
+			cmp.graphReadBytes = b.stats.readBytes;
+			cmp.digest = b.stats.digest ?? "";
+		}
+		{
+			const a = await coarseGpu(device, plan, {
+				digest: true,
+				epsScale: STRESS,
+			});
+			const b = await coarseGpu(device, plan, {
+				digest: true,
+				epsScale: STRESS,
+				graph: true,
+			});
+			cmp.sameStress = same(a, b) && sameStats(a.stats, b.stats);
+		}
+		const med = (x: number[]) =>
+			[...x].sort((p, q) => p - q)[Math.floor(x.length / 2)];
 		rows.push({
 			cond,
 			nYaw: plan.dys.length,
@@ -184,9 +233,180 @@ export async function benchPhoto(e: Entry, reps = 3) {
 			gridCpuMs: cpuMs,
 			gridFraction: cpuMs / solveMs,
 			gpu: gpuRuns,
+			graph: {
+				same: cmp.same,
+				sameStress: cmp.sameStress,
+				digest: cmp.digest,
+				graphFellBack: cmp.graphFellBack,
+				hzUploads: cmp.hzUploads,
+				oldReadBytes: cmp.oldReadBytes,
+				graphReadBytes: cmp.graphReadBytes,
+				oldMedMs: med(cmp.oldMs),
+				graphMedMs: med(cmp.graphMs),
+			},
 			solveConfidence: sp.confidence,
 			solveAccepted: sp.accepted,
 		});
 	}
 	return { id: e.id, sceneMs, warmMs, skyWidth: sky.width, rows };
+}
+
+/**
+ * The GPU row fold (./graph.ts FOLD) against the single-dispatch path's CPU fold on adversarial blocks:
+ * NaN / ±inf / ±0 minima, empty bands (first > last), and block minima within a few ulps of the f64
+ * threshold g + 2ε. Every row must either match the CPU fold bit for bit (g bits incl. the sign of 0,
+ * band from / to) or carry the "too close" flag (which makes the graph path rerun the old path); a
+ * NaN block must set the NaN flag. Also runs the fold graph twice with different data (stale transients).
+ */
+export async function benchFold(nYaw = 20000, nBlk = 3) {
+	const device = await getComputeDevice();
+	if (!device) return { error: "no WebGPU device" };
+	const { ComputeGraph } = await import("../core/graph");
+	const { K_FOLD } = await import("./graph");
+	const { Buffer } = await import("@luma.gl/core");
+	type P = { n: number };
+	const g = new ComputeGraph<P>(device, "solve-fold-bench");
+	const fu = g.importBuffer(
+		"fu",
+		16,
+		undefined,
+		Buffer.UNIFORM | Buffer.COPY_DST,
+	);
+	const blocks = g.importBuffer("blocks", nYaw * nBlk * 16);
+	const rows = g.transientBuffer("rows", nYaw * 16);
+	g.clearNode("clear-rows", { buffer: rows, size: (p) => p.n * 16 });
+	g.addKernel({
+		id: "fold",
+		spec: K_FOLD,
+		bindings: { fu, blocks, rows },
+		workgroups: (p) => [Math.ceil(p.n / 64)],
+		writes: { rows: "partial" },
+	});
+	g.readNode("rows", [{ buffer: rows, size: (p) => p.n * 16 }]);
+	g.compile();
+	const f32 = new Float32Array(1);
+	const u32 = new Uint32Array(f32.buffer);
+	const bitsOf = (x: number) => ((f32[0] = x), u32[0]);
+	const ulp = (x: number, k: number) => {
+		f32[0] = x;
+		u32[0] += k;
+		return f32[0];
+	};
+	let seed = 12345;
+	const rnd = () =>
+		(seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+	const runs = [];
+	let ok = true;
+	for (const [rep, n, eps] of [
+		[0, nYaw, 3.7e-5],
+		[1, Math.floor(nYaw * 0.7), 1.1e-3],
+	] as const) {
+		const nPitch = nBlk * 256;
+		const buf = new ArrayBuffer(nYaw * nBlk * 16);
+		const bu = new Uint32Array(buf);
+		const bf = new Float32Array(buf);
+		for (let r = 0; r < n; r++) {
+			const kind = r % 11;
+			const base = kind === 0 ? 0 : Math.fround(0.05 + 3 * rnd());
+			for (let b = 0; b < nBlk; b++) {
+				const o = (r * nBlk + b) * 4;
+				let v: number;
+				const t = rnd();
+				if (kind === 1 && b === 1) v = Number.NaN;
+				else if (kind === 2 && b === 2) v = Number.POSITIVE_INFINITY;
+				else if (kind === 0)
+					v = b === 0 ? -0 : b === 1 ? 0 : Math.fround(2 * eps * rnd());
+				else if (b === 0) v = base;
+				// near the threshold: base + 2ε, then ±0..6 ulps
+				else if (t < 0.6)
+					v = ulp(Math.fround(base + 2 * eps), Math.floor(rnd() * 13) - 6);
+				else v = Math.fround(base + 4 * eps * rnd());
+				bf[o] = v;
+				const first = Math.floor(rnd() * nPitch);
+				const last =
+					rnd() < 0.1
+						? first - 1
+						: Math.min(nPitch - 1, first + Math.floor(rnd() * 20));
+				// an empty band looks like the kernel's init: first = 0xffffffff > last = 0
+				bu[o + 1] = last < 0 ? 0xffffffff : first;
+				bu[o + 2] = last < 0 ? 0 : last;
+			}
+			// shuffle which block holds the minimum
+			if (r % 3 === 1 && nBlk > 1) {
+				const a = r * nBlk * 4;
+				const c = (r * nBlk + nBlk - 1) * 4;
+				for (let k = 0; k < 4; k++)
+					[bu[a + k], bu[c + k]] = [bu[c + k], bu[a + k]];
+			}
+		}
+		const fb = new ArrayBuffer(16);
+		new Uint32Array(fb).set([n, nBlk, nPitch]);
+		new Float32Array(fb)[3] = 2 * eps;
+		const fuBuf = device.createBuffer({
+			usage: Buffer.UNIFORM | Buffer.COPY_DST,
+			byteLength: 16,
+			data: new Uint8Array(fb),
+		});
+		const bBuf = device.createBuffer({
+			usage: Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC,
+			byteLength: buf.byteLength,
+			data: new Uint8Array(buf),
+		});
+		const { reads } = await g.run(
+			{ n },
+			{ buffers: { fu: fuBuf, blocks: bBuf } },
+		);
+		fuBuf.destroy();
+		bBuf.destroy();
+		const ru = new Uint32Array(reads.rows[0]);
+		let close = 0;
+		let nan = 0;
+		let bad = 0;
+		let naiveWrong = 0;
+		for (let r = 0; r < n; r++) {
+			// the single-dispatch path's CPU fold (index.ts coarseOnce), verbatim semantics
+			let m = Number.POSITIVE_INFINITY;
+			for (let b = 0; b < nBlk; b++) m = Math.min(m, bf[(r * nBlk + b) * 4]);
+			let from = nPitch;
+			let to = -1;
+			let naiveFrom = nPitch;
+			let naiveTo = -1;
+			const thr32 = Math.fround(m + Math.fround(2 * eps));
+			for (let b = 0; b < nBlk; b++) {
+				const o = (r * nBlk + b) * 4;
+				if (bu[o + 1] > bu[o + 2]) continue;
+				if (!(bf[o] > m + 2 * eps)) {
+					from = Math.min(from, bu[o + 1]);
+					to = Math.max(to, bu[o + 2]);
+				}
+				if (!(bf[o] > thr32)) {
+					naiveFrom = Math.min(naiveFrom, bu[o + 1]);
+					naiveTo = Math.max(naiveTo, bu[o + 2]);
+				}
+			}
+			const flags = ru[r * 4 + 3];
+			if (Number.isNaN(m)) {
+				nan++;
+				if (flags !== 1) bad++;
+				continue;
+			}
+			const naiveDiffers = naiveFrom !== from || naiveTo !== to;
+			if (naiveDiffers) naiveWrong++;
+			if (flags & 2) {
+				close++;
+				continue;
+			}
+			const has = (flags & 4) !== 0;
+			if (
+				ru[r * 4] !== bitsOf(m) ||
+				(has ? ru[r * 4 + 1] : nPitch) !== from ||
+				(has ? ru[r * 4 + 2] : -1) !== to
+			)
+				bad++;
+		}
+		ok &&= bad === 0 && nan > 0 && close > 0;
+		runs.push({ rep, n, eps, bad, nan, close, naiveWrong });
+	}
+	g.destroy();
+	return { ok, runs };
 }
