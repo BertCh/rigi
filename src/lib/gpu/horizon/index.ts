@@ -23,9 +23,9 @@
  * `opts.peaks` is classified on the CPU with peakVisibilityFast (one ray per peak; cheap), which is exactly
  * what computeHorizonFast does for them.
  *
- * App wiring: the horizon-fast-app worker marches on the GPU only when opted in (?gpuHorizon=1 or
- * ?gpuHorizon=on; see opt-in.ts), because autoAlign reacts to last-bit changes in the
- * skyline (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll). Default app output stays on the CPU march.
+ * App wiring: the horizon-fast-app worker marches on the GPU by default where WebGPU exists (off with
+ * ?gpuHorizon=off or ?gpu=off; see opt-in.ts). autoAlign reacts to last-bit changes in the skyline
+ * (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll); that drift was accepted when the default flipped.
  */
 import { Buffer, type ComputePipeline, type Device } from "@luma.gl/core";
 import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";

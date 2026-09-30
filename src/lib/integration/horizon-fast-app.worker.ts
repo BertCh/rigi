@@ -115,10 +115,11 @@ async function marchProfile(
 	if (device)
 		try {
 			const [prof] = await computeHorizonGpu(device, mosaics, [eye], opts);
-			// opt-in path only (?gpuHorizon), so this is not noise in the default app
-			console.info(
-				`[horizon worker] marched on the GPU (${prof.stats.ms.toFixed(0)} ms)`,
-			);
+			// gpuHorizon is on by default, so this per-march log is dev-only
+			if (import.meta.env?.DEV)
+				console.info(
+					`[horizon worker] marched on the GPU (${prof.stats.ms.toFixed(0)} ms)`,
+				);
 			return { prof, on: "gpu" };
 		} catch (e) {
 			console.warn("[horizon worker] GPU march failed, using the CPU", e);
