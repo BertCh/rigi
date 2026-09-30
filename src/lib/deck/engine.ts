@@ -535,9 +535,18 @@ export class DeckEngine implements Renderer {
 			// is true) is not needed: exports render offscreen (composite.ts renderImage) or draw the
 			// world frame and read it in the same task (exportWorld), and no harness reads a deck
 			// canvas outside a frame (style-baseline, which does, is pinned to three.js).
+			// antialias (luma's default is true) multisamples the canvas' default framebuffer. The
+			// world view draws straight onto it and is fill-bound there at DPR 2: orbit 29–39 fps
+			// with it, ~59 without (reports/deck-default.md). At DPR ≥ 2 the pixels hide the
+			// aliasing, so it is off; below that it stays on. The photo view is unaffected either
+			// way: it renders into the compositor's own MSAA target. Decided once, when the context
+			// is created (a later DPR change does not revisit it).
 			deviceProps: {
 				powerPreference: "high-performance",
-				webgl: { preserveDrawingBuffer: false },
+				webgl: {
+					preserveDrawingBuffer: false,
+					antialias: (window.devicePixelRatio || 1) < 2,
+				},
 			},
 			views: this.world?.controls
 				? map?.active
