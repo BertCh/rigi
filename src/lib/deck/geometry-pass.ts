@@ -4,8 +4,9 @@
 //
 // - `TerrainPassRenderer` draws the Deck's TerrainTileLayers (same GPU meshes, no copies) into any
 //   framebuffer with a PhotoViewport, as the 'geometry' (range) or 'color' (styled, linear) pass.
-// - `GeometryTarget` owns an r32float(+depth) framebuffer and an async PBO + fence readback
-//   (luma texture.readBuffer → Buffer, device.createFence, then Buffer.readAsync).
+// - `GeometryTarget` owns an r32float(+depth) framebuffer and a truly async readback: readPixels
+//   into a STREAM_READ pixel-pack buffer, fenceSync + flush, the fence polled across tasks, and
+//   getBufferSubData only once the GPU queue is short (see readbackQuiet for why).
 // - `GpuGeometrySource` implements the GeometrySource contract (geometry-source.ts) on top of both.
 //
 // Range only is rendered (r32float, 4 B/px): xyz is exactly eye + ray(pixel centre)·range, so it is
@@ -191,6 +192,8 @@ export async function gpuDone(device: Device): Promise<boolean> {
 	} catch {
 		return false;
 	}
+	// submit the fence (and the readPixels before it) now rather than with the next frame's flush
+	(device as unknown as { gl?: WebGL2RenderingContext }).gl?.flush();
 	const ok = await Promise.race([
 		fence.signaled.then(() => true),
 		device.lost.then(() => false),
@@ -209,13 +212,100 @@ export function readbackBuffer(device: Device, byteLength: number, id: string) {
 	});
 }
 
+/** Resolves on the next timer turn (a fence's status can only change between tasks). */
+const nextTurn = () => new Promise<void>((res) => setTimeout(res, 4));
+
+/**
+ * Fences every GL command issued so far, flushes it and polls it with clientWaitSync(…, 0) on
+ * later tasks; never blocks the thread. ok = signalled; false = context lost / wait failed /
+ * `cancelled()`.
+ */
+export async function glFence(
+	gl: WebGL2RenderingContext,
+	cancelled: () => boolean = () => false,
+): Promise<{ ok: boolean; polls: number; ms: number }> {
+	const t0 = performance.now();
+	const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+	if (!sync) return { ok: false, polls: 0, ms: 0 };
+	gl.flush();
+	let polls = 0;
+	const done = (ok: boolean) => ({ ok, polls, ms: performance.now() - t0 });
+	try {
+		for (;;) {
+			await nextTurn();
+			polls++;
+			if (cancelled() || gl.isContextLost()) return done(false);
+			const s = gl.clientWaitSync(sync, 0, 0);
+			if (s === gl.ALREADY_SIGNALED || s === gl.CONDITION_SATISFIED)
+				return done(true);
+			if (s === gl.WAIT_FAILED) return done(false);
+		}
+	} finally {
+		gl.deleteSync(sync);
+	}
+}
+
+/** A fence that signals within this many ms of being inserted = the GPU queue is short. */
+export const QUIET_FENCE_MS = 40;
+/** Longest a readback defers its copy for a quiet queue before copying anyway (bounded stall). */
+export const QUIET_MAX_MS = 3000;
+
+/**
+ * Resolves once the GPU queue is short: `firstMs` (how long the fence behind the readPixels took)
+ * or a fresh probe fence signalled within QUIET_FENCE_MS. Why: on Chrome + ANGLE Metal the
+ * getBufferSubData that ends every WebGL readback is a synchronous round-trip that waits for the
+ * whole queued backlog, even behind a signalled fence and with fresh STREAM_READ storage (the
+ * shadow-copy fast path did not engage in the app: measured 100–420 ms per call for 16×16 and
+ * 1024×768 alike while GPU-bound frames were queued; luma's Buffer.readAsync is that same bare
+ * call). While frames keep the GPU busy (a drag at 10 fps) the copy waits here off the thread;
+ * once the queue drains it is a ~1 ms memcpy. After QUIET_MAX_MS it copies anyway.
+ * `quiet` = the queue was short when it returned (false = cancelled / lost / gave up).
+ */
+export async function readbackQuiet(
+	gl: WebGL2RenderingContext,
+	firstMs: number,
+	cancelled: () => boolean = () => false,
+): Promise<{ ok: boolean; quiet: boolean; probes: number }> {
+	let probes = 0;
+	if (firstMs <= QUIET_FENCE_MS) return { ok: true, quiet: true, probes };
+	const t0 = performance.now();
+	while (performance.now() - t0 < QUIET_MAX_MS) {
+		probes++;
+		const f = await glFence(gl, cancelled);
+		if (!f.ok) return { ok: false, quiet: false, probes };
+		if (f.ms <= QUIET_FENCE_MS) return { ok: true, quiet: true, probes };
+	}
+	return { ok: !cancelled() && !gl.isContextLost(), quiet: false, probes };
+}
+
+/** Timing of the last GeometryTarget.read(), ms. */
+export type ReadbackTiming = {
+	/** readPixels issued → fence signalled and queue short (GPU work + deferral, off the thread). */
+	fenceMs: number;
+	/** Polls of the readPixels fence. */
+	polls: number;
+	/** Probe fences waited for a short GPU queue before the copy (0 = it was short already). */
+	probes: number;
+	/** The synchronous getBufferSubData (should be a memcpy: ~1 ms for 1024×768 floats). */
+	copyMs: number;
+	/** readPixels issued → data in `out`. */
+	readbackMs: number;
+};
+
 /** An r32float + depth render target with an asynchronous (PBO + fence) readback. */
 export class GeometryTarget {
 	fbo: Framebuffer;
-	private pbo: Buffer | null = null;
+	/** Idle STREAM_READ pack buffers of `pboBytes` each (one per overlapping read, so a newer
+	 * read never overwrites a buffer whose fence an older one is still waiting on). */
+	private pbos: WebGLBuffer[] = [];
+	private pboBytes = 0;
+	/** RGBA fallback staging (4 floats per pixel). */
+	private rgba: Float32Array | null = null;
 	/** null = not probed yet; true = RED/FLOAT is not a readPixels format here, read RGBA/FLOAT */
 	private readRGBA: boolean | null = null;
 	private destroyed = false;
+	/** Timing of the last completed read(). */
+	lastRead: ReadbackTiming | null = null;
 
 	constructor(
 		readonly device: Device,
@@ -271,28 +361,59 @@ export class GeometryTarget {
 
 	/**
 	 * Async readback of the range channel into `out` (GL order: row 0 = BOTTOM). Issues the
-	 * readPixels into a PBO (luma texture.readBuffer) now and copies it out once a luma Fence
-	 * signals; never stalls the thread. false = superseded (resize / destroy) or device lost.
+	 * readPixels into a STREAM_READ pack buffer now and copies it out once a fence behind it has
+	 * been seen signalled and the GPU queue is short (readbackQuiet); does not stall the thread
+	 * (at most a bounded copy after QUIET_MAX_MS of continuous GPU load). false = superseded
+	 * (resize / destroy) or context lost.
 	 */
 	async read(out: Float32Array): Promise<boolean> {
+		if (this.destroyed) return false;
+		const gl = glOf(this.device);
 		const { width, height } = this.fbo;
 		const n = width * height;
 		this.readRGBA ??= !this.redFloatReadable();
 		const comps = this.readRGBA ? 4 : 1;
 		const bytes = n * comps * 4;
-		if (this.pbo?.byteLength !== bytes) {
-			this.pbo?.destroy();
-			this.pbo = readbackBuffer(this.device, bytes, "geometry-readback");
+		if (this.pboBytes !== bytes) {
+			for (const b of this.pbos) gl.deleteBuffer(b);
+			this.pbos = [];
+			this.pboBytes = bytes;
 		}
-		const pbo = this.pbo;
-		if (comps === 1) this.texture.readBuffer({}, pbo);
-		else this.readPixelsRGBA(pbo);
-		if (!(await gpuDone(this.device)) || this.destroyed || pbo.destroyed)
+		const pbo = this.pbos.pop() ?? gl.createBuffer();
+		if (!pbo) return false;
+		const t0 = performance.now();
+		this.readPixelsInto(pbo, comps === 4);
+		const cancelled = () => this.destroyed;
+		const fence = await glFence(gl, cancelled);
+		const quiet = fence.ok
+			? await readbackQuiet(gl, fence.ms, cancelled)
+			: { ok: false, probes: 0 };
+		const t1 = performance.now();
+		if (!quiet.ok || this.destroyed) {
+			gl.deleteBuffer(pbo);
 			return false;
-		const data = await pbo.readAsync(0, bytes);
-		const f = new Float32Array(data.buffer, data.byteOffset, n * comps);
-		if (comps === 1) out.set(f);
-		else for (let i = 0; i < n; i++) out[i] = f[i * 4];
+		}
+		const prev = gl.getParameter(gl.COPY_READ_BUFFER_BINDING);
+		gl.bindBuffer(gl.COPY_READ_BUFFER, pbo);
+		if (comps === 1) gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, out, 0, n);
+		else {
+			if (this.rgba?.length !== n * 4) this.rgba = new Float32Array(n * 4);
+			const f = this.rgba;
+			gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, f, 0, n * 4);
+			for (let i = 0; i < n; i++) out[i] = f[i * 4];
+		}
+		gl.bindBuffer(gl.COPY_READ_BUFFER, prev);
+		const t2 = performance.now();
+		// a resize meanwhile changed the size: this buffer belongs to no pool any more
+		if (this.pboBytes === bytes) this.pbos.push(pbo);
+		else gl.deleteBuffer(pbo);
+		this.lastRead = {
+			fenceMs: t1 - t0,
+			polls: fence.polls,
+			probes: quiet.probes,
+			copyMs: t2 - t1,
+			readbackMs: t2 - t0,
+		};
 		return true;
 	}
 
@@ -309,19 +430,32 @@ export class GeometryTarget {
 		return ok;
 	}
 
-	/** Fallback when RED/FLOAT isn't readable: RGBA/FLOAT (always allowed) into the PBO; luma's
-	 * readBuffer only reads the texture's own format. */
-	private readPixelsRGBA(pbo: Buffer) {
+	/** readPixels of the range attachment into `pbo`: RED/FLOAT (what luma's texture.readBuffer
+	 * issued), or RGBA/FLOAT (always allowed) where RED/FLOAT isn't a readPixels format. */
+	private readPixelsInto(pbo: WebGLBuffer, rgba: boolean) {
 		const gl = glOf(this.device);
 		const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
 		const prevPack = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
+		const prevAlign = gl.getParameter(gl.PACK_ALIGNMENT);
 		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fboHandle);
 		gl.readBuffer(gl.COLOR_ATTACHMENT0);
-		gl.bindBuffer(
-			gl.PIXEL_PACK_BUFFER,
-			(pbo as unknown as { handle: WebGLBuffer }).handle,
+		gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+		// re-specify (orphan) the storage on every read: a READ-usage buffer written again after a
+		// fenced readback loses Chrome's shadow copy (console warning; in an isolated page the
+		// reused buffer's getBufferSubData took 2.2 s, the orphaned one 1–2 ms behind the same
+		// queue; in the app it was not enough on its own, hence readbackQuiet)
+		gl.bufferData(gl.PIXEL_PACK_BUFFER, this.pboBytes, gl.STREAM_READ);
+		gl.pixelStorei(gl.PACK_ALIGNMENT, 4);
+		gl.readPixels(
+			0,
+			0,
+			this.width,
+			this.height,
+			rgba ? gl.RGBA : gl.RED,
+			gl.FLOAT,
+			0,
 		);
-		gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.FLOAT, 0);
+		gl.pixelStorei(gl.PACK_ALIGNMENT, prevAlign);
 		gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prevPack);
 		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
 	}
@@ -332,8 +466,9 @@ export class GeometryTarget {
 
 	destroy() {
 		this.destroyed = true;
-		this.pbo?.destroy();
-		this.pbo = null;
+		const gl = glOf(this.device);
+		for (const b of this.pbos) gl.deleteBuffer(b);
+		this.pbos = [];
 		this.fbo.colorAttachments[0].texture.destroy();
 		this.fbo.depthStencilAttachment?.texture.destroy();
 		this.fbo.destroy();
@@ -346,6 +481,12 @@ export type GeometryTiming = {
 	submitMs: number;
 	/** submit → fence signalled → buffer copied (GPU render + transfer). */
 	readbackMs: number;
+	/** Of readbackMs: the synchronous getBufferSubData (≈1 ms when the readback is truly async). */
+	copyMs?: number;
+	/** Fence polls (timer turns) the readback waited. */
+	polls?: number;
+	/** Quiet-queue probe fences before the copy (readbackQuiet; 0 = the GPU queue was short). */
+	probes?: number;
 	/** Row flip, sky → Infinity, xyz rebuild. */
 	unpackMs: number;
 	totalMs: number;
@@ -417,6 +558,9 @@ export class GpuGeometrySource implements GeometrySource {
 		this.timing = {
 			submitMs: t1 - t0,
 			readbackMs: t2 - t1,
+			copyMs: this.target.lastRead?.copyMs,
+			polls: this.target.lastRead?.polls,
+			probes: this.target.lastRead?.probes,
 			unpackMs: t3 - t2,
 			totalMs: t3 - t0,
 		};

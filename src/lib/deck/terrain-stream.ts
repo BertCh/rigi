@@ -41,6 +41,15 @@ export type StreamOptions = {
 	concurrency?: number;
 	/** Meshes kept beyond the rendered set (LRU-ish cache for panning back). */
 	spareMeshes?: number;
+	/**
+	 * Coarse-first loading (off when unset): the first selection is preceded by the same
+	 * selection capped at this zoom (three's terrain stops at 14), queued ahead of the finer
+	 * tiles and handed to `onPreview` once complete. The full set and its first `onUpdate` are
+	 * unchanged; they arrive after it.
+	 */
+	previewMaxZoom?: number;
+	/** The coarse-first set (at most once, before the first `onUpdate`; see previewMaxZoom). */
+	onPreview?: (set: TerrainSet) => void;
 	/** New render set (throttled). Not called until the first selection has fully loaded. */
 	onUpdate: (set: TerrainSet) => void;
 	onProgress?: (done: number, total: number) => void;
@@ -59,14 +68,21 @@ const isAncestor = (a: TileKey, d: TileKey) =>
 
 export class TerrainStreamer {
 	readonly frame: EnuFrame;
-	private o: Required<Omit<StreamOptions, "onProgress">> &
-		Pick<StreamOptions, "onProgress">;
+	private o: Required<
+		Omit<StreamOptions, "onProgress" | "onPreview" | "previewMaxZoom">
+	> &
+		Pick<StreamOptions, "onProgress" | "onPreview" | "previewMaxZoom">;
 	/** One mesh per tile id (replaced when the wanted resolution changes). */
 	private meshes = new Map<string, TileMesh>();
 	private lastUsed = new Map<string, number>();
 	private want: Want[] = [];
 	private wantById = new Map<string, Want>();
 	private queue: Want[] = [];
+	/** Coarse-first selection still to be handed to onPreview (null = none pending). */
+	private preview: Want[] | null = null;
+	private previewById = new Map<string, Want>();
+	/** ms from the first setWedge to the preview set (-1 = not emitted). */
+	private previewMs = -1;
 	/** In-flight loads, abortable when they go stale. */
 	private loading = new Map<string, { seg: number; ac: AbortController }>();
 	private wedge?: ViewWedge;
@@ -118,7 +134,7 @@ export class TerrainStreamer {
 		// Cancel in-flight loads the new view no longer wants (or wants at another resolution);
 		// the shared cache drops their network request once no other caller wants it.
 		for (const [id, l] of this.loading) {
-			const w = this.wantById.get(id);
+			const w = this.wantById.get(id) ?? this.previewById.get(id);
 			if (!w || w.seg !== l.seg) {
 				l.ac.abort();
 				this.loading.delete(id); // free the slot; re-queued below if wanted at a new seg
@@ -126,14 +142,47 @@ export class TerrainStreamer {
 		}
 		// Queue whatever isn't loaded at the wanted resolution; near + in-view first. Anything
 		// queued for the previous wedge and not in this list is dropped (stale).
+		const missing = (w: Want) =>
+			this.meshes.get(w.id)?.seg !== w.seg && !this.loading.has(w.id);
 		this.queue = this.want
-			.filter(
-				(w) => this.meshes.get(w.id)?.seg !== w.seg && !this.loading.has(w.id),
-			)
+			.filter(missing)
 			.sort((a, b) => this.priority(a) - this.priority(b));
 		this.genTotal = this.queue.length + this.loading.size;
+		// Coarse-first (first selection only): the capped selection's tiles go ahead of the rest.
+		// Most of them (the far field) are in the full selection too, at the same resolution.
+		this.preview = null;
+		this.previewById.clear();
+		if (
+			!this.ready &&
+			this.generation === 1 &&
+			this.o.previewMaxZoom != null &&
+			this.o.previewMaxZoom < this.o.maxZoom &&
+			this.o.onPreview
+		) {
+			const coarse = selectDemTiles(this.frame.lat, this.frame.lon, {
+				...this.o,
+				maxZoom: this.o.previewMaxZoom,
+				wedge,
+			}).map((c) => ({ ...c, id: tileId(c.key), seg: segmentsFor(c) }));
+			this.preview = coarse;
+			this.previewById = new Map(coarse.map((w) => [w.id, w]));
+			const first = coarse
+				.filter((w) => {
+					const f = this.wantById.get(w.id);
+					return missing(w) && (!f || f.seg === w.seg);
+				})
+				.sort((a, b) => this.priority(a) - this.priority(b));
+			const ahead = new Set(first.map((w) => w.id));
+			this.queue = [...first, ...this.queue.filter((w) => !ahead.has(w.id))];
+		}
 		this.pump();
 		this.scheduleEmit(0);
+		this.maybePreview();
+	}
+
+	/** Load diagnostics of the coarse-first set: ms from the first view to it (-1 = none yet). */
+	get previewLoadMs() {
+		return this.previewMs;
 	}
 
 	dispose() {
@@ -156,7 +205,7 @@ export class TerrainStreamer {
 			this.queue.length
 		) {
 			const w = this.queue.shift() as Want;
-			const cur = this.wantById.get(w.id);
+			const cur = this.wantById.get(w.id) ?? this.previewById.get(w.id);
 			if (!cur || cur.seg !== w.seg) continue; // went stale
 			if (this.meshes.get(w.id)?.seg === w.seg || this.loading.has(w.id))
 				continue;
@@ -165,6 +214,7 @@ export class TerrainStreamer {
 			this.load(w, ac.signal).finally(() => {
 				if (this.loading.get(w.id)?.ac === ac) this.loading.delete(w.id);
 				this.pump();
+				this.maybePreview();
 				this.scheduleEmit(this.queue.length || this.loading.size ? 150 : 0);
 			});
 		}
@@ -188,6 +238,45 @@ export class TerrainStreamer {
 			mesh.grid = buildBatchGrid(this.frame, dem.key, dem.heights);
 		this.buildMs += performance.now() - t0;
 		this.meshes.set(w.id, mesh);
+	}
+
+	/** Hands the coarse-first set to onPreview once every tile of it is loaded (once). */
+	private maybePreview() {
+		const p = this.preview;
+		if (!p || this.disposed) return;
+		if (this.ready) {
+			this.preview = null; // the full set made it first
+			return;
+		}
+		const tiles: TileMesh[] = [];
+		for (const w of p) {
+			// (a tile of both selections has one resolution; the full one's wins if they differ)
+			const m = this.meshes.get(w.id);
+			if (!m || (m.seg !== w.seg && m.seg !== this.wantById.get(w.id)?.seg))
+				return;
+			tiles.push(m);
+		}
+		this.preview = null;
+		this.previewMs = Math.round(performance.now() - this.genStart);
+		const set = new TerrainSet(
+			this.frame,
+			tiles.sort((a, b) => a.distance - b.distance),
+		);
+		const zooms: Record<number, number> = {};
+		for (const t of tiles) zooms[t.key.z] = (zooms[t.key.z] ?? 0) + 1;
+		set.stats = {
+			tiles: tiles.length,
+			zooms,
+			fallbacks: tiles.filter((t) => t.sourceZ < t.key.z).length,
+			standIns: 0,
+			pending: this.want.filter((w) => this.meshes.get(w.id)?.seg !== w.seg)
+				.length,
+			triangles: tiles.reduce((n, t) => n + meshTriangles(t), 0),
+			loadMs: this.previewMs,
+			generation: 0,
+			buildMs: Math.round(this.buildMs),
+		};
+		this.o.onPreview?.(set);
 	}
 
 	private scheduleEmit(ms: number) {

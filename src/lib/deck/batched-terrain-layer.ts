@@ -610,7 +610,12 @@ export type BatchedTerrainProps = LayerProps &
 	};
 
 /** Per-instance row buffers, one per draw group (a Model's attributes are swapped per draw). */
-type RowBuf = { buf: Buffer; cap: number };
+type RowBuf = {
+	buf: Buffer;
+	cap: number;
+	/** The rows last written to `buf` (skips the upload when a pass draws the same set). */
+	rows?: Float32Array;
+};
 type SegModel = { model: Model; bufs: Map<string, RowBuf> };
 
 export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
@@ -749,15 +754,24 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 			eye?: [number, number, number];
 			width: number;
 			height: number;
+			isGeospatial?: boolean;
+			viewProjectionMatrix?: ArrayLike<number>;
 		};
+		// the photo camera: its pose frustum; any other CARTESIAN camera (world orbit / fly / top-down,
+		// step-inside; all ENU WorldViewports): the side planes of its view-projection
+		const photoCam = !!(viewport.pose && viewport.eye);
 		const cull =
-			viewport.pose && viewport.eye
+			photoCam && viewport.pose && viewport.eye
 				? sphereCuller(
 						viewport.pose,
 						viewport.eye,
 						viewport.width / Math.max(1, viewport.height),
 					)
-				: null;
+				: batchedCullStats.world &&
+						!viewport.isGeospatial &&
+						viewport.viewProjectionMatrix
+					? matrixCuller(viewport.viewProjectionMatrix)
+					: null;
 		const pass = currentTerrainPass();
 		// imagery: the colour / canvas passes group each resolution's tiles by map pool
 		const withMaps =
@@ -787,7 +801,13 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 		for (const t of this.props.tiles) {
 			const s = store.slots.get(t);
 			if (!s || !t.grid) continue;
-			if (cull?.(t.grid.sphere)) continue;
+			if (cull?.(t.grid.sphere)) {
+				batchedCullStats.culled++;
+				if (!photoCam) batchedCullStats.culledW++;
+				continue;
+			}
+			batchedCullStats.drawn++;
+			if (!photoCam) batchedCullStats.drawnW++;
 			const pool = withMaps ? store.mapPool(t.id) : null;
 			const key = pool ? `${pool.width}x${pool.height}` : "all";
 			let bySeg = groups.get(t.seg);
@@ -805,7 +825,10 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 			setTerrainShaderProps(sm.model, this.props, undefined, viewport);
 			for (const [key, { pool, rows }] of bySeg) {
 				const rb = this.rowBuf(seg, sm.bufs, key, rows.length);
-				rb.buf.write(new Float32Array(rows));
+				if (!sameRows(rb.rows, rows)) {
+					rb.rows = new Float32Array(rows);
+					rb.buf.write(rb.rows);
+				}
 				sm.model.setAttributes({ row: rb.buf });
 				sm.model.setInstanceCount(rows.length);
 				sm.model.shaderInputs.setProps({
@@ -817,6 +840,56 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 			}
 		}
 	}
+}
+
+/**
+ * Diagnostics for harnesses (globalThis.__rigiBatchedCull): tile instances drawn / culled so far,
+ * all passes and (…W) non-photo cameras only; `world: false` turns the non-photo camera culling
+ * off (A/B pixel checks).
+ */
+export const batchedCullStats = {
+	drawn: 0,
+	culled: 0,
+	drawnW: 0,
+	culledW: 0,
+	world: true,
+};
+(
+	globalThis as { __rigiBatchedCull?: typeof batchedCullStats }
+).__rigiBatchedCull = batchedCullStats;
+
+function sameRows(a: Float32Array | undefined, b: number[]) {
+	if (!a || a.length !== b.length) return false;
+	for (let i = 0; i < b.length; i++) if (a[i] !== b[i]) return false;
+	return true;
+}
+
+/**
+ * true = the sphere lies entirely outside one of the four side planes of a view-projection
+ * (column-major, common space = ENU metres for a CARTESIAN non-geospatial viewport). Near / far are
+ * not tested: the terrain writes its own log depth. For a perspective camera the side planes pass
+ * through the eye and together imply w ≥ 0, so a sphere behind the camera is culled too. The pad is
+ * sphereCuller's (the grid spheres already include skirts, heights and a sag margin).
+ */
+export function matrixCuller(m: ArrayLike<number>) {
+	const planes: number[][] = [];
+	for (const [r, sgn] of [
+		[0, 1],
+		[0, -1],
+		[1, 1],
+		[1, -1],
+	] as const) {
+		const p = [0, 1, 2, 3].map((c) => m[c * 4 + 3] + sgn * m[c * 4 + r]);
+		const n = Math.hypot(p[0], p[1], p[2]);
+		if (!(n > 1e-12) || !p.every(Number.isFinite)) return null;
+		planes.push(p.map((v) => v / n));
+	}
+	return ([cx, cy, cz, rad]: [number, number, number, number]) => {
+		const pad = rad * 1.02 + 1;
+		for (const p of planes)
+			if (p[0] * cx + p[1] * cy + p[2] * cz + p[3] < -pad) return true;
+		return false;
+	};
 }
 
 /** true = the sphere lies entirely outside the photo camera's frustum (geometry-pass.ts frustumCuller). */

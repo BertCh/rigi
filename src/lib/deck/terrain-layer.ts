@@ -30,6 +30,7 @@ import { PROVENANCE_COLORS } from "../nearfield/provenance";
 import { type DeckTerrainStyle, deckTerrainStyle } from "../style/deck-apply";
 import { CLASSIC } from "../style/defaults";
 import { BatchedTerrainTileLayer } from "./batched-terrain-layer";
+import { narrowIndices } from "./index-width";
 import type { TileMesh } from "./terrain-data";
 import {
 	type TerrainMode,
@@ -392,7 +393,9 @@ float contourLine(float e, float widthPx) {
 }
 
 void main() {
+#ifdef TERRAIN_FRAGMENT_DEPTH
   gl_FragDepth = log2(vLogW) * terrain.logDepthFC;
+#endif
   vec3 n = normalize(vNormal);
   float range = length(vWorld - vCamera);
   // photo-camera passes only: terrain closer than the GPS error is in the wrong place anyway (the
@@ -637,7 +640,7 @@ class TerrainTileLayer extends Layer<TileLayerProps> {
 			gpu ??
 			new Geometry({
 				topology: "triangle-list",
-				indices: mesh.indices,
+				indices: narrowIndices(mesh.indices, mesh.positions.length / 3),
 				attributes: {
 					positions: { size: 3, value: mesh.positions },
 					normals: { size: 3, value: mesh.normals },
@@ -716,6 +719,34 @@ export type TerrainDrawProps = TerrainUniformProps & {
 };
 
 /**
+ * How the terrain writes its logarithmic depth (log2(1 + w) · logDepthFC, LOG_DEPTH_FAR), the
+ * convention trails, splats, 3D tiles, the world gizmo and the roll drape test against:
+ *   "vertex"   per vertex, in gl_Position.z (terrainLogDepthModule). No fragment depth write, so
+ *              early depth testing stays on: hidden terrain is rejected before the uber-shader
+ *              runs. Apple TBDR, DPR 2, photo drag: MSAA colour pass 34–46 → 16–18 ms per redraw.
+ *   "fragment" exact per fragment (gl_FragDepth), the old path; kept as the fallback.
+ * The hardware's screen-linear interpolation of a per-vertex log is never nearer than the exact
+ * value (log is concave) and at most (ln ρ)²/8 farther for a triangle whose far / near distance
+ * ratio is ρ (multi-drape-layer.ts derives the same bound): millimetres on far tiles, a few cm
+ * next to the camera. Layers writing the exact per-fragment value therefore still pass on the
+ * terrain surface (ties get looser, never tighter), and shared vertices keep seams crack-free.
+ * DPR 1 diffs against "fragment" (IMG_6958 / 7086 / 7155, photo and world views): ≤ 0.29 % of
+ * pixels by > 8/255, along trails, tile skirts and labels.
+ * The near plane moves to w = 0 (z = -w there): terrain between the camera and the view's near
+ * distance is no longer clipped.
+ */
+export const TERRAIN_DEPTH: "vertex" | "fragment" = "vertex";
+
+/** Terrain log depth per vertex (TERRAIN_DEPTH "vertex"): z_ndc = 2 · log depth - 1. */
+const terrainLogDepthModule = {
+	name: "terrainLogDepth",
+	inject: {
+		"vs:#main-end": /* glsl */ `\
+  gl_Position.z = (2.0 * log2(1.0 + max(gl_Position.w, 1e-6)) * terrain.logDepthFC - 1.0) * gl_Position.w;`,
+	},
+} as const satisfies ShaderModule;
+
+/**
  * The terrain program's shaders for `p`'s look: `vs` + the shared fragment shader, the terrain
  * uniform module and the look's LOOK_* defines (none for classic: the classic program is unchanged).
  */
@@ -724,9 +755,11 @@ export function terrainShaders(
 	vs: string,
 	extraModules: ShaderModule[] = [],
 ) {
-	const d = tileDefines(p);
-	if (!d.length)
-		return { vs, fs, modules: [project32, terrainModule, ...extraModules] };
+	const d: string[] = [...tileDefines(p)];
+	const base = [project32, terrainModule, ...extraModules];
+	if (TERRAIN_DEPTH === "vertex") base.push(terrainLogDepthModule);
+	else d.push("TERRAIN_FRAGMENT_DEPTH");
+	if (!d.length) return { vs, fs, modules: base };
 	const look = [
 		d.includes("LOOK_ATMOSPHERE") && ATM_LUMA_MODULE,
 		d.includes("LOOK_RELIEF") && REL_LUMA_MODULE,
@@ -736,7 +769,7 @@ export function terrainShaders(
 	return {
 		vs,
 		fs,
-		modules: [project32, terrainModule, ...extraModules, ...look],
+		modules: [...base, ...look],
 		defines: Object.fromEntries(d.map((k) => [k, true])),
 	};
 }
@@ -940,6 +973,27 @@ const DEFAULTS: TerrainUniformProps = {
 	truth: 0,
 };
 
+/**
+ * Draw state of every terrain pass (canvas, geometry, colour, normal: the offscreen passes spread
+ * the layer's parameters, geometry-pass.ts getLayerParameters).
+ *
+ * Back faces are culled, like three's FrontSide terrain material (materials.ts). Both mesh paths
+ * share buildMesh's triangulation (terrain-data.ts tileIndex / batched-terrain-grid.ts gridMesh):
+ * grid row 0 = north, so (a, a + n, a + 1) runs south then east, counter-clockwise seen from +z
+ * (ENU up) → front-facing under the right-handed photo / world projections. Skirt quads are
+ * emitted in both windings, so they stay visible from either side. From the photo camera (above
+ * the surface) a back face is only reached through it; DPR 1 diffs on IMG_6958 / 7086 / 7155 (photo
+ * and world views) change ≤ 0.33 % of pixels by > 8/255: crest pixels where a back face used to win
+ * the less-equal depth tie, and labels nudged by the geometry pass. Underground views see through
+ * the terrain, as in three. Apple TBDR, DPR 2: MSAA colour pass 75–100 → 34–46 ms per redraw.
+ */
+export const TERRAIN_PARAMETERS = {
+	cullMode: "back",
+	frontFace: "ccw",
+	depthWriteEnabled: true,
+	depthCompare: "less-equal",
+} as const;
+
 export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 	static layerName = "TerrainLayer";
 	declare state: {
@@ -1065,11 +1119,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 					...this.getSubLayerProps({ id: "batched" }),
 					coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
 					pickable: false,
-					parameters: {
-						cullMode: "none",
-						depthWriteEnabled: true,
-						depthCompare: "less-equal",
-					},
+					parameters: TERRAIN_PARAMETERS,
 					tiles: this.props.tiles,
 					// the compositor's geometry cache key reads `mesh` (composite.ts geoKey)
 					mesh: this.props.tiles,
@@ -1088,11 +1138,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 					...this.getSubLayerProps({ id: mesh.id }),
 					coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
 					pickable: false,
-					parameters: {
-						cullMode: "none",
-						depthWriteEnabled: true,
-						depthCompare: "less-equal",
-					},
+					parameters: TERRAIN_PARAMETERS,
 					mesh,
 					image: this.props.imagery?.get(mesh.id) ?? null,
 					photoTexture: photo ?? null,
