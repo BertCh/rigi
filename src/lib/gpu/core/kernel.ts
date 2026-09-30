@@ -1,8 +1,8 @@
-// Compute kernels over luma 9.4's stable API, generalised from look/kernel.ts:
+// Compute kernels over luma 10's stable API, generalised from look/kernel.ts:
 // - defineKernel() at module level (WGSL + explicit binding layout, optional entry point and
 //   override constants, a warm-up group); the pipeline is created once per device and cached;
-// - kernelAsync()/warmKernelsAsync() compile with createComputePipelineAsync so warm-up does not
-//   block the thread (luma 9.4 has no async pipelines; we hand luma the finished handle);
+// - kernelAsync()/warmKernelsAsync() compile with Device.createComputePipelineAsync (luma 10,
+//   visgl/luma.gl#3204) so warm-up does not block the thread;
 // - dispatch() sets the bindings on the PASS, never on the shared pipeline object, so concurrent
 //   callers of one kernel cannot see each other's bindings, and labels the pass for core/profile;
 // - storage()/uniform()/stage()/release() keep look/kernel.ts's API; the pooled variants are in
@@ -121,48 +121,42 @@ const makeShader = (device: Device, spec: KernelSpec): Shader =>
 		stage: "compute",
 	});
 
-function wrap(
-	device: Device,
-	spec: KernelSpec,
-	shader: Shader,
-	handle?: unknown,
-): Kernel {
-	const pipeline = device.createComputePipeline({
-		id: spec.label,
-		shader,
-		entryPoint: spec.entryPoint,
-		...(spec.constants ? { constants: spec.constants } : {}),
-		shaderLayout: shaderLayout(spec),
-		...(handle ? { handle } : {}),
-	});
-	// luma 9.4 bug (check on the luma 10 bump): every WebGPUComputePipeline starts with the SAME
-	// module-level empty bindings object and pipeline.setBindings() mutates it in place, so one
-	// not-yet-migrated setBindings() caller leaks its buffers into every other compute pipeline, and
-	// WebGPUComputePass.setPipeline() then builds a bind group from them (throws once they are
-	// destroyed). Core pipelines get their own empty object; per-pass bindings do the rest.
-	const own = pipeline as unknown as { _bindingsByGroup?: object };
-	if (own._bindingsByGroup) own._bindingsByGroup = {};
-	return { pipeline, names: spec.layout.map(([n]) => n), spec };
-}
+const pipelineProps = (spec: KernelSpec, shader: Shader) => ({
+	id: spec.label,
+	shader,
+	entryPoint: spec.entryPoint,
+	...(spec.constants ? { constants: spec.constants } : {}),
+	shaderLayout: shaderLayout(spec),
+});
+
+// luma 9.4 shared one module-level bindings object across every WebGPUComputePipeline (we reset
+// `_bindingsByGroup` here); luma 10 gives each pipeline its own, so no workaround is needed.
+const wrap = (spec: KernelSpec, pipeline: ComputePipeline): Kernel => ({
+	pipeline,
+	names: spec.layout.map(([n]) => n),
+	spec,
+});
 
 /** The pipeline of a defined kernel, created (synchronously) on first use and cached per device. */
 export function kernel(device: Device, spec: KernelSpec): Kernel {
 	const m = cacheOf(device);
 	let k = m.get(spec);
 	if (!k) {
-		k = wrap(device, spec, makeShader(device, spec));
+		k = wrap(
+			spec,
+			device.createComputePipeline(
+				pipelineProps(spec, makeShader(device, spec)),
+			),
+		);
 		m.set(spec, k);
 	}
 	return k;
 }
 
-type RawDevice = {
-	createComputePipelineAsync?: (d: unknown) => Promise<unknown>;
-};
-
 /**
- * Like kernel(), but compiles with createComputePipelineAsync where the device has it (WebGPU), so
- * the thread is not blocked. Same WGSL, same module: identical results to kernel().
+ * Like kernel(), but compiles with Device.createComputePipelineAsync (GPUDevice.
+ * createComputePipelineAsync on WebGPU; the sync path elsewhere), so the thread is not blocked.
+ * Same WGSL, same module, same descriptor: identical results to kernel().
  */
 export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel> {
 	const ready = cache.get(device)?.get(spec);
@@ -177,24 +171,14 @@ export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel> {
 	if (!p) {
 		const inflight = b;
 		p = (async () => {
-			const raw = (device as unknown as { handle?: RawDevice }).handle;
 			const shader = makeShader(device, spec);
-			let k: Kernel;
-			if (device.type === "webgpu" && raw?.createComputePipelineAsync) {
-				const handle = await untilLost(
+			const k = wrap(
+				spec,
+				await untilLost(
 					device,
-					raw.createComputePipelineAsync({
-						label: spec.label,
-						compute: {
-							module: (shader as unknown as { handle: unknown }).handle,
-							entryPoint: spec.entryPoint,
-							constants: spec.constants ?? {},
-						},
-						layout: "auto",
-					}),
-				);
-				k = wrap(device, spec, shader, handle);
-			} else k = wrap(device, spec, shader);
+					device.createComputePipelineAsync(pipelineProps(spec, shader)),
+				),
+			);
 			const m = cacheOf(device);
 			// a sync kernel() may have won meanwhile: keep the first
 			const won = m.get(spec);
@@ -241,8 +225,6 @@ export async function warmKernelsAsync(
 	return failed;
 }
 
-type PassWithBindings = ComputePass & { setBindings?: (b: Bindings) => void };
-
 /**
  * A dispatch over the device's maxComputeWorkgroupsPerDimension is a validation error that fails the
  * whole submit silently (the reads then return stale slot bytes unless __RIGI_GPU_CHECKS__ is on), so
@@ -269,16 +251,10 @@ export function encodeDispatch(
 	z = 1,
 ) {
 	checkWorkgroups(k, x, y, z);
-	const p = pass as PassWithBindings;
-	if (p.setBindings) {
-		p.setPipeline(k.pipeline);
-		p.setBindings(bindings);
-	} else {
-		// not WebGPU (luma 9.4 declares setBindings only on WebGPUComputePass)
-		k.pipeline.setBindings(bindings);
-		p.setPipeline(k.pipeline);
-	}
-	p.dispatch(x, y, z);
+	// per-pass bindings (ComputePass.setBindings is abstract in luma 10; 9.4 had it on WebGPU only)
+	pass.setPipeline(k.pipeline);
+	pass.setBindings(bindings);
+	pass.dispatch(x, y, z);
 }
 
 /**

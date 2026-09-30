@@ -31,6 +31,7 @@ import {
 	type GPUCommandGraphComputeNode,
 	type GPUCommandGraphEncoding,
 	type GPUCommandGraphTimingReport,
+	type GPUNode,
 	type GPUScalarFormat,
 	type GraphBufferHandle,
 	type GraphBufferUsage,
@@ -62,8 +63,12 @@ export type KernelNode<P> = {
 	dependsOn?: string[];
 };
 
-/** Anything with gpu-core's addToGraph (GPUReduction, GPUSort, GPUHistogram, GPUScan, …). */
-export type GraphOp<P> = { addToGraph: (graph: GPUCommandGraph<P>) => void };
+/**
+ * Anything gpu-core's GPUCommandGraph.add takes: an op producing command nodes (GPUReduction,
+ * GPUSort, GPUHistogram, GPUScan, … via getCommandNodes(graph); luma 10, visgl/luma.gl#3258
+ * replaced 9.4's op.addToGraph(graph)), a raw command node, or a group of them.
+ */
+export type GraphOp<P> = GPUNode<P>;
 
 const USE: Record<BindKind, GraphBufferUsage> = {
 	uniform: "uniform",
@@ -175,7 +180,7 @@ export class ComputeGraph<P = void> {
 
 	/** Add a gpu-core op (GPUReduction, GPUSort, …) built on this graph's handles. */
 	add(op: GraphOp<P>): this {
-		op.addToGraph(this.graph);
+		this.graph.add(op);
 		return this;
 	}
 

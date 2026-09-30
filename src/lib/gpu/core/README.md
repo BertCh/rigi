@@ -1,6 +1,6 @@
 # src/lib/gpu/core: shared WebGPU compute foundation
 
-This directory is the shared layer that every kernel in `src/lib/gpu/**` builds on. It uses luma 9.4.2's stable `@luma.gl/core` API plus the experimental `@luma.gl/gpgpu/gpu-core`, and it is meant to move to luma/deck "next" (WebGPU everywhere) with as little churn as possible. The house rules from `../README.md` all still apply:
+This directory is the shared layer that every kernel in `src/lib/gpu/**` builds on. It uses luma 10.0.0-alpha.2's stable `@luma.gl/core` API plus the experimental `@luma.gl/gpgpu/gpu-core`, and it is meant to move to luma/deck "next" (WebGPU everywhere) with as little churn as possible. The house rules from `../README.md` all still apply:
 - Every kernel keeps a CPU twin, and the CPU twin is the reference.
 - `getComputeDevice()` resolving `null` means the caller takes the CPU path.
 - `?gpu=off` turns everything off.
@@ -88,7 +88,7 @@ export type KernelOptions = { entryPoint?: string; constants?: Record<string, nu
 export function defineKernel(id: string, source: string, layout: [string, BindKind][], opts?: KernelOptions): KernelSpec;
 export const definedKernels: (group?: string) => KernelSpec[];
 export function kernel(device: Device, spec: KernelSpec): Kernel;                 // sync, cached per (device, spec)
-export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel>;   // createComputePipelineAsync, same cache
+export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel>;   // Device.createComputePipelineAsync, same cache
 export function warmKernels(device: Device, group?: string): number;              // failures; never throws
 export function warmKernelsAsync(device: Device, group?: string): Promise<number>;
 export function encodeDispatch(pass: ComputePass, k: Kernel, bindings: Bindings, x: number, y?: number, z?: number): void;
@@ -118,7 +118,7 @@ export type GraphBinding = GraphBufferHandle | GraphDataView;
 export type Workgroups = [number, number?, number?];
 export type KernelNode<P> = { id: string; spec: KernelSpec; bindings: Record<string, GraphBinding>;
   workgroups: Workgroups | ((parameters: P) => Workgroups); dependsOn?: string[] };
-export type GraphOp<P> = { addToGraph: (graph: GPUCommandGraph<P>) => void };
+export type GraphOp<P> = GPUNode<P>;   // luma 10 (#3258): graph.add(op) replaces op.addToGraph(graph)
 export class ComputeGraph<P = void> {
   readonly device: Device; readonly id: string; readonly graph: GPUCommandGraph<P>;
   constructor(device: Device, id: string);
@@ -166,11 +166,11 @@ Numerics do not change. The WGSL, the shader module, the explicit shader layout 
 
 ## Design notes
 
-- **Device limits.** In luma 9.4 the only way to raise adapter limits is `featureLevel: "max"`, and that also requests every feature. `device.ts` therefore wraps `webgpuAdapter` (via `Object.create`) so that the adapter's `requestDevice` asks for `RAISED_LIMITS` at the adapter maximum. If that request fails, it retries with default limits. On this Mac (Apple, Metal) the sidecar now gets `maxStorageBufferBindingSize` / `maxBufferSize` of 4 GiB−4, and `maxComputeWorkgroupStorageSize` of 32 KiB.
+- **Device limits.** In luma 9.4 and 10.0.0-alpha.2 the only way to raise adapter limits is `featureLevel: "max"`, and that also requests every feature. `device.ts` therefore wraps `webgpuAdapter` (via `Object.create`) so that the adapter's `requestDevice` asks for `RAISED_LIMITS` at the adapter maximum. If that request fails, it retries with default limits. On this Mac (Apple, Metal) the sidecar now gets `maxStorageBufferBindingSize` / `maxBufferSize` of 4 GiB−4, and `maxComputeWorkgroupStorageSize` of 32 KiB.
 - **Adopted device.** `getComputeDevice()` returns the adopted render device instead of the sidecar. Pipelines, pools and readback slots are all per device (WeakMaps), so both devices can be live at once. Never mix buffers between devices.
 - **Pool retirement.** When a slot grows, the old buffer is destroyed once the lease covering that key ends. For unleased slots it happens at the next core `submit()`. Unleased callers must therefore encode and submit without awaiting in between.
 - **Why readback does not use `GPUReadbackRing`.** Its slots have one fixed byte length and `acquire()` waits when every slot is busy. Our readback sizes vary per call (and per photo), so `readback.ts` implements the same ticket pattern (reserve, copy on the caller's encoder, submit, map, return the slot) with grow-on-demand slots. Up to 4 idle slots are kept per device. The ring is still re-exported from `luma.ts` for fixed-size streaming readbacks.
-- **Async pipelines.** luma 9.4 has no async pipeline creation. `kernelAsync` calls the raw `GPUDevice.createComputePipelineAsync` on the luma shader's module (layout `auto`) and passes the resulting `handle` into `device.createComputePipeline`. The self-test checks that the sync and async pipelines give bit-identical output.
+- **Async pipelines.** luma 10 has `Device.createComputePipelineAsync` (visgl/luma.gl#3204; `GPUDevice.createComputePipelineAsync`, layout `auto`, same descriptor as the sync path). `kernelAsync` uses it; in luma 9.4 it called the raw GPUDevice method and passed the `handle` into `device.createComputePipeline`. The self-test checks that the sync and async pipelines give bit-identical output.
 - **Profiling.** Each profiled pass gets its own pooled 2-slot `timestamp` QuerySet. The durations are read after `submit()`. Graph runs use the encoder's `timeProfilingQuerySet` and report under `<graphId>/<nodeId>`. Chromium quantises timestamps (about 65 µs steps on this Mac), so a single small pass can read as 0 ms: sum over many calls.
 - **Worker profiling.** Kernels in the GPU workers run in their own realm. The worker clients put `realmGpuOptions()` on a message they already send (`spans` for horizon-fast-app, `prepare` / `solve` for unknown-pose, the eye search request); it is `undefined` unless the page profiles or checks, so nothing changes by default. The worker calls `applyRealmGpuOptions`, and attaches `takeGpuProfile()` to its result (`dirs`, the solve response, `done` / `error`); the client merges it as `horizon-worker:…`, `unknown-pose-worker:…`, `eye-worker:…`. `scripts/gpu/with-gpu-profile.mjs` therefore reports worker kernels too, with per-realm sums under `realms`. A worker terminated before it answered is missed.
 - **Error checks.** WebGPU validation and OOM errors are asynchronous, so without checks a broken kernel resolves whatever its output buffer held. With `globalThis.__RIGI_GPU_CHECKS__ = true` (forwarded to the workers like profiling), `submit()` wraps `finish()` + `queue.submit()` in `validation` and `out-of-memory` error scopes. Encoder errors (invalid pipeline, bind group, destroyed or failed buffers used by a pass) surface at `finish()`, so one scope covers every dispatch on the encoder. Every staged read of that encoder (`readBack`, `stage`, `stageReads`, `ComputeGraph.run`) then rejects with `GpuValidationError`, and callers take their CPU path. Outputs that stay on the GPU can await `submitted(enc)`. Errors raised outside the encoder (e.g. `createBuffer` OOM) still reach the buffer's first use. Cost: see the self-test's `error-checks-cost`. It stays opt-in until the cost is confirmed in the app benches.
