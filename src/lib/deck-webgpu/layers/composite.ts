@@ -917,6 +917,8 @@ export class CompositeCore implements GpuLayerCore {
 	private brushDirty = true;
 	private maskTex?: Texture;
 	private maskSrc: Uint8Array | null = null;
+	/** refined masks already on the GPU (compute-bridge.ts); not owned, wins over look.mask */
+	private maskExt: Texture | null = null;
 	private placeholders?: { photo: Texture; mask: Texture; rgba: Texture };
 
 	constructor(opts: CompositeCoreOptions = {}) {
@@ -986,6 +988,14 @@ export class CompositeCore implements GpuLayerCore {
 					owned: true,
 				};
 		}
+		this.bump();
+	}
+
+	/** The refined masks as a texture (rgba8unorm, row 0 = top; the caller keeps it alive) instead
+	 * of look.mask's bytes; null = use look.mask. */
+	setMaskTexture(t: Texture | null) {
+		if (t === this.maskExt) return;
+		this.maskExt = t;
 		this.bump();
 	}
 
@@ -1122,7 +1132,8 @@ export class CompositeCore implements GpuLayerCore {
 			brushTex: this.brushTex ?? ph.mask,
 			occlTex: this.occlTex ?? ph.mask,
 		};
-		if (defines.LOOK_MASK) bindings.maskTex = this.maskTex ?? ph.rgba;
+		if (defines.LOOK_MASK)
+			bindings.maskTex = this.maskExt ?? this.maskTex ?? ph.rgba;
 		if (defines.LOOK_INK) bindings.normalTex = ctx.geometry.normal;
 		model.setBindings(bindings);
 		model.draw(ctx.renderPass);

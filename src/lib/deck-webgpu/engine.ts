@@ -166,6 +166,7 @@ import {
 	projectToPixel,
 	worldCamera,
 } from "./camera";
+import { createLookBridge, type LookBridge } from "./compute-bridge";
 import { deckBuild, webgpuAvailable } from "./device";
 import type { Host, HostStats } from "./hosts/direct";
 import {
@@ -185,6 +186,7 @@ import { type CompositeCore, createCompositeCore } from "./layers/composite";
 import { createDrape, type DrapePart } from "./layers/drape";
 import {
 	GeometryGenerations,
+	WebGpuGeometrySource,
 	webgpuGeometryFactory,
 } from "./layers/geometry-source";
 import { createGizmoCore, type GizmoCore } from "./layers/gizmo";
@@ -340,6 +342,8 @@ type Gpu = {
 	photoTex: Texture | null;
 	photoTexFrom: HTMLImageElement | null;
 	reliefFrom: ReliefField | null;
+	/** look passes on the render targets (compute-bridge.ts); null = the readback path */
+	bridge: LookBridge | null;
 };
 
 export type WebGpuEngineOptions = {
@@ -347,6 +351,9 @@ export type WebGpuEngineOptions = {
 	host?: "deck" | "direct";
 	/** The terrain path (default: the ?terrain flag, deck/terrain-mode.ts). */
 	terrain?: "batched" | "tiles";
+	/** Look passes straight on the render targets (compute-bridge.ts) where the gate allows
+	 * (default true); false = the geometry / colour readback path. See setLookBridge. */
+	lookBridge?: boolean;
 };
 
 export type WebGpuEngineStats = {
@@ -709,6 +716,7 @@ export class WebGpuEngine implements Renderer {
 			photoTex: null,
 			photoTexFrom: null,
 			reliefFrom: null,
+			bridge: null,
 		};
 		const view = () => this.view;
 		const inPhoto = () => this.view === "photo";
@@ -733,6 +741,47 @@ export class WebGpuEngine implements Renderer {
 		this.host = host;
 		this.gpu = gpu;
 		this.applyState();
+		if (this.opts.lookBridge !== false) void this.attachBridge(gpu);
+	}
+
+	/** compute-bridge.ts on this device when its gate passes (else the readback path stays). */
+	private async attachBridge(gpu: Gpu) {
+		const b = await createLookBridge(gpu.device);
+		if (!b) return;
+		if (this.gpu !== gpu || this.disposed || this.opts.lookBridge === false)
+			return b.destroy();
+		b.onAsync = () => {
+			if (this.disposed) return;
+			this.updateLook();
+			if (this.world?.controls) this.sync();
+		};
+		gpu.bridge = b;
+		this.compLook.setSky(this.skyMaskStore);
+		this.updateLook();
+		this.scheduleStats();
+	}
+
+	/** The compute bridge (harnesses), or null on the readback path. */
+	get lookBridge(): LookBridge | null {
+		return this.gpu?.bridge ?? null;
+	}
+
+	/** Switch the look passes between the compute bridge (when gated in) and the readback path. */
+	async setLookBridge(on: boolean) {
+		this.opts = { ...this.opts, lookBridge: on };
+		const g = this.gpu;
+		if (!g) return;
+		g.bridge?.destroy();
+		g.bridge = null;
+		g.composite.setMaskTexture(null);
+		// both paths recompute from scratch (CompositeLook caches its inputs and stats key)
+		this.compLook.setSky(this.skyMaskStore);
+		this.layerGen++;
+		if (on) await this.attachBridge(g);
+		else {
+			this.updateLook();
+			this.scheduleStats();
+		}
 	}
 
 	/** Push the whole CPU state into a fresh set of cores (boot / after a device loss). */
@@ -770,6 +819,7 @@ export class WebGpuEngine implements Renderer {
 		// engine-owned resources first, while the device is alive; then host.destroy() destroys
 		// the cores, the deck (if any) and the device
 		for (const f of [
+			() => g.bridge?.destroy(),
 			() => g.imagery.destroy(),
 			() => g.styles.destroy(),
 			() => g.drape.destroy(),
@@ -1337,7 +1387,24 @@ export class WebGpuEngine implements Renderer {
 			(COMPOSITE_DEFINES as readonly string[]).includes(d),
 		);
 		const grid = this.geometryReady() ? this.rangeGrid() : null;
-		if (defines.length && grid) {
+		const bridge = this.gpu?.bridge ?? null;
+		const geoTex = this.geometryTexture();
+		if (defines.length && grid && bridge && geoTex) {
+			bridge.updateMasks({
+				style: this.style,
+				gen: this.geoBufGen,
+				img: this.photoImg,
+				fg: this.fgMask,
+				sky: this.skyMaskStore,
+				cut:
+					this.settings.mode === "replace" && composite
+						? blendCut(this.settings, composite.brushCanvas, this.brushVersion)
+						: null,
+				geometry: geoTex,
+				range: () => grid,
+			});
+			this.compLook.updateNoise(this.style, this.photoImg, () => grid);
+		} else if (defines.length && grid) {
 			this.compLook.updateMasks({
 				style: this.style,
 				gen: this.geoBufGen,
@@ -1356,18 +1423,19 @@ export class WebGpuEngine implements Renderer {
 		const L = this.compLook;
 		const c = this.style.composite;
 		const gen = this.gens.generation;
+		const M = bridge ? bridge.masks : L.masks;
+		composite.setMaskTexture(bridge?.masks?.texture ?? null);
 		composite.setLook({
 			defines,
 			values: (outW, outH) =>
 				compositeValues(this.style, {
 					outW,
 					outH,
-					refine: L.masks?.gen === gen,
+					refine: M?.gen === gen,
 					// the geometry target's normal is written every frame for the current pose
 					crease: true,
 					cut:
-						!!L.masks?.cut &&
-						L.masks.cut === blendCutKey(this.settings, this.brushVersion),
+						!!M?.cut && M.cut === blendCutKey(this.settings, this.brushVersion),
 					premul:
 						this.settings.mode === "replace" &&
 						this.settings.mapStyle !== "bands",
@@ -1375,8 +1443,8 @@ export class WebGpuEngine implements Renderer {
 					photoW: this.photo.width,
 					visibility: this.haze.fit?.visibility,
 				}),
-			harmonize: harmonizeValues(L.stats, c.harmonize),
-			mask: L.masks,
+			harmonize: harmonizeValues(bridge ? bridge.stats : L.stats, c.harmonize),
+			mask: bridge ? null : L.masks,
 			normal: defines.includes("LOOK_INK") && c.ink.crease > 0 ? gen : null,
 		});
 	}
@@ -1394,11 +1462,12 @@ export class WebGpuEngine implements Renderer {
 					? this.style.composite.harmonize
 					: 0;
 		const key = `${this.geoBufGen}|${this.layerGen}|${s.mode}|${s.mapStyle}|${s.worldStyle}|${this.imagery.key}|${this.imagery.map.size}`;
+		const bridge = this.gpu?.bridge ?? null;
 		if (
 			!lookKey(this.style).includes("LOOK_HARMONIZE") ||
 			!this.geometryReady() ||
 			!this.photoImg ||
-			!this.compLook.wantsStats(amount, key) ||
+			!(bridge ?? this.compLook).wantsStats(amount, key) ||
 			this.statsTimer ||
 			this.statsBusy
 		)
@@ -1409,6 +1478,27 @@ export class WebGpuEngine implements Renderer {
 			const img = this.photoImg;
 			if (this.disposed || !this.geometryReady() || !grid || !img) return;
 			const [w, h] = gridSize(this.aspect, STATS_LONG_SIDE);
+			const geoTex = this.geometryTexture();
+			if (bridge && geoTex && bridge === this.gpu?.bridge) {
+				this.statsBusy = true;
+				try {
+					await this.renderLayer(w, h, (color) =>
+						bridge.setStats({
+							key,
+							img,
+							layer: color,
+							geometry: geoTex,
+							fg: this.fgMask,
+							minRange: trustedRange(this.photo.hAccuracy),
+						}),
+					);
+				} catch (e) {
+					console.warn("[webgpu-engine] bridged band stats failed", e);
+				} finally {
+					this.statsBusy = false;
+				}
+				return;
+			}
 			this.statsBusy = true;
 			let layer: Float32Array | null = null;
 			try {
@@ -2544,6 +2634,8 @@ export class WebGpuEngine implements Renderer {
 		view: View;
 		cores?: readonly GpuLayerCore[];
 		screen: boolean;
+		/** compute bridge: consume the resolved colour target on the GPU instead of reading it back */
+		consume?: (color: Texture) => Promise<unknown>;
 	}): Promise<Uint8Array | Float32Array | null> {
 		await this.ready;
 		const g = this.gpu;
@@ -2612,6 +2704,11 @@ export class WebGpuEngine implements Renderer {
 			}
 			device.submit();
 			this.viewOverride = prevOverride;
+			if (o.consume) {
+				// right after the render's submit, same queue; the targets live until it resolves
+				await o.consume(read);
+				return null;
+			}
 			const bytes = await readTexture(device, read);
 			if (!bytes) return null;
 			return o.screen ? bytes : halfToFloat(bytes);
@@ -2655,6 +2752,32 @@ export class WebGpuEngine implements Renderer {
 				out[d + 3] = a;
 			}
 		return out;
+	}
+
+	/** readLayer's render (photo camera, terrain only) with the colour target handed to `consume`. */
+	private async renderLayer(
+		w: number,
+		h: number,
+		consume: (color: Texture) => Promise<unknown>,
+	) {
+		const g = this.gpu;
+		if (!g) return;
+		await this.renderOffscreen({
+			width: w,
+			height: h,
+			view: "photo",
+			cores: [new ViewGate(g.terrain, () => "photo")],
+			screen: false,
+			consume,
+		});
+	}
+
+	/** The query geometry target (rgba32float xyz + range, row 0 = top) the look passes read. */
+	private geometryTexture(): Texture | null {
+		const src = this.geoSrc;
+		return src instanceof WebGpuGeometrySource && src.pose
+			? src.targets.geometry
+			: null;
 	}
 
 	/** The on-screen world frame (canvas size, sky included) as a PNG. */
