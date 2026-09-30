@@ -1,6 +1,6 @@
 // The engine surface PhotoWorkspace (src/components/PhotoWorkspace.tsx) and the export layer
 // (src/lib/export/**) use, so the three.js PhotoEngine (src/lib/engine.ts) and the deck.gl
-// DeckEngine (src/lib/deck/engine.ts) are interchangeable behind `?renderer=deck`.
+// DeckEngine (src/lib/deck/engine.ts, the default) are interchangeable behind `?renderer=`.
 //
 // Exactly the members those callers use (grepped 2026-09-25), typed with the existing types.
 // PhotoEngine satisfies it structurally (checked in renderer.check.ts) without edits to
@@ -65,7 +65,7 @@ export interface Renderer {
 	// ---- state ----
 	setPose(p: Pose): void;
 	setSettings(s: Partial<Settings>): void;
-	/** How the views look (src/lib/style). Optional: PhotoEngine applies it; DeckEngine adopts it later. */
+	/** How the views look (src/lib/style). Both engines implement it; optional for other Renderer shapes. */
 	setStyle?(s: ViewStyle): void;
 	/** The photo's P(sky) (#/lib/sky segmentSky, row 0 = top), for the fitted haze. Both engines. */
 	setSkyMask?(m: FgMask | null): void;

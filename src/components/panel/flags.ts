@@ -54,7 +54,7 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "renderer",
 		label: "Engine",
-		help: "three.js is the default; deck.gl is the parity backend (loaded on demand).",
+		help: "deck.gl is the default; three.js is the fallback (each loads on demand).",
 		group: "render",
 		options: { three: "three.js", deck: "deck.gl" },
 	},

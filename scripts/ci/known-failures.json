@@ -24,5 +24,11 @@
 		"of": 14,
 		"lastObserved": "12/14 within 1\u00b0 yaw, median 6.5 px (2026-09-29, :3130)",
 		"note": "1 below observed for run-to-run noise; status.md: App 12/14"
+	},
+	"evalAppDeck": {
+		"minWithin1deg": 11,
+		"of": 14,
+		"lastObserved": "12/14 within 1\u00b0 yaw, median 6.2 px (2026-09-30, flip snapshot 408f989, app default = deck)",
+		"note": "added by hand at the deck default flip, observed \u2212 1 (scripts/ci/README.md)"
 	}
 }

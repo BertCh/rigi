@@ -330,12 +330,10 @@ export const CHECKS = [
 		retries: 1,
 		env: { APP_URL: "{url}" },
 		needs: ["data/control-points.json", "public/photos/photos.json"],
-		note: "deck-pinned, opt-in (--only eval-app-deck); advisory until known-failures.json has evalAppDeck: any failure, crash or timeout included, reports KNOWN; after that, 'N/M within 1° yaw' ≥ evalAppDeck.minWithin1deg gates like eval-app",
+		note: "deck-pinned (deck is the default renderer); gate: 'N/M within 1° yaw' ≥ known-failures.json evalAppDeck.minWithin1deg",
 		timeoutS: 3600,
-		// not in the default full tier: it is a second 14-photo eval-app run (~doubles that part of
-		// the tier). Moves into the tier (drop optIn) in the commit that flips the default renderer.
-		optIn: true,
-		// until this baseline key exists, a failure of any kind (gate, exit code, timeout) is KNOWN, not FAIL
+		// in the full tier since the default renderer flipped to deck. Were evalAppDeck removed from the
+		// baseline, a failure of any kind (gate, exit code, timeout) would report KNOWN, not FAIL
 		advisoryUntil: "evalAppDeck",
 		gate: evalAppGate("deck", "evalAppDeck"),
 	},

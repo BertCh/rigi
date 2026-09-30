@@ -1,4 +1,4 @@
-// The app's switches: one typed table, one reader. Every page-level option (?renderer=deck, ?gpu=off,
+// The app's switches: one typed table, one reader. Every page-level option (?renderer=three, ?gpu=off,
 // ?tiles3d=swisstopo, …) is declared here and read with getFlag(); nothing else parses location.search
 // for them. The router validates and carries these params across navigation (routes/__root.tsx), and
 // the sidebar's "Experimental & dev" section sets them (components/panel).
@@ -32,7 +32,8 @@ const text = { kind: "text" } as TextDef;
 
 export const FLAG_SCHEMA = {
 	// render
-	renderer: oneOf(["three", "deck"], "three"),
+	/** deck.gl is the default (reports/deck-default.md); ?renderer=three is the fallback */
+	renderer: oneOf(["three", "deck"], "deck"),
 	/** deck only: one instanced grid per resolution, or one mesh per tile */
 	terrain: oneOf(["batched", "tiles"], "batched"),
 	// GPU compute sidecar (src/lib/gpu); the CPU path is always the reference

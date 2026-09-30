@@ -88,9 +88,9 @@ import { useStepInside } from "./nearfield/useStepInside";
 import { AdvancedPanel } from "./panel/AdvancedPanel";
 import { LabelStylePanel, StylePanel, TrailStylePanel } from "./StylePanel";
 
-// Both backends load on demand, so /photo downloads only the one it runs: ?renderer=deck the deck.gl
-// DeckEngine (src/lib/deck/engine.ts), otherwise the three.js PhotoEngine (src/lib/engine.ts, with
-// three's WebGLRenderer, three/examples and the splat renderer). One promise per backend, started when
+// Both backends load on demand, so /photo downloads only the one it runs: by default the deck.gl
+// DeckEngine (src/lib/deck/engine.ts); with ?renderer=three the three.js PhotoEngine
+// (src/lib/engine.ts, with three's WebGLRenderer, three/examples and the splat renderer). One promise per backend, started when
 // this module evaluates (below) so the engine chunk downloads alongside the first render instead of
 // after the engine effect runs.
 type MakeRenderer = (c: HTMLCanvasElement, p: PhotoMeta) => Renderer;
@@ -354,7 +354,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		const start = (engine: Renderer): (() => void) => {
 			engineRef.current = engine;
 			skylineRef.current = null;
-			// the deck engine arrives after an async import: give it the settings changed meanwhile
+			// either engine arrives after an async import: give it the settings changed meanwhile
 			engine.setSettings(settingsRef.current);
 			engine.setStyle?.(styleRef.current);
 			// missing heading / gravity / focal: start the cascade's 360° terrain + horizon alongside the engine

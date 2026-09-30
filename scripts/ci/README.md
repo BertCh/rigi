@@ -81,11 +81,9 @@ other hand-written fields (`note`) are kept. Review the diff before keeping it: 
 minimum. To record only the deck baseline, add `evalAppDeck` by hand (observed − 1) rather than
 rerunning `--update-baseline` over everything. The `checks` and `tsc` entries are edited by hand.
 
-`eval-app-deck` (eval-app with `--renderer deck`) is opt-in: it runs only with `--only eval-app-deck`
-and is advisory while `evalAppDeck` is missing from the JSON. Advisory means every failure, including a
-crash, a timeout or an engine mismatch, reports KNOWN and does not fail the gate. Once `evalAppDeck`
-exists it gates like `eval-app`. It joins the default full tier (drop `optIn` in `checks.mjs`) in the
-commit that flips the default renderer.
+`eval-app-deck` (eval-app with `--renderer deck`, the default renderer) runs in the full tier and
+gates like `eval-app` against `evalAppDeck`. Without an `evalAppDeck` entry it would be advisory: every
+failure, including a crash, a timeout or an engine mismatch, reports KNOWN and does not fail the gate.
 
 `eval-app` metrics are noisy from run to run (background second opinion, tile timing), so
 `minWithin1deg` is set a little below the observed count. See `evalApp` in the JSON for the last
