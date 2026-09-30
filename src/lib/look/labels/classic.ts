@@ -14,6 +14,8 @@
 // Blocks never overlap each other, leaders never cross text, and text avoids other summits' dots. A
 // label with no valid spot is dropped. `prev` (the previous layout) adds hysteresis while dragging.
 
+import { prevIsCurrent, stampFontEpoch } from "./layout";
+
 export type ClassicInput = {
 	id: string;
 	name: string;
@@ -247,6 +249,7 @@ export function layoutClassic(
 	const lead = Math.max(4, o.leadPx);
 	const minLead = Math.max(dotR + 2, Math.min(lead, 6));
 	const prevById = new Map(prev?.map((p) => [p.id, p]));
+	const prevFresh = prevIsCurrent(prev);
 
 	const dots: Box[] = labels.map((l) => ({
 		x0: l.x - dotR - 1,
@@ -278,7 +281,10 @@ export function layoutClassic(
 	for (let li = 0; li < labels.length; li++) {
 		const l = labels[li];
 		if (!Number.isFinite(l.x) || !Number.isFinite(l.y)) continue;
-		const pv = prevById.get(l.id);
+		// hysteresis only against a previous layout from the current font epoch: after a web font
+		// arrives the previous spots were chosen with fallback-font widths, and following them would
+		// make the result depend on when the font came (the layout is redone fresh instead)
+		const pv = prevFresh ? prevById.get(l.id) : undefined;
 		let best: ClassicPlaced | null = null;
 		let bestCost = Number.POSITIVE_INFINITY;
 		for (const s of shapesFor(l, o)) {
@@ -370,5 +376,5 @@ export function layoutClassic(
 		texts.push(best.box);
 		leaders.push(best.leader);
 	}
-	return out;
+	return stampFontEpoch(out);
 }

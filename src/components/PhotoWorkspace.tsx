@@ -49,6 +49,7 @@ import {
 	type PlacedLabel,
 } from "#/lib/look/labels";
 import { PeakLabelsSvg } from "#/lib/look/labels/PeakLabelsSvg";
+import { useLabelFontEpoch } from "#/lib/look/labels/useLabelFonts";
 import { needsPhotoSky } from "#/lib/look/look-key";
 import {
 	formatTakenAt,
@@ -245,6 +246,9 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 	/** the last fresh skyline (it lags a drag) and the previous layout (hysteresis) for the panorama / inline labels */
 	const skylineRef = useRef<Float32Array | null>(null);
 	const placedRef = useRef<PlacedLabel[]>([]);
+	/** bumps once the label web font has loaded: re-run both layouts with its real widths */
+	const fontEpoch = useLabelFontEpoch();
+	// biome-ignore lint/correctness/useExhaustiveDependencies: fontEpoch invalidates cached text widths
 	const placed = useMemo(() => {
 		const ls = viewStyle.labels;
 		if (ls.layout === "classic" || !stageSize.w) return [];
@@ -265,9 +269,10 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			placedRef.current,
 		);
 		return placedRef.current;
-	}, [labels, stageSize.w, stageSize.h, viewStyle.labels]);
+	}, [labels, stageSize.w, stageSize.h, viewStyle.labels, fontEpoch]);
 	/** classic: wrapped, edge-clamped text blocks kept above their summits (look/labels/classic.ts) */
 	const classicRef = useRef<ClassicPlaced[]>([]);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: fontEpoch invalidates cached text widths
 	const classicPlaced = useMemo(() => {
 		const ls = viewStyle.labels;
 		if (ls.layout !== "classic" || !stageSize.w) return [];
@@ -293,7 +298,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			classicRef.current,
 		);
 		return classicRef.current;
-	}, [labels, stageSize.w, stageSize.h, viewStyle.labels]);
+	}, [labels, stageSize.w, stageSize.h, viewStyle.labels, fontEpoch]);
 	const classicById = useMemo(
 		() => new Map(classicPlaced.map((c) => [c.id, c])),
 		[classicPlaced],

@@ -129,6 +129,85 @@ let measureCanvas: {
 	ctx: CanvasRenderingContext2D;
 	cache: Map<string, number>;
 } | null = null;
+
+// Web-font state. Manrope comes from Google Fonts (display=swap), so a label laid out before its
+// face arrives is measured with the fallback font. Those widths used to be cached for good, and the
+// layout was not redone when the face arrived: the final placement then depended on whether the
+// font or the first label layout came first (the style-baseline peak-label flake, 2026-09-30).
+// Now a width is cached only once its face is loaded (or its load has settled without one: blocked
+// or offline, the fallback is final), the load is requested once per font + text, and a finished
+// font load after any fallback measurement clears the cache and bumps labelFontEpoch() so the
+// layouts can re-run (useLabelFontEpoch in useLabelFonts.ts). A layout's `prev` from an older
+// epoch is ignored (prevIsCurrent), so the re-run places labels fresh instead of following spots
+// chosen with fallback widths; within one epoch the hysteresis is unchanged.
+let fontEpoch = 0;
+const fontListeners = new Set<() => void>();
+let fontWatch = false;
+/** a width was measured with a face still loading since the last epoch bump */
+let fallbackUsed = false;
+/** font|text → its load has settled (true) or is in flight (false) */
+const fontRequested = new Map<string, boolean>();
+/** epoch each layout result was computed in (keyed by the returned array) */
+const layoutEpochs = new WeakMap<object, number>();
+
+/** Bumped when a font load finishes after a fallback measurement: a layout keyed on it re-runs. */
+export const labelFontEpoch = () => fontEpoch;
+
+/** Calls `cb` after each labelFontEpoch() bump; returns the unsubscribe. */
+export function subscribeLabelFonts(cb: () => void) {
+	fontListeners.add(cb);
+	return () => {
+		fontListeners.delete(cb);
+	};
+}
+
+/** Records the font epoch a layout result was measured in (for prevIsCurrent). */
+export function stampFontEpoch<T extends object>(placed: T): T {
+	layoutEpochs.set(placed, fontEpoch);
+	return placed;
+}
+
+/** False when `prev` was laid out before the last font change (its spots used stale widths). */
+export function prevIsCurrent(prev: object | undefined) {
+	if (!prev) return true;
+	const e = layoutEpochs.get(prev);
+	return e === undefined || e === fontEpoch;
+}
+
+/** True when `text` in `font` measures with its final face (no web font still to load for it). */
+function fontSettled(font: string, text: string) {
+	const fonts = typeof document !== "undefined" ? document.fonts : undefined;
+	if (!fonts?.check) return true;
+	if (!fontWatch) {
+		fontWatch = true;
+		fonts.addEventListener("loadingdone", () => {
+			if (!fallbackUsed) return;
+			fallbackUsed = false;
+			measureCanvas?.cache.clear();
+			fontEpoch++;
+			for (const cb of fontListeners) cb();
+		});
+	}
+	try {
+		if (fonts.check(font, text)) return true;
+	} catch {
+		return true; // an unparsable font string: nothing to wait for
+	}
+	const key = `${font}|${text}`;
+	const settled = fontRequested.get(key);
+	if (settled) return true; // loaded nothing (blocked, offline, no such face): the fallback is final
+	if (settled === undefined) {
+		if (fontRequested.size > 4000) fontRequested.clear();
+		fontRequested.set(key, false);
+		fonts
+			.load(font, text)
+			.catch(() => {})
+			.finally(() => fontRequested.set(key, true));
+	}
+	fallbackUsed = true;
+	return false;
+}
+
 /** Canvas-based text measurement (browser only); falls back to the approximation elsewhere. */
 export function canvasMeasure(text: string, font: string) {
 	if (typeof document === "undefined") return approxMeasure(text, font);
@@ -142,8 +221,11 @@ export function canvasMeasure(text: string, font: string) {
 	if (w == null) {
 		measureCanvas.ctx.font = font;
 		w = measureCanvas.ctx.measureText(text).width;
-		if (measureCanvas.cache.size > 4000) measureCanvas.cache.clear();
-		measureCanvas.cache.set(key, w);
+		// a fallback-font width is used now but not kept: the loadingdone handler re-runs the layouts
+		if (fontSettled(font, text)) {
+			if (measureCanvas.cache.size > 4000) measureCanvas.cache.clear();
+			measureCanvas.cache.set(key, w);
+		}
 	}
 	return w;
 }
@@ -389,7 +471,9 @@ export function layoutLabels(
 	const edge = Math.round(fontPx * 0.35);
 
 	const prevById = new Map<string, PlacedLabel>();
-	if (prev) for (const p of prev) if (p.style === style) prevById.set(p.id, p);
+	// a prev laid out before the last font change is stale (fallback-font widths): start fresh
+	if (prev && prevIsCurrent(prev))
+		for (const p of prev) if (p.style === style) prevById.set(p.id, p);
 	const scored = scoreCandidates(cands, W, prevById);
 
 	// label band: skyline smoothed by a running minimum over ±bandR px so neighbouring labels
@@ -631,5 +715,5 @@ export function layoutLabels(
 		summits.push(obstacle(summitBox));
 		rank++;
 	}
-	return placed;
+	return stampFontEpoch(placed);
 }
