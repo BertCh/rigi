@@ -15,8 +15,6 @@ import path from "node:path";
 import { vfovFromFocal } from "../../src/lib/camera";
 import type { CameraX } from "../../src/lib/concord/core";
 import { unprojectDirX } from "../../src/lib/concord/core";
-import type { JointCue } from "../../src/lib/concord/solve";
-import { focalPx1600, horizonEl } from "../../src/lib/concord/solve/joint";
 import {
 	cameraXFromState,
 	dAngle,
@@ -33,9 +31,12 @@ import {
 	compassFactor,
 	concordCueFactors,
 	focalFactor,
+	focalPx1600,
 	gpsFactor,
 	gravityFactor,
 	groundFactor,
+	horizonEl,
+	type JointCue,
 	pointFactor,
 	skylineFactor,
 	solveMap,

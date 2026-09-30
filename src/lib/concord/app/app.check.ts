@@ -1,7 +1,7 @@
 // Integration checks (node, synthetic): npx tsx src/lib/concord/app/app.check.ts
-import type { MatchedCue } from "../cues";
 import { concordFlags, parseConcordFlags } from "../flags";
-import { runConcordDisplay, toFieldCues } from "./display";
+import { isLowConfidence } from "./confidence";
+import { runConcordDisplay } from "./display";
 import { concordConfidence } from "./useConcordDisplay";
 
 let fails = 0;
@@ -18,9 +18,12 @@ check(
 	"no ?concord ⇒ every flag off",
 	Object.values(none).every((v) => v === false),
 );
-check("node (no location) ⇒ off", !concordFlags().warp && !concordFlags().eye);
+check("node (no location) ⇒ off", !concordFlags().occl && !concordFlags().eye);
 const f = parseConcordFlags("?renderer=deck&concord=warp,%20occl,bogus");
-check("?concord=warp, occl,bogus ⇒ warp+occl only", f.warp && f.occl && !f.eye);
+check(
+	"?concord=warp, occl,bogus ⇒ occl only (warp was removed)",
+	f.occl && !f.eye && !("warp" in f),
+);
 
 // confidence mapping (fail closed)
 const base = { pose: {}, settled: true, alignState: "auto" };
@@ -43,26 +46,17 @@ for (const a of ["manual", "pinned", "saved", "prior", "unverified"])
 		concordConfidence({ ...base, alignState: a, verify: null }) === null,
 	);
 
-// WP-C edge cue (predicted u,v) → WP-E field cue (observed u,v)
-const edge: MatchedCue = {
-	kind: "edge",
-	u: 0.5,
-	v: 0.5,
-	nu: 0,
-	nv: 1,
-	world: [0, 0, 0],
-	depthM: 1000,
-	sigmaPx: 1,
-	source: "t",
-	residualPx: 3,
-	conf: 1,
-};
-const [fc] = toFieldCues([edge], 4 / 3);
+// fail-closed confidence
+check("null ⇒ LOW", isLowConfidence(null));
 check(
-	"edge cue moved to observed position (−3 px along n, @1600)",
-	Math.abs(fc.u - 0.5) < 1e-12 && Math.abs((0.5 - fc.v) * 1200 - 3) < 1e-9,
-	`v ${fc.v}`,
+	"accepted high ⇒ not LOW",
+	!isLowConfidence({ accepted: true, level: "high" }),
 );
+check(
+	"accepted:false ⇒ LOW",
+	isLowConfidence({ accepted: false, level: "high" }),
+);
+check("level only, no confidence ⇒ LOW", isLowConfidence({}));
 
 // LOW confidence: clears, computes nothing
 let calls = 0;
@@ -72,36 +66,30 @@ const host = {
 	aspect: 4 / 3,
 	pose: { yaw: 0, pitch: 0, roll: 0, vfov: 50 },
 	eye: { x: 0, y: 0, z: 1000 },
-	photoElement: undefined,
 	sampleAt: () => {
 		calls++;
 		return null;
 	},
-	isForeground: () => false,
 	readback: async () => {
 		calls++;
 		return true;
 	},
-	setWarp: (w: unknown) => set.push(`warp:${w}`),
 	setOccluder: (m: unknown) => set.push(`occl:${m}`),
 } as unknown as Parameters<typeof runConcordDisplay>[0];
-const r = await runConcordDisplay(host, null, { warp: true, occl: true });
+const r = await runConcordDisplay(host, null, { occl: true });
 check(
-	"LOW ⇒ refused, both cleared, no readback / sampling",
+	"LOW ⇒ refused, occluder cleared, no readback / sampling",
 	r.refused === "pose confidence LOW" &&
 		calls === 0 &&
-		set.join() === "warp:null,occl:null",
+		set.join() === "occl:null",
 	set.join(),
 );
 const r2 = await runConcordDisplay(
 	host,
 	{ accepted: true, level: "high" },
-	{ warp: false, occl: false },
+	{ occl: false },
 );
-check(
-	"no flags ⇒ nothing at all",
-	!r2.warp && !r2.occl && calls === 0 && set.length === 2,
-);
+check("no flags ⇒ nothing at all", !r2.occl && calls === 0 && set.length === 1);
 
 console.log(fails ? `${fails} FAILED` : "ALL PASS");
 process.exit(fails ? 1 : 0);

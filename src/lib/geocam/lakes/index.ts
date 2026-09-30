@@ -1,5 +1,5 @@
-// Lakes (GEO GA0/GA4): compact OSM lake geometry, levels, the eye floor, and (factors.ts, Agent E) the
-// waterline / shore / floor factors for the MAP solver.
+// Lakes (GEO GA0): compact OSM lake geometry, levels and the eye floor (the floor's MAP prior factor is
+// map/factors.ts lakeFloorFactor). The GA4 waterline / shore factors were removed on 2026-09-30.
 export * from "./compact";
 export * from "./fetch";
 export * from "./floor";

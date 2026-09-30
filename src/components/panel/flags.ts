@@ -123,7 +123,6 @@ export const FLAG_UI: FlagUI[] = [
 		help: "Whole-image concordance passes (display-only on the accepted pose).",
 		group: "assist",
 		options: {
-			warp: { label: "warp", title: "Residual warp field" },
 			occl: { label: "occl", title: "DSM occluders" },
 		},
 	},
@@ -145,13 +144,6 @@ export const FLAG_UI: FlagUI[] = [
 		name: "geoLakes",
 		label: "Store lake outlines",
 		help: "GEO: keep compact lake polygons with newly fetched upload regions.",
-		group: "assist",
-		options: ONOFF,
-	},
-	{
-		name: "geoInliers",
-		label: "Matcher inliers",
-		help: "GEO: request the matcher's 2D–3D inlier correspondences (needs a matcher that returns them).",
 		group: "assist",
 		options: ONOFF,
 	},

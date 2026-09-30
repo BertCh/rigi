@@ -199,7 +199,7 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 
-	// ---- fast: concordance (WP-A..F; field.check also asserts ?concord defaults off) -----------
+	// ---- fast: concordance (kept: core, priors/focal table, cues, occluder; app.check asserts ?concord defaults off)
 	{
 		id: "concord-core",
 		tier: "fast",
@@ -222,17 +222,10 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
-		id: "concord-joint",
+		id: "concord-app",
 		tier: "fast",
 		group: "concord",
-		cmd: tsx("src/lib/concord/solve/joint.check.ts"),
-		timeoutS: 600,
-	},
-	{
-		id: "concord-field",
-		tier: "fast",
-		group: "concord",
-		cmd: tsx("src/lib/concord/field/field.check.ts"),
+		cmd: tsx("src/lib/concord/app/app.check.ts"),
 		timeoutS: 300,
 	},
 	{
@@ -266,31 +259,10 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
-		id: "geocam-lakes-factors",
-		tier: "fast",
-		group: "geocam",
-		cmd: tsx("src/lib/geocam/lakes/lakes-factors.check.ts"),
-		timeoutS: 300,
-	},
-	{
-		id: "geocam-tjunc",
-		tier: "fast",
-		group: "geocam",
-		cmd: tsx("src/lib/geocam/tjunc/tjunc.check.ts"),
-		timeoutS: 300,
-	},
-	{
 		id: "geocam-integrity",
 		tier: "fast",
 		group: "geocam",
 		cmd: tsx("src/lib/geocam/integrity/integrity.check.ts"),
-		timeoutS: 300,
-	},
-	{
-		id: "geocam-observe",
-		tier: "fast",
-		group: "geocam",
-		cmd: tsx("src/lib/geocam/observe/observe.check.ts"),
 		timeoutS: 300,
 	},
 

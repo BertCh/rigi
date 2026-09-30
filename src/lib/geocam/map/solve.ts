@@ -1,7 +1,7 @@
 // GA1 MAP solve: priors + image factors, outer re-linearisation of eye-dependent predictors, Laplace
 // covariance at the solution (reports/geometry-first-pose.md G3; plan §1 map/solve.ts).
 //
-// Outer loop (as concord/solve/joint.ts): every factor with `relinearize` rebuilds its eye-dependent
+// Outer loop (as the removed concord/solve/joint.ts): every factor with `relinearize` rebuilds its eye-dependent
 // predictor (horizons at eye ± δ, junctions, lake cues) at the current x; the inner LM solves the
 // linearised problem; stop when the eye moves less than relinM (or maxOuter). Unlike joint.ts there is
 // no proximal prior on the eye (a proximal term that is still active when the loop stops shrinks the

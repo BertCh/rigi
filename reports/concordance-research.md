@@ -1,5 +1,7 @@
 # Whole-image concordance: research and plan
 
+> **2026-09-30:** the WP-D joint solve, WP-E display warp and WP-G re-match code named in this plan was removed as negative or unconsumed; see [negative-results.md](negative-results.md#code-removed-in-the-2026-09-30-cleanup) for the numbers and the recovery commit. WP-A core, WP-B priors, WP-C cues and WP-F occluder remain.
+
 Status: research synthesis, 2026-09-29. It is read-only: no repo files were changed. All pixel figures are at the **1600 px basis** unless marked "@4032". The measurements come from the CPU audit (scratch `/private/tmp/claude-501/concord-audit/`) run on the 14 photos with ground-truth poses, plus figures from the five SoTA streams.
 
 ---

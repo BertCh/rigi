@@ -6,7 +6,7 @@
 //   compass  EXIF heading made TRUE (priorHeading: + WMM2025 declination when the ref is magnetic),
 //            Student-t (map/factors.ts compassFactor)
 //   focal    optional (focal-table prior, scaled to the 1600 basis by the caller)
-//   lakeFloor optional one-sided floor (lakes/floor.ts level → lakes/factors.ts lakeFloorFactor)
+//   lakeFloor optional one-sided floor (lakes/floor.ts level → map/factors.ts lakeFloorFactor)
 // Frame: the MapProblem frame (eye E, N, U in m). `eye0` is the GPS fix in that frame (usually [0, 0, ·]);
 // `zDatum` is the absolute altitude of U = 0 (m), so an absolute altitude a maps to U = a − zDatum.
 // "hAcc into the priors" was already true for refine / concord / pose6dof (plan §0); this is the geocam
@@ -14,7 +14,6 @@
 import { EYE_PRIOR_DEFAULTS } from "../../concord/priors/altitude";
 import type { PhotoMeta } from "../../photos";
 import type { Factor, Vec3 } from "../core";
-import { lakeFloorFactor } from "../lakes/factors";
 import {
 	altFactor,
 	compassFactor,
@@ -22,6 +21,7 @@ import {
 	gpsFactor,
 	gravityFactor,
 	groundFactor,
+	lakeFloorFactor,
 } from "../map/factors";
 import { priorHeading } from "./heading";
 

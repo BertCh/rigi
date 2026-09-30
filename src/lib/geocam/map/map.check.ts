@@ -17,7 +17,6 @@ import {
 	unprojectDirX,
 } from "../../concord/core";
 import { defaultDemSigmaM } from "../../concord/cues/contours";
-import { focalPx1600 } from "../../concord/solve/joint";
 import type {
 	EyeHorizon,
 	HorizonsAtEyes,
@@ -41,9 +40,11 @@ import {
 	focalFactor,
 	gpsFactor,
 	gravityFactor,
+	lakeFloorFactor,
 	pointFactor,
 	skylineFactor,
 } from "./factors";
+import { focalPx1600 } from "./joint-residual";
 import { solveMap } from "./solve";
 
 let seed = 20260929;
@@ -548,6 +549,25 @@ const perturbed = (): GeoState => {
 		"Student-t compass robust to a 90° blunder",
 		dS < 0.2 * dL && dS < 0.02,
 		`yaw shift student ${dS.toFixed(4)}° vs l2 ${dL.toFixed(4)}°`,
+	);
+}
+
+// lake floor (one-sided, analytic Jacobian; moved from the removed lakes-factors.check.ts)
+{
+	const fl = lakeFloorFactor(-10, { marginM: 0.5, sigmaM: 0.25 });
+	const a = new Float64Array(NP);
+	const b = new Float64Array(NP);
+	b[IDX.U] = -12;
+	const ra = fl.residual(a)[0];
+	const rb = fl.residual(b)[0];
+	const jb = fl.jacobian?.(b) ?? new Float64Array(NP);
+	check(
+		"lakeFloor one-sided",
+		ra === 0 &&
+			Math.abs(rb - 2.5 / 0.25) < 1e-9 &&
+			jb[IDX.U] === -4 &&
+			fl.prior === true,
+		`above ${ra}, below ${rb}, dU ${jb[IDX.U]}`,
 	);
 }
 

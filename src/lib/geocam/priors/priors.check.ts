@@ -85,7 +85,7 @@ ok(
 
 // 3. every geo* flag exists, defaults off; the engine-construction ones restart the engine
 const geo = FLAG_NAMES.filter((n) => n.startsWith("geo"));
-for (const want of ["geoDecl", "geoLakeFloor", "geoLakes", "geoInliers"])
+for (const want of ["geoDecl", "geoLakeFloor", "geoLakes"])
 	ok((geo as string[]).includes(want), `flag ${want} declared`);
 for (const n of geo) {
 	const def = FLAG_SCHEMA[n] as { kind: string; def?: string };

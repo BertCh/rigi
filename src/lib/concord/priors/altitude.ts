@@ -56,8 +56,8 @@ export type EyePrior = {
 };
 
 /**
- * Tunables. Values are fitted on the DEV photos only (scripts/concord/priors-study.ts; the frozen split in
- * tools/concord/pins/PROTOCOL.txt); see tools/concord/priors/RESULT.txt for the derivation.
+ * Tunables. Values are fitted on the DEV photos only (scripts/concord/priors-study.ts, removed
+ * 2026-09-30; the frozen split in tools/concord/pins/PROTOCOL.txt); see tools/concord/priors/RESULT.txt for the derivation.
  */
 export const EYE_PRIOR_DEFAULTS = {
 	/**

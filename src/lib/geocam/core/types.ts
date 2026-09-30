@@ -1,5 +1,5 @@
 // Geometry-first camera (GEO, reports/geometry-first-pose.md): shared types. FROZEN API: additive
-// changes only. Every geocam package (map, priors, lakes, observe, tjunc, integrity) codes against these.
+// changes only. Every geocam package (map, priors, lakes, integrity) codes against these.
 //
 // State vector (PARAMS order): yaw, pitch, roll in degrees (camera/index.ts convention: yaw = true
 // heading clockwise from north, pitch up +, roll right side down +), logf = ln(f / f0) where f0 is the

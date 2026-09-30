@@ -18,5 +18,6 @@ export type {
 export * from "./cluster";
 export * from "./covariance";
 export * from "./factors";
+export * from "./joint-residual";
 export * from "./lm";
 export * from "./solve";

@@ -27,7 +27,6 @@
 import path from "node:path";
 import type { CameraX, Vec3 } from "../../src/lib/concord/core";
 import { EYE_PRIOR_DEFAULTS } from "../../src/lib/concord/priors/altitude";
-import { focalPx1600, JOINT_DEFAULTS } from "../../src/lib/concord/solve/joint";
 import { IDX, stateFromCameraX } from "../../src/lib/geocam/core";
 import {
 	altFactor,
@@ -35,9 +34,11 @@ import {
 	compassFactor,
 	type Factor,
 	focalFactor,
+	focalPx1600,
 	gpsFactor,
 	gravityFactor,
 	groundFactor,
+	JOINT_DEFAULTS,
 	pointFactor,
 	skylineFactor,
 	solveMap,

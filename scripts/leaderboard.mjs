@@ -263,7 +263,7 @@ const OWNERS = [
 	[
 		"f0",
 		{
-			exact: ["src/routes/deck.tsx", "src/lib/matcher-client.ts"],
+			exact: ["src/lib/matcher-client.ts"],
 			prefix: ["src/lib/deck/", "src/lib/cache/", "tools/"],
 		},
 	],
@@ -3311,7 +3311,7 @@ async function selftest() {
 	);
 	ok(
 		ownerOf("src/lib/matcher-client.ts") === "f0" &&
-			ownerOf("src/lib/upload/x.ts") === "lead" &&
+			ownerOf("src/lib/upload/region.ts") === "lead" &&
 			ownerOf("out/lead/leaderboard/API.md") === "leaderboard" &&
 			ownerOf("out/eval-classic-cascade/report.json") === "0f",
 		"ownerOf: f0 matcher-client, lead upload, leaderboard, 0f eval variants",

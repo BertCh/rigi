@@ -4,7 +4,7 @@
 // residual z gets weight a·ψ(z), a = min(1, nEff / validRows) (grid thinning, held fixed within one
 // inner solve so the cost stays comparable between trial steps), ψ the loss's IRLS weight:
 //   l2 1 · huber min(1, c/|z|) · cauchy 1/(1 + z²/c²) · student (ν+1)/(ν+z²)
-// and the cost is Σ a·ρ(z) with ρ(z) = z² (l2), the Huber/Cauchy ρ as in concord/solve/joint.ts, and
+// and the cost is Σ a·ρ(z) with ρ(z) = z² (l2), the Huber/Cauchy ρ as in the removed concord/solve/joint.ts, and
 // (ν+1)·ln(1 + z²/ν) (student; ρ'(z)/2z = ψ(z)). NaN rows are dropped from the normal equations and
 // cost a constant penalty ρ(3·scale) in the objective (as joint.ts) so a step that loses rows is not
 // rewarded. Fixed parameters (MapProblem.free) are never updated. Jacobians: factor.jacobian when given,

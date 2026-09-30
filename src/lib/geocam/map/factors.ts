@@ -10,25 +10,17 @@
 //             Student-t ν = 3 (a 90° compass blunder must not drag the pose)
 //   focal     f0·exp(logf) − fPrior ± σf (concord/priors/focal-table.ts focalPrior)          l2
 // Evidence
-//   skyline   (el(u, v) − horizon(az; eye))·f per observed skyline sample (joint.ts skylineResidualsX),
+//   skyline   (el(u, v) − horizon(az; eye))·f per observed skyline sample (as concord joint.ts skylineResidualsX),
 //             the horizon linearised in the eye by central differences of horizons at eye ± δ
 //             (HorizonsAtEyes; re-linearised by solveMap's outer loop). Per-sample σ is refine/model.ts
 //             columnSigma at the horizon distance: σpx ⊕ f·σDEM(d)/d ⊕ f·σK·d/2R. Cauchy c = 2, nEff 60.
 //   point     2D–3D correspondence, projectX residual (px @1600), σ = σpx ⊕ f·σDEM(d)/d
 //             (concord/cues/contours.ts defaultDemSigmaM). Cauchy c = 2.5.
-//   edge / level / shore / point cues: concordCueFactors wraps joint.ts cueResidualPx (one factor per kind;
+//   edge / level / shore / point cues: concordCueFactors wraps joint-residual.ts cueResidualPx (one factor per kind;
 //             nEff per kind from JOINT_DEFAULTS.groupEff; pins uncapped).
 import { projectX, unprojectDirX } from "../../concord/core";
 import { defaultDemSigmaM } from "../../concord/cues/contours";
 import { EYE_PRIOR_DEFAULTS } from "../../concord/priors/altitude";
-import {
-	basisPx,
-	cueResidualPx,
-	focalPx1600,
-	horizonEl,
-	JOINT_DEFAULTS,
-	type JointCue,
-} from "../../concord/solve/joint";
 import type {
 	EyeHorizon,
 	HorizonsAtEyes,
@@ -54,6 +46,14 @@ import {
 	clusterKey,
 	clusterWhitener,
 } from "./cluster";
+import {
+	basisPx,
+	cueResidualPx,
+	focalPx1600,
+	horizonEl,
+	JOINT_DEFAULTS,
+	type JointCue,
+} from "./joint-residual";
 
 const D = Math.PI / 180;
 
@@ -624,4 +624,40 @@ export function concordCueFactors(
 		});
 	}
 	return out;
+}
+
+// ---------------------------------------------------------------- lake floor (GA0 "eye ≥ lake level")
+// Moved from lakes/factors.ts (GA4 waterline factors removed 2026-09-30): a one-sided eye floor
+// U ≥ level + margin (scene-frame z) as a prior factor (zero residual when satisfied, stiff quadratic
+// below). A veto-style bound, not a pull (guard-rail 2).
+
+export type LakeFloorOpts = {
+	/** Eye must be at least this far above the level (m). Default 0.3 (lakes/floor.ts margin). */
+	marginM?: number;
+	/** Stiffness below the floor (m). Default 0.25. */
+	sigmaM?: number;
+};
+
+/**
+ * One-sided eye floor: U ≥ levelZ + margin, levelZ in the SCENE frame (absolute level − alt0 −
+ * curvature drop at the eye, i.e. what lakes/floor.ts returns converted by the caller). Zero residual
+ * above; (floor − U)/σ below. Prior factor (excluded from the MAD rescale), analytic Jacobian.
+ */
+export function lakeFloorFactor(levelZ: number, o: LakeFloorOpts = {}): Factor {
+	const floorZ = levelZ + (o.marginM ?? 0.3);
+	const sig = o.sigmaM ?? 0.25;
+	return {
+		family: "lakeFloor",
+		name: "lakeFloor",
+		dim: 1,
+		loss: { kind: "l2" },
+		prior: true,
+		residual: (x) =>
+			Float64Array.of(x[IDX.U] < floorZ ? (floorZ - x[IDX.U]) / sig : 0),
+		jacobian: (x) => {
+			const j = new Float64Array(NP);
+			if (x[IDX.U] < floorZ) j[IDX.U] = -1 / sig;
+			return j;
+		},
+	};
 }
