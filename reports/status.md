@@ -51,6 +51,6 @@
 
 ## Housekeeping
 
-- **Disk:** 12 GB free (98% full). About 3.5 GB of weights and packages in `tools/research/tm` can be pruned. Check `df -h` before model downloads or renders.
+- **Disk:** ~33 GB free (93%) after the 2026-09-30 prune of ~6 GB of gitignored caches, killed-research weights (GeoCalib/AnyCalib, tm matcher weights) and research `.pylib`s. Do **not** prune `tools/research/tm/weights/x2` or `.pylib_x2`: the near-field service loads MoGe-2/DA3 from there. Remaining optional prunes: `tools/research/tm/cache` (2.4 GB, keep `wc_0054/meta.json`), `tools/nearfield/service/weights/sharp_*.pt` (2.6 GB, research licence). Check `df -h` before model downloads or renders.
 - **GPU:** one browser or render job at a time (`node scripts/gpu/with-render-lock.mjs -- <cmd>`). The near-field service holds the lock until it unloads when idle.
-- **Uncommitted:** this page, roadmap, negative-results, concordance, and the completion notes.
+- **2026-09-30 cleanup pass** (mt-image-80): format/imports, style-check fixed, dead exports and duplicated helpers removed, killed experiments deleted (see [negative-results.md](negative-results.md) "Code removed"), load-path perf (warm ready ~2.0 → ~1.2 s; three terrain decode/mesh in workers; 3D Tiles and roll lazy-loaded).
