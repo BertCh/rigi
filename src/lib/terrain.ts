@@ -11,7 +11,7 @@ import {
 	tileXToLon,
 	tileYToLat,
 } from "./dem";
-import { distanceM, type EnuFrame, M_PER_DEG_LAT } from "./geodesy";
+import { DEG, distanceM, type EnuFrame, M_PER_DEG_LAT, WGS84 } from "./geodesy";
 import { imageryTileUrls } from "./licences/imagery";
 
 // DEM: Mapterhorn (512 px, national lidar such as swissALTI3D where available) through dem's loadDemTile,
@@ -171,6 +171,54 @@ function sampleGrid(h: Float32Array, S: number, fu: number, fv: number) {
 	const a = h[y0 * S + x0] * (1 - fx) + h[y0 * S + x1] * fx;
 	const b = h[y1 * S + x0] * (1 - fx) + h[y1 * S + x1] * fx;
 	return a * (1 - fy) + b * fy;
+}
+
+/** Vertex t (0..n-1) along tile edge e (north, south, west, east) of an n×n grid. */
+function edgeVertex(e: number, t: number, n: number) {
+	return e === 0
+		? t
+		: e === 1
+			? (n - 1) * n + t
+			: e === 2
+				? t * n
+				: t * n + n - 1;
+}
+
+const tileIndexCache = new Map<number, Uint16Array | Uint32Array>();
+
+/** Triangle index of a (seg+1)² tile grid plus its four skirts (buildMesh's vertex layout). */
+function tileIndex(seg: number): Uint16Array | Uint32Array {
+	const hit = tileIndexCache.get(seg);
+	if (hit) return hit;
+	const n = seg + 1;
+	const vCount = n * n + 4 * n;
+	const count = seg * seg * 6 + 4 * (n - 1) * 12;
+	const index =
+		vCount > 65535 ? new Uint32Array(count) : new Uint16Array(count);
+	let o = 0;
+	const push = (...v: number[]) => {
+		for (const x of v) index[o++] = x;
+	};
+	for (let j = 0; j < seg; j++)
+		for (let i = 0; i < seg; i++) {
+			const a = j * n + i;
+			const b = a + 1;
+			const c = a + n;
+			const d = c + 1;
+			push(a, c, b, b, c, d);
+		}
+	for (let e = 0; e < 4; e++) {
+		const start = n * n + e * n;
+		for (let i = 0; i < n - 1; i++) {
+			const a = edgeVertex(e, i, n);
+			const b = edgeVertex(e, i + 1, n);
+			const c = start + i;
+			const d = start + i + 1;
+			push(a, c, b, b, c, d, a, b, c, b, d, c);
+		}
+	}
+	tileIndexCache.set(seg, index);
+	return index;
 }
 
 /** Azimuth sector (degrees, clockwise from north) that must be loaded up front. */
@@ -397,15 +445,31 @@ export class Terrain {
 		const pos = new Float32Array(vCount * 3);
 		const uv = new Float32Array(vCount * 2);
 		const elev = new Float32Array(vCount);
+		const nor = new Float32Array(vCount * 3);
+		// WGS84 → ECEF → ENU as EnuFrame.fromGeo does, with the latitude terms per row and the longitude
+		// terms per column instead of per vertex (bit-identical)
+		const { A, E2 } = WGS84;
+		const cosLam = new Float64Array(n);
+		const sinLam = new Float64Array(n);
+		for (let i = 0; i < n; i++) {
+			const lam = tileXToLon(key.x + i / seg, key.z) * DEG;
+			cosLam[i] = Math.cos(lam);
+			sinLam[i] = Math.sin(lam);
+		}
 		const tmp = [0, 0, 0];
 		for (let j = 0; j < n; j++) {
-			const ty = key.y + j / seg;
-			const lat = tileYToLat(ty, key.z);
+			const phi = tileYToLat(key.y + j / seg, key.z) * DEG;
+			const sp = Math.sin(phi);
+			const N = A / Math.sqrt(1 - E2 * sp * sp);
+			const cp = Math.cos(phi);
 			for (let i = 0; i < n; i++) {
-				const tx = key.x + i / seg;
-				const lon = tileXToLon(tx, key.z);
 				const h = sampleGrid(heights, size, i / seg, j / seg);
-				this.frame.fromGeo(lat, lon, h, tmp);
+				this.frame.fromEcef(
+					(N + h) * cp * cosLam[i],
+					(N + h) * cp * sinLam[i],
+					(N * (1 - E2) + h) * sp,
+					tmp,
+				);
 				const k = j * n + i;
 				pos[k * 3] = tmp[0] - center[0];
 				pos[k * 3 + 1] = tmp[1] - center[1];
@@ -415,57 +479,69 @@ export class Terrain {
 				elev[k] = h;
 			}
 		}
-		const index: number[] = [];
+		// Normals: three's computeVertexNormals over the grid triangles (area-weighted face normals,
+		// accumulated in float32 in index order, then normalised), inlined on the typed arrays: the
+		// same bits at a fraction of the cost (it was ~half of buildMesh through Vector3 accessors)
+		const face = (a: number, b: number, c: number) => {
+			const a3 = a * 3;
+			const b3 = b * 3;
+			const c3 = c * 3;
+			const cbx = pos[c3] - pos[b3];
+			const cby = pos[c3 + 1] - pos[b3 + 1];
+			const cbz = pos[c3 + 2] - pos[b3 + 2];
+			const abx = pos[a3] - pos[b3];
+			const aby = pos[a3 + 1] - pos[b3 + 1];
+			const abz = pos[a3 + 2] - pos[b3 + 2];
+			const x = cby * abz - cbz * aby;
+			const y = cbz * abx - cbx * abz;
+			const z = cbx * aby - cby * abx;
+			nor[a3] += x;
+			nor[a3 + 1] += y;
+			nor[a3 + 2] += z;
+			nor[b3] += x;
+			nor[b3 + 1] += y;
+			nor[b3 + 2] += z;
+			nor[c3] += x;
+			nor[c3 + 1] += y;
+			nor[c3 + 2] += z;
+		};
 		for (let j = 0; j < seg; j++)
 			for (let i = 0; i < seg; i++) {
 				const a = j * n + i;
-				const bb = a + 1;
-				const c = a + n;
-				const d = c + 1;
-				index.push(a, c, bb, bb, c, d);
+				face(a, a + n, a + 1);
+				face(a + 1, a + n, a + n + 1);
 			}
-		const geo = new THREE.BufferGeometry();
-		geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-		geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-		geo.setAttribute("elev", new THREE.BufferAttribute(elev, 1));
-		geo.setIndex(index);
-		geo.computeVertexNormals();
+		for (let k = 0; k < n * n * 3; k += 3) {
+			const x = nor[k];
+			const y = nor[k + 1];
+			const z = nor[k + 2];
+			const inv = 1 / (Math.sqrt(x * x + y * y + z * z) || 1);
+			nor[k] = x * inv;
+			nor[k + 1] = y * inv;
+			nor[k + 2] = z * inv;
+		}
 		// Skirts: drop a copy of each edge row to hide cracks between LOD levels.
-		const nor = geo.getAttribute("normal") as THREE.BufferAttribute;
-		const norArr = new Float32Array(vCount * 3);
-		norArr.set(nor.array as Float32Array);
-		const edges: number[][] = [
-			Array.from({ length: n }, (_, i) => i),
-			Array.from({ length: n }, (_, i) => (n - 1) * n + i),
-			Array.from({ length: n }, (_, j) => j * n),
-			Array.from({ length: n }, (_, j) => j * n + n - 1),
-		];
-		let v = n * n;
-		for (const edge of edges) {
-			const start = v;
-			for (const k of edge) {
+		for (let e = 0; e < 4; e++)
+			for (let t = 0; t < n; t++) {
+				const k = edgeVertex(e, t, n);
+				const v = n * n + e * n + t;
 				pos[v * 3] = pos[k * 3];
 				pos[v * 3 + 1] = pos[k * 3 + 1];
 				pos[v * 3 + 2] = pos[k * 3 + 2] - skirt;
 				uv[v * 2] = uv[k * 2];
 				uv[v * 2 + 1] = uv[k * 2 + 1];
 				elev[v] = elev[k] - skirt;
-				norArr.set(
-					[norArr[k * 3], norArr[k * 3 + 1], norArr[k * 3 + 2]],
-					v * 3,
-				);
-				v++;
+				nor[v * 3] = nor[k * 3];
+				nor[v * 3 + 1] = nor[k * 3 + 1];
+				nor[v * 3 + 2] = nor[k * 3 + 2];
 			}
-			for (let i = 0; i < n - 1; i++) {
-				const a = edge[i];
-				const bb = edge[i + 1];
-				const c = start + i;
-				const d = start + i + 1;
-				index.push(a, c, bb, bb, c, d, a, bb, c, bb, d, c);
-			}
-		}
-		geo.setAttribute("normal", new THREE.BufferAttribute(norArr, 3));
-		geo.setIndex(index);
+		const geo = new THREE.BufferGeometry();
+		geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+		geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+		geo.setAttribute("elev", new THREE.BufferAttribute(elev, 1));
+		geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+		// the index depends on seg alone: one shared array, a BufferAttribute (GL buffer) per tile
+		geo.setIndex(new THREE.BufferAttribute(tileIndex(seg), 1));
 		geo.computeBoundingSphere();
 		geo.computeBoundingBox();
 		const uniforms: Record<string, THREE.IUniform> = {

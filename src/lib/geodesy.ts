@@ -66,6 +66,16 @@ export class EnuFrame {
 		out: number[] = [0, 0, 0],
 	): number[] {
 		const [x, y, z] = toEcef(lat, lon, h);
+		return this.fromEcef(x, y, z, out);
+	}
+
+	/** ECEF → ENU (with fromGeo's refraction lift). */
+	fromEcef(
+		x: number,
+		y: number,
+		z: number,
+		out: number[] = [0, 0, 0],
+	): number[] {
 		const dx = x - this.o[0];
 		const dy = y - this.o[1];
 		const dz = z - this.o[2];
