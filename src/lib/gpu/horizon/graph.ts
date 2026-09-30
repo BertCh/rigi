@@ -18,10 +18,10 @@
 // c only. The graph's lease is held for the whole call (inside the "horizon" lease).
 import { Buffer, type Device } from "@luma.gl/core";
 import { cachedGraph } from "#/lib/gpu/core/graph";
+import type { KernelSpec } from "#/lib/gpu/core/kernel";
 import { submit } from "#/lib/gpu/core/kernel";
 import { acquire, capacityFor, pooledUniform } from "#/lib/gpu/core/pool";
 import type { StagedRead } from "#/lib/gpu/core/readback";
-import type { KernelSpec } from "#/lib/gpu/core/kernel";
 
 type Params = {
 	nAz: number;

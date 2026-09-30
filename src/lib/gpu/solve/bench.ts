@@ -286,15 +286,20 @@ export async function benchFold(nYaw = 20000, nBlk = 3) {
 	g.compile();
 	const f32 = new Float32Array(1);
 	const u32 = new Uint32Array(f32.buffer);
-	const bitsOf = (x: number) => ((f32[0] = x), u32[0]);
+	const bitsOf = (x: number) => {
+		f32[0] = x;
+		return u32[0];
+	};
 	const ulp = (x: number, k: number) => {
 		f32[0] = x;
 		u32[0] += k;
 		return f32[0];
 	};
 	let seed = 12345;
-	const rnd = () =>
-		(seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+	const rnd = () => {
+		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+		return seed / 2 ** 32;
+	};
 	const runs = [];
 	let ok = true;
 	for (const [rep, n, eps] of [
