@@ -95,6 +95,12 @@ import type { PhotoMeta, RegionData, RegionTrail } from "./photos";
 import { applyPose, projectPoint, unprojectDir } from "./pose";
 import type { RevealUniforms } from "./reveal/config";
 import { REVEAL_GLSL } from "./reveal/glsl";
+import {
+	defaultSettings,
+	type PeakLabel,
+	type Sample,
+	type Settings,
+} from "./settings";
 import { CLASSIC } from "./style/defaults";
 import {
 	applyAtmosphereLook,
@@ -113,7 +119,16 @@ import { heightFromTile, type ImagerySource, Terrain } from "./terrain";
 import { TILES3D_LAYER } from "./tiles3d/config";
 import { ThreeTiles3D } from "./tiles3d/three-tiles";
 
-export type ViewMode = "overlay" | "replace" | "world";
+// Settings and the shared label/sample types live in the three-free ./settings (so the UI and DeckEngine
+// can import them without this module); re-exported for existing importers.
+export {
+	type BlendMethod,
+	defaultSettings,
+	type PeakLabel,
+	type Sample,
+	type Settings,
+	type ViewMode,
+} from "./settings";
 
 /**
  * THREE layer of the Step Inside splats (src/lib/nearfield). Only the world / step-inside camera enables
@@ -129,80 +144,6 @@ type NearFieldMasks = {
 	step: THREE.DataTexture;
 	sky: THREE.DataTexture;
 };
-export type BlendMethod = "swipe" | "lens" | "range" | "brush";
-
-export type Settings = {
-	mode: ViewMode;
-	// overlay
-	overlayStyle: "contours" | "bands" | "slope" | "none";
-	contourInterval: number;
-	layerOpacity: number;
-	ridges: number;
-	depthTint: number;
-	trails: boolean;
-	// replace
-	mapStyle: "satellite" | "topo" | "hillshade" | "bands";
-	method: BlendMethod;
-	swipe: number;
-	lens: [number, number];
-	lensR: number;
-	rangeKm: number;
-	keepSky: boolean;
-	feather: number;
-	// world
-	projectOpacity: number;
-	minProjectRange: number;
-	worldStyle: "satellite" | "topo" | "hillshade";
-	protectPeople: boolean;
-	/** fade overlay terrain closer than this (m); unreliable within the GPS error */
-	nearFade: number;
-};
-
-export const defaultSettings: Settings = {
-	mode: "overlay",
-	overlayStyle: "contours",
-	contourInterval: 50,
-	layerOpacity: 0.9,
-	ridges: 0.8,
-	depthTint: 0,
-	// off by default: uploads fetch their paths from Overpass only when switched on
-	trails: false,
-	mapStyle: "satellite",
-	method: "lens",
-	swipe: 0.5,
-	lens: [0.5, 0.4],
-	lensR: 0.18,
-	rangeKm: 3,
-	keepSky: true,
-	feather: 0.03,
-	projectOpacity: 1,
-	minProjectRange: 80,
-	worldStyle: "satellite",
-	protectPeople: true,
-	nearFade: 60,
-};
-
-export type PeakLabel = {
-	name: string;
-	ele: number | null;
-	/** OSM prominence (m), null if unknown */
-	prominence?: number | null;
-	u: number;
-	v: number;
-	distKm: number;
-	rank: number;
-	visible: boolean;
-	world: [number, number, number];
-};
-
-export type Sample = {
-	lat: number;
-	lon: number;
-	h: number;
-	range: number;
-	world: [number, number, number];
-};
-
 const quadVert = /* glsl */ `
 varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }

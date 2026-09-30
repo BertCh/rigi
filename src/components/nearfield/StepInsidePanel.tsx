@@ -2,7 +2,7 @@
 // the status chip ([data-nearfield-status]), the Truth toggle and, while stepping, 'Back to photo'.
 // Renders nothing while the near-field service is down, so the classic view is untouched.
 import { Box, Eye, Loader2, Undo2 } from "lucide-react";
-import { SPLAT_PROVENANCE_COLORS } from "#/lib/nearfield/three-splats";
+import { SPLAT_PROVENANCE_COLORS } from "#/lib/nearfield/provenance";
 import { cn } from "#/lib/utils";
 import type { StepInside } from "./useStepInside";
 

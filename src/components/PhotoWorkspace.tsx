@@ -19,13 +19,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Pin } from "#/lib/align";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { useConcordDisplay } from "#/lib/concord/app/useConcordDisplay";
-import {
-	defaultSettings,
-	type PeakLabel,
-	PhotoEngine,
-	type Sample,
-	type Settings,
-} from "#/lib/engine";
 import { ExportMenu } from "#/lib/export/ExportMenu";
 import { getFlag } from "#/lib/flags";
 import {
@@ -70,6 +63,12 @@ import type { Renderer } from "#/lib/renderer";
 import { getRevealConfig, useRevealConfig } from "#/lib/reveal/config";
 import { RevealController, type RevealFrame } from "#/lib/reveal/controller";
 import { RevealPanel } from "#/lib/reveal/RevealPanel";
+import {
+	defaultSettings,
+	type PeakLabel,
+	type Sample,
+	type Settings,
+} from "#/lib/settings";
 import { PRESET_OVERLAY_LAYER, useViewStyle } from "#/lib/style";
 import { cn } from "#/lib/utils";
 import {
@@ -87,6 +86,39 @@ import { Tiles3DCredit } from "./nearfield/Tiles3DCredit";
 import { useStepInside } from "./nearfield/useStepInside";
 import { AdvancedPanel } from "./panel/AdvancedPanel";
 import { LabelStylePanel, StylePanel, TrailStylePanel } from "./StylePanel";
+
+// Both backends load on demand, so /photo downloads only the one it runs: ?renderer=deck the deck.gl
+// DeckEngine (src/lib/deck/engine.ts), otherwise the three.js PhotoEngine (src/lib/engine.ts, with
+// three's WebGLRenderer, three/examples and the splat renderer). One promise per backend, started when
+// this module evaluates (below) so the engine chunk downloads alongside the first render instead of
+// after the engine effect runs.
+type MakeRenderer = (c: HTMLCanvasElement, p: PhotoMeta) => Renderer;
+const rendererChunks = new Map<boolean, Promise<MakeRenderer>>();
+function loadRenderer(deck: boolean): Promise<MakeRenderer> {
+	let p = rendererChunks.get(deck);
+	if (!p) {
+		p = (
+			deck
+				? import("#/lib/deck/engine").then(
+						({ DeckEngine }): MakeRenderer =>
+							(c, p) =>
+								new DeckEngine(c, p),
+					)
+				: import("#/lib/engine").then(
+						({ PhotoEngine }): MakeRenderer =>
+							(c, p) =>
+								new PhotoEngine(c, p),
+					)
+		).catch((e) => {
+			rendererChunks.delete(deck); // a later mount retries a failed download
+			throw e;
+		});
+		rendererChunks.set(deck, p);
+	}
+	return p;
+}
+if (typeof window !== "undefined")
+	loadRenderer(getFlag("renderer") === "deck").catch(() => {}); // the effect reports failures
 
 type Tool = "inspect" | "align" | "pin";
 /** Where the shown pose came from. "unverified" = best guess for a photo lacking heading/gravity/focal. */
@@ -179,6 +211,8 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 	);
 	const verifyAbort = useRef<AbortController | null>(null);
 	const [stageSize, setStageSize] = useState({ w: 0, h: 0, left: 0, top: 0 });
+	// the latest measured stage size, for an engine that arrives after the first measure (lazy chunk)
+	const stageSizeRef = useRef({ w: 0, h: 0 });
 	const [flying, setFlying] = useState(false);
 	const [hasPeople, setHasPeople] = useState(false);
 	const aspect = photo.width / photo.height;
@@ -543,26 +577,41 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				engineRef.current = null;
 			};
 		};
-		// ?renderer=deck: the deck.gl backend (src/lib/deck/engine.ts) is loaded on demand so deck.gl stays
-		// out of the default /photo chunk; three.js stays the default and is constructed synchronously
+		// the backend's chunk loads on demand (loadRenderer above); start() applies the settings and style
+		// changed while it loaded
 		const deck = getFlag("renderer") === "deck";
+		const name = deck ? "deck" : "three.js";
 		let stop: (() => void) | null = null;
 		let cancelled = false;
-		if (deck) {
-			import("#/lib/deck/engine")
-				.then(({ DeckEngine }) => {
-					if (cancelled) return;
-					const engine = create(() => new DeckEngine(canvas, photo));
-					if (engine) stop = start(engine);
-				})
-				.catch((e) => {
-					if (!cancelled)
-						setError(`deck renderer failed to load: ${(e as Error).message}`);
-				});
-		} else {
-			const engine = create(() => new PhotoEngine(canvas, photo));
-			if (engine) stop = start(engine);
-		}
+		loadRenderer(deck).then(
+			(make) => {
+				if (cancelled) return;
+				const engine = create(() => make(canvas, photo));
+				if (!engine) return;
+				try {
+					stop = start(engine);
+					// the stage measure ran before the chunk arrived: PhotoEngine sizes itself only in resize(),
+					// and DeckEngine's constructor read canvas.clientWidth, which may predate layout
+					const { w, h } = stageSizeRef.current;
+					if (w && h) engine.resize(w, h);
+				} catch (e) {
+					// a half-started engine: release it (and its WebGL context) rather than leak it
+					if (stop) stop();
+					else {
+						unknownSolver.current?.dispose();
+						unknownSolver.current = null;
+						engine.dispose();
+						if (engineRef.current === engine) engineRef.current = null;
+					}
+					stop = null;
+					setError(`${name} renderer failed to start: ${(e as Error).message}`);
+				}
+			},
+			(e) => {
+				if (!cancelled)
+					setError(`${name} renderer failed to load: ${(e as Error).message}`);
+			},
+		);
 		return () => {
 			cancelled = true;
 			stop?.();
@@ -591,7 +640,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		return () => ctl.abort();
 	}, [trailsOn, photo.region]);
 
-	// the engine re-renders (and re-emits labels) on a style change; DeckEngine has no setStyle yet
+	// the engine re-renders (and re-emits labels) on a style change
 	useEffect(() => {
 		engineRef.current?.setStyle?.(viewStyle);
 		loadSky(engineRef.current);
@@ -610,6 +659,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				if (W / H > aspect) w = Math.round(H * aspect);
 				else h = Math.round(W / aspect);
 			}
+			stageSizeRef.current = { w, h };
 			setStageSize({
 				w,
 				h,

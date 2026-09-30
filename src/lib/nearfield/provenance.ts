@@ -22,6 +22,15 @@ export const PROVENANCE_COLORS_BY_CODE: [number, number, number][] = (
 	return a;
 }, []);
 
+/**
+ * Truth-toggle tint per PROVENANCE_CODE (observed, reconstructed, dem, generated), sRGB 0..1 (mixed with
+ * the stored sRGB colour by the splat renderers; also the Step Inside legend swatches).
+ */
+export const SPLAT_PROVENANCE_COLORS: readonly [number, number, number][] =
+	PROVENANCE_COLORS_BY_CODE.map(
+		(c) => [c[0] / 255, c[1] / 255, c[2] / 255] as [number, number, number],
+	);
+
 /** Provenance name of a code, or null for an unknown code. */
 export function provenanceOf(code: number): Provenance | null {
 	for (const p of Object.keys(PROVENANCE_CODE) as Provenance[])

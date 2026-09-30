@@ -11,18 +11,13 @@
 // logdepthbuf chunks, so splats occlude and are occluded correctly against the engine's
 // logarithmicDepthBuffer terrain (and still work without log depth). Perspective cameras only.
 import * as THREE from "three";
-import { PROVENANCE_COLORS_BY_CODE } from "./provenance";
+import { SPLAT_PROVENANCE_COLORS } from "./provenance";
 import { type DepthRow, SplatSorter } from "./splat-sort";
 import type { GaussianCloud } from "./types";
 
-/**
- * Truth-toggle tint per PROVENANCE_CODE (observed, reconstructed, dem, generated), sRGB 0..1 (mixed with
- * the stored sRGB colour). The canonical palette lives in ./provenance (PROVENANCE_COLORS).
- */
-export const SPLAT_PROVENANCE_COLORS: readonly [number, number, number][] =
-	PROVENANCE_COLORS_BY_CODE.map(
-		(c) => [c[0] / 255, c[1] / 255, c[2] / 255] as [number, number, number],
-	);
+// Moved to ./provenance (three-free, so the Step Inside panel can use it without this module);
+// re-exported for existing importers.
+export { SPLAT_PROVENANCE_COLORS };
 
 export type ThreeSplatsOpts = {
 	/** Global opacity multiplier 0..1 (fades). Default 1. */
