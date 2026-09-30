@@ -8,6 +8,7 @@ import {
 	lonToTileX,
 	type TileKey,
 	tileBounds,
+	tileNum,
 	tileXToLon,
 	tileYToLat,
 } from "./dem";
@@ -261,7 +262,7 @@ export class Terrain {
 	/** Aborted by dispose() (and by the caller's signal): stops in-flight DEM loading. */
 	private loadAbort = new AbortController();
 	/** z/x/y → tile, and the loaded zooms finest-first, for O(#zooms) height lookups. */
-	private byKey = new Map<string, TerrainTile>();
+	private byKey = new Map<number, TerrainTile>();
 	private zooms: number[] = [];
 
 	constructor(frame: EnuFrame, shared: Record<string, THREE.IUniform>) {
@@ -272,10 +273,13 @@ export class Terrain {
 	/** Metres above sea level at a point, from the finest loaded tile (null if outside). */
 	heightAt(lat: number, lon: number): number | null {
 		// was a linear scan over every tile with trig per tile (~340k calls from peaks + trails ≈ 3 s per load)
+		// Mercator once (z 0), scaled by 2^z per zoom: the same values lonToTileX/latToTileY(…, z) give
+		const mx = lonToTileX(lon, 0);
+		const my = latToTileY(lat, 0);
 		for (const z of this.zooms) {
-			const fx = lonToTileX(lon, z);
-			const fy = latToTileY(lat, z);
-			const t = this.byKey.get(`${z}/${Math.floor(fx)}/${Math.floor(fy)}`);
+			const fx = mx * 2 ** z;
+			const fy = my * 2 ** z;
+			const t = this.byKey.get(tileNum(z, Math.floor(fx), Math.floor(fy)));
 			if (t) return sampleGrid(t.heights, t.size, fx - t.key.x, fy - t.key.y);
 		}
 		return null;
@@ -413,7 +417,7 @@ export class Terrain {
 			t.mesh.renderOrder = 1 + i;
 		});
 		for (const t of added)
-			this.byKey.set(`${t.key.z}/${t.key.x}/${t.key.y}`, t);
+			this.byKey.set(tileNum(t.key.z, t.key.x, t.key.y), t);
 		this.zooms = [...new Set(this.tiles.map((t) => t.key.z))].sort(
 			(a, b) => b - a,
 		);

@@ -5,6 +5,10 @@ export type TileKey = { z: number; x: number; y: number };
 
 export const tileId = (k: TileKey) => `${k.z}/${k.x}/${k.y}`;
 
+/** Numeric z/x/y key for hot lookup maps (heightAt): exact in a double for x, y < 2^20. */
+export const tileNum = (z: number, x: number, y: number) =>
+	(z * 2 ** 20 + x) * 2 ** 20 + y;
+
 export const parentKey = (k: TileKey): TileKey => ({
 	z: k.z - 1,
 	x: k.x >> 1,
