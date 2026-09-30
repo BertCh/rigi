@@ -989,7 +989,8 @@ const DEFAULTS: TerrainUniformProps = {
  */
 export const TERRAIN_PARAMETERS = {
 	cullMode: "back",
-	frontFace: "ccw",
+	// no frontFace: CCW is GL's default, and deck also hands layer parameters to the legacy GL
+	// setter, where the string "ccw" reached glFrontFace as GL_INVALID_ENUM (257 errors per /photo visit)
 	depthWriteEnabled: true,
 	depthCompare: "less-equal",
 } as const;
