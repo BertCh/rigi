@@ -16,7 +16,7 @@ import {
 	RAISED_LIMITS,
 	releaseWhenIdle,
 } from "./device";
-import { ComputeGraph } from "./graph";
+import { ComputeGraph, cachedGraph, cachedGraphCount } from "./graph";
 import {
 	defineKernel,
 	dispatch,
@@ -114,6 +114,34 @@ const K_FILL = defineKernel(
 		["v", "storage"],
 	],
 	{ group: "selftest" },
+);
+
+// graph clear / alias test: acc[x[i] % m] += 1 (atomics on a transient that aliases another one)
+const K_HIST = defineKernel(
+	"selftest-hist",
+	/* wgsl */ `
+struct P { n: u32, m: u32 }
+@group(0) @binding(0) var<uniform> p: P;
+@group(0) @binding(1) var<storage, read> x: array<u32>;
+@group(0) @binding(2) var<storage, read_write> acc: array<atomic<u32>>;
+// @workgroup_size(64): tiny test kernel
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g: vec3u) {
+	if (g.x >= p.n) { return; }
+	atomicAdd(&acc[x[g.x] % p.m], 1u);
+}`,
+	[
+		["p", "uniform"],
+		["x", "read-only-storage"],
+		["acc", "storage"],
+	],
+	{ group: "selftest" },
+);
+// the sine kernel under a spec only the graph compileAsync check builds (so its pipeline is async)
+const K_SIN_GRAPH_ASYNC = defineKernel(
+	"selftest-sin-graph-async",
+	SINE,
+	SINE_LAYOUT,
+	{ group: "selftest-graph-async", constants: { SCALE: 1.7 } },
 );
 
 // a kernel that cannot compile: its pipeline is invalid, so the encoder fails validation
@@ -568,6 +596,349 @@ export async function coreSelftest(): Promise<{
 			"graph-reduction",
 			results.every(([a, b]) => a === lo && b === hi),
 			{ results, cpu: [lo, hi] },
+		);
+	});
+
+	// Transients are never zeroed and alias: B (atomics) reuses A's physical buffer. With a clear node
+	// the histogram is exact on every run (two runs, different data and sizes); without one it
+	// inherits A's bytes. Also: readNode on a transient (A, B, and a parameter-sized range), and the
+	// `cleared` check refusing an unclearaed atomic transient.
+	await run("graph-clear-alias", async () => {
+		type P = { n: number; m: number };
+		const N = 4096;
+		const M = 1024;
+		const build = (withClear: boolean) => {
+			const g = new ComputeGraph<P>(device, `selftest-alias-${withClear}`);
+			const params = g.importBuffer(
+				"params",
+				16,
+				undefined,
+				Buffer.UNIFORM | Buffer.COPY_DST,
+			);
+			const x = g.importBuffer("x", N * 4);
+			const a = g.transientBuffer("A", N * 4);
+			const b = g.transientBuffer("B", M * 4);
+			g.addKernel({
+				id: "fill",
+				spec: K_FILL,
+				bindings: { p: params, v: a },
+				workgroups: (p) => [Math.ceil(p.n / 256)],
+			});
+			g.readNode("readA", [{ buffer: a, size: (p) => p.n * 4 }]);
+			// order B's lifetime after A's (independent nodes may otherwise interleave), so they alias
+			if (withClear) g.clearNode("clearB", b, { dependsOn: ["readA"] });
+			g.addKernel({
+				id: "hist",
+				spec: K_HIST,
+				bindings: { p: params, x, acc: b },
+				workgroups: (p) => [Math.ceil(p.n / 64)],
+				cleared: withClear ? ["acc"] : undefined,
+				dependsOn: ["readA"],
+			});
+			g.readNode("readB", [
+				b,
+				{ buffer: b, offset: 16, size: (p) => p.m * 4 - 16 },
+			]);
+			return g.compile();
+		};
+		const g = build(true);
+		const raw = build(false);
+		const stats = g.stats;
+		// the clear lint (at compile, against the scheduled order): no clear at all; a use before the clear
+		const lintOf = (useFirst: boolean) => {
+			try {
+				const bad = new ComputeGraph<P>(
+					device,
+					`selftest-alias-lint-${useFirst}`,
+				);
+				const t = bad.transientBuffer("T", 64);
+				if (useFirst) {
+					bad.readNode("peek", [t]);
+					bad.clearNode("clear", t, { dependsOn: ["peek"] });
+				}
+				bad.addKernel({
+					id: "h",
+					spec: K_HIST,
+					bindings: {
+						p: bad.importBuffer(
+							"p",
+							16,
+							undefined,
+							Buffer.UNIFORM | Buffer.COPY_DST,
+						),
+						x: bad.importBuffer("x", 64),
+						acc: t,
+					},
+					workgroups: [1],
+					writes: { acc: "atomic" },
+				});
+				bad.compile();
+				bad.destroy();
+				return "";
+			} catch (e) {
+				return String((e as Error).message);
+			}
+		};
+		const lint = `${lintOf(false)} / ${lintOf(true)}`;
+		const runs: Record<string, unknown>[] = [];
+		let ok =
+			!!stats &&
+			stats.physicalTransientBufferCount < stats.logicalTransientBufferCount &&
+			lint.includes("without a clear node") &&
+			lint.includes("before its clear node");
+		let staleSeen = false;
+		for (const [rep, n, m, seed] of [
+			[0, 4096, 1024, 7],
+			[1, 3001, 997, 13],
+		] as const) {
+			const x = u32(N, (i) => Math.imul(i + seed, 2654435761) >>> 7);
+			const pBuf = uniform(device, new Uint32Array([n, m]).buffer);
+			const xBuf = storage(device, x);
+			const hist = new Uint32Array(M);
+			for (let i = 0; i < n; i++) hist[x[i] % m]++;
+			const fill = new Float32Array(n);
+			for (let i = 0; i < n; i++) fill[i] = ((i * 7919) % 10007) - 5000;
+			const res = await g.run({ n, m }, { buffers: { params: pBuf, x: xBuf } });
+			const res2 = await raw.run(
+				{ n, m },
+				{ buffers: { params: pBuf, x: xBuf } },
+			);
+			release(pBuf, xBuf);
+			const [bAll, bTail] = res.reads.readB;
+			const got = new Uint32Array(bAll);
+			let histOk = true;
+			// B beyond m is never touched by the kernel: the clear left zeros there
+			for (let i = 0; i < M; i++)
+				if (got[i] !== (i < m ? hist[i] : 0)) histOk = false;
+			const tailOk = sameBits(bTail, got.slice(4, m).buffer);
+			const aOk = sameBits(res.reads.readA[0], fill.buffer);
+			const rawGot = new Uint32Array(res2.reads.readB[0]);
+			let rawDiff = 0;
+			for (let i = 0; i < m; i++) if (rawGot[i] !== hist[i]) rawDiff++;
+			staleSeen ||= rawDiff > 0;
+			ok &&= histOk && tailOk && aOk;
+			runs.push({ rep, n, m, histOk, tailOk, aOk, rawDiff });
+		}
+		g.destroy();
+		raw.destroy();
+		check("graph-clear-alias", ok && staleSeen, {
+			physical: stats?.physicalTransientBufferCount,
+			logical: stats?.logicalTransientBufferCount,
+			lint: lint.slice(0, 120),
+			runs,
+		});
+	});
+
+	// compileAsync: pipelines built with createComputePipelineAsync give the sync pipeline's bits;
+	// concurrent compileAsync calls share one compilation.
+	await run("graph-compile-async", async () => {
+		const n = 5000;
+		const x = Float32Array.from({ length: n }, (_, i) => (i - 2500) * 0.37);
+		const build = (spec: typeof K_SIN_SYNC, id: string) => {
+			const g = new ComputeGraph(device, id);
+			const xs = g.importBuffer("x", n * 4);
+			const out = g.transientBuffer("out", n * 4);
+			g.addKernel({
+				id: "sin",
+				spec,
+				bindings: { x: xs, out },
+				workgroups: [Math.ceil(n / 64)],
+			});
+			g.readNode("read", [out]);
+			return g;
+		};
+		const ga = build(K_SIN_GRAPH_ASYNC, "selftest-graph-async");
+		const [a1, a2] = await Promise.all([ga.compileAsync(), ga.compileAsync()]);
+		const gs = build(K_SIN_SYNC, "selftest-graph-sync").compile();
+		const xBuf = storage(device, x);
+		const ra = await ga.run(undefined, { buffers: { x: xBuf } });
+		const rs = await gs.run(undefined, { buffers: { x: xBuf } });
+		release(xBuf);
+		ga.destroy();
+		gs.destroy();
+		check(
+			"graph-compile-async",
+			a1 === ga && a2 === ga && sameBits(ra.reads.read[0], rs.reads.read[0]),
+			{
+				bytes: ra.reads.read[0].byteLength,
+			},
+		);
+	});
+
+	// shape-keyed cache: hit returns the same compiled graph, LRU evicts beyond max (destroyed under its
+	// lease), and a cached graph's runs are exact.
+	await run("graph-cache", async () => {
+		let builds = 0;
+		const get = (n: number) =>
+			cachedGraph<{ n: number }, number>(
+				device,
+				"selftest-cache",
+				`n=${n}`,
+				(g) => {
+					builds++;
+					const params = g.importBuffer(
+						"params",
+						16,
+						undefined,
+						Buffer.UNIFORM | Buffer.COPY_DST,
+					);
+					const v = g.transientBuffer("v", n * 4);
+					g.addKernel({
+						id: "fill",
+						spec: K_FILL,
+						bindings: { p: params, v },
+						workgroups: [Math.ceil(n / 256)],
+					});
+					g.readNode("read", [v]);
+					g.compile();
+					return n;
+				},
+				2,
+			);
+		const a = get(1000);
+		const b = get(2000);
+		const a2 = get(1000);
+		const c = get(3000); // evicts n=2000
+		const b2 = get(2000); // rebuilt, evicts n=1000
+		const count = cachedGraphCount(device, "selftest-cache");
+		let exact = true;
+		for (const e of [c, b2]) {
+			const n = e.extra;
+			const pBuf = uniform(device, new Uint32Array([n]).buffer);
+			const r = await e.graph.run({ n }, { buffers: { params: pBuf } });
+			release(pBuf);
+			const f = new Float32Array(n);
+			for (let i = 0; i < n; i++) f[i] = ((i * 7919) % 10007) - 5000;
+			exact &&= sameBits(r.reads.read[0], f.buffer);
+		}
+		// the evicted graphs were destroyed after their (absent) runs
+		await a.graph.lease(() => {});
+		await b.graph.lease(() => {});
+		check(
+			"graph-cache",
+			a2 === a &&
+				b2 !== b &&
+				builds === 4 &&
+				count === 2 &&
+				!a.graph.isCompiled &&
+				!b.graph.isCompiled &&
+				exact,
+			{
+				builds,
+				count,
+				exact,
+			},
+		);
+	});
+
+	// Read-node slots never leak: (a) a checked submit's validation error (a bad kernel after the read
+	// node) rejects run() and returns every staged slot; (b) a throw while encoding (a graph kernel
+	// node over maxComputeWorkgroupsPerDimension, refused by encodeDispatch's guard) after a read node
+	// staged returns it too; (c) a caller dropping encodeReads' reads sees them as pending.
+	await run("graph-read-leak", async () => {
+		const checks = globalThis as { __RIGI_GPU_CHECKS__?: boolean };
+		const busy0 = readbackStats(device).busy;
+		const build = (id: string, bad: "pipeline" | "limit") => {
+			const g = new ComputeGraph<{ n: number }>(device, id);
+			const params = g.importBuffer(
+				"params",
+				16,
+				undefined,
+				Buffer.UNIFORM | Buffer.COPY_DST,
+			);
+			const v = g.transientBuffer("v", 4096);
+			const o = g.transientBuffer("o", 256);
+			g.addKernel({
+				id: "fill",
+				spec: K_FILL,
+				bindings: { p: params, v },
+				workgroups: [4],
+			});
+			g.readNode("read", [v]);
+			if (bad === "pipeline")
+				g.addKernel({
+					id: "bad",
+					spec: K_BAD,
+					bindings: { out: o },
+					workgroups: [1],
+					dependsOn: ["read"],
+				});
+			else
+				g.addKernel({
+					id: "huge",
+					spec: K_FILL,
+					bindings: { p: params, v: o },
+					workgroups: [device.limits.maxComputeWorkgroupsPerDimension + 1],
+					dependsOn: ["read"],
+				});
+			return g.compile();
+		};
+		const pBuf = uniform(device, new Uint32Array([1024]).buffer);
+		const ga = build("selftest-leak-validation", "pipeline");
+		checks.__RIGI_GPU_CHECKS__ = true;
+		const a = await settle(
+			ga.run({ n: 1024 }, { buffers: { params: pBuf } }),
+			3000,
+		);
+		checks.__RIGI_GPU_CHECKS__ = undefined;
+		await sleep(50);
+		const busyA = readbackStats(device).busy;
+		const gb = build("selftest-leak-limit", "limit");
+		const b = await settle(
+			gb.run({ n: 1024 }, { buffers: { params: pBuf } }),
+			3000,
+		);
+		const busyB = readbackStats(device).busy;
+		// (c) encodeReads: reads are pending until read or cancelled
+		const gc = new ComputeGraph<{ n: number }>(device, "selftest-leak-pending");
+		const pc = gc.importBuffer(
+			"params",
+			16,
+			undefined,
+			Buffer.UNIFORM | Buffer.COPY_DST,
+		);
+		const vc = gc.transientBuffer("v", 4096);
+		gc.addKernel({
+			id: "fill",
+			spec: K_FILL,
+			bindings: { p: pc, v: vc },
+			workgroups: [4],
+		});
+		gc.readNode("read", [vc]);
+		gc.compile();
+		const enc = device.createCommandEncoder({ id: "selftest-leak-pending" });
+		const { reads } = await gc.lease(() =>
+			gc.encodeReads(enc, { n: 1024 }, { params: pBuf }),
+		);
+		const pendingBefore = reads.pending;
+		reads.cancel();
+		const pendingAfter = reads.pending;
+		const busyC = readbackStats(device).busy;
+		release(pBuf);
+		ga.destroy();
+		gb.destroy();
+		gc.destroy();
+		check(
+			"graph-read-leak",
+			a.state === "rejected" &&
+				a.error.startsWith("GpuValidationError") &&
+				b.state === "rejected" &&
+				/exceeds maxComputeWorkgroupsPerDimension/.test(b.error) &&
+				busyA === busy0 &&
+				busyB === busy0 &&
+				pendingBefore === 1 &&
+				pendingAfter === 0 &&
+				busyC === busy0,
+			{
+				busy0,
+				a: a.error.slice(0, 90),
+				busyA,
+				b: b.error.slice(0, 110),
+				busyB,
+				pendingBefore,
+				pendingAfter,
+				busyC,
+			},
 		);
 	});
 

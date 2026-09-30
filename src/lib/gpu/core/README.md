@@ -136,7 +136,25 @@ export class ComputeGraph<P = void> {
     read?: ReadRange[]; timings?: boolean }):
     Promise<{ data: ArrayBuffer[]; timings?: GPUCommandGraphTimingReport }>;
   destroy(): void;
+  // additive (worker-realm graph migration, 2026-09-30):
+  clearNode(id: string, target: GraphRange<P>, opts?: { dependsOn?: string[] }): this;  // encoder clearBuffer
+  readNode(id: string, targets: GraphRange<P>[], opts?: { dependsOn?: string[] }): this; // → one readback slot
+  encodeReads(enc, parameters, buffers?, textures?): { encoding: GPUCommandGraphEncoding; reads: GraphReads };
+  compileAsync(): Promise<this>;  lease<T>(fn): Promise<T>;  readonly isCompiled: boolean;  readonly stats;
+  // KernelNode.bindings also take a GraphRange (per-run { offset, size }: capacity-keyed graphs bind
+  // exactly the bytes a call uses)
+  // run() also resolves `reads: Record<readNodeId, ArrayBuffer[]>` and, in a finally, cancels every
+  // staged slot not read (a throwing stage/submit, a checked submit's validation error, a failed read).
+  // KernelNode.writes?: Record<binding, "full" | "partial" | "atomic"> (cleared?: string[] = "partial"):
+  // compile() lints the scheduled order and throws when such a transient has no clear node before it
+  // (or is used before its clear). stats: compiled stats + nodeCount. GraphReads.pending: unread slots.
 }
+export type GraphRange<P> = GraphBufferHandle | GraphDataView
+  | { buffer: GraphBufferHandle; offset?: number; size: number | ((p: P) => number) };
+export function cachedGraph<P, X>(device: Device, group: string, key: string,
+  build: (g: ComputeGraph<P>) => X, max?: number /* 4 */): { graph: ComputeGraph<P>; extra: X; hit?: boolean }; // LRU per group
+export function cachedGraphCount(device: Device, group?: string): number;
+export function releaseCachedGraphs(device: Device, group?: string): Promise<void>;
 ```
 
 ## Rules for migrating a kernel
@@ -177,7 +195,9 @@ Numerics do not change. The WGSL, the shader module, the explicit shader layout 
 - **Device loss.** `submit()` throws `GpuDeviceLostError` on a lost device. Staged reads, timestamp reads, `readTimings` and async pipeline builds race the device's `lost` promise, so work in flight rejects promptly (and releases its lease) instead of waiting on a map that may never settle. Pools, readback slots, kernel caches and profiler query sets drop themselves on loss (`onLost`, which also runs hooks registered after the loss, so state recreated on a stale device reference is dropped too). When `submit()` throws, it cancels the reads staged on that encoder, so their slots and the realm's in-flight count are returned even if the caller does not `cancel()`. `getComputeDevice()` never returns a lost device: it notices `isLost` synchronously (luma sets it in `destroy()`) and creates a new sidecar, up to 3 losses per realm; after that the realm stays on the CPU. Resets and idle releases are not counted as losses.
 - **Idle release.** `releaseWhenIdle(ms)` destroys the realm's sidecar after `ms` without `getComputeDevice()` / `submit()`, never while a lease is held or a readback is in flight. It forgets only the sidecar; an adopted render device stays adopted. The unknown-pose worker uses 30 s (it lives as long as the photo, but uses the GPU in bursts). The one-shot workers (horizon-fast-app, eye) are terminated after their job, which frees their device anyway.
 - **Devices per realm (typical `/photo` load).** The page's sidecar, one in the horizon-fast-app worker (created on the `spans` message so creation overlaps the tile work; terminated after the march), and one in the unknown-pose worker (created on `prepare` to warm the solve kernel while the scene loads; terminated after the second opinion, or released after 30 s idle when it is kept for an unknown-pose photo). The eye worker (`?eyesearch`) adds one while a search runs. ONNX Runtime's webgpu EP creates its own in the sky worker when sky segmentation runs; it is outside this registry. Nothing creates a device on import.
-- **Graph.** `ComputeGraph.run` holds a lease on `graph:<id>`, because transients and timestamp slots are shared between runs. A `GraphDataView` is bound with its exact byte range, and its `byteOffset` must be a multiple of 256 (the storage-binding offset alignment). Only imported buffers can be read back.
+- **Graph.** `ComputeGraph.run` holds a lease on `graph:<id>`, because transients and timestamp slots are shared between runs. A `GraphDataView` is bound with its exact byte range, and its `byteOffset` must be a multiple of 256 (the storage-binding offset alignment). `run({ read })` reads imported buffers; a `readNode` copies transients (or imports) into a readback slot at its point in the graph.
+- **Graph transients are never zeroed, and they alias.** A transient gets the physical buffer of another transient whose lifetime ended earlier (and the previous run's bytes). Anything read-modify-written (atomics, accumulators, partial writes that are later read) needs a `clearNode` before it; declare those bindings in `KernelNode.cleared` and `addKernel` refuses a transient without one. Independent nodes may interleave, so pass `dependsOn` when an ordering matters (the selftest does, to force aliasing).
+- **Shape-keyed cache.** `cachedGraph(device, group, key, build)` keeps 4 compiled graphs per group (LRU; an evicted graph is destroyed under its lease). Call it inside the group's own lease and queue the graph's lease synchronously after it. Callers that encode chunks themselves (`encodeReads` + core `submit`) hold `graph.lease()` for the whole sequence.
 
 ## Self-test result (2026-09-30, Apple GPU, headless Chromium)
 
@@ -193,3 +213,9 @@ Numerics do not change. The WGSL, the shader module, the explicit shader layout 
 - graph (custom WGSL fill → `GPUReduction` extent): exactly equal to the CPU min/max, with per-node timings
 - profile
 - adoptRenderDevice: adopt, run a kernel, destroy, fall back to the sidecar
+- graph-clear-alias (2026-09-30 migration): two transients forced to alias (1 physical for 2 logical); with a clear node the atomic histogram is exact on two runs with different data and sizes, without one it inherits the other transient's / the previous run's bytes; readNode on transients, including a parameter-sized range; the `cleared` check refuses an uncleared atomic transient
+- graph-compile-async: `compileAsync` (createComputePipelineAsync) bit-identical to a sync-compiled graph; concurrent calls share one compilation
+- graph-cache: hit returns the same graph, LRU eviction destroys (under the lease), runs of cached graphs exact
+- graph-read-leak: a checked submit's validation error after a read node, and a graph kernel node over maxComputeWorkgroupsPerDimension (encodeDispatch's guard applies to graph nodes) thrown mid-encode, both reject run() and leave no readback slot busy; encodeReads' `pending` counts unread slots
+
+Hosting the sky refine's local helpers (mig-sky `refine-graph.ts`): `AuditedGraph.clearNode(id, buf, dependsOn)` = `clearNode(id, buf, { dependsOn })`; `readNode(id, bufs, ranges(p))` = `readNode(id, [{ buffer, size: (p) => … }])` (a size of 0 skips a range, e.g. the optional float mask) with results in `run().reads[id]` instead of a `ReadSink` in the parameters; `writes` / `lintClears` = `KernelNode.writes` + the compile-time lint; `ShapeCache.get(device, key, build) → { value, hit }` = `cachedGraph(device, group, key, build, max) → { graph, extra, hit }`; `(g as unknown as { compiled }).compiled.stats` = `g.stats`.
