@@ -1,6 +1,6 @@
 # Rigi: where things stand
 
-*2026-09-29. This is the entry point. The plan is in [roadmap.md](roadmap.md), dead ends are in [negative-results.md](negative-results.md), and every doc is indexed in [README.md](README.md). When a number here disagrees with the linked source, the source wins. Update the date and the tables when a thread moves.*
+*2026-09-30. This is the entry point. The plan is in [roadmap.md](roadmap.md), dead ends are in [negative-results.md](negative-results.md), and every doc is indexed in [README.md](README.md). When a number here disagrees with the linked source, the source wins. Update the date and the tables when a thread moves.*
 
 ## Threads
 
@@ -11,6 +11,7 @@
 | **Geometry-first camera** (GEO phase A, [geometry-first-pose.md](geometry-first-pose.md)) | Built 2026-09-30 in `src/lib/geocam`; kept after the 2026-09-30 cleanup: `map` (GA1), `integrity` (GA5), `priors`, `lakes` (4 CI check suites; flags `geoDecl`/`geoLakeFloor`/`geoLakes` off, app unchanged). GA2–GA4 code and `geoInliers` removed ([negative-results.md](negative-results.md#code-removed-in-the-2026-09-30-cleanup)). Dev only, `tools/research/geo/` | GA1 MAP solver: pitch pass, σ ~2.5× over-confident. GA2/GA3/GA4/GA5 **killed**: T-junctions work on renders but not on photos; lake cues carry a 4 px bias (≈11 m); GA5 protection level separates wrong basins (AUROC 0.94) and catches 9/10 of E1's wrong eyes, but at a 36% correct-pose cost | GA5 as a candidate in the R2 veto prereg; eye cues wait for a learned contour detector (GC3) |
 | **Concordance** (whole-frame fit) | Kept under `src/lib/concord`: core, cues, priors (focal table), occl, app; flags `?concord=eye,occl` (off by default). The warp (WP-E), joint solve (WP-D) and re-match loop (WP-G) code was removed 2026-09-30 ([negative-results.md](negative-results.md#code-removed-in-the-2026-09-30-cleanup)) | Focal table: holdout 1.99%→0.32% (n = 2). DSM occluder: smear removal 4–15% → 46–59% (dev). The joint solve made holdout **worse** (8.8→16.2 px median; 7130's eye moved 200 m) and is unsafe as gated. Warp: no gain (0/8 holdout pins better) | You click interior pins (`tools/concord/pins/PROTOCOL.txt`); any new solve must gate on held-out pins (restore from `a1845f5` if useful) |
 | **Step Inside** (near-field 3D) | Built in both renderers; opt-out via `?nearfield=off` | Smear gate 4% (three) / 15% (deck) vs 80%. Pose propagation: 0/83 wrong pairs pass | Semantic + depth split (v1.1); propagation prereg |
+| **Renderer** (deck.gl default, [deck-default.md](deck-default.md)) | **Not flipped** (2026-09-30); default stays three, `?renderer=deck` opt-in. deck photo view now at three parity | Photo drag / Blend lens 10–26 → 59–60 fps; export 2× slower → faster than three; eval-app 12/14 on both. Flip gate fails on world orbit (29–39 fps vs ≥ 45): the multisampled deck canvas; `antialias: false` measured 59 fps | Canvas antialias off + DPR 1 pixel diff, re-capture style-baseline, Firefox smoke, re-run the gate, then flip |
 | **Launch** | Two commits; CI fast tier written (`.github/workflows/ci.yml`, `scripts/ci/`), not yet pushed; licence register + opt-in swaps done, owner decisions open; no iOS path; no hosted matcher | Still nobody else ships automatic post-hoc registration | CI gate + licence swaps before any public URL |
 
 ## What the threads teach together
@@ -34,7 +35,7 @@
 | Work | Where | Blocked on |
 |---|---|---|
 | H1 blind verification | `tools/research/tm/h1_mine/REPORT.txt` ("How to run the verifiers") | Nothing |
-| Style-baseline re-run on a quiet tree (0/16 identical, cause unknown) | `node scripts/ci/run.mjs full --only style-baseline` | No other session editing `src/` |
+| Style-baseline re-capture (0/16 identical back to a7287da: trails off by default since 71e846e, baseline never re-captured; [deck-default.md](deck-default.md)) | `node scripts/ci/run.mjs full --only style-baseline` | Owner of `out/lead/style-baseline` |
 | Smear v1.1 re-measure | `tools/nearfield/smear/labels.json` | Choice of a permissively licensed segmenter |
 | Completion P0 (slab diagnosis first) | `research_notes/completion_integration_2026-09.md` §3 | Provenance decision (below) |
 
