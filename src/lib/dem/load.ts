@@ -1,40 +1,83 @@
-// Browser DEM loading: decode (createImageBitmap + canvas), a plain uncached fetch, and the app's one
+// Browser DEM loading: decode (image.ts, in a worker pool on the page), a plain uncached fetch, and the app's one
 // Mapterhorn tile policy (shared tile cache; a missing tile is stood in for by its nearest ancestor).
 import { cachedFetch, tilePriority } from "../cache";
-import { decodeTerrarium } from "./decode";
+import type { DecodeIn, DecodeOut } from "./decode.worker";
+import { blobHeights } from "./image";
 import { type DemSource, MAPTERHORN } from "./sources";
 import { parentKey, type TileKey, tileId } from "./tiles";
 
-function context2d(w: number, h: number) {
-	if (typeof OffscreenCanvas !== "undefined")
-		return new OffscreenCanvas(w, h).getContext("2d", {
-			willReadFrequently: true,
-		}) as OffscreenCanvasRenderingContext2D | null;
-	const c = document.createElement("canvas");
-	c.width = w;
-	c.height = h;
-	return c.getContext("2d", { willReadFrequently: true });
-}
+export { bitmapHeights, blobHeights } from "./image";
 
-/** Heights of a decoded Terrarium image (OffscreenCanvas, or a <canvas> where there is none). */
-export function bitmapHeights(bmp: ImageBitmap) {
-	const ctx = context2d(bmp.width, bmp.height);
-	if (!ctx) throw new Error("2D canvas unavailable for DEM decode");
-	ctx.drawImage(bmp, 0, 0);
-	return decodeTerrarium(ctx.getImageData(0, 0, bmp.width, bmp.height).data);
-}
+/**
+ * Page-side decode pool: Terrarium tiles decode in a few workers (the same blobHeights, see
+ * decode.worker.ts) instead of on the main thread, where ~200 tiles per /photo load cost ~120 ms.
+ * Elsewhere (workers, node, no OffscreenCanvas) or if a worker fails, blobHeights runs here.
+ */
+type Pending = {
+	buf: ArrayBuffer;
+	resolve: (h: Float32Array) => void;
+	reject: (e: unknown) => void;
+};
+let pool: Worker[] | null | undefined;
+let nextWorker = 0;
+let nextId = 0;
+const pending = new Map<number, Pending>();
 
-/** Heights of an encoded Terrarium tile (PNG / WebP bytes). */
-export async function blobHeights(blob: Blob) {
-	const bmp = await createImageBitmap(blob, {
-		colorSpaceConversion: "none",
-		premultiplyAlpha: "none",
-	});
+function decodePool(): Worker[] | null {
+	if (pool !== undefined) return pool;
+	pool = null;
+	if (
+		typeof document === "undefined" ||
+		typeof Worker === "undefined" ||
+		typeof OffscreenCanvas === "undefined"
+	)
+		return pool;
 	try {
-		return bitmapHeights(bmp);
-	} finally {
-		bmp.close();
+		const n = Math.max(
+			1,
+			Math.min(4, (navigator.hardwareConcurrency || 4) - 1),
+		);
+		const workers: Worker[] = [];
+		for (let i = 0; i < n; i++) {
+			const w = new Worker(new URL("./decode.worker.ts", import.meta.url), {
+				type: "module",
+			});
+			w.onmessage = (e: MessageEvent<DecodeOut>) => {
+				const p = pending.get(e.data.id);
+				if (!p) return;
+				pending.delete(e.data.id);
+				if ("heights" in e.data) p.resolve(e.data.heights);
+				else p.reject(new Error(e.data.error));
+			};
+			// a worker that cannot start or dies: decode everything here from now on, pending jobs too
+			w.onerror = () => {
+				for (const x of workers) x.terminate();
+				pool = null;
+				const jobs = [...pending.values()];
+				pending.clear();
+				for (const p of jobs)
+					blobHeights(new Blob([p.buf])).then(p.resolve, p.reject);
+			};
+			workers.push(w);
+		}
+		pool = workers;
+	} catch {
+		pool = null;
 	}
+	return pool;
+}
+
+/** Heights of an encoded Terrarium tile, decoded in the page's worker pool when there is one. */
+export function decodeHeights(buf: ArrayBuffer): Promise<Float32Array> {
+	const workers = decodePool();
+	if (!workers) return blobHeights(new Blob([buf]));
+	const id = nextId++;
+	const w = workers[nextWorker++ % workers.length];
+	return new Promise<Float32Array>((resolve, reject) => {
+		pending.set(id, { buf, resolve, reject });
+		// copied, not transferred: kept for the fallback should the worker die
+		w.postMessage({ id, buf } satisfies DecodeIn);
+	});
 }
 
 /** Plain fetch (HTTP cache only) + decode; undefined when the source has no such tile (any non-2xx). */
@@ -156,7 +199,7 @@ export async function loadDemTile(
 ): Promise<DemRaster | null> {
 	const r = await fetchDemBytes(key, o);
 	if (!r) return null;
-	const h = await blobHeights(new Blob([r.buf])).catch(() => null);
+	const h = await decodeHeights(r.buf).catch(() => null);
 	if (!h) return null;
 	const size = Math.round(Math.sqrt(h.length));
 	return {
