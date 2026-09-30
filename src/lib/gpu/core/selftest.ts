@@ -388,6 +388,30 @@ export async function coreSelftest(): Promise<{
 		check("kernel-sync-concurrent", ok);
 	});
 
+	await run("dispatch-limit", async () => {
+		// over maxComputeWorkgroupsPerDimension: refused while encoding (not a silent failed submit)
+		const k = kernel(device, K_AXPY);
+		const max = device.limits.maxComputeWorkgroupsPerDimension;
+		const p = uniform(device, new Uint32Array([1, 4]).buffer);
+		const b = storage(device, 16);
+		const enc = device.createCommandEncoder({ id: "selftest-dispatch-limit" });
+		let threw = "";
+		try {
+			dispatch(enc, k, { p, x: b, y: b, out: b }, max + 1);
+		} catch (e) {
+			threw = String(e);
+		}
+		release(p, b);
+		check(
+			"dispatch-limit",
+			/exceeds maxComputeWorkgroupsPerDimension/.test(threw),
+			{
+				max,
+				threw,
+			},
+		);
+	});
+
 	await run("kernel-async-vs-sync", async () => {
 		const failed = await warmKernelsAsync(device, "selftest-async");
 		const n = 4096;

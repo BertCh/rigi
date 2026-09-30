@@ -243,6 +243,22 @@ export async function warmKernelsAsync(
 
 type PassWithBindings = ComputePass & { setBindings?: (b: Bindings) => void };
 
+/**
+ * A dispatch over the device's maxComputeWorkgroupsPerDimension is a validation error that fails the
+ * whole submit silently (the reads then return stale slot bytes unless __RIGI_GPU_CHECKS__ is on), so
+ * refuse it while encoding: the caller's catch takes its CPU path. Kernels that can exceed it (e.g.
+ * the sky refine above ~16.7 Mpx) need a 2-D dispatch to run on the GPU.
+ */
+function checkWorkgroups(k: Kernel, x: number, y: number, z: number) {
+	const max =
+		(k.pipeline as unknown as { device?: Device }).device?.limits
+			.maxComputeWorkgroupsPerDimension ?? 65535;
+	if (x > max || y > max || z > max)
+		throw new Error(
+			`[gpu] ${k.spec.label}: dispatch ${x}×${y}×${z} exceeds maxComputeWorkgroupsPerDimension ${max}`,
+		);
+}
+
 /** Record `k` with `bindings` into an open pass (sets pipeline + bindings, then dispatches). */
 export function encodeDispatch(
 	pass: ComputePass,
@@ -252,6 +268,7 @@ export function encodeDispatch(
 	y = 1,
 	z = 1,
 ) {
+	checkWorkgroups(k, x, y, z);
 	const p = pass as PassWithBindings;
 	if (p.setBindings) {
 		p.setPipeline(k.pipeline);
