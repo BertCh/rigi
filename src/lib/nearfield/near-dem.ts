@@ -17,7 +17,13 @@ import {
 	TerrainProfiles,
 } from "../deck/cpu-geometry";
 import { eyeAltitude } from "../deck/scene";
-import { latToTileY, loadDemTile, lonToTileX, type TileKey } from "../dem";
+import {
+	latToTileY,
+	loadDemTile,
+	lonToTileX,
+	sampleGrid,
+	type TileKey,
+} from "../dem";
 import { EARTH_R } from "../geodesy";
 
 /** Ranges (m) up to this come from the CPU profiles in both engines. */
@@ -107,22 +113,6 @@ export function loadNearDem(
 		}
 	}
 	return p;
-}
-
-/** Bilinear on a size × size grid of cell-centred samples (deck/terrain-data.ts sampleGrid). */
-function sampleGrid(h: Float32Array, S: number, px: number, py: number) {
-	const m = S - 1;
-	const x = Math.min(Math.max(px - 0.5, 0), m);
-	const y = Math.min(Math.max(py - 0.5, 0), m);
-	const x0 = Math.floor(x);
-	const y0 = Math.floor(y);
-	const x1 = Math.min(x0 + 1, m);
-	const y1 = Math.min(y0 + 1, m);
-	const fx = x - x0;
-	const fy = y - y0;
-	const a = h[y0 * S + x0] * (1 - fx) + h[y0 * S + x1] * fx;
-	const b = h[y1 * S + x0] * (1 - fx) + h[y1 * S + x1] * fx;
-	return a * (1 - fy) + b * fy;
 }
 
 export type NearDemView = {

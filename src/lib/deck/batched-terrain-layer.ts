@@ -115,7 +115,7 @@ float hTexel(int x, int y) {
               : texelFetch(heightSmall, ivec3(x, y, tLayer), 0).r;
 }
 
-// terrain-data.ts sampleGrid: bilinear on the pixel-centred S×S grid at pixel coords (0..S)
+// dem/grid.ts sampleGrid: bilinear on the pixel-centred S×S grid at pixel coords (0..S)
 float sampleH(float px, float py) {
   float m = tSize - 1.0;
   float x = clamp(px - 0.5, 0.0, m);

@@ -2,6 +2,8 @@
 // of metres ASL: three TerrainTile, deck TileMesh) resampled bilinearly onto a square ENU grid, with
 // no heightAt lookups. Finer tiles overwrite coarser ones. Heights are ASL, not ENU z: within the
 // field (±20 km) the curvature drop barely matters to shading, and ASL keeps the field view-independent.
+
+import { sampleGrid } from "../../dem/grid";
 import {
 	latToTileY,
 	lonToTileX,
@@ -16,22 +18,6 @@ export type Extent = [number, number, number, number];
 
 /** Mercator lookup grid: frame.toGeo at G+1 × G+1 nodes, bilinear in between (< 1 m error at ±30 km). */
 const G = 32;
-
-/** Pixel-centred bilinear sample of an S×S grid at pixel coords (as terrain.ts / terrain-data.ts). */
-function sampleGrid(h: Float32Array, S: number, px: number, py: number) {
-	const m = S - 1;
-	const x = Math.min(Math.max(px - 0.5, 0), m);
-	const y = Math.min(Math.max(py - 0.5, 0), m);
-	const x0 = Math.floor(x);
-	const y0 = Math.floor(y);
-	const x1 = Math.min(x0 + 1, m);
-	const y1 = Math.min(y0 + 1, m);
-	const fx = x - x0;
-	const fy = y - y0;
-	const a = h[y0 * S + x0] * (1 - fx) + h[y0 * S + x1] * fx;
-	const b = h[y1 * S + x0] * (1 - fx) + h[y1 * S + x1] * fx;
-	return a * (1 - fy) + b * fy;
-}
 
 /** res × res heights at texel centres (row 0 = south), `hole` where no tile covers. */
 export function rasterizeHeights(
