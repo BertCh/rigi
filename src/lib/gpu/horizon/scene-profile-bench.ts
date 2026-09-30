@@ -17,7 +17,11 @@ import {
 	mosaicsFromSampler,
 } from "#/lib/horizon-fast/march";
 import { parity } from "./bench";
-import { type SceneHorizonGpuTiming, sceneHorizonGpu } from "./scene-profile";
+import {
+	releaseSceneHorizonGpu,
+	type SceneHorizonGpuTiming,
+	sceneHorizonGpu,
+} from "./scene-profile";
 
 const asFast = (h: HorizonProfile) => h as unknown as FastHorizonProfile;
 
@@ -63,12 +67,19 @@ export async function benchScene(a: {
 
 	const gpuRuns: SceneHorizonGpuTiming[] = [];
 	let gpu: HorizonProfile | null = null;
+	// First run as the app does it (build, march, free); runs 2-3 keep the scene (the cached path).
 	for (let r = 0; r < 3; r++) {
-		gpu = await sceneHorizonGpu(terrain, a.lat, a.lon, eye, (t) =>
-			gpuRuns.push(t),
+		gpu = await sceneHorizonGpu(
+			terrain,
+			a.lat,
+			a.lon,
+			eye,
+			(t) => gpuRuns.push(t),
+			{ keep: r > 0 },
 		);
 		if (!gpu) break;
 	}
+	releaseSceneHorizonGpu();
 	return {
 		eye,
 		tiles,

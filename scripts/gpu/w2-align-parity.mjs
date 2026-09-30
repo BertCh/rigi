@@ -45,7 +45,7 @@ try {
 		);
 		await page.addInitScript(() => localStorage.clear());
 		// the app itself loads with the GPU off; the test flips __RIGI_FLAGS__.gpu per measurement
-		const qs = `?gpu=${APP_GPU}${RENDERER === "deck" ? "&renderer=deck" : ""}`;
+		const qs = `?gpu=${APP_GPU}&renderer=${RENDERER}`;
 		await page.goto(`${BASE}/photo/${id}${qs}`);
 		await page.waitForSelector("[data-ready]", {
 			state: "attached",

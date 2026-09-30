@@ -1,0 +1,1514 @@
+// Texture-input look passes: the guided-filter masks, the band colour stats and the haze prep, fed
+// straight from the renderer's GPU targets instead of CPU arrays read back from them.
+//
+// ── API note for the deck-webgpu renderer (mt-image-be) ──────────────────────────────────────────
+// 1. Hand the render device to compute once: adoptRenderDevice(device) (#/lib/gpu/device; your
+//    adoptForCompute already does it). Then `const d = await getComputeDevice()` returns YOUR
+//    device while it lives. Only call these when `d && d === yourDevice` (textures cannot cross
+//    devices); otherwise (null, ?gpu=off, WebGL, sidecar) keep the CPU / array path.
+// 2. Inputs are luma Textures on that device, with Texture.SAMPLE usage, read with textureLoad
+//    (no sampler, no filtering). Pass `{ texture, flipY: true }` when the texture's row 0 is the
+//    image's BOTTOM row (GL readPixels order, or copyExternalImage, which ignores flipY); a plain
+//    Texture means row 0 = top (a WebGPU render target):
+//    - geometry: rgba32float with RGBA = ENU xyz, range (the three engine's geoRT), or r32float
+//      range (deck). Range in metres, 0 = sky. f16 overflows at 65 km: float32 only.
+//    - photo: rgba8unorm, or rgba8unorm-srgb (re-encoded to the stored bytes; exact for all 256
+//      values; level 0 of a mip chain is read). Box-resampled to each
+//      pass's grid; bit-exact vs the CPU when it already has the grid's size (the CPU resamples
+//      with canvas drawImage, which the GPU cannot reproduce). For haze, any size is exact
+//      against the array path given the same photo (the prep kernel box-filters on the GPU).
+//    - sky / fg masks: r8unorm (or rgba8unorm, .r), P·255, as the segmentation's Uint8 masks.
+//    - layer (stats): the band-stats layer target, LINEAR, PREMULTIPLIED RGBA float (rgba32float /
+//      rgba16float); the stats kernel un-premultiplies and only counts texels with alpha > 0.98, so
+//      sky (0,0,0,0) drops out.
+//    - Formats of the deck-webgpu targets (deck-webgpu/targets.ts TARGET_FORMATS): geometry
+//      rgba32float xyz ENU + w range (0 = sky), colour rgba16float linear premultiplied, photo
+//      rgba8unorm-srgb, all row 0 = top: pass them as plain Textures (no flipY).
+// 3. Outputs stay on the GPU unless asked (`read: true`):
+//    - masksTex → `texture`: an rgba8unorm (r = coverage, g = cut, b = people, a = 255: exactly
+//      CompositeLook.masks) or r8unorm (coverage) texture to sample directly, plus the f32 planes
+//      (`q`) and the padded RGBA8 words (`packed`) as GPU buffers.
+//    - bandStatsTex → the per-workgroup partial sums on the GPU; the 4-band ColorStats (a few
+//      uniforms) is read back by default since the composite's uniforms are set from the CPU.
+//    - hazePrepTex → range, P(sky), linear photo, bins, counts and percentile state on the GPU
+//      (what haze.ts fitHazeGpu's CPU tail consumes; `read: true` returns them as arrays).
+//    Buffers are pooled per pass: valid until that pass's next call. A mask texture created here
+//    is kept per format and valid until a masks call with another grid size (then it is replaced);
+//    sample it, never destroy it.
+// 4. Input textures must stay alive and unchanged until the returned promise resolves: calls of
+//    a pass are serialised, so a queued call can run frames later. A destroyed input (or a lost
+//    device) rejects the call instead of submitting.
+// 5. Every call is one GPU submit through a core ComputeGraph (textures → gather node → the
+//    existing look WGSL → outputs). Graphs are compiled once per (sizes, formats, flags).
+// ────────────────────────────────────────────────────────────────────────────────────────────────
+//
+// Parity (textures-bench.ts, scripts/gpu/textures-bench.mjs): the gathered inputs are bit-identical
+// to the arrays capture.ts / composite.ts / haze.ts build on the CPU, so every downstream kernel
+// output is bit-identical to the array path's.
+import { Buffer, type Device, Texture } from "@luma.gl/core";
+import { type ColorStats, N_BANDS } from "#/lib/look/color-stats";
+import { gridSize, MASK_LONG_SIDE } from "#/lib/look/composite";
+import { srgbToLinear } from "#/lib/style/color";
+import { hasFeature } from "../core/device";
+import { ComputeGraph, type GraphBinding } from "../core/graph";
+import {
+	type BindKind,
+	defineKernel,
+	encodeDispatch,
+	type Kernel,
+	type KernelSpec,
+	storage,
+	uniform,
+} from "../core/kernel";
+import type {
+	GraphBufferHandle,
+	GraphBufferUsage,
+	GraphTextureHandle,
+} from "../core/luma";
+import { acquire, withLease } from "../core/pool";
+import { finalizeBands } from "./color-stats";
+import { BAND_STATS, BAND_STATS_SG, STATS_VALUES } from "./color-stats.wgsl";
+import {
+	PACK_MASKS,
+	TEX_FGBITS,
+	TEX_HAZE,
+	TEX_MASKS,
+	TEX_PHOTO,
+	TEX_STATS,
+	ZERO_U32,
+} from "./gather-tex.wgsl";
+import { GF_H0, GF_H1, GF_V0, GF_V1 } from "./guided-filter.wgsl";
+import {
+	BUCKETS,
+	HZ_BIN,
+	HZ_DILH,
+	HZ_HIST,
+	HZ_PREP,
+	HZ_SCAN,
+	HZ_SEL_INIT,
+	SEL,
+} from "./haze.wgsl";
+
+/** A texture input; `flipY` = its row 0 is the image's bottom row. */
+export type TexIn = Texture | { texture: Texture; flipY?: boolean };
+
+// ── kernels ─────────────────────────────────────────────────────────────────────────────────────
+
+const GROUP = "look-tex";
+const buf = (id: string, source: string, layout: [string, BindKind][]) =>
+	defineKernel(id, source, layout, { group: GROUP, label: `look-tex-${id}` });
+
+const K_GF_H0 = buf("gf-h0", GF_H0, [
+	["prm", "uniform"],
+	["gI", "read-only-storage"],
+	["gp", "read-only-storage"],
+	["outv", "storage"],
+]);
+const K_GF_V0 = buf("gf-v0", GF_V0, [
+	["prm", "uniform"],
+	["inv", "read-only-storage"],
+	["ab", "storage"],
+]);
+const K_GF_H1 = buf("gf-h1", GF_H1, [
+	["prm", "uniform"],
+	["ab", "read-only-storage"],
+	["outv", "storage"],
+]);
+const K_GF_V1 = buf("gf-v1", GF_V1, [
+	["prm", "uniform"],
+	["inv", "read-only-storage"],
+	["gI", "read-only-storage"],
+	["q", "storage"],
+]);
+const K_PACK = buf("pack-masks", PACK_MASKS, [
+	["prm", "uniform"],
+	["qc", "read-only-storage"],
+	["qg", "read-only-storage"],
+	["qf", "read-only-storage"],
+	["outp", "storage"],
+]);
+const STATS_LAYOUT: [string, BindKind][] = [
+	["prm", "uniform"],
+	["photo", "read-only-storage"],
+	["layer", "read-only-storage"],
+	["range", "read-only-storage"],
+	["fg", "read-only-storage"],
+	["lut", "read-only-storage"],
+	["partial", "storage"],
+];
+const K_BAND_STATS = buf("band-stats", BAND_STATS, STATS_LAYOUT);
+// needs the "subgroups" feature: its own warm-up group
+const K_BAND_STATS_SG = defineKernel(
+	"band-stats-sg",
+	BAND_STATS_SG,
+	STATS_LAYOUT,
+	{
+		group: `${GROUP}-subgroups`,
+		label: "look-tex-band-stats-sg",
+	},
+);
+const K_HZ_PREP = buf("hz-prep", HZ_PREP, [
+	["prm", "uniform"],
+	["photo", "read-only-storage"],
+	["xb", "read-only-storage"],
+	["yb", "read-only-storage"],
+	["lut", "read-only-storage"],
+	["range", "read-only-storage"],
+	["fgm", "read-only-storage"],
+	["lin", "storage"],
+	["flags", "storage"],
+]);
+const K_HZ_DILH = buf("hz-dilh", HZ_DILH, [
+	["prm", "uniform"],
+	["flags", "read-only-storage"],
+	["outf", "storage"],
+]);
+const K_HZ_BIN = buf("hz-bin", HZ_BIN, [
+	["prm", "uniform"],
+	["flagsH", "read-only-storage"],
+	["range", "read-only-storage"],
+	["psky", "read-only-storage"],
+	["bins", "storage"],
+	["counts", "storage"],
+]);
+const K_HZ_SEL_INIT = buf("hz-sel-init", HZ_SEL_INIT, [
+	["counts", "read-only-storage"],
+	["state", "storage"],
+]);
+const K_ZERO = buf("zero-u32", ZERO_U32, [["buf", "storage"]]);
+const K_HZ_HIST = buf("hz-hist", HZ_HIST, [
+	["prm", "uniform"],
+	["bins", "read-only-storage"],
+	["lin", "read-only-storage"],
+	["state", "read-only-storage"],
+	["hist", "storage"],
+]);
+const K_HZ_SCAN = buf("hz-scan", HZ_SCAN, [
+	["prm", "uniform"],
+	["hist", "read-only-storage"],
+	["state", "storage"],
+]);
+
+// Kernels that read textures: core/kernel's layout covers buffers only, so these build their own
+// pipeline (explicit layout for the name → location map; the WGSL's auto layout makes the
+// textureLoad-only textures 'unfilterable-float', which accepts rgba32float and unorm formats).
+type TexBind = BindKind | "texture";
+type TexSpec = { id: string; source: string; layout: [string, TexBind][] };
+const texSpecs: TexSpec[] = [];
+const texSpec = (id: string, source: string, layout: [string, TexBind][]) => {
+	const s = { id, source, layout };
+	texSpecs.push(s);
+	return s;
+};
+
+const K_TEX_PHOTO = texSpec("photo", TEX_PHOTO, [
+	["prm", "uniform"],
+	["xb", "read-only-storage"],
+	["yb", "read-only-storage"],
+	["src", "texture"],
+	["outp", "storage"],
+]);
+const K_TEX_MASKS = texSpec("masks", TEX_MASKS, [
+	["prm", "uniform"],
+	["tab", "read-only-storage"],
+	["photo", "read-only-storage"],
+	["geo", "texture"],
+	["skyT", "texture"],
+	["fgT", "texture"],
+	["gI", "storage"],
+	["cov", "storage"],
+	["fgv", "storage"],
+]);
+const K_TEX_STATS = texSpec("stats", TEX_STATS, [
+	["prm", "uniform"],
+	["tab", "read-only-storage"],
+	["geo", "texture"],
+	["layerT", "texture"],
+	["fgT", "texture"],
+	["range", "storage"],
+	["layer", "storage"],
+	["fgv", "storage"],
+]);
+const K_TEX_HAZE = texSpec("haze", TEX_HAZE, [
+	["prm", "uniform"],
+	["tab", "read-only-storage"],
+	["geo", "texture"],
+	["skyT", "texture"],
+	["range", "storage"],
+	["psky", "storage"],
+]);
+const K_TEX_FGBITS = texSpec("fgbits", TEX_FGBITS, [
+	["prm", "uniform"],
+	["tab", "read-only-storage"],
+	["fgT", "texture"],
+	["fgm", "storage"],
+]);
+
+const texKernels = new WeakMap<Device, Map<TexSpec, Kernel>>();
+function texKernel(device: Device, spec: TexSpec): Kernel {
+	let m = texKernels.get(device);
+	if (!m) {
+		m = new Map();
+		texKernels.set(device, m);
+	}
+	let k = m.get(spec);
+	if (!k) {
+		const label = `look-tex-${spec.id}`;
+		const shader = device.createShader({
+			id: label,
+			source: spec.source,
+			language: "wgsl",
+			stage: "compute",
+		});
+		const pipeline = device.createComputePipeline({
+			id: label,
+			shader,
+			entryPoint: "main",
+			shaderLayout: {
+				bindings: spec.layout.map(([name, type], location) =>
+					type === "texture"
+						? {
+								name,
+								type,
+								group: 0,
+								location,
+								viewDimension: "2d" as const,
+								sampleType: "unfilterable-float" as const,
+							}
+						: type === "uniform"
+							? { name, type, group: 0, location }
+							: { name, type, group: 0, location },
+				),
+			},
+		});
+		// encodeDispatch only uses the pipeline; the spec is for labels
+		k = {
+			pipeline,
+			names: spec.layout.map(([n]) => n),
+			spec: { ...spec, entryPoint: "main", group: GROUP, label } as KernelSpec,
+		};
+		m.set(spec, k);
+	}
+	return k;
+}
+
+/** Compile every texture-look pipeline now (the buffer kernels: core warmKernels(d, "look-tex")). */
+export function warmTextureKernels(device: Device): number {
+	let failed = 0;
+	for (const s of texSpecs)
+		try {
+			texKernel(device, s);
+		} catch (e) {
+			failed++;
+			console.warn(`[lookgpu] tex ${s.id} compile failed`, e);
+		}
+	return failed;
+}
+
+const USE: Record<BindKind, GraphBufferUsage> = {
+	uniform: "uniform",
+	"read-only-storage": "storage-read",
+	storage: "storage-read-write",
+};
+
+type TexBinding = GraphBinding | GraphTextureHandle;
+
+/** A graph node running a texture-reading kernel (ComputeGraph.addKernel covers buffers only). */
+function addTexNode<P>(
+	g: ComputeGraph<P>,
+	id: string,
+	spec: TexSpec,
+	bindings: Record<string, TexBinding>,
+	groups: number,
+) {
+	g.addComputePass({
+		id,
+		resources: spec.layout.map(([name, kind]) =>
+			kind === "texture"
+				? {
+						texture: bindings[name] as GraphTextureHandle,
+						usage: "sampled" as const,
+					}
+				: { buffer: bindings[name] as GraphBufferHandle, usage: USE[kind] },
+		),
+		compile: ({ device }) => {
+			const k = texKernel(device, spec);
+			return {
+				encode: ({ computePass, getBuffer, getTexture }) => {
+					const b: Record<
+						string,
+						Texture | { buffer: Buffer; offset: number; size: number }
+					> = {};
+					for (const [name, kind] of spec.layout) {
+						const h = bindings[name];
+						b[name] =
+							kind === "texture"
+								? getTexture(h as GraphTextureHandle)
+								: {
+										buffer: getBuffer(h as GraphBufferHandle),
+										offset: 0,
+										size: (h as GraphBufferHandle).byteLength,
+									};
+					}
+					encodeDispatch(computePass, k, b, groups);
+				},
+			};
+		},
+	});
+}
+
+// ── shared plumbing ─────────────────────────────────────────────────────────────────────────────
+
+const WG = 256;
+const STORAGE = Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST;
+const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
+
+type Src = { texture: Texture; flip: boolean };
+const src = (t: TexIn): Src =>
+	t instanceof Texture
+		? { texture: t, flip: false }
+		: { texture: t.texture, flip: !!t.flipY };
+
+const GEO_FORMATS = ["rgba32float", "r32float"];
+const PHOTO_FORMATS = ["rgba8unorm", "rgba8unorm-srgb"];
+const MASK_FORMATS = ["r8unorm", "rgba8unorm"];
+const LAYER_FORMATS = ["rgba32float", "rgba16float", "rgba8unorm"];
+
+function check(device: Device, s: Src, what: string, formats: string[]) {
+	if (s.texture.device !== device)
+		throw new Error(
+			`[lookgpu] ${what} texture is on another device (adoptRenderDevice first)`,
+		);
+	if (!formats.includes(s.texture.format))
+		throw new Error(
+			`[lookgpu] ${what} texture is ${s.texture.format}, want ${formats.join(" | ")}`,
+		);
+	if ((s.texture.props.usage ?? 0) & Texture.SAMPLE) return;
+	throw new Error(`[lookgpu] ${what} texture lacks Texture.SAMPLE usage`);
+}
+
+/**
+ * Re-checked inside the pass lease, just before the submit: a queued call may run frames after it
+ * was made, and a destroyed input would fail validation and read back stale staging bytes.
+ */
+function assertAlive(device: Device, srcs: (Src | null)[]) {
+	if (device.isLost) throw new Error("[lookgpu] device lost");
+	for (const s of srcs)
+		if (s?.texture.destroyed)
+			throw new Error(
+				`[lookgpu] input texture ${s.texture.id} was destroyed before the pass ran`,
+			);
+}
+
+const dummies = new WeakMap<Device, Texture>();
+/** 1 × 1 r8unorm for an absent mask (the kernels branch on a flag and never read it). */
+function dummyMask(device: Device): Texture {
+	let t = dummies.get(device);
+	if (!t) {
+		// WebGPU zero-initialises it
+		t = device.createTexture({
+			id: "look-tex-dummy",
+			format: "r8unorm",
+			width: 1,
+			height: 1,
+			usage: Texture.SAMPLE | Texture.COPY_DST,
+		});
+		dummies.set(device, t);
+	}
+	return t;
+}
+
+/** A compiled graph plus the constant buffers / textures it owns. */
+type Entry<X> = {
+	graph: ComputeGraph;
+	owned: (Buffer | Texture)[];
+	extra: X;
+};
+const MAX_GRAPHS = 6;
+const graphs = new WeakMap<Device, Map<string, Entry<unknown>>>();
+
+/**
+ * The graph for `key`, built on first use; least recently used graphs beyond 6 are destroyed.
+ * Call it INSIDE the pass lease and call `graph.run` synchronously after it: run() queues on the
+ * graph's lease at once, so an eviction (which destroys under that same lease) always lands after
+ * it; looked up earlier, a queued call could find its graph destroyed.
+ */
+function cachedGraph<X>(
+	device: Device,
+	key: string,
+	build: () => Entry<X>,
+): Entry<X> {
+	let m = graphs.get(device);
+	if (!m) {
+		m = new Map();
+		graphs.set(device, m);
+	}
+	let e = m.get(key) as Entry<X> | undefined;
+	if (e) m.delete(key);
+	else e = build();
+	m.set(key, e as Entry<unknown>);
+	while (m.size > MAX_GRAPHS) {
+		const [k0, old] = m.entries().next().value as [string, Entry<unknown>];
+		m.delete(k0);
+		// after any run of it still in flight (ComputeGraph.run holds this lease)
+		void withLease(`graph:${old.graph.id}`, () => {
+			old.graph.destroy();
+			for (const r of old.owned) r.destroy();
+		});
+	}
+	return e;
+}
+
+/** The per-pass leases (every call of a pass is serialised under its lease). */
+const PASS = {
+	masks: "look-tex/masks",
+	stats: "look-tex/stats",
+	haze: "look-tex/haze",
+} as const;
+
+/**
+ * Free every cached texture-look graph of `device` (and its constant buffers), the output mask
+ * textures and the dummy mask. Each graph is destroyed after any run of it in flight, the textures
+ * after every queued pass; calls made afterwards rebuild what they need.
+ */
+export async function releaseTextureGraphs(device: Device): Promise<void> {
+	const m = graphs.get(device);
+	const old = m ? [...m.values()] : [];
+	m?.clear();
+	const done = old.map((e) =>
+		withLease(`graph:${e.graph.id}`, () => {
+			e.graph.destroy();
+			for (const r of e.owned) r.destroy();
+		}),
+	);
+	// every pass samples the dummy; masks also writes the output textures (no pass nests leases,
+	// so taking all three here cannot deadlock)
+	done.push(
+		withLease(PASS.masks, () =>
+			withLease(PASS.stats, () =>
+				withLease(PASS.haze, () => {
+					for (const t of outTextures.get(device)?.values() ?? []) t.destroy();
+					outTextures.delete(device);
+					dummies.get(device)?.destroy();
+					dummies.delete(device);
+				}),
+			),
+		),
+	);
+	await Promise.all(done);
+}
+
+/** Graph-side constants: a uniform / storage buffer imported with a fixed default. */
+function constants(g: ComputeGraph, owned: (Buffer | Texture)[]) {
+	return {
+		uniform(id: string, words: ArrayBuffer) {
+			const b = uniform(g.device, words);
+			owned.push(b);
+			return g.importBuffer(id, b.byteLength, b, UNIFORM);
+		},
+		storage(id: string, data: ArrayBufferView) {
+			const b = storage(g.device, data);
+			owned.push(b);
+			return g.importBuffer(id, b.byteLength, b);
+		},
+	};
+}
+
+const u32Words = (...v: number[]) => new Uint32Array(v).buffer;
+
+/**
+ * Box footprints [x0, x1) of each of `n` output pixels over `size` source texels, in f64 as
+ * haze.ts prepGpu (1 texel each when n = size).
+ */
+function footprints(n: number, size: number): Uint32Array {
+	const s = size / n;
+	const t = new Uint32Array(2 * n);
+	for (let x = 0; x < n; x++) {
+		const x0 = Math.floor(x * s);
+		t[2 * x] = x0;
+		t[2 * x + 1] = Math.max(x0 + 1, Math.min(size, Math.floor((x + 1) * s)));
+	}
+	return t;
+}
+
+/** composite.ts / capture.ts maskAt's texel index of cell k of n over a mask of `size` texels. */
+const maskIndex = (k: number, n: number, size: number) =>
+	Math.min(size - 1, Math.floor(((k + 0.5) / n) * size));
+
+/** TEX_PHOTO node: `photo` box-resampled to w × h packed RGBA8 words in transient `id`. */
+function addPhoto(
+	g: ComputeGraph,
+	c: ReturnType<typeof constants>,
+	photo: Src,
+	w: number,
+	h: number,
+	id: string,
+) {
+	const pw = photo.texture.width;
+	const ph = photo.texture.height;
+	const tex = g.importTexture({
+		id: `${id}-tex`,
+		format: photo.texture.format,
+		width: pw,
+		height: ph,
+		usage: Texture.SAMPLE,
+	});
+	const out = g.transientBuffer(id, w * h * 4);
+	addTexNode(
+		g,
+		`${id}-gather`,
+		K_TEX_PHOTO,
+		{
+			prm: c.uniform(
+				`${id}-prm`,
+				u32Words(
+					w,
+					h,
+					ph,
+					photo.flip ? 1 : 0,
+					photo.texture.format === "rgba8unorm-srgb" ? 1 : 0,
+					0,
+					0,
+					0,
+				),
+			),
+			xb: c.storage(`${id}-xb`, footprints(w, pw)),
+			yb: c.storage(`${id}-yb`, footprints(h, ph)),
+			src: tex,
+			outp: out,
+		},
+		Math.ceil((w * h) / WG),
+	);
+	return out;
+}
+
+const texKey = (s: Src | null) =>
+	s
+		? `${s.texture.format}:${s.texture.width}x${s.texture.height}:${+s.flip}`
+		: "-";
+
+/** Import a sampled texture (a 1 × 1 dummy stands in for an absent mask). */
+function importSampled(g: ComputeGraph, id: string, s: Src | null) {
+	const t = s?.texture ?? dummyMask(g.device);
+	return g.importTexture({
+		id,
+		format: t.format,
+		width: t.width,
+		height: t.height,
+		usage: Texture.SAMPLE,
+	});
+}
+
+/** An output slot of pass `pass`: a pooled buffer (valid until the pass's next call). */
+const slot = (device: Device, pass: string, name: string, bytes: number) =>
+	acquire(device, `look-tex/${pass}/${name}`, Math.max(4, bytes), STORAGE);
+
+/** Read `bytes` from each buffer, resolved after the graph's submit. */
+const reads = (list: [Buffer, number][]) =>
+	list.map(([buffer, size]) => ({ buffer, size: Math.max(4, size) }));
+
+// ── masks (guided filter) ───────────────────────────────────────────────────────────────────────
+
+export type MasksTexInput = {
+	geometry: TexIn;
+	/** The photo; exact vs the CPU when it is already the mask grid's size. */
+	photo: TexIn;
+	/** P(sky) (composite.sky "photo"); null = coverage from the DEM alone. */
+	sky?: TexIn | null;
+	/** People (segmentation). */
+	fg?: TexIn | null;
+	/** The blend cut plane, w × h row 0 = top (CompositeLook builds it from a CPU closure). */
+	cut?: Float32Array | null;
+	/** Mask grid; default composite.ts gridSize(gw / gh, MASK_LONG_SIDE). */
+	size?: [number, number];
+};
+
+export type MasksTexOptions = {
+	/**
+	 * Also write the packed masks into a texture: "rgba8unorm" (r coverage, g cut, b people, a 255)
+	 * or "r8unorm" (coverage) creates and caches one of the grid's size; or pass your own (COPY_DST
+	 * usage, the grid's size, one of those formats).
+	 */
+	texture?: "rgba8unorm" | "r8unorm" | Texture;
+	/** Read the float planes and the RGBA8 masks back (default false: GPU only). */
+	read?: boolean;
+};
+
+export type MasksTexResult = {
+	w: number;
+	h: number;
+	/** refined planes, in CompositeLook's job order: coverage, cut (if any), people (if any) */
+	q: Buffer[];
+	/** packed masks: `rowWords` u32 per row (rgba: one texel a word; r8: four) */
+	packed: Buffer;
+	rowWords: number;
+	texture?: Texture;
+	/** with `read`: the planes and the RGBA8 masks (w × h × 4, as CompositeLook.masks.data) */
+	data?: { q: Float32Array[]; masks: Uint8Array };
+};
+
+/** One output texture per format, recreated when the grid changes (call under the masks lease). */
+const outTextures = new WeakMap<Device, Map<string, Texture>>();
+function ownTexture(
+	device: Device,
+	format: "rgba8unorm" | "r8unorm",
+	w: number,
+	h: number,
+): Texture {
+	let m = outTextures.get(device);
+	if (!m) {
+		m = new Map();
+		outTextures.set(device, m);
+	}
+	let t = m.get(format);
+	if (t && (t.width !== w || t.height !== h || t.destroyed)) {
+		// WebGPU defers the destroy until the work already submitted with it completes
+		t.destroy();
+		t = undefined;
+	}
+	if (!t) {
+		t = device.createTexture({
+			id: `look-tex-masks-${format}:${w}x${h}`,
+			format,
+			width: w,
+			height: h,
+			usage: Texture.SAMPLE | Texture.COPY_DST | Texture.COPY_SRC,
+		});
+		m.set(format, t);
+	}
+	return t;
+}
+
+/**
+ * CompositeLook.updateMasks on the GPU from textures: the mask-grid inputs gathered from the
+ * geometry / photo / mask textures, the guided filters (same radii and ε as masksAsync), the RGBA8
+ * packing, and optionally the texture copy. One submit; nothing read back unless `read`.
+ */
+export function masksTex(
+	device: Device,
+	input: MasksTexInput,
+	opts: MasksTexOptions = {},
+): Promise<MasksTexResult> {
+	const geo = src(input.geometry);
+	const photo = src(input.photo);
+	const sky = input.sky ? src(input.sky) : null;
+	const fg = input.fg ? src(input.fg) : null;
+	check(device, geo, "geometry", GEO_FORMATS);
+	check(device, photo, "photo", PHOTO_FORMATS);
+	if (sky) check(device, sky, "sky", MASK_FORMATS);
+	if (fg) check(device, fg, "fg", MASK_FORMATS);
+	const gw = geo.texture.width;
+	const gh = geo.texture.height;
+	const [w, h] = input.size ?? gridSize(gw / gh, MASK_LONG_SIDE);
+	const n = w * h;
+	const cut = input.cut ?? null;
+	if (cut && cut.length !== n) throw new Error("[lookgpu] cut is not w × h");
+	const given = opts.texture instanceof Texture ? opts.texture : null;
+	if (given) {
+		if (given.device !== device)
+			throw new Error("[lookgpu] mask texture is on another device");
+		if (given.format !== "rgba8unorm" && given.format !== "r8unorm")
+			throw new Error(
+				`[lookgpu] mask texture is ${given.format}, want rgba8unorm | r8unorm`,
+			);
+		if (!((given.props.usage ?? 0) & Texture.COPY_DST))
+			throw new Error("[lookgpu] mask texture lacks Texture.COPY_DST usage");
+		if (given.width !== w || given.height !== h)
+			throw new Error("[lookgpu] mask texture is not the grid's size");
+	}
+	const outFormat: "rgba8unorm" | "r8unorm" | null = given
+		? (given.format as "rgba8unorm" | "r8unorm")
+		: typeof opts.texture === "string"
+			? opts.texture
+			: null;
+	const fmt = outFormat === "r8unorm" ? 1 : 4;
+	const rowWords = fmt === 4 ? Math.ceil(w / 64) * 64 : Math.ceil(w / 256) * 64;
+	// masksAsync's jobs: coverage, cut, people
+	const jobs = [
+		{ name: "cov", r: Math.max(2, Math.round(w * 0.008)), eps: 4e-4 },
+	];
+	if (cut)
+		jobs.push({
+			name: "cut",
+			r: Math.max(2, Math.round(w * 0.008)),
+			eps: 3e-3,
+		});
+	if (fg)
+		jobs.push({ name: "fg", r: Math.max(3, Math.round(w * 0.012)), eps: 1e-3 });
+	const key = [
+		"masks",
+		w,
+		h,
+		texKey(geo),
+		texKey(photo),
+		texKey(sky),
+		texKey(fg),
+		+!!cut,
+		outFormat ?? "-",
+	].join("|");
+	const graphOf = () =>
+		cachedGraph(device, key, () => {
+			const g = new ComputeGraph(device, `look-tex-${key}`);
+			const owned: (Buffer | Texture)[] = [];
+			const c = constants(g, owned);
+			const groups = Math.ceil(n / WG);
+			const words = addPhoto(g, c, photo, w, h, "photo");
+			const sx = gw / w;
+			const sy = gh / h;
+			const ss = Math.max(1, Math.round(sx));
+			const tab = new Uint32Array(4 * w + 4 * h);
+			for (let x = 0; x < w; x++) tab[x] = Math.floor(x * sx);
+			for (let y = 0; y < h; y++) tab[w + y] = Math.floor(y * sy);
+			for (const [m, o] of [
+				[sky, w + h],
+				[fg, 2 * w + 2 * h],
+			] as const)
+				if (m) {
+					for (let x = 0; x < w; x++)
+						tab[o + x] = maskIndex(x, w, m.texture.width);
+					for (let y = 0; y < h; y++)
+						tab[o + w + y] = maskIndex(y, h, m.texture.height);
+				}
+			const gI = g.transientBuffer("gI", n * 4);
+			const cov = g.transientBuffer("cov", n * 4);
+			const fgv = g.transientBuffer("fgv", n * 4);
+			addTexNode(
+				g,
+				"gather",
+				K_TEX_MASKS,
+				{
+					prm: c.uniform(
+						"gather-prm",
+						u32Words(
+							w,
+							h,
+							gw,
+							gh,
+							ss,
+							+geo.flip,
+							+!!sky,
+							+!!sky?.flip,
+							sky?.texture.height ?? 1,
+							+!!fg,
+							+!!fg?.flip,
+							fg?.texture.height ?? 1,
+							+(geo.texture.format === "r32float"),
+							0,
+							0,
+							0,
+						),
+					),
+					tab: c.storage("gather-tab", tab),
+					photo: words,
+					geo: importSampled(g, "geo", geo),
+					skyT: importSampled(g, "sky", sky),
+					fgT: importSampled(g, "fg", fg),
+					gI,
+					cov,
+					fgv,
+				},
+				groups,
+			);
+			const cutIn = cut ? g.importBuffer("cut", n * 4) : null;
+			const qs: GraphBufferHandle[] = [];
+			for (const j of jobs) {
+				const pw = new ArrayBuffer(16);
+				new Uint32Array(pw, 0, 3).set([w, h, j.r]);
+				new Float32Array(pw, 12, 1)[0] = j.eps;
+				const prm = c.uniform(`${j.name}-prm`, pw);
+				const p =
+					j.name === "cov"
+						? cov
+						: j.name === "fg"
+							? fgv
+							: (cutIn as GraphBufferHandle);
+				const t4 = g.transientBuffer(`${j.name}-t4`, n * 16);
+				const ab = g.transientBuffer(`${j.name}-ab`, n * 8);
+				const t2 = g.transientBuffer(`${j.name}-t2`, n * 8);
+				const q = g.importBuffer(`q-${j.name}`, n * 4);
+				qs.push(q);
+				g.addKernel({
+					id: `${j.name}-h0`,
+					spec: K_GF_H0,
+					bindings: { prm, gI, gp: p, outv: t4 },
+					workgroups: [groups],
+				});
+				g.addKernel({
+					id: `${j.name}-v0`,
+					spec: K_GF_V0,
+					bindings: { prm, inv: t4, ab },
+					workgroups: [groups],
+				});
+				g.addKernel({
+					id: `${j.name}-h1`,
+					spec: K_GF_H1,
+					bindings: { prm, ab, outv: t2 },
+					workgroups: [groups],
+				});
+				g.addKernel({
+					id: `${j.name}-v1`,
+					spec: K_GF_V1,
+					bindings: { prm, inv: t2, gI, q },
+					workgroups: [groups],
+				});
+			}
+			const packed = g.importBuffer("packed", rowWords * h * 4);
+			const qOf = (name: string) =>
+				qs[jobs.findIndex((j) => j.name === name)] ?? qs[0];
+			g.addKernel({
+				id: "pack",
+				spec: K_PACK,
+				bindings: {
+					prm: c.uniform(
+						"pack-prm",
+						u32Words(w, h, rowWords, fmt, +!!cut, +!!fg, 0, 0),
+					),
+					qc: qs[0],
+					qg: qOf("cut"),
+					qf: qOf("fg"),
+					outp: packed,
+				},
+				workgroups: [Math.ceil((rowWords * h) / WG)],
+			});
+			if (outFormat) {
+				const dst = g.importTexture({
+					id: "out",
+					format: outFormat,
+					width: w,
+					height: h,
+					usage: Texture.COPY_DST,
+				});
+				g.graph.addCopyPass({
+					id: "to-texture",
+					resources: [
+						{ buffer: packed, usage: "copy-source" },
+						{ texture: dst, usage: "copy-destination" },
+					],
+					compile: () => ({
+						encode: ({ commandEncoder, getBuffer, getTexture }) =>
+							commandEncoder.copyBufferToTexture({
+								sourceBuffer: getBuffer(packed),
+								destinationTexture: getTexture(dst),
+								bytesPerRow: rowWords * 4,
+								rowsPerImage: h,
+								size: [w, h, 1],
+							}),
+					}),
+				});
+			}
+			g.compile();
+			return { graph: g as ComputeGraph, owned, extra: null };
+		});
+	return withLease(PASS.masks, async () => {
+		assertAlive(device, [geo, photo, sky, fg, given && src(given)]);
+		const outTex =
+			given ?? (outFormat ? ownTexture(device, outFormat, w, h) : null);
+		const e = graphOf();
+		const buffers: Record<string, Buffer> = {};
+		const q = jobs.map((j) => {
+			const b = slot(device, "masks", `q-${j.name}`, n * 4);
+			buffers[`q-${j.name}`] = b;
+			return b;
+		});
+		const packed = slot(device, "masks", "packed", rowWords * h * 4);
+		buffers.packed = packed;
+		if (cut) {
+			const b = slot(device, "masks", "cut", n * 4);
+			b.write(cut);
+			buffers.cut = b;
+		}
+		const textures: Record<string, Texture> = {
+			geo: geo.texture,
+			sky: sky?.texture ?? dummyMask(device),
+			fg: fg?.texture ?? dummyMask(device),
+			"photo-tex": photo.texture,
+		};
+		if (outTex) textures.out = outTex;
+		const { data } = await e.graph.run(undefined, {
+			buffers,
+			textures,
+			read: opts.read
+				? reads([
+						...q.map((b) => [b, n * 4] as [Buffer, number]),
+						[packed, rowWords * h * 4],
+					])
+				: [],
+		});
+		const r: MasksTexResult = { w, h, q, packed, rowWords };
+		if (outTex) r.texture = outTex;
+		if (opts.read) {
+			const words = new Uint32Array(data[q.length]);
+			const masks = new Uint8Array(n * 4);
+			if (fmt === 4)
+				for (let y = 0; y < h; y++)
+					masks.set(
+						new Uint8Array(words.buffer, y * rowWords * 4, w * 4),
+						y * w * 4,
+					);
+			else {
+				// r8: coverage only, as rgba with g = b = 0, a = 255
+				const bytes = new Uint8Array(words.buffer);
+				for (let y = 0; y < h; y++)
+					for (let x = 0; x < w; x++) {
+						masks[(y * w + x) * 4] = bytes[y * rowWords * 4 + x];
+						masks[(y * w + x) * 4 + 3] = 255;
+					}
+			}
+			r.data = {
+				q: data.slice(0, q.length).map((b) => new Float32Array(b)),
+				masks,
+			};
+		}
+		return r;
+	});
+}
+
+// ── band colour stats ───────────────────────────────────────────────────────────────────────────
+
+export type StatsTexInput = {
+	geometry: TexIn;
+	/** the band-stats layer (linear RGBA, alpha = coverage), w × h */
+	layer: TexIn;
+	/** the photo; exact vs the CPU when it is already w × h */
+	photo: TexIn;
+	fg?: TexIn | null;
+	/** nearer terrain doesn't count (composite.ts trustedRange) */
+	minRange: number;
+	/** reduceBands' minCount (default 60) */
+	minCount?: number;
+};
+
+export type StatsTexResult = {
+	/** per-workgroup partial sums (32 × 52 f32) on the GPU */
+	partial: Buffer;
+	/** with `read` (default true): the ColorStats CompositeLook.stats holds */
+	stats: ColorStats | null;
+};
+
+const SRGB_LUT_STATS = Float32Array.from({ length: 256 }, (_, i) => {
+	const c = i / 255;
+	return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+});
+const SGROUPS = 32;
+const SWG = 64;
+
+/**
+ * CompositeLook.setStats' GPU band stats from textures: one submit, 6.6 KB back (or none).
+ * `subgroups` as bandStatsGpu's (default off). This path can't see BAND_STATS_SG's NaN
+ * layout-check partials without reading back, so only opt in where the layout check is known to pass.
+ */
+export function bandStatsTex(
+	device: Device,
+	input: StatsTexInput,
+	opts: { read?: boolean; subgroups?: boolean } = {},
+): Promise<StatsTexResult> {
+	const geo = src(input.geometry);
+	const layer = src(input.layer);
+	const photo = src(input.photo);
+	const fg = input.fg ? src(input.fg) : null;
+	check(device, geo, "geometry", GEO_FORMATS);
+	check(device, layer, "layer", LAYER_FORMATS);
+	check(device, photo, "photo", PHOTO_FORMATS);
+	if (fg) check(device, fg, "fg", MASK_FORMATS);
+	const w = layer.texture.width;
+	const h = layer.texture.height;
+	const n = w * h;
+	const gw = geo.texture.width;
+	const gh = geo.texture.height;
+	const read = opts.read ?? true;
+	const sg = (opts.subgroups ?? false) && hasFeature(device, "subgroups");
+	const key = [
+		"stats",
+		+sg,
+		texKey(geo),
+		texKey(layer),
+		texKey(photo),
+		texKey(fg),
+	].join("|");
+	const graphOf = () =>
+		cachedGraph(device, key, () => {
+			const g = new ComputeGraph(device, `look-tex-${key}`);
+			const owned: (Buffer | Texture)[] = [];
+			const c = constants(g, owned);
+			const words = addPhoto(g, c, photo, w, h, "photo");
+			const tab = new Uint32Array(2 * w + 2 * h);
+			for (let x = 0; x < w; x++) tab[x] = Math.floor(((x + 0.5) * gw) / w);
+			for (let y = 0; y < h; y++) tab[w + y] = Math.floor(((y + 0.5) * gh) / h);
+			if (fg) {
+				for (let x = 0; x < w; x++)
+					tab[w + h + x] = maskIndex(x, w, fg.texture.width);
+				for (let y = 0; y < h; y++)
+					tab[2 * w + h + y] = maskIndex(y, h, fg.texture.height);
+			}
+			const range = g.transientBuffer("range", n * 4);
+			const lay = g.transientBuffer("layer", n * 16);
+			const fgv = g.transientBuffer("fgv", n * 4);
+			addTexNode(
+				g,
+				"gather",
+				K_TEX_STATS,
+				{
+					prm: c.uniform(
+						"gather-prm",
+						u32Words(
+							w,
+							h,
+							gh,
+							+geo.flip,
+							+layer.flip,
+							+!!fg,
+							+!!fg?.flip,
+							fg?.texture.height ?? 1,
+							+(geo.texture.format === "r32float"),
+							0,
+							0,
+							0,
+						),
+					),
+					tab: c.storage("gather-tab", tab),
+					geo: importSampled(g, "geo", geo),
+					layerT: importSampled(g, "layer-tex", layer),
+					fgT: importSampled(g, "fg", fg),
+					range,
+					layer: lay,
+					fgv,
+				},
+				Math.ceil(n / WG),
+			);
+			// per call: minRange (bandStatsGpu's words)
+			const prmBuf = uniform(device, new ArrayBuffer(20));
+			owned.push(prmBuf);
+			g.addKernel({
+				id: "band-stats",
+				spec: sg ? K_BAND_STATS_SG : K_BAND_STATS,
+				bindings: {
+					prm: g.importBuffer("stats-prm", prmBuf.byteLength, prmBuf, UNIFORM),
+					photo: words,
+					layer: lay,
+					range,
+					fg: fgv,
+					lut: c.storage("lut", SRGB_LUT_STATS),
+					partial: g.importBuffer("partial", SGROUPS * STATS_VALUES * 4),
+				},
+				workgroups: [SGROUPS],
+			});
+			g.compile();
+			return { graph: g as ComputeGraph, owned, extra: prmBuf };
+		});
+	return withLease(PASS.stats, async () => {
+		assertAlive(device, [geo, layer, photo, fg]);
+		const e = graphOf();
+		const pw = new ArrayBuffer(20);
+		new Uint32Array(pw, 0, 4).set([w, h, SGROUPS * SWG, fg ? 1 : 0]);
+		new Float32Array(pw, 16, 1)[0] = input.minRange ?? 0;
+		(e.extra as Buffer).write(new Uint8Array(pw));
+		const bytes = SGROUPS * STATS_VALUES * 4;
+		const partial = slot(device, "stats", "partial", bytes);
+		const { data } = await e.graph.run(undefined, {
+			buffers: { partial },
+			textures: {
+				geo: geo.texture,
+				"layer-tex": layer.texture,
+				"photo-tex": photo.texture,
+				fg: fg?.texture ?? dummyMask(device),
+			},
+			read: read ? reads([[partial, bytes]]) : [],
+		});
+		if (!read) return { partial, stats: null };
+		const p = new Float32Array(data[0]);
+		// bandStatsGpu's float64 fold of the partials (keep in sync)
+		const acc = new Float64Array(N_BANDS * 12);
+		const cnt = new Uint32Array(N_BANDS);
+		for (let gi = 0; gi < SGROUPS; gi++)
+			for (let b = 0; b < N_BANDS; b++) {
+				const s = gi * STATS_VALUES + b * 13;
+				cnt[b] += Math.round(p[s]);
+				for (let v = 0; v < 12; v++) acc[b * 12 + v] += p[s + 1 + v];
+			}
+		return { partial, stats: finalizeBands(acc, cnt, input.minCount ?? 60) };
+	});
+}
+
+// ── haze prep ───────────────────────────────────────────────────────────────────────────────────
+
+export type HazeTexInput = {
+	geometry: TexIn;
+	/** the photo at any size (the haze controller's CPU path uses it at 2W × 2H) */
+	photo: TexIn;
+	sky?: TexIn | null;
+	fg?: TexIn | null;
+	/** geometry decimation (the haze controller's STEP, 2) */
+	step?: number;
+};
+
+/** The haze prep's outputs as arrays (row 0 = top, W × H): what fitHazeGpu's CPU tail reads. */
+export type HazePrep = {
+	W: number;
+	H: number;
+	range: Float32Array;
+	pSky: Float32Array;
+	lin: Float32Array;
+	bins: Int32Array;
+	counts: Uint32Array;
+	/** order statistic per (bin, channel, slot), as f32 */
+	stat: Float32Array;
+};
+
+export type HazePrepResult = {
+	W: number;
+	H: number;
+	/** pooled GPU buffers (valid until the next haze prep) */
+	buffers: Record<
+		"range" | "pSky" | "lin" | "bins" | "counts" | "state",
+		Buffer
+	>;
+	/** with `read` */
+	data?: HazePrep;
+};
+
+// mirror of haze.ts / haze-fit.ts (keep in sync)
+const NBINS = 24;
+const DMIN = 200;
+const DMAX = 150000;
+const SRGB_LUT_HAZE = (() => {
+	const t = new Float32Array(256);
+	for (let i = 0; i < 256; i++) t[i] = srgbToLinear(i / 255);
+	return t;
+})();
+
+/** The array-path inputs of the haze prep (for the bench: same graph, CPU-built inputs). */
+export type HazeArrays = {
+	W: number;
+	H: number;
+	photo: {
+		width: number;
+		height: number;
+		data: Uint8Array | Uint8ClampedArray;
+	};
+	range: Float32Array;
+	pSky: Float32Array;
+	/** people bits as haze.ts packs them (bit i & 31 of word i >> 5) */
+	fgBits: Uint32Array;
+	/** whether a people mask was given (fgRad) */
+	hasFg: boolean;
+};
+
+type HazeGeom = {
+	W: number;
+	H: number;
+	pw: number;
+	ph: number;
+	hasFg: boolean;
+};
+
+function hazeGraph(
+	device: Device,
+	key: string,
+	d: HazeGeom,
+	gather: null | {
+		geo: Src;
+		photo: Src;
+		sky: Src | null;
+		fg: Src | null;
+		step: number;
+	},
+) {
+	return cachedGraph(device, key, () => {
+		const { W, H, pw, ph } = d;
+		const N = W * H;
+		const g = new ComputeGraph(device, `look-tex-${key}`);
+		const owned: (Buffer | Texture)[] = [];
+		const c = constants(g, owned);
+		const groups = Math.ceil(N / WG);
+		const range = g.importBuffer("range", N * 4);
+		const psky = g.importBuffer("pSky", N * 4);
+		let photo: GraphBufferHandle;
+		let fgm: GraphBufferHandle;
+		if (gather) {
+			const { geo, sky, fg, step } = gather;
+			const gh = geo.texture.height;
+			photo = addPhoto(g, c, gather.photo, pw, ph, "photo");
+			fgm = g.transientBuffer("fgm", Math.ceil(N / 32) * 4);
+			// fitHazeGpu: range row y (top) = the ×step buffer's GL row H−1−y = geometry GL row
+			// (H−1−y)·step, i.e. image row gh−1−(H−1−y)·step
+			const tab = new Uint32Array(4 * W + 4 * H);
+			for (let x = 0; x < W; x++) tab[x] = x * step;
+			for (let y = 0; y < H; y++) tab[W + y] = gh - 1 - (H - 1 - y) * step;
+			for (const [m, o] of [
+				[sky, W + H],
+				[fg, 2 * W + 2 * H],
+			] as const)
+				if (m) {
+					for (let x = 0; x < W; x++)
+						tab[o + x] = Math.min(
+							m.texture.width - 1,
+							Math.floor(((x + 0.5) * m.texture.width) / W),
+						);
+					for (let y = 0; y < H; y++)
+						tab[o + W + y] = Math.min(
+							m.texture.height - 1,
+							Math.floor(((y + 0.5) * m.texture.height) / H),
+						);
+				}
+			const gprm = c.uniform(
+				"gather-prm",
+				u32Words(
+					W,
+					H,
+					gh,
+					+geo.flip,
+					+!!sky,
+					+!!sky?.flip,
+					sky?.texture.height ?? 1,
+					+!!fg,
+					+!!fg?.flip,
+					fg?.texture.height ?? 1,
+					+(geo.texture.format === "r32float"),
+					0,
+				),
+			);
+			const gtab = c.storage("gather-tab", tab);
+			addTexNode(
+				g,
+				"gather",
+				K_TEX_HAZE,
+				{
+					prm: gprm,
+					tab: gtab,
+					geo: importSampled(g, "geo", geo),
+					skyT: importSampled(g, "sky", sky),
+					range,
+					psky,
+				},
+				groups,
+			);
+			addTexNode(
+				g,
+				"fgbits",
+				K_TEX_FGBITS,
+				{ prm: gprm, tab: gtab, fgT: importSampled(g, "fg", fg), fgm },
+				Math.ceil(Math.ceil(N / 32) / WG),
+			);
+		} else {
+			photo = g.importBuffer("photo", pw * ph * 4);
+			fgm = g.importBuffer("fgm", Math.ceil(N / 32) * 4);
+		}
+		// prepGpu, node for node
+		const pxScale = W / 1024;
+		const rad = Math.max(1, Math.round(3 * pxScale));
+		const fgRad = d.hasFg ? Math.max(2, Math.round(8 * pxScale)) : 0;
+		const words = new ArrayBuffer(36);
+		new Uint32Array(words, 0, 5).set([W, H, pw, rad, fgRad]);
+		const lo = Math.log(DMIN);
+		new Float32Array(words, 20, 4).set([
+			lo,
+			Math.log(DMAX) - lo,
+			Math.max(150, DMIN),
+			DMAX,
+		]);
+		const prm = c.uniform("prep-prm", words);
+		const lin = g.importBuffer("lin", N * 12);
+		const flags = g.transientBuffer("flags", N * 4);
+		const flagsH = g.transientBuffer("flagsH", N * 4);
+		const bins = g.importBuffer("bins", N * 4);
+		const counts = g.importBuffer("counts", NBINS * 4);
+		const state = g.importBuffer("state", SEL * 8);
+		const hist = g.transientBuffer("hist", SEL * BUCKETS * 4);
+		g.addKernel({
+			id: "prep",
+			spec: K_HZ_PREP,
+			bindings: {
+				prm,
+				photo,
+				xb: c.storage("xb", footprints(W, pw)),
+				yb: c.storage("yb", footprints(H, ph)),
+				lut: c.storage("lut", SRGB_LUT_HAZE),
+				range,
+				fgm,
+				lin,
+				flags,
+			},
+			workgroups: [groups],
+		});
+		g.addKernel({
+			id: "dilh",
+			spec: K_HZ_DILH,
+			bindings: { prm, flags, outf: flagsH },
+			workgroups: [groups],
+		});
+		// prepGpu's counts come from a fresh (zeroed) buffer
+		g.addKernel({
+			id: "zero-counts",
+			spec: K_ZERO,
+			bindings: { buf: counts },
+			workgroups: [1],
+		});
+		g.addKernel({
+			id: "bin",
+			spec: K_HZ_BIN,
+			bindings: { prm, flagsH, range, psky, bins, counts },
+			workgroups: [groups],
+		});
+		g.addKernel({
+			id: "sel-init",
+			spec: K_HZ_SEL_INIT,
+			bindings: { counts, state },
+			workgroups: [Math.ceil(SEL / 64)],
+		});
+		for (let p = 0; p < 3; p++) {
+			const pp = c.uniform(`pass${p}`, u32Words(W, H, p, 0));
+			g.addKernel({
+				id: `clear${p}`,
+				spec: K_ZERO,
+				bindings: { buf: hist },
+				workgroups: [Math.ceil((SEL * BUCKETS) / 256)],
+			});
+			g.addKernel({
+				id: `hist${p}`,
+				spec: K_HZ_HIST,
+				bindings: { prm: pp, bins, lin, state, hist },
+				workgroups: [groups],
+			});
+			g.addKernel({
+				id: `scan${p}`,
+				spec: K_HZ_SCAN,
+				bindings: { prm: pp, hist, state },
+				workgroups: [Math.ceil(SEL / 64)],
+			});
+		}
+		g.compile();
+		return { graph: g as ComputeGraph, owned, extra: null };
+	});
+}
+
+async function runHaze(
+	device: Device,
+	e: { graph: ComputeGraph },
+	W: number,
+	H: number,
+	read: boolean,
+	extra: {
+		buffers?: Record<string, Buffer>;
+		textures?: Record<string, Texture>;
+		/** write the array path's inputs into the (pooled) range / pSky slots */
+		fill?: (b: HazePrepResult["buffers"]) => void;
+	},
+): Promise<HazePrepResult> {
+	const N = W * H;
+	const sizes = {
+		range: N * 4,
+		pSky: N * 4,
+		lin: N * 12,
+		bins: N * 4,
+		counts: NBINS * 4,
+		state: SEL * 8,
+	};
+	const buffers = {} as HazePrepResult["buffers"];
+	for (const [k, b] of Object.entries(sizes))
+		buffers[k as keyof typeof sizes] = slot(device, "haze", k, b);
+	extra.fill?.(buffers);
+	const names = Object.keys(sizes) as (keyof typeof sizes)[];
+	const { data } = await e.graph.run(undefined, {
+		buffers: { ...buffers, ...extra.buffers },
+		textures: extra.textures,
+		read: read ? reads(names.map((k) => [buffers[k], sizes[k]])) : [],
+	});
+	const r: HazePrepResult = { W, H, buffers };
+	if (read) {
+		const st = new Uint32Array(data[5]);
+		const stat = new Float32Array(SEL);
+		const bits = new Uint32Array(stat.buffer);
+		for (let k = 0; k < SEL; k++) bits[k] = st[2 * k];
+		r.data = {
+			W,
+			H,
+			range: new Float32Array(data[0]),
+			pSky: new Float32Array(data[1]),
+			lin: new Float32Array(data[2]),
+			bins: new Int32Array(data[3]),
+			counts: new Uint32Array(data[4]),
+			stat,
+		};
+	}
+	return r;
+}
+
+/**
+ * fitHazeGpu's GPU prep from textures: geometry decimated ×step (row 0 = top), P(sky), people,
+ * the photo box-resampled to linear, depth edges, dilations, log-range bins and the percentile
+ * order statistics. One submit; GPU buffers out (arrays too with `read`).
+ */
+export function hazePrepTex(
+	device: Device,
+	input: HazeTexInput,
+	opts: { read?: boolean } = {},
+): Promise<HazePrepResult> {
+	const geo = src(input.geometry);
+	const photo = src(input.photo);
+	const sky = input.sky ? src(input.sky) : null;
+	const fg = input.fg ? src(input.fg) : null;
+	check(device, geo, "geometry", GEO_FORMATS);
+	check(device, photo, "photo", PHOTO_FORMATS);
+	if (sky) check(device, sky, "sky", MASK_FORMATS);
+	if (fg) check(device, fg, "fg", MASK_FORMATS);
+	const step = input.step ?? 2;
+	const W = Math.floor(geo.texture.width / step);
+	const H = Math.floor(geo.texture.height / step);
+	const pw = photo.texture.width;
+	const ph = photo.texture.height;
+	const key = [
+		"haze",
+		step,
+		texKey(geo),
+		texKey(photo),
+		texKey(sky),
+		texKey(fg),
+	].join("|");
+	return withLease(PASS.haze, () => {
+		assertAlive(device, [geo, photo, sky, fg]);
+		const e = hazeGraph(
+			device,
+			key,
+			{ W, H, pw, ph, hasFg: !!fg },
+			{ geo, photo, sky, fg, step },
+		);
+		// runHaze reaches graph.run without an await
+		return runHaze(device, e, W, H, !!opts.read, {
+			textures: {
+				geo: geo.texture,
+				"photo-tex": photo.texture,
+				sky: sky?.texture ?? dummyMask(device),
+				fg: fg?.texture ?? dummyMask(device),
+			},
+		});
+	});
+}
+
+/** The same prep graph fed from CPU arrays (fitHazeGpu's inputs): the bench's array path. */
+export function hazePrepArrays(
+	device: Device,
+	a: HazeArrays,
+	opts: { read?: boolean } = {},
+): Promise<HazePrepResult> {
+	const { W, H } = a;
+	const pw = a.photo.width;
+	const ph = a.photo.height;
+	const key = ["haze-arrays", W, H, pw, ph, +a.hasFg].join("|");
+	return withLease(PASS.haze, () => {
+		if (device.isLost) throw new Error("[lookgpu] device lost");
+		const e = hazeGraph(device, key, { W, H, pw, ph, hasFg: a.hasFg }, null);
+		const photo = slot(device, "haze", "photo-in", pw * ph * 4);
+		photo.write(
+			new Uint8Array(a.photo.data.buffer, a.photo.data.byteOffset, pw * ph * 4),
+		);
+		const fgm = slot(device, "haze", "fgm-in", Math.ceil((W * H) / 32) * 4);
+		fgm.write(a.fgBits);
+		return runHaze(device, e, W, H, !!opts.read, {
+			buffers: { photo, fgm },
+			fill: (b) => {
+				b.range.write(a.range);
+				b.pSky.write(a.pSky);
+			},
+		});
+	});
+}

@@ -9,6 +9,9 @@
  * scores are bit-identical to the CPU path; the coordinate descent over ≤ 5 hypotheses stays on the
  * CPU (it's sequential, and its fine-map evaluations are few). Any GPU failure, no WebGPU, or the
  * kill switch (?gpu=off, src/lib/flags) → plain autoAlign.
+ *
+ * Runs on gpu/core: pooled buffers (the edge map's static planes uploaded once per photo), ring
+ * readback, and the core/profile pass label "align-pose-grid".
  */
 import {
 	type AlignResult,
@@ -19,8 +22,12 @@ import {
 	fitPriorSky,
 } from "#/lib/align";
 import type { Pose } from "#/lib/camera";
-import { getComputeDevice } from "../device";
-import { scorePoseGridGpu, warmPoseGrid } from "./pose-grid";
+import { getComputeDevice } from "#/lib/gpu/core/device";
+import {
+	lastUploadBytes,
+	scorePoseGridGpu,
+	warmPoseGridAsync,
+} from "./pose-grid";
 
 /**
  * Re-score window around each yaw column's GPU maximum. f32 error per cell is ~1e-4 at worst (a
@@ -39,17 +46,22 @@ export type AlignGpuTiming = {
 	gridMs: number;
 	/** cells re-scored on the CPU (of 2525) */
 	rescored: number;
+	/** bytes uploaded for the GPU grid (the edge map's coarse/fg planes only on a photo's first grid) */
+	uploadBytes?: number;
 	error?: string;
 };
 
 /** Timing of the last autoAlignAsync call (for benchmarks and the engines' stats). */
 export let lastAlignTiming: AlignGpuTiming | null = null;
 
-/** Create the compute device and compile the kernel ahead of the first autoAlign. Never throws. */
+/**
+ * Create the compute device and compile the kernel ahead of the first autoAlign (async pipeline
+ * creation, so the thread is not blocked). Never throws.
+ */
 export async function warmAlignGpu() {
 	try {
 		const device = await getComputeDevice();
-		if (device) warmPoseGrid(device);
+		if (device) await warmPoseGridAsync(device);
 	} catch {}
 }
 
@@ -80,11 +92,13 @@ export async function autoAlignAsync(
 	fitPriorSky(prior, aspect, dirs, edge);
 	let grid: CoarseGridScores | undefined;
 	let error: string | undefined;
+	let uploadBytes: number | undefined;
 	const tg = performance.now();
 	try {
 		const { poses } = coarseGridPoses(prior, yawRange);
 		const scores = await scorePoseGridGpu(device, poses, aspect, dirs, edge, 3);
 		grid = { scores, tol: GRID_TOL, skyFitted: true };
+		uploadBytes = lastUploadBytes;
 	} catch (e) {
 		error = String(e);
 		console.warn("[gpu] autoAlign grid failed, using the CPU", e);
@@ -103,6 +117,7 @@ export async function autoAlignAsync(
 		totalMs: performance.now() - t0,
 		gridMs,
 		rescored: grid?.rescored ?? 0,
+		uploadBytes,
 		error,
 	};
 	return res;

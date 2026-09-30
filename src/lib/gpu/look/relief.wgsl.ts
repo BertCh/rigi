@@ -1,6 +1,8 @@
 // WGSL for the GPU relief field (twin of look/relief/field.ts: castShadow, skyView,
 // curvatureAndNormal). Same line sweeps, same hull pointers, same byte rounding; f32 instead of the
 // CPU's f64 temporaries, so a byte can differ by 1 where a value sits on a rounding edge.
+// The shadow bytes are packed four per u32 (little-endian, texel q in byte q & 3 of word q >> 2):
+// RELIEF_SHADOW ORs them into a zeroed buffer, RELIEF_PACK unpacks them.
 
 const PARAMS = /* wgsl */ `
 struct P {
@@ -18,12 +20,12 @@ const NEG: f32 = -3.0e38;
  * Cast shadow: the occluder surface propagated one row (along the sun's major axis) at a time,
  * rows strictly in order. One workgroup; the previous row's max(H, O) lives in workgroup memory,
  * double-buffered so a single barrier per row suffices.
- * @workgroup_size(256): res ≤ 2048 texels per row, 4–8 per invocation.
+ * @workgroup_size(256): res ≤ 2048 texels per row, 4–8 per invocation. `shadow` must be zeroed.
  */
 export const RELIEF_SHADOW = /* wgsl */ `${PARAMS}
 @group(0) @binding(0) var<uniform> prm: P;
 @group(0) @binding(1) var<storage, read> H: array<f32>;
-@group(0) @binding(2) var<storage, read_write> shadow: array<u32>;
+@group(0) @binding(2) var<storage, read_write> shadow: array<atomic<u32>>;
 var<workgroup> rows: array<f32, 4096>;
 @compute @workgroup_size(256)
 fn main(@builtin(local_invocation_index) lid: u32) {
@@ -43,7 +45,8 @@ fn main(@builtin(local_invocation_index) lid: u32) {
       let h = H[q];
       rows[cur + u32(b)] = max(h, o);
       let t = clamp((h + prm.bias - o + prm.w) / (2.0 * prm.w), 0.0, 1.0);
-      shadow[q] = u32(255.0 * (t * t * (3.0 - 2.0 * t)) + 0.5);
+      // neighbouring texels of one word belong to other invocations (or rows): OR the byte in
+      atomicOr(&shadow[q >> 2u], u32(255.0 * (t * t * (3.0 - 2.0 * t)) + 0.5) << ((q & 3u) * 8u));
     }
     workgroupBarrier();
   }
@@ -168,7 +171,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   if (i >= res || j >= res) { return; }
   let q = u32(j) * prm.res + u32(i);
   var R = 0u;
-  if (prm.shadowConst >= 0) { R = u32(prm.shadowConst); } else { R = shadow[q]; }
+  if (prm.shadowConst >= 0) { R = u32(prm.shadowConst); } else { R = (shadow[q >> 2u] >> ((q & 3u) * 8u)) & 255u; }
   // sky view: half-res centres at full-res 2i + 0.5, clamped at the borders
   let rh = i32(prm.resH);
   let v = clamp((f32(j) - 0.5) / 2.0, 0.0, f32(rh - 1));

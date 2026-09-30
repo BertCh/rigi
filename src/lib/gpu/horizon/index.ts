@@ -16,6 +16,19 @@
  * are treated as immutable after the first GPU call; call releaseHorizonGpu(mosaics) to free the VRAM
  * early (otherwise it's freed when the device goes away).
  *
+ * Plumbing (src/lib/gpu/core): the kernel is a core defineKernel (group "horizon", pass label
+ * "horizon-march" for core/profile); the per-call buffers (uniform, params, output, stats) are pooled
+ * slots under "horizon/…", reused by every chunk (WebGPU orders a chunk's writeBuffer after the previous
+ * chunk's dispatch and staging copy, so no second set is needed); chunk c+1 is packed and submitted before
+ * chunk c is collected, so the CPU packing overlaps the GPU march. (The readback itself does not overlap:
+ * luma 9.4's mapAndReadAsync waits for all submitted work, so collecting chunk c also waits for c+1.)
+ * Readback goes through core/readback's staging slots on the dispatch's own encoder;
+ * bindings are set per pass. A call holds the "horizon" lease from upload to its last read, so
+ * overlapping callers (several eye heights in the worker, the eye search) run one after another
+ * instead of sharing buffers, and releaseHorizonGpu destroys pages only after in-flight calls finish.
+ * Pooled slots are bound with their original byte sizes (core range()), so the kernel sees exactly
+ * what it saw with per-call buffers: outputs are bit-identical to the pre-core path.
+ *
  * Ridges and peaks (decision): the GPU doesn't record ridges. Ridge lists are variable-length per azimuth
  * and only the Overlay / refine paths use them; the app worker and eye search pass noRidges. So
  * computeHorizonGpu always returns an empty ridge list per azimuth (the shape computeHorizonFast gives with
@@ -23,12 +36,31 @@
  * `opts.peaks` is classified on the CPU with peakVisibilityFast (one ray per peak; cheap), which is exactly
  * what computeHorizonFast does for them.
  *
- * App wiring: the horizon-fast-app worker marches on the GPU by default where WebGPU exists (off with
- * ?gpuHorizon=off or ?gpu=off; see opt-in.ts). autoAlign reacts to last-bit changes in the skyline
- * (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll); that drift was accepted when the default flipped.
+ * App wiring (on by default since 2026-09-28, not opt-in): the horizon-fast-app worker marches on the GPU
+ * wherever WebGPU exists (off with ?gpuHorizon=off or ?gpu=off; see opt-in.ts). autoAlign reacts to
+ * last-bit changes in the skyline (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll); that drift was
+ * accepted when the default flipped. The eye search (../eye) and the page's eye suggestion use it
+ * whenever getComputeDevice() gives a device. Only the unknown-pose 360° horizon (scene-profile.ts) is
+ * still opt-in (?unknownGpu=on, unknown-opt-in.ts).
  */
-import { Buffer, type ComputePipeline, type Device } from "@luma.gl/core";
+import { Buffer, type Device } from "@luma.gl/core";
 import { DEG, EARTH_R, REFRACTION_K } from "#/lib/geodesy";
+import {
+	defineKernel,
+	dispatch,
+	kernel,
+	submit,
+	warmKernels,
+	warmKernelsAsync,
+} from "#/lib/gpu/core/kernel";
+import {
+	acquire,
+	pooledStorage,
+	pooledUniform,
+	range,
+	withLease,
+} from "#/lib/gpu/core/pool";
+import { type StagedRead, stageReads } from "#/lib/gpu/core/readback";
 import {
 	computeHorizonFast,
 	type Eye,
@@ -45,6 +77,8 @@ const MAX_PAGES = 4;
 const MAX_MIPS = 8;
 /** Rays per submit: keeps each command buffer well under a second (GPU watchdogs). */
 const RAYS_PER_SUBMIT = 7200 * 24;
+/** core/pool lease: every "horizon/…" slot, and the mosaic pages' lifetime. */
+const LEASE = "horizon";
 
 // ---------- mosaic upload (cached per mosaics array) ----------
 
@@ -64,12 +98,21 @@ interface MosaicSet {
 
 const sets = new WeakMap<Mosaic[], MosaicSet>();
 
-/** Frees the GPU copy of these mosaics (the next GPU call re-uploads them). */
+/**
+ * Frees the GPU copy of these mosaics (the next GPU call re-uploads them). The pages are destroyed
+ * once the calls already running (or queued) on the "horizon" lease are done with them.
+ */
 export function releaseHorizonGpu(mosaics: Mosaic[]) {
 	const s = sets.get(mosaics);
 	if (!s) return;
-	for (const p of s.pages) p.destroy();
 	sets.delete(mosaics);
+	destroySet(s);
+}
+
+function destroySet(s: MosaicSet) {
+	withLease(LEASE, () => {
+		for (const p of s.pages) p.destroy();
+	}).catch(() => {});
 }
 
 /** Uploads (once) the mosaics' heights + max-mips; builds missing mips like the CPU march does. */
@@ -139,62 +182,38 @@ export function uploadMosaics(device: Device, mosaics: Mosaic[]): MosaicSet {
 		bytes: pageBytes.reduce((a, b) => a + b, 0),
 		uploadMs: performance.now() - t0,
 	};
+	// No device.lost listener here: it would keep `mosaics` (and the pages) reachable for the device's
+	// whole life, defeating the WeakMap. A hit on another device is re-uploaded above instead.
 	sets.set(mosaics, s);
 	return s;
 }
 
-// ---------- pipeline (one per device) ----------
+// ---------- kernel (core/kernel: one pipeline per device) ----------
 
-interface Kernel {
-	pipeline: ComputePipeline;
-	dummy: Buffer;
-}
-const kernels = new WeakMap<Device, Kernel>();
-
-function kernel(device: Device): Kernel {
-	let k = kernels.get(device);
-	if (k) return k;
-	const shader = device.createShader({
-		id: "horizon-march",
-		source: HORIZON_WGSL,
-		language: "wgsl",
-		stage: "compute",
-	});
-	const ro = "read-only-storage" as const;
-	const pipeline = device.createComputePipeline({
-		id: "horizon-march",
-		shader,
-		entryPoint: "main",
-		shaderLayout: {
-			bindings: [
-				{ name: "u", type: "uniform", group: 0, location: 0 },
-				{ name: "params", type: ro, group: 0, location: 1 },
-				{ name: "pg0", type: ro, group: 0, location: 2 },
-				{ name: "pg1", type: ro, group: 0, location: 3 },
-				{ name: "pg2", type: ro, group: 0, location: 4 },
-				{ name: "pg3", type: ro, group: 0, location: 5 },
-				{ name: "outTD", type: "storage", group: 0, location: 6 },
-				{ name: "stats", type: "storage", group: 0, location: 7 },
-			],
-		},
-	});
-	const dummy = device.createBuffer({
-		id: "horizon-dummy",
-		usage: Buffer.STORAGE,
-		byteLength: 16,
-	});
-	k = { pipeline, dummy };
-	kernels.set(device, k);
-	return k;
-}
+const MARCH = defineKernel(
+	"horizon-march",
+	HORIZON_WGSL,
+	[
+		["u", "uniform"],
+		["params", "read-only-storage"],
+		["pg0", "read-only-storage"],
+		["pg1", "read-only-storage"],
+		["pg2", "read-only-storage"],
+		["pg3", "read-only-storage"],
+		["outTD", "storage"],
+		["stats", "storage"],
+	],
+	{ group: "horizon", label: "horizon-march" },
+);
 
 /** Creates the kernel's pipeline now (e.g. while tiles still decode). Never throws. */
 export function warmHorizonGpu(device: Device) {
-	try {
-		kernel(device);
-	} catch (e) {
-		console.warn("[gpu] horizon kernel compile failed", e);
-	}
+	warmKernels(device, "horizon");
+}
+
+/** warmHorizonGpu without blocking the thread (createComputePipelineAsync). Never rejects. */
+export function warmHorizonGpuAsync(device: Device): Promise<void> {
+	return warmKernelsAsync(device, "horizon").then(() => {});
 }
 
 // ---------- per-eye segmenting (mirrors march.ts makeCtx) ----------
@@ -259,12 +278,65 @@ export async function computeHorizonGpu(
 ): Promise<FastHorizonProfile[]> {
 	const t0 = performance.now();
 	if (!eyes.length) return [];
+	const out = await withLease(LEASE, () =>
+		marchLocked(device, mosaics, eyes, opts, t0),
+	);
+	if (opts.peaks)
+		for (let j = 0; j < eyes.length; j++)
+			out[j].peaks = peakVisibilityFast(mosaics, eyes[j], opts.peaks, opts);
+	const t2 = performance.now();
+	for (const p of out) p.stats.ms = (t2 - t0) / eyes.length;
+	if (lastGpuHorizonTiming) lastGpuHorizonTiming.totalMs = t2 - t0;
+	return out;
+}
+
+/** The per-call slots, shared by every chunk of a call (queue order keeps chunks apart). */
+function slots(device: Device, paramsBytes: number, outBytes: number) {
+	return {
+		u: `${LEASE}/u`,
+		params: acquire(
+			device,
+			`${LEASE}/params`,
+			paramsBytes,
+			Buffer.STORAGE | Buffer.COPY_DST,
+		),
+		out: acquire(
+			device,
+			`${LEASE}/out`,
+			outBytes,
+			Buffer.STORAGE | Buffer.COPY_SRC,
+		),
+		stats: `${LEASE}/stats`,
+	};
+}
+
+/** A submitted chunk: its readback and where its eyes go in the output. */
+interface Pending {
+	c0: number;
+	nE: number;
+	read: StagedRead;
+}
+
+/** computeHorizonGpu's body, holding the "horizon" lease (pooled slots and pages are ours). */
+async function marchLocked(
+	device: Device,
+	mosaics: Mosaic[],
+	eyes: Eye[],
+	opts: FastHorizonOptions,
+	t0: number,
+): Promise<FastHorizonProfile[]> {
+	const tu = performance.now();
 	const set = uploadMosaics(device, mosaics);
 	const t1 = performance.now();
-	const uploadMs = t1 - t0;
-	const { pipeline, dummy } = kernel(device);
+	const uploadMs = t1 - tu;
+	const k = kernel(device, MARCH);
+	// unused pages bind a 16-byte dummy, as before
+	const dummy = range(
+		acquire(device, `${LEASE}/dummy`, 16, Buffer.STORAGE),
+		16,
+	);
 
-	const k = opts.k ?? REFRACTION_K;
+	const kR = opts.k ?? REFRACTION_K;
 	const maxDistance = Math.min(
 		opts.maxDistance ?? 150_000,
 		mosaics[mosaics.length - 1].maxDistance,
@@ -324,43 +396,51 @@ export async function computeHorizonGpu(
 		pF[azOff + 2 * i + 1] = Math.cos(a);
 	}
 
-	const uniform = device.createBuffer({
-		id: "horizon-u",
-		usage: Buffer.UNIFORM | Buffer.COPY_DST,
-		byteLength: 64,
-	});
-	const paramsBuf = device.createBuffer({
-		id: "horizon-params",
-		usage: Buffer.STORAGE | Buffer.COPY_DST,
-		byteLength: buf.byteLength,
-	});
-	const outBuf = device.createBuffer({
-		id: "horizon-out",
-		usage: Buffer.STORAGE | Buffer.COPY_SRC,
-		byteLength: eyesPerChunk * nAz * 8,
-	});
-	const statsBuf = device.createBuffer({
-		id: "horizon-stats",
-		usage: Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST,
-		byteLength: Math.max(16, eyesPerChunk * 12),
-	});
-	const out: FastHorizonProfile[] = [];
+	// The byte sizes the per-call buffers had; pooled slots are bound with exactly these.
+	const paramsBytes = buf.byteLength;
+	const outBytes = eyesPerChunk * nAz * 8;
+	const statsBytes = Math.max(16, eyesPerChunk * 12);
+	const pages = [0, 1, 2, 3].map((i) => set.pages[i] ?? dummy);
+	const ub = new ArrayBuffer(64);
+	const uu = new Uint32Array(ub);
+	const uf = new Float32Array(ub);
+
+	const out: FastHorizonProfile[] = new Array(eyes.length);
 	let chunks = 0;
+	/** Reads chunk `p` back into `out` (throws on the kernel's iteration cap). */
+	const collect = async (p: Pending) => {
+		const [td, st] = await p.read.read();
+		chunks++;
+		const T = new Float32Array(td, 0, p.nE * nAz * 2);
+		const S = new Uint32Array(st, 0, p.nE * 3);
+		for (let j = 0; j < p.nE; j++) {
+			if (S[3 * j + 2] > 0)
+				throw new Error("horizon kernel hit its iteration cap");
+			const elevation = new Float32Array(nAz);
+			const distance = new Float32Array(nAz);
+			for (let i = 0; i < nAz; i++) {
+				const t = T[2 * (j * nAz + i)];
+				elevation[i] = t <= -3e38 ? -90 : Math.atan(t) / DEG;
+				distance[i] = T[2 * (j * nAz + i) + 1];
+			}
+			out[p.c0 + j] = {
+				step,
+				elevation,
+				distance,
+				ridges: Array.from({ length: nAz }, () => []),
+				i0,
+				stats: {
+					azimuths: nAz,
+					samples: S[3 * j],
+					skips: S[3 * j + 1],
+					ms: 0,
+				},
+			};
+		}
+	};
+
+	let prev: Pending | null = null;
 	try {
-		pipeline.setBindings({
-			u: uniform,
-			params: paramsBuf,
-			pg0: set.pages[0] ?? dummy,
-			pg1: set.pages[1] ?? dummy,
-			pg2: set.pages[2] ?? dummy,
-			pg3: set.pages[3] ?? dummy,
-			outTD: outBuf,
-			stats: statsBuf,
-		});
-		const ub = new ArrayBuffer(64);
-		const uu = new Uint32Array(ub);
-		const uf = new Float32Array(ub);
-		const zeroStats = new Uint32Array(statsBuf.byteLength / 4);
 		for (let c0 = 0; c0 < eyes.length; c0 += eyesPerChunk) {
 			const nE = Math.min(eyesPerChunk, eyes.length - c0);
 			for (let j = 0; j < nE; j++) {
@@ -408,61 +488,57 @@ export async function computeHorizonGpu(
 			uu[7] = mipSkip ? 1 : 0;
 			uf[8] = opts.stepFactor ?? 3.5e-4;
 			uf[9] = opts.nearFactor ?? 0.01;
-			uf[10] = (1 - k) / (2 * EARTH_R);
+			uf[10] = (1 - kR) / (2 * EARTH_R);
 			uu[11] = 1_000_000;
 			uu[12] = 0; // U.zero
-			uniform.write(new Uint8Array(ub));
-			paramsBuf.write(new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4));
-			statsBuf.write(zeroStats);
+			// Same slots every chunk: this chunk's writes queue after the previous chunk's dispatch + copy.
+			const sl = slots(device, paramsBytes, outBytes);
+			const u = pooledUniform(device, sl.u, ub);
+			sl.params.write(new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4));
+			const stats = pooledStorage(device, sl.stats, statsBytes); // zeroed
 			const enc = device.createCommandEncoder({ id: "horizon-march" });
-			const pass = enc.beginComputePass({ id: "horizon-march" });
-			pass.setPipeline(pipeline);
-			pass.dispatch(Math.ceil(nAz / 64), nE, 1);
-			pass.end();
-			device.submit(enc.finish());
-			const [td, st] = await Promise.all([
-				outBuf.readAsync(0, nE * nAz * 8),
-				statsBuf.readAsync(0, nE * 12),
+			dispatch(
+				enc,
+				k,
+				{
+					u,
+					params: range(sl.params, paramsBytes),
+					pg0: pages[0],
+					pg1: pages[1],
+					pg2: pages[2],
+					pg3: pages[3],
+					outTD: range(sl.out, outBytes),
+					stats: range(stats, statsBytes),
+				},
+				Math.ceil(nAz / 64),
+				nE,
+				1,
+			);
+			const read = stageReads(device, enc, [
+				{ buffer: sl.out, size: nE * nAz * 8 },
+				{ buffer: stats, size: nE * 12 },
 			]);
-			chunks++;
-			const T = new Float32Array(td.buffer, td.byteOffset, nE * nAz * 2);
-			const S = new Uint32Array(st.buffer, st.byteOffset, nE * 3);
-			for (let j = 0; j < nE; j++) {
-				if (S[3 * j + 2] > 0)
-					throw new Error("horizon kernel hit its iteration cap");
-				const elevation = new Float32Array(nAz);
-				const distance = new Float32Array(nAz);
-				for (let i = 0; i < nAz; i++) {
-					const t = T[2 * (j * nAz + i)];
-					elevation[i] = t <= -3e38 ? -90 : Math.atan(t) / DEG;
-					distance[i] = T[2 * (j * nAz + i) + 1];
-				}
-				out.push({
-					step,
-					elevation,
-					distance,
-					ridges: Array.from({ length: nAz }, () => []),
-					i0,
-					stats: {
-						azimuths: nAz,
-						samples: S[3 * j],
-						skips: S[3 * j + 1],
-						ms: 0,
-					},
-				});
+			try {
+				submit(device, enc);
+			} catch (e) {
+				read.cancel();
+				throw e;
 			}
+			const cur: Pending = { c0, nE, read };
+			// Collect the previous chunk now that this one is packed and submitted.
+			const p = prev;
+			prev = cur;
+			if (p) await collect(p);
 		}
+		const last = prev;
+		prev = null;
+		if (last) await collect(last);
 	} finally {
-		uniform.destroy();
-		paramsBuf.destroy();
-		outBuf.destroy();
-		statsBuf.destroy();
+		// an error left a chunk submitted: wait for it (and return its staging slot) before the
+		// lease lets anyone else reuse the slots
+		if (prev) await prev.read.read().catch(() => {});
 	}
-	if (opts.peaks)
-		for (let j = 0; j < eyes.length; j++)
-			out[j].peaks = peakVisibilityFast(mosaics, eyes[j], opts.peaks, opts);
 	const t2 = performance.now();
-	for (const p of out) p.stats.ms = (t2 - t0) / eyes.length;
 	lastGpuHorizonTiming = {
 		uploadMs,
 		gpuMs: t2 - t1,

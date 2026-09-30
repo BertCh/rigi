@@ -1,9 +1,11 @@
 // GPU twin of look/haze-fit.ts fitHaze. The GPU (haze.wgsl.ts) does the per-pixel work (photo
 // resample, depth edges, dilations, log-range bins), the per-bin 1st / 9th percentiles (exact order
-// statistics by radix select, replacing the CPU's sorts) and the physical fit's 5 550-cell grid
-// scan. The CPU keeps what is small or sequential: the airlight band, the dark-subset sums and
-// representative paths, the free-β IRLS, the refinement passes and the quality terms. Those parts
-// mirror haze-fit.ts line for line (keep in sync; look-bench.mjs catches drift).
+// statistics by radix select, replacing the CPU's sorts), the representative pixel lists and the
+// airlight band's values (compacted / gathered, so the per-pixel lin + bins stay on the GPU), and
+// the physical fit's 5 550-cell grid scan. The CPU keeps what is small or sequential: the airlight
+// statistics, the dark-subset sums and representative paths, the free-β IRLS, the refinement
+// passes and the quality terms. Those parts mirror haze-fit.ts line for line (keep in sync;
+// look-bench.mjs catches drift). Buffers are pooled (lease "look-haze").
 import type { Device } from "@luma.gl/core";
 import {
 	ATM_CURV,
@@ -29,25 +31,34 @@ import {
 import { sunColor } from "../../look/sun";
 import { srgbToLinear } from "../../style/color";
 import {
+	BLOCK,
 	BUCKETS,
 	HZ_BIN,
-	HZ_CLEAR,
+	HZ_CNT,
 	HZ_DILH,
+	HZ_GATHER,
 	HZ_GRID,
 	HZ_HIST,
+	HZ_OFFS,
 	HZ_PREP,
 	HZ_SCAN,
+	HZ_SCATTER,
 	HZ_SEL_INIT,
+	LISTS,
 	SEL,
 } from "./haze.wgsl";
 import {
+	clear,
 	defineKernel,
 	dispatch,
 	kernel,
-	release,
-	stage,
-	storage,
-	uniform,
+	pooledStorage,
+	pooledUniform,
+	type ReadRange,
+	readBack,
+	stageReads,
+	submit,
+	withLease,
 } from "./kernel";
 
 const K_HZ_PREP = defineKernel("hz-prep", HZ_PREP, [
@@ -78,7 +89,6 @@ const K_HZ_SEL_INIT = defineKernel("hz-sel-init", HZ_SEL_INIT, [
 	["counts", "read-only-storage"],
 	["state", "storage"],
 ]);
-const K_HZ_CLEAR = defineKernel("hz-clear", HZ_CLEAR, [["hist", "storage"]]);
 const K_HZ_HIST = defineKernel("hz-hist", HZ_HIST, [
 	["prm", "uniform"],
 	["bins", "read-only-storage"],
@@ -90,6 +100,34 @@ const K_HZ_SCAN = defineKernel("hz-scan", HZ_SCAN, [
 	["prm", "uniform"],
 	["hist", "read-only-storage"],
 	["state", "storage"],
+]);
+const K_HZ_CNT = defineKernel("hz-cnt", HZ_CNT, [
+	["prm", "uniform"],
+	["bins", "read-only-storage"],
+	["lin", "read-only-storage"],
+	["state", "read-only-storage"],
+	["blk", "storage"],
+]);
+const K_HZ_OFFS = defineKernel("hz-offs", HZ_OFFS, [
+	["prm", "uniform"],
+	["blk", "storage"],
+	["starts", "storage"],
+]);
+const K_HZ_SCATTER = defineKernel("hz-scatter", HZ_SCATTER, [
+	["prm", "uniform"],
+	["bins", "read-only-storage"],
+	["lin", "read-only-storage"],
+	["state", "read-only-storage"],
+	["blk", "read-only-storage"],
+	["starts", "read-only-storage"],
+	["outIdx", "storage"],
+	["outVal", "storage"],
+]);
+const K_HZ_GATHER = defineKernel("hz-gather", HZ_GATHER, [
+	["prm", "uniform"],
+	["idx", "read-only-storage"],
+	["lin", "read-only-storage"],
+	["outv", "storage"],
 ]);
 const K_HZ_GRID = defineKernel("hz-grid", HZ_GRID, [
 	["prm", "uniform"],
@@ -112,29 +150,54 @@ const SRGB_LUT = (() => {
 })();
 const GRID_A = 25;
 const GRID_B = 37;
+const HM_PRIOR = Float32Array.from(
+	H_M_CANDIDATES,
+	(h) => 8 * Math.log2(h / H_M) ** 2,
+);
 
 /** Timings of the last fitHazeGpu (ms), for the bench. */
 export const hazeGpuTimes: Record<string, number> = {};
 
+/** How fitHazeGpu gets the per-pixel results to the CPU. */
+export type HazeGpuOptions = {
+	/**
+	 * true (default): only the representative lists and the airlight band's values come back (the
+	 * GPU compacts them). false: the whole lin + bins come back and the CPU walks every pixel, as
+	 * before (kept for the bench; the result is the same).
+	 */
+	compact?: boolean;
+};
+
+/** One (bin, channel)'s candidate pixels in pixel order: indices and their lin values. */
+type List = { idx: ArrayLike<number>; val: Float32Array };
+
 type Prep = {
-	lin: Float32Array;
-	bins: Int32Array;
 	counts: Uint32Array;
 	/** order statistic per (bin, channel, slot), as f32 */
 	stat: Float32Array;
+	/** lin (3 per pixel) at the `skyIdx` pixels, in order */
+	sky: Float32Array;
+	/** list L = bin·3 + channel: a superset of the CPU's [v0, v1] pixels, in pixel order */
+	list: (L: number) => List;
+	/** bytes read back */
+	bytes: number;
+	/** the compacted lists overflowed the first readback (one more round trip) */
+	tail: boolean;
 };
 
-/** Submit 1: per-pixel prep, bins and the percentile order statistics. */
-async function prepGpu(
+/** Submit 1: per-pixel prep, bins, the percentile order statistics and (compact) the lists. */
+function prepGpu(
 	device: Device,
 	photo: HazeFitInput["photo"],
 	W: number,
 	H: number,
 	range: Float32Array,
 	pSky: Float32Array,
-	fgm: Uint32Array,
+	fgBits: Uint32Array,
 	rad: number,
 	fgRad: number,
+	skyIdx: Uint32Array,
+	compact: boolean,
 ): Promise<Prep> {
 	const N = W * H;
 	// the box footprints, in f64 as the CPU
@@ -167,118 +230,226 @@ async function prepGpu(
 		Math.max(150, DMIN),
 		DMAX,
 	]);
-	const prm = uniform(device, words);
-	const gPhoto = storage(
-		device,
-		new Uint8Array(
-			photo.data.buffer,
-			photo.data.byteOffset,
-			photo.data.byteLength,
-		),
-	);
-	const gxb = storage(device, xb);
-	const gyb = storage(device, yb);
-	const lut = storage(device, SRGB_LUT);
-	const gRange = storage(device, range);
-	const gSky = storage(device, pSky);
-	const gFg = storage(device, fgm);
-	const lin = storage(device, N * 12);
-	const flags = storage(device, N * 4);
-	const flagsH = storage(device, N * 4);
-	const bins = storage(device, N * 4);
-	const counts = storage(device, new Uint32Array(NBINS));
-	const state = storage(device, SEL * 8);
-	const hist = storage(device, SEL * BUCKETS * 4);
-	const passPrm = [0, 1, 2].map((p) =>
-		uniform(device, new Uint32Array([W, H, p, 0]).buffer),
-	);
-	const owned = [
-		prm,
-		gPhoto,
-		gxb,
-		gyb,
-		lut,
-		gRange,
-		gSky,
-		gFg,
-		lin,
-		flags,
-		flagsH,
-		bins,
-		counts,
-		state,
-		hist,
-		...passPrm,
-	];
-	const groups = Math.ceil(N / 256);
-	const enc = device.createCommandEncoder({ id: "look-haze-prep" });
-	dispatch(
-		enc,
-		kernel(device, K_HZ_PREP),
-		{
-			prm,
-			photo: gPhoto,
-			xb: gxb,
-			yb: gyb,
-			lut,
-			range: gRange,
-			fgm: gFg,
-			lin,
-			flags,
-		},
-		groups,
-	);
-	dispatch(
-		enc,
-		kernel(device, K_HZ_DILH),
-		{ prm, flags, outf: flagsH },
-		groups,
-	);
-	dispatch(
-		enc,
-		kernel(device, K_HZ_BIN),
-		{ prm, flagsH, range: gRange, psky: gSky, bins, counts },
-		groups,
-	);
-	dispatch(
-		enc,
-		kernel(device, K_HZ_SEL_INIT),
-		{ counts, state },
-		Math.ceil(SEL / 64),
-	);
-	const kClear = kernel(device, K_HZ_CLEAR);
-	const kHist = kernel(device, K_HZ_HIST);
-	const kScan = kernel(device, K_HZ_SCAN);
-	for (let p = 0; p < 3; p++) {
-		dispatch(enc, kClear, { hist }, Math.ceil((SEL * BUCKETS) / 256));
-		dispatch(enc, kHist, { prm: passPrm[p], bins, lin, state, hist }, groups);
-		dispatch(enc, kScan, { prm: passPrm[p], hist, state }, Math.ceil(SEL / 64));
-	}
-	const rLin = stage(device, enc, lin, N * 12);
-	const rBins = stage(device, enc, bins, N * 4);
-	const rCounts = stage(device, enc, counts, NBINS * 4);
-	const rState = stage(device, enc, state, SEL * 8);
-	device.submit(enc.finish());
-	try {
-		const [l, b, c, s] = await Promise.all([
-			rLin.read(),
-			rBins.read(),
-			rCounts.read(),
-			rState.read(),
-		]);
-		const st = new Uint32Array(s);
-		const stat = new Float32Array(SEL);
-		const bits = new Uint32Array(stat.buffer);
-		for (let k = 0; k < SEL; k++) bits[k] = st[2 * k];
+	const K = skyIdx.length;
+	const nBlk = Math.ceil(N / BLOCK);
+	return withLease("look-haze", async () => {
+		const up = (key: string, data: ArrayBufferView | number) =>
+			pooledStorage(device, `look-haze/${key}`, data);
+		// outputs every pixel / slot of which its kernel writes: no zeroing needed
+		const scratch = (key: string, bytes: number) =>
+			pooledStorage(device, `look-haze/${key}`, bytes, { zero: false });
+		const prm = pooledUniform(device, "look-haze/prm", words);
+		const gPhoto = up(
+			"photo",
+			new Uint8Array(
+				photo.data.buffer,
+				photo.data.byteOffset,
+				photo.data.byteLength,
+			),
+		);
+		const gxb = up("xb", xb);
+		const gyb = up("yb", yb);
+		const lut = up("lut", SRGB_LUT);
+		const gRange = up("range", range);
+		const gSky = up("psky", pSky);
+		const gFg = up("fgm", fgBits);
+		const lin = scratch("lin", N * 12);
+		const flags = scratch("flags", N * 4);
+		const flagsH = scratch("flagsH", N * 4);
+		const bins = scratch("bins", N * 4);
+		const counts = up("counts", NBINS * 4); // atomics: zeroed
+		const state = scratch("state", SEL * 8);
+		const hist = scratch("hist", SEL * BUCKETS * 4); // cleared per pass
+		// one uniform per radix pass: all three are recorded before the submit
+		const passPrm = [0, 1, 2].map((p) =>
+			pooledUniform(
+				device,
+				`look-haze/pass${p}`,
+				new Uint32Array([W, H, p, 0]),
+			),
+		);
+		const groups = Math.ceil(N / 256);
+		const enc = device.createCommandEncoder({ id: "look-haze-prep" });
+		dispatch(
+			enc,
+			kernel(device, K_HZ_PREP),
+			{
+				prm,
+				photo: gPhoto,
+				xb: gxb,
+				yb: gyb,
+				lut,
+				range: gRange,
+				fgm: gFg,
+				lin,
+				flags,
+			},
+			groups,
+		);
+		dispatch(
+			enc,
+			kernel(device, K_HZ_DILH),
+			{ prm, flags, outf: flagsH },
+			groups,
+		);
+		dispatch(
+			enc,
+			kernel(device, K_HZ_BIN),
+			{ prm, flagsH, range: gRange, psky: gSky, bins, counts },
+			groups,
+		);
+		dispatch(
+			enc,
+			kernel(device, K_HZ_SEL_INIT),
+			{ counts, state },
+			Math.ceil(SEL / 64),
+		);
+		const kHist = kernel(device, K_HZ_HIST);
+		const kScan = kernel(device, K_HZ_SCAN);
+		for (let p = 0; p < 3; p++) {
+			clear(enc, hist, 0, SEL * BUCKETS * 4);
+			dispatch(enc, kHist, { prm: passPrm[p], bins, lin, state, hist }, groups);
+			dispatch(
+				enc,
+				kScan,
+				{ prm: passPrm[p], hist, state },
+				Math.ceil(SEL / 64),
+			);
+		}
+		const head: ReadRange[] = [
+			{ buffer: counts, size: NBINS * 4 },
+			{ buffer: state, size: SEL * 8 },
+		];
+		if (!compact) {
+			head.push({ buffer: lin, size: N * 12 }, { buffer: bins, size: N * 4 });
+			const rd = stageReads(device, enc, head);
+			submit(device, enc);
+			const [c, s, l, b] = await rd.read();
+			const linF = new Float32Array(l);
+			const binsI = new Int32Array(b);
+			const cnt = new Uint32Array(c);
+			// the CPU's walk: every pixel of the bin, in pixel order
+			const start = new Int32Array(NBINS + 1);
+			for (let k = 0; k < NBINS; k++) start[k + 1] = start[k] + cnt[k];
+			const fill = start.slice(0, NBINS);
+			const order = new Int32Array(start[NBINS]);
+			for (let i = 0; i < N; i++)
+				if (binsI[i] >= 0) order[fill[binsI[i]]++] = i;
+			const sky = new Float32Array(3 * K);
+			for (let k = 0; k < K; k++)
+				for (let ch = 0; ch < 3; ch++)
+					sky[3 * k + ch] = linF[skyIdx[k] * 3 + ch];
+			return {
+				counts: cnt,
+				stat: statOf(s),
+				sky,
+				list: (L: number) => {
+					const bin = Math.floor(L / 3);
+					const ch = L - bin * 3;
+					const idx = order.subarray(start[bin], start[bin + 1]);
+					const val = new Float32Array(idx.length);
+					for (let k = 0; k < idx.length; k++) val[k] = linF[idx[k] * 3 + ch];
+					return { idx, val };
+				},
+				bytes: NBINS * 4 + SEL * 8 + N * 16,
+				tail: false,
+			};
+		}
+		// compact: the lists' block counts → starts → scatter, and the airlight band gather
+		const cprm = pooledUniform(
+			device,
+			"look-haze/cprm",
+			new Uint32Array([N, nBlk, K, 0]),
+		);
+		const blk = scratch("blk", nBlk * LISTS * 4);
+		const starts = scratch("starts", (LISTS + 1) * 4);
+		// capacity: every binned pixel in all three channels' lists
+		const outIdx = scratch("outIdx", 3 * N * 4);
+		const outVal = scratch("outVal", 3 * N * 4);
+		const blocks = Math.ceil(nBlk / 64);
+		dispatch(
+			enc,
+			kernel(device, K_HZ_CNT),
+			{ prm: cprm, bins, lin, state, blk },
+			blocks,
+		);
+		dispatch(enc, kernel(device, K_HZ_OFFS), { prm: cprm, blk, starts }, 1);
+		dispatch(
+			enc,
+			kernel(device, K_HZ_SCATTER),
+			{ prm: cprm, bins, lin, state, blk, starts, outIdx, outVal },
+			blocks,
+		);
+		let skyOut = null;
+		if (K) {
+			const idx = up("skyIdx", skyIdx);
+			skyOut = scratch("skyOut", 3 * K * 4);
+			dispatch(
+				enc,
+				kernel(device, K_HZ_GATHER),
+				{ prm: cprm, idx, lin, outv: skyOut },
+				Math.ceil(K / 64),
+			);
+		}
+		// the lists hold ~8 % of the binned pixels per channel (+ ties): read a guess with the rest,
+		// then whatever did not fit
+		const guess = Math.min(3 * N, Math.ceil(0.27 * N) + 512);
+		head.push(
+			{ buffer: starts, size: (LISTS + 1) * 4 },
+			{ buffer: outIdx, size: guess * 4 },
+			{ buffer: outVal, size: guess * 4 },
+		);
+		if (skyOut) head.push({ buffer: skyOut, size: 3 * K * 4 });
+		const rd = stageReads(device, enc, head);
+		submit(device, enc);
+		const got = await rd.read();
+		const st = new Uint32Array(got[2]);
+		const total = st[LISTS];
+		let idxAll = new Uint32Array(got[3]);
+		let valAll = new Float32Array(got[4]);
+		let bytes = NBINS * 4 + SEL * 8 + (LISTS + 1) * 4 + guess * 8 + 12 * K;
+		if (total > guess) {
+			const rest = (total - guess) * 4;
+			const [ti, tv] = await readBack(
+				device,
+				() => {},
+				[
+					{ buffer: outIdx, offset: guess * 4, size: rest },
+					{ buffer: outVal, offset: guess * 4, size: rest },
+				],
+				{ id: "look-haze-tail" },
+			);
+			const i2 = new Uint32Array(total);
+			i2.set(idxAll);
+			i2.set(new Uint32Array(ti), guess);
+			const v2 = new Float32Array(total);
+			v2.set(valAll);
+			v2.set(new Float32Array(tv), guess);
+			idxAll = i2;
+			valAll = v2;
+			bytes += 2 * rest;
+		}
 		return {
-			lin: new Float32Array(l),
-			bins: new Int32Array(b),
-			counts: new Uint32Array(c),
-			stat,
+			counts: new Uint32Array(got[0]),
+			stat: statOf(got[1]),
+			sky: skyOut ? new Float32Array(got[5]) : new Float32Array(0),
+			list: (L: number) => ({
+				idx: idxAll.subarray(st[L], st[L + 1]),
+				val: valAll.subarray(st[L], st[L + 1]),
+			}),
+			bytes,
+			tail: total > guess,
 		};
-	} finally {
-		release(...owned);
-	}
+	});
+}
+
+/** The selected f32 bit patterns out of the radix-select state (prefix, remaining rank) pairs. */
+function statOf(state: ArrayBuffer): Float32Array {
+	const st = new Uint32Array(state);
+	const stat = new Float32Array(SEL);
+	const bits = new Uint32Array(stat.buffer);
+	for (let k = 0; k < SEL; k++) bits[k] = st[2 * k];
+	return stat;
 }
 
 /** Submit 2: the physical grid's cost per cell (index = (hk·25 + a)·37 + b). */
@@ -327,35 +498,39 @@ async function gridGpu(
 		0,
 	]);
 	const cells = NH * GRID_A * GRID_B;
-	const prm = uniform(device, words);
-	const gReps = storage(device, flat);
-	const gOff = storage(device, off);
-	const gIw = storage(device, iw);
-	const hm = storage(
-		device,
-		Float32Array.from(H_M_CANDIDATES, (h) => 8 * Math.log2(h / H_M) ** 2),
-	);
-	const err = storage(device, cells * 4);
-	const enc = device.createCommandEncoder({ id: "look-haze-grid" });
-	dispatch(
-		enc,
-		kernel(device, K_HZ_GRID),
-		{ prm, reps: gReps, repOff: gOff, Iw: gIw, hmPrior: hm, err },
-		Math.ceil(cells / 64),
-	);
-	const rd = stage(device, enc, err, cells * 4);
-	device.submit(enc.finish());
-	try {
-		return new Float32Array(await rd.read());
-	} finally {
-		release(prm, gReps, gOff, gIw, hm, err);
-	}
+	return withLease("look-haze", async () => {
+		const up = (key: string, data: ArrayBufferView) =>
+			pooledStorage(device, `look-haze/${key}`, data);
+		const prm = pooledUniform(device, "look-haze/gprm", words);
+		const gReps = up("reps", flat);
+		const gOff = up("repOff", off);
+		const gIw = up("Iw", iw);
+		const hm = up("hmPrior", HM_PRIOR);
+		// every cell is written
+		const err = pooledStorage(device, "look-haze/err", cells * 4, {
+			zero: false,
+		});
+		const [e] = await readBack(
+			device,
+			(enc) =>
+				dispatch(
+					enc,
+					kernel(device, K_HZ_GRID),
+					{ prm, reps: gReps, repOff: gOff, Iw: gIw, hmPrior: hm, err },
+					Math.ceil(cells / 64),
+				),
+			[{ buffer: err, size: cells * 4 }],
+			{ id: "look-haze-grid" },
+		);
+		return new Float32Array(e);
+	});
 }
 
 /** GPU twin of fitHaze(input): the same HazeFit, up to f32 rounding in the GPU parts. */
 export async function fitHazeGpu(
 	device: Device,
 	input: HazeFitInput,
+	opts: HazeGpuOptions = {},
 ): Promise<HazeFit> {
 	const T0 = performance.now();
 	const { photo, geo, geoW: W, geoH: H, sky, foreground: fg, eyeAlt } = input;
@@ -400,7 +575,8 @@ export async function fitHazeGpu(
 		}
 	const pxScale = W / 1024;
 	const rad = Math.max(1, Math.round(3 * pxScale));
-	const fgm = new Uint32Array(N);
+	// the people mask, 1 bit per pixel (bit i & 31 of word i >> 5)
+	const fgBits = new Uint32Array(Math.ceil(N / 32));
 	if (fg)
 		for (let y = 0; y < H; y++)
 			for (let x = 0; x < W; x++) {
@@ -412,30 +588,18 @@ export async function fitHazeGpu(
 					fg.height - 1,
 					Math.floor(((y + 0.5) * fg.height) / H),
 				);
-				fgm[y * W + x] = fg.data[my * fg.width + mx] > 64 ? 1 : 0;
+				if (fg.data[my * fg.width + mx] > 64) {
+					const i = y * W + x;
+					fgBits[i >> 5] |= 1 << (i & 31);
+				}
 			}
 	const fgRad = fg ? Math.max(2, Math.round(8 * pxScale)) : 0;
-	const t1 = performance.now();
-	const { lin, bins, counts, stat } = await prepGpu(
-		device,
-		photo,
-		W,
-		H,
-		range,
-		pSky,
-		fgm,
-		rad,
-		fgRad,
-	);
-	const t2 = performance.now();
 
-	// --- airlight (as the CPU)
+	// the airlight band's pixels (as the CPU; range and sky only), or, with fewer than 20 of them,
+	// robustSky's fallback (every range-0 pixel): the GPU gathers their lin
 	const a0 = Math.max(2, Math.round(20 * pxScale));
 	const a1 = Math.max(a0 + 2, Math.round(60 * pxScale));
-	const skyR: number[] = [];
-	const skyG: number[] = [];
-	const skyB: number[] = [];
-	const skyL: number[] = [];
+	const band: number[] = [];
 	for (let x = 0; x < W; x += 2) {
 		let top = -1;
 		for (let y = 0; y < H; y++) {
@@ -449,15 +613,55 @@ export async function fitHazeGpu(
 		for (let y = Math.max(0, top - a1); y <= top - a0; y++) {
 			const i = y * W + x;
 			if (range[i] > 0 || pSky[i] < 0.7) continue;
-			skyR.push(lin[i * 3]);
-			skyG.push(lin[i * 3 + 1]);
-			skyB.push(lin[i * 3 + 2]);
-			skyL.push(
-				0.2126 * lin[i * 3] + 0.7152 * lin[i * 3 + 1] + 0.0722 * lin[i * 3 + 2],
-			);
+			band.push(i);
 		}
 	}
-	const airlight = robustSky(skyR, skyG, skyB, skyL, lin, range);
+	if (band.length < 20) {
+		band.length = 0;
+		for (let i = 0; i < N; i++) if (range[i] <= 0) band.push(i);
+	}
+	const skyIdx = Uint32Array.from(band);
+	const t1 = performance.now();
+	const {
+		counts,
+		stat,
+		sky: skyLin,
+		list,
+		bytes,
+		tail,
+	} = await prepGpu(
+		device,
+		photo,
+		W,
+		H,
+		range,
+		pSky,
+		fgBits,
+		rad,
+		fgRad,
+		skyIdx,
+		opts.compact ?? true,
+	);
+	const t2 = performance.now();
+
+	// --- airlight (as the CPU)
+	const skyR: number[] = [];
+	const skyG: number[] = [];
+	const skyB: number[] = [];
+	const skyL: number[] = [];
+	for (let k = 0; k < skyIdx.length; k++) {
+		const r = skyLin[3 * k];
+		const g = skyLin[3 * k + 1];
+		const b = skyLin[3 * k + 2];
+		skyR.push(r);
+		skyG.push(g);
+		skyB.push(b);
+		skyL.push(0.2126 * r + 0.7152 * g + 0.0722 * b);
+	}
+	// ≥ 20 values: robustSky uses them as they are; fewer (only when even the fallback has < 20)
+	// it returns its default without looking at lin
+	const none = new Float32Array(0);
+	const airlight = robustSky(skyR, skyG, skyB, skyL, none, none);
 
 	// --- bins (from the GPU), then the CPU's per-bin loop with the GPU's order statistics
 	let total = 0;
@@ -468,11 +672,6 @@ export async function fitHazeGpu(
 	const REPS = 24;
 	const NH = H_M_CANDIDATES.length;
 	const reps: Float64Array[][] = [[], [], []];
-	const start = new Int32Array(NBINS + 1);
-	for (let b = 0; b < NBINS; b++) start[b + 1] = start[b] + counts[b];
-	const fill = start.slice(0, NBINS);
-	const order = new Int32Array(total);
-	for (let i = 0; i < N; i++) if (bins[i] >= 0) order[fill[bins[i]]++] = i;
 	// percentile(val, n, q) of the CPU from the selected order statistics
 	const pct = (b: number, c: number, n: number, q: 0.01 | 0.09) => {
 		const s0 = (b * 3 + c) * 4 + (q === 0.01 ? 0 : 2);
@@ -488,7 +687,6 @@ export async function fitHazeGpu(
 		if (i === gi - 1) return stat[s0];
 		throw new Error(`haze percentile rank ${i} vs ${gi}`);
 	};
-	const val = new Float32Array(N);
 	for (let b = 0; b < NBINS; b++) {
 		const n = counts[b];
 		if (n < minCount) continue;
@@ -500,18 +698,21 @@ export async function fitHazeGpu(
 		let mG = 0;
 		let ok = true;
 		for (let c = 0; c < 3; c++) {
-			for (let k = 0; k < n; k++) val[k] = lin[order[start[b] + k] * 3 + c];
+			// the bin's pixels in pixel order (compact: only those between the bracketing order
+			// statistics, a superset of [v0, v1]); the CPU's own test picks [v0, v1] from them
+			const { idx, val } = list(b * 3 + c);
+			const len = val.length;
 			const v0 = pct(b, c, n, 0.01);
 			const v1 = pct(b, c, n, 0.09);
 			let sel = 0;
-			for (let k = 0; k < n; k++) if (val[k] >= v0 && val[k] <= v1) sel++;
+			for (let k = 0; k < len; k++) if (val[k] >= v0 && val[k] <= v1) sel++;
 			const stride = Math.max(1, Math.floor(sel / REPS));
 			const rep = new Float64Array(Math.min(REPS, sel) * (1 + NH));
 			let nr = 0;
 			let m = 0;
-			for (let k = 0; k < n; k++) {
+			for (let k = 0; k < len; k++) {
 				if (val[k] < v0 || val[k] > v1) continue;
-				const i = order[start[b] + k];
+				const i = idx[k];
 				low[c] += val[k];
 				const keep = m % stride === 0 && nr * (1 + NH) < rep.length;
 				m++;
@@ -557,6 +758,8 @@ export async function fitHazeGpu(
 			gpuPrep: t2 - t1,
 			cpuBins: t3 - t2,
 			total: performance.now() - T0,
+			readKB: bytes / 1024,
+			tailRead: tail ? 1 : 0,
 		});
 		return {
 			betaR: [...BETA_R0],
@@ -768,6 +971,8 @@ export async function fitHazeGpu(
 		gridCandidates: cand.length,
 		cpuRefine: performance.now() - t5,
 		total: performance.now() - T0,
+		readKB: bytes / 1024,
+		tailRead: tail ? 1 : 0,
 	});
 	return {
 		betaR: [BETA_R0[0] * best.kR, BETA_R0[1] * best.kR, BETA_R0[2] * best.kR],

@@ -20,6 +20,11 @@
  *
  * Mosaics are built once around the photo and shared by every eye (the eye moves ≤ ~100 m; sector
  * windows are padded by `padMeters`, default 250). The GPU keeps its copy until release().
+ *
+ * GPU plumbing is ../horizon's (src/lib/gpu/core): each horizonsAtEyes batch reuses pooled buffers and
+ * one staged readback, and holds the "horizon" lease, so overlapping batches (or the app worker's
+ * marches in the same realm) queue instead of sharing buffers. release() frees the pages once the
+ * batches already queued are done.
  */
 import { blobHeights, MAPTERHORN } from "#/lib/dem";
 import { DEG, EARTH_R } from "#/lib/geodesy";

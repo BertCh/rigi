@@ -19,6 +19,8 @@
 // @workgroup_size(64) for CELLS: 64 consecutive yaws of one combo per workgroup, so neighbouring
 // invocations read neighbouring profile bins and the same combo constants. REDUCE uses 256
 // invocations per yaw (one workgroup each) striding over the ≤ ~4000 combos. CANDS is 64 × 1.
+// REDUCE_SG_WGSL is REDUCE with subgroup operations (when the device has "subgroups"): the same
+// max / min / (max mid, first index) results, since each is order-independent.
 
 const HEADER = /* wgsl */ `
 struct U {
@@ -186,6 +188,61 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (e.z >= r.x && (e.w >= 0.0 || ci == bitcast<u32>(r.w))) {
     let slot = atomicAdd(&list[0], 1u);
     if (slot < u.cap) { atomicStore(&list[slot + 1u], i); }
+  }
+}
+`;
+
+// REDUCE with subgroup ops: each subgroup folds its lanes with subgroupMax / subgroupMin, one lane
+// per subgroup appends that partial to workgroup memory (slot from an atomic counter, so nothing is
+// assumed about how invocations map to subgroups), and invocation 0 folds the ≤ 64 partials. The
+// argmax is (max mid, then the smallest combo among the lanes holding it), exactly REDUCE's
+// tie-break, and max / min are exact in any order, so red[] is identical to REDUCE's.
+export const REDUCE_SG_WGSL = /* wgsl */ `enable subgroups;
+${HEADER}
+@group(0) @binding(0) var<uniform> u: U;
+@group(0) @binding(1) var<storage, read> cells: array<vec4<f32>>;
+@group(0) @binding(2) var<storage, read_write> red: array<vec4<f32>>;
+var<workgroup> shLo: array<f32, 256>;
+var<workgroup> shMid: array<f32, 256>;
+var<workgroup> shArg: array<u32, 256>;
+var<workgroup> shZero: array<u32, 256>;
+var<workgroup> nSub: atomic<u32>;
+
+@compute @workgroup_size(256)
+fn main(
+  @builtin(workgroup_id) wid: vec3<u32>,
+  @builtin(local_invocation_index) lid: u32,
+  @builtin(subgroup_invocation_id) sid: u32,
+) {
+  let iy = wid.x;
+  if (lid == 0u) { atomicStore(&nSub, 0u); }
+  var mLo = -3.0e38; var mMid = -3.0e38; var mArg = 0xffffffffu; var zArg = 0xffffffffu;
+  for (var c = lid; c < u.nCombo; c += 256u) {
+    let e = cells[c * u.nYaw + iy];
+    mLo = max(mLo, e.y);
+    if (e.w < 0.0) { zArg = min(zArg, c); }
+    if (e.x > mMid) { mMid = e.x; mArg = c; }
+  }
+  workgroupBarrier();
+  let sLo = subgroupMax(mLo);
+  let sZero = subgroupMin(zArg);
+  let sMid = subgroupMax(mMid);
+  let sArg = subgroupMin(select(0xffffffffu, mArg, mMid == sMid));
+  if (sid == 0u) {
+    let s = atomicAdd(&nSub, 1u);
+    shLo[s] = sLo; shMid[s] = sMid; shArg[s] = sArg; shZero[s] = sZero;
+  }
+  workgroupBarrier();
+  if (lid == 0u) {
+    let n = atomicLoad(&nSub);
+    var rLo = shLo[0]; var rMid = shMid[0]; var rArg = shArg[0]; var rZero = shZero[0];
+    for (var s = 1u; s < n; s++) {
+      rZero = min(rZero, shZero[s]);
+      rLo = max(rLo, shLo[s]);
+      let om = shMid[s]; let oa = shArg[s];
+      if (om > rMid || (om == rMid && oa < rArg)) { rMid = om; rArg = oa; }
+    }
+    red[iy] = vec4<f32>(rLo, rMid, bitcast<f32>(rArg), bitcast<f32>(rZero));
   }
 }
 `;

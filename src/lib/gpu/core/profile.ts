@@ -1,0 +1,93 @@
+// Optional GPU timestamp profiling. Off unless `globalThis.__RIGI_GPU_PROFILE__ = true` (read live,
+// per realm) and the device has 'timestamp-query'. When off, passProps() returns a shared empty
+// object: no query sets, no extra work.
+//
+// When on, each profiled compute pass gets a 2-slot timestamp QuerySet (pooled per device); after
+// core submit() the durations are read asynchronously and summed per label. getGpuProfile() gives
+// { [label]: { gpuMs, count } } in this realm (workers keep their own).
+import type { ComputePassProps, Device, QuerySet } from "@luma.gl/core";
+
+declare global {
+	var __RIGI_GPU_PROFILE__: boolean | undefined;
+}
+
+export type GpuProfile = Record<string, { gpuMs: number; count: number }>;
+
+const EMPTY: ComputePassProps = Object.freeze({}) as ComputePassProps;
+
+let totals: GpuProfile = {};
+const free = new WeakMap<Device, QuerySet[]>();
+const pending = new WeakMap<Device, { label: string; qs: QuerySet }[]>();
+const reads = new Set<Promise<void>>();
+
+/** Whether profiling is on for `device` right now. */
+export const profiling = (device: Device) =>
+	globalThis.__RIGI_GPU_PROFILE__ === true &&
+	device.features.has("timestamp-query");
+
+/**
+ * Props for `enc.beginComputePass(...)`: timestamp writes labelled `label` when profiling is on,
+ * else an empty object. The pass must be submitted through core submit() to be counted.
+ */
+export function passProps(device: Device, label: string): ComputePassProps {
+	if (!profiling(device)) return EMPTY;
+	const qs =
+		free.get(device)?.pop() ??
+		device.createQuerySet({ type: "timestamp", count: 2 });
+	let p = pending.get(device);
+	if (!p) {
+		p = [];
+		pending.set(device, p);
+	}
+	p.push({ label, qs });
+	return {
+		id: label,
+		timestampQuerySet: qs,
+		beginTimestampIndex: 0,
+		endTimestampIndex: 1,
+	};
+}
+
+/** Add a measured duration (graph.ts reports per-node timings through this). */
+export function recordGpuTime(label: string, ms: number) {
+	if (!Number.isFinite(ms) || ms < 0) return;
+	const t = totals[label] ?? { gpuMs: 0, count: 0 };
+	t.gpuMs += ms;
+	t.count++;
+	totals[label] = t;
+}
+
+/** @internal core/queue.ts: after a submit, read this device's pending pass timestamps. */
+export function afterSubmit(device: Device) {
+	const p = pending.get(device);
+	if (!p?.length) return;
+	pending.set(device, []);
+	for (const { label, qs } of p) {
+		const r = qs
+			.readTimestampDuration(0, 1)
+			.then((ms) => recordGpuTime(label, ms))
+			.catch(() => {})
+			.finally(() => {
+				reads.delete(r);
+				if (device.isLost) return;
+				let f = free.get(device);
+				if (!f) {
+					f = [];
+					free.set(device, f);
+				}
+				f.push(qs);
+			});
+		reads.add(r);
+	}
+}
+
+/** Per-label GPU time so far (waits for in-flight timestamp reads first). */
+export async function getGpuProfile(): Promise<GpuProfile> {
+	await Promise.all([...reads]);
+	return structuredClone(totals);
+}
+
+/** Clear the totals. */
+export function resetGpuProfile() {
+	totals = {};
+}

@@ -9,18 +9,30 @@
 // polish is inherently sequential.
 //
 // Not wired into the service: see the parity / timing report (scripts/gpu/skyglobal-bench.mjs).
-import type { Buffer, Device } from "@luma.gl/core";
-import { getComputeDevice } from "../device";
+//
+// Plumbing (src/lib/gpu/core): pooled buffers under the "skyglobal" lease (one grid at a time per
+// module, as before), bindings per pass, one core submit. The candidate list is read count-first:
+// the one submit reads the count plus the first `head` slots (sized from the last call's count),
+// and only an unusually long list costs a second, exact-length read of the rest.
+import { type Device, Buffer as LumaBuffer } from "@luma.gl/core";
 import {
 	type BindKind,
+	defineKernel,
 	dispatch,
-	type KernelSpec,
 	kernel,
-	release,
-	stage,
-	storage,
-	uniform,
-} from "../look/kernel";
+	kernelAsync,
+	submit,
+} from "../core/kernel";
+import {
+	acquire,
+	clear,
+	pooledStorage,
+	pooledUniform,
+	releasePool,
+	withLease,
+} from "../core/pool";
+import { readBack, stageReads } from "../core/readback";
+import { getComputeDevice, hasFeature } from "../device";
 import {
 	type EdgeInputs,
 	type GridPlan,
@@ -31,18 +43,15 @@ import {
 	CANDS_WGSL,
 	CELLS_WGSL,
 	COMBO_FLOATS,
+	REDUCE_SG_WGSL,
 	REDUCE_WGSL,
 } from "./skyglobal.wgsl";
 
-const spec = (
-	id: string,
-	source: string,
-	layout: [string, BindKind][],
-): KernelSpec => ({
-	id: `skyglobal-${id}`,
-	source,
-	layout,
-});
+const spec = (id: string, source: string, layout: [string, BindKind][]) =>
+	defineKernel(`skyglobal-${id}`, source, layout, {
+		group: "skyglobal",
+		label: `skyglobal-${id}`,
+	});
 const K_CELLS = spec("cells", CELLS_WGSL, [
 	["u", "uniform"],
 	["S", "read-only-storage"],
@@ -52,11 +61,19 @@ const K_CELLS = spec("cells", CELLS_WGSL, [
 	["combos", "read-only-storage"],
 	["cells", "storage"],
 ]);
-const K_REDUCE = spec("reduce", REDUCE_WGSL, [
+const REDUCE_LAYOUT: [string, BindKind][] = [
 	["u", "uniform"],
 	["cells", "read-only-storage"],
 	["red", "storage"],
-]);
+];
+const K_REDUCE = spec("reduce", REDUCE_WGSL, REDUCE_LAYOUT);
+// defined outside the "skyglobal" warm group: it only compiles on devices with "subgroups"
+const K_REDUCE_SG = defineKernel(
+	"skyglobal-reduce-sg",
+	REDUCE_SG_WGSL,
+	REDUCE_LAYOUT,
+	{ group: "skyglobal-sg", label: "skyglobal-reduce-sg" },
+);
 const K_CANDS = spec("cands", CANDS_WGSL, [
 	["u", "uniform"],
 	["cells", "read-only-storage"],
@@ -64,9 +81,20 @@ const K_CANDS = spec("cands", CANDS_WGSL, [
 	["list", "storage"],
 ]);
 
+/** REDUCE with subgroup ops where the device has them (identical output), else the shared-memory tree. */
+const reduceSpec = (device: Device) =>
+	hasFeature(device, "subgroups") ? K_REDUCE_SG : K_REDUCE;
+
 /** Compile the three pipelines now (so the first search does not pay the WGSL compile). */
 export function warmSkyGlobalGpu(device: Device) {
-	for (const k of [K_CELLS, K_REDUCE, K_CANDS]) kernel(device, k);
+	for (const k of [K_CELLS, reduceSpec(device), K_CANDS]) kernel(device, k);
+}
+
+/** warmSkyGlobalGpu without blocking the thread (createComputePipelineAsync). */
+export async function warmSkyGlobalGpuAsync(device: Device) {
+	await Promise.all(
+		[K_CELLS, reduceSpec(device), K_CANDS].map((k) => kernelAsync(device, k)),
+	);
 }
 
 export type GridGpuOptions = {
@@ -76,6 +104,10 @@ export type GridGpuOptions = {
 	zeps?: number;
 	/** candidate list capacity (default max(65536, 32 · nYaw)); overflow → CPU grid */
 	cap?: number;
+	/** candidate slots read with the count in the first readback (default from the last call); a longer list costs a second read */
+	head?: number;
+	/** force the shared-memory REDUCE even when the device has subgroups (parity checks) */
+	noSubgroups?: boolean;
 	/** also read back the GPU's point estimates (combo × yaw, float32) for parity reports */
 	debugGrid?: boolean;
 };
@@ -95,6 +127,12 @@ export type GridGpuStats = {
 	midArgFlips: number;
 	/** true when the candidate list overflowed or was inconsistent and the CPU grid ran instead */
 	fellBack: boolean;
+	/** bytes read back from the GPU (all reads) */
+	readBytes: number;
+	/** readbacks (1, or 2 when the list outgrew `head`) */
+	reads: number;
+	/** REDUCE ran with subgroup ops */
+	subgroups: boolean;
 };
 
 export type GridGpuResult = GridResult & {
@@ -108,8 +146,19 @@ export type GridGpuResult = GridResult & {
 	hi?: Float32Array;
 };
 
-// the pipelines' bindings are shared state: one grid at a time per device
-let queue: Promise<unknown> = Promise.resolve();
+// the pooled buffers are shared state: one grid at a time (FIFO), as the old module queue did
+const OWNER = "skyglobal";
+const key = (slot: string) => `${OWNER}/${slot}`;
+const STORAGE = LumaBuffer.STORAGE | LumaBuffer.COPY_DST | LumaBuffer.COPY_SRC;
+/** Minimum candidate slots read in the first readback (16 KiB); dev fixtures have ~700–800. */
+const HEAD_MIN = 4096;
+// last call's candidate count: sizes the next call's first read (1.5×, so one read nearly always)
+let lastCount = 0;
+
+/** Free the grid's pooled buffers on `device` (the cells buffer alone is nCells × 16 B, ~24 MB). */
+export function releaseSkyGlobalGpu(device: Device) {
+	return withLease(OWNER, () => releasePool(device, `${OWNER}/`));
+}
 
 /** SkyGlobal.gridCpu(g) with the scoring on the GPU; resolves the identical {best, arg}. */
 export function gridGpu(
@@ -118,9 +167,7 @@ export function gridGpu(
 	g: GridPlan,
 	o: GridGpuOptions = {},
 ): Promise<GridGpuResult> {
-	const run = queue.then(() => gridOnce(device, sg, g, o));
-	queue = run.catch(() => {});
-	return run;
+	return withLease(OWNER, () => gridOnce(device, sg, g, o));
 }
 
 async function gridOnce(
@@ -190,114 +237,147 @@ async function gridOnce(
 	uu.set([sg.w, sg.h, g.n, g.sy, nYaw, nCombo, Math.floor(g.cntMin) + 1, cap]);
 	uf.set([o.eps ?? 5e-3, o.zeps ?? 1e-5, smin, smax], 8);
 
-	const bufs: Buffer[] = [];
-	const keep = <B extends Buffer>(b: B) => {
-		bufs.push(b);
-		return b;
+	const head = Math.min(
+		cap,
+		Math.max(1, o.head ?? Math.max(HEAD_MIN, Math.ceil(lastCount * 1.5))),
+	);
+	const sub = !o.noSubgroups && hasFeature(device, "subgroups");
+
+	// every slot is either fully rewritten (inputs, cells, red) or cleared where it is read (the
+	// list's count word): no stale bytes from the previous call reach a result
+	const u = pooledUniform(device, key("u"), ub);
+	const S = pooledStorage(device, key("S"), sg.Sc);
+	const cells = acquire(device, key("cells"), nCells * 16, STORAGE);
+	const red = acquire(device, key("red"), nYaw * 16, STORAGE);
+	const list = acquire(device, key("list"), (cap + 1) * 4, STORAGE);
+	const bind = {
+		u,
+		S,
+		prof: pooledStorage(device, key("prof"), prof),
+		alpha: pooledStorage(device, key("alpha"), alpha),
+		vfs: pooledStorage(device, key("vfs"), vfs),
+		combos: pooledStorage(device, key("combos"), combos),
+		cells,
 	};
+	const t1 = performance.now();
+	const enc = device.createCommandEncoder({ id: "skyglobal-grid" });
+	clear(enc, list, 0, 4);
+	dispatch(enc, kernel(device, K_CELLS), bind, Math.ceil(nYaw / 64), nCombo);
+	dispatch(
+		enc,
+		kernel(device, sub ? K_REDUCE_SG : K_REDUCE),
+		{ u, cells, red },
+		nYaw,
+	);
+	dispatch(
+		enc,
+		kernel(device, K_CANDS),
+		{ u, cells, red, list },
+		Math.ceil(nYaw / 64),
+		nCombo,
+	);
+	// one submit: the count + the first `head` slots, the reduction, (debug) the whole grid
+	const ranges = [
+		{ buffer: list, size: (head + 1) * 4 },
+		{ buffer: red, size: nYaw * 16 },
+	];
+	if (o.debugGrid) ranges.push({ buffer: cells, size: nCells * 16 });
+	const staged = stageReads(device, enc, ranges);
 	try {
-		const u = keep(uniform(device, ub));
-		const S = keep(storage(device, sg.Sc));
-		const cells = keep(storage(device, nCells * 16));
-		const red = keep(storage(device, nYaw * 16));
-		const list = keep(storage(device, new Uint32Array(cap + 1)));
-		const bind = {
-			u,
-			S,
-			prof: keep(storage(device, prof)),
-			alpha: keep(storage(device, alpha)),
-			vfs: keep(storage(device, vfs)),
-			combos: keep(storage(device, combos)),
-			cells,
-		};
-		const t1 = performance.now();
-		const enc = device.createCommandEncoder({ id: "skyglobal-grid" });
-		dispatch(enc, kernel(device, K_CELLS), bind, Math.ceil(nYaw / 64), nCombo);
-		dispatch(enc, kernel(device, K_REDUCE), { u, cells, red }, nYaw);
-		dispatch(
-			enc,
-			kernel(device, K_CANDS),
-			{ u, cells, red, list },
-			Math.ceil(nYaw / 64),
-			nCombo,
-		);
-		const rList = stage(device, enc, list, (cap + 1) * 4);
-		const rRed = stage(device, enc, red, nYaw * 16);
-		const rCells = o.debugGrid ? stage(device, enc, cells, nCells * 16) : null;
-		device.submit(enc.finish());
-		const [lb, rb, cb] = await Promise.all([
-			rList.read(),
-			rRed.read(),
-			rCells?.read(),
-		]);
-		const t2 = performance.now();
-		const L = new Uint32Array(lb);
-		const Ru = new Uint32Array(rb);
-		const count = L[0];
-		const stats: GridGpuStats = {
-			gpuMs: t2 - t1,
-			uploadMs: t1 - t0,
-			rescoreMs: 0,
-			nCells,
-			nCand: count,
-			maxCandPerYaw: 0,
-			midArgFlips: 0,
-			fellBack: false,
-		};
-		let dbg: Pick<GridGpuResult, "mid" | "lo" | "hi"> = {};
-		if (cb) {
-			const C = new Float32Array(cb);
-			const mid = new Float32Array(nCells);
-			const lo = new Float32Array(nCells);
-			const hi = new Float32Array(nCells);
-			for (let i = 0; i < nCells; i++) {
-				mid[i] = C[i * 4];
-				lo[i] = C[i * 4 + 1];
-				hi[i] = C[i * 4 + 2];
-			}
-			dbg = { mid, lo, hi };
-		}
-		// exact re-score of the candidates, per yaw in combo order (gridCpu's strict ">" keeps the first max)
-		const t3 = performance.now();
-		const perYaw: number[][] = Array.from({ length: nYaw }, () => []);
-		if (count <= cap)
-			for (let i = 1; i <= count; i++) {
-				const c = L[i];
-				perYaw[c % nYaw].push(Math.floor(c / nYaw));
-			}
-		const best = new Float64Array(nYaw).fill(Number.NEGATIVE_INFINITY);
-		const arg = new Int32Array(nYaw);
-		let ok = count <= cap;
-		for (let iy = 0; ok && iy < nYaw; iy++) {
-			const cs = perYaw[iy].sort((a, b) => a - b);
-			if (!cs.length) ok = false;
-			stats.maxCandPerYaw = Math.max(stats.maxCandPerYaw, cs.length);
-			for (const ci of cs) {
-				const sc = sg.cellScore(g, T, iy, ci);
-				if (sc > best[iy]) {
-					best[iy] = sc;
-					arg[iy] = ci;
-				}
-			}
-			if (Ru[iy * 4 + 2] !== arg[iy]) stats.midArgFlips++;
-		}
-		stats.rescoreMs = performance.now() - t3;
-		if (!ok) {
-			stats.fellBack = true;
-			const r = sg.gridCpu(g);
-			return { ...r, ms: performance.now() - t0, stats, ...dbg };
-		}
-		return {
-			best,
-			arg,
-			ms: performance.now() - t0,
-			stats,
-			cands: L.slice(1, count + 1),
-			...dbg,
-		};
-	} finally {
-		release(...bufs);
+		submit(device, enc);
+	} catch (e) {
+		staged.cancel();
+		throw e;
 	}
+	const [lb, rb, cb] = await staged.read();
+	let readBytes = ranges.reduce((a, r) => a + r.size, 0);
+	let reads = 1;
+	const L0 = new Uint32Array(lb);
+	const count = L0[0];
+	lastCount = Math.min(count, cap);
+	// the rest of the list, only when it outgrew `head` (and fits: an overflow falls back anyway)
+	let L = L0;
+	if (count > head && count <= cap) {
+		const rest = {
+			buffer: list,
+			offset: (head + 1) * 4,
+			size: (count - head) * 4,
+		};
+		const [tail] = await readBack(device, () => {}, [rest], {
+			id: "skyglobal-cands-tail",
+		});
+		L = new Uint32Array(count + 1);
+		L.set(L0);
+		L.set(new Uint32Array(tail), head + 1);
+		readBytes += rest.size;
+		reads++;
+	}
+	const t2 = performance.now();
+	const Ru = new Uint32Array(rb);
+	const stats: GridGpuStats = {
+		gpuMs: t2 - t1,
+		uploadMs: t1 - t0,
+		rescoreMs: 0,
+		nCells,
+		nCand: count,
+		maxCandPerYaw: 0,
+		midArgFlips: 0,
+		fellBack: false,
+		readBytes,
+		reads,
+		subgroups: sub,
+	};
+	let dbg: Pick<GridGpuResult, "mid" | "lo" | "hi"> = {};
+	if (cb) {
+		const C = new Float32Array(cb);
+		const mid = new Float32Array(nCells);
+		const lo = new Float32Array(nCells);
+		const hi = new Float32Array(nCells);
+		for (let i = 0; i < nCells; i++) {
+			mid[i] = C[i * 4];
+			lo[i] = C[i * 4 + 1];
+			hi[i] = C[i * 4 + 2];
+		}
+		dbg = { mid, lo, hi };
+	}
+	// exact re-score of the candidates, per yaw in combo order (gridCpu's strict ">" keeps the first max)
+	const t3 = performance.now();
+	const perYaw: number[][] = Array.from({ length: nYaw }, () => []);
+	if (count <= cap)
+		for (let i = 1; i <= count; i++) {
+			const c = L[i];
+			perYaw[c % nYaw].push(Math.floor(c / nYaw));
+		}
+	const best = new Float64Array(nYaw).fill(Number.NEGATIVE_INFINITY);
+	const arg = new Int32Array(nYaw);
+	let ok = count <= cap;
+	for (let iy = 0; ok && iy < nYaw; iy++) {
+		const cs = perYaw[iy].sort((a, b) => a - b);
+		if (!cs.length) ok = false;
+		stats.maxCandPerYaw = Math.max(stats.maxCandPerYaw, cs.length);
+		for (const ci of cs) {
+			const sc = sg.cellScore(g, T, iy, ci);
+			if (sc > best[iy]) {
+				best[iy] = sc;
+				arg[iy] = ci;
+			}
+		}
+		if (Ru[iy * 4 + 2] !== arg[iy]) stats.midArgFlips++;
+	}
+	stats.rescoreMs = performance.now() - t3;
+	if (!ok) {
+		stats.fellBack = true;
+		const r = sg.gridCpu(g);
+		return { ...r, ms: performance.now() - t0, stats, ...dbg };
+	}
+	return {
+		best,
+		arg,
+		ms: performance.now() - t0,
+		stats,
+		cands: L.slice(1, count + 1),
+		...dbg,
+	};
 }
 
 /** SkyGlobal.search with the GPU grid (CPU grid when there is no device). Same result shape. */

@@ -1,14 +1,12 @@
 #!/usr/bin/env node
-// W5 parity / speed bench for the look passes on the GPU (src/lib/gpu/look/**). For each photo it
-// opens /photo/<id> in headless Chromium with WebGPU, captures the real look-pass inputs from
-// window.__engine (the three.js engine at the ground-truth pose), then runs every GPU twin against
-// its CPU function (src/lib/gpu/look/bench.ts) and prints max / p99 / mean abs error and ms.
-// Always run it under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/look-bench.mjs [--photos IMG_7086,IMG_6958]
-//     [--url http://localhost:3110] [--reps 5] [--settings JSON] [--module /src/…] [--fn name]
-// --settings (default {"mode":"replace","mapStyle":"hillshade"}) is pushed to the engine before the
-// capture, so the band-stats layer is a fully covering map layer (the case LOOK_HARMONIZE serves).
-// Writes out/gpu/w5/look-bench.json (small).
+// Parity / speed bench of the texture-input look passes (src/lib/gpu/look/textures.ts) against the
+// array path: for each photo it opens /photo/<id> in headless Chromium with WebGPU, captures the
+// real look inputs from window.__engine (three.js, ground-truth pose), re-creates the engine's
+// targets as textures on the compute device and runs runTexturesBench (textures-bench.ts): masks,
+// band stats and haze prep, bit-exact checks and ms. Always run it under the render lock:
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/textures-bench.mjs [--photos IMG_7086,IMG_6958]
+//     [--url http://localhost:3110] [--reps 5] [--settings JSON] [--query …] [--tag …]
+// Writes out/gpu/core/textures-bench[-tag].json (small). Exit code 1 if any pass is not exact.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,8 +20,8 @@ const arg = (k, d) => {
 const URL0 = arg("url", process.env.APP_URL ?? "http://localhost:3110");
 const PHOTOS = arg("photos", "IMG_7086,IMG_6958").split(",");
 const REPS = Number(arg("reps", "5"));
-const MOD = arg("module", "/src/lib/gpu/look/bench.ts");
-const FN = arg("fn", "runLookBench");
+const MOD = "/src/lib/gpu/look/textures-bench.ts";
+const FN = "runTexturesBench";
 // extra page query, e.g. "lookgpu=1&style=swiss&renderer=deck" (lookSmoke checks the hooks)
 // renderer=three unless the query names one: captureLookInputs needs the three.js engine
 const QUERY_ARG = arg("query", "");
@@ -34,7 +32,7 @@ const TAG = arg("tag", "");
 const SETTINGS = JSON.parse(
 	arg("settings", '{"mode":"replace","mapStyle":"hillshade"}'),
 );
-const OUT = join(ROOT, "out/gpu/w5");
+const OUT = join(ROOT, "out/gpu/core");
 
 const gt = JSON.parse(
 	readFileSync(join(ROOT, "data/ground-truth.json"), "utf8"),
@@ -48,7 +46,10 @@ function fixedPose(id) {
 
 const t0 = Date.now();
 const log = (...m) =>
-	console.log(`[look-bench ${((Date.now() - t0) / 1000).toFixed(1)}s]`, ...m);
+	console.log(
+		`[textures-bench ${((Date.now() - t0) / 1000).toFixed(1)}s]`,
+		...m,
+	);
 
 async function runOne(browser, id) {
 	const ctx = await browser.newContext({
@@ -130,6 +131,19 @@ try {
 	await browser.close();
 }
 mkdirSync(OUT, { recursive: true });
-const name = `${FN === "runLookBench" ? "look-bench" : FN}${TAG ? `-${TAG}` : ""}.json`;
+const name = `textures-bench${TAG ? `-${TAG}` : ""}.json`;
 writeFileSync(join(OUT, name), JSON.stringify(results, null, 1));
-log(`wrote out/gpu/w5/${name}`);
+log(`wrote out/gpu/core/${name}`);
+const bad = Object.entries(results).filter(
+	([, r]) =>
+		r.error ||
+		(r.masks && !r.masks.exact) ||
+		(r.stats && !(r.stats.subgroups.exact && r.stats.plain.exact)) ||
+		(r.haze && !r.haze.exact) ||
+		(r.variants?.masks && !r.variants.masks.exact) ||
+		(r.variants?.haze && !r.variants.haze.exact) ||
+		(r.adopted &&
+			!(r.adopted.returned && r.adopted.exact && r.adopted.afterDestroy)),
+);
+for (const [id] of bad) log(`${id}: NOT EXACT`);
+process.exitCode = bad.length ? 1 : 0;

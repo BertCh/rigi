@@ -3,58 +3,92 @@
 // rounding only (see the WGSL header), and autoAlign's `grid` option re-scores near-winners on the
 // CPU, so callers get the CPU's exact result.
 //
-// Readback: all scores (nPoses × 4 B, 10 KB for the 2525-pose grid). A GPU top-K would save
-// nothing measurable at that size, and autoAlign needs every column's near-maximum cells anyway.
-import { Buffer, type ComputePipeline, type Device } from "@luma.gl/core";
+// Buffers live in the gpu/core pool ("align/…" slots, one lease "align" per grid), so warm calls
+// allocate nothing. The edge map's `coarse` and `fg` planes (~1 MB each at 512 px) never change
+// after buildEdgeMap, so they are uploaded once per photo: a slot remembers which array it holds
+// and skips the write when the same one comes back. `skyCum` is refit IN PLACE by fitPriorSky
+// (it depends on the prior), so it is uploaded on every call.
+//
+// Readback: all scores (nPoses × 4 B, 10 KB for the 2525-pose grid) through a core/readback slot.
+// A GPU top-K would save nothing measurable at that size, and autoAlign needs every column's
+// near-maximum cells anyway.
+import { Buffer, type Device } from "@luma.gl/core";
 import type { EdgeMap } from "#/lib/align";
 import { type Pose, poseBasis } from "#/lib/camera";
+import {
+	defineKernel,
+	dispatch,
+	kernel,
+	stage,
+	submit,
+	warmKernels,
+	warmKernelsAsync,
+} from "#/lib/gpu/core/kernel";
+import {
+	acquire,
+	pooledStorage,
+	pooledUniform,
+	withLease,
+} from "#/lib/gpu/core/pool";
 import { POSE_GRID_WGSL } from "./pose-grid.wgsl";
 
 const D = Math.PI / 180;
 
-const pipelines = new WeakMap<Device, ComputePipeline>();
+/** core/kernel warm-up group of this module. */
+export const ALIGN_GROUP = "align";
 
-function pipeline(device: Device): ComputePipeline {
-	let p = pipelines.get(device);
-	if (p) return p;
-	const shader = device.createShader({
-		id: "align-pose-grid",
-		source: POSE_GRID_WGSL,
-		language: "wgsl",
-		stage: "compute",
-	});
-	const ro = "read-only-storage" as const;
-	p = device.createComputePipeline({
-		id: "align-pose-grid",
-		shader,
-		entryPoint: "main",
-		shaderLayout: {
-			bindings: [
-				{ name: "u", type: "uniform", group: 0, location: 0 },
-				{ name: "poses", type: ro, group: 0, location: 1 },
-				{ name: "dirs", type: ro, group: 0, location: 2 },
-				{ name: "coarse", type: ro, group: 0, location: 3 },
-				{ name: "fg", type: ro, group: 0, location: 4 },
-				{ name: "skyCum", type: ro, group: 0, location: 5 },
-				{ name: "scores", type: "storage", group: 0, location: 6 },
-			],
-		},
-	});
-	pipelines.set(device, p);
-	return p;
-}
+const ro = "read-only-storage" as const;
+const POSE_GRID = defineKernel(
+	"align-pose-grid",
+	POSE_GRID_WGSL,
+	[
+		["u", "uniform"],
+		["poses", ro],
+		["dirs", ro],
+		["coarse", ro],
+		["fg", ro],
+		["skyCum", ro],
+		["scores", "storage"],
+	],
+	// the label is the shader/pipeline id and the core/profile pass label
+	{ group: ALIGN_GROUP, label: "align-pose-grid" },
+);
 
 /** Compiles the pipeline now (first-use shader compile is otherwise on the autoAlign path). */
 export function warmPoseGrid(device: Device) {
-	pipeline(device);
+	warmKernels(device, ALIGN_GROUP);
 }
 
-// one grid at a time per device: the pipeline's bindings are shared state
-let queue: Promise<unknown> = Promise.resolve();
+/** warmPoseGrid without blocking the thread (createComputePipelineAsync). Resolves the failure count. */
+export const warmPoseGridAsync = (device: Device) =>
+	warmKernelsAsync(device, ALIGN_GROUP);
+
+const STORAGE = Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC;
+
+// pooled buffer → the array last written into it (the edge-map planes that don't change)
+const resident = new WeakMap<Buffer, Float32Array>();
+
+/** The pooled slot `key` holding `data`, written only if it holds a different array (or grew). */
+function uploadOnce(device: Device, key: string, data: Float32Array): Buffer {
+	const b = acquire(device, key, Math.max(16, data.byteLength), STORAGE);
+	if (resident.get(b) !== data) {
+		b.write(data);
+		resident.set(b, data);
+		lastUploadBytes += data.byteLength;
+	}
+	return b;
+}
+
+/** Bytes written to the GPU by the last scorePoseGridGpu (inputs; the cached edge planes count only when uploaded). */
+export let lastUploadBytes = 0;
 
 /**
  * scorePose(p, aspect, dirs, edge, false, stride) for every pose (coarse edge map), on the GPU.
- * Resolves the scores in pose order. Throws on GPU errors (callers fall back to the CPU).
+ * Resolves the scores in pose order. Throws on GPU errors (callers fall back to the CPU). Grids run
+ * one at a time (the "align" lease: its pooled buffers are shared state).
+ *
+ * `edge.coarse` and `edge.fg` must not be modified in place after the first call with this edge map
+ * (buildEdgeMap never does); `edge.skyCum` may be (fitPriorSky), it is re-uploaded every call.
  */
 export function scorePoseGridGpu(
 	device: Device,
@@ -64,11 +98,9 @@ export function scorePoseGridGpu(
 	edge: EdgeMap,
 	stride = 3,
 ): Promise<Float32Array> {
-	const run = queue.then(() =>
+	return withLease(ALIGN_GROUP, () =>
 		scoreOnce(device, poses, aspect, dirs, edge, stride),
 	);
-	queue = run.catch(() => {});
-	return run;
 }
 
 async function scoreOnce(
@@ -79,6 +111,9 @@ async function scoreOnce(
 	edge: EdgeMap,
 	stride: number,
 ): Promise<Float32Array> {
+	lastUploadBytes = 0;
+	const nPoses = poses.length;
+	if (!nPoses) return new Float32Array(0);
 	const { w, h } = edge;
 	// same subsampling and `total` as scorePose
 	const nDirs = Math.ceil(dirs.length / (3 * stride));
@@ -88,8 +123,7 @@ async function scoreOnce(
 		dirs4[k * 4 + 1] = dirs[i + 1];
 		dirs4[k * 4 + 2] = dirs[i + 2];
 	}
-	const nPoses = poses.length;
-	const pose4 = new Float32Array(Math.max(1, nPoses) * 12);
+	const pose4 = new Float32Array(nPoses * 12);
 	for (let i = 0; i < nPoses; i++) {
 		const p = poses[i];
 		const b = poseBasis(p);
@@ -112,59 +146,27 @@ async function scoreOnce(
 	uf[6] = aspect;
 	uf[7] = nDirs;
 
-	const ro = Buffer.STORAGE | Buffer.COPY_DST;
-	const bufs: Buffer[] = [];
-	const mk = (id: string, data: Float32Array) => {
-		const b = device.createBuffer({ id: `align-${id}`, usage: ro, data });
-		bufs.push(b);
-		return b;
+	// every slot below is read only within its first w·h / nDirs / nPoses entries, and `scores` is
+	// fully overwritten for pi < nPoses, so pool capacity and stale bytes don't reach the result
+	const bindings = {
+		u: pooledUniform(device, "align/u", uw),
+		poses: pooledStorage(device, "align/poses", pose4),
+		dirs: pooledStorage(device, "align/dirs", dirs4),
+		coarse: uploadOnce(device, "align/coarse", edge.coarse),
+		fg: uploadOnce(device, "align/fg", edge.fg),
+		skyCum: pooledStorage(device, "align/skycum", edge.skyCum),
+		scores: acquire(device, "align/scores", nPoses * 4, STORAGE),
 	};
+	lastUploadBytes +=
+		32 + pose4.byteLength + dirs4.byteLength + edge.skyCum.byteLength;
+	const enc = device.createCommandEncoder({ id: "align-pose-grid" });
+	dispatch(enc, kernel(device, POSE_GRID), bindings, nPoses);
+	const staged = stage(device, enc, bindings.scores, nPoses * 4);
 	try {
-		const uBuf = device.createBuffer({
-			id: "align-u",
-			usage: Buffer.UNIFORM | Buffer.COPY_DST,
-			data: new Uint8Array(uw),
-		});
-		bufs.push(uBuf);
-		const outBytes = Math.max(16, nPoses * 4);
-		const out = device.createBuffer({
-			id: "align-scores",
-			usage: Buffer.STORAGE | Buffer.COPY_SRC,
-			byteLength: outBytes,
-		});
-		bufs.push(out);
-		const staging = device.createBuffer({
-			id: "align-scores-read",
-			usage: Buffer.MAP_READ | Buffer.COPY_DST,
-			byteLength: outBytes,
-		});
-		bufs.push(staging);
-		const pl = pipeline(device);
-		pl.setBindings({
-			u: uBuf,
-			poses: mk("poses", pose4),
-			dirs: mk("dirs", dirs4),
-			coarse: mk("coarse", edge.coarse),
-			fg: mk("fg", edge.fg),
-			skyCum: mk("skycum", edge.skyCum),
-			scores: out,
-		});
-		const enc = device.createCommandEncoder({ id: "align-pose-grid" });
-		const pass = enc.beginComputePass({ id: "align-pose-grid" });
-		pass.setPipeline(pl);
-		pass.dispatch(nPoses);
-		pass.end();
-		enc.copyBufferToBuffer({
-			sourceBuffer: out,
-			destinationBuffer: staging,
-			size: outBytes,
-		});
-		device.submit(enc.finish());
-		const u8 = await staging.readAsync(0, nPoses * 4);
-		return new Float32Array(
-			u8.buffer.slice(u8.byteOffset, u8.byteOffset + nPoses * 4),
-		);
-	} finally {
-		for (const b of bufs) b.destroy();
+		submit(device, enc);
+	} catch (e) {
+		staged.cancel();
+		throw e;
 	}
+	return new Float32Array(await staged.read());
 }

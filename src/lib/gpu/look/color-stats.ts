@@ -1,23 +1,29 @@
 // GPU twin of look/color-stats.ts `reduceBands(...bandInputs(...))`: Oklab, masks and the per-band
 // Σ / Σ² reduction on the GPU (color-stats.wgsl.ts); only 52 floats per workgroup come back.
+// Buffers are pooled (lease "look-stats"). Opt-in ({subgroups: true}, on a device with subgroups):
+// the per-workgroup reduction by subgroupAdd (BAND_STATS_SG), equal to the shared-memory tree up to
+// float-sum reassociation (look-bench reports the difference). Off by default: it measured no
+// faster at 1 ms and isn't bit-identical.
 import type { Device } from "@luma.gl/core";
 import {
 	type ColorStats,
 	identityStats,
 	N_BANDS,
 } from "../../look/color-stats";
-import { BAND_STATS, STATS_VALUES } from "./color-stats.wgsl";
+import { hasFeature } from "../device";
+import { BAND_STATS, BAND_STATS_SG, STATS_VALUES } from "./color-stats.wgsl";
 import {
 	defineKernel,
 	dispatch,
 	kernel,
-	release,
-	stage,
-	storage,
-	uniform,
+	pooledStorage,
+	pooledUniform,
+	stageReads,
+	submit,
+	withLease,
 } from "./kernel";
 
-const K_BAND_STATS = defineKernel("band-stats", BAND_STATS, [
+const LAYOUT: Parameters<typeof defineKernel>[2] = [
 	["prm", "uniform"],
 	["photo", "read-only-storage"],
 	["layer", "read-only-storage"],
@@ -25,7 +31,18 @@ const K_BAND_STATS = defineKernel("band-stats", BAND_STATS, [
 	["fg", "read-only-storage"],
 	["lut", "read-only-storage"],
 	["partial", "storage"],
-]);
+];
+const K_BAND_STATS = defineKernel("band-stats", BAND_STATS, LAYOUT);
+/** Warm-up group of the kernels that need the "subgroups" feature (warmLook checks it). */
+export const LOOK_SUBGROUP_GROUP = "look-subgroups";
+const K_BAND_STATS_SG = defineKernel("band-stats-sg", BAND_STATS_SG, LAYOUT, {
+	group: LOOK_SUBGROUP_GROUP,
+});
+
+export type BandStatsOptions = {
+	/** Use the subgroup reduction when the device has subgroups (default false). */
+	subgroups?: boolean;
+};
 
 export type BandStatsInput = {
 	/** sRGB RGBA bytes, w × h, row 0 = top. */
@@ -56,6 +73,7 @@ const WG = 64;
 export async function bandStatsGpu(
 	device: Device,
 	o: BandStatsInput,
+	opts: BandStatsOptions = {},
 ): Promise<ColorStats> {
 	const { w, h } = o;
 	const n = w * h;
@@ -68,24 +86,11 @@ export async function bandStatsGpu(
 	const words = new ArrayBuffer(20);
 	new Uint32Array(words, 0, 4).set([w, h, GROUPS * WG, o.fg ? 1 : 0]);
 	new Float32Array(words, 16, 1)[0] = o.minRange ?? 0;
-	const prm = uniform(device, words);
-	const photo = storage(device, o.photo);
-	const layer = storage(device, o.layer);
-	const range = storage(device, R);
-	const fg = storage(device, o.fg ?? 4);
-	const lut = storage(device, SRGB_LUT);
-	const partial = storage(device, GROUPS * STATS_VALUES * 4);
-	const k = kernel(device, K_BAND_STATS);
-	const enc = device.createCommandEncoder({ id: "look-band-stats" });
-	dispatch(enc, k, { prm, photo, layer, range, fg, lut, partial }, GROUPS);
-	const rd = stage(device, enc, partial, GROUPS * STATS_VALUES * 4);
-	device.submit(enc.finish());
-	let p: Float32Array;
-	try {
-		p = new Float32Array(await rd.read());
-	} finally {
-		release(prm, photo, layer, range, fg, lut, partial);
-	}
+	const sg = (opts.subgroups ?? false) && hasFeature(device, "subgroups");
+	let p = await bandPartials(device, o, words, R, sg);
+	// BAND_STATS_SG writes NaN when the subgroup layout isn't what it assumes
+	if (sg && p.some(Number.isNaN))
+		p = await bandPartials(device, o, words, R, false);
 	// per band: count, Σp(3), Σp²(3), Σl(3), Σl²(3) → reduceBands' acc layout (Σp, Σp², Σl, Σl²)
 	const acc = new Float64Array(N_BANDS * 12);
 	const cnt = new Uint32Array(N_BANDS);
@@ -96,6 +101,41 @@ export async function bandStatsGpu(
 			for (let v = 0; v < 12; v++) acc[b * 12 + v] += p[s + 1 + v];
 		}
 	return finalizeBands(acc, cnt, o.minCount ?? 60);
+}
+
+/** One BAND_STATS(_SG) dispatch: the GROUPS × STATS_VALUES per-workgroup partials. */
+function bandPartials(
+	device: Device,
+	o: BandStatsInput,
+	words: ArrayBuffer,
+	R: Float32Array,
+	sg: boolean,
+): Promise<Float32Array> {
+	const k = kernel(device, sg ? K_BAND_STATS_SG : K_BAND_STATS);
+	return withLease("look-stats", async () => {
+		const up = (key: string, data: ArrayBufferView | number) =>
+			pooledStorage(device, `look-stats/${key}`, data);
+		const prm = pooledUniform(device, "look-stats/prm", words);
+		const photo = up("photo", o.photo);
+		const layer = up("layer", o.layer);
+		const range = up("range", R);
+		const fg = up("fg", o.fg ?? 4);
+		const lut = up("lut", SRGB_LUT);
+		// every workgroup writes its 52 partials
+		const partial = pooledStorage(
+			device,
+			"look-stats/partial",
+			GROUPS * STATS_VALUES * 4,
+			{ zero: false },
+		);
+		const enc = device.createCommandEncoder({ id: "look-band-stats" });
+		dispatch(enc, k, { prm, photo, layer, range, fg, lut, partial }, GROUPS);
+		const rd = stageReads(device, enc, [
+			{ buffer: partial, size: GROUPS * STATS_VALUES * 4 },
+		]);
+		submit(device, enc);
+		return new Float32Array((await rd.read())[0]);
+	});
 }
 
 /** reduceBands' tail (color-stats.ts; keep in sync): means, floored stds, empty-band back-fill. */

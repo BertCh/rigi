@@ -19,6 +19,7 @@ import {
 	type Vec3,
 } from "#/lib/pose6dof/eye";
 import { getComputeDevice } from "../device";
+import { warmHorizonGpuAsync } from "../horizon";
 import {
 	createEyeHorizonProvider,
 	loadEyeMosaics,
@@ -115,7 +116,10 @@ export async function runEyeSearch(
 	const pose0: Pose = { ...input.pose };
 	const sector = sectorForPose(pose0, aspect);
 	report("terrain");
-	gpu = !!(await getComputeDevice());
+	const device = await getComputeDevice();
+	gpu = !!device;
+	// compile the march kernel off-thread while the tiles download (the first batch then doesn't pay it)
+	if (device) void warmHorizonGpuAsync(device);
 	const mosaics = await loadEyeMosaics(input.lat, input.lon, { sector });
 	const hp = createEyeHorizonProvider({
 		lat: input.lat,

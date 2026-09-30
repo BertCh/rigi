@@ -1,6 +1,7 @@
 // GPU twin of look/relief/field.ts buildReliefField: the heights are still rasterised on the CPU
 // (rasterizeHeights, ~15 ms: tile lookups), then shadow, sky view, curvature and the generalised
-// normal run as WGSL kernels (relief.wgsl.ts) and the two RGBA8 textures are read back.
+// normal run as WGSL kernels (relief.wgsl.ts) and the two RGBA8 textures are read back. Buffers are
+// pooled (core/pool.ts, lease "look-relief"), so a warm call allocates nothing on the GPU.
 import type { Device } from "@luma.gl/core";
 import type { EnuFrame } from "../../geodesy";
 import type { Vec3 } from "../../look/atmosphere";
@@ -11,13 +12,15 @@ import {
 	rasterizeHeights,
 } from "../../look/relief/heights";
 import {
+	clear,
 	defineKernel,
 	dispatch,
 	kernel,
-	release,
-	stage,
-	storage,
-	uniform,
+	pooledStorage,
+	pooledUniform,
+	stageReads,
+	submit,
+	withLease,
 } from "./kernel";
 import {
 	RELIEF_DOWN,
@@ -146,52 +149,59 @@ export async function reliefPassesGpu(
 
 	const N = res * res;
 	const NH = resH * resH;
-	const prm = uniform(device, words);
-	const gH = storage(device, H);
-	const shadow = storage(device, N * 4);
-	const Hh = storage(device, NH * 4);
-	const hull = storage(device, 8 * NH * 4);
-	const acc8 = storage(device, 8 * NH * 4);
-	const acc = storage(device, NH * 4);
-	const field = storage(device, N * 4);
-	const gen = storage(device, N * 4);
+	return withLease("look-relief", async () => {
+		// every output below is fully written by its kernel, except the OR-packed shadow bytes
+		// (cleared on the encoder); acc8 is cleared too, as the fresh buffers were zero
+		const scratch = (key: string, bytes: number) =>
+			pooledStorage(device, `look-relief/${key}`, bytes, { zero: false });
+		const prm = pooledUniform(device, "look-relief/prm", words);
+		const gH = pooledStorage(device, "look-relief/H", H);
+		const shadow = scratch("shadow", N); // 4 texels per u32
+		const Hh = scratch("Hh", NH * 4);
+		const hull = scratch("hull", 8 * NH * 4);
+		const acc8 = scratch("acc8", 8 * NH * 4);
+		const acc = scratch("acc", NH * 4);
+		const field = scratch("field", N * 4);
+		const gen = scratch("gen", N * 4);
 
-	const enc = device.createCommandEncoder({ id: "look-relief" });
-	if (!degenerate)
-		dispatch(enc, kernel(device, K_RELIEF_SHADOW), { prm, H: gH, shadow }, 1);
-	dispatch(
-		enc,
-		kernel(device, K_RELIEF_DOWN),
-		{ prm, Hf: gH, Hh },
-		Math.ceil(NH / 256),
-	);
-	dispatch(
-		enc,
-		kernel(device, K_RELIEF_SVF),
-		{ prm, Hh, hull, acc8 },
-		Math.ceil((2 * resH) / 64),
-		8,
-	);
-	dispatch(
-		enc,
-		kernel(device, K_RELIEF_SUM),
-		{ prm, acc8, acc },
-		Math.ceil(NH / 256),
-	);
-	dispatch(
-		enc,
-		kernel(device, K_RELIEF_PACK),
-		{ prm, H: gH, shadow, acc, field, gen },
-		Math.ceil(res / 16),
-		Math.ceil(res / 16),
-	);
-	const rf = stage(device, enc, field, N * 4);
-	const rg = stage(device, enc, gen, N * 4);
-	device.submit(enc.finish());
-	try {
-		const [f, g] = await Promise.all([rf.read(), rg.read()]);
+		const enc = device.createCommandEncoder({ id: "look-relief" });
+		if (!degenerate) {
+			clear(enc, shadow, 0, N);
+			dispatch(enc, kernel(device, K_RELIEF_SHADOW), { prm, H: gH, shadow }, 1);
+		}
+		dispatch(
+			enc,
+			kernel(device, K_RELIEF_DOWN),
+			{ prm, Hf: gH, Hh },
+			Math.ceil(NH / 256),
+		);
+		clear(enc, acc8, 0, 8 * NH * 4);
+		dispatch(
+			enc,
+			kernel(device, K_RELIEF_SVF),
+			{ prm, Hh, hull, acc8 },
+			Math.ceil((2 * resH) / 64),
+			8,
+		);
+		dispatch(
+			enc,
+			kernel(device, K_RELIEF_SUM),
+			{ prm, acc8, acc },
+			Math.ceil(NH / 256),
+		);
+		dispatch(
+			enc,
+			kernel(device, K_RELIEF_PACK),
+			{ prm, H: gH, shadow, acc, field, gen },
+			Math.ceil(res / 16),
+			Math.ceil(res / 16),
+		);
+		const rd = stageReads(device, enc, [
+			{ buffer: field, size: N * 4 },
+			{ buffer: gen, size: N * 4 },
+		]);
+		submit(device, enc);
+		const [f, g] = await rd.read();
 		return { field: new Uint8Array(f), gen: new Uint8Array(g) };
-	} finally {
-		release(prm, gH, shadow, Hh, hull, acc8, acc, field, gen);
-	}
+	});
 }

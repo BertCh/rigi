@@ -12,12 +12,16 @@ import { guidedFilter } from "../../look/guided-filter";
 import { fitHaze, type HazeFit, type HazeFitInput } from "../../look/haze-fit";
 import { buildReliefField, type ReliefField } from "../../look/relief/field";
 import type { HeightTile } from "../../look/relief/heights";
-import { getComputeDevice } from "../device";
-import { type BandStatsInput, bandStatsGpu } from "./color-stats";
+import { getComputeDevice, hasFeature } from "../device";
+import {
+	type BandStatsInput,
+	bandStatsGpu,
+	LOOK_SUBGROUP_GROUP,
+} from "./color-stats";
 import { selectLook } from "./flag";
 import { type GuidedJob, guidedFiltersGpu } from "./guided-filter";
 import { fitHazeGpu } from "./haze";
-import { warmKernels } from "./kernel";
+import { warmKernelsAsync } from "./kernel";
 import { buildReliefFieldGpu } from "./relief";
 
 const run = <T>(
@@ -76,14 +80,20 @@ export const bandStatsAsync = (o: BandStatsInput): Promise<ColorStats> =>
 	);
 
 /**
- * Get the compute device and compile every look kernel now (the modules above define them all), so
- * the first relief / haze / mask pass does not pay the WGSL compile. Resolves the ms it took, or
- * null without a device.
+ * Get the compute device and compile every look kernel now (the modules above define them all;
+ * the subgroup variants only where the device has subgroups), so the first relief / haze / mask
+ * pass does not pay the WGSL compile. Pipelines are created asynchronously (the thread is not
+ * blocked). Resolves the ms it took, or null without a device.
  */
 export async function warmLook(): Promise<number | null> {
 	const device = await getComputeDevice();
 	if (!device) return null;
 	const t0 = performance.now();
-	warmKernels(device);
+	await Promise.all([
+		warmKernelsAsync(device),
+		hasFeature(device, "subgroups")
+			? warmKernelsAsync(device, LOOK_SUBGROUP_GROUP)
+			: 0,
+	]);
 	return performance.now() - t0;
 }

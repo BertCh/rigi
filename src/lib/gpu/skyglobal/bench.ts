@@ -130,6 +130,21 @@ export async function benchPhoto(o: {
 		});
 	}
 	const dbg = await gridGpu(device, sg, g, { eps: o.eps, debugGrid: true });
+	// subgroup REDUCE vs the shared-memory tree (must be identical); a forced 2-read list (head 16)
+	const tree = await gridGpu(device, sg, g, { eps: o.eps, noSubgroups: true });
+	const split = await gridGpu(device, sg, g, { eps: o.eps, head: 16 });
+	const sortedCands = (r: typeof last) =>
+		Array.from(r.cands ?? []).sort((a, b) => a - b);
+	const sameCands = (a: typeof last, b: typeof last) => {
+		const x = sortedCands(a);
+		const y = sortedCands(b);
+		return x.length === y.length && x.every((v, i) => v === y[i]);
+	};
+	const sameGrid = (a: typeof last, b: typeof last) =>
+		sameCands(a, b) &&
+		a.arg.every((v, i) => v === b.arg[i]) &&
+		a.best.every((v, i) => v === b.best[i]) &&
+		a.stats.midArgFlips === b.stats.midArgFlips;
 	// parity: GPU exact result vs CPU; GPU point estimates vs CPU full grid; certification check
 	let bestDiff = 0;
 	let argFlips = 0;
@@ -205,6 +220,11 @@ export async function benchPhoto(o: {
 			nCand: last.stats.nCand,
 			maxCandPerYaw: last.stats.maxCandPerYaw,
 			fellBack: last.stats.fellBack,
+			subgroups: last.stats.subgroups,
+			readBytes: last.stats.readBytes,
+			reads: last.stats.reads,
+			treeReduceIdentical: sameGrid(last, tree),
+			splitReadIdentical: split.stats.reads === 2 && sameGrid(last, split),
 			// exact path (GPU intervals + CPU re-score) vs the CPU grid
 			bestMaxAbs: bestDiff,
 			argFlips,

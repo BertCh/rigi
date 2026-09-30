@@ -1,16 +1,18 @@
 // GPU twin of look/guided-filter.ts guidedFilter (grey guide, (2r+1)² clamped box means). The batch
 // form filters several masks against one guide in one submit and one readback, which is what
-// CompositeLook.updateMasks needs (coverage, cut, people).
+// CompositeLook.updateMasks needs (coverage, cut, people). Buffers are pooled (lease "look-guided");
+// each job has its own parameter, input and output slots, since all jobs share one submit.
 import type { Device } from "@luma.gl/core";
 import { GF_H0, GF_H1, GF_V0, GF_V1 } from "./guided-filter.wgsl";
 import {
 	defineKernel,
-	dispatch,
+	dispatchAll,
 	kernel,
-	release,
-	stage,
-	storage,
-	uniform,
+	pooledStorage,
+	pooledUniform,
+	stageReads,
+	submit,
+	withLease,
 } from "./kernel";
 
 const K_GF_H0 = defineKernel("gf-h0", GF_H0, [
@@ -53,33 +55,37 @@ export async function guidedFiltersGpu(
 	const kV0 = kernel(device, K_GF_V0);
 	const kH1 = kernel(device, K_GF_H1);
 	const kV1 = kernel(device, K_GF_V1);
-	const gI = storage(device, I);
-	const t4 = storage(device, n * 16);
-	const ab = storage(device, n * 8);
-	const t2 = storage(device, n * 8);
-	const owned = [gI, t4, ab, t2];
-	const enc = device.createCommandEncoder({ id: "look-guided" });
-	const groups = Math.ceil(n / WG);
-	const reads = jobs.map((j) => {
-		const words = new ArrayBuffer(16);
-		new Uint32Array(words, 0, 3).set([w, h, j.r]);
-		new Float32Array(words, 12, 1)[0] = j.eps;
-		const prm = uniform(device, words);
-		const gp = storage(device, j.p);
-		const q = storage(device, n * 4);
-		owned.push(prm, gp, q);
-		dispatch(enc, kH0, { prm, gI, gp, outv: t4 }, groups);
-		dispatch(enc, kV0, { prm, inv: t4, ab }, groups);
-		dispatch(enc, kH1, { prm, ab, outv: t2 }, groups);
-		dispatch(enc, kV1, { prm, inv: t2, gI, q }, groups);
-		return stage(device, enc, q, n * 4);
+	return withLease("look-guided", async () => {
+		// every kernel writes all n texels of its output: no zeroing needed
+		const scratch = (key: string, bytes: number) =>
+			pooledStorage(device, `look-guided/${key}`, bytes, { zero: false });
+		const gI = pooledStorage(device, "look-guided/I", I);
+		const t4 = scratch("t4", n * 16);
+		const ab = scratch("ab", n * 8);
+		const t2 = scratch("t2", n * 8);
+		const enc = device.createCommandEncoder({ id: "look-guided" });
+		const groups = Math.ceil(n / WG);
+		const outs = jobs.map((j, k) => {
+			const words = new ArrayBuffer(16);
+			new Uint32Array(words, 0, 3).set([w, h, j.r]);
+			new Float32Array(words, 12, 1)[0] = j.eps;
+			const prm = pooledUniform(device, `look-guided/prm${k}`, words);
+			const gp = pooledStorage(device, `look-guided/p${k}`, j.p);
+			const q = scratch(`q${k}`, n * 4);
+			dispatchAll(
+				enc,
+				[
+					{ k: kH0, bindings: { prm, gI, gp, outv: t4 }, x: groups },
+					{ k: kV0, bindings: { prm, inv: t4, ab }, x: groups },
+					{ k: kH1, bindings: { prm, ab, outv: t2 }, x: groups },
+					{ k: kV1, bindings: { prm, inv: t2, gI, q }, x: groups },
+				],
+				"look-guided",
+			);
+			return { buffer: q, size: n * 4 };
+		});
+		const rd = stageReads(device, enc, outs);
+		submit(device, enc);
+		return (await rd.read()).map((b) => new Float32Array(b));
 	});
-	device.submit(enc.finish());
-	try {
-		return (await Promise.all(reads.map((r) => r.read()))).map(
-			(b) => new Float32Array(b),
-		);
-	} finally {
-		release(...owned);
-	}
 }

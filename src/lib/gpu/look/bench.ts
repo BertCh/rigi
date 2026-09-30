@@ -11,7 +11,7 @@ import {
 import { guidedFilter } from "../../look/guided-filter";
 import { fitHaze, type HazeFit } from "../../look/haze-fit";
 import { buildReliefField } from "../../look/relief/field";
-import { getComputeDevice } from "../device";
+import { getComputeDevice, hasFeature } from "../device";
 import { captureLookInputs, type LookInputs } from "./capture";
 import { bandStatsGpu } from "./color-stats";
 import { guidedFiltersGpu } from "./guided-filter";
@@ -102,6 +102,10 @@ function hazeErrors(c: HazeFit, g: HazeFit) {
 	};
 }
 
+/** Whether two fits are equal number for number (samples included). */
+const sameFit = (a: HazeFit, b: HazeFit) =>
+	JSON.stringify(a) === JSON.stringify(b);
+
 function statsErrors(c: ColorStats, g: ColorStats) {
 	const all = (k: "photoMean" | "photoStd" | "layerMean" | "layerStd") =>
 		errStats(c[k].length, (i) => [c[k][i], g[k][i]]);
@@ -158,11 +162,21 @@ export async function runLookBench(
 		const h = inp.haze;
 		const cpu = await time(reps, () => fitHaze(h));
 		const gpu = await time(reps, () => fitHazeGpu(device, h));
+		const gpuSteps = { ...hazeGpuTimes };
+		// the full lin + bins readback path (compact: false) must give the very same fit
+		const full = await time(reps, () =>
+			fitHazeGpu(device, h, { compact: false }),
+		);
 		out.haze = {
 			dims: [h.geoW, h.geoH],
 			cpuMs: cpu.ms,
 			gpuMs: gpu.ms,
-			gpuSteps: { ...hazeGpuTimes },
+			gpuSteps,
+			fullReadback: {
+				gpuMs: full.ms,
+				gpuSteps: { ...hazeGpuTimes },
+				identical: sameFit(gpu.out, full.out),
+			},
 			...hazeErrors(cpu.out, gpu.out),
 		};
 	}
@@ -221,13 +235,44 @@ export async function runLookBench(
 			return reduceBands(a, b, s.w * s.h);
 		});
 		const gpu = await time(reps, () => bandStatsGpu(device, s));
+		const subgroups = hasFeature(device, "subgroups");
+		// the opt-in subgroup reduction: its reassociation drift vs the default shared-memory tree
+		const withSg = subgroups
+			? await time(reps, () => bandStatsGpu(device, s, { subgroups: true }))
+			: null;
 		out.stats = {
 			dims: [s.w, s.h],
 			coveredTerrainPx: valid,
 			cpuMs: cpu.ms,
 			gpuMs: gpu.ms,
+			subgroups,
+			...(withSg && {
+				withSubgroups: {
+					gpuMs: withSg.ms,
+					maxAbsDiff: Math.max(
+						...(
+							["photoMean", "photoStd", "layerMean", "layerStd"] as const
+						).map((k) => statsErrors(gpu.out, withSg.out)[k].max),
+					),
+					sameCounts: withSg.out.count.join() === gpu.out.count.join(),
+					vsCpu: statsErrors(cpu.out, withSg.out),
+				},
+			}),
 			...statsErrors(cpu.out, gpu.out),
 		};
 	}
 	return out;
+}
+
+/**
+ * runLookBench after warmLook(): the passes then run on the async-compiled pipelines (the app's
+ * path), which must give the same numbers (look-bench.mjs --fn runLookBenchWarm).
+ */
+export async function runLookBenchWarm(
+	engine: unknown,
+	opts: { reps?: number; label?: string } = {},
+) {
+	const { warmLook } = await import("./hooks");
+	const warmMs = await warmLook();
+	return { warmMs, ...(await runLookBench(engine, opts)) };
 }

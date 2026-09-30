@@ -1,0 +1,188 @@
+// GPU → CPU readback through reusable MAP_READ staging slots, per device (the GPUReadbackRing
+// pattern, but slots grow on demand because our readback sizes vary per call):
+// - stageReads() records copies of the wanted ranges into ONE slot, packed, on the caller's
+//   encoder (so they run after that encoder's passes); the caller submits once;
+// - read() maps just the packed bytes, slices out one ArrayBuffer per range, returns the slot.
+// No per-call staging allocation once warm, and never luma's readAsync on a non-mappable buffer
+// (which creates and submits a temporary buffer + encoder per call).
+import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
+import { capacityFor } from "./pool";
+import { submit } from "./queue";
+
+/** `size` bytes of `buffer` from `offset` (a 4-byte multiple). */
+export type ReadRange = { buffer: Buffer; offset?: number; size: number };
+
+/** Staged copies: call read() after submitting the encoder, or cancel() if it won't be. */
+export type StagedRead = {
+	read: () => Promise<ArrayBuffer[]>;
+	/** Return the slot unread (only when the encoder was NOT submitted). */
+	cancel: () => void;
+};
+
+type Slot = { buffer: Buffer; busy: boolean };
+
+/** Idle slots kept per device; more are destroyed as reads finish. */
+const MAX_IDLE = 4;
+const rings = new WeakMap<Device, Slot[]>();
+
+function ring(device: Device): Slot[] {
+	let r = rings.get(device);
+	if (!r) {
+		const created: Slot[] = [];
+		rings.set(device, created);
+		device.lost.then(() => {
+			for (const s of created) s.buffer.destroy();
+			created.length = 0;
+		});
+		r = created;
+	}
+	return r;
+}
+
+function reserve(device: Device, bytes: number): Slot {
+	const r = ring(device);
+	let best: Slot | null = null;
+	for (const s of r)
+		if (
+			!s.busy &&
+			s.buffer.byteLength >= bytes &&
+			(!best || s.buffer.byteLength < best.buffer.byteLength)
+		)
+			best = s;
+	if (!best) {
+		// too small or all busy: replace the smallest idle slot, else add one
+		let small = -1;
+		for (let i = 0; i < r.length; i++)
+			if (
+				!r[i].busy &&
+				(small < 0 || r[i].buffer.byteLength < r[small].buffer.byteLength)
+			)
+				small = i;
+		best = {
+			buffer: device.createBuffer({
+				id: "core-readback-slot",
+				usage: Buffer.MAP_READ | Buffer.COPY_DST,
+				byteLength: capacityFor(bytes),
+			}),
+			busy: false,
+		};
+		if (small >= 0) r.splice(small, 1)[0].buffer.destroy();
+		r.push(best);
+	}
+	best.busy = true;
+	return best;
+}
+
+function giveBack(device: Device, slot: Slot) {
+	slot.busy = false;
+	const r = rings.get(device);
+	if (!r || device.isLost) {
+		slot.buffer.destroy();
+		return;
+	}
+	const idle = r.filter((s) => !s.busy);
+	if (idle.length > MAX_IDLE) {
+		idle.sort((a, b) => a.buffer.byteLength - b.buffer.byteLength);
+		const drop = idle[0];
+		r.splice(r.indexOf(drop), 1);
+		drop.buffer.destroy();
+	}
+}
+
+/**
+ * Record copies of `ranges` into one staging slot on `enc` (after whatever `enc` recorded so far).
+ * Offsets must be 4-byte multiples; sizes are rounded up to 4 for the copy (the source must hold
+ * those bytes; core buffers are always padded) but each result is exactly `size` bytes.
+ */
+export function stageReads(
+	device: Device,
+	enc: CommandEncoder,
+	ranges: ReadRange[],
+): StagedRead {
+	const at: number[] = [];
+	let total = 0;
+	for (const { buffer, offset = 0, size } of ranges) {
+		const n = Math.ceil(size / 4) * 4;
+		if (offset % 4 || offset + n > buffer.byteLength)
+			throw new Error(
+				`readback range ${offset}+${size} (padded ${n}) is unaligned or outside ${buffer.id} (${buffer.byteLength} B)`,
+			);
+		at.push(total);
+		total += n;
+	}
+	if (!total)
+		return {
+			read: async () => ranges.map(() => new ArrayBuffer(0)),
+			cancel() {},
+		};
+	const slot = reserve(device, total);
+	ranges.forEach(({ buffer, offset = 0, size }, i) => {
+		if (size > 0)
+			enc.copyBufferToBuffer({
+				sourceBuffer: buffer,
+				sourceOffset: offset,
+				destinationBuffer: slot.buffer,
+				destinationOffset: at[i],
+				size: Math.ceil(size / 4) * 4,
+			});
+	});
+	let used = false;
+	return {
+		read: async () => {
+			if (used) throw new Error("readback already read or cancelled");
+			used = true;
+			try {
+				return await slot.buffer.mapAndReadAsync(
+					(mapped) =>
+						ranges.map(({ size }, i) => mapped.slice(at[i], at[i] + size)),
+					0,
+					total,
+				);
+			} finally {
+				giveBack(device, slot);
+			}
+		},
+		cancel: () => {
+			if (used) return;
+			used = true;
+			giveBack(device, slot);
+		},
+	};
+}
+
+/**
+ * Encode with `build`, stage `ranges` (or the ReadRange[] `build` returns) on the same encoder, submit
+ * once, and resolve one ArrayBuffer per range.
+ */
+export async function readBack(
+	device: Device,
+	build: (enc: CommandEncoder) => unknown,
+	ranges?: ReadRange[],
+	opts: { id?: string } = {},
+): Promise<ArrayBuffer[]> {
+	const enc = device.createCommandEncoder({ id: opts.id ?? "core-readback" });
+	const built = build(enc);
+	const staged = stageReads(
+		device,
+		enc,
+		ranges ?? (Array.isArray(built) ? (built as ReadRange[]) : []),
+	);
+	submit(device, enc);
+	return staged.read();
+}
+
+/** Staging slots of `device`: count, busy count and bytes held. */
+export function readbackStats(device: Device): {
+	slots: number;
+	busy: number;
+	bytes: number;
+} {
+	const r = rings.get(device) ?? [];
+	let busy = 0;
+	let bytes = 0;
+	for (const s of r) {
+		if (s.busy) busy++;
+		bytes += s.buffer.byteLength;
+	}
+	return { slots: r.length, busy, bytes };
+}

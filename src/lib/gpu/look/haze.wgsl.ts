@@ -4,7 +4,11 @@
 //  2. exact order statistics per (bin, channel) for the 1st / 9th percentiles: a 3-pass radix
 //     select over the f32 bit patterns (lin ≥ 0, so they sort as u32), 11 + 11 + 10 bits, with
 //     atomic histograms, all on the GPU (no readback between passes);
-//  3. the physical fit's (H_M, kR, β_M) grid: one invocation per cell evaluates the robust SSE,
+//  3. the representative pixels: per (bin, channel) the pixels whose value lies between the 1st
+//     and 9th percentile's bracketing order statistics (a superset of the CPU's [v0, v1]), in pixel
+//     order, compacted into one list (block counts → per-list offsets → scatter), plus the airlight
+//     band's pixels gathered by index, so the ~16 B/pixel lin + bins never come back to the CPU;
+//  4. the physical fit's (H_M, kR, β_M) grid: one invocation per cell evaluates the robust SSE,
 //     read back as 5 550 floats; the CPU re-checks the near-best cells in f64.
 
 const NBINS = 24;
@@ -24,7 +28,7 @@ export const HZ_PREP = /* wgsl */ `${PREP_PARAMS}
 @group(0) @binding(3) var<storage, read> yb: array<u32>;
 @group(0) @binding(4) var<storage, read> lut: array<f32>;
 @group(0) @binding(5) var<storage, read> range: array<f32>;
-@group(0) @binding(6) var<storage, read> fgm: array<u32>;
+@group(0) @binding(6) var<storage, read> fgm: array<u32>; // 1 bit per pixel
 @group(0) @binding(7) var<storage, read_write> lin: array<f32>;
 @group(0) @binding(8) var<storage, read_write> flags: array<u32>;
 @compute @workgroup_size(256)
@@ -59,7 +63,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
       if (nb[k] <= 0.0 || abs(log(nb[k] / r)) > 0.12) { edge = true; }
     }
   }
-  flags[i] = select(0u, 1u, edge) | (fgm[i] << 1u);
+  flags[i] = select(0u, 1u, edge) | (((fgm[i >> 5u] >> (i & 31u)) & 1u) << 1u);
 }
 `;
 
@@ -142,14 +146,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 `;
 
-export const HZ_CLEAR = /* wgsl */ `
-@group(0) @binding(0) var<storage, read_write> hist: array<u32>;
-@compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  if (id.x < arrayLength(&hist)) { hist[id.x] = 0u; }
-}
-`;
-
 /** One radix pass: histogram the digit of every binned pixel whose higher bits match the prefix. */
 export const HZ_HIST = /* wgsl */ `${SEL_COMMON}
 @group(0) @binding(0) var<uniform> prm: S;
@@ -205,6 +201,129 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   st.x = (st.x << bitsOf(p)) | min(d, nb - 1u);
   st.y -= cum;
   state[s] = st;
+}
+`;
+
+/** Representative lists: one per (bin, channel), L = bin·3 + channel. */
+export const LISTS = NBINS * 3;
+/** Pixels per compaction block (one invocation each, walked in pixel order). */
+export const BLOCK = 128;
+
+const COMPACT_COMMON = /* wgsl */ `
+struct C { N: u32, nBlk: u32, K: u32, pad: u32 };
+// list L takes the pixels of bin L / 3 whose channel L % 3 lies in [lo, hi] (f32 bits; lin ≥ 0 so
+// they order as u32): the order statistics of slots 0 and 3, i.e. ranks ⌊0.01(n−1)⌋ and
+// ⌊0.09(n−1)⌋ + 1, which bracket the CPU's interpolated percentiles v0 ≤ v1
+var<workgroup> thr: array<vec2<u32>, ${NBINS * 3}>;
+fn loadThr(lid: u32) {
+  for (var L = lid; L < ${NBINS * 3}u; L += 64u) { thr[L] = vec2<u32>(state[4u * L].x, state[4u * L + 3u].x); }
+  workgroupBarrier();
+}
+fn inList(L: u32, v: u32) -> bool { return v >= thr[L].x && v <= thr[L].y; }
+`;
+
+/** Per block of ${BLOCK} pixels: how many go to each list. @workgroup_size(64). */
+export const HZ_CNT = /* wgsl */ `
+@group(0) @binding(0) var<uniform> prm: C;
+@group(0) @binding(1) var<storage, read> bins: array<i32>;
+@group(0) @binding(2) var<storage, read> lin: array<f32>;
+@group(0) @binding(3) var<storage, read> state: array<vec2<u32>>;
+@group(0) @binding(4) var<storage, read_write> blk: array<u32>;
+${COMPACT_COMMON}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_index) lid: u32) {
+  loadThr(lid);
+  let t = id.x;
+  if (t >= prm.nBlk) { return; }
+  var cnt: array<u32, ${NBINS * 3}>;
+  for (var L = 0u; L < ${NBINS * 3}u; L++) { cnt[L] = 0u; }
+  for (var i = t * ${BLOCK}u; i < min(prm.N, (t + 1u) * ${BLOCK}u); i++) {
+    let b = bins[i];
+    if (b < 0) { continue; }
+    for (var c = 0u; c < 3u; c++) {
+      let L = u32(b) * 3u + c;
+      if (inList(L, bitcast<u32>(lin[3u * i + c]))) { cnt[L] += 1u; }
+    }
+  }
+  for (var L = 0u; L < ${NBINS * 3}u; L++) { blk[t * ${NBINS * 3}u + L] = cnt[L]; }
+}
+`;
+
+/**
+ * One workgroup: per list, the exclusive prefix over blocks (in place in blk), then the lists'
+ * starts in the packed output: starts[L] = start of list L, starts[${NBINS * 3}] = total.
+ */
+export const HZ_OFFS = /* wgsl */ `
+struct C { N: u32, nBlk: u32, K: u32, pad: u32 };
+@group(0) @binding(0) var<uniform> prm: C;
+@group(0) @binding(1) var<storage, read_write> blk: array<u32>;
+@group(0) @binding(2) var<storage, read_write> starts: array<u32>;
+var<workgroup> tot: array<u32, ${NBINS * 3}>;
+@compute @workgroup_size(${NBINS * 3})
+fn main(@builtin(local_invocation_index) L: u32) {
+  var run = 0u;
+  for (var t = 0u; t < prm.nBlk; t++) {
+    let k = t * ${NBINS * 3}u + L;
+    let c = blk[k];
+    blk[k] = run;
+    run += c;
+  }
+  tot[L] = run;
+  workgroupBarrier();
+  var base = 0u;
+  for (var k = 0u; k < L; k++) { base += tot[k]; }
+  starts[L] = base;
+  if (L == ${NBINS * 3 - 1}u) { starts[${NBINS * 3}] = base + run; }
+}
+`;
+
+/** Per block again: write each list's pixels (index, value bits) at their packed position. */
+export const HZ_SCATTER = /* wgsl */ `
+@group(0) @binding(0) var<uniform> prm: C;
+@group(0) @binding(1) var<storage, read> bins: array<i32>;
+@group(0) @binding(2) var<storage, read> lin: array<f32>;
+@group(0) @binding(3) var<storage, read> state: array<vec2<u32>>;
+@group(0) @binding(4) var<storage, read> blk: array<u32>;
+@group(0) @binding(5) var<storage, read> starts: array<u32>;
+@group(0) @binding(6) var<storage, read_write> outIdx: array<u32>;
+@group(0) @binding(7) var<storage, read_write> outVal: array<u32>;
+${COMPACT_COMMON}
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_index) lid: u32) {
+  loadThr(lid);
+  let t = id.x;
+  if (t >= prm.nBlk) { return; }
+  var at: array<u32, ${NBINS * 3}>;
+  for (var L = 0u; L < ${NBINS * 3}u; L++) { at[L] = starts[L] + blk[t * ${NBINS * 3}u + L]; }
+  for (var i = t * ${BLOCK}u; i < min(prm.N, (t + 1u) * ${BLOCK}u); i++) {
+    let b = bins[i];
+    if (b < 0) { continue; }
+    for (var c = 0u; c < 3u; c++) {
+      let L = u32(b) * 3u + c;
+      let v = bitcast<u32>(lin[3u * i + c]);
+      if (inList(L, v)) {
+        outIdx[at[L]] = i;
+        outVal[at[L]] = v;
+        at[L] += 1u;
+      }
+    }
+  }
+}
+`;
+
+/** lin at K given pixel indices (the airlight band), 3 floats each. @workgroup_size(64). */
+export const HZ_GATHER = /* wgsl */ `
+struct C { N: u32, nBlk: u32, K: u32, pad: u32 };
+@group(0) @binding(0) var<uniform> prm: C;
+@group(0) @binding(1) var<storage, read> idx: array<u32>;
+@group(0) @binding(2) var<storage, read> lin: array<f32>;
+@group(0) @binding(3) var<storage, read_write> outv: array<f32>;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+  let k = id.x;
+  if (k >= prm.K) { return; }
+  let i = idx[k];
+  outv[3u * k] = lin[3u * i]; outv[3u * k + 1u] = lin[3u * i + 1u]; outv[3u * k + 2u] = lin[3u * i + 2u];
 }
 `;
 
