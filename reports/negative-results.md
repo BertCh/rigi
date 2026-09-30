@@ -133,7 +133,7 @@ Every path below still exists at commit **`a1845f5`** (master before the cleanup
 | `src/lib/geocam/lakes/factors.ts` (waterline/shore factors), `lakes-factors.check.ts`, `scripts/geocam/ga4-eval.ts` | GA4 lake eye-height factors | GA4 |
 | `geoInliers` flag, `returnCorrespondences` request field and `correspondences` response type in `src/lib/matcher-client.ts` | GA0 matcher-inlier request | GA0 matcher inliers |
 | CI checks `concord-joint`, `concord-field`, `geocam-observe`, `geocam-tjunc`, `geocam-lakes-factors` (`scripts/ci/checks.mjs`) | Checks of the removed code. `concord-app` (`src/lib/concord/app/app.check.ts`) now carries the "`?concord` defaults off" assertion | — |
-| `scripts/nearfield/{camera-modes-check,deck-splats-check,step-inside-three-check}.mjs`, `scripts/reveal-bench.mjs` | One-off browser checks referenced nowhere (not in CI, docs or code) | — (not experiments) |
+| `scripts/nearfield/deck-splats-check.mjs` | One-off browser check referenced nowhere (not in CI, docs or code) | — (not experiments) |
 
 Moved rather than removed: the joint solver's cue residuals (`JointCue`, `cueResidualPx`, `focalPx1600`, `horizonEl`, `basisPx`, the read `JOINT_DEFAULTS` fields) to `src/lib/geocam/map/joint-residual.ts`; `lakeFloorFactor` to `src/lib/geocam/map/factors.ts`; the concord display's fail-closed `isLowConfidence` to `src/lib/concord/app/confidence.ts`.
 
