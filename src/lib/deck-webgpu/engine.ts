@@ -2726,7 +2726,8 @@ export class WebGpuEngine implements Renderer {
 
 	/**
 	 * deck/composite.ts readLayer: the terrain colour at w × h through the photo camera, linear
-	 * straight-alpha RGBA floats in GL row order (row 0 = bottom), as CompositeLook.setStats wants.
+	 * PREMULTIPLIED RGBA floats in GL row order (row 0 = bottom), as CompositeLook.setStats wants
+	 * (look/color-stats.ts bandInputs divides by alpha itself; un-premultiplying here divided twice).
 	 */
 	private async readLayer(w: number, h: number): Promise<Float32Array | null> {
 		const g = this.gpu;
@@ -2744,12 +2745,10 @@ export class WebGpuEngine implements Renderer {
 			for (let x = 0; x < w; x++) {
 				const s = (y * w + x) * 4;
 				const d = ((h - 1 - y) * w + x) * 4;
-				const a = px[s + 3];
-				const k = a > 1e-6 ? 1 / a : 0;
-				out[d] = px[s] * k;
-				out[d + 1] = px[s + 1] * k;
-				out[d + 2] = px[s + 2] * k;
-				out[d + 3] = a;
+				out[d] = px[s];
+				out[d + 1] = px[s + 1];
+				out[d + 2] = px[s + 2];
+				out[d + 3] = px[s + 3];
 			}
 		return out;
 	}
