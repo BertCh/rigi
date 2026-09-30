@@ -1,8 +1,8 @@
 // Versioned, self-describing pose JSON for a solved photo.
 import {
+	buildCameraModel,
 	type CameraInput,
 	type CameraModel,
-	buildCameraModel,
 	colmapLines,
 } from "./camera";
 

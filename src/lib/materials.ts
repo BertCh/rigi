@@ -8,20 +8,20 @@
 // using the photo camera's range buffer as a shadow map (only surfaces the photo saw).
 import * as THREE from "three";
 import {
-	ATMOSPHERE_FNS,
 	ATM_BLOCK,
+	ATMOSPHERE_FNS,
 	SKY_BLOCK,
 	SKY_FS_MAIN,
 	SKY_VS,
 } from "./look/glsl/atmosphere";
-import { HARMONIZE_FNS, HARM_BLOCK } from "./look/glsl/composite";
+import { HARM_BLOCK, HARMONIZE_FNS } from "./look/glsl/composite";
 import {
 	ALPINE_FNS,
 	SLOPE_BLOCK,
 	SLOPE_FNS,
 	TANAKA_FNS,
 } from "./look/glsl/ramps";
-import { RELIEF_FNS, REL_BLOCK } from "./look/glsl/relief";
+import { REL_BLOCK, RELIEF_FNS } from "./look/glsl/relief";
 
 /** slopeClass (6): the slope layer, only in a LOOK_SLOPE program; normal (7): the ink creases' normal pass, only under LOOK_INK. */
 export const STYLE = {

@@ -2,9 +2,9 @@
 // Reference: https://developers.google.com/kml/documentation/kmlreference#photooverlay
 //            https://developers.google.com/kml/documentation/cameras
 import {
+	buildCameraModel,
 	type CameraInput,
 	type CameraModel,
-	buildCameraModel,
 	fixedAzimuth,
 	kmlCameraAngles,
 } from "./camera";

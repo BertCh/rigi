@@ -1,7 +1,7 @@
 // three.js adapter for the camera model in ./camera (Pose conventions are documented there).
 import * as THREE from "three";
-import * as camera from "./camera";
 import type { Pose } from "./camera";
+import * as camera from "./camera";
 
 const vec3 = (a: ArrayLike<number>) => new THREE.Vector3(a[0], a[1], a[2]);
 

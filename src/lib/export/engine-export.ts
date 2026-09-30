@@ -4,14 +4,15 @@
 //   peaksInFrame(), sampleAt(u,v), isForeground(u,v), exportImage(withLabels), photoElement,
 //   onRender(), setPose(). Nothing here changes engine state: exportImage() restores itself, and
 //   refreshGeometry() re-sets the SAME pose only to force a fresh geometry-buffer readback.
-import type { Renderer as PhotoEngine } from "#/lib/renderer";
-import { unprojectDir } from "#/lib/pose";
-import type { PhotoMeta } from "#/lib/photos";
+
 import { attributionLine, fullAttribution } from "#/lib/licences/attribution";
+import type { PhotoMeta } from "#/lib/photos";
+import { unprojectDir } from "#/lib/pose";
+import type { Renderer as PhotoEngine } from "#/lib/renderer";
 import { composeAnnotatedPng } from "./annotate";
-import { type CameraModel, buildCameraModel } from "./camera";
+import { buildCameraModel, type CameraModel } from "./camera";
 import { buildColmapZip } from "./colmap";
-import { type PeakInput, buildGeoJson } from "./geojson";
+import { buildGeoJson, type PeakInput } from "./geojson";
 import { buildKmz, kmzBlob } from "./kml";
 import { buildPoseJson } from "./pose-json";
 import { buildXmp } from "./xmp";

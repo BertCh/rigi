@@ -20,29 +20,29 @@
  */
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
+import { demTileLoaderNode, loadRGBA } from "../../../scripts/lib/node-io";
+import { eyeHeight } from "../../../scripts/lib/pipeline-node";
 import {
 	cameraToPose,
 	poseToCamera,
 	vfovFromHfov,
 } from "../../../src/lib/camera";
+import { MAPTERHORN } from "../../../src/lib/dem";
 import type { Camera } from "../../../src/lib/geo/camera";
+import {
+	computeHorizon,
+	type HorizonProfile,
+} from "../../../src/lib/geo/horizon";
 import { detectSkyline } from "../../../src/lib/geo/skyline";
 import {
 	type SolveOptions,
 	type SolveResult,
 	solvePose,
 } from "../../../src/lib/geo/solve";
-import { refinePose, type RefineOptions } from "../../../src/lib/refine/index";
+import { loadTerrain } from "../../../src/lib/geo/terrain";
+import { type RefineOptions, refinePose } from "../../../src/lib/refine/index";
 import { DEFAULT_INIT } from "../../../src/lib/refine/init";
 import { DEFAULT_PRIOR_SIGMA } from "../../../src/lib/refine/robust";
-import {
-	computeHorizon,
-	type HorizonProfile,
-} from "../../../src/lib/geo/horizon";
-import { MAPTERHORN } from "../../../src/lib/dem";
-import { loadTerrain } from "../../../src/lib/geo/terrain";
-import { demTileLoaderNode, loadRGBA } from "../../../scripts/lib/node-io";
-import { eyeHeight } from "../../../scripts/lib/pipeline-node";
 
 /**
  * DEM for the cascade: 0f's own MAPTERHORN source (src/lib/geo/terrain.ts levels + 512 px tiles),

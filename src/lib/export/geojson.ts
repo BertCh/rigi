@@ -1,7 +1,7 @@
 // GeoJSON (RFC 7946) for a solved photo: camera point, view ray, horizontal FOV wedge, visible
 // peak labels, and an optional ground footprint sampled through a pixel→geo function.
 import { EARTH_R } from "../geodesy";
-import { type CameraInput, type CameraModel, buildCameraModel } from "./camera";
+import { buildCameraModel, type CameraInput, type CameraModel } from "./camera";
 
 type Pos = [number, number] | [number, number, number];
 export type Feature = {

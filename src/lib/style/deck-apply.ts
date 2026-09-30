@@ -13,8 +13,8 @@
 //  - sky, photo-frame lines and pin: displayed sRGB (three's THREE.Color → output encoding round
 //    trip), i.e. the colour itself as 0..255 bytes / CSS.
 import {
-	type AtmValues,
 	type AtmosphereParams,
+	type AtmValues,
 	atmosphereValues,
 } from "../look/atmosphere";
 import { type LookDefine, terrainDefines } from "../look/look-key";

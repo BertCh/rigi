@@ -16,16 +16,17 @@
 // The deadline bounds the export lock (PhotoWorkspace locks exports while the verdict is pending): the
 // cascade's 360° Mapterhorn terrain is tens of MB cold, and a stalled network would otherwise
 // hold it forever. The matcher escalation is bounded by its own 150 s request timeout (v0.3 takes 45–77 s idle).
+
+import type { AlignResult } from "#/lib/align";
+import type { Pose } from "#/lib/camera";
 import {
+	type MatchResult,
 	matchAccepted,
 	matcherAvailable,
 	requestMatchOrDefer,
 	shouldEscalate,
-	type MatchResult,
 } from "#/lib/matcher-client";
-import type { AlignResult } from "#/lib/align";
 import type { PhotoMeta } from "#/lib/photos";
-import type { Pose } from "#/lib/camera";
 import {
 	matchUnknownPoseOrDefer,
 	positionSource,

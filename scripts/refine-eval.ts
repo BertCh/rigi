@@ -22,13 +22,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
+import { vfovFromFocal } from "../src/lib/camera";
 import {
 	type Camera,
 	cameraFromAngles,
 	perturbCamera,
 	resizeCamera,
 } from "../src/lib/geo/camera";
-import { vfovFromFocal } from "../src/lib/camera";
 import type { HorizonProfile } from "../src/lib/geo/horizon";
 import { detectSkyline, type SkylineObservation } from "../src/lib/geo/skyline";
 import {

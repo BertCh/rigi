@@ -11,10 +11,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import {
-	computeHorizon,
-	type HorizonProfile,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/horizon";
+import { fileHeights } from "/Users/robertchristie/Documents/GitHub/mt-image/scripts/lib/node-io";
+import { eyeHeight } from "/Users/robertchristie/Documents/GitHub/mt-image/scripts/lib/pipeline-node";
 import {
 	lonLatToTile,
 	MAPTERHORN,
@@ -23,20 +21,29 @@ import {
 	tileId,
 } from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/dem";
 import {
+	computeHorizon,
+	type HorizonProfile,
+} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/horizon";
+import {
 	overpassPeaksQuery,
 	type Peak,
 	parseOverpassPeaks,
 } from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/peaks";
-import { OVERPASS, overpass } from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/overpass";
 import { TerrainSampler } from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/terrain";
-import { distanceBearing, EARTH_R } from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geodesy";
-import { fileHeights } from "/Users/robertchristie/Documents/GitHub/mt-image/scripts/lib/node-io";
-import { eyeHeight } from "/Users/robertchristie/Documents/GitHub/mt-image/scripts/lib/pipeline-node";
+import {
+	distanceBearing,
+	EARTH_R,
+} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geodesy";
+import {
+	OVERPASS,
+	overpass,
+} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/overpass";
 
 export const ROOT = path.resolve(import.meta.dirname, "../../../..");
 export const HARNESS = path.resolve(import.meta.dirname, "..");
 // H1 copy: caches go under tools/research/tm/h1_mine/harness/cache (never into tools/bench/**)
-export const CACHE = process.env.H1_OVERLAY_CACHE ?? path.join(import.meta.dirname, "cache");
+export const CACHE =
+	process.env.H1_OVERLAY_CACHE ?? path.join(import.meta.dirname, "cache");
 const TILE_DIR =
 	process.env.BENCH_MAPTERHORN_DIR ?? path.join(CACHE, "mapterhorn");
 const TILE_CAP_BYTES = Number(process.env.BENCH_MAPTERHORN_CAP ?? 4e8);

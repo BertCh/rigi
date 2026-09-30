@@ -52,15 +52,15 @@
 import {
 	existsSync,
 	mkdirSync,
-	readFileSync,
 	readdirSync,
+	readFileSync,
 	rmSync,
 	statSync,
 	writeFileSync,
 } from "node:fs";
-import { gunzipSync, gzipSync } from "node:zlib";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { chromium } from "playwright";
 

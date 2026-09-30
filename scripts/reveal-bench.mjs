@@ -36,7 +36,8 @@ async function run(id, renderer, legacy) {
 	const r = await page.evaluate(
 		async ({ preset, secs, legacy }) => {
 			const e = window.__engine;
-			if (legacy && e.compositor) e.compositor.onChange = () => e.updateLayers();
+			if (legacy && e.compositor)
+				e.compositor.onChange = () => e.updateLayers();
 			const cfg = { preset, duration: secs };
 			const dts = [];
 			let last = performance.now();

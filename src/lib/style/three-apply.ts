@@ -11,17 +11,17 @@
 //    colours): the classic literals were used as-is in linear space, so a float tuple is passed
 //    through exactly, while a '#hex' string (what the UI and presets write) is converted sRGB → linear.
 import * as THREE from "three";
-import { type RampStopsU, writeRamp } from "../materials";
 import {
 	type AtmosphereParams,
-	type Vec3,
 	atmosphereValues,
+	type Vec3,
 } from "../look/atmosphere";
 import { ATM_BLOCK } from "../look/glsl/atmosphere";
 import { SLOPE_BLOCK } from "../look/glsl/ramps";
 import { REL_BLOCK } from "../look/glsl/relief";
 import { type ReliefField, reliefValues } from "../look/relief/field";
 import { type SunContext, sunDirFromStyle } from "../look/sun";
+import { type RampStopsU, writeRamp } from "../materials";
 import { hexToRgb01, hexToRgba01, srgbToLinear } from "./color";
 import { RAMPS, resolveRamp, turbo } from "./ramps";
 import type {

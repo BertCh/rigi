@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { sceneAt } from "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/harness/lib/geo";
+
 const ids = process.argv.slice(2);
 const man = JSON.parse(
 	fs.readFileSync(

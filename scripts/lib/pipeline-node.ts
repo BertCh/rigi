@@ -1,13 +1,13 @@
 /** Node helpers shared by baseline scripts: per-photo meta, prior, terrain, cached horizon. */
 import fs from "node:fs";
 import path from "node:path";
+import { DEM_SOURCES } from "../../src/lib/dem";
 import { type Camera, cameraFromMeta } from "../../src/lib/geo/camera";
 import { computeHorizon, type HorizonProfile } from "../../src/lib/geo/horizon";
-import { EYE_ABOVE_GROUND } from "../../src/lib/geo/pipeline";
 import { type PhotoMeta, readPhotoMeta } from "../../src/lib/geo/photo-meta";
-import { DEM_SOURCES } from "../../src/lib/dem";
+import { EYE_ABOVE_GROUND } from "../../src/lib/geo/pipeline";
 import { loadTerrain, type TerrainSampler } from "../../src/lib/geo/terrain";
-import { imagePixelSize, CACHE, demTileLoaderNode } from "./node-io";
+import { CACHE, demTileLoaderNode, imagePixelSize } from "./node-io";
 
 /**
  * Eye-height rule, overridable with EYE=max|gps|ground for experiments.

@@ -34,6 +34,7 @@ import {
 	bandTable,
 	baselineCam,
 	builtinFit,
+	EVAL_OUT,
 	type EvalPin,
 	type EvalResidual,
 	loadPins,
@@ -43,7 +44,6 @@ import {
 	median,
 	pinUV,
 	quantile,
-	EVAL_OUT,
 	R_EFF,
 	scorePins,
 } from "./eval";

@@ -4,9 +4,9 @@
 // ReadImagesText drops an image (silently) if the second line is missing, so we always emit an
 // empty POINTS2D line after each image line.
 import {
+	buildCameraModel,
 	type CameraInput,
 	type CameraModel,
-	buildCameraModel,
 	colmapLines,
 } from "./camera";
 import { zipStore } from "./zip";

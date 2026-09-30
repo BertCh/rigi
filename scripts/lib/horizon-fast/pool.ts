@@ -7,7 +7,6 @@
  */
 
 import type { Ridge } from "../../../src/lib/geo/horizon";
-import { type EngineOptions, type EngineTimings, prepare } from "./engine";
 import type {
 	Eye,
 	FastHorizonProfile,
@@ -19,6 +18,7 @@ import {
 	type TileStore,
 } from "../../../src/lib/horizon-fast/mosaic";
 import type { PeakVisibility } from "../../../src/lib/horizon-fast/visibility";
+import { type EngineOptions, type EngineTimings, prepare } from "./engine";
 import type { SectorJob, SectorResult } from "./worker-core";
 
 /** Minimal worker handle (node worker_threads: see node.ts). */

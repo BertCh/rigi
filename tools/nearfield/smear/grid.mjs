@@ -1,5 +1,6 @@
-import { createCanvas, loadImage } from "@napi-rs/canvas";
 import fs from "node:fs";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
+
 const [, , id, out, x0 = 0, y0 = 0, x1 = 1, y1 = 1, W = 1200] = process.argv;
 const img = await loadImage(fs.readFileSync(`public/photos/${id}.jpg`));
 const sx = +x0 * img.width,

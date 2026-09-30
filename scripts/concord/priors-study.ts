@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import exifr from "exifr";
 import { vfovFromFocal } from "../../src/lib/camera";
+import { focalPxFromF35 } from "../../src/lib/camera/focal";
 import {
 	type CameraX,
 	distanceBand,
@@ -45,7 +46,6 @@ import {
 	TERRARIUM_AWS,
 	type TerrainLevel,
 } from "../../src/lib/dem";
-import { focalPxFromF35 } from "../../src/lib/camera/focal";
 import { computeHorizon, type HorizonProfile } from "../../src/lib/geo/horizon";
 import { detectSkyline } from "../../src/lib/geo/skyline";
 import { loadTerrain, type TerrainSampler } from "../../src/lib/geo/terrain";

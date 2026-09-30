@@ -139,9 +139,9 @@
  *   out/refine/results.json is). Method name: "matcher:<method|file suffix>", "<track>[:<method>]".
  */
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
-import crypto from "node:crypto";
 import path from "node:path";
 import zlib from "node:zlib";
 
@@ -1543,14 +1543,12 @@ async function stepPerf(scale, appUrl, ids) {
 				args: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 				viewport: { width: 1400, height: 900 },
 			};
-			ctx = await chromium
-				.launchPersistentContext(profile, opts)
-				.catch(() =>
-					chromium.launchPersistentContext(profile, {
-						...opts,
-						channel: "chrome",
-					}),
-				);
+			ctx = await chromium.launchPersistentContext(profile, opts).catch(() =>
+				chromium.launchPersistentContext(profile, {
+					...opts,
+					channel: "chrome",
+				}),
+			);
 			const page = ctx.pages()[0] ?? (await ctx.newPage());
 			await page.addInitScript(() => {
 				localStorage.clear();
@@ -4024,15 +4022,13 @@ async function main() {
 								", ",
 							)}${f.reads > 1 ? `, ${f.reads} reads` : ""}${f.warning ? `, WARNING ${f.warning}` : ""}`,
 		})),
-		...(steps.matcher?.reported ?? [])
-			.slice(0, 1)
-			.map((r) => ({
-				file: r.source,
-				owner: "f0",
-				mtime: r.mtime,
-				ageMin: ageMin(Date.parse(r.mtime)),
-				note: "summary lines, not re-scored (cross-check only)",
-			})),
+		...(steps.matcher?.reported ?? []).slice(0, 1).map((r) => ({
+			file: r.source,
+			owner: "f0",
+			mtime: r.mtime,
+			ageMin: ageMin(Date.parse(r.mtime)),
+			note: "summary lines, not re-scored (cross-check only)",
+		})),
 		...(steps.app?.stale
 			? [
 					{

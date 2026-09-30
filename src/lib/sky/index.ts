@@ -23,8 +23,8 @@ import type {
 	SkyWorkerResponse,
 } from "./protocol";
 
-export { skylineFromSky, skylineFromSkyDP } from "./skyline";
 export type { SkylineDPOptions, SkylineFromSkyOptions } from "./skyline";
+export { skylineFromSky, skylineFromSkyDP } from "./skyline";
 
 export type SkyMask = {
 	width: number;

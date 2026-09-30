@@ -109,7 +109,8 @@ async function main() {
 		const L = c.label;
 		const width = c.width;
 		const file = path.join(dir, `candidate_${L}.jpg`);
-		if (fs.existsSync(file) && (key.candidates as Record<string, unknown>)[L]) continue;
+		if (fs.existsSync(file) && (key.candidates as Record<string, unknown>)[L])
+			continue;
 		for (let a = 0; ; a++) {
 			try {
 				let photoFile = path.join(REPO, "tools/bench/data", e.file);

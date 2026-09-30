@@ -3,7 +3,7 @@
 // untrusted partials (localStorage) and diffing (so storage keeps diff-only overrides).
 import { isHex } from "./color";
 import { CLASSIC } from "./defaults";
-import { MAX_RAMP_STOPS, isRampName } from "./ramps";
+import { isRampName, MAX_RAMP_STOPS } from "./ramps";
 import type { DeepPartial, ViewStyle } from "./types";
 
 type Obj = Record<string, unknown>;

@@ -6,17 +6,10 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as THREE from "three";
-import { makeSharedUniforms } from "../src/lib/materials.ts";
 import { drawPeakLabels } from "../src/lib/look/labels/canvas.ts";
 import { labelCssVars } from "../src/lib/look/labels/css.ts";
-import {
-	applyCompositeStyle,
-	applyLayerStyle,
-	applyTerrainLook,
-	makeCompositeStyleUniforms,
-	rawColor,
-	trailColor,
-} from "../src/lib/style/three-apply.ts";
+import { lookKey } from "../src/lib/look/look-key.ts";
+import { makeSharedUniforms } from "../src/lib/materials.ts";
 import {
 	hazeColorAsRendered,
 	hexToRgba01,
@@ -40,13 +33,20 @@ import {
 	pruneOverrides,
 	validateStyle,
 } from "../src/lib/style/schema.ts";
-import { lookKey } from "../src/lib/look/look-key.ts";
 import {
-	STYLE_STORAGE_KEY,
 	createStyleStore,
 	parseStoredState,
+	STYLE_STORAGE_KEY,
 	urlPreset,
 } from "../src/lib/style/store.ts";
+import {
+	applyCompositeStyle,
+	applyLayerStyle,
+	applyTerrainLook,
+	makeCompositeStyleUniforms,
+	rawColor,
+	trailColor,
+} from "../src/lib/style/three-apply.ts";
 import type { ViewStyle } from "../src/lib/style/types.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");

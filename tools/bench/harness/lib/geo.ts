@@ -10,10 +10,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import {
-	computeHorizon,
-	type HorizonProfile,
-} from "../../../../src/lib/geo/horizon";
+import { fileHeights } from "../../../../scripts/lib/node-io";
+import { eyeHeight } from "../../../../scripts/lib/pipeline-node";
 import {
 	lonLatToTile,
 	MAPTERHORN,
@@ -22,15 +20,17 @@ import {
 	tileId,
 } from "../../../../src/lib/dem";
 import {
+	computeHorizon,
+	type HorizonProfile,
+} from "../../../../src/lib/geo/horizon";
+import {
 	overpassPeaksQuery,
 	type Peak,
 	parseOverpassPeaks,
 } from "../../../../src/lib/geo/peaks";
-import { OVERPASS, overpass } from "../../../../src/lib/overpass";
 import { TerrainSampler } from "../../../../src/lib/geo/terrain";
 import { distanceBearing, EARTH_R } from "../../../../src/lib/geodesy";
-import { fileHeights } from "../../../../scripts/lib/node-io";
-import { eyeHeight } from "../../../../scripts/lib/pipeline-node";
+import { OVERPASS, overpass } from "../../../../src/lib/overpass";
 
 export const ROOT = path.resolve(import.meta.dirname, "../../../..");
 export const HARNESS = path.resolve(import.meta.dirname, "..");

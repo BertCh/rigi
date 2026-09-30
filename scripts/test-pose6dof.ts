@@ -7,18 +7,19 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { solveFromControlPoints } from "../src/lib/geo/control-points";
-import { cameraFromAngles } from "../src/lib/geo/camera";
 import {
 	focalFromVfov,
 	type Pose,
 	projectPoint,
 	unprojectDir,
 } from "../src/lib/camera";
+import { cameraFromAngles } from "../src/lib/geo/camera";
+import { solveFromControlPoints } from "../src/lib/geo/control-points";
+import { wrap180 } from "../src/lib/geodesy";
 import {
 	azElFromDir,
-	bearing,
 	azimuthCorr,
+	bearing,
 	type Correspondence,
 	cameraFrame,
 	dirCorr,
@@ -37,7 +38,6 @@ import {
 	solvePose6dof,
 	unproject,
 } from "../src/lib/pose6dof";
-import { wrap180 } from "../src/lib/geodesy";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const OUT = path.join(ROOT, "out/lead/pose6dof");

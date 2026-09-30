@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	GalleryHorizontalEnd,
 	Layers,
@@ -8,10 +8,10 @@ import {
 	Wrench,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { photos, regionNames } from "#/lib/photos";
-import type { LocalPhotoSummary } from "#/lib/upload";
 import { RigiMark } from "#/brand/RigiMark";
 import { RigiPanorama, VEX } from "#/brand/RigiPanorama";
+import { photos, regionNames } from "#/lib/photos";
+import type { LocalPhotoSummary } from "#/lib/upload";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -120,9 +120,9 @@ function Home() {
 							Upload your photo
 						</span>
 						<span className="mt-0.5 block text-xs leading-relaxed text-white/50">
-							JPEG or HEIC straight from your phone. It stays in this browser;
-							GPS, compass and lens come from the EXIF, and you can pin the
-							position on a map if GPS is missing.
+							JPEG, HEIC, PNG, WebP or AVIF from any phone or camera. It stays
+							in this browser; GPS, compass and lens come from the EXIF, and you
+							can pin the position on a map if GPS is missing.
 						</span>
 					</span>
 					<span className="text-xs font-medium text-white/50 transition group-hover:text-[var(--rigi-glow)]">

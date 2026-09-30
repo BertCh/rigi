@@ -1,8 +1,8 @@
 // Split class of the labelled cells that still smear with the feature on (forced), per label class.
 //   node tools/nearfield/smear/why.mjs [three|deck]
-import fs from "node:fs";
+import fs, { existsSync as _ex, readFileSync as _rd } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { existsSync as _ex, readFileSync as _rd } from "node:fs";
+
 // grids are stored gzipped (grid-*.json.gz); plain .json still read
 const readGrid = (f) =>
 	_ex(f)

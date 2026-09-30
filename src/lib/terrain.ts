@@ -11,7 +11,7 @@ import {
 	tileXToLon,
 	tileYToLat,
 } from "./dem";
-import { type EnuFrame, distanceM } from "./geodesy";
+import { distanceM, type EnuFrame } from "./geodesy";
 import { imageryTileUrls } from "./licences/imagery";
 
 // DEM: Mapterhorn (512 px, national lidar such as swissALTI3D where available) through dem's loadDemTile,

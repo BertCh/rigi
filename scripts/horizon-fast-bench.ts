@@ -13,10 +13,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { TERRAIN_LEVELS, validateTile } from "../src/lib/dem";
 import { computeHorizon } from "../src/lib/geo/horizon";
 import { viewPeaks } from "../src/lib/geo/peaks";
 import { readPhotoMeta } from "../src/lib/geo/photo-meta";
-import { TERRAIN_LEVELS, validateTile } from "../src/lib/dem";
 import { loadTerrain } from "../src/lib/geo/terrain";
 import {
 	destination,
@@ -43,10 +43,10 @@ import {
 	type PeakVisibility,
 	snapPeaks,
 } from "../src/lib/horizon-fast/visibility";
+import { HF_OUT, mapterhornNode } from "./horizon-fast-io";
 import { prepare } from "./lib/horizon-fast/engine";
 import { nodeWorkers } from "./lib/horizon-fast/node";
 import { HorizonPool } from "./lib/horizon-fast/pool";
-import { HF_OUT, mapterhornNode } from "./horizon-fast-io";
 import {
 	imagePixelSize,
 	listPhotos,

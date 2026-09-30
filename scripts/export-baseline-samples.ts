@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { readPhotoMeta } from "../src/lib/geo/photo-meta";
-import { imagePixelSize, heicToJpeg, listPhotos, ROOT } from "./lib/node-io";
+import { heicToJpeg, imagePixelSize, listPhotos, ROOT } from "./lib/node-io";
 
 const OUT = path.join(ROOT, "public", "baseline");
 

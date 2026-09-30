@@ -21,9 +21,9 @@ import { REFRACTION_K } from "#/lib/geodesy";
 import { gpuHorizonOptIn } from "#/lib/gpu/horizon/opt-in";
 import {
 	LITE_RINGS,
+	mosaicTileKeys,
 	type Ring,
 	type RingSpan,
-	mosaicTileKeys,
 	resolveRings,
 } from "#/lib/horizon-fast/mosaic";
 

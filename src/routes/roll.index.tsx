@@ -1,16 +1,16 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, GalleryHorizontalEnd, ImagePlus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { builtinRolls } from "#/lib/roll/roll";
-import type { Roll } from "#/lib/roll/types";
 import {
-	POSE_SOURCES,
-	POSE_SOURCE_COLOR,
-	POSE_SOURCE_LABEL,
 	fmtDateSpan,
 	fmtDistance,
 	listUploadRolls,
+	POSE_SOURCE_COLOR,
+	POSE_SOURCE_LABEL,
+	POSE_SOURCES,
 } from "#/lib/roll/mosaic";
+import { builtinRolls } from "#/lib/roll/roll";
+import type { Roll } from "#/lib/roll/types";
 
 // client-only: pose sources read saved poses from localStorage
 export const Route = createFileRoute("/roll/")({

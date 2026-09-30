@@ -92,7 +92,8 @@ const STATUS_TEXT: Record<Status, string> = {
 };
 
 const isImageFile = (f: File) =>
-	f.type.startsWith("image/") || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name);
+	f.type.startsWith("image/") ||
+	/\.(heic|heif|jpe?g|png|webp|avif)$/i.test(f.name);
 
 type Phase =
 	| { kind: "edit" }
@@ -384,9 +385,9 @@ function ImportPage() {
 					Bring in a whole camera roll.
 				</h1>
 				<p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/55">
-					Drop a day's photos (JPEG or HEIC). Photos without GPS get a position
-					from the ones taken just before and after them. Everything stays in
-					this browser.
+					Drop a day's photos (JPEG, HEIC, PNG, WebP or AVIF). Photos without
+					GPS get a position from the ones taken just before and after them.
+					Everything stays in this browser.
 				</p>
 			</header>
 
@@ -423,7 +424,7 @@ function ImportPage() {
 							ref={inputRef}
 							type="file"
 							multiple
-							accept="image/*,.heic,.heif"
+							accept="image/*,.heic,.heif,.avif"
 							className="sr-only"
 							data-testid="import-input"
 							onChange={(e) => {

@@ -3,10 +3,10 @@
 //   green  draped OFF, masked ON (removed by the split)
 //   blue   masked in both (people mask)
 //   node tools/nearfield/smear/viz.mjs three IMG_7086 out.jpg
-import fs from "node:fs";
-import { createCanvas, loadImage } from "@napi-rs/canvas";
+import fs, { existsSync as _ex, readFileSync as _rd } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { existsSync as _ex, readFileSync as _rd } from "node:fs";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
+
 // grids are stored gzipped (grid-*.json.gz); plain .json still read
 const readGrid = (f) =>
 	_ex(f)

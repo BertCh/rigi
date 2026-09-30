@@ -6,6 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { SKRSContext2D } from "@napi-rs/canvas";
+import { TERRAIN_LEVELS, type TerrainLevel } from "../src/lib/dem";
 import {
 	type Camera,
 	cameraFromAngles,
@@ -15,14 +16,13 @@ import {
 } from "../src/lib/geo/camera";
 import type { ControlPoint } from "../src/lib/geo/control-points";
 import { computeHorizon, type HorizonProfile } from "../src/lib/geo/horizon";
-import { type PhotoMeta, readPhotoMeta } from "../src/lib/geo/photo-meta";
 import {
 	apparentElevation,
 	type PeakView,
 	viewPeaks,
 } from "../src/lib/geo/peaks";
+import { type PhotoMeta, readPhotoMeta } from "../src/lib/geo/photo-meta";
 import { EYE_ABOVE_GROUND } from "../src/lib/geo/pipeline";
-import { TERRAIN_LEVELS, type TerrainLevel } from "../src/lib/dem";
 import { loadTerrain, type TerrainSampler } from "../src/lib/geo/terrain";
 import { imagePixelSize, loadTerrariumTileNode, ROOT } from "./lib/node-io";
 import { fetchPeaks } from "./lib/overpass";

@@ -14,10 +14,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { contours } from "d3-contour";
 import {
-	MAPTERHORN,
-	type TileKey,
 	latToTileY,
 	lonToTileX,
+	MAPTERHORN,
+	type TileKey,
 	tileId,
 } from "../../src/lib/dem";
 import { fileHeights } from "../lib/node-io";

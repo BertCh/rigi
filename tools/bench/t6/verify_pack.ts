@@ -11,8 +11,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { prefetchPeaksBBox, ROOT } from "../harness/lib/geo";
 import type { Pose } from "../../../src/lib/camera";
+import { prefetchPeaksBBox, ROOT } from "../harness/lib/geo";
 import { renderOverlay } from "../harness/overlay";
 
 const BENCH = path.join(ROOT, "tools", "bench");

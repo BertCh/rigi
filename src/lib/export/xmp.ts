@@ -8,9 +8,9 @@
 // - Full model: a custom namespace `slens` (https://summit-lens.app/ns/pose/1.0/) with fov,
 //   focal px, ECEF centre and camera→ECEF rotation.
 import {
+	buildCameraModel,
 	type CameraInput,
 	type CameraModel,
-	buildCameraModel,
 	fixedAzimuth,
 	wrap360,
 } from "./camera";

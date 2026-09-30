@@ -545,7 +545,7 @@ export function BaselinePage({
 								Upload…
 								<input
 									type="file"
-									accept="image/jpeg,image/heic,image/heif,.heic,.heif,.jpg,.jpeg"
+									accept="image/jpeg,image/heic,image/heif,image/png,image/webp,image/avif,.jpg,.jpeg,.heic,.heif,.png,.webp,.avif"
 									className="hidden"
 									onChange={(e) => {
 										const f = e.target.files?.[0];
@@ -556,7 +556,8 @@ export function BaselinePage({
 							</label>
 						</div>
 						<p className="mt-1 text-xs text-neutral-500">
-							Or drag &amp; drop a JPEG/HEIC onto the photo area.
+							Or drag &amp; drop a JPEG, HEIC, PNG, WebP or AVIF onto the photo
+							area.
 						</p>
 						{samplesError && (
 							<div className="mt-2">

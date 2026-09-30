@@ -18,7 +18,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createCanvas, loadImage, type SKRSContext2D } from "@napi-rs/canvas";
-import { type Pose, poseToCamera } from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/camera";
+import {
+	type Pose,
+	poseToCamera,
+} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/camera";
 import {
 	layoutPeakLabels,
 	type Peak,

@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
+import { TERRAIN_LEVELS } from "../src/lib/dem";
 import {
 	type Camera,
 	cameraFromMeta,
@@ -17,9 +18,8 @@ import {
 	project,
 } from "../src/lib/geo/camera";
 import { computeHorizon, type HorizonProfile } from "../src/lib/geo/horizon";
-import { EYE_ABOVE_GROUND } from "../src/lib/geo/pipeline";
 import { readPhotoMeta } from "../src/lib/geo/photo-meta";
-import { TERRAIN_LEVELS } from "../src/lib/dem";
+import { EYE_ABOVE_GROUND } from "../src/lib/geo/pipeline";
 import { loadTerrain } from "../src/lib/geo/terrain";
 import {
 	heicToJpeg,
