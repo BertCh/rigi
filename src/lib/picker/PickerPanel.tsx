@@ -306,7 +306,7 @@ export default function PickerPanel(props: PickerPanelProps) {
 					})),
 				});
 				if (import.meta.env.DEV)
-					(window as unknown as { __picker?: unknown }).__picker = {
+					window.__picker = {
 						candidates: top,
 						shown: at,
 						shownIndex,
@@ -489,7 +489,7 @@ export default function PickerPanel(props: PickerPanelProps) {
 			})),
 		});
 		if (import.meta.env.DEV)
-			(window as unknown as { __pickerTap?: unknown }).__pickerTap = {
+			window.__pickerTap = {
 				taps: next,
 				results,
 			};

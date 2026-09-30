@@ -134,9 +134,7 @@ export function PanoramaStrip({
 		viewpointTerrain(eye).then(
 			(t) => {
 				// debug handle, like window.__roll
-				(
-					window as unknown as { __rollPanoTerrain?: unknown }
-				).__rollPanoTerrain = t;
+				window.__rollPanoTerrain = t;
 				if (live)
 					setTerrain({
 						vp: vpIndex,

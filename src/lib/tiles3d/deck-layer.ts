@@ -231,10 +231,7 @@ type State = {
 
 /** Draw counters (dev probes read window.__tiles3dDeck). */
 export const tiles3dDeckStats = { layers: 0, draws: 0, meshes: 0, models: 0 };
-if (typeof window !== "undefined")
-	(
-		window as unknown as { __tiles3dDeck: typeof tiles3dDeckStats }
-	).__tiles3dDeck = tiles3dDeckStats;
+if (typeof window !== "undefined") window.__tiles3dDeck = tiles3dDeckStats;
 
 export class Tiles3DDeckLayer extends Layer<Tiles3DDeckLayerProps> {
 	static layerName = "Tiles3DDeckLayer";

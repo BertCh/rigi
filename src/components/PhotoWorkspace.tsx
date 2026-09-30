@@ -302,14 +302,12 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				!solver && !eyeMoveRef.current && !loadSavedPose(photo.id)
 					? new UnknownPoseSolver(photo)
 					: null;
-			if (import.meta.env.DEV)
-				(window as unknown as { __engine: Renderer }).__engine = engine;
+			if (import.meta.env.DEV) window.__engine = engine;
 			const reveal = new RevealController(engine, (f) => {
 				if (engineRef.current === engine) setRevealFrame(f);
 			});
 			revealRef.current = reveal;
-			if (import.meta.env.DEV)
-				(window as unknown as { __reveal: RevealController }).__reveal = reveal;
+			if (import.meta.env.DEV) window.__reveal = reveal;
 			// keep the overlay hidden while the pose is solved, so it arrives with the flourish
 			const revealOnLoad =
 				getRevealConfig().onLoad && settingsRef.current.mode !== "world";
@@ -444,9 +442,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 										sinceReadyMs,
 									});
 									if (import.meta.env.DEV)
-										(
-											window as unknown as { __secondOpinion: unknown }
-										).__secondOpinion = { ...out, sinceReadyMs };
+										window.__secondOpinion = { ...out, sinceReadyMs };
 									if (out.pose !== app.pose) setPose(out.pose, false);
 									if (out.verdict === "unverified") setAlignState("unverified");
 									else if (
@@ -485,7 +481,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				setStatus(null);
 				setHasPeople(engine.hasPeople);
 				if (import.meta.env.DEV)
-					(window as unknown as { __poseAtReady: Pose }).__poseAtReady = {
+					window.__poseAtReady = {
 						...engine.pose,
 					};
 				if (revealOnLoad) {

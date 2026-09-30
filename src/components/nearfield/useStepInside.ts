@@ -266,7 +266,7 @@ export function useStepInside(opts: {
 	// dev handle (like window.__engine): state, build / enter / back and the step camera
 	useEffect(() => {
 		if (!import.meta.env.DEV || !ctl) return;
-		const w = window as unknown as { __nearfield?: unknown };
+		const w = window;
 		const handle = {
 			controller: ctl,
 			get state() {

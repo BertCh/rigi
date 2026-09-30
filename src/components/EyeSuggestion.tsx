@@ -76,8 +76,7 @@ export function EyeSuggestion({
 			.then((result) => {
 				if (ctl.signal.aborted) return;
 				console.debug("[eye-search]", result);
-				if (import.meta.env.DEV)
-					(window as unknown as { __eyeSearch: unknown }).__eyeSearch = result;
+				if (import.meta.env.DEV) window.__eyeSearch = result;
 				setPhase({ kind: "result", result, pose: start });
 			})
 			.catch((e) => {

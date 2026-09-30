@@ -64,7 +64,7 @@ export function useConcordDisplay(
 				.then((report) => {
 					if (ctl.signal.aborted) return;
 					console.debug("[concord]", report);
-					(window as unknown as { __concord: unknown }).__concord = report;
+					window.__concord = report;
 				})
 				.catch((e) => console.warn("[concord]", e));
 		}, 250);

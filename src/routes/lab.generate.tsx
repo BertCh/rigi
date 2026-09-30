@@ -190,7 +190,7 @@ function LabGenerate() {
 		if (!canvas) return;
 		const photoId = search.photo ?? "IMG_7131";
 		const lab: GenLab = { done: false, panels: [] };
-		(window as unknown as { __genLab?: GenLab }).__genLab = lab;
+		window.__genLab = lab;
 		let engine: PhotoEngine | null = null;
 		let cache: CacheRenderer | null = null;
 		let cancelled = false;

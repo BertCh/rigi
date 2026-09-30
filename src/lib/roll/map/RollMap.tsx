@@ -83,7 +83,7 @@ export function RollMap({
 				onHover: (h) => live && setHover(h),
 				onView: (id) => live && setViewId(id),
 			});
-			(window as unknown as { __roll?: RollMapEngine }).__roll = eng;
+			window.__roll = eng;
 			setEngine(eng);
 			void eng.init();
 		});
@@ -146,7 +146,7 @@ export function RollMap({
 				});
 			if (ac.signal.aborted) return;
 			if (!s) return setSpotNote((n) => n || "unavailable");
-			(window as unknown as { __rollSpotLast?: unknown }).__rollSpotLast = s;
+			window.__rollSpotLast = s;
 			engine.setExtraLayers("spot3d", [m.spotLayer(s.cloud)]);
 			setSpotNote(
 				`${s.views.filter((v) => v.splats > 0).length}/${ids.length} photos · ${s.cloud.count} splats`,

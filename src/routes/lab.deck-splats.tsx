@@ -581,7 +581,7 @@ function LabDeckSplats() {
 				};
 			},
 		};
-		(window as { __splatLab?: LabHook }).__splatLab = hook;
+		window.__splatLab = hook;
 
 		const hudTimer = setInterval(() => {
 			const s = splatStats;

@@ -105,9 +105,7 @@ export function logPickerEvent(e: PickerLogEntry): void {
 	} catch {
 		/* private mode / quota: the in-memory copy still downloads */
 	}
-	if (import.meta.env?.DEV)
-		(window as unknown as { __pickerLog?: PickerLogEntry[] }).__pickerLog =
-			trimmed;
+	if (import.meta.env?.DEV) window.__pickerLog = trimmed;
 }
 
 export function readPickerLog(): PickerLogEntry[] {

@@ -435,7 +435,7 @@ function SplatLab() {
 				};
 			},
 		};
-		(window as unknown as { __splatLab?: Lab }).__splatLab = lab;
+		window.__splatLab = lab;
 		return () => {
 			cancelAnimationFrame(raf);
 			window.removeEventListener("resize", resize);
@@ -449,7 +449,7 @@ function SplatLab() {
 				}
 			});
 			renderer.dispose();
-			(window as unknown as { __splatLab?: Lab }).__splatLab = undefined;
+			window.__splatLab = undefined;
 		};
 		// truth is applied live below; only n / logdepth rebuild the scene
 	}, [search.n, search.logdepth, search.aa]);
