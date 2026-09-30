@@ -114,15 +114,6 @@ export function readPickerLog(): PickerLogEntry[] {
 	return read();
 }
 
-export function clearPickerLog(): void {
-	mem.length = 0;
-	try {
-		localStorage.removeItem(PICKER_LOG_KEY);
-	} catch {
-		/* ignore */
-	}
-}
-
 /** Save the whole log as `rigi-picker-log-<date>.json`. */
 export function downloadPickerLog(): void {
 	const blob = new Blob(

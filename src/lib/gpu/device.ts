@@ -13,8 +13,6 @@ import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import { getFlag } from "#/lib/flags";
 
-export type GpuMode = "on" | "off";
-
 export const gpuEnabled = () =>
 	getFlag("gpu") === "on" &&
 	typeof navigator !== "undefined" &&
@@ -52,11 +50,4 @@ async function create(): Promise<Device | null> {
 		console.warn("[gpu] WebGPU unavailable, using CPU paths", e);
 		return null;
 	}
-}
-
-/** For tests and benchmarks: drop the cached device so the next call re-creates it. */
-export function resetComputeDevice() {
-	const p = pending;
-	pending = null;
-	p?.then((d) => d?.destroy());
 }

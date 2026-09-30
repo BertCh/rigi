@@ -25,10 +25,6 @@ export function hexToRgb01(c: Hex): [number, number, number] {
 	return [r, g, b];
 }
 
-export function alphaOf(c: Hex): number {
-	return hexToRgba01(c)[3];
-}
-
 /** '#rrggbb' (or '#rrggbbaa' when alpha < 1), rounding floats to 8 bits. For UI colour inputs. */
 export function toHexString(c: Hex, withAlpha = true): `#${string}` {
 	const [r, g, b, a] = hexToRgba01(c);

@@ -202,12 +202,6 @@ export function setFlagOverride<K extends FlagName>(
 	else g.__RIGI_FLAGS__[name] = value;
 }
 
-/** The default of an enum flag (the value that means "unset"). */
-export function flagDefault(name: FlagName): string | undefined {
-	const d: FlagDef = FLAG_SCHEMA[name];
-	return d.kind === "enum" ? d.def : undefined;
-}
-
 // ---- router ------------------------------------------------------------------------------------------
 // The root route validates the flag params (keeping them as the router parsed them) and retains them
 // across navigation. Values stay primitive: getFlag re-parses from the URL.

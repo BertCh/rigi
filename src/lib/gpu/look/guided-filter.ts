@@ -83,16 +83,3 @@ export async function guidedFiltersGpu(
 		release(...owned);
 	}
 }
-
-/** GPU twin of guidedFilter(I, p, w, h, r, eps). */
-export async function guidedFilterGpu(
-	device: Device,
-	I: Float32Array,
-	p: Float32Array,
-	w: number,
-	h: number,
-	r: number,
-	eps: number,
-): Promise<Float32Array> {
-	return (await guidedFiltersGpu(device, I, w, h, [{ p, r, eps }]))[0];
-}

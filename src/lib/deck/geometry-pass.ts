@@ -466,12 +466,6 @@ export class GpuGeometrySource implements GeometrySource {
 	}
 }
 
-/** GeometrySourceFactory for a live Deck and eye (see geometry-source.ts). */
-export function gpuGeometryFactory(deck: Deck, eye: Eye) {
-	return (width: number, height: number) =>
-		new GpuGeometrySource(deck, eye, width, height);
-}
-
 /** The drape's range map (terrain-layer.ts photoRange: row 0 = top, 0 = sky) from a source. */
 export function rangeMapFrom(
 	src: Pick<GeometrySource, "width" | "height" | "range">,

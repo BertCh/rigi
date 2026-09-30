@@ -5,8 +5,6 @@
  */
 
 export const isPow2 = (n: number) => n > 0 && (n & (n - 1)) === 0;
-export const nextPow2 = (n: number) =>
-	2 ** Math.ceil(Math.log2(Math.max(1, n)));
 
 const twiddles = new Map<number, { cos: Float64Array; sin: Float64Array }>();
 

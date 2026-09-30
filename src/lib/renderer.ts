@@ -129,9 +129,6 @@ export interface Renderer {
 	exportImage(withLabels?: boolean): Promise<Blob | null>;
 }
 
-/** Plan name (out/lead/deck-parity/features.md). */
-export type PhotoRenderer = Renderer;
-
 /** Constructor shape both backends share: `new Engine(canvas, photo)`. */
 export type RendererConstructor = new (
 	canvas: HTMLCanvasElement,

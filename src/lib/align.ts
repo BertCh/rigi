@@ -207,29 +207,6 @@ export function fitSkyModel(map: EdgeMap, lbl: Int8Array) {
 	}
 }
 
-/** Relabel sky/terrain from a pose (with a margin) and refit the colour model. */
-export function refitSkyModel(
-	map: EdgeMap,
-	p: Pose,
-	aspect: number,
-	dirs: Float32Array,
-	margin = 0.04,
-) {
-	const rows = skylineRows(p, aspect, dirs, map);
-	const lbl = new Int8Array(map.w * map.h);
-	const m = Math.round(map.h * margin);
-	let labelled = 0;
-	for (let x = 0; x < map.w; x++) {
-		const r = rows[x];
-		if (r < 0) continue;
-		labelled++;
-		for (let y = 0; y < map.h; y++)
-			lbl[y * map.w + x] = y < r - m ? 1 : y > r + m ? -1 : 0;
-	}
-	// keep the pose-free model if the pose's skyline barely crosses the frame
-	if (labelled > map.w * 0.3) fitSkyModel(map, lbl);
-}
-
 /** Rendered skyline row per edge-map column for a pose (-1 where no horizon point projects). */
 function skylineRows(
 	p: Pose,

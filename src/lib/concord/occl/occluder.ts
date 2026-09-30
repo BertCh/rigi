@@ -37,13 +37,6 @@ export const OCCL_RULE = { ratio: 1.05, slackM: 3 } as const;
 export const occludedBy = (r: number, occl: number) =>
 	r > occl * OCCL_RULE.ratio + OCCL_RULE.slackM;
 
-/** GLSL twin of occludedBy for the composites (sampler holds metres; 0 texels ⇒ people). */
-export const OCCL_GLSL = /* glsl */ `
-float occlDim(sampler2D tOccl, vec2 uv, float r) {
-  float o = texture2D(tOccl, uv).r;
-  return r > o * ${OCCL_RULE.ratio.toFixed(2)} + ${OCCL_RULE.slackM.toFixed(1)} ? 1.0 : 0.0;
-}`;
-
 const R_DROP = (1 - REFRACTION_K) / (2 * EARTH_R);
 const BLOCK = 16;
 
@@ -212,12 +205,4 @@ export function occluderRange(
 			out[k] = r;
 		}
 	return out;
-}
-
-/** Texture payload: Infinity → 1e7 m (fits a float/half-float texture's "far"). */
-export function occlTexture(occl: Float32Array): Float32Array {
-	const t = new Float32Array(occl.length);
-	for (let k = 0; k < occl.length; k++)
-		t[k] = Number.isFinite(occl[k]) ? occl[k] : 1e7;
-	return t;
 }

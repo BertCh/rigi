@@ -209,12 +209,6 @@ export function getStyleStore(): StyleStore {
 	return browserStore;
 }
 
-export const getStyleState = () => getStyleStore().getState();
-export const setStyleState = (
-	next: StyleState | ((prev: StyleState) => StyleState),
-) => getStyleStore().setState(next);
-export const subscribeStyle = (cb: () => void) => getStyleStore().subscribe(cb);
-
 const serverState = () => DEFAULT_STYLE_STATE;
 const serverStyle = () => presetStyle("classic");
 

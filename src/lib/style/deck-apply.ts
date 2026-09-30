@@ -324,7 +324,6 @@ export function deckCompositeStyle(style: ViewStyle): DeckCompositeStyle {
 
 /** SAC scale → the four trail classes of TrailStyle.colors (engine.ts buildTrails). */
 export const TRAIL_CLASSES = ["hiking", "mountain", "alpine", "other"] as const;
-export type TrailClass = (typeof TRAIL_CLASSES)[number];
 
 export function trailClass(sac: string | null | undefined): number {
 	switch (sac) {

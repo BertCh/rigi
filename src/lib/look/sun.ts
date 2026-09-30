@@ -83,38 +83,6 @@ export function sunPosition(
 }
 
 /**
- * Lighting direction for relief shading. Real sun when it is reasonably high; otherwise
- * (dusk, night, or overcast looks) fall back toward the cartographic NW 45° light so the
- * relief stays legible. `realism` 1 = always real sun, 0 = always cartographic.
- */
-export function shadingLight(
-	sun: SunPosition,
-	realism = 1,
-): [number, number, number] {
-	const carto = { az: 315, el: 45 };
-	const w = realism * smooth(2, 12, sun.elevation);
-	const az = lerpAngle(carto.az, sun.azimuth, w);
-	const el = carto.el + (Math.max(sun.elevation, 8) - carto.el) * w;
-	const ce = Math.cos(el * D);
-	return [ce * Math.sin(az * D), ce * Math.cos(az * D), Math.sin(el * D)];
-}
-
-function smooth(a: number, b: number, x: number) {
-	const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-	return t * t * (3 - 2 * t);
-}
-
-function lerpAngle(a: number, b: number, t: number) {
-	const d = ((b - a + 540) % 360) - 180;
-	return (a + d * t + 360) % 360;
-}
-
-/** UTC capture time. Prefers `takenAtUtc` (GPS/offset-corrected) when ingest provides it. */
-export function photoTimeUtc(photo: { takenAt: string; takenAtUtc?: string }) {
-	return new Date(photo.takenAtUtc ?? photo.takenAt);
-}
-
-/**
  * Clear-sky sun colour (linear) from elevation in degrees, or from an ENU direction toward the sun:
  * Rayleigh + a little Mie along the Kasten–Young air mass, normalised so the high sun is ~white.
  * Low sun turns warm on its own.

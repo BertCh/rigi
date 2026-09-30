@@ -303,12 +303,5 @@ export function attributionLine(
 	return parts.join(" · ");
 }
 
-/** Plain-text credits block for sidecar/zip exports (one credit per line with licence and link). */
-export function attributionText(q: AttributionQuery): string {
-	return attributionFor(q)
-		.map((c) => `© ${c.label} — ${c.licence}${c.href ? ` — ${c.href}` : ""}`)
-		.join("\n");
-}
-
 /** True when the per-source credit should replace the classic fixed line (`?attrib=full`). */
 export const fullAttribution = () => attributionMode() === "full";

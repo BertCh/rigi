@@ -32,8 +32,3 @@ export function enuFromEcef(
 		0, 0, 0, 1,
 	);
 }
-
-/** The ENU point (x east, y north, z up) in ECEF, for tile-space distance tests. */
-export function ecefOfEnu(m: THREE.Matrix4, p: THREE.Vector3): THREE.Vector3 {
-	return p.clone().applyMatrix4(m.clone().invert());
-}

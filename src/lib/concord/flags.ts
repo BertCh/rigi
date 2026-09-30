@@ -28,6 +28,3 @@ export const concordFlags = (): ConcordFlags => toRecord(getFlag("concord"));
 
 export const concordOn = (f: ConcordFlag): boolean =>
 	getFlag("concord").includes(f);
-
-/** Any flag on at all (cheap guard for call sites). */
-export const concordAny = (): boolean => getFlag("concord").length > 0;

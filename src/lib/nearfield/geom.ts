@@ -56,13 +56,6 @@ export function maskSampler(
 	};
 }
 
-/** Normalised coords of depth-grid cell (col, row). */
-export const cellUV = (
-	d: { width: number; height: number },
-	i: number,
-	j: number,
-) => [(i + 0.5) / d.width, (j + 0.5) / d.height] as const;
-
 /** Model z-depth at a cell, or NaN when invalid (valid = 0, non-finite or ≤ 0). */
 export function modelDepth(d: NearFieldDepth, k: number): number {
 	const z = d.depth[k];

@@ -8,7 +8,6 @@
  * ?gpu=off marches the horizons on the CPU (slower, same search).
  */
 import type { Pose } from "#/lib/camera";
-import { getFlag } from "#/lib/flags";
 import type { PhotoMeta } from "#/lib/photos";
 import { gpuEnabled } from "../device";
 import type {
@@ -18,12 +17,6 @@ import type {
 } from "./suggest";
 
 export type { EyeSearchInput, EyeSearchProgress, EyeSearchResult };
-
-export type EyeSearchFlag = "off" | "on" | "auto";
-
-export function eyeSearchFlag(): EyeSearchFlag {
-	return getFlag("eyesearch");
-}
 
 export interface EyeSearchInWorker {
 	input: EyeSearchInput;

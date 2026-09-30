@@ -471,10 +471,6 @@ export function nearHeightAt(
 	);
 }
 
-/** nDSM (object height above terrain) at ENU (e, n). */
-export const ndsmAt = (g: NearDsm, e: number, n: number) =>
-	nearHeightAt(g, "dsm", e, n) - nearHeightAt(g, "dtm", e, n);
-
 /** Engine eye rule (deck/scene.ts eyeAltitude) over a given ground height. */
 export const eyeAltitudeOver = (alt: number | null | undefined, dem: number) =>
 	alt != null ? Math.max(alt, dem + 1.6) : dem + 1.8;

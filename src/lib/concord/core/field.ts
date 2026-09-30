@@ -38,10 +38,6 @@ export function sampleField(
 	return [bilinear(f.du, f.w, f.h, u, v), bilinear(f.dv, f.w, f.h, u, v)];
 }
 
-/** Bilinear sample of the posterior σ (px @1600). */
-export const sampleFieldSigma = (f: ResidualField, u: number, v: number) =>
-	bilinear(f.sigmaPx, f.w, f.h, u, v);
-
 /**
  * Inverse field on the same grid: render uv q → photo uv offset (photo = q + W⁻¹(q)).
  * Per cell centre q: fixed point p ← q − W(p), then W⁻¹(q) = p − q. Converges for |∇W| < 1.

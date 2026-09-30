@@ -940,17 +940,6 @@ const DEFAULTS: TerrainUniformProps = {
 	truth: 0,
 };
 
-/** sRGB hex → linear RGB triple, exactly as THREE.Color.setHex does under ColorManagement. */
-export function srgbHexToLinear(hex: number): [number, number, number] {
-	const f = (c: number) =>
-		c < 0.04045 ? c * 0.0773993808 : (c * 0.9478672986 + 0.0521327014) ** 2.4;
-	return [
-		f(((hex >> 16) & 255) / 255),
-		f(((hex >> 8) & 255) / 255),
-		f((hex & 255) / 255),
-	];
-}
-
 export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 	static layerName = "TerrainLayer";
 	declare state: {

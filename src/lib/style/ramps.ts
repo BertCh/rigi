@@ -132,8 +132,6 @@ export const ABSOLUTE_RAMP_RANGE = {
 	hi: 3500,
 } as const;
 
-export const RAMP_NAMES = Object.keys(RAMPS) as RampName[];
-
 export function isRampName(v: unknown): v is RampName {
 	return typeof v === "string" && v in RAMPS;
 }

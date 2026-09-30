@@ -125,10 +125,6 @@ export type NearFieldScene = {
 	model?: string;
 };
 
-/** Optional renderer hook (src/lib/renderer.ts): both engines implement it additively. */
-export interface NearFieldRenderer {
-	setNearField?(scene: NearFieldScene | null, opts?: NearFieldViewOpts): void;
-}
 export type NearFieldViewOpts = {
 	/** Tint surfaces by provenance (the "Truth" toggle). */
 	truth?: boolean;

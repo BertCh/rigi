@@ -131,12 +131,6 @@ type NearFieldMasks = {
 	step: THREE.DataTexture;
 	sky: THREE.DataTexture;
 };
-export type LayerStyle =
-	| "contours"
-	| "bands"
-	| "satellite"
-	| "topo"
-	| "hillshade";
 export type BlendMethod = "swipe" | "lens" | "range" | "brush";
 
 export type Settings = {
