@@ -454,6 +454,8 @@ export class PhotoEngine {
 	private layerGen = 0;
 	/** Brush strokes so far (the refined cut's key) and the debounce for re-refining after an edit. */
 	private brushVersion = 0;
+	/** brushVersion last uploaded to brushTex (-1: the CanvasTexture's own first upload pending). */
+	private brushTexVersion = -1;
 	private lookTimer = 0;
 	/** World view atmospheric sky (world.sky.mode 'atmosphere'), made on first use. */
 	private skyMesh?: ReturnType<typeof makeSkyMesh>;
@@ -1627,7 +1629,11 @@ export class PhotoEngine {
 			cu.uNearFade.value = s.nearFade;
 			u.uNearFade.value = s.mode === "overlay" ? s.nearFade : 0;
 			cu.uFgOn.value = s.protectPeople ? 1 : 0;
-			this.brushTex.needsUpdate = true;
+			// re-upload the 512² brush canvas only after paint / clearBrush, not every frame
+			if (this.brushTexVersion !== this.brushVersion) {
+				this.brushTex.needsUpdate = true;
+				this.brushTexVersion = this.brushVersion;
+			}
 			if (this.compositeLook) this.applyCompositeLook(cu);
 			this.renderer.render(this.compScene, this.orthoCam);
 		}
