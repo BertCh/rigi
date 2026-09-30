@@ -218,10 +218,16 @@ export async function decodeImage(
 	try {
 		src = await nativeDecode(file);
 	} catch (e) {
-		if (!heif)
-			throw new Error(
-				`This browser could not decode the image (${(e as Error).message})`,
+		if (!heif) {
+			const raw = /\.(dng|cr[23]|nef|arw|orf|rw2|raf|tiff?)$/i.test(
+				(file as File).name ?? "",
 			);
+			throw new Error(
+				raw
+					? "RAW and TIFF files can't be decoded in the browser. Export the photo as JPEG (keep location metadata) and upload that."
+					: `This browser could not decode the image (${(e as Error).message}). Supported: JPEG, HEIC, PNG, WebP, AVIF.`,
+			);
+		}
 		try {
 			src = await heicDecode(bytes);
 			decoder = "libheif";

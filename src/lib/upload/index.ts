@@ -1,7 +1,8 @@
 // Browser upload path: File → EXIF prior + upright JPEG → PhotoMeta (same as ingest.mjs) →
 // OSM region → IndexedDB. See out/lead/upload/API.md.
-import * as photosModule from "../photos";
+
 import type { PhotoMeta, RegionData } from "../photos";
+import * as photosModule from "../photos";
 import { contentHash, type Decoded, decodeImage } from "./decode";
 import {
 	buildPhotoMeta,

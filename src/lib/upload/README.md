@@ -2,7 +2,7 @@
 
 > Moved from the lead's API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
 
-Browser photo upload for Rigi. `/upload` takes a HEIC or JPEG, builds the same `PhotoMeta` that `scripts/ingest.mjs` builds, gets OSM peaks, trails and lakes, stores everything in IndexedDB, and opens the photo in the existing `PhotoWorkspace` at `/photo/local-<hash>`.
+Browser photo upload for Rigi. `/upload` takes a JPEG, HEIC, PNG, WebP or AVIF (RAW/TIFF are rejected with an export hint), builds the same `PhotoMeta` that `scripts/ingest.mjs` builds, gets OSM peaks, trails and lakes, stores everything in IndexedDB, and opens the photo in the existing `PhotoWorkspace` at `/photo/local-<hash>`.
 
 ## Files (owned by the upload track)
 

@@ -1,4 +1,4 @@
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
 	AlertTriangle,
 	ArrowLeft,
@@ -268,19 +268,19 @@ function UploadPage() {
 					<span className="text-base font-semibold">
 						{stage
 							? STAGE_LABEL[stage]
-							: "Drop an iPhone photo here, or click to choose"}
+							: "Drop a phone photo here, or click to choose"}
 					</span>
 					<span className="max-w-xl text-xs leading-relaxed text-white/50">
-						HEIC or JPEG straight from the camera. GPS, compass heading, lens
-						and the gravity sensor in the Apple MakerNote give the starting
-						camera pose. Nothing leaves your browser except the map-data query
-						to OpenStreetMap.
+						HEIC, JPEG, PNG, WebP or AVIF, from any phone or camera. GPS,
+						compass heading and lens give the starting camera pose (iPhones also
+						record the gravity sensor, which pins tilt and roll). Nothing leaves
+						your browser except the map-data query to OpenStreetMap.
 					</span>
 					<input
 						id="upload-input"
 						ref={inputRef}
 						type="file"
-						accept="image/heic,image/heif,image/jpeg,image/png,image/webp,.heic,.heif,.jpg,.jpeg"
+						accept="image/jpeg,image/heic,image/heif,image/png,image/webp,image/avif,.jpg,.jpeg,.heic,.heif,.png,.webp,.avif"
 						className="sr-only"
 						data-testid="upload-input"
 						onChange={(e) => {
