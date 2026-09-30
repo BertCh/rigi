@@ -35,6 +35,13 @@ export type TileCacheOptions = {
 	 * `signal` is always managed by the queue.
 	 */
 	fetchInit?: Omit<RequestInit, "signal">;
+	/**
+	 * Read-only view of a store another context owns (a dedicated worker next to the page, see
+	 * ./index.ts). Every memory miss probes the store directly (the owner's index is debounced, so it
+	 * would lag), and nothing is ever written, deleted or indexed: the owner's LRU stays the only
+	 * writer, so no body can end up outside its index (and its byte cap). Default false.
+	 */
+	readOnly?: boolean;
 };
 
 export type FetchSource = "memory" | "persistent" | "network";
@@ -106,6 +113,7 @@ export class TileCache {
 			name: "summit-lens-tiles-v1",
 			metaDebounceMs: 2000,
 			writeConcurrency: 2,
+			readOnly: false,
 			...options,
 			fetchInit: { mode: "cors", cache: "no-store", ...options.fetchInit },
 		};
@@ -136,6 +144,10 @@ export class TileCache {
 	private async open() {
 		try {
 			const store = await openStore(this.opts.name, this.opts.backend);
+			if (this.opts.readOnly) {
+				this.store = store;
+				return;
+			}
 			const meta = await store.getMeta();
 			if (meta) this.index = LruIndex.fromJSON(meta, this.opts.capBytes);
 			else if (store.kind === "cache" || store.kind === "idb")
@@ -184,7 +196,9 @@ export class TileCache {
 			p = (async () => {
 				await this.readyP;
 				const store = this.store;
-				if (!store || !this.index.has(url)) return null;
+				if (!store) return null;
+				if (this.opts.readOnly) return await store.get(url);
+				if (!this.index.has(url)) return null;
 				const v = await store.get(url);
 				if (!v) {
 					this.index.remove(url); // index said yes, store said no (evicted by browser / other tab)
@@ -245,6 +259,7 @@ export class TileCache {
 
 	/** Queue a persistent write; writes run a few at a time so they don't compete with reads. */
 	private persist(url: string, v: StoredBody): Promise<void> {
+		if (this.opts.readOnly) return Promise.resolve();
 		if (this.pendingWrites.has(url)) return Promise.resolve(); // joined callers of one network job
 		this.pendingWrites.set(url, v);
 		return this.writes
@@ -298,6 +313,7 @@ export class TileCache {
 	}
 
 	private scheduleMeta() {
+		if (this.opts.readOnly) return;
 		if (this.metaTimer) return;
 		this.metaTimer = setTimeout(() => {
 			this.metaTimer = null;
@@ -311,6 +327,7 @@ export class TileCache {
 			clearTimeout(this.metaTimer);
 			this.metaTimer = null;
 		}
+		if (this.opts.readOnly) return;
 		try {
 			await this.store?.putMeta(this.index.toJSON());
 		} catch {
@@ -348,6 +365,7 @@ export class TileCache {
 		this.negative.clear();
 		this.index.clear();
 		await this.readyP;
+		if (this.opts.readOnly) return; // the owner's store is not ours to wipe
 		try {
 			await this.store?.clear();
 			await this.store?.putMeta(this.index.toJSON());

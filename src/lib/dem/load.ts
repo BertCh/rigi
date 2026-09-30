@@ -1,5 +1,6 @@
-// Browser DEM loading: decode (image.ts, in a worker pool on the page), a plain uncached fetch, and the app's one
-// Mapterhorn tile policy (shared tile cache; a missing tile is stood in for by its nearest ancestor).
+// Browser DEM loading: decode (image.ts, in a worker pool on the page), a plain uncached fetch and its
+// tile-cached twin, and the app's one Mapterhorn tile policy (shared tile cache; a missing tile is stood
+// in for by its nearest ancestor).
 import { cachedFetch, tilePriority } from "../cache";
 import { WorkerPool } from "../worker-pool";
 import { ancestorCrop } from "./grid";
@@ -33,6 +34,24 @@ export async function fetchDemTile(
 	signal?: AbortSignal,
 ): Promise<Float32Array | undefined> {
 	const res = await fetch(src.url(key), { signal });
+	return res.ok ? blobHeights(await res.blob()) : undefined;
+}
+
+/**
+ * fetchDemTile through the shared tile cache (src/lib/cache): the same bytes, decoded by the same
+ * blobHeights, but a tile the page already has costs no request. Works in a dedicated worker (the
+ * unknown-pose cascade), where the cache is read-only and a download goes through the HTTP cache
+ * instead. Undefined on any non-2xx; network errors/aborts reject.
+ */
+export async function fetchDemTileCached(
+	src: DemSource,
+	key: TileKey,
+	signal?: AbortSignal,
+): Promise<Float32Array | undefined> {
+	const res = await cachedFetch(src.url(key), {
+		priority: tilePriority(0, key.z),
+		signal,
+	});
 	return res.ok ? blobHeights(await res.blob()) : undefined;
 }
 

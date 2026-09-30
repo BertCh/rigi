@@ -9,7 +9,8 @@
 // responses are written back to the store, which is LRU-evicted to a byte cap (300 MB).
 // All storage failures (private mode, quota, missing APIs) degrade to cache misses.
 //
-// Everything here is safe to call before the store has finished opening.
+// Everything here is safe to call before the store has finished opening, and from a dedicated
+// worker (which gets a read-only view of the page's store, see cache() below).
 import {
 	type CachedFetchOptions,
 	TileCache,
@@ -34,8 +35,24 @@ export type {
 
 let instance: TileCache | null = null;
 
+/**
+ * Inside a dedicated worker (the unknown-pose cascade loads its own terrain) the page owns the store:
+ * the worker's instance only reads it (TileCacheOptions.readOnly), so the page's LRU index stays the
+ * one record of every stored body and its byte cap holds. What the worker downloads itself is not
+ * stored, so it fetches with the HTTP cache on (Mapterhorn tiles are max-age=604800): a later
+ * photo's worker then gets those tiles from the browser cache as the plain fetch did. No memory tier
+ * (those workers live for one photo and load each tile once).
+ */
+const WORKER_OPTIONS: TileCacheOptions = {
+	readOnly: true,
+	memoryCapBytes: 0,
+	fetchInit: { mode: "cors", cache: "default" },
+};
+const inWorker = () =>
+	typeof window === "undefined" && "WorkerGlobalScope" in globalThis;
+
 function cache(): TileCache {
-	if (!instance) instance = new TileCache();
+	if (!instance) instance = new TileCache(inWorker() ? WORKER_OPTIONS : {});
 	return instance;
 }
 
