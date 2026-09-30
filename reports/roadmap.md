@@ -13,7 +13,7 @@
 1. Every accuracy claim is pre-registered and measured on sealed data. Dev numbers are never quoted as results.
 2. Precision beats recall. A HIGH must be right; everything uncertain is a suggestion the user confirms.
 3. Generated or warped pixels are display-only. They never feed the pose, confidence, benchmarks, the measurement readout or exports.
-4. Classic view stays pixel-identical, and both renderers (three, deck) stay at parity.
+4. Classic view stays pixel-identical, and both renderers (deck, the default since 2026-09-30, and three via `?renderer=three`) stay at parity.
 5. Commercial-licence models only in the product path. Research licences stay behind dev flags.
 
 ## Now: unblock launch and spend evaluation data well
@@ -25,7 +25,7 @@
 | N3 | **Evaluation data plan.** Collect one ~100-photo set with trip sequences (overlapping neighbours) and seal it before opening `data_v3`. It serves propagation, the pano solve and the next matcher round. Decide the order in which claimants spend `data_v3` | Sealed by sha1 | Not started |
 | N4 | **Fix the basin-gap calibration.** v034's 0.20 gap was tuned on v1 verdicts that later flipped: it rejects the correct wc_0063 (gap ≈ 0.18) and keeps the gross wc_0069 (≈ 0.21), and the threshold sits inside run-to-run noise (0.139–0.182) | Re-derive in the H2 veto prereg; don't hand-tune | Found in consolidation |
 | N5 | **Re-annotate ground truth on Mapterhorn.** The GT poses and `demGround` were fitted on Terrarium, which is up to 81 m low at Niederhorn. That biases every comparison toward Terrarium and keeps the CPU eval default on it (`src/lib/geo/README.md`) | Then switch the eval and `/baseline` defaults | Not started |
-| N6 | **deck.gl as the default renderer** ([deck-default.md](deck-default.md)). Flip `renderer` to `deck`, keep `?renderer=three` as the escape hatch | Flip gate: photo interactions ≥ 55 fps, world orbit ≥ 45, eval-app deck ≥ three, correctness checks pass | **Not flipped 2026-09-30.** Photo view at parity (59–60 fps), eval-app 12/14 both; world orbit 29–39 fps fails. Next: canvas `antialias: false` (measured 59 fps), style-baseline re-capture, Firefox smoke, re-run the gate. WebGPU renderer is a separate track (`src/lib/deck-webgpu/README.md`) |
+| N6 | **deck.gl as the default renderer** ([deck-default.md](deck-default.md)). Flip `renderer` to `deck`, keep `?renderer=three` as the escape hatch | Flip gate: photo interactions ≥ 55 fps, world orbit ≥ 45, eval-app deck ≥ three, correctness checks pass | **Done 2026-09-30** (3b121ae). Canvas antialias off at DPR ≥ 2 (408f989) took world orbit to 59–60 fps; eval-app 12/14 both; Firefox headless renders. `eval-app-deck` is in the CI full tier. Open: style-baseline re-capture, Windows/Safari. WebGPU renderer is a separate track (`src/lib/deck-webgpu/README.md`) |
 
 ## Next: registration trust and recall (0–3 months)
 
