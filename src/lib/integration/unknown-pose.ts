@@ -56,6 +56,8 @@ export type UnknownPosePrepare = {
 	gpu?: boolean;
 	/** solvePose's coarse grid on the GPU (src/lib/gpu/solve; identical by construction): gpuEnabled() */
 	solveGpu?: boolean;
+	/** GPU plumbing only: coarse grid and 360° horizon on core command graphs (identical results) */
+	gpuGraph?: boolean;
 	/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
 	gpuOpts?: RealmGpuOptions;
 };
@@ -76,6 +78,8 @@ export type UnknownPoseRequest = {
 	gpu?: boolean;
 	/** as UnknownPosePrepare.solveGpu */
 	solveGpu?: boolean;
+	/** as UnknownPosePrepare.gpuGraph */
+	gpuGraph?: boolean;
 	/** as UnknownPosePrepare.gpuOpts */
 	gpuOpts?: RealmGpuOptions;
 };
@@ -138,7 +142,11 @@ export class UnknownPoseSolver {
 	/** GPU coarse grid: on wherever WebGPU is (off under ?gpu=off); the result is the CPU's by construction */
 	private solveGpu = gpuEnabled();
 
-	constructor(private photo: PhotoMeta) {
+	constructor(
+		private photo: PhotoMeta,
+		/** graph: GPU work on core command graphs (A/B of the plumbing; default the pooled paths) */
+		private opts: { graph?: boolean } = {},
+	) {
 		this.worker = new Worker(
 			new URL("./unknown-pose.worker.ts", import.meta.url),
 			{ type: "module" },
@@ -160,6 +168,7 @@ export class UnknownPoseSolver {
 			alt: photo.alt,
 			gpu: this.gpu,
 			solveGpu: this.solveGpu,
+			gpuGraph: opts.graph,
 			gpuOpts: realmGpuOptions(),
 		};
 		this.worker.postMessage(prep);
@@ -223,6 +232,7 @@ export class UnknownPoseSolver {
 				image: { width: w, height: h, data },
 				gpu: this.gpu,
 				solveGpu: this.solveGpu,
+				gpuGraph: this.opts.graph,
 				gpuOpts: realmGpuOptions(),
 			};
 			this.worker.postMessage(req, [data.buffer]);

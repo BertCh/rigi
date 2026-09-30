@@ -97,10 +97,16 @@ let horizonCache: {
 } | null = null;
 
 /** 360° horizon at the camera, computed once per position (the 'prepare' message starts it early). */
-function horizonAt(lat: number, lon: number, alt: number | null, gpu = false) {
-	const key = `${lat.toFixed(6)},${lon.toFixed(6)},${alt ?? ""},${gpu ? "gpu" : ""}`;
+function horizonAt(
+	lat: number,
+	lon: number,
+	alt: number | null,
+	gpu = false,
+	graph = false,
+) {
+	const key = `${lat.toFixed(6)},${lon.toFixed(6)},${alt ?? ""},${gpu ? "gpu" : ""}${graph ? "+graph" : ""}`;
 	if (horizonCache?.key !== key) {
-		const promise = computeScene(lat, lon, alt, gpu);
+		const promise = computeScene(lat, lon, alt, gpu, graph);
 		promise.catch(() => {
 			if (horizonCache?.promise === promise) horizonCache = null;
 		});
@@ -129,6 +135,7 @@ async function computeScene(
 	lon: number,
 	alt: number | null,
 	gpu = false,
+	graph = false,
 ) {
 	const signal = AbortSignal.timeout(SCENE_TIMEOUT_MS);
 	// a failed tile stays a hole (ocean, 404) as before, but a timeout fails the scene: a horizon with
@@ -147,7 +154,9 @@ async function computeScene(
 	// opt-in (unknownGpuOptIn, page side): the same march on the GPU; null → the CPU sceneHorizon below
 	if (gpu) {
 		const { sceneHorizonGpu } = await import("#/lib/gpu/horizon/scene-profile");
-		const horizon = await sceneHorizonGpu(terrain, lat, lon, eye);
+		const horizon = await sceneHorizonGpu(terrain, lat, lon, eye, undefined, {
+			graph,
+		});
 		if (horizon) return { horizon, eye, horizonOn: "gpu" as const };
 	}
 	return {
@@ -164,6 +173,7 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 		req.lon,
 		req.alt,
 		req.gpu,
+		req.gpuGraph,
 	);
 	const tHorizon = performance.now() - t0;
 	const sky = detectSkyline(req.image);
@@ -194,8 +204,10 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 	// solvePose's coarse grid on the GPU when the page allows it (identical by construction)
 	const on = new Set<"gpu" | "cpu">();
 	const coarse: CoarseProvider | undefined = req.solveGpu
-		? async (...a) => {
-				const r = await solveCoarse(...a);
+		? async (prior, horizon, sky, o) => {
+				const r = await solveCoarse(prior, horizon, sky, o, {
+					graph: req.gpuGraph,
+				});
 				if (r) on.add(r.on);
 				return r;
 			}
@@ -276,9 +288,13 @@ ctx.onmessage = async (
 ) => {
 	applyRealmGpuOptions(ev.data.gpuOpts);
 	if (ev.data.type === "prepare") {
-		horizonAt(ev.data.lat, ev.data.lon, ev.data.alt, ev.data.gpu).catch(
-			() => {},
-		);
+		horizonAt(
+			ev.data.lat,
+			ev.data.lon,
+			ev.data.alt,
+			ev.data.gpu,
+			ev.data.gpuGraph,
+		).catch(() => {});
 		if (ev.data.solveGpu)
 			getComputeDevice()
 				.then((d) => d && warmSolveGpu(d))

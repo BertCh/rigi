@@ -98,7 +98,7 @@ try {
 			for (const e of manifest) {
 				const t0 = Date.now();
 				const res = await page.evaluate(
-					async ({ e, conds }) => {
+					async ({ e, conds, graph }) => {
 						const m = await import("/src/lib/integration/unknown-pose.ts");
 						// the host page is an SVG document (no app): make createElement("canvas") an HTML canvas
 						if (!(document instanceof HTMLDocument)) {
@@ -123,7 +123,8 @@ try {
 							width: e.width,
 							height: e.height,
 						};
-						const s = new m.UnknownPoseSolver(photo);
+						// ABL_GRAPH=1: GPU work on core command graphs (plumbing A/B)
+						const s = new m.UnknownPoseSolver(photo, { graph });
 						const out = [];
 						try {
 							for (const [cond, u] of conds) {
@@ -159,7 +160,7 @@ try {
 						}
 						return out;
 					},
-					{ e, conds: CONDS },
+					{ e, conds: CONDS, graph: process.env.ABL_GRAPH === "1" },
 				);
 				for (const r of res) {
 					const row = { id: e.id, mode, ...r };
@@ -183,7 +184,7 @@ try {
 			}
 		}
 		fs.writeFileSync(
-			path.join(OUT, "ablation.json"),
+			path.join(OUT, process.env.ABL_OUT ?? "ablation.json"),
 			JSON.stringify(rows, null, 1),
 		);
 		// tables
