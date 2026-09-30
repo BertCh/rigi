@@ -23,6 +23,7 @@ import {
 import type { Buffer, Device, Framebuffer, Texture } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { Pose } from "../camera";
+import { glOf } from "../deck/gl";
 import { PhotoViewport } from "../deck/photo-view";
 import {
 	currentTerrainPass,
@@ -421,8 +422,6 @@ export function isDeckSplatLayer(layer: unknown): layer is DeckSplatLayer {
 
 // ---------------- photo view colour pass (composite.ts) ----------------
 
-type GL = WebGL2RenderingContext;
-
 /** Only the splat layers, with their own blend / depth parameters (no terrain overrides). */
 class SplatLayersPass extends LayersPass {
 	shouldDrawLayer(layer: Layer) {
@@ -480,7 +479,7 @@ export class SplatColorPass {
 	}
 
 	private get gl() {
-		return (this.device as unknown as { gl: GL }).gl;
+		return glOf(this.device);
 	}
 
 	private tex(id: string, width: number, height: number) {

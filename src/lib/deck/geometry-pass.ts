@@ -24,6 +24,7 @@ import {
 import type { Pose } from "../camera";
 import { poseBasis } from "../pose";
 import type { GeometrySource } from "./geometry-source";
+import { glOf } from "./gl";
 import { PhotoViewport } from "./photo-view";
 import type { TileMesh } from "./terrain-data";
 import {
@@ -176,8 +177,6 @@ function frustumCuller(pose: Pose, eye: Eye, aspect: number) {
 	};
 }
 
-type GL = WebGL2RenderingContext;
-
 /**
  * Resolves true once every GPU command issued so far has completed (a luma Fence polled from
  * timers), false if the device is lost first. Never blocks the thread: after it, reading a
@@ -299,7 +298,7 @@ export class GeometryTarget {
 
 	/** Whether readPixels accepts RED/FLOAT for this target (implementation-defined for float targets). */
 	private redFloatReadable() {
-		const gl = (this.device as unknown as { gl: GL }).gl;
+		const gl = glOf(this.device);
 		const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
 		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fboHandle);
 		gl.readBuffer(gl.COLOR_ATTACHMENT0);
@@ -313,7 +312,7 @@ export class GeometryTarget {
 	/** Fallback when RED/FLOAT isn't readable: RGBA/FLOAT (always allowed) into the PBO; luma's
 	 * readBuffer only reads the texture's own format. */
 	private readPixelsRGBA(pbo: Buffer) {
-		const gl = (this.device as unknown as { gl: GL }).gl;
+		const gl = glOf(this.device);
 		const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
 		const prevPack = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
 		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fboHandle);

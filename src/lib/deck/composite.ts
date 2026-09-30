@@ -55,6 +55,7 @@ import {
 	readbackBuffer,
 	TerrainPassRenderer,
 } from "./geometry-pass";
+import { glOf } from "./gl";
 import type { PhotoViewport } from "./photo-view";
 import { isTerrainTile, makeTexture, maskTexture } from "./terrain-layer";
 import { isTrailLayer } from "./trail-layer";
@@ -108,8 +109,6 @@ export type CompositeTiming = {
 	/** With `benchmark = true` the passes are gl.finish()ed, so the times include the GPU. */
 	synced: boolean;
 };
-
-type GL = WebGL2RenderingContext;
 
 /** The look composite (look/glsl/composite.ts) as the engine hands it over; defines [] = classic. */
 export type DeckCompositeLook = {
@@ -367,7 +366,7 @@ export class PhotoCompositor implements Effect {
 		const colorLayers = opts.layers.filter(
 			(l) => isTerrainTile(l) || isTrailLayer(l),
 		);
-		const gl = (device as unknown as { gl: GL }).gl;
+		const gl = glOf(device);
 		// geometry: pose, eye, size and the tile meshes (not their styling)
 		const geoKey = [
 			pose.yaw,
@@ -576,7 +575,7 @@ export class PhotoCompositor implements Effect {
 			if (splats) this.snapshotForSplats(target);
 			return;
 		}
-		const gl = (this.device as unknown as { gl: GL }).gl;
+		const gl = glOf(this.device as Device);
 		// a stand-in luma Framebuffer: the render pass only binds `handle` and reads the size
 		const proxy = {
 			id: "composite-color-msaa",
@@ -622,7 +621,7 @@ export class PhotoCompositor implements Effect {
 		if (this.msaa === null || !this.device || this.msaaSamples < 2) return null;
 		const m = this.msaa;
 		if (m && m.width === width && m.height === height) return m;
-		const gl = (this.device as unknown as { gl: GL }).gl;
+		const gl = glOf(this.device);
 		this.destroyMsaa();
 		const samples = Math.min(
 			this.msaaSamples,
@@ -687,7 +686,7 @@ export class PhotoCompositor implements Effect {
 	private destroyMsaa() {
 		const m = this.msaa;
 		if (!m || !this.device) return;
-		const gl = (this.device as unknown as { gl: GL }).gl;
+		const gl = glOf(this.device);
 		gl.deleteFramebuffer(m.fbo);
 		gl.deleteRenderbuffer(m.color);
 		gl.deleteRenderbuffer(m.depth);
