@@ -1,0 +1,210 @@
+// WebGPU render device for the deck-webgpu renderer: availability check, device creation (with a
+// canvas context), and the hand-off to the compute sidecar (src/lib/gpu, owned by the GPU compute
+// workstream) so look kernels read our render targets on the SAME device (no copies).
+import { _LayersPass, Deck } from "@deck.gl/core";
+import { type Device, luma } from "@luma.gl/core";
+import { webgpuAdapter } from "@luma.gl/webgpu";
+import { adoptRenderDevice } from "#/lib/gpu/device";
+
+/** Features the renderer cannot run without: rgba32float geometry targets and r32float height
+ * arrays are bound as filterable `texture_2d<f32>` (README rule 14). */
+export const REQUIRED_FEATURES = ["float32-filterable"] as const;
+
+/** Features requested when present. float32-filterable lets passes sample the rgba32float geometry
+ * target with a linear sampler; timestamp-query feeds pass timings. */
+export const OPTIONAL_FEATURES = [
+	"timestamp-query",
+	"float32-filterable",
+	"float32-blendable",
+	"rg11b10ufloat-renderable",
+	"shader-f16",
+	"subgroups",
+] as const;
+
+export type Availability =
+	| { ok: true; adapter: string }
+	| { ok: false; reason: string };
+
+/** Can this browser give us a WebGPU adapter? Never throws. */
+export async function webgpuAvailable(): Promise<Availability> {
+	const gpu = (navigator as { gpu?: GPU }).gpu;
+	if (!gpu)
+		return {
+			ok: false,
+			reason:
+				"This browser has no WebGPU (navigator.gpu). Use Chrome/Edge 113+, or Safari/Firefox with WebGPU enabled.",
+		};
+	try {
+		const a = await gpu.requestAdapter({ powerPreference: "high-performance" });
+		if (!a)
+			return {
+				ok: false,
+				reason:
+					"WebGPU is present but no adapter was granted (blocklisted GPU or disabled).",
+			};
+		const missing = REQUIRED_FEATURES.filter((f) => !a.features.has(f));
+		if (missing.length)
+			return {
+				ok: false,
+				reason: `This WebGPU adapter lacks required feature(s): ${missing.join(", ")}.`,
+			};
+		const i = a.info;
+		return {
+			ok: true,
+			adapter:
+				`${i?.vendor ?? "?"} ${i?.architecture ?? ""} ${i?.description ?? ""}`.trim(),
+		};
+	} catch (e) {
+		return {
+			ok: false,
+			reason: `requestAdapter failed: ${(e as Error).message}`,
+		};
+	}
+}
+
+/**
+ * Which deck.gl build the bundler resolved. The app's vite.config.ts picks deck's
+ * `visgl:webgl-only` export (WebGPU branches compiled out); deck-on-WebGPU needs the full build
+ * (scripts/deck-webgpu/vite.webgpu.config.ts). The full LayersPass mentions 'webgpu'.
+ */
+export function deckBuild(): "full" | "webgl-only" {
+	const src = String(
+		(_LayersPass as unknown as { prototype: { _render?: unknown } }).prototype
+			._render,
+	);
+	return src.includes("webgpu") ? "full" : "webgl-only";
+}
+
+/** A standalone luma WebGPU device drawing into `canvas` (no deck.gl). */
+export async function createRenderDevice(
+	canvas: HTMLCanvasElement,
+	opts: { useDevicePixels?: number } = {},
+): Promise<Device> {
+	const device = await luma.createDevice({
+		id: "rigi-render-webgpu",
+		type: "webgpu",
+		adapters: [webgpuAdapter],
+		powerPreference: "high-performance",
+		// every adapter limit (maxTextureArrayLayers 2048 on Apple vs 256 in 'core')
+		featureLevel: "max",
+		optionalFeatures: [...OPTIONAL_FEATURES],
+		createCanvasContext: {
+			canvas,
+			useDevicePixels:
+				opts.useDevicePixels ?? Math.min(window.devicePixelRatio || 1, 2),
+			autoResize: true,
+			alphaMode: "premultiplied",
+		},
+	} as never);
+	try {
+		assertRequiredFeatures(device);
+	} catch (e) {
+		device.destroy();
+		throw e;
+	}
+	adoptForCompute(device);
+	return device;
+}
+
+/** Throws when `device` was not granted a REQUIRED_FEATURES entry. */
+export function assertRequiredFeatures(device: Device) {
+	const missing = REQUIRED_FEATURES.filter(
+		(f) => !device.features.has(f as never),
+	);
+	if (missing.length)
+		throw new Error(
+			`WebGPU device lacks required feature(s): ${missing.join(", ")}`,
+		);
+}
+
+/** How long deck may take to create its device before createWebgpuDeck gives up. */
+const DECK_DEVICE_TIMEOUT_MS = 15_000;
+
+/** A Deck on WebGPU. Resolves once deck has created its device. */
+export async function createWebgpuDeck(
+	props: Record<string, unknown> & { canvas: HTMLCanvasElement },
+): Promise<{ deck: Deck; device: Device }> {
+	if (deckBuild() !== "full")
+		throw new Error(
+			"deck.gl was bundled with the `visgl:webgl-only` condition; serve with scripts/deck-webgpu/vite.webgpu.config.ts",
+		);
+	let settled = false;
+	let resolve!: (d: Device) => void;
+	let reject!: (e: Error) => void;
+	const ready = new Promise<Device>((res, rej) => {
+		resolve = (d) => {
+			settled = true;
+			res(d);
+		};
+		reject = (e) => {
+			if (settled) return;
+			settled = true;
+			rej(e);
+		};
+	});
+	// deck/luma report a failed device creation only through onError (AnimationLoop.start catches
+	// it), never onDeviceInitialized: reject while pending, and time out as a last resort
+	const timer = setTimeout(
+		() =>
+			reject(
+				new Error(
+					`deck did not create a WebGPU device within ${DECK_DEVICE_TIMEOUT_MS} ms`,
+				),
+			),
+		DECK_DEVICE_TIMEOUT_MS,
+	);
+	const userOnError = props.onError as ((e: Error) => void) | undefined;
+	const deck = new Deck({
+		width: null,
+		height: null,
+		controller: false,
+		...props,
+		deviceProps: {
+			type: "webgpu",
+			adapters: [webgpuAdapter],
+			powerPreference: "high-performance",
+			featureLevel: "max",
+			optionalFeatures: [...OPTIONAL_FEATURES],
+			...(props.deviceProps as object | undefined),
+		},
+		onError: (e: Error) => {
+			if (!settled) reject(e instanceof Error ? e : new Error(String(e)));
+			userOnError?.(e);
+		},
+		onDeviceInitialized: (d: Device) => {
+			if (settled) return;
+			try {
+				assertRequiredFeatures(d);
+			} catch (e) {
+				reject(e as Error);
+				return;
+			}
+			adoptForCompute(d);
+			resolve(d);
+			(props.onDeviceInitialized as ((d: Device) => void) | undefined)?.(d);
+		},
+	} as never);
+	try {
+		return { deck, device: await ready };
+	} catch (e) {
+		// finalize the half-built deck; destroy its device if one exists (feature check failed)
+		const d = (deck as unknown as { device?: Device }).device;
+		try {
+			deck.finalize();
+		} catch {}
+		d?.destroy();
+		throw e;
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+/**
+ * Hand the render device to the compute layer (src/lib/gpu/device adoptRenderDevice, mt-image-03):
+ * getComputeDevice() then resolves to this device, so look kernels bind our targets directly (one
+ * queue, no copies). Losing the device falls back to the compute sidecar there. THE ONLY PLACE
+ * that couples the renderer and src/lib/gpu.
+ */
+export function adoptForCompute(device: Device) {
+	adoptRenderDevice(device);
+}

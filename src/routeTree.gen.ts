@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as BaselineRouteImport } from './routes/baseline'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as LabDeckSplatsRouteImport } from './routes/lab.deck-splats'
+import { Route as LabDeckWebgpuRouteImport } from './routes/lab.deck-webgpu'
 import { Route as LabGenerateRouteImport } from './routes/lab.generate'
 import { Route as LabSplatsRouteImport } from './routes/lab.splats'
 import { Route as PhotoIdRouteImport } from './routes/photo.$id'
@@ -38,6 +39,11 @@ const UploadRoute = UploadRouteImport.update({
 const LabDeckSplatsRoute = LabDeckSplatsRouteImport.update({
   id: '/lab/deck-splats',
   path: '/lab/deck-splats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabDeckWebgpuRoute = LabDeckWebgpuRouteImport.update({
+  id: '/lab/deck-webgpu',
+  path: '/lab/deck-webgpu',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LabGenerateRoute = LabGenerateRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/baseline': typeof BaselineRoute
   '/upload': typeof UploadRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
+  '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
   '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/baseline': typeof BaselineRoute
   '/upload': typeof UploadRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
+  '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
   '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/baseline': typeof BaselineRoute
   '/upload': typeof UploadRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
+  '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
   '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/baseline'
     | '/upload'
     | '/lab/deck-splats'
+    | '/lab/deck-webgpu'
     | '/lab/generate'
     | '/lab/splats'
     | '/photo/$id'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/baseline'
     | '/upload'
     | '/lab/deck-splats'
+    | '/lab/deck-webgpu'
     | '/lab/generate'
     | '/lab/splats'
     | '/photo/$id'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/baseline'
     | '/upload'
     | '/lab/deck-splats'
+    | '/lab/deck-webgpu'
     | '/lab/generate'
     | '/lab/splats'
     | '/photo/$id'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   BaselineRoute: typeof BaselineRoute
   UploadRoute: typeof UploadRoute
   LabDeckSplatsRoute: typeof LabDeckSplatsRoute
+  LabDeckWebgpuRoute: typeof LabDeckWebgpuRoute
   LabGenerateRoute: typeof LabGenerateRoute
   LabSplatsRoute: typeof LabSplatsRoute
   PhotoIdRoute: typeof PhotoIdRoute
@@ -188,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/lab/deck-splats'
       fullPath: '/lab/deck-splats'
       preLoaderRoute: typeof LabDeckSplatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab/deck-webgpu': {
+      id: '/lab/deck-webgpu'
+      path: '/lab/deck-webgpu'
+      fullPath: '/lab/deck-webgpu'
+      preLoaderRoute: typeof LabDeckWebgpuRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lab/generate': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   BaselineRoute: BaselineRoute,
   UploadRoute: UploadRoute,
   LabDeckSplatsRoute: LabDeckSplatsRoute,
+  LabDeckWebgpuRoute: LabDeckWebgpuRoute,
   LabGenerateRoute: LabGenerateRoute,
   LabSplatsRoute: LabSplatsRoute,
   PhotoIdRoute: PhotoIdRoute,

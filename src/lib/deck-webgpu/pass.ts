@@ -1,0 +1,178 @@
+// The layer contract (README.md): a layer is a host-agnostic `GpuLayerCore` that draws into one
+// or more pass kinds. Hosts (hosts/direct.ts: plain luma; hosts/deck.ts: deck.gl on WebGPU) own
+// the device, targets and render passes and call `draw(ctx)` once per pass the core takes part in.
+import type {
+	Device,
+	RenderPass,
+	RenderPipelineParameters,
+} from "@luma.gl/core";
+import type { Model, ModelProps } from "@luma.gl/engine";
+import type { ShaderModule } from "@luma.gl/shadertools";
+import { type CameraUniforms, cameraModule } from "./camera";
+import { REVERSED_Z } from "./depth";
+import type { ColorTargets, GeometryTargets } from "./targets";
+import { PASS_ATTACHMENTS } from "./targets";
+
+/**
+ * Pass kinds, drawn in this order each frame:
+ *   geometry  photo camera → GeometryTargets (MRT: xyz+range, normal+class), reversed-Z. The
+ *             queries / align / drape / look kernels read it. Opaque only, no blending.
+ *   color     the view's camera → ColorTargets (4× MSAA rgba16float, linear, premultiplied α),
+ *             reversed-Z; resolved into ColorTargets.color after the pass.
+ *   screen    the canvas: composite / present / screen-space overlays. No 3D depth.
+ */
+export type PassKind = "geometry" | "color" | "screen";
+export const PASS_ORDER: readonly PassKind[] = ["geometry", "color", "screen"];
+
+/** What the render target of the running pass looks like (pipelines must match it). */
+export type PassTarget = {
+	width: number;
+	height: number;
+	colorFormats: readonly string[];
+	depthFormat: string | null;
+	samples: number;
+};
+
+export type FrameState = {
+	/** Monotonic frame counter (host). */
+	frame: number;
+	/** performance.now() at frame start. */
+	time: number;
+	/** Which camera the color pass uses: the photo camera or the world orbit camera. */
+	view: "photo" | "world";
+};
+
+export type PassContext = {
+	device: Device;
+	kind: PassKind;
+	renderPass: RenderPass;
+	/** Camera for this pass and target (geometry: always the photo camera). */
+	camera: CameraUniforms;
+	target: PassTarget;
+	frame: FrameState;
+	/** Earlier passes' outputs this frame (color may read geometry; screen may read both). */
+	geometry?: GeometryTargets;
+	color?: ColorTargets;
+};
+
+export interface GpuLayerCore {
+	readonly id: string;
+	/** Pass kinds this core draws in. */
+	readonly passes: readonly PassKind[];
+	/** Draw order within a pass (lower first; opaque < transparent). Default 0. */
+	readonly order?: number;
+	/** Pipeline parameters for the screen pass when hosted by deck (deck merges its defaults
+	 * — premultiplied blending, less-equal depth — under these). */
+	readonly screenParameters?: RenderPipelineParameters;
+	/** Draw into ctx.renderPass. Never begin/end passes or submit here. */
+	draw(ctx: PassContext): void;
+	/** Visible this frame? (hosts skip draw when false). */
+	visible?(): boolean;
+	destroy(): void;
+}
+
+/** Shared modules every 3D pipeline gets (camera; add yours after it). */
+export const SHARED_MODULES: ShaderModule[] = [
+	cameraModule as unknown as ShaderModule,
+];
+
+/**
+ * Model props for drawing into `kind` (attachment formats, sample count, reversed-Z depth).
+ * Spread into `new Model(device, {...passModelProps(kind), ...yours})`; `parameters` merge:
+ * pass `{...passModelProps(kind).parameters, ...mine}` if you override any.
+ */
+export function passModelProps(
+	kind: Exclude<PassKind, "screen">,
+	opts: { depth?: "write" | "test" | "none"; blend?: boolean } = {},
+): Pick<
+	ModelProps,
+	"colorAttachmentFormats" | "depthStencilAttachmentFormat" | "parameters"
+> {
+	const a = PASS_ATTACHMENTS[kind];
+	const depth =
+		opts.depth === "test"
+			? REVERSED_Z.testOnly
+			: opts.depth === "none"
+				? REVERSED_Z.none
+				: REVERSED_Z.parameters;
+	const blend =
+		opts.blend && kind === "color"
+			? {
+					// PREMULTIPLIED alpha into the linear colour target (targets.ts): shaders output
+					// (rgb·a, a); "over" = one, one-minus-src-alpha for both channels
+					blend: true,
+					blendColorOperation: "add",
+					blendColorSrcFactor: "one",
+					blendColorDstFactor: "one-minus-src-alpha",
+					blendAlphaOperation: "add",
+					blendAlphaSrcFactor: "one",
+					blendAlphaDstFactor: "one-minus-src-alpha",
+				}
+			: {};
+	return {
+		colorAttachmentFormats: [...a.colorAttachmentFormats] as never,
+		depthStencilAttachmentFormat: a.depthStencilAttachmentFormat,
+		parameters: {
+			cullMode: "none",
+			sampleCount: a.sampleCount,
+			...depth,
+			...blend,
+		} as RenderPipelineParameters,
+	};
+}
+
+/** Screen-pass model props derived from the running pass's target. */
+export function screenModelProps(
+	t: PassTarget,
+): Pick<
+	ModelProps,
+	"colorAttachmentFormats" | "depthStencilAttachmentFormat" | "parameters"
+> {
+	return {
+		colorAttachmentFormats: [...t.colorFormats] as never,
+		depthStencilAttachmentFormat: (t.depthFormat ?? undefined) as never,
+		// luma adds a depth-stencil state (preferred format) as soon as ANY depth parameter is set:
+		// pipelines for depth-less targets must carry none
+		parameters: {
+			sampleCount: t.samples,
+			...(t.depthFormat
+				? { depthWriteEnabled: false, depthCompare: "always" }
+				: {}),
+		} as RenderPipelineParameters,
+	};
+}
+
+/**
+ * One Model per (pass kind, target signature). WebGPU writes uniforms with queue.writeBuffer, so a
+ * Model drawn twice in one submit with different uniforms shows the LAST values in both draws;
+ * separate models per pass keep the photo camera (geometry) and view camera (color) apart.
+ */
+export class ModelCache {
+	private models = new Map<string, Model>();
+
+	get(key: string, make: () => Model): Model {
+		let m = this.models.get(key);
+		if (!m) {
+			m = make();
+			this.models.set(key, m);
+		}
+		return m;
+	}
+
+	/** Drop models whose key starts with `prefix` (e.g. after a shader define change). */
+	invalidate(prefix = "") {
+		for (const [k, m] of this.models)
+			if (k.startsWith(prefix)) {
+				m.destroy();
+				this.models.delete(k);
+			}
+	}
+
+	destroy() {
+		this.invalidate();
+	}
+}
+
+/** Key describing a pass target, for ModelCache keys. */
+export const targetKey = (ctx: PassContext) =>
+	`${ctx.kind}|${ctx.target.colorFormats.join(",")}|${ctx.target.depthFormat}|${ctx.target.samples}`;

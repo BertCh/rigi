@@ -1,0 +1,9 @@
+// Chromium flags for real-GPU WebGPU runs on this Mac (Metal). Headless Chromium exposes
+// navigator.gpu with these (see src/lib/gpu/README.md).
+export const GPU_ARGS = [
+	"--use-angle=metal",
+	"--enable-gpu",
+	"--ignore-gpu-blocklist",
+	"--enable-unsafe-webgpu",
+	"--enable-features=Vulkan,WebGPU",
+];
