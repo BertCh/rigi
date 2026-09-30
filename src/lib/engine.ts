@@ -786,10 +786,35 @@ export class PhotoEngine {
 					)
 					.catch(() => {});
 		}
+		// only the viewing wedge (+ the yaw search range) up front; the rest loads for the 3D view.
+		// Without a trustworthy prior (no compass / gravity / focal) the view can face anywhere: load 360°.
+		// Started before the photo decode (it needs only the photo's metadata) so the two overlap.
+		const hfov = hfovFromAspect(this.prior.vfov, this.aspect);
+		const terrainLoad = Terrain.load(
+			this.frame,
+			this.shared,
+			(u) => makeTerrainMaterial(u, this.terrainDefines),
+			{
+				onProgress: (d, t) => onProgress?.(`Loading terrain ${d}/${t}`, d / t),
+				wedge: this.unknowns.any
+					? undefined
+					: { center: this.prior.yaw, halfWidth: hfov / 2 + 32 },
+				signal: this.loadAbort.signal,
+			},
+		);
+		terrainLoad.catch(() => {}); // an abort mid-decode surfaces at the await below, not unhandled
 		const img = new Image();
 		img.crossOrigin = "anonymous";
 		img.src = this.photo.src;
-		await img.decode();
+		try {
+			await img.decode();
+		} catch (e) {
+			terrainLoad.then(
+				(t) => t.dispose(),
+				() => {},
+			);
+			throw e;
+		}
 		this.photoImg = img;
 		const tex = new THREE.Texture(img);
 		tex.colorSpace = THREE.SRGBColorSpace;
@@ -804,21 +829,7 @@ export class PhotoEngine {
 			? segment(img).catch(() => null)
 			: Promise.resolve(null);
 
-		// only the viewing wedge (+ the yaw search range) up front; the rest loads for the 3D view.
-		// Without a trustworthy prior (no compass / gravity / focal) the view can face anywhere: load 360°.
-		const hfov = hfovFromAspect(this.prior.vfov, this.aspect);
-		const terrain = await Terrain.load(
-			this.frame,
-			this.shared,
-			(u) => makeTerrainMaterial(u, this.terrainDefines),
-			{
-				onProgress: (d, t) => onProgress?.(`Loading terrain ${d}/${t}`, d / t),
-				wedge: this.unknowns.any
-					? undefined
-					: { center: this.prior.yaw, halfWidth: hfov / 2 + 32 },
-				signal: this.loadAbort.signal,
-			},
-		);
+		const terrain = await terrainLoad;
 		if (this.disposed) {
 			terrain.dispose();
 			return;

@@ -444,6 +444,18 @@ export class DeckEngine implements Renderer {
 					)
 					.catch(() => {});
 		}
+		// the viewing wedge + the yaw search range up front; 360° without a trustworthy prior.
+		// Started before the photo decode (it needs only the photo's metadata) so the two overlap.
+		const wedge: ViewWedge = this.unknowns.any
+			? { headingDeg: this.prior.yaw, halfAngleDeg: 180 }
+			: {
+					headingDeg: this.prior.yaw,
+					halfAngleDeg: Math.min(
+						180,
+						hfovFromAspect(this.prior.vfov, this.aspect) / 2 + 32,
+					),
+				};
+		const terrainLoad = this.startStreaming(wedge, onProgress);
 		const img = new Image();
 		img.crossOrigin = "anonymous";
 		img.src = this.photo.src;
@@ -455,17 +467,7 @@ export class DeckEngine implements Renderer {
 			? segment(img).catch(() => null)
 			: Promise.resolve(null);
 
-		// the viewing wedge + the yaw search range up front; 360° without a trustworthy prior
-		const wedge: ViewWedge = this.unknowns.any
-			? { headingDeg: this.prior.yaw, halfAngleDeg: 180 }
-			: {
-					headingDeg: this.prior.yaw,
-					halfAngleDeg: Math.min(
-						180,
-						hfovFromAspect(this.prior.vfov, this.aspect) / 2 + 32,
-					),
-				};
-		const terrain = await this.startStreaming(wedge, onProgress);
+		const terrain = await terrainLoad;
 		if (!terrain || this.disposed) return;
 		this.terrain = terrain;
 		this.queryWedge = wedge;
