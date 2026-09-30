@@ -23,27 +23,27 @@ const def = (id: string, src: string, layout: [string, BindKind][]) =>
 	defineKernel(id, src, layout, { group: GROUP, label: `sky-${id}` });
 const RO = "read-only-storage" as const;
 
-const K_LO_H = def("lo-h", LO_H, [
+export const K_LO_H = def("lo-h", LO_H, [
 	["prm", "uniform"],
 	["gl", RO],
 	["gp", RO],
 	["t", "storage"],
 ]);
-const K_LO_V = def("lo-v", LO_V, [
+export const K_LO_V = def("lo-v", LO_V, [
 	["prm", "uniform"],
 	["t", RO],
 	["gp", RO],
 	["ab", "storage"],
 	["band", "storage"],
 ]);
-const K_LO_H2 = def("lo-h2", LO_H2, [
+export const K_LO_H2 = def("lo-h2", LO_H2, [
 	["prm", "uniform"],
 	["ab", RO],
 	["band", RO],
 	["abH", "storage"],
 	["bandH", "storage"],
 ]);
-const K_LO_V2 = def("lo-v2", LO_V2, [
+export const K_LO_V2 = def("lo-v2", LO_V2, [
 	["prm", "uniform"],
 	["abH", RO],
 	["bandH", RO],
@@ -51,7 +51,7 @@ const K_LO_V2 = def("lo-v2", LO_V2, [
 	["abS", "storage"],
 	["pb", "storage"],
 ]);
-const K_UP_H = def("up-h", UP_H, [
+export const K_UP_H = def("up-h", UP_H, [
 	["prm", "uniform"],
 	["axis", RO],
 	["abS", RO],
@@ -59,7 +59,7 @@ const K_UP_H = def("up-h", UP_H, [
 	["u4", "storage"],
 	["u2", "storage"],
 ]);
-const K_UP_V = def("up-v", UP_V, [
+export const K_UP_V = def("up-v", UP_V, [
 	["prm", "uniform"],
 	["axis", RO],
 	["u4", RO],
@@ -68,7 +68,7 @@ const K_UP_V = def("up-v", UP_V, [
 	["lut", RO],
 	["q", "storage"],
 ]);
-const K_PACK = def("pack", PACK, [
+export const K_PACK = def("pack", PACK, [
 	["prm", "uniform"],
 	["q", RO],
 	["lut", RO],
@@ -99,6 +99,11 @@ export interface SkyRefineInput {
 	band?: number;
 	/** Also read the float mask back (the parity bench); the app needs bytes only. */
 	floats?: boolean;
+	/**
+	 * Run on a shape-keyed GPUCommandGraph with aliased transients (refine-graph.ts) instead of the
+	 * pooled dispatchAll path. Same WGSL, bit-identical bytes and floats. Default false.
+	 */
+	graph?: boolean;
 }
 
 export interface SkyRefineOutput {
@@ -144,7 +149,12 @@ function axisTaps(n: number, m: number) {
 const axisCache = new Map<string, Uint32Array>();
 
 /** axis[j] = (start, count) for columns (j < W) then rows; taps follow as (index, f32 bits). */
-function axisTable(lw: number, lh: number, W: number, H: number): Uint32Array {
+export function axisTable(
+	lw: number,
+	lh: number,
+	W: number,
+	H: number,
+): Uint32Array {
 	const key = `${lw}x${lh}>${W}x${H}`;
 	let tab = axisCache.get(key);
 	if (tab) return tab;
@@ -176,7 +186,7 @@ let lutCache: Float32Array | undefined;
  * lut[0..255] = fround(d / 255) (rgbPlanes); lut[256 + k − 1] = the least f32 v with toByte(v) ≥ k,
  * k = 1..255 (found from the f64 midpoint by stepping ulps, then checked).
  */
-function lutTable(): Float32Array {
+export function lutTable(): Float32Array {
 	if (lutCache) return lutCache;
 	const lut = new Float32Array(512);
 	for (let d = 0; d < 256; d++) lut[d] = d / 255;
@@ -197,7 +207,8 @@ function lutTable(): Float32Array {
 	return lut;
 }
 
-const isFloats = (p: SkyProb): p is Float32Array => p instanceof Float32Array;
+export const isFloats = (p: SkyProb): p is Float32Array =>
+	p instanceof Float32Array;
 
 /**
  * refineToWorking(rgbPlanes(rgba), W, H, { prob, width: lw, height: lh }, true, opts) → toBytes, on
@@ -207,6 +218,9 @@ export async function refineSkyGpu(
 	device: Device,
 	input: SkyRefineInput,
 ): Promise<SkyRefineOutput> {
+	// lazy: the default path does not pull GPUCommandGraph into the sky worker's bundle
+	if (input.graph)
+		return (await import("./refine-graph")).refineSkyGraph(device, input);
 	const { W, H, lw, lh } = input;
 	const n = lw * lh;
 	const N = W * H;
