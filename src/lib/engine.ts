@@ -23,7 +23,7 @@ import { startLakeFloor } from "./geocam/lakes/fetch";
 import { priorHeading } from "./geocam/priors/heading";
 import { distanceM, EnuFrame } from "./geodesy";
 import { autoAlignAsync, warmAlignGpu } from "./gpu/align";
-import { lookIdle } from "./gpu/look/opt-in";
+import { lookIdle, trackLook } from "./gpu/look/opt-in";
 import {
 	type FastHorizon,
 	startFastHorizon,
@@ -116,6 +116,7 @@ import {
 } from "./style/three-apply";
 import type { ViewStyle } from "./style/types";
 import { heightFromTile, type ImagerySource, Terrain } from "./terrain";
+import { readTargetAsync, readTargetSync, sameBytes } from "./three-readback";
 import { TILES3D_LAYER } from "./tiles3d/config";
 import { ThreeTiles3D } from "./tiles3d/three-tiles";
 
@@ -345,6 +346,49 @@ type PeakPoint = {
  * is usually better than the horizontal fix: near summits a few metres of horizontal error put the DEM
  * point far down the slope. Never go underground.
  */
+/**
+ * Mean photo edge strength along the inner silhouettes (log-range jumps) of a W × H geometry
+ * readback (GL rows, row 0 = bottom; range in .w): autoAlign's re-rank score for one pose.
+ */
+function silhouetteFromRange(
+	buf: Float32Array,
+	W: number,
+	H: number,
+	edge: EdgeMap,
+) {
+	const lr = (x: number, y: number) => {
+		const r = buf[(y * W + x) * 4 + 3];
+		return r > 0 ? Math.log(r) : 13.5;
+	};
+	let sum = 0;
+	let n = 0;
+	for (let y = 1; y < H - 1; y++)
+		for (let x = 1; x < W - 1; x++) {
+			const r = buf[(y * W + x) * 4 + 3];
+			if (!(r > 0) || r > 25000) continue;
+			const c = lr(x, y);
+			// inner silhouette: a nearer surface in front of a much farther one (not the sky)
+			const up = lr(x, y + 1);
+			const right = lr(x + 1, y);
+			const left = lr(x - 1, y);
+			const far = Math.max(
+				up < 13 ? up : 0,
+				right < 13 ? right : 0,
+				left < 13 ? left : 0,
+			);
+			if (far - c < 0.5) continue;
+			const u = x / W;
+			const v = 1 - y / H;
+			const ex = Math.min(edge.w - 1, Math.floor(u * edge.w));
+			const ey = Math.min(edge.h - 1, Math.floor(v * edge.h));
+			const i = ey * edge.w + ex;
+			if (edge.fg[i] > 0.3) continue;
+			sum += edge.coarse[i];
+			n++;
+		}
+	return n > 30 ? sum / n : 0;
+}
+
 const eyeAltitude = (alt: number | null | undefined, dem: number) =>
 	alt != null ? Math.max(alt, dem + 1.6) : dem + 1.8;
 
@@ -413,6 +457,19 @@ export class PhotoEngine {
 	private geoRTGen = -1;
 	private geoBufGen = -1;
 	private readbackWaiters: ((ok: boolean) => void)[] = [];
+	/**
+	 * The fenced async readback of geoRT (three-readback): the generation it reads, its promise, and
+	 * the spare CPU buffer it lands in (swapped with geoBuf when it lands newer than geoBufGen, so an
+	 * older read never overwrites a newer buffer — e.g. one readbackSync() took meanwhile).
+	 */
+	private geoRead: { gen: number; done: Promise<void> } | null = null;
+	private geoSpare?: Float32Array;
+	/** Dev: the first async geometry read is compared once with a sync read of the same target. */
+	private geoParityChecked = false;
+	/** Band stats key whose async layer read is in flight (not re-issued every frame meanwhile). */
+	private statsPending: string | null = null;
+	/** Reads block (the old sync path) while set: the export's renderNow, whose stats must be current. */
+	private syncReads = false;
 	/** Occlusion verdicts from the last fresh geometry buffer (eye-dependent only, not rotation). */
 	private peakVis = new Map<PeakPoint, boolean>();
 	private composite: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
@@ -979,8 +1036,13 @@ export class PhotoEngine {
 		return this.computeHorizon();
 	}
 
-	/** 360° DEM skyline from the camera position as ENU unit directions (rotation-independent). Fallback path. */
-	private computeHorizon() {
+	/**
+	 * 360° DEM skyline from the camera position as ENU unit directions (rotation-independent). Fallback
+	 * path. Each of the 8 renders is read back fenced (three-readback) instead of stalling the main
+	 * thread 8 × 25 MB; frames drawn while a read is in flight change shared uniforms, so every render
+	 * re-applies the pass's state (geometry style, trails hidden, its own target and clear).
+	 */
+	private async computeHorizon() {
 		const W = 1024;
 		const H = 1536;
 		const rt = new THREE.WebGLRenderTarget(W, H, {
@@ -993,34 +1055,42 @@ export class PhotoEngine {
 		const hfov = 50;
 		const vfov = vfovFromAspect(hfov, W / H);
 		const dirs: number[] = [];
-		this.shared.uStyle.value = STYLE.geometry;
-		if (this.trails) this.trails.visible = false;
-		const prevTarget = this.renderer.getRenderTarget();
-		for (let k = 0; k < 8; k++) {
-			applyPose(cam, { yaw: k * 45, pitch: 0, roll: 0, vfov }, W / H, this.eye);
-			this.renderer.setRenderTarget(rt);
-			this.renderer.setClearColor(0x000000, 0);
-			this.renderer.clear();
-			this.renderer.render(this.scene, cam);
-			this.renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
-			for (let x = 0; x < W; x++) {
-				// readback row 0 is the bottom — scan from the top row down
-				for (let y = H - 1; y >= 0; y--) {
-					const i = (y * W + x) * 4;
-					if (buf[i + 3] > 0) {
-						const dx = buf[i] - this.eye.x;
-						const dy = buf[i + 1] - this.eye.y;
-						const dz = buf[i + 2] - this.eye.z;
-						const l = Math.hypot(dx, dy, dz);
-						if (y < H - 1) dirs.push(dx / l, dy / l, dz / l);
-						break;
+		const eye = this.eye.clone();
+		try {
+			for (let k = 0; k < 8; k++) {
+				if (this.disposed) return new Float32Array(0);
+				applyPose(cam, { yaw: k * 45, pitch: 0, roll: 0, vfov }, W / H, eye);
+				this.shared.uStyle.value = STYLE.geometry;
+				if (this.trails) this.trails.visible = false;
+				const prevTarget = this.renderer.getRenderTarget();
+				this.renderer.setRenderTarget(rt);
+				this.renderer.setClearColor(0x000000, 0);
+				this.renderer.clear();
+				this.renderer.render(this.scene, cam);
+				this.renderer.setRenderTarget(prevTarget);
+				if (this.trails) this.trails.visible = true;
+				await readTargetAsync(this.renderer, rt, buf);
+				for (let x = 0; x < W; x++) {
+					// readback row 0 is the bottom — scan from the top row down
+					for (let y = H - 1; y >= 0; y--) {
+						const i = (y * W + x) * 4;
+						if (buf[i + 3] > 0) {
+							const dx = buf[i] - eye.x;
+							const dy = buf[i + 1] - eye.y;
+							const dz = buf[i + 2] - eye.z;
+							const l = Math.hypot(dx, dy, dz);
+							if (y < H - 1) dirs.push(dx / l, dy / l, dz / l);
+							break;
+						}
 					}
 				}
 			}
+		} catch (e) {
+			if (this.disposed) return new Float32Array(0);
+			throw e;
+		} finally {
+			rt.dispose();
 		}
-		this.renderer.setRenderTarget(prevTarget);
-		if (this.trails) this.trails.visible = true;
-		rt.dispose();
 		return new Float32Array(dirs);
 	}
 
@@ -1059,34 +1129,89 @@ export class PhotoEngine {
 
 	/**
 	 * Resolves once the CPU geometry buffer describes the current pose (true), or false if the engine
-	 * is disposed first. With terrain loaded it renders + reads back synchronously instead of waiting
-	 * for the debounced readback, so `setPose(p); await engine.readback()` always gives a fresh buffer.
+	 * is disposed first. With terrain loaded it renders the pass now and awaits a fenced read of it
+	 * instead of waiting for the debounced readback, so `setPose(p); await engine.readback()` always
+	 * gives a fresh buffer (a pose change while the read is in flight is followed, up to 4 times).
 	 */
-	readback(): Promise<boolean> {
-		if (this.geometryReady()) return Promise.resolve(true);
-		if (this.disposed) return Promise.resolve(false);
-		if (this.terrain) {
+	async readback(): Promise<boolean> {
+		for (let tries = 0; tries < 4; tries++) {
+			if (this.geometryReady()) return true;
+			if (this.disposed) return false;
+			if (!this.terrain)
+				// before init() has the terrain: resolved by the first readback
+				return new Promise((res) => this.readbackWaiters.push(res));
 			if (this.geoDirty) this.renderGeometry();
-			this.readGeometryNow();
-			return Promise.resolve(this.geometryReady());
+			clearTimeout(this.readbackTimer);
+			this.readbackTimer = 0;
+			await this.readGeometryAsync();
 		}
-		// before init() has the terrain: resolved by the first readback
-		return new Promise((res) => this.readbackWaiters.push(res));
+		return this.geometryReady();
 	}
 
-	private readGeometryNow() {
+	/**
+	 * readback() without yielding: renders and reads geoRT synchronously (a full GPU pipeline stall).
+	 * For tools / tests that need the buffer before they return; the app awaits readback().
+	 */
+	readbackSync(): boolean {
+		if (this.geometryReady()) return true;
+		if (this.disposed || !this.terrain) return false;
+		if (this.geoDirty) this.renderGeometry();
 		clearTimeout(this.readbackTimer);
 		this.readbackTimer = 0;
-		if (this.disposed) return;
-		this.renderer.readRenderTargetPixels(
-			this.geoRT,
-			0,
-			0,
-			this.geoRT.width,
-			this.geoRT.height,
-			this.geoBuf,
+		const buf = this.geoSpare ?? new Float32Array(this.geoBuf.length);
+		this.geoSpare = undefined;
+		readTargetSync(this.renderer, this.geoRT, buf);
+		this.landGeometry(this.geoRTGen, buf);
+		return this.geometryReady();
+	}
+
+	/**
+	 * Fenced read of geoRT (the generation drawn there now) into the spare buffer; lands through
+	 * landGeometry unless a newer generation landed first. One read per generation.
+	 */
+	private readGeometryAsync(): Promise<void> {
+		clearTimeout(this.readbackTimer);
+		this.readbackTimer = 0;
+		const gen = this.geoRTGen;
+		if (this.disposed || gen < 0 || gen <= this.geoBufGen)
+			return Promise.resolve();
+		if (this.geoRead?.gen === gen) return this.geoRead.done;
+		const buf = this.geoSpare ?? new Float32Array(this.geoBuf.length);
+		this.geoSpare = undefined;
+		const done = readTargetAsync(this.renderer, this.geoRT, buf).then(
+			() => {
+				if (this.disposed) return;
+				if (import.meta.env.DEV && !this.geoParityChecked)
+					this.checkGeometryParity(gen, buf);
+				this.landGeometry(gen, buf);
+			},
+			(e) => {
+				this.geoSpare ??= buf;
+				if (!this.disposed)
+					console.warn("[engine] geometry readback failed", e);
+			},
 		);
-		this.geoBufGen = this.geoRTGen;
+		const read = { gen, done };
+		this.geoRead = read;
+		void done.finally(() => {
+			if (this.geoRead === read) this.geoRead = null;
+		});
+		return done;
+	}
+
+	/**
+	 * A read of generation `gen` landed in `buf`: it becomes geoBuf unless an equal or newer
+	 * generation is already there (then it goes back to the spare slot). Fresh for the current pose:
+	 * haze fit, relief, look masks and the readback() waiters; the render listeners either way.
+	 */
+	private landGeometry(gen: number, buf: Float32Array) {
+		if (gen <= this.geoBufGen) {
+			this.geoSpare = buf;
+			return;
+		}
+		this.geoSpare = this.geoBuf;
+		this.geoBuf = buf;
+		this.geoBufGen = gen;
 		if (this.geoBufGen === this.geoGen) {
 			this.fitHaze();
 			this.updateRelief();
@@ -1096,6 +1221,80 @@ export class PhotoEngine {
 			for (const r of w) r(true);
 		}
 		for (const cb of this.listeners) cb();
+	}
+
+	/** Dev, once: the async read of generation `gen` vs a sync read of geoRT, if geoRT still holds it. */
+	private checkGeometryParity(gen: number, buf: Float32Array) {
+		if (this.geoRTGen !== gen || this.geoDirty) return;
+		this.geoParityChecked = true;
+		const ref = readTargetSync(
+			this.renderer,
+			this.geoRT,
+			new Float32Array(buf.length),
+		);
+		const r = sameBytes(buf, ref);
+		const w = window as unknown as { __threeReadbackCheck?: unknown };
+		w.__threeReadbackCheck = { gen, bytes: buf.byteLength, ...r };
+		if (r.equal)
+			console.info(
+				`[three-readback] async geometry read = sync read (${buf.byteLength} bytes)`,
+			);
+		else
+			console.error(
+				`[three-readback] async geometry read differs from the sync read at byte ${r.firstDiff}`,
+			);
+	}
+
+	/**
+	 * Dev / bench: reads the current geometry pass, the band-stats layer and the silhouette renders
+	 * both ways (fenced async vs sync) and compares the bytes; geometry timings in ms.
+	 */
+	async readbackParity() {
+		if (!this.terrain || this.disposed) return null;
+		if (this.geoDirty) this.renderGeometry();
+		const n = this.geoBuf.length;
+		let t = performance.now();
+		const a = await readTargetAsync(
+			this.renderer,
+			this.geoRT,
+			new Float32Array(n),
+		);
+		const asyncMs = performance.now() - t;
+		t = performance.now();
+		const s = readTargetSync(this.renderer, this.geoRT, new Float32Array(n));
+		const syncMs = performance.now() - t;
+		const geo = { ...sameBytes(a, s), bytes: a.byteLength, asyncMs, syncMs };
+		// the band-stats layer as last rendered (LOOK_HARMONIZE in replace mode), if it was
+		let stats: { equal: boolean; bytes: number } | null = null;
+		if (this.statsRT) {
+			const { width: w, height: h } = this.statsRT;
+			const sa = await readTargetAsync(
+				this.renderer,
+				this.statsRT,
+				new Float32Array(w * h * 4),
+			);
+			const ss = readTargetSync(
+				this.renderer,
+				this.statsRT,
+				new Float32Array(w * h * 4),
+			);
+			stats = { equal: sameBytes(sa, ss).equal, bytes: sa.byteLength };
+		}
+		let sil: { equal: boolean; sync: number[]; async: number[] } | null = null;
+		if (this.edge) {
+			const poses = [-2, 0, 2].map((d) => ({
+				...this.pose,
+				yaw: this.pose.yaw + d,
+			}));
+			const syncS = poses.map((p) => this.silhouetteScore(p));
+			const asyncS = await this.silhouetteScoresAsync(poses);
+			sil = {
+				equal: syncS.every((v, i) => Object.is(v, asyncS[i])),
+				sync: syncS,
+				async: asyncS,
+			};
+		}
+		return { geo, stats, sil };
 	}
 
 	setSettings(s: Partial<Settings>) {
@@ -1291,17 +1490,25 @@ export class PhotoEngine {
 		this.normalGen = this.geoGen;
 	}
 
+	/** The band stats' key: the geometry buffer, the layer's look and what it shows. */
+	private statsKey() {
+		const s = this.settings;
+		return `${this.geoBufGen}|${this.layerGen}|${s.mode}|${s.mapStyle}|${s.worldStyle}|${this.imageryDone}`;
+	}
+
 	/**
 	 * Band stats (LOOK_HARMONIZE) of the layer as the uniforms stand, rendered at ≤ 256 px from the
-	 * photo camera once the pose settles (and again as imagery streams in).
+	 * photo camera once the pose settles (and again as imagery streams in). The layer is read back
+	 * fenced (three-readback): the stats land a frame or two later (as with ?lookgpu=1) and only if the
+	 * key still stands; export waits for them (trackLook → lookIdle) and reads synchronously.
 	 */
 	private layerStats(amount: number) {
-		const s = this.settings;
-		const key = `${this.geoBufGen}|${this.layerGen}|${s.mode}|${s.mapStyle}|${s.worldStyle}|${this.imageryDone}`;
+		const key = this.statsKey();
 		if (
 			!this.photoImg ||
 			!this.geometryReady() ||
-			!this.look.wantsStats(amount, key)
+			!this.look.wantsStats(amount, key) ||
+			(this.statsPending === key && !this.syncReads)
 		)
 			return;
 		const [w, h] = gridSize(this.aspect, STATS_LONG_SIDE);
@@ -1317,20 +1524,48 @@ export class PhotoEngine {
 		this.renderer.setClearColor(0x000000, 0);
 		this.renderer.clear();
 		this.renderer.render(this.scene, this.cam);
-		this.renderer.readRenderTargetPixels(this.statsRT, 0, 0, w, h, buf);
 		this.renderer.setRenderTarget(null);
 		if (this.trails) this.trails.visible = !!tv;
 		if (this.frustum) this.frustum.visible = !!fv;
-		this.look.setStats({
-			key,
-			img: this.photoImg,
-			layer: buf,
-			w,
-			h,
-			geo: this.rangeGrid(),
-			fg: this.fgMask,
-			minRange: trustedRange(this.photo.hAccuracy),
-		});
+		const land = () =>
+			this.look.setStats({
+				key,
+				img: this.photoImg as HTMLImageElement,
+				layer: buf,
+				w,
+				h,
+				geo: this.rangeGrid(),
+				fg: this.fgMask,
+				minRange: trustedRange(this.photo.hAccuracy),
+			});
+		if (this.syncReads) {
+			readTargetSync(this.renderer, this.statsRT, buf, 0, 0, w, h);
+			land();
+			return;
+		}
+		this.statsPending = key;
+		trackLook(
+			readTargetAsync(this.renderer, this.statsRT, buf, 0, 0, w, h).then(
+				() => {
+					if (this.statsPending === key) this.statsPending = null;
+					if (this.disposed) return;
+					// a newer geometry buffer / look / imagery since: that frame asks again
+					if (
+						this.photoImg &&
+						this.geometryReady() &&
+						this.statsKey() === key &&
+						this.look.wantsStats(1, key)
+					)
+						land();
+					this.requestRender();
+				},
+				(e) => {
+					if (this.statsPending === key) this.statsPending = null;
+					if (!this.disposed)
+						console.warn("[engine] band stats readback failed", e);
+				},
+			),
+		);
 	}
 
 	private applyTerrainStyle() {
@@ -1452,7 +1687,20 @@ export class PhotoEngine {
 		this.geoRTGen = this.geoGen;
 		// the 12 MB CPU readback (labels, hover) waits until the pose stops changing; readback() forces it
 		clearTimeout(this.readbackTimer);
-		this.readbackTimer = window.setTimeout(() => this.readGeometryNow(), 90);
+		this.readbackTimer = window.setTimeout(
+			() => void this.readGeometryAsync(),
+			90,
+		);
+	}
+
+	/** renderNow with blocking reads (the band stats land in this very frame): the export's renders. */
+	private renderNowSync() {
+		this.syncReads = true;
+		try {
+			this.renderNow();
+		} finally {
+			this.syncReads = false;
+		}
 	}
 
 	renderNow() {
@@ -2014,8 +2262,9 @@ export class PhotoEngine {
 
 	/**
 	 * autoAlign with the coarse grid on the WebGPU compute device (src/lib/gpu/align; CPU when
-	 * unavailable or ?gpu=off), then the same silhouette re-rank. Same result as autoAlign();
-	 * PhotoWorkspace prefers it. autoAlign() itself stays synchronous for the tools that call it.
+	 * unavailable or ?gpu=off), then the same silhouette re-rank with its renders pipelined and read
+	 * back fenced (three-readback). Same result as autoAlign(); PhotoWorkspace prefers it. autoAlign()
+	 * itself stays synchronous for the tools that call it.
 	 */
 	async autoAlignAsync(fromPrior = true): Promise<AlignResult | null> {
 		if (!this.horizonDirs || !this.edge) return null;
@@ -2027,10 +2276,23 @@ export class PhotoEngine {
 			fromPrior ? 25 : 6,
 		);
 		if (this.disposed) return null;
-		return this.autoAlign(fromPrior, res);
+		const alts = res.alternatives;
+		if (!alts || alts.length < 2) return res;
+		let sils: number[];
+		try {
+			sils = await this.silhouetteScoresAsync(alts.map((a) => a.pose));
+		} catch (e) {
+			// a fenced read can fail (e.g. context loss: three rejects with undefined); the sync
+			// scores are what autoAlign() uses
+			if (this.disposed) return null;
+			console.warn("[engine] async silhouette read failed, scoring sync", e);
+			sils = alts.map((a) => this.silhouetteScore(a.pose));
+		}
+		if (this.disposed) return null;
+		return this.rerank(res, sils);
 	}
 
-	/** `pre`: the skyline search's result, already computed (autoAlignAsync). */
+	/** `pre`: the skyline search's result, already computed. */
 	autoAlign(fromPrior = true, pre?: AlignResult): AlignResult | null {
 		if (!this.horizonDirs || !this.edge) return null;
 		const res =
@@ -2044,10 +2306,20 @@ export class PhotoEngine {
 			);
 		const alts = res.alternatives;
 		if (!alts || alts.length < 2) return res;
-		// Re-rank the finalists with inner silhouettes (ridges in front of ridges), which the
-		// skyline-only search can't see. Needs a geometry render per hypothesis, so only here.
+		return this.rerank(
+			res,
+			alts.map((a) => this.silhouetteScore(a.pose)),
+		);
+	}
+
+	/**
+	 * Re-rank the finalists with inner silhouettes (ridges in front of ridges), which the
+	 * skyline-only search can't see. `sils[i]`: silhouetteScore of alternatives[i].
+	 */
+	private rerank(res: AlignResult, sils: number[]): AlignResult {
+		const alts = res.alternatives ?? [];
 		const ranked = alts
-			.map((a) => ({ ...a, sil: this.silhouetteScore(a.pose) }))
+			.map((a, i) => ({ ...a, sil: sils[i] }))
 			.map((a) => ({ ...a, total: a.score + 0.5 * a.sil }))
 			.sort((a, b) => b.total - a.total);
 		const best = ranked[0];
@@ -2069,12 +2341,15 @@ export class PhotoEngine {
 	private silRT?: THREE.WebGLRenderTarget;
 	private silBuf?: Float32Array;
 
-	/** Mean photo edge strength along rendered inner silhouettes (log-range jumps) for a pose. */
-	silhouetteScore(pose: Pose) {
-		const edge = this.edge;
-		if (!edge) return 0;
+	/** The silhouette pass's size (384 wide, the photo's aspect). */
+	private silSize() {
 		const W = 384;
-		const H = Math.round(W / this.aspect);
+		return [W, Math.round(W / this.aspect)] as const;
+	}
+
+	/** Render the geometry pass for `pose` into silRT (made on first use). */
+	private renderSilhouette(pose: Pose) {
+		const [W, H] = this.silSize();
 		if (!this.silRT) {
 			this.silRT = new THREE.WebGLRenderTarget(W, H, {
 				type: THREE.FloatType,
@@ -2083,7 +2358,6 @@ export class PhotoEngine {
 			});
 			this.silBuf = new Float32Array(W * H * 4);
 		}
-		const buf = this.silBuf as Float32Array;
 		const cam = new THREE.PerspectiveCamera(1, 1, 1, 400000);
 		applyPose(cam, pose, this.aspect, this.eye);
 		this.shared.uStyle.value = STYLE.geometry;
@@ -2093,40 +2367,60 @@ export class PhotoEngine {
 		this.renderer.setClearColor(0x000000, 0);
 		this.renderer.clear();
 		this.renderer.render(this.scene, cam);
-		this.renderer.readRenderTargetPixels(this.silRT, 0, 0, W, H, buf);
+		return tv;
+	}
+
+	/** Mean photo edge strength along rendered inner silhouettes (log-range jumps) for a pose. */
+	silhouetteScore(pose: Pose) {
+		const edge = this.edge;
+		if (!edge) return 0;
+		const [W, H] = this.silSize();
+		const tv = this.renderSilhouette(pose);
+		const buf = this.silBuf as Float32Array;
+		readTargetSync(
+			this.renderer,
+			this.silRT as THREE.WebGLRenderTarget,
+			buf,
+			0,
+			0,
+			W,
+			H,
+		);
 		this.renderer.setRenderTarget(null);
 		if (this.trails) this.trails.visible = !!tv;
-		const lr = (x: number, y: number) => {
-			const r = buf[(y * W + x) * 4 + 3];
-			return r > 0 ? Math.log(r) : 13.5;
-		};
-		let sum = 0;
-		let n = 0;
-		for (let y = 1; y < H - 1; y++)
-			for (let x = 1; x < W - 1; x++) {
-				const r = buf[(y * W + x) * 4 + 3];
-				if (!(r > 0) || r > 25000) continue;
-				const c = lr(x, y);
-				// inner silhouette: a nearer surface in front of a much farther one (not the sky)
-				const up = lr(x, y + 1);
-				const right = lr(x + 1, y);
-				const left = lr(x - 1, y);
-				const far = Math.max(
-					up < 13 ? up : 0,
-					right < 13 ? right : 0,
-					left < 13 ? left : 0,
-				);
-				if (far - c < 0.5) continue;
-				const u = x / W;
-				const v = 1 - y / H;
-				const ex = Math.min(edge.w - 1, Math.floor(u * edge.w));
-				const ey = Math.min(edge.h - 1, Math.floor(v * edge.h));
-				const i = ey * edge.w + ex;
-				if (edge.fg[i] > 0.3) continue;
-				sum += edge.coarse[i];
-				n++;
-			}
-		return n > 30 ? sum / n : 0;
+		return silhouetteFromRange(buf, W, H, edge);
+	}
+
+	/**
+	 * silhouetteScore for each pose, without stalling: every render is followed by its fenced read
+	 * into its own buffer before the next render reuses silRT (the pack copies run in GL order, see
+	 * three-readback), then one wait for all of them. Same bytes, same scores as the sync loop.
+	 */
+	async silhouetteScoresAsync(poses: Pose[]): Promise<number[]> {
+		const edge = this.edge;
+		if (!edge) return poses.map(() => 0);
+		const [W, H] = this.silSize();
+		const reads: Promise<Float32Array>[] = [];
+		let tv: boolean | undefined;
+		for (let k = 0; k < poses.length; k++) {
+			const v = this.renderSilhouette(poses[k]);
+			if (k === 0) tv = v;
+			reads.push(
+				readTargetAsync(
+					this.renderer,
+					this.silRT as THREE.WebGLRenderTarget,
+					new Float32Array(W * H * 4),
+					0,
+					0,
+					W,
+					H,
+				),
+			);
+		}
+		this.renderer.setRenderTarget(null);
+		if (this.trails) this.trails.visible = !!tv;
+		const bufs = await Promise.all(reads);
+		return bufs.map((b) => silhouetteFromRange(b, W, H, edge));
 	}
 
 	solvePins(pins: Pin[], from: Pose = this.pose, solveFov = true) {
@@ -2169,13 +2463,19 @@ export class PhotoEngine {
 	/** Render the current photo view at the photo's full resolution (with labels) as a PNG blob. */
 	async exportImage(withLabels = true): Promise<Blob | null> {
 		// labels need occlusion for THIS pose, not the debounced previous one
-		if (withLabels && this.settings.mode !== "world") await this.readback();
+		// readback() can give up while the pose keeps moving: then read this pose synchronously
+		if (
+			withLabels &&
+			this.settings.mode !== "world" &&
+			!(await this.readback())
+		)
+			this.readbackSync();
 		// GPU look passes (gpu/look) still in flight land before the export draws
 		await lookIdle();
 		if (this.settings.mode === "world" || this.step) {
 			// display-only 3D Tiles (Google) never enter an export (tiles3d/three-tiles.ts)
 			const capture = () => {
-				this.renderNow();
+				this.renderNowSync();
 				return new Promise<Blob | null>((res) =>
 					this.renderer.domElement.toBlob(res, "image/png"),
 				);
@@ -2192,7 +2492,7 @@ export class PhotoEngine {
 		this.renderer.setSize(W, H, false);
 		this.layerRT.setSize(W, H);
 		this.trailMat?.resolution.set(W, H);
-		this.renderNow();
+		this.renderNowSync();
 		const out = document.createElement("canvas");
 		out.width = W;
 		out.height = H;
