@@ -100,6 +100,31 @@ type AlignState =
 	| "manual"
 	| "pinned";
 
+/** Same length and, per item, the same own fields (Object.is; array fields compared element-wise). */
+function sameRecords<T extends object>(a: readonly T[], b: readonly T[]) {
+	if (a === b) return true;
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		const x = a[i] as Record<string, unknown>;
+		const y = b[i] as Record<string, unknown>;
+		const kx = Object.keys(x);
+		if (kx.length !== Object.keys(y).length) return false;
+		for (const k of kx) {
+			const p = x[k];
+			const q = y[k];
+			if (Object.is(p, q)) continue;
+			if (
+				!Array.isArray(p) ||
+				!Array.isArray(q) ||
+				p.length !== q.length ||
+				p.some((v, j) => !Object.is(v, q[j]))
+			)
+				return false;
+		}
+	}
+	return true;
+}
+
 export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 	// opt-in eye-position suggestion (EyeSuggestion.tsx): an applied move re-creates the engine at the
 	// moved eye with the re-fitted rotation; null = the photo's own GPS position
@@ -313,21 +338,27 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				getRevealConfig().onLoad && settingsRef.current.mode !== "world";
 			if (revealOnLoad) reveal.hold(getRevealConfig());
 			const off = engine.onRender(() => {
+				// every engine frame re-emits labels: keep the previous array when nothing changed, so React
+				// (and the label layout memos keyed on it) skips the no-op re-render
 				if (engine.settings.mode === "world") {
-					setLabels([]);
+					setLabels((prev) => (prev.length ? [] : prev));
 					setFlying(engine.isFlying);
 					return;
 				}
 				const ls = styleRef.current.labels;
 				// panorama / inline lay out every visible peak themselves (look/labels layout.ts)
-				setLabels(
+				const next =
 					ls.layout === "classic"
 						? engine.peakLabels(ls.maxLabels)
-						: engine.peakLabels(100, { declutter: false }),
-				);
+						: engine.peakLabels(100, { declutter: false });
+				// a fresh skyline re-runs the panorama / inline layout (it reads skylineRef) even when the
+				// labels themselves are unchanged
 				const sky = engine.skyline?.();
+				const skyNew = !!sky && sky !== skylineRef.current;
 				if (sky) skylineRef.current = sky;
-				setCandidates(engine.peaksInFrame());
+				setLabels((prev) => (!skyNew && sameRecords(prev, next) ? prev : next));
+				const cand = engine.peaksInFrame();
+				setCandidates((prev) => (sameRecords(prev, cand) ? prev : cand));
 			});
 			(async () => {
 				// Start everything at once: the ≈2 MB region JSON (2–11 s cold on the dev server) no longer
@@ -858,6 +889,126 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		};
 	}, [revealFrame, revealCfg.labels]);
 
+	// the label layers re-render only when labels / layout / reveal change, not on every hover move
+	const labelsSvg = useMemo(
+		() => (
+			<PeakLabelsSvg
+				labels={placed}
+				width={stageSize.w}
+				height={stageSize.h}
+				style={viewStyle.labels}
+			/>
+		),
+		[placed, stageSize.w, stageSize.h, viewStyle.labels],
+	);
+	const classicLabels = useMemo(
+		() =>
+			labels.map((l) => {
+				const c = classicById.get(l.name + l.world[0]);
+				if (!c) return null;
+				// leader: summit → block edge, a rotated gradient bar (angled when the block slid sideways)
+				const ldx = c.leader[2] - c.leader[0];
+				const ldy = c.leader[3] - c.leader[1];
+				const len = Math.hypot(ldx, ldy);
+				const deg = (Math.atan2(ldx, Math.abs(ldy)) * 180) / Math.PI;
+				return (
+					<div
+						key={c.id}
+						className="pointer-events-none absolute"
+						style={{
+							left: c.x,
+							top: c.y,
+							...revealLabels?.of(l),
+						}}
+					>
+						{/* sizes and colours come from style.labels via the --lbl-* variables (labelCssVars) */}
+						<div
+							className="absolute left-0"
+							style={{
+								[c.below ? "top" : "bottom"]: 0,
+								height: len,
+								width: "var(--lbl-lead-w)",
+								transform: `translateX(-50%) rotate(${c.below ? -deg : deg}deg)`,
+								transformOrigin: c.below ? "50% 0" : "50% 100%",
+								backgroundImage: `linear-gradient(${c.below ? "to bottom" : "to top"} in oklab, var(--lbl-lead-from) 0%, var(--lbl-lead-to) 100%)`,
+							}}
+						/>
+						<div
+							className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 rounded-full"
+							style={{
+								width: "var(--lbl-dot)",
+								height: "var(--lbl-dot)",
+								backgroundColor: "var(--lbl-dot-c)",
+								boxShadow: "var(--lbl-dot-shadow)",
+							}}
+						/>
+						<div
+							className="absolute whitespace-nowrap"
+							style={{
+								left: c.anchorX - c.x,
+								[c.below ? "top" : "bottom"]: c.lead,
+								textAlign: c.align,
+								transform:
+									c.align === "center"
+										? "translateX(-50%)"
+										: c.align === "right"
+											? "translateX(-100%)"
+											: undefined,
+								filter: "var(--lbl-halo)",
+								...(viewStyle.labels.halo.kind === "stroke"
+									? {
+											WebkitTextStroke: "var(--lbl-stroke)",
+											paintOrder: "stroke fill",
+										}
+									: null),
+							}}
+						>
+							{c.nameLines.map((t, i) => (
+								<div
+									key={t}
+									className="leading-tight"
+									style={{
+										fontSize: "var(--lbl-name-px)",
+										fontWeight: "var(--lbl-name-w)",
+										color: "var(--lbl-name-c)",
+									}}
+								>
+									{t}
+									{c.subInline && i === 0 && (
+										<span
+											style={{
+												marginLeft: "0.3em",
+												fontSize: "var(--lbl-sub-px)",
+												fontWeight: "var(--lbl-sub-w)",
+												color: "var(--lbl-sub-c)",
+											}}
+										>
+											{c.subLines[0]}
+										</span>
+									)}
+								</div>
+							))}
+							{!c.subInline &&
+								c.subLines.map((t) => (
+									<div
+										key={t}
+										className="leading-tight"
+										style={{
+											fontSize: "var(--lbl-sub-px)",
+											fontWeight: "var(--lbl-sub-w)",
+											color: "var(--lbl-sub-c)",
+										}}
+									>
+										{t}
+									</div>
+								))}
+						</div>
+					</div>
+				);
+			}),
+		[labels, classicById, revealLabels, viewStyle.labels.halo.kind],
+	);
+
 	const place = regionNames[photo.region] ?? photo.region;
 	const taken = useMemo(() => formatTakenAt(photo), [photo]);
 
@@ -928,120 +1079,13 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 								tool !== "pin" &&
 								viewStyle.labels.layout !== "classic" && (
 									<div style={{ opacity: revealLabels ? revealLabels.all : 1 }}>
-										<PeakLabelsSvg
-											labels={placed}
-											width={stageSize.w}
-											height={stageSize.h}
-											style={viewStyle.labels}
-										/>
+										{labelsSvg}
 									</div>
 								)}
 							{showPeaks &&
 								tool !== "pin" &&
 								viewStyle.labels.layout === "classic" &&
-								labels.map((l) => {
-									const c = classicById.get(l.name + l.world[0]);
-									if (!c) return null;
-									// leader: summit → block edge, a rotated gradient bar (angled when the block slid sideways)
-									const ldx = c.leader[2] - c.leader[0];
-									const ldy = c.leader[3] - c.leader[1];
-									const len = Math.hypot(ldx, ldy);
-									const deg = (Math.atan2(ldx, Math.abs(ldy)) * 180) / Math.PI;
-									return (
-										<div
-											key={c.id}
-											className="pointer-events-none absolute"
-											style={{
-												left: c.x,
-												top: c.y,
-												...revealLabels?.of(l),
-											}}
-										>
-											{/* sizes and colours come from style.labels via the --lbl-* variables (labelCssVars) */}
-											<div
-												className="absolute left-0"
-												style={{
-													[c.below ? "top" : "bottom"]: 0,
-													height: len,
-													width: "var(--lbl-lead-w)",
-													transform: `translateX(-50%) rotate(${c.below ? -deg : deg}deg)`,
-													transformOrigin: c.below ? "50% 0" : "50% 100%",
-													backgroundImage: `linear-gradient(${c.below ? "to bottom" : "to top"} in oklab, var(--lbl-lead-from) 0%, var(--lbl-lead-to) 100%)`,
-												}}
-											/>
-											<div
-												className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 rounded-full"
-												style={{
-													width: "var(--lbl-dot)",
-													height: "var(--lbl-dot)",
-													backgroundColor: "var(--lbl-dot-c)",
-													boxShadow: "var(--lbl-dot-shadow)",
-												}}
-											/>
-											<div
-												className="absolute whitespace-nowrap"
-												style={{
-													left: c.anchorX - c.x,
-													[c.below ? "top" : "bottom"]: c.lead,
-													textAlign: c.align,
-													transform:
-														c.align === "center"
-															? "translateX(-50%)"
-															: c.align === "right"
-																? "translateX(-100%)"
-																: undefined,
-													filter: "var(--lbl-halo)",
-													...(viewStyle.labels.halo.kind === "stroke"
-														? {
-																WebkitTextStroke: "var(--lbl-stroke)",
-																paintOrder: "stroke fill",
-															}
-														: null),
-												}}
-											>
-												{c.nameLines.map((t, i) => (
-													<div
-														key={t}
-														className="leading-tight"
-														style={{
-															fontSize: "var(--lbl-name-px)",
-															fontWeight: "var(--lbl-name-w)",
-															color: "var(--lbl-name-c)",
-														}}
-													>
-														{t}
-														{c.subInline && i === 0 && (
-															<span
-																style={{
-																	marginLeft: "0.3em",
-																	fontSize: "var(--lbl-sub-px)",
-																	fontWeight: "var(--lbl-sub-w)",
-																	color: "var(--lbl-sub-c)",
-																}}
-															>
-																{c.subLines[0]}
-															</span>
-														)}
-													</div>
-												))}
-												{!c.subInline &&
-													c.subLines.map((t) => (
-														<div
-															key={t}
-															className="leading-tight"
-															style={{
-																fontSize: "var(--lbl-sub-px)",
-																fontWeight: "var(--lbl-sub-w)",
-																color: "var(--lbl-sub-c)",
-															}}
-														>
-															{t}
-														</div>
-													))}
-											</div>
-										</div>
-									);
-								})}
+								classicLabels}
 							{tool === "pin" &&
 								candidates.map((c) => {
 									const active = pendingPeak?.world.join() === c.world.join();
