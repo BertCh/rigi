@@ -7,7 +7,7 @@
 // is divided by s², s = max(1, MAD scale of the pooled whitened data residuals) (refine/robust.ts
 // madScale): when the data scatter more than their modelled σ the covariance widens accordingly; it
 // never shrinks below the model. Rows / cols of fixed parameters are 0. perFamily.info is each family's
-// (s-scaled for data) 7×7 information, reused by GA2 (observe) and GA5 (integrity).
+// (s-scaled for data) 7×7 information, reused by GA5 (integrity; GA2 observe was removed 2026-09-30).
 import { invSym } from "../../linalg";
 import { madScale } from "../../refine/robust";
 import {

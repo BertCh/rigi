@@ -625,3 +625,39 @@ export function concordCueFactors(
 	}
 	return out;
 }
+
+// ---------------------------------------------------------------- lake floor (GA0 "eye ≥ lake level")
+// Moved from lakes/factors.ts (GA4 waterline factors removed 2026-09-30): a one-sided eye floor
+// U ≥ level + margin (scene-frame z) as a prior factor (zero residual when satisfied, stiff quadratic
+// below). A veto-style bound, not a pull (guard-rail 2).
+
+export type LakeFloorOpts = {
+	/** Eye must be at least this far above the level (m). Default 0.3 (lakes/floor.ts margin). */
+	marginM?: number;
+	/** Stiffness below the floor (m). Default 0.25. */
+	sigmaM?: number;
+};
+
+/**
+ * One-sided eye floor: U ≥ levelZ + margin, levelZ in the SCENE frame (absolute level − alt0 −
+ * curvature drop at the eye, i.e. what lakes/floor.ts returns converted by the caller). Zero residual
+ * above; (floor − U)/σ below. Prior factor (excluded from the MAD rescale), analytic Jacobian.
+ */
+export function lakeFloorFactor(levelZ: number, o: LakeFloorOpts = {}): Factor {
+	const floorZ = levelZ + (o.marginM ?? 0.3);
+	const sig = o.sigmaM ?? 0.25;
+	return {
+		family: "lakeFloor",
+		name: "lakeFloor",
+		dim: 1,
+		loss: { kind: "l2" },
+		prior: true,
+		residual: (x) =>
+			Float64Array.of(x[IDX.U] < floorZ ? (floorZ - x[IDX.U]) / sig : 0),
+		jacobian: (x) => {
+			const j = new Float64Array(NP);
+			if (x[IDX.U] < floorZ) j[IDX.U] = -1 / sig;
+			return j;
+		},
+	};
+}

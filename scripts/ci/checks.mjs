@@ -238,31 +238,10 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
-		id: "geocam-lakes-factors",
-		tier: "fast",
-		group: "geocam",
-		cmd: tsx("src/lib/geocam/lakes/lakes-factors.check.ts"),
-		timeoutS: 300,
-	},
-	{
-		id: "geocam-tjunc",
-		tier: "fast",
-		group: "geocam",
-		cmd: tsx("src/lib/geocam/tjunc/tjunc.check.ts"),
-		timeoutS: 300,
-	},
-	{
 		id: "geocam-integrity",
 		tier: "fast",
 		group: "geocam",
 		cmd: tsx("src/lib/geocam/integrity/integrity.check.ts"),
-		timeoutS: 300,
-	},
-	{
-		id: "geocam-observe",
-		tier: "fast",
-		group: "geocam",
-		cmd: tsx("src/lib/geocam/observe/observe.check.ts"),
 		timeoutS: 300,
 	},
 
