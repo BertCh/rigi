@@ -85,8 +85,8 @@ const SRGB_LUT = Float32Array.from({ length: 256 }, (_, i) => {
 });
 
 /**
- * reduceBands' inputs at w × h (row 0 = top): `photo` sRGB bytes, `layer` linear RGBA floats
- * (alpha = coverage; rgb is un-premultiplied here), `range(x, y)` metres (≤ 0 or non-finite = sky),
+ * reduceBands' inputs at w × h (row 0 = top): `photo` sRGB bytes, `layer` linear PREMULTIPLIED RGBA
+ * floats (alpha = coverage; this function divides rgb by alpha, so never pass un-premultiplied data), `range(x, y)` metres (≤ 0 or non-finite = sky),
  * `fg(x, y)` people 0..1. A pixel counts when it is terrain beyond `minRange` (m; nearer terrain is
  * misplaced by the GPS error anyway, and the engines treat it differently) that the layer fully
  * covers, not people, and ≥ 3 px from the sky (misregistration mixes sky into terrain there).
