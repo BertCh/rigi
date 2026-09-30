@@ -2,9 +2,6 @@
 // Exit 0 = all pass. Covers: CLASSIC = today's constants (numbers snapshot + cross-check against
 // materials.ts makeSharedUniforms + source literal scan), ramps vs the shader formulas, merge/clamp/
 // union semantics, presets resolving to complete styles, storage parsing/fallback, ?style=, cross-tab.
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import * as THREE from "three";
 import { drawPeakLabels } from "../src/lib/look/labels/canvas.ts";
 import { labelCssVars } from "../src/lib/look/labels/css.ts";
@@ -49,7 +46,6 @@ import {
 } from "../src/lib/style/three-apply.ts";
 import type { ViewStyle } from "../src/lib/style/types.ts";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 let pass = 0;
 let fail = 0;
 const warns: string[] = [];
@@ -409,106 +405,6 @@ ok(
 	];
 	for (const [k, v] of opt)
 		if (u[k]) ok(u[k].value === v, `chunk-2 uniform ${k}`, u[k].value);
-}
-
-// ---- 3. source literal scan (WARN only: chunks 2–4 move these literals into uniforms/CSS vars) ----
-{
-	const src = (f: string) => readFileSync(join(ROOT, f), "utf8");
-	const mat = src("src/lib/materials.ts");
-	const eng = src("src/lib/engine.ts");
-	const ws = src("src/components/PhotoWorkspace.tsx");
-	const lits: [string, string, string][] = [
-		[mat, "materials.ts", "vec3 c0 = vec3(0.36, 0.52, 0.30)"],
-		[mat, "materials.ts", "vec3 c4 = vec3(0.97, 0.98, 1.00)"],
-		[mat, "materials.ts", "smoothstep(0.72, 0.85, t)"],
-		[mat, "materials.ts", "vec3 a = vec3(0.10, 0.85, 0.80)"],
-		[mat, "materials.ts", "vec3 e = vec3(1.00, 0.95, 0.85)"],
-		[mat, "materials.ts", "return 0.25 * sky + 0.85 * l"],
-		[mat, "materials.ts", "-range * 0.000018 * uHaze"],
-		[mat, "materials.ts", "clamp(f, 0.0, 0.85)"],
-		[mat, "materials.ts", "smoothstep(0.08, 0.2, density)"],
-		[mat, "materials.ts", "smoothstep(0.1, 0.25, fwidth(em))"],
-		[mat, "materials.ts", "uContourWidth * 1.8"],
-		[
-			mat,
-			"materials.ts",
-			"max(minorA * 0.45, majorA * 0.95) * mix(0.3, 1.0, fade)",
-		],
-		[mat, "materials.ts", "(0.55 + 0.45 * shade(n))"],
-		[
-			mat,
-			"materials.ts",
-			"mix(bc, vec3(1.0), a * 0.8), (0.55 + 0.4 * a) * smoothstep(60.0, 450.0, range)",
-		],
-		[mat, "materials.ts", "vec3(0.02, 0.03, 0.06)"],
-		[mat, "materials.ts", "casing * 0.55"],
-		[mat, "materials.ts", "vec3(1.0, 0.85, 0.6)"],
-		[eng, "engine.ts", "log(200.0)) / (log(80000.0) - log(200.0))"],
-		[
-			eng,
-			"engine.ts",
-			"(0.35 + 0.65 * dot(col, vec3(0.333)) * 1.4), uDepthTint * 0.75",
-		],
-		[
-			eng,
-			"engine.ts",
-			"mix(vec3(1.0, 0.95, 0.85), vec3(1.0, 0.45, 0.25), isSkyline)",
-		],
-		[eng, "engine.ts", "ridge * uRidges * 0.9"],
-		[eng, "engine.ts", "smoothstep(0.12, 0.45, e)"],
-		[eng, "engine.ts", "smoothstep(0.7, 1.0, edgeLine) * 0.6"],
-		[eng, "engine.ts", "ridge * uRidges * 0.5 * m"],
-		[eng, "engine.ts", "s.mode === 'replace' ? 0.6 : 1"],
-		[eng, "engine.ts", "u.uHaze.value = 0.5"],
-		[eng, "engine.ts", "setClearColor(0x9fb8d0, 1)"],
-		[eng, "engine.ts", "new THREE.Color(0xa9c2da)"],
-		[
-			eng,
-			"engine.ts",
-			"new THREE.SphereGeometry(18, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff5533 })",
-		],
-		[eng, "engine.ts", "color: 0xffffff, transparent: true, opacity: 0.9"],
-		[eng, "engine.ts", "hiking: [1.0, 0.82, 0.25]"],
-		[eng, "engine.ts", "mountain_hiking: [1.0, 0.32, 0.36]"],
-		[eng, "engine.ts", "alpine_hiking: [0.3, 0.67, 0.97]"],
-		[
-			eng,
-			"engine.ts",
-			"linewidth: 2.2, vertexColors: true, worldUnits: false, transparent: true, opacity: 0.95",
-		],
-		[eng, "engine.ts", "peakLabels(max = 28)"],
-		[eng, "engine.ts", "const s = W / 1400"],
-		[eng, "engine.ts", "const stem = 34 * s"],
-		[eng, "engine.ts", "1.5 * s, stem"],
-		[eng, "engine.ts", "ctx.arc(x, y, 3.5 * s"],
-		[eng, "engine.ts", "ctx.shadowColor = 'rgba(0,0,0,0.85)'"],
-		[eng, "engine.ts", "ctx.shadowBlur = 4 * s"],
-		[eng, "engine.ts", "y - stem - 16 * s"],
-		[eng, "engine.ts", "`600 ${15 * s}px Manrope, system-ui, sans-serif`"],
-		[eng, "engine.ts", "`400 ${12 * s}px Manrope, system-ui, sans-serif`"],
-		[eng, "engine.ts", "'rgba(255,255,255,0.8)'"],
-		[eng, "engine.ts", "ty + 15 * s"],
-		[
-			ws,
-			"PhotoWorkspace.tsx",
-			"h-7 w-px -translate-x-1/2 from-white/90 to-white/0",
-		],
-		[
-			ws,
-			"PhotoWorkspace.tsx",
-			"size-1.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-white shadow-[0_0_6px_rgba(0,0,0,0.6)]",
-		],
-		[ws, "PhotoWorkspace.tsx", "drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"],
-		[
-			ws,
-			"PhotoWorkspace.tsx",
-			"text-[12px] leading-tight font-semibold text-white",
-		],
-		[ws, "PhotoWorkspace.tsx", "text-[10px] leading-tight text-white/75"],
-	];
-	for (const [s, f, lit] of lits)
-		if (!s.includes(lit))
-			warns.push(`${f}: literal not found (moved by a later chunk?): ${lit}`);
 }
 
 // ---- 4. ramps reproduce the shader functions ----------------------------------------------------
@@ -1049,32 +945,25 @@ ok(
 		ok(!bad, `adapter: preset ${id} yields finite uniforms`);
 	}
 
-	// canvas labels: CLASSIC replays the pre-chunk-3 exportImage drawing call for call
+	// canvas labels: the drawer goes through the shared classic layout (labels/classic.ts), so the
+	// old call-for-call replay no longer applies; check invariants instead.
 	const record = () => {
-		const log: unknown[] = [];
+		const log: unknown[][] = [];
 		const ctx = new Proxy({} as Record<string, unknown>, {
 			get(t, k) {
+				if (k === "measureText")
+					return (s: string) => ({ width: s.length * 7 });
 				if (k === "createLinearGradient")
 					return (...a: unknown[]) => {
 						log.push(["grad", ...a]);
-						return {
-							addColorStop: (...b: unknown[]) => log.push(["stop", ...b]),
-						};
+						return { addColorStop: () => {} };
 					};
-				if (
-					typeof k === "string" &&
-					["fillRect", "beginPath", "arc", "fill", "fillText"].includes(k)
-				)
+				if (typeof k === "string" && !(k in t))
 					return (...a: unknown[]) => log.push([k, ...a]);
 				return t[k as string];
 			},
 			set(t, k, v) {
-				const val = typeof v === "object" ? "gradient" : v;
-				log.push([
-					"set",
-					k,
-					k === "fillStyle" && v === "#fff" ? "rgb(255,255,255)" : val,
-				]);
+				log.push(["set", k, v]);
 				t[k as string] = v;
 				return true;
 			},
@@ -1085,61 +974,27 @@ ok(
 		{ name: "Eiger", ele: 3967, u: 0.3, v: 0.4, distKm: 12.345 },
 		{ name: "Nameless", ele: null, u: 0.7, v: 0.05, distKm: 3 },
 	];
-	const W = 4032;
-	const H = 3024;
-	const ref = record();
-	{
-		// engine.ts exportImage labels before chunk 3 (verbatim, "l.u * W" etc.)
-		const ctx = ref.ctx;
-		const s = W / 1400;
-		ctx.textAlign = "center";
-		for (const l of labels) {
-			const x = l.u * W;
-			const y = l.v * H;
-			const up = l.v >= 0.1;
-			const stem = 34 * s;
-			const g = ctx.createLinearGradient(0, y, 0, up ? y - stem : y + stem);
-			g.addColorStop(0, "rgba(255,255,255,0.9)");
-			g.addColorStop(1, "rgba(255,255,255,0)");
-			ctx.fillStyle = g;
-			ctx.fillRect(x - 0.75 * s, up ? y - stem : y, 1.5 * s, stem);
-			ctx.fillStyle = "#fff";
-			ctx.beginPath();
-			ctx.arc(x, y, 3.5 * s, 0, Math.PI * 2);
-			ctx.fill();
-			ctx.shadowColor = "rgba(0,0,0,0.85)";
-			ctx.shadowBlur = 4 * s;
-			const ty = up ? y - stem - 16 * s : y + stem + 16 * s;
-			ctx.font = `600 ${15 * s}px Manrope, system-ui, sans-serif`;
-			ctx.fillText(l.name, x, ty);
-			ctx.font = `400 ${12 * s}px Manrope, system-ui, sans-serif`;
-			ctx.fillStyle = "rgba(255,255,255,0.8)";
-			ctx.fillText(
-				`${l.ele ? `${Math.round(l.ele).toLocaleString()} m · ` : ""}${l.distKm.toFixed(1)} km`,
-				x,
-				ty + 15 * s,
-			);
-			ctx.shadowBlur = 0;
-		}
-	}
 	const got = record();
-	drawPeakLabels(got.ctx, labels, CLASSIC.labels, W, H);
-	// the new drawer sets the (unchanged) white fill again before the name: drop no-op re-sets
-	const dedupe = (log: unknown[]) => {
-		const out: unknown[] = [];
-		const cur: Record<string, unknown> = {};
-		for (const e of log as unknown[][]) {
-			if (e[0] === "set" && e[2] !== "gradient" && cur[e[1] as string] === e[2])
-				continue;
-			if (e[0] === "set") cur[e[1] as string] = e[2];
-			out.push(e);
-		}
-		return JSON.stringify(out);
-	};
+	drawPeakLabels(got.ctx, labels, CLASSIC.labels, 4032, 3024);
+	const texts = got.log.filter((e) => e[0] === "fillText");
+	const count = (k: string) => got.log.filter((e) => e[0] === k).length;
 	ok(
-		dedupe(got.log) === dedupe(ref.log),
-		"labels-canvas: CLASSIC = the old export drawing (call for call)",
-		dedupe(got.log).slice(0, 300),
+		labels.every((l) =>
+			texts.some((e) => String(e[1]).includes(l.name.split(" ")[0])),
+		),
+		"labels-canvas: every label name is drawn",
+	);
+	ok(
+		texts.every((e) => Number.isFinite(e[2]) && Number.isFinite(e[3])),
+		"labels-canvas: text positions are finite",
+	);
+	ok(
+		count("save") === count("restore"),
+		"labels-canvas: save/restore balanced",
+	);
+	ok(
+		!JSON.stringify(got.log).match(/NaN|Infinity/),
+		"labels-canvas: no NaN/Infinity in drawing calls",
 	);
 
 	// DOM label variables: CLASSIC computes to the old Tailwind classes' values

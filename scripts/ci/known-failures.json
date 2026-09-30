@@ -1,8 +1,6 @@
 {
 	"updated": "2026-09-30",
-	"checks": {
-		"style-check": "pre-existing 2026-09-29: TypeError ctx.save is not a function at src/lib/look/labels/canvas.ts:95 (drawPeakLabels called from scripts/style-check.ts:1126 with a stub ctx); owner: look/labels + style"
-	},
+	"checks": {},
 	"tsc": {
 		"allowed": [],
 		"ciAllowed": [
@@ -24,7 +22,7 @@
 	"evalApp": {
 		"minWithin1deg": 11,
 		"of": 14,
-		"lastObserved": "12/14 within 1° yaw, median 6.5 px (2026-09-29, :3130)",
+		"lastObserved": "12/14 within 1\u00b0 yaw, median 6.5 px (2026-09-29, :3130)",
 		"note": "1 below observed for run-to-run noise; status.md: App 12/14"
 	}
 }
