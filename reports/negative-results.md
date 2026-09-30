@@ -1,6 +1,6 @@
 # What didn't work
 
-*Consolidated 2026-09-29. One line per experiment: what was tried, the key numbers, and why it was dropped. Follow the source for detail. "Removed" sources were deleted in the 2026-09-29 doc consolidation; to read one, run `git show 384df44:<path>`.*
+*Consolidated 2026-09-29. One line per experiment: what was tried, the key numbers, and why it was dropped. Follow the source for detail. "Removed" sources were deleted in the 2026-09-29 doc consolidation; to read one, run `git show 384df44:<path>`. The code of killed experiments was deleted on 2026-09-30; rows marked "Code removed" say where to recover it, and [the list at the end](#code-removed-in-the-2026-09-30-cleanup) has every removed path.*
 
 Don't re-run anything here without a new reason. Most entries were measured on small dev sets, so "dropped" means "not worth it at current evidence", not "impossible".
 
@@ -78,19 +78,21 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 
 | Tried | Result | Source |
 |---|---|---|
-| Display warp field | 0.00 px LOO gain on existing (mostly > 5 km) pins | [concordance-research.md](concordance-research.md) (session f3) |
-| Altitude-contour eye rule | Worse on holdout: median 12.0→13.4 px, p90 18→36 | `tools/concord/priors/RESULT.txt`, `tools/concord/review/RESULT.txt` |
-| Joint whole-frame solve (skyline + interior cues + priors, gated) | Holdout median 8.8→16.2 px; 7130's eye moved 200 m (2.9σ) while the skyline improved and the pins went 10→30 px. The gate scores on the cues it fitted, so it can't catch this. From the GT start it drifts 3–6 px off the pin-fitted poses | `tools/concord/solve/RESULT.txt`, `tools/concord/review/RESULT.txt` |
-| Display warp on holdout | 0 better / 8 worse pins (LOO at the GT pose, 1.20→1.41 px) | `tools/concord/review/RESULT.txt` |
+| Display warp field (WP-E: GP/TPS residual field in u, v, log-range, applied to the composite's render-space reads) | 0.00 px LOO gain on existing (mostly > 5 km) pins. Code removed 2026-09-30 (`git show a1845f5:src/lib/concord/field/fit.ts`; the shader hook was `WARP_GLSL` in `field/glsl.ts`) | [concordance-research.md](concordance-research.md) (session f3) |
+| Altitude-contour eye rule | Worse on holdout: median 12.0→13.4 px, p90 18→36. The prior code stays (`src/lib/concord/priors/altitude.ts`, used by the geocam priors); the study script was removed 2026-09-30 (`git show a1845f5:scripts/concord/priors-study.ts`) | `tools/concord/priors/RESULT.txt`, `tools/concord/review/RESULT.txt` |
+| Joint whole-frame solve (WP-D: skyline + interior cues + priors, gated) | Holdout median 8.8→16.2 px; 7130's eye moved 200 m (2.9σ) while the skyline improved and the pins went 10→30 px. The gate scores on the cues it fitted, so it can't catch this. From the GT start it drifts 3–6 px off the pin-fitted poses. Never wired into the app. Code removed 2026-09-30 (`git show a1845f5:src/lib/concord/solve/joint.ts`); its cue residuals live on in `src/lib/geocam/map/joint-residual.ts` | `tools/concord/solve/RESULT.txt`, `tools/concord/review/RESULT.txt` |
+| Display warp on holdout (`?concord=warp`) | 0 better / 8 worse pins (LOO at the GT pose, 1.20→1.41 px). The flag value is gone; `?concord=warp` now logs "not a valid value". Code removed 2026-09-30 (`git show a1845f5:src/lib/concord/app/display.ts`) | `tools/concord/review/RESULT.txt` |
+| Render → re-match loop with semantic masking (WP-G, service on :8768) | Inliers up 2.9–15× from iteration 1 to 3 (7086 lower half 78→215), 17–20 s per photo on CPU LightGlue. Fails its acceptance as written: ≥ 25% more lower-half inliers only on 7131 and 7053 (the other 3 have none to gain), ≥ 2 more quadrants on 0/5; the building/forest "lift" overcorrects (dy 0 → −4…−8 px), so "drop" was the default. Its only consumer was the joint solve. Code removed 2026-09-30 (`git show a1845f5:tools/concord/rematch/server.py`, `…:src/lib/concord/match/client.ts`) | `tools/concord/rematch/RESULT.txt` |
 
 ## Geometry-first camera (GEO phase A, 2026-09-30)
 
 | Tried | Result | Source |
 |---|---|---|
 | Free eye from appearance matches (pycolmap with GPS prior, PoseLib 6-DoF, P4Pf, up2p) | Drift 180–270 m at correct poses; σ 14–86× over-confident; flags every decoy and every correct pose (AUROC 0.49) | `tools/research/geo/REPORT_PNP.txt` |
-| GA2 σ_eye (CRLB) as the eye gate | ρ 0.498 < 0.5; 25% of displaced-eye decoys confidently wrong | `tools/research/geo/REPORT_GA2.txt` |
-| GA3 occlusion-crossing (T-junction) eye cue | Renders: true-eye argmin 6/6 but a 10–20 m well. Real photos: median improvement −0.83, wrong eye wins 93%; only 6/40 refs eligible | `tools/research/geo/REPORT_GA3.txt` |
-| GA4 lake waterline/shore for eye height | Median eye-Z 16.9 m vs 5 m; −4.4 px constant cue bias ≈ 11 m of height at 2–8 km | `tools/research/geo/REPORT_GA4.txt` |
+| GA0 matcher inliers returned to the app (`?geoInliers`) | No consumer: nothing read the returned correspondences (GA1 was never wired) and the matcher patch was only proposed (`out/geocam/ga0/matcher-correspondences.patch`). Flag removed 2026-09-30 (`git show a1845f5:src/lib/matcher-client.ts`) | `tools/research/geo/REPORT_GA0.txt` |
+| GA2 σ_eye (CRLB) as the eye gate | ρ 0.498 < 0.5; 25% of displaced-eye decoys confidently wrong. Code removed 2026-09-30 (`git show a1845f5:src/lib/geocam/observe/fisher.ts`, `…:scripts/geocam/ga2-eval.ts`) | `tools/research/geo/REPORT_GA2.txt` |
+| GA3 occlusion-crossing (T-junction) eye cue | Renders: true-eye argmin 6/6 but a 10–20 m well. Real photos: median improvement −0.83, wrong eye wins 93%; only 6/40 refs eligible. Code removed 2026-09-30 (`git show a1845f5:src/lib/geocam/tjunc/junctions.ts`, `…:scripts/geocam/ga3-common.ts`) | `tools/research/geo/REPORT_GA3.txt` |
+| GA4 lake waterline/shore for eye height | Median eye-Z 16.9 m vs 5 m; −4.4 px constant cue bias ≈ 11 m of height at 2–8 km. Code removed 2026-09-30 (`git show a1845f5:src/lib/geocam/lakes/factors.ts`, `…:scripts/geocam/ga4-eval.ts`); the lake floor prior (`lakeFloorFactor`) moved to `src/lib/geocam/map/factors.ts` | `tools/research/geo/REPORT_GA4.txt` |
 | GA5 solution-separation integrity as a zero-loss veto | Rejects 12/33 correct poses; wrong-basin AUROC 0.94, wrong-eye 0.83; viewshed veto 2/754. Kept as a veto-panel candidate | `tools/research/geo/REPORT_GA5.txt` |
 | GA1 MAP solver σ calibration | Not killed: rotation (err/σ)² 6.0, eye 3.5 vs [0.5, 2]; mostly wrong-basin starts | `tools/research/geo/REPORT_GA1.txt` |
 
@@ -114,3 +116,25 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 - **FABDEM, SegFormer, UniDepth, Depth Pro, Perspective Fields**: non-commercial licences.
 - **OrienterNet-style BEV localisers**: wrong domain for summit photos.
 - **Consumer subscription against PeakVisor, racing AI identifier apps, Strava/Komoot feeds, law-enforcement sales**: avoided per the [competitive roadmap](<Rigi competitive landscape and roadmap.md>).
+
+## Code removed in the 2026-09-30 cleanup
+
+Every path below still exists at commit **`a1845f5`** (master before the cleanup). To read one, run `git show a1845f5:<path>`; to restore a directory, run `git checkout a1845f5 -- <path>`. The RESULT/REPORT records under `tools/` were kept.
+
+| Removed | What it was | Result row |
+|---|---|---|
+| `src/lib/concord/field/` (`fit.ts`, `glsl.ts`, `readback.ts`, `index.ts`, `field.check.ts`), `scripts/concord/field-eval.ts`, `tools/concord/field/glsl-check.mts` | WP-E display warp: field fit, GLSL hook, CPU inverse | Display warp (both rows) |
+| `?concord=warp` and its plumbing: warp branch of `src/lib/concord/app/display.ts`, `setWarp` / `renderUVOf` on `Renderer`, the `tWarp`/`uWarp*` uniforms in `src/lib/engine.ts`, `warpTex`/`warpScale`/`warpOn` in `src/lib/deck/composite{,-shader}.ts`, the warp label mapping in `src/lib/deck/engine.ts`, the sidebar option | App wiring of the warp. The composites now read render space at `uvG = vUv`, the exact warp-off path | Display warp |
+| `src/lib/concord/solve/` (`joint.ts`, `gate.ts`, `refine.ts`, `index.ts`, `joint.check.ts`), `scripts/concord/solve-eval.ts` | WP-D joint whole-frame solver and gate | Joint whole-frame solve |
+| `src/lib/concord/match/client.ts`, `scripts/concord/rematch-eval.ts`, `tools/concord/rematch/{server,tiles,mask}.py` | WP-G re-match service (:8768) and client | Render → re-match loop |
+| `scripts/concord/priors-study.ts` | WP-B fitting study (the priors themselves are kept) | Altitude-contour eye rule |
+| `src/lib/geocam/observe/` (`fisher.ts`, `gate.ts`, `heldout.ts`, `index.ts`, `observe.check.ts`), `scripts/geocam/ga2-eval.ts` | GA2 CRLB eye gate | GA2 |
+| `src/lib/geocam/tjunc/` (`junctions.ts`, `measure.ts`, `factor.ts`, `layered.ts`, `index.ts`, `tjunc.check.ts`), `scripts/geocam/ga3-{common,dev,synth}.ts` | GA3 T-junction eye cue | GA3 |
+| `src/lib/geocam/lakes/factors.ts` (waterline/shore factors), `lakes-factors.check.ts`, `scripts/geocam/ga4-eval.ts` | GA4 lake eye-height factors | GA4 |
+| `geoInliers` flag, `returnCorrespondences` request field and `correspondences` response type in `src/lib/matcher-client.ts` | GA0 matcher-inlier request | GA0 matcher inliers |
+| CI checks `concord-joint`, `concord-field`, `geocam-observe`, `geocam-tjunc`, `geocam-lakes-factors` (`scripts/ci/checks.mjs`) | Checks of the removed code. `concord-app` (`src/lib/concord/app/app.check.ts`) now carries the "`?concord` defaults off" assertion | — |
+| `scripts/nearfield/{camera-modes-check,deck-splats-check,step-inside-three-check}.mjs`, `scripts/reveal-bench.mjs` | One-off browser checks referenced nowhere (not in CI, docs or code) | — (not experiments) |
+
+Moved rather than removed: the joint solver's cue residuals (`JointCue`, `cueResidualPx`, `focalPx1600`, `horizonEl`, `basisPx`, the read `JOINT_DEFAULTS` fields) to `src/lib/geocam/map/joint-residual.ts`; `lakeFloorFactor` to `src/lib/geocam/map/factors.ts`; the concord display's fail-closed `isLowConfidence` to `src/lib/concord/app/confidence.ts`.
+
+Kept on purpose: `src/lib/concord/{core,cues,priors,occl,app}` (`?concord=eye,occl`, and the cue extraction the GA1/GA5 evals use); `src/lib/geocam/{core,map,integrity,priors,lakes}` (GA1 solver, GA5 veto candidate, `geoDecl`/`geoLakeFloor`/`geoLakes`); `scripts/concord/{lib,eval}.ts`, `scripts/geocam/{lib,ga0-audit,ga1-eval,ga1-fixtures,ga5-eval,eval-app-flags}`.

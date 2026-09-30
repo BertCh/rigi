@@ -88,7 +88,7 @@ overlapping photos (`propagate.ts`) is a library, not yet wired into the UI.
 **Other modules.**
 
 - `src/lib/gpu`: an optional WebGPU compute sidecar for the auto-align grid, horizon, look passes, batched deck terrain and eye search. See its README.
-- `src/lib/concord`: whole-image concordance, in progress. See `reports/concordance-research.md`.
+- `src/lib/concord`: whole-image concordance (focal-table eye prior, DSM occluder). See `reports/concordance-research.md`; the killed parts are listed in `reports/negative-results.md`.
 - `src/lib/reveal`: the overlay bloom-in on load.
 - `src/lib/cache`: the tile cache.
 - `src/lib/upload`, `src/lib/export`, `src/lib/pose6dof`: have API READMEs.
@@ -115,7 +115,6 @@ Every flag is declared in `src/lib/flags` (typed, the only reader), carried acro
 | 3110 | Private Vite server for GPU and near-field browser checks (`scripts/gpu/vite.gpu.config.ts`) |
 | 8765 | Matcher (`tools/matcher/server/run.sh`) |
 | 8767 | Near-field service (`tools/nearfield/run.sh`) |
-| 8768 | Concordance re-match service (`tools/concord/rematch/server.py`) |
 
 ## The pose pipeline today
 
