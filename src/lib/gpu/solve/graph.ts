@@ -278,7 +278,7 @@ export async function coarseGraphOnce(
 		if (f & 2) close = true;
 	}
 	if (!g.every(Number.isFinite)) return fallback();
-	if (close) {
+	if (close || o.forceGraphFallback) {
 		// a band threshold f32 cannot call: the old path folds this call in f64 on the CPU
 		const r = await coarseOnce(device, p, o);
 		r.stats.graphFellBack = true;

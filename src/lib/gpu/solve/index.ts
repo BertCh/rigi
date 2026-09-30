@@ -156,6 +156,8 @@ export type CoarseGpuOptions = {
 	 * the single dispatch + CPU fold. Same WGSL, same selection; the result is bit-identical.
 	 */
 	graph?: boolean;
+	/** Graph path, tests only: treat every row as flagged "too close", so the old-path rerun runs. */
+	forceGraphFallback?: boolean;
 	/** Record stats.digest (bench parity of the per-row intervals between paths). */
 	digest?: boolean;
 };

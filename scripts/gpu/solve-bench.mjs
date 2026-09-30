@@ -72,7 +72,8 @@ try {
 				c.twinVsSolvePose &&
 				!c.fellBack &&
 				c.graph.same &&
-				c.graph.sameStress;
+				c.graph.sameStress &&
+				c.graph.forcedFallback;
 			if (!ok) fail++;
 			const warm = c.gpu.slice(1).map((g) => g.ms);
 			console.log(
@@ -83,7 +84,7 @@ try {
 					`(${f(100 * c.gridFraction)}% of solvePose ${f(c.solvePoseMs)} ms) | ` +
 					`GPU cold ${f(c.gpu[0].ms)} warm ${warm.map((x) => f(x)).join("/")} ms ` +
 					`(gpu ${f(c.gpu.at(-1).gpuMs)} select ${f(c.gpu.at(-1).selectMs)}) | ` +
-					`graph=old ${c.graph.same} stress ${c.graph.sameStress} digest ${c.graph.digest} fellBack ${c.graph.graphFellBack} ` +
+					`graph=old ${c.graph.same} stress ${c.graph.sameStress} forcedFallback ${c.graph.forcedFallback} digest ${c.graph.digest} fellBack ${c.graph.graphFellBack} ` +
 					`hz uploads ${c.graph.hzUploads.filter(Boolean).length}/${c.graph.hzUploads.length} read ${c.graph.oldReadBytes}→${c.graph.graphReadBytes} B ` +
 					`med old ${f(c.graph.oldMedMs, 2)} graph ${f(c.graph.graphMedMs, 2)} ms`,
 			);

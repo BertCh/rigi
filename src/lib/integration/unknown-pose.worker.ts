@@ -206,7 +206,9 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 	const coarse: CoarseProvider | undefined = req.solveGpu
 		? async (prior, horizon, sky, o) => {
 				const r = await solveCoarse(prior, horizon, sky, o, {
-					graph: req.gpuGraph,
+					// the command-graph path (GPU row fold, resident horizon profile) unless the page
+					// asked for the pooled paths (gpuGraph: false); the 360° horizon's graph stays opt-in
+					graph: req.gpuGraph !== false,
 				});
 				if (r) on.add(r.on);
 				return r;

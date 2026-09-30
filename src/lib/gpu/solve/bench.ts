@@ -175,6 +175,7 @@ export async function benchPhoto(e: Entry, reps = 3) {
 			graphMs: [] as number[],
 			hzUploads: [] as boolean[],
 			graphFellBack: 0,
+			forcedFallback: false,
 			oldReadBytes: 0,
 			graphReadBytes: 0,
 			digest: "",
@@ -202,6 +203,14 @@ export async function benchPhoto(e: Entry, reps = 3) {
 				graph: true,
 			});
 			cmp.sameStress = same(a, b) && sameStats(a.stats, b.stats);
+		}
+		{
+			// the "too close to call in f32" rerun never triggers on real data: force it
+			const b = await coarseGpu(device, plan, {
+				graph: true,
+				forceGraphFallback: true,
+			});
+			cmp.forcedFallback = !!b.stats.graphFellBack && same(b, cpu);
 		}
 		const med = (x: number[]) =>
 			[...x].sort((p, q) => p - q)[Math.floor(x.length / 2)];
@@ -236,6 +245,7 @@ export async function benchPhoto(e: Entry, reps = 3) {
 			graph: {
 				same: cmp.same,
 				sameStress: cmp.sameStress,
+				forcedFallback: cmp.forcedFallback,
 				digest: cmp.digest,
 				graphFellBack: cmp.graphFellBack,
 				hzUploads: cmp.hzUploads,

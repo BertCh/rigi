@@ -56,7 +56,10 @@ export type UnknownPosePrepare = {
 	gpu?: boolean;
 	/** solvePose's coarse grid on the GPU (src/lib/gpu/solve; identical by construction): gpuEnabled() */
 	solveGpu?: boolean;
-	/** GPU plumbing only: coarse grid and 360° horizon on core command graphs (identical results) */
+	/**
+	 * GPU plumbing only (identical results): true = coarse grid and 360° horizon on core command
+	 * graphs; false = both on the pooled paths; unset = coarse grid on the graph, horizon pooled.
+	 */
 	gpuGraph?: boolean;
 	/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
 	gpuOpts?: RealmGpuOptions;
