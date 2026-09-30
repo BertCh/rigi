@@ -1,7 +1,9 @@
 // Browser self-test of src/lib/gpu/core (scripts/gpu/core-selftest.mjs runs it in headless
 // Chromium): device registry, pool + leases, ring readback, kernels (sync / async / pooled, per-pass
-// bindings), a ComputeGraph with a custom WGSL node feeding GPUReduction, timestamp profiling, and
-// adoptRenderDevice. Every GPU result is compared exactly with a CPU computation.
+// bindings), a ComputeGraph with a custom WGSL node feeding GPUReduction, timestamp profiling,
+// adoptRenderDevice, the worker profile protocol, error checks (and their cost), the idle release and
+// device loss (last: they destroy the sidecar). Every GPU result is compared exactly with a CPU
+// computation.
 import { Buffer, type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import { setFlagOverride } from "#/lib/flags";
@@ -12,6 +14,7 @@ import {
 	getComputeDevice,
 	hasFeature,
 	RAISED_LIMITS,
+	releaseWhenIdle,
 } from "./device";
 import { ComputeGraph } from "./graph";
 import {
@@ -27,16 +30,25 @@ import {
 	uniform,
 	warmKernelsAsync,
 } from "./kernel";
+import { GpuDeviceLostError, idleFor, onLost } from "./lifecycle";
 import { GPUReduction } from "./luma";
 import {
 	acquire,
 	capacityFor,
 	pooledStorage,
 	pooledUniform,
+	poolStats,
 	withLease,
 } from "./pool";
 import { getGpuProfile, resetGpuProfile } from "./profile";
-import { readBack, readbackStats } from "./readback";
+import { GpuValidationError } from "./queue";
+import { readBack, readbackStats, stageReads } from "./readback";
+import {
+	applyRealmGpuOptions,
+	mergeGpuProfile,
+	realmGpuOptions,
+	takeGpuProfile,
+} from "./realm";
 
 type Check = { name: string; ok: boolean; detail?: unknown };
 
@@ -103,6 +115,59 @@ const K_FILL = defineKernel(
 	],
 	{ group: "selftest" },
 );
+
+// a kernel that cannot compile: its pipeline is invalid, so the encoder fails validation
+const K_BAD = defineKernel(
+	"selftest-bad",
+	/* wgsl */ `
+@group(0) @binding(0) var<storage, read_write> out: array<u32>;
+// @workgroup_size(64): tiny test kernel
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g: vec3u) {
+	out[g.x] = no_such_symbol + 1u;
+}`,
+	[["out", "storage"]],
+	{ group: "selftest-bad" },
+);
+// long-running kernel, so a read is still in flight when the device is destroyed
+const K_SPIN = defineKernel(
+	"selftest-spin",
+	/* wgsl */ `
+@group(0) @binding(0) var<storage, read_write> out: array<u32>;
+// @workgroup_size(64): tiny test kernel
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g: vec3u) {
+	var h = g.x;
+	for (var i = 0u; i < 20000u; i++) { h = h * 1664525u + 1013904223u; }
+	out[g.x] = h;
+}`,
+	[["out", "storage"]],
+	{ group: "selftest" },
+);
+
+/** How `p` settles within `ms`: resolved / rejected (with the error's name) / timeout. */
+const settle = async <T>(p: Promise<T>, ms: number) => {
+	const t0 = performance.now();
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const r = await Promise.race([
+		p.then(
+			(value) => ({ state: "resolved" as const, value, error: "" }),
+			(e: Error) => ({
+				state: "rejected" as const,
+				value: undefined,
+				error: `${e?.name}: ${String(e?.message ?? e).slice(0, 160)}`,
+			}),
+		),
+		new Promise<{ state: "timeout"; value: undefined; error: string }>(
+			(res) => {
+				timer = setTimeout(
+					() => res({ state: "timeout", value: undefined, error: "" }),
+					ms,
+				);
+			},
+		),
+	]);
+	clearTimeout(timer);
+	return { ...r, ms: Math.round(performance.now() - t0) };
+};
 
 const u32 = (n: number, f: (i: number) => number) =>
 	Uint32Array.from({ length: n }, (_, i) => f(i) >>> 0);
@@ -552,6 +617,363 @@ export async function coreSelftest(): Promise<{
 				sameBits(r, axpyCpu(x, x, 2).buffer) &&
 				adoptedRenderDevice() === null &&
 				after === device,
+		);
+	});
+
+	await run("realm-profile", async () => {
+		const off = realmGpuOptions();
+		globalThis.__RIGI_GPU_PROFILE__ = true;
+		const on = realmGpuOptions();
+		const k = kernel(device, K_AXPY);
+		const p = uniform(device, new Uint32Array([3, 64]).buffer);
+		const xb = storage(device, 256);
+		const out = storage(device, 256);
+		resetGpuProfile();
+		await readBack(
+			device,
+			(enc) =>
+				dispatch(enc, k, { p, x: xb, y: xb, out }, 1, 1, 1, "selftest-realm"),
+			[{ buffer: out, size: 4 }],
+		);
+		release(p, xb, out);
+		// what a worker sends back: its totals, then cleared
+		const taken = await takeGpuProfile();
+		const left = await getGpuProfile();
+		mergeGpuProfile("selftest-worker", taken);
+		mergeGpuProfile("selftest-worker", undefined);
+		const merged = await getGpuProfile();
+		globalThis.__RIGI_GPU_PROFILE__ = undefined;
+		const none = takeGpuProfile();
+		resetGpuProfile();
+		const g = globalThis as { __RIGI_GPU_CHECKS__?: boolean };
+		applyRealmGpuOptions({ checks: true });
+		const applied = g.__RIGI_GPU_CHECKS__ === true;
+		g.__RIGI_GPU_CHECKS__ = undefined;
+		const timed = hasFeature(device, "timestamp-query");
+		check(
+			"realm-profile",
+			off === undefined &&
+				on?.profile === true &&
+				none === undefined &&
+				applied &&
+				(!timed ||
+					(taken?.["selftest-realm"]?.count === 1 &&
+						!left["selftest-realm"] &&
+						merged["selftest-worker:selftest-realm"]?.count === 1)),
+			{ on, taken, merged },
+		);
+	});
+
+	await run("error-checks", async () => {
+		const g = globalThis as { __RIGI_GPU_CHECKS__?: boolean };
+		const res: Record<string, unknown> = {};
+		const attempt = () =>
+			settle(
+				(async () => {
+					const o = storage(device, new Uint32Array(64).fill(7));
+					try {
+						const [b] = await readBack(
+							device,
+							(enc) => dispatch(enc, kernel(device, K_BAD), { out: o }, 1),
+							[{ buffer: o, size: 256 }],
+						);
+						return new Uint32Array(b)[0];
+					} finally {
+						release(o);
+					}
+				})(),
+				3000,
+			);
+		// a storage binding without STORAGE usage: a bind-group validation error
+		const badBinding = () =>
+			settle(
+				(async () => {
+					const k = kernel(device, K_AXPY);
+					const p = uniform(device, new Uint32Array([1, 64]).buffer);
+					const xb = storage(device, 256);
+					const out = storage(device, 256);
+					try {
+						const [b] = await readBack(
+							device,
+							(enc) => dispatch(enc, k, { p, x: p, y: xb, out }, 1),
+							[{ buffer: out, size: 4 }],
+						);
+						return new Uint32Array(b)[0];
+					} finally {
+						release(p, xb, out);
+					}
+				})(),
+				3000,
+			);
+		g.__RIGI_GPU_CHECKS__ = undefined;
+		const off = await attempt();
+		g.__RIGI_GPU_CHECKS__ = true;
+		const on = await attempt();
+		const onBinding = await badBinding();
+		// a valid kernel under checks: same bits as without
+		const x = u32(1000, (i) => i * 2654435761);
+		const k = kernel(device, K_AXPY);
+		const p = uniform(device, new Uint32Array([9, 1000]).buffer);
+		const xb = storage(device, x);
+		const out = storage(device, 4000);
+		const [good] = await readBack(
+			device,
+			(enc) => dispatch(enc, k, { p, x: xb, y: xb, out }, 16),
+			[{ buffer: out, size: 4000 }],
+		);
+		release(p, xb, out);
+		g.__RIGI_GPU_CHECKS__ = undefined;
+		res.off = off;
+		res.on = on;
+		res.onBinding = onBinding;
+		// the pool / readback state is still usable after the failures
+		const stats = readbackStats(device);
+		check(
+			"error-checks",
+			off.state === "resolved" &&
+				on.state === "rejected" &&
+				on.error.startsWith(GpuValidationError.name) &&
+				onBinding.state === "rejected" &&
+				sameBits(good, axpyCpu(x, x, 9).buffer) &&
+				stats.busy === 0,
+			res,
+		);
+	});
+
+	await run("error-checks-cost", async () => {
+		// the typical small kernel + readback (align's grid is ~2 ms wall): checks off vs on, interleaved
+		const g = globalThis as { __RIGI_GPU_CHECKS__?: boolean };
+		const n = 1 << 14;
+		const k = kernel(device, K_AXPY);
+		const x = u32(n, (i) => i);
+		const once = () =>
+			withLease("selftest-cost", async () => {
+				const p = pooledUniform(
+					device,
+					"selftest-cost/p",
+					new Uint32Array([3, n]),
+				);
+				const xb = pooledStorage(device, "selftest-cost/x", x);
+				const out = pooledStorage(device, "selftest-cost/out", n * 4, {
+					zero: false,
+				});
+				const t = performance.now();
+				await readBack(
+					device,
+					(enc) => dispatch(enc, k, { p, x: xb, y: xb, out }, n / 64),
+					[{ buffer: out, size: n * 4 }],
+				);
+				return performance.now() - t;
+			});
+		const ms: Record<"off" | "on", number[]> = { off: [], on: [] };
+		for (let i = 0; i < 20; i++) await once(); // warm
+		for (let rep = 0; rep < 10; rep++)
+			for (const mode of ["off", "on"] as const) {
+				g.__RIGI_GPU_CHECKS__ = mode === "on";
+				for (let i = 0; i < 20; i++) ms[mode].push(await once());
+			}
+		g.__RIGI_GPU_CHECKS__ = undefined;
+		const med = (a: number[]) => [...a].sort((p, q) => p - q)[a.length >> 1];
+		const mean = (a: number[]) => a.reduce((p, q) => p + q, 0) / a.length;
+		const r = {
+			calls: ms.off.length,
+			medianOff: +med(ms.off).toFixed(3),
+			medianOn: +med(ms.on).toFixed(3),
+			meanOff: +mean(ms.off).toFixed(3),
+			meanOn: +mean(ms.on).toFixed(3),
+		};
+		// negligible: within 0.2 ms (or 15 %) of the unchecked median
+		check(
+			"error-checks-cost",
+			r.medianOn - r.medianOff < Math.max(0.2, 0.15 * r.medianOff),
+			r,
+		);
+	});
+
+	await run("idle-release", async () => {
+		const d = await getComputeDevice();
+		if (!d) throw new Error("no device");
+		// an adopted render device must survive the sidecar's idle release
+		const render: Device = await luma.createDevice({
+			id: "selftest-idle-render",
+			type: "webgpu",
+			adapters: [webgpuAdapter],
+		});
+		adoptRenderDevice(render);
+		releaseWhenIdle(150);
+		// a held lease keeps it alive past the timeout
+		await withLease("selftest-idle", () => sleep(400));
+		const aliveWhileLeased = !d.isLost;
+		await sleep(500);
+		const released = d.isLost;
+		releaseWhenIdle(null);
+		const adoptKept =
+			adoptedRenderDevice() === render &&
+			!render.isLost &&
+			(await getComputeDevice()) === render;
+		render.destroy();
+		await render.lost;
+		const d2 = await getComputeDevice();
+		const x = u32(64, (i) => i * 3);
+		let ok = false;
+		if (d2) {
+			const p = uniform(d2, new Uint32Array([4, 64]).buffer);
+			const xb = storage(d2, x);
+			const out = storage(d2, 256);
+			const [r] = await readBack(
+				d2,
+				(enc) => dispatch(enc, kernel(d2, K_AXPY), { p, x: xb, y: xb, out }, 1),
+				[{ buffer: out, size: 256 }],
+			);
+			release(p, xb, out);
+			ok = sameBits(r, axpyCpu(x, x, 4).buffer);
+		}
+		check(
+			"idle-release",
+			aliveWhileLeased &&
+				released &&
+				adoptKept &&
+				!!d2 &&
+				d2 !== d &&
+				d2 !== render &&
+				ok,
+			{
+				aliveWhileLeased,
+				released,
+				adoptKept,
+				recreated: !!d2 && d2 !== d && d2 !== render,
+				ok,
+			},
+		);
+	});
+
+	await run("device-loss", async () => {
+		const d = await getComputeDevice();
+		if (!d) throw new Error("no device");
+		// warm state on the old device: pooled slots, a readback slot, a cached pipeline
+		const k = kernel(d, K_SPIN);
+		const n = 1 << 20;
+		const o = pooledStorage(d, "selftest-loss/out", n * 4, { zero: false });
+		// a caller holding a lease, with a long kernel in flight
+		const inflight = withLease("selftest-loss", async () => {
+			const enc = d.createCommandEncoder({ id: "selftest-spin" });
+			dispatch(enc, k, { out: o }, n / 64);
+			const s = stageReads(d, enc, [{ buffer: o, size: 1024 }]);
+			submit(d, enc);
+			return s.read();
+		});
+		await sleep(0);
+		const pooledBefore = poolStats(d).slots;
+		d.destroy();
+		// synchronously after destroy(), before d.lost settles: never the lost device
+		const next = getComputeDevice();
+		const read = await settle(inflight, 3000);
+		// the lease was released by the rejection
+		const lease = await settle(
+			withLease("selftest-loss", () => "free"),
+			1000,
+		);
+		// new work on the lost device rejects at once
+		const again = await settle(
+			readBack(d, (enc) => dispatch(enc, k, { out: o }, 1), [
+				{ buffer: o, size: 4 },
+			]),
+			1000,
+		);
+		const d2 = await next;
+		await d.lost;
+		const oldPool = poolStats(d).slots;
+		const oldRing = readbackStats(d).slots;
+		// after the loss fired: a hook registered late still runs (in a microtask), and a caller
+		// that stages reads on the stale device and does not cancel() them when submit() throws
+		// (sky/refine, the look passes) leaks no slot and no in-flight count (idle release stays on)
+		let lateHook = false;
+		onLost(d, () => {
+			lateHook = true;
+		});
+		const staleEnc = d.createCommandEncoder({ id: "selftest-stale" });
+		// (a buffer made on the stale device: the pooled `o` was destroyed with the pool)
+		const staleSrc = d.createBuffer({
+			id: "selftest-stale-src",
+			usage: Buffer.STORAGE | Buffer.COPY_SRC,
+			byteLength: 256,
+		});
+		stageReads(d, staleEnc, [{ buffer: staleSrc, size: 4 }]);
+		const staleBusy = readbackStats(d).busy;
+		let staleThrew = false;
+		try {
+			submit(d, staleEnc);
+		} catch (e) {
+			staleThrew = e instanceof GpuDeviceLostError;
+		}
+		const staleBusyAfter = readbackStats(d).busy;
+		await sleep(5);
+		const late = {
+			lateHook,
+			staleBusy,
+			staleThrew,
+			staleBusyAfter,
+			staleRing: readbackStats(d).slots,
+			idle: idleFor() > 0,
+		};
+		// the new device computes the same as the CPU, from fresh pools / pipelines
+		const x = u32(1000, (i) => i * 7 + 1);
+		let same = false;
+		let fresh = false;
+		if (d2) {
+			const r = await withLease("selftest-axpy", async () => {
+				const p = pooledUniform(
+					d2,
+					"selftest-axpy/p",
+					new Uint32Array([6, 1000]),
+				);
+				const xb = pooledStorage(d2, "selftest-axpy/x", x);
+				const out = pooledStorage(d2, "selftest-axpy/out", 4000, {
+					zero: false,
+				});
+				fresh = !xb.destroyed && kernel(d2, K_AXPY) !== kernel(d, K_AXPY);
+				return readBack(
+					d2,
+					(enc) =>
+						dispatch(enc, kernel(d2, K_AXPY), { p, x: xb, y: xb, out }, 16),
+					[{ buffer: out, size: 4000 }],
+				);
+			});
+			same = sameBits(r[0], axpyCpu(x, x, 6).buffer);
+		}
+		check(
+			"device-loss",
+			read.state === "rejected" &&
+				read.error.startsWith(GpuDeviceLostError.name) &&
+				read.ms < 1000 &&
+				lease.state === "resolved" &&
+				again.state === "rejected" &&
+				!!d2 &&
+				d2 !== d &&
+				!d2.isLost &&
+				pooledBefore > 0 &&
+				oldPool === 0 &&
+				oldRing === 0 &&
+				late.lateHook &&
+				late.staleBusy === 1 &&
+				late.staleThrew &&
+				late.staleBusyAfter === 0 &&
+				late.staleRing === 0 &&
+				late.idle &&
+				fresh &&
+				same,
+			{
+				read: { state: read.state, ms: read.ms, error: read.error },
+				lease: lease.state,
+				again: { state: again.state, error: again.error },
+				newDevice: !!d2 && d2 !== d,
+				pooledBefore,
+				oldPool,
+				oldRing,
+				late,
+				fresh,
+				same,
+			},
 		);
 	});
 

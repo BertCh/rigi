@@ -68,18 +68,31 @@ const STORAGE = Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC;
 // pooled buffer → the array last written into it (the edge-map planes that don't change)
 const resident = new WeakMap<Buffer, Float32Array>();
 
-/** The pooled slot `key` holding `data`, written only if it holds a different array (or grew). */
-function uploadOnce(device: Device, key: string, data: Float32Array): Buffer {
+/** The pooled slot `key` holding `data`, written only if it holds a different array (or grew); `up` counts the bytes. */
+function uploadOnce(
+	device: Device,
+	key: string,
+	data: Float32Array,
+	up: PoseGridStats,
+): Buffer {
 	const b = acquire(device, key, Math.max(16, data.byteLength), STORAGE);
 	if (resident.get(b) !== data) {
 		b.write(data);
 		resident.set(b, data);
-		lastUploadBytes += data.byteLength;
+		up.uploadBytes += data.byteLength;
 	}
 	return b;
 }
 
-/** Bytes written to the GPU by the last scorePoseGridGpu (inputs; the cached edge planes count only when uploaded). */
+export type PoseGridStats = {
+	/** bytes written to the GPU by this grid (inputs; the cached edge planes count only when uploaded) */
+	uploadBytes: number;
+};
+
+/**
+ * Bytes written to the GPU by the last scorePoseGridGpu to finish. Racy with concurrent grids: pass
+ * `stats` to scorePoseGridGpu instead (filled under the lease, for that call only).
+ */
 export let lastUploadBytes = 0;
 
 /**
@@ -89,6 +102,7 @@ export let lastUploadBytes = 0;
  *
  * `edge.coarse` and `edge.fg` must not be modified in place after the first call with this edge map
  * (buildEdgeMap never does); `edge.skyCum` may be (fitPriorSky), it is re-uploaded every call.
+ * `stats` (optional) receives this call's upload bytes.
  */
 export function scorePoseGridGpu(
 	device: Device,
@@ -97,10 +111,18 @@ export function scorePoseGridGpu(
 	dirs: Float32Array,
 	edge: EdgeMap,
 	stride = 3,
+	stats?: PoseGridStats,
 ): Promise<Float32Array> {
-	return withLease(ALIGN_GROUP, () =>
-		scoreOnce(device, poses, aspect, dirs, edge, stride),
-	);
+	return withLease(ALIGN_GROUP, async () => {
+		const up: PoseGridStats = { uploadBytes: 0 };
+		try {
+			return await scoreOnce(device, poses, aspect, dirs, edge, stride, up);
+		} finally {
+			// written while the lease is still held: no other grid's bytes can land in between
+			lastUploadBytes = up.uploadBytes;
+			if (stats) stats.uploadBytes = up.uploadBytes;
+		}
+	});
 }
 
 async function scoreOnce(
@@ -110,8 +132,8 @@ async function scoreOnce(
 	dirs: Float32Array,
 	edge: EdgeMap,
 	stride: number,
+	up: PoseGridStats,
 ): Promise<Float32Array> {
-	lastUploadBytes = 0;
 	const nPoses = poses.length;
 	if (!nPoses) return new Float32Array(0);
 	const { w, h } = edge;
@@ -152,12 +174,12 @@ async function scoreOnce(
 		u: pooledUniform(device, "align/u", uw),
 		poses: pooledStorage(device, "align/poses", pose4),
 		dirs: pooledStorage(device, "align/dirs", dirs4),
-		coarse: uploadOnce(device, "align/coarse", edge.coarse),
-		fg: uploadOnce(device, "align/fg", edge.fg),
+		coarse: uploadOnce(device, "align/coarse", edge.coarse, up),
+		fg: uploadOnce(device, "align/fg", edge.fg, up),
 		skyCum: pooledStorage(device, "align/skycum", edge.skyCum),
 		scores: acquire(device, "align/scores", nPoses * 4, STORAGE),
 	};
-	lastUploadBytes +=
+	up.uploadBytes +=
 		32 + pose4.byteLength + dirs4.byteLength + edge.skyCum.byteLength;
 	const enc = device.createCommandEncoder({ id: "align-pose-grid" });
 	dispatch(enc, kernel(device, POSE_GRID), bindings, nPoses);

@@ -266,7 +266,7 @@ const fullOpts = (o: SolveOptions): SolveOptions => ({
 		o.acceptConfidence ?? o.fullSearchConfidence ?? FULL_SEARCH_CONFIDENCE,
 });
 
-const DEFAULT_SIGMA = { yaw: 15, pitch: 1.5, roll: 1.5, focal: 0.06 };
+export const DEFAULT_SIGMA = { yaw: 15, pitch: 1.5, roll: 1.5, focal: 0.06 };
 const FULL_SEARCH_CONFIDENCE = 0.75;
 
 function solveOnce(
@@ -308,6 +308,91 @@ function solveOnce(
 	);
 }
 
+/** Everything the coarse grid reads, in float64 (src/lib/gpu/solve uploads it to the GPU). */
+export type CoarsePlan = {
+	horizon: HorizonProfile;
+	/** coarse observations (every 2nd usable column): azimuth / elevation under cam0 (deg), weight */
+	az: number[];
+	el: number[];
+	w: number[];
+	/** Σw, summed in observation order */
+	wSum: number;
+	/** truncated-L1 cutoff, deg */
+	trunc: number;
+	/** the yaw and pitch offsets, accumulated step by step */
+	dys: number[];
+	dps: number[];
+	sigmaYaw: number;
+	sigmaPitch: number;
+};
+
+/**
+ * solveOnce's coarse-grid inputs for (prior, sky, opts), where `opts` are the options solveOnce
+ * itself receives. null where solveOnce returns "no-skyline" before the grid.
+ */
+export function planCoarse(
+	prior: Camera,
+	horizon: HorizonProfile,
+	sky: SkylineRows,
+	opts: SolveOptions = {},
+): CoarsePlan | null {
+	const obs = observations(sky, 1);
+	if (obs.length < sky.width * 0.1) return null;
+	return coarsePlan(resizeCamera(prior, sky.width), horizon, obs, opts);
+}
+
+function coarsePlan(
+	cam0: Camera,
+	horizon: HorizonProfile,
+	obs: Obs[],
+	opts: SolveOptions,
+): CoarsePlan {
+	const yawRange = opts.yawRange ?? 25;
+	const pitchRange = opts.pitchRange ?? 3;
+	const sigma = opts.sigma ?? DEFAULT_SIGMA;
+	const coarse = obs.filter((_, i) => i % 2 === 0);
+	const ae = coarse.map((o) => azimuthElevation(unproject(cam0, o.x, o.y)));
+	const az = ae.map((v) => v[0]);
+	const el = ae.map((v) => v[1]);
+	const w = coarse.map((o) => o.w);
+	const degPerPx = 1 / (cam0.f * DEG);
+	const trunc = 12 * degPerPx; // truncated-L1 cutoff: ~12 px
+	const yawStep = Math.max(0.1, 1.5 * degPerPx);
+	const pitchStep = Math.max(0.1, 1.5 * degPerPx);
+	const wSum = coarse.reduce((s, o) => s + o.w, 0);
+	const dys: number[] = [];
+	for (let dy = -yawRange; dy <= yawRange + 1e-9; dy += yawStep) dys.push(dy);
+	const dps: number[] = [];
+	for (let dp = -pitchRange; dp <= pitchRange + 1e-9; dp += pitchStep)
+		dps.push(dp);
+	return {
+		horizon,
+		az,
+		el,
+		w,
+		wSum,
+		trunc,
+		dys,
+		dps,
+		sigmaYaw: sigma.yaw,
+		sigmaPitch: sigma.pitch,
+	};
+}
+
+/** The coarse grid's cost at (dYaw, dPitch): truncated L1 on the small-angle shift plus the priors. */
+export function coarseCost(p: CoarsePlan, dy: number, dp: number) {
+	const { az, el, w, horizon, trunc } = p;
+	let c = 0;
+	for (let i = 0; i < az.length; i++) {
+		const r = Math.abs(el[i] + dp - horizonAt(horizon, az[i] + dy));
+		c += w[i] * Math.min(r, trunc);
+	}
+	return (
+		c / p.wSum +
+		0.02 * trunc * ((dy / p.sigmaYaw) ** 2 + (dp / p.sigmaPitch) ** 2)
+	);
+}
+
 /** Coarse: small-angle grid over (dYaw, dPitch); src/lib/gpu/solve is its GPU twin. */
 function coarseStage(
 	cam0: Camera,
@@ -315,32 +400,14 @@ function coarseStage(
 	obs: Obs[],
 	opts: SolveOptions,
 ): CoarseStage {
-	const yawRange = opts.yawRange ?? 25;
-	const pitchRange = opts.pitchRange ?? 3;
-	const sigma = opts.sigma ?? DEFAULT_SIGMA;
-	const coarse = obs.filter((_, i) => i % 2 === 0);
-	const ae = coarse.map((o) => azimuthElevation(unproject(cam0, o.x, o.y)));
-	const degPerPx = 1 / (cam0.f * DEG);
-	const trunc = 12 * degPerPx; // truncated-L1 cutoff: ~12 px
-	const yawStep = Math.max(0.1, 1.5 * degPerPx);
-	const pitchStep = Math.max(0.1, 1.5 * degPerPx);
-	const wSum = coarse.reduce((s, o) => s + o.w, 0);
-	const coarseCost = (dy: number, dp: number) => {
-		let c = 0;
-		for (let i = 0; i < ae.length; i++) {
-			const r = Math.abs(ae[i][1] + dp - horizonAt(horizon, ae[i][0] + dy));
-			c += coarse[i].w * Math.min(r, trunc);
-		}
-		return (
-			c / wSum +
-			0.02 * trunc * ((dy / sigma.yaw) ** 2 + (dp / sigma.pitch) ** 2)
-		);
-	};
+	const p = coarsePlan(cam0, horizon, obs, opts);
 	const yawCosts: { dy: number; dp: number; c: number }[] = [];
-	for (let dy = -yawRange; dy <= yawRange + 1e-9; dy += yawStep) {
+	for (let iy = 0; iy < p.dys.length; iy++) {
+		const dy = p.dys[iy];
 		let best = { dy, dp: 0, c: Number.POSITIVE_INFINITY };
-		for (let dp = -pitchRange; dp <= pitchRange + 1e-9; dp += pitchStep) {
-			const c = coarseCost(dy, dp);
+		for (let j = 0; j < p.dps.length; j++) {
+			const dp = p.dps[j];
+			const c = coarseCost(p, dy, dp);
 			if (c < best.c) best = { dy, dp, c };
 		}
 		yawCosts.push(best);

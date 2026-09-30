@@ -2,7 +2,10 @@
 // Run a playwright script with GPU timestamp profiling on in every page it opens
 // (globalThis.__RIGI_GPU_PROFILE__ = true, read by src/lib/gpu/core/profile.ts), and collect each
 // page's getGpuProfile() before it navigates or closes. Totals (summed over pages) go to PROFILE_OUT.
-// Only the page realm is profiled: kernels run inside workers keep their own totals and are missed.
+// Kernels in the app's GPU workers (horizon-fast-app, unknown-pose, eye suggest) are included: the
+// page forwards the switch on the worker messages and merges each worker's report into its own
+// profile as "<realm>:<label>" (src/lib/gpu/core/realm.ts). `realms` sums gpuMs / count per realm.
+// A worker whose result never came back (terminated early) is missed.
 // Usage: PROFILE_OUT=out/gpu/core/profile/horizon.json node scripts/gpu/with-gpu-profile.mjs scripts/gpu/horizon-bench.mjs …
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -24,8 +27,25 @@ const save = () => {
 	mkdirSync(dirname(resolve(OUT)), { recursive: true });
 	writeFileSync(
 		resolve(OUT),
-		JSON.stringify({ script, args: rest, pages, kernels: totals }, null, 1),
+		JSON.stringify(
+			{ script, args: rest, pages, realms: byRealm(), kernels: totals },
+			null,
+			1,
+		),
 	);
+};
+const byRealm = () => {
+	const r = {};
+	for (const [k, v] of Object.entries(totals)) {
+		const realm = /^[\w-]+-worker:/.test(k)
+			? k.slice(0, k.indexOf(":"))
+			: "page";
+		const t = r[realm] ?? { gpuMs: 0, count: 0 };
+		t.gpuMs += v.gpuMs;
+		t.count += v.count;
+		r[realm] = t;
+	}
+	return r;
 };
 // Read this document's totals. Importing the module in a page that never loaded it just yields {}.
 const flush = async (page) => {

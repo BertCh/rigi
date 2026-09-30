@@ -11,6 +11,7 @@
 // uses arrayLength()), and holds the previous call's bytes, so zero it (`zero: true` or clear())
 // when a kernel relies on a fresh buffer being zero, as look/kernel.ts's storage(device, n) did.
 import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
+import { busy, done as notBusy, onLost } from "./lifecycle";
 
 type Entry = { buffer: Buffer; retired: Buffer[] };
 type Pool = Map<string, Entry>;
@@ -23,7 +24,7 @@ function poolOf(device: Device): Pool {
 	if (!p) {
 		const created: Pool = new Map();
 		pools.set(device, created);
-		device.lost.then(() => destroyPool(device, created));
+		onLost(device, () => destroyPool(device, created));
 		p = created;
 	}
 	return p;
@@ -174,9 +175,11 @@ export function withLease<T>(
 	tails.set(key, tail);
 	return prev.then(async () => {
 		active.add(key);
+		busy();
 		try {
 			return await fn();
 		} finally {
+			notBusy();
 			active.delete(key);
 			destroyRetired((k) => covers(key, k));
 			if (tails.get(key) === tail) tails.delete(key);

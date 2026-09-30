@@ -18,6 +18,12 @@
 import { tilePriority } from "#/lib/cache";
 import { fetchDemBytes, MAPTERHORN, type TileKey, tileId } from "#/lib/dem";
 import { REFRACTION_K } from "#/lib/geodesy";
+import {
+	type GpuProfile,
+	mergeGpuProfile,
+	type RealmGpuOptions,
+	realmGpuOptions,
+} from "#/lib/gpu/core/realm";
 import { gpuHorizonOptIn } from "#/lib/gpu/horizon/opt-in";
 import {
 	LITE_RINGS,
@@ -36,6 +42,8 @@ export type HorizonWorkerIn =
 			spans: SectorSpan[];
 			/** March on the GPU (src/lib/gpu/horizon) when the worker gets a WebGPU device. Opt-in: gpuHorizonOptIn(). */
 			gpu?: boolean;
+			/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
+			gpuOpts?: RealmGpuOptions;
 	  }
 	| {
 			type: "tile";
@@ -65,7 +73,14 @@ export type HorizonStats = {
 };
 
 export type HorizonWorkerOut =
-	| { type: "dirs"; eyeH: number; dirs: Float32Array; stats: HorizonStats }
+	| {
+			type: "dirs";
+			eyeH: number;
+			dirs: Float32Array;
+			stats: HorizonStats;
+			/** the worker's GPU pass times, when the page profiles (merged as "horizon-worker:…") */
+			gpuProfile?: GpuProfile;
+	  }
 	| { type: "error"; error: string };
 
 type Dirs = Extract<HorizonWorkerOut, { type: "dirs" }>;
@@ -135,6 +150,7 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 	worker.onmessage = (e: MessageEvent<HorizonWorkerOut>) => {
 		const m = e.data;
 		if (m.type === "error") return fail(new Error(m.error));
+		mergeGpuProfile("horizon-worker", m.gpuProfile);
 		results.set(m.eyeH, m);
 		waiters.get(m.eyeH)?.resolve(m);
 		waiters.delete(m.eyeH);
@@ -156,7 +172,12 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 		);
 		// GPU march is opt-in (?gpuHorizon, on by default; see gpu/horizon/opt-in.ts). The switches live in the page
 		// (URL, localStorage), which the worker can't read.
-		post({ type: "spans", spans, gpu: gpuHorizonOptIn() });
+		post({
+			type: "spans",
+			spans,
+			gpu: gpuHorizonOptIn(),
+			gpuOpts: realmGpuOptions(),
+		});
 		const seen = new Set<string>();
 		const keys = spans
 			.flatMap((s) =>

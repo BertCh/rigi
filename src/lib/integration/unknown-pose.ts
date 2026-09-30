@@ -9,6 +9,12 @@
 
 import type { Pose } from "#/lib/camera";
 import { priorHeading } from "#/lib/geocam/priors/heading";
+import {
+	type GpuProfile,
+	mergeGpuProfile,
+	type RealmGpuOptions,
+	realmGpuOptions,
+} from "#/lib/gpu/core/realm";
 import { gpuEnabled } from "#/lib/gpu/device";
 import { unknownGpuOptIn } from "#/lib/gpu/horizon/unknown-opt-in";
 import {
@@ -50,6 +56,8 @@ export type UnknownPosePrepare = {
 	gpu?: boolean;
 	/** solvePose's coarse grid on the GPU (src/lib/gpu/solve; identical by construction): gpuEnabled() */
 	solveGpu?: boolean;
+	/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
+	gpuOpts?: RealmGpuOptions;
 };
 
 export type UnknownPoseRequest = {
@@ -68,6 +76,8 @@ export type UnknownPoseRequest = {
 	gpu?: boolean;
 	/** as UnknownPosePrepare.solveGpu */
 	solveGpu?: boolean;
+	/** as UnknownPosePrepare.gpuOpts */
+	gpuOpts?: RealmGpuOptions;
 };
 
 export type UnknownPoseResult = {
@@ -102,9 +112,13 @@ export type UnknownPoseResult = {
 	solveOn?: "gpu" | "cpu" | "mixed";
 };
 
-export type UnknownPoseResponse =
+export type UnknownPoseResponse = (
 	| { id: number; ok: true; result: UnknownPoseResult }
-	| { id: number; ok: false; error: string };
+	| { id: number; ok: false; error: string }
+) & {
+	/** the worker's GPU pass times, when the page profiles (merged as "unknown-pose-worker:…") */
+	gpuProfile?: GpuProfile;
+};
 
 const WORK_WIDTH = 800; // as scripts/eval.ts
 let seq = 0;
@@ -130,6 +144,7 @@ export class UnknownPoseSolver {
 			{ type: "module" },
 		);
 		this.worker.onmessage = (ev: MessageEvent<UnknownPoseResponse>) => {
+			mergeGpuProfile("unknown-pose-worker", ev.data.gpuProfile);
 			const p = this.pending.get(ev.data.id);
 			if (!p) return;
 			this.pending.delete(ev.data.id);
@@ -145,6 +160,7 @@ export class UnknownPoseSolver {
 			alt: photo.alt,
 			gpu: this.gpu,
 			solveGpu: this.solveGpu,
+			gpuOpts: realmGpuOptions(),
 		};
 		this.worker.postMessage(prep);
 	}
@@ -207,6 +223,7 @@ export class UnknownPoseSolver {
 				image: { width: w, height: h, data },
 				gpu: this.gpu,
 				solveGpu: this.solveGpu,
+				gpuOpts: realmGpuOptions(),
 			};
 			this.worker.postMessage(req, [data.buffer]);
 		});

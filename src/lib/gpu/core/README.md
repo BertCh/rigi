@@ -15,8 +15,10 @@ Self-test: `node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/core-selft
 | `pool.ts` | A persistent grow-only buffer pool (per device), `withLease` for serialising async callers, and `clear` / `range` |
 | `readback.ts` | Ring readback: staged copies into reusable MAP_READ slots on the caller's encoder, one map per read |
 | `kernel.ts` | `defineKernel` / `kernel` / `kernelAsync` / `dispatch`, with bindings set per pass. A superset of `look/kernel.ts` |
-| `queue.ts` | `submit(device, enc)`: finishes and submits the encoder, then runs the pool and profiler hooks |
-| `profile.ts` | Opt-in GPU timestamp profiling (`globalThis.__RIGI_GPU_PROFILE__ = true`) and `getGpuProfile()` |
+| `queue.ts` | `submit(device, enc)`: finishes and submits the encoder, then runs the pool and profiler hooks. Opt-in error checks (`__RIGI_GPU_CHECKS__`) |
+| `profile.ts` | Opt-in GPU timestamp profiling (`globalThis.__RIGI_GPU_PROFILE__ = true`) and `getGpuProfile()`, including the GPU workers' reports |
+| `realm.ts` | The page → worker protocol for the profiling / error-check switches, and the worker → page profile report. Import-light (no luma runtime) |
+| `lifecycle.ts` | `untilLost`, `onLost` and the activity counters behind the idle release. No luma runtime |
 | `graph.ts` | `ComputeGraph`, a thin wrapper over `GPUCommandGraph` for multi-pass pipelines with GPU-resident intermediates |
 | `selftest.ts` | `coreSelftest()` for the browser, which exercises all of the above against CPU results |
 
@@ -33,6 +35,7 @@ export function getComputeDevice(): Promise<Device | null>;          // adopted 
 export function adoptRenderDevice(device: Device | null | undefined): void; // WebGPU only; WebGL/null ignored; loss un-adopts
 export const adoptedRenderDevice: () => Device | null;
 export function resetComputeDevice(opts?: { destroy?: boolean }): void;
+export function releaseWhenIdle(ms: number | null): void;            // destroy the sidecar after ms without GPU use
 export function hasFeature(device: Device | null | undefined, feature: ComputeFeature): boolean;
 
 // pool.ts
@@ -50,14 +53,31 @@ export function poolStats(device: Device): { slots: number; bytes: number };
 
 // readback.ts
 export type ReadRange = { buffer: Buffer; offset?: number; size: number };  // offset % 4 == 0
-export type StagedRead = { read: () => Promise<ArrayBuffer[]>; cancel: () => void };
+export type StagedRead = { read: () => Promise<ArrayBuffer[]>; cancel: () => void };  // a throwing core submit() cancels
 export function stageReads(device: Device, enc: CommandEncoder, ranges: ReadRange[]): StagedRead;
 export function readBack(device: Device, build: (enc: CommandEncoder) => unknown, ranges?: ReadRange[],
   opts?: { id?: string }): Promise<ArrayBuffer[]>;                   // ranges ?? (ReadRange[] returned by build)
 export function readbackStats(device: Device): { slots: number; busy: number; bytes: number };
 
-// queue.ts (also re-exported from kernel.ts)
-export function submit(device: Device, enc: CommandEncoder): void;
+// queue.ts (submit is also re-exported from kernel.ts)
+export function submit(device: Device, enc: CommandEncoder): void;  // throws GpuDeviceLostError on a lost device
+export function cancelIfSubmitFails(enc: CommandEncoder, cancel: () => void): void; // stageReads registers here
+export const submitted: (enc: CommandEncoder) => Promise<void>;     // rejects GpuValidationError if a checked submit failed
+export const errorChecks: () => boolean;                            // globalThis.__RIGI_GPU_CHECKS__ === true
+export class GpuValidationError extends Error { readonly kind: "validation" | "out-of-memory" }
+
+// lifecycle.ts
+export class GpuDeviceLostError extends Error {}
+export function untilLost<T>(device: Device, p: Promise<T>): Promise<T>;       // rejects as soon as device is lost
+export function onLost(device: Device, fn: () => void): void;              // once; in a microtask if already lost
+export const touch: () => void; export const busy: () => void; export const done: () => void; // realm activity
+export const idleFor: () => number;                                  // ms since last use; 0 while work is in flight
+
+// realm.ts
+export type RealmGpuOptions = { profile?: true; checks?: true };
+export function realmGpuOptions(): RealmGpuOptions | undefined;      // page: undefined when all off
+export function applyRealmGpuOptions(o: RealmGpuOptions | undefined): void; // worker
+export { takeGpuProfile, mergeGpuProfile } from "./profile";
 
 // kernel.ts
 export type BindKind = "uniform" | "storage" | "read-only-storage";
@@ -89,6 +109,9 @@ export function passProps(device: Device, label: string): ComputePassProps;     
 export function recordGpuTime(label: string, ms: number): void;
 export function getGpuProfile(): Promise<GpuProfile>;
 export function resetGpuProfile(): void;
+export const profileRequested: () => boolean;
+export function takeGpuProfile(): Promise<GpuProfile> | undefined;   // worker: totals, then cleared; undefined when off
+export function mergeGpuProfile(realm: string, p: GpuProfile | undefined): void; // page: adds `${realm}:${label}`
 
 // graph.ts
 export type GraphBinding = GraphBufferHandle | GraphDataView;
@@ -149,11 +172,16 @@ Numerics do not change. The WGSL, the shader module, the explicit shader layout 
 - **Why readback does not use `GPUReadbackRing`.** Its slots have one fixed byte length and `acquire()` waits when every slot is busy. Our readback sizes vary per call (and per photo), so `readback.ts` implements the same ticket pattern (reserve, copy on the caller's encoder, submit, map, return the slot) with grow-on-demand slots. Up to 4 idle slots are kept per device. The ring is still re-exported from `luma.ts` for fixed-size streaming readbacks.
 - **Async pipelines.** luma 9.4 has no async pipeline creation. `kernelAsync` calls the raw `GPUDevice.createComputePipelineAsync` on the luma shader's module (layout `auto`) and passes the resulting `handle` into `device.createComputePipeline`. The self-test checks that the sync and async pipelines give bit-identical output.
 - **Profiling.** Each profiled pass gets its own pooled 2-slot `timestamp` QuerySet. The durations are read after `submit()`. Graph runs use the encoder's `timeProfilingQuerySet` and report under `<graphId>/<nodeId>`. Chromium quantises timestamps (about 65 µs steps on this Mac), so a single small pass can read as 0 ms: sum over many calls.
+- **Worker profiling.** Kernels in the GPU workers run in their own realm. The worker clients put `realmGpuOptions()` on a message they already send (`spans` for horizon-fast-app, `prepare` / `solve` for unknown-pose, the eye search request); it is `undefined` unless the page profiles or checks, so nothing changes by default. The worker calls `applyRealmGpuOptions`, and attaches `takeGpuProfile()` to its result (`dirs`, the solve response, `done` / `error`); the client merges it as `horizon-worker:…`, `unknown-pose-worker:…`, `eye-worker:…`. `scripts/gpu/with-gpu-profile.mjs` therefore reports worker kernels too, with per-realm sums under `realms`. A worker terminated before it answered is missed.
+- **Error checks.** WebGPU validation and OOM errors are asynchronous, so without checks a broken kernel resolves whatever its output buffer held. With `globalThis.__RIGI_GPU_CHECKS__ = true` (forwarded to the workers like profiling), `submit()` wraps `finish()` + `queue.submit()` in `validation` and `out-of-memory` error scopes. Encoder errors (invalid pipeline, bind group, destroyed or failed buffers used by a pass) surface at `finish()`, so one scope covers every dispatch on the encoder. Every staged read of that encoder (`readBack`, `stage`, `stageReads`, `ComputeGraph.run`) then rejects with `GpuValidationError`, and callers take their CPU path. Outputs that stay on the GPU can await `submitted(enc)`. Errors raised outside the encoder (e.g. `createBuffer` OOM) still reach the buffer's first use. Cost: see the self-test's `error-checks-cost`. It stays opt-in until the cost is confirmed in the app benches.
+- **Device loss.** `submit()` throws `GpuDeviceLostError` on a lost device. Staged reads, timestamp reads, `readTimings` and async pipeline builds race the device's `lost` promise, so work in flight rejects promptly (and releases its lease) instead of waiting on a map that may never settle. Pools, readback slots, kernel caches and profiler query sets drop themselves on loss (`onLost`, which also runs hooks registered after the loss, so state recreated on a stale device reference is dropped too). When `submit()` throws, it cancels the reads staged on that encoder, so their slots and the realm's in-flight count are returned even if the caller does not `cancel()`. `getComputeDevice()` never returns a lost device: it notices `isLost` synchronously (luma sets it in `destroy()`) and creates a new sidecar, up to 3 losses per realm; after that the realm stays on the CPU. Resets and idle releases are not counted as losses.
+- **Idle release.** `releaseWhenIdle(ms)` destroys the realm's sidecar after `ms` without `getComputeDevice()` / `submit()`, never while a lease is held or a readback is in flight. It forgets only the sidecar; an adopted render device stays adopted. The unknown-pose worker uses 30 s (it lives as long as the photo, but uses the GPU in bursts). The one-shot workers (horizon-fast-app, eye) are terminated after their job, which frees their device anyway.
+- **Devices per realm (typical `/photo` load).** The page's sidecar, one in the horizon-fast-app worker (created on the `spans` message so creation overlaps the tile work; terminated after the march), and one in the unknown-pose worker (created on `prepare` to warm the solve kernel while the scene loads; terminated after the second opinion, or released after 30 s idle when it is kept for an unknown-pose photo). The eye worker (`?eyesearch`) adds one while a search runs. ONNX Runtime's webgpu EP creates its own in the sky worker when sky segmentation runs; it is outside this registry. Nothing creates a device on import.
 - **Graph.** `ComputeGraph.run` holds a lease on `graph:<id>`, because transients and timestamp slots are shared between runs. A `GraphDataView` is bound with its exact byte range, and its `byteOffset` must be a multiple of 256 (the storage-binding offset alignment). Only imported buffers can be read back.
 
 ## Self-test result (2026-09-30, Apple GPU, headless Chromium)
 
-13/13 checks pass in about 90 ms:
+18/18 checks pass in about 1.2 s (2026-09-30 core fix round; the 13 below plus realm-profile, error-checks, error-checks-cost, idle-release incl. an adopted device surviving it, device-loss incl. late onLost hooks and a stale-device submit that leaks no slot):
 - device, features and limits
 - `gpu=off`
 - pool

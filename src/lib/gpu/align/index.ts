@@ -24,7 +24,7 @@ import {
 import type { Pose } from "#/lib/camera";
 import { getComputeDevice } from "#/lib/gpu/core/device";
 import {
-	lastUploadBytes,
+	type PoseGridStats,
 	scorePoseGridGpu,
 	warmPoseGridAsync,
 } from "./pose-grid";
@@ -96,9 +96,20 @@ export async function autoAlignAsync(
 	const tg = performance.now();
 	try {
 		const { poses } = coarseGridPoses(prior, yawRange);
-		const scores = await scorePoseGridGpu(device, poses, aspect, dirs, edge, 3);
+		// this call's own upload stat, filled inside the lease (a module global read here could
+		// already hold a concurrent grid's bytes)
+		const st: PoseGridStats = { uploadBytes: 0 };
+		const scores = await scorePoseGridGpu(
+			device,
+			poses,
+			aspect,
+			dirs,
+			edge,
+			3,
+			st,
+		);
 		grid = { scores, tol: GRID_TOL, skyFitted: true };
-		uploadBytes = lastUploadBytes;
+		uploadBytes = st.uploadBytes;
 	} catch (e) {
 		error = String(e);
 		console.warn("[gpu] autoAlign grid failed, using the CPU", e);

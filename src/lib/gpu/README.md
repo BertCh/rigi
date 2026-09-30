@@ -19,7 +19,7 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
   `GraphDataView` and the rest from there. A luma 10 bump should touch this file plus the
   workarounds its header lists. We stay on luma 9.4.2 for now: deck 10 is not published, and
   10.0.0-alpha.2 has broken packaging.
-- **Kernel modules** (`horizon/`, `align/`, `look/`, `eye/`, `skyglobal/`, `solve/`): each defines
+- **Kernel modules** (`horizon/`, `align/`, `look/`, `eye/`, `skyglobal/`, `solve/`, `sky/`): each defines
   its WGSL with `core/kernel` `defineKernel`, pools its buffers under its own lease, submits through
   `core/queue` and reads back through `core/readback`.
 - **`device.ts`** re-exports `core/device`. This is the stable import path that callers outside
@@ -90,9 +90,18 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
   - **Contract.** The API note at the top of `look/textures.ts` covers input liveness, `flipY` and
     how long outputs stay valid.
 - **Profiling.** Set `globalThis.__RIGI_GPU_PROFILE__ = true`, then call
-  `getGpuProfile()` (`core/profile`) to get GPU ms per pass label. It covers the current realm only;
-  workers keep their own totals. To profile a whole bench, run it through
-  `scripts/gpu/with-gpu-profile.mjs` with `PROFILE_OUT=…`.
+  `getGpuProfile()` (`core/profile`) to get GPU ms per pass label. The horizon-fast-app,
+  unknown-pose and eye workers get the switch in their messages (`core/realm.ts`) and send their
+  totals back, merged as `<realm>-worker:<label>`; the sky worker does not report yet. To profile a
+  whole bench, run it through `scripts/gpu/with-gpu-profile.mjs` with `PROFILE_OUT=…` (per-realm
+  totals under `realms`).
+- **Error checks.** `globalThis.__RIGI_GPU_CHECKS__ = true` wraps every core `submit()` in
+  validation / out-of-memory error scopes (forwarded to the same workers). A failed submit rejects
+  the encoder's staged reads with `GpuValidationError` and the caller takes its CPU path. Opt-in.
+- **three.js on WebGPU.** `src/lib/three-webgpu/` is a spike (not wired): three 0.186's
+  `WebGPURenderer` with the terrain material in TSL renders on `getComputeDevice().handle`
+  ("sidecar" mode), so the render and compute share one device with the 4 GiB limits. Details and
+  traps in its README.
 
 ## Kernels
 
@@ -103,4 +112,5 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
 | `look/` | relief field, haze fit (radix select, compact readback), guided filter, colour stats (opt-in subgroup path `{subgroups: true}` with a layout check and plain fallback; default plain) (`look-*`). `textures.ts`: texture-input masks / stats / haze prep as `ComputeGraph`s, for the WebGPU renderer | on (`?lookgpu=0`). Texture path not wired yet | `look/**` |
 | `eye/` | batched horizon provider for the pose6dof eye search (uses `horizon/`; no kernel of its own). Async kernel warm-up | suggestion only (`?eyesearch=1`) | `pose6dof/eye.ts` per-eye path |
 | `skyglobal/` | matcher T6 stage-1 skyline grid (`skyglobal-cells` / `-reduce` / `-cands`). A GPU bound pass, then the CPU re-scores the candidates exactly; subgroup REDUCE; count-first readback | service only, behind `T6_GPU_GRID=1` | `tools/matcher/stage1/skyglobal.py` (`skyglobal/cpu.ts` is a TS port. Its polish differs from numpy on 3/50 photos due to libm last-bit differences, so only the grid may replace numpy) |
-| `solve/` | solvePose coarse yaw × pitch grid (`solve-coarse`). The GPU gives certified row bounds, then the CPU re-scores the rows that bounded selection cannot settle, so the result is identical by construction | **on** in the unknown-pose worker (`?gpu=off` = CPU); 60/60 identical in the worker A/B | `solve/cpu.ts` (mirrors `geo/solve.ts` `solveOnce`) |
+| `solve/` | solvePose coarse yaw × pitch grid (`solve-coarse`). The GPU gives certified row bounds, then the CPU re-scores the rows that bounded selection cannot settle, so the result is identical by construction | **on** in the unknown-pose worker (`?gpu=off` = CPU); 60/60 identical in the worker A/B | `geo/solve.ts` `planCoarse` / `coarseCost` (re-exported by `solve/cpu.ts`; one copy of the cost since 2026-09-30) |
+| `sky/` | sky-mask guided-filter refine (`sky-refine`), GPU twin of `sky/refine` `refineToWorking` + `toBytes`. Runs in the sky worker on the device ORT also uses (`sky/model.ts` `shareOrtDevice`), reading the model's output buffer directly and reading back only the byte mask | **on** in the sky worker (page `gpuEnabled()` sent as `gpu`) | `sky/refine.ts` (f64 sums vs f32: ≤ 1.2e-5, ≤ 9 mask bytes of 786k differ by 1; `scripts/gpu/sky-bench.mjs`) |

@@ -166,6 +166,12 @@ export type HazeGpuOptions = {
 	 * before (kept for the bench; the result is the same).
 	 */
 	compact?: boolean;
+	/**
+	 * Test hook (compact only): list slots in the first readback instead of the 0.27·N + 512
+	 * estimate. A small value forces the second, exact-length tail read (the bench checks it gives
+	 * the very same fit).
+	 */
+	listHead?: number;
 };
 
 /** One (bin, channel)'s candidate pixels in pixel order: indices and their lin values. */
@@ -198,6 +204,7 @@ function prepGpu(
 	fgRad: number,
 	skyIdx: Uint32Array,
 	compact: boolean,
+	listHead?: number,
 ): Promise<Prep> {
 	const N = W * H;
 	// the box footprints, in f64 as the CPU
@@ -393,7 +400,10 @@ function prepGpu(
 		}
 		// the lists hold ~8 % of the binned pixels per channel (+ ties): read a guess with the rest,
 		// then whatever did not fit
-		const guess = Math.min(3 * N, Math.ceil(0.27 * N) + 512);
+		const guess = Math.min(
+			3 * N,
+			Math.max(1, Math.floor(listHead ?? Math.ceil(0.27 * N) + 512)),
+		);
 		head.push(
 			{ buffer: starts, size: (LISTS + 1) * 4 },
 			{ buffer: outIdx, size: guess * 4 },
@@ -641,6 +651,7 @@ export async function fitHazeGpu(
 		fgRad,
 		skyIdx,
 		opts.compact ?? true,
+		opts.listHead,
 	);
 	const t2 = performance.now();
 

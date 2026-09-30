@@ -4,8 +4,14 @@
 //
 // When on, each profiled compute pass gets a 2-slot timestamp QuerySet (pooled per device); after
 // core submit() the durations are read asynchronously and summed per label. getGpuProfile() gives
-// { [label]: { gpuMs, count } } in this realm (workers keep their own).
+// { [label]: { gpuMs, count } } for this realm plus the GPU workers' reports merged into it.
+//
+// Workers: kernels in the app's GPU workers (horizon-fast-app, unknown-pose, eye suggest) run in
+// their own realm. core/realm.ts carries the page's switch to them on their existing messages; each
+// worker hands back takeGpuProfile() with its result, and the page's worker client adds it here with
+// mergeGpuProfile(realm, p) as `${realm}:${label}` (e.g. "horizon-worker:horizon-march").
 import type { ComputePassProps, Device, QuerySet } from "@luma.gl/core";
+import { onLost, untilLost } from "./lifecycle";
 
 declare global {
 	var __RIGI_GPU_PROFILE__: boolean | undefined;
@@ -38,6 +44,10 @@ export function passProps(device: Device, label: string): ComputePassProps {
 	if (!p) {
 		p = [];
 		pending.set(device, p);
+		onLost(device, () => {
+			pending.delete(device);
+			free.delete(device);
+		});
 	}
 	p.push({ label, qs });
 	return {
@@ -63,8 +73,8 @@ export function afterSubmit(device: Device) {
 	if (!p?.length) return;
 	pending.set(device, []);
 	for (const { label, qs } of p) {
-		const r = qs
-			.readTimestampDuration(0, 1)
+		// a lost device may never answer: untilLost keeps getGpuProfile() from waiting forever
+		const r = untilLost(device, qs.readTimestampDuration(0, 1))
 			.then((ms) => recordGpuTime(label, ms))
 			.catch(() => {})
 			.finally(() => {
@@ -90,4 +100,38 @@ export async function getGpuProfile(): Promise<GpuProfile> {
 /** Clear the totals. */
 export function resetGpuProfile() {
 	totals = {};
+}
+
+/** Whether this realm profiles (the page's switch; a worker gets it through core/realm.ts). */
+export const profileRequested = () => globalThis.__RIGI_GPU_PROFILE__ === true;
+
+/**
+ * For a worker's result message: this realm's totals so far, then cleared (so the page never counts
+ * a pass twice). undefined, without waiting on anything, when profiling is off.
+ */
+export function takeGpuProfile(): Promise<GpuProfile> | undefined {
+	if (!profileRequested()) return undefined;
+	return getGpuProfile().then((p) => {
+		for (const k of Object.keys(p)) {
+			const t = totals[k];
+			if (!t) continue;
+			// passes that finished while we waited stay for the next report
+			t.gpuMs -= p[k].gpuMs;
+			t.count -= p[k].count;
+			if (t.count <= 0) delete totals[k];
+		}
+		return p;
+	});
+}
+
+/** Page side: add a worker's report as `${realm}:${label}`. No-op for undefined. */
+export function mergeGpuProfile(realm: string, p: GpuProfile | undefined) {
+	if (!p) return;
+	for (const [label, v] of Object.entries(p)) {
+		const k = `${realm}:${label}`;
+		const t = totals[k] ?? { gpuMs: 0, count: 0 };
+		t.gpuMs += v.gpuMs;
+		t.count += v.count;
+		totals[k] = t;
+	}
 }

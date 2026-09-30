@@ -10,11 +10,25 @@
 //   kernels (and ORT-sized buffers) fit. Numerics are unaffected: limits only gate validation.
 // - hasFeature(device, name) for the optional features kernels may branch on.
 //
+// Device loss: work in flight on a lost device rejects (core/lifecycle.ts untilLost, core/queue.ts
+// submit), and the per-device pools, readback slots, kernel and profiler caches drop themselves. The
+// next getComputeDevice() creates a new sidecar (the registry never hands out a lost device), at
+// most MAX_LOSSES times per realm; after that the realm stays on the CPU.
+// Idle release: releaseWhenIdle(ms) lets a long-lived worker destroy its sidecar after `ms` without
+// GPU use (no lease held, no readback in flight); the next getComputeDevice() recreates it.
+//
+// Devices per realm on a typical /photo load (2026-09-30, out/gpu/followups/core/devices-*.json):
+// the page's sidecar, one in the horizon-fast-app worker (terminated after its march) and one in
+// the unknown-pose worker (the second-opinion solve; terminated after it). The eye worker
+// (?eyesearch) adds one while a search runs; ONNX Runtime's webgpu EP in the sky worker creates its
+// own (outside this registry) when sky segmentation runs.
+//
 // Every caller keeps its CPU twin: null means take the CPU path.
 
 import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import { getFlag } from "#/lib/flags";
+import { idleFor, touch } from "./lifecycle";
 
 /** Optional WebGPU features the sidecar asks for (granted only if the adapter has them). */
 export const COMPUTE_FEATURES = [
@@ -42,28 +56,49 @@ export const gpuEnabled = () =>
 	typeof navigator !== "undefined" &&
 	!!(navigator as { gpu?: unknown }).gpu;
 
+/** Sidecar losses (not resets / idle releases) after which the realm stays on the CPU. */
+const MAX_LOSSES = 3;
+
 let pending: Promise<Device | null> | null = null;
+/** The sidecar `pending` resolved to (null while creating). */
+let current: Device | null = null;
 let adopted: Device | null = null;
+let losses = 0;
 
 /**
  * The realm's WebGPU compute device, or null (use the CPU path). Never throws. Returns the adopted
- * render device while it is alive, else the lazily created sidecar.
+ * render device while it is alive, else the lazily created sidecar; never a lost device.
  */
 export function getComputeDevice(): Promise<Device | null> {
 	if (!gpuEnabled()) return Promise.resolve(null);
+	touch();
 	if (adopted && !adopted.isLost) return Promise.resolve(adopted);
+	// lost, and its lost promise not handled yet (luma marks isLost first)
+	if (current?.isLost) lostSidecar(current);
 	if (!pending) {
+		if (losses >= MAX_LOSSES) return Promise.resolve(null);
 		const p = create();
 		pending = p;
-		p.then((device) =>
-			device?.lost.then((info) => {
-				console.warn("[gpu] compute device lost", info);
-				// resetComputeDevice may already have replaced it
-				if (pending === p) pending = null;
-			}),
-		);
+		p.then((device) => {
+			if (pending !== p) return;
+			current = device;
+			device?.lost.then((info) => lostSidecar(device, info));
+			if (device && idleMs !== null) scheduleIdle();
+		});
 	}
 	return pending;
+}
+
+/** Forget the current sidecar after a loss (a reset or idle release forgot it first: not a loss). */
+function lostSidecar(device: Device, info?: unknown) {
+	if (current !== device) return;
+	current = null;
+	pending = null;
+	losses++;
+	console.warn(
+		`[gpu] compute device lost (${losses}/${MAX_LOSSES})`,
+		info ?? "",
+	);
 }
 
 /**
@@ -90,8 +125,42 @@ export const adoptedRenderDevice = (): Device | null =>
 export function resetComputeDevice(opts: { destroy?: boolean } = {}): void {
 	const p = pending;
 	pending = null;
+	current = null;
 	adopted = null;
 	if (opts.destroy && p) p.then((d) => d?.destroy());
+}
+
+let idleMs: number | null = null;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Destroy this realm's sidecar after `ms` without GPU use (getComputeDevice, submit), never while a
+ * lease is held or a readback is in flight; the next getComputeDevice() creates a new one. For
+ * long-lived workers that use the GPU in bursts. The adopted render device is never touched.
+ * null turns it off.
+ */
+export function releaseWhenIdle(ms: number | null): void {
+	idleMs = ms;
+	if (idleTimer) clearTimeout(idleTimer);
+	idleTimer = null;
+	if (ms !== null && current) scheduleIdle();
+}
+
+function scheduleIdle() {
+	if (idleTimer || idleMs === null) return;
+	const wait = Math.max(idleMs - idleFor(), 50);
+	idleTimer = setTimeout(() => {
+		idleTimer = null;
+		if (idleMs === null || !current || current.isLost) return;
+		if (idleFor() < idleMs) return scheduleIdle();
+		// forget only the sidecar: an adopted render device stays adopted
+		const d = current;
+		pending = null;
+		current = null;
+		d.destroy();
+		if (import.meta.env?.DEV)
+			console.info(`[gpu] compute device released after ${idleMs} ms idle`);
+	}, wait);
 }
 
 /** Whether `device` has an optional feature (false for null). */

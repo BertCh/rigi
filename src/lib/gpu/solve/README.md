@@ -14,7 +14,7 @@ The unknown-pose cascade is where the grid gets big: 360° of yaw, and ±15° of
 
 | File | What it does |
 |---|---|
-| `cpu.ts` | `planCoarse` builds solveOnce's inputs (observations, accumulated yaw/pitch grids, truncation, sigmas). `coarseCost` / `coarseRow` score cells and rows exactly. `coarseCpu` is the whole-grid twin. `selectCoarse` / `finish` do solveOnce's selection and ambiguity. `fullSearchOptions` gives the 360° pass's options. |
+| `cpu.ts` | Re-exports `planCoarse` (solveOnce's inputs: observations, accumulated yaw/pitch grids, truncation, sigmas) and `coarseCost` (one cell) from `geo/solve.ts`, which its own `coarseStage` uses, so there is no copy to drift. `coarseRow` scores a row exactly. `coarseCpu` is the whole-grid twin. `selectCoarse` / `finish` do solveOnce's selection and ambiguity. `fullSearchOptions` gives the 360° pass's options. |
 | `coarse.wgsl.ts` | One dispatch. Each workgroup takes one yaw row and one block of 256 pitches, and writes the block's minimum cost plus the first/last pitch within 2.5ε of it. |
 | `index.ts` | `coarseGpu(device, plan)` returns `CoarseResult` + stats. `solveCoarse(prior, horizon, sky, opts)` is the drop-in: GPU when there is a compute device, CPU otherwise, `null` when there is no skyline. Also `warmSolveGpu` and `costBound`. |
 | `bench.ts` | The browser side of `scripts/gpu/solve-bench.mjs`. |
@@ -59,7 +59,7 @@ A cold call, which includes the pipeline compile on the first photo, takes 6–1
 
 1. **`src/lib/geo/solve.ts`** (geo owner):
    - Split `solveOnce` into `coarseStage(cam0, horizon, obs, opts) → { seeds, coarse, ambiguity }`, which is today's code verbatim, and the fine stage, which consumes those three values.
-   - Export `coarseCost`, or the stage itself, so that `cpu.ts` imports it instead of rebuilding it. That removes the only duplicated code here.
+   - Export `coarseCost`, or the stage itself, so that `cpu.ts` imports it instead of rebuilding it. Done (2026-09-30): `planCoarse`, `coarseCost`, `CoarsePlan` and `DEFAULT_SIGMA` are exported and `coarseStage` runs on them.
    - Add `solvePoseAsync(prior, horizon, sky, opts, coarse?)`. It calls `await coarse(prior, horizon, sky, onceOpts)` with the options solveOnce receives. For the 360° pass those are `fullSearchOptions(opts)` (the accept threshold is not part of the coarse stage). It falls back to `coarseStage` when `coarse` resolves `null` or is not given.
    - The sync `solvePose` stays as it is: CPU, and the reference.
 2. **`src/lib/geo/pipeline.ts`**: add `cascadeAsync`, which is `cascade` with `await solvePoseAsync(…, solveCoarse)`. refinePose stays on the CPU. Its FFT correlation (`refine/init.ts`) is already cheap and is not a grid.

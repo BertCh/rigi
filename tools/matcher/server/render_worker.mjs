@@ -258,6 +258,7 @@ async function openPage(id, adhoc = null, key = id) {
 			`page for ${id} has no engine/horizon after load: ${err.replace(/\s+/g, " ")}`,
 		);
 	}
+	if (SKY_GPU) await skyGridWarm(page);
 	const entry = { page };
 	pages.set(key, entry);
 	while (pages.size > MAX_PAGES) await dropPage(pages.keys().next().value);
@@ -410,6 +411,7 @@ async function edges(req) {
 // req.skyGrid = {vfov0, focalKnown, aspect}. → {cands (base64 u32), nYaw, nCombo, nCand, ms, …} or null
 // when WebGPU is missing / ?gpu=off / the list overflowed / anything throws (the caller keeps its CPU grid).
 async function edgesSkyGrid(page, req) {
+	skyGridUsed(page);
 	try {
 		return await page.evaluate(async (o) => {
 			const { getComputeDevice } = await import("/src/lib/gpu/device.ts");
@@ -466,6 +468,56 @@ async function edgesSkyGrid(page, req) {
 		log(`edges skyGrid failed (CPU grid used): ${String(err).slice(0, 300)}`);
 		return null;
 	}
+}
+
+// T6_GPU_GRID=1 only (session mt-image-bc, 2026-09-30; additive, nothing changes without the env): compile
+// the grid's pipelines when a page opens (warmSkyGlobalGpuAsync), and free its pooled GPU buffers
+// (releaseSkyGlobalGpu, ~32 MB: the cells buffer alone is ~24 MB) once no skyGrid request has used the page
+// for SKY_GPU_IDLE_MS. The release runs on the command chain, so never inside a request. Shutdown needs no
+// release: closing Chromium frees everything.
+const SKY_GPU = process.env.T6_GPU_GRID === "1";
+const SKY_GPU_IDLE_MS = Number(process.env.T6_GPU_IDLE_MS ?? 120000);
+const skyGridPages = new Set(); // pages holding the grid's pooled buffers
+let skyGridTimer = null;
+
+async function skyGridWarm(page) {
+	await page
+		.evaluate(async () => {
+			const { getComputeDevice } = await import("/src/lib/gpu/device.ts");
+			const device = await getComputeDevice();
+			if (!device) return;
+			const m = await import("/src/lib/gpu/skyglobal/index.ts");
+			await m.warmSkyGlobalGpuAsync(device);
+		})
+		.catch((err) => log(`skyGrid warm failed: ${String(err).slice(0, 200)}`));
+}
+
+function skyGridUsed(page) {
+	if (!SKY_GPU) return;
+	skyGridPages.add(page);
+	if (skyGridTimer) clearTimeout(skyGridTimer);
+	skyGridTimer = setTimeout(() => {
+		skyGridTimer = null;
+		chain = chain.then(skyGridRelease);
+	}, SKY_GPU_IDLE_MS);
+	skyGridTimer.unref();
+}
+
+async function skyGridRelease() {
+	for (const page of skyGridPages) {
+		skyGridPages.delete(page);
+		if (page.isClosed()) continue;
+		await page
+			.evaluate(async () => {
+				const { getComputeDevice } = await import("/src/lib/gpu/device.ts");
+				const device = await getComputeDevice();
+				if (!device) return;
+				const m = await import("/src/lib/gpu/skyglobal/index.ts");
+				await m.releaseSkyGlobalGpu(device);
+			})
+			.catch(() => {});
+	}
+	log("skyGrid: idle, released the grid's GPU buffers");
 }
 
 // Skyline cue for fusion, exactly as ../export_skyline.mjs: with engine.prior = the request prior (in

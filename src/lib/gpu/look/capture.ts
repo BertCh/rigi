@@ -61,6 +61,8 @@ type Engine = {
 	shared: { uSunDir: { value: { toArray(): number[] } } };
 	look: { setStats: (o: unknown) => void; statsKey: string };
 	layerStats(amount: number): void;
+	/** engine: read the stats layer synchronously (layerStats is otherwise fenced / async) */
+	syncReads: boolean;
 };
 
 const maskAt = (m: SkyMask, u: number, v: number) =>
@@ -189,10 +191,12 @@ export function captureLookInputs(engine: unknown, label = "live"): LookInputs {
 		};
 		// force the render even if these stats were already taken
 		look.statsKey = "";
+		e.syncReads = true;
 		e.layerStats(1);
 	} catch (err) {
 		console.warn("[lookgpu] stats capture failed", err);
 	} finally {
+		e.syncReads = false;
 		look.setStats = orig;
 	}
 	return {

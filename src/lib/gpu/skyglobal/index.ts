@@ -10,10 +10,11 @@
 //
 // Not wired into the service: see the parity / timing report (scripts/gpu/skyglobal-bench.mjs).
 //
-// Plumbing (src/lib/gpu/core): pooled buffers under the "skyglobal" lease (one grid at a time per
-// module, as before), bindings per pass, one core submit. The candidate list is read count-first:
-// the one submit reads the count plus the first `head` slots (sized from the last call's count),
-// and only an unusually long list costs a second, exact-length read of the rest.
+// Plumbing (src/lib/gpu/core): pooled buffers under the "skyglobal" lease (one grid on the GPU at a
+// time, as before; the lease covers the GPU phase only, not the CPU re-score), bindings per pass, one
+// core submit. The candidate list is read count-first: the one submit reads the count plus the first
+// `head` slots (sized from the device's, or the caller's, last count), and only an unusually long
+// list costs a second, exact-length read of the rest.
 import { type Device, Buffer as LumaBuffer } from "@luma.gl/core";
 import {
 	type BindKind,
@@ -104,8 +105,10 @@ export type GridGpuOptions = {
 	zeps?: number;
 	/** candidate list capacity (default max(65536, 32 · nYaw)); overflow → CPU grid */
 	cap?: number;
-	/** candidate slots read with the count in the first readback (default from the last call); a longer list costs a second read */
+	/** candidate slots read with the count in the first readback (default from the last count); a longer list costs a second read */
 	head?: number;
+	/** the caller's own last-count hint for `head` (read, then updated); default: one per device */
+	hint?: { count: number };
 	/** force the shared-memory REDUCE even when the device has subgroups (parity checks) */
 	noSubgroups?: boolean;
 	/** also read back the GPU's point estimates (combo × yaw, float32) for parity reports */
@@ -152,34 +155,57 @@ const key = (slot: string) => `${OWNER}/${slot}`;
 const STORAGE = LumaBuffer.STORAGE | LumaBuffer.COPY_DST | LumaBuffer.COPY_SRC;
 /** Minimum candidate slots read in the first readback (16 KiB); dev fixtures have ~700–800. */
 const HEAD_MIN = 4096;
-// last call's candidate count: sizes the next call's first read (1.5×, so one read nearly always)
-let lastCount = 0;
+// per device, the last grid's candidate count: sizes the next grid's first read (1.5×, so one read
+// nearly always). A caller with its own mix of photos can keep its own hint instead (`o.hint`).
+const lastCounts = new WeakMap<Device, number>();
 
 /** Free the grid's pooled buffers on `device` (the cells buffer alone is nCells × 16 B, ~24 MB). */
 export function releaseSkyGlobalGpu(device: Device) {
 	return withLease(OWNER, () => releasePool(device, `${OWNER}/`));
 }
 
-/** SkyGlobal.gridCpu(g) with the scoring on the GPU; resolves the identical {best, arg}. */
-export function gridGpu(
+/** The grid's inputs, packed on the CPU (no GPU state: built outside the lease). */
+type Packed = {
+	T: ReturnType<SkyGlobal["tables"]>;
+	ub: ArrayBuffer;
+	prof: Float32Array;
+	alpha: Float32Array;
+	vfs: Uint32Array;
+	combos: Float32Array;
+	cap: number;
+};
+
+/** What the GPU phase hands the CPU re-score: the candidate list and the reduction. */
+type GpuOut = {
+	L: Uint32Array;
+	Ru: Uint32Array;
+	count: number;
+	stats: GridGpuStats;
+	dbg: Pick<GridGpuResult, "mid" | "lo" | "hi">;
+};
+
+/**
+ * SkyGlobal.gridCpu(g) with the scoring on the GPU; resolves the identical {best, arg}. The
+ * "skyglobal" lease covers the GPU phase only (buffers, submit, readbacks): the packing before it and
+ * the exact CPU re-score (and any gridCpu fallback, 1–2 s) after it run with the lease released.
+ */
+export async function gridGpu(
 	device: Device,
 	sg: SkyGlobal,
 	g: GridPlan,
 	o: GridGpuOptions = {},
 ): Promise<GridGpuResult> {
-	return withLease(OWNER, () => gridOnce(device, sg, g, o));
+	const t0 = performance.now();
+	const P = pack(sg, g, o);
+	const packMs = performance.now() - t0;
+	const r = await withLease(OWNER, () => gridOnGpu(device, sg, g, o, P));
+	r.stats.uploadMs += packMs;
+	return rescore(sg, g, P, r, t0);
 }
 
-async function gridOnce(
-	device: Device,
-	sg: SkyGlobal,
-	g: GridPlan,
-	o: GridGpuOptions,
-): Promise<GridGpuResult> {
-	const t0 = performance.now();
+function pack(sg: SkyGlobal, g: GridPlan, o: GridGpuOptions): Packed {
 	const nYaw = g.nYaw;
 	const nCombo = g.combos.length;
-	const nCells = nYaw * nCombo;
 	const cap = o.cap ?? Math.max(65536, 32 * nYaw);
 	const T = sg.tables(g);
 	// tables (float64 on the CPU, rounded once to float32)
@@ -236,16 +262,32 @@ async function gridOnce(
 	const uf = new Float32Array(ub);
 	uu.set([sg.w, sg.h, g.n, g.sy, nYaw, nCombo, Math.floor(g.cntMin) + 1, cap]);
 	uf.set([o.eps ?? 5e-3, o.zeps ?? 1e-5, smin, smax], 8);
+	return { T, ub, prof, alpha, vfs, combos, cap };
+}
 
+/** The GPU phase (under the lease): upload, CELLS → REDUCE → CANDS, the count-first readback. */
+async function gridOnGpu(
+	device: Device,
+	sg: SkyGlobal,
+	g: GridPlan,
+	o: GridGpuOptions,
+	P: Packed,
+): Promise<GpuOut> {
+	const t0 = performance.now();
+	const nYaw = g.nYaw;
+	const nCombo = g.combos.length;
+	const nCells = nYaw * nCombo;
+	const { cap } = P;
+	const hint = o.hint ? o.hint.count : (lastCounts.get(device) ?? 0);
 	const head = Math.min(
 		cap,
-		Math.max(1, o.head ?? Math.max(HEAD_MIN, Math.ceil(lastCount * 1.5))),
+		Math.max(1, o.head ?? Math.max(HEAD_MIN, Math.ceil(hint * 1.5))),
 	);
 	const sub = !o.noSubgroups && hasFeature(device, "subgroups");
 
 	// every slot is either fully rewritten (inputs, cells, red) or cleared where it is read (the
 	// list's count word): no stale bytes from the previous call reach a result
-	const u = pooledUniform(device, key("u"), ub);
+	const u = pooledUniform(device, key("u"), P.ub);
 	const S = pooledStorage(device, key("S"), sg.Sc);
 	const cells = acquire(device, key("cells"), nCells * 16, STORAGE);
 	const red = acquire(device, key("red"), nYaw * 16, STORAGE);
@@ -253,10 +295,10 @@ async function gridOnce(
 	const bind = {
 		u,
 		S,
-		prof: pooledStorage(device, key("prof"), prof),
-		alpha: pooledStorage(device, key("alpha"), alpha),
-		vfs: pooledStorage(device, key("vfs"), vfs),
-		combos: pooledStorage(device, key("combos"), combos),
+		prof: pooledStorage(device, key("prof"), P.prof),
+		alpha: pooledStorage(device, key("alpha"), P.alpha),
+		vfs: pooledStorage(device, key("vfs"), P.vfs),
+		combos: pooledStorage(device, key("combos"), P.combos),
 		cells,
 	};
 	const t1 = performance.now();
@@ -294,7 +336,8 @@ async function gridOnce(
 	let reads = 1;
 	const L0 = new Uint32Array(lb);
 	const count = L0[0];
-	lastCount = Math.min(count, cap);
+	if (o.hint) o.hint.count = Math.min(count, cap);
+	else lastCounts.set(device, Math.min(count, cap));
 	// the rest of the list, only when it outgrew `head` (and fits: an overflow falls back anyway)
 	let L = L0;
 	if (count > head && count <= cap) {
@@ -313,7 +356,6 @@ async function gridOnce(
 		reads++;
 	}
 	const t2 = performance.now();
-	const Ru = new Uint32Array(rb);
 	const stats: GridGpuStats = {
 		gpuMs: t2 - t1,
 		uploadMs: t1 - t0,
@@ -327,7 +369,7 @@ async function gridOnce(
 		reads,
 		subgroups: sub,
 	};
-	let dbg: Pick<GridGpuResult, "mid" | "lo" | "hi"> = {};
+	let dbg: GpuOut["dbg"] = {};
 	if (cb) {
 		const C = new Float32Array(cb);
 		const mid = new Float32Array(nCells);
@@ -340,6 +382,20 @@ async function gridOnce(
 		}
 		dbg = { mid, lo, hi };
 	}
+	return { L, Ru: new Uint32Array(rb), count, stats, dbg };
+}
+
+/** The CPU phase (no lease): exact re-score of the candidates, or gridCpu when the list is unusable. */
+function rescore(
+	sg: SkyGlobal,
+	g: GridPlan,
+	P: Packed,
+	r: GpuOut,
+	t0: number,
+): GridGpuResult {
+	const { L, Ru, count, stats, dbg } = r;
+	const nYaw = g.nYaw;
+	const { cap, T } = P;
 	// exact re-score of the candidates, per yaw in combo order (gridCpu's strict ">" keeps the first max)
 	const t3 = performance.now();
 	const perYaw: number[][] = Array.from({ length: nYaw }, () => []);
@@ -367,8 +423,8 @@ async function gridOnce(
 	stats.rescoreMs = performance.now() - t3;
 	if (!ok) {
 		stats.fellBack = true;
-		const r = sg.gridCpu(g);
-		return { ...r, ms: performance.now() - t0, stats, ...dbg };
+		const c = sg.gridCpu(g);
+		return { ...c, ms: performance.now() - t0, stats, ...dbg };
 	}
 	return {
 		best,

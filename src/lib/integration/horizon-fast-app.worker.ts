@@ -12,6 +12,7 @@ import {
 	validateTile,
 } from "#/lib/dem";
 import { destination, EARTH_R, EnuFrame } from "#/lib/geodesy";
+import { applyRealmGpuOptions, takeGpuProfile } from "#/lib/gpu/core/realm";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { computeHorizonGpu, warmHorizonGpu } from "#/lib/gpu/horizon";
 import {
@@ -188,8 +189,12 @@ async function march(
 	}
 	let bytes = 0;
 	for (const mo of mosaics) bytes += mo.data.byteLength;
+	// profiling only (undefined, nothing awaited, when the page does not profile)
+	const pending = takeGpuProfile();
+	const gpuProfile = pending && (await pending);
 	return {
 		type: "dirs",
+		...(gpuProfile ? { gpuProfile } : {}),
 		eyeH,
 		dirs: out.slice(0, k),
 		stats: {
@@ -215,6 +220,7 @@ scope.onmessage = async (e: MessageEvent<HorizonWorkerIn>) => {
 	try {
 		if (m.type === "spans") {
 			spans = m.spans;
+			applyRealmGpuOptions(m.gpuOpts);
 			if (m.gpu && !gpu) {
 				gpu = getComputeDevice().then((d) => {
 					if (d) warmHorizonGpu(d);

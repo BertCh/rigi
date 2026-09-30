@@ -5,14 +5,21 @@
 // - read() maps just the packed bytes, slices out one ArrayBuffer per range, returns the slot.
 // No per-call staging allocation once warm, and never luma's readAsync on a non-mappable buffer
 // (which creates and submits a temporary buffer + encoder per call).
+// read() rejects when the encoder's checked submit failed (core/queue.ts error checks) and as soon
+// as the device is lost (core/lifecycle.ts), so a failed or orphaned kernel never resolves zeros
+// or hangs its caller (and the lease it holds).
 import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
+import { busy, done, onLost, untilLost } from "./lifecycle";
 import { capacityFor } from "./pool";
-import { submit } from "./queue";
+import { cancelIfSubmitFails, submit, submitted } from "./queue";
 
 /** `size` bytes of `buffer` from `offset` (a 4-byte multiple). */
 export type ReadRange = { buffer: Buffer; offset?: number; size: number };
 
-/** Staged copies: call read() after submitting the encoder, or cancel() if it won't be. */
+/**
+ * Staged copies: call read() after submitting the encoder, or cancel() if it won't be (a core
+ * submit() that throws cancels them itself).
+ */
 export type StagedRead = {
 	read: () => Promise<ArrayBuffer[]>;
 	/** Return the slot unread (only when the encoder was NOT submitted). */
@@ -30,9 +37,16 @@ function ring(device: Device): Slot[] {
 	if (!r) {
 		const created: Slot[] = [];
 		rings.set(device, created);
-		device.lost.then(() => {
-			for (const s of created) s.buffer.destroy();
+		onLost(device, () => {
+			for (const s of created) {
+				if (s.busy) {
+					s.busy = false;
+					done();
+				}
+				s.buffer.destroy();
+			}
 			created.length = 0;
+			rings.delete(device);
 		});
 		r = created;
 	}
@@ -70,11 +84,14 @@ function reserve(device: Device, bytes: number): Slot {
 		r.push(best);
 	}
 	best.busy = true;
+	busy();
 	return best;
 }
 
 function giveBack(device: Device, slot: Slot) {
+	if (!slot.busy) return;
 	slot.busy = false;
+	done();
 	const r = rings.get(device);
 	if (!r || device.isLost) {
 		slot.buffer.destroy();
@@ -127,26 +144,38 @@ export function stageReads(
 			});
 	});
 	let used = false;
+	const cancel = () => {
+		if (used) return;
+		used = true;
+		giveBack(device, slot);
+	};
+	cancelIfSubmitFails(enc, cancel);
 	return {
 		read: async () => {
 			if (used) throw new Error("readback already read or cancelled");
 			used = true;
+			const mapped = slot.buffer.mapAndReadAsync(
+				(mapped) =>
+					ranges.map(({ size }, i) => mapped.slice(at[i], at[i] + size)),
+				0,
+				total,
+			);
+			let settled = false;
 			try {
-				return await slot.buffer.mapAndReadAsync(
-					(mapped) =>
-						ranges.map(({ size }, i) => mapped.slice(at[i], at[i] + size)),
-					0,
-					total,
+				const [out] = await untilLost(
+					device,
+					Promise.all([mapped, submitted(enc)]),
 				);
+				settled = true;
+				return out;
 			} finally {
-				giveBack(device, slot);
+				// a failed check (or loss) can beat the map: return the slot once the map is over
+				const back = () => giveBack(device, slot);
+				if (settled || device.isLost) back();
+				else mapped.then(back, back);
 			}
 		},
-		cancel: () => {
-			if (used) return;
-			used = true;
-			giveBack(device, slot);
-		},
+		cancel,
 	};
 }
 
@@ -167,7 +196,12 @@ export async function readBack(
 		enc,
 		ranges ?? (Array.isArray(built) ? (built as ReadRange[]) : []),
 	);
-	submit(device, enc);
+	try {
+		submit(device, enc);
+	} catch (e) {
+		staged.cancel();
+		throw e;
+	}
 	return staged.read();
 }
 

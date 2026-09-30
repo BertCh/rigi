@@ -23,6 +23,7 @@ export {
 	getComputeDevice,
 	gpuEnabled,
 	hasFeature,
+	releaseWhenIdle,
 	resetComputeDevice,
 } from "./core/device";
 

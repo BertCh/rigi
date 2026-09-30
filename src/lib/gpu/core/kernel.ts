@@ -18,6 +18,7 @@ import {
 	type Device,
 	type Shader,
 } from "@luma.gl/core";
+import { onLost, untilLost } from "./lifecycle";
 import { isPooled } from "./pool";
 import { passProps } from "./profile";
 import { stageReads } from "./readback";
@@ -103,6 +104,11 @@ function cacheOf(device: Device) {
 	if (!m) {
 		m = new Map();
 		cache.set(device, m);
+		// pipelines of a lost device are dead: drop them now (the next device compiles afresh)
+		onLost(device, () => {
+			cache.delete(device);
+			building.delete(device);
+		});
 	}
 	return m;
 }
@@ -161,6 +167,7 @@ type RawDevice = {
 export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel> {
 	const ready = cache.get(device)?.get(spec);
 	if (ready) return Promise.resolve(ready);
+	cacheOf(device);
 	let b = building.get(device);
 	if (!b) {
 		b = new Map();
@@ -174,15 +181,18 @@ export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel> {
 			const shader = makeShader(device, spec);
 			let k: Kernel;
 			if (device.type === "webgpu" && raw?.createComputePipelineAsync) {
-				const handle = await raw.createComputePipelineAsync({
-					label: spec.label,
-					compute: {
-						module: (shader as unknown as { handle: unknown }).handle,
-						entryPoint: spec.entryPoint,
-						constants: spec.constants ?? {},
-					},
-					layout: "auto",
-				});
+				const handle = await untilLost(
+					device,
+					raw.createComputePipelineAsync({
+						label: spec.label,
+						compute: {
+							module: (shader as unknown as { handle: unknown }).handle,
+							entryPoint: spec.entryPoint,
+							constants: spec.constants ?? {},
+						},
+						layout: "auto",
+					}),
+				);
 				k = wrap(device, spec, shader, handle);
 			} else k = wrap(device, spec, shader);
 			const m = cacheOf(device);

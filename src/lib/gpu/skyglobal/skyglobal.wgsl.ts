@@ -202,10 +202,11 @@ ${HEADER}
 @group(0) @binding(0) var<uniform> u: U;
 @group(0) @binding(1) var<storage, read> cells: array<vec4<f32>>;
 @group(0) @binding(2) var<storage, read_write> red: array<vec4<f32>>;
-var<workgroup> shLo: array<f32, 256>;
-var<workgroup> shMid: array<f32, 256>;
-var<workgroup> shArg: array<u32, 256>;
-var<workgroup> shZero: array<u32, 256>;
+// one slot per subgroup: 256 invocations / the minimum subgroup size (WebGPU guarantees ≥ 4) = 64
+var<workgroup> shLo: array<f32, 64>;
+var<workgroup> shMid: array<f32, 64>;
+var<workgroup> shArg: array<u32, 64>;
+var<workgroup> shZero: array<u32, 64>;
 var<workgroup> nSub: atomic<u32>;
 
 @compute @workgroup_size(256)

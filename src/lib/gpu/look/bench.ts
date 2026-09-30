@@ -167,6 +167,13 @@ export async function runLookBench(
 		const full = await time(reps, () =>
 			fitHazeGpu(device, h, { compact: false }),
 		);
+		const fullSteps = { ...hazeGpuTimes };
+		// the compact path's tail read (lists longer than the first read's estimate), forced with a
+		// 64-slot first read: it must give the very same fit too
+		const forced = await time(reps, () =>
+			fitHazeGpu(device, h, { listHead: 64 }),
+		);
+		const forcedSteps = { ...hazeGpuTimes };
 		out.haze = {
 			dims: [h.geoW, h.geoH],
 			cpuMs: cpu.ms,
@@ -174,8 +181,15 @@ export async function runLookBench(
 			gpuSteps,
 			fullReadback: {
 				gpuMs: full.ms,
-				gpuSteps: { ...hazeGpuTimes },
+				gpuSteps: fullSteps,
 				identical: sameFit(gpu.out, full.out),
+			},
+			forcedTail: {
+				listHead: 64,
+				gpuMs: forced.ms,
+				tailRead: forcedSteps.tailRead,
+				readKB: forcedSteps.readKB,
+				identical: sameFit(gpu.out, forced.out),
 			},
 			...hazeErrors(cpu.out, gpu.out),
 		};

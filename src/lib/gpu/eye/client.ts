@@ -9,6 +9,12 @@
  */
 import type { Pose } from "#/lib/camera";
 import type { PhotoMeta } from "#/lib/photos";
+import {
+	type GpuProfile,
+	mergeGpuProfile,
+	type RealmGpuOptions,
+	realmGpuOptions,
+} from "../core/realm";
 import { gpuEnabled } from "../device";
 import type {
 	EyeSearchInput,
@@ -21,12 +27,19 @@ export type { EyeSearchInput, EyeSearchProgress, EyeSearchResult };
 export interface EyeSearchInWorker {
 	input: EyeSearchInput;
 	gpu: "on" | "off";
+	/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
+	gpuOpts?: RealmGpuOptions;
 }
 
 export type EyeSearchOutWorker =
 	| { type: "progress"; progress: EyeSearchProgress }
-	| { type: "done"; result: EyeSearchResult }
-	| { type: "error"; error: string };
+	| ((
+			| { type: "done"; result: EyeSearchResult }
+			| { type: "error"; error: string }
+	  ) & {
+			/** the worker's GPU pass times, when the page profiles (merged as "eye-worker:…") */
+			gpuProfile?: GpuProfile;
+	  });
 
 /** The eye-search input for a photo at its current pose. */
 export function eyeSearchInput(photo: PhotoMeta, pose: Pose): EyeSearchInput {
@@ -75,6 +88,7 @@ export function startEyeSearch(
 			const m = ev.data;
 			if (m.type === "progress") onProgress(m.progress);
 			else {
+				mergeGpuProfile("eye-worker", m.gpuProfile);
 				done();
 				if (m.type === "done") resolve(m.result);
 				else reject(new Error(m.error));
@@ -87,6 +101,7 @@ export function startEyeSearch(
 		const msg: EyeSearchInWorker = {
 			input,
 			gpu: gpuEnabled() ? "on" : "off",
+			gpuOpts: realmGpuOptions(),
 		};
 		worker.postMessage(msg);
 	});

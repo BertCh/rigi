@@ -15,9 +15,12 @@
  * Mosaic cache (opt-in, `keep`): by default the mosaics are built per call and their VRAM is freed
  * right after the march (the app worker builds a fresh terrain per scene, so nothing could hit a
  * cache). With `keep: true` the mosaics (CPU build) and their GPU pages are kept for the last
- * MAX_SCENES scenes, keyed on the terrain sampler's identity plus (lat, lon, tile count), so marching
- * the same terrain again (the bench's repeat runs) skips both the build and the upload. An evicted,
- * garbage-collected or device-lost scene releases its pages; releaseSceneHorizonGpu frees them all.
+ * MAX_SCENES scenes, keyed on the terrain sampler's identity plus (lat, lon) and its tile set (every
+ * tile key with the identity of its array: a tile added, dropped or replaced in place, same key or
+ * not, is a different scene), so marching the same terrain again (the bench's repeat runs) skips both
+ * the build and the upload. A tile array whose values are overwritten in place is not detected (no
+ * sampler does that). An evicted, garbage-collected or device-lost scene releases its pages, a failed
+ * march drops only its own scene, and releaseSceneHorizonGpu frees them all.
  */
 import type { Device } from "@luma.gl/core";
 import type { HorizonProfile } from "#/lib/geo/horizon";
@@ -58,16 +61,33 @@ function dropScene(e: SceneEntry) {
 	releaseHorizonGpu(e.mosaics);
 }
 
-const tileCount = (terrain: TerrainSampler) =>
-	(terrain as unknown as { tiles?: Map<string, unknown> }).tiles?.size ?? -1;
+// each tile array seen gets a serial, so the tile-set key tells a replaced tile from the one it replaced
+const tileIds = new WeakMap<object, number>();
+let nextTileId = 1;
 
-/** The scene's mosaics, built once per (terrain, lat, lon) and kept for the last MAX_SCENES scenes (`keep`). */
+/** The sampler's tile set: every `key:serial` in map order (a sampler without a visible set is never reused). */
+function tileSetKey(terrain: TerrainSampler): string {
+	const tiles = (terrain as unknown as { tiles?: Map<string, object> }).tiles;
+	if (!(tiles instanceof Map)) return `none#${nextTileId++}`;
+	let s = "";
+	for (const [k, v] of tiles) {
+		let id = tileIds.get(v);
+		if (id === undefined) {
+			id = nextTileId++;
+			tileIds.set(v, id);
+		}
+		s += `${k}:${id};`;
+	}
+	return s;
+}
+
+/** The scene for (terrain, lat, lon, tile set), built once and kept for the last MAX_SCENES scenes (`keep`). */
 function sceneMosaics(
 	device: Device,
 	terrain: TerrainSampler,
 	lat: number,
 	lon: number,
-): Mosaic[] {
+): SceneEntry {
 	if (!watched.has(device)) {
 		watched.add(device);
 		// a lost device took the pages with it; drop the CPU mosaics too
@@ -75,7 +95,7 @@ function sceneMosaics(
 			for (const e of [...scenes]) dropScene(e);
 		});
 	}
-	const key = `${lat},${lon},${MAX_DISTANCE},${tileCount(terrain)}`;
+	const key = `${lat},${lon},${MAX_DISTANCE}|${tileSetKey(terrain)}`;
 	for (let i = scenes.length - 1; i >= 0; i--) {
 		const e = scenes[i];
 		const t = e.terrain.deref();
@@ -86,7 +106,7 @@ function sceneMosaics(
 		if (t === terrain && e.key === key) {
 			scenes.splice(i, 1);
 			scenes.push(e);
-			return e.mosaics;
+			return e;
 		}
 	}
 	const e: SceneEntry = {
@@ -101,7 +121,7 @@ function sceneMosaics(
 		finalizer.unregister(old);
 		dropScene(old);
 	}
-	return e.mosaics;
+	return e;
 }
 
 /** Frees every cached scene's mosaics and GPU pages. */
@@ -129,9 +149,11 @@ export async function sceneHorizonGpu(
 	const device = await getComputeDevice();
 	if (!device) return null;
 	let once: Mosaic[] | null = null;
+	let kept: SceneEntry | null = null;
 	try {
 		if (!opts.keep) once = mosaicsFromSampler(terrain, lat, lon, MAX_DISTANCE);
-		const mosaics = once ?? sceneMosaics(device, terrain, lat, lon);
+		else kept = sceneMosaics(device, terrain, lat, lon);
+		const mosaics = once ?? (kept as SceneEntry).mosaics;
 		const t1 = performance.now();
 		const [p] = await computeHorizonGpu(
 			device,
@@ -149,8 +171,11 @@ export async function sceneHorizonGpu(
 		};
 	} catch (e) {
 		console.warn("[gpu] scene horizon failed, using the CPU", e);
-		// don't keep a scene that failed (a later call rebuilds it)
-		if (opts.keep) releaseSceneHorizonGpu();
+		// don't keep the scene that failed (a later call rebuilds it); the other kept scenes stay
+		if (kept) {
+			finalizer.unregister(kept);
+			dropScene(kept);
+		}
 		return null;
 	} finally {
 		// one eye per scene: free the VRAM now rather than when the device goes away

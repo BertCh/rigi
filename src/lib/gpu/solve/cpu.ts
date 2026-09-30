@@ -1,109 +1,24 @@
-// CPU reference for solvePose's coarse stage (src/lib/geo/solve.ts solveOnce, "Coarse: small-angle
-// grid over (dYaw, dPitch)"): the plan (observations, grids, truncation), the exact score of one yaw
-// row, the whole-grid twin and the selection of seeds / coarse winner / ambiguity.
+// CPU reference for solvePose's coarse stage (src/lib/geo/solve.ts coarseStage, "Coarse: small-angle
+// grid over (dYaw, dPitch)"): the exact score of one yaw row, the whole-grid twin and the selection of
+// seeds / coarse winner / ambiguity.
 //
-// solveOnce keeps its cost as a closure (`coarseCost`), so it cannot be imported from here (geo/ has
-// another owner). This file rebuilds it from geo's exported pieces (horizonAt, unproject,
-// azimuthElevation, resizeCamera) with the same expressions in the same order, and the bench
-// (scripts/gpu/solve-bench.mjs) checks the result against solvePose's own SolveResult (coarse, and
-// ambiguity, which depends on the winner's, the runner-up's and the median cost) bit for bit. The
-// integration note (./README.md) exports coarseCost from solve.ts so this file imports it instead.
+// The plan (observations, grids, truncation) and the per-cell cost are solve.ts's own (planCoarse,
+// coarseCost), re-exported here; the selection is rebuilt with the same expressions in the same
+// order, and the bench (scripts/gpu/solve-bench.mjs) checks the result against solvePose's own
+// SolveResult (coarse, and ambiguity, which depends on the winner's, the runner-up's and the median
+// cost) bit for bit.
 
 import {
-	azimuthElevation,
-	type Camera,
-	resizeCamera,
-	unproject,
-} from "#/lib/geo/camera";
-import type { HorizonProfile } from "#/lib/geo/horizon";
-import {
-	horizonAt,
-	type SkylineRows,
+	type CoarsePlan,
+	coarseCost,
+	DEFAULT_SIGMA,
 	type SolveOptions,
 } from "#/lib/geo/solve";
-import { DEG } from "#/lib/geodesy";
 
-/** solveOnce's DEFAULT_SIGMA (not exported by solve.ts). */
-const DEFAULT_SIGMA = { yaw: 15, pitch: 1.5, roll: 1.5, focal: 0.06 };
+export { type CoarsePlan, coarseCost, planCoarse } from "#/lib/geo/solve";
 
 /** One yawCosts entry of solveOnce: the best pitch at a yaw offset. */
 export type YawCost = { dy: number; dp: number; c: number };
-
-/** Everything solveOnce's coarse grid reads, in float64. */
-export type CoarsePlan = {
-	horizon: HorizonProfile;
-	/** coarse observations (every 2nd usable column): azimuth / elevation under cam0 (deg), weight */
-	az: Float64Array;
-	el: Float64Array;
-	w: Float64Array;
-	/** Σw, summed in observation order as solveOnce does */
-	wSum: number;
-	/** truncated-L1 cutoff, deg */
-	trunc: number;
-	/** the yaw and pitch offsets, accumulated exactly as solveOnce's loops do */
-	dys: Float64Array;
-	dps: Float64Array;
-	sigmaYaw: number;
-	sigmaPitch: number;
-};
-
-/**
- * solveOnce's coarse inputs for (prior, sky, opts), where `opts` are the options solveOnce itself
- * receives (for the full-360° pass: fullSearchOptions(opts)). null where solveOnce returns
- * "no-skyline" before the grid.
- */
-export function planCoarse(
-	prior: Camera,
-	horizon: HorizonProfile,
-	sky: SkylineRows,
-	opts: SolveOptions = {},
-): CoarsePlan | null {
-	const yawRange = opts.yawRange ?? 25;
-	const pitchRange = opts.pitchRange ?? 3;
-	const sigma = opts.sigma ?? DEFAULT_SIGMA;
-	const cam0 = resizeCamera(prior, sky.width);
-	// observations(sky, 1)
-	const obs: { x: number; y: number; w: number }[] = [];
-	for (let x = 0; x < sky.width; x += 1) {
-		const y = sky.rows[x];
-		const w = sky.weight[x];
-		if (Number.isFinite(y) && w > 0.05) obs.push({ x: x + 0.5, y, w });
-	}
-	if (obs.length < sky.width * 0.1) return null;
-	const coarse = obs.filter((_, i) => i % 2 === 0);
-	const n = coarse.length;
-	const az = new Float64Array(n);
-	const el = new Float64Array(n);
-	const w = new Float64Array(n);
-	coarse.forEach((o, i) => {
-		const ae = azimuthElevation(unproject(cam0, o.x, o.y));
-		az[i] = ae[0];
-		el[i] = ae[1];
-		w[i] = o.w;
-	});
-	const degPerPx = 1 / (cam0.f * DEG);
-	const trunc = 12 * degPerPx;
-	const yawStep = Math.max(0.1, 1.5 * degPerPx);
-	const pitchStep = Math.max(0.1, 1.5 * degPerPx);
-	const wSum = coarse.reduce((s, o) => s + o.w, 0);
-	const dys: number[] = [];
-	for (let dy = -yawRange; dy <= yawRange + 1e-9; dy += yawStep) dys.push(dy);
-	const dps: number[] = [];
-	for (let dp = -pitchRange; dp <= pitchRange + 1e-9; dp += pitchStep)
-		dps.push(dp);
-	return {
-		horizon,
-		az,
-		el,
-		w,
-		wSum,
-		trunc,
-		dys: Float64Array.from(dys),
-		dps: Float64Array.from(dps),
-		sigmaYaw: sigma.yaw,
-		sigmaPitch: sigma.pitch,
-	};
-}
 
 /** solvePose's options for its full-360° pass (solve.ts fullOpts, minus the accept threshold). */
 export function fullSearchOptions(opts: SolveOptions = {}): SolveOptions {
@@ -112,20 +27,6 @@ export function fullSearchOptions(opts: SolveOptions = {}): SolveOptions {
 		yawRange: 180,
 		sigma: { ...(opts.sigma ?? DEFAULT_SIGMA), yaw: 1e6 },
 	};
-}
-
-/** solveOnce's coarseCost(dy, dp), exactly (same expressions, same summation order). */
-export function coarseCost(p: CoarsePlan, dy: number, dp: number) {
-	const { az, el, w, horizon, trunc } = p;
-	let c = 0;
-	for (let i = 0; i < az.length; i++) {
-		const r = Math.abs(el[i] + dp - horizonAt(horizon, az[i] + dy));
-		c += w[i] * Math.min(r, trunc);
-	}
-	return (
-		c / p.wSum +
-		0.02 * trunc * ((dy / p.sigmaYaw) ** 2 + (dp / p.sigmaPitch) ** 2)
-	);
 }
 
 /**

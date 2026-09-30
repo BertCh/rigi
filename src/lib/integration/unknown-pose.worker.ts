@@ -11,7 +11,7 @@ import {
 	vfovFromFocal,
 	vfovFromHfov,
 } from "#/lib/camera";
-import { fetchDemTile, MAPTERHORN, type TileKey } from "#/lib/dem";
+import { fetchDemTileCached, MAPTERHORN, type TileKey } from "#/lib/dem";
 import type { HorizonProfile } from "#/lib/geo/horizon";
 import {
 	type CascadeOptions,
@@ -22,7 +22,8 @@ import {
 } from "#/lib/geo/pipeline";
 import { detectSkyline } from "#/lib/geo/skyline";
 import type { CoarseProvider, SolveOptions } from "#/lib/geo/solve";
-import { getComputeDevice } from "#/lib/gpu/device";
+import { applyRealmGpuOptions, takeGpuProfile } from "#/lib/gpu/core/realm";
+import { getComputeDevice, releaseWhenIdle } from "#/lib/gpu/device";
 import { solveCoarse, warmSolveGpu } from "#/lib/gpu/solve";
 import type { RefineOptions } from "#/lib/refine/index";
 import type { InitOptions } from "#/lib/refine/init";
@@ -35,6 +36,12 @@ import type {
 } from "./unknown-pose";
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
+/**
+ * This worker lives as long as the photo (re-runs reuse its horizon) but uses the GPU in bursts:
+ * destroy the WebGPU device after this long without GPU use; the next solve recreates it.
+ */
+const GPU_IDLE_MS = 30_000;
+releaseWhenIdle(GPU_IDLE_MS);
 /** Accept threshold when the focal length is unknown (see the ambiguity check in solve()). */
 const FOCAL_UNKNOWN_MIN_CONFIDENCE = 0.75;
 /**
@@ -111,7 +118,9 @@ const SCENE_TIMEOUT_MS = 90_000;
 
 /**
  * Mapterhorn is the DEM the app engine (src/lib/terrain.ts) draws with, so the cascade solves on the same
- * terrain the overlay shows. Tiles come through dem's plain fetchDemTile (no tile cache), abortable.
+ * terrain the overlay shows. Tiles come through the page's shared tile cache (dem's fetchDemTileCached;
+ * this worker gets a read-only view of the same store), so tiles the page loaded cost no request; the
+ * rest are fetched through the HTTP cache. Abortable.
  */
 const DEM = MAPTERHORN;
 
@@ -126,7 +135,7 @@ async function computeScene(
 	// holes could be accepted at a wrong pose. horizonAt drops the failed promise, so a re-run retries.
 	const loadTile = (k: TileKey) => {
 		if (signal.aborted) return Promise.reject(signal.reason);
-		return fetchDemTile(DEM, k, signal).catch(() => {
+		return fetchDemTileCached(DEM, k, signal).catch(() => {
 			if (signal.aborted)
 				throw new Error(
 					`terrain tiles timed out after ${SCENE_TIMEOUT_MS / 1000} s`,
@@ -265,6 +274,7 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 ctx.onmessage = async (
 	ev: MessageEvent<UnknownPoseRequest | UnknownPosePrepare>,
 ) => {
+	applyRealmGpuOptions(ev.data.gpuOpts);
 	if (ev.data.type === "prepare") {
 		horizonAt(ev.data.lat, ev.data.lon, ev.data.alt, ev.data.gpu).catch(
 			() => {},
@@ -285,5 +295,8 @@ ctx.onmessage = async (
 			error: e instanceof Error ? e.message : String(e),
 		};
 	}
+	// profiling only (undefined, nothing awaited, when the page does not profile)
+	const prof = takeGpuProfile();
+	if (prof) msg.gpuProfile = await prof;
 	ctx.postMessage(msg);
 };

@@ -24,6 +24,7 @@ import {
 	type KernelSpec,
 	kernel,
 } from "./kernel";
+import { untilLost } from "./lifecycle";
 import {
 	type CompiledGPUCommandGraph,
 	GPUCommandGraph,
@@ -233,10 +234,15 @@ export class ComputeGraph<P = void> {
 				textures: opts.textures,
 			});
 			const staged = stageReads(this.device, enc, opts.read ?? []);
-			submit(this.device, enc);
+			try {
+				submit(this.device, enc);
+			} catch (e) {
+				staged.cancel();
+				throw e;
+			}
 			const data = await staged.read();
 			if (!timed || !encoding.canReadGPUTimings) return { data };
-			const timings = await encoding.readTimings();
+			const timings = await untilLost(this.device, encoding.readTimings());
 			if (prof)
 				for (const n of timings.nodes)
 					if (n.gpuTimeMilliseconds !== undefined)

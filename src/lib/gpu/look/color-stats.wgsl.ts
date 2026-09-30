@@ -158,9 +158,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
   let sg = lid / ssz;
   // every lane of this subgroup in the same row (rows then map 1:1 to subgroups)
   let ok = subgroupAll(sg == subgroupBroadcastFirst(lid) / ssz);
+  // NaN via a var: a const bitcast<f32>(0x7fc00000u) is a WGSL const-eval error
+  var nanBits = 0x7fc00000u;
+  let nan = bitcast<f32>(nanBits);
   for (var k = 0u; k < 52u; k++) {
     let v = subgroupAdd(acc[k]);
-    if (sid == 0u) { sh[sg][k] = select(bitcast<f32>(0x7fc00000u), v, ok); }
+    if (sid == 0u) { sh[sg][k] = select(nan, v, ok); }
   }
   workgroupBarrier();
   if (lid < 52u) {
