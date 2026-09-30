@@ -1,0 +1,37 @@
+# Rigi regression gate, fast tier (roadmap N1). See scripts/ci/README.md.
+# The full tier (browser: style-baseline / deck smoke / eval-app) needs the gitignored photos, DEM
+# network access and the stored pixel baseline, so it runs locally: node scripts/ci/run.mjs full
+name: ci
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # no engines/.nvmrc in the repo; @types/node is ^22 and local dev runs v22.20
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Fast tier (tsc, biome ratchet, node unit checks)
+        run: node scripts/ci/run.mjs fast --biome all
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: out/ci/
+          retention-days: 14

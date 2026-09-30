@@ -14,6 +14,7 @@
  *   cpuSeq    per-eye CPU calls: the original path, the reference
  * Returns small JSON (no profiles).
  */
+import { flagOverride, setFlagOverride } from "#/lib/flags";
 import {
 	type EyeHorizon,
 	fitRotationToHorizon,
@@ -140,8 +141,7 @@ function delta(a: RefineEyeResult, ref: RefineEyeResult) {
 }
 
 export async function benchEye(o: EyeBenchIn) {
-	const g = globalThis as { __RIGI_GPU__?: "on" | "off" };
-	const prevMode = g.__RIGI_GPU__;
+	const prevMode = flagOverride("gpu");
 	const t0 = performance.now();
 	const { W, H, samples } = await photoSamples(o.img);
 	const skyMs = performance.now() - t0;
@@ -187,12 +187,12 @@ export async function benchEye(o: EyeBenchIn) {
 	const modes = o.modes ?? ["gpuBatch", "gpuSeq", "cpuBatch", "cpuSeq"];
 	try {
 		// Warm-up: device, pipeline, mosaic upload (reported, not charged to the runs).
-		g.__RIGI_GPU__ = "on";
+		setFlagOverride("gpu", "on");
 		out.gpu = !!(await getComputeDevice());
 		const w0 = performance.now();
 		const [hg] = await hp.horizonsAtEyes([eye0]);
 		out.gpuWarmupMs = Math.round(performance.now() - w0);
-		g.__RIGI_GPU__ = "off";
+		setFlagOverride("gpu", "off");
 		const c0 = performance.now();
 		const [hc] = await hp.horizonsAtEyes([eye0]);
 		out.cpuHorizonMs = Math.round(performance.now() - c0);
@@ -208,7 +208,7 @@ export async function benchEye(o: EyeBenchIn) {
 		}
 		out.horizonParity = { maxDElDeg: maxD, emptyMismatch };
 		for (const mode of modes) {
-			g.__RIGI_GPU__ = mode.startsWith("gpu") ? "on" : "off";
+			setFlagOverride("gpu", mode.startsWith("gpu") ? "on" : "off");
 			hp.stats.maxBatch = 0;
 			const s0 = { ...hp.stats };
 			const batch = mode !== "gpuSeq" && mode !== "cpuSeq";
@@ -245,7 +245,7 @@ export async function benchEye(o: EyeBenchIn) {
 			if (!r) continue;
 			cross[k] = {};
 			for (const hz of ["gpu", "cpu"] as const) {
-				g.__RIGI_GPU__ = hz === "gpu" ? "on" : "off";
+				setFlagOverride("gpu", hz === "gpu" ? "on" : "off");
 				const [h] = await hp.horizonsAtEyes([r.refinedEye]);
 				const f = fitRotationToHorizon(samples, h, r.after.pose, {
 					...opts,
@@ -257,7 +257,7 @@ export async function benchEye(o: EyeBenchIn) {
 		}
 		out.crossEval = cross;
 		// Batch latency scaling on the GPU (eyes on a 2 m lattice around eye0).
-		g.__RIGI_GPU__ = "on";
+		setFlagOverride("gpu", "on");
 		const scaling: Record<string, number> = {};
 		for (const nb of [1, 6, 30, 100, 343]) {
 			const es: Vec3[] = Array.from({ length: nb }, (_, i) => [
@@ -271,7 +271,7 @@ export async function benchEye(o: EyeBenchIn) {
 		}
 		out.gpuBatchMs = scaling;
 	} finally {
-		g.__RIGI_GPU__ = prevMode;
+		setFlagOverride("gpu", prevMode);
 		hp.release();
 		mapterhornTileStore().clear();
 	}

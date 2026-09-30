@@ -1,0 +1,77 @@
+FUND E0 — Observability map: PROTOCOL (frozen before any predictor was computed)
+Frozen: 2026-09-29T23:06Z (UTC). Author: E0 agent. Dev split only (50 dev ids), C0 render cache only, no rendering.
+
+0. What was looked at before freezing
+   Only structure: plan/READMEs/FORMAT.md, F1 taxonomy (labels), meta.json fields (heading, hfov0/vfov0, ring vfov,
+   ref labels/yaws). No skyline, depth or I_eye value was computed before this file was written.
+   Observed data constraint that shapes the design: NONE of the 9 position-stage failures has a correct ref, and 6/9
+   have no manifest heading; all 19 successes have a correct ref. So "at the ref pose" cannot be the primary analysis
+   (POS n = 0), and mixing ref-yaw for successes with something else for failures would leak the label (photographers
+   aim at distinctive views, refs exist mostly for successes). Hence a uniform, label-free primary analysis.
+
+1. Labels (F1 taxonomy.json, field "stage"; the 19 dev ids not in taxonomy are T6 correct HIGH)
+   SUCCESS = not in taxonomy                                   (19)
+   ROT     = stage in {search, matching, refine}               (16)  "rotation/search/matching failure"
+   POS     = stage == position                                 ( 9)  (0010 0035 0069 0070 0073 0074 0086 0087 0095)
+   OTHER   = stage in {decision, verification}                 ( 6)  (right pose found/rejected, or GT ambiguity)
+   ANYFAIL = ROT + POS + OTHER                                 (31)
+   Secondary labels (reported, not used for the kill):
+   POSc    = first-listed cause in {a_small, a_big}            (12)  (adds 0001 0002 0037 from matching stage)
+   ROTs    = stage == search or cause 'e' (narrow FOV) present, excluding POS  (small n; descriptive only)
+
+2. Geometry (all at the photo's STATED eye = meta.eye, world frame of the cache)
+   2.1 360° skyline S(a): from the 24 ring views' xyz (stride 2). Each terrain sample -> azimuth a = atan2(dx,dy)
+       (cw from north), elevation e = atan2(dz, hypot(dx,dy)) (the xyz are in the rendered frame so this equals the
+       pixel ray; curvature/refraction as rendered). 0.1° azimuth bins; S = max elevation in bin. A bin is INVALID if it
+       has no terrain (empty views) or if a terrain sample in the top xyz row of any ring view falls in it (skyline
+       clipped above the ring's top edge). Resampled to 0.25° for matching.
+   2.2 Unique width w*(a0): window of width w centred at a0, profile P0(t)=S(a0+t), t in [-w/2, w/2].
+       For every candidate a with circular |a - a0| > 3° (0.25° steps): r(a) = RMS_t[ S(a+t) - P0(t) - mean_t(...) ]
+       (best constant pitch offset removed; roll and focal ignored), over samples valid in both, needing >= 70 % of
+       the window valid in both (else candidate skipped). w* = smallest w in
+       {2,4,...,60,70,80,90,105,120,150,180} with min_a r(a) > floor. If none: w* = 360 (never unique).
+       If P0 itself has < 70 % valid samples at a given w, that (a0,w) is undefined; w*(a0) = nan if undefined at all w.
+       Floor primary = 0.10° RMS. Sensitivity sweep: 0.05, 0.10, 0.20, 0.30, 0.50°.
+   2.3 Rotation predictor R = hfov0 / w*   (hfov0 from meta; larger = more unique skyline inside the photo's FOV).
+   2.4 Eye information. Each ring terrain sample i is owned only by the ring view whose centre yaw is nearest its
+       azimuth (no double counting). Sample solid angle Omega_i = 4 cos^3(theta_i)/(fx fy) (stride 2, pinhole).
+       Photo pixel solid angle Omega_px = (2 tan(hfov0/2)/Wl)^2, Wl = photo width in px when the long side is 1024.
+       Window(a0) = samples with circular |a - a0| <= hfov0/2 and |e| <= vb, vb = min(vfov0/2, atan(tan(ringvf/2) cos 20°))
+       (pitch-0 frame clipped to what every ring view covers).
+       I_band(a0) = sum_{i in window, d_i in band} (Omega_i/Omega_px) / d_i^2   [m^-2 per photo pixel]
+       bands: <250 m, 250 m-2 km, 2-10 km, >10 km. I_tot = sum; I_no250 = I_tot - I_<250; f250 = I_<250/I_tot.
+   2.5 Cramér-Rao eye bound (interpretive number). Bearing model, 6 unknowns (3 rotation, 3 eye), per sample tangent
+       basis (t1 horizontal, t2 = b x t1): rows [ (b x t_k)^T , -t_k^T / d ].  Assumption: N = 500 matched points
+       drawn uniformly per photo pixel from terrain pixels in the window, sigma = 1 photo pixel = sqrt(Omega_px) rad,
+       i.i.d.; focal known. F = (N / sum w) sum_i w_i J_i^T J_i / sigma^2, w_i = Omega_i. Eye covariance = inverse of
+       the Schur complement (rotation marginalised). Report sigma_h = sqrt(var_E + var_N) and sigma_up, for the matcher
+       band (d >= 250 m) and for all depths. Compare with typical phone GPS error (~5-15 m horizontal, 10-30 m vertical).
+
+3. Analyses
+   A (PRIMARY, uniform, all 50): azimuth-agnostic at the stated eye. a0 over 72 azimuths (5° step).
+       R_A = hfov0 / median_a0 w*(a0);  I_A = mean_a0 I(a0) per band;  CRB_A = median_a0 sigma_h(a0).
+   B (secondary, label-free direction): a0 = manifest headingDeg where present (n per class reported), same formulas.
+   C (secondary, ref subset): a0 = first correct ref's yaw (meta.perturbBase); w* at that a0 from the ring skyline;
+       I_eye and CRB from the ref view's own xyz (full photo frame at ref pose/eye, Omega_px from ref intrinsics).
+       Only ROT (n=5) / OTHER vs SUCCESS feasible; POS has no refs.  Also a sanity check: Spearman between ring-window
+       I (a0 = ref yaw) and ref-view I on ref holders.
+   D (secondary, LEAKY, labelled as such): "best available" a0 = ref yaw, else heading, else azimuth-averaged.
+
+4. Metrics
+   AUROC (Mann-Whitney, ties 0.5), positive = failure group, score oriented in the hypothesised direction:
+     rotation:  score = -R          (low hfov/w* -> ROT failure)
+     position:  score = -I_no250    (low kept eye information -> POS failure; the plan's direction, §3 E0 + §3 note)
+   Pre-registered secondary scores: -I_tot, +f250, +CRB sigma_h (matcher band). Reverse-direction AUROC = 1 - AUROC is
+   reported for the position scores because physics admits the opposite mechanism (a stated-eye error only hurts
+   when parallax is large); it is NOT used for the kill.
+   Comparisons: ROT vs SUCCESS, POS vs SUCCESS (primary); each group vs all non-members; ANYFAIL vs SUCCESS (both scores).
+   Uncertainty: 95 % stratified bootstrap percentile CI (4000 resamples, seed 0); one-sided permutation p (10000).
+   n is small (19/16/9): CIs will be wide; point estimates are what the fixed kill criterion uses.
+
+5. Kill criterion (fixed in reports/fundamentals-plan.md §3):
+   KILL if AUROC(ROT vs SUCCESS, -R_A) < 0.65 AND AUROC(POS vs SUCCESS, -I_no250_A) < 0.65 (analysis A, floor 0.10°).
+   If only one is >= 0.65, the hypothesis survives for that half only. Secondary analyses cannot rescue a killed primary
+   (they are reported as post-hoc-free secondaries, labelled).
+
+6. Also reported: per-photo table; f250 (share of eye information < 250 m) median per group (A and C);
+   floor sweep of the rotation AUROC; fraction of invalid (clipped/empty) skyline bins per photo.

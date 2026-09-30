@@ -1,0 +1,117 @@
+FUND E3 - NEAR-FIELD FIDELITY - REPORT
+Completed 2026-09-29 (resumed after a machine shutdown; see DEVIATIONS.txt). Protocol: PROTOCOL.txt (frozen before any
+render/match/solve). Kill criterion (reports/fundamentals-plan.md s3, fixed): KILL iff no gain in (a) near/mid
+inliers, OR (b) free-centre eye better than GPS on < 60 % of refs. Machine-readable: results.json (frozen analysis
+from analyse.py; post-hoc block under "posthoc" from analyse_posthoc.py). Per-photo raw: out/<pid>.json,
+out_posthoc/<pid>.json, corr/<pid>_<tag>.npz (lifted correspondences), examples/*.jpg.
+
+VERDICT: KILL.  Both kill conditions are met independently:
+  (a) no gain in 0-2 km ref-pose inliers (bootstrap CI of the mean log2 gain includes 0 for V1 and for V2);
+  (b) PRIMARY (V2, d = 50 m, 3-DoF) better than GPS on 3/30 = 10 % of refs (95 % CI 0-23 %), far below 60 %.
+  (c) F1 matching bucket: 0/4 photos gain support.
+
+PHOTO SET: all 30 pre-registered dev photos with a verified-correct ref (full set, not a pilot). None excluded
+(min 0-2 km DTM coverage in the view wedge = 100 %). Test ids / data_v3 never touched. Processing order as frozen
+(F1 four first, then sorted pid).
+
+------------------------------------------------------------------------------------------------------------------
+RENDERER VALIDATION (reported, not gating; medians over 30 photos)
+  cached xyz reprojected with this camera code: 0.001 px.
+  depth vs cached render, 0-250 m: V0e 2.3 %, V1 3.0 % median relative error; 250-2000 m: V1 0.11 %.
+  grey-level correlation with cached render where the near render hits: V0e 0.94, V1 0.88.
+  eye clamp at T: 1/30 (wc_0047). The offline renderer reproduces the app's geometry; V1/V2 add real detail.
+
+------------------------------------------------------------------------------------------------------------------
+(a) REF-POSE INLIERS AT THE REF EYE T (6 px, ALIKED+LightGlue, no 250 m cut)
+  Sum over 30 photos       near <250 m   mid 250-2000 m   0-2 km   far >2 km   photos with any 0-2 km inlier
+  V0  cached app render          7           2310            2317     11088        14
+  V0e app emulation              6           2419            2425     11051        15
+  V1  hi-res DTM + ortho        12           2639            2651      9276        15
+  V2  V1 + DSM                  21           2643            2664      9513        15
+  PRIMARY mean log2((1+n_V)/(1+n_V0)) 0-2 km, photo bootstrap 95 % CI (10k, seed 0):
+     V1 +0.047 [-0.480, +0.509]    V2 +0.104 [-0.340, +0.527]    (V0e +0.090 [-0.117, +0.290])
+     median paired difference: 0 for all variants.   => "gain in (a)" = FALSE.
+  Status quo with the 250 m cut (V0cut) loses only the 7 near inliers: the cut is not what is starving the solver.
+  Key facts behind the null:
+   - The near band (<250 m) essentially never matches: 255 lifted near correspondences for V2 over 30 photos, 21
+     of them consistent with the ref pose. Photo foregrounds (grass, flowers, rocks, snow, people) do not match an
+     ortho-draped heightfield at 10-25 cm, with or without the DSM.
+   - Half the photos (15/30) have zero 0-2 km inliers in every variant (content is all > 2 km or unmatchable).
+   - Where mid-band inliers exist, V1/V2 help some photos (wc_0009 786->1072, wc_0054 5->76, wc_0011 120->225) and
+     hurt others (wc_0076 123->38 for V2, wc_0088 19->0, wc_0006 60->39); the far band loses ~15 % because the
+     hi-res near field occludes it (wc_0088: V1/V2 near render covers 99 % of the frame at T; wc_0047 far 158->2).
+
+------------------------------------------------------------------------------------------------------------------
+(b) FREE-CENTRE EYE FROM DISPLACED GPS EYES (score |E-T| < |G-T|; failed solve = GPS eye = not better)
+                         n better / 30   fraction [95 % CI]   solved   solved-only median |E-T|
+  PRIMARY G50 V2 3-DoF        3            0.10 [0.00, 0.23]      6          44.2 m (3 better, 3 worse)
+  G50 V2 2-DoF                3            0.10                   3          17.3 m
+  G50 V1 3-DoF                3            0.10                   5          32.0 m
+  G50 V0e 3-DoF (app-like)    4            0.13 [0.03, 0.27]      4          23.5 m
+  G20 V2 3-DoF                7            0.23 [0.10, 0.40]      9          16.1 m (GPS 20 m)
+  G150 V2 3-DoF               2            0.07                   2          22.7 m (GPS 150 m)
+  Failures of the primary: 20 "rotation it0" (< 6 far5 inliers), 4 "centre it0" (< 6 near/mid RANSAC inliers).
+  Circular diagnostic at C0 = T (optimistic floor incl. T's own error): V2 solves 10/30, median |E-T| 13.4 m
+  (V0 10/30, 15.6 m) - even starting at the truth the solver moves the eye > 10 m on the photos it can solve.
+  Successful G50 V2 solves: wc_0082 50.8->7.3 m, wc_0088 50.4->14.9, wc_0094 50.7->32.1 (better);
+                            wc_0020 50.1->115.1, wc_0027 ->56.3, wc_0072 ->409.4 (worse; 6-14 near/mid matches).
+  Note: the app-like V0e render solves as well as V2 on these photos - near-field fidelity is not what made the
+  difference; having hundreds of mid-band matches plus > 5 km content is.
+
+  RESUME BUG CHECK (requested): "every G50 result = GPS error, rotation it0" is NOT a code bug. The solver works when
+  it has data (G20 wc_0004 27.6->6.0 m, G150 wc_0004 183.8->13.7 m, circular solves <= 7 m on wc_0004/0009). The
+  fails are the pre-set guard rail (< 6 far5 correspondences) and have two real causes (post-hoc anatomy below).
+  Details and the per-photo checks are in DEVIATIONS.txt. No code was changed and nothing needed re-running.
+
+------------------------------------------------------------------------------------------------------------------
+(c) F1 MATCHING BUCKET (wc_0002 wc_0034 wc_0052 wc_0055): total ref-pose inliers V0cut / V1 / V2
+  wc_0002 1/1/1, wc_0034 0/0/0, wc_0052 0/0/0, wc_0055 0/1/0  ->  0/4 gain support (rule: >= 1.5x AND >= +20).
+  These photos do not match any render at all at the ref pose; near-field fidelity does not recover them.
+  The 8 matching-bucket photos without a verified ref are not testable (no ref pose).
+
+------------------------------------------------------------------------------------------------------------------
+POST HOC (labelled; NOT used for the verdict)
+ 1. Anatomy of the 30 primary outcomes (analyse_posthoc.py):
+      10  no far5 content even at T with the cached render (matched content all < 5 km: rotation step cannot run -
+          a limitation of the frozen solver design, e.g. wc_0006 0011 0019 0047 0076 have 300-1200 mid matches)
+      9   displaced render lost the matches (lifted at G50 < 20 % of lifted at T). Mechanism: with the ref rotation
+          and z = DTM(G) + AGL(T), a 50 m step off a summit/ridge drops the eye 26-49 m (wc_0002 0004 0054) or puts
+          a crest / hut / slope right in front of the camera (wc_0009: 10 m tall hut 25 m ahead; wc_0014: ground
+          rising 4 m within 20 m under a 9 deg telephoto).
+      4   centre step failed (< 6 near/mid RANSAC inliers; photos with far-only matches)
+      1   other rotation fail (wc_0085, 8 far5 at T);  3 solved-worse;  3 solved-better.
+ 2. G50h (PROTOCOL amendment: same 50 m horizontal offset, height kept z = max(T.z, DTM+1.6)):
+      V2 3-DoF better 6/30 = 0.20 [0.07, 0.37] (8 solved); V1 3-DoF 7/30 = 0.23 [0.10, 0.40].
+      Better: wc_0004 ->15.8, wc_0014 ->2.4, wc_0082 ->9.2, wc_0088 ->15.5, wc_0094 ->31.8, wc_0002 ->45.2 m.
+      Even with the occlusion artefact removed the fraction is ~1/3 of the 60 % bar.
+ 3. Convergence across independent starts (G20/G50/G150/G50h, V2 3-DoF, photos with >= 2 solves):
+      wc_0094: 4 starts agree within 0.2 m, at 31.9 m from T; T is 26.4 m above the DTM and the estimate sits at
+               ground level -> T's height is very likely wrong (EXIF altitude); the "error" is mostly T's.
+      wc_0088: 3 starts agree within 1.0 m, 15.0 m from T (EXIF-GPS eye; hi-res terrain blocks the view at T).
+      wc_0082: within 2.5 m, 8.5 m from T.   wc_0004: within 12 m, 9.2 m from T.
+      (wc_0027 and wc_0072 "agree" only between G50 and G50h, which share the start azimuth - not independent.)
+    So when a photo has hundreds of mid-band (250-2000 m) matches plus far content, the eye IS observable to a few
+    metres and may beat an unsurveyed T. That is 3-4 photos out of 30.
+
+------------------------------------------------------------------------------------------------------------------
+WHAT THIS MEANS
+  - The hypothesis's mechanism fails at its first step: correspondences < 250 m essentially do not exist with
+    ALIKED+LightGlue against ortho-draped renders, however high-res the DTM/DSM/ortho (21 near inliers in 30 photos).
+    Hi-res mid-field rendering gives a noisy, non-significant change in inlier counts.
+  - Eye position from parallax works only on the minority of photos with dense mid-band matches (3-4/30), and the
+    app-grade (3.3 m DEM, z16 ortho) render already achieves it there.
+  - The frozen solver design (far5 rotation, fixed ref rotation for the displaced render) turns many photos into
+    automatic failures; a redesigned solver would lift the post-hoc numbers a little, but the G50h ceiling (20-23 %)
+    and the (a) null make a pass at 60 % implausible.
+
+LIMITATIONS
+  - T is not surveyed; errors include T's own error (wc_0094/0088 suggest T is off by 15-30 m on some photos).
+  - Displaced eyes use the ref rotation for the render and fixed intrinsics; a real pipeline would re-render after
+    each update. LoMa secondary not run (optional; never verdict-relevant).
+  - n = 30; CIs are wide, but the primary point value (10 %) is far from the 60 % bar.
+
+FILES (all under tools/research/fund/e3_nearfield/)
+  PROTOCOL.txt (frozen) DEVIATIONS.txt REPORT.txt results.json analyse_out.txt analyse_posthoc_out.txt
+  nf_geo.py nf_data.py nf_render.py e3_run.py e3_posthoc.py analyse.py analyse_posthoc.py run_c.sh
+  out/ (30) out_posthoc/ (30) corr/ examples/ run_a.log run_b.log run_ph.log run_c.log
+  Downloaded swisstopo grids/tiles (data/) deleted. Nothing written outside this directory.

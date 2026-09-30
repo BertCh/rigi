@@ -1,0 +1,4680 @@
+{
+ "n": 30,
+ "pids": [
+  "wc_0002",
+  "wc_0004",
+  "wc_0006",
+  "wc_0009",
+  "wc_0011",
+  "wc_0014",
+  "wc_0017",
+  "wc_0019",
+  "wc_0020",
+  "wc_0027",
+  "wc_0028",
+  "wc_0034",
+  "wc_0046",
+  "wc_0047",
+  "wc_0048",
+  "wc_0052",
+  "wc_0054",
+  "wc_0055",
+  "wc_0059",
+  "wc_0063",
+  "wc_0067",
+  "wc_0071",
+  "wc_0072",
+  "wc_0076",
+  "wc_0077",
+  "wc_0082",
+  "wc_0085",
+  "wc_0088",
+  "wc_0094",
+  "wc_0099"
+ ],
+ "validation": {
+  "V0e_nearMedRel": 0.02310768152905858,
+  "V1_nearMedRel": 0.030425315017146966,
+  "V1_midMedRel": 0.0011075745033596357,
+  "V0e_gray": 0.9360063645647705,
+  "V1_gray": 0.8788884063505917,
+  "reproj": 0.0011374471389844728,
+  "cov": 1.0,
+  "clampT": 1,
+  "minCoverage": 1.0
+ },
+ "a": {
+  "perPhoto": {
+   "wc_0002": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 1,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 1,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 1,
+     "lift<2km": 87
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 1,
+     "lift<2km": 91
+    }
+   },
+   "wc_0004": {
+    "V0": {
+     "inl<2km": 446,
+     "inl_far": 1271,
+     "lift<2km": 522
+    },
+    "V0e": {
+     "inl<2km": 450,
+     "inl_far": 1254,
+     "lift<2km": 539
+    },
+    "V1": {
+     "inl<2km": 459,
+     "inl_far": 1248,
+     "lift<2km": 564
+    },
+    "V2": {
+     "inl<2km": 468,
+     "inl_far": 1268,
+     "lift<2km": 553
+    }
+   },
+   "wc_0006": {
+    "V0": {
+     "inl<2km": 60,
+     "inl_far": 0,
+     "lift<2km": 844
+    },
+    "V0e": {
+     "inl<2km": 50,
+     "inl_far": 0,
+     "lift<2km": 796
+    },
+    "V1": {
+     "inl<2km": 42,
+     "inl_far": 0,
+     "lift<2km": 818
+    },
+    "V2": {
+     "inl<2km": 39,
+     "inl_far": 0,
+     "lift<2km": 816
+    }
+   },
+   "wc_0009": {
+    "V0": {
+     "inl<2km": 786,
+     "inl_far": 145,
+     "lift<2km": 899
+    },
+    "V0e": {
+     "inl<2km": 848,
+     "inl_far": 146,
+     "lift<2km": 944
+    },
+    "V1": {
+     "inl<2km": 1072,
+     "inl_far": 126,
+     "lift<2km": 1200
+    },
+    "V2": {
+     "inl<2km": 1056,
+     "inl_far": 127,
+     "lift<2km": 1180
+    }
+   },
+   "wc_0011": {
+    "V0": {
+     "inl<2km": 120,
+     "inl_far": 494,
+     "lift<2km": 179
+    },
+    "V0e": {
+     "inl<2km": 113,
+     "inl_far": 494,
+     "lift<2km": 182
+    },
+    "V1": {
+     "inl<2km": 144,
+     "inl_far": 497,
+     "lift<2km": 217
+    },
+    "V2": {
+     "inl<2km": 225,
+     "inl_far": 567,
+     "lift<2km": 296
+    }
+   },
+   "wc_0014": {
+    "V0": {
+     "inl<2km": 174,
+     "inl_far": 496,
+     "lift<2km": 295
+    },
+    "V0e": {
+     "inl<2km": 183,
+     "inl_far": 494,
+     "lift<2km": 298
+    },
+    "V1": {
+     "inl<2km": 228,
+     "inl_far": 496,
+     "lift<2km": 350
+    },
+    "V2": {
+     "inl<2km": 220,
+     "inl_far": 493,
+     "lift<2km": 351
+    }
+   },
+   "wc_0017": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 561,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 561,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 561,
+     "lift<2km": 0
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 561,
+     "lift<2km": 0
+    }
+   },
+   "wc_0019": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 634,
+     "lift<2km": 1
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 586,
+     "lift<2km": 8
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 558,
+     "lift<2km": 108
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 542,
+     "lift<2km": 105
+    }
+   },
+   "wc_0020": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 585,
+     "lift<2km": 10
+    },
+    "V0e": {
+     "inl<2km": 2,
+     "inl_far": 603,
+     "lift<2km": 7
+    },
+    "V1": {
+     "inl<2km": 3,
+     "inl_far": 575,
+     "lift<2km": 14
+    },
+    "V2": {
+     "inl<2km": 2,
+     "inl_far": 571,
+     "lift<2km": 13
+    }
+   },
+   "wc_0027": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 302,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 299,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 1,
+     "inl_far": 283,
+     "lift<2km": 1
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 287,
+     "lift<2km": 1
+    }
+   },
+   "wc_0028": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 2,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 2,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 2,
+     "lift<2km": 0
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 2,
+     "lift<2km": 0
+    }
+   },
+   "wc_0034": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    }
+   },
+   "wc_0046": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 31,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 31,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 31,
+     "lift<2km": 0
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 34,
+     "lift<2km": 0
+    }
+   },
+   "wc_0047": {
+    "V0": {
+     "inl<2km": 142,
+     "inl_far": 158,
+     "lift<2km": 1169
+    },
+    "V0e": {
+     "inl<2km": 182,
+     "inl_far": 38,
+     "lift<2km": 730
+    },
+    "V1": {
+     "inl<2km": 144,
+     "inl_far": 2,
+     "lift<2km": 549
+    },
+    "V2": {
+     "inl<2km": 143,
+     "inl_far": 2,
+     "lift<2km": 560
+    }
+   },
+   "wc_0048": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 1037,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 1037,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 1037,
+     "lift<2km": 0
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 941,
+     "lift<2km": 0
+    }
+   },
+   "wc_0052": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    }
+   },
+   "wc_0054": {
+    "V0": {
+     "inl<2km": 5,
+     "inl_far": 579,
+     "lift<2km": 53
+    },
+    "V0e": {
+     "inl<2km": 10,
+     "inl_far": 582,
+     "lift<2km": 41
+    },
+    "V1": {
+     "inl<2km": 38,
+     "inl_far": 563,
+     "lift<2km": 84
+    },
+    "V2": {
+     "inl<2km": 76,
+     "inl_far": 577,
+     "lift<2km": 135
+    }
+   },
+   "wc_0055": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 21
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 17
+    },
+    "V1": {
+     "inl<2km": 1,
+     "inl_far": 0,
+     "lift<2km": 38
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 40
+    }
+   },
+   "wc_0059": {
+    "V0": {
+     "inl<2km": 20,
+     "inl_far": 154,
+     "lift<2km": 54
+    },
+    "V0e": {
+     "inl<2km": 22,
+     "inl_far": 226,
+     "lift<2km": 68
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 41,
+     "lift<2km": 5
+    },
+    "V2": {
+     "inl<2km": 30,
+     "inl_far": 221,
+     "lift<2km": 114
+    }
+   },
+   "wc_0063": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 280,
+     "lift<2km": 1
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 269,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 248,
+     "lift<2km": 7
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 245,
+     "lift<2km": 8
+    }
+   },
+   "wc_0067": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 542,
+     "lift<2km": 2
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 536,
+     "lift<2km": 2
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 495,
+     "lift<2km": 3
+    },
+    "V2": {
+     "inl<2km": 1,
+     "inl_far": 548,
+     "lift<2km": 2
+    }
+   },
+   "wc_0071": {
+    "V0": {
+     "inl<2km": 94,
+     "inl_far": 4,
+     "lift<2km": 419
+    },
+    "V0e": {
+     "inl<2km": 104,
+     "inl_far": 2,
+     "lift<2km": 393
+    },
+    "V1": {
+     "inl<2km": 91,
+     "inl_far": 3,
+     "lift<2km": 418
+    },
+    "V2": {
+     "inl<2km": 96,
+     "inl_far": 3,
+     "lift<2km": 422
+    }
+   },
+   "wc_0072": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 46,
+     "lift<2km": 5
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 46,
+     "lift<2km": 12
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 46,
+     "lift<2km": 2
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 1
+    }
+   },
+   "wc_0076": {
+    "V0": {
+     "inl<2km": 123,
+     "inl_far": 221,
+     "lift<2km": 341
+    },
+    "V0e": {
+     "inl<2km": 112,
+     "inl_far": 226,
+     "lift<2km": 377
+    },
+    "V1": {
+     "inl<2km": 112,
+     "inl_far": 223,
+     "lift<2km": 353
+    },
+    "V2": {
+     "inl<2km": 38,
+     "inl_far": 222,
+     "lift<2km": 775
+    }
+   },
+   "wc_0077": {
+    "V0": {
+     "inl<2km": 1,
+     "inl_far": 1418,
+     "lift<2km": 82
+    },
+    "V0e": {
+     "inl<2km": 4,
+     "inl_far": 1420,
+     "lift<2km": 67
+    },
+    "V1": {
+     "inl<2km": 11,
+     "inl_far": 1280,
+     "lift<2km": 66
+    },
+    "V2": {
+     "inl<2km": 7,
+     "inl_far": 1306,
+     "lift<2km": 63
+    }
+   },
+   "wc_0082": {
+    "V0": {
+     "inl<2km": 42,
+     "inl_far": 289,
+     "lift<2km": 506
+    },
+    "V0e": {
+     "inl<2km": 65,
+     "inl_far": 285,
+     "lift<2km": 511
+    },
+    "V1": {
+     "inl<2km": 64,
+     "inl_far": 263,
+     "lift<2km": 495
+    },
+    "V2": {
+     "inl<2km": 27,
+     "inl_far": 299,
+     "lift<2km": 585
+    }
+   },
+   "wc_0085": {
+    "V0": {
+     "inl<2km": 285,
+     "inl_far": 15,
+     "lift<2km": 374
+    },
+    "V0e": {
+     "inl<2km": 276,
+     "inl_far": 17,
+     "lift<2km": 354
+    },
+    "V1": {
+     "inl<2km": 241,
+     "inl_far": 15,
+     "lift<2km": 317
+    },
+    "V2": {
+     "inl<2km": 236,
+     "inl_far": 11,
+     "lift<2km": 300
+    }
+   },
+   "wc_0088": {
+    "V0": {
+     "inl<2km": 19,
+     "inl_far": 1112,
+     "lift<2km": 78
+    },
+    "V0e": {
+     "inl<2km": 4,
+     "inl_far": 1189,
+     "lift<2km": 10
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 0,
+     "lift<2km": 0
+    }
+   },
+   "wc_0094": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 454,
+     "lift<2km": 514
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 451,
+     "lift<2km": 528
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 425,
+     "lift<2km": 587
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 429,
+     "lift<2km": 581
+    }
+   },
+   "wc_0099": {
+    "V0": {
+     "inl<2km": 0,
+     "inl_far": 257,
+     "lift<2km": 0
+    },
+    "V0e": {
+     "inl<2km": 0,
+     "inl_far": 256,
+     "lift<2km": 0
+    },
+    "V1": {
+     "inl<2km": 0,
+     "inl_far": 257,
+     "lift<2km": 0
+    },
+    "V2": {
+     "inl<2km": 0,
+     "inl_far": 256,
+     "lift<2km": 0
+    }
+   }
+  },
+  "V0e_vs_V0_log2gain_0-2km": [
+   0.09003748830800878,
+   -0.1165868660505693,
+   0.28991968515164585
+  ],
+  "V0e_vs_V0_medianDiff_0-2km": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "V0e_sum_inl_0-2km": 2425,
+  "V0e_sum_inl_near": 6,
+  "V0e_sum_lift_near": 84,
+  "V0e_sum_inl_mid": 2419,
+  "V0e_sum_lift_mid": 5800,
+  "V0e_sum_inl_far": 11051,
+  "V0e_sum_lift_far": 17027,
+  "V0e_photos_with_any_inl_0-2km": 15,
+  "V1_vs_V0_log2gain_0-2km": [
+   0.046637264138795646,
+   -0.48037282497245465,
+   0.5086459263550197
+  ],
+  "V1_vs_V0_medianDiff_0-2km": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "V1_sum_inl_0-2km": 2651,
+  "V1_sum_inl_near": 12,
+  "V1_sum_lift_near": 222,
+  "V1_sum_inl_mid": 2639,
+  "V1_sum_lift_mid": 6061,
+  "V1_sum_inl_far": 9276,
+  "V1_sum_lift_far": 14693,
+  "V1_photos_with_any_inl_0-2km": 15,
+  "V2_vs_V0_log2gain_0-2km": [
+   0.1037355692372644,
+   -0.3401256039690009,
+   0.5269990653957376
+  ],
+  "V2_vs_V0_medianDiff_0-2km": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "V2_sum_inl_0-2km": 2664,
+  "V2_sum_inl_near": 21,
+  "V2_sum_lift_near": 255,
+  "V2_sum_inl_mid": 2643,
+  "V2_sum_lift_mid": 6737,
+  "V2_sum_inl_far": 9513,
+  "V2_sum_lift_far": 14959,
+  "V2_photos_with_any_inl_0-2km": 15,
+  "V0_sum_inl_near": 7,
+  "V0_sum_lift_near": 78,
+  "V0_sum_inl_mid": 2310,
+  "V0_sum_lift_mid": 6291,
+  "V0_sum_inl_far": 11088,
+  "V0_sum_lift_far": 17252,
+  "V0_sum_inl_0-2km": 2317,
+  "V0_photos_with_any_inl_0-2km": 14,
+  "cutEffect_V0_near_inliers_regained": 7,
+  "GAIN": false
+ },
+ "b": {
+  "G50_V2_3dof": {
+   "n": 30,
+   "fracBetter": [
+    0.1,
+    0.0,
+    0.23333333333333334
+   ],
+   "nBetter": 3,
+   "nSolved": 6,
+   "failReasons": {
+    "rotation it0": 20,
+    "centre it0": 4
+   },
+   "medianErrEst": 50.21786990242314,
+   "medianErrGps": 50.331238620912686,
+   "fracBetterH": 0.1,
+   "solvedOnly_medianErr": 44.19552750979719,
+   "solvedOnly_fracBetter": 0.5,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 70.0,
+     "est": 70.0,
+     "fail": "rotation it0",
+     "nFar5": 6,
+     "nNearMid": 25,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 59.9,
+     "est": 59.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0006": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 341,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0011": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 388,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 1278,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 35,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 50.1,
+     "est": 115.1,
+     "fail": null,
+     "nFar5": 541,
+     "nNearMid": 7,
+     "ctrInl": 6
+    },
+    "wc_0027": {
+     "gps": 50.1,
+     "est": 56.3,
+     "fail": null,
+     "nFar5": 694,
+     "nNearMid": 14,
+     "ctrInl": 12
+    },
+    "wc_0028": {
+     "gps": 50.7,
+     "est": 50.7,
+     "fail": "centre it0",
+     "nFar5": 436,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 51.9,
+     "est": 51.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 2,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 1115,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 880,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 50.5,
+     "est": 50.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 56.3,
+     "est": 56.3,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0055": {
+     "gps": 50.6,
+     "est": 50.6,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 37,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 50,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 52.0,
+     "est": 52.0,
+     "fail": "rotation it0",
+     "nFar5": 6,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0067": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 11,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 396,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 50.8,
+     "est": 409.4,
+     "fail": null,
+     "nFar5": 46,
+     "nNearMid": 14,
+     "ctrInl": 7
+    },
+    "wc_0076": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 788,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 68.5,
+     "est": 68.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0082": {
+     "gps": 50.8,
+     "est": 7.3,
+     "fail": null,
+     "nFar5": 229,
+     "nNearMid": 522,
+     "ctrInl": 461
+    },
+    "wc_0085": {
+     "gps": 54.1,
+     "est": 54.1,
+     "fail": "rotation it0",
+     "nFar5": 7,
+     "nNearMid": 308,
+     "ctrInl": null
+    },
+    "wc_0088": {
+     "gps": 50.4,
+     "est": 14.9,
+     "fail": null,
+     "nFar5": 421,
+     "nNearMid": 94,
+     "ctrInl": 82
+    },
+    "wc_0094": {
+     "gps": 50.7,
+     "est": 32.1,
+     "fail": null,
+     "nFar5": 329,
+     "nNearMid": 549,
+     "ctrInl": 531
+    },
+    "wc_0099": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 323,
+     "nNearMid": 0,
+     "ctrInl": null
+    }
+   }
+  },
+  "G50_V2_2dof": {
+   "n": 30,
+   "fracBetter": [
+    0.1,
+    0.0,
+    0.23333333333333334
+   ],
+   "nBetter": 3,
+   "nSolved": 3,
+   "failReasons": {
+    "rotation it0": 20,
+    "centre it0": 7
+   },
+   "medianErrEst": 50.1699248331327,
+   "medianErrGps": 50.331238620912686,
+   "fracBetterH": 0.1,
+   "solvedOnly_medianErr": 17.26012406531842,
+   "solvedOnly_fracBetter": 1.0,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 70.0,
+     "est": 70.0,
+     "fail": "rotation it0",
+     "nFar5": 6,
+     "nNearMid": 25,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 59.9,
+     "est": 59.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0006": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 341,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0011": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 388,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 1278,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 35,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 541,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 694,
+     "nNearMid": 14,
+     "ctrInl": null
+    },
+    "wc_0028": {
+     "gps": 50.7,
+     "est": 50.7,
+     "fail": "centre it0",
+     "nFar5": 436,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 51.9,
+     "est": 51.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 2,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 1115,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 880,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 50.5,
+     "est": 50.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 56.3,
+     "est": 56.3,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0055": {
+     "gps": 50.6,
+     "est": 50.6,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 37,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 50,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 52.0,
+     "est": 52.0,
+     "fail": "rotation it0",
+     "nFar5": 6,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0067": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 11,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 396,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "centre it0",
+     "nFar5": 46,
+     "nNearMid": 14,
+     "ctrInl": null
+    },
+    "wc_0076": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 788,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 68.5,
+     "est": 68.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0082": {
+     "gps": 50.8,
+     "est": 12.0,
+     "fail": null,
+     "nFar5": 229,
+     "nNearMid": 522,
+     "ctrInl": 10
+    },
+    "wc_0085": {
+     "gps": 54.1,
+     "est": 54.1,
+     "fail": "rotation it0",
+     "nFar5": 7,
+     "nNearMid": 308,
+     "ctrInl": null
+    },
+    "wc_0088": {
+     "gps": 50.4,
+     "est": 17.3,
+     "fail": null,
+     "nFar5": 421,
+     "nNearMid": 94,
+     "ctrInl": 83
+    },
+    "wc_0094": {
+     "gps": 50.7,
+     "est": 31.7,
+     "fail": null,
+     "nFar5": 329,
+     "nNearMid": 549,
+     "ctrInl": 530
+    },
+    "wc_0099": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 323,
+     "nNearMid": 0,
+     "ctrInl": null
+    }
+   }
+  },
+  "G50_V1_3dof": {
+   "n": 30,
+   "fracBetter": [
+    0.1,
+    0.0,
+    0.23333333333333334
+   ],
+   "nBetter": 3,
+   "nSolved": 5,
+   "failReasons": {
+    "rotation it0": 19,
+    "centre it0": 6
+   },
+   "medianErrEst": 50.199615780722795,
+   "medianErrGps": 50.331238620912686,
+   "fracBetterH": 0.1,
+   "solvedOnly_medianErr": 31.988764612545765,
+   "solvedOnly_fracBetter": 0.6,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 70.0,
+     "est": 70.0,
+     "fail": "rotation it0",
+     "nFar5": 5,
+     "nNearMid": 28,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 59.9,
+     "est": 59.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0006": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 343,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 10,
+     "ctrInl": null
+    },
+    "wc_0011": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 318,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 1278,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 41,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 543,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 50.1,
+     "est": 73.3,
+     "fail": null,
+     "nFar5": 686,
+     "nNearMid": 12,
+     "ctrInl": 12
+    },
+    "wc_0028": {
+     "gps": 50.7,
+     "est": 50.7,
+     "fail": "centre it0",
+     "nFar5": 446,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 51.9,
+     "est": 51.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 1100,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 880,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 50.5,
+     "est": 50.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 56.3,
+     "est": 56.3,
+     "fail": "centre it0",
+     "nFar5": 176,
+     "nNearMid": 2,
+     "ctrInl": null
+    },
+    "wc_0055": {
+     "gps": 50.6,
+     "est": 50.6,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 35,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 52.0,
+     "est": 52.0,
+     "fail": "rotation it0",
+     "nFar5": 7,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0067": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 4,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 372,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 50.8,
+     "est": 229.7,
+     "fail": null,
+     "nFar5": 40,
+     "nNearMid": 17,
+     "ctrInl": 7
+    },
+    "wc_0076": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 288,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 68.5,
+     "est": 68.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0082": {
+     "gps": 50.8,
+     "est": 7.2,
+     "fail": null,
+     "nFar5": 177,
+     "nNearMid": 456,
+     "ctrInl": 337
+    },
+    "wc_0085": {
+     "gps": 54.1,
+     "est": 54.1,
+     "fail": "rotation it0",
+     "nFar5": 8,
+     "nNearMid": 325,
+     "ctrInl": null
+    },
+    "wc_0088": {
+     "gps": 50.4,
+     "est": 16.3,
+     "fail": null,
+     "nFar5": 421,
+     "nNearMid": 88,
+     "ctrInl": 81
+    },
+    "wc_0094": {
+     "gps": 50.7,
+     "est": 32.0,
+     "fail": null,
+     "nFar5": 330,
+     "nNearMid": 552,
+     "ctrInl": 535
+    },
+    "wc_0099": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 319,
+     "nNearMid": 0,
+     "ctrInl": null
+    }
+   }
+  },
+  "G50_V1_2dof": {
+   "n": 30,
+   "fracBetter": [
+    0.1,
+    0.0,
+    0.23333333333333334
+   ],
+   "nBetter": 3,
+   "nSolved": 4,
+   "failReasons": {
+    "rotation it0": 19,
+    "centre it1": 1,
+    "centre it0": 6
+   },
+   "medianErrEst": 50.199615780722795,
+   "medianErrGps": 50.331238620912686,
+   "fracBetterH": 0.1,
+   "solvedOnly_medianErr": 24.63245308540437,
+   "solvedOnly_fracBetter": 0.75,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 70.0,
+     "est": 70.0,
+     "fail": "rotation it0",
+     "nFar5": 5,
+     "nNearMid": 28,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 59.9,
+     "est": 59.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0006": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 343,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 10,
+     "ctrInl": null
+    },
+    "wc_0011": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 318,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 1278,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 41,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 543,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 50.1,
+     "est": 51.0,
+     "fail": null,
+     "nFar5": 686,
+     "nNearMid": 12,
+     "ctrInl": 9
+    },
+    "wc_0028": {
+     "gps": 50.7,
+     "est": 50.7,
+     "fail": "centre it0",
+     "nFar5": 446,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 51.9,
+     "est": 51.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 1100,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 880,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 50.5,
+     "est": 50.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 56.3,
+     "est": 56.3,
+     "fail": "centre it0",
+     "nFar5": 176,
+     "nNearMid": 2,
+     "ctrInl": null
+    },
+    "wc_0055": {
+     "gps": 50.6,
+     "est": 50.6,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 35,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 52.0,
+     "est": 52.0,
+     "fail": "rotation it0",
+     "nFar5": 7,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0067": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 4,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 372,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "centre it1",
+     "nFar5": 40,
+     "nNearMid": 17,
+     "ctrInl": 7
+    },
+    "wc_0076": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 288,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 68.5,
+     "est": 68.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0082": {
+     "gps": 50.8,
+     "est": 14.9,
+     "fail": null,
+     "nFar5": 177,
+     "nNearMid": 456,
+     "ctrInl": 31
+    },
+    "wc_0085": {
+     "gps": 54.1,
+     "est": 54.1,
+     "fail": "rotation it0",
+     "nFar5": 8,
+     "nNearMid": 325,
+     "ctrInl": null
+    },
+    "wc_0088": {
+     "gps": 50.4,
+     "est": 17.6,
+     "fail": null,
+     "nFar5": 421,
+     "nNearMid": 88,
+     "ctrInl": 81
+    },
+    "wc_0094": {
+     "gps": 50.7,
+     "est": 31.7,
+     "fail": null,
+     "nFar5": 330,
+     "nNearMid": 552,
+     "ctrInl": 534
+    },
+    "wc_0099": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 319,
+     "nNearMid": 0,
+     "ctrInl": null
+    }
+   }
+  },
+  "G50_V0e_3dof": {
+   "n": 30,
+   "fracBetter": [
+    0.13333333333333333,
+    0.03333333333333333,
+    0.26666666666666666
+   ],
+   "nBetter": 4,
+   "nSolved": 4,
+   "failReasons": {
+    "rotation it0": 17,
+    "centre it0": 9
+   },
+   "medianErrEst": 50.1699248331327,
+   "medianErrGps": 50.331238620912686,
+   "fracBetterH": 0.1,
+   "solvedOnly_medianErr": 23.49698003625443,
+   "solvedOnly_fracBetter": 1.0,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 70.0,
+     "est": 70.0,
+     "fail": "rotation it0",
+     "nFar5": 9,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 59.9,
+     "est": 59.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0006": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 419,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0011": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 299,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 1278,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 3,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 613,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 812,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0028": {
+     "gps": 50.7,
+     "est": 50.7,
+     "fail": "centre it0",
+     "nFar5": 447,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 51.9,
+     "est": 51.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 1199,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 880,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 50.5,
+     "est": 50.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 56.3,
+     "est": 56.3,
+     "fail": "centre it0",
+     "nFar5": 182,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0055": {
+     "gps": 50.6,
+     "est": 50.6,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 13,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 13,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 52.0,
+     "est": 52.0,
+     "fail": "rotation it0",
+     "nFar5": 3,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0067": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 12,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 357,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "centre it0",
+     "nFar5": 43,
+     "nNearMid": 14,
+     "ctrInl": null
+    },
+    "wc_0076": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 294,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 68.5,
+     "est": 52.8,
+     "fail": null,
+     "nFar5": 193,
+     "nNearMid": 10,
+     "ctrInl": 8
+    },
+    "wc_0082": {
+     "gps": 50.8,
+     "est": 5.8,
+     "fail": null,
+     "nFar5": 195,
+     "nNearMid": 461,
+     "ctrInl": 382
+    },
+    "wc_0085": {
+     "gps": 54.1,
+     "est": 54.1,
+     "fail": "rotation it0",
+     "nFar5": 3,
+     "nNearMid": 311,
+     "ctrInl": null
+    },
+    "wc_0088": {
+     "gps": 50.4,
+     "est": 15.2,
+     "fail": null,
+     "nFar5": 420,
+     "nNearMid": 89,
+     "ctrInl": 80
+    },
+    "wc_0094": {
+     "gps": 50.7,
+     "est": 31.8,
+     "fail": null,
+     "nFar5": 348,
+     "nNearMid": 498,
+     "ctrInl": 473
+    },
+    "wc_0099": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 318,
+     "nNearMid": 0,
+     "ctrInl": null
+    }
+   }
+  },
+  "G50_V0e_2dof": {
+   "n": 30,
+   "fracBetter": [
+    0.13333333333333333,
+    0.03333333333333333,
+    0.26666666666666666
+   ],
+   "nBetter": 4,
+   "nSolved": 4,
+   "failReasons": {
+    "rotation it0": 17,
+    "centre it0": 9
+   },
+   "medianErrEst": 50.1499389974778,
+   "medianErrGps": 50.331238620912686,
+   "fracBetterH": 0.13333333333333333,
+   "solvedOnly_medianErr": 21.36510050278115,
+   "solvedOnly_fracBetter": 1.0,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 70.0,
+     "est": 70.0,
+     "fail": "rotation it0",
+     "nFar5": 9,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 59.9,
+     "est": 59.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0006": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 419,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0011": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 299,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 1278,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 3,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 613,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 812,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0028": {
+     "gps": 50.7,
+     "est": 50.7,
+     "fail": "centre it0",
+     "nFar5": 447,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 51.9,
+     "est": 51.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 1,
+     "nNearMid": 1199,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 880,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 50.5,
+     "est": 50.5,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 56.3,
+     "est": 56.3,
+     "fail": "centre it0",
+     "nFar5": 182,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0055": {
+     "gps": 50.6,
+     "est": 50.6,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 13,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 13,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 52.0,
+     "est": 52.0,
+     "fail": "rotation it0",
+     "nFar5": 3,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0067": {
+     "gps": 50.1,
+     "est": 50.1,
+     "fail": "centre it0",
+     "nFar5": 12,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 50.2,
+     "est": 50.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 357,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 50.8,
+     "est": 50.8,
+     "fail": "centre it0",
+     "nFar5": 43,
+     "nNearMid": 14,
+     "ctrInl": null
+    },
+    "wc_0076": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 294,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 68.5,
+     "est": 25.5,
+     "fail": null,
+     "nFar5": 193,
+     "nNearMid": 10,
+     "ctrInl": 8
+    },
+    "wc_0082": {
+     "gps": 50.8,
+     "est": 14.9,
+     "fail": null,
+     "nFar5": 195,
+     "nNearMid": 461,
+     "ctrInl": 26
+    },
+    "wc_0085": {
+     "gps": 54.1,
+     "est": 54.1,
+     "fail": "rotation it0",
+     "nFar5": 3,
+     "nNearMid": 311,
+     "ctrInl": null
+    },
+    "wc_0088": {
+     "gps": 50.4,
+     "est": 17.3,
+     "fail": null,
+     "nFar5": 420,
+     "nNearMid": 89,
+     "ctrInl": 81
+    },
+    "wc_0094": {
+     "gps": 50.7,
+     "est": 31.1,
+     "fail": null,
+     "nFar5": 348,
+     "nNearMid": 498,
+     "ctrInl": 473
+    },
+    "wc_0099": {
+     "gps": 50.0,
+     "est": 50.0,
+     "fail": "centre it0",
+     "nFar5": 318,
+     "nNearMid": 0,
+     "ctrInl": null
+    }
+   }
+  },
+  "G20_V2_3dof": {
+   "n": 30,
+   "fracBetter": [
+    0.23333333333333334,
+    0.1,
+    0.4
+   ],
+   "nBetter": 7,
+   "nSolved": 9,
+   "failReasons": {
+    "rotation it0": 13,
+    "centre it0": 8
+   },
+   "medianErrEst": 20.055623354290294,
+   "medianErrGps": 20.18743530669266,
+   "fracBetterH": 0.23333333333333334,
+   "solvedOnly_medianErr": 16.061325480319905,
+   "solvedOnly_fracBetter": 0.7777777777777778,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 36.9,
+     "est": 36.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 27.6,
+     "est": 6.0,
+     "fail": null,
+     "nFar5": 883,
+     "nNearMid": 509,
+     "ctrInl": 502
+    },
+    "wc_0006": {
+     "gps": 20.7,
+     "est": 20.7,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1156,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 20.7,
+     "est": 12.4,
+     "fail": null,
+     "nFar5": 181,
+     "nNearMid": 1004,
+     "ctrInl": 950
+    },
+    "wc_0011": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 405,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 20.4,
+     "est": 20.4,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 20.2,
+     "est": 20.2,
+     "fail": "centre it0",
+     "nFar5": 1284,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 148,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "centre it0",
+     "nFar5": 534,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 20.6,
+     "est": 20.6,
+     "fail": "centre it0",
+     "nFar5": 636,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0028": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "centre it0",
+     "nFar5": 420,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 20.3,
+     "est": 20.3,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 20.2,
+     "est": 20.2,
+     "fail": "centre it0",
+     "nFar5": 25,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 20.2,
+     "est": 20.2,
+     "fail": "centre it0",
+     "nFar5": 866,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 21.6,
+     "est": 18.9,
+     "fail": null,
+     "nFar5": 172,
+     "nNearMid": 88,
+     "ctrInl": 55
+    },
+    "wc_0055": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 30,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 20.2,
+     "est": 20.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 59,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 20.2,
+     "est": 81.7,
+     "fail": null,
+     "nFar5": 137,
+     "nNearMid": 37,
+     "ctrInl": 21
+    },
+    "wc_0067": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 2,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 481,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "centre it0",
+     "nFar5": 47,
+     "nNearMid": 10,
+     "ctrInl": null
+    },
+    "wc_0076": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 832,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 30.4,
+     "est": 20.5,
+     "fail": null,
+     "nFar5": 299,
+     "nNearMid": 61,
+     "ctrInl": 48
+    },
+    "wc_0082": {
+     "gps": 20.1,
+     "est": 9.5,
+     "fail": null,
+     "nFar5": 216,
+     "nNearMid": 591,
+     "ctrInl": 535
+    },
+    "wc_0085": {
+     "gps": 20.5,
+     "est": 16.1,
+     "fail": null,
+     "nFar5": 10,
+     "nNearMid": 308,
+     "ctrInl": 252
+    },
+    "wc_0088": {
+     "gps": 21.1,
+     "est": 14.8,
+     "fail": null,
+     "nFar5": 412,
+     "nNearMid": 83,
+     "ctrInl": 75
+    },
+    "wc_0094": {
+     "gps": 20.6,
+     "est": 32.0,
+     "fail": null,
+     "nFar5": 328,
+     "nNearMid": 569,
+     "ctrInl": 557
+    },
+    "wc_0099": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "centre it0",
+     "nFar5": 366,
+     "nNearMid": 0,
+     "ctrInl": null
+    }
+   }
+  },
+  "G20_V2_2dof": {
+   "n": 30,
+   "fracBetter": [
+    0.2,
+    0.06666666666666667,
+    0.36666666666666664
+   ],
+   "nBetter": 6,
+   "nSolved": 8,
+   "failReasons": {
+    "rotation it0": 13,
+    "centre it0": 9
+   },
+   "medianErrEst": 20.063330923906253,
+   "medianErrGps": 20.18743530669266,
+   "fracBetterH": 0.2,
+   "solvedOnly_medianErr": 16.12492635753618,
+   "solvedOnly_fracBetter": 0.75,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 36.9,
+     "est": 36.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 27.6,
+     "est": 6.1,
+     "fail": null,
+     "nFar5": 883,
+     "nNearMid": 509,
+     "ctrInl": 502
+    },
+    "wc_0006": {
+     "gps": 20.7,
+     "est": 20.7,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1156,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 20.7,
+     "est": 2.8,
+     "fail": null,
+     "nFar5": 181,
+     "nNearMid": 1004,
+     "ctrInl": 924
+    },
+    "wc_0011": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 405,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 20.4,
+     "est": 20.4,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 20.2,
+     "est": 20.2,
+     "fail": "centre it0",
+     "nFar5": 1284,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 148,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "centre it0",
+     "nFar5": 534,
+     "nNearMid": 7,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 20.6,
+     "est": 20.6,
+     "fail": "centre it0",
+     "nFar5": 636,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0028": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "centre it0",
+     "nFar5": 420,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 20.3,
+     "est": 20.3,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 20.2,
+     "est": 20.2,
+     "fail": "centre it0",
+     "nFar5": 25,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 20.2,
+     "est": 20.2,
+     "fail": "centre it0",
+     "nFar5": 866,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 21.6,
+     "est": 14.9,
+     "fail": null,
+     "nFar5": 172,
+     "nNearMid": 88,
+     "ctrInl": 55
+    },
+    "wc_0055": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 30,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 20.2,
+     "est": 20.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 59,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 20.2,
+     "est": 82.2,
+     "fail": null,
+     "nFar5": 137,
+     "nNearMid": 37,
+     "ctrInl": 14
+    },
+    "wc_0067": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 2,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 481,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "centre it0",
+     "nFar5": 47,
+     "nNearMid": 10,
+     "ctrInl": null
+    },
+    "wc_0076": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 832,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 30.4,
+     "est": 25.3,
+     "fail": null,
+     "nFar5": 299,
+     "nNearMid": 61,
+     "ctrInl": 46
+    },
+    "wc_0082": {
+     "gps": 20.1,
+     "est": 20.1,
+     "fail": "centre it0",
+     "nFar5": 216,
+     "nNearMid": 591,
+     "ctrInl": null
+    },
+    "wc_0085": {
+     "gps": 20.5,
+     "est": 15.6,
+     "fail": null,
+     "nFar5": 10,
+     "nNearMid": 308,
+     "ctrInl": 244
+    },
+    "wc_0088": {
+     "gps": 21.1,
+     "est": 16.7,
+     "fail": null,
+     "nFar5": 412,
+     "nNearMid": 83,
+     "ctrInl": 75
+    },
+    "wc_0094": {
+     "gps": 20.6,
+     "est": 31.0,
+     "fail": null,
+     "nFar5": 328,
+     "nNearMid": 569,
+     "ctrInl": 560
+    },
+    "wc_0099": {
+     "gps": 20.0,
+     "est": 20.0,
+     "fail": "centre it0",
+     "nFar5": 366,
+     "nNearMid": 0,
+     "ctrInl": null
+    }
+   }
+  },
+  "G150_V2_3dof": {
+   "n": 30,
+   "fracBetter": [
+    0.06666666666666667,
+    0.0,
+    0.16666666666666666
+   ],
+   "nBetter": 2,
+   "nSolved": 2,
+   "failReasons": {
+    "rotation it0": 22,
+    "centre it0": 6
+   },
+   "medianErrEst": 150.9795955335007,
+   "medianErrGps": 152.25146491806703,
+   "fracBetterH": 0.06666666666666667,
+   "solvedOnly_medianErr": 22.746439975800154,
+   "solvedOnly_fracBetter": 1.0,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 175.3,
+     "est": 175.3,
+     "fail": "centre it0",
+     "nFar5": 172,
+     "nNearMid": 9,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 183.8,
+     "est": 13.7,
+     "fail": null,
+     "nFar5": 899,
+     "nNearMid": 261,
+     "ctrInl": 255
+    },
+    "wc_0006": {
+     "gps": 156.6,
+     "est": 156.6,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 267,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 201.1,
+     "est": 201.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 3,
+     "ctrInl": null
+    },
+    "wc_0011": {
+     "gps": 158.0,
+     "est": 158.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 361,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 177.7,
+     "est": 177.7,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 156.7,
+     "est": 156.7,
+     "fail": "centre it0",
+     "nFar5": 1228,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 150.1,
+     "est": 150.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 3,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 150.8,
+     "est": 150.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 150.1,
+     "est": 150.1,
+     "fail": "rotation it0",
+     "nFar5": 10,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0028": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "centre it0",
+     "nFar5": 418,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 150.2,
+     "est": 150.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 2,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 152.2,
+     "est": 152.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 419,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 158.8,
+     "est": 158.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 2,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 152.3,
+     "est": 152.3,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 6,
+     "ctrInl": null
+    },
+    "wc_0055": {
+     "gps": 162.4,
+     "est": 162.4,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 16,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 2,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "centre it0",
+     "nFar5": 241,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0067": {
+     "gps": 151.1,
+     "est": 151.1,
+     "fail": "rotation it0",
+     "nFar5": 4,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 2,
+     "nNearMid": 403,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 152.6,
+     "est": 152.6,
+     "fail": "centre it0",
+     "nFar5": 35,
+     "nNearMid": 20,
+     "ctrInl": null
+    },
+    "wc_0076": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 779,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 176.0,
+     "est": 176.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0082": {
+     "gps": 150.3,
+     "est": 150.3,
+     "fail": "rotation it0",
+     "nFar5": 11,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0085": {
+     "gps": 191.9,
+     "est": 191.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0088": {
+     "gps": 175.0,
+     "est": 175.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0094": {
+     "gps": 155.2,
+     "est": 31.8,
+     "fail": null,
+     "nFar5": 316,
+     "nNearMid": 549,
+     "ctrInl": 536
+    },
+    "wc_0099": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "centre it0",
+     "nFar5": 344,
+     "nNearMid": 1,
+     "ctrInl": null
+    }
+   }
+  },
+  "G150_V2_2dof": {
+   "n": 30,
+   "fracBetter": [
+    0.06666666666666667,
+    0.0,
+    0.16666666666666666
+   ],
+   "nBetter": 2,
+   "nSolved": 2,
+   "failReasons": {
+    "rotation it0": 22,
+    "centre it0": 6
+   },
+   "medianErrEst": 150.9795955335007,
+   "medianErrGps": 152.25146491806703,
+   "fracBetterH": 0.06666666666666667,
+   "solvedOnly_medianErr": 19.71949621283578,
+   "solvedOnly_fracBetter": 1.0,
+   "perPhoto": {
+    "wc_0002": {
+     "gps": 175.3,
+     "est": 175.3,
+     "fail": "centre it0",
+     "nFar5": 172,
+     "nNearMid": 9,
+     "ctrInl": null
+    },
+    "wc_0004": {
+     "gps": 183.8,
+     "est": 8.0,
+     "fail": null,
+     "nFar5": 899,
+     "nNearMid": 261,
+     "ctrInl": 234
+    },
+    "wc_0006": {
+     "gps": 156.6,
+     "est": 156.6,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 267,
+     "ctrInl": null
+    },
+    "wc_0009": {
+     "gps": 201.1,
+     "est": 201.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 3,
+     "ctrInl": null
+    },
+    "wc_0011": {
+     "gps": 158.0,
+     "est": 158.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 361,
+     "ctrInl": null
+    },
+    "wc_0014": {
+     "gps": 177.7,
+     "est": 177.7,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0017": {
+     "gps": 156.7,
+     "est": 156.7,
+     "fail": "centre it0",
+     "nFar5": 1228,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0019": {
+     "gps": 150.1,
+     "est": 150.1,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 3,
+     "ctrInl": null
+    },
+    "wc_0020": {
+     "gps": 150.8,
+     "est": 150.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0027": {
+     "gps": 150.1,
+     "est": 150.1,
+     "fail": "rotation it0",
+     "nFar5": 10,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0028": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "centre it0",
+     "nFar5": 418,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0034": {
+     "gps": 150.2,
+     "est": 150.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0046": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 2,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0047": {
+     "gps": 152.2,
+     "est": 152.2,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 419,
+     "ctrInl": null
+    },
+    "wc_0048": {
+     "gps": 158.8,
+     "est": 158.8,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 2,
+     "ctrInl": null
+    },
+    "wc_0052": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0054": {
+     "gps": 152.3,
+     "est": 152.3,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 6,
+     "ctrInl": null
+    },
+    "wc_0055": {
+     "gps": 162.4,
+     "est": 162.4,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 16,
+     "ctrInl": null
+    },
+    "wc_0059": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 2,
+     "ctrInl": null
+    },
+    "wc_0063": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "centre it0",
+     "nFar5": 241,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0067": {
+     "gps": 151.1,
+     "est": 151.1,
+     "fail": "rotation it0",
+     "nFar5": 4,
+     "nNearMid": 1,
+     "ctrInl": null
+    },
+    "wc_0071": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 2,
+     "nNearMid": 403,
+     "ctrInl": null
+    },
+    "wc_0072": {
+     "gps": 152.6,
+     "est": 152.6,
+     "fail": "centre it0",
+     "nFar5": 35,
+     "nNearMid": 20,
+     "ctrInl": null
+    },
+    "wc_0076": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 779,
+     "ctrInl": null
+    },
+    "wc_0077": {
+     "gps": 176.0,
+     "est": 176.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0082": {
+     "gps": 150.3,
+     "est": 150.3,
+     "fail": "rotation it0",
+     "nFar5": 11,
+     "nNearMid": 4,
+     "ctrInl": null
+    },
+    "wc_0085": {
+     "gps": 191.9,
+     "est": 191.9,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0088": {
+     "gps": 175.0,
+     "est": 175.0,
+     "fail": "rotation it0",
+     "nFar5": 0,
+     "nNearMid": 0,
+     "ctrInl": null
+    },
+    "wc_0094": {
+     "gps": 155.2,
+     "est": 31.4,
+     "fail": null,
+     "nFar5": 316,
+     "nNearMid": 549,
+     "ctrInl": 535
+    },
+    "wc_0099": {
+     "gps": 150.0,
+     "est": 150.0,
+     "fail": "centre it0",
+     "nFar5": 344,
+     "nNearMid": 1,
+     "ctrInl": null
+    }
+   }
+  },
+  "PRIMARY_fracBetter": 0.1,
+  "PASS": false,
+  "circularAtT": {
+   "V0": {
+    "nSolved": 10,
+    "medianErrSolved": 15.635253397556347
+   },
+   "V0e": {
+    "nSolved": 9,
+    "medianErrSolved": 10.203451765790932
+   },
+   "V1": {
+    "nSolved": 10,
+    "medianErrSolved": 12.182777824246706
+   },
+   "V2": {
+    "nSolved": 10,
+    "medianErrSolved": 13.384575450663803
+   }
+  },
+  "gpsEyeHeightChange": {
+   "median_dz_G50": 5.684725003638505,
+   "G50_liftedMedian_V2": 328.5,
+   "T_liftedMedian_V2": 752.5
+  }
+ },
+ "refVsStated_m": {
+  "min": 0.0,
+  "median": 0.0,
+  "max": 0.18527928924368098
+ },
+ "c": {
+  "wc_0002": {
+   "V0cut_total": 1,
+   "V0_total": 1,
+   "V1_total": 1,
+   "V2_total": 1,
+   "gainsSupport": false
+  },
+  "wc_0034": {
+   "V0cut_total": 0,
+   "V0_total": 0,
+   "V1_total": 0,
+   "V2_total": 0,
+   "gainsSupport": false
+  },
+  "wc_0052": {
+   "V0cut_total": 0,
+   "V0_total": 0,
+   "V1_total": 0,
+   "V2_total": 0,
+   "gainsSupport": false
+  },
+  "wc_0055": {
+   "V0cut_total": 0,
+   "V0_total": 0,
+   "V1_total": 1,
+   "V2_total": 0,
+   "gainsSupport": false
+  }
+ },
+ "VERDICT": "KILL",
+ "posthoc": {
+  "label": "POST HOC - not used for the verdict",
+  "G50h": {
+   "G50h_V1_3dof": {
+    "n": 30,
+    "nBetter": 7,
+    "fracBetter": [
+     0.23333333333333334,
+     0.1,
+     0.4
+    ],
+    "nSolved": 9,
+    "failReasons": {
+     "centre it0": 6,
+     "rotation it0": 15
+    },
+    "perPhoto": {
+     "wc_0002": {
+      "gps": 50.0,
+      "est": 43.4,
+      "lifted": 430,
+      "fail": null
+     },
+     "wc_0004": {
+      "gps": 50.0,
+      "est": 27.8,
+      "lifted": 1511,
+      "fail": null
+     },
+     "wc_0006": {
+      "gps": 50.2,
+      "est": 50.2,
+      "lifted": 333,
+      "fail": "rotation it0"
+     },
+     "wc_0009": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1,
+      "fail": "rotation it0"
+     },
+     "wc_0011": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 897,
+      "fail": "rotation it0"
+     },
+     "wc_0014": {
+      "gps": 50.0,
+      "est": 2.2,
+      "lifted": 763,
+      "fail": null
+     },
+     "wc_0017": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1260,
+      "fail": "centre it0"
+     },
+     "wc_0019": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 980,
+      "fail": "rotation it0"
+     },
+     "wc_0020": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 575,
+      "fail": "centre it0"
+     },
+     "wc_0027": {
+      "gps": 50.1,
+      "est": 53.5,
+      "lifted": 722,
+      "fail": null
+     },
+     "wc_0028": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 576,
+      "fail": "centre it0"
+     },
+     "wc_0034": {
+      "gps": 51.8,
+      "est": 51.8,
+      "lifted": 9,
+      "fail": "rotation it0"
+     },
+     "wc_0046": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1,
+      "fail": "rotation it0"
+     },
+     "wc_0047": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1241,
+      "fail": "rotation it0"
+     },
+     "wc_0048": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1278,
+      "fail": "centre it0"
+     },
+     "wc_0052": {
+      "gps": 50.5,
+      "est": 50.5,
+      "lifted": 6,
+      "fail": "rotation it0"
+     },
+     "wc_0054": {
+      "gps": 50.0,
+      "est": 5.6,
+      "lifted": 802,
+      "fail": null
+     },
+     "wc_0055": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 39,
+      "fail": "rotation it0"
+     },
+     "wc_0059": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 14,
+      "fail": "rotation it0"
+     },
+     "wc_0063": {
+      "gps": 52.0,
+      "est": 52.0,
+      "lifted": 18,
+      "fail": "rotation it0"
+     },
+     "wc_0067": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 220,
+      "fail": "centre it0"
+     },
+     "wc_0071": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 384,
+      "fail": "rotation it0"
+     },
+     "wc_0072": {
+      "gps": 50.0,
+      "est": 304.3,
+      "lifted": 87,
+      "fail": null
+     },
+     "wc_0076": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 520,
+      "fail": "rotation it0"
+     },
+     "wc_0077": {
+      "gps": 68.5,
+      "est": 68.5,
+      "lifted": 173,
+      "fail": "rotation it0"
+     },
+     "wc_0082": {
+      "gps": 50.0,
+      "est": 9.4,
+      "lifted": 730,
+      "fail": null
+     },
+     "wc_0085": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 343,
+      "fail": "rotation it0"
+     },
+     "wc_0088": {
+      "gps": 50.0,
+      "est": 15.7,
+      "lifted": 1465,
+      "fail": null
+     },
+     "wc_0094": {
+      "gps": 50.0,
+      "est": 31.9,
+      "lifted": 1041,
+      "fail": null
+     },
+     "wc_0099": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 338,
+      "fail": "centre it0"
+     }
+    }
+   },
+   "G50h_V1_2dof": {
+    "n": 30,
+    "nBetter": 6,
+    "fracBetter": [
+     0.2,
+     0.06666666666666667,
+     0.3333333333333333
+    ],
+    "nSolved": 6,
+    "failReasons": {
+     "centre it0": 9,
+     "rotation it0": 15
+    },
+    "perPhoto": {
+     "wc_0002": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 430,
+      "fail": "centre it0"
+     },
+     "wc_0004": {
+      "gps": 50.0,
+      "est": 41.8,
+      "lifted": 1511,
+      "fail": null
+     },
+     "wc_0006": {
+      "gps": 50.2,
+      "est": 50.2,
+      "lifted": 333,
+      "fail": "rotation it0"
+     },
+     "wc_0009": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1,
+      "fail": "rotation it0"
+     },
+     "wc_0011": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 897,
+      "fail": "rotation it0"
+     },
+     "wc_0014": {
+      "gps": 50.0,
+      "est": 5.2,
+      "lifted": 763,
+      "fail": null
+     },
+     "wc_0017": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1260,
+      "fail": "centre it0"
+     },
+     "wc_0019": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 980,
+      "fail": "rotation it0"
+     },
+     "wc_0020": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 575,
+      "fail": "centre it0"
+     },
+     "wc_0027": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 722,
+      "fail": "centre it0"
+     },
+     "wc_0028": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 576,
+      "fail": "centre it0"
+     },
+     "wc_0034": {
+      "gps": 51.8,
+      "est": 51.8,
+      "lifted": 9,
+      "fail": "rotation it0"
+     },
+     "wc_0046": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1,
+      "fail": "rotation it0"
+     },
+     "wc_0047": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1241,
+      "fail": "rotation it0"
+     },
+     "wc_0048": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1278,
+      "fail": "centre it0"
+     },
+     "wc_0052": {
+      "gps": 50.5,
+      "est": 50.5,
+      "lifted": 6,
+      "fail": "rotation it0"
+     },
+     "wc_0054": {
+      "gps": 50.0,
+      "est": 4.1,
+      "lifted": 802,
+      "fail": null
+     },
+     "wc_0055": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 39,
+      "fail": "rotation it0"
+     },
+     "wc_0059": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 14,
+      "fail": "rotation it0"
+     },
+     "wc_0063": {
+      "gps": 52.0,
+      "est": 52.0,
+      "lifted": 18,
+      "fail": "rotation it0"
+     },
+     "wc_0067": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 220,
+      "fail": "centre it0"
+     },
+     "wc_0071": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 384,
+      "fail": "rotation it0"
+     },
+     "wc_0072": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 87,
+      "fail": "centre it0"
+     },
+     "wc_0076": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 520,
+      "fail": "rotation it0"
+     },
+     "wc_0077": {
+      "gps": 68.5,
+      "est": 68.5,
+      "lifted": 173,
+      "fail": "rotation it0"
+     },
+     "wc_0082": {
+      "gps": 50.0,
+      "est": 15.0,
+      "lifted": 730,
+      "fail": null
+     },
+     "wc_0085": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 343,
+      "fail": "rotation it0"
+     },
+     "wc_0088": {
+      "gps": 50.0,
+      "est": 17.7,
+      "lifted": 1465,
+      "fail": null
+     },
+     "wc_0094": {
+      "gps": 50.0,
+      "est": 31.5,
+      "lifted": 1041,
+      "fail": null
+     },
+     "wc_0099": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 338,
+      "fail": "centre it0"
+     }
+    }
+   },
+   "G50h_V2_3dof": {
+    "n": 30,
+    "nBetter": 6,
+    "fracBetter": [
+     0.2,
+     0.06666666666666667,
+     0.36666666666666664
+    ],
+    "nSolved": 8,
+    "failReasons": {
+     "centre it0": 6,
+     "rotation it0": 16
+    },
+    "perPhoto": {
+     "wc_0002": {
+      "gps": 50.0,
+      "est": 45.2,
+      "lifted": 440,
+      "fail": null
+     },
+     "wc_0004": {
+      "gps": 50.0,
+      "est": 15.8,
+      "lifted": 1508,
+      "fail": null
+     },
+     "wc_0006": {
+      "gps": 50.2,
+      "est": 50.2,
+      "lifted": 327,
+      "fail": "rotation it0"
+     },
+     "wc_0009": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 2,
+      "fail": "rotation it0"
+     },
+     "wc_0011": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 957,
+      "fail": "rotation it0"
+     },
+     "wc_0014": {
+      "gps": 50.0,
+      "est": 2.4,
+      "lifted": 799,
+      "fail": null
+     },
+     "wc_0017": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1260,
+      "fail": "centre it0"
+     },
+     "wc_0019": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 949,
+      "fail": "rotation it0"
+     },
+     "wc_0020": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 577,
+      "fail": "centre it0"
+     },
+     "wc_0027": {
+      "gps": 50.1,
+      "est": 53.2,
+      "lifted": 726,
+      "fail": null
+     },
+     "wc_0028": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 591,
+      "fail": "centre it0"
+     },
+     "wc_0034": {
+      "gps": 51.8,
+      "est": 51.8,
+      "lifted": 9,
+      "fail": "rotation it0"
+     },
+     "wc_0046": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 2,
+      "fail": "rotation it0"
+     },
+     "wc_0047": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1243,
+      "fail": "rotation it0"
+     },
+     "wc_0048": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1278,
+      "fail": "centre it0"
+     },
+     "wc_0052": {
+      "gps": 50.5,
+      "est": 50.5,
+      "lifted": 0,
+      "fail": "rotation it0"
+     },
+     "wc_0054": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 769,
+      "fail": "centre it0"
+     },
+     "wc_0055": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 24,
+      "fail": "rotation it0"
+     },
+     "wc_0059": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 198,
+      "fail": "rotation it0"
+     },
+     "wc_0063": {
+      "gps": 52.0,
+      "est": 52.0,
+      "lifted": 12,
+      "fail": "rotation it0"
+     },
+     "wc_0067": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 9,
+      "fail": "rotation it0"
+     },
+     "wc_0071": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 397,
+      "fail": "rotation it0"
+     },
+     "wc_0072": {
+      "gps": 50.0,
+      "est": 252.0,
+      "lifted": 95,
+      "fail": null
+     },
+     "wc_0076": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1050,
+      "fail": "rotation it0"
+     },
+     "wc_0077": {
+      "gps": 68.5,
+      "est": 68.5,
+      "lifted": 173,
+      "fail": "rotation it0"
+     },
+     "wc_0082": {
+      "gps": 50.0,
+      "est": 9.2,
+      "lifted": 902,
+      "fail": null
+     },
+     "wc_0085": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 330,
+      "fail": "rotation it0"
+     },
+     "wc_0088": {
+      "gps": 50.0,
+      "est": 15.5,
+      "lifted": 1469,
+      "fail": null
+     },
+     "wc_0094": {
+      "gps": 50.0,
+      "est": 31.8,
+      "lifted": 1042,
+      "fail": null
+     },
+     "wc_0099": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 341,
+      "fail": "centre it0"
+     }
+    }
+   },
+   "G50h_V2_2dof": {
+    "n": 30,
+    "nBetter": 5,
+    "fracBetter": [
+     0.16666666666666666,
+     0.03333333333333333,
+     0.3
+    ],
+    "nSolved": 6,
+    "failReasons": {
+     "centre it0": 8,
+     "rotation it0": 16
+    },
+    "perPhoto": {
+     "wc_0002": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 440,
+      "fail": "centre it0"
+     },
+     "wc_0004": {
+      "gps": 50.0,
+      "est": 8.0,
+      "lifted": 1508,
+      "fail": null
+     },
+     "wc_0006": {
+      "gps": 50.2,
+      "est": 50.2,
+      "lifted": 327,
+      "fail": "rotation it0"
+     },
+     "wc_0009": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 2,
+      "fail": "rotation it0"
+     },
+     "wc_0011": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 957,
+      "fail": "rotation it0"
+     },
+     "wc_0014": {
+      "gps": 50.0,
+      "est": 5.2,
+      "lifted": 799,
+      "fail": null
+     },
+     "wc_0017": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1260,
+      "fail": "centre it0"
+     },
+     "wc_0019": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 949,
+      "fail": "rotation it0"
+     },
+     "wc_0020": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 577,
+      "fail": "centre it0"
+     },
+     "wc_0027": {
+      "gps": 50.1,
+      "est": 50.1,
+      "lifted": 726,
+      "fail": "centre it0"
+     },
+     "wc_0028": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 591,
+      "fail": "centre it0"
+     },
+     "wc_0034": {
+      "gps": 51.8,
+      "est": 51.8,
+      "lifted": 9,
+      "fail": "rotation it0"
+     },
+     "wc_0046": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 2,
+      "fail": "rotation it0"
+     },
+     "wc_0047": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1243,
+      "fail": "rotation it0"
+     },
+     "wc_0048": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1278,
+      "fail": "centre it0"
+     },
+     "wc_0052": {
+      "gps": 50.5,
+      "est": 50.5,
+      "lifted": 0,
+      "fail": "rotation it0"
+     },
+     "wc_0054": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 769,
+      "fail": "centre it0"
+     },
+     "wc_0055": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 24,
+      "fail": "rotation it0"
+     },
+     "wc_0059": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 198,
+      "fail": "rotation it0"
+     },
+     "wc_0063": {
+      "gps": 52.0,
+      "est": 52.0,
+      "lifted": 12,
+      "fail": "rotation it0"
+     },
+     "wc_0067": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 9,
+      "fail": "rotation it0"
+     },
+     "wc_0071": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 397,
+      "fail": "rotation it0"
+     },
+     "wc_0072": {
+      "gps": 50.0,
+      "est": 241.0,
+      "lifted": 95,
+      "fail": null
+     },
+     "wc_0076": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 1050,
+      "fail": "rotation it0"
+     },
+     "wc_0077": {
+      "gps": 68.5,
+      "est": 68.5,
+      "lifted": 173,
+      "fail": "rotation it0"
+     },
+     "wc_0082": {
+      "gps": 50.0,
+      "est": 12.5,
+      "lifted": 902,
+      "fail": null
+     },
+     "wc_0085": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 330,
+      "fail": "rotation it0"
+     },
+     "wc_0088": {
+      "gps": 50.0,
+      "est": 17.6,
+      "lifted": 1469,
+      "fail": null
+     },
+     "wc_0094": {
+      "gps": 50.0,
+      "est": 31.0,
+      "lifted": 1042,
+      "fail": null
+     },
+     "wc_0099": {
+      "gps": 50.0,
+      "est": 50.0,
+      "lifted": 341,
+      "fail": "centre it0"
+     }
+    }
+   }
+  },
+  "primaryFailureAnatomy": {
+   "counts": {
+    "displaced-render-lost-matches": 9,
+    "no-far5-even-at-T": 10,
+    "other-centre it0": 4,
+    "solved-worse": 3,
+    "solved-better": 3,
+    "other-rotation it0": 1
+   },
+   "perPhoto": {
+    "wc_0002": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 260,
+     "lifted_T_V2": 931,
+     "lifted_G50_V2": 32,
+     "dz_G50": -48.9,
+     "fail": "rotation it0",
+     "err": 70.0,
+     "gps": 70.0
+    },
+    "wc_0004": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 928,
+     "lifted_T_V2": 1864,
+     "lifted_G50_V2": 0,
+     "dz_G50": -33.1,
+     "fail": "rotation it0",
+     "err": 59.9,
+     "gps": 59.9
+    },
+    "wc_0006": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 0,
+     "lifted_T_V2": 816,
+     "lifted_G50_V2": 341,
+     "dz_G50": 4.7,
+     "fail": "rotation it0",
+     "err": 50.2,
+     "gps": 50.2
+    },
+    "wc_0009": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 288,
+     "lifted_T_V2": 1427,
+     "lifted_G50_V2": 0,
+     "dz_G50": 3.9,
+     "fail": "rotation it0",
+     "err": 50.2,
+     "gps": 50.2
+    },
+    "wc_0011": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 0,
+     "lifted_T_V2": 968,
+     "lifted_G50_V2": 957,
+     "dz_G50": 2.5,
+     "fail": "rotation it0",
+     "err": 50.1,
+     "gps": 50.1
+    },
+    "wc_0014": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 725,
+     "lifted_T_V2": 1069,
+     "lifted_G50_V2": 0,
+     "dz_G50": -8.9,
+     "fail": "rotation it0",
+     "err": 50.8,
+     "gps": 50.8
+    },
+    "wc_0017": {
+     "class": "other-centre it0",
+     "far5_atT_V0": 1270,
+     "lifted_T_V2": 1270,
+     "lifted_G50_V2": 1278,
+     "dz_G50": -1.7,
+     "fail": "centre it0",
+     "err": 50.0,
+     "gps": 50.0
+    },
+    "wc_0019": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 0,
+     "lifted_T_V2": 1190,
+     "lifted_G50_V2": 919,
+     "dz_G50": 2.2,
+     "fail": "rotation it0",
+     "err": 50.0,
+     "gps": 50.0
+    },
+    "wc_0020": {
+     "class": "solved-worse",
+     "far5_atT_V0": 676,
+     "lifted_T_V2": 744,
+     "lifted_G50_V2": 579,
+     "dz_G50": 2.8,
+     "fail": null,
+     "err": 115.1,
+     "gps": 50.1
+    },
+    "wc_0027": {
+     "class": "solved-worse",
+     "far5_atT_V0": 798,
+     "lifted_T_V2": 761,
+     "lifted_G50_V2": 708,
+     "dz_G50": 3.8,
+     "fail": null,
+     "err": 56.3,
+     "gps": 50.1
+    },
+    "wc_0028": {
+     "class": "other-centre it0",
+     "far5_atT_V0": 494,
+     "lifted_T_V2": 697,
+     "lifted_G50_V2": 618,
+     "dz_G50": 8.6,
+     "fail": "centre it0",
+     "err": 50.7,
+     "gps": 50.7
+    },
+    "wc_0034": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 0,
+     "lifted_T_V2": 0,
+     "lifted_G50_V2": 4,
+     "dz_G50": 13.8,
+     "fail": "rotation it0",
+     "err": 51.9,
+     "gps": 51.9
+    },
+    "wc_0046": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 36,
+     "lifted_T_V2": 41,
+     "lifted_G50_V2": 2,
+     "dz_G50": 0.1,
+     "fail": "rotation it0",
+     "err": 50.0,
+     "gps": 50.0
+    },
+    "wc_0047": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 0,
+     "lifted_T_V2": 564,
+     "lifted_G50_V2": 1246,
+     "dz_G50": -4.6,
+     "fail": "rotation it0",
+     "err": 50.2,
+     "gps": 50.2
+    },
+    "wc_0048": {
+     "class": "other-centre it0",
+     "far5_atT_V0": 900,
+     "lifted_T_V2": 1178,
+     "lifted_G50_V2": 1218,
+     "dz_G50": -3.0,
+     "fail": "centre it0",
+     "err": 50.1,
+     "gps": 50.1
+    },
+    "wc_0052": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 1,
+     "lifted_T_V2": 5,
+     "lifted_G50_V2": 1,
+     "dz_G50": 7.1,
+     "fail": "rotation it0",
+     "err": 50.5,
+     "gps": 50.5
+    },
+    "wc_0054": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 191,
+     "lifted_T_V2": 1033,
+     "lifted_G50_V2": 1,
+     "dz_G50": -25.9,
+     "fail": "rotation it0",
+     "err": 56.3,
+     "gps": 56.3
+    },
+    "wc_0055": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 0,
+     "lifted_T_V2": 40,
+     "lifted_G50_V2": 37,
+     "dz_G50": -7.7,
+     "fail": "rotation it0",
+     "err": 50.6,
+     "gps": 50.6
+    },
+    "wc_0059": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 0,
+     "lifted_T_V2": 373,
+     "lifted_G50_V2": 146,
+     "dz_G50": -0.5,
+     "fail": "rotation it0",
+     "err": 50.0,
+     "gps": 50.0
+    },
+    "wc_0063": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 313,
+     "lifted_T_V2": 277,
+     "lifted_G50_V2": 10,
+     "dz_G50": 14.4,
+     "fail": "rotation it0",
+     "err": 52.0,
+     "gps": 52.0
+    },
+    "wc_0067": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 81,
+     "lifted_T_V2": 678,
+     "lifted_G50_V2": 74,
+     "dz_G50": -3.4,
+     "fail": "rotation it0",
+     "err": 50.1,
+     "gps": 50.1
+    },
+    "wc_0071": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 5,
+     "lifted_T_V2": 426,
+     "lifted_G50_V2": 397,
+     "dz_G50": 4.3,
+     "fail": "rotation it0",
+     "err": 50.2,
+     "gps": 50.2
+    },
+    "wc_0072": {
+     "class": "solved-worse",
+     "far5_atT_V0": 55,
+     "lifted_T_V2": 1,
+     "lifted_G50_V2": 74,
+     "dz_G50": -9.2,
+     "fail": null,
+     "err": 409.4,
+     "gps": 50.8
+    },
+    "wc_0076": {
+     "class": "no-far5-even-at-T",
+     "far5_atT_V0": 0,
+     "lifted_T_V2": 1069,
+     "lifted_G50_V2": 1057,
+     "dz_G50": 1.5,
+     "fail": "rotation it0",
+     "err": 50.0,
+     "gps": 50.0
+    },
+    "wc_0077": {
+     "class": "displaced-render-lost-matches",
+     "far5_atT_V0": 328,
+     "lifted_T_V2": 1632,
+     "lifted_G50_V2": 173,
+     "dz_G50": 46.8,
+     "fail": "rotation it0",
+     "err": 68.5,
+     "gps": 68.5
+    },
+    "wc_0082": {
+     "class": "solved-better",
+     "far5_atT_V0": 242,
+     "lifted_T_V2": 1029,
+     "lifted_G50_V2": 917,
+     "dz_G50": -9.0,
+     "fail": null,
+     "err": 7.3,
+     "gps": 50.8
+    },
+    "wc_0085": {
+     "class": "other-rotation it0",
+     "far5_atT_V0": 8,
+     "lifted_T_V2": 322,
+     "lifted_G50_V2": 316,
+     "dz_G50": -20.8,
+     "fail": "rotation it0",
+     "err": 54.1,
+     "gps": 54.1
+    },
+    "wc_0088": {
+     "class": "solved-better",
+     "far5_atT_V0": 475,
+     "lifted_T_V2": 0,
+     "lifted_G50_V2": 1502,
+     "dz_G50": -6.6,
+     "fail": null,
+     "err": 14.9,
+     "gps": 50.4
+    },
+    "wc_0094": {
+     "class": "solved-better",
+     "far5_atT_V0": 355,
+     "lifted_T_V2": 1144,
+     "lifted_G50_V2": 1048,
+     "dz_G50": 8.2,
+     "fail": null,
+     "err": 32.1,
+     "gps": 50.7
+    },
+    "wc_0099": {
+     "class": "other-centre it0",
+     "far5_atT_V0": 367,
+     "lifted_T_V2": 402,
+     "lifted_G50_V2": 341,
+     "dz_G50": 0.1,
+     "fail": "centre it0",
+     "err": 50.0,
+     "gps": 50.0
+    }
+   }
+  },
+  "a_photosWithAny0-2kmInlier": {
+   "n": 18,
+   "pids": [
+    "wc_0004",
+    "wc_0006",
+    "wc_0009",
+    "wc_0011",
+    "wc_0014",
+    "wc_0020",
+    "wc_0027",
+    "wc_0047",
+    "wc_0054",
+    "wc_0055",
+    "wc_0059",
+    "wc_0067",
+    "wc_0071",
+    "wc_0076",
+    "wc_0077",
+    "wc_0082",
+    "wc_0085",
+    "wc_0088"
+   ],
+   "V1_log2gain": [
+    0.0777287735646594,
+    -0.8197621031162584,
+    0.847549837368123
+   ],
+   "V1_nPhotosUp": 11,
+   "V1_nPhotosDown": 6,
+   "V1_near_inl_sum": 12,
+   "V2_log2gain": [
+    0.17289261539544074,
+    -0.5684642211893134,
+    0.8673195367520726
+   ],
+   "V2_nPhotosUp": 11,
+   "V2_nPhotosDown": 5,
+   "V2_near_inl_sum": 21,
+   "V0_near_inl_sum": 7
+  },
+  "convergenceAcrossStarts": {
+   "wc_0004": {
+    "starts": [
+     "G20_V2",
+     "G150_V2",
+     "G50h_V2"
+    ],
+    "maxDevFromMean_m": 12.0,
+    "meanE_minus_T": [
+     6.1,
+     6.4,
+     -2.6
+    ],
+    "meanE_dist_to_T_m": 9.2,
+    "T_agl_m": 1.4
+   },
+   "wc_0027": {
+    "starts": [
+     "G50_V2",
+     "G50h_V2"
+    ],
+    "maxDevFromMean_m": 3.7,
+    "meanE_minus_T": [
+     -38.1,
+     -39.1,
+     3.1
+    ],
+    "meanE_dist_to_T_m": 54.7,
+    "T_agl_m": 1.9
+   },
+   "wc_0072": {
+    "starts": [
+     "G50_V2",
+     "G50h_V2"
+    ],
+    "maxDevFromMean_m": 285.2,
+    "meanE_minus_T": [
+     -126.5,
+     135.0,
+     -2.5
+    ],
+    "meanE_dist_to_T_m": 185.0,
+    "T_agl_m": 1.9
+   },
+   "wc_0082": {
+    "starts": [
+     "G20_V2",
+     "G50_V2",
+     "G50h_V2"
+    ],
+    "maxDevFromMean_m": 2.5,
+    "meanE_minus_T": [
+     1.4,
+     -4.8,
+     6.9
+    ],
+    "meanE_dist_to_T_m": 8.5,
+    "T_agl_m": 13.3
+   },
+   "wc_0088": {
+    "starts": [
+     "G20_V2",
+     "G50_V2",
+     "G50h_V2"
+    ],
+    "maxDevFromMean_m": 1.0,
+    "meanE_minus_T": [
+     -6.5,
+     12.6,
+     -4.9
+    ],
+    "meanE_dist_to_T_m": 15.0,
+    "T_agl_m": 1.4
+   },
+   "wc_0094": {
+    "starts": [
+     "G20_V2",
+     "G50_V2",
+     "G150_V2",
+     "G50h_V2"
+    ],
+    "maxDevFromMean_m": 0.2,
+    "meanE_minus_T": [
+     14.4,
+     -1.2,
+     -28.5
+    ],
+    "meanE_dist_to_T_m": 31.9,
+    "T_agl_m": 26.4
+   }
+  }
+ }
+}

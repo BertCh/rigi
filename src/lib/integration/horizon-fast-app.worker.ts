@@ -115,7 +115,7 @@ async function marchProfile(
 	if (device)
 		try {
 			const [prof] = await computeHorizonGpu(device, mosaics, [eye], opts);
-			// opt-in path only (rigi.gpuHorizon=1), so this is not noise in the default app
+			// opt-in path only (?gpuHorizon), so this is not noise in the default app
 			console.info(
 				`[horizon worker] marched on the GPU (${prof.stats.ms.toFixed(0)} ms)`,
 			);

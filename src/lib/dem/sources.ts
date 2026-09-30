@@ -42,9 +42,36 @@ export const TERRARIUM_AWS: DemSource = {
  * levels. Missing fine tiles fall back to coarser levels in
  * TerrainSampler.sampleAt.
  */
+export const MAPTERHORN_DEFAULT_URL =
+	"https://tiles.mapterhorn.com/{z}/{x}/{y}.webp";
+
+/**
+ * Tile URL template: VITE_MAPTERHORN_URL (browser build) or MAPTERHORN_URL (Node scripts), e.g. a
+ * self-hosted `pmtiles serve` endpoint (reports/licences.md); default the public service. Must
+ * serve the same tiles (512 px Terrarium WebP) or every DEM consumer changes.
+ */
+function mapterhornTemplate(): string {
+	let t: string | undefined;
+	try {
+		t = (import.meta as { env?: Record<string, string | undefined> }).env
+			?.VITE_MAPTERHORN_URL;
+	} catch {}
+	t ||= (
+		globalThis as { process?: { env?: Record<string, string | undefined> } }
+	).process?.env?.MAPTERHORN_URL;
+	return t || MAPTERHORN_DEFAULT_URL;
+}
+const MAPTERHORN_TEMPLATE = mapterhornTemplate();
+
 export const MAPTERHORN: DemSource = {
 	name: "mapterhorn",
-	url: (k) => `https://tiles.mapterhorn.com/${k.z}/${k.x}/${k.y}.webp`,
+	url:
+		MAPTERHORN_TEMPLATE === MAPTERHORN_DEFAULT_URL
+			? (k) => `https://tiles.mapterhorn.com/${k.z}/${k.x}/${k.y}.webp`
+			: (k) =>
+					MAPTERHORN_TEMPLATE.replace("{z}", String(k.z))
+						.replace("{x}", String(k.x))
+						.replace("{y}", String(k.y)),
 	tileSize: 512,
 	maxZoom: 17,
 	levels: [

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // W4 parity: the batched terrain path (src/lib/deck/batched-terrain-layer.ts) vs the per-tile path,
 // on the SAME streamed tiles in one page (globalThis.__RIGI_TERRAIN_BOTH__ builds both
-// representations; __RIGI_TERRAIN__ flips the drawing path live).
+// representations; __RIGI_FLAGS__.terrain flips the drawing path live).
 // Per photo: autoAlign → settle the stream at that pose → render the geometry (range) pass at
 // 1024 px in both modes (and tiles twice, the noise floor), compare, time the submit, count draw
 // calls, and save small JPEG screenshots of the overlay and the 3D world view in both modes.
@@ -45,7 +45,10 @@ async function run(id) {
 	await page.addInitScript(() => {
 		localStorage.clear();
 		globalThis.__RIGI_TERRAIN_BOTH__ = true;
-		globalThis.__RIGI_TERRAIN__ = "tiles";
+		globalThis.__RIGI_FLAGS__ = {
+			...globalThis.__RIGI_FLAGS__,
+			terrain: "tiles",
+		};
 	});
 	try {
 		await page.goto(`${BASE}/photo/${id}?renderer=deck`);
@@ -66,7 +69,10 @@ async function run(id) {
 			const set = e.renderSet;
 			const draws = globalThis.__rigiTerrainStats;
 			const render = async (mode, reps = 1) => {
-				globalThis.__RIGI_TERRAIN__ = mode;
+				globalThis.__RIGI_FLAGS__ = {
+					...globalThis.__RIGI_FLAGS__,
+					terrain: mode,
+				};
 				e.updateLayers();
 				e.flushLayers();
 				const made = e.makeSource(
@@ -187,7 +193,10 @@ async function shots(page, id, pose) {
 		for (const mode of ["tiles", "batched"]) {
 			await ensure();
 			await page.evaluate((m) => {
-				globalThis.__RIGI_TERRAIN__ = m;
+				globalThis.__RIGI_FLAGS__ = {
+					...globalThis.__RIGI_FLAGS__,
+					terrain: m,
+				};
 				window.__engine.updateLayers();
 			}, mode);
 			await shot(`overlay-${mode}`);
@@ -197,7 +206,10 @@ async function shots(page, id, pose) {
 		await page.waitForTimeout(3000);
 		for (const mode of ["tiles", "batched"]) {
 			await page.evaluate((m) => {
-				globalThis.__RIGI_TERRAIN__ = m;
+				globalThis.__RIGI_FLAGS__ = {
+					...globalThis.__RIGI_FLAGS__,
+					terrain: m,
+				};
 				window.__engine.updateLayers();
 			}, mode);
 			await shot(`world-${mode}`);

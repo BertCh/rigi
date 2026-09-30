@@ -1,0 +1,424 @@
+{
+ "wc_0085_k000|/Users/robertchristie/Documents/GitHub/mt-image/tools/research/tm/h1_mine/corr/wc_0085/wc_0085_k000__single.npz": {
+  "stat": {
+   "nCorr": 987,
+   "W": 1024,
+   "H": 768,
+   "T": 154.30066154899973,
+   "Tfit": 3056.7394656080883,
+   "tests": {
+    "A->B": {
+     "s": 2347.059133344256,
+     "n": 929,
+     "k": 705,
+     "tau": 7.545871066614224,
+     "p0": 0.00022746126842479886,
+     "fit": true,
+     "driftDeg": 0.2116292369582224
+    },
+    "B->A": {
+     "s": 154.30066154899973,
+     "n": 58,
+     "k": 45,
+     "tau": 7.013539654229865,
+     "p0": 0.00019650029633247557,
+     "fit": true,
+     "driftDeg": 0.08583057660647427
+    },
+    "L->R": {
+     "s": 1293.0018659083967,
+     "n": 771,
+     "k": 454,
+     "tau": 10.64746621052071,
+     "p0": 0.00045287801368468916,
+     "fit": true,
+     "driftDeg": 0.35740155225445736
+    },
+    "R->L": {
+     "s": 464.9567980122886,
+     "n": 216,
+     "k": 141,
+     "tau": 6.920093972238723,
+     "p0": 0.000191298991335466,
+     "fit": true,
+     "driftDeg": 0.15177548287965026
+    }
+   },
+   "split": "5km",
+   "nFar": 58,
+   "nNear": 929,
+   "medDepth": 1875.7791342223518,
+   "fitAll": {
+    "s": 3056.7394656080883,
+    "n": 987,
+    "k": 886,
+    "tau": 7.855032592616537,
+    "p0": 0.00024648169892883554,
+    "fit": true,
+    "driftDeg": 0.011477354279098798
+   },
+   "sky": true
+  },
+  "misfit": null
+ },
+ "wc_0085_k002|/Users/robertchristie/Documents/GitHub/mt-image/tools/research/tm/h1_mine/corr/wc_0085/wc_0085_k002__single.npz": {
+  "stat": {
+   "nCorr": 995,
+   "W": 1024,
+   "H": 768,
+   "T": 0.9211061008897651,
+   "Tfit": 1663.9448766329426,
+   "tests": {
+    "A->B": {
+     "s": 562.6686247440646,
+     "n": 944,
+     "k": 212,
+     "tau": 7.259390352908284,
+     "p0": 0.0002105178839362721,
+     "fit": true,
+     "driftDeg": 0.36236697751778846
+    },
+    "B->A": {
+     "s": 76.54539054214068,
+     "n": 51,
+     "k": 28,
+     "tau": 11.94597792431271,
+     "p0": 0.000570075152010705,
+     "fit": true,
+     "driftDeg": 0.06577820660823895
+    },
+    "L->R": {
+     "s": 27.867390343694694,
+     "n": 769,
+     "k": 21,
+     "tau": 11.72004382475783,
+     "p0": 0.000548715423028609,
+     "fit": true,
+     "driftDeg": 1.5147710813426614
+    },
+    "R->L": {
+     "s": 0.9211061008897651,
+     "n": 226,
+     "k": 1,
+     "tau": 11.89347954773702,
+     "p0": 0.0005650756017639994,
+     "fit": true,
+     "driftDeg": 0.07086877221151554
+    }
+   },
+   "split": "5km",
+   "nFar": 51,
+   "nNear": 944,
+   "medDepth": 1875.0457652726852,
+   "fitAll": {
+    "s": 1663.9448766329426,
+    "n": 995,
+    "k": 605,
+    "tau": 12.199761742250587,
+    "p0": 0.0005945541218109634,
+    "fit": true,
+    "driftDeg": 0.1555285029099627
+   },
+   "sky": true
+  },
+  "misfit": null
+ },
+ "wc_0085_dispd150b282|gen/wc_0085/wc_0085_dispd150b282.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": {
+   "medPx": 893.8997426692898,
+   "p90Px": 1325.1517649721848,
+   "n": 44329
+  }
+ },
+ "wc_0085_dispd400b282|gen/wc_0085/wc_0085_dispd400b282.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": {
+   "medPx": 1180.6895628242714,
+   "p90Px": 2128.581569976959,
+   "n": 44329
+  }
+ },
+ "wc_0085_ringy060|gen/wc_0085/wc_0085_ringy060.npz": {
+  "stat": {
+   "nCorr": 1,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy075|gen/wc_0085/wc_0085_ringy075.npz": {
+  "stat": {
+   "nCorr": 9,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {
+    "A->B": {
+     "s": 0.0,
+     "n": 4,
+     "k": 0,
+     "tau": 39.54020861358764,
+     "p0": 0.00624549131342358,
+     "fit": true,
+     "driftDeg": 7.112336527442378
+    },
+    "B->A": {
+     "s": 0.0,
+     "n": 5,
+     "k": 0,
+     "fit": false
+    },
+    "L->R": {
+     "s": 0.0,
+     "n": 9,
+     "k": 0,
+     "tau": 15.97224502148643,
+     "p0": 0.0010191089689110342,
+     "fit": true,
+     "driftDeg": 1.583700643485437
+    },
+    "R->L": {
+     "s": 0.0,
+     "n": 0,
+     "k": 0,
+     "tau": 33.77924398594986,
+     "p0": 0.0045581493064553455,
+     "fit": true,
+     "driftDeg": 6.041146763277387
+    }
+   },
+   "split": "median(12719m)",
+   "nFar": 5,
+   "nNear": 4,
+   "medDepth": 12718.891665511801,
+   "fitAll": {
+    "s": 0.0,
+    "n": 9,
+    "k": 0,
+    "tau": 39.54020861358764,
+    "p0": 0.00624549131342358,
+    "fit": true,
+    "driftDeg": 7.112336527442378
+   },
+   "sky": true
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy090|gen/wc_0085/wc_0085_ringy090.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy105|gen/wc_0085/wc_0085_ringy105.npz": {
+  "stat": {
+   "nCorr": 3,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy120|gen/wc_0085/wc_0085_ringy120.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy135|gen/wc_0085/wc_0085_ringy135.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy150|gen/wc_0085/wc_0085_ringy150.npz": {
+  "stat": {
+   "nCorr": 5,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy165|gen/wc_0085/wc_0085_ringy165.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy180|gen/wc_0085/wc_0085_ringy180.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy195|gen/wc_0085/wc_0085_ringy195.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy210|gen/wc_0085/wc_0085_ringy210.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy225|gen/wc_0085/wc_0085_ringy225.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy240|gen/wc_0085/wc_0085_ringy240.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy255|gen/wc_0085/wc_0085_ringy255.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy270|gen/wc_0085/wc_0085_ringy270.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy285|gen/wc_0085/wc_0085_ringy285.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy300|gen/wc_0085/wc_0085_ringy300.npz": {
+  "stat": {
+   "nCorr": 0,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy315|gen/wc_0085/wc_0085_ringy315.npz": {
+  "stat": {
+   "nCorr": 2,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy330|gen/wc_0085/wc_0085_ringy330.npz": {
+  "stat": {
+   "nCorr": 3,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ },
+ "wc_0085_ringy345|gen/wc_0085/wc_0085_ringy345.npz": {
+  "stat": {
+   "nCorr": 2,
+   "W": 1024,
+   "H": 768,
+   "T": 0.0,
+   "Tfit": 0.0,
+   "tests": {}
+  },
+  "misfit": null
+ }
+}

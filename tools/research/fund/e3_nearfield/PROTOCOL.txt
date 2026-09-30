@@ -1,0 +1,115 @@
+FUND E3 - NEAR-FIELD FIDELITY - PRE-REGISTERED PROTOCOL
+Frozen 2026-09-29T23:15Z, before any near-field render, match or eye solve was run. Changes after this point are
+listed at the bottom under AMENDMENTS with a timestamp and reason; anything designed after seeing results is labelled
+POST HOC in the report.
+
+0. HYPOTHESIS (reports/fundamentals-plan.md s1 "physics", s3 E3 row)
+   Eye position is observable only through near/mid-field parallax. Rendering the near/mid field properly
+   (high-res DTM, DSM with trees/buildings, 10-25 cm ortho) and not discarding < 250 m correspondences
+   (a) adds near/mid inliers, (b) makes a free-centre eye estimate better than GPS, (c) recovers F1 matching-bucket
+   photos.
+   FIXED KILL (plan s3): no gain in (a), OR (b) not better than GPS on >= 60 % of refs  ->  KILL.
+
+1. PHOTO SET
+   Dev photos (tools/matcher/v2/refs.py) with >= 1 verified-correct ref: 30 photos. All 30 stated eyes are inside
+   the swisstopo extent (swiss-cog.ts inSwissExtent). A photo is excluded (and listed) only if < 90 % of the
+   0-2 km view-wedge cells have swissALTI3D data. Ref pose = the cache's perturbBase ref (first correct ref),
+   rendered view refs/<label> of tools/research/tm/cache.
+   Processing order (so a partial run is still a defined subset): first the 4 F1 matching-bucket photos with a
+   verified ref (wc_0002, wc_0034, wc_0052, wc_0055), then the rest by sorted pid. If time runs out the report
+   states exactly which prefix was completed ("pilot") - no cherry-picking.
+   Test ids and tools/bench/data_v3 are never touched.
+
+2. EYES (world frame = cache frame EnuFrame(photo.lat, photo.lon, 0), x east, y north, z up)
+   T  "reference eye" = the ref's renderEye = (0, 0, eyeH). The ref pose was blind-verified as correct AT this eye.
+      T is not independently surveyed: it can itself be wrong by metres to tens of metres (manual pin / EXIF GPS);
+      any "error" measured against T includes T's own error.
+   S  "stated / GPS eye" = cache meta.eye (manifest lat/lon, max(alt, DEM+1.6)).
+   Fact checked before freezing: for all 30 refs T and S share lat/lon (refs carry only a height), |T - S| <= 0.19 m
+   (28 exactly 0). The ref-vs-stated distance distribution is therefore degenerate and the literal test
+   "|E - T| < |S - T|" can never be passed. (b) is therefore operationalised with DISPLACED GPS EYES:
+   G_d = T + d * (sin a, cos a, 0) horizontally, a ~ U[0, 360) from a fixed per-photo seed
+         (seed = int(pid[3:]) * 7919 + d), z(G_d) = DTM(G_d) + max(1.6, T.z - DTM(T)) (same height above ground as
+         T, swissALTI3D 2 m DTM). d = 50 m PRIMARY (the plan's smallest E1 displaced-eye decoy; typical of
+         manual pins and bad phone fixes), d = 150 m secondary, d = 20 m secondary.
+   The pipeline sees only G: all renders for (b) are made AT G with the ref rotation and intrinsics (the rotation is
+   then re-solved from far points, see s5). Truth T is used only for scoring.
+
+3. RENDERER (offline Python, scripts in this directory; API documented in the report)
+   Per-pixel ray march (torch, MPS or CPU) of a heightfield in the cache frame, 0-2000 m from the eye, at the
+   cached native render size (view.json W x H, intrinsics fx fy cx cy, pixel centres +0.5), outputs rgb (H,W,3),
+   xyz (H,W,3, 0 = no hit within 2 km) in the cache's frame convention. Heights: swisstopo LN02 metres used as
+   ellipsoidal h exactly as the app does with its DEM; the frame's curvature (tangent plane) and refraction
+   (k = 0.13) are applied via the same EnuFrame formula as src/lib/geodesy.ts (effect <= 0.3 m at 2 km).
+   LV95 <-> WGS84 via pyproj (EPSG:2056, CH1903+ -> WGS84 Helmert, ~1 m class).
+   Data (downloaded clipped to r <= 2.1 km and the view wedge +-(hfov/2 + 15 deg); raw data deleted at the end):
+     DTM  swissALTI3D (STAC ch.swisstopo.swissalti3d, newest year per km tile): 0.5 m product for r <= 500 m,
+          2 m product for 500 m < r <= 2.1 km.
+     DSM  swissSURFACE3D Raster (ch.swisstopo.swisssurface3d-raster) 0.5 m for r <= 500 m, its 2 m-class COG
+          overview beyond. Within 15 m (horizontal) of the render eye the DSM is replaced by the DTM (the
+          photographer stands in the open; also keeps GPS/pin error from putting the eye inside a canopy/roof).
+     Ortho SWISSIMAGE WMTS 3857 (wmts.geo.admin.ch ch.swisstopo.swissimage, same source as the app's drape in CH),
+          zoom chosen per pixel from the ground footprint (<= z19 ~0.2 m near, z16 far).
+   Eye clamp: if the render eye is < DTM + 1.0 m it is raised to DTM + 1.6 m (recorded per render).
+   Variants:
+     V0   cached far+near render (tools/research/tm/cache refs/<label>), as is.       (only at T)
+     V0e  app emulation: DTM resampled to 3.3 m (Mapterhorn z14/512 px class), ortho <= z16; composited like V1.
+          Used as the "status quo" render at G where no cached render exists.
+     V1   near DTM hi-res + hi-res ortho.
+     V2   V1 + DSM (trees/buildings).
+   Composite: per pixel, the near render wins where it hits within 2 km; where it has no hit the far field is used
+   (at T: the cached rgb/xyz; at G: the cached T render forward-warped to G by z-buffered splatting of its xyz,
+   holes filled by nearest valid neighbour in a 5x5 window - an approximation, valid because far parallax is small).
+   Validation (reported, not gating): (i) reproject cached xyz with my camera code -> median px error;
+   (ii) V0e and V1 (DTM only) at T vs the cached render in the 250-2000 m band: depth agreement (median
+   |d_near - d_cache| / d_cache over pixels where both hit) and rgb similarity; V0e vs cached should agree closely.
+
+4. MATCHING (at every render: V0, V1, V2 at T; V0e, V1, V2 at G_d)
+   ALIKED (max 4096 kp, detection_threshold 0.01) + LightGlue (aliked), CPU, photo = cache photo.jpg resized to
+   native W x H (Lanczos). Render keypoints lifted to xyz as tools/matcher/match.py lift() (nearest pixel, 5x5 range
+   spread < 8 % discontinuity filter) but with the 250 m cut REMOVED (min_range 0). Depth band by the lifted point's
+   distance from the render eye: near < 250 m, mid 250-2000 m, far > 2000 m; far5 > 5000 m.
+   (a) metric = "ref-pose inliers" at T: lifted correspondences whose photo keypoint is within 6 px (PX_THRESH) of
+       the projection of X with the ref pose at T. Counted per band, per variant. Also reported: V0 with the 250 m cut
+       (status quo = V0 minus its near band).
+   (a) PRIMARY statistic: per photo g = log2((1 + n_V) / (1 + n_V0)) for the 0-2 km band (near + mid), V in {V1, V2}
+       vs V0 (both without the cut); mean over photos with a photo-bootstrap 95 % CI (10 000 resamples, seed 0).
+       "Gain in (a)" iff the CI lower bound > 0 for V1 or for V2. Also reported: medians of paired differences,
+       per band.
+   LoMa: optional secondary (only if time; under tm_common.gpu_lock()); never used for the verdict.
+
+5. EYE SOLVE (b) - identical code for every variant and displacement
+   Inputs: lifted correspondences from the render at the start eye C0 (= G_d; also run at C0 = T as a circular
+   noise-floor diagnostic). Intrinsics fixed (view.json fx, fy, cx, cy).
+   Alternate 3 times: (1) rotation R from far5 correspondences with centre C fixed: 2-point RANSAC (6 px) + robust
+   LM (soft_l1, f_scale 2 px), started from the ref rotation; (2) centre C from near+mid (< 2 km) correspondences
+   with R fixed: 2-point line-intersection RANSAC (6 px, 2000 iterations, seed 0) + robust LM on reprojection
+   (soft_l1, f_scale 2 px) over the RANSAC inliers.
+     3-DoF = C free (PRIMARY).  2-DoF = C_xy free, C_z = DTM(C_xy) + 1.7 m (reported).
+   Guard rails (pre-set): if < 6 far5 inliers or < 6 near/mid RANSAC inliers, or the LM moves C more than 1000 m,
+   the solve FAILS and the estimate is E = C0 (the GPS eye) -> counts as NOT better.
+   Score: e_est = |E - T| (3-D), e_gps = |G_d - T|. Photo is "better than GPS" iff e_est < e_gps.
+   (b) PRIMARY: V2, d = 50 m, 3-DoF. (b) passes iff better on >= 60 % of the processed refs. Also reported: V0e, V1,
+   2-DoF, d = 20 / 150 m, horizontal-only errors, bootstrap CIs of the fraction and of median e_est.
+   The circular run at T reports |E_T - T| (optimistic floor + T's own error, not a truth measure).
+
+6. (c) F1 matching bucket with refs: wc_0002, wc_0034, wc_0052, wc_0055. "Gains support" iff total ref-pose inliers
+   (all bands) with V1 or V2 >= 1.5 x AND >= +20 over V0 with the 250 m cut (status quo). Counts reported. The 8
+   matching-bucket photos without a verified ref cannot be scored at a ref pose (reported as not testable).
+
+7. VERDICT = KILL iff (a) shows no gain OR (b) primary is better than GPS on < 60 % of refs. n is small (<= 30);
+   all fractions get photo-bootstrap CIs; the verdict uses the point values as the kill rule states.
+
+8. POST HOC (labelled): known eye-error photos wc_0069, wc_0073, wc_0074, wc_0086 have no verified-correct ref in the
+   cache, so no truth pose; any run on them is exploratory only.
+
+Budget: fund/ < 3 GB; clipped downloads; intermediates deleted; renders kept only as a few small example images.
+
+AMENDMENTS
+2026-09-30T00:45Z (POST HOC, after seeing 5 photos' G50 results; does NOT change the primary test or the verdict):
+  Observed: with z(G) = DTM(G) + AGL(T), a 50 m horizontal displacement from a summit/ridge eye often lands 20-50 m
+  below the ridge, where the rendered view is blocked by the summit itself (wc_0004: 0 matches at G50, while G20
+  and G150 converge to within 6-14 m of T). Added a labelled secondary variant "G50h" (e3_posthoc.py): same
+  azimuth and 50 m horizontal offset, z(G) = max(T.z, DTM(G) + 1.6) (height kept, as when EXIF altitude is
+  known), V1 and V2, identical solver. Reported separately as POST HOC; the kill verdict uses only the frozen
+  primary (G50, V2, 3-DoF).

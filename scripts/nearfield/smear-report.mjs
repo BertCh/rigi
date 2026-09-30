@@ -3,10 +3,15 @@
 // See smear-measure.mjs for the smear definition. No browser.
 //   node scripts/nearfield/smear-report.mjs [--renderer=three] [--band=0.02]
 // Writes tools/nearfield/smear/summary-<renderer>.json and prints a table.
-import { readFileSync, writeFileSync } from "node:fs";
+import {
+	existsSync as _ex,
+	readFileSync as _rd,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { existsSync as _ex, readFileSync as _rd } from "node:fs";
+
 // grids are stored gzipped (grid-*.json.gz); plain .json still read
 const readGrid = (f) =>
 	_ex(f)

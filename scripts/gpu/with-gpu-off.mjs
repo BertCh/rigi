@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Run a playwright script with the app's GPU compute kill switch on in every page it opens
-// (globalThis.__RIGI_GPU__ = "off", which survives the scripts' localStorage.clear()).
+// (globalThis.__RIGI_FLAGS__.gpu = "off", which survives the scripts' localStorage.clear()).
 // Usage: node scripts/gpu/with-gpu-off.mjs scripts/eval-app.mjs IMG_6958 …
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,7 +18,7 @@ chromium.launch = async (...a) => {
 	browser.newContext = async (...b) => {
 		const ctx = await newContext(...b);
 		await ctx.addInitScript(() => {
-			globalThis.__RIGI_GPU__ = "off";
+			globalThis.__RIGI_FLAGS__ = { ...globalThis.__RIGI_FLAGS__, gpu: "off" };
 		});
 		return ctx;
 	};
@@ -26,7 +26,7 @@ chromium.launch = async (...a) => {
 	browser.newPage = async (...b) => {
 		const page = await newPage(...b);
 		await page.addInitScript(() => {
-			globalThis.__RIGI_GPU__ = "off";
+			globalThis.__RIGI_FLAGS__ = { ...globalThis.__RIGI_FLAGS__, gpu: "off" };
 		});
 		return page;
 	};

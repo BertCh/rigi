@@ -1,0 +1,89 @@
+GA5 - INTEGRITY: SOLUTION-SEPARATION PROTECTION LEVEL + VIEWSHED VETO (G6 + G7)                 2026-09-30
+Agent E. Protocol: tools/research/geo/PROTOCOL.txt SECTION GA5 (written 03:17Z, before any GA5 number).
+Code: src/lib/geocam/integrity/{separation,viewshed,index}.ts, integrity.check.ts; scripts/geocam/ga5-eval.ts.
+Machine-readable: out/geocam/ga5/summary.json (verdict, rates, CIs, sweep), out/geocam/ga5/hyps.json (per hypothesis).
+Kill criterion (fixed): rejects < 30% of wrong-basin/wrong-eye decoys at <= 2 pts true-accept loss.
+
+VERDICT: GA5 KILLED at the frozen operating point, and no alert-limit scale reaches <= 2 pts true-accept loss on the
+33 positives even with label-tuned limits. The decoy side works (99% of all labelled negatives, 93% of the
+non-trivial ones, 89% of NE-dec rejected); the price is 12 of 33 correct poses rejected (36 pts).
+
+WHAT WAS RUN
+  787 labelled E1 hypotheses (35 dev photos; Agent C export out/geocam/decoys, primary cut; UNL/AMB/secondary out).
+  Per hypothesis, label-free: B's pointFactor on the exported LoMa correspondences (<= 400, grid-thinned; sigma 3 px
+  @1600 + DEM sigma, Cauchy 2.5), rotation-only MAP solve with the eye and focal FIXED at the hypothesis ("the camera
+  as proposed"), then protectionLevel with leave-out subsets -left/-right/-near/-far (near/far split at the
+  hypothesis' median correspondence depth), K = 5.33, alert yaw 1.0 deg / pitch 0.5 deg, minRows 24; plus
+  viewshedVeto on Mapterhorn (eye below DEM > 1 m, or > 20% of matched points occluded). Reject = integrity fail or
+  veto. Runtime ~5 min CPU for all 787 (no renders, no services).
+
+MAIN TABLE (rejected / n, Clopper-Pearson 95%)
+  POS (true-accept loss)          12/33  36.4%  [20.4, 54.9]     <- kill: must be <= 2 pts (0/33)
+  POS accepted by E1 CUR          2/19   10.5%  [1.3, 33.1]      (reported; loss vs the current gate)
+  all labelled negatives          748/754 99.2% [98.3, 99.7]
+  non-trivial negatives (nCorr>=30) 86/92 93.5% [86.3, 97.6]
+  NE-dec (wrong eye, 150/400 m)   50/56  89.3%  [78.1, 96.0]    (150 m: 24/29, 400 m: 26/27)
+  by label: NB-inh 3/3, NB-con 93/93, NB-dec 597/597, NE-inh 5/5.
+  Mechanism: 689 of the 754 negatives are "unavailable" (too few correspondences for the four subsets: NB-dec ring
+  views 591/597, NB-con 74/93, NE-dec 23/56) - the current rule's match-count gates already dispose of those. On the
+  non-trivial ones the rejection is by separation (subset rotations disagree).
+  Viewshed veto alone: 2/754 negatives (wc_0074_k000 occlusion 32%, wc_0085_dispd150b282 eye 3.3 m under the DEM),
+  0/33 POS. Expected by construction: E1 put every displaced eye at DEM + ~1.7 m and lifted the 3-D points from the
+  render AT that eye, so they are visible from it. The veto can only bite on solver-moved eyes and GT-type errors.
+
+E1 CROSS-REFERENCE (asked for): of the 10 displaced-eye decoys E1's NFA accepted (AC1), GA5 at the frozen point
+  rejects 9 (misses wc_0067_dispd150b259, PL_yaw 0.77 / PL_pitch 0.44). Of AC2's 5, it rejects 4.
+  BUT at the frozen point this is cheap: it also rejects 36% of the positives. Along the alert-limit scale a (both
+  limits x a; label-tuned, an upper bound, see below):
+      a     POS loss   POS(CUR) loss  non-trivial rej   NE-dec rej   AC1 NE-dec rej  AC2
+      1     36.4%      10.5%          93.5%             89.3%        9/10            4/5    <- frozen point
+      2     21.2%       5.3%          79.3%             71.4%        5/10            2/5
+      4     12.1%       0             73.9%             62.5%        3/10            1/5
+      8      6.1%       0             54.3%             46.4%        1/10            0/5
+      16     3.0%       0             33.7%             41.1%        0/10            0/5
+      >=32   3.0%       0             32.6-31.5%        41.1%        0/10            0/5
+  The decoys that fool the NFA are exactly the ones whose subset consistency looks like a true pose's: as the limit
+  is relaxed to keep the positives, those 10 are the first to pass. AUROC of max(PL_yaw/1, PL_pitch/0.5)
+  (POST HOC, descriptive): NE-dec vs POS 0.83; AC1-accepted NE-dec vs POS 0.75; NB-con (non-trivial) vs POS 0.94.
+  Distribution (non-trivial, median [p10, p90]): POS PL_yaw 0.48 [0.24, 1.65], PL_pitch 0.42 [0.23, 1.33];
+  NE-dec PL_yaw 1.49 [0.54, 4.85], PL_pitch 0.86 [0.35, 3.41]; NB-con PL_yaw 7.5 [3.9, 10.2].
+
+ORACLE (pre-declared secondary; label-tuned, NOT a verdict): the best a with POS loss <= 2 pts does not exist - the
+  minimum loss is 1/33 = 3.0 pts at every a >= 16, set by wc_0055_k005, a correct pose with only 6 correspondences
+  (never verifiable). At a = 16 the non-trivial rejection is 33.7% and NE-dec 41%, i.e. just above 30% at 3 pts.
+  POST HOC (not in the protocol): counting the loss over the 19 positives the current gate (E1 CUR) accepts, a = 4
+  gives 0 loss with 73.9% non-trivial rejection and 62.5% NE-dec rejection, but only 3/10 of the AC1 decoys. That
+  reading would pass the criterion; it was not the pre-registered one and was chosen after seeing the data.
+
+WHY THE POSITIVES FAIL (descriptive): 2 REF positives (wc_0002_refC, wc_0028_refB) have correspondences that do not
+  support the verified pose at all (28 and 37 of 400 inliers; the matches fit a pose ~10 deg / 4.5 deg away) - E1
+  gave both T = 0. wc_0055_k005 has 6 correspondences. The rest fail the 0.5 deg pitch or 1 deg yaw limit by
+  0.1-2 deg on one subset (mostly -left or -far): with the eye fixed, any systematic misfit that differs between
+  image halves or depth bands (lens distortion k1 ~ +0.04 was measured by concord, DEM/drape differences, LoMa bias
+  on far ridges) looks like a rotation separation. K*sigma_sep is tiny (0.01-0.2 deg), so PL ~ |d|: the statistic
+  is essentially "do the subset rotations agree within the alert limit", and true poses do not agree to 0.5 deg.
+
+SECONDARY: EYE FREE (prior N(h eye, 20 m H / 10 m V)), reported only
+  PL rule: rejects 31/33 POS (PL_H median 82 m: removing a band leaves the eye at its prior, sigma_sep ~ 15-20 m,
+  K*sigma_sep > 50 m) - the RAIM availability problem: the eye information of these photos lives in one band.
+  Bubble test (hypothesis outside max(PL, K sigma0) of the MAP): POS 7/33, non-trivial negatives 42/92 (45.7%),
+  NE-dec 32/56 (57%), AC1 6/10. The eye-free MAP moves NE-dec eyes by a median 163 m (toward the truth) and POS eyes
+  by 18 m; that is the GA2/GA1 question (does the MAP eye move right), not an integrity pass.
+
+HONESTY / CAVEATS
+  - n is small: 33 positives in 31 photos, 56 NE-dec in 29 photos (<= 2 per photo, correlated). CP intervals are per
+    hypothesis, not per photo; by-photo intervals would be wider.
+  - The alert limits (1.0 / 0.5 deg) were set a priori as product tolerances, not tuned; the sweep shows the verdict
+    does not hinge on them at the pre-registered loss definition.
+  - The E1 correspondences are single-view LoMa sets thinned to <= 400; the product would have skyline + concord cues
+    as further families ("-skyline / -point" subsets) that this dataset does not carry. With skyline as an
+    independent family the rotation separation may be better conditioned; untested here.
+  - Viewshed has no DSM here (swisstopo COG not fetched); the E1 decoys cannot exercise it (see above).
+  - The stricter "binding reading" (0/33 POS) was fixed before scoring. The kill does not depend on it: even the
+    oracle cannot get below 1/33.
+
+IMPLICATION: solution separation on appearance correspondences with the eye fixed is a good wrong-BASIN detector
+  (NB-con AUROC 0.94, every non-trivial wrong-basin decoy rejected) but not a wrong-EYE detector at an acceptable true
+  loss: the displaced eyes that fool E1 are also the ones whose subsets agree. Same conclusion as E1/E3 from another
+  angle: appearance matches carry rotation, not eye; eye integrity needs eye-observing families (T-junctions GA3,
+  lakes GA4) as separate subsets.

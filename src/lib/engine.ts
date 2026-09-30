@@ -19,6 +19,10 @@ import {
 	solvePins,
 } from "./align";
 import type { Pose } from "./camera";
+import type { ResidualField } from "./concord/core";
+import { WARP_GLSL, WarpState } from "./concord/field";
+import { startLakeFloor } from "./geocam/lakes/fetch";
+import { priorHeading } from "./geocam/priors/heading";
 import { distanceM, EnuFrame } from "./geodesy";
 import { autoAlignAsync, warmAlignGpu } from "./gpu/align";
 import { lookIdle } from "./gpu/look/opt-in";
@@ -80,6 +84,8 @@ import {
 	makePhotoSky,
 	type PhotoSky,
 	StepCamera,
+	type StepInsideOpts,
+	type StepView,
 } from "./nearfield/step-camera";
 import { ThreeSplats } from "./nearfield/three-splats";
 import {
@@ -106,6 +112,8 @@ import {
 } from "./style/three-apply";
 import type { ViewStyle } from "./style/types";
 import { heightFromTile, type ImagerySource, Terrain } from "./terrain";
+import { ThreeTiles3D } from "./tiles3d/three-tiles";
+import { TILES3D_LAYER } from "./tiles3d/tiles";
 
 export type ViewMode = "overlay" | "replace" | "world";
 
@@ -259,10 +267,18 @@ uniform float uDepthRampT[RAMP_MAX];
 uniform float uDepthRampD[RAMP_MAX];
 uniform float uDepthRampE[RAMP_MAX];
 uniform int uDepthRampN;
+// concord display warp (?concord=warp; src/lib/concord/field): off (uWarpOn = 0) ⇒ uvG == vUv exactly
+uniform sampler2D tWarp;
+uniform float uWarpScale;
+uniform float uWarpOn;
+// concord DSM occluder (?concord=occl; src/lib/concord/occl): dim mask, row 0 = top like tFg; off ⇒ no read
+uniform sampler2D tOccl;
+uniform float uOcclOn;
 varying vec2 vUv;
 
 ${TURBO_GLSL}
 ${REVEAL_GLSL}
+${WARP_GLSL}
 ${compositeChunk(`uniform sampler2D tCompMask;
 uniform sampler2D tCompNormal;
 #define GEO_RANGE(p) texelFetch(tGeo, p, 0).a
@@ -280,12 +296,14 @@ float lr(vec2 uv) {
 
 void main() {
   vec4 photo = texture2D(tPhoto, vUv);
+  // render-space reads (tLayer, tGeo) at uvG; photo-space reads (tPhoto, tFg, tBrush, masks) at vUv
+  vec2 uvG = warpUV(tWarp, uWarpScale, uWarpOn, vUv);
 #ifdef LOOK_REFINE
-  vec4 layer = layerAt(vUv);
+  vec4 layer = layerAt(uvG);
 #else
-  vec4 layer = texture2D(tLayer, vUv);
+  vec4 layer = texture2D(tLayer, uvG);
 #endif
-  float range = texture2D(tGeo, vUv).a;
+  float range = texture2D(tGeo, uvG).a;
   vec3 col = photo.rgb;
   // people & other foreground: keep the photo untouched there
   float fg = uFgOn * texture2D(tFg, vUv).r;
@@ -298,24 +316,26 @@ void main() {
     fg = uFgOn * softMask(ref.b);
   }
 #endif
+  // concord DSM occluder: a tree / hut in front of the terrain this pixel shows dims it (dim, don't hide)
+  if (uOcclOn > 0.5) fg = max(fg, 0.8 * texture2D(tOccl, vUv).r);
 
   // silhouettes: discontinuities in log-range
-  float c = lr(vUv);
+  float c = lr(uvG);
   vec2 o = uGeoTexel * 1.25;
-  float e = max(max(abs(c - lr(vUv + vec2(o.x, 0.0))), abs(c - lr(vUv - vec2(o.x, 0.0)))),
-                max(abs(c - lr(vUv + vec2(0.0, o.y))), abs(c - lr(vUv - vec2(0.0, o.y)))));
-  float isSkyline = (range > 0.0 && texture2D(tGeo, vUv + vec2(0.0, o.y)).a == 0.0) ? 1.0 : 0.0;
+  float e = max(max(abs(c - lr(uvG + vec2(o.x, 0.0))), abs(c - lr(uvG - vec2(o.x, 0.0)))),
+                max(abs(c - lr(uvG + vec2(0.0, o.y))), abs(c - lr(uvG - vec2(0.0, o.y)))));
+  float isSkyline = (range > 0.0 && texture2D(tGeo, uvG + vec2(0.0, o.y)).a == 0.0) ? 1.0 : 0.0;
   float ridge = smoothstep(uRidgeThr.x, uRidgeThr.y, e);
   if (uNearFade > 0.0) ridge *= range > 0.0 ? smoothstep(uNearFade * 0.5, uNearFade, range) : 1.0;
 #ifdef LOOK_INK
-  vec2 ink = inkLines(vUv, range, uNearFade, cov);
+  vec2 ink = inkLines(uvG, range, uNearFade, cov);
 #endif
 #ifdef LOOK_OUTPUT
   float grainA = 0.0;
 #endif
   // reveal: x = overlay alpha, y = light band, z = ridge alpha (1, 0, 1 when off)
   vec3 rv = vec3(1.0, 0.0, 1.0);
-  if (uReveal.w > 0.0) rv = revealAt(vUv, range, uReveal, uRevealWin, uRevealQD, uRevealQE, uRevealShape, uRevealFocus, uRevealF, uRevealR, uRevealU, uAspect);
+  if (uReveal.w > 0.0) rv = revealAt(uvG, range, uReveal, uRevealWin, uRevealQD, uRevealQE, uRevealShape, uRevealFocus, uRevealF, uRevealR, uRevealU, uAspect);
 
   if (uMode == 0) {
     if (uDepthTint > 0.0 && range > 0.0 && fg < 0.5) {
@@ -446,6 +466,8 @@ export class PhotoEngine {
 	private scene = new THREE.Scene();
 	private cam = new THREE.PerspectiveCamera(50, 1, 1, 400000);
 	private worldCam = new THREE.PerspectiveCamera(55, 1, WORLD_NEAR, 600000);
+	/** Step Inside 3D Tiles (src/lib/tiles3d); null unless ?tiles3d= is on. */
+	private tiles3d: ThreeTiles3D | null = null;
 	private controls?: OrbitControls;
 	private geoRT: THREE.WebGLRenderTarget;
 	private layerRT: THREE.WebGLRenderTarget;
@@ -524,6 +546,8 @@ export class PhotoEngine {
 		cam: StepCamera;
 		sky: PhotoSky;
 		fromWorld: boolean;
+		/** 'step': Step Inside (splats, photo sky, full drape); 'map': the In-map view's own style. */
+		view: StepView;
 	} | null = null;
 	/** The last setSkyMask() mask (P(sky) 0..255), for Step Inside's split. */
 	private skyMaskStore: SkyMask | null = null;
@@ -542,7 +566,7 @@ export class PhotoEngine {
 		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 		this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 		this.prior = {
-			yaw: photo.heading ?? 0,
+			yaw: priorHeading(photo) ?? 0,
 			pitch: photo.pitch ?? 0,
 			roll: photo.roll ?? 0,
 			vfov: photo.vfov,
@@ -614,6 +638,11 @@ export class PhotoEngine {
 					uRevealF: { value: new THREE.Vector3() },
 					uRevealR: { value: new THREE.Vector3() },
 					uRevealU: { value: new THREE.Vector3() },
+					tWarp: { value: blankTexture() },
+					uWarpScale: { value: 0 },
+					uWarpOn: { value: 0 },
+					tOccl: { value: blankTexture() },
+					uOcclOn: { value: 0 },
 					...makeCompositeStyleUniforms(),
 					// the look composite (read only under its LOOK_* defines)
 					...COMP_BLOCK.threeUniforms(),
@@ -628,6 +657,83 @@ export class PhotoEngine {
 		this.scene.background = null;
 		// Step Inside splats live on their own layer: only the world / step camera draws them
 		this.worldCam.layers.enable(NEARFIELD_LAYER);
+		// Step Inside 3D Tiles (?tiles3d=, off by default): their own layer too, shown only while stepping;
+		// the drape's photo projection decides where they fill (tiles3d/material.ts)
+		this.tiles3d = ThreeTiles3D.create(
+			this.scene,
+			{
+				uPhotoViewProj: this.shared.uPhotoViewProj,
+				uPhotoPos: this.shared.uPhotoPos,
+				uPhotoRange: this.shared.uPhotoRange as { value: THREE.Texture | null },
+				uPhotoFg: this.shared.uPhotoFg as { value: THREE.Texture | null },
+				uPhotoFgOn: this.shared.uPhotoFgOn,
+			},
+			() => this.requestRender(),
+		);
+		if (this.tiles3d) this.worldCam.layers.enable(TILES3D_LAYER);
+	}
+
+	/** concord display warp (src/lib/concord/field WarpState); null = off. */
+	private warp: WarpState | null = null;
+
+	/**
+	 * Display-only residual warp (?concord=warp): render-space composite reads and peak labels move by
+	 * W; nothing else (pose, pins, exports of measurements) sees it. null = off: the composite is
+	 * bit-identical to no warp. Callers get the field from concord/field displayField (null at LOW).
+	 */
+	setWarp(field: ResidualField | null) {
+		const u = this.composite.material.uniforms;
+		if (!field && !this.warp) return;
+		const old = u.tWarp.value as THREE.Texture;
+		if (!field) {
+			this.warp = null;
+			u.tWarp.value = blankTexture();
+			u.uWarpScale.value = 0;
+			u.uWarpOn.value = 0;
+		} else {
+			this.warp = new WarpState(field);
+			const t = this.warp.texture;
+			const tex = new THREE.DataTexture(t.data, t.width, t.height);
+			tex.flipY = false; // row 0 = top; warpUV samples at (x, 1 − y)
+			tex.minFilter = tex.magFilter = THREE.NearestFilter;
+			tex.generateMipmaps = false;
+			tex.needsUpdate = true;
+			u.tWarp.value = tex;
+			u.uWarpScale.value = t.scale;
+			u.uWarpOn.value = 1;
+		}
+		old.dispose();
+		this.requestRender();
+	}
+
+	/** Photo uv (as shown) → the render uv whose terrain is drawn there (hover / geo readback). */
+	renderUVOf(u: number, v: number): [number, number] {
+		return this.warp ? this.warp.renderOf(u, v) : [u, v];
+	}
+
+	/**
+	 * concord DSM occluder (?concord=occl, src/lib/concord/occl): photo-space dim mask (row 0 = top,
+	 * 255 = a surface-model object stands in front of the terrain there); null = off (bit-identical).
+	 * Display-only, like setWarp.
+	 */
+	setOccluder(m: { width: number; height: number; data: Uint8Array } | null) {
+		const u = this.composite.material.uniforms;
+		if (!m && u.uOcclOn.value === 0) return;
+		(u.tOccl.value as THREE.Texture).dispose();
+		if (!m) {
+			u.tOccl.value = blankTexture();
+			u.uOcclOn.value = 0;
+		} else {
+			const rgba = new Uint8Array(m.width * m.height * 4);
+			for (let i = 0; i < m.data.length; i++) rgba[i * 4] = m.data[i];
+			const tex = new THREE.DataTexture(rgba, m.width, m.height);
+			tex.flipY = true; // like fgTex: sampled at vUv
+			tex.minFilter = tex.magFilter = THREE.LinearFilter;
+			tex.needsUpdate = true;
+			u.tOccl.value = tex;
+			u.uOcclOn.value = 1;
+		}
+		this.requestRender();
 	}
 
 	/** One frame of the overlay reveal (src/lib/reveal); null = off. */
@@ -665,6 +771,8 @@ export class PhotoEngine {
 		) => Promise<{ width: number; height: number; data: Uint8Array } | null>,
 	) {
 		onProgress?.("Loading photo", 0);
+		// ?geoLakeFloor (null when off): lake outlines load in parallel; eye ≥ lake level, fail-open
+		const lakeFloor = startLakeFloor(this.photo, region, this.loadAbort.signal);
 		// CPU skyline (horizon-fast in a worker): its tiles stream in with the photo decode and the terrain
 		if (!this.fastHorizon) {
 			const fast = this.startFastHorizon();
@@ -759,6 +867,15 @@ export class PhotoEngine {
 			onProgress?.("Placing peaks and trails", 1);
 			this.buildPeaks(regionData);
 			this.buildTrails(regionData);
+		}
+		if (lakeFloor) {
+			const floor = await lakeFloor(dem, (la, lo) => terrain.heightAt(la, lo));
+			if (this.disposed) return;
+			if (floor != null && floor > this.eyeAlt) {
+				this.eyeAlt = floor;
+				this.eye.set(0, 0, floor);
+				this.fastHorizon?.setEye(floor);
+			}
 		}
 		const fg = await fgPromise;
 		if (this.disposed) return;
@@ -1679,10 +1796,22 @@ export class PhotoEngine {
 		const w = this.style.world;
 		let photoPlaneOpacity = w.frame.planeOpacity;
 		const step = this.step;
+		/** Step Inside proper (not the In-map view driven by the step camera). */
+		const stepView = step?.view === "step";
 		if (step) {
-			// Step Inside: the step camera drives worldCam; the frustum gizmo would sit on the eye
+			// Step Inside: the step camera drives worldCam; the frustum gizmo would sit on the eye (the
+			// In-map view fades it in as the camera leaves the eye)
 			if (step.cam.update()) this.requestRender();
-			photoPlaneOpacity = 0;
+			photoPlaneOpacity = stepView
+				? 0
+				: photoPlaneOpacity *
+					Math.max(
+						0,
+						Math.min(
+							1,
+							(this.worldCam.position.distanceTo(this.eye) - 30) / 300,
+						),
+					);
 		} else if (this.flight?.held) {
 			photoPlaneOpacity = 0;
 		} else if (this.flight) {
@@ -1731,7 +1860,7 @@ export class PhotoEngine {
 				this.applyCompositeLook(this.composite.material.uniforms);
 		}
 		// Step Inside: the full photo on the drape, at every incidence (materials.ts: > 1.5)
-		u.uProjectPhoto.value = this.step ? 2 : s.projectOpacity;
+		u.uProjectPhoto.value = stepView ? 2 : s.projectOpacity;
 		u.uPhoto.value = this.photoTex;
 		u.uPhotoRange.value = this.geoRT.texture;
 		u.uPhotoMinRange.value = s.minProjectRange;
@@ -1740,7 +1869,7 @@ export class PhotoEngine {
 		if (nf?.masks && nf.opts.maskDrape !== false) {
 			// Object pixels (huts, people, trees) must not smear across the terrain behind them: the split's
 			// Object mask OR'd into the people-mask path of the drape
-			u.uPhotoFg.value = step
+			u.uPhotoFg.value = stepView
 				? nf.masks.step
 				: s.protectPeople
 					? nf.masks.worldFg
@@ -1761,7 +1890,7 @@ export class PhotoEngine {
 			this.worldCam.updateProjectionMatrix();
 		}
 		// from the photo camera the near terrain drapes exactly: no grazing-angle cut-off
-		if (step) u.uPhotoMinRange.value = 1;
+		if (stepView) u.uPhotoMinRange.value = 1;
 		u.uPhotoPos.value.copy(this.eye);
 		applyPose(this.cam, this.pose, this.aspect, this.eye);
 		u.uPhotoViewProj.value.multiplyMatrices(
@@ -1769,7 +1898,7 @@ export class PhotoEngine {
 			this.cam.matrixWorldInverse,
 		);
 		if (this.trails) this.trails.visible = s.trails;
-		if (step) {
+		if (step && stepView) {
 			const su = step.sky.material.uniforms;
 			su.uPhoto.value = this.photoTex;
 			su.uPhotoViewProj.value.copy(u.uPhotoViewProj.value);
@@ -1795,10 +1924,17 @@ export class PhotoEngine {
 			this.scene.add(sky);
 		} else
 			this.scene.background = setColor(new THREE.Color(), w.sky.background);
+		if (stepView)
+			this.tiles3d?.beforeRender(
+				this.worldCam,
+				this.renderer.domElement.width,
+				this.renderer.domElement.height,
+				{ truth: !!nf?.opts.truth },
+			);
 		this.renderer.render(this.scene, this.worldCam);
 		this.scene.background = null;
 		if (sky) this.scene.remove(sky);
-		if (step) this.scene.remove(step.sky);
+		if (step && stepView) this.scene.remove(step.sky);
 		if (nf) u.uPhotoFg.value = this.fgTex;
 		u.uTruth.value = 0;
 		u.uProjectPhoto.value = 0;
@@ -1859,7 +1995,9 @@ export class PhotoEngine {
 				this.peakVis.set(p, visible);
 			} else visible = this.peakVis.get(p);
 			if (visible === undefined) continue; // unknown: no buffer for this pose has tested it yet
-			if (this.settings.protectPeople && this.isForeground(pr.u, pr.v))
+			// display warp: the label goes where the render point is SHOWN (visibility stays in render space)
+			const [lu, lv] = this.warp ? this.warp.photoOf(pr.u, pr.v) : [pr.u, pr.v];
+			if (this.settings.protectPeople && this.isForeground(lu, lv))
 				visible = false;
 			if (!visible) continue;
 			const rank = peakRank(p.prominence, p.ele, range);
@@ -1867,8 +2005,8 @@ export class PhotoEngine {
 				name: p.name,
 				ele: p.ele,
 				prominence: p.prominence,
-				u: pr.u,
-				v: pr.v,
+				u: lu,
+				v: lv,
 				distKm: range / 1000,
 				rank,
 				visible,
@@ -2147,10 +2285,16 @@ export class PhotoEngine {
 		// GPU look passes (gpu/look) still in flight land before the export draws
 		await lookIdle();
 		if (this.settings.mode === "world" || this.step) {
-			this.renderNow();
-			return new Promise((res) =>
-				this.renderer.domElement.toBlob(res, "image/png"),
-			);
+			// display-only 3D Tiles (Google) never enter an export (tiles3d/three-tiles.ts)
+			const capture = () => {
+				this.renderNow();
+				return new Promise<Blob | null>((res) =>
+					this.renderer.domElement.toBlob(res, "image/png"),
+				);
+			};
+			return this.tiles3d
+				? this.tiles3d.withoutDisplayOnly(capture)
+				: capture();
 		}
 		const { w, h } = this.cssSize;
 		const pr = this.renderer.getPixelRatio();
@@ -2226,6 +2370,7 @@ export class PhotoEngine {
 		this.controls?.dispose();
 		this.exitStepInside();
 		this.setNearField(null);
+		this.tiles3d?.dispose();
 		this.terrain?.dispose();
 		this.skyMesh?.geometry.dispose();
 		this.skyMesh?.material.dispose();
@@ -2489,6 +2634,11 @@ export class PhotoEngine {
 	}
 
 	/** The step-inside camera (dev tools / UI), or null. */
+	/** Renderer.tiles3dAttribution: the 3D Tiles credit line while stepping (null = none on screen). */
+	tiles3dAttribution(): string | null {
+		return this.tiles3d?.attribution() ?? null;
+	}
+
 	get stepCamera() {
 		return this.step?.cam ?? null;
 	}
@@ -2498,11 +2648,10 @@ export class PhotoEngine {
 	 * `radius` metres (NearFieldScene.confidenceRadius), drawn with the drape, the near-field splats and
 	 * the photo on a far sphere. Works from any mode; `onBack` fires when backToPhoto() arrives.
 	 */
-	enterStepInside(
-		opts: { radius?: number; pivotDist?: number; onBack?: () => void } = {},
-	) {
+	enterStepInside(opts: StepInsideOpts = {}) {
 		if (!this.terrain || this.disposed) return;
 		this.exitStepInside();
+		const view = opts.view ?? "step";
 		applyPose(this.cam, this.pose, this.aspect, this.eye);
 		const fromWorld = this.settings.mode === "world";
 		if (this.controls) this.controls.enabled = false;
@@ -2514,10 +2663,19 @@ export class PhotoEngine {
 			aspect: this.aspect,
 			radius: opts.radius ?? this.nf?.scene.confidenceRadius ?? 10,
 			pivotDist: opts.pivotDist,
+			mode: opts.mode,
+			easeIn: view === "map" && fromWorld,
+			groundAt: (x, y) => {
+				const g = this.frame.toGeo(x, y, 0);
+				const h = this.terrain?.heightAt(g.lat, g.lon);
+				return h == null ? null : this.frame.fromGeo(g.lat, g.lon, h)[2];
+			},
 			onChange: () => this.requestRender(),
 			onBack: opts.onBack,
 		});
-		this.step = { cam, sky: makePhotoSky(), fromWorld };
+		this.step = { cam, sky: makePhotoSky(), fromWorld, view };
+		if (view === "step")
+			this.tiles3d?.enter(this.photo.lat, this.photo.lon, this.eye);
 		this.requestRender();
 	}
 
@@ -2526,6 +2684,7 @@ export class PhotoEngine {
 		const st = this.step;
 		if (!st) return;
 		this.step = null;
+		this.tiles3d?.exit();
 		st.cam.dispose();
 		st.sky.geometry.dispose();
 		st.sky.material.dispose();

@@ -1,0 +1,14 @@
+DEVIATIONS FROM METHOD.txt (METHOD.txt itself is unchanged; its sha1 is in METHOD.sha1)
+
+D1 (2026-09-29, after the first run crashed with an empty column set, BEFORE any residual, fit, parallax or
+   decision number had been computed). Cause: the GT eyes are the GPS altitudes (1928-1942 m), chosen by the GT's
+   'max' eye rule against the AWS Terrarium ground at the GPS points (1859-1903 m). Mapterhorn z14 puts the ground
+   there at 1944.6 / 1946.0 / 1947.5 m (7059 / 7063 / 7068), i.e. 5-18 m ABOVE the stated eyes, so every ray from
+   the stated eye hits terrain within 5 m and no skyline exists. Change: eye z = max(GT eye, Mapterhorn ground +
+   1.6 m), i.e. the same 'max' rule the GT used (scripts/annotate.ts), applied to the DEM of this check. This is
+   ground + 1.6 m for all three photos. Used for GT, propagated and fitted poses alike and for the parallax
+   simulation. Consequence to state in the report: the GT poses were solved at a different eye and DEM, so a
+   pitch offset between GT and F is expected and is NOT evidence of GT error by itself; the relative rotations
+   (d_F, d_GF) are the primary statistic and are much less sensitive to a common eye offset.
+D2 (same time, same reason). METHOD's eye-sensitivity refit at 'GT demGround + 1.7 m' is impossible (that is
+   below Mapterhorn ground too). Replaced by a refit at the D1 eye + 15 m (a GPS-altitude-sized eye error).

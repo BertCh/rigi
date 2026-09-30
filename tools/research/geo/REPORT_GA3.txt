@@ -1,0 +1,81 @@
+GA3 - T-junction (occlusion crossing) eye cue                         Agent D, 2026-09-30
+Rule: tools/research/geo/PROTOCOL.txt SECTION GA3 + AMENDMENT GA3-A + AMENDMENT GA3-B (all written before any
+real-photo GA3 number). Data: out/geocam/ga3/{census.json, synth/, synth_v1_frozen/, synth-summary.json, dev/,
+dev-summary.json}. Code: src/lib/geocam/tjunc/**, scripts/geocam/ga3-{common,synth,dev}.ts.
+
+VERDICT: GA3 KILLED on real photos (median improvement -0.83 vs kill < 0.20; non-true eye wins 93% vs kill > 15%).
+GA3-synth (render-only gate) FAILS its convexity rule under both the frozen rule and amendment A, although the
+global minimum sits at the true eye on 6/6 synthetic photos.
+
+WHAT WAS BUILT
+  layeredHorizon   DEM march (copy of geo/horizon.ts, scene-frame HeightFn, curvature+refraction k=0.13 folded in or
+                   applied) keeping every visible silhouette crest per azimuth with its background distance dBack.
+  predictJunctions crests linked into polylines (depth/elevation continuity); T-junction = far line ending where a
+                   nearer crest (ratio >= 1.3) rises over its extrapolated elevation; J by linear crossing; near/far
+                   distances, image normals (toward increasing elevation), crossing angle, pxPer10m = f*10*(1/d1-1/d2),
+                   world samples of both contours (re-projectable under any rotation/focal). Amendment A3: complete
+                   samples only + duplicate merge. junctionsFromGeomBuffer = image-space variant (range-jump clusters).
+  measureJunctions searchAlongNormal on thin photo edges, pair residuals (e_near, e_far) and the plan's differential
+                   r = e_far - e_near/(n_near.n_far); edgesFromMask/boundaryMask for synthetic "photos".
+  junctionFactor   core Factor, family "junction", point-to-curve offsets, exact in rotation/focal, eye linearised by
+                   central differences of the full prediction at eye +-5 m, relinearize().
+  tjunc.check.ts   10/10 synthetic checks pass (crests, curvature, junction geometry, image-space agreement, <1 px at
+                   truth, 6 m eye shift -> 4-7 px differential residual, pitch-insensitivity of r, factor recovers a
+                   45 m displacement to 0.23 m with rotation fixed).
+
+A NOTE ON THE DIFFERENTIAL RESIDUAL (analysis, not data): a single junction's two contour offsets carry NO eye
+information once a free local image translation (rotation) is allowed - any (e_near, e_far) pair is a translation
+of J. r = e_far - e_near/(n_near.n_far) cancels only translation along n_far (pitch-like); translation along the far
+tangent leaks with gain tan(angle). Eye information from junctions therefore needs rotation pinned elsewhere (far
+skyline, other junctions): the report's "rotation cancels" holds only for near-parallel depth layers.
+
+COVERAGE (geometry only; census.json)
+  Eligible (>= 3 junctions, near 200-3000 m, crossing >= 20 deg, at the reference camera): 6 / 40 photos with a
+  reference (GT dev 1/10: IMG_7059; wild dev 5/30: wc_0006 0020 0052 0071 0085). Most views are far-field: junctions
+  exist but at 5-60 km (pxPer10m < 1) or cross at < 20 deg. Several GT eyes lie 10-18 m BELOW Mapterhorn
+  (7053 7059 7063 7155), wild eyes up to 570 m above ground (wc_0028: aerial?).
+
+GA3-SYNTH (render-only; synthetic edges = ray-cast range/sky boundary at the reference eye; +-200 m grid, 10 m)
+  v1 frozen rule:     1/6 pass (argmin <= 10 m on 6/6: 0 m on 4, 10 m on 2; ray-monotone fraction 0.00-0.81).
+  v2 amendment A:     1/6 pass (argmin 0 m on 5/6, 10 m on 1/6; monotone fraction 0.06-0.88).
+  Shape: a narrow well (~10-20 m radius) on a plateau of capped costs. With +-12 px search windows and 2-18 px per
+  10 m of eye motion, a contour leaves its window after ~10 m; beyond that the cost is flat or noisy (junction
+  sets change with the eye). The geometry DOES single out the true eye when the edges are exactly the DEM's.
+
+GA3-DEV (real photo edges, 6 eligible photos x 12 starts = 72 cases; 5 m lattice search within +-150 m)
+                         n   median impr.  median d_rec  success (<= 50% d)       non-true win (> 25 m)
+  PRIMARY (rot re-fit)   72    -0.83        101.7 m      8/72 = 0.11 [0.06,0.20]  67/72 = 0.93 [0.85,0.97]
+    GT (IMG_7059)        12    -1.59        129.6 m      2/12                     10/12
+    wild (5 photos)      60    -0.77         88.6 m      6/60                     57/60
+    by d=25/50/100       24 each: median impr. -3.07 / -0.90 / -0.02; success 1 / 2 / 5
+  secondary oracle pair  72    -0.08         45.0 m      17/72 = 0.24             59/72 = 0.82
+  secondary oracle diff  72    -0.52         92.9 m      10/72 = 0.14             70/72 = 0.97
+  (oracle = the reference rotation held at every candidate eye: an unrealistic upper bound.)
+  Per photo (primary median impr.): 7059 -1.59, wc_0006 -1.78, wc_0020 -0.41, wc_0052 -0.17, wc_0071 -0.83,
+  wc_0085 -1.03. KILL: median improvement -0.83 < 0.20 AND non-true-win 0.93 > 0.15.
+
+WHY IT FAILS (post-hoc diagnosis, labelled)
+  1. The true eye does not look best on real edges: cost(truth) = 13-38 px^2 (only 2/3 .. 4/6 junctions have both
+     contours matched within 12 px at the reference pose), while wrong eyes that predict exactly 3 junctions find
+     clutter edges within 12 px for all of them (cost < 1 px^2, e.g. wc_0020 at 70 m). Real photos are full of
+     forest, snow, rock-band, building and shadow edges that the DEM lacks; the near contours at 1-3 km are also
+     where the DEM rim slides and forests sit on the silhouette.
+  2. The cost is a mean over the junctions predicted AT the candidate eye, so eyes with fewer (3) junctions have
+     fewer chances to miss. A fixed-identity junction set would need tracking across eyes (the factor does this
+     locally via matchJunction, which is only valid within ~40 px).
+  3. The information is local: the synthetic well is ~10-20 m wide, so from 25-100 m away only a global search can
+     find it, and a global search on real edges is dominated by (1).
+  4. Coverage is low (6/40 eligible) for the kill criterion's ">= 3 crossings within 3 km" condition.
+
+HONEST CAVEATS
+  - Reference eyes (GT, C0 refs) are not surveyed; for 7059 the reference eye is 12 m below the DEM.
+  - n = 6 photos (1 GT); CIs are Wilson intervals over cases that are correlated within a photo.
+  - The search is a global lattice search in the window (a local solver could only do worse). Focal is fixed.
+  - The junctionFactor (MAP use) was only validated synthetically; it was not scored on real data because the
+    scorer-level test already fails.
+  - Amendments A (foreground cut 100 m, smoothed eye height, junction completeness/merge) and B (5 m lattice) were
+    made after seeing synthetic (render-only) surfaces, before any real-photo number; v1 results are kept.
+WHAT MIGHT RESCUE IT (not tested; for the record)
+  A photo-side contour detector that separates depth edges from texture (the GC3 pseudo-label idea), or scoring
+  junction TOPOLOGY (ordering of which ridge occludes which along the skyline) instead of pixel offsets; an
+  a-contrario significance on the junction match rather than a truncated mean.

@@ -6,9 +6,10 @@
 //
 // Only DSM cells that stand ≥ minObjM above the DTM (nDSM) occlude: the bare-earth part of the DSM is already
 // the render's DEM, and counting it would make DSM-vs-DEM noise at grazing angles look like objects.
+
+import { EARTH_R, REFRACTION_K } from "../../geodesy";
 import type { CameraX, Vec3 } from "../core";
 import { unprojectDirX } from "../core";
-import { EARTH_R, REFRACTION_K } from "../../geodesy";
 import type { NearDsm } from "./ndsm";
 
 /** Photo-space geometry at `cam` (WP-C's GeomBuffer): xyz/range of the DEM hit per pixel, sky = no hit. */

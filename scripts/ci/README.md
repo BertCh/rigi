@@ -1,0 +1,135 @@
+# Regression gate (roadmap N1)
+
+One runner for every check the repo already had. It works with any number of concurrent sessions on
+the tree and never changes app behaviour.
+
+```sh
+node scripts/ci/run.mjs fast                  # ~30 s: tsc, biome ratchet, 21 node/tsx unit checks
+node scripts/ci/run.mjs full                  # + browser: style-baseline, deck smoke, eval-app (~minutes)
+node scripts/ci/run.mjs full --only deck-smoke,style-baseline
+node scripts/ci/run.mjs fast --skip concord-joint --jobs 8
+node scripts/ci/run.mjs --list                # every check id, tier, command and untracked inputs
+node scripts/ci/install-hook.mjs              # OPTIONAL pre-push hook (fast tier); not installed by default
+```
+
+The runner exits 1 if any check is `FAIL` and 0 otherwise. Each run prints a table of check, tier,
+status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `out/ci/last-run.json`.
+
+| status | meaning | fails the gate |
+|---|---|---|
+| PASS | exit 0, gate satisfied | no |
+| FAIL | new failure (or a known one under `--strict`) | **yes** |
+| KNOWN | fails, but matches the baseline in `known-failures.json` | no |
+| FIXED | listed as known but passes now. Delete it from the baseline | no |
+| SKIP | a gitignored input it needs (`data/`, `public/photos/`, `out/…`) is missing, e.g. in CI | no |
+
+## Checks
+
+| id | tier | what it guards | command |
+|---|---|---|---|
+| tsc | fast | types across `src/`, `scripts/`, `tools/` (this includes `src/lib/renderer.check.ts`: both engines satisfy `Renderer`) | `tsc --noEmit --pretty false` |
+| biome | fast | lint + format + import order, as a per-file ratchet | `biome check --reporter=json <files>` |
+| style-check | fast | CLASSIC style = today's constants, ramps, presets, `?style=` | `scripts/style-check.ts` |
+| labels | fast | peak labels: classic byte-identical, no overlaps | `src/lib/look/__tests__/labels.check.ts` |
+| haze-fit | fast | `fitHaze` recovers J, A, β | `src/lib/look/__tests__/haze-fit.test.ts` |
+| annotate-selftest | fast | `solveFromControlPoints` (output `FAIL` counts, since it always exits 0) | `scripts/annotate-selftest.ts` |
+| eye-check | fast | pose6dof eye refinement, analytic ridge | `src/lib/pose6dof/eye.check.ts` |
+| pose6dof | fast | pose6dof solvers + real control points (`--quick`) | `scripts/test-pose6dof.ts` (needs `data/`) |
+| refine-test | fast | refine Jacobians, FFT, synthetic recovery | `scripts/refine-test.ts` |
+| export | fast | export/interchange (XMP, GeoJSON, KML, COLMAP…) | `scripts/test-export.ts` (needs `public/photos/`) |
+| nearfield-core / -export / -generate / -spot / -eyes / -propagate, splat-sort | fast | Step Inside core; generated splats never exported; propagation parity with Python; depth sort | `src/lib/nearfield/**`, `tools/nearfield/propagate/propagate.check.ts`, `scripts/nearfield/splat-sort-test.ts` |
+| concord-core / -priors / -cues / -joint / -field / -occl | fast | concordance WP-A..F (synthetic, offline). `field` also asserts `?concord` defaults off | `src/lib/concord/*/*.check.ts` |
+| style-baseline | full | **classic pixel identity + geometry hash** on the three.js route. No `?style`/`?concord`/`?renderer` flag is set, so this row is also the **concord-off parity** gate | `scripts/style-baseline.mjs check --url …` |
+| deck-smoke | full | three vs `?renderer=deck` parity: \|Δyaw\| ≤ 0.5°, label overlap ≥ 0.6 | `scripts/deck-engine-smoke.mjs --url … --out out/ci/…` |
+| eval-app | full | app auto-alignment vs control points. Gate: `N/M within 1° yaw` ≥ `evalApp.minWithin1deg` | `scripts/eval-app.mjs` (`APP_URL=…`) |
+
+Full-tier checks run one at a time through `node scripts/gpu/with-render-lock.mjs -- …`. That wrapper
+waits for the machine-wide render lock and for memory headroom, and the wait counts against the check's
+timeout. The runner starts its own `vite dev --port 3130 --strictPort`, which gets its own dep cache
+`node_modules/.vite-3130` (see `vite.config.ts`), and stops it at the end. If something already answers
+on that port, the runner reuses it. `--url http://localhost:3100` uses an existing server instead.
+
+Left out on purpose:
+- `scripts/gpu/*` benches and parity checks: they need a GPU and dumped fixtures, and they are research
+  checks, not a gate.
+- `scripts/nearfield/*.mjs` browser labs: long, and they need the near-field service on :8767.
+- `tools/nearfield/service/selftest.py`: needs the Python env.
+- `occl.check.ts --live`: network.
+
+Any of these can be added to `checks.mjs` as another entry.
+
+## Known-failures baseline (`known-failures.json`)
+
+The gate compares each run against this baseline. It does not demand zero: pre-existing failures that
+belong to other owners are recorded here, and only new ones fail. Fix the cause, then delete the entry.
+Don't add an entry just to get your own change through.
+
+Baseline as of 2026-09-29, taken while other sessions were editing the tree:
+
+| check | known failure | where |
+|---|---|---|
+| style-check | `TypeError: ctx.save is not a function` at `src/lib/look/labels/canvas.ts:95` (`drawPeakLabels` is called from `scripts/style-check.ts:1126` with a stub ctx). Fails locally and in CI | look/labels + style owners |
+| tsc (CI only) | `src/lib/roll/roll.ts` imports `../../../data/ground-truth.json`, and `data/` is gitignored, so a fresh clone can't typecheck (or build) that module. Tolerated only when `CI=1` (`tsc.ciAllowed`). Locally tsc is clean | roll owner. Move the GT JSON into a tracked path, or load it at runtime |
+| biome | 79 errors in 64 files (54 of them `organizeImports`, then `noAssignInExpressions`, format…). `biome.errors` stores a per-file count, and the gate fails only when a file has **more** errors than its baseline or a new file has any | everyone. `npx biome check --write <file>` on files you own |
+| pose6dof, export | SKIP in CI: they read gitignored `data/` and `public/photos/`. They run locally | n/a |
+| style-baseline, deck-smoke, eval-app | Not run in CI: they need the photos, DEM tiles over the network, and the stored ~10 MB pixel baseline | n/a |
+
+To update the baseline, run `node scripts/ci/run.mjs full --biome all --update-baseline`. It rewrites
+`biome.errors` (only with `--biome all`) and `evalApp` from this run. Review the diff before keeping it.
+The `checks` and `tsc` entries are edited by hand.
+
+`eval-app` metrics are noisy from run to run (background second opinion, tile timing), so
+`minWithin1deg` is set a little below the observed count. See `evalApp` in the JSON for the last
+observed value.
+
+## Biome scope
+
+- `--biome all` checks every tracked file plus untracked files that aren't gitignored. This is the default under `CI=1` and in the workflow.
+- `--biome changed` checks only files that differ from `merge-base(HEAD, upstream or origin/master)`, plus untracked files. This is the local default and what the hook uses.
+
+Both scopes skip gitignored trees such as `tools/research/tm/.pylib*`. Plain `npx biome check .` does
+not skip them, because `biome.json` has `vcs.enabled: false`.
+
+## CI
+
+`.github/workflows/ci.yml` runs `node scripts/ci/run.mjs fast --biome all` on push and PR, with
+Node 22 (the repo pins nothing; `@types/node` is ^22) and `npm ci`. Playwright browsers are not
+downloaded. The logs are uploaded as the `ci-logs` artifact.
+
+To simulate a fresh checkout locally, copy `git ls-files -co --exclude-standard` into a scratch dir,
+symlink `node_modules`, and run `CI=1 node scripts/ci/run.mjs fast` there.
+
+## Pre-push hook (optional)
+
+`node scripts/ci/install-hook.mjs` writes `.git/hooks/pre-push`, which runs
+`node scripts/ci/run.mjs fast --biome changed`. It won't overwrite another hook unless you pass
+`--force`, `--uninstall` removes it, and `git push --no-verify` skips it once. Nothing installs the hook
+automatically.
+
+## First runs (2026-09-29)
+
+These runs were on the shared working tree while other sessions had uncommitted edits in `src/`.
+
+- **fast (local)**: 21 pass, 1 KNOWN (style-check), 1 FAIL (biome). The biome failure is new unformatted
+  or unsorted-import code in files other sessions are editing right now (`src/lib/licences/attribution.ts`,
+  `src/lib/dem/sources.ts`, `src/lib/deck/terrain-data.ts`, …). The gate caught it as designed, and it was
+  left alone. About 27 s.
+- **fast (fresh-checkout simulation, `CI=1`)**: tsc KNOWN (the gitignored `data/ground-truth.json`
+  import), pose6dof and export SKIP, biome FAIL on the same in-flight files, everything else PASS.
+- **full**:
+  - deck-smoke: PASS.
+  - eval-app: PASS, 12/14 within 1° yaw, median 6.5 px. This matches `reports/status.md`. The first
+    attempt crashed inside Playwright's launch, which is why eval-app now retries once.
+  - style-baseline: **FAIL**, 0/16 images identical, geometry hash identical. Diffs are 0.5–3.8% of
+    pixels, along the draped map/overlay lines. The harness warned that `src/` changed during the run.
+    At the time, `engine.ts`, `terrain.ts`, `dem/sources.ts`, `deck/*` and `export/engine-export.ts`
+    had uncommitted edits from other sessions. It is not yet known whether this is a real classic-view
+    regression from that work or remote-tile drift. Re-run `node scripts/ci/run.mjs full --only
+    style-baseline` on a quiet tree and look at `out/lead/style-baseline/diff/`. It is deliberately
+    **not** recorded as a known failure.
+- **fast, re-run about 20 min later**: 20 pass, 1 KNOWN, 2 FAIL. Both failures come from new in-flight work
+  by other sessions. tsc: `scripts/licences-check.ts:155-156` TS2352 (`OsmElement[]` cast to `{id:number}[]`).
+  biome: format/import order in `src/lib/tiles3d/*`, `src/lib/concord/flags.ts`, `src/lib/engine.ts`,
+  `src/lib/deck/{engine,composite-shader}.ts`, `scripts/tiles3d/step-tiles-check.mjs` and
+  `scripts/licences-check.ts`. The new peer checks (`scripts/licences-check.ts`,
+  `scripts/tiles3d/step-tiles-check.mjs`) should be added to `checks.mjs` once their owners call them stable.

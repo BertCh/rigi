@@ -20,6 +20,7 @@ import {
 	type EnuFrame,
 	REFRACTION_K,
 } from "../geodesy";
+import { imageryTileUrls } from "../licences/imagery";
 import type { BatchGrid } from "./batched-terrain-grid";
 
 export type ImagerySource = "satellite" | "topo";
@@ -432,36 +433,22 @@ export function segmentsFor(t: TileChoice) {
 
 // ---------- draped imagery ----------
 
-const SWISS_BBOX = { west: 5.9, east: 10.55, south: 45.8, north: 47.85 };
-
+// URL lists come from the imagery provider abstraction (src/lib/licences/imagery.ts); its
+// "default" provider is byte-identical to the URLs this file used to build inline.
 function imageryUrls(
 	src: ImagerySource,
 	z: number,
 	x: number,
 	y: number,
 ): string[] {
-	const lat = tileYToLat(y + 0.5, z);
-	const lon = tileXToLon(x + 0.5, z);
-	const inCH =
-		lon > SWISS_BBOX.west &&
-		lon < SWISS_BBOX.east &&
-		lat > SWISS_BBOX.south &&
-		lat < SWISS_BBOX.north;
-	const esri = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
-	if (src === "satellite")
-		return inCH && z >= 8
-			? [
-					`https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/${z}/${x}/${y}.jpeg`,
-					esri,
-				]
-			: [esri];
-	const osm = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
-	return inCH
-		? [
-				`https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/${z}/${x}/${y}.jpeg`,
-				osm,
-			]
-		: [osm];
+	return imageryTileUrls(
+		src,
+		z,
+		x,
+		y,
+		tileYToLat(y + 0.5, z),
+		tileXToLon(x + 0.5, z),
+	);
 }
 
 async function fetchBitmap(

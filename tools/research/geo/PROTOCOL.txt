@@ -1,0 +1,337 @@
+GEO PHASE A - PROTOCOL (frozen kill criteria + per-evaluation rules)
+File created 2026-09-30T02:55Z (UTC) by Agent C, before any GEO real-data evaluation was scored.
+Rules: tools/research/geo/README.txt. Each agent APPENDS a timestamped section with its exact rule BEFORE scoring.
+Nothing above an agent's section may be edited afterwards; corrections go in a new, timestamped AMENDMENT section.
+
+KILL CRITERIA - copied verbatim from reports/geometry-first-pose.md s5 (FIXED; 2026-09-29):
+
+| ID | Test | Kill criterion (fixed now) |
+|---|---|---|
+| **GA0 Quick fixes** | Declination, hAcc, eye ≥ lake level, inliers returned | Any regression on eval-app or style-baseline |
+| **GA1 MAP solver** (G3) | pycolmap-with-prior afternoon test, then GTSAM reference, then TS port. On GT and dev refs: pitch within 0.02° of the current 0.07°; all-far photos report σ_EN ≥ 0.8·σ_GPS; median (err/σ)² in [0.5, 2] | Pitch worse, or covariance over-confident by more than 3× |
+| **GA2 Observability gate** (G2) | Per-photo σ per DoF; Spearman(σ_eye, actual eye error on displaced-eye decoys) | ρ < 0.5 |
+| **GA3 T-junction eye** (G1) | Render-only first: the residual surface is convex with its minimum within 10 m of truth. Then dev refs with the eye displaced ±25/50/100 m: recovered error ≤ 50% of the displacement on photos with ≥ 3 predicted crossings within 3 km | Median improvement < 20%, or a non-true eye wins on > 15% |
+| **GA4 Lakes** (G4) | Wire the downloaded polygons in; eye-Z from waterline plus shore on dev lake photos. Also report the fraction of wild photos with a usable lake | Median eye-Z error > 5 m, or coverage < 5% |
+| **GA5 Integrity** (G6 + G7) | Leave-one-cue-family-out protection level plus a viewshed/eye-on-DSM veto, run on H1/E1 decoys | Rejects < 30% of wrong-basin/wrong-eye decoys at ≤ 2 pts true-accept loss |
+
+Phase B (GB1 vector chamfer: kill if median eye gain < 25% on photos with >= 200 px trail/road within 1 km; GB2;
+GB3) runs only if phase A passes.
+
+SPLITS: wild = 50 dev ids only (tools/bench/split.json dev); GT = dev 5495 6971 7018 7033 7053 7059 7063 7068 7131
+7155; holdout 6019 6958 7086 7130 refused by code.
+
+=====================================================================================================================
+SECTION PNP (Agent C) - pnp_prior.py "afternoon test" (GA1 pre-study)        written 2026-09-30T03:10Z (UTC)
+Written BEFORE any real-data PnP number was computed. Only synthetic checks of the pycolmap API were run before this
+(findings: pycolmap 4.2.1 AbsolutePoseRefinementOptions HAS use_position_prior / position_prior_in_world /
+position_prior_covariance; its default gradient_tolerance = 1.0 stops refinement early, so 1e-10 is used; its
+returned 6x6 covariance is [rotation(3), translation t(3)] of cam_from_world for UNIT pixel noise, i.e. unscaled).
+Status: descriptive pre-study feeding GA1. It is NOT the GA1 kill test (that is Agent B's ga1-eval on GT+dev refs);
+the GA1-style numbers below are reported as indicative only.
+
+DATA (dev only; geo_common.assert_dev on every id; no renders, no services)
+  E1: tools/research/fund/e1_acontrario hyp_scores.json (PRIMARY cut) hypotheses with label POS (n=33, REF + H1 POOL
+      correspondences at the stated eye) and NE-dec (n=56, displaced 150/400 m eyes); NE-inh (n=5, no eye truth) is
+      reported for flag rate only. Secondary: hyp_scores_dispfull.json extra DISP (incl. AMB 50 m), reported apart.
+      Correspondences = the E1/H1 corr npz (x2d at W x H, X in a frame centred on the hypothesis eye lat/lon).
+      Truth: pose = first verified-correct pose V[0] of hyps_pool.json; true eye = stated eye, expressed in the
+      hypothesis frame via the equirectangular offset (e1lib formula).
+  E3: tools/research/fund/e3_nearfield corr/<pid>_T_V2.npz (true eye T, near field kept) and <pid>_G{20,50,150}_V2.npz
+      (displaced eye G from out/<pid>.json b.G*_V2.G), world = cache frame; intrinsics = cache refs/<ref>/view.json;
+      truth pose = that ref pose, truth eye = T.
+  Focal: fixed methods use f0 = focal_px(vfov0, H) (E1 state vfov0; E3 view.json fx). Start rotation for (a) and the
+      gravity for (d) = the HYPOTHESIS pose (label-free). A hypothesis with < 12 correspondences is skipped (listed).
+
+METHODS (all with RANSAC threshold 6 px = tools/matcher/match.py PX_THRESH, seed 0)
+  ROT   match.solve_rotation (fixed f0, centre fixed at the hypothesis eye)       - status quo rotation-only
+  PNP6  match.solve_pnp_exif (PoseLib LO-RANSAC 6-DoF, f0)                       - current 6-DoF variant
+  P4PF  match.solve_p4pf (PoseLib P4Pf RANSAC, free focal)
+  COL0  pycolmap.estimate_and_refine_absolute_pose, PINHOLE f0, no prior, loss_function_scale 2, gradient_tolerance
+        1e-10, return_covariance
+  COLP  same + use_position_prior at the hypothesis eye, covariance diag(20^2, 20^2, 20^2) m^2 (EyePrior default hAcc
+        20 m; no per-photo hAcc exists for the wild set)
+  FUSE  COL0 centre + its centre covariance fused with the same GPS prior by information addition
+  UP2P  PoseLib up2p (gravity = hypothesis pitch/roll) in a 2-point RANSAC (2000 draws), then robust LM (soft_l1,
+        f_scale 2 px) on 4 DoF (yaw, C) over inliers
+  Covariance used for every sigma below: Laplace (J^T J)^-1 * s^2 at the method's solution over its 6 px inliers,
+  parameters (rotvec, C), s = 1.4826 * MAD of the inlier reprojection residual components (floor 0.5 px). COLP's
+  covariance adds the prior information. pycolmap's own covariance x s^2 is also reported (t-block, converted to C).
+
+METRICS (per hypothesis x method)
+  rotErrDeg = angle(R_est, R_truth) (E1 NE-dec: vs V[0] at the TRUE eye); pitch/yaw/roll errors;
+  centre shift |C_est - C_hyp|; eye error eTrue = |C_est - C_true| vs eHyp = |C_hyp - C_true|; "toward truth" =
+  eTrue < eHyp; sigma per axis; calibration z2 = (C_est - C_true)_k^2 / sigma_k^2 per axis (POS and E3-T; median).
+
+FLAG RULE (fixed now; the question "does the covariance/centre estimate flag the wrong eye?")
+  FLAG(h) iff COL0 succeeds with >= 12 inliers AND d2 = (C_hyp - C_est)^T Sigma_C^-1 (C_hyp - C_est) > 11.34
+  (chi2_3, 0.99), Sigma_C = COL0 Laplace centre covariance (MAD-scaled).  Secondary: horizontal only, chi2_2 0.99 =
+  9.21.  Reported: flag rate on NE-dec (detection) vs POS (false alarm) and E3 T (false alarm) / E3 G (detection),
+  each with a Clopper-Pearson 95% interval. A useful eye check would need detection >= 50% at false alarm <= 10%
+  (descriptive bar, set now; not a kill).
+  Indicative GA1 items: median |pitch err| COLP vs ROT on POS (GA1 wants not worse by > 0.02 deg); calibration
+  median z2 of COLP on POS+E3-T (GA1 wants in [0.5, 2]; over-confident by > 3x means median z2 > 9).
+  Caveat fixed now: the POS "true eye" is the stated (manual/EXIF) eye, not a surveyed one; errors vs it include its
+  own error. E3 T has the same caveat.
+
+==============================================================================================================
+GA0 - Agent A (quick fixes: declination, lake floor, flags off parity)      appended 2026-09-30T03:04Z (UTC)
+Written BEFORE ga0-audit.ts or eval-app-flags.mjs was run on any real photo.
+
+KILL CRITERION (fixed, s5): "Any regression on eval-app or style-baseline".
+  Operationalised: with every geo* flag at its default (off),
+    (1) `node scripts/ci/run.mjs full --only style-baseline,eval-app` passes: style-baseline = classic pixel identity
+        + geometry hash vs out/lead/style-baseline/baseline.json; eval-app = the ci gate ("N/M within 1 deg yaw"
+        >= known-failures minWithin1deg) AND, stricter, per-photo yaw/pitch/roll/px identical to a flags-off
+        eval-app run taken in the same session (|dyaw| < 0.005 deg, px within 0.05) - any per-photo difference
+        with flags off counts as a regression (the hooks must be inert).
+    (2) Flag-on A/B (eval-app-flags.mjs, geoDecl=on,geoLakeFloor=on,geoLakes=on) vs flags-off on the SAME harness:
+        regression = any photo moving from |dYawAuto| < 1 deg to >= 1 deg, or the count within 1 deg dropping, or
+        median auto px error rising by > 0.5 px. Holdout GT ids 6019 6958 7086 7130 are REFUSED by
+        eval-app-flags (dev + non-GT control-point photos only). Overpass water is served from the cached
+        out/concord/pins/osm/*_water.json union (deterministic); --live is a separate, labelled run.
+    If a flag-on regression occurs, the corresponding flag stays default-off and GA0 reports it; flags-off parity
+    failing = GA0 KILLED for the hook (it must be reverted).
+
+LAKE-FLOOR RULE (frozen here; src/lib/geocam/lakes/floor.ts LAKE_FLOOR_DEFAULTS):
+  lakes = OSM natural=water, not water in {river,stream,canal,ditch,drain,rapids,fish_pass,stream_pool,lock,
+  wastewater}, outer area >= 20 000 m2, and NOT water in {reservoir, basin}.
+  level = OSM ele -> SWISS_LAKE_LEVELS (levels.ts, by name) -> DEM median inside the polygon.
+  eligible iff (a) GPS fix inside the outline (even-odd with islands), or
+               (b) unsigned distance(fix, outline) <= clamp(hAcc ?? 20, 5, 100) + 30 m AND level - DEM(fix) <= 3 m.
+  floor = max eligible (level + 0.3 m). App: eyeAlt := max(eyeAlt, floor) before the horizon is taken.
+  Deviation from the plan's radius 500 m + hAcc (decided before any data): dam feet, polders and outlet valleys lie
+  below lakes within 500 m; the floor must be a veto that cannot lift a correct eye into the air.
+GA0 AUDIT (ga0-audit.ts, DEV GT only; holdout refused by code): per photo DEM(fix), eyeAltitude(alt, DEM) (app rule),
+  floor, and GT eye alt. Reported (descriptive, not a kill): #photos where the floor binds; for each, whether the
+  raised eye is closer to the GT eye (|eye - GT|) than the app eye. The motivating 6958 is holdout: NOT evaluated.
+  headingRef census over bundled photos.json + dev GT EXIF; declination per photo (none is applied unless ref M).
+
+=====================================================================================================================
+SECTION GA4 (Agent E) - lakes as known horizontal planes: ga4-eval.ts               written 2026-09-30T03:04Z (UTC)
+Written BEFORE any GA4 real-data number (cue counts, eye errors, coverage) was computed. Only synthetic checks
+(src/lib/geocam/lakes/lakes-factors.check.ts) were run before this.
+
+FACTOR (src/lib/geocam/lakes/factors.ts, frozen for this eval): waterlineFactors over concord waterCuesX, families
+  level + shore, re-extracted in relinearize() at the current camera; Cauchy c = 2; per-family bias nuisance
+  b ~ N(0, 3 px) profiled out in closed form (NOT a constant fitted on dev); nEff 20/20; minCues 4; mirror axis OFF
+  (mirrorHalfPx 0). Extraction: CPU ray cast GeomBuffer 800 px (long side) on Mapterhorn (scripts/geocam/lib.ts
+  terrainFor "mh"), photo edges of the 1600 px JPEG, searchPx 30 (@1600; covers a 20 m eye error at >= 1 km),
+  stepPx 8, polarity auto, minLevelM 1000, shoreRangeM [300, 3000].
+  Lake levels: A's lakeLevelOf (OSM ele -> SWISS_LAKE_LEVELS -> DEM median inside the polygon); polygons = cached
+  Overpass water JSON out/concord/pins/osm/*_water.json via A's compactLakes / toSceneLakes (>= 5 ha, within 40 km).
+
+RECOVERY TEST (DEV GT only; holdout refused by code via lib.assertDevGT)
+  Photos (primary, fixed now): 6971, 7018, 7033, 7053 (plan). Other dev GT photos are run too and reported
+  separately IF they have >= 8 water cues at the GT camera (secondary; not in the kill median).
+  Start: GT rotation + GT focal; eye = GT eye + (0, 0, dz), dz in {-20, -10, -5, +5, +10, +20} m.
+  Configurations (MapProblem free: rotation, focal, eye):
+    W  (PRIMARY) gps(fix, sigmaH = WP-B eyePrior sigmaH) + focal prior (WP-B focal table) + skyline (B's
+       skylineFactor, eye-linearised horizons) + waterline(level + shore). NO vertical prior (alt/ground excluded:
+       several GT eyes were set as DEM + 1.6 m, so a ground prior would "recover" U by construction).
+    S  (control) W without the waterline factors.
+    WG (secondary, product-like) W + groundFactor (1.6 m, sigma 2 / 0.5).
+  solveMap defaults except maxOuter 8.
+  Metric: eye-Z error = |U_final - U_GT| (U_GT = 0 in the scene frame). Also reported: |U_final - U_(dz=0 run)|,
+  horizontal eye shift, pitch change, bias b_hat, cue counts.
+  KILL (fixed text): median eye-Z error > 5 m over the 4 primary photos x 6 displacements (n = 24 runs, config W),
+  OR coverage < 5%. CIs: bootstrap by photo (2000 resamples of the 4 photos, median of their pooled runs, 95%
+  percentile), plus per-photo medians. n = 4 photos: the CI is the honest statement, not the point value.
+  Caveat fixed now: the GT eye is not independent ground truth (GT eyes = fix + DEM/GPS rule); an error vs it
+  includes the GT eye's own error and the lake-level error (OSM ele/table +-0.5 m, DEM median 0.7-3.6 m low).
+
+COVERAGE (wild dev, 50 ids of tools/bench/split.json dev; assertWildDev)
+  Lakes: Overpass, the SAME query as src/lib/upload/region.ts regionQueries().water (named natural=water, bbox
+  TRAIL_RADIUS_KM + 3 = 15 km around the snapped 0.05 deg centre), cached to out/geocam/ga4/osm/<pid>.json
+  (public Overpass endpoints via src/lib/overpass.ts; no local services). Levels as above.
+  Camera: the first verified correct ref of the C0 cache (meta.correct_refs[0]: pose, renderEye z), scene frame
+  at the photo fix with Mapterhorn heights (curvature + refraction folded in).
+  USABLE LAKE (fixed now) iff waterCuesX at that camera (default opts: searchPx 10, stepPx 8, minLevelM 1000,
+  shore 300-3000 m; edges of the C0 photo.jpg) returns >= 8 cues (level + shore). Secondary: predicted waterline
+  columns >= 8 (geometry only, no photo evidence).
+  coverage = usable / 50 (photos without a correct ref count as NOT usable: a lower bound). Also reported:
+  usable / (photos with a correct ref).
+
+=====================================================================================================================
+SECTION GA1 (Agent B) - MAP solver with priors + Laplace covariance: ga1-eval.ts       written 2026-09-30T03:12Z (UTC)
+Written BEFORE any GA1 real-data number was computed. Only synthetic checks (src/lib/geocam/map/map.check.ts: recovery,
+fixed params, Monte Carlo sigma within +-20 % incl. cluster-correlated DEM error, all-far sigma_EN >= 0.8 sigma_GPS,
+near sigma_EN << sigma_GPS, Student-t compass) were run before this.
+
+SOLVER (frozen for this eval): src/lib/geocam/map solveMap defaults (maxIter 50, maxOuter 8, relinM 0.5 m, eye step
+  clip trustM 25 m, MAD rescale ON). Free: rotation + focal + eye (all with priors).
+FACTORS (scripts/geocam/lib.ts photoSetup, Mapterhorn DEM, scene frame of scripts/concord/lib.ts):
+  gps      fix (0,0), sigma = WP-B eyePrior sigmaH (clamp(hAcc ?? 20, 5, 100))
+  alt      EXIF GPSAltitude (scene frame) read as alt - altBias (-7), sigmaA 3 (skipped when no altitude)
+  ground   standing height 1.6 m above Mapterhorn, sigma 2 above / 0.5 below
+  gravity  photos.json pitch/roll, sigma 1.5 deg          compass  photos.json heading, Student-t nu 3, sigma sqrt(5^2+5^2)
+  focal    WP-B focal table (focalPrior), px @1600
+  skyline  detectSkyline samples (1600 px, every 2nd column, w >= 0.3), CPU sector horizons (solve-eval march),
+           eye-linearised (delta 5 m), sigma 2 px (+) DEM sigma sqrt(1-rho)*(3+0.001d) (+) refraction, Cauchy c 2, nEff 60,
+           cluster-correlated DEM error rho 0.5 (15 deg sectors x distance bands)
+  point    WP-G re-match inliers out/concord/rematch/cues (app-start renders; present for 6971 7018 7033 7053 7131),
+           Cauchy c 2.5, nEff 60, same DEM/cluster model
+  PRIMARY config P = all of the above. Secondary (reported apart): R = P with the eye FIXED at the app eye;
+  C = P + WP-C cues (extractCues at the app camera: edge/level/shore, edge offset fixed at -2 px, nEff per joint.ts).
+START: the app's automatic solve (scripts/concord/lib.ts appSolve: pose + app eye, Terrarium eye rule). Photos: the 10
+  DEV GT photos (holdout refused by lib.assertDevGT). Wild dev refs are NOT in this run (GT only); stated as a gap.
+
+METRICS AND RULES (config P unless stated)
+ 1 PITCH: e_p = |pitch - GT pitch| per photo. "Current" = the app start's median e_p on the same 10 photos (computed
+   here; the plan quotes ~0.07 deg). PASS iff median_P(e_p) <= median_app(e_p) + 0.02 deg. Otherwise "pitch worse" = KILL.
+ 2 ALL-FAR: a photo is all-far iff (at the app camera and eye) >= 90 % of its skyline samples have horizon distance
+   >= 3 km AND no point cue lies closer than 3 km. PASS iff every all-far photo has sigma_EN >= 0.8 * sigma_GPS.
+   sigma_EN < sigma_GPS / 3 on an all-far photo counts as "over-confident by > 3x" (KILL). If no photo is all-far the
+   item is reported as untested on real data (synthetic check only).
+ 3 CALIBRATION (err/sigma)^2:
+   primary  rotation vs GT: z2 = ((x - GT)/sigma)^2 for yaw, pitch, roll (yaw difference wrapped), pooled over photos
+            (30 values); statistic = median. PASS band [0.5, 2]. KILL iff median > 9 (over-confident > 3x).
+   eye      synthetic GPS displacement (GT eyes are not independent truth: GT lat/lon = the fix): for each photo, 4
+            seeded draws delta ~ N(0, sigmaH^2 I2) shift the gps factor's mean; truth = GT eye (0,0);
+            z2 = err_EN^T Sigma_EN^-1 err_EN / 2 (per-DoF). Median over 40 runs; same band / kill.
+   Note fixed now: the median of chi2_1 is 0.455 (and of chi2_2/2 is 0.693); a perfectly calibrated 1-DoF sigma gives
+   ~0.45, i.e. just below the band. Such a value is REPORTED as outside the band (under-confident side), not a kill.
+   Secondary (labelled): rotation z2 with an assumed GT error of 0.03 deg added in quadrature.
+Outputs: out/geocam/ga1/ga1-eval.json, tools/research/geo/REPORT_GA1.txt.
+
+=====================================================================================================================
+SECTION GA3 (Agent D) - T-junction eye cue: ga3-synth.ts + ga3-dev.ts                written 2026-09-30T03:15Z (UTC)
+Written BEFORE any GA3 eye-recovery number (synthetic or real) was computed. Run before this: synthetic unit checks
+(src/lib/geocam/tjunc/tjunc.check.ts) and a GEOMETRY-ONLY census of predicted junction counts at the reference
+cameras (no photo evidence, no eye search): eligible = IMG_7059, wc_0006, wc_0020, wc_0052, wc_0071, wc_0085
+(6 of 40). Stated so the reader knows the eligible set was seen before the rule was frozen; the rule below does
+not depend on it.
+
+GEOMETRY (frozen; src/lib/geocam/tjunc + scripts/geocam/ga3-common.ts SCORER)
+  DEM: Mapterhorn (z17 <= 300 m, then MAPTERHORN.levels), rastered onto nested ENU grids (2/4/8/25/50/100/200 m for
+  radii 300/1000/2500/6000/15000/40000/150000 m from the fix), scene frame of scripts/concord/lib.ts (curvature +
+  refraction k=0.13 folded in). layeredHorizon step 0.05 deg, 20 m -> 150 km, sample spacing max(5 m, 0.003 d),
+  minOcclusion 0.3. Junctions: depth ratio >= 1.3, link tol |ln d| 0.12 / 1.5 deg, near distance 200-3000 m,
+  crossing angle >= 20 deg, >= 16 px @1600 inside the frame, samples at arc 4/8/12 px.
+  Reference camera: GT dev = data/ground-truth.json pose + GT eye; wild dev = first correct C0 ref (pose, renderEye z)
+  at the photo fix. Candidate eye (E, N): U = DEM(E, N) + (reference eye height above DEM), i.e. a 2-D search.
+  ELIGIBLE photo: >= 3 junctions at the reference camera and eye.
+COST (per candidate eye; primary): rotation (yaw, pitch, roll) re-fit from the reference rotation by 3 robust
+  Gauss-Newton steps (Cauchy c = 3 px, step <= 0.5 deg) on the junction contour samples + skyline samples (one per
+  0.5 deg of azimuth), each re-measured on the photo edges with concord searchAlongNormal (+-12 px @1600, band 1.5 px,
+  orientation tol min(20 deg, angle/2), thin-edge quantile 0.8); focal fixed at the reference.
+  cost = mean over the junctions predicted at that eye of min(e_near^2, 36) + min(e_far^2, 36) px^2 (e = median over
+  a contour's matched samples; < 2 matched samples => 36); < 3 predicted junctions => cost 72.
+  Secondary (reported, not in the rule): the same without the re-fit (reference rotation) - pair cost and the plan's
+  differential r = e_far - e_near/(n_near.n_far) (min(r^2, 36); crossing <= 70 deg else 36).
+
+GA3-SYNTH (render-only, eligible photos): synthetic edges = both-sided boundary (range ratio >= 1.3 or sky/terrain)
+  of a CPU ray cast (buildGeomBuffer, long side 1600, az step 0.01 deg) at the reference camera and eye, blurred
+  sigma 0.8 px. Grid E, N in [-200, 200] m at 10 m (truth on the grid). Per photo PASS iff argmin <= 10 m from truth
+  AND >= 80 % of 16 rays from the argmin are non-decreasing out to 100 m (tolerance 2 % of the surface range).
+  GA3-synth PASSES iff >= 2/3 of eligible photos pass. (Gate for reading GA3-dev; not a kill by itself.)
+GA3-DEV (real photo edges): photoEdgesFromRGBA on the photo at long side 1600 (GT: HEIC -> 1600 JPEG; wild: C0
+  photo.jpg). Photos: 10 GT dev + 30 wild dev with a correct ref; scored = eligible ones.
+  Starts: truth + d * (sin b, cos b), d in {25, 50, 100} m, b in {0, 90, 180, 270} deg => 12 cases per photo.
+  Search: lattice 12.5 m offset by (+3.7, -5.1) m (truth is NOT a node); nodes with |dE|, |dN| <= 150 m of the start;
+  argmin of the primary cost (tie -> node nearest the start); then a 5 x 5 refinement at 2.5 m around it (argmin
+  again). Recovered error d_rec = |final - truth| (horizontal).
+  improvement = 1 - d_rec / d; success iff d_rec <= 0.5 d; non-true eye wins iff d_rec > 25 m.
+  KILL (fixed text "Median improvement < 20%, or a non-true eye wins on > 15%"): median improvement over all
+  eligible cases < 0.20 OR non-true-win rate > 0.15. If no photo is eligible: untestable (reported, not a pass).
+  Also reported: success rate, per photo, GT vs wild, per displacement, pxPer10m, secondary costs, Wilson 95% CIs.
+  Caveats fixed now: GT/ref eyes are not surveyed truth; the lattice search is a global search in the window (a
+  local solver would do no better); real edges include forest/snow/building/texture edges that the DEM lacks.
+
+=====================================================================================================================
+SECTION GA5 (Agent E) - integrity: solution separation + viewshed veto: ga5-eval.ts     written 2026-09-30T03:17Z (UTC)
+Written BEFORE any GA5 real-data number was computed. Only synthetic checks (src/lib/geocam/integrity/
+integrity.check.ts) and a frame probe of one POS hypothesis (xyz z = DEM altitude - d^2/2R_eff, i.e. the app ENU
+frame with curvature; used for the viewshed height function) were run before this.
+
+DATA: out/geocam/decoys/<pid>.json (Agent C export of FUND E1, 35 dev photos; format geocam-decoys/1), PRIMARY cut
+  only (secondary = true hypotheses excluded; UNL excluded from every metric). Labels as E1: POS (33) positives;
+  negatives NB-inh (3), NB-con (93), NB-dec (597) wrong basin; NE-inh (5), NE-dec (56) wrong eye.
+  Correspondences as exported (<= 400 per hypothesis, 16 x 12 grid thinning).
+
+PER HYPOTHESIS h (all label-free; the label is read only for scoring):
+  Camera: pose = h.pose (vfov = h.pose.vfov), eye = h.eyeEnu (stated-eye ENU frame), aspect W/H.
+  Evidence: B's pointFactor over (uv / (W, H), xyz), sigmaPx 3 @1600 (+ DEM sigma 3 + 0.001 d m), Cauchy 2.5.
+  PRIMARY configuration P ("the camera as proposed"): MapProblem free = rotation only (eye fixed at h's eye, focal
+    fixed at h's vfov), no priors. Full solve from h, then protectionLevel with subsets
+      -left / -right (u < 0.5 / >= 0.5), -near / -far (depth < / >= the median depth of h's correspondences),
+    minRows 24 (12 points), kMd 5.33, alert limits yaw 1.0 deg, pitch 0.5 deg (eye PLs are 0 with the eye fixed).
+    Unavailable subsets (fewer rows) or no correspondences => integrity FAIL (cannot be verified).
+  Viewshed veto (viewshedVeto, defaults): Mapterhorn DEM in the same frame (z = alt - d^2/2R_eff); eye below DEM
+    by > 1 m, or > 20% of the (<= 400) matched points occluded from h's eye (tolerance 2 m + 1 m/km, end margin
+    max(60 m, 3%)). No DSM (swisstopo COG fetch is not used here); maxAboveGround off.
+  REJECT(h) iff integrity FAIL or viewshed veto.
+  SECONDARY configuration E (eye free, reported only): + gpsFactor centred on h's eye (sigmaH 20 m = EyePrior
+    default hAcc) + altFactor-like U prior at h's eye z (sigma 10 m); same subsets; PL alert H 50 m, V 25 m,
+    yaw 1.0, pitch 0.5; plus the bubble test (h outside max(PL, K sigma0) of the MAP solution).
+
+METRICS
+  Decoy rejection rate per label, pooled over all labelled negatives (n = 754), over the NON-TRIVIAL negatives
+  (nCorr >= 30: the ones the current rule's match-count gates do not already dispose of), and over NE-dec.
+  True-accept loss = POS rejected / 33 (percentage points; also over the POS that E1's CUR rule accepts).
+  E1 cross-reference (asked for): of the 10 NE-dec accepted by E1 AC1 (and the 5 by AC2), how many GA5 rejects.
+KILL (fixed text): rejects < 30% of wrong-basin/wrong-eye decoys at <= 2 pts true-accept loss.
+  Binding reading (fixed now, stricter than the text on purpose): at the frozen PRIMARY operating point, GA5 PASSES
+  only if the true-accept loss is <= 2 pts (i.e. 0 of 33 POS rejected) AND the rejection rate is >= 30% on BOTH the
+  pooled labelled negatives AND the non-trivial negatives. The wrong-eye rate (NE-dec) is reported next to it.
+  Secondary (oracle, label-tuned => an upper bound, NOT a verdict): a common scale a on both alert limits swept over
+  [0.25, 64] (x2 steps); report the best non-trivial rejection with POS loss <= 2 pts.
+  CIs: Clopper-Pearson 95% on each rate; photos are the correlated unit (<= 2 NE-dec per photo), stated as caveat.
+
+---------------------------------------------------------------------------------------------------------------------
+AMENDMENT GA3-A (Agent D)                                                              written 2026-09-30T03:21Z (UTC)
+Written AFTER the frozen GA3-synth rule was run (render-only; results kept in out/geocam/ga3/synth_v1_frozen/) and
+BEFORE any real-photo GA3 number. GA3-synth v1 under the frozen rule: FAIL (1/6 eligible photos pass; argmin at truth
+on 4/6, but the ray-monotonicity condition failed). Diagnosis (post-hoc): predicted junction sets flicker with the eye
+because (i) DEM foreground bumps 20-100 m from the eye occlude everything when the eye moves 10-20 m in steep terrain,
+(ii) the per-point eye height DEM(E,N)+hag jumps by up to 20 m between neighbouring candidates (several reference
+eyes lie 10-18 m BELOW Mapterhorn, e.g. IMG_7059), (iii) short far-line fragments give junk tangents/duplicates.
+Changes (apply to BOTH ga3-synth v2 and ga3-dev; nothing else in the GA3 section changes):
+  A1 march and synthetic cast start at 100 m (layeredHorizon minD, buildGeomBuffer minD): terrain < 100 m from the
+     eye neither occludes nor is predicted.
+  A2 candidate eye U = mean DEM over a 5x5 grid at 10 m around (E, N) + (reference U - same mean at the fix).
+  A3 predictJunctions keeps a junction only if all 3 far samples and 3+3 near samples exist, and merges junctions
+     < 10 px @1600 apart with |ln(nearD ratio)| < 0.1 (keeps the widest crossing).
+  ELIGIBILITY is re-computed under A1-A3 (geometry only) and the GA3-dev scored set is whatever it gives.
+  GA3-synth v2 is reported with the SAME pass rule, labelled "post-amendment"; v1 stays the frozen-rule result.
+
+---------------------------------------------------------------------------------------------------------------------
+AMENDMENT GA3-B (Agent D)                                                              written 2026-09-30T03:33Z (UTC)
+Written AFTER GA3-synth v2 (post-amendment A; render-only) and BEFORE any real-photo GA3 number.
+GA3-synth v2 result (same pass rule): FAIL, 1/6 photos pass. Argmin within 10 m of truth on 6/6 (0 m on 5), but the
+surfaces are not convex: the minimum is a narrow well (~10-20 m radius; +-12 px windows vs 2-18 px per 10 m) on a
+plateau of capped costs. Consequence for GA3-dev: a 12.5 m lattice can step over the well. Change (dev only):
+  B1 search lattice 5 m, offset (+1.7, -2.3) m (truth still not a node), same +-150 m window around the start;
+     refinement 5 x 5 at 1 m around the lattice argmin. Everything else in GA3 + amendment A unchanged, including
+     the kill rule.
+
+=====================================================================================================================
+SECTION GA2 (Agent D) - observability gate: ga2-eval.ts                                written 2026-09-30T03:38Z (UTC)
+Written BEFORE any GA2 real-data number was computed. Only synthetic checks (src/lib/geocam/observe/observe.check.ts:
+CRLB vs Monte-Carlo within 20 %, far/near shares, held-out confirmation, gate fails closed) were run before this.
+
+CRLB (frozen): src/lib/geocam/observe crlb at the MAP solution: central-difference Jacobians of each factor's whitened
+  residual (= prediction Jacobian / row sigma; steps 1e-3 deg, 1e-4 logf, 0.5 m), information = sum a_f J^T J with the
+  factor's nEff thinning, NO robust weights, NO MAD. sigma_eye = sqrt(lambda_max) of the E/N covariance block (m).
+  Secondary: B's Laplace sigma_EN (MapResult.sigmaEN: robust weights + MAD rescale).
+PRIMARY DATA = E1 displaced-eye decoys (out/geocam/decoys/*.json, Agent C's export; dev wild ids only, assertWildDev):
+  hypotheses with label POS (kind POOL|REF) or NE-dec with secondary=false (dispDistM 150/400) - the E1 primary cut.
+  Truth eye = refs[0].eyeEnu if present else the stated eye [0, 0, stated.h] (E1 convention).
+  Problem per hypothesis (frame = the export's stated-eye ENU; base camera = hypothesis pose + hypothesis eye;
+  f0Px1600 = the base camera's focal at the long-side-1600 basis):
+    gps   at the HYPOTHESIS eye (E, N), sigma 20 m (EyePrior default; a decoy = a GPS fix 150/400 m off)
+    alt   U at the hypothesis eye U (altBias 0), sigma 5 m
+    focal export f0Px scaled to 1600, sigma 3 % (focalKnown) else 10 %
+    point the hypothesis correspondences (uv at W x H, xyz): map/pointFactor defaults (sigma 2 px (+) DEM sigma(d)
+          with cluster-correlated DEM error, Cauchy 2.5), nEff 60
+  free: rotation + focal + eye; solveMap defaults; start = the hypothesis state.
+  actual eye error = |x_hat(E,N) - truth(E,N)| (horizontal, m) after the solve.
+  STATISTIC: Spearman rho(sigma_eye, actual eye error) over all primary hypotheses (POS + NE-dec), ties averaged.
+  KILL (fixed text "rho < 0.5"): rho < 0.5. Also reported: rho within NE-dec only, bootstrap-by-photo 95% CI
+  (2000 resamples of photos), rho with the Laplace sigma, per-label medians of sigma_eye / error, and the gate
+  counterfactual: the fraction of NE-dec whose final eye is still > 50 m off while sigma_eye < 15 m ("confidently
+  wrong"; the reason the gate needs held-out families + GA5 in addition to sigma).
+SECONDARY (descriptive, not in the kill) = GT dev photos: config P of the GA1 section (copied build: gps, alt, ground,
+  gravity, compass, focal, skyline, re-match points; app start; Mapterhorn) -> CRLB sigma per DoF and per-family
+  shares at the solution; plus GPS-displaced runs (gps mean shifted 150 m at bearings 0/90/180/270; truth = GT eye
+  (0,0)) -> Spearman(sigma_eye, |x_hat - GT eye|) over the 40 runs (labelled secondary: the GT eye is not surveyed).
+Outputs: out/geocam/ga2/ga2-eval.json, tools/research/geo/REPORT_GA2.txt.

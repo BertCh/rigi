@@ -1,0 +1,34 @@
+Concordance integration (2026-09-29). All behaviour behind ?concord=<csv>; everything off by default.
+
+New files
+  src/lib/concord/flags.ts                 parseConcordFlags / concordFlags / concordOn / concordAny (off outside a browser)
+  src/lib/concord/app/display.ts           runConcordDisplay: WP-C cues -> WP-E displayField -> setWarp; WP-F loadNearDsm +
+                                           occluderRange -> CPU dim mask -> setOccluder. Geometry = renderer sampleAt readback
+                                           (engine frame), edges = photoEdgesFromRGBA of the shown photo, people masked.
+                                           toFieldCues: WP-C edge cues (predicted u,v) moved to the observed u,v WP-E expects.
+  src/lib/concord/app/useConcordDisplay.ts the PhotoWorkspace hook; confidence = verify in {verified,refined,matched} or
+                                           alignState "accepted", after load + second opinion settled; otherwise LOW: clear.
+  src/lib/concord/app/app.check.ts         18 checks (flags, fail-closed confidence, cue conversion, LOW = no work)
+  out/concord/integrate/*.png              screenshots
+
+Shared-file hooks applied
+  engine.ts, deck/composite-shader.ts, deck/composite.ts, deck/engine.ts, renderer.ts: WP-E hooks.patch.txt (1 hunk
+    re-placed by hand after tiles3d edits), + deck compositor re-uploads the warp after a device destroy (warpDirty).
+  same files: WP-F occluder as a composite-only dim mask (setOccluder; uOcclOn/occlOn = 0 => mask never read).
+  geo/camera.ts: WP-B focalPrior under ?concord=eye (cameraFromMeta only: baseline page / node; the app prior uses
+    photos.json vfov, and workers/node never see the flag).
+  PhotoWorkspace.tsx: one useConcordDisplay call.
+
+Skipped (reasons)
+  WP-B concordEye altitude hook (pipeline.ts / engine eye): failed on holdout (WP-B), horizontal moves need a re-centred frame.
+  WP-D concordRefine: pose-moving; needs skyline samples + a horizonsAtEyes provider in the browser; 6-60 s CPU per photo;
+    unresolved 3-6 px drift from pin-fitted GT; WP-D recommends off until interior pins exist.
+  WP-F drape (materials.ts / deck terrain-layer.ts) and label occlusion: materials.ts is off-limits; composite-only here.
+  WP-G: service-side, no browser hook proposed.
+
+Gates: tsc no new errors; test-export 29/29; test-pose6dof ALL PASS; style-check crashes pre-existing
+(look/labels/canvas.ts ctx.save vs style-check recorder mock; both unmodified); style-baseline 0/16 both WITH and
+WITHOUT these hooks with identical per-image diff counts (trail-data change from another session), geometry identical;
+deck-engine-smoke 4/4 PASS.
+Runtime IMG_7018 (dev): three warp 135 cues, max 4.6 px, 668 ms; occl 11.5 % of terrain cells dimmed, 3.61 MB, 2.1 s.
+                        deck  warp 96 cues, max 4.2 px, 606 ms; occl 10.8 %, 3.61 MB, 1.5 s.

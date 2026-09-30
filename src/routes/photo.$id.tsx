@@ -1,5 +1,10 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	notFound,
+	useRouterState,
+} from "@tanstack/react-router";
 import { PhotoWorkspace } from "#/components/PhotoWorkspace";
+import { flagsKey } from "#/lib/flags";
 import { getPhoto } from "#/lib/photos";
 
 export const Route = createFileRoute("/photo/$id")({
@@ -28,6 +33,9 @@ export const Route = createFileRoute("/photo/$id")({
 
 function PhotoPage() {
 	const photo = Route.useLoaderData();
-	// key: fresh engine per photo
-	return <PhotoWorkspace key={photo.id} photo={photo} />;
+	// key: a fresh engine per photo, and per set of engine-start flags (RESTART_FLAGS); the rest apply live
+	const flags = useRouterState({
+		select: (s) => flagsKey(s.location.searchStr),
+	});
+	return <PhotoWorkspace key={`${photo.id}?${flags}`} photo={photo} />;
 }

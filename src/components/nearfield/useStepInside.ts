@@ -1,6 +1,7 @@
 // Step Inside state for PhotoWorkspace: one NearFieldController per engine, the accepted-pose gate, the
 // step camera enter / back, the Truth toggle and the hover sampler. Everything stays dormant (and the
 // panel invisible) while the near-field service is down or the engine has no setNearField.
+
 import {
 	type RefObject,
 	useCallback,
@@ -9,6 +10,8 @@ import {
 	useState,
 } from "react";
 import type { Pose } from "#/lib/camera";
+import { getFlag } from "#/lib/flags";
+import { useFlag } from "#/lib/flags/react";
 import {
 	NearFieldController,
 	type NearFieldState,
@@ -16,17 +19,18 @@ import {
 } from "#/lib/nearfield/controller";
 import { median } from "#/lib/nearfield/geom";
 import type { MeasurableScene, NearFieldSample } from "#/lib/nearfield/measure";
-import type { StepCamera } from "#/lib/nearfield/step-camera";
+import type {
+	StepCamera,
+	StepInsideOpts,
+	StepMode,
+	StepView,
+} from "#/lib/nearfield/step-camera";
 import type { PhotoMeta } from "#/lib/photos";
 import type { Renderer } from "#/lib/renderer";
 
 /** The engine extras Step Inside drives (structural: PhotoEngine and DeckEngine both have them). */
 type StepEngine = Renderer & {
-	enterStepInside?(o: {
-		radius?: number;
-		pivotDist?: number;
-		onBack?: () => void;
-	}): void;
+	enterStepInside?(o: StepInsideOpts): void;
 	exitStepInside?(): void;
 	readonly stepCamera?: StepCamera | null;
 	readonly steppingInside?: boolean;
@@ -41,6 +45,17 @@ export type StepInside = {
 	/** Why the button is disabled, or null when it can be pressed. */
 	disabledReason: string | null;
 	stepping: boolean;
+	/** The step camera drives the view: 'step' (Step Inside) or 'map' (In map), else null. */
+	camView: StepView | null;
+	/** Current camera mode ('orbit' in the In-map view before the step camera takes over). */
+	camMode: StepMode;
+	/** Camera mode bar allowed (not under automation unless opted in). */
+	camModesAllowed: boolean;
+	/**
+	 * Switch camera mode. While stepping: the step camera's setMode. In the In-map view: hands the
+	 * world camera to a step camera (view 'map') in that mode.
+	 */
+	setCamMode: (m: StepMode) => void;
 	truth: boolean;
 	setTruth: (v: boolean) => void;
 	enter: () => void;
@@ -49,17 +64,23 @@ export type StepInside = {
 	sampleAt: (u: number, v: number) => NearFieldSample | null;
 };
 
+/** The camera-mode bar: like stepInsideAllowed, plus ?cammodes=on opts automation in without the service. */
+export function camModesAllowed(): boolean {
+	if (typeof window === "undefined") return false;
+	return stepInsideAllowed() || getFlag("cammodes") === "on";
+}
+
 /**
- * Whether the Step Inside UI may probe the service at all. Automated browsers (navigator.webdriver:
- * style-baseline, eval-app, leaderboards) never see it unless they opt in with ?nearfield (any value,
- * e.g. ?nearfield=1 or ?nearfield=sharp), so their captures and network stay exactly as before
- * (the reveal's precedent, src/lib/reveal/config.ts). ?nearfield=off hides it for everyone.
+ * Whether the Step Inside UI may probe the service at all (?nearfield, src/lib/flags). "auto" (the
+ * default) probes except in automated browsers (navigator.webdriver: style-baseline, eval-app,
+ * leaderboards), so their captures and network stay as they were (the reveal's precedent,
+ * src/lib/reveal/config.ts); they opt in with ?nearfield=on or =sharp. ?nearfield=off hides it for everyone.
  */
 export function stepInsideAllowed(): boolean {
 	if (typeof window === "undefined") return false;
-	const q = new URLSearchParams(window.location.search).get("nearfield");
-	if (q === "off" || q === "0") return false;
-	return q != null || !navigator.webdriver;
+	const m = getFlag("nearfield");
+	if (m === "off") return false;
+	return m !== "auto" || !navigator.webdriver;
 }
 
 /** Median range (m) of the scene's measured Object cells: the step camera's orbit pivot. */
@@ -80,13 +101,37 @@ export function useStepInside(opts: {
 	pose: Pose | null;
 	alignState: string | null;
 	verify: string | null;
+	/** The workspace is in the In-map (world) view. */
+	worldMode?: boolean;
 }): StepInside {
-	const { engineRef, ready, photo, pose, alignState, verify } = opts;
+	const { engineRef, ready, photo, pose, alignState, verify, worldMode } = opts;
+	// ?cammodes applies live: re-render when it changes (camModesAllowed reads it)
+	useFlag("cammodes");
 	const ctlRef = useRef<NearFieldController | null>(null);
 	const [ctl, setCtl] = useState<NearFieldController | null>(null);
 	const [state, setState] = useState<NearFieldState>({ phase: "idle" });
 	const [available, setAvailable] = useState(false);
 	const [stepping, setStepping] = useState(false);
+	const [camView, setCamView] = useState<StepView | null>(null);
+	const [camMode, setCamModeState] = useState<StepMode>("photo");
+	const camOffRef = useRef<(() => void) | null>(null);
+	/** The step camera left (onBack, exit, pose / view change): back to the idle state. */
+	const camGone = useCallback(() => {
+		camOffRef.current?.();
+		camOffRef.current = null;
+		setStepping(false);
+		setCamView(null);
+		setCamModeState("photo");
+	}, []);
+	/** Follow the engine's new step camera (its mode changes too: keys 1–4). */
+	const camEntered = useCallback((engine: StepEngine, view: StepView) => {
+		camOffRef.current?.();
+		const cam = engine.stepCamera;
+		camOffRef.current = cam?.onModeChange(setCamModeState) ?? null;
+		setCamModeState(cam?.mode ?? "photo");
+		setCamView(view);
+		setStepping(view === "step");
+	}, []);
 	const [truth, setTruthState] = useState(false);
 	const truthRef = useRef(truth);
 	truthRef.current = truth;
@@ -117,10 +162,20 @@ export function useStepInside(opts: {
 			c.dispose();
 			if (ctlRef.current === c) ctlRef.current = null;
 			setCtl(null);
-			setStepping(false);
+			camGone();
 			setState({ phase: "idle" });
 		};
-	}, [ready, engineRef, photo]);
+	}, [ready, engineRef, photo, camGone]);
+
+	// the engine leaves the step camera on a view switch (overlay / blend / In map): follow it
+	useEffect(() => {
+		void worldMode;
+		const t = window.setTimeout(() => {
+			const engine = engineRef.current as StepEngine | null;
+			if (!engine?.steppingInside) camGone();
+		}, 0);
+		return () => window.clearTimeout(t);
+	}, [worldMode, engineRef, camGone]);
 
 	// a pose change makes the scene stale: leave the step camera, drop the splats, and (when the slow
 	// service part is cached and the pose is still accepted) rebuild locally after the pose settles
@@ -133,7 +188,7 @@ export function useStepInside(opts: {
 		const engine = engineRef.current as StepEngine | null;
 		if (engine?.steppingInside) {
 			engine.exitStepInside?.();
-			setStepping(false);
+			camGone();
 		}
 		c.invalidate();
 		if (!c.hasPhotoData()) return;
@@ -141,7 +196,7 @@ export function useStepInside(opts: {
 			if (acceptedRef.current) void c.build();
 		}, 400);
 		return () => window.clearTimeout(t);
-	}, [poseSig, engineRef]);
+	}, [poseSig, engineRef, camGone]);
 
 	const setTruth = useCallback((v: boolean) => {
 		setTruthState(v);
@@ -154,9 +209,9 @@ export function useStepInside(opts: {
 		if (cam && !cam.atPhoto) cam.backToPhoto();
 		else {
 			engine?.exitStepInside?.();
-			setStepping(false);
+			camGone();
 		}
-	}, [engineRef]);
+	}, [engineRef, camGone]);
 
 	const enter = useCallback(() => {
 		const c = ctlRef.current;
@@ -172,12 +227,36 @@ export function useStepInside(opts: {
 				pivotDist: pivotFor(scene),
 				onBack: () => {
 					engine.exitStepInside?.();
-					setStepping(false);
+					camGone();
 				},
 			});
-			setStepping(true);
+			camEntered(engine, "step");
 		})();
-	}, [engineRef]);
+	}, [engineRef, camGone, camEntered]);
+
+	const setCamMode = useCallback(
+		(m: StepMode) => {
+			const engine = engineRef.current as StepEngine | null;
+			if (!engine) return;
+			const cam = engine.stepCamera;
+			if (cam) {
+				cam.setMode(m);
+				return;
+			}
+			// In map: OrbitControls is the native 'orbit'; any other mode hands over to a step camera
+			if (!worldMode || m === "orbit" || !engine.enterStepInside) return;
+			engine.enterStepInside({
+				view: "map",
+				mode: m,
+				onBack: () => {
+					engine.exitStepInside?.();
+					camGone();
+				},
+			});
+			camEntered(engine, "map");
+		},
+		[engineRef, worldMode, camGone, camEntered],
+	);
 
 	const sampleAt = useCallback(
 		(u: number, v: number) => ctlRef.current?.sampleAt(u, v) ?? null,
@@ -209,13 +288,14 @@ export function useStepInside(opts: {
 			enter,
 			back,
 			setTruth,
+			setCamMode,
 			sampleAt: (u: number, v: number) => ctl.sampleAt(u, v),
 		};
 		w.__nearfield = handle;
 		return () => {
 			if (w.__nearfield === handle) w.__nearfield = undefined;
 		};
-	}, [ctl, enter, back, setTruth, engineRef]);
+	}, [ctl, enter, back, setTruth, setCamMode, engineRef]);
 
 	const phase = state.phase;
 	const disabledReason = !accepted
@@ -234,6 +314,10 @@ export function useStepInside(opts: {
 		accepted,
 		disabledReason,
 		stepping,
+		camView,
+		camMode: camView ? camMode : worldMode ? "orbit" : "photo",
+		camModesAllowed: camModesAllowed(),
+		setCamMode,
 		truth,
 		setTruth,
 		enter,

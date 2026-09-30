@@ -1,0 +1,116 @@
+E1 - A-CONTRARIO (NFA) ACCEPT TEST WITH A HELD-OUT CUE (FUND F1)                               2026-09-30
+Protocol: PROTOCOL.txt (frozen 2026-09-29T23:13:57Z, unchanged). Deviations: DEVIATIONS.txt (D1-D3).
+Plan row: reports/fundamentals-plan.md section 3, E1. Kill criterion (fixed): recall at 0 gross below the current rule,
+OR any wrong-eye decoy accepted.
+Machine-readable: results.json (primary; includes "verdict" and "postHoc"), hyp_scores.json (per hypothesis),
+results_dispfull.json / hyp_scores_dispfull.json (pre-declared secondary run), tables.txt (all tables).
+
+VERDICT: E1 FAILS. Killed at PRIMARY (eps = 1) and at the pre-registered ALTERNATIVE (eps = 0.01).
+  - Wrong-eye decoys accepted: PRIMARY 12 (10 of 56 displaced-eye decoys + 2 of 5 inherited wrong-eye candidates);
+    ALTERNATIVE 6 (5 of 56 displaced + 1 of 5 inherited). Kill clause (i) fires on its own.
+  - Neither is at 0 gross (PRIMARY 13 labelled negatives accepted in 11 photos; ALTERNATIVE 7 in 7 photos). Kill clause
+    (ii) fires too, although both have higher raw photo recall than the current rule (23 and 22 vs 19 of 31).
+
+WHAT WAS RUN
+  35 dev photos (30 P_ref with a verified ref + 5 P_lab), 1102 hypotheses after dedupe: POOL (H1 pool, reused), REF,
+  RING (24 yaws at the stated eye), YAW (+-6/+-12 deg about the correct ref), DISPLACED eyes. Every hypothesis gets one
+  LoMa single-view correspondence set; T(h) = min over 4 held-out directions (far->near, near->far, L->R, R->L) of a
+  binomial hit score; per-photo label-free null over the photo's other hypotheses; NFA = N_tests x Gaussian tail.
+  Scale-down (D1, pre-declared in the protocol, written before any statistic): displaced eyes cut to bearing theta x
+  {150, 400} m for all photos (the ~4 h session limit and the render/gpu locks shared with E2/E3 could not fit the full
+  9-eye set). So AMBIGUOUS (50 m) is empty in the primary analysis, and NE-dec has 56 decoys (<= 2 per P_ref photo).
+  All 35 photos were completed; none was dropped. Infrastructure (D2): renders used a private Vite server on :3196
+  (the pre-crash run used the default :3100, which the fund rules forbid). Photos 1-5 were rendered before the crash,
+  30 after it, possibly from slightly different working-tree app code. Frozen T6 rule sha1 292fb74f... matches.
+
+MAIN TABLE (accepted / n, primary analysis)
+  kind      n    photos   AC1(eps=1)  AC2(eps=.01)  CUR   CUR-all   AC1fit  AC2fit   (fit = no held-out; diagnostic)
+  POS       33   31       25          24            19    22        27      16
+  NB-inh    3    3        0           0             0     0         0       0
+  NB-con    93   30       1 (hard)    1 (hard)      0     0         1       0
+  NB-dec    597  30       0           0             0     0         3       1
+  NE-inh    5    5        2           1             0     2         4       1
+  NE-dec    56   29       10          5             0     9         22      2
+  AMB       0    -        -           -             -     -         -       -
+  UNL       315  27       33          19            1     3         58      16   (unlabelled; in no metric)
+
+  Photo recall (photos with >=1 positive accepted, of 31) with bootstrap-by-photo 95% CI, and gross:
+    AC1     23/31 [17, 28]   gross 13 [6, 20]   in 11 photos
+    AC2     22/31 [16, 27]   gross 7  [3, 12]   in 7 photos
+    CUR     19/31 [13, 25]   gross 0            <- the current v0.3.4-era T6 gate; the bar to beat at 0 gross
+    CUR-all 22/31 [16, 28]   gross 11           (gate stack applied everywhere incl. rule.high on displaced solves;
+                                                 an upper bound, and it too accepts 9 displaced-eye decoys)
+  Per kind, recall at 0 gross vs the current rule:
+    basin negatives (NB-inh / NB-con / NB-dec, n = 693): AC1 accepts 1 (wc_0028_k039, a "hard" NB-con), AC2 accepts
+      the same one; CUR accepts 0. The basin side is nearly clean but not at 0.
+    eye negatives (NE-inh / NE-dec, n = 61): AC1 accepts 12, AC2 accepts 6, CUR accepts 0. This is where it fails.
+  Clopper-Pearson one-sided 95% upper bounds on the accept rate: AC1 NE-dec 10/56 -> 0.28; AC2 NE-dec 5/56 -> 0.18;
+  CUR NE-dec 0/56 -> 0.052. All labelled negatives under CUR: 0/754 -> 0.004.
+
+  Wrong-eye decoys accepted by AC2 (the stricter one), with the truth-geometry misfit diagnostic (median px of the
+  correct ref's terrain projected from the displaced eye with the hypothesis rotation):
+    wc_0020_dispd150b159 (12.7 px), wc_0034_dispd150b319 (8.9), wc_0067_dispd150b259 (12.6), wc_0072_dispd400b231
+    (96.5), wc_0099_dispd150b6 (6.0), and NE-inh wc_0086_k007 (log10 NFA -39). AC1 adds wc_0004_d150 (71.7 px),
+    wc_0067_d400 (41.3), wc_0076_d150 (32.7), wc_0094_d150 (104.4), wc_0094_d400 (369.6), and NE-inh wc_0074_k000.
+    POST HOC reading: some accepted 150 m decoys are near misses by this diagnostic (6-13 px). But even if every decoy
+    with a median misfit under 15 px were relabelled ambiguous, AC1 still accepts 6 clear wrong-eye decoys and AC2 still
+    accepts wc_0072 d400 (96 px) and the inherited wc_0086_k007, and each also accepts the NB-con. The verdict does not
+    depend on the 150 m label.
+
+  Secondary run (pre-declared in D1: all generated displaced eyes on the 5 pre-crash photos, +12 NE-dec, +13 AMB):
+    AC1 recall 23, gross 12 (NE-dec 9/68, AMB 1/13); AC2 recall 22, gross 7 (NE-dec 5/68, AMB 1/13); CUR 19, gross 0.
+    Same conclusion.
+
+DESCRIPTIVE (not decisions)
+  AUROC POS vs kind of the held-out statistic T: NB-inh 0.89, NB-con 0.89, NB-dec 0.89, NE-inh 0.71, NE-dec 0.82.
+  The no-held-out Tfit: NB-inh 0.84, NB-con 0.98, NB-dec 1.00, NE-inh 0.63, NE-dec 0.87.
+  So the held-out split does not buy wrong-eye separation. Tfit separates the displaced decoys better than T does.
+  Both are weakest on the eye kinds, which is the parallax/observability problem E3 targets.
+  In 10 of 29 P_ref photos, a >= 150 m decoy has T >= the photo's best positive. Five of those are ties at T = 0.
+
+WHY IT FAILED (POST HOC analysis - mechanisms seen after scoring; not pre-registered)
+  1. Degenerate null. 90% of all hypotheses have T = 0: ring views mostly have almost no matches, and many held-out
+     directions score k = 0. The per-photo null is mostly zeros. Its sd is small (median 0.56 in z units, at the
+     0.05 floor for 21% of hypotheses), so any hypothesis with modest agreement gets a huge Gaussian z. log10 NFA runs
+     to -895. The Gaussian tail says nothing here; the protocol's HONESTY note flagged this risk.
+     The empirical P, (1 + #{z >= z_h}) / (1 + |N|), is >= 1/(1+~30) ~ 0.03 for every hypothesis. With N_tests ~ 32,
+     an empirical NFA can never be < 1, so a calibrated version with these null sizes could accept nothing at all.
+  2. A min over 4 directions is brittle for correct poses. 7 of 33 positives have T = 0 despite 800-1900 matches and
+     large Tfit (e.g. wc_0009_k000: Tfit 4101, T 0). A rotation-only refit on one half (usually the near half, or one
+     image side) drifts ~0.4-1.3 deg, and the held-out half then gets k = 0 hits within 3 sigma (~10 px). The
+     direction that zeroes T is most often A->B (240 of the 374 hypotheses with >= 6 matches and T = 0).
+  3. Wrong eyes fit the held-out cue as well as right ones. A 150-400 m eye shift followed by a rotation re-solve leaves
+     structured misfit, but when both halves are dominated by distant terrain, far->near and L/R agreement stays high.
+     Held-out agreement does not measure parallax.
+  Oracle thresholds (POST HOC, chosen with labels, so an upper bound on the idea with this statistic): the best photo
+  recall at 0 gross is 12/31 on log10 NFA (the cut is set by NE-inh wc_0086_k007 at -39.3), 10/31 on raw T, 12/31 on
+  Tfit, and 9/31 on the fit-NFA. All are below CUR's 19/31. Even a label-tuned cut on this statistic does not reach the
+  current rule at 0 gross.
+
+HONESTY / CAVEATS
+  - n is small: 31 photos with positives, 5 inherited wrong-eye candidates, 56 displaced decoys from 29 photos. The CIs
+    above are by photo. Single cases are anecdotes.
+  - D1 cut: 2 displaced eyes per photo instead of 9. More decoys could only add wrong-eye accepts (the kill is already
+    hit), so the cut cannot rescue the verdict.
+  - "Wrong by construction" for 150 m relies on the parallax argument in PROTOCOL.txt. The misfit diagnostic shows a few
+    near misses; see the post hoc relabelling above, which leaves the verdict unchanged.
+  - The app code used for photos 6-35 may differ slightly from photos 1-5 (D2). Not tested.
+  - The current rule's 0 gross on NE-dec partly reflects its conservative CUR definition: moved eyes are never
+    auto-accepted, and displaced hypotheses are excluded by construction. CUR-all, the gate stack applied to the
+    displaced solves, accepts 9/56. That finding is interesting in itself: rule.high on its own would accept wrong
+    eyes. It is outside the E1 kill.
+
+IMPLICATION FOR THE PLAN (interpretation)
+  E1 as specified should not replace the T6 gate or absorb R1/R2. The held-out-cue statistic does not separate wrong eyes
+  from right ones, and the per-photo decoy null is too small and too degenerate for NFA calibration. If an a-contrario
+  gate is revisited, it needs a larger continuous null, for example many more decoys per photo or pooling across
+  photos, with an explicit leave-photo-out step. It also needs a statistic that is sensitive to parallax (near/far
+  differential residual at a fixed eye) rather than to halves agreeing. E3's near-field renders are the natural input.
+
+FILES (all under tools/research/fund/e1_acontrario/)
+  PROTOCOL.txt (frozen), DEVIATIONS.txt, gen.py (+ --disp-cut), score.py (+ D1 filter, --disp-full, --out-suffix),
+  tables.py (format fix + CP bounds), finalize.py (verdict + post hoc), hyps.py, e1lib.py, hyps_pool.json,
+  gen/<pid>/ (state.json, corr npz, dirs npy, stats.json cache), logs/ (gen_full, gen_pilot, gen_resume, score_full,
+  score_dispfull, vite_3196, score_partial = the empty pre-crash run), results*.json, hyp_scores*.json, tables.txt.
+  The pre-crash "score_partial" all-zero output was not a bug. It scored an empty photo list: results.json had
+  photos = [] and nHyps = 0, and no stats cache existed.

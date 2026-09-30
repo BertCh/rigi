@@ -8,7 +8,7 @@
  * few cells per yaw column within GRID_TOL of the GPU's best, so the per-column winners and their
  * scores are bit-identical to the CPU path; the coordinate descent over ≤ 5 hypotheses stays on the
  * CPU (it's sequential, and its fine-map evaluations are few). Any GPU failure, no WebGPU, or the
- * kill switch (?gpu=off, localStorage rigi.gpu=off) → plain autoAlign.
+ * kill switch (?gpu=off, src/lib/flags) → plain autoAlign.
  */
 import {
 	type AlignResult,

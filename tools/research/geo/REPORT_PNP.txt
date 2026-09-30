@@ -1,0 +1,125 @@
+GEO GA1 PRE-STUDY - PnP WITH PRIOR / COVARIANCE ("AFTERNOON TEST")                          2026-09-30 (Agent C)
+Rule: PROTOCOL.txt section PNP (written 03:10Z, before any real-data number). Code: pnp_prior.py.
+Data: out/geocam/python/pnp_prior.json (summary + one record per hypothesis x method). Dev ids only; no renders.
+Status: a descriptive pre-study for GA1, NOT the GA1 kill test. The GA1-style numbers are indicative.
+
+ENVIRONMENT
+  pycolmap 4.2.1, gtsam 4.3.0, pygeomag 1.1.0: cp312 macOS arm64 wheels exist. They are installed with
+  `pip install --no-deps --target tools/research/geo/.pylib` into the matcher venv's Python 3.12.13 (212 MB), so no
+  3.11 venv was needed. numpy 2.5.3, scipy and poselib 2.0.5 come from tools/matcher/.venv.
+  Gotchas:
+  (1) torch and pycolmap each ship a libomp, and importing both aborts the process (OMP #15). pnp_prior therefore
+      execs the solver functions of tools/matcher/match.py verbatim, via ast, without importing match.py.
+  (2) pycolmap 4.2.1 DOES support a position prior: AbsolutePoseRefinementOptions.use_position_prior /
+      position_prior_in_world / position_prior_covariance. This resolves plan risk 1.
+  (3) Its default gradient_tolerance = 1.0 stops the refinement early. With that default a 20 m prior never moved
+      the centre, so 1e-10 is used.
+  (4) return_covariance gives a 6x6 over [rotation(3), t(3)] of cam_from_world, for UNIT pixel noise (not scaled by
+      the residual). It was checked against Monte-Carlo and against our own J^T J to 1e-4.
+
+WHAT WAS RUN
+  Hypotheses (skipped if < 12 correspondences; 44 skipped, listed in the json):
+  - E1 primary: 32 POS (REF plus H1 POOL correspondences at the stated eye) and 46 NE-dec (150/400 m displaced
+    eyes).
+  - E1 NE-inh: 5 (no eye truth).
+  - E1 dispfull extras: 10 NE-dec and 13 AMB (50 m).
+  - E3: 26 T (true eye, near field kept), plus 25 G20, 22 G50 and 16 G150.
+  Methods, all with a 6 px RANSAC threshold and fixed f0 unless stated:
+    ROT   rotation only at the hypothesis eye
+    PNP6  PoseLib 6-DoF
+    P4PF  PoseLib P4Pf, free focal
+    COL0  pycolmap, no prior
+    COLP  pycolmap with a 20 m position prior
+    FUSE  COL0 fused with the prior by information addition
+    UP2P  PoseLib upright 2-point with gravity taken from the hypothesis pose, then 4-DoF LM
+  Sigmas are Laplace (J^T J)^-1 s^2 with s = 1.4826 MAD of the inlier residual components (COLP adds the prior).
+  pycolmap's own covariance x s^2 is also stored.
+
+MAIN RESULTS (medians; eTrue = |estimated eye - true eye| in metres; rot = full rotation error vs the verified pose)
+
+  E1 POS, true eye, n = 32. Every free-centre solver drifts hundreds of metres:
+    ROT   rot 0.93  pitch 0.18    eye fixed (0 m)
+    PNP6  rot 0.80  pitch 0.25    eTrue 261 m
+    P4PF  rot 0.40  pitch 0.12    eTrue  37 m   f/f0 1.01
+    COL0  rot 0.79  pitch 0.22    eTrue 272 m   sigma_EN 2.1 m
+    COLP  rot 0.80  pitch 0.24    eTrue 179 m   sigma_EN 2.1 m  (the 20 m prior barely matters; data claims ~2 m)
+    FUSE                          eTrue 228 m
+    UP2P  rot 0.59  pitch 0.02*   eTrue 258 m   (*gravity from the hypothesis = within 0.5 deg of truth: near-oracle)
+
+  E3 T, true eye, V2 near field kept, n = 26:
+    ROT   rot 0.26  pitch 0.057
+    COL0  rot 0.36  pitch 0.091   eTrue 36 m    sigma_EN 1.5 m
+    COLP  rot 0.29  pitch 0.090   eTrue 23 m
+    P4PF                          eTrue 39 m
+    UP2P                          eTrue 33 m    (gravity = truth here)
+
+  Displaced eyes: does the free centre move back toward the truth? "toward" = eTrue < displacement.
+    E1 NE-dec 150 m (n = 25):  COL0 eTrue 317, toward 36%  | P4PF eTrue  94, toward 64%  | COLP toward 52%
+    E1 NE-dec 400 m (n = 21):  COL0 eTrue 259, toward 62%  | P4PF eTrue 182, toward 76%  | COLP toward 76%
+    E3 G20  (n = 25):          COL0 eTrue  34, toward 32%  | P4PF toward 24% | UP2P toward 38%
+    E3 G50  (n = 22):          COL0 eTrue  68, toward 41%  | P4PF toward 41% | UP2P toward 57% (gravity = truth)
+    E3 G150 (n = 16):          COL0 eTrue  74, toward 75%  | P4PF toward 69% | UP2P toward 69%
+  Rotation at displaced eyes (E1 NE-dec, vs the verified pose at the TRUE eye): ROT 2.9 deg, COL0 1.1, P4PF 0.52.
+  Freeing the centre (and the focal) absorbs part of the displacement's rotation error. It does NOT recover the eye.
+
+PRE-DECLARED QUESTIONS
+  1. Covariance calibration (GA1 wants median (err/sigma)^2 in [0.5, 2]; over-confident by > 3x means > 9):
+     COL0 median z^2 per axis (E, N, U):
+       POS  5200 / 7400 / 385  -> sigma too small by 72x / 86x / 20x
+       E3 T  486 /  686 / 188  -> 22x / 26x / 14x
+     COLP is 53x / 75x / 16x on POS.
+     => A point-only Laplace covariance is over-confident by 1-2 orders of magnitude. That is far past the GA1 3x
+     kill line if used as is.
+  2. Pitch, COLP vs ROT on POS (GA1 wants "not worse by > 0.02 deg"): paired medians 0.239 vs 0.182 deg
+     (+0.055 deg), and on E3 T 0.090 vs 0.057 (+0.033). Freeing the centre makes pitch WORSE, the same failure as
+     the old P4Pf.
+  3. FLAG rule (COL0 Mahalanobis d^2 of the hypothesis eye > 11.34):
+       NE-dec  46/46 flagged, CI [0.92, 1.00]
+       POS     32/32 flagged (false alarms), CI [0.89, 1.00]
+       E3 T    24/25; E3 G50 20/20; E3 G20 22/23; E3 G150 14/14
+       AMB (50 m) 13/13; NE-inh 5/5
+     => The rule flags EVERYTHING. The descriptive bar (>= 50% detection at <= 10% false alarm) fails. The raw
+     d^2 does not separate POS from NE-dec at all (AUROC 0.49).
+  Answer to "does the covariance/centre estimate flag the wrong eye?": NO. With appearance matches (> 250 m in E1;
+  near kept but rarely matched in E3) the PnP centre is not an eye measurement. It drifts 30-300 m from a CORRECT
+  eye, while claiming 1-6 m.
+
+POST HOC (seen after scoring; hypotheses for later, not findings)
+  - The size of the centre shift carries SOME signal. AUROC for NE-dec > POS:
+      P4PF shift 0.87 (POS median 37 m vs NE-dec 332 m)
+      COL0 0.67, PNP6 0.67, UP2P 0.65, COLP 0.59
+    E3 (G50 + G150 vs T): 0.67-0.77.
+    P4PF's free focal seems to soak up the systematic error that otherwise drives the centre, so its centre drifts
+    least on correct eyes. n is small, and this was not pre-registered.
+  - The inflation needed to make COL0 calibrated (about 20-100x in sigma) is much larger than the grid-thinning
+    correction the plan proposes (nEff 60 of ~1000 matches is about 4x). The residuals are systematic: DEM/render vs
+    photo, lens distortion, LoMa bias. They are not iid, so a MAD rescale alone cannot fix it.
+  - Clean subset: hypotheses where ROT gets >= 100 inliers AND is within 0.3 deg of the verified pose. Only 5 E1 POS
+    photos and 12 E3 T photos qualify. Many POS correspondence sets are mostly outliers; for example wc_0002 refC has
+    a 104 px median residual at its own pose.
+    On this subset, free-centre drift is smaller but still real:
+      E1 POS: COL0 eTrue 33 m, sigma_EN 0.7 m, sigma still too small by 13-20x.
+      E3 T:   COL0 eTrue 26 m, sigma still too small by 6-15x.
+    Pitch: ROT 0.017 deg vs COLP 0.073 deg on E1 POS, and 0.028 vs 0.050 deg on E3 T. The conclusion holds on clean
+    data.
+  - UP2P pitch 0.02 deg on POS is a gravity-oracle artefact, since gravity comes from a hypothesis pose that is
+    within 0.5 deg of truth. It says nothing about a real IMU.
+
+IMPLICATIONS FOR GA1 (Agent B)
+  - Point factors should constrain ROTATION. Do not let them move the eye (guard-rail 1). This agrees with E0, E1
+    and E3.
+  - If point factors enter the MAP with the eye free, their information must be deflated heavily, or the eye block
+    must be fixed or marginalised with a strong prior. Otherwise the solve reports sigma_EN of ~2 m on photos where
+    the eye is really unobserved, and GA1's "all-far photos report sigma_EN >= 0.8 sigma_GPS" fails by
+    construction.
+  - Suggested (untested) point-factor sigma: hypot(sigma_px, f * sigma_DEM(d) / d) PLUS a per-photo systematic
+    term. Alternatively, calibrate nEff so that the point family's eye information matches this study's observed
+    eTrue spread.
+
+CAVEATS
+  - The "true eye" for POS and E3 T is the stated manual/EXIF eye, not surveyed. Part of a 30-270 m drift could, in
+    principle, be the truth being wrong. The drifts are too large and too common for that to be the main story, and
+    E3's 3/30 result agrees.
+  - E1 correspondences are LoMa, lifted with the 250 m cut; E3's are ALIKED with near points kept. Both are from a
+    single view.
+  - E3 UP2P and the E3 hypothesis rotation use the ref pose, so E3 gravity is truth.

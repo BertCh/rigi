@@ -108,3 +108,81 @@ Reproduce (service on 127.0.0.1:8767 must be up for DA3; per-pair results are ca
   tools/matcher/.venv/bin/python tools/nearfield/propagate/run_propagate.py --only all --synth 120 --neg 60
   tools/matcher/.venv/bin/python tools/nearfield/propagate/analyze.py
   npx tsx tools/nearfield/propagate/propagate.check.ts
+
+DEM RENDER CHECK: GT ERROR vs PARALLAX (added 2026-09-29; render_check/)
+=====================================================================================================
+Method frozen before running: render_check/METHOD.txt (sha1 in METHOD.sha1). Deviations: DEVIATIONS.txt.
+Code: render_check/skyline.ts (the app's sky model -> photo skyline), check.py (frozen analysis -> out/result.json),
+posthoc.py (POST HOC -> out/posthoc.json). Overlays: out/overlay_<id>.jpg (white GT, orange/red propagated,
+green DEM fit, cyan photo skyline). Everything is CPU (dem.py horizon renderer, Mapterhorn). No browser or GPU render.
+  How it works: the DEM skyline is rendered at the GT pose, at each propagated pose and at a free DEM-skyline fit F
+  (yaw/pitch/roll, GT focal). Each is scored against the photo's own skyline as a truncated mean |row delta|
+  (12 px cap) on 1024-px images, over columns whose DEM skyline is at least 1 km away. A separate parallax
+  simulation ray-casts each rot inlier from anchor A into the DEM. It then re-projects the hit from B's GPS eye
+  and fits the pure rotation that DEM-scale parallax alone would produce.
+  Deviation D1: the GT eyes (GPS altitude) are 5-18 m BELOW Mapterhorn ground at all three GPS points. The GT
+  was built on AWS Terrarium, which puts the ground at 1859-1903 m. Every eye is therefore ground + 1.6 m (the
+  GT's own 'max' rule, applied to Mapterhorn). So the absolute skyline fit of the GT poses is also degraded here.
+
+Frozen result: INCONCLUSIVE (decision rule 0: fit precision).
+  IMG_7059 (13 mm ultrawide) cannot be fitted to the skyline. The bootstrap geodesic RMS of F is 5.9 deg (the
+  limit is 0.5), and F lands 10 deg from GT. The far skyline in 7059 is short and flat, and from a 1.6 m DEM eye
+  at the cliff-edge lookout the near plateau hides most of it. The frozen parallax simulation is also invalid for
+  anchor 7059: all 82 and 92 inlier rays hit the DEM within ~4 m (the same eye/lookout artefact). Its median
+  bias_par of 64 deg is therefore meaningless.
+  7063 and 7068 fit well: bootstrap RMS 0.10 and 0.12 deg; an eye 15 m higher moves F by 0.43 and 0.30 deg.
+
+POST HOC (after seeing the frozen result; exploratory, n = 1 viewpoint)
+  P2: the parallax simulation with DEM hits < 500 m dropped (0 hits left from anchor 7059).
+  P4: implied pose R_B = Cpar^T . relR_rot . R_F_A. This undoes the simulated parallax rotation Cpar and uses
+  the DEM-fitted anchor F instead of GT.
+                     baseline  inlier dist  sim parallax  d_GT   bias_par  |  implied pose vs F_B   skyline r (px)
+                     (GPS)     median       median/inl    (rot)  (sim)     |  (P4)                  implied / uncorr / GT / F
+  7063 -> 7068       73 m      2.7 km       1.37 deg      1.81   1.71      |  0.36 deg              2.91 / 7.22 / 3.03 / 2.22
+  7068 -> 7063       73 m      3.0 km       1.20 deg      1.54   1.22      |  0.41 deg              3.60 / 5.53 / 5.43 / 1.41
+  7063 -> 7059        7 m      2.5 km       0.09 deg      2.28   0.12      |  (7059 F unusable)     8.54 / 8.32 / 7.07 / -
+  7068 -> 7059       74 m      2.5 km       1.02 deg      3.50   1.20      |  (7059 F unusable)     9.45 / 9.66 / 7.07 / -
+  7059 -> 7063/7068  7/74 m    (all rays hit the DEM within 4 m; not simulated)
+  Direction check on the 73 m pair (rotation vectors in B's camera frame, deg: x pitch-like, y yaw-like, z roll):
+    7063->7068: rot vs F (-0.56,-1.66,+1.08), simulated parallax (-0.56,-1.34,+0.90)
+    7068->7063: rot vs F (+0.02,+0.90,-0.81), simulated parallax (+0.15,+1.11,-0.49)
+  So the rot error on this pair is the simulated parallax to within ~0.4 deg, in both magnitude and direction.
+  F vs GT: 7068 is 0.28 deg (GT fine). 7063 is 1.55 deg, almost all roll (-1.49), and F lowers 7063's skyline
+  residual from 5.43 to 1.41 px.
+
+Conclusion
+  Frozen rule: INCONCLUSIVE, because 7059 cannot be fitted. Post hoc, the ~2 deg error has two separable parts:
+  - PARALLAX is real, and it is the terrain itself, not near foreground. At a 73 m baseline, the matched terrain
+    at 2.5-3 km gives a simulated pure-rotation bias of 1.2-1.7 deg, and the 7063<->7068 error matches it in
+    direction. REPORT's earlier argument that this pair's small error 'argues against parallax dominating' is
+    wrong: its error is mostly parallax, which partly cancels 7063's GT roll error.
+  - GT ERROR is also real. 7063's 'approx' GT roll looks ~1.5 deg off (7068's GT agrees with the DEM fit). For
+    7059, the 7059<->7063 pair was shot 13 s apart (baseline ~0; simulated parallax 0.12 deg), so parallax
+    cannot explain its 2.2-2.3 deg. The implied 7059 poses from the 7063 and 7068 anchors, parallax-corrected
+    and F-anchored, agree with each other within ~0.9 deg and sit ~2 deg of yaw below 7059's GT (implied yaw
+    2.1-2.5 vs GT 4.39 and the GT note's 3.3-4.4 range). But the skyline cannot confirm this: the implied poses
+    score worse than GT (8.5-9.5 vs 7.07 px) on a skyline that is ill-conditioned anyway. So for 7059 it stays
+    open between GT yaw error and an ultrawide lens-model bias in rot. It is not parallax.
+  Correcting for parallax works. The DEM-depth parallax correction plus a DEM-fitted anchor brings the 73 m pair
+  to 0.36-0.41 deg of the target's own DEM fit. Uncorrected, the skyline residual at the propagated pose is 7.2
+  and 5.5 px; corrected, it is 2.9 and 3.6 px.
+
+Implications for PREREG_DRAFT.txt (notes only; the draft is unchanged)
+  - The 250 m baseline cap is too loose for a pure-rotation seed. The measured bias is ~baseline / (matched-
+    terrain distance): about 1.4 deg at 73 m and ~3 km, so up to ~5 deg at 250 m, which reaches the 5 deg seed
+    radius (H2 p90 <= 5). Either (a) cap the baseline much lower (~50 m for <= 1 deg at >= 3 km), or (b) freeze a
+    parallax-corrected composition: DEM depth for the anchor's inliers, known target eye, then a rotation-only
+    solve, as check.py/posthoc.py do. Choose before freezing; do not tune it on the held-out set.
+  - Dev 'approx' GT is not accurate enough to score sub-2-deg propagation error (7063 roll ~1.5 deg; 7059 yaw
+    unresolved). The prereg already scores by blind verification, not GT, which is the right call.
+  - The GT eyes of the Niederhorn photos are below Mapterhorn ground (Terrarium-era eyes). Worth a GT-maintenance
+    note: this was not changed here.
+  - Anchor-at-a-lookout trap: a ground + 1.6 m DEM eye at a cliff edge can hide the terrain the matches sit on
+    (7059). Any DEM-depth correction must detect rays that hit within a few metres and fall back or skip.
+  Caveats: n = 1 viewpoint, 2 usable targets, 4 usable ordered pairs. The analysis is post hoc. F and the
+  parallax simulation depend on GPS positions (hAccuracy 7-37 m) and a guessed eye height.
+
+Reproduce (CPU, ~3 min):
+  npx tsx tools/nearfield/propagate/render_check/skyline.ts
+  tools/matcher/.venv/bin/python tools/nearfield/propagate/render_check/check.py     # frozen
+  cd tools/nearfield/propagate/render_check && ../../../matcher/.venv/bin/python posthoc.py   # POST HOC

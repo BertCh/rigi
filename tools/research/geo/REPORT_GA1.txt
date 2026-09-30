@@ -1,0 +1,87 @@
+GA1 - MAP solver with priors + Laplace covariance (Agent B)                         2026-09-30
+Rule: tools/research/geo/PROTOCOL.txt SECTION GA1 (written 03:12Z, before scoring). Data: out/geocam/ga1/ga1-eval.json
+(primary, Mapterhorn), out/geocam/ga1/ga1-eval-terrarium.json (POST-HOC secondary, labelled).
+
+VERDICT: NOT KILLED, NOT PASSED.
+  pitch        PASS   median |pitch err| P 0.162 deg vs app start 0.260 deg (rule: <= app + 0.02). R (eye fixed) 0.089.
+  all-far      FAIL   3 all-far photos: sigma_EN/sigma_GPS 5495 1.00, 7018 0.88, 7033 0.54 (< 0.8). None < 1/3 (no kill).
+  calibration  FAIL   rotation median (err/sigma)^2 = 6.0 (yaw 11.2, pitch 6.0, roll 6.7; n 30) -> sigma ~2.4x too small;
+                      with 0.03 deg GT error in quadrature 5.7. Eye (synthetic GPS displacement, n 40) median 3.5.
+                      Both outside [0.5, 2]; both < 9, so "over-confident by > 3x" (kill) is NOT met - but not by much.
+
+WHAT WAS BUILT
+  src/lib/geocam/map/{lm,covariance,cluster,factors,solve,index,map.check}.ts
+    solveMap(p, x0, o?) -> MapResult (core/types.ts). Dense LM on the free params, per-factor IRLS (l2/huber/cauchy/
+    student), nEff thinning, NaN rows dropped (constant penalty in the objective), FD central Jacobians (core steps),
+    yaw wrap. Outer loop re-linearises eye-dependent factors; eye steps > trustM (25 m) are clipped (NO proximal prior:
+    joint.ts's proximal term shrank the Monte Carlo spread by ~30 % when still active at the stop). Covariance
+    (J^T W J)^-1 at the solution, data block / max(1, MAD)^2, perFamily info, sigma_EN = sqrt(lambda_max EN).
+    Factors: gps, alt, ground (asymmetric), gravity, compass (Student-t nu 3), focal, skyline (eye-linearised horizon,
+    columnSigma per sample, Cauchy 2, nEff 60), point (2D-3D), concordCueFactors (joint.ts cueResidualPx).
+    NEW (needed for the all-far criterion): cluster-correlated DEM error (map/cluster.ts). A DEM offset shared by a
+    patch of terrain is exactly an eye offset for those rows, so independent-row DEM sigma let 100+ far samples
+    "observe" the eye to a few metres. Each factor splits the DEM variance: (1-rho) independent, rho (0.5) as a 3D
+    offset per (15 deg sector x distance band) cluster, marginalised in closed form (Woodbury whitening with the rows'
+    eye Jacobian). Default ON for skyline and point; cluster: null turns it off.
+  scripts/geocam/lib.ts (shared eval helpers, API in its header), ga1-eval.ts, ga1-fixtures.ts.
+
+SYNTHETIC CHECKS (npx tsx src/lib/geocam/map/map.check.ts) - all 7 PASS
+  recovery from 2/1/1 deg, 3 % focal, 37 m eye with 10 % outliers: |drot| 0.008 deg, |deye| 0.09 m.
+  fixed params untouched, cov rows 0.
+  Monte Carlo 200 trials (l2, data + prior means redrawn): sigma/sd 0.94-1.04 for all 7 params.
+  Monte Carlo 300 trials with cluster-correlated DEM error generated as modelled: sigma/sd 0.96-1.07.
+  all-far (points 15-30 km, ridge 20 km, default error model): sigma_EN 18.6 m vs sigma_GPS 20 (>= 0.8).
+  near points 0.3-1 km: sigma_EN 4.5 m. Student-t compass: 90 deg blunder moves yaw 0.0006 deg vs 0.023 deg (l2).
+  NOTE: the all-far check passes only with the cluster model; without it sigma_EN was 14 m (fail).
+
+PER PHOTO (primary P, Mapterhorn; err = MAP - GT)
+  photo   far   pitch app / P / R      sigma_p  yaw err/sig    roll err/sig   sigmaEN/GPS  MAD  eye shift (m)
+  5495    ALL  -0.29 / -0.52 / -0.64   0.21     6.46/0.46      -0.50/0.61     21.6/21.6    3.4  [2,-11,5]
+  6971    .96  -0.23 /  0.15 / -0.03   0.06     0.20/0.09      -1.10/0.12     10.2/14.0    1.1  [6,-2,1]
+  7018    ALL   0.07 /  0.15 /  0.08   0.05    -0.27/0.07       0.17/0.13     12.3/14.0    0.8  [-2,5,0]
+  7033    ALL  -0.32 / -0.07 / -0.07   0.08     0.19/0.09      -0.40/0.16     11.4/21.1    0.7  [-5,-10,-7]
+  7053    .63   0.21 /  0.28 /  0.01   0.06    -0.18/0.11      -1.10/0.16     12.4/14.0    1.5  [-6,-14,7]
+  7059    .14  -0.82 / -0.15 /  0.07   0.15    -0.78/0.08       0.32/0.38      4.8/37.2    0.5  [-9,-6,8]
+  7063    .35  -0.02 /  0.14 /  0.41   0.18    -0.47/0.09      -1.25/0.42      4.9/7.0     0.5  [-1,-8,17]
+  7068    .64  -0.32 / -0.17 / -0.10   0.06    -0.15/0.07       0.86/0.19      7.6/14.0    0.8  [-7,-3,7]
+  7131   1.00  -0.34 / -0.24 / -0.28   0.07    -0.01/0.08       0.38/0.14     16.6/41.3    0.8  [-20,-27,5]
+  7155    .50  -0.03 /  1.02 / -0.37   1.46    -3.49/0.33       2.28/1.37      7.2/16.5    0.3  [27,5,10]
+  (7131: skyline far fraction 1.00 but its nearest re-match point is 717 m, so it is not all-far under the rule.)
+
+FINDINGS
+ 1 The start is the reproduced CPU app solve (scripts/concord/lib.ts appSolve): its median pitch error on the 10 dev
+   photos is 0.26 deg, not the 0.07 deg quoted in the plan (that number is not this pipeline). The rule compares against
+   the start measured here, as registered. MAP improves the median pitch (0.26 -> 0.16), R (eye fixed) more (0.09).
+ 2 Over-confidence is dominated by errors the covariance cannot see: wrong-basin / gross starts (5495 yaw 6.5 deg, the
+   compass is 9 deg off and the solve stays there; 7155 yaw 3.5 deg) and roll errors of ~1 deg on 6971/7053/7063 with
+   sigma 0.12-0.4 (roll is where skyline-only geometry is weakest). A Laplace sigma is a local statement; it needs a
+   basin/integrity check (GA5) in front of it. Pitch alone: median z2 6.0.
+ 3 The eye moves on the ground + alt priors, not on image evidence: Mapterhorn ground at the fix is 5-18 m ABOVE the
+   GPS-altitude GT eye on 7053/7059/7063/7068/7155 (summit fixes), so the asymmetric ground prior lifts the eye 7-17 m
+   and pitch shifts to match (7063: R 0.41 at the underground GT eye vs P 0.14). GT eyes here are Terrarium/GPS-rule
+   eyes, so pitch "errors" vs GT partly measure the eye convention, not the solver.
+ 4 all-far failure (7033: sigma_EN 11.4 vs 21.1): 394 re-match points all >= 3 km plus a 100 % far skyline still carry
+   eye information under the model (cluster rho 0.5, 15 deg sectors). The model is honest on synthetic data generated
+   from it; on real data the correlation length / rho is larger than assumed. Candidate fixes (post-hoc, NOT applied):
+   rho -> 0.8-1 for d > 3 km, wider sectors for far bands, or capping total far-field eye information.
+ 5 Eye synthetic displacement: median z2 3.5; z2 ~ 1 where the evidence is far (5495/6971/7018), large where the eye
+   was pulled by ground/alt priors to a place GT does not share (7059/7063/7131/7155). Guard-rail 4.1 stands: the eye
+   must not be moved on this solver's say-so.
+
+POST-HOC (labelled; decided after seeing the primary numbers): same run on Terrarium (the DEM of GT and the app):
+  pitch median P 0.195 (app 0.260; PASS), rotation z2 median 2.44 (yaw 4.9, pitch 2.4, roll 1.6), eye z2 6.4;
+  all-far n 5: ratios 1.00 / 0.77 / 0.59 / 0.92 / 1.00 (FAIL, 7018 and 7033). On Terrarium the ground at the
+  summit fixes is 35-70 m below the GPS altitude, and the ground prior (sigma 2 m above) drags the eye 40-117 m
+  horizontally (7053, 7059, 7063, 7068, 7155): the priors act as pulls, exactly guard-rail 4.2's warning.
+
+OPEN ISSUES / NOTES FOR OTHER AGENTS
+  - concord/solve/refine.ts cachedHorizons can evict a cached hit while inserting the misses of the same batch and
+    return undefined (crashed the first run). scripts/geocam/lib.ts now uses its own memoHorizons; concord owner
+    should fix theirs.
+  - Agent C (GTSAM parity): fixtures out/geocam/fixtures/IMG_{7018,7063,5495}_P.json use format
+    "geocam-map-fixture/1" + an additive skyline "horizons" field (precomputed horizons at the TS solution's eL and
+    eL +- 5 m; x0 = TS solution; see ga1-fixtures.ts header); ground is a local plane. opts.trustM now means an
+    eye-step clip, not a proximal prior.
+  - Wild dev refs were not evaluated (GT dev only), as stated in the protocol.
+  - Product implication: nothing here may move an app pose. The rotation sigma needs ~2.5x inflation (or a better
+    roll/basin model) before it is displayed.

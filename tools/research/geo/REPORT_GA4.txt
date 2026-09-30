@@ -1,0 +1,61 @@
+GA4 - LAKES AS KNOWN HORIZONTAL PLANES (G4)                                                       2026-09-30
+Agent E. Protocol: tools/research/geo/PROTOCOL.txt SECTION GA4 (written 03:04Z, before any GA4 number).
+Code: src/lib/geocam/lakes/factors.ts (waterlineFactors, lakeFloorFactor), lakes-factors.check.ts;
+scripts/geocam/ga4-eval.ts. Machine-readable: out/geocam/ga4/{summary.json, recovery/*.json, recovery.json (6971 W),
+coverage.json, osm/<pid>.json}.
+Kill criterion (fixed): median eye-Z error > 5 m, OR coverage < 5%.
+
+VERDICT: GA4 KILLED on the eye-Z clause. Median eye-Z error 16.9 m (bootstrap-by-photo 95% CI [6.3, 32.7]) over
+4 photos x 6 displacements; the CI lies entirely above 5 m. Coverage passes: 11/50 wild dev photos (22%, Wilson
+[13, 35]) have a usable lake by the frozen rule.
+
+RECOVERY (DEV GT 6971, 7018, 7033, 7053; start = GT rotation + focal, eye U displaced by +-5/10/20 m; solveMap,
+maxOuter 8; median |U - U_GT| over the 24 displaced runs)
+  config                                        median  CI95 (by photo)   per photo 6971 / 7018 / 7033 / 7053
+  W  gps + focal + skyline + water (PRIMARY)    16.9 m  [6.3, 32.7]       5.7 / 9.3 / 19.3 / 46.4
+  S  control, no water                          31.1 m  [16.2, 77.3]      12.9 / 86.6 / 77.3 / 31.1
+  WG W + ground prior (product-like)            10.5 m  [1.0, 12.0]       7.7 / 1.0 / 10.7 / 12.0
+  Undisplaced start (dz = 0) already moves the eye: W U = 3.8 / 9.7 / 12.2 / 20.1 m. Median |U(dz) - U(dz=0)| = 12.2 m
+  (W), i.e. the solve does not even return to its own dz = 0 answer. 20 of 24 W runs report not converged
+  (maxOuter hit: the re-extracted cue set changes every outer iteration).
+  Water beats no-water (16.9 vs 31.1 m) - the skyline alone does not observe U at all here (sigma_U 15-270 m) - but
+  it is a factor 3 short of the bar. WG is mostly the ground prior (7018: 1.0 m because GT eye = DEM + ~1 m).
+
+WHAT THE CUES LOOKED LIKE (descriptive)
+  6971: 46 water cues at GT, all SHORE (near shore < 1 km; no level cue). Shore-only solves slide horizontally
+    (EN up to 30/65 m) and in pitch (-7.9, -9.7 deg in two runs): the shore distance constrains the lake-plane hit,
+    not the eye height, and the family pulls the skyline out of its basin.
+  7018 / 7033: ~157 LEVEL cues at 2-8 km (Thunersee from ~220 m above the lake). At the GT camera the level residual
+    is a flat -4.4 px in both distance bands (2-4 km: -4.41, > 4 km: -3.84..-4.42; POST HOC diagnostic) - exactly
+    concord's cue bias, with no 1/d signature. Dip sensitivity is f/d = 1216/3000 = 0.4 px/m, so -4.4 px equals
+    ~11 m of eye height; the bias nuisance (sigma 3 px, profiled) absorbs part of it, the rest leaks into U/pitch.
+    Over a 2-8 km range the 1/d spread is too small to separate a constant bias from eye height (the synthetic
+    check needed a 1.5 km bay next to a 4.5 km shore to do so).
+  7053: 19 level cues at > 4 km from 1366 m above the lake (GT eye is 10.6 m BELOW the Mapterhorn DEM at the fix -
+    a GT/DEM problem in itself). sigma_h ~ d*sigma_theta = 8 km * 2 px / 1213 px ~ 13 m before any bias: the geometry
+    cannot deliver 5 m. Two runs diverged to pitch +50 deg (cues lost, the solve ran off the skyline).
+
+COVERAGE (wild dev, 50 ids; lakes = region.ts water query via Overpass, cached out/geocam/ga4/osm)
+  usable (>= 8 water cues at the first verified correct ref): 11/50 = 22% [12.8, 35.2]; of the 30 photos with a
+  correct ref: 11/30 = 37%. Usable ids: wc_0014 0028 0046 0052 0054 0071 0072 0077 0082 0088 0099. Geometry-only
+  (>= 8 predicted waterline columns) gives the same 11. Photos without a ref (20) count as not usable (lower bound).
+  Caveat: the cue count says an edge was found near the predicted waterline, not that it is the waterline; small
+  unnamed tarns (e.g. wc_0027 "reflection in tarn") are invisible to the named-water query.
+
+HONESTY / CAVEATS
+  - n = 4 photos (three on the same lake, Thunersee). The CI is the statement; 16.9 m is not a precise number, but
+    even the lower CI bound (6.3 m) fails the bar.
+  - GT eyes are not independent (DEM + 1.6 rule; 7053 below the DEM). The error vs GT includes the GT's own error;
+    the non-convergence and the dz=0 drift are independent of that.
+  - Lake levels: Thunersee from OSM ele 558.0 (+-0.5 m) - not the limiting factor at these error sizes.
+  - searchPx 30 (frozen) widens the search enough to cover a 20 m error at 1 km but also admits wrong edges; the
+    6971/7053 blow-ups are consistent with wrong-edge lock-in after an outer re-extraction. No other setting was
+    tried (no tuning after scoring).
+  - Runtime: ~1.5-4 min per solve (7 horizon marches + one 800 px ray cast + cue search per outer iteration).
+
+IMPLICATION: the dip geometry is sound (synthetic check: 0.3 m with a -3 px bias when the distances span 1.5-4.5 km),
+  but on the dev lakes the waterline cue is (a) biased by a constant ~ -4 px that is collinear with eye height over a
+  narrow distance range, and (b) far away from high viewpoints, where sigma_h ~ d * sigma_theta is > 5 m anyway.
+  GA4 as specified does not deliver a 5 m eye height. The lake FLOOR (a veto, GA0) is unaffected by this result.
+  A redesign would need a bias-free waterline observation (e.g. the shore/reflection pair giving the axis, which
+  concord found worse) or near lakes (< 1.5 km) with level cues, which none of the dev lake photos has.

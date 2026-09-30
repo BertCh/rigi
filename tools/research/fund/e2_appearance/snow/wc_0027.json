@@ -1,0 +1,95 @@
+{
+ "pid": "wc_0027",
+ "date": "2014-08-28T12:41:35",
+ "bbox": [
+  7.714565277099609,
+  46.37074279785156,
+  7.905383110046387,
+  46.42461013793945
+ ],
+ "W": 244,
+ "H": 100,
+ "source": "none",
+ "items": [
+  {
+   "id": "LC08_L2SP_195028_20140827_02_T1",
+   "date": "2014-08-27T10:16:58.943891",
+   "dd": 1.1004173160763888,
+   "cloud": 31.46,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.05,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_195028_20140904_02_T1",
+   "date": "2014-09-04T10:14:33.162065",
+   "dd": 6.897895394270834,
+   "cloud": 57.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.116,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_194028_20140820_02_T1",
+   "date": "2014-08-20T10:10:48.160518",
+   "dd": 8.104708790300926,
+   "cloud": 75.74,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.011,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_195028_20140819_02_T1",
+   "date": "2014-08-19T10:14:32.724083",
+   "dd": 9.102109674965279,
+   "cloud": 65.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.0,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_195028_20140912_02_T1",
+   "date": "2014-09-12T10:17:03.208741",
+   "dd": 14.899632045613425,
+   "cloud": 29.65,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.132,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_194028_20140913_02_T1",
+   "date": "2014-09-13T10:08:21.851343",
+   "dd": 15.893597816469908,
+   "cloud": 17.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.054,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_194028_20140812_02_T1",
+   "date": "2014-08-12T10:08:22.867643",
+   "dd": 16.10639042079861,
+   "cloud": 49.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.001,
+   "skipped": true,
+   "newPx": 0
+  }
+ ],
+ "coverage": 0.0,
+ "snowFracMeanKnown": null,
+ "medianDaysOffset": null
+}

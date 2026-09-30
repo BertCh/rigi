@@ -51,6 +51,10 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | P1 title-geocode position triage | Precision 0.25, recall 0.33, flags 6/30 solved photos | `tools/research/tm/p1_position/REPORT.txt` |
 | H1 S5 masked-basin rerun (negative mining) | Stage-2 fan pulls seeds back to the true basin; only 3 negatives | `tools/research/tm/h1_mine/REPORT.txt` |
 | v1 verification with Terrarium overlays | Wrong numbers (precision 0.72) and a wrong "GPS parallax" story; protocol rebuilt on Mapterhorn | bench-wild.md |
+| FUND E0: predict failures from geometry (FOV/w\* for rotation, Σ(1/d)² eye information) | Killed as pre-registered: AUROC 0.60 / 0.50 (< 0.65). The rotation half is confounded by skyline clipping in the pitch-0 ring cache, so it is untested rather than refuted. ≥ 99.9% of Σ(1/d)² sits below 250 m, so that metric measures the foreground, not the eye | `tools/research/fund/e0_observability/REPORT.txt` |
+| FUND E2: date-matched appearance renders (photo-time sun, snow composite, Sentinel-2) | Killed: median inlier gain −0.8% to +0.3% (bar 15%), no separation gain, 30 dev photos. The flat snow tint wipes out rock texture (−31/−52% on 6 snowy photos). Tests this implementation, not snow physics: a texture-preserving, slope-aware tint is untested | `tools/research/fund/e2_appearance/REPORT.txt` |
+| FUND E3: hi-res near field (swissALTI3D z17 + DSM + SWISSIMAGE) and a mid-band free-eye solve | Killed on 30 refs: no gain in inliers < 2 km (log2 +0.10 [−0.34, +0.53]); matches < 250 m almost absent in any render; eye better than GPS on 3/30 (bar 60%). The matcher, not the render, is what fails to see the near field | `tools/research/fund/e3_nearfield/REPORT.txt` |
+| FUND E1: a-contrario held-out-cue accept with a per-photo decoy null | Killed: 23/31 recall but 13 gross accepts, 10/56 displaced-eye decoys accepted (ε = 1); ε = 0.01 still 7 gross. 90% of hypotheses score 0, so the null is degenerate; the min over held-out directions zeroes 7/33 correct poses. Best label-tuned threshold: 12/31 at 0 gross (current rule 19/31) | `tools/research/fund/e1_acontrario/REPORT.txt` |
 
 ## Step Inside and near-field 3D
 
@@ -75,7 +79,20 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | Tried | Result | Source |
 |---|---|---|
 | Display warp field | 0.00 px LOO gain on existing (mostly > 5 km) pins | [concordance-research.md](concordance-research.md) (session f3) |
-| Altitude-contour eye rule | Failed on holdout | concordance (session f3) |
+| Altitude-contour eye rule | Worse on holdout: median 12.0→13.4 px, p90 18→36 | `tools/concord/priors/RESULT.txt`, `tools/concord/review/RESULT.txt` |
+| Joint whole-frame solve (skyline + interior cues + priors, gated) | Holdout median 8.8→16.2 px; 7130's eye moved 200 m (2.9σ) while the skyline improved and the pins went 10→30 px. The gate scores on the cues it fitted, so it can't catch this. From the GT start it drifts 3–6 px off the pin-fitted poses | `tools/concord/solve/RESULT.txt`, `tools/concord/review/RESULT.txt` |
+| Display warp on holdout | 0 better / 8 worse pins (LOO at the GT pose, 1.20→1.41 px) | `tools/concord/review/RESULT.txt` |
+
+## Geometry-first camera (GEO phase A, 2026-09-30)
+
+| Tried | Result | Source |
+|---|---|---|
+| Free eye from appearance matches (pycolmap with GPS prior, PoseLib 6-DoF, P4Pf, up2p) | Drift 180–270 m at correct poses; σ 14–86× over-confident; flags every decoy and every correct pose (AUROC 0.49) | `tools/research/geo/REPORT_PNP.txt` |
+| GA2 σ_eye (CRLB) as the eye gate | ρ 0.498 < 0.5; 25% of displaced-eye decoys confidently wrong | `tools/research/geo/REPORT_GA2.txt` |
+| GA3 occlusion-crossing (T-junction) eye cue | Renders: true-eye argmin 6/6 but a 10–20 m well. Real photos: median improvement −0.83, wrong eye wins 93%; only 6/40 refs eligible | `tools/research/geo/REPORT_GA3.txt` |
+| GA4 lake waterline/shore for eye height | Median eye-Z 16.9 m vs 5 m; −4.4 px constant cue bias ≈ 11 m of height at 2–8 km | `tools/research/geo/REPORT_GA4.txt` |
+| GA5 solution-separation integrity as a zero-loss veto | Rejects 12/33 correct poses; wrong-basin AUROC 0.94, wrong-eye 0.83; viewshed veto 2/754. Kept as a veto-panel candidate | `tools/research/geo/REPORT_GA5.txt` |
+| GA1 MAP solver σ calibration | Not killed: rotation (err/σ)² 6.0, eye 3.5 vs [0.5, 2]; mostly wrong-basin starts | `tools/research/geo/REPORT_GA1.txt` |
 
 ## GPU and performance
 

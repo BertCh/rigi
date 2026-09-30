@@ -3,7 +3,7 @@
 //  - grid: max |GPU − CPU| over the 2525 coarse cells (after the prior's sky fit), CPU grid ms vs GPU ms
 //  - search: align.autoAlign vs gpu/align autoAlignAsync, exact equality of every hypothesis, ms
 //  - engine: engine autoAlign with GPU off vs on (three: autoAlign vs autoAlignAsync; deck: autoAlign
-//    under __RIGI_GPU__ off/on), final pose Δ and the silhouette re-rank timing (deck stats)
+//    under __RIGI_FLAGS__.gpu off/on), final pose Δ and the silhouette re-rank timing (deck stats)
 // Usage (under the render lock):
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/w2-align-parity.mjs [--renderer deck]
 //     [--url http://localhost:3110] [--out out/gpu/w2/parity-three.json] [IMG_xxxx ...]
@@ -44,7 +44,7 @@ try {
 				m.type() === "error" && logs.push(`error: ${m.text().slice(0, 200)}`),
 		);
 		await page.addInitScript(() => localStorage.clear());
-		// the app itself loads with the GPU off; the test flips __RIGI_GPU__ per measurement
+		// the app itself loads with the GPU off; the test flips __RIGI_FLAGS__.gpu per measurement
 		const qs = `?gpu=${APP_GPU}${RENDERER === "deck" ? "&renderer=deck" : ""}`;
 		await page.goto(`${BASE}/photo/${id}${qs}`);
 		await page.waitForSelector("[data-ready]", {
@@ -67,7 +67,7 @@ try {
 				const e = window.__engine;
 				const med = (xs) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 				const { horizonDirs: dirs, edge, prior, aspect } = e;
-				globalThis.__RIGI_GPU__ = "on";
+				globalThis.__RIGI_FLAGS__ = { ...globalThis.__RIGI_FLAGS__, gpu: "on" };
 				let dirsHash = 0;
 				for (let i = 0; i < dirs.length; i++)
 					dirsHash = (dirsHash * 31 + Math.round(dirs[i] * 1e6)) | 0;
@@ -145,7 +145,10 @@ try {
 				};
 				// ---- engine (search + silhouette re-rank) ----
 				const run = async (mode) => {
-					globalThis.__RIGI_GPU__ = mode;
+					globalThis.__RIGI_FLAGS__ = {
+						...globalThis.__RIGI_FLAGS__,
+						gpu: mode,
+					};
 					const ts = [];
 					let res;
 					let sil = null;
@@ -180,7 +183,10 @@ try {
 						),
 					confidence: [off.res.confidence, on.res.confidence],
 				};
-				globalThis.__RIGI_GPU__ = undefined;
+				globalThis.__RIGI_FLAGS__ = {
+					...globalThis.__RIGI_FLAGS__,
+					gpu: undefined,
+				};
 				return out;
 			},
 			{ REPS, RENDERER },

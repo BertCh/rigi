@@ -4,40 +4,20 @@
 //             Same poses as tiles on eval-app/deck smoke, ≥ 99.8 % identical imagery pixels, draws
 //             20–100× fewer, mesh build ~8× faster (research_notes/gpu_compute_plan_2026-09.md)
 //   "tiles"   one TerrainTileLayer + luma Model per tile, meshes built on the main thread
-// Checked in order: globalThis.__RIGI_TERRAIN__ (tests; read live), ?terrain=batched|tiles in the
-// page URL, localStorage "rigi.terrain" (both read once per page load).
+// Set with ?terrain=tiles (src/lib/flags; harnesses flip globalThis.__RIGI_FLAGS__.terrain live).
 // globalThis.__RIGI_TERRAIN_BOTH__ = true makes the streamer build both representations, so a
-// harness can flip __RIGI_TERRAIN__ on the same tiles (parity checks).
+// harness can flip the terrain flag on the same tiles (parity checks).
+import { getFlag } from "#/lib/flags";
 
 export type TerrainMode = "tiles" | "batched";
 
 type G = {
-	__RIGI_TERRAIN__?: TerrainMode;
 	__RIGI_TERRAIN_BOTH__?: boolean;
 	__rigiTerrainStats?: typeof terrainDrawStats;
 };
 
-let fromPage: TerrainMode | null = null;
-
-function readPage(): TerrainMode {
-	try {
-		const q = new URLSearchParams(globalThis.location?.search ?? "").get(
-			"terrain",
-		);
-		if (q === "batched" || q === "tiles") return q;
-	} catch {}
-	try {
-		const s = globalThis.localStorage?.getItem("rigi.terrain");
-		if (s === "batched" || s === "tiles") return s;
-	} catch {}
-	return "batched";
-}
-
 export function terrainMode(): TerrainMode {
-	const g = (globalThis as G).__RIGI_TERRAIN__;
-	if (g === "tiles" || g === "batched") return g;
-	fromPage ??= readPage();
-	return fromPage;
+	return getFlag("terrain");
 }
 
 /** What the streamer builds per tile: the CPU mesh (per-tile path) and / or the batch grid. */

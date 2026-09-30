@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // W4b: imagery-style pixel parity, batched terrain (imagery texture arrays) vs the per-tile path,
 // on the SAME streamed tiles and the SAME imagery bitmaps in one page (__RIGI_TERRAIN_BOTH__
-// builds both representations; __RIGI_TERRAIN__ flips the drawing path live).
+// builds both representations; __RIGI_FLAGS__.terrain flips the drawing path live).
 // Per photo: autoAlign → settle the stream → for each case (photo view "replace" with the
 // satellite / topo drape, rendered offscreen through compositor.renderImage = the colour pass;
 // the 3D world view with the satellite drape = the canvas pass) wait for every tile's imagery,
@@ -48,7 +48,10 @@ async function run(id) {
 	await page.addInitScript(() => {
 		localStorage.clear();
 		globalThis.__RIGI_TERRAIN_BOTH__ = true;
-		globalThis.__RIGI_TERRAIN__ = "tiles";
+		globalThis.__RIGI_FLAGS__ = {
+			...globalThis.__RIGI_FLAGS__,
+			terrain: "tiles",
+		};
 	});
 	try {
 		await page.goto(`${BASE}/photo/${id}?renderer=deck`);
@@ -92,7 +95,10 @@ async function run(id) {
 			const rw = e.aspect >= 1 ? W : Math.round(W * e.aspect);
 			const rh = e.aspect >= 1 ? Math.round(W / e.aspect) : W;
 			const render = async (mode, world) => {
-				globalThis.__RIGI_TERRAIN__ = mode;
+				globalThis.__RIGI_FLAGS__ = {
+					...globalThis.__RIGI_FLAGS__,
+					terrain: mode,
+				};
 				e.updateLayers();
 				e.flushLayers();
 				await sleep(300);
@@ -198,7 +204,10 @@ async function run(id) {
 					ms: { tiles: t2.ms, batched: b2.ms },
 					pool,
 				};
-				globalThis.__RIGI_TERRAIN__ = "tiles";
+				globalThis.__RIGI_FLAGS__ = {
+					...globalThis.__RIGI_FLAGS__,
+					terrain: "tiles",
+				};
 			}
 			return {
 				pose,

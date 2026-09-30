@@ -1,7 +1,7 @@
 // Roll → GeoJSON: every camera (point + pose), its view wedge, and the day's track, so a roll can
 // be opened in any GIS / web map (QGIS, geojson.io, Mapillary-style viewers).
 import { destination } from "../geodesy";
-import { hfovOf } from "./roll";
+import { hfovOf, loadSolvedPose } from "./roll";
 import type { Roll } from "./types";
 
 /** Radius (m) of the drawn view wedges: a symbol, not a visibility claim. */
@@ -29,6 +29,11 @@ export function rollToGeoJSON(roll: Roll) {
 			vfov: round(p.pose.vfov, 2),
 			hfov: round(hfovOf(p.pose, m.width / m.height), 2),
 			altitude: m.alt,
+			// R5: a user-accepted propagated suggestion is not a measured solve; say so (absent otherwise)
+			...(p.poseSource === "solved" &&
+			loadSolvedPose(m.id)?.method === "propagated-suggestion"
+				? { poseMethod: "propagated-suggestion" }
+				: {}),
 		};
 		features.push({
 			type: "Feature",

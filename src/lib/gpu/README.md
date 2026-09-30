@@ -15,7 +15,7 @@ Rules:
   explaining the choice.
 - **Keep readbacks small.** Reduce on the GPU and read back winners and scalars, not full images,
   whenever the caller allows it.
-- **Kill switch:** `?gpu=off`, `localStorage["rigi.gpu"]="off"`, or `globalThis.__RIGI_GPU__="off"`.
+- **Kill switch:** `?gpu=off` (src/lib/flags), or in a harness `globalThis.__RIGI_FLAGS__ = { ...globalThis.__RIGI_FLAGS__, gpu: "off" }` (per realm, read live).
 - **Test with headless Chromium**, which has WebGPU on this Mac with the repo's usual flags
   (`--use-angle=metal --ignore-gpu-blocklist --enable-gpu`). Features include
   `timestamp-query`, `subgroups`, `shader-f16` and `float32-filterable`.

@@ -1,0 +1,41 @@
+E3 DEVIATIONS / RUN LOG (PROTOCOL.txt is frozen; this file records departures and operational events)
+
+2026-09-29 ~19:52 local  Machine shut down mid-run. Two runners (run_a/run_b, _lists.txt) had completed out/ for
+  wc_0002 wc_0063 wc_0034 wc_0052 wc_0055 wc_0004 wc_0009; wc_0006 partial (corr only); posthoc run had just started
+  (no out_posthoc written). Resumed by a new agent the same day.
+
+Operational change (not a method change): after resume ONE runner at a time (RAM constraint on the shared machine),
+  driver run_c.sh: per photo e3_run.py -> e3_posthoc.py -> delete data/<pid> (grid.npz + ortho tiles, regenerable
+  from swisstopo). wc_0006 re-run from scratch (its corr files are overwritten; nothing was scored from them).
+
+Bug check requested at resume: "every G50 V2 3-dof result = GPS error, fail 'rotation it0'". Investigated before
+  continuing (no code changed):
+  - The solver itself works when correspondences exist: circular-at-T solves on wc_0004/wc_0009 move <= 7 m;
+    G20 wc_0004 -> 6.0 m, G20 wc_0009 -> 12.4 m (2-DoF 2.8 m), G150 wc_0004 -> 13.7 m.
+  - 'rotation it0' = fewer than 6 far5 (> 5 km) correspondences at the displaced render, i.e. the pre-set guard rail.
+    At G50 the renders have ~0 lifted matches in total (not only mid-band): wc_0004 0, wc_0009 0, wc_0034 4,
+    wc_0052 1. Cause checked on wc_0009: the G50 eye (42.5,-26.4) is ~25 m from a ~10 m tall DSM object (hut) lying
+    in the view direction; with the frozen 15 m DTM clear radius the V2 render is a wall at 16 m depth (nearFrac 1.0);
+    the V1 (DTM) render at G50 has a crest 40 m ahead 1.1 m above the eye. For wc_0004/wc_0002 the G50 eye drops
+    33/49 m below the summit eye (z = DTM(G)+AGL(T)), view blocked (as noted in the protocol amendment).
+    The DSM/DTM grids validate against the cached render (0-250 m median rel. depth error 0.2-11 %, 250-2000 m
+    < 0.2 %), the far warp at T/G20 gives sensible far5 matches (wc_0009: 123/148 far5).
+  - wc_0034/wc_0052/wc_0055 (F1 bucket) have ~0 far5 matches even at T, so every solve fails there by design.
+  => Not a code bug: the result is a real property of the frozen displaced-eye design (displacing a summit/ridge eye
+     by 50 m with the ref rotation frequently occludes the view) plus the far5 rotation guard rail. No re-runs needed.
+
+2026-09-29 20:04-22:35 local  Resumed run (run_c.log). All 30 photos of the frozen set processed (out/ 30, out_posthoc/ 30,
+  no FAILED). The first run_c background job hit the 2 h tool limit after wc_0077's e3_run finished (before its
+  posthoc); resumed with the remaining ids (wc_0077 posthoc, wc_0082..wc_0099). No result was affected.
+  Further checks during the run (no code changed):
+  - wc_0014: G20 and G50 renders are a ground surface 4-6 m ahead (terrain rises +3/+4 m within 20 m along the view,
+    telephoto vfov 9 deg, eye 1.6 m AGL), i.e. the same occlusion mechanism, not a render fault; at G50h (height
+    kept) the solve converges to 2.4 m.
+  - wc_0006/0011/0019/0047/0076/...: the matched content is entirely < 5 km (0 far5 matches even with the cached V0
+    at T), so the frozen far5 rotation step can never run on these photos.
+  - wc_0088 (T renders V1/V2 nearFrac 0.99 - hi-res terrain right in front of the stated eye blocks the view at T)
+    and wc_0094 (T is 26 m above the DTM): solves from different starts agree to <= 1 m but sit 15 m / 32 m from T,
+    so part of the "error" there is probably T's own error (T is not surveyed, PROTOCOL s2).
+Added analysis script analyse_posthoc.py (POST HOC summaries merged into results.json["posthoc"]; analyse.py unchanged
+  and still produces the frozen verdict). analyse.py's printed output saved as analyse_out.txt.
+Disk: data/<pid> (grid.npz + ortho tiles, ~30-40 MB each) deleted after each photo; fund/ ~420 MB total.

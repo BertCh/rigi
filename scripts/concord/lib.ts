@@ -355,32 +355,70 @@ type CpPoint = {
 	label?: string;
 };
 
-/** First terrain hit along (az, el) from the GT eye (audit ray march). */
-function rayHit(s: Scene, az: number, el: number) {
-	const t = Math.tan(el * DEG);
-	const rel = (d: number) => {
+/**
+ * The far-shore waterline along azimuth `az` from the GT fix: the first flat water run of the scene DEM
+ * (≥ 12 samples and ≥ 60 m within 5 cm), then the first point beyond it where the ground rises > 1 m
+ * above that level (bisected). Lake level: Mapterhorn over the water run (median of 5 samples) when
+ * available, else the scene DEM's flat level. Independent of the GT eye and of the hand "el".
+ */
+async function waterlineShore(
+	s: Scene,
+	az: number,
+): Promise<{
+	d: number;
+	lat: number;
+	lon: number;
+	lakeM: number;
+	levelSrc: string;
+} | null> {
+	const hAt = (d: number) => {
 		const p = destination(s.lat, s.lon, az, d);
-		return (
-			s.terrain.sampleAt(p.lon, p.lat, d) - s.eyeAlt - (d * d) / (2 * R_EFF)
-		);
+		return s.terrain.sampleAt(p.lon, p.lat, d);
 	};
-	let prev = 0;
-	for (let d = 15; d < 150000; d += Math.max(5, d * 0.004)) {
-		const r = rel(d);
-		if (Number.isNaN(r)) return null;
-		if (r >= d * t) {
-			let a = prev;
-			let b = d;
-			for (let k = 0; k < 16; k++) {
-				const m = (a + b) / 2;
-				if (rel(m) >= m * t) b = m;
-				else a = m;
-			}
-			return { d: b, ...destination(s.lat, s.lon, az, b) };
-		}
-		prev = d;
+	const pts: { d: number; h: number }[] = [];
+	for (let d = 10; d < 30000; d += Math.max(5, d * 0.004)) {
+		const h = hAt(d);
+		if (!Number.isFinite(h)) break;
+		pts.push({ d, h });
 	}
-	return null;
+	let i0 = -1;
+	let i1 = -1;
+	for (let i = 0; i < pts.length; i++) {
+		let j = i;
+		while (j + 1 < pts.length && Math.abs(pts[j + 1].h - pts[i].h) < 0.05) j++;
+		if (j - i >= 11 && pts[j].d - pts[i].d >= 60) {
+			i0 = i;
+			i1 = j;
+			break;
+		}
+		i = j;
+	}
+	if (i0 < 0) return null;
+	const level = pts[i0].h;
+	let k = i1 + 1;
+	while (k < pts.length && pts[k].h <= level + 1) k++;
+	if (k >= pts.length) return null;
+	let a = pts[k - 1].d;
+	let b = pts[k].d;
+	for (let it = 0; it < 16; it++) {
+		const m = (a + b) / 2;
+		if (hAt(m) > level + 1) b = m;
+		else a = m;
+	}
+	const mh: number[] = [];
+	for (let q = 1; q <= 5; q++) {
+		const d = pts[i0].d + ((pts[i1].d - pts[i0].d) * q) / 6;
+		const p = destination(s.lat, s.lon, az, d);
+		const m = await mapterhornHeight(p.lat, p.lon);
+		if (m) mh.push(m.h);
+	}
+	const lakeM = mh.length >= 3 ? median(mh) : level;
+	return {
+		d: b,
+		...destination(s.lat, s.lon, az, b),
+		lakeM,
+		levelSrc: mh.length >= 3 ? "Mapterhorn over water" : "scene DEM flat level",
+	};
 }
 
 const azEl = (d: ArrayLike<number>) => [
@@ -424,28 +462,29 @@ export async function controlPointPins(
 			label: sp.label ?? sp.peak ?? "",
 		};
 		if (sp.level) {
+			// The pixel shows the FAR-SHORE waterline: the pin is the shore point along the pixel's
+			// azimuth at the lake level. (Review fix: the old conversion ray-marched at the stored el,
+			// which hits the flat DEM lake plane itself — 289 m instead of the labelled 450 m shore on
+			// 6971, 12 m instead of ~4 km on 6958 — and so tied the lake level to the GT eye's
+			// "eye 2.5 m above water" assumption.)
 			const [pu, pv] = pinUV(x, y, s.aspect);
 			const dir = unprojectDirX(gtCam(photo), pu, pv);
 			const [az] = azEl(dir);
-			const hit = rayHit(s, az, sp.el as number);
-			if (!hit) {
-				console.error(`${common.id} (${common.label}): waterline ray miss`);
+			const sh = await waterlineShore(s, az);
+			if (!sh) {
+				console.error(`${common.id} (${common.label}): no lake/shore on ray`);
 				continue;
 			}
-			const lakeM =
-				s.eyeAlt +
-				hit.d * Math.tan((sp.el as number) * DEG) +
-				(hit.d * hit.d) / (2 * R_EFF);
 			out.push({
 				...common,
-				lat: hit.lat,
-				lon: hit.lon,
-				level: { lakeM },
+				lat: sh.lat,
+				lon: sh.lon,
+				level: { lakeM: sh.lakeM },
 				kind: "waterline",
 				source: "manual",
-				note: `control-points level el=${sp.el}°`,
-				enu: enuOf(s, hit.lat, hit.lon, lakeM),
-				distM: hit.d,
+				note: `control-points level el=${sp.el}° (hand el not used); far shore ${Math.round(sh.d)} m, lake ${sh.lakeM.toFixed(2)} m (${sh.levelSrc})`,
+				enu: enuOf(s, sh.lat, sh.lon, sh.lakeM),
+				distM: sh.d,
 			});
 		} else if (sp.peak) {
 			const m = peakViews()

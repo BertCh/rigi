@@ -6,6 +6,7 @@
 //
 // DISPLAY ONLY: never feed either map into pose, confidence, pin errors, benchmarks or exports of
 // measurements (XMP/KML/pose). Export IMAGES may carry warped labels, since they show the display.
+import { flagFrom } from "#/lib/flags";
 import {
 	encodeFieldRGBA8,
 	invertField,
@@ -62,8 +63,7 @@ export function packWarpTexture(f: ResidualField): WarpTexture {
 
 /** `?concord=warp` (comma list; see reports/concordance-research.md §4 ground rules). */
 export function warpFlag(search: string): boolean {
-	const q = new URLSearchParams(search).get("concord");
-	return !!q && q.split(",").some((s) => s.trim() === "warp");
+	return flagFrom(search, "concord").includes("warp");
 }
 
 /**

@@ -1,0 +1,138 @@
+E1 — a-contrario (NFA) accept test with a held-out cue (FUND F1)       FROZEN 2026-09-29T23:13:57Z (UTC)
+Written before any decoy was generated and before any statistic was computed on any hypothesis.
+Plan row: reports/fundamentals-plan.md §3 E1. Kill criterion (FIXED by the plan): recall at 0 gross below the current
+rule, OR any wrong-eye decoy accepted.
+
+SCOPE / RULES
+- DEV ids only (tools/matcher/v2/refs.py; tm_common.assert_dev on every id). Nothing from test / data_v3. The H1 blind
+  pack overlays (tools/research/tm/h1_mine/pack/**) are not opened; no verdict is assigned by eye.
+- Writes only under tools/research/fund/e1_acontrario/. H1 code (h1lib) is imported read-only for its production-path
+  wrappers; nothing is written to h1_mine.
+- Rendering: stage-1 worker (vendored) on private port 8796, only while holding tm_common.render_lock(); LoMa (MPS) only
+  while holding tm_common.gpu_lock(). The lock is held per photo (worker created and closed per photo) so concurrent
+  FUND studies can interleave. Never :8765/:8766/:8767/:8768/:3000/:3100.
+- Render budget: <= ~6 h. If the timing pilot (first 2 photos) projects past it, the displaced-eye set is cut to
+  bearings {theta} x {150, 400} m first, then photos from the end of the P_lab list, by a timestamped amendment below,
+  written before any statistic is computed.
+
+PHOTOS
+- P_ref = the 30 dev photos with a verified-correct ref in refs.correct_refs (all at the stated eye, |eyeH - z| <= 0.2 m).
+- P_lab = dev photos without such a ref but with >= 1 labelled H1 pool candidate: wc_0001, wc_0069, wc_0070, wc_0074,
+  wc_0086. Analysed set = P_ref + P_lab (35 photos). Other dev photos are not analysed.
+
+HYPOTHESES (per analysed photo; every hypothesis = pose + eye + ONE LoMa-B single-view correspondence set)
+- Evidence type everywhere = the H1 "common support" procedure: render ONE sat view at the hypothesis pose and eye
+  (worker, 1024 long side, photo aspect), LoMa-B (4096 kp, MPS fp32, filter 0.1) photo<->view via correspond_loma,
+  service lift (>250 m, no depth discontinuity). -> x2d (render px), X (world), eye, W, H.
+  (a) POOL: every H1 pool candidate of the photo with a scored single corr (pool.json common.corrSingle; reused, not
+      re-matched).
+  (b) REF: every refs.correct_refs pose with no pool hypothesis within 0.5 deg yaw & pitch and 2 m eye -> rendered here.
+  (c) RING (null generator, stated eye): 24 views yaw 0,15..345, pitch 0, roll 0, hfov 40 deg, rendered at the stated
+      eye; LoMa per view; single-view rotation solve (s1.solve, prior = view yaw / pitch 0 / roll 0 / photo vfov0,
+      free focal iff focal unknown - the X3/stage-1 single-view solve). Hypothesis pose = solved pose. If the solve
+      has >= 30 inliers the evidence is re-made by the common procedure at the solved pose; otherwise the ring view's
+      own matches are the evidence (pose = solved pose, or the view pose if the solve failed).
+  (d) YAW (P_ref only, null generator): seeds = first correct ref pose with yaw +-6 and +-12 deg; render at the seed,
+      LoMa, single-view solve (prior = seed); evidence as in (c).
+  (e) DISPLACED EYE (all 35 photos): eyes at distance {50, 150, 400} m x bearings {theta, theta+120, theta+240},
+      theta ~ U(0,360) from numpy default_rng(20260929 + int(pid digits)); eye height = DEM ground (tools/matcher/dem.py)
+      + 1.7 m (adhoc altitudeM = round(., 2); the worker clamps to its DEM + 1.6 m). Rejected if the DEM has no value.
+      Re-solve with the SAME solver the T6/T6+LoMa candidates used: pipeline.stage2 (5-view fan, APP.assemble fused
+      solve with skyline + LoMa matches) at the displaced eye with prior2 = the first correct ref pose (P_ref) or, for
+      P_lab, the photo's own T6 ALIKED stated-eye rule.select pose (label-free). Hypothesis = the fused pose at the
+      achieved eye; evidence re-made by the common procedure at that pose/eye. The stage-2 result (level, checks) is
+      stored, and pipeline.basin_gap is computed exactly when run_photo would (level high or matchSupport >= 0.5, and
+      positionSource != exif-gps) so the current rule can be applied to it (positionSource = the photo's own).
+- Dedupe of generated hypotheses (c-e): a generated hypothesis within 0.5 deg yaw & pitch and 2 m eye of an earlier one
+  (order a, b, e, c, d) is dropped.
+- Skyline cue (pose-free, label-free): photo edge maps (fine, fg, rgb) from tools/matcher/v2/.cache/edges/<pid>.npz,
+  P(sky) = skyglobal.fit_sky(rgb, fg, scan_labels(rgb, fg)) (no prior pose), S map = fusion.skyline_from_arrays; DEM
+  horizonDirs at the hypothesis eye: stated eye -> the cached edges dirs; displaced eyes -> the stage-2 skyline export's
+  horizon (eye-only); other eyes (H1 S3 / v2 moved eyes) -> one worker `edges` call per eye. If unavailable, the test
+  runs on matches only (flagged).
+
+LABELS (mechanical; fixed now)
+- Verified-correct poses V_p = refs.correct_refs (manifest lat/lon, eyeH) + H1 pool candidates inherited "correct"
+  (incl. wc_0074's v2verify moved-eye pose).
+- POSITIVE: a POOL or REF hypothesis within 0.5 deg yaw & pitch and 2 m eye of a pose in V_p.
+- NEGATIVE, wrong-basin:
+    NB-inh   H1 inherited-wrong candidates whose eye is within 2 m of a pose in V_p (expected: wc_0002, 0006, 0028).
+    NB-con   any other POOL hypothesis within 2 m eye of a V_p pose and > 3 deg in yaw OR pitch from every V_p pose at
+             that eye (H1 construction rule, applied to all scored pool candidates; sub-counts: hard = common >= 100 or
+             native fused >= 100; S5-sourced).
+    NB-dec   RING / YAW hypotheses in P_ref photos, > 3 deg (yaw or pitch) from every V_p pose at the stated eye.
+- NEGATIVE, wrong-eye:
+    NE-inh   H1 inherited-wrong candidates not in NB-inh (eye not within 2 m of any verified-correct pose; expected
+             wc_0001, 0069, 0070, 0074, 0086) - wrong eye presumed, not constructed.
+    NE-dec   DISPLACED hypotheses at >= 150 m in P_ref photos (wrong by construction; argument below).
+- AMBIGUOUS: DISPLACED at 50 m in P_ref (near-miss; not counted as gross or correct).
+- UNLABELLED (excluded from every metric; distributions reported, clearly marked): H1 blind-to-verify candidates, all
+  other pool candidates not labelled above (moved-eye, near-correct 0.5-3 deg variants, photos without truth),
+  RING/YAW within 3 deg of V_p, all hypotheses of P_lab photos except NE-inh/NB-inh, DISPLACED in P_lab.
+- Why >= 150 m is wrong by construction: angular parallax between features at d1 < d2 from an eye error b is
+  b (1/d1 - 1/d2). A rotation re-solve absorbs the common shift, not the differential. 150 m: 5 km vs 30 km -> 1.43 deg,
+  20 km vs 60 km -> 0.29 deg; at the dev pixel scales (hfov 12-113 deg on 1024 px, i.e. 9-85 px/deg) this is >= ~10 px
+  of structured misfit in every photo that has two depth layers within 60 km - a visible near-miss, which the product's
+  verification protocol calls wrong. 50 m gives a third of it (a few px on wide frames): ambiguous. As a diagnostic
+  (not a label), each displaced hypothesis in P_ref gets the truth-geometry misfit: the correct ref's cached xyz
+  (C0 cache refs/<label>/xyz.npz, terrain samples) projected from the displaced eye with the hypothesis rotation vs
+  their pixel centres (median / p90 px, native).
+
+STATISTIC  T(h)  (held-out cue agreement; all constants fixed a priori, none fitted to labels)
+- Split 1 (depth): A = matches with |X - eye| >= 5 km, plus the skyline cue; B = matches < 5 km. If |A| < 12 or
+  |B| < 12 matches, split at the median match depth instead (skyline stays with the far half; flagged "median").
+- Split 2 (image halves): L = matches with u < W/2 plus skyline columns with u < W/2; R = the rest.
+- Directed test F -> G (4 tests: A->B, B->A, L->R, R->L): rotation-only refit (yaw, pitch, roll; focal fixed at h's vfov)
+  on F starting at h's pose: fusion.py's schedule (match gates 30/15/8/8 px, skyline association windows 24/12/6/6 edge
+  rows, Huber 1.345 IRLS, per-term MAD sigma floored at 1 px, scipy LM). Fit fails if the last iteration has < 6 gated
+  matches and < 10 skyline columns -> s = 0.
+  sigma_F = final MAD sigma of F's gated match residuals (per coordinate; skyline sigma if F has no gated matches),
+  floor 1 px. tau = 3 sigma_F. For G's matches: e_i = |residual| under the F-fit pose; n = |G|, k = #{e_i <= tau},
+  p0 = min(1, pi tau^2 / (W H)) (uniform-background chance of a hit).
+  s(F->G) = -log10 P[Binom(n, p0) >= k]  (0 if k = 0 or n = 0).
+- T(h) = min of the 4 directed s (every held-out direction must agree). Hypotheses with < 6 matches: T = 0.
+- Diagnostic only (pre-registered, not a decision): T_fit = same binomial score of ALL matches under a fit on all
+  matches + skyline (no held-out) -> shows what the held-out split adds.
+
+NULL, NFA, DECISION
+- Alternatives of h, N(h) (label-free, relative to h): every other hypothesis of the same photo whose eye is >= 100 m
+  from h's eye, OR within 2 m of h's eye and > 3 deg (yaw or pitch) from h. Hypotheses 2-100 m from h's eye and
+  same-eye ones within 3 deg are excluded from N(h). No label is used to build any null.
+- z = log10(1 + T). P_null(h) = 1 - Phi((z_h - mu) / sd), mu / sd = mean / sample sd of z over N(h) (sd floored at
+  0.05). If |N(h)| < 10: no decision (reject), flagged. Also reported: the empirical P = (1 + #{z >= z_h}) / (1 + |N(h)|).
+- N_tests(p) = number of hypotheses of photo p after dedupe (all kinds). NFA(h) = N_tests(p) x P_null(h).
+- PRIMARY accept: log10 NFA < 0 (a-contrario default, eps = 1).
+  ALTERNATIVE (pre-registered, the only one): log10 NFA < -2 (eps = 0.01; <= ~0.35 expected false accepts over the
+  35 photos if the Gaussian tail were exact).
+- Leave-one-photo-out: nothing is fitted across photos (the null is per photo, label-free; all constants fixed above),
+  so every decision is already out-of-photo. Stated, not simulated.
+
+CURRENT RULE (comparison, as recorded)
+- CUR (primary; the v0.3.4-era T6 production gate): rule.py (frozen T6, sha1 checked and reported) select + confidence
+  on the T6 ALIKED stated-eye record tools/matcher/v2/out/dev/raw/<pid>.json["stated"]; a hypothesis is accepted by CUR
+  iff it is within 0.5 deg yaw & pitch and 2 m eye of that record's HIGH pose. Moved-eye results are never auto-accepted
+  (v2 suggest-only product rule).
+- CUR-all (secondary; the gate stack applied everywhere): rule.py HIGH of every full-T6 record: v2dev stated + v2dev
+  eye:* (ALIKED), dev_loma stated / H1 S1 rerun (LoMa), H1 S5 masked, H1 S3a eye records; plus, for DISPLACED
+  hypotheses, candidate-level rule.high(c) on their own stage-2 result (no ambiguity clause: an upper bound on what
+  the rule would accept).
+
+METRICS (reported for PRIMARY, ALTERNATIVE, CUR, CUR-all; and the T_fit diagnostic under the same NFA machinery)
+- Per kind: accepted / n for POSITIVE, NB-inh, NB-con (hard / easy / S5), NB-dec, NE-inh, NE-dec, AMBIGUOUS; unlabelled
+  accept counts and T distributions, marked unlabelled.
+- Photo level: recall = # P_ref+P_lab photos with >= 1 POSITIVE accepted; gross = # labelled negatives accepted
+  (any kind) and # photos with one.
+- "Recall at 0 gross": a method is at 0 gross iff it accepts no labelled negative of any kind. Bootstrap by photo
+  (2000 resamples, seed 20260929) 95% CIs for recall and gross; exact binomial upper bound for the per-kind miss rate.
+- KILL (per plan), evaluated for PRIMARY and, separately, ALTERNATIVE:
+    (i) any NE-dec (displaced >= 150 m, P_ref) accepted, or any NE-inh accepted  -> kill ("wrong-eye decoy accepted");
+   (ii) not at 0 gross, or photo recall < CUR's photo recall on the same photos  -> kill.
+  E1 passes iff PRIMARY survives both. If only ALTERNATIVE survives: reported as "passes at the pre-registered
+  alternative eps only". Anything decided after seeing statistics is labelled POST HOC in REPORT.txt.
+
+HONESTY
+- n is tiny (30 P_ref photos, <= 8 inherited wrongs from 8 photos); bootstrap CIs by photo; single cases are anecdotes.
+- The Gaussian tail on log10(1+T) is an assumption with ~30-70 null samples per photo; the empirical P is shown next
+  to it.
+
+AMENDMENTS (timestamped, before scoring)

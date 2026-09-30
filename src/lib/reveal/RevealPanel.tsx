@@ -43,6 +43,8 @@ export function RevealPanel({
 	return (
 		<Section
 			title="Reveal"
+			collapse={{ id: "reveal", defaultOpen: false }}
+			summary={preset.label}
 			aside={
 				<Button
 					onClick={() => {

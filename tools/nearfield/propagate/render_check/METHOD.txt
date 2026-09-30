@@ -1,0 +1,77 @@
+PROPAGATION DEM-RENDER CHECK: GT ERROR vs PARALLAX                              written 2026-09-29
+FROZEN BEFORE ANY RESULT OF THIS CHECK WAS COMPUTED OR LOOKED AT. sha1 of this file -> METHOD.sha1.
+Anything decided after the first run is labelled POST HOC in the report.
+
+Question (tools/nearfield/propagate/REPORT.txt): on the 6 real overlapping ordered pairs among
+IMG_7059 / IMG_7063 / IMG_7068 the rot estimator's propagated pose is ~1.5-3.7 deg (geodesic) from GT, while
+its relative rotations are self-consistent (cycle 0.6-1.0 deg). Is that (a) GT error ('approx' GT poses at the
+GPS eyes are off), or (b) parallax (the pure-rotation model is wrong because cameras are 7-76 m apart and
+matched structure is near), or (c) some other matcher-side bias (lens model of the 13 mm ultrawide, etc.)?
+
+Inputs (all dev; no data_v3, no test split)
+  poses     data/ground-truth.json (GT: yaw/pitch/roll/f, eye = GT 'eye' altitude at GT lat/lon)
+  rot       tools/nearfield/propagate/raw.json 'real' rows: rot relR (A-cam -> B-cam), and the propagated pose
+            as REPORT.txt defines it (R_B = relR . R_GT_A, EXIF vfov of B).
+  photos    public/photos/IMG_70xx.jpg
+  DEM       Mapterhorn via tools/matcher/dem.py (the matcher's CPU horizon renderer; app ENU frame, curvature +
+            refraction k = 0.13). CPU only; no browser/GPU render is needed, so no render lock.
+
+Step 1. Photo skyline (render_check/skyline.ts, node, CPU/WASM)
+  The app's sky model exactly as scripts/sky-eval.ts runs it: U2-Net-P (public/models/skyseg-u2netp.873ea284.onnx),
+  model long side 384 (wasm), refineToWorking(refine=true), skylineFromSky on the photo at long side 1024.
+  Output per column: row (sub-px, NaN = none) and weight. A column is photo-valid if row is finite and weight > 0.05.
+
+Step 2. DEM skyline for a pose (render_check/check.py)
+  Dem.horizon at the target's GT eye, azimuth step 0.02 deg over 360 deg. Each horizon direction is projected with
+  the pose (common.pose_to_R) and a pinhole K at the working size (fx = fy = f_GT * W/W0 unless stated; principal
+  point = centre; pixel centres at +0.5). Per column the DEM skyline row = min projected row of the horizon samples
+  falling in that column; its distance = that sample's distance.
+
+Step 3. Column set C_B (fixed per target, identical for every pose compared on that target)
+  Photo-valid columns where, under ALL of {GT_B, prop(A1->B), prop(A2->B)} (GT focal), the DEM skyline is in frame
+  (2 <= row <= H-2) and its distance >= 1000 m (excludes the near slope/rocks, where eye position dominates).
+  People/hair/fence occluding the skyline are NOT masked by hand; the loss is truncated instead.
+
+Step 4. Residual of a pose
+  delta_c = photo row - DEM row (px at 1024 long side). Primary r = truncated mean of min(|delta_c|, 12 px) over C_B.
+  Also reported: median |delta|, signed median (bias), converted to deg by the working focal.
+
+Step 5. DEM-skyline fit F_B (orientation only, focal fixed at GT, eye = GT eye)
+  Minimise r over (yaw, pitch, roll) with Nelder-Mead (xatol 0.005 deg) from 3 starts: GT_B and the two propagated
+  poses (GT focal); keep the lowest r. Precision: moving-block bootstrap over C_B (block 32 columns, 200 reps,
+  seed 0), refit from F_B; report SD of yaw/pitch/roll and the SD of the geodesic.
+  Eye sensitivity: refit F_B with eye z = GT demGround + 1.7 m (the GPS altitudes are 39-69 m above the DEM ground).
+
+Step 6. Parallax simulation (render_check/check.py)
+  Re-run the frozen rot estimator (run_propagate.lg_match + rot_ransac, same K as REPORT: A = GT focal, B = EXIF vfov)
+  for each ordered pair to recover the inlier keypoints (must reproduce the cached inlier count within +/-2; else stop
+  and report). For each A inlier: ray from A's GT eye through the pixel at GT pose A, first DEM intersection
+  (march 2 m..40 km) -> world point X and distance; inliers with no hit are listed and dropped. True bearing of X
+  from B's GT eye (GPS lat/lon + GT eye z) in B's GT camera frame. R_par = Kabsch(A bearings -> true B bearings).
+    bias_par(A->B)  = geodesic(R_par, relR_GT)   (rotation error that DEM-scale parallax alone would cause)
+    d_rot_par(A->B) = geodesic(relR_rot, R_par)  (rot error left after parallax is accounted for)
+  Also per inlier: the parallax angle between X's bearings from eye A and eye B; report the distance distribution
+  (share < 500 m, < 2 km) and median parallax. Baselines are from GPS lat/lon (hAccuracy 7-37 m; stated).
+  Caveat fixed now: the DEM has no people, fences, rocks or trees, so parallax of such objects is not simulated.
+
+Primary statistics over the 6 ordered pairs (medians)
+  d_GT  = geodesic(relR_rot, relR_GT)          (known: REPORT median 2.2)
+  d_F   = geodesic(relR_rot, R_F_B R_F_A^T)    (does rot agree with the DEM-skyline-fitted relative rotation?)
+  d_GF  = geodesic(relR_GT,  R_F_B R_F_A^T)
+  bias_par, d_rot_par as above.
+
+Decision rule (applied mechanically; first matching line wins)
+  0. INCONCLUSIVE if any F_B has bootstrap geodesic SD > 0.5 deg, or |C_B| < 100 columns for any target.
+  1. MIXED if both 2 and 3 hold.
+  2. GT ERROR    if med d_F <= 0.5 * med d_GT, AND med bias_par <= 0.5 * med d_GT,
+                 AND r(F_B) < r(GT_B) for every B.
+  3. PARALLAX    if med bias_par >= 0.5 * med d_GT AND med d_rot_par <= 0.5 * med d_GT.
+  4. OTHER MATCHER BIAS (neither GT nor DEM-scale parallax) if med d_F >= 0.8 * med d_GT and med bias_par < 0.5 * med d_GT.
+  5. INCONCLUSIVE otherwise.
+  The eye-sensitivity refit is reported; if it would flip the class, say so and append "(eye-sensitive)".
+
+Secondary (descriptive, no decision): per target, r and median |delta| at GT_B, at each propagated pose with EXIF vfov
+(what the app would show) and with GT focal (orientation only). Expected under GT ERROR: the photo whose GT is off
+is fitted better by poses propagated INTO it than by its own GT. Expected under PARALLAX: GT beats all 6.
+
+Implications for PREREG_DRAFT.txt are written only as notes in REPORT.txt; the draft itself is not edited.

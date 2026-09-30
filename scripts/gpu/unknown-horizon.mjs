@@ -7,7 +7,7 @@
 // bench:    per ablation photo, the worker's scene (loadScene, Mapterhorn): DEM load, CPU sceneHorizon,
 //           GPU sceneHorizonGpu cold/warm, profile parity (per-azimuth elevation differences).
 // ablation: the real worker (UnknownPoseSolver, src/lib/integration/unknown-pose.ts) on each photo under
-//           five conditions, once with ?unknownGpu=0 (CPU horizon) and once with ?unknownGpu=1 (GPU).
+//           five conditions, once with ?unknownGpu=off (CPU horizon) and once with ?unknownGpu=on (GPU).
 //           Scored against the pin GT (11 photos) and data/ground-truth.json (12) as reports/bench-ablation.md:
 //           accepted at |Δyaw| < 1° = true accept, accepted at ≥ 1° = FALSE accept.
 //
@@ -92,7 +92,7 @@ try {
 		const rows = [];
 		for (const mode of ["cpu", "gpu"]) {
 			await page.goto(
-				`${BASE}/favicon.svg?unknownGpu=${mode === "gpu" ? 1 : 0}`,
+				`${BASE}/favicon.svg?unknownGpu=${mode === "gpu" ? "on" : "off"}`,
 			);
 			for (const e of manifest) {
 				const t0 = Date.now();

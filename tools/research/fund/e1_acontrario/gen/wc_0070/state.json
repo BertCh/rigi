@@ -1,0 +1,773 @@
+{
+ "pid": "wc_0070",
+ "vfov0": 41.491830811959375,
+ "focalKnown": true,
+ "aspect": 1.7777777777777777,
+ "narrow": false,
+ "ref": [],
+ "ring": [
+  {
+   "seedTag": "y000",
+   "seed": {
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 320.34564412306383,
+    "pitch": 0.22364467570551713,
+    "roll": -0.009944543655976044,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 100,
+   "viewLifted": 135,
+   "eyeZ": 2193.0,
+   "evidence": "common@solved",
+   "hid": "wc_0070_ringy000",
+   "corr": "gen/wc_0070/wc_0070_ringy000.npz",
+   "nCorr": 656,
+   "ms": 5367
+  },
+  {
+   "seedTag": "y015",
+   "seed": {
+    "yaw": 15.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 15.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 0,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy015",
+   "corr": "gen/wc_0070/wc_0070_ringy015.npz",
+   "nCorr": 0,
+   "ms": 1808
+  },
+  {
+   "seedTag": "y030",
+   "seed": {
+    "yaw": 30.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 30.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy030",
+   "corr": "gen/wc_0070/wc_0070_ringy030.npz",
+   "nCorr": 1,
+   "ms": 1768
+  },
+  {
+   "seedTag": "y045",
+   "seed": {
+    "yaw": 45.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 45.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 19,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy045",
+   "corr": "gen/wc_0070/wc_0070_ringy045.npz",
+   "nCorr": 19,
+   "ms": 1759
+  },
+  {
+   "seedTag": "y060",
+   "seed": {
+    "yaw": 60.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 60.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy060",
+   "corr": "gen/wc_0070/wc_0070_ringy060.npz",
+   "nCorr": 1,
+   "ms": 1791
+  },
+  {
+   "seedTag": "y075",
+   "seed": {
+    "yaw": 75.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 75.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 7,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy075",
+   "corr": "gen/wc_0070/wc_0070_ringy075.npz",
+   "nCorr": 7,
+   "ms": 1703
+  },
+  {
+   "seedTag": "y090",
+   "seed": {
+    "yaw": 90.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 90.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 0,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy090",
+   "corr": "gen/wc_0070/wc_0070_ringy090.npz",
+   "nCorr": 0,
+   "ms": 1722
+  },
+  {
+   "seedTag": "y105",
+   "seed": {
+    "yaw": 105.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 105.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy105",
+   "corr": "gen/wc_0070/wc_0070_ringy105.npz",
+   "nCorr": 1,
+   "ms": 1692
+  },
+  {
+   "seedTag": "y120",
+   "seed": {
+    "yaw": 120.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 120.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy120",
+   "corr": "gen/wc_0070/wc_0070_ringy120.npz",
+   "nCorr": 1,
+   "ms": 1781
+  },
+  {
+   "seedTag": "y135",
+   "seed": {
+    "yaw": 135.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 135.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 2,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy135",
+   "corr": "gen/wc_0070/wc_0070_ringy135.npz",
+   "nCorr": 2,
+   "ms": 1885
+  },
+  {
+   "seedTag": "y150",
+   "seed": {
+    "yaw": 150.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 150.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 5,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy150",
+   "corr": "gen/wc_0070/wc_0070_ringy150.npz",
+   "nCorr": 5,
+   "ms": 1858
+  },
+  {
+   "seedTag": "y165",
+   "seed": {
+    "yaw": 165.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 165.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 4,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy165",
+   "corr": "gen/wc_0070/wc_0070_ringy165.npz",
+   "nCorr": 4,
+   "ms": 1682
+  },
+  {
+   "seedTag": "y180",
+   "seed": {
+    "yaw": 180.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 180.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 9,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy180",
+   "corr": "gen/wc_0070/wc_0070_ringy180.npz",
+   "nCorr": 9,
+   "ms": 1695
+  },
+  {
+   "seedTag": "y195",
+   "seed": {
+    "yaw": 195.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 195.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 4,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy195",
+   "corr": "gen/wc_0070/wc_0070_ringy195.npz",
+   "nCorr": 4,
+   "ms": 1650
+  },
+  {
+   "seedTag": "y210",
+   "seed": {
+    "yaw": 210.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 210.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 6,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy210",
+   "corr": "gen/wc_0070/wc_0070_ringy210.npz",
+   "nCorr": 6,
+   "ms": 1659
+  },
+  {
+   "seedTag": "y225",
+   "seed": {
+    "yaw": 225.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 225.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 6,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy225",
+   "corr": "gen/wc_0070/wc_0070_ringy225.npz",
+   "nCorr": 6,
+   "ms": 1715
+  },
+  {
+   "seedTag": "y240",
+   "seed": {
+    "yaw": 240.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 240.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 8,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy240",
+   "corr": "gen/wc_0070/wc_0070_ringy240.npz",
+   "nCorr": 8,
+   "ms": 1503
+  },
+  {
+   "seedTag": "y255",
+   "seed": {
+    "yaw": 255.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 255.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 2,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy255",
+   "corr": "gen/wc_0070/wc_0070_ringy255.npz",
+   "nCorr": 2,
+   "ms": 1453
+  },
+  {
+   "seedTag": "y270",
+   "seed": {
+    "yaw": 270.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 270.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 12,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy270",
+   "corr": "gen/wc_0070/wc_0070_ringy270.npz",
+   "nCorr": 12,
+   "ms": 1478
+  },
+  {
+   "seedTag": "y285",
+   "seed": {
+    "yaw": 285.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 285.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy285",
+   "corr": "gen/wc_0070/wc_0070_ringy285.npz",
+   "nCorr": 1,
+   "ms": 1459
+  },
+  {
+   "seedTag": "y300",
+   "seed": {
+    "yaw": 300.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 319.41982752340147,
+    "pitch": -2.0969876821326827,
+    "roll": -4.621738854030376,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 27,
+   "viewLifted": 70,
+   "eyeZ": 2193.0,
+   "evidence": "view",
+   "hid": "wc_0070_ringy300",
+   "corr": "gen/wc_0070/wc_0070_ringy300.npz",
+   "nCorr": 70,
+   "ms": 1474
+  },
+  {
+   "seedTag": "y315",
+   "seed": {
+    "yaw": 315.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 320.0740784280316,
+    "pitch": 0.07255893062738665,
+    "roll": 0.6839547973869444,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 198,
+   "viewLifted": 419,
+   "eyeZ": 2193.0,
+   "evidence": "common@solved",
+   "hid": "wc_0070_ringy315",
+   "corr": "gen/wc_0070/wc_0070_ringy315.npz",
+   "nCorr": 641,
+   "ms": 3306
+  },
+  {
+   "seedTag": "y330",
+   "seed": {
+    "yaw": 330.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 320.34228972125095,
+    "pitch": -0.19599922000493555,
+    "roll": -0.8668635464380985,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 437,
+   "viewLifted": 597,
+   "eyeZ": 2193.0,
+   "evidence": "common@solved",
+   "hid": "wc_0070_ringy330",
+   "corr": "gen/wc_0070/wc_0070_ringy330.npz",
+   "nCorr": 632,
+   "ms": 3222
+  },
+  {
+   "seedTag": "y345",
+   "seed": {
+    "yaw": 345.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 23.140917140577795
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 320.3330459870693,
+    "pitch": -0.08486563308407687,
+    "roll": -0.7975975067611343,
+    "vfov": 41.491830811959375
+   },
+   "solveInliers": 355,
+   "viewLifted": 479,
+   "eyeZ": 2193.0,
+   "evidence": "common@solved",
+   "hid": "wc_0070_ringy345",
+   "corr": "gen/wc_0070/wc_0070_ringy345.npz",
+   "nCorr": 615,
+   "ms": 3676
+  }
+ ],
+ "dispPrior": {
+  "from": "T6 ALIKED stated rule.select",
+  "pose": {
+   "yaw": 320.4788211894927,
+   "pitch": -0.9325868289654695,
+   "roll": -3.503617342264798,
+   "vfov": 41.491830811959375
+  }
+ },
+ "disp": [
+  {
+   "tag": "d150b159",
+   "dist": 150,
+   "bearing": 159.06887223498904,
+   "e": 53.58682246684822,
+   "n": -140.10157906999655,
+   "lat": 46.95901803796953,
+   "lon": 9.121539100387789,
+   "ground": 2154.810897058378,
+   "alt": 2156.51,
+   "kind": "DISP",
+   "fused": {
+    "pose": {
+     "yaw": 321.54186114355105,
+     "pitch": 1.7653599886264166,
+     "roll": 1.3074856180177288,
+     "vfov": 41.14996642399471
+    },
+    "level": "low",
+    "method": "fused",
+    "checks": {
+     "cueAgreeDeg": 9.261,
+     "skylineMedPx": 8.425,
+     "matchSupport": 0.114
+    },
+    "fusionScore": 0.0,
+    "inliers": 236,
+    "inlierFrac": 0.1142,
+    "nLifted": 2066,
+    "cues": {
+     "skyline": {
+      "pose": {
+       "yaw": 328.19132118949256,
+       "pitch": -1.1700868289654696,
+       "roll": -4.328617342264797,
+       "vfov": 40.66199419572018
+      },
+      "residualPx": 4.131,
+      "appConfidence": 0.374,
+      "accepted": "confident"
+     },
+     "match": {
+      "pose": {
+       "yaw": 321.5318546898563,
+       "pitch": 1.8126427642333858,
+       "roll": 1.3411430195232985,
+       "vfov": 41.11302341300993
+      },
+      "inliers": 226,
+      "residualPx": 3.777
+     }
+    },
+    "eye": [
+     0.0,
+     0.0,
+     2156.51
+    ]
+   },
+   "eyeZ": 2156.51,
+   "dirs": "gen/wc_0070/dirs_wc_0070_dispd150b159.npy",
+   "pose": {
+    "yaw": 321.54186114355105,
+    "pitch": 1.7653599886264166,
+    "roll": 1.3074856180177288,
+    "vfov": 41.491830811959375
+   },
+   "hid": "wc_0070_dispd150b159",
+   "corr": "gen/wc_0070/wc_0070_dispd150b159.npz",
+   "nCorr": 431,
+   "ms": 26681
+  },
+  {
+   "tag": "d400b159",
+   "dist": 400,
+   "bearing": 159.06887223498904,
+   "e": 142.8981932449286,
+   "n": -373.6042108533241,
+   "lat": 46.956918101252064,
+   "lon": 9.122715934367442,
+   "ground": 2122.5394533828044,
+   "alt": 2124.24,
+   "kind": "DISP",
+   "fused": {
+    "pose": {
+     "yaw": 323.1310611539773,
+     "pitch": 4.806949976105178,
+     "roll": -3.481584760857643,
+     "vfov": 42.414460296073585
+    },
+    "level": "low",
+    "method": "fused",
+    "checks": {
+     "cueAgreeDeg": 15.088,
+     "skylineMedPx": 10.091,
+     "matchSupport": 0.429
+    },
+    "fusionScore": 0.0,
+    "inliers": 21,
+    "inlierFrac": 0.4286,
+    "nLifted": 49,
+    "cues": {
+     "skyline": {
+      "pose": {
+       "yaw": 336.9038211894927,
+       "pitch": -0.33258682896546954,
+       "roll": -4.103617342264798,
+       "vfov": 41.90674912007897
+      },
+      "residualPx": 2.202,
+      "appConfidence": 0.329,
+      "accepted": "confident"
+     },
+     "match": {
+      "pose": {
+       "yaw": 322.7243289003088,
+       "pitch": 2.945521103948072,
+       "roll": -0.4188547548451311,
+       "vfov": 41.782784272224696
+      },
+      "inliers": 22,
+      "residualPx": 3.325
+     }
+    },
+    "eye": [
+     0.0,
+     0.0,
+     2124.24
+    ]
+   },
+   "eyeZ": 2124.24,
+   "dirs": "gen/wc_0070/dirs_wc_0070_dispd400b159.npy",
+   "pose": {
+    "yaw": 323.1310611539773,
+    "pitch": 4.806949976105178,
+    "roll": -3.481584760857643,
+    "vfov": 41.491830811959375
+   },
+   "hid": "wc_0070_dispd400b159",
+   "corr": "gen/wc_0070/wc_0070_dispd400b159.npz",
+   "nCorr": 10,
+   "ms": 21866
+  }
+ ],
+ "edges": {
+  "46.9602780,9.1221507,2211.18": {
+   "dirs": "gen/wc_0070/dirs_edges_000.npy",
+   "eye": [
+    0.0,
+    0.0,
+    2211.18
+   ]
+  },
+  "46.9602780,9.1224801,2219.12": {
+   "dirs": "gen/wc_0070/dirs_edges_001.npy",
+   "eye": [
+    0.0,
+    0.0,
+    2219.12
+   ]
+  },
+  "46.9607277,9.1257743,2214.36": {
+   "dirs": "gen/wc_0070/dirs_edges_002.npy",
+   "eye": [
+    0.0,
+    0.0,
+    2214.36
+   ]
+  },
+  "46.9623015,9.1178682,2260.29": {
+   "dirs": "gen/wc_0070/dirs_edges_003.npy",
+   "eye": [
+    0.0,
+    0.0,
+    2260.29
+   ]
+  }
+ }
+}

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import math
+import os
 import urllib.request
 from pathlib import Path
 
@@ -69,7 +70,8 @@ def _tile(z, x, y):
     p = TILES / f"{z}_{x}_{y}.npy"
     if p.exists():
         return np.load(p)
-    req = urllib.request.Request(f"https://tiles.mapterhorn.com/{z}/{x}/{y}.webp", headers={"User-Agent": "Mozilla/5.0"})
+    url = (os.environ.get("MAPTERHORN_URL") or "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp").format(z=z, x=x, y=y)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     b = urllib.request.urlopen(req, timeout=30).read()
     im = np.asarray(Image.open(io.BytesIO(b)).convert("RGB"), np.float64)
     h = (im[..., 0] * 256 + im[..., 1] + im[..., 2] / 256 - 32768).astype(np.float32)

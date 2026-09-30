@@ -24,7 +24,7 @@
  * what computeHorizonFast does for them.
  *
  * App wiring: the horizon-fast-app worker marches on the GPU only when opted in (?gpuHorizon=1 or
- * localStorage rigi.gpuHorizon=1; see opt-in.ts), because autoAlign reacts to last-bit changes in the
+ * ?gpuHorizon=on; see opt-in.ts), because autoAlign reacts to last-bit changes in the
  * skyline (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll). Default app output stays on the CPU march.
  */
 import { Buffer, type ComputePipeline, type Device } from "@luma.gl/core";

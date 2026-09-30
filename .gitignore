@@ -87,3 +87,6 @@ tools/nearfield/shots/
 tools/nearfield/**/*.ply
 # keep the small (16 KB) blind-verifier outputs that verify/score.py reads (raw/ is ignored globally)
 !tools/nearfield/propagate/verify/raw/
+
+# vendored python site-packages for research scripts
+.pylib/

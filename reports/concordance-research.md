@@ -678,3 +678,32 @@ Renders run under the render lock. Stop when the median change is < 0.5 px or af
 - LUT nets: github.com/WontaeaeKim/LUTwithBGrid; huggingface.co/razordvrz/LUTwithBGrid-ONNX; github.com/HuiZeng/Image-Adaptive-3DLUT
 - OpSeg: github.com/deyang2000/OpSeg; arxiv.org/pdf/2305.11513; github.com/bcmi/Awesome-Image-Harmonization
 - SunCalc: github.com/mourner/suncalc
+---
+
+## 7. Results of the build (2026-09-29, same day)
+
+Seven packages were built in parallel by workflow agents. An integration agent then added the flagged hooks, and an adversarial reviewer fixed one bug and scored the holdout photos once. Per-package detail is in `tools/concord/<pkg>/RESULT.txt`; the review and holdout table are in `tools/concord/review/RESULT.txt`.
+
+| WP | Built | Verdict |
+|---|---|---|
+| A: harness | `src/lib/concord/core`, `scripts/concord/eval.ts`, split frozen 10 dev / 4 holdout (6019, 6958, 7086, 7130), 96 candidate landmarks | Infrastructure. The audit pin table reproduces bit-exactly. (The "≈ 4.9 px < 6.5 km" in §1 was mislabelled; the right figure is 3.74 px.) |
+| B: priors | Focal table, eye prior | **Focal table positive**: holdout 1.99% → 0.32% (n = 2). **Altitude eye rule negative**: holdout median 12.0 → 13.4 px |
+| C: cues | Contours, edge distance transform, waterlines | 74% sign agreement (bar 75%). At the GT pose, photo ridges sit 1.5–2.7 px beyond DEM silhouettes, consistent with canopy and DEM smoothing |
+| D: joint solve | LM over rotation, focal and eye, with a gate | **Negative, unsafe as gated.** Holdout median 8.8 → 16.2 px. The gate's cue checks reuse the cues the solve fitted. Not wired into the app |
+| E: warp | GP/TPS field, GLSL hook in both renderers | No gain (holdout 0 better / 8 worse). Wired behind `?concord=warp` but parked |
+| F: DSM occluder | Own COG reader for swissSURFACE3D/swissALTI3D, occluder mask | **Positive (dev):** smear removal 46–59% vs 4–15%. Wired behind `?concord=occl` |
+| G: re-match | Service on `:8768` | Adds inliers (e.g. 78 → 215 in the lower half of 7086) but fails its acceptance as written |
+
+**Review fix:** waterline pins had ray-marched into the flat lake surface instead of reaching the far shore, which made them score about 0 px at GT by construction. This is fixed in `scripts/concord/lib.ts`. A side finding: 6958's GT eye sits below the lake surface.
+
+**What this teaches:**
+1. The interior error is real (§1), but the existing pins are mostly peaks at the GT pose, which was fitted to them. Nothing can be proven or tuned without the blind interior pins.
+2. A joint eye solve has enough freedom to trade eye position against rotation and still improve the skyline. Any gate has to score on held-out geometry that the fit never saw.
+3. The wins that need no pins are the metadata and near-field data: the focal table and the swissSURFACE3D occluder.
+
+**Next:**
+1. The user clicks the interior pins.
+2. Re-score C/D/E on those pins.
+3. Redesign D's gate so it only accepts on held-out pins or independent matcher points.
+4. Move the focal table into the app's prior (`photos.json` path).
+5. Add the occluder to the drape and labels (`materials.ts`, owned by another session).

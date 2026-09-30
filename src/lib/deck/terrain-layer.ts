@@ -963,7 +963,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 		mode?: TerrainMode;
 	};
 
-	/** Re-render the sublayers when the terrain path flips (harnesses flip __RIGI_TERRAIN__ live). */
+	/** Re-render the sublayers when the terrain path flips (harnesses flip __RIGI_FLAGS__.terrain live). */
 	shouldUpdateState(params: UpdateParameters<this>) {
 		return super.shouldUpdateState(params) || this.state.mode !== terrainMode();
 	}

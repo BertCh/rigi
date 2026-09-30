@@ -1,0 +1,879 @@
+{
+ "pid": "wc_0046",
+ "vfov0": 34.53005830924895,
+ "focalKnown": false,
+ "aspect": 1.5003663003663004,
+ "narrow": false,
+ "ref": [],
+ "ring": [
+  {
+   "seedTag": "y000",
+   "seed": {
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 0.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 2,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy000",
+   "corr": "gen/wc_0046/wc_0046_ringy000.npz",
+   "nCorr": 2,
+   "ms": 3452
+  },
+  {
+   "seedTag": "y015",
+   "seed": {
+    "yaw": 15.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 15.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 3,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy015",
+   "corr": "gen/wc_0046/wc_0046_ringy015.npz",
+   "nCorr": 3,
+   "ms": 1875
+  },
+  {
+   "seedTag": "y030",
+   "seed": {
+    "yaw": 30.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 30.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 0,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy030",
+   "corr": "gen/wc_0046/wc_0046_ringy030.npz",
+   "nCorr": 0,
+   "ms": 1897
+  },
+  {
+   "seedTag": "y045",
+   "seed": {
+    "yaw": 45.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 45.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 0,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy045",
+   "corr": "gen/wc_0046/wc_0046_ringy045.npz",
+   "nCorr": 0,
+   "ms": 1918
+  },
+  {
+   "seedTag": "y060",
+   "seed": {
+    "yaw": 60.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 60.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 0,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy060",
+   "corr": "gen/wc_0046/wc_0046_ringy060.npz",
+   "nCorr": 0,
+   "ms": 1887
+  },
+  {
+   "seedTag": "y075",
+   "seed": {
+    "yaw": 75.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 75.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy075",
+   "corr": "gen/wc_0046/wc_0046_ringy075.npz",
+   "nCorr": 1,
+   "ms": 1881
+  },
+  {
+   "seedTag": "y090",
+   "seed": {
+    "yaw": 90.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 90.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 2,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy090",
+   "corr": "gen/wc_0046/wc_0046_ringy090.npz",
+   "nCorr": 2,
+   "ms": 1871
+  },
+  {
+   "seedTag": "y105",
+   "seed": {
+    "yaw": 105.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 105.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy105",
+   "corr": "gen/wc_0046/wc_0046_ringy105.npz",
+   "nCorr": 1,
+   "ms": 1908
+  },
+  {
+   "seedTag": "y120",
+   "seed": {
+    "yaw": 120.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 120.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 0,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy120",
+   "corr": "gen/wc_0046/wc_0046_ringy120.npz",
+   "nCorr": 0,
+   "ms": 1861
+  },
+  {
+   "seedTag": "y135",
+   "seed": {
+    "yaw": 135.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 135.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 10,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy135",
+   "corr": "gen/wc_0046/wc_0046_ringy135.npz",
+   "nCorr": 10,
+   "ms": 1922
+  },
+  {
+   "seedTag": "y150",
+   "seed": {
+    "yaw": 150.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 177.97938403180146,
+    "pitch": -3.083516263947999,
+    "roll": 2.1411154192523125,
+    "vfov": 33.633618344575424
+   },
+   "solveInliers": 80,
+   "viewLifted": 95,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "common@solved",
+   "hid": "wc_0046_ringy150",
+   "corr": "gen/wc_0046/wc_0046_ringy150.npz",
+   "nCorr": 317,
+   "ms": 4060
+  },
+  {
+   "seedTag": "y165",
+   "seed": {
+    "yaw": 165.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 177.6001694921367,
+    "pitch": -2.7360664444514238,
+    "roll": 1.4273803337699618,
+    "vfov": 32.51339947876932
+   },
+   "solveInliers": 204,
+   "viewLifted": 232,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "common@solved",
+   "hid": "wc_0046_ringy165",
+   "corr": "gen/wc_0046/wc_0046_ringy165.npz",
+   "nCorr": 355,
+   "ms": 4143
+  },
+  {
+   "seedTag": "y180",
+   "seed": {
+    "yaw": 180.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 177.6125276073908,
+    "pitch": -2.7535769816811366,
+    "roll": 1.461374096641608,
+    "vfov": 32.53280137078964
+   },
+   "solveInliers": 246,
+   "viewLifted": 297,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "common@solved",
+   "hid": "wc_0046_ringy180",
+   "corr": "gen/wc_0046/wc_0046_ringy180.npz",
+   "nCorr": 342,
+   "ms": 4203
+  },
+  {
+   "seedTag": "y195",
+   "seed": {
+    "yaw": 195.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 177.6317179052608,
+    "pitch": -2.6984003073658163,
+    "roll": 1.45041798108862,
+    "vfov": 32.31465473377447
+   },
+   "solveInliers": 129,
+   "viewLifted": 166,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "common@solved",
+   "hid": "wc_0046_ringy195",
+   "corr": "gen/wc_0046/wc_0046_ringy195.npz",
+   "nCorr": 355,
+   "ms": 4088
+  },
+  {
+   "seedTag": "y210",
+   "seed": {
+    "yaw": 210.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 210.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 4,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy210",
+   "corr": "gen/wc_0046/wc_0046_ringy210.npz",
+   "nCorr": 4,
+   "ms": 1934
+  },
+  {
+   "seedTag": "y225",
+   "seed": {
+    "yaw": 225.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 225.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 2,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy225",
+   "corr": "gen/wc_0046/wc_0046_ringy225.npz",
+   "nCorr": 2,
+   "ms": 1917
+  },
+  {
+   "seedTag": "y240",
+   "seed": {
+    "yaw": 240.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 240.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 4,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy240",
+   "corr": "gen/wc_0046/wc_0046_ringy240.npz",
+   "nCorr": 4,
+   "ms": 1915
+  },
+  {
+   "seedTag": "y255",
+   "seed": {
+    "yaw": 255.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 255.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy255",
+   "corr": "gen/wc_0046/wc_0046_ringy255.npz",
+   "nCorr": 1,
+   "ms": 1878
+  },
+  {
+   "seedTag": "y270",
+   "seed": {
+    "yaw": 270.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 270.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy270",
+   "corr": "gen/wc_0046/wc_0046_ringy270.npz",
+   "nCorr": 1,
+   "ms": 1843
+  },
+  {
+   "seedTag": "y285",
+   "seed": {
+    "yaw": 285.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 285.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 0,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy285",
+   "corr": "gen/wc_0046/wc_0046_ringy285.npz",
+   "nCorr": 0,
+   "ms": 1787
+  },
+  {
+   "seedTag": "y300",
+   "seed": {
+    "yaw": 300.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 300.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 0,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy300",
+   "corr": "gen/wc_0046/wc_0046_ringy300.npz",
+   "nCorr": 0,
+   "ms": 1470
+  },
+  {
+   "seedTag": "y315",
+   "seed": {
+    "yaw": 315.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 315.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy315",
+   "corr": "gen/wc_0046/wc_0046_ringy315.npz",
+   "nCorr": 1,
+   "ms": 1495
+  },
+  {
+   "seedTag": "y330",
+   "seed": {
+    "yaw": 330.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 330.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy330",
+   "corr": "gen/wc_0046/wc_0046_ringy330.npz",
+   "nCorr": 1,
+   "ms": 1487
+  },
+  {
+   "seedTag": "y345",
+   "seed": {
+    "yaw": 345.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 27.27166754206444
+   },
+   "kind": "RING",
+   "pose": {
+    "yaw": 345.0,
+    "pitch": 0.0,
+    "roll": 0.0,
+    "vfov": 34.53005830924895
+   },
+   "solveInliers": 0,
+   "viewLifted": 1,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "view",
+   "hid": "wc_0046_ringy345",
+   "corr": "gen/wc_0046/wc_0046_ringy345.npz",
+   "nCorr": 1,
+   "ms": 1500
+  }
+ ],
+ "yaw": [
+  {
+   "seedTag": "o-12",
+   "seed": {
+    "yaw": 165.80893409551436,
+    "pitch": -2.8378208329763472,
+    "roll": 1.5036149526645772,
+    "vfov": 32.967717538552655
+   },
+   "kind": "YAW",
+   "pose": {
+    "yaw": 177.6192876800802,
+    "pitch": -2.7398709490954327,
+    "roll": 1.3783527858803453,
+    "vfov": 32.53895148698509
+   },
+   "solveInliers": 208,
+   "viewLifted": 240,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "common@solved",
+   "hid": "wc_0046_yawo-12",
+   "corr": "gen/wc_0046/wc_0046_yawo-12.npz",
+   "nCorr": 338,
+   "ms": 3466
+  },
+  {
+   "seedTag": "o-6",
+   "seed": {
+    "yaw": 171.80893409551436,
+    "pitch": -2.8378208329763472,
+    "roll": 1.5036149526645772,
+    "vfov": 32.967717538552655
+   },
+   "kind": "YAW",
+   "pose": {
+    "yaw": 177.6171110560458,
+    "pitch": -2.6748638884143983,
+    "roll": 1.3087440546698537,
+    "vfov": 32.336169588352135
+   },
+   "solveInliers": 244,
+   "viewLifted": 300,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "common@solved",
+   "hid": "wc_0046_yawo-6",
+   "corr": "gen/wc_0046/wc_0046_yawo-6.npz",
+   "nCorr": 333,
+   "ms": 3397
+  },
+  {
+   "seedTag": "o+6",
+   "seed": {
+    "yaw": 183.80893409551436,
+    "pitch": -2.8378208329763472,
+    "roll": 1.5036149526645772,
+    "vfov": 32.967717538552655
+   },
+   "kind": "YAW",
+   "pose": {
+    "yaw": 177.60060666838822,
+    "pitch": -2.7053169280993083,
+    "roll": 1.3918845917938567,
+    "vfov": 32.40579439748884
+   },
+   "solveInliers": 230,
+   "viewLifted": 274,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "common@solved",
+   "hid": "wc_0046_yawo+6",
+   "corr": "gen/wc_0046/wc_0046_yawo+6.npz",
+   "nCorr": 326,
+   "ms": 3624
+  },
+  {
+   "seedTag": "o+12",
+   "seed": {
+    "yaw": 189.80893409551436,
+    "pitch": -2.8378208329763472,
+    "roll": 1.5036149526645772,
+    "vfov": 32.967717538552655
+   },
+   "kind": "YAW",
+   "pose": {
+    "yaw": 177.64506096211574,
+    "pitch": -2.712543572609359,
+    "roll": 1.111691459199448,
+    "vfov": 32.43787875559686
+   },
+   "solveInliers": 189,
+   "viewLifted": 252,
+   "eyeZ": 1454.5107396474937,
+   "evidence": "common@solved",
+   "hid": "wc_0046_yawo+12",
+   "corr": "gen/wc_0046/wc_0046_yawo+12.npz",
+   "nCorr": 337,
+   "ms": 3529
+  }
+ ],
+ "dispPrior": {
+  "from": "refs.correct_refs[0]",
+  "pose": {
+   "yaw": 177.80893409551436,
+   "pitch": -2.8378208329763472,
+   "roll": 1.5036149526645772,
+   "vfov": 32.967717538552655
+  }
+ },
+ "disp": [
+  {
+   "tag": "d150b177",
+   "dist": 150,
+   "bearing": 176.638207647045,
+   "e": 8.796102745188298,
+   "n": -149.74187315676298,
+   "lat": 47.038738340841675,
+   "lon": 8.478950077339855,
+   "ground": 1387.5227780385321,
+   "alt": 1389.22,
+   "kind": "DISP",
+   "fused": {
+    "pose": {
+     "yaw": 177.64047328025353,
+     "pitch": -2.5029813474908686,
+     "roll": 1.2675779734707997,
+     "vfov": 32.728585657260716
+    },
+    "level": "low",
+    "method": "fused",
+    "checks": {
+     "cueAgreeDeg": 5.878,
+     "skylineMedPx": 5.31,
+     "matchSupport": 0.711
+    },
+    "fusionScore": 0.001,
+    "inliers": 782,
+    "inlierFrac": 0.7109,
+    "nLifted": 1100,
+    "cues": {
+     "skyline": {
+      "pose": {
+       "yaw": 172.5839340955144,
+       "pitch": 0.5121791670236527,
+       "roll": 1.4036149526645774,
+       "vfov": 33.29739471393818
+      },
+      "residualPx": 5.051,
+      "appConfidence": 0.495,
+      "accepted": "confident"
+     },
+     "match": {
+      "pose": {
+       "yaw": 177.6306418229134,
+       "pitch": -2.504317127833858,
+       "roll": 1.3573990397326843,
+       "vfov": 32.74709627312367
+      },
+      "inliers": 762,
+      "residualPx": 3.562
+     }
+    },
+    "eye": [
+     0.0,
+     0.0,
+     1389.22
+    ]
+   },
+   "eyeZ": 1389.22,
+   "dirs": "gen/wc_0046/dirs_wc_0046_dispd150b177.npy",
+   "pose": {
+    "yaw": 177.64047328025353,
+    "pitch": -2.5029813474908686,
+    "roll": 1.2675779734707997,
+    "vfov": 32.728585657260716
+   },
+   "hid": "wc_0046_dispd150b177",
+   "corr": "gen/wc_0046/wc_0046_dispd150b177.npz",
+   "nCorr": 304,
+   "ms": 25483
+  },
+  {
+   "tag": "d400b177",
+   "dist": 400,
+   "bearing": 176.638207647045,
+   "e": 23.456273987168792,
+   "n": -399.3116617513679,
+   "lat": 47.03649390891114,
+   "lon": 8.479143539572945,
+   "ground": 1256.1298791315953,
+   "alt": 1257.83,
+   "kind": "DISP",
+   "fused": {
+    "pose": {
+     "yaw": 177.74201748141218,
+     "pitch": -2.038255805246432,
+     "roll": 0.8874940225381448,
+     "vfov": 33.14418880674194
+    },
+    "level": "low",
+    "method": "fused",
+    "checks": {
+     "cueAgreeDeg": 6.079,
+     "skylineMedPx": 7.136,
+     "matchSupport": 0.613
+    },
+    "fusionScore": 0.0,
+    "inliers": 483,
+    "inlierFrac": 0.6129,
+    "nLifted": 788,
+    "cues": {
+     "skyline": {
+      "pose": {
+       "yaw": 172.48393409551434,
+       "pitch": 0.9371791670236528,
+       "roll": 1.8036149526645773,
+       "vfov": 33.35920918432297
+      },
+      "residualPx": 5.641,
+      "appConfidence": 0.331,
+      "accepted": "confident"
+     },
+     "match": {
+      "pose": {
+       "yaw": 177.7301372599151,
+       "pitch": -2.0422407500366813,
+       "roll": 1.0030139296134226,
+       "vfov": 33.14210687475571
+      },
+      "inliers": 484,
+      "residualPx": 3.521
+     }
+    },
+    "eye": [
+     0.0,
+     0.0,
+     1257.83
+    ]
+   },
+   "eyeZ": 1257.83,
+   "dirs": "gen/wc_0046/dirs_wc_0046_dispd400b177.npy",
+   "pose": {
+    "yaw": 177.74201748141218,
+    "pitch": -2.038255805246432,
+    "roll": 0.8874940225381448,
+    "vfov": 33.14418880674194
+   },
+   "hid": "wc_0046_dispd400b177",
+   "corr": "gen/wc_0046/wc_0046_dispd400b177.npz",
+   "nCorr": 195,
+   "ms": 27060
+  }
+ ],
+ "edges": {
+  "47.0409843,8.4788340,1465.53": {
+   "dirs": "gen/wc_0046/dirs_edges_000.npy",
+   "eye": [
+    0.0,
+    0.0,
+    1465.53
+   ]
+  },
+  "47.0414340,8.4778443,1483.85": {
+   "dirs": "gen/wc_0046/dirs_edges_001.npy",
+   "eye": [
+    0.0,
+    0.0,
+    1483.85
+   ]
+  },
+  "47.0427830,8.4768545,1514.86": {
+   "dirs": "gen/wc_0046/dirs_edges_002.npy",
+   "eye": [
+    0.0,
+    0.0,
+    1514.86
+   ]
+  },
+  "47.0387360,8.4814733,1516.06": {
+   "dirs": "gen/wc_0046/dirs_edges_003.npy",
+   "eye": [
+    0.0,
+    0.0,
+    1516.06
+   ]
+  },
+  "47.0385112,8.4827929,1548.18": {
+   "dirs": "gen/wc_0046/dirs_edges_004.npy",
+   "eye": [
+    0.0,
+    0.0,
+    1548.18
+   ]
+  }
+ }
+}

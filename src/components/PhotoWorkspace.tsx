@@ -18,6 +18,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Pin } from "#/lib/align";
 import type { Pose } from "#/lib/camera";
+import { useConcordDisplay } from "#/lib/concord/app/useConcordDisplay";
 import {
 	defaultSettings,
 	type PeakLabel,
@@ -26,6 +27,7 @@ import {
 	type Settings,
 } from "#/lib/engine";
 import { ExportMenu } from "#/lib/export/ExportMenu";
+import { getFlag } from "#/lib/flags";
 import {
 	type EyeSearchResult,
 	persistPosition,
@@ -42,6 +44,7 @@ import {
 	type UnknownPoseOutcome,
 	UnknownPoseSolver,
 } from "#/lib/integration/unknown-pose";
+import { CreditLine } from "#/lib/licences/CreditLine";
 import {
 	type ClassicPlaced,
 	candidatesFrom,
@@ -62,16 +65,27 @@ import {
 	regionNames,
 	savePose,
 } from "#/lib/photos";
+import { PickerMount } from "#/lib/picker/PickerMount";
 import type { Renderer } from "#/lib/renderer";
 import { getRevealConfig, useRevealConfig } from "#/lib/reveal/config";
 import { RevealController, type RevealFrame } from "#/lib/reveal/controller";
 import { RevealPanel } from "#/lib/reveal/RevealPanel";
 import { PRESET_OVERLAY_LAYER, useViewStyle } from "#/lib/style";
 import { cn } from "#/lib/utils";
-import { Button, Section, Segmented, Slider, Toggle } from "./controls";
+import {
+	Button,
+	PanelBand,
+	Section,
+	Segmented,
+	Slider,
+	Toggle,
+} from "./controls";
 import { EyeSuggestion } from "./EyeSuggestion";
+import { CameraModeBar } from "./nearfield/CameraModeBar";
 import { StepInsidePanel } from "./nearfield/StepInsidePanel";
+import { Tiles3DCredit } from "./nearfield/Tiles3DCredit";
 import { useStepInside } from "./nearfield/useStepInside";
+import { AdvancedPanel } from "./panel/AdvancedPanel";
 import { LabelStylePanel, StylePanel, TrailStylePanel } from "./StylePanel";
 
 type Tool = "inspect" | "align" | "pin";
@@ -504,8 +518,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		};
 		// ?renderer=deck: the deck.gl backend (src/lib/deck/engine.ts) is loaded on demand so deck.gl stays
 		// out of the default /photo chunk; three.js stays the default and is constructed synchronously
-		const deck =
-			new URLSearchParams(window.location.search).get("renderer") === "deck";
+		const deck = getFlag("renderer") === "deck";
 		let stop: (() => void) | null = null;
 		let cancelled = false;
 		if (deck) {
@@ -592,6 +605,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		pose,
 		alignState,
 		verify,
+		worldMode: settings.mode === "world",
 	});
 
 	// ---------- pointer interaction ----------
@@ -808,6 +822,13 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 
 	// exports need the FINAL pose: status clears after autoAlign, but a pending second opinion may still move it
 	const exportLocked = !!status || !!error || verify === "pending";
+	// ?concord=warp,occl (src/lib/concord): display-only pass on the final, accepted pose; no-op without the flag
+	useConcordDisplay(engineRef, {
+		pose,
+		settled: !exportLocked,
+		verify,
+		alignState,
+	});
 
 	const hfov = pose
 		? (2 * Math.atan(Math.tan((pose.vfov * Math.PI) / 360) * aspect) * 180) /
@@ -1095,28 +1116,52 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 							)}
 						</div>
 					)}
-					{settings.mode === "world" && !si.stepping && (
-						<div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-							{flying ? (
-								<Button
-									variant="solid"
-									onClick={() => engineRef.current?.flyOut()}
-								>
-									<Plane className="size-3.5 rotate-180" /> Back out to map
-								</Button>
-							) : (
-								<Button
-									variant="accent"
-									onClick={() => engineRef.current?.flyToPhoto()}
-								>
-									<Plane className="size-3.5" /> Fly into the photo
-								</Button>
+					{/* ?picker=on (src/lib/picker): top-3 candidates + tap-a-peak; renders nothing without the flag */}
+					{isPhotoView && !si.stepping && (
+						<PickerMount
+							engineRef={engineRef}
+							photo={photo}
+							pose={pose}
+							alignState={alignState}
+							verify={verify}
+							ready={!exportLocked}
+							stage={stageSize}
+							unknownSolverRef={unknownSolver}
+							onPreview={(p) => setPose(p, false)}
+							onConfirm={(p, note) => {
+								setPose(p);
+								setAlignNote(note);
+							}}
+						/>
+					)}
+					{(settings.mode === "world" || si.stepping) && (
+						<div className="pointer-events-none absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2">
+							<CameraModeBar si={si} />
+							{settings.mode === "world" && !si.camView && (
+								<div className="pointer-events-auto flex gap-2">
+									{flying ? (
+										<Button
+											variant="solid"
+											onClick={() => engineRef.current?.flyOut()}
+										>
+											<Plane className="size-3.5 rotate-180" /> Back out to map
+										</Button>
+									) : (
+										<Button
+											variant="accent"
+											onClick={() => engineRef.current?.flyToPhoto()}
+										>
+											<Plane className="size-3.5" /> Fly into the photo
+										</Button>
+									)}
+								</div>
 							)}
 						</div>
 					)}
 				</div>
 
 				<StepInsidePanel si={si} />
+				<Tiles3DCredit engineRef={engineRef} stepping={si.stepping} />
 
 				{(verify === "verified" ||
 					verify === "refined" ||
@@ -1187,477 +1232,506 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			</div>
 
 			{/* panel */}
-			<aside className="max-h-[45dvh] w-full shrink-0 overflow-y-auto border-white/8 bg-[#10151c] md:max-h-none md:w-80 md:border-l">
-				<div className="px-4 pt-4 pb-3">
-					<Segmented
-						value={settings.mode}
-						onChange={(mode) => {
-							update({ mode });
-							if (mode === "world") {
-								setTool("inspect");
-								revealRef.current?.stop();
-							}
-						}}
-						options={[
-							{
-								value: "overlay",
-								label: (
-									<span className="flex items-center justify-center gap-1">
-										<Layers className="size-3.5" /> Overlay
-									</span>
-								),
-							},
-							{
-								value: "replace",
-								label: (
-									<span className="flex items-center justify-center gap-1">
-										<Sparkles className="size-3.5" /> Blend
-									</span>
-								),
-							},
-							{
-								value: "world",
-								label: (
-									<span className="flex items-center justify-center gap-1">
-										<MapIcon className="size-3.5" /> In map
-									</span>
-								),
-							},
-						]}
-					/>
-					<p className="mt-2 text-[11px] leading-relaxed text-white/45">
-						{settings.mode === "overlay" &&
-							"Terrain data drawn onto the photo from the camera’s exact viewpoint."}
-						{settings.mode === "replace" &&
-							"Swap parts of the photo for a 3D map rendered from the same viewpoint."}
-						{settings.mode === "world" &&
-							"The photo projected onto 3D terrain. Orbit around, then fly into the photographer’s viewpoint."}
-					</p>
-				</div>
-
-				{settings.mode === "overlay" && (
-					<Section title="Topology">
+			{/* panel: mode switch (sticky) → View → Pose → Experimental & dev → credits (always shown) */}
+			<aside className="flex max-h-[45dvh] w-full shrink-0 flex-col border-white/8 bg-[#10151c] md:max-h-none md:w-80 md:border-l">
+				<div className="min-h-0 flex-1 overflow-y-auto">
+					<div className="sticky top-0 z-10 border-b border-white/8 bg-[#10151c]/95 px-4 pt-4 pb-3 backdrop-blur">
 						<Segmented
-							size="sm"
-							value={settings.overlayStyle}
-							onChange={(overlayStyle) => update({ overlayStyle })}
-							options={[
-								{ value: "contours", label: "Contours" },
-								{ value: "bands", label: "Bands" },
-								{
-									value: "slope",
-									label: "Slope",
-									title: "Slope angle classes: 30°, 35°, 40°, 45°",
-								},
-								{ value: "none", label: "None" },
-							]}
-						/>
-						<Segmented
-							size="sm"
-							value={String(settings.contourInterval)}
-							onChange={(v) => update({ contourInterval: Number(v) })}
-							options={["20", "50", "100", "200"].map((v) => ({
-								value: v,
-								label: `${v} m`,
-							}))}
-						/>
-						<Slider
-							label="Layer opacity"
-							value={settings.layerOpacity}
-							min={0}
-							max={1}
-							onChange={(layerOpacity) => update({ layerOpacity })}
-						/>
-						<Slider
-							label="Ridgelines"
-							value={settings.ridges}
-							min={0}
-							max={1}
-							onChange={(ridges) => update({ ridges })}
-						/>
-						<Slider
-							label="Fade terrain closer than"
-							value={settings.nearFade}
-							min={0}
-							max={400}
-							step={10}
-							format={(v) => (v ? `${v} m` : "off")}
-							onChange={(nearFade) => update({ nearFade })}
-						/>
-						<Slider
-							label="Distance tint"
-							value={settings.depthTint}
-							min={0}
-							max={1}
-							onChange={(depthTint) => update({ depthTint })}
-						/>
-						{hasPeople && (
-							<Toggle
-								label="Keep people in front"
-								checked={settings.protectPeople}
-								onChange={(protectPeople) => update({ protectPeople })}
-							/>
-						)}
-						<Toggle
-							label="Peak labels"
-							checked={showPeaks}
-							onChange={setShowPeaks}
-						/>
-						{showPeaks && <LabelStylePanel style={viewStyle} />}
-						<Toggle
-							label="Hiking trails"
-							checked={settings.trails}
-							onChange={(trails) => update({ trails })}
-						/>
-						{settings.trails && <TrailStylePanel style={viewStyle} />}
-					</Section>
-				)}
-
-				{settings.mode === "replace" && (
-					<Section title="3D map blend">
-						<Segmented
-							size="sm"
-							value={settings.mapStyle}
-							onChange={(mapStyle) => update({ mapStyle })}
-							options={[
-								{ value: "satellite", label: "Satellite" },
-								{ value: "topo", label: "Topo map" },
-								{ value: "hillshade", label: "Relief" },
-								{ value: "bands", label: "Bands" },
-							]}
-						/>
-						<Segmented
-							size="sm"
-							value={settings.method}
-							onChange={(method) => {
-								update({ method });
-								if (method === "brush") engineRef.current?.clearBrush();
+							value={settings.mode}
+							onChange={(mode) => {
+								update({ mode });
+								if (mode === "world") {
+									setTool("inspect");
+									revealRef.current?.stop();
+								}
 							}}
 							options={[
-								{ value: "lens", label: "Lens" },
-								{ value: "swipe", label: "Swipe" },
-								{ value: "range", label: "Distance" },
-								{ value: "brush", label: "Brush" },
+								{
+									value: "overlay",
+									label: (
+										<span className="flex items-center justify-center gap-1">
+											<Layers className="size-3.5" /> Overlay
+										</span>
+									),
+								},
+								{
+									value: "replace",
+									label: (
+										<span className="flex items-center justify-center gap-1">
+											<Sparkles className="size-3.5" /> Blend
+										</span>
+									),
+								},
+								{
+									value: "world",
+									label: (
+										<span className="flex items-center justify-center gap-1">
+											<MapIcon className="size-3.5" /> In map
+										</span>
+									),
+								},
 							]}
 						/>
-						{settings.method === "lens" && (
-							<Slider
-								label="Lens radius"
-								value={settings.lensR}
-								min={0.05}
-								max={0.6}
-								onChange={(lensR) => update({ lensR })}
+						<p className="mt-2 text-[11px] leading-relaxed text-white/45">
+							{settings.mode === "overlay" &&
+								"Terrain data drawn onto the photo from the camera’s exact viewpoint."}
+							{settings.mode === "replace" &&
+								"Swap parts of the photo for a 3D map rendered from the same viewpoint."}
+							{settings.mode === "world" &&
+								"The photo projected onto 3D terrain. Orbit around, then fly into the photographer’s viewpoint."}
+						</p>
+					</div>
+
+					<PanelBand label="View" hint="what is drawn and how it looks" />
+
+					{settings.mode === "overlay" && (
+						<Section title="Topology" collapse={{ id: "layers-overlay" }}>
+							<Segmented
+								size="sm"
+								value={settings.overlayStyle}
+								onChange={(overlayStyle) => update({ overlayStyle })}
+								options={[
+									{ value: "contours", label: "Contours" },
+									{ value: "bands", label: "Bands" },
+									{
+										value: "slope",
+										label: "Slope",
+										title: "Slope angle classes: 30°, 35°, 40°, 45°",
+									},
+									{ value: "none", label: "None" },
+								]}
 							/>
-						)}
-						{settings.method === "swipe" && (
+							<Segmented
+								size="sm"
+								value={String(settings.contourInterval)}
+								onChange={(v) => update({ contourInterval: Number(v) })}
+								options={["20", "50", "100", "200"].map((v) => ({
+									value: v,
+									label: `${v} m`,
+								}))}
+							/>
 							<Slider
-								label="Swipe position"
-								value={settings.swipe}
+								label="Layer opacity"
+								value={settings.layerOpacity}
 								min={0}
 								max={1}
-								onChange={(swipe) => update({ swipe })}
+								onChange={(layerOpacity) => update({ layerOpacity })}
 							/>
-						)}
-						{settings.method === "range" && (
 							<Slider
-								label="Replace terrain beyond"
-								value={settings.rangeKm}
-								min={0.2}
-								max={60}
-								step={0.1}
-								format={(v) => `${v.toFixed(1)} km`}
-								onChange={(rangeKm) => update({ rangeKm })}
+								label="Ridgelines"
+								value={settings.ridges}
+								min={0}
+								max={1}
+								onChange={(ridges) => update({ ridges })}
 							/>
-						)}
-						{settings.method === "brush" && (
-							<div className="flex gap-2">
-								<p className="flex-1 text-[11px] leading-snug text-white/45">
-									Paint to reveal the map. Hold Alt to erase.
-								</p>
-								<Button onClick={() => engineRef.current?.clearBrush()}>
-									Clear
-								</Button>
-								<Button onClick={() => engineRef.current?.clearBrush(true)}>
-									Fill
-								</Button>
-							</div>
-						)}
-						<Slider
-							label="Feather"
-							value={settings.feather}
-							min={0}
-							max={0.15}
-							onChange={(feather) => update({ feather })}
-						/>
-						<Slider
-							label="Ridge accent"
-							value={settings.ridges}
-							min={0}
-							max={1}
-							onChange={(ridges) => update({ ridges })}
-						/>
-						<Toggle
-							label="Keep the photo's sky"
-							checked={settings.keepSky}
-							onChange={(keepSky) => update({ keepSky })}
-						/>
-						{hasPeople && (
+							<Slider
+								label="Fade terrain closer than"
+								value={settings.nearFade}
+								min={0}
+								max={400}
+								step={10}
+								format={(v) => (v ? `${v} m` : "off")}
+								onChange={(nearFade) => update({ nearFade })}
+							/>
+							<Slider
+								label="Distance tint"
+								value={settings.depthTint}
+								min={0}
+								max={1}
+								onChange={(depthTint) => update({ depthTint })}
+							/>
+							{hasPeople && (
+								<Toggle
+									label="Keep people in front"
+									checked={settings.protectPeople}
+									onChange={(protectPeople) => update({ protectPeople })}
+								/>
+							)}
 							<Toggle
-								label="Keep people in front"
-								checked={settings.protectPeople}
-								onChange={(protectPeople) => update({ protectPeople })}
+								label="Peak labels"
+								checked={showPeaks}
+								onChange={setShowPeaks}
 							/>
-						)}
-						<Toggle
-							label="Peak labels"
-							checked={showPeaks}
-							onChange={setShowPeaks}
-						/>
-						{showPeaks && <LabelStylePanel style={viewStyle} />}
-						<Toggle
-							label="Hiking trails"
-							checked={settings.trails}
-							onChange={(trails) => update({ trails })}
-						/>
-						{settings.trails && <TrailStylePanel style={viewStyle} />}
-					</Section>
-				)}
-
-				{settings.mode === "world" && (
-					<Section title="Photo on terrain">
-						<Segmented
-							size="sm"
-							value={settings.worldStyle}
-							onChange={(worldStyle) => update({ worldStyle })}
-							options={[
-								{ value: "satellite", label: "Satellite" },
-								{ value: "topo", label: "Topo map" },
-								{ value: "hillshade", label: "Relief" },
-							]}
-						/>
-						<Slider
-							label="Photo projection"
-							value={settings.projectOpacity}
-							min={0}
-							max={1}
-							onChange={(projectOpacity) => update({ projectOpacity })}
-						/>
-						{hasPeople && (
+							{showPeaks && <LabelStylePanel style={viewStyle} />}
 							<Toggle
-								label="Keep people in front"
-								checked={settings.protectPeople}
-								onChange={(protectPeople) => update({ protectPeople })}
+								label="Hiking trails"
+								checked={settings.trails}
+								onChange={(trails) => update({ trails })}
 							/>
-						)}
-						<Slider
-							label="Skip foreground closer than"
-							value={settings.minProjectRange}
-							min={0}
-							max={2000}
-							step={10}
-							format={(v) => `${Math.round(v)} m`}
-							onChange={(minProjectRange) => update({ minProjectRange })}
-						/>
-						<Toggle
-							label="Hiking trails"
-							checked={settings.trails}
-							onChange={(trails) => update({ trails })}
-						/>
-						{settings.trails && <TrailStylePanel style={viewStyle} />}
-						<p className="text-[11px] leading-relaxed text-white/45">
-							Drag to orbit, right-drag to pan, scroll to zoom. Only terrain the
-							camera could actually see receives the photo: occluded slopes keep
-							the map.
-						</p>
-					</Section>
-				)}
-
-				{settings.mode !== "world" &&
-					revealRef.current?.supported !== false && (
-						<RevealPanel
-							cfg={revealCfg}
-							onChange={setRevealCfg}
-							playing={!!revealFrame}
-							onReplay={(c) => revealRef.current?.play(c)}
-							onSeek={(c, k, first) => revealRef.current?.seek(c, k, first)}
-						/>
+							{settings.trails && <TrailStylePanel style={viewStyle} />}
+						</Section>
 					)}
 
-				<StylePanel
-					mode={settings.mode}
-					settings={settings}
-					style={viewStyle}
-					state={styleState}
-				/>
-
-				{isPhotoView && (
-					<Section
-						title="Alignment"
-						aside={
-							<span className="text-[10px] text-white/35">{alignNote}</span>
-						}
-					>
-						<Segmented
-							size="sm"
-							value={tool}
-							onChange={(t) => {
-								setTool(t);
-								setPendingPeak(null);
-							}}
-							options={[
-								{
-									value: "inspect",
-									label: (
-										<span className="flex items-center justify-center gap-1">
-											<Crosshair className="size-3" /> Inspect
-										</span>
-									),
-								},
-								{
-									value: "align",
-									label: (
-										<span className="flex items-center justify-center gap-1">
-											<Hand className="size-3" /> Drag
-										</span>
-									),
-								},
-								{
-									value: "pin",
-									label: (
-										<span className="flex items-center justify-center gap-1">
-											<MapPin className="size-3" /> Pin peaks
-										</span>
-									),
-								},
-							]}
-						/>
-						<p className="text-[11px] leading-relaxed text-white/45">
-							{tool === "inspect" &&
-								"Hover to read coordinates, elevation and distance of any pixel."}
-							{tool === "align" &&
-								"Drag to move the terrain. Shift-drag rolls, scroll changes field of view."}
-							{tool === "pin" &&
-								(pendingPeak
-									? `Now click where ${pendingPeak.name} really is in the photo.`
-									: "Click a peak marker, then click its true position. One pin fixes heading, two add roll, three add field of view.")}
-						</p>
-						<div className="flex flex-wrap gap-2">
-							<Button
-								variant="accent"
-								onClick={() => runAlign(true)}
-								disabled={!!status}
-							>
-								<Wand2 className="size-3.5" /> Auto-align
-							</Button>
-							<Button
-								onClick={() => runAlign(false)}
-								disabled={!!status}
-								title="Local skyline refinement from the current pose"
-							>
-								<Mountain className="size-3.5" /> Refine
-							</Button>
-							<Button
-								onClick={resetExif}
-								disabled={!!status}
-								title="Back to the phone's compass and gravity sensor"
-							>
-								<RotateCcw className="size-3.5" /> EXIF
-							</Button>
-							{pins.length > 0 && (
-								<Button onClick={() => setPins([])}>
-									Clear {pins.length} pins
-								</Button>
+					{settings.mode === "replace" && (
+						<Section title="3D map blend" collapse={{ id: "layers-replace" }}>
+							<Segmented
+								size="sm"
+								value={settings.mapStyle}
+								onChange={(mapStyle) => update({ mapStyle })}
+								options={[
+									{ value: "satellite", label: "Satellite" },
+									{ value: "topo", label: "Topo map" },
+									{ value: "hillshade", label: "Relief" },
+									{ value: "bands", label: "Bands" },
+								]}
+							/>
+							<Segmented
+								size="sm"
+								value={settings.method}
+								onChange={(method) => {
+									update({ method });
+									if (method === "brush") engineRef.current?.clearBrush();
+								}}
+								options={[
+									{ value: "lens", label: "Lens" },
+									{ value: "swipe", label: "Swipe" },
+									{ value: "range", label: "Distance" },
+									{ value: "brush", label: "Brush" },
+								]}
+							/>
+							{settings.method === "lens" && (
+								<Slider
+									label="Lens radius"
+									value={settings.lensR}
+									min={0.05}
+									max={0.6}
+									onChange={(lensR) => update({ lensR })}
+								/>
 							)}
-						</div>
-						{pose && (
-							<div className="space-y-2 pt-1">
+							{settings.method === "swipe" && (
 								<Slider
-									label="Heading"
-									value={
-										unknowns.yaw ? ((pose.yaw % 360) + 360) % 360 : pose.yaw
-									}
-									min={unknowns.yaw ? 0 : (photo.heading ?? 0) - 40}
-									max={unknowns.yaw ? 360 : (photo.heading ?? 0) + 40}
-									step={0.05}
-									format={(v) => `${(((v % 360) + 360) % 360).toFixed(2)}°`}
-									onChange={(yaw) => setPose({ ...pose, yaw })}
+									label="Swipe position"
+									value={settings.swipe}
+									min={0}
+									max={1}
+									onChange={(swipe) => update({ swipe })}
 								/>
+							)}
+							{settings.method === "range" && (
 								<Slider
-									label="Pitch"
-									value={pose.pitch}
-									min={-30}
-									max={30}
-									step={0.05}
-									format={(v) => `${v.toFixed(2)}°`}
-									onChange={(pitch) => setPose({ ...pose, pitch })}
+									label="Replace terrain beyond"
+									value={settings.rangeKm}
+									min={0.2}
+									max={60}
+									step={0.1}
+									format={(v) => `${v.toFixed(1)} km`}
+									onChange={(rangeKm) => update({ rangeKm })}
 								/>
-								<Slider
-									label="Roll"
-									value={pose.roll}
-									min={-15}
-									max={15}
-									step={0.05}
-									format={(v) => `${v.toFixed(2)}°`}
-									onChange={(roll) => setPose({ ...pose, roll })}
+							)}
+							{settings.method === "brush" && (
+								<div className="flex gap-2">
+									<p className="flex-1 text-[11px] leading-snug text-white/45">
+										Paint to reveal the map. Hold Alt to erase.
+									</p>
+									<Button onClick={() => engineRef.current?.clearBrush()}>
+										Clear
+									</Button>
+									<Button onClick={() => engineRef.current?.clearBrush(true)}>
+										Fill
+									</Button>
+								</div>
+							)}
+							<Slider
+								label="Feather"
+								value={settings.feather}
+								min={0}
+								max={0.15}
+								onChange={(feather) => update({ feather })}
+							/>
+							<Slider
+								label="Ridge accent"
+								value={settings.ridges}
+								min={0}
+								max={1}
+								onChange={(ridges) => update({ ridges })}
+							/>
+							<Toggle
+								label="Keep the photo's sky"
+								checked={settings.keepSky}
+								onChange={(keepSky) => update({ keepSky })}
+							/>
+							{hasPeople && (
+								<Toggle
+									label="Keep people in front"
+									checked={settings.protectPeople}
+									onChange={(protectPeople) => update({ protectPeople })}
 								/>
-								<Slider
-									label="Field of view (h)"
-									value={pose.vfov}
-									min={photo.vfov * 0.7}
-									max={photo.vfov * 1.3}
-									step={0.02}
-									format={() => `${hfov.toFixed(1)}°`}
-									onChange={(vfov) => setPose({ ...pose, vfov })}
-								/>
-							</div>
-						)}
-					</Section>
-				)}
+							)}
+							<Toggle
+								label="Peak labels"
+								checked={showPeaks}
+								onChange={setShowPeaks}
+							/>
+							{showPeaks && <LabelStylePanel style={viewStyle} />}
+							<Toggle
+								label="Hiking trails"
+								checked={settings.trails}
+								onChange={(trails) => update({ trails })}
+							/>
+							{settings.trails && <TrailStylePanel style={viewStyle} />}
+						</Section>
+					)}
 
-				<Section title="Camera">
-					<dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
-						<dt className="text-white/40">Position</dt>
-						<dd className="text-right font-mono text-white/75">
-							{photo.lat.toFixed(5)}, {photo.lon.toFixed(5)}
-						</dd>
-						<dt className="text-white/40">GPS altitude</dt>
-						<dd className="text-right font-mono text-white/75">
-							{photoIn.alt ? `${Math.round(photoIn.alt)} m` : "—"}
-						</dd>
-						<dt className="text-white/40">Eye (DEM-snapped)</dt>
-						<dd className="text-right font-mono text-white/75">
-							{engineRef.current?.eyeAlt
-								? `${Math.round(engineRef.current.eyeAlt)} m`
-								: "—"}
-						</dd>
-						<dt className="text-white/40">Compass</dt>
-						<dd className="text-right font-mono text-white/75">
-							{photo.heading != null
-								? `${photo.heading.toFixed(1)}°`
-								: "unknown"}
-						</dd>
-						<dt className="text-white/40">Lens</dt>
-						<dd className="text-right font-mono text-white/75">
-							{photo.f35} mm eq.
-						</dd>
-						<dt className="text-white/40">GPS accuracy</dt>
-						<dd className="text-right font-mono text-white/75">
-							{photo.hAccuracy ? `±${Math.round(photo.hAccuracy)} m` : "—"}
-						</dd>
-					</dl>
-					<p className="text-[10px] leading-relaxed text-white/30">
-						Terrain © Mapterhorn · Imagery © swisstopo, Esri · Peaks & trails ©
-						OpenStreetMap contributors
-					</p>
-					<EyeSuggestion
-						photo={photo}
-						pose={pose}
-						ready={!!pose && !status && !error && verify !== "pending"}
-						applied={!!eyeMove}
-						onApply={applyEyeMove}
-						onRevert={revertEyeMove}
+					{settings.mode === "world" && (
+						<Section title="Photo on terrain" collapse={{ id: "layers-world" }}>
+							<Segmented
+								size="sm"
+								value={settings.worldStyle}
+								onChange={(worldStyle) => update({ worldStyle })}
+								options={[
+									{ value: "satellite", label: "Satellite" },
+									{ value: "topo", label: "Topo map" },
+									{ value: "hillshade", label: "Relief" },
+								]}
+							/>
+							<Slider
+								label="Photo projection"
+								value={settings.projectOpacity}
+								min={0}
+								max={1}
+								onChange={(projectOpacity) => update({ projectOpacity })}
+							/>
+							{hasPeople && (
+								<Toggle
+									label="Keep people in front"
+									checked={settings.protectPeople}
+									onChange={(protectPeople) => update({ protectPeople })}
+								/>
+							)}
+							<Slider
+								label="Skip foreground closer than"
+								value={settings.minProjectRange}
+								min={0}
+								max={2000}
+								step={10}
+								format={(v) => `${Math.round(v)} m`}
+								onChange={(minProjectRange) => update({ minProjectRange })}
+							/>
+							<Toggle
+								label="Hiking trails"
+								checked={settings.trails}
+								onChange={(trails) => update({ trails })}
+							/>
+							{settings.trails && <TrailStylePanel style={viewStyle} />}
+							<p className="text-[11px] leading-relaxed text-white/45">
+								Drag to orbit, right-drag to pan, scroll to zoom. Only terrain
+								the camera could actually see receives the photo: occluded
+								slopes keep the map.
+							</p>
+						</Section>
+					)}
+
+					<StylePanel
+						mode={settings.mode}
+						settings={settings}
+						style={viewStyle}
+						state={styleState}
 					/>
-				</Section>
+
+					{settings.mode !== "world" &&
+						revealRef.current?.supported !== false && (
+							<RevealPanel
+								cfg={revealCfg}
+								onChange={setRevealCfg}
+								playing={!!revealFrame}
+								onReplay={(c) => revealRef.current?.play(c)}
+								onSeek={(c, k, first) => revealRef.current?.seek(c, k, first)}
+							/>
+						)}
+
+					<PanelBand label="Pose" hint="where the camera was" />
+
+					{isPhotoView && (
+						<Section
+							title="Alignment"
+							collapse={{ id: "alignment" }}
+							aside={
+								<span className="text-[10px] text-white/35">{alignNote}</span>
+							}
+						>
+							<Segmented
+								size="sm"
+								value={tool}
+								onChange={(t) => {
+									setTool(t);
+									setPendingPeak(null);
+								}}
+								options={[
+									{
+										value: "inspect",
+										label: (
+											<span className="flex items-center justify-center gap-1">
+												<Crosshair className="size-3" /> Inspect
+											</span>
+										),
+									},
+									{
+										value: "align",
+										label: (
+											<span className="flex items-center justify-center gap-1">
+												<Hand className="size-3" /> Drag
+											</span>
+										),
+									},
+									{
+										value: "pin",
+										label: (
+											<span className="flex items-center justify-center gap-1">
+												<MapPin className="size-3" /> Pin peaks
+											</span>
+										),
+									},
+								]}
+							/>
+							<p className="text-[11px] leading-relaxed text-white/45">
+								{tool === "inspect" &&
+									"Hover to read coordinates, elevation and distance of any pixel."}
+								{tool === "align" &&
+									"Drag to move the terrain. Shift-drag rolls, scroll changes field of view."}
+								{tool === "pin" &&
+									(pendingPeak
+										? `Now click where ${pendingPeak.name} really is in the photo.`
+										: "Click a peak marker, then click its true position. One pin fixes heading, two add roll, three add field of view.")}
+							</p>
+							<div className="flex flex-wrap gap-2">
+								<Button
+									variant="accent"
+									onClick={() => runAlign(true)}
+									disabled={!!status}
+								>
+									<Wand2 className="size-3.5" /> Auto-align
+								</Button>
+								<Button
+									onClick={() => runAlign(false)}
+									disabled={!!status}
+									title="Local skyline refinement from the current pose"
+								>
+									<Mountain className="size-3.5" /> Refine
+								</Button>
+								<Button
+									onClick={resetExif}
+									disabled={!!status}
+									title="Back to the phone's compass and gravity sensor"
+								>
+									<RotateCcw className="size-3.5" /> EXIF
+								</Button>
+								{pins.length > 0 && (
+									<Button onClick={() => setPins([])}>
+										Clear {pins.length} pins
+									</Button>
+								)}
+							</div>
+							{pose && (
+								<div className="space-y-2 pt-1">
+									<Slider
+										label="Heading"
+										value={
+											unknowns.yaw ? ((pose.yaw % 360) + 360) % 360 : pose.yaw
+										}
+										min={unknowns.yaw ? 0 : (photo.heading ?? 0) - 40}
+										max={unknowns.yaw ? 360 : (photo.heading ?? 0) + 40}
+										step={0.05}
+										format={(v) => `${(((v % 360) + 360) % 360).toFixed(2)}°`}
+										onChange={(yaw) => setPose({ ...pose, yaw })}
+									/>
+									<Slider
+										label="Pitch"
+										value={pose.pitch}
+										min={-30}
+										max={30}
+										step={0.05}
+										format={(v) => `${v.toFixed(2)}°`}
+										onChange={(pitch) => setPose({ ...pose, pitch })}
+									/>
+									<Slider
+										label="Roll"
+										value={pose.roll}
+										min={-15}
+										max={15}
+										step={0.05}
+										format={(v) => `${v.toFixed(2)}°`}
+										onChange={(roll) => setPose({ ...pose, roll })}
+									/>
+									<Slider
+										label="Field of view (h)"
+										value={pose.vfov}
+										min={photo.vfov * 0.7}
+										max={photo.vfov * 1.3}
+										step={0.02}
+										format={() => `${hfov.toFixed(1)}°`}
+										onChange={(vfov) => setPose({ ...pose, vfov })}
+									/>
+								</div>
+							)}
+						</Section>
+					)}
+
+					<Section
+						title="Camera"
+						collapse={{ id: "camera" }}
+						summary={`${photo.lat.toFixed(4)}, ${photo.lon.toFixed(4)} · ${photo.f35} mm`}
+					>
+						<dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+							<dt className="text-white/40">Position</dt>
+							<dd className="text-right font-mono text-white/75">
+								{photo.lat.toFixed(5)}, {photo.lon.toFixed(5)}
+							</dd>
+							<dt className="text-white/40">GPS altitude</dt>
+							<dd className="text-right font-mono text-white/75">
+								{photoIn.alt ? `${Math.round(photoIn.alt)} m` : "—"}
+							</dd>
+							<dt className="text-white/40">Eye (DEM-snapped)</dt>
+							<dd className="text-right font-mono text-white/75">
+								{engineRef.current?.eyeAlt
+									? `${Math.round(engineRef.current.eyeAlt)} m`
+									: "—"}
+							</dd>
+							<dt className="text-white/40">Compass</dt>
+							<dd className="text-right font-mono text-white/75">
+								{photo.heading != null
+									? `${photo.heading.toFixed(1)}°`
+									: "unknown"}
+							</dd>
+							<dt className="text-white/40">Lens</dt>
+							<dd className="text-right font-mono text-white/75">
+								{photo.f35} mm eq.
+							</dd>
+							<dt className="text-white/40">GPS accuracy</dt>
+							<dd className="text-right font-mono text-white/75">
+								{photo.hAccuracy ? `±${Math.round(photo.hAccuracy)} m` : "—"}
+							</dd>
+						</dl>
+						<EyeSuggestion
+							photo={photo}
+							pose={pose}
+							ready={!!pose && !status && !error && verify !== "pending"}
+							applied={!!eyeMove}
+							onApply={applyEyeMove}
+							onRevert={revertEyeMove}
+						/>
+					</Section>
+
+					<PanelBand label="Advanced" tone="muted" />
+					<AdvancedPanel />
+				</div>
+				{/* attribution is a licence requirement: pinned, never collapsed */}
+				<div className="shrink-0 border-t border-white/8 px-4 py-2">
+					<CreditLine
+						className="text-[10px] leading-relaxed text-white/30"
+						lat={photo.lat}
+						lon={photo.lon}
+						imagery={
+							settings.mode === "replace" &&
+							(settings.mapStyle === "satellite" ||
+								settings.mapStyle === "topo")
+								? settings.mapStyle
+								: settings.mode === "world" &&
+										settings.worldStyle !== "hillshade"
+									? settings.worldStyle
+									: "satellite"
+						}
+					/>
+				</div>
 			</aside>
 		</div>
 	);

@@ -4,7 +4,9 @@
 // A reveal is a per-pixel "arrival field" f ∈ [0, 1] built from the pixel's distance (log range),
 // its terrain elevation and its screen position. A front sweeps f from 0 to 1; terrain with f behind
 // the front shows its overlay, a band of light rides the front, and ridgelines run slightly ahead.
+
 import { useCallback, useSyncExternalStore } from "react";
+import { getFlag } from "#/lib/flags";
 
 export type RevealPresetId =
 	| "bloom"
@@ -291,7 +293,7 @@ function parse(raw: string | null): RevealConfig {
  * no animation unless it asks for one. */
 function urlOverride(): Partial<RevealConfig> {
 	try {
-		const q = new URLSearchParams(location.search).get("reveal");
+		const q = getFlag("reveal");
 		if (q === "off" || (!q && navigator.webdriver)) return { onLoad: false };
 		if (q && q in REVEAL_MODE)
 			return { onLoad: true, preset: q as RevealPresetId };

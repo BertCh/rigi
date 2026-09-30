@@ -24,7 +24,7 @@ from PIL import Image
 HERE = Path(__file__).resolve().parent
 CACHE = Path(os.environ.get("MATCHER_DEM_CACHE", HERE / ".cache" / "mapterhorn"))
 CACHE_CAP = int(os.environ.get("MATCHER_DEM_CACHE_BYTES", 1 << 30))
-URL = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp"
+URL = os.environ.get("MAPTERHORN_URL") or "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp"  # self-hosting: reports/licences.md
 R_EARTH = 6371008.8
 K_REFR = 0.13
 D = math.pi / 180

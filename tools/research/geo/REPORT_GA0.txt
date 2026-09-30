@@ -1,0 +1,74 @@
+GA0 - quick fixes (GEO phase A, Agent A)                                          2026-09-30 (UTC ~03:30Z)
+Rule: tools/research/geo/PROTOCOL.txt section "GA0 - Agent A" (appended 03:04Z, before any real-data run).
+Kill criterion (fixed): any regression on eval-app or style-baseline.
+
+VERDICT: GA0 PASSES its kill criterion for everything GA0 added (hooks inert with flags off; no change with flags
+on). style-baseline itself FAILS 0/16, but that failure predates GA0 (below) and is not caused by the GEO hooks.
+GA0 brings no measurable accuracy gain on the evaluation sets: none of the photos has a magnetic heading, and the
+lake floor never binds.
+
+1. WHAT WAS BUILT
+  src/lib/geocam/priors/wmm.ts          WMM2025 (NOAA COF, degree 12, embedded) - declination(lat, lon, altM, date)
+  src/lib/geocam/priors/heading.ts      priorHeading(photo[, enabled]) - off: photo.heading unchanged; on: + D when
+                                        local.headingRef is magnetic
+  src/lib/geocam/priors/photo-priors.ts mapPriorsFromPhoto(photo, eye0, ground, opts) -> Factor[] (gps with EyePrior
+                                        hAcc clamp [5,100] default 20, alt, ground, gravity, compass TRUE north,
+                                        optional focal and lakeFloor)
+  src/lib/geocam/lakes/{compact,levels,floor,fetch,index}.ts
+                                        compactLakes, toSceneLakes, lakeLevelOf (OSM ele -> Swiss table -> DEM median),
+                                        lakeFloor/lakeFloorDetail (frozen rule), lakesNear (memoised, abortable,
+                                        fail-open), photoLakeFloor, startLakeFloor (engine hook)
+  Checks: priors.check.ts (all 100 official WMM2025 test values: worst |dD| 0.0050 deg, which is the 2-decimal
+          rounding of the table; X/Y/Z within 7e-4 nT; flags default off), lakes.check.ts (synthetic). Both PASS.
+  Flags (all default off): geoDecl, geoLakeFloor (both RESTART_FLAGS), geoLakes, geoInliers, geoMap (not wired).
+
+2. FLAGS-OFF GATE (hooks inert?)
+  node scripts/ci/run.mjs fast: every check passes, including the 6 geocam checks, except biome. biome FAILS only
+    on other agents' new files (geocam map/tjunc/integrity/lakes factors, scripts/geocam/ga3*/ga4, core/state.ts
+    format and import order). None of the files GA0 touched is flagged, and region.ts ratchets BETTER.
+  eval-app (ci, :3130): PASS 12/14 within 1 deg, median 6.5 px. The per-photo rows match the earlier logged runs
+    exactly (out/gpu/w1/eval-app.txt: 6958/7018/7063/7155 rows identical).
+  style-baseline: FAIL 0/16. Geometry hashes are identical and "0 px differ" on both photos. The pixel diffs lie
+    along the trail-overlay lines (diff images in out/lead/style-baseline/diff). A re-run on a private server
+    (:8792) gave the same 0/16. The same "0/16 pass; geometry: identical" result is in the style-baseline log of
+    the 18:31 local run (2026-09-29), hours before any GA0 edit.
+    With flags off the GA0 code paths are provably no-ops:
+      - priorHeading returns photo.heading;
+      - startLakeFloor returns null, so there is no await, no fetch and no eye change;
+      - the region and matcher hooks spread {}.
+    The style-baseline failure therefore belongs to another session's uncommitted change (trail rendering).
+    OPEN for the lead.
+
+3. FLAG-ON A/B (eval-app-flags.mjs, geoDecl+geoLakeFloor+geoLakes on; cached water union; holdout refused)
+  off 9/10 within 1 deg, median 4.4 px; on 9/10, median 4.4 px.
+  Changed photos: none (yaw, px, eye and prior yaw identical). Regressions: none.
+  The floor was computed for IMG_6971 and IMG_7108: Thunersee, OSM ele 558, fix INSIDE the outline, floor
+  558.3 m. It did not bind because the app eye (559.2) is already above it.
+  out/geocam/ga0/eval-app-flags.json
+
+4. DEV AUDIT (scripts/geocam/ga0-audit.ts; out/geocam/ga0/audit.{json,txt})
+  headingRef census: dev GT 10/10 "T"; the other bundled photos 5/5 "T"; the wild dev C0 meta keeps no ref
+    (33/50 have a heading). Declination is therefore applied to 0 evaluation photos. As the plan predicted,
+    declination is verified by the unit tests only; it matters for uploads with GPSImgDirectionRef=M.
+  Declination at the Swiss dev sites: +3.4 to +3.6 deg; IMG_5495 (Maine): -14.6 deg.
+  Lake floor: exists for 1/10 dev photos (6971), binds for 0/10, and no GT eye lies below a floor. The motivating
+    6958 is holdout and was not evaluated.
+  POST-HOC observation (not a GA0 criterion): on 7053/7059/7063/7155 the GT eye = GPS alt, which is 10-18 m below
+    the Mapterhorn DEM + 1.6 at the fix. That is the GT eye convention (plan risk 3), not a GA0 effect.
+
+5. DESIGN DECISIONS (fixed before data)
+  Floor radius: clamp(hAcc,5,100) + 30 m instead of the plan's 500 m + hAcc, plus a 3 m drop guard for
+    shore-strip eligibility. Reservoirs and basins are skipped, and so is flowing water. Why: land below a lake
+    within 500 m is real (dam feet, polders, outlet valleys), and there a floor would lift a correct eye.
+  Declination is applied where the heading is used (engine constructors, unknown-pose), never where it is
+    stored, so IndexedDB keeps the EXIF value.
+  SWISS_LAKE_LEVELS were compiled from reference knowledge and NOT re-downloaded (+-0.5 m). They are used only
+    when OSM has no ele.
+
+6. MATCHER PATCH (proposal only; tools/matcher is f0's): out/geocam/ga0/matcher-correspondences.patch
+  app.py: assemble() becomes a thin wrapper over assemble_core(). With returnCorrespondences the result carries
+  correspondences = {W, H, eye, uv, X, nInliers, supportPx}: the inliers within SUPPORT_PX (6 px) at the
+  RETURNED pose, round-robin thinned on a 16x12 grid to at most 400, rounded to 0.01 px / 0.01 m. It is wired
+  for photoId, multipart and ad-hoc (v034 and t6). Off means byte-identical responses.
+  `git apply --check` passes. The helper was unit-tested on synthetic data (1788 inliers -> 400).
+  Caveat (plan risk 2): match.py drops < 250 m and depth-edge pixels, so these points mainly constrain rotation.

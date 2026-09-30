@@ -5,12 +5,14 @@
 //   Query: ?mode=fp|orbit  &truth=1  &nodepth=1  &n=<extra random splats>  &yaw= &pitch= &x= &y= &z=
 //   First person: drag to look, WASD / arrows to move, Q/E down/up. Orbit: drag to orbit the hut.
 //   Harness hook: window.__splatLab { setView, stats, measureFps }.
+
 import { Deck } from "@deck.gl/core";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PhotoView } from "#/lib/deck/photo-view";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import { TerrainLayer } from "#/lib/deck/terrain-layer";
+import { setFlagOverride } from "#/lib/flags";
 import { DeckSplatLayer, splatStats } from "#/lib/nearfield/deck-splat-layer";
 import { type GaussianCloud, PROVENANCE_CODE } from "#/lib/nearfield/types";
 
@@ -436,7 +438,7 @@ function LabDeckSplats() {
 
 	const [world] = useState(() => {
 		// the per-tile terrain path renders a CPU TileMesh (the batched default needs a batch grid)
-		(globalThis as { __RIGI_TERRAIN__?: string }).__RIGI_TERRAIN__ = "tiles";
+		setFlagOverride("terrain", "tiles");
 		return { tile: syntheticTile(), cloud: syntheticCloud(extra) };
 	});
 

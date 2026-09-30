@@ -1,13 +1,13 @@
 // "Check camera position": the pose6dof eye search as an opt-in, unverified SUGGESTION (matching-v2
-// policy, reports/matching-v2.md). Hidden unless ?eyesearch=1|auto or localStorage rigi.eyesearch is set
+// policy, reports/matching-v2.md). Hidden unless ?eyesearch=on|auto (src/lib/flags)
 // (#/lib/gpu/eye/client.ts). It never applies anything by itself: only the Apply button calls onApply.
 import { Crosshair, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Pose } from "#/lib/camera";
+import { useFlag } from "#/lib/flags/react";
 import {
 	type EyeSearchProgress,
 	type EyeSearchResult,
-	eyeSearchFlag,
 	eyeSearchInput,
 	startEyeSearch,
 } from "#/lib/gpu/eye/client";
@@ -54,7 +54,7 @@ export function EyeSuggestion({
 	onApply: (r: EyeSearchResult) => void;
 	onRevert: () => void;
 }) {
-	const [flag] = useState(eyeSearchFlag);
+	const flag = useFlag("eyesearch");
 	const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 	const abort = useRef<AbortController | null>(null);
 	const autoRan = useRef(false);

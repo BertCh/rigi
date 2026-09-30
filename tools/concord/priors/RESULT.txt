@@ -239,3 +239,8 @@ Known issues
   - The altBias −7 m is a regional/temporal effect. It could be barometric drift or the "stand at the lip" effect
     in section 1, and it hurt on holdout. Keep it out of any default-on path.
   - Mapterhorn tiles fetched: +58 MB in .cache/dem-mapterhorn (65 MB total). Horizon cache: out/concord/priors/cache (12 MB).
+
+Review note (2026-09-29): scripts/concord/lib.ts waterline-pin conversion was fixed (see
+tools/concord/review/RESULT.txt F1). Numbers above that include the 6971/6958 waterline pins (the
+<0.5 km and 0.5-2 km dev bands, and dev all-pin medians) predate the fix. Re-run values and the
+once-only holdout table are in tools/concord/review/RESULT.txt.

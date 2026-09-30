@@ -15,6 +15,8 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | Thread | Doc | Notes |
 |---|---|---|
 | Registration | [terrain-matching-research.md](terrain-matching-research.md) | Synthesis of the TM studies; study records in `tools/research/tm/*/REPORT.*` |
+| | [fundamentals-plan.md](fundamentals-plan.md) | 2026-09-29 first-principles review of rendering+matching: missing common core (a-contrario accept, dense feature-metric objective, ray-cast oracle), parallax/near-field observability, data engine; experiments E0–E8; phase 0 (E0–E3) run 2026-09-29, all killed; reports in `tools/research/fund/` |
+| | [geometry-first-pose.md](geometry-first-pose.md) | 2026-09-29 geometry-first camera: unused 3D assets (lakes, ridges, near field, sun, vectors), occlusion-crossing eye cue, MAP solver + covariance (GTSAM/pycolmap/PoseLib), integrity; GEO phase GA0–GC3; phase A results §8 (2026-09-30: GA2–GA5 killed, GA1 solver built) |
 | | [tm-strategy.md](tm-strategy.md) | Plan for H1→H2→levers (owned by session 58). Part A statuses are stale: H1 is built and P1 is done |
 | | [matcher-service-v040.md](matcher-service-v040.md), [matcher-service.md](matcher-service.md) | Service ops (v0.4 policies) and API/changelog (v0.2–0.3.5). The "Running it" section's `MATCHER_MAX_PAGES` default is 1, not 2 |
 | | [stage1.md](stage1.md), [fusion.md](fusion.md) | T6 two-stage search; skyline+match fusion and the a-priori HIGH rule |

@@ -1,0 +1,71 @@
+{
+ "pid": "wc_0059",
+ "date": "2007-03-21T14:34:50",
+ "bbox": [
+  9.979461669921875,
+  46.42266845703125,
+  10.037421226501465,
+  46.48115921020508
+ ],
+ "W": 74,
+ "H": 109,
+ "source": "Landsat",
+ "items": [
+  {
+   "id": "LE07_L2SP_194028_20070318_02_T1",
+   "date": "2007-03-18T10:01:15.481343",
+   "dd": 3.1899828548263884,
+   "cloud": 12.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.628,
+   "newPx": 5065
+  },
+  {
+   "id": "LE07_L2SP_193028_20070311_02_T1",
+   "date": "2007-03-11T09:55:03.959628",
+   "dd": 10.194282874675926,
+   "cloud": 59.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.638,
+   "newPx": 1989
+  },
+  {
+   "id": "LT05_L2SP_194028_20070310_02_T1",
+   "date": "2007-03-10T10:05:41.892013",
+   "dd": 11.186899397997685,
+   "cloud": 43.0,
+   "platform": "landsat-5",
+   "src": "Landsat",
+   "localValid": 0.036,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_194028_20070403_02_T1",
+   "date": "2007-04-03T10:01:15.606913",
+   "dd": 12.810018598530094,
+   "cloud": 39.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.138,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LT05_L2SP_193028_20070404_02_T2",
+   "date": "2007-04-04T09:59:24.271069",
+   "dd": 13.808729989224537,
+   "cloud": 73.0,
+   "platform": "landsat-5",
+   "src": "Landsat",
+   "localValid": 0.201,
+   "skipped": true,
+   "newPx": 0
+  }
+ ],
+ "coverage": 0.8745350855442598,
+ "snowFracMeanKnown": 0.9730111956596375,
+ "medianDaysOffset": 3.1899828910827637
+}

@@ -1,0 +1,180 @@
+LABEL COUNTS {'POS': 33, 'NB-inh': 3, 'NB-con': 93, 'NB-dec': 597, 'NE-inh': 5, 'NE-dec': 56, 'AMB': 0, 'UNL': 315} photos 35 hyps 1102
+
+kind         n  ph      AC1      AC2      CUR   CURall   AC1fit   AC2fit
+POS         33  31       25       24       19       22       27       16
+NB-inh       3   3        0        0        0        0        0        0
+NB-con      93  30        1        1        0        0        1        0
+NB-dec     597  30        0        0        0        0        3        1
+NE-inh       5   5        2        1        0        2        4        1
+NE-dec      56  29       10        5        0        9       22        2
+AMB          0   0        0        0        0        0        0        0
+UNL        315  27       33       19        1        3       58       16
+
+AC1     photoRecall 23/31 (95% boot [17.0, 28.0]) posAccepted CI [18.0, 32.0] gross 13 (boot [6.0, 20.0]) grossPhotos ['wc_0004', 'wc_0020', 'wc_0028', 'wc_0034', 'wc_0067', 'wc_0072', 'wc_0074', 'wc_0076', 'wc_0086', 'wc_0094', 'wc_0099'] wrongEye ['wc_0004_dispd150b119', 'wc_0020_dispd150b159', 'wc_0034_dispd150b319', 'wc_0067_dispd150b259', 'wc_0067_dispd400b259', 'wc_0072_dispd400b231', 'wc_0076_dispd150b122', 'wc_0094_dispd150b114', 'wc_0094_dispd400b114', 'wc_0099_dispd150b6', 'wc_0074_k000', 'wc_0086_k007']
+AC2     photoRecall 22/31 (95% boot [16.0, 27.0]) posAccepted CI [17.0, 31.0] gross 7 (boot [3.0, 12.0]) grossPhotos ['wc_0020', 'wc_0028', 'wc_0034', 'wc_0067', 'wc_0072', 'wc_0086', 'wc_0099'] wrongEye ['wc_0020_dispd150b159', 'wc_0034_dispd150b319', 'wc_0067_dispd150b259', 'wc_0072_dispd400b231', 'wc_0099_dispd150b6', 'wc_0086_k007']
+CUR     photoRecall 19/31 (95% boot [13.0, 25.0]) posAccepted CI [13.0, 25.0] gross 0 (boot [0.0, 0.0]) grossPhotos [] wrongEye []
+CURall  photoRecall 22/31 (95% boot [16.0, 28.0]) posAccepted CI [16.0, 28.0] gross 11 (boot [5.0, 17.0]) grossPhotos ['wc_0004', 'wc_0017', 'wc_0020', 'wc_0059', 'wc_0063', 'wc_0067', 'wc_0069', 'wc_0086', 'wc_0094', 'wc_0099'] wrongEye ['wc_0004_dispd150b119', 'wc_0017_dispd150b243', 'wc_0020_dispd150b159', 'wc_0020_dispd400b159', 'wc_0059_dispd150b110', 'wc_0063_dispd400b247', 'wc_0067_dispd150b259', 'wc_0094_dispd150b114', 'wc_0099_dispd150b6', 'wc_0069_k000', 'wc_0086_k007']
+AC1fit  photoRecall 26/31 (95% boot [20.0, 31.0]) posAccepted CI [21.0, 32.0] gross 30 (boot [21.0, 40.0]) grossPhotos ['wc_0001', 'wc_0009', 'wc_0011', 'wc_0014', 'wc_0017', 'wc_0019', 'wc_0020', 'wc_0027', 'wc_0034', 'wc_0048', 'wc_0052', 'wc_0055', 'wc_0059', 'wc_0063', 'wc_0067', 'wc_0069', 'wc_0070', 'wc_0074', 'wc_0082', 'wc_0094', 'wc_0099'] wrongEye ['wc_0009_dispd150b21', 'wc_0011_dispd150b163', 'wc_0011_dispd400b163', 'wc_0014_dispd150b241', 'wc_0017_dispd150b243', 'wc_0017_dispd400b243', 'wc_0019_dispd150b156', 'wc_0020_dispd150b159', 'wc_0027_dispd150b305', 'wc_0034_dispd150b319', 'wc_0034_dispd400b319', 'wc_0048_dispd150b146', 'wc_0048_dispd400b146', 'wc_0059_dispd150b110', 'wc_0059_dispd400b110', 'wc_0063_dispd150b247', 'wc_0063_dispd400b247', 'wc_0067_dispd150b259', 'wc_0082_dispd150b153', 'wc_0094_dispd150b114', 'wc_0094_dispd400b114', 'wc_0099_dispd150b6', 'wc_0001_k000', 'wc_0069_k000', 'wc_0070_k000', 'wc_0074_k000']
+AC2fit  photoRecall 16/31 (95% boot [10.0, 22.0]) posAccepted CI [10.0, 22.0] gross 4 (boot [1.0, 8.0]) grossPhotos ['wc_0014', 'wc_0034', 'wc_0055', 'wc_0069'] wrongEye ['wc_0014_dispd150b241', 'wc_0034_dispd150b319', 'wc_0069_k000']
+
+AC1 NB-con {'hard': '1/10', 'S5': '0/55', 'easy': '0/83'}
+AC2 NB-con {'hard': '1/10', 'S5': '0/55', 'easy': '0/83'}
+CUR NB-con {'hard': '0/10', 'S5': '0/55', 'easy': '0/83'}
+CURall NB-con {'hard': '0/10', 'S5': '0/55', 'easy': '0/83'}
+AC1fit NB-con {'hard': '0/10', 'S5': '0/55', 'easy': '1/83'}
+AC2fit NB-con {'hard': '0/10', 'S5': '0/55', 'easy': '0/83'}
+
+POSITIVES
+  wc_0002_refC           REF  nCorr  1337 T      0.0 Tfit     57.6 z   0.00 log10NFA   1.28 split 5km acc []
+  wc_0004_k000           POOL nCorr  2314 T   1768.3 Tfit   6849.4 z   3.87 log10NFA  -2.74 split 5km acc ['AC1', 'AC1fit', 'AC2', 'CUR', 'CURall']
+  wc_0004_refCMT         REF  nCorr  2293 T   1377.8 Tfit   6934.7 z   3.73 log10NFA  -2.49 split 5km acc ['AC1', 'AC1fit', 'AC2']
+  wc_0006_k000           POOL nCorr  1183 T    634.6 Tfit   2730.1 z  56.06 log10NFA -683.03 split median(507m) acc ['AC1', 'AC2']
+  wc_0006_refB           REF  nCorr  1159 T     87.1 Tfit   1261.5 z  38.90 log10NFA -328.99 split median(501m) acc ['AC1', 'AC2']
+  wc_0009_k000           POOL nCorr  1380 T      0.0 Tfit   4100.7 z   0.00 log10NFA   1.22 split 5km acc ['AC1fit', 'CUR', 'CURall']
+  wc_0011_k000           POOL nCorr  1876 T   2019.9 Tfit   5491.7 z  36.67 log10NFA -292.54 split median(2601m) acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0014_k000           POOL nCorr  1716 T    714.2 Tfit   4876.7 z  57.09 log10NFA -708.39 split 5km acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0017_k000           POOL nCorr  1739 T    296.2 Tfit   3096.3 z  49.46 log10NFA -531.91 split median(22390m) acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0019_k000           POOL nCorr  1713 T   1617.3 Tfit   4610.6 z  64.18 log10NFA -895.25 split median(3372m) acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0020_k000           POOL nCorr   995 T      9.6 Tfit   2301.5 z   4.40 log10NFA  -3.84 split 5km acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0027_k000           POOL nCorr  1155 T   1291.7 Tfit   3169.5 z   3.66 log10NFA  -2.37 split median(8944m) acc ['AC1', 'AC1fit', 'AC2', 'CUR', 'CURall']
+  wc_0028_refB           REF  nCorr  1198 T      0.0 Tfit     65.0 z  -0.27 log10NFA   1.52 split 5km acc []
+  wc_0034_k000           POOL nCorr   287 T     52.5 Tfit    515.0 z   4.40 log10NFA  -3.79 split median(4320m) acc ['AC1', 'AC1fit', 'AC2', 'AC2fit']
+  wc_0046_k000           POOL nCorr   347 T    380.6 Tfit   1110.0 z   2.03 log10NFA  -0.17 split median(13550m) acc ['AC1', 'AC1fit']
+  wc_0047_k000           POOL nCorr  1907 T      0.0 Tfit   2699.9 z   0.00 log10NFA   1.11 split 5km acc ['AC1fit', 'AC2fit', 'CUR', 'CURall']
+  wc_0048_k000           POOL nCorr  1599 T   1227.2 Tfit   4457.7 z  33.07 log10NFA -237.97 split 5km acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0052_k000           POOL nCorr   130 T      9.7 Tfit    354.3 z  20.58 log10NFA -92.12 split median(2180m) acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CURall']
+  wc_0054_k000           POOL nCorr  1075 T    935.1 Tfit   3269.9 z   4.09 log10NFA   -3.2 split 5km acc ['AC1', 'AC1fit', 'AC2', 'CUR', 'CURall']
+  wc_0055_k005           POOL nCorr     6 T      0.0 Tfit      9.5 z   0.00 log10NFA   1.22 split median(1018m) acc ['AC1fit']
+  wc_0059_k000           POOL nCorr   938 T    770.4 Tfit   2604.5 z  16.33 log10NFA -58.12 split median(2111m) acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0063_k000           POOL nCorr   711 T    176.0 Tfit   2381.0 z  13.21 log10NFA -38.05 split median(8017m) acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CURall']
+  wc_0067_k000           POOL nCorr  1454 T   1128.2 Tfit   4470.1 z   3.95 log10NFA  -2.99 split 5km acc ['AC1', 'AC1fit', 'AC2', 'CUR', 'CURall']
+  wc_0071_k000           POOL nCorr   828 T      0.0 Tfit   1325.3 z   0.00 log10NFA   1.24 split 5km acc ['AC1fit']
+  wc_0072_k000           POOL nCorr   333 T      0.0 Tfit    580.0 z  -0.34 log10NFA   1.39 split 5km acc []
+  wc_0074_k006           POOL nCorr  1727 T    554.3 Tfit   3768.1 z   4.27 log10NFA   -3.4 split 5km acc ['AC1', 'AC1fit', 'AC2', 'CURall']
+  wc_0076_k017           POOL nCorr  1508 T      3.5 Tfit   2154.9 z   0.48 log10NFA   1.04 split median(1831m) acc []
+  wc_0077_k000           POOL nCorr  2202 T   1132.8 Tfit   6501.7 z  61.09 log10NFA -811.21 split 5km acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0082_k000           POOL nCorr  1376 T   1013.4 Tfit   3248.6 z  60.12 log10NFA -785.74 split 5km acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0085_k000           POOL nCorr   987 T    154.3 Tfit   3056.7 z  43.82 log10NFA -417.69 split 5km acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0088_k000           POOL nCorr  2049 T   1574.1 Tfit   5243.7 z  30.32 log10NFA -200.01 split 5km acc ['AC1', 'AC1fit', 'AC2', 'CUR', 'CURall']
+  wc_0094_k000           POOL nCorr  1307 T    192.8 Tfit   1922.8 z   4.43 log10NFA  -3.95 split 5km acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+  wc_0099_k000           POOL nCorr   844 T    163.9 Tfit   2945.9 z   4.88 log10NFA  -4.83 split 5km acc ['AC1', 'AC1fit', 'AC2', 'AC2fit', 'CUR', 'CURall']
+
+WRONG-EYE / AMBIGUOUS DISPLACED + inherited wrong
+  NB-inh wc_0002_k000               nCorr  1425 T      0.0 Tfit    736.5 z   0.00 NFA   1.28 nNull  33 misfit med/p90    nan/   nan fused None None acc []
+  NB-inh wc_0006_k018               nCorr  1084 T      0.0 Tfit    937.0 z  -0.37 NFA   1.46 nNull  35 misfit med/p90    nan/   nan fused None None acc []
+  NB-inh wc_0028_k000               nCorr  1272 T      0.0 Tfit    475.7 z  -0.27 NFA   1.52 nNull  48 misfit med/p90    nan/   nan fused None None acc []
+  NE-dec wc_0002_dispd150b153       nCorr   584 T      0.0 Tfit     98.4 z   0.00 NFA   1.28 nNull  37 misfit med/p90   20.2/  35.8 fused low 58 acc []
+  NE-dec wc_0002_dispd400b153       nCorr   397 T      0.0 Tfit     76.6 z   0.00 NFA   1.28 nNull  37 misfit med/p90   34.5/  70.3 fused low 82 acc []
+  NE-dec wc_0004_dispd150b119       nCorr   615 T    172.0 Tfit   1949.6 z   2.05 NFA  -0.17 nNull  31 misfit med/p90   71.7/ 304.9 fused high 2517 acc ['AC1', 'CURall']
+  NE-dec wc_0006_dispd150b151       nCorr   447 T      0.0 Tfit    702.3 z  -0.33 NFA   1.45 nNull  42 misfit med/p90  109.5/ 692.3 fused low 652 acc []
+  NE-dec wc_0006_dispd400b151       nCorr   310 T      0.0 Tfit    109.4 z  -0.32 NFA   1.45 nNull  44 misfit med/p90  177.5/ 925.5 fused low 41 acc []
+  NE-dec wc_0009_dispd150b21        nCorr   530 T      0.0 Tfit    867.7 z   0.00 NFA   1.22 nNull  31 misfit med/p90   69.0/ 140.8 fused low 710 acc ['AC1fit']
+  NE-dec wc_0009_dispd400b21        nCorr    75 T      0.0 Tfit      0.0 z   0.00 NFA   1.22 nNull  31 misfit med/p90  368.9/ 527.1 fused low 0 acc []
+  NE-dec wc_0011_dispd150b163       nCorr  1830 T      1.7 Tfit    609.7 z   0.45 NFA   0.91 nNull  24 misfit med/p90   26.3/  51.3 fused low 903 acc ['AC1fit']
+  NE-dec wc_0011_dispd400b163       nCorr  1615 T      0.0 Tfit    189.5 z  -0.23 NFA   1.17 nNull  24 misfit med/p90   63.4/ 130.6 fused low 255 acc ['AC1fit']
+  NE-dec wc_0014_dispd150b241       nCorr  1065 T      0.0 Tfit   1130.3 z  -0.19 NFA   1.22 nNull  28 misfit med/p90   34.0/ 396.9 fused low 816 acc ['AC1fit', 'AC2fit']
+  NE-dec wc_0014_dispd400b241       nCorr    64 T      0.0 Tfit      0.4 z  -0.19 NFA   1.22 nNull  28 misfit med/p90 1011.9/1093.8 fused low 0 acc []
+  NE-dec wc_0017_dispd150b243       nCorr  1731 T      0.0 Tfit   2210.3 z  -0.20 NFA   1.16 nNull  24 misfit med/p90   12.3/  27.3 fused high 2912 acc ['AC1fit', 'CURall']
+  NE-dec wc_0017_dispd400b243       nCorr  1610 T      0.0 Tfit   1597.2 z  -0.20 NFA   1.16 nNull  24 misfit med/p90   21.6/  68.9 fused low 1564 acc ['AC1fit']
+  NE-dec wc_0019_dispd150b156       nCorr    38 T      0.0 Tfit     59.2 z  -0.20 NFA   1.19 nNull  26 misfit med/p90   50.4/ 945.0 fused low 140 acc ['AC1fit']
+  NE-dec wc_0019_dispd400b156       nCorr     1 T      0.0 Tfit      0.0 z  -0.20 NFA   1.19 nNull  26 misfit med/p90  950.5/1702.3 fused low 0 acc []
+  NE-dec wc_0020_dispd150b159       nCorr   645 T     12.0 Tfit   1583.0 z   4.58 NFA  -4.19 nNull  26 misfit med/p90   12.7/  66.9 fused high 1627 acc ['AC1', 'AC1fit', 'AC2', 'CURall']
+  NE-dec wc_0020_dispd400b159       nCorr    54 T      0.0 Tfit    135.9 z  -0.34 NFA   1.23 nNull  26 misfit med/p90   35.4/ 214.5 fused high 126 acc ['CURall']
+  NE-dec wc_0027_dispd150b305       nCorr  1045 T     31.0 Tfit   1193.5 z   1.34 NFA   0.48 nNull  30 misfit med/p90   14.0/  19.6 fused high 2624 acc ['AC1fit']
+  NE-dec wc_0027_dispd400b305       nCorr     0 T      0.0 Tfit      0.0 z  -0.47 NFA   1.35 nNull  32 misfit med/p90  282.4/ 309.5 fused low 0 acc []
+  NE-dec wc_0028_dispd150b105       nCorr    35 T      0.0 Tfit     73.1 z  -0.27 NFA   1.51 nNull  49 misfit med/p90  127.2/ 269.5 fused low 22 acc []
+  NE-dec wc_0028_dispd400b105       nCorr   461 T      0.0 Tfit     23.4 z  -0.26 NFA   1.51 nNull  53 misfit med/p90  101.3/ 284.9 fused low 6 acc []
+  NE-dec wc_0034_dispd150b319       nCorr   409 T     83.2 Tfit    632.3 z   5.45 NFA  -6.11 nNull  29 misfit med/p90    8.9/  19.5 fused low 174 acc ['AC1', 'AC1fit', 'AC2', 'AC2fit']
+  NE-dec wc_0034_dispd400b319       nCorr   329 T      3.4 Tfit    231.1 z   1.10 NFA   0.61 nNull  29 misfit med/p90   21.7/  37.8 fused low 101 acc ['AC1fit']
+  NE-dec wc_0046_dispd150b177       nCorr   304 T    191.0 Tfit    804.8 z   1.69 NFA   0.16 nNull  31 misfit med/p90    7.2/  17.1 fused low 782 acc []
+  NE-dec wc_0046_dispd400b177       nCorr   195 T    163.8 Tfit    472.1 z   1.62 NFA   0.22 nNull  31 misfit med/p90   11.8/  29.9 fused low 483 acc []
+  NE-dec wc_0047_dispd150b293       nCorr   861 T      0.0 Tfit    543.5 z  -0.33 NFA   1.21 nNull  25 misfit med/p90   50.7/  90.8 fused low 555 acc []
+  NE-dec wc_0047_dispd400b293       nCorr     0 T      0.0 Tfit      0.0 z  -0.33 NFA   1.21 nNull  25 misfit med/p90  122.9/ 283.9 fused low 0 acc []
+  NE-dec wc_0048_dispd150b146       nCorr  1305 T      0.0 Tfit    941.5 z  -0.22 NFA   1.22 nNull  27 misfit med/p90   18.0/  27.8 fused low 1590 acc ['AC1fit']
+  NE-dec wc_0048_dispd400b146       nCorr   889 T      2.0 Tfit    502.4 z   0.60 NFA   0.88 nNull  27 misfit med/p90   47.7/  57.9 fused low 643 acc ['AC1fit']
+  NE-dec wc_0052_dispd150b230       nCorr     2 T      0.0 Tfit      0.0 z  -0.25 NFA   1.32 nNull  34 misfit med/p90   23.4/  75.7 fused low 20 acc []
+  NE-dec wc_0052_dispd400b230       nCorr    25 T      0.0 Tfit     27.7 z  -0.25 NFA   1.32 nNull  34 misfit med/p90   91.8/ 206.7 fused low 25 acc []
+  NE-dec wc_0054_dispd150b337       nCorr     5 T      0.0 Tfit      0.0 z  -0.45 NFA   1.31 nNull  28 misfit med/p90  199.0/ 554.0 fused low 0 acc []
+  NE-dec wc_0054_dispd400b337       nCorr   106 T      0.0 Tfit      0.0 z  -0.49 NFA   1.31 nNull  29 misfit med/p90  210.7/2298.1 fused low 0 acc []
+  NE-dec wc_0055_dispd150b326       nCorr     1 T      0.0 Tfit      0.0 z   0.00 NFA   1.22 nNull  32 misfit med/p90  282.9/ 497.6 fused low 0 acc []
+  NE-dec wc_0055_dispd400b326       nCorr     2 T      0.0 Tfit      0.0 z   0.00 NFA   1.22 nNull  32 misfit med/p90  427.4/ 900.3 fused low 3 acc []
+  NE-dec wc_0059_dispd150b110       nCorr   694 T      6.8 Tfit   1344.4 z   1.38 NFA   0.36 nNull  26 misfit med/p90   72.0/ 326.6 fused high 1069 acc ['AC1fit', 'CURall']
+  NE-dec wc_0059_dispd400b110       nCorr   428 T      0.0 Tfit    482.0 z  -0.25 NFA   1.21 nNull  26 misfit med/p90  181.1/ 918.8 fused low 266 acc ['AC1fit']
+  NE-dec wc_0063_dispd150b247       nCorr   298 T      0.0 Tfit    966.7 z  -0.28 NFA   1.15 nNull  22 misfit med/p90    3.6/   7.0 fused low 795 acc ['AC1fit']
+  NE-dec wc_0063_dispd400b247       nCorr   592 T      5.1 Tfit    760.0 z   1.43 NFA   0.25 nNull  22 misfit med/p90   10.7/  23.1 fused high 1917 acc ['AC1fit', 'CURall']
+  NE-dec wc_0067_dispd150b259       nCorr  1401 T    868.6 Tfit   3117.6 z   3.53 NFA  -2.25 nNull  26 misfit med/p90   12.6/ 467.7 fused high 2779 acc ['AC1', 'AC1fit', 'AC2', 'CURall']
+  NE-dec wc_0067_dispd400b259       nCorr   721 T    117.5 Tfit    748.2 z   2.09 NFA   -0.3 nNull  26 misfit med/p90   41.3/1048.4 fused low 444 acc ['AC1']
+  NE-dec wc_0071_dispd150b14        nCorr   816 T      0.0 Tfit    811.1 z   0.00 NFA   1.24 nNull  34 misfit med/p90   39.6/ 183.2 fused low 465 acc []
+  NE-dec wc_0071_dispd400b14        nCorr   375 T      0.0 Tfit      0.0 z   0.00 NFA   1.24 nNull  34 misfit med/p90   86.7/ 250.5 fused low 0 acc []
+  NE-dec wc_0072_dispd150b231       nCorr   228 T      0.0 Tfit    589.0 z  -0.35 NFA    1.4 nNull  37 misfit med/p90   42.7/ 159.6 fused low 601 acc []
+  NE-dec wc_0072_dispd400b231       nCorr   245 T    140.2 Tfit    606.3 z   4.36 NFA  -3.59 nNull  38 misfit med/p90   96.5/ 304.1 fused low 570 acc ['AC1', 'AC2']
+  NE-dec wc_0076_dispd150b122       nCorr  1424 T    207.5 Tfit   1725.8 z   3.18 NFA  -1.58 nNull  33 misfit med/p90   32.7/  97.8 fused low 2350 acc ['AC1']
+  NE-dec wc_0076_dispd400b122       nCorr  1175 T      0.0 Tfit    656.4 z  -0.51 NFA   1.39 nNull  34 misfit med/p90   93.0/ 420.9 fused low 492 acc []
+  NE-dec wc_0077_dispd150b292       nCorr  1926 T      0.0 Tfit    263.6 z  -0.20 NFA   1.16 nNull  24 misfit med/p90   67.7/ 109.4 fused low 337 acc []
+  NE-dec wc_0077_dispd400b292       nCorr  1431 T      0.0 Tfit    341.9 z  -0.20 NFA   1.16 nNull  24 misfit med/p90   69.2/ 123.0 fused low 338 acc []
+  NE-dec wc_0082_dispd150b153       nCorr   321 T      0.0 Tfit   1065.4 z  -0.26 NFA   1.18 nNull  24 misfit med/p90   97.2/ 334.6 fused low 984 acc ['AC1fit']
+  NE-dec wc_0085_dispd150b282       nCorr     0 T      0.0 Tfit      0.0 z  -0.23 NFA   1.15 nNull  23 misfit med/p90  893.9/1325.2 fused low 0 acc []
+  NE-dec wc_0085_dispd400b282       nCorr     0 T      0.0 Tfit      0.0 z  -0.23 NFA   1.15 nNull  23 misfit med/p90 1180.7/2128.6 fused low 0 acc []
+  NE-dec wc_0094_dispd150b114       nCorr  1067 T     52.5 Tfit   1239.7 z   2.76 NFA  -1.16 nNull  23 misfit med/p90  104.4/ 403.5 fused high 1696 acc ['AC1', 'AC1fit', 'CURall']
+  NE-dec wc_0094_dispd400b114       nCorr   313 T     34.2 Tfit    264.4 z   2.33 NFA  -0.63 nNull  23 misfit med/p90  369.6/1610.0 fused low 538 acc ['AC1', 'AC1fit']
+  NE-dec wc_0099_dispd150b6         nCorr   833 T    136.0 Tfit   1858.9 z   4.45 NFA  -3.91 nNull  27 misfit med/p90    6.0/  24.3 fused high 2255 acc ['AC1', 'AC1fit', 'AC2', 'CURall']
+  NE-dec wc_0099_dispd400b6         nCorr     1 T      0.0 Tfit      0.0 z  -0.34 NFA   1.25 nNull  27 misfit med/p90  512.3/ 699.2 fused low 0 acc []
+  NE-inh wc_0001_k000               nCorr  1087 T      1.7 Tfit   2007.7 z   0.51 NFA   1.01 nNull  32 misfit med/p90    nan/   nan fused None None acc ['AC1fit']
+  NE-inh wc_0069_k000               nCorr   329 T      0.0 Tfit   1166.8 z   0.00 NFA   1.15 nNull  26 misfit med/p90    nan/   nan fused None None acc ['AC1fit', 'AC2fit', 'CURall']
+  NE-inh wc_0070_k000               nCorr   609 T      0.0 Tfit   1140.8 z   0.00 NFA    1.2 nNull  27 misfit med/p90    nan/   nan fused None None acc ['AC1fit']
+  NE-inh wc_0074_k000               nCorr  1286 T    100.3 Tfit   2961.3 z   3.29 NFA  -1.68 nNull  32 misfit med/p90    nan/   nan fused None None acc ['AC1', 'AC1fit']
+  NE-inh wc_0086_k007               nCorr  1083 T    802.8 Tfit   3241.2 z  13.47 NFA -39.31 nNull  13 misfit med/p90    nan/   nan fused None None acc ['AC1', 'AC2', 'CURall']
+
+NE-dec: z of the displaced decoy vs z of the photo's best positive (same photo)
+  wc_0002 bestPOS T      0.0  bestNE-dec T      0.0  NE>=POS
+  wc_0004 bestPOS T   1768.3  bestNE-dec T    172.0  
+  wc_0006 bestPOS T    634.6  bestNE-dec T      0.0  
+  wc_0009 bestPOS T      0.0  bestNE-dec T      0.0  NE>=POS
+  wc_0011 bestPOS T   2019.9  bestNE-dec T      1.7  
+  wc_0014 bestPOS T    714.2  bestNE-dec T      0.0  
+  wc_0017 bestPOS T    296.2  bestNE-dec T      0.0  
+  wc_0019 bestPOS T   1617.3  bestNE-dec T      0.0  
+  wc_0020 bestPOS T      9.6  bestNE-dec T     12.0  NE>=POS
+  wc_0027 bestPOS T   1291.7  bestNE-dec T     31.0  
+  wc_0028 bestPOS T      0.0  bestNE-dec T      0.0  NE>=POS
+  wc_0034 bestPOS T     52.5  bestNE-dec T     83.2  NE>=POS
+  wc_0046 bestPOS T    380.6  bestNE-dec T    191.0  
+  wc_0047 bestPOS T      0.0  bestNE-dec T      0.0  NE>=POS
+  wc_0048 bestPOS T   1227.2  bestNE-dec T      2.0  
+  wc_0052 bestPOS T      9.7  bestNE-dec T      0.0  
+  wc_0054 bestPOS T    935.1  bestNE-dec T      0.0  
+  wc_0055 bestPOS T      0.0  bestNE-dec T      0.0  NE>=POS
+  wc_0059 bestPOS T    770.4  bestNE-dec T      6.8  
+  wc_0063 bestPOS T    176.0  bestNE-dec T      5.1  
+  wc_0067 bestPOS T   1128.2  bestNE-dec T    868.6  
+  wc_0071 bestPOS T      0.0  bestNE-dec T      0.0  NE>=POS
+  wc_0072 bestPOS T      0.0  bestNE-dec T    140.2  NE>=POS
+  wc_0076 bestPOS T      3.5  bestNE-dec T    207.5  NE>=POS
+  wc_0077 bestPOS T   1132.8  bestNE-dec T      0.0  
+  wc_0082 bestPOS T   1013.4  bestNE-dec T      0.0  
+  wc_0085 bestPOS T    154.3  bestNE-dec T      0.0  
+  wc_0094 bestPOS T    192.8  bestNE-dec T     52.5  
+  wc_0099 bestPOS T    163.9  bestNE-dec T    136.0  
+  photos where a >=150 m decoy scores >= the best positive: 10 / 29
+
+UNLABELLED (not in any metric): accept counts by sub-kind
+  ('DISP', 'displaced, photo without verified truth') {'n': 10, 'AC1': 1, 'AC2': 1, 'CUR': 0, 'CURall': 1, 'AC1fit': 3, 'AC2fit': 0}
+  ('POOL', 'below-threshold') {'n': 67, 'AC1': 0, 'AC2': 0, 'CUR': 0, 'CURall': 0, 'AC1fit': 3, 'AC2fit': 1}
+  ('POOL', 'blind') {'n': 83, 'AC1': 21, 'AC2': 9, 'CUR': 1, 'CURall': 2, 'AC1fit': 25, 'AC2fit': 3}
+  ('POOL', 'capped') {'n': 25, 'AC1': 3, 'AC2': 3, 'CUR': 0, 'CURall': 0, 'AC1fit': 7, 'AC2fit': 1}
+  ('RING', 'RING within 3 deg of a correct pose or n') {'n': 126, 'AC1': 6, 'AC2': 5, 'CUR': 0, 'CURall': 0, 'AC1fit': 16, 'AC2fit': 7}
+  ('YAW', 'YAW within 3 deg of a correct pose or no') {'n': 4, 'AC1': 2, 'AC2': 1, 'CUR': 0, 'CURall': 0, 'AC1fit': 4, 'AC2fit': 4}
+
+DESCRIPTIVE AUROC (POS vs kind), T and Tfit: {"T": {"NB-inh": 0.8939393939393939, "NB-con": 0.8918214402085369, "NB-dec": 0.8939393939393939, "NE-inh": 0.7090909090909091, "NE-dec": 0.8176406926406926, "AMB": null}, "Tfit": {"NB-inh": 0.8383838383838383, "NB-con": 0.982078853046595, "NB-dec": 0.9980711639003096, "NE-inh": 0.6303030303030303, "NE-dec": 0.8695887445887446, "AMB": null}}
+
+Split used: {'5km': 185, 'median': 298, 'none': 619} no-sky: 0
+null sizes: median 30.0 min 5 no-decision (<10): 9 tests/photo median 32.0
+exact 95% upper bound on accept rate with 0 accepted: NE-dec n=56 -> 0.052; all labelled negatives n=754 -> 0.004
+
+Clopper-Pearson one-sided 95% upper bound on the per-kind accept rate (k accepted / n):
+  AC1 {'POS': '25/33 ub 0.873', 'NB-inh': '0/3 ub 0.632', 'NB-con': '1/93 ub 0.050', 'NB-dec': '0/597 ub 0.005', 'NE-inh': '2/5 ub 0.811', 'NE-dec': '10/56 ub 0.284'}
+  AC2 {'POS': '24/33 ub 0.850', 'NB-inh': '0/3 ub 0.632', 'NB-con': '1/93 ub 0.050', 'NB-dec': '0/597 ub 0.005', 'NE-inh': '1/5 ub 0.657', 'NE-dec': '5/56 ub 0.179'}
+  CUR {'POS': '19/33 ub 0.722', 'NB-inh': '0/3 ub 0.632', 'NB-con': '0/93 ub 0.032', 'NB-dec': '0/597 ub 0.005', 'NE-inh': '0/5 ub 0.451', 'NE-dec': '0/56 ub 0.052'}
+  CURall {'POS': '22/33 ub 0.801', 'NB-inh': '0/3 ub 0.632', 'NB-con': '0/93 ub 0.032', 'NB-dec': '0/597 ub 0.005', 'NE-inh': '2/5 ub 0.811', 'NE-dec': '9/56 ub 0.264'}
+  AC1fit {'POS': '27/33 ub 0.918', 'NB-inh': '0/3 ub 0.632', 'NB-con': '1/93 ub 0.050', 'NB-dec': '3/597 ub 0.013', 'NE-inh': '4/5 ub 0.990', 'NE-dec': '22/56 ub 0.511'}
+  AC2fit {'POS': '16/33 ub 0.639', 'NB-inh': '0/3 ub 0.632', 'NB-con': '0/93 ub 0.032', 'NB-dec': '1/597 ub 0.008', 'NE-inh': '1/5 ub 0.657', 'NE-dec': '2/56 ub 0.108'}

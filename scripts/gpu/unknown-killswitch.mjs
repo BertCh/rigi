@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Checks the unknown-pose GPU horizon flag in the page: ?unknownGpu=1 → "gpu"; with ?gpu=off → "cpu";
+// Checks the unknown-pose GPU horizon flag in the page: ?unknownGpu=on → "gpu"; with ?gpu=off → "cpu";
 // no flag → "cpu". One photo, full metadata (fast).
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/unknown-killswitch.mjs
 import { chromium } from "playwright";
@@ -13,8 +13,8 @@ let bad = 0;
 try {
 	const page = await browser.newPage();
 	for (const [qs, want] of [
-		["?unknownGpu=1", "gpu"],
-		["?unknownGpu=1&gpu=off", "cpu"],
+		["?unknownGpu=on", "gpu"],
+		["?unknownGpu=on&gpu=off", "cpu"],
 		["", "cpu"],
 	]) {
 		await page.goto(`${BASE}/favicon.svg${qs}`);

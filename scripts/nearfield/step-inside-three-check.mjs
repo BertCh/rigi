@@ -77,7 +77,7 @@ for (const id of ids) {
 		);
 	try {
 		// webdriver sessions only get the Step Inside UI with ?nearfield (useStepInside.stepInsideAllowed)
-		await page.goto(`${BASE}/photo/${id}?nearfield=${sharp ? "sharp" : "1"}`);
+		await page.goto(`${BASE}/photo/${id}?nearfield=${sharp ? "sharp" : "on"}`);
 		await page.waitForSelector("[data-ready]", {
 			state: "attached",
 			timeout: 180000,

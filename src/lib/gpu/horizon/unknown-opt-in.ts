@@ -4,22 +4,12 @@
 // different solvers, each with its own acceptance evidence (the unknown-pose cascade has a hard
 // 0-false-accept rule), so turning one on must not turn on the other.
 //
-// On with ?unknownGpu=1 in the page URL or localStorage "rigi.unknownGpu" = "1", and never when the GPU
-// kill switch (?gpu=off, rigi.gpu=off; see ../device.ts) is set. Call it in the page, not in the worker
-// (a worker has no page URL or localStorage): UnknownPoseSolver sends the answer with its messages.
+// On with ?unknownGpu=on (src/lib/flags), never with the GPU kill switch (?gpu=off; ../device.ts). Call
+// it in the page, not in the worker (a worker has no page URL): UnknownPoseSolver sends the answer with
+// its messages.
+import { getFlag } from "#/lib/flags";
 import { gpuEnabled } from "../device";
 
 export function unknownGpuOptIn(): boolean {
-	let on = false;
-	try {
-		const q = new URLSearchParams(globalThis.location?.search ?? "").get(
-			"unknownGpu",
-		);
-		if (q !== null) on = q === "1" || q === "on";
-		else {
-			const s = globalThis.localStorage?.getItem("rigi.unknownGpu");
-			on = s === "1" || s === "on";
-		}
-	} catch {}
-	return on && gpuEnabled();
+	return getFlag("unknownGpu") === "on" && gpuEnabled();
 }

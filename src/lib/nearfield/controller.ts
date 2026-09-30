@@ -8,6 +8,7 @@
 //   show()/hide() → renderer.setNearField(scene | null, opts)
 // Gate: only for an accepted pose (poseAccepted); the scene is hidden when anchor.quality <
 // ANCHOR_MIN_QUALITY and flagged 'low trust' below LOW_TRUST_QUALITY.
+import { getFlag } from "#/lib/flags";
 import type { Pose } from "../camera";
 import type { EnuFrame } from "../geodesy";
 import type { PhotoMeta } from "../photos";
@@ -150,11 +151,7 @@ export function poseKey(p: Pose, eye: { x: number; y: number; z: number }) {
 
 /** Dev flag: ?nearfield=sharp uses Apple SHARP (research-only weights) for the splats. */
 export function gaussianModelFromUrl(): GaussianModel {
-	if (typeof window === "undefined") return "lift";
-	return new URLSearchParams(window.location.search).get("nearfield") ===
-		"sharp"
-		? "sharp"
-		: "lift";
+	return getFlag("nearfield") === "sharp" ? "sharp" : "lift";
 }
 
 async function photoBlob(

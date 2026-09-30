@@ -1,0 +1,114 @@
+E2 — DATE-MATCHED APPEARANCE (FUND, reports/fundamentals-plan.md §3 E2)          2026-09-29/30, finished on resume
+==============================================================================================================
+
+VERDICT: KILLED under the fixed plan criterion. All 6 cells (3 plan variants x LoMa/ALIKED) meet "median inlier gain
+< 15% AND no separation gain". No cell comes close: the best median gain is +0.3% (ALIKED, sun-relit) against a +15% bar,
+and no variant has a positive, significant separation change. The E1-score version of the separation metric is
+PENDING (E1 had no scores when this ran). A simple pose-consistency separation on our own decoys was used instead,
+and it has almost no headroom (see "Caveats").
+
+Rule and metrics: PROTOCOL.txt. It was written on resume BEFORE any match or score. The pre-crash agent had written
+no protocol. Amendments A1-A3 are all procedural or data-access changes, made before scoring.
+Machine-readable results: results.json (per-cell stats, decision, per-photo I/D for every variant and matcher).
+
+SET AND METHOD (short)
+- The 30 dev photos with a correct ref and a perturb base (full planned set, not a subset). Views from the C0 cache:
+  every correct ref, every wrong ref, and perturb yaw -8/-4/+4/+8. No new renders, so no render lock was needed.
+- Variants are offline post-processing of the cached ortho render. True and decoy views get identical processing.
+    (i)   v0  current render.
+    (ii)  v1  re-lit: the baked ortho shading (fitted on ring views) is divided out, then multiplied by the photo-time
+              sun (Lambert + DEM cast shadow, ambient by weather tag).
+    (iii) v2  v1 + a date-matched snow fraction mixing albedo toward snow. Copernicus GFSC had no anonymous access, so
+              the snow comes from S2 SCL (+-10 d) and Landsat QA (+-16 d) composites on a ~60 m grid.
+    (iv)  v5  v2 shading + the nearest clear S2 L2A true colour (low frequencies from S2, high frequencies from the
+              ortho). The source is Earth Search, with Planetary Computer as fallback before 2018. It applies to 11
+              photos (date >= 2016-11 and >= 50% S2 cover of the true view).
+    Extras (not plan variants, not in the verdict): v3 = v2 + a per-view haze/gain fit to the photo; v4 = v0 + the
+    same fit.
+- LoMa-B (4096 kp, MPS fp32) and ALIKED+LightGlue. Photo LANCZOS-resized to the view. X3 lifting (>250 m, no depth
+  discontinuity) and X3 eval_view. v0 LoMa matches reproduce X3's cached 'sat' matches exactly (checked on 3 wc_0002
+  views: identical keypoints).
+- I = cons6 at the true (perturb-base) ref = lifted matches within 6 px of the true pose, no solve.
+  Gain = (I_v - I_0) / max(I_0, 10), median over photos.
+  D = max cons6 over the decoys (wrong refs + perturbs, each at its own pose). S = log10((I+1)/(D+1)).
+  Separation gain = median dS > 0 AND a one-sided Wilcoxon p < 0.05.
+
+RESULTS (PRIMARY; n = photos; CI = bootstrap 95% of the median gain)
+matcher variant            n  median gain  CI95               sum(I_v)/sum(I_0)  up/down  median dS  Wilcoxon p  rank-1  KILL
+loma    (ii)  sun-relit   30   -0.6%   [-2.4%, +0.9%]       0.986            11/16    -0.003     0.55    28->28  yes
+loma    (iii) +snow       30   -0.8%   [-4.0%, +0.3%]       0.868            10/18    -0.004     0.82    28->28  yes
+loma    (iv)  +S2         11   -0.2%   [-8.8%, +9.3%]       0.990             5/6     -0.015     0.77    10->10  yes
+aliked  (ii)  sun-relit   30   +0.3%   [-0.2%, +4.0%]       1.004            15/10    +0.004     0.17    24->24  yes
+aliked  (iii) +snow       30    0.0%   [-1.2%, +1.8%]       0.858            12/13     0.000     0.79    24->23  yes
+aliked  (iv)  +S2         11    0.0%   [-1.5%, +13.0%]      0.987             5/4     -0.004     0.77     8->8   yes
+Extras (not decisive):
+loma    v3 v2+photo fit   30  -25.3%   [-42.6%, -8.9%]      0.695             4/25    -0.135     1.00    28->25
+loma    v4 v0+photo fit   30  -19.0%   [-37.5%, -10.8%]     0.760             6/24    -0.070     1.00    28->26
+aliked  v3                30  -23.2%   [-42.3%, -4.6%]      0.661             5/22    -0.149     1.00    24->18
+aliked  v4                30  -22.5%   [-56.7%, -5.6%]      0.703             2/24    -0.110     1.00    24->21
+Secondary metrics agree. inlAtRef6 median gain: -0.9 / -1.0 / 0.0% (LoMa ii/iii/iv) and 0.0% for every ALIKED cell.
+Mean cons6 over all correct refs: within +-0.8%.
+
+Pre-declared descriptive subgroups (median gain, LoMa / ALIKED):
+- snowy (true-view snow fraction >= 0.05; n = 6: wc_0014, 0020, 0046, 0048, 0059, 0067):
+    (ii) -3.1% / +0.9%   (iii) -30.8% / -51.8%   (iv, n = 3: 0014, 0020, 0048) +0.6% / +7.6%
+- low sun (< 25 deg; n = 6: wc_0034, 0052, 0067, 0072, 0085, 0099):
+    (ii) +3.0% / +5.8%   (iii) +1.1% / -5.0%   (iv) n = 0
+
+WHAT THE NUMBERS SAY
+1. Sun relighting (ii) does nothing measurable. It is +-1% overall and +3-6% in the low-sun group, with individual
+   photos going both ways (wc_0099: LoMa -24%, ALIKED +28%). The matchers are already largely invariant to shading
+   direction at these view scales, or the Lambert + cast-shadow model is too crude to help.
+2. The snow tint (iii), as implemented, HURTS exactly where it acts. Snowy photos lose 31% (LoMa) and 52% (ALIKED) of
+   true-pose inliers. Worst cases: wc_0048 1024 -> 341, wc_0059 747 -> 73, wc_0067 1141 -> 486; ALIKED drops to 54, 0
+   and 1. One snowy photo gains: wc_0020, +14% LoMa, +12% ALIKED.
+   POST HOC diagnosis from examples/wc_0048__refs__B.jpg: the mix replaces textured ortho with a flat snow albedo and,
+   at 60 m, paints snow over dark cliffs that are bare in the photo. This removes the high-frequency texture the
+   matchers use. This finding is about the implementation, not proof that snow physics cannot help: a
+   texture-preserving tint with slope/aspect masking was not tested.
+3. Nearest clear S2 colour (iv) is neutral overall (-0.2% / 0.0%, n = 11) and mixed per photo. wc_0014 gains (LoMa
+   972 -> 1129, ALIKED 713 -> 833). wc_0047 ALIKED and wc_0011 LoMa lose about 10-17%. On snowy photos it is
+   harmless where (iii) was harmful (wc_0048 LoMa 934 vs v2's 341). Real on-date snow keeps texture, so it does
+   not show the flat-tint failure. Too few photos to claim more.
+4. Photo-fitted haze/gain (extras v3/v4) is clearly harmful: -19 to -25% median, 22-25 of 30 photos worse. Fitting the
+   photo's colour and airlight onto the render degrades matching. This agrees with the X3 finding that generic
+   post-processing does not help, and is stronger.
+5. Separation. The decoys already score ~0 on 27-28 of 30 photos (median D = 0, both matchers). No variant flipped
+   any of the photos where a decoy beats the truth: wc_0002 (LoMa I 6 vs D 163) and wc_0028 (9 vs 181), plus wc_0006
+   on ALIKED. These are the wrong-basin cases E1 lists as inherited NB. Their true-pose I stays at 4-9 under every
+   variant. Appearance is not what separates them.
+
+CAVEATS (honest)
+- The separation half is weak as a test. The simple decoys (wrong refs + yaw +-4/8 perturbs, scored by
+  pose-consistency) are nearly all at 0 at baseline, so there is little room to improve, and only 2-3 photos carry
+  information. The plan's E1-score separation is PENDING: it needs E1's a-contrario statistic on E1's hypotheses,
+  which requires fresh renders and skyline cues.
+- Structural: a median-over-30-photos rule cannot be passed by a change that alters only a minority of photos. Snow
+  acts on 6 photos, S2 exists for 11. The criterion is fixed and applied as written. The subgroup numbers above are
+  the fairer read for snow and S2, and they are also negative, or n = 3.
+- Deviations from the plan text:
+  (a) GFSC was replaced by an S2-SCL/Landsat snow composite (no anonymous GFSC access on 2026-09-29).
+  (b) Snow coverage is incomplete. No usable data for wc_0019, 0027, 0028, 0055, 0063, 0072. Winter photos without
+      snow data (wc_0072, 0085, 0099) got no snow tint.
+  (c) S2 before 2018 came from Planetary Computer (Earth Search has no pre-2018 items over the Alps).
+  (d) (iv) covers 11 photos. wc_0009 was excluded (true-view S2 cover 0.10); wc_0054 had no clear scene.
+- Capture times are EXIF DateTimeOriginal read as Europe/Zurich time. Camera clocks are unverified, and a wrong clock
+  shifts the sun used in (ii).
+- n = 30 dev photos, one ref per photo. Per-photo effects are anecdotes.
+
+WHAT'S LEFT
+- E1-score separation: rerun once E1 has scores, or feed the v1/v5 images into E1's common-support procedure for its
+  NB/NE hypotheses. Cost is low (post-processing plus LoMa). Given point 5 above, a flip is not expected.
+- Optional, POST HOC and outside the kill decision: a texture-preserving, slope-masked snow tint on the 6 snowy
+  photos (about 10 min of matching). It would show whether snow's failure is only an implementation artefact.
+
+HOUSEKEEPING
+- Code: common.py, dates.py, geo.py, colour.py, dem_local.py, snow_fetch.py (pre-crash; resume changes: PC token
+  cache, 429 fix), appearance.py (pre-crash; v5 and DONE marker added on resume), montage.py, s2_fetch.py (new),
+  match_run.py (new), score.py (new), run_all.sh (new).
+- Data: snow/ (S2/Landsat snow maps), s2/ (S2 TCI composites), variants/, raw/ (matches), eval_cache/, examples/.
+  The e2 dir totals about 215 MB; fund/ about 470 MB.
+- Logs: logs/snow_fetch.log, s2_fetch.log, appearance.log, match.log, score.log.
+- Nothing was written outside tools/research/fund/e2_appearance/. No live services were called. Rendering: none.
+  MPS work ran only while holding tools/research/tm/.gpu.lock (amendment A3). Processes started: fetch, appearance,
+  match and score python jobs, one at a time, all exited. No render worker or chromium was started.

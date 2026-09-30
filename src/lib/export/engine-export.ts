@@ -7,6 +7,7 @@
 import type { Renderer as PhotoEngine } from "#/lib/renderer";
 import { unprojectDir } from "#/lib/pose";
 import type { PhotoMeta } from "#/lib/photos";
+import { attributionLine, fullAttribution } from "#/lib/licences/attribution";
 import { composeAnnotatedPng } from "./annotate";
 import { type CameraModel, buildCameraModel } from "./camera";
 import { buildColmapZip } from "./colmap";
@@ -348,7 +349,13 @@ export async function exportFromEngine(
 			try {
 				const title = `${engine.photo.id} · heading ${(((engine.pose.yaw % 360) + 360) % 360).toFixed(1)}° · Rigi`;
 				return {
-					blob: await composeAnnotatedPng(bmp, [], { title }),
+					blob: await composeAnnotatedPng(bmp, [], {
+						title,
+						// opt-in (?attrib=full): per-source credits instead of DEFAULT_ATTRIBUTION
+						...(fullAttribution()
+							? { attribution: engineAttribution(engine) }
+							: {}),
+					}),
 					filename,
 					notes,
 				};
@@ -357,6 +364,22 @@ export async function exportFromEngine(
 			}
 		}
 	}
+}
+
+/** Compact per-source credit line for the engine's current view (src/lib/licences). */
+function engineAttribution(engine: PhotoEngine) {
+	const s = engine.settings;
+	const imagery =
+		s.mode === "replace" &&
+		(s.mapStyle === "satellite" || s.mapStyle === "topo")
+			? s.mapStyle
+			: s.mode === "world" && s.worldStyle !== "hillshade"
+				? s.worldStyle
+				: "satellite";
+	return attributionLine(
+		{ lat: engine.photo.lat, lon: engine.photo.lon, imagery },
+		{ compact: true },
+	);
 }
 
 /** Trigger a browser download for a Blob. */

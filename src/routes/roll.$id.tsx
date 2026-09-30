@@ -37,6 +37,7 @@ import {
 	vpColor,
 } from "#/lib/roll/mosaic";
 import { deleteUploadRoll, isLocalRollId } from "#/lib/roll/mosaic/loadRoll";
+import { PropagatePanel, propagateMode } from "#/lib/roll/propagate";
 import { hfovOf } from "#/lib/roll/roll";
 import type { Roll, RollPhoto } from "#/lib/roll/types";
 
@@ -91,6 +92,8 @@ function RollPage() {
 			resetScroll: false,
 		});
 
+	// R5 pose propagation (suggestions only), off unless ?propagate=on|dev
+	const [propagate] = useState(propagateMode);
 	const [visibleIds, setVisibleIds] = useState<
 		ReadonlySet<string> | undefined
 	>();
@@ -243,6 +246,15 @@ function RollPage() {
 					</div>
 				)}
 			</div>
+			{propagate !== "off" && (
+				<PropagatePanel
+					roll={roll}
+					mode={propagate}
+					selectedId={selectedId}
+					onSelect={onSelect}
+					onChanged={() => router.invalidate()}
+				/>
+			)}
 			{selected && view === "mosaic" && (
 				<DetailStrip
 					roll={roll}

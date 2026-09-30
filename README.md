@@ -99,13 +99,15 @@ overlapping photos (`propagate.ts`) is a library, not yet wired into the UI.
 |---|---|
 | `?renderer=deck` | deck.gl backend |
 | `?style=<preset>` | View style preset |
-| `?nearfield=off` | Hide Step Inside. Any value opts headless browsers in. `sharp` selects the dev-only SHARP model (research licence) |
-| `?gpu=off` | WebGPU kill switch (also localStorage `rigi.gpu`) |
-| `?gpuHorizon=0`, `?lookgpu=0` | Turn off the GPU horizon or the GPU look passes (both on by default) |
-| `?eyesearch=1\|auto`, `?unknownGpu=1` | Opt-in GPU eye search / GPU unknown-pose horizon |
+| `?nearfield=off\|on\|sharp` | Step Inside: hide, force on (headless browsers too), or the dev-only SHARP model (research licence). Default `auto` |
+| `?gpu=off` | WebGPU kill switch |
+| `?gpuHorizon=off`, `?lookgpu=off` | Turn off the GPU horizon or the GPU look passes (both on by default) |
+| `?eyesearch=on\|auto`, `?unknownGpu=on` | Opt-in GPU eye search / GPU unknown-pose horizon |
 | `?terrain=tiles` | deck: per-tile terrain instead of batched |
 | `?reveal=off\|<preset>` | Load animation |
-| `?concord=warp` | Concordance display warp (in progress; more values planned) |
+| `?concord=warp,occl,…` | Concordance passes |
+
+Every flag is declared in `src/lib/flags` (typed, the only reader), carried across navigation by the root route, and settable from the photo sidebar's **Experimental & dev** section. Booleans are `on`/`off`. Harnesses override per realm with `globalThis.__RIGI_FLAGS__ = { gpu: "off", … }`.
 
 | Port | Service |
 |---|---|

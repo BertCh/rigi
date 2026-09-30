@@ -3,8 +3,8 @@
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/eye-ui-check.mjs [IMG_7063]
 //
-// 1. Flag off vs ?eyesearch=1 (no saved pose): no button without the flag; the load pose is identical.
-// 2. Saved pose = ground truth (the W6 bench's pose0), ?eyesearch=1: click "Check camera position" and
+// 1. Flag off vs ?eyesearch=on (no saved pose): no button without the flag; the load pose is identical.
+// 2. Saved pose = ground truth (the W6 bench's pose0), ?eyesearch=on: click "Check camera position" and
 //    compare the suggestion with out/gpu/w6/eye-bench.json gpuBatch (and ?gpu=off with cpuBatch).
 // 3. Apply: the engine re-opens at the moved eye with the re-fitted pose; the saved pose is untouched
 //    (bundled photo: session only). Revert: back to the GPS eye and the saved pose.
@@ -59,7 +59,6 @@ try {
 		await page.goto(`${BASE}/favicon.svg`);
 		await page.evaluate(
 			([k, v]) => {
-				localStorage.removeItem("rigi.eyesearch");
 				if (v) localStorage.setItem(k, v);
 				else localStorage.removeItem(k);
 			},
@@ -85,7 +84,7 @@ try {
 	const offBtn = await page.getByText("Check camera position").count();
 	const offEl = await page.locator("[data-eye-search]").count();
 	check("flag off: no button / card", offBtn === 0 && offEl === 0);
-	await open("?eyesearch=1", null);
+	await open("?eyesearch=on", null);
 	const onPose = await poseNow();
 	check(
 		"flag on: load pose identical to flag off",
@@ -166,7 +165,7 @@ try {
 				);
 				return x;
 			});
-	const r = await runSearch("?eyesearch=1");
+	const r = await runSearch("?eyesearch=on");
 	cmp(r, bench?.gpuBatch, "gpuBatch (UI eye0)", 1);
 	cmp(await parity("gpu"), bench?.gpuBatch, "gpuBatch (bench eye0)");
 	await page
@@ -238,7 +237,7 @@ try {
 	}
 
 	if (process.env.CPU !== "0") {
-		const rc = await runSearch("?eyesearch=1&gpu=off");
+		const rc = await runSearch("?eyesearch=on&gpu=off");
 		check("gpu=off ran on the CPU", rc?.gpu === false);
 		cmp(rc, bench?.cpuBatch, "cpuBatch (UI eye0)", 2);
 		cmp(await parity("cpu"), bench?.cpuBatch, "cpuBatch (bench eye0)");

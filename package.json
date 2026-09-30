@@ -30,6 +30,7 @@
 		"@tailwindcss/vite": "^4.1.18",
 		"@tanstack/react-router": "^1.170.39",
 		"@tanstack/react-start": "^1.168.58",
+		"3d-tiles-renderer": "0.5.3",
 		"clsx": "^2.1.1",
 		"deck.gl": "^9.4.0",
 		"exifr": "^7.1.3",

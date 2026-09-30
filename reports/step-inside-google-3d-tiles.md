@@ -1,6 +1,46 @@
 # Google Photorealistic 3D Tiles in Step Inside: investigation
 
-Date: 2026-09-29. This is a research-only investigation: no code was changed. It draws on four parallel research briefs (Google terms, pricing and coverage; rendering libraries and compositing; state of the art; a codebase integration map), plus direct probes of the endpoints. It builds on [step-inside-design.md](step-inside-design.md) and [step-inside-results.md](step-inside-results.md). The cross-project picture is in [status.md](status.md). Every Google policy page was fetched on 2026-09-29. The Maps Platform ToS was last modified on 2026-08-26 and the Service Specific Terms on 2026-06-10. **UNVERIFIED** marks anything not confirmed from a primary source or from code.
+Date: 2026-09-29. It started as a research-only investigation, and the same day it was **built** (T0, T1 and T3 below) after your decisions. The build status comes first; the investigation follows unchanged except where the build corrected it. It draws on four parallel research briefs (Google terms, pricing and coverage; rendering libraries and compositing; state of the art; a codebase integration map), plus direct probes of the endpoints. It builds on [step-inside-design.md](step-inside-design.md) and [step-inside-results.md](step-inside-results.md). The cross-project picture is in [status.md](status.md). Every Google policy page was fetched on 2026-09-29. The Maps Platform ToS was last modified on 2026-08-26 and the Service Specific Terms on 2026-06-10. **UNVERIFIED** marks anything not confirmed from a primary source or from code.
+
+## Build status (2026-09-29)
+
+**Your decisions:**
+1. Billing is a **US** Google Cloud account, which is non-EEA, so the tiles are served (root.json returns 200). The key was copied from poopdeck-presentation into `.env.local` as `VITE_GOOGLE_TILES_KEY`. It has no referrer restriction.
+2. Rendering Google tiles in deck.gl or three.js is fine by you. The ToS "non-Google map" question is **not pursued**.
+3. Start with swisstopo.
+
+The display-only rules (no measurement, no exports, no persistent cache, attribution) are still enforced, because they cost nothing.
+
+**What's built.** Everything is behind `?tiles3d=off|swisstopo|buildings|google|all`, off by default. Code is in `src/lib/tiles3d/` (with a README); dependency `3d-tiles-renderer@0.5.3`.
+
+| Piece | State |
+|---|---|
+| Shared tile selector (`Tiles3DSet`) | One TilesRenderer per source, a 3 km near-field mask plugin, per-source datum, material swap, credits |
+| three.js | Layer 8, visible only while stepping. Log depth with a per-source bias. Fill rule against the drape's range buffer and mask |
+| deck.gl | `Tiles3DDeckLayer`, fed by the **same** selector (the world camera is a THREE camera), so both engines load identical tiles (132 visible at IMG_7018 in both). Terrain log depth. i3dm instancing |
+| Fill blend (default) | Inside the photo frame the photo stays the truth. Tiles fill outside the frame, behind people and Object pixels, and in disocclusions |
+| Clear zones | Tiles fade in over 25–40 m from the photo eye and 5–10 m from the camera, because the GPS eye is 7–37 m off and a tile house would swallow the camera |
+| Truth view | swisstopo tints as DEM-grade survey data. Google is hidden (not ours to label) |
+| Exports | Google is forced off during any world/step capture in both engines |
+| Credits | `components/nearfield/Tiles3DCredit.tsx`: Google per-tile copyrights (sorted by occurrence), the swisstopo credits and a "visual only, not measured" note |
+| Checks | CI `tiles3d` (geoid, placement, datum table, flags). `scripts/tiles3d/step-tiles-check.mjs` (browser: screenshots, `sampleAt` identical with tiles on and off, `--perf`, `--nearfield`, `--truth`) |
+
+**Results:**
+- **Datum.** Google is ellipsoidal: the p25 of (mesh − DEM) is −0.35 m with N = 50.4 m. swisstopo stores MSL, so it needs N = 0 (building bases a median 2.8 m below the DEM). The investigation's assumption that swisstopo was ellipsoidal was wrong and is corrected in §4.2.
+- **Isolation.** `sampleAt` is bit-identical with tiles on and off in both engines. eval-app is unchanged (12/14 within 1°, median 6.5 px). deck smoke passes. Fast CI passes 22/22 plus 1 known failure.
+- **style-baseline 0/16, not from this work.** Every diff is missing hiking trails, caused by the `trails: false` default committed in 71e846e by another session. The geometry is identical and the tiles code is inert with the flag off. The baseline needs re-capturing for the trails change.
+- **Frame rate** (IMG_7018, about 39k splats, 4 s orbit, headless Metal):
+  - three.js: 60 fps with and without Google (vsync-capped).
+  - deck.gl: 16.2 fps without tiles and 15.4 fps with Google. The deck step view is already slow with splats, so that cost comes from the view, not the tiles.
+- **Load time.** 132 Google tiles plus 90 swisstopo tiles settle in about 7 s (three.js) and 13–15 s (deck.gl).
+
+**Not done yet:**
+1. The **official Google Maps logo** (16–19 dp) is not bundled. The credit text is there, but the logo must go in before any public URL.
+2. **T2:** swisstopo buildings and vegetation into the depth split and the readout. That's the smear-gate lever, shared with roadmap C4 and S1.
+3. Photo drape onto swisstopo facades.
+4. An iOS memory budget.
+5. A Google coverage survey across the other GT sites. Only IMG_7018 (Lake Thun) was tested; it has photogrammetric coverage.
+6. Referrer-restricting the API key.
 
 ## Verdict
 
@@ -107,8 +147,9 @@ Research use gives no shelter here. The Map Tiles policies have no research exem
 ### 4.2 Frame and vertical datum (a 50 m trap)
 
 - The ENU frame is `new EnuFrame(photo.lat, photo.lon, 0)` (`engine.ts:551`, `deck/engine.ts:306`; `geodesy.ts:36-107`) with the origin at ellipsoid height 0.
-- **Rigi feeds orthometric Mapterhorn heights into the ellipsoid formula as if they were ellipsoidal** (N = 0; `export/camera.ts:38-43`). Google tiles, and swisstopo's Cesium 3D Tiles (**UNVERIFIED**, but they're built for CesiumJS), are in true ellipsoidal ECEF.
-- Unless corrected, they will float **about 47–54 m above our DEM** in Switzerland (EGM2008 N; verify with PROJ `us_nga_egm08_25.tif`).
+- **Rigi feeds orthometric Mapterhorn heights into the ellipsoid formula as if they were ellipsoidal** (N = 0; `export/camera.ts:38-43`).
+- **Measured in the build (IMG_7018):** Google tiles are true ellipsoidal ECEF. With N = 50.4 m applied, the 25th percentile of (mesh − DEM) is −0.35 m, so open ground sits on the DEM. **swisstopo's Cesium tilesets are not ellipsoidal:** like Rigi, they put MSL heights in the ellipsoid slot. With N = 0, building bases sit a median 2.8 m below the DEM (foundations on a slope). With N applied they'd be buried 53 m deep. The correction is therefore per source (`tiles3d/config.ts` `heights`).
+- Uncorrected, Google tiles float **about 47–55 m above our DEM** in Switzerland. EGM2008 N from PROJ (`us_nga_egm08_25`) is 50.5 m at Niederhorn, 54.7 m at Zermatt and 48.4 m at Rigi.
 - Placement: `tiles.group.matrix = ENU_from_ECEF(lat, lon, h0 = N)`, which subtracts N. Set `matrixAutoUpdate = false`.
   - three.js composes the matrices in float64 on the CPU, so ECEF magnitude causes no precision loss.
   - The `EnuFrame.fromGeo` refraction lift (k = 0.13) is 4 cm at 2 km, so we can ignore it inside the near field.
@@ -232,12 +273,12 @@ Research use gives no shelter here. The Map Tiles policies have no research exem
 
 | Phase | Scope | Exit gate |
 |---|---|---|
-| **T0: shared tiles layer on swisstopo, three.js** | `src/lib/tiles3d/**`: loader, `NearFieldMask`, the ENU+N matrix, layer 8 isolation, fade to DEM, attribution line. `?tiles3d=swisstopo` in step mode. Needs your OK for the `3d-tiles-renderer` dependency | Buildings and trees sit on the DEM within 1 m on 5 CH photos. style-baseline 16/16, eval-app unchanged, a nearfield check proves tiles are absent from `renderGeometry`, horizon, silhouette and export. Holds 60 fps at 200k splats |
-| **T1: deck.gl parity** | `deck/tiles3d-layer.ts` fed by the shared selector, log depth | deck smoke 4/4. Same tile set as three.js. Visual parity on the 5 photos |
-| **T2: swisstopo into the split (the real win)** | Building and vegetation tiles (and optionally nDSM) mark Object pixels. Tile range grounds object splats. swisstopo tile range added to the step-mode geometry pass for the readout. Photo drape onto facades | Re-measure the smear gate on the existing `tools/nearfield/smear/labels.json`, with the frozen labels and the same metric as the results doc, against the 80% target |
-| **T3: Google backdrop (optional)** | `?tiles3d=google`, display-only: the DEM and drape are hidden under Google coverage, no recolouring, Google is hidden in Truth view, the readout is suppressed on Google pixels, exports force it off, the logo and credits component is shown. **Blocked** on decisions 1–2 below | A check suite proves Google content never reaches `sampleAt`, anchoring, split, align, concordance, matcher, any export, or a persistent cache. Legal sign-off recorded |
+| **T0: shared tiles layer on swisstopo, three.js** (BUILT) | `src/lib/tiles3d/**`: loader, `NearFieldMask`, the ENU+N matrix, layer 8 isolation, fade to DEM, attribution line. `?tiles3d=swisstopo` in step mode. Needs your OK for the `3d-tiles-renderer` dependency | Buildings and trees sit on the DEM within 1 m on 5 CH photos. style-baseline 16/16, eval-app unchanged, a nearfield check proves tiles are absent from `renderGeometry`, horizon, silhouette and export. Holds 60 fps at 200k splats |
+| **T1: deck.gl parity** (BUILT) | `deck/tiles3d-layer.ts` fed by the shared selector, log depth | deck smoke 4/4. Same tile set as three.js. Visual parity on the 5 photos |
+| **T2: swisstopo into the split (the real win)** (next) | Building and vegetation tiles (and optionally nDSM) mark Object pixels. Tile range grounds object splats. swisstopo tile range added to the step-mode geometry pass for the readout. Photo drape onto facades | Re-measure the smear gate on the existing `tools/nearfield/smear/labels.json`, with the frozen labels and the same metric as the results doc, against the 80% target |
+| **T3: Google backdrop (optional)** (BUILT behind the flag; logo pending) | `?tiles3d=google`, display-only: the DEM and drape are hidden under Google coverage, no recolouring, Google is hidden in Truth view, the readout is suppressed on Google pixels, exports force it off, the logo and credits component is shown. **Blocked** on decisions 1–2 below | A check suite proves Google content never reaches `sampleAt`, anchoring, split, align, concordance, matcher, any export, or a persistent cache. Legal sign-off recorded |
 
-## Decisions for you
+## Decisions for you (answered 2026-09-29: see Build status)
 
 1. **Billing entity.** Google 3D Tiles are only available to a **non-EEA** billing account (CH or UK), and a new EEA project gets a 403. Do you have, or want, a Swiss or UK GCP billing account for this? If it's Austria-based or another EEA country, T3 is off the table: only the closed `Map3DElement` remains, and that can't host our splats or DEM.
 2. **The "non-Google map" clause.** Under the global ToS, T3 needs a written answer from Google (open question 1 below). Do you want to ask, or drop T3?

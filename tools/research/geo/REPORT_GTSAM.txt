@@ -1,0 +1,89 @@
+GEO GA1 - GTSAM REFERENCE MAP SOLVER: PARITY WITH THE TS PORT                               2026-09-30 (Agent C)
+Code: gtsam_ref.py (reference, fixtures, parity) + ts_fixture_solve.ts (runs src/lib/geocam/map solveMap on a fixture).
+Results: out/geocam/python/gtsam_parity.json. Fixtures: out/geocam/python/fixtures/<name>.json (+ <name>.ts.json).
+
+WHAT THE REFERENCE IS
+  A GTSAM 4.3.0 graph over the same parameters as core/types.ts:
+    R = (yaw, pitch, roll) in degrees, as a Vector3
+    F = logf, as a Vector1
+    E = (E, N, U) in metres, as a Vector3
+  Fixed blocks are held as constants.
+  Every TS factor row becomes one gtsam.CustomFactor. Its robust loss is a noiseModel.mEstimator.Custom with weight
+  a*psi(z) and loss a*rho(z)/2, where psi and rho follow map/lm.ts and a is the TS grid-thinning factor.
+  Factors mirrored (Python ports, not calls into TS):
+    - gps, alt
+    - ground (asymmetric sigma)
+    - gravity
+    - compass, Student-t nu = 3 (via the custom mEstimator)
+    - focal
+    - point 2D-3D, sigma = sigma_px (+) f sqrt(1-rho) sigma_DEM(d)/d
+    - skyline, with the eye-linearised horizon, columnSigma per sample, and the horizons recomputed in Python from
+      the fixture ridge
+    - the map/cluster.ts correlated-DEM whitening (I + s_c^2 G G^T)^-1/2, for both point and skyline
+  The camera model is a Python port of camera/index.ts and concord camera-x.ts (fScale, k1, principal point).
+  Optimiser: gtsam.LevenbergMarquardtOptimizer.
+  Covariance: gtsam.Marginals joint marginal of the free keys. It uses a second graph whose data rows carry 1/s^2,
+  with s = max(1, MAD scale) as in map/covariance.ts.
+  Jacobians: central differences with small steps (1e-5 deg, 1e-7, 1e-3 m).
+  Parity mirrors TS's pass structure exactly:
+    - the MAP of TS's last inner solve (the linearisation of relinAll pass k-1, thinning at that state), solved
+      from the fixture's x0;
+    - the covariance at the TS solution with the final pass's linearisation;
+    - the skyline no-op rule when the quantised eye is unchanged is replayed.
+
+FIXTURES (made by `gtsam_ref.py make`; no B fixtures existed in out/geocam/fixtures by the end of this session)
+  syn_near_all              priors + 150 near points (10% outliers, Cauchy) + skyline (8 km ridge); focal and eye free
+  syn_far_all               priors + points at 15-30 km + skyline (20 km ridge); default DEM sigma + clusters; eye free
+  syn_rot_blunder           eye fixed, focal free, 90 deg compass blunder (Student-t)
+  syn_skyline_eye           priors + ground plane + near skyline (2 km ridge) only; eye free
+  syn_near_nocluster_huber  cluster: null (independent rows), Huber(1.5) points, nEff 80
+  real_wc_0067_k000         E1 POS LoMa correspondences of dev photo wc_0067 (400 after thinning) + priors; eye and
+                            focal free
+  real_wc_0067_dispd150b259 the same photo's 150 m displaced-eye decoy correspondences
+
+PARITY (target: parameters within 1e-3 deg / 0.1 m, sigma within 5%). ALL 7 PASS, with margin.
+  fixture                    |dx| rot deg  |dlogf|   |d eye| m  max |sigma_G/sigma_TS - 1|  max corr diff  MAD TS/Py
+  real_wc_0067_dispd150b259   1.2e-06      5.5e-08   <1e-3      <1e-4                      2.7e-09        1.087/1.087
+  real_wc_0067_k000           2.2e-06      6.4e-08   <1e-3      <1e-4                      2.9e-07        1.129/1.129
+  syn_far_all                 1.8e-07      0         <1e-3      <1e-4                      8.0e-06        0.310/0.310
+  syn_near_all                7.1e-08      4.1e-09   <1e-3      <1e-4                      4.1e-07        0.814/0.814
+  syn_near_nocluster_huber    8.9e-09      1.5e-09   <1e-3      <1e-4                      1.9e-05        0.139/0.139
+  syn_rot_blunder             1.3e-06      4.0e-08   0 (fixed)  <1e-4                      7.0e-10        1.424/1.424
+  syn_skyline_eye             1.3e-05      0         <1e-3      2e-4                       1.5e-04        0.047/0.047
+  Also matching:
+  - Python-recomputed skyline per-sample sigma vs TS: max relative difference 3e-16.
+  - Horizon elevation arrays: max difference 0 deg.
+  - Quantised linearisation eyes are identical.
+  - Starting GTSAM from the TS solution instead of x0 gives the same numbers.
+
+OBSERVATIONS (not parity items)
+  - syn_far_all: sigma_E/N = 17.4/16.9 m against a 20 m GPS prior, i.e. 0.84-0.87 sigma_GPS. That is the GA1
+    "all-far photos report sigma_EN >= 0.8 sigma_GPS" behaviour, and it comes from the cluster whitening.
+  - real_wc_0067_k000: sigma_E/N = 9.9/16.9 m. The same photo's plain point-only Laplace (REPORT_PNP) claims about
+    1 m. The cluster model removes most of the eye over-confidence found in the PnP pre-study, but whether the
+    sigmas are calibrated can only be judged on data (GA1 eval).
+  - syn_skyline_eye: a 2 km ridge skyline alone leaves sigma_EN at ~18 m (the cluster part absorbs most of it).
+
+CAVEATS
+  - B's map code was still changing during this session (point/skyline clusters appeared, and the solveMap trust
+    term was replaced by an eye step cap). The results above are for the code as of 2026-09-30T03:40Z. Re-run:
+      npx tsx tools/research/geo/ts_fixture_solve.ts out/geocam/python/fixtures/*.json &&
+      PYTHONPATH=tools/research/geo/.pylib tools/matcher/.venv/bin/python tools/research/geo/gtsam_ref.py parity
+    Any later model change in factors.ts or cluster.ts must be mirrored in gtsam_ref.py (build_blocks, point_block,
+    sky_state).
+  - The concord cue factors (edge / level / shore via cueResidualPx) and the lakes, junction and integrity factors
+    are NOT mirrored.
+  - Parity uses a FIXED linearisation per pass. The outer relinearisation loop itself (the eye step cap, relinM)
+    is only replayed from TS's recorded pass states, not re-derived independently.
+  - Fixture ground is a plane. A DEM ground is not in the format.
+
+OTHER DELIVERABLES (same session)
+  - decl_ref.py -> out/geocam/python/decl_ref.json: 280 WMM2025 points (35 places, of which 23 are Swiss/Alpine,
+    plus worldwide including Everest; years 2025.0-2029.9).
+    pygeomag against the official NOAA WMM2025 test values (100 rows): max |dD| 0.005 deg (the table rounds to
+    0.01), max |dXYZ| 0.0007 nT.
+  - export_decoys.py -> out/geocam/decoys/<pid>.json: 35 dev photos, 1127 hypotheses, 13 MB. Format in README.txt.
+    Labels: POS 33, NB-inh 3, NB-con 93, NB-dec 597, NE-inh 5, NE-dec 68 (56 primary + 12 secondary), AMB 13,
+    UNL 315.
+    Sanity check: at a hypothesis' own pose and eye, a clean set reprojects with a median of ~3 px (wc_0067 POS
+    3.3 px). Some sets are mostly outliers (wc_0002 refC 104 px), so consumers must robustify.

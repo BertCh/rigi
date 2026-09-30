@@ -1550,6 +1550,8 @@ export function StylePanel({
 	return (
 		<Section
 			title="Look"
+			collapse={{ id: "look" }}
+			summary={PRESET_LABELS[state.preset]}
 			aside={
 				custom ? (
 					<span

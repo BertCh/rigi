@@ -24,7 +24,7 @@
  * Scores: dev pins via scripts/concord/lib.ts scorePins, banded by the pin's distance from the GT eye.
  * The gated camera for a LOW-confidence start is the start (concordRefine refuses); the raw solve is
  * still reported (diagnostic) for every photo.
- * Outputs: out/concord/solve/eval-<tag>.json, cand/<start>-cues/<photo>.json (eval.ts --candidate).
+ * Outputs: out/concord/solve/eval-<tag>.json, cand/<tag>/<start>-cues/<photo>.json (eval.ts --candidate).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -54,8 +54,8 @@ import {
 	offsetLatLon,
 } from "../../src/lib/concord/priors/ground";
 import {
-	cachedHorizons,
 	type ConcordRefineOut,
+	cachedHorizons,
 	concordRefine,
 	cueCrossCheck,
 	gate,
@@ -129,9 +129,13 @@ if (!photos.length)
 	photos = Object.keys(split)
 		.filter((p) => split[p] === "dev")
 		.sort();
+// the once-only final report may score the frozen HOLDOUT photos (CONCORD_HOLDOUT=final); never tune on it
+const holdoutFinal = process.env.CONCORD_HOLDOUT === "final";
 for (const p of photos)
-	if (split[p] !== "dev")
-		throw new Error(`${p} is not a DEV photo; WP-D tunes/reports on DEV only`);
+	if (split[p] !== "dev" && !(holdoutFinal && split[p] === "holdout"))
+		throw new Error(
+			`${p} is not a DEV photo; WP-D tunes/reports on DEV only (holdout: CONCORD_HOLDOUT=final)`,
+		);
 fs.mkdirSync(HZ_CACHE, { recursive: true });
 
 // ---------------------------------------------------------------- DEM + horizons
@@ -610,7 +614,7 @@ async function setup(photo: string, start: "app" | "gt"): Promise<Setup> {
 			frame: { alt0: s.eyeAlt, rEff: R_EFF },
 		},
 		cuesAt,
-		pins: await loadPins({ photos: [photo], split: "dev" }),
+		pins: await loadPins({ photos: [photo], split: split[photo] }),
 		meta,
 		priorNote: `${pr.source} σH ${pr.sigmaH.toFixed(0)} σV ${pr.sigmaV.toFixed(0)} (${pr.reason}); focal ${lens ?? "default"} ×${fp.fScale.toFixed(4)} σ ${(100 * fp.entry.sigma).toFixed(1)}%; lakes ${lakes.length}; rematch ${rm.length}`,
 	};
@@ -772,11 +776,11 @@ for (const start of starts) {
 			};
 			add(`${start}/cues`, photo, rec);
 			const rawSky = await skylineRms(photo, rawCam);
-			fs.mkdirSync(path.join(OUT, "cand", `${start}-cues`), {
+			fs.mkdirSync(path.join(OUT, "cand", tag, `${start}-cues`), {
 				recursive: true,
 			});
 			fs.writeFileSync(
-				path.join(OUT, "cand", `${start}-cues`, `${photo}.json`),
+				path.join(OUT, "cand", tag, `${start}-cues`, `${photo}.json`),
 				JSON.stringify({
 					cam: camJson(gatedCam),
 					raw: camJson(rawCam),
@@ -888,7 +892,7 @@ for (const start of starts) {
 const tables: Record<string, unknown> = {};
 const criteria: Record<string, unknown> = {};
 console.log(
-	`\n\nDEV pins (px @1600), median / p90 (n); bands by pin distance from the GT eye. DEM ${dem}.`,
+	`\n\n${holdoutFinal ? "HOLDOUT" : "DEV"} pins (px @1600), median / p90 (n); bands by pin distance from the GT eye. DEM ${dem}.`,
 );
 console.log(
 	`${"run".padEnd(24)}${DISTANCE_BANDS.map((b) => pad(b, 18)).join("")}${pad("all", 18)}`,

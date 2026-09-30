@@ -8,6 +8,7 @@
 //   3. otherwise the best guess is shown as "unverified".
 
 import type { Pose } from "#/lib/camera";
+import { priorHeading } from "#/lib/geocam/priors/heading";
 import { unknownGpuOptIn } from "#/lib/gpu/horizon/unknown-opt-in";
 import {
 	type MatchRequest,
@@ -33,7 +34,7 @@ type LocalFlags = {
 
 export function photoUnknowns(photo: PhotoMeta): Unknowns {
 	const l = (photo as PhotoMeta & { local?: LocalFlags }).local;
-	const yaw = photo.heading == null || !!l?.yawUnknown;
+	const yaw = priorHeading(photo) == null || !!l?.yawUnknown;
 	const gravity = photo.gravity == null || !!l?.pitchRollUnknown;
 	const focal = !!l?.focalUnknown;
 	return { yaw, gravity, focal, any: yaw || gravity || focal };
@@ -111,7 +112,7 @@ export class UnknownPoseSolver {
 		number,
 		{ resolve: (r: UnknownPoseResult) => void; reject: (e: Error) => void }
 	>();
-	/** GPU 360° horizon, opt-in (?unknownGpu=1; off under ?gpu=off) */
+	/** GPU 360° horizon, opt-in (?unknownGpu=on; off under ?gpu=off) */
 	private gpu = unknownGpuOptIn();
 
 	constructor(private photo: PhotoMeta) {

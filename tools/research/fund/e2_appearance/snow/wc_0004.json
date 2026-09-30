@@ -1,0 +1,193 @@
+{
+ "pid": "wc_0004",
+ "date": "2014-07-06T11:47:53",
+ "bbox": [
+  9.020074844360352,
+  47.148014068603516,
+  10.550994873046875,
+  48.45102310180664
+ ],
+ "W": 1905,
+ "H": 2413,
+ "source": "Landsat",
+ "items": [
+  {
+   "id": "LE07_L2SP_193027_20140704_02_T1",
+   "date": "2014-07-04T10:01:39.853737",
+   "dd": 2.0737632669328705,
+   "cloud": 47.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.142,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_193026_20140704_02_T1",
+   "date": "2014-07-04T10:01:15.971668",
+   "dd": 2.0740396797685183,
+   "cloud": 12.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.022,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_194027_20140703_02_T1",
+   "date": "2014-07-03T10:10:07.331342",
+   "dd": 3.067889683541667,
+   "cloud": 3.54,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.85,
+   "newPx": 3906569
+  },
+  {
+   "id": "LC08_L2SP_194026_20140703_02_T1",
+   "date": "2014-07-03T10:09:43.448777",
+   "dd": 3.0681661021180555,
+   "cloud": 14.28,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.32,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_195026_20140702_02_T1",
+   "date": "2014-07-02T10:13:37.063202",
+   "dd": 4.0654622314583335,
+   "cloud": 54.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.0,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_194026_20140711_02_T1",
+   "date": "2014-07-11T10:07:27.227598",
+   "dd": 4.930257263865741,
+   "cloud": 52.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.049,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_194027_20140711_02_T1",
+   "date": "2014-07-11T10:07:51.110187",
+   "dd": 4.930533682719908,
+   "cloud": 87.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.081,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_193026_20140712_02_T1",
+   "date": "2014-07-12T10:03:36.742638",
+   "dd": 5.927589613865741,
+   "cloud": 75.99,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.0,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_193027_20140712_02_T1",
+   "date": "2014-07-12T10:04:00.633676",
+   "dd": 5.927866130509259,
+   "cloud": 89.58,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.018,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_193027_20140626_02_T1",
+   "date": "2014-06-26T10:03:51.419422",
+   "dd": 10.072240515949074,
+   "cloud": 16.73,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.297,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_193026_20140626_02_T1",
+   "date": "2014-06-26T10:03:27.532621",
+   "dd": 10.07251698355324,
+   "cloud": 35.8,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.052,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_194027_20140625_02_T1",
+   "date": "2014-06-25T10:07:47.277829",
+   "dd": 11.069510673275463,
+   "cloud": 70.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.144,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_195026_20140718_02_T1",
+   "date": "2014-07-18T10:13:38.669544",
+   "dd": 11.934556360462963,
+   "cloud": 0.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.1,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LE07_L2SP_195027_20140718_02_T1",
+   "date": "2014-07-18T10:14:02.552642",
+   "dd": 11.934832785208334,
+   "cloud": 2.0,
+   "platform": "landsat-7",
+   "src": "Landsat",
+   "localValid": 0.1,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_195027_20140624_02_T1",
+   "date": "2014-06-24T10:16:13.228835",
+   "dd": 12.063654758854167,
+   "cloud": 63.55,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.04,
+   "skipped": true,
+   "newPx": 0
+  },
+  {
+   "id": "LC08_L2SP_195026_20140624_02_T1",
+   "date": "2014-06-24T10:15:49.346271",
+   "dd": 12.063931177418981,
+   "cloud": 16.55,
+   "platform": "landsat-8",
+   "src": "Landsat",
+   "localValid": 0.032,
+   "skipped": true,
+   "newPx": 0
+  }
+ ],
+ "coverage": 0.84985179794921,
+ "snowFracMeanKnown": 5.4102861213323195e-06,
+ "medianDaysOffset": 3.06788969039917
+}

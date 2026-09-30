@@ -1,6 +1,7 @@
 // Client for the optional render-and-match escalation service (tools/matcher/server, default :8765).
 // Everything here degrades to `false` / `null` when the service isn't running: it never throws.
 import type { Pose } from "./camera";
+import { getFlag } from "./flags";
 
 const BASE = (
 	import.meta.env?.VITE_MATCHER_URL ?? "http://localhost:8765"
@@ -117,6 +118,18 @@ export type MatchResult = {
 	};
 	/** exp(−agree/1°)·exp(−skyMed/4 px)·min(1, support/0.3), a monotone summary of the checks */
 	fusionScore?: number;
+	/**
+	 * ?geoInliers (src/lib/geocam): the 2D–3D inliers at `pose`, grid-thinned (≤ 400), when the server
+	 * supports `returnCorrespondences` (proposal: out/geocam/ga0/matcher-correspondences.patch). Photo px
+	 * at W×H; X in the ENU frame at `eye` (m).
+	 */
+	correspondences?: {
+		W: number;
+		H: number;
+		eye: [number, number, number];
+		uv: [number, number][];
+		X: [number, number, number][];
+	};
 	/** the v0.1 render-match heuristic, kept for reference */
 	matchConfidence?: number;
 	skylineUnavailable?: string;
@@ -196,6 +209,10 @@ export function matcherAvailable(force = false): Promise<boolean> {
 	return healthInFlight;
 }
 
+/** ?geoInliers: ask for the inlier correspondences (unknown fields are ignored by older servers). */
+const geoInliers = () =>
+	getFlag("geoInliers") === "on" ? { returnCorrespondences: true } : {};
+
 function buildBody(
 	req: MatchRequest,
 	serverTimeoutMs: number,
@@ -203,7 +220,11 @@ function buildBody(
 	// discriminate on the photo Blob: the views variant may carry a photoId too, and must stay multipart
 	if (!("photo" in req))
 		return {
-			body: JSON.stringify({ ...req, timeoutMs: serverTimeoutMs }),
+			body: JSON.stringify({
+				...req,
+				timeoutMs: serverTimeoutMs,
+				...geoInliers(),
+			}),
 			headers: { "Content-Type": "application/json" },
 		};
 	if ("meta" in req) {
@@ -228,6 +249,7 @@ function buildBody(
 				yawSeeds,
 				poseSeeds,
 				timeoutMs: serverTimeoutMs,
+				...geoInliers(),
 			}),
 		);
 		fd.append("photo", req.photo, "photo.jpg");
@@ -258,6 +280,7 @@ function buildBody(
 				accepted: sk.accepted,
 			},
 			timeoutMs: serverTimeoutMs,
+			...geoInliers(),
 		}),
 	);
 	fd.append("photo", req.photo, "photo.jpg");

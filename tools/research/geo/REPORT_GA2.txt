@@ -1,0 +1,64 @@
+GA2 - Observability gate (Fisher / CRLB per DoF)                          Agent D, 2026-09-30
+Rule: tools/research/geo/PROTOCOL.txt SECTION GA2 (written before any GA2 real-data number).
+Data: out/geocam/ga2/ga2-eval.json (decoys + gt), logs run-decoys.log / run-gt.log.
+Code: src/lib/geocam/observe/** (crlb, heldOutFamily, eyeMayMove), scripts/geocam/ga2-eval.ts.
+
+VERDICT: GA2 KILLED (by a hair). Spearman rho(sigma_eye, actual eye error) = 0.498 over 89 E1 hypotheses
+(33 POS + 56 NE-dec) vs kill rho < 0.5; bootstrap-by-photo 95% CI [0.34, 0.65]. The interval straddles the
+threshold: the honest statement is "sigma_eye ranks eye error only moderately", and it is not usable ALONE as a gate.
+
+WHAT WAS BUILT
+  crlb(p, x, {steps, relinearize, thinning}) -> FisherReport {info, cov, sigma (per DoF), sigmaEye (sqrt lambda_max
+      of the E/N block), sigmaU, sigmaEye3, byFamily [{family, n, info, sigmaEyeAlone, share}], cond, mask}.
+      Central-difference Jacobians of the whitened residuals (= prediction Jacobian / row sigma), nEff thinning, no
+      robust weights, no MAD: the Gaussian CRLB of the model at x. share = family's part of tr(Sigma_EN) from
+      Sigma = sum_f Sigma I_f Sigma (shares sum to 1); sigmaEyeAlone = family + all priors; cond in correlation form.
+  heldOutFamily(p, full, family, {x0}) -> {before, after, improved, xWithout, eyeMoveM, agreeM}: re-solve without the
+      family from the pre-move state; the family's mean robust cost at x0 vs at the held-out solution.
+  eyeMayMove(fr, held[], {maxSigmaEyeM: 15, integrity}) -> {ok, reasons}: sigma_eye < 15 m AND a held-out family
+      confirms (and its fit agrees with the full fit) AND GA5 passes; fails closed (GA5 missing => shut).
+  observe.check.ts: 7/7 synthetic checks pass (CRLB = Monte-Carlo spread of solveMap within 20 %: 0.18 vs 0.16-0.18 m;
+      far-only sigma_eye 27.9 m >= 0.8 sigma_GPS with GPS share 0.83; near sigma_eye 0.19 m with point share 1.0;
+      free focal + far points ill-conditioned; held-out family confirms a true move and refuses a family agreeing
+      with a wrong fix; gate opens only with all three legs).
+
+PRIMARY: E1 displaced-eye decoys (MAP per hypothesis: gps at the hypothesis eye sigma 20 m, alt 5 m, focal, points)
+                     n   median sigma_eye   median eye error   sigma_eye = inf (0-1 matches)
+  POS               33        12.5 m             15.8 m                0
+  NE-dec (150/400)  56        18.2 m            180.5 m                7
+  rho (all)          0.498   CI [0.34, 0.65]  -> KILL (< 0.5)
+  rho (NE-dec only)  0.477
+  rho with the Laplace sigma_EN (robust weights + MAD; secondary) 0.603
+  No NE-dec decoy was pulled back within 50 m of the true eye (150 m: median error 135 m; 400 m: 368 m; 38/56 moved
+  somewhat toward truth). "Confidently wrong" (final error > 50 m with sigma_eye < 15 m): 14/56 NE-dec = 25 %.
+  Side finding (GA1-relevant): 7/33 POS hypotheses, started AT the true eye, ended > 30 m away (up to 98 m, wc_0072);
+  with appearance matches the eye drifts on match noise / DEM mismatch while the CRLB claims 5-15 m.
+  Reading: most of rho comes from the label split (decoy correspondences are fewer and farther, so sigma is larger);
+  within the observable photos sigma does not predict whether a wrong eye comes back. This is the E1/E3 lesson again:
+  point factors from appearance matches mostly constrain rotation (median point share of the E/N variance 0.40).
+
+SECONDARY (descriptive; GT dev, GA1 config P, app start, Mapterhorn)
+  CRLB sigma per DoF at the MAP solution (sigma_eye m / yaw deg / pitch deg; dominant eye family):
+    5495 20.5/0.115/0.065 gps   6971 9.2/0.059/0.042 skyline   7018 11.7/0.051/0.044 gps   7033 10.6/0.073/0.061 point
+    7053 10.2/0.058/0.034 gps   7059 2.8/0.073/0.156 skyline   7063 4.8/0.088/0.180 skyline 7068 7.1/0.059/0.044 skyline
+    7131 15.9/0.080/0.067 skyline 7155 7.1/0.296/1.457 skyline
+  GPS mean displaced 150 m (4 bearings x 10 photos = 40 runs): median final error 93 m, median sigma_eye 9.5 m,
+  only 6/40 end within 50 m; 31/40 are confidently wrong (sigma < 15 m, error > 50 m); rho = -0.16.
+  Caveat: this secondary test also mis-specifies the GPS prior (a 150 m shift at sigma 14-20 m is a 7-10 sigma prior
+  error), so a compromise far from truth is expected; still, the CRLB of the skyline family (2.8-10 m on 6 photos)
+  is not borne out: the skyline does not pull the eye back 150 m. Either the skyline eye information is largely
+  model artefact (DEM / refraction error correlated along the ridge, under-modelled), or the relinearised solver
+  cannot travel that far (trust region 25 m x 8 outer). GT eyes are not surveyed truth.
+
+CONSEQUENCES
+  - sigma_eye (CRLB or Laplace) is necessary but NOT sufficient: a tight sigma is often a wrong eye. The gate must
+    keep all three legs of guard-rail 4.1 (sigma + held-out family + GA5); eyeMayMove fails closed by design.
+  - Keep reporting sigma per DoF (rotation sigmas are sensible: yaw 0.05-0.3 deg, pitch 0.03-0.2 deg except 7155),
+    but do not present sigma_eye to users as "position +-N m" until a held-out family confirms it.
+  - The Laplace sigma (0.60) ranks slightly better than the CRLB (0.50): the MAD rescale carries misfit
+    information that the CRLB by construction ignores (post-hoc observation, not in the rule).
+HONEST CAVEATS
+  - n = 89 hypotheses from 33 photos; bootstrap by photo. Infinite sigma (hypotheses with 0-1 matches, singular
+    rotation) is ranked last (fixed as an implementation bug before the final run: the first run silently dropped
+    them, rho 0.41; the rule "over all primary hypotheses" requires them).
+  - The E1 truth eye is the stated (manual/EXIF) eye, not surveyed.

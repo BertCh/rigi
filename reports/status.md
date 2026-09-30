@@ -6,10 +6,12 @@
 
 | Thread | State | Headline evidence | Next step |
 |---|---|---|---|
-| **Registration** | App pipeline stable. Matcher v0.4.0 runs locally only. Terrain-matching research done. Hard-negative pack built (120 overlays, 27 photos), not yet verified | App: 12/14 within 1°, 0 false accepts. Held-out wild test: 29/50 correct, HIGH 17/17 (arm A). ~20% of wild photos auto-accept | Blind-verify the pack → veto prereg → recall levers ([roadmap](roadmap.md) R1–R3) |
-| **Concordance** (whole-frame fit) | Research done; WP-A..G being built under `src/lib/concord` (session f3) | The skyline can't see eye error (10 m shift = 0.2–2 px of skyline). Interior error 73 px at 50–500 m, 2.5 px at 2–5 km. Lens focal table cuts focal error 1.85%→0.54% | You click interior pins; then the joint solve is measured |
+| **Registration** | App pipeline stable. Matcher v0.4.0 runs locally only. Terrain-matching research done. Hard-negative pack built (120 overlays, 27 photos), not yet verified. Top-3 picker / tap-a-peak built behind `?picker=on` (R4). Propagation DEM render check: **inconclusive** (R5) | App: 12/14 within 1°, 0 false accepts. Held-out wild test: 29/50 correct, HIGH 17/17 (arm A). ~20% of wild photos auto-accept | Blind-verify the pack → veto prereg → recall levers ([roadmap](roadmap.md) R1–R3). FUND E1 may replace the veto panel design |
+| **Fundamentals** (FUND phase 0, [fundamentals-plan.md](fundamentals-plan.md)) | **Phase 0 finished 2026-09-29: E0–E3 all killed** (E1–E3 were cut off by the shutdown and resumed the same evening). Dev only, `tools/research/fund/` | E0 **killed as pre-registered** (AUROC 0.60 rotation / 0.50 position, both < 0.65). But the rotation half is confounded by skyline clipping in the pitch-0 ring cache (13/13 heavily clipped photos read as "never unique"). Post hoc, position failures have *more* near-field parallax at the stated eye (0.71, p = 0.04). E2 killed: date-matched sun/snow/S2 renders gain ≤ 0.3% median inliers (bar 15%). E3 killed: hi-res near-field renders don't add < 2 km inliers, and the eye beats GPS on 3/30. E1 killed: a-contrario accept lifts recall 19→23/31 but accepts 10/56 displaced-eye decoys | Decide on phase 1: E4 dense refinement and/or E5 ray-cast oracle. Wrong-eye rejection is the open problem; the displaced-eye decoys are the test any future veto must pass |
+| **Geometry-first camera** (GEO phase A, [geometry-first-pose.md](geometry-first-pose.md)) | Built 2026-09-30 in `src/lib/geocam` (7 CI check suites, flags `geo*` off, app unchanged). Dev only, `tools/research/geo/` | GA1 MAP solver: pitch pass, σ ~2.5× over-confident. GA2/GA3/GA4/GA5 **killed**: T-junctions work on renders but not on photos; lake cues carry a 4 px bias (≈11 m); GA5 protection level separates wrong basins (AUROC 0.94) and catches 9/10 of E1's wrong eyes, but at a 36% correct-pose cost | GA5 as a candidate in the R2 veto prereg; eye cues wait for a learned contour detector (GC3) |
+| **Concordance** (whole-frame fit) | WP-A..G built under `src/lib/concord`; flags `?concord=warp,occl,eye` are wired (all off by default); `solve` isn't wired | Focal table: holdout 1.99%→0.32% (n = 2). DSM occluder: smear removal 4–15% → 46–59% (dev). The joint solve made holdout **worse** (8.8→16.2 px median; 7130's eye moved 200 m) and is unsafe as gated. Warp: no gain (0/8 holdout pins better) | You click interior pins (`tools/concord/pins/PROTOCOL.txt`); redesign the solve gate to score on held-out pins |
 | **Step Inside** (near-field 3D) | Built in both renderers; opt-out via `?nearfield=off` | Smear gate 4% (three) / 15% (deck) vs 80%. Pose propagation: 0/83 wrong pairs pass | Semantic + depth split (v1.1); propagation prereg |
-| **Launch** | Two commits; no CI; licences open; no iOS path; no hosted matcher | Still nobody else ships automatic post-hoc registration | CI gate + licence swaps before any public URL |
+| **Launch** | Two commits; CI fast tier written (`.github/workflows/ci.yml`, `scripts/ci/`), not yet pushed; licence register + opt-in swaps done, owner decisions open; no iOS path; no hosted matcher | Still nobody else ships automatic post-hoc registration | CI gate + licence swaps before any public URL |
 
 ## What the threads teach together
 
@@ -32,7 +34,7 @@
 | Work | Where | Blocked on |
 |---|---|---|
 | H1 blind verification | `tools/research/tm/h1_mine/REPORT.txt` ("How to run the verifiers") | Nothing |
-| Propagation DEM-render check (GT error vs parallax) | `tools/nearfield/propagate/` | Nothing |
+| Style-baseline re-run on a quiet tree (0/16 identical, cause unknown) | `node scripts/ci/run.mjs full --only style-baseline` | No other session editing `src/` |
 | Smear v1.1 re-measure | `tools/nearfield/smear/labels.json` | Choice of a permissively licensed segmenter |
 | Completion P0 (slab diagnosis first) | `research_notes/completion_integration_2026-09.md` §3 | Provenance decision (below) |
 
@@ -40,14 +42,12 @@
 
 1. **Evaluation data:** collect the ~100-photo set now? In what order do claimants spend `data_v3`?
 2. **Propagation prereg** sign-off, and which camera-roll viewpoints form its held-out set.
-3. **Top-3 picker / tap-a-peak:** build it? It is the biggest recall lever.
+3. **Top-3 picker / tap-a-peak:** built behind `?picker=on` (`src/lib/picker/README.md`). Turn it on by default once you've tried it? Picks are logged, and they need blind verification before they enter any benchmark.
 4. **Imagery licence:** replace Esri World Imagery outside Switzerland, or buy ArcGIS access?
 5. **Step Inside v1.1** in the beta as opt-in, or wait for the smear gate?
 6. **Completion provenance:** reuse `generated`, or add a new code (which needs the `isMeasurable` allow-list fix)?
 7. **Funding:** one GEN3C rented-GPU run; gated downloads for completion P1 (3DB, SAM 3D).
-8. **3D Tiles in Step Inside** ([step-inside-google-3d-tiles.md](step-inside-google-3d-tiles.md)):
-   - Add `3d-tiles-renderer`, and build the shared tiles layer on swisstopo first (roadmap S3)?
-   - Google backdrop: only possible from a non-EEA (CH/UK) billing account. It needs Google's written answer on the "non-Google map" clause. Pursue it or drop it?
+8. ~~3D Tiles in Step Inside~~: answered 2026-09-29. US billing; rendering accepted; swisstopo first. Built behind `?tiles3d=` ([step-inside-google-3d-tiles.md](step-inside-google-3d-tiles.md), roadmap S3). Open: T2 (tiles into the split) and the official Google logo before any public URL.
 
 ## Housekeeping
 

@@ -83,3 +83,15 @@ Known issues
   - click.html records point pins only; waterline pins are added by hand. localStorage keeps clicks per browser.
   - Mapterhorn eye-ground tiles are fetched once into .cache/dem-mapterhorn. CONCORD_OFFLINE=1 skips them.
   - The control-points pins are the constraints the GT was fitted to, so GT-pose numbers on them are in-sample.
+
+Review fix (2026-09-29, adversarial review; see tools/concord/review/RESULT.txt)
+  - Waterline (level) control-point pins were converted by ray-marching at the hand "el", which hits the
+    flat DEM lake plane itself, not the far shore: 6971 L/R at 289/634 m (labels 450 m / 1 km), 6958 L/R at
+    295/12 m (label ~4 km). The lake level then equalled the Terrarium plane (557.0) tied to the GT eye's
+    "eye 2.5 m above water" assumption, so these pins favoured the GT eye and mis-banded 6958.
+    lib.ts now finds the far shore along the pixel's azimuth (first flat water run, then ground > level+1 m)
+    and uses the Mapterhorn lake surface (557.66 m on Thunersee): 6971 428/892 m, 6958 3858/3286 m.
+    The hand el is no longer used. Audit point-pin bands are unchanged (3.74 / 1.68; level pins excluded);
+    dev GT baseline all-pin median 3.0 -> 3.1 (waterlines now 3.9 / 2.1 px at GT instead of ~0).
+    Run WITHOUT CONCORD_OFFLINE=1 (the Mapterhorn lake level needs the tile cache; offline falls back to
+    the scene DEM level and the note on the pin says so).

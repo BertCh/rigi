@@ -2,12 +2,13 @@
  * Main-thread side of the photo page's eye-position suggestion (suggest.ts, in suggest.worker.ts).
  * Light on purpose: the photo chunk only gets this file; pose6dof / horizon-fast load in the worker.
  *
- * Opt-in (matching-v2: a moved eye is a LOW-confidence suggestion, never auto-applied):
- *   ?eyesearch=1 (or localStorage "rigi.eyesearch" = "1")     shows the "Check camera position" button
- *   ?eyesearch=auto (or "rigi.eyesearch" = "auto")            also runs it once in the background
- * ?gpu=off / rigi.gpu=off marches the horizons on the CPU (slower, same search).
+ * Opt-in (matching-v2: a moved eye is a LOW-confidence suggestion, never auto-applied), src/lib/flags:
+ *   ?eyesearch=on      shows the "Check camera position" button
+ *   ?eyesearch=auto    also runs it once in the background
+ * ?gpu=off marches the horizons on the CPU (slower, same search).
  */
 import type { Pose } from "#/lib/camera";
+import { getFlag } from "#/lib/flags";
 import type { PhotoMeta } from "#/lib/photos";
 import { gpuEnabled } from "../device";
 import type {
@@ -21,25 +22,7 @@ export type { EyeSearchInput, EyeSearchProgress, EyeSearchResult };
 export type EyeSearchFlag = "off" | "on" | "auto";
 
 export function eyeSearchFlag(): EyeSearchFlag {
-	const parse = (v: string | null | undefined): EyeSearchFlag | null =>
-		v == null
-			? null
-			: v === "auto"
-				? "auto"
-				: v === "1" || v === "on"
-					? "on"
-					: "off";
-	try {
-		const q = parse(
-			new URLSearchParams(globalThis.location?.search ?? "").get("eyesearch"),
-		);
-		if (q) return q;
-	} catch {}
-	try {
-		return parse(globalThis.localStorage?.getItem("rigi.eyesearch")) ?? "off";
-	} catch {
-		return "off";
-	}
+	return getFlag("eyesearch");
 }
 
 export interface EyeSearchInWorker {

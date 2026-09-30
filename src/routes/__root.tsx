@@ -1,8 +1,20 @@
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
+import {
+	createRootRoute,
+	HeadContent,
+	retainSearchParams,
+	Scripts,
+} from "@tanstack/react-router";
+import { FLAG_NAMES, type FlagSearch, flagSearch } from "#/lib/flags";
 
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
+	// the app's flags (?renderer, ?gpu, ?tiles3d, …; src/lib/flags) are validated here and carried
+	// across in-app navigation, so a switch set on one page stays on for the next
+	validateSearch: flagSearch,
+	search: {
+		middlewares: [retainSearchParams<FlagSearch>(FLAG_NAMES)],
+	},
 	head: () => ({
 		meta: [
 			{

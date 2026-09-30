@@ -6,30 +6,17 @@
 // (Safari/Firefox before macOS 26, older iOS), disabled, or the device was lost. The CPU code is
 // the accuracy reference.
 //
-// Kill switch, checked in order: globalThis.__RIGI_GPU__ (set by tests), ?gpu=off|on in the page
-// URL, localStorage "rigi.gpu" = "off"|"on". Default: on when WebGPU is available.
+// Kill switch: ?gpu=off (src/lib/flags; harnesses set globalThis.__RIGI_FLAGS__.gpu, also inside
+// workers). Default: on when WebGPU is available.
 
 import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
+import { getFlag } from "#/lib/flags";
 
 export type GpuMode = "on" | "off";
 
-function readMode(): GpuMode {
-	const g = (globalThis as { __RIGI_GPU__?: GpuMode }).__RIGI_GPU__;
-	if (g === "on" || g === "off") return g;
-	try {
-		const q = new URLSearchParams(globalThis.location?.search ?? "").get("gpu");
-		if (q === "on" || q === "off") return q;
-	} catch {}
-	try {
-		const s = globalThis.localStorage?.getItem("rigi.gpu");
-		if (s === "on" || s === "off") return s;
-	} catch {}
-	return "on";
-}
-
 export const gpuEnabled = () =>
-	readMode() === "on" &&
+	getFlag("gpu") === "on" &&
 	typeof navigator !== "undefined" &&
 	!!(navigator as { gpu?: unknown }).gpu;
 

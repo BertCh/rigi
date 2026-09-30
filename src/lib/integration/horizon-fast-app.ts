@@ -154,7 +154,7 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 				? { span, az0: 0, az1: 360 }
 				: { span, az0, az1 },
 		);
-		// GPU march is opt-in (rigi.gpuHorizon=1; see gpu/horizon/opt-in.ts). The switches live in the page
+		// GPU march is opt-in (?gpuHorizon, on by default; see gpu/horizon/opt-in.ts). The switches live in the page
 		// (URL, localStorage), which the worker can't read.
 		post({ type: "spans", spans, gpu: gpuHorizonOptIn() });
 		const seen = new Set<string>();

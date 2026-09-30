@@ -14,7 +14,7 @@
  * cached in out/concord/field/geom/. No people mask (none in the eval).
  * --sweep: the dev-only hyper-parameter grid (ℓ, λ, method); --write-candidates: all-pin fields as
  * eval.ts candidates in out/concord/field/cand/ (IN-SAMPLE, integration smoke test only).
- * The holdout split is never read.
+ * The holdout split is only read by the once-only final report (--holdout, CONCORD_HOLDOUT=final).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -322,15 +322,23 @@ const line = (name: string, s: Summary) =>
 
 async function main() {
 	const splitOf = loadSplit();
+	// the once-only final report scores the frozen HOLDOUT photos (CONCORD_HOLDOUT=final, --holdout); never tune on it
+	const want = has("holdout") ? "holdout" : "dev";
+	if (want === "holdout" && process.env.CONCORD_HOLDOUT !== "final")
+		throw new Error(
+			"--holdout is the once-only final report: set CONCORD_HOLDOUT=final",
+		);
+	if (want === "holdout" && (has("sweep") || has("write-candidates")))
+		throw new Error("--holdout runs the frozen default config only");
 	const photos = (
 		arg("photos")?.split(",").filter(Boolean) ?? Object.keys(splitOf)
-	).filter((p) => splitOf[p] === "dev");
-	const pins = await loadPins({ photos, split: "dev" });
+	).filter((p) => splitOf[p] === want);
+	const pins = await loadPins({ photos, split: want });
 	const byPhoto = new Map<string, EvalPin[]>();
 	for (const p of pins)
 		byPhoto.set(p.photo, [...(byPhoto.get(p.photo) ?? []), p]);
 	console.log(
-		`dev photos ${byPhoto.size}, pins ${pins.length}: ${[...byPhoto].map(([p, v]) => `${p.slice(4)}:${v.length}`).join(" ")}`,
+		`${want} photos ${byPhoto.size}, pins ${pins.length}: ${[...byPhoto].map(([p, v]) => `${p.slice(4)}:${v.length}`).join(" ")}`,
 	);
 	const bases = (arg("base") || "gt,rot").split(",") as ("gt" | "rot")[];
 	const configs: [string, FitOptions][] = [["default gp ℓ200 λ1", {}]];
@@ -358,7 +366,7 @@ async function main() {
 	}
 	const results: Record<string, unknown> = {};
 	for (const base of bases) {
-		console.log(`\n== base ${base} (LOO over dev pins; px @1600) ==`);
+		console.log(`\n== base ${base} (LOO over ${want} pins; px @1600) ==`);
 		for (const [name, opts] of configs) {
 			const r = await runConfig(byPhoto, base, opts);
 			console.log(line(name, r.summary));
@@ -405,15 +413,15 @@ async function main() {
 	fs.mkdirSync(OUT, { recursive: true });
 	const out = path.join(
 		OUT,
-		`field-eval-${has("sweep") ? "sweep" : "default"}.json`,
+		`field-eval-${has("sweep") ? "sweep" : "default"}${want === "holdout" ? "-holdout" : ""}.json`,
 	);
 	fs.writeFileSync(
 		out,
 		JSON.stringify(
 			{
 				date: new Date().toISOString(),
-				split: "dev",
-				note: "LOO over dev control-point pins; GT pose is in-sample for these pins",
+				split: want,
+				note: `LOO over ${want} control-point pins; GT pose is in-sample for these pins`,
 				results: Object.fromEntries(
 					Object.entries(results).map(([k, v]) => {
 						const x = v as { opts: FitOptions; summary: Summary; rows: Row[] };

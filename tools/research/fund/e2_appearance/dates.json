@@ -1,0 +1,802 @@
+{
+ "wc_0001": {
+  "dateTaken": "2021-03-19T12:44:14",
+  "camera": "NIKON CORPORATION NIKON D850",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 46.781325,
+  "lon": 10.150078,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2021-03-19T11:44:14+00:00",
+  "sun": {
+   "az": 185.84,
+   "el": 42.73
+  },
+  "time_ok": true
+ },
+ "wc_0002": {
+  "dateTaken": "2023-08-19T13:38:11",
+  "camera": "samsung Galaxy S23",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.90117,
+  "lon": 9.17801,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2023-08-19T11:38:11+00:00",
+  "sun": {
+   "az": 184.86,
+   "el": 55.8
+  },
+  "time_ok": true
+ },
+ "wc_0004": {
+  "dateTaken": "2014-07-06T11:47:53",
+  "camera": "Canon Canon EOS 600D",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 47.15232,
+  "lon": 9.26597,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2014-07-06T09:47:53+00:00",
+  "sun": {
+   "az": 132.07,
+   "el": 58.39
+  },
+  "time_ok": true
+ },
+ "wc_0005": {
+  "dateTaken": "2025-11-19T16:27:29",
+  "camera": "RICOH IMAGING COMPANY, LTD. PENTAX K-1 Mark II",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 47.351668,
+  "lon": 8.487503,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2025-11-19T15:27:29+00:00",
+  "sun": {
+   "az": 237.9,
+   "el": 2.18
+  },
+  "time_ok": true
+ },
+ "wc_0006": {
+  "dateTaken": "2020-08-23T14:56:41",
+  "camera": "samsung SM-G970F",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 46.94556,
+  "lon": 9.29333,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2020-08-23T12:56:41+00:00",
+  "sun": {
+   "az": 215.78,
+   "el": 49.37
+  },
+  "time_ok": true
+ },
+ "wc_0009": {
+  "dateTaken": "2026-06-23T12:46:58",
+  "camera": "Apple iPhone 16 Plus",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 46.427772,
+  "lon": 8.093003,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2026-06-23T10:46:58+00:00",
+  "sun": {
+   "az": 155.75,
+   "el": 65.43
+  },
+  "time_ok": true
+ },
+ "wc_0010": {
+  "dateTaken": "2016-03-27T07:52:33",
+  "camera": "Apple iPhone 6s",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 47.269658,
+  "lon": 9.404736,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2016-03-27T05:52:33+00:00",
+  "sun": {
+   "az": 92.69,
+   "el": 6.39
+  },
+  "time_ok": true
+ },
+ "wc_0011": {
+  "dateTaken": "2025-07-31T10:37:44",
+  "camera": "samsung SM-G998B",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "lat": 46.501763,
+  "lon": 7.697634,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2025-07-31T08:37:44+00:00",
+  "sun": {
+   "az": 112.62,
+   "el": 43.87
+  },
+  "time_ok": true
+ },
+ "wc_0013": {
+  "dateTaken": "2021-09-14T11:42:40",
+  "camera": "Apple iPhone 11 Pro Max",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.8168,
+  "lon": 8.407122,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2021-09-14T09:42:40+00:00",
+  "sun": {
+   "az": 146.04,
+   "el": 41.44
+  },
+  "time_ok": true
+ },
+ "wc_0014": {
+  "dateTaken": "2017-07-23T12:05:27",
+  "camera": "Panasonic DC-TZ91",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "lat": 46.40315,
+  "lon": 9.64424,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2017-07-23T10:05:27+00:00",
+  "sun": {
+   "az": 140.49,
+   "el": 58.67
+  },
+  "time_ok": true
+ },
+ "wc_0015": {
+  "dateTaken": "2006-02-04T12:46:29",
+  "camera": "Canon Canon EOS 350D DIGITAL",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 47.129722,
+  "lon": 7.050843,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2006-02-04T11:46:29+00:00",
+  "sun": {
+   "az": 180.2,
+   "el": 26.72
+  },
+  "time_ok": true
+ },
+ "wc_0017": {
+  "dateTaken": "2005-08-05T10:23:39",
+  "camera": "PENTAX Corporation PENTAX Optio S50",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "lat": 46.4487,
+  "lon": 8.1642,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2005-08-05T08:23:39+00:00",
+  "sun": {
+   "az": 110.88,
+   "el": 41.08
+  },
+  "time_ok": true
+ },
+ "wc_0019": {
+  "dateTaken": "2014-08-28T15:39:25",
+  "camera": "NIKON COOLPIX P7800",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.435833,
+  "lon": 7.718611,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2014-08-28T13:39:25+00:00",
+  "sun": {
+   "az": 227.1,
+   "el": 44.09
+  },
+  "time_ok": true
+ },
+ "wc_0020": {
+  "dateTaken": "2020-02-18T14:51:23",
+  "camera": "NIKON CORPORATION NIKON D7500",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 46.238318,
+  "lon": 7.65562,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2020-02-18T13:51:23+00:00",
+  "sun": {
+   "az": 215.05,
+   "el": 25.37
+  },
+  "time_ok": true
+ },
+ "wc_0023": {
+  "dateTaken": "2014-06-20T09:23:54",
+  "camera": "NIKON COOLPIX P7800",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "lat": 46.374722,
+  "lon": 7.977222,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2014-06-20T07:23:54+00:00",
+  "sun": {
+   "az": 93.08,
+   "el": 36.22
+  },
+  "time_ok": true
+ },
+ "wc_0027": {
+  "dateTaken": "2014-08-28T12:41:35",
+  "camera": "NIKON COOLPIX P7800",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "lat": 46.414444,
+  "lon": 7.719444,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2014-08-28T10:41:35+00:00",
+  "sun": {
+   "az": 160.31,
+   "el": 51.81
+  },
+  "time_ok": true
+ },
+ "wc_0028": {
+  "dateTaken": "2012-06-16T12:54:23",
+  "camera": "Apple iPhone 4",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.990667,
+  "lon": 8.264,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2012-06-16T10:54:23+00:00",
+  "sun": {
+   "az": 161.32,
+   "el": 65.46
+  },
+  "time_ok": true
+ },
+ "wc_0033": {
+  "dateTaken": "2022-07-15T12:41:58",
+  "camera": "Apple iPhone SE (2nd generation)",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.970447,
+  "lon": 8.267675,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2022-07-15T10:41:58+00:00",
+  "sun": {
+   "az": 153.61,
+   "el": 62.52
+  },
+  "time_ok": true
+ },
+ "wc_0034": {
+  "dateTaken": "2014-08-27T18:33:50",
+  "camera": "NIKON CORPORATION NIKON D800",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 46.343563,
+  "lon": 7.012033,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2014-08-27T16:33:50+00:00",
+  "sun": {
+   "az": 266.13,
+   "el": 17.48
+  },
+  "time_ok": true
+ },
+ "wc_0035": {
+  "dateTaken": "2020-01-06T15:17:08",
+  "camera": "Canon Canon PowerShot G15",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 47.362778,
+  "lon": 7.810556,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2020-01-06T14:17:08+00:00",
+  "sun": {
+   "az": 217.86,
+   "el": 11.2
+  },
+  "time_ok": true
+ },
+ "wc_0037": {
+  "dateTaken": "2018-04-30T19:31:49",
+  "camera": "SONY ILCE-6000",
+  "season": "winter",
+  "weather": "cloudy",
+  "lat": 46.600296,
+  "lon": 10.417307,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2018-04-30T17:31:49+00:00",
+  "sun": {
+   "az": 283.23,
+   "el": 8.15
+  },
+  "time_ok": true
+ },
+ "wc_0040": {
+  "dateTaken": "2011-12-08T11:26:09",
+  "camera": "NIKON CORPORATION NIKON D7000",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 46.583668,
+  "lon": 7.081074,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2011-12-08T10:26:09+00:00",
+  "sun": {
+   "az": 165.99,
+   "el": 19.56
+  },
+  "time_ok": true
+ },
+ "wc_0046": {
+  "dateTaken": "2011-10-17T13:10:13",
+  "camera": "CASIO COMPUTER CO.,LTD. EX-Z75",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 47.040085,
+  "lon": 8.478834,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2011-10-17T11:10:13+00:00",
+  "sun": {
+   "az": 179.62,
+   "el": 33.77
+  },
+  "time_ok": true
+ },
+ "wc_0047": {
+  "dateTaken": "2017-09-07T10:51:37",
+  "camera": "SONY DSC-RX100",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 46.52155,
+  "lon": 9.90202,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2017-09-07T08:51:37+00:00",
+  "sun": {
+   "az": 130.5,
+   "el": 38.61
+  },
+  "time_ok": true
+ },
+ "wc_0048": {
+  "dateTaken": "2020-02-17T12:59:14",
+  "camera": "NIKON CORPORATION NIKON D7500",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "lat": 46.229335,
+  "lon": 7.609819,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2020-02-17T11:59:14+00:00",
+  "sun": {
+   "az": 184.49,
+   "el": 31.62
+  },
+  "time_ok": true
+ },
+ "wc_0052": {
+  "dateTaken": "2014-07-17T07:29:37",
+  "camera": "Canon Canon EOS 5D Mark III",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 47.020972,
+  "lon": 8.952639,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2014-07-17T05:29:37+00:00",
+  "sun": {
+   "az": 75.07,
+   "el": 15.29
+  },
+  "time_ok": true
+ },
+ "wc_0053": {
+  "dateTaken": "2021-05-09T07:29:55",
+  "camera": "samsung SM-N986B",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 46.52211,
+  "lon": 9.874626,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2021-05-09T05:29:55+00:00",
+  "sun": {
+   "az": 80.07,
+   "el": 14.8
+  },
+  "time_ok": true
+ },
+ "wc_0054": {
+  "dateTaken": "2024-10-14T13:24:10",
+  "camera": "Apple iPhone 12 Pro Max",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 45.977158,
+  "lon": 8.947661,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2024-10-14T11:24:10+00:00",
+  "sun": {
+   "az": 184.28,
+   "el": 35.53
+  },
+  "time_ok": true
+ },
+ "wc_0055": {
+  "dateTaken": "2024-04-18T16:35:49",
+  "camera": "Google Pixel 6 Pro",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "lat": 47.039994,
+  "lon": 8.530356,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2024-04-18T14:35:49+00:00",
+  "sun": {
+   "az": 244.13,
+   "el": 36.29
+  },
+  "time_ok": true
+ },
+ "wc_0058": {
+  "dateTaken": "2014-08-26T10:24:47",
+  "camera": "Canon Canon EOS 5D Mark II",
+  "season": "summer",
+  "weather": "clouds_on_skyline",
+  "lat": 47.06337,
+  "lon": 9.05504,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2014-08-26T08:24:47+00:00",
+  "sun": {
+   "az": 118.84,
+   "el": 37.18
+  },
+  "time_ok": true
+ },
+ "wc_0059": {
+  "dateTaken": "2007-03-21T14:34:50",
+  "camera": "Canon Canon EOS 350D DIGITAL",
+  "season": "winter",
+  "weather": "cloudy",
+  "lat": 46.427626,
+  "lon": 9.995344,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2007-03-21T13:34:50+00:00",
+  "sun": {
+   "az": 220.78,
+   "el": 36.04
+  },
+  "time_ok": true
+ },
+ "wc_0063": {
+  "dateTaken": "2007-08-01T14:56:02",
+  "camera": "NIKON CORPORATION NIKON D80",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.934514,
+  "lon": 9.135194,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2007-08-01T12:56:02+00:00",
+  "sun": {
+   "az": 218.79,
+   "el": 56.11
+  },
+  "time_ok": true
+ },
+ "wc_0067": {
+  "dateTaken": "2014-01-26T15:22:58",
+  "camera": "Canon Canon EOS 7D",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 47.185453,
+  "lon": 9.332547,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2014-01-26T14:22:58+00:00",
+  "sun": {
+   "az": 220.78,
+   "el": 14.23
+  },
+  "time_ok": true
+ },
+ "wc_0069": {
+  "dateTaken": "2015-11-07T17:26:06",
+  "camera": "Canon Canon EOS 60D",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 46.979063,
+  "lon": 8.634782,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2015-11-07T16:26:06+00:00",
+  "sun": {
+   "az": 251.12,
+   "el": -4.78
+  },
+  "time_ok": false
+ },
+ "wc_0070": {
+  "dateTaken": "2017-06-18T14:22:58",
+  "camera": "samsung SM-G920F",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.960278,
+  "lon": 9.120833,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2017-06-18T12:22:58+00:00",
+  "sun": {
+   "az": 211.4,
+   "el": 63.72
+  },
+  "time_ok": true
+ },
+ "wc_0071": {
+  "dateTaken": "2015-05-14T13:27:51",
+  "camera": "Apple iPhone 5s",
+  "season": "winter",
+  "weather": "clouds_on_skyline",
+  "lat": 46.408169,
+  "lon": 10.018936,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2015-05-14T11:27:51+00:00",
+  "sun": {
+   "az": 185.87,
+   "el": 62.11
+  },
+  "time_ok": true
+ },
+ "wc_0072": {
+  "dateTaken": "2008-01-24T12:59:16",
+  "camera": "Canon Canon EOS 400D DIGITAL",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 47.239778,
+  "lon": 9.453075,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2008-01-24T11:59:16+00:00",
+  "sun": {
+   "az": 186.45,
+   "el": 23.27
+  },
+  "time_ok": true
+ },
+ "wc_0073": {
+  "dateTaken": "2022-03-26T13:56:05",
+  "camera": "OPPO OPPO Find X3 Lite 5G",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 46.831903,
+  "lon": 8.176028,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2022-03-26T12:56:05+00:00",
+  "sun": {
+   "az": 208.48,
+   "el": 41.98
+  },
+  "time_ok": true
+ },
+ "wc_0074": {
+  "dateTaken": "2015-08-22T07:46:02",
+  "camera": "Canon Canon EOS 700D",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 47.145832,
+  "lon": 9.214307,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2015-08-22T05:46:02+00:00",
+  "sun": {
+   "az": 85.43,
+   "el": 12.11
+  },
+  "time_ok": true
+ },
+ "wc_0076": {
+  "dateTaken": "2019-05-13T17:03:08",
+  "camera": "NIKON CORPORATION NIKON D3300",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 46.52297,
+  "lon": 7.05917,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2019-05-13T15:03:08+00:00",
+  "sun": {
+   "az": 256.07,
+   "el": 37.99
+  },
+  "time_ok": true
+ },
+ "wc_0077": {
+  "dateTaken": "2010-07-16T11:13:28",
+  "camera": "SONY  DSLR-A700",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 47.260708,
+  "lon": 9.451503,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2010-07-16T09:13:28+00:00",
+  "sun": {
+   "az": 121.93,
+   "el": 52.51
+  },
+  "time_ok": true
+ },
+ "wc_0082": {
+  "dateTaken": "2013-09-20T11:21:43",
+  "camera": "Apple iPhone 5",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.401489,
+  "lon": 9.690803,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2013-09-20T09:21:43+00:00",
+  "sun": {
+   "az": 142.94,
+   "el": 38.31
+  },
+  "time_ok": true
+ },
+ "wc_0085": {
+  "dateTaken": "2013-01-25T12:08:29",
+  "camera": "Apple iPhone 4S",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 46.742667,
+  "lon": 9.597667,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2013-01-25T11:08:29+00:00",
+  "sun": {
+   "az": 173.39,
+   "el": 24.19
+  },
+  "time_ok": true
+ },
+ "wc_0086": {
+  "dateTaken": "2007-09-23T13:54:34",
+  "camera": "EASTMAN KODAK COMPANY KODAK EASYSHARE C643 ZOOM DIGITAL CAMERA",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 45.976924,
+  "lon": 8.946991,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2007-09-23T11:54:34+00:00",
+  "sun": {
+   "az": 193.04,
+   "el": 43.26
+  },
+  "time_ok": true
+ },
+ "wc_0087": {
+  "dateTaken": "2011-01-02T10:13:43",
+  "camera": "SONY DSLR-A900",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 46.38295,
+  "lon": 7.0712,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2011-01-02T09:13:43+00:00",
+  "sun": {
+   "az": 146.65,
+   "el": 13.68
+  },
+  "time_ok": true
+ },
+ "wc_0088": {
+  "dateTaken": "2018-10-14T11:29:29",
+  "camera": "Apple iPhone 8 Plus",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.770869,
+  "lon": 8.238139,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2018-10-14T09:29:29+00:00",
+  "sun": {
+   "az": 149.92,
+   "el": 30.43
+  },
+  "time_ok": true
+ },
+ "wc_0094": {
+  "dateTaken": "2020-08-24T11:44:27",
+  "camera": "NIKON CORPORATION NIKON D850",
+  "season": "summer",
+  "weather": "cloudy",
+  "lat": 46.428549,
+  "lon": 10.035843,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2020-08-24T09:44:27+00:00",
+  "sun": {
+   "az": 141.9,
+   "el": 48.87
+  },
+  "time_ok": true
+ },
+ "wc_0095": {
+  "dateTaken": "2020-10-31T13:42:57",
+  "camera": "SONY ILCA-77M2",
+  "season": "summer",
+  "weather": "clear",
+  "lat": 46.43,
+  "lon": 7.78897,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2020-10-31T12:42:57+00:00",
+  "sun": {
+   "az": 204.49,
+   "el": 25.93
+  },
+  "time_ok": true
+ },
+ "wc_0098": {
+  "dateTaken": "2012-01-03T16:01:19",
+  "camera": "CASIO COMPUTER CO.,LTD. EX-Z75",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 46.644661,
+  "lon": 9.278875,
+  "eval": false,
+  "date_ok": true,
+  "utc": "2012-01-03T15:01:19+00:00",
+  "sun": {
+   "az": 228.11,
+   "el": 5.54
+  },
+  "time_ok": true
+ },
+ "wc_0099": {
+  "dateTaken": "2013-12-27T13:42:12",
+  "camera": "Apple iPhone 4S",
+  "season": "winter",
+  "weather": "clear",
+  "lat": 47.025561,
+  "lon": 8.401447,
+  "eval": true,
+  "date_ok": true,
+  "utc": "2013-12-27T12:42:12+00:00",
+  "sun": {
+   "az": 197.96,
+   "el": 17.73
+  },
+  "time_ok": true
+ }
+}

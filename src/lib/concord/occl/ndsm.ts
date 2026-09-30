@@ -9,6 +9,7 @@
 // requested radius / wedge or without data are NaN.
 import { EnuFrame } from "../../geodesy";
 import {
+	type CogHeader,
 	DSM_COLLECTION,
 	DTM_COLLECTION,
 	type FetchStats,
@@ -18,13 +19,12 @@ import {
 	type JsonFetcher,
 	lv95ToWgs84,
 	newStats,
-	type CogHeader,
 	openCog,
 	pickLevel,
 	type RangeFetcher,
 	readWindow,
-	stacTiles,
 	type SwissTile,
+	stacTiles,
 	wgs84ToLv95,
 } from "./swiss-cog";
 

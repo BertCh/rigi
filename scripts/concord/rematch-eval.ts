@@ -48,8 +48,10 @@ const URL = opt("url", "http://localhost:8768") as string;
 const OUT = path.join(ROOT, "out", "concord", "rematch");
 
 const split = loadSplit();
+// the once-only final report may run the frozen HOLDOUT photos (CONCORD_HOLDOUT=final); never tune on it
+const holdoutFinal = process.env.CONCORD_HOLDOUT === "final";
 for (const p of photos)
-	if (split[p] !== "dev") {
+	if (split[p] !== "dev" && !(holdoutFinal && split[p] === "holdout")) {
 		console.error(`${p}: not a DEV photo (split=${split[p]}); refusing`);
 		process.exit(2);
 	}

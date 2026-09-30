@@ -1,0 +1,79 @@
+Concordance adversarial review + fix (2026-09-29)
+
+Scope: src/lib/concord/**, scripts/concord/**, tools/concord/**, and the flagged shared-file hunks
+(engine.ts, deck/composite-shader.ts, deck/composite.ts, deck/engine.ts, renderer.ts, geo/camera.ts,
+PhotoWorkspace.tsx). tiles3d / licences / CreditLine hunks in the same files belong to other sessions.
+
+FINDINGS
+ F1 FIXED  scripts/concord/lib.ts: waterline (level) control-point pins were converted wrongly.
+    The old code ray-marched at the hand el, so the ray hit the flat DEM lake plane, not the far shore:
+      6971 L/R  289 / 634 m   (labels 450 m / 1 km)   -> now 428 / 892 m
+      6958 L/R  295 /  12 m   (label  ~4 km)          -> now 3858 / 3286 m
+    The lake level came out as the Terrarium plane (557.0), tied to the GT eye's "2.5 m above water"
+    guess. The pins were therefore ~0 px at GT by construction, favoured the GT eye, and 6958 landed in
+    the <0.5 km band. Fix: find the far shore along the pixel's azimuth, and take the lake level from
+    Mapterhorn over the water (557.66 m). Audit point-pin bands are unchanged (3.74 / 1.68). Side
+    finding: 6958's GT eye (GPS 557.2) is below the lake surface, so that GT eye is physically stale.
+ F2 FIXED  solve-eval.ts, field-eval.ts, rematch-eval.ts refused holdout entirely. They now run holdout
+    only with CONCORD_HOLDOUT=final. field-eval --holdout forbids --sweep and --write-candidates.
+    Also fixed "DEV" labels that were hard-coded in the output.
+ F3 NOT FIXED (design)  The WP-D gate is too permissive. The last round's cues are matched in a ±12 px
+    window around the round-1 camera. Both the gate's cue-RMS test and the 2-fold cue cross-check are
+    scored on those cues, so they favour the refined camera, and the cues agree with each other by
+    construction. The holdout confirms it: 3/3 non-LOW photos were accepted and 2 got much worse (below).
+    7130 moved the eye 200 m (2.9σH against a 3σH limit) with focal z 3.1 (limit 4). Needs a pin
+    holdout (ctx.holdout) or a much tighter gate before ?concord=solve is ever wired.
+ F4 NOTE  eval.ts --loo builtin:rot keeps photos with ≤2 pins at GT (in-sample, disclosed by WP-A).
+    Excluding those 8 pins does not change the dev LOO median (4.57 px, n=26 vs 34).
+ F5 NOTE  useConcordDisplay counts alignState "accepted" as high confidence even when the second opinion
+    says "kept" or "timeout". This is the app's own accept rule, so it is acceptable. Manual, pinned
+    and unverified poses fail closed.
+ F6 CHECKED, no defect  The field direction is consistent everywhere (render = photo + W, labels at
+    photo = r + W⁻¹(r)). So is the v flip (texelFetch row 0 = top, sampled at (x, 1 − vUv.y), dv
+    negated) in both composites. Occluder mask orientation matches the fg mask. The 1600-width pin basis
+    matches annotate-lib, and edge cues are converted from predicted to observed by residual·n.
+    With the flags off: warpUV returns vUv, the occluder branch is gated, label u/v is unchanged when
+    warp = null, geo/camera takes the EXIF path, and the hook returns before any engine call.
+    The warp does not reach pose, confidence, GeoJSON (peaksInFrame), sampleAt or pinError.
+    No holdout tuning was found: the LENS_TABLE evidence is dev-only and the holdout has no ultrawide.
+
+RE-RUN (dev, after F1; px @1600 median / p90)
+  core.check, priors.check, cues.check, field.check, joint.check, app.check, occl.check: all PASS
+  eval --baseline --split all: audit <6.5 km 3.74 (n=12), >15 km 1.68 (n=18)  [reproduces]
+  eval --baseline (GT, dev): 3.0 -> 3.1 / 6.7 (waterlines now 3.9 / 2.1 at GT)
+  eval --baseline --pose app: 12.3 -> 12.7 / 159
+  eval --loo builtin:rot: 4.3 -> 4.6 / 9.1
+  WP-B cand (dev): old rule 5.6 -> 6.1, concord eye 4.7 -> 5.0; <6.5 km 7.50 / 5.27 unchanged
+  WP-D app-cues gated cand: 9.6 -> 9.7; <0.5 km 13.8 -> 9.9 (was 9.81 -> 6.10); 0.5-2 km 0.6 -> 2.8
+  WP-E field LOO dev: gt base gain 0.00 (+6/-15), rot base gain 0.00 (+10/-11), no band p90 worse
+  WP-C sign agreement (app pose): 23/31 = 74.2% [unchanged]
+  WP-F smear (dev): three 53.6% / 54.4%, deck 46.1% / 59.3% [reproduce]
+  The WP-D pins/cuespins LOO modes were not re-run (diagnostic only; they are affected by F1).
+
+HOLDOUT (frozen split: 6019, 6958, 7086, 7130; 14 control-point pins; run ONCE, nothing tuned after)
+  px @1600 median / p90; "<6.5k" = audit point-pin band (n=3).
+  | configuration                                  | all          | <6.5k | >15k (n=6) | per photo 6019/6958/7086/7130 |
+  | GT pose (pins in-sample: reference)            | 1.2 / 6.8    | 1.91  | 0.88       | 0.3 / 6.5 / 0.9 / 1.9         |
+  | app baseline (skyline solve, app eye)          | 8.8 / 464    | 14.22 | 7.26       | 464 (LOW) / 9.8 / 4.9 / 10.2  |
+  | WP-B old eye rule, Mapterhorn (GT rot refit)   | 12.0 / 18.0  | 15.67 | 2.26       | 10.9 / 15.6 / 1.9 / 12.7      |
+  | WP-B concord eye prior (GT rot refit)          | 13.4 / 35.7  | 19.17 | 2.27       | 11.2 / 15.4 / 1.9 / 27.4      |
+  | WP-D joint solve, app start, gated (product)   | 16.2 / 464   | 24.07 | 3.65       | 464 (LOW) / 16.5 / 2.7 / 29.5 |
+  | WP-E field LOO, GT base                        | 1.20 -> 1.41 median, mean gain -0.23, 0 better / 8 worse, p90 6.85 -> 7.22, |
+  |                                                | band p90 worse: 5-15 km, >15 km                                               |
+  | WP-E field LOO, rot base                       | gain 0.00, mean -0.23, 0 / 8, band p90 worse: >15 km                          |
+  WP-D accepted 6958 (eye fixed, fScale 0.998), 7086 (fScale 0.991) and 7130 (eye 200 m, fScale 0.973).
+  6019 was refused (LOW). Skyline RMS (MH) improved on all three while pins got worse on 6958 and 7130.
+  WP-G rematch on holdout (feeds WP-D): lower-half inliers 6958 0->0, 7086 78->215 (+176 %),
+  7130 0->0; quadrants +0 on all three.
+  WP-B focal table holdout was scored once by WP-B (0.32 % vs EXIF 1.99 %, n=2) and was not re-run.
+
+VERDICT
+  WP-A core + eval: ship as infrastructure. Accuracy acceptance waits on the blind interior pins.
+  WP-B focal prior: ship behind ?concord=eye (weak: n=2 holdout). Altitude eye rule: not useful (worse on holdout).
+  WP-C cues: needs pins. Sign agreement 74.2 % narrowly fails; use only as solver/field input.
+  WP-D joint solve: not useful and unsafe as gated (holdout 8.8 -> 16.2). Keep unwired until a pin-holdout gate exists.
+  WP-E warp: needs pins. Zero LOO gain on dev, slightly negative on holdout. Display-only and off by default.
+  WP-F occluder: ship behind ?concord=occl (display dimming, CH only). The trail/contour criterion is pending.
+  WP-G re-match: needs pins. Acceptance fails as written, and it only matters through WP-D.
+  Integration: flags-off parity holds by code inspection and the integration's style-baseline A/B.
+  The deck-vs-three LSB check on full composites is still pending.

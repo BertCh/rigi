@@ -17,7 +17,13 @@
 // query geometry buffer (1024 px GPU range, = three's geoRT), plus trails (canvas pass) and the
 // photo-camera gizmo (photo plane, frustum, pin) with the terrain's log depth.
 
-import { Deck, type Layer, OrthographicView } from "@deck.gl/core";
+import {
+	Deck,
+	type InteractionState,
+	type Layer,
+	type MapViewState,
+	OrthographicView,
+} from "@deck.gl/core";
 import * as THREE from "three";
 import {
 	type AlignResult,
@@ -27,6 +33,8 @@ import {
 	solvePins,
 } from "../align";
 import type { Pose } from "../camera";
+import type { ResidualField } from "../concord/core";
+import { WarpState } from "../concord/field";
 import { tileBounds } from "../dem";
 import {
 	defaultSettings,
@@ -34,6 +42,8 @@ import {
 	type Sample,
 	type Settings,
 } from "../engine";
+import { startLakeFloor } from "../geocam/lakes/fetch";
+import { priorHeading } from "../geocam/priors/heading";
 import { distanceM, EnuFrame } from "../geodesy";
 import { autoAlignAsync, warmAlignGpu } from "../gpu/align";
 import { lookIdle } from "../gpu/look/opt-in";
@@ -59,6 +69,7 @@ import type { SkyMask } from "../look/haze-fit";
 import { drawExportLabels, skylineAt } from "../look/labels";
 import { lookKey } from "../look/look-key";
 import { ReliefController } from "../look/relief/field";
+import { DeckMapCamera, MAP_VIEW_ID } from "../nearfield/deck-map-camera";
 import {
 	DeckSplatLayer,
 	isDeckSplatLayer,
@@ -75,7 +86,11 @@ import {
 	nearFieldDemRangeFrom,
 } from "../nearfield/near-dem";
 import { PROVENANCE_TINT_MIX } from "../nearfield/provenance";
-import { StepCamera } from "../nearfield/step-camera";
+import {
+	StepCamera,
+	type StepInsideOpts,
+	type StepView,
+} from "../nearfield/step-camera";
 import {
 	type NearFieldScene,
 	type NearFieldViewOpts,
@@ -97,6 +112,7 @@ import {
 import { CLASSIC } from "../style/defaults";
 import type { ViewStyle } from "../style/types";
 import { heightFromTile } from "../terrain";
+import { DeckTiles3D } from "../tiles3d/deck-tiles";
 import { PhotoCompositor } from "./composite";
 import { CpuGeometrySource, TerrainProfiles } from "./cpu-geometry";
 import { GpuGeometrySource, geometrySize, rangeMapFrom } from "./geometry-pass";
@@ -283,9 +299,19 @@ export class DeckEngine implements Renderer {
 		cam: StepCamera;
 		enteredWorld: boolean;
 		masks: { step: ByteMask; sky: ByteMask } | null;
+		/** Map mode's camera: deck's MapController on a hidden MapView (nearfield/deck-map-camera). */
+		map: DeckMapCamera;
+		/** 'step': Step Inside (splats, photo sky, full drape); 'map': the In-map view's own style. */
+		view: StepView;
 	} | null = null;
 	/** World view near plane (5 m classic; splats metres from the eye need less). */
 	private worldNear = 5;
+	/** Step Inside 3D Tiles (src/lib/tiles3d, ?tiles3d=); null unless on. Shown only while stepping. */
+	private tiles3d = DeckTiles3D.create(() => {
+		if (!this.step || this.disposed) return;
+		this.updateLayers();
+		this.kickWorld();
+	});
 	/** The world drape's mask: people ∪ the scene's Object pixels, cached per input. */
 	private drapeMaskCache: {
 		key: unknown[];
@@ -296,7 +322,7 @@ export class DeckEngine implements Renderer {
 		this.photo = photo;
 		this.aspect = photo.width / photo.height;
 		this.prior = {
-			yaw: photo.heading ?? 0,
+			yaw: priorHeading(photo) ?? 0,
 			pitch: photo.pitch ?? 0,
 			roll: photo.roll ?? 0,
 			vfov: photo.vfov,
@@ -353,8 +379,29 @@ export class DeckEngine implements Renderer {
 			}: {
 				layer: { id: string };
 				viewport: { id: string };
-			}) => layer.id.startsWith("screen-") === (viewport.id === "screen"),
+			}) =>
+				viewport.id !== MAP_VIEW_ID &&
+				layer.id.startsWith("screen-") === (viewport.id === "screen"),
 			controller: false,
+			// Step Inside map mode: deck's MapController drives the world camera (DeckMapCamera)
+			onViewStateChange: (p: { viewId: string; viewState: MapViewState }) => {
+				const map = this.step?.map;
+				if (p.viewId === MAP_VIEW_ID && map?.active)
+					map.onViewStateChange(p.viewState);
+				return p.viewState;
+			},
+			onInteractionStateChange: (s: InteractionState) => {
+				const map = this.step?.map;
+				if (
+					map?.active &&
+					!s.isDragging &&
+					!s.inTransition &&
+					!s.isPanning &&
+					!s.isRotating &&
+					!s.isZooming
+				)
+					map.settle();
+			},
 			onLoad: () => onLoad(),
 			onAfterRender: () => this.emit(),
 			onError: (e: Error) => console.error("[deck-engine]", e),
@@ -381,6 +428,8 @@ export class DeckEngine implements Renderer {
 		segment?: (img: HTMLImageElement) => Promise<FgMask | null>,
 	) {
 		onProgress?.("Loading photo", 0);
+		// ?geoLakeFloor (null when off): lake outlines load in parallel; eye ≥ lake level, fail-open
+		const lakeFloor = startLakeFloor(this.photo, region, this.loadAbort.signal);
 		// CPU skyline in a worker (engine.ts init): starts with the photo decode and the tiles
 		if (!this.fastHorizon) {
 			const fast = this.startFastHorizon();
@@ -446,6 +495,17 @@ export class DeckEngine implements Renderer {
 			this.peaks = regionData.peaks;
 			this.buildTrails();
 			this.updateLayers();
+		}
+		if (lakeFloor) {
+			const floor = await lakeFloor(dem, (la, lo) => terrain.heightAt(la, lo));
+			if (this.disposed) return;
+			if (floor != null && floor > this.eyeAlt) {
+				this.eyeAlt = floor;
+				this.eye = { x: 0, y: 0, z: floor };
+				this.fastHorizon?.setEye(floor);
+				this.invalidateGeometry();
+				this.updateLayers();
+			}
 		}
 		const fg = await fgPromise;
 		if (this.disposed) return;
@@ -551,12 +611,14 @@ export class DeckEngine implements Renderer {
 	resize(w: number, h: number) {
 		this.cssSize = { w: Math.max(1, w), h: Math.max(1, h) };
 		this.world?.setAspect(this.cssSize.w / this.cssSize.h);
+		this.step?.map.setSize(this.cssSize.w, this.cssSize.h);
 		this.updateLayers();
 	}
 
 	dispose() {
 		if (this.disposed) return;
 		this.disposed = true;
+		this.tiles3d?.dispose();
 		clearTimeout(this.statsTimer);
 		clearTimeout(this.lookTimer);
 		this.loadAbort.abort();
@@ -711,6 +773,22 @@ export class DeckEngine implements Renderer {
 		});
 		if (built) this.layerGen++;
 		return built;
+	}
+
+	/** concord display warp; see engine.ts setWarp. */
+	private warp: WarpState | null = null;
+	setWarp(field: ResidualField | null) {
+		if (!field && !this.warp) return;
+		this.warp = field ? new WarpState(field) : null;
+		this.compositor.setWarp(this.warp);
+	}
+	/** concord DSM occluder dim mask (?concord=occl; row 0 = top, 255 = dim); null = off. Composite-only. */
+	setOccluder(m: FgMask | null) {
+		this.compositor.setOccluder(m);
+	}
+	/** Photo uv (as shown) → the render uv whose terrain is drawn there (hover / geo readback). */
+	renderUVOf(u: number, v: number): [number, number] {
+		return this.warp ? this.warp.renderOf(u, v) : [u, v];
 	}
 
 	/** One frame of the overlay reveal (src/lib/reveal); null = off. Composite-only: no terrain pass. */
@@ -879,8 +957,13 @@ export class DeckEngine implements Renderer {
 	// ---------------- rendering ----------------
 
 	private viewState() {
-		if (this.world?.controls)
-			return { world: this.world.viewState(this.eyeVec) };
+		if (this.world?.controls) {
+			const map = this.step?.map;
+			return {
+				world: this.world.viewState(this.eyeVec),
+				...(map?.active ? { [MAP_VIEW_ID]: map.viewState } : {}),
+			};
+		}
 		const { w, h } = this.cssSize;
 		return {
 			screen: { target: [w / 2, h / 2, 0], zoom: 0 },
@@ -900,7 +983,7 @@ export class DeckEngine implements Renderer {
 			if (near !== this.worldNear) {
 				this.worldNear = near;
 				this.worldViews = [new WorldView({ id: "world", near, far: 600_000 })];
-				this.deck.setProps({ views: this.worldViews } as never);
+				this.syncWorldViews();
 			}
 			this.deck.setProps({
 				viewState: this.viewState(),
@@ -1324,7 +1407,9 @@ export class DeckEngine implements Renderer {
 			for (const p of snapped) {
 				if (vis.get(p) !== true) continue;
 				const pr = projectPoint(this.pose, this.aspect, eyeV, p.position);
-				if (pr && this.isForeground(pr.u, pr.v)) vis.set(p, false);
+				const q =
+					pr && this.warp ? this.warp.photoOf(pr.u, pr.v) : pr && [pr.u, pr.v];
+				if (q && this.isForeground(q[0], q[1])) vis.set(p, false);
 			}
 		}
 		return placePeakLabels(snapped, vis, this.pose, this.eyeArr, this.aspect, {
@@ -1332,6 +1417,11 @@ export class DeckEngine implements Renderer {
 			declutter,
 		})
 			.slice(0, max)
+			.map((l) => {
+				// display warp: labels go where the render point is SHOWN
+				const [u, v] = this.warp ? this.warp.photoOf(l.u, l.v) : [l.u, l.v];
+				return { ...l, u, v };
+			})
 			.map((l) => ({
 				name: l.name,
 				ele: l.ele,
@@ -1687,6 +1777,11 @@ export class DeckEngine implements Renderer {
 		return { photoFg: mask, protectPeople: !!mask };
 	}
 
+	/** Renderer.tiles3dAttribution: the 3D Tiles credit line while stepping (null = none on screen). */
+	tiles3dAttribution(): string | null {
+		return this.tiles3d?.attribution() ?? null;
+	}
+
 	/** The people / foreground mask (row 0 = top), or null (Step Inside, as engine.ts). */
 	get foregroundMask() {
 		return this.fgMask;
@@ -1761,7 +1856,7 @@ export class DeckEngine implements Renderer {
 	private stepMasks() {
 		const st = this.step;
 		const nf = this.nearField;
-		if (!st || !nf) return null;
+		if (!st || !nf || st.view !== "step") return null;
 		if (!st.masks) {
 			const fresh = this.geometryReady();
 			const dem = this.nearFieldDemRange(
@@ -1789,11 +1884,10 @@ export class DeckEngine implements Renderer {
 	 * world view is switched on for the duration (settings.mode is unchanged); `onBack` fires when
 	 * backToPhoto() arrives.
 	 */
-	enterStepInside(
-		opts: { radius?: number; pivotDist?: number; onBack?: () => void } = {},
-	) {
+	enterStepInside(opts: StepInsideOpts = {}) {
 		if (!this.terrain || this.disposed) return;
 		this.exitStepInside(false);
+		const view = opts.view ?? "step";
 		const enteredWorld = !this.world?.controls;
 		if (enteredWorld) this.enterWorld();
 		const w = this.world;
@@ -1810,7 +1904,20 @@ export class DeckEngine implements Renderer {
 			toQ,
 			held: true,
 		};
-		w.photoPlaneOpacity = 0;
+		w.photoPlaneOpacity = view === "map" ? this.stepGizmoOpacity(w) : 0;
+		const terrain = this.terrain;
+		const groundAt = (x: number, y: number) => {
+			const g = this.frame.toGeo(x, y, 0);
+			const h = terrain.heightAt(g.lat, g.lon);
+			return h == null ? null : this.frame.fromGeo(g.lat, g.lon, h)[2];
+		};
+		const map = new DeckMapCamera(this.frame, groundAt, (views) => {
+			if (this.step?.map !== map) return;
+			if (views) this.syncWorldViews();
+			else this.deck.setProps({ viewState: this.viewState() } as never);
+			this.kickWorld();
+		});
+		map.setSize(this.cssSize.w, this.cssSize.h);
 		const cam = new StepCamera(w.cam, this.canvas, {
 			eye: this.eyeVec,
 			quaternion: toQ,
@@ -1818,10 +1925,18 @@ export class DeckEngine implements Renderer {
 			aspect: this.aspect,
 			radius: opts.radius ?? this.nearField?.scene.confidenceRadius ?? 10,
 			pivotDist: opts.pivotDist,
+			mode: opts.mode,
+			easeIn: view === "map" && !enteredWorld,
+			groundAt,
+			mapDriver: map,
 			onChange: () => this.kickWorld(),
 			onBack: opts.onBack,
 		});
-		this.step = { cam, enteredWorld, masks: null };
+		this.step = { cam, enteredWorld, masks: null, map, view };
+		// the camera may have opened in map mode (its MapView joins the views)
+		this.syncWorldViews();
+		if (view === "step")
+			this.tiles3d?.enter(this.photo.lat, this.photo.lon, this.eyeVec);
 		if (!this.geometryReady())
 			void this.readback().then(() => {
 				if (this.step?.cam === cam) {
@@ -1841,11 +1956,13 @@ export class DeckEngine implements Renderer {
 		const st = this.step;
 		if (!st) return;
 		this.step = null;
+		this.tiles3d?.exit();
 		st.cam.dispose();
 		const w = this.world;
 		if (st.enteredWorld) {
 			this.exitWorld();
 		} else if (w?.controls) {
+			this.syncWorldViews();
 			w.controls.enabled = true;
 			w.flight = {
 				t0: 0,
@@ -1885,6 +2002,18 @@ export class DeckEngine implements Renderer {
 		this.kickWorld();
 	}
 
+	/**
+	 * The world view, plus the step camera's MapView while its map mode runs. Views and view state go
+	 * together: a MapView without its view state builds a controller without a map centre.
+	 */
+	private syncWorldViews() {
+		const map = this.step?.map;
+		this.deck.setProps({
+			views: map?.active ? [...this.worldViews, map.view] : this.worldViews,
+			viewState: this.viewState(),
+		} as never);
+	}
+
 	/** engine.ts exitWorld. */
 	private exitWorld() {
 		this.world?.exit();
@@ -1913,8 +2042,18 @@ export class DeckEngine implements Renderer {
 			const stepping = this.step?.cam.update() ?? false;
 			// worldRaf is still set here: a 'change' fired inside tick() only resets worldStill
 			const moved = w.tick(this.pose, this.eyeVec, this.aspect) || stepping;
+			// 3D Tiles refine from the world camera (its loads come back through updateLayers)
+			if (this.step)
+				this.tiles3d?.update(w.cam, this.canvas.width, this.canvas.height);
 			// the photo plane fades during the flight (a layer prop); orbiting only moves the view
-			if (flying) this.updateLayers();
+			// the In-map step camera: the photo frustum fades in as the camera leaves the eye
+			let gizmo = false;
+			if (this.step?.view === "map") {
+				const o = this.stepGizmoOpacity(w);
+				gizmo = Math.abs(o - w.photoPlaneOpacity) > 0.01;
+				if (gizmo) w.photoPlaneOpacity = o;
+			}
+			if (flying || gizmo) this.updateLayers();
 			else if (moved)
 				this.deck.setProps({ viewState: this.viewState() } as never);
 			this.worldStill = moved ? 0 : this.worldStill + 1;
@@ -1923,6 +2062,12 @@ export class DeckEngine implements Renderer {
 				flying || this.worldStill < 30 ? requestAnimationFrame(step) : 0;
 		};
 		this.worldRaf = requestAnimationFrame(step);
+	}
+
+	/** In-map step camera: the photo plane's opacity, 0 at the eye, full a few hundred metres out. */
+	private stepGizmoOpacity(w: WorldCamera) {
+		const d = w.cam.position.distanceTo(this.eyeVec);
+		return w.planeOpacity * Math.max(0, Math.min(1, (d - 30) / 300));
 	}
 
 	/** The drape's range map, rebuilt when the query geometry buffer has a new generation. */
@@ -2002,9 +2147,9 @@ export class DeckEngine implements Renderer {
 				),
 				photoPos: this.eyeArr,
 				// Step Inside: the full photo on the drape, at every incidence (terrain-layer.ts: > 1.5)
-				projectPhoto: this.step ? 2 : s.projectOpacity,
+				projectPhoto: this.step?.view === "step" ? 2 : s.projectOpacity,
 				// from the photo camera the near terrain drapes exactly: no grazing-angle cut-off (engine.ts)
-				photoMinRange: this.step ? 1 : s.minProjectRange,
+				photoMinRange: this.step?.view === "step" ? 1 : s.minProjectRange,
 				harmonize: harmonizeValues(
 					this.compLook.stats,
 					this.style.world.drapeHarmonize,
@@ -2038,6 +2183,21 @@ export class DeckEngine implements Renderer {
 					pinRadiusM: ws.pinRadiusM,
 				}),
 			);
+		// Step Inside 3D Tiles (opaque, log depth): before the splats
+		if (this.step?.view === "step" && this.tiles3d) {
+			const dm = this.drapeMask();
+			const tl = this.tiles3d.layer({
+				photoViewProj: Array.from(
+					photoViewProjection(this.pose, this.eyeArr, this.aspect),
+				),
+				photoPos: this.eyeArr,
+				photoRange: this.drapeRange(),
+				photoFg: dm.protectPeople ? dm.photoFg : null,
+				truth: !!this.nearField?.opts.truth,
+				camera: w.cam.position,
+			});
+			if (tl) out.push(tl);
+		}
 		// Step Inside splats last: they blend without writing depth, so everything opaque must be in
 		// the depth buffer first (the trails would otherwise draw over them)
 		const nf = this.nearFieldLayer();
@@ -2102,7 +2262,11 @@ export class DeckEngine implements Renderer {
 	 * In world mode (as three): the current world frame as a PNG, without labels.
 	 */
 	async exportImage(withLabels = true): Promise<Blob | null> {
-		if (this.settings.mode === "world") return this.exportWorld();
+		// display-only 3D Tiles (Google) never enter an export (tiles3d/deck-tiles.ts)
+		if (this.settings.mode === "world")
+			return this.tiles3d
+				? this.tiles3d.withoutDisplayOnly(() => this.exportWorld())
+				: this.exportWorld();
 		// labels need occlusion for THIS pose, not the debounced previous one
 		if (withLabels) await this.readback();
 		// GPU look passes (gpu/look) still in flight land before the export draws

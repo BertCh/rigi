@@ -1,0 +1,81 @@
+E2 — date-matched appearance (FUND, reports/fundamentals-plan.md §3 E2)
+WRITTEN ON RESUME, 2026-09-29 (after the ~19:52 shutdown), BEFORE ANY MATCH WAS RUN OR SCORED.
+State at the time of writing: snow maps for 10 photos, variant images for wc_0002 only, zero matches, zero scores.
+The previous agent had not written a protocol; the variant code (appearance.py) existed and is adopted as-is below,
+plus one new variant (v5) for plan item (iv), which the pre-crash code did not implement.
+
+PLAN ROW (fixed)
+Hypothesis: most of the appearance gap is predictable physics (snow on the day, sun direction, haze).
+Variants at the ref pose: (i) current; (ii) x hillshade lit by the photo-time sun; (iii) + date-matched snow mask
+tinting the ortho; (iv) + nearest clear Sentinel-2 L2A. Metric: LoMa and ALIKED inliers at the true pose, and
+true-vs-decoy separation. KILL: median inlier gain < 15% AND no separation gain.
+
+SET
+- The 30 dev photos of common.eval_ids() (C0 cache done, >= 1 correct ref, a perturb base). Dev only (tm_common).
+  All 30 have date_ok and time_ok (dates.json; manifest dateTaken read as Europe/Zurich time). Time of day is not
+  verifiable (camera clocks): caveat, not a filter.
+- Views per photo (geo.scored_views): every correct ref, every wrong ref, perturb yaw-8/-4/+4/+8 around the perturb
+  base. All renders come from the C0 cache (no new rendering; so no render lock is needed).
+- Full set planned (estimate ~1-2 h matching). No subset.
+
+VARIANTS (all offline post-processing of the cached rgb.jpg; identical processing for true and decoy views)
+  v0 = (i)   cached rgb.jpg unchanged.
+  v1 = (ii)  sun-relit: albedo = dehazed ortho / baked shading (Lambert; baked sun az/el/ambient grid-fitted per photo
+             on RING views, pose-agnostic), x photo-time Lambert shading (sun from dates.json, ambient by weather tag)
+             x cast shadow (Mapterhorn DEM march), exposure renormalised to v0 terrain median, app haze re-applied.
+  v2 = (iii) v1 + date-matched snow: albedo mixed toward snow albedo by the snow fraction at each pixel's lon/lat.
+             Snow source: Copernicus GFSC had no anonymous access on 2026-09-29 (see snow_fetch.py header), so the
+             fallback is S2 L2A SCL (+-10 d) and Landsat C2 L2 QA_PIXEL (+-16 d), nearest-date-first composite on a
+             ~60 m grid, scenes clear on < 40% of the box skipped. Deviation from the plan (GFSC) - stated.
+  v5 = (iv)  v2's shading + nearest clear Sentinel-2 L2A colour: TCI ('visual') from Earth Search, same SCL clear mask,
+             candidates +-20 d, nearest-date-first composite (same 40% QC), grid max(10 m, box/4000). S2 shading at
+             its own sun (item sun angles, else ephemeris at item time) divided out; the S2 albedo's low frequencies
+             replace the ortho albedo's (normalised Gaussian low-pass sigma 4 px in image space, ratio clipped to
+             [1/3, 3], S2 scaled to the ortho albedo's terrain median); ortho high frequencies kept. Where S2 has
+             no clear pixel, v2's albedo (with the snow mix) is used; where S2 is clear, no extra snow mix (S2 carries
+             the day's snow). APPLICABLE only if the photo date >= 2016-11-01 and the composite covers >= 50% of the
+             true view's terrain pixels; other photos are excluded from (iv)'s statistics (not counted as zero gain).
+  Extras (coded before the crash, NOT plan variants, NOT used for the verdict):
+  v3 = v2 + per-view photo-fitted haze and per-channel gain (appearance.py docstring); v4 = v0 + the same fit.
+
+MATCHING
+- LoMa-B (tools/research/tm/x3_modality/matchers.py 'loma': 4096 kp, MPS fp32) and ALIKED+LightGlue ('aliked'),
+  photo resized to the view with PIL LANCZOS (as X3 run_match.py). All MPS work under tm_common.gpu_lock(), held per
+  photo (so the concurrent E1/E3 studies can interleave). One heavy process at a time.
+- Lifting and metrics: X3 evaluate.eval_view (read-only import): render keypoint -> xyz, dropped if sky, range
+  <= 250 m, or depth discontinuity; cons6 = lifted matches within 6 px of the VIEW's own pose (no solve); also the
+  rotation(+focal) RANSAC solve, inliers, inlAtRef6.
+
+METRICS (per matcher m, variant v)
+- True-pose inliers I_v(p) = cons6 at the perturb-base correct ref (PRIMARY). Secondary: inlAtRef6 of the solve at
+  that view; mean cons6 over all correct refs.
+- Inlier gain g_v(p) = (I_v - I_0) / max(I_0, 10). Statistic: median over applicable photos. Also: ratio of sums,
+  bootstrap-by-photo 95% CI of the median (2000, seed 20260929), # photos improved / worsened.
+- Separation: D_v(p) = max cons6 over the photo's decoy views (wrong refs + perturb yaw+-4, +-8) under variant v.
+  S_v(p) = log10((I_v + 1) / (D_v + 1)). dS = S_v - S_0. "Separation gain" := median dS > 0 AND one-sided Wilcoxon
+  signed-rank p < 0.05 over applicable photos (zero differences dropped; if < 6 non-zero pairs, no gain).
+  Secondary: # photos with I > D (rank-1), before/after.
+- The plan names the E1 score for separation. E1 (a-contrario) scores were not available when this was written
+  (e1_acontrario/hyp_scores.json empty; E1 being resumed concurrently), and E1's statistic needs fresh renders with
+  skyline cues at E1's own hypotheses. So separation uses the simple pose-consistency score above on our own decoys;
+  the E1-score half is reported as PENDING.
+
+DECISION (fixed)
+- For each plan variant v in {(ii) v1, (iii) v2, (iv) v5} and matcher m in {loma, aliked}:
+  KILL(v, m) iff median g_v < 0.15 AND no separation gain.
+- E2 hypothesis KILLED iff KILL(v, m) for all 3 variants x 2 matchers. A pass on only one of the 6 cells is reported
+  as weak (6 chances; no multiplicity correction applied to the rule itself).
+- Pre-declared subgroups (descriptive, not decisive): "snowy" = photos whose snow map gives mean snow fraction >= 0.05
+  over the true view's terrain pixels; "low sun" = photo-time sun elevation < 25 deg.
+- Anything chosen after seeing scores is labelled POST HOC in REPORT.txt.
+
+AMENDMENTS (timestamped)
+A1 2026-09-30T00:06:22Z  (before any match) S2 source: Earth Search sentinel-2-l2a has no items before 2018 over the Alps
+   (probed 2016-2019); s2_fetch.py falls back to Planetary Computer sentinel-2-l2a (anonymous SAS token, 'visual' +
+   'SCL', sun from s2:mean_solar_*) when Earth Search returns no candidate. PC token cached per process (HTTP 429 fix).
+A2 2026-09-30T00:06:22Z  (before any match) v5 samples the S2 grid bilinearly over clear neighbours (nearest sampling
+   showed 10 m cells as facets in the near field of wc_0002 refs/C, seen in examples/, no scores involved).
+A3 2026-09-30T00:20Z (procedural, before any score) match_run.py takes the same tools/research/tm/.gpu.lock file with a
+   blocking flock instead of tm_common's 2 s LOCK_NB poll (E1 releases/re-takes the lock back-to-back per photo, so
+   polling starved E2). Same lock, same exclusivity. score.py was smoke-run once on 1-2 partial photos with its output
+   discarded (pipeline test; no numbers viewed) before the final run.

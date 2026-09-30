@@ -1,0 +1,17 @@
+{
+ "pid": "wc_0063",
+ "date": "2007-08-01T14:56:02",
+ "bbox": [
+  9.127634048461914,
+  46.887088775634766,
+  9.288034439086914,
+  46.94541931152344
+ ],
+ "W": 203,
+ "H": 109,
+ "source": "none",
+ "items": [],
+ "coverage": 0.0,
+ "snowFracMeanKnown": null,
+ "medianDaysOffset": null
+}

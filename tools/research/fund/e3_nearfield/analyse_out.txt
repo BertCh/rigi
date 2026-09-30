@@ -1,0 +1,130 @@
+{
+ "n": 30,
+ "validation": {
+  "V0e_nearMedRel": 0.02310768152905858,
+  "V1_nearMedRel": 0.030425315017146966,
+  "V1_midMedRel": 0.0011075745033596357,
+  "V0e_gray": 0.9360063645647705,
+  "V1_gray": 0.8788884063505917,
+  "reproj": 0.0011374471389844728,
+  "cov": 1.0,
+  "clampT": 1,
+  "minCoverage": 1.0
+ },
+ "refVsStated_m": {
+  "min": 0.0,
+  "median": 0.0,
+  "max": 0.18527928924368098
+ },
+ "c": {
+  "wc_0002": {
+   "V0cut_total": 1,
+   "V0_total": 1,
+   "V1_total": 1,
+   "V2_total": 1,
+   "gainsSupport": false
+  },
+  "wc_0034": {
+   "V0cut_total": 0,
+   "V0_total": 0,
+   "V1_total": 0,
+   "V2_total": 0,
+   "gainsSupport": false
+  },
+  "wc_0052": {
+   "V0cut_total": 0,
+   "V0_total": 0,
+   "V1_total": 0,
+   "V2_total": 0,
+   "gainsSupport": false
+  },
+  "wc_0055": {
+   "V0cut_total": 0,
+   "V0_total": 0,
+   "V1_total": 1,
+   "V2_total": 0,
+   "gainsSupport": false
+  }
+ },
+ "VERDICT": "KILL"
+}
+{
+ "V0e_vs_V0_log2gain_0-2km": [
+  0.09003748830800878,
+  -0.1165868660505693,
+  0.28991968515164585
+ ],
+ "V0e_vs_V0_medianDiff_0-2km": [
+  0.0,
+  0.0,
+  1.0
+ ],
+ "V0e_sum_inl_0-2km": 2425,
+ "V0e_sum_inl_near": 6,
+ "V0e_sum_lift_near": 84,
+ "V0e_sum_inl_mid": 2419,
+ "V0e_sum_lift_mid": 5800,
+ "V0e_sum_inl_far": 11051,
+ "V0e_sum_lift_far": 17027,
+ "V0e_photos_with_any_inl_0-2km": 15,
+ "V1_vs_V0_log2gain_0-2km": [
+  0.046637264138795646,
+  -0.48037282497245465,
+  0.5086459263550197
+ ],
+ "V1_vs_V0_medianDiff_0-2km": [
+  0.0,
+  0.0,
+  1.0
+ ],
+ "V1_sum_inl_0-2km": 2651,
+ "V1_sum_inl_near": 12,
+ "V1_sum_lift_near": 222,
+ "V1_sum_inl_mid": 2639,
+ "V1_sum_lift_mid": 6061,
+ "V1_sum_inl_far": 9276,
+ "V1_sum_lift_far": 14693,
+ "V1_photos_with_any_inl_0-2km": 15,
+ "V2_vs_V0_log2gain_0-2km": [
+  0.1037355692372644,
+  -0.3401256039690009,
+  0.5269990653957376
+ ],
+ "V2_vs_V0_medianDiff_0-2km": [
+  0.0,
+  0.0,
+  1.0
+ ],
+ "V2_sum_inl_0-2km": 2664,
+ "V2_sum_inl_near": 21,
+ "V2_sum_lift_near": 255,
+ "V2_sum_inl_mid": 2643,
+ "V2_sum_lift_mid": 6737,
+ "V2_sum_inl_far": 9513,
+ "V2_sum_lift_far": 14959,
+ "V2_photos_with_any_inl_0-2km": 15,
+ "V0_sum_inl_near": 7,
+ "V0_sum_lift_near": 78,
+ "V0_sum_inl_mid": 2310,
+ "V0_sum_lift_mid": 6291,
+ "V0_sum_inl_far": 11088,
+ "V0_sum_lift_far": 17252,
+ "V0_sum_inl_0-2km": 2317,
+ "V0_photos_with_any_inl_0-2km": 14,
+ "cutEffect_V0_near_inliers_regained": 7,
+ "GAIN": false
+}
+G50_V2_3dof {'n': 30, 'fracBetter': [0.1, 0.0, 0.23333333333333334], 'nBetter': 3, 'nSolved': 6, 'failReasons': {'rotation it0': 20, 'centre it0': 4}, 'medianErrEst': 50.21786990242314, 'medianErrGps': 50.331238620912686, 'fracBetterH': 0.1, 'solvedOnly_medianErr': 44.19552750979719, 'solvedOnly_fracBetter': 0.5}
+G50_V2_2dof {'n': 30, 'fracBetter': [0.1, 0.0, 0.23333333333333334], 'nBetter': 3, 'nSolved': 3, 'failReasons': {'rotation it0': 20, 'centre it0': 7}, 'medianErrEst': 50.1699248331327, 'medianErrGps': 50.331238620912686, 'fracBetterH': 0.1, 'solvedOnly_medianErr': 17.26012406531842, 'solvedOnly_fracBetter': 1.0}
+G50_V1_3dof {'n': 30, 'fracBetter': [0.1, 0.0, 0.23333333333333334], 'nBetter': 3, 'nSolved': 5, 'failReasons': {'rotation it0': 19, 'centre it0': 6}, 'medianErrEst': 50.199615780722795, 'medianErrGps': 50.331238620912686, 'fracBetterH': 0.1, 'solvedOnly_medianErr': 31.988764612545765, 'solvedOnly_fracBetter': 0.6}
+G50_V1_2dof {'n': 30, 'fracBetter': [0.1, 0.0, 0.23333333333333334], 'nBetter': 3, 'nSolved': 4, 'failReasons': {'rotation it0': 19, 'centre it1': 1, 'centre it0': 6}, 'medianErrEst': 50.199615780722795, 'medianErrGps': 50.331238620912686, 'fracBetterH': 0.1, 'solvedOnly_medianErr': 24.63245308540437, 'solvedOnly_fracBetter': 0.75}
+G50_V0e_3dof {'n': 30, 'fracBetter': [0.13333333333333333, 0.03333333333333333, 0.26666666666666666], 'nBetter': 4, 'nSolved': 4, 'failReasons': {'rotation it0': 17, 'centre it0': 9}, 'medianErrEst': 50.1699248331327, 'medianErrGps': 50.331238620912686, 'fracBetterH': 0.1, 'solvedOnly_medianErr': 23.49698003625443, 'solvedOnly_fracBetter': 1.0}
+G50_V0e_2dof {'n': 30, 'fracBetter': [0.13333333333333333, 0.03333333333333333, 0.26666666666666666], 'nBetter': 4, 'nSolved': 4, 'failReasons': {'rotation it0': 17, 'centre it0': 9}, 'medianErrEst': 50.1499389974778, 'medianErrGps': 50.331238620912686, 'fracBetterH': 0.13333333333333333, 'solvedOnly_medianErr': 21.36510050278115, 'solvedOnly_fracBetter': 1.0}
+G20_V2_3dof {'n': 30, 'fracBetter': [0.23333333333333334, 0.1, 0.4], 'nBetter': 7, 'nSolved': 9, 'failReasons': {'rotation it0': 13, 'centre it0': 8}, 'medianErrEst': 20.055623354290294, 'medianErrGps': 20.18743530669266, 'fracBetterH': 0.23333333333333334, 'solvedOnly_medianErr': 16.061325480319905, 'solvedOnly_fracBetter': 0.7777777777777778}
+G20_V2_2dof {'n': 30, 'fracBetter': [0.2, 0.06666666666666667, 0.36666666666666664], 'nBetter': 6, 'nSolved': 8, 'failReasons': {'rotation it0': 13, 'centre it0': 9}, 'medianErrEst': 20.063330923906253, 'medianErrGps': 20.18743530669266, 'fracBetterH': 0.2, 'solvedOnly_medianErr': 16.12492635753618, 'solvedOnly_fracBetter': 0.75}
+G150_V2_3dof {'n': 30, 'fracBetter': [0.06666666666666667, 0.0, 0.16666666666666666], 'nBetter': 2, 'nSolved': 2, 'failReasons': {'rotation it0': 22, 'centre it0': 6}, 'medianErrEst': 150.9795955335007, 'medianErrGps': 152.25146491806703, 'fracBetterH': 0.06666666666666667, 'solvedOnly_medianErr': 22.746439975800154, 'solvedOnly_fracBetter': 1.0}
+G150_V2_2dof {'n': 30, 'fracBetter': [0.06666666666666667, 0.0, 0.16666666666666666], 'nBetter': 2, 'nSolved': 2, 'failReasons': {'rotation it0': 22, 'centre it0': 6}, 'medianErrEst': 150.9795955335007, 'medianErrGps': 152.25146491806703, 'fracBetterH': 0.06666666666666667, 'solvedOnly_medianErr': 19.71949621283578, 'solvedOnly_fracBetter': 1.0}
+PRIMARY_fracBetter 0.1
+PASS False
+circularAtT {'V0': {'nSolved': 10, 'medianErrSolved': 15.635253397556347}, 'V0e': {'nSolved': 9, 'medianErrSolved': 10.203451765790932}, 'V1': {'nSolved': 10, 'medianErrSolved': 12.182777824246706}, 'V2': {'nSolved': 10, 'medianErrSolved': 13.384575450663803}}
+gpsEyeHeightChange {'median_dz_G50': 5.684725003638505, 'G50_liftedMedian_V2': 328.5, 'T_liftedMedian_V2': 752.5}

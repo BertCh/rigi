@@ -1,0 +1,241 @@
+WP-D (joint whole-frame solver + acceptance gate): result, 2026-09-29
+=====================================================================
+
+Files (no shared file edited)
+  src/lib/concord/solve/joint.ts        solveJoint, cueResidualPx, skylineResidualsX, focalPx1600, horizonEl,
+                                        camFromParams, JOINT_DEFAULTS, PARAM_NAMES
+  src/lib/concord/solve/gate.ts         gate, cueCrossCheck, cueScore, GATE_DEFAULTS
+  src/lib/concord/solve/refine.ts       concordRefine(ctx)  <- the pipeline/engine hook (?concord=solve); cachedHorizons
+  src/lib/concord/solve/index.ts
+  src/lib/concord/solve/joint.check.ts  npx tsx src/lib/concord/solve/joint.check.ts  (14 checks, all PASS)
+  scripts/concord/solve-eval.ts         DEV-only evaluation (refuses non-dev photos); --verify-horizon self-check
+  out/concord/solve/                    run-*.log, eval-<tag>.json, cand/<tag>/<start>-cues/<photo>.json
+                                        (eval.ts --candidate format), cache/ (sector horizons). 49 MB total.
+
+Method
+  State: yaw, pitch, roll, fScale, eye E/N/U, k1 (optional), plus ONE nuisance: an edge-cue offset along the
+  cue normal (px, prior 0 ± 3). WP-C measured a −1.5…−2.7 px contour offset at GT in every band. The
+  nuisance absorbs it so it is not read as pose; fitted values range from −3.9 to +0.2 px.
+  Residuals (whitened; Cauchy on data rows, quadratic priors):
+    skyline  f·(el_obs − horizon(az; eye)), σ 2 px, scale 4 px, all samples weigh like 60 (pose6dof/eye.ts
+             convention). horizon(az; eye) is linearised in the eye by central differences of horizons at eye
+             ± 5 m (7 horizons per HorizonsAtEyes call). An outer loop re-linearises at the new eye with a
+             proximal trust term (σ 10 m) until the eye moves < 1 m: Gauss–Newton form of the variable
+             projection in refineEyeFromSkyline.
+    cues     point [dx, dy]; edge (along n) − offset; level f·(el_obs − el(world from eye)); shore = signed shore
+             distance of the lake-plane hit ÷ its image gradient (px). Each group (kind:source) is capped at an
+             effective count: edge 40, level 20, shore 20, point 60 (WP-G), pins uncapped. Non-pin point cues
+             get the DEM σ (3 + 0.001·d m) added in quadrature.
+    priors   GPS: σH horizontal and σV vertical around eyePrior.eye0. Standing height: eye − DEM(eye.xy) −
+             1.6, σ 2 m above and 0.5 m below. These two are WP-B's altitude-contour term split into its
+             measurements. Also: focal (WP-B focalPrior), k1 0 ± 0.05, rotation 5/3/3° around cam0.
+  Freedom rules: eye freed only with ≥ 6 cues nearer than 2 km; k1 only with ≥ 6 corner cues; the
+  principal point is never freed.
+  Gate (gate.ts):
+    - skyline RMS (|r| < 30 px) ≤ before + 0.5 px, inlier fraction drop ≤ 0.05;
+    - cue RMS no worse (+0.05);
+    - |eye shift| ≤ 3σH; focal ≤ 4σ from the prior;
+    - holdout evidence required. Either held-out pins (callback) must improve their median, with p90 no
+      worse than +1 px, or, without pins, a 2-fold spatial cue cross-check (4×4 checkerboard; fit one colour,
+      score the other at cam0 vs the fit, both ways) must improve the sum with no fold worse by > 0.25 px;
+    - no evidence ⇒ reject.
+  concordRefine: refuses at LOW confidence (field/fit.ts isLowConfidence, the rule WP-E uses). Otherwise:
+  extract cues → solve → re-extract at the new camera (WP-C searches only ±12 px) → solve → cross-check
+  → gate. It returns ctx.cam unchanged unless accepted.
+
+API vs plan (additive / clarifying only)
+  - JointInput adds: start (initial camera; cam0 stays the prior and "before" reference); ground ((e, n) →
+    z in cam0's frame, the standing-height term; default eyePrior.isoBand.ground); frame (lake level → z for
+    shore cues without world).
+  - cues are JointCue = Cue & {residualPx?, conf?, world?}. For "edge" cues (u, v) is the PREDICTED
+    contour point and the observed edge is (u, v) − residualPx·n (WP-C MatchedCue convention). Point, level
+    and shore cues carry the observed pixel. Level/shore use `world` (WP-C WaterCue) when present.
+  - focal: {fPx, sigmaPx, basisLongPx?}. px at the 1600 long-side basis unless basisLongPx is given
+    (WP-B focalPrior returns px of the full image: pass basisLongPx = max(w, h)).
+  - eyePrior must be in cam0.eye's frame. WP-B's is fix-centred with absolute z: in the engine frame (eye
+    [0, 0, eyeAlt], absolute) no conversion is needed; in the eval frame subtract the GT eye altitude
+    (solve-eval.ts does).
+  - JointResult adds: cam0, freed, eyeShift, eyeShiftSigmaH, focalZ, edgeBiasPx, skylineInlierBefore/After,
+    counts, iterations, outer, horizonCalls, converged, ms. cov is 9×9 in PARAM_NAMES order (0 for fixed).
+    sigma is keyed by parameter name.
+  - JointOpts adds the tunables listed in JOINT_DEFAULTS (all fixed a priori, not tuned on pins).
+  - gate(r, holdout?, extra?): holdout may return a number (median) or {medPx, p90Px}. extra carries
+    {crossCheck, opts}.
+  - "Near cues are the only ones that may move the eye" is implemented as a precondition: the eye is freed
+    only with ≥ 6 near cues. Far cues and the skyline stay exactly modelled at the moving eye. Zeroing
+    their eye derivatives would make the LM cost inconsistent: a 10 m move shifts a 2 km cue by ~6 px.
+  - Plan said the solver "may call lmSolve from pose6dof/solve.ts". It uses its own dense LM instead:
+    skyline, edge and shore rows are not correspondences.
+
+Tests run (actual output)
+  1. joint.check.ts: 14/14 PASS. Synthetic setup: analytic terrain, sector ray-march horizons, 240 point cues
+     at 0.3–30 km plus the skyline.
+     | case                                          | start error      | recovered            |
+     |-----------------------------------------------|------------------|----------------------|
+     | 15 m horizontal eye + 1.5 % focal             | 15 m / 1.5 %     | 0.16 m / 0.009 %     |
+     | 15 m horizontal + 5 m vertical, −1.5 % focal  | 15.8 m / 1.5 %   | 0.42 m / 0.031 %     |
+     | 1.5 px noise + 15 % gross outliers (15–60 px) | 15 m / 1.5 %     | 0.09 m / 0.042 %     |
+     Rotation error ≤ 0.011° in all three; each run converges in 2 outer iterations and 16 horizons.
+     Other checks, all PASS:
+     - cue sign conventions;
+     - far-only cues keep the eye fixed; k1 fixed without corner cues;
+     - gate rejects without holdout evidence, rejects skyline +0.8 px, rejects non-improving holdout,
+       accepts improving holdout;
+     - cross-check passes (24.2 → 0.60, 29.5 → 0.67 px);
+     - concordRefine refuses at LOW confidence and recovers the truth end to end.
+  2. solve-eval --verify-horizon: the sector horizon equals geo/horizon.ts computeHorizon exactly at the
+     origin eye, and to ≤ 1.6e-4° (0.003 px) at an eye 25 m / 3 m away. 0.55 s per sector vs 3.6 s per 360°.
+  3. tsc --noEmit: 0 errors in concord/solve or solve-eval. biome check clean.
+
+DEV evaluation (10 DEV photos, 34 control-points pins; no interior pins exist yet)
+  Runs:
+    npx tsx scripts/concord/solve-eval.ts --start app --tag app-mh
+    npx tsx scripts/concord/solve-eval.ts --start gt --tag gt-mh
+  DEM Mapterhorn. Bands use the pin's distance from the GT eye. px @1600, median/p90 (n).
+  "raw" = the solve before gating (diagnostic, all photos, LOW included); "gated" = what the product
+  would use (LOW ⇒ start pose; rejected ⇒ start pose).
+
+  A. PRODUCT START (app skyline solve + app eye; baseline = eval.ts --baseline --pose app, 12.3 median)
+     mode cues (pins never seen; gate = cue cross-check)
+       base   <0.5 9.81 (1) | 0.5-2 2.36 (1) | 2-5 13.37/15.4 (4) | 5-15 11.92/35.4 (16) | >15 12.44/162 (12) | all 12.27/159 (34)
+       raw          6.10    |        4.60    |      9.07/28.2     |       6.36/69.7      |      7.16/135     |     6.36/127
+       gated        6.10    |        4.60    |     13.37/15.4     |       8.39/35.4      |      9.71/162     |     9.57/159
+       (eval.ts --candidate out/concord/solve/cand/cues-mh/app-cues/ reproduces gated: all 9.6, <6.5 km 15.45)
+       Accepted 4/10:
+         | photo | pins before → after | notes                                                   |
+         |-------|---------------------|---------------------------------------------------------|
+         | 6971  | 8.28 → 6.71         | eye moved 20.9 m (1.5σH), fScale 0.998                  |
+         | 7018  | 12.57 → 6.40        | eye fixed (no near cues), fScale 0.980                  |
+         | 7053  | 7.02 → 3.04         | eye fixed, fScale 1.0035                                |
+         | 7131  | 8.32 → 6.75         | eye moved 28 m north (0.7σH)                            |
+       Skyline RMS fell on all four.
+       Rejected:
+         - 7033 on the skyline rule (5.19 → 5.98 px), although its pins would have gone 5.37 → 3.60.
+         - LOW confidence: 5495, 7059, 7063, 7068, 7155. The raw solve can't rescue the 160 px failures
+           5495/7155, and it made 7059 (ultrawide) worse (15 → 28 px); the gate/LOW rule blocks all of them.
+       No photo p90 regressed > 1 px (gated).
+     mode pins (LOO: skyline + priors + pins \ i; gate = sanity rules only — no holdout exists in a fold)
+       raw   all 5.71/146 | <0.5 4.69 | 0.5-2 1.41 | 2-5 5.32/8.2 | 5-15 5.83/34.6 | >15 4.78/153
+       gated all 8.42/159;  6971 p90 +2.6 px
+     mode cuespins (LOO: cues + pins \ i; gate = cue cross-check)
+       raw   all 5.61/128 | <0.5 4.29 | 0.5-2 0.29 | 2-5 5.40/10.8 | 5-15 5.94/39.2 | >15 6.52/146
+       gated all 9.17/159;  no photo p90 regression
+
+  B. GT START (pin-fitted GT pose: the pins are IN-SAMPLE for it; reference only)
+     cues:     base all 3.01/6.7 → raw 4.88/14.8 → gated 5.65/10.1. Gated p90 regressions: 6971 +16.3,
+               7018 +5.2, 7033 +8.1, 7053 +2.8, 7131 +5.2.
+     pins:     gated 2.98/6.9. The sanity gate rejects most folds, but 7033, 7059, 7063 and 7068 still
+               regress p90.
+     cuespins: gated 4.76/10.0, five photos regress p90.
+     From GT and from the app pose the solve lands at nearly the same camera. Raw pins at convergence:
+       | photo | from app | from GT |
+       |-------|----------|---------|
+       | 7018  | 6.40     | 6.36    |
+       | 6971  | 6.71     | 6.61    |
+       | 7131  | 6.75     | 6.98    |
+     So the problem is well posed (start-independent). But its optimum sits 3–6 px from the pin-fitted GT
+     on the accepted photos: the cue/skyline evidence and the control-point pins disagree systematically.
+     The cross-check gate cannot see this: the cues are self-consistent. Which side is right cannot be
+     settled with these pins. They are what GT was fitted to, notch pins are defined on the Terrarium
+     horizon at the GT eye, and WP-G already reported a −6 px render-match/GT disagreement on 7018.
+
+  C. Sensitivity (DEV, cues mode):
+     - Terrarium DEM (tag both-terrarium-cues): app gated all 12.27 → 9.68, 3/10 accepted, no p90
+       regression; GT gated 3.01 → 4.58, four p90 regressions. The GT drift is not a DEM-choice artefact.
+     - Without WP-G inliers (tag norematch-cues, 5 photos): WP-C alone gives < 6 near cues on every
+       photo except 6971 (whose 50 m eye move was rejected at 4.3σH), so the eye stays fixed. App-start
+       gated 8.64 → 7.02. Near-field eye evidence comes almost entirely from the WP-G inliers.
+
+Acceptance (plan §4 WP-D)
+  - Synthetic 15 m / 1.5 % recovered to < 2 m / 0.2 %: PASS (0.16 m / 0.009 %; 0.09 m / 0.042 % with
+    noise + 15 % outliers).
+  - 0.5–2 km band median −30 % vs baseline (DEV, LOO): FAIL / NOT MEASURABLE.
+    - The band holds ONE dev pin (6971 waterline).
+    - Product cues mode: 2.36 → 4.60 (+95 %, worse). The first run gave 5.26; the difference comes from
+      horizon-cache float rounding (see known issues).
+    - LOO pins/cuespins: 1.41 / 0.29 (−41 % / −88 %).
+    - n = 1 decides nothing. Needs the blind interior pins (WP-A PENDING).
+  - < 0.5 km band median −20 % where cues exist: NOT MEASURABLE. One dev pin (6971); product mode
+    9.81 → 6.10 (−38 %), LOO 4.69 / 4.29.
+  - No photo p90 regresses > 1 px:
+    - PASS from the product (app) start in the cues mode, the configuration concordRefine implements.
+    - FAIL in the pins-LOO mode (6971 +2.6).
+    - FAIL from the GT start (up to +16 px): see B. This is the most important caveat of this package.
+  - Skyline RMS ≤ before + 0.5 px: PASS by construction; the gate enforces it. Every accepted photo's
+    skyline improved (Mapterhorn horizon). 7033 was rejected by this rule.
+  - k1 only with ≥ 6 corner cues: PASS (enforced, unit-tested). k1 stayed off in every real run: free.k1 is
+    false in the eval, since WP-B/C give no corner evidence and §5 forbids freeing k1 with the eye.
+  - Holdout photos reported once: NOT RUN. The task restricts WP-D to DEV. solve-eval refuses non-dev
+    photos; the holdout run is for the integration/final report.
+  Overall: product-start improvement is real on DEV (all-pin median 12.3 → 9.6 gated, 4 photos accepted,
+  0 p90 regressions). The band criteria can't be evaluated with 1 pin per near band. The GT-start drift
+  shows the gate would also accept moves away from the pin-fitted pose. Recommend keeping ?concord=solve
+  OFF by default until the blind interior pins exist. Then rerun:
+    npx tsx scripts/concord/solve-eval.ts --start app,gt
+  If the interior pins side with the pins over the cues, add them (or a per-photo pin holdout) as the
+  gate's holdout (concordRefine ctx.holdout).
+
+Pipeline hook (NOT applied; for the integration agent; ?concord=solve, a no-op when off)
+  Where: the engine's post-solve path, after autoAlign/cascade has ACCEPTED a pose. That is where the
+  photo edge map, a GeomBuffer, the eye and the DEM are available: src/lib/engine.ts and
+  src/lib/deck/engine.ts, next to the eyeAltitude/solve sites listed in tools/concord/priors/RESULT.txt.
+  geo/pipeline.ts cascade() has no photo edges or render, so it is the wrong place; pipeline.ts stays
+  untouched.
+    if (concordOn("solve")) {
+      const out = await concordRefine({
+        cam: { pose: this.pose, eye: [0, 0, this.eyeAlt], aspect: W / H, intr: { ...IDENTITY_INTRINSICS } },
+        confidence: { accepted: r.accepted, confidence: r.confidence },
+        eyePrior: eyePriorFromExif({ lat, lon, alt: photo.alt, hAcc: photo.hAccuracy },
+                                   await nearGround(lat, lon)),         // engine frame = WP-B frame
+        ground: (e, n) => ground(e, n),                                  // nearGround, absolute z
+        skyline: samplesFrom(detectSkyline(...)),                        // {u, v, w} as pose6dof/eye.ts
+        horizonsAtEyes: gpuEye.horizonsAtEyes ?? cpuSector,              // src/lib/gpu/eye (sector ok)
+        focal: { ...focalPrior(lensModel, f35, { width, height }), basisLongPx: Math.max(width, height) },
+        cuesAt: async (cam) => [
+          ...extractCues({ geom: await geomAt(cam), cam, edges: photoEdgesFromEdgeMap(edgeMap),
+                           lakes }).cues,
+          ...(rematchInliers ?? []),                                     // WP-G client, optional
+        ],
+      });
+      if (out.accepted) {
+        const c = out.cam;
+        // fold fScale into vfov (exact for k1 = 0): the app Pose has no intrinsics
+        const vfov = 2 * Math.atan(Math.tan((c.pose.vfov * Math.PI) / 360) / c.intr.fScale) * 180 / Math.PI;
+        this.setPose({ ...c.pose, vfov });
+        this.eyeAlt = c.eye[2];                  // vertical move: always safe
+        // horizontal move (c.eye[0..1] ≠ 0) needs the scene frame re-centred on the moved fix (WP-B note:
+        // near-dem.ts profiles march from x = y = 0). Until that exists, apply the eye only if
+        // Math.hypot(c.eye[0], c.eye[1]) < 1, else keep the rotation/focal and the old eye.
+      }
+    }
+  Everything is async and CPU-heavy: 6–60 s per photo in node, dominated by 7-horizon linearisations
+  (0.55 s each on CPU) and the 2 extractions. Run it off the main thread; the GPU eye sampler
+  (src/lib/gpu/eye) is the intended horizon provider. Warps (WP-E) must use out.cues / the accepted
+  camera, never feed back.
+
+Known issues
+  - Pins: all 34 DEV pins are control-points pins (mostly > 5 km) that GT was fitted to. Near bands hold
+    one pin each. Pinned acceptance is PENDING the blind interior pins.
+  - Evidence conflict: from the GT start the solve drifts 3–6 px from the pins on 5 photos, with any DEM
+    and with or without WP-G. Candidates:
+    - skyline detection vs DEM horizon on hazy or forested ridges (7018 GT skyline RMS 9 px);
+    - WP-G render-match yaw (7018);
+    - focal-table pull;
+    - notch pins defined on the Terrarium horizon.
+    Unresolved.
+  - WP-G inliers dominate the near-cue count (e.g. 7131: 1142 points vs 23 contours). They were matched
+    from app-eye renders (WP-G known issue) but are used as fixed world points. Forest/building-classed
+    points keep σ 4 px.
+  - The ultrawide (7059) raw solve is poor: focal σ 4 %, 33 cues. It is blocked there only by LOW
+    confidence and the cross-check minimum.
+  - Small run-to-run differences (≤ ~0.7 px on single pins). Freshly computed horizons (Float32) and
+    disk-cached ones (rounded to 1e-5°) differ slightly, so an LM can land on a slightly different
+    optimum. The 0.5–2 km pin read 5.26 in run app-mh and 4.60 in run cues-mh.
+  - The eye prior uses WP-B's frozen defaults (altBias −7, σA 3). Per WP-B these were tuned on DEV and
+    failed on holdout. Here they sit inside a gated joint solve, never as a standalone snap.
+  - k1 never exercised on real data (no corner evidence).
+
+Review note (2026-09-29): scripts/concord/lib.ts waterline-pin conversion was fixed (see
+tools/concord/review/RESULT.txt F1). Numbers above that include the 6971/6958 waterline pins (the
+<0.5 km and 0.5-2 km dev bands, and dev all-pin medians) predate the fix. Re-run values and the
+once-only holdout table are in tools/concord/review/RESULT.txt.

@@ -12,14 +12,15 @@ import {
 	tileYToLat,
 } from "./dem";
 import { type EnuFrame, distanceM } from "./geodesy";
+import { imageryTileUrls } from "./licences/imagery";
 
 // DEM: Mapterhorn (512 px, national lidar such as swissALTI3D where available) through dem's loadDemTile,
 // the policy the deck terrain and the CPU horizon share (a missing tile = its nearest ancestor, upsampled).
 
 export type ImagerySource = "satellite" | "topo" | "none";
 
-const SWISS_BBOX = { west: 5.9, east: 10.55, south: 45.8, north: 47.85 };
-
+// URL lists come from the imagery provider abstraction (src/lib/licences/imagery.ts); its
+// "default" provider is byte-identical to the URLs this file used to build inline.
 function imageryUrl(
 	src: ImagerySource,
 	z: number,
@@ -28,27 +29,7 @@ function imageryUrl(
 	lat: number,
 	lon: number,
 ): string[] {
-	const inCH =
-		lon > SWISS_BBOX.west &&
-		lon < SWISS_BBOX.east &&
-		lat > SWISS_BBOX.south &&
-		lat < SWISS_BBOX.north;
-	const esri = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
-	if (src === "satellite") {
-		return inCH && z >= 8
-			? [
-					`https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/${z}/${x}/${y}.jpeg`,
-					esri,
-				]
-			: [esri];
-	}
-	const osm = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
-	return inCH
-		? [
-				`https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/${z}/${x}/${y}.jpeg`,
-				osm,
-			]
-		: [osm];
+	return src === "none" ? [] : imageryTileUrls(src, z, x, y, lat, lon);
 }
 
 export type TerrainTile = {

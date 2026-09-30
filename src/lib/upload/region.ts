@@ -4,11 +4,15 @@
 // fetched with the region: fetchRegionTrails() loads them only when the trails layer is switched on.
 // Results are cached in memory and IndexedDB, keyed by a snapped centre so nearby uploads share one
 // region.
+import { getFlag } from "../flags";
+import { compactLakes, type LakeGeo } from "../geocam/lakes/compact";
 import { EARTH_R } from "../geodesy";
+import { osmExtractEnabled } from "../licences/config";
+import { namedPeaksInBBox, parseBBox } from "../osm/extract";
 import { type OsmElement, overpass } from "../overpass";
 import {
-	loadRegion,
 	photos as bundledPhotos,
+	loadRegion,
 	type RegionData,
 	type RegionPeak,
 	type RegionTrail,
@@ -31,6 +35,10 @@ export function bboxAround(
 }
 
 const bb = (b: number[]) => b.map((v) => v.toFixed(5)).join(",");
+
+/** The peaks query's bbox exactly as Overpass parses it (the 5-decimal strings in regionQueries). */
+export const peakBBox = (lat: number, lon: number) =>
+	parseBBox(bb(bboxAround(lat, lon, PEAK_RADIUS_KM)));
 
 export function regionQueries(lat: number, lon: number) {
 	const pk = bb(bboxAround(lat, lon, PEAK_RADIUS_KM));
@@ -137,6 +145,8 @@ export type RegionProgress = (
  * retries later) and `trailsFetched` (fetchRegionTrails has queried this region's paths).
  */
 export type LocalRegion = RegionData & {
+	/** ?geoLakes: compact lake outlines (src/lib/geocam/lakes) from the same water query. */
+	lakes?: LakeGeo[];
 	warnings?: string[];
 	partial?: boolean;
 	trailsFetched?: boolean;
@@ -313,11 +323,16 @@ async function fetchFromOverpass(
 		const [clat, clon] = snapCenter(lat, lon);
 		const q = regionQueries(clat, clon);
 		opts.onProgress?.("peaks");
-		const peaks = await overpass(q.peaks, {
-			timeoutMs: 45_000,
-			signal: opts.signal,
-			retryQuickFail: true,
-		});
+		// opt-in (?osmextract=on): the same answer from a static pre-extract when one covers the box
+		const peaks =
+			(osmExtractEnabled()
+				? await namedPeaksInBBox(peakBBox(clat, clon)).catch(() => null)
+				: null) ??
+			(await overpass(q.peaks, {
+				timeoutMs: 45_000,
+				signal: opts.signal,
+				retryQuickFail: true,
+			}));
 		opts.onProgress?.("water");
 		const water = await overpass(q.water, {
 			timeoutMs: 20_000,
@@ -341,6 +356,9 @@ async function fetchFromOverpass(
 						.filter((n): n is string => !!n),
 				),
 			],
+			...(getFlag("geoLakes") === "on"
+				? { lakes: compactLakes(water.elements) }
+				: {}),
 		};
 		await putRegion(region).catch(() => {});
 		opts.onProgress?.("done", "network");

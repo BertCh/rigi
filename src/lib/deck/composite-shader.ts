@@ -7,6 +7,7 @@
 //   brushTex  brush mask canvas (top → bottom, uvT); fgTex people mask (top → bottom, uvT)
 import type { Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import { WARP_GLSL } from "../concord/field/glsl";
 import { TURBO_GLSL } from "../look/glsl/common";
 import { COMP_BLOCK, compositeChunk, HARM_BLOCK } from "../look/glsl/composite";
 import { REVEAL_GLSL } from "../reveal/glsl";
@@ -56,6 +57,11 @@ layout(std140) uniform compositeUniforms {
   vec4 revealF;
   vec4 revealR;
   vec4 revealU;
+  // concord display warp (?concord=warp): warpOn 0 ⇒ uvG == vUv exactly
+  float warpScale;
+  float warpOn;
+  // concord DSM occluder (?concord=occl): occlOn 0 ⇒ occlTex is never read
+  float occlOn;
 } composite;
 `;
 
@@ -103,11 +109,18 @@ export type CompositeModuleProps = {
 	revealF: number[];
 	revealR: number[];
 	revealU: number[];
+	warpScale: number;
+	warpOn: number;
+	occlOn: number;
 	photoTex: Texture;
 	layerTex: Texture;
 	geoTex: Texture;
 	brushTex: Texture;
 	fgTex: Texture;
+	/** RGBA8 warp (concord/field packWarpTexture), row 0 = top, nearest; the 1×1 empty when off. */
+	warpTex: Texture;
+	/** concord DSM occluder dim mask (R, top → bottom, uvT); the 1×1 empty when off. */
+	occlTex: Texture;
 };
 
 export const compositeModule = {
@@ -156,6 +169,9 @@ export const compositeModule = {
 		revealF: "vec4<f32>",
 		revealR: "vec4<f32>",
 		revealU: "vec4<f32>",
+		warpScale: "f32",
+		warpOn: "f32",
+		occlOn: "f32",
 	},
 } as const satisfies ShaderModule;
 
@@ -183,6 +199,8 @@ uniform sampler2D layerTex;
 uniform sampler2D geoTex;
 uniform sampler2D brushTex;
 uniform sampler2D fgTex;
+uniform sampler2D warpTex;
+uniform sampler2D occlTex;
 in vec2 vUv;
 out vec4 fragColor;
 
@@ -196,6 +214,7 @@ vec3 srgbEncode(vec3 c) {
 
 ${TURBO_GLSL}
 ${REVEAL_GLSL}
+${WARP_GLSL}
 ${compositeChunk(`uniform sampler2D maskTex;
 uniform sampler2D normalTex;
 #define GEO_RANGE(p) texelFetch(geoTex, p, 0).r
@@ -234,12 +253,14 @@ float lr(vec2 uv) {
 void main() {
   vec2 uvT = vec2(vUv.x, 1.0 - vUv.y);
   vec3 col = composite.hasPhoto > 0.5 ? srgbDecode(texture(photoTex, uvT).rgb) : vec3(0.0);
+  // render-space reads (layerTex, geoTex) at uvG; photo-space reads (photo, fg, brush, masks) unchanged
+  vec2 uvG = warpUV(warpTex, composite.warpScale, composite.warpOn, vUv);
 #ifdef LOOK_REFINE
-  vec4 layer = layerAt(vUv);
+  vec4 layer = layerAt(uvG);
 #else
-  vec4 layer = texture(layerTex, vUv);
+  vec4 layer = texture(layerTex, uvG);
 #endif
-  float range = texture(geoTex, vUv).r;
+  float range = texture(geoTex, uvG).r;
   // people & other foreground: keep the photo untouched there
   float fg = composite.fgOn * texture(fgTex, uvT).r;
   // terrain coverage (look composite: snapped to the photo's edges while the refined masks are fresh)
@@ -251,24 +272,26 @@ void main() {
     fg = composite.fgOn * softMask(ref.b);
   }
 #endif
+  // concord DSM occluder: a tree / hut in front of the terrain this pixel shows dims it (dim, don't hide)
+  if (composite.occlOn > 0.5) fg = max(fg, 0.8 * texture(occlTex, uvT).r);
 
   // silhouettes: discontinuities in log-range
-  float c = lr(vUv);
+  float c = lr(uvG);
   vec2 o = composite.geoTexel * 1.25;
-  float e = max(max(abs(c - lr(vUv + vec2(o.x, 0.0))), abs(c - lr(vUv - vec2(o.x, 0.0)))),
-                max(abs(c - lr(vUv + vec2(0.0, o.y))), abs(c - lr(vUv - vec2(0.0, o.y)))));
-  float isSkyline = (range > 0.0 && texture(geoTex, vUv + vec2(0.0, o.y)).r == 0.0) ? 1.0 : 0.0;
+  float e = max(max(abs(c - lr(uvG + vec2(o.x, 0.0))), abs(c - lr(uvG - vec2(o.x, 0.0)))),
+                max(abs(c - lr(uvG + vec2(0.0, o.y))), abs(c - lr(uvG - vec2(0.0, o.y)))));
+  float isSkyline = (range > 0.0 && texture(geoTex, uvG + vec2(0.0, o.y)).r == 0.0) ? 1.0 : 0.0;
   float ridge = smoothstep(composite.ridgeThr.x, composite.ridgeThr.y, e);
   if (composite.nearFade > 0.0) ridge *= range > 0.0 ? smoothstep(composite.nearFade * 0.5, composite.nearFade, range) : 1.0;
 #ifdef LOOK_INK
-  vec2 ink = inkLines(vUv, range, composite.nearFade, cov);
+  vec2 ink = inkLines(uvG, range, composite.nearFade, cov);
 #endif
 #ifdef LOOK_OUTPUT
   float grainA = 0.0;
 #endif
   // reveal: x = overlay alpha, y = light band, z = ridge alpha (1, 0, 1 when off)
   vec3 rv = vec3(1.0, 0.0, 1.0);
-  if (composite.reveal.w > 0.0) rv = revealAt(vUv, range, composite.reveal, composite.revealWin, composite.revealQD, composite.revealQE, composite.revealShape, composite.revealFocus, composite.revealF.xyz, composite.revealR.xyz, composite.revealU.xyz, composite.aspect);
+  if (composite.reveal.w > 0.0) rv = revealAt(uvG, range, composite.reveal, composite.revealWin, composite.revealQD, composite.revealQE, composite.revealShape, composite.revealFocus, composite.revealF.xyz, composite.revealR.xyz, composite.revealU.xyz, composite.aspect);
 
   if (composite.mode < 0.5) {
     if (composite.depthTint > 0.0 && range > 0.0 && fg < 0.5) {

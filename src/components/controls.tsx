@@ -1,25 +1,137 @@
-import type { ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { cn } from "#/lib/utils";
 
+const OPEN_KEY = (id: string) => `rigi.panel.${id}`;
+
+/** A section's remembered open state. Automation (navigator.webdriver) always starts open, so scripts find every control. */
+function useSectionOpen(
+	id: string | undefined,
+	defaultOpen: boolean,
+): [boolean, (v: boolean) => void] {
+	const [open, setOpen] = useState(() => {
+		if (!id) return true;
+		try {
+			if (navigator.webdriver) return true;
+			const s = localStorage.getItem(OPEN_KEY(id));
+			return s == null ? defaultOpen : s === "1";
+		} catch {
+			return defaultOpen;
+		}
+	});
+	return [
+		open,
+		(v) => {
+			setOpen(v);
+			try {
+				if (id) localStorage.setItem(OPEN_KEY(id), v ? "1" : "0");
+			} catch {
+				// storage unavailable: remembered for this page only
+			}
+		},
+	];
+}
+
+/**
+ * A sidebar section. With `collapse` the title becomes a disclosure whose open state is remembered
+ * per id (localStorage rigi.panel.<id>); `summary` is shown beside the title while it is closed.
+ */
 export function Section({
 	title,
 	children,
 	aside,
+	collapse,
+	summary,
+	icon,
 }: {
 	title: string;
 	children: ReactNode;
 	aside?: ReactNode;
+	collapse?: { id: string; defaultOpen?: boolean };
+	summary?: ReactNode;
+	icon?: ReactNode;
 }) {
+	const [open, setOpen] = useSectionOpen(
+		collapse?.id,
+		collapse?.defaultOpen ?? true,
+	);
+	const heading = (
+		<h3 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.14em] text-white/55 uppercase">
+			{collapse && (
+				<ChevronRight
+					className={cn(
+						"size-3.5 text-white/35 transition-transform",
+						open && "rotate-90",
+					)}
+				/>
+			)}
+			{icon}
+			{title}
+		</h3>
+	);
 	return (
-		<section className="border-b border-white/8 px-4 py-4">
-			<div className="mb-3 flex items-center justify-between">
-				<h3 className="text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">
-					{title}
-				</h3>
+		<section
+			className="border-b border-white/8 px-4 py-3.5"
+			data-section={collapse?.id}
+			data-open={collapse ? String(open) : undefined}
+		>
+			<div className="flex min-h-5 items-center justify-between gap-2">
+				{collapse ? (
+					<button
+						type="button"
+						aria-expanded={open}
+						onClick={() => setOpen(!open)}
+						className="flex min-w-0 flex-1 items-center gap-2 text-left hover:[&_h3]:text-white/85"
+					>
+						{heading}
+						{!open && summary && (
+							<span className="truncate text-[10px] text-white/35">
+								{summary}
+							</span>
+						)}
+					</button>
+				) : (
+					heading
+				)}
 				{aside}
 			</div>
-			<div className="space-y-3">{children}</div>
+			{open && <div className="mt-3 space-y-3">{children}</div>}
 		</section>
+	);
+}
+
+/**
+ * A tier heading in the sidebar: groups sections by concern (View, Pose, Advanced). Purely a label
+ * row; the sections below it carry their own collapse state.
+ */
+export function PanelBand({
+	label,
+	hint,
+	tone = "default",
+}: {
+	label: string;
+	hint?: ReactNode;
+	tone?: "default" | "muted";
+}) {
+	return (
+		<div
+			className={cn(
+				"flex items-baseline justify-between gap-2 border-b px-4 pt-5 pb-1.5",
+				tone === "muted"
+					? "border-amber-300/15 bg-amber-300/[0.03]"
+					: "border-white/10 bg-white/[0.02]",
+			)}
+		>
+			<span
+				className={cn(
+					"text-[10px] font-bold tracking-[0.2em] uppercase",
+					tone === "muted" ? "text-amber-200/60" : "text-cyan-200/70",
+				)}
+			>
+				{label}
+			</span>
+			{hint && <span className="text-[10px] text-white/30">{hint}</span>}
+		</div>
 	);
 }
 

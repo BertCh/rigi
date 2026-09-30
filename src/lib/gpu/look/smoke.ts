@@ -1,6 +1,7 @@
 // Hook smoke test for the opt-in GPU look passes (scripts/gpu/look-bench.mjs --fn lookSmoke
 // --query "lookgpu=1&style=…"): waits for the engine's async results to land and summarises them,
 // so a run with lookgpu=1 can be compared with one without (the CPU path).
+import { setFlagOverride } from "#/lib/flags";
 import { lookGpuOn } from "./opt-in";
 
 type Field = { res: number; field: Uint8Array; ms: number } | null;
@@ -101,7 +102,6 @@ export async function hookParity(
 	opts: { label?: string } = {},
 ) {
 	const e = engine as Priv;
-	const g = globalThis as { __RIGI_LOOKGPU__?: string };
 	const cl = (e.kind === "deck" ? e.compLook : e.look) as {
 		maskIn: unknown[];
 		masks: Look["masks"];
@@ -114,19 +114,19 @@ export async function hookParity(
 		masks: cl.masks?.data ?? null,
 	});
 	const run = async (flag: string) => {
-		g.__RIGI_LOOKGPU__ = flag;
+		setFlagOverride("lookgpu", flag);
 		e.relief.key = "";
 		e.haze.key = "";
 		cl.maskIn = [];
 		e.fitHaze();
 		e.updateRelief();
 		e.updateLook();
-		await sleep(flag === "1" ? 3000 : 200);
+		await sleep(flag === "on" ? 3000 : 200);
 		return snap();
 	};
-	const cpu = await run("0");
-	const gpu = await run("1");
-	g.__RIGI_LOOKGPU__ = undefined;
+	const cpu = await run("off");
+	const gpu = await run("on");
+	setFlagOverride("lookgpu", undefined);
 	const bytes = (a: Uint8Array | null, b: Uint8Array | null) => {
 		if (!a || !b) return { present: [!!a, !!b] };
 		let n = 0;

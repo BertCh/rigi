@@ -1,34 +1,19 @@
 // The look-on-GPU switch, without importing luma.gl: look/** checks this synchronously and only
 // then loads the GPU code (hooks.ts) with a dynamic import, so the CPU path and the node tests never
 // touch WebGPU.
-//   switch:      globalThis.__RIGI_LOOKGPU__ | ?lookgpu= | localStorage "rigi.lookgpu" (first one set
-//                wins; "0" turns it off). Default ON since 2026-09-28 where WebGPU exists: parity is
-//                ≤ 1 byte / ~1e-6 and relief / haze run ~2× faster; results land one frame after the
+//   switch:      ?lookgpu=off (src/lib/flags). Default ON since 2026-09-28 where WebGPU exists: parity
+//                is ≤ 1 byte / ~1e-6 and relief / haze run ~2× faster; results land one frame after the
 //                settle frame, and export waits for them (lookIdle).
-//   kill switch: the compute sidecar's (gpu/device.ts readMode, mirrored here): __RIGI_GPU__,
-//                ?gpu=, localStorage "rigi.gpu"; "off" wins over the opt-in.
+//   kill switch: ?gpu=off (the compute sidecar's, gpu/device.ts) wins over the switch.
+import { getFlag } from "#/lib/flags";
 
-function pick(glob: string, query: string, storage: string): string | null {
-	const g = (globalThis as Record<string, unknown>)[glob];
-	if (typeof g === "string") return g;
-	try {
-		const q = new URLSearchParams(globalThis.location?.search ?? "").get(query);
-		if (q != null) return q;
-	} catch {}
-	try {
-		return globalThis.localStorage?.getItem(storage) ?? null;
-	} catch {}
-	return null;
-}
-
-/** The look switch alone (on unless set to "0"). */
-export const lookGpuOptedIn = () =>
-	pick("__RIGI_LOOKGPU__", "lookgpu", "rigi.lookgpu") !== "0";
+/** The look switch alone. */
+export const lookGpuOptedIn = () => getFlag("lookgpu") === "on";
 
 /** Switched on, the compute sidecar not killed, and WebGPU present: the look passes try the GPU. */
 export const lookGpuOn = () =>
 	lookGpuOptedIn() &&
-	pick("__RIGI_GPU__", "gpu", "rigi.gpu") !== "off" &&
+	getFlag("gpu") === "on" &&
 	typeof navigator !== "undefined" &&
 	!!(navigator as { gpu?: unknown }).gpu;
 

@@ -1,4 +1,6 @@
 import { FF35_DIAGONAL_MM, focalPxFromF35 } from "../camera/focal";
+import { concordOn } from "../concord/flags";
+import { focalPrior, lensModelFromCamera } from "../concord/priors/focal-table";
 import type { PhotoMeta, Vec3 } from "./photo-meta";
 
 /**
@@ -106,11 +108,19 @@ export function cameraFromMeta(meta: PhotoMeta): Camera {
 		width,
 		height,
 		// crop-aware (sensor = EXIF size); principal point stays centred, a crop's is unknown
-		f: focalPxFromF35(
-			meta.focal35,
-			{ width, height },
-			{ width: meta.sensorWidth, height: meta.sensorHeight },
-		),
+		// ?concord=eye: the per-lens focal table (WP-B, concord/priors); off ⇒ the EXIF focal unchanged
+		f: concordOn("eye")
+			? focalPrior(
+					lensModelFromCamera(meta.model, meta.focal35),
+					meta.focal35,
+					{ width, height },
+					{ width: meta.sensorWidth, height: meta.sensorHeight },
+				).fPx
+			: focalPxFromF35(
+					meta.focal35,
+					{ width, height },
+					{ width: meta.sensorWidth, height: meta.sensorHeight },
+				),
 		gravity: gravityInDisplayFrame(meta.gravity, meta.orientation),
 		heading: meta.heading,
 	});

@@ -1,0 +1,90 @@
+FUND E0 — Observability map: REPORT
+2026-09-29 · dev split only (50 ids) · C0 render cache only, no rendering · protocol frozen first (PROTOCOL.txt, 23:06Z)
+Files: compute.py (features.json), evaluate.py (results.json, table.txt = per-photo table), posthoc.py (post-hoc,
+labelled; merged into results.json "posthoc_LABELLED_POST_HOC"), compute.log, evaluate.log.
+
+VERDICT (fixed kill rule, primary analysis A, floor 0.10°):  KILL
+  AUROC(ROT vs SUCCESS, low hfov/w*)   = 0.599  [95% CI 0.40–0.79]  (n 16 vs 19)
+  AUROC(POS vs SUCCESS, low I_no250)   = 0.503  [0.27–0.73]         (n 9 vs 19)
+  Both < 0.65 → kill as pre-registered. But read §3: the rotation half is not a valid test (cache gap), and the
+  position half shows a signal in the OPPOSITE direction to the plan's.
+
+1. Design notes (from PROTOCOL; why it differs from "at the ref pose")
+ - Labels from F1 stage: SUCCESS 19 (T6 correct HIGH), ROT = search/matching/refine 16, POS = position 9,
+   OTHER = decision/verification 6.
+ - None of the 9 POS photos has a correct ref (6/9 have no manifest heading). All 19 successes do. A ref-pose analysis
+   therefore has POS n = 0, and mixing ref yaw for successes with anything else for failures leaks the label.
+   Primary analysis A is uniform and label-free: at the stated eye, from the 24 ring views, averaged over 72 azimuths
+   (w* = median over azimuths; I_eye = mean over hfov0-wide windows, pitch-0 band clipped to the ring's coverage).
+   Secondary: B = at the manifest heading (label-free, n 15/11/4/3), C = at the correct ref (xyz of the ref view;
+   ROT n = 5, POS n = 0), D = "best available" (ref, then heading, then A). D is label-leaky and is shown only to
+   demonstrate that leak.
+ - One implementation fix was made before any AUROC was computed. Skyline bins were first invalidated whenever any
+   ring view clipped them. They are now judged only by the owning (nearest-centre) ring view, whose top edge is highest
+   at that azimuth.
+
+2. Results (point AUROC [bootstrap 95% CI]; oriented so > 0.5 = the hypothesised direction)
+                                   A (all 50)          B (heading)        C (ref subset)
+  ROT vs SUCC, -hfov/w*            0.599 [.40,.79]     0.533 (11/15)      0.521 (5/19)
+  POS vs SUCC, -I_no250            0.503 [.27,.73]     0.717 (4/15)       n/a
+  ANYFAIL vs SUCC, -hfov/w*        0.474               0.483              0.500
+  ANYFAIL vs SUCC, -I_no250        0.460               0.615              0.550
+  ROT vs rest, -hfov/w*            0.664 [.51,.81]     0.562              0.524
+  POS vs SUCC, +f250               0.614               0.933 [.80,1] n=4  n/a
+  POS vs SUCC, +CRB sigma_h        0.515               0.622              n/a
+  Pre-registered reverse direction (reported, not used for the kill):
+  POS vs SUCC, HIGH I_tot          0.708 [.49,.91] p=.04   0.983 (n=4)
+  Leaky D: POS vs SUCC +f250 = 0.854 and ANYFAIL +f250 = 0.732. This is an artefact. Successes get ref-view values,
+  which include the downward frame and give f250 of 0 for several telephoto views. Failures get ring values, and
+  ring f250 ≈ 1 almost everywhere. Ignore D.
+  Floor sweep, rotation (A): AUROC 0.607 / 0.599 / 0.609 / 0.618 / 0.548 at floors 0.05 / 0.1 / 0.2 / 0.3 / 0.5°.
+  Median w* (A, 0.1°): SUCC 10°, ROT 18.5°, POS 9°, OTHER 9°. At 0.3°: 28° vs 94°.
+  (C, 0.2°): 0.653, n = 5 ROT; one of five floors, not significant.
+
+3. What the numbers mean (honest reading)
+ a) The rotation predictor is confounded by a cache gap. POST HOC: every photo with ≥ 50% of its 360° skyline clipped
+    gets w* = 360 ("never unique"): 13/13 photos, against 1/37 of the rest. The clipping comes from skyline above the
+    top edge of the pitch-0 ring (ring vfov 17–57°). Spearman(hfov/w*, clipped fraction) = −0.57. Among photos with
+    < 30% clipping, AUROC = 0.54 (6 vs 9). So FOV/w* has not been tested properly. The failure groups do have
+    wider median w* (ROT 18.5° vs 10°), and ROT vs rest gives 0.664 (p = 0.03, secondary). Both are too entangled with
+    clipping to claim. Fixing this needs a pitched ring (e.g. +20°/+40° at the stated eye). That means rendering, which
+    the brief says to ask about first, so it was NOT done.
+ b) Eye information. The pre-registered direction ("low kept information → position failure") is null (0.50).
+    Reverse direction: position failures have MORE total parallax information at the stated eye (A 0.708, p = 0.04;
+    B 0.98 with only n = 4). This fits a stated-eye error mattering exactly where parallax is large: a big foreground
+    in frame, the F1 "44% within 300 m" observation. It does not fit "the eye is unobservable". Caveats:
+    - it was not the primary direction;
+    - 5/9 POS are gross (> 400 m) position errors, so geometry "at the stated eye" is not the photo's geometry;
+    - I_tot is dominated by ground a few metres from the eye (see c).
+ c) Where the information lives (item 5). Under the Σ(1/d)² metric, ≥ 99.9% of eye information lies below 250 m for
+    nearly every photo, failing or succeeding. A median f250: SUCC 0.9999, ROT 0.9998, POS 1.0000, OTHER 0.9999.
+    Ref-view C: SUCC 0.97, ROT 0.59 (n = 5). Inside the kept band (≥ 250 m), 94–99% lies in 250 m–2 km in every group.
+    The 250 m cut therefore discards nearly all raw eye information for successes as well. It cannot by itself separate
+    failures from successes.
+ d) The Cramér–Rao bound is not the binding limit. Assumptions: 500 matches uniform over ≥ 250 m terrain, 1 px noise,
+    rotation marginalised, focal known. Horizontal eye 1σ, analysis A median: SUCC 0.44 m, ROT 0.26 m, POS 0.48 m.
+    The worst photo is 3.9 m (wc_0020). The ref view gives 0.1–5 m. Every photo, including the failures, carries
+    enough mid-field parallax in principle to fix the eye far better than GPS (5–15 m). The practical limit is model
+    and measurement error: near/mid-field render fidelity (z14 blur, smeared faces, DSM objects), appearance gap,
+    outliers, DEM error. It is not geometric information content. The mid-field bound is optimistic by construction
+    because it assumes correct correspondences there.
+
+4. Implications for the plan (interpretation, not tested here)
+ - E0's premise "solvability is predictable from geometry alone" fails its fixed test. Geometry-only predictors do
+   not separate the F1 buckets at n ≈ 50.
+ - Lever question (E3 vs FOV): no support for "low I_eye → position failure". There is weak, direction-reversed
+   support for "lots of near-field parallax + wrong stated eye → failure". Together with (d), this points E3 at
+   FIDELITY of the 250 m–2 km band and at an eye search/veto, not at "more information". E3 is not contradicted.
+ - FOV/w* (multi-photo/pano) is untested because of the ring clipping. Re-run (a) if a pitched ring is rendered
+   (≈ 2 extra views × 24 yaws × 50 photos, stated eye only).
+
+5. Limitations
+ - n = 19/16/9/6. CIs span ~0.4 wide. F1 labels are unblinded post-hoc judgements (±2–3 per bucket).
+ - The ring covers only the pitch-0 band. The near field below −9…−28° and the skyline above +9…+28° are missing
+   in A/B.
+ - Sanity check: Spearman of I_no250 between ring (at ref yaw) and ref view = 0.76 (n = 30). The ring's within-band
+   f250 is lower than the ref view's (median 0.978 vs 0.990).
+ - The skyline elevation is quantised at the ring's stride-2 sample (~0.08°), so the 0.05–0.1° floors are close to
+   that quantisation.
+ - Roll and focal are ignored in w*. Skylines are the rendered DEM's, not the photo's: clouds and occluders are
+   ignored.

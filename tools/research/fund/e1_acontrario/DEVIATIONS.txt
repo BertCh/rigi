@@ -1,0 +1,43 @@
+E1 DEVIATIONS / AMENDMENTS (PROTOCOL.txt is left untouched; this file records every change, with reasons)
+
+D1  2026-09-30T00:05Z (UTC) - written BEFORE any statistic was computed on any hypothesis.
+    Context: the machine was shut down at ~23:52Z during gen.py (photos wc_0002, 0004, 0006, 0009 complete; wc_0011
+    ring/yaw/ref complete, displaced eyes d50b163 and d50b283 complete, rest missing). The earlier "score_partial"
+    run scored an EMPTY photo list (results.json photos = [], nHyps = 0; no gen/<pid>/stats.json exists), so no
+    statistic has been seen by anyone. Confirmed by inspection of results.json / hyp_scores.json ("[]").
+    Reason: the resumed session has a ~4 h wall-clock limit, shares render_lock/gpu_lock with two concurrent FUND
+    studies (E2, E3), and the observed cost is ~7-8 min per photo with the full 9-eye displaced set -> 31 remaining
+    photos ~4.1 h of pure render time plus lock waits. This exceeds the available budget.
+    Change (the protocol's own pre-declared first cut, "displaced-eye set cut to bearings {theta} x {150, 400} m"):
+      - DISPLACED hypotheses = bearing theta (the first bearing drawn by the protocol's seeded rng) at 150 m and
+        400 m only, for ALL 35 photos (applied uniformly, including the five photos that already have more
+        displaced eyes generated). No photo is dropped unless generation runs out of time, in which case photos are
+        dropped from the END of the analysed list (P_lab first, as the protocol says), recorded in D2.
+      - Consequence: AMBIGUOUS (displaced 50 m) is empty in the primary analysis; NE-dec has <= 2 per P_ref photo.
+      - The already-generated extra displaced hypotheses of wc_0002/0004/0006/0009/0011 are NOT part of the primary
+        analysis. A SECONDARY sensitivity run (score.py --disp-full, same code, all generated displaced eyes on
+        those photos) is pre-declared here and will be reported as secondary; it cannot change the verdict.
+    Implementation: gen.py --disp-cut (skips non-cut eyes); score.py filters DISP to the cut set unless --disp-full.
+    Scratch dir: E1_SCRATCH set to the resumed session's scratchpad (the old one did not survive the reboot); no
+    effect on results.
+    Scoring parallelism: E1_PROCS=2 (RAM constraint); no effect on results.
+
+D2  2026-09-30T00:10Z (UTC) - infrastructure only, before any statistic.
+    The stage-1 worker's Chromium loads the app from APP_URL (default http://localhost:3100, the user's dev server,
+    which the pre-crash run evidently used and which is forbidden by fund/README.txt). After the reboot :3100 was down,
+    so the first resume attempt failed on every photo at the first render (ERR_CONNECTION_REFUSED; nothing written
+    except empty state.json stubs, which gen.py resumes from). Fix: a private Vite dev server for E1 only on :3196
+    (npx vite dev --config scripts/gpu/vite.gpu.config.ts --port 3196 --strictPort; same app, no tools/** watching),
+    APP_URL=http://localhost:3196 for gen.py. It is killed when generation ends. Caveat: the app is served from the
+    current working tree, which other sessions may have edited since the pre-crash photos were rendered; renders of
+    photos 1-5 and 6-35 may therefore come from slightly different app code (not controllable; noted, not tested).
+
+D3  2026-09-30T02:45Z (UTC) - bookkeeping, after scoring (none of it changes a decision).
+    - gen.py was killed once by the harness's 2 h background limit at 22:02 EDT, mid wc_0082 (ring/yaw saved); it was
+      restarted and resumed from state.json (displaced eyes of wc_0082 were run after the restart). No data lost.
+    - E2's matcher held the gpu lock with a blocking flock ~20:26-21:31 EDT; E1 waited (holding render_lock) - timing only.
+    - Final generation: all 35 photos complete (no photo dropped). Displaced eyes with no stage-2 pose (solver returned
+      nothing: wc_0082 d400, wc_0088 d150+d400, and 4 non-cut eyes of wc_0004) yield no hypothesis, as gen.py always did.
+    - tables.py: fixed a format-string bug in its last line ("95%" read as a conversion); added Clopper-Pearson upper
+      bounds per kind (the protocol's "exact binomial upper bound") since accept counts are not all 0.
+    - finalize.py (new): applies the fixed KILL clauses to results.json and adds POST HOC diagnostics, labelled as such.

@@ -26,6 +26,7 @@ import type { Buffer, Device, Framebuffer, Texture } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { Pose } from "../camera";
+import type { WarpState } from "../concord/field";
 import type { compositeValues, harmonizeValues } from "../look/composite";
 import { COMP_BLOCK, HARM_BLOCK } from "../look/glsl/composite";
 import type { LookDefine } from "../look/look-key";
@@ -174,6 +175,15 @@ export class PhotoCompositor implements Effect {
 	private photoTex?: Texture;
 	private photoSrc: HTMLImageElement | ImageBitmap | null = null;
 	private fgTex?: Texture;
+	/** concord display warp (setWarp); null = off. */
+	private warp: WarpState | null = null;
+	private warpTex?: Texture;
+	private warpDirty = false;
+	/** concord DSM occluder dim mask (setOccluder); null = off. */
+	private occlMask: { width: number; height: number; data: Uint8Array } | null =
+		null;
+	private occlTex?: Texture;
+	private occlDirty = false;
 	private fgMask: { width: number; height: number; data: Uint8Array } | null =
 		null;
 	private fgDirty = false;
@@ -243,6 +253,22 @@ export class PhotoCompositor implements Effect {
 
 	get hasForeground() {
 		return !!this.fgMask;
+	}
+
+	/** concord DSM occluder dim mask (composite-only change); null = off: the composite is bit-identical. */
+	setOccluder(m: { width: number; height: number; data: Uint8Array } | null) {
+		if (!m && !this.occlMask) return;
+		this.occlMask = m;
+		this.occlDirty = true;
+		this.bump();
+	}
+
+	/** concord display warp (composite-only change); null = off: the composite is bit-identical. */
+	setWarp(w: WarpState | null) {
+		if (!w && !this.warp) return;
+		this.warp = w;
+		this.warpDirty = true;
+		this.bump();
 	}
 
 	/** engine.ts paint(): into the brush mask (normalised coords, v down). */
@@ -844,6 +870,12 @@ export class PhotoCompositor implements Effect {
 		this.photoTex?.destroy();
 		this.fgTex?.destroy();
 		this.brushTex?.destroy();
+		this.warpTex?.destroy();
+		this.warpTex = undefined;
+		this.warpDirty = !!this.warp;
+		this.occlTex?.destroy();
+		this.occlTex = undefined;
+		this.occlDirty = !!this.occlMask;
 		this.empty = this.photoTex = this.fgTex = this.brushTex = undefined;
 		this.fgDirty = !!this.fgMask;
 		this.brushDirty = true;
@@ -890,6 +922,32 @@ export class PhotoCompositor implements Effect {
 			this.fgTex?.destroy();
 			this.fgTex = this.fgMask ? maskTexture(device, this.fgMask) : undefined;
 			this.fgDirty = false;
+		}
+		if (this.warpDirty) {
+			this.warpTex?.destroy();
+			const t = this.warp?.texture;
+			// row 0 = top, sampled at (x, 1 − y) like fgTex; nearest: warpUV filters manually
+			this.warpTex = t
+				? device.createTexture({
+						data: t.data,
+						width: t.width,
+						height: t.height,
+						sampler: {
+							minFilter: "nearest",
+							magFilter: "nearest",
+							addressModeU: "clamp-to-edge",
+							addressModeV: "clamp-to-edge",
+						},
+					})
+				: undefined;
+			this.warpDirty = false;
+		}
+		if (this.occlDirty) {
+			this.occlTex?.destroy();
+			this.occlTex = this.occlMask
+				? maskTexture(device, this.occlMask)
+				: undefined;
+			this.occlDirty = false;
 		}
 		if (this.brushDirty) {
 			if (!this.brushTex)
@@ -946,6 +1004,11 @@ export class PhotoCompositor implements Effect {
 			geoTex: geo.texture,
 			brushTex: this.brushTex ?? empty,
 			fgTex: this.fgTex ?? empty,
+			warpTex: this.warpTex ?? empty,
+			warpScale: this.warpTex ? (this.warp?.texture.scale ?? 0) : 0,
+			warpOn: this.warpTex ? 1 : 0,
+			occlTex: this.occlTex ?? empty,
+			occlOn: this.occlTex ? 1 : 0,
 			...revealProps(this.reveal),
 		};
 	}

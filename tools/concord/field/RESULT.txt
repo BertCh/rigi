@@ -92,3 +92,8 @@ Known issues / notes for the integration agent
     peaksInFrame / sampleAt deliberately not; LOOK_INK + comp_refine refinedSkyline reads MASK at uvG; the
     three.js composite shader was type-checked but not GLSL-compiled here (the deck one was).
   - holdout photos were never loaded (field-eval filters split === "dev").
+
+Review note (2026-09-29): scripts/concord/lib.ts waterline-pin conversion was fixed (see
+tools/concord/review/RESULT.txt F1). Numbers above that include the 6971/6958 waterline pins (the
+<0.5 km and 0.5-2 km dev bands, and dev all-pin medians) predate the fix. Re-run values and the
+once-only holdout table are in tools/concord/review/RESULT.txt.
