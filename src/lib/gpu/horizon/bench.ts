@@ -147,6 +147,34 @@ function eyeGrid(e: Eye, count: number): Eye[] {
 	return out;
 }
 
+/** Bit-level diff of two GPU profile batches: differing elevation / distance entries and stats. */
+function bitDiff(a: FastHorizonProfile[], b: FastHorizonProfile[]) {
+	let el = 0;
+	let dist = 0;
+	let stats = 0;
+	const bits = (x: Float32Array) =>
+		new Uint32Array(x.buffer, x.byteOffset, x.length);
+	for (let j = 0; j < a.length; j++) {
+		const ae = bits(a[j].elevation);
+		const be = bits(b[j].elevation);
+		const ad = bits(a[j].distance);
+		const bd = bits(b[j].distance);
+		if (ae.length !== be.length) el += Math.max(ae.length, be.length);
+		for (let i = 0; i < ae.length; i++) if (ae[i] !== be[i]) el++;
+		for (let i = 0; i < ad.length; i++) if (ad[i] !== bd[i]) dist++;
+		if (
+			a[j].stats.samples !== b[j].stats.samples ||
+			a[j].stats.skips !== b[j].stats.skips ||
+			a[j].step !== b[j].step ||
+			a[j].i0 !== b[j].i0
+		)
+			stats++;
+	}
+	return { el, dist, stats, n: a.length };
+}
+const median = (x: number[]) =>
+	[...x].sort((p, q) => p - q)[Math.floor(x.length / 2)];
+
 export async function benchPhoto(o: BenchIn) {
 	const device = await getComputeDevice();
 	if (!device) throw new Error("no WebGPU compute device");
@@ -199,7 +227,30 @@ export async function benchPhoto(o: BenchIn) {
 			g = (await computeHorizonGpu(device, mosaics, [eye], opts))[0];
 			warm.push(lastGpuHorizonTiming?.totalMs ?? Number.NaN);
 		}
+		// the command-graph path (./graph.ts) against the pooled path: bit-identical, alternated timings
+		const oldMs: number[] = [];
+		const graphMs: number[] = [];
+		let diff = bitDiff(
+			[g],
+			await computeHorizonGpu(device, mosaics, [eye], opts, { graph: true }),
+		);
+		for (let r = 0; r < 5; r++) {
+			const a = await computeHorizonGpu(device, mosaics, [eye], opts);
+			oldMs.push(lastGpuHorizonTiming?.totalMs ?? Number.NaN);
+			const b = await computeHorizonGpu(device, mosaics, [eye], opts, {
+				graph: true,
+			});
+			graphMs.push(lastGpuHorizonTiming?.totalMs ?? Number.NaN);
+			const d = bitDiff(a, b);
+			diff = {
+				el: diff.el + d.el,
+				dist: diff.dist + d.dist,
+				stats: diff.stats + d.stats,
+				n: diff.n + d.n,
+			};
+		}
 		res[name] = {
+			graph: { diff, oldMedMs: median(oldMs), graphMedMs: median(graphMs) },
 			cpuMs,
 			gpuColdMs: coldT?.totalMs,
 			gpuWarmMs: Math.min(...warm),
@@ -220,6 +271,34 @@ export async function benchPhoto(o: BenchIn) {
 	const b0 = performance.now();
 	const batch = await computeHorizonGpu(device, mosaics, eyes, bOpts);
 	const batchMs = performance.now() - b0;
+	const batchChunks = lastGpuHorizonTiming?.chunks;
+	// graph path on the batch (15 chunks of 24 eyes at 343 eyes: the chunk overlap), alternated
+	const bOld: number[] = [batchMs];
+	const bGraph: number[] = [];
+	let batchDiff = { el: 0, dist: 0, stats: 0, n: 0 };
+	for (let r = 0; r < 3; r++) {
+		const t = performance.now();
+		const gb = await computeHorizonGpu(device, mosaics, eyes, bOpts, {
+			graph: true,
+		});
+		bGraph.push(performance.now() - t);
+		const d = bitDiff(batch, gb);
+		batchDiff = {
+			el: batchDiff.el + d.el,
+			dist: batchDiff.dist + d.dist,
+			stats: batchDiff.stats + d.stats,
+			n: batchDiff.n + d.n,
+		};
+		if (r < 2) {
+			const t2 = performance.now();
+			const ob = await computeHorizonGpu(device, mosaics, eyes, bOpts);
+			bOld.push(performance.now() - t2);
+			const d2 = bitDiff(batch, ob);
+			batchDiff.el += d2.el;
+			batchDiff.dist += d2.dist;
+			batchDiff.stats += d2.stats;
+		}
+	}
 	const sampleN = Math.min(eyes.length, o.cpuSample ?? 6);
 	const stride = Math.max(1, Math.floor(eyes.length / sampleN));
 	const worst = {
@@ -246,7 +325,12 @@ export async function benchPhoto(o: BenchIn) {
 		eyes: eyes.length,
 		gpuMs: batchMs,
 		gpuMsPerEye: batchMs / eyes.length,
-		chunks: lastGpuHorizonTiming?.chunks,
+		chunks: batchChunks,
+		graph: {
+			diff: batchDiff,
+			oldMedMs: median(bOld),
+			graphMedMs: median(bGraph),
+		},
 		cpuMsPerEye: cpuMs / sampleN,
 		cpuMsExtrapolated: (cpuMs / sampleN) * eyes.length,
 		speedup: ((cpuMs / sampleN) * eyes.length) / batchMs,

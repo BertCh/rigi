@@ -143,7 +143,7 @@ export async function sceneHorizonGpu(
 	lon: number,
 	eye: number,
 	timing?: (t: SceneHorizonGpuTiming) => void,
-	opts: { keep?: boolean } = {},
+	opts: { keep?: boolean; graph?: boolean } = {},
 ): Promise<HorizonProfile | null> {
 	const t0 = performance.now();
 	const device = await getComputeDevice();
@@ -160,6 +160,7 @@ export async function sceneHorizonGpu(
 			mosaics,
 			[{ lat, lon, h: eye }],
 			{ step: STEP, maxDistance: MAX_DISTANCE, noRidges: true },
+			{ graph: opts.graph },
 		);
 		const t2 = performance.now();
 		timing?.({ mosaicMs: t1 - t0, gpuMs: t2 - t1, totalMs: t2 - t0 });

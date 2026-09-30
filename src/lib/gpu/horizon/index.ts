@@ -28,6 +28,10 @@
  * instead of sharing buffers, and releaseHorizonGpu destroys pages only after in-flight calls finish.
  * Pooled slots are bound with their original byte sizes (core range()), so the kernel sees exactly
  * what it saw with per-call buffers: outputs are bit-identical to the pre-core path.
+ * Opt-in (computeHorizonGpu(…, { graph: true }), computeHorizonsAuto 4th arg, sceneHorizonGpu opts.graph):
+ * each chunk is one encoding of a cached core ComputeGraph instead (./graph.ts: out / stats as cleared
+ * graph transients read through a read node, the same kernel, bindings of the same byte sizes, the
+ * same chunk overlap); bit-identical to the default pooled path (scripts/gpu/horizon-bench.mjs).
  *
  * Ridges and peaks (decision): the GPU doesn't record ridges. Ridge lists are variable-length per azimuth
  * and only the Overlay / refine paths use them; the app worker and eye search pass noRidges. So
@@ -190,7 +194,7 @@ export function uploadMosaics(device: Device, mosaics: Mosaic[]): MosaicSet {
 
 // ---------- kernel (core/kernel: one pipeline per device) ----------
 
-const MARCH = defineKernel(
+export const MARCH = defineKernel(
 	"horizon-march",
 	HORIZON_WGSL,
 	[
@@ -262,6 +266,12 @@ export interface GpuHorizonTiming {
 	chunks: number;
 }
 
+/** Plumbing options of the GPU march (not numerics: every path gives the same bits). */
+export interface HorizonGpuOptions {
+	/** march each chunk as a core ComputeGraph encoding (./graph.ts); default: pooled single dispatch */
+	graph?: boolean;
+}
+
 /** Timing of the latest computeHorizonGpu call in this realm (benchmarks). */
 export let lastGpuHorizonTiming: GpuHorizonTiming | null = null;
 
@@ -275,11 +285,12 @@ export async function computeHorizonGpu(
 	mosaics: Mosaic[],
 	eyes: Eye[],
 	opts: FastHorizonOptions = {},
+	gpu: HorizonGpuOptions = {},
 ): Promise<FastHorizonProfile[]> {
 	const t0 = performance.now();
 	if (!eyes.length) return [];
 	const out = await withLease(LEASE, () =>
-		marchLocked(device, mosaics, eyes, opts, t0),
+		marchLocked(device, mosaics, eyes, opts, t0, gpu),
 	);
 	if (opts.peaks)
 		for (let j = 0; j < eyes.length; j++)
@@ -324,6 +335,7 @@ async function marchLocked(
 	eyes: Eye[],
 	opts: FastHorizonOptions,
 	t0: number,
+	gpu: HorizonGpuOptions = {},
 ): Promise<FastHorizonProfile[]> {
 	const tu = performance.now();
 	const set = uploadMosaics(device, mosaics);
@@ -404,6 +416,18 @@ async function marchLocked(
 	const ub = new ArrayBuffer(64);
 	const uu = new Uint32Array(ub);
 	const uf = new Float32Array(ub);
+	// graph path: one ComputeGraph encoding per chunk (same kernel, same bytes; ./graph.ts)
+	const chunker = gpu.graph
+		? await (await import("./graph")).graphChunker(device, LEASE, {
+				spec: MARCH,
+				pages: pages.map((b) =>
+					b instanceof Buffer ? { buffer: b, size: b.byteLength } : b,
+				),
+				paramsBytes,
+				outBytes,
+				statsBytes,
+			})
+		: null;
 
 	const out: FastHorizonProfile[] = new Array(eyes.length);
 	let chunks = 0;
@@ -491,38 +515,48 @@ async function marchLocked(
 			uf[10] = (1 - kR) / (2 * EARTH_R);
 			uu[11] = 1_000_000;
 			uu[12] = 0; // U.zero
-			// Same slots every chunk: this chunk's writes queue after the previous chunk's dispatch + copy.
-			const sl = slots(device, paramsBytes, outBytes);
-			const u = pooledUniform(device, sl.u, ub);
-			sl.params.write(new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4));
-			const stats = pooledStorage(device, sl.stats, statsBytes); // zeroed
-			const enc = device.createCommandEncoder({ id: "horizon-march" });
-			dispatch(
-				enc,
-				k,
-				{
-					u,
-					params: range(sl.params, paramsBytes),
-					pg0: pages[0],
-					pg1: pages[1],
-					pg2: pages[2],
-					pg3: pages[3],
-					outTD: range(sl.out, outBytes),
-					stats: range(stats, statsBytes),
-				},
-				Math.ceil(nAz / 64),
-				nE,
-				1,
-			);
-			const read = stageReads(device, enc, [
-				{ buffer: sl.out, size: nE * nAz * 8 },
-				{ buffer: stats, size: nE * 12 },
-			]);
-			try {
-				submit(device, enc);
-			} catch (e) {
-				read.cancel();
-				throw e;
+			let read: StagedRead;
+			if (chunker)
+				read = chunker.submit(
+					ub,
+					new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4),
+					nAz,
+					nE,
+				);
+			else {
+				// Same slots every chunk: this chunk's writes queue after the previous chunk's dispatch + copy.
+				const sl = slots(device, paramsBytes, outBytes);
+				const u = pooledUniform(device, sl.u, ub);
+				sl.params.write(new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4));
+				const stats = pooledStorage(device, sl.stats, statsBytes); // zeroed
+				const enc = device.createCommandEncoder({ id: "horizon-march" });
+				dispatch(
+					enc,
+					k,
+					{
+						u,
+						params: range(sl.params, paramsBytes),
+						pg0: pages[0],
+						pg1: pages[1],
+						pg2: pages[2],
+						pg3: pages[3],
+						outTD: range(sl.out, outBytes),
+						stats: range(stats, statsBytes),
+					},
+					Math.ceil(nAz / 64),
+					nE,
+					1,
+				);
+				read = stageReads(device, enc, [
+					{ buffer: sl.out, size: nE * nAz * 8 },
+					{ buffer: stats, size: nE * 12 },
+				]);
+				try {
+					submit(device, enc);
+				} catch (e) {
+					read.cancel();
+					throw e;
+				}
 			}
 			const cur: Pending = { c0, nE, read };
 			// Collect the previous chunk now that this one is packed and submitted.
@@ -537,6 +571,7 @@ async function marchLocked(
 		// an error left a chunk submitted: wait for it (and return its staging slot) before the
 		// lease lets anyone else reuse the slots
 		if (prev) await prev.read.read().catch(() => {});
+		chunker?.release();
 	}
 	const t2 = performance.now();
 	lastGpuHorizonTiming = {
@@ -568,12 +603,13 @@ export async function computeHorizonsAuto(
 	mosaics: Mosaic[],
 	eyes: Eye[],
 	opts: FastHorizonOptions = {},
+	gpu: HorizonGpuOptions = {},
 ): Promise<FastHorizonProfile[]> {
 	if (gpuCanServe(opts)) {
 		const device = await getComputeDevice();
 		if (device) {
 			try {
-				return await computeHorizonGpu(device, mosaics, eyes, opts);
+				return await computeHorizonGpu(device, mosaics, eyes, opts, gpu);
 			} catch (e) {
 				console.warn("[gpu] horizon kernel failed, using the CPU", e);
 			}

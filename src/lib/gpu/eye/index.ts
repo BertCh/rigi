@@ -118,6 +118,8 @@ export interface EyeHorizonProviderOptions {
 	 * step 0.05°, minDistance 2 m, maxDistance 120 km.
 	 */
 	horizon?: FastHorizonOptions;
+	/** GPU march plumbing: each chunk as a core ComputeGraph (identical bits; default the pooled path) */
+	graph?: boolean;
 }
 
 export interface EyeHorizonProviderStats {
@@ -180,7 +182,9 @@ export function createEyeHorizonProvider(
 	};
 	const horizonsAtEyes = async (eyes: Vec3[]): Promise<EyeHorizon[]> => {
 		const t0 = performance.now();
-		const profs = await computeHorizonsAuto(mosaics, eyes.map(toEye), hOpts);
+		const profs = await computeHorizonsAuto(mosaics, eyes.map(toEye), hOpts, {
+			graph: o.graph,
+		});
 		const out = profs.map((p): EyeHorizon => {
 			if (p.i0 === 0 && p.elevation.length === n)
 				return { step: p.step, elevation: p.elevation, distance: p.distance };

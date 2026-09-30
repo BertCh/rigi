@@ -56,6 +56,12 @@ try {
 				`cpu ${a.cpuMs.toFixed(0)} ms, gpu cold ${a.gpuColdMs.toFixed(0)} (upload ${r.firstCallUploadMs.toFixed(0)}) warm ${a.gpuWarmMs.toFixed(1)} ms | ` +
 				`batch ${r.batch.eyes}: ${r.batch.gpuMs.toFixed(0)} ms (${r.batch.gpuMsPerEye.toFixed(2)}/eye) vs cpu ≈${(r.batch.cpuMsExtrapolated / 1000).toFixed(1)} s ×${r.batch.speedup.toFixed(0)} [${((Date.now() - t0) / 1000).toFixed(0)} s]`,
 		);
+		const gd = [a.graph, r.defaults.graph, r.noMipSkip.graph, r.batch.graph];
+		console.log(
+			`   graph vs pooled: ${gd.map((x) => `el≠ ${x.diff.el} dist≠ ${x.diff.dist} stats≠ ${x.diff.stats} (${x.diff.n} profiles) med ${x.oldMedMs.toFixed(1)}→${x.graphMedMs.toFixed(1)} ms`).join(" | ")}`,
+		);
+		if (gd.some((x) => x.diff.el || x.diff.dist || x.diff.stats))
+			process.exitCode = 1;
 		for (const k of ["defaults", "noMipSkip"])
 			console.log(
 				`   ${k}: max ${r[k].parity.maxDEl.toFixed(5)}° p99 ${r[k].parity.p99DEl.toExponential(2)}° empty≠ ${r[k].parity.emptyMismatch} dist±1% ${(100 * r[k].parity.dist1pct).toFixed(2)}% cpu ${r[k].cpuMs.toFixed(0)} gpu ${r[k].gpuWarmMs.toFixed(1)} ms`,

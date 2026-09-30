@@ -54,6 +54,8 @@ export interface EyeBenchIn {
 	/** Photo URL (served by the dev server). */
 	img: string;
 	modes?: Mode[];
+	/** GPU horizon on the command-graph path (./horizon/graph.ts) */
+	graph?: boolean;
 }
 
 /** cpuJitter: cpuBatch with ±1e-4° deterministic noise on the horizon (the search's own sensitivity). */
@@ -163,6 +165,7 @@ export async function benchEye(o: EyeBenchIn) {
 		lon: o.lon,
 		mosaics,
 		sector,
+		graph: o.graph,
 	});
 	const eye0: Vec3 = [0, 0, o.eyeU];
 	const opts: RefineEyeOptions = {
