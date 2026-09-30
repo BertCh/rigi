@@ -86,7 +86,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
  * workgroup memory, then invocation k < 52 adds sum k over the subgroups. Rows are indexed by
  * local_invocation_index / subgroup_size, which assumes subgroups are contiguous runs of it. That
  * holds for 1-D workgroups on Metal / Vulkan / D3D but WGSL doesn't guarantee it, so each subgroup
- * checks it and writes NaN partials when it fails (bandStatsGpu then re-runs BAND_STATS).
+ * checks it and writes -1 partials when it fails (bandStatsGpu then re-runs BAND_STATS).
  * The pixel loop runs in uniform control flow (the subgroup ops require it).
  */
 export const BAND_STATS_SG = /* wgsl */ `enable subgroups;
@@ -158,12 +158,11 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
   let sg = lid / ssz;
   // every lane of this subgroup in the same row (rows then map 1:1 to subgroups)
   let ok = subgroupAll(sg == subgroupBroadcastFirst(lid) / ssz);
-  // NaN via a var: a const bitcast<f32>(0x7fc00000u) is a WGSL const-eval error
-  var nanBits = 0x7fc00000u;
-  let nan = bitcast<f32>(nanBits);
+  // on a failed check every partial is -1 (a count is never negative). Not NaN: a NaN constant is a
+  // WGSL shader-creation error, and WGSL implementations may assume floats are never NaN
   for (var k = 0u; k < 52u; k++) {
     let v = subgroupAdd(acc[k]);
-    if (sid == 0u) { sh[sg][k] = select(nan, v, ok); }
+    if (sid == 0u) { sh[sg][k] = select(-1.0, v, ok); }
   }
   workgroupBarrier();
   if (lid < 52u) {

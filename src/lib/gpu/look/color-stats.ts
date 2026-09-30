@@ -88,8 +88,8 @@ export async function bandStatsGpu(
 	new Float32Array(words, 16, 1)[0] = o.minRange ?? 0;
 	const sg = (opts.subgroups ?? false) && hasFeature(device, "subgroups");
 	let p = await bandPartials(device, o, words, R, sg);
-	// BAND_STATS_SG writes NaN when the subgroup layout isn't what it assumes
-	if (sg && p.some(Number.isNaN))
+	// BAND_STATS_SG writes -1 partials (a negative count) when the subgroup layout isn't what it assumes
+	if (sg && hasNegativeCount(p))
 		p = await bandPartials(device, o, words, R, false);
 	// per band: count, Σp(3), Σp²(3), Σl(3), Σl²(3) → reduceBands' acc layout (Σp, Σp², Σl, Σl²)
 	const acc = new Float64Array(N_BANDS * 12);
@@ -102,6 +102,13 @@ export async function bandStatsGpu(
 		}
 	return finalizeBands(acc, cnt, o.minCount ?? 60);
 }
+
+const hasNegativeCount = (p: Float32Array) => {
+	for (let g = 0; g < GROUPS; g++)
+		for (let b = 0; b < N_BANDS; b++)
+			if (p[g * STATS_VALUES + b * 13] < 0) return true;
+	return false;
+};
 
 /** One BAND_STATS(_SG) dispatch: the GROUPS × STATS_VALUES per-workgroup partials. */
 function bandPartials(

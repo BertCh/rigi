@@ -994,7 +994,7 @@ const SWG = 64;
 
 /**
  * CompositeLook.setStats' GPU band stats from textures: one submit, 6.6 KB back (or none).
- * `subgroups` as bandStatsGpu's (default off). This path can't see BAND_STATS_SG's NaN
+ * `subgroups` as bandStatsGpu's (default off). This path can't see BAND_STATS_SG's -1
  * layout-check partials without reading back, so only opt in where the layout check is known to pass.
  */
 export function bandStatsTex(
