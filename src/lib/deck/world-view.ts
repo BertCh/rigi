@@ -21,7 +21,7 @@ import { Model } from "@luma.gl/engine";
 import { Matrix4 } from "@math.gl/core";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { Pose } from "../camera";
+import { hfovFromAspect, type Pose } from "../camera";
 import type { AtmValues } from "../look/atmosphere";
 import {
 	ATM_BLOCK,
@@ -217,14 +217,10 @@ export class WorldCamera {
 			this.cam.quaternion.slerpQuaternions(f.fromQ, f.toQ, e);
 			// viewport aspect may differ from the photo: fit the photo's frame inside it
 			const fitV = pose.vfov;
-			const vfovForWidth =
-				(2 *
-					Math.atan(
-						Math.tan((pose.vfov * Math.PI) / 360) *
-							(photoAspect / this.cam.aspect),
-					) *
-					180) /
-				Math.PI;
+			const vfovForWidth = hfovFromAspect(
+				pose.vfov,
+				photoAspect / this.cam.aspect,
+			);
 			this.cam.fov = f.fromFov + (Math.max(fitV, vfovForWidth) - f.fromFov) * e;
 			this.cam.updateProjectionMatrix();
 			this.photoPlaneOpacity = this.planeOpacity * (1 - e);

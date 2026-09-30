@@ -95,6 +95,14 @@ export const hfovFromVfov = (vfov: number, W: number, H: number) =>
 	(2 * Math.atan(Math.tan((vfov * D) / 2) * (W / H))) / D;
 export const vfovFromHfov = (hfov: number, W: number, H: number) =>
 	(2 * Math.atan(Math.tan((hfov * D) / 2) * (H / W))) / D;
+/**
+ * hfovFromVfov / vfovFromHfov for an aspect (w/h), in the renderers' operation order (π/360, ·180/π).
+ * Not bit-identical to the pair above, so the callers that used this form keep it.
+ */
+export const hfovFromAspect = (vfov: number, aspect: number) =>
+	(2 * Math.atan(Math.tan((vfov * Math.PI) / 360) * aspect) * 180) / Math.PI;
+export const vfovFromAspect = (hfov: number, aspect: number) =>
+	(2 * Math.atan(Math.tan((hfov * Math.PI) / 360) / aspect) * 180) / Math.PI;
 
 /** The solvers' pixel camera for a pose on a W×H image. */
 export const poseToCamera = (p: Pose, W: number, H: number): Camera =>

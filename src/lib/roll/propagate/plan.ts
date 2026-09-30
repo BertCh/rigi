@@ -8,8 +8,8 @@
 //  - Gate = PROPAGATE_GATE unchanged (src/lib/nearfield/propagate.ts). A gated result is still a
 //    suggestion: kind "suggestion", provenance "propagated-suggestion", confidence never set.
 
-import type { Pose } from "../../camera";
-import { distanceM } from "../../geodesy";
+import { hfovFromAspect, type Pose } from "../../camera";
+import { distanceM, wrap180 } from "../../geodesy";
 import {
 	type Mat3,
 	mul3,
@@ -82,9 +82,6 @@ export type Candidate = {
 };
 
 const aspect = (p: RollPhoto) => p.meta.width / p.meta.height;
-const wrap180 = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180;
-const hfov = (vfov: number, asp: number) =>
-	(2 * Math.atan(Math.tan((vfov * Math.PI) / 360) * asp) * 180) / Math.PI;
 
 /** Neighbours of an anchor worth trying, nearest (then closest in time) first, with skip reasons. */
 export function candidatesFor(
@@ -123,8 +120,8 @@ export function candidatesFor(
 		else if (
 			compassDeltaDeg != null &&
 			Math.abs(compassDeltaDeg) >
-				hfov(anchor.pose.vfov, aspect(anchor)) / 2 +
-					hfov(t.meta.vfov, aspect(t)) / 2 +
+				hfovFromAspect(anchor.pose.vfov, aspect(anchor)) / 2 +
+					hfovFromAspect(t.meta.vfov, aspect(t)) / 2 +
 					COMPASS_MARGIN_DEG &&
 			mode !== "dev"
 		)

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Pin } from "#/lib/align";
-import type { Pose } from "#/lib/camera";
+import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { useConcordDisplay } from "#/lib/concord/app/useConcordDisplay";
 import {
 	defaultSettings,
@@ -661,11 +661,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		if (drag.current && pose) {
 			const d = drag.current;
 			const w = stageSize.w || 1;
-			const hfov =
-				(2 *
-					Math.atan(Math.tan((d.pose.vfov * Math.PI) / 360) * aspect) *
-					180) /
-				Math.PI;
+			const hfov = hfovFromAspect(d.pose.vfov, aspect);
 			const dx = e.clientX - d.x;
 			const dy = e.clientY - d.y;
 			if (d.shift) setPose({ ...d.pose, roll: d.pose.roll + dx * 0.05 });
@@ -830,10 +826,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		alignState,
 	});
 
-	const hfov = pose
-		? (2 * Math.atan(Math.tan((pose.vfov * Math.PI) / 360) * aspect) * 180) /
-			Math.PI
-		: 0;
+	const hfov = pose ? hfovFromAspect(pose.vfov, aspect) : 0;
 	const isPhotoView = settings.mode !== "world";
 	const cursor =
 		settings.mode === "world"

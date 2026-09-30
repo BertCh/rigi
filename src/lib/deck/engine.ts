@@ -32,7 +32,7 @@ import {
 	type Pin,
 	solvePins,
 } from "../align";
-import type { Pose } from "../camera";
+import { hfovFromAspect, type Pose } from "../camera";
 import type { ResidualField } from "../concord/core";
 import { WarpState } from "../concord/field";
 import { tileBounds } from "../dem";
@@ -154,9 +154,6 @@ import {
 	WorldGizmoLayer,
 	WorldView,
 } from "./world-view";
-
-const hfovOf = (vfov: number, aspect: number) =>
-	(2 * Math.atan(Math.tan((vfov * Math.PI) / 360) * aspect) * 180) / Math.PI;
 
 const angleDiff = (a: number, b: number) =>
 	Math.abs(((a - b + 540) % 360) - 180);
@@ -465,7 +462,7 @@ export class DeckEngine implements Renderer {
 					headingDeg: this.prior.yaw,
 					halfAngleDeg: Math.min(
 						180,
-						hfovOf(this.prior.vfov, this.aspect) / 2 + 32,
+						hfovFromAspect(this.prior.vfov, this.aspect) / 2 + 32,
 					),
 				};
 		const terrain = await this.startStreaming(wedge, onProgress);
@@ -562,7 +559,7 @@ export class DeckEngine implements Renderer {
 			!this.streamerWedge
 		)
 			return;
-		const hf = hfovOf(this.pose.vfov, this.aspect) / 2;
+		const hf = hfovFromAspect(this.pose.vfov, this.aspect) / 2;
 		const q = this.queryWedge;
 		if (angleDiff(this.pose.yaw, q.headingDeg) + hf <= q.halfAngleDeg) return;
 		this.terrain = set;
@@ -604,7 +601,10 @@ export class DeckEngine implements Renderer {
 	private wedgeFor(pose: Pose): ViewWedge {
 		return {
 			headingDeg: pose.yaw,
-			halfAngleDeg: Math.min(180, hfovOf(pose.vfov, this.aspect) / 2 + 32),
+			halfAngleDeg: Math.min(
+				180,
+				hfovFromAspect(pose.vfov, this.aspect) / 2 + 32,
+			),
 		};
 	}
 
@@ -1108,7 +1108,7 @@ export class DeckEngine implements Renderer {
 	private startFastHorizon(): FastHorizon | undefined {
 		if (typeof Worker === "undefined") return undefined;
 		try {
-			const half = hfovOf(this.prior.vfov, this.aspect) / 2 + 34;
+			const half = hfovFromAspect(this.prior.vfov, this.aspect) / 2 + 34;
 			const full = this.unknowns.any || half >= 180;
 			return startFastHorizon({
 				lat: this.photo.lat,

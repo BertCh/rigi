@@ -22,6 +22,7 @@
 // cues in the corner radius band; the principal point is never freed.
 //
 // Pure TS, no DOM; the horizon provider is injected (src/lib/gpu/eye or a CPU ray march).
+import { wrap180 } from "../../geodesy";
 import { invSym } from "../../linalg";
 import type {
 	EyeHorizon,
@@ -362,8 +363,6 @@ function psi(z: number, c: number, loss: "huber" | "cauchy") {
 	const a = Math.abs(z);
 	return a <= c ? 1 : c / a;
 }
-
-const wrap180 = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180;
 
 export function camFromParams(base: CameraX, p: ArrayLike<number>): CameraX {
 	return {

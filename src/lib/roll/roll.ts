@@ -6,7 +6,7 @@
 // single-linkage on distance (ROLL_LINK_M) so a day's hike stays one roll.
 
 import groundTruth from "../../../data/ground-truth.json";
-import { type Pose, vfovFromFocal } from "../camera";
+import { hfovFromAspect, type Pose, vfovFromFocal } from "../camera";
 import { distanceM } from "../geodesy";
 import { loadSavedPose, type PhotoMeta, photos, regionNames } from "../photos";
 import type { Roll, RollPhoto, SolvedPose, Viewpoint } from "./types";
@@ -275,8 +275,5 @@ export function getBuiltinRoll(id: string): Roll | null {
 
 /** Horizontal FOV (deg) of a pose on an image of the given aspect (w/h). */
 export function hfovOf(pose: Pose, aspect: number) {
-	return (
-		(2 * Math.atan(Math.tan((pose.vfov * Math.PI) / 360) * aspect) * 180) /
-		Math.PI
-	);
+	return hfovFromAspect(pose.vfov, aspect);
 }

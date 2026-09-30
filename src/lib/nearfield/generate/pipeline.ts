@@ -5,6 +5,7 @@
 //     provenance `generated` → merge.
 // Generated splats never reach measurement exports (provenance.filterForExport) or the hover readout
 // (./readout.ts). Browser only (the cache renders with three.js; the fill runs in the near-field service).
+import { hfovFromAspect } from "../../camera";
 import type { GaussianCloud } from "../types";
 import { PROVENANCE_CODE } from "../types";
 import type { CacheRenderer } from "./cache-render";
@@ -135,11 +136,7 @@ export async function generateAlongTrajectory(
 				for (let k = 0; k < W * H; k++)
 					needs[k] = hole[k] && !(view.range[k] > 0) ? 1 : 0;
 				const K = cam.pose;
-				const hfov =
-					(2 *
-						Math.atan(Math.tan((K.vfov * Math.PI) / 360) * cache.input.aspect) *
-						180) /
-					Math.PI;
+				const hfov = hfovFromAspect(K.vfov, cache.input.aspect);
 				opts.onProgress?.(`${cam.name}: MoGe-2 depth for no-DEM holes`);
 				const d = await depthWithFov(await rgbaToPng(filled, W, H), hfov, {
 					maxSide: W,

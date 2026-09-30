@@ -9,6 +9,7 @@
 // Harness hook: window.__genLab { done, error, summary, panels } (tools/nearfield/generate/shots.mjs).
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { hfovFromAspect } from "#/lib/camera";
 import { PhotoEngine } from "#/lib/engine";
 import { exportableCloud } from "#/lib/export/splat";
 import { nearField } from "#/lib/nearfield/client";
@@ -240,11 +241,7 @@ function LabGenerate() {
 			const terrain = eng.terrain;
 			if (!img || !terrain) return fail("engine not ready");
 			setStatus("MoGe-2 depth (service)");
-			const hfov =
-				(2 *
-					Math.atan(Math.tan((rp.pose.vfov * Math.PI) / 360) * eng.aspect) *
-					180) /
-				Math.PI;
+			const hfov = hfovFromAspect(rp.pose.vfov, eng.aspect);
 			const blob = await (await fetch(photo.src)).blob();
 			const depth = await depthWithFov(blob, hfov, { maxSide: 768 });
 			if (!depth) return fail("/depth failed");

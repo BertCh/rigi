@@ -7,7 +7,7 @@
 // Grid convention: cell (i, j) centre at ENU e = e0 + i·res, n = n0 − j·res (row 0 = north), heights are
 // absolute metres (LV95 / LN02 ≈ MSL, as the engine's DEM heights), NOT curvature-dropped. Cells outside the
 // requested radius / wedge or without data are NaN.
-import { EnuFrame } from "../../geodesy";
+import { EnuFrame, wrap180 } from "../../geodesy";
 import {
 	type CogHeader,
 	DSM_COLLECTION,
@@ -98,8 +98,6 @@ export function enuToLv95Affine(frame: EnuFrame) {
 		],
 	};
 }
-
-const wrap180 = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180;
 
 function tileSelected(
 	kx: number,

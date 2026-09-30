@@ -25,6 +25,7 @@
 // Also exports makePhotoSky(): the photo projected on a far sphere, so the sky (and anything past the
 // drape) keeps the photo's own pixels from the photo camera.
 import * as THREE from "three";
+import { hfovFromAspect } from "../camera";
 
 export type StepMode = "photo" | "orbit" | "fly" | "map";
 export const STEP_MODES: readonly StepMode[] = ["photo", "orbit", "fly", "map"];
@@ -125,9 +126,7 @@ export function fitVfov(
 	photoAspect: number,
 	viewAspect: number,
 ): number {
-	const t = Math.tan((vfov * Math.PI) / 360);
-	const forWidth =
-		(2 * Math.atan(t * (photoAspect / viewAspect)) * 180) / Math.PI;
+	const forWidth = hfovFromAspect(vfov, photoAspect / viewAspect);
 	return Math.max(vfov, forWidth);
 }
 

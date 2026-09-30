@@ -18,7 +18,7 @@ import {
 	type Pin,
 	solvePins,
 } from "./align";
-import type { Pose } from "./camera";
+import { hfovFromAspect, type Pose, vfovFromAspect } from "./camera";
 import type { ResidualField } from "./concord/core";
 import { WARP_GLSL, WarpState } from "./concord/field";
 import { startLakeFloor } from "./geocam/lakes/fetch";
@@ -806,11 +806,7 @@ export class PhotoEngine {
 
 		// only the viewing wedge (+ the yaw search range) up front; the rest loads for the 3D view.
 		// Without a trustworthy prior (no compass / gravity / focal) the view can face anywhere: load 360°.
-		const hfov =
-			(2 *
-				Math.atan(Math.tan((this.prior.vfov * Math.PI) / 360) * this.aspect) *
-				180) /
-			Math.PI;
+		const hfov = hfovFromAspect(this.prior.vfov, this.aspect);
 		const terrain = await Terrain.load(
 			this.frame,
 			this.shared,
@@ -1021,11 +1017,7 @@ export class PhotoEngine {
 	private startFastHorizon(): FastHorizon | undefined {
 		if (typeof Worker === "undefined") return undefined;
 		try {
-			const hfov =
-				(2 *
-					Math.atan(Math.tan((this.prior.vfov * Math.PI) / 360) * this.aspect) *
-					180) /
-				Math.PI;
+			const hfov = hfovFromAspect(this.prior.vfov, this.aspect);
 			const half = hfov / 2 + 34;
 			const full = this.unknowns.any || half >= 180;
 			return startFastHorizon({
@@ -1093,9 +1085,7 @@ export class PhotoEngine {
 		const buf = new Float32Array(W * H * 4);
 		const cam = new THREE.PerspectiveCamera(1, W / H, 1, 400000);
 		const hfov = 50;
-		const vfov =
-			(2 * Math.atan(Math.tan((hfov * Math.PI) / 360) / (W / H)) * 180) /
-			Math.PI;
+		const vfov = vfovFromAspect(hfov, W / H);
 		const dirs: number[] = [];
 		this.shared.uStyle.value = STYLE.geometry;
 		if (this.trails) this.trails.visible = false;
@@ -1819,14 +1809,10 @@ export class PhotoEngine {
 			this.worldCam.quaternion.slerpQuaternions(f.fromQ, f.toQ, e);
 			// viewport aspect may differ from the photo: fit the photo's frame inside it
 			const fitV = this.pose.vfov;
-			const vfovForWidth =
-				(2 *
-					Math.atan(
-						Math.tan((this.pose.vfov * Math.PI) / 360) *
-							(this.aspect / this.worldCam.aspect),
-					) *
-					180) /
-				Math.PI;
+			const vfovForWidth = hfovFromAspect(
+				this.pose.vfov,
+				this.aspect / this.worldCam.aspect,
+			);
 			this.worldCam.fov =
 				f.fromFov + (Math.max(fitV, vfovForWidth) - f.fromFov) * e;
 			this.worldCam.updateProjectionMatrix();

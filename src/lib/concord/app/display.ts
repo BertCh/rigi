@@ -8,6 +8,7 @@
 // photo, h = 0; eye = renderer.eye). Photo edges are computed from the shown photo (WP-C
 // photoEdgesFromRGBA, people suppressed with maskEdges). No lakes: water cues need OSM water polygons,
 // which the app does not load (WP-C used cached Overpass results); contour cues only.
+import { hfovFromAspect } from "../../camera";
 import type { Renderer } from "../../renderer";
 import { type CameraX, IDENTITY_INTRINSICS, type Vec3 } from "../core";
 import {
@@ -232,11 +233,7 @@ export async function runConcordDisplay(
 
 	if (flags.occl) {
 		const t0 = performance.now();
-		const hfov =
-			(2 *
-				Math.atan(Math.tan((cam.pose.vfov * Math.PI) / 360) * cam.aspect) *
-				180) /
-			Math.PI;
+		const hfov = hfovFromAspect(cam.pose.vfov, cam.aspect);
 		let reason: string | undefined;
 		const dsm = await loadNearDsm(host.photo.lat, host.photo.lon, 2000, 2, {
 			wedge: { yawDeg: cam.pose.yaw, halfDeg: hfov / 2 + 10 },
