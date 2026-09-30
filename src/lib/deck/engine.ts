@@ -407,6 +407,9 @@ export class DeckEngine implements Renderer {
 	private world?: WorldCamera;
 	private worldRaf = 0;
 	private worldStill = 0;
+	/** The layers the last worldLayers built, and the gizmo plane opacity they (or a flight frame) used. */
+	private worldList: unknown[] = [];
+	private worldGizmoOpacity = -1;
 	/** The drape's range map (rangeMapFrom the query geometry buffer) and its generation. */
 	private drape: { gen: number; map: PhotoRangeMap } | null = null;
 	private loadAbort = new AbortController();
@@ -2509,7 +2512,10 @@ export class DeckEngine implements Renderer {
 				gizmo = Math.abs(o - w.photoPlaneOpacity) > 0.01;
 				if (gizmo) w.photoPlaneOpacity = o;
 			}
-			if (flying || gizmo) this.updateLayers();
+			// a flight / the In-map fade changes only the gizmo's plane opacity: swap that one layer and
+			// keep every other instance (terrain, trails, sky, splats) as it is
+			if ((flying || gizmo) && w.photoPlaneOpacity !== this.worldGizmoOpacity)
+				this.updateWorldGizmo(w);
 			else if (moved)
 				this.deck.setProps({ viewState: this.viewState() } as never);
 			this.worldStill = moved ? 0 : this.worldStill + 1;
@@ -2572,7 +2578,6 @@ export class DeckEngine implements Renderer {
 		const imagery = src
 			? this.syncImagery(set, src, () => this.worldTileOrder(w))
 			: undefined;
-		const ws = deckWorldStyle(this.style);
 		const atm = this.look("world").atm;
 		const out: unknown[] = [
 			this.style.world.sky.mode === "atmosphere" &&
@@ -2619,21 +2624,7 @@ export class DeckEngine implements Renderer {
 					onCanvas: true,
 				}),
 			);
-		// engine.ts: the frustum is hidden once the plane has faded (end of the fly-in)
-		if (w.photoPlaneOpacity > 0.02)
-			out.push(
-				this.keepLayer(WorldGizmoLayer, {
-					id: "world-gizmo",
-					pose: this.pose,
-					eye: this.eyeArr,
-					aspect: this.aspect,
-					image: this.photoImg ?? null,
-					planeOpacity: w.photoPlaneOpacity,
-					lineColor: ws.lineColor,
-					pinColor: ws.pinColor,
-					pinRadiusM: ws.pinRadiusM,
-				}),
-			);
+		out.push(this.worldGizmo(w));
 		// Step Inside 3D Tiles (opaque, log depth): before the splats
 		if (this.step?.view === "step" && this.tiles3d) {
 			const dm = this.drapeMask();
@@ -2651,7 +2642,49 @@ export class DeckEngine implements Renderer {
 		// the depth buffer first (the trails would otherwise draw over them)
 		const nf = this.nearFieldLayer();
 		if (nf) out.push(nf);
-		return out.filter(Boolean);
+		this.worldList = out.filter(Boolean);
+		return this.worldList;
+	}
+
+	/** The photo-camera gizmo (null once the plane has faded: engine.ts hides the frustum then). */
+	private worldGizmo(w: WorldCamera): Layer | null {
+		this.worldGizmoOpacity = w.photoPlaneOpacity;
+		if (w.photoPlaneOpacity <= 0.02) {
+			this.kept.delete("world-gizmo");
+			this.nextKept.delete("world-gizmo");
+			return null;
+		}
+		const ws = deckWorldStyle(this.style);
+		return this.keepLayer(WorldGizmoLayer, {
+			id: "world-gizmo",
+			pose: this.pose,
+			eye: this.eyeArr,
+			aspect: this.aspect,
+			image: this.photoImg ?? null,
+			planeOpacity: w.photoPlaneOpacity,
+			lineColor: ws.lineColor,
+			pinColor: ws.pinColor,
+			pinRadiusM: ws.pinRadiusM,
+		});
+	}
+
+	/**
+	 * A flight frame: the camera and the gizmo's plane opacity only. The last world layer list with
+	 * the gizmo swapped (or dropped); every other layer instance stays, so deck diffs nothing else.
+	 */
+	private updateWorldGizmo(w: WorldCamera) {
+		const list = this.worldList;
+		const i = list.findIndex((l) => (l as Layer | null)?.id === "world-gizmo");
+		// no gizmo in the list yet (or no list): the full rebuild
+		if (i < 0 && w.photoPlaneOpacity > 0.02) return this.updateLayers();
+		const g = this.worldGizmo(w);
+		const next = list.slice();
+		if (i >= 0) {
+			if (g) next[i] = g;
+			else next.splice(i, 1);
+		}
+		this.worldList = next;
+		this.deck.setProps({ viewState: this.viewState(), layers: next } as never);
 	}
 
 	/** Stepping: the photo's Sky pixels on a far sphere, over the world sky (step-camera.ts makePhotoSky). */
