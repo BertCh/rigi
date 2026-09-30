@@ -17,7 +17,7 @@ import {
 	unprojectDirX,
 } from "../../concord/core";
 import { defaultDemSigmaM } from "../../concord/cues/contours";
-import { focalPx1600 } from "../../concord/solve/joint";
+import { focalPx1600 } from "./joint-residual";
 import type {
 	EyeHorizon,
 	HorizonsAtEyes,

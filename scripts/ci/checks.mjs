@@ -201,13 +201,6 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
-		id: "concord-joint",
-		tier: "fast",
-		group: "concord",
-		cmd: tsx("src/lib/concord/solve/joint.check.ts"),
-		timeoutS: 600,
-	},
-	{
 		id: "concord-app",
 		tier: "fast",
 		group: "concord",

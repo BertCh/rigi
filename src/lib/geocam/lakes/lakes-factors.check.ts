@@ -14,7 +14,7 @@ import {
 	shoreDistance,
 	type WaterCue,
 } from "../../concord/cues/water";
-import { focalPx1600 } from "../../concord/solve/joint";
+import { focalPx1600 } from "../map/joint-residual";
 import {
 	type CameraX,
 	cameraXFromState,

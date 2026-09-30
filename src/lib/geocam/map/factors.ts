@@ -10,13 +10,13 @@
 //             Student-t ν = 3 (a 90° compass blunder must not drag the pose)
 //   focal     f0·exp(logf) − fPrior ± σf (concord/priors/focal-table.ts focalPrior)          l2
 // Evidence
-//   skyline   (el(u, v) − horizon(az; eye))·f per observed skyline sample (joint.ts skylineResidualsX),
+//   skyline   (el(u, v) − horizon(az; eye))·f per observed skyline sample (as concord joint.ts skylineResidualsX),
 //             the horizon linearised in the eye by central differences of horizons at eye ± δ
 //             (HorizonsAtEyes; re-linearised by solveMap's outer loop). Per-sample σ is refine/model.ts
 //             columnSigma at the horizon distance: σpx ⊕ f·σDEM(d)/d ⊕ f·σK·d/2R. Cauchy c = 2, nEff 60.
 //   point     2D–3D correspondence, projectX residual (px @1600), σ = σpx ⊕ f·σDEM(d)/d
 //             (concord/cues/contours.ts defaultDemSigmaM). Cauchy c = 2.5.
-//   edge / level / shore / point cues: concordCueFactors wraps joint.ts cueResidualPx (one factor per kind;
+//   edge / level / shore / point cues: concordCueFactors wraps joint-residual.ts cueResidualPx (one factor per kind;
 //             nEff per kind from JOINT_DEFAULTS.groupEff; pins uncapped).
 import { projectX, unprojectDirX } from "../../concord/core";
 import { defaultDemSigmaM } from "../../concord/cues/contours";
@@ -28,7 +28,7 @@ import {
 	horizonEl,
 	JOINT_DEFAULTS,
 	type JointCue,
-} from "../../concord/solve/joint";
+} from "./joint-residual";
 import type {
 	EyeHorizon,
 	HorizonsAtEyes,

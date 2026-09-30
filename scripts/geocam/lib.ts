@@ -26,7 +26,7 @@
  *   writeJson(file, obj)                mkdir -p + JSON write
  *
  * Horizons: disk cache out/geocam/ga1/hzcache (elevation + distance per 0.05° bin; the key format of
- * scripts/concord/solve-eval.ts, whose own cache lacks distances and is therefore not read).
+ * the removed scripts/concord/solve-eval.ts, whose own cache lacks distances and is therefore not read).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -53,7 +53,7 @@ import {
 	groundFromHeightAt,
 	offsetLatLon,
 } from "../../src/lib/concord/priors/ground";
-import type { JointCue } from "../../src/lib/concord/solve";
+import type { JointCue } from "../../src/lib/geocam/map";
 import { lonLatToTile, MAPTERHORN, type TerrainLevel } from "../../src/lib/dem";
 import { detectSkyline } from "../../src/lib/geo/skyline";
 import { loadTerrain, type TerrainSampler } from "../../src/lib/geo/terrain";

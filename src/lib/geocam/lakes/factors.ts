@@ -31,7 +31,7 @@
 // bound, not a pull (guard-rail 2).
 
 import type { WaterCue } from "../../concord/cues/water";
-import { cueResidualPx, type JointCue } from "../../concord/solve/joint";
+import { cueResidualPx, type JointCue } from "../map/joint-residual";
 import {
 	type CameraX,
 	type CueFamily,

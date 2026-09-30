@@ -3,7 +3,8 @@
 // (camera/focal.ts focalPxFromF35, FF35_DIAGONAL_MM), so fScale = f_true / focalPxFromF35(f35, …).
 //
 // Fitted on DEV photos only (frozen split, tools/concord/pins/PROTOCOL.txt) by
-// scripts/concord/priors-study.ts focal; evidence and holdout score in tools/concord/priors/RESULT.txt.
+// scripts/concord/priors-study.ts focal (removed 2026-09-30, recoverable from a1845f5); evidence and
+// holdout score in tools/concord/priors/RESULT.txt.
 import { focalPxFromF35, type PixelSize } from "../../camera/focal";
 
 export type LensEntry = {
