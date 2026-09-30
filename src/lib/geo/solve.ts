@@ -192,38 +192,79 @@ export function solvePose(
 	sky: SkylineRows,
 	opts: SolveOptions = {},
 ): SolveResult {
-	const sigma = opts.sigma ?? DEFAULT_SIGMA;
-	const fullOpts = (o: SolveOptions): SolveOptions => ({
-		...o,
-		yawRange: 180,
-		sigma: { ...sigma, yaw: 1e6 },
-		// A full-circle search finds false matches on repetitive ridges far
-		// more easily, so it always gets the stricter bar unless the caller
-		// sets one explicitly. (A 360° first pass at the local 0.5 bar
-		// accepted IMG_7053 at −123.7° in the wild benchmark.)
-		acceptConfidence:
-			o.acceptConfidence ?? o.fullSearchConfidence ?? FULL_SEARCH_CONFIDENCE,
-	});
-	if (opts.headingKnown === false || (opts.yawRange ?? 25) >= 90)
+	if (fullOnly(opts))
 		return solveOnce(prior, horizon, sky, fullOpts(opts), "full");
-
 	const local = solveOnce(prior, horizon, sky, opts, "local");
-	if (
+	if (!wantsFull(local, opts)) return local;
+	const full = solveOnce(prior, horizon, sky, fallbackOpts(opts), "full");
+	return pickFull(local, full);
+}
+
+/** The outputs of solveOnce's coarse stage that its fine stage consumes. */
+export type CoarseStage = {
+	/** LM start offsets from the prior, best first (≤ 3, > 1.5° apart) */
+	seeds: { dy: number; dp: number; c: number }[];
+	coarse: { yaw: number; pitch: number };
+	ambiguity: number;
+};
+/**
+ * A replacement for solveOnce's coarse grid, called with the options solveOnce gets (the GPU grid,
+ * src/lib/gpu/solve solveCoarse, identical by construction). null = use solveOnce's own.
+ */
+export type CoarseProvider = (
+	prior: Camera,
+	horizon: HorizonProfile,
+	sky: SkylineRows,
+	opts: SolveOptions,
+) => Promise<CoarseStage | null>;
+
+/** solvePose with its coarse grid from `coarse` (solvePose itself when not given). */
+export async function solvePoseAsync(
+	prior: Camera,
+	horizon: HorizonProfile,
+	sky: SkylineRows,
+	opts: SolveOptions = {},
+	coarse?: CoarseProvider,
+): Promise<SolveResult> {
+	const once = async (o: SolveOptions, search: "local" | "full") =>
+		solveOnce(
+			prior,
+			horizon,
+			sky,
+			o,
+			search,
+			coarse ? await coarse(prior, horizon, sky, o) : null,
+		);
+	if (fullOnly(opts)) return once(fullOpts(opts), "full");
+	const local = await once(opts, "local");
+	if (!wantsFull(local, opts)) return local;
+	return pickFull(local, await once(fallbackOpts(opts), "full"));
+}
+
+const fullOnly = (opts: SolveOptions) =>
+	opts.headingKnown === false || (opts.yawRange ?? 25) >= 90;
+const wantsFull = (local: SolveResult, opts: SolveOptions) =>
+	!(
 		local.accepted ||
 		local.rejectReason === "no-skyline" ||
 		opts.fullSearchFallback === false
-	)
-		return local;
-	const full = solveOnce(
-		prior,
-		horizon,
-		sky,
-		// The local threshold must not leak into the fallback.
-		fullOpts({ ...opts, acceptConfidence: undefined }),
-		"full",
 	);
-	return full.accepted || full.confidence > local.confidence ? full : local;
-}
+// The local threshold must not leak into the fallback.
+const fallbackOpts = (opts: SolveOptions) =>
+	fullOpts({ ...opts, acceptConfidence: undefined });
+const pickFull = (local: SolveResult, full: SolveResult) =>
+	full.accepted || full.confidence > local.confidence ? full : local;
+const fullOpts = (o: SolveOptions): SolveOptions => ({
+	...o,
+	yawRange: 180,
+	sigma: { ...(o.sigma ?? DEFAULT_SIGMA), yaw: 1e6 },
+	// A full-circle search finds false matches on repetitive ridges far
+	// more easily, so it always gets the stricter bar unless the caller
+	// sets one explicitly. (A 360° first pass at the local 0.5 bar
+	// accepted IMG_7053 at −123.7° in the wild benchmark.)
+	acceptConfidence:
+		o.acceptConfidence ?? o.fullSearchConfidence ?? FULL_SEARCH_CONFIDENCE,
+});
 
 const DEFAULT_SIGMA = { yaw: 15, pitch: 1.5, roll: 1.5, focal: 0.06 };
 const FULL_SEARCH_CONFIDENCE = 0.75;
@@ -234,15 +275,8 @@ function solveOnce(
 	sky: SkylineRows,
 	opts: SolveOptions,
 	search: "local" | "full",
+	pre: CoarseStage | null = null,
 ): SolveResult {
-	const yawRange = opts.yawRange ?? 25;
-	const pitchRange = opts.pitchRange ?? 3;
-	const sigma = opts.sigma ?? DEFAULT_SIGMA;
-	const tiltGate = opts.tiltGate ?? 3;
-	const acceptConfidence = opts.acceptConfidence ?? 0.5;
-	const inlierPx = opts.inlierPx ?? 4;
-	const solveFocal = opts.solveFocal ?? true;
-
 	const cam0 = resizeCamera(prior, sky.width);
 	const obs = observations(sky, 1);
 	const coverage = obs.length / sky.width;
@@ -261,8 +295,29 @@ function solveOnce(
 		search,
 	};
 	if (obs.length < sky.width * 0.1) return empty;
+	return fineStage(
+		prior,
+		cam0,
+		horizon,
+		obs,
+		coverage,
+		empty,
+		opts,
+		search,
+		pre ?? coarseStage(cam0, horizon, obs, opts),
+	);
+}
 
-	// --- Coarse: small-angle grid over (dYaw, dPitch). ---
+/** Coarse: small-angle grid over (dYaw, dPitch); src/lib/gpu/solve is its GPU twin. */
+function coarseStage(
+	cam0: Camera,
+	horizon: HorizonProfile,
+	obs: Obs[],
+	opts: SolveOptions,
+): CoarseStage {
+	const yawRange = opts.yawRange ?? 25;
+	const pitchRange = opts.pitchRange ?? 3;
+	const sigma = opts.sigma ?? DEFAULT_SIGMA;
 	const coarse = obs.filter((_, i) => i % 2 === 0);
 	const ae = coarse.map((o) => azimuthElevation(unproject(cam0, o.x, o.y)));
 	const degPerPx = 1 / (cam0.f * DEG);
@@ -315,6 +370,29 @@ function solveOnce(
 		runnerUp && spread > 0
 			? Math.max(0, Math.min(1, 1 - (runnerUp.c - minima[0].c) / spread))
 			: 0;
+	return {
+		seeds,
+		coarse: { yaw: minima[0].dy, pitch: minima[0].dp },
+		ambiguity,
+	};
+}
+
+function fineStage(
+	prior: Camera,
+	cam0: Camera,
+	horizon: HorizonProfile,
+	obs: Obs[],
+	coverage: number,
+	empty: SolveResult,
+	opts: SolveOptions,
+	search: "local" | "full",
+	{ seeds, coarse, ambiguity }: CoarseStage,
+): SolveResult {
+	const sigma = opts.sigma ?? DEFAULT_SIGMA;
+	const tiltGate = opts.tiltGate ?? 3;
+	const acceptConfidence = opts.acceptConfidence ?? 0.5;
+	const inlierPx = opts.inlierPx ?? 4;
+	const solveFocal = opts.solveFocal ?? true;
 
 	// --- Fine: LM over [yaw, pitch, roll, log f] from each seed. ---
 	const fineObs = obs.filter((_, i) => i % 2 === 0);
@@ -406,7 +484,7 @@ function solveOnce(
 			roll: dRoll,
 			focal: Math.exp(best.p[3]),
 		},
-		coarse: { yaw: minima[0].dy, pitch: minima[0].dp },
+		coarse,
 		search,
 	};
 }

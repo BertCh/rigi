@@ -7,7 +7,13 @@ import { type RefineOptions, refinePose } from "../refine/index";
 import type { Camera } from "./camera";
 import { computeHorizon, type HorizonProfile } from "./horizon";
 import type { SkylineObservation } from "./skyline";
-import { type SolveOptions, solvePose } from "./solve";
+import {
+	type CoarseProvider,
+	type SolveOptions,
+	type SolveResult,
+	solvePose,
+	solvePoseAsync,
+} from "./solve";
 import { loadTerrain, type TerrainSampler, type TileLoader } from "./terrain";
 
 export const EYE_ABOVE_GROUND = 1.6;
@@ -78,7 +84,34 @@ export function cascade(
 	sky: SkylineObservation,
 	o: CascadeOptions = {},
 ) {
-	const s = solvePose(prior, horizon, sky, o.solve);
+	return escalate(
+		solvePose(prior, horizon, sky, o.solve),
+		prior,
+		horizon,
+		sky,
+		o,
+	);
+}
+
+/** cascade with solvePose's coarse grid from `coarse` (the GPU grid, src/lib/gpu/solve); refine stays on the CPU. */
+export async function cascadeAsync(
+	prior: Camera,
+	horizon: HorizonProfile,
+	sky: SkylineObservation,
+	o: CascadeOptions = {},
+	coarse?: CoarseProvider,
+) {
+	const s = await solvePoseAsync(prior, horizon, sky, o.solve, coarse);
+	return escalate(s, prior, horizon, sky, o);
+}
+
+function escalate(
+	s: SolveResult,
+	prior: Camera,
+	horizon: HorizonProfile,
+	sky: SkylineObservation,
+	o: CascadeOptions,
+) {
 	const { camera, confidence, accepted, residualPx, rejectReason } = s;
 	const solve = {
 		stage: "solve" as Stage,

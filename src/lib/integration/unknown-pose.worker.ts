@@ -15,12 +15,15 @@ import { fetchDemTile, MAPTERHORN, type TileKey } from "#/lib/dem";
 import type { HorizonProfile } from "#/lib/geo/horizon";
 import {
 	type CascadeOptions,
-	cascade,
+	type cascade,
+	cascadeAsync,
 	loadScene,
 	sceneHorizon,
 } from "#/lib/geo/pipeline";
 import { detectSkyline } from "#/lib/geo/skyline";
-import type { SolveOptions } from "#/lib/geo/solve";
+import type { CoarseProvider, SolveOptions } from "#/lib/geo/solve";
+import { getComputeDevice } from "#/lib/gpu/device";
+import { solveCoarse, warmSolveGpu } from "#/lib/gpu/solve";
 import type { RefineOptions } from "#/lib/refine/index";
 import type { InitOptions } from "#/lib/refine/init";
 import { DEFAULT_PRIOR_SIGMA } from "#/lib/refine/robust";
@@ -179,11 +182,20 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 	const vfovs = req.unknown.focal
 		? [40, 50, 65].map((h) => vfovFromHfov(h, req.width, req.height))
 		: [req.prior.vfov];
+	// solvePose's coarse grid on the GPU when the page allows it (identical by construction)
+	const on = new Set<"gpu" | "cpu">();
+	const coarse: CoarseProvider | undefined = req.solveGpu
+		? async (...a) => {
+				const r = await solveCoarse(...a);
+				if (r) on.add(r.on);
+				return r;
+			}
+		: undefined;
 	let best: ReturnType<typeof cascade> | null = null;
 	const seeds: UnknownPoseResult["seeds"] = [];
 	const runs: ReturnType<typeof cascade>[] = [];
 	for (const v of vfovs) {
-		const r = cascade(cam(v), horizon, sky, opts);
+		const r = await cascadeAsync(cam(v), horizon, sky, opts, coarse);
 		runs.push(r);
 		seeds.push({
 			vfov: v,
@@ -246,6 +258,7 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 			total: Math.round(performance.now() - t0),
 		},
 		horizonOn,
+		solveOn: on.size === 2 ? "mixed" : on.has("gpu") ? "gpu" : "cpu",
 	};
 }
 
@@ -256,6 +269,10 @@ ctx.onmessage = async (
 		horizonAt(ev.data.lat, ev.data.lon, ev.data.alt, ev.data.gpu).catch(
 			() => {},
 		);
+		if (ev.data.solveGpu)
+			getComputeDevice()
+				.then((d) => d && warmSolveGpu(d))
+				.catch(() => {});
 		return;
 	}
 	let msg: UnknownPoseResponse;

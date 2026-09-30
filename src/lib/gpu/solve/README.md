@@ -1,6 +1,8 @@
 # src/lib/gpu/solve: solvePose coarse grid on the GPU
 
-This is library code only. Nothing in `src/lib/geo` or `src/lib/integration` calls it yet.
+Wired into the unknown-pose worker on 2026-09-30. `geo/solve.ts` gained `solvePoseAsync` with a `CoarseProvider`, and `geo/pipeline.ts` gained `cascadeAsync`. The worker passes `solveCoarse` when the page's `gpuEnabled()` allows it, sent as `solveGpu`; `?gpu=off` turns it off. It is on by default because the result is the CPU's by construction.
+
+A/B of the real worker (`ABL_MODES=cpu unknown-horizon.mjs ablation`, normal vs under `with-gpu-off.mjs`): 12 photos × 5 conditions = 60 requests. All 60 are identical in pose, confidence, accept, stage and seeds. Solve time (total minus horizon) summed 187 s on the CPU vs 25 s with the GPU grid; the median request went from 870 to 339 ms, and the slowest from 13.1 s to about 1 s.
 
 `solvePose` (`src/lib/geo/solve.ts`, `solveOnce`) starts with a coarse stage. It scores a dYaw × dPitch grid with a truncated-L1 cost over every second skyline column, keeps the best pitch for each yaw, and from the resulting yaw curve takes:
 - the local minima,

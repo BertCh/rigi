@@ -90,7 +90,8 @@ try {
 
 	if (doAbl) {
 		const rows = [];
-		for (const mode of ["cpu", "gpu"]) {
+		// ABL_MODES=cpu: only the CPU-horizon pass (e.g. A/B of the GPU coarse grid under with-gpu-off.mjs)
+		for (const mode of (process.env.ABL_MODES ?? "cpu,gpu").split(",")) {
 			await page.goto(
 				`${BASE}/favicon.svg?unknownGpu=${mode === "gpu" ? "on" : "off"}`,
 			);
@@ -142,6 +143,7 @@ try {
 										stage: r.stage,
 										ms: r.ms,
 										horizonOn: r.horizonOn,
+										solveOn: r.solveOn,
 										seeds: r.seeds.map((x) => ({
 											yaw: x.yaw,
 											c: x.confidence,

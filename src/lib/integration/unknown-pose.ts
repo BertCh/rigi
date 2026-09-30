@@ -9,6 +9,7 @@
 
 import type { Pose } from "#/lib/camera";
 import { priorHeading } from "#/lib/geocam/priors/heading";
+import { gpuEnabled } from "#/lib/gpu/device";
 import { unknownGpuOptIn } from "#/lib/gpu/horizon/unknown-opt-in";
 import {
 	type MatchRequest,
@@ -47,6 +48,8 @@ export type UnknownPosePrepare = {
 	alt: number | null;
 	/** 360° horizon on the GPU (opt-in: unknownGpuOptIn); the CPU sceneHorizon otherwise and on failure */
 	gpu?: boolean;
+	/** solvePose's coarse grid on the GPU (src/lib/gpu/solve; identical by construction): gpuEnabled() */
+	solveGpu?: boolean;
 };
 
 export type UnknownPoseRequest = {
@@ -63,6 +66,8 @@ export type UnknownPoseRequest = {
 	image: { width: number; height: number; data: Uint8ClampedArray };
 	/** as UnknownPosePrepare.gpu */
 	gpu?: boolean;
+	/** as UnknownPosePrepare.solveGpu */
+	solveGpu?: boolean;
 };
 
 export type UnknownPoseResult = {
@@ -93,6 +98,8 @@ export type UnknownPoseResult = {
 	ms: { horizon: number; total: number };
 	/** where the 360° horizon was marched (src/lib/gpu/horizon/scene-profile.ts when "gpu") */
 	horizonOn?: "gpu" | "cpu";
+	/** where solvePose's coarse grids ran ("mixed": some fell back to the CPU) */
+	solveOn?: "gpu" | "cpu" | "mixed";
 };
 
 export type UnknownPoseResponse =
@@ -114,6 +121,8 @@ export class UnknownPoseSolver {
 	>();
 	/** GPU 360° horizon, opt-in (?unknownGpu=on; off under ?gpu=off) */
 	private gpu = unknownGpuOptIn();
+	/** GPU coarse grid: on wherever WebGPU is (off under ?gpu=off); the result is the CPU's by construction */
+	private solveGpu = gpuEnabled();
 
 	constructor(private photo: PhotoMeta) {
 		this.worker = new Worker(
@@ -135,6 +144,7 @@ export class UnknownPoseSolver {
 			lon: photo.lon,
 			alt: photo.alt,
 			gpu: this.gpu,
+			solveGpu: this.solveGpu,
 		};
 		this.worker.postMessage(prep);
 	}
@@ -196,6 +206,7 @@ export class UnknownPoseSolver {
 				},
 				image: { width: w, height: h, data },
 				gpu: this.gpu,
+				solveGpu: this.solveGpu,
 			};
 			this.worker.postMessage(req, [data.buffer]);
 		});
