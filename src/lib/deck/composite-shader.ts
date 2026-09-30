@@ -7,7 +7,6 @@
 //   brushTex  brush mask canvas (top → bottom, uvT); fgTex people mask (top → bottom, uvT)
 import type { Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
-import { WARP_GLSL } from "../concord/field/glsl";
 import { TURBO_GLSL } from "../look/glsl/common";
 import { COMP_BLOCK, compositeChunk, HARM_BLOCK } from "../look/glsl/composite";
 import { REVEAL_GLSL } from "../reveal/glsl";
@@ -57,9 +56,6 @@ layout(std140) uniform compositeUniforms {
   vec4 revealF;
   vec4 revealR;
   vec4 revealU;
-  // concord display warp (?concord=warp): warpOn 0 ⇒ uvG == vUv exactly
-  float warpScale;
-  float warpOn;
   // concord DSM occluder (?concord=occl): occlOn 0 ⇒ occlTex is never read
   float occlOn;
 } composite;
@@ -109,16 +105,12 @@ export type CompositeModuleProps = {
 	revealF: number[];
 	revealR: number[];
 	revealU: number[];
-	warpScale: number;
-	warpOn: number;
 	occlOn: number;
 	photoTex: Texture;
 	layerTex: Texture;
 	geoTex: Texture;
 	brushTex: Texture;
 	fgTex: Texture;
-	/** RGBA8 warp (concord/field packWarpTexture), row 0 = top, nearest; the 1×1 empty when off. */
-	warpTex: Texture;
 	/** concord DSM occluder dim mask (R, top → bottom, uvT); the 1×1 empty when off. */
 	occlTex: Texture;
 };
@@ -169,8 +161,6 @@ export const compositeModule = {
 		revealF: "vec4<f32>",
 		revealR: "vec4<f32>",
 		revealU: "vec4<f32>",
-		warpScale: "f32",
-		warpOn: "f32",
 		occlOn: "f32",
 	},
 } as const satisfies ShaderModule;
@@ -199,7 +189,6 @@ uniform sampler2D layerTex;
 uniform sampler2D geoTex;
 uniform sampler2D brushTex;
 uniform sampler2D fgTex;
-uniform sampler2D warpTex;
 uniform sampler2D occlTex;
 in vec2 vUv;
 out vec4 fragColor;
@@ -214,7 +203,6 @@ vec3 srgbEncode(vec3 c) {
 
 ${TURBO_GLSL}
 ${REVEAL_GLSL}
-${WARP_GLSL}
 ${compositeChunk(`uniform sampler2D maskTex;
 uniform sampler2D normalTex;
 #define GEO_RANGE(p) texelFetch(geoTex, p, 0).r
@@ -254,7 +242,7 @@ void main() {
   vec2 uvT = vec2(vUv.x, 1.0 - vUv.y);
   vec3 col = composite.hasPhoto > 0.5 ? srgbDecode(texture(photoTex, uvT).rgb) : vec3(0.0);
   // render-space reads (layerTex, geoTex) at uvG; photo-space reads (photo, fg, brush, masks) unchanged
-  vec2 uvG = warpUV(warpTex, composite.warpScale, composite.warpOn, vUv);
+  vec2 uvG = vUv;
 #ifdef LOOK_REFINE
   vec4 layer = layerAt(uvG);
 #else

@@ -178,7 +178,7 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 
-	// ---- fast: concordance (WP-A..F; field.check also asserts ?concord defaults off) -----------
+	// ---- fast: concordance (kept: core, priors/focal table, cues, occluder; app.check asserts ?concord defaults off)
 	{
 		id: "concord-core",
 		tier: "fast",
@@ -208,10 +208,10 @@ export const CHECKS = [
 		timeoutS: 600,
 	},
 	{
-		id: "concord-field",
+		id: "concord-app",
 		tier: "fast",
 		group: "concord",
-		cmd: tsx("src/lib/concord/field/field.check.ts"),
+		cmd: tsx("src/lib/concord/app/app.check.ts"),
 		timeoutS: 300,
 	},
 	{

@@ -14,7 +14,6 @@
 
 import type { AlignResult, Pin } from "./align";
 import type { Pose } from "./camera";
-import type { ResidualField } from "./concord/core";
 import type { PeakLabel, Sample, Settings } from "./engine";
 import type { EnuFrame } from "./geodesy";
 import type { Unknowns } from "./integration/unknown-pose";
@@ -76,13 +75,6 @@ export interface Renderer {
 	setTrails?(trails: RegionTrail[]): void;
 	/** One frame of the overlay reveal (src/lib/reveal); null = off (the classic composite, untouched). */
 	setReveal?(r: RevealUniforms | null): void;
-	/**
-	 * concord display warp (?concord=warp, src/lib/concord/field): display-only residual field; null =
-	 * off (bit-identical composite). Get the field from displayField (null at LOW confidence).
-	 */
-	setWarp?(field: ResidualField | null): void;
-	/** Photo uv (as shown) → render uv under the display warp (identity when off). */
-	renderUVOf?(u: number, v: number): [number, number];
 	/**
 	 * concord DSM occluder (?concord=occl, src/lib/concord/occl): photo-space dim mask, row 0 = top,
 	 * 255 = dim the overlay there; null = off (bit-identical composite). Display-only.

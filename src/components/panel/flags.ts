@@ -123,7 +123,6 @@ export const FLAG_UI: FlagUI[] = [
 		help: "Whole-image concordance passes (display-only on the accepted pose).",
 		group: "assist",
 		options: {
-			warp: { label: "warp", title: "Residual warp field" },
 			occl: { label: "occl", title: "DSM occluders" },
 		},
 	},

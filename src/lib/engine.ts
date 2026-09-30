@@ -19,8 +19,6 @@ import {
 	solvePins,
 } from "./align";
 import { hfovFromAspect, type Pose, vfovFromAspect } from "./camera";
-import type { ResidualField } from "./concord/core";
-import { WARP_GLSL, WarpState } from "./concord/field";
 import { startLakeFloor } from "./geocam/lakes/fetch";
 import { priorHeading } from "./geocam/priors/heading";
 import { distanceM, EnuFrame } from "./geodesy";
@@ -261,10 +259,6 @@ uniform float uDepthRampT[RAMP_MAX];
 uniform float uDepthRampD[RAMP_MAX];
 uniform float uDepthRampE[RAMP_MAX];
 uniform int uDepthRampN;
-// concord display warp (?concord=warp; src/lib/concord/field): off (uWarpOn = 0) ⇒ uvG == vUv exactly
-uniform sampler2D tWarp;
-uniform float uWarpScale;
-uniform float uWarpOn;
 // concord DSM occluder (?concord=occl; src/lib/concord/occl): dim mask, row 0 = top like tFg; off ⇒ no read
 uniform sampler2D tOccl;
 uniform float uOcclOn;
@@ -272,7 +266,6 @@ varying vec2 vUv;
 
 ${TURBO_GLSL}
 ${REVEAL_GLSL}
-${WARP_GLSL}
 ${compositeChunk(`uniform sampler2D tCompMask;
 uniform sampler2D tCompNormal;
 #define GEO_RANGE(p) texelFetch(tGeo, p, 0).a
@@ -291,7 +284,7 @@ float lr(vec2 uv) {
 void main() {
   vec4 photo = texture2D(tPhoto, vUv);
   // render-space reads (tLayer, tGeo) at uvG; photo-space reads (tPhoto, tFg, tBrush, masks) at vUv
-  vec2 uvG = warpUV(tWarp, uWarpScale, uWarpOn, vUv);
+  vec2 uvG = vUv;
 #ifdef LOOK_REFINE
   vec4 layer = layerAt(uvG);
 #else
@@ -634,9 +627,6 @@ export class PhotoEngine {
 					uRevealF: { value: new THREE.Vector3() },
 					uRevealR: { value: new THREE.Vector3() },
 					uRevealU: { value: new THREE.Vector3() },
-					tWarp: { value: blankTexture() },
-					uWarpScale: { value: 0 },
-					uWarpOn: { value: 0 },
 					tOccl: { value: blankTexture() },
 					uOcclOn: { value: 0 },
 					...makeCompositeStyleUniforms(),
@@ -669,48 +659,10 @@ export class PhotoEngine {
 		if (this.tiles3d) this.worldCam.layers.enable(TILES3D_LAYER);
 	}
 
-	/** concord display warp (src/lib/concord/field WarpState); null = off. */
-	private warp: WarpState | null = null;
-
-	/**
-	 * Display-only residual warp (?concord=warp): render-space composite reads and peak labels move by
-	 * W; nothing else (pose, pins, exports of measurements) sees it. null = off: the composite is
-	 * bit-identical to no warp. Callers get the field from concord/field displayField (null at LOW).
-	 */
-	setWarp(field: ResidualField | null) {
-		const u = this.composite.material.uniforms;
-		if (!field && !this.warp) return;
-		const old = u.tWarp.value as THREE.Texture;
-		if (!field) {
-			this.warp = null;
-			u.tWarp.value = blankTexture();
-			u.uWarpScale.value = 0;
-			u.uWarpOn.value = 0;
-		} else {
-			this.warp = new WarpState(field);
-			const t = this.warp.texture;
-			const tex = new THREE.DataTexture(t.data, t.width, t.height);
-			tex.flipY = false; // row 0 = top; warpUV samples at (x, 1 − y)
-			tex.minFilter = tex.magFilter = THREE.NearestFilter;
-			tex.generateMipmaps = false;
-			tex.needsUpdate = true;
-			u.tWarp.value = tex;
-			u.uWarpScale.value = t.scale;
-			u.uWarpOn.value = 1;
-		}
-		old.dispose();
-		this.requestRender();
-	}
-
-	/** Photo uv (as shown) → the render uv whose terrain is drawn there (hover / geo readback). */
-	renderUVOf(u: number, v: number): [number, number] {
-		return this.warp ? this.warp.renderOf(u, v) : [u, v];
-	}
-
 	/**
 	 * concord DSM occluder (?concord=occl, src/lib/concord/occl): photo-space dim mask (row 0 = top,
 	 * 255 = a surface-model object stands in front of the terrain there); null = off (bit-identical).
-	 * Display-only, like setWarp.
+	 * Display-only.
 	 */
 	setOccluder(m: { width: number; height: number; data: Uint8Array } | null) {
 		const u = this.composite.material.uniforms;
@@ -1992,9 +1944,7 @@ export class PhotoEngine {
 				this.peakVis.set(p, visible);
 			} else visible = this.peakVis.get(p);
 			if (visible === undefined) continue; // unknown: no buffer for this pose has tested it yet
-			// display warp: the label goes where the render point is SHOWN (visibility stays in render space)
-			const [lu, lv] = this.warp ? this.warp.photoOf(pr.u, pr.v) : [pr.u, pr.v];
-			if (this.settings.protectPeople && this.isForeground(lu, lv))
+			if (this.settings.protectPeople && this.isForeground(pr.u, pr.v))
 				visible = false;
 			if (!visible) continue;
 			const rank = peakRank(p.prominence, p.ele, range);
@@ -2002,8 +1952,8 @@ export class PhotoEngine {
 				name: p.name,
 				ele: p.ele,
 				prominence: p.prominence,
-				u: lu,
-				v: lv,
+				u: pr.u,
+				v: pr.v,
 				distKm: range / 1000,
 				rank,
 				visible,

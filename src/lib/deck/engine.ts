@@ -33,8 +33,6 @@ import {
 	solvePins,
 } from "../align";
 import { hfovFromAspect, type Pose } from "../camera";
-import type { ResidualField } from "../concord/core";
-import { WarpState } from "../concord/field";
 import { tileBounds } from "../dem";
 import {
 	defaultSettings,
@@ -777,20 +775,9 @@ export class DeckEngine implements Renderer {
 		return built;
 	}
 
-	/** concord display warp; see engine.ts setWarp. */
-	private warp: WarpState | null = null;
-	setWarp(field: ResidualField | null) {
-		if (!field && !this.warp) return;
-		this.warp = field ? new WarpState(field) : null;
-		this.compositor.setWarp(this.warp);
-	}
 	/** concord DSM occluder dim mask (?concord=occl; row 0 = top, 255 = dim); null = off. Composite-only. */
 	setOccluder(m: FgMask | null) {
 		this.compositor.setOccluder(m);
-	}
-	/** Photo uv (as shown) → the render uv whose terrain is drawn there (hover / geo readback). */
-	renderUVOf(u: number, v: number): [number, number] {
-		return this.warp ? this.warp.renderOf(u, v) : [u, v];
 	}
 
 	/** One frame of the overlay reveal (src/lib/reveal); null = off. Composite-only: no terrain pass. */
@@ -1409,9 +1396,7 @@ export class DeckEngine implements Renderer {
 			for (const p of snapped) {
 				if (vis.get(p) !== true) continue;
 				const pr = projectPoint(this.pose, this.aspect, eyeV, p.position);
-				const q =
-					pr && this.warp ? this.warp.photoOf(pr.u, pr.v) : pr && [pr.u, pr.v];
-				if (q && this.isForeground(q[0], q[1])) vis.set(p, false);
+				if (pr && this.isForeground(pr.u, pr.v)) vis.set(p, false);
 			}
 		}
 		return placePeakLabels(snapped, vis, this.pose, this.eyeArr, this.aspect, {
@@ -1419,11 +1404,6 @@ export class DeckEngine implements Renderer {
 			declutter,
 		})
 			.slice(0, max)
-			.map((l) => {
-				// display warp: labels go where the render point is SHOWN
-				const [u, v] = this.warp ? this.warp.photoOf(l.u, l.v) : [l.u, l.v];
-				return { ...l, u, v };
-			})
 			.map((l) => ({
 				name: l.name,
 				ele: l.ele,

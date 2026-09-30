@@ -845,7 +845,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 
 	// exports need the FINAL pose: status clears after autoAlign, but a pending second opinion may still move it
 	const exportLocked = !!status || !!error || verify === "pending";
-	// ?concord=warp,occl (src/lib/concord): display-only pass on the final, accepted pose; no-op without the flag
+	// ?concord=occl (src/lib/concord): display-only pass on the final, accepted pose; no-op without the flag
 	useConcordDisplay(engineRef, {
 		pose,
 		settled: !exportLocked,

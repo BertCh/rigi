@@ -105,7 +105,7 @@ overlapping photos (`propagate.ts`) is a library, not yet wired into the UI.
 | `?eyesearch=on\|auto`, `?unknownGpu=on` | Opt-in GPU eye search / GPU unknown-pose horizon |
 | `?terrain=tiles` | deck: per-tile terrain instead of batched |
 | `?reveal=off\|<preset>` | Load animation |
-| `?concord=warp,occl,…` | Concordance passes |
+| `?concord=eye,occl` | Concordance: focal-table eye prior, DSM occluder dimming |
 
 Every flag is declared in `src/lib/flags` (typed, the only reader), carried across navigation by the root route, and settable from the photo sidebar's **Experimental & dev** section. Booleans are `on`/`off`. Harnesses override per realm with `globalThis.__RIGI_FLAGS__ = { gpu: "off", … }`.
 
