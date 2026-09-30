@@ -38,9 +38,38 @@ const DEFAULT_MODEL: SegmentModel = "multiclass";
 type Loaded = "multiclass" | "deeplab";
 const segmenters = new Map<Loaded, Promise<ImageSegmenter>>();
 
+/**
+ * createFromOptions loads the wasm loader script and then the .wasm only once the model buffer is in:
+ * preload both as soon as their URLs are known so the three downloads run side by side. The link
+ * attributes match what MediaPipe requests (script crossOrigin=anonymous; emscripten's cors fetch),
+ * so the browser reuses the preloaded responses.
+ */
+let wasmPreloaded = false;
+function preloadWasm(fileset: {
+	wasmLoaderPath: string;
+	wasmBinaryPath: string;
+}) {
+	if (wasmPreloaded || typeof document === "undefined") return;
+	wasmPreloaded = true;
+	for (const [href, as] of [
+		[fileset.wasmLoaderPath, "script"],
+		[fileset.wasmBinaryPath, "fetch"],
+	]) {
+		const link = document.createElement("link");
+		link.rel = "preload";
+		link.as = as;
+		link.href = href;
+		link.crossOrigin = "anonymous";
+		document.head.appendChild(link);
+	}
+}
+
 async function createSegmenter(model: Loaded): Promise<ImageSegmenter> {
 	const [fileset, buf] = await Promise.all([
-		FilesetResolver.forVisionTasks(WASM_BASE),
+		FilesetResolver.forVisionTasks(WASM_BASE).then((f) => {
+			preloadWasm(f);
+			return f;
+		}),
 		// 16 MB model: keep it in the persistent cache (GCS sends max-age=3600, and it is too big for
 		// many HTTP caches). Priority -1 = ahead of DEM tiles in the shared queue. Any failure → the URL.
 		cachedFetchBuffer(MODEL_URLS[model], { priority: -1 }).catch(() => null),
