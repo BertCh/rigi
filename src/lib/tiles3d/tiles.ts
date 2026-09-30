@@ -18,6 +18,7 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { getFlag } from "#/lib/flags";
 import {
 	googleTilesKey,
+	TILES3D_LAYER,
 	TILES3D_SOURCES,
 	type Tiles3DConfig,
 	type Tiles3DSource,
@@ -30,9 +31,6 @@ import {
 	makeTileSharedUniforms,
 	type TileSharedUniforms,
 } from "./material";
-
-/** THREE layer of the tiles (engine.ts): only the step camera enables it, like NEARFIELD_LAYER (7). */
-export const TILES3D_LAYER = 8;
 
 /** Culls tiles whose bounding volume lies beyond `radius` of an ECEF point (tile frame = ECEF). */
 class NearFieldMaskPlugin {

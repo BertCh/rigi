@@ -112,8 +112,8 @@ import {
 } from "./style/three-apply";
 import type { ViewStyle } from "./style/types";
 import { heightFromTile, type ImagerySource, Terrain } from "./terrain";
+import { TILES3D_LAYER } from "./tiles3d/config";
 import { ThreeTiles3D } from "./tiles3d/three-tiles";
-import { TILES3D_LAYER } from "./tiles3d/tiles";
 
 export type ViewMode = "overlay" | "replace" | "world";
 

@@ -1,6 +1,8 @@
 // deck/engine.ts's side of Step Inside 3D Tiles (three-tiles.ts's twin): owns the photo's Tiles3DSet,
 // refines it from the deck world camera (a THREE camera) while stepping and hands worldLayers() a
-// Tiles3DDeckLayer. Tile arrivals are coalesced to one layer update per animation frame.
+// Tiles3DDeckLayer. Tile arrivals are coalesced to one layer update per animation frame. The tiles
+// renderer and its layer are imported only once ?tiles3d= is on (three-tiles.ts); an enter() before
+// they arrive is replayed on arrival.
 import type * as THREE from "three";
 import type { PhotoRangeMap } from "../deck/terrain-layer";
 import {
@@ -8,14 +10,20 @@ import {
 	PROVENANCE_TINT_MIX,
 } from "../nearfield/provenance";
 import { type Tiles3DConfig, tiles3dConfig } from "./config";
-import { Tiles3DDeckLayer } from "./deck-layer";
-import { Tiles3DSet } from "./tiles";
+import type { Tiles3DDeckLayer } from "./deck-layer";
+import type { Tiles3DSet } from "./tiles";
+
+type Mods = [typeof import("./tiles"), typeof import("./deck-layer")];
 
 export class DeckTiles3D {
 	private set: Tiles3DSet | null = null;
 	private active = false;
 	private hidden = false;
 	private raf = 0;
+	private mods: Mods | null = null;
+	private pending: { lat: number; lon: number; eye: THREE.Vector3 } | null =
+		null;
+	private disposed = false;
 
 	private constructor(
 		private config: Tiles3DConfig,
@@ -25,12 +33,28 @@ export class DeckTiles3D {
 	/** null when ?tiles3d is off (the default): deck/engine.ts then never touches tiles. */
 	static create(onChange: () => void): DeckTiles3D | null {
 		const config = tiles3dConfig();
-		return config ? new DeckTiles3D(config, onChange) : null;
+		if (!config) return null;
+		const t = new DeckTiles3D(config, onChange);
+		void Promise.all([import("./tiles"), import("./deck-layer")]).then((m) => {
+			if (t.disposed) return;
+			t.mods = m;
+			const p = t.pending;
+			t.pending = null;
+			if (p) {
+				t.enter(p.lat, p.lon, p.eye);
+				t.onChange();
+			}
+		});
+		return t;
 	}
 
 	enter(lat: number, lon: number, eye: THREE.Vector3) {
+		if (!this.mods) {
+			this.pending = { lat, lon, eye };
+			return;
+		}
 		if (!this.set) {
-			this.set = new Tiles3DSet(this.config, { lat, lon, eye });
+			this.set = new this.mods[0].Tiles3DSet(this.config, { lat, lon, eye });
 			this.set.onChange = () => {
 				if (!this.active || this.raf) return;
 				this.raf = requestAnimationFrame(() => {
@@ -47,6 +71,7 @@ export class DeckTiles3D {
 	}
 
 	exit() {
+		this.pending = null;
 		this.active = false;
 	}
 
@@ -65,9 +90,9 @@ export class DeckTiles3D {
 		camera: THREE.Vector3;
 	}): Tiles3DDeckLayer | null {
 		const set = this.set;
-		if (!set || !this.active) return null;
+		if (!set || !this.active || !this.mods) return null;
 		const d = PROVENANCE_COLORS.dem;
-		return new Tiles3DDeckLayer({
+		return new this.mods[1].Tiles3DDeckLayer({
 			id: "world-tiles3d",
 			set,
 			version: set.version,
@@ -105,6 +130,8 @@ export class DeckTiles3D {
 	}
 
 	dispose() {
+		this.disposed = true;
+		this.pending = null;
 		cancelAnimationFrame(this.raf);
 		this.set?.dispose();
 		this.set = null;

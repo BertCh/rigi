@@ -1,7 +1,9 @@
 // engine.ts's side of Step Inside 3D Tiles: owns the photo's Tiles3DSet, shows it only while stepping,
 // feeds it the step camera and the drape's uniforms, and hides display-only (Google) content for
 // exports. engine.ts calls: enter/exit (enterStepInside/exitStepInside), beforeRender (renderWorld),
-// withoutDisplayOnly (exportImage), dispose.
+// withoutDisplayOnly (exportImage), dispose. The tiles renderer itself (./tiles: 3d-tiles-renderer,
+// DRACO, ~300 KB) is imported only once ?tiles3d= is on, so the default /photo load never fetches it;
+// an enter() before it arrives is replayed on arrival.
 import type * as THREE from "three";
 import {
 	PROVENANCE_COLORS,
@@ -9,7 +11,7 @@ import {
 } from "../nearfield/provenance";
 import { type Tiles3DConfig, tiles3dConfig } from "./config";
 import type { TileSharedUniforms } from "./material";
-import { Tiles3DSet } from "./tiles";
+import type { Tiles3DSet } from "./tiles";
 
 type DrapeUniforms = Pick<
 	TileSharedUniforms,
@@ -20,6 +22,11 @@ export class ThreeTiles3D {
 	private set: Tiles3DSet | null = null;
 	private active = false;
 	private hidden = false;
+	private mod: typeof import("./tiles") | null = null;
+	/** enter() called before ./tiles arrived: replayed on arrival (exit/dispose clear it). */
+	private pending: { lat: number; lon: number; eye: THREE.Vector3 } | null =
+		null;
+	private disposed = false;
 
 	private constructor(
 		private config: Tiles3DConfig,
@@ -35,15 +42,30 @@ export class ThreeTiles3D {
 		requestRender: () => void,
 	): ThreeTiles3D | null {
 		const config = tiles3dConfig();
-		return config
-			? new ThreeTiles3D(config, scene, drape, requestRender)
-			: null;
+		if (!config) return null;
+		const t = new ThreeTiles3D(config, scene, drape, requestRender);
+		void import("./tiles").then((m) => {
+			if (t.disposed) return;
+			t.mod = m;
+			const p = t.pending;
+			t.pending = null;
+			if (p) t.enter(p.lat, p.lon, p.eye);
+		});
+		return t;
 	}
 
 	/** Stepping starts: make the photo's set on first use (eye in ENU metres). */
 	enter(lat: number, lon: number, eye: THREE.Vector3) {
+		if (!this.mod) {
+			this.pending = { lat, lon, eye };
+			return;
+		}
 		if (!this.set) {
-			this.set = new Tiles3DSet(this.config, { lat, lon, eye }, this.drape);
+			this.set = new this.mod.Tiles3DSet(
+				this.config,
+				{ lat, lon, eye },
+				this.drape,
+			);
 			this.set.onChange = () => {
 				if (this.active) this.requestRender();
 			};
@@ -59,6 +81,7 @@ export class ThreeTiles3D {
 	}
 
 	exit() {
+		this.pending = null;
 		this.active = false;
 		if (this.set) this.set.group.visible = false;
 	}
@@ -105,6 +128,8 @@ export class ThreeTiles3D {
 	}
 
 	dispose() {
+		this.disposed = true;
+		this.pending = null;
 		this.set?.dispose();
 		this.set = null;
 		this.active = false;
