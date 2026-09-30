@@ -5,6 +5,7 @@
 //  2. Pin solve: Levenberg–Marquardt on user "this peak is here" pins.
 import { type Pose, poseBasis, projectPoint } from "./camera";
 import { gaussJordan } from "./linalg";
+import { kthSmallest } from "./math";
 
 export type EdgeMap = {
 	w: number;
@@ -101,8 +102,7 @@ export function buildEdgeMap(
 			E[i] = oriented + 0.5 * Math.abs(gx) + 2.0 * Math.max(by, 0);
 		}
 	// normalise by a high percentile so haze-faint skylines still count
-	const sorted = Float32Array.from(E).sort();
-	const p = sorted[Math.floor(sorted.length * 0.97)] || 1;
+	const p = kthSmallest(Float32Array.from(E), Math.floor(E.length * 0.97)) || 1;
 	for (let i = 0; i < E.length; i++)
 		E[i] = Math.min(E[i] / p, 1.5) * (1 - fg[i]);
 	const map: EdgeMap = {
