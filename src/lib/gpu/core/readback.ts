@@ -9,7 +9,7 @@
 // as the device is lost (core/lifecycle.ts), so a failed or orphaned kernel never resolves zeros
 // or hangs its caller (and the lease it holds).
 import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
-import { busy, done, onLost, untilLost } from "./lifecycle";
+import { busy, done, GpuDeviceLostError, onLost, untilLost } from "./lifecycle";
 import { capacityFor } from "./pool";
 import { cancelIfSubmitFails, submit, submitted } from "./queue";
 
@@ -154,12 +154,24 @@ export function stageReads(
 		read: async () => {
 			if (used) throw new Error("readback already read or cancelled");
 			used = true;
-			const mapped = slot.buffer.mapAndReadAsync(
-				(mapped) =>
-					ranges.map(({ size }, i) => mapped.slice(at[i], at[i] + size)),
-				0,
-				total,
-			);
+			// Raw mapAsync, not luma's mapAndReadAsync: that awaits queue.onSubmittedWorkDone() first,
+			// so a read would also wait for everything submitted after this encoder (horizon's chunk
+			// c+1). mapAsync alone resolves once the work using this slot is done. Offset 0 and a
+			// 4-byte-multiple size meet its alignment rule (offset % 8, size % 4). `mapped` settles
+			// only after unmap(), so the slot is never given back while mapped. Losing the device
+			// aborts the map at once (AbortError): report that as the loss it is.
+			const handle = (slot.buffer as unknown as { handle: GPUBuffer }).handle;
+			const mapped = (async () => {
+				await handle.mapAsync(1 /* GPUMapMode.READ */, 0, total);
+				try {
+					const view = handle.getMappedRange(0, total);
+					return ranges.map(({ size }, i) => view.slice(at[i], at[i] + size));
+				} finally {
+					handle.unmap();
+				}
+			})().catch((e) => {
+				throw device.isLost ? new GpuDeviceLostError("readback") : e;
+			});
 			let settled = false;
 			try {
 				const [out] = await untilLost(

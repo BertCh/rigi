@@ -20,8 +20,8 @@
  * "horizon-march" for core/profile); the per-call buffers (uniform, params, output, stats) are pooled
  * slots under "horizon/…", reused by every chunk (WebGPU orders a chunk's writeBuffer after the previous
  * chunk's dispatch and staging copy, so no second set is needed); chunk c+1 is packed and submitted before
- * chunk c is collected, so the CPU packing overlaps the GPU march. (The readback itself does not overlap:
- * luma 9.4's mapAndReadAsync waits for all submitted work, so collecting chunk c also waits for c+1.)
+ * chunk c is collected, so the CPU packing overlaps the GPU march. (core/readback.ts maps with the raw
+ * mapAsync, so collecting chunk c waits only for chunk c's work, not for c+1.)
  * Readback goes through core/readback's staging slots on the dispatch's own encoder;
  * bindings are set per pass. A call holds the "horizon" lease from upload to its last read, so
  * overlapping callers (several eye heights in the worker, the eye search) run one after another
