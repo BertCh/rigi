@@ -4,8 +4,10 @@
 //   · one luma Model per tile mesh, made on first draw from its THREE geometry (positions / uv / colour
 //     converted to float32 once), freed when the tile unloads (Tiles3DSet.onDisposeMesh)
 //   · i3dm (instanced trees): the InstancedMesh matrices as four per-instance vec4 attributes
-//   · the terrain's LOGARITHMIC gl_FragDepth (deck/terrain-layer.ts LOG_DEPTH_FAR), w scaled by the
-//     source's depth bias, depthWrite on, 'less-equal': opaque, so it must come before the splats
+//   · the terrain's LOGARITHMIC depth convention (deck/terrain-layer.ts LOG_DEPTH_FAR), written
+//     exactly per fragment (gl_FragDepth) with w scaled by the source's depth bias, depthWrite on,
+//     'less-equal' (the terrain writes it per vertex, TERRAIN_DEPTH): opaque, so it must come
+//     before the splats
 //   · material.ts's rules ported: fill test against the photo range map + foreground mask, the eye /
 //     camera clear zones, the radius fade, derivative shading for untextured meshes, the Truth tint
 // Output is sRGB bytes as-is on the canvas (as DeckSplatLayer's canvas pass).

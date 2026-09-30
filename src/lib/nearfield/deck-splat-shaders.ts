@@ -1,8 +1,9 @@
 // GLSL for DeckSplatLayer (deck-splat-layer.ts): 3D Gaussians as instanced screen-space quads with
-// EWA covariance projection, premultiplied alpha and the terrain's LOGARITHMIC depth
-// (deck/terrain-layer.ts: gl_FragDepth = log2(1 + clip.w) * logDepthFC, logDepthFC =
-// 1 / log2(LOG_DEPTH_FAR + 1)), so the log-depth terrain occludes the splats with
-// depthCompare 'less-equal' and depthWrite off (as the trails / world gizmo do).
+// EWA covariance projection, premultiplied alpha and the terrain's LOGARITHMIC depth convention
+// (deck/terrain-layer.ts: depth = log2(1 + clip.w) * logDepthFC, logDepthFC =
+// 1 / log2(LOG_DEPTH_FAR + 1); the splats write it exactly per fragment, the terrain per vertex,
+// TERRAIN_DEPTH), so the log-depth terrain occludes the splats with depthCompare 'less-equal'
+// and depthWrite off (as the trails / world gizmo do).
 //
 // Per-splat data lives in one rgba32float texture, SPLAT_TEX_PER_ROW splats per row, 3 texels each:
 //   t0 = position xyz (layer coordinates, ENU metres), provenance code

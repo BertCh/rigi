@@ -2,7 +2,8 @@
 // GaussianCloud in DeckEngine's CARTESIAN, camera-anchored ENU metres (deck/photo-view.ts,
 // deck/world-view.ts).
 //   · instanced quads, EWA covariance projection, premultiplied alpha (deck-splat-shaders.ts)
-//   · the terrain's LOGARITHMIC gl_FragDepth (deck/terrain-layer.ts LOG_DEPTH_FAR), depthCompare
+//   · the terrain's LOGARITHMIC depth convention (deck/terrain-layer.ts LOG_DEPTH_FAR; the terrain
+//     writes it per vertex, TERRAIN_DEPTH, the splats exactly per fragment), depthCompare
 //     'less-equal', depthWrite off: the log-depth terrain occludes the splats, splats never occlude
 //     anything (they are drawn last, back to front)
 //   · back-to-front order from ./splat-sort.ts (SplatSorter: a module worker, sync fallback),

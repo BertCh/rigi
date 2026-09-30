@@ -1,8 +1,10 @@
 // Hiking trails for the deck photo view: the port of engine.ts buildTrails() + three's
 // LineSegments2/LineMaterial (screen-space width in target pixels, vertex colours, opacity 0.95).
-// Drawn ONLY in the offscreen colour pass (composite.ts), after the terrain tiles, with the same
-// logarithmic gl_FragDepth as terrain-layer.ts so the terrain occludes them, and blended into the
-// linear, straight-alpha colour target like three's trails in layerRT.
+// Drawn ONLY in the offscreen colour pass (composite.ts), after the terrain tiles, writing the exact
+// per-fragment logarithmic gl_FragDepth of terrain-layer.ts's convention (the terrain itself writes
+// it per vertex, TERRAIN_DEPTH: never nearer than exact, so trails on the surface still pass) so the
+// terrain occludes them, and blended into the linear, straight-alpha colour target like three's
+// trails in layerRT.
 import {
 	COORDINATE_SYSTEM,
 	Layer,
