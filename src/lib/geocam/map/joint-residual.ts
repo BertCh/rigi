@@ -2,7 +2,7 @@
 // solver (src/lib/concord/solve/joint.ts, WP-D), which was removed on 2026-09-30 as a negative result
 // (reports/negative-results.md); only the pieces geocam uses are kept. JOINT_DEFAULTS keeps the joint
 // solver's values for the fields the factors read.
-import type { EyeHorizon } from "../../pose6dof/eye";
+
 import {
 	type CameraX,
 	type Cue,
@@ -10,6 +10,7 @@ import {
 	unprojectDirX,
 	type Vec3,
 } from "../../concord/core";
+import type { EyeHorizon } from "../../pose6dof/eye";
 
 const D = Math.PI / 180;
 

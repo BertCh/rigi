@@ -48,8 +48,14 @@ for (const a of ["manual", "pinned", "saved", "prior", "unverified"])
 
 // fail-closed confidence
 check("null ⇒ LOW", isLowConfidence(null));
-check("accepted high ⇒ not LOW", !isLowConfidence({ accepted: true, level: "high" }));
-check("accepted:false ⇒ LOW", isLowConfidence({ accepted: false, level: "high" }));
+check(
+	"accepted high ⇒ not LOW",
+	!isLowConfidence({ accepted: true, level: "high" }),
+);
+check(
+	"accepted:false ⇒ LOW",
+	isLowConfidence({ accepted: false, level: "high" }),
+);
 check("level only, no confidence ⇒ LOW", isLowConfidence({}));
 
 // LOW confidence: clears, computes nothing
@@ -83,10 +89,7 @@ const r2 = await runConcordDisplay(
 	{ accepted: true, level: "high" },
 	{ occl: false },
 );
-check(
-	"no flags ⇒ nothing at all",
-	!r2.occl && calls === 0 && set.length === 1,
-);
+check("no flags ⇒ nothing at all", !r2.occl && calls === 0 && set.length === 1);
 
 console.log(fails ? `${fails} FAILED` : "ALL PASS");
 process.exit(fails ? 1 : 0);

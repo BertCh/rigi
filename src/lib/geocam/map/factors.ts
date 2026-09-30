@@ -21,14 +21,6 @@
 import { projectX, unprojectDirX } from "../../concord/core";
 import { defaultDemSigmaM } from "../../concord/cues/contours";
 import { EYE_PRIOR_DEFAULTS } from "../../concord/priors/altitude";
-import {
-	basisPx,
-	cueResidualPx,
-	focalPx1600,
-	horizonEl,
-	JOINT_DEFAULTS,
-	type JointCue,
-} from "./joint-residual";
 import type {
 	EyeHorizon,
 	HorizonsAtEyes,
@@ -54,6 +46,14 @@ import {
 	clusterKey,
 	clusterWhitener,
 } from "./cluster";
+import {
+	basisPx,
+	cueResidualPx,
+	focalPx1600,
+	horizonEl,
+	JOINT_DEFAULTS,
+	type JointCue,
+} from "./joint-residual";
 
 const D = Math.PI / 180;
 

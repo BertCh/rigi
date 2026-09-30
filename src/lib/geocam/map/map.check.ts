@@ -17,7 +17,6 @@ import {
 	unprojectDirX,
 } from "../../concord/core";
 import { defaultDemSigmaM } from "../../concord/cues/contours";
-import { focalPx1600 } from "./joint-residual";
 import type {
 	EyeHorizon,
 	HorizonsAtEyes,
@@ -45,6 +44,7 @@ import {
 	pointFactor,
 	skylineFactor,
 } from "./factors";
+import { focalPx1600 } from "./joint-residual";
 import { solveMap } from "./solve";
 
 let seed = 20260929;

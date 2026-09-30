@@ -53,10 +53,10 @@ import {
 	groundFromHeightAt,
 	offsetLatLon,
 } from "../../src/lib/concord/priors/ground";
-import type { JointCue } from "../../src/lib/geocam/map";
 import { lonLatToTile, MAPTERHORN, type TerrainLevel } from "../../src/lib/dem";
 import { detectSkyline } from "../../src/lib/geo/skyline";
 import { loadTerrain, type TerrainSampler } from "../../src/lib/geo/terrain";
+import type { JointCue } from "../../src/lib/geocam/map";
 import {
 	destination,
 	distanceBearing as distBear,

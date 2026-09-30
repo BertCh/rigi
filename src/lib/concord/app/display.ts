@@ -18,13 +18,7 @@ import { isLowConfidence, type PoseConfidence } from "./confidence";
 
 type Host = Pick<
 	Renderer,
-	| "photo"
-	| "aspect"
-	| "pose"
-	| "eye"
-	| "sampleAt"
-	| "readback"
-	| "setOccluder"
+	"photo" | "aspect" | "pose" | "eye" | "sampleAt" | "readback" | "setOccluder"
 >;
 
 export type ConcordDisplayReport = {
