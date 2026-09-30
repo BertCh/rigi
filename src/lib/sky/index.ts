@@ -10,6 +10,7 @@
  * unavailable, a classical colour/texture + Viterbi segmenter is used, so the
  * call always resolves with a mask.
  */
+import { gpuEnabled } from "#/lib/gpu/device";
 import {
 	classicalSky,
 	refineToWorking,
@@ -36,6 +37,10 @@ export type SkyMask = {
 	backend?: "webgpu" | "wasm";
 	/** Timings in ms (worker-side). */
 	ms?: { load: number; infer: number; refine: number };
+	/** Where the guided-filter refine ran (GPU unless ?gpu=off, no WebGPU, or a GPU error). */
+	refineOn?: "gpu" | "cpu";
+	/** ORT WebGPU EP on the shared compute device, or its own; absent on WASM / fallback. */
+	ortDevice?: "shared" | "own";
 };
 
 export interface SegmentSkyOptions {
@@ -112,7 +117,12 @@ export function preloadSkyModel(
 		return preloadPromise;
 	}
 	const id = nextId++;
-	const req: SkyWorkerRequest = { type: "preload", id, backend: opts.backend };
+	const req: SkyWorkerRequest = {
+		type: "preload",
+		id,
+		backend: opts.backend,
+		gpu: gpuEnabled(),
+	};
 	preloadPromise = new Promise<SkyWorkerResponse>((resolve, reject) => {
 		pending.set(id, { resolve, reject });
 		wk.postMessage(req);
@@ -192,6 +202,7 @@ function inlineFallback(
 		data,
 		source: "fallback",
 		ms: { load: 0, infer: t1 - t0, refine: performance.now() - t1 },
+		refineOn: "cpu",
 	};
 }
 
@@ -243,6 +254,7 @@ async function segmentSkyUncached(
 			modelLongSide: opts.modelLongSide,
 			backend: opts.backend,
 			forceFallback: opts.forceFallback,
+			gpu: gpuEnabled(),
 		};
 		try {
 			const res = await new Promise<SkyWorkerResponse>((resolve, reject) => {
@@ -257,6 +269,8 @@ async function segmentSkyUncached(
 					source: res.source,
 					backend: res.backend,
 					ms: res.ms,
+					refineOn: res.refineOn,
+					ortDevice: res.ortDevice,
 				};
 			console.warn(
 				"[sky] worker failed, running fallback inline:",

@@ -16,7 +16,8 @@ const sky = skylineFromSky(mask); // { width, height, rows, weight }: same shape
 1. The main thread rasterises the photo at the working size (long side 1024) and posts it to a module worker (`sky.worker.ts`).
 2. The worker lazily loads `public/models/skyseg-u2netp.onnx` with onnxruntime-web: WebGPU when `navigator.gpu` exists, otherwise WASM. The input is ImageNet-normalised RGB, with long side 512 on WebGPU and 384 on WASM, rounded to multiples of 32. The output is sigmoid P(sky).
 3. Refinement uses a fast colour guided filter (He, Sun & Tang; He & Sun 2015). The a and b coefficients are solved at model resolution (r=3, eps=2e-3) with the downsampled photo as guide, upsampled bilinearly, and applied to the full-resolution photo. The filtered value is used only in a band around the model's 0.5 contour or where the model is unsure. Everywhere else the upsampled model output is kept, so snow and cloud texture far from the ridge can't leak into the mask.
-4. Fallback: `detectSkyline` from `geo/skyline.ts` (colour/texture sky model + Viterbi) at about 640 px wide. It gives a soft step at its boundary, plus its sky probability where it found no boundary. The same guided filter then refines it.
+4. GPU (default when the page's `gpuEnabled()` allows it; the page sends the answer as `gpu` in the worker messages, so `?gpu=off` turns it off). The worker creates its luma compute device first and hands it to ORT (`shareOrtDevice` in `model.ts`), so the model and the refine run on ONE `GPUDevice`. The session keeps its output on the GPU (`preferredOutputLocation: "gpu-buffer"`), and `src/lib/gpu/sky/refine.ts` (the GPU twin of `refineToWorking` + `toBytes`) reads that buffer and reads back only the byte mask. ORT 1.30's JSEP bundle ignores `env.webgpu.device` when it initialises (it always calls `adapter.requestDevice()`), so the device goes in through `env.webgpu.adapter`, an adapter shim whose `requestDevice` resolves our device. The first WebGPU session fixes ORT's device for the worker's life. If it is ORT's own device, or the backend is WASM or the classical fallback, the GPU refine takes the downloaded P(sky). The CPU refine is the reference and the fallback when there is no WebGPU, with `?gpu=off`, and on any GPU error. The response reports `refineOn` (`gpu`/`cpu`) and `ortDevice` (`shared`/`own`).
+5. Fallback: `detectSkyline` from `geo/skyline.ts` (colour/texture sky model + Viterbi) at about 640 px wide. It gives a soft step at its boundary, plus its sky probability where it found no boundary. The same guided filter then refines it.
 
 ## Model choice
 
@@ -40,6 +41,10 @@ The dataset the sky model was trained on isn't documented. The weights are relea
 | Chromium, WASM, 1 thread (384 input) | 1.1–1.35 s | 80–200 ms | **1.2–1.5 s** |
 | node, onnxruntime-web WASM, 4 threads (384) | ~0.45 s | ~0.1 s | ~0.55 s |
 | classical fallback (browser) | – | – | ~0.6 s |
+
+GPU refine on the shared device (2026-09-30, M3 Pro, headless Chromium with Metal, 6 photos at 1024×768, `scripts/gpu/sky-bench.mjs`):
+- **Worker model + refine: about 200 ms before, about 89 ms after** (`infer` 87–99 ms and `refine` 93–121 ms before; 15–21 ms and 67–69 ms after). The model's GPU work now finishes inside the refine's single readback, so ORT no longer waits on its own download. The GPU refine itself takes about 4 ms. With `?gpu=off` the timings are the old ones.
+- **Parity with the CPU refine on the same P(sky):** float max |Δ| 3e-6 to 1.2e-5, p99 ≤ 1.2e-6. Mask bytes differ on 0–9 of 786k pixels, by 1 each. The CPU sums in f64 and the GPU in f32; the LUT guide, the band test and `toBytes` are exact. Both the ORT buffer and uploaded floats give identical bytes. The classical fallback (640→1024) differs on 42 bytes, by 1 each. The downsample branch (640→512) differs on none.
 
 The first call also pays the worker start, the ORT wasm (28 MB jsep build, cached afterwards) and the 4.5 MB model: about 10 s in the Vite dev server under load, much less in a build. WASM is single-threaded unless the page is crossOriginIsolated.
 

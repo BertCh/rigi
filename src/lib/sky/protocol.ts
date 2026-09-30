@@ -15,6 +15,11 @@ export interface SkySegmentRequest {
 	backend?: "webgpu" | "wasm";
 	/** Skip the model (testing the classical path). */
 	forceFallback?: boolean;
+	/**
+	 * The page's gpuEnabled() (?gpu=off → false): the worker has no page URL. When true, ORT's WebGPU
+	 * EP shares the worker's luma compute device and the refine runs on it (src/lib/gpu/sky).
+	 */
+	gpu?: boolean;
 }
 
 /** Start fetching the wasm + model and creating the session; replies when ready. */
@@ -23,6 +28,8 @@ export interface SkyPreloadRequest {
 	id: number;
 	modelUrl?: string;
 	backend?: "webgpu" | "wasm";
+	/** As SkySegmentRequest.gpu (decides whether ORT shares the compute device). */
+	gpu?: boolean;
 }
 
 export type SkyWorkerRequest = SkySegmentRequest | SkyPreloadRequest;
@@ -39,6 +46,10 @@ export type SkyWorkerResponse =
 			backend?: "webgpu" | "wasm";
 			error?: string;
 			ms: { load: number; infer: number; refine: number };
+			/** Where the refine ran (the GPU path falls back to the CPU on any error). */
+			refineOn?: "gpu" | "cpu";
+			/** ORT's WebGPU device: the compute device ("shared") or its own; absent on WASM. */
+			ortDevice?: "shared" | "own";
 	  }
 	| {
 			id: number;
