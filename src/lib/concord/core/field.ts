@@ -1,9 +1,7 @@
 // Display residual field W (photo uv → render uv offset, render = photo + W) on a cell-centred
 // grid. Display-only: never feeds pose, confidence, benchmarks or exports.
+import { clamp } from "../../math";
 import type { ResidualField } from "./types";
-
-const clamp = (x: number, lo: number, hi: number) =>
-	x < lo ? lo : x > hi ? hi : x;
 
 function bilinear(
 	a: Float32Array,

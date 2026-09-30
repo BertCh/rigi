@@ -18,6 +18,8 @@
 // (render − photo) in px @1600 (long side = 1600), the scripts/concord/eval.ts sign. For a point
 // cue it is [dx, dy]; for an edge the scalar along its normal (nu, nv) (a pixel-space direction,
 // normalised here); for level / shore the scalar dy.
+
+import { smoothstep } from "../../math";
 import {
 	type CameraX,
 	type Cue,
@@ -136,11 +138,6 @@ type Obs = {
 	val: number;
 	noise: number;
 	cue: number;
-};
-
-const smoothstep = (a: number, b: number, x: number) => {
-	const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-	return t * t * (3 - 2 * t);
 };
 
 /** Cues → scalar observations (px @1600 positions, log range). */

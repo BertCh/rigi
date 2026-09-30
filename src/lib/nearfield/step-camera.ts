@@ -26,6 +26,7 @@
 // drape) keeps the photo's own pixels from the photo camera.
 import * as THREE from "three";
 import { hfovFromAspect } from "../camera";
+import { clamp } from "../math";
 
 export type StepMode = "photo" | "orbit" | "fly" | "map";
 export const STEP_MODES: readonly StepMode[] = ["photo", "orbit", "fly", "map"];
@@ -156,8 +157,6 @@ function yawPitchOf(q: THREE.Quaternion) {
 }
 
 const cloneFree = (s: Free): Free => ({ ...s, pivot: s.pivot.clone() });
-const clamp = (x: number, lo: number, hi: number) =>
-	Math.max(lo, Math.min(hi, x));
 
 export class StepCamera {
 	readonly camera: THREE.PerspectiveCamera;

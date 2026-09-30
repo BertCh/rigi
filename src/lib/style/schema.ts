@@ -1,6 +1,7 @@
 // Schema for ViewStyle: validation (clamps, hex checks, unknown keys dropped), schema-aware deep
 // merge (tuples / ramps replaced wholesale, discriminated unions switch variant cleanly), pruning of
 // untrusted partials (localStorage) and diffing (so storage keeps diff-only overrides).
+import { clamp } from "../math";
 import { isHex } from "./color";
 import { CLASSIC } from "./defaults";
 import { isRampName, MAX_RAMP_STOPS } from "./ramps";
@@ -42,8 +43,6 @@ const unit = num(0, 1);
 
 const isObj = (v: unknown): v is Obj =>
 	typeof v === "object" && v !== null && !Array.isArray(v);
-const clamp = (x: number, lo: number, hi: number) =>
-	Math.min(hi, Math.max(lo, x));
 
 // ---- the ViewStyle schema ----------------------------------------------------------------------
 

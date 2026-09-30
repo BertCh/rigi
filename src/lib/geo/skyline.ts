@@ -19,7 +19,7 @@
  *    up above the local median.
  */
 
-import { smoothstep } from "../math";
+import { clamp01, smoothstep } from "../math";
 
 export interface RGBALike {
 	width: number;
@@ -60,8 +60,6 @@ export interface SkylineOptions {
 	/** Return the per-pixel sky probability map (default true). */
 	returnSky?: boolean;
 }
-
-const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /** Separable box blur of a single-channel image, radius r (in place-safe). */
 function boxBlur(src: Float32Array, w: number, h: number, r: number) {

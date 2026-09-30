@@ -13,6 +13,8 @@
  *      yaw is, and how much the horizon actually varies (a flat horizon
  *      can't fix yaw).
  */
+
+import { clamp01 } from "../math";
 import {
 	azimuthElevation,
 	type Camera,
@@ -374,7 +376,6 @@ function solveOnce(
 		els.reduce((s, v) => s + (v - mean) ** 2, 0) / els.length,
 	);
 
-	const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 	const dPitch = best.p[1] - cam0.pitch;
 	const dRoll = best.p[2] - cam0.roll;
 	const tilted = Math.abs(dPitch) > tiltGate || Math.abs(dRoll) > tiltGate;

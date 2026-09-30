@@ -5,6 +5,7 @@
 // upload the result as a texture / uniforms. compositeValues() / harmonizeValues() are the blocks'
 // values (look/glsl/composite.ts).
 import { lookGpuOn, trackLook } from "../gpu/look/opt-in";
+import { smoothstep } from "../math";
 import { hexToRgb01, srgbToLinear } from "../style/color";
 import type { Hex, ViewStyle } from "../style/types";
 import {
@@ -35,11 +36,6 @@ export type Mask8 = {
 export type Cut = {
 	key: string;
 	at: (u: number, v: number, range: number) => number;
-};
-
-const smoothstep = (a: number, b: number, x: number) => {
-	const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-	return t * t * (3 - 2 * t);
 };
 
 /** blendCut's key without reading the brush. */
