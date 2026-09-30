@@ -1125,6 +1125,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 					// the compositor's geometry cache key reads `mesh` (composite.ts geoKey)
 					mesh: this.props.tiles,
 					imagery: this.props.imagery ?? null,
+					offscreen: !!this.props.offscreen,
 					photoTexture: photo ?? null,
 					photoRange: range ?? null,
 					photoFg: fg ?? null,

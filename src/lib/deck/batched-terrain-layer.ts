@@ -12,10 +12,12 @@
 // and the fragment shader is terrain-layer.ts's own (same uniforms, same passes, same ENU / log
 // depth), so every pass (geometry, normal, colour, canvas) works unchanged.
 //
-// Imagery (the satellite / topo drape, props.imagery): rgba8 2d-array textures with mipmaps, one
-// per image size (256 / 512 / 1024 px), the tile's layer in its table row. The colour / canvas
-// passes of the imagery style draw one instanced draw per (resolution, image size), plus one for
-// the tiles whose image hasn't arrived yet (hasMap 0); the geometry and normal passes ignore it.
+// Imagery (the satellite / topo drape, props.imagery): fixed-size pages of rgba8 2d-array textures
+// with mipmaps (≈ 96 MB each, one image size per page), the tile's layer in its table row. Tiles
+// that leave props.imagery keep their layer up to a byte budget (imageryBudget), so the world view's
+// imagery survives a trip to the photo view. The colour / canvas passes of the imagery style draw one
+// instanced draw per (resolution, page), plus one for the tiles whose image hasn't arrived yet
+// (hasMap 0); the geometry and normal passes ignore it.
 import { Layer, type LayerProps, type UpdateParameters } from "@deck.gl/core";
 import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
@@ -293,65 +295,65 @@ const MAP_SAMPLER = {
 	maxAnisotropy: 8,
 } as const;
 
+/** Bytes of one mipmapped rgba8 layer of a w × h image. */
+function layerBytes(w: number, h: number) {
+	return Math.round(w * h * 4 * (4 / 3));
+}
+
 /**
- * Imagery of one size as a growable, mipmapped rgba8 2d-array texture with a free list of layers.
- * Growing re-creates the texture and re-uploads the images it holds (the bitmaps stay alive in
- * the engine's imagery cache while they're in props.imagery).
+ * Imagery budget knobs (see TileStore.syncMaps):
+ *  - pageBytes: one imagery page (a fixed-size 2d-array texture) holds about this much, so a page
+ *    never grows (growing re-uploaded everything it held) and pages free one by one;
+ *  - retainBytes: tiles no longer in props.imagery (the photo view after the world view, tiles the
+ *    world camera left) keep their layers up to this much, least recently used first out, so the
+ *    next world entry finds them uploaded;
+ *  - uploadBytes: canvas-drawn layers (the world view) upload at most this much per frame, the
+ *    rest next frame (the tile draws without imagery meanwhile, as while it streams in).
  */
-class MapPool {
-	tex: Texture;
-	cap: number;
+export const imageryBudget = {
+	pageBytes: 96 << 20,
+	retainBytes: 300 << 20,
+	uploadBytes: 32 << 20,
+};
+
+/**
+ * One page of imagery of one size: a fixed-size, mipmapped rgba8 2d-array texture with a free list
+ * of layers. Uploads copy the bitmap once; the page never needs it again.
+ */
+class MapPage {
+	readonly tex: Texture;
 	private free: number[] = [];
 	private next = 0;
-	private images = new Map<number, ImageBitmap>();
+	used = 0;
 	private dirty = false;
 	constructor(
 		private device: Device,
+		readonly key: string,
 		readonly width: number,
 		readonly height: number,
-		cap: number,
-		private max: number,
+		readonly cap: number,
 	) {
-		this.cap = cap;
-		this.tex = this.create(cap);
-	}
-	private create(cap: number) {
-		return this.device.createTexture({
-			id: `terrain-maps-${this.width}x${this.height}`,
+		this.tex = device.createTexture({
+			id: `terrain-maps-${key}`,
 			dimension: "2d-array",
 			format: "rgba8unorm",
-			width: this.width,
-			height: this.height,
+			width,
+			height,
 			depth: cap,
-			mipLevels: this.device.getMipLevelCount(this.width, this.height),
+			mipLevels: device.getMipLevelCount(width, height),
 			sampler: MAP_SAMPLER,
 		});
 	}
-	get used() {
-		return this.images.size;
+	get full() {
+		return this.used >= this.cap;
 	}
-	/** The image's layer, −1 past the device's array layer limit. */
+	get bytes() {
+		return this.cap * layerBytes(this.width, this.height);
+	}
+	/** Copy `image` into a free layer (the page must not be full); the layer. */
 	add(image: ImageBitmap): number {
 		const i = this.free.pop() ?? this.next++;
-		if (i >= this.max) {
-			this.free.push(i);
-			return -1;
-		}
-		this.images.set(i, image);
-		if (i >= this.cap) {
-			this.tex.destroy();
-			this.cap = Math.min(this.max, Math.max(i + 1, Math.ceil(this.cap * 1.5)));
-			this.tex = this.create(this.cap);
-			for (const [j, im] of this.images) this.upload(j, im);
-		} else this.upload(i, image);
-		return i;
-	}
-	release(i: number) {
-		if (this.images.delete(i)) this.free.push(i);
-	}
-	private upload(i: number, image: ImageBitmap) {
-		// closed since (the engine dropped it): leave the layer stale, the tile goes next sync
-		if (!image.width) return;
+		this.used++;
 		// makeTexture's upload: no flip, no premultiply, sRGB bytes as-is (the shader decodes)
 		this.tex.copyExternalImage({
 			image,
@@ -365,6 +367,11 @@ class MapPool {
 			premultipliedAlpha: false,
 		});
 		this.dirty = true;
+		return i;
+	}
+	release(i: number) {
+		this.free.push(i);
+		this.used--;
 	}
 	/** Rebuild the mip chain after uploads. */
 	flush() {
@@ -377,6 +384,29 @@ class MapPool {
 	}
 }
 
+/** A tile's imagery in a page; `gen` = the last syncMaps that had it in props.imagery. */
+type MapEntry = {
+	image: ImageBitmap;
+	page: MapPage;
+	layer: number;
+	gen: number;
+};
+
+/** Diagnostics (globalThis.__rigiTerrainMaps): imagery uploads, retained hits, evictions. */
+export const terrainMapStats = {
+	uploads: 0,
+	uploadBytes: 0,
+	hits: 0,
+	evicted: 0,
+	pages: 0,
+	pageBytes: 0,
+	retained: 0,
+	pending: 0,
+};
+(
+	globalThis as { __rigiTerrainMaps?: typeof terrainMapStats }
+).__rigiTerrainMaps = terrainMapStats;
+
 class TileStore {
 	small: LayerPool;
 	big: LayerPool;
@@ -386,12 +416,13 @@ class TileStore {
 	private rowsCap: number;
 	readonly slots = new Map<TileMesh, Slot>();
 	private maxLayers: number;
-	/** Imagery: one pool per image size ("256x256", …), and each tile id's layer in it. */
-	readonly mapPools = new Map<string, MapPool>();
-	private maps = new Map<
-		string,
-		{ image: ImageBitmap; pool: MapPool; layer: number }
-	>();
+	/** Imagery pages (any image size), and each tile id's layer in one. */
+	readonly pages: MapPage[] = [];
+	private maps = new Map<string, MapEntry>();
+	/** Tiles whose image waits for an upload (throttled draws), in the set's order. */
+	private pending = new Map<string, ImageBitmap>();
+	private gen = 0;
+	private pageSeq = 0;
 	/** Bound as terrainMaps when a draw has no imagery (a sampler2DArray needs an array). */
 	readonly emptyMaps: Texture;
 
@@ -521,51 +552,158 @@ class TileStore {
 		});
 	}
 
+	/** Tile `id`'s imagery layer while it is in props.imagery (retained ones: −1). */
 	private mapLayer(id: string) {
-		return this.maps.get(id)?.layer ?? -1;
+		const m = this.maps.get(id);
+		return m && m.gen === this.gen ? m.layer : -1;
 	}
 
 	/**
-	 * Imagery per tile id into the map pools (one per image size), and each tile's layer (or −1)
-	 * into its table row. Call after sync().
+	 * Imagery per tile id into the pages, and each tile's layer (or −1) into its table row. Call
+	 * after sync(). A tile's image stays uploaded while it's in `imagery` (matched by bitmap
+	 * identity); once out, it's retained (imageryBudget.retainBytes, least recently used out first,
+	 * the latest pages first on a tie), so switching the world view off and on again re-uploads
+	 * nothing it kept. `budget` caps this call's upload bytes (the rest waits for pump()).
 	 */
-	syncMaps(tiles: TileMesh[], imagery: Map<string, ImageBitmap> | null) {
-		const live = new Set<string>();
+	syncMaps(
+		tiles: TileMesh[],
+		imagery: Map<string, ImageBitmap> | null,
+		budget = Number.POSITIVE_INFINITY,
+	) {
+		const gen = ++this.gen;
+		this.pending.clear();
 		for (const t of tiles) {
 			const image = imagery?.get(t.id);
 			// a closed bitmap is 0 × 0
 			if (!image?.width || !image.height) continue;
-			live.add(t.id);
 			const cur = this.maps.get(t.id);
-			if (cur?.image === image) continue;
-			if (cur) cur.pool.release(cur.layer);
-			const key = `${image.width}x${image.height}`;
-			let pool = this.mapPools.get(key);
-			if (!pool) {
-				pool = new MapPool(
-					this.device,
-					image.width,
-					image.height,
-					16,
-					this.maxLayers,
-				);
-				this.mapPools.set(key, pool);
+			if (cur?.image === image) {
+				if (cur.gen < gen - 1) terrainMapStats.hits++;
+				cur.gen = gen;
+				continue;
 			}
-			const layer = pool.add(image);
-			if (layer < 0) this.maps.delete(t.id);
-			else this.maps.set(t.id, { image, pool, layer });
+			if (cur) this.dropMap(t.id, cur);
+			this.pending.set(t.id, image);
 		}
+		this.evict();
+		this.pump(budget, true);
+	}
+
+	/** Upload pending imagery, at most `budget` bytes (one at least); true = some still waits. */
+	pump(budget: number, force = false): boolean {
+		if (!this.pending.size && !force) return false;
+		let spent = 0;
+		for (const [id, image] of this.pending) {
+			if (spent > 0 && spent >= budget) break;
+			this.pending.delete(id);
+			// closed since (the engine dropped it): the tile goes next sync
+			if (!image.width) continue;
+			const page = this.pageFor(image.width, image.height);
+			if (!page) continue;
+			const layer = page.add(image);
+			this.maps.set(id, { image, page, layer, gen: this.gen });
+			const b = layerBytes(image.width, image.height);
+			spent += b;
+			terrainMapStats.uploads++;
+			terrainMapStats.uploadBytes += b;
+		}
+		for (const p of this.pages) p.flush();
+		this.writeMapLayers();
+		terrainMapStats.pending = this.pending.size;
+		return this.pending.size > 0;
+	}
+
+	/** A page of this image size with a free layer (a new one if none); null past the layer limit. */
+	private pageFor(w: number, h: number): MapPage | null {
+		const key = `${w}x${h}`;
+		for (const p of this.pages)
+			if (p.width === w && p.height === h && !p.full) return p;
+		const cap = Math.max(
+			1,
+			Math.min(
+				this.maxLayers,
+				Math.floor(imageryBudget.pageBytes / layerBytes(w, h)),
+			),
+		);
+		const page = new MapPage(
+			this.device,
+			`${key}-${this.pageSeq++}`,
+			w,
+			h,
+			cap,
+		);
+		this.pages.push(page);
+		this.pageStats();
+		return page;
+	}
+
+	private dropMap(id: string, m: MapEntry) {
+		m.page.release(m.layer);
+		this.maps.delete(id);
+	}
+
+	/** Retained imagery over imageryBudget.retainBytes out (LRU), then empty pages. */
+	private evict() {
+		const old: [string, MapEntry][] = [];
+		let bytes = 0;
+		for (const e of this.maps)
+			if (e[1].gen !== this.gen) {
+				old.push(e);
+				bytes += layerBytes(e[1].page.width, e[1].page.height);
+			}
+		if (bytes > imageryBudget.retainBytes) {
+			const idx = new Map(this.pages.map((p, i) => [p, i]));
+			old.sort(
+				(a, b) =>
+					a[1].gen - b[1].gen ||
+					(idx.get(b[1].page) ?? 0) - (idx.get(a[1].page) ?? 0) ||
+					b[1].layer - a[1].layer,
+			);
+			for (const [id, m] of old) {
+				if (bytes <= imageryBudget.retainBytes) break;
+				bytes -= layerBytes(m.page.width, m.page.height);
+				this.dropMap(id, m);
+				terrainMapStats.evicted++;
+			}
+		}
+		// the freed layers are scattered over the pages: whole pages holding only retained imagery
+		// then go too (the fewest held first) until those pages fit the budget, so what the view
+		// doesn't draw costs at most retainBytes of texture memory
+		const live = new Set<MapPage>();
+		const held = new Map<MapPage, string[]>();
 		for (const [id, m] of this.maps)
-			if (!live.has(id)) {
-				m.pool.release(m.layer);
-				this.maps.delete(id);
+			if (m.gen === this.gen) live.add(m.page);
+			else held.set(m.page, [...(held.get(m.page) ?? []), id]);
+		const idle = this.pages
+			.filter((p) => p.used && !live.has(p))
+			.sort((a, b) => a.used - b.used);
+		let idleBytes = idle.reduce((a, p) => a + p.bytes, 0);
+		for (const p of idle) {
+			if (idleBytes <= imageryBudget.retainBytes) break;
+			idleBytes -= p.bytes;
+			for (const id of held.get(p) ?? []) {
+				const m = this.maps.get(id);
+				if (!m) continue;
+				bytes -= layerBytes(m.page.width, m.page.height);
+				this.dropMap(id, m);
+				terrainMapStats.evicted++;
 			}
-		for (const [key, pool] of this.mapPools) {
-			if (!pool.used) {
-				pool.destroy();
-				this.mapPools.delete(key);
-			} else pool.flush();
 		}
+		for (let i = this.pages.length - 1; i >= 0; i--)
+			if (!this.pages[i].used) {
+				this.pages[i].destroy();
+				this.pages.splice(i, 1);
+			}
+		terrainMapStats.retained = bytes;
+		this.pageStats();
+	}
+
+	private pageStats() {
+		terrainMapStats.pages = this.pages.length;
+		terrainMapStats.pageBytes = this.pages.reduce((a, p) => a + p.bytes, 0);
+	}
+
+	private writeMapLayers() {
 		let dirty = false;
 		for (const [m, s] of this.slots) {
 			const o = s.row * TABLE_W * 4 + 10;
@@ -582,9 +720,10 @@ class TileStore {
 			});
 	}
 
-	/** The map pool holding tile `id`'s imagery (null: none yet). */
-	mapPool(id: string) {
-		return this.maps.get(id)?.pool ?? null;
+	/** The page holding tile `id`'s imagery (null: none, not yet, or only retained). */
+	mapPage(id: string) {
+		const m = this.maps.get(id);
+		return m && m.gen === this.gen ? m.page : null;
 	}
 
 	destroy() {
@@ -592,9 +731,11 @@ class TileStore {
 		this.big.destroy();
 		this.base.destroy();
 		this.table.destroy();
-		for (const p of this.mapPools.values()) p.destroy();
-		this.mapPools.clear();
+		for (const p of this.pages) p.destroy();
+		this.pages.length = 0;
 		this.maps.clear();
+		this.pending.clear();
+		this.pageStats();
 		this.emptyMaps.destroy();
 	}
 }
@@ -607,6 +748,8 @@ export type BatchedTerrainProps = LayerProps &
 		/** Opaque change key for the compositor's geometry cache (composite.ts reads props.mesh). */
 		mesh: unknown;
 		imagery: Map<string, ImageBitmap> | null;
+		/** The parent's offscreen (photo view): imagery uploads unthrottled (uploadBudget). */
+		offscreen?: boolean;
 	};
 
 /** Per-instance row buffers, one per draw group (a Model's attributes are swapped per draw). */
@@ -620,6 +763,7 @@ type SegModel = { model: Model; bufs: Map<string, RowBuf> };
 
 export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 	static layerName = "BatchedTerrainTileLayer";
+	private lastPump = 0;
 	declare state: {
 		store?: TileStore;
 		segs: Map<number, SegModel>;
@@ -719,7 +863,22 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 			this.state.defines = d;
 		}
 		if (props.imagery !== oldProps.imagery || props.tiles !== oldProps.tiles)
-			this.state.store?.syncMaps(props.tiles, props.imagery);
+			this.state.store?.syncMaps(
+				props.tiles,
+				props.imagery,
+				this.uploadBudget(),
+			);
+	}
+
+	/**
+	 * Per-frame imagery upload bytes: the canvas (world view) draws every frame, so a big batch (a
+	 * world re-entry, a new imagery source) streams in over a few frames instead of one long task.
+	 * Offscreen (photo view) passes are cached by the compositor: everything at once there.
+	 */
+	private uploadBudget() {
+		return this.props.offscreen
+			? Number.POSITIVE_INFINITY
+			: imageryBudget.uploadBytes;
 	}
 
 	finalizeState(context: Parameters<Layer["finalizeState"]>[0]) {
@@ -747,6 +906,12 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 	}) {
 		const { store } = this.state;
 		if (!store) return;
+		// throttled imagery uploads (uploadBudget): the next slice, once per frame
+		const now = performance.now();
+		if (now - this.lastPump > 4) {
+			this.lastPump = now;
+			if (store.pump(this.uploadBudget())) this.setNeedsRedraw();
+		}
 		const viewport = (shaderModuleProps?.project?.viewport ??
 			this.context.viewport) as {
 			cameraPosition: number[];
@@ -778,7 +943,7 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 			this.props.style === "imagery" &&
 			pass !== "geometry" &&
 			pass !== "normal" &&
-			store.mapPools.size > 0;
+			store.pages.length > 0;
 		const g = this.props.tiles.find((t) => t.grid)?.grid;
 		const DEG = Math.PI / 180;
 		const frame = g
@@ -796,7 +961,7 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 		// visible tiles per resolution (and map pool), in the set's (near → far) order
 		const groups = new Map<
 			number,
-			Map<string, { pool: MapPool | null; rows: number[] }>
+			Map<string, { pool: MapPage | null; rows: number[] }>
 		>();
 		for (const t of this.props.tiles) {
 			const s = store.slots.get(t);
@@ -808,8 +973,8 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 			}
 			batchedCullStats.drawn++;
 			if (!photoCam) batchedCullStats.drawnW++;
-			const pool = withMaps ? store.mapPool(t.id) : null;
-			const key = pool ? `${pool.width}x${pool.height}` : "all";
+			const pool = withMaps ? store.mapPage(t.id) : null;
+			const key = pool ? pool.key : "all";
 			let bySeg = groups.get(t.seg);
 			if (!bySeg) {
 				bySeg = new Map();
