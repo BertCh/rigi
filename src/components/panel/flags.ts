@@ -156,13 +156,6 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
-		name: "geoMap",
-		label: "MAP σ readout",
-		help: "GEO: display-only pose uncertainty readout (research; not wired yet).",
-		group: "assist",
-		options: ONOFF,
-	},
-	{
 		name: "gpu",
 		label: "WebGPU (master)",
 		help: "Kill switch for every GPU kernel below. Off runs everything on the CPU.",

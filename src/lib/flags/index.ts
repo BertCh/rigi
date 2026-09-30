@@ -56,7 +56,7 @@ export const FLAG_SCHEMA = {
 	// alignment aids
 	picker: oneOf(["off", "on", "always"], "off"),
 	eyesearch: oneOf(["off", "on", "auto"], "off"),
-	concord: setOf(["eye", "cues", "solve", "warp", "occl", "match"]),
+	concord: setOf(["eye", "warp", "occl"]),
 	// geometry-first camera (src/lib/geocam, GEO phase A); all off = the pre-GEO app
 	/** magnetic declination (WMM2025) on EXIF headings with GPSImgDirectionRef M */
 	geoDecl: onOff("off"),
@@ -66,8 +66,6 @@ export const FLAG_SCHEMA = {
 	geoLakes: onOff("off"),
 	/** ask the matcher for its inlier correspondences */
 	geoInliers: onOff("off"),
-	/** display-only MAP σ readout (not wired in phase A) */
-	geoMap: onOff("off"),
 	// data & licences (src/lib/licences; VITE_* env vars apply when unset)
 	imagery: oneOf(["default", "esri", "swisstopo", "custom"], "default"),
 	attrib: oneOf(["classic", "full"], "classic"),

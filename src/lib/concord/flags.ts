@@ -1,16 +1,9 @@
-// Whole-image concordance feature flags: ?concord=<csv> (eye, cues, solve, warp, occl, match), read
+// Whole-image concordance feature flags: ?concord=<csv> (eye, warp, occl), read
 // through src/lib/flags. Everything is off by default, and off outside a browser (node pipeline,
 // workers).
 import { flagFrom, getFlag } from "#/lib/flags";
 
-export const CONCORD_FLAGS = [
-	"eye",
-	"cues",
-	"solve",
-	"warp",
-	"occl",
-	"match",
-] as const;
+export const CONCORD_FLAGS = ["eye", "warp", "occl"] as const;
 export type ConcordFlag = (typeof CONCORD_FLAGS)[number];
 export type ConcordFlags = Readonly<Record<ConcordFlag, boolean>>;
 

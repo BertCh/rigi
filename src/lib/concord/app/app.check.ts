@@ -20,10 +20,7 @@ check(
 );
 check("node (no location) ⇒ off", !concordFlags().warp && !concordFlags().eye);
 const f = parseConcordFlags("?renderer=deck&concord=warp,%20occl,bogus");
-check(
-	"?concord=warp, occl,bogus ⇒ warp+occl only",
-	f.warp && f.occl && !f.eye && !f.solve && !f.cues && !f.match,
-);
+check("?concord=warp, occl,bogus ⇒ warp+occl only", f.warp && f.occl && !f.eye);
 
 // confidence mapping (fail closed)
 const base = { pose: {}, settled: true, alignState: "auto" };
