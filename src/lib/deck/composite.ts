@@ -99,6 +99,22 @@ export const defaultCompositeSettings: CompositeSettings = {
 
 const METHOD = { swipe: 0, lens: 1, range: 2, brush: 3 } as const;
 
+/**
+ * MSAA sample policy of the settled on-screen colour pass: three's layerRT uses 4 samples (exports
+ * keep 4 at any DPR). At device-pixel ratio ≥ 2 the colour target already supersamples the CSS
+ * pixel, so it takes 2 (MSAA_SAMPLES_HIDPI): measured 2026-09-30 on M3 Pro / ANGLE Metal at
+ * 2160×1620, colour pass 35–47 → 23–31 ms GPU and half the MSAA memory; the settled frame differs
+ * from 4× only in edge coverage (1–2% of pixels, visually identical at 4× zoom). DPR < 2 is
+ * unchanged (bit-identical). While interactive (setInteractive) the colour pass has no MSAA.
+ */
+export const MSAA_SAMPLES = 4;
+export const MSAA_SAMPLES_HIDPI = 2;
+
+/** The settled colour pass's MSAA samples at a device-pixel ratio (capped by `max`; 0 = off). */
+export function msaaSamplesFor(dpr: number, max = MSAA_SAMPLES) {
+	return Math.min(max, dpr >= 2 ? MSAA_SAMPLES_HIDPI : MSAA_SAMPLES);
+}
+
 export type CompositeTiming = {
 	/** CPU time to encode the geometry / colour passes (ms); GPU time only with `benchmark`. */
 	geometryMs: number;
@@ -194,6 +210,10 @@ export class PhotoCompositor implements Effect {
 	private splatKey: unknown[] = [];
 	/** True once the colour + geometry targets hold a frame for the current viewport. */
 	ready = false;
+	/** setInteractive: the colour pass draws without MSAA until the interaction ends. */
+	private interactive = false;
+	/** The cached colour frame was drawn at interactive (reduced) quality. */
+	private colorReduced = false;
 
 	constructor(aspect = 4 / 3) {
 		this.brushCanvas = document.createElement("canvas");
@@ -207,6 +227,24 @@ export class PhotoCompositor implements Effect {
 
 	setSettings(s: Partial<CompositeSettings>) {
 		this.settings = { ...this.settings, ...s };
+	}
+
+	/**
+	 * Interaction quality switch (the engine calls it on camera / pose / lens interaction start and
+	 * again ~150 ms after input idles). While active the colour pass renders without MSAA (about
+	 * 7x cheaper on Apple GPUs at DPR 2); a frame cached at full quality stays in use. On
+	 * setInteractive(false) a colour frame drawn at reduced quality is redrawn at full quality, the
+	 * same frame as if the interaction never switched modes.
+	 */
+	setInteractive(active: boolean) {
+		if (active === this.interactive) return;
+		this.interactive = active;
+		// settle: request a frame so preRender replaces the reduced colour frame (if any)
+		if (!active && this.colorReduced) this.bump();
+	}
+
+	get isInteractive() {
+		return this.interactive;
 	}
 
 	/** Ridge / skyline / hairline / depth-tint look (src/lib/style/deck-apply.ts deckCompositeStyle). */
@@ -401,15 +439,24 @@ export class PhotoCompositor implements Effect {
 		const splatLayers = opts.layers.filter((l) => isDeckSplatLayer(l));
 		if (splatLayers.length) colorKey.push("splats");
 		let colorDrawn = false;
-		if (!sameKey(colorKey, this.colorKey)) {
+		// a full-quality frame serves an interaction too; a reduced one must be redrawn on settle
+		if (
+			!sameKey(colorKey, this.colorKey) ||
+			(this.colorReduced && !this.interactive)
+		) {
+			const samples = this.interactive
+				? 0
+				: msaaSamplesFor(dpr, this.msaaSamples);
 			this.renderColor(
 				colorLayers,
 				this.color,
 				pose,
 				eye,
 				splatLayers.length > 0,
+				samples,
 			);
 			this.colorKey = colorKey;
+			this.colorReduced = this.interactive;
 			colorDrawn = true;
 			if (this.benchmark) gl.finish();
 		}
@@ -532,8 +579,8 @@ export class PhotoCompositor implements Effect {
 		};
 	}
 
-	/** MSAA samples for the colour pass (three: layerRT samples 4); 0 = off. */
-	msaaSamples = 4;
+	/** Max MSAA samples for the colour pass (three: layerRT samples 4); 0 = off. See msaaSamplesFor. */
+	msaaSamples = MSAA_SAMPLES;
 	private msaa?: {
 		fbo: WebGLFramebuffer;
 		color: WebGLRenderbuffer;
@@ -541,12 +588,14 @@ export class PhotoCompositor implements Effect {
 		width: number;
 		height: number;
 		samples: number;
+		/** the requested count (samples is it capped by MAX_SAMPLES) */
+		want: number;
 	} | null;
 
 	/**
 	 * The colour pass into `target`, multisampled when possible: rendered into an MSAA
 	 * RGBA16F + depth renderbuffer pair, then resolved (blit) into target's texture, like three's
-	 * layerRT (samples: 4). Falls back to drawing into `target` directly.
+	 * layerRT (samples: 4). Falls back to drawing into `target` directly (also when samples < 2).
 	 */
 	private renderColor(
 		layers: Layer[],
@@ -554,9 +603,13 @@ export class PhotoCompositor implements Effect {
 		pose: Pose,
 		eye: [number, number, number],
 		splats = false,
+		samples = this.msaaSamples,
 	) {
 		const renderer = this.renderer as TerrainPassRenderer;
-		const ms = this.ensureMsaa(target.width, target.height);
+		const ms =
+			samples >= 2
+				? this.ensureMsaa(target.width, target.height, samples)
+				: null;
 		if (!ms) {
 			renderer.render("color", layers, target, pose, eye);
 			if (splats) this.snapshotForSplats(target);
@@ -593,6 +646,11 @@ export class PhotoCompositor implements Effect {
 			splats ? gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT : gl.COLOR_BUFFER_BIT,
 			gl.NEAREST,
 		);
+		// the multisampled contents are dead once resolved: let a tiler skip storing them
+		gl.invalidateFramebuffer(gl.READ_FRAMEBUFFER, [
+			gl.COLOR_ATTACHMENT0,
+			gl.DEPTH_ATTACHMENT,
+		]);
 		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
 		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prevDraw);
 		if (splats) this.snapshotForSplats(target);
@@ -604,16 +662,14 @@ export class PhotoCompositor implements Effect {
 		this.splatPass.snapshot(target);
 	}
 
-	private ensureMsaa(width: number, height: number) {
-		if (this.msaa === null || !this.device || this.msaaSamples < 2) return null;
+	private ensureMsaa(width: number, height: number, want: number) {
+		if (this.msaa === null || !this.device || want < 2) return null;
 		const m = this.msaa;
-		if (m && m.width === width && m.height === height) return m;
+		if (m && m.width === width && m.height === height && m.want === want)
+			return m;
 		const gl = glOf(this.device);
 		this.destroyMsaa();
-		const samples = Math.min(
-			this.msaaSamples,
-			gl.getParameter(gl.MAX_SAMPLES) as number,
-		);
+		const samples = Math.min(want, gl.getParameter(gl.MAX_SAMPLES) as number);
 		if (samples < 2) {
 			this.msaa = null;
 			return null;
@@ -666,7 +722,7 @@ export class PhotoCompositor implements Effect {
 			this.msaa = null;
 			return null;
 		}
-		this.msaa = { fbo, color, depth, width, height, samples };
+		this.msaa = { fbo, color, depth, width, height, samples, want };
 		return this.msaa;
 	}
 

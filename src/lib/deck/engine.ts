@@ -34,12 +34,6 @@ import {
 } from "../align";
 import { hfovFromAspect, type Pose } from "../camera";
 import { tileBounds } from "../dem";
-import {
-	defaultSettings,
-	type PeakLabel,
-	type Sample,
-	type Settings,
-} from "../engine";
 import { startLakeFloor } from "../geocam/lakes/fetch";
 import { priorHeading } from "../geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "../geodesy";
@@ -99,6 +93,12 @@ import { projectPoint, unprojectDir } from "../pose";
 import type { FgMask, Renderer } from "../renderer";
 import type { RevealUniforms } from "../reveal/config";
 import {
+	defaultSettings,
+	type PeakLabel,
+	type Sample,
+	type Settings,
+} from "../settings";
+import {
 	type DeckStyleMode,
 	type DeckTerrainStyle,
 	deckCompositeStyle,
@@ -113,6 +113,7 @@ import { heightFromTile } from "../terrain";
 import { DeckTiles3D } from "../tiles3d/deck-tiles";
 import { PhotoCompositor } from "./composite";
 import { CpuGeometrySource, TerrainProfiles } from "./cpu-geometry";
+import { pendingPrograms, reviveDevice, watchContextLoss } from "./device-lost";
 import { GpuGeometrySource, geometrySize, rangeMapFrom } from "./geometry-pass";
 import {
 	type GeometrySource,
@@ -174,11 +175,88 @@ export type DeckEngineStats = {
 	trailSegments: number;
 };
 
+/** requestIdleCallback (setTimeout where missing: Safari), with a 3 s deadline. */
+const requestIdle = (cb: () => void): number =>
+	typeof requestIdleCallback === "function"
+		? requestIdleCallback(cb, { timeout: 3000 })
+		: window.setTimeout(cb, 1000);
+const cancelIdle = (h: number) =>
+	typeof cancelIdleCallback === "function"
+		? cancelIdleCallback(h)
+		: clearTimeout(h);
+
 const samePose = (a: Pose, b: Pose) =>
 	a.yaw === b.yaw &&
 	a.pitch === b.pitch &&
 	a.roll === b.roll &&
 	a.vfov === b.vfov;
+
+/**
+ * Input idle (ms): a pose / lens / swipe change this soon after the previous one is an interaction
+ * (compositor.setInteractive), and the interaction ends this long after the last one.
+ */
+const INPUT_IDLE_MS = 150;
+
+/**
+ * Settings only the composite pass reads (compositeFor), never the terrain / trail layers or the
+ * band stats: a change to these alone skips the layer rebuild, so the cached colour pass is reused.
+ */
+const COMPOSITE_ONLY = new Set<string>([
+	"layerOpacity",
+	"ridges",
+	"depthTint",
+	"method",
+	"swipe",
+	"lens",
+	"lensR",
+	"rangeKm",
+	"keepSky",
+	"feather",
+	"protectPeople",
+]);
+
+/** Settings a pointer drives continuously (the lens follows the mouse, the swipe bar is dragged). */
+const POINTER_SETTINGS = new Set<string>(["lens", "swipe"]);
+
+/** Value equality for settings / layer props: identity, or equal small numeric arrays. */
+function sameValue(a: unknown, b: unknown) {
+	if (a === b) return true;
+	if (
+		!(Array.isArray(a) || ArrayBuffer.isView(a)) ||
+		!(Array.isArray(b) || ArrayBuffer.isView(b))
+	)
+		return false;
+	const x = a as ArrayLike<unknown>;
+	const y = b as ArrayLike<unknown>;
+	if (x.length !== y.length || x.length > 64) return false;
+	for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+	return true;
+}
+
+function sameProps(a: Record<string, unknown>, b: Record<string, unknown>) {
+	const ka = Object.keys(a);
+	if (ka.length !== Object.keys(b).length) return false;
+	return ka.every((k) => k in b && sameValue(a[k], b[k]));
+}
+
+/** The world sky's draw state (a stable object, so its layer props compare equal across frames). */
+const WORLD_SKY_PARAMETERS = {
+	depthCompare: "always",
+	depthWriteEnabled: false,
+} as const;
+
+/** Engine counters for benches (__engine.metrics()). */
+export type DeckEngineCounters = {
+	/** Layer instances built / reused unchanged by updateLayers (keepLayer). */
+	layerBuilds: number;
+	layersKept: number;
+	/** setSettings calls that took the composite-only path. */
+	compositeOnly: number;
+	/** Interactions (setInteractive(true)) so far. */
+	interactions: number;
+	contextLost: number;
+	contextRestored: number;
+};
 
 export class DeckEngine implements Renderer {
 	readonly kind = "deck" as const;
@@ -266,6 +344,57 @@ export class DeckEngine implements Renderer {
 		key: "",
 		map: new Map<string, ImageBitmap>(),
 		abort: null as AbortController | null,
+		/** Bumps on every change to `map`; `snap` is the copy handed to the layers at `snapVersion`. */
+		version: 0,
+		snap: null as Map<string, ImageBitmap> | null,
+		snapVersion: -1,
+	};
+	/**
+	 * The layers passed to deck by the last updateLayers, by id, with the props they were made from:
+	 * keepLayer hands the same instance back while the props are unchanged, so deck skips the
+	 * layer's diff and the compositor's colour pass (keyed on the layer instances) stays cached.
+	 */
+	private kept = new Map<
+		string,
+		{ layer: Layer; ctor: unknown; props: Record<string, unknown> }
+	>();
+	private nextKept = new Map<
+		string,
+		{ layer: Layer; ctor: unknown; props: Record<string, unknown> }
+	>();
+	/** photoViewProjection for the current pose (memoised: a stable array for the layer props). */
+	private pvp?: { key: number[]; arr: number[] };
+	/** harmonizeValues memo (a stable object for the layer props). */
+	private harm?: {
+		stats: unknown;
+		amount: unknown;
+		value: ReturnType<typeof harmonizeValues>;
+	};
+	/** An interaction runs (compositor.setInteractive(true)); see noteInput. */
+	private interactive = false;
+	private lastInputAt = Number.NEGATIVE_INFINITY;
+	private idleTimer = 0;
+	/**
+	 * The photo-view terrain layer carries the full-size photo too (unused there: the photo only
+	 * drapes in the world view), so its mip-mapped texture is uploaded once, not on every world entry.
+	 */
+	private photoTexWarm = false;
+	private warmHandle = 0;
+	/** The WebGL context is lost (device-lost.ts); nothing draws until it is restored. */
+	private contextLost = false;
+	private unwatchContext: () => void = () => {};
+	/** The occluder mask last handed to setOccluder (a rebuilt compositor gets it again). */
+	private occluder: FgMask | null = null;
+	/** Compositors made after a context loss (their effect ids). */
+	private compositorGen = 0;
+	private deckMetrics: Record<string, unknown> | null = null;
+	private counters: DeckEngineCounters = {
+		layerBuilds: 0,
+		layersKept: 0,
+		compositeOnly: 0,
+		interactions: 0,
+		contextLost: 0,
+		contextRestored: 0,
 	};
 	private listeners = new Set<() => void>();
 	private readbackWaiters: ((ok: boolean) => void)[] = [];
@@ -350,24 +479,71 @@ export class DeckEngine implements Renderer {
 		];
 		// engine.ts worldCam: near 5, far 600 km
 		this.worldViews = [new WorldView({ id: "world", near: 5, far: 600_000 })];
-		this.compositor = new PhotoCompositor(this.aspect);
-		this.compositor.viewId = "photo";
-		this.compositor.onChange = () => this.updateComposite();
+		this.compositor = this.makeCompositor();
+		this.deckReady = Promise.resolve();
+		this.deck = this.createDeck();
+		this.unwatchContext = watchContextLoss(canvas, {
+			onLost: () => this.onContextLost(),
+			onRestored: () => this.onContextRestored(),
+		});
+	}
+
+	/** The photo view's compositor; `prev`: a lost context's, whose state it takes over. */
+	private makeCompositor(prev?: PhotoCompositor) {
+		const c = new PhotoCompositor(this.aspect);
+		c.viewId = "photo";
+		if (prev) {
+			// a new id: deck's EffectManager hands a replacement with the same id no setup() call
+			c.id = `photo-composite-${++this.compositorGen}`;
+			c.enabled = prev.enabled;
+			c.msaaSamples = prev.msaaSamples;
+			c.setSettings(prev.settings);
+			c.setStyle(prev.style);
+			c.setReveal(prev.reveal);
+			c.setLook(prev.look);
+			c.setPhoto(this.photoImg ?? null);
+			c.setForegroundMask(this.fgMask);
+			c.setOccluder(this.occluder);
+			c.brushCanvas.getContext("2d")?.drawImage(prev.brushCanvas, 0, 0);
+		}
+		c.onChange = () => this.updateComposite();
+		return c;
+	}
+
+	/**
+	 * The Deck on this.canvas (constructor; again after a context loss, then `withEffects` false:
+	 * the compositor joins once the Deck knows the canvas size, see onContextRestored).
+	 */
+	private createDeck(withEffects = true) {
+		const canvas = this.canvas;
 		let onLoad = () => {};
 		this.deckReady = new Promise<void>((r) => {
 			onLoad = r;
 		});
-		this.deck = new Deck({
+		const map = this.step?.map;
+		return new Deck({
 			canvas,
 			// null: never touch the canvas' CSS size (PhotoWorkspace sizes it); the canvas context
 			// follows its client size
 			width: null,
 			height: null,
 			useDevicePixels: Math.min(window.devicePixelRatio || 1, 2),
-			views: this.photoViews,
+			// Only applies when the canvas' context is created. preserveDrawingBuffer (luma's default
+			// is true) is not needed: exports render offscreen (composite.ts renderImage) or draw the
+			// world frame and read it in the same task (exportWorld), and no harness reads a deck
+			// canvas outside a frame (style-baseline, which does, is pinned to three.js).
+			deviceProps: {
+				powerPreference: "high-performance",
+				webgl: { preserveDrawingBuffer: false },
+			},
+			views: this.world?.controls
+				? map?.active
+					? [...this.worldViews, map.view]
+					: this.worldViews
+				: this.photoViews,
 			viewState: this.viewState(),
 			layers: [],
-			effects: [this.compositor],
+			effects: withEffects ? [this.compositor] : [],
 			layerFilter: ({
 				layer,
 				viewport,
@@ -400,7 +576,115 @@ export class DeckEngine implements Renderer {
 			onLoad: () => onLoad(),
 			onAfterRender: () => this.emit(),
 			onError: (e: Error) => console.error("[deck-engine]", e),
+			// once a second (deck's own fps / memory / timing counters): metrics()
+			_onMetrics: (m: Record<string, unknown>) => {
+				this.deckMetrics = { ...m };
+			},
 		} as never);
+	}
+
+	// ---------------- GPU context loss (device-lost.ts) ----------------
+
+	private onContextLost() {
+		if (this.disposed) return;
+		this.contextLost = true;
+		this.counters.contextLost++;
+		console.warn("[deck-engine] WebGL context lost; waiting for the restore");
+		cancelAnimationFrame(this.worldRaf);
+		this.worldRaf = 0;
+		clearTimeout(this.geoTimer);
+		this.geoTimer = 0;
+		clearTimeout(this.statsTimer);
+		this.statsTimer = 0;
+		// every GL call is a no-op now: stop deck's frame loop until the rebuild
+		(
+			this.deck as unknown as { animationLoop?: { stop(): void } | null }
+		).animationLoop?.stop();
+	}
+
+	/**
+	 * The context is back (empty): revive deck's device, then a new Deck, compositor, layers and
+	 * geometry sources on it. CPU state (terrain, imagery bitmaps, masks, the brush, the query
+	 * buffers' generations) is kept; the geometry buffer is re-read for the current pose.
+	 */
+	private onContextRestored() {
+		if (this.disposed || !this.contextLost) return;
+		const old = this.deck;
+		const device = (
+			old as unknown as { device?: Parameters<typeof reviveDevice>[0] }
+		).device;
+		if (!device || !reviveDevice(device)) {
+			console.error(
+				"[deck-engine] context restored but the device could not be revived",
+			);
+			return;
+		}
+		this.contextLost = false;
+		this.counters.contextRestored++;
+		try {
+			old.finalize();
+		} catch (e) {
+			console.warn("[deck-engine] finalizing the lost Deck", e);
+		}
+		try {
+			this.dropGeometrySources();
+		} catch {}
+		const prev = this.compositor;
+		prev.onChange = undefined;
+		this.compositor = this.makeCompositor(prev);
+		this.kept.clear();
+		this.sceneLayers = [];
+		// deck's first frame on the reused device can come before it knows the canvas size (seen: a
+		// zero viewport, "Pixel project matrix not invertible"): the compositor joins once the Deck
+		// is up, then a few redraws; settleAfterRestore finishes the job once the programs link.
+		const deck = this.createDeck(false);
+		this.deck = deck;
+		this.updateLayers();
+		this.invalidateGeometry();
+		if (this.world?.controls) this.kickWorld();
+		void this.deckReady.then(() => {
+			let n = 0;
+			const again = () => {
+				if (this.disposed || this.deck !== deck || this.contextLost) return;
+				if (n === 0) deck.setProps({ effects: [this.compositor] } as never);
+				this.updateLayers();
+				deck.redraw("context restored");
+				if (++n < 3) requestAnimationFrame(again);
+			};
+			requestAnimationFrame(again);
+		});
+		void this.settleAfterRestore(deck);
+		console.warn("[deck-engine] WebGL context restored; renderer rebuilt");
+	}
+
+	/**
+	 * Every program recompiles after a restore, asynchronously (KHR_parallel_shader_compile): a pass
+	 * drawn before its program links draws nothing, and both the geometry buffer (generation
+	 * semantics) and the compositor (geometry pass cached per pose) would keep that empty result.
+	 * So: one readback to create the query programs, wait until nothing is linking (≤ 5 s), then
+	 * read the geometry again and put a fresh compositor in, which redraws every pass.
+	 */
+	private async settleAfterRestore(deck: Deck) {
+		const live = () =>
+			!this.disposed && this.deck === deck && !this.contextLost;
+		await this.deckReady;
+		await this.readback();
+		const device = (
+			deck as unknown as { device?: Parameters<typeof pendingPrograms>[0] }
+		).device;
+		for (let t = 0; t < 100 && live(); t++) {
+			await new Promise((r) => setTimeout(r, 50));
+			if (device && pendingPrograms(device) === 0) break;
+		}
+		if (!live()) return;
+		this.invalidateGeometry();
+		await this.readback();
+		if (!live()) return;
+		const cur = this.compositor;
+		cur.onChange = undefined;
+		this.compositor = this.makeCompositor(cur);
+		deck.setProps({ effects: [this.compositor] } as never);
+		this.updateLayers();
 	}
 
 	// ---------------- Renderer: lifecycle ----------------
@@ -514,6 +798,7 @@ export class DeckEngine implements Renderer {
 		if (this.disposed) return;
 		this.horizonDirs = dirs;
 		this.updateLayers();
+		this.warmPhotoTexture();
 	}
 
 	/** Starts the streamer; resolves with its first complete TerrainSet (null if disposed first). */
@@ -618,9 +903,13 @@ export class DeckEngine implements Renderer {
 	dispose() {
 		if (this.disposed) return;
 		this.disposed = true;
+		this.unwatchContext();
 		this.tiles3d?.dispose();
 		clearTimeout(this.statsTimer);
 		clearTimeout(this.lookTimer);
+		clearTimeout(this.idleTimer);
+		if (this.warmHandle) cancelIdle(this.warmHandle);
+		this.kept.clear();
 		this.loadAbort.abort();
 		this.fastHorizon?.dispose();
 		this.streamer?.dispose();
@@ -677,10 +966,50 @@ export class DeckEngine implements Renderer {
 		return this.deck;
 	}
 
+	/**
+	 * Performance counters for benches (window.__engine.metrics()): deck's once-a-second metrics
+	 * (fps, cpu / gpu time per frame, layer and memory counts; `live` = its current object), luma's
+	 * GPU memory and resource-count tables, the compositor's last pass timing, and this engine's
+	 * counters (layers built vs reused, composite-only settings, interactions, context losses).
+	 */
+	metrics() {
+		const deck = this.deck as unknown as {
+			metrics?: Record<string, unknown>;
+			device?: {
+				statsManager?: {
+					getStats(name: string): { getTable(): Record<string, unknown> };
+				};
+			};
+		};
+		const table = (name: string) => {
+			try {
+				return deck.device?.statsManager?.getStats(name).getTable() ?? null;
+			} catch {
+				return null;
+			}
+		};
+		return {
+			deck: this.deckMetrics,
+			deckLive: deck.metrics ? { ...deck.metrics } : null,
+			luma: {
+				memory: table("GPU Time and Memory"),
+				resources: table("GPU Resource Counts"),
+			},
+			composite: this.compositor.timing ? { ...this.compositor.timing } : null,
+			engine: {
+				...this.counters,
+				interactive: this.interactive,
+				lostNow: this.contextLost,
+				photoTexWarm: this.photoTexWarm,
+			},
+		};
+	}
+
 	// ---------------- Renderer: state ----------------
 
 	setPose(p: Pose) {
 		this.pose = { ...p };
+		this.noteInput();
 		this.updateLayers();
 		this.invalidateGeometry();
 		// the DEM's high-detail wedge follows the view, ~300 ms after it settles
@@ -701,8 +1030,66 @@ export class DeckEngine implements Renderer {
 		const cur = this.settings;
 		if (cur.mode === "world" && prev.mode !== "world") this.enterWorld();
 		if (cur.mode !== "world" && prev.mode === "world") this.exitWorld();
-		this.updateLayers();
+		const changed = (Object.keys(cur) as (keyof Settings)[]).filter(
+			(k) => !sameValue(prev[k], cur[k]),
+		);
+		if (changed.some((k) => POINTER_SETTINGS.has(k))) this.noteInput();
+		// the lens, swipe and blend sliders only change the composite pass: keep the terrain layers
+		// (and with them the cached colour pass); PhotoWorkspace hands the whole Settings every time
+		if (!this.world?.controls && changed.every((k) => COMPOSITE_ONLY.has(k))) {
+			this.counters.compositeOnly++;
+			this.compositor.setSettings(compositeFor(cur));
+			this.updateComposite();
+		} else this.updateLayers();
 		this.scheduleLook();
+	}
+
+	/**
+	 * Interaction tracking (pose drags, the lens / swipe following the pointer): a change within
+	 * INPUT_IDLE_MS of the previous one starts an interaction, so a lone setPose (auto-align, a
+	 * harness) still draws the full-quality frame. While it runs the compositor draws its colour
+	 * pass the cheap way (setInteractive) and the geometry readback waits; INPUT_IDLE_MS after the
+	 * last change inputIdle reads the geometry back, then restores the full-quality frame.
+	 */
+	private noteInput() {
+		const now = performance.now();
+		const burst = now - this.lastInputAt < INPUT_IDLE_MS;
+		this.lastInputAt = now;
+		if (burst && !this.interactive) {
+			this.interactive = true;
+			this.counters.interactions++;
+			// the debounced readback of the previous change must not fire mid-drag
+			clearTimeout(this.geoTimer);
+			this.geoTimer = 0;
+			this.compositor.setInteractive?.(true);
+		}
+		clearTimeout(this.idleTimer);
+		this.idleTimer = window.setTimeout(() => this.inputIdle(), INPUT_IDLE_MS);
+	}
+
+	private inputIdle() {
+		this.idleTimer = 0;
+		if (!this.interactive || this.disposed) return;
+		this.interactive = false;
+		const restore = () => {
+			// a new interaction may have started meanwhile
+			if (!this.disposed && !this.interactive)
+				this.compositor.setInteractive?.(false);
+		};
+		// read the geometry back before the full-quality frame is queued: the readback then waits
+		// for no heavy frame (bounded, so a slow read never holds the quality back for long)
+		if (this.terrain && !this.geometryReady() && !this.contextLost) {
+			let t = 0;
+			void Promise.race([
+				this.refreshGeometry(),
+				new Promise((r) => {
+					t = window.setTimeout(r, 250);
+				}),
+			]).then(() => {
+				clearTimeout(t);
+				restore();
+			});
+		} else restore();
 	}
 
 	/** engine.ts scheduleLook: updateLook once a blend edit (range, feather, brush) settles. */
@@ -777,6 +1164,7 @@ export class DeckEngine implements Renderer {
 
 	/** concord DSM occluder dim mask (?concord=occl; row 0 = top, 255 = dim); null = off. Composite-only. */
 	setOccluder(m: FgMask | null) {
+		this.occluder = m;
 		this.compositor.setOccluder(m);
 	}
 
@@ -974,23 +1362,27 @@ export class DeckEngine implements Renderer {
 				this.worldViews = [new WorldView({ id: "world", near, far: 600_000 })];
 				this.syncWorldViews();
 			}
+			this.nextKept = new Map();
+			const layers = this.worldLayers();
+			this.kept = this.nextKept;
 			this.deck.setProps({
 				viewState: this.viewState(),
-				layers: this.worldLayers(),
+				layers,
 			} as never);
 			this.scheduleStats();
 			return;
 		}
 		const look = terrainLookFor(this.settings);
 		this.compositor.setSettings(compositeFor(this.settings));
-		const layers: unknown[] = [];
+		const layers: Layer[] = [];
 		const set = this.renderSet;
+		this.nextKept = new Map();
 		if (set && this.terrain) {
 			const imagery = look.imagery
 				? this.syncImagery(set, look.imagery)
 				: undefined;
 			layers.push(
-				new TerrainLayer({
+				this.keepLayer(TerrainLayer, {
 					id: "terrain",
 					tiles: set.tiles,
 					imagery,
@@ -1003,11 +1395,14 @@ export class DeckEngine implements Renderer {
 					elevRange: deckElevRange(this.style, this.elevRange) ?? undefined,
 					relief: this.relief.field,
 					offscreen: true,
+					// the world drape's texture, kept across mode switches (the photo view never samples
+					// it: projectPhoto is 0 in its offscreen passes); see warmPhotoTexture
+					...(this.photoTexWarm ? { photo: this.photoImg ?? null } : {}),
 				}),
 			);
 			if (look.trails && this.trails?.count)
 				layers.push(
-					new TrailLayer({
+					this.keepLayer(TrailLayer, {
 						id: "trails",
 						segments: this.trails,
 						widthPx: this.style.trails.width,
@@ -1015,14 +1410,78 @@ export class DeckEngine implements Renderer {
 					}),
 				);
 		}
+		this.kept = this.nextKept;
 		// Step Inside splats draw only in the world / step view (engine.ts NEARFIELD_LAYER): the photo view
 		// shows the photo
-		this.sceneLayers = layers as Layer[];
+		this.sceneLayers = layers;
 		this.deck.setProps({
 			viewState: this.viewState(),
 			layers: [...layers, this.compositor.layer("screen-composite")],
 		} as never);
 		this.scheduleStats();
+	}
+
+	/**
+	 * `new Ctor(props)`, or the instance the last updateLayers passed to deck under this id when it
+	 * was made from equal props (sameProps: identity, or equal small numeric arrays). Deck then
+	 * skips the layer's diff, a composite layer keeps its sublayers, and the compositor's colour
+	 * pass (keyed on the layer instances) stays cached. Only layers still live in deck are reused.
+	 */
+	private keepLayer<C extends new (...props: never[]) => unknown>(
+		Ctor: C,
+		props: ConstructorParameters<C>[0] & { id: string },
+	): Layer {
+		const p = props as unknown as Record<string, unknown>;
+		const id = p.id as string;
+		const k = this.kept.get(id);
+		if (k && k.ctor === Ctor && sameProps(k.props, p)) {
+			this.counters.layersKept++;
+			this.nextKept.set(id, k);
+			return k.layer;
+		}
+		const layer = new (Ctor as unknown as new (p: unknown) => Layer)(props);
+		this.counters.layerBuilds++;
+		this.nextKept.set(id, { layer, ctor: Ctor, props: p });
+		return layer;
+	}
+
+	/** photoViewProjection of the current pose, memoised (a stable array for layer props). */
+	private photoViewProj(): number[] {
+		const p = this.pose;
+		const key = [p.yaw, p.pitch, p.roll, p.vfov, ...this.eyeArr, this.aspect];
+		if (!this.pvp || !sameValue(this.pvp.key, key))
+			this.pvp = {
+				key,
+				arr: Array.from(photoViewProjection(p, this.eyeArr, this.aspect)),
+			};
+		return this.pvp.arr;
+	}
+
+	/** harmonizeValues memoised on its inputs (a stable object for layer props). */
+	private harmonize(amount: number) {
+		const stats = this.compLook.stats;
+		if (!this.harm || this.harm.stats !== stats || this.harm.amount !== amount)
+			this.harm = { stats, amount, value: harmonizeValues(stats, amount) };
+		return this.harm.value;
+	}
+
+	/**
+	 * Upload the world drape's photo texture ahead of the first world entry, when the browser is
+	 * idle (about 90 ms for a 2048 px photo with mips) and no interaction runs. From then on the
+	 * photo-view terrain layer carries it too, so no mode switch re-creates it.
+	 */
+	private warmPhotoTexture() {
+		if (this.photoTexWarm || this.warmHandle || this.disposed) return;
+		this.warmHandle = requestIdle(() => {
+			this.warmHandle = 0;
+			if (this.disposed || this.photoTexWarm) return;
+			if (this.interactive || !this.photoImg) {
+				this.warmPhotoTexture();
+				return;
+			}
+			this.photoTexWarm = true;
+			this.updateLayers();
+		});
 	}
 
 	/**
@@ -1058,7 +1517,7 @@ export class DeckEngine implements Renderer {
 	private syncImagery(
 		set: TerrainSet,
 		src: ImagerySource,
-		order?: (a: TileMesh, b: TileMesh) => number,
+		order?: () => (a: TileMesh, b: TileMesh) => number,
 	) {
 		const c = this.imagery;
 		if (c.key !== src) {
@@ -1067,9 +1526,10 @@ export class DeckEngine implements Renderer {
 			for (const b of c.map.values()) b.close();
 			c.key = src;
 			c.map = new Map();
+			c.version++;
 		}
 		const missing = set.tiles.filter((t) => !c.map.has(t.id));
-		if (order) missing.sort(order);
+		if (order && missing.length > 1) missing.sort(order());
 		if (missing.length && !c.abort) {
 			const ac = new AbortController();
 			c.abort = ac;
@@ -1080,6 +1540,7 @@ export class DeckEngine implements Renderer {
 				(id, bmp) => {
 					if (ac.signal.aborted) return bmp.close();
 					c.map.set(id, bmp);
+					c.version++;
 					if (n++ % 6 === 0) this.updateLayers();
 				},
 				ac.signal,
@@ -1088,7 +1549,13 @@ export class DeckEngine implements Renderer {
 				if (!ac.signal.aborted) this.updateLayers();
 			});
 		}
-		return new Map(c.map);
+		// a new Map only when a tile arrived (the layers compare it by identity): an unchanged
+		// imagery set keeps the terrain layer, and the cached colour pass, as they are
+		if (!c.snap || c.snapVersion !== c.version) {
+			c.snap = new Map(c.map);
+			c.snapVersion = c.version;
+		}
+		return c.snap;
 	}
 
 	// ---------------- horizon ----------------
@@ -1186,7 +1653,10 @@ export class DeckEngine implements Renderer {
 	private invalidateGeometry() {
 		this.geoGen++;
 		clearTimeout(this.geoTimer);
-		if (!this.terrain || this.disposed) return;
+		this.geoTimer = 0;
+		// mid-interaction the readback waits for input idle (inputIdle), never a pause in the frames
+		if (!this.terrain || this.disposed || this.interactive || this.contextLost)
+			return;
 		// the float readback (labels, hover) waits until the pose stops changing; readback() forces it
 		this.geoTimer = window.setTimeout(() => {
 			this.geoTimer = 0;
@@ -1243,7 +1713,7 @@ export class DeckEngine implements Renderer {
 
 	/** Render + read back the geometry for the current pose; true if the buffer is fresh after. */
 	private async refreshGeometry(): Promise<boolean> {
-		if (this.disposed || !this.terrain) return false;
+		if (this.disposed || !this.terrain || this.contextLost) return false;
 		await this.deckReady;
 		if (this.disposed) return false;
 		if (!this.geoSrc) {
@@ -1717,17 +2187,19 @@ export class DeckEngine implements Renderer {
 		// splat layer, otherwise the photo view is untouched
 		if (this.sceneLayers.some((l) => isDeckSplatLayer(l))) {
 			this.sceneLayers = this.sceneLayers.filter((l) => !isDeckSplatLayer(l));
+			for (const [id, k] of this.kept)
+				if (isDeckSplatLayer(k.layer)) this.kept.delete(id);
 			this.updateComposite();
 		}
 	}
 
 	/** The world / step view's splat layer (drawn on the canvas), or null. */
-	private nearFieldLayer(): DeckSplatLayer | null {
+	private nearFieldLayer(): Layer | null {
 		const nf = this.nearField;
 		if (!nf?.scene.splats.count) return null;
 		const opacity = nf.opts.opacity ?? 1;
 		if (!(opacity > 0)) return null;
-		return new DeckSplatLayer({
+		return this.keepLayer(DeckSplatLayer, {
 			id: "world-nearfield-splats",
 			cloud: nf.scene.splats,
 			opacity,
@@ -1970,6 +2442,8 @@ export class DeckEngine implements Renderer {
 
 	/** engine.ts enterWorld: three's framing + OrbitControls, the world view, the sky. */
 	private enterWorld() {
+		// the drape's photo texture stays up from now on (no re-upload on the next entry)
+		this.photoTexWarm = true;
 		this.world ??= new WorldCamera(this.canvas, () => this.kickWorld());
 		const ws = deckWorldStyle(this.style);
 		this.world.planeOpacity = ws.planeOpacity;
@@ -2096,20 +2570,20 @@ export class DeckEngine implements Renderer {
 		const s = this.settings;
 		const src = s.worldStyle === "hillshade" ? null : s.worldStyle;
 		const imagery = src
-			? this.syncImagery(set, src, this.worldTileOrder(w))
+			? this.syncImagery(set, src, () => this.worldTileOrder(w))
 			: undefined;
 		const ws = deckWorldStyle(this.style);
 		const atm = this.look("world").atm;
 		const out: unknown[] = [
 			this.style.world.sky.mode === "atmosphere" &&
 				atm &&
-				new AtmSkyLayer({
+				this.keepLayer(AtmSkyLayer, {
 					id: "world-sky",
 					atm,
-					parameters: { depthCompare: "always", depthWriteEnabled: false },
+					parameters: WORLD_SKY_PARAMETERS,
 				}),
 			this.photoSkyLayer(),
-			new TerrainLayer({
+			this.keepLayer(TerrainLayer, {
 				id: "terrain",
 				tiles: set.tiles,
 				imagery,
@@ -2124,25 +2598,20 @@ export class DeckEngine implements Renderer {
 				photo: this.photoImg ?? null,
 				photoRange: this.drapeRange(),
 				...this.drapeMask(),
-				photoViewProj: Array.from(
-					photoViewProjection(this.pose, this.eyeArr, this.aspect),
-				),
+				photoViewProj: this.photoViewProj(),
 				photoPos: this.eyeArr,
 				// Step Inside: the full photo on the drape, at every incidence (terrain-layer.ts: > 1.5)
 				projectPhoto: this.step?.view === "step" ? 2 : s.projectOpacity,
 				// from the photo camera the near terrain drapes exactly: no grazing-angle cut-off (engine.ts)
 				photoMinRange: this.step?.view === "step" ? 1 : s.minProjectRange,
-				harmonize: harmonizeValues(
-					this.compLook.stats,
-					this.style.world.drapeHarmonize,
-				),
+				harmonize: this.harmonize(this.style.world.drapeHarmonize),
 				// Truth toggle: the terrain tinted by provenance too (terrain-layer.ts truth; 0 = classic)
 				truth: this.nearField?.opts.truth ? PROVENANCE_TINT_MIX : 0,
 			}),
 		];
 		if (s.trails && this.trails?.count)
 			out.push(
-				new TrailLayer({
+				this.keepLayer(TrailLayer, {
 					id: "world-trails",
 					segments: this.trails,
 					widthPx: this.style.trails.width,
@@ -2153,7 +2622,7 @@ export class DeckEngine implements Renderer {
 		// engine.ts: the frustum is hidden once the plane has faded (end of the fly-in)
 		if (w.photoPlaneOpacity > 0.02)
 			out.push(
-				new WorldGizmoLayer({
+				this.keepLayer(WorldGizmoLayer, {
 					id: "world-gizmo",
 					pose: this.pose,
 					eye: this.eyeArr,
@@ -2169,9 +2638,7 @@ export class DeckEngine implements Renderer {
 		if (this.step?.view === "step" && this.tiles3d) {
 			const dm = this.drapeMask();
 			const tl = this.tiles3d.layer({
-				photoViewProj: Array.from(
-					photoViewProjection(this.pose, this.eyeArr, this.aspect),
-				),
+				photoViewProj: this.photoViewProj(),
 				photoPos: this.eyeArr,
 				photoRange: this.drapeRange(),
 				photoFg: dm.protectPeople ? dm.photoFg : null,
@@ -2191,14 +2658,12 @@ export class DeckEngine implements Renderer {
 	private photoSkyLayer() {
 		const sm = this.stepMasks();
 		if (!sm || !this.photoImg) return null;
-		return new PhotoSkyLayer({
+		return this.keepLayer(PhotoSkyLayer, {
 			id: "world-photo-sky",
 			parameters: PHOTO_SKY_PARAMETERS,
 			photo: this.photoImg,
 			skyMask: sm.sky,
-			photoViewProj: Array.from(
-				photoViewProjection(this.pose, this.eyeArr, this.aspect),
-			),
+			photoViewProj: this.photoViewProj(),
 			photoPos: this.eyeArr,
 		});
 	}
@@ -2245,7 +2710,8 @@ export class DeckEngine implements Renderer {
 	 */
 	async exportImage(withLabels = true): Promise<Blob | null> {
 		// display-only 3D Tiles (Google) never enter an export (tiles3d/deck-tiles.ts)
-		if (this.settings.mode === "world")
+		// as three: the world view, or stepping inside from the photo view (the world view on screen)
+		if (this.settings.mode === "world" || this.step)
 			return this.tiles3d
 				? this.tiles3d.withoutDisplayOnly(() => this.exportWorld())
 				: this.exportWorld();

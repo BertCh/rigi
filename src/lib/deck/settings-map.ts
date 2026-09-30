@@ -2,7 +2,7 @@
 //   terrainLookFor   → TerrainLayer props (layer pass: style, imagery, haze, contours, near fade)
 //   compositeFor     → PhotoCompositor settings (composite pass uniforms, engine.ts ~:715-729)
 
-import type { Settings } from "../engine";
+import type { Settings } from "../settings";
 import type { CompositeSettings } from "./composite";
 import type { ImagerySource } from "./terrain-data";
 import type { TerrainStyle } from "./terrain-layer";

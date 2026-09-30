@@ -4,7 +4,7 @@
 // through PhotoWorkspace's useViewStyle → engine.setStyle.
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Settings } from "#/lib/engine";
+import type { Settings } from "#/lib/settings";
 import {
 	ABSOLUTE_RAMP_RANGE,
 	ABSOLUTE_RAMPS,
