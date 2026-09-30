@@ -28,7 +28,6 @@ import {
 	fmtDistance,
 	fmtTime,
 	HeadingChip,
-	loadRoll,
 	POSE_SOURCE_LABEL,
 	POSE_SOURCES,
 	PoseBadge,
@@ -51,6 +50,8 @@ export const Route = createFileRoute("/roll/$id")({
 		view: s.view === "map" || s.view === "split" ? s.view : undefined,
 	}),
 	loader: async ({ params }) => {
+		// dynamic: a static import here lands the mosaic barrel in the entry chunk every route pays
+		const { loadRoll } = await import("#/lib/roll/mosaic/loadRoll");
 		const roll = await loadRoll(params.id);
 		if (!roll) throw notFound();
 		return roll;
