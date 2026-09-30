@@ -64,8 +64,6 @@ export const FLAG_SCHEMA = {
 	geoLakeFloor: onOff("off"),
 	/** keep compact lake polygons with newly fetched upload regions */
 	geoLakes: onOff("off"),
-	/** ask the matcher for its inlier correspondences */
-	geoInliers: onOff("off"),
 	// data & licences (src/lib/licences; VITE_* env vars apply when unset)
 	imagery: oneOf(["default", "esri", "swisstopo", "custom"], "default"),
 	attrib: oneOf(["classic", "full"], "classic"),

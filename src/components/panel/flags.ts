@@ -148,13 +148,6 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
-		name: "geoInliers",
-		label: "Matcher inliers",
-		help: "GEO: request the matcher's 2D–3D inlier correspondences (needs a matcher that returns them).",
-		group: "assist",
-		options: ONOFF,
-	},
-	{
 		name: "gpu",
 		label: "WebGPU (master)",
 		help: "Kill switch for every GPU kernel below. Off runs everything on the CPU.",
