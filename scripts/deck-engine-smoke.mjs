@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Smoke test for DeckEngine (src/lib/deck/engine.ts) against the three.js PhotoEngine.
 // For each photo:
-//   three: /photo/<id> (fresh localStorage), wait for [data-ready], then window.__engine.autoAlign(true)
+//   three: /photo/<id>?renderer=three (fresh localStorage), wait for [data-ready], then window.__engine.autoAlign(true)
 //          (the same call PhotoWorkspace makes on load, without the second opinion) and its labels
 //          at that pose.
 //   deck:  the same on /photo/<id>?renderer=deck, plus its labels at three's pose.
@@ -14,6 +14,8 @@
 // Usage: node scripts/deck-engine-smoke.mjs [--url http://localhost:3100] [--photos IMG_6958,...]
 //        [--out out/lead/deck-parity/deck-engine-smoke.json] [--headed]
 // Needs the vite dev server (window.__engine is DEV-only). Exit 0 = all pass, 3 = some fail.
+// Both arms pass ?renderer= explicitly (the app default may be either) and each row records the
+// engine that actually ran (__engine.kind ?? "three"); a run whose engine is not the one asked for fails.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -81,13 +83,12 @@ async function run(id, renderer, threePose = null) {
 	);
 	await page.addInitScript(() => localStorage.clear());
 	const t0 = Date.now();
-	await page.goto(
-		`${BASE}/photo/${id}${renderer === "deck" ? "?renderer=deck" : ""}`,
-	);
+	await page.goto(`${BASE}/photo/${id}?renderer=${renderer}`);
 	await page.waitForSelector("[data-ready]", { timeout: 240_000 });
 	const readyMs = Date.now() - t0;
 	const r = await page.evaluate(async (tp) => {
 		const e = window.__engine;
+		const engineKind = e.kind ?? "three";
 		// occlusion margin per in-frame peak (m; > 0 = visible), as peakLabels tests it
 		const margins = () => {
 			const out = {};
@@ -126,6 +127,7 @@ async function run(id, renderer, threePose = null) {
 			atThreeMargins = margins();
 		}
 		return {
+			engineKind,
 			pose: res.pose,
 			confidence: res.confidence,
 			alignMs,
@@ -138,6 +140,10 @@ async function run(id, renderer, threePose = null) {
 		};
 	}, threePose);
 	await page.close();
+	if (r && r.engineKind !== renderer)
+		throw new Error(
+			`asked for renderer=${renderer} but __engine.kind is ${r.engineKind}`,
+		);
 	return { readyMs, ...r, logs };
 }
 
@@ -175,7 +181,7 @@ for (const id of IDS) {
 	rows.push(row);
 	console.log(
 		row.dYaw != null
-			? `Δyaw ${row.dYaw.toFixed(2)}° Δpitch ${row.dPitch.toFixed(2)}° Δroll ${row.dRoll.toFixed(2)}° Δvfov ${row.dVfov.toFixed(2)}° | labels@three J=${row.labelsAtThreePose.jaccard.toFixed(2)} (strict ${row.labelsAtThreePose.strictJaccard.toFixed(2)}, ${row.labelsAtThreePose.tolerated.length} borderline; ${row.labelsAtThreePose.inter}/${three.labels.length}/${deck.atThree.length}) own J=${row.labelsOwnPose.jaccard.toFixed(2)} | deck ready ${deck.readyMs} ms align ${Math.round(deck.alignMs)} ms (three align ${Math.round(three.alignMs)} ms) horizon=${deck.stats?.horizonSource} ${row.pass ? "PASS" : "FAIL"}`
+			? `Δyaw ${row.dYaw.toFixed(2)}° Δpitch ${row.dPitch.toFixed(2)}° Δroll ${row.dRoll.toFixed(2)}° Δvfov ${row.dVfov.toFixed(2)}° | labels@three J=${row.labelsAtThreePose.jaccard.toFixed(2)} (strict ${row.labelsAtThreePose.strictJaccard.toFixed(2)}, ${row.labelsAtThreePose.tolerated.length} borderline; ${row.labelsAtThreePose.inter}/${three.labels.length}/${deck.atThree.length}) own J=${row.labelsOwnPose.jaccard.toFixed(2)} | deck ready ${deck.readyMs} ms align ${Math.round(deck.alignMs)} ms (three align ${Math.round(three.alignMs)} ms) horizon=${deck.stats?.horizonSource} engines=${three.engineKind}/${deck.engineKind} ${row.pass ? "PASS" : "FAIL"}`
 			: `FAIL ${three?.error ?? ""} ${deck?.error ?? ""}`,
 	);
 }

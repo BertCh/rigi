@@ -11,7 +11,7 @@
 //     --biome changed|all biome scope (default: all under CI=1, else changed vs upstream + worktree)
 //     --url URL           use this dev server instead of starting one
 //     --port N            port for the dev server we start (default 3130)
-//     --update-baseline   rewrite known-failures.json's biome counts / eval-app minimum from this run
+//     --update-baseline   rewrite known-failures.json's biome counts / eval-app minima (three, deck) from this run
 //     --strict            known failures count as failures too
 //
 // Statuses: PASS, FAIL, KNOWN (fails, but listed in known-failures.json → does not fail the gate),
@@ -285,6 +285,7 @@ async function ensureServer() {
 		if (server.exitCode != null) break;
 		if (await up()) {
 			// warm the SSR + route transforms once so the first browser check doesn't pay for them
+			// (an HTTP fetch, not a page open: no engine runs, so no ?renderer= is needed)
 			await fetch(`${url}/photo/IMG_7086`).catch(() => {});
 			return url;
 		}
@@ -449,6 +450,13 @@ if (updateBaseline) {
 			minWithin1deg: ev.metrics.within1deg,
 			of: ev.metrics.of,
 			medianAutoPx: ev.metrics.medianAutoPx,
+		};
+	const evd = results.get("eval-app-deck");
+	if (evd?.metrics)
+		b.evalAppDeck = {
+			minWithin1deg: evd.metrics.within1deg,
+			of: evd.metrics.of,
+			medianAutoPx: evd.metrics.medianAutoPx,
 		};
 	b.updated = new Date().toISOString().slice(0, 10);
 	writeFileSync(BASELINE_FILE, `${JSON.stringify(b, null, "\t")}\n`);

@@ -85,7 +85,7 @@ for (const id of ids) {
 		if (process.argv.includes("--nearfield")) q.set("nearfield", "1");
 		if (arg("bias")) q.set("tiles3dBias", arg("bias"));
 		if (process.argv.includes("--debug")) q.set("tiles3dDebug", "on");
-		if (renderer !== "three") q.set("renderer", renderer);
+		q.set("renderer", renderer); // always explicit: the app default may be either
 		await page.goto(`${BASE}/photo/${id}?${q}`);
 		await page.waitForSelector("[data-ready]", {
 			state: "attached",

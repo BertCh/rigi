@@ -13,6 +13,27 @@
 // "biome" is not a command: run.mjs handles it itself (per-file ratchet against known-failures.json).
 
 const tsx = (file, ...args) => ["npx", "tsx", file, ...args];
+
+// Renderer pinning: every browser check names its engine explicitly (?renderer= / --renderer), so a
+// change of the app's default renderer never silently changes what a gate measures. The three-pinned
+// rows are the historical baselines; the deck rows are their explicit deck counterparts.
+
+/** eval-app gate: the pinned engine really ran, and 'N/M within 1° yaw' ≥ the baseline for that engine. */
+const evalAppGate = (renderer, baselineKey) => (out, ctx) => {
+	const eng = /^engine: (\S+) \(pinned\)/m.exec(out);
+	if (!eng) return "no 'engine: … (pinned)' line in the output";
+	if (eng[1] !== renderer)
+		return `renderer=${renderer} pinned but engine ${eng[1]} ran`;
+	const m = /(\d+)\/(\d+) within 1° yaw; median auto px error ([\d.∞]+)/.exec(
+		out,
+	);
+	if (!m) return "no summary line in the output";
+	const [ok, of, med] = [Number(m[1]), Number(m[2]), m[3]];
+	ctx.metrics = { renderer, within1deg: ok, of, medianAutoPx: med };
+	const min = ctx.baseline?.[baselineKey]?.minWithin1deg;
+	if (min == null) return null; // no baseline yet (first run / --update-baseline records it)
+	return ok < min ? `${ok}/${of} within 1° < baseline ${min}` : null;
+};
 const lock = (argv) => [
 	"node",
 	"scripts/gpu/with-render-lock.mjs",
@@ -279,8 +300,9 @@ export const CHECKS = [
 		tier: "full",
 		group: "parity",
 		browser: true,
-		// No ?style / ?concord / ?renderer flag on the captured URLs, so this row is also the
-		// concord-off (and look-off) parity gate: classic must stay pixel-identical with flags off.
+		// The script pins ?renderer=three (it reads three internals, e.g. e.geoBuf) and sets no ?style /
+		// ?concord flag, so this row is also the concord-off (and look-off) parity gate: classic must
+		// stay pixel-identical with flags off.
 		cmd: lock([
 			"node",
 			"scripts/style-baseline.mjs",
@@ -292,7 +314,7 @@ export const CHECKS = [
 			"out/lead/style-baseline/baseline.json",
 			"public/photos/photos.json",
 		],
-		note: "classic pixel identity + geometry hash; = concord-off parity (no flag set)",
+		note: "three-pinned: classic pixel identity + geometry hash; = concord-off parity (no style/concord flag)",
 		timeoutS: 3600,
 	},
 	{
@@ -309,7 +331,7 @@ export const CHECKS = [
 			"out/ci/deck-engine-smoke.json",
 		]),
 		needs: ["public/photos/photos.json"],
-		note: "three vs ?renderer=deck: |Δyaw| ≤ 0.5°, label overlap ≥ 0.6",
+		note: "?renderer=three vs ?renderer=deck (each run checks __engine.kind): |Δyaw| ≤ 0.5°, label overlap ≥ 0.6",
 		timeoutS: 3600,
 	},
 	{
@@ -317,23 +339,27 @@ export const CHECKS = [
 		tier: "full",
 		group: "accuracy",
 		browser: true,
-		cmd: lock(["node", "scripts/eval-app.mjs"]),
+		cmd: lock(["node", "scripts/eval-app.mjs", "--renderer", "three"]),
 		// one retry on a crash: the first run on 2026-09-29 died in playwright's launch
 		// ("SyntaxError: Unexpected end of JSON input" in coreBundle.js) and passed on re-run
 		retries: 1,
 		env: { APP_URL: "{url}" },
 		needs: ["data/control-points.json", "public/photos/photos.json"],
-		note: "gate: 'N/M within 1° yaw' ≥ known-failures.json evalApp.minWithin1deg",
+		note: "three-pinned; gate: 'N/M within 1° yaw' ≥ known-failures.json evalApp.minWithin1deg",
 		timeoutS: 3600,
-		gate(out, ctx) {
-			const m =
-				/(\d+)\/(\d+) within 1° yaw; median auto px error ([\d.∞]+)/.exec(out);
-			if (!m) return "no summary line in the output";
-			const [ok, of, med] = [Number(m[1]), Number(m[2]), m[3]];
-			ctx.metrics = { within1deg: ok, of, medianAutoPx: med };
-			const min = ctx.baseline?.evalApp?.minWithin1deg;
-			if (min == null) return null; // no baseline yet (first run / --update-baseline records it)
-			return ok < min ? `${ok}/${of} within 1° < baseline ${min}` : null;
-		},
+		gate: evalAppGate("three", "evalApp"),
+	},
+	{
+		id: "eval-app-deck",
+		tier: "full",
+		group: "accuracy",
+		browser: true,
+		cmd: lock(["node", "scripts/eval-app.mjs", "--renderer", "deck"]),
+		retries: 1,
+		env: { APP_URL: "{url}" },
+		needs: ["data/control-points.json", "public/photos/photos.json"],
+		note: "deck-pinned; gate: 'N/M within 1° yaw' ≥ known-failures.json evalAppDeck.minWithin1deg (unset → recorded, not gated)",
+		timeoutS: 3600,
+		gate: evalAppGate("deck", "evalAppDeck"),
 	},
 ];

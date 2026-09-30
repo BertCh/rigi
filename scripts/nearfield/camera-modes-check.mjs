@@ -91,9 +91,7 @@ const log = async (name) => {
 	console.log(name, JSON.stringify(r));
 };
 try {
-	await page.goto(
-		`${BASE}/photo/${id}?nearfield=on${deck ? "&renderer=deck" : ""}`,
-	);
+	await page.goto(`${BASE}/photo/${id}?nearfield=on&renderer=${tag}`);
 	await page.waitForSelector("[data-ready]", {
 		state: "attached",
 		timeout: 180000,

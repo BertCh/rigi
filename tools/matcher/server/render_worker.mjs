@@ -241,7 +241,7 @@ async function openPage(id, adhoc = null, key = id) {
 		safe((r) => r.abort()),
 	);
 	if (adhoc) await routeAdhoc(page, adhoc);
-	await page.goto(`${BASE}/photo/${id}`);
+	await page.goto(`${BASE}/photo/${id}?renderer=three`); // pinned: reads three internals (e.renderer, geoRT); f0 owns this file
 	await page.waitForSelector("[data-ready]", {
 		state: "attached",
 		timeout: 240000,

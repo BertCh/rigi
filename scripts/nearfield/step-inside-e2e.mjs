@@ -84,7 +84,7 @@ for (const id of ids) {
 				),
 		);
 	try {
-		const q = renderer === "three" ? "" : `&renderer=${renderer}`;
+		const q = `&renderer=${renderer}`; // always explicit: the app default may be either
 		await page.goto(`${BASE}/photo/${id}?nearfield=on${q}`);
 		await page.waitForSelector("[data-ready]", {
 			state: "attached",

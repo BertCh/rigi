@@ -5,7 +5,10 @@
 // script), and compares per photo. Holdout GT ids are REFUSED (the GEO rule); dev GT + non-GT photos only.
 //
 //   APP_URL=http://localhost:8792 node scripts/gpu/with-render-lock.mjs -- \
-//     node scripts/geocam/eval-app-flags.mjs --flags geoDecl=on,geoLakeFloor=on,geoLakes=on [--live] [IMG_x …]
+//     node scripts/geocam/eval-app-flags.mjs --flags geoDecl=on,geoLakeFloor=on,geoLakes=on [--live]
+//     [--renderer three|deck] [IMG_x …]
+// --renderer pins the engine for both arms (?renderer=); without it the app default runs. Each row records
+// the engine that actually ran (engine: __engine.kind ?? "three").
 //
 // Overpass water queries are answered from the union of the cached out/concord/pins/osm/*_water.json
 // (deterministic; --live lets them through). Needs a dev server (APP_URL; never the shared :3100).
@@ -26,6 +29,17 @@ const flagArg = args.includes("--flags")
 	? args[args.indexOf("--flags") + 1]
 	: "geoDecl=on,geoLakeFloor=on,geoLakes=on";
 const live = args.includes("--live");
+const rendererEq = args.find((a) => a.startsWith("--renderer="));
+const renderer = rendererEq
+	? rendererEq.slice(11)
+	: args.includes("--renderer")
+		? args[args.indexOf("--renderer") + 1]
+		: null;
+if (renderer != null && !["three", "deck"].includes(renderer)) {
+	console.error(`--renderer must be three or deck (got ${renderer})`);
+	process.exit(2);
+}
+const rendererQuery = renderer ? `?renderer=${renderer}` : "";
 const only = args.filter(
 	(a, i) => a.startsWith("IMG_") && args[i - 1] !== "--flags",
 );
@@ -107,7 +121,7 @@ async function runArm(arm, armFlags) {
 				if (Object.keys(f).length)
 					globalThis.__RIGI_FLAGS__ = { ...globalThis.__RIGI_FLAGS__, ...f };
 			}, armFlags);
-			await page.goto(`${BASE}/photo/${id}`);
+			await page.goto(`${BASE}/photo/${id}${rendererQuery}`);
 			await page.waitForSelector("[data-ready]", {
 				state: "attached",
 				timeout: 180000,
@@ -128,6 +142,7 @@ async function runArm(arm, armFlags) {
 				const auto = e.pose;
 				const d = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
 				return {
+					engine: e.kind ?? "three",
 					pins: n,
 					gtResid: e.pinError(gt, pins, cp.basis).mean,
 					priorErr: e.pinError(e.prior, pins, cp.basis).mean,
@@ -165,9 +180,16 @@ const summarise = (rows) => {
 const A = await runArm("off", {});
 const B = await runArm("on", flags);
 await browser.close();
+const engines = [...new Set([...A, ...B].map((r) => r.engine))];
+if (renderer && engines.some((k) => k !== renderer)) {
+	console.error(
+		`--renderer ${renderer} asked for, but engines ran: ${engines.join(",")}`,
+	);
+	process.exit(2);
+}
 
 console.log(
-	`flags: ${JSON.stringify(flags)}; water: ${live ? "LIVE Overpass" : "cached union"}; refused holdout: ${refused.join(" ")}`,
+	`engine: ${engines.join(",")}${renderer ? " (pinned)" : " (app default)"}; flags: ${JSON.stringify(flags)}; water: ${live ? "LIVE Overpass" : "cached union"}; refused holdout: ${refused.join(" ")}`,
 );
 console.log(
 	"photo     pins  auto-px(off) auto-px(on)  Δyaw(off)  Δyaw(on)  eye(off)   eye(on)   prior yaw off→on   geo log",
@@ -217,6 +239,8 @@ fs.writeFileSync(
 			format: "geocam-ga0-eval-app-flags/1",
 			created: new Date().toISOString(),
 			base: BASE,
+			renderer: renderer ?? "app-default",
+			engines,
 			flags,
 			water: live ? "live" : "cached-union",
 			refused,

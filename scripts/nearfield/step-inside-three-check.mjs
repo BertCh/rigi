@@ -77,7 +77,10 @@ for (const id of ids) {
 		);
 	try {
 		// webdriver sessions only get the Step Inside UI with ?nearfield (useStepInside.stepInsideAllowed)
-		await page.goto(`${BASE}/photo/${id}?nearfield=${sharp ? "sharp" : "on"}`);
+		// renderer pinned: this check drives the three.js workspace, whatever the app default is
+		await page.goto(
+			`${BASE}/photo/${id}?nearfield=${sharp ? "sharp" : "on"}&renderer=three`,
+		);
 		await page.waitForSelector("[data-ready]", {
 			state: "attached",
 			timeout: 180000,

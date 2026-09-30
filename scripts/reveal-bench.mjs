@@ -28,8 +28,8 @@ async function run(id, renderer, legacy) {
 		deviceScaleFactor: 2,
 	});
 	const page = await ctx.newPage();
-	const q = new URLSearchParams({ reveal: "off" });
-	if (renderer === "deck") q.set("renderer", "deck");
+	// renderer always explicit: the app default may be either
+	const q = new URLSearchParams({ reveal: "off", renderer });
 	await page.goto(`${BASE}/photo/${id}?${q}`);
 	await page.waitForSelector("[data-ready]", { timeout: 240_000 });
 	await page.waitForTimeout(1500);

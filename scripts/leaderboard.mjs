@@ -41,6 +41,9 @@
  *   --photos IMG_a,IMG_b              restrict the accuracy passes to these photos
  *   --perf-photos IMG_a,IMG_b,IMG_c   photos for the perf step (default: first, middle, last)
  *   --app-url http://localhost:3100   dev server (env APP_URL also works)
+ *   --renderer three|deck             pin the engine on every /photo open (?renderer=; also passed to eval-app.mjs).
+ *                                     Default: the app default. The engine that ran (__engine.kind ?? 'three') is
+ *                                     recorded per app/perf row and evalapp row, and as `engines` on those steps.
  *   --concurrency 3                   parallel pages in the app pass
  *   --timeout-scale 1                 multiply every step timeout
  *   --out reports                     where leaderboard.md/json go
@@ -56,7 +59,7 @@
  *
  * ── reports/leaderboard.json, schemaVersion 2 (v1 + ranking, ensemble, recommendation, inputs.files) ──
  * {
- *   schemaVersion: 2, generatedAt: ISO, durationMs, appUrl, argv: string[],
+ *   schemaVersion: 2, generatedAt: ISO, durationMs, appUrl, renderer: 'three'|'deck'|'app-default', argv: string[],
  *   targets: { medianYawDeg, success1Rate, meanYawSotaDeg, success1SotaRate, coldReadyMs },
  *   steps: {
  *     <step>: { status: 'ok'|'partial'|'fail'|'timeout'|'skipped'|'error', ms, note?, stale?: ISO (carried over), ...step fields }
@@ -146,6 +149,9 @@ import path from "node:path";
 import zlib from "node:zlib";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
+/** --renderer: pins ?renderer= on every /photo open (null = the app default). Set once in main(). */
+let RENDERER = null;
+const rendererQuery = () => (RENDERER ? `?renderer=${RENDERER}` : "");
 const MY_DIR = path.join(ROOT, "out", "lead", "leaderboard");
 const STEPS = [
 	"tsc",
@@ -869,10 +875,18 @@ async function stepEvalCpu(scale, runIt, nExpected) {
 }
 
 async function stepEvalApp(scale, appUrl, photos) {
-	const r = await run("node", ["scripts/eval-app.mjs", ...photos], {
-		timeoutMs: 400000 * scale,
-		env: { APP_URL: appUrl },
-	});
+	const r = await run(
+		"node",
+		[
+			"scripts/eval-app.mjs",
+			...(RENDERER ? ["--renderer", RENDERER] : []),
+			...photos,
+		],
+		{
+			timeoutMs: 400000 * scale,
+			env: { APP_URL: appUrl },
+		},
+	);
 	const rows = [];
 	for (const l of r.out.split("\n")) {
 		const m = l.trim().split(/\s+/);
@@ -889,6 +903,7 @@ async function stepEvalApp(scale, appUrl, photos) {
 			dPitchAuto: n(m[7]),
 			dRollAuto: n(m[8]),
 			gtYawFromPrior: n(m[9]),
+			engine: m[10] ?? null,
 		});
 	}
 	const sum = r.out.match(
@@ -900,6 +915,7 @@ async function stepEvalApp(scale, appUrl, photos) {
 		rows,
 		within1: sum?.[1] ?? null,
 		medianAutoPx: sum ? Number(sum[2]) : null,
+		engines: [...new Set(rows.map((x) => x.engine).filter(Boolean))],
 		...(r.code !== 0 || r.timedOut ? { note: tail(r.err || r.out) } : {}),
 	};
 }
@@ -1347,7 +1363,7 @@ async function loadPhoto(
 		});
 	if (reload) await page.reload({ waitUntil: "commit" });
 	else
-		await page.goto(`${appUrl}/photo/${id}`, {
+		await page.goto(`${appUrl}/photo/${id}${rendererQuery()}`, {
 			waitUntil: "commit",
 			timeout: timeoutMs,
 		});
@@ -1360,6 +1376,7 @@ async function loadPhoto(
 		const res = performance.getEntriesByType("resource");
 		return {
 			readyMs: performance.now(),
+			engine: window.__engine ? (window.__engine.kind ?? "three") : null,
 			loadMs: nav?.loadEventEnd || null,
 			// responseEnd is exposed cross-origin even without Timing-Allow-Origin; transferSize is not
 			lastResponseMs: res.reduce((m, r) => Math.max(m, r.responseEnd || 0), 0),
@@ -1371,6 +1388,7 @@ async function loadPhoto(
 	return {
 		page,
 		readyMs: Math.round(t.readyMs),
+		engine: t.engine,
 		loadMs: t.loadMs ? Math.round(t.loadMs) : null,
 		pageErrors: pageErrors.length,
 		lastResponseMs: Math.round(t.lastResponseMs),
@@ -1437,6 +1455,7 @@ async function stepApp(scale, appUrl, ids, ctxFor, concurrency) {
 								error: "window.__engine missing (needs a DEV build of the app)",
 							};
 						const out = {
+							engine: e.kind ?? "three",
 							prior: { ...e.prior },
 							final: { ...e.pose },
 							aspect: e.aspect,
@@ -1511,6 +1530,7 @@ async function stepApp(scale, appUrl, ids, ctxFor, concurrency) {
 		photos: Object.keys(results).length,
 		failures,
 		concurrency,
+		engines: [...new Set(Object.values(results).map((x) => x.engine))],
 		note: "ready times here are under concurrent load; use the perf step for clean timings. app 'accepted' mirrors PhotoWorkspace (confidence > 0.2).",
 		raw: results,
 	};
@@ -1590,6 +1610,11 @@ async function stepPerf(scale, appUrl, ids) {
 		medianWarmMs: median(warm),
 		nCold: cold.length,
 		nWarm: warm.length,
+		engines: [
+			...new Set(
+				runs.flatMap((r) => [r.cold?.engine, r.warm?.engine]).filter(Boolean),
+			),
+		],
 		note: "cold = fresh on-disk browser profile (empty HTTP cache/storage; the Vite dev server's own transform cache may be warm); warm = reload in the same profile. Sequential, one page at a time. Bytes = on-the-wire bytes of every response, cross-origin included (Chrome DevTools protocol). A load with >1 document request was reloaded mid-measurement (e.g. dev-server HMR) and is flagged.",
 	};
 }
@@ -3682,7 +3707,11 @@ function parseArgs(argv) {
 		else if (a === "--photos") o.photos = next().split(",");
 		else if (a === "--perf-photos") o.perfPhotos = next().split(",");
 		else if (a === "--app-url") o.appUrl = next();
-		else if (a === "--concurrency") o.concurrency = Number(next());
+		else if (a === "--renderer") {
+			o.renderer = next();
+			if (!["three", "deck"].includes(o.renderer))
+				throw new Error(`--renderer must be three or deck (got ${o.renderer})`);
+		} else if (a === "--concurrency") o.concurrency = Number(next());
 		else if (a === "--timeout-scale") o.scale = Number(next());
 		else if (a === "--out") o.out = next();
 		else if (a === "--no-carry") o.carry = false;
@@ -3717,6 +3746,7 @@ async function main() {
 		return;
 	}
 	if (opt.selftest) return selftest();
+	RENDERER = opt.renderer ?? null;
 	const outDir = path.resolve(ROOT, opt.out);
 	const prev = opt.carry
 		? readJson(path.join(outDir, "leaderboard.json"))
@@ -4057,6 +4087,7 @@ async function main() {
 		generatedAt: new Date().toISOString(),
 		durationMs: Date.now() - T0,
 		appUrl: opt.appUrl,
+		renderer: opt.renderer ?? "app-default",
 		argv: process.argv.slice(2),
 		targets: TARGETS,
 		steps,

@@ -301,7 +301,9 @@ async function runPhoto(id, sink) {
 		plog(
 			`goto (yaw ${pose.yaw.toFixed(2)} pitch ${pose.pitch.toFixed(2)} roll ${pose.roll.toFixed(2)} vfov ${pose.vfov.toFixed(2)})`,
 		);
-		await page.goto(`${BASE_URL}/photo/${id}`, {
+		// renderer pinned to three: the baseline is of the three.js route and this harness reads its
+		// internals (e.geoBuf); ?renderer=three is the only renderer flag on the URL (no style/concord).
+		await page.goto(`${BASE_URL}/photo/${id}?renderer=three`, {
 			waitUntil: "load",
 			timeout: 120000,
 		});
@@ -312,6 +314,11 @@ async function runPhoto(id, sink) {
 		if (!(await page.evaluate(() => !!window.__engine)))
 			throw new Error(
 				"window.__engine missing: run against the vite dev server",
+			);
+		const kind = await page.evaluate(() => window.__engine.kind ?? "three");
+		if (kind !== "three")
+			throw new Error(
+				`renderer=three was asked for but __engine.kind is ${kind}`,
 			);
 		plog("ready");
 
