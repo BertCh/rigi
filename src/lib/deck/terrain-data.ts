@@ -15,9 +15,11 @@ import {
 } from "../dem";
 import {
 	bearingDeg,
+	DEG,
 	distanceM,
 	EARTH_R,
 	type EnuFrame,
+	M_PER_DEG_LAT,
 	REFRACTION_K,
 } from "../geodesy";
 import { imageryTileUrls } from "../licences/imagery";
@@ -71,8 +73,6 @@ export type TerrainStats = {
 	/** Main-thread ms spent building tile meshes / batch grids so far (all generations). */
 	buildMs?: number;
 };
-
-const DEG = Math.PI / 180;
 
 async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
 	let i = 0;
@@ -140,8 +140,8 @@ export class TerrainSet {
 			lon,
 			h: this.heightAt(lat, lon) ?? Number.NEGATIVE_INFINITY,
 		};
-		const dLat = radiusM / 111320;
-		const dLon = radiusM / (111320 * Math.cos(lat * DEG));
+		const dLat = radiusM / M_PER_DEG_LAT;
+		const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
 		for (let i = -4; i <= 4; i++)
 			for (let j = -4; j <= 4; j++) {
 				const la = lat + (i / 4) * dLat;
@@ -360,8 +360,8 @@ export function selectDemTiles(
 	},
 ): TileChoice[] {
 	const { radiusM, maxZoom, minZoom, lod, lodOutside, wedge } = opts;
-	const dLat = radiusM / 111320;
-	const dLon = radiusM / (111320 * Math.cos(lat * DEG));
+	const dLat = radiusM / M_PER_DEG_LAT;
+	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
 	const here = { lat, lon };
 	const rel = (la: number, lo: number) =>
 		wedge

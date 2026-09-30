@@ -3,10 +3,8 @@
  * angle itself comes from the march (march.ts marches one extra ray at each
  * peak's exact bearing and records the running maximum before the summit).
  */
-import { distanceBearing, EARTH_R } from "../geodesy";
+import { DEG, distanceBearing, EARTH_R } from "../geodesy";
 import { type Mosaic, mosaicFor, mosaicHeight } from "./mosaic";
-
-const DEG = Math.PI / 180;
 
 export interface PeakInput {
 	id?: string;

@@ -14,6 +14,7 @@
  *      can't fix yaw).
  */
 
+import { DEG } from "../geodesy";
 import { clamp01 } from "../math";
 import {
 	azimuthElevation,
@@ -103,8 +104,6 @@ export interface SolveResult {
 		accepted: boolean;
 	}[];
 }
-
-const DEG = Math.PI / 180;
 
 /** Skyline elevation (deg) at an azimuth, linearly interpolated with wrap. */
 export function horizonAt(h: HorizonProfile, azimuth: number) {

@@ -14,7 +14,7 @@
 import { MIN_VALID } from "../dem";
 import type { HorizonOptions, HorizonProfile, Ridge } from "../geo/horizon";
 import { type TerrainSampler, TILE_SIZE } from "../geo/terrain";
-import { EARTH_R, REFRACTION_K } from "../geodesy";
+import { DEG, EARTH_R, REFRACTION_K } from "../geodesy";
 import {
 	buildMips,
 	buildMosaics,
@@ -31,8 +31,6 @@ import {
 	type PeakVisibility,
 	type SnappedPeak,
 } from "./visibility";
-
-const DEG = Math.PI / 180;
 
 export interface Eye {
 	lat: number;

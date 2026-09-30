@@ -6,7 +6,9 @@
 // Only still water: rivers, streams and canals are not horizontal, so a single "level" is meaningless
 // for them (FLOWING). Reservoirs and basins are kept here (their outline is useful for display and GA4)
 // but carry `water` so the floor rule can skip them (floor.ts).
+
 import { type Lake, ringArea, stitchRings } from "../../concord/cues/water";
+import { DEG, EARTH_R } from "../../geodesy";
 import { parseEle as parseMetres } from "./levels";
 
 type LL = { lat: number; lon: number };
@@ -56,13 +58,10 @@ export type CompactOpts = {
 	minAreaM2?: number;
 };
 
-const R = 6371008.8;
-const DEG = Math.PI / 180;
-
 /** Local equirectangular metres around lat0 (errors ≪ 1 m over a lake's extent). */
 function toXY(r: LL[], lat0: number, lon0: number): [number, number][] {
-	const kx = R * DEG * Math.cos(lat0 * DEG);
-	const ky = R * DEG;
+	const kx = EARTH_R * DEG * Math.cos(lat0 * DEG);
+	const ky = EARTH_R * DEG;
 	return r.map((p) => [(p.lon - lon0) * kx, (p.lat - lat0) * ky]);
 }
 

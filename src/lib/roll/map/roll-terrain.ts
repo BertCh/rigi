@@ -18,7 +18,12 @@ import {
 	type TileKey,
 	tileBounds,
 } from "#/lib/dem";
-import { distanceM, type EnuFrame, type LatLon } from "#/lib/geodesy";
+import {
+	distanceM,
+	type EnuFrame,
+	type LatLon,
+	M_PER_DEG_LAT,
+} from "#/lib/geodesy";
 
 export type RollTerrainOptions = {
 	foci: LatLon[];
@@ -76,8 +81,9 @@ export function selectRollTiles(
 		const distance = Math.min(df, dc);
 		out.push({ key: t, distance, size, seg: distance < size ? 128 : 96 });
 	};
-	const dLat = radiusM / 111_320;
-	const dLon = radiusM / (111_320 * Math.cos((frame.lat * Math.PI) / 180));
+	const dLat = radiusM / M_PER_DEG_LAT;
+	const dLon =
+		radiusM / (M_PER_DEG_LAT * Math.cos((frame.lat * Math.PI) / 180));
 	const x0 = Math.floor(lonToTileX(frame.lon - dLon, minZoom));
 	const x1 = Math.floor(lonToTileX(frame.lon + dLon, minZoom));
 	const y0 = Math.floor(latToTileY(frame.lat + dLat, minZoom));

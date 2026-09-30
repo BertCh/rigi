@@ -5,6 +5,7 @@
 // canvas: x = true azimuth, y = elevation, degrees, in the eye's ENU frame (the frame poses live in).
 // Pure: the worker (ridgelines.worker.ts) supplies the height sampler.
 import {
+	DEG,
 	destination,
 	distanceBearing,
 	EARTH_R,
@@ -77,7 +78,6 @@ export type ViewpointTerrain = {
 	peaks: RidgePeak[];
 };
 
-const DEG = Math.PI / 180;
 /** Peaks closer than this (m) are the one underfoot, not a label. */
 const MIN_PEAK_D = 60;
 

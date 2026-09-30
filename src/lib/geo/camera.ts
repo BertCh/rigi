@@ -1,6 +1,7 @@
 import { FF35_DIAGONAL_MM, focalPxFromF35 } from "../camera/focal";
 import { concordOn } from "../concord/flags";
 import { focalPrior, lensModelFromCamera } from "../concord/priors/focal-table";
+import { DEG } from "../geodesy";
 import type { PhotoMeta, Vec3 } from "./photo-meta";
 
 /**
@@ -23,8 +24,6 @@ export interface Camera {
 	pitch: number;
 	roll: number;
 }
-
-const DEG = Math.PI / 180;
 
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a: Vec3, b: Vec3): Vec3 => [

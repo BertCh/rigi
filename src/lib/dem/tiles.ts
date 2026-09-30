@@ -1,7 +1,5 @@
 // Web-Mercator (slippy map) tile math shared by every DEM consumer.
-import { EARTH_R } from "../geodesy";
-
-const DEG = Math.PI / 180;
+import { DEG, EARTH_R } from "../geodesy";
 
 export type TileKey = { z: number; x: number; y: number };
 

@@ -10,6 +10,7 @@
 //
 // Image units: isotropic px @1600 (long side 1600), x right, y down; normals point toward increasing
 // elevation (from the occluder into what it hides, as concord/cues/contours.ts).
+
 import {
 	type CameraX,
 	projectX,
@@ -18,9 +19,8 @@ import {
 } from "../../concord/core";
 import { focal1600 } from "../../concord/cues/contours";
 import type { GeomBuffer } from "../../concord/cues/types";
+import { DEG } from "../../geodesy";
 import type { Crest, LayeredHorizon } from "./layered";
-
-const DEG = Math.PI / 180;
 
 export type Junction = {
 	/** Photo uv (0..1, v down) of J at the camera it was predicted for. */

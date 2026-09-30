@@ -24,8 +24,10 @@
 // photo (backToPhoto: eases onto the photo camera, then onBack).
 // Also exports makePhotoSky(): the photo projected on a far sphere, so the sky (and anything past the
 // drape) keeps the photo's own pixels from the photo camera.
+
 import * as THREE from "three";
 import { hfovFromAspect } from "../camera";
+import { DEG } from "../geodesy";
 import { clamp } from "../math";
 
 export type StepMode = "photo" | "orbit" | "fly" | "map";
@@ -109,7 +111,6 @@ const _right = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const Z = new THREE.Vector3(0, 0, 1);
 const X = new THREE.Vector3(1, 0, 0);
-const DEG = Math.PI / 180;
 /** Metres the free modes keep between the camera and the terrain. */
 const CLEARANCE = 1.5;
 const MAX_DIST = 150_000;

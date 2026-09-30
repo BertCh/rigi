@@ -3,6 +3,7 @@
  * in the photo; we solve yaw/pitch/roll (and optionally f) so the features'
  * known directions project onto the tapped pixels.
  */
+import { DEG } from "../geodesy";
 import {
 	azimuthElevation,
 	type Camera,
@@ -42,7 +43,6 @@ export interface ControlPointSolve {
 	solvedFocal: boolean;
 }
 
-const DEG = Math.PI / 180;
 /** Residual used for points that end up behind the camera. */
 const BEHIND_PX = 1e5;
 

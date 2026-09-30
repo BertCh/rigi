@@ -9,7 +9,9 @@
 //   6. concordRefine refuses at LOW confidence and returns the input camera.
 //
 //   npx tsx src/lib/concord/solve/joint.check.ts
+
 import type { Pose } from "../../camera";
+import { DEG } from "../../geodesy";
 import type { EyeHorizon, SkylineSample } from "../../pose6dof/eye";
 import {
 	type CameraX,
@@ -30,7 +32,6 @@ import {
 } from "./joint";
 import { concordRefine } from "./refine";
 
-const DEG = Math.PI / 180;
 let seed = 4242;
 const rnd = () => {
 	seed = (seed * 1664525 + 1013904223) >>> 0;

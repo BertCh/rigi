@@ -28,7 +28,7 @@
  * (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll); that drift was accepted when the default flipped.
  */
 import { Buffer, type ComputePipeline, type Device } from "@luma.gl/core";
-import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";
+import { DEG, EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 import {
 	computeHorizonFast,
 	type Eye,
@@ -40,7 +40,6 @@ import { buildMips, type Mosaic } from "#/lib/horizon-fast/mosaic";
 import { getComputeDevice } from "../device";
 import { HORIZON_WGSL } from "./horizon.wgsl";
 
-const DEG = Math.PI / 180;
 const RING_STRIDE = 40;
 const MAX_PAGES = 4;
 const MAX_MIPS = 8;

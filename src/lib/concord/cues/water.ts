@@ -15,12 +15,11 @@
 //          angle (deg) of the lake-level shore point from the eye.
 //   "shore" (0.3–3 km): u, v = observed pixel; lakeM; shoreDist(e, n) = signed distance (m) to the
 //          lake outline (negative inside the water) of the observed ray's lake-plane intersection.
+import { DEG } from "../../geodesy";
 import { type CameraX, type Cue, unprojectDirX, type Vec3 } from "../core";
 import { focal1600 } from "./contours";
 import { searchAlongNormal, thinEdgesMemo } from "./edge-dt";
 import type { GeomBuffer, PhotoEdges } from "./types";
-
-const DEG = Math.PI / 180;
 
 export type Lake = {
 	polygon: [number, number][];

@@ -13,13 +13,13 @@
 //   diff:  r = e_far − e_near / (n_near·n_far) (the plan's differential residual): cancels any image
 //          translation along n_far (pitch-like) exactly; a translation along the far tangent leaks with
 //          gain tan(angle). Undefined (NaN) when |n_near·n_far| < cos(maxDiffAngleDeg).
+
 import { type CameraX, projectX } from "../../concord/core";
 import { defaultDemSigmaM, focal1600 } from "../../concord/cues/contours";
 import { searchAlongNormal, thinEdgesMemo } from "../../concord/cues/edge-dt";
 import type { PhotoEdges } from "../../concord/cues/types";
+import { DEG } from "../../geodesy";
 import type { Junction } from "./junctions";
-
-const DEG = Math.PI / 180;
 
 /** An observed contour point: photo uv and the predicted unit normal (px @1600, x right, y down). */
 export type ContourObs = { u: number; v: number; nx: number; ny: number };

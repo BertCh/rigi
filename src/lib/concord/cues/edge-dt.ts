@@ -10,11 +10,11 @@
 // within oriTolDeg of n (mod 180°) are scored by strength × a Gaussian in the normal offset; the best
 // gives the signed offset t (sub-pixel) and residualPx = −t (predicted − observed along n, px @1600).
 // conf = uniqueness (1 − second/best among distinct offsets) × strength saturation.
+
 import type { EdgeMap } from "../../align";
+import { DEG } from "../../geodesy";
 import type { Cue } from "../core";
 import type { MatchedCue, PhotoEdges } from "./types";
-
-const DEG = Math.PI / 180;
 
 function gaussBlur(src: Float32Array, w: number, h: number, sigma: number) {
 	if (sigma <= 0) return src;

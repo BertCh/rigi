@@ -7,6 +7,7 @@
 // stepPx and each sample is refined to the silhouette by bisecting rays between p and the far side
 // (GeomBuffer.cast), so u,v is sub-pixel. Normals point from the occluder into the occluded
 // (farther) side, in isotropic pixel units (x right, y down). Pixel lengths are @1600 (long side).
+import { DEG } from "../../geodesy";
 import { type CameraX, type Cue, projectX, type Vec3 } from "../core";
 import type { EdgeCue, GeomBuffer } from "./types";
 
@@ -24,8 +25,6 @@ export type ContourOpts = {
 	/** Bisection iterations of the silhouette refinement. Default 10. */
 	refineIters?: number;
 };
-
-const DEG = Math.PI / 180;
 
 /** Focal length in px @1600 (long side 1600). */
 export function focal1600(cam: CameraX): number {

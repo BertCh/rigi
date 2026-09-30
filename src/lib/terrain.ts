@@ -11,7 +11,7 @@ import {
 	tileXToLon,
 	tileYToLat,
 } from "./dem";
-import { distanceM, type EnuFrame } from "./geodesy";
+import { distanceM, type EnuFrame, M_PER_DEG_LAT } from "./geodesy";
 import { imageryTileUrls } from "./licences/imagery";
 
 // DEM: Mapterhorn (512 px, national lidar such as swissALTI3D where available) through dem's loadDemTile,
@@ -109,8 +109,8 @@ export function selectTiles(
 	>,
 ) {
 	const { radiusM, maxZoom, minZoom, lod } = opts;
-	const dLat = radiusM / 111320;
-	const dLon = radiusM / (111320 * Math.cos((lat * Math.PI) / 180));
+	const dLat = radiusM / M_PER_DEG_LAT;
+	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
 	const x0 = Math.floor(lonToTileX(lon - dLon, minZoom));
 	const x1 = Math.floor(lonToTileX(lon + dLon, minZoom));
 	const y0 = Math.floor(latToTileY(lat + dLat, minZoom));
@@ -240,8 +240,8 @@ export class Terrain {
 			lon,
 			h: this.heightAt(lat, lon) ?? Number.NEGATIVE_INFINITY,
 		};
-		const dLat = radiusM / 111320;
-		const dLon = radiusM / (111320 * Math.cos((lat * Math.PI) / 180));
+		const dLat = radiusM / M_PER_DEG_LAT;
+		const dLon = radiusM / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
 		for (let i = -4; i <= 4; i++)
 			for (let j = -4; j <= 4; j++) {
 				const la = lat + (i / 4) * dLat;

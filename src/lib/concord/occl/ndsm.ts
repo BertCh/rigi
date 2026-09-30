@@ -7,7 +7,7 @@
 // Grid convention: cell (i, j) centre at ENU e = e0 + i·res, n = n0 − j·res (row 0 = north), heights are
 // absolute metres (LV95 / LN02 ≈ MSL, as the engine's DEM heights), NOT curvature-dropped. Cells outside the
 // requested radius / wedge or without data are NaN.
-import { EnuFrame, wrap180 } from "../../geodesy";
+import { DEG, EnuFrame, wrap180 } from "../../geodesy";
 import {
 	type CogHeader,
 	DSM_COLLECTION,
@@ -70,8 +70,6 @@ export type NearDsmOpts = {
 	 */
 	maxBytes?: number;
 };
-
-const DEG = Math.PI / 180;
 
 /** ENU (of `frame`) → LV95, as an affine map fitted at the frame origin (< 0.1 m error within 3 km). */
 export function enuToLv95Affine(frame: EnuFrame) {

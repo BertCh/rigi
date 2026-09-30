@@ -1,5 +1,6 @@
 // Synthetic checks for WP-C cue extraction.
 //   npx tsx src/lib/concord/cues/cues.check.ts
+import { DEG } from "../../geodesy";
 import { type CameraX, IDENTITY_INTRINSICS, projectX } from "../core";
 import {
 	buildGeomBuffer,
@@ -23,7 +24,6 @@ const check = (name: string, ok: boolean, info: string) => {
 	console.log(`${ok ? "PASS" : "FAIL"}  ${name}: ${info}`);
 	if (!ok) fails++;
 };
-const DEG = Math.PI / 180;
 
 const W = 800;
 const H = 600;

@@ -13,7 +13,7 @@
 // Curvature + refraction: the concord scene frame (scripts/concord/lib.ts) already folds the drop
 // d²/(2·R_eff), R_eff = R/(1 − k), k = 0.13 (src/lib/geodesy) into z, so the default leaves heights
 // alone; `curvature: "apply"` subtracts it here for a plain-altitude HeightFn.
-import { EARTH_R, REFRACTION_K } from "../../geodesy";
+import { DEG, EARTH_R, REFRACTION_K } from "../../geodesy";
 import type { Vec3 } from "../core";
 
 /** Scene-frame z at ENU (e, n); d = horizontal distance from the eye (DEM level choice). NaN ⇒ no data. */
@@ -58,8 +58,6 @@ export type LayeredOpts = {
 	/** "frame" (default): HeightFn already includes the curvature + refraction drop; "apply": subtract d²/(2·R_eff) here. */
 	curvature?: "frame" | "apply";
 };
-
-const DEG = Math.PI / 180;
 
 /** Sample distances of the march (shared by every azimuth). */
 export function marchDistances(o: LayeredOpts = {}): Float64Array {

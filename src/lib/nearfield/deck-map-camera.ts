@@ -7,14 +7,14 @@
 // Like deck's TerrainController, the map plane (the controller's z = 0) sits at the ground under the
 // view centre (absolute height h0). It is re-anchored when an interaction ends, without moving the
 // camera, and the camera is kept above the terrain.
+
 import { MapView, type MapViewState, WebMercatorViewport } from "@deck.gl/core";
 import * as THREE from "three";
-import type { EnuFrame } from "../geodesy";
+import { DEG, type EnuFrame } from "../geodesy";
 import type { StepMapDriver } from "./step-camera";
 
 export const MAP_VIEW_ID = "stepmap";
 
-const DEG = Math.PI / 180;
 /** Metres kept between the map camera and the terrain. */
 const CLEARANCE = 5;
 const LIMITS = { minZoom: 6, maxZoom: 21, minPitch: 0, maxPitch: 80 };

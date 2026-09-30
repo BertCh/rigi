@@ -37,7 +37,7 @@ import {
 	WorldView,
 } from "#/lib/deck/world-view";
 import { tileBounds } from "#/lib/dem";
-import { EnuFrame } from "#/lib/geodesy";
+import { EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import type { ForegroundMask } from "#/lib/segment";
 import { vpColor } from "../mosaic/style";
 import type { Roll, RollPhoto } from "../types";
@@ -719,7 +719,7 @@ export class RollMapEngine {
 				);
 				const size =
 					(b.east - b.west) *
-					111_320 *
+					M_PER_DEG_LAT *
 					Math.cos((this.frame.lat * Math.PI) / 180);
 				v =
 					Math.hypot(c[0] - cam.x, c[1] - cam.y, c[2] - cam.z) /

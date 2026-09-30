@@ -44,7 +44,7 @@ import {
 } from "../engine";
 import { startLakeFloor } from "../geocam/lakes/fetch";
 import { priorHeading } from "../geocam/priors/heading";
-import { distanceM, EnuFrame } from "../geodesy";
+import { distanceM, EnuFrame, M_PER_DEG_LAT } from "../geodesy";
 import { autoAlignAsync, warmAlignGpu } from "../gpu/align";
 import { lookIdle } from "../gpu/look/opt-in";
 import {
@@ -2095,7 +2095,7 @@ export class DeckEngine implements Renderer {
 				const lat = (b.north + b.south) / 2;
 				const c = this.frame.fromGeo(lat, (b.west + b.east) / 2, h);
 				const size =
-					(b.east - b.west) * 111_320 * Math.cos((lat * Math.PI) / 180);
+					(b.east - b.west) * M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180);
 				v =
 					Math.hypot(c[0] - cam.x, c[1] - cam.y, c[2] - cam.z) /
 					Math.max(size, 1);

@@ -8,10 +8,13 @@ const E2 = F * (2 - F);
 export const WGS84 = { A, F, E2 } as const;
 /** Mean Earth radius (IUGG) for every spherical model: curvature drop, great circles. */
 export const EARTH_R = 6371008.8;
+/** Rounded metres per degree of latitude, used to size DEM tile-selection boxes (not EARTH_R·DEG). */
+export const M_PER_DEG_LAT = 111320;
 /** Coefficient of atmospheric refraction used to lift distant terrain (k ≈ 0.13). */
 export const REFRACTION_K = 0.13;
 
-const DEG = Math.PI / 180;
+/** Degrees → radians. */
+export const DEG = Math.PI / 180;
 
 export type LatLon = { lat: number; lon: number };
 

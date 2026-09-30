@@ -10,8 +10,10 @@
 // photoLakeFloor: everything the engines need in one fail-open call — lakes near the fix, levels (OSM
 // ele → Swiss table → DEM median via `absHeight`), floor.ts's rule; null on no lake, timeout (default
 // 3 s), abort or any error.
+
 import { lakeLevel } from "../../concord/cues/water";
 import { getFlag } from "../../flags";
+import { DEG, EARTH_R } from "../../geodesy";
 import {
 	compactLakes,
 	type LakeGeo,
@@ -104,14 +106,12 @@ export function lakesNear(
 	return raceSignal(p, opts.signal);
 }
 
-const DEG = Math.PI / 180;
-const R = 6371008.8;
 /** Local ENU (m) around (lat0, lon0), equirectangular: < 0.1 m error at a few km. */
 export const enuAround =
 	(lat0: number, lon0: number) =>
 	(lat: number, lon: number): [number, number] => [
-		(lon - lon0) * DEG * R * Math.cos(lat0 * DEG),
-		(lat - lat0) * DEG * R,
+		(lon - lon0) * DEG * EARTH_R * Math.cos(lat0 * DEG),
+		(lat - lat0) * DEG * EARTH_R,
 	];
 
 export type PhotoLakeFloorOpts = {
@@ -148,8 +148,9 @@ export function candidateLakes(
 		const lv = lakeLevelOf(lakes[i], () => {
 			const abs = o.absHeight;
 			if (!abs) return null;
-			const lat1 = (n: number) => lat + n / (R * DEG);
-			const lon1 = (e: number) => lon + e / (R * DEG * Math.cos(lat * DEG));
+			const lat1 = (n: number) => lat + n / (EARTH_R * DEG);
+			const lon1 = (e: number) =>
+				lon + e / (EARTH_R * DEG * Math.cos(lat * DEG));
 			return lakeLevel(l, (e, n) => abs(lat1(n), lon1(e)) ?? Number.NaN, {
 				maxSamples: 600,
 			}).levelM;

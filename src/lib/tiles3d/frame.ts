@@ -2,9 +2,7 @@
 // at the photo's lat/lon, h = 0, MSL heights used as-is). float64 on the CPU: the tile meshes reach the
 // GPU relative to their own centres, so ECEF magnitudes never lose precision.
 import * as THREE from "three";
-import { toEcef } from "../geodesy";
-
-const DEG = Math.PI / 180;
+import { DEG, toEcef } from "../geodesy";
 
 /**
  * ENU(Rigi) ← ECEF: the east/north/up rotation at (lat, lon) about the ellipsoid point at h = 0, then

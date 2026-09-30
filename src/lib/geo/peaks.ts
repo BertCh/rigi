@@ -5,6 +5,7 @@
  */
 
 import {
+	DEG,
 	destination,
 	distanceBearing,
 	EARTH_R,
@@ -22,8 +23,6 @@ export interface Peak {
 	prominence?: number;
 	wikidata?: string;
 }
-
-const DEG = Math.PI / 180;
 
 /** Overpass QL for natural=peak / volcano nodes within `radiusM` of a point. */
 export function overpassPeaksQuery(

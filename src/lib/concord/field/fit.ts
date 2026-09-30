@@ -19,6 +19,7 @@
 // cue it is [dx, dy]; for an edge the scalar along its normal (nu, nv) (a pixel-space direction,
 // normalised here); for level / shore the scalar dy.
 
+import { DEG } from "../../geodesy";
 import { smoothstep } from "../../math";
 import {
 	type CameraX,
@@ -26,8 +27,6 @@ import {
 	type ResidualField,
 	ZERO_FIELD,
 } from "../core";
-
-const DEG = Math.PI / 180;
 
 /**
  * The renderer's geometry for the photo, resampled to a photo-uv grid (cell-centred, row 0 = top).

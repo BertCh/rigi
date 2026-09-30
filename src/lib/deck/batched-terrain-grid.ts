@@ -12,10 +12,14 @@
 // out before storing and re-added in the shader, so what gets interpolated is nearly planar.
 // Residual interpolation error is < 0.25 m on z7–z8 tiles (≥ ~80 km away) and < 2 cm elsewhere.
 import { type DemRaster, type TileKey, tileBounds, tileId } from "../dem";
-import { distanceM, EARTH_R, type EnuFrame, REFRACTION_K } from "../geodesy";
+import {
+	DEG,
+	distanceM,
+	EARTH_R,
+	type EnuFrame,
+	REFRACTION_K,
+} from "../geodesy";
 import type { TileMesh } from "./terrain-data";
-
-const DEG = Math.PI / 180;
 
 export type BatchGrid = {
 	/** Base cells per side (the base texture layer holds (G+1)² nodes). */

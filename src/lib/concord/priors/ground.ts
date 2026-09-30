@@ -5,12 +5,10 @@
 // nearGround() reads the shared near DEM (nearfield/near-dem.ts loadNearDem: Mapterhorn at NEAR_DEM_ZOOM,
 // the one both engines use), so the prior sees exactly the ground the renderers stand the eye on. It is
 // imported lazily: near-dem.ts pulls in the deck CPU geometry, which node checks don't need.
-import { EARTH_R } from "../../geodesy";
+import { DEG, EARTH_R } from "../../geodesy";
 
 /** DEM height (m) at a horizontal offset (dE east, dN north, metres) from the fix; NaN = no data. */
 export type GroundFn = (dE: number, dN: number) => number;
-
-const DEG = Math.PI / 180;
 
 /**
  * (dE, dN) → (lat, lon) on the local tangent plane at the fix. Offsets here are ≤ a few hundred metres,

@@ -10,12 +10,10 @@
 // drop uses the same refraction k (0.13) as the meshes (EnuFrame) and TerrainSet.clearance.
 
 import type { Pose } from "../camera";
-import { EARTH_R, REFRACTION_K } from "../geodesy";
+import { DEG, EARTH_R, REFRACTION_K } from "../geodesy";
 import { poseBasis } from "../pose";
 import type { GeometrySource } from "./geometry-source";
 import type { TerrainSet } from "./terrain-data";
-
-const DEG = Math.PI / 180;
 
 /** March distances (m): 1.5 m steps near the camera, then 0.45 % of the distance. */
 function marchDistances(maxRange: number) {

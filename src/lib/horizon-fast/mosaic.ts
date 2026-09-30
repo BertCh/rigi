@@ -18,9 +18,7 @@ import {
 	tileId,
 	validateTile,
 } from "../dem";
-import { destination, WGS84 } from "../geodesy";
-
-const DEG = Math.PI / 180;
+import { DEG, destination, WGS84 } from "../geodesy";
 
 /**
  * A Terrarium tile source. `load` resolves to size² heights, `null` when the

@@ -14,6 +14,7 @@
  *   cpuSeq    per-eye CPU calls: the original path, the reference
  * Returns small JSON (no profiles).
  */
+
 import { flagOverride, setFlagOverride } from "#/lib/flags";
 import {
 	type EyeHorizon,
@@ -23,6 +24,7 @@ import {
 	refineEyeFromSkyline,
 	type Vec3,
 } from "#/lib/pose6dof/eye";
+import { DEG } from "../../geodesy";
 import { getComputeDevice } from "../device";
 import {
 	createEyeHorizonProvider,
@@ -31,8 +33,6 @@ import {
 	sectorForPose,
 } from "./index";
 import { photoSamples } from "./samples";
-
-const DEG = Math.PI / 180;
 
 export interface EyeBenchIn {
 	id: string;

@@ -1,3 +1,5 @@
+import { DEG } from "../../geodesy";
+
 // World Magnetic Model 2025 (NOAA NCEI / BGS; public domain, US Government work): magnetic declination
 // for the GEO priors (reports/geometry-first-pose.md G3, GA0 "apply declination when the heading is
 // magnetic"). Degree/order 12 spherical-harmonic main field + linear secular variation, valid 2025.0–2030.0
@@ -12,7 +14,6 @@
 // Schmidt semi-normalised associated Legendre functions (Gauss recursion + Schmidt factors), field in the
 // geocentric frame, rotated back to the geodetic frame. Declination D = atan2(Y, X), east positive.
 
-const DEG = Math.PI / 180;
 const A_WGS84 = 6378.137; // km
 const F_WGS84 = 1 / 298.257223563;
 const E2 = F_WGS84 * (2 - F_WGS84);

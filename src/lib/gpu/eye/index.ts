@@ -22,7 +22,7 @@
  * windows are padded by `padMeters`, default 250). The GPU keeps its copy until release().
  */
 import { blobHeights, MAPTERHORN } from "#/lib/dem";
-import { EARTH_R } from "#/lib/geodesy";
+import { DEG, EARTH_R } from "#/lib/geodesy";
 import type { Eye, FastHorizonOptions } from "#/lib/horizon-fast/march";
 import {
 	DEFAULT_RINGS,
@@ -34,8 +34,6 @@ import {
 } from "#/lib/horizon-fast/mosaic";
 import type { EyeHorizon, Vec3 } from "#/lib/pose6dof/eye";
 import { computeHorizonsAuto, releaseHorizonGpu } from "../horizon";
-
-const DEG = Math.PI / 180;
 
 /** Azimuth sector, degrees clockwise from north (az0 < az1; az1 − az0 ≥ 360 = full circle). */
 export interface AzSector {
