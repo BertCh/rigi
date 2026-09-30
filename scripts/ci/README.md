@@ -75,8 +75,17 @@ Baseline as of 2026-09-29, taken while other sessions were editing the tree:
 | style-baseline, deck-smoke, eval-app | Not run in CI: they need the photos, DEM tiles over the network, and the stored ~10 MB pixel baseline | n/a |
 
 To update the baseline, run `node scripts/ci/run.mjs full --biome all --update-baseline`. It rewrites
-`biome.errors` (only with `--biome all`) and `evalApp` from this run. Review the diff before keeping it.
-The `checks` and `tsc` entries are edited by hand.
+`biome.errors` (only with `--biome all`) and, for each eval-app row that ran, `evalApp` / `evalAppDeck`:
+`minWithin1deg` becomes the observed count minus one (noise margin), `lastObserved` records the run, and
+other hand-written fields (`note`) are kept. Review the diff before keeping it: a bad run lowers the
+minimum. To record only the deck baseline, add `evalAppDeck` by hand (observed − 1) rather than
+rerunning `--update-baseline` over everything. The `checks` and `tsc` entries are edited by hand.
+
+`eval-app-deck` (eval-app with `--renderer deck`) is opt-in: it runs only with `--only eval-app-deck`
+and is advisory while `evalAppDeck` is missing from the JSON. Advisory means every failure, including a
+crash, a timeout or an engine mismatch, reports KNOWN and does not fail the gate. Once `evalAppDeck`
+exists it gates like `eval-app`. It joins the default full tier (drop `optIn` in `checks.mjs`) in the
+commit that flips the default renderer.
 
 `eval-app` metrics are noisy from run to run (background second opinion, tile timing), so
 `minWithin1deg` is set a little below the observed count. See `evalApp` in the JSON for the last

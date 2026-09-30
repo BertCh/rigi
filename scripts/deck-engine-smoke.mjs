@@ -15,7 +15,7 @@
 //        [--out out/lead/deck-parity/deck-engine-smoke.json] [--headed]
 // Needs the vite dev server (window.__engine is DEV-only). Exit 0 = all pass, 3 = some fail.
 // Both arms pass ?renderer= explicitly (the app default may be either) and each row records the
-// engine that actually ran (__engine.kind ?? "three"); a run whose engine is not the one asked for fails.
+// engine that actually ran (__engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu"); a run whose engine is not the one asked for fails.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -88,7 +88,7 @@ async function run(id, renderer, threePose = null) {
 	const readyMs = Date.now() - t0;
 	const r = await page.evaluate(async (tp) => {
 		const e = window.__engine;
-		const engineKind = e.kind ?? "three";
+		const engineKind = e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three");
 		// occlusion margin per in-frame peak (m; > 0 = visible), as peakLabels tests it
 		const margins = () => {
 			const out = {};

@@ -315,7 +315,11 @@ async function runPhoto(id, sink) {
 			throw new Error(
 				"window.__engine missing: run against the vite dev server",
 			);
-		const kind = await page.evaluate(() => window.__engine.kind ?? "three");
+		const kind = await page.evaluate(() =>
+			window.__engine.backend === "webgpu"
+				? "webgpu"
+				: (window.__engine.kind ?? "three"),
+		);
 		if (kind !== "three")
 			throw new Error(
 				`renderer=three was asked for but __engine.kind is ${kind}`,

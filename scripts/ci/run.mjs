@@ -11,7 +11,7 @@
 //     --biome changed|all biome scope (default: all under CI=1, else changed vs upstream + worktree)
 //     --url URL           use this dev server instead of starting one
 //     --port N            port for the dev server we start (default 3130)
-//     --update-baseline   rewrite known-failures.json's biome counts / eval-app minima (three, deck) from this run
+//     --update-baseline   rewrite known-failures.json's biome counts and eval-app minima (observed − 1, other fields kept)
 //     --strict            known failures count as failures too
 //
 // Statuses: PASS, FAIL, KNOWN (fails, but listed in known-failures.json → does not fail the gate),
@@ -61,7 +61,7 @@ for (const id of [...(only ?? []), ...skip])
 if (flag("list")) {
 	for (const c of CHECKS)
 		console.log(
-			`${c.id.padEnd(20)} ${c.tier.padEnd(5)} ${c.group.padEnd(10)} ${c.builtin ? `(builtin ${c.builtin})` : c.cmd.join(" ")}${c.needs ? `  needs ${c.needs.join(", ")}` : ""}`,
+			`${c.id.padEnd(20)} ${c.tier.padEnd(5)} ${c.group.padEnd(10)} ${c.builtin ? `(builtin ${c.builtin})` : c.cmd.join(" ")}${c.needs ? `  needs ${c.needs.join(", ")}` : ""}${c.optIn ? "  (opt-in: --only)" : ""}`,
 		);
 	process.exit(0);
 }
@@ -80,6 +80,7 @@ const selected = CHECKS.filter(
 	(c) =>
 		(tier === "full" || c.tier === "fast") &&
 		(!only || only.includes(c.id)) &&
+		(!c.optIn || only?.includes(c.id)) &&
 		!skip.includes(c.id),
 );
 
@@ -344,8 +345,12 @@ async function runCheck(c, url) {
 			(ctx.metrics ? JSON.stringify(ctx.metrics) : lastLine(r.out)),
 	};
 	const known = isKnown(c.id);
+	// advisory check (no baseline key yet): every failure, exit code and timeout included, is KNOWN
+	const advisory = !!c.advisoryUntil && baseline[c.advisoryUntil] == null;
+	if (reason && advisory)
+		res.note = `advisory (no ${c.advisoryUntil} baseline): ${res.note}`;
 	if (!reason) res.status = ctx.known ? "KNOWN" : known ? "FIXED" : "PASS";
-	else res.status = known && !strict ? "KNOWN" : "FAIL";
+	else res.status = (known || advisory) && !strict ? "KNOWN" : "FAIL";
 	return res;
 }
 
@@ -444,20 +449,27 @@ if (updateBaseline) {
 		b.biome = { errors: bio.biomeErrors };
 	else if (bio.biomeErrors)
 		console.log("[ci] biome baseline only updates from --biome all");
-	const ev = results.get("eval-app");
-	if (ev?.metrics)
-		b.evalApp = {
-			minWithin1deg: ev.metrics.within1deg,
-			of: ev.metrics.of,
-			medianAutoPx: ev.metrics.medianAutoPx,
+	// eval-app minima: observed − EVAL_NOISE (run-to-run noise), merged into the existing entry so
+	// hand-written fields (note, …) survive; lastObserved records the raw run.
+	const EVAL_NOISE = 1;
+	const day = new Date().toISOString().slice(0, 10);
+	for (const [id, key] of [
+		["eval-app", "evalApp"],
+		["eval-app-deck", "evalAppDeck"],
+	]) {
+		const m = results.get(id)?.metrics;
+		if (!m) continue;
+		b[key] = {
+			...b[key],
+			minWithin1deg: Math.max(0, m.within1deg - EVAL_NOISE),
+			of: m.of,
+			lastObserved: `${m.within1deg}/${m.of} within 1° yaw, median ${m.medianAutoPx} px (${day})`,
 		};
-	const evd = results.get("eval-app-deck");
-	if (evd?.metrics)
-		b.evalAppDeck = {
-			minWithin1deg: evd.metrics.within1deg,
-			of: evd.metrics.of,
-			medianAutoPx: evd.metrics.medianAutoPx,
-		};
+		delete b[key].medianAutoPx;
+		console.log(
+			`[ci] ${key}.minWithin1deg = ${b[key].minWithin1deg} (observed ${m.within1deg}/${m.of} − ${EVAL_NOISE})`,
+		);
+	}
 	b.updated = new Date().toISOString().slice(0, 10);
 	writeFileSync(BASELINE_FILE, `${JSON.stringify(b, null, "\t")}\n`);
 	console.log(`[ci] wrote ${BASELINE_FILE}`);

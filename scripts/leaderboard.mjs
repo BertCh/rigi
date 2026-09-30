@@ -34,7 +34,8 @@
  *
  * Flags:
  *   --skip tsc,biome,build,evalcpu,evalapp,matcher,app,perf   skip steps (a skipped step carries over the
- *                                     previous reports/leaderboard.json result, marked stale, unless --no-carry)
+ *                                     previous reports/leaderboard.json result, marked stale, unless --no-carry;
+ *                                     evalapp/app/perf are carried only when the previous run's renderer matches)
  *   --only tsc,biome                  run only these steps (others skipped)
  *   --quick                           = --skip build,perf (evalapp is off unless --run-evalapp)
  *   --run-evalapp                     also run 9e's scripts/eval-app.mjs (cross-check; not run by default)
@@ -42,7 +43,7 @@
  *   --perf-photos IMG_a,IMG_b,IMG_c   photos for the perf step (default: first, middle, last)
  *   --app-url http://localhost:3100   dev server (env APP_URL also works)
  *   --renderer three|deck             pin the engine on every /photo open (?renderer=; also passed to eval-app.mjs).
- *                                     Default: the app default. The engine that ran (__engine.kind ?? 'three') is
+ *                                     Default: the app default. The engine that ran (__engine.kind ?? 'three'; 'webgpu' when __engine.backend is 'webgpu') is
  *                                     recorded per app/perf row and evalapp row, and as `engines` on those steps.
  *   --concurrency 3                   parallel pages in the app pass
  *   --timeout-scale 1                 multiply every step timeout
@@ -62,7 +63,7 @@
  *   schemaVersion: 2, generatedAt: ISO, durationMs, appUrl, renderer: 'three'|'deck'|'app-default', argv: string[],
  *   targets: { medianYawDeg, success1Rate, meanYawSotaDeg, success1SotaRate, coldReadyMs },
  *   steps: {
- *     <step>: { status: 'ok'|'partial'|'fail'|'timeout'|'skipped'|'error', ms, note?, stale?: ISO (carried over), ...step fields }
+ *     <step>: { status: 'ok'|'partial'|'fail'|'timeout'|'skipped'|'error', ms, note?, stale?: ISO (carried over; engine steps only from a run with the same renderer), ...step fields }
  *              (partial = some photos failed; the failures are listed and reach the blocking list)
  *     tsc:     { errorCount, byOwner: {owner: n}, byFile: {file: n}, sample: string[] }
  *     biome:   { errors, warnings, infos, filesChecked?, byOwner, byCategory, byFile }
@@ -1376,7 +1377,11 @@ async function loadPhoto(
 		const res = performance.getEntriesByType("resource");
 		return {
 			readyMs: performance.now(),
-			engine: window.__engine ? (window.__engine.kind ?? "three") : null,
+			engine: window.__engine
+				? window.__engine.backend === "webgpu"
+					? "webgpu"
+					: (window.__engine.kind ?? "three")
+				: null,
 			loadMs: nav?.loadEventEnd || null,
 			// responseEnd is exposed cross-origin even without Timing-Allow-Origin; transferSize is not
 			lastResponseMs: res.reduce((m, r) => Math.max(m, r.responseEnd || 0), 0),
@@ -1455,7 +1460,7 @@ async function stepApp(scale, appUrl, ids, ctxFor, concurrency) {
 								error: "window.__engine missing (needs a DEV build of the app)",
 							};
 						const out = {
-							engine: e.kind ?? "three",
+							engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three"),
 							prior: { ...e.prior },
 							final: { ...e.pose },
 							aspect: e.aspect,
@@ -3793,9 +3798,24 @@ async function main() {
 			(v, i, a) => v && a.indexOf(v) === i,
 		);
 	const steps = {};
+	// Steps whose numbers depend on the engine: never carry them across a renderer change (a
+	// `--renderer deck --skip perf` run must not report three's perf under renderer: "deck").
+	const RENDERER_STEPS = new Set(["evalapp", "app", "perf"]);
+	const curRenderer = opt.renderer ?? "app-default";
+	const prevRenderer = prev?.renderer ?? "app-default (pre-pinning)";
 	const skipped = (k) => {
 		const p = prev?.steps?.[k];
-		if (p && p.status !== "skipped")
+		if (
+			p &&
+			p.status !== "skipped" &&
+			RENDERER_STEPS.has(k) &&
+			prevRenderer !== curRenderer
+		)
+			steps[k] = {
+				status: "skipped",
+				note: `not carried over: the previous run's renderer was ${prevRenderer}, this run's is ${curRenderer}`,
+			};
+		else if (p && p.status !== "skipped")
 			steps[k] = { ...p, stale: p.stale ?? prev.generatedAt };
 		else steps[k] = { status: "skipped" };
 	};

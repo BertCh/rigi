@@ -3,7 +3,7 @@
 // Needs the dev server (default http://localhost:3100).
 // Usage: node scripts/eval-app.mjs [--renderer three|deck] [IMG_xxxx ...]
 // --renderer pins the engine (?renderer=); without it the app default runs. Either way each row records
-// the engine that actually ran (__engine.kind ?? "three") and the summary names it.
+// the engine that actually ran (__engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu") and the summary names it.
 import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -62,7 +62,7 @@ await Promise.all(
 			const auto = e.pose;
 			const d = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
 			return {
-				engine: e.kind ?? "three",
+				engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three"),
 				pins: n,
 				gtResid: e.pinError(gt, pins, cp.basis).mean,
 				priorErr: e.pinError(e.prior, pins, cp.basis).mean,

@@ -8,7 +8,7 @@
 //     node scripts/geocam/eval-app-flags.mjs --flags geoDecl=on,geoLakeFloor=on,geoLakes=on [--live]
 //     [--renderer three|deck] [IMG_x …]
 // --renderer pins the engine for both arms (?renderer=); without it the app default runs. Each row records
-// the engine that actually ran (engine: __engine.kind ?? "three").
+// the engine that actually ran (engine: __engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu").
 //
 // Overpass water queries are answered from the union of the cached out/concord/pins/osm/*_water.json
 // (deterministic; --live lets them through). Needs a dev server (APP_URL; never the shared :3100).
@@ -142,7 +142,7 @@ async function runArm(arm, armFlags) {
 				const auto = e.pose;
 				const d = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
 				return {
-					engine: e.kind ?? "three",
+					engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three"),
 					pins: n,
 					gtResid: e.pinError(gt, pins, cp.basis).mean,
 					priorErr: e.pinError(e.prior, pins, cp.basis).mean,
