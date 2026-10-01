@@ -51,6 +51,7 @@ import {
 import { PeakLabelsSvg } from "#/lib/look/labels/PeakLabelsSvg";
 import { useLabelFontEpoch } from "#/lib/look/labels/useLabelFonts";
 import { needsPhotoSky } from "#/lib/look/look-key";
+import type { AlignState } from "#/lib/ontology/crosswalk/pose";
 import {
 	formatTakenAt,
 	loadRegion,
@@ -122,17 +123,6 @@ if (typeof window !== "undefined")
 	loadRenderer(getFlag("renderer") === "deck").catch(() => {}); // the effect reports failures
 
 type Tool = "inspect" | "align" | "pin";
-/** Where the shown pose came from. "unverified" = best guess for a photo lacking heading/gravity/focal. */
-type AlignState =
-	| "auto"
-	| "near-compass"
-	| "prior"
-	| "saved"
-	| "accepted"
-	| "unverified"
-	| "manual"
-	| "pinned";
-
 /** Same length and, per item, the same own fields (Object.is; array fields compared element-wise). */
 function sameRecords<T extends object>(a: readonly T[], b: readonly T[]) {
 	if (a === b) return true;
