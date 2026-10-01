@@ -7,10 +7,12 @@
 // argument. The range lives in each re-rank source's `targets.geometry` (rgba32float, w = range,
 // 0 = sky, row 0 = top) on the render device, so the kernel runs there (no compute-device gate is
 // needed: nothing crosses devices). One invocation per 96-pixel group writes 3 words of pass bits
-// + a header (nonce << 16 | positive texels << 8 | undecided); every pose of one re-rank is one dispatch in ONE
-// encoder, submitted after the geometry passes (same queue → they see the finished targets), and
-// read back with ONE staged copy (core/readback): 18 KB per 384 × 288 pose instead of the 1.77 MB
-// rgba32float range readback.
+// + a header (nonce << 16 | positive texels << 8 | undecided); every pose of one re-rank is one kernel
+// node of ONE core ComputeGraph (cachedGraph group "silhouette-mask", keyed by pose count and target
+// shape), run as one encoder and one submit after the geometry passes (same queue → they see the
+// finished targets), and read back by ONE read node (one staged copy, core/readback): 18 KB per
+// 384 × 288 pose instead of the 1.77 MB rgba32float range readback. The graph only imports: the
+// per-pose uniforms and the output buffer stay owned by this class, the targets are bound per run.
 // A dispatch that fails validation silently leaves the output untouched: the per-call nonce in
 // every header makes scoreFromMask reject such a mask (that pose is then scored on the CPU).
 import { Buffer, type Device, type Texture } from "@luma.gl/core";
@@ -20,9 +22,9 @@ import {
 	silhouetteThresholds,
 	silMaskWords,
 } from "#/lib/deck/silhouette-mask";
-import { defineKernel, dispatch, kernelAsync } from "#/lib/gpu/core/kernel";
-import { submit } from "#/lib/gpu/core/queue";
-import { stageReads } from "#/lib/gpu/core/readback";
+import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
+import { defineKernel } from "#/lib/gpu/core/kernel";
+import { importSampledTexture, textureShapeKey } from "./graph-texture";
 
 const WG = 64;
 
@@ -104,8 +106,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 `;
 
-// gpu/core owns the pipeline: cached per device, compiled with createComputePipelineAsync (no
-// render-thread stall), dropped when the device is lost, and checked by scripts/gpu/kernel-layout-check.
+// gpu/core owns the pipeline: cached per device, compiled with createComputePipelineAsync (the graph's
+// compileAsync: no render-thread stall), dropped when the device is lost, and checked by
+// scripts/gpu/kernel-layout-check.
 const SPEC = defineKernel(
 	"silhouette-mask",
 	WGSL,
@@ -116,6 +119,44 @@ const SPEC = defineKernel(
 	],
 	{ group: "silhouette" },
 );
+
+/** core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "silhouette-gpu"). */
+const GRAPH_GROUP = "silhouette-mask";
+const PRM_BYTES = 48;
+
+type MaskRun = {
+	/** the output buffer's byteLength: each dispatch binds all of it, as the raw dispatch did */
+	outBufferBytes: number;
+};
+
+/**
+ * One kernel node per pose (node i: uniform `prm<i>`, target `geo<i>`, writing its own block of the
+ * shared output from word i · per), then one read node of the `bytes` the masks fill.
+ */
+function buildMaskGraph(
+	g: ComputeGraph<MaskRun>,
+	targets: Texture[],
+	W: number,
+	H: number,
+	bytes: number,
+) {
+	const out = g.importBuffer("out", bytes);
+	const outp = { buffer: out, size: (p: MaskRun) => p.outBufferBytes };
+	const x = Math.ceil((silGroups(W) * H) / WG);
+	targets.forEach((tex, i) => {
+		g.addKernel({
+			id: `mask${i}`,
+			spec: SPEC,
+			bindings: {
+				prm: g.importBuffer(`prm${i}`, PRM_BYTES, undefined, Buffer.UNIFORM),
+				geo: importSampledTexture(g, `geo${i}`, tex),
+				outp,
+			},
+			workgroups: [x],
+		});
+	});
+	g.readNode("mask-read", [{ buffer: out, size: bytes }]);
+}
 
 /** One per WebGpuEngine (one render device). */
 export class SilhouetteMaskGpu {
@@ -144,11 +185,23 @@ export class SilhouetteMaskGpu {
 			return null;
 		this.busy = true;
 		try {
-			const k = await kernelAsync(device, SPEC);
-			// destroyed or lost while the pipeline compiled: nothing to allocate or submit
-			if (this.destroyed || device.isLost) return null;
 			const per = silMaskWords(W, H);
 			const bytes = per * ranges.length * 4;
+			const shapes = [...new Set(ranges.map(textureShapeKey))].join(",");
+			// the lookup right before run() queues the graph's lease in the same tick (core cachedGraph's
+			// rule); an eviction between the two lookups only rebuilds the graph, compiled by run() from
+			// the per-device pipeline cache
+			const graphOf = () =>
+				cachedGraph<MaskRun, void>(
+					device,
+					GRAPH_GROUP,
+					`${ranges.length}:${W}x${H}:${shapes}`,
+					(g) => buildMaskGraph(g, ranges, W, H, bytes),
+					2,
+				).graph;
+			await graphOf().compileAsync();
+			// destroyed or lost while the pipeline compiled: nothing to allocate or submit
+			if (this.destroyed || device.isLost) return null;
 			if (!this.out || this.out.byteLength < bytes) {
 				this.out?.destroy();
 				this.out = device.createBuffer({
@@ -159,9 +212,10 @@ export class SilhouetteMaskGpu {
 			}
 			const t = silhouetteThresholds();
 			const G = silGroups(W);
-			const enc = device.createCommandEncoder({ id: "silhouette-mask" });
+			const buffers: Record<string, Buffer> = { out: this.out };
+			const textures: Record<string, Texture> = {};
 			ranges.forEach((tex, i) => {
-				const words = new ArrayBuffer(48);
+				const words = new ArrayBuffer(PRM_BYTES);
 				const iv = new Int32Array(words);
 				const uv = new Uint32Array(words);
 				const fv = new Float32Array(words);
@@ -174,21 +228,19 @@ export class SilhouetteMaskGpu {
 				// one uniform buffer per pose: writes land at write time, before this one submit
 				this.prms[i] ??= device.createBuffer({
 					id: `silhouette-mask-prm-${i}`,
-					byteLength: 48,
+					byteLength: PRM_BYTES,
 					usage: Buffer.UNIFORM | Buffer.COPY_DST,
 				});
 				this.prms[i].write(new Uint8Array(words));
-				dispatch(
-					enc,
-					k,
-					{ prm: this.prms[i], geo: tex, outp: this.out as Buffer },
-					Math.ceil((G * H) / WG),
-				);
+				buffers[`prm${i}`] = this.prms[i];
+				textures[`geo${i}`] = tex;
 			});
-			const st = stageReads(device, enc, [{ buffer: this.out, size: bytes }]);
-			submit(device, enc);
-			const [ab] = await st.read();
-			if (this.destroyed) return null;
+			const { reads } = await graphOf().run(
+				{ outBufferBytes: this.out.byteLength },
+				{ buffers, textures },
+			);
+			const ab = reads["mask-read"][0];
+			if (!ab || this.destroyed) return null;
 			this.lastBytes = bytes;
 			return new Uint32Array(ab.slice(0, bytes));
 		} catch (e) {

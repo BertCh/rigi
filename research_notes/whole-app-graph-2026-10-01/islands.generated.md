@@ -12,7 +12,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I1 | Terrain residency | per tile | page | ingest-terrarium, look-relief-heights | `ingest-terrarium` |
 | I2 | Photo prep | per photo | page, worker:sky | photoprep | `photoprep` |
 | I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march, horizon-cert, precision-probe | `horizon-march`, `horizon-cert`, `precision-probe` |
-| I4 | Align | per align | page | align-pose, align-cert, silhouette-gpu | `align-pose`, `align-cert` |
+| I4 | Align | per align | page | align-pose, align-cert, silhouette-gpu | `align-pose`, `align-cert`, `silhouette-mask` |
 | I5 | Unknown-pose solve | per photo | worker:unknown-pose, worker:pipeline | solve-coarse, skyglobal | `solve-coarse`, `skyglobal` |
 | I6 | Sky model | per photo | worker:sky | sky-model, sky-refine | `sky-refine` |
 | I7 | Frame | per frame | page | deck-webgpu-frame, terrain-gpu-cull | – |
@@ -34,7 +34,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | precision-probe | I3 | opt-in | worker:horizon-fast, page | per photo | `precision-probe` | u, pin (pooled imports); pout (transient) | read: pout 4096·80 B, once per device |
 | align-pose | I4 | default | page | per align | `align-pose` | u, poses, dirs, edge planes (uploaded once per photo), sky planes (pooled imports); out (transient, cleared) | read: nPoses·stride B per round (≈40 rounds per autoAlign) |
 | align-cert | I4 | opt-in | page | per align | `align-cert` | u, lane state, move logs, audit rings, jobs, results, indirect commands (pooled imports); f32 + double-f32 lattice tables (uploaded per autoAlign and on a window re-centre); dirs, edge planes (shared align slots / resident photo prep), private skyCum | read per submit (≈4 per autoAlign): lane states + move logs + audit rings ≤ 8·6.3 KB |
-| silhouette-gpu | I4 | default | page | per align | – | geometry target rgba32float (render device) | pass mask: 18 KB per 384 × 288 pose (one staged copy per re-rank) |
+| silhouette-gpu | I4 | default | page | per align | `silhouette-mask` | geometry targets rgba32float, one per pose (render device; imports bound per run); per-pose uniforms, mask output (imports, owned by SilhouetteMaskGpu) | read: pass mask, 18 KB per 384 × 288 pose (one read node per re-rank) |
 | solve-coarse | I5 | default | worker:unknown-pose, worker:pipeline (remote) | per photo | `solve-coarse` | resident horizon profile hz (per device); u, grid imports | rows: 16 B per yaw row; blocks (flagged rows only): nYaw·nBlk·16 B |
 | skyglobal | I5 | bench only | bench | bench | `skyglobal` | score maps, profile (pooled imports); cells, red (transients) | candidate list: count + head slots, rare second exact read |
 | sky-model | I6 | external | worker:sky (remote) | per photo | – | ORT WebGPU session (ORT's device, attached to luma) | – |
@@ -61,7 +61,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **horizon-cert**: certified-f32 tan → degrees and ENU / resample (D7, D8); ?horizonPrecision=certified-f32; ties recomputed by the f64 path
 - **precision-probe**: strict-IEEE probe gating every certified-f32 stage (horizon in the horizon-fast worker; align on the page)
 - **align-cert**: certified-f32 coordinate descent (WAG W3.3): R rounds per submit, DECIDE → EVAL (indirect) → EVAL2 double-f32 (indirect); ?alignPrecision=certified-f32
-- **silhouette-gpu**: single dispatch + core/readback, not a ComputeGraph
+- **silhouette-gpu**: one kernel node per pose, one submit per re-rank; keyed by pose count and target shape
 - **solve-coarse**: certified f32 fold; flagged rows fold on the CPU in f64
 - **skyglobal**: T6 skyline global search; not wired into the service
 - **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU

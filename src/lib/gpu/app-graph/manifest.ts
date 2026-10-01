@@ -364,16 +364,23 @@ export const GPU_MODULES: readonly GpuModule[] = [
 	{
 		id: "silhouette-gpu",
 		island: "I4",
-		paths: ["src/lib/deck-webgpu/silhouette-gpu.ts"],
-		groups: [],
+		paths: [
+			"src/lib/deck-webgpu/silhouette-gpu.ts",
+			"src/lib/deck-webgpu/graph-texture.ts",
+		],
+		groups: ["silhouette-mask"],
 		realms: ["page"],
 		cadence: "per align",
-		resources: ["geometry target rgba32float (render device)"],
+		resources: [
+			"geometry targets rgba32float, one per pose (render device; imports bound per run)",
+			"per-pose uniforms, mask output (imports, owned by SilhouetteMaskGpu)",
+		],
 		readbacks: [
-			"pass mask: 18 KB per 384 × 288 pose (one staged copy per re-rank)",
+			"read: pass mask, 18 KB per 384 × 288 pose (one read node per re-rank)",
 		],
 		status: "default",
-		notes: "single dispatch + core/readback, not a ComputeGraph",
+		notes:
+			"one kernel node per pose, one submit per re-rank; keyed by pose count and target shape",
 	},
 	{
 		id: "solve-coarse",
