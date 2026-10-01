@@ -26,6 +26,8 @@
 //   await g.compileAsync();                                 // pipelines via createComputePipelineAsync
 //   const e = cachedGraph(device, "solve", key, (g) => {...}); // shape-keyed LRU (transients have fixed sizes)
 //   g.addKernel({ ..., condition: { id: "sun", source: "cpu", evaluate: (p) => !p.flat } }); // per-run skip
+//   const r = g.runNow(p, { buffers });                  // no lease, sync up to submit: transient-free graphs
+//                                                          // whose imports the caller writes right before
 //
 // W0.1 widening (all additive; graphs that do not use these encode exactly as before):
 //   g.addKernel({ ..., condition: { id: "tail", source: "gpu", mode: "indirect", buffer: cmd } });
@@ -209,6 +211,25 @@ export type GraphReads = {
  */
 export type GraphOp<P> = GPUNode<P>;
 
+/** Options of ComputeGraph.run() / runNow(). */
+export type GraphRunOptions<P> = {
+	buffers?: Record<string, GraphImportedBuffer>;
+	/** imported textures by id (e.g. render targets), overriding the defaults */
+	textures?: Record<string, GraphImportedTexture>;
+	/** importFrameTexture handles by id ({ texture, frameId }, frameId strictly increasing) */
+	frameTextures?: GraphEncodeExtras<P>["frameTextures"];
+	read?: ReadRange[];
+	timings?: boolean;
+};
+
+/** What ComputeGraph.run() / runNow() resolve. */
+export type GraphRunResult = {
+	data: ArrayBuffer[];
+	/** read-node results by node id */
+	reads: Record<string, ArrayBuffer[]>;
+	timings?: GPUCommandGraphTimingReport;
+};
+
 const USE: Record<Exclude<BindKind, "texture">, GraphBufferUsage> = {
 	uniform: "uniform",
 	"read-only-storage": "storage-read",
@@ -252,6 +273,8 @@ export class ComputeGraph<P = void> {
 	private compiled: CompiledGPUCommandGraph<P> | null = null;
 	private compiling: Promise<CompiledGPUCommandGraph<P>> | null = null;
 	private timestamps: QuerySet | null = null;
+	/** a timed run is in flight (its encoding owns the timestamp query set until its timings are read) */
+	private timing = false;
 	/**
 	 * clear audit: node id → handles it clears / writes partially or atomically / uses at all / writes
 	 * at all, and the indirect command of GPU-conditioned nodes
@@ -846,50 +869,78 @@ export class ComputeGraph<P = void> {
 	 * `timings` (or globalThis.__RIGI_GPU_PROFILE__) records per-node GPU time when the device has
 	 * 'timestamp-query'; profiled runs also add `${id}/${node}` to getGpuProfile().
 	 */
-	run(
+	run(parameters: P, opts: GraphRunOptions<P> = {}): Promise<GraphRunResult> {
+		return withLease(`graph:${this.id}`, () => this.execute(parameters, opts));
+	}
+
+	/**
+	 * run() without the graph lease, for graphs WITHOUT transients (every buffer and texture is an
+	 * import, so two encodings share no graph-owned state): compile (sync, when compileAsync() has
+	 * not finished), encode, stage and submit happen synchronously in this call, so a caller may write
+	 * its imports with queue.writeBuffer right before it and a concurrent call's writes land after
+	 * this submit in queue order. Runs are not serialised: the returned promise only reads back.
+	 * Per-node timings are taken only when no other timed run of this graph is in flight (the
+	 * timestamp query set is shared); a cache eviction (destroy) during a timed run rejects it.
+	 * Throws (synchronously) on a graph with transients.
+	 */
+	runNow(
 		parameters: P,
-		opts: {
-			buffers?: Record<string, GraphImportedBuffer>;
-			/** imported textures by id (e.g. render targets), overriding the defaults */
-			textures?: Record<string, GraphImportedTexture>;
-			/** importFrameTexture handles by id ({ texture, frameId }, frameId strictly increasing) */
-			frameTextures?: GraphEncodeExtras<P>["frameTextures"];
-			read?: ReadRange[];
-			timings?: boolean;
-		} = {},
-	): Promise<{
-		data: ArrayBuffer[];
-		/** read-node results by node id */
-		reads: Record<string, ArrayBuffer[]>;
-		timings?: GPUCommandGraphTimingReport;
-	}> {
-		return withLease(`graph:${this.id}`, async () => {
-			const compiled = this.compile().compiled as CompiledGPUCommandGraph<P>;
-			const prof = profiling(this.device);
-			const timed =
-				(opts.timings || prof) && this.device.features.has("timestamp-query");
-			if (timed && !this.timestamps)
-				this.timestamps = this.device.createQuerySet({
-					type: "timestamp",
-					count: 2 * compiled.stats.nodeOrder.length + 2,
-				});
-			const enc = this.device.createCommandEncoder({
-				id: this.id,
-				...(timed ? { timeProfilingQuerySet: this.timestamps } : {}),
+		opts: GraphRunOptions<P> = {},
+	): Promise<GraphRunResult> {
+		const s = this.compile().compiled?.stats;
+		if (s && (s.logicalTransientBufferCount || s.logicalTransientTextureCount))
+			throw new Error(`${this.id}: runNow() needs a graph without transients`);
+		return this.execute(parameters, opts);
+	}
+
+	/** run()'s body: synchronous up to the submit, then the reads (and timings) as a promise. */
+	private execute(
+		parameters: P,
+		opts: GraphRunOptions<P>,
+	): Promise<GraphRunResult> {
+		const compiled = this.compile().compiled as CompiledGPUCommandGraph<P>;
+		const prof = profiling(this.device);
+		const timed =
+			(opts.timings || prof) &&
+			this.device.features.has("timestamp-query") &&
+			!this.timing;
+		if (timed && !this.timestamps)
+			this.timestamps = this.device.createQuerySet({
+				type: "timestamp",
+				count: 2 * compiled.stats.nodeOrder.length + 2,
 			});
-			const { encoding, reads: nodeReads } = this.encodeReads(
-				enc,
-				parameters,
-				opts.buffers,
-				opts.textures,
-				opts.frameTextures ? { frameTextures: opts.frameTextures } : undefined,
-			);
-			let staged: StagedRead | null = null;
+		const enc = this.device.createCommandEncoder({
+			id: this.id,
+			...(timed ? { timeProfilingQuerySet: this.timestamps } : {}),
+		});
+		const { encoding, reads: nodeReads } = this.encodeReads(
+			enc,
+			parameters,
+			opts.buffers,
+			opts.textures,
+			opts.frameTextures ? { frameTextures: opts.frameTextures } : undefined,
+		);
+		let staged: StagedRead | null = null;
+		const finish = () => {
+			// whatever threw (staging, submit, a checked submit's validation error, a read, the
+			// timings), no staged slot stays reserved: cancel is a no-op on reads already taken
+			staged?.cancel();
+			nodeReads.cancel();
+			if (timed) this.timing = false;
+		};
+		if (timed) this.timing = true;
+		try {
+			staged = stageReads(this.device, enc, opts.read ?? []);
+			submit(this.device, enc);
+		} catch (e) {
+			finish();
+			return Promise.reject(e);
+		}
+		const pending = staged;
+		return (async () => {
 			try {
-				staged = stageReads(this.device, enc, opts.read ?? []);
-				submit(this.device, enc);
 				const [data, reads] = await Promise.all([
-					staged.read(),
+					pending.read(),
 					nodeReads.read(),
 				]);
 				if (!timed || !encoding.canReadGPUTimings) return { data, reads };
@@ -910,12 +961,9 @@ export class ComputeGraph<P = void> {
 							recordGpuTime(`${this.id}/${n.id}`, n.gpuTimeMilliseconds);
 				return { data, reads, timings };
 			} finally {
-				// whatever threw (staging, submit, a checked submit's validation error, a read, the
-				// timings), no staged slot stays reserved: cancel is a no-op on reads already taken
-				staged?.cancel();
-				nodeReads.cancel();
+				finish();
 			}
-		});
+		})();
 	}
 
 	/** Free the compiled graph's transients, pipelines and timestamp slots. */

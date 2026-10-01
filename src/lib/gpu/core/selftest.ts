@@ -52,6 +52,7 @@ import {
 	pooledStorage,
 	pooledUniform,
 	poolStats,
+	releasePool,
 	withLease,
 } from "./pool";
 import { getGpuGraphProfile, getGpuProfile, resetGpuProfile } from "./profile";
@@ -820,6 +821,76 @@ export async function coreSelftest(): Promise<{
 			{
 				bytes: ra.reads.read[0].byteLength,
 			},
+		);
+	});
+
+	// runNow (no lease, sync up to submit) on an import-only graph: two back-to-back calls that rewrite
+	// the SAME pooled input in between each read their own input (queue order), bit-equal to run();
+	// a graph with a transient is refused.
+	await run("graph-run-now", async () => {
+		const n = 3000;
+		const g = new ComputeGraph(device, "selftest-run-now");
+		const xs = g.importBuffer("x", n * 4);
+		const out = g.importBuffer("out", n * 4);
+		g.addKernel({
+			id: "sin",
+			spec: K_SIN_SYNC,
+			bindings: { x: xs, out },
+			workgroups: [Math.ceil(n / 64)],
+		});
+		g.readNode("read", [out]);
+		await g.compileAsync();
+		const xa = Float32Array.from({ length: n }, (_, i) => (i - 1500) * 0.37);
+		const xb = Float32Array.from({ length: n }, (_, i) => (i - 900) * 0.11);
+		const call = (x: Float32Array) =>
+			g.runNow(undefined, {
+				buffers: {
+					x: pooledStorage(device, "selftest-run-now/x", x),
+					out: acquire(
+						device,
+						"selftest-run-now/out",
+						n * 4,
+						Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST,
+					),
+				},
+			});
+		const pa = call(xa);
+		const pb = call(xb);
+		const [ra, rb] = await Promise.all([pa, pb]);
+		const ref = async (x: Float32Array) => {
+			const xBuf = storage(device, x);
+			const outBuf = storage(device, n * 4);
+			const r = await g.run(undefined, { buffers: { x: xBuf, out: outBuf } });
+			release(xBuf, outBuf);
+			return r.reads.read[0];
+		};
+		const [fa, fb] = [await ref(xa), await ref(xb)];
+		const t = new ComputeGraph(device, "selftest-run-now-transient");
+		const tx = t.importBuffer("x", n * 4);
+		const tout = t.transientBuffer("out", n * 4);
+		t.addKernel({
+			id: "sin",
+			spec: K_SIN_SYNC,
+			bindings: { x: tx, out: tout },
+			workgroups: [Math.ceil(n / 64)],
+		});
+		t.readNode("read", [tout]);
+		let refused = false;
+		try {
+			void t.runNow(undefined, {});
+		} catch {
+			refused = true;
+		}
+		t.destroy();
+		g.destroy();
+		releasePool(device, "selftest-run-now/");
+		check(
+			"graph-run-now",
+			sameBits(ra.reads.read[0], fa) &&
+				sameBits(rb.reads.read[0], fb) &&
+				!sameBits(fa, fb) &&
+				refused,
+			{ bytes: fa.byteLength, refused },
 		);
 	});
 
