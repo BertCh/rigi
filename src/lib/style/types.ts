@@ -51,7 +51,13 @@ export type TerrainLook = {
 	 *  derived from the sun or fitted to the photo (look/haze-fit, falls back to physical on a weak fit). */
 	atmosphere:
 		| { mode: "classic" }
-		| { mode: "physical"; strength: number; airlight: "physical" | "fitted" };
+		| {
+				mode: "physical";
+				strength: number;
+				airlight: "physical" | "fitted";
+				/** Valley fog layer (look/nebelmeer); density 0 = off. */
+				nebelmeer?: NebelmeerStyle;
+		  };
 	/** 'lambert' = ambient/direct above; 'swiss' = multidirectional relief + cast shadow (LOOK_RELIEF).
 	 *  realism: 0 cartographic NW light … 1 the photo's sun. */
 	relief:
@@ -59,6 +65,18 @@ export type TerrainLook = {
 		| { mode: "swiss"; realism: number; generalize: number; curvature: number };
 	/** 'ramp' = reliefRamp; 'alpine' = absolute-elevation Patterson tint with rock, snow and lakes (LOOK_ALPINE); water: lakes get depth tint + Fresnel sky reflection (LOOK_WATER). */
 	albedo: { mode: "ramp" } | { mode: "alpine"; water: boolean };
+};
+
+/** Valley-fog layer over the physical atmosphere (look/nebelmeer). */
+export type NebelmeerStyle = {
+	/** Altitude of the fog surface, m ASL. */
+	top: number;
+	/** Extinction inside the sea, 1/m (0 = off). 0.004 is about 250 m visibility. */
+	density: number;
+	/** Inverse metres: how fast the fog thins above `top` (0.01 = 100 m scale height). */
+	falloff: number;
+	/** Fog colour (display sRGB; linearised for the shaders). */
+	color: Hex;
 };
 
 export type LineStyle = {

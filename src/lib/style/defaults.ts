@@ -2,7 +2,15 @@
 // the line it comes from (tree as of 2026-09-25 12:55; engine.ts lines after ~690 are re-verified
 // and differ from styling.md, which predates a +7-line edit there). The chunk-0 pixel diff and scripts/style-check.ts
 // guard it; changing a number here changes the classic look, so don't.
-import type { ViewStyle } from "./types";
+import type { NebelmeerStyle, ViewStyle } from "./types";
+
+/** Valley fog (look/nebelmeer) when a style turns it on; density 0 = off. */
+export const NEBELMEER_DEFAULT: NebelmeerStyle = {
+	top: 1400,
+	density: 0,
+	falloff: 0.01,
+	color: "#dfe6ee",
+};
 
 export const CLASSIC: ViewStyle = {
 	v: 1,

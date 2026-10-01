@@ -3,7 +3,7 @@
 // untrusted partials (localStorage) and diffing (so storage keeps diff-only overrides).
 import { clamp } from "../math";
 import { isHex } from "./color";
-import { CLASSIC } from "./defaults";
+import { CLASSIC, NEBELMEER_DEFAULT } from "./defaults";
 import { isRampName, MAX_RAMP_STOPS } from "./ramps";
 import type { DeepPartial, ViewStyle } from "./types";
 
@@ -136,8 +136,22 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 			variants: {
 				classic: { fields: {}, def: { mode: "classic" } },
 				physical: {
-					fields: { strength: num(0, 3), airlight: en("physical", "fitted") },
-					def: { mode: "physical", strength: 1, airlight: "physical" },
+					fields: {
+						strength: num(0, 3),
+						airlight: en("physical", "fitted"),
+						nebelmeer: obj({
+							top: num(-500, 6000),
+							density: num(0, 0.02),
+							falloff: num(0.0002, 0.1),
+							color: hex,
+						}),
+					},
+					def: {
+						mode: "physical",
+						strength: 1,
+						airlight: "physical",
+						nebelmeer: NEBELMEER_DEFAULT,
+					},
 				},
 			},
 		},

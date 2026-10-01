@@ -8,7 +8,9 @@
 // World frame is the camera-anchored ENU frame: z is metres ASL minus the curvature drop that
 // terrain.ts bakes into the vertices, so altitude = z + (x² + y²)·(1 − k)/2R.
 import { EARTH_R, REFRACTION_K } from "../geodesy";
+import { hexToRgb01, srgbToLinear } from "../style/color";
 import type { ViewStyle } from "../style/types";
+import { nebelRayTransmittance } from "./nebelmeer";
 import { sunColor } from "./sun";
 
 export type Vec3 = [number, number, number];
@@ -73,6 +75,26 @@ export function transmittance(p: AtmosphereParams, eye: Vec3, pt: Vec3): Vec3 {
 	];
 }
 
+/**
+ * CPU mirror of applyNebelmeer(): the fog's transmittance from the eye to an ENU point (1 when the
+ * layer is off or absent). Altitudes are curvature-corrected like atmTransmittance.
+ */
+export function nebelTransmittance(
+	v: Pick<AtmValues, "nebel">,
+	eye: Vec3,
+	pt: Vec3,
+): number {
+	if (!v.nebel || v.nebel[1] <= 0) return 1;
+	return nebelRayTransmittance(
+		Math.hypot(pt[0] - eye[0], pt[1] - eye[1], pt[2] - eye[2]),
+		enuAltitude(eye[0], eye[1], eye[2]),
+		enuAltitude(pt[0], pt[1], pt[2]),
+		v.nebel[1],
+		v.nebel[0],
+		v.nebel[2],
+	);
+}
+
 /** Physical defaults for a given sun direction (airlight derived in the shader). */
 export function defaultAtmosphere(
 	sunDir: Vec3 = [-0.5, -0.4, 0.75],
@@ -108,6 +130,10 @@ export type AtmValues = {
 	strength: number;
 	mieG: number;
 	airlightMix: number;
+	/** Nebelmeer (look/nebelmeer): (top m, density 1/m, falloff 1/m). Density 0: off. */
+	nebel?: Vec3;
+	/** Nebelmeer colour, linear RGB. */
+	nebelColor?: Vec3;
 };
 
 /**
@@ -136,7 +162,21 @@ export function atmosphereValues(
 			: mode === "world"
 				? style.world.haze
 				: 1;
+	// always emitted: the WebGL writers keep a missing field's last value, so off must be sent as
+	// density 0 (the shader's density <= 0 early-return makes it the identity)
+	const nm = a.mode === "physical" ? a.nebelmeer : undefined;
+	const nebel =
+		nm && nm.density > 0
+			? {
+					nebel: [nm.top, nm.density, nm.falloff] as Vec3,
+					nebelColor: hexToRgb01(nm.color).map(srgbToLinear) as Vec3,
+				}
+			: {
+					nebel: [nm?.top ?? 0, 0, nm?.falloff ?? 0] as Vec3,
+					nebelColor: [0, 0, 0] as Vec3,
+				};
 	return {
+		...nebel,
 		eye,
 		betaR: p.betaR,
 		sunDir: phys.sunDir,

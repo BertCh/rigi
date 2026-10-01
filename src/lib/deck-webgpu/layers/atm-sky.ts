@@ -38,6 +38,7 @@ import type { RenderPipelineParameters } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { ATM_CURV, type AtmValues } from "#/lib/look/atmosphere";
+import { NEBELMEER_WGSL } from "#/lib/look/nebelmeer";
 import { cameraModule } from "../camera";
 import {
 	type GpuLayerCore,
@@ -72,6 +73,12 @@ export type AtmosphereUniforms = {
 	h: [number, number];
 	pad1: number;
 	pad2: number;
+	nebelColor: V3;
+	nebelTop: number;
+	nebelDensity: number;
+	nebelFalloff: number;
+	pad3: number;
+	pad4: number;
 };
 
 /** AtmValues (look/atmosphere.ts atmosphereValues) → the `atmosphere` module's props. */
@@ -94,6 +101,13 @@ export function atmosphereUniforms(
 		h: [atm.h[0], atm.h[1]],
 		pad1: 0,
 		pad2: 0,
+		// density 0 (absent) = no Nebelmeer: atm_nebelmeer is the identity
+		nebelColor: v3(atm.nebelColor ?? [0, 0, 0]),
+		nebelTop: atm.nebel?.[0] ?? 0,
+		nebelDensity: atm.nebel?.[1] ?? 0,
+		nebelFalloff: atm.nebel?.[2] ?? 0,
+		pad3: 0,
+		pad4: 0,
 	};
 }
 
@@ -116,6 +130,7 @@ const NEUTRAL_ATM: AtmValues = {
  * below-horizon fade) is spelled out as atm_smoothstep: WGSL leaves low ≥ high undefined.
  */
 export const ATMOSPHERE_WGSL = /* wgsl */ `\
+${NEBELMEER_WGSL}
 struct AtmosphereUniforms {
   eye: vec3<f32>,
   strength: f32,
@@ -130,6 +145,12 @@ struct AtmosphereUniforms {
   h: vec2<f32>,
   pad1: f32,
   pad2: f32,
+  nebelColor: vec3<f32>,
+  nebelTop: f32,
+  nebelDensity: f32,
+  nebelFalloff: f32,
+  pad3: f32,
+  pad4: f32,
 };
 @group(0) @binding(auto) var<uniform> atmosphere: AtmosphereUniforms;
 
@@ -194,10 +215,18 @@ fn atm_airlight(viewDir: vec3<f32>) -> vec3<f32> {
   return mix(atm_phys_airlight(viewDir), atmosphere.airlight, atmosphere.airlightMix);
 }
 
+// applyNebelmeer (look/nebelmeer): the valley-fog layer over the hazed colour; identity at density 0
+fn atm_nebelmeer(col: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
+  if (atmosphere.nebelDensity <= 0.0) { return col; }
+  let T = nebel_ray_t(length(worldPos - atmosphere.eye), atm_altitude(atmosphere.eye),
+    atm_altitude(worldPos), atmosphere.nebelDensity, atmosphere.nebelTop, atmosphere.nebelFalloff);
+  return mix(atmosphere.nebelColor, col, T);
+}
+
 // applyAtmosphere: linear in, linear out
 fn atm_apply(colLinear: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
   let T = atm_transmittance(worldPos);
-  return colLinear * T + atm_airlight(normalize(worldPos - atmosphere.eye)) * (1.0 - T);
+  return atm_nebelmeer(colLinear * T + atm_airlight(normalize(worldPos - atmosphere.eye)) * (1.0 - T), worldPos);
 }
 
 // Preetham-like analytic sky (atmSky): zenith→horizon gradient keyed to sun height, with a Mie
@@ -246,6 +275,12 @@ export const atmosphereModule = {
 		h: "vec2<f32>",
 		pad1: "f32",
 		pad2: "f32",
+		nebelColor: "vec3<f32>",
+		nebelTop: "f32",
+		nebelDensity: "f32",
+		nebelFalloff: "f32",
+		pad3: "f32",
+		pad4: "f32",
 	},
 	bindingLayout: [{ name: "atmosphere", group: 0 }],
 } as const satisfies ShaderModule;
@@ -415,7 +450,12 @@ export const FOG_ATMOSPHERE_WGSL = /* wgsl */ `\
 fn atm_fog_terrain(c: vec4<f32>, s: TerrainSample) -> vec4<f32> {
   let T = atm_transmittance(s.enu);
   let air = atm_airlight(normalize(s.enu - atmosphere.eye));
-  return vec4<f32>(c.rgb * T + air * (1.0 - T) * c.a, c.a);
+  // premultiplied: the fog colour is scaled by the coverage like the airlight
+  let hazed = c.rgb * T + air * (1.0 - T) * c.a;
+  if (atmosphere.nebelDensity <= 0.0) { return vec4<f32>(hazed, c.a); }
+  let N = nebel_ray_t(length(s.enu - atmosphere.eye), atm_altitude(atmosphere.eye),
+    atm_altitude(s.enu), atmosphere.nebelDensity, atmosphere.nebelTop, atmosphere.nebelFalloff);
+  return vec4<f32>(hazed * N + atmosphere.nebelColor * (1.0 - N) * c.a, c.a);
 }
 `;
 

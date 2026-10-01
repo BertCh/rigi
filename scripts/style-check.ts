@@ -13,7 +13,7 @@ import {
 	isHex,
 	toCss,
 } from "../src/lib/style/color.ts";
-import { CLASSIC } from "../src/lib/style/defaults.ts";
+import { CLASSIC, NEBELMEER_DEFAULT } from "../src/lib/style/defaults.ts";
 import {
 	LOOK_PRESETS,
 	PRESET_IDS,
@@ -332,6 +332,8 @@ ok(
 			mode: "physical",
 			strength: 1,
 			airlight: "physical",
+			// the variant default carries the (off, density 0) valley fog since look/nebelmeer (df, U1)
+			nebelmeer: NEBELMEER_DEFAULT,
 		}),
 		"atmosphere union default",
 		s.terrain.atmosphere,

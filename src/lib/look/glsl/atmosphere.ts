@@ -5,6 +5,7 @@
 // World frame: the camera-anchored ENU frame with the curvature drop baked into z (terrain.ts).
 import * as THREE from "three";
 import { ATM_CURV } from "../atmosphere";
+import { NEBELMEER_GLSL } from "../nebelmeer";
 import { defineBlock } from "./block";
 import { SRGB_ENCODE_GLSL } from "./common";
 
@@ -15,6 +16,8 @@ export const ATM_BLOCK = defineBlock("atm", "atmosphere", {
 	sunDir: "vec3",
 	sunColor: "vec3",
 	airlight: "vec3",
+	nebel: "vec3", // (top m, density 1/m, falloff 1/m); density 0 = no Nebelmeer (look/nebelmeer)
+	nebelColor: "vec3",
 	h: "vec2",
 	betaM: "float",
 	strength: "float",
@@ -22,7 +25,7 @@ export const ATM_BLOCK = defineBlock("atm", "atmosphere", {
 	airlightMix: "float",
 });
 
-export const ATMOSPHERE_FNS = /* glsl */ `
+export const ATMOSPHERE_FNS = /* glsl */ `${NEBELMEER_GLSL}
 float atmAltitude(vec3 p) {
   return p.z + dot(p.xy, p.xy) * ${ATM_CURV.toExponential(9)};
 }
@@ -76,9 +79,17 @@ vec3 atmAirlight(vec3 viewDir) {
   return mix(atmPhysAirlight(viewDir), atm_airlight, atm_airlightMix);
 }
 
+// Nebelmeer: the valley-fog layer over the hazed colour; the identity at density 0
+vec3 applyNebelmeer(vec3 col, vec3 worldPos) {
+  if (atm_nebel.y <= 0.0) return col;
+  float T = nebelRayT(length(worldPos - atm_eye), atmAltitude(atm_eye), atmAltitude(worldPos),
+    atm_nebel.y, atm_nebel.x, atm_nebel.z);
+  return mix(atm_nebelColor, col, T);
+}
+
 vec3 applyAtmosphere(vec3 colLinear, vec3 worldPos) {
   vec3 T = atmTransmittance(worldPos);
-  return colLinear * T + atmAirlight(normalize(worldPos - atm_eye)) * (1.0 - T);
+  return applyNebelmeer(colLinear * T + atmAirlight(normalize(worldPos - atm_eye)) * (1.0 - T), worldPos);
 }
 
 // Preetham-like analytic sky: zenith→horizon gradient keyed to sun height, with a Mie aureole
