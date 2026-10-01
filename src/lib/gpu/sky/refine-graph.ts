@@ -1,11 +1,11 @@
-// The GPU sky refine (refine.ts) on gpu-core's GPUCommandGraph, via core/graph.ts ComputeGraph.
-// Selected per call with `refineSkyGpu(device, { …, graph: true })` (the sky worker's default path).
+// The GPU sky refine (refine.ts refineSkyGpu) on gpu-core's GPUCommandGraph, via core/graph.ts
+// ComputeGraph: the only GPU refine since 2026-10-01 (the pooled dispatchAll path it replaced gave
+// bit-identical bytes and floats).
 //
-// Same seven kernels (the KernelSpecs of refine.ts, unchanged WGSL), same workgroup counts, same
-// dispatch order (a linear chain, so the graph's topological order is the insertion order and the
-// seven dispatches coalesce into one compute pass exactly like dispatchAll). What changes:
+// The seven kernels of refine.ts in one linear chain (the graph's topological order is the insertion
+// order, and the seven dispatches coalesce into one compute pass):
 // - the ten intermediates (t, ab, band, abH, bandH, abS, pb, u4, u2, q) and the byte mask are graph
-//   TRANSIENTS, sized exactly (the pool rounds each to a power of two) and aliased by lifetime: the
+//   TRANSIENTS, sized exactly (a pool would round each to a power of two) and aliased by lifetime: the
 //   low-res t / ab / band / … die before the full-res u4 / u2 / q / bytes are born;
 // - the inputs (params, guideLo, P(sky), rgba, axis taps, LUT) are graph IMPORTS, still pooled under
 //   the "sky-refine" lease (graph imports are caller-owned) and bound per run through
@@ -49,7 +49,7 @@ const WG = 256;
 export const SKY_GRAPH_GROUP = "sky-refine";
 
 /**
- * Compiled graphs kept per device. Each holds its transients (≈ the old pool's scratch), so keep
+ * Compiled graphs kept per device. Each holds its transients (the refine's scratch), so keep
  * this small: photos in one session mostly share a size; a new size evicts the oldest.
  */
 const MAX_GRAPHS = 2;
@@ -58,7 +58,7 @@ type Params = { floats: boolean };
 
 type GraphStats = NonNullable<ComputeGraph<Params>["stats"]>;
 
-/** Byte sizes of every intermediate (the old path's pooled scratch slots, before pow2 rounding). */
+/** Byte sizes of every intermediate (exact, before any pow2 rounding). */
 export function skyScratchBytes(lw: number, lh: number, W: number, H: number) {
 	const n = lw * lh;
 	const N = W * H;
@@ -196,7 +196,7 @@ export let lastSkyGraphRun:
 	| { key: string; hit: boolean; stats: GraphStats }
 	| undefined;
 
-/** refineSkyGpu's graph path: same inputs, same outputs, bit-identical. */
+/** refineSkyGpu's body (refine.ts): the refine graph for this shape, run once. */
 export async function refineSkyGraph(
 	device: Device,
 	input: SkyRefineInput,

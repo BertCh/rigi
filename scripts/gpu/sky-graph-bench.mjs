@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Sky refine on GPUCommandGraph (src/lib/gpu/sky/refine-graph.ts) vs the pooled dispatchAll path:
-// bit-identity (bytes and float bits), repeated runs with different data across shape-cache hits /
-// misses / evictions, the clear-node rule, transient VRAM and timings. Page realm,
+// Sky refine on GPUCommandGraph (src/lib/gpu/sky/refine-graph.ts) vs the CPU refine (sky/core.ts):
+// float / byte parity, bytes-only = floats run, repeated runs with different data across shape-cache
+// hits / misses / evictions, the clear-node rule, transient VRAM and timings. Page realm,
 // src/lib/gpu/sky/bench-graph.ts. Always under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/sky-graph-bench.mjs [--url http://localhost:3183]
 //     [--photos IMG_6958,IMG_7086,IMG_7131,IMG_7155] [--reps 7] [--tag x]
@@ -62,9 +62,9 @@ for (const c of results.cases ?? [])
 		c.name,
 		c.size,
 		`lo ${c.lo} ort=${c.ortBuffer}`,
-		`bytes≠ ${c.bytesDiff}/${c.bytes} bytesOnly≠ ${c.bytesOnlyDiff} floatBits≠ ${c.floatBitsDiff}`,
-		`| MB old ${(c.vram.oldLogical / 1e6).toFixed(1)} (pooled ${(c.vram.oldPooled / 1e6).toFixed(1)}) new ${(c.vram.newPhysical / 1e6).toFixed(1)} [${c.vram.newPhysicalCount} bufs]`,
-		`| ms old ${c.ms.old.toFixed(2)} graph ${c.ms.graph.toFixed(2)}`,
+		`vs cpu: float max|Δ| ${c.cpuFloatMaxAbs.toExponential(2)} bytes≠ ${c.cpuBytesDiff}/${c.bytes} (max ${c.cpuBytesMax}) | bytesOnly≠ ${c.bytesOnlyDiff}`,
+		`| MB logical ${(c.vram.pooledLogical / 1e6).toFixed(1)} (pow2 ${(c.vram.pooledCapacity / 1e6).toFixed(1)}) graph ${(c.vram.newPhysical / 1e6).toFixed(1)} [${c.vram.newPhysicalCount} bufs]`,
+		`| ms graph ${c.ms.graph.toFixed(2)} (miss ${c.ms.graphMiss.toFixed(1)})`,
 	);
 for (const s of results.sequence ?? []) log("seq", JSON.stringify(s));
 for (const x of results.extra ?? []) log("extra", JSON.stringify(x));

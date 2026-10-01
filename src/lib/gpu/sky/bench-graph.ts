@@ -1,14 +1,16 @@
-// Migration bench for the sky refine graph (refine-graph.ts) against the pooled dispatchAll path
-// (refine.ts), run in the page realm by scripts/gpu/sky-graph-bench.mjs. Checks:
-// - bit-identity: byte mask AND float mask (compared as u32 bits) of the graph path vs the old GPU
-//   path, for ORT-buffer P(sky) (shared device) at several working sizes up to 24 Mpx, plus the
-//   uploaded-floats branches (classical fallback, downsample);
+// Bench of the sky refine graph (refine-graph.ts, the only GPU refine) against the CPU twin (sky/core.ts
+// refineToWorking + toBytes), run in the page realm by scripts/gpu/sky-graph-bench.mjs. Checks:
+// - CPU parity: float mask max |Δ| and byte mask differences vs the CPU refine (the tolerance of
+//   scripts/gpu/sky-bench.mjs: f32 vs f64 sums, ≤ ~1e-5, a few bytes off by 1), for ORT-buffer
+//   P(sky) (shared device) at several working sizes up to 24 Mpx, plus the uploaded-floats branches
+//   (classical fallback, downsample); and the bytes-only run equal to the floats run bit for bit;
 // - the graph run repeatedly with different data: a shape sequence that hits, misses and evicts the
-//   shape cache, every run compared to the old path;
+//   shape cache, every run compared to the CPU (stale transients would show as large differences);
 // - the clear rule: a partial-write kernel on an aliased transient (lint must throw without a clear;
 //   with the clear the stale bytes are gone; without it (lint bypassed) the stale bytes show);
-// - VRAM: transient bytes old (logical and pow2 pool capacity) vs new (physical after aliasing);
-// - timing: interleaved old/new bytes-only refines, medians.
+// - VRAM: transient bytes as pooled slots would hold them (logical and pow2 capacity) vs the graph's
+//   (physical after aliasing);
+// - timing: bytes-only refines (cache hit) and one cache miss, medians.
 
 import type { Device } from "@luma.gl/core";
 import * as ort from "onnxruntime-web";
@@ -19,8 +21,10 @@ import { capacityFor, pooledStorage } from "#/lib/gpu/core/pool";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
 	classicalSky,
+	refineToWorking,
 	resamplePlanes,
 	rgbPlanes,
+	toBytes,
 	workingSize,
 } from "#/lib/sky/core";
 import { createSkyModel, inferSkyModel, MODEL_FILE } from "#/lib/sky/model";
@@ -72,32 +76,54 @@ function differ(a: ArrayBufferView, b: ArrayBufferView, u32: boolean) {
 
 type Input = Parameters<typeof refineSkyGpu>[1];
 
-/** Old vs graph, floats on: {bytesDiff, floatBitsDiff}; both must be 0. */
 /** Validation / OOM error scopes on every submit (a failed submit then rejects, not a stale read). */
 const checks = (on: boolean) => {
 	(globalThis as { __RIGI_GPU_CHECKS__?: boolean }).__RIGI_GPU_CHECKS__ = on;
 };
 
-async function parity(device: Device, input: Input) {
+/**
+ * GPU (graph) vs the CPU refine of the same P(sky) (`cpuProb`: input.prob as floats): float max |Δ|,
+ * byte mask differences (count, max); the bytes-only run must equal the floats run bit for bit.
+ */
+async function parity(device: Device, input: Input, cpuProb: Float32Array) {
 	checks(true);
+	let g: Awaited<ReturnType<typeof refineSkyGpu>>;
+	let gb: Awaited<ReturnType<typeof refineSkyGpu>>;
+	let run: typeof lastSkyGraphRun;
 	try {
-		return await parityChecked(device, input);
+		g = await refineSkyGpu(device, { ...input, floats: true });
+		run = lastSkyGraphRun;
+		// bytes-only run too (the read node's other branch)
+		gb = await refineSkyGpu(device, input);
 	} finally {
 		checks(false);
 	}
-}
-
-async function parityChecked(device: Device, input: Input) {
-	const o = await refineSkyGpu(device, { ...input, floats: true });
-	const g = await refineSkyGpu(device, { ...input, floats: true, graph: true });
-	const run = lastSkyGraphRun;
-	// bytes-only graph run too (the read node's other branch)
-	const gb = await refineSkyGpu(device, { ...input, graph: true });
+	const { W, H } = input;
+	const rgb = rgbPlanes({ width: W, height: H, data: input.rgba });
+	const cq = refineToWorking(
+		rgb,
+		W,
+		H,
+		{ prob: cpuProb, width: input.lw, height: input.lh },
+		true,
+		{ radius: input.radius, eps: input.eps, band: input.band },
+	);
+	const cb = toBytes(cq);
+	const q = g.q as Float32Array;
+	let maxAbs = 0;
+	for (let i = 0; i < q.length; i++) {
+		const d = Math.abs(q[i] - cq[i]);
+		if (!(d <= maxAbs)) maxAbs = d;
+	}
+	let bytesMax = 0;
+	for (let i = 0; i < cb.length; i++)
+		bytesMax = Math.max(bytesMax, Math.abs(g.bytes[i] - cb[i]));
 	return {
-		bytes: o.bytes.length,
-		bytesDiff: differ(o.bytes, g.bytes, false),
-		bytesOnlyDiff: differ(o.bytes, gb.bytes, false),
-		floatBitsDiff: differ(o.q as Float32Array, g.q as Float32Array, true),
+		bytes: g.bytes.length,
+		cpuFloatMaxAbs: maxAbs,
+		cpuBytesDiff: differ(cb, g.bytes, false),
+		cpuBytesMax: bytesMax,
+		bytesOnlyDiff: differ(g.bytes, gb.bytes, false),
 		cacheHit: run?.hit,
 	};
 }
@@ -107,8 +133,8 @@ function vram(lw: number, lh: number, W: number, H: number) {
 	const vals = Object.values(s);
 	const st = lastSkyGraphRun?.stats;
 	return {
-		oldLogical: vals.reduce((a, b) => a + b, 0),
-		oldPooled: vals.reduce((a, b) => a + capacityFor(b), 0),
+		pooledLogical: vals.reduce((a, b) => a + b, 0),
+		pooledCapacity: vals.reduce((a, b) => a + capacityFor(b), 0),
 		newLogical: st?.logicalTransientBytes,
 		newPhysical: st?.physicalTransientBytes,
 		newPhysicalCount: st?.physicalTransientBufferCount,
@@ -262,34 +288,34 @@ export async function runSkyGraphBench(opts: {
 			guideLo: inf.rgbLo,
 			prob: (inf.gpuBuffer ?? (await inf.download())) as SkyProb,
 		};
-		return { input, inf, gpuBuffer: !!inf.gpuBuffer };
+		const cpuProb = await inf.download();
+		return { input, inf, cpuProb, gpuBuffer: !!inf.gpuBuffer };
 	};
 
 	for (const [W, H] of sizes)
 		for (const name of opts.names) {
-			const { input, inf, gpuBuffer } = await prep(name, W, H);
+			const { input, inf, cpuProb, gpuBuffer } = await prep(name, W, H);
 			try {
-				const par = await parity(device, input);
+				const par = await parity(device, input, cpuProb);
 				const v = vram(input.lw, input.lh, W, H);
-				// imports (identical on both paths; P(sky) is ORT's own buffer when shared)
+				// imports (P(sky) is ORT's own buffer when shared)
 				const imports =
 					32 +
 					3 * input.lw * input.lh * 4 +
 					W * H * 4 +
 					axisTable(input.lw, input.lh, W, H).byteLength +
 					2048;
-				const ms = { old: [] as number[], graph: [] as number[] };
+				const ms: number[] = [];
 				// a cache miss (graph build + compile + transient allocation) on this shape
 				await releaseSkyGraphs(device);
 				let t = performance.now();
-				await refineSkyGpu(device, { ...input, graph: true });
+				await refineSkyGpu(device, input);
 				const graphMiss = performance.now() - t;
-				for (let r = 0; r < reps; r++)
-					for (const graph of r & 1 ? [true, false] : [false, true]) {
-						t = performance.now();
-						await refineSkyGpu(device, { ...input, graph });
-						(graph ? ms.graph : ms.old).push(performance.now() - t);
-					}
+				for (let r = 0; r < reps; r++) {
+					t = performance.now();
+					await refineSkyGpu(device, input);
+					ms.push(performance.now() - t);
+				}
 				out.cases.push({
 					name,
 					size: `${W}x${H}`,
@@ -297,21 +323,21 @@ export async function runSkyGraphBench(opts: {
 					ortBuffer: gpuBuffer,
 					...par,
 					vram: { ...v, importsApprox: imports },
-					ms: { old: med(ms.old), graph: med(ms.graph), graphMiss, reps },
+					ms: { graph: med(ms), graphMiss, reps },
 				});
 			} finally {
 				inf.release();
 			}
 		}
 
-	// past the 1-D dispatch limit (27 Mpx): the old path submits an invalid encoder (caught here only
-	// because checks are on); the graph path refuses before encoding
+	// past the 1-D dispatch limit (27 Mpx): the graph path refuses before encoding (the worker then
+	// takes the CPU refine)
 	{
 		const { input, inf } = await prep(opts.names[0], 6000, 4500);
-		const outcome = async (graph: boolean) => {
+		const outcome = async () => {
 			checks(true);
 			try {
-				await refineSkyGpu(device, { ...input, graph });
+				await refineSkyGpu(device, input);
 				return "resolved";
 			} catch (e) {
 				return `rejected: ${String(e).slice(0, 160)}`;
@@ -322,8 +348,7 @@ export async function runSkyGraphBench(opts: {
 		try {
 			out.extra.push({
 				case: "6000x4500 (over the dispatch limit)",
-				old: await outcome(false),
-				graph: await outcome(true),
+				graph: await outcome(),
 			});
 		} finally {
 			inf.release();
@@ -343,12 +368,12 @@ export async function runSkyGraphBench(opts: {
 		[opts.names[0], 1024, 768],
 	];
 	for (const [name, W, H] of seq) {
-		const { input, inf } = await prep(name, W, H);
+		const { input, inf, cpuProb } = await prep(name, W, H);
 		try {
 			out.sequence.push({
 				name,
 				size: `${W}x${H}`,
-				...(await parity(device, input)),
+				...(await parity(device, input, cpuProb)),
 				cachedKey: lastSkyGraphRun?.key,
 				cachedCount: cachedGraphCount(device, SKY_GRAPH_GROUP),
 			});
@@ -365,18 +390,22 @@ export async function runSkyGraphBench(opts: {
 		const low = classicalSky(rgb, W, H);
 		out.extra.push({
 			case: `classical ${low.width}x${low.height} → ${W}x${H}`,
-			...(await parity(device, {
-				W,
-				H,
-				rgba,
-				lw: low.width,
-				lh: low.height,
-				guideLo: resamplePlanes(rgb, W, H, 3, low.width, low.height),
-				prob: low.prob,
-				radius: 5,
-				eps: 1e-3,
-				band: 2,
-			})),
+			...(await parity(
+				device,
+				{
+					W,
+					H,
+					rgba,
+					lw: low.width,
+					lh: low.height,
+					guideLo: resamplePlanes(rgb, W, H, 3, low.width, low.height),
+					prob: low.prob,
+					radius: 5,
+					eps: 1e-3,
+					band: 2,
+				},
+				low.prob,
+			)),
 		});
 	}
 	{
@@ -385,17 +414,22 @@ export async function runSkyGraphBench(opts: {
 		const rgb = rgbPlanes({ width: W, height: H, data: rgba });
 		const inf = await inferSkyModel(model, rgb, W, H, 640);
 		try {
+			const prob = await inf.download();
 			out.extra.push({
 				case: `model ${inf.width}x${inf.height} → ${W}x${H} (downsample, floats)`,
-				...(await parity(device, {
-					W,
-					H,
-					rgba,
-					lw: inf.width,
-					lh: inf.height,
-					guideLo: inf.rgbLo,
-					prob: await inf.download(),
-				})),
+				...(await parity(
+					device,
+					{
+						W,
+						H,
+						rgba,
+						lw: inf.width,
+						lh: inf.height,
+						guideLo: inf.rgbLo,
+						prob,
+					},
+					prob,
+				)),
 			});
 		} finally {
 			inf.release();

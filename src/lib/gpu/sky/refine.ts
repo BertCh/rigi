@@ -3,19 +3,15 @@
 // runs on this same device (sky/model.ts shareOrtDevice), the model's output GPUBuffer itself, so
 // the model output never leaves the GPU and only the final byte mask is read back.
 // Parity with the CPU refine: scripts/gpu/sky-bench.mjs (float mask ~1e-6, bytes almost all equal;
-// see refine.wgsl.ts for what is exact and what is f32-vs-f64). Buffers are pooled under the lease
-// "sky-refine"; one submit, one readback.
-import type { Buffer, Device } from "@luma.gl/core";
+// see refine.wgsl.ts for what is exact and what is f32-vs-f64). The kernels run as one core
+// ComputeGraph (./refine-graph.ts: aliased transients, inputs pooled under the lease "sky-refine",
+// one submit, one readback); the pooled dispatchAll path it replaced was removed on 2026-10-01.
+import type { Device } from "@luma.gl/core";
 import {
 	type BindKind,
 	defineKernel,
-	dispatchAll,
-	kernel,
-	submit,
 	warmKernelsAsync,
 } from "#/lib/gpu/core/kernel";
-import { pooledStorage, pooledUniform, withLease } from "#/lib/gpu/core/pool";
-import { type ReadRange, stageReads } from "#/lib/gpu/core/readback";
 import { LO_H, LO_H2, LO_V, LO_V2, PACK, UP_H, UP_V } from "./refine.wgsl";
 
 const GROUP = "sky";
@@ -99,11 +95,6 @@ export interface SkyRefineInput {
 	band?: number;
 	/** Also read the float mask back (the parity bench); the app needs bytes only. */
 	floats?: boolean;
-	/**
-	 * Run on a shape-keyed GPUCommandGraph with aliased transients (refine-graph.ts) instead of the
-	 * pooled dispatchAll path. Same WGSL, bit-identical bytes and floats. Default false.
-	 */
-	graph?: boolean;
 }
 
 export interface SkyRefineOutput {
@@ -112,8 +103,6 @@ export interface SkyRefineOutput {
 	/** refineToWorking(…) itself, when `floats` was asked for. */
 	q?: Float32Array;
 }
-
-const WG = 256;
 
 /**
  * The exact per-output taps of sky/core.ts resampleAxis (n → m): area average when downsampling,
@@ -218,117 +207,6 @@ export async function refineSkyGpu(
 	device: Device,
 	input: SkyRefineInput,
 ): Promise<SkyRefineOutput> {
-	// lazy: the default path does not pull GPUCommandGraph into the sky worker's bundle
-	if (input.graph)
-		return (await import("./refine-graph")).refineSkyGraph(device, input);
-	const { W, H, lw, lh } = input;
-	const n = lw * lh;
-	const N = W * H;
-	if (input.rgba.length !== 4 * N || input.guideLo.length !== 3 * n)
-		throw new Error("refineSkyGpu: input sizes do not match");
-	const kLoH = kernel(device, K_LO_H);
-	const kLoV = kernel(device, K_LO_V);
-	const kLoH2 = kernel(device, K_LO_H2);
-	const kLoV2 = kernel(device, K_LO_V2);
-	const kUpH = kernel(device, K_UP_H);
-	const kUpV = kernel(device, K_UP_V);
-	const kPack = kernel(device, K_PACK);
-	return withLease("sky-refine", async () => {
-		// every kernel writes all of its output: no zeroing needed
-		const scratch = (key: string, bytes: number) =>
-			pooledStorage(device, `sky-refine/${key}`, bytes, { zero: false });
-		const words = new ArrayBuffer(32);
-		new Uint32Array(words, 0, 6).set([
-			lw,
-			lh,
-			W,
-			H,
-			input.radius ?? 3,
-			input.band ?? 3,
-		]);
-		new Float32Array(words, 24, 1)[0] = input.eps ?? 2e-3;
-		const prm = pooledUniform(device, "sky-refine/prm", words);
-		const gl = pooledStorage(device, "sky-refine/guideLo", input.guideLo);
-		const gp: Buffer = isFloats(input.prob)
-			? pooledStorage(device, "sky-refine/prob", input.prob)
-			: // ORT's buffer, wrapped (not owned: destroying the wrapper below leaves the handle alone and
-				// only takes it off luma's memory counters)
-				device.createBuffer({
-					id: "sky-refine/ort-prob",
-					handle: input.prob,
-					byteLength: input.prob.size,
-					usage: input.prob.usage,
-				});
-		const rgba = new Uint8Array(
-			input.rgba.buffer,
-			input.rgba.byteOffset,
-			input.rgba.byteLength,
-		);
-		const gRgba = pooledStorage(
-			device,
-			"sky-refine/rgba",
-			rgba.byteOffset % 4 ? rgba.slice() : rgba,
-		);
-		const axis = pooledStorage(
-			device,
-			"sky-refine/axis",
-			axisTable(lw, lh, W, H),
-		);
-		const lut = pooledStorage(device, "sky-refine/lut", lutTable());
-		const t = scratch("t", n * 64);
-		const ab = scratch("ab", n * 16);
-		const band = scratch("band", n * 4);
-		const abH = scratch("abH", n * 16);
-		const bandH = scratch("bandH", n * 4);
-		const abS = scratch("abS", n * 16);
-		const pb = scratch("pb", n * 8);
-		const u4 = scratch("u4", W * lh * 16);
-		const u2 = scratch("u2", W * lh * 8);
-		const q = scratch("q", N * 4);
-		const nWords = Math.ceil(N / 4);
-		const bytes = scratch("bytes", nWords * 4);
-		const lo = Math.ceil(n / WG);
-		const enc = device.createCommandEncoder({ id: "sky-refine" });
-		dispatchAll(
-			enc,
-			[
-				{ k: kLoH, bindings: { prm, gl, gp, t }, x: lo },
-				{ k: kLoV, bindings: { prm, t, gp, ab, band }, x: lo },
-				{ k: kLoH2, bindings: { prm, ab, band, abH, bandH }, x: lo },
-				{ k: kLoV2, bindings: { prm, abH, bandH, gp, abS, pb }, x: lo },
-				{
-					k: kUpH,
-					bindings: { prm, axis, abS, pb, u4, u2 },
-					x: Math.ceil((W * lh) / WG),
-				},
-				{
-					k: kUpV,
-					bindings: { prm, axis, u4, u2, rgba: gRgba, lut, q },
-					x: Math.ceil(N / WG),
-				},
-				{
-					k: kPack,
-					bindings: { prm, q, lut, bytes },
-					x: Math.ceil(nWords / WG),
-				},
-			],
-			"sky-refine",
-		);
-		const reads: ReadRange[] = [{ buffer: bytes, size: nWords * 4 }];
-		if (input.floats) reads.push({ buffer: q, size: N * 4 });
-		const rd = stageReads(device, enc, reads);
-		let b: ArrayBuffer;
-		let f: ArrayBuffer | undefined;
-		try {
-			submit(device, enc);
-			[b, f] = await rd.read();
-		} finally {
-			if (gp.props.handle) gp.destroy();
-		}
-		return {
-			// exactly N bytes (the worker transfers the whole ArrayBuffer)
-			bytes: N % 4 ? new Uint8Array(b, 0, N).slice() : new Uint8Array(b, 0, N),
-			q: f ? new Float32Array(f) : undefined,
-		};
-	});
+	// ./refine-graph.ts imports this module's kernel specs and tables (hence the dynamic import)
+	return (await import("./refine-graph")).refineSkyGraph(device, input);
 }
