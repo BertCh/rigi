@@ -119,6 +119,7 @@ export type DemRaster = {
 	key: TileKey;
 	/** Grid is size × size, row-major, row 0 = north edge. */
 	size: number;
+	/** Metres above mean sea level (the Height<"msl"> datum; Terrarium / Mapterhorn decode, dem/decode.ts). */
 	heights: Float32Array;
 	/** The tile the data actually came from (an ancestor when `key` is missing). */
 	source: TileKey;
