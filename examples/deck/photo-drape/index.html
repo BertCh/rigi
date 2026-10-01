@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- Rigi -->
+<!-- SPDX-License-Identifier: MIT -->
+<!-- SPDX-FileCopyrightText: Copyright (c) Rigi contributors -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title>Photo drape · Rigi</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div
+      id="scene"
+      aria-label="A photo projected onto alpine terrain, seen from an orbit camera"
+    ></div>
+    <aside class="luma-example-infobox luma-example-infobox--overlay">
+      <div class="eyebrow">LUMA.GL + DECK.GL</div>
+      <h1>Photo drape</h1>
+      <section class="control-card">
+        <h2>Scene</h2>
+        <label
+          >Renderer<select id="backend">
+            <option value="webgpu">WebGPU</option>
+            <option value="webgl">WebGL2</option>
+          </select></label
+        >
+        <label
+          >Drape opacity<input
+            id="drape-opacity"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value="1"
+          ></label
+        >
+        <label class="toggle">Show shadowed areas<input id="shadowed-areas" type="checkbox"></label>
+        <label class="toggle">Show frustum<input id="frustum" type="checkbox" checked></label>
+        <div class="button-row">
+          <button id="fly-into-photo" type="button">Fly into the photo</button>
+          <button id="reset-orbit" type="button">Reset orbit</button>
+        </div>
+      </section>
+      <div id="status" class="hint" role="status">
+        Niederhorn above Lake Thun, projected from the photo's solved camera.<br>Drag to orbit, then
+        fly into the photo.
+      </div>
+    </aside>
+    <div class="attribution">
+      Terrain <a href="https://mapterhorn.com/attribution">© Mapterhorn</a> (swisstopo, Copernicus)
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
