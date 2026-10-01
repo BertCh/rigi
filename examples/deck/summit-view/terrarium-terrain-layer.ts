@@ -179,10 +179,7 @@ export class TerrariumTerrainLayer extends Layer<TerrariumTerrainLayerProps> {
     if (props.tiles !== oldProps.tiles) {
       const tileData = new Float32Array(Math.max(props.tiles.length, 1) * 6);
       props.tiles.forEach((tile, index) => {
-        tileData.set(
-          [...tile.latitudeOffsets, ...tile.longitudeOffsets, tile.layer],
-          index * 6
-        );
+        tileData.set([...tile.latitudeOffsets, ...tile.longitudeOffsets, tile.layer], index * 6);
       });
       this.state.tileBuffer?.destroy();
       const tileBuffer = this.context.device.createBuffer({data: tileData});

@@ -49,10 +49,12 @@ export function getCameraAxes(pose: CameraPose): {forward: Vector3; right: Vecto
   ];
   const cosine = Math.cos(roll);
   const sine = Math.sin(roll);
-  const right = levelRight.map(
-    (value, index) => value * cosine - levelUp[index] * sine
-  ) as Vector3;
-  const up = levelUp.map((value, index) => value * cosine + levelRight[index] * sine) as Vector3;
+  const right: Vector3 = [0, 0, 0];
+  const up: Vector3 = [0, 0, 0];
+  for (let index = 0; index < 3; index++) {
+    right[index] = levelRight[index] * cosine - levelUp[index] * sine;
+    up[index] = levelUp[index] * cosine + levelRight[index] * sine;
+  }
   return {forward, right, up};
 }
 

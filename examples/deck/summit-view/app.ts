@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import {COORDINATE_SYSTEM, Deck, OrthographicView} from '@deck.gl/core';
-import {BitmapLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
+import {BitmapLayer, LineLayer, ScatterplotLayer, TextLayer} from '@deck.gl/layers';
 import type {Device, Texture} from '@luma.gl/core';
 import {getDeckExampleProps, type DeckExampleDeviceOptions} from '../deck-example-device';
 import {
@@ -23,13 +23,23 @@ import {SummitView, SummitViewport, getCameraAxes, type SummitViewState} from '.
 import {TerrariumTerrainLayer} from './terrarium-terrain-layer';
 
 /** A summit label in canvas pixels (y down). */
-export type PeakLabel = Peak & {x: number; y: number; visible: boolean};
+export type PeakLabel = Peak & {
+  /** Where the summit projects. */
+  x: number;
+  y: number;
+  /** In the frame and not hidden by nearer terrain. */
+  visible: boolean;
+  /** Baseline of the label text, stacked upwards so neighbouring labels do not overlap. */
+  textY: number;
+};
 
 const PHOTO_URL = new URL('./niederhorn.jpg', import.meta.url).href;
 const CONCURRENT_TILE_REQUESTS = 6;
 const NEAR_PLANE = 80;
 const TEXT_COLOR: [number, number, number, number] = [255, 255, 255, 255];
 const LABEL_BACKGROUND: [number, number, number, number] = [8, 12, 20, 190];
+const LABEL_FONT_SIZE = 13;
+const LABEL_ROW_HEIGHT = 20;
 
 export function createSummitViewScene(
   parent: HTMLDivElement,
@@ -43,8 +53,8 @@ export function createSummitViewScene(
   const photoViewState: SummitViewState = {
     ...camera,
     position: [0, 0, camera.altitude],
-    // GPS puts the lens within about 30 m, and the 0.5 m swissALTI3D surface has it 15 m below
-    // ground on the Niederhorn summit. Terrain nearer than this is not trustworthy: clip it.
+    // GPS places the lens to within about 30 m, and at zoom 14 the DEM puts it 15 m below the
+    // Niederhorn summit surface. Terrain nearer than the near plane is not trustworthy: clip it.
     near: NEAR_PLANE
   };
   let demTexture: Texture | null = null;
@@ -88,7 +98,8 @@ export function createSummitViewScene(
     // The photo camera draws the terrain; a pixel-space view draws the photo and labels on top.
     views: [new SummitView({id: 'photo'}), new OrthographicView({id: 'screen'})],
     viewState: getViewState(),
-    layerFilter: ({layer, viewport}) => layer.id.startsWith('screen-') === (viewport.id === 'screen'),
+    layerFilter: ({layer, viewport}) =>
+      layer.id.startsWith('screen-') === (viewport.id === 'screen'),
     layers: [],
     onDeviceInitialized: device => {
       diagnostics.backend = device.type;
@@ -121,10 +132,8 @@ export function createSummitViewScene(
   });
 
   function getViewState() {
-    return {
-      photo: photoViewState,
-      screen: {target: [width / 2, height / 2, 0] as [number, number, number], zoom: 0}
-    };
+    const screenCenter: [number, number, number] = [width / 2, height / 2, 0];
+    return {photo: photoViewState, screen: {target: screenCenter, zoom: 0}};
   }
 
   function waitForFrame(): Promise<void> {
@@ -166,8 +175,9 @@ export function createSummitViewScene(
           peak.elevation,
           curvatureScale
         );
-      return {...peak, x, y, visible};
+      return {...peak, x, y, visible, textY: y};
     });
+    stackLabels(labels.filter(label => label.visible));
     diagnostics.labels = labels;
     updateLayers();
   }
@@ -198,6 +208,16 @@ export function createSummitViewScene(
           visible: photo !== null && photoBlend > 0,
           parameters: {depthCompare: 'always', depthWriteEnabled: false}
         }),
+        new LineLayer<PeakLabel>({
+          id: 'screen-peak-leaders',
+          data: visibleLabels,
+          visible: labelsVisible,
+          getSourcePosition: label => [label.x, label.y],
+          getTargetPosition: label => [label.x, label.textY],
+          getColor: TEXT_COLOR,
+          getWidth: 1,
+          parameters: {depthCompare: 'always', depthWriteEnabled: false}
+        }),
         new ScatterplotLayer<PeakLabel>({
           id: 'screen-peak-markers',
           data: visibleLabels,
@@ -218,13 +238,12 @@ export function createSummitViewScene(
           visible: labelsVisible,
           characterSet: 'auto',
           fontFamily: 'system-ui, sans-serif',
-          getPosition: label => [label.x, label.y],
-          getText: label => `${label.name} ${Math.round(label.elevation)} m`,
-          getSize: 13,
+          getPosition: label => [label.x, label.textY],
+          getText: getLabelText,
+          getSize: LABEL_FONT_SIZE,
           getColor: TEXT_COLOR,
           getTextAnchor: 'middle',
           getAlignmentBaseline: 'bottom',
-          getPixelOffset: [0, -8],
           background: true,
           getBackgroundColor: LABEL_BACKGROUND,
           backgroundPadding: [5, 2],
@@ -304,4 +323,37 @@ export function createSummitViewScene(
       photo?.close();
     }
   };
+}
+
+function getLabelText(label: Peak): string {
+  return `${label.name} ${Math.round(label.elevation)} m`;
+}
+
+/** Greedy layout: each label rises in steps until its box clears the boxes already placed. */
+function stackLabels(labels: PeakLabel[]): void {
+  const placedBoxes: {left: number; right: number; top: number; bottom: number}[] = [];
+  for (const label of [...labels].sort((first, second) => first.x - second.x)) {
+    // About 0.55 em per character, plus the background padding.
+    const halfWidth = (getLabelText(label).length * 0.55 * LABEL_FONT_SIZE) / 2 + 6;
+    for (let row = 0; ; row++) {
+      const box = {
+        left: label.x - halfWidth,
+        right: label.x + halfWidth,
+        bottom: label.y - 10 - row * LABEL_ROW_HEIGHT,
+        top: label.y - 10 - row * LABEL_ROW_HEIGHT - LABEL_ROW_HEIGHT
+      };
+      const overlaps = placedBoxes.some(
+        placed =>
+          box.left < placed.right &&
+          box.right > placed.left &&
+          box.top < placed.bottom &&
+          box.bottom > placed.top
+      );
+      if (!overlaps) {
+        placedBoxes.push(box);
+        label.textY = box.bottom;
+        break;
+      }
+    }
+  }
 }

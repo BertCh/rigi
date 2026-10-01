@@ -115,7 +115,9 @@ try {
       // Render only: terrain must be visible, with a bright sky above darker ground.
       await page.uncheck('#labels');
       await page.evaluate(() => window.summitViewScene.waitForFrame());
-      const render = await scene.screenshot({path: join(screenshotDirectory, `render-${backend}.png`)});
+      const render = await scene.screenshot({
+        path: join(screenshotDirectory, `render-${backend}.png`)
+      });
       const statistics = await measureScene(page, render);
       console.log(
         `${backend}: sky ${statistics.sky.mean.toFixed(0)}, ground ${statistics.ground.mean.toFixed(0)}, ` +
@@ -160,9 +162,13 @@ try {
         const fallbackPage = await fallbackContext.newPage();
         fallbackPage.on('pageerror', error => fallbackErrors.push(error.message));
         await fallbackPage.goto(url);
-        await fallbackPage.waitForFunction(() => document.body.dataset.ready === 'true', undefined, {
-          timeout: 120_000
-        });
+        await fallbackPage.waitForFunction(
+          () => document.body.dataset.ready === 'true',
+          undefined,
+          {
+            timeout: 120_000
+          }
+        );
         assert.equal(
           await fallbackPage.evaluate(() => window.summitViewScene.diagnostics.backend),
           'webgl',

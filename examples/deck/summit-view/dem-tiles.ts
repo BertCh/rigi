@@ -79,7 +79,8 @@ export function getLocalPositionFromOffsets(
     frame.cosLatitude * (1 - getSmallVersine(latitudeOffset)) -
     frame.sinLatitude * getSmallSine(latitudeOffset);
   const heightScale = 1 + elevation / frame.earthRadius;
-  const east = frame.primeVerticalRadius * cosLatitude * getSmallSine(longitudeOffset) * heightScale;
+  const east =
+    frame.primeVerticalRadius * cosLatitude * getSmallSine(longitudeOffset) * heightScale;
   const north =
     (frame.meridionalRadius * getSmallSine(latitudeOffset) +
       frame.primeVerticalRadius *
@@ -280,7 +281,9 @@ export async function loadDemTile(
   const context = canvas.getContext('2d', {willReadFrequently: true})!;
   context.drawImage(bitmap, 0, 0);
   bitmap.close();
-  const pixels = new Uint8Array(context.getImageData(0, 0, DEM_TILE_SIZE, DEM_TILE_SIZE).data.buffer);
+  const pixels = new Uint8Array(
+    context.getImageData(0, 0, DEM_TILE_SIZE, DEM_TILE_SIZE).data.buffer
+  );
   return {pixels, elevations: getVertexElevations(pixels)};
 }
 

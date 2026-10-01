@@ -2,15 +2,51 @@
 <!-- Rigi -->
 <!-- SPDX-License-Identifier: MIT -->
 <!-- SPDX-FileCopyrightText: Copyright (c) Rigi contributors -->
-<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="icon" href="data:," /><title>Summit view · Rigi</title><link rel="stylesheet" href="./style.css" /></head>
-<body><div id="scene" aria-label="Alpine terrain rendered from a photo's solved camera"></div>
-<aside class="luma-example-infobox luma-example-infobox--overlay"><div class="eyebrow">LUMA.GL + DECK.GL</div><h1>Summit view</h1>
-<section class="control-card"><h2>Scene</h2>
-<label>Renderer<select id="backend"><option value="webgpu">WebGPU</option><option value="webgl">WebGL2</option></select></label>
-<label>Photo blend<input id="photo-blend" type="range" min="0" max="1" step="0.05" value="0" /></label>
-<label class="toggle">Peak labels<input id="labels" type="checkbox" checked /></label>
-<label class="toggle">Earth curvature<input id="earth-curvature" type="checkbox" checked /></label></section>
-<div id="status" class="hint" role="status">Niederhorn above Lake Thun, from the photo's solved camera.<br />Blend in the photo to check the skyline.</div></aside>
-<div class="attribution">Terrain <a href="https://mapterhorn.com/attribution">© Mapterhorn</a> (swisstopo, Copernicus) · Peaks <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a></div>
-<script type="module" src="./main.ts"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title>Summit view · Rigi</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="scene" aria-label="Alpine terrain rendered from a photo's solved camera"></div>
+    <aside class="luma-example-infobox luma-example-infobox--overlay">
+      <div class="eyebrow">LUMA.GL + DECK.GL</div>
+      <h1>Summit view</h1>
+      <section class="control-card">
+        <h2>Scene</h2>
+        <label
+          >Renderer<select id="backend">
+            <option value="webgpu">WebGPU</option>
+            <option value="webgl">WebGL2</option>
+          </select></label
+        >
+        <label
+          >Photo blend<input
+            id="photo-blend"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value="0"
+          ></label
+        >
+        <label class="toggle">Peak labels<input id="labels" type="checkbox" checked></label>
+        <label class="toggle"
+          >Earth curvature<input id="earth-curvature" type="checkbox" checked></label
+        >
+      </section>
+      <div id="status" class="hint" role="status">
+        Niederhorn above Lake Thun, from the photo's solved camera.<br>Blend in the photo to check
+        the skyline.
+      </div>
+    </aside>
+    <div class="attribution">
+      Terrain <a href="https://mapterhorn.com/attribution">© Mapterhorn</a> (swisstopo, Copernicus)
+      · Peaks <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

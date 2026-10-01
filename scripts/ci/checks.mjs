@@ -88,6 +88,14 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "examples",
+		tier: "fast",
+		group: "static",
+		cmd: ["node", "scripts/examples.mjs", "check"],
+		note: "examples/** (luma.gl-style standalone examples): tsc -p per example; the browser smoke is `node scripts/examples.mjs smoke`",
+		timeoutS: 180,
+	},
+	{
 		id: "ontology",
 		tier: "fast",
 		group: "static",
