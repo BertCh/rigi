@@ -139,7 +139,7 @@ export function parseAppleMakerNote(buf: Uint8Array): Record<number, number[]> {
 }
 
 /** Apple MakerNote tag 0x0008 AccelerationVector (units of g, CoreMotion device frame). */
-export function appleGravity(
+function appleGravity(
 	makerNote: Uint8Array | undefined | null,
 ): number[] | null {
 	if (!makerNote) return null;

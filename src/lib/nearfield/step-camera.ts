@@ -35,7 +35,7 @@ import { DEG } from "../geodesy";
 import { clamp } from "../math";
 
 export type StepMode = "photo" | "orbit" | "fly" | "map";
-export const STEP_MODES: readonly StepMode[] = ["photo", "orbit", "fly", "map"];
+const STEP_MODES: readonly StepMode[] = ["photo", "orbit", "fly", "map"];
 /**
  * The engines' step view: 'step' is Step Inside (near-field splats, the photo's sky on a far sphere,
  * the full photo on the drape); 'map' is the In-map view driven by the same camera, in its own style.
@@ -127,7 +127,7 @@ const MODE_FOV: Record<Exclude<StepMode, "photo">, number> = {
 const TRANSITION_MS = 750;
 
 /** Vertical FOV (deg) that fits a photo of `vfov`/`photoAspect` inside a viewport of `viewAspect`. */
-export function fitVfov(
+function fitVfov(
 	vfov: number,
 	photoAspect: number,
 	viewAspect: number,

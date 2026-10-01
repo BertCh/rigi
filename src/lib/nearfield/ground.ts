@@ -52,7 +52,7 @@ export type GroundOpts = {
 	/** The upright test needs at least this many rows. Default 8. */
 	uprightMinRows: number;
 };
-export const GROUND_DEFAULTS: GroundOpts = {
+const GROUND_DEFAULTS: GroundOpts = {
 	maxLogStep: 0.5,
 	bottomBandFrac: 0.15,
 	bottomBandMin: 2,
@@ -96,10 +96,7 @@ export type GroundResult = {
 };
 
 /** Model ray length per depth cell (NaN when invalid). */
-export function modelRayGrid(
-	depth: NearFieldDepth,
-	K: IntrinsicsNorm,
-): Float32Array {
+function modelRayGrid(depth: NearFieldDepth, K: IntrinsicsNorm): Float32Array {
 	const { width: W, height: H } = depth;
 	const out = new Float32Array(W * H);
 	for (let j = 0; j < H; j++)
@@ -361,7 +358,7 @@ export type FarObjectOpts = {
 	/** Max top/bottom-quarter model-depth ratio (standing ≈ 1). Default 1.3. */
 	maxRecede: number;
 };
-export const FAR_OBJECT_DEFAULTS: FarObjectOpts = {
+const FAR_OBJECT_DEFAULTS: FarObjectOpts = {
 	farRadius: 600,
 	discontinuity: 4,
 	skylineFrac: 0.3,

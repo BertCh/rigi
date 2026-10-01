@@ -96,8 +96,6 @@ export const vfovFromHfov = (hfov: number, W: number, H: number) =>
  */
 export const hfovFromAspect = (vfov: number, aspect: number) =>
 	(2 * Math.atan(Math.tan((vfov * Math.PI) / 360) * aspect) * 180) / Math.PI;
-export const vfovFromAspect = (hfov: number, aspect: number) =>
-	(2 * Math.atan(Math.tan((hfov * Math.PI) / 360) / aspect) * 180) / Math.PI;
 
 /** The solvers' pixel camera for a pose on a W×H image. */
 export const poseToCamera = (p: Pose, W: number, H: number): Camera =>

@@ -23,7 +23,7 @@ export type DepthModel = "moge2" | "da3";
 export type GaussianModel = "sharp" | "lift";
 export type RequestOpts = { signal?: AbortSignal; timeoutMs?: number };
 /** /gaussians X-NearField-Meta (service-defined; only the fields the client relies on are typed). */
-export type GaussianMeta = {
+type GaussianMeta = {
 	width?: number;
 	height?: number;
 	intrinsicsNorm?: { fx: number; fy: number; cx: number; cy: number };
@@ -64,7 +64,7 @@ export function f16ToF32(bytes: Uint8Array): Float32Array {
 	return out;
 }
 
-export function base64ToBytes(b64: string): Uint8Array {
+function base64ToBytes(b64: string): Uint8Array {
 	const bin = atob(b64);
 	const out = new Uint8Array(bin.length);
 	for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
@@ -98,7 +98,7 @@ export function decodeDepthWire(
 }
 
 /** A /gaussians body: .splat-v1 (magic RIGISPL1) or a standard 3DGS binary .ply. Throws if neither. */
-export function decodeGaussianBody(buf: ArrayBuffer): GaussianCloud {
+function decodeGaussianBody(buf: ArrayBuffer): GaussianCloud {
 	const head = new TextDecoder("latin1").decode(
 		new Uint8Array(buf, 0, Math.min(8, buf.byteLength)),
 	);

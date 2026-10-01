@@ -105,7 +105,7 @@ export type Placement =
  * wall-clock ('exif-local') was read as UTC; shift it by the zone the batch's GPS'd photos use.
  * GPS-less photos timed only by the file date get NaN (not interpolated).
  */
-export function effectiveTimes(metas: LocalPhotoMeta[]): Map<string, number> {
+function effectiveTimes(metas: LocalPhotoMeta[]): Map<string, number> {
 	const located = metas.filter(hasPosition);
 	const known = located
 		.filter((m) => !m.local.tzEstimated)

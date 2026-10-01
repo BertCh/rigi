@@ -16,6 +16,7 @@ import type {
 	UnknownPoseResult,
 } from "#/lib/integration/unknown-pose";
 import type { MatchResult } from "#/lib/matcher-client";
+import type { RelRotationEvidence } from "#/lib/nearfield/propagate";
 import type { CandidateSource } from "#/lib/picker/candidates";
 import type { AlignStatus } from "#/lib/roll/align/align";
 import type { AnchorKind } from "#/lib/roll/propagate/plan";
@@ -323,3 +324,10 @@ export const CANDIDATE_SOURCE = {
 	cascade: { agent: "solver", method: "cascade", status: "candidate" },
 	tap: { agent: "user", method: "picker-tap", status: "candidate" },
 } as const satisfies Record<CandidateSource, ProvenanceClass>;
+
+/** How a neighbour's relative rotation was measured (nearfield/propagate.ts RelRotationEvidence.method). */
+export const RELATIVE_ROTATION_METHOD = {
+	rot: { agent: "solver", method: "relrot-features", role: "observation" },
+	ess: { agent: "solver", method: "relrot-essential", role: "observation" },
+	da3: { agent: "model", method: "relrot-da3", role: "observation" },
+} as const satisfies Record<RelRotationEvidence["method"], ProvenanceClass>;

@@ -17,7 +17,7 @@ type Feature = {
 	properties: Record<string, unknown>;
 };
 
-export function rollToGeoJSON(roll: Roll) {
+function rollToGeoJSON(roll: Roll) {
 	const features: Feature[] = [];
 	for (const p of roll.photos) {
 		const m = p.meta;

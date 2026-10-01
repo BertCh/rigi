@@ -12,6 +12,7 @@
 //   3. otherwise the best guess is shown as "unverified".
 
 import type { Pose } from "#/lib/camera";
+import type { CascadeStage } from "#/lib/geo/pipeline";
 import { priorHeading } from "#/lib/geocam/priors/heading";
 import {
 	type GpuProfile,
@@ -96,7 +97,7 @@ export type UnknownPoseResult = {
 	pose: Pose;
 	confidence: number;
 	accepted: boolean;
-	stage: "solve" | "refine";
+	stage: CascadeStage;
 	/**
 	 * every cascade stage that ran, in order (solve, then refine on reject), for the chosen focal seed and
 	 * then the other focal seeds; near-duplicates dropped, at most MAX_CANDIDATES. `pose` is the first
@@ -105,7 +106,7 @@ export type UnknownPoseResult = {
 	candidates: {
 		pose: Pose;
 		confidence: number;
-		stage: "solve" | "refine";
+		stage: CascadeStage;
 		accepted: boolean;
 	}[];
 	/** one entry per focal seed (a single one when the focal is known) */
@@ -115,7 +116,7 @@ export type UnknownPoseResult = {
 		solvedVfov: number;
 		confidence: number;
 		accepted: boolean;
-		stage: "solve" | "refine";
+		stage: CascadeStage;
 	}[];
 	ms: { horizon: number; total: number };
 	/** where the 360° horizon was marched (src/lib/gpu/horizon/scene-profile.ts when "gpu") */

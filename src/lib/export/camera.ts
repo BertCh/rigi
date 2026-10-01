@@ -100,7 +100,7 @@ export type CameraModel = {
 
 const D = Math.PI / 180;
 
-export function mat3FromCols(
+function mat3FromCols(
 	a: ArrayLike<number>,
 	b: ArrayLike<number>,
 	c: ArrayLike<number>,

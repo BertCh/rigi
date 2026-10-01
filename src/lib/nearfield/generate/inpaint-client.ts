@@ -59,11 +59,7 @@ export async function rgbaToPng(
 }
 
 /** 0/1 mask (row 0 = top) → greyscale PNG (255 = hole). */
-export function maskToPng(
-	mask: Uint8Array,
-	w: number,
-	h: number,
-): Promise<Blob> {
+function maskToPng(mask: Uint8Array, w: number, h: number): Promise<Blob> {
 	const rgba = new Uint8ClampedArray(4 * w * h);
 	for (let k = 0; k < w * h; k++) {
 		const v = mask[k] ? 255 : 0;
@@ -76,7 +72,7 @@ export function maskToPng(
 }
 
 /** Decode an image blob to RGBA at its own size. */
-export async function blobToRgba(
+async function blobToRgba(
 	b: Blob,
 ): Promise<{ width: number; height: number; data: Uint8ClampedArray }> {
 	const bmp = await createImageBitmap(b, {

@@ -109,7 +109,7 @@ export function confidenceRadiusFrom(ranges: ArrayLike<number>): number {
  * 1 when fewer than 30 Gaussians can be compared. A cloud lifted from the same depth gives exactly 1; a
  * SHARP cloud (own metric scale) gives its scale relative to the depth the anchor was fitted on.
  */
-export function cloudDepthScale(
+function cloudDepthScale(
 	positions: Float32Array,
 	count: number,
 	K: IntrinsicsNorm,
@@ -146,7 +146,7 @@ export function cloudDepthScale(
  * scales), and classified against the DEM with classifyRange at its photo pixel (intrinsics `K`).
  * Off-image and sky-mask Gaussians are dropped. Returns a camera-frame cloud.
  */
-export function anchorAndFilterCloud(
+function anchorAndFilterCloud(
 	cloud: GaussianCloud,
 	anchor: AnchorLike,
 	K: IntrinsicsNorm,
@@ -229,7 +229,7 @@ export function anchorAndFilterCloud(
 }
 
 /** Placed ray lengths (grounded factor, else the anchor) of the depth cells of one class. */
-export function classRanges(
+function classRanges(
 	depth: NearFieldDepth,
 	split: SplitResult,
 	anchor: AnchorLike,
@@ -353,9 +353,7 @@ export function buildNearFieldScene(input: BuildSceneInput): NearFieldScene {
 	};
 }
 
-export function emptyCloud(
-	frame: GaussianCloud["frame"] = "camera",
-): GaussianCloud {
+function emptyCloud(frame: GaussianCloud["frame"] = "camera"): GaussianCloud {
 	return {
 		count: 0,
 		frame,

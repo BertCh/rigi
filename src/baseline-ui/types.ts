@@ -5,6 +5,7 @@
 import type { Camera } from "#/lib/geo/camera";
 import type { PeakView } from "#/lib/geo/peaks";
 import type { ExifPhotoMeta } from "#/lib/geo/photo-meta";
+import type { CascadeStage } from "#/lib/geo/pipeline";
 import type { SkylineObservation } from "#/lib/geo/skyline";
 import type { RealmGpuOptions } from "#/lib/gpu/core/realm";
 
@@ -49,7 +50,7 @@ export interface AlignResult {
 	accepted: boolean;
 	rejectReason?: string;
 	/** Which tier produced the pose: solvePose, or refinePose after a reject. */
-	method?: "solve" | "refine";
+	method?: CascadeStage;
 	/** Where the coarse grid ran (diagnostic; the pose is identical either way). */
 	solveOn?: "gpu" | "cpu" | "mixed";
 }

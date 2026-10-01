@@ -8,6 +8,7 @@
 // saved (headless screenshots); while it is active, edits stay in memory for that tab only.
 // Other tabs follow through the `storage` event.
 import { useCallback, useSyncExternalStore } from "react";
+import { flagFrom } from "#/lib/flags";
 import { storageKey } from "#/lib/ontology/core/storage";
 import {
 	isPresetId,
@@ -53,12 +54,8 @@ export function serializeState(s: StyleState): string {
 /** `?style=<preset>` from a location.search string, or null. */
 export function urlPreset(search: string | null | undefined): PresetId | null {
 	if (!search) return null;
-	try {
-		const p = new URLSearchParams(search).get(STYLE_URL_PARAM);
-		return isPresetId(p) ? p : null;
-	} catch {
-		return null;
-	}
+	const p = flagFrom(search, STYLE_URL_PARAM);
+	return isPresetId(p) ? p : null;
 }
 
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;

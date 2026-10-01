@@ -18,9 +18,9 @@ import type { ForegroundMask } from "#/lib/segment";
 import type { RangeGpu } from "./range-gpu";
 
 /** Photos in the full-resolution first atlas. */
-export const ATLAS0_PHOTOS = 16;
+const ATLAS0_PHOTOS = 16;
 /** Photo atlases the shader binds (sampler count stays well under WebGL2's 16 units). */
-export const MAX_PHOTO_ATLASES = 4;
+const MAX_PHOTO_ATLASES = 4;
 /** Largest atlas side (px): safe on every WebGL2 device and keeps each atlas ≤ 64 MB. */
 const MAX_SIDE = 4096;
 
@@ -47,7 +47,7 @@ function coarsen(data: Float32Array, w: number, h: number): CoarseRange {
 	return { width: cw, height: ch, data: out };
 }
 
-export type DrapeCell = {
+type DrapeCell = {
 	/** Which photo atlas (0..3). */
 	atlas: number;
 	/** Photo rect in its atlas (uv). */
@@ -73,7 +73,7 @@ function grid(n: number) {
 }
 
 /** Photo atlas plan: [{ first photo, count, cell px }]. */
-export function planAtlases(n: number) {
+function planAtlases(n: number) {
 	const plan: { first: number; count: number; cell: number }[] = [];
 	if (!n) return plan;
 	plan.push({ first: 0, count: Math.min(n, ATLAS0_PHOTOS), cell: 1024 });

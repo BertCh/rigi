@@ -179,7 +179,7 @@ export function _resetRegionMemo() {
 }
 
 /** Memo key: bundled regions by their own id (the reuse test is exact-position), else the cell. */
-export function regionKeyFor(lat: number, lon: number, force = false) {
+function regionKeyFor(lat: number, lon: number, force = false) {
 	const bundled = force ? null : bundledRegionIdFor(lat, lon);
 	return bundled
 		? { key: `bundled:${bundled}`, bundled }

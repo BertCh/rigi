@@ -318,6 +318,10 @@ Trusted auto (`isTrustedAuto`) means: an automatic agent, status `accepted`, and
 | `sky-fallback` | rule | Colour-based sky fallback | pixels | sky | lib/sky |
 | `sky-model` | model | Sky segmentation network | pixels | sky | lib/sky |
 | `depth-model` | model | Monocular depth (MoGe-2 / DA3) | pixels | depth | lib/nearfield |
+| `depth-multiview` | model | Multi-view depth (DA3 /multiview) placed by Rigi's poses or as one rigid reconstruction | pixels, rotation | depth, geometry | lib/nearfield/roll/roll-spot.ts |
+| `relrot-features` | solver | Relative rotation: ALIKED+LightGlue matches, pure-rotation RANSAC | pixels | orientation | lib/nearfield/propagate.ts |
+| `relrot-essential` | solver | Relative rotation from the essential matrix | pixels | orientation | lib/nearfield/propagate.ts |
+| `relrot-da3` | model | Relative rotation from DA3 /multiview cameras | pixels | orientation | lib/nearfield/propagate.ts |
 | `splat-model` | model | Gaussian splat lift (SHARP / lift) | pixels | geometry | lib/nearfield |
 | `generative-model` | model | Novel-view generation | pixels | geometry | lib/nearfield/generate |
 
@@ -414,6 +418,16 @@ Each table maps every member of an app union onto the canonical axes, and tsc en
 | `align` | agent=solver · method=skyline-align · status=candidate |  |
 | `cascade` | agent=solver · method=cascade · status=candidate |  |
 | `tap` | agent=user · method=picker-tap · status=candidate |  |
+
+### RelRotationEvidence.method
+
+`lib/nearfield/propagate.ts`
+
+| value | provenance | UI |
+|---|---|---|
+| `rot` | agent=solver · method=relrot-features · role=observation |  |
+| `ess` | agent=solver · method=relrot-essential · role=observation |  |
+| `da3` | agent=model · method=relrot-da3 · role=observation |  |
 
 ### AlignStatus (roll)
 
@@ -547,6 +561,17 @@ Each table maps every member of an app union onto the canonical axes, and tsc en
 |---|---|---|
 | `model` | agent=model · method=sky-model |  |
 | `fallback` | agent=rule · method=sky-fallback · level=low |  |
+
+### SpotDepthSource
+
+`lib/nearfield/roll/roll-spot.ts`
+
+| value | provenance | UI |
+|---|---|---|
+| `multiview` | agent=model · method=depth-multiview |  |
+| `multiview-joint` | agent=model · method=depth-multiview |  |
+| `moge2` | agent=model · method=depth-model |  |
+| `da3` | agent=model · method=depth-model |  |
 
 ### View mode and blend method (UI words)
 

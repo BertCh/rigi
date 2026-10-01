@@ -72,6 +72,11 @@ const CROSSWALKS: [string, string, Record<string, ProvenanceClass>][] = [
 		pose.UNKNOWN_OUTCOME_SOURCE,
 	],
 	["CandidateSource", "lib/picker/candidates.ts", pose.CANDIDATE_SOURCE],
+	[
+		"RelRotationEvidence.method",
+		"lib/nearfield/propagate.ts",
+		pose.RELATIVE_ROTATION_METHOD,
+	],
 	["AlignStatus (roll)", "lib/roll/align/align.ts", pose.ROLL_ALIGN_STATUS],
 	[
 		"RowStatus (propagate)",
@@ -109,6 +114,11 @@ const CROSSWALKS: [string, string, Record<string, ProvenanceClass>][] = [
 	],
 	["nearfield Provenance", "lib/nearfield/types.ts", world.SPLAT_PROVENANCE],
 	["SkyMask.source", "lib/sky/index.ts", world.SKY_SOURCE],
+	[
+		"SpotDepthSource",
+		"lib/nearfield/roll/roll-spot.ts",
+		world.SPOT_DEPTH_SOURCE,
+	],
 ];
 
 export function renderOntologyDoc(): string {

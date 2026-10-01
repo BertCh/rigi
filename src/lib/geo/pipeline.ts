@@ -75,7 +75,8 @@ export type CascadeOptions = {
 	refine?: RefineOptions;
 	gpsAccuracy?: number;
 };
-type Stage = "solve" | "refine";
+/** The cascade tier that produced a pose: solvePose, or refinePose after solve rejects. */
+export type CascadeStage = "solve" | "refine";
 
 /**
  * solvePose, escalating a reject to refinePose (scripts/eval.ts SOLVER=cascade). Returns the first
@@ -118,7 +119,7 @@ function escalate(
 ) {
 	const { camera, confidence, accepted, residualPx, rejectReason } = s;
 	const solve = {
-		stage: "solve" as Stage,
+		stage: "solve" as CascadeStage,
 		camera,
 		confidence,
 		accepted,
@@ -134,7 +135,7 @@ function escalate(
 		options: o.refine,
 	});
 	const refine = {
-		stage: "refine" as Stage,
+		stage: "refine" as CascadeStage,
 		camera: r.camera,
 		confidence: r.confidence.score,
 		accepted: r.confidence.accept,

@@ -27,7 +27,7 @@ export type PanoMesh = {
 	elMax: number;
 };
 
-export function azElOf(d: ArrayLike<number>): [number, number] {
+function azElOf(d: ArrayLike<number>): [number, number] {
 	return [
 		Math.atan2(d[0], d[1]) * R2D,
 		Math.asin(Math.max(-1, Math.min(1, d[2]))) * R2D,

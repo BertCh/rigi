@@ -208,7 +208,7 @@ function cholSolve(A: Float64Array, b: Float64Array, n: number) {
 	return x;
 }
 
-export type PairStat = { a: number; b: number; w: number; d: Vec3 };
+type PairStat = { a: number; b: number; w: number; d: Vec3 };
 
 /**
  * The per-photo linear gains (null = no overlap evidence: leave the photos alone). `stale` is polled
@@ -331,7 +331,7 @@ export async function solveGains(
 const clampGain = (g: number) => Math.min(GAIN_MAX, Math.max(GAIN_MIN, g));
 
 /** The regularised, Huber-reweighted least squares of the header: log gains per photo (3 channels). */
-export function solveLogGains(N: number, pairs: readonly PairStat[]): Vec3[] {
+function solveLogGains(N: number, pairs: readonly PairStat[]): Vec3[] {
 	const degree = (2 * pairs.reduce((s, p) => s + p.w, 0)) / N;
 	const lambda = Math.max(0.1 * degree, 1e-3);
 	const out: Vec3[] = Array.from({ length: N }, () => [0, 0, 0]);

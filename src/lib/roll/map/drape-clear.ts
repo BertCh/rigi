@@ -48,9 +48,9 @@ import {
 } from "./drape-gains";
 
 /** Blend of the corrected colour (look/clear-air.ts amount). */
-export const CLEAR_AMOUNT = 0.85;
+const CLEAR_AMOUNT = 0.85;
 /** Lowest transmittance divided by (caps the gain at 1/floor on far, noisy ridges). */
-export const CLEAR_FLOOR = 0.3;
+const CLEAR_FLOOR = 0.3;
 /** Long side (px) of the range grid the fit runs on; the photo goes in at 2×. */
 const FIT_LONG = 256;
 /** Long side (px) of the photo copy kept for fits and gains (= 2 × FIT_LONG). */
@@ -95,7 +95,7 @@ const flat = (v: ClearAirValues, e: Vec3) => [
 ];
 
 /** A fit as the drape's clear-air values, or CLEAR_AIR_OFF when it isn't trustworthy. */
-export function clearValuesOf(fit: HazeFit | null): ClearAirValues {
+function clearValuesOf(fit: HazeFit | null): ClearAirValues {
 	if (!fit || fit.quality < FIT_MIN_QUALITY) return CLEAR_AIR_OFF;
 	const k = fit.strength;
 	return {

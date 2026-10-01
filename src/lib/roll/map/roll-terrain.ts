@@ -46,10 +46,7 @@ export type RollTerrainOptions = {
 
 type Choice = { key: TileKey; distance: number; size: number; seg: number };
 
-export function selectRollTiles(
-	frame: EnuFrame,
-	o: RollTerrainOptions,
-): Choice[] {
+function selectRollTiles(frame: EnuFrame, o: RollTerrainOptions): Choice[] {
 	const { foci, radiusM } = o;
 	const lod = o.lod ?? 1.5;
 	const lodContext = o.lodContext ?? 0.8;

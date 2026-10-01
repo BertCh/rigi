@@ -154,7 +154,7 @@ export function poseKey(p: Pose, eye: { x: number; y: number; z: number }) {
 }
 
 /** Dev flag: ?nearfield=sharp uses Apple SHARP (research-only weights) for the splats. */
-export function gaussianModelFromUrl(): GaussianModel {
+function gaussianModelFromUrl(): GaussianModel {
 	return getFlag("nearfield") === "sharp" ? "sharp" : "lift";
 }
 

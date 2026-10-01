@@ -34,7 +34,7 @@ export async function listUploadRolls(): Promise<{
  * Pick a local roll by id: the stable `local-roll-<hash>` (else the roll now holding photo
  * `local-<hash>`, e.g. after an earlier photo joined it), or a legacy `local-roll-<n>` index.
  */
-export function findUploadRoll(rolls: Roll[], id: string): Roll | null {
+function findUploadRoll(rolls: Roll[], id: string): Roll | null {
 	const exact = rolls.find((r) => r.id === id);
 	if (exact) return exact;
 	const n = legacyUploadRollIndex(id);

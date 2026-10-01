@@ -114,7 +114,7 @@ export function splatLicence(model: string | undefined | null): SplatLicence {
 }
 
 /** Rough Swiss bounding box (LV95 domain), WGS84 degrees. A box, not the border: it also covers e.g. Chamonix. */
-export const inSwitzerland = (lat: number, lon: number) =>
+const inSwitzerland = (lat: number, lon: number) =>
 	lat >= 45.8 && lat <= 47.9 && lon >= 5.9 && lon <= 10.6;
 
 const emptyCounts = (): Record<Provenance, number> => ({
@@ -178,7 +178,7 @@ function sceneModel(scene: NearFieldScene, meta: SplatExportMeta) {
 }
 
 /** The header comment lines (without the "comment " prefix) for a scene export. */
-export function splatHeaderLines(
+function splatHeaderLines(
 	scene: NearFieldScene,
 	meta: SplatExportMeta,
 	stats: SplatExportStats,
