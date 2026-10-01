@@ -9,9 +9,12 @@
 // so heights are bit-identical to decodeTerrarium OF THE SAME RGBA BYTES. Whether the texture holds
 // the same bytes as the canvas getImageData path is measured by scripts/gpu/terrarium-ingest-check.mjs.
 //
-// Opt-in: nothing in the app calls this yet (the TextureArrayAtlas WP integrates it). validateTile
+// The app's GPU decode path is terrarium-tile.ts (flag terrainGpuDecode: decode + 2× downsample +
+// stats, written into the terrain height atlas with addHeightsToTexture); the node and the one-shot
+// decodeTerrariumTileGpu here are the reference the browser gate compares it with. validateTile
 // (NO_DATA fill, ±256 m R-channel repair) stays on the CPU: decodeTerrariumTileGpu returns heights the
-// caller validates exactly as it validates decodeTerrarium's.
+// caller validates exactly as it validates decodeTerrarium's, and the tile path counts the samples
+// validateTile would fill and leaves those tiles to the CPU.
 //
 //   const g = new ComputeGraph(device, "dem");
 //   const rgba = importTextureResource(g, uploadBitmap(device, bmp, { id: "rgba" }));
@@ -142,6 +145,7 @@ export function addTerrariumDecode<P>(
 /**
  * Add a copy node: `width × height` f32 heights at `heights` + `byteOffset` → `layer` of the r32float
  * texture `target` (copyBufferToTexture; rows must be 256-byte aligned, true for 64·k px widths).
+ * `layer` may be per run (a function of the run's parameters, e.g. an atlas slot).
  */
 export function addHeightsToTexture<P>(
 	g: ComputeGraph<P>,
@@ -152,7 +156,7 @@ export function addHeightsToTexture<P>(
 		width: number;
 		height: number;
 		byteOffset?: number;
-		layer?: number;
+		layer?: number | ((parameters: P) => number);
 		dependsOn?: string[];
 	},
 ): ComputeGraph<P> {
@@ -175,12 +179,16 @@ export function addHeightsToTexture<P>(
 			{ texture: target, usage: "copy-destination" },
 		],
 		compile: () => ({
-			encode: ({ commandEncoder, getBuffer, getTexture }) =>
+			encode: ({ commandEncoder, getBuffer, getTexture, parameters }) =>
 				commandEncoder.copyBufferToTexture({
 					sourceBuffer: getBuffer(heights),
 					byteOffset,
 					destinationTexture: getTexture(target),
-					origin: [0, 0, layer],
+					origin: [
+						0,
+						0,
+						typeof layer === "function" ? layer(parameters) : layer,
+					],
 					bytesPerRow: width * 4,
 					rowsPerImage: height,
 					size: [width, height, 1],

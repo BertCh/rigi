@@ -66,3 +66,98 @@ export function inexactPartial(r: number, g: number, b: number): string | null {
 	for (const [name, v] of parts) if (f(v) !== v) return name;
 	return null;
 }
+
+// ---------- the tile kernel (terrarium-tile.ts TERRARIUM_TILE_WGSL) ----------
+//
+// Decode + optional 2× box downsample + statistics, for tiles the CPU path would leave untouched by
+// validateTile (no sample outside (MIN_VALID, 9000)): the kernel counts those samples and the caller
+// falls back to the CPU path when there is one. Why the downsample is exact when the count is 0: every
+// valid sample is a multiple of 1/256 in (−1000, 9000), so every partial sum of four of them (in any
+// order, with or without FMA) is a multiple of 1/256 below 36000 < 2^16 in magnitude, i.e. at most 24
+// significant bits, and × 0.25 is exact: the f32 GPU mean equals the f64 CPU mean (downsampleHeights2)
+// stored to f32. Min / max are exact comparisons; the kernel reduces them as order-preserving u32 keys.
+
+/** validateTile's valid range (dem/decode.ts: MIN_VALID < h < 9000). */
+export const VALID_MIN = -1000;
+export const VALID_MAX = 9000;
+
+/** f32 → u32 key whose unsigned order is the float order (no NaN in Terrarium heights). */
+export function orderKey(h: number): number {
+	const b = new Uint32Array(new Float32Array([h]).buffer)[0];
+	return (b & 0x80000000 ? ~b : b | 0x80000000) >>> 0;
+}
+/** orderKey's inverse. */
+export function fromOrderKey(k: number): number {
+	const b = (k & 0x80000000 ? k & 0x7fffffff : ~k) >>> 0;
+	return new Float32Array(new Uint32Array([b]).buffer)[0];
+}
+
+/** The tile kernel's result: heights (out × out) and its statistics words, decoded. */
+export type TerrariumTileResult = {
+	heights: Float32Array;
+	/** source samples outside (VALID_MIN, VALID_MAX) */
+	invalid: number;
+	lo: number;
+	hi: number;
+	lo7: number;
+	hi7: number;
+};
+
+/** The stats words the kernel writes (u32 × 8) → numbers. lo / lo7 are stored as ~key (atomicMax). */
+export function decodeTileStats(
+	words: Uint32Array,
+): Omit<TerrariumTileResult, "heights"> {
+	return {
+		invalid: words[0],
+		lo: fromOrderKey(~words[1] >>> 0),
+		hi: fromOrderKey(words[2]),
+		lo7: fromOrderKey(~words[3] >>> 0),
+		hi7: fromOrderKey(words[4]),
+	};
+}
+
+/**
+ * The tile kernel on the CPU, in f32 with the WGSL's operation order: `rgba` (S × S texels, the
+ * texture's bytes) → (S/down)² heights + stats words. The node check compares it with the CPU twin.
+ */
+export function terrariumTileF32(
+	rgba: Uint8Array | Uint8ClampedArray,
+	S: number,
+	down: 1 | 2,
+): { heights: Float32Array; words: Uint32Array } {
+	const out = S / down;
+	const heights = new Float32Array(out * out);
+	const words = new Uint32Array(8);
+	const texel = (x: number, y: number) => {
+		const o = (y * S + x) * 4;
+		return terrariumF32(rgba[o], rgba[o + 1], rgba[o + 2]);
+	};
+	const bad = (h: number) => (h > VALID_MIN && h < VALID_MAX ? 0 : 1);
+	for (let y = 0; y < out; y++)
+		for (let x = 0; x < out; x++) {
+			let h: number;
+			let n: number;
+			if (down === 1) {
+				h = texel(x, y);
+				n = bad(h);
+			} else {
+				const a = texel(2 * x, 2 * y);
+				const b = texel(2 * x + 1, 2 * y);
+				const c = texel(2 * x, 2 * y + 1);
+				const d = texel(2 * x + 1, 2 * y + 1);
+				n = bad(a) + bad(b) + bad(c) + bad(d);
+				h = f(f(f(f(a + b) + c) + d) * 0.25);
+			}
+			const i = y * out + x;
+			heights[i] = h;
+			words[0] += n;
+			const k = orderKey(h);
+			words[1] = Math.max(words[1], ~k >>> 0);
+			words[2] = Math.max(words[2], k);
+			if (i % 7 === 0) {
+				words[3] = Math.max(words[3], ~k >>> 0);
+				words[4] = Math.max(words[4], k);
+			}
+		}
+	return { heights, words };
+}

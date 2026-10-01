@@ -236,6 +236,24 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"GPU Terrarium decode (W2.3); CPU twin dem/decode.ts decodeTerrarium",
 	},
 	{
+		id: "ingest-terrarium-tile",
+		island: "I1",
+		paths: ["src/lib/gpu/ingest/terrarium-tile.ts"],
+		groups: ["ingest-terrarium-tile"],
+		graphIdPrefixes: ["ingest-terrarium-layer|"],
+		realms: ["page"],
+		cadence: "per tile",
+		resources: [
+			"tile rgba8unorm texture (import; staging per source size for the layer writer)",
+			"heights f32 + stats u32×8 (transients)",
+			"height atlas r32float 2d-array (import, per-run layer)",
+		],
+		readbacks: ["stats: 32 B per tile (read node)"],
+		status: "not wired",
+		notes:
+			"WAG W2.3: Terrarium tile decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi (terrariumTileStatsGpu), and TerrariumLayerWriter into a height-atlas layer. CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
+	},
+	{
 		id: "look-relief-heights",
 		island: "I1",
 		paths: ["src/lib/gpu/look/relief-heights.ts"],

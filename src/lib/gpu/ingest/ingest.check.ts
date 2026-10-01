@@ -11,10 +11,16 @@
 //  2. unorm8 → byte: round(f32(k/255) · 255) == k for all 256 k, also with the load perturbed by
 //     up to ±4 ULP;
 //  3. the WGSL multiplies by 1/256 (never divides) and uses the twin's constants;
-//  4. layout math: raster formats, byte sizes, copy alignment, workgroups.
+//  4. layout math: raster formats, byte sizes, copy alignment, workgroups;
+//  5. the tile kernel (terrarium-tile.ts, flag terrainGpuDecode): its f32 twin (terrariumTileF32) ==
+//     decodeTerrarium + downsampleHeights2 + heightStats bit for bit on tiles validateTile leaves alone,
+//     its out-of-range count == validateTile's fill count, every partial sum of a 2×2 block is f32-exact,
+//     order keys, WGSL constants.
 // What this does not cover: the texel BYTES copyExternalImageToTexture produces (browser check
 // scripts/gpu/terrarium-ingest-check.mjs).
-import { decodeTerrarium } from "#/lib/dem/decode";
+import { heightStats } from "#/lib/dem/cpu-heights";
+import { decodeTerrarium, validateTile } from "#/lib/dem/decode";
+import { downsampleHeights2 } from "#/lib/dem/grid";
 import {
 	bufferByteLength,
 	bytesPerTexel,
@@ -25,12 +31,18 @@ import {
 	texelWorkgroups,
 } from "./layout";
 import {
+	decodeTileStats,
+	fromOrderKey,
 	INV_256,
 	inexactPartial,
 	OFFSET,
+	orderKey,
 	SEA_FLOOR,
 	terrariumF32,
+	terrariumTileF32,
 	unormToByte,
+	VALID_MAX,
+	VALID_MIN,
 } from "./terrarium-f32";
 
 let failures = 0;
@@ -193,6 +205,149 @@ try {
 		bad === 0 && threw,
 		`${cases.length} cases, ${bad} wrong${threw ? "" : "; 2-band Uint16 did not throw"}`,
 	);
+}
+
+// ---------------- 5. the tile kernel (decode + 2× downsample + stats, terrarium-tile.ts) ----------------
+{
+	const t0 = performance.now();
+	let seed = 12345;
+	const rnd = () => {
+		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+		return seed / 4294967296;
+	};
+	/** RGBA of an exact Terrarium height (a multiple of 1/256 in [−32768, 32768)). */
+	const put = (rgba: Uint8Array, i: number, h: number) => {
+		const n = Math.round((h + OFFSET) * 256);
+		rgba[i * 4] = n >>> 16;
+		rgba[i * 4 + 1] = (n >>> 8) & 255;
+		rgba[i * 4 + 2] = n & 255;
+		rgba[i * 4 + 3] = 255;
+	};
+	const q = (h: number) => Math.round(h * 256) / 256;
+	// near the validity bounds, the sea clamp and 0, mixed into 2×2 blocks
+	const EDGE = [
+		-999.99609375, -999.5, -0.00390625, -11999, 0, 0.00390625, 8999.99609375,
+		8999.5, 4500.25, 1234.56640625,
+	];
+	type Case = { name: string; S: number; rgba: Uint8Array };
+	const cases: Case[] = [];
+	for (let t = 0; t < 24; t++) {
+		const S = [16, 64, 256, 512][t % 4];
+		const rgba = new Uint8Array(S * S * 4);
+		const base = rnd() * 4000;
+		for (let i = 0; i < S * S; i++) {
+			const kind = rnd();
+			const h =
+				t % 6 === 5 && kind < 0.3
+					? EDGE[Math.floor(rnd() * EDGE.length)]
+					: q(base + (rnd() - 0.5) * 3000);
+			put(rgba, i, Math.min(8999.99609375, Math.max(-999.99609375, h)));
+		}
+		// a few tiles with samples validateTile fills (no data, R = 0; too high)
+		if (t % 5 === 2) {
+			put(rgba, 3, -32768);
+			put(rgba, S * S - 1, 9000);
+			put(rgba, S + 5, 12000.5);
+		}
+		cases.push({ name: `tile ${t} (${S} px)`, S, rgba });
+	}
+	let compared = 0;
+	let heightBad = 0;
+	let statBad = 0;
+	let invalidBad = 0;
+	let firstBad = "";
+	const bits = (a: Float32Array) =>
+		new Uint32Array(a.buffer, a.byteOffset, a.length);
+	for (const c of cases)
+		for (const down of [1, 2] as const) {
+			// CPU twin: decodeTerrarium → validateTile's fill count → downsampleHeights2 → heightStats
+			const h = decodeTerrarium(c.rgba);
+			const filled = validateTile(
+				Float32Array.from(h),
+				c.S,
+				Number.POSITIVE_INFINITY,
+			).filled;
+			const cpu = down === 2 ? downsampleHeights2(h, c.S) : h;
+			const st = heightStats(cpu);
+			const gpu = terrariumTileF32(c.rgba, c.S, down);
+			const ws = decodeTileStats(gpu.words);
+			compared++;
+			if (ws.invalid !== filled) {
+				invalidBad++;
+				firstBad ||= `${c.name}/${down}: invalid ${ws.invalid} vs filled ${filled}`;
+			}
+			if (filled) continue; // the CPU path keeps such tiles
+			const a = bits(gpu.heights);
+			const b = bits(cpu);
+			let diff = a.length !== b.length ? 1 : 0;
+			for (let i = 0; i < a.length && !diff; i++) if (a[i] !== b[i]) diff++;
+			if (diff) {
+				heightBad++;
+				firstBad ||= `${c.name}/${down}: heights differ`;
+			}
+			if (
+				!Object.is(ws.lo, st.lo) ||
+				!Object.is(ws.hi, st.hi) ||
+				!Object.is(ws.lo7, st.lo7) ||
+				!Object.is(ws.hi7, st.hi7)
+			) {
+				statBad++;
+				firstBad ||= `${c.name}/${down}: stats ${JSON.stringify(ws)} vs ${JSON.stringify(st)}`;
+			}
+		}
+	check(
+		"tile kernel twin == decodeTerrarium + downsampleHeights2 + heightStats; invalid == validateTile fills",
+		!heightBad && !statBad && !invalidBad,
+		`(${compared} tile×down cases, ${heightBad} height / ${statBad} stats / ${invalidBad} count mismatches) ${firstBad}`,
+	);
+	// every partial sum of four valid samples is f32-exact (the downsample argument's premise)
+	let inexact = 0;
+	for (let i = 0; i < 200000; i++) {
+		const v = [0, 1, 2, 3].map(() =>
+			i % 3
+				? q(-999.99609375 + rnd() * 9999.9921875)
+				: EDGE[Math.floor(rnd() * EDGE.length)],
+		);
+		for (let m = 1; m < 16; m++) {
+			let sum = 0;
+			for (let k = 0; k < 4; k++) if (m & (1 << k)) sum += v[k];
+			if (Math.fround(sum) !== sum || Math.fround(sum * 0.25) !== sum * 0.25)
+				inexact++;
+		}
+	}
+	check(
+		"every partial sum (and its quarter) of four valid samples is exact in f32",
+		!inexact,
+		`(200000 quadruples × 15 subsets, ${inexact} inexact)`,
+	);
+	// the order keys sort like the floats and round-trip
+	const vals = [
+		-32768, -12000.5, -999.99609375, -0.00390625, 0, 0.00390625, 1, 255.5,
+		8999.99609375, 9000, 32767.99609375,
+	];
+	const keys = vals.map(orderKey);
+	check(
+		"orderKey is monotone and inverts",
+		keys.every((k, i) => i === 0 || k > keys[i - 1]) &&
+			vals.every((v, i) => Object.is(fromOrderKey(keys[i]), v)),
+	);
+	try {
+		const { TERRARIUM_TILE_WGSL } = await import("./terrarium-tile");
+		const body = TERRARIUM_TILE_WGSL.replace(/\/\/.*$/gm, "");
+		check(
+			"tile WGSL: no f32 division, the twin's constants",
+			!body.replace("/ DOWN", "").includes("/") &&
+				body.includes(`* ${INV_256}`) &&
+				body.includes(`- ${OFFSET}.0`) &&
+				body.includes(`> ${SEA_FLOOR}.0`) &&
+				body.includes(`h > ${VALID_MIN}.0 && h < ${VALID_MAX}.0`) &&
+				body.includes("(((a + b) + c) + d) * 0.25") &&
+				body.includes("round(clamp(v, vec4f(0.0), vec4f(1.0)) * 255.0)"),
+		);
+	} catch (e) {
+		check("load terrarium-tile.ts in node", false, String(e).slice(0, 200));
+	}
+	console.log(`     ${(performance.now() - t0).toFixed(0)} ms`);
 }
 
 console.log(

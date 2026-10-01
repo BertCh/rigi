@@ -12,18 +12,32 @@
 //     exactness separately from the input bytes);
 //  c. the r32float copy node round trip, and decodeTerrariumTileGpu (the one-shot API) against the
 //     graph's heights;
-//  d. validateTile on the CPU heights: how often the repair / fill fires (info for keeping it on CPU).
-import { Texture } from "@luma.gl/core";
+//  d. validateTile on the CPU heights: how often the repair / fill fires (info for keeping it on CPU);
+//  e. the terrainGpuDecode path (terrarium-tile.ts), for down = 1 and 2: the worker-pool decode the app
+//     uses (dem/load decodeHeights) against the page canvas decode; the load-time stats
+//     (terrariumTileStatsGpu) against validateTile's fill count and heightStats of the CPU heights; the
+//     TerrariumLayerWriter layer (read back) and GpuDecodedHeights.materialize against the CPU heights
+//     (bitmapHeights + downsampleHeights2), bit for bit.
+import { Buffer, Texture } from "@luma.gl/core";
+import { heightStats } from "#/lib/dem/cpu-heights";
 import { decodeTerrarium, validateTile } from "#/lib/dem/decode";
+import { downsampleHeights2 } from "#/lib/dem/grid";
 import { bitmapHeights } from "#/lib/dem/image";
+import { decodeHeights } from "#/lib/dem/load";
 import { getComputeDevice } from "../core/device";
 import { ComputeGraph } from "../core/graph";
+import { readBack } from "../core/readback";
 import {
 	addHeightsToTexture,
 	addTerrariumDecode,
 	decodeTerrariumTileGpu,
 	terrariumInputDescriptor,
 } from "./terrarium";
+import {
+	GpuDecodedHeights,
+	TerrariumLayerWriter,
+	terrariumTileStatsGpu,
+} from "./terrarium-tile";
 import { releaseResource, uploadBitmap } from "./upload";
 
 export type TileResult = {
@@ -45,6 +59,15 @@ export type TileResult = {
 	/** bitmapHeights twice (the canvas path is deterministic) */
 	cpuRepeatDiff: number;
 	validate: { repaired: number; filled: number; remaining: number };
+	/** heights whose bits differ between the worker-pool decode (the app's) and the page decode */
+	workerDiff: number;
+	/** terrainGpuDecode path, summed over down = 1, 2: stats fields that differ from the CPU twin */
+	tileStatsDiff: number;
+	/** its out-of-range count != validateTile's fills (jump ∞, the app's call) */
+	tileInvalidDiff: number;
+	/** layer-writer texels / materialised heights whose bits differ (tiles without fills only) */
+	tileLayerDiff: number;
+	tileLazyDiff: number;
 	first?: string;
 	error?: string;
 };
@@ -151,6 +174,56 @@ function checkGraph(
 	return g;
 }
 
+const writers = new Map<object, TerrariumLayerWriter>();
+
+/** TerrariumLayerWriter into layer 1 of a 2-layer r32float array, read back. */
+async function writerLayer(
+	device: NonNullable<Awaited<ReturnType<typeof getComputeDevice>>>,
+	bmp: ImageBitmap,
+	down: 1 | 2,
+) {
+	const out = bmp.width / down;
+	let writer = writers.get(device);
+	if (!writer) {
+		writer = new TerrariumLayerWriter(device, "ingest-check");
+		writers.set(device, writer);
+	}
+	const tex = device.createTexture({
+		id: "ingest-check-atlas",
+		dimension: "2d-array",
+		format: "r32float",
+		width: out,
+		height: out,
+		depth: 2,
+		usage: Texture.SAMPLE | Texture.COPY_DST | Texture.COPY_SRC,
+	});
+	const buf = device.createBuffer({
+		id: "ingest-check-layer",
+		byteLength: out * out * 4,
+		usage: Buffer.COPY_DST | Buffer.COPY_SRC,
+	});
+	try {
+		writer.write(tex, 1, { bitmap: bmp, down });
+		const [data] = await readBack(device, (enc) => {
+			enc.copyTextureToBuffer({
+				sourceTexture: tex,
+				origin: [0, 0, 1],
+				width: out,
+				height: out,
+				depthOrArrayLayers: 1,
+				destinationBuffer: buf,
+				bytesPerRow: out * 4,
+				rowsPerImage: out,
+			});
+			return [{ buffer: buf, size: out * out * 4 }];
+		});
+		return new Float32Array(data);
+	} finally {
+		tex.destroy();
+		buf.destroy();
+	}
+}
+
 /** Run the checks over `urls` (Terrarium PNG / WebP tiles). */
 export async function terrariumIngestSelftest(
 	urls: string[],
@@ -172,11 +245,18 @@ export async function terrariumIngestSelftest(
 			apiDiff: -1,
 			cpuRepeatDiff: -1,
 			validate: { repaired: 0, filled: 0, remaining: 0 },
+			workerDiff: -1,
+			tileStatsDiff: -1,
+			tileInvalidDiff: -1,
+			tileLayerDiff: -1,
+			tileLazyDiff: -1,
 		};
 		try {
 			const res = await fetch(url);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			bmp = await createImageBitmap(await res.blob(), NONE);
+			const blob = await res.blob();
+			const encoded = await blob.arrayBuffer();
+			bmp = await createImageBitmap(blob, NONE);
 			const { width: w, height: h } = bmp;
 			r.width = w;
 			r.height = h;
@@ -221,6 +301,34 @@ export async function terrariumIngestSelftest(
 						break;
 					}
 			}
+			// e. the app's worker decode, and the terrainGpuDecode path
+			r.workerDiff = countDiff(
+				bitsOf(await decodeHeights(encoded.slice(0))),
+				bitsOf(cpu),
+			);
+			const filled = validateTile(
+				Float32Array.from(cpu),
+				w,
+				Number.POSITIVE_INFINITY,
+			).filled;
+			r.tileStatsDiff = 0;
+			r.tileInvalidDiff = 0;
+			r.tileLayerDiff = 0;
+			r.tileLazyDiff = 0;
+			if (w === h)
+				for (const down of [1, 2] as const) {
+					const ref = down === 2 ? downsampleHeights2(cpu, w) : cpu;
+					const st = await terrariumTileStatsGpu(device, bmp, down);
+					if (st.invalid !== filled) r.tileInvalidDiff++;
+					if (filled) continue; // the app keeps the CPU path for such tiles
+					const want = heightStats(ref);
+					for (const k of ["lo", "hi", "lo7", "hi7"] as const)
+						if (!Object.is(st[k], want[k])) r.tileStatsDiff++;
+					const layer = await writerLayer(device, bmp, down);
+					r.tileLayerDiff += countDiff(bitsOf(layer), bitsOf(ref));
+					const lazy = new GpuDecodedHeights(bmp, down).materialize();
+					r.tileLazyDiff += countDiff(bitsOf(lazy), bitsOf(ref));
+				}
 			const v = validateTile(cpu, w);
 			r.validate = {
 				repaired: v.repaired,

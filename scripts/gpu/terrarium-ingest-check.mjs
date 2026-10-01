@@ -10,7 +10,9 @@
 //     getImageData bytes of the same ImageBitmap (colour conversion, premultiply): decides BIT;
 //  b. the GPU heights with bitmapHeights (dem/image.ts), bit for bit, and with decodeTerrarium of the
 //     GPU's own texel bytes;
-//  c. the r32float copy round trip and the one-shot decodeTerrariumTileGpu.
+//  c. the r32float copy round trip and the one-shot decodeTerrariumTileGpu;
+//  d. the app's worker-pool decode against the page decode, and the terrainGpuDecode path
+//     (terrarium-tile.ts: load-time stats, the layer writer, the lazy CPU view) against the CPU path.
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/terrarium-ingest-check.mjs \
 //     [--cache DIR]... [--limit N] [--fetch]
@@ -171,6 +173,23 @@ const summary = {
 			differing: sum("cpuRepeatDiff"),
 			tiles: tilesWith("cpuRepeatDiff"),
 		},
+		workerVsPage: {
+			differing: sum("workerDiff"),
+			tiles: tilesWith("workerDiff"),
+		},
+	},
+	terrainGpuDecode: {
+		statsFieldsDiffering: sum("tileStatsDiff"),
+		invalidCountDiffering: sum("tileInvalidDiff"),
+		layerTexelsDiffering: sum("tileLayerDiff"),
+		lazyHeightsDiffering: sum("tileLazyDiff"),
+		tilesDiffering: tiles.filter(
+			(t) =>
+				t.tileStatsDiff ||
+				t.tileInvalidDiff ||
+				t.tileLayerDiff ||
+				t.tileLazyDiff,
+		).length,
 	},
 	validateTile: {
 		tilesRepaired: tiles.filter((t) => t.validate.repaired > 0).length,
@@ -186,17 +205,22 @@ const bad = tiles.filter(
 		t.heightDiff ||
 		t.kernelDiff ||
 		t.textureDiff ||
-		t.apiDiff,
+		t.apiDiff ||
+		t.workerDiff ||
+		t.tileStatsDiff ||
+		t.tileInvalidDiff ||
+		t.tileLayerDiff ||
+		t.tileLazyDiff,
 );
 console.log(JSON.stringify(summary, null, 1));
 for (const t of bad.slice(0, 10))
 	console.log(
-		`FAIL ${t.file ?? t.url}: rgba ${t.rgbaDiff} h ${t.heightDiff} kernel ${t.kernelDiff} tex ${t.textureDiff} api ${t.apiDiff}${t.first ? ` (${t.first})` : ""}${t.error ? ` ${t.error}` : ""}`,
+		`FAIL ${t.file ?? t.url}: rgba ${t.rgbaDiff} h ${t.heightDiff} kernel ${t.kernelDiff} tex ${t.textureDiff} api ${t.apiDiff} worker ${t.workerDiff} tile stats ${t.tileStatsDiff} invalid ${t.tileInvalidDiff} layer ${t.tileLayerDiff} lazy ${t.tileLazyDiff}${t.first ? ` (${t.first})` : ""}${t.error ? ` ${t.error}` : ""}`,
 	);
 const ok = tiles.length > 0 && bad.length === 0;
 console.log(
 	ok
-		? `PASS: ${tiles.length} tiles, ${pixels} px: RGBA bytes and heights bit-identical to the canvas + decodeTerrarium path`
+		? `PASS: ${tiles.length} tiles, ${pixels} px: RGBA bytes, heights and the terrainGpuDecode layers / stats / lazy CPU heights bit-identical to the canvas + decodeTerrarium path`
 		: `FAIL: ${bad.length}/${tiles.length} tiles differ or errored`,
 );
 fs.mkdirSync(OUT, { recursive: true });

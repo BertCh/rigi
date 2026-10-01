@@ -9,7 +9,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | island | name | cadence | realms today | modules | cachedGraph groups |
 |---|---|---|---|---|---|
 | I0 | Loaders (not a graph) | per photo, per tile | page, worker:decode | – | – |
-| I1 | Terrain residency | per tile | page | ingest-terrarium, look-relief-heights | `ingest-terrarium` |
+| I1 | Terrain residency | per tile | page | ingest-terrarium, ingest-terrarium-tile, look-relief-heights | `ingest-terrarium`, `ingest-terrarium-tile` |
 | I2 | Photo prep | per photo | page, worker:sky | photoprep | `photoprep` |
 | I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march, horizon-cert, precision-probe | `horizon-march`, `horizon-cert`, `precision-probe` |
 | I4 | Align | per align | page | align-pose, align-cert, silhouette-gpu | `align-pose`, `align-cert`, `silhouette-mask` |
@@ -27,6 +27,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | module | island | status | realm | cadence | groups | resources | readbacks |
 |---|---|---|---|---|---|---|---|
 | ingest-terrarium | I1 | not wired | page | per tile | `ingest-terrarium` | tile rgba8unorm texture (import); heights f32 (transient) | heights: w·h·4 B (read node) |
+| ingest-terrarium-tile | I1 | not wired | page | per tile | `ingest-terrarium-tile`, `ingest-terrarium-layer|*` (uncached) | tile rgba8unorm texture (import; staging per source size for the layer writer); heights f32 + stats u32×8 (transients); height atlas r32float 2d-array (import, per-run layer) | stats: 32 B per tile (read node) |
 | look-relief-heights | I1 | default | page | per settle | – | terrain tile heights texture array (import); Mercator nodes, tile rows (imports) | – |
 | photoprep | I2 | default | page | per photo | `photoprep` | rgba, fg, lim, dims (pooled imports); edge / sky scratch (transients) | read: coarse + fine edge planes, sky, sky-cum, select, echo (≈3.5 MB at 512 grid) |
 | horizon-march | I3 | default | worker:horizon-fast, worker:unknown-pose, worker:eye (remote) | per eye | `horizon-march` | mosaic pages pg0…pgN (imports); u, params (imports) | read: out nE·nAz·8 B + stats |
@@ -55,6 +56,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 ## Notes
 
 - **ingest-terrarium**: GPU Terrarium decode (W2.3); CPU twin dem/decode.ts decodeTerrarium
+- **ingest-terrarium-tile**: WAG W2.3: Terrarium tile decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi (terrariumTileStatsGpu), and TerrariumLayerWriter into a height-atlas layer. CPU twin: decodeTerrarium + validateTile + downsampleHeights2
 - **look-relief-heights**: rasterises the relief height field from the resident tiles; compiles into the "look-relief" group (listed under look-relief)
 - **photoprep**: planes read back and re-uploaded by align (R1, dataflow-map §3)
 - **horizon-march**: each worker owns its own compute device (worker realm)
