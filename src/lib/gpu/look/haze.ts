@@ -12,8 +12,9 @@
 // in the same order, with three bit-identical shortcuts (atmPath's exp(−eyeAlt / H) hoisted, a
 // per-pass memo of the refinement's revisited points, typed-array sorts for the airlight). The node
 // check haze-tail.check.ts proves the tail equals fitHaze bit for bit on synthetic scenes;
-// look-bench.mjs compares the whole GPU fit with the CPU on captured inputs. Both submits run as core ComputeGraphs (./haze-graph.ts); the pooled
-// dispatch path and its full-readback (compact: false) mode were removed on 2026-10-01.
+// look-bench.mjs compares the whole GPU fit with the CPU on captured inputs. Both submits run as
+// core ComputeGraphs (./haze-graph.ts); the pooled dispatch path and its full-readback
+// (compact: false) mode were removed on 2026-10-01.
 import type { Device } from "@luma.gl/core";
 import {
 	ATM_CURV,

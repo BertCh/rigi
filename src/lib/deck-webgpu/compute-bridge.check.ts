@@ -482,6 +482,8 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 	const fitStages: Record<string, number[]> = {};
 	for (let i = 0; i < reps; i++) {
 		fitT.ref.push((await fitVia()).ms);
+		// hazeGpuTimes is merged, not replaced: clear the ref fit's keys (a short fit sets fewer)
+		for (const k of Object.keys(hazeGpuTimes)) delete hazeGpuTimes[k];
 		fitT.bridge.push((await fitVia(viaBridge)).ms);
 		for (const k of [
 			"gpuPrep",
@@ -493,7 +495,10 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 			fitStages[k] = [...(fitStages[k] ?? []), hazeGpuTimes[k] ?? Number.NaN];
 	}
 	(fit as Record<string, unknown>).stagesMs = Object.fromEntries(
-		Object.entries(fitStages).map(([k, v]) => [k, +median(v).toFixed(2)]),
+		Object.entries(fitStages).map(([k, v]) => {
+			const timed = v.filter(Number.isFinite);
+			return [k, timed.length ? +median(timed).toFixed(2) : null];
+		}),
 	);
 	// ── relief: readback path (bytes → writeData) vs bridge (graph → copyBufferToTexture)
 	const relief: Record<string, unknown> = { ran: false };

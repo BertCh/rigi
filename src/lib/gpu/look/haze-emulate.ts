@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Node-only helpers for the haze checks (haze-tail.check.ts, haze-band.check.ts): synthetic haze
+// Node-only helpers for the haze tail check (haze-tail.check.ts): synthetic haze
 // scenes and a CPU emulation of submit 1's outputs (./haze-graph.ts prepGraph) built with
 // look/haze-fit.ts's own per-pixel code, so that hazeFitTail on the emulated prep can be compared
 // bit for bit with fitHaze. Not imported by app code.

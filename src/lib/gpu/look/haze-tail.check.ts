@@ -203,6 +203,8 @@ for (let s = 0; s < scenes; s++) {
 	const input = makeHazeScene(opts);
 	const { prep, ctx } = emulatePrep(input);
 	const want = fitHaze(input);
+	// hazeGpuTimes is merged, not replaced: clear it so a short fit cannot show the last one's keys
+	for (const k of Object.keys(hazeGpuTimes)) delete hazeGpuTimes[k];
 	const got = await hazeFitTail(null as never, ctx, prep, emulatedGrid);
 	const label = `scene ${s} (${opts.width}×${opts.height}${opts.skyMask ? " sky" : ""}${opts.foreground ? " fg" : ""}${opts.rangeOnly ? " range" : ""})`;
 	if (hasSubRankPercentile(prep.counts)) {
