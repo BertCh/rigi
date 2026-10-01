@@ -322,6 +322,27 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   total, where the default path decodes in workers; and the small height atlas uploads ~4× the
   bytes (rgba8 512 px sources instead of r32f 256 px heights), plus one upload per tile for the
   load-time stats. Hence default off: the hot heightAt callers need batched GPU gathers first.
+- GPU height gathers (WAG W2.4 second half, under `terrainGpuDecode`): `height-gather.ts`
+  `HeightGather.heightsAt(set, lats, lons)` answers TerrainSet.heightAt bit for bit (NaN = null)
+  without materialising lazy tiles. Plan and blend stay on the CPU in f64 (`TerrainSet.locate`,
+  `dem/grid.ts` `gridCorners` / `blendCorners` = `sampleGrid`); the kernel (core cachedGraph group
+  `height-gather`, "texture-array" bindings on the two height arrays) only copies the four corner
+  texels of each sample on a resident lazy tile, 8 B per texel (nonce + raw bits), one dispatch per
+  tick. Tiles with CPU heights are sampled in place; a non-resident tile, a bad nonce or a slot that
+  changed between plan and read take heightAt. `replayHeights` records and replays the
+  value-independent readers. Wired in the engine for the camera DEM height (init), `buildTrails`
+  and peak snapping (`snapPeaksNear`'s `localMax`; a peak being gathered joins the list on a later
+  call, `settle()` waits for the pose's peaks). `snapOne`, Step Inside's ground / `nearFieldDemRange`
+  and the lake floor (`geoLakeFloor`, off) keep heightAt. Gates: fast check `height-gather`
+  (emulated kernel) and `scripts/deck-webgpu/height-gathers-probe.mjs` (counters, atlas bytes, and
+  parity of camera height / snapped peaks / trail positions with the CPU readers). Counters:
+  `globalThis.__rigiHeightGathers`. Measured 2026-10-01 (Apple / Metal, IMG_7086 / 6958 / 3304,
+  flag on): tiles materialised on the main thread within 8 s of ready 206 / 165 / 177 (374 / 294 /
+  295 ms) → 0; after four pans 493 / 404 / 416 (875 / 710 / 703 ms) → 12 / 10 / 8 (24 / 26 / 17 ms,
+  tiles not resident in the atlas); parity bit for bit (858 / 311 / 99 peaks, every trail
+  coordinate, camera height). The atlas still uploads ~3.5–4× the flag-off bytes (884–1017 MB vs
+  248–262 MB per probe walk; slightly more than before the gathers, as fewer tiles now take the r32f
+  upload), so the flag stays off.
 - Hooks waiting for compute: `RIDGES_WGSL` (binding-free, runs in
   `@compute` as-is: an edge-mask pass).
 - Kernels must not write a target that a later pass of the same frame reads. Schedule them after
