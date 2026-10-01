@@ -21,6 +21,7 @@
 //   const { reads } = await g.run(p);                      // reads.read = [ArrayBuffer, ArrayBuffer]
 //   await g.compileAsync();                                 // pipelines via createComputePipelineAsync
 //   const e = cachedGraph(device, "solve", key, (g) => {...}); // shape-keyed LRU (transients have fixed sizes)
+//   g.addKernel({ ..., condition: { id: "sun", source: "cpu", evaluate: (p) => !p.flat } }); // per-run skip
 //
 // Transients are NEVER zeroed by the graph, and a transient can alias another one whose lifetime ended
 // earlier in the same encoding (or a previous encoding's bytes): anything read-modify-written
@@ -90,7 +91,20 @@ export type KernelNode<P> = {
 	writes?: Record<string, WriteMode>;
 	/** Shorthand: these bindings are written "partial" (read-modify-write, needs a clear). */
 	cleared?: string[];
+	/**
+	 * Record this dispatch only when `evaluate(parameters)` is true (GPUCommandGraph CPU condition,
+	 * checked per encoding). A skipped node keeps its place in the schedule, so transient lifetimes,
+	 * aliasing and the clear lint are those of the graph with the node; its outputs are then whatever
+	 * the earlier nodes left (e.g. a clear node's zeros).
+	 */
+	condition?: KernelCondition<P>;
 };
+
+/** A KernelNode's CPU condition (GPUCommandGraph's CPU condition shape). */
+export type KernelCondition<P> = Extract<
+	NonNullable<GPUCommandGraphComputeNode<P>["condition"]>,
+	{ source: "cpu" }
+>;
 
 /** How a kernel writes one of its storage bindings (KernelNode.writes). */
 export type WriteMode = "full" | "partial" | "atomic";
@@ -254,6 +268,7 @@ export class ComputeGraph<P = void> {
 		this.graph.addComputePass({
 			id: node.id,
 			dependsOn: node.dependsOn,
+			condition: node.condition,
 			resources: spec.layout.map(([name, kind]) => {
 				const v = node.bindings[name];
 				return {

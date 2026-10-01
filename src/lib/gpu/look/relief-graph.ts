@@ -12,9 +12,10 @@
 // imports; field and gen come back through a read node (one readback slot, as before).
 //
 // Clear audit (graph transients are never zeroed and alias other transients' bytes):
-// - shadow: written with atomicOr ("atomic") → clear node, always. A degenerate sun (below the
-//   horizon / zenith) gets its own graph without the SHADOW node (as the old path skips that
-//   dispatch); its shadow transient is still cleared (PACK binds it but writes the constant byte);
+// - shadow: written with atomicOr ("atomic") → clear node, always. ONE graph serves every sun: the
+//   SHADOW node carries a CPU condition on the run's `degenerate` parameter (below the horizon /
+//   zenith), so a degenerate sun skips that dispatch as the old path does, and the cleared shadow
+//   transient reaches PACK (which binds it but writes the constant byte);
 // - acc8: SVF writes every element of all 8 direction planes (every texel lies on exactly one sweep
 //   line per direction), but the old path clears it, so it is declared "partial" and cleared here
 //   too (zero-cost insurance, and the clear lint then guards it);
@@ -37,7 +38,8 @@ import {
 	K_RELIEF_SVF,
 } from "./relief";
 
-type Params = undefined;
+/** Per-run graph parameters: `degenerate` skips the SHADOW dispatch (CPU condition). */
+type Params = { degenerate: boolean };
 
 const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
 export const RELIEF_GRAPH_GROUP = "look-relief";
@@ -58,15 +60,18 @@ export function reliefScratchBytes(res: number) {
 }
 
 /**
- * Build the relief graph for `res` (imports sized `hBytes` / `prmBytes`; no SHADOW node when the sun
- * is `degenerate`). `unsafeSkipClears` exists only for the bench's lint check (compile must throw).
+ * Build the relief graph for `res` (imports sized `hBytes` / `prmBytes`), run with
+ * `{ degenerate }`. `unsafeSkipClears` exists only for the bench's lint check (compile must throw).
+ * `_degenerate` is ignored (kept for the bench's call signature): the SHADOW node is always added,
+ * with a CPU condition on the run's parameters (a graph run with `undefined` parameters, as the
+ * bench's lint graph is typed, counts as a non-degenerate sun).
  */
-export function buildReliefGraph(
-	g: ComputeGraph<Params>,
+export function buildReliefGraph<P extends Params | undefined = Params>(
+	g: ComputeGraph<P>,
 	res: number,
 	hBytes: number,
 	prmBytes: number,
-	degenerate: boolean,
+	_degenerate?: boolean,
 	unsafeSkipClears = false,
 ) {
 	const resH = res >> 1;
@@ -83,15 +88,15 @@ export function buildReliefGraph(
 	const field = t("field");
 	const gen = t("gen");
 	if (!unsafeSkipClears) g.clearNode("clear-shadow", shadow);
-	if (!degenerate)
-		g.addKernel({
-			id: "shadow",
-			spec: K_RELIEF_SHADOW,
-			bindings: { prm, H, shadow },
-			// one workgroup: the rows run strictly in order
-			workgroups: [1],
-			writes: { shadow: "atomic" },
-		});
+	g.addKernel({
+		id: "shadow",
+		spec: K_RELIEF_SHADOW,
+		bindings: { prm, H, shadow },
+		// one workgroup: the rows run strictly in order
+		workgroups: [1],
+		writes: { shadow: "atomic" },
+		condition: { id: "sun", source: "cpu", evaluate: (p) => !p?.degenerate },
+	});
 	g.addKernel({
 		id: "down",
 		spec: K_RELIEF_DOWN,
@@ -138,18 +143,20 @@ export function reliefGraphPasses(
 	return withLease("look-relief-graph", async () => {
 		const prm = pooledUniform(device, "look-relief-graph/prm", words);
 		const gH = pooledStorage(device, "look-relief-graph/H", H);
-		const key = `${res}${degenerate ? "|flat" : ""}|H${gH.byteLength}|u${prm.byteLength}`;
+		const key = `${res}|H${gH.byteLength}|u${prm.byteLength}`;
 		const { graph, hit } = cachedGraph<Params, void>(
 			device,
 			RELIEF_GRAPH_GROUP,
 			key,
-			(g) =>
-				buildReliefGraph(g, res, gH.byteLength, prm.byteLength, degenerate),
+			(g) => buildReliefGraph(g, res, gH.byteLength, prm.byteLength),
 		);
 		await graph.compileAsync();
-		const { reads } = await graph.run(undefined, {
-			buffers: { prm, H: gH },
-		});
+		const { reads } = await graph.run(
+			{ degenerate },
+			{
+				buffers: { prm, H: gH },
+			},
+		);
 		lastReliefGraphRun.hit = hit;
 		lastReliefGraphRun.stats = graph.stats;
 		const [f, g] = reads.read;
