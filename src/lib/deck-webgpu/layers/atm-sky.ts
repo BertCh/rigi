@@ -314,7 +314,9 @@ ${fullscreenWGSL}
  * samples pass) and "under" blending into the premultiplied target, which equals drawing the
  * opaque sky first (the WebGL order) whatever translucent layers drew earlier.
  */
-export const SKY_PARAMETERS: RenderPipelineParameters = {
+export const skyParameters = (): RenderPipelineParameters => ({
+	// built per Model, not once at load: passModelProps carries the colour pass's current
+	// sampleCount (4× MSAA, or 1× in the interactive mode), and a frozen copy would pin 4×
 	...passModelProps("color", { depth: "test" }).parameters,
 	blend: true,
 	blendColorOperation: "add",
@@ -323,7 +325,7 @@ export const SKY_PARAMETERS: RenderPipelineParameters = {
 	blendAlphaOperation: "add",
 	blendAlphaSrcFactor: "one-minus-dst-alpha",
 	blendAlphaDstFactor: "one",
-};
+});
 
 export type AtmSkyProps = {
 	/** style.world.sky.mode. */
@@ -367,7 +369,7 @@ function hexDigitsToLinear(h: string, dec: (v: number) => number): V3 {
 
 export class AtmSkyCore implements GpuLayerCore {
 	readonly passes: readonly PassKind[] = ["color"];
-	/** Last in the colour pass: after every surface and overlay (see SKY_PARAMETERS). */
+	/** Last in the colour pass: after every surface and overlay (see skyParameters). */
 	readonly order = 90;
 	private models = new ModelCache();
 	private props: AtmSkyProps = { mode: "flat", atm: null };
@@ -409,7 +411,7 @@ export class AtmSkyCore implements GpuLayerCore {
 					fragmentEntryPoint: "fragmentMain",
 					modules: [cameraModule, atmosphereModule, skyModule] as never,
 					...passModelProps("color", { depth: "test" }),
-					parameters: SKY_PARAMETERS,
+					parameters: skyParameters(),
 					topology: "triangle-list",
 					vertexCount: 3,
 				} as never),
