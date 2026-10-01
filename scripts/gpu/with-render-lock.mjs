@@ -42,7 +42,8 @@ const LEGACY =
 	process.env.RIGI_LEGACY_RENDER_LOCK ??
 	join(homedir(), "Documents/GitHub/mt-image/out/.render-lock");
 
-const argv = process.argv.slice(process.argv.indexOf("--") + 1);
+const dashAt = process.argv.indexOf("--");
+const argv = dashAt < 0 ? [] : process.argv.slice(dashAt + 1);
 if (!argv.length) {
 	console.error("usage: with-render-lock.mjs -- <cmd> [args…]");
 	process.exit(2);

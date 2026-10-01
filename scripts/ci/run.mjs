@@ -19,6 +19,7 @@
 // Exit 0 iff no FAIL. Logs: out/ci/logs/<id>.log; summary: out/ci/last-run.json. See README.md.
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { CHECKS } from "./checks.mjs";
 
@@ -87,6 +88,16 @@ const selected = CHECKS.filter(
 mkdirSync(LOGS, { recursive: true });
 
 // ---- process helpers ----------------------------------------------------------------------
+/** Process groups of live detached children, so Ctrl-C / SIGTERM can reach grandchildren (chromium, vite). */
+const groups = new Set();
+function killGroups(sig = "SIGTERM") {
+	for (const pid of groups) {
+		try {
+			process.kill(-pid, sig);
+		} catch {}
+	}
+}
+
 /** Run argv in ROOT, capture stdout+stderr to a log; kill the whole group on timeout. */
 function run(cmd, { env = {}, timeoutS = 600, log }) {
 	return new Promise((done) => {
@@ -97,6 +108,7 @@ function run(cmd, { env = {}, timeoutS = 600, log }) {
 			detached: true, // own process group → the timeout kill reaches grandchildren (chromium)
 			stdio: ["ignore", "pipe", "pipe"],
 		});
+		groups.add(child.pid);
 		let out = "";
 		const onData = (b) => {
 			out += b.toString();
@@ -117,6 +129,7 @@ function run(cmd, { env = {}, timeoutS = 600, log }) {
 		}, timeoutS * 1000);
 		const finish = (code, err) => {
 			clearTimeout(timer);
+			groups.delete(child.pid);
 			if (err) out += `\n[ci] spawn error: ${err.message}\n`;
 			if (log) writeFileSync(log, `$ ${cmd.join(" ")}\n\n${out}`);
 			done({
@@ -247,8 +260,8 @@ let server = null;
 async function ensureServer() {
 	const given = opt("url");
 	if (given) return given.replace(/\/$/, "");
-	const port = Number(opt("port", 3130));
-	const url = `http://localhost:${port}`;
+	let port = Number(opt("port", 3130));
+	let url = `http://localhost:${port}`;
 	const up = async () => {
 		try {
 			const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -258,8 +271,21 @@ async function ensureServer() {
 		}
 	};
 	if (await up()) {
-		console.log(`[ci] reusing the dev server already on ${url}`);
-		return url;
+		// Not ours (we have not started anything yet): another run may own it and kill it when it
+		// finishes, so never share it; take the next free port and start our own server.
+		const free = (p) =>
+			new Promise((ok) => {
+				const s = createServer();
+				s.once("error", () => ok(false));
+				s.listen(p, () => s.close(() => ok(true)));
+			});
+		const was = port;
+		do port++;
+		while (!(await free(port)) && port < was + 50);
+		url = `http://localhost:${port}`;
+		console.log(
+			`[ci] :${was} is in use by another server; using :${port} instead`,
+		);
 	}
 	console.log(
 		`[ci] starting vite dev on :${port} (own dep cache node_modules/.vite-${port})`,
@@ -274,6 +300,7 @@ async function ensureServer() {
 			stdio: ["ignore", "pipe", "pipe"],
 		},
 	);
+	groups.add(server.pid);
 	let slog = "";
 	server.stdout.on("data", (b) => {
 		slog += b;
@@ -303,10 +330,13 @@ function stopServer() {
 		process.kill(-server.pid, "SIGTERM");
 	} catch {}
 }
-process.on("SIGINT", () => {
-	stopServer();
-	process.exit(130);
-});
+for (const sig of ["SIGINT", "SIGTERM"]) {
+	process.on(sig, () => {
+		killGroups("SIGTERM");
+		stopServer();
+		process.exit(sig === "SIGINT" ? 130 : 143);
+	});
+}
 
 // ---- one check ----------------------------------------------------------------------------
 async function runCheck(c, url) {

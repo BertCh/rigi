@@ -27,6 +27,7 @@ import _env  # noqa: F401  (path setup first)
 import argparse
 import io
 import json
+import os
 import sys
 import time
 import traceback
@@ -44,7 +45,23 @@ import models
 import splat
 from models import ServiceError
 
-MAX_BODY = 256 * 1024 * 1024
+MAX_BODY = int(os.environ.get("NEARFIELD_MAX_BODY", 512 * 1024 * 1024))  # 16 x 8192 px multiview jobs fit
+# Origin allowlist: localhost / 127.0.0.1 / [::1] on any port, plus NEARFIELD_CORS (comma-separated exact origins)
+EXTRA_ORIGINS = {o.strip() for o in os.environ.get("NEARFIELD_CORS", "").split(",") if o.strip()}
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "[::1]")
+
+
+def host_ok(hostport: str | None) -> bool:
+    h = (hostport or "").strip().lower()
+    h = h[: h.index("]") + 1] if h.startswith("[") and "]" in h else h.rsplit(":", 1)[0]
+    return h in LOCAL_HOSTS
+
+
+def origin_ok(origin: str) -> bool:
+    if origin in EXTRA_ORIGINS:
+        return True
+    scheme, sep, rest = origin.partition("://")
+    return bool(sep) and scheme in ("http", "https") and host_ok(rest)
 DEPTH_MODELS = ("moge2", "moge2b", "da3")
 MGR: models.Manager | None = None
 _raw_depth: OrderedDict[str, dict] = OrderedDict()  # small in-memory cache of raw depth results (for lift)
@@ -330,7 +347,10 @@ class Handler(BaseHTTPRequestHandler):
         sys.stderr.write("[nearfield] %s %s\n" % (self.address_string(), fmt % args))
 
     def _cors(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        if origin and origin_ok(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Expose-Headers", "X-Splat-Count, X-Model, X-Seconds, X-NearField-Meta, X-Cache")
@@ -349,19 +369,34 @@ class Handler(BaseHTTPRequestHandler):
     def _err(self, e: ServiceError):
         self._send(e.status, "application/json", json.dumps({"error": e.code, "message": e.message}).encode())
 
+    def _guard(self) -> bool:
+        """Block DNS rebinding (Host must be local) and cross-origin callers (Origin, when sent, must be allowed)."""
+        origin = self.headers.get("Origin")
+        if not host_ok(self.headers.get("Host")) or (origin and not origin_ok(origin)):
+            self.close_connection = True
+            self._err(ServiceError(403, "forbidden", "host or origin not allowed"))
+            return False
+        return True
+
     def do_OPTIONS(self):  # noqa: N802
+        if not self._guard():
+            return
         self.send_response(204)
         self._cors()
         self.send_header("Content-Length", "0")
         self.end_headers()
 
     def do_GET(self):  # noqa: N802
+        if not self._guard():
+            return
         if self.path.split("?")[0] in ("/health", "/"):
             self._send(200, "application/json", json.dumps(health()).encode())
         else:
             self._err(ServiceError(404, "not_found", self.path))
 
     def do_POST(self):  # noqa: N802
+        if not self._guard():
+            return
         path = self.path.split("?")[0]
         try:
             fn = ROUTES.get(path)

@@ -208,7 +208,7 @@ def main():
         # CORS preflight
         req = urllib.request.Request(base + "/depth", method="OPTIONS", headers={"Origin": "http://localhost:3100"})
         with urllib.request.urlopen(req) as r:
-            check(r.status == 204 and r.headers.get("Access-Control-Allow-Origin") == "*", "CORS preflight 204 + ACAO *")
+            check(r.status == 204 and r.headers.get("Access-Control-Allow-Origin") == "http://localhost:3100", "CORS preflight 204 + ACAO echoes origin")
 
         check_inpaint(base, h, timings)
         if a.inpaint_only:
@@ -219,7 +219,6 @@ def main():
             st, hdr, body, dt = post(base, "/depth", {"model": model}, [("image", PHOTO.name, img)])
             check(st == 200, f"/depth {model}: status {st} {body[:200] if st != 200 else ''}")
             if st == 200:
-                check(hdr.get("Access-Control-Allow-Origin") == "*", f"/depth {model}: CORS header")
                 check_depth_wire(json.loads(body), f"/depth {model}", normal)
             timings[f"depth {model} (cold, incl. load)"] = dt
         st, hdr, body, dt = post(base, "/depth", {"model": "moge2"}, [("image", PHOTO.name, img)])
