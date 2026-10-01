@@ -14,6 +14,7 @@ import { tilePriority } from "#/lib/cache";
 import { buildBatchGrid } from "#/lib/deck/batched-terrain-grid";
 import { buildMesh, TerrainSet, type TileMesh } from "#/lib/deck/terrain-data";
 import { terrainBuild } from "#/lib/deck/terrain-mode";
+import { downsample2 } from "#/lib/deck/terrain-stream";
 import {
 	type DemRaster,
 	latToTileY,
@@ -142,18 +143,4 @@ export async function loadRollTerrain(
 		generation: 1,
 	};
 	return set;
-}
-
-/** 2× box-filter downsample (terrain-stream.ts downsample2). */
-function downsample2(r: DemRaster): DemRaster {
-	const s = r.size / 2;
-	const h = r.heights;
-	const S = r.size;
-	const out = new Float32Array(s * s);
-	for (let y = 0; y < s; y++)
-		for (let x = 0; x < s; x++) {
-			const o = 2 * y * S + 2 * x;
-			out[y * s + x] = (h[o] + h[o + 1] + h[o + S] + h[o + S + 1]) * 0.25;
-		}
-	return { ...r, size: s, heights: out };
 }

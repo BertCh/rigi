@@ -6,6 +6,7 @@
 
 import * as THREE from "three";
 import type { Pose } from "../camera";
+import { getCpuHeights } from "../dem/cpu-heights";
 import { distanceM } from "../geodesy";
 import { declutterClassic, peakRank, rankPeaks } from "../look/labels/rank";
 import { projectPoint } from "../pose";
@@ -77,7 +78,14 @@ export function localElevRange(terrain: TerrainSet): [number, number] {
 	let hi = Number.NEGATIVE_INFINITY;
 	for (const t of terrain.tiles) {
 		if (t.distance > 25000 || !(t.focus || t.distance < 3000)) continue;
-		const h = t.heights;
+		// a GPU-decoded tile brings the exact every-7th-sample range (dem/cpu-heights.ts heightStats)
+		const s = t.heights ? undefined : t.heightStats;
+		if (s) {
+			if (s.lo7 < lo) lo = s.lo7;
+			if (s.hi7 > hi) hi = s.hi7;
+			continue;
+		}
+		const h = getCpuHeights(t);
 		for (let i = 0; i < h.length; i += 7) {
 			if (h[i] < lo) lo = h[i];
 			if (h[i] > hi) hi = h[i];

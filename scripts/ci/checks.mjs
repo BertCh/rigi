@@ -173,6 +173,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "cpu-heights",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/dem/cpu-heights.check.ts"),
+		note: "lazy CPU heights view (WAG W2.4): getCpuHeights materialises once; heightStats == the batch-grid / colour-ramp scans; batch grid from stats == from heights; lazy TerrainSet queries == eager; downsample plumbing == the old loop",
+		timeoutS: 60,
+	},
+	{
 		id: "atlas-layout",
 		tier: "fast",
 		group: "gpu",

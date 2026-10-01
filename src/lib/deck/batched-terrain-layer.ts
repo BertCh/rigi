@@ -27,6 +27,7 @@ import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { Pose } from "../camera";
+import { getCpuHeights } from "../dem/cpu-heights";
 import { poseBasis } from "../pose";
 import { BASE_MAX, gridMesh } from "./batched-terrain-grid";
 import type { TileMesh } from "./terrain-data";
@@ -526,7 +527,7 @@ class TileStore {
 				continue;
 			}
 			if (isFresh || (s.big ? reBig : reSmall))
-				pool.write(s.layer, m.heights, m.size, m.size);
+				pool.write(s.layer, m.heights ?? getCpuHeights(m), m.size, m.size);
 			const g = m.grid;
 			if (!g) continue;
 			if (isFresh || reBase) this.base.write(s.row, g.base, g.G + 1, g.G + 1);

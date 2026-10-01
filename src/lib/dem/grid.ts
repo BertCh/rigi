@@ -61,3 +61,28 @@ export function ancestorCrop(
 	}
 	return out;
 }
+
+/**
+ * 2× box-filter downsample of an S×S grid (S even): each output is the mean of a 2×2 block, summed
+ * left to right, top row first (the streamer's and roll terrain's tile downsample).
+ */
+export function downsampleHeights2(h: Float32Array, S: number) {
+	const s = S / 2;
+	const out = new Float32Array(s * s);
+	for (let y = 0; y < s; y++)
+		for (let x = 0; x < s; x++) {
+			const o = 2 * y * S + 2 * x;
+			out[y * s + x] = (h[o] + h[o + 1] + h[o + S] + h[o + S + 1]) * 0.25;
+		}
+	return out;
+}
+
+/**
+ * How many 2× downsamples a `size` px tile gets for a `seg`-segment mesh: halve while the grid has
+ * more than 2 samples per segment and more than 256 px (terrain-stream / roll-terrain).
+ */
+export function downsampleSteps(size: number, seg: number) {
+	let n = 0;
+	for (let s = size; s > 2 * seg && s > 256; s /= 2) n++;
+	return n;
+}

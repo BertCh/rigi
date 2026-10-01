@@ -131,7 +131,17 @@ export async function loadDemTile(
 	o: DemLoadOptions = {},
 ): Promise<DemRaster | null> {
 	const r = await fetchDemBytes(key, o);
-	if (!r) return null;
+	return r && demRasterFromBytes(key, r);
+}
+
+/**
+ * loadDemTile's decode half: the encoded bytes of `r.source` (fetchDemBytes) → the raster of `key`
+ * (decode pool, validateTile no-data fill, ancestor crop). Null = a bad image.
+ */
+export async function demRasterFromBytes(
+	key: TileKey,
+	r: { source: TileKey; buf: ArrayBuffer },
+): Promise<DemRaster | null> {
 	const h = await decodeHeights(r.buf).catch(() => null);
 	if (!h) return null;
 	const size = Math.round(Math.sqrt(h.length));

@@ -48,6 +48,7 @@ import {
 	gridMesh,
 } from "#/lib/deck/batched-terrain-grid";
 import type { TileMesh } from "#/lib/deck/terrain-data";
+import { getCpuHeights } from "#/lib/dem/cpu-heights";
 import { getFlag } from "#/lib/flags";
 import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 import { gpuEnabled } from "#/lib/gpu/core/device";
@@ -432,7 +433,7 @@ class TileStore {
 				continue;
 			}
 			const isFresh = freshSet.has(m);
-			if (isFresh) pool.writeRaster(s.layer, m.heights, m.size);
+			if (isFresh) pool.writeRaster(s.layer, getCpuHeights(m), m.size);
 			const g = m.grid;
 			if (!g) continue;
 			if (isFresh || placed.repacked)

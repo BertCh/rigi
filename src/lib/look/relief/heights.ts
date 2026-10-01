@@ -7,6 +7,7 @@
 // no heightAt lookups. Finer tiles overwrite coarser ones. Heights are ASL, not ENU z: within the
 // field (±20 km) the curvature drop barely matters to shading, and ASL keeps the field view-independent.
 
+import { type CpuHeightsTile, getCpuHeights } from "../../dem/cpu-heights";
 import { sampleGrid } from "../../dem/grid";
 import {
 	latToTileY,
@@ -16,7 +17,8 @@ import {
 } from "../../dem/tiles";
 import type { EnuFrame } from "../../geodesy";
 
-export type HeightTile = { key: TileKey; size: number; heights: Float32Array };
+/** A loaded tile; heights through getCpuHeights (a lazy tile materialises only if it overlaps). */
+export type HeightTile = { key: TileKey; size: number } & CpuHeightsTile;
 /** [minX, minY, maxX, maxY], ENU metres. */
 export type Extent = [number, number, number, number];
 
@@ -105,6 +107,7 @@ export function rasterizeHeights(
 		const j0 = Math.max(0, Math.floor((ly - y0) / px) - 1);
 		const j1 = Math.min(res - 1, Math.ceil((hy - y0) / px) + 1);
 		if (i0 > i1 || j0 > j1) continue;
+		const heights = t.heights ?? getCpuHeights(t);
 		const S = t.size;
 		const s = 2 ** t.key.z;
 		// tile pixel = ((o + m) · 2^z − key) · S
@@ -117,7 +120,7 @@ export function rasterizeHeights(
 				const tx = ax + mx[q] * k;
 				const ty = ay + my[q] * k;
 				if (tx >= 0 && tx < S && ty >= 0 && ty < S)
-					out[q] = sampleGrid(t.heights, S, tx, ty);
+					out[q] = sampleGrid(heights, S, tx, ty);
 			}
 	}
 	return out;

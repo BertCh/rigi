@@ -8,7 +8,9 @@
 
 import { cachedFetch, tilePriority } from "../cache";
 import {
+	type CpuHeightsTile,
 	type DemRaster,
+	getCpuHeights,
 	latToTileY,
 	lonToTileX,
 	sampleGrid,
@@ -34,13 +36,18 @@ import type { BatchGrid } from "./batched-terrain-grid";
 
 export type ImagerySource = "satellite" | "topo";
 
-export type TileMesh = {
+/**
+ * A streamed tile. Heights are size × size (512 near the camera, 256 elsewhere, less on fallback),
+ * read through getCpuHeights(tile) (dem/cpu-heights.ts): `heights` for a CPU-decoded tile, or
+ * materialised on first use from `lazyHeights` for a GPU-decoded one (flag terrainGpuDecode), whose
+ * `heightStats` carry the exact lo / hi the batch grid and the colour ramp need.
+ */
+export type TileMesh = CpuHeightsTile & {
 	id: string;
 	key: TileKey;
 	distance: number;
-	/** Height grid is size × size (512 near the camera, 256 elsewhere, less on fallback). */
+	/** Height grid is size × size. */
 	size: number;
-	heights: Float32Array;
 	/** Zoom the DEM data actually came from (< key.z where the finer tile 404'd). */
 	sourceZ: number;
 	/** Inside the photo's viewing wedge (refined harder). */
@@ -118,7 +125,7 @@ export class TerrainSet {
 			const t = this.byId.get(tileNum(z, x, y));
 			if (t)
 				return sampleGrid(
-					t.heights,
+					t.heights ?? getCpuHeights(t),
 					t.size,
 					(fx - x) * t.size,
 					(fy - y) * t.size,

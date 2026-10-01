@@ -10,7 +10,10 @@
 
 import { tilePriority } from "../cache";
 import {
+	type DemLoadOptions,
 	type DemRaster,
+	downsampleHeights2,
+	getCpuHeights,
 	loadDemTile,
 	parentKey,
 	type TileKey,
@@ -21,6 +24,7 @@ import {
 	buildBatchGrid,
 	buildLiteMesh,
 	meshTriangles,
+	type StreamRaster,
 } from "./batched-terrain-grid";
 import {
 	buildMesh,
@@ -52,12 +56,42 @@ export type StreamOptions = {
 	 * unchanged; they arrive after it.
 	 */
 	previewMaxZoom?: number;
+	/**
+	 * Loads one tile at the size its `seg`-segment mesh uses (default: defaultStreamTile =
+	 * loadDemTile + the 2× downsamples). The WebGPU engine's terrainGpuDecode loader returns lazy
+	 * rasters (no CPU heights; deck-webgpu/terrain-gpu-decode.ts). Null = no data / aborted.
+	 */
+	loadTile?: StreamTileLoader;
 	/** The coarse-first set (at most once, before the first `onUpdate`; see previewMaxZoom). */
 	onPreview?: (set: TerrainSet) => void;
 	/** New render set (throttled). Not called until the first selection has fully loaded. */
 	onUpdate: (set: TerrainSet) => void;
 	onProgress?: (done: number, total: number) => void;
 };
+
+/** One tile of `seg` mesh segments, loaded and sized for its mesh (StreamOptions.loadTile). */
+export type StreamTileLoader = (
+	key: TileKey,
+	seg: number,
+	o: DemLoadOptions,
+) => Promise<StreamRaster | null>;
+
+/** The CPU path: loadDemTile, then halved while it has > 2 samples per segment and > 256 px. */
+export async function defaultStreamTile(
+	key: TileKey,
+	seg: number,
+	o: DemLoadOptions,
+): Promise<DemRaster | null> {
+	const dem = await loadDemTile(key, o);
+	return dem && fitStreamTile(dem, seg);
+}
+
+/** A loaded raster sized for a `seg`-segment mesh (the streamer's 2× downsamples). */
+export function fitStreamTile(dem: DemRaster, seg: number): DemRaster {
+	let r = dem;
+	while (r.size > 2 * seg && r.size > 256) r = downsample2(r);
+	return r;
+}
 
 type Want = TileChoice & { id: string; seg: number };
 
@@ -73,9 +107,15 @@ const isAncestor = (a: TileKey, d: TileKey) =>
 export class TerrainStreamer {
 	readonly frame: EnuFrame;
 	private o: Required<
-		Omit<StreamOptions, "onProgress" | "onPreview" | "previewMaxZoom">
+		Omit<
+			StreamOptions,
+			"onProgress" | "onPreview" | "previewMaxZoom" | "loadTile"
+		>
 	> &
-		Pick<StreamOptions, "onProgress" | "onPreview" | "previewMaxZoom">;
+		Pick<
+			StreamOptions,
+			"onProgress" | "onPreview" | "previewMaxZoom" | "loadTile"
+		>;
 	/** One mesh per tile id (replaced when the wanted resolution changes). */
 	private meshes = new Map<string, TileMesh>();
 	private lastUsed = new Map<string, number>();
@@ -225,21 +265,26 @@ export class TerrainStreamer {
 	}
 
 	private async load(w: Want, signal: AbortSignal) {
-		let dem = await loadDemTile(w.key, {
+		const load: StreamTileLoader = this.o.loadTile ?? defaultStreamTile;
+		const dem = await load(w.key, w.seg, {
 			minZoom: this.o.minZoom - 2,
 			priority: tilePriority(w.focus ? w.distance : w.distance * 4, w.key.z),
 			signal,
 		}).catch(() => null); // aborted (stale) or no data anywhere up the pyramid
-		if (!dem || this.disposed || signal.aborted) return;
-		while (dem.size > 2 * w.seg && dem.size > 256) dem = downsample2(dem);
+		if (!dem || this.disposed || signal.aborted) {
+			dem?.lazyHeights?.release?.();
+			return;
+		}
 		const t0 = performance.now();
 		// terrain-mode.ts: the per-tile path's CPU mesh and / or the batched path's grid
 		const build = terrainBuild();
-		const mesh = build.mesh
-			? buildMesh(this.frame, dem, w.seg, w.distance, w.focus)
-			: buildLiteMesh(this.frame, dem, w.seg, w.distance, w.focus);
-		if (build.mesh && build.grid)
-			mesh.grid = buildBatchGrid(this.frame, dem.key, dem.heights);
+		let mesh: TileMesh;
+		if (build.mesh) {
+			// the per-tile CPU mesh needs every height: a lazy tile materialises here
+			const r: DemRaster = { ...dem, heights: getCpuHeights(dem) };
+			mesh = buildMesh(this.frame, r, w.seg, w.distance, w.focus);
+			if (build.grid) mesh.grid = buildBatchGrid(this.frame, r.key, r.heights);
+		} else mesh = buildLiteMesh(this.frame, dem, w.seg, w.distance, w.focus);
 		this.buildMs += performance.now() - t0;
 		this.meshes.set(w.id, mesh);
 	}
@@ -389,15 +434,10 @@ export class TerrainStreamer {
 }
 
 /** 2× box-filter downsample (for tiles whose mesh can't use the full 512 px). */
-function downsample2(r: DemRaster): DemRaster {
-	const s = r.size / 2;
-	const h = r.heights;
-	const S = r.size;
-	const out = new Float32Array(s * s);
-	for (let y = 0; y < s; y++)
-		for (let x = 0; x < s; x++) {
-			const o = 2 * y * S + 2 * x;
-			out[y * s + x] = (h[o] + h[o + 1] + h[o + S] + h[o + S + 1]) * 0.25;
-		}
-	return { ...r, size: s, heights: out };
+export function downsample2(r: DemRaster): DemRaster {
+	return {
+		...r,
+		size: r.size / 2,
+		heights: downsampleHeights2(r.heights, r.size),
+	};
 }

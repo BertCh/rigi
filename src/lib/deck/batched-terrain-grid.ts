@@ -15,7 +15,13 @@
 // final e, n. The base is bilinear between nodes; the dominant curvature term (e² + n²) / 2R is taken
 // out before storing and re-added in the shader, so what gets interpolated is nearly planar.
 // Residual interpolation error is < 0.25 m on z7–z8 tiles (≥ ~80 km away) and < 2 cm elsewhere.
-import { type DemRaster, type TileKey, tileBounds, tileId } from "../dem";
+import {
+	type CpuHeightsTile,
+	type DemRaster,
+	type TileKey,
+	tileBounds,
+	tileId,
+} from "../dem";
 import {
 	DEG,
 	distanceM,
@@ -24,6 +30,12 @@ import {
 	REFRACTION_K,
 } from "../geodesy";
 import type { TileMesh } from "./terrain-data";
+
+/**
+ * A loaded tile as the streamer meshes it: a DemRaster whose heights may be lazy (dem/cpu-heights.ts;
+ * a GPU-decoded tile has `lazyHeights` + `heightStats` and no `heights` until a CPU consumer asks).
+ */
+export type StreamRaster = Omit<DemRaster, "heights"> & CpuHeightsTile;
 
 export type BatchGrid = {
 	/** Base cells per side (the base texture layer holds (G+1)² nodes). */
@@ -61,10 +73,14 @@ export const gridTriangles = (seg: number) => 2 * seg * seg + 16 * seg;
 export const meshTriangles = (m: TileMesh) =>
 	m.indices.length ? m.indices.length / 3 : gridTriangles(m.seg);
 
+/**
+ * The batch grid of tile `key`. `heights` = the tile's heights, or their exact lo / hi
+ * (dem/cpu-heights.ts HeightStats of a GPU-decoded tile): only the range is read.
+ */
 export function buildBatchGrid(
 	frame: EnuFrame,
 	key: TileKey,
-	heights: Float32Array,
+	heights: Float32Array | { lo: number; hi: number },
 ): BatchGrid {
 	const G = baseCells(key.z);
 	const Z = 2 ** key.z;
@@ -98,11 +114,13 @@ export function buildBatchGrid(
 	// bounding box over a 9×9 subset of nodes at the lowest (skirt) and highest height
 	let lo = Number.POSITIVE_INFINITY;
 	let hi = Number.NEGATIVE_INFINITY;
-	for (let i = 0; i < heights.length; i++) {
-		const h = heights[i];
-		if (h < lo) lo = h;
-		if (h > hi) hi = h;
-	}
+	if (heights instanceof Float32Array)
+		for (let i = 0; i < heights.length; i++) {
+			const h = heights[i];
+			if (h < lo) lo = h;
+			if (h > hi) hi = h;
+		}
+	else ({ lo, hi } = heights);
 	if (!Number.isFinite(lo)) lo = hi = 0;
 	const mn = [Infinity, Infinity, Infinity];
 	const mx = [-Infinity, -Infinity, -Infinity];
@@ -141,20 +159,28 @@ export function buildBatchGrid(
 	};
 }
 
-/** A TileMesh without vertex arrays (the batched path builds them on the GPU). */
+/**
+ * A TileMesh without vertex arrays (the batched path builds them on the GPU). `dem` may be lazy
+ * (no `heights`, a `lazyHeights` source and exact `heightStats`: a GPU-decoded tile).
+ */
 export function buildLiteMesh(
 	frame: EnuFrame,
-	dem: DemRaster,
+	dem: StreamRaster,
 	seg: number,
 	distance: number,
 	focus: boolean,
 ): TileMesh {
+	const range = dem.heights ?? dem.heightStats;
+	// invariant: a lazy raster carries its exact stats (deck-webgpu/terrain-gpu-decode.ts)
+	if (!range) throw new Error("buildLiteMesh: lazy tile without heightStats");
 	return {
 		id: tileId(dem.key),
 		key: dem.key,
 		distance,
 		size: dem.size,
 		heights: dem.heights,
+		lazyHeights: dem.lazyHeights,
+		heightStats: dem.heightStats,
 		sourceZ: dem.source.z,
 		focus,
 		seg,
@@ -163,7 +189,7 @@ export function buildLiteMesh(
 		texCoords: EMPTY_F32,
 		elev: EMPTY_F32,
 		indices: EMPTY_U32,
-		grid: buildBatchGrid(frame, dem.key, dem.heights),
+		grid: buildBatchGrid(frame, dem.key, range),
 	};
 }
 

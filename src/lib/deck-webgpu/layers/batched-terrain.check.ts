@@ -17,6 +17,7 @@
 import type { Texture } from "@luma.gl/core";
 import { buildBatchGrid } from "#/lib/deck/batched-terrain-grid";
 import type { TileMesh } from "#/lib/deck/terrain-data";
+import { getCpuHeights } from "#/lib/dem/cpu-heights";
 import { EnuFrame } from "#/lib/geodesy";
 import { getPhoto } from "#/lib/photos";
 import type { Host } from "../hosts/direct";
@@ -103,7 +104,7 @@ export async function runBatchedTerrainCheck() {
 	const meshes: TileMesh[] = cpuTiles
 		.map((m) => ({
 			...m,
-			grid: m.grid ?? buildBatchGrid(frame, m.key, m.heights),
+			grid: m.grid ?? buildBatchGrid(frame, m.key, getCpuHeights(m)),
 		}))
 		.sort((a, b) => a.distance - b.distance);
 	const gridMs = performance.now() - t0;
