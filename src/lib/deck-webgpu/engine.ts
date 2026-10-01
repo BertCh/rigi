@@ -589,6 +589,10 @@ export class WebGpuEngine implements Renderer {
 	private renderSet: TerrainSet | null = null;
 	private queryWedge?: ViewWedge;
 	private streamerWedge?: ViewWedge;
+	/** loadFullTerrain: the streamer keeps refining all around the eye (setPose no longer narrows it). */
+	private fullWedge?: ViewWedge;
+	/** renderPoseView in progress: the photo-view terrain drops its near discard (deck/engine.ts). */
+	private poseView = false;
 	private elevRange: [number, number] | null = null;
 	private photoImg?: HTMLImageElement;
 	private fgMask: FgMask | null = null;
@@ -1707,7 +1711,7 @@ export class WebGpuEngine implements Renderer {
 		clearTimeout(this.wedgeTimer);
 		this.wedgeTimer = window.setTimeout(() => {
 			if (this.disposed || !this.terrain) return;
-			const w = this.wedgeFor(this.pose);
+			const w = this.fullWedge ?? this.wedgeFor(this.pose);
 			this.streamerWedge = w;
 			this.streamer?.setWedge(w);
 		}, 300);
@@ -2190,7 +2194,10 @@ export class WebGpuEngine implements Renderer {
 		host.view = world ? this.viewPose() : host.photo;
 		host.frameView = world ? "world" : "photo";
 		const photoU = this.photoUniforms();
-		const nearDiscard = nearFadeFor(this.photo.hAccuracy) * 0.5;
+		// renderPoseView: the whole DEM, as deck/engine.ts (the matcher's renders never discarded)
+		const nearDiscard = this.poseView
+			? 0
+			: nearFadeFor(this.photo.hAccuracy) * 0.5;
 		const elevRange = deckElevRange(this.style, this.elevRange) ??
 			this.elevRange ?? [400, 4200];
 		g.atmSky.setView(world ? "world" : "photo");
@@ -3760,6 +3767,191 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	// =============================================================================================
+	// offscreen pose renders (tools/matcher/server/render_worker.mjs): deck/engine.ts contract
+
+	/**
+	 * deck/engine.ts loadFullTerrain: the terrain all around the eye. The streamer's high-detail wedge
+	 * becomes 360° (and stays so: setPose no longer narrows it), the CPU queries switch to the complete
+	 * set, and the horizon is re-traced over 360°. Resolves with the ms it took (0 when already done).
+	 * The new tiles go through the same residency as any streamed set (gpu.terrain.setTiles: the batched
+	 * height atlas grows by copy; past the device's layer limit tiles are dropped and counted in
+	 * stats().terrain overflow, as for an unknown-heading photo's 360° wedge).
+	 */
+	async loadFullTerrain(timeoutMs = 300_000): Promise<number> {
+		if (this.fullWedge) return 0;
+		const t0 = performance.now();
+		await this.ready;
+		const streamer = this.streamer;
+		if (!streamer || !this.terrain || this.disposed)
+			throw new Error("loadFullTerrain: no terrain yet");
+		const w: ViewWedge = { headingDeg: this.prior.yaw, halfAngleDeg: 180 };
+		// the streamer already selects 360° (an unknown-heading photo's initial wedge): setWedge is a
+		// no-op and emits no new set, so the current one counts once it is complete
+		const already = (this.streamerWedge?.halfAngleDeg ?? 0) >= 180;
+		this.fullWedge = w;
+		clearTimeout(this.wedgeTimer);
+		const before = this.renderSet;
+		this.streamerWedge = w;
+		streamer.setWedge(w);
+		// a fresh, complete set (the streamer emits as tiles land; pending 0 = this wedge fully loaded)
+		for (;;) {
+			const set = this.renderSet;
+			if (set && (set !== before || already) && (set.stats?.pending ?? 0) === 0)
+				break;
+			if (this.disposed) throw new Error("loadFullTerrain: disposed");
+			if (performance.now() - t0 > timeoutMs)
+				throw new Error("loadFullTerrain: timed out");
+			await new Promise((res) => setTimeout(res, 100));
+		}
+		// maybeSwapQueryTerrain, unconditionally
+		this.terrain = this.renderSet as TerrainSet;
+		this.queryWedge = w;
+		this.snaps.clear();
+		this.vis.clear();
+		this.profiles = undefined;
+		this.dropGeometrySources();
+		this.buildTrails();
+		this.invalidateGeometry();
+		this.sync();
+		this.horizonDirs = await this.traceHorizon();
+		if (!this.disposed) this.sync();
+		return Math.round(performance.now() - t0);
+	}
+
+	/**
+	 * deck/engine.ts loadSatellite: satellite imagery for the render set's tiles within `maxDistM` of
+	 * the eye (0 = all), fetched now; failed tiles are re-fetched up to `retries` times. Other tiles
+	 * keep streaming in the background. The bitmaps upload into the imagery array asynchronously:
+	 * renderPoseView waits for those uploads before it draws.
+	 */
+	async loadSatellite(maxDistM = 0, retries = 2) {
+		await this.ready;
+		const c = this.imagery;
+		const sleep = () => new Promise((res) => setTimeout(res, 100));
+		const want = () =>
+			(this.renderSet?.tiles ?? []).filter(
+				(t) => !(maxDistM > 0) || t.distance < maxDistM,
+			);
+		const missing = () => want().filter((t) => !c.map.has(t.id));
+		let tries = 0;
+		for (;;) {
+			if (this.disposed || !missing().length) break;
+			// a load already running (it may cover these tiles): let it land first
+			while (c.abort && !this.disposed) await sleep();
+			if (this.disposed || !missing().length || tries > retries) break;
+			tries++;
+			this.syncImagery(
+				{ tiles: missing() } as unknown as TerrainSet,
+				"satellite",
+			);
+		}
+		return {
+			tiles: want().length,
+			missing: missing().length,
+			retries: Math.max(0, tries - 1),
+		};
+	}
+
+	/**
+	 * deck/engine.ts renderPoseView, the matcher's view: the satellite drape and the geometry buffer
+	 * through an arbitrary `pose`, both offscreen at width × height (default: the query geometry size,
+	 * 1024 px on the long side). Neither the on-screen view nor the engine's pose changes.
+	 *   xyz:  ENU metres in `frame`, 3 per pixel, row 0 = top, 0,0,0 = sky
+	 *   rgba: sRGB 8-bit, row 0 = top, opaque; the terrain colour pass alone in the Blend-satellite
+	 *         look (no contours, trails or near discard), sky = #b9cde0
+	 * Satellite tiles are drawn as far as they are loaded: call loadSatellite first. On WebGPU the
+	 * geometry is a private WebGpuGeometrySource (terrain cores, its own targets) and the colour is
+	 * renderOffscreen's terrain-only colour pass (rgba16float, linear premultiplied, MSAA-resolved).
+	 */
+	async renderPoseView(
+		pose: Pose,
+		opts: { width?: number; height?: number } = {},
+	): Promise<{
+		width: number;
+		height: number;
+		xyz: Float32Array;
+		rgba: Uint8ClampedArray;
+	} | null> {
+		if (this.world?.controls || this.step)
+			throw new Error("renderPoseView: photo views only");
+		await this.ready;
+		const g0 = this.gpu;
+		if (this.disposed || !this.terrain || !g0) return null;
+		const def = geometrySize(this.aspect);
+		const width = opts.width ?? def.width;
+		const height = opts.height ?? def.height;
+		const p: Pose = {
+			yaw: pose.yaw,
+			pitch: pose.pitch,
+			roll: pose.roll,
+			vfov: pose.vfov,
+		};
+		const prev = this.settings;
+		this.settings = {
+			...prev,
+			mode: "replace",
+			mapStyle: "satellite",
+			trails: false,
+		};
+		this.poseView = true;
+		let src: WebGpuGeometrySource | undefined;
+		try {
+			this.sync();
+			// the imagery bitmaps already fetched land in the array first (async resize + upload)
+			const t0 = performance.now();
+			while (
+				this.gpu &&
+				this.gpu.imagery.pendingUploads > 0 &&
+				!this.disposed &&
+				performance.now() - t0 < 30_000
+			)
+				await new Promise((res) => setTimeout(res, 16));
+			const g = this.gpu;
+			if (this.disposed || !g || this.lost) return null;
+			// geometry: a private source at this size (the query buffer and its pose stay as they are)
+			src = new WebGpuGeometrySource(
+				{
+					device: g.device,
+					cores: () => [g.terrain],
+					eye: this.eyeArr,
+					near: PHOTO_NEAR,
+				},
+				width,
+				height,
+				{ xyz: true },
+			);
+			await src.render(p);
+			if (this.disposed || !src.pose) return null;
+			const xyz = new Float32Array(width * height * 3);
+			const sx = src.xyz;
+			for (let i = 0; i < width * height; i++) {
+				if (!(src.range[i] > 0) || !Number.isFinite(src.range[i])) continue;
+				if (sx) {
+					xyz[i * 3] = sx[i * 3];
+					xyz[i * 3 + 1] = sx[i * 3 + 1];
+					xyz[i * 3 + 2] = sx[i * 3 + 2];
+				}
+			}
+			// colour: the terrain colour pass alone (linear, premultiplied) → sRGB over the sky colour
+			const lin = (await this.renderOffscreen({
+				width,
+				height,
+				view: "photo",
+				pose: p,
+				cores: [new ViewGate(g.terrain, () => "photo")],
+				screen: false,
+			})) as Float32Array | null;
+			if (!lin || this.disposed) return null;
+			return { width, height, xyz, rgba: poseViewRgba(lin, width, height) };
+		} finally {
+			src?.dispose();
+			this.poseView = false;
+			this.settings = prev;
+			if (!this.disposed) this.sync();
+		}
+	}
+
+	// =============================================================================================
 	// offscreen renders: export, band stats
 
 	/**
@@ -3772,6 +3964,8 @@ export class WebGpuEngine implements Renderer {
 		width: number;
 		height: number;
 		view: View;
+		/** the photo camera's pose (default: the engine's pose; renderPoseView) */
+		pose?: Pose;
 		cores?: readonly GpuLayerCore[];
 		screen: boolean;
 		/** compute bridge: consume the resolved colour target on the GPU instead of reading it back */
@@ -3787,7 +3981,7 @@ export class WebGpuEngine implements Renderer {
 		if (!g || !host || this.disposed || this.lost) return null;
 		const device = g.device;
 		const cores = o.cores ?? host.cores;
-		const photo = this.photoPose();
+		const photo = this.photoPose(o.pose);
 		const view = o.view === "world" ? this.viewPose() : photo;
 		const gs = geometrySize(this.aspect);
 		const geo = new GeometryTargets(
@@ -4028,6 +4222,32 @@ export class WebGpuEngine implements Renderer {
 
 // ---------------------------------------------------------------------------------------------
 // helpers
+
+/**
+ * deck/engine.ts renderPoseView's colour conversion: linear colour + alpha (0 = nothing drawn = sky)
+ * → sRGB 8-bit over the matcher's sky colour #b9cde0, opaque. Same arithmetic as the deck engine
+ * (colour / alpha, OETF, × alpha + sky × (1 − alpha)); on WebGPU the input is premultiplied, so the
+ * division recovers the straight colour.
+ */
+export function poseViewRgba(
+	lin: Float32Array,
+	width: number,
+	height: number,
+): Uint8ClampedArray {
+	const rgba = new Uint8ClampedArray(width * height * 4);
+	const SKY = [0xb9, 0xcd, 0xe0];
+	const oetf = (c: number) =>
+		c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055;
+	for (let i = 0; i < width * height; i++) {
+		const a = Math.min(1, Math.max(0, lin[i * 4 + 3]));
+		for (let k = 0; k < 3; k++) {
+			const c = a > 0 ? oetf(Math.min(1, Math.max(0, lin[i * 4 + k] / a))) : 0;
+			rgba[i * 4 + k] = Math.round(c * a * 255 + SKY[k] * (1 - a));
+		}
+		rgba[i * 4 + 3] = 255;
+	}
+	return rgba;
+}
 
 /** GPU work recorded into a render's encoder (renderOffscreen `encode`). */
 type EncodedWork = { after: () => Promise<unknown>; cancel: () => void };

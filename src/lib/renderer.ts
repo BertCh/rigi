@@ -132,7 +132,38 @@ export interface Renderer {
 	flyToPhoto(dur?: number): void;
 	flyOut(): void;
 	exportImage(withLabels?: boolean): Promise<Blob | null>;
+
+	// ---- offscreen pose renders (tools/matcher/server/render_worker.mjs, not the workspace) ----
+	// Both engines implement them (renderer.check.ts); optional so other Renderer shapes need not.
+	/**
+	 * The terrain all around the eye: 360° high-detail streaming (kept), the CPU queries on the complete
+	 * set, the horizon re-traced over 360°. Resolves with the ms it took (0 when already done).
+	 */
+	loadFullTerrain?(timeoutMs?: number): Promise<number>;
+	/** Satellite imagery for the render set's tiles within `maxDistM` of the eye (0 = all), fetched now. */
+	loadSatellite?(
+		maxDistM?: number,
+		retries?: number,
+	): Promise<{ tiles: number; missing: number; retries: number }>;
+	/**
+	 * The matcher's view through `pose`, offscreen at width × height (default 1024 px on the long side):
+	 * xyz = ENU metres in `frame` (3 per pixel, row 0 = top, 0,0,0 = sky); rgba = sRGB 8-bit, opaque,
+	 * the terrain colour pass alone in the Blend-satellite look over sky #b9cde0. The engine's pose and
+	 * the on-screen view are unchanged.
+	 */
+	renderPoseView?(
+		pose: Pose,
+		opts?: { width?: number; height?: number },
+	): Promise<PoseView | null>;
 }
+
+/** renderPoseView's output (see Renderer.renderPoseView). */
+export type PoseView = {
+	width: number;
+	height: number;
+	xyz: Float32Array;
+	rgba: Uint8ClampedArray;
+};
 
 /** Constructor shape the backends share: `new Engine(canvas, photo)`. */
 export type RendererConstructor = new (

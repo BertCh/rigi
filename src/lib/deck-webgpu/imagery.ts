@@ -86,6 +86,11 @@ export class ImageryArray {
 		return this.atlas?.texture ?? null;
 	}
 
+	/** Bitmaps sync() started uploading that have not landed yet (renderPoseView waits for 0). */
+	get pendingUploads() {
+		return this.pending.size;
+	}
+
 	/** Layer of a tile's imagery, or -1 (none yet / overflow). */
 	layerOf(id: string) {
 		return this.layers.get(id) ?? -1;

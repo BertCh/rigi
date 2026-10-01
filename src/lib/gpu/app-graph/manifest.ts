@@ -498,7 +498,9 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"geometry / colour / photo targets",
 			"TextureArrayAtlas height + imagery arrays",
 		],
-		readbacks: [],
+		readbacks: [
+			"matcher only (renderPoseView, offline): xyzr rgba32f + colour rgba16f per pose view",
+		],
 		status: "default",
 		notes: "deck.gl layers in one encoder; not a ComputeGraph",
 	},
