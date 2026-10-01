@@ -204,6 +204,15 @@ export async function autoAlignAsync(
 	}
 	// the grid scores depend on the prior's sky fit, so fit first (autoAlign then skips it)
 	fitPriorSky(prior, aspect, dirs, edge);
+	// Everything below awaits, and a concurrent autoAlign's fitPriorSky rewrites the sky planes in
+	// place: take a private copy NOW (no await since the fit), where the synchronous autoAlign would
+	// read them, and use it for the grid, the bounds, the refine and every CPU fallback (coarse /
+	// fine / fg are never written after buildEdgeMap, so they stay shared and keep their uploads).
+	const own: EdgeMap = {
+		...edge,
+		sky: edge.sky.slice(),
+		skyCum: edge.skyCum.slice(),
+	};
 	let grid: CoarseGridScores | undefined;
 	let error: string | undefined;
 	let uploadBytes: number | undefined;
@@ -218,7 +227,7 @@ export async function autoAlignAsync(
 			poses,
 			aspect,
 			dirs,
-			edge,
+			own,
 			3,
 			st,
 		);
@@ -244,14 +253,6 @@ export async function autoAlignAsync(
 	let violation: string | undefined;
 	if (refine === "gpu") {
 		boundStats = { uploadBytes: 0, calls: 0, poses: 0, unbounded: 0, gpuMs: 0 };
-		// the refine awaits between rounds, and a concurrent autoAlign's fitPriorSky rewrites the
-		// sky planes in place: score a private copy, taken where the synchronous autoAlign would read
-		// them (coarse / fine / fg are never written after buildEdgeMap)
-		const own: EdgeMap = {
-			...edge,
-			sky: edge.sky.slice(),
-			skyCum: edge.skyCum.slice(),
-		};
 		let bounds: ScoreBounds = poseBoundSession(
 			device,
 			aspect,
@@ -290,7 +291,7 @@ export async function autoAlignAsync(
 		res = g.res;
 		violation = g.violation;
 		if (violation) refine = "cpu";
-	} else res = autoAlign(prior, aspect, dirs, edge, yawRange, coarse, rs);
+	} else res = autoAlign(prior, aspect, dirs, own, yawRange, coarse, rs);
 	lastAlignTiming = {
 		path: grid ? "gpu" : "cpu",
 		totalMs: performance.now() - t0,
