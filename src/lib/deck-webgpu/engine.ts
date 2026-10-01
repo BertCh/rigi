@@ -91,6 +91,7 @@ import {
 import {
 	type ImagerySource,
 	loadImagery,
+	localMaxOf,
 	type TerrainSet,
 	type TileMesh,
 	type ViewWedge,
@@ -205,6 +206,7 @@ import {
 import { createLookBridge, type LookBridge } from "./compute-bridge";
 import { deckBuild, releaseForCompute, webgpuAvailable } from "./device";
 import { GeoQueryGpu } from "./geo-query-gpu";
+import { HeightGather, replayHeights } from "./height-gather";
 import type { Host, HostStats } from "./hosts/direct";
 import {
 	type CameraPose,
@@ -542,6 +544,20 @@ export class WebGpuEngine implements Renderer {
 	private silMask: SilhouetteMaskGpu | null = null;
 	/** geometry diet (see WebGpuEngineOptions.geometryDiet) */
 	private geoQuery: GeoQueryGpu | null = null;
+	/**
+	 * WAG W2.4: the CPU height readers (camera DEM height, trails, peak snapping) gather lazy tiles'
+	 * heights from the atlas (height-gather.ts) while the terrainGpuDecode loader streams; null = heightAt.
+	 */
+	private heightGather: HeightGather | null = null;
+	private gpuDecodeOn = false;
+	/** trail builds in flight: a newer build (or terrain) supersedes an older one */
+	private trailGen = 0;
+	/** peak snaps gathered asynchronously: results waiting for snapPeaksNear, peaks in flight, epoch */
+	private snapDone = new Map<Peak, { lat: number; lon: number; h: number }>();
+	private snapPending = new Set<Peak>();
+	private snapFlights = new Set<Promise<void>>();
+	private snapGen = 0;
+	private snapEmitQueued = false;
 	private dietBroken = false;
 	/** Occlusion verdicts of a render (peaks in frame only), valid for exactly the inputs they were made from. */
 	private occGpu: {
@@ -1244,10 +1260,14 @@ export class WebGpuEngine implements Renderer {
 
 		const terrain = await terrainLoad;
 		if (!terrain || this.disposed) return;
+		const hg = this.heights();
+		const demHere = hg
+			? await this.cameraDemHeight(hg, terrain)
+			: terrain.heightAt(this.photo.lat, this.photo.lon);
+		if (this.disposed) return;
 		this.terrain = terrain;
 		this.queryWedge = wedge;
-		const dem =
-			terrain.heightAt(this.photo.lat, this.photo.lon) ?? this.photo.alt ?? 0;
+		const dem = demHere ?? this.photo.alt ?? 0;
 		this.demAtCamera = dem;
 		this.setEye(eyeAltitude(this.photo.alt, dem));
 		this.elevRange = localElevRange(terrain);
@@ -1357,6 +1377,7 @@ export class WebGpuEngine implements Renderer {
 			terrainBuild().mesh
 		)
 			return undefined;
+		this.gpuDecodeOn = true;
 		return gpuDecodeTileLoader(async () => {
 			await this.ready.catch(() => {});
 			return this.disposed || this.lost ? null : (this.gpu?.device ?? null);
@@ -1377,6 +1398,7 @@ export class WebGpuEngine implements Renderer {
 		this.terrain = set;
 		this.queryWedge = this.streamerWedge;
 		this.snaps.clear();
+		this.dropSnapGathers();
 		this.vis.clear();
 		this.profiles = undefined;
 		if (this.geoSrcKind === "cpu") this.dropGeometrySources();
@@ -1395,15 +1417,116 @@ export class WebGpuEngine implements Renderer {
 
 	private buildTrails() {
 		const t = this.terrain;
-		if (!this.region || !t) return;
-		this.trails = buildTrailSegments(
-			this.region,
-			this.frame,
-			this.photo,
-			(lat, lon) => t.heightAt(lat, lon),
-			trailPalette(this.style),
+		const region = this.region;
+		if (!region || !t) return;
+		const gen = ++this.trailGen;
+		const hg = this.heights();
+		if (!hg) {
+			this.trails = buildTrailSegments(
+				region,
+				this.frame,
+				this.photo,
+				(lat, lon) => t.heightAt(lat, lon),
+				trailPalette(this.style),
+			);
+			this.gpu?.trails.setSegments(this.trails);
+			return;
+		}
+		// terrainGpuDecode: the same segments, every height in one batched lookup (height-gather.ts)
+		const built = replayHeights(
+			(heightAt) =>
+				buildTrailSegments(
+					region,
+					this.frame,
+					this.photo,
+					heightAt,
+					trailPalette(this.style),
+				),
+			(lats, lons) => hg.heightsAt(t, lats, lons),
 		);
-		this.gpu?.trails.setSegments(this.trails);
+		const apply = (seg: TrailSegments) => {
+			if (gen !== this.trailGen || this.disposed) return false;
+			this.trails = seg;
+			this.gpu?.trails.setSegments(seg);
+			return true;
+		};
+		if (built instanceof Promise)
+			void built.then((seg) => apply(seg) && this.sync());
+		else apply(built);
+	}
+
+	/**
+	 * The gathers of height-gather.ts while the terrainGpuDecode loader streams on the batched terrain
+	 * (whose atlas holds the lazy tiles' heights), else null: the CPU readers call heightAt.
+	 */
+	private heights(): HeightGather | null {
+		const g = this.gpu;
+		if (!this.gpuDecodeOn || !g || !("residentHeights" in g.terrain))
+			return null;
+		if (this.heightGather?.device !== g.device) {
+			this.heightGather?.destroy();
+			const terrain = g.terrain;
+			this.heightGather = new HeightGather(g.device, () =>
+				this.gpu?.terrain === terrain ? terrain.residentHeights() : null,
+			);
+		}
+		return this.heightGather;
+	}
+
+	/** heightAt at the camera (init) from the atlas under terrainGpuDecode (one gather). */
+	private async cameraDemHeight(hg: HeightGather, terrain: TerrainSet) {
+		const { lat, lon } = this.photo;
+		// the stream's first set may have arrived before the device: make it resident first
+		this.gpu?.terrain.setTiles(terrain.tiles);
+		const h = hg.heightsAt(terrain, [lat], [lon]);
+		const v = (h instanceof Float64Array ? h : await h)[0];
+		return Number.isNaN(v) ? null : v;
+	}
+
+	/**
+	 * snapPeaksNear's localMax under terrainGpuDecode: localMaxOf over one batched lookup. Synchronous
+	 * when every sample's tile has CPU heights; else the peak is gathered (all peaks of one call share
+	 * one dispatch), skipped for now, and handed over on a later call once its summit is known.
+	 */
+	private gatheredLocalMax(hg: HeightGather, terrain: TerrainSet) {
+		return (p: Peak, radiusM: number) => {
+			const done = this.snapDone.get(p);
+			if (done) {
+				this.snapDone.delete(p);
+				return done;
+			}
+			if (this.snapPending.has(p)) return undefined;
+			const r = replayHeights(
+				(heightAt) => localMaxOf(heightAt, p.lat, p.lon, radiusM),
+				(lats, lons) => hg.heightsAt(terrain, lats, lons),
+			);
+			if (!(r instanceof Promise)) return r;
+			const gen = this.snapGen;
+			this.snapPending.add(p);
+			const flight = r.then((snap) => {
+				this.snapFlights.delete(flight);
+				if (gen !== this.snapGen || this.disposed) return;
+				this.snapPending.delete(p);
+				this.snapDone.set(p, snap);
+				// the snapped list grew: labels (and their verdicts) re-read it, once per batch
+				if (this.snapEmitQueued) return;
+				this.snapEmitQueued = true;
+				queueMicrotask(() => {
+					this.snapEmitQueued = false;
+					this.emit();
+				});
+			});
+			this.snapFlights.add(flight);
+			return undefined;
+		};
+	}
+
+	/** The query terrain changed: gathered snaps of the old one are void. */
+	private dropSnapGathers() {
+		this.snapGen++;
+		this.snapDone.clear();
+		this.snapPending.clear();
+		this.snapFlights.clear();
 	}
 
 	private wedgeFor(pose: Pose): ViewWedge {
@@ -1450,6 +1573,8 @@ export class WebGpuEngine implements Renderer {
 		this.silMask = null;
 		this.geoQuery?.destroy();
 		this.geoQuery = null;
+		this.heightGather?.destroy();
+		this.heightGather = null;
 		this.listeners.clear();
 		const g = this.gpu;
 		this.gpu = null;
@@ -2410,6 +2535,12 @@ export class WebGpuEngine implements Renderer {
 	 */
 	async settle(): Promise<boolean> {
 		if (!(await this.gens.readback())) return false;
+		// terrainGpuDecode: the pose's peaks whose summits are being gathered join the list first
+		if (this.terrain && this.heights()) {
+			this.snapped(this.pose);
+			if (this.snapFlights.size) await Promise.all(this.snapFlights);
+			if (this.disposed) return false;
+		}
 		// the verdicts must describe the current snapped list too (peaks can change without a geometry
 		// invalidation): recompute them from the target for this render if they don't
 		for (let i = 0; i < 3 && !this.disposed; i++) {
@@ -2757,6 +2888,7 @@ export class WebGpuEngine implements Renderer {
 
 	private snapped(pose: Pose) {
 		if (!this.terrain || !this.peaks.length) return [];
+		const hg = this.heights();
 		return snapPeaksNear(
 			this.terrain,
 			this.peaks,
@@ -2765,6 +2897,7 @@ export class WebGpuEngine implements Renderer {
 			this.eyeArr,
 			this.aspect,
 			this.snaps,
+			hg ? this.gatheredLocalMax(hg, this.terrain) : undefined,
 		);
 	}
 
