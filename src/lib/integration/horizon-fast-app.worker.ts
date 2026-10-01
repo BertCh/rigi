@@ -15,10 +15,14 @@ import {
 	tileId,
 	validateTile,
 } from "#/lib/dem";
-import { destination, EARTH_R, EnuFrame } from "#/lib/geodesy";
 import { applyRealmGpuOptions, takeGpuProfile } from "#/lib/gpu/core/realm";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { computeHorizonGpu, warmHorizonGpu } from "#/lib/gpu/horizon";
+import {
+	type HorizonPrecision,
+	skylineDirs,
+	warmCertifiedAsync,
+} from "#/lib/gpu/horizon/certified";
 import {
 	computeHorizonFast,
 	type FastHorizonOptions,
@@ -75,24 +79,6 @@ async function decode(
 
 type Job = Extract<HorizonWorkerIn, { type: "build" }>;
 let job: Job | null = null;
-/**
- * Azimuths of the columns the old GPU horizon read back: 8 perspective renders, 1024 columns over 50° each,
- * every 45°. align.scorePose averages over the projected directions, so this density (denser towards each
- * render's edges, doubled in the 5° overlaps) is part of what autoAlign was tuned on.
- */
-const GPU_COLUMNS = (() => {
-	const out: number[] = [];
-	const t = Math.tan((25 * Math.PI) / 180);
-	for (let r = 0; r < 8; r++)
-		for (let x = 0; x < 1024; x++)
-			out.push(
-				(r * 45 +
-					(Math.atan((((x + 0.5) / 1024) * 2 - 1) * t) * 180) / Math.PI +
-					360) %
-					360,
-			);
-	return out;
-})();
 
 let built: Promise<{ mosaics: Mosaic[]; mosaicMs: number }> | null = null;
 
@@ -101,6 +87,8 @@ let built: Promise<{ mosaics: Mosaic[]; mosaicMs: number }> | null = null;
  * tiles decode) so adapter/device creation and the kernel compile overlap the tile work. null = CPU.
  */
 let gpu: ReturnType<typeof getComputeDevice> | null = null;
+/** The tan → degrees and ENU stages' precision (page flag horizonPrecision; certified-f32 needs the GPU march). */
+let precision: HorizonPrecision = "f64";
 
 /** The profile on the GPU (src/lib/gpu/horizon, parity-checked against this CPU march), else the CPU. */
 async function marchProfile(
@@ -119,7 +107,10 @@ async function marchProfile(
 	const device = gpu ? await gpu : null;
 	if (device)
 		try {
-			const [prof] = await computeHorizonGpu(device, mosaics, [eye], opts);
+			const [prof] = await computeHorizonGpu(device, mosaics, [eye], {
+				...opts,
+				precision,
+			});
 			// gpuHorizon is on by default, so this per-march log is dev-only
 			if (import.meta.env?.DEV)
 				console.info(
@@ -140,57 +131,23 @@ async function march(
 	mosaicMs: number,
 ): Promise<Extract<HorizonWorkerOut, { type: "dirs" }>> {
 	const t1 = performance.now();
-	const step = j.step;
 	const { prof, on } = await marchProfile(mosaics, j, eyeH);
 	const t2 = performance.now();
-	// ENU unit directions (x east, y north, z up) in PhotoEngine's frame. horizon-fast marches a sphere;
-	// the engine's frame is WGS84 (EnuFrame, with the same k = 0.13 refraction lift), whose azimuths differ
-	// by up to ~0.09° (M ≠ N). So each skyline sample goes back to its geographic point (the lat/lon
-	// horizon-fast sampled, the DEM height it found) and through EnuFrame.fromGeo, exactly as the terrain
-	// mesh vertices the GPU horizon rendered.
-	const D = Math.PI / 180;
-	const n = prof.elevation.length;
-	const frame = new EnuFrame(j.lat, j.lon, 0);
-	const inv2R = (1 - j.k) / (2 * EARTH_R);
-	const az = new Float64Array(n); // ENU azimuth, unwrapped to within ±180° of the march azimuth (in practice < 0.1°)
-	const el = new Float64Array(n); // ENU elevation, NaN where the ray found no terrain
-	const v = [0, 0, 0];
-	for (let i = 0; i < n; i++) {
-		const a = (prof.i0 + i) * step;
-		const d = prof.distance[i];
-		const e0 = prof.elevation[i];
-		if (!(e0 > -90) || !(d > 0)) {
-			az[i] = a;
-			el[i] = Number.NaN;
-			continue;
-		}
-		const p = destination(j.lat, j.lon, a, d);
-		frame.fromGeo(p.lat, p.lon, eyeH + d * (Math.tan(e0 * D) + d * inv2R), v);
-		const z = v[2] - eyeH;
-		const b = Math.atan2(v[0], v[1]) / D;
-		az[i] = a + ((((b - a) % 360) + 540) % 360) - 180;
-		el[i] = Math.atan2(z, Math.hypot(v[0], v[1])) / D;
-	}
-	// the profile, linearly interpolated at the GPU horizon's column azimuths (n samples cover 360°)
-	const at = (m: number) => az[((m % n) + n) % n] + Math.floor(m / n) * 360;
-	const out = new Float32Array(GPU_COLUMNS.length * 3);
-	let k = 0;
-	for (const c of GPU_COLUMNS) {
-		let i = Math.floor(c / step);
-		while (at(i) > c) i--;
-		while (at(i + 1) <= c) i++;
-		const e0 = el[((i % n) + n) % n];
-		const e1 = el[(((i + 1) % n) + n) % n];
-		if (Number.isNaN(e0) || Number.isNaN(e1)) continue;
-		const t = Math.min(
-			Math.max((c - at(i)) / Math.max(at(i + 1) - at(i), 1e-9), 0),
-			1,
+	// ENU unit directions in PhotoEngine's frame (gpu/horizon/dirs-cpu.ts: the f64 stage, moved there
+	// verbatim; certified-f32 gives the same bits through the GPU plus the f64 tie path)
+	const device = on === "gpu" && gpu ? await gpu : null;
+	const { dirs, stats: cert } = await skylineDirs(
+		device,
+		prof,
+		j,
+		eyeH,
+		on === "gpu" ? precision : "f64",
+	);
+	if (import.meta.env?.DEV && cert.precision !== "f64")
+		console.info(
+			`[horizon worker] ${cert.precision} directions: ${cert.certified} certified, ${cert.ties} ties` +
+				(cert.fellBack ? ` (fell back: ${cert.fellBack})` : ""),
 		);
-		const e = (e0 + (e1 - e0) * t) * D;
-		out[k++] = Math.sin(c * D) * Math.cos(e);
-		out[k++] = Math.cos(c * D) * Math.cos(e);
-		out[k++] = Math.sin(e);
-	}
 	let bytes = 0;
 	for (const mo of mosaics) bytes += mo.data.byteLength;
 	// profiling only (undefined, nothing awaited, when the page does not profile)
@@ -200,7 +157,7 @@ async function march(
 		type: "dirs",
 		...(gpuProfile ? { gpuProfile } : {}),
 		eyeH,
-		dirs: out.slice(0, k),
+		dirs,
 		stats: {
 			decodeMs,
 			mosaicMs,
@@ -208,6 +165,18 @@ async function march(
 			marchOn: on,
 			tiles: store.tiles.size,
 			mosaicMB: bytes / 1e6,
+			...(cert.precision !== "f64"
+				? {
+						precision: {
+							mode: cert.precision,
+							ties: cert.ties,
+							certified: cert.certified,
+							gpuMs: cert.gpuMs,
+							finishMs: cert.finishMs,
+							...(cert.fellBack ? { fellBack: cert.fellBack } : {}),
+						},
+					}
+				: {}),
 		},
 	};
 }
@@ -224,10 +193,12 @@ scope.onmessage = async (e: MessageEvent<HorizonWorkerIn>) => {
 	try {
 		if (m.type === "spans") {
 			spans = m.spans;
+			precision = m.precision ?? "f64";
 			applyRealmGpuOptions(m.gpuOpts);
 			if (m.gpu && !gpu) {
 				gpu = getComputeDevice().then((d) => {
 					if (d) warmHorizonGpu(d);
+					if (d && precision !== "f64") void warmCertifiedAsync(d);
 					return d;
 				});
 				gpu.catch(() => {});

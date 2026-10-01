@@ -177,6 +177,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "horizonPrecision",
+		label: "Skyline precision",
+		help: "Certified f32: the skyline's angle stages on the GPU with an exact certificate and CPU f64 ties (same output).",
+		group: "compute",
+		options: { f64: "f64 (CPU)", "certified-f32": "Certified f32" },
+	},
+	{
 		name: "lookgpu",
 		label: "Look passes",
 		help: "Relief / haze on the GPU (~2× faster, ≤ 1 byte parity).",

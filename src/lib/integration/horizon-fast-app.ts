@@ -28,7 +28,11 @@ import {
 	type RealmGpuOptions,
 	realmGpuOptions,
 } from "#/lib/gpu/core/realm";
-import { gpuHorizonOptIn } from "#/lib/gpu/horizon/opt-in";
+import type { HorizonPrecision } from "#/lib/gpu/horizon/certified-cpu";
+import {
+	gpuHorizonOptIn,
+	horizonPrecisionOptIn,
+} from "#/lib/gpu/horizon/opt-in";
 import {
 	LITE_RINGS,
 	mosaicTileKeys,
@@ -48,6 +52,8 @@ export type HorizonWorkerIn =
 			gpu?: boolean;
 			/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
 			gpuOpts?: RealmGpuOptions;
+			/** Precision of the tan → degrees and ENU stages (opt-in: horizonPrecisionOptIn(); default f64). */
+			precision?: HorizonPrecision;
 	  }
 	| {
 			type: "tile";
@@ -74,6 +80,15 @@ export type HorizonStats = {
 	mosaicMB: number;
 	/** Where the profile was marched: "gpu" (src/lib/gpu/horizon) or "cpu" (horizon-fast). */
 	marchOn?: "gpu" | "cpu";
+	/** Only with ?horizonPrecision=certified-f32: the certified ENU stage's columns and timing. */
+	precision?: {
+		mode: HorizonPrecision;
+		ties: number;
+		certified: number;
+		gpuMs: number;
+		finishMs: number;
+		fellBack?: string;
+	};
 };
 
 export type HorizonWorkerOut =
@@ -181,6 +196,7 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 			spans,
 			gpu: gpuHorizonOptIn(),
 			gpuOpts: realmGpuOptions(),
+			precision: horizonPrecisionOptIn(),
 		});
 		const seen = new Set<string>();
 		const keys = spans

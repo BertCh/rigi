@@ -56,6 +56,8 @@ export const FLAG_SCHEMA = {
 	gpu: onOff("on"),
 	/** autoAlign's skyline march */
 	gpuHorizon: onOff("on"),
+	/** the skyline's tan → degrees and ENU stages: f64 on the CPU, or certified f32 on the GPU (same bits) */
+	horizonPrecision: oneOf(["f64", "certified-f32"], "f64"),
 	/** relief / haze look passes */
 	lookgpu: onOff("on"),
 	/** unknown-pose 360° horizon (off: 0-false-accept rule) */

@@ -39,6 +39,10 @@
  * `opts.peaks` is classified on the CPU with peakVisibilityFast (one ray per peak; cheap), which is exactly
  * what computeHorizonFast does for them.
  *
+ * Precision (opt-in, ./certified.ts and README.md "Certified f32"): `opts.precision: "certified-f32"` turns
+ * the f64 tan → degrees step of the readback into a certified GPU stage (the march output goes through
+ * horizonElevations); the elevations are bit-identical to the default "f64" either way.
+ *
  * App wiring (on by default since 2026-09-28, not opt-in): the horizon-fast-app worker marches on the GPU
  * wherever WebGPU exists (off with ?gpuHorizon=off or ?gpu=off; see opt-in.ts). autoAlign reacts to
  * last-bit changes in the skyline (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll); that drift was
@@ -64,6 +68,7 @@ import {
 } from "#/lib/horizon-fast/march";
 import { buildMips, type Mosaic } from "#/lib/horizon-fast/mosaic";
 import { getComputeDevice } from "../device";
+import { type HorizonPrecision, horizonElevations } from "./certified";
 import { graphChunker } from "./graph";
 import { HORIZON_WGSL } from "./horizon.wgsl";
 
@@ -260,6 +265,12 @@ export interface GpuHorizonTiming {
 /** Timing of the latest computeHorizonGpu call in this realm (benchmarks). */
 export let lastGpuHorizonTiming: GpuHorizonTiming | null = null;
 
+/** computeHorizonGpu's options: the CPU march's, plus the precision of the tan → degrees stage. */
+export type GpuHorizonOptions = FastHorizonOptions & {
+	/** "f64" (default): CPU atan per sample; "certified-f32": GPU + certificate + CPU ties (bit-identical) */
+	precision?: HorizonPrecision;
+};
+
 /**
  * Horizon profiles for a batch of eyes over one mosaic set. Same output as computeHorizonFast per eye,
  * except `ridges` is always one empty list per azimuth (see the header) and stats.ms is the batch's wall
@@ -269,13 +280,17 @@ export async function computeHorizonGpu(
 	device: Device,
 	mosaics: Mosaic[],
 	eyes: Eye[],
-	opts: FastHorizonOptions = {},
+	opts: GpuHorizonOptions = {},
 ): Promise<FastHorizonProfile[]> {
 	const t0 = performance.now();
 	if (!eyes.length) return [];
+	// certified-f32: the march's raw (t, d) per eye, converted after the march (outside its lease)
+	const tds: Float32Array[] | null =
+		opts.precision === "certified-f32" ? [] : null;
 	const out = await withLease(LEASE, () =>
-		marchLocked(device, mosaics, eyes, opts, t0),
+		marchLocked(device, mosaics, eyes, opts, t0, tds),
 	);
+	if (tds) await certifyElevations(device, out, tds);
 	if (opts.peaks)
 		for (let j = 0; j < eyes.length; j++)
 			out[j].peaks = peakVisibilityFast(mosaics, eyes[j], opts.peaks, opts);
@@ -292,6 +307,25 @@ interface Pending {
 	read: StagedRead;
 }
 
+/** Elevations of every eye's profile through the certified stage (one GPU run for the batch). */
+async function certifyElevations(
+	device: Device,
+	out: FastHorizonProfile[],
+	tds: Float32Array[],
+) {
+	const nAz = tds[0]?.length / 2 || 0;
+	const td = new Float32Array(tds.length * nAz * 2);
+	for (let j = 0; j < tds.length; j++) td.set(tds[j], j * nAz * 2);
+	const { elevation } = await horizonElevations(
+		device,
+		td,
+		tds.length * nAz,
+		"certified-f32",
+	);
+	for (let j = 0; j < out.length; j++)
+		out[j].elevation = elevation.slice(j * nAz, (j + 1) * nAz);
+}
+
 /** computeHorizonGpu's body, holding the "horizon" lease (pooled slots and pages are ours). */
 async function marchLocked(
 	device: Device,
@@ -299,6 +333,7 @@ async function marchLocked(
 	eyes: Eye[],
 	opts: FastHorizonOptions,
 	t0: number,
+	tds: Float32Array[] | null = null,
 ): Promise<FastHorizonProfile[]> {
 	const tu = performance.now();
 	const set = uploadMosaics(device, mosaics);
@@ -402,11 +437,16 @@ async function marchLocked(
 				throw new Error("horizon kernel hit its iteration cap");
 			const elevation = new Float32Array(nAz);
 			const distance = new Float32Array(nAz);
-			for (let i = 0; i < nAz; i++) {
-				const t = T[2 * (j * nAz + i)];
-				elevation[i] = t <= -3e38 ? -90 : Math.atan(t) / DEG;
-				distance[i] = T[2 * (j * nAz + i) + 1];
-			}
+			if (tds) {
+				// certified-f32: keep (t, d); computeHorizonGpu converts after the march
+				tds[p.c0 + j] = T.slice(2 * j * nAz, 2 * (j + 1) * nAz);
+				for (let i = 0; i < nAz; i++) distance[i] = T[2 * (j * nAz + i) + 1];
+			} else
+				for (let i = 0; i < nAz; i++) {
+					const t = T[2 * (j * nAz + i)];
+					elevation[i] = t <= -3e38 ? -90 : Math.atan(t) / DEG;
+					distance[i] = T[2 * (j * nAz + i) + 1];
+				}
 			out[p.c0 + j] = {
 				step,
 				elevation,
@@ -516,7 +556,7 @@ const gpuCanServe = (opts: FastHorizonOptions) => !!opts.noRidges;
 export async function computeHorizonAuto(
 	mosaics: Mosaic[],
 	eye: Eye,
-	opts: FastHorizonOptions = {},
+	opts: GpuHorizonOptions = {},
 ): Promise<FastHorizonProfile> {
 	return (await computeHorizonsAuto(mosaics, [eye], opts))[0];
 }
@@ -525,7 +565,7 @@ export async function computeHorizonAuto(
 export async function computeHorizonsAuto(
 	mosaics: Mosaic[],
 	eyes: Eye[],
-	opts: FastHorizonOptions = {},
+	opts: GpuHorizonOptions = {},
 ): Promise<FastHorizonProfile[]> {
 	if (gpuCanServe(opts)) {
 		const device = await getComputeDevice();

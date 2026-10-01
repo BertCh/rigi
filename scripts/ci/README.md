@@ -49,6 +49,8 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | gpu-inspect | fast | graph inspection (`gpu/core/inspect.ts`, `inspector.ts`): stats / preflight / inspector-sample summary, observation through the upstream `GPUCommandGraphInspector`, `getGpuGraphProfile`, device-loss cleanup (fake device, no GPU) | `src/lib/gpu/core/inspect.check.ts` |
 | app-graph | fast | app graph manifest ↔ code: every `cachedGraph` group in `src/lib/gpu/**` and `src/lib/deck-webgpu/**` is declared in `gpu/app-graph/manifest.ts` and vice versa; island ids, unique ids, paths | `src/lib/gpu/app-graph/app-graph.check.ts` |
 | app-graph-table | fast | `research_notes/whole-app-graph-2026-10-01/islands.generated.md` matches the manifest (regenerate with `--write`) | `scripts/gpu/app-graph-table.ts --check` |
+| ieee-probe | fast | shared certified-f32 arithmetic (`gpu/precision`): df32 ops within budget, strict-IEEE probe verifier accepts the emulated machine and rejects broken ones | `src/lib/gpu/precision/ieee-probe.check.ts` |
+| horizon-cert | fast | certified-f32 horizon stages on the f32 emulation: 0 false certifications, finished output bit-identical to the f64 path, probe verifier; DEM cases when `out/gpu/horizon-cert/real-cases.json` exists (`scripts/gpu/horizon-cert-cases.ts`) | `src/lib/gpu/horizon/certified.check.ts` |
 | examples | fast | `examples/` type check (`scripts/examples.mjs check`) | `node scripts/examples.mjs check` |
 | ontology | fast | ontology layer: provenance axes, crosswalks | `src/lib/ontology/ontology.check.ts` (needs `public/photos/`) |
 | atlas | fast | `/atlas` graph data | `src/lib/atlas/atlas.check.ts` |

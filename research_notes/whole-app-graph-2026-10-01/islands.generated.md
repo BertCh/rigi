@@ -11,7 +11,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I0 | Loaders (not a graph) | per photo, per tile | page, worker:decode | – | – |
 | I1 | Terrain residency | per tile | page | ingest-terrarium, look-relief-heights | `ingest-terrarium` |
 | I2 | Photo prep | per photo | page, worker:sky | photoprep | `photoprep` |
-| I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march | `horizon-march` |
+| I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march, horizon-cert, precision-probe | `horizon-march`, `horizon-cert`, `precision-probe` |
 | I4 | Align | per align | page | align-pose, silhouette-gpu | `align-pose` |
 | I5 | Unknown-pose solve | per photo | worker:unknown-pose, worker:pipeline | solve-coarse, skyglobal | `solve-coarse`, `skyglobal` |
 | I6 | Sky model | per photo | worker:sky | sky-model, sky-refine | `sky-refine` |
@@ -30,6 +30,8 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | look-relief-heights | I1 | default | page | per settle | – | terrain tile heights texture array (import); Mercator nodes, tile rows (imports) | – |
 | photoprep | I2 | default | page | per photo | `photoprep` | rgba, fg, lim, dims (pooled imports); edge / sky scratch (transients) | read: coarse + fine edge planes, sky, sky-cum, select, echo (≈3.5 MB at 512 grid) |
 | horizon-march | I3 | default | worker:horizon-fast, worker:unknown-pose, worker:eye (remote) | per eye | `horizon-march` | mosaic pages pg0…pgN (imports); u, params (imports) | read: out nE·nAz·8 B + stats |
+| horizon-cert | I3 | opt-in | worker:horizon-fast (remote) | per eye | `horizon-cert` | u, consts, td (march [t, d]) or prof + az + cols (pooled imports); samp (transient, B → C) | A: outA n·8 B (elevation bits + flag); B→C: outC 8192·16 B (direction bits + flag) |
+| precision-probe | I3 | opt-in | worker:horizon-fast (remote) | per photo | `precision-probe` | u, pin (pooled imports); pout (transient) | read: pout 4096·80 B, once per device |
 | align-pose | I4 | default | page | per align | `align-pose` | u, poses, dirs, edge planes (uploaded once per photo), sky planes (pooled imports); out (transient, cleared) | read: nPoses·stride B per round (≈40 rounds per autoAlign) |
 | silhouette-gpu | I4 | default | page | per align | – | geometry target rgba32float (render device) | pass mask: 18 KB per 384 × 288 pose (one staged copy per re-rank) |
 | solve-coarse | I5 | default | worker:unknown-pose, worker:pipeline (remote) | per photo | `solve-coarse` | resident horizon profile hz (per device); u, grid imports | rows: 16 B per yaw row; blocks (flagged rows only): nYaw·nBlk·16 B |
@@ -55,6 +57,8 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **look-relief-heights**: rasterises the relief height field from the resident tiles; compiles into the "look-relief" group (listed under look-relief)
 - **photoprep**: planes read back and re-uploaded by align (R1, dataflow-map §3)
 - **horizon-march**: each worker owns its own compute device (worker realm)
+- **horizon-cert**: certified-f32 tan → degrees and ENU / resample (D7, D8); ?horizonPrecision=certified-f32; ties recomputed by the f64 path
+- **precision-probe**: strict-IEEE probe gating every certified-f32 stage (horizon today; shared with align)
 - **silhouette-gpu**: single dispatch + core/readback, not a ComputeGraph
 - **solve-coarse**: certified f32 fold; flagged rows fold on the CPU in f64
 - **skyglobal**: T6 skyline global search; not wired into the service

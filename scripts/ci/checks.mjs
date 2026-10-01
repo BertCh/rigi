@@ -280,6 +280,22 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "ieee-probe",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/precision/ieee-probe.check.ts"),
+		note: "shared certified-f32 arithmetic: df32 ops within their budgets (also with ±3 ULP div/sqrt); the strict-IEEE probe verifier accepts the emulated machine and rejects re-associated TwoSum, unfused fma, 8-ULP division",
+		timeoutS: 60,
+	},
+	{
+		id: "horizon-cert",
+		tier: "fast",
+		group: "pose",
+		cmd: tsx("src/lib/gpu/horizon/certified.check.ts"),
+		note: "certified-f32 horizon stages (tan → degrees, ENU, resample) on the f32 emulation: 0 false certifications, bit-identical to the f64 path; DEM cases when out/gpu/horizon-cert/real-cases.json exists",
+		timeoutS: 120,
+	},
+	{
 		id: "export",
 		tier: "fast",
 		group: "export",

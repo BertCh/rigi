@@ -281,6 +281,45 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		notes: "each worker owns its own compute device (worker realm)",
 	},
 	{
+		id: "horizon-cert",
+		island: "I3",
+		paths: [
+			"src/lib/gpu/horizon/certified.ts",
+			"src/lib/gpu/horizon/certified.wgsl.ts",
+			"src/lib/gpu/horizon/certified-cpu.ts",
+		],
+		groups: ["horizon-cert"],
+		realms: ["worker:horizon-fast"],
+		cadence: "per eye",
+		resources: [
+			"u, consts, td (march [t, d]) or prof + az + cols (pooled imports)",
+			"samp (transient, B → C)",
+		],
+		readbacks: [
+			"A: outA n·8 B (elevation bits + flag)",
+			"B→C: outC 8192·16 B (direction bits + flag)",
+		],
+		status: "opt-in",
+		notes:
+			"certified-f32 tan → degrees and ENU / resample (D7, D8); ?horizonPrecision=certified-f32; ties recomputed by the f64 path",
+	},
+	{
+		id: "precision-probe",
+		island: "I3",
+		paths: [
+			"src/lib/gpu/precision/ieee-probe.ts",
+			"src/lib/gpu/precision/df32.ts",
+		],
+		groups: ["precision-probe"],
+		realms: ["worker:horizon-fast"],
+		cadence: "per photo",
+		resources: ["u, pin (pooled imports)", "pout (transient)"],
+		readbacks: ["read: pout 4096·80 B, once per device"],
+		status: "opt-in",
+		notes:
+			"strict-IEEE probe gating every certified-f32 stage (horizon today; shared with align)",
+	},
+	{
 		id: "align-pose",
 		island: "I4",
 		paths: [

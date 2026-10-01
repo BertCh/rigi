@@ -10,7 +10,19 @@
 // WebGPU the CPU march runs as before.
 import { getFlag } from "#/lib/flags";
 import { gpuEnabled } from "../device";
+import type { HorizonPrecision } from "./certified-cpu";
 
 export function gpuHorizonOptIn(): boolean {
 	return getFlag("gpuHorizon") === "on" && gpuEnabled();
+}
+
+/**
+ * Precision of the worker's tan → degrees and ENU stages (README.md "Certified f32"): "f64" (default)
+ * or, with ?horizonPrecision=certified-f32 and the GPU march on, the certified GPU stages. Both give
+ * the same bits; certified-f32 stays opt-in until its EVAL / wild-set gate passes.
+ */
+export function horizonPrecisionOptIn(): HorizonPrecision {
+	return getFlag("horizonPrecision") === "certified-f32" && gpuHorizonOptIn()
+		? "certified-f32"
+		: "f64";
 }
