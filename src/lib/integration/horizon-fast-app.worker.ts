@@ -17,10 +17,13 @@ import {
 } from "#/lib/dem";
 import { applyRealmGpuOptions, takeGpuProfile } from "#/lib/gpu/core/realm";
 import { getComputeDevice } from "#/lib/gpu/device";
-import { computeHorizonGpu, warmHorizonGpu } from "#/lib/gpu/horizon";
+import {
+	certElevationStats,
+	computeHorizonGpu,
+	warmHorizonGpu,
+} from "#/lib/gpu/horizon";
 import {
 	type HorizonPrecision,
-	lastCertStats,
 	skylineDirs,
 	warmCertifiedAsync,
 } from "#/lib/gpu/horizon/certified";
@@ -138,9 +141,9 @@ async function march(
 	// ENU unit directions in PhotoEngine's frame (gpu/horizon/dirs-cpu.ts: the f64 stage, moved there
 	// verbatim; certified-f32 gives the same bits through the GPU plus the f64 tie path)
 	const device = on === "gpu" && gpu ? await gpu : null;
-	// the march's tan → degrees stage recorded its stats (certified-f32 requests only)
-	const elev =
-		on === "gpu" && precision !== "f64" ? lastCertStats.elevations : undefined;
+	// this march's tan → degrees stage stats (certified-f32 requests only; per profile, since several
+	// eye heights can march at once in this worker)
+	const elev = on === "gpu" ? certElevationStats.get(prof) : undefined;
 	const { dirs, stats: cert } = await skylineDirs(
 		device,
 		prof,

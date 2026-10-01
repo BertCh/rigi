@@ -68,7 +68,11 @@ import {
 } from "#/lib/horizon-fast/march";
 import { buildMips, type Mosaic } from "#/lib/horizon-fast/mosaic";
 import { getComputeDevice } from "../device";
-import { type HorizonPrecision, horizonElevations } from "./certified";
+import {
+	type CertStats,
+	type HorizonPrecision,
+	horizonElevations,
+} from "./certified";
 import { graphChunker } from "./graph";
 import { HORIZON_WGSL } from "./horizon.wgsl";
 
@@ -307,6 +311,13 @@ interface Pending {
 	read: StagedRead;
 }
 
+/**
+ * The certified tan → degrees stage's stats for each profile computeHorizonGpu certified (the batch's
+ * one horizonElevations call, which may have run f64: stats.fellBack). Keyed by the profile so a caller
+ * with several marches in flight (the fast-horizon worker) reads its own, not the realm's latest.
+ */
+export const certElevationStats = new WeakMap<FastHorizonProfile, CertStats>();
+
 /** Elevations of every eye's profile through the certified stage (one GPU run for the batch). */
 async function certifyElevations(
 	device: Device,
@@ -316,14 +327,16 @@ async function certifyElevations(
 	const nAz = tds[0]?.length / 2 || 0;
 	const td = new Float32Array(tds.length * nAz * 2);
 	for (let j = 0; j < tds.length; j++) td.set(tds[j], j * nAz * 2);
-	const { elevation } = await horizonElevations(
+	const { elevation, stats } = await horizonElevations(
 		device,
 		td,
 		tds.length * nAz,
 		"certified-f32",
 	);
-	for (let j = 0; j < out.length; j++)
+	for (let j = 0; j < out.length; j++) {
 		out[j].elevation = elevation.slice(j * nAz, (j + 1) * nAz);
+		certElevationStats.set(out[j], stats);
+	}
 }
 
 /** computeHorizonGpu's body, holding the "horizon" lease (pooled slots and pages are ours). */
