@@ -12,6 +12,14 @@
 //
 //   node scripts/gpu/kernel-layout-check.mjs [-v]
 //
+// Also lints binding USE (check id `kernel-binding-use`): every declared binding must be statically
+// reachable from the entry point (named in the entry body or in a helper fn it calls, transitively;
+// a phony `_ = name;` counts). luma compiles compute pipelines with layout 'auto', which drops a
+// binding the entry never references, and Dawn then rejects the bind group at dispatch (the bug
+// fixed in 4d92d3f for splatsort-scan-totals). A fixture of that pre-fix WGSL must be flagged.
+// Coverage: kernels made through defineKernel only; raw device.createComputePipeline callers are
+// not seen. Limit: a local that shadows a binding name counts as a use (false negative).
+//
 // Exit 1 listing the mismatches (or modules that failed to import); 0 when every spec agrees.
 // Kernels defined inside functions (e.g. sky/bench-graph.ts) are only registered when called, so they
 // are reported as unchecked, not as failures.
@@ -101,6 +109,67 @@ for (const { file, rel } of loaded) {
 		);
 }
 
+/** Body text of every `fn name(...) ... { ... }` in comment-stripped WGSL. */
+function wgslFunctionBodies(src) {
+	const bodies = new Map();
+	for (const m of src.matchAll(/\bfn\s+(\w+)\s*\(/g)) {
+		let i = m.index + m[0].length;
+		for (let depth = 1; depth > 0 && i < src.length; i++)
+			depth += src[i] === "(" ? 1 : src[i] === ")" ? -1 : 0;
+		const open = src.indexOf("{", i);
+		if (open < 0) continue;
+		let end = open + 1;
+		for (let depth = 1; depth > 0 && end < src.length; end++)
+			depth += src[end] === "{" ? 1 : src[end] === "}" ? -1 : 0;
+		bodies.set(m[1], src.slice(open, end));
+	}
+	return bodies;
+}
+
+/** Declared binding names that the entry point cannot reach (see the header). */
+function unusedBindings(source, entryPoint, names) {
+	const src = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+	const bodies = wgslFunctionBodies(src);
+	if (!bodies.has(entryPoint)) return [];
+	const seen = new Set([entryPoint]);
+	const queue = [entryPoint];
+	let text = "";
+	while (queue.length) {
+		const body = bodies.get(queue.pop());
+		text += `${body}\n`;
+		for (const id of body.match(/\b\w+\b/g) ?? [])
+			if (bodies.has(id) && !seen.has(id)) {
+				seen.add(id);
+				queue.push(id);
+			}
+	}
+	return names.filter((n) => !new RegExp(`\\b${n}\\b`).test(text));
+}
+
+// fixture: splatsort-scan-totals before 4d92d3f (declares p and base, main reads only base)
+const PRE_FIX_SCAN_TOTALS = `
+struct Params { n: u32 };
+@group(0) @binding(0) var<uniform> p: Params;
+@group(0) @binding(1) var<storage, read_write> base: array<u32>;
+fn helper(i: u32) -> u32 { return base[i]; }
+@compute @workgroup_size(64) fn main(@builtin(local_invocation_index) t: u32) {
+  base[t] = helper(t);
+}`;
+const selfTest = [
+	[PRE_FIX_SCAN_TOTALS, ["p"]],
+	[PRE_FIX_SCAN_TOTALS.replace("base[t] =", "_ = p; base[t] ="), []],
+	[PRE_FIX_SCAN_TOTALS.replace("return base[i]", "return base[i] + p.n"), []],
+];
+for (const [source, want] of selfTest) {
+	const got = unusedBindings(source, "main", ["p", "base"]);
+	if (got.join() !== want.join()) {
+		console.log(
+			`FAIL binding-use self-test: expected [${want}], got [${got}] for:${source}`,
+		);
+		process.exit(1);
+	}
+}
+
 /** Problems of one spec, as strings. */
 function check(spec) {
 	const out = [];
@@ -142,6 +211,14 @@ function check(spec) {
 	for (const c of Object.keys(spec.constants ?? {}))
 		if (!new RegExp(`\\boverride\\s+${c}\\b`).test(src))
 			out.push(`constant "${c}" has no \`override ${c}\``);
+	for (const n of unusedBindings(
+		spec.source,
+		spec.entryPoint,
+		spec.layout.map(([name]) => name),
+	))
+		out.push(
+			`binding "${n}" is never referenced from entry point "${spec.entryPoint}" (auto layout drops it and Dawn rejects the bind group); add \`_ = ${n};\``,
+		);
 	return out;
 }
 

@@ -157,6 +157,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "kernel-binding-use",
+		tier: "fast",
+		group: "gpu",
+		cmd: ["node", "scripts/gpu/kernel-layout-check.mjs"],
+		note: "every defineKernel spec: layout matches WGSL @binding declarations AND each declared binding is reachable from the entry point (auto layout drops unused ones; 4d92d3f); fixture of the pre-fix scan-totals WGSL must be flagged",
+		timeoutS: 60,
+	},
+	{
 		id: "terrain-cull",
 		tier: "fast",
 		group: "gpu",
