@@ -1,5 +1,6 @@
 /**
- * Browser parity + timing of the skyline global search: GPU grid (./index.ts) vs the TS CPU twin
+ * Browser parity + timing of the skyline global search: GPU grid (./index.ts; graph path by default,
+ * diffed against the pooled path `{ graph: false }`, which must be bit-identical) vs the TS CPU twin
  * (./cpu.ts) vs Python skyglobal.py (reference outputs dumped by
  * tools/matcher/gpu_port/dump_skyglobal_fixtures.py). Loaded by scripts/gpu/skyglobal-bench.mjs in
  * headless Chromium:
@@ -11,6 +12,7 @@
  */
 import { getComputeDevice } from "../device";
 import { type Hyp, type Pose, SkyGlobal } from "./cpu";
+import { lastSkyGlobalGraphRun } from "./graph";
 import { gridGpu, warmSkyGlobalGpu } from "./index";
 
 type Ref = {
@@ -130,6 +132,27 @@ export async function benchPhoto(o: {
 		});
 	}
 	const dbg = await gridGpu(device, sg, g, { eps: o.eps, debugGrid: true });
+	const graphInfo = lastSkyGlobalGraphRun;
+	// the pooled path (graph: false): timed like the graph path, then diffed bit for bit
+	const pooledWarm: number[] = [];
+	const pooledGpu: number[] = [];
+	let pooled = await gridGpu(device, sg, g, { eps: o.eps, graph: false });
+	for (let i = 0; i < reps; i++) {
+		t0 = performance.now();
+		pooled = await gridGpu(device, sg, g, { eps: o.eps, graph: false });
+		pooledWarm.push(performance.now() - t0);
+		pooledGpu.push(pooled.stats.gpuMs);
+	}
+	const pooledDbg = await gridGpu(device, sg, g, {
+		eps: o.eps,
+		debugGrid: true,
+		graph: false,
+	});
+	const pooledSplit = await gridGpu(device, sg, g, {
+		eps: o.eps,
+		head: 16,
+		graph: false,
+	});
 	// subgroup REDUCE vs the shared-memory tree (must be identical); a forced 2-read list (head 16)
 	const tree = await gridGpu(device, sg, g, { eps: o.eps, noSubgroups: true });
 	const split = await gridGpu(device, sg, g, { eps: o.eps, head: 16 });
@@ -145,6 +168,28 @@ export async function benchPhoto(o: {
 		a.arg.every((v, i) => v === b.arg[i]) &&
 		a.best.every((v, i) => v === b.best[i]) &&
 		a.stats.midArgFlips === b.stats.midArgFlips;
+	const sameBits = (a?: Float32Array, b?: Float32Array) =>
+		!!a &&
+		!!b &&
+		a.length === b.length &&
+		new Uint32Array(a.buffer, a.byteOffset, a.length).every(
+			(v, i) => v === new Uint32Array(b.buffer, b.byteOffset, b.length)[i],
+		);
+	const graphVsPooled = {
+		// sorted candidate set, best (f64 bits via ===), arg, midArgFlips (= red's mid argmax)
+		grid: sameGrid(last, pooled),
+		splitRead: split.stats.reads === 2 && sameGrid(split, pooledSplit),
+		// the full GPU grid: mid / lo / hi bitwise
+		cells:
+			sameBits(dbg.mid, pooledDbg.mid) &&
+			sameBits(dbg.lo, pooledDbg.lo) &&
+			sameBits(dbg.hi, pooledDbg.hi),
+		stats:
+			last.stats.nCand === pooled.stats.nCand &&
+			last.stats.readBytes === pooled.stats.readBytes &&
+			last.stats.reads === pooled.stats.reads &&
+			last.stats.fellBack === pooled.stats.fellBack,
+	};
 	// parity: GPU exact result vs CPU; GPU point estimates vs CPU full grid; certification check
 	let bestDiff = 0;
 	let argFlips = 0;
@@ -224,6 +269,15 @@ export async function benchPhoto(o: {
 			readBytes: last.stats.readBytes,
 			reads: last.stats.reads,
 			treeReduceIdentical: sameGrid(last, tree),
+			graphVsPooled,
+			pooledWarmMs: med(pooledWarm),
+			pooledGpuMs: med(pooledGpu),
+			graph: graphInfo && {
+				key: graphInfo.key,
+				nodes: graphInfo.stats.nodeCount,
+				logicalTransientBytes: graphInfo.stats.logicalTransientBytes,
+				physicalTransientBytes: graphInfo.stats.physicalTransientBytes,
+			},
 			splitReadIdentical: split.stats.reads === 2 && sameGrid(last, split),
 			// exact path (GPU intervals + CPU re-score) vs the CPU grid
 			bestMaxAbs: bestDiff,

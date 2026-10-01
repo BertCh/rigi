@@ -10,20 +10,16 @@
 //
 // Not wired into the service: see the parity / timing report (scripts/gpu/skyglobal-bench.mjs).
 //
-// Plumbing (src/lib/gpu/core): pooled buffers under the "skyglobal" lease (one grid on the GPU at a
-// time, as before; the lease covers the GPU phase only, not the CPU re-score), bindings per pass, one
-// core submit. The candidate list is read count-first: the one submit reads the count plus the first
+// Plumbing (src/lib/gpu/core), two bit-identical GPU paths under the "skyglobal" lease (one grid on
+// the GPU at a time; the lease covers the GPU phase only, not the CPU re-score):
+// - default: one core ComputeGraph encoding (./graph.ts; cells / red are graph transients, cached
+//   per capacity);
+// - `{ graph: false }`: pooled buffers, bindings per pass, one core submit (gridOnGpu below).
+// Kernel specs and the shared readback decode live in ./kernels.ts. The candidate list is read count-first: the one submit reads the count plus the first
 // `head` slots (sized from the device's, or the caller's, last count), and only an unusually long
-// list costs a second, exact-length read of the rest.
-import { type Device, Buffer as LumaBuffer } from "@luma.gl/core";
-import {
-	type BindKind,
-	defineKernel,
-	dispatch,
-	kernel,
-	kernelAsync,
-	submit,
-} from "../core/kernel";
+// list costs a second, exact-length read of the rest (both paths).
+import type { Device } from "@luma.gl/core";
+import { dispatch, kernel, kernelAsync, submit } from "../core/kernel";
 import {
 	acquire,
 	clear,
@@ -32,7 +28,7 @@ import {
 	releasePool,
 	withLease,
 } from "../core/pool";
-import { readBack, stageReads } from "../core/readback";
+import { stageReads } from "../core/readback";
 import { getComputeDevice, hasFeature } from "../device";
 import {
 	type EdgeInputs,
@@ -40,51 +36,20 @@ import {
 	type GridResult,
 	SkyGlobal,
 } from "./cpu";
+import { gridOnGraph, releaseSkyGlobalGraphs } from "./graph";
 import {
-	CANDS_WGSL,
-	CELLS_WGSL,
-	COMBO_FLOATS,
-	REDUCE_SG_WGSL,
-	REDUCE_WGSL,
-} from "./skyglobal.wgsl";
-
-const spec = (id: string, source: string, layout: [string, BindKind][]) =>
-	defineKernel(`skyglobal-${id}`, source, layout, {
-		group: "skyglobal",
-		label: `skyglobal-${id}`,
-	});
-const K_CELLS = spec("cells", CELLS_WGSL, [
-	["u", "uniform"],
-	["S", "read-only-storage"],
-	["prof", "read-only-storage"],
-	["alpha", "read-only-storage"],
-	["vfs", "read-only-storage"],
-	["combos", "read-only-storage"],
-	["cells", "storage"],
-]);
-const REDUCE_LAYOUT: [string, BindKind][] = [
-	["u", "uniform"],
-	["cells", "read-only-storage"],
-	["red", "storage"],
-];
-const K_REDUCE = spec("reduce", REDUCE_WGSL, REDUCE_LAYOUT);
-// defined outside the "skyglobal" warm group: it only compiles on devices with "subgroups"
-const K_REDUCE_SG = defineKernel(
-	"skyglobal-reduce-sg",
-	REDUCE_SG_WGSL,
-	REDUCE_LAYOUT,
-	{ group: "skyglobal-sg", label: "skyglobal-reduce-sg" },
-);
-const K_CANDS = spec("cands", CANDS_WGSL, [
-	["u", "uniform"],
-	["cells", "read-only-storage"],
-	["red", "read-only-storage"],
-	["list", "storage"],
-]);
-
-/** REDUCE with subgroup ops where the device has them (identical output), else the shared-memory tree. */
-const reduceSpec = (device: Device) =>
-	hasFeature(device, "subgroups") ? K_REDUCE_SG : K_REDUCE;
+	collect,
+	headFor,
+	K_CANDS,
+	K_CELLS,
+	K_REDUCE,
+	K_REDUCE_SG,
+	key,
+	OWNER,
+	reduceSpec,
+	STORAGE,
+} from "./kernels";
+import { COMBO_FLOATS } from "./skyglobal.wgsl";
 
 /** Compile the three pipelines now (so the first search does not pay the WGSL compile). */
 export function warmSkyGlobalGpu(device: Device) {
@@ -113,6 +78,8 @@ export type GridGpuOptions = {
 	noSubgroups?: boolean;
 	/** also read back the GPU's point estimates (combo × yaw, float32) for parity reports */
 	debugGrid?: boolean;
+	/** false: the pooled per-pass dispatches; default (true): one core ComputeGraph encoding (./graph.ts) */
+	graph?: boolean;
 };
 
 export type GridGpuStats = {
@@ -149,23 +116,17 @@ export type GridGpuResult = GridResult & {
 	hi?: Float32Array;
 };
 
-// the pooled buffers are shared state: one grid at a time (FIFO), as the old module queue did
-const OWNER = "skyglobal";
-const key = (slot: string) => `${OWNER}/${slot}`;
-const STORAGE = LumaBuffer.STORAGE | LumaBuffer.COPY_DST | LumaBuffer.COPY_SRC;
-/** Minimum candidate slots read in the first readback (16 KiB); dev fixtures have ~700–800. */
-const HEAD_MIN = 4096;
-// per device, the last grid's candidate count: sizes the next grid's first read (1.5×, so one read
-// nearly always). A caller with its own mix of photos can keep its own hint instead (`o.hint`).
-const lastCounts = new WeakMap<Device, number>();
-
-/** Free the grid's pooled buffers on `device` (the cells buffer alone is nCells × 16 B, ~24 MB). */
-export function releaseSkyGlobalGpu(device: Device) {
-	return withLease(OWNER, () => releasePool(device, `${OWNER}/`));
+/**
+ * Free the grid's pooled buffers and cached graphs on `device` (the cells buffer / transient alone is
+ * nCells × 16 B, ~24 MB).
+ */
+export async function releaseSkyGlobalGpu(device: Device) {
+	await withLease(OWNER, () => releasePool(device, `${OWNER}/`));
+	await releaseSkyGlobalGraphs(device);
 }
 
 /** The grid's inputs, packed on the CPU (no GPU state: built outside the lease). */
-type Packed = {
+export type Packed = {
 	T: ReturnType<SkyGlobal["tables"]>;
 	ub: ArrayBuffer;
 	prof: Float32Array;
@@ -176,7 +137,7 @@ type Packed = {
 };
 
 /** What the GPU phase hands the CPU re-score: the candidate list and the reduction. */
-type GpuOut = {
+export type GpuOut = {
 	L: Uint32Array;
 	Ru: Uint32Array;
 	count: number;
@@ -198,7 +159,11 @@ export async function gridGpu(
 	const t0 = performance.now();
 	const P = pack(sg, g, o);
 	const packMs = performance.now() - t0;
-	const r = await withLease(OWNER, () => gridOnGpu(device, sg, g, o, P));
+	const r = await withLease(OWNER, () =>
+		o.graph === false
+			? gridOnGpu(device, sg, g, o, P)
+			: gridOnGraph(device, sg, g, o, P),
+	);
 	r.stats.uploadMs += packMs;
 	return rescore(sg, g, P, r, t0);
 }
@@ -278,11 +243,7 @@ async function gridOnGpu(
 	const nCombo = g.combos.length;
 	const nCells = nYaw * nCombo;
 	const { cap } = P;
-	const hint = o.hint ? o.hint.count : (lastCounts.get(device) ?? 0);
-	const head = Math.min(
-		cap,
-		Math.max(1, o.head ?? Math.max(HEAD_MIN, Math.ceil(hint * 1.5))),
-	);
+	const head = headFor(device, o, cap);
 	const sub = !o.noSubgroups && hasFeature(device, "subgroups");
 
 	// every slot is either fully rewritten (inputs, cells, red) or cleared where it is read (the
@@ -332,57 +293,23 @@ async function gridOnGpu(
 		throw e;
 	}
 	const [lb, rb, cb] = await staged.read();
-	let readBytes = ranges.reduce((a, r) => a + r.size, 0);
-	let reads = 1;
-	const L0 = new Uint32Array(lb);
-	const count = L0[0];
-	if (o.hint) o.hint.count = Math.min(count, cap);
-	else lastCounts.set(device, Math.min(count, cap));
-	// the rest of the list, only when it outgrew `head` (and fits: an overflow falls back anyway)
-	let L = L0;
-	if (count > head && count <= cap) {
-		const rest = {
-			buffer: list,
-			offset: (head + 1) * 4,
-			size: (count - head) * 4,
-		};
-		const [tail] = await readBack(device, () => {}, [rest], {
-			id: "skyglobal-cands-tail",
-		});
-		L = new Uint32Array(count + 1);
-		L.set(L0);
-		L.set(new Uint32Array(tail), head + 1);
-		readBytes += rest.size;
-		reads++;
-	}
-	const t2 = performance.now();
-	const stats: GridGpuStats = {
-		gpuMs: t2 - t1,
-		uploadMs: t1 - t0,
-		rescoreMs: 0,
-		nCells,
-		nCand: count,
-		maxCandPerYaw: 0,
-		midArgFlips: 0,
-		fellBack: false,
-		readBytes,
-		reads,
-		subgroups: sub,
-	};
-	let dbg: GpuOut["dbg"] = {};
-	if (cb) {
-		const C = new Float32Array(cb);
-		const mid = new Float32Array(nCells);
-		const lo = new Float32Array(nCells);
-		const hi = new Float32Array(nCells);
-		for (let i = 0; i < nCells; i++) {
-			mid[i] = C[i * 4];
-			lo[i] = C[i * 4 + 1];
-			hi[i] = C[i * 4 + 2];
-		}
-		dbg = { mid, lo, hi };
-	}
-	return { L, Ru: new Uint32Array(rb), count, stats, dbg };
+	return collect(
+		device,
+		{
+			list,
+			head,
+			cap,
+			nCells,
+			readBytes: ranges.reduce((a, r) => a + r.size, 0),
+			sub,
+			t0,
+			t1,
+		},
+		o,
+		lb,
+		rb,
+		cb,
+	);
 }
 
 /** The CPU phase (no lease): exact re-score of the candidates, or gridCpu when the list is unusable. */
