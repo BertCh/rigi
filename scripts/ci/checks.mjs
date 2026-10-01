@@ -181,6 +181,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "height-gather",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/deck-webgpu/height-gather.check.ts"),
+		note: "GPU height gathers (WAG W2.4, flag terrainGpuDecode): gridCorners + blendCorners == sampleGrid; plan + emulated kernel + finish == TerrainSet.heightAt bit for bit on eager / lazy / non-resident tiles; nonce and slot certificate fall back to heightAt; replayHeights(buildTrailSegments, localMaxOf) == direct",
+		timeoutS: 60,
+	},
+	{
 		id: "atlas-layout",
 		tier: "fast",
 		group: "gpu",

@@ -259,6 +259,27 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default off; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi; residency: decode straight into the TileStore height layer; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
 	},
 	{
+		id: "height-gather",
+		island: "I1",
+		paths: [
+			"src/lib/deck-webgpu/height-gather.ts",
+			"src/lib/deck-webgpu/engine.ts",
+		],
+		groups: ["height-gather"],
+		realms: ["page"],
+		cadence: "per view",
+		resources: [
+			"terrain height atlas r32float 2d-arrays, small + big (imports, bound per run)",
+			"per-call uniform, texel words, output (imports, created per call)",
+		],
+		readbacks: [
+			"read: 8 B per texel (nonce + raw f32 bits), 4 texels per height sample of a lazy tile",
+		],
+		status: "opt-in",
+		notes:
+			"WAG W2.4 second half, under flag terrainGpuDecode: the WebGPU photo view's CPU height readers (camera DEM height, trails, peak snapping) take lazy tiles' heights from the atlas instead of materialising them; plan + blend on the CPU in f64 (TerrainSet.locate, gridCorners / blendCorners = sampleGrid), the GPU only copies texels, so a result is heightAt's bit for bit; nonce + slot certificate, heightAt fallback. CPU twin: TerrainSet.heightAt / localMax",
+	},
+	{
 		id: "look-relief-heights",
 		island: "I1",
 		paths: ["src/lib/gpu/look/relief-heights.ts"],
