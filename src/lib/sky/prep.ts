@@ -99,8 +99,24 @@ async function verify(
 }
 
 /**
+ * What to do with a prepared photo, given the alpha gate and the verification state. "gpu": use the
+ * GPU buffers; "verify": compare them with the CPU chain first; "cpu": drop them (a translucent photo
+ * is outside what the bitmap upload is verified for, so it always takes the CPU path, however many
+ * photos were verified before); "need-pixels": verification due but no CPU pixels were sent.
+ */
+export function prepGate(
+	opaque: boolean,
+	verified: number,
+	hasPixels: boolean,
+): "gpu" | "verify" | "cpu" | "need-pixels" {
+	if (!opaque) return "cpu";
+	if (verified < PREP_VERIFY) return hasPixels ? "verify" : "need-pixels";
+	return "gpu";
+}
+
+/**
  * The GPU prep of `bitmap` for `model`, or undefined when this photo takes the CPU path (not eligible,
- * unsupported shape, GPU error, or a failed verification — `rgba` then carries the photo). Throws
+ * unsupported shape, GPU error, a translucent photo, or a failed verification — `rgba` then carries the photo). Throws
  * NeedPixels when verification is due and `rgba` was not sent. The caller owns the returned buffers.
  */
 export async function prepareGpu(
@@ -126,6 +142,17 @@ export async function prepareGpu(
 		if (!unsupported && ++st.errors >= MAX_ERRORS)
 			st.disabled = `GPU prep failed ${st.errors} times: ${String(e)}`;
 		console.warn("[sky] GPU prep unavailable, using the CPU prep:", e);
+		return undefined;
+	}
+	// every photo, verified device or not: ImageBitmap bytes equal getImageData's only where alpha = 255
+	let opaque = false;
+	try {
+		opaque = await prep.isOpaque();
+	} catch (e) {
+		console.warn("[sky] GPU prep alpha check failed, using the CPU prep:", e);
+	}
+	if (prepGate(opaque, st.verified, !!rgba) === "cpu") {
+		prep.dispose();
 		return undefined;
 	}
 	if (st.verified < PREP_VERIFY && rgba) {

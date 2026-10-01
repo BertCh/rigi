@@ -223,6 +223,23 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 `;
 
 /**
+ * Opacity gate: flag = 1 when any pixel of the unpacked photo has alpha != 255 (flag starts zeroed).
+ * ImageBitmap bytes only equal getImageData's for opaque pixels (premultiply round trips), so a photo
+ * with any translucent pixel must not take the GPU prep (sky/prep.ts).
+ */
+export const PREP_ALPHA = /* wgsl */ `${PARAMS}
+@group(0) @binding(0) var<uniform> prm: P;
+@group(0) @binding(1) var<storage, read> rgba: array<u32>;
+@group(0) @binding(2) var<storage, read_write> flag: atomic<u32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+  let i = id.x;
+  if (i >= prm.W * prm.H) { return; }
+  if ((rgba[i] >> 24u) != 255u) { atomicStore(&flag, 1u); }
+}
+`;
+
+/**
  * Horizontal pass: tmp[(c·H + y)·lw + j] = fround(Σ w·s / scaleH) over row y's taps; s = LUT[byte].
  * axH: (start, count) per output j, then taps (index, w lo, w hi); cst[0..1] = scaleH words.
  */

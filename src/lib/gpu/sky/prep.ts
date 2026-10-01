@@ -24,7 +24,13 @@ import {
 } from "#/lib/gpu/core/kernel";
 import { pooledStorage, withLease } from "#/lib/gpu/core/pool";
 import { readBack } from "#/lib/gpu/core/readback";
-import { PREP_H, PREP_NORM, PREP_UNPACK, PREP_V } from "./prep.wgsl";
+import {
+	PREP_ALPHA,
+	PREP_H,
+	PREP_NORM,
+	PREP_UNPACK,
+	PREP_V,
+} from "./prep.wgsl";
 import { axisTapsF64, constsTable } from "./prep-ref";
 import { lutTable } from "./refine";
 
@@ -37,6 +43,11 @@ export const K_PREP_UNPACK = def("prep-unpack", PREP_UNPACK, [
 	["prm", "uniform"],
 	["pad", RO],
 	["rgba", "storage"],
+]);
+export const K_PREP_ALPHA = def("prep-alpha", PREP_ALPHA, [
+	["prm", "uniform"],
+	["rgba", RO],
+	["flag", "storage"],
 ]);
 export const K_PREP_H = def("prep-h", PREP_H, [
 	["prm", "uniform"],
@@ -75,6 +86,8 @@ export interface SkyPrepGpu {
 	rgbLo: GPUBuffer;
 	/** 3·lw·lh f32 NCHW: normalise(rgbLo), ORT's input. */
 	input: GPUBuffer;
+	/** True when every pixel's alpha is 255 (4 bytes read back): the precondition of the bitmap's bytes equalling getImageData's. */
+	isOpaque(): Promise<boolean>;
 	/** The photo's bytes (W·H·4) read back from the GPU: only for a CPU fallback. */
 	readRgba(): Promise<Uint8Array>;
 	/** All three buffers read back (rgba bytes, rgbLo and input as f32 bit patterns): the verification. */
@@ -160,6 +173,7 @@ export function prepSkyGpu(
 			),
 		);
 	const kUnpack = kernel(device, K_PREP_UNPACK);
+	const kAlpha = kernel(device, K_PREP_ALPHA);
 	const kH = kernel(device, K_PREP_H);
 	const kV = kernel(device, K_PREP_V);
 	const kNorm = kernel(device, K_PREP_NORM);
@@ -179,9 +193,11 @@ export function prepSkyGpu(
 		const pad = storage(device, rowBytes * H);
 		const rgba = storage(device, N * 4);
 		const tmp = storage(device, 3 * H * lw * 4);
+		const flag = storage(device, 4);
 		const rgbLo = storage(device, 3 * n * 4);
 		const input = storage(device, 3 * n * 4);
 		const scratch = [prm, pad, tmp];
+		const keep = [flag];
 		const outs = [rgba, rgbLo, input];
 		try {
 			// pixels → texture (no conversion, unpremultiplied) → padded rows in `pad`
@@ -217,6 +233,11 @@ export function prepSkyGpu(
 						x: Math.ceil(N / WG),
 					},
 					{
+						k: kAlpha,
+						bindings: { prm, rgba, flag },
+						x: Math.ceil(N / WG),
+					},
+					{
 						k: kH,
 						bindings: { prm, axH, cst, lut, rgba, tmp },
 						x: Math.ceil((3 * H * lw) / WG),
@@ -236,7 +257,7 @@ export function prepSkyGpu(
 			);
 			submit(device, enc);
 		} catch (e) {
-			for (const b of [...scratch, ...outs]) b.destroy();
+			for (const b of [...scratch, ...keep, ...outs]) b.destroy();
 			throw e;
 		}
 		// the scratch is released after the submitted work (destroy is deferred by WebGPU)
@@ -250,6 +271,15 @@ export function prepSkyGpu(
 			rgba: handleOf(rgba),
 			rgbLo: handleOf(rgbLo),
 			input: handleOf(input),
+			isOpaque: async () => {
+				const [b] = await readBack(
+					device,
+					() => [{ buffer: flag, size: 4 }],
+					undefined,
+					{ id: "sky-prep-alpha" },
+				);
+				return new Uint32Array(b)[0] === 0;
+			},
 			readRgba: async () => {
 				const [b] = await readBack(
 					device,
@@ -279,7 +309,7 @@ export function prepSkyGpu(
 			dispose: () => {
 				if (dead) return;
 				dead = true;
-				for (const b of outs) b.destroy();
+				for (const b of [...outs, ...keep]) b.destroy();
 			},
 		};
 		return prep;
