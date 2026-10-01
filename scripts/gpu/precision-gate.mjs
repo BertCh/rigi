@@ -44,10 +44,12 @@
 //   eval     (default on; --no-eval) the GT-12 arm: scripts/eval-app.mjs on data/control-points.json,
 //            f64 vs the defaults: photos within 1° yaw, median px error.
 //   identity reported, not gated: identical / within the f64 noise / differs.
-//   FAIL  cand has more verified-wrong accepts (a false accept) or fewer verified-correct ones, or
-//         fewer GT-12 photos within 1°, or a GT-12 median error > 0.5 px worse.
-//   NEEDS-VERIFY (exit 4)  cand accepts a pose base did not accept and no blind verdict covers it
-//         (a potential false accept under the frozen 0-false-accept rule until blind-verified).
+//   FAIL  cand has more verified-wrong accepts or fewer verified-correct ones, or on any one photo
+//         accepts a verified-wrong pose / loses a verified-correct accept that f64 (base and base2)
+//         did not, or fewer GT-12 photos within 1°, or a GT-12 median error > 0.5 px worse.
+//   NEEDS-VERIFY (exit 4)  cand accepts a pose f64 did not show (new, or another pose) and no blind
+//         verdict calls it correct or wrong (a potential false accept under the frozen
+//         0-false-accept rule until blind-verified).
 //   INCONCLUSIVE (exit 3)  a photo errored, an eval run is missing, or cand never took a certified
 //         path (every call fell back: nothing was tested).
 //   PASS  otherwise.
@@ -229,8 +231,13 @@ const read = (renderer, id) => {
 		return null;
 	}
 };
-/** How cand's certified stages ran over its seeds. */
-function certifiedUse(runs) {
+/**
+ * How cand's certified stages ran over its seeds. `horizonSource` = the mode's re-traced horizon
+ * (render_worker modes[].horizon.source): only a "fast" horizon ran the certified-f32 march. After
+ * loadFullTerrain (or a fast-horizon fallback) the horizon is the CPU f64 one, and the per-run
+ * horizon stats are the page's last fast horizon (init, under other flags), so they don't count.
+ */
+function certifiedUse(runs, horizonSource) {
 	const c = {
 		seeds: runs.length,
 		alignCert: 0,
@@ -246,7 +253,14 @@ function certifiedUse(runs) {
 			c.alignFellBack[why] = (c.alignFellBack[why] ?? 0) + 1;
 		}
 		const h = r.precision?.horizon;
-		if (h?.mode === "certified-f32" && !h.fellBack && !h.elevations?.fellBack)
+		if (horizonSource !== "fast") {
+			const why = `horizon source ${horizonSource ?? "unknown"}`;
+			c.horizonFellBack[why] = (c.horizonFellBack[why] ?? 0) + 1;
+		} else if (
+			h?.mode === "certified-f32" &&
+			!h.fellBack &&
+			!h.elevations?.fellBack
+		)
 			c.horizonCert++;
 		else if (h?.mode === "certified-f32") {
 			const why = String(h.fellBack ?? h.elevations?.fellBack).slice(0, 80);
@@ -328,7 +342,7 @@ for (const renderer of renderers) {
 		if (tIds.size > 1) row.issues.push("modes ran on different terrain sets");
 		if (m.base2 && m.base.horizon?.hash !== m.base2.horizon?.hash)
 			row.issues.push("f64 horizon differs between base and base2");
-		row.use = certifiedUse(m.cand.runs ?? []);
+		row.use = certifiedUse(m.cand.runs ?? [], m.cand.horizon?.source);
 		totals.seeds += row.use.seeds;
 		totals.alignCert += row.use.alignCert;
 		totals.horizonCert += row.use.horizonCert;

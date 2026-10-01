@@ -146,6 +146,92 @@ ok(verdictOf(verified, "c", P(50.1)) === "unsure", "conflicting → unsure");
 		`unverified new accept → NEEDS-VERIFY (${d.verdict})`,
 	);
 }
+// a new false accept traded against one lost on another photo: the totals are equal, still FAIL
+{
+	const v = [
+		...verified,
+		{ photo: "d", pose: P(300), verdict: "wrong", source: "t" },
+	];
+	const rows = [
+		scorePhoto(
+			"b",
+			{
+				base: mode(P(200), false),
+				cand: mode(P(200), true),
+				base2: mode(P(200), false),
+			},
+			v,
+		),
+		scorePhoto(
+			"d",
+			{
+				base: mode(P(300), true),
+				cand: mode(P(300), false),
+				base2: mode(P(300), true),
+			},
+			v,
+		),
+	];
+	const d = decide({ rows, evalArm: null, vacuous: [] });
+	ok(
+		d.verdict === "FAIL" && d.quality.cand.wrong === d.quality.base.wrong,
+		`traded false accept → FAIL per photo (${d.verdict})`,
+	);
+}
+// f64 noise: base2 accepts the same verified-wrong pose → not cand's false accept
+{
+	const rows = [
+		scorePhoto(
+			"b",
+			{
+				base: mode(P(200), false),
+				cand: mode(P(200), true),
+				base2: mode(P(200), true),
+			},
+			verified,
+		),
+	];
+	const d = decide({ rows, evalArm: null, vacuous: [] });
+	ok(
+		!rows[0].falseAccept && !d.reasons.some((x) => x.startsWith("new")),
+		"a wrong accept f64 also gives (base2) is noise, not a per-photo false accept",
+	);
+}
+// both accept, cand moves to an unverified pose → NEEDS-VERIFY
+{
+	const rows = [
+		scorePhoto(
+			"a",
+			{
+				base: mode(P(100), true),
+				cand: mode(P(130), true),
+				base2: mode(P(100), true),
+			},
+			verified,
+		),
+	];
+	const d = decide({ rows, evalArm: null, vacuous: [] });
+	ok(
+		d.verdict === "FAIL" && rows[0].changedAccept,
+		`moved accept that loses a verified-correct pose → FAIL (${d.verdict})`,
+	);
+	const rows2 = [
+		scorePhoto(
+			"e",
+			{
+				base: mode(P(10), true),
+				cand: mode(P(40), true),
+				base2: mode(P(10), true),
+			},
+			verified,
+		),
+	];
+	ok(
+		decide({ rows: rows2, evalArm: null, vacuous: [] }).verdict ===
+			"NEEDS-VERIFY",
+		"moved accept to an unverified pose → NEEDS-VERIFY",
+	);
+}
 // eval arm worse → FAIL; error / vacuous → INCONCLUSIVE
 {
 	const rows = [

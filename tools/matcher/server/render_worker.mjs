@@ -515,6 +515,8 @@ async function align(req) {
 				for (const k of Object.keys(flags)) delete flags[k];
 				Object.assign(flags, saved);
 			}
+			// the page is cached: leave it with the horizon of its own flags, not the last mode's
+			if (modes && e.retraceHorizon) await e.retraceHorizon();
 			if (modes) runs = byMode[modes[0].name].runs;
 			return {
 				runs,

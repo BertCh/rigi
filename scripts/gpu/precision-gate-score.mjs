@@ -199,16 +199,30 @@ export function scorePhoto(id, modes, verified) {
 		};
 	const qb = row.quality.base;
 	const qc = row.quality.cand;
+	const q2 = row.quality.base2 ?? null;
 	row.newAccept = !qb.accepted && qc.accepted;
 	row.lostAccept = qb.accepted && !qc.accepted;
+	// cand shows an accepted pose f64 did not show (a new accept, or another pose than base's)
+	const shown = (r) => (r?.accepted ? (r.shownPose ?? r.pose) : null);
+	const sameShown = (x, y) => !!x && !!y && nearPose(x, y);
+	row.changedAccept =
+		qc.accepted &&
+		!sameShown(shown(cand), shown(base)) &&
+		!sameShown(shown(cand), shown(base2));
+	// per photo, with the f64 noise floor: f64 itself (base or base2) giving the same verdict is not cand's
+	row.falseAccept =
+		qc.verdict === "wrong" && qb.verdict !== "wrong" && q2?.verdict !== "wrong";
+	row.lostCorrect =
+		qb.verdict === "correct" &&
+		qc.verdict !== "correct" &&
+		(q2 == null || q2.verdict === "correct");
 	if (row.noise?.length) row.issues.push(`f64 noise: ${row.noise}`);
 	if (row.diff.length) row.issues.push(`cand differs: ${row.diff}`);
-	if (qc.accepted && qc.verdict === "wrong" && qb.verdict !== "wrong")
+	if (row.falseAccept)
 		row.issues.push("cand accepts a verified-WRONG pose (false accept)");
-	if (qb.accepted && qb.verdict === "correct" && qc.verdict !== "correct")
-		row.issues.push("cand lost a verified-correct accept");
-	if (qc.accepted && qc.verdict === "unverified" && row.diff.length)
-		row.issues.push("cand accepts an unverified pose base did not show");
+	if (row.lostCorrect) row.issues.push("cand lost a verified-correct accept");
+	if (row.changedAccept && qc.verdict !== "correct" && qc.verdict !== "wrong")
+		row.issues.push(`cand accepts a ${qc.verdict} pose f64 did not show`);
 	row.status = !row.diff.length
 		? "identical"
 		: row.noise?.length && row.diff.every((d) => row.noise.includes(d))
@@ -238,10 +252,13 @@ export function acceptQuality(rows, m) {
 /**
  * The verdict. The user judges on quality, not identity (2026-10-01): cand need not be bit-identical
  * to f64, it must not be worse.
- *   FAIL  cand has more verified-wrong accepts than base (a false accept), fewer verified-correct
- *         accepts, or (with the eval arm) fewer GT-12 photos within 1° / a worse median error.
- *   NEEDS-VERIFY  cand accepts a pose base did not accept at all and no blind verdict covers it:
- *         under the frozen 0-false-accept rule it is a potential false accept until verified.
+ *   FAIL  cand has more verified-wrong accepts than base, fewer verified-correct accepts, or, on any
+ *         one photo, accepts a verified-wrong pose / loses a verified-correct accept that f64 (base and
+ *         base2: the noise floor) did not; or (with the eval arm) fewer GT-12 photos within 1° / a
+ *         worse median error.
+ *   NEEDS-VERIFY  cand accepts a pose f64 did not show (a new accept, or another pose than base's
+ *         and base2's) and no blind verdict calls it correct or wrong: under the frozen
+ *         0-false-accept rule it is a potential false accept until verified.
  *   INCONCLUSIVE  a photo errored, or cand never took a certified path (nothing was tested).
  *   PASS  otherwise. Identity (identical / within f64 noise / differs) is reported, not gated.
  */
@@ -254,6 +271,13 @@ export function decide({ rows, evalArm, vacuous }) {
 		reasons.push(`verified-wrong accepts ${qb.wrong} → ${qc.wrong}`);
 	if (qc.correct < qb.correct)
 		reasons.push(`verified-correct accepts ${qb.correct} → ${qc.correct}`);
+	// per photo too: one new false accept traded against one lost elsewhere is still a new false accept
+	const falseAccepts = ok.filter((r) => r.falseAccept).map((r) => r.id);
+	const lostCorrect = ok.filter((r) => r.lostCorrect).map((r) => r.id);
+	if (falseAccepts.length)
+		reasons.push(`new verified-wrong accepts: ${falseAccepts.join(", ")}`);
+	if (lostCorrect.length)
+		reasons.push(`lost verified-correct accepts: ${lostCorrect.join(", ")}`);
 	if (evalArm && !evalArm.error) {
 		if (evalArm.within1deg[1] < evalArm.within1deg[0])
 			reasons.push(`GT-12 within 1° ${evalArm.within1deg.join(" → ")}`);
@@ -262,8 +286,12 @@ export function decide({ rows, evalArm, vacuous }) {
 				`GT-12 median px error ${evalArm.medianAutoErr.map((x) => x.toFixed(1)).join(" → ")}`,
 			);
 	}
+	// an accepted pose f64 did not show (new, or moved) without a correct verdict: unverified or unsure
 	const unverifiedNew = ok.filter(
-		(r) => r.newAccept && r.quality.cand.verdict !== "correct",
+		(r) =>
+			r.changedAccept &&
+			r.quality.cand.verdict !== "correct" &&
+			r.quality.cand.verdict !== "wrong",
 	);
 	const errors = rows.filter((r) => r.status === "error");
 	const verdict = reasons.length
