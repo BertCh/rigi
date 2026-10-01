@@ -4,10 +4,10 @@ One runner for every check the repo already had. It works with any number of con
 the tree and never changes app behaviour.
 
 ```sh
-node scripts/ci/run.mjs fast                  # ~30 s: tsc, biome ratchet, 21 node/tsx unit checks
-node scripts/ci/run.mjs full                  # + browser: style-baseline, deck smoke, eval-app (~minutes)
+node scripts/ci/run.mjs fast                  # ~30 s: tsc, biome ratchet, ~34 node/tsx unit checks (36 fast ids, 4 full)
+node scripts/ci/run.mjs full                  # + browser: style-baseline, deck smoke, eval-app, eval-app-deck (~minutes)
 node scripts/ci/run.mjs full --only deck-smoke,style-baseline
-node scripts/ci/run.mjs fast --skip concord-joint --jobs 8
+node scripts/ci/run.mjs fast --skip concord-occl --jobs 8
 node scripts/ci/run.mjs --list                # every check id, tier, command and untracked inputs
 node scripts/ci/install-hook.mjs              # OPTIONAL pre-push hook (fast tier); not installed by default
 ```
@@ -38,10 +38,18 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | refine-test | fast | refine Jacobians, FFT, synthetic recovery | `scripts/refine-test.ts` |
 | export | fast | export/interchange (XMP, GeoJSON, KML, COLMAP…) | `scripts/test-export.ts` (needs `public/photos/`) |
 | nearfield-core / -export / -generate / -spot / -eyes / -propagate, splat-sort | fast | Step Inside core; generated splats never exported; propagation parity with Python; depth sort | `src/lib/nearfield/**`, `tools/nearfield/propagate/propagate.check.ts`, `scripts/nearfield/splat-sort-test.ts` |
-| concord-core / -priors / -cues / -joint / -field / -occl | fast | concordance WP-A..F (synthetic, offline). `field` also asserts `?concord` defaults off | `src/lib/concord/*/*.check.ts` |
+| tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |
+| photoprep | fast | GPU photo prep path (`4 100000` args) | `src/lib/gpu/photoprep/photoprep.check.ts` |
+| examples | fast | `examples/` type check (`scripts/examples.mjs check`) | `node scripts/examples.mjs check` |
+| ontology | fast | ontology layer: provenance axes, crosswalks | `src/lib/ontology/ontology.check.ts` (needs `public/photos/`) |
+| atlas | fast | `/atlas` graph data | `src/lib/atlas/atlas.check.ts` |
+| terroir-labels / -viz / -roll / -pack | fast | terroir cartography: labels, viz, roll, packs | `src/lib/terroir/*/*.check.ts`, `scripts/terroir/pack.check.ts` |
+| geocam-map / -priors / -lakes / -integrity | fast | geometry-first pose modules (flags off by default) | `src/lib/geocam/*/*.check.ts` |
+| concord-core / -priors / -cues / -app / -occl | fast | concordance modules kept after the 2026-09-30 cleanup (synthetic, offline). The joint, warp and re-match checks went with their code (a1845f5) | `src/lib/concord/*/*.check.ts` |
 | style-baseline | full | **classic pixel identity + geometry hash** on the WebGL deck route (`?renderer=deck`, SwiftShader). No `?style`/`?concord` flag is set, so this row is also the **concord-off parity** gate. **Needs a deck reference** (see below); SKIPs until one exists | `scripts/style-baseline.mjs check --url …` |
 | deck-smoke | full | `?renderer=deck` (WebGL, reference) vs `?renderer=webgpu` parity: \|Δyaw\| ≤ 0.5°, label overlap ≥ 0.6 | `scripts/deck-engine-smoke.mjs --url … --out out/ci/… --renderer webgpu` |
 | eval-app | full | app auto-alignment vs control points on the default engine (`--renderer webgpu`). Gate: `N/M within 1° yaw` ≥ `evalAppWebgpu.minWithin1deg`; advisory until that baseline exists | `scripts/eval-app.mjs --renderer webgpu` (`APP_URL=…`) |
+| eval-app-deck | full | the same accuracy run on the WebGL deck fallback (`--renderer deck`) | `scripts/eval-app.mjs --renderer deck` |
 
 Full-tier checks run one at a time through `node scripts/gpu/with-render-lock.mjs -- …`. That wrapper
 waits for the machine-wide render lock and for memory headroom, and the wait counts against the check's

@@ -100,7 +100,7 @@ engine.eye.set(...res.eyeOffset)                                    // absolute:
 applyPose(camera, res.pose, aspect, engine.eye)
 ```
 
-## Integration steps for session 9e (owner of align.ts, engine.ts and photo.$id.tsx)
+## Integration steps for session 9e (owner of align.ts, deck/engine.ts and photo.$id.tsx)
 
 1. **Pins.** Replace or extend `align.ts solvePins(prior, aspect, eye, pins, W, H, solveFov)`. Engine `Pin.world` is already in the engine frame, so convert each `Pin {u, v, world}` directly to `{kind:'point', u, v, world}`, or to `{kind:'dir', …}` for sky or DEM-direction pins.
    - **Priors:** build them with `priorsFromPhoto(photo, { eye })`, where `eye` is the same `eye` vector that solvePins receives (engine.eye = `(0, 0, eyeAlt)`). Do **not** use the default `[0,0,0]`: that is sea level in the engine frame.
@@ -119,7 +119,7 @@ applyPose(camera, res.pose, aspect, engine.eye)
      grid: { radius: 2 * photo.hAccuracy, step: 7.5, dz: [-10, 0, 10] },    // near silhouettes have a narrow basin
    })
    ```
-   The grid moves only the axes being refined. dx and dy must be in `params`, or the grid is skipped, and the `dz` values apply only when dz is refined. The grid cost includes the position prior. `eye`, `priors.position.value` and `res.eye` are all absolute positions in the engine frame. `renderHorizonV` can be the GPU horizon from `src/lib/render/` (session d1) or a CPU ray-march of the DEM from `eye`. Each call evaluates it once. The cost is (2r/step+1)² × |dz| for the grid, plus about 2·n_params+2 per LM iteration with `central`. Cache or downsample (80–120 columns is enough). Mark columns with no data as `null` to get NaN residuals; these are charged `nanPenalty`, not fitted. The callback can return any residual vector, for example control-point residuals concatenated with skyline residuals.
+   The grid moves only the axes being refined. dx and dy must be in `params`, or the grid is skipped, and the `dz` values apply only when dz is refined. The grid cost includes the position prior. `eye`, `priors.position.value` and `res.eye` are all absolute positions in the engine frame. `renderHorizonV` can be the GPU horizon from `src/lib/gpu/horizon` or a CPU ray-march of the DEM from `eye`. Each call evaluates it once. The cost is (2r/step+1)² × |dz| for the grid, plus about 2·n_params+2 per LM iteration with `central`. Cache or downsample (80–120 columns is enough). Mark columns with no data as `null` to get NaN residuals; these are charged `nanPenalty`, not fitted. The callback can return any residual vector, for example control-point residuals concatenated with skyline residuals.
 3. **Peaks.** Take them from `public/photos/region-*.json` and build them with `pointCorr(engineFrame(lat, lon), …)`. They are then in the same coordinates as the engine, and the refraction matches the renderer (k = 0.13 from geodesy.ts).
 
 ## Verified numbers (`results.md`, full run)

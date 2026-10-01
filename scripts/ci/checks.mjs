@@ -212,7 +212,7 @@ export const CHECKS = [
 		tier: "fast",
 		group: "export",
 		cmd: tsx("scripts/test-export.ts"),
-		needs: ["public/photos/photos.json"],
+		needs: ["public/photos/photos.json", "public/photos/IMG_7131.jpg"],
 		timeoutS: 300,
 	},
 

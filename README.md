@@ -206,8 +206,8 @@ node scripts/eval-app.mjs [IMG_xxxx ...]     # the app's final pose vs data/cont
 node scripts/leaderboard.mjs                 # every method re-scored on one GT snapshot → reports/leaderboard.md
 
 # regression gate (scripts/ci/README.md): one runner for every check
-node scripts/ci/run.mjs fast                 # ~30 s: tsc, biome ratchet, ~25 unit checks
-node scripts/ci/run.mjs full                 # + browser checks (style-baseline, deck smoke, eval-app), via the render lock
+node scripts/ci/run.mjs fast                 # ~30 s: tsc, biome ratchet, ~34 unit checks
+node scripts/ci/run.mjs full                 # + browser checks (style-baseline, deck smoke, eval-app, eval-app-deck), via the render lock
 node scripts/ci/run.mjs --list               # every check, its command and inputs
 
 # matcher service (optional; needs tools/matcher/.venv and weights)

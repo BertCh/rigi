@@ -116,6 +116,11 @@ import {
 } from "#/lib/integration/horizon-fast-app";
 import { photoUnknowns, type Unknowns } from "#/lib/integration/unknown-pose";
 import {
+	clearAirOn,
+	clearAirValues,
+	wantsClearAirFit,
+} from "#/lib/look/clear-air";
+import {
 	blendCut,
 	blendCutKey,
 	CompositeLook,
@@ -133,11 +138,6 @@ import {
 	rangeGeo,
 } from "#/lib/look/haze-controller";
 import type { SkyMask } from "#/lib/look/haze-fit";
-import {
-	clearAirOn,
-	clearAirValues,
-	wantsClearAirFit,
-} from "#/lib/look/clear-air";
 import { drawExportLabels, skylineAt } from "#/lib/look/labels";
 import { lookKey } from "#/lib/look/look-key";
 import { ReliefController } from "#/lib/look/relief/field";

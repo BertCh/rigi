@@ -13,7 +13,13 @@ import { type FastSampler, HZ_STEP, R_EFF, type Scene } from "../geocam/lib";
 export const D_MIN = 150;
 const DEG = Math.PI / 180;
 
-type RayTable = { k0: number; nAz: number; ds: Float64Array; lat: Float64Array; lon: Float64Array };
+type RayTable = {
+	k0: number;
+	nAz: number;
+	ds: Float64Array;
+	lat: Float64Array;
+	lon: Float64Array;
+};
 const memo = new Map<string, RayTable>();
 function rays(s: Scene, a0: number, a1: number, dMin: number): RayTable {
 	const key = `${s.photo}_${a0}_${a1}_${dMin}`;
@@ -61,7 +67,11 @@ export function sectorHorizonFrom(
 		let bestD = 0;
 		for (let j = 0; j < nd; j++) {
 			const d = R.ds[j];
-			const h = fs_.sampleAt(R.lon[k * nd + j] + dLon, R.lat[k * nd + j] + dLat, d);
+			const h = fs_.sampleAt(
+				R.lon[k * nd + j] + dLon,
+				R.lat[k * nd + j] + dLat,
+				d,
+			);
 			if (Number.isNaN(h)) continue;
 			const a = Math.atan2(h - eyeAlt - (d * d) / (2 * R_EFF), d) / DEG;
 			if (a > best) {

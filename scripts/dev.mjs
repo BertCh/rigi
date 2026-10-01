@@ -68,7 +68,9 @@ const probe = (port, host) =>
 		s.once("error", () => resolve(false));
 	});
 const listening = async (port) =>
-	(await Promise.all([probe(port, "127.0.0.1"), probe(port, "::1")])).some(Boolean);
+	(await Promise.all([probe(port, "127.0.0.1"), probe(port, "::1")])).some(
+		Boolean,
+	);
 
 const tag = (name, color) => `\x1b[${color}m[${name.padEnd(9)}]\x1b[0m `;
 const pipe = (stream, out, prefix) => {

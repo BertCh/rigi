@@ -34,7 +34,10 @@ const page = await browser.newPage({
 });
 page.on("pageerror", (e) => console.log("pageerror", e.message));
 await page.goto(`${BASE}/photo/${photo}?reveal=${preset}`);
-await page.waitForSelector("[data-ready]", { state: "attached", timeout: 180_000 });
+await page.waitForSelector("[data-ready]", {
+	state: "attached",
+	timeout: 180_000,
+});
 await page.waitForFunction(
 	() =>
 		document.querySelector("[data-ready]")?.getAttribute("data-verify") !==
@@ -60,7 +63,9 @@ const cfg = {
 	labels: true,
 };
 const clip = await page.evaluate(() => {
-	const r = document.querySelector("[data-ready] canvas")?.getBoundingClientRect();
+	const r = document
+		.querySelector("[data-ready] canvas")
+		?.getBoundingClientRect();
 	return r && { x: r.x, y: r.y, width: r.width, height: r.height };
 });
 if (!clip) throw new Error("no canvas");
@@ -69,8 +74,14 @@ console.log("clip", clip);
 const seek = (k: number | null, remeasure = false) =>
 	page.evaluate(
 		async ([c, k, re]) => {
-			await window.__reveal?.seek(c as never, k as number | null, re as boolean);
-			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+			await window.__reveal?.seek(
+				c as never,
+				k as number | null,
+				re as boolean,
+			);
+			await new Promise((r) =>
+				requestAnimationFrame(() => requestAnimationFrame(r)),
+			);
 		},
 		[cfg, k, remeasure] as const,
 	);
@@ -79,7 +90,10 @@ await seek(0, true);
 for (let i = 0; i < REVEAL; i++) {
 	await seek(i / REVEAL);
 	await page.waitForTimeout(40); // label layer re-render
-	await page.screenshot({ path: join(frames, `f${String(i).padStart(4, "0")}.png`), clip });
+	await page.screenshot({
+		path: join(frames, `f${String(i).padStart(4, "0")}.png`),
+		clip,
+	});
 }
 await seek(null);
 await page.waitForTimeout(300);
@@ -87,9 +101,13 @@ await page.screenshot({ path: join(frames, "final.png"), clip });
 await browser.close();
 
 const ff = (args: string[]) =>
-	execFileSync("/opt/homebrew/bin/ffmpeg", ["-y", "-loglevel", "error", ...args], {
-		stdio: "inherit",
-	});
+	execFileSync(
+		"/opt/homebrew/bin/ffmpeg",
+		["-y", "-loglevel", "error", ...args],
+		{
+			stdio: "inherit",
+		},
+	);
 const W = Math.min(1600, Math.round(clip.width / 2) * 2);
 // reveal → hold → cross-fade back to frame 0
 const filter = [
@@ -113,7 +131,42 @@ const inputs = [
 	"-map",
 	"[v]",
 ];
-ff([...inputs, "-c:v", "libx264", "-crf", "24", "-preset", "slow", "-movflags", "+faststart", join(OUT, "reveal.mp4")]);
-ff([...inputs, "-c:v", "libvpx-vp9", "-crf", "36", "-b:v", "0", "-row-mt", "1", join(OUT, "reveal.webm")]);
-ff(["-i", join(frames, "final.png"), "-vf", `scale=${W}:-2`, "-q:v", "3", join(OUT, "reveal.jpg")]);
-console.log("frames in", frames, "aspect", (clip.width / clip.height).toFixed(4));
+ff([
+	...inputs,
+	"-c:v",
+	"libx264",
+	"-crf",
+	"24",
+	"-preset",
+	"slow",
+	"-movflags",
+	"+faststart",
+	join(OUT, "reveal.mp4"),
+]);
+ff([
+	...inputs,
+	"-c:v",
+	"libvpx-vp9",
+	"-crf",
+	"36",
+	"-b:v",
+	"0",
+	"-row-mt",
+	"1",
+	join(OUT, "reveal.webm"),
+]);
+ff([
+	"-i",
+	join(frames, "final.png"),
+	"-vf",
+	`scale=${W}:-2`,
+	"-q:v",
+	"3",
+	join(OUT, "reveal.jpg"),
+]);
+console.log(
+	"frames in",
+	frames,
+	"aspect",
+	(clip.width / clip.height).toFixed(4),
+);

@@ -17,8 +17,8 @@
 // Curvature + refraction: the concord scene frame (scripts/concord/lib.ts) already folds the drop
 // d²/(2·R_eff), R_eff = R/(1 − k), k = 0.13 (src/lib/geodesy) into z, so the default leaves heights
 // alone; `curvature: "apply"` subtracts it here for a plain-altitude HeightFn.
-import { DEG, EARTH_R, REFRACTION_K } from "../geodesy";
 import type { Vec3 } from "../concord/core";
+import { DEG, EARTH_R, REFRACTION_K } from "../geodesy";
 
 /** Scene-frame z at ENU (e, n); d = horizontal distance from the eye (DEM level choice). NaN ⇒ no data. */
 export type HeightFn = (e: number, n: number, d: number) => number;

@@ -10,6 +10,8 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | [roadmap.md](roadmap.md) | Position, rules, sequenced plan (Now / Next / Later / Parked) |
 | [negative-results.md](negative-results.md) | Every experiment that didn't pan out, one line each, with its source |
 | [code-review-2026-09-30.md](code-review-2026-09-30.md) | Code-health backlog from the 2026-09-30 whole-repo review: CR-01…CR-53 and CR-W1…W6 with file:line, failure and state. Set a row to `fixed <commit>` when you fix it (roadmap N7) |
+| [licences.md](licences.md) | Licence register (roadmap N2): every external data, tile, API and model source, and the decisions the owner still has to make. Summarised in `NOTICE.md` |
+| [cleanup-2026-10-01.md](cleanup-2026-10-01.md) | 2026-10-01 cleanup pass: inventory of what was removed, retained and refactored |
 | [ontology.md](ontology.md) (generated) · [ontology-design.md](ontology-design.md) | The Rigi ontology: every concept and its UI/code words, provenance axes, crosswalks from app unions, confidence scales, resolution policies, ids, storage keys, and semantic findings. Regenerate with `npx tsx scripts/ontology/doc.ts`; checked by CI `ontology` |
 
 ## Current references by thread
@@ -25,11 +27,14 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | | [bench-wild.md](bench-wild.md), [bench-ablation.md](bench-ablation.md) | Wild benchmark and verification protocol (use the Mapterhorn update, not the headline); heading/gravity ablation, which is the unknown-pose design basis |
 | | [matching-v2.md](matching-v2.md) | Eye fallback, calibration priors, LoMa: not shipped |
 | | [v3-prereg.md](v3-prereg.md) | Draft prereg for `data_v3`; needs revision (roadmap R6) |
-| Concordance | [concordance-research.md](concordance-research.md) | Whole-image concordance research and plan (2026-09-29); WP-A..G being built under `src/lib/concord` behind `?concord=`; results pending interior pins (session f3) |
+| Concordance | [concordance-research.md](concordance-research.md) | Whole-image concordance research and plan (2026-09-29); kept under `src/lib/concord` behind `?concord=`: core, cues, priors, occl, app; the joint solve, warp and re-match code (WP-D/E/G) was removed 2026-09-30 (a1845f5, see negative-results.md); accuracy claims pending interior pins (session f3) |
 | Step Inside | [step-inside-design.md](step-inside-design.md) → [step-inside-results.md](step-inside-results.md) | Design of record, then build verdict. Experiment records in `tools/nearfield/*/{REPORT,SUMMARY,NOTES}.txt` |
 | Step Inside: 3D Tiles | [step-inside-google-3d-tiles.md](step-inside-google-3d-tiles.md) | Google Photorealistic 3D Tiles investigation (2026-09-29): licence per use case, EEA 403, integration design for both engines, and the licence-clean swisstopo 3D Tiles path |
-| Renderer | [deck-default.md](deck-default.md) | deck.gl as the default renderer (2026-09-30): **flipped** (3b121ae) after canvas antialias off at DPR ≥ 2 (408f989) lifted world orbit to 59–60 fps. Perf baseline → final, commits, gate runs C (failed) and D (passed), Firefox smoke, known gaps and next fixes. WebGPU renderer work is in `src/lib/deck-webgpu/README.md` |
+| Renderer | [deck-default.md](deck-default.md) | deck.gl as the default renderer (2026-09-30): **flipped** (3b121ae) after canvas antialias off at DPR ≥ 2 (408f989) lifted world orbit to 59–60 fps. Perf baseline → final, commits, gate runs C (failed) and D (passed), Firefox smoke, known gaps and next fixes. Superseded by webgpu-default.md; WebGPU engine notes are in `src/lib/deck-webgpu/README.md` |
+| Renderer | [webgpu-default.md](webgpu-default.md) | WebGPU deck as the default engine (2026-10-01, b520b1d), with WebGL deck as the fallback: what `?renderer=auto` probes, decision record and gates. The three.js renderer was removed the same day (583e2b7) |
 | Renderer | [luma-deck-upstream-2026-10-01.md](luma-deck-upstream-2026-10-01.md) | luma.gl/deck.gl master + open PRs vs our pins: verified adoption plan **and its outcome** (WPs A–I, U1–U4 landed 2026-10-01; J1/J2 vendored luma pending), gate results, local upstream branches |
+| Renderer | [visgl-frontier-2026-10-01.md](visgl-frontier-2026-10-01.md) | Follow-on sweep to the upstream review: luma, deck, loaders.gl and math at the bleeding edge, and the plan to express the app as one luma GPU graph |
+| Atlas | [explainer-research.md](explainer-research.md) | Research on explainer design principles for the `/atlas` pages (2026-10-01) |
 | Strategy | [Rigi competitive landscape and roadmap.md](<Rigi competitive landscape and roadmap.md>) | Market and competitor analysis (2026-09-26). Its sequencing is superseded by roadmap.md |
 | Strategy | [extension-opportunities.md](extension-opportunities.md) | Domain expansion review (2026-09-30): art, science, sport, adventure, tourism, transport and modalities; six platform building blocks; impact × effort placement and Now/Next/Later. Advisory; roadmap.md is the plan of record |
 | Literature | [Mountain photo georeferencing SoTA.md](<Mountain photo georeferencing SoTA.md>) | Skyline/DEM pose literature (2026-09-24). Later verdicts are in negative-results.md |
@@ -55,7 +60,7 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | `../src/lib/roll/propagate/README.md` | Pose propagation in `/roll` (R5, suggestions only) |
 | `../src/lib/sky/README.md`, `../src/lib/tiles3d/README.md` | Sky segmentation; 3D Tiles in Step Inside (S3) |
 | `../src/lib/gpu/README.md` → `gpu/core/README.md`, `gpu/solve/README.md` | WebGPU compute: rules, core layer API, solve grid |
-| `../src/lib/deck-webgpu/README.md`, `../src/lib/three-webgpu/README.md` | WebGPU deck renderer (lab) and its gotchas; three.js WebGPU spike |
+| `../src/lib/deck-webgpu/README.md` | WebGPU deck renderer (the default engine) and its gotchas |
 | `../vendor/deck/README.md` | Why deck is vendored on luma 10 alpha, and how to swap back to npm |
 | `../src/lib/ontology/README.md` | The ontology layer: units/frames brands, Provenance sidecar, crosswalks, how to add a concept, key or id |
 | `../scripts/ci/README.md` | The regression gate: every check, tier and status |
@@ -75,4 +80,4 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | `rendering_aesthetics_sota.md` | Render-polish backlog (haze, relief, labels, drape) |
 | `Mountain photo georeferencing SoTA/`, `Rigi competitive landscape and roadmap/`, `Geospatial rendering aesthetics frontier/` | Source notes behind the three reports |
 
-**Removed 2026-09-29** (superseded; negatives kept in negative-results.md; recover with `git show 384df44:<path>`): `reports/{matcher,position,perf-photo-load}.md` and `research_notes/{analysis_algorithms_sota_2026,current_state_audit,implementation_summary,matching_v2_research}.md`, plus `rigi_internal_audit.md` and `existing_tools_products.md` from the two note folders.
+**Removed 2026-09-29** (superseded; negatives kept in negative-results.md; recover with `git show 384df44:<path>`): `reports/{matcher,position,perf-photo-load}.md` (links to them elsewhere read "removed") and `research_notes/{analysis_algorithms_sota_2026,current_state_audit,implementation_summary,matching_v2_research}.md`, plus `rigi_internal_audit.md` and `existing_tools_products.md` from the two note folders.

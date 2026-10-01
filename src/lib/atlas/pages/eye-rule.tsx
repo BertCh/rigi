@@ -1213,7 +1213,7 @@ export default function Page({ node: _node }: { node: AtlasNode }) {
 					<CodeRef path="src/lib/concord/priors/altitude.ts">
 						eyePriorFromExif, concordEye, floorEye
 					</CodeRef>
-					<CodeRef path="src/lib/engine.ts">eyeAltitude</CodeRef>
+					<CodeRef path="src/lib/deck/scene.ts">eyeAltitude</CodeRef>
 					<CodeRef path="src/lib/geo/pipeline.ts">EYE_ABOVE_GROUND</CodeRef>
 					<CodeRef path="src/lib/roll/mosaic/ridgelines.worker.ts" />
 					<CodeRef path="reports/ontology.md" />

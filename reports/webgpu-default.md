@@ -1,6 +1,6 @@
 # WebGPU as the default renderer
 
-*2026-10-01. **Decision: flipped** (b520b1d). `renderer` is `oneOf(["auto","webgpu","deck","three"], "auto")` in `src/lib/flags/index.ts`, and `src/lib/renderer-select.ts` resolves `auto`. The user's direction was "we should be on GPU unless strictly necessary", followed by "push to flip now". They accepted that parity regressions get fixed after the flip. Unlike [deck-default.md](deck-default.md), **this flip was made without a browser gate.** The user put browser testing on hold while many sessions were landing work in parallel. The consolidated pass that will run later is described at the end.*
+*2026-10-01. **Decision: flipped** (b520b1d). `renderer` is `oneOf(["auto","webgpu","deck"], "auto")` in `src/lib/flags/index.ts` (three.js removed 2026-10-01, 583e2b7), and `src/lib/renderer-select.ts` resolves `auto`. The user's direction was "we should be on GPU unless strictly necessary", followed by "push to flip now". They accepted that parity regressions get fixed after the flip. Unlike [deck-default.md](deck-default.md), **this flip was made without a browser gate.** The user put browser testing on hold while many sessions were landing work in parallel. The consolidated pass that will run later is described at the end.*
 
 ## What `auto` does
 
@@ -12,7 +12,7 @@
 3. The workspace root reports the resolved engine as `data-renderer` and the reason as `data-renderer-reason`.
 
 Overrides:
-- `?renderer=webgpu|deck|three` pins an engine.
+- `?renderer=webgpu|deck` pins an engine (`three` was a third value until its removal on 2026-10-01 and now falls back to the default).
 - `?renderer=auto&webgpu=off` forces the WebGL fallback for testing.
 - The harnesses accept `--renderer webgpu|auto` (eval-app, deck-engine-smoke, leaderboard, eval-app-flags), and they fail when the pinned engine did not run.
 
@@ -31,7 +31,7 @@ Under WebGPU the render device is also the compute device (`adoptRenderDevice`).
 | Fallback `auto&webgpu=off` | WebGL deck engine on 4/4 photos, no errors. The `--no-gpu` variant is still unrun: `--disable-features=WebGPU` leaves `navigator.gpu` in place. |
 | Load under `auto` | WebGPU on 6/7 photos, render device == compute device on all of them. IMG_7033 hit the 180 s ready timeout under heavy contention. |
 | deck-engine-smoke on WebGPU | IMG_6958 and IMG_7063 pass (Δyaw ≤ 0.04°). IMG_7018 and IMG_7155 timed out under load. |
-| Not run | eval-app on WebGPU, 19-photo no-error check, style-baseline (it pins three; a deck/WebGPU counterpart is needed), orbit fps |
+| Not run | eval-app on WebGPU, 19-photo no-error check, style-baseline (it pinned three at the time; three is now removed, so it needs a deck reference), orbit fps |
 
 ## Known gaps on WebGPU (the regression list)
 
@@ -55,7 +55,7 @@ Under WebGPU the render device is also the compute device (`adoptRenderDevice`).
 
 ## Consolidated pass (on hold, owner mt-image-0a)
 
-When the user asks for it, run the battery once per renderer: webgpu/auto, deck, three, and forced fallback.
+When the user asks for it, run the battery once per renderer: webgpu/auto, deck, and forced fallback (three.js was also in this list before its removal).
 
 - **Baseline:** HEAD vs the last fully-gated commit, 85d8ca8. WebGPU has no 85d8ca8 baseline, so compare it against deck at HEAD.
 - **On failure:** `git bisect run` over the fast-gated commits, reinstalling `node_modules` across b7ed88a and the vendored-luma landing.

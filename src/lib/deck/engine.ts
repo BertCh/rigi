@@ -50,6 +50,11 @@ import {
 } from "../integration/horizon-fast-app";
 import { photoUnknowns, type Unknowns } from "../integration/unknown-pose";
 import {
+	type ClearAirValues,
+	clearAirValues,
+	wantsClearAirFit,
+} from "../look/clear-air";
+import {
 	blendCut,
 	blendCutKey,
 	CompositeLook,
@@ -61,11 +66,6 @@ import {
 	trustedRange,
 } from "../look/composite";
 import { COMPOSITE_DEFINES } from "../look/glsl/composite";
-import {
-	type ClearAirValues,
-	clearAirValues,
-	wantsClearAirFit,
-} from "../look/clear-air";
 import { HazeController, rangeGeo } from "../look/haze-controller";
 import type { SkyMask } from "../look/haze-fit";
 import { drawExportLabels, skylineAt } from "../look/labels";

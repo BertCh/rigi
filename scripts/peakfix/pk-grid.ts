@@ -14,16 +14,20 @@ import path from "node:path";
 import {
 	type Arm,
 	camOf,
-	fitArm,
 	type FitResult,
+	fitArm,
 	type Obs,
-	PK_OPTS,
 	type Params,
+	PK_OPTS,
 	projectAzEl,
 	pxPerDeg,
 	scanStart,
 } from "../../src/lib/peakfix/fit";
-import { horizonPeaks, skylinePeaks, type WorldPeak } from "../../src/lib/peakfix/peaks";
+import {
+	horizonPeaks,
+	skylinePeaks,
+	type WorldPeak,
+} from "../../src/lib/peakfix/peaks";
 import type { EyeHorizon } from "../../src/lib/pose6dof/eye";
 import {
 	FastSampler,
@@ -40,7 +44,9 @@ const opt = (k: string, d: string) => {
 	return i >= 0 ? argv[i + 1] : d;
 };
 const VALUED = ["--half", "--step", "--tag"];
-const photo = argv.filter((a, i) => !a.startsWith("--") && !VALUED.includes(argv[i - 1]))[0];
+const photo = argv.filter(
+	(a, i) => !a.startsWith("--") && !VALUED.includes(argv[i - 1]),
+)[0];
 const synth = flag("--synth");
 const HALF = Number(opt("--half", "400"));
 const STEP = Number(opt("--step", "20"));
@@ -67,7 +73,13 @@ const halfAz = halfDiagFovDeg(ref) + 3;
 const a0 = ref.pose.yaw - halfAz;
 
 const hzAt = (eye: [number, number, number]): EyeHorizon =>
-	sectorHorizonFrom(P.s, fs_, eye, a0 < 0 ? a0 + 360 : a0, (a0 < 0 ? a0 + 360 : a0) + 2 * halfAz);
+	sectorHorizonFrom(
+		P.s,
+		fs_,
+		eye,
+		a0 < 0 ? a0 + 360 : a0,
+		(a0 < 0 ? a0 + 360 : a0) + 2 * halfAz,
+	);
 const AZ0 = a0 < 0 ? a0 + 360 : a0;
 
 // --- observations
@@ -189,7 +201,15 @@ const detail = (e: number, n: number, a: Arm) => {
 			az: +mp[q.model].az.toFixed(3),
 			photo: obs.peaks[q.photo],
 		}));
-	return { cost: r.cost, dense: r.dense, peak: r.peak, nMatched: r.nMatched, nItems: r.nItems, p: r.p, matched };
+	return {
+		cost: r.cost,
+		dense: r.dense,
+		peak: r.peak,
+		nMatched: r.nMatched,
+		nItems: r.nItems,
+		p: r.p,
+		matched,
+	};
 };
 
 const result: Record<string, unknown> = {
@@ -204,7 +224,13 @@ const result: Record<string, unknown> = {
 	gtP,
 	msGrid: tGrid,
 	nGrid: grid.length,
-	grid: grid.map((c) => [c.e, c.n, ...ARMS.map((a) => +c.arms[a].cost.toFixed(4)), c.arms.peak.nMatched, c.arms.both.nMatched]),
+	grid: grid.map((c) => [
+		c.e,
+		c.n,
+		...ARMS.map((a) => +c.arms[a].cost.toFixed(4)),
+		c.arms.peak.nMatched,
+		c.arms.both.nMatched,
+	]),
 	gridCols: ["e", "n", ...ARMS, "peakMatched", "bothMatched"],
 };
 const arms: Record<string, unknown> = {};
@@ -224,7 +250,14 @@ for (const a of ARMS) {
 		err: Math.hypot(f.e, f.n),
 		cost: f.arms[a].cost,
 		nMatched: f.arms[a].nMatched,
-		second: s2 ? { e: s2.e, n: s2.n, cost: s2.arms[a].cost, ratio: s2.arms[a].cost / Math.max(1e-9, f.arms[a].cost) } : null,
+		second: s2
+			? {
+					e: s2.e,
+					n: s2.n,
+					cost: s2.arms[a].cost,
+					ratio: s2.arms[a].cost / Math.max(1e-9, f.arms[a].cost),
+				}
+			: null,
 		detail: detail(f.e, f.n, a),
 	};
 }

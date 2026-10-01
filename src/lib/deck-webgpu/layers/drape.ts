@@ -68,7 +68,7 @@
 // view's colour pass stays classic, as the WebGL offscreen passes forced projectPhoto 0).
 import type { Device, Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
-import { type ClearAirValues, CLEAR_AIR_OFF } from "#/lib/look/clear-air";
+import { CLEAR_AIR_OFF, type ClearAirValues } from "#/lib/look/clear-air";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
 import type { harmonizeValues } from "#/lib/look/composite";
 import {

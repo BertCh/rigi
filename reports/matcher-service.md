@@ -1,6 +1,8 @@
 # Render-and-match service (optional escalation tier)
 
-*2026-09-25 · v0.2 (fused) · code in `tools/matcher/server/` and `src/lib/matcher-client.ts` · method in `reports/matcher.md` (render-match) and `reports/fusion.md` (fusion)*
+> **Older document (v0.2 to v0.3.5 API and changelog).** The current service ops and policies (v0.4.0) are in [matcher-service-v040.md](matcher-service-v040.md); read that first.
+
+*2026-09-25 · v0.2 (fused) · code in `tools/matcher/server/` and `src/lib/matcher-client.ts` · method in `reports/matcher.md` (removed; `git show 384df44:reports/matcher.md`) (render-match) and `reports/fusion.md` (fusion)*
 
 ## Summary
 
@@ -467,7 +469,7 @@ Notes:
 - **Single job at a time.** A second client waits in the queue, up to its own timeout.
 - **Mode (a) is dev-only.** Prod needs the app to produce its own views plus the skyline arrays (mode b).
 - **The skyline cue follows the live app.** If `align.ts` changes, the server's skyline cue changes with it (as seen on IMG_7086). The HIGH rule still needs both cues to agree.
-- **Imagery licences.** Server-side use of swisstopo or Esri imagery for production needs a terms check (see `reports/matcher.md`).
+- **Imagery licences.** Server-side use of swisstopo or Esri imagery for production needs a terms check (see `reports/matcher.md`, removed; `git show 384df44:reports/matcher.md`).
 
 ## v0.1 (render-match only, `fused:false`) results, for reference
 

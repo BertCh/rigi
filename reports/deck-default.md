@@ -1,5 +1,7 @@
 # deck.gl as the default renderer
 
+> **Superseded by [webgpu-default.md](webgpu-default.md).** WebGPU deck has been the default since 2026-10-01 (b520b1d), with WebGL deck as the fallback, and the three.js renderer was removed in 583e2b7. The flag is now `oneOf(["auto","webgpu","deck"], "auto")`. The body below is the historical record of the three-to-deck flip.
+
 *2026-09-30. **Decision: flipped** (3b121ae). `renderer` is `oneOf(["three","deck"], "deck")` in `src/lib/flags/index.ts`; `?renderer=three` selects three.js. The deciding fix is 408f989 (canvas antialias off at DPR ≥ 2). Gate C, which failed earlier the same day, is kept below as history. The WebGPU renderer is a separate, in-progress track: see `src/lib/deck-webgpu/README.md`.*
 
 ## Decision

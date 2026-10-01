@@ -91,7 +91,7 @@ Share of photos where at least one method is correct, by photo tag (the tags are
 
 1. **No heading, and search.** The fused 360° match sweep found fewer than 30 matches on 61 of 99 photos. Seeded by the sweep, fused is correct on 32 of 38 photos; seeded by the app skyline, on 18 of 61. The largest lever is **a better stage-1 search**: a finer yaw/FOV sweep, and features that are more robust to season and lighting (winter, dusk and haze against summer orthophotos).
 2. **Low light and haze** leave weak skyline and texture evidence.
-3. **Position error and near-field terrain:** much smaller than v1 suggested. T5's position refinement (`reports/position.md`) turns 2 more dev photos correct and breaks none (blind, v2 overlays), but it isn't the main lever.
+3. **Position error and near-field terrain:** much smaller than v1 suggested. T5's position refinement (`reports/position.md`, removed; `git show 384df44:reports/position.md`) turns 2 more dev photos correct and breaks none (blind, v2 overlays), but it isn't the main lever.
 4. **Narrow FOV** (hfov below about 10°): fused falls back to the skyline and returns LOW. This is a documented limit (`reports/bench-ablation.md`).
 
 ## v1 → v2: what changed
@@ -145,7 +145,7 @@ The fused cold time is mostly imagery drape, which is now limited to 40 km on 36
   - `verify_v2/` + `verdicts_v2/` (v2)
 - **Scoring:** `tools/bench/score/score_wild.py`, which writes `wild_scores_v1.json` and `wild_scores_v2.json`.
 - **Leaderboard rows:** `tools/bench/results.json` (`wild:app`, `wild:cascade`, `wild:fused`).
-- **Related reports:** `reports/bench-ablation.md` (the 12-photo metadata ablation) and `reports/position.md` (T5).
+- **Related reports:** `reports/bench-ablation.md` (the 12-photo metadata ablation) and `reports/position.md` (T5; removed, `git show 384df44:reports/position.md`).
 
 ## Update: cascade re-run on Mapterhorn (2026-09-25)
 

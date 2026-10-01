@@ -97,10 +97,7 @@ function unproject(c: Cam, px: number, py: number): [number, number] {
 	const d1 = c.fw[1] + c.rt[1] * x + c.up[1] * y;
 	const d2 = c.fw[2] + c.rt[2] * x + c.up[2] * y;
 	const az = Math.atan2(d0, d1) / D;
-	return [
-		az < 0 ? az + 360 : az,
-		Math.atan2(d2, Math.hypot(d0, d1)) / D,
-	];
+	return [az < 0 ? az + 360 : az, Math.atan2(d2, Math.hypot(d0, d1)) / D];
 }
 
 export function hzEl(hz: EyeHorizon, az: number): number {
@@ -175,7 +172,13 @@ export function associate(
 
 type Eval = { r: number[]; w: number[]; cost: number };
 
-function denseEval(p: Params, hz: EyeHorizon, obs: Obs, o: FitOpts, stride = 1): Eval {
+function denseEval(
+	p: Params,
+	hz: EyeHorizon,
+	obs: Obs,
+	o: FitOpts,
+	stride = 1,
+): Eval {
 	const c = camOf(p, obs);
 	const ppd = c.f * D;
 	const T2 = o.trunc * o.trunc;
@@ -187,7 +190,9 @@ function denseEval(p: Params, hz: EyeHorizon, obs: Obs, o: FitOpts, stride = 1):
 		const s = obs.samples[i];
 		const [az, el] = unproject(c, s.x, s.y);
 		const eh = hzEl(hz, az);
-		const res = Number.isFinite(eh) ? ((el - eh) * ppd) / o.sigmaPx : o.trunc * 2;
+		const res = Number.isFinite(eh)
+			? ((el - eh) * ppd) / o.sigmaPx
+			: o.trunc * 2;
 		const q = Math.min(res * res, T2);
 		cost += s.w * q;
 		wsum += s.w;
@@ -301,8 +306,7 @@ export function fitArm(
 ): FitResult {
 	const H = [0.01, 0.01, 0.01, 1e-4];
 	const total = (p: Params, pairs: Pair[] | null, nItems?: number) => {
-		const de =
-			arm === "peak" ? null : denseEval(p, hz, obs, o, 1);
+		const de = arm === "peak" ? null : denseEval(p, hz, obs, o, 1);
 		const pe =
 			arm === "dense" ? null : peakEval(p, model, obs, o, pairs, nItems);
 		const nD = de ? Math.max(1, de.r.length) : 1;
@@ -363,9 +367,17 @@ export function fitArm(
 			const Ad = A.map((row, a) =>
 				row.map((v, b) => (a === b ? v * (1 + lambda) + 1e-9 : v)),
 			);
-			const dx = solve4(Ad, g.map((v) => -v));
+			const dx = solve4(
+				Ad,
+				g.map((v) => -v),
+			);
 			if (!dx) break;
-			const q: Params = [p[0] + dx[0], p[1] + dx[1], p[2] + dx[2], p[3] + dx[3]];
+			const q: Params = [
+				p[0] + dx[0],
+				p[1] + dx[1],
+				p[2] + dx[2],
+				p[3] + dx[3],
+			];
 			q[3] = Math.max(-o.lnfMax, Math.min(o.lnfMax, q[3]));
 			const e = total(q, null);
 			if (e.cost < cur.cost) {

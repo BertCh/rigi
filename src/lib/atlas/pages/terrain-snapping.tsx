@@ -476,7 +476,7 @@ const LEDGER: {
 		what: "OSM peaks",
 		verb: "snap",
 		rule: "highest of 9×9 samples within ±min(250, 60 + 0.004·d) m",
-		where: "src/lib/engine.ts",
+		where: "src/lib/deck/engine.ts",
 		when: "always (150 m – 110 km)",
 	},
 	{
@@ -908,7 +908,7 @@ export default function Page({ node }: { node: AtlasNode }) {
 					bound. A GPS altitude is still evidence, so it stays a prior.
 				</p>
 				<div className="flex flex-wrap gap-2">
-					<CodeRef path="src/lib/engine.ts" />
+					<CodeRef path="src/lib/deck/engine.ts" />
 					<CodeRef path="src/lib/deck/scene.ts" />
 					<CodeRef path="src/lib/terrain.ts" />
 					<CodeRef path="src/lib/geo/horizon.ts" />

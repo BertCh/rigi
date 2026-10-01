@@ -87,7 +87,7 @@ _how a solved photo is drawn: modes, looks, labels, layers_
 
 | concept | definition | UI words | code words | avoid |
 |---|---|---|---|---|
-| **View mode** `view-mode` | How terrain and photo combine: Overlay (lines on the photo), Blend (terrain replaces parts of it), In map (3D world). | Overlay, Blend, In map | `ViewMode`, `overlay`, `replace`, `world`, `StyleMode`, `DeckStyleMode` | replace (UI: Blend); world (UI: In map) |
+| **View mode** `view-mode` | How terrain and photo combine: Overlay (lines on the photo), Blend (terrain replaces parts of it), In map (3D world). | Overlay, Blend, In map | `ViewMode`, `overlay`, `replace`, `world`, `DeckStyleMode` | replace (UI: Blend); world (UI: In map) |
 | **Blend method** `blend-method` | How Blend chooses where terrain shows: lens, swipe, distance range, brush. | Lens, Swipe, Distance, Brush | `BlendMethod`, `range` |  |
 | **Look** `look` | The whole visual style of a view (terrain lighting, overlay lines, bands, labels): a preset plus overrides. | Look, Style | `ViewStyle`, `StyleState`, `PresetId` |  |
 | **Look preset** `look-preset` | A named patch over CLASSIC (classic, minimal, topo-map, night, …). |  | `PresetId`, `PRESETS` |  |
@@ -110,7 +110,7 @@ _renderers, flags, settings, storage_
 
 | concept | definition | UI words | code words | avoid |
 |---|---|---|---|---|
-| **Renderer** `renderer` | An engine that draws terrain behind/over the photo: deck.gl (default) or three.js; WebGPU deck in progress. |  | `Renderer`, `PhotoEngine`, `DeckEngine` |  |
+| **Renderer** `renderer` | An engine that draws terrain behind/over the photo: deck.gl on WebGPU (default where available) or on WebGL (fallback). |  | `Renderer`, `WebGpuEngine`, `DeckEngine` |  |
 | **Flag** `flag` | A typed page-level switch (?name=value), read only through lib/flags. |  | `FLAG_SCHEMA`, `Flags`, `FlagName` |  |
 | **View settings** `settings` | The workspace's per-view knobs (mode, blend method, overlay/replace/world layer choice, opacity, toggles). |  | `Settings` |  |
 
@@ -199,7 +199,7 @@ These are the TypeScript types that realize each concept. The first is canonical
 | `confidence` | `lib/ontology/core/confidence.ts#Confidence`, `lib/refine/confidence.ts#Confidence`, `lib/concord/app/confidence.ts#PoseConfidence` |
 | `ground-truth` | `lib/roll/roll.ts#GtEntry` |
 | `suggestion` | `lib/roll/propagate/store.ts#StoredSuggestion` |
-| `view-mode` | `lib/settings.ts#ViewMode`, `lib/style/three-apply.ts#StyleMode` |
+| `view-mode` | `lib/settings.ts#ViewMode`, `lib/style/deck-apply.ts#DeckStyleMode` |
 | `blend-method` | `lib/settings.ts#BlendMethod` |
 | `look` | `lib/style/types.ts#ViewStyle`, `lib/style/types.ts#StyleState` |
 | `look-preset` | `lib/style/types.ts#PresetId` |
@@ -309,7 +309,7 @@ Trusted auto (`isTrustedAuto`) means: an automatic agent, status `accepted`, and
 | `swisstopo-data` | reference | swisstopo data | map, terrain | geometry | lib/tiles3d, lib/concord |
 | `dem-sample` | reference | DEM height sample | terrain | eye-height, geometry | lib/dem |
 | `level-table` | reference | Lake level table | map | eye-height | lib/geocam/lakes/levels.ts |
-| `eye-rule` | rule | Eye = max(GPS alt, DEM + 1.6 m) (DEM + 1.8 m without altitude in the engine) | ground, alt | eye-height | lib/engine.ts, lib/geo/pipeline.ts |
+| `eye-rule` | rule | Eye = max(GPS alt, DEM + 1.6 m) (DEM + 1.8 m without altitude in the engine) | ground, alt | eye-height | lib/deck/scene.ts, lib/geo/pipeline.ts |
 | `alt-contour` | rule | Eye on the GPS-altitude iso-band | gps, alt, ground | position, eye-height | lib/concord/priors/altitude.ts |
 | `viewpoint-bias` | rule | Shift a prior by the median yaw offset of the viewpoint's solved anchors | compass, rotation | orientation | lib/roll/align/viewpoint.ts |
 | `track-interpolate` | rule | Interpolate position along the roll's GPS track | time, gps | position | lib/roll/import/interpolate.ts |

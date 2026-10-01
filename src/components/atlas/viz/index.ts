@@ -8,8 +8,6 @@ export { DEMO_IMAGES, DemoImage, type DemoName } from "./DemoImage";
 export { Figure } from "./Figure";
 export { useInView, useRaf, useReducedMotion, useTime } from "./hooks";
 export { Plot, type PlotScale } from "./Plot";
-export { PROSE, Section, Stat } from "./Section";
-export { Flow, type FlowNode, Steps } from "./Steps";
 export {
 	ATLAS_PHOTO_IDS,
 	type AtlasIndex,
@@ -26,3 +24,5 @@ export {
 	useAtlasIndex,
 	useAtlasPhoto,
 } from "./real";
+export { PROSE, Section, Stat } from "./Section";
+export { Flow, type FlowNode, Steps } from "./Steps";

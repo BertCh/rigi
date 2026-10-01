@@ -125,7 +125,7 @@ export const ATLAS_NODES: AtlasNode[] = [
 			"Everything Rigi places in the world is reconciled with the DEM. The eye is lifted to max(GPS altitude, ground + 1.6 m) and bounded below by a still lake's level; OSM peaks are moved to the highest DEM point within a radius that grows with distance; and monocular depth in Step Inside is anchored to DEM ray lengths with a scored fit. Each one is either a snap, a bound or a prior, chosen on purpose.",
 		modules: [
 			"src/lib/terrain.ts",
-			"src/lib/engine.ts",
+			"src/lib/deck/scene.ts",
 			"src/lib/geocam/lakes/floor.ts",
 			"src/lib/nearfield/anchor.ts",
 		],
@@ -219,10 +219,10 @@ export const ATLAS_NODES: AtlasNode[] = [
 		status: "live",
 		tagline: "max(GPS alt, DEM + 1.6 m), except where the engine says 1.8 m.",
 		summary:
-			"How eye height is set without a solve. A recorded drift: engine.ts and roll ridgelines use DEM+1.8 m while geo/pipeline uses DEM+1.6 m.",
+			"How eye height is set without a solve. A recorded drift: deck/scene.ts (eyeAltitude) and roll ridgelines use DEM+1.8 m while geo/pipeline uses DEM+1.6 m.",
 		modules: [
 			"src/lib/concord/priors/altitude.ts",
-			"src/lib/engine.ts",
+			"src/lib/deck/scene.ts",
 			"src/lib/geo/pipeline.ts",
 		],
 		reports: ["reports/ontology.md"],

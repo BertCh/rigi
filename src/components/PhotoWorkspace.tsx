@@ -88,7 +88,11 @@ import {
 	type Sample,
 	type Settings,
 } from "#/lib/settings";
-import { PRESET_MAP_LAYERS, PRESET_OVERLAY_LAYER, useViewStyle } from "#/lib/style";
+import {
+	PRESET_MAP_LAYERS,
+	PRESET_OVERLAY_LAYER,
+	useViewStyle,
+} from "#/lib/style";
 import { uncertainOpacity, uncertainPrefix } from "#/lib/terroir/labels/names";
 import {
 	classicTier,

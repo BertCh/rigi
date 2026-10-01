@@ -134,7 +134,7 @@ This GT covers 12 photos, is solved from all labelled points, and is the leaderb
   - no matches: 6971 −15°;
   - weak match support: 7018 +15°, 9 %;
   - d_agree just over 1°: 6958 +15°;
-  - the skyline residual on 7059 (6 px). That's the ridge-top photo whose near crest hides the valley; see `reports/matcher.md`.
+  - the skyline residual on 7059 (6 px). That's the ridge-top photo whose near crest hides the valley; see `reports/matcher.md` (removed; `git show 384df44:reports/matcher.md`).
 
 **Synthetic wrong GPS:**
 - Setup: the eye is moved 1 km or 3 km to the right of the prior heading, in memory, via `gps_offset.mjs`, then snapped to DEM + 1.8 m, with the horizon recomputed. Everything is re-rendered and re-matched from the wrong position.
@@ -175,7 +175,7 @@ The result is flat across a 16× range of λ. No setting beats λ = 1 on robustn
 
 - Fusion itself (skyline-only LM, match RANSAC + LM, and two joint solves) takes a median of **2.5 s** per photo per scenario, 4.6 s at most, on the CPU with numeric Jacobians. The dominant cost is the horizon-polyline crossing test.
 - It needs, on top:
-  - the render-match inputs: 5 renders plus matching, ~10–30 s on the M3 Pro GPU (MPS), see `reports/matcher.md`;
+  - the render-match inputs: 5 renders plus matching, ~10–30 s on the M3 Pro GPU (MPS), see `reports/matcher.md` (removed; `git show 384df44:reports/matcher.md`);
   - the app's skyline evidence, which the app computes anyway at load.
 
 ## Leaderboard files
@@ -199,7 +199,7 @@ Both are in the format documented at the top of `scripts/leaderboard.mjs`.
 ## Reproduce
 
 ```bash
-# prerequisites: tools/matcher/.venv and weights as in reports/matcher.md; dev server on :3100; ≥ 3 GB free
+# prerequisites: tools/matcher/.venv and weights as in reports/matcher.md (removed; `git show 384df44:reports/matcher.md`); dev server on :3100; ≥ 3 GB free
 node tools/matcher/export_skyline.mjs                  # app skyline evidence + autoAlign at shifts 0/±15 → out/skyline/
 tools/matcher/fusion_prep.sh                           # per photo: render 11 views, check_xyz, match, save out/corr/*.npz, delete renders
 cd tools/matcher
@@ -225,4 +225,4 @@ All paths are under `/Users/robertchristie/Documents/GitHub/mt-image/`.
   - New: `fusion.py`, `fusion_report.py`, `gtjson_check.py`, `export_skyline.mjs`, `gps_offset.mjs`, `collect_corr.py`, `fusion_prep.sh`, `write_leaderboard.py`, `results.json`, `results-fusion.json`.
   - `match.py`: now exposes a `correspondences()` library function, and its thresholds are parameters.
   - `render.mjs`: supports `@r<m>` GPS-offset ids and has a `--meta-only` mode.
-- `reports/fusion.md` (this file); `reports/matcher.md` has a pointer here.
+- `reports/fusion.md` (this file); `reports/matcher.md` (removed) had a pointer here.

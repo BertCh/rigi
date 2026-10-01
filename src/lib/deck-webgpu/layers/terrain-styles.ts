@@ -56,7 +56,13 @@ import {
 	deckTerrainStyle,
 } from "#/lib/style/deck-apply";
 import { CLASSIC } from "#/lib/style/defaults";
-import { coverTexels, terroirBlockValues, terroirMajorEvery, type TerroirShader } from "#/lib/terroir/glsl/values";
+import { TER_BLOCK } from "#/lib/terroir/glsl/terrain";
+import {
+	coverTexels,
+	type TerroirShader,
+	terroirBlockValues,
+	terroirMajorEvery,
+} from "#/lib/terroir/glsl/values";
 import {
 	TERROIR_CONTOUR_TAIL,
 	type TerroirFeatures,
@@ -68,7 +74,6 @@ import {
 	terroirUniformModule,
 	terroirWGSL,
 } from "#/lib/terroir/wgsl/terrain";
-import { TER_BLOCK } from "#/lib/terroir/glsl/terrain";
 import type { PassContext } from "../pass";
 import { USAGE } from "../targets";
 import type { TerrainLook, TerrainShaderPart } from "../terrain";
@@ -1056,7 +1061,11 @@ export class TerrainStyles {
 		const T = this.p.terroir;
 		if (!T) return {};
 		return TER_BLOCK.pack(
-			terroirBlockValues(T, this.p.contourInterval, this.p.look.contourMajorEvery),
+			terroirBlockValues(
+				T,
+				this.p.contourInterval,
+				this.p.look.contourMajorEvery,
+			),
 		);
 	}
 
@@ -1110,7 +1119,9 @@ export class TerrainStyles {
 								reliefGen: this.relief?.gen ?? this.zeroTexture(),
 							}
 						: {}),
-					...(terroirNeedsCover(ft) ? { terroirCover: this.coverTexture() } : {}),
+					...(terroirNeedsCover(ft)
+						? { terroirCover: this.coverTexture() }
+						: {}),
 				},
 			}),
 		};

@@ -81,6 +81,11 @@ export function Plot({
 			viewBox={`0 0 ${width} ${height}`}
 			className={`block h-auto w-full ${className ?? ""}`}
 			role="img"
+			aria-label={
+				yLabel && xLabel
+					? `${yLabel} vs ${xLabel}`
+					: (yLabel ?? xLabel ?? "plot")
+			}
 		>
 			{ys.map((v) => (
 				<g key={`y${v}`}>

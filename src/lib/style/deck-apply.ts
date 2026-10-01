@@ -23,9 +23,9 @@ import {
 	type AtmValues,
 	atmosphereValues,
 } from "../look/atmosphere";
+import { clearAirOn } from "../look/clear-air";
 import { type LookDefine, terrainDefines } from "../look/look-key";
 import { type RelValues, reliefValues } from "../look/relief/field";
-import { clearAirOn } from "../look/clear-air";
 import { type SunContext, sunDirFromStyle } from "../look/sun";
 import {
 	hexToLinearLikeThree,

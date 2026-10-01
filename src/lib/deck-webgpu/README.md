@@ -1,10 +1,10 @@
 # src/lib/deck-webgpu — the WebGPU renderer (deck.gl on WebGPU, luma.gl 10)
 
-Experimental (2026-09-30). The deck backend (`src/lib/deck`, WebGL2) is being moved to WebGPU.
-Every layer of the WebGL DeckEngine is ported (see **Status**), and `engine.ts` (`WebGpuEngine`)
-implements the whole `Renderer` interface on them. It is wired into `PhotoWorkspace` behind
-`?renderer=auto|webgpu` with an automatic WebGL fallback (see **In the app**); the lab route
-(`/lab/deck-webgpu`) remains the bench / debug consumer.
+The default engine since 2026-10-01 (b520b1d, `reports/webgpu-default.md`); the WebGL deck backend
+(`src/lib/deck`) is the fallback. Every layer of the WebGL DeckEngine is ported (see **Status**), and
+`engine.ts` (`WebGpuEngine`) implements the whole `Renderer` interface on them. `PhotoWorkspace` picks it
+with `?renderer=auto` (or pins it with `?renderer=webgpu`) and falls back to WebGL automatically (see
+**In the app**); the lab route (`/lab/deck-webgpu`) remains the bench / debug consumer.
 
 ## Approach (decided by `spike.ts`, `/lab/deck-webgpu?spike=1`)
 
