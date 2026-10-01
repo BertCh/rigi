@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Smoke test for DeckEngine (src/lib/deck/engine.ts) against the three.js PhotoEngine.
 // For each photo:
-//   three: /photo/<id>?renderer=three (fresh localStorage), wait for [data-ready], then window.__engine.autoAlign(true)
+//   three: /photo/<id>?renderer=three (fresh localStorage), wait for [data-ready] and for the background
+//          second opinion to settle ([data-verify] not "pending"), then window.__engine.autoAlign(true)
 //          (the same call PhotoWorkspace makes on load, without the second opinion) and its labels
 //          at that pose.
 //   deck:  the same on /photo/<id>?renderer=deck, plus its labels at three's pose.
@@ -86,6 +87,17 @@ async function run(id, renderer, threePose = null) {
 	await page.goto(`${BASE}/photo/${id}?renderer=${renderer}`);
 	await page.waitForSelector("[data-ready]", { timeout: 240_000 });
 	const readyMs = Date.now() - t0;
+	// The app's background second opinion lands ~150-300 ms after [data-ready] and calls
+	// engine.setPose(its pose). Started before it settles, the setPose(res.pose) below races it and
+	// the labels are read at the second opinion's pose (IMG_7086: 162.70° instead of 156.72°, which
+	// swaps Finsteraarhorn at the left edge for Balmhorn at the right). Same wait as eval-app.mjs.
+	await page.waitForFunction(
+		() =>
+			document.querySelector("[data-ready]")?.getAttribute("data-verify") !==
+			"pending",
+		null,
+		{ timeout: 180_000 },
+	);
 	const r = await page.evaluate(async (tp) => {
 		const e = window.__engine;
 		const engineKind = e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three");
@@ -110,19 +122,31 @@ async function run(id, renderer, threePose = null) {
 			}
 			return out;
 		};
+		// setPose + readback, then check nothing else (a late matcher upgrade) moved the pose meanwhile;
+		// peakLabels() follows synchronously, so the labels are for exactly this pose
+		const same = (a, b) =>
+			["yaw", "pitch", "roll", "vfov"].every((k) => a[k] === b[k]);
+		let poseRetries = 0;
+		const settle = async (p) => {
+			for (let i = 0; i < 3; i++) {
+				e.setPose(p);
+				await e.readback();
+				if (same(e.pose, p)) return;
+				poseRetries++;
+			}
+			throw new Error("the app kept moving the pose after setPose");
+		};
 		const t = performance.now();
 		const res = await e.autoAlign(true);
 		const alignMs = performance.now() - t;
 		if (!res) return null;
-		e.setPose(res.pose);
-		await e.readback();
+		await settle(res.pose);
 		const labels = e.peakLabels().map((l) => l.name);
 		const ownMargins = margins();
 		let atThree = null;
 		let atThreeMargins = null;
 		if (tp) {
-			e.setPose(tp);
-			await e.readback();
+			await settle(tp);
 			atThree = e.peakLabels().map((l) => l.name);
 			atThreeMargins = margins();
 		}
@@ -136,6 +160,7 @@ async function run(id, renderer, threePose = null) {
 			margins: ownMargins,
 			atThree,
 			atThreeMargins,
+			poseRetries,
 			stats: e.stats ?? null,
 		};
 	}, threePose);
