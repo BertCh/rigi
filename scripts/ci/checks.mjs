@@ -232,6 +232,14 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "haze-tail",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/gpu/look/haze-tail.check.ts", "16"),
+		note: "GPU haze fit's CPU tail (hoisted atmPath exp, refine memo, typed-sort airlight) = fitHaze bit for bit on 16 synthetic scenes (no GPU)",
+		timeoutS: 300,
+	},
+	{
 		id: "bridge-fusion",
 		tier: "fast",
 		group: "look",

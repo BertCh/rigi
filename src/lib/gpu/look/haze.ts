@@ -8,13 +8,15 @@
 // airlight band's values (compacted / gathered, so the per-pixel lin + bins stay on the GPU), and
 // the physical fit's 5 550-cell grid scan. The CPU keeps what is small or sequential: the airlight
 // statistics, the dark-subset sums and representative paths, the free-β IRLS, the refinement
-// passes and the quality terms. Those parts mirror haze-fit.ts line for line (keep in sync;
-// look-bench.mjs catches drift). Both submits run as core ComputeGraphs (./haze-graph.ts); the pooled
+// passes and the quality terms. Those parts mirror haze-fit.ts (keep in sync): the same arithmetic
+// in the same order, with three bit-identical shortcuts (atmPath's exp(−eyeAlt / H) hoisted, a
+// per-pass memo of the refinement's revisited points, typed-array sorts for the airlight). The node
+// check haze-tail.check.ts proves the tail equals fitHaze bit for bit on synthetic scenes;
+// look-bench.mjs compares the whole GPU fit with the CPU on captured inputs. Both submits run as core ComputeGraphs (./haze-graph.ts); the pooled
 // dispatch path and its full-readback (compact: false) mode were removed on 2026-10-01.
 import type { Device } from "@luma.gl/core";
 import {
 	ATM_CURV,
-	atmPath,
 	BETA_M0,
 	BETA_R0,
 	H_M,
@@ -467,6 +469,59 @@ export function airlightBand(
 	return Uint32Array.from(band);
 }
 
+/**
+ * atmPath(h0, h1, L, H) with its exp(−h0 / H) passed in (`e0`): the same expression in the same
+ * order, `e0 · L · f`, so the same bits when e0 = Math.exp(−h0 / H) (haze-tail.check.ts).
+ */
+export function pathFrom(
+	e0: number,
+	h0: number,
+	h1: number,
+	L: number,
+	H: number,
+) {
+	const x = (h1 - h0) / H;
+	const f = Math.abs(x) < 1e-3 ? 1 - 0.5 * x : (1 - Math.exp(-x)) / x;
+	return e0 * L * f;
+}
+
+/** evalPhys's memo key: the exact doubles (JS number → string round-trips) and the H_M index. */
+const evalKey = (kR: number, bM: number, hk: number) => `${kR} ${bM} ${hk}`;
+
+/**
+ * look/haze-fit.ts robustSky on the tail's band values (no fallback lin: with fewer than 20 values
+ * it returns robustSky's default), with typed-array sorts instead of comparator sorts. The values
+ * picked are the same: a numeric sort's k-th element is unique except for NaN and the order of ±0,
+ * so inputs holding either take robustSky itself.
+ */
+export function robustSkyExact(
+	r: number[],
+	g: number[],
+	b: number[],
+	l: number[],
+): Vec3 {
+	const plain = (a: number[]) => {
+		for (const v of a) if (Number.isNaN(v) || Object.is(v, -0)) return false;
+		return true;
+	};
+	if (r.length < 20 || !plain(r) || !plain(g) || !plain(b) || !plain(l)) {
+		const none = new Float32Array(0);
+		return robustSky(r, g, b, l, none, none);
+	}
+	const sortedL = Float64Array.from(l).sort();
+	const thr = sortedL[Math.floor(l.length * 0.4)];
+	const pick = (a: number[]) => {
+		let n = 0;
+		for (const v of l) if (v >= thr) n++;
+		const s = new Float64Array(n);
+		let k = 0;
+		for (let i = 0; i < a.length; i++) if (l[i] >= thr) s[k++] = a[i];
+		s.sort();
+		return s[Math.floor(n / 2)];
+	};
+	return [pick(r), pick(g), pick(b)];
+}
+
 /** What the CPU tail needs besides the prep's lists (timestamps for hazeGpuTimes). */
 export type HazeTailContext = {
 	/** range, row 0 = top (as the CPU) */
@@ -510,8 +565,7 @@ export async function hazeFitTail(
 	}
 	// ≥ 20 values: robustSky uses them as they are; fewer (only when even the fallback has < 20)
 	// it returns its default without looking at lin
-	const none = new Float32Array(0);
-	const airlight = robustSky(skyR, skyG, skyB, skyL, none, none);
+	const airlight = robustSkyExact(skyR, skyG, skyB, skyL);
 
 	// --- bins (from the GPU), then the CPU's per-bin loop with the GPU's order statistics
 	let total = 0;
@@ -522,6 +576,9 @@ export async function hazeFitTail(
 	const REPS = 24;
 	const NH = H_M_CANDIDATES.length;
 	const reps: Float64Array[][] = [[], [], []];
+	// atmPath's exp(−h0 / H) depends on the scale height only: hoisted (pathFrom, same bits)
+	const eyeFactorR = Math.exp(-eyeAlt / H_R);
+	const eyeFactorM = H_M_CANDIDATES.map((h) => Math.exp(-eyeAlt / h));
 	// percentile(val, n, q) of the CPU from the selected order statistics
 	const pct = (b: number, c: number, n: number, q: 0.01 | 0.09) => {
 		const s0 = (b * 3 + c) * 4 + (q === 0.01 ? 0 : 2);
@@ -569,10 +626,16 @@ export async function hazeFitTail(
 				if (!keep && c !== 1) continue;
 				const [px, py, pz] = pointAt(i);
 				const h1 = pz + (px * px + py * py) * ATM_CURV;
-				const r0 = atmPath(eyeAlt, h1, range[i], H_R);
+				const r0 = pathFrom(eyeFactorR, eyeAlt, h1, range[i], H_R);
 				if (keep) rep[nr * (1 + NH)] = r0;
 				for (let q = 0; q < NH; q++) {
-					const v = atmPath(eyeAlt, h1, range[i], H_M_CANDIDATES[q]);
+					const v = pathFrom(
+						eyeFactorM[q],
+						eyeAlt,
+						h1,
+						range[i],
+						H_M_CANDIDATES[q],
+					);
 					if (keep) rep[nr * (1 + NH) + 1 + q] = v;
 					if (c === 1) pM[q] += v;
 				}
@@ -702,6 +765,7 @@ export async function hazeFitTail(
 		Math.exp(Math.log(0.25) + (a / 24) * Math.log(40 / 0.25));
 	const gridBM = (b: number) =>
 		Math.exp(Math.log(1e-7) + (b / 36) * Math.log(3e-2 / 1e-7));
+	let memoHits = 0;
 	const t4 = performance.now();
 	const gErr = await grid(
 		device,
@@ -736,8 +800,13 @@ export async function hazeFitTail(
 		const e = evalPhys(kR, bM, hk).err;
 		if (e < best.err) best = { kR, bM, hk, err: e };
 	}
+	// evalPhys is a pure function of (kR, bM, hk) while wp is fixed: the descent revisits points
+	// bit for bit (a move keeps the other coordinate's exp(0) = 1 factor), so their err is reused.
+	// Cleared whenever reweight changes wp. Same decisions, same bits (haze-tail.check.ts).
+	const seen = new Map<string, number>();
 	for (let pass = 0; pass < 4; pass++) {
 		if (pass > 0) {
+			seen.clear();
 			const cur = evalPhys(best.kR, best.bM, best.hk);
 			reweight(
 				[0, 1, 2].map((c) =>
@@ -752,10 +821,13 @@ export async function hazeFitTail(
 			let b2 = { ...best, err: Number.POSITIVE_INFINITY };
 			for (let hk = 0; hk < NH; hk++) {
 				const e = evalPhys(best.kR, best.bM, hk).err;
+				seen.set(evalKey(best.kR, best.bM, hk), e);
 				if (e < b2.err) b2 = { ...best, hk, err: e };
 			}
 			best = b2;
-		}
+		} else if (best.err < Number.POSITIVE_INFINITY)
+			// the candidates' winner, evaluated with this pass's wp (the default start is not)
+			seen.set(evalKey(best.kR, best.bM, best.hk), best.err);
 		let stepR = Math.log(40 / 0.25) / 24;
 		let stepM = Math.log(3e-2 / 1e-7) / 36;
 		for (let it = 0; it < 24; it++) {
@@ -772,7 +844,12 @@ export async function hazeFitTail(
 			]) {
 				const k2 = Math.min(40, Math.max(0.25, kR * Math.exp(dr * stepR)));
 				const b2 = Math.min(3e-2, Math.max(1e-7, bM * Math.exp(dm * stepM)));
-				const e = evalPhys(k2, b2, hk).err;
+				const key = evalKey(k2, b2, hk);
+				let e = seen.get(key);
+				if (e === undefined) {
+					e = evalPhys(k2, b2, hk).err;
+					seen.set(key, e);
+				} else memoHits++;
 				if (e < best.err) best = { kR: k2, bM: b2, hk, err: e };
 			}
 			if (best.kR === kR && best.bM === bM) {
@@ -819,6 +896,7 @@ export async function hazeFitTail(
 		cpuFreeBeta: t4 - t3,
 		gpuGrid: t5 - t4,
 		gridCandidates: cand.length,
+		refineMemoHits: memoHits,
 		cpuRefine: performance.now() - t5,
 		total: performance.now() - T0,
 		readKB: bytes / 1024,
