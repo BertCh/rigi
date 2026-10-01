@@ -502,7 +502,10 @@ export async function runSplatsGpuCheck(
 	const cam = cameraUniforms(pose);
 	const cloud = syntheticCloud();
 	const frame: FrameState = { frame: 0, time: 0, view: "photo" };
-	const splats = createSplatsCore(device, { sortWorker: false });
+	const splats = createSplatsCore(device, {
+		sortWorker: false,
+		sortBackend: "worker",
+	});
 	splats.setCloud(cloud);
 	const results: Record<string, unknown> = {};
 

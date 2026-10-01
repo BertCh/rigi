@@ -8,10 +8,12 @@
 // 2. f32 keys vs the worker's f64 keys: how often and by how much they differ (the WGSL arithmetic
 //    cannot be proven bit-equal to the worker's f64), and that the resulting order is still
 //    back-to-front up to two key bins.
+
 import {
 	radixOrderTiled,
 	splatKeysF32,
 } from "../../src/lib/gpu/splat-sort/cpu";
+import { SortBackendState } from "../../src/lib/gpu/splat-sort/fallback";
 import {
 	type DepthRow,
 	sortSplatsByDepth,
@@ -141,10 +143,58 @@ for (const [name, gen] of Object.entries(gens))
 console.log(
 	`cases ${cases}, adjacent equal-key pairs in worker order ${ties}; f32 keys differ from the worker's f64 keys on ${f32KeyDiff}/${f32Total} splats (${((100 * f32KeyDiff) / f32Total).toFixed(4)}%), max |dkey| ${maxKeyDelta}`,
 );
+// 3. fallback state machine (src/lib/gpu/splat-sort/fallback.ts): one-way, idempotent, one warning,
+//    rejections of watched promises (compile / validation) and a device-lost style direct fail all
+//    switch exactly once with the first reason.
+async function fallbackTests() {
+	const mk = (initial: "gpu" | "worker") => {
+		const log = { switches: [] as string[], warns: [] as string[] };
+		const st = new SortBackendState(
+			initial,
+			(r) => log.switches.push(r),
+			(m) => log.warns.push(m),
+		);
+		return { st, log };
+	};
+	let { st, log } = mk("gpu");
+	check(st.backend === "gpu" && st.reason === null, "fallback: initial gpu");
+	st.watch(Promise.resolve(), "validation");
+	await new Promise((r) => setTimeout(r, 0));
+	check(st.backend === "gpu", "fallback: resolved promise must not switch");
+	st.watch(Promise.reject(new Error("compile boom")), "pipeline");
+	await new Promise((r) => setTimeout(r, 0));
+	check(
+		st.backend === "worker" && st.reason === "pipeline: compile boom",
+		"fallback: rejection switches with its reason",
+	);
+	check(st.fail("device lost") === false, "fallback: second fail ignored");
+	check(
+		log.switches.length === 1 && log.warns.length === 1,
+		"fallback: exactly one switch and one warning",
+	);
+	check(st.reason === "pipeline: compile boom", "fallback: first reason kept");
+	({ st, log } = mk("gpu"));
+	check(
+		st.fail("device lost") === true && st.reason === "device lost",
+		"fallback: direct fail",
+	);
+	st.watch(Promise.reject("str"), "validation");
+	await new Promise((r) => setTimeout(r, 0));
+	check(
+		log.switches.length === 1,
+		"fallback: late rejection after switch ignored",
+	);
+	({ st, log } = mk("worker"));
+	check(
+		st.fail("x") === false && log.switches.length === 0,
+		"fallback: worker-initial never switches",
+	);
+}
+await fallbackTests();
 if (fails) {
 	console.error(`${fails} FAILED`);
 	process.exit(1);
 }
 console.log(
-	"OK: stable radix == worker order on identical keys (ties included)",
+	"OK: stable radix == worker order on identical keys (ties included); fallback state machine",
 );

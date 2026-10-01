@@ -3,9 +3,9 @@
 `GpuSplatSorter` (index.ts) sorts the near-field Gaussian splats by view depth on the render device
 and writes the order buffer that `deck-webgpu/layers/splats.ts` indexes by `instance_index`. It
 replaces the worker round trip (`nearfield/splat-sort.ts`, a 16-bit counting sort, order transferred
-back after each sort) for the WebGPU renderer. The worker stays the default and the fallback (WebGL
-deck renderer, no GPU, an incapable device): select with `SplatsOptions.sortBackend: "gpu"`
-(`splats.setOptions` before `setCloud`), not a flag.
+back after each sort) for the WebGPU renderer. This is the DEFAULT sort of the WebGPU deck renderer (`SplatsOptions.sortBackend: "gpu"`); the worker
+(`sortBackend: "worker"`, not a flag) is what the WebGL deck layer uses and the automatic fallback
+described below.
 
 ## Pipeline (one submit, one compute pass, no readback)
 
@@ -45,6 +45,25 @@ sort over the keys that scatters in ascending index, so **ties keep ascending in
   is taken over f32 depths on the GPU and over f64 dists in the worker, a second tiny source of the
   same 1-bin differences.
 * Requires `near >= 0` (the depth atomics order positive floats by bit pattern); `near` is 0.
+
+## Fallback to the worker (deck-webgpu/layers/splats.ts, fallback.ts)
+
+Per cloud, a one-way state machine (`SortBackendState`, node-tested) switches the layer to the
+worker sorter on ANY of: an incapable device (`gpuSplatSortSupported`), a pipeline compile failure
+(`kernelAsync` rejects), a validation / out-of-memory error on the first two sorts (core
+`submitted(enc)` when `__RIGI_GPU_CHECKS__` is on, else a push/popErrorScope pair around the
+submit), a throwing `sort()`, or device loss (`gpu/core/lifecycle` `onLost`). It warns once and sets
+`stats.sortBackend = "worker"` and `stats.sortFallbackReason`. Until the pipelines have compiled
+the draw uses the identity order; an invalid submit writes nothing, and on fallback the order buffer
+is reset to identity unless a GPU sort was already confirmed valid (then the last valid order is
+kept) until the worker's first result lands and redraws. A garbage order buffer is never drawn.
+
+## Accepted difference
+
+The 1-bin key difference from the worker (0.13% of keys in the f32 twin, never more than one bin)
+is accepted for a draw-order sort: it only reorders splats whose depths are within 1/65535 of the
+depth span, the effect is visual only, and the result is deterministic per frame for a given
+camera and device.
 
 ## Limits
 

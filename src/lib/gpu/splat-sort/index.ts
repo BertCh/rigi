@@ -25,10 +25,11 @@ import {
 	defineKernel,
 	dispatchAll,
 	type Kernel,
-	kernel,
+	kernelAsync,
 	submit,
 } from "../core/kernel";
 import { clear, range } from "../core/pool";
+import { errorChecks, submitted } from "../core/queue";
 import {
 	DEPTH_WGSL,
 	DIGITS,
@@ -121,6 +122,14 @@ const SCAN_TOTALS = defineKernel(
 	{ group: GROUP },
 );
 
+/** How many first sorts get an error check (a broken kernel fails on the first). */
+const CHECKED_SORTS = 2;
+
+type ErrorScopeDevice = {
+	pushErrorScope: (f: "validation" | "out-of-memory") => void;
+	popErrorScope: () => Promise<{ message: string } | null>;
+};
+
 export type GpuSplatSortStats = {
 	sorts: number;
 	/** CPU time to encode + submit the last sort (ms); the GPU time is not measured here. */
@@ -150,7 +159,10 @@ export class GpuSplatSorter {
 	private readonly hist: Buffer;
 	private readonly base: Buffer;
 	private readonly owned: Buffer[];
-	private readonly ks: Kernel[];
+	private ks: Kernel[] | null = null;
+	/** Resolves when every pipeline is compiled; rejects if one fails (caller falls back). */
+	readonly ready: Promise<void>;
+	private checked = 0;
 
 	/**
 	 * @param data the splat storage buffer (3 × vec4<u32> per splat, position at word 0 of each
@@ -189,23 +201,41 @@ export class GpuSplatSorter {
 			this.hist,
 			this.base,
 		];
-		this.ks = [
-			DEPTH,
-			KEYS,
-			TILE0,
-			SCATTER0,
-			TILE1,
-			SCATTER1,
-			SCAN_DIGIT,
-			SCAN_TOTALS,
-		].map((s) => kernel(device, s));
+		// async compile (kernelAsync rejects on a failed pipeline); sort() is refused until it lands
+		this.ready = Promise.all(
+			[
+				DEPTH,
+				KEYS,
+				TILE0,
+				SCATTER0,
+				TILE1,
+				SCATTER1,
+				SCAN_DIGIT,
+				SCAN_TOTALS,
+			].map((s) => kernelAsync(device, s)),
+		).then((ks) => {
+			this.ks = ks;
+		});
+	}
+
+	/** Pipelines compiled: sort() may be called. */
+	get isReady(): boolean {
+		return this.ks !== null;
 	}
 
 	/**
 	 * Sort by the depth row (worker DepthRow: view z = a x + b y + c z + d, camera looks down -z;
 	 * depth = -z, kept when > 0) and write the order buffer. One submit, no readback.
+	 *
+	 * Returns a promise that rejects on a validation / out-of-memory error of the submit, for the
+	 * first `CHECKED_SORTS` sorts only (undefined afterwards): with __RIGI_GPU_CHECKS__ on it is
+	 * core's `submitted(enc)`, otherwise a validation + out-of-memory error scope around the submit.
+	 * An invalid submit writes nothing, so the order buffer keeps its previous (valid) contents.
 	 */
-	sort(row: readonly [number, number, number, number]): void {
+	sort(
+		row: readonly [number, number, number, number],
+	): Promise<void> | undefined {
+		if (!this.ks) throw new Error("[splat-sort] sort() before ready");
 		const t0 = performance.now();
 		const { device, blocks, count } = this;
 		const w = new ArrayBuffer(32);
@@ -296,9 +326,28 @@ export class GpuSplatSorter {
 			],
 			"splatsort",
 		);
-		submit(device, enc);
+		const check = this.checked++ < CHECKED_SORTS;
+		let verdict: Promise<void> | undefined;
+		if (check && !errorChecks()) {
+			const raw = (device as unknown as { handle?: ErrorScopeDevice }).handle;
+			if (raw?.pushErrorScope) {
+				raw.pushErrorScope("out-of-memory");
+				raw.pushErrorScope("validation");
+				submit(device, enc);
+				const v = raw.popErrorScope();
+				const m = raw.popErrorScope();
+				verdict = Promise.all([v, m]).then(([ve, me]) => {
+					const e = ve ?? me;
+					if (e) throw new Error(e.message);
+				});
+			} else submit(device, enc);
+		} else {
+			submit(device, enc);
+			if (check) verdict = submitted(enc);
+		}
 		this.stats.sorts++;
 		this.stats.lastEncodeMs = performance.now() - t0;
+		return verdict;
 	}
 
 	destroy(): void {

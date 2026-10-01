@@ -9,7 +9,7 @@
 //     splats, the splats never occlude anything (depth test only, no depth write)
 //   - premultiplied alpha, back-to-front order from nearfield/splat-sort.ts SplatSorter (worker,
 //     sync fallback), re-sorted when the camera turns / moves by more than `sortEvery` (deg / m)
-//     OR (option sortBackend: "gpu", WebGPU device only) gpu/splat-sort: the same keys and a stable
+//     OR (default, WebGPU device) gpu/splat-sort: the same keys and a stable
 //     radix sort on the render device, writing the order buffer directly (no worker, no readback;
 //     identical order wherever the 16-bit keys agree, see gpu/splat-sort/README.md)
 //   - the Truth toggle (provenance tints mixed into the sRGB colour, PROVENANCE_TINT_MIX) and the
@@ -48,15 +48,20 @@
 //   splats.setCloud(scene.splats);                      // ENU GaussianCloud (null clears)
 //   splats.setOptions({ truth, opacity, sortEvery, maxRadiusPx, sigmas, geometry });
 //   splats.setEnabled(stepping);                        // visible() gate
-// GPU sort: splats.setOptions({ sortBackend: "gpu" }) BEFORE setCloud (the engine passes it for a
-// WebGPU render device; the worker stays the default and the fallback). stats.lastSortMs is then
-// the CPU encode + submit time, not the GPU time.
+// GPU sort is the default (sortBackend: "gpu", applied at setCloud); the worker is the fallback on
+// ANY of: an incapable device, a pipeline compile failure, a validation / out-of-memory error on
+// the first two sorts, a throwing sort, device loss. One console warning, stats.sortBackend turns
+// "worker" and stats.sortFallbackReason says why; the draw keeps the identity order (until the GPU
+// sort is confirmed valid) or the last valid order until the worker's first result lands.
+// stats.lastSortMs on the GPU backend is the CPU encode + submit time, not the GPU time.
 // Diagnostics: splats.stats (sorts, lastSortMs, drawn, worker, sortBackend, sortVersion). The WebGL layer's
 // globalThis.__rigiSplatStats is not touched here (engine may alias splats.stats onto it).
 import type { Buffer, Device } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import { onLost } from "#/lib/gpu/core/lifecycle";
 import { GpuSplatSorter, gpuSplatSortSupported } from "#/lib/gpu/splat-sort";
+import { SortBackendState } from "#/lib/gpu/splat-sort/fallback";
 import {
 	PROVENANCE_COLORS_BY_CODE,
 	PROVENANCE_TINT_MIX,
@@ -98,9 +103,10 @@ export type SplatsOptions = {
 	/** Sort in a worker (default true; false = synchronous, for tests). Applies at the next setCloud. */
 	sortWorker: boolean;
 	/**
-	 * Where the back-to-front sort runs. "worker" (default; also the fallback): nearfield/splat-sort
-	 * (a worker, or sync with sortWorker: false). "gpu": gpu/splat-sort on this device, falling back
-	 * to "worker" when the device cannot run it. Applies at the next setCloud.
+	 * Where the back-to-front sort runs. "gpu" (default): gpu/splat-sort on this device. "worker":
+	 * nearfield/splat-sort (a worker, or sync with sortWorker: false), also the automatic fallback
+	 * when the device cannot run the GPU sort or it fails (pipeline compile, validation error on
+	 * the first sorts, device loss; stats.sortFallbackReason says why). Applies at the next setCloud.
 	 */
 	sortBackend: "worker" | "gpu";
 	/** Test hook: depth test off (splats over everything), to prove occlusion works. */
@@ -118,7 +124,7 @@ export const DEFAULT_SPLATS_OPTIONS: SplatsOptions = {
 	maxRadiusPx: 1024,
 	sigmas: 3,
 	sortWorker: true,
-	sortBackend: "worker",
+	sortBackend: "gpu",
 	noDepthTest: false,
 	geometry: false,
 	geometryAlpha: 0.5,
@@ -440,8 +446,10 @@ export type SplatsStats = {
 	/** Instances drawn in the last colour pass. */
 	drawn: number;
 	worker: boolean;
-	/** The backend in use for the current cloud ("gpu" only when sortBackend: "gpu" took effect). */
+	/** The backend in use for the current cloud ("gpu" until a fallback, or when sortBackend: "worker"). */
 	sortBackend: "worker" | "gpu";
+	/** Why the GPU sort was abandoned for the current cloud (null: it was not, or never wanted). */
+	sortFallbackReason: string | null;
 	/** Bumped when a new draw order lands. */
 	sortVersion: number;
 };
@@ -452,10 +460,14 @@ type Gpu = {
 	order: Buffer;
 	/** identity order for the geometry pass (created on first use) */
 	identity?: Buffer;
-	/** the worker / sync sorter; null on the GPU backend */
+	/** the worker / sync sorter; null while the GPU backend is in use */
 	sorter: SplatSorter | null;
-	/** the GPU sorter (sortBackend "gpu"); writes `order` in place */
+	/** the GPU sorter (sortBackend "gpu"); writes `order` in place; dropped on fallback */
 	gpuSort?: GpuSplatSorter;
+	/** GPU → worker fallback state (one per cloud) */
+	state: SortBackendState;
+	/** GPU sorts whose submit was confirmed valid; 0 → the order buffer may hold nothing useful */
+	validSorts: number;
 	/** spare index array for the next sort (transferred to the worker and back) */
 	spare?: Uint32Array;
 	drawCount: number;
@@ -474,6 +486,7 @@ export class SplatsCore implements GpuLayerCore {
 		drawn: 0,
 		worker: false,
 		sortBackend: "worker",
+		sortFallbackReason: null,
 		sortVersion: 0,
 	};
 	/** Called when a new back-to-front order has landed (hook host.requestRender() here). */
@@ -532,28 +545,88 @@ export class SplatsCore implements GpuLayerCore {
 			data: initial,
 			usage: STORAGE | COPY_DST,
 		});
-		const gpuSort =
-			this.options.sortBackend === "gpu" && gpuSplatSortSupported(d)
-				? new GpuSplatSorter(d, data, order, n)
-				: undefined;
-		const sorter = gpuSort
-			? null
-			: new SplatSorter(cloud.positions, n, {
-					worker: this.options.sortWorker,
-				});
+		const wantGpu =
+			this.options.sortBackend === "gpu" && gpuSplatSortSupported(d);
 		this.stats.count = n;
-		this.stats.worker = !!sorter?.usingWorker;
-		this.stats.sortBackend = gpuSort ? "gpu" : "worker";
-		this.gpu = {
+		this.stats.sortFallbackReason = null;
+		const g: Gpu = {
 			cloud,
 			data,
 			order,
-			sorter,
-			gpuSort,
-			spare: sorter ? new Uint32Array(n) : undefined,
+			sorter: null,
+			state: new SortBackendState(wantGpu ? "gpu" : "worker", (reason) =>
+				this.switchToWorker(g, reason),
+			),
+			validSorts: 0,
 			drawCount: n,
 			dirty: true,
 		};
+		this.gpu = g;
+		if (!wantGpu) {
+			this.startWorker(g);
+			return;
+		}
+		this.stats.worker = false;
+		this.stats.sortBackend = "gpu";
+		// until the pipelines are compiled the draw uses the identity order in `order`
+		try {
+			const gs = new GpuSplatSorter(d, data, order, n);
+			g.gpuSort = gs;
+			g.state.watch(gs.ready, "pipeline");
+			gs.ready.then(
+				() => {
+					if (this.gpu === g && g.state.backend === "gpu") {
+						g.dirty = true;
+						this.onChange?.();
+					}
+				},
+				() => {},
+			);
+			onLost(d, () => {
+				if (this.gpu === g) g.state.fail("device lost");
+			});
+		} catch (e) {
+			g.state.fail(`init: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	private startWorker(g: Gpu) {
+		g.sorter = new SplatSorter(g.cloud.positions, g.cloud.count, {
+			worker: this.options.sortWorker,
+		});
+		g.spare = new Uint32Array(g.cloud.count);
+		g.dirty = true;
+		this.stats.worker = g.sorter.usingWorker;
+		this.stats.sortBackend = "worker";
+	}
+
+	/**
+	 * GPU sort abandoned (SortBackendState.fail): the draw keeps the last valid order buffer, or the
+	 * identity order when no GPU sort was confirmed valid (an invalid submit writes nothing, but the
+	 * buffer is reset anyway); the worker takes over and its first result lands through onChange.
+	 */
+	private switchToWorker(g: Gpu, reason: string) {
+		if (this.gpu !== g) return;
+		this.stats.sortFallbackReason = reason;
+		const n = g.cloud.count;
+		if (g.validSorts === 0) {
+			const id = new Uint32Array(n);
+			for (let i = 0; i < n; i++) id[i] = i;
+			try {
+				g.order.write(id);
+			} catch {
+				// lost device: nothing is drawn anyway
+			}
+			g.drawCount = n;
+		}
+		try {
+			g.gpuSort?.destroy();
+		} catch {
+			// as above
+		}
+		g.gpuSort = undefined;
+		this.startWorker(g);
+		this.onChange?.();
 	}
 
 	private model(kind: "geometry" | "color") {
@@ -614,7 +687,21 @@ export class SplatsCore implements GpuLayerCore {
 			// submitted now, ahead of the frame encoder that is still recording this draw: the queue
 			// runs it first, so THIS frame already draws the new order (no onChange round trip). All
 			// `count` splats are in the order buffer (dropped ones last, culled by the shader).
-			gpuSort.sort(row);
+			if (!gpuSort.isReady) return;
+			let verdict: Promise<void> | undefined;
+			try {
+				verdict = gpuSort.sort(row);
+			} catch (e) {
+				g.state.fail(`sort: ${e instanceof Error ? e.message : String(e)}`);
+				return;
+			}
+			if (verdict)
+				g.state.watch(
+					verdict.then(() => {
+						g.validSorts++;
+					}),
+					"validation",
+				);
 			this.stats.sorts++;
 			this.stats.lastSortMs = gpuSort.stats.lastEncodeMs;
 			g.drawCount = g.cloud.count;
