@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside 3D Tiles credit line (src/lib/tiles3d): bottom-right on the stage while stepping with
 // ?tiles3d= on. Google's Map Tiles policies require the per-tile copyrights on screen, never obscured,
 // and a UI note of which surfaces are Google's; swisstopo requires its credit. Renders nothing when the

@@ -1,3 +1,8 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Precipitation (rain / snow) for the deck world view and the landing scenes, never the photo overlay.
 // A standalone port of luma.gl #3325's `precipitation` shadertools module (MIT, vis.gl contributors):
 // stateless, seeded falling particles in a movable volume, local metres (here: ENU, z up). Two changes

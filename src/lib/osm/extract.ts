@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Static OSM pre-extracts (roadmap N2): answer peak queries from a file under public/osm/ instead of
 // the public Overpass API (~10k queries/day shared by everyone) when the query area lies wholly
 // inside an extract. Built by tools/osm/extract-peaks.mjs; listed in public/osm/extracts.json.

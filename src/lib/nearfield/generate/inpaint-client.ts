@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Client for the near-field service's POST /inpaint (LaMa big-lama, Apache-2.0; tools/nearfield/service/inpaint.py).
 // Browser only (PNG encode / decode through a canvas). Like ../client.ts it never throws: null on any failure.
 import { decodeDepthWire, nearField } from "../client";

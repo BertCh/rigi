@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // EXIF → camera prior, ported from scripts/ingest.mjs so browser uploads get exactly the same
 // PhotoMeta as ingested photos. Pure functions (no DOM), so this runs in node for the tests too.
 //

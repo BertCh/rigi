@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * ONNX Runtime wrapper for the U²-Net sky model. Works with onnxruntime-web
  * in a browser worker (WebGPU → WASM) and in node (the package's node build,

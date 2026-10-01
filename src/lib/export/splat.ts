@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Georeferenced Step Inside splat export: a NearFieldScene (ENU splats) + the renderer's ENU frame →
 //   (1) .splat-v1 (Rigi wire format, WGS84 origin in the header; src/lib/nearfield/splat-io.ts), or
 //   (2) a standard 3DGS binary_little_endian .ply (x,y,z ENU metres, f_dc_0..2, opacity logit,

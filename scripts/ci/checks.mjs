@@ -95,8 +95,8 @@ export const CHECKS = [
 		id: "spdx",
 		tier: "fast",
 		group: "static",
-		cmd: ["node", "scripts/ci/spdx.mjs"],
-		note: "every first-party source file carries SPDX-License-Identifier + SPDX-FileCopyrightText (luma.gl convention); files naming another licence are listed for a human",
+		cmd: ["node", "scripts/ci/spdx.mjs", "--strict"],
+		note: "every first-party source file carries SPDX-License-Identifier + SPDX-FileCopyrightText (luma.gl convention); --strict: a file naming another licence or a port must be resolved by hand (ports carry both copyright holders)",
 		timeoutS: 60,
 	},
 	{

@@ -1,3 +1,8 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Rain / snow for the deck WORLD view and the landing scenes (style.world.weather, default off): the
 // instanced screen-space streaks / flakes of look/weather/precipitation.ts (a port of luma.gl #3325's
 // precipitation module, MIT). Drawn straight onto the canvas after the opaque world (like the world

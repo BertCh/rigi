@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser image decode → upright JPEG capped at MAX_PX on the long side (like ingest.mjs).
 // JPEG/PNG/WebP (and HEIC on Safari) decode natively; HEIC elsewhere goes through libheif in a
 // worker, with a main-thread fallback if workers are unavailable.

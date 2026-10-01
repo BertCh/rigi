@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Decodes HEIC/HEIF off the main thread with libheif (LGPL-3.0, see ./licenses.ts). libheif is
 // NOT bundled into this worker: the page passes the URL of the unmodified libheif-js bundle
 // (emitted by Vite as its own file via `?url`) and it is loaded with a dynamic import, so it

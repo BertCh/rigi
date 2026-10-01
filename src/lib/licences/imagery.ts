@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Draped-imagery provider abstraction (roadmap N2). The three renderer paths (src/lib/terrain.ts,
 // src/lib/deck/terrain-data.ts) ask this module for a tile's URL list, tried in order.
 //

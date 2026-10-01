@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for the georeferenced splat export (src/lib/export/splat.ts).
 // Run: npx tsx src/lib/nearfield/export-check.ts   (exits 1 on any failure)
 // Asserts: no `generated` splat ever reaches a .ply / .splat-v1 export; the .ply round-trips through

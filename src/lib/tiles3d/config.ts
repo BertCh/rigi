@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside 3D Tiles (reports/step-inside-google-3d-tiles.md): which OGC 3D Tiles sources are shown
 // around the eye while stepping, from ?tiles3d= (src/lib/flags; default off).
 //   ?tiles3d=off | buildings | swisstopo | google | all      (swisstopo = buildings + vegetation)

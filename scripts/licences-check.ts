@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for the N2 licence work (src/lib/licences, src/lib/osm). Run: npx tsx scripts/licences-check.ts
 //   [--no-network]  skip the live Overpass identity comparison
 // 1. imagery provider "default" returns byte-identical URL lists to the pre-N2 inline code (both paths)

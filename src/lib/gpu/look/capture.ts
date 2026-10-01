@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Real look-pass inputs read back from a live deck engine (DeckEngine or WebGpuEngine; window.__engine on
 // /photo/<id> in dev), for the W5 parity bench (bench.ts, scripts/gpu/look-bench.mjs). It pokes
 // engine internals (the private geometry source, haze controller, photo and masks), so it is dev-only.

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Opt-in switches for the licence work (roadmap N2). Every default reproduces the app as it was.
 // Read from (first hit wins): the page flag (src/lib/flags: URL, main thread only), a Vite env var
 // (VITE_*, baked at build time), then a Node env var (scripts under tsx). Workers see neither the

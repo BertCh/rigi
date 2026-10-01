@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Small hand-made pack for node checks (not served). Around Niederhorn / Thunersee.
 import { makeGrid } from "../pack";
 import type { TerroirPack } from "../types";

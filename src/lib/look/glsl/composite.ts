@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared GLSL of the look composite (photo ⊕ render), one source for both engines' composite
 // shaders (engine.ts compositeFrag, deck/composite-shader.ts), compiled only under a composite
 // LOOK_* define (look-key.ts), so the classic programs are unchanged:

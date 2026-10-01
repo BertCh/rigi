@@ -1,3 +1,8 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Nebelmeer: a sea of valley fog layered over the physical atmosphere (look/atmosphere.ts).
 // The extinction is luma's analytic height-fog ray-transmittance integral, ported (GLSL for the
 // WebGL look, WGSL for deck-webgpu, and the CPU mirror below), uniform-free on purpose.

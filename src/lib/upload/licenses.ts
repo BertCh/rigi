@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Third-party notices for the upload path. libheif (and the libde265 HEVC decoder it embeds)
 // are LGPL-3.0: we ship them unmodified as a separate, replaceable file (decode.ts LIBHEIF_URL)
 // and must give prominent notice plus the licence text. The text is imported raw from the

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside P3: request builders for REMOTE DEM-conditioned video generators. NOT EXECUTED anywhere in
 // Rigi: there are no API keys, no endpoints and no network calls here. Both models need rented Linux GPUs
 // (research_notes/step_inside_models_2026-09.md §3). These functions only package Rigi's true geometry into
