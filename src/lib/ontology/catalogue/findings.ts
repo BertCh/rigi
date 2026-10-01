@@ -126,14 +126,6 @@ export const FINDINGS = [
 	{
 		kind: "deferred",
 		summary:
-			"AlignState is declared locally in PhotoWorkspace.tsx; the canonical union is ontology ALIGN_STATE. PhotoWorkspace adoption waits on in-flight patches (site layout, GPU refine).",
-		where: ["components/PhotoWorkspace.tsx"],
-		action:
-			"Replace the local union with `import type { AlignState } from '#/lib/ontology'`.",
-	},
-	{
-		kind: "deferred",
-		summary:
 			"Vec3 copies inside files with in-flight patches (gpu/**, deck/**, deck-webgpu/**, look haze/relief) keep their local declaration for now.",
 		where: ["lib/gpu", "lib/deck", "lib/deck-webgpu", "lib/look"],
 		action: "Re-export the ontology Vec3 once those patches land.",

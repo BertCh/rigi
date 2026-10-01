@@ -123,9 +123,8 @@ export function isPropagationAnchor(
 // ---- workspace: the pose shown on /photo/$id -----------------------------------------------------------
 
 /**
- * The workspace's align state. Canonical home of the union PhotoWorkspace.tsx declares locally
- * (adoption there waits on in-flight patches; see reports/ontology.md Findings). `label` is a
- * PROPOSED UI word: the workspace shows its alignNote text, not these labels.
+ * The workspace's align state (PhotoWorkspace.tsx imports it from here). `label` is a PROPOSED UI
+ * word: the workspace shows its alignNote text, not these labels.
  */
 export const ALIGN_STATE = {
 	auto: {
