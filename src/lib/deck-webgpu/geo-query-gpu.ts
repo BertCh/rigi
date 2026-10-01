@@ -13,15 +13,27 @@
 //   verdicts             per peak: 2 bits per sample (hidden / visible / undecided), 4 B per peak
 //   gather(tex, xy)      raw texels (bit copies) at the requested pixels, 16 B per pixel
 //   skyline              per column the first terrain row (u32), 4 B per column
-// The graphs only import: the uniform, input and output buffers are created per call (and
-// destroyed after its read), as the raw dispatches did, and each kernel binds them whole.
-// Every output word carries a per-call nonce: a dispatch that failed validation silently leaves
-// the buffer untouched (zeros), so a missing nonce rejects the result and the caller takes the
-// full-readback path. null = not run (lost device, compile / submit failure, bad nonce).
+// The graphs only import (no transients). The uniform, input and output buffers are persistent core
+// pool slots (grow-only, per job of a kernel combination: "geo-query/<kernel><job>/…"), written with
+// queue.writeBuffer and bound with the exact ranges the former per-call buffers had (uniform 16 B,
+// input = its words, output = max(16, words × 4)), so every kernel sees the same bindings, dispatch
+// and bytes. The writes, the encode and the submit run in ONE synchronous block (ComputeGraph.runNow,
+// no lease): a concurrent call (a hover gather during a settle, or the same kernels again) writes its
+// slots only after this submit, in queue order, so it can never change what this one reads.
+// Every output word carries a per-call nonce: a run whose commands did not execute leaves the bytes
+// a previous call (or nothing) wrote, with another nonce, so a missing nonce rejects the result and
+// the caller takes the full-readback path. null = not run (lost device, compile / submit failure,
+// bad nonce).
 import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import { OCC_STRIDE } from "#/lib/deck/geo-query";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
+import {
+	acquire,
+	pooledStorage,
+	pooledUniform,
+	releasePool,
+} from "#/lib/gpu/core/pool";
 import { importSampledTexture, textureShapeKey } from "./graph-texture";
 
 const WG = 64;
@@ -142,8 +154,11 @@ type Which = keyof typeof SPECS;
 /** core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "geo-query-gpu"). */
 const GRAPH_GROUP = "geo-query";
 const PRM_BYTES = 16;
-/** the smallest output buffer a call creates (Math.max(16, …)): the graph's import capacity */
+/** the smallest output binding (Math.max(16, …), as the former per-call buffers): the graph's import capacity */
 const MIN_OUT_BYTES = 16;
+/** core pool key prefix of the persistent slots */
+const POOL = "geo-query";
+const OUT_USAGE = Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST;
 const READ_NODE = "query-read";
 
 /** One kernel of a call: `n` threads over `input` (u32 words, or none) into `outWords` words. */
@@ -155,7 +170,7 @@ type QueryJob = {
 	nonce: number;
 };
 
-/** Per-run sizes of each job's buffers (bound whole, as the raw dispatches bound them). */
+/** Per-run binding sizes of each job's buffers (those of the former per-call buffers, bound whole). */
 type QueryRun = {
 	jobs: {
 		n: number;
@@ -226,12 +241,7 @@ export class GeoQueryGpu {
 		const label = jobs.map((j) => j.which).join("+");
 		if (this.destroyed || device.isLost || !jobs.every((j) => j.n > 0))
 			return null;
-		const bufs: Buffer[] = [];
 		try {
-			// no group lease: the lookup right before run() queues the graph's lease in the same tick
-			// (core cachedGraph's rule), so a concurrent call of another key (the hover gather during a
-			// settle's verdicts + skyline) is not serialised behind this one; an eviction between the
-			// two lookups only rebuilds the graph, compiled by run() from the per-device pipeline cache
 			const graphOf = () =>
 				cachedGraph<QueryRun, void>(
 					device,
@@ -245,48 +255,44 @@ export class GeoQueryGpu {
 						),
 					6,
 				).graph;
-			await graphOf().compileAsync();
+			const first = graphOf();
+			if (!first.isCompiled) await first.compileAsync();
+			if (this.destroyed || device.isLost) return null;
+			// from here to the submit (inside runNow) nothing awaits: the slot writes below land in queue
+			// order before this submit and before any later call's writes. The lookup is repeated after
+			// the await: an eviction in between only rebuilds the graph, which runNow compiles from the
+			// per-device pipeline cache (an evicted graph is destroyed under its lease, after this block)
+			const graph = graphOf();
 			const w = tex.width;
 			const h = tex.height;
 			const buffers: Record<string, Buffer> = {};
 			const run: QueryRun = { jobs: [] };
-			jobs.forEach(({ n, input, outWords, nonce }, j) => {
+			jobs.forEach(({ which, n, input, outWords, nonce }, j) => {
+				const slot = `${POOL}/${which}${j}`;
 				const words = new ArrayBuffer(PRM_BYTES);
 				new Uint32Array(words).set([n, nonce]);
 				new Int32Array(words).set([w, h], 2);
-				const prm = device.createBuffer({
-					id: "geo-query-prm",
-					usage: Buffer.UNIFORM | Buffer.COPY_DST,
-					data: new Uint8Array(words),
-				});
-				bufs.push(prm);
-				const out = device.createBuffer({
-					id: "geo-query-out",
-					byteLength: Math.max(MIN_OUT_BYTES, outWords * 4),
-					usage: Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST,
-				});
-				bufs.push(out);
-				buffers[`prm${j}`] = prm;
-				buffers[`out${j}`] = out;
+				buffers[`prm${j}`] = pooledUniform(device, `${slot}/prm`, words);
+				const outBufferBytes = Math.max(MIN_OUT_BYTES, outWords * 4);
+				buffers[`out${j}`] = acquire(
+					device,
+					`${slot}/out`,
+					outBufferBytes,
+					OUT_USAGE,
+				);
 				let inputBytes = 0;
 				if (input) {
-					const q = device.createBuffer({
-						id: "geo-query-in",
-						usage: Buffer.STORAGE | Buffer.COPY_DST,
-						data: input,
-					});
-					bufs.push(q);
-					buffers[`q${j}`] = q;
-					inputBytes = q.byteLength;
+					buffers[`q${j}`] = pooledStorage(device, `${slot}/q`, input);
+					inputBytes = input.byteLength;
 				}
 				run.jobs.push({
 					n,
 					inputBytes,
-					outBufferBytes: out.byteLength,
+					outBufferBytes,
 					readBytes: outWords * 4,
 				});
 			});
-			const { reads } = await graphOf().run(run, {
+			const { reads } = await graph.runNow(run, {
 				buffers,
 				textures: { geo: tex },
 			});
@@ -300,8 +306,6 @@ export class GeoQueryGpu {
 		} catch (e) {
 			console.warn(`[geo-query] ${label} failed, full readback`, e);
 			return null;
-		} finally {
-			for (const b of bufs) b.destroy();
 		}
 	}
 
@@ -403,7 +407,9 @@ export class GeoQueryGpu {
 		return out;
 	}
 
+	/** Stops further calls and frees the pool slots (work already submitted completes). */
 	destroy() {
 		this.destroyed = true;
+		if (!this.device.isLost) releasePool(this.device, `${POOL}/`);
 	}
 }
