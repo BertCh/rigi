@@ -99,7 +99,12 @@ async function parity(device: Device, input: Input, cpuProb: Float32Array) {
 		checks(false);
 	}
 	const { W, H } = input;
-	const rgb = rgbPlanes({ width: W, height: H, data: input.rgba });
+	// the bench inputs are host arrays
+	const rgb = rgbPlanes({
+		width: W,
+		height: H,
+		data: input.rgba as Uint8Array,
+	});
 	const cq = refineToWorking(
 		rgb,
 		W,

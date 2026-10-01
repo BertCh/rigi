@@ -41,6 +41,8 @@ export type SkyMask = {
 	refineOn?: "gpu" | "cpu";
 	/** ORT WebGPU EP on the shared compute device, or its own; absent on WASM / fallback. */
 	ortDevice?: "shared" | "own";
+	/** Where the model input was prepared: "gpu" (ImageBitmap → WGSL), else the CPU chain. */
+	prepOn?: "gpu" | "cpu";
 };
 
 export interface SegmentSkyOptions {
@@ -54,9 +56,27 @@ export interface SegmentSkyOptions {
 	backend?: "webgpu" | "wasm";
 	/** Skip the model and use the classical segmenter. */
 	forceFallback?: boolean;
+	/**
+	 * Prepare the model input on the GPU (default DEFAULT_GPU_PREP): the working-size photo goes to the
+	 * worker as an ImageBitmap (no getImageData once the device is verified) and the resample and
+	 * normalise run in WGSL, bit-identical to the CPU chain (gpu/sky/prep.ts, sky/prep.ts). Needs the
+	 * GPU path (gpuEnabled()) and ORT on WebGPU; otherwise, or on any failure, the CPU prep runs.
+	 */
+	gpuPrep?: boolean;
 }
 
 const DEFAULT_LONG_SIDE = 1024;
+/** Opt-in until the GPU prep has been exercised in a browser (see the verification in sky/prep.ts). */
+const DEFAULT_GPU_PREP = false;
+/** Photos the worker verifies against the CPU chain per device (sky/prep.ts PREP_VERIFY). */
+const PREP_VERIFY = 3;
+// what the worker last reported about the GPU prep: while unverified the CPU pixels ride along
+let prepVerified = 0;
+let prepDisabled = false;
+// replies where the worker ran the CPU prep although a bitmap was sent (no shared WebGPU device, WASM
+// model, unsupported shape): after PREP_MISSES in a row stop building bitmaps
+let prepMisses = 0;
+const PREP_MISSES = 3;
 
 let worker: Worker | null | undefined;
 // worker crashes: the worker may be re-created later, up to a cap (null = cannot start at all)
@@ -160,19 +180,30 @@ function sourceSize(img: Source) {
 	return { w: img.width, h: img.height };
 }
 
-/** Pixels at working resolution. */
-async function rasterise(
-	img: Source,
-	W: number,
-	H: number,
-): Promise<Uint8ClampedArray> {
+const BITMAP_OPTS = {
+	premultiplyAlpha: "none",
+	colorSpaceConversion: "none",
+} as const;
+
+/** The photo at working resolution: its pixels (getImageData) and/or an ImageBitmap of the same raster. */
+interface Raster {
+	pixels(): Uint8ClampedArray;
+	bitmap(): Promise<ImageBitmap>;
+}
+
+async function rasterise(img: Source, W: number, H: number): Promise<Raster> {
 	if (
 		typeof ImageData !== "undefined" &&
 		img instanceof ImageData &&
 		img.width === W &&
 		img.height === H
-	)
-		return new Uint8ClampedArray(img.data);
+	) {
+		const data = img;
+		return {
+			pixels: () => new Uint8ClampedArray(data.data),
+			bitmap: () => createImageBitmap(data, BITMAP_OPTS),
+		};
+	}
 	let src: CanvasImageSource = img as CanvasImageSource;
 	if (typeof ImageData !== "undefined" && img instanceof ImageData)
 		src = await createImageBitmap(img);
@@ -192,7 +223,11 @@ async function rasterise(
 	ctx.imageSmoothingQuality = "high";
 	ctx.drawImage(src, 0, 0, W, H);
 	if (src !== img && "close" in src) (src as ImageBitmap).close();
-	return ctx.getImageData(0, 0, W, H).data;
+	return {
+		pixels: () => ctx.getImageData(0, 0, W, H).data,
+		// the canvas raster as is: the bytes getImageData would return (the worker verifies this)
+		bitmap: () => createImageBitmap(canvas, BITMAP_OPTS),
+	};
 }
 
 function inlineFallback(
@@ -249,29 +284,55 @@ async function segmentSkyUncached(
 	);
 	const { width: W, height: H } = workingSize(w, h, longSide);
 	const refine = opts.refine ?? true;
-	const rgba = await rasterise(img, W, H);
+	const raster = await rasterise(img, W, H);
 
 	const wk = getWorker();
+	// the GPU prep also needs the page's gpuEnabled(): the worker shares the compute device only then
+	const gpuPrep =
+		(opts.gpuPrep ?? DEFAULT_GPU_PREP) &&
+		!opts.forceFallback &&
+		!prepDisabled &&
+		prepMisses < PREP_MISSES &&
+		typeof createImageBitmap !== "undefined" &&
+		gpuEnabled();
 	if (wk) {
-		const id = nextId++;
-		const req: SkySegmentRequest = {
-			type: "segment",
-			id,
-			width: W,
-			height: H,
-			rgba: rgba.buffer.slice(0) as ArrayBuffer,
-			refine,
-			modelLongSide: opts.modelLongSide,
-			backend: opts.backend,
-			forceFallback: opts.forceFallback,
-			gpu: gpuEnabled(),
+		const send = async (bitmap: boolean, pixels: boolean) => {
+			const id = nextId++;
+			const transfer: Transferable[] = [];
+			const req: SkySegmentRequest = {
+				type: "segment",
+				id,
+				width: W,
+				height: H,
+				refine,
+				modelLongSide: opts.modelLongSide,
+				backend: opts.backend,
+				forceFallback: opts.forceFallback,
+				gpu: gpuEnabled(),
+			};
+			if (pixels) {
+				req.rgba = raster.pixels().buffer.slice(0) as ArrayBuffer;
+				transfer.push(req.rgba);
+			}
+			if (bitmap) {
+				req.bitmap = await raster.bitmap();
+				transfer.push(req.bitmap);
+			}
+			return new Promise<SkyWorkerResponse>((resolve, reject) => {
+				pending.set(id, { resolve, reject });
+				wk.postMessage(req, transfer);
+			});
 		};
 		try {
-			const res = await new Promise<SkyWorkerResponse>((resolve, reject) => {
-				pending.set(id, { resolve, reject });
-				wk.postMessage(req, [req.rgba]);
-			});
-			if (res.ok && res.type === "segment")
+			// while the device is unverified the CPU pixels ride along, so the worker can compare
+			let res = await send(gpuPrep, !gpuPrep || prepVerified < PREP_VERIFY);
+			if (!res.ok && res.needPixels) res = await send(gpuPrep, true);
+			if (res.ok && res.type === "segment") {
+				if (res.prep) {
+					prepVerified = Math.max(prepVerified, res.prep.verified);
+					prepDisabled ||= !!res.prep.disabled;
+					if (gpuPrep) prepMisses = res.prep.on === "gpu" ? 0 : prepMisses + 1;
+				}
 				return {
 					width: res.width,
 					height: res.height,
@@ -281,7 +342,9 @@ async function segmentSkyUncached(
 					ms: res.ms,
 					refineOn: res.refineOn,
 					ortDevice: res.ortDevice,
+					prepOn: res.prep?.on,
 				};
+			}
 			console.warn(
 				"[sky] worker failed, running fallback inline:",
 				res.ok ? "unexpected reply" : res.error,
@@ -290,5 +353,5 @@ async function segmentSkyUncached(
 			console.warn("[sky] worker failed, running fallback inline:", e);
 		}
 	}
-	return inlineFallback(rgba, W, H, refine);
+	return inlineFallback(raster.pixels(), W, H, refine);
 }

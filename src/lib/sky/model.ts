@@ -172,8 +172,11 @@ export async function createSkyModel(
 export interface SkyInference {
 	width: number;
 	height: number;
-	/** resamplePlanes(rgbWork, W, H, 3, width, height): the model input, also the refine's low-res guide. */
-	rgbLo: Float32Array;
+	/**
+	 * resamplePlanes(rgbWork, W, H, 3, width, height): the model input, also the refine's low-res
+	 * guide. Absent when the GPU prep produced the input (its rgbLo stays on the GPU).
+	 */
+	rgbLo?: Float32Array;
 	/** P(sky) at model resolution, when the output is on the CPU. */
 	prob?: Float32Array;
 	/** The output buffer (width·height f32) on `model.sharedDevice`, valid until `release()`. */
@@ -194,7 +197,7 @@ export async function inferSkyModel(
 	W: number,
 	H: number,
 	longSide = MODEL_LONG_SIDE[model.backend],
-): Promise<SkyInference> {
+): Promise<SkyInference & { rgbLo: Float32Array }> {
 	const { width, height } = modelSize(W, H, longSide);
 	const rgb = resamplePlanes(rgbWork, W, H, 3, width, height);
 	const input = new ort.Tensor("float32", normalise(rgb, width * height), [
@@ -203,20 +206,54 @@ export async function inferSkyModel(
 		height,
 		width,
 	]);
+	return runInput(model, input, width, height, rgb);
+}
+
+/**
+ * inferSkyModel with the GPU prep (gpu/sky/prep.ts): `input` is the normalised NCHW float32 buffer
+ * (3·width·height) on `model.sharedDevice`, handed to ORT as a GPU-buffer tensor, so the photo never
+ * leaves the GPU. The caller owns the buffer (ORT neither frees nor retains it past the run); the
+ * result has no `rgbLo` (the refine's guide is the prep's own buffer).
+ */
+export async function inferSkyModelGpu(
+	model: SkyModel,
+	input: GPUBuffer,
+	width: number,
+	height: number,
+): Promise<SkyInference> {
+	if (!model.sharedDevice)
+		throw new Error(
+			"inferSkyModelGpu: the session is not on the shared device",
+		);
+	const tensor = ort.Tensor.fromGpuBuffer(input, {
+		dataType: "float32",
+		dims: [1, 3, height, width],
+	});
+	return runInput(model, tensor, width, height, undefined, false);
+}
+
+async function runInput<L extends Float32Array | undefined>(
+	model: SkyModel,
+	input: ort.Tensor,
+	width: number,
+	height: number,
+	rgbLo: L,
+	dispose = true,
+): Promise<SkyInference & { rgbLo: L }> {
 	const s = model.session;
 	let t: ort.Tensor;
 	try {
 		const out = await s.run({ [s.inputNames[0]]: input });
 		t = out[s.outputNames[0]];
 	} finally {
-		input.dispose?.();
+		if (dispose) input.dispose?.();
 	}
 	if (t.location === "gpu-buffer") {
 		let prob: Float32Array | undefined;
 		return {
 			width,
 			height,
-			rgbLo: rgb,
+			rgbLo,
 			gpuBuffer: t.gpuBuffer as GPUBuffer,
 			download: async () => {
 				prob ??= new Float32Array((await t.getData()) as Float32Array);
@@ -230,7 +267,7 @@ export async function inferSkyModel(
 	return {
 		width,
 		height,
-		rgbLo: rgb,
+		rgbLo,
 		prob,
 		download: async () => prob,
 		release: () => {},

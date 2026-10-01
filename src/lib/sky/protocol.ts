@@ -4,8 +4,19 @@ export interface SkySegmentRequest {
 	id: number;
 	width: number;
 	height: number;
-	/** RGBA bytes at working resolution (transferred). */
-	rgba: ArrayBuffer;
+	/**
+	 * RGBA bytes at working resolution (transferred). Absent when `bitmap` is sent alone (the GPU prep
+	 * of an already verified device); present with `bitmap` while the worker still verifies the GPU
+	 * prep against it.
+	 */
+	rgba?: ArrayBuffer;
+	/**
+	 * The working-resolution photo as an ImageBitmap (premultiplyAlpha / colorSpaceConversion
+	 * 'none', transferred; exactly width × height): the worker uploads it and prepares the model
+	 * input on the GPU (gpu/sky/prep.ts, bit-identical to the CPU chain). Needs `gpu`. If the GPU prep
+	 * cannot run and `rgba` is absent the worker answers `needPixels`.
+	 */
+	bitmap?: ImageBitmap;
 	refine: boolean;
 	/** Model input long side (default per backend, see MODEL_LONG_SIDE). */
 	modelLongSide?: number;
@@ -50,6 +61,8 @@ export type SkyWorkerResponse =
 			refineOn?: "gpu" | "cpu";
 			/** ORT's WebGPU device: the compute device ("shared") or its own; absent on WASM. */
 			ortDevice?: "shared" | "own";
+			/** Where the model input was prepared, and the GPU prep's per-device verification state. */
+			prep?: SkyPrepStatus;
 	  }
 	| {
 			id: number;
@@ -60,4 +73,19 @@ export type SkyWorkerResponse =
 			error?: string;
 			ms: number;
 	  }
-	| { id: number; ok: false; error: string };
+	| {
+			id: number;
+			ok: false;
+			error: string;
+			/** The worker needs the RGBA bytes (verifying or falling back from the GPU prep): resend with `rgba`. */
+			needPixels?: boolean;
+	  };
+
+/** Per-device state of the GPU prep, reported on every segment reply (sky/prep.ts). */
+export interface SkyPrepStatus {
+	on: "gpu" | "cpu";
+	/** Photos whose GPU prep matched the CPU chain bit for bit on this device. */
+	verified: number;
+	/** Set once a verification mismatched (or errors repeated): the GPU prep stays off for this device. */
+	disabled?: string;
+}

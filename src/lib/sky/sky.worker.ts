@@ -26,10 +26,12 @@ import type { Device } from "@luma.gl/core";
 import * as ort from "onnxruntime-web";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
 import { getComputeDevice } from "#/lib/gpu/device";
+import type { SkyPrepGpu } from "#/lib/gpu/sky/prep";
 import { refineSkyGpu, warmSkyKernels } from "#/lib/gpu/sky/refine";
 import {
 	classicalSky,
 	type ModelRun,
+	modelSize,
 	refineToWorking,
 	resamplePlanes,
 	rgbPlanes,
@@ -39,10 +41,13 @@ import {
 	type Backend,
 	createSkyModel,
 	inferSkyModel,
+	inferSkyModelGpu,
 	MODEL_FILE,
+	MODEL_LONG_SIDE,
 	type SkyInference,
 	type SkyModel,
 } from "./model";
+import { NeedPixels, prepareGpu, prepStatus } from "./prep";
 import type {
 	SkyPreloadRequest,
 	SkySegmentRequest,
@@ -155,28 +160,83 @@ const ortDeviceOf = (model: SkyModel | null | undefined) =>
 		: undefined;
 
 async function segment(req: SkySegmentRequest) {
-	const { id, width: W, height: H } = req;
+	try {
+		await segmentOf(req);
+	} finally {
+		req.bitmap?.close();
+	}
+}
+
+async function segmentOf(req: SkySegmentRequest) {
+	const { width: W, height: H } = req;
 	const t0 = performance.now();
-	const rgba = new Uint8Array(req.rgba);
-	const rgb = rgbPlanes({ width: W, height: H, data: rgba });
+	if (!req.rgba && !req.bitmap) throw new Error("segment: no pixels");
+	const rgba = req.rgba ? new Uint8Array(req.rgba) : undefined;
 	const device = await computeDevice(req.gpu);
 	const model = req.forceFallback
 		? null
 		: await loadModel(modelUrlOf(req), req.backend, device);
+	// GPU prep (src/lib/sky/prep.ts): the photo goes ImageBitmap → GPU buffers (ORT's input, the
+	// refine's guides) without visiting the CPU; undefined = the CPU prep below
+	const modelLongSide =
+		req.modelLongSide ?? (model ? MODEL_LONG_SIDE[model.backend] : 0);
+	const prep =
+		req.bitmap && device && model
+			? await prepareGpu(device, model, req.bitmap, W, H, modelLongSide, rgba)
+			: undefined;
+	if (!prep && !rgba) throw new NeedPixels();
+	try {
+		await segmentWith(req, t0, device, model, prep, rgba);
+	} finally {
+		prep?.dispose();
+	}
+}
+
+async function segmentWith(
+	req: SkySegmentRequest,
+	t0: number,
+	device: Device | null,
+	model: SkyModel | null,
+	prep: SkyPrepGpu | undefined,
+	rgba: Uint8Array | undefined,
+) {
+	const { id, width: W, height: H } = req;
+	// CPU pixels / planes on demand: with the GPU prep they are read back only if a fallback needs them
+	const pixels = async () => {
+		rgba ??= await (prep as SkyPrepGpu).readRgba();
+		return rgba;
+	};
+	let planes: Float32Array | undefined;
+	const rgbOf = async () =>
+		(planes ??= rgbPlanes({ width: W, height: H, data: await pixels() }));
 	const t1 = performance.now();
 	let inf: SkyInference | undefined;
 	let low: ModelRun | undefined;
 	let source: "model" | "fallback" = "fallback";
 	if (model) {
 		try {
-			inf = await inferSkyModel(model, rgb, W, H, req.modelLongSide);
+			if (prep) {
+				const { width, height } = modelSize(
+					W,
+					H,
+					req.modelLongSide ?? MODEL_LONG_SIDE[model.backend],
+				);
+				inf = await inferSkyModelGpu(model, prep.input, width, height);
+			} else
+				inf = await inferSkyModel(
+					model,
+					await rgbOf(),
+					W,
+					H,
+					req.modelLongSide,
+				);
 			source = "model";
 		} catch (e) {
 			console.warn("[sky] inference failed, using classical fallback:", e);
 			modelError = String(e);
 		}
 	}
-	if (!inf) low = classicalSky(rgb, W, H);
+	if (!inf) low = classicalSky(await rgbOf(), W, H);
 	const t2 = performance.now();
 	let data: Uint8Array | undefined;
 	let refineOn: "gpu" | "cpu" = "cpu";
@@ -203,10 +263,15 @@ async function segment(req: SkySegmentRequest) {
 				const out = await refineSkyGpu(refineDev, {
 					W,
 					H,
-					rgba,
+					// the prep's buffers live on `device`; refineDev is `device` whenever the prep ran
+					// (the prep needs ORT on the shared device) or the model output is on the CPU
+					rgba: prep && refineDev === device ? prep.rgba : await pixels(),
 					lw,
 					lh,
-					guideLo: inf?.rgbLo ?? resamplePlanes(rgb, W, H, 3, lw, lh),
+					guideLo:
+						prep && refineDev === device && lw === prep.lw && lh === prep.lh
+							? prep.rgbLo
+							: (inf?.rgbLo ?? resamplePlanes(await rgbOf(), W, H, 3, lw, lh)),
 					prob:
 						onDevice ?? (inf ? await inf.download() : (low as ModelRun).prob),
 				});
@@ -222,7 +287,9 @@ async function segment(req: SkySegmentRequest) {
 				width: inf.width,
 				height: inf.height,
 			};
-			data = toBytes(refineToWorking(rgb, W, H, low as ModelRun, req.refine));
+			data = toBytes(
+				refineToWorking(await rgbOf(), W, H, low as ModelRun, req.refine),
+			);
 		}
 	} finally {
 		inf?.release();
@@ -241,6 +308,7 @@ async function segment(req: SkySegmentRequest) {
 		ms: { load: t1 - t0, infer: t2 - t1, refine: t3 - t2 },
 		refineOn,
 		ortDevice: source === "model" ? ortDeviceOf(model) : undefined,
+		prep: prepStatus(device, prep ? "gpu" : "cpu"),
 	};
 	scope.postMessage(msg, [msg.data]);
 }
@@ -254,7 +322,12 @@ async function handle(req: SkyWorkerRequest) {
 		if (req.type === "preload") await preload(req);
 		else await segment(req);
 	} catch (e) {
-		const msg: SkyWorkerResponse = { id: req.id, ok: false, error: String(e) };
+		const msg: SkyWorkerResponse = {
+			id: req.id,
+			ok: false,
+			error: String(e),
+			needPixels: e instanceof NeedPixels || undefined,
+		};
 		scope.postMessage(msg);
 	}
 }

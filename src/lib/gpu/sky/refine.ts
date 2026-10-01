@@ -6,7 +6,7 @@
 // see refine.wgsl.ts for what is exact and what is f32-vs-f64). The kernels run as one core
 // ComputeGraph (./refine-graph.ts: aliased transients, inputs pooled under the lease "sky-refine",
 // one submit, one readback); the pooled dispatchAll path it replaced was removed on 2026-10-01.
-import type { Device } from "@luma.gl/core";
+import type { Buffer, Device } from "@luma.gl/core";
 import {
 	type BindKind,
 	defineKernel,
@@ -79,15 +79,22 @@ export const warmSkyKernels = (device: Device) =>
 export type SkyProb = Float32Array | GPUBuffer;
 
 export interface SkyRefineInput {
-	/** Working size and its RGBA bytes (the photo the CPU turns into rgbWork with rgbPlanes). */
+	/**
+	 * Working size and its RGBA bytes (the photo the CPU turns into rgbWork with rgbPlanes), or a
+	 * GPUBuffer on `device.handle` holding the same bytes as W·H u32 words (gpu/sky/prep.ts: the photo
+	 * never visits the CPU). A GPU buffer stays alive until the call resolves and is not destroyed here.
+	 */
 	W: number;
 	H: number;
-	rgba: Uint8Array | Uint8ClampedArray;
+	rgba: Uint8Array | Uint8ClampedArray | GPUBuffer;
 	/** Model (low) resolution. */
 	lw: number;
 	lh: number;
-	/** resamplePlanes(rgbWork, W, H, 3, lw, lh): the guided filter's low-res guide. */
-	guideLo: Float32Array;
+	/**
+	 * resamplePlanes(rgbWork, W, H, 3, lw, lh): the guided filter's low-res guide; a GPUBuffer on
+	 * `device.handle` holds the same 3·lw·lh floats (prep.ts's rgbLo, bit-identical).
+	 */
+	guideLo: Float32Array | GPUBuffer;
 	prob: SkyProb;
 	/** refineToWorking's RefineOptions (defaults radius 3, eps 2e-3, band 3). */
 	radius?: number;
@@ -198,6 +205,21 @@ export function lutTable(): Float32Array {
 
 export const isFloats = (p: SkyProb): p is Float32Array =>
 	p instanceof Float32Array;
+
+/** Host data (as opposed to a borrowed GPUBuffer, which has a `size`). */
+export const isHost = <T extends ArrayBufferView>(v: T | GPUBuffer): v is T =>
+	ArrayBuffer.isView(v);
+
+/** Byte length of a rgba / guideLo input, host or GPU. */
+export const inputBytes = (v: ArrayBufferView | GPUBuffer) =>
+	isHost(v) ? v.byteLength : v.size;
+
+/**
+ * Wrap a borrowed GPUBuffer (not owned: destroying the wrapper leaves the handle alone and only takes
+ * it off luma's memory counters).
+ */
+export const wrapGpu = (device: Device, id: string, b: GPUBuffer): Buffer =>
+	device.createBuffer({ id, handle: b, byteLength: b.size, usage: b.usage });
 
 /**
  * refineToWorking(rgbPlanes(rgba), W, H, { prob, width: lw, height: lh }, true, opts) → toBytes, on

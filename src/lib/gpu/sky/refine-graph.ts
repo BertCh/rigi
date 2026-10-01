@@ -30,7 +30,9 @@ import {
 import { pooledStorage, pooledUniform, withLease } from "#/lib/gpu/core/pool";
 import {
 	axisTable,
+	inputBytes,
 	isFloats,
+	isHost,
 	K_LO_H,
 	K_LO_H2,
 	K_LO_V,
@@ -41,6 +43,7 @@ import {
 	lutTable,
 	type SkyRefineInput,
 	type SkyRefineOutput,
+	wrapGpu,
 } from "./refine";
 
 const WG = 256;
@@ -204,7 +207,7 @@ export async function refineSkyGraph(
 	const { W, H, lw, lh } = input;
 	const n = lw * lh;
 	const N = W * H;
-	if (input.rgba.length !== 4 * N || input.guideLo.length !== 3 * n)
+	if (inputBytes(input.rgba) !== 4 * N || inputBytes(input.guideLo) !== 12 * n)
 		throw new Error("refineSkyGraph: input sizes do not match");
 	checkDispatch(device, lw, lh, W, H);
 	return withLease(SKY_GRAPH_GROUP, async () => {
@@ -235,7 +238,11 @@ export async function refineSkyGraph(
 		]);
 		new Float32Array(words, 24, 1)[0] = input.eps ?? 2e-3;
 		const prm = pooledUniform(device, "sky-refine/prm", words);
-		const gl = pooledStorage(device, "sky-refine/guideLo", input.guideLo);
+		const borrowed: Buffer[] = [];
+		const gl = isHost(input.guideLo)
+			? pooledStorage(device, "sky-refine/guideLo", input.guideLo)
+			: wrapGpu(device, "sky-refine/guideLo", input.guideLo);
+		if (!isHost(input.guideLo)) borrowed.push(gl);
 		const gp: Buffer = isFloats(input.prob)
 			? pooledStorage(device, "sky-refine/prob", input.prob)
 			: // ORT's buffer, wrapped (not owned; destroying the wrapper leaves the handle alone)
@@ -246,16 +253,22 @@ export async function refineSkyGraph(
 					usage: input.prob.usage,
 				});
 		try {
-			const rgba8 = new Uint8Array(
-				input.rgba.buffer,
-				input.rgba.byteOffset,
-				input.rgba.byteLength,
-			);
-			const rgba = pooledStorage(
-				device,
-				"sky-refine/rgba",
-				rgba8.byteOffset % 4 ? rgba8.slice() : rgba8,
-			);
+			let rgba: Buffer;
+			if (isHost(input.rgba)) {
+				const rgba8 = new Uint8Array(
+					input.rgba.buffer,
+					input.rgba.byteOffset,
+					input.rgba.byteLength,
+				);
+				rgba = pooledStorage(
+					device,
+					"sky-refine/rgba",
+					rgba8.byteOffset % 4 ? rgba8.slice() : rgba8,
+				);
+			} else {
+				rgba = wrapGpu(device, "sky-refine/rgba", input.rgba);
+				borrowed.push(rgba);
+			}
 			const axis = pooledStorage(
 				device,
 				"sky-refine/axis",
@@ -277,6 +290,7 @@ export async function refineSkyGraph(
 			};
 		} finally {
 			if (gp.props.handle) gp.destroy();
+			for (const b of borrowed) b.destroy();
 		}
 	});
 }
