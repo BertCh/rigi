@@ -63,13 +63,13 @@ export function warmPoseGrid(device: Device) {
 export const warmPoseGridAsync = (device: Device) =>
 	warmKernelsAsync(device, ALIGN_GROUP);
 
-const STORAGE = Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC;
+export const STORAGE = Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC;
 
 // pooled buffer → the array last written into it (the edge-map planes that don't change)
 const resident = new WeakMap<Buffer, Float32Array>();
 
 /** The pooled slot `key` holding `data`, written only if it holds a different array (or grew); `up` counts the bytes. */
-function uploadOnce(
+export function uploadOnce(
 	device: Device,
 	key: string,
 	data: Float32Array,
