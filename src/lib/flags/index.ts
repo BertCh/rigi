@@ -32,8 +32,13 @@ const text = { kind: "text" } as TextDef;
 
 export const FLAG_SCHEMA = {
 	// render
-	/** deck.gl is the default (reports/deck-default.md); ?renderer=three is the fallback */
-	renderer: oneOf(["three", "deck"], "deck"),
+	/**
+	 * The /photo engine (src/lib/renderer-select.ts): auto = WebGPU deck where the browser passes the probe,
+	 * else WebGL deck; webgpu = the same, asked for explicitly; deck = WebGL deck only; three = three.js.
+	 */
+	renderer: oneOf(["auto", "webgpu", "deck", "three"], "deck"),
+	/** off: ?renderer=auto / webgpu act as if navigator.gpu were missing (proves the WebGL fallback) */
+	webgpu: onOff("on"),
 	/** deck only: one instanced grid per resolution, or one mesh per tile */
 	terrain: oneOf(["batched", "tiles"], "batched"),
 	// GPU compute sidecar (src/lib/gpu); the CPU path is always the reference
@@ -258,6 +263,7 @@ export type { FlagDef };
  */
 export const RESTART_FLAGS: readonly FlagName[] = [
 	"renderer",
+	"webgpu",
 	"terrain",
 	"gpu",
 	"unknownGpu",

@@ -2,9 +2,9 @@
 
 Experimental (2026-09-30). The deck backend (`src/lib/deck`, WebGL2) is being moved to WebGPU.
 Every layer of the WebGL DeckEngine is ported (see **Status**), and `engine.ts` (`WebGpuEngine`)
-implements the whole `Renderer` interface on them. Nothing here is wired into `PhotoWorkspace` yet:
-the lab route (`/lab/deck-webgpu`) is the only consumer. It will become `?renderer=webgpu` (see
-**Staged plan**).
+implements the whole `Renderer` interface on them. It is wired into `PhotoWorkspace` behind
+`?renderer=auto|webgpu` with an automatic WebGL fallback (see **In the app**); the lab route
+(`/lab/deck-webgpu`) remains the bench / debug consumer.
 
 ## Approach (decided by `spike.ts`, `/lab/deck-webgpu?spike=1`)
 
@@ -44,9 +44,40 @@ should be mechanical: only `hosts/deck.ts` and `device.ts` touch deck. Cores use
 `ShaderModule` and `RenderPass` and nothing else, and build their Models with pass.ts's own
 `WGSLShaderAssembler`, so deck's default-assembler state never reaches them.
 
-**To run deck-hosted in the app**, `vite.config.ts` must drop the `visgl:webgl-only` condition
-(it is owned by another session). Until then, use `scripts/deck-webgpu/vite.webgpu.config.ts` on
-port 3111. On :3100 / :3110 the lab falls back to the direct host automatically.
+**Deck's full build in the app.** `vite.config.ts` no longer takes deck's `visgl:webgl-only`
+condition, so the deck host runs on every dev server and in production builds
+(`RIGI_DECK_BUILD=webgl-only` restores the old resolution; WebGpuEngine then runs on the direct
+host). `scripts/deck-webgpu/vite.webgpu.config.ts` is kept for :3111 and is now equivalent.
+
+## In the app (src/lib/renderer-select.ts, PhotoWorkspace)
+
+| `?renderer=` | Engine |
+|---|---|
+| `auto` | WebGpuEngine when the probe passes, else the WebGL DeckEngine |
+| `webgpu` | the same, asked for explicitly (a fallback logs a console warning) |
+| `deck` | the WebGL DeckEngine only (the escape hatch) |
+| `three` | the three.js PhotoEngine |
+
+- **Probe** (`probeWebGpu`, cached per page): `navigator.gpu`, a high-performance adapter with
+  `float32-filterable` (= `device.ts REQUIRED_FEATURES`; keep them equal), `maxTextureDimension2D`
+  ≥ 8192, `maxColorAttachments` ≥ 2, `maxStorageBufferBindingSize` ≥ 128 MiB, and a device that is
+  actually granted (then destroyed).
+- **`?webgpu=off`**: auto / webgpu behave as if `navigator.gpu` were missing. Use it to prove the
+  WebGL fallback on a WebGPU machine.
+- **Init failure**: PhotoWorkspace awaits `engine.whenReady()` before starting the engine. If the
+  host fails to boot, the engine is disposed, the canvas is re-mounted (a canvas that held a WebGPU
+  context cannot give a WebGL2 one) and DeckEngine runs on it.
+- **What ran**: the workspace root carries `data-renderer` = `webgpu` | `deck` | `three` and
+  `data-renderer-reason` (`pinned`, `auto: <adapter>`, `webgpu=off`, `fallback: <why>`).
+  `__engine.backend === "webgpu"` tells WebGpuEngine apart from DeckEngine (both have kind `deck`).
+- **Compute**: both hosts hand their device to `src/lib/gpu/device.adoptRenderDevice`, so
+  `getComputeDevice()` is the render device. `app-load.mjs` checks this per photo.
+- **Harnesses** pin explicitly: `eval-app.mjs`, `deck-engine-smoke.mjs`, `leaderboard.mjs`,
+  `geocam/eval-app-flags.mjs` take `--renderer webgpu|auto` (and launch Chromium with
+  `gpu-args.mjs`); a pinned webgpu that fell back fails the run.
+  `node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/app-load.mjs --renderer auto
+  [--query webgpu=off] [--no-gpu] [ids…]` loads every GT photo and reports the engine, the adopted
+  device and page errors.
 
 ## Targets (`targets.ts`) — also the interface to the compute kernels (src/lib/gpu)
 
@@ -297,8 +328,6 @@ buffers, the MSAA colour target, the per-size geometry targets).
 
 ## Known gaps
 
-- **App wiring.** `vite.config.ts` still resolves deck's `visgl:webgl-only` build, so in the app
-  the engine runs on the direct host (no deck views / controllers). Only :3111 runs the deck host.
 - **Renderer interface.** `WebGpuEngine` implements all of `Renderer`; deviations:
   `kind` is `'deck'` (the type only allows three / deck) with `backend: 'webgpu'`, so tools that
   poke WebGL deck internals (`deckInstance.layerManager`, compositor) must check `backend`.

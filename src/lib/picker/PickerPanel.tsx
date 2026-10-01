@@ -243,7 +243,12 @@ export default function PickerPanel(props: PickerPanelProps) {
 			...e,
 			t: new Date().toISOString(),
 			photoId: photo.id,
-			renderer: eng?.kind === "deck" ? "deck" : "three",
+			renderer:
+				(eng as { backend?: string } | null)?.backend === "webgpu"
+					? "webgpu"
+					: eng?.kind === "deck"
+						? "deck"
+						: "three",
 			alignState,
 			verify,
 			session,

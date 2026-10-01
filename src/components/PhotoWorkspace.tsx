@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Pin } from "#/lib/align";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { useConcordDisplay } from "#/lib/concord/app/useConcordDisplay";
+import type { WebGpuEngine } from "#/lib/deck-webgpu/engine";
 import { ExportMenu } from "#/lib/export/ExportMenu";
 import { getFlag } from "#/lib/flags";
 import {
@@ -62,6 +63,13 @@ import {
 } from "#/lib/photos";
 import { PickerMount } from "#/lib/picker/PickerMount";
 import type { Renderer } from "#/lib/renderer";
+import {
+	probeWebGpu,
+	type RendererChoice,
+	type ResolvedRenderer,
+	requestedRenderer,
+	resolveRenderer,
+} from "#/lib/renderer-select";
 import { getRevealConfig, useRevealConfig } from "#/lib/reveal/config";
 import { RevealController, type RevealFrame } from "#/lib/reveal/controller";
 import { RevealPanel } from "#/lib/reveal/RevealPanel";
@@ -89,38 +97,57 @@ import { useStepInside } from "./nearfield/useStepInside";
 import { AdvancedPanel } from "./panel/AdvancedPanel";
 import { LabelStylePanel, StylePanel, TrailStylePanel } from "./StylePanel";
 
-// Both backends load on demand, so /photo downloads only the one it runs: by default the deck.gl
-// DeckEngine (src/lib/deck/engine.ts); with ?renderer=three the three.js PhotoEngine
-// (src/lib/engine.ts, with three's WebGLRenderer, three/examples and the splat renderer). One promise per backend, started when
-// this module evaluates (below) so the engine chunk downloads alongside the first render instead of
-// after the engine effect runs.
+// Every backend loads on demand, so /photo downloads only the one it runs (src/lib/renderer-select.ts
+// picks it): the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts) where WebGPU passes the probe, the
+// WebGL DeckEngine (src/lib/deck/engine.ts) otherwise or with ?renderer=deck, the three.js PhotoEngine
+// (src/lib/engine.ts) with ?renderer=three. One promise per backend, started when this module evaluates
+// (below) so the engine chunk downloads alongside the first render instead of after the engine effect runs.
 type MakeRenderer = (c: HTMLCanvasElement, p: PhotoMeta) => Renderer;
-const rendererChunks = new Map<boolean, Promise<MakeRenderer>>();
-function loadRenderer(deck: boolean): Promise<MakeRenderer> {
-	let p = rendererChunks.get(deck);
+const rendererChunks = new Map<ResolvedRenderer, Promise<MakeRenderer>>();
+function loadRenderer(kind: ResolvedRenderer): Promise<MakeRenderer> {
+	let p = rendererChunks.get(kind);
 	if (!p) {
 		p = (
-			deck
-				? import("#/lib/deck/engine").then(
-						({ DeckEngine }): MakeRenderer =>
+			kind === "webgpu"
+				? import("#/lib/deck-webgpu/engine").then(
+						({ WebGpuEngine }): MakeRenderer =>
 							(c, p) =>
-								new DeckEngine(c, p),
+								new WebGpuEngine(c, p),
 					)
-				: import("#/lib/engine").then(
-						({ PhotoEngine }): MakeRenderer =>
-							(c, p) =>
-								new PhotoEngine(c, p),
-					)
+				: kind === "deck"
+					? import("#/lib/deck/engine").then(
+							({ DeckEngine }): MakeRenderer =>
+								(c, p) =>
+									new DeckEngine(c, p),
+						)
+					: import("#/lib/engine").then(
+							({ PhotoEngine }): MakeRenderer =>
+								(c, p) =>
+									new PhotoEngine(c, p),
+						)
 		).catch((e) => {
-			rendererChunks.delete(deck); // a later mount retries a failed download
+			rendererChunks.delete(kind); // a later mount retries a failed download
 			throw e;
 		});
-		rendererChunks.set(deck, p);
+		rendererChunks.set(kind, p);
 	}
 	return p;
 }
-if (typeof window !== "undefined")
-	loadRenderer(getFlag("renderer") === "deck").catch(() => {}); // the effect reports failures
+const RENDERER_NAME: Record<ResolvedRenderer, string> = {
+	webgpu: "WebGPU",
+	deck: "deck",
+	three: "three.js",
+};
+if (typeof window !== "undefined") {
+	// the effect reports failures; auto / webgpu start the WebGPU chunk and the probe together
+	const want = requestedRenderer();
+	if (want === "auto" || want === "webgpu") {
+		if (getFlag("webgpu") !== "off") {
+			loadRenderer("webgpu").catch(() => {});
+			void probeWebGpu();
+		} else loadRenderer("deck").catch(() => {});
+	} else loadRenderer(want).catch(() => {});
+}
 
 type Tool = "inspect" | "align" | "pin";
 /** Same length and, per item, the same own fields (Object.is; array fields compared element-wise). */
@@ -168,6 +195,10 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		frac: 0,
 	});
 	const [error, setError] = useState<string | null>(null);
+	// the engine that actually runs ([data-renderer]); a WebGpuEngine that failed to start sets
+	// rendererFallback, which re-mounts the canvas (keyed on it) and re-runs the engine effect on WebGL deck
+	const [rendererUsed, setRendererUsed] = useState<RendererChoice | null>(null);
+	const [rendererFallback, setRendererFallback] = useState<string | null>(null);
 	const [settings, setSettings] = useState<Settings>(() => ({
 		...defaultSettings,
 		// near terrain is only as good as the GPS fix
@@ -577,44 +608,77 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		};
 		// the backend's chunk loads on demand (loadRenderer above); start() applies the settings and style
 		// changed while it loaded
-		const deck = getFlag("renderer") === "deck";
-		const name = deck ? "deck" : "three.js";
 		let stop: (() => void) | null = null;
 		let cancelled = false;
-		loadRenderer(deck).then(
-			(make) => {
-				if (cancelled) return;
-				const engine = create(() => make(canvas, photo));
-				if (!engine) return;
-				try {
-					stop = start(engine);
-					// the stage measure ran before the chunk arrived: PhotoEngine sizes itself only in resize(),
-					// and DeckEngine's constructor read canvas.clientWidth, which may predate layout
-					const { w, h } = stageSizeRef.current;
-					if (w && h) engine.resize(w, h);
-				} catch (e) {
-					// a half-started engine: release it (and its WebGL context) rather than leak it
-					if (stop) stop();
-					else {
-						unknownSolver.current?.dispose();
-						unknownSolver.current = null;
-						engine.dispose();
-						if (engineRef.current === engine) engineRef.current = null;
+		let name = "deck";
+		(rendererFallback
+			? Promise.resolve<RendererChoice>({
+					renderer: "deck",
+					reason: `fallback: ${rendererFallback}`,
+				})
+			: resolveRenderer()
+		)
+			.then(async (choice) => {
+				name = RENDERER_NAME[choice.renderer];
+				const make = await loadRenderer(choice.renderer);
+				return { choice, make };
+			})
+			.then(
+				async ({ choice, make }) => {
+					if (cancelled) return;
+					const engine = create(() => make(canvas, photo));
+					if (!engine) return;
+					if (choice.renderer === "webgpu") {
+						// the WebGPU host boots asynchronously: a failure here falls back to WebGL deck on a fresh canvas
+						try {
+							await (engine as WebGpuEngine).whenReady();
+						} catch (e) {
+							engine.dispose();
+							if (cancelled) return;
+							const why = `WebGPU init failed: ${(e as Error)?.message ?? e}`;
+							console.warn(`[renderer] ${why}; falling back to WebGL deck`);
+							setRendererFallback(why);
+							return;
+						}
+						if (cancelled) {
+							engine.dispose();
+							return;
+						}
 					}
-					stop = null;
-					setError(`${name} renderer failed to start: ${(e as Error).message}`);
-				}
-			},
-			(e) => {
-				if (!cancelled)
-					setError(`${name} renderer failed to load: ${(e as Error).message}`);
-			},
-		);
+					setRendererUsed(choice);
+					try {
+						stop = start(engine);
+						// the stage measure ran before the chunk arrived: PhotoEngine sizes itself only in resize(),
+						// and DeckEngine's constructor read canvas.clientWidth, which may predate layout
+						const { w, h } = stageSizeRef.current;
+						if (w && h) engine.resize(w, h);
+					} catch (e) {
+						// a half-started engine: release it (and its WebGL context) rather than leak it
+						if (stop) stop();
+						else {
+							unknownSolver.current?.dispose();
+							unknownSolver.current = null;
+							engine.dispose();
+							if (engineRef.current === engine) engineRef.current = null;
+						}
+						stop = null;
+						setError(
+							`${name} renderer failed to start: ${(e as Error).message}`,
+						);
+					}
+				},
+				(e) => {
+					if (!cancelled)
+						setError(
+							`${name} renderer failed to load: ${(e as Error).message}`,
+						);
+				},
+			);
 		return () => {
 			cancelled = true;
 			stop?.();
 		};
-	}, [photo, setPose, loadSky]);
+	}, [photo, setPose, loadSky, rendererFallback]);
 
 	useEffect(() => {
 		engineRef.current?.setSettings(settings);
@@ -1064,6 +1128,8 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		<div
 			className="flex h-dvh w-full flex-col bg-[#0b0f14] text-white md:flex-row"
 			data-ready={status || error ? undefined : ""}
+			data-renderer={rendererUsed?.renderer}
+			data-renderer-reason={rendererUsed?.reason}
 			data-align={alignState ?? undefined}
 			data-verify={verify ?? undefined}
 		>
@@ -1098,6 +1164,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 
 				<div ref={stageRef} className="absolute inset-0">
 					<canvas
+						key={rendererFallback ? "webgl-fallback" : "primary"}
 						ref={canvasRef}
 						className="absolute"
 						style={{

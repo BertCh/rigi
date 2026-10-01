@@ -54,9 +54,24 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "renderer",
 		label: "Engine",
-		help: "deck.gl is the default; three.js is the fallback (each loads on demand).",
+		help: "Auto: deck.gl on WebGPU where the browser supports it, else deck.gl on WebGL. WebGL pins deck.gl on WebGL; three.js is the old engine (each loads on demand).",
 		group: "render",
-		options: { three: "three.js", deck: "deck.gl" },
+		options: {
+			auto: { label: "Auto", title: "WebGPU when available, else WebGL" },
+			webgpu: {
+				label: "WebGPU",
+				title: "deck.gl on WebGPU (WebGL if unavailable)",
+			},
+			deck: { label: "WebGL", title: "deck.gl on WebGL2" },
+			three: "three.js",
+		},
+	},
+	{
+		name: "webgpu",
+		label: "WebGPU",
+		help: "Off: Auto / WebGPU behave as if this browser had no WebGPU (tests the WebGL fallback).",
+		group: "render",
+		options: ONOFF,
 	},
 	{
 		name: "terrain",

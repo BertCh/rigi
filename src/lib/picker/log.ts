@@ -76,7 +76,7 @@ export type LoggedTap = {
 export type PickerLogEntry = PickerEvent & {
 	t: string;
 	photoId: string;
-	renderer: "three" | "deck";
+	renderer: "three" | "deck" | "webgpu";
 	/** app state when the event happened */
 	alignState: AlignState | null;
 	verify: Verify;

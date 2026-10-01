@@ -174,7 +174,7 @@ export function AdvancedPanel() {
 		go(Object.fromEntries(FLAG_NAMES.map((k) => [k, undefined])));
 
 	const active = FLAG_UI.filter((ui) => flagSet(ui.name));
-	const deck = getFlag("renderer") === "deck";
+	const deck = getFlag("renderer") !== "three"; // auto / webgpu / deck are all deck.gl
 
 	return (
 		<Section
