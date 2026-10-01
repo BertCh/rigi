@@ -1,5 +1,7 @@
 // Where an imported photo's position came from, when it was not EXIF GPS. LocalPhotoMeta only
 // knows 'exif' | 'pin', so interpolation provenance lives here (localStorage, per photo id).
+
+import { storageKey } from "#/lib/ontology/core/storage";
 import type { EstimatedPosition } from "./interpolate";
 
 export type PositionProvenance = {
@@ -12,7 +14,7 @@ export type PositionProvenance = {
 	at: number;
 };
 
-const KEY = (id: string) => `mt-image:import:pos:${id}`;
+const KEY = (id: string) => storageKey("importPosition", id);
 
 export function loadProvenance(id: string): PositionProvenance | null {
 	try {

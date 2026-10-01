@@ -2,6 +2,8 @@
 // Accepting stores the pose through the roll's own solved-pose slot with method "propagated-suggestion"
 // and confidence 0, so it is never HIGH, never anchors further suggestions (plan.ts anchorKind) and is
 // distinguishable everywhere the solved pose is read. Nothing here feeds benchmarks.
+
+import { storageKey } from "#/lib/ontology/core/storage";
 import type { Pose } from "../../camera";
 import { loadSolvedPose, saveSolvedPose } from "../roll";
 import { ACCEPTED_METHOD, type AnchorKind, type PROVENANCE } from "./plan";
@@ -27,7 +29,7 @@ export type StoredSuggestion = {
 	at: string;
 };
 
-const KEY = "mt-image:propagate:v1";
+const KEY = storageKey("propagate");
 
 function readAll(): Record<string, StoredSuggestion> {
 	try {

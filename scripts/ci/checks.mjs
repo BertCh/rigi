@@ -87,6 +87,15 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "ontology",
+		tier: "fast",
+		group: "static",
+		cmd: tsx("src/lib/ontology/ontology.check.ts"),
+		note: "Rigi ontology: catalogue integrity, id schemes vs data, storage-key registry, canonical semantics == app (picker HIGH, resolvePose order), reports/ontology.md current; crosswalk/realization exhaustiveness is enforced by tsc",
+		needs: ["public/photos/photos.json"],
+		timeoutS: 120,
+	},
+	{
 		id: "labels",
 		tier: "fast",
 		group: "look",

@@ -17,6 +17,7 @@ import type {
 	UnknownPoseSolver,
 	Unknowns,
 } from "#/lib/integration/unknown-pose";
+import type { AlignState, Verify } from "#/lib/ontology/crosswalk/pose";
 import type { PhotoMeta } from "#/lib/photos";
 import type { Renderer } from "#/lib/renderer";
 import {
@@ -46,8 +47,8 @@ export type PickerPanelProps = {
 	engineRef: RefObject<Renderer | null>;
 	photo: PhotoMeta;
 	pose: Pose | null;
-	alignState: string | null;
-	verify: string | null;
+	alignState: AlignState | null;
+	verify: Verify;
 	/** load finished, no error, second opinion not pending */
 	ready: boolean;
 	stage: { w: number; h: number; left: number; top: number };

@@ -20,17 +20,12 @@ import {
 	PROVENANCE_CODE,
 	type Provenance,
 } from "#/lib/nearfield/types";
+import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
 import type { Renderer as PhotoEngine } from "#/lib/renderer";
 
 export type SplatExportKind = "splat-ply" | "splat-v1";
 
-export type SplatExportFormat = {
-	kind: SplatExportKind;
-	label: string;
-	ext: string;
-	mime: string;
-	hint: string;
-};
+export type SplatExportFormat = FormatDescriptor<SplatExportKind>;
 
 /** Menu entries (ExportMenu shows them only when the renderer has a near-field scene). */
 export const SPLAT_EXPORT_FORMATS: SplatExportFormat[] = [

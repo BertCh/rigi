@@ -1,3 +1,5 @@
+import type { LatLon } from "./ontology/core/geometry";
+
 // Geodesy helpers: WGS84 ↔ ECEF ↔ camera-local ENU, spherical great-circle helpers, angle wrapping.
 // All ENU work is float64 on the CPU; only camera-relative offsets reach the GPU. Tile math: src/lib/dem.
 
@@ -16,7 +18,7 @@ export const REFRACTION_K = 0.13;
 /** Degrees → radians. */
 export const DEG = Math.PI / 180;
 
-export type LatLon = { lat: number; lon: number };
+export type { LatLon };
 
 export function toEcef(
 	lat: number,

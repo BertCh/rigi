@@ -1,3 +1,4 @@
+import type { WSEN } from "#/lib/ontology/core/geometry";
 // Per-source attribution for everything the app draws from third-party data (roadmap N2).
 // One registry feeds the UI credit line and the export footer, so they cannot drift.
 //
@@ -31,7 +32,7 @@ export interface Credit {
 }
 
 /** [west, south, east, north] */
-type BBox = [number, number, number, number];
+type BBox = WSEN;
 
 interface DemSourceCredit extends Credit {
 	bbox: BBox | null; // null = global

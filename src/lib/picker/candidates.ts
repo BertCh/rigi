@@ -4,6 +4,7 @@
 // Rules (reports/roadmap.md): precision beats recall. Nothing here ever marks a pose HIGH: a candidate
 // is a suggestion, and a pose the user picks is "user-confirmed" provenance, never an auto accept.
 import { type Pose, poseBasis, projectPoint, unprojectDir } from "#/lib/camera";
+import type { AlignState, Verify } from "#/lib/ontology/crosswalk/pose";
 
 const D = Math.PI / 180;
 
@@ -207,8 +208,8 @@ export function rerankWithTaps(
  * ("manual"), a pin, a saved or restored pose are never HIGH here.
  */
 export function isAutoHigh(
-	alignState: string | null | undefined,
-	verify: string | null | undefined,
+	alignState: AlignState | null | undefined,
+	verify: Verify | undefined,
 ): boolean {
 	if (alignState === "accepted") return true;
 	return (

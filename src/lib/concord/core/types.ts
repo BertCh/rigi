@@ -1,8 +1,9 @@
 // Whole-image concordance: shared types (WP-A, frozen API — see reports/concordance-research.md §4).
 // Additive changes only. Every other concord package codes against these.
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { Pose } from "../../camera";
 
-export type Vec3 = [number, number, number];
+export type { Vec3 };
 
 /** Deviation from the app's pinhole; IDENTITY ⇒ bit-identical to camera/index.ts. */
 export type Intrinsics = {

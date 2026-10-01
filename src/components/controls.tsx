@@ -1,8 +1,9 @@
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { storageKey } from "#/lib/ontology/core/storage";
 import { cn } from "#/lib/utils";
 
-const OPEN_KEY = (id: string) => `rigi.panel.${id}`;
+const OPEN_KEY = (id: string) => storageKey("panel", id);
 
 /** A section's remembered open state. Automation (navigator.webdriver) always starts open, so scripts find every control. */
 function useSectionOpen(

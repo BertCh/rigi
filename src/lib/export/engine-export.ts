@@ -1,3 +1,4 @@
+import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
 // Glue between a live PhotoEngine and the pure export builders in this folder.
 // Browser-only (Blob, fetch, canvas). Uses ONLY the engine's public API:
 //   engine.photo, pose, frame, eye, demAtCamera, terrain (readiness), settings.protectPeople,
@@ -19,13 +20,7 @@ import { buildXmp } from "./xmp";
 
 export type ExportKind = "png" | "kmz" | "geojson" | "pose" | "colmap" | "xmp";
 
-export type ExportFormat = {
-	kind: ExportKind;
-	label: string;
-	ext: string;
-	mime: string;
-	hint: string;
-};
+export type ExportFormat = FormatDescriptor<ExportKind>;
 
 /** Menu order + file naming. File name = `${photo.id}${ext}`. */
 export const EXPORT_FORMATS: ExportFormat[] = [

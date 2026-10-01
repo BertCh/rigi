@@ -7,6 +7,7 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import { getFlag } from "#/lib/flags";
+import { storageKey } from "#/lib/ontology/core/storage";
 
 export type RevealPresetId =
 	| "bloom"
@@ -272,7 +273,7 @@ export function hexToLinear(hex: string): [number, number, number] {
 
 // ---- persistence: localStorage `rigi.reveal.v1`, try/catch'd, same-tab subscribers ----
 
-const KEY = "rigi.reveal.v1";
+const KEY = storageKey("reveal");
 const subs = new Set<() => void>();
 let cache: RevealConfig | null = null;
 

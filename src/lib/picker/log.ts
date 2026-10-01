@@ -6,9 +6,11 @@
 // never ground truth on its own: a pick is what a person chose between suggestions, and must be
 // blind-verified before it enters a benchmark (reports/wild-benchmark rules).
 import type { Pose } from "#/lib/camera";
+import { storageKey } from "#/lib/ontology/core/storage";
+import type { AlignState, Verify } from "#/lib/ontology/crosswalk/pose";
 import type { CandidateSource } from "./candidates";
 
-export const PICKER_LOG_KEY = "rigi.picker.log.v1";
+export const PICKER_LOG_KEY = storageKey("pickerLog");
 /** Ring size: oldest events drop first (a few hundred bytes each). */
 export const PICKER_LOG_MAX = 2000;
 
@@ -76,8 +78,8 @@ export type PickerLogEntry = PickerEvent & {
 	photoId: string;
 	renderer: "three" | "deck";
 	/** app state when the event happened */
-	alignState: string | null;
-	verify: string | null;
+	alignState: AlignState | null;
+	verify: Verify;
 	/** one id per picker session (engine lifetime), to group events */
 	session: string;
 };

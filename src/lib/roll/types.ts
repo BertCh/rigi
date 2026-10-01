@@ -1,6 +1,7 @@
 // Camera-roll mode: many photos of one area, viewed together as a mosaic and draped on terrain.
 // Contract shared by the roll data layer (roll.ts), the mosaic UI and the map (roll-map.ts).
 
+import type { SolveMethod } from "#/lib/ontology/crosswalk/pose";
 import type { Pose } from "../camera";
 import type { PhotoMeta } from "../photos";
 
@@ -12,8 +13,8 @@ export type SolvedPose = {
 	pose: Pose;
 	/** Solver confidence 0..1 (the cascade's). */
 	confidence: number;
-	/** Which stage accepted it, e.g. 'cascade' or 'viewpoint'. */
-	method: string;
+	/** Who produced it: 'cascade' (roll aligner) or 'propagated-suggestion' (a person accepted a suggestion); see ontology SOLVE_METHOD. */
+	method: SolveMethod;
 	/** ISO time it was solved. */
 	at: string;
 };

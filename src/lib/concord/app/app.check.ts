@@ -1,4 +1,5 @@
 // Integration checks (node, synthetic): npx tsx src/lib/concord/app/app.check.ts
+import type { AlignState } from "#/lib/ontology/crosswalk/pose";
 import { concordFlags, parseConcordFlags } from "../flags";
 import { isLowConfidence } from "./confidence";
 import { runConcordDisplay } from "./display";
@@ -26,12 +27,12 @@ check(
 );
 
 // confidence mapping (fail closed)
-const base = { pose: {}, settled: true, alignState: "auto" };
+const base = { pose: {}, settled: true, alignState: "auto" as AlignState };
 check(
 	"verified ⇒ not LOW",
 	concordConfidence({ ...base, verify: "verified" }) !== null,
 );
-for (const v of ["unverified", "kept", "timeout", "pending", null])
+for (const v of ["unverified", "kept", "timeout", "pending", null] as const)
 	check(
 		`verify=${v} (auto) ⇒ LOW`,
 		concordConfidence({ ...base, verify: v }) === null,
@@ -40,7 +41,7 @@ check(
 	"not settled ⇒ LOW even if verified",
 	concordConfidence({ ...base, settled: false, verify: "verified" }) === null,
 );
-for (const a of ["manual", "pinned", "saved", "prior", "unverified"])
+for (const a of ["manual", "pinned", "saved", "prior", "unverified"] as const)
 	check(
 		`alignState=${a} ⇒ LOW`,
 		concordConfidence({ ...base, alignState: a, verify: null }) === null,

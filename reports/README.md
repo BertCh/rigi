@@ -9,6 +9,7 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | [status.md](status.md) | Where each thread stands; evaluation budget; decisions waiting |
 | [roadmap.md](roadmap.md) | Position, rules, sequenced plan (Now / Next / Later / Parked) |
 | [negative-results.md](negative-results.md) | Every experiment that didn't pan out, one line each, with its source |
+| [ontology.md](ontology.md) (generated) · [ontology-design.md](ontology-design.md) | The Rigi ontology: every concept and its UI/code words, provenance axes, crosswalks from app unions, confidence scales, resolution policies, ids, storage keys, and semantic findings. Regenerate with `npx tsx scripts/ontology/doc.ts`; checked by CI `ontology` |
 
 ## Current references by thread
 

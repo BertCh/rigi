@@ -3,23 +3,14 @@
 // vfov = vertical FOV of the photo, all degrees. Image coords are normalised 0..1, v pointing down.
 // pose.ts adapts this to three.js; pose6dof/project.ts carries the same basis with analytic
 // derivatives; geo/camera's pixel `Camera` is the solvers' representation (poseToCamera/cameraToPose).
+import type { Mat3 } from "#/lib/ontology/core/geometry";
+import type { Deg } from "#/lib/ontology/core/quantity";
 import { type Camera, cameraFromAngles } from "../geo/camera";
 import { wrap360 } from "../geodesy";
 import { cross3, dot3, type Vec3 } from "../linalg";
 
-export type Pose = { yaw: number; pitch: number; roll: number; vfov: number };
-/** 3×3 matrix, row-major: [r00, r01, r02, r10, ...]. */
-export type Mat3 = [
-	number,
-	number,
-	number,
-	number,
-	number,
-	number,
-	number,
-	number,
-	number,
-];
+export type Pose = { yaw: Deg; pitch: Deg; roll: Deg; vfov: Deg };
+export type { Mat3 };
 
 const D = Math.PI / 180;
 

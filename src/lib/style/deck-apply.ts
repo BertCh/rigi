@@ -12,6 +12,8 @@
 //    are converted sRGB → linear;
 //  - sky, photo-frame lines and pin: displayed sRGB (three's THREE.Color → output encoding round
 //    trip), i.e. the colour itself as 0..255 bytes / CSS.
+
+import type { ViewMode } from "#/lib/settings";
 import {
 	type AtmosphereParams,
 	type AtmValues,
@@ -36,7 +38,7 @@ import type {
 	ViewStyle,
 } from "./types";
 
-export type DeckStyleMode = "overlay" | "replace" | "world";
+export type DeckStyleMode = ViewMode;
 type V3 = [number, number, number];
 
 /** A "raw" shader colour: float tuples exact, hex strings sRGB → linear (three-apply.ts rawColor). */

@@ -1,7 +1,8 @@
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 // Small dense linear algebra for the solvers: row-major number[][] (n ≤ 12) and, for the
 // Cholesky routines, flat row-major Float64Array.
 
-export type Vec3 = [number, number, number];
+export type { Vec3 };
 
 export const dot3 = (a: ArrayLike<number>, b: ArrayLike<number>) =>
 	a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

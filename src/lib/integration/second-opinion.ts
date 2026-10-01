@@ -26,6 +26,7 @@ import {
 	requestMatchOrDefer,
 	shouldEscalate,
 } from "#/lib/matcher-client";
+import { photoKind } from "#/lib/ontology/core/ids";
 import type { PhotoMeta } from "#/lib/photos";
 import {
 	matchUnknownPoseOrDefer,
@@ -121,7 +122,7 @@ async function escalate(
 ): Promise<
 	{ result: MatchResult | null } | { deferred: Promise<MatchResult | null> }
 > {
-	if (/^IMG_\d+$/.test(photo.id))
+	if (photoKind(photo.id) === "bundled")
 		return requestMatchOrDefer(
 			{ photoId: photo.id, prior, fused: true },
 			{ signal, timeoutMs: 150_000 },

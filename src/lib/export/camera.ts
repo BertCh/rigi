@@ -10,6 +10,7 @@
 //   top-left pixel at (0,0); `Kopencv` is K with cx,cy shifted by −0.5 for that convention.
 // - ENU→ECEF is the plain rigid transform (no refraction). The engine's EnuFrame.fromGeo adds a
 //   refraction lift (k = 0.13) to distant points; the exported model is purely geometric.
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
 	FF35_DIAGONAL_MM,
 	hfovFromVfov,
@@ -19,7 +20,7 @@ import {
 } from "../camera";
 import { toEcef, WGS84 } from "../geodesy";
 
-export type Vec3 = [number, number, number];
+export type { Vec3 };
 
 export type CameraInput = {
 	photoId: string;

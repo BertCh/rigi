@@ -11,6 +11,7 @@
 //    colours): the classic literals were used as-is in linear space, so a float tuple is passed
 //    through exactly, while a '#hex' string (what the UI and presets write) is converted sRGB → linear.
 import * as THREE from "three";
+import type { ViewMode } from "#/lib/settings";
 import {
 	type AtmosphereParams,
 	atmosphereValues,
@@ -34,7 +35,7 @@ import type {
 } from "./types";
 
 type U = Record<string, THREE.IUniform>;
-export type StyleMode = "overlay" | "replace" | "world";
+export type StyleMode = ViewMode;
 
 /** A "raw" shader colour: float tuples exact, hex strings sRGB → linear. */
 export function rawColor(c: Hex): [number, number, number] {

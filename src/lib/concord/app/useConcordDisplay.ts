@@ -4,6 +4,7 @@
 // accepted/verified. Any other state (manual drag, pins, unverified, prior fallback) is LOW confidence:
 // the occluder is cleared and nothing is computed (plan §5, the wc_0069 trap).
 import { type RefObject, useEffect } from "react";
+import type { AlignState, Verify } from "#/lib/ontology/crosswalk/pose";
 import type { Renderer } from "../../renderer";
 import { concordFlags } from "../flags";
 import type { PoseConfidence } from "./confidence";
@@ -14,9 +15,9 @@ export type ConcordPoseState = {
 	/** True once the load finished and the second opinion is not pending. */
 	settled: boolean;
 	/** PhotoWorkspace's second-opinion verdict. */
-	verify: string | null;
+	verify: Verify;
 	/** PhotoWorkspace's align state. */
-	alignState: string | null;
+	alignState: AlignState | null;
 };
 
 /** The app's pose state → PoseConfidence; fail closed (null = LOW). */

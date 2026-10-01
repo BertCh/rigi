@@ -5,6 +5,7 @@
 // Built-in photos form one roll per bundled region. Uploads (any camera roll) are clustered:
 // single-linkage on distance (ROLL_LINK_M) so a day's hike stays one roll.
 
+import { storageKey } from "#/lib/ontology/core/storage";
 import groundTruth from "../../../data/ground-truth.json";
 import { hfovFromAspect, type Pose, vfovFromFocal } from "../camera";
 import { distanceM } from "../geodesy";
@@ -16,7 +17,8 @@ export const ROLL_LINK_M = 15_000;
 /** Photos within this distance (m) of a viewpoint's first photo share it. */
 export const VIEWPOINT_RADIUS_M = 250;
 
-type GtEntry = {
+/** One data/ground-truth.json entry as the app reads it (the ontology's ground-truth concept). */
+export type GtEntry = {
 	width: number;
 	height: number;
 	yaw: number | null;
@@ -28,7 +30,7 @@ type GtEntry = {
 };
 const GT = groundTruth as Record<string, GtEntry>;
 
-const SOLVED_KEY = (id: string) => `mt-image:rollpose:${id}`;
+const SOLVED_KEY = (id: string) => storageKey("solvedPose", id);
 
 /** The roll aligner's pose for a photo (client only; null when none or storage is unavailable). */
 export function loadSolvedPose(id: string): SolvedPose | null {

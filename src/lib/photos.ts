@@ -1,5 +1,7 @@
 import photosJson from "virtual:photos";
+import { storageKey } from "#/lib/ontology/core/storage";
 import type { Pose } from "./camera";
+import type { LatLonPair, LonLatPair } from "./ontology/core/geometry";
 
 export type PhotoMeta = {
 	id: string;
@@ -35,11 +37,11 @@ export type RegionPeak = {
 export type RegionTrail = {
 	sac: string | null;
 	name: string | null;
-	coords: [number, number][];
+	coords: LonLatPair[];
 };
 export type RegionData = {
 	id: string;
-	center: [number, number];
+	center: LatLonPair;
 	photos: string[];
 	peaks: RegionPeak[];
 	trails: RegionTrail[];
@@ -77,7 +79,7 @@ export function loadRegion(id: string) {
 	return p;
 }
 
-const POSE_KEY = (id: string) => `mt-image:pose:${id}`;
+const POSE_KEY = (id: string) => storageKey("savedPose", id);
 
 /** A stored pose is only used when every angle is finite and the fov is a real lens; anything else
  * (e.g. a bench seeding an unlabelled ground-truth entry as `{yaw:null,…,vfov:180}`) is ignored. */

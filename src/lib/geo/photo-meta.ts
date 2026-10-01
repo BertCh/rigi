@@ -1,6 +1,7 @@
 import exifr from "exifr";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 
-export type Vec3 = [number, number, number];
+export type { Vec3 };
 
 export interface PhotoMeta {
 	/**

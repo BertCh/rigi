@@ -1,3 +1,4 @@
+import type { SWNE } from "#/lib/ontology/core/geometry";
 // OSM region data for an uploaded photo: named peaks within PEAK_RADIUS_KM and named lakes
 // within TRAIL_RADIUS_KM, fetched from Overpass like scripts/ingest.mjs and shaped as RegionData
 // (public/photos/region-*.json). Hiking paths are the heaviest query (`out geom`), so they are not
@@ -24,11 +25,7 @@ export const TRAIL_RADIUS_KM = 12;
 /** Region centres snap to this grid (degrees) so photos a few km apart share one fetch. */
 export const REGION_SNAP_DEG = 0.05;
 
-export function bboxAround(
-	lat: number,
-	lon: number,
-	km: number,
-): [number, number, number, number] {
+export function bboxAround(lat: number, lon: number, km: number): SWNE {
 	const dLat = km / 111.32;
 	const dLon = km / (111.32 * Math.cos((lat * Math.PI) / 180));
 	return [lat - dLat, lon - dLon, lat + dLat, lon + dLon];

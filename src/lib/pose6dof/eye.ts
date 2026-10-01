@@ -7,13 +7,14 @@
 // (variable projection: the cost of an eye is the best cost over yaw/pitch/roll at that eye).
 //
 // Pure TS, no DOM; the horizon is injected, so this file only depends on pose6dof itself.
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { focalFromVfov, type Pose } from "../camera";
 import { wrap180 } from "../geodesy";
 import { gaussJordan } from "../linalg";
 import { azElFromDir, basis, unproject } from "./project";
 import { refinePosition } from "./refine";
 
-export type Vec3 = [number, number, number];
+export type { Vec3 };
 
 /** A 360° (or sector) DEM skyline: elevation (deg) at azimuth i·step. ≤ −89 = no data. */
 export interface EyeHorizon {

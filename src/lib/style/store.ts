@@ -4,6 +4,7 @@
 // saved (headless screenshots); while it is active, edits stay in memory for that tab only.
 // Other tabs follow through the `storage` event.
 import { useCallback, useSyncExternalStore } from "react";
+import { storageKey } from "#/lib/ontology/core/storage";
 import {
 	isPresetId,
 	presetStyle,
@@ -13,7 +14,7 @@ import {
 import { pruneOverrides } from "./schema";
 import type { DeepPartial, PresetId, StyleState, ViewStyle } from "./types";
 
-export const STYLE_STORAGE_KEY = "mt-image.viewStyle.v1";
+export const STYLE_STORAGE_KEY = storageKey("viewStyle");
 export const STYLE_URL_PARAM = "style";
 
 export const DEFAULT_STYLE_STATE: StyleState = {

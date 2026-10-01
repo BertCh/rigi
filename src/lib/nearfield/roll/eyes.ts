@@ -13,10 +13,11 @@
 // and eye z = DEM(x, y) + 1.6 m ± 2 m.
 //
 // Evidence is thin (one usable pair, IMG_7059/IMG_7063): see REPORT.txt. Default off (REFINE_EYES_DEFAULT).
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { Pose } from "../../camera";
 import { camToEnuMatrix } from "../lift";
 
-export type Vec3 = [number, number, number];
+export type { Vec3 };
 
 /** Off by default: one usable pair of evidence, near-field coverage still tiny after refinement. */
 export const REFINE_EYES_DEFAULT = false;

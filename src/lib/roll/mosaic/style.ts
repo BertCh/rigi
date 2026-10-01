@@ -1,5 +1,8 @@
 // Shared look and small formatters for the roll mosaic: viewpoint colours, pose-source labels,
 // compass names and capture times in the photo's own local time.
+
+import { rankUnder } from "#/lib/ontology/core/resolution";
+import { POSE_SOURCE } from "#/lib/ontology/crosswalk/pose";
 import type { PhotoMeta } from "../../photos";
 import type { PoseSource, RollPhoto } from "../types";
 
@@ -20,24 +23,19 @@ export const vpColor = (i: number) =>
 			VIEWPOINT_COLORS.length
 	];
 
-export const POSE_SOURCES: PoseSource[] = [
-	"saved",
-	"ground-truth",
-	"solved",
-	"prior",
-];
-export const POSE_SOURCE_LABEL: Record<PoseSource, string> = {
-	saved: "saved",
-	"ground-truth": "fitted",
-	solved: "solved",
-	prior: "prior",
-};
-export const POSE_SOURCE_HINT: Record<PoseSource, string> = {
-	saved: "Pose you saved in the workspace",
-	"ground-truth": "Hand-fitted to the terrain",
-	solved: "Aligned to the terrain by the roll aligner (skyline match)",
-	prior: "From EXIF: compass, gravity and lens (can be off by 10°+)",
-};
+export const POSE_SOURCES: PoseSource[] = (
+	Object.keys(POSE_SOURCE) as PoseSource[]
+).sort(
+	(a, b) =>
+		rankUnder("rollDisplay", POSE_SOURCE[a]) -
+		rankUnder("rollDisplay", POSE_SOURCE[b]),
+);
+export const POSE_SOURCE_LABEL = Object.fromEntries(
+	POSE_SOURCES.map((s) => [s, POSE_SOURCE[s].label]),
+) as Record<PoseSource, string>;
+export const POSE_SOURCE_HINT = Object.fromEntries(
+	POSE_SOURCES.map((s) => [s, POSE_SOURCE[s].hint]),
+) as Record<PoseSource, string>;
 /** Tailwind classes for the badge of each source. */
 export const POSE_SOURCE_CLASS: Record<PoseSource, string> = {
 	saved: "bg-emerald-400/90 text-emerald-950",
