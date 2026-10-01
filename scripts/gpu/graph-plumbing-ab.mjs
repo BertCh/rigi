@@ -15,6 +15,11 @@
 // Measured 2026-10-01 (Apple M-series, headless Chromium, --reps 30): every read-back and order buffer
 // byte-identical; medians graph vs raw: silhouette 12 poses 7.2 vs 7.1 ms, verdicts + skyline (one
 // submit vs two) 1.3 vs 1.1 ms, gather 0.8 vs 0.7 ms, splat sort 1M 9.0 vs 9.1 ms (encode 0.1 both).
+// Re-run 2026-10-01 after geo-query-gpu moved to persistent pool slots + ComputeGraph.runNow (same
+// machine, a quieter load state, --reps 30): every read-back and order buffer byte-identical (geo-query
+// 32/32 per kind); medians graph vs raw: silhouette 1.9 vs 1.9 ms, verdicts + skyline 0.4 vs 0.5 ms,
+// gather 0.3 vs 0.3 ms, splat sort 1M 3.2 vs 3.2 ms. Wall times are per call, so the 0.1 ms
+// performance.now() granularity of the page dominates these small medians.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { chromium } from "playwright";
