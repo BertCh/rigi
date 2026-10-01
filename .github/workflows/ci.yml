@@ -28,6 +28,8 @@ jobs:
       - run: npm ci
       - name: Fast tier (tsc, biome ratchet, node unit checks)
         run: node scripts/ci/run.mjs fast --biome all
+      - name: Build the examples gallery (luma.gl-style examples/, no browser)
+        run: node scripts/examples.mjs site
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4

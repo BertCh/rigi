@@ -58,6 +58,8 @@ public/models/
 *.webp
 *.tif
 *.tiff
+# example gallery thumbnails (renders of open map data, no photos): scripts/examples.mjs site
+!examples/**/thumbnail.jpg
 
 # caches / generated outputs
 cache/
