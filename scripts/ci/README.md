@@ -46,6 +46,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |
 | photoprep | fast | GPU photo prep path (`4 100000` args) | `src/lib/gpu/photoprep/photoprep.check.ts` |
 | photoprep-resident | fast | Photo prep residency: lazy CPU read, memo, pins, LRU, device mismatch (fake device) | `src/lib/gpu/photoprep/resident.check.ts` |
+| align-cert | fast | Certified-f32 align refine in emulation: AlignResult bit-identical to autoAlign, runtime checks catch a broken bound | `src/lib/gpu/align/cert.check.ts` |
 | gpu-clear-lint | fast | ComputeGraph clear lint: the partial/atomic rule and the GPU-condition rule (same gate, command rewrite, unaudited nodes, whole clears) | `src/lib/gpu/core/clear-lint.check.ts` |
 | gpu-inspect | fast | graph inspection (`gpu/core/inspect.ts`, `inspector.ts`): stats / preflight / inspector-sample summary, observation through the upstream `GPUCommandGraphInspector`, `getGpuGraphProfile`, device-loss cleanup (fake device, no GPU) | `src/lib/gpu/core/inspect.check.ts` |
 | app-graph | fast | app graph manifest ↔ code: every `cachedGraph` group in `src/lib/gpu/**` and `src/lib/deck-webgpu/**` is declared in `gpu/app-graph/manifest.ts` and vice versa; island ids, unique ids, paths | `src/lib/gpu/app-graph/app-graph.check.ts` |

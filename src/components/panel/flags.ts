@@ -205,6 +205,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "alignPrecision",
+		label: "Align refine precision",
+		help: "certified-f32: the auto-align refine runs as a GPU loop with certified f32 compares (same result as f64; the CPU decides only ties). Opt-in until its wild-set gate passes.",
+		group: "compute",
+		options: { f64: "f64 (default)", "certified-f32": "Certified f32" },
+	},
+	{
 		name: "imagery",
 		label: "Imagery provider",
 		help: "Default: swisstopo in CH, Esri elsewhere. swisstopo: licence-clean, CH only. Custom needs VITE_IMAGERY_URL.",

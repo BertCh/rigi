@@ -77,7 +77,7 @@ const POSE_BOUND = defineKernel(
 
 // stride-1 direction table (vec4 per direction) per horizon array
 const dirTables = new WeakMap<Float32Array, Float32Array>();
-function dirTable(dirs: Float32Array) {
+export function dirTable(dirs: Float32Array) {
 	let t = dirTables.get(dirs);
 	if (!t) {
 		const n = Math.floor(dirs.length / 3);
@@ -107,7 +107,7 @@ export type PoseBoundRaw = {
 
 // fg weights the terms by (1 − fg); the per-term error bound assumes fg ∈ [0, 1]
 const fgChecked = new WeakMap<Float32Array, boolean>();
-function fgInRange(fg: Float32Array) {
+export function fgInRange(fg: Float32Array) {
 	let ok = fgChecked.get(fg);
 	if (ok === undefined) {
 		ok = true;

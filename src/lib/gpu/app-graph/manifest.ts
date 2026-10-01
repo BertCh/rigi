@@ -311,13 +311,13 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"src/lib/gpu/precision/df32.ts",
 		],
 		groups: ["precision-probe"],
-		realms: ["worker:horizon-fast"],
+		realms: ["worker:horizon-fast", "page"],
 		cadence: "per photo",
 		resources: ["u, pin (pooled imports)", "pout (transient)"],
 		readbacks: ["read: pout 4096·80 B, once per device"],
 		status: "opt-in",
 		notes:
-			"strict-IEEE probe gating every certified-f32 stage (horizon today; shared with align)",
+			"strict-IEEE probe gating every certified-f32 stage (horizon in the horizon-fast worker; align on the page)",
 	},
 	{
 		id: "align-pose",
@@ -336,6 +336,30 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		readbacks: ["read: nPoses·stride B per round (≈40 rounds per autoAlign)"],
 		status: "default",
+	},
+	{
+		id: "align-cert",
+		island: "I4",
+		paths: [
+			"src/lib/gpu/align/cert-gpu.ts",
+			"src/lib/gpu/align/cert.wgsl.ts",
+			"src/lib/gpu/align/cert-refine.ts",
+			"src/lib/gpu/align/cert-emulate.ts",
+		],
+		groups: ["align-cert"],
+		realms: ["page"],
+		cadence: "per align",
+		resources: [
+			"u, lane state, move logs, audit rings, jobs, results, indirect commands (pooled imports)",
+			"f32 + double-f32 lattice tables (uploaded per autoAlign and on a window re-centre)",
+			"dirs, edge planes (shared align slots / resident photo prep), private skyCum",
+		],
+		readbacks: [
+			"read per submit (≈4 per autoAlign): lane states + move logs + audit rings ≤ 8·6.3 KB",
+		],
+		status: "opt-in",
+		notes:
+			"certified-f32 coordinate descent (WAG W3.3): R rounds per submit, DECIDE → EVAL (indirect) → EVAL2 double-f32 (indirect); ?alignPrecision=certified-f32",
 	},
 	{
 		id: "silhouette-gpu",

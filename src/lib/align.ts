@@ -455,17 +455,25 @@ export const newRefineStats = (): RefineStats => ({
 	verifyMs: 0,
 });
 
-const DESCENT_KEYS = ["yaw", "pitch", "roll", "vfov"] as const;
-type Steps = { yaw: number; pitch: number; roll: number; vfov: number };
+export const DESCENT_KEYS = ["yaw", "pitch", "roll", "vfov"] as const;
+export type Steps = { yaw: number; pitch: number; roll: number; vfov: number };
+
+/** Descent's initial steps (every pass starts from them; a step halves on an iteration without a move). */
+export const descentSteps = (vfov0: number): Steps => ({
+	yaw: 0.4,
+	pitch: 0.4,
+	roll: 0.8,
+	vfov: vfov0 * 0.02,
+});
 
 /** Neighbour `j` (0..7) of `base`, built with the very expression of the CPU loop (k = j>>1, + then −). */
-const neighbour = (base: Pose, j: number, steps: Steps): Pose => {
+export const neighbour = (base: Pose, j: number, steps: Steps): Pose => {
 	const k = DESCENT_KEYS[j >> 1];
 	const sgn = j & 1 ? -1 : 1;
 	return { ...base, [k]: base[k] + sgn * steps[k] };
 };
 
-const halve = (steps: Steps): Steps => ({
+export const halve = (steps: Steps): Steps => ({
 	yaw: steps.yaw / 2,
 	pitch: steps.pitch / 2,
 	roll: steps.roll / 2,
@@ -529,7 +537,7 @@ export class Descent {
 		private readonly stats?: RefineStats,
 	) {
 		this.best = start;
-		this.steps = { yaw: 0.4, pitch: 0.4, roll: 0.8, vfov: vfov0 * 0.02 };
+		this.steps = descentSteps(vfov0);
 		this.cur = f(start, fine);
 		if (stats) stats.cpuEvals++;
 	}
@@ -626,7 +634,7 @@ export class Descent {
 	}
 }
 
-type AlignCtx = {
+export type AlignCtx = {
 	prior: Pose;
 	aspect: number;
 	dirs: Float32Array;
@@ -635,18 +643,29 @@ type AlignCtx = {
 	f: (p: Pose, fine: boolean, stride?: number) => number;
 };
 
-function alignCtx(
+/**
+ * autoAlign's prior penalty, one term per pose angle; the penalty is their sum in this order
+ * (yaw + pitch + roll + vfov, left to right). src/lib/gpu/align/cert-refine.ts (fillLaneTable) tabulates the terms.
+ */
+export function penaltyTerms(prior: Pose) {
+	return {
+		yaw: (v: number) => 0.04 * ((v - prior.yaw) / 20) ** 2,
+		// the gravity vector is good to ~1–3°, the compass only to ~10°
+		pitch: (v: number) => 0.08 * ((v - prior.pitch) / 2.5) ** 2,
+		roll: (v: number) => 0.08 * ((v - prior.roll) / 4) ** 2,
+		vfov: (v: number) => 0.1 * ((v - prior.vfov) / (prior.vfov * 0.08)) ** 2,
+	};
+}
+
+export function alignCtx(
 	prior: Pose,
 	aspect: number,
 	dirs: Float32Array,
 	edge: EdgeMap,
 ): AlignCtx {
+	const t = penaltyTerms(prior);
 	const penalty = (p: Pose) =>
-		0.04 * ((p.yaw - prior.yaw) / 20) ** 2 +
-		// the gravity vector is good to ~1–3°, the compass only to ~10°
-		0.08 * ((p.pitch - prior.pitch) / 2.5) ** 2 +
-		0.08 * ((p.roll - prior.roll) / 4) ** 2 +
-		0.1 * ((p.vfov - prior.vfov) / (prior.vfov * 0.08)) ** 2;
+		t.yaw(p.yaw) + t.pitch(p.pitch) + t.roll(p.roll) + t.vfov(p.vfov);
 	const f = (p: Pose, fine: boolean, stride = 1) =>
 		scorePose(p, aspect, dirs, edge, fine, stride) - penalty(p);
 	return { prior, aspect, dirs, edge, penalty, f };
@@ -866,6 +885,36 @@ export async function autoAlignRefined(
 	return alignResult(
 		done.map((r) => r as { pose: Pose; score: number }).sort(byScore),
 	);
+}
+
+/**
+ * autoAlign with the refine delegated: `refine(starts, ctx)` must return, for every coarse hypothesis
+ * (`starts[i]`, best first), exactly what autoAlign's refine returns for it (the coarse pass from the
+ * hypothesis, then the fine pass from its result: Descent with ctx.f / ctx.penalty and vfov0 =
+ * prior.vfov). The rest (sky fit, hypotheses, stable sort, confidence) is autoAlign's own, so equal
+ * per-hypothesis results give autoAlign's AlignResult bit for bit. src/lib/gpu/align/cert-refine.ts
+ * (the certified-f32 GPU-driven refine) is the provider.
+ */
+export async function autoAlignLanes(
+	prior: Pose,
+	aspect: number,
+	dirs: Float32Array,
+	edge: EdgeMap,
+	yawRange: number,
+	grid: CoarseGridScores | undefined,
+	refine: (
+		starts: Pose[],
+		ctx: AlignCtx,
+	) => Promise<{ pose: Pose; score: number }[]>,
+): Promise<AlignResult> {
+	const ctx = alignCtx(prior, aspect, dirs, edge);
+	if (!grid?.skyFitted) fitPriorSky(prior, aspect, dirs, edge);
+	const hyps = coarseHypotheses(ctx, yawRange, grid);
+	const results = await refine(
+		hyps.map((h) => h.pose),
+		ctx,
+	);
+	return alignResult(results.slice().sort(byScore));
 }
 
 // ---------------- pin solver ----------------

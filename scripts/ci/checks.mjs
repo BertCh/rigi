@@ -304,6 +304,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "align-cert",
+		tier: "fast",
+		group: "pose",
+		cmd: tsx("src/lib/gpu/align/cert.check.ts", "2", "1"),
+		note: "certified-f32 align refine (W3.3) in f32 / double-f32 emulation under the production host loop: AlignResult bit-identical to autoAlign (synthetic + up to 2 real photos when public/photos, .cache/horizon and sips exist), fault caught by the runtime checks; full set: `npx tsx src/lib/gpu/align/cert.check.ts 100 4`",
+		timeoutS: 120,
+	},
+	{
 		id: "export",
 		tier: "fast",
 		group: "export",

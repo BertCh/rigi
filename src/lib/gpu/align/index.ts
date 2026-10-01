@@ -19,6 +19,19 @@
  * `alignGpuOptions.refine = "cpu"` (or the `refine` option) keeps the refine on the plain CPU loop.
  * Any GPU failure, no WebGPU, or the kill switch (?gpu=off, src/lib/flags) → plain autoAlign.
  *
+ * OPT-IN (WAG W3.3, precision policy P1): `alignPrecision: "certified-f32"` (the option, or the flag
+ * ?alignPrecision=certified-f32) runs the refine as a GPU-driven fixed-round loop with certified f32
+ * compares instead (./cert-refine.ts; WGSL and error bound in ./cert.wgsl.ts): all hypotheses' coarse
+ * and fine passes on the GPU, a few submits per autoAlign, the CPU deciding only the comparisons the
+ * f32 and double-f32 bounds cannot. The AlignResult is the f64 path's as long as every certified
+ * decision is correct (the bound plus the device premise; see ./cert-refine.ts). It needs the device
+ * to pass the shared strict-IEEE probe (../precision/ieee-probe.ts) and the same probe compiled in
+ * EVAL2's module (./cert-gpu.ts probeEval2Module), read through alignProbeOk; a failing probe, a pose
+ * outside the bound's range, a GPU error, more than 32 CPU-decided comparisons, or a failed runtime
+ * check (intervals re-scored exactly; EVAL2 accepts, near-margin decisions and a sample re-decided on
+ * exact scores) runs the f64 path for the call, and a broken bound turns the certified path off for
+ * the device. The default stays "f64".
+ *
  * Runs on gpu/core: both kernels on a core ComputeGraph (./graph.ts: cleared output transient + read
  * node over the pooled input slots; the only GPU path since 2026-10-01), the edge map's static planes
  * bound from the resident photo prep when `edge` is a resident prep's map on this device (../photoprep
@@ -30,6 +43,7 @@ import type { Device } from "@luma.gl/core";
 import {
 	type AlignResult,
 	autoAlign,
+	autoAlignLanes,
 	autoAlignRefined,
 	type CoarseGridScores,
 	coarseGridPoses,
@@ -44,9 +58,24 @@ import {
 	type SkipVerifier,
 } from "#/lib/align";
 import type { Pose } from "#/lib/camera";
+import { getFlag } from "#/lib/flags";
 import { getComputeDevice } from "#/lib/gpu/core/device";
 import { fitPriorSkyGpu } from "#/lib/gpu/photoprep";
-import { type PoseBoundStats, poseBoundSession } from "./pose-bound";
+import { probeStrictIeee } from "#/lib/gpu/precision/ieee-probe";
+import {
+	alignProbeOk,
+	type CertGpuStats,
+	certGpuRunner,
+	probeEval2Module,
+} from "./cert-gpu";
+import {
+	CertAbort,
+	type CertStats,
+	certifiable,
+	certifiedRefine,
+	newCertStats,
+} from "./cert-refine";
+import { fgInRange, type PoseBoundStats, poseBoundSession } from "./pose-bound";
 import {
 	type PoseGridStats,
 	scorePoseGridGpu,
@@ -74,8 +103,11 @@ export type AlignGpuTiming = {
 	uploadBytes?: number;
 	/** bytes of edge planes the grid bound from the resident photo prep (not uploaded) */
 	residentBytes?: number;
-	/** refine: "gpu" (bound-screened descent) or "cpu" (plain loop), with its counters */
-	refine?: "gpu" | "cpu";
+	/**
+	 * refine: "gpu" (bound-screened descent), "cpu" (plain loop), with its counters, or
+	 * "certified-f32" (the opt-in GPU-driven loop; counters in `cert`)
+	 */
+	refine?: "gpu" | "cpu" | "certified-f32";
 	refineStats?: RefineStats;
 	/** refine bound dispatches: count, poses, unbounded poses, upload bytes, ms awaiting the GPU */
 	boundStats?: PoseBoundStats;
@@ -84,6 +116,32 @@ export type AlignGpuTiming = {
 	/** set when this call hit a bound violation (refine re-run on the CPU, device's GPU refine off) */
 	violation?: string;
 	error?: string;
+	/** the precision the call asked for ("f64" unless opted in) */
+	precision?: AlignPrecision;
+	/** the certified-f32 refine: what ran, why not, its counters */
+	cert?: CertTiming;
+};
+
+/** autoAlignAsync's refine precision (WAG precision policy P1); "f64" is the default. */
+export type AlignPrecision = "f64" | "certified-f32";
+
+export type CertTiming = {
+	/** "certified-f32": the result came from it; "f64": the call fell back (see `reason`) */
+	path: "certified-f32" | "f64";
+	reason?:
+		| "disabled"
+		| "probe"
+		| "inputs"
+		| "pose-range"
+		| "violation"
+		| "cpu-decisions"
+		| "error";
+	detail?: string;
+	/** ms of the whole certified attempt (incl. the hypotheses' CPU re-score of the grid) */
+	ms: number;
+	probeMs?: number;
+	stats?: CertStats;
+	gpu?: CertGpuStats;
 };
 
 /**
@@ -93,15 +151,23 @@ export type AlignGpuTiming = {
 export const alignGpuOptions: {
 	refine: "gpu" | "cpu";
 	speculation: RefineSpeculation;
+	/** rounds per submit of the certified-f32 refine (opt-in path) */
+	certRounds: number;
 	/**
 	 * TEST ONLY, dev builds only (import.meta.env.DEV; absent from production bundles): subtracted
 	 * from every GPU bound (forces a bound violation and the fallback). scripts/gpu/align-refine-ab.mjs.
 	 */
 	faultDeflate?: number;
+	/**
+	 * TEST ONLY, dev builds only: subtracted on the GPU from every neighbour interval of the certified
+	 * refine (a broken bound; scripts/gpu/align-f32-bench.mjs checks the runtime checks catch it).
+	 */
+	certFault?: number;
 } = {
 	refine: "gpu",
 	speculation: { ...REFINE_SPECULATION },
-	...(import.meta.env?.DEV ? { faultDeflate: 0 } : {}),
+	certRounds: 48,
+	...(import.meta.env?.DEV ? { faultDeflate: 0, certFault: 0 } : {}),
 };
 
 /**
@@ -175,6 +241,149 @@ function skipVerifier(st: RefineDeviceState): SkipVerifier {
 	};
 }
 
+/**
+ * The certified-f32 refine's per-device state: the runtime decision re-checks (first VERIFY_FIRST
+ * certified decisions of the device, then 1 in VERIFY_EVERY), and the switch a broken bound throws.
+ */
+type CertDeviceState = {
+	checked: number;
+	disabled: boolean;
+	violation?: string;
+};
+const certDevices = new WeakMap<Device, CertDeviceState>();
+const certState = (device: Device) => {
+	let st = certDevices.get(device);
+	if (!st) {
+		st = { checked: 0, disabled: false };
+		certDevices.set(device, st);
+	}
+	return st;
+};
+/** True once a broken bound turned the certified-f32 refine off for `device`. */
+export const certifiedDisabled = (device: Device) =>
+	certDevices.get(device)?.disabled ?? false;
+/** Forget `device`'s certified-f32 state (tests). */
+export const resetCertified = (device: Device) => {
+	certDevices.delete(device);
+};
+
+class CertSkip extends Error {}
+
+/**
+ * The certified-f32 refine of one call (autoAlignLanes over certifiedRefine on the GPU runner). Never
+ * throws: no `res` means the caller runs the f64 path; `info` says why.
+ */
+async function certifiedAlign(
+	device: Device,
+	prior: Pose,
+	aspect: number,
+	dirs: Float32Array,
+	own: EdgeMap,
+	yawRange: number,
+	grid: CoarseGridScores,
+): Promise<{ res?: AlignResult; info: CertTiming }> {
+	const t0 = performance.now();
+	const dev = certState(device);
+	const done = (info: Omit<CertTiming, "ms">, res?: AlignResult) => ({
+		res,
+		info: { ...info, ms: performance.now() - t0 },
+	});
+	if (dev.disabled)
+		return done({ path: "f64", reason: "disabled", detail: dev.violation });
+	// the shared strict-IEEE probe, then the same probe compiled inside EVAL2's own module (fma
+	// fusion, opq and flushing are per shader); both read through align's granular verdict
+	const probe = await probeStrictIeee(device);
+	const modProbe = alignProbeOk(probe) ? await probeEval2Module(device) : null;
+	const probeMs = performance.now() - t0;
+	if (!alignProbeOk(probe) || !modProbe || !alignProbeOk(modProbe))
+		return done({
+			path: "f64",
+			reason: "probe",
+			probeMs,
+			detail: !alignProbeOk(probe)
+				? `shared: ${probe.error ?? JSON.stringify(probe.failures)}`
+				: `eval2 module: ${modProbe?.error ?? JSON.stringify(modProbe?.failures)}`,
+		});
+	// the bound's per-term argument needs fg ∈ [0, 1]; the kernels read whole direction triples
+	if (dirs.length % 3 || !fgInRange(own.fg))
+		return done({ path: "f64", reason: "inputs", probeMs });
+	const stats = newCertStats();
+	const gpu: CertGpuStats = {
+		uploadBytes: 0,
+		runs: 0,
+		gpuMs: 0,
+		readBytes: 0,
+	};
+	try {
+		const res = await autoAlignLanes(
+			prior,
+			aspect,
+			dirs,
+			own,
+			yawRange,
+			grid,
+			(starts, ctx) => {
+				if (!certifiable(starts, prior, aspect)) throw new CertSkip();
+				return certifiedRefine(starts, ctx, {
+					runner: certGpuRunner(device, aspect, dirs, own, gpu, () =>
+						import.meta.env?.DEV ? (alignGpuOptions.certFault ?? 0) : 0,
+					),
+					rounds: alignGpuOptions.certRounds,
+					stats,
+					verify: {
+						check: () => {
+							if (dev.checked < VERIFY_FIRST) {
+								dev.checked++;
+								return true;
+							}
+							return Math.random() < 1 / VERIFY_EVERY;
+						},
+					},
+				});
+			},
+		);
+		return done({ path: "certified-f32", probeMs, stats, gpu }, res);
+	} catch (e) {
+		if (e instanceof CertSkip)
+			return done({ path: "f64", reason: "pose-range", probeMs, stats, gpu });
+		if (e instanceof CertAbort)
+			return done({
+				path: "f64",
+				reason: "cpu-decisions",
+				detail: e.message,
+				probeMs,
+				stats,
+				gpu,
+			});
+		if (e instanceof RefineBoundViolation) {
+			// the device broke the bound's premise: no more certified refine on it
+			dev.disabled = true;
+			dev.violation = e.message;
+			console.warn(
+				"[gpu] certified-f32 align: bound violated; off for this device",
+				e,
+			);
+			return done({
+				path: "f64",
+				reason: "violation",
+				detail: e.message,
+				probeMs,
+				stats,
+				gpu,
+			});
+		}
+		console.warn("[gpu] certified-f32 align failed, using the f64 path", e);
+		return done({
+			path: "f64",
+			reason: "error",
+			detail: String(e),
+			probeMs,
+			stats,
+			gpu,
+		});
+	}
+}
+
 /** Timing of the last autoAlignAsync call (for benchmarks and the engines' stats). */
 export let lastAlignTiming: AlignGpuTiming | null = null;
 
@@ -196,10 +405,11 @@ export async function autoAlignAsync(
 	dirs: Float32Array,
 	edge: EdgeMap,
 	yawRange = 25,
-	opts: { refine?: "gpu" | "cpu" } = {},
+	opts: { refine?: "gpu" | "cpu"; alignPrecision?: AlignPrecision } = {},
 ): Promise<AlignResult> {
 	const t0 = performance.now();
 	const mode = opts.refine ?? alignGpuOptions.refine;
+	const precision = opts.alignPrecision ?? getFlag("alignPrecision");
 	let device = null;
 	try {
 		device = await getComputeDevice();
@@ -211,6 +421,7 @@ export async function autoAlignAsync(
 			totalMs: performance.now() - t0,
 			gridMs: 0,
 			rescored: 0,
+			precision,
 		};
 		return res;
 	}
@@ -265,13 +476,33 @@ export async function autoAlignAsync(
 	};
 	const rs = newRefineStats();
 	const tr = performance.now();
-	let res: AlignResult;
+	let res: AlignResult | undefined;
 	let boundStats: PoseBoundStats | undefined;
 	const devState = refineState(device);
-	let refine: "gpu" | "cpu" =
+	let refine: "gpu" | "cpu" | "certified-f32" =
 		grid && mode === "gpu" && !devState.disabled ? "gpu" : "cpu";
 	let violation: string | undefined;
-	if (refine === "gpu") {
+	let cert: CertTiming | undefined;
+	// opt-in: the certified-f32 GPU-driven refine (needs the GPU grid's sky fit and private planes)
+	if (precision === "certified-f32" && grid) {
+		const c = await certifiedAlign(
+			device,
+			prior,
+			aspect,
+			dirs,
+			own,
+			yawRange,
+			coarse,
+		);
+		cert = c.info;
+		if (c.res) {
+			res = c.res;
+			refine = "certified-f32";
+		}
+	}
+	if (res) {
+		// certified-f32 result (identical to the f64 path's by construction)
+	} else if (refine === "gpu") {
 		boundStats = { uploadBytes: 0, calls: 0, poses: 0, unbounded: 0, gpuMs: 0 };
 		let bounds: ScoreBounds = poseBoundSession(
 			device,
@@ -325,6 +556,8 @@ export async function autoAlignAsync(
 		searchMs: performance.now() - tr,
 		violation,
 		error,
+		precision,
+		cert,
 	};
 	return res;
 }

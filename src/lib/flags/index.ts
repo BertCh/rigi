@@ -69,6 +69,12 @@ export const FLAG_SCHEMA = {
 	 * always cull on the CPU.
 	 */
 	terrainGpuCull: onOff("off"),
+	/**
+	 * autoAlign's refine precision (WAG P1, src/lib/gpu/align/cert-refine.ts): f64 (default) = exact CPU
+	 * scores decide every move; certified-f32 = GPU-driven loop with certified f32 compares, the CPU
+	 * deciding only what the bound cannot (same result; opt-in until its wild-set gate passes)
+	 */
+	alignPrecision: oneOf(["f64", "certified-f32"], "f64"),
 	// Step Inside 3D Tiles (src/lib/tiles3d)
 	tiles3d: oneOf(["off", "buildings", "swisstopo", "google", "all"], "off"),
 	tiles3dBlend: oneOf(["fill", "over"], "fill"),
