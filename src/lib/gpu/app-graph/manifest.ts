@@ -515,7 +515,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		cadence: "per settle",
 		resources: [
 			"geometry target rgba32float (render device; import bound per run)",
-			"per-call uniforms, inputs, outputs (imports, created per call)",
+			"uniforms, inputs, outputs: persistent core pool slots geo-query/<kernel><job>/* (imports bound with exact ranges; written + submitted in one sync block via runNow)",
 		],
 		readbacks: [
 			"read: verdicts 4 B per peak + skyline 4 B per column (one graph run)",
