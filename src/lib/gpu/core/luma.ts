@@ -22,6 +22,9 @@
 //   own MAP_READ slots.
 // - GPUReadbackRing has fixed-size slots; core/readback.ts implements the same ticket pattern with
 //   grow-on-demand slots (re-exported here for callers with a fixed readback size).
+// - GPUProgram / GPUProgramCompiler (semantic scalar ops, literals baked at compile, GPU predicates
+//   lowered to indirect-dispatch gates) are used by look/haze-argmin.ts, with our kernels lowered
+//   into the program's graph through a registered lowering (core/graph.ts ComputeGraph adopts it).
 // - GPUCommandGraphInspector (bounded per-node CPU / GPU timing samples over compiled graphs) is used
 //   only by core/inspector.ts (one inspector per device, opt-in; see core/inspect.ts).
 
@@ -74,6 +77,9 @@ export type {
 	GPUCommandGraphTimingReport,
 	GPUHistogramProps,
 	GPUNode,
+	GPUOperation,
+	GPUOperationLoweringContext,
+	GPUProgramCompilation,
 	GPUReductionOperation,
 	GPUReductionProps,
 	GPUScalarFormat,
@@ -96,8 +102,12 @@ export {
 	GPUCommandGraph,
 	GPUCommandGraphEncoding,
 	GPUCommandGraphInspector,
+	GPUConditionalOperation,
 	GPUFFT1D,
 	GPUHistogram,
+	GPUProgram,
+	GPUProgramCompiler,
+	GPUProgramScalarLiteral,
 	GPUReadbackRing,
 	GPUReadbackTicket,
 	GPUReduction,
@@ -107,4 +117,6 @@ export {
 	GraphDataView,
 	GraphTextureHandle,
 	GraphTextureView,
+	scalarArithmetic,
+	scalarCompare,
 } from "@luma.gl/gpgpu/gpu-core";

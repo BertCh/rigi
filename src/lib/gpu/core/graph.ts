@@ -696,6 +696,23 @@ export class ComputeGraph<P = void> {
 	 * of it) uses it without being gated by the same indirect command. Destroys and throws.
 	 */
 	private linted(c: CompiledGPUCommandGraph<P>) {
+		// nodes added through this wrapper that an adopting program compiler gated afterwards
+		// (GPUProgramCompiler: a GPUConditionalOperation around a fixed-workgroup kernel adds its own
+		// indirect gate): the gate joins the audit from the preflight, one stand-in handle per gate
+		// buffer (identity is all the lint compares; the gate buffer is the compiler's transient)
+		const standIns = new Map<string, GraphBufferHandle>();
+		for (const n of c.preflight.nodes) {
+			const g = n.condition;
+			if (g?.source !== "gpu" || !g.bufferId) continue;
+			if (this.audit.gates.has(n.id) || !this.audit.uses.has(n.id)) continue;
+			let h = standIns.get(g.bufferId);
+			if (!h) {
+				h = { id: g.bufferId, transient: true } as unknown as GraphBufferHandle;
+				standIns.set(g.bufferId, h);
+			}
+			this.audit.gates.set(n.id, { buffer: h, byteOffset: g.byteOffset ?? 0 });
+			this.audit.uses.get(n.id)?.push(h);
+		}
 		const error = clearLintError(
 			c.stats.nodeOrder,
 			this.audit,
@@ -1014,6 +1031,8 @@ const cacheDevices = new Set<WeakRef<Device>>();
  * (not compiled: call compile() / compileAsync()). Call it INSIDE the caller's own lease for `group`
  * and queue the graph's lease (run() / lease()) synchronously after it, so an eviction (destroy under
  * the same graph lease) always lands after the caller's use.
+ * `create(id)` builds the ComputeGraph instead of `new ComputeGraph(device, id)`, e.g. one adopting a
+ * GPUProgramCompiler's lowering graph whose nodes are added while the program compiles (haze-argmin).
  */
 export function cachedGraph<P, X = undefined>(
 	device: Device,
@@ -1021,6 +1040,7 @@ export function cachedGraph<P, X = undefined>(
 	key: string,
 	build: (g: ComputeGraph<P>) => X,
 	max = MAX_CACHED,
+	create?: (id: string) => ComputeGraph<P>,
 ): CachedGraph<P, X> {
 	let groups = caches.get(device);
 	if (!groups) {
@@ -1051,7 +1071,8 @@ export function cachedGraph<P, X = undefined>(
 		m.delete(key);
 		e.hit = true;
 	} else {
-		const graph = new ComputeGraph<P>(device, `${group}|${key}`);
+		const id = `${group}|${key}`;
+		const graph = create ? create(id) : new ComputeGraph<P>(device, id);
 		e = { graph, extra: build(graph), hit: false };
 	}
 	m.set(key, e as CachedGraph<unknown, unknown>);

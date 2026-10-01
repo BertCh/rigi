@@ -184,7 +184,8 @@ export type GraphEncodeExtras<P> = Pick<GPUCommandGraphEncodeOptions<P>, "frameT
 export type GraphRange<P> = GraphBufferHandle | GraphDataView
   | { buffer: GraphBufferHandle; offset?: number; size: number | ((p: P) => number) };
 export function cachedGraph<P, X>(device: Device, group: string, key: string,
-  build: (g: ComputeGraph<P>) => X, max?: number /* 4 */): { graph: ComputeGraph<P>; extra: X; hit?: boolean }; // LRU per group
+  build: (g: ComputeGraph<P>) => X, max?: number /* 4 */,
+  create?: (id: string) => ComputeGraph<P> /* e.g. adopting a GPUProgramCompiler's graph */): { graph: ComputeGraph<P>; extra: X; hit?: boolean }; // LRU per group
 export function cachedGraphCount(device: Device, group?: string): number;
 export function releaseCachedGraphs(device: Device, group?: string): Promise<void>;
 export function listCachedGraphs(device?: Device, group?: string): CachedGraphInfo[]; // LRU order, read-only
