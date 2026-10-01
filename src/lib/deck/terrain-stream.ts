@@ -95,6 +95,18 @@ export function fitStreamTile(dem: DemRaster, seg: number): DemRaster {
 
 type Want = TileChoice & { id: string; seg: number };
 
+/**
+ * Loads of one tile (at one resolution) that may come back empty (null: a fetch that failed through
+ * the whole ancestor fallback, a decode error, a mesh build that threw) before the streamer gives up
+ * on it for this selection. A given-up tile no longer counts as pending, so the set completes with a
+ * stand-in (its old resolution, loaded children or a parent) instead of waiting forever: one failed
+ * tile used to keep `pending` above 0 for good, and loadFullTerrain (which waits for pending 0) ran
+ * into its 300 s timeout. A new selection (setWedge) tries given-up tiles again.
+ */
+export const TILE_LOAD_ATTEMPTS = 3;
+/** Backoff before retry n (1-based) of a failed tile load: n × this. */
+export const TILE_RETRY_MS = 400;
+
 const childrenOf = (k: TileKey): TileKey[] => [
 	{ z: k.z + 1, x: k.x * 2, y: k.y * 2 },
 	{ z: k.z + 1, x: k.x * 2 + 1, y: k.y * 2 },
@@ -127,6 +139,10 @@ export class TerrainStreamer {
 	private previewById = new Map<string, Want>();
 	/** ms from the first setWedge to the preview set (-1 = not emitted). */
 	private previewMs = -1;
+	/** Failed loads per tile at a resolution (`id:seg`) in this selection (TILE_LOAD_ATTEMPTS). */
+	private failures = new Map<string, number>();
+	/** Tiles given up on for this selection (`id:seg`): not pending, stood in for. */
+	private gaveUp = new Set<string>();
 	/** In-flight loads, abortable when they go stale. */
 	private loading = new Map<string, { seg: number; ac: AbortController }>();
 	private wedge?: ViewWedge;
@@ -156,20 +172,26 @@ export class TerrainStreamer {
 		};
 	}
 
-	/** Re-select for a new view wedge. Cheap no-op if the wedge barely moved. */
-	setWedge(wedge: ViewWedge) {
-		if (this.disposed) return;
+	/**
+	 * Re-select for a new view wedge. Cheap no-op if the wedge barely moved (or both are 360°): then
+	 * it returns false and no new set is emitted for it.
+	 */
+	setWedge(wedge: ViewWedge): boolean {
+		if (this.disposed) return false;
 		const w = this.wedge;
 		if (
 			w &&
-			Math.abs(((wedge.headingDeg - w.headingDeg + 540) % 360) - 180) < 2 &&
-			Math.abs(wedge.halfAngleDeg - w.halfAngleDeg) < 2
+			((wedge.halfAngleDeg >= 180 && w.halfAngleDeg >= 180) ||
+				(Math.abs(((wedge.headingDeg - w.headingDeg + 540) % 360) - 180) < 2 &&
+					Math.abs(wedge.halfAngleDeg - w.halfAngleDeg) < 2))
 		)
-			return;
+			return false;
 		this.wedge = wedge;
 		this.generation++;
 		this.genStart = performance.now();
 		this.genDoneMs = -1;
+		this.failures.clear();
+		this.gaveUp.clear();
 		this.want = selectDemTiles(this.frame.lat, this.frame.lon, {
 			...this.o,
 			wedge,
@@ -222,6 +244,7 @@ export class TerrainStreamer {
 		this.pump();
 		this.scheduleEmit(0);
 		this.maybePreview();
+		return true;
 	}
 
 	/** Load diagnostics of the coarse-first set: ms from the first view to it (-1 = none yet). */
@@ -255,16 +278,60 @@ export class TerrainStreamer {
 				continue;
 			const ac = new AbortController();
 			this.loading.set(w.id, { seg: w.seg, ac });
-			this.load(w, ac.signal).finally(() => {
-				if (this.loading.get(w.id)?.ac === ac) this.loading.delete(w.id);
-				this.pump();
-				this.maybePreview();
-				this.scheduleEmit(this.queue.length || this.loading.size ? 150 : 0);
-			});
+			const gen = this.generation;
+			this.load(w, ac.signal)
+				.catch(() => false) // a mesh build that threw: a failed load
+				.then((ok) => {
+					if (!ok && !ac.signal.aborted && gen === this.generation)
+						this.failed(w);
+				})
+				.finally(() => {
+					if (this.loading.get(w.id)?.ac === ac) this.loading.delete(w.id);
+					this.pump();
+					this.maybePreview();
+					this.scheduleEmit(this.queue.length || this.loading.size ? 150 : 0);
+				});
 		}
 	}
 
-	private async load(w: Want, signal: AbortSignal) {
+	/** A load of `w` came back empty: retried after a backoff, or given up on (TILE_LOAD_ATTEMPTS). */
+	private failed(w: Want) {
+		const key = `${w.id}:${w.seg}`;
+		const n = (this.failures.get(key) ?? 0) + 1;
+		this.failures.set(key, n);
+		if (n >= TILE_LOAD_ATTEMPTS) {
+			this.gaveUp.add(key);
+			console.warn(
+				`[terrain-stream] tile ${w.id} (seg ${w.seg}) failed ${n}×, stood in for`,
+			);
+			return;
+		}
+		const gen = this.generation;
+		setTimeout(() => {
+			if (this.disposed || gen !== this.generation) return;
+			const cur = this.wantById.get(w.id) ?? this.previewById.get(w.id);
+			if (!cur || cur.seg !== w.seg) return;
+			if (this.meshes.get(w.id)?.seg === w.seg || this.loading.has(w.id))
+				return;
+			this.queue.unshift(cur);
+			this.pump();
+		}, n * TILE_RETRY_MS);
+	}
+
+	/** Wanted tiles not loaded at their resolution and not given up on. */
+	private pendingCount() {
+		let n = 0;
+		for (const w of this.want)
+			if (
+				this.meshes.get(w.id)?.seg !== w.seg &&
+				!this.gaveUp.has(`${w.id}:${w.seg}`)
+			)
+				n++;
+		return n;
+	}
+
+	/** true = the mesh is in; false = nothing loaded (aborted, disposed, or no data: see failed()). */
+	private async load(w: Want, signal: AbortSignal): Promise<boolean> {
 		const load: StreamTileLoader = this.o.loadTile ?? defaultStreamTile;
 		const dem = await load(w.key, w.seg, {
 			minZoom: this.o.minZoom - 2,
@@ -273,7 +340,7 @@ export class TerrainStreamer {
 		}).catch(() => null); // aborted (stale) or no data anywhere up the pyramid
 		if (!dem || this.disposed || signal.aborted) {
 			dem?.lazyHeights?.release?.();
-			return;
+			return false;
 		}
 		const t0 = performance.now();
 		// terrain-mode.ts: the per-tile path's CPU mesh and / or the batched path's grid
@@ -294,6 +361,7 @@ export class TerrainStreamer {
 		} else mesh = buildLiteMesh(this.frame, dem, w.seg, w.distance, w.focus);
 		this.buildMs += performance.now() - t0;
 		this.meshes.set(w.id, mesh);
+		return true;
 	}
 
 	/** Hands the coarse-first set to onPreview once every tile of it is loaded (once). */
@@ -363,9 +431,7 @@ export class TerrainStreamer {
 
 	private emit() {
 		if (this.disposed) return;
-		const pending = this.want.filter(
-			(w) => this.meshes.get(w.id)?.seg !== w.seg,
-		).length;
+		const pending = this.pendingCount();
 		this.o.onProgress?.(Math.max(0, this.genTotal - pending), this.genTotal);
 		if (!this.ready && pending > 0) return; // first load: all or nothing
 		this.ready = true;
@@ -417,6 +483,7 @@ export class TerrainStreamer {
 			fallbacks: tiles.filter((t) => t.sourceZ < t.key.z).length,
 			standIns,
 			pending,
+			...(this.gaveUp.size ? { failed: this.gaveUp.size } : {}),
 			triangles: tiles.reduce((n, t) => n + meshTriangles(t), 0),
 			loadMs: this.genDoneMs,
 			generation: this.generation,

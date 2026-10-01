@@ -79,6 +79,8 @@ export type TerrainStats = {
 	standIns: number;
 	/** Desired tiles still queued or loading. */
 	pending: number;
+	/** Desired tiles given up on after repeated failed loads (stood in for; terrain-stream.ts). */
+	failed?: number;
 	triangles: number;
 	/** Time from the view change that started this generation to its completion. */
 	loadMs: number;

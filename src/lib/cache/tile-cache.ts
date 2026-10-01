@@ -30,6 +30,14 @@ export type TileCacheOptions = {
 	writeConcurrency?: number;
 	/** Debounce for persisting the LRU index, ms. Default 2000. */
 	metaDebounceMs?: number;
+	/**
+	 * A network fetch (response and body) that takes longer than this, ms, is aborted and fails like
+	 * a network error (a TimeoutError; the DEM loader retries it, then falls back to the ancestor).
+	 * Without it one stalled request held its tile, and its queue slot, forever: the terrain
+	 * streamer's set never completed and loadFullTerrain ran into its 300 s timeout. Default 30000;
+	 * 0 = none.
+	 */
+	fetchTimeoutMs?: number;
 	/** Injectable fetch (tests). Default globalThis.fetch. */
 	fetch?: typeof fetch;
 	/**
@@ -80,7 +88,8 @@ export type TileCacheStats = {
 	memory: { entries: number; bytes: number; capBytes: number };
 	hits: { memory: number; persistent: number };
 	misses: number;
-	network: { bytes: number; errors: number; notOk: number };
+	/** errors include timeouts (fetchTimeoutMs) */
+	network: { bytes: number; errors: number; notOk: number; timeouts: number };
 	writes: { ok: number; failed: number; pending: number };
 	evictions: number;
 	queue: QueueStats;
@@ -114,6 +123,7 @@ export class TileCache {
 		misses: 0,
 		netBytes: 0,
 		netErrors: 0,
+		netTimeouts: 0,
 		notOk: 0,
 		writesOk: 0,
 		writesFailed: 0,
@@ -125,6 +135,7 @@ export class TileCache {
 			capBytes: 300 * 1024 * 1024,
 			memoryCapBytes: 64 * 1024 * 1024,
 			concurrency: 24,
+			fetchTimeoutMs: 30_000,
 			backend: "auto",
 			name: "summit-lens-tiles-v1",
 			metaDebounceMs: 2000,
@@ -235,10 +246,54 @@ export class TileCache {
 	}
 
 	private async network(key: string, signal: AbortSignal): Promise<NetResult> {
-		const f = this.opts.fetch ?? globalThis.fetch.bind(globalThis);
 		const m = RANGE_KEY.exec(key);
 		const url = m ? m[1] : key;
 		const start = m ? Number(m[2]) : 0;
+		// the queue's signal (every caller left) plus the stall timeout, on one controller
+		const ac = new AbortController();
+		const forward = () => ac.abort(signal.reason);
+		if (signal.aborted) forward();
+		else signal.addEventListener("abort", forward, { once: true });
+		let timedOut = false;
+		const ms = this.opts.fetchTimeoutMs;
+		const timer =
+			ms > 0
+				? setTimeout(() => {
+						timedOut = true;
+						const e = new Error(`tile fetch timed out after ${ms} ms: ${url}`);
+						e.name = "TimeoutError";
+						ac.abort(e);
+					}, ms)
+				: null;
+		try {
+			return await this.networkOnce(key, url, start, m, ac.signal);
+		} catch (e) {
+			if (timedOut) {
+				this.counters.netTimeouts++;
+				this.counters.netErrors++;
+				// what fetch rejects with on abort varies (the reason, or an AbortError): a timeout is
+				// always a TimeoutError, never an AbortError (callers retry it like a network error)
+				if ((e as Error)?.name !== "TimeoutError") {
+					const t = new Error(`tile fetch timed out after ${ms} ms: ${url}`);
+					t.name = "TimeoutError";
+					throw t;
+				}
+			}
+			throw e;
+		} finally {
+			if (timer) clearTimeout(timer);
+			signal.removeEventListener("abort", forward);
+		}
+	}
+
+	private async networkOnce(
+		key: string,
+		url: string,
+		start: number,
+		m: RegExpExecArray | null,
+		signal: AbortSignal,
+	): Promise<NetResult> {
+		const f = this.opts.fetch ?? globalThis.fetch.bind(globalThis);
 		const init: RequestInit = { ...this.opts.fetchInit, signal };
 		if (m) {
 			const headers = new Headers(this.opts.fetchInit.headers);
@@ -249,7 +304,9 @@ export class TileCache {
 		try {
 			res = await f(url, init);
 		} catch (e) {
-			if ((e as Error)?.name !== "AbortError") this.counters.netErrors++;
+			const name = (e as Error)?.name;
+			if (name !== "AbortError" && name !== "TimeoutError")
+				this.counters.netErrors++;
 			throw e;
 		}
 		if (!res.ok) {
@@ -417,7 +474,12 @@ export class TileCache {
 			},
 			hits: { memory: c.memHits, persistent: c.persistentHits },
 			misses: c.misses,
-			network: { bytes: c.netBytes, errors: c.netErrors, notOk: c.notOk },
+			network: {
+				bytes: c.netBytes,
+				errors: c.netErrors,
+				notOk: c.notOk,
+				timeouts: c.netTimeouts,
+			},
 			writes: {
 				ok: c.writesOk,
 				failed: c.writesFailed,
