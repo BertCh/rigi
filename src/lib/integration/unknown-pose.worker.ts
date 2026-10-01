@@ -87,6 +87,14 @@ function options(yawKnown: boolean, gravKnown: boolean) {
 	};
 }
 
+/**
+ * The fused horizon → solve chain (gpu/solve/fused.ts): only with the GPU horizon and the GPU coarse grid
+ * on the graph path. The default there (identical by construction: same kernels, the resident profile
+ * is bit-checked on every coarse call); gpuFused: false or gpuGraph: false opt out.
+ */
+const fusedFor = (m: UnknownPosePrepare | UnknownPoseRequest) =>
+	!!m.gpu && !!m.solveGpu && m.gpuGraph !== false && m.gpuFused !== false;
+
 let horizonCache: {
 	key: string;
 	promise: Promise<{
@@ -103,10 +111,11 @@ function horizonAt(
 	alt: number | null,
 	gpu = false,
 	graph = false,
+	fused = false,
 ) {
-	const key = `${lat.toFixed(6)},${lon.toFixed(6)},${alt ?? ""},${gpu ? "gpu" : ""}${graph ? "+graph" : ""}`;
+	const key = `${lat.toFixed(6)},${lon.toFixed(6)},${alt ?? ""},${gpu ? "gpu" : ""}${graph ? "+graph" : ""}${fused ? "+fused" : ""}`;
 	if (horizonCache?.key !== key) {
-		const promise = computeScene(lat, lon, alt, gpu, graph);
+		const promise = computeScene(lat, lon, alt, gpu, graph, fused);
 		promise.catch(() => {
 			if (horizonCache?.promise === promise) horizonCache = null;
 		});
@@ -136,6 +145,7 @@ async function computeScene(
 	alt: number | null,
 	gpu = false,
 	graph = false,
+	fused = false,
 ) {
 	const signal = AbortSignal.timeout(SCENE_TIMEOUT_MS);
 	// a failed tile stays a hole (ocean, 404) as before, but a timeout fails the scene: a horizon with
@@ -151,6 +161,13 @@ async function computeScene(
 		});
 	};
 	const { terrain, eye } = await loadScene(lat, lon, alt, DEM, loadTile);
+	// fused (gpu/solve/fused.ts): the march on its command graph, then the solve's resident profile
+	// primed with the same bits; the CPU sceneHorizon below when the GPU cannot serve
+	if (gpu && fused) {
+		const { fusedSceneHorizon } = await import("#/lib/gpu/solve/fused");
+		const f = await fusedSceneHorizon(terrain, lat, lon, eye);
+		if (f) return { horizon: f.horizon, eye, horizonOn: "gpu" as const };
+	}
 	// opt-in (unknownGpuOptIn, page side): the same march on the GPU; null → the CPU sceneHorizon below
 	if (gpu) {
 		const { sceneHorizonGpu } = await import("#/lib/gpu/horizon/scene-profile");
@@ -174,6 +191,7 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 		req.alt,
 		req.gpu,
 		req.gpuGraph,
+		fusedFor(req),
 	);
 	const tHorizon = performance.now() - t0;
 	const sky = detectSkyline(req.image);
@@ -296,11 +314,19 @@ ctx.onmessage = async (
 			ev.data.alt,
 			ev.data.gpu,
 			ev.data.gpuGraph,
+			fusedFor(ev.data),
 		).catch(() => {});
-		if (ev.data.solveGpu)
+		if (ev.data.solveGpu) {
+			const fused = fusedFor(ev.data);
 			getComputeDevice()
-				.then((d) => d && warmSolveGpu(d))
+				.then(async (d) => {
+					if (!d) return;
+					if (fused)
+						await (await import("#/lib/gpu/solve/fused")).warmFusedSolve(d);
+					else await warmSolveGpu(d);
+				})
 				.catch(() => {});
+		}
 		return;
 	}
 	let msg: UnknownPoseResponse;

@@ -61,6 +61,12 @@ export type UnknownPosePrepare = {
 	 * graphs; false = both on the pooled paths; unset = coarse grid on the graph, horizon pooled.
 	 */
 	gpuGraph?: boolean;
+	/**
+	 * The fused horizon → solve chain (src/lib/gpu/solve/fused.ts; identical results): with gpu and
+	 * solveGpu, the march on its command graph primes the coarse graph's resident profile. Default on;
+	 * false opts out (the march then follows gpuGraph).
+	 */
+	gpuFused?: boolean;
 	/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
 	gpuOpts?: RealmGpuOptions;
 };
@@ -83,6 +89,8 @@ export type UnknownPoseRequest = {
 	solveGpu?: boolean;
 	/** as UnknownPosePrepare.gpuGraph */
 	gpuGraph?: boolean;
+	/** as UnknownPosePrepare.gpuFused */
+	gpuFused?: boolean;
 	/** as UnknownPosePrepare.gpuOpts */
 	gpuOpts?: RealmGpuOptions;
 };
@@ -148,7 +156,7 @@ export class UnknownPoseSolver {
 	constructor(
 		private photo: PhotoMeta,
 		/** graph: GPU work on core command graphs (A/B of the plumbing; default the pooled paths) */
-		private opts: { graph?: boolean } = {},
+		private opts: { graph?: boolean; fused?: boolean } = {},
 	) {
 		this.worker = new Worker(
 			new URL("./unknown-pose.worker.ts", import.meta.url),
@@ -172,6 +180,7 @@ export class UnknownPoseSolver {
 			gpu: this.gpu,
 			solveGpu: this.solveGpu,
 			gpuGraph: opts.graph,
+			gpuFused: opts.fused,
 			gpuOpts: realmGpuOptions(),
 		};
 		this.worker.postMessage(prep);
@@ -236,6 +245,7 @@ export class UnknownPoseSolver {
 				gpu: this.gpu,
 				solveGpu: this.solveGpu,
 				gpuGraph: this.opts.graph,
+				gpuFused: this.opts.fused,
 				gpuOpts: realmGpuOptions(),
 			};
 			this.worker.postMessage(req, [data.buffer]);

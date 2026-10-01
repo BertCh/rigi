@@ -18,6 +18,7 @@ The unknown-pose cascade is where the grid gets big: 360° of yaw, and ±15° of
 | `coarse.wgsl.ts` | One dispatch. Each workgroup takes one yaw row and one block of 256 pitches, and writes the block's minimum cost plus the first/last pitch within 2.5ε of it. |
 | `index.ts` | `coarseGpu(device, plan)` returns `CoarseResult` + stats. `solveCoarse(prior, horizon, sky, opts)` is the drop-in: GPU when there is a compute device, CPU otherwise, `null` when there is no skyline. Also `warmSolveGpu` and `costBound`. |
 | `graph.ts` | Opt-in command-graph path (`coarseGpu(…, { graph: true })`, `solveCoarse(…, { graph: true })`; default off). See below. |
+| `fused.ts` | The unknown-pose worker's fused horizon → solve chain (`gpuFused`). See below. |
 | `bench.ts` | The browser side of `scripts/gpu/solve-bench.mjs`. Also compares the two GPU paths, and `benchFold` checks the GPU row fold on adversarial blocks. |
 
 ## Why the result is identical by construction
@@ -84,3 +85,12 @@ A shape-keyed core `ComputeGraph` (`cachedGraph`, group `solve-coarse`, keyed on
 - The COARSE WGSL, the certified ε, `selectBounded` and its exact re-scores are shared and unchanged.
 
 Evidence (`scripts/gpu/solve-bench.mjs`): on 5 photos × 4 conditions, the graph path equals the single-dispatch path in the result, the per-row digest of (g, from, to) and every non-timing stat (rescored rows/cells, ε, maxErr, fellBack), at ε × 1 and ε × 100; 0 graph fallbacks. `benchFold` (20 000 + 14 000 adversarial rows, NaN / ±inf / ±0 / empty bands / minima within ±6 ulps of the threshold, run twice with different data): 0 mismatches; every row where a naive f32 threshold would differ from the CPU (539 and 515) is flagged.
+
+## Fused horizon → solve chain (`fused.ts`, 2026-10-01)
+
+With the GPU 360° horizon (`?unknownGpu=on`) and the GPU coarse grid on its graph, the worker runs (default; `gpuFused: false` opts out) `fusedSceneHorizon`: the march on its command graph (`horizon/graph.ts`), the CPU's tan → degrees conversion as before, then the solve's resident `hz` buffer written with exactly `packCoarse`'s bits (`profileHz`, `primeResidentHz`). Every coarse graph run of the photo then binds that buffer: the first one no longer uploads (`stats.hzUploaded` false). `prepare` also compiles the fold kernel (`warmFusedSolve`).
+
+What stays unfused, and why:
+- **The horizon readback.** The CPU needs the profile anyway: the LM fine stage, refinePose, the exact re-scores and the certified ε (max |hz|, steepest step) all read `horizon.elevation`.
+- **The tan → degrees conversion.** The kernel must see f32(Math.atan(t) / DEG), computed in f64. WGSL has no f64, specifies atan only to 4096 ULP and allows FMA contraction, so a GPU node cannot be proven to produce those bits. Verifying it would mean reading 28.8 KB back, the size of the once-per-photo upload it would save. Using it unverified with a wider ε would keep the result but change the row intervals, bands and re-score work.
+- **One submit for the march and the first grid.** The coarse uniforms carry 2.5ε, and ε, the plan's observations and the selection all need the CPU profile first.

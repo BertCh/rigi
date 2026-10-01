@@ -179,6 +179,20 @@ export function rowsDigest(g: Float64Array, from: Int32Array, to: Int32Array) {
 	return h.toString(16).padStart(8, "0");
 }
 
+/**
+ * The coarse kernel's horizon buffer: the profile's elevations plus the wrap sample (f32, as the
+ * kernel reads them), or null when the GPU cannot use the profile (packCoarse's profile checks).
+ */
+export function profileHz(h: HorizonProfile): Float32Array | null {
+	const nH = h.elevation.length;
+	if (Math.abs(nH * h.step - 360) > 1e-6 || !h.elevation.every(Number.isFinite))
+		return null;
+	const hz = new Float32Array(nH + 1);
+	hz.set(h.elevation);
+	hz[nH] = h.elevation[0];
+	return hz;
+}
+
 /** The coarse kernel's inputs for plan `p` (shared by both paths), or null when the GPU can't serve it. */
 export function packCoarse(p: CoarsePlan, o: CoarseGpuOptions) {
 	const h = p.horizon;
@@ -196,9 +210,7 @@ export function packCoarse(p: CoarsePlan, o: CoarseGpuOptions) {
 	)
 		return null;
 
-	const hz = new Float32Array(nH + 1);
-	hz.set(h.elevation);
-	hz[nH] = h.elevation[0];
+	const hz = profileHz(h) as Float32Array;
 	// observation azimuth (as horizonAt reads it) → (bin, fraction)
 	const ob = new ArrayBuffer(nObs * 16);
 	const obU = new Uint32Array(ob);

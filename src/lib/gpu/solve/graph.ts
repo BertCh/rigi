@@ -153,6 +153,11 @@ function residentHz(
 	return { buf: r.buf, uploaded: true };
 }
 
+/** Make `hz` the device's resident profile now (./fused.ts; call under the "solve" lease). */
+export function primeResidentHz(device: Device, hz: Float32Array) {
+	return residentHz(device, hz).uploaded;
+}
+
 /** Drop the resident profile of `device` (tests; the next call re-uploads). */
 export function releaseResidentHz(device: Device) {
 	resident.get(device)?.buf.destroy();
