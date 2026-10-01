@@ -14,7 +14,8 @@
 //          range readback) vs LookBridge.hazePrep on the geometry target
 //   fit    the whole HazeFit (JSON): a fresh HazeController on the readback path (range readback →
 //          fitHazeGpu) vs one with `bridged` = LookBridge.fitHaze (prepAndFitHazeTex on the target),
-//          plus the engine's live fit; and the guards (stale prep, wrong geo size) reject
+//          plus the engine's live fit, the bridged fit's stage medians (fit.stagesMs, haze.ts
+//          hazeGpuTimes); and the guards (stale prep, wrong geo size) reject
 //   relief the readback path (buildReliefFieldGpu: relief graph → read node → bytes, uploaded with
 //          TerrainStyles.setReliefField's descriptor + writeData) vs LookBridge.reliefField (the
 //          same graph → copyBufferToTexture), both textures read back, field + gen; plus the
@@ -24,6 +25,7 @@
 import type { Device, Texture } from "@luma.gl/core";
 import type { EnuFrame } from "#/lib/geodesy";
 import { getComputeDevice } from "#/lib/gpu/device";
+import { hazeGpuTimes } from "#/lib/gpu/look/haze";
 import { fitHazeFromPrep, prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
 import { buildReliefFieldGpu } from "#/lib/gpu/look/relief";
 import {
@@ -476,10 +478,23 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 		);
 	}
 	const fitT = { ref: [] as number[], bridge: [] as number[] };
+	// the bridged fit's stages (haze.ts hazeGpuTimes: the GPU part incl. the prep, the CPU tail)
+	const fitStages: Record<string, number[]> = {};
 	for (let i = 0; i < reps; i++) {
 		fitT.ref.push((await fitVia()).ms);
 		fitT.bridge.push((await fitVia(viaBridge)).ms);
+		for (const k of [
+			"gpuPrep",
+			"cpuBins",
+			"cpuFreeBeta",
+			"gpuGrid",
+			"cpuRefine",
+		])
+			fitStages[k] = [...(fitStages[k] ?? []), hazeGpuTimes[k] ?? Number.NaN];
 	}
+	(fit as Record<string, unknown>).stagesMs = Object.fromEntries(
+		Object.entries(fitStages).map(([k, v]) => [k, +median(v).toFixed(2)]),
+	);
 	// ── relief: readback path (bytes → writeData) vs bridge (graph → copyBufferToTexture)
 	const relief: Record<string, unknown> = { ran: false };
 	const rt = { ref: [] as number[], bridge: [] as number[] };
