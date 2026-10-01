@@ -88,12 +88,25 @@ export function terrainCoresOf(cores: readonly GpuLayerCore[]): GpuLayerCore[] {
 	);
 }
 
+/**
+ * Lazy mode of the 1024 px query source (WebGpuEngine's geometry diet): render() draws into the
+ * target and awaits `after` (GPU point queries on that target) instead of reading the whole
+ * rgba32float target back. `range` / `xyz` then stay empty until ensureFull() is called, and
+ * `hasCpu` says whether they describe the current render. `after` resolving false (a kernel
+ * failed) makes that render() fall back to the full readback.
+ */
+export type LazyQueries = {
+	after: (seq: number, pose: Pose) => Promise<boolean>;
+};
+
 export type WebGpuGeometryOptions = {
 	device: Device;
 	/** Cores to draw (terrain only). Read on every render, so tile / core swaps apply. */
 	cores: () => readonly GpuLayerCore[];
 	/** Photo eye (ENU m). Read once per source: a source describes the eye it was made with. */
 	eye: Eye | (() => Eye);
+	/** Lazy queries for the sources wider than `xyzMinWidth` (the 1024 px query source). */
+	lazyQueries?: () => LazyQueries | undefined;
 	/** Near plane (m); the frame's photo camera uses 1 (lab.ts, deck/geometry-pass.ts). */
 	near?: number;
 };
@@ -114,6 +127,10 @@ export class WebGpuGeometrySource implements GeometrySource {
 	/** The targets of the last render (GPU consumers: geometry.w = range, 0 = sky; top-first). */
 	readonly targets: GeometryTargets;
 	private readonly device: Device;
+	private lazy: LazyQueries | null;
+	/** The render() whose readback `range` / `xyz` hold (0 = none yet). */
+	private cpuSeq = 0;
+	private fullRead: { seq: number; p: Promise<boolean> } | null = null;
 	private readonly cores: () => readonly GpuLayerCore[];
 	private readonly eye: Eye;
 	private readonly near: number;
@@ -140,9 +157,10 @@ export class WebGpuGeometrySource implements GeometrySource {
 		o: Omit<WebGpuGeometryOptions, "eye"> & { eye: Eye },
 		width: number,
 		height: number,
-		opts: { xyz?: boolean } = {},
+		opts: { xyz?: boolean; lazy?: LazyQueries } = {},
 	) {
 		this.device = o.device;
+		this.lazy = opts.lazy ?? null;
 		this.cores = o.cores;
 		this.eye = [o.eye[0], o.eye[1], o.eye[2]];
 		this.near = o.near ?? 1;
@@ -177,6 +195,49 @@ export class WebGpuGeometrySource implements GeometrySource {
 			vfov: c.vfov,
 			near: c.near,
 		};
+	}
+
+	/** True when `range` / `xyz` hold the render `pose` describes (always, outside lazy mode). */
+	get hasCpu() {
+		return this.cpuSeq > 0 && this.cpuSeq === this.unpacked;
+	}
+
+	/** Lazy mode on (render() does not read the target back). */
+	get isLazy() {
+		return this.lazy !== null;
+	}
+
+	/** Back to reading every render() in full (a diet kernel failed for good). */
+	disableLazy() {
+		this.lazy = null;
+	}
+
+	/**
+	 * Lazy mode: read the current render's target back in full now (once per render; concurrent calls
+	 * share it) so `range` / `xyz` / hasCpu describe it. The copy is queued immediately, so it holds
+	 * the render the pose describes; a newer render() meanwhile discards the result.
+	 */
+	ensureFull(): Promise<boolean> {
+		if (this.hasCpu) return Promise.resolve(true);
+		const seq = this.unpacked;
+		if (this.disposed || !seq || seq !== this.seq || !this.pose)
+			return Promise.resolve(false);
+		if (this.fullRead?.seq === seq) return this.fullRead.p;
+		const p = (async () => {
+			const reader = this.readers.pop() ?? new TextureReader(this.device);
+			const data = await reader.read(this.targets.geometry);
+			if (this.disposed || this.readers.length >= 2) reader.destroy();
+			else this.readers.push(reader);
+			if (!data || seq !== this.seq || this.disposed) return false;
+			this.readBytes = data.byteLength;
+			this.unpack(data);
+			this.cpuSeq = seq;
+			return true;
+		})().finally(() => {
+			if (this.fullRead?.seq === seq) this.fullRead = null;
+		});
+		this.fullRead = { seq, p };
+		return p;
 	}
 
 	/** The device the targets live on (GPU consumers of `targets.geometry`). */
@@ -251,6 +312,31 @@ export class WebGpuGeometrySource implements GeometrySource {
 		const t0 = performance.now();
 		const cores = this.drawPass(pose, t0);
 		const t1 = performance.now();
+		if (this.lazy) {
+			let ok = false;
+			try {
+				ok = await this.lazy.after(seq, { ...pose });
+			} catch (e) {
+				console.warn("[geometry-source] lazy queries failed, full readback", e);
+			}
+			if (this.disposed || seq !== this.seq) return;
+			if (ok) {
+				this.pose = { ...pose };
+				this.unpacked = seq;
+				const t2 = performance.now();
+				this.timing = {
+					submitMs: t1 - t0,
+					readbackMs: t2 - t1,
+					unpackMs: 0,
+					totalMs: t2 - t0,
+					cores: cores.filter(
+						(c) => c.passes.includes("geometry") && (c.visible?.() ?? true),
+					).length,
+				};
+				return;
+			}
+			this.lazy = null;
+		}
 		await this.finish(seq, pose, cores, t0, t1);
 	}
 
@@ -274,6 +360,7 @@ export class WebGpuGeometrySource implements GeometrySource {
 		const t3 = performance.now();
 		this.pose = { ...pose };
 		this.unpacked = seq;
+		this.cpuSeq = seq;
 		this.timing = {
 			submitMs: t1 - t0,
 			readbackMs: t2 - t1,
@@ -340,7 +427,12 @@ export function webgpuGeometryFactory(
 			},
 			width,
 			height,
-			{ xyz: width > xyzMin },
+			{
+				xyz: width > xyzMin,
+				...(width > xyzMin && o.lazyQueries?.()
+					? { lazy: o.lazyQueries() }
+					: {}),
+			},
 		);
 }
 

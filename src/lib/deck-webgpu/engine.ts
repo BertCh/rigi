@@ -57,6 +57,13 @@ import {
 import * as cam from "#/lib/camera";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { CpuGeometrySource, TerrainProfiles } from "#/lib/deck/cpu-geometry";
+import {
+	type OccPlan,
+	planOcclusion,
+	resolveOcclusion,
+	skylineFromRows,
+	texelOf,
+} from "#/lib/deck/geo-query";
 import type {
 	GeometrySource,
 	GeometrySourceFactory,
@@ -97,8 +104,6 @@ import { tileBounds } from "#/lib/dem";
 import { startLakeFloor } from "#/lib/geocam/lakes/fetch";
 import { priorHeading } from "#/lib/geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
-import { type TerroirShader, terroirShader } from "#/lib/terroir/glsl/values";
-import type { CoverGrid } from "#/lib/terroir/pack";
 import { autoAlignAsync, warmAlignGpu } from "#/lib/gpu/align";
 import { lookIdle } from "#/lib/gpu/look/opt-in";
 import {
@@ -169,6 +174,8 @@ import {
 import { CLASSIC } from "#/lib/style/defaults";
 import type { ViewStyle } from "#/lib/style/types";
 import { heightFromTile } from "#/lib/terrain";
+import { type TerroirShader, terroirShader } from "#/lib/terroir/glsl/values";
+import type { CoverGrid } from "#/lib/terroir/pack";
 import { tiles3dConfig } from "#/lib/tiles3d/config";
 import { DeckTiles3D } from "#/lib/tiles3d/deck-tiles";
 import {
@@ -180,6 +187,7 @@ import {
 } from "./camera";
 import { createLookBridge, type LookBridge } from "./compute-bridge";
 import { deckBuild, releaseForCompute, webgpuAvailable } from "./device";
+import { GeoQueryGpu } from "./geo-query-gpu";
 import type { Host, HostStats } from "./hosts/direct";
 import {
 	type CameraPose,
@@ -388,6 +396,14 @@ export type WebGpuEngineOptions = {
 	 * pose instead of the rgba32float range). false = the CPU scorer, which also runs per pose
 	 * whenever the GPU can't decide. Harnesses flip `silhouetteGpu` for the A/B. */
 	silhouetteGpu?: boolean;
+	/** The 1024 px query geometry is NOT read back in full on every settle (default true): peak-label
+	 * occlusion verdicts and the skyline come from compute passes over the geometry target
+	 * (geo-query-gpu.ts, deck/geo-query.ts: identical results by construction, a few hundred bytes
+	 * read), point queries gather single texels, and the full rgba32float copy is read lazily only
+	 * for the consumers that need it (readback(), the CPU look fallbacks, a fitted haze, Step
+	 * Inside). false = the full readback on every settle, which is also what any failing kernel
+	 * switches to. Harnesses flip it for the A/B. */
+	geometryDiet?: boolean;
 };
 
 export type WebGpuEngineStats = {
@@ -493,6 +509,32 @@ export class WebGpuEngine implements Renderer {
 	/** WebGpuEngineOptions.silhouetteGpu (harnesses flip it for the A/B). */
 	silhouetteGpu = true;
 	private silMask: SilhouetteMaskGpu | null = null;
+	/** geometry diet (see WebGpuEngineOptions.geometryDiet) */
+	private geoQuery: GeoQueryGpu | null = null;
+	private dietBroken = false;
+	/** Occlusion verdicts of a render (peaks in frame only), valid for exactly the inputs they were made from. */
+	private occGpu: {
+		seq: number;
+		pose: Pose;
+		eye: V3;
+		aspect: number;
+		snapped: SnappedPeak[];
+		vis: Map<SnappedPeak, boolean>;
+		applied: boolean;
+	} | null = null;
+	private skyGpu: { seq: number; sky: Float32Array } | null = null;
+	private queryBusy = false;
+	/** Gathered texels (x y z w) of the render `seq`, by y * w + x. */
+	private ptCache: { seq: number; map: Map<number, Float32Array> } | null =
+		null;
+	private ptQueue = new Map<
+		number,
+		{ x: number; y: number; res: ((t: Float32Array | null) => void)[] }
+	>();
+	private ptFlushing = false;
+	/** Bytes the diet's kernels read back, and the full readbacks it still did (evidence / stats). */
+	dietStats = { kernelCalls: 0, fullReads: 0, fullBytes: 0 };
+	private fullKicked = false;
 	private streamer?: TerrainStreamer;
 	private renderSet: TerrainSet | null = null;
 	private queryWedge?: ViewWedge;
@@ -1004,6 +1046,8 @@ export class WebGpuEngine implements Renderer {
 		}
 		if (this.disposed) return;
 		this.lost = false;
+		// a kernel failure caused by the loss must not keep the diet off for good
+		this.dietBroken = false;
 		this.counters.contextRestored++;
 		if (this.step?.map) this.syncMapViews();
 		this.invalidateGeometry();
@@ -1326,6 +1370,8 @@ export class WebGpuEngine implements Renderer {
 		this.dropGeometrySources();
 		this.silMask?.destroy();
 		this.silMask = null;
+		this.geoQuery?.destroy();
+		this.geoQuery = null;
 		this.listeners.clear();
 		const g = this.gpu;
 		this.gpu = null;
@@ -1407,6 +1453,11 @@ export class WebGpuEngine implements Renderer {
 				...this.counters,
 				interactive: this.interactive,
 				lostNow: this.lost,
+				geometryDiet: {
+					on: this.dietOn(),
+					...this.dietStats,
+					kernelBytes: this.geoQuery?.totalBytes ?? 0,
+				},
 				view: this.view,
 			},
 		};
@@ -1609,6 +1660,8 @@ export class WebGpuEngine implements Renderer {
 	private rangeGrid(): RangeGrid | null {
 		const src = this.geoSrc;
 		if (!src?.pose) return null;
+		// diet: no CPU copy of the current render (callers that need it call needFull())
+		if (src instanceof WebGpuGeometrySource && !src.hasCpu) return null;
 		const { width: w, height: h, range } = src;
 		return { w, h, at: (x, y) => range[y * w + x] };
 	}
@@ -1619,34 +1672,50 @@ export class WebGpuEngine implements Renderer {
 		const defines = lookKey(this.style).filter((d) =>
 			(COMPOSITE_DEFINES as readonly string[]).includes(d),
 		);
-		const grid = this.geometryReady() ? this.rangeGrid() : null;
+		const ready = this.geometryReady();
+		const grid = ready ? this.rangeGrid() : null;
 		const bridge = this.gpu?.bridge ?? null;
 		const geoTex = this.geometryTexture();
-		if (defines.length && grid && bridge && geoTex) {
+		const cut =
+			this.settings.mode === "replace" && composite
+				? blendCut(this.settings, composite.brushCanvas, this.brushVersion)
+				: null;
+		// the bridged masks read the geometry TEXTURE; the CPU range grid is only sampled for a blend
+		// cut and for the photo-noise estimate without a photo sky mask (compLook.updateNoise)
+		const bridged = !!(defines.length && ready && bridge && geoTex);
+		const wantsGrid =
+			!bridged ||
+			cut !== null ||
+			(this.style.composite.output === "neutral" &&
+				!!this.photoImg &&
+				!this.skyMaskStore);
+		if (defines.length && ready && !grid && wantsGrid) {
+			// no CPU copy of this render: read it (once) and come back
+			void this.needFull().then((ok) => ok && this.updateLook());
+		}
+		if (bridged && (grid || !wantsGrid)) {
 			bridge.updateMasks({
 				style: this.style,
 				gen: this.geoBufGen,
 				img: this.photoImg,
 				fg: this.fgMask,
 				sky: this.skyMaskStore,
-				cut:
-					this.settings.mode === "replace" && composite
-						? blendCut(this.settings, composite.brushCanvas, this.brushVersion)
-						: null,
+				cut,
 				geometry: geoTex,
-				range: () => grid,
+				range: () => grid ?? NO_GRID,
 			});
-			this.compLook.updateNoise(this.style, this.photoImg, () => grid);
-		} else if (defines.length && grid) {
+			this.compLook.updateNoise(
+				this.style,
+				this.photoImg,
+				() => grid ?? NO_GRID,
+			);
+		} else if (!bridged && defines.length && grid) {
 			this.compLook.updateMasks({
 				style: this.style,
 				gen: this.geoBufGen,
 				img: this.photoImg,
 				fg: this.fgMask,
-				cut:
-					this.settings.mode === "replace" && composite
-						? blendCut(this.settings, composite.brushCanvas, this.brushVersion)
-						: null,
+				cut,
 				geo: () => grid,
 			});
 			this.compLook.updateNoise(this.style, this.photoImg, () => grid);
@@ -1707,9 +1776,9 @@ export class WebGpuEngine implements Renderer {
 			return;
 		this.statsTimer = window.setTimeout(async () => {
 			this.statsTimer = 0;
-			const grid = this.rangeGrid();
 			const img = this.photoImg;
-			if (this.disposed || !this.geometryReady() || !grid || !img) return;
+			if (this.disposed || !this.geometryReady() || !this.geoSrc?.pose || !img)
+				return;
 			const [w, h] = gridSize(this.aspect, STATS_LONG_SIDE);
 			const geoTex = this.geometryTexture();
 			if (bridge && geoTex && bridge === this.gpu?.bridge) {
@@ -1730,6 +1799,12 @@ export class WebGpuEngine implements Renderer {
 				} finally {
 					this.statsBusy = false;
 				}
+				return;
+			}
+			// the CPU stats path samples the range grid
+			const grid = this.rangeGrid();
+			if (!grid) {
+				void this.needFull().then((ok) => ok && this.scheduleStats());
 				return;
 			}
 			this.statsBusy = true;
@@ -1765,6 +1840,22 @@ export class WebGpuEngine implements Renderer {
 		const pose = src.pose;
 		const bridge = this.gpu?.bridge ?? null;
 		const img = this.photoImg;
+		// the fit's CPU input is the range ×2 decimated: read the full copy first (only for a fitted
+		// haze whose pose / eye changed; HazeController.isDue)
+		if (
+			src instanceof WebGpuGeometrySource &&
+			!src.hasCpu &&
+			this.haze.isDue({
+				style: this.style,
+				pose,
+				img,
+				eyeAlt: this.eyeAlt,
+				fg: this.fgMask,
+			})
+		) {
+			void this.needFull().then((ok) => ok && this.fitHaze());
+			return;
+		}
 		// the geometry target holds the render `src.range` was read from until the next render()
 		const seq = src instanceof WebGpuGeometrySource ? src.rangeSeq : -1;
 		const bridged =
@@ -2096,6 +2187,10 @@ export class WebGpuEngine implements Renderer {
 				cores: () => (this.gpu ? [this.gpu.terrain] : []),
 				eye: this.eyeArr,
 				near: PHOTO_NEAR,
+				lazyQueries: () =>
+					this.dietOn()
+						? { after: (seq, pose) => this.queryOnDraw(seq, pose) }
+						: undefined,
 			});
 			this.geoSrcEye = this.eyeArr;
 			return { src: factory(width, height), kind: "gpu" };
@@ -2132,6 +2227,9 @@ export class WebGpuEngine implements Renderer {
 		this.geoSrc?.dispose?.();
 		for (const s of this.silSources) s.dispose?.();
 		this.geoSrc = undefined;
+		this.occGpu = null;
+		this.skyGpu = null;
+		this.ptCache = null;
 		this.silSources = [];
 		this.geoSrcKind = null;
 		this.geoSrcEye = null;
@@ -2148,8 +2246,280 @@ export class WebGpuEngine implements Renderer {
 		this.emit();
 	}
 
-	readback(): Promise<boolean> {
-		return this.gens.readback();
+	/**
+	 * Resolves true once the geometry describes the current pose, with the CPU copy (sampleAt,
+	 * rangeGrid) too. settle() is the same without the full copy.
+	 */
+	async readback(): Promise<boolean> {
+		// a newer render starting during the copy supersedes it: retry as gens.readback does
+		for (let i = 0; i < 4 && !this.disposed; i++) {
+			if (!(await this.gens.readback())) return false;
+			const src = this.geoSrc;
+			if (!(src instanceof WebGpuGeometrySource) || src.hasCpu) return true;
+			if ((await this.needFull()) && this.geometryReady()) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Resolves true once the geometry describes the current pose, for peakLabels, skyline and
+	 * sampleAtAsync. Under the geometry diet that is the GPU queries only: no full readback.
+	 */
+	async settle(): Promise<boolean> {
+		if (!(await this.gens.readback())) return false;
+		// the verdicts must describe the current snapped list too (peaks can change without a geometry
+		// invalidation): recompute them from the target for this render if they don't
+		for (let i = 0; i < 3 && !this.disposed; i++) {
+			const src = this.geoSrc;
+			if (!(src instanceof WebGpuGeometrySource) || !this.terrain) break;
+			if (!src.isLazy) {
+				// the diet failed: the full copy is what peakLabels / skyline use now
+				if (!src.hasCpu) await this.needFull();
+				break;
+			}
+			if (this.applyGpuVerdicts(this.snapped(this.pose))) break;
+			if (!src.pose || src.renderSeq !== src.rangeSeq) break;
+			if (!(await this.queryOnDraw(src.rangeSeq, src.pose))) continue;
+		}
+		return this.geometryReady();
+	}
+
+	// ---------------------------------------------------------------------------------------------
+	// geometry diet (geo-query-gpu.ts, deck/geo-query.ts)
+
+	/** The diet is on: option, no kernel failed so far, a render device. */
+	private dietOn() {
+		return this.opts.geometryDiet !== false && !this.dietBroken && !!this.gpu;
+	}
+
+	/** A diet kernel failed (or the device went): every render reads back in full from now on. */
+	private dietFail(why: string) {
+		if (this.dietBroken) return;
+		this.dietBroken = true;
+		console.warn(`[webgpu-engine] geometry diet off (${why}); full readback`);
+		const src = this.geoSrc;
+		if (src instanceof WebGpuGeometrySource) {
+			src.disableLazy();
+			void src.ensureFull().then(() => {
+				if (!this.disposed) this.emit();
+			});
+		}
+	}
+
+	/** The query source's full CPU copy of the current render (lazy; false = superseded / failed). */
+	private async needFull(): Promise<boolean> {
+		const src = this.geoSrc;
+		if (!(src instanceof WebGpuGeometrySource)) return !!src?.pose;
+		if (src.hasCpu) return true;
+		const before = src.hasCpu;
+		const ok = await src.ensureFull();
+		if (ok && !before) {
+			this.dietStats.fullReads++;
+			this.dietStats.fullBytes += src.readBytes;
+		}
+		return ok && !this.disposed && this.geoSrc === src;
+	}
+
+	private geoQueryGpu(): GeoQueryGpu | null {
+		const device = this.gpu?.device;
+		if (!device) return null;
+		if (this.geoQuery?.device !== device) {
+			this.geoQuery?.destroy();
+			this.geoQuery = new GeoQueryGpu(device);
+		}
+		return this.geoQuery;
+	}
+
+	/** The peaks of `snapped` inside the frame, projected (the CPU loop's own filter). */
+	private inFrameProjections(snapped: SnappedPeak[], pose: Pose) {
+		return snapped.map((p) => {
+			const pr = this.projectToPhoto(p.position, pose);
+			return !pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1 ? null : pr;
+		});
+	}
+
+	/**
+	 * The GPU queries of one render (lazy query source, after its geometry pass): occlusion verdicts
+	 * of the snapped peaks and the skyline rows, each one dispatch over targets.geometry and a few
+	 * hundred bytes read. false = a kernel failed (the source then reads the render back in full).
+	 */
+	private async queryOnDraw(seq: number, pose: Pose): Promise<boolean> {
+		const src = this.geoSrc;
+		const q = this.geoQueryGpu();
+		if (!(src instanceof WebGpuGeometrySource) || !q) return false;
+		if (src.renderSeq !== seq) return true; // superseded: the source drops this render
+		const tex = src.targets.geometry;
+		const snapped = this.terrain ? this.snapped(pose) : [];
+		const eye = this.eyeArr;
+		const aspect = this.aspect;
+		const prs = this.inFrameProjections(snapped, pose);
+		const plan: OccPlan = planOcclusion(prs, src.width, src.height);
+		const [codes, rows] = await Promise.all([
+			plan.slots.length ? q.verdicts(tex, plan.words) : new Uint32Array(0),
+			q.skylineRows(tex),
+		]);
+		if (!codes || !rows) {
+			this.dietFail(!rows ? "skyline kernel" : "verdict kernel");
+			return false;
+		}
+		const verdicts = await resolveOcclusion(plan, codes, (xy) =>
+			q.gather(tex, xy),
+		);
+		if (!verdicts) {
+			this.dietFail("gather kernel");
+			return false;
+		}
+		this.dietStats.kernelCalls++;
+		if (src.renderSeq !== seq) return true;
+		const vis = new Map<SnappedPeak, boolean>();
+		snapped.forEach((p, i) => {
+			if (prs[i]) vis.set(p, verdicts[i] === true);
+		});
+		this.occGpu = {
+			seq,
+			pose: { ...pose },
+			eye,
+			aspect,
+			snapped,
+			vis,
+			applied: false,
+		};
+		this.skyGpu = { seq, sky: skylineFromRows(rows, src.height) };
+		return true;
+	}
+
+	/** Recompute the GPU queries for the render the target holds now (state changed without a new render). */
+	private kickQueries() {
+		const src = this.geoSrc;
+		if (
+			this.queryBusy ||
+			!(src instanceof WebGpuGeometrySource) ||
+			!src.isLazy ||
+			!src.pose ||
+			src.renderSeq !== src.rangeSeq
+		)
+			return;
+		const seq = src.rangeSeq;
+		this.queryBusy = true;
+		this.queryOnDraw(seq, src.pose)
+			.then((ok) => {
+				if (ok && !this.disposed) this.emit();
+			})
+			.catch((e) => this.dietFail(String(e)))
+			.finally(() => {
+				this.queryBusy = false;
+			});
+	}
+
+	/** Copies the GPU verdicts into `vis` when they were made from exactly the current inputs. */
+	private applyGpuVerdicts(snapped: SnappedPeak[]) {
+		const c = this.occGpu;
+		const src = this.geoSrc;
+		const p = this.pose;
+		if (
+			!c ||
+			!(src instanceof WebGpuGeometrySource) ||
+			c.seq !== src.rangeSeq ||
+			c.pose.yaw !== p.yaw ||
+			c.pose.pitch !== p.pitch ||
+			c.pose.roll !== p.roll ||
+			c.pose.vfov !== p.vfov ||
+			c.eye[0] !== this.eye.x ||
+			c.eye[1] !== this.eye.y ||
+			c.eye[2] !== this.eye.z ||
+			c.aspect !== this.aspect ||
+			c.snapped.length !== snapped.length ||
+			!c.snapped.every((q, i) => q === snapped[i])
+		)
+			return false;
+		if (!c.applied) {
+			for (const [k, v] of c.vis) this.vis.set(k, v);
+			c.applied = true;
+		}
+		return true;
+	}
+
+	/** Texel (x y z w) of the render `seq` at buffer pixel (x, y), from the gather cache. */
+	private cachedTexel(seq: number, x: number, y: number) {
+		const c = this.ptCache;
+		return c && c.seq === seq
+			? c.map.get(y * (this.geoSrc?.width ?? 0) + x)
+			: undefined;
+	}
+
+	private sampleFromTexel(t: ArrayLike<number>): Sample | null {
+		const range = t[3] > 0 ? t[3] : Number.POSITIVE_INFINITY;
+		if (!(range > 0) || !Number.isFinite(range)) return null;
+		const world: V3 = [t[0], t[1], t[2]];
+		const g = this.frame.toGeo(world[0], world[1], world[2]);
+		return { lat: g.lat, lon: g.lon, h: g.h, range, world };
+	}
+
+	/**
+	 * sampleAt for a pixel without the full CPU copy: one gathered texel (16 B read), cached per
+	 * render, coalesced with the other requests of the same tick. Same result as sampleAt (the texel
+	 * is a bit copy of the buffer sampleAt reads). null = sky / outside / the geometry is stale.
+	 */
+	async sampleAtAsync(u: number, v: number): Promise<Sample | null> {
+		const src = this.geoSrc;
+		if (!(src instanceof WebGpuGeometrySource) || !src.pose) return null;
+		if (src.hasCpu || !src.isLazy) return this.sampleAt(u, v);
+		const t = texelOf(u, v, src.width, src.height);
+		if (!t) return null;
+		if (src.renderSeq !== src.rangeSeq) return null;
+		const seq = src.rangeSeq;
+		const hit = this.cachedTexel(seq, t.x, t.y);
+		const tex =
+			hit ??
+			(await new Promise<Float32Array | null>((res) => {
+				const key = t.y * src.width + t.x;
+				const q = this.ptQueue.get(key);
+				if (q) q.res.push(res);
+				else this.ptQueue.set(key, { x: t.x, y: t.y, res: [res] });
+				if (!this.ptFlushing) {
+					this.ptFlushing = true;
+					queueMicrotask(() => void this.flushPoints(src, seq));
+				}
+			}));
+		if (!tex || this.geoSrc !== src || src.rangeSeq !== seq) return null;
+		return this.sampleFromTexel(tex);
+	}
+
+	private async flushPoints(src: WebGpuGeometrySource, seq: number) {
+		const batch = [...this.ptQueue.values()];
+		this.ptQueue.clear();
+		let texels: Float32Array | null = null;
+		try {
+			const q = this.geoQueryGpu();
+			if (q && src.renderSeq === seq && src.rangeSeq === seq) {
+				const xy: number[] = [];
+				for (const b of batch) xy.push(b.x, b.y);
+				texels = await q.gather(src.targets.geometry, xy);
+			}
+		} catch (e) {
+			console.warn("[webgpu-engine] point gather failed", e);
+		}
+		const ok = texels && src.rangeSeq === seq && this.geoSrc === src;
+		if (ok && (!this.ptCache || this.ptCache.seq !== seq))
+			this.ptCache = { seq, map: new Map() };
+		batch.forEach((b, i) => {
+			const t = ok && texels ? texels.slice(i * 4, i * 4 + 4) : null;
+			if (t) this.ptCache?.map.set(b.y * src.width + b.x, t);
+			for (const r of b.res) r(t);
+		});
+		this.ptFlushing = false;
+		if (this.ptQueue.size) {
+			this.ptFlushing = true;
+			// the source may have changed meanwhile: flush against the current one
+			const cur = this.geoSrc;
+			if (cur instanceof WebGpuGeometrySource)
+				queueMicrotask(() => void this.flushPoints(cur, cur.rangeSeq));
+			else {
+				for (const b of this.ptQueue.values()) for (const r of b.res) r(null);
+				this.ptQueue.clear();
+				this.ptFlushing = false;
+			}
+		}
 	}
 
 	geometryReady() {
@@ -2168,6 +2538,22 @@ export class WebGpuEngine implements Renderer {
 		const x = Math.floor(u * w);
 		const y = Math.floor(v * h);
 		if (x < 0 || y < 0 || x >= w || y >= h) return null;
+		if (src instanceof WebGpuGeometrySource && !src.hasCpu) {
+			// diet: start the lazy full copy (bulk consumers sample many pixels; hover uses
+			// sampleAtAsync) and answer null until it lands. Never answer from the hover gather cache:
+			// a render is all-or-nothing here, or geometryBufferState (export) would see one cached texel
+			// as a fresh buffer and enginePeaks / the footprint would work from a partial one.
+			// (Consumers that read null on the first frame after a render, e.g. terroir Legend /
+			// placeNames, get the real answer on the emit that follows the copy.)
+			if (!this.fullKicked) {
+				this.fullKicked = true;
+				void this.needFull().then((ok) => {
+					this.fullKicked = false;
+					if (ok && !this.disposed) this.emit();
+				});
+			}
+			return null;
+		}
 		const i = y * w + x;
 		const range = src.range[i];
 		if (!(range > 0) || !Number.isFinite(range)) return null;
@@ -2244,7 +2630,18 @@ export class WebGpuEngine implements Renderer {
 	): PeakLabel[] {
 		if (!this.terrain) return [];
 		const snapped = this.snapped(this.pose);
-		if (this.geometryReady() && !this.occlusionFresh(snapped))
+		const wsrc =
+			this.geoSrc instanceof WebGpuGeometrySource ? this.geoSrc : null;
+		const live = this.geometryReady();
+		// the GPU verdicts (identical to the loop below, deck/geo-query.ts); without them and without a
+		// CPU copy they are recomputed from the target (kickQueries) and the labels re-emit
+		if (live && this.applyGpuVerdicts(snapped)) {
+			// verdicts applied
+		} else if (live && wsrc && !wsrc.hasCpu) {
+			if (wsrc.isLazy) this.kickQueries();
+			else
+				void this.needFull().then((ok) => ok && !this.disposed && this.emit());
+		} else if (live && !this.occlusionFresh(snapped))
 			for (const p of snapped) {
 				const pr = this.projectToPhoto(p.position);
 				if (!pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1) continue;
@@ -2332,6 +2729,18 @@ export class WebGpuEngine implements Renderer {
 	skyline(): Float32Array | null {
 		const src = this.geoSrc;
 		if (!this.geometryReady() || !src?.pose) return null;
+		if (src instanceof WebGpuGeometrySource) {
+			const c = this.skyGpu;
+			if (c && c.seq === src.rangeSeq) return c.sky;
+			if (!src.hasCpu) {
+				if (src.isLazy) this.kickQueries();
+				else
+					void this.needFull().then(
+						(ok) => ok && !this.disposed && this.emit(),
+					);
+				return null;
+			}
+		}
 		if (this.skyCache?.gen !== this.geoBufGen)
 			this.skyCache = {
 				gen: this.geoBufGen,
@@ -2751,7 +3160,17 @@ export class WebGpuEngine implements Renderer {
 		const nf = this.nearField;
 		if (!st || !nf || st.view !== "step") return null;
 		if (!st.masks) {
-			const fresh = this.geometryReady();
+			// the DEM range is sampled per depth pixel: needs the CPU copy (lazy under the diet)
+			const src = this.geoSrc;
+			const cpu = !(src instanceof WebGpuGeometrySource) || src.hasCpu;
+			if (this.geometryReady() && !cpu)
+				void this.needFull().then((ok) => {
+					if (ok && this.step === st) {
+						st.masks = null;
+						this.sync();
+					}
+				});
+			const fresh = this.geometryReady() && cpu;
 			const dem = this.nearFieldDemRange(
 				nf.scene.split.width,
 				nf.scene.split.height,
@@ -3184,7 +3603,7 @@ export class WebGpuEngine implements Renderer {
 	 */
 	async exportImage(withLabels = true): Promise<Blob | null> {
 		if (this.settings.mode === "world" || this.step) return this.exportWorld();
-		if (withLabels) await this.readback();
+		if (withLabels) await this.settle();
 		await lookIdle();
 		await this.ready;
 		const g = this.gpu;
@@ -3226,6 +3645,9 @@ export class WebGpuEngine implements Renderer {
 
 // ---------------------------------------------------------------------------------------------
 // helpers
+
+/** Stand-in for a range grid nobody will sample (updateLook computed that none is needed). */
+const NO_GRID: RangeGrid = { w: 1, h: 1, at: () => Number.POSITIVE_INFINITY };
 
 /** deck/engine.ts objectDrapeMask: people ∪ Object pixels (dilated one split cell), row 0 = top. */
 function objectDrapeMask(

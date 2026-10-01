@@ -101,6 +101,16 @@ export interface Renderer {
 	geometryReady(): boolean;
 	/** Terrain under normalised photo coords (u right, v down), null for sky / no data. */
 	sampleAt(u: number, v: number): Sample | null;
+	/**
+	 * sampleAt that does not need the full CPU copy of the geometry (WebGPU: one gathered texel, cached
+	 * per render). Same answer as sampleAt; hover and other point queries prefer it when present.
+	 */
+	sampleAtAsync?(u: number, v: number): Promise<Sample | null>;
+	/**
+	 * Like readback(), resolving once peakLabels / skyline / sampleAtAsync describe the current pose,
+	 * without forcing the full CPU copy sampleAt needs (WebGPU geometry diet).
+	 */
+	settle?(): Promise<boolean>;
 	isForeground(u: number, v: number): boolean;
 	/** Ranked visible peaks; `declutter: false` skips the classic declutter (panorama / inline layouts). */
 	peakLabels(max?: number, opts?: { declutter?: boolean }): PeakLabel[];

@@ -64,6 +64,22 @@ export class HazeController {
 		warmLookGpu();
 	}
 
+	/** True when update() would fit now: the style wants it and (pose, eye, foreground mask) changed since the last fit. */
+	isDue(o: {
+		style: ViewStyle;
+		pose: Pose;
+		img: HTMLImageElement | undefined;
+		eyeAlt: number;
+		fg: SkyMask | null;
+	}): boolean {
+		if (!wantsHazeFit(o.style) || !o.img) return false;
+		const p = o.pose;
+		return (
+			`${p.yaw},${p.pitch},${p.roll},${p.vfov},${o.eyeAlt}` !== this.key ||
+			o.fg !== this.fgRef
+		);
+	}
+
 	/**
 	 * Fit if the style wants it and (pose, eye, sky) changed; true when a new fit arrived. `geo` is
 	 * only called when a fit is due: the full-size buffer (row 0 = bottom, sky = 0) and its size.

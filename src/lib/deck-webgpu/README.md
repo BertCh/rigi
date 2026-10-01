@@ -98,6 +98,9 @@ host). `scripts/deck-webgpu/vite.webgpu.config.ts` is kept for :3111 and is now 
   is bottom-first.
 - rgba32float is not filterable unless the device has `float32-filterable`. Use `textureLoad`.
 
+
+**Geometry diet (`geo-query-gpu.ts`, `deck/geo-query.ts`).** The 1024 px query target is no longer read back in full (~12 MB) on every settle. After the geometry pass the engine runs compute passes over `GeometryTargets.geometry`: peak-label occlusion verdicts (4 B per peak), the skyline rows (4 B per column) and, on demand, gathered texels (16 B per pixel, `sampleAtAsync`, hover). Undecided samples (denormal texels, never produced in practice) are resolved on the CPU from gathered texels, so the results equal the CPU tests exactly (argument in `deck/geo-query.ts`; `npx tsx scripts/gpu/geo-query-check.ts`). The full copy (`range`, `xyz`) is read lazily by `WebGpuGeometrySource.ensureFull()` for the consumers that sample many pixels (`readback()`, `sampleAt` misses, CPU look fallbacks, a fitted haze, Step Inside masks). `settle()` waits for the GPU queries only. `geometryDiet: false`, or any failing kernel, restores the full readback per render.
+
 ## Depth (`depth.ts`)
 
 Reversed infinite-far Z with `depth32float`: clip.z = near, clip.w = view depth. Clear to **0**

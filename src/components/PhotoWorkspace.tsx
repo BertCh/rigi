@@ -647,7 +647,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				}
 				// [data-ready] means final labels: occlusion from a geometry buffer of THIS pose, not an empty
 				// or previous-pose buffer (the debounced readback otherwise lands ≥90 ms later)
-				await engine.readback();
+				await (engine.settle ? engine.settle() : engine.readback());
 				if (engineRef.current !== engine) return;
 				setStatus(null);
 				setHasPeople(engine.hasPeople);
@@ -858,6 +858,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 	});
 
 	// ---------- pointer interaction ----------
+	const hoverGen = useRef(0);
 	const drag = useRef<{
 		x: number;
 		y: number;
@@ -944,10 +945,22 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			return;
 		}
 		// a lagging geometry buffer (mid-drag) would report the previous pose's terrain under the cursor
-		const s =
-			!eng.geometryReady() || (settings.protectPeople && eng.isForeground(u, v))
-				? null
-				: eng.sampleAt(u, v);
+		if (
+			!eng.geometryReady() ||
+			(settings.protectPeople && eng.isForeground(u, v))
+		) {
+			setHover(null);
+			return;
+		}
+		if (eng.sampleAtAsync) {
+			// no full CPU copy of the geometry (WebGPU): one gathered texel; drop a stale answer
+			const gen = ++hoverGen.current;
+			void eng.sampleAtAsync(u, v).then((s) => {
+				if (gen === hoverGen.current) setHover(s ? { ...s, u, v } : null);
+			});
+			return;
+		}
+		const s = eng.sampleAt(u, v);
 		setHover(s ? { ...s, u, v } : null);
 	};
 
