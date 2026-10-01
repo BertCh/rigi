@@ -162,7 +162,10 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 			tag: "mode",
 			variants: {
 				ramp: { fields: {}, def: { mode: "ramp" } },
-				alpine: { fields: {}, def: { mode: "alpine" } },
+				alpine: {
+					fields: { water: bool },
+					def: { mode: "alpine", water: false },
+				},
 			},
 		},
 	}),
@@ -236,6 +239,21 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 		}),
 		projectionTint: obj({ color: hex, amount: unit }),
 		drapeHarmonize: unit,
+		weather: {
+			k: "union",
+			tag: "mode",
+			variants: {
+				off: { fields: {}, def: { mode: "off" } },
+				rain: {
+					fields: { intensity: unit, wind: num(-20, 20) },
+					def: { mode: "rain", intensity: 0.6, wind: 3 },
+				},
+				snow: {
+					fields: { intensity: unit, wind: num(-20, 20) },
+					def: { mode: "snow", intensity: 0.6, wind: 1 },
+				},
+			},
+		},
 	}),
 	composite: obj({
 		refine: bool,
@@ -255,6 +273,7 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 		width: num(0.5, 10),
 		opacity: unit,
 		colors: obj({ hiking: hex, mountain: hex, alpine: hex, other: hex }),
+		dash: tup(num(0.5, 5000), num(0, 5000)),
 	}),
 	labels: obj({
 		layout: en("classic", "panorama", "inline"),
@@ -291,6 +310,28 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 			inner: obj(exportFields),
 			def: CLASSIC.labels.export,
 		},
+	}),
+	terroir: obj({
+		names: obj({
+			on: bool,
+			reach: en("near", "all"),
+			language: en("local", "local+usual"),
+			maxLabels: num(0, 80, true),
+		}),
+		peakTiers: bool,
+		subPill: bool,
+		contours: obj({ adaptive: bool, swissIndex: bool, inkByCover: bool }),
+		cover: obj({ on: bool, snow: en("none", "date") }),
+		glacier: obj({
+			on: bool,
+			year: num(1850, 2030, true),
+			style: en("outline", "fill"),
+		}),
+		sunPath: bool,
+		legend: bool,
+		uncertainty: bool,
+		placeCard: bool,
+		furniture: bool,
 	}),
 });
 

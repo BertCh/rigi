@@ -103,6 +103,7 @@ export const CLASSIC: ViewStyle = {
 		},
 		projectionTint: { color: [1, 0.85, 0.6], amount: 0 }, // materials.ts:208, :34 (uPhotoTint always 0)
 		drapeHarmonize: 0,
+		weather: { mode: "off" },
 	},
 	composite: {
 		refine: false,
@@ -158,5 +159,19 @@ export const CLASSIC: ViewStyle = {
 			subAlpha: 0.8, // engine.ts:1178
 			dotShadow: false, // engine.ts:1168–1171 (dot drawn before shadowBlur is set)
 		},
+	},
+	// Terroir layers (reports/terroir-cartography.md): all off, so classic stays pixel-identical.
+	terroir: {
+		names: { on: false, reach: "near", language: "local", maxLabels: 24 },
+		peakTiers: false,
+		subPill: false,
+		contours: { adaptive: false, swissIndex: false, inkByCover: false },
+		cover: { on: false, snow: "none" },
+		glacier: { on: false, year: 1850, style: "outline" },
+		sunPath: false,
+		legend: false,
+		uncertainty: false,
+		placeCard: false,
+		furniture: false,
 	},
 };

@@ -57,8 +57,8 @@ export type TerrainLook = {
 	relief:
 		| { mode: "lambert" }
 		| { mode: "swiss"; realism: number; generalize: number; curvature: number };
-	/** 'ramp' = reliefRamp; 'alpine' = absolute-elevation Patterson tint with rock, snow and lakes (LOOK_ALPINE). */
-	albedo: { mode: "ramp" } | { mode: "alpine" };
+	/** 'ramp' = reliefRamp; 'alpine' = absolute-elevation Patterson tint with rock, snow and lakes (LOOK_ALPINE); water: lakes get depth tint + Fresnel sky reflection (LOOK_WATER). */
+	albedo: { mode: "ramp" } | { mode: "alpine"; water: boolean };
 };
 
 export type LineStyle = {
@@ -166,6 +166,10 @@ export type WorldStyle = {
 	projectionTint: { color: Hex; amount: number };
 	/** Oklab band transfer of the photo drape toward the photo's own statistics. 0 = off. */
 	drapeHarmonize: number;
+	/** Rain / snow in the deck world view and landing scenes (look/weather); never the photo overlay. */
+	weather:
+		| { mode: "off" }
+		| { mode: "rain" | "snow"; intensity: number; wind: number };
 };
 
 /** Photo ⊕ render compositing (overlay and replace). CLASSIC sets no LOOK_* define. */
@@ -193,6 +197,8 @@ export type TrailStyle = {
 	width: number;
 	opacity: number;
 	colors: { hiking: Hex; mountain: Hex; alpine: Hex; other: Hex };
+	/** Optional dashed trails: [dashM, gapM] metres along the path (luma pathDash). Absent / empty = solid. */
+	dash?: readonly [number, number];
 };
 
 export type LabelHalo = {
@@ -241,6 +247,49 @@ export type LabelStyle = {
 	export: LabelExport | null;
 };
 
+/**
+ * Terroir cartography (reports/terroir-cartography.md): place-specific layers on top of every view.
+ * Purely additive: CLASSIC switches every part off, so classic stays pixel-identical. Display-only;
+ * nothing here feeds the matcher, pose, confidence or exports' measurements.
+ */
+export type TerroirStyle = {
+	/** Names beyond peaks from the region's terroir pack (water, settlements, passes, huts, glaciers…). */
+	names: {
+		on: boolean;
+		/** 'near' = landscape names only within ~12 km (alps, field names); 'all' = every class at any range */
+		reach: "near" | "all";
+		/** 'local' = the official local-language form; 'local+usual' adds the usual/bilingual form as a second line */
+		language: "local" | "local+usual";
+		maxLabels: number;
+	};
+	/** Peak labels sized by prominence class (major / summit / minor) instead of one size. */
+	peakTiers: boolean;
+	/** A soft backing behind the elevation · distance line so it reads on bright cloud. */
+	subPill: boolean;
+	contours: {
+		/** thin the interval with range (screen density) instead of a fixed interval to the horizon */
+		adaptive: boolean;
+		/** index contours on round 100 m (Swiss maps) whatever the interval */
+		swissIndex: boolean;
+		/** brown on soil, black on rock and scree, blue on ice and water (needs the pack's cover) */
+		inkByCover: boolean;
+	};
+	/** Real land cover from the pack in Blend / In map instead of the elevation belts. */
+	cover: { on: boolean; snow: "none" | "date" };
+	/** A glacier's former extent registered on the photo (GLAMOS / pack), labelled with its year. */
+	glacier: { on: boolean; year: number; style: "outline" | "fill" };
+	/** The sun's arc for the capture date above the skyline, with sunrise / sunset azimuths. */
+	sunPath: boolean;
+	/** Elevation key + land-cover key for whatever the view encodes. */
+	legend: boolean;
+	/** Soften labels and lines while the pose is unverified (far field first). */
+	uncertainty: boolean;
+	/** Tap the photo for a "read this view" card: name, class, elevation, distance, aspect, cover. */
+	placeCard: boolean;
+	/** Scale, north and a sun / time chip. */
+	furniture: boolean;
+};
+
 export type ViewStyle = {
 	v: 1;
 	terrain: TerrainLook;
@@ -250,6 +299,7 @@ export type ViewStyle = {
 	composite: CompositeLook;
 	trails: TrailStyle;
 	labels: LabelStyle;
+	terroir: TerroirStyle;
 };
 
 export type PresetId =
@@ -262,7 +312,8 @@ export type PresetId =
 	| "swiss"
 	| "berann"
 	| "topo-ink"
-	| "slope";
+	| "slope"
+	| "terroir";
 
 /** Tuples / arrays are replaced wholesale, objects merge key by key. */
 export type DeepPartial<T> = T extends readonly unknown[]

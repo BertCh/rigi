@@ -17,6 +17,7 @@ export const PRESET_IDS: readonly PresetId[] = [
 	"berann",
 	"topo-ink",
 	"slope",
+	"terroir",
 ];
 
 export const PRESET_LABELS: Record<PresetId, string> = {
@@ -30,6 +31,7 @@ export const PRESET_LABELS: Record<PresetId, string> = {
 	berann: "Berann",
 	"topo-ink": "Topo ink",
 	slope: "Slope angle",
+	terroir: "Terroir",
 };
 
 export function isPresetId(v: unknown): v is PresetId {
@@ -325,6 +327,52 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 		composite: { harmonize: 0.2, ridges: "ink", ink: { strength: 0.4 } },
 		labels: { export: null },
 	},
+
+	/**
+	 * Terroir (reports/terroir-cartography.md): the place, not the GIS. Absolute elevation (Berann
+	 * ramp, keyed by the legend), warm-brown Swiss contours with a 100 m index that thin with range,
+	 * land cover / names / glaciers from the region's terroir pack, prominence-tiered peaks, the sun's
+	 * path, and softened marks while a pose is unverified. Every terroir layer degrades to nothing
+	 * where no pack covers the photo.
+	 */
+	terroir: {
+		terrain: {
+			sun: { mode: "photo-time" },
+			reliefRamp: "berann",
+			rampRange: { mode: "absolute", lo: ABSOLUTE_RAMP_RANGE.lo, hi: ABSOLUTE_RAMP_RANGE.hi },
+			relief: { mode: "swiss", realism: 0.3, generalize: 0.5, curvature: 0.4 },
+			albedo: { mode: "alpine" },
+			atmosphere: { mode: "physical", strength: 0.8, airlight: "physical" },
+		},
+		overlay: {
+			contours: {
+				color: { mode: "solid", minor: "#b98a5e", major: "#8a5a32" },
+				minorAlpha: 0.55,
+				majorAlpha: 0.9,
+				width: 1.0,
+				majorWidthMul: 1.9,
+				casing: { on: true, color: [0.12, 0.08, 0.04], extraPx: 1.2, alpha: 0.35 },
+			},
+			bands: { ramp: "berann" },
+		},
+		replace: { haze: 0.75 },
+		world: { haze: 0.75 },
+		composite: { ridges: "ink", ink: { strength: 0.55, inner: [0.16, 0.11, 0.07], skyline: [0.1, 0.07, 0.05] } },
+		labels: { layout: "panorama", export: null },
+		terroir: {
+			names: { on: true, reach: "near", language: "local+usual", maxLabels: 24 },
+			peakTiers: true,
+			subPill: true,
+			contours: { adaptive: true, swissIndex: true, inkByCover: true },
+			cover: { on: true, snow: "date" },
+			glacier: { on: true, year: 1850, style: "outline" },
+			sunPath: true,
+			legend: true,
+			uncertainty: true,
+			placeCard: true,
+			furniture: true,
+		},
+	},
 };
 
 /** The photo-view layer (Settings.overlayStyle) a preset switches to when it is chosen. */
@@ -339,6 +387,7 @@ export const LOOK_PRESETS: readonly PresetId[] = [
 	"berann",
 	"topo-ink",
 	"slope",
+	"terroir",
 ];
 
 const presetCache = new Map<PresetId, ViewStyle>();
