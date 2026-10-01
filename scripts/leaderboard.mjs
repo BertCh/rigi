@@ -303,6 +303,15 @@ export function ownerOf(file) {
 	return "unowned";
 }
 
+/** Neutral area name for an owner key, used only in human-facing text (the keys themselves stay in the JSON). */
+const OWNER_AREA = {
+	"9e": "app",
+	"0f": "cpu pipeline",
+	d1: "refine/sky",
+	f0: "matcher/deck",
+	lead: "upload/export",
+};
+const ownerArea = (o) => OWNER_AREA[o] ?? o;
 // ─────────────────────────────── math ───────────────────────────────
 export const angleDiff = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
 export function median(v) {
@@ -761,16 +770,16 @@ const mtimeOf = (p) => {
 /** Labels for 0f's CPU variants, keyed by the out/eval-<key>/ directory (classic-<solver>[-fasth][-<dem>]: SOLVER=<solver> [HORIZON=fast] [DEM=<dem>]). */
 const CPU_VARIANTS = {
 	"classic-cascade": [
-		"CPU classic+cascade (0f recommended default)",
+		"CPU classic+cascade (recommended default)",
 		"detectSkyline → solvePose → on reject refinePose; what /baseline Auto-align runs (SOLVER=cascade)",
 	],
 	"classic-skyfirst": [
-		"CPU classic+skyfirst (0f high-accuracy mode)",
+		"CPU classic+skyfirst (high-accuracy mode)",
 		"refine with ONNX sky cross-check, else cascade; always loads the 4.5 MB sky model (SOLVER=skyfirst)",
 	],
 	"classic-cascade-fasth": [
 		"CPU classic+cascade, HORIZON=fast",
-		"the cascade on d1's horizon-fast horizon (what the browser runs)",
+		"the cascade on horizon-fast horizon (what the browser runs)",
 	],
 	"classic-solve": [
 		"CPU classic+solve",
@@ -787,9 +796,9 @@ export function cpuVariantInfo(key) {
 	return m
 		? [
 				`CPU ${m[1]}+${m[2]}${m[3] ? ", HORIZON=fast" : ""}`,
-				`0f variant out/eval-${key}/`,
+				`CPU variant out/eval-${key}/`,
 			]
-		: [`CPU ${key}`, `0f variant out/eval-${key}/`];
+		: [`CPU ${key}`, `CPU variant out/eval-${key}/`];
 }
 /**
  * 0f's CPU pipeline results, READ-ONLY: out/eval/report.json (0f's last default run → methods cpu / cpu-final)
@@ -821,7 +830,7 @@ async function stepEvalCpu(scale, runIt, nExpected) {
 			res.reportStale = true;
 	} else
 		notes.push(
-			"read-only: 0f's out/eval*/report.json as last written (pass --run-evalcpu to regenerate out/eval/)",
+			"read-only: the app pipeline's out/eval*/report.json as last written (pass --run-evalcpu to regenerate out/eval/)",
 		);
 	const dirs = fs
 		.readdirSync(path.join(ROOT, "out"), { withFileTypes: true })
@@ -936,28 +945,28 @@ async function stepEvalApp(scale, appUrl, photos) {
 
 const EXT_INFO = {
 	refine: [
-		"d1 refine",
-		"d1 src/lib/refine: robust skyline refinement from the prior (out/refine/results.json, method 'refine')",
+		"refine",
+		"src/lib/refine: robust skyline refinement from the prior (out/refine/results.json, method 'refine')",
 	],
 	"refine+sky": [
-		"d1 refine+sky",
-		"d1 src/lib/refine with the ONNX sky mask (out/refine/results.json, method 'refine+sky')",
+		"refine+sky",
+		"src/lib/refine with the ONNX sky mask (out/refine/results.json, method 'refine+sky')",
 	],
 	"matcher:render-match": [
-		"f0 render-match (ALIKED+LightGlue, sat, rot_fixf)",
-		"f0 tools/matcher: satellite-draped DEM renders at prior yaw ±20°, ALIKED+LightGlue, rotation-only solve at the GPS eye (f0's headline config). From tools/matcher/results.json (with f0's confidence / accepted) when present, else re-derived from out/results/<id>_initial.json (then it always 'accepts'); ms = match+solve, rendering excluded",
+		"render-match (ALIKED+LightGlue, sat, rot_fixf)",
+		"tools/matcher: satellite-draped DEM renders at prior yaw ±20°, ALIKED+LightGlue, rotation-only solve at the GPS eye (the app pipeline's headline config). From tools/matcher/results.json (with the app pipeline's confidence / accepted) when present, else re-derived from out/results/<id>_initial.json (then it always 'accepts'); ms = match+solve, rendering excluded",
 	],
 	"matcher:render-match-it1": [
-		"f0 render-match + 1 refinement render",
-		"f0 tools/matcher refine stage (it1): one more render at the solved pose, same config. Always 'accepts'",
+		"render-match + 1 refinement render",
+		"tools/matcher refine stage (it1): one more render at the solved pose, same config. Always 'accepts'",
 	],
 	"matcher:fusion": [
-		"f0 fusion (skyline + render-match)",
-		"f0 tools/matcher/results-fusion.json (contract file): joint skyline + render-match refinement (fusion.py), with f0's confidence / accepted",
+		"fusion (skyline + render-match)",
+		"tools/matcher/results-fusion.json (contract file): joint skyline + render-match refinement (fusion.py), with the app pipeline's confidence / accepted",
 	],
 	"matcher:fused": [
-		"f0 fused skyline+match",
-		"f0 tools/matcher/fusion.py (fusion_default.json, shift 0): joint skyline + match refinement; accepted = confidence level HIGH (agreement / sky / support gates)",
+		"fused skyline+match",
+		"tools/matcher/fusion.py (fusion_default.json, shift 0): joint skyline + match refinement; accepted = confidence level HIGH (agreement / sky / support gates)",
 	],
 };
 /**
@@ -1223,7 +1232,7 @@ async function stepMatcher(extra, ids) {
 				medianPinPx: +m[6],
 				within1: +m[7],
 				of: +m[8],
-				gt: "f0's in-page control-point solve (engine.solvePins)",
+				gt: "the app pipeline's in-page control-point solve (engine.solvePins)",
 				mtime: isoOf(mtimeOf(tf)),
 			});
 	}
@@ -1650,7 +1659,7 @@ const METHOD_INFO = {
 	],
 	app: [
 		"App GPU aligner (final)",
-		"9e src/lib/align.ts via the app: the pose the UI shows after load (conf > 0.2 → aligned, else near-compass alt or prior)",
+		"src/lib/align.ts via the app: the pose the UI shows after load (conf > 0.2 → aligned, else near-compass alt or prior)",
 	],
 	"app-raw": [
 		"App GPU aligner (raw)",
@@ -1658,11 +1667,11 @@ const METHOD_INFO = {
 	],
 	cpu: [
 		"CPU skyline solver (raw)",
-		"0f scripts/eval.ts: detectSkyline + solvePose, always the solved pose",
+		"scripts/eval.ts: detectSkyline + solvePose, always the solved pose",
 	],
 	"cpu-final": [
 		"CPU skyline solver (final)",
-		"0f: solved if accepted, else prior (what the baseline pipeline would show)",
+		"solved if accepted, else prior (what the baseline pipeline would show)",
 	],
 };
 
@@ -2773,13 +2782,13 @@ function deriveBlocking(L) {
 	);
 	if (partial.length)
 		b.push(
-			`The control-point GT (secondary column) is solved in-page from a subset of the labelled points: engine.controlPins has no level constraint for lake waterlines and no OSM-node-id lookup (region JSON carries no ids), so ${partial.map((p) => `${p.id} drops ${[p.gtCp.kinds.levels ? `${p.gtCp.kinds.levels} level` : "", p.gtCp.kinds.nodes ? `${p.gtCp.kinds.nodes} node/<id>` : ""].filter(Boolean).join(" + ")}`).join(", ")}. The primary GT (ground-truth.json, 0f's solve with all points) is unaffected.`,
+			`The control-point GT (secondary column) is solved in-page from a subset of the labelled points: engine.controlPins has no level constraint for lake waterlines and no OSM-node-id lookup (region JSON carries no ids), so ${partial.map((p) => `${p.id} drops ${[p.gtCp.kinds.levels ? `${p.gtCp.kinds.levels} level` : "", p.gtCp.kinds.nodes ? `${p.gtCp.kinds.nodes} node/<id>` : ""].filter(Boolean).join(" + ")}`).join(", ")}. The primary GT (ground-truth.json, the app pipeline's solve with all points) is unaffected.`,
 		);
 	const tsc = steps.tsc;
 	if (tsc?.errorCount)
 		b.push(
 			`tsc: ${tsc.errorCount} errors (${Object.entries(tsc.byOwner)
-				.map(([o, n]) => `${o} ${n}`)
+				.map(([o, n]) => `${ownerArea(o)} ${n}`)
 				.join(", ")}).`,
 		);
 	if (steps.biome?.errors)
@@ -2787,7 +2796,7 @@ function deriveBlocking(L) {
 			`biome: ${steps.biome.errors} errors (${Object.entries(
 				steps.biome.byOwner,
 			)
-				.map(([o, n]) => `${o} ${n}`)
+				.map(([o, n]) => `${ownerArea(o)} ${n}`)
 				.join(", ")}).`,
 		);
 	if (
@@ -2904,7 +2913,7 @@ function renderMd(L) {
 		);
 	o.push(
 		"",
-		"¹ No accept/reject signal in the source, so it counts as always accepting (every error clearly ≥ 1° is a false accept). 'Correct/false accepts' use the method's own accept flag (app: confidence > 0.2; CPU variants: 0f's accept; refine and matcher contract files: their `accepted`; fused from fusion_default.json: confidence level HIGH). '> 2°' and '≤ 1°' score the pose as shown: a rejected CPU photo shows the prior, the app shows its fallback, external methods (refine, matcher) are scored on the pose in their file even when they rejected it. Median ms: CPU = skyline + solve on Node; app = autoAlign in the browser; matcher = match + solve on the MPS GPU, rendering excluded.",
+		"¹ No accept/reject signal in the source, so it counts as always accepting (every error clearly ≥ 1° is a false accept). 'Correct/false accepts' use the method's own accept flag (app: confidence > 0.2; CPU variants: the app pipeline's accept; refine and matcher contract files: their `accepted`; fused from fusion_default.json: confidence level HIGH). '> 2°' and '≤ 1°' score the pose as shown: a rejected CPU photo shows the prior, the app shows its fallback, external methods (refine, matcher) are scored on the pose in their file even when they rejected it. Median ms: CPU = skyline + solve on Node; app = autoAlign in the browser; matcher = match + solve on the MPS GPU, rendering excluded.",
 		"",
 	);
 
@@ -3064,7 +3073,7 @@ function renderMd(L) {
 	const rep = L.steps.matcher?.reported ?? [];
 	if (rep.length) {
 		o.push(
-			`### f0's own matcher summary (from report, not re-scored; ${rep[0].source})`,
+			`### the matcher's own summary (from report, not re-scored; ${rep[0].source})`,
 			"",
 			"| method | n | median \\|Δyaw\\| | median \\|Δpitch\\| | median \\|Δroll\\| | median pin px | within 1° |",
 			"|---|---|---|---|---|---|---|",
@@ -3177,7 +3186,7 @@ function renderMd(L) {
 			return `${s.errorCount} errors${
 				s.errorCount
 					? `: ${Object.entries(s.byOwner)
-							.map(([o2, n]) => `${o2} ${n}`)
+							.map(([o2, n]) => `${ownerArea(o2)} ${n}`)
 							.join(", ")}`
 					: ""
 			}`;
@@ -3185,7 +3194,7 @@ function renderMd(L) {
 			return `${s.errors} errors, ${s.warnings} warnings over ${s.filesChecked} files${
 				s.errors
 					? ` (${Object.entries(s.byOwner)
-							.map(([o2, n]) => `${o2} ${n}`)
+							.map(([o2, n]) => `${ownerArea(o2)} ${n}`)
 							.join(", ")}; ${Object.entries(s.byCategory)
 							.map(([c, n]) => `${c} ${n}`)
 							.join(", ")})`
@@ -3240,13 +3249,10 @@ function renderMd(L) {
 		"Default mode runs no other track's evaluator: it reads their latest outputs (retrying a read while a file looks mid-rewrite).",
 		"",
 	);
-	o.push(
-		"| file | owner | written | age at run | note |",
-		"|---|---|---|---|---|",
-	);
+	o.push("| file | written | age at run | note |", "|---|---|---|---|");
 	for (const f of L.inputs.files ?? [])
 		o.push(
-			`| ${f.file} | ${f.owner} | ${f.mtime ?? "–"} | ${ageTxt(f.ageMin)} | ${String(f.note ?? "").replace(/\|/g, "\\|")} |`,
+			`| ${f.file} | ${f.mtime ?? "–"} | ${ageTxt(f.ageMin)} | ${String(f.note ?? "").replace(/\|/g, "\\|")} |`,
 		);
 	o.push("");
 	o.push("## Methods", "");
@@ -3754,7 +3760,7 @@ function parseArgs(argv) {
 	if (o.only) for (const s of STEPS) if (!o.only.has(s)) o.skip.add(s);
 	if (o.runEvalCpu && o.photos)
 		throw new Error(
-			"--run-evalcpu cannot be combined with --photos: scripts/eval.ts would replace 0f's full out/eval/report.json with the subset",
+			"--run-evalcpu cannot be combined with --photos: scripts/eval.ts would replace the app pipeline's full out/eval/report.json with the subset",
 		);
 	return o;
 }
@@ -3982,13 +3988,13 @@ async function main() {
 			const r = cpuReports[k];
 			info = [
 				l,
-				`${d}. 0f's out/eval-${k}/report.json (written ${r?.mtime ?? "?"}); final pose = solved if accepted, else prior; re-scored here from prior + delta`,
+				`${d}. the app pipeline's out/eval-${k}/report.json (written ${r?.mtime ?? "?"}); final pose = solved if accepted, else prior; re-scored here from prior + delta`,
 			];
 		}
 		if ((m === "cpu" || m === "cpu-final") && info)
 			info = [
 				`${info[0]}, out/eval`,
-				`${info[1]}. out/eval/report.json = 0f's last default run (written ${cpuReports.eval?.mtime ?? "?"})${evalSame.length ? `; its results match out/eval-${evalSame.join(", out/eval-")}` : ""}`,
+				`${info[1]}. out/eval/report.json = the app pipeline's last default run (written ${cpuReports.eval?.mtime ?? "?"})${evalSame.length ? `; its results match out/eval-${evalSame.join(", out/eval-")}` : ""}`,
 			];
 		const [label, description] = info ?? [
 			m,

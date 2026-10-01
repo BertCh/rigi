@@ -51,7 +51,7 @@ Import everything from `#/lib/export` (the barrel is `index.ts`).
 - `composeAnnotatedPng(photo, overlays[], {width?, height?, attribution?, title?, footerHeight?, type?, quality?, createCanvas?}) → Promise<Blob>`.
   - It uses `OffscreenCanvas` when available and otherwise `document.createElement('canvas')`, or a factory you pass in.
   - Overlays are stretched onto the photo rectangle.
-  - A footer strip (about 2.6 % of the height) is added below the photo. It holds the optional title on the left and `DEFAULT_ATTRIBUTION` on the right: "Terrain © Mapterhorn · Imagery © swisstopo / Esri · © OpenStreetMap contributors".
+  - A footer strip (about 2.6 % of the height) is added below the photo. It holds the optional title on the left and `DEFAULT_ATTRIBUTION` on the right: "Terrain © Mapterhorn · Imagery © swisstopo, Esri, Maxar, Earthstar Geographics, and the GIS User Community · © OpenStreetMap contributors".
 - `zipStore(entries: {name, data: Uint8Array|string, date?}[]) → Uint8Array`, and `crc32(bytes)`.
 
 ## Conventions (all verified in `scripts/test-export.ts`)

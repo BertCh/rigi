@@ -225,9 +225,12 @@ export const ESRI_CREDIT: Credit = {
 	licence: "Esri Master Agreement (ArcGIS account required)",
 };
 
-/** The credit line the app has always shown (kept verbatim for the classic mode). */
+/**
+ * The classic credit line. The Esri part is the credit Esri names for World Imagery
+ * ("Sources: Esri, Maxar, Earthstar Geographics, and the GIS User Community"; reports/licences.md).
+ */
 export const CLASSIC_UI_LINE =
-	"Terrain © Mapterhorn · Imagery © swisstopo, Esri · Peaks & trails © OpenStreetMap contributors";
+	"Terrain © Mapterhorn · Imagery © swisstopo, Esri, Maxar, Earthstar Geographics, and the GIS User Community · Peaks & trails © OpenStreetMap contributors";
 
 export interface AttributionQuery {
 	lat: number;

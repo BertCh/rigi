@@ -7,7 +7,7 @@
 // canvas factory (e.g. @napi-rs/canvas in Node tests).
 
 export const DEFAULT_ATTRIBUTION =
-	"Terrain © Mapterhorn · Imagery © swisstopo / Esri · © OpenStreetMap contributors";
+	"Terrain © Mapterhorn · Imagery © swisstopo, Esri, Maxar, Earthstar Geographics, and the GIS User Community · © OpenStreetMap contributors";
 
 type Drawable = CanvasImageSource & {
 	width: number | SVGAnimatedLength;
@@ -111,15 +111,19 @@ export async function composeAnnotatedPng(
 		ctx.font = `500 ${fs}px Manrope, system-ui, -apple-system, Segoe UI, sans-serif`;
 		ctx.textBaseline = "middle";
 		const pad = Math.round(fh * 0.5);
+		let titleWidth = 0;
 		if (opts.title) {
 			ctx.fillStyle = "#f2f4f7";
 			ctx.textAlign = "left";
 			ctx.fillText(opts.title, pad, H + fh / 2);
+			titleWidth = ctx.measureText(opts.title).width + pad;
 		}
 		if (text) {
 			ctx.fillStyle = "rgba(242,244,247,0.78)";
 			ctx.textAlign = "right";
-			ctx.fillText(text, W - pad, H + fh / 2);
+			// maxWidth condenses a long credit line instead of running it off the edge or over the title
+			const maxWidth = Math.max(1, W - 2 * pad - titleWidth);
+			ctx.fillText(text, W - pad, H + fh / 2, maxWidth);
 		}
 	}
 	return toBlob(canvas, opts.type ?? "image/png", opts.quality);

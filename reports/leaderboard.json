@@ -514,7 +514,7 @@
    "reportMtime": "2026-09-25T03:53:38.758Z",
    "reportAgeMin": 46,
    "photos": 13,
-   "note": "read-only: 0f's out/eval*/report.json as last written (pass --run-evalcpu to regenerate out/eval/)"
+   "note": "read-only: the app pipeline's out/eval*/report.json as last written (pass --run-evalcpu to regenerate out/eval/)"
   },
   "matcher": {
    "status": "ok",
@@ -582,7 +582,7 @@
      "medianPinPx": 97.4,
      "within1": 3,
      "of": 11,
-     "gt": "f0's in-page control-point solve (engine.solvePins)",
+     "gt": "the app pipeline's in-page control-point solve (engine.solvePins)",
      "mtime": "2026-09-25T03:39:37.205Z"
     },
     {
@@ -595,7 +595,7 @@
      "medianPinPx": 7.9,
      "within1": 11,
      "of": 11,
-     "gt": "f0's in-page control-point solve (engine.solvePins)",
+     "gt": "the app pipeline's in-page control-point solve (engine.solvePins)",
      "mtime": "2026-09-25T03:39:37.205Z"
     },
     {
@@ -608,7 +608,7 @@
      "medianPinPx": 10.5,
      "within1": 11,
      "of": 11,
-     "gt": "f0's in-page control-point solve (engine.solvePins)",
+     "gt": "the app pipeline's in-page control-point solve (engine.solvePins)",
      "mtime": "2026-09-25T03:39:37.205Z"
     }
    ],
@@ -12346,7 +12346,7 @@
   },
   "app": {
    "label": "App GPU aligner (final)",
-   "description": "9e src/lib/align.ts via the app: the pose the UI shows after load (conf > 0.2 → aligned, else near-compass alt or prior)",
+   "description": "src/lib/align.ts via the app: the pose the UI shows after load (conf > 0.2 → aligned, else near-compass alt or prior)",
    "medianMsAll": 156,
    "agg": {
     "primary": {
@@ -12638,8 +12638,8 @@
    }
   },
   "cpu:classic-cascade": {
-   "label": "CPU classic+cascade (0f recommended default)",
-   "description": "detectSkyline → solvePose → on reject refinePose; what /baseline Auto-align runs (SOLVER=cascade). 0f's out/eval-classic-cascade/report.json (written 2026-09-25T03:27:49.828Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
+   "label": "CPU classic+cascade (recommended default)",
+   "description": "detectSkyline → solvePose → on reject refinePose; what /baseline Auto-align runs (SOLVER=cascade). the app pipeline's out/eval-classic-cascade/report.json (written 2026-09-25T03:27:49.828Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
    "medianMsAll": 958,
    "agg": {
     "primary": {
@@ -12757,8 +12757,8 @@
    }
   },
   "cpu:classic-skyfirst": {
-   "label": "CPU classic+skyfirst (0f high-accuracy mode)",
-   "description": "refine with ONNX sky cross-check, else cascade; always loads the 4.5 MB sky model (SOLVER=skyfirst). 0f's out/eval-classic-skyfirst/report.json (written 2026-09-25T03:35:20.663Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
+   "label": "CPU classic+skyfirst (high-accuracy mode)",
+   "description": "refine with ONNX sky cross-check, else cascade; always loads the 4.5 MB sky model (SOLVER=skyfirst). the app pipeline's out/eval-classic-skyfirst/report.json (written 2026-09-25T03:35:20.663Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
    "medianMsAll": 1785,
    "agg": {
     "primary": {
@@ -12877,7 +12877,7 @@
   },
   "cpu-final": {
    "label": "CPU skyline solver (final), out/eval",
-   "description": "0f: solved if accepted, else prior (what the baseline pipeline would show). out/eval/report.json = 0f's last default run (written 2026-09-25T03:53:38.758Z); its results match out/eval-classic-solve-fasth",
+   "description": "solved if accepted, else prior (what the baseline pipeline would show). out/eval/report.json = the app pipeline's last default run (written 2026-09-25T03:53:38.758Z); its results match out/eval-classic-solve-fasth",
    "medianMsAll": 258,
    "agg": {
     "primary": {
@@ -13009,7 +13009,7 @@
   },
   "cpu": {
    "label": "CPU skyline solver (raw), out/eval",
-   "description": "0f scripts/eval.ts: detectSkyline + solvePose, always the solved pose. out/eval/report.json = 0f's last default run (written 2026-09-25T03:53:38.758Z); its results match out/eval-classic-solve-fasth",
+   "description": "scripts/eval.ts: detectSkyline + solvePose, always the solved pose. out/eval/report.json = the app pipeline's last default run (written 2026-09-25T03:53:38.758Z); its results match out/eval-classic-solve-fasth",
    "medianMsAll": 258,
    "agg": {
     "primary": {
@@ -13140,7 +13140,7 @@
   },
   "cpu:classic-cascade-fasth": {
    "label": "CPU classic+cascade, HORIZON=fast",
-   "description": "the cascade on d1's horizon-fast horizon (what the browser runs). 0f's out/eval-classic-cascade-fasth/report.json (written 2026-09-25T03:36:26.827Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
+   "description": "the cascade on the app pipeline's horizon-fast horizon (what the browser runs). the app pipeline's out/eval-classic-cascade-fasth/report.json (written 2026-09-25T03:36:26.827Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
    "medianMsAll": 594,
    "agg": {
     "primary": {
@@ -13266,7 +13266,7 @@
   },
   "cpu:classic-cascade2": {
    "label": "CPU classic+cascade2",
-   "description": "solve → refine with sky cross-check → refine. 0f's out/eval-classic-cascade2/report.json (written 2026-09-25T03:34:51.569Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
+   "description": "solve → refine with sky cross-check → refine. the app pipeline's out/eval-classic-cascade2/report.json (written 2026-09-25T03:34:51.569Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
    "medianMsAll": 1523,
    "agg": {
     "primary": {
@@ -13385,7 +13385,7 @@
   },
   "cpu:classic-refine": {
    "label": "CPU classic+refine",
-   "description": "classic skyline, refinePose only. 0f's out/eval-classic-refine/report.json (written 2026-09-25T03:26:13.586Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
+   "description": "classic skyline, refinePose only. the app pipeline's out/eval-classic-refine/report.json (written 2026-09-25T03:26:13.586Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
    "medianMsAll": 1000,
    "agg": {
     "primary": {
@@ -13512,7 +13512,7 @@
   },
   "cpu:classic-solve-fasth": {
    "label": "CPU classic+solve, HORIZON=fast",
-   "description": "simple solvePose core on the horizon-fast horizon. 0f's out/eval-classic-solve-fasth/report.json (written 2026-09-25T03:36:13.958Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
+   "description": "simple solvePose core on the horizon-fast horizon. the app pipeline's out/eval-classic-solve-fasth/report.json (written 2026-09-25T03:36:13.958Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
    "medianMsAll": 290,
    "agg": {
     "primary": {
@@ -13644,7 +13644,7 @@
   },
   "cpu:model-refine": {
    "label": "CPU ONNX sky+refine",
-   "description": "ONNX sky-model skyline, refinePose. 0f's out/eval-model-refine/report.json (written 2026-09-25T03:26:48.852Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
+   "description": "ONNX sky-model skyline, refinePose. the app pipeline's out/eval-model-refine/report.json (written 2026-09-25T03:26:48.852Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
    "medianMsAll": 2306,
    "agg": {
     "primary": {
@@ -13771,7 +13771,7 @@
   },
   "cpu:model-solve": {
    "label": "CPU ONNX sky+solve",
-   "description": "ONNX sky-model skyline, solvePose (0f: do not pair these). 0f's out/eval-model-solve/report.json (written 2026-09-25T03:25:57.203Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
+   "description": "ONNX sky-model skyline, solvePose (0f: do not pair these). the app pipeline's out/eval-model-solve/report.json (written 2026-09-25T03:25:57.203Z); final pose = solved if accepted, else prior; re-scored here from prior + delta",
    "medianMsAll": 1828,
    "agg": {
     "primary": {
@@ -13933,8 +13933,8 @@
    }
   },
   "refine": {
-   "label": "d1 refine",
-   "description": "d1 src/lib/refine: robust skyline refinement from the prior (out/refine/results.json, method 'refine')",
+   "label": "refine",
+   "description": "src/lib/refine: robust skyline refinement from the prior (out/refine/results.json, method 'refine')",
    "external": true,
    "file": "out/refine/results.json",
    "fileMtime": "2026-09-25T03:32:04.672Z",
@@ -14062,8 +14062,8 @@
    }
   },
   "refine+sky": {
-   "label": "d1 refine+sky",
-   "description": "d1 src/lib/refine with the ONNX sky mask (out/refine/results.json, method 'refine+sky')",
+   "label": "refine+sky",
+   "description": "src/lib/refine with the ONNX sky mask (out/refine/results.json, method 'refine+sky')",
    "external": true,
    "file": "out/refine/results.json",
    "fileMtime": "2026-09-25T03:32:04.672Z",
@@ -14186,8 +14186,8 @@
    }
   },
   "matcher:fusion": {
-   "label": "f0 fusion (skyline + render-match)",
-   "description": "f0 tools/matcher/results-fusion.json (contract file): joint skyline + render-match refinement (fusion.py), with f0's confidence / accepted",
+   "label": "fusion (skyline + render-match)",
+   "description": "tools/matcher/results-fusion.json (contract file): joint skyline + render-match refinement (fusion.py), with the app pipeline's confidence / accepted",
    "external": true,
    "file": "tools/matcher/results-fusion.json",
    "fileMtime": "2026-09-25T04:06:33.984Z",
@@ -14309,8 +14309,8 @@
    }
   },
   "matcher:render-match": {
-   "label": "f0 render-match (ALIKED+LightGlue, sat, rot_fixf)",
-   "description": "f0 tools/matcher: satellite-draped DEM renders at prior yaw ±20°, ALIKED+LightGlue, rotation-only solve at the GPS eye (f0's headline config). From tools/matcher/results.json (with f0's confidence / accepted) when present, else re-derived from out/results/<id>_initial.json (then it always 'accepts'); ms = match+solve, rendering excluded",
+   "label": "render-match (ALIKED+LightGlue, sat, rot_fixf)",
+   "description": "tools/matcher: satellite-draped DEM renders at prior yaw ±20°, ALIKED+LightGlue, rotation-only solve at the GPS eye (the app pipeline's headline config). From tools/matcher/results.json (with the app pipeline's confidence / accepted) when present, else re-derived from out/results/<id>_initial.json (then it always 'accepts'); ms = match+solve, rendering excluded",
    "external": true,
    "file": "tools/matcher/results.json",
    "fileMtime": "2026-09-25T04:06:33.983Z",
@@ -14441,8 +14441,8 @@
    }
   },
   "matcher:render-match-it1": {
-   "label": "f0 render-match + 1 refinement render",
-   "description": "f0 tools/matcher refine stage (it1): one more render at the solved pose, same config. Always 'accepts'",
+   "label": "render-match + 1 refinement render",
+   "description": "tools/matcher refine stage (it1): one more render at the solved pose, same config. Always 'accepts'",
    "external": true,
    "file": "tools/matcher/out/results/*_refine.json",
    "fileMtime": "2026-09-25T03:36:26.648Z",
@@ -15259,7 +15259,7 @@
    "baseline": true
   }
  },
- "recommendation": "**CPU classic+cascade (0f recommended default)** as the default: 11/12 correct accepts, 0 false accept(s), 0 error(s) > 2°, median 958 ms; tied on accept counts with CPU classic+cascade2, CPU classic+skyfirst (0f high-accuracy mode) (their median |yaw| differences are inside GT noise, so the cheapest wins). **No agreement gate beats CPU classic+cascade (0f recommended default) alone on this set.** Alone it escalates 1/13 photos (8%: IMG_7059), 0 false accept(s) and 0 > 2° on 11 accepted GT photos, members' median ms sum 958; only 1 escalated GT photo(s), too few to pick an escalation tier from data (best on this set: App GPU aligner (final), 1/1 accepted within 1°); until then show the prior flagged \"unverified\" or ask for manual pins. The best gate (2 of 3 (app, cascade, refine+sky): accept only when any two of app, cascade, refine+sky agree within 1° yaw) escalates 2/13 photos (15%: IMG_7059, IMG_7130), 0 false accept(s) and 0 > 2° on 10 accepted GT photos, members' median ms sum 2160: no fewer false accepts or > 2° errors, 1 more escalation(s) and 2.3× the cost. Treat a gate as defence-in-depth that this 12-photo set does not support.",
+ "recommendation": "**CPU classic+cascade (recommended default)** as the default: 11/12 correct accepts, 0 false accept(s), 0 error(s) > 2°, median 958 ms; tied on accept counts with CPU classic+cascade2, CPU classic+skyfirst (high-accuracy mode) (their median |yaw| differences are inside GT noise, so the cheapest wins). **No agreement gate beats CPU classic+cascade (recommended default) alone on this set.** Alone it escalates 1/13 photos (8%: IMG_7059), 0 false accept(s) and 0 > 2° on 11 accepted GT photos, members' median ms sum 958; only 1 escalated GT photo(s), too few to pick an escalation tier from data (best on this set: App GPU aligner (final), 1/1 accepted within 1°); until then show the prior flagged \"unverified\" or ask for manual pins. The best gate (2 of 3 (app, cascade, refine+sky): accept only when any two of app, cascade, refine+sky agree within 1° yaw) escalates 2/13 photos (15%: IMG_7059, IMG_7130), 0 false accept(s) and 0 > 2° on 10 accepted GT photos, members' median ms sum 2160: no fewer false accepts or > 2° errors, 1 more escalation(s) and 2.3× the cost. Treat a gate as defence-in-depth that this 12-photo set does not support.",
  "disagreement": [
   {
    "id": "IMG_7130",
@@ -15274,25 +15274,25 @@
  "blocking": [
   "**Ground truth covers 12/13 photos** (12 ground-truth.json poses, 11 control-point solves). Missing: IMG_7108. The SoTA report asks for a 50–100 photo in-house set; every number below rests on 12 photo(s).",
   "**App GPU aligner (final)**: 10/12 correct accepts, 1 false accept(s) (IMG_7130 (2.98°)), 1 > 2°; within noise of target (median |yaw| 0.33° is within GT noise of the 0.3° target); beats published SoTA (mean 0.466° vs Porzi 1.23°, 92% ≤1° vs LandscapeAR 39%).",
-  "**CPU classic+cascade (0f recommended default)**: 11/12 correct accepts, 0 false accept(s), 0 > 2°; meets target; beats published SoTA (mean 0.224° vs Porzi 1.23°, 100% ≤1° vs LandscapeAR 39%).",
-  "**CPU classic+skyfirst (0f high-accuracy mode)**: 11/12 correct accepts, 0 false accept(s), 0 > 2°; meets target; beats published SoTA (mean 0.176° vs Porzi 1.23°, 100% ≤1° vs LandscapeAR 39%).",
-  "**d1 refine**: 9/12 correct accepts, 0 false accept(s), 1 > 2°; meets target; beats published SoTA (mean 0.634° vs Porzi 1.23°, 92% ≤1° vs LandscapeAR 39%).",
-  "**d1 refine+sky**: 8/12 correct accepts, 0 false accept(s), 0 > 2°; meets target; beats published SoTA (mean 0.265° vs Porzi 1.23°, 92% ≤1° vs LandscapeAR 39%).",
-  "**f0 render-match (ALIKED+LightGlue, sat, rot_fixf)**: 10/12 correct accepts, 0 false accept(s), 1 borderline accept(s) inside GT noise (IMG_7059 (1.03°)), 0 > 2°; within noise of target (83% within 1°, 92% counting the borderline IMG_7059 (1.03°)); beats published SoTA (mean 0.405° vs Porzi 1.23°, 83% ≤1° vs LandscapeAR 39%).",
-  "**f0 fusion (skyline + render-match)**: 9/12 correct accepts, 0 false accept(s), 0 > 2°; meets target; beats published SoTA (mean 0.293° vs Porzi 1.23°, 92% ≤1° vs LandscapeAR 39%).",
-  "Other ranked variants: meet the target (or are within noise of it): CPU classic+cascade2, CPU classic+cascade, HORIZON=fast, f0 render-match + 1 refinement render (within noise: 83% within 1°, 92% counting the borderline IMG_7059 (1.03°)); false accepts: f0 render-match + 1 refinement render (IMG_7130 (1.75°)); CPU ONNX sky+solve (IMG_7053 (-5.61°)); borderline accepts inside GT noise: f0 render-match + 1 refinement render (IMG_7059 (1.03°)).",
+  "**CPU classic+cascade (recommended default)**: 11/12 correct accepts, 0 false accept(s), 0 > 2°; meets target; beats published SoTA (mean 0.224° vs Porzi 1.23°, 100% ≤1° vs LandscapeAR 39%).",
+  "**CPU classic+skyfirst (high-accuracy mode)**: 11/12 correct accepts, 0 false accept(s), 0 > 2°; meets target; beats published SoTA (mean 0.176° vs Porzi 1.23°, 100% ≤1° vs LandscapeAR 39%).",
+  "**refine**: 9/12 correct accepts, 0 false accept(s), 1 > 2°; meets target; beats published SoTA (mean 0.634° vs Porzi 1.23°, 92% ≤1° vs LandscapeAR 39%).",
+  "**refine+sky**: 8/12 correct accepts, 0 false accept(s), 0 > 2°; meets target; beats published SoTA (mean 0.265° vs Porzi 1.23°, 92% ≤1° vs LandscapeAR 39%).",
+  "**render-match (ALIKED+LightGlue, sat, rot_fixf)**: 10/12 correct accepts, 0 false accept(s), 1 borderline accept(s) inside GT noise (IMG_7059 (1.03°)), 0 > 2°; within noise of target (83% within 1°, 92% counting the borderline IMG_7059 (1.03°)); beats published SoTA (mean 0.405° vs Porzi 1.23°, 83% ≤1° vs LandscapeAR 39%).",
+  "**fusion (skyline + render-match)**: 9/12 correct accepts, 0 false accept(s), 0 > 2°; meets target; beats published SoTA (mean 0.293° vs Porzi 1.23°, 92% ≤1° vs LandscapeAR 39%).",
+  "Other ranked variants: meet the target (or are within noise of it): CPU classic+cascade2, CPU classic+cascade, HORIZON=fast, render-match + 1 refinement render (within noise: 83% within 1°, 92% counting the borderline IMG_7059 (1.03°)); false accepts: render-match + 1 refinement render (IMG_7130 (1.75°)); CPU ONNX sky+solve (IMG_7053 (-5.61°)); borderline accepts inside GT noise: render-match + 1 refinement render (IMG_7059 (1.03°)).",
   "Worst photos for App GPU aligner (final): IMG_7130 (2.983° yaw, 82.3 px).",
   "App GPU aligner (final) accepts 1 wrong pose(s): IMG_7130 (conf 0.397, 2.983° off). Simulated fix, accept only confidence > 0.397: the 1 newly rejected photo(s) fall back (IMG_7130 2.983° → prior 4.017°); within 1° 11/12 → 11/12, mean |yaw| 0.466° → 0.552°. No gain: a higher threshold alone does not fix this; the fallback (or an escalation tier) has to.",
-  "Worst photos for d1 refine: IMG_7059 (5.651° yaw, 104.3 px, rejected).",
-  "Worst photos for d1 refine+sky: IMG_7059 (-1.333° yaw, 26.9 px, rejected).",
-  "Worst photos for f0 render-match (ALIKED+LightGlue, sat, rot_fixf): IMG_7130 (1.884° yaw, 47.7 px, rejected), IMG_7059 (1.029° yaw, 20.2 px).",
-  "Worst photos for f0 fusion (skyline + render-match): IMG_7130 (1.918° yaw, 48.9 px, rejected).",
-  "App GPU aligner (final) and CPU classic+cascade (0f recommended default) disagree by > 1° yaw on 1/13 photos (IMG_7130 3°). Where GT exists the first is closer on 0/1.",
+  "Worst photos for refine: IMG_7059 (5.651° yaw, 104.3 px, rejected).",
+  "Worst photos for refine+sky: IMG_7059 (-1.333° yaw, 26.9 px, rejected).",
+  "Worst photos for render-match (ALIKED+LightGlue, sat, rot_fixf): IMG_7130 (1.884° yaw, 47.7 px, rejected), IMG_7059 (1.029° yaw, 20.2 px).",
+  "Worst photos for fusion (skyline + render-match): IMG_7130 (1.918° yaw, 48.9 px, rejected).",
+  "App GPU aligner (final) and CPU classic+cascade (recommended default) disagree by > 1° yaw on 1/13 photos (IMG_7130 3°). Where GT exists the first is closer on 0/1.",
   "Load (median of n=3, carried over from 2026-09-25T03:31:38.380Z): cold 11.1 s with 59.5 MiB on the wire (all origins, incl. DEM tiles and the segmentation model); warm reload 6.2 s with 8 KiB on the wire (472/512 requests from cache). The warm load barely touches the network yet stays slow, so the time is in-browser compute (horizon renders, segmentation, alignment).",
   "The two GT sources disagree by > 0.3° yaw on IMG_6958 (0.376°), IMG_7155 (-0.334°). Reconcile them before trusting sub-degree numbers.",
-  "The control-point GT (secondary column) is solved in-page from a subset of the labelled points: engine.controlPins has no level constraint for lake waterlines and no OSM-node-id lookup (region JSON carries no ids), so IMG_6958 drops 2 level, IMG_6971 drops 2 level, IMG_7059 drops 1 node/<id>, IMG_7131 drops 1 node/<id>. The primary GT (ground-truth.json, 0f's solve with all points) is unaffected.",
-  "tsc: 2 errors (f0 2).",
-  "biome: 94 errors (d1 28, 9e 17, lead 33, f0 1, unowned 17).",
+  "The control-point GT (secondary column) is solved in-page from a subset of the labelled points: engine.controlPins has no level constraint for lake waterlines and no OSM-node-id lookup (region JSON carries no ids), so IMG_6958 drops 2 level, IMG_6971 drops 2 level, IMG_7059 drops 1 node/<id>, IMG_7131 drops 1 node/<id>. The primary GT (ground-truth.json, the app pipeline's solve with all points) is unaffected.",
+  "tsc: 2 errors (matcher/deck 2).",
+  "biome: 94 errors (refine/sky 28, app 17, upload/export 33, matcher/deck 1, unowned 17).",
   "Cold time-to-ready median 11.1 s (n=3) is over the 10 s target."
  ]
 }
