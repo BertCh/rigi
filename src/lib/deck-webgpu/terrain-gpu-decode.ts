@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // GPU Terrarium decode for the WebGPU engine's terrain stream (WAG W2.3 wiring + W2.4 lazy CPU view),
-// flag terrainGpuDecode (default off; WebGPU engine, batched terrain, ?gpu=on only; WebGL and ?gpu=off
+// flag terrainGpuDecode (default on; WebGPU engine, batched terrain, ?gpu=on only; WebGL and ?gpu=off
 // always decode on the CPU).
 //
 // Per tile (deck/terrain-stream.ts StreamOptions.loadTile):

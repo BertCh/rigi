@@ -254,9 +254,9 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"terrain height atlas r32float 2d-array (import, per-run layer)",
 		],
 		readbacks: ["stats: 32 B per streamed tile (read node, load time)"],
-		status: "opt-in",
+		status: "default",
 		notes:
-			"WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default off; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi; residency: decode straight into the TileStore height layer; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
+			"WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default on; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi; residency: decode straight into the TileStore height layer; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
 	},
 	{
 		id: "height-gather",
@@ -275,7 +275,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: [
 			"read: 8 B per texel (nonce + raw f32 bits), 4 texels per height sample of a lazy tile",
 		],
-		status: "opt-in",
+		status: "default",
 		notes:
 			"WAG W2.4 second half, under flag terrainGpuDecode: the WebGPU photo view's CPU height readers (camera DEM height, trails, peak snapping) take lazy tiles' heights from the atlas instead of materialising them; plan + blend on the CPU in f64 (TerrainSet.locate, gridCorners / blendCorners = sampleGrid), the GPU only copies texels, so a result is heightAt's bit for bit; nonce + slot certificate, heightAt fallback. CPU twin: TerrainSet.heightAt / localMax",
 	},
@@ -343,7 +343,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"A: outA n·8 B (elevation bits + flag)",
 			"B→C: outC 8192·16 B (direction bits + flag)",
 		],
-		status: "opt-in",
+		status: "default",
 		notes:
 			"certified-f32 tan → degrees and ENU / resample (D7, D8); ?horizonPrecision=certified-f32; ties recomputed by the f64 path",
 	},
@@ -359,7 +359,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		cadence: "per photo",
 		resources: ["u, pin (pooled imports)", "pout (transient)"],
 		readbacks: ["read: pout 4096·80 B, once per device"],
-		status: "opt-in",
+		status: "default",
 		notes:
 			"strict-IEEE probe gating every certified-f32 stage (horizon in the horizon-fast worker; align on the page)",
 	},
@@ -401,7 +401,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: [
 			"read per submit (≈4 per autoAlign): lane states + move logs + audit rings ≤ 8·6.3 KB",
 		],
-		status: "opt-in",
+		status: "default",
 		notes:
 			"certified-f32 coordinate descent (WAG W3.3): R rounds per submit, DECIDE → EVAL (indirect) → EVAL2 double-f32 (indirect); ?alignPrecision=certified-f32",
 	},
@@ -522,9 +522,9 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"vis flags (transient)",
 		],
 		readbacks: [],
-		status: "opt-in",
+		status: "default",
 		notes:
-			"WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default off: no CPU saving measured; ?terrainGpuCull=on, WebGPU only; off / ?gpu=off / WebGL: the CPU twin visibleRows)",
+			"WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default on, WebGPU only; ?terrainGpuCull=off, off / ?gpu=off / WebGL: the CPU twin visibleRows)",
 	},
 	{
 		id: "geo-query-gpu",

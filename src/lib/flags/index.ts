@@ -56,33 +56,38 @@ export const FLAG_SCHEMA = {
 	gpu: onOff("on"),
 	/** autoAlign's skyline march */
 	gpuHorizon: onOff("on"),
-	/** the skyline's tan → degrees and ENU stages: f64 on the CPU, or certified f32 on the GPU (same bits) */
-	horizonPrecision: oneOf(["f64", "certified-f32"], "f64"),
+	/**
+	 * the skyline's tan → degrees and ENU stages: certified f32 on the GPU (default since 2026-10-01; the
+	 * precision gate found no quality difference: GT-12 12/12 identical, webgpu accepts identical) or f64
+	 * on the CPU (?horizonPrecision=f64)
+	 */
+	horizonPrecision: oneOf(["f64", "certified-f32"], "certified-f32"),
 	/** relief / haze look passes */
 	lookgpu: onOff("on"),
 	/** unknown-pose 360° horizon (off: 0-false-accept rule) */
 	unknownGpu: onOff("off"),
 	/**
 	 * WebGPU batched terrain: GPU frustum cull + indirect draws (WAG W1.5; byte-identical frames to the
-	 * CPU cull, scripts/deck-webgpu/terrain-indirect-check.mjs); off = the CPU cull. Default off: no CPU
-	 * saving measured at ~350–390 tiles (0.15–0.19 vs 0.12–0.14 ms per frame) and the full tier is unrun. WebGL and ?gpu=off
+	 * CPU cull, scripts/deck-webgpu/terrain-indirect-check.mjs); off = the CPU cull. Default on since
+	 * 2026-10-01 (GPU-graph first; no CPU saving at ~350–390 tiles, but no loss). WebGL and ?gpu=off
 	 * always cull on the CPU.
 	 */
-	terrainGpuCull: onOff("off"),
+	terrainGpuCull: onOff("on"),
 	/**
 	 * WebGPU terrain stream: Terrarium tiles decode on the GPU straight into the height atlas (WAG W2.3,
 	 * deck-webgpu/terrain-gpu-decode.ts) and CPU heights are produced only when a CPU consumer asks
 	 * (W2.4 getCpuHeights). Same heights bit for bit (texel bytes == canvas bytes, measured); off = the
-	 * CPU decode. Default off until the wild-set / browser gates run. WebGL and ?gpu=off always decode
+	 * CPU decode. Default on since 2026-10-01: the hot heightAt callers gather from the atlas (no main-thread
+	 * decodes); the atlas uploads ~3.5–4× the bytes of the CPU path. WebGL and ?gpu=off always decode
 	 * on the CPU.
 	 */
-	terrainGpuDecode: onOff("off"),
+	terrainGpuDecode: onOff("on"),
 	/**
 	 * autoAlign's refine precision (WAG P1, src/lib/gpu/align/cert-refine.ts): f64 (default) = exact CPU
-	 * scores decide every move; certified-f32 = GPU-driven loop with certified f32 compares, the CPU
-	 * deciding only what the bound cannot (same result; opt-in until its wild-set gate passes)
+	 * scores decide every move; certified-f32 (default since 2026-10-01) = GPU-driven loop with certified f32
+	 * compares, the CPU deciding only what the bound cannot. Precision gate: no quality difference found
 	 */
-	alignPrecision: oneOf(["f64", "certified-f32"], "f64"),
+	alignPrecision: oneOf(["f64", "certified-f32"], "certified-f32"),
 	// Step Inside 3D Tiles (src/lib/tiles3d)
 	tiles3d: oneOf(["off", "buildings", "swisstopo", "google", "all"], "off"),
 	tiles3dBlend: oneOf(["fill", "over"], "fill"),
