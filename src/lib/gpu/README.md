@@ -22,6 +22,9 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
 - **Kernel modules** (`horizon/`, `align/`, `look/`, `eye/`, `skyglobal/`, `solve/`, `sky/`): each defines
   its WGSL with `core/kernel` `defineKernel`, pools its buffers under its own lease, submits through
   `core/queue` and reads back through `core/readback`.
+- **`splat-sort/`**: the GPU back-to-front sort of the Step Inside splats on the render device
+  (stable radix, order buffer written in place, no readback); see its README for the key identity
+  with the worker's counting sort.
 - **`device.ts`** re-exports `core/device`. This is the stable import path that callers outside
   `src/lib/gpu` use (the app workers, the look controller, deck-webgpu).
 

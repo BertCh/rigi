@@ -273,8 +273,10 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   `src/lib/gpu/device.adoptRenderDevice(device)` for both hosts, so look kernels run on the render
   device and bind the targets above directly: `STORAGE_BINDING` is set on geometry, normal and
   colour.
+- `SplatsCore`'s order buffer is written by the GPU radix sort with `sortBackend: "gpu"`
+  (`src/lib/gpu/splat-sort`, the worker stays the default and fallback).
 - Hooks waiting for compute: `BatchedTerrainCore.cull(ctx, tiles)` (GPU cull + indirect draws),
-  `SplatsCore`'s order buffer (GPU radix sort writes it), `RIDGES_WGSL` (binding-free, runs in
+  `RIDGES_WGSL` (binding-free, runs in
   `@compute` as-is: an edge-mask pass).
 - Kernels must not write a target that a later pass of the same frame reads. Schedule them after
   `runOffscreenPasses` (colour pass done), or give them their own targets.
