@@ -32,16 +32,23 @@ const LAYOUT: Parameters<typeof defineKernel>[2] = [
 	["lut", "read-only-storage"],
 	["partial", "storage"],
 ];
-const K_BAND_STATS = defineKernel("band-stats", BAND_STATS, LAYOUT);
+export const K_BAND_STATS = defineKernel("band-stats", BAND_STATS, LAYOUT);
 /** Warm-up group of the kernels that need the "subgroups" feature (warmLook checks it). */
 export const LOOK_SUBGROUP_GROUP = "look-subgroups";
-const K_BAND_STATS_SG = defineKernel("band-stats-sg", BAND_STATS_SG, LAYOUT, {
-	group: LOOK_SUBGROUP_GROUP,
-});
+export const K_BAND_STATS_SG = defineKernel(
+	"band-stats-sg",
+	BAND_STATS_SG,
+	LAYOUT,
+	{
+		group: LOOK_SUBGROUP_GROUP,
+	},
+);
 
 export type BandStatsOptions = {
 	/** Use the subgroup reduction when the device has subgroups (default false). */
 	subgroups?: boolean;
+	/** run the BAND_STATS(_SG) dispatch as a core ComputeGraph node (color-stats-graph.ts; default false) */
+	graph?: boolean;
 };
 
 export type BandStatsInput = {
@@ -61,13 +68,13 @@ export type BandStatsInput = {
 	minCount?: number;
 };
 
-const SRGB_LUT = Float32Array.from({ length: 256 }, (_, i) => {
+export const SRGB_LUT = Float32Array.from({ length: 256 }, (_, i) => {
 	const c = i / 255;
 	return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 });
 
-const GROUPS = 32;
-const WG = 64;
+export const GROUPS = 32;
+export const WG = 64;
 
 /** reduceBands(bandInputs(photo, layer, w, h, range, fg, minRange), w·h, minCount) on the GPU. */
 export async function bandStatsGpu(
@@ -87,10 +94,12 @@ export async function bandStatsGpu(
 	new Uint32Array(words, 0, 4).set([w, h, GROUPS * WG, o.fg ? 1 : 0]);
 	new Float32Array(words, 16, 1)[0] = o.minRange ?? 0;
 	const sg = (opts.subgroups ?? false) && hasFeature(device, "subgroups");
-	let p = await bandPartials(device, o, words, R, sg);
+	const partials = opts.graph
+		? (await import("./color-stats-graph")).bandPartialsGraph
+		: bandPartials;
+	let p = await partials(device, o, words, R, sg);
 	// BAND_STATS_SG writes -1 partials (a negative count) when the subgroup layout isn't what it assumes
-	if (sg && hasNegativeCount(p))
-		p = await bandPartials(device, o, words, R, false);
+	if (sg && hasNegativeCount(p)) p = await partials(device, o, words, R, false);
 	// per band: count, Σp(3), Σp²(3), Σl(3), Σl²(3) → reduceBands' acc layout (Σp, Σp², Σl, Σl²)
 	const acc = new Float64Array(N_BANDS * 12);
 	const cnt = new Uint32Array(N_BANDS);
@@ -111,7 +120,7 @@ const hasNegativeCount = (p: Float32Array) => {
 };
 
 /** One BAND_STATS(_SG) dispatch: the GROUPS × STATS_VALUES per-workgroup partials. */
-function bandPartials(
+export function bandPartials(
 	device: Device,
 	o: BandStatsInput,
 	words: ArrayBuffer,

@@ -30,28 +30,28 @@ import {
 	RELIEF_SVF,
 } from "./relief.wgsl";
 
-const K_RELIEF_SHADOW = defineKernel("relief-shadow", RELIEF_SHADOW, [
+export const K_RELIEF_SHADOW = defineKernel("relief-shadow", RELIEF_SHADOW, [
 	["prm", "uniform"],
 	["H", "read-only-storage"],
 	["shadow", "storage"],
 ]);
-const K_RELIEF_DOWN = defineKernel("relief-down", RELIEF_DOWN, [
+export const K_RELIEF_DOWN = defineKernel("relief-down", RELIEF_DOWN, [
 	["prm", "uniform"],
 	["Hf", "read-only-storage"],
 	["Hh", "storage"],
 ]);
-const K_RELIEF_SVF = defineKernel("relief-svf", RELIEF_SVF, [
+export const K_RELIEF_SVF = defineKernel("relief-svf", RELIEF_SVF, [
 	["prm", "uniform"],
 	["Hh", "read-only-storage"],
 	["hull", "storage"],
 	["acc8", "storage"],
 ]);
-const K_RELIEF_SUM = defineKernel("relief-sum", RELIEF_SUM, [
+export const K_RELIEF_SUM = defineKernel("relief-sum", RELIEF_SUM, [
 	["prm", "uniform"],
 	["acc8", "read-only-storage"],
 	["acc", "storage"],
 ]);
-const K_RELIEF_PACK = defineKernel("relief-pack", RELIEF_PACK, [
+export const K_RELIEF_PACK = defineKernel("relief-pack", RELIEF_PACK, [
 	["prm", "uniform"],
 	["H", "read-only-storage"],
 	["shadow", "read-only-storage"],
@@ -67,6 +67,11 @@ const AHEAD = 12000;
 const SVF_R = 3000;
 const HOLE = -1e6;
 
+export type ReliefGpuOptions = {
+	/** run the passes on a core ComputeGraph (relief-graph.ts); default false: the pooled path below */
+	graph?: boolean;
+};
+
 /** GPU twin of buildReliefField(tiles, frame, sunDir, yawDeg). */
 export async function buildReliefFieldGpu(
 	device: Device,
@@ -74,6 +79,7 @@ export async function buildReliefFieldGpu(
 	frame: EnuFrame,
 	sunDir: Vec3,
 	yawDeg: number | null,
+	opts: ReliefGpuOptions = {},
 ): Promise<ReliefField> {
 	const t0 = performance.now();
 	const res = RES;
@@ -83,7 +89,14 @@ export async function buildReliefFieldGpu(
 	const extent: Extent = [c[0] - HALF, c[1] - HALF, c[0] + HALF, c[1] + HALF];
 	const px = (2 * HALF) / res;
 	const H = rasterizeHeights(tiles, frame, extent, res, HOLE);
-	const { field, gen } = await reliefPassesGpu(device, H, res, px, sunDir);
+	const { field, gen } = await reliefPassesGpu(
+		device,
+		H,
+		res,
+		px,
+		sunDir,
+		opts,
+	);
 	return { res, extent, field, gen, ms: performance.now() - t0 };
 }
 
@@ -94,6 +107,7 @@ export async function reliefPassesGpu(
 	res: number,
 	px: number,
 	sun: Vec3,
+	opts: ReliefGpuOptions = {},
 ): Promise<{ field: Uint8Array; gen: Uint8Array }> {
 	if (res > 2048 || res % 2) throw new Error(`relief res ${res} unsupported`);
 	const resH = res >> 1;
@@ -147,6 +161,14 @@ export async function reliefPassesGpu(
 	f32(1 / (2 * ra * px)); // g
 	f32(SVF_R);
 
+	if (opts.graph)
+		return (await import("./relief-graph")).reliefGraphPasses(
+			device,
+			H,
+			res,
+			words,
+			degenerate,
+		);
 	const N = res * res;
 	const NH = resH * resH;
 	return withLease("look-relief", async () => {

@@ -121,9 +121,11 @@ function statsErrors(c: ColorStats, g: ColorStats) {
 
 export async function runLookBench(
 	engine: unknown,
-	opts: { reps?: number; label?: string } = {},
+	opts: { reps?: number; label?: string; graph?: boolean } = {},
 ) {
 	const reps = opts.reps ?? 5;
+	// graph: relief / guided / band stats through their ComputeGraph paths (*-graph.ts)
+	const graph = opts.graph ?? false;
 	const device = await getComputeDevice();
 	if (!device) return { error: "no WebGPU compute device" };
 	const inp: LookInputs = captureLookInputs(engine, opts.label);
@@ -135,7 +137,7 @@ export async function runLookBench(
 			buildReliefField(r.tiles, r.frame, r.sunDir, r.yaw),
 		);
 		const gpu = await time(reps, () =>
-			buildReliefFieldGpu(device, r.tiles, r.frame, r.sunDir, r.yaw),
+			buildReliefFieldGpu(device, r.tiles, r.frame, r.sunDir, r.yaw, { graph }),
 		);
 		const a = cpu.out;
 		const b = gpu.out;
@@ -230,7 +232,7 @@ export async function runLookBench(
 			jobs.map((j) => guidedFilter(m.I, j.p, m.w, m.h, j.r, j.eps)),
 		);
 		const gpu = await time(reps, () =>
-			guidedFiltersGpu(device, m.I, m.w, m.h, jobs),
+			guidedFiltersGpu(device, m.I, m.w, m.h, jobs, { graph }),
 		);
 		const n = m.w * m.h;
 		out.guided = {
@@ -271,11 +273,13 @@ export async function runLookBench(
 			);
 			return reduceBands(a, b, s.w * s.h);
 		});
-		const gpu = await time(reps, () => bandStatsGpu(device, s));
+		const gpu = await time(reps, () => bandStatsGpu(device, s, { graph }));
 		const subgroups = hasFeature(device, "subgroups");
 		// the opt-in subgroup reduction: its reassociation drift vs the default shared-memory tree
 		const withSg = subgroups
-			? await time(reps, () => bandStatsGpu(device, s, { subgroups: true }))
+			? await time(reps, () =>
+					bandStatsGpu(device, s, { subgroups: true, graph }),
+				)
 			: null;
 		out.stats = {
 			dims: [s.w, s.h],
@@ -313,3 +317,9 @@ export async function runLookBenchWarm(
 	const warmMs = await warmLook();
 	return { warmMs, ...(await runLookBench(engine, opts)) };
 }
+
+/** runLookBench with relief / guided / band stats on their ComputeGraph paths (look-bench.mjs --fn runLookBenchGraph). */
+export const runLookBenchGraph = (
+	engine: unknown,
+	opts: { reps?: number; label?: string } = {},
+) => runLookBench(engine, { ...opts, graph: true });

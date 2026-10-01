@@ -15,23 +15,23 @@ import {
 	withLease,
 } from "./kernel";
 
-const K_GF_H0 = defineKernel("gf-h0", GF_H0, [
+export const K_GF_H0 = defineKernel("gf-h0", GF_H0, [
 	["prm", "uniform"],
 	["gI", "read-only-storage"],
 	["gp", "read-only-storage"],
 	["outv", "storage"],
 ]);
-const K_GF_V0 = defineKernel("gf-v0", GF_V0, [
+export const K_GF_V0 = defineKernel("gf-v0", GF_V0, [
 	["prm", "uniform"],
 	["inv", "read-only-storage"],
 	["ab", "storage"],
 ]);
-const K_GF_H1 = defineKernel("gf-h1", GF_H1, [
+export const K_GF_H1 = defineKernel("gf-h1", GF_H1, [
 	["prm", "uniform"],
 	["ab", "read-only-storage"],
 	["outv", "storage"],
 ]);
-const K_GF_V1 = defineKernel("gf-v1", GF_V1, [
+export const K_GF_V1 = defineKernel("gf-v1", GF_V1, [
 	["prm", "uniform"],
 	["inv", "read-only-storage"],
 	["gI", "read-only-storage"],
@@ -49,7 +49,17 @@ export async function guidedFiltersGpu(
 	w: number,
 	h: number,
 	jobs: readonly GuidedJob[],
+	opts: { graph?: boolean } = {},
 ): Promise<Float32Array[]> {
+	// opt-in: the same four kernels per job on a core ComputeGraph (guided-filter-graph.ts)
+	if (opts.graph)
+		return (await import("./guided-filter-graph")).guidedFiltersGraph(
+			device,
+			I,
+			w,
+			h,
+			jobs,
+		);
 	const n = w * h;
 	const kH0 = kernel(device, K_GF_H0);
 	const kV0 = kernel(device, K_GF_V0);
