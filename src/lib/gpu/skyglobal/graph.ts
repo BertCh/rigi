@@ -1,23 +1,23 @@
-// The skyglobal grid's GPU phase on a core ComputeGraph: the default path of gridGpu (the pooled
-// per-pass dispatches in ./index.ts are the explicit fallback, `{ graph: false }`; the CPU twin
-// ./cpu.ts is unchanged).
+// The skyglobal grid's GPU phase on a core ComputeGraph: the only GPU path of gridGpu (./index.ts;
+// the pooled per-pass dispatches it replaced, bit for bit, were removed on 2026-10-01). The CPU twin
+// is ./cpu.ts.
 //
 // One encoding per grid, one submit, one read slot:
 //   clear list[0] → CELLS → REDUCE (subgroup or tree) → CANDS → read [list head, red, (debug) cells]
-// Same three kernel specs (./kernels.ts, unchanged WGSL), same uniforms, same workgroup counts.
+// The three kernel specs of ./kernels.ts.
 //
 // Buffers:
-// - `cells` (nCells × 16 B, ~24 MB) and `red` (nYaw × 16 B) are graph TRANSIENTS sized to the pooled
-//   path's power-of-two capacities (so every binding has the pooled path's byte size), aliased by
-//   the graph by lifetime. Neither is read back mid-chain: red rides the final read (the CPU uses its
+// - `cells` (nCells × 16 B, ~24 MB) and `red` (nYaw × 16 B) are graph TRANSIENTS sized to
+//   power-of-two capacities (so photos of similar size share a graph), aliased by the graph by
+//   lifetime. Neither is read back mid-chain: red rides the final read (the CPU uses its
 //   per-yaw mid argmax for stats.midArgFlips), cells only when debugGrid asks (a 0-byte range
 //   otherwise, which stages no copy).
 // - the inputs (u, S, prof, alpha, vfs, combos) are imports: pooled uploads under the "skyglobal"
-//   lease, bound per run, exactly as the pooled path writes them.
+//   lease, bound per run.
 // - the candidate `list` is an IMPORT (the pooled "skyglobal/list" slot), not a transient: a list
 //   longer than the head read needs a second, exact-length read of its tail AFTER the encoding
 //   resolved its count, and a graph transient cannot be read outside its encoding. Kept pooled (and
-//   under the lease until that tail read), it keeps the count-first readback of the pooled path.
+//   under the lease until that tail read), it keeps the count-first readback.
 //
 // Clear audit (transients are never zeroed and alias other transients' bytes): CELLS writes every
 // cells[ci · nYaw + iy] in range (its only return is the range guard) and REDUCE writes red[iy] for
@@ -25,14 +25,12 @@
 // clear. CANDS appends with atomicAdd on list[0]: the count word is cleared by a clearNode ordered
 // before CANDS (list is an import, so core's lint does not require it; it is the house rule anyway).
 //
-// Bit-identity with the pooled path: same specs / WGSL / pipelines, same uniform and input bytes,
-// bindings of the same byte sizes, and REDUCE's red[] is order-independent (see skyglobal.wgsl.ts).
-// The list's ORDER is atomicAdd order on both paths (not deterministic run to run); its set, the
-// count, red, cells and so the re-scored {best, arg} are identical. That is also why CANDS stays a
-// custom append and is not luma's GPUCompaction: a stable compaction would emit index order, which
-// no pooled run is guaranteed to produce (and it would scan all ~1.5M cells to keep ~800).
+// Determinism: REDUCE's red[] is order-independent (see skyglobal.wgsl.ts). The list's ORDER is
+// atomicAdd order (not deterministic run to run); its set, the count, red, cells and so the re-scored
+// {best, arg} are. CANDS stays a custom append rather than luma's GPUCompaction: a stable compaction
+// would scan all ~1.5M cells to keep ~800, and the CPU re-score sorts per yaw anyway.
 //
-// Per-call overhead: ./index.ts imports this module statically; the compiled graph is cached per
+// Per-call overhead: the compiled graph is cached per
 // (subgroups, input / transient capacities) with core cachedGraph (group "skyglobal", 2 per device),
 // so photos of similar size share one graph; pipelines come from the core kernel cache (the warm
 // functions in ./index.ts compile them).
@@ -63,7 +61,7 @@ import {
 	STORAGE,
 } from "./kernels";
 
-/** cachedGraph group of the skyglobal graphs (also the pooled path's lease name). */
+/** cachedGraph group of the skyglobal graphs (also the lease / pool prefix). */
 export const SKYGLOBAL_GRAPH_GROUP = OWNER;
 /** Compiled graphs kept per device (each holds a cells transient of up to ~32 MB). */
 const MAX_GRAPHS = 2;
@@ -131,7 +129,7 @@ export function releaseSkyGlobalGraphs(device: Device): Promise<void> {
 	return releaseCachedGraphs(device, SKYGLOBAL_GRAPH_GROUP);
 }
 
-/** gridOnGpu (./index.ts) on the graph: same GpuOut, bit-identical. Call under the "skyglobal" lease. */
+/** gridGpu's GPU phase: upload, CELLS → REDUCE → CANDS, the count-first readback. Call under the "skyglobal" lease. */
 export async function gridOnGraph(
 	device: Device,
 	sg: SkyGlobal,
@@ -146,7 +144,7 @@ export async function gridOnGraph(
 	const { cap } = P;
 	const head = headFor(device, o, cap);
 	const sub = !o.noSubgroups && hasFeature(device, "subgroups");
-	// the pooled path's uploads, same slots and bytes
+	// pooled uploads under the "skyglobal" lease
 	const bufs: Inputs = {
 		u: pooledUniform(device, key("u"), P.ub),
 		S: pooledStorage(device, key("S"), sg.Sc),

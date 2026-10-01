@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// T6 skyline global search: GPU grid (src/lib/gpu/skyglobal; graph path, diffed bit for bit against
-// the pooled `{ graph: false }` path) vs the TS CPU twin vs Python
+// T6 skyline global search: GPU grid (src/lib/gpu/skyglobal, on its core graph; run to run bit for
+// bit) vs the TS CPU twin vs Python
 // skyglobal.py, parity + timing on the dumped dev fixtures (out/gpu/skyglobal/<id>/, see
 // tools/matcher/gpu_port/dump_skyglobal_fixtures.py). Runs src/lib/gpu/skyglobal/bench.ts in
 // headless Chromium (WebGPU) against the private dev server.
@@ -66,8 +66,8 @@ try {
 			console.log(`${id}: ${r.error}`);
 			continue;
 		}
-		const gp = g.graphVsPooled;
-		const gpOk = gp.grid && gp.splitRead && gp.cells && gp.stats;
+		const gp = g.rerun;
+		const gpOk = gp.grid && gp.cells && gp.stats && g.splitReadIdentical;
 		if (!gpOk) process.exitCode = 1;
 		const h = (x) =>
 			x.identical ? "same" : `DIFF ${x.maxPoseDiff.toExponential(1)}`;
@@ -77,7 +77,7 @@ try {
 				`plain f32: max ${g.midMaxAbs.toExponential(1)} cells>1e-5 ${g.midCellsOver1e5} winnerFlips ${g.midWinnerFlips} peaks ${g.midPeaksIdentical ? "same" : "DIFF"} hyps ${h(g.midHyps)} | ` +
 				`ms: py grid ${r.py.grid} refine ${r.py.refine} · cpu ctor ${r.cpu.ctorMs.toFixed(0)} grid ${r.cpu.gridMs.toFixed(0)} polish ${r.cpu.polishMs.toFixed(0)} · ` +
 				`gpu cold ${g.coldMs.toFixed(0)} warm ${g.warmMs.toFixed(1)} (gpu ${g.gpuMs.toFixed(1)} up ${g.uploadMs.toFixed(1)} rescore ${g.rescoreMs.toFixed(1)}) · ` +
-				`graph≡pooled ${gpOk ? "same" : `DIFF ${JSON.stringify(gp)}`} (pooled warm ${g.pooledWarmMs.toFixed(1)} gpu ${g.pooledGpuMs.toFixed(1)}) [${((Date.now() - t0) / 1000).toFixed(0)} s]`,
+				`rerun+split ${gpOk ? "same" : `DIFF ${JSON.stringify(gp)} split ${g.splitReadIdentical}`} [${((Date.now() - t0) / 1000).toFixed(0)} s]`,
 		);
 	}
 } finally {

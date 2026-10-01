@@ -10,26 +10,18 @@
 //
 // Not wired into the service: see the parity / timing report (scripts/gpu/skyglobal-bench.mjs).
 //
-// Plumbing (src/lib/gpu/core), two bit-identical GPU paths under the "skyglobal" lease (one grid on
-// the GPU at a time; the lease covers the GPU phase only, not the CPU re-score):
-// - default: one core ComputeGraph encoding (./graph.ts; cells / red are graph transients, cached
-//   per capacity);
-// - `{ graph: false }`: pooled buffers, bindings per pass, one core submit (gridOnGpu below).
-// Kernel specs and the shared readback decode live in ./kernels.ts. The candidate list is read count-first: the one submit reads the count plus the first
-// `head` slots (sized from the device's, or the caller's, last count), and only an unusually long
-// list costs a second, exact-length read of the rest (both paths).
+// Plumbing (src/lib/gpu/core): one core ComputeGraph encoding (./graph.ts; cells / red are graph
+// transients, cached per capacity; the inputs and the candidate list are pooled imports) under the
+// "skyglobal" lease (one grid on the GPU at a time; the lease covers the GPU phase only, not the CPU
+// re-score). The pooled per-pass path it replaced (bit for bit) was removed on 2026-10-01. Kernel
+// specs and the readback decode live in ./kernels.ts. The candidate list is read count-first: the
+// one submit reads the count plus the first `head` slots (sized from the device's, or the caller's,
+// last count), and only an unusually long list costs a second, exact-length read of the rest from
+// the pooled list buffer.
 import type { Device } from "@luma.gl/core";
-import { dispatch, kernel, kernelAsync, submit } from "../core/kernel";
-import {
-	acquire,
-	clear,
-	pooledStorage,
-	pooledUniform,
-	releasePool,
-	withLease,
-} from "../core/pool";
-import { stageReads } from "../core/readback";
-import { getComputeDevice, hasFeature } from "../device";
+import { kernel, kernelAsync } from "../core/kernel";
+import { releasePool, withLease } from "../core/pool";
+import { getComputeDevice } from "../device";
 import {
 	type EdgeInputs,
 	type GridPlan,
@@ -37,18 +29,7 @@ import {
 	SkyGlobal,
 } from "./cpu";
 import { gridOnGraph, releaseSkyGlobalGraphs } from "./graph";
-import {
-	collect,
-	headFor,
-	K_CANDS,
-	K_CELLS,
-	K_REDUCE,
-	K_REDUCE_SG,
-	key,
-	OWNER,
-	reduceSpec,
-	STORAGE,
-} from "./kernels";
+import { K_CANDS, K_CELLS, OWNER, reduceSpec } from "./kernels";
 import { COMBO_FLOATS } from "./skyglobal.wgsl";
 
 /** Compile the three pipelines now (so the first search does not pay the WGSL compile). */
@@ -78,8 +59,6 @@ export type GridGpuOptions = {
 	noSubgroups?: boolean;
 	/** also read back the GPU's point estimates (combo × yaw, float32) for parity reports */
 	debugGrid?: boolean;
-	/** false: the pooled per-pass dispatches; default (true): one core ComputeGraph encoding (./graph.ts) */
-	graph?: boolean;
 };
 
 export type GridGpuStats = {
@@ -159,11 +138,7 @@ export async function gridGpu(
 	const t0 = performance.now();
 	const P = pack(sg, g, o);
 	const packMs = performance.now() - t0;
-	const r = await withLease(OWNER, () =>
-		o.graph === false
-			? gridOnGpu(device, sg, g, o, P)
-			: gridOnGraph(device, sg, g, o, P),
-	);
+	const r = await withLease(OWNER, () => gridOnGraph(device, sg, g, o, P));
 	r.stats.uploadMs += packMs;
 	return rescore(sg, g, P, r, t0);
 }
@@ -228,88 +203,6 @@ function pack(sg: SkyGlobal, g: GridPlan, o: GridGpuOptions): Packed {
 	uu.set([sg.w, sg.h, g.n, g.sy, nYaw, nCombo, Math.floor(g.cntMin) + 1, cap]);
 	uf.set([o.eps ?? 5e-3, o.zeps ?? 1e-5, smin, smax], 8);
 	return { T, ub, prof, alpha, vfs, combos, cap };
-}
-
-/** The GPU phase (under the lease): upload, CELLS → REDUCE → CANDS, the count-first readback. */
-async function gridOnGpu(
-	device: Device,
-	sg: SkyGlobal,
-	g: GridPlan,
-	o: GridGpuOptions,
-	P: Packed,
-): Promise<GpuOut> {
-	const t0 = performance.now();
-	const nYaw = g.nYaw;
-	const nCombo = g.combos.length;
-	const nCells = nYaw * nCombo;
-	const { cap } = P;
-	const head = headFor(device, o, cap);
-	const sub = !o.noSubgroups && hasFeature(device, "subgroups");
-
-	// every slot is either fully rewritten (inputs, cells, red) or cleared where it is read (the
-	// list's count word): no stale bytes from the previous call reach a result
-	const u = pooledUniform(device, key("u"), P.ub);
-	const S = pooledStorage(device, key("S"), sg.Sc);
-	const cells = acquire(device, key("cells"), nCells * 16, STORAGE);
-	const red = acquire(device, key("red"), nYaw * 16, STORAGE);
-	const list = acquire(device, key("list"), (cap + 1) * 4, STORAGE);
-	const bind = {
-		u,
-		S,
-		prof: pooledStorage(device, key("prof"), P.prof),
-		alpha: pooledStorage(device, key("alpha"), P.alpha),
-		vfs: pooledStorage(device, key("vfs"), P.vfs),
-		combos: pooledStorage(device, key("combos"), P.combos),
-		cells,
-	};
-	const t1 = performance.now();
-	const enc = device.createCommandEncoder({ id: "skyglobal-grid" });
-	clear(enc, list, 0, 4);
-	dispatch(enc, kernel(device, K_CELLS), bind, Math.ceil(nYaw / 64), nCombo);
-	dispatch(
-		enc,
-		kernel(device, sub ? K_REDUCE_SG : K_REDUCE),
-		{ u, cells, red },
-		nYaw,
-	);
-	dispatch(
-		enc,
-		kernel(device, K_CANDS),
-		{ u, cells, red, list },
-		Math.ceil(nYaw / 64),
-		nCombo,
-	);
-	// one submit: the count + the first `head` slots, the reduction, (debug) the whole grid
-	const ranges = [
-		{ buffer: list, size: (head + 1) * 4 },
-		{ buffer: red, size: nYaw * 16 },
-	];
-	if (o.debugGrid) ranges.push({ buffer: cells, size: nCells * 16 });
-	const staged = stageReads(device, enc, ranges);
-	try {
-		submit(device, enc);
-	} catch (e) {
-		staged.cancel();
-		throw e;
-	}
-	const [lb, rb, cb] = await staged.read();
-	return collect(
-		device,
-		{
-			list,
-			head,
-			cap,
-			nCells,
-			readBytes: ranges.reduce((a, r) => a + r.size, 0),
-			sub,
-			t0,
-			t1,
-		},
-		o,
-		lb,
-		rb,
-		cb,
-	);
 }
 
 /** The CPU phase (no lease): exact re-score of the candidates, or gridCpu when the list is unusable. */

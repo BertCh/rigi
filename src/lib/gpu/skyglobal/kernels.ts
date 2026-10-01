@@ -1,6 +1,6 @@
-// The skyglobal kernel specs and the pieces both GPU paths share (pooled ./index.ts, graph ./graph.ts):
-// the lease / pool names, the count-first head sizing and the readback → GpuOut decode (incl. the
-// optional tail read of a long candidate list). Its own module so ./graph.ts can import it without
+// The skyglobal kernel specs and the GPU phase's helpers (./graph.ts): the lease / pool names, the
+// count-first head sizing and the readback → GpuOut decode (incl. the optional tail read of a long
+// candidate list from the pooled list buffer). Its own module so ./graph.ts can import it without
 // an import cycle through ./index.ts.
 import { type Buffer, type Device, Buffer as LumaBuffer } from "@luma.gl/core";
 import { type BindKind, defineKernel } from "../core/kernel";
