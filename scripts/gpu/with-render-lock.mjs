@@ -80,9 +80,7 @@ for (;;) {
 				console.error(`[render-lock] next in line; running: ${owner || "?"}`);
 		}
 	} else if (waited % 30 === 0) {
-		const ahead = readdirSync(QUEUE)
-			.sort()
-			.indexOf(ticket);
+		const ahead = readdirSync(QUEUE).sort().indexOf(ticket);
 		console.error(`[render-lock] queued (${ahead} ahead)`);
 	}
 	await new Promise((r) => setTimeout(r, 1000));
