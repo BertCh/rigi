@@ -549,9 +549,12 @@ export class WebGpuEngine implements Renderer {
 	 * heights from the atlas (height-gather.ts) while the terrainGpuDecode loader streams; null = heightAt.
 	 */
 	private heightGather: HeightGather | null = null;
+	private heightGatherCore: object | null = null;
 	private gpuDecodeOn = false;
 	/** trail builds in flight: a newer build (or terrain) supersedes an older one */
 	private trailGen = 0;
+	/** the latest gathered trail build in flight (settle() waits for it) */
+	private trailFlight: Promise<unknown> | null = null;
 	/** peak snaps gathered asynchronously: results waiting for snapPeaksNear, peaks in flight, epoch */
 	private snapDone = new Map<Peak, { lat: number; lon: number; h: number }>();
 	private snapPending = new Set<Peak>();
@@ -1271,7 +1274,12 @@ export class WebGpuEngine implements Renderer {
 		this.demAtCamera = dem;
 		this.setEye(eyeAltitude(this.photo.alt, dem));
 		this.elevRange = localElevRange(terrain);
-		this.gpu?.terrain.setTiles(terrain.tiles);
+		// under terrainGpuDecode the camera gather above spans a GPU round trip, in which onUpdate may
+		// have rendered a newer set: keep that one (re-setting the first set would drop its new tiles
+		// until the next update). The default path is left as it was.
+		this.gpu?.terrain.setTiles(
+			(hg ? (this.renderSet ?? terrain) : terrain).tiles,
+		);
 		this.pushImagery();
 		this.updateRelief();
 		this.sync();
@@ -1450,9 +1458,16 @@ export class WebGpuEngine implements Renderer {
 			this.gpu?.trails.setSegments(seg);
 			return true;
 		};
-		if (built instanceof Promise)
-			void built.then((seg) => apply(seg) && this.sync());
-		else apply(built);
+		if (built instanceof Promise) {
+			const flight = built.then(
+				(seg) => apply(seg) && this.sync(),
+				(e) => console.warn("[height-gather] trail build failed", e),
+			);
+			this.trailFlight = flight;
+			void flight.then(() => {
+				if (this.trailFlight === flight) this.trailFlight = null;
+			});
+		} else apply(built);
 	}
 
 	/**
@@ -1463,9 +1478,14 @@ export class WebGpuEngine implements Renderer {
 		const g = this.gpu;
 		if (!this.gpuDecodeOn || !g || !("residentHeights" in g.terrain))
 			return null;
-		if (this.heightGather?.device !== g.device) {
+		// one per (device, terrain core): the gather reads that core's atlas
+		if (
+			this.heightGather?.device !== g.device ||
+			this.heightGatherCore !== g.terrain
+		) {
 			this.heightGather?.destroy();
 			const terrain = g.terrain;
+			this.heightGatherCore = terrain;
 			this.heightGather = new HeightGather(g.device, () =>
 				this.gpu?.terrain === terrain ? terrain.residentHeights() : null,
 			);
@@ -1575,6 +1595,7 @@ export class WebGpuEngine implements Renderer {
 		this.geoQuery = null;
 		this.heightGather?.destroy();
 		this.heightGather = null;
+		this.heightGatherCore = null;
 		this.listeners.clear();
 		const g = this.gpu;
 		this.gpu = null;
@@ -2534,6 +2555,11 @@ export class WebGpuEngine implements Renderer {
 	 * sampleAtAsync. Under the geometry diet that is the GPU queries only: no full readback.
 	 */
 	async settle(): Promise<boolean> {
+		// terrainGpuDecode: a trail build waiting for its height gather lands before the frame is read
+		while (this.trailFlight) {
+			await this.trailFlight;
+			if (this.disposed) return false;
+		}
 		if (!(await this.gens.readback())) return false;
 		// terrainGpuDecode: the pose's peaks whose summits are being gathered join the list first
 		if (this.terrain && this.heights()) {
