@@ -1,6 +1,7 @@
 // The GPU haze fit's two submits on core ComputeGraphs (opt-in: fitHazeGpu(device, input,
 // { graph: true }); the dispatch path in ./haze.ts stays the default), plus fitHazeFromPrep, which
-// finishes the fit from textures.ts hazePrepTex's GPU-resident outputs.
+// finishes the fit from textures.ts hazePrepTex's GPU-resident outputs, and prepAndFitHazeTex, which
+// runs that prep and the fit's GPU part under ONE haze lease (the safe entry point for textures).
 //
 // Submit 1 (one graph per N = W·H, cached, group "look-haze-prep"):
 //   prep → dilh → clear counts → bin (atomic counts) → sel-init
@@ -42,7 +43,7 @@
 // look bench forces a 64-slot head). No GPU condition / indirect dispatch: the only remaining round
 // trips end in CPU reads whose sizes are CPU-side (WebGPU copy sizes), and every GPU consumer's
 // dispatch size is already known on the CPU.
-import { Buffer, type Device } from "@luma.gl/core";
+import { Buffer, type Device, Texture } from "@luma.gl/core";
 import type { Vec3 } from "../../look/atmosphere";
 import type { HazeFit, HazeFitInput } from "../../look/haze-fit";
 import { type CachedGraph, cachedGraph, type GraphRange } from "../core/graph";
@@ -78,7 +79,12 @@ import {
 	readBack,
 	withLease,
 } from "./kernel";
-import type { HazePrepResult } from "./textures";
+import {
+	type HazePrepResult,
+	type HazeTexInput,
+	hazePrepGen,
+	hazePrepTexThen,
+} from "./textures";
 
 const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
 const STORAGE = Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST;
@@ -563,6 +569,202 @@ function gatherGraphFor(device: Device): CachedGraph<GatherParams, undefined> {
 /** The geometry fitHazeFromPrep needs on the CPU (the representative pixels' ENU points). */
 export type HazePrepGeometry = Pick<HazeFitInput, "geo" | "eyeAlt" | "sunDir">;
 
+/** textures.ts's lease of the haze prep (PASS.haze): its buffers are only stable under it. */
+const PREP_LEASE = "look-tex/haze";
+
+/** `geo` must be the prep's grid: W × H values (× 4 for xyzr). */
+function checkGeo(input: HazePrepGeometry, W: number, H: number) {
+	const k = input.geo.kind === "xyzr" ? 4 : 1;
+	if (input.geo.data.length !== W * H * k)
+		throw new Error(
+			`[haze-graph] geo.data has ${input.geo.data.length} values, the prep is ${W} × ${H}${k > 1 ? " × 4" : ""}`,
+		);
+}
+
+/**
+ * The prep's buffers are still this prep's (call under PREP_LEASE): not destroyed (a later prep
+ * grew a slot and retired them), large enough, and no other haze prep has run since (it would have
+ * overwritten them with another photo's / pose's data).
+ */
+function checkPrep(device: Device, prep: HazePrepResult) {
+	const N = prep.W * prep.H;
+	const need = {
+		range: N * 4,
+		pSky: N * 4,
+		lin: N * 12,
+		bins: N * 4,
+		counts: NBINS * 4,
+		state: SEL * 8,
+	};
+	for (const [k, bytes] of Object.entries(need)) {
+		const b = prep.buffers[k as keyof typeof need];
+		if (!b || b.destroyed)
+			throw new Error(`[haze-graph] prep buffer ${k} was destroyed`);
+		if (b.byteLength < bytes)
+			throw new Error(`[haze-graph] prep buffer ${k} is too small`);
+	}
+	if (prep.gen !== hazePrepGen(device))
+		throw new Error(
+			`[haze-graph] stale prep: haze prep ${hazePrepGen(device)} ran after it (${prep.gen})`,
+		);
+}
+
+type FitGpu = {
+	lists: Prep;
+	range: Float32Array;
+	skyIdx: Uint32Array;
+	t1: number;
+};
+
+/**
+ * The fit's GPU part on the prep's buffers (compaction + head read, then the band gather + tail
+ * read). The caller holds PREP_LEASE; this takes this module's "look-haze" lease (the nesting order
+ * fitHazeFromPrep always used; prepGraph / gridGraph never take PREP_LEASE, so no cycle).
+ */
+function fitGpuPart(
+	device: Device,
+	prep: HazePrepResult,
+	listHead: number | undefined,
+): Promise<FitGpu> {
+	const { W, H } = prep;
+	const N = W * H;
+	const nBlk = Math.ceil(N / BLOCK);
+	const pb = prep.buffers;
+	return withLease("look-haze", async () => {
+		checkPrep(device, prep);
+		const key = (k: string) => `look-haze/p/${k}`;
+		const head = headFor(device, N, listHead);
+		const outIdx = pooledStorage(device, key("outIdx"), 3 * N * 4, {
+			zero: false,
+		});
+		const outVal = pooledStorage(device, key("outVal"), 3 * N * 4, {
+			zero: false,
+		});
+		const c = compactGraphFor(device, N);
+		await c.graph.compileAsync();
+		const r1 = await c.graph.run(
+			{ N, nBlk, head },
+			{
+				buffers: {
+					cprm: pooledUniform(
+						device,
+						key("cprm"),
+						new Uint32Array([N, nBlk, 0, 0]),
+					),
+					lin: pb.lin,
+					bins: pb.bins,
+					state: pb.state,
+					counts: pb.counts,
+					range: pb.range,
+					pSky: pb.pSky,
+					outIdx,
+					outVal,
+				},
+			},
+		);
+		const [cnt, s, st0, hi, hv, rg, ps] = r1.reads.head;
+		const st = new Uint32Array(st0);
+		const total = st[LISTS];
+		noteTotal(device, N, total);
+		const range = new Float32Array(rg);
+		const pSky = new Float32Array(ps);
+		const skyIdx = airlightBand(range, pSky, W, H);
+		const K = skyIdx.length;
+		// submit 2: the band's lin, plus the lists' tail on the same encoder
+		const rest = total > head ? (total - head) * 4 : 0;
+		const tailRanges: ReadRange[] = rest
+			? [
+					{ buffer: outIdx, offset: head * 4, size: rest },
+					{ buffer: outVal, offset: head * 4, size: rest },
+				]
+			: [];
+		let sky = new Float32Array(0);
+		let tail: ArrayBuffer[] = [];
+		if (K) {
+			const gg = gatherGraphFor(device);
+			await gg.graph.compileAsync();
+			const r2 = await gg.graph.run(
+				{ K, N },
+				{
+					buffers: {
+						cprm: pooledUniform(
+							device,
+							key("gprm"),
+							new Uint32Array([N, nBlk, K, 0]),
+						),
+						skyIdx: pooledStorage(device, key("skyIdx"), skyIdx),
+						lin: pb.lin,
+						skyOut: pooledStorage(device, key("skyOut"), 3 * K * 4, {
+							zero: false,
+						}),
+					},
+					read: tailRanges,
+				},
+			);
+			sky = new Float32Array(r2.reads.sky[0]);
+			tail = r2.data;
+		} else if (rest) tail = await readBack(device, () => {}, tailRanges);
+		const { idx, val } = joinLists(
+			[hi, hv],
+			rest ? [tail[0], tail[1]] : null,
+			head,
+			total,
+		);
+		const t1 = performance.now();
+		const lists: Prep = {
+			counts: new Uint32Array(cnt),
+			stat: statOf(s),
+			sky,
+			list: (L: number) => ({
+				idx: idx.subarray(st[L], st[L + 1]),
+				val: val.subarray(st[L], st[L + 1]),
+			}),
+			bytes:
+				NBINS * 4 +
+				SEL * 8 +
+				(LISTS + 1) * 4 +
+				head * 8 +
+				N * 8 +
+				12 * K +
+				2 * rest,
+			tail: rest > 0,
+		};
+		Object.assign(hazeGraphStats, {
+			head,
+			total,
+			tail: rest > 0,
+			cacheHit: !!c.hit,
+		});
+		return { lists, range, skyIdx, t1 };
+	});
+}
+
+/** The CPU tail (and the grid, which takes the "look-haze" lease itself), after the leases. */
+function fitTail(
+	device: Device,
+	W: number,
+	H: number,
+	input: HazePrepGeometry,
+	T0: number,
+	g: FitGpu,
+): Promise<HazeFit> {
+	return hazeFitTail(
+		device,
+		{
+			range: g.range,
+			skyIdx: g.skyIdx,
+			pointAt: pointAtOf(input.geo, W, H, input.eyeAlt),
+			eyeAlt: input.eyeAlt,
+			sunDir: input.sunDir,
+			T0,
+			t1: T0,
+			t2: g.t1,
+		},
+		g.lists,
+		gridGraph,
+	);
+}
+
 /**
  * The haze fit from textures.ts hazePrepTex / hazePrepArrays outputs (range, pSky, lin, bins, counts,
  * radix-select state, GPU-resident), with no re-upload of them: the 72 lists are compacted from the
@@ -573,9 +775,10 @@ export type HazePrepGeometry = Pick<HazeFitInput, "geo" | "eyeAlt" | "sunDir">;
  * the fit is fitHazeGpu's, bit for bit.
  *
  * `geo` must be the prep's geometry as fitHazeGpu takes it (W × H = prep.W × prep.H, row 0 = bottom):
- * the representative pixels' ENU points come from it. The prep's buffers are read under textures.ts's
- * haze lease, so no other haze prep overwrites them between the two submits; call this right after
- * the prep (they are valid until the next one).
+ * the representative pixels' ENU points come from it (its length is checked). The prep's buffers are
+ * only valid until the next haze prep: this rejects (instead of reading another prep's data or a
+ * destroyed buffer) when another prep ran between the two calls. For textures, prefer
+ * prepAndFitHazeTex, which cannot be interleaved.
  */
 export function fitHazeFromPrep(
 	device: Device,
@@ -584,135 +787,43 @@ export function fitHazeFromPrep(
 	opts: { listHead?: number } = {},
 ): Promise<HazeFit> {
 	const T0 = performance.now();
-	const { W, H } = prep;
-	const N = W * H;
-	const nBlk = Math.ceil(N / BLOCK);
-	const pb = prep.buffers;
-	// textures.ts PASS.haze, then this module's lease (prepGraph / gridGraph never take the first)
-	const gpu = withLease("look-tex/haze", () =>
-		withLease("look-haze", async () => {
-			const key = (k: string) => `look-haze/p/${k}`;
-			const head = headFor(device, N, opts.listHead);
-			const outIdx = pooledStorage(device, key("outIdx"), 3 * N * 4, {
-				zero: false,
-			});
-			const outVal = pooledStorage(device, key("outVal"), 3 * N * 4, {
-				zero: false,
-			});
-			const c = compactGraphFor(device, N);
-			await c.graph.compileAsync();
-			const r1 = await c.graph.run(
-				{ N, nBlk, head },
-				{
-					buffers: {
-						cprm: pooledUniform(
-							device,
-							key("cprm"),
-							new Uint32Array([N, nBlk, 0, 0]),
-						),
-						lin: pb.lin,
-						bins: pb.bins,
-						state: pb.state,
-						counts: pb.counts,
-						range: pb.range,
-						pSky: pb.pSky,
-						outIdx,
-						outVal,
-					},
-				},
-			);
-			const [cnt, s, st0, hi, hv, rg, ps] = r1.reads.head;
-			const st = new Uint32Array(st0);
-			const total = st[LISTS];
-			noteTotal(device, N, total);
-			const range = new Float32Array(rg);
-			const pSky = new Float32Array(ps);
-			const skyIdx = airlightBand(range, pSky, W, H);
-			const K = skyIdx.length;
-			// submit 2: the band's lin, plus the lists' tail on the same encoder
-			const rest = total > head ? (total - head) * 4 : 0;
-			const tailRanges: ReadRange[] = rest
-				? [
-						{ buffer: outIdx, offset: head * 4, size: rest },
-						{ buffer: outVal, offset: head * 4, size: rest },
-					]
-				: [];
-			let sky = new Float32Array(0);
-			let tail: ArrayBuffer[] = [];
-			if (K) {
-				const gg = gatherGraphFor(device);
-				await gg.graph.compileAsync();
-				const r2 = await gg.graph.run(
-					{ K, N },
-					{
-						buffers: {
-							cprm: pooledUniform(
-								device,
-								key("gprm"),
-								new Uint32Array([N, nBlk, K, 0]),
-							),
-							skyIdx: pooledStorage(device, key("skyIdx"), skyIdx),
-							lin: pb.lin,
-							skyOut: pooledStorage(device, key("skyOut"), 3 * K * 4, {
-								zero: false,
-							}),
-						},
-						read: tailRanges,
-					},
-				);
-				sky = new Float32Array(r2.reads.sky[0]);
-				tail = r2.data;
-			} else if (rest) tail = await readBack(device, () => {}, tailRanges);
-			const { idx, val } = joinLists(
-				[hi, hv],
-				rest ? [tail[0], tail[1]] : null,
-				head,
-				total,
-			);
-			const t1 = performance.now();
-			const lists: Prep = {
-				counts: new Uint32Array(cnt),
-				stat: statOf(s),
-				sky,
-				list: (L: number) => ({
-					idx: idx.subarray(st[L], st[L + 1]),
-					val: val.subarray(st[L], st[L + 1]),
-				}),
-				bytes:
-					NBINS * 4 +
-					SEL * 8 +
-					(LISTS + 1) * 4 +
-					head * 8 +
-					N * 8 +
-					12 * K +
-					2 * rest,
-				tail: rest > 0,
-			};
-			Object.assign(hazeGraphStats, {
-				head,
-				total,
-				tail: rest > 0,
-				cacheHit: !!c.hit,
-			});
-			return { lists, range, skyIdx, t1 };
-		}),
+	try {
+		checkGeo(input, prep.W, prep.H);
+	} catch (e) {
+		return Promise.reject(e);
+	}
+	return withLease(PREP_LEASE, () =>
+		fitGpuPart(device, prep, opts.listHead),
+	).then((g) => fitTail(device, prep.W, prep.H, input, T0, g));
+}
+
+/**
+ * textures.ts hazePrepTex + fitHazeFromPrep under ONE haze lease: the prep's buffers cannot be
+ * overwritten or retired by another haze prep before the fit has read them. Bit-identical to
+ * fitHazeGpu on the same geometry / photo / masks (both halves are). `input.geo` must be the
+ * texture's ×step grid (floor(width / step) × floor(height / step), row 0 = bottom).
+ * `valid` is re-checked inside the lease just before the prep's submit: false (the caller's
+ * texture was re-rendered while this call was queued) resolves null with nothing submitted.
+ */
+export async function prepAndFitHazeTex(
+	device: Device,
+	tex: HazeTexInput,
+	input: HazePrepGeometry,
+	opts: { listHead?: number; valid?: () => boolean } = {},
+): Promise<HazeFit | null> {
+	const T0 = performance.now();
+	const geoTex =
+		tex.geometry instanceof Texture ? tex.geometry : tex.geometry.texture;
+	const step = tex.step ?? 2;
+	const W = Math.floor(geoTex.width / step);
+	const H = Math.floor(geoTex.height / step);
+	checkGeo(input, W, H);
+	const r = await hazePrepTexThen(
+		device,
+		tex,
+		(prep) => fitGpuPart(device, prep, opts.listHead),
+		{ valid: opts.valid },
 	);
-	// the CPU tail (and the grid, which takes the "look-haze" lease itself) after the leases
-	return gpu.then(({ lists, range, skyIdx, t1 }) =>
-		hazeFitTail(
-			device,
-			{
-				range,
-				skyIdx,
-				pointAt: pointAtOf(input.geo, W, H, input.eyeAlt),
-				eyeAlt: input.eyeAlt,
-				sunDir: input.sunDir,
-				T0,
-				t1: T0,
-				t2: t1,
-			},
-			lists,
-			gridGraph,
-		),
-	);
+	if (!r) return null;
+	return fitTail(device, W, H, input, T0, r);
 }

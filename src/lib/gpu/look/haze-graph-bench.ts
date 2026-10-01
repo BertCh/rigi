@@ -15,7 +15,11 @@ import { poolStats, releasePool } from "../core/pool";
 import { getComputeDevice } from "../device";
 import { captureLookInputs } from "./capture";
 import { fitHazeGpu, hazeGpuTimes, K_HZ_BIN, K_HZ_HIST } from "./haze";
-import { fitHazeFromPrep, hazeGraphStats } from "./haze-graph";
+import {
+	fitHazeFromPrep,
+	hazeGraphStats,
+	prepAndFitHazeTex,
+} from "./haze-graph";
 import { hazePrepArrays, hazePrepTex } from "./textures";
 
 const median = (a: number[]) => [...a].sort((x, y) => x - y)[a.length >> 1];
@@ -352,6 +356,8 @@ export async function runHazeGraphBench(
 				{ listHead: 64 },
 			);
 			const tail = hazeGraphStats.tail;
+			// prep + fit under one lease (the bridge's entry point)
+			const fc = await prepAndFitHazeTex(device, input, geoIn);
 			const tArr = await time(reps, async () =>
 				fitHazeFromPrep(device, await hazePrepArrays(device, arrays), geoIn),
 			);
@@ -365,6 +371,7 @@ export async function runHazeGraphBench(
 					forcedTail: { tail, identical: sameFit(old, ftForced) },
 					ms: tTex.ms,
 				},
+				combined: { identical: !!fc && sameFit(old, fc) },
 				vsCpuMaxRel: maxRel(cpu, ft),
 				gpuVsCpuMaxRel: maxRel(cpu, old),
 			});

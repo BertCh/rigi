@@ -34,6 +34,15 @@ export function rangeGeo(
 	};
 }
 
+/** A GPU-resident haze fit of HazeController's ×2 grid (null = take the readback path). */
+export type BridgedHazeFit = (o: {
+	geo: HazeGeo;
+	sky: SkyMask | null;
+	fg: SkyMask | null;
+	eyeAlt: number;
+	sunDir: Vec3;
+}) => Promise<HazeFit | null>;
+
 export class HazeController {
 	fit: HazeFit | null = null;
 	sky: SkyMask | null = null;
@@ -65,6 +74,12 @@ export class HazeController {
 		sunDir: Vec3;
 		fg: SkyMask | null;
 		geo: () => { geo: HazeGeo; w: number; h: number };
+		/**
+		 * A GPU-resident fit of the same input (deck-webgpu compute-bridge.ts: prep + fit on the
+		 * geometry render target), given the ×2 grid. Used instead of the GPU readback path when set;
+		 * null / a rejection falls back to it. Async like the GPU path (onAsync).
+		 */
+		bridged?: BridgedHazeFit;
 	}): boolean {
 		if (!wantsHazeFit(o.style) || !o.img) return false;
 		const p = o.pose;
@@ -86,20 +101,39 @@ export class HazeController {
 				? { kind: "xyzr", data }
 				: { kind: "range", data, ray: (x, y) => geo.ray(x * STEP, y * STEP) };
 		const seq = ++this.seq;
-		if (lookGpuOn()) {
-			const input = {
-				photo: this.pixels(o.img, W * 2, H * 2),
-				geo: small,
-				geoW: W,
-				geoH: H,
-				sky: this.sky,
-				foreground: o.fg,
-				eyeAlt: o.eyeAlt,
-				sunDir: o.sunDir,
-			};
+		if (o.bridged || lookGpuOn()) {
+			const img = o.img;
+			const sky = this.sky;
+			const readback = () =>
+				import("../gpu/look/hooks").then((m) =>
+					m.hazeFitAsync({
+						photo: this.pixels(img, W * 2, H * 2),
+						geo: small,
+						geoW: W,
+						geoH: H,
+						sky,
+						foreground: o.fg,
+						eyeAlt: o.eyeAlt,
+						sunDir: o.sunDir,
+					}),
+				);
+			const fitted = o.bridged
+				? o
+						.bridged({
+							geo: small,
+							sky,
+							fg: o.fg,
+							eyeAlt: o.eyeAlt,
+							sunDir: o.sunDir,
+						})
+						.catch((e) => {
+							console.warn("[haze] bridged fit failed, reading back", e);
+							return null;
+						})
+						.then((fit) => fit ?? (seq === this.seq ? readback() : null))
+				: readback();
 			trackLook(
-				import("../gpu/look/hooks")
-					.then((m) => m.hazeFitAsync(input))
+				fitted
 					.catch((e) => {
 						console.warn("[haze] fit failed", e);
 						return null;

@@ -121,8 +121,20 @@ export class WebGpuGeometrySource implements GeometrySource {
 	 * render may still be mapping when a newer one starts, so each read takes its own reader. */
 	private readers: TextureReader[] = [];
 	private seq = 0;
+	private unpacked = 0;
 	private frame = 0;
 	private disposed = false;
+
+	/** The latest render() started (its pass is on the queue: the targets hold it, or will). */
+	get renderSeq() {
+		return this.seq;
+	}
+
+	/** The render() whose readback `range` / `xyz` / `pose` hold. The targets still hold that
+	 * render exactly while renderSeq === rangeSeq (GPU consumers pairing them with `range`). */
+	get rangeSeq() {
+		return this.unpacked;
+	}
 
 	constructor(
 		o: Omit<WebGpuGeometryOptions, "eye"> & { eye: Eye },
@@ -198,6 +210,7 @@ export class WebGpuGeometrySource implements GeometrySource {
 		this.unpack(data);
 		const t3 = performance.now();
 		this.pose = { ...pose };
+		this.unpacked = seq;
 		this.timing = {
 			submitMs: t1 - t0,
 			readbackMs: t2 - t1,

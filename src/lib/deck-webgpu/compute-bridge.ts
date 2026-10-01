@@ -7,6 +7,8 @@
 // - LOOK_HARMONIZE band stats: an offscreen colour render at ≤ 256 px → readTexture (rgba16float
 //   → f32 on the CPU, flipped, un-premultiplied) → CompositeLook.setStats (flipped back, range /
 //   people arrays) → upload → band-stats kernel → 6.6 KB back.
+// - the fitted haze (HazeController): the range readback ×2-decimated → fitHazeGpu's CPU input build
+//   (range, P(sky), people bits, the photo at 2W × 2H) → upload → prep → lists → fit.
 // This bridge runs src/lib/gpu/look/textures.ts' texture-in ComputeGraphs (masksTex, bandStatsTex,
 // hazePrepTex; mt-image-03) on the render targets themselves:
 // - geometry: WebGpuGeometrySource.targets.geometry (rgba32float, xyz + range, 0 = sky, row 0 = top)
@@ -30,12 +32,17 @@
 // else (sidecar device, ?gpu=off, CPU geometry source) keeps the readback path. Select it per
 // engine with WebGpuEngineOptions.lookBridge (default true) or engine.setLookBridge(on).
 //
-// Not bridged: the fitted haze. hazePrepTex gives fitHazeGpu's GPU prep (checked bit-identical in
-// compute-bridge.check.ts), but gpu/look/haze.ts has no entry point that finishes a HazeFit from
-// prepared buffers (its CPU tail is internal and also needs the range on the CPU, which the query
-// readback already provides), so the engine keeps HazeController on the readback path.
+// Haze (fitHaze): gpu/look/haze-graph.ts prepAndFitHazeTex = hazePrepTex on the geometry target +
+// fitHazeFromPrep, under ONE haze lease (no other prep can overwrite the prep's buffers in between).
+// The CPU keeps only what the fit's f64 tail needs: the ×2 range grid HazeController already builds
+// from the query readback (which stays, for labels / queries) for the representative pixels' ENU
+// points; nothing is read back from a render target and nothing is uploaded per pose. The engine
+// guards the pairing (geometry target ↔ that range readback) with WebGpuGeometrySource.renderSeq:
+// re-rendered while the call was queued → null → HazeController's readback path. Bit-identical to
+// fitHazeGpu (bridge-check.mjs: whole fit + final image). Engine option hazeBridge (default true).
 import type { Device, Texture } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
+import { prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
 import { lookGpuOn, trackLook } from "#/lib/gpu/look/opt-in";
 import {
 	bandStatsTex,
@@ -44,6 +51,7 @@ import {
 	masksTex,
 	releaseTextureGraphs,
 } from "#/lib/gpu/look/textures";
+import type { Vec3 } from "#/lib/look/atmosphere";
 import type { ColorStats } from "#/lib/look/color-stats";
 import {
 	type Cut,
@@ -53,6 +61,7 @@ import {
 	photoPixels,
 	type RangeGrid,
 } from "#/lib/look/composite";
+import type { HazeFit, HazeGeo } from "#/lib/look/haze-fit";
 import type { ViewStyle } from "#/lib/style/types";
 import { USAGE } from "./targets";
 
@@ -115,9 +124,14 @@ export class LookBridge {
 	version = 0;
 	/** A pass landed (the engine re-applies the look). */
 	onAsync?: () => void;
-	readonly timing: { masks: BridgeTiming[]; stats: BridgeTiming[] } = {
+	readonly timing: {
+		masks: BridgeTiming[];
+		stats: BridgeTiming[];
+		haze: BridgeTiming[];
+	} = {
 		masks: [],
 		stats: [],
+		haze: [],
 	};
 	private maskIn: unknown[] = [];
 	private statsKey = "";
@@ -283,6 +297,48 @@ export class LookBridge {
 			},
 			{ read: o.read },
 		);
+	}
+
+	/**
+	 * HazeController's fit (fitHazeGpu, bit for bit) on the geometry TEXTURE: prep + fit under one
+	 * haze lease (haze-graph.ts prepAndFitHazeTex). `geo` is HazeController's ×2 grid (row 0 =
+	 * bottom; its points only). `valid` is re-checked just before the prep's submit: false (the
+	 * geometry target no longer holds the render `geo` was read from) resolves null, as does a
+	 * destroyed bridge, so the caller can take the readback path.
+	 */
+	async fitHaze(o: {
+		img: HTMLImageElement;
+		geometry: Texture;
+		sky: Mask8 | null;
+		fg: Mask8 | null;
+		geo: HazeGeo;
+		eyeAlt: number;
+		sunDir: Vec3;
+		valid?: () => boolean;
+	}): Promise<HazeFit | null> {
+		if (this.destroyed) return null;
+		const t0 = performance.now();
+		const W = Math.floor(o.geometry.width / 2);
+		const H = Math.floor(o.geometry.height / 2);
+		const run = prepAndFitHazeTex(
+			this.device,
+			{
+				geometry: o.geometry,
+				photo: this.photoTexture(o.img, W * 2, H * 2),
+				sky: o.sky ? this.byteMask("sky", o.sky) : null,
+				fg: o.fg ? this.byteMask("fg", o.fg) : null,
+				step: 2,
+			},
+			{ geo: o.geo, eyeAlt: o.eyeAlt, sunDir: o.sunDir },
+			{ valid: () => !this.destroyed && (o.valid?.() ?? true) },
+		);
+		const cpuMs = performance.now() - t0;
+		const fit = await trackLook(run);
+		// graph.run's lease hop sits between the pre-submit valid() and the submit, so a render can
+		// slip in there: re-check after the fit (a false negative only costs one readback fallback).
+		if (o.valid && !o.valid()) return null;
+		if (fit) push(this.timing.haze, { cpuMs, totalMs: performance.now() - t0 });
+		return this.destroyed ? null : fit;
 	}
 
 	/** The photo at w × h as rgba8unorm: photoPixels' bytes (the CPU path's resample), cached. */

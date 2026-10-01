@@ -1157,14 +1157,21 @@ export type HazePrep = {
 export type HazePrepResult = {
 	W: number;
 	H: number;
-	/** pooled GPU buffers (valid until the next haze prep) */
+	/** pooled GPU buffers (valid until the next haze prep; see `gen`) */
 	buffers: Record<
 		"range" | "pSky" | "lin" | "bins" | "counts" | "state",
 		Buffer
 	>;
+	/** the device's haze prep counter when this prep ran (hazePrepGen): a later prep overwrote the
+	 * buffers (or grew and retired them) once hazePrepGen(device) moved on */
+	gen: number;
 	/** with `read` */
 	data?: HazePrep;
 };
+
+const hazeGens = new WeakMap<Device, number>();
+/** How many haze preps (tex or arrays) have been issued on `device`; read it under the haze lease. */
+export const hazePrepGen = (device: Device) => hazeGens.get(device) ?? 0;
 
 // mirror of haze.ts / haze-fit.ts (keep in sync)
 const NBINS = 24;
@@ -1406,6 +1413,8 @@ async function runHaze(
 	const buffers = {} as HazePrepResult["buffers"];
 	for (const [k, b] of Object.entries(sizes))
 		buffers[k as keyof typeof sizes] = slot(device, "haze", k, b);
+	const gen = hazePrepGen(device) + 1;
+	hazeGens.set(device, gen);
 	extra.fill?.(buffers);
 	const names = Object.keys(sizes) as (keyof typeof sizes)[];
 	const { data } = await e.graph.run(undefined, {
@@ -1413,7 +1422,7 @@ async function runHaze(
 		textures: extra.textures,
 		read: read ? reads(names.map((k) => [buffers[k], sizes[k]])) : [],
 	});
-	const r: HazePrepResult = { W, H, buffers };
+	const r: HazePrepResult = { W, H, buffers, gen };
 	if (read) {
 		const st = new Uint32Array(data[5]);
 		const stat = new Float32Array(SEL);
@@ -1443,6 +1452,27 @@ export function hazePrepTex(
 	input: HazeTexInput,
 	opts: { read?: boolean } = {},
 ): Promise<HazePrepResult> {
+	return hazePrepTexThen(
+		device,
+		input,
+		async (r) => r,
+		opts,
+	) as Promise<HazePrepResult>;
+}
+
+/**
+ * hazePrepTex, then `then(prep)` under the SAME haze lease: no other haze prep can overwrite (or
+ * grow and retire) the prep's buffers before `then` has finished with them (haze-graph.ts
+ * prepAndFitHazeTex). `valid` is re-checked inside the lease just before the submit (the caller's
+ * inputs, e.g. the geometry target, may have been re-rendered while the call was queued): false
+ * resolves null and submits nothing. `then` must not take the haze lease itself.
+ */
+export function hazePrepTexThen<T>(
+	device: Device,
+	input: HazeTexInput,
+	then: (prep: HazePrepResult) => Promise<T>,
+	opts: { read?: boolean; valid?: () => boolean } = {},
+): Promise<T | null> {
 	const geo = src(input.geometry);
 	const photo = src(input.photo);
 	const sky = input.sky ? src(input.sky) : null;
@@ -1464,8 +1494,9 @@ export function hazePrepTex(
 		texKey(sky),
 		texKey(fg),
 	].join("|");
-	return withLease(PASS.haze, () => {
+	return withLease(PASS.haze, async () => {
 		assertAlive(device, [geo, photo, sky, fg]);
+		if (opts.valid && !opts.valid()) return null;
 		const e = hazeGraph(
 			device,
 			key,
@@ -1473,7 +1504,7 @@ export function hazePrepTex(
 			{ geo, photo, sky, fg, step },
 		);
 		// runHaze reaches graph.run without an await
-		return runHaze(device, e, W, H, !!opts.read, {
+		const prep = await runHaze(device, e, W, H, !!opts.read, {
 			textures: {
 				geo: geo.texture,
 				"photo-tex": photo.texture,
@@ -1481,6 +1512,7 @@ export function hazePrepTex(
 				fg: fg?.texture ?? dummyMask(device),
 			},
 		});
+		return then(prep);
 	});
 }
 

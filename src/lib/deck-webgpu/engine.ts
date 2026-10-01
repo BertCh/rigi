@@ -110,7 +110,11 @@ import {
 	trustedRange,
 } from "#/lib/look/composite";
 import { COMPOSITE_DEFINES } from "#/lib/look/glsl/composite";
-import { HazeController, rangeGeo } from "#/lib/look/haze-controller";
+import {
+	type BridgedHazeFit,
+	HazeController,
+	rangeGeo,
+} from "#/lib/look/haze-controller";
 import type { SkyMask } from "#/lib/look/haze-fit";
 import { drawExportLabels, skylineAt } from "#/lib/look/labels";
 import { lookKey } from "#/lib/look/look-key";
@@ -354,6 +358,9 @@ export type WebGpuEngineOptions = {
 	/** Look passes straight on the render targets (compute-bridge.ts) where the gate allows
 	 * (default true); false = the geometry / colour readback path. See setLookBridge. */
 	lookBridge?: boolean;
+	/** With the bridge on: the fitted haze on the geometry target too (default true; false = the
+	 * haze fit keeps the range readback path while masks / stats stay bridged). See setHazeBridge. */
+	hazeBridge?: boolean;
 };
 
 export type WebGpuEngineStats = {
@@ -757,6 +764,7 @@ export class WebGpuEngine implements Renderer {
 		};
 		gpu.bridge = b;
 		this.compLook.setSky(this.skyMaskStore);
+		this.refitHaze();
 		this.updateLook();
 		this.scheduleStats();
 	}
@@ -779,9 +787,22 @@ export class WebGpuEngine implements Renderer {
 		this.layerGen++;
 		if (on) await this.attachBridge(g);
 		else {
+			this.refitHaze();
 			this.updateLook();
 			this.scheduleStats();
 		}
+	}
+
+	/** Switch the haze fit between the bridge (when it is on) and the range readback path. */
+	setHazeBridge(on: boolean) {
+		this.opts = { ...this.opts, hazeBridge: on };
+		this.refitHaze();
+	}
+
+	/** Drop the haze fit's key (and any fit in flight) and fit again on the current path. */
+	private refitHaze() {
+		this.haze.setSky(this.skyMaskStore);
+		this.fitHaze();
 	}
 
 	/** Push the whole CPU state into a fresh set of cores (boot / after a device loss). */
@@ -1530,7 +1551,29 @@ export class WebGpuEngine implements Renderer {
 		const src = this.geoSrc;
 		if (!this.geometryReady() || !src?.pose) return;
 		const pose = src.pose;
+		const bridge = this.gpu?.bridge ?? null;
+		const img = this.photoImg;
+		// the geometry target holds the render `src.range` was read from until the next render()
+		const seq = src instanceof WebGpuGeometrySource ? src.rangeSeq : -1;
+		const bridged =
+			bridge &&
+			img &&
+			this.opts.hazeBridge !== false &&
+			src instanceof WebGpuGeometrySource &&
+			src.renderSeq === seq
+				? (h: Parameters<BridgedHazeFit>[0]) =>
+						bridge.fitHaze({
+							img,
+							geometry: src.targets.geometry,
+							...h,
+							valid: () =>
+								this.geoSrc === src &&
+								src.renderSeq === seq &&
+								this.gpu?.bridge === bridge,
+						})
+				: undefined;
 		const fitted = this.haze.update({
+			bridged,
 			style: this.style,
 			pose,
 			img: this.photoImg,

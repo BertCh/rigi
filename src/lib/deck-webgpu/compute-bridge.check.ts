@@ -8,11 +8,20 @@
 //          renderLayer → LookBridge.setStats on the colour target
 //   haze   hazePrepArrays(HazeController's ×2 decimation + fitHazeGpu's input build from the
 //          range readback) vs LookBridge.hazePrep on the geometry target
+//   fit    the whole HazeFit (JSON): a fresh HazeController on the readback path (range readback →
+//          fitHazeGpu) vs one with `bridged` = LookBridge.fitHaze (prepAndFitHazeTex on the target),
+//          plus the engine's live fit; and the guards (stale prep, wrong geo size) reject
 // and times each (median of `reps`, warm). The final look image is compared by the harness
 // (scripts/deck-webgpu/bridge-check.mjs) with engine.setLookBridge(false / true).
 import type { Device, Texture } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
-import { type HazePrep, hazePrepArrays } from "#/lib/gpu/look/textures";
+import { fitHazeFromPrep, prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
+import {
+	type HazePrep,
+	hazePrepArrays,
+	hazePrepTex,
+} from "#/lib/gpu/look/textures";
+import type { Vec3 } from "#/lib/look/atmosphere";
 import type { ColorStats } from "#/lib/look/color-stats";
 import {
 	blendCut,
@@ -23,7 +32,12 @@ import {
 	STATS_LONG_SIDE,
 	trustedRange,
 } from "#/lib/look/composite";
-import type { SkyMask } from "#/lib/look/haze-fit";
+import {
+	type BridgedHazeFit,
+	HazeController,
+	rangeGeo,
+} from "#/lib/look/haze-controller";
+import type { HazeFit, SkyMask } from "#/lib/look/haze-fit";
 import type { ViewStyle } from "#/lib/style/types";
 import { LookBridge } from "./compute-bridge";
 import type { WebGpuEngine } from "./engine";
@@ -41,6 +55,9 @@ type Internals = {
 	geoBufGen: number;
 	brushVersion: number;
 	aspect: number;
+	eyeAlt: number;
+	hazeFit: HazeFit | null;
+	look(mode: "overlay"): { sunDir: Vec3 };
 	gpu: {
 		device: Device;
 		composite: { brushCanvas: HTMLCanvasElement };
@@ -388,6 +405,90 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 		await idle();
 		ht.bridge.push(performance.now() - t0);
 	}
+
+	// ── the whole haze fit: HazeController readback path vs bridged (prep + fit, one lease)
+	const pose = (src as WebGpuGeometrySource).pose;
+	const sunDir = e.look("overlay").sunDir;
+	const fitVia = async (bridged?: BridgedHazeFit) => {
+		const hc = new HazeController();
+		hc.setSky(sky);
+		const t0 = performance.now();
+		const landed = new Promise<HazeFit | null>((r) => {
+			hc.onAsync = r;
+		});
+		hc.update({
+			style,
+			pose: pose as NonNullable<typeof pose>,
+			img,
+			eyeAlt: e.eyeAlt,
+			sunDir,
+			fg,
+			geo: () => ({
+				geo: rangeGeo(src.range, src.width, src.height, pose as never),
+				w: src.width,
+				h: src.height,
+			}),
+			bridged,
+		});
+		const fit = await landed;
+		await idle();
+		return { fit, ms: performance.now() - t0 };
+	};
+	const viaBridge: BridgedHazeFit = (h) =>
+		bridge.fitHaze({ img, geometry, ...h });
+	const fr = await fitVia();
+	const fb = await fitVia(viaBridge);
+	const json = (f: HazeFit | null) => JSON.stringify(f);
+	const liveFit = e.hazeFit;
+	const fit = {
+		exact: !!fr.fit && json(fr.fit) === json(fb.fit),
+		live: liveFit ? json(liveFit) === json(fr.fit) : null,
+		bridgeOn: !!e.gpu?.bridge,
+		visibility: fr.fit?.visibility ?? null,
+		quality: fr.fit?.quality ?? null,
+		guards: {} as Record<string, string>,
+	};
+	// guards: a fit from a prep that another prep superseded, and a geo of the wrong size
+	{
+		const W = Math.floor(geometry.width / 2);
+		const H = Math.floor(geometry.height / 2);
+		const tin = {
+			geometry,
+			photo: bridge.photoTexture(img, W * 2, H * 2),
+			step: 2,
+		};
+		const geoIn = {
+			geo: {
+				kind: "range" as const,
+				data: new Float32Array(W * H),
+				ray: () => [0, 0, 1] as Vec3,
+			},
+			eyeAlt: e.eyeAlt,
+			sunDir,
+		};
+		const p1 = await hazePrepTex(device, tin);
+		await hazePrepTex(device, tin);
+		const msg = (p: Promise<unknown>) =>
+			p.then(
+				() => "resolved",
+				(err) => String(err?.message ?? err).slice(0, 120),
+			);
+		fit.guards.stalePrep = await msg(fitHazeFromPrep(device, p1, geoIn));
+		fit.guards.wrongGeo = await msg(
+			prepAndFitHazeTex(device, tin, {
+				...geoIn,
+				geo: { ...geoIn.geo, data: new Float32Array(W * H - 1) },
+			}),
+		);
+		fit.guards.invalid = await msg(
+			prepAndFitHazeTex(device, tin, geoIn, { valid: () => false }),
+		);
+	}
+	const fitT = { ref: [] as number[], bridge: [] as number[] };
+	for (let i = 0; i < reps; i++) {
+		fitT.ref.push((await fitVia()).ms);
+		fitT.bridge.push((await fitVia(viaBridge)).ms);
+	}
 	bridge.destroy();
 
 	const med = (o: Record<string, number[]>) =>
@@ -400,11 +501,13 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 		masks,
 		stats,
 		haze,
+		fit,
 		exact: {
 			masks: (masks.bytes as Diff).diff === 0 && masks.sameSize === true,
 			stats: stats.exact,
 			haze: haze.exact,
+			fit: fit.exact,
 		},
-		ms: { masks: med(mt), stats: med(st), haze: med(ht) },
+		ms: { masks: med(mt), stats: med(st), haze: med(ht), fit: med(fitT) },
 	};
 }
