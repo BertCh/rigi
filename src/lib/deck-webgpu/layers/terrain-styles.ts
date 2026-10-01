@@ -45,7 +45,7 @@ import type { ShaderModule } from "@luma.gl/shadertools";
 import { ATM_CURV } from "#/lib/look/atmosphere";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
 import type { harmonizeValues } from "#/lib/look/composite";
-import type { ReliefField } from "#/lib/look/relief/field";
+import type { ReliefField, ResidentReliefField } from "#/lib/look/relief/field";
 import { WATER_WGSL } from "#/lib/look/water/water";
 import {
 	type DeckTerrainStyle,
@@ -845,12 +845,29 @@ export class TerrainStyles {
 		};
 	}
 
-	/** The Swiss relief's field (look/relief/field.ts, LOOK_RELIEF); null until built. */
-	setReliefField(r: ReliefField | null) {
+	/**
+	 * The Swiss relief's field (look/relief/field.ts, LOOK_RELIEF); null until built. CPU bytes are
+	 * uploaded; a ResidentReliefField (compute-bridge.ts, built on this device) is sampled as is and
+	 * owned from here on (destroyed on replace, like the uploads). A resident field of another device
+	 * or already destroyed (device loss) counts as null.
+	 */
+	setReliefField(r: ReliefField | ResidentReliefField | null) {
 		this.relief?.field.destroy();
 		this.relief?.gen.destroy();
 		this.relief = null;
 		if (!r) return;
+		if ("textures" in r) {
+			const { field, gen } = r.textures;
+			if (
+				field.device !== this.device ||
+				gen.device !== this.device ||
+				field.destroyed ||
+				gen.destroyed
+			)
+				return;
+			this.relief = { field, gen, extent: [...r.extent] };
+			return;
+		}
 		const tex = (data: Uint8Array, id: string) => {
 			const t = this.device.createTexture({
 				id,

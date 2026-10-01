@@ -12,7 +12,8 @@ type Look = {
 };
 type Eng = {
 	kind?: string;
-	relief: { field: Field };
+	// ReliefController: `current` may be GPU-resident (deck-webgpu bridge); bytes() reads it lazily
+	relief: { field: Field; current?: unknown; bytes(): Promise<Field> };
 	look?: Look;
 	compLook?: Look;
 	hazeFit: { visibility: number; quality: number; betaM: number } | null;
@@ -40,10 +41,14 @@ export async function lookSmoke(
 			await new Promise((r) => setTimeout(r, 250));
 		return ok();
 	};
-	await wait(() => !!e.relief.field || !!e.hazeFit || !!look().masks, 25000);
+	await wait(
+		() =>
+			!!(e.relief.current ?? e.relief.field) || !!e.hazeFit || !!look().masks,
+		25000,
+	);
 	// let the rest (stats after the 120 ms timer, other passes) arrive
 	await new Promise((r) => setTimeout(r, 3000));
-	const f = e.relief.field;
+	const f = await e.relief.bytes().catch(() => null);
 	const L = look();
 	return {
 		label: opts.label,
@@ -84,7 +89,7 @@ export async function lookSmoke(
 type Ctl = { key: string };
 type Priv = {
 	kind?: string;
-	relief: Ctl & { field: Field };
+	relief: Ctl & { field: Field; bytes(): Promise<Field> };
 	haze: Ctl & { fit: Eng["hazeFit"] };
 	fitHaze(): void;
 	updateRelief(): void;
@@ -108,8 +113,8 @@ export async function hookParity(
 	};
 	const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 	await sleep(3000);
-	const snap = () => ({
-		relief: e.relief.field?.field ?? null,
+	const snap = async () => ({
+		relief: (await e.relief.bytes().catch(() => null))?.field ?? null,
 		fit: e.haze.fit,
 		masks: cl.masks?.data ?? null,
 	});

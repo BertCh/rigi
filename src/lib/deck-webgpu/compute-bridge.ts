@@ -40,10 +40,29 @@
 // guards the pairing (geometry target ↔ that range readback) with WebGpuGeometrySource.renderSeq:
 // re-rendered while the call was queued → null → HazeController's readback path. Bit-identical to
 // fitHazeGpu (bridge-check.mjs: whole fit + final image). Engine option hazeBridge (default true).
+//
+// Relief (reliefField): the readback path was ReliefController → gpu/look/hooks.ts →
+// buildReliefFieldGpu (relief graph on the compute device) → read node (2 × 4 MB) → CPU
+// ReliefField → TerrainStyles.setReliefField → writeData into two new rgba8unorm textures. On the
+// render device the same graph (gpu/look/relief-graph.ts reliefGraphToTextures, out = "texture")
+// ends in a copyBufferToTexture of its packed field / gen transients into two fresh rgba8unorm
+// textures made here with setReliefField's descriptor (+ COPY_SRC for the lazy CPU copy). Same
+// heights (reliefHeights), same uniform block (reliefWords), same kernels; PACK's u32 per texel is
+// the RGBA8 texel byte for byte and both paths use tightly packed rows (res·4 = 4096 B, 256-aligned)
+// with row 0 = south, so the textures hold exactly the bytes the readback path uploads (no format
+// conversion exists on either path). Ordering: one submit on the render queue; every later frame
+// samples the finished textures. The result is a ResidentReliefField whose textures pass to
+// TerrainStyles (it owns and destroys them on replace); its read() is the lazy CPU copy (only the
+// lookSmoke / hookParity diagnostics read the WebGPU engine's field bytes). The engine passes it as
+// ReliefController.update's `bridged` while the bridge is attached (same gate); a rejection or
+// null (bridge destroyed in flight) falls back to the readback path, and the CPU twin stays the
+// lookgpu-off path.
 import type { Device, Texture } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
 import { lookGpuOn, trackLook } from "#/lib/gpu/look/opt-in";
+import { reliefHeights, reliefWords } from "#/lib/gpu/look/relief";
+import { reliefGraphToTextures } from "#/lib/gpu/look/relief-graph";
 import {
 	bandStatsTex,
 	type HazePrepResult,
@@ -62,6 +81,11 @@ import {
 	type RangeGrid,
 } from "#/lib/look/composite";
 import type { HazeFit, HazeGeo } from "#/lib/look/haze-fit";
+import type {
+	BridgedRelief,
+	ReliefField,
+	ResidentReliefField,
+} from "#/lib/look/relief/field";
 import type { ViewStyle } from "#/lib/style/types";
 import { USAGE } from "./targets";
 
@@ -128,10 +152,12 @@ export class LookBridge {
 		masks: BridgeTiming[];
 		stats: BridgeTiming[];
 		haze: BridgeTiming[];
+		relief: BridgeTiming[];
 	} = {
 		masks: [],
 		stats: [],
 		haze: [],
+		relief: [],
 	};
 	private maskIn: unknown[] = [];
 	private statsKey = "";
@@ -341,6 +367,76 @@ export class LookBridge {
 		return this.destroyed ? null : fit;
 	}
 
+	/** reliefField as ReliefController.update's `bridged`. */
+	readonly relief: BridgedRelief = (o) => this.reliefField(o);
+
+	/**
+	 * buildReliefFieldGpu on this (render) device, straight into two new rgba8unorm textures (see the
+	 * header). Resolves once the graph is submitted, or null when the bridge was destroyed meanwhile
+	 * (the caller takes the readback path). The caller owns the result (setReliefField / dispose).
+	 */
+	async reliefField(
+		o: Parameters<BridgedRelief>[0],
+	): Promise<ResidentReliefField | null> {
+		if (this.destroyed) return null;
+		const t0 = performance.now();
+		const { res, extent, px, H } = reliefHeights(o.tiles, o.frame, o.yawDeg);
+		const { words, degenerate } = reliefWords(res, px, o.sunDir);
+		const tex = (id: string) =>
+			this.device.createTexture({
+				id,
+				format: "rgba8unorm",
+				width: res,
+				height: res,
+				usage: USAGE.SAMPLE | USAGE.COPY_DST | USAGE.COPY_SRC,
+				sampler: LINEAR_CLAMP,
+			});
+		const textures = { field: tex("relief-field"), gen: tex("relief-gen") };
+		const dispose = () => {
+			textures.field.destroy();
+			textures.gen.destroy();
+		};
+		const cpuMs = performance.now() - t0;
+		try {
+			await reliefGraphToTextures(
+				this.device,
+				H,
+				res,
+				words,
+				degenerate,
+				textures,
+			);
+		} catch (e) {
+			dispose();
+			throw e;
+		}
+		if (this.destroyed) {
+			dispose();
+			return null;
+		}
+		const ms = performance.now() - t0;
+		push(this.timing.relief, { cpuMs, totalMs: ms });
+		const device = this.device;
+		let bytes: Promise<ReliefField> | null = null;
+		return {
+			res,
+			extent,
+			textures,
+			ms,
+			read: () =>
+				(bytes ??= (async () => {
+					if (textures.field.destroyed || textures.gen.destroyed)
+						throw new Error("relief textures destroyed");
+					const [field, gen] = await Promise.all([
+						readRgba8(device, textures.field),
+						readRgba8(device, textures.gen),
+					]);
+					return { res, extent, field, gen, ms };
+				})()),
+			dispose,
+		};
+	}
+
 	/** The photo at w × h as rgba8unorm: photoPixels' bytes (the CPU path's resample), cached. */
 	photoTexture(img: HTMLImageElement, w: number, h: number): Texture {
 		const key = `${w}x${h}`;
@@ -421,6 +517,33 @@ export class LookBridge {
 		for (const t of textures) t?.destroy();
 		if (!this.device.isLost)
 			void releaseTextureGraphs(this.device).catch(() => {});
+	}
+}
+
+/** A whole rgba8unorm texture (COPY_SRC), rows top-first (row 0 = texel row 0), tightly packed. */
+export async function readRgba8(
+	device: Device,
+	tex: Texture,
+): Promise<Uint8Array> {
+	const layout = tex.computeMemoryLayout();
+	const buf = device.createBuffer({
+		id: "look-bridge-read",
+		byteLength: layout.byteLength,
+		usage: 0x0001 | 0x0008, // MAP_READ | COPY_DST
+	});
+	try {
+		tex.readBuffer({}, buf);
+		const data = await buf.readAsync(0, layout.byteLength);
+		const row = tex.width * 4;
+		const out = new Uint8Array(row * tex.height);
+		for (let y = 0; y < tex.height; y++)
+			out.set(
+				data.subarray(y * layout.bytesPerRow, y * layout.bytesPerRow + row),
+				y * row,
+			);
+		return out;
+	} finally {
+		buf.destroy();
 	}
 }
 

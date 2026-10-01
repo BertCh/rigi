@@ -118,7 +118,7 @@ import {
 import type { SkyMask } from "#/lib/look/haze-fit";
 import { drawExportLabels, skylineAt } from "#/lib/look/labels";
 import { lookKey } from "#/lib/look/look-key";
-import { ReliefController, type ReliefField } from "#/lib/look/relief/field";
+import { ReliefController } from "#/lib/look/relief/field";
 import { DeckMapCamera, MAP_VIEW_ID } from "#/lib/nearfield/deck-map-camera";
 import { type ByteMask, stepMasks } from "#/lib/nearfield/deck-step";
 import {
@@ -345,7 +345,7 @@ type Gpu = {
 	tiles3d: Tiles3DCore | null;
 	photoTex: Texture | null;
 	photoTexFrom: HTMLImageElement | null;
-	reliefFrom: ReliefField | null;
+	reliefFrom: ReliefController["current"];
 	/** look passes on the render targets (compute-bridge.ts); null = the readback path */
 	bridge: LookBridge | null;
 };
@@ -1371,6 +1371,7 @@ export class WebGpuEngine implements Renderer {
 			frame: this.frame,
 			sunDir: this.look("overlay").sunDir,
 			yawDeg: this.pose.yaw,
+			bridged: this.gpu?.bridge?.relief,
 		});
 		if (built) this.layerGen++;
 		return built;
@@ -1643,9 +1644,9 @@ export class WebGpuEngine implements Renderer {
 			opacity: this.style.trails.opacity,
 			dash: this.style.trails.dash,
 		});
-		if (this.relief.field !== g.reliefFrom) {
-			g.styles.setReliefField(this.relief.field);
-			g.reliefFrom = this.relief.field;
+		if (this.relief.current !== g.reliefFrom) {
+			g.styles.setReliefField(this.relief.current);
+			g.reliefFrom = this.relief.current;
 		}
 		g.drape.setPhotoCamera(photoU);
 		g.styles.applyTo(g.terrain, [g.drape.part()]);

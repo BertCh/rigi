@@ -82,13 +82,7 @@ export async function buildReliefFieldGpu(
 	opts: ReliefGpuOptions = {},
 ): Promise<ReliefField> {
 	const t0 = performance.now();
-	const res = RES;
-	const a = ((yawDeg ?? 0) * Math.PI) / 180;
-	const c =
-		yawDeg == null ? [0, 0] : [Math.sin(a) * AHEAD, Math.cos(a) * AHEAD];
-	const extent: Extent = [c[0] - HALF, c[1] - HALF, c[0] + HALF, c[1] + HALF];
-	const px = (2 * HALF) / res;
-	const H = rasterizeHeights(tiles, frame, extent, res, HOLE);
+	const { res, extent, px, H } = reliefHeights(tiles, frame, yawDeg);
 	const { field, gen } = await reliefPassesGpu(
 		device,
 		H,
@@ -100,6 +94,22 @@ export async function buildReliefFieldGpu(
 	return { res, extent, field, gen, ms: performance.now() - t0 };
 }
 
+/** buildReliefField's extent + rasterised heights (res², row 0 = south) for `yawDeg`. */
+export function reliefHeights(
+	tiles: readonly HeightTile[],
+	frame: EnuFrame,
+	yawDeg: number | null,
+) {
+	const res = RES;
+	const a = ((yawDeg ?? 0) * Math.PI) / 180;
+	const c =
+		yawDeg == null ? [0, 0] : [Math.sin(a) * AHEAD, Math.cos(a) * AHEAD];
+	const extent: Extent = [c[0] - HALF, c[1] - HALF, c[0] + HALF, c[1] + HALF];
+	const px = (2 * HALF) / res;
+	const H = rasterizeHeights(tiles, frame, extent, res, HOLE);
+	return { res, extent, px, H };
+}
+
 /** field.ts castShadow + skyView + curvatureAndNormal over heights `H` (res², row 0 = south). */
 export async function reliefPassesGpu(
 	device: Device,
@@ -109,58 +119,7 @@ export async function reliefPassesGpu(
 	sun: Vec3,
 	opts: ReliefGpuOptions = {},
 ): Promise<{ field: Uint8Array; gen: Uint8Array }> {
-	if (res > 2048 || res % 2) throw new Error(`relief res ${res} unsupported`);
-	const resH = res >> 1;
-	// castShadow's constants (f64 here, as the CPU)
-	const hz = Math.hypot(sun[0], sun[1]);
-	const degenerate = sun[2] <= -0.02 || hz < 1e-4;
-	const xMajor = Math.abs(sun[0]) >= Math.abs(sun[1]);
-	const major = xMajor ? sun[0] : sun[1];
-	const slope = degenerate ? 0 : (xMajor ? sun[1] : sun[0]) / Math.abs(major);
-	const tanEl = degenerate ? 0 : sun[2] / hz;
-	const drop = px * Math.hypot(1, slope) * tanEl;
-	// curvatureAndNormal's constants
-	const ra = Math.max(1, Math.round(60 / px));
-	const rb = Math.max(3, Math.round(250 / px));
-	const da = Math.max(1, Math.round(ra / Math.SQRT2));
-	const db = Math.max(1, Math.round(rb / Math.SQRT2));
-
-	const words = new ArrayBuffer(80);
-	const dv = new DataView(words);
-	let o = 0;
-	const u32 = (v: number) => {
-		dv.setUint32(o, v, true);
-		o += 4;
-	};
-	const i32 = (v: number) => {
-		dv.setInt32(o, v, true);
-		o += 4;
-	};
-	const f32 = (v: number) => {
-		dv.setFloat32(o, v, true);
-		o += 4;
-	};
-	u32(res);
-	u32(resH);
-	u32(xMajor ? 1 : res); // sa
-	u32(xMajor ? res : 1); // sb
-	i32(major > 0 ? 1 : -1); // s
-	i32(Math.floor(slope)); // b0 = b + floor(slope)
-	f32(slope - Math.floor(slope)); // the interpolation weight, constant along a row
-	f32(drop);
-	f32(Math.max(8, 0.6 * drop)); // w
-	f32(0.6 + 0.15 * px); // bias
-	i32(degenerate ? (sun[2] <= -0.02 ? 0 : 255) : -1);
-	f32(px * 2); // pxH
-	i32(ra);
-	i32(rb);
-	i32(da);
-	i32(db);
-	f32((0.55 / (ra * px * 0.35)) * 0.125); // ka
-	f32((0.45 / (rb * px * 0.3)) * 0.125); // kb
-	f32(1 / (2 * ra * px)); // g
-	f32(SVF_R);
-
+	const { words, degenerate } = reliefWords(res, px, sun);
 	if (opts.graph ?? true)
 		return (await import("./relief-graph")).reliefGraphPasses(
 			device,
@@ -169,6 +128,7 @@ export async function reliefPassesGpu(
 			words,
 			degenerate,
 		);
+	const resH = res >> 1;
 	const N = res * res;
 	const NH = resH * resH;
 	return withLease("look-relief", async () => {
@@ -226,4 +186,64 @@ export async function reliefPassesGpu(
 		const [f, g] = await rd.read();
 		return { field: new Uint8Array(f), gen: new Uint8Array(g) };
 	});
+}
+
+/** The relief kernels' uniform block for (res, px, sun): castShadow's and curvatureAndNormal's constants. */
+export function reliefWords(
+	res: number,
+	px: number,
+	sun: Vec3,
+): { words: ArrayBuffer; degenerate: boolean } {
+	if (res > 2048 || res % 2) throw new Error(`relief res ${res} unsupported`);
+	const resH = res >> 1;
+	// castShadow's constants (f64 here, as the CPU)
+	const hz = Math.hypot(sun[0], sun[1]);
+	const degenerate = sun[2] <= -0.02 || hz < 1e-4;
+	const xMajor = Math.abs(sun[0]) >= Math.abs(sun[1]);
+	const major = xMajor ? sun[0] : sun[1];
+	const slope = degenerate ? 0 : (xMajor ? sun[1] : sun[0]) / Math.abs(major);
+	const tanEl = degenerate ? 0 : sun[2] / hz;
+	const drop = px * Math.hypot(1, slope) * tanEl;
+	// curvatureAndNormal's constants
+	const ra = Math.max(1, Math.round(60 / px));
+	const rb = Math.max(3, Math.round(250 / px));
+	const da = Math.max(1, Math.round(ra / Math.SQRT2));
+	const db = Math.max(1, Math.round(rb / Math.SQRT2));
+
+	const words = new ArrayBuffer(80);
+	const dv = new DataView(words);
+	let o = 0;
+	const u32 = (v: number) => {
+		dv.setUint32(o, v, true);
+		o += 4;
+	};
+	const i32 = (v: number) => {
+		dv.setInt32(o, v, true);
+		o += 4;
+	};
+	const f32 = (v: number) => {
+		dv.setFloat32(o, v, true);
+		o += 4;
+	};
+	u32(res);
+	u32(resH);
+	u32(xMajor ? 1 : res); // sa
+	u32(xMajor ? res : 1); // sb
+	i32(major > 0 ? 1 : -1); // s
+	i32(Math.floor(slope)); // b0 = b + floor(slope)
+	f32(slope - Math.floor(slope)); // the interpolation weight, constant along a row
+	f32(drop);
+	f32(Math.max(8, 0.6 * drop)); // w
+	f32(0.6 + 0.15 * px); // bias
+	i32(degenerate ? (sun[2] <= -0.02 ? 0 : 255) : -1);
+	f32(px * 2); // pxH
+	i32(ra);
+	i32(rb);
+	i32(da);
+	i32(db);
+	f32((0.55 / (ra * px * 0.35)) * 0.125); // ka
+	f32((0.45 / (rb * px * 0.3)) * 0.125); // kb
+	f32(1 / (2 * ra * px)); // g
+	f32(SVF_R);
+	return { words, degenerate };
 }

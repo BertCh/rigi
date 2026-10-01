@@ -11,11 +11,17 @@
 //   fit    the whole HazeFit (JSON): a fresh HazeController on the readback path (range readback →
 //          fitHazeGpu) vs one with `bridged` = LookBridge.fitHaze (prepAndFitHazeTex on the target),
 //          plus the engine's live fit; and the guards (stale prep, wrong geo size) reject
+//   relief the readback path (buildReliefFieldGpu: relief graph → read node → bytes, uploaded with
+//          TerrainStyles.setReliefField's descriptor + writeData) vs LookBridge.reliefField (the
+//          same graph → copyBufferToTexture), both textures read back, field + gen; plus the
+//          engine's live resident field (if its pose / sun still match) and the lazy CPU copy
 // and times each (median of `reps`, warm). The final look image is compared by the harness
 // (scripts/deck-webgpu/bridge-check.mjs) with engine.setLookBridge(false / true).
 import type { Device, Texture } from "@luma.gl/core";
+import type { EnuFrame } from "#/lib/geodesy";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { fitHazeFromPrep, prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
+import { buildReliefFieldGpu } from "#/lib/gpu/look/relief";
 import {
 	type HazePrep,
 	hazePrepArrays,
@@ -38,8 +44,10 @@ import {
 	rangeGeo,
 } from "#/lib/look/haze-controller";
 import type { HazeFit, SkyMask } from "#/lib/look/haze-fit";
+import type { ResidentReliefField } from "#/lib/look/relief/field";
+import type { HeightTile } from "#/lib/look/relief/heights";
 import type { ViewStyle } from "#/lib/style/types";
-import { LookBridge } from "./compute-bridge";
+import { LookBridge, readRgba8 } from "./compute-bridge";
 import type { WebGpuEngine } from "./engine";
 import { WebGpuGeometrySource } from "./layers/geometry-source";
 
@@ -58,6 +66,10 @@ type Internals = {
 	eyeAlt: number;
 	hazeFit: HazeFit | null;
 	look(mode: "overlay"): { sunDir: Vec3 };
+	terrain?: { tiles: readonly HeightTile[] };
+	frame: EnuFrame;
+	pose: { yaw: number };
+	relief: { resident: ResidentReliefField | null };
 	gpu: {
 		device: Device;
 		composite: { brushCanvas: HTMLCanvasElement };
@@ -90,32 +102,7 @@ function diff(a: ArrayLike<number>, b: ArrayLike<number>): Diff {
 }
 const median = (a: number[]) => [...a].sort((x, y) => x - y)[a.length >> 1];
 
-/** A whole rgba8unorm texture, rows top-first, tightly packed. */
-export async function readRgba8(
-	device: Device,
-	tex: Texture,
-): Promise<Uint8Array> {
-	const layout = tex.computeMemoryLayout();
-	const buf = device.createBuffer({
-		id: "bridge-check-read",
-		byteLength: layout.byteLength,
-		usage: 0x0001 | 0x0008,
-	});
-	try {
-		tex.readBuffer({}, buf);
-		const data = await buf.readAsync(0, layout.byteLength);
-		const row = tex.width * 4;
-		const out = new Uint8Array(row * tex.height);
-		for (let y = 0; y < tex.height; y++)
-			out.set(
-				data.subarray(y * layout.bytesPerRow, y * layout.bytesPerRow + row),
-				y * row,
-			);
-		return out;
-	} finally {
-		buf.destroy();
-	}
-}
+export { readRgba8 };
 
 function statsDiff(a: ColorStats | null, b: ColorStats | null) {
 	if (!a || !b) return { exact: false, missing: !a ? "readback" : "bridge" };
@@ -489,6 +476,94 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 		fitT.ref.push((await fitVia()).ms);
 		fitT.bridge.push((await fitVia(viaBridge)).ms);
 	}
+	// ── relief: readback path (bytes → writeData) vs bridge (graph → copyBufferToTexture)
+	const relief: Record<string, unknown> = { ran: false };
+	const rt = { ref: [] as number[], bridge: [] as number[] };
+	const tiles = e.terrain?.tiles ?? [];
+	if (tiles.length) {
+		// ReliefController.update's yaw snap
+		const yaw = (Math.round(e.pose.yaw / 30) * 30 + 360) % 360;
+		const upload = (res: number, data: Uint8Array) => {
+			// TerrainStyles.setReliefField's texture, + COPY_SRC to read it back
+			const t = device.createTexture({
+				format: "rgba8unorm",
+				width: res,
+				height: res,
+				usage: 0x04 | 0x02 | 0x01,
+			});
+			t.writeData(data as never, {
+				width: res,
+				height: res,
+				bytesPerRow: res * 4,
+			});
+			return t;
+		};
+		const reliefRef = async () => {
+			const t0 = performance.now();
+			const f = await buildReliefFieldGpu(device, tiles, e.frame, sunDir, yaw);
+			const tf = upload(f.res, f.field);
+			const tg = upload(f.res, f.gen);
+			await idle();
+			return { f, tf, tg, ms: performance.now() - t0 };
+		};
+		const reliefBridge = async () => {
+			const t0 = performance.now();
+			const r = await bridge.reliefField({
+				tiles,
+				frame: e.frame,
+				sunDir,
+				yawDeg: yaw,
+			});
+			await idle();
+			return { r, ms: performance.now() - t0 };
+		};
+		const ra = await reliefRef();
+		const rb = await reliefBridge();
+		if (rb.r) {
+			const [af, ag, bf, bg] = await Promise.all([
+				readRgba8(device, ra.tf),
+				readRgba8(device, ra.tg),
+				readRgba8(device, rb.r.textures.field),
+				readRgba8(device, rb.r.textures.gen),
+			]);
+			const lazy = await rb.r.read();
+			relief.ran = true;
+			relief.res = rb.r.res;
+			relief.extent =
+				JSON.stringify(ra.f.extent) === JSON.stringify(rb.r.extent);
+			relief.field = diff(af, bf);
+			relief.gen = diff(ag, bg);
+			// the uploaded texture vs the bytes it came from (the readback path itself)
+			relief.refUpload = diff(ra.f.field, af).diff + diff(ra.f.gen, ag).diff;
+			relief.lazy =
+				diff(ra.f.field, lazy.field).diff + diff(ra.f.gen, lazy.gen).diff;
+			const live = e.relief.resident;
+			if (live && JSON.stringify(live.extent) === JSON.stringify(ra.f.extent))
+				relief.live =
+					diff(af, await readRgba8(device, live.textures.field)).diff +
+					diff(ag, await readRgba8(device, live.textures.gen)).diff;
+			rb.r.dispose();
+		} else relief.error = "bridge returned null";
+		ra.tf.destroy();
+		ra.tg.destroy();
+		for (let i = 0; i < reps; i++) {
+			const a2 = await reliefRef();
+			a2.tf.destroy();
+			a2.tg.destroy();
+			rt.ref.push(a2.ms);
+			const b2 = await reliefBridge();
+			b2.r?.dispose();
+			rt.bridge.push(b2.ms);
+		}
+	}
+	const reliefExact =
+		relief.ran === true &&
+		relief.extent === true &&
+		(relief.field as Diff).diff === 0 &&
+		(relief.gen as Diff).diff === 0 &&
+		relief.refUpload === 0 &&
+		relief.lazy === 0;
+
 	bridge.destroy();
 
 	const med = (o: Record<string, number[]>) =>
@@ -502,12 +577,20 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 		stats,
 		haze,
 		fit,
+		relief,
 		exact: {
 			masks: (masks.bytes as Diff).diff === 0 && masks.sameSize === true,
 			stats: stats.exact,
 			haze: haze.exact,
 			fit: fit.exact,
+			relief: reliefExact,
 		},
-		ms: { masks: med(mt), stats: med(st), haze: med(ht), fit: med(fitT) },
+		ms: {
+			masks: med(mt),
+			stats: med(st),
+			haze: med(ht),
+			fit: med(fitT),
+			relief: rt.ref.length ? med(rt) : null,
+		},
 	};
 }

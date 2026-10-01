@@ -8,6 +8,7 @@
 //   shadow  the occluder surface propagated one texel at a time away from the sun
 //   SVF     8 azimuths, each a max-horizon search along hull pointers (the tangent point of the
 //           texel ahead is the next vertex of the upper hull), capped at SVF_R
+import type { Texture } from "@luma.gl/core";
 import type { EnuFrame } from "../../geodesy";
 import { lookGpuOn, trackLook } from "../../gpu/look/opt-in";
 import type { ViewStyle } from "../../style/types";
@@ -25,6 +26,31 @@ export type ReliefField = {
 	/** Build time, ms. */
 	ms: number;
 };
+
+/**
+ * The field resident on a WebGPU render device (deck-webgpu/compute-bridge.ts LookBridge.reliefField):
+ * the same bytes as ReliefField.field / .gen, already in two rgba8unorm res² textures (row 0 = south =
+ * uv.y 0, LINEAR_CLAMP; SAMPLE | COPY_DST | COPY_SRC). Whoever displays them owns them
+ * (TerrainStyles.setReliefField destroys them on replace); `read` is the lazy CPU copy (memoised,
+ * rejects once the textures are gone), `dispose` frees a field nobody took.
+ */
+export type ResidentReliefField = {
+	res: number;
+	extent: Extent;
+	textures: { field: Texture; gen: Texture };
+	/** Build time (heights + encode + submit), ms. */
+	ms: number;
+	read(): Promise<ReliefField>;
+	dispose(): void;
+};
+
+/** A GPU-resident relief build of the same input (null / a rejection = the readback path). */
+export type BridgedRelief = (o: {
+	tiles: readonly HeightTile[];
+	frame: EnuFrame;
+	sunDir: Vec3;
+	yawDeg: number | null;
+}) => Promise<ResidentReliefField | null>;
 
 const RES = 1024;
 const HALF = 20000;
@@ -272,17 +298,47 @@ function curvatureAndNormal(
  * `update` returns the new field (upload it) or null (keep the current one).
  */
 export class ReliefController {
+	/** The latest field as CPU bytes (CPU / readback paths); null while `resident` is the latest. */
 	field: ReliefField | null = null;
+	/** The latest field when it was built on the render device (update's `bridged`); else null. */
+	resident: ResidentReliefField | null = null;
 	private key = "";
 	/** Opt-in GPU path (gpu/look, ?lookgpu=1): update returns null and this fires when the field lands. */
-	onAsync?: (f: ReliefField) => void;
+	onAsync?: (f: ReliefField | ResidentReliefField) => void;
 	private seq = 0;
+
+	/**
+	 * The latest field, CPU or resident (what a WebGPU engine hands TerrainStyles.setReliefField). A
+	 * resident field whose textures were destroyed (device loss / teardown) is dropped and the next
+	 * update rebuilds.
+	 */
+	get current(): ReliefField | ResidentReliefField | null {
+		const r = this.resident;
+		const t = r?.textures;
+		if (t && (t.field.destroyed || t.gen.destroyed || t.field.device.isLost)) {
+			this.resident = null;
+			this.key = "";
+		}
+		return this.resident ?? this.field;
+	}
+
+	/** The latest field's bytes: `field`, or the resident field read back (lazily, once). */
+	async bytes(): Promise<ReliefField | null> {
+		const c = this.current;
+		return c && "textures" in c ? c.read() : c;
+	}
 
 	update(o: {
 		tiles: readonly HeightTile[];
 		frame: EnuFrame;
 		sunDir: Vec3;
 		yawDeg: number | null;
+		/**
+		 * Build on the render device straight into the textures it samples (deck-webgpu
+		 * compute-bridge.ts). Used instead of the GPU readback path when set; null / a rejection
+		 * falls back to it. Async like the GPU path (onAsync; the result lands in `resident`).
+		 */
+		bridged?: BridgedRelief;
 	}): ReliefField | null {
 		const yaw =
 			o.yawDeg == null ? null : (Math.round(o.yawDeg / 30) * 30 + 360) % 360;
@@ -290,14 +346,38 @@ export class ReliefController {
 		if (key === this.key || !o.tiles.length) return null;
 		this.key = key;
 		const seq = ++this.seq;
-		if (lookGpuOn()) {
+		if (o.bridged || lookGpuOn()) {
 			const { tiles, frame, sunDir } = o;
+			const readback = () =>
+				import("../../gpu/look/hooks").then((m) =>
+					m.reliefFieldAsync(tiles, frame, sunDir, yaw),
+				);
+			const built: Promise<ReliefField | ResidentReliefField | null> = o.bridged
+				? o
+						.bridged({ tiles, frame, sunDir, yawDeg: yaw })
+						.catch((e) => {
+							console.warn("[relief] bridged field failed, reading back", e);
+							return null;
+						})
+						.then<ReliefField | ResidentReliefField | null>(
+							(f) => f ?? (seq === this.seq ? readback() : null),
+						)
+				: readback();
 			trackLook(
-				import("../../gpu/look/hooks")
-					.then((m) => m.reliefFieldAsync(tiles, frame, sunDir, yaw))
+				built
 					.then((f) => {
-						if (seq !== this.seq) return;
-						this.field = f;
+						if (!f) return;
+						if (seq !== this.seq) {
+							if ("textures" in f) f.dispose();
+							return;
+						}
+						if ("textures" in f) {
+							this.resident = f;
+							this.field = null;
+						} else {
+							this.field = f;
+							this.resident = null;
+						}
 						this.onAsync?.(f);
 					})
 					.catch((e) => console.warn("[relief] async field failed", e)),
@@ -305,6 +385,7 @@ export class ReliefController {
 			return null;
 		}
 		this.field = buildReliefField(o.tiles, o.frame, o.sunDir, yaw);
+		this.resident = null;
 		if (import.meta.env?.DEV)
 			console.info(
 				`[relief] field ${this.field.res}² in ${this.field.ms.toFixed(0)} ms`,

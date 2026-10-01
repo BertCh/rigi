@@ -4,6 +4,15 @@
 //
 //   clear shadow → SHADOW (atomicOr)          ┐
 //   DOWN → clear acc8 → SVF → SUM             ├→ PACK → read (field, gen)
+//                                             └─────→ or: to-texture (field, gen → 2 rgba8unorm)
+//
+// The texture variant (reliefGraphToTextures, out = "texture"; deck-webgpu/compute-bridge.ts on the
+// render device) ends in a copy node instead of the read node: copyBufferToTexture of the packed
+// field / gen transients into caller-owned rgba8unorm textures. PACK writes one u32 per texel, byte
+// k = channel k (little-endian), i.e. exactly the RGBA8 bytes the read node returns and
+// TerrainStyles.setReliefField uploads with writeData (bytesPerRow res·4, row 0 = south = uv.y 0),
+// so the texture contents are the readback path's, byte for byte; no format conversion exists on
+// either path. res·4 must be a multiple of 256 (copyBufferToTexture's row pitch): res % 64 == 0.
 //
 // Same five KernelSpecs as relief.ts (unchanged WGSL: RELIEF_SUM keeps its fixed k = 0..7 f32 order,
 // the CPU's Float32Array order), same uniform words (built by relief.ts), same workgroup counts. What
@@ -27,7 +36,7 @@
 // NaN semantics: unchanged kernels, so exactly the old GPU path's (a NaN height is not ≤ HOLE, so it
 // is not a hole; it propagates through the f32 maths and the u32() casts of PACK). The bench compares
 // outputs as raw bytes, NaN inputs included.
-import { Buffer, type Device } from "@luma.gl/core";
+import { Buffer, type Device, Texture } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import {
@@ -73,6 +82,7 @@ export function buildReliefGraph<P extends Params | undefined = Params>(
 	prmBytes: number,
 	_degenerate?: boolean,
 	unsafeSkipClears = false,
+	out: "read" | "texture" = "read",
 ) {
 	const resH = res >> 1;
 	const NH = resH * resH;
@@ -123,7 +133,44 @@ export function buildReliefGraph<P extends Params | undefined = Params>(
 		bindings: { prm, H, shadow, acc, field, gen },
 		workgroups: [Math.ceil(res / 16), Math.ceil(res / 16)],
 	});
-	g.readNode("read", [field, gen]);
+	if (out === "read") {
+		g.readNode("read", [field, gen]);
+		return;
+	}
+	// field / gen → the imported textures "field-tex" / "gen-tex" (tightly packed rows, 256-aligned)
+	if ((res * 4) % 256)
+		throw new Error(`relief res ${res}: rows not 256-aligned`);
+	const tex = (id: string) =>
+		g.importTexture({
+			id,
+			format: "rgba8unorm",
+			width: res,
+			height: res,
+			usage: Texture.COPY_DST,
+		});
+	const pairs = [
+		[field, tex("field-tex")],
+		[gen, tex("gen-tex")],
+	] as const;
+	g.graph.addCopyPass({
+		id: "to-texture",
+		resources: pairs.flatMap(([b, t]) => [
+			{ buffer: b, usage: "copy-source" as const },
+			{ texture: t, usage: "copy-destination" as const },
+		]),
+		compile: () => ({
+			encode: ({ commandEncoder, getBuffer, getTexture }) => {
+				for (const [b, t] of pairs)
+					commandEncoder.copyBufferToTexture({
+						sourceBuffer: getBuffer(b),
+						destinationTexture: getTexture(t),
+						bytesPerRow: res * 4,
+						rowsPerImage: res,
+						size: [res, res, 1],
+					});
+			},
+		}),
+	});
 }
 
 /** Last graph run's shape-cache hit and compiled stats (bench / tests). */
@@ -161,5 +208,62 @@ export function reliefGraphPasses(
 		lastReliefGraphRun.stats = graph.stats;
 		const [f, g] = reads.read;
 		return { field: new Uint8Array(f), gen: new Uint8Array(g) };
+	});
+}
+
+/** The relief output textures: rgba8unorm, res², COPY_DST (+ SAMPLE for the styles). */
+export type ReliefOutTextures = { field: Texture; gen: Texture };
+
+/**
+ * reliefGraphPasses with the field / gen written into `out` on the GPU (no readback): same lease,
+ * same kernels, uniforms and workgroups; the graph ends in a copy node (out = "texture"). Resolves
+ * once the submit is queued; WebGPU queue order makes every later render on `device` see the
+ * textures written. `out` must live on `device`.
+ */
+export function reliefGraphToTextures(
+	device: Device,
+	H: Float32Array,
+	res: number,
+	words: ArrayBuffer,
+	degenerate: boolean,
+	out: ReliefOutTextures,
+): Promise<void> {
+	for (const t of [out.field, out.gen])
+		if (
+			t.device !== device ||
+			t.format !== "rgba8unorm" ||
+			t.width !== res ||
+			t.height !== res
+		)
+			throw new Error("relief textures: not rgba8unorm res² on this device");
+	return withLease("look-relief-graph", async () => {
+		const prm = pooledUniform(device, "look-relief-graph/prm", words);
+		const gH = pooledStorage(device, "look-relief-graph/H", H);
+		const key = `${res}|H${gH.byteLength}|u${prm.byteLength}|tex`;
+		const { graph, hit } = cachedGraph<Params, void>(
+			device,
+			RELIEF_GRAPH_GROUP,
+			key,
+			(g) =>
+				buildReliefGraph(
+					g,
+					res,
+					gH.byteLength,
+					prm.byteLength,
+					undefined,
+					false,
+					"texture",
+				),
+		);
+		await graph.compileAsync();
+		await graph.run(
+			{ degenerate },
+			{
+				buffers: { prm, H: gH },
+				textures: { "field-tex": out.field, "gen-tex": out.gen },
+			},
+		);
+		lastReliefGraphRun.hit = hit;
+		lastReliefGraphRun.stats = graph.stats;
 	});
 }
