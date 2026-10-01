@@ -228,6 +228,8 @@ const angleDiff = (a: number, b: number) =>
 
 /** deck/engine.ts INPUT_IDLE_MS: a change this soon after the previous one is an interaction. */
 const INPUT_IDLE_MS = 150;
+/** Device losses the engine rebuilds from; the next one hands over to the app's fallback (onUnrecoverable). */
+const MAX_DEVICE_LOSSES = 3;
 
 /** Settings only the composite reads (deck/engine.ts COMPOSITE_ONLY): a "screen" frame only. */
 const COMPOSITE_ONLY = new Set<string>([
@@ -433,6 +435,12 @@ export class WebGpuEngine implements Renderer {
 	/** Resolves once the first host is up (rejects when WebGPU is unavailable). */
 	private ready: Promise<void>;
 	private lost = false;
+	/**
+	 * Called once when the engine cannot recover from a device loss (the rebuild failed, or the loss
+	 * budget below is spent). The host app then replaces it (PhotoWorkspace: WebGL deck, fresh canvas).
+	 */
+	onUnrecoverable: ((why: string) => void) | null = null;
+	private gaveUp = false;
 	private looks = new Map<string, DeckTerrainStyle>();
 	private haze = new HazeController();
 	private relief = new ReliefController();
@@ -892,10 +900,25 @@ export class WebGpuEngine implements Renderer {
 	 * the same canvas, then the CPU state again. Intentional destroys (dispose, rebuild) detach the
 	 * host first, so they never get here.
 	 */
+	private giveUp(why: string) {
+		if (this.gaveUp || this.disposed) return;
+		this.gaveUp = true;
+		this.onUnrecoverable?.(why);
+	}
+
 	private async onDeviceLost(host: Host, info: { message?: string }) {
 		if (this.disposed || this.host !== host) return;
 		this.lost = true;
 		this.counters.contextLost++;
+		// same budget as the compute realm (gpu/core/device.ts MAX_LOSSES): a device that keeps dying
+		// is not worth another rebuild
+		if (this.counters.contextLost > MAX_DEVICE_LOSSES) {
+			console.warn(
+				`[webgpu-engine] device lost ${this.counters.contextLost} times (${info.message ?? "?"})`,
+			);
+			this.giveUp(`device lost ${this.counters.contextLost} times`);
+			return;
+		}
 		console.warn(
 			`[webgpu-engine] device lost (${info.message ?? "?"}); rebuilding`,
 		);
@@ -914,6 +937,9 @@ export class WebGpuEngine implements Renderer {
 			await this.ready;
 		} catch (e) {
 			console.error("[webgpu-engine] rebuild after device loss failed", e);
+			this.giveUp(
+				`rebuild after device loss failed: ${(e as Error)?.message ?? e}`,
+			);
 			return;
 		}
 		if (this.disposed) return;
@@ -925,9 +951,14 @@ export class WebGpuEngine implements Renderer {
 		console.warn("[webgpu-engine] device restored; renderer rebuilt");
 	}
 
-	/** Test hook: lose the device on purpose (the rebuild path runs as for a real loss). */
+	/** Test hook (window.__RIGI_FORCE_DEVICE_LOSS__ in dev): lose the device on purpose (the rebuild path runs as for a real loss). */
 	simulateDeviceLoss() {
 		this.host?.device.destroy();
+	}
+
+	/** Test hook: take the unrecoverable path (the app's WebGL switch) without a real loss. */
+	simulateUnrecoverableLoss() {
+		this.giveUp("forced (simulated unrecoverable loss)");
 	}
 
 	// =============================================================================================

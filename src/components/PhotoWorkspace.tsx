@@ -199,6 +199,10 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 	// rendererFallback, which re-mounts the canvas (keyed on it) and re-runs the engine effect on WebGL deck
 	const [rendererUsed, setRendererUsed] = useState<RendererChoice | null>(null);
 	const [rendererFallback, setRendererFallback] = useState<string | null>(null);
+	// a mid-session WebGPU failure carries the live pose over to the WebGL deck that replaces it
+	const carryRef = useRef<{ pose: Pose; align: AlignState | null } | null>(
+		null,
+	);
 	const [settings, setSettings] = useState<Settings>(() => ({
 		...defaultSettings,
 		// near terrain is only as good as the GPS fix
@@ -225,6 +229,8 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 	const [pendingPeak, setPendingPeak] = useState<PeakLabel | null>(null);
 	const [alignNote, setAlignNote] = useState<string>("");
 	const [alignState, setAlignState] = useState<AlignState | null>(null);
+	const alignStateRef = useRef(alignState);
+	alignStateRef.current = alignState;
 	const unknownAbort = useRef<AbortController | null>(null);
 	const unknownSolver = useRef<UnknownPoseSolver | null>(null);
 	/** background second opinion on autoAlign (full metadata only): "pending" until it settles */
@@ -395,7 +401,9 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			if (import.meta.env.DEV) window.__reveal = reveal;
 			// keep the overlay hidden while the pose is solved, so it arrives with the flourish
 			const revealOnLoad =
-				getRevealConfig().onLoad && settingsRef.current.mode !== "world";
+				getRevealConfig().onLoad &&
+				settingsRef.current.mode !== "world" &&
+				!carryRef.current;
 			if (revealOnLoad) reveal.hold(getRevealConfig());
 			const off = engine.onRender(() => {
 				// every engine frame re-emits labels: keep the previous array when nothing changed, so React
@@ -439,7 +447,12 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				const saved = loadSavedPose(photo.id);
 				const moved = eyeMoveRef.current;
 				let startVerify: (() => void) | null = null;
-				if (moved) {
+				const carried = carryRef.current;
+				carryRef.current = null;
+				if (carried) {
+					setPose(carried.pose, false);
+					setAlignState(carried.align);
+				} else if (moved) {
 					setPose(moved.pose, false);
 					setAlignState("manual");
 					// a pose the person chose: a verdict from an earlier (aborted) second opinion no longer applies
@@ -614,7 +627,9 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		(rendererFallback
 			? Promise.resolve<RendererChoice>({
 					renderer: "deck",
-					reason: `fallback: ${rendererFallback}`,
+					reason: rendererFallback.startsWith("device-lost")
+						? rendererFallback
+						: `fallback: ${rendererFallback}`,
 				})
 			: resolveRenderer()
 		)
@@ -646,6 +661,32 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 						}
 					}
 					setRendererUsed(choice);
+					if (choice.renderer === "webgpu") {
+						// mid-session: the device is lost and the engine could not rebuild (or keeps losing it).
+						// Reuse the init fallback: dispose, re-mount a fresh canvas, run WebGL deck on the same state.
+						const w = engine as WebGpuEngine;
+						w.onUnrecoverable = (why) => {
+							if (cancelled || engineRef.current !== engine) return;
+							const msg = `device-lost: ${why}`;
+							console.warn(
+								`[renderer] WebGPU ${msg}; switching to WebGL deck (photo, pose and settings kept)`,
+							);
+							carryRef.current = {
+								pose: { ...engine.pose },
+								align: alignStateRef.current,
+							};
+							// compute must not keep the dead adopted device: it re-creates its own or uses the CPU
+							import("#/lib/gpu/device")
+								.then((m) => m.resetComputeDevice())
+								.catch(() => {});
+							setStatus({ msg: "Switching to WebGL", frac: 0 });
+							setRendererFallback(msg);
+						};
+						window.__RIGI_FORCE_DEVICE_LOSS__ = (unrecoverable) =>
+							unrecoverable
+								? w.simulateUnrecoverableLoss()
+								: w.simulateDeviceLoss();
+					}
 					try {
 						stop = start(engine);
 						// the stage measure ran before the chunk arrived: PhotoEngine sizes itself only in resize(),
@@ -677,6 +718,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		return () => {
 			cancelled = true;
 			stop?.();
+			window.__RIGI_FORCE_DEVICE_LOSS__ = undefined;
 		};
 	}, [photo, setPose, loadSky, rendererFallback]);
 

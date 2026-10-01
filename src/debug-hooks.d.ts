@@ -12,6 +12,8 @@ declare global {
 		__engine?: Renderer;
 		__reveal?: RevealController;
 		__poseAtReady?: Pose;
+		/** /photo on WebGPU: destroy the device (the engine rebuilds); `true` skips the rebuild and switches to WebGL deck. */
+		__RIGI_FORCE_DEVICE_LOSS__?: (unrecoverable?: boolean) => void;
 		__secondOpinion?: unknown;
 		__eyeSearch?: unknown;
 		__nearfield?: unknown;
