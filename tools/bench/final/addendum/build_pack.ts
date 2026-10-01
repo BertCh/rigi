@@ -1,11 +1,12 @@
+import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { createCanvas, loadImage } from "/Users/robertchristie/Documents/GitHub/mt-image/node_modules/@napi-rs/canvas/index.js";
-import { prefetchPeaksBBox } from "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/harness/lib/geo";
-import { renderOverlay } from "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/harness/overlay";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
+import { prefetchPeaksBBox } from "../../harness/lib/geo";
+import { renderOverlay } from "../../harness/overlay";
 
-const REPO = "/Users/robertchristie/Documents/GitHub/mt-image";
+const REPO = fileURLToPath(new URL("../../../../", import.meta.url)).replace(/\/$/, "");
 const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), "pack");
 const PERTURB: Record<string, number> = { wc_0003: 3.0, wc_0038: 5.0 };
 const manifest = JSON.parse(fs.readFileSync(`${REPO}/tools/bench/data/manifest.json`, "utf8"));

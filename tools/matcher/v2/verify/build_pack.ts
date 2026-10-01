@@ -10,14 +10,15 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import {
-	createCanvas,
-	loadImage,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/node_modules/@napi-rs/canvas/index.js";
-import { prefetchPeaksBBox } from "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/harness/lib/geo";
-import { renderOverlay } from "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/harness/overlay";
+import { fileURLToPath } from "node:url";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
+import { prefetchPeaksBBox } from "../../../bench/harness/lib/geo";
+import { renderOverlay } from "../../../bench/harness/overlay";
 
-const REPO = "/Users/robertchristie/Documents/GitHub/mt-image";
+const REPO = fileURLToPath(new URL("../../../../", import.meta.url)).replace(
+	/\/$/,
+	"",
+);
 const [candFile, outDir] = process.argv.slice(2);
 const OUT = path.resolve(outDir);
 const PACK = path.join(OUT, "pack");

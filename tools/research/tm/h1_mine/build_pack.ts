@@ -15,14 +15,15 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import {
-	createCanvas,
-	loadImage,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/node_modules/@napi-rs/canvas/index.js";
+import { fileURLToPath } from "node:url";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { prefetchPeaksBBox } from "./harness/geo";
 import { renderOverlay } from "./harness/overlay";
 
-const REPO = "/Users/robertchristie/Documents/GitHub/mt-image";
+const REPO = fileURLToPath(new URL("../../../../", import.meta.url)).replace(
+	/\/$/,
+	"",
+);
 const [candFile, outDir, keyDir] = process.argv.slice(2);
 const OUT = path.resolve(outDir);
 const PACK = path.join(OUT, "pack");

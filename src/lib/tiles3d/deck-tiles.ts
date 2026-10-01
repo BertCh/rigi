@@ -1,7 +1,7 @@
-// deck/engine.ts's side of Step Inside 3D Tiles (three-tiles.ts's twin): owns the photo's Tiles3DSet,
+// deck/engine.ts's side of Step Inside 3D Tiles: owns the photo's Tiles3DSet,
 // refines it from the deck world camera (a THREE camera) while stepping and hands worldLayers() a
 // Tiles3DDeckLayer. Tile arrivals are coalesced to one layer update per animation frame. The tiles
-// renderer and its layer are imported only once ?tiles3d= is on (three-tiles.ts); an enter() before
+// renderer and its layer are imported only once ?tiles3d= is on; an enter() before
 // they arrive is replayed on arrival.
 import type * as THREE from "three";
 import type { PhotoRangeMap } from "../deck/terrain-layer";
@@ -103,7 +103,7 @@ export class DeckTiles3D {
 			photoFg: p.photoFg,
 			truth: p.truth ? PROVENANCE_TINT_MIX : 0,
 			truthColor: [d[0] / 255, d[1] / 255, d[2] / 255],
-			// Truth view: Google is not ours to label (three-tiles.ts); exports never carry it
+			// Truth view: Google is not ours to label; exports never carry it
 			hideDisplayOnly: p.truth || this.hidden,
 			camera: [p.camera.x, p.camera.y, p.camera.z],
 		});

@@ -57,9 +57,8 @@ const config = defineConfig({
 	ssr: { resolve: { conditions: [...WEBGL_ONLY, ...defaultServerConditions] } },
 	// gpu-core is imported lazily (src/lib/gpu/**): on a cold cache Vite would re-optimise on first import
 	// and load a second @luma.gl/core, which breaks graph destroy.
-	// three/webgpu + three/tsl likewise: a mid-page re-optimise loads a second three core and crashes TSL.
 	optimizeDeps: {
-		include: ["@luma.gl/gpgpu/gpu-core", "three/webgpu", "three/tsl"],
+		include: ["@luma.gl/gpgpu/gpu-core"],
 	},
 	server: {
 		// TM research and the test scripts write here constantly: watching it reloaded pages mid-test

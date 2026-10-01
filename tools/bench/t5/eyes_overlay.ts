@@ -1,10 +1,11 @@
 import fs from "node:fs";
-import { sceneAt } from "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/harness/lib/geo";
+import { fileURLToPath } from "node:url";
+import { sceneAt } from "../harness/lib/geo";
 
 const ids = process.argv.slice(2);
 const man = JSON.parse(
 	fs.readFileSync(
-		"/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/manifest.json",
+		fileURLToPath(new URL("../data/manifest.json", import.meta.url)),
 		"utf8",
 	),
 );

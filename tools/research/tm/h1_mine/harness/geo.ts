@@ -11,33 +11,27 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileHeights } from "/Users/robertchristie/Documents/GitHub/mt-image/scripts/lib/node-io";
-import { eyeHeight } from "/Users/robertchristie/Documents/GitHub/mt-image/scripts/lib/pipeline-node";
+import { fileHeights } from "../../../../../scripts/lib/node-io";
+import { eyeHeight } from "../../../../../scripts/lib/pipeline-node";
 import {
 	lonLatToTile,
 	MAPTERHORN,
 	type TerrainLevel,
 	type TileKey,
 	tileId,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/dem";
+} from "../../../../../src/lib/dem";
 import {
 	computeHorizon,
 	type HorizonProfile,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/horizon";
+} from "../../../../../src/lib/geo/horizon";
 import {
 	overpassPeaksQuery,
 	type Peak,
 	parseOverpassPeaks,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/peaks";
-import { TerrainSampler } from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/terrain";
-import {
-	distanceBearing,
-	EARTH_R,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geodesy";
-import {
-	OVERPASS,
-	overpass,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/overpass";
+} from "../../../../../src/lib/geo/peaks";
+import { TerrainSampler } from "../../../../../src/lib/geo/terrain";
+import { distanceBearing, EARTH_R } from "../../../../../src/lib/geodesy";
+import { OVERPASS, overpass } from "../../../../../src/lib/overpass";
 
 export const ROOT = path.resolve(import.meta.dirname, "../../../..");
 export const HARNESS = path.resolve(import.meta.dirname, "..");

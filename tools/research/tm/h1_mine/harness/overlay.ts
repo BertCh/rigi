@@ -18,17 +18,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createCanvas, loadImage, type SKRSContext2D } from "@napi-rs/canvas";
-import {
-	type Pose,
-	poseToCamera,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/camera";
+import { type Pose, poseToCamera } from "../../../../../src/lib/camera";
 import {
 	layoutPeakLabels,
 	type Peak,
 	type PeakView,
 	viewPeaks,
-} from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/peaks";
-import { projectSkylineRows } from "/Users/robertchristie/Documents/GitHub/mt-image/src/lib/geo/solve";
+} from "../../../../../src/lib/geo/peaks";
+import { projectSkylineRows } from "../../../../../src/lib/geo/solve";
 import { appEye, peaksAt, sceneAt } from "./geo";
 
 export interface OverlayOptions {
