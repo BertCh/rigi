@@ -4,6 +4,15 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Type system (2026-10-01)
+
+Review and open items: `reports/type-system-review-2026-10-01.md`.
+- `src/lib/ontology/domain.ts` (generated from the concept catalogue): one type per concept (`Photo`, `Orientation`, `Horizon`, `Skyline`, `PoseEstimate`, `PeakLabel`, …) bound to its canonical realization; CI `ontology` fails when it is stale.
+- One canonical `Vec3`, `Mat3`, `LatLon`, `SWNE`, `Size` and the new `ByteMask` replace 30+ local copies; `CascadeStage` and `HeightFn` are declared once.
+- Same-name exports renamed: `ExifPhotoMeta`, `SkylineSolveResult` / `GcpSolveResult`, `RefineConfidence`, `PeakLabelPx` / `BaselinePeakLabel`, `GeoJsonPeak` / `RidgelinePeakInput`, `FitParams` / `GcpParams`, `CompositeLookStyle`. Catalogued types must have unique names (CI `ontology`).
+- Storage keys are built with `storageKey()` everywhere (CI fails on a spelled-out registered key); `?style=` is read through `lib/flags`; the autoAlign and matcher-v0.1 bars go through `levelOf`.
+- `Renderer`: members both engines implement are required; the unimplemented `nearFieldSampleAt` is removed. 35 exports with no importer are module-local.
+
 ### Cleanup pass (2026-10-01)
 
 Inventory of removed, retained and refactored code: `reports/cleanup-2026-10-01.md`.

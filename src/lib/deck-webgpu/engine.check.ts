@@ -150,7 +150,7 @@ export async function runEngineCheck(o: EngineCheckOptions = {}) {
 		out.samples = { hits, of: pts.length, maxErrPx: +maxErrPx.toFixed(3) };
 		expect(hits > pts.length * 0.2, `sampleAt hits ${hits}/${pts.length}`);
 		expect(maxErrPx <= 1.5, `sample re-projection ${maxErrPx.toFixed(2)} px`);
-		const sky = engine.skyline?.();
+		const sky = engine.skyline();
 		out.skyline = sky
 			? { columns: sky.length, mid: sky[sky.length >> 1] }
 			: null;

@@ -12,6 +12,7 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | [code-review-2026-09-30.md](code-review-2026-09-30.md) | Code-health backlog from the 2026-09-30 whole-repo review: CR-01…CR-53 and CR-W1…W6 with file:line, failure and state. Set a row to `fixed <commit>` when you fix it (roadmap N7) |
 | [licences.md](licences.md) | Licence register (roadmap N2): every external data, tile, API and model source, and the decisions the owner still has to make. Summarised in `NOTICE.md` |
 | [cleanup-2026-10-01.md](cleanup-2026-10-01.md) | 2026-10-01 cleanup pass: inventory of what was removed, retained and refactored |
+| [type-system-review-2026-10-01.md](type-system-review-2026-10-01.md) | Repo-wide type review: the domain vocabulary (`src/lib/ontology/domain.ts`), what was consolidated, and the open items by value |
 | [ontology.md](ontology.md) (generated) · [ontology-design.md](ontology-design.md) | The Rigi ontology: every concept and its UI/code words, provenance axes, crosswalks from app unions, confidence scales, resolution policies, ids, storage keys, and semantic findings. Regenerate with `npx tsx scripts/ontology/doc.ts`; checked by CI `ontology` |
 
 ## Current references by thread

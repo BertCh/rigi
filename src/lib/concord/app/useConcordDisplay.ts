@@ -54,7 +54,7 @@ export function useConcordDisplay(
 			alignState,
 		});
 		// an occluder belongs to the pose it was computed at: drop it until this pose's pass lands
-		engine.setOccluder?.(null);
+		engine.setOccluder(null);
 		if (!confidence) return;
 		const ctl = new AbortController();
 		// let the final pose's frame and readback land first

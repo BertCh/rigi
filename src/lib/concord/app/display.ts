@@ -93,7 +93,7 @@ export async function runConcordDisplay(
 	const out: ConcordDisplayReport = { occl: null };
 	if (!flags.occl) return out;
 	if (isLowConfidence(confidence)) {
-		host.setOccluder?.(null);
+		host.setOccluder(null);
 		out.refused = "pose confidence LOW";
 		return out;
 	}
@@ -114,7 +114,7 @@ export async function runConcordDisplay(
 		});
 		if (signal?.aborted) return out;
 		if (!dsm) {
-			host.setOccluder?.(null);
+			host.setOccluder(null);
 			out.occl = {
 				applied: false,
 				dimmedFrac: 0,
@@ -139,7 +139,7 @@ export async function runConcordDisplay(
 				}
 			}
 			if (signal?.aborted) return out;
-			host.setOccluder?.(dim ? { width: ow, height: oh, data } : null);
+			host.setOccluder(dim ? { width: ow, height: oh, data } : null);
 			out.occl = {
 				applied: dim > 0,
 				dimmedFrac: terrain ? dim / terrain : 0,

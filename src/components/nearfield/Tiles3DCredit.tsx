@@ -18,8 +18,7 @@ export function Tiles3DCredit({
 			setText(null);
 			return;
 		}
-		const read = () =>
-			setText(engineRef.current?.tiles3dAttribution?.() ?? null);
+		const read = () => setText(engineRef.current?.tiles3dAttribution() ?? null);
 		read();
 		const t = window.setInterval(read, 1000);
 		return () => window.clearInterval(t);

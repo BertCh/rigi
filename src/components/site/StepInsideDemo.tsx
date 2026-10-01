@@ -174,7 +174,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 				frame: engine.frame,
 			};
 			scene.measure = { ...measure.buildMeasureGrid(scene, ctx), ...ctx };
-			engine.setNearField?.(scene, { maskDrape: true });
+			engine.setNearField(scene, { maskDrape: true });
 			engine.enterStepInside({
 				radius: scene.confidenceRadius,
 				pivotDist: baked.medianObjectRange

@@ -76,7 +76,7 @@ export class RevealController {
 	stop() {
 		cancelAnimationFrame(this.raf);
 		this.run++;
-		this.engine.setReveal?.(null);
+		this.engine.setReveal(null);
 		this.onFrame?.(null);
 	}
 
@@ -100,7 +100,7 @@ export class RevealController {
 					this.show(cfg, k);
 					this.raf = requestAnimationFrame(tick);
 				} else {
-					engine.setReveal?.(null);
+					engine.setReveal(null);
 					this.onFrame?.(null);
 					done();
 				}
@@ -156,7 +156,7 @@ export class RevealController {
 				cfg.reverse,
 			);
 		// uniforms() takes the ray basis from the current pose, so a drag mid-reveal stays consistent
-		engine.setReveal?.({ ...u, a: [t, u.a[1], u.a[2], u.a[3]] });
+		engine.setReveal({ ...u, a: [t, u.a[1], u.a[2], u.a[3]] });
 		this.onFrame?.({ p: frontAt(t, soft, grain), soft, fieldOf });
 	}
 

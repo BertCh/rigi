@@ -293,7 +293,7 @@ export function PhotoWorkspace({
 		skyFor.current.add(engine);
 		import("#/lib/sky")
 			.then((m) => m.segmentSky(img))
-			.then((mask) => engineRef.current === engine && engine.setSkyMask?.(mask))
+			.then((mask) => engineRef.current === engine && engine.setSkyMask(mask))
 			.catch((e) => console.warn("[sky] segmentation failed", e));
 	}, []);
 	// terroir label options (peakTiers / subPill / uncertainty): inert unless their style.terroir switch is on
@@ -481,7 +481,7 @@ export function PhotoWorkspace({
 			skylineRef.current = null;
 			// either engine arrives after an async import: give it the settings changed meanwhile
 			engine.setSettings(settingsRef.current);
-			engine.setStyle?.(styleRef.current);
+			engine.setStyle(styleRef.current);
 			// missing heading / gravity / focal: start the cascade's 360° terrain + horizon alongside the engine
 			const solver = engine.unknowns.any ? new UnknownPoseSolver(photo) : null;
 			unknownSolver.current = solver;
@@ -521,7 +521,7 @@ export function PhotoWorkspace({
 						: engine.peakLabels(100, { declutter: false });
 				// a fresh skyline re-runs the panorama / inline layout (it reads skylineRef) even when the
 				// labels themselves are unchanged
-				const sky = engine.skyline?.();
+				const sky = engine.skyline();
 				const skyNew = !!sky && sky !== skylineRef.current;
 				if (sky) skylineRef.current = sky;
 				setLabels((prev) => (!skyNew && sameRecords(prev, next) ? prev : next));
@@ -845,8 +845,7 @@ export function PhotoWorkspace({
 			.then((m) => m.fetchRegionTrails(photo.region, { signal: ctl.signal }))
 			.then((trails) => {
 				// an engine still initialising keeps them until its region arrives
-				if (trails && !ctl.signal.aborted)
-					engineRef.current?.setTrails?.(trails);
+				if (trails && !ctl.signal.aborted) engineRef.current?.setTrails(trails);
 			})
 			.catch((e) => {
 				if (!ctl.signal.aborted) console.warn("[trails]", e);
@@ -856,7 +855,7 @@ export function PhotoWorkspace({
 
 	// the engine re-renders (and re-emits labels) on a style change
 	useEffect(() => {
-		engineRef.current?.setStyle?.(viewStyle);
+		engineRef.current?.setStyle(viewStyle);
 		loadSky(engineRef.current);
 	}, [viewStyle, loadSky]);
 

@@ -21,7 +21,6 @@ import type { AlignResult, Pin } from "./align";
 import type { Pose } from "./camera";
 import type { EnuFrame } from "./geodesy";
 import type { Unknowns } from "./integration/unknown-pose";
-import type { NearFieldSample } from "./nearfield/measure";
 import type { NearFieldScene, NearFieldViewOpts } from "./nearfield/types";
 import type { ByteMask } from "./ontology/core/geometry";
 import type { PhotoMeta, RegionData, RegionTrail } from "./photos";
@@ -37,7 +36,7 @@ export type FgMask = ByteMask;
 
 export interface Renderer {
 	/** 'deck' for both engines (WebGpuEngine adds backend 'webgpu'). */
-	readonly kind?: "deck";
+	readonly kind: "deck";
 
 	// ---- identity & camera (PW, export) ----
 	readonly photo: PhotoMeta;
@@ -73,32 +72,30 @@ export interface Renderer {
 	setPose(p: Pose): void;
 	setSettings(s: Partial<Settings>): void;
 	/** How the views look (src/lib/style). Both engines implement it; optional for other Renderer shapes. */
-	setStyle?(s: ViewStyle): void;
+	setStyle(s: ViewStyle): void;
 	/** The photo's P(sky) (#/lib/sky segmentSky, row 0 = top), for the fitted haze. Both engines. */
-	setSkyMask?(m: FgMask | null): void;
+	setSkyMask(m: FgMask | null): void;
 	/** Step Inside 3D Tiles (src/lib/tiles3d, ?tiles3d=): the on-screen credit line while stepping, or null. */
-	tiles3dAttribution?(): string | null;
+	tiles3dAttribution(): string | null;
 	/**
 	 * Terroir land cover (src/lib/terroir, reports/terroir-cartography.md): the pack's class grid for
 	 * style.terroir.cover / contours.inkByCover; null = off (bit-identical to before). Display-only.
 	 */
-	setTerroirCover?(grid: import("./terroir/pack").CoverGrid | null): void;
+	setTerroirCover(grid: import("./terroir/pack").CoverGrid | null): void;
 	/** Replace the region's hiking paths (loaded on demand when the trails layer is switched on). */
-	setTrails?(trails: RegionTrail[]): void;
+	setTrails(trails: RegionTrail[]): void;
 	/** One frame of the overlay reveal (src/lib/reveal); null = off (the classic composite, untouched). */
-	setReveal?(r: RevealUniforms | null): void;
+	setReveal(r: RevealUniforms | null): void;
 	/**
 	 * concord DSM occluder (?concord=occl, src/lib/concord/occl): photo-space dim mask, row 0 = top,
 	 * 255 = dim the overlay there; null = off (bit-identical composite). Display-only.
 	 */
-	setOccluder?(m: FgMask | null): void;
+	setOccluder(m: FgMask | null): void;
 	/**
 	 * Step Inside (src/lib/nearfield): show a near-field scene (null = remove). Splats draw in the world
 	 * view / step-inside camera (deck: also the photo view); the world drape skips the scene's Object pixels.
 	 */
-	setNearField?(scene: NearFieldScene | null, opts?: NearFieldViewOpts): void;
-	/** Near-field object under normalised photo coords (Object pixels of the shown scene), else null. */
-	nearFieldSampleAt?(u: number, v: number): NearFieldSample | null;
+	setNearField(scene: NearFieldScene | null, opts?: NearFieldViewOpts): void;
 
 	// ---- queries ----
 	/** Resolves true once sampleAt / peakLabels describe the current pose (false if disposed first). */
@@ -120,7 +117,7 @@ export interface Renderer {
 	/** Ranked visible peaks; `declutter: false` skips the classic declutter (panorama / inline layouts). */
 	peakLabels(max?: number, opts?: { declutter?: boolean }): PeakLabel[];
 	/** Per-column skyline of the fresh geometry buffer (fraction of the height from the top), else null. */
-	skyline?(): Float32Array | null;
+	skyline(): Float32Array | null;
 	peaksInFrame(): PeakLabel[];
 
 	// ---- alignment ----
