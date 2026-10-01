@@ -605,28 +605,36 @@ export const GPU_MODULES: readonly GpuModule[] = [
 	{
 		id: "look-haze",
 		island: "I9",
-		paths: ["src/lib/gpu/look/haze-graph.ts"],
+		paths: [
+			"src/lib/gpu/look/haze-graph.ts",
+			"src/lib/gpu/look/haze-band.ts",
+			"src/lib/gpu/look/haze-argmin.ts",
+		],
 		groups: [
 			"look-haze-prep",
 			"look-haze-compact",
 			"look-haze-gather",
 			"look-haze-grid",
+			"look-haze-band",
+			"look-haze-argmin",
 		],
 		realms: ["page"],
 		cadence: "per settle",
 		resources: [
 			"range, pSky, photo, fg mask (pooled imports)",
 			"lin, flags, bins, hist (transients)",
+			"arg-min program: luma GPUProgram scalar arena (gMin, tol, count, over) + pick (transients)",
 		],
 		readbacks: [
 			"prep head: counts + selection state",
 			"compact head: counts",
-			"gather sky: 3·K·4 B",
-			"grid err: cells·4 B",
+			"gather sky: 3·K·4 B (CPU band only)",
+			"grid: 16 B + 256 candidate pairs (2 KiB; arg-min program, default) or err cells·4 B (?hazeArgminGpu=off)",
+			"band head (default on the texture path; ?hazeBandGpu=off = CPU band): lists + their range, band counts / K / idx / lin, 8 spot columns (no range / P(sky) planes)",
 		],
 		status: "default",
 		notes:
-			"graph breaks for the f64 airlight band / tail on the CPU (D16, D18)",
+			"graph break for the f64 tail on the CPU (D18; the round trip before the grid is inherent: its inputs come from f64 code). Default: the airlight band on the GPU on the texture path (look-haze-band, one submit instead of two; D16 removed; ?hazeBandGpu=off, WebGL / ?gpu=off / spot-check fault = CPU band) and the grid arg-min as a luma GPUProgram with a GPU indirect-gated selection (look-haze-argmin; ?hazeArgminGpu=off or a per-call check fault = whole-grid read)",
 	},
 	{
 		id: "look-relief",

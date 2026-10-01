@@ -102,6 +102,22 @@ export const FLAG_SCHEMA = {
 	 * compares, the CPU deciding only what the bound cannot. Precision gate: no quality difference found
 	 */
 	alignPrecision: oneOf(["f64", "certified-f32"], "certified-f32"),
+	/**
+	 * The fitted haze's airlight band on the GPU (WAG haze-graph, src/lib/gpu/look/haze-band.ts): on
+	 * (default since 2026-10-01) = the WebGPU texture path's fit runs compaction, band and gathers as
+	 * one submit and reads no range / P(sky) planes back (integer work, same fit bit for bit,
+	 * spot-checked per call); off = the CPU band between two submits. WebGL, ?gpu=off and a device or
+	 * spot-check fault use the CPU band.
+	 */
+	hazeBandGpu: onOff("on"),
+	/**
+	 * The haze grid's arg-min on the GPU (WAG haze-graph, src/lib/gpu/look/haze-argmin.ts, a luma
+	 * GPUProgram with a GPU-gated selection): on (default since 2026-10-01) = only the grid minimum and
+	 * at most 256 candidate cells come back, the CPU re-applies its exact test (same fit bit for bit,
+	 * checked per call); off = the whole 5 550-cell grid is read back. A compile fault or failed check
+	 * turns it off for the device.
+	 */
+	hazeArgminGpu: onOff("on"),
 	// Step Inside 3D Tiles (src/lib/tiles3d)
 	tiles3d: oneOf(["off", "buildings", "swisstopo", "google", "all"], "off"),
 	tiles3dBlend: oneOf(["fill", "over"], "fill"),

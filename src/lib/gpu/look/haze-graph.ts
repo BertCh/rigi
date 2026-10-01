@@ -13,7 +13,8 @@
 //   → cnt → offs (GPUScan, exclusive) → starts → scatter             72-list stable compaction
 //   → gather                                                         the airlight band's lin
 //   → read node "head": counts, state, starts, the lists' first `head` slots, the band's lin
-// Submit 2 (one graph, group "look-haze-grid"): grid → read node "err" (5 550 floats).
+// Submit 2 (one graph, group "look-haze-grid"): grid → read node "err" (5 550 floats); by default the
+//   arg-min program instead (group "look-haze-argmin", see below), read node "pick" (2 KiB).
 // Between them the CPU middle stage and after submit 2 the arg-min + refinement run in f64 on the CPU,
 // unchanged (haze.ts hazeFitTail): the round trip is inherent (the grid's inputs come from f64 code).
 //
@@ -38,6 +39,18 @@
 //   (haze.ts hazeFitTail): `e < gMin` / `e <= tol` are false for NaN, so NaN cells are never
 //   candidates (all NaN: no candidate, the default start), as before.
 //
+// fitHazeFromPrep / prepAndFitHazeTex (the WebGPU engine's texture path) run the compaction on
+// textures.ts's prep ("look-haze-compact", read node "head" with the range / P(sky) planes), the CPU
+// airlight band, then "look-haze-gather" when ?hazeBandGpu=off (or the GPU band is unusable: a short
+// band, a failed spot check). By default (since 2026-10-01) the band runs on the GPU instead: one graph
+// "look-haze-band" (compaction + ./haze-band.ts's band, lin and list-range gathers and spot columns),
+// one read, no planes; same fit bit for bit, spot-checked per call.
+//
+// Submit 2 by default runs the grid's arg-min too, as a luma GPUProgram (./haze-argmin.ts, group
+// "look-haze-argmin", ?hazeArgminGpu): only the minimum and ≤ 256 candidate cells come back, the CPU
+// re-applies its exact test (same candidates, same fit). The selection past 256 candidates is a
+// GPU-indirect-gated node (the program's GPUConditionalOperation).
+//
 // The first read (head) holds `head` list slots; lists longer than that need a second, exact-length
 // read (one more round trip). The head is adaptive: the last run's list total per device (as a
 // fraction of N) × 1.5 + 1 024 (the look photos' totals span 0.050–0.070·N, so a switch between
@@ -46,13 +59,22 @@
 // trips end in CPU reads whose sizes are CPU-side (WebGPU copy sizes), and every GPU consumer's
 // dispatch size is already known on the CPU.
 import { Buffer, type Device, Texture } from "@luma.gl/core";
+import { getFlag } from "#/lib/flags";
 import type { Vec3 } from "../../look/atmosphere";
 import type { HazeFit, HazeFitInput } from "../../look/haze-fit";
-import { type CachedGraph, cachedGraph, type GraphRange } from "../core/graph";
-import type { GraphBufferHandle } from "../core/luma";
+import {
+	type CachedGraph,
+	type ComputeGraph,
+	cachedGraph,
+	type GraphRange,
+} from "../core/graph";
+import { GPUScan, type GraphBufferHandle } from "../core/luma";
 import {
 	addListOffsets,
 	airlightBand,
+	bandLength,
+	GRID_CELLS,
+	type GridPick,
 	gridUploads,
 	HM_PRIOR,
 	hazeFitTail,
@@ -75,6 +97,21 @@ import {
 	statOf,
 } from "./haze";
 import { BLOCK, BUCKETS, LISTS, SEL } from "./haze.wgsl";
+import { buildArgminProgram, decodePick } from "./haze-argmin";
+import {
+	bandShape,
+	bandWords,
+	K_HZB_COUNT,
+	K_HZB_GATHER,
+	K_HZB_RANGE,
+	K_HZB_SCATTER,
+	K_HZB_SPOT,
+	K_HZB_TOTAL,
+	pickSpotColumns,
+	RANGE_GROUP,
+	SPOT_COLUMNS,
+	verifyBand,
+} from "./haze-band";
 import {
 	pooledStorage,
 	pooledUniform,
@@ -106,6 +143,12 @@ export const hazeGraphStats: {
 	ms?: { upload: number; run: number };
 	/** compiled stats of the last prep graph: logical vs physical transient bytes */
 	transientBytes?: { logical: number; physical: number };
+	/**
+	 * fitHazeFromPrep's airlight band: "cpu" (range / P(sky) read back, haze.ts airlightBand),
+	 * "gpu" (./haze-band.ts, one submit), "gpu-short" (GPU band under 20 pixels: the CPU band's
+	 * fallback ran), "gpu-failed" (the spot check failed: the CPU band ran, the GPU band is off)
+	 */
+	band?: "cpu" | "gpu" | "gpu-short" | "gpu-failed";
 } = { head: 0, total: 0, tail: false, cacheHit: false };
 
 // ---------- adaptive first-read length ----------
@@ -133,19 +176,26 @@ function joinLists(
 	guess: number,
 	total: number,
 ) {
-	let idx = new Uint32Array(head[0]);
-	let val = new Float32Array(head[1]);
-	if (tail) {
-		const i2 = new Uint32Array(total);
-		i2.set(idx);
-		i2.set(new Uint32Array(tail[0]), guess);
-		const v2 = new Float32Array(total);
-		v2.set(val);
-		v2.set(new Float32Array(tail[1]), guess);
-		idx = i2;
-		val = v2;
-	}
-	return { idx, val };
+	return {
+		idx: joinWords(Uint32Array, head[0], tail?.[0], guess, total),
+		val: joinWords(Float32Array, head[1], tail?.[1], guess, total),
+	};
+}
+
+/** One list array: the head read's words, then (when it overflowed) the tail read's from `guess`. */
+function joinWords<A extends Uint32Array | Float32Array>(
+	Kind: { new (b: ArrayBuffer | number): A },
+	head: ArrayBuffer,
+	tail: ArrayBuffer | undefined,
+	guess: number,
+	total: number,
+): A {
+	const a = new Kind(head);
+	if (!tail) return a;
+	const out = new Kind(total);
+	out.set(a);
+	out.set(new Kind(tail), guess);
+	return out;
 }
 
 // ---------- submit 1 ----------
@@ -405,27 +455,32 @@ export function prepGraph(
 
 type GridParams = { cells: number; repsBytes: number; S: number };
 
+/** The grid kernel and its imports on `g`; returns its output `err` (GRID_CELLS f32, a transient). */
+function addGrid(g: ComputeGraph<GridParams>) {
+	const imp = (id: string) => g.importBuffer(id, 4, undefined, STORAGE);
+	const prm = g.importBuffer("gprm", 64, undefined, UNIFORM);
+	const reps = at<GridParams>(imp("reps"), (p) => p.repsBytes);
+	const repOff = at<GridParams>(imp("repOff"), (p) => 3 * p.S * 8);
+	const Iw = at<GridParams>(imp("Iw"), (p) => 3 * p.S * 8);
+	const hmPrior = at<GridParams>(imp("hmPrior"), () => HM_PRIOR.byteLength);
+	// every cell is written (no clear needed)
+	const err = g.transientBuffer("err", GRID_CELLS * 4);
+	g.addKernel({
+		id: "grid",
+		spec: K_HZ_GRID,
+		bindings: { prm, reps, repOff, Iw, hmPrior, err },
+		workgroups: [Math.ceil(GRID_CELLS / 64)],
+	});
+	return err;
+}
+
 function gridGraphFor(device: Device): CachedGraph<GridParams, undefined> {
 	return cachedGraph<GridParams, undefined>(
 		device,
 		"look-haze-grid",
 		"grid",
 		(g) => {
-			const imp = (id: string) => g.importBuffer(id, 4, undefined, STORAGE);
-			const prm = g.importBuffer("gprm", 64, undefined, UNIFORM);
-			const reps = at<GridParams>(imp("reps"), (p) => p.repsBytes);
-			const repOff = at<GridParams>(imp("repOff"), (p) => 3 * p.S * 8);
-			const Iw = at<GridParams>(imp("Iw"), (p) => 3 * p.S * 8);
-			const hmPrior = at<GridParams>(imp("hmPrior"), () => HM_PRIOR.byteLength);
-			const cells = HM_PRIOR.length * 25 * 37;
-			// every cell is written (no clear needed)
-			const err = g.transientBuffer("err", cells * 4);
-			g.addKernel({
-				id: "grid",
-				spec: K_HZ_GRID,
-				bindings: { prm, reps, repOff, Iw, hmPrior, err },
-				workgroups: (p) => [Math.ceil(p.cells / 64)],
-			});
+			const err = addGrid(g);
 			g.readNode("err", [{ buffer: err, size: (p) => p.cells * 4 }]);
 			return undefined;
 		},
@@ -433,7 +488,35 @@ function gridGraphFor(device: Device): CachedGraph<GridParams, undefined> {
 	);
 }
 
-/** Submit 2: the physical grid's cost per cell (a GridFn, ./haze.ts). */
+/** The grid + its arg-min as a luma GPUProgram (./haze-argmin.ts), group "look-haze-argmin". */
+function gridPickGraphFor(device: Device): CachedGraph<GridParams, undefined> {
+	return cachedGraph<GridParams, undefined>(
+		device,
+		"look-haze-argmin",
+		"grid",
+		() => undefined,
+		1,
+		(id) => buildArgminProgram<GridParams>(device, id, addGrid),
+	);
+}
+
+/** Devices whose GPU arg-min failed (compile fault or per-call check): whole-grid reads from then on. */
+const pickFailed = new WeakSet<Device>();
+
+/** What the last gridGraph call did: "pick" (the arg-min program), "grid" (whole grid read). */
+export const hazeArgminStats: {
+	last?: "pick" | "grid";
+	/** cells within the pick's superset tolerance (the last pick) */
+	count?: number;
+	/** why the program is off on the last device, if it failed */
+	failed?: string;
+} = {};
+
+/**
+ * Submit 2: the physical grid (a GridFn, ./haze.ts). By default (?hazeArgminGpu, `opts.pick`) its
+ * arg-min runs on the GPU too (./haze-argmin.ts, a luma GPUProgram) and only the candidates come
+ * back (a GridPick: the same candidates, haze.ts gridCandidates); else the whole grid.
+ */
 export function gridGraph(
 	device: Device,
 	reps: Float64Array[][],
@@ -443,7 +526,8 @@ export function gridGraph(
 	lam: number,
 	jBar: number,
 	priorK: number,
-): Promise<Float32Array> {
+	opts: { pick?: boolean } = {},
+): Promise<Float32Array | GridPick> {
 	const { flat, off, iw, words, cells } = gridUploads(
 		reps,
 		Ic,
@@ -462,12 +546,39 @@ export function gridGraph(
 			Iw: pooledStorage(device, key("Iw"), iw),
 			hmPrior: pooledStorage(device, key("hmPrior"), HM_PRIOR),
 		};
+		const params = { cells, repsBytes: flat.byteLength, S: Ic[0].length };
+		if (
+			cells === GRID_CELLS &&
+			!pickFailed.has(device) &&
+			(opts.pick ?? getFlag("hazeArgminGpu") === "on")
+		) {
+			let why = "";
+			try {
+				const e = gridPickGraphFor(device);
+				await e.graph.compileAsync();
+				const { reads } = await e.graph.run(params, { buffers });
+				const pick = decodePick(reads.pick[0], reads.pick[1]);
+				if (pick) {
+					hazeArgminStats.last = "pick";
+					hazeArgminStats.count = pick.count;
+					return pick;
+				}
+				why = "per-call check failed";
+			} catch (err) {
+				if (device.isLost) throw err;
+				why = String((err as Error)?.message ?? err).slice(0, 200);
+			}
+			// runtime guard: a broken program would silently change the haze fit's start
+			pickFailed.add(device);
+			hazeArgminStats.failed = why;
+			console.warn(
+				`[haze-graph] GPU grid arg-min off on this device (${why}); reading the whole grid`,
+			);
+		}
 		const e = gridGraphFor(device);
 		await e.graph.compileAsync();
-		const { reads } = await e.graph.run(
-			{ cells, repsBytes: flat.byteLength, S: Ic[0].length },
-			{ buffers },
-		);
+		const { reads } = await e.graph.run(params, { buffers });
+		hazeArgminStats.last = "grid";
 		return new Float32Array(reads.err[0]);
 	});
 }
@@ -664,6 +775,9 @@ function fitGpuPart(
 		const range = new Float32Array(rg);
 		const pSky = new Float32Array(ps);
 		const skyIdx = airlightBand(range, pSky, W, H);
+		// a short GPU band sent this device here: back to the GPU band once a band is long again
+		if (bandShort.get(device))
+			bandShort.set(device, bandLength(range, pSky, W, H) < 20);
 		const K = skyIdx.length;
 		// submit 2: the band's lin, plus the lists' tail on the same encoder
 		const rest = total > head ? (total - head) * 4 : 0;
@@ -734,6 +848,308 @@ function fitGpuPart(
 	});
 }
 
+// ---------- the airlight band on the GPU (default on the texture path, ./haze-band.ts) ----------
+
+type BandParams = { N: number; nBlk: number; head: number };
+
+/**
+ * compactGraphFor's compaction plus the airlight band, its lin gather, the lists' range gather and
+ * the spot columns, in one graph per W × H (group "look-haze-band"), one read node. Integer work
+ * only (./haze-band.wgsl.ts); every dispatch and read size is CPU-side.
+ */
+function bandGraphFor(
+	device: Device,
+	W: number,
+	H: number,
+): CachedGraph<BandParams, undefined> {
+	return cachedGraph<BandParams, undefined>(
+		device,
+		"look-haze-band",
+		`${W}x${H}`,
+		(g) => {
+			const N = W * H;
+			const nBlk = Math.ceil(N / BLOCK);
+			const { nCol, kMax } = bandShape(W, H);
+			const cprm = g.importBuffer("cprm", 16, undefined, UNIFORM);
+			const bprm = g.importBuffer("bprm", 32, undefined, UNIFORM);
+			const pin = (id: string, bytes: (p: BandParams) => number) =>
+				at<BandParams>(g.importBuffer(id, 4, undefined, PREP_IN), bytes);
+			const lin = pin("lin", (p) => p.N * 12);
+			const bins = pin("bins", (p) => p.N * 4);
+			const state = pin("state", () => SEL * 8);
+			const range = pin("range", (p) => p.N * 4);
+			const psky = pin("pSky", (p) => p.N * 4);
+			const imp = (id: string) => g.importBuffer(id, 4, undefined, STORAGE);
+			const outIdxH = imp("outIdx");
+			const outValH = imp("outVal");
+			const outRangeH = imp("outRange");
+			const bandIdxH = imp("bandIdx");
+			const bandLinH = imp("bandLin");
+			const outIdx = at<BandParams>(outIdxH, (p) => 3 * p.N * 4);
+			const outVal = at<BandParams>(outValH, (p) => 3 * p.N * 4);
+			const outRange = at<BandParams>(outRangeH, (p) => 3 * p.N * 4);
+			const bandIdx = at<BandParams>(bandIdxH, () => kMax * 4);
+			const bandLin = at<BandParams>(bandLinH, () => 3 * kMax * 4);
+			const cols = at<BandParams>(imp("cols"), () => SPOT_COLUMNS * 4);
+			const blk = g.transientBuffer("blk", nBlk * LISTS * 4);
+			const offs = g.transientBuffer("offs", nBlk * LISTS * 4);
+			const starts = g.transientBuffer("starts", (LISTS + 1) * 4);
+			const top = g.transientBuffer("top", nCol * 4);
+			const cnt = g.transientBuffer("bandCnt", nCol * 4);
+			const off = g.transientBuffer("bandOff", nCol * 4);
+			const total = g.transientBuffer("bandK", 4);
+			const spot = g.transientBuffer("spot", SPOT_COLUMNS * H * 8);
+			const blkGroups: [number] = [Math.ceil(nBlk / 64)];
+			const colGroups: [number] = [Math.ceil(nCol / 64)];
+			g.addKernel({
+				id: "cnt",
+				spec: K_HZ_CNT,
+				bindings: { prm: cprm, bins, lin, state, blk },
+				workgroups: blkGroups,
+			});
+			addListOffsets(g, { cprm, blk, offs, starts }, nBlk);
+			g.addKernel({
+				id: "scatter",
+				spec: K_HZ_SCATTER,
+				bindings: { prm: cprm, bins, lin, state, offs, outIdx, outVal },
+				workgroups: blkGroups,
+				writes: { outIdx: "full", outVal: "full" },
+			});
+			g.addKernel({
+				id: "list-range",
+				spec: K_HZB_RANGE,
+				bindings: { starts, outIdx, range, outRange },
+				// only [0, total) is written and read
+				workgroups: [Math.ceil((3 * N) / RANGE_GROUP)],
+				writes: { outRange: "full" },
+			});
+			g.addKernel({
+				id: "band-count",
+				spec: K_HZB_COUNT,
+				bindings: { prm: bprm, range, psky, top, cnt },
+				workgroups: colGroups,
+			});
+			g.add(
+				new GPUScan({
+					id: "band-off",
+					input: g.view(cnt, "uint32", nCol),
+					output: g.view(off, "uint32", nCol),
+					mode: "exclusive",
+				}),
+			);
+			g.addKernel({
+				id: "band-total",
+				spec: K_HZB_TOTAL,
+				bindings: { prm: bprm, cnt, off, total },
+				workgroups: [1],
+			});
+			g.addKernel({
+				id: "band-scatter",
+				spec: K_HZB_SCATTER,
+				bindings: { prm: bprm, range, psky, top, off, bandIdx },
+				workgroups: colGroups,
+				// [0, K) is written; the CPU reads [0, K) only
+				writes: { bandIdx: "full" },
+			});
+			g.addKernel({
+				id: "band-gather",
+				spec: K_HZB_GATHER,
+				bindings: { total, bandIdx, lin, bandLin },
+				workgroups: [Math.ceil(kMax / 64)],
+				writes: { bandLin: "full" },
+			});
+			g.addKernel({
+				id: "band-spot",
+				spec: K_HZB_SPOT,
+				bindings: { prm: bprm, cols, range, psky, spot },
+				workgroups: [Math.ceil((SPOT_COLUMNS * H) / 64)],
+			});
+			g.readNode("head", [
+				{
+					buffer: g.importBuffer("counts", 4, undefined, PREP_IN),
+					size: NBINS * 4,
+				},
+				state,
+				starts,
+				{ buffer: outIdxH, size: (p) => p.head * 4 },
+				{ buffer: outValH, size: (p) => p.head * 4 },
+				{ buffer: outRangeH, size: (p) => p.head * 4 },
+				cnt,
+				total,
+				{ buffer: bandIdxH, size: kMax * 4 },
+				{ buffer: bandLinH, size: 3 * kMax * 4 },
+				spot,
+			]);
+			return undefined;
+		},
+		MAX_SHAPES,
+	);
+}
+
+/** Devices whose GPU band failed its spot check (they take the CPU band from then on). */
+const bandFailed = new WeakSet<Device>();
+/** The device's last GPU band was under 20 pixels: take the CPU band until a band is long again. */
+const bandShort = new WeakMap<Device, boolean>();
+
+/**
+ * fitHazeFromPrep's band choice: the option, else ?hazeBandGpu; never after a failed spot check,
+ * nor while the last band was short, nor past hzb-range's 1-D dispatch limit.
+ */
+function chooseBandGpu(device: Device, N: number, opt: boolean | undefined) {
+	if (bandFailed.has(device)) return false;
+	if (!(opt ?? getFlag("hazeBandGpu") === "on")) return false;
+	if (Math.ceil((3 * N) / RANGE_GROUP) > 65535) return false;
+	return !bandShort.get(device);
+}
+
+/**
+ * fitGpuPart with the airlight band on the GPU: one submit, no range / P(sky) planes read back.
+ * Resolves null (nothing usable: the caller runs fitGpuPart, the CPU band) when the band has under
+ * 20 pixels (airlightBand's fallback needs the whole range plane) or fails its spot check. The
+ * caller holds PREP_LEASE; this takes "look-haze".
+ */
+function fitGpuPartBand(
+	device: Device,
+	prep: HazePrepResult,
+	listHead: number | undefined,
+): Promise<FitGpu | null> {
+	const { W, H } = prep;
+	const N = W * H;
+	const nBlk = Math.ceil(N / BLOCK);
+	const { kMax } = bandShape(W, H);
+	const pb = prep.buffers;
+	return withLease("look-haze", async () => {
+		checkPrep(device, prep);
+		const key = (k: string) => `look-haze/b/${k}`;
+		const head = headFor(device, N, listHead);
+		const out = (k: string, bytes: number) =>
+			pooledStorage(device, key(k), bytes, { zero: false });
+		const cols = pickSpotColumns(W);
+		const buffers = {
+			cprm: pooledUniform(
+				device,
+				key("cprm"),
+				new Uint32Array([N, nBlk, 0, 0]),
+			),
+			bprm: pooledUniform(device, key("bprm"), bandWords(W, H)),
+			lin: pb.lin,
+			bins: pb.bins,
+			state: pb.state,
+			counts: pb.counts,
+			range: pb.range,
+			pSky: pb.pSky,
+			outIdx: out("outIdx", 3 * N * 4),
+			outVal: out("outVal", 3 * N * 4),
+			outRange: out("outRange", 3 * N * 4),
+			bandIdx: out("bandIdx", kMax * 4),
+			bandLin: out("bandLin", 3 * kMax * 4),
+			cols: pooledStorage(device, key("cols"), cols),
+		};
+		const e = bandGraphFor(device, W, H);
+		await e.graph.compileAsync();
+		const r1 = await e.graph.run({ N, nBlk, head }, { buffers });
+		const [cnt0, s, st0, hi, hv, hr, bc, bk, bi, bl, sp] = r1.reads.head;
+		const st = new Uint32Array(st0);
+		const total = st[LISTS];
+		noteTotal(device, N, total);
+		const K = new Uint32Array(bk)[0];
+		const bandCnt = new Uint32Array(bc);
+		const bandIdx = new Uint32Array(bi);
+		const failure = verifyBand(
+			W,
+			H,
+			bandCnt,
+			K,
+			bandIdx,
+			cols,
+			new Uint32Array(sp),
+		);
+		if (failure) {
+			bandFailed.add(device);
+			hazeGraphStats.band = "gpu-failed";
+			// runtime guard: a wrong band would silently change the airlight
+			console.warn(
+				`[haze-graph] GPU airlight band failed its spot check (${failure}); the CPU band takes over on this device`,
+			);
+			return null;
+		}
+		if (K < 20) {
+			bandShort.set(device, true);
+			hazeGraphStats.band = "gpu-short";
+			return null;
+		}
+		const rest = total > head ? (total - head) * 4 : 0;
+		const tail = rest
+			? await readBack(
+					device,
+					() => {},
+					[
+						{ buffer: buffers.outIdx, offset: head * 4, size: rest },
+						{ buffer: buffers.outVal, offset: head * 4, size: rest },
+						{ buffer: buffers.outRange, offset: head * 4, size: rest },
+					],
+					{ id: "look-haze-band-tail" },
+				)
+			: null;
+		const idx = joinWords(Uint32Array, hi, tail?.[0], head, total);
+		const val = joinWords(Float32Array, hv, tail?.[1], head, total);
+		const rng = joinWords(Float32Array, hr, tail?.[2], head, total);
+		const t1 = performance.now();
+		const lists: Prep = {
+			counts: new Uint32Array(cnt0),
+			stat: statOf(s),
+			sky: new Float32Array(bl, 0, 3 * K),
+			list: (L: number) => ({
+				idx: idx.subarray(st[L], st[L + 1]),
+				val: val.subarray(st[L], st[L + 1]),
+				range: rng.subarray(st[L], st[L + 1]),
+			}),
+			bytes:
+				NBINS * 4 +
+				SEL * 8 +
+				(LISTS + 1) * 4 +
+				head * 12 +
+				bandCnt.byteLength +
+				4 +
+				16 * kMax +
+				SPOT_COLUMNS * H * 8 +
+				3 * rest,
+			tail: rest > 0,
+		};
+		Object.assign(hazeGraphStats, {
+			head,
+			total,
+			tail: rest > 0,
+			cacheHit: !!e.hit,
+			band: "gpu",
+		});
+		return {
+			lists,
+			// the tail reads range through the lists (bit for bit range[idx])
+			range: new Float32Array(0),
+			skyIdx: bandIdx.subarray(0, K),
+			t1,
+		};
+	});
+}
+
+/** The fit's GPU part: the GPU band when chosen and usable, else the CPU band (fitGpuPart). */
+async function fitGpuPartAuto(
+	device: Device,
+	prep: HazePrepResult,
+	opts: { listHead?: number; bandGpu?: boolean },
+): Promise<FitGpu> {
+	let band: typeof hazeGraphStats.band = "cpu";
+	if (chooseBandGpu(device, prep.W * prep.H, opts.bandGpu)) {
+		const r = await fitGpuPartBand(device, prep, opts.listHead);
+		if (r) return r;
+		band = hazeGraphStats.band;
+	}
+	const r = await fitGpuPart(device, prep, opts.listHead);
+	hazeGraphStats.band = band;
+	return r;
+}
+
 /** The CPU tail (and the grid, which takes the "look-haze" lease itself), after the leases. */
 function fitTail(
 	device: Device,
@@ -774,12 +1190,16 @@ function fitTail(
  * only valid until the next haze prep: this rejects (instead of reading another prep's data or a
  * destroyed buffer) when another prep ran between the two calls. For textures, prefer
  * prepAndFitHazeTex, which cannot be interleaved.
+ *
+ * `bandGpu` (default: the flag ?hazeBandGpu, on) picks the airlight band on the GPU
+ * (./haze-band.ts): one submit instead of two and no range / P(sky) planes read back, the same fit
+ * bit for bit (integer work, spot-checked per call; a short band or a failed check takes the CPU band).
  */
 export function fitHazeFromPrep(
 	device: Device,
 	prep: HazePrepResult,
 	input: HazePrepGeometry,
-	opts: { listHead?: number } = {},
+	opts: { listHead?: number; bandGpu?: boolean } = {},
 ): Promise<HazeFit> {
 	const T0 = performance.now();
 	try {
@@ -787,9 +1207,9 @@ export function fitHazeFromPrep(
 	} catch (e) {
 		return Promise.reject(e);
 	}
-	return withLease(PREP_LEASE, () =>
-		fitGpuPart(device, prep, opts.listHead),
-	).then((g) => fitTail(device, prep.W, prep.H, input, T0, g));
+	return withLease(PREP_LEASE, () => fitGpuPartAuto(device, prep, opts)).then(
+		(g) => fitTail(device, prep.W, prep.H, input, T0, g),
+	);
 }
 
 /**
@@ -804,7 +1224,7 @@ export async function prepAndFitHazeTex(
 	device: Device,
 	tex: HazeTexInput,
 	input: HazePrepGeometry,
-	opts: { listHead?: number; valid?: () => boolean } = {},
+	opts: { listHead?: number; valid?: () => boolean; bandGpu?: boolean } = {},
 ): Promise<HazeFit | null> {
 	const T0 = performance.now();
 	const geoTex =
@@ -816,7 +1236,7 @@ export async function prepAndFitHazeTex(
 	const r = await hazePrepTexThen(
 		device,
 		tex,
-		(prep) => fitGpuPart(device, prep, opts.listHead),
+		(prep) => fitGpuPartAuto(device, prep, opts),
 		{ valid: opts.valid },
 	);
 	if (!r) return null;

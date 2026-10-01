@@ -17,7 +17,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I6 | Sky model | per photo | worker:sky | sky-model, sky-prep, sky-refine | `sky-prep`, `sky-refine` |
 | I7 | Frame | per frame | page | deck-webgpu-frame, terrain-gpu-cull | – |
 | I8 | Queries | per settle | page | geo-query-gpu | `geo-query` |
-| I9 | Look | per settle, per style | page | look-guided, look-stats, look-haze, look-relief, look-textures | `look-guided`, `look-stats`, `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-relief` |
+| I9 | Look | per settle, per style | page | look-guided, look-stats, look-haze, look-relief, look-textures | `look-guided`, `look-stats`, `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-haze-band`, `look-haze-argmin`, `look-relief` |
 | I10 | Labels (not a graph) | per emit | page | labels | – |
 | I11 | Nearfield | per view | page | splat-sort | `splat-sort` |
 | I12 | Roll | per photo, per frame | page, worker:ridgelines | horizon-ridges, roll-webgl | `horizon-ridges` |
@@ -47,7 +47,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | geo-query-gpu | I8 | default | page | per settle | `geo-query` | geometry target rgba32float (render device; import bound per run); uniforms, inputs, outputs: persistent core pool slots geo-query/<kernel><job>/* (imports bound with exact ranges; written + submitted in one sync block via runNow) | read: verdicts 4 B per peak + skyline 4 B per column (one graph run); read: gather 20 B per pixel (nonce + 4 raw words), only for undecided samples |
 | look-guided | I9 | default | page | per settle | `look-guided` | guide I, inputs p0…pk, params (imports); t4, ab, t2, q (transients) | q: n·4 B per filtered mask |
 | look-stats | I9 | default | page | per settle | `look-stats` | photo, layer, range, fg, LUT (imports) | partial: band stats partial sums (f64 fold on the CPU) |
-| look-haze | I9 | default | page | per settle | `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid` | range, pSky, photo, fg mask (pooled imports); lin, flags, bins, hist (transients) | prep head: counts + selection state; compact head: counts; gather sky: 3·K·4 B; grid err: cells·4 B |
+| look-haze | I9 | default | page | per settle | `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-haze-band`, `look-haze-argmin` | range, pSky, photo, fg mask (pooled imports); lin, flags, bins, hist (transients); arg-min program: luma GPUProgram scalar arena (gMin, tol, count, over) + pick (transients) | prep head: counts + selection state; compact head: counts; gather sky: 3·K·4 B (CPU band only); grid: 16 B + 256 candidate pairs (2 KiB; arg-min program, default) or err cells·4 B (?hazeArgminGpu=off); band head (default on the texture path; ?hazeBandGpu=off = CPU band): lists + their range, band counts / K / idx / lin, 8 spot columns (no range / P(sky) planes) |
 | look-relief | I9 | default | page | per style | `look-relief` | height field H (import or relief-heights transient); params | field + gen (array path only); texture path writes textures, no readback |
 | look-textures | I9 | default | page | per settle | `look-tex-*` (uncached) | renderer targets (geometry, photo, sky / fg masks, layer) as textures | band stats partials; haze head |
 | labels | I10 | cpu | page | per emit | – | – | – |
@@ -75,7 +75,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **terrain-gpu-cull**: WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default on, WebGPU only; ?terrainGpuCull=off, off / ?gpu=off / WebGL: the CPU twin visibleRows)
 - **geo-query-gpu**: verdicts + skyline share one graph run (one submit, was two); gather runs after it; keyed by kernels and target shape
 - **look-guided**: array-input masks path (WebGL deck + sidecar); ?lookgpu=off keeps the CPU twin
-- **look-haze**: graph breaks for the f64 airlight band / tail on the CPU (D16, D18)
+- **look-haze**: graph break for the f64 tail on the CPU (D18; the round trip before the grid is inherent: its inputs come from f64 code). Default: the airlight band on the GPU on the texture path (look-haze-band, one submit instead of two; D16 removed; ?hazeBandGpu=off, WebGL / ?gpu=off / spot-check fault = CPU band) and the grid arg-min as a luma GPUProgram with a GPU indirect-gated selection (look-haze-argmin; ?hazeArgminGpu=off or a per-call check fault = whole-grid read)
 - **look-textures**: texture-input look passes; its own per-key graph cache (not core cachedGraph). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)
 - **labels**: CPU / DOM by nature; fed by I8's small readbacks
 - **splat-sort**: deck-webgpu splats sortBackend "gpu"; clear + 10 kernel nodes in one compute pass, encoded and submitted synchronously on the sorter's encoder (no lease); keyed by buffer sizes

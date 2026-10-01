@@ -256,6 +256,22 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "haze-band",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/gpu/look/haze-band.check.ts", "8"),
+		note: "GPU airlight band (default on): the WGSL's integer logic (emulated) = airlightBand on adversarial planes, the spot check's teeth, band-path tail = fitHaze (no GPU)",
+		timeoutS: 300,
+	},
+	{
+		id: "haze-argmin",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/gpu/look/haze-argmin.check.ts", "400"),
+		note: "haze grid arg-min GPUProgram (default on): its integer min / candidate / rank logic (emulated) gives the whole grid's candidates on adversarial grids; per-call check teeth; the program lowers with select the only GPU-indirect-gated node (no GPU)",
+		timeoutS: 300,
+	},
+	{
 		id: "bridge-fusion",
 		tier: "fast",
 		group: "look",

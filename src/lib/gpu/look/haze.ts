@@ -182,6 +182,8 @@ export const SRGB_LUT = (() => {
 })();
 const GRID_A = 25;
 const GRID_B = 37;
+/** The physical grid's cells (H_M candidates × kR × β_M). */
+export const GRID_CELLS = H_M_CANDIDATES.length * GRID_A * GRID_B;
 export const HM_PRIOR = Float32Array.from(
 	H_M_CANDIDATES,
 	(h) => 8 * Math.log2(h / H_M) ** 2,
@@ -200,8 +202,11 @@ export type HazeGpuOptions = {
 	listHead?: number;
 };
 
-/** One (bin, channel)'s candidate pixels in pixel order: indices and their lin values. */
-type List = { idx: ArrayLike<number>; val: Float32Array };
+/**
+ * One (bin, channel)'s candidate pixels in pixel order: indices and their lin values, and (when the
+ * airlight band ran on the GPU, ./haze-band.ts) their range values, bit for bit range[idx[k]].
+ */
+type List = { idx: ArrayLike<number>; val: Float32Array; range?: Float32Array };
 
 export type Prep = {
 	counts: Uint32Array;
@@ -315,7 +320,58 @@ export function gridUploads(
 	return { flat, off, iw, words, cells };
 }
 
-/** Submit 2: the physical grid's cost per cell (index = (hk·25 + a)·37 + b); ./haze-graph.ts gridGraph. */
+/**
+ * What the GPU grid arg-min program (./haze-argmin.ts) reads back instead of the whole grid: the
+ * grid's minimum `gMin` (exact: a NaN-skipping min of the f32 cells), how many cells `count` lie
+ * within its f32 superset tolerance (≥ gridTolerance(gMin)), and up to GRID_PICK_CAP of them (`idx`,
+ * their `err`): all of them when count ≤ GRID_PICK_CAP, else the GRID_PICK_CAP smallest by (err,
+ * index). gridCandidates gives the same candidates as from the whole grid (haze-argmin.check.ts).
+ */
+export type GridPick = {
+	gMin: number;
+	count: number;
+	idx: Uint32Array;
+	err: Float32Array;
+};
+
+/** The most grid candidates the CPU re-evaluates (hazeFitTail), = the GPU pick's read slots. */
+export const GRID_PICK_CAP = 256;
+
+/** hazeFitTail's candidate tolerance around the grid minimum (f64). */
+export const gridTolerance = (gMin: number) =>
+	gMin + Math.abs(gMin) * 1e-3 + 1e-12;
+
+/**
+ * The cells hazeFitTail re-evaluates in f64, in index order: those within gridTolerance of the
+ * grid's minimum (NaN cells never), at most GRID_PICK_CAP (the smallest by err, ties by index).
+ * From the whole grid, or from the GPU pick (the same cells: the pick's superset is a prefix-closed
+ * superset of them in (err, index) order, and the exact f64 test is re-applied here).
+ */
+export function gridCandidates(g: Float32Array | GridPick): number[] {
+	if (!(g instanceof Float32Array)) {
+		const tol = gridTolerance(g.gMin);
+		const n = Math.min(g.count, GRID_PICK_CAP);
+		const cand: number[] = [];
+		for (let k = 0; k < n; k++) if (g.err[k] <= tol) cand.push(g.idx[k]);
+		return cand.sort((p, q) => p - q);
+	}
+	let gMin = Number.POSITIVE_INFINITY;
+	for (const e of g) if (e < gMin) gMin = e;
+	const tol = gridTolerance(gMin);
+	let cand: number[] = [];
+	for (let k = 0; k < g.length; k++) if (g[k] <= tol) cand.push(k);
+	if (cand.length > GRID_PICK_CAP)
+		cand = cand
+			.sort((p, q) => g[p] - g[q])
+			.slice(0, GRID_PICK_CAP)
+			.sort((p, q) => p - q);
+	return cand;
+}
+
+/**
+ * Submit 2: the physical grid's cost per cell (index = (hk·25 + a)·37 + b), whole or as the GPU
+ * arg-min program's pick; ./haze-graph.ts gridGraph.
+ */
 export type GridFn = (
 	device: Device,
 	reps: Float64Array[][],
@@ -325,7 +381,7 @@ export type GridFn = (
 	lam: number,
 	jBar: number,
 	priorK: number,
-) => Promise<Float32Array>;
+) => Promise<Float32Array | GridPick>;
 
 /** GPU twin of fitHaze(input): the same HazeFit, up to f32 rounding in the GPU parts. */
 export async function fitHazeGpu(
@@ -443,31 +499,64 @@ export function airlightBand(
 	H: number,
 ): Uint32Array {
 	const N = W * H;
-	const pxScale = W / 1024;
-	const a0 = Math.max(2, Math.round(20 * pxScale));
-	const a1 = Math.max(a0 + 2, Math.round(60 * pxScale));
+	const { a0, a1 } = bandRows(W);
 	const band: number[] = [];
-	for (let x = 0; x < W; x += 2) {
-		let top = -1;
-		for (let y = 0; y < H; y++) {
-			const i = y * W + x;
-			if (range[i] > 0 && pSky[i] < 0.5) {
-				top = y;
-				break;
-			}
-		}
-		if (top < 0) continue;
-		for (let y = Math.max(0, top - a1); y <= top - a0; y++) {
-			const i = y * W + x;
-			if (range[i] > 0 || pSky[i] < 0.7) continue;
-			band.push(i);
-		}
-	}
+	for (let x = 0; x < W; x += 2)
+		airlightBandColumn(range, pSky, W, H, x, a0, a1, band);
 	if (band.length < 20) {
 		band.length = 0;
 		for (let i = 0; i < N; i++) if (range[i] <= 0) band.push(i);
 	}
 	return Uint32Array.from(band);
+}
+
+/** The airlight band's length before airlightBand's fallback (all its columns' pixels). */
+export function bandLength(
+	range: Float32Array,
+	pSky: Float32Array,
+	W: number,
+	H: number,
+) {
+	const { a0, a1 } = bandRows(W);
+	const band: number[] = [];
+	for (let x = 0; x < W; x += 2)
+		airlightBandColumn(range, pSky, W, H, x, a0, a1, band);
+	return band.length;
+}
+
+/** The airlight band's rows above the topmost terrain row: [top − a1, top − a0] (as the CPU). */
+export function bandRows(W: number) {
+	const pxScale = W / 1024;
+	const a0 = Math.max(2, Math.round(20 * pxScale));
+	const a1 = Math.max(a0 + 2, Math.round(60 * pxScale));
+	return { a0, a1 };
+}
+
+/** One column x of airlightBand: pushes its band pixels (row 0 = top), in row order. */
+export function airlightBandColumn(
+	range: Float32Array,
+	pSky: Float32Array,
+	W: number,
+	H: number,
+	x: number,
+	a0: number,
+	a1: number,
+	band: number[],
+) {
+	let top = -1;
+	for (let y = 0; y < H; y++) {
+		const i = y * W + x;
+		if (range[i] > 0 && pSky[i] < 0.5) {
+			top = y;
+			break;
+		}
+	}
+	if (top < 0) return;
+	for (let y = Math.max(0, top - a1); y <= top - a0; y++) {
+		const i = y * W + x;
+		if (range[i] > 0 || pSky[i] < 0.7) continue;
+		band.push(i);
+	}
 }
 
 /**
@@ -525,7 +614,7 @@ export function robustSkyExact(
 
 /** What the CPU tail needs besides the prep's lists (timestamps for hazeGpuTimes). */
 export type HazeTailContext = {
-	/** range, row 0 = top (as the CPU) */
+	/** range, row 0 = top (as the CPU); unused (may be empty) when every list carries its range */
 	range: Float32Array;
 	/** the airlight band's pixels (airlightBand), in the prep's gather order */
 	skyIdx: Uint32Array;
@@ -608,7 +697,7 @@ export async function hazeFitTail(
 		for (let c = 0; c < 3; c++) {
 			// the bin's pixels in pixel order (compact: only those between the bracketing order
 			// statistics, a superset of [v0, v1]); the CPU's own test picks [v0, v1] from them
-			const { idx, val } = list(b * 3 + c);
+			const { idx, val, range: listRange } = list(b * 3 + c);
 			const len = val.length;
 			const v0 = pct(b, c, n, 0.01);
 			const v1 = pct(b, c, n, 0.09);
@@ -621,28 +710,23 @@ export async function hazeFitTail(
 			for (let k = 0; k < len; k++) {
 				if (val[k] < v0 || val[k] > v1) continue;
 				const i = idx[k];
+				const ri = listRange ? listRange[k] : range[i];
 				low[c] += val[k];
 				const keep = m % stride === 0 && nr * (1 + NH) < rep.length;
 				m++;
 				if (!keep && c !== 1) continue;
 				const [px, py, pz] = pointAt(i);
 				const h1 = pz + (px * px + py * py) * ATM_CURV;
-				const r0 = pathFrom(eyeFactorR, eyeAlt, h1, range[i], H_R);
+				const r0 = pathFrom(eyeFactorR, eyeAlt, h1, ri, H_R);
 				if (keep) rep[nr * (1 + NH)] = r0;
 				for (let q = 0; q < NH; q++) {
-					const v = pathFrom(
-						eyeFactorM[q],
-						eyeAlt,
-						h1,
-						range[i],
-						H_M_CANDIDATES[q],
-					);
+					const v = pathFrom(eyeFactorM[q], eyeAlt, h1, ri, H_M_CANDIDATES[q]);
 					if (keep) rep[nr * (1 + NH) + 1 + q] = v;
 					if (c === 1) pM[q] += v;
 				}
 				if (keep) nr++;
 				if (c === 1) {
-					logR += Math.log(range[i]);
+					logR += Math.log(ri);
 					pR += r0;
 				}
 			}
@@ -781,16 +865,7 @@ export async function hazeFitTail(
 	const t5 = performance.now();
 	// the CPU's argmin (first strict minimum in loop order) among the cells the GPU puts within
 	// 0.1 % of its own minimum, re-evaluated in f64
-	let gMin = Number.POSITIVE_INFINITY;
-	for (const e of gErr) if (e < gMin) gMin = e;
-	const tol = gMin + Math.abs(gMin) * 1e-3 + 1e-12;
-	let cand: number[] = [];
-	for (let k = 0; k < gErr.length; k++) if (gErr[k] <= tol) cand.push(k);
-	if (cand.length > 256)
-		cand = cand
-			.sort((p, q) => gErr[p] - gErr[q])
-			.slice(0, 256)
-			.sort((p, q) => p - q);
+	const cand = gridCandidates(gErr);
 	let best = { kR: 1, bM: BETA_M0, hk: 2, err: Number.POSITIVE_INFINITY };
 	for (const k of cand) {
 		const hk = Math.floor(k / (GRID_A * GRID_B));

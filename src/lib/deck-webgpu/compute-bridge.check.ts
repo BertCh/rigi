@@ -15,7 +15,9 @@
 //   fit    the whole HazeFit (JSON): a fresh HazeController on the readback path (range readback →
 //          fitHazeGpu) vs one with `bridged` = LookBridge.fitHaze (prepAndFitHazeTex on the target),
 //          plus the engine's live fit, the bridged fit's stage medians (fit.stagesMs, haze.ts
-//          hazeGpuTimes); and the guards (stale prep, wrong geo size) reject
+//          hazeGpuTimes); and the guards (stale prep, wrong geo size) reject; and the GPU airlight
+//          band (?hazeBandGpu, haze-band.ts, default on) vs the CPU band on the bridged path: its
+//          fit (bandExact), what the band did (band: "gpu" = used) and both paths' stage medians
 //   relief the readback path (buildReliefFieldGpu: relief graph → read node → bytes, uploaded with
 //          TerrainStyles.setReliefField's descriptor + writeData) vs LookBridge.reliefField (the
 //          same graph → copyBufferToTexture), both textures read back, field + gen; plus the
@@ -23,10 +25,16 @@
 // and times each (median of `reps`, warm). The final look image is compared by the harness
 // (scripts/deck-webgpu/bridge-check.mjs) with engine.setLookBridge(false / true).
 import type { Device, Texture } from "@luma.gl/core";
+import { setFlagOverride } from "#/lib/flags";
 import type { EnuFrame } from "#/lib/geodesy";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { hazeGpuTimes } from "#/lib/gpu/look/haze";
-import { fitHazeFromPrep, prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
+import {
+	fitHazeFromPrep,
+	hazeArgminStats,
+	hazeGraphStats,
+	prepAndFitHazeTex,
+} from "#/lib/gpu/look/haze-graph";
 import { buildReliefFieldGpu } from "#/lib/gpu/look/relief";
 import {
 	type HazePrep,
@@ -431,10 +439,37 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 		bridge.fitHaze({ img, geometry, ...h });
 	const fr = await fitVia();
 	const fb = await fitVia(viaBridge);
+	// the GPU airlight band (?hazeBandGpu, default on) vs the CPU band, on the same bridged path
+	const withBand = async <T>(on: boolean, fn: () => Promise<T>) => {
+		setFlagOverride("hazeBandGpu", on ? "on" : "off");
+		try {
+			return await fn();
+		} finally {
+			setFlagOverride("hazeBandGpu", undefined);
+		}
+	};
+	const fbb = await withBand(true, () => fitVia(viaBridge));
+	const bandOutcome = hazeGraphStats.band ?? null;
+	const fbc = await withBand(false, () => fitVia(viaBridge));
+	// the default bridged fit (GPU band + the grid arg-min program) vs the pre-2026-10-01 default
+	// (CPU band, whole grid read back)
+	const argminOutcome = { ...hazeArgminStats };
+	setFlagOverride("hazeArgminGpu", "off");
+	const fOld = await withBand(false, () => fitVia(viaBridge)).finally(() =>
+		setFlagOverride("hazeArgminGpu", undefined),
+	);
 	const json = (f: HazeFit | null) => JSON.stringify(f);
 	const liveFit = e.hazeFit;
 	const fit = {
 		exact: !!fr.fit && json(fr.fit) === json(fb.fit),
+		/** the GPU-band path's fit = the readback path's, and what the band did ("gpu" = used) */
+		bandExact: !!fr.fit && json(fr.fit) === json(fbb.fit),
+		/** the CPU-band bridged path's fit = the readback path's */
+		cpuBandExact: !!fr.fit && json(fr.fit) === json(fbc.fit),
+		band: bandOutcome,
+		/** the default bridged fit = the old default's (CPU band, whole grid), and the arg-min's stats */
+		oldDefaultExact: !!fb.fit && json(fb.fit) === json(fOld.fit),
+		argmin: argminOutcome,
 		live: liveFit ? json(liveFit) === json(fr.fit) : null,
 		bridgeOn: !!e.gpu?.bridge,
 		visibility: fr.fit?.visibility ?? null,
@@ -477,22 +512,43 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 			prepAndFitHazeTex(device, tin, geoIn, { valid: () => false }),
 		);
 	}
-	const fitT = { ref: [] as number[], bridge: [] as number[] };
-	// the bridged fit's stages (haze.ts hazeGpuTimes: the GPU part incl. the prep, the CPU tail)
+	const fitT = {
+		ref: [] as number[],
+		bridge: [] as number[],
+		bridgeCpuBand: [] as number[],
+	};
+	// the bridged fit's stages (haze.ts hazeGpuTimes: the GPU part incl. the prep and, on the GPU
+	// band path, the band; the CPU tail), per band path ("gpuBand." = default, "cpuBand." = off)
 	const fitStages: Record<string, number[]> = {};
-	for (let i = 0; i < reps; i++) {
-		fitT.ref.push((await fitVia()).ms);
-		// hazeGpuTimes is merged, not replaced: clear the ref fit's keys (a short fit sets fewer)
-		for (const k of Object.keys(hazeGpuTimes)) delete hazeGpuTimes[k];
-		fitT.bridge.push((await fitVia(viaBridge)).ms);
+	const stage = (path: string) => {
 		for (const k of [
 			"gpuPrep",
 			"cpuBins",
 			"cpuFreeBeta",
 			"gpuGrid",
 			"cpuRefine",
-		])
-			fitStages[k] = [...(fitStages[k] ?? []), hazeGpuTimes[k] ?? Number.NaN];
+		]) {
+			const key = `${path}.${k}`;
+			fitStages[key] = [
+				...(fitStages[key] ?? []),
+				hazeGpuTimes[k] ?? Number.NaN,
+			];
+		}
+	};
+	// hazeGpuTimes is merged, not replaced: clear the previous fit's keys (a short fit sets fewer)
+	const clearTimes = () => {
+		for (const k of Object.keys(hazeGpuTimes)) delete hazeGpuTimes[k];
+	};
+	for (let i = 0; i < reps; i++) {
+		fitT.ref.push((await fitVia()).ms);
+		clearTimes();
+		fitT.bridge.push((await withBand(true, () => fitVia(viaBridge))).ms);
+		stage("gpuBand");
+		clearTimes();
+		fitT.bridgeCpuBand.push(
+			(await withBand(false, () => fitVia(viaBridge))).ms,
+		);
+		stage("cpuBand");
 	}
 	(fit as Record<string, unknown>).stagesMs = Object.fromEntries(
 		Object.entries(fitStages).map(([k, v]) => {
@@ -607,6 +663,9 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 			stats: stats.exact,
 			haze: haze.exact,
 			fit: fit.exact,
+			fitBand: fit.bandExact,
+			fitCpuBand: fit.cpuBandExact,
+			fitOldDefault: fit.oldDefaultExact,
 			relief: reliefExact,
 		},
 		ms: {

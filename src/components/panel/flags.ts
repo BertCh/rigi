@@ -226,6 +226,20 @@ export const FLAG_UI: FlagUI[] = [
 		options: { f64: "f64 (default)", "certified-f32": "Certified f32" },
 	},
 	{
+		name: "hazeBandGpu",
+		label: "Haze band on GPU",
+		help: "WebGPU: the fitted haze's airlight band runs on the GPU (one submit, no range planes read back; same fit bit for bit, spot-checked). Off = the CPU band.",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
+		name: "hazeArgminGpu",
+		label: "Haze grid arg-min on GPU",
+		help: "The fitted haze's grid minimum and candidate cells are picked on the GPU (a luma GPUProgram); only the candidates are read back. Same fit bit for bit, checked per call. Off = read the whole grid.",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
 		name: "imagery",
 		label: "Imagery provider",
 		help: "Default: swisstopo in CH, Esri elsewhere. swisstopo: licence-clean, CH only. Custom needs VITE_IMAGERY_URL.",
