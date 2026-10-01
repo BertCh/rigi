@@ -6,6 +6,7 @@ import photosJson from "virtual:photos";
 import { storageKey } from "#/lib/ontology/core/storage";
 import type { Pose } from "./camera";
 import type { LatLonPair, LonLatPair } from "./ontology/core/geometry";
+import type { Height } from "./ontology/core/quantity";
 
 export type PhotoMeta = {
 	id: string;
@@ -19,7 +20,8 @@ export type PhotoMeta = {
 	tzOffset?: string | null;
 	lat: number;
 	lon: number;
-	alt: number | null;
+	/** GPS altitude, metres above mean sea level (EXIF GPSAltitude) */
+	alt: Height<"msl"> | null;
 	hAccuracy: number | null;
 	heading: number | null;
 	f35: number;
@@ -35,7 +37,8 @@ export type RegionPeak = {
 	name: string;
 	lat: number;
 	lon: number;
-	ele: number | null;
+	/** metres above mean sea level (OSM `ele`) */
+	ele: Height<"msl"> | null;
 	prominence: number | null;
 };
 export type RegionTrail = {

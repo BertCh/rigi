@@ -15,6 +15,7 @@ import {
 	EARTH_R,
 	REFRACTION_K,
 } from "../geodesy";
+import type { Height } from "../ontology/core/quantity";
 import { type Camera, directionENU, project } from "./camera";
 import type { TerrainSampler } from "./terrain";
 
@@ -23,7 +24,8 @@ export interface Peak {
 	name?: string;
 	lat: number;
 	lon: number;
-	ele?: number;
+	/** summit height, metres above mean sea level (OSM `ele`) */
+	ele?: Height<"msl">;
 	prominence?: number;
 	wikidata?: string;
 }

@@ -34,9 +34,10 @@ Under the domain layer, the ontology core provides the axes:
 
 ## Open, by value
 
-1. **Height datum is not carried by world types.**
-   - DEM, peak and horizon heights are MSL (EGM2008), and Google 3D Tiles heights are ellipsoidal. Only `GeoPoint` says which.
-   - Next step: put `Height<"msl">` on `TerrainSampler`, `Peak.ele` and `HorizonProfile`.
+1. **Height datum is only partly carried by world types.**
+   - DEM, peak and horizon heights are MSL (EGM2008), and Google 3D Tiles heights are ellipsoidal.
+   - Done: `TerrainSampler.sample`, `Peak.ele`, `RegionPeak.ele`, `PoolPeak.ele` and `PhotoMeta.alt` are `Height<"msl">`, so an ellipsoidal height no longer assigns to them.
+   - Next step: the `DemRaster` heights, the `HorizonProfile` eye height and the tiles3d frame.
 2. **Peak elevation nullability differs.** `Peak.ele` is optional, while `RegionPeak`, `PoolPeak`, `LabelCandidate` and `settings.PeakLabel` use `number | null`. `MISSING` in `core/quantity.ts` says `null`.
 3. **The engine escape hatches cluster.**
    - deck.gl internals peeks: about 17.

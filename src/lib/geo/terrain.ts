@@ -13,6 +13,7 @@ import {
 	tileId,
 	tilesAround,
 } from "../dem";
+import type { Height } from "../ontology/core/quantity";
 
 /** Default tile size (AWS Terrarium). Pass the real size for other sources. */
 export const TILE_SIZE = 256;
@@ -28,7 +29,8 @@ export class TerrainSampler {
 		readonly tileSize = TILE_SIZE,
 	) {}
 
-	sample(lon: number, lat: number, z: number) {
+	/** Bilinear DEM height at (lon, lat) on zoom z: metres above mean sea level (Terrarium / Mapterhorn). */
+	sample(lon: number, lat: number, z: number): Height<"msl"> {
 		const t = lonLatToTile(lon, lat, z);
 		const px = t.x * this.tileSize - 0.5;
 		const py = t.y * this.tileSize - 0.5;
