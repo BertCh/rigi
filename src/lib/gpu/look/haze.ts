@@ -61,7 +61,7 @@ import {
 	withLease,
 } from "./kernel";
 
-const K_HZ_PREP = defineKernel("hz-prep", HZ_PREP, [
+export const K_HZ_PREP = defineKernel("hz-prep", HZ_PREP, [
 	["prm", "uniform"],
 	["photo", "read-only-storage"],
 	["xb", "read-only-storage"],
@@ -72,12 +72,12 @@ const K_HZ_PREP = defineKernel("hz-prep", HZ_PREP, [
 	["lin", "storage"],
 	["flags", "storage"],
 ]);
-const K_HZ_DILH = defineKernel("hz-dilh", HZ_DILH, [
+export const K_HZ_DILH = defineKernel("hz-dilh", HZ_DILH, [
 	["prm", "uniform"],
 	["flags", "read-only-storage"],
 	["outf", "storage"],
 ]);
-const K_HZ_BIN = defineKernel("hz-bin", HZ_BIN, [
+export const K_HZ_BIN = defineKernel("hz-bin", HZ_BIN, [
 	["prm", "uniform"],
 	["flagsH", "read-only-storage"],
 	["range", "read-only-storage"],
@@ -85,35 +85,35 @@ const K_HZ_BIN = defineKernel("hz-bin", HZ_BIN, [
 	["bins", "storage"],
 	["counts", "storage"],
 ]);
-const K_HZ_SEL_INIT = defineKernel("hz-sel-init", HZ_SEL_INIT, [
+export const K_HZ_SEL_INIT = defineKernel("hz-sel-init", HZ_SEL_INIT, [
 	["counts", "read-only-storage"],
 	["state", "storage"],
 ]);
-const K_HZ_HIST = defineKernel("hz-hist", HZ_HIST, [
+export const K_HZ_HIST = defineKernel("hz-hist", HZ_HIST, [
 	["prm", "uniform"],
 	["bins", "read-only-storage"],
 	["lin", "read-only-storage"],
 	["state", "read-only-storage"],
 	["hist", "storage"],
 ]);
-const K_HZ_SCAN = defineKernel("hz-scan", HZ_SCAN, [
+export const K_HZ_SCAN = defineKernel("hz-scan", HZ_SCAN, [
 	["prm", "uniform"],
 	["hist", "read-only-storage"],
 	["state", "storage"],
 ]);
-const K_HZ_CNT = defineKernel("hz-cnt", HZ_CNT, [
+export const K_HZ_CNT = defineKernel("hz-cnt", HZ_CNT, [
 	["prm", "uniform"],
 	["bins", "read-only-storage"],
 	["lin", "read-only-storage"],
 	["state", "read-only-storage"],
 	["blk", "storage"],
 ]);
-const K_HZ_OFFS = defineKernel("hz-offs", HZ_OFFS, [
+export const K_HZ_OFFS = defineKernel("hz-offs", HZ_OFFS, [
 	["prm", "uniform"],
 	["blk", "storage"],
 	["starts", "storage"],
 ]);
-const K_HZ_SCATTER = defineKernel("hz-scatter", HZ_SCATTER, [
+export const K_HZ_SCATTER = defineKernel("hz-scatter", HZ_SCATTER, [
 	["prm", "uniform"],
 	["bins", "read-only-storage"],
 	["lin", "read-only-storage"],
@@ -123,13 +123,13 @@ const K_HZ_SCATTER = defineKernel("hz-scatter", HZ_SCATTER, [
 	["outIdx", "storage"],
 	["outVal", "storage"],
 ]);
-const K_HZ_GATHER = defineKernel("hz-gather", HZ_GATHER, [
+export const K_HZ_GATHER = defineKernel("hz-gather", HZ_GATHER, [
 	["prm", "uniform"],
 	["idx", "read-only-storage"],
 	["lin", "read-only-storage"],
 	["outv", "storage"],
 ]);
-const K_HZ_GRID = defineKernel("hz-grid", HZ_GRID, [
+export const K_HZ_GRID = defineKernel("hz-grid", HZ_GRID, [
 	["prm", "uniform"],
 	["reps", "read-only-storage"],
 	["repOff", "read-only-storage"],
@@ -139,18 +139,18 @@ const K_HZ_GRID = defineKernel("hz-grid", HZ_GRID, [
 ]);
 
 // mirror of haze-fit.ts (keep in sync)
-const NBINS = 24;
+export const NBINS = 24;
 const DMIN = 200;
 const DMAX = 150000;
 const H_M_CANDIDATES = [600, 900, 1200, 1800, 2700, 4000];
-const SRGB_LUT = (() => {
+export const SRGB_LUT = (() => {
 	const t = new Float32Array(256);
 	for (let i = 0; i < 256; i++) t[i] = srgbToLinear(i / 255);
 	return t;
 })();
 const GRID_A = 25;
 const GRID_B = 37;
-const HM_PRIOR = Float32Array.from(
+export const HM_PRIOR = Float32Array.from(
 	H_M_CANDIDATES,
 	(h) => 8 * Math.log2(h / H_M) ** 2,
 );
@@ -172,12 +172,18 @@ export type HazeGpuOptions = {
 	 * the very same fit).
 	 */
 	listHead?: number;
+	/**
+	 * Run both submits on core ComputeGraphs (./haze-graph.ts: shape-keyed cache, aliased transients,
+	 * clear nodes, an adaptive first-read length). Default false (the dispatch path below). Compact
+	 * only: with compact: false the dispatch path runs. The fit is bit-identical either way.
+	 */
+	graph?: boolean;
 };
 
 /** One (bin, channel)'s candidate pixels in pixel order: indices and their lin values. */
 type List = { idx: ArrayLike<number>; val: Float32Array };
 
-type Prep = {
+export type Prep = {
 	counts: Uint32Array;
 	/** order statistic per (bin, channel, slot), as f32 */
 	stat: Float32Array;
@@ -191,22 +197,14 @@ type Prep = {
 	tail: boolean;
 };
 
-/** Submit 1: per-pixel prep, bins, the percentile order statistics and (compact) the lists. */
-function prepGpu(
-	device: Device,
+/** Submit 1's small uploads: the photo box footprints (f64, as the CPU) and the prep uniform. */
+export function prepUploads(
 	photo: HazeFitInput["photo"],
 	W: number,
 	H: number,
-	range: Float32Array,
-	pSky: Float32Array,
-	fgBits: Uint32Array,
 	rad: number,
 	fgRad: number,
-	skyIdx: Uint32Array,
-	compact: boolean,
-	listHead?: number,
-): Promise<Prep> {
-	const N = W * H;
+) {
 	// the box footprints, in f64 as the CPU
 	const sx = photo.width / W;
 	const sy = photo.height / H;
@@ -237,6 +235,26 @@ function prepGpu(
 		Math.max(150, DMIN),
 		DMAX,
 	]);
+	return { xb, yb, words };
+}
+
+/** Submit 1: per-pixel prep, bins, the percentile order statistics and (compact) the lists. */
+function prepGpu(
+	device: Device,
+	photo: HazeFitInput["photo"],
+	W: number,
+	H: number,
+	range: Float32Array,
+	pSky: Float32Array,
+	fgBits: Uint32Array,
+	rad: number,
+	fgRad: number,
+	skyIdx: Uint32Array,
+	compact: boolean,
+	listHead?: number,
+): Promise<Prep> {
+	const N = W * H;
+	const { xb, yb, words } = prepUploads(photo, W, H, rad, fgRad);
 	const K = skyIdx.length;
 	const nBlk = Math.ceil(N / BLOCK);
 	return withLease("look-haze", async () => {
@@ -454,7 +472,7 @@ function prepGpu(
 }
 
 /** The selected f32 bit patterns out of the radix-select state (prefix, remaining rank) pairs. */
-function statOf(state: ArrayBuffer): Float32Array {
+export function statOf(state: ArrayBuffer): Float32Array {
 	const st = new Uint32Array(state);
 	const stat = new Float32Array(SEL);
 	const bits = new Uint32Array(stat.buffer);
@@ -462,9 +480,8 @@ function statOf(state: ArrayBuffer): Float32Array {
 	return stat;
 }
 
-/** Submit 2: the physical grid's cost per cell (index = (hk·25 + a)·37 + b). */
-async function gridGpu(
-	device: Device,
+/** Submit 2's uploads: the flat representative paths, their offsets, (I, w) and the grid uniform. */
+export function gridUploads(
 	reps: Float64Array[][],
 	Ic: number[][],
 	wp: number[][],
@@ -472,7 +489,7 @@ async function gridGpu(
 	lam: number,
 	jBar: number,
 	priorK: number,
-): Promise<Float32Array> {
+) {
 	const S = Ic[0].length;
 	const NH = H_M_CANDIDATES.length;
 	let total = 0;
@@ -508,6 +525,32 @@ async function gridGpu(
 		0,
 	]);
 	const cells = NH * GRID_A * GRID_B;
+	return { flat, off, iw, words, cells };
+}
+
+/** The grid's signature (submit 2), for ./haze-graph.ts's twin. */
+export type GridFn = typeof gridGpu;
+
+/** Submit 2: the physical grid's cost per cell (index = (hk·25 + a)·37 + b). */
+async function gridGpu(
+	device: Device,
+	reps: Float64Array[][],
+	Ic: number[][],
+	wp: number[][],
+	airlight: Vec3,
+	lam: number,
+	jBar: number,
+	priorK: number,
+): Promise<Float32Array> {
+	const { flat, off, iw, words, cells } = gridUploads(
+		reps,
+		Ic,
+		wp,
+		airlight,
+		lam,
+		jBar,
+		priorK,
+	);
 	return withLease("look-haze", async () => {
 		const up = (key: string, data: ArrayBufferView) =>
 			pooledStorage(device, `look-haze/${key}`, data);
@@ -545,17 +588,7 @@ export async function fitHazeGpu(
 	const T0 = performance.now();
 	const { photo, geo, geoW: W, geoH: H, sky, foreground: fg, eyeAlt } = input;
 	const N = W * H;
-	const pointAt = (i: number): Vec3 => {
-		const gx = i % W;
-		const gy = H - 1 - Math.floor(i / W);
-		if (geo.kind === "xyzr") {
-			const g = (gy * W + gx) * 4;
-			return [geo.data[g], geo.data[g + 1], geo.data[g + 2]];
-		}
-		const r = geo.data[gy * W + gx];
-		const d = geo.ray(gx, gy);
-		return [d[0] * r, d[1] * r, eyeAlt + d[2] * r];
-	};
+	const pointAt = pointAtOf(geo, W, H, eyeAlt);
 
 	// range and sky probability, row 0 = top (as the CPU)
 	const range = new Float32Array(N);
@@ -605,8 +638,67 @@ export async function fitHazeGpu(
 			}
 	const fgRad = fg ? Math.max(2, Math.round(8 * pxScale)) : 0;
 
-	// the airlight band's pixels (as the CPU; range and sky only), or, with fewer than 20 of them,
-	// robustSky's fallback (every range-0 pixel): the GPU gathers their lin
+	const skyIdx = airlightBand(range, pSky, W, H);
+	const t1 = performance.now();
+	const args = [
+		device,
+		photo,
+		W,
+		H,
+		range,
+		pSky,
+		fgBits,
+		rad,
+		fgRad,
+		skyIdx,
+	] as const;
+	// opt-in: both submits on core ComputeGraphs (./haze-graph.ts, compact lists only)
+	const g =
+		opts.graph && (opts.compact ?? true) ? await import("./haze-graph") : null;
+	const prep = g
+		? await g.prepGraph(...args, opts.listHead)
+		: await prepGpu(...args, opts.compact ?? true, opts.listHead);
+	const t2 = performance.now();
+	return hazeFitTail(
+		device,
+		{ range, skyIdx, pointAt, eyeAlt, sunDir: input.sunDir, T0, t1, t2 },
+		prep,
+		g ? g.gridGraph : gridGpu,
+	);
+}
+
+/** The geo buffer's ENU point of pixel i (row 0 = top), as the CPU. */
+export function pointAtOf(
+	geo: HazeFitInput["geo"],
+	W: number,
+	H: number,
+	eyeAlt: number,
+): (i: number) => Vec3 {
+	return (i: number): Vec3 => {
+		const gx = i % W;
+		const gy = H - 1 - Math.floor(i / W);
+		if (geo.kind === "xyzr") {
+			const g = (gy * W + gx) * 4;
+			return [geo.data[g], geo.data[g + 1], geo.data[g + 2]];
+		}
+		const r = geo.data[gy * W + gx];
+		const d = geo.ray(gx, gy);
+		return [d[0] * r, d[1] * r, eyeAlt + d[2] * r];
+	};
+}
+
+/**
+ * The airlight band's pixels (as the CPU; range and sky only, row 0 = top), or, with fewer than 20
+ * of them, robustSky's fallback (every range-0 pixel): the GPU gathers their lin.
+ */
+export function airlightBand(
+	range: Float32Array,
+	pSky: Float32Array,
+	W: number,
+	H: number,
+): Uint32Array {
+	const N = W * H;
+	const pxScale = W / 1024;
 	const a0 = Math.max(2, Math.round(20 * pxScale));
 	const a1 = Math.max(a0 + 2, Math.round(60 * pxScale));
 	const band: number[] = [];
@@ -630,30 +722,35 @@ export async function fitHazeGpu(
 		band.length = 0;
 		for (let i = 0; i < N; i++) if (range[i] <= 0) band.push(i);
 	}
-	const skyIdx = Uint32Array.from(band);
-	const t1 = performance.now();
-	const {
-		counts,
-		stat,
-		sky: skyLin,
-		list,
-		bytes,
-		tail,
-	} = await prepGpu(
-		device,
-		photo,
-		W,
-		H,
-		range,
-		pSky,
-		fgBits,
-		rad,
-		fgRad,
-		skyIdx,
-		opts.compact ?? true,
-		opts.listHead,
-	);
-	const t2 = performance.now();
+	return Uint32Array.from(band);
+}
+
+/** What the CPU tail needs besides the prep's lists (timestamps for hazeGpuTimes). */
+export type HazeTailContext = {
+	/** range, row 0 = top (as the CPU) */
+	range: Float32Array;
+	/** the airlight band's pixels (airlightBand), in the prep's gather order */
+	skyIdx: Uint32Array;
+	pointAt: (i: number) => Vec3;
+	eyeAlt: number;
+	sunDir?: Vec3;
+	T0: number;
+	t1: number;
+	t2: number;
+};
+
+/**
+ * Everything after submit 1, on the CPU as haze-fit.ts (f64): the airlight, the per-bin loop, the
+ * free β, then the physical fit around submit 2 (`grid`) and the quality terms.
+ */
+export async function hazeFitTail(
+	device: Device,
+	ctx: HazeTailContext,
+	prep: Prep,
+	grid: GridFn,
+): Promise<HazeFit> {
+	const { range, skyIdx, pointAt, eyeAlt, T0, t1, t2 } = ctx;
+	const { counts, stat, sky: skyLin, list, bytes, tail } = prep;
 
 	// --- airlight (as the CPU)
 	const skyR: number[] = [];
@@ -762,7 +859,7 @@ export async function fitHazeGpu(
 	}
 	const t3 = performance.now();
 
-	const sunDir: Vec3 = input.sunDir ?? [-0.5, -0.4, 0.75];
+	const sunDir: Vec3 = ctx.sunDir ?? [-0.5, -0.4, 0.75];
 	if (samples.length < 3) {
 		Object.assign(hazeGpuTimes, {
 			cpuPrep: t1 - T0,
@@ -864,7 +961,7 @@ export async function fitHazeGpu(
 	const gridBM = (b: number) =>
 		Math.exp(Math.log(1e-7) + (b / 36) * Math.log(3e-2 / 1e-7));
 	const t4 = performance.now();
-	const gErr = await gridGpu(
+	const gErr = await grid(
 		device,
 		reps,
 		Ic,

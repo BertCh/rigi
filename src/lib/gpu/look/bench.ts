@@ -174,6 +174,17 @@ export async function runLookBench(
 			fitHazeGpu(device, h, { listHead: 64 }),
 		);
 		const forcedSteps = { ...hazeGpuTimes };
+		// the graph path (./haze-graph.ts, opt-in): the very same fit, with its adaptive first read
+		// and with the forced 64-slot one
+		const { hazeGraphStats } = await import("./haze-graph");
+		const graph = await time(reps, () =>
+			fitHazeGpu(device, h, { graph: true }),
+		);
+		const graphStats = { ...hazeGraphStats };
+		const graphForced = await time(reps, () =>
+			fitHazeGpu(device, h, { graph: true, listHead: 64 }),
+		);
+		const graphForcedStats = { ...hazeGraphStats };
 		out.haze = {
 			dims: [h.geoW, h.geoH],
 			cpuMs: cpu.ms,
@@ -190,6 +201,18 @@ export async function runLookBench(
 				tailRead: forcedSteps.tailRead,
 				readKB: forcedSteps.readKB,
 				identical: sameFit(gpu.out, forced.out),
+			},
+			graph: {
+				gpuMs: graph.ms,
+				identical: sameFit(gpu.out, graph.out),
+				head: graphStats.head,
+				total: graphStats.total,
+				tailRead: graphStats.tail,
+				forcedTail: {
+					listHead: 64,
+					tailRead: graphForcedStats.tail,
+					identical: sameFit(gpu.out, graphForced.out),
+				},
 			},
 			...hazeErrors(cpu.out, gpu.out),
 		};
