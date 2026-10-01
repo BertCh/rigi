@@ -17,7 +17,9 @@ export const MAP_VIEW_ID = "stepmap";
 
 /** Metres kept between the map camera and the terrain. */
 const CLEARANCE = 5;
-const LIMITS = { minZoom: 6, maxZoom: 21, minPitch: 0, maxPitch: 80 };
+// roll: 0 is spread over every view state (onViewStateChange) so a controller that grows a roll
+// (deck.gl #10697) cannot desync deck's map viewport from the ENU camera, which has no roll.
+const LIMITS = { minZoom: 6, maxZoom: 21, minPitch: 0, maxPitch: 80, roll: 0 };
 
 type VS = MapViewState & typeof LIMITS;
 

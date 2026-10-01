@@ -18,6 +18,7 @@ import {
 } from "@deck.gl/core";
 import { BitmapLayer, LineLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { Model } from "@luma.gl/engine";
+import type { ShaderModule } from "@luma.gl/shadertools";
 import { Matrix4 } from "@math.gl/core";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -307,23 +308,22 @@ export class AtmSkyLayer extends Layer<LayerProps & { atm: AtmValues }> {
 
 const LOG_FC = (1 / Math.log2(LOG_DEPTH_FAR + 1)).toFixed(12);
 
+/** Per-fragment log depth, matching the terrain's (one module object, like terrainLogDepthModule). */
+const logDepthModule = {
+	name: "logDepth",
+	inject: {
+		"vs:#decl": "out float vLogDepthW;",
+		"vs:#main-end": "vLogDepthW = 1.0 + max(gl_Position.w, 1e-6);",
+		"fs:#decl": "in float vLogDepthW;",
+		"fs:#main-end": `gl_FragDepth = log2(vLogDepthW) * ${LOG_FC};`,
+	},
+} as const satisfies ShaderModule;
+
 /** Writes the terrain's logarithmic depth (terrain-layer.ts) so the terrain occludes the layer. */
 export class LogDepthExtension extends LayerExtension {
 	static extensionName = "LogDepthExtension";
 	getShaders() {
-		return {
-			modules: [
-				{
-					name: "logDepth",
-					inject: {
-						"vs:#decl": "out float vLogDepthW;",
-						"vs:#main-end": "vLogDepthW = 1.0 + max(gl_Position.w, 1e-6);",
-						"fs:#decl": "in float vLogDepthW;",
-						"fs:#main-end": `gl_FragDepth = log2(vLogDepthW) * ${LOG_FC};`,
-					},
-				},
-			],
-		};
+		return { modules: [logDepthModule] };
 	}
 }
 

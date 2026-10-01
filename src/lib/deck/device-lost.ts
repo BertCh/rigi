@@ -52,6 +52,7 @@ type LumaWebGLDevice = {
 	lost: Promise<unknown>;
 	_resolveContextLost?: (v: { reason: "destroyed"; message: string }) => void;
 	_isLost?: boolean;
+	_lossWasRequested?: boolean;
 	_moduleData?: Record<string, Record<string, unknown>>;
 	extensions?: Record<string, unknown>;
 };
@@ -76,6 +77,8 @@ export function reviveDevice(device: Device): boolean {
 		d._resolveContextLost = resolve;
 	});
 	d._isLost = false;
+	// set by loseDevice(); left true, the next real loss would report "destroyed" (app-requested)
+	d._lossWasRequested = false;
 	d._moduleData = {};
 	const st = gl.lumaState;
 	if (st) {
