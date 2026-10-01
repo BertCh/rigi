@@ -591,6 +591,8 @@ export class WebGpuEngine implements Renderer {
 	private streamerWedge?: ViewWedge;
 	/** loadFullTerrain: the streamer keeps refining all around the eye (setPose no longer narrows it). */
 	private fullWedge?: ViewWedge;
+	/** loadFullTerrain completed (the query terrain is the 360° set and the horizon re-traced). */
+	private fullTerrainDone = false;
 	/** renderPoseView in progress: the photo-view terrain drops its near discard (deck/engine.ts). */
 	private poseView = false;
 	private elevRange: [number, number] | null = null;
@@ -3778,7 +3780,9 @@ export class WebGpuEngine implements Renderer {
 	 * stats().terrain overflow, as for an unknown-heading photo's 360° wedge).
 	 */
 	async loadFullTerrain(timeoutMs = 300_000): Promise<number> {
-		if (this.fullWedge) return 0;
+		// done once it completed: a call that threw (timeout) leaves the wedge at 360°, and the retry
+		// waits for that wedge's set again (`already` below) instead of reporting success
+		if (this.fullTerrainDone) return 0;
 		const t0 = performance.now();
 		await this.ready;
 		const streamer = this.streamer;
@@ -3815,6 +3819,7 @@ export class WebGpuEngine implements Renderer {
 		this.sync();
 		this.horizonDirs = await this.traceHorizon();
 		if (!this.disposed) this.sync();
+		this.fullTerrainDone = true;
 		return Math.round(performance.now() - t0);
 	}
 
