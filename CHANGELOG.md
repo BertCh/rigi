@@ -4,6 +4,14 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### WAG next wave: graph plumbing, precision gate, lazy CPU heights, haze tail (2026-10-01)
+
+- silhouette-gpu, geo-query-gpu and the WebGPU splat sort run as core ComputeGraphs (`cachedGraph` groups `silhouette-mask`, `geo-query`, `splat-sort`) and appear in `/dev/graph`; outputs byte-identical (full-tier check `graph-plumbing-ab`). `GeoQueryGpu.verdictsAndSkyline()` replaces `verdicts()` + `skylineRows()`: one submit and one read per settle instead of two. Splat-sort profiling is reported per node. The manifest now marks terrain-gpu-cull opt-in, matching its flag.
+- Precision gate for the opt-in certified-f32 stages: `scripts/gpu/precision-gate.mjs` (frozen dev split, f64 vs certified-f32, 0-false-accept rule). The matcher render worker takes `MATCHER_RENDERER`, `MATCHER_HORIZON_PRECISION`, `MATCHER_ALIGN_PRECISION` and records `pageFlags` and the precision path; `eval-app` gets `--horizon-precision`, `--align-precision`, `--json`. Only a 2-photo smoke has run (PASS).
+- Certified-f32 horizon: per-(adapter, shader) spot-check ledger (first 3 calls check 64 outputs, then 8 per call with 1 in 32 at 64; a mismatch disables the key). Certified-f32 align: forced exact re-decisions are scored while the next submit runs; results identical, browser wall-clock gain not measured. Both stay opt-in.
+- Haze fit CPU tail: bit-identical shortcuts (hoisted exponentials, a per-pass memo of revisited descent points, typed-array airlight sorts): −0.6–2.9 ms per fit in the WebGPU engine on 4 photos. New fast check `haze-tail`; `compute-bridge.check` reports `fit.stagesMs`.
+- `getCpuHeights(tile)` (`src/lib/dem/cpu-heights.ts`) is the accessor for streamed DEM tile heights; default path bit-identical (fast check `cpu-heights`). New flag `terrainGpuDecode` (off): on WebGPU, DEM tiles decode on the GPU straight into the height atlas with CPU heights on demand; frames byte-identical but no gain yet (see negative results). `atlas-frames-check.mjs --query` runs a flag A/B on one tree.
+
 ### Photo-view VRAM on WebGPU: 371 → 241 MiB (WAG W1.6; 2026-10-01)
 
 - Attribution first: `scripts/gpu/vram-attribution.mjs` (dev only, render lock) wraps `GPUDevice.createTexture` / `createBuffer` in an init script and lists every live allocation by label and creating call site next to luma's totals. At 4d92d3f the photo view (IMG_7086) held 106 MiB of terrain height arrays, an 85 MiB imagery array with no imagery in it, a 47 MiB base-grid buffer, 40 MiB of MSAA colour targets, 2 × 21 MiB of 1024 px geometry targets (view + query source), 15 MiB of idle 384 px silhouette sources and a 16 MiB photo texture.

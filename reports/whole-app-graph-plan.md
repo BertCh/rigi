@@ -156,6 +156,8 @@ Order: W0.6 re-baseline first. W1.4 and W1.7 rest on unconfirmed costs, so measu
 
 ### WAG-4: semantics and upstream
 
+> **2026-10-01, the user's decision:** nothing is posted upstream (no PRs or issues to visgl). The candidates below stay local, in this repo and the vendored rigi builds.
+
 - `GPUProgram` lowerings for the scalar and vector stages (band-stats fold, haze grid argmin), once a per-run-input story exists.
 - Upstream candidates. **Post only with the user's direct OK.** Peers' relays don't count; see [luma-alignment-coordination].
   - a transient initialisation contract (our clear lint)
