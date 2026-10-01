@@ -6,7 +6,7 @@
 // Submit 1 (one graph per N = W·H, cached, group "look-haze-prep"):
 //   prep → dilh → clear counts → bin (atomic counts) → sel-init
 //   → 3 × (clear hist → hist (atomic) → scan)                      radix select, 288 order statistics
-//   → cnt → offs → scatter                                           72-list stable compaction
+//   → cnt → offs (GPUScan, exclusive) → starts → scatter             72-list stable compaction
 //   → gather                                                         the airlight band's lin
 //   → read node "head": counts, state, starts, the lists' first `head` slots, the band's lin
 // Submit 2 (one graph, group "look-haze-grid"): grid → read node "err" (5 550 floats).
@@ -17,15 +17,16 @@
 // - Every node is the dispatch path's kernel spec (same WGSL, pipeline, uniforms), in the same order
 //   with the same workgroup counts. Consecutive nodes share a compute pass; WebGPU orders dispatches
 //   and their storage writes within a pass exactly as across passes.
-// - Custom kernels only: no luma primitive runs (so no float sums, no subgroup reassociation). Radix
-//   select (288 concurrent selections) and the 72-way compaction do not map onto GPUHistogram /
-//   GPUCompaction (luma-master-design §2.4).
+// - Custom kernels plus one luma primitive, the lists' exclusive GPUScan (haze.ts addListOffsets,
+//   shared with the dispatch path): u32 adds only, so subgroup / tree order cannot change a bit. No
+//   float sums. Radix select (288 concurrent selections) and the 72-way compaction do not map onto
+//   GPUHistogram / GPUCompaction (luma-master-design §2.4).
 // - Transients are never zeroed and alias: counts and hist are the only read-modify-write transients
 //   (atomics), each has a clear node before every use (compile() lints it: writes: "atomic"); counts
 //   was a zeroed pooled buffer, hist was cleared per pass, exactly what the clear nodes do. Every
 //   other transient is fully written by the node that first touches it (lin, flags, flagsH, bins per
-//   pixel; state per selection; blk per (block, list) by cnt, then rewritten in place by offs; starts
-//   by offs), so aliased bytes are never read.
+//   pixel; state per selection; blk per (list, block) by cnt; offs per (list, block) by the scan;
+//   starts by starts), so aliased bytes are never read.
 // - Imports (inputs and the lists, which the tail read may need after the submit) are pooled buffers
 //   bound with the run's exact byte ranges. No kernel uses arrayLength(), so the binding size does
 //   not reach the numerics (the dispatch path binds the pooled capacity).
@@ -49,6 +50,7 @@ import type { HazeFit, HazeFitInput } from "../../look/haze-fit";
 import { type CachedGraph, cachedGraph, type GraphRange } from "../core/graph";
 import type { GraphBufferHandle } from "../core/luma";
 import {
+	addListOffsets,
 	airlightBand,
 	gridUploads,
 	HM_PRIOR,
@@ -59,7 +61,6 @@ import {
 	K_HZ_GATHER,
 	K_HZ_GRID,
 	K_HZ_HIST,
-	K_HZ_OFFS,
 	K_HZ_PREP,
 	K_HZ_SCAN,
 	K_HZ_SCATTER,
@@ -68,6 +69,7 @@ import {
 	type Prep,
 	pointAtOf,
 	prepUploads,
+	SCAN_GROUPS,
 	SRGB_LUT,
 	statOf,
 } from "./haze";
@@ -205,6 +207,7 @@ function prepGraphFor(
 			const state = g.transientBuffer("state", SEL * 8);
 			const hist = g.transientBuffer("hist", SEL * BUCKETS * 4);
 			const blk = g.transientBuffer("blk", nBlk * LISTS * 4);
+			const offs = g.transientBuffer("offs", nBlk * LISTS * 4);
 			const starts = g.transientBuffer("starts", (LISTS + 1) * 4);
 			const groups: [number] = [Math.ceil(N / 256)];
 			const selGroups: [number] = [Math.ceil(SEL / 64)];
@@ -248,7 +251,7 @@ function prepGraphFor(
 					id: `scan${p}`,
 					spec: K_HZ_SCAN,
 					bindings: { prm: pass[p], hist, state },
-					workgroups: selGroups,
+					workgroups: [SCAN_GROUPS],
 				});
 			}
 			g.addKernel({
@@ -257,16 +260,11 @@ function prepGraphFor(
 				bindings: { prm: cprm, bins, lin, state, blk },
 				workgroups: blkGroups,
 			});
-			g.addKernel({
-				id: "offs",
-				spec: K_HZ_OFFS,
-				bindings: { prm: cprm, blk, starts },
-				workgroups: [1],
-			});
+			addListOffsets(g, { cprm, blk, offs, starts }, nBlk);
 			g.addKernel({
 				id: "scatter",
 				spec: K_HZ_SCATTER,
-				bindings: { prm: cprm, bins, lin, state, blk, starts, outIdx, outVal },
+				bindings: { prm: cprm, bins, lin, state, offs, outIdx, outVal },
 				workgroups: blkGroups,
 				// only [0, total) is written and only [0, total) is read (imports, not transients)
 				writes: { outIdx: "full", outVal: "full" },
@@ -499,6 +497,7 @@ function compactGraphFor(
 			const outIdx = at<CompactParams>(outIdxH, (p) => 3 * p.N * 4);
 			const outVal = at<CompactParams>(outValH, (p) => 3 * p.N * 4);
 			const blk = g.transientBuffer("blk", nBlk * LISTS * 4);
+			const offs = g.transientBuffer("offs", nBlk * LISTS * 4);
 			const starts = g.transientBuffer("starts", (LISTS + 1) * 4);
 			const blkGroups: [number] = [Math.ceil(nBlk / 64)];
 			g.addKernel({
@@ -507,16 +506,11 @@ function compactGraphFor(
 				bindings: { prm: cprm, bins, lin, state, blk },
 				workgroups: blkGroups,
 			});
-			g.addKernel({
-				id: "offs",
-				spec: K_HZ_OFFS,
-				bindings: { prm: cprm, blk, starts },
-				workgroups: [1],
-			});
+			addListOffsets(g, { cprm, blk, offs, starts }, nBlk);
 			g.addKernel({
 				id: "scatter",
 				spec: K_HZ_SCATTER,
-				bindings: { prm: cprm, bins, lin, state, blk, starts, outIdx, outVal },
+				bindings: { prm: cprm, bins, lin, state, offs, outIdx, outVal },
 				workgroups: blkGroups,
 			});
 			g.readNode("head", [

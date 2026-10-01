@@ -178,29 +178,56 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 `;
 
-/** Pick the bucket holding each selection's remaining rank; extend its prefix. */
+/**
+ * Pick the bucket holding each selection's remaining rank; extend its prefix. One workgroup per
+ * selection (dispatch SEL workgroups of 256): each invocation sums 8 (pass 2: 4) consecutive
+ * buckets, a workgroup inclusive scan of those sums finds the one chunk that holds the
+ * rank, and that invocation walks its few buckets exactly as the serial walk did. u32 adds only, so
+ * the result is the serial walk's: the first d with cum(d) + hist(d) > rank, or (no such d, e.g. an
+ * empty bin) d = nb with cum = the block's total, the digit then clamped to nb − 1.
+ */
 export const HZ_SCAN = /* wgsl */ `${SEL_COMMON}
 @group(0) @binding(0) var<uniform> prm: S;
 @group(0) @binding(1) var<storage, read> hist: array<u32>;
 @group(0) @binding(2) var<storage, read_write> state: array<vec2<u32>>;
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let s = id.x;
-  if (s >= ${SEL}u) { return; }
+var<workgroup> part: array<u32, 256>;
+var<workgroup> st0: vec2<u32>;
+@compute @workgroup_size(256)
+fn main(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) lid: u32) {
+  let s = wg.x;
   let p = prm.pass_;
-  let h0 = select(s, s & ~3u, p == 0u) * ${BUCKETS}u;
-  let nb = 1u << bitsOf(p);
-  var st = state[s];
-  var cum = 0u;
-  var d = 0u;
-  for (; d < nb; d++) {
-    let h = hist[h0 + d];
-    if (cum + h > st.y) { break; }
-    cum += h;
+  let bits = bitsOf(p);
+  let nb = 1u << bits;
+  let per = nb >> 8u;
+  let b0 = select(s, s & ~3u, p == 0u) * ${BUCKETS}u + lid * per;
+  if (lid == 0u) { st0 = state[s]; }
+  var loc = 0u;
+  for (var k = 0u; k < per; k++) { loc += hist[b0 + k]; }
+  part[lid] = loc;
+  workgroupBarrier();
+  for (var off = 1u; off < 256u; off <<= 1u) {
+    var v = 0u;
+    if (lid >= off) { v = part[lid - off]; }
+    workgroupBarrier();
+    part[lid] += v;
+    workgroupBarrier();
   }
-  st.x = (st.x << bitsOf(p)) | min(d, nb - 1u);
-  st.y -= cum;
-  state[s] = st;
+  let st = st0;
+  let incl = part[lid];
+  var excl = 0u;
+  if (lid > 0u) { excl = part[lid - 1u]; }
+  if (excl <= st.y && st.y < incl) {
+    var cum = excl;
+    var d = 0u;
+    for (; d < per; d++) {
+      let h = hist[b0 + d];
+      if (cum + h > st.y) { break; }
+      cum += h;
+    }
+    state[s] = vec2<u32>((st.x << bits) | (lid * per + d), st.y - cum);
+  } else if (lid == 255u && incl <= st.y) {
+    state[s] = vec2<u32>((st.x << bits) | (nb - 1u), st.y - incl);
+  }
 }
 `;
 
@@ -222,7 +249,7 @@ fn loadThr(lid: u32) {
 fn inList(L: u32, v: u32) -> bool { return v >= thr[L].x && v <= thr[L].y; }
 `;
 
-/** Per block of ${BLOCK} pixels: how many go to each list. @workgroup_size(64). */
+/** Per block of ${BLOCK} pixels: how many go to each list, list-major (blk[L·nBlk + t]). @workgroup_size(64). */
 export const HZ_CNT = /* wgsl */ `
 @group(0) @binding(0) var<uniform> prm: C;
 @group(0) @binding(1) var<storage, read> bins: array<i32>;
@@ -245,48 +272,41 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_
       if (inList(L, bitcast<u32>(lin[3u * i + c]))) { cnt[L] += 1u; }
     }
   }
-  for (var L = 0u; L < ${NBINS * 3}u; L++) { blk[t * ${NBINS * 3}u + L] = cnt[L]; }
+  for (var L = 0u; L < ${NBINS * 3}u; L++) { blk[L * prm.nBlk + t] = cnt[L]; }
 }
 `;
 
 /**
- * One workgroup: per list, the exclusive prefix over blocks (in place in blk), then the lists'
- * starts in the packed output: starts[L] = start of list L, starts[${NBINS * 3}] = total.
+ * After one exclusive scan of the list-major block counts (offs = scan(blk), core GPUScan): the
+ * lists' starts in the packed output, starts[L] = offs[L·nBlk], starts[${NBINS * 3}] = the total.
+ * @workgroup_size(${NBINS * 3 + 1}), one workgroup.
  */
-export const HZ_OFFS = /* wgsl */ `
+export const HZ_STARTS = /* wgsl */ `
 struct C { N: u32, nBlk: u32, K: u32, pad: u32 };
 @group(0) @binding(0) var<uniform> prm: C;
-@group(0) @binding(1) var<storage, read_write> blk: array<u32>;
-@group(0) @binding(2) var<storage, read_write> starts: array<u32>;
-var<workgroup> tot: array<u32, ${NBINS * 3}>;
-@compute @workgroup_size(${NBINS * 3})
+@group(0) @binding(1) var<storage, read> blk: array<u32>;
+@group(0) @binding(2) var<storage, read> offs: array<u32>;
+@group(0) @binding(3) var<storage, read_write> starts: array<u32>;
+@compute @workgroup_size(${NBINS * 3 + 1})
 fn main(@builtin(local_invocation_index) L: u32) {
-  var run = 0u;
-  for (var t = 0u; t < prm.nBlk; t++) {
-    let k = t * ${NBINS * 3}u + L;
-    let c = blk[k];
-    blk[k] = run;
-    run += c;
+  if (L < ${NBINS * 3}u) {
+    starts[L] = offs[L * prm.nBlk];
+  } else {
+    let k = ${NBINS * 3}u * prm.nBlk - 1u;
+    starts[L] = offs[k] + blk[k];
   }
-  tot[L] = run;
-  workgroupBarrier();
-  var base = 0u;
-  for (var k = 0u; k < L; k++) { base += tot[k]; }
-  starts[L] = base;
-  if (L == ${NBINS * 3 - 1}u) { starts[${NBINS * 3}] = base + run; }
 }
 `;
 
-/** Per block again: write each list's pixels (index, value bits) at their packed position. */
+/** Per block again: write each list's pixels (index, value bits) at their packed position (offs[L·nBlk + t]). */
 export const HZ_SCATTER = /* wgsl */ `
 @group(0) @binding(0) var<uniform> prm: C;
 @group(0) @binding(1) var<storage, read> bins: array<i32>;
 @group(0) @binding(2) var<storage, read> lin: array<f32>;
 @group(0) @binding(3) var<storage, read> state: array<vec2<u32>>;
-@group(0) @binding(4) var<storage, read> blk: array<u32>;
-@group(0) @binding(5) var<storage, read> starts: array<u32>;
-@group(0) @binding(6) var<storage, read_write> outIdx: array<u32>;
-@group(0) @binding(7) var<storage, read_write> outVal: array<u32>;
+@group(0) @binding(4) var<storage, read> offs: array<u32>;
+@group(0) @binding(5) var<storage, read_write> outIdx: array<u32>;
+@group(0) @binding(6) var<storage, read_write> outVal: array<u32>;
 ${COMPACT_COMMON}
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_index) lid: u32) {
@@ -294,7 +314,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_
   let t = id.x;
   if (t >= prm.nBlk) { return; }
   var at: array<u32, ${NBINS * 3}>;
-  for (var L = 0u; L < ${NBINS * 3}u; L++) { at[L] = starts[L] + blk[t * ${NBINS * 3}u + L]; }
+  for (var L = 0u; L < ${NBINS * 3}u; L++) { at[L] = offs[L * prm.nBlk + t]; }
   for (var i = t * ${BLOCK}u; i < min(prm.N, (t + 1u) * ${BLOCK}u); i++) {
     let b = bins[i];
     if (b < 0) { continue; }

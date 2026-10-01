@@ -1380,7 +1380,8 @@ function hazeGraph(
 				id: `scan${p}`,
 				spec: K_HZ_SCAN,
 				bindings: { prm: pp, hist, state },
-				workgroups: [Math.ceil(SEL / 64)],
+				// one workgroup per selection (haze.ts SCAN_GROUPS)
+				workgroups: [SEL],
 			});
 		}
 		g.compile();

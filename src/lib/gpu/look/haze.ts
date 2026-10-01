@@ -6,7 +6,7 @@
 // statistics, the dark-subset sums and representative paths, the free-β IRLS, the refinement
 // passes and the quality terms. Those parts mirror haze-fit.ts line for line (keep in sync;
 // look-bench.mjs catches drift). Buffers are pooled (lease "look-haze").
-import type { Device } from "@luma.gl/core";
+import { Buffer, type Device } from "@luma.gl/core";
 import {
 	ATM_CURV,
 	atmPath,
@@ -31,6 +31,12 @@ import {
 import { sunColor } from "../../look/sun";
 import { srgbToLinear } from "../../style/color";
 import {
+	type ComputeGraph,
+	cachedGraph,
+	type GraphBinding,
+} from "../core/graph";
+import { GPUScan, type GraphBufferHandle } from "../core/luma";
+import {
 	BLOCK,
 	BUCKETS,
 	HZ_BIN,
@@ -39,11 +45,11 @@ import {
 	HZ_GATHER,
 	HZ_GRID,
 	HZ_HIST,
-	HZ_OFFS,
 	HZ_PREP,
 	HZ_SCAN,
 	HZ_SCATTER,
 	HZ_SEL_INIT,
+	HZ_STARTS,
 	LISTS,
 	SEL,
 } from "./haze.wgsl";
@@ -108,9 +114,10 @@ export const K_HZ_CNT = defineKernel("hz-cnt", HZ_CNT, [
 	["state", "read-only-storage"],
 	["blk", "storage"],
 ]);
-export const K_HZ_OFFS = defineKernel("hz-offs", HZ_OFFS, [
+export const K_HZ_STARTS = defineKernel("hz-starts", HZ_STARTS, [
 	["prm", "uniform"],
-	["blk", "storage"],
+	["blk", "read-only-storage"],
+	["offs", "read-only-storage"],
 	["starts", "storage"],
 ]);
 export const K_HZ_SCATTER = defineKernel("hz-scatter", HZ_SCATTER, [
@@ -118,8 +125,7 @@ export const K_HZ_SCATTER = defineKernel("hz-scatter", HZ_SCATTER, [
 	["bins", "read-only-storage"],
 	["lin", "read-only-storage"],
 	["state", "read-only-storage"],
-	["blk", "read-only-storage"],
-	["starts", "read-only-storage"],
+	["offs", "read-only-storage"],
 	["outIdx", "storage"],
 	["outVal", "storage"],
 ]);
@@ -137,6 +143,77 @@ export const K_HZ_GRID = defineKernel("hz-grid", HZ_GRID, [
 	["hmPrior", "read-only-storage"],
 	["err", "storage"],
 ]);
+
+/** hz-scan's dispatch: one workgroup per selection. */
+export const SCAN_GROUPS = SEL;
+
+/**
+ * The lists' offsets on a ComputeGraph: one exclusive core GPUScan over the list-major block counts
+ * (offs[L·nBlk + t] = the packed position of block t's first list-L pixel, what hz-scatter starts
+ * from), then hz-starts (starts[L], starts[LISTS] = total). u32 adds only: the numbers of the old
+ * per-list serial walk (hz-offs), bit for bit. Every element of offs and starts is written.
+ */
+export function addListOffsets<P>(
+	g: ComputeGraph<P>,
+	b: {
+		cprm: GraphBinding;
+		blk: GraphBufferHandle;
+		offs: GraphBufferHandle;
+		starts: GraphBinding;
+	},
+	nBlk: number,
+) {
+	const n = LISTS * nBlk;
+	g.add(
+		new GPUScan({
+			id: "offs",
+			input: g.view(b.blk, "uint32", n),
+			output: g.view(b.offs, "uint32", n),
+			mode: "exclusive",
+		}),
+	);
+	g.addKernel({
+		id: "starts",
+		spec: K_HZ_STARTS,
+		bindings: { prm: b.cprm, blk: b.blk, offs: b.offs, starts: b.starts },
+		workgroups: [1],
+	});
+}
+
+/** addListOffsets for the dispatch path: a cached graph per nBlk, recorded into `enc`. */
+function encodeListOffsets(
+	device: Device,
+	enc: ReturnType<Device["createCommandEncoder"]>,
+	nBlk: number,
+	buffers: { cprm: Buffer; blk: Buffer; offs: Buffer; starts: Buffer },
+) {
+	const e = cachedGraph<void, undefined>(
+		device,
+		"look-haze-offs",
+		`b${nBlk}`,
+		(g) => {
+			const bytes = LISTS * nBlk * 4;
+			addListOffsets(
+				g,
+				{
+					cprm: g.importBuffer(
+						"cprm",
+						16,
+						undefined,
+						Buffer.UNIFORM | Buffer.COPY_DST,
+					),
+					blk: g.importBuffer("blk", bytes),
+					offs: g.importBuffer("offs", bytes),
+					starts: g.importBuffer("starts", (LISTS + 1) * 4),
+				},
+				nBlk,
+			);
+			return undefined;
+		},
+		2,
+	);
+	e.graph.compile().encode(enc, undefined, buffers);
+}
 
 // mirror of haze-fit.ts (keep in sync)
 export const NBINS = 24;
@@ -334,12 +411,7 @@ function prepGpu(
 		for (let p = 0; p < 3; p++) {
 			clear(enc, hist, 0, SEL * BUCKETS * 4);
 			dispatch(enc, kHist, { prm: passPrm[p], bins, lin, state, hist }, groups);
-			dispatch(
-				enc,
-				kScan,
-				{ prm: passPrm[p], hist, state },
-				Math.ceil(SEL / 64),
-			);
+			dispatch(enc, kScan, { prm: passPrm[p], hist, state }, SCAN_GROUPS);
 		}
 		const head: ReadRange[] = [
 			{ buffer: counts, size: NBINS * 4 },
@@ -387,6 +459,7 @@ function prepGpu(
 			new Uint32Array([N, nBlk, K, 0]),
 		);
 		const blk = scratch("blk", nBlk * LISTS * 4);
+		const offs = scratch("offs", nBlk * LISTS * 4);
 		const starts = scratch("starts", (LISTS + 1) * 4);
 		// capacity: every binned pixel in all three channels' lists
 		const outIdx = scratch("outIdx", 3 * N * 4);
@@ -398,11 +471,11 @@ function prepGpu(
 			{ prm: cprm, bins, lin, state, blk },
 			blocks,
 		);
-		dispatch(enc, kernel(device, K_HZ_OFFS), { prm: cprm, blk, starts }, 1);
+		encodeListOffsets(device, enc, nBlk, { cprm, blk, offs, starts });
 		dispatch(
 			enc,
 			kernel(device, K_HZ_SCATTER),
-			{ prm: cprm, bins, lin, state, blk, starts, outIdx, outVal },
+			{ prm: cprm, bins, lin, state, offs, outIdx, outVal },
 			blocks,
 		);
 		let skyOut = null;
