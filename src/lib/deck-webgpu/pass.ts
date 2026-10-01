@@ -6,6 +6,7 @@
 // or more pass kinds. Hosts (hosts/direct.ts: plain luma; hosts/deck.ts: deck.gl on WebGPU) own
 // the device, targets and render passes and call `draw(ctx)` once per pass the core takes part in.
 import type {
+	CommandEncoder,
 	Device,
 	RenderPass,
 	RenderPipelineParameters,
@@ -59,6 +60,15 @@ export type PassContext = {
 	color?: ColorTargets;
 };
 
+/**
+ * What a core's prepass sees: the pass it is about to take part in, and the command encoder that
+ * pass will be recorded on (device.commandEncoder), with no render pass open yet.
+ */
+export type PrepassContext = Omit<
+	PassContext,
+	"renderPass" | "geometry" | "color"
+> & { commandEncoder: CommandEncoder };
+
 export interface GpuLayerCore {
 	readonly id: string;
 	/** Pass kinds this core draws in. */
@@ -70,6 +80,12 @@ export interface GpuLayerCore {
 	readonly screenParameters?: RenderPipelineParameters;
 	/** Draw into ctx.renderPass. Never begin/end passes or submit here. */
 	draw(ctx: PassContext): void;
+	/**
+	 * Optional, geometry / colour passes: record compute work the coming draw(ctx) consumes (e.g. a
+	 * GPU cull writing indirect draw records) on ctx.commandEncoder. Hosts call it right before they
+	 * begin that pass, on the same encoder, once per pass the core is drawn in. Never submit here.
+	 */
+	prepass?(ctx: PrepassContext): void;
 	/** Visible this frame? (hosts skip draw when false). */
 	visible?(): boolean;
 	destroy(): void;

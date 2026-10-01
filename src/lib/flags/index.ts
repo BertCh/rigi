@@ -60,6 +60,13 @@ export const FLAG_SCHEMA = {
 	lookgpu: onOff("on"),
 	/** unknown-pose 360° horizon (off: 0-false-accept rule) */
 	unknownGpu: onOff("off"),
+	/**
+	 * WebGPU batched terrain: GPU frustum cull + indirect draws (WAG W1.5; byte-identical frames to the
+	 * CPU cull, scripts/deck-webgpu/terrain-indirect-check.mjs); off = the CPU cull. Default off: no CPU
+	 * saving measured at ~350–390 tiles (0.15–0.19 vs 0.12–0.14 ms per frame) and the full tier is unrun. WebGL and ?gpu=off
+	 * always cull on the CPU.
+	 */
+	terrainGpuCull: onOff("off"),
 	// Step Inside 3D Tiles (src/lib/tiles3d)
 	tiles3d: oneOf(["off", "buildings", "swisstopo", "google", "all"], "off"),
 	tiles3dBlend: oneOf(["fill", "over"], "fill"),

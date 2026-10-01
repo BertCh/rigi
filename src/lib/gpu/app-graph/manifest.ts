@@ -389,6 +389,28 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		notes: "deck.gl layers in one encoder; not a ComputeGraph",
 	},
 	{
+		id: "terrain-gpu-cull",
+		island: "I7",
+		paths: [
+			"src/lib/deck-webgpu/layers/terrain-cull.ts",
+			"src/lib/deck-webgpu/layers/terrain-cull.wgsl.ts",
+			"src/lib/deck-webgpu/layers/batched-terrain.ts",
+		],
+		groups: [],
+		graphIdPrefixes: ["terrain-cull-"],
+		realms: ["page"],
+		cadence: "per frame",
+		resources: [
+			"tile spheres + rows (import, per tile set)",
+			"per-pass uniform, instance rows and indexed indirect records (imports, encoder ring)",
+			"vis flags (transient)",
+		],
+		readbacks: [],
+		status: "default",
+		notes:
+			"WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default on, WebGPU only; off / ?gpu=off / WebGL: the CPU twin visibleRows)",
+	},
+	{
 		id: "geo-query-gpu",
 		island: "I8",
 		paths: ["src/lib/deck-webgpu/geo-query-gpu.ts"],

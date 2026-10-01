@@ -14,7 +14,11 @@
 //   - tile table: a read-only storage buffer, one 48-byte TileRow per tile (height layer, size,
 //                seg, skirt | Mercator / lon params | G, big, imagery layer)
 //   - instances: per (pass kind, seg) a compact uint32 vertex buffer of the visible tiles' table
-//                rows (CPU-culled with the grid's bounding sphere), step mode "instance"
+//                rows (CPU-culled with the grid's bounding sphere), step mode "instance". On WebGPU
+//                (flag terrainGpuCull, default on; WAG W1.5) terrain-cull.ts culls and compacts them
+//                on the GPU in the pass's prepass and the draws are indirect (no CPU cull, no count
+//                readback); conservative and in the CPU path's draw order, so the frames are
+//                byte-identical (scripts/deck-webgpu/terrain-indirect-check.mjs)
 //   - vertices:  none. (i, j, skirt) come from @builtin(vertex_index) in gridMesh's vertex order
 //                (grid rows, then the four edge copies); the index buffer is gridMesh's, so the
 //                triangulation (and the double-sided skirts) are buildMesh's.
@@ -35,7 +39,7 @@
 // foundation.
 //
 // luma 10: nothing deck-specific here; Model / Buffer / Texture / ShaderModule only.
-import type { Buffer, Device, Texture } from "@luma.gl/core";
+import type { Buffer, CommandEncoder, Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import {
 	BASE_MAX,
@@ -43,14 +47,17 @@ import {
 	gridMesh,
 } from "#/lib/deck/batched-terrain-grid";
 import type { TileMesh } from "#/lib/deck/terrain-data";
+import { getFlag } from "#/lib/flags";
 import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";
-import { sphereInView } from "../camera";
+import { gpuEnabled } from "#/lib/gpu/core/device";
+import { type CameraUniforms, sphereInView } from "../camera";
 import type { ImageryArray } from "../imagery";
 import {
 	type GpuLayerCore,
 	ModelCache,
 	type PassContext,
 	type PassKind,
+	type PrepassContext,
 	passModelProps,
 } from "../pass";
 import {
@@ -61,6 +68,7 @@ import {
 	terrainModules,
 	terrainSource,
 } from "../terrain";
+import { type CulledDraw, TerrainGpuCull } from "./terrain-cull";
 
 // ---------- WGSL ----------
 
@@ -488,6 +496,11 @@ export type BatchedTerrainStats = {
 	draws: { geometry: number; color: number };
 	triangles: number;
 	uploadMs: number;
+	/** which cull the last pass of each kind used ("gpu": drawn/culled are not known on the CPU;
+	 * drawn = resident tiles, culled = -1) */
+	cullPath: { geometry: "cpu" | "gpu"; color: "cpu" | "gpu" };
+	/** CPU ms of the core's prepass + draw, last pass of each kind */
+	cpuMs: { geometry: number; color: number };
 };
 
 /**
@@ -507,9 +520,8 @@ export class BatchedTerrainCore implements GpuLayerCore {
 	private instBufs = new Map<string, InstBuf>();
 	private empty?: Texture;
 	/**
-	 * Optional culling override (GPU culling by mt-image-03's compute core, when it exists):
-	 * return the visible rows per seg for this pass, or null to use the CPU sphere cull.
-	 * TODO(mt-image-03): src/lib/gpu/core compute cull → an indirect-draw buffer.
+	 * Optional culling override: return the visible rows per seg for this pass, or null to use the
+	 * CPU sphere cull. When set, the GPU cull (terrain-cull.ts) stays off.
 	 */
 	cull?: (
 		ctx: PassContext,
@@ -523,7 +535,27 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		draws: { geometry: 0, color: 0 },
 		triangles: 0,
 		uploadMs: 0,
+		cullPath: { geometry: "cpu", color: "cpu" },
+		cpuMs: { geometry: 0, color: 0 },
 	};
+	/** GPU cull (created on first use under the flag; WebGPU only) */
+	private gpuCull: TerrainGpuCull | null = null;
+	/** the GPU cull's candidates are stale (tile set changed) */
+	private cullDirty = true;
+	/** the GPU cull cannot take the current tile set (too many segs) */
+	private cullUnsupported = false;
+	/** per kind: the cull recorded by prepass for the coming draw */
+	private prepared: Partial<
+		Record<
+			"geometry" | "color",
+			{
+				draw: CulledDraw;
+				encoder: CommandEncoder;
+				camera: CameraUniforms;
+				ms: number;
+			}
+		>
+	> = {};
 
 	constructor(
 		readonly device: Device,
@@ -560,6 +592,7 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		const t0 = performance.now();
 		this.tiles = meshes;
 		this.store.sync(meshes, this.layerOf);
+		this.cullDirty = true;
 		this.stats.tiles = this.store.slots.size;
 		this.stats.overflow = this.store.overflow;
 		this.stats.uploadMs += performance.now() - t0;
@@ -656,6 +689,49 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		return ib;
 	}
 
+	/** The GPU cull applies: WebGPU, ?gpu=on, terrainGpuCull=on, no custom `cull` hook. */
+	private gpuCullWanted() {
+		return (
+			this.device.type === "webgpu" &&
+			!this.cull &&
+			gpuEnabled() &&
+			getFlag("terrainGpuCull") === "on" &&
+			!this.gpuCull?.failed
+		);
+	}
+
+	/** GpuLayerCore.prepass: record the GPU cull of this pass (when it applies and is ready). */
+	prepass(ctx: PrepassContext) {
+		if (ctx.kind === "screen") return;
+		const t0 = performance.now();
+		delete this.prepared[ctx.kind];
+		if (!this.gpuCullWanted() || !this.store.slots.size) return;
+		this.gpuCull ??= new TerrainGpuCull(this.device);
+		if (this.cullDirty) {
+			this.cullDirty = false;
+			const cands: {
+				sphere: [number, number, number, number];
+				row: number;
+				seg: number;
+			}[] = [];
+			for (const t of this.tiles) {
+				const s = this.store.slots.get(t);
+				if (s && t.grid)
+					cands.push({ sphere: t.grid.sphere, row: s.row, seg: t.seg });
+			}
+			this.cullUnsupported = !this.gpuCull.setCandidates(cands);
+		}
+		if (this.cullUnsupported) return;
+		const draw = this.gpuCull.prepare(ctx.commandEncoder, ctx.camera);
+		if (draw)
+			this.prepared[ctx.kind] = {
+				draw,
+				encoder: ctx.commandEncoder,
+				camera: ctx.camera,
+				ms: performance.now() - t0,
+			};
+	}
+
 	/** Visible table rows per seg, near → far (the set's order), CPU sphere cull. */
 	private visibleRows(ctx: PassContext, kind: "geometry" | "color") {
 		const custom = this.cull?.(ctx, this.tiles);
@@ -681,7 +757,17 @@ export class BatchedTerrainCore implements GpuLayerCore {
 
 	draw(ctx: PassContext) {
 		if (ctx.kind === "screen" || !this.store.slots.size) return;
+		const t0 = performance.now();
 		const kind = ctx.kind;
+		// the prepass's GPU cull, if it was recorded for THIS pass (same encoder, same camera)
+		const prep = this.prepared[kind];
+		delete this.prepared[kind];
+		const culled =
+			prep &&
+			prep.encoder === ctx.device.commandEncoder &&
+			prep.camera === ctx.camera
+				? prep
+				: null;
 		const model = this.model(kind);
 		const L = this.look;
 		model.shaderInputs.setProps({
@@ -722,6 +808,12 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		}
 		model.setBindings(bindings as never);
 
+		if (culled) {
+			this.drawCulled(model, culled.draw, ctx);
+			this.stats.cpuMs[kind] = culled.ms + performance.now() - t0;
+			return;
+		}
+		model.setIndirectBuffer(null);
 		let drawn = 0;
 		let draws = 0;
 		let tris = 0;
@@ -741,6 +833,29 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		this.stats.drawn[kind] = drawn;
 		this.stats.draws[kind] = draws;
 		if (kind === "color") this.stats.triangles = tris;
+		this.stats.cullPath[kind] = "cpu";
+		this.stats.cpuMs[kind] = performance.now() - t0;
+	}
+
+	/**
+	 * The GPU-culled draws: one drawIndexedIndirect per draw slot, in the CPU path's group order
+	 * (the compaction orders the slots by first visible tile), each with its slot's instance buffer.
+	 * Empty slots draw nothing (instanceCount 0 in the record).
+	 */
+	private drawCulled(model: Model, d: CulledDraw, ctx: PassContext) {
+		const kind = ctx.kind as "geometry" | "color";
+		model.setIndexBuffer(d.index);
+		model.setIndexCount(d.indexCount);
+		for (let s = 0; s < d.slots; s++) {
+			model.setAttributes({ row: d.inst[s] });
+			model.setIndirectBuffer(d.args, s * d.recordBytes);
+			model.draw(ctx.renderPass);
+		}
+		model.setIndirectBuffer(null);
+		this.stats.drawn[kind] = this.store.slots.size;
+		this.stats.culled[kind] = -1;
+		this.stats.draws[kind] = d.slots;
+		this.stats.cullPath[kind] = "gpu";
 	}
 
 	private emptyArray() {
@@ -756,6 +871,9 @@ export class BatchedTerrainCore implements GpuLayerCore {
 	}
 
 	destroy() {
+		this.gpuCull?.destroy();
+		this.gpuCull = null;
+		this.prepared = {};
 		this.models.destroy();
 		for (const b of this.indexBufs.values()) b.buf.destroy();
 		this.indexBufs.clear();

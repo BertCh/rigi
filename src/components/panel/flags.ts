@@ -191,6 +191,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "terrainGpuCull",
+		label: "Terrain GPU cull",
+		help: "WebGPU: cull the batched terrain's tiles on the GPU and draw them indirectly (no CPU cull per frame).",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
 		name: "imagery",
 		label: "Imagery provider",
 		help: "Default: swisstopo in CH, Esri elsewhere. swisstopo: licence-clean, CH only. Custom needs VITE_IMAGERY_URL.",

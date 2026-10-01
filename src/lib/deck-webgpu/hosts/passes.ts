@@ -18,6 +18,7 @@ import {
 	type PassContext,
 	type PassKind,
 	type PassTarget,
+	type PrepassContext,
 	setColorSamples,
 } from "../pass";
 import {
@@ -50,6 +51,15 @@ function sorted(cores: readonly GpuLayerCore[], kind: PassKind) {
 		.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
+/** The cores' prepasses, on the encoder the pass is about to be recorded on (no pass open). */
+function runPrepasses(
+	cores: readonly GpuLayerCore[],
+	ctx: Omit<PrepassContext, "commandEncoder">,
+) {
+	for (const c of cores)
+		c.prepass?.({ ...ctx, commandEncoder: ctx.device.commandEncoder });
+}
+
 /**
  * The geometry pass alone: `cores`' geometry draws through the photo camera into `geometry`.
  * Also what off-frame renders use (queries / align, layers/geometry-source.ts): pass your own
@@ -67,12 +77,6 @@ export function runGeometryPass(o: {
 	const frame: FrameState =
 		o.frame.view === "photo" ? o.frame : { ...o.frame, view: "photo" };
 	const cam = camerasFor(o.photo, geometry.width, geometry.height);
-	const renderPass = device.beginRenderPass({
-		id: "rigi-geometry",
-		framebuffer: geometry.fbo,
-		clearColor: [0, 0, 0, 0],
-		clearDepth: REVERSED_Z.clearDepth,
-	});
 	const target: PassTarget = {
 		width: geometry.width,
 		height: geometry.height,
@@ -80,7 +84,15 @@ export function runGeometryPass(o: {
 		depthFormat: PASS_ATTACHMENTS.geometry.depthStencilAttachmentFormat,
 		samples: 1,
 	};
-	for (const c of sorted(o.cores, "geometry"))
+	const cores = sorted(o.cores, "geometry");
+	runPrepasses(cores, { device, kind: "geometry", camera: cam, target, frame });
+	const renderPass = device.beginRenderPass({
+		id: "rigi-geometry",
+		framebuffer: geometry.fbo,
+		clearColor: [0, 0, 0, 0],
+		clearDepth: REVERSED_Z.clearDepth,
+	});
+	for (const c of cores)
 		c.draw({
 			device,
 			kind: "geometry",
@@ -104,6 +116,15 @@ export function runColorPass(o: {
 	const { device, geometry, color, frame } = o;
 	const cam = camerasFor(o.view, color.width, color.height);
 	const samples = color.samples;
+	const target: PassTarget = {
+		width: color.width,
+		height: color.height,
+		colorFormats: PASS_ATTACHMENTS.color.colorAttachmentFormats,
+		depthFormat: PASS_ATTACHMENTS.color.depthStencilAttachmentFormat,
+		samples,
+	};
+	const cores = sorted(o.cores, "color");
+	runPrepasses(cores, { device, kind: "color", camera: cam, target, frame });
 	const renderPass = device.beginRenderPass({
 		id: "rigi-color",
 		framebuffer: color.passFbo,
@@ -113,17 +134,10 @@ export function runColorPass(o: {
 		// Interactive (1×): the pass draws into color.color itself
 		...(samples > 1 ? { resolveTargets: [color.color], discard: true } : {}),
 	} as never);
-	const target: PassTarget = {
-		width: color.width,
-		height: color.height,
-		colorFormats: PASS_ATTACHMENTS.color.colorAttachmentFormats,
-		depthFormat: PASS_ATTACHMENTS.color.depthStencilAttachmentFormat,
-		samples,
-	};
 	// layers build their colour Models while drawing: they must see this pass's sample count
 	setColorSamples(samples);
 	try {
-		for (const c of sorted(o.cores, "color"))
+		for (const c of cores)
 			c.draw({
 				device,
 				kind: "color",

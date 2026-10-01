@@ -4,6 +4,12 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Batched terrain: GPU cull and indirect draws (WAG W1.5; 2026-10-01)
+
+- WebGPU: the batched terrain's per-frame frustum cull moved to a two-node `ComputeGraph` (`deck-webgpu/layers/terrain-cull.ts`): a conservative f32 sphere test, then a stable compaction into per-resolution instance buffers and indexed indirect records, drawn with `Model.setIndirectBuffer` (luma #3328, vendored rigi.2). No count is read back. Frames are byte-identical to the CPU cull (3 photos × 10 poses incl. the world view, geometry + normal + colour targets); the CPU cost per pass is about the same (~17–19 µs vs ~16–21 µs at ~350–390 tiles), so this is not a CPU saving at today's tile counts.
+- Flag `terrainGpuCull` (default off, since it saves no CPU time at today's tile counts; WebGL, `?gpu=off` and `terrainGpuCull=off` keep the CPU cull). New optional layer hook `GpuLayerCore.prepass(ctx)`, called by `hosts/passes.ts` before the geometry / colour pass on the same encoder.
+- Checks: fast tier `terrain-cull` (`layers/terrain-cull-math.check.ts`); browser gate `scripts/deck-webgpu/terrain-indirect-check.mjs` (render lock, `?renderer=webgpu`).
+
 ### Graph inspection and app graph manifest (WAG W0.2, W0.3; 2026-10-01)
 
 - `gpu/core/inspect.ts` + `inspector.ts`: luma's `GPUCommandGraphInspector` (one per device) and the upstream preflight over every `cachedGraph`; `getGpuGraphProfile()` in `core/profile.ts` reports per-graph and per-node CPU encode / GPU p50 / p95, transient bytes, aliasing savings and the preflight fit. Opt-in (profiling on, or `/dev/graph` open); unobserved graphs encode as before.

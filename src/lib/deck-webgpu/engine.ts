@@ -246,6 +246,7 @@ import {
 	modelEpoch,
 	type PassContext,
 	type PassKind,
+	type PrepassContext,
 } from "./pass";
 import { PresentCore, type PresentMode } from "./present";
 import { SilhouetteMaskGpu } from "./silhouette-gpu";
@@ -355,6 +356,9 @@ class ViewGate implements GpuLayerCore {
 		this.inner.draw(
 			ctx.frame.view === view ? ctx : { ...ctx, frame: { ...ctx.frame, view } },
 		);
+	}
+	prepass(ctx: PrepassContext) {
+		this.inner.prepass?.(ctx);
 	}
 	visible() {
 		return this.show() && (this.inner.visible?.() ?? true);

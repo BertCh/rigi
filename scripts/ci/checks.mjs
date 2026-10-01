@@ -157,6 +157,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "terrain-cull",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/terrain-cull-math.check.ts"),
+		note: "batched-terrain GPU cull (WAG W1.5): f32 kernel twin ⊇ CPU sphereInView on random + on-plane spheres; compaction order = visibleRows; WGSL binding layouts",
+		timeoutS: 60,
+	},
+	{
 		id: "labels",
 		tier: "fast",
 		group: "look",

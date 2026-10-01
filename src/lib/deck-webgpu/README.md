@@ -280,8 +280,15 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   colour.
 - `SplatsCore`'s order buffer is written by the GPU radix sort with `sortBackend: "gpu"`
   (`src/lib/gpu/splat-sort`, the worker stays the default and fallback).
-- Hooks waiting for compute: `BatchedTerrainCore.cull(ctx, tiles)` (GPU cull + indirect draws),
-  `RIDGES_WGSL` (binding-free, runs in
+- GPU cull + indirect draws (WAG W1.5): `layers/terrain-cull.ts` culls the batched terrain's tiles
+  (conservative f32 twin of `sphereInView`), compacts the visible rows in the CPU path's order and
+  writes one indexed indirect record per mesh resolution; `BatchedTerrainCore.draw` draws them with
+  luma's `Model.setIndirectBuffer` (#3328). It is recorded by the optional
+  `GpuLayerCore.prepass(ctx)`, which `hosts/passes.ts` calls on the pass's encoder right before the
+  geometry / colour render pass. Flag `terrainGpuCull` (default **off**: byte-identical, but no CPU saving at ~350–390 tiles, 0.15–0.19 vs 0.12–0.14 ms per frame; WebGPU only, `?gpu=off` and
+  WebGL keep the CPU cull). Gates: `layers/terrain-cull-math.check.ts` (fast tier `terrain-cull`)
+  and `scripts/deck-webgpu/terrain-indirect-check.mjs` (byte-equal frames, CPU ms).
+- Hooks waiting for compute: `RIDGES_WGSL` (binding-free, runs in
   `@compute` as-is: an edge-mask pass).
 - Kernels must not write a target that a later pass of the same frame reads. Schedule them after
   `runOffscreenPasses` (colour pass done), or give them their own targets.
