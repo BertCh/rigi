@@ -723,6 +723,12 @@ export class DeckEngine implements Renderer {
 		try {
 			this.dropGeometrySources();
 		} catch {}
+		// the silhouette-mask helper's GL handles died with the context (the revived device keeps
+		// its identity, so the device check in silhouetteScoresGpu would not rebuild it)
+		try {
+			this.silMask?.destroy();
+		} catch {}
+		this.silMask = null;
 		this.drapeTex = [];
 		const prev = this.compositor;
 		prev.onChange = undefined;
