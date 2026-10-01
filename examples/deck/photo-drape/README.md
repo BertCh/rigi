@@ -101,12 +101,16 @@ deck.gl and luma.gl APIs are used (no underscore-prefixed exports).
 
 API observations from this example, collected for deck.gl and luma.gl:
 
-- **An offscreen pass is possible with public API, through `Effect`.** Rigi's app renders its range
-  pass with deck.gl's `_LayersPass`. Here, `Effect.preRender` plus a luma.gl render pass on the
-  effect's own framebuffer does the same job publicly. The layer has to expose a method
+- **An offscreen pass is possible with public API, through `Effect`.** Here, `Effect.preRender` plus
+  a luma.gl render pass on the effect's own framebuffer does the job. The layer has to expose a method
   (`drawPhotoDepth`) and own a second `Model`, because a layer's `draw()` runs inside deck.gl's open
   render pass. `Effect`, `EffectContext` and `PreRenderOptions` are exported only as types, and
-  deck.gl documents custom effects only loosely.
+  deck.gl documents custom effects only loosely. Rigi's app used `_LayersPass` for its range pass;
+  it now re-creates that pass's draw sequence from public pieces (`src/lib/deck/offscreen-layers.ts`:
+  `filterSubLayer`, `activateViewport`, `setShaderModuleProps`, `getModels`, `context.renderPass`,
+  `draw()`, and luma's `WebGLDevice.withParametersWebGL`). deck.gl has no public "draw these layers
+  through this viewport into this framebuffer" call, so that file copies `LayersPass` internals
+  (module props, polygon offset, parameter merging) that can drift between deck.gl versions.
 - **Orbit controller state drops custom view-state fields.** `OrbitState` keeps only its own
   fields, so `roll` (or any extra field) is lost during interaction and transitions, and
   `OrbitState` is not exported for subclassing. Roll is therefore a view prop (`rollAnchor`) here.

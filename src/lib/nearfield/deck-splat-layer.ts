@@ -20,7 +20,6 @@ import {
 	COORDINATE_SYSTEM,
 	Layer,
 	type LayerProps,
-	_LayersPass as LayersPass,
 	project32,
 	type UpdateParameters,
 	type Viewport,
@@ -29,6 +28,7 @@ import type { Buffer, Device, Framebuffer, Texture } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { Pose } from "../camera";
 import { glOf } from "../deck/gl";
+import { drawLayersOffscreen } from "../deck/offscreen-layers";
 import { PhotoViewport } from "../deck/photo-view";
 import {
 	currentTerrainPass,
@@ -427,14 +427,9 @@ export function isDeckSplatLayer(layer: unknown): layer is DeckSplatLayer {
 
 // ---------------- photo view colour pass (composite.ts) ----------------
 
-/** Only the splat layers, with their own blend / depth parameters (no terrain overrides). */
-class SplatLayersPass extends LayersPass {
-	shouldDrawLayer(layer: Layer) {
-		return isDeckSplatLayer(layer);
-	}
-	protected getLayerParameters(layer: Layer) {
-		return { ...layer.props.parameters };
-	}
+/** The splat layers keep their own blend / depth parameters (no terrain overrides). */
+function splatPassParameters(layer: Layer) {
+	return { ...layer.props.parameters };
 }
 
 const mergeVs = /* glsl */ `#version 300 es
@@ -473,15 +468,12 @@ void main() {
  * as the splats change; the snapshot keeps the terrain so a splat-only change redraws only splats.
  */
 export class SplatColorPass {
-	private pass: SplatLayersPass;
 	private base?: Framebuffer;
 	private splat?: Texture;
 	private splatFbo?: WebGLFramebuffer;
 	private splatFboKey: [unknown, unknown] = [null, null];
 	private merge?: Model;
-	constructor(readonly device: Device) {
-		this.pass = new SplatLayersPass(device, { id: "splat-color-pass" });
-	}
+	constructor(readonly device: Device) {}
 
 	private get gl() {
 		return glOf(this.device);
@@ -605,17 +597,16 @@ export class SplatColorPass {
 			far: 400_000,
 		});
 		withTerrainPass("color", () =>
-			this.pass.render({
+			drawLayersOffscreen(this.device, {
 				layers: layers.filter(isDeckSplatLayer),
-				viewports: [viewport],
-				views: {},
-				onViewportActive: () => {},
+				viewport,
 				target: proxy,
 				pass: "splat-color",
 				clearCanvas: false,
-				layerFilter: null,
+				shouldDrawLayer: isDeckSplatLayer,
+				getLayerParameters: splatPassParameters,
 				shaderModuleProps: { project: { devicePixelRatio: 1 } },
-			} as never),
+			}),
 		);
 		this.merge ??= new Model(this.device, {
 			id: "splat-merge",

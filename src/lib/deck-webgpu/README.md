@@ -419,7 +419,8 @@ vendor). Each open one has a local workaround.
 6. *The `visgl:webgl-only` export condition removes every WebGPU branch silently*; a WebGPU Deck
    then fails obscurely. PR: a runtime error when `deviceProps.type === 'webgpu'` on the
    webgl-only build, or an exported build marker (`device.ts` `deckBuild()` infers the build
-   from `project.source`, null in webgl-only).
+   from the exported shader modules' `source` (`project`, then `project32`, `picking`), null in
+   webgl-only).
 
 *Pending re-vendor* (fixed in luma's own deck patch, `.yarn/patches/@deck.gl-core-npm-9.4.0-707f3fb147.patch`
 from luma #3325 / `7d1d11e9`; not in deck master, #10752 or any open deck PR; dormant for us today

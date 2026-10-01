@@ -15,6 +15,7 @@
 //      'greater', view clearDepth 0) drawn in deck's own canvas pass.
 //   T3 _LayersPass into our own framebuffer: rgba32float + depth32float, reversed-Z; readback.
 //   T4 _LayersPass into a 4× MSAA rgba16float framebuffer + a resolve pass; readback.
+// Deliberately exercises deck internals (`_LayersPass`): a lab probe of deck.gl, not app code.
 import {
 	COORDINATE_SYSTEM,
 	Deck,

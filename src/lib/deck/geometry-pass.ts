@@ -15,11 +15,7 @@
 //
 // Range only is rendered (r32float, 4 B/px): xyz is exactly eye + ray(pixel centre)·range, so it is
 // rebuilt on the CPU instead of reading back three extra floats per pixel.
-import {
-	type Deck,
-	type Layer,
-	_LayersPass as LayersPass,
-} from "@deck.gl/core";
+import type { Deck, Layer } from "@deck.gl/core";
 import {
 	Buffer,
 	type Device,
@@ -32,6 +28,7 @@ import type { Pose } from "../camera";
 import { poseBasis } from "../pose";
 import type { GeometrySource } from "./geometry-source";
 import { glOf } from "./gl";
+import { drawLayersOffscreen } from "./offscreen-layers";
 import { PhotoViewport } from "./photo-view";
 import type { TileMesh } from "./terrain-data";
 import {
@@ -52,34 +49,31 @@ export function geometrySize(aspect: number, longSide = GEOMETRY_LONG_SIDE) {
 		: { width: Math.round(longSide * aspect), height: longSide };
 }
 
-class TerrainLayersPass extends LayersPass {
-	shouldDrawLayer(layer: Layer) {
-		// trails join the colour pass only (three hides them in its geometry renders)
-		return (
-			isTerrainTile(layer) ||
-			(currentTerrainPass() === "color" && isTrailLayer(layer))
-		);
-	}
-	protected getLayerParameters(layer: Layer) {
-		// trails blend over the terrain colour and depth-test against it (half-float blends fine)
-		if (isTrailLayer(layer)) return { ...layer.props.parameters };
-		// float targets can't blend (EXT_float_blend); the colour pass keeps straight alpha like
-		// three's layerRT (ShaderMaterial transparent: false → NoBlending)
-		return {
-			...layer.props.parameters,
-			blend: false,
-			depthWriteEnabled: true,
-			depthCompare: "less-equal" as const,
-		};
-	}
+/** The layers a terrain pass draws: trails join the colour pass only (three hides them in its
+ * geometry renders). */
+function terrainPassLayer(layer: Layer) {
+	return (
+		isTerrainTile(layer) ||
+		(currentTerrainPass() === "color" && isTrailLayer(layer))
+	);
+}
+
+function terrainPassParameters(layer: Layer) {
+	// trails blend over the terrain colour and depth-test against it (half-float blends fine)
+	if (isTrailLayer(layer)) return { ...layer.props.parameters };
+	// float targets can't blend (EXT_float_blend); the colour pass keeps straight alpha like
+	// three's layerRT (ShaderMaterial transparent: false → NoBlending)
+	return {
+		...layer.props.parameters,
+		blend: false,
+		depthWriteEnabled: true,
+		depthCompare: "less-equal" as const,
+	};
 }
 
 /** Draws a Deck's terrain tiles through a photo camera into an offscreen framebuffer. */
 export class TerrainPassRenderer {
-	private pass: TerrainLayersPass;
-	constructor(readonly device: Device) {
-		this.pass = new TerrainLayersPass(device, { id: "terrain-pass" });
-	}
+	constructor(readonly device: Device) {}
 
 	render(
 		kind: TerrainPassKind,
@@ -107,19 +101,18 @@ export class TerrainPassRenderer {
 			(l) => !isTerrainTile(l) || !cull((l.props as { mesh?: TileMesh }).mesh),
 		);
 		withTerrainPass(kind, () =>
-			this.pass.render({
+			drawLayersOffscreen(this.device, {
 				layers: drawn,
-				viewports: [viewport],
-				views: {},
-				onViewportActive: () => {},
+				viewport,
 				target,
 				pass: `terrain-${kind}`,
 				clearColor: [0, 0, 0, 0],
 				clearCanvas: true,
-				layerFilter: null,
+				shouldDrawLayer: terrainPassLayer,
+				getLayerParameters: terrainPassParameters,
 				// the viewport is already in target pixels
 				shaderModuleProps: { project: { devicePixelRatio: 1 } },
-			} as never),
+			}),
 		);
 	}
 }
