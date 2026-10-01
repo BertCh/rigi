@@ -79,10 +79,18 @@ export function loadRegion(id: string) {
 
 const POSE_KEY = (id: string) => `mt-image:pose:${id}`;
 
+/** A stored pose is only used when every angle is finite and the fov is a real lens; anything else
+ * (e.g. a bench seeding an unlabelled ground-truth entry as `{yaw:null,…,vfov:180}`) is ignored. */
 export function loadSavedPose(id: string): Pose | null {
 	try {
 		const raw = localStorage.getItem(POSE_KEY(id));
-		return raw ? (JSON.parse(raw) as Pose) : null;
+		const p = raw ? (JSON.parse(raw) as Partial<Pose> | null) : null;
+		const ok =
+			p != null &&
+			[p.yaw, p.pitch, p.roll, p.vfov].every(Number.isFinite) &&
+			(p.vfov as number) > 0 &&
+			(p.vfov as number) < 180;
+		return ok ? (p as Pose) : null;
 	} catch {
 		return null;
 	}
