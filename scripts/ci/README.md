@@ -36,6 +36,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | eye-check | fast | pose6dof eye refinement, analytic ridge | `src/lib/pose6dof/eye.check.ts` |
 | pose6dof | fast | pose6dof solvers + real control points (`--quick`) | `scripts/test-pose6dof.ts` (needs `data/`) |
 | refine-test | fast | refine Jacobians, FFT, synthetic recovery | `scripts/refine-test.ts` |
+| ingest | fast | GPU Terrarium decode arithmetic: f32 twin bit-equal to `decodeTerrarium` over all 2^24 RGB, f32-exact partials, ingest layout math. The browser byte/height gate is `scripts/gpu/terrarium-ingest-check.mjs` (not in the registry) | `src/lib/gpu/ingest/ingest.check.ts` |
 | export | fast | export/interchange (XMP, GeoJSON, KML, COLMAP…) | `scripts/test-export.ts` (needs `public/photos/`) |
 | nearfield-core / -export / -generate / -spot / -eyes / -propagate, splat-sort | fast | Step Inside core; generated splats never exported; propagation parity with Python; depth sort | `src/lib/nearfield/**`, `tools/nearfield/propagate/propagate.check.ts`, `scripts/nearfield/splat-sort-test.ts` |
 | tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |

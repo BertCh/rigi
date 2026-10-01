@@ -208,6 +208,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "ingest",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/ingest/ingest.check.ts"),
+		note: "GPU Terrarium decode: f32 twin == decodeTerrarium over all 2^24 RGB, f32-exact partials, ingest layout math (browser byte/height gate: scripts/gpu/terrarium-ingest-check.mjs)",
+		timeoutS: 120,
+	},
+	{
 		id: "export",
 		tier: "fast",
 		group: "export",
