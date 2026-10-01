@@ -388,12 +388,9 @@ function twinFragment(
 // Node: assembly + tables (no GPU)
 
 async function assemblyCheck() {
-	const { ShaderAssembler } = await import("@luma.gl/shadertools");
-	const { getShaderLayoutFromWGSL } = await import("@luma.gl/webgpu");
-	const asm = ShaderAssembler.getDefaultShaderAssembler(
-		"wgsl" as never,
-	) as never as { assembleWGSLShader(p: unknown): { source: string } };
-	const r = asm.assembleWGSLShader({
+	// a fresh assembler (no default modules), like the Models' pass.ts RIGI_WGSL_ASSEMBLER
+	const { WGSLShaderAssembler } = await import("@luma.gl/shadertools");
+	const r = new WGSLShaderAssembler().assembleWGSLShader({
 		platformInfo: {
 			type: "webgpu",
 			shaderLanguage: "wgsl",
@@ -405,7 +402,7 @@ async function assemblyCheck() {
 		modules: [cameraModule, multiDrapeModule],
 		defines: {},
 	});
-	const layout = getShaderLayoutFromWGSL(r.source);
+	const layout = r.shaderLayout;
 	const names = (layout?.bindings ?? []).map((b) => b.name);
 	const want = [
 		"camera",
@@ -426,14 +423,24 @@ async function assemblyCheck() {
 	];
 	const missing = want.filter((n) => !names.includes(n));
 	const attrs = (layout?.attributes ?? []).map((a) => a.name);
+	const ok =
+		!missing.length &&
+		!names.includes("mdRangeSampler") &&
+		["positions", "normals", "tileInfo"].every((a) => attrs.includes(a));
 	return {
-		ok:
-			!missing.length &&
-			!names.includes("mdRangeSampler") &&
-			["positions", "normals", "tileInfo"].every((a) => attrs.includes(a)),
+		ok,
 		bindings: names,
 		attributes: attrs,
 		missing,
+		// luma's per-binding debug rows (group:binding name kind module), only when it failed
+		...(ok
+			? {}
+			: {
+					bindingTable: r.bindingTable.map(
+						(b) =>
+							`${b.group}:${b.binding} ${b.name} ${b.kind} ${b.moduleName ?? b.owner}`,
+					),
+				}),
 	};
 }
 

@@ -27,6 +27,7 @@ import { deckBuild, webgpuAvailable } from "./device";
 import type { Host } from "./hosts/direct";
 import type { CameraPose } from "./hosts/passes";
 import { ImageryArray } from "./imagery";
+import type { ModelCache } from "./pass";
 import { PresentCore, type PresentMode } from "./present";
 import { rangeOf, TextureReader } from "./readback";
 import {
@@ -326,12 +327,28 @@ export async function startLab(
 		},
 	};
 	window.__deckWebgpuLab = hook;
-	// debugging handles (not API)
+	// debugging handles (not API). bindings(key) / wgsl(key): luma's binding debug table / the
+	// assembled WGSL of every cached model whose "<core id>/<ModelCache key>" contains `key`
+	// (e.g. "color|" for the terrain colour pipelines); diffing wgsl() between ?host=deck and
+	// ?host=direct shows whether both hosts assemble the same program.
+	const cachedModels = (key: string) =>
+		[terrain, present].flatMap((core) =>
+			(core as unknown as { models: ModelCache }).models
+				.entries()
+				.map(([k, m]) => [`${core.id}/${k}`, m] as const)
+				.filter(([k]) => k.includes(key)),
+		);
 	(hook as unknown as { _debug: unknown })._debug = {
 		host,
 		terrain,
 		imagery,
 		present,
+		bindings: (key = "") =>
+			Object.fromEntries(
+				cachedModels(key).map(([k, m]) => [k, m.getBindingDebugTable()]),
+			),
+		wgsl: (key = "") =>
+			Object.fromEntries(cachedModels(key).map(([k, m]) => [k, m.source])),
 	};
 	host.requestRender();
 

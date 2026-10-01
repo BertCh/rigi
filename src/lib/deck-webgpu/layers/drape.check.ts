@@ -1,6 +1,7 @@
 // CPU check for layers/drape.ts (no GPU):
 //   1. the terrain colour program with the drape plugin (plain and DRAPE_HARMONIZE) assembles the
-//      way luma's Model does, and its binding layout has the drape's uniforms and textures;
+//      way luma's Model does (a fresh WGSLShaderAssembler, like pass.ts RIGI_WGSL_ASSEMBLER), and
+//      its binding layout (the assembler's own shaderLayout) has the drape's uniforms and textures;
 //   2. the occlusion test (drapeVisibilityCpu = the shader's drape_visibility, + drapeSlack) on a
 //      ray-cast range map of a flat valley floor seen at grazing incidence with a wall across it:
 //      the classic single-texel test rejects open ground ("drape acne"), the soft 2×2 vote +
@@ -8,8 +9,7 @@
 //      ~1.5·r·Δθ/0.012 behind an occluder, ≈ 240 m here at r ≈ 1.9 km, the bias does let the drape
 //      through: the same trade multi-drape-layer.ts makes, hence the behind samples start 400 m back.)
 //   npx tsx src/lib/deck-webgpu/layers/drape.check.ts
-import { ShaderAssembler } from "@luma.gl/shadertools";
-import { getShaderLayoutFromWGSL } from "@luma.gl/webgpu";
+import { WGSLShaderAssembler } from "@luma.gl/shadertools";
 import { cameraUniforms, photoCamera, projectToPixel } from "../camera";
 import {
 	TILE_VERTEX_WGSL,
@@ -22,11 +22,7 @@ import { DrapePart, drapeSlack, drapeVisibilityCpu } from "./drape";
 type V3 = [number, number, number];
 
 // ---- 1. assembly + layout ----
-const asm = ShaderAssembler.getDefaultShaderAssembler(
-	"wgsl" as never,
-) as never as {
-	assembleWGSLShader(p: unknown): { source: string };
-};
+const asm = new WGSLShaderAssembler();
 const fakeDevice = {
 	createTexture: () => ({ writeData() {}, destroy() {} }),
 } as never;
@@ -58,9 +54,15 @@ for (const harmonize of [false, true]) {
 		modules: terrainModules([part]),
 		defines: terrainDefines("color", [part]),
 	});
-	const layout = getShaderLayoutFromWGSL(r.source);
-	const names = (layout?.bindings ?? []).map((b) => b.name);
+	const names = (r.shaderLayout?.bindings ?? []).map((b) => b.name);
 	layouts[part.key] = names;
+	const table = () =>
+		r.bindingTable
+			.map(
+				(b) =>
+					`${b.group}:${b.binding} ${b.name} ${b.kind} ${b.moduleName ?? b.owner}`,
+			)
+			.join("\n  ");
 	const want = [
 		"camera",
 		"fog",
@@ -76,9 +78,13 @@ for (const harmonize of [false, true]) {
 	];
 	for (const n of want)
 		if (!names.includes(n))
-			throw new Error(`${part.key}: binding ${n} missing (${names})`);
+			throw new Error(
+				`${part.key}: binding ${n} missing; bindingTable:\n  ${table()}`,
+			);
 	if (!harmonize && names.includes("drapeHrm"))
-		throw new Error("drapeHrm bound without DRAPE_HARMONIZE");
+		throw new Error(
+			`drapeHrm bound without DRAPE_HARMONIZE; bindingTable:\n  ${table()}`,
+		);
 	if (!r.source.includes("c = drape_apply(c, s);"))
 		throw new Error("plugin call not spliced");
 }

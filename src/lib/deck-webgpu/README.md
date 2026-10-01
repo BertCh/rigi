@@ -1,4 +1,4 @@
-# src/lib/deck-webgpu — the WebGPU renderer (deck.gl 9.4 on WebGPU)
+# src/lib/deck-webgpu — the WebGPU renderer (deck.gl on WebGPU, luma.gl 10)
 
 Experimental (2026-09-30). The deck backend (`src/lib/deck`, WebGL2) is being moved to WebGPU.
 Every layer of the WebGL DeckEngine is ported (see **Status**), and `engine.ts` (`WebGpuEngine`)
@@ -8,12 +8,14 @@ the lab route (`/lab/deck-webgpu`) is the only consumer. It will become `?render
 
 ## Approach (decided by `spike.ts`, `/lab/deck-webgpu?spike=1`)
 
-**deck.gl 9.4 on a WebGPU device hosts the frame; our own pass runner draws the 3D passes.**
-Layers are host-agnostic `GpuLayerCore`s on plain luma.gl 9.4 (`Model`, WGSL). The same cores
+**deck.gl (vendored from PR #10752) on a WebGPU device hosts the frame; our own pass runner
+draws the 3D passes.**
+Layers are host-agnostic `GpuLayerCore`s on plain luma.gl 10 (`Model`, WGSL). The same cores
 also run under a luma-direct host with no deck at all (`hosts/direct.ts`). That host is the
 fallback when deck's full build isn't bundled, and it is also the A/B reference.
 
-What the spike showed on deck 9.4.0 / luma 9.4.2 with Chrome and Metal:
+What the spike showed with Chrome and Metal (first on deck 9.4.0 / luma 9.4.2; re-run on
+luma 10.0.0-alpha.2 + the vendored deck PR #10752, `vendor/deck/README.md`, with the same results):
 
 | Check | Result |
 |---|---|
@@ -25,7 +27,8 @@ What the spike showed on deck 9.4.0 / luma 9.4.2 with Chrome and Metal:
 | View `clear: true` on WebGPU | **broken**: it begins a render pass inside the open one, so the command buffer is invalid |
 | reversed-Z in deck's canvas pass | not possible: `LayersPass` hard-codes `clearDepth: 1` |
 | `WEBGPU_DEFAULT_DRAW_PARAMETERS` | premultiplied blending + `less-equal` are merged **over** the model's parameters; `blend: false` cannot remove the blend state |
-| layer extensions (`LogDepthExtension`, `TerrainExtension`) | no WGSL hooks in 9.4 (`SHADER_HOOKS_WGSL = []`) |
+| layer extensions (`LogDepthExtension`, `TerrainExtension`) | no WGSL hooks (`SHADER_HOOKS_WGSL = []` in #10752; deck #10751 adds one vertex hook, no fs / depth hook) |
+| deck's default WGSL modules (`geometry`) | registered on luma's shared default assembler, so they leaked into every Model built without an explicit `shaderAssembler`; our Models use `RIGI_WGSL_ASSEMBLER` (pass.ts) and assemble the same WGSL under both hosts |
 | the app's vite config | resolves deck's `visgl:webgl-only` build, which has **all** WebGPU branches compiled out |
 
 Hence:
@@ -36,8 +39,10 @@ Hence:
   MRT, MSAA resolve and pipeline state.
 - deck's canvas pass draws only the screen cores, through one thin `CoreLayer`.
 
-Moving to luma 10 / deck 10 should be mechanical: only `hosts/deck.ts` and `device.ts` touch
-deck. Cores use `Model`, `ShaderModule` and `RenderPass` and nothing else.
+We are on luma 10.0.0-alpha.2 with deck vendored from PR #10752. Moving to a published deck 10
+should be mechanical: only `hosts/deck.ts` and `device.ts` touch deck. Cores use `Model`,
+`ShaderModule` and `RenderPass` and nothing else, and build their Models with pass.ts's own
+`WGSLShaderAssembler`, so deck's default-assembler state never reaches them.
 
 **To run deck-hosted in the app**, `vite.config.ts` must drop the `visgl:webgl-only` condition
 (it is owned by another session). Until then, use `scripts/deck-webgpu/vite.webgpu.config.ts` on
@@ -131,14 +136,21 @@ interface GpuLayerCore {
    foundation: ask the foundation owner.
 2. **Pipelines per pass.** Create models through `ModelCache` with
    `passModelProps(kind, {depth, blend})` for geometry / colour. For screen, use
-   `screenModelProps(ctx.target)` keyed by `targetKey(ctx)`. WebGPU uniform writes land before
+   `screenModelProps(ctx.target)` keyed by `targetKey(ctx)`. Both carry `shaderAssembler:
+   RIGI_WGSL_ASSEMBLER`; spread them whole (a Model built without it gets luma's shared default
+   assembler and, under the deck host, deck's default modules). Indexed draws: set an explicit
+   `indexCount` (luma #3291: an indexed draw uses `indexCount`, else a `vertexCount` that was
+   ever set, else the whole index buffer, so a stale `vertexCount` silently becomes the index
+   count). WebGPU uniform writes land before
    the submit, so **never draw one Model with different uniforms twice in a frame**. Use one
    model per pass kind. Per-draw data goes in vertex attributes or storage buffers, not in a
    shared UBO (see `terrain.ts`: the imagery layer is baked per vertex).
 3. **Uniforms** go in a luma `ShaderModule` with `source` (WGSL struct +
    `@group(0) @binding(auto) var<uniform> <name>`), `uniformTypes` in the **same order**, and
-   `bindingLayout: [{name, group: 0}]`. Never pin explicit group-0 slots in modules (luma
-   reserves < 100 for the app). Set them with `model.shaderInputs.setProps({camera: ctx.camera,
+   `bindingLayout: [{name, group: 0}]`. Keep `@binding(auto)`: since luma #3304 a module may pin a
+   group-0 slot ≥ 100 (< 100 stays the application's), but auto is what every core here relies
+   on and what the assembler's binding registry keeps stable. Set them with
+   `model.shaderInputs.setProps({camera: ctx.camera,
    <name>: {...}})`. Pad structs to 16 bytes with named `padN` fields.
 4. **Textures**: declare them with `@group(0) @binding(auto) var t: texture_2d<f32>;` +
    `var tSampler: sampler;` and bind with `model.setBindings({t: texture})` (the sampler comes
@@ -325,8 +337,10 @@ buffers, the MSAA colour target, the per-size geometry targets).
 5. **Retire WebGL deck layers** (terrain-layer, batched-terrain-layer, composite*, trail-layer,
    world-view layers, deck-splat-layer, tiles3d deck-layer, geometry-pass) once Safari / Firefox
    ship WebGPU on the supported OS versions; move `/roll` last (`layers/multi-drape.ts` is ready).
-6. **luma 10 / deck 10:** only `hosts/deck.ts` and `device.ts` touch deck; bump when published
-   (luma 10.0.0-alpha.2's packaging is broken today), then drop the workarounds listed below.
+6. **luma 10 / deck 10:** we run luma 10.0.0-alpha.2 with deck vendored from PR #10752 (its
+   packaging needs the `.npmrc` / `overrides` workarounds, `vendor/deck/README.md`). Only
+   `hosts/deck.ts` and `device.ts` touch deck; swap to npm when deck publishes on luma 10, then
+   drop the workarounds listed below.
 
 Integration snippet (PhotoWorkspace owner):
 
@@ -343,7 +357,9 @@ if (wantWebGpu) {
 
 ## Upstream: luma.gl / deck.gl issues and PR ideas
 
-Found on deck.gl 9.4.0 / luma.gl 9.4.2, Chrome, Apple Metal. Each has a local workaround.
+Found on deck.gl 9.4.0 / luma.gl 9.4.2, Chrome, Apple Metal; re-checked against luma
+10.0.0-alpha.2 (= luma master `7d1d11e9` in core / webgpu / engine) and deck PR #10752 (what we
+vendor). Each open one has a local workaround.
 
 **deck.gl**
 1. *View `clear: true` on WebGPU opens a render pass inside the open one* → invalid command
@@ -356,28 +372,41 @@ Found on deck.gl 9.4.0 / luma.gl 9.4.2, Chrome, Apple Metal. Each has a local wo
    under model / layer parameters and honour `blend: false`.
 4. *No `sampleCount` / resolve targets in `LayersPass`.* PR: MSAA framebuffer + `resolveTargets`.
 5. *No WGSL shader hooks (`SHADER_HOOKS_WGSL = []`)*, so extensions (LogDepth, Terrain, …) cannot
-   port. PR: the WGSL counterparts of `DECKGL_FILTER_*` hooks.
+   port. deck #10751 adds one WGSL vertex hook and no fragment / depth hook, which is not enough for
+   TerrainExtension (not adopted). PR: the remaining WGSL counterparts of `DECKGL_FILTER_*` hooks.
 6. *The `visgl:webgl-only` export condition removes every WebGPU branch silently*; a WebGPU Deck
    then fails obscurely. PR: a runtime error when `deviceProps.type === 'webgpu'` on the
-   webgl-only build.
+   webgl-only build, or an exported build marker (`device.ts` `deckBuild()` infers the build
+   from `project.source`, null in webgl-only).
+
+*Pending re-vendor* (fixed in luma's own deck patch, `.yarn/patches/@deck.gl-core-npm-9.4.0-707f3fb147.patch`
+from luma #3325 / `7d1d11e9`; not in deck master, #10752 or any open deck PR; dormant for us today
+— full-canvas views, no picking — but needed before the WebGPU renderer ships): WebGPU Y-origin in
+`getGLViewport`, the pick pass `scissorY`, the `DeckPicker` readback flip / row order, a
+`depth24plus` attachment on `deck-renderbuffer-0`, and the `project.wgsl`
+`project_get_orientation_matrix` `select` argument order (NaN for a vertical up vector).
 
 **luma.gl**
 7. *`Model.draw()` does not forward `firstInstance` / `baseVertex`* to `renderPass.draw` → one
-   compact instance buffer per group instead of offsets into one (batched terrain).
+   compact instance buffer per group instead of offsets into one (batched terrain). Still present
+   in 10.0.0-alpha.2.
 8. *`generateMipmapsWebGPU` encodes its own passes and submits* → calling it while a render pass
    is open breaks the frame. PR: take a `CommandEncoder` (or queue the work for the next submit);
-   at least document it.
+   at least document it. Still present in 10.0.0-alpha.2.
 9. *WGSL reflection maps `texture_2d<f32>` to sampleType `'float'`* → `r32float` / `rgba32float`
    bindings need `float32-filterable`. PR: derive `unfilterable-float` when the WGSL only uses
    `textureLoad` on it, or accept a per-binding `sampleType` override in `shaderLayout`.
 10. *Uniform writes are `queue.writeBuffer`*: a Model drawn twice in one submit with different
     uniforms shows the last values in both draws. PR: a dynamic-offset uniform ring in
     `UniformStore` (per-draw uniforms without one Model per pass / one buffer per object).
-11. *WGSL preprocessor handles only `#ifdef NAME`* (no `#if A && B`, no `==`) → combined defines
-    are computed on the CPU (`compositeDefines()`). PR: expression support as in the GLSL path.
-12. *Uniform layout validation:* `uniformTypes` order / std140 vs WGSL alignment mismatches fail
-    silently (vec3 + scalar packing). PR: compare `uniformTypes` against the reflected WGSL struct
-    in dev builds.
+11. *WGSL preprocessor has no compound expressions*: `#ifdef` / `#ifndef` / `#else` and a simple
+    `#if NAME` / `#if !NAME` / `#if defined(NAME)` work in 10.0.0-alpha.2, but `&&` / `||` / `==` do
+    not → combined defines are still computed on the CPU (`compositeDefines()`). PR: expression
+    support as in the GLSL path.
+12. *Uniform layout validation:* since 10.0.0-alpha.2 field names and order are checked against
+    the WGSL struct (`validateShaderModuleUniformLayout`, which throws); std140 vs WGSL alignment
+    and field types are still unchecked and fail silently (vec3 + scalar packing). PR: extend the
+    check to types and offsets.
 13. *`copyExternalImage` with an `HTMLImageElement`* uses the given width / height; callers pass
     `.width` (layout size in the DOM). Doc note: prefer `naturalWidth`.
 14. *`TextureReader`-style async readback* (staging buffer pool, 256-byte rows) is re-implemented

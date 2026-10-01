@@ -7,7 +7,7 @@ import type {
 	RenderPipelineParameters,
 } from "@luma.gl/core";
 import type { Model, ModelProps } from "@luma.gl/engine";
-import type { ShaderModule } from "@luma.gl/shadertools";
+import { type ShaderModule, WGSLShaderAssembler } from "@luma.gl/shadertools";
 import { type CameraUniforms, cameraModule } from "./camera";
 import { REVERSED_Z } from "./depth";
 import type { ColorTargets, GeometryTargets } from "./targets";
@@ -77,6 +77,17 @@ export const SHARED_MODULES: ShaderModule[] = [
 ];
 
 /**
+ * The WGSL assembler every deck-webgpu Model uses (passModelProps / screenModelProps carry it).
+ * luma's shared default assembler is process-global and deck.gl's shaderlib registers its default
+ * modules on it (`geometry`, …), so under the deck host those leaked into our pipelines while the
+ * direct host assembled without them. Our own assembler has no default modules or hooks: both
+ * hosts now assemble byte-identical WGSL, and the *.check.ts files assemble with one exactly like
+ * it. Module-level rather than per device: it holds no GPU objects, only the default module / hook
+ * lists and a deterministic auto-binding registry, and the callers' props carry no device.
+ */
+export const RIGI_WGSL_ASSEMBLER = new WGSLShaderAssembler();
+
+/**
  * Model props for drawing into `kind` (attachment formats, sample count, reversed-Z depth).
  * Spread into `new Model(device, {...passModelProps(kind), ...yours})`; `parameters` merge:
  * pass `{...passModelProps(kind).parameters, ...mine}` if you override any.
@@ -86,7 +97,10 @@ export function passModelProps(
 	opts: { depth?: "write" | "test" | "none"; blend?: boolean } = {},
 ): Pick<
 	ModelProps,
-	"colorAttachmentFormats" | "depthStencilAttachmentFormat" | "parameters"
+	| "colorAttachmentFormats"
+	| "depthStencilAttachmentFormat"
+	| "parameters"
+	| "shaderAssembler"
 > {
 	const a = PASS_ATTACHMENTS[kind];
 	const depth =
@@ -110,6 +124,7 @@ export function passModelProps(
 				}
 			: {};
 	return {
+		shaderAssembler: RIGI_WGSL_ASSEMBLER,
 		colorAttachmentFormats: [...a.colorAttachmentFormats] as never,
 		depthStencilAttachmentFormat: a.depthStencilAttachmentFormat,
 		parameters: {
@@ -126,9 +141,13 @@ export function screenModelProps(
 	t: PassTarget,
 ): Pick<
 	ModelProps,
-	"colorAttachmentFormats" | "depthStencilAttachmentFormat" | "parameters"
+	| "colorAttachmentFormats"
+	| "depthStencilAttachmentFormat"
+	| "parameters"
+	| "shaderAssembler"
 > {
 	return {
+		shaderAssembler: RIGI_WGSL_ASSEMBLER,
 		colorAttachmentFormats: [...t.colorFormats] as never,
 		depthStencilAttachmentFormat: (t.depthFormat ?? undefined) as never,
 		// luma adds a depth-stencil state (preferred format) as soon as ANY depth parameter is set:
@@ -166,6 +185,12 @@ export class ModelCache {
 				m.destroy();
 				this.models.delete(k);
 			}
+	}
+
+	/** Debug (lab `_debug.bindings` / `_debug.wgsl`): the cached models whose key starts with
+	 * `prefix`. */
+	entries(prefix = ""): [string, Model][] {
+		return [...this.models].filter(([k]) => k.startsWith(prefix));
 	}
 
 	destroy() {

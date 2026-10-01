@@ -224,8 +224,8 @@ export const cameraModule = {
 		viewport: "vec2<f32>",
 		offset: "vec2<f32>",
 	},
-	// group 0, slot chosen by luma (@binding(auto)); luma 9.4 reserves explicit group-0 slots < 100
-	// for the application, so modules must not pin one
+	// group 0, slot chosen by luma (@binding(auto)). Since luma #3304 a module may pin a group-0
+	// slot >= 100 (< 100 is the application's), but auto keeps the binding registry stable: keep it
 	bindingLayout: [{ name: "camera", group: 0 }],
 } as const satisfies ShaderModule;
 

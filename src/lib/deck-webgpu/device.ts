@@ -1,7 +1,7 @@
 // WebGPU render device for the deck-webgpu renderer: availability check, device creation (with a
 // canvas context), and the hand-off to the compute sidecar (src/lib/gpu, owned by the GPU compute
 // workstream) so look kernels read our render targets on the SAME device (no copies).
-import { _LayersPass, Deck } from "@deck.gl/core";
+import { _LayersPass, Deck, project } from "@deck.gl/core";
 import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import { adoptRenderDevice } from "#/lib/gpu/device";
@@ -65,14 +65,21 @@ export async function webgpuAvailable(): Promise<Availability> {
 /**
  * Which deck.gl build the bundler resolved. The app's vite.config.ts picks deck's
  * `visgl:webgl-only` export (WebGPU branches compiled out); deck-on-WebGPU needs the full build
- * (scripts/deck-webgpu/vite.webgpu.config.ts). The full LayersPass mentions 'webgpu'.
+ * (scripts/deck-webgpu/vite.webgpu.config.ts). Neither build exports a marker and the export
+ * condition is not visible at runtime, so read the build's shape: the full build's `project`
+ * shader module carries its WGSL `source` (a string), the webgl-only build strips it to null.
+ * Fallback (should `project` ever lose `source` in both builds): the old sniff, the full
+ * LayersPass._render mentions 'webgpu'.
  */
 export function deckBuild(): "full" | "webgl-only" {
-	const src = String(
+	const src = (project as { source?: unknown } | undefined)?.source;
+	if (typeof src === "string" && src.length) return "full";
+	if (src === null) return "webgl-only";
+	const render = String(
 		(_LayersPass as unknown as { prototype: { _render?: unknown } }).prototype
 			._render,
 	);
-	return src.includes("webgpu") ? "full" : "webgl-only";
+	return render.includes("webgpu") ? "full" : "webgl-only";
 }
 
 /** A standalone luma WebGPU device drawing into `canvas` (no deck.gl). */
