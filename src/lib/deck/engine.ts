@@ -24,6 +24,7 @@ import {
 	type MapViewState,
 	OrthographicView,
 } from "@deck.gl/core";
+import type { Device, Texture } from "@luma.gl/core";
 import * as THREE from "three";
 import {
 	type AlignResult,
@@ -138,7 +139,11 @@ import {
 	type TileMesh,
 	type ViewWedge,
 } from "./terrain-data";
-import { type PhotoRangeMap, TerrainLayer } from "./terrain-layer";
+import {
+	type PhotoRangeMap,
+	RANGE_SAMPLER,
+	TerrainLayer,
+} from "./terrain-layer";
 import { TerrainStreamer } from "./terrain-stream";
 import {
 	buildTrailSegments,
@@ -156,6 +161,16 @@ import {
 
 const angleDiff = (a: number, b: number) =>
 	Math.abs(((a - b + 540) % 360) - 180);
+
+export type DeckEngineOptions = {
+	/**
+	 * The world drape's range map straight from the GPU geometry target (default true): a GPU copy
+	 * (GpuGeometrySource.copyRangeTo) instead of rangeMapFrom() over the read-back buffer and a
+	 * re-upload. false = the CPU path; it also runs whenever the GPU copy can't (CPU geometry
+	 * source, the target already re-rendered for a newer pose).
+	 */
+	gpuDrape?: boolean;
+};
 
 export type DeckEngineStats = {
 	terrainTiles: number;
@@ -410,8 +425,16 @@ export class DeckEngine implements Renderer {
 	/** The layers the last worldLayers built, and the gizmo plane opacity they (or a flight frame) used. */
 	private worldList: unknown[] = [];
 	private worldGizmoOpacity = -1;
-	/** The drape's range map (rangeMapFrom the query geometry buffer) and its generation. */
+	/** The drape's range map (the query geometry buffer's: drapeRange) and its generation. */
 	private drape: { gen: number; map: PhotoRangeMap } | null = null;
+	/**
+	 * Engine-owned r32float textures of the GPU drape (drapeRange): the current generation's and
+	 * the previous one's, which a layer may still bind until the new props reach it. A new
+	 * generation is copied into the texture no layer has, so a geometry pass re-rendering or
+	 * reallocating its target never touches the texture the drape samples.
+	 */
+	private drapeTex: Texture[] = [];
+	private readonly gpuDrape: boolean;
 	private loadAbort = new AbortController();
 	/** Step Inside (setNearField): the scene and its view options; null = off (the classic views). */
 	private nearField: {
@@ -445,7 +468,12 @@ export class DeckEngine implements Renderer {
 		mask: FgMask | null;
 	} | null = null;
 
-	constructor(canvas: HTMLCanvasElement, photo: PhotoMeta) {
+	constructor(
+		canvas: HTMLCanvasElement,
+		photo: PhotoMeta,
+		opts: DeckEngineOptions = {},
+	) {
+		this.gpuDrape = opts.gpuDrape ?? true;
 		this.photo = photo;
 		this.aspect = photo.width / photo.height;
 		this.prior = {
@@ -641,6 +669,9 @@ export class DeckEngine implements Renderer {
 		try {
 			this.dropGeometrySources();
 		} catch {}
+		// the GPU drape's textures died with the context (the CPU map is re-uploaded by new layers)
+		this.drapeTex = [];
+		if (this.drape?.map.texture) this.drape = null;
 		const prev = this.compositor;
 		prev.onChange = undefined;
 		this.compositor = this.makeCompositor(prev);
@@ -940,6 +971,8 @@ export class DeckEngine implements Renderer {
 		this.compositor.onChange = undefined;
 		this.listeners.clear();
 		this.deck.finalize();
+		for (const t of this.drapeTex) t.destroy();
+		this.drapeTex = [];
 	}
 
 	get photoElement() {
@@ -2546,8 +2579,47 @@ export class DeckEngine implements Renderer {
 		const src = this.geoSrc;
 		if (!src?.pose || this.geoBufGen < 0) return this.drape?.map ?? null;
 		if (this.drape?.gen !== this.geoBufGen)
-			this.drape = { gen: this.geoBufGen, map: rangeMapFrom(src) };
+			this.drape = {
+				gen: this.geoBufGen,
+				map: this.gpuDrapeRange(src) ?? rangeMapFrom(src),
+			};
 		return this.drape.map;
+	}
+
+	/**
+	 * The query buffer's range map as a GPU copy of the geometry target (gpuDrape), the same texels
+	 * rangeMapFrom would upload; null = take the CPU path (option off, a CPU source, or the target
+	 * no longer holds the buffer's render).
+	 */
+	private gpuDrapeRange(src: GeometrySource): PhotoRangeMap | null {
+		if (!this.gpuDrape || !(src instanceof GpuGeometrySource)) return null;
+		const device = (this.deck as unknown as { device?: Device }).device;
+		if (!device) return null;
+		const { width, height } = src;
+		// the texture the layers may bind until this generation's props reach them
+		const bound = this.drape?.map.texture;
+		let tex = this.drapeTex.find(
+			(t) => t !== bound && t.width === width && t.height === height,
+		);
+		if (!tex) {
+			tex = device.createTexture({
+				id: "drape-range",
+				format: "r32float",
+				width,
+				height,
+				sampler: RANGE_SAMPLER,
+			});
+			this.drapeTex.push(tex);
+		}
+		if (!src.copyRangeTo(tex)) return null;
+		// older textures (a resize) are no layer's any more
+		const keep = tex;
+		this.drapeTex = this.drapeTex.filter((t) => {
+			if (t === keep || t === bound) return true;
+			t.destroy();
+			return false;
+		});
+		return { width, height, texture: tex };
 	}
 
 	/**

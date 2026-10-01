@@ -926,10 +926,21 @@ export function makeTexture(
 
 // ---------- all tiles ----------
 
-export type PhotoRangeMap = {
+/**
+ * Range from the photo camera, row 0 = top, 0 = sky: CPU data (rangeMapFrom; the layer uploads its
+ * own r32float texture) or a texture the caller owns and keeps alive while it is a prop (engine.ts
+ * drapeRange: GpuGeometrySource.copyRangeTo, no CPU round trip), sampled nearest either way.
+ */
+export type PhotoRangeMap =
+	| PhotoRangeData
+	| { width: number; height: number; texture: Texture; data?: undefined };
+
+/** A PhotoRangeMap's CPU form (rangeMapFrom). */
+export type PhotoRangeData = {
 	width: number;
 	height: number;
 	data: Float32Array;
+	texture?: undefined;
 };
 
 export type TerrainLayerProps = LayerProps &
@@ -938,7 +949,7 @@ export type TerrainLayerProps = LayerProps &
 		/** Draped imagery per tile id. */
 		imagery?: Map<string, ImageBitmap>;
 		photo?: HTMLImageElement | ImageBitmap | null;
-		/** Range from the photo camera, row 0 = top, 0 = sky (GPU geometry pass, rangeMapFrom()). */
+		/** Range from the photo camera, row 0 = top, 0 = sky (GPU geometry pass; PhotoRangeMap). */
 		photoRange?: PhotoRangeMap | null;
 		/** People mask (segmentForeground, row 0 = top): kept out of the drape. */
 		photoFg?: { width: number; height: number; data: Uint8Array } | null;
@@ -1001,6 +1012,8 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 		empty?: Texture;
 		photo?: Texture;
 		range?: Texture;
+		/** `range` was uploaded here from CPU data (not a caller-owned PhotoRangeMap.texture). */
+		rangeOwned?: boolean;
 		fg?: Texture;
 		relief?: { field: Texture; gen: Texture; extent: number[] };
 		/** terrain-mode.ts path the sublayers were rendered for. */
@@ -1063,23 +1076,11 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 			});
 		}
 		if (props.photoRange !== oldProps.photoRange) {
-			this.state.range?.destroy();
+			if (this.state.rangeOwned) this.state.range?.destroy();
 			const r = props.photoRange;
 			this.setState({
-				range: r
-					? device.createTexture({
-							data: r.data,
-							width: r.width,
-							height: r.height,
-							format: "r32float",
-							sampler: {
-								minFilter: "nearest",
-								magFilter: "nearest",
-								addressModeU: "clamp-to-edge",
-								addressModeV: "clamp-to-edge",
-							},
-						})
-					: undefined,
+				range: r ? (r.texture ?? rangeTexture(device, r)) : undefined,
+				rangeOwned: !!r?.data,
 			});
 		}
 	}
@@ -1088,7 +1089,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 		super.finalizeState(context);
 		this.state.empty?.destroy();
 		this.state.photo?.destroy();
-		this.state.range?.destroy();
+		if (this.state.rangeOwned) this.state.range?.destroy();
 		this.state.fg?.destroy();
 		this.destroyRelief();
 	}
@@ -1151,6 +1152,25 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 				}),
 		);
 	}
+}
+
+/** The drape range sampler: float32 is not filterable (no OES_texture_float_linear needed). */
+export const RANGE_SAMPLER = {
+	minFilter: "nearest",
+	magFilter: "nearest",
+	addressModeU: "clamp-to-edge",
+	addressModeV: "clamp-to-edge",
+} as const;
+
+/** A PhotoRangeMap's CPU data as an r32float texture (RANGE_SAMPLER). */
+export function rangeTexture(device: Device, r: PhotoRangeData) {
+	return device.createTexture({
+		data: r.data,
+		width: r.width,
+		height: r.height,
+		format: "r32float",
+		sampler: RANGE_SAMPLER,
+	});
 }
 
 /** A 0..255 single-channel mask (row 0 = top) as a linear-filtered texture; r = mask. */

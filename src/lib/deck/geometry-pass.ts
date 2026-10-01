@@ -21,6 +21,7 @@ import {
 	type Device,
 	type Fence,
 	type Framebuffer,
+	type Texture,
 } from "@luma.gl/core";
 import type { Pose } from "../camera";
 import { poseBasis } from "../pose";
@@ -31,7 +32,7 @@ import type { TileMesh } from "./terrain-data";
 import {
 	currentTerrainPass,
 	isTerrainTile,
-	type PhotoRangeMap,
+	type PhotoRangeData,
 	type TerrainPassKind,
 	withTerrainPass,
 } from "./terrain-layer";
@@ -464,6 +465,11 @@ export class GeometryTarget {
 		return (this.fbo as unknown as { handle: WebGLFramebuffer }).handle;
 	}
 
+	/** The range framebuffer's GL handle (GpuGeometrySource.copyRangeTo reads from it). */
+	get framebufferHandle() {
+		return this.fboHandle;
+	}
+
 	destroy() {
 		this.destroyed = true;
 		const gl = glOf(this.device);
@@ -508,7 +514,12 @@ export class GpuGeometrySource implements GeometrySource {
 	private target: GeometryTarget;
 	private renderer: TerrainPassRenderer;
 	private raw: Float32Array;
+	/** render() calls issued (each draws into the target right away). */
 	private seq = 0;
+	/** The render() whose result `range` / `pose` hold (== seq: the target holds it too). */
+	private shown = 0;
+	/** Draw framebuffer of copyRangeTo (created on first use). */
+	private copyFbo: WebGLFramebuffer | null = null;
 	private disposed = false;
 
 	constructor(
@@ -537,6 +548,70 @@ export class GpuGeometrySource implements GeometrySource {
 		return this.target.texture;
 	}
 
+	/**
+	 * GPU twin of rangeMapFrom(this): copies the range target into `dst` (an r32float texture of
+	 * this size) with its rows flipped to the drape's order (row 0 = top), on the GPU (no readback,
+	 * no re-upload). The texels are exactly rangeMapFrom's: the target clears to 0 (sky; terrain
+	 * the near discard drops stays 0 too) and only ever receives length(vWorld - eye) > 0, never
+	 * Infinity / NaN, so rangeMapFrom's Infinity → 0 fix-up is the identity on this data and the
+	 * shader's `seen > 0.0` test sees the same sky. A nearest-filter blit at scale 1 lands every
+	 * destination pixel centre on a source texel centre: a bit-exact copy. (Flipping in GLSL
+	 * instead is not exact: hardware nearest filtering rounds the texel coordinate in fixed point,
+	 * so floor(v·h) and h-1-floor((1-v)·h) disagree near texel edges; and editing the terrain
+	 * shader re-optimises the geometry pass that shares it, which moved IMG_6958's range bits.)
+	 *
+	 * false (nothing copied) unless the target still holds the render that `range` describes: a
+	 * newer render() draws into the target at once, before its readback lands, and the caller
+	 * keys its copy to the buffer's generation (engine.ts drapeRange); likewise after a failed
+	 * readback, after dispose(), or for a texture of another size.
+	 */
+	copyRangeTo(dst: Texture): boolean {
+		if (this.disposed || !this.pose || this.shown !== this.seq) return false;
+		const { width: w, height: h } = this;
+		if (
+			dst.width !== w ||
+			dst.height !== h ||
+			this.target.width !== w ||
+			this.target.height !== h
+		)
+			return false;
+		const gl = glOf(this.target.device);
+		this.copyFbo ??= gl.createFramebuffer();
+		if (!this.copyFbo) return false;
+		const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+		const prevDraw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
+		const scissor = gl.isEnabled(gl.SCISSOR_TEST);
+		const discard = gl.isEnabled(gl.RASTERIZER_DISCARD);
+		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.target.framebufferHandle);
+		gl.readBuffer(gl.COLOR_ATTACHMENT0);
+		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFbo);
+		gl.framebufferTexture2D(
+			gl.DRAW_FRAMEBUFFER,
+			gl.COLOR_ATTACHMENT0,
+			gl.TEXTURE_2D,
+			(dst as unknown as { handle: WebGLTexture }).handle,
+			0,
+		);
+		// blits pass the scissor test and rasterizer discard (no other fragment operation)
+		if (scissor) gl.disable(gl.SCISSOR_TEST);
+		if (discard) gl.disable(gl.RASTERIZER_DISCARD);
+		// destination rows h → 0: the flip (GL row 0 = bottom → the drape's row 0 = top)
+		gl.blitFramebuffer(0, 0, w, h, 0, h, w, 0, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+		if (scissor) gl.enable(gl.SCISSOR_TEST);
+		if (discard) gl.enable(gl.RASTERIZER_DISCARD);
+		// detach: the texture is sampled next, and its owner may destroy it any time
+		gl.framebufferTexture2D(
+			gl.DRAW_FRAMEBUFFER,
+			gl.COLOR_ATTACHMENT0,
+			gl.TEXTURE_2D,
+			null,
+			0,
+		);
+		gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, prevDraw);
+		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
+		return true;
+	}
+
 	async render(pose: Pose): Promise<void> {
 		if (this.disposed) return;
 		const seq = ++this.seq;
@@ -555,6 +630,7 @@ export class GpuGeometrySource implements GeometrySource {
 		this.unpack(pose);
 		const t3 = performance.now();
 		this.pose = { ...pose };
+		this.shown = seq;
 		this.timing = {
 			submitMs: t1 - t0,
 			readbackMs: t2 - t1,
@@ -605,14 +681,19 @@ export class GpuGeometrySource implements GeometrySource {
 
 	dispose() {
 		this.disposed = true;
+		if (this.copyFbo) glOf(this.target.device).deleteFramebuffer(this.copyFbo);
+		this.copyFbo = null;
 		this.target.destroy();
 	}
 }
 
-/** The drape's range map (terrain-layer.ts photoRange: row 0 = top, 0 = sky) from a source. */
+/**
+ * The drape's range map (terrain-layer.ts photoRange: row 0 = top, 0 = sky) from a source, on the
+ * CPU: the fallback of GpuGeometrySource.copyRangeTo (CPU geometry sources, no GPU copy).
+ */
 export function rangeMapFrom(
 	src: Pick<GeometrySource, "width" | "height" | "range">,
-): PhotoRangeMap {
+): PhotoRangeData {
 	const data = new Float32Array(src.range.length);
 	for (let i = 0; i < data.length; i++) {
 		const r = src.range[i];

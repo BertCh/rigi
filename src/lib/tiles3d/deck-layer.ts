@@ -28,6 +28,7 @@ import {
 	makeTexture,
 	maskTexture,
 	type PhotoRangeMap,
+	rangeTexture,
 } from "../deck/terrain-layer";
 import { REFRACTION_LIFT, TILE_GLSL_COMMON } from "./material";
 import type { Tiles3DSet } from "./tiles";
@@ -226,6 +227,8 @@ function textureOf(
 type State = {
 	meshes: Map<THREE.Mesh, MeshGpu>;
 	range?: Texture;
+	/** `range` was uploaded here from CPU data (not a caller-owned PhotoRangeMap.texture). */
+	rangeOwned?: boolean;
 	fg?: Texture;
 	empty: Texture;
 	onDispose: (m: THREE.Mesh) => void;
@@ -268,23 +271,11 @@ export class Tiles3DDeckLayer extends Layer<Tiles3DDeckLayerProps> {
 	}) {
 		const device = this.context.device;
 		if (props.photoRange !== oldProps.photoRange) {
-			this.state.range?.destroy();
+			if (this.state.rangeOwned) this.state.range?.destroy();
 			const r = props.photoRange;
 			this.setState({
-				range: r
-					? device.createTexture({
-							data: r.data,
-							width: r.width,
-							height: r.height,
-							format: "r32float",
-							sampler: {
-								minFilter: "nearest",
-								magFilter: "nearest",
-								addressModeU: "clamp-to-edge",
-								addressModeV: "clamp-to-edge",
-							},
-						})
-					: undefined,
+				range: r ? (r.texture ?? rangeTexture(device, r)) : undefined,
+				rangeOwned: !!r?.data,
 			});
 		}
 		if (props.photoFg !== oldProps.photoFg) {
@@ -311,7 +302,7 @@ export class Tiles3DDeckLayer extends Layer<Tiles3DDeckLayerProps> {
 	finalizeState() {
 		this.props.set.onDisposeMesh.delete(this.state.onDispose);
 		this.freeAll();
-		this.state.range?.destroy();
+		if (this.state.rangeOwned) this.state.range?.destroy();
 		this.state.fg?.destroy();
 		this.state.empty.destroy();
 	}
