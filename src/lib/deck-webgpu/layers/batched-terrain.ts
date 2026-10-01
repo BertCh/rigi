@@ -52,6 +52,7 @@ import { getCpuHeights } from "#/lib/dem/cpu-heights";
 import { getFlag } from "#/lib/flags";
 import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 import { gpuEnabled } from "#/lib/gpu/core/device";
+import { GpuDecodedHeights } from "#/lib/gpu/ingest/terrarium-tile";
 import { BaseSlotAllocator, baseSlotVec4, placeSlots } from "../base-slots";
 import { type CameraUniforms, sphereInView } from "../camera";
 import type { ImageryArray } from "../imagery";
@@ -433,7 +434,17 @@ class TileStore {
 				continue;
 			}
 			const isFresh = freshSet.has(m);
-			if (isFresh) pool.writeRaster(s.layer, getCpuHeights(m), m.size);
+			if (isFresh) {
+				// a GPU-decoded tile (flag terrainGpuDecode) whose CPU heights nobody asked for yet:
+				// decode its bitmap straight into the layer; else upload the CPU heights
+				const gpu = m.heights ? undefined : m.lazyHeights;
+				if (
+					gpu instanceof GpuDecodedHeights &&
+					gpu.bitmap.width / gpu.down === m.size
+				)
+					pool.writeTerrarium(s.layer, gpu);
+				else pool.writeRaster(s.layer, getCpuHeights(m), m.size);
+			}
 			const g = m.grid;
 			if (!g) continue;
 			if (isFresh || placed.repacked)

@@ -304,6 +304,24 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   geometry / colour render pass. Flag `terrainGpuCull` (default **off**: byte-identical, but no CPU saving at ~350–390 tiles, 0.15–0.19 vs 0.12–0.14 ms per frame; WebGPU only, `?gpu=off` and
   WebGL keep the CPU cull). Gates: `layers/terrain-cull-math.check.ts` (fast tier `terrain-cull`)
   and `scripts/deck-webgpu/terrain-indirect-check.mjs` (byte-equal frames, CPU ms).
+- GPU Terrarium decode (WAG W2.3 wiring + W2.4): `terrain-gpu-decode.ts` is the terrain stream's
+  tile loader under flag `terrainGpuDecode` (default **off**; batched terrain, `?gpu=on`; WebGL and
+  `?gpu=off` keep the CPU decode). A tile that stands for itself (no ancestor crop) and is 256 or
+  512 px is decoded from its `ImageBitmap` on the GPU (`gpu/ingest/terrarium-tile.ts`), halved when
+  the mesh wants 256 px, and only its statistics come back (validateTile's out-of-range count, exact
+  lo / hi for the batch grid, stride-7 lo / hi for the colour ramp; 32 B). Any out-of-range sample
+  keeps the CPU path. `TileStore.sync` then decodes the bitmap straight into the tile's height layer
+  (`TextureArrayAtlas.writeTerrarium`), and CPU heights exist only once a CPU consumer calls
+  `getCpuHeights(tile)` (`dem/cpu-heights.ts`; heightAt / localMax for peaks, trails, the lake floor,
+  the CPU relief raster). Bit identity rests on the f32 argument (`ingest.check.ts`) and the browser
+  byte / layer / lazy-heights gate `scripts/gpu/terrarium-ingest-check.mjs`; the frame A/B is
+  `scripts/deck-webgpu/atlas-frames-check.mjs --query terrainGpuDecode=on`. Counters:
+  `globalThis.__rigiTerrainGpuDecode`. Measured 2026-10-01 (Apple / Metal, IMG_7086 / 6958 / 3304):
+  frames byte-identical to the flag-off path, but 165–206 of 331–368 query tiles (~50 %) are
+  materialised on the main thread within 8 s of ready (peaks, trails, lake floor), 298–349 ms in
+  total, where the default path decodes in workers; and the small height atlas uploads ~4× the
+  bytes (rgba8 512 px sources instead of r32f 256 px heights), plus one upload per tile for the
+  load-time stats. Hence default off: the hot heightAt callers need batched GPU gathers first.
 - Hooks waiting for compute: `RIDGES_WGSL` (binding-free, runs in
   `@compute` as-is: an edge-mask pass).
 - Kernels must not write a target that a later pass of the same frame reads. Schedule them after

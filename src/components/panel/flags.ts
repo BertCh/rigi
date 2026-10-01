@@ -205,6 +205,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "terrainGpuDecode",
+		label: "Terrain GPU decode",
+		help: "WebGPU: decode the DEM tiles on the GPU straight into the terrain's height arrays; CPU heights only where labels, trails or queries ask (same heights bit for bit). Opt-in until its gates pass.",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
 		name: "alignPrecision",
 		label: "Align refine precision",
 		help: "certified-f32: the auto-align refine runs as a GPU loop with certified f32 compares (same result as f64; the CPU decides only ties). Opt-in until its wild-set gate passes.",

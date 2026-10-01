@@ -95,7 +95,7 @@ import {
 	type TileMesh,
 	type ViewWedge,
 } from "#/lib/deck/terrain-data";
-import { terrainMode } from "#/lib/deck/terrain-mode";
+import { terrainBuild, terrainMode } from "#/lib/deck/terrain-mode";
 import { TerrainStreamer } from "#/lib/deck/terrain-stream";
 import {
 	buildTrailSegments,
@@ -104,10 +104,12 @@ import {
 } from "#/lib/deck/trail-layer";
 import { poseQuaternion, WorldCamera } from "#/lib/deck/world-view";
 import { tileBounds } from "#/lib/dem";
+import { getFlag } from "#/lib/flags";
 import { startLakeFloor } from "#/lib/geocam/lakes/fetch";
 import { priorHeading } from "#/lib/geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import { autoAlignAsync, warmAlignGpu } from "#/lib/gpu/align";
+import { gpuEnabled } from "#/lib/gpu/core/device";
 import { submitWithDefault } from "#/lib/gpu/core/queue";
 import { lookIdle } from "#/lib/gpu/look/opt-in";
 import {
@@ -252,6 +254,7 @@ import { PresentCore, type PresentMode } from "./present";
 import { SilhouetteMaskGpu } from "./silhouette-gpu";
 import { ColorTargets, GeometryTargets, geometrySize, USAGE } from "./targets";
 import { TerrainCore } from "./terrain";
+import { gpuDecodeTileLoader } from "./terrain-gpu-decode";
 import { imageTexture } from "./textures";
 
 type View = "photo" | "world";
@@ -1317,6 +1320,7 @@ export class WebGpuEngine implements Renderer {
 			const abort = () => resolve(null);
 			this.loadAbort.signal.addEventListener("abort", abort, { once: true });
 			const streamer = new TerrainStreamer(this.frame, {
+				loadTile: this.gpuDecodeLoader(),
 				onProgress: (d, t) =>
 					!this.terrain &&
 					onProgress?.(`Loading terrain ${d}/${t}`, t ? d / t : 0),
@@ -1337,6 +1341,25 @@ export class WebGpuEngine implements Renderer {
 			});
 			this.streamer = streamer;
 			streamer.setWedge(wedge);
+		});
+	}
+
+	/**
+	 * The stream's tile loader under flag terrainGpuDecode (batched terrain, ?gpu=on): GPU Terrarium
+	 * decode into the height atlas, CPU heights on demand (terrain-gpu-decode.ts); undefined = the
+	 * default CPU decode.
+	 */
+	private gpuDecodeLoader() {
+		if (
+			getFlag("terrainGpuDecode") !== "on" ||
+			!gpuEnabled() ||
+			(this.opts.terrain ?? terrainMode()) !== "batched" ||
+			terrainBuild().mesh
+		)
+			return undefined;
+		return gpuDecodeTileLoader(async () => {
+			await this.ready.catch(() => {});
+			return this.disposed || this.lost ? null : (this.gpu?.device ?? null);
 		});
 	}
 

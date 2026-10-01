@@ -238,7 +238,12 @@ export const GPU_MODULES: readonly GpuModule[] = [
 	{
 		id: "ingest-terrarium-tile",
 		island: "I1",
-		paths: ["src/lib/gpu/ingest/terrarium-tile.ts"],
+		paths: [
+			"src/lib/gpu/ingest/terrarium-tile.ts",
+			"src/lib/deck-webgpu/terrain-gpu-decode.ts",
+			"src/lib/deck-webgpu/texture-array-atlas.ts",
+			"src/lib/deck-webgpu/layers/batched-terrain.ts",
+		],
 		groups: ["ingest-terrarium-tile"],
 		graphIdPrefixes: ["ingest-terrarium-layer|"],
 		realms: ["page"],
@@ -246,12 +251,12 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		resources: [
 			"tile rgba8unorm texture (import; staging per source size for the layer writer)",
 			"heights f32 + stats u32×8 (transients)",
-			"height atlas r32float 2d-array (import, per-run layer)",
+			"terrain height atlas r32float 2d-array (import, per-run layer)",
 		],
-		readbacks: ["stats: 32 B per tile (read node)"],
-		status: "not wired",
+		readbacks: ["stats: 32 B per streamed tile (read node, load time)"],
+		status: "opt-in",
 		notes:
-			"WAG W2.3: Terrarium tile decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi (terrariumTileStatsGpu), and TerrariumLayerWriter into a height-atlas layer. CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
+			"WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default off; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi; residency: decode straight into the TileStore height layer; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
 	},
 	{
 		id: "look-relief-heights",

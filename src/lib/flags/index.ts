@@ -70,6 +70,14 @@ export const FLAG_SCHEMA = {
 	 */
 	terrainGpuCull: onOff("off"),
 	/**
+	 * WebGPU terrain stream: Terrarium tiles decode on the GPU straight into the height atlas (WAG W2.3,
+	 * deck-webgpu/terrain-gpu-decode.ts) and CPU heights are produced only when a CPU consumer asks
+	 * (W2.4 getCpuHeights). Same heights bit for bit (texel bytes == canvas bytes, measured); off = the
+	 * CPU decode. Default off until the wild-set / browser gates run. WebGL and ?gpu=off always decode
+	 * on the CPU.
+	 */
+	terrainGpuDecode: onOff("off"),
+	/**
 	 * autoAlign's refine precision (WAG P1, src/lib/gpu/align/cert-refine.ts): f64 (default) = exact CPU
 	 * scores decide every move; certified-f32 = GPU-driven loop with certified f32 compares, the CPU
 	 * deciding only what the bound cannot (same result; opt-in until its wild-set gate passes)

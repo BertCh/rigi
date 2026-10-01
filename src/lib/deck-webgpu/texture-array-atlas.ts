@@ -18,6 +18,7 @@
 //   re-creations.
 // - Pure allocation / growth math lives in atlas-layout.ts (node-checked).
 import type { Device, Texture } from "@luma.gl/core";
+import { TerrariumLayerWriter } from "../gpu/ingest/terrarium-tile";
 import { uploadBitmap, uploadRaster } from "../gpu/ingest/upload";
 import {
 	type GrowPolicy,
@@ -49,7 +50,14 @@ export class TextureArrayAtlas {
 	readonly maxLayers: number;
 	readonly size: number;
 	readonly mipLevels: number;
-	stats = { grows: 0, copiedLayers: 0, writes: 0, writeBytes: 0 };
+	stats = {
+		grows: 0,
+		copiedLayers: 0,
+		writes: 0,
+		writeBytes: 0,
+		/** writeTerrarium calls (writeBytes counts their rgba8 upload) */
+		gpuDecodes: 0,
+	};
 	private layers: LayerAllocator;
 
 	constructor(
@@ -155,7 +163,24 @@ export class TextureArrayAtlas {
 		this.stats.writeBytes += r.byteLength;
 	}
 
+	private terrarium?: TerrariumLayerWriter;
+
+	/**
+	 * A Terrarium tile bitmap decoded on the GPU (halved when `down` = 2) into the top-left of `layer`
+	 * (gpu/ingest TerrariumLayerWriter; r32float atlases only; flag terrainGpuDecode).
+	 */
+	writeTerrarium(layer: number, src: { bitmap: ImageBitmap; down: 1 | 2 }) {
+		this.terrarium ??= new TerrariumLayerWriter(this.device, this.props.id);
+		this.terrarium.write(this.texture, layer, src);
+		const out = src.bitmap.width / src.down;
+		this.stats.writes++;
+		this.stats.writeBytes += src.bitmap.width * src.bitmap.height * 4;
+		this.stats.gpuDecodes++;
+		return out;
+	}
+
 	destroy() {
+		this.terrarium?.destroy();
 		this.texture.destroy();
 	}
 }
