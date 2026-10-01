@@ -1344,8 +1344,9 @@ export class WebGpuEngine implements Renderer {
 		this.scheduleLook();
 	}
 
-	/** deck/engine.ts noteInput (the WebGPU compositor has no cheap interactive mode: only the
-	 * readback waits for input idle). */
+	/** deck/engine.ts noteInput: while an interaction runs the colour pass draws without MSAA
+	 * (host.setInteractive; luma pipelines per sample count are cached, pass.ts ModelCache) and the
+	 * readback waits; inputIdle restores 4× MSAA with one full "all" frame. */
 	private noteInput() {
 		const now = performance.now();
 		const burst = now - this.lastInputAt < INPUT_IDLE_MS;
@@ -1353,6 +1354,7 @@ export class WebGpuEngine implements Renderer {
 		if (burst && !this.interactive) {
 			this.interactive = true;
 			this.counters.interactions++;
+			this.host?.setInteractive(true);
 		}
 		clearTimeout(this.idleTimer);
 		this.idleTimer = window.setTimeout(() => this.inputIdle(), INPUT_IDLE_MS);
@@ -1362,6 +1364,13 @@ export class WebGpuEngine implements Renderer {
 		this.idleTimer = 0;
 		if (!this.interactive || this.disposed) return;
 		this.interactive = false;
+		// the full-quality frame follows the geometry readback (bounded), so the readback waits for
+		// no heavy frame; a new interaction meanwhile keeps the reduced mode
+		const restore = () => {
+			if (this.disposed || this.interactive) return;
+			this.host?.setInteractive(false);
+			this.schedule("all");
+		};
 		if (this.terrain && !this.geometryReady() && !this.lost) {
 			let t = 0;
 			void Promise.race([
@@ -1369,8 +1378,11 @@ export class WebGpuEngine implements Renderer {
 				new Promise((r) => {
 					t = window.setTimeout(r, 250);
 				}),
-			]).then(() => clearTimeout(t));
-		}
+			]).then(() => {
+				clearTimeout(t);
+				restore();
+			});
+		} else restore();
 	}
 
 	private scheduleLook() {

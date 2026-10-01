@@ -295,7 +295,7 @@ path; "in-app A/B" means compared inside the running engine against `/photo/<id>
 | `layers/terrain-styles.ts` | terrain-layer fs, look GLSL | (shading part) | 22/22 programs; hillshade ≤ 0.18 %, imagery ≤ 0.08 % vs CPU port of the GLSL | yes (overlay / replace styles) | atmosphere eye convention to confirm |
 | `layers/drape.ts` | projectPhoto / truth | (plugin) | Step Inside frame reproduces the photo; grazing acne 17.7 % → 0 % | world view screenshots | no pixel A/B of the world drape |
 | `layers/trail.ts` | TrailLayer (LineSegments2) | color | position / width / occlusion / premul checks | yes (`&trails=1`) | class-1 normal write undecided |
-| `layers/composite.ts` | PhotoCompositor + composite shader | screen | ≤ 0.53/255 vs CPU copy of the GLSL, 20/20 cases | yes (export diff, see Measured) | no cheap interactive mode |
+| `layers/composite.ts` | PhotoCompositor + composite shader | screen | ≤ 0.53/255 vs CPU copy of the GLSL, 20/20 cases | yes (export diff, see Measured) | interactive: colour pass 1× (below) |
 | `layers/ridges.ts` | composite ridges / skyline / ink | (WGSL lib) | 0 bad px, max err 1e-5 vs GLSL CPU port | via composite | texel-edge ties shift 1 row |
 | `layers/atm-sky.ts` | AtmSkyLayer, applyAtmosphere | color | ≤ 1/255 vs the GLSL compiled on WebGL2 | world view | — |
 | `layers/photo-sky.ts` | PhotoSkyLayer | color | max err 0 vs CPU model | not run (needs Step Inside scene) | — |
@@ -337,8 +337,15 @@ buffers, the MSAA colour target, the per-size geometry targets).
   now implemented); on the direct host `StepCamera` runs its own map mode.
 - **Not exercised end to end:** Step Inside (splats, photo sky, 3D tiles), because the harness has
   no near-field scene / tiles config; the per-layer checks cover them in isolation.
-- **Interactive composite:** the WebGL compositor had a cheaper interactive mode; here only the
-  geometry readback is deferred during drags.
+- **Interactive mode (unmeasured, no browser run yet):** `engine.noteInput` → `host.setInteractive`
+  → `ColorTargets.setReduced`: while a drag / lens burst runs the colour pass draws 1× straight
+  into the resolve-format `color` target (lazy 1× depth + framebuffer, no resolve), the geometry
+  readback waits, and `inputIdle` restores 4× MSAA with one "all" frame after the (bounded)
+  readback. Pipelines bake the sample count, so `pass.ts` `ModelCache` keeps one Model per
+  (key, sample variant): `runColorPass` sets `setColorSamples(1)` while recording and
+  `passModelProps("color")` reads it; both variants live side by side, created lazily on first
+  use (the first drag pays one pipeline build per colour layer). The look (`scheduleLook`) is
+  already debounced past the drag. Exports and `renderOffscreen` use fresh targets, always 4×.
 - **Full-resolution export** allocates a 4× MSAA rgba16float target at photo size (hundreds of MB
   at 12 MP, as the WebGL renderImage). Tile it via the camera offset.
 - **Colour space:** WebGPU blends in linear light into rgba16float; WebGL blended sRGB bytes on

@@ -45,6 +45,11 @@ export interface Host {
 	 * composite-only change: reveal, brush, blend); "all" (default) re-renders geometry + colour.
 	 */
 	requestRender(scope?: "all" | "screen"): void;
+	/**
+	 * Interactive quality: the colour pass draws without MSAA until `false`. Switching back only
+	 * changes the mode; the caller requests the full-quality "all" frame (it also fires onRender).
+	 */
+	setInteractive(active: boolean): void;
 	/** Resolves after the next frame's GPU work completes. */
 	nextFrame(scope?: "all" | "screen"): Promise<void>;
 	destroy(): void;
@@ -112,6 +117,10 @@ export class DirectHost implements Host {
 			this.raf = 0;
 			this.render();
 		});
+	}
+
+	setInteractive(active: boolean) {
+		if (this.color.setReduced(active)) this.offscreenDirty = true;
 	}
 
 	nextFrame(scope: "all" | "screen" = "all") {

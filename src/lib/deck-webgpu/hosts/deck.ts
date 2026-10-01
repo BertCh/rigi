@@ -226,6 +226,10 @@ export class DeckHost implements Host {
 		} as never);
 	}
 
+	setInteractive(active: boolean) {
+		if (this.color.setReduced(active)) this.offscreenDirty = true;
+	}
+
 	nextFrame(scope: "all" | "screen" = "all") {
 		return new Promise<void>((r) => {
 			this.waiters.push(r);

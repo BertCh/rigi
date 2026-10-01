@@ -11,7 +11,7 @@ import { type ShaderModule, WGSLShaderAssembler } from "@luma.gl/shadertools";
 import { type CameraUniforms, cameraModule } from "./camera";
 import { REVERSED_Z } from "./depth";
 import type { ColorTargets, GeometryTargets } from "./targets";
-import { PASS_ATTACHMENTS } from "./targets";
+import { MSAA_SAMPLES, PASS_ATTACHMENTS } from "./targets";
 
 /**
  * Pass kinds, drawn in this order each frame:
@@ -88,6 +88,19 @@ export const SHARED_MODULES: ShaderModule[] = [
 export const RIGI_WGSL_ASSEMBLER = new WGSLShaderAssembler();
 
 /**
+ * Sample count of the colour pass being recorded (hosts/passes.ts runColorPass sets it for the
+ * duration of the pass, then restores MSAA_SAMPLES). WebGPU pipelines bake their sample count, so
+ * the Models a layer builds for "color" must match the target it is drawn into: while the colour
+ * pass runs without MSAA (ColorTargets.setReduced, the interactive mode) passModelProps("color")
+ * declares 1 and ModelCache keeps a second Model per key. Outside the colour pass it reads
+ * MSAA_SAMPLES, so geometry / screen models and everything created elsewhere are unaffected.
+ */
+let colorSamples = MSAA_SAMPLES;
+export function setColorSamples(n: number) {
+	colorSamples = n;
+}
+
+/**
  * Model props for drawing into `kind` (attachment formats, sample count, reversed-Z depth).
  * Spread into `new Model(device, {...passModelProps(kind), ...yours})`; `parameters` merge:
  * pass `{...passModelProps(kind).parameters, ...mine}` if you override any.
@@ -129,7 +142,7 @@ export function passModelProps(
 		depthStencilAttachmentFormat: a.depthStencilAttachmentFormat,
 		parameters: {
 			cullMode: "none",
-			sampleCount: a.sampleCount,
+			sampleCount: kind === "color" ? colorSamples : a.sampleCount,
 			...depth,
 			...blend,
 		} as RenderPipelineParameters,
@@ -169,11 +182,15 @@ export function screenModelProps(
 export class ModelCache {
 	private models = new Map<string, Model>();
 
+	/** `key` plus the colour-pass sample variant: the MSAA and the interactive 1× Model of one
+	 * key coexist (pipelines are created once per variant, never per switch). Geometry and screen
+	 * draws always see the MSAA variant, so they keep a single Model. */
 	get(key: string, make: () => Model): Model {
-		let m = this.models.get(key);
+		const k = colorSamples === MSAA_SAMPLES ? key : `${key}|x${colorSamples}`;
+		let m = this.models.get(k);
 		if (!m) {
 			m = make();
-			this.models.set(key, m);
+			this.models.set(k, m);
 		}
 		return m;
 	}

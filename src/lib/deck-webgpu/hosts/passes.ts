@@ -1,5 +1,5 @@
 // The offscreen half of a frame, shared by both hosts: the geometry pass (photo camera) and the
-// MSAA colour pass (view camera) with its resolve. Hosts differ only in who owns the device /
+// MSAA colour pass (view camera) with its resolve (1×, no resolve, while interactive). Hosts differ only in who owns the device /
 // canvas and how the screen pass is driven.
 import type { Device, Framebuffer, RenderPass } from "@luma.gl/core";
 import {
@@ -8,16 +8,18 @@ import {
 	cameraUniforms,
 } from "../camera";
 import { REVERSED_Z } from "../depth";
-import type {
-	FrameState,
-	GpuLayerCore,
-	PassContext,
-	PassKind,
-	PassTarget,
+import {
+	type FrameState,
+	type GpuLayerCore,
+	type PassContext,
+	type PassKind,
+	type PassTarget,
+	setColorSamples,
 } from "../pass";
 import {
 	type ColorTargets,
 	type GeometryTargets,
+	MSAA_SAMPLES,
 	PASS_ATTACHMENTS,
 } from "../targets";
 
@@ -97,32 +99,39 @@ export function runColorPass(o: {
 }) {
 	const { device, geometry, color, frame } = o;
 	const cam = camerasFor(o.view, color.width, color.height);
+	const samples = color.samples;
 	const renderPass = device.beginRenderPass({
 		id: "rigi-color",
-		framebuffer: color.fbo,
+		framebuffer: color.passFbo,
 		clearColor: [0, 0, 0, 0],
 		clearDepth: REVERSED_Z.clearDepth,
-		// resolve at the end of the pass; the multisampled contents are not needed afterwards
-		resolveTargets: [color.color],
-		discard: true,
+		// MSAA: resolve at the end of the pass; the multisampled contents are not needed afterwards.
+		// Interactive (1×): the pass draws into color.color itself
+		...(samples > 1 ? { resolveTargets: [color.color], discard: true } : {}),
 	} as never);
 	const target: PassTarget = {
 		width: color.width,
 		height: color.height,
 		colorFormats: PASS_ATTACHMENTS.color.colorAttachmentFormats,
 		depthFormat: PASS_ATTACHMENTS.color.depthStencilAttachmentFormat,
-		samples: PASS_ATTACHMENTS.color.sampleCount,
+		samples,
 	};
-	for (const c of sorted(o.cores, "color"))
-		c.draw({
-			device,
-			kind: "color",
-			renderPass,
-			camera: cam,
-			target,
-			frame,
-			geometry,
-		} satisfies PassContext);
+	// layers build their colour Models while drawing: they must see this pass's sample count
+	setColorSamples(samples);
+	try {
+		for (const c of sorted(o.cores, "color"))
+			c.draw({
+				device,
+				kind: "color",
+				renderPass,
+				camera: cam,
+				target,
+				frame,
+				geometry,
+			} satisfies PassContext);
+	} finally {
+		setColorSamples(MSAA_SAMPLES);
+	}
 	renderPass.end();
 }
 

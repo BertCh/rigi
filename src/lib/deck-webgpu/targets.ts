@@ -156,6 +156,11 @@ export class ColorTargets {
 	depthMS!: Texture;
 	color!: Texture;
 	fbo!: Framebuffer;
+	/** Interactive variant (setReduced): 1× depth + a framebuffer drawing straight into `color`.
+	 * Allocated on first use, so a session that never drags pays nothing. */
+	private depth1: Texture | null = null;
+	private fbo1: Framebuffer | null = null;
+	private reducedMode = false;
 
 	constructor(
 		readonly device: Device,
@@ -205,6 +210,46 @@ export class ColorTargets {
 		});
 	}
 
+	/** Samples per pixel the colour pass draws with: MSAA_SAMPLES, or 1 while reduced. */
+	get samples() {
+		return this.reducedMode ? 1 : MSAA_SAMPLES;
+	}
+
+	/**
+	 * Interactive quality (no MSAA): the colour pass draws into `color` directly, no resolve.
+	 * Returns whether the mode changed (the caller redraws at full quality on leaving it).
+	 */
+	setReduced(reduced: boolean) {
+		if (reduced === this.reducedMode) return false;
+		this.reducedMode = reduced;
+		return true;
+	}
+
+	/** The colour pass framebuffer for the current mode (MSAA + resolve, or 1× direct). */
+	get passFbo(): Framebuffer {
+		if (!this.reducedMode) return this.fbo;
+		if (!this.fbo1) this.fbo1 = this.createReduced();
+		return this.fbo1;
+	}
+
+	private createReduced() {
+		const d = this.device;
+		this.depth1 = tex(
+			d,
+			`${this.id}-depth-1x`,
+			{ ...TARGET_FORMATS.colorDepthMS, samples: 1 },
+			this.width,
+			this.height,
+		);
+		return d.createFramebuffer({
+			id: `${this.id}-fbo-1x`,
+			width: this.width,
+			height: this.height,
+			colorAttachments: [this.color],
+			depthStencilAttachment: this.depth1,
+		});
+	}
+
 	resize(width: number, height: number) {
 		if (width === this.width && height === this.height) return false;
 		this.destroy();
@@ -213,6 +258,9 @@ export class ColorTargets {
 	}
 
 	destroy() {
+		this.fbo1?.destroy();
+		this.depth1?.destroy();
+		this.fbo1 = this.depth1 = null;
 		this.fbo.destroy();
 		this.colorMS.destroy();
 		this.depthMS.destroy();
