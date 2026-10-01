@@ -33,10 +33,10 @@ const text = { kind: "text" } as TextDef;
 export const FLAG_SCHEMA = {
 	// render
 	/**
-	 * The /photo engine (src/lib/renderer-select.ts): auto = WebGPU deck where the browser passes the probe,
+	 * The /photo engine (src/lib/renderer-select.ts): auto (the default) = WebGPU deck where the browser passes the probe,
 	 * else WebGL deck; webgpu = the same, asked for explicitly; deck = WebGL deck only; three = three.js.
 	 */
-	renderer: oneOf(["auto", "webgpu", "deck", "three"], "deck"),
+	renderer: oneOf(["auto", "webgpu", "deck", "three"], "auto"),
 	/** off: ?renderer=auto / webgpu act as if navigator.gpu were missing (proves the WebGL fallback) */
 	webgpu: onOff("on"),
 	/** deck only: one instanced grid per resolution, or one mesh per tile */

@@ -53,7 +53,7 @@ host). `scripts/deck-webgpu/vite.webgpu.config.ts` is kept for :3111 and is now 
 
 | `?renderer=` | Engine |
 |---|---|
-| `auto` | WebGpuEngine when the probe passes, else the WebGL DeckEngine |
+| `auto` (default) | WebGpuEngine when the probe passes, else the WebGL DeckEngine |
 | `webgpu` | the same, asked for explicitly (a fallback logs a console warning) |
 | `deck` | the WebGL DeckEngine only (the escape hatch) |
 | `three` | the three.js PhotoEngine |
@@ -361,8 +361,9 @@ buffers, the MSAA colour target, the per-size geometry targets).
    the wild benchmark and the Step Inside e2e with `renderer=webgpu`; require the WebGL numbers
    (Δyaw ≤ 0.5°, label Jaccard ≥ 0.6, export diffs at today's levels), plus the splat smear gate and
    a 3D-tiles A/B.
-4. **Default on for WebGPU-capable browsers** (`renderer=deck` → WebGPU when available, WebGL
-   otherwise) once 3 is green for a week; keep `?renderer=deck-webgl` as the escape hatch.
+4. **Default on for WebGPU-capable browsers (done 2026-10-01, ahead of the step-3 gate by the
+   user's call):** `?renderer=auto` is the default; `?renderer=deck` is the WebGL escape hatch.
+   Parity regressions found at the flip are fixed after it.
 5. **Retire WebGL deck layers** (terrain-layer, batched-terrain-layer, composite*, trail-layer,
    world-view layers, deck-splat-layer, tiles3d deck-layer, geometry-pass) once Safari / Firefox
    ship WebGPU on the supported OS versions; move `/roll` last (`layers/multi-drape.ts` is ready).

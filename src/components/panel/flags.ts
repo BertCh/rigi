@@ -54,7 +54,7 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "renderer",
 		label: "Engine",
-		help: "Auto: deck.gl on WebGPU where the browser supports it, else deck.gl on WebGL. WebGL pins deck.gl on WebGL; three.js is the old engine (each loads on demand).",
+		help: "Auto (default): deck.gl on WebGPU where the browser supports it, else deck.gl on WebGL. WebGL pins deck.gl on WebGL; three.js is the old engine (each loads on demand).",
 		group: "render",
 		options: {
 			auto: { label: "Auto", title: "WebGPU when available, else WebGL" },

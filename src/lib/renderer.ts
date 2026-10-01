@@ -1,6 +1,8 @@
 // The engine surface PhotoWorkspace (src/components/PhotoWorkspace.tsx) and the export layer
-// (src/lib/export/**) use, so the three.js PhotoEngine (src/lib/engine.ts) and the deck.gl
-// DeckEngine (src/lib/deck/engine.ts, the default) are interchangeable behind `?renderer=`.
+// (src/lib/export/**) use, so the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts, the default
+// where WebGPU is available), the WebGL DeckEngine (src/lib/deck/engine.ts, the fallback) and the
+// three.js PhotoEngine (src/lib/engine.ts) are interchangeable behind `?renderer=`
+// (src/lib/renderer-select.ts). WebGpuEngine reports kind 'deck' with backend 'webgpu'.
 //
 // Exactly the members those callers use (grepped 2026-09-25), typed with the existing types.
 // PhotoEngine satisfies it structurally (checked in renderer.check.ts) without edits to
