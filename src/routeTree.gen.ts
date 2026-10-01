@@ -18,6 +18,7 @@ import { Route as AtlasConceptRouteImport } from './routes/atlas.$concept'
 import { Route as DevExportRollRouteImport } from './routes/dev.export-roll'
 import { Route as DevGraphRouteImport } from './routes/dev.graph'
 import { Route as DevHowSceneRouteImport } from './routes/dev.how-scene'
+import { Route as DevMetaRouteImport } from './routes/dev.meta'
 import { Route as LabDeckSplatsRouteImport } from './routes/lab.deck-splats'
 import { Route as LabDeckWebgpuRouteImport } from './routes/lab.deck-webgpu'
 import { Route as LabGenerateRouteImport } from './routes/lab.generate'
@@ -72,6 +73,11 @@ const DevHowSceneRoute = DevHowSceneRouteImport.update({
   path: '/dev/how-scene',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevMetaRoute = DevMetaRouteImport.update({
+  id: '/dev/meta',
+  path: '/dev/meta',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LabDeckSplatsRoute = LabDeckSplatsRouteImport.update({
   id: '/lab/deck-splats',
   path: '/lab/deck-splats',
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/dev/export-roll': typeof DevExportRollRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
+  '/dev/meta': typeof DevMetaRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/dev/export-roll': typeof DevExportRollRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
+  '/dev/meta': typeof DevMetaRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/dev/export-roll': typeof DevExportRollRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
+  '/dev/meta': typeof DevMetaRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -182,6 +191,7 @@ export interface FileRouteTypes {
     | '/dev/export-roll'
     | '/dev/graph'
     | '/dev/how-scene'
+    | '/dev/meta'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/dev/export-roll'
     | '/dev/graph'
     | '/dev/how-scene'
+    | '/dev/meta'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/dev/export-roll'
     | '/dev/graph'
     | '/dev/how-scene'
+    | '/dev/meta'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   DevExportRollRoute: typeof DevExportRollRoute
   DevGraphRoute: typeof DevGraphRoute
   DevHowSceneRoute: typeof DevHowSceneRoute
+  DevMetaRoute: typeof DevMetaRoute
   LabDeckSplatsRoute: typeof LabDeckSplatsRoute
   LabDeckWebgpuRoute: typeof LabDeckWebgpuRoute
   LabGenerateRoute: typeof LabGenerateRoute
@@ -316,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevHowSceneRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev/meta': {
+      id: '/dev/meta'
+      path: '/dev/meta'
+      fullPath: '/dev/meta'
+      preLoaderRoute: typeof DevMetaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lab/deck-splats': {
       id: '/lab/deck-splats'
       path: '/lab/deck-splats'
@@ -384,6 +404,7 @@ const rootRouteChildren: RootRouteChildren = {
   DevExportRollRoute: DevExportRollRoute,
   DevGraphRoute: DevGraphRoute,
   DevHowSceneRoute: DevHowSceneRoute,
+  DevMetaRoute: DevMetaRoute,
   LabDeckSplatsRoute: LabDeckSplatsRoute,
   LabDeckWebgpuRoute: LabDeckWebgpuRoute,
   LabGenerateRoute: LabGenerateRoute,
