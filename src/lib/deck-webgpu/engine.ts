@@ -73,6 +73,12 @@ import {
 } from "#/lib/deck/scene";
 import { compositeFor, terrainLookFor } from "#/lib/deck/settings-map";
 import {
+	type SilScores,
+	scoreFromMask,
+	silMaskWords,
+	silNonce,
+} from "#/lib/deck/silhouette-mask";
+import {
 	type ImagerySource,
 	loadImagery,
 	type TerrainSet,
@@ -209,6 +215,7 @@ import {
 import { createTrailCore, type TrailCore } from "./layers/trail";
 import type { FrameState, GpuLayerCore, PassContext, PassKind } from "./pass";
 import { PresentCore, type PresentMode } from "./present";
+import { SilhouetteMaskGpu } from "./silhouette-gpu";
 import { ColorTargets, GeometryTargets, geometrySize, USAGE } from "./targets";
 import { TerrainCore } from "./terrain";
 import { imageTexture } from "./textures";
@@ -361,6 +368,11 @@ export type WebGpuEngineOptions = {
 	/** With the bridge on: the fitted haze on the geometry target too (default true; false = the
 	 * haze fit keeps the range readback path while masks / stats stay bridged). See setHazeBridge. */
 	hazeBridge?: boolean;
+	/** autoAlign's silhouette re-rank scored by a WGSL mask kernel on the geometry targets
+	 * (default true; deck/silhouette-mask.ts: identical scores by construction, 18 KB read per
+	 * pose instead of the rgba32float range). false = the CPU scorer, which also runs per pose
+	 * whenever the GPU can't decide. Harnesses flip `silhouetteGpu` for the A/B. */
+	silhouetteGpu?: boolean;
 };
 
 export type WebGpuEngineStats = {
@@ -443,7 +455,16 @@ export class WebGpuEngine implements Renderer {
 		ms: number;
 		searchMs: number;
 		scoreMs?: number;
+		/** "gpu" = mask kernel (silhouetteGpu), "cpu" = range readback + CPU scorer */
+		path?: "gpu" | "cpu";
+		/** bytes read back from the GPU for the whole re-rank */
+		bytes?: number;
+		/** GPU path: poses re-scored on the CPU (undecided pixel / bad header) */
+		fallbacks?: number;
 	} | null = null;
+	/** WebGpuEngineOptions.silhouetteGpu (harnesses flip it for the A/B). */
+	silhouetteGpu = true;
+	private silMask: SilhouetteMaskGpu | null = null;
 	private streamer?: TerrainStreamer;
 	private renderSet: TerrainSet | null = null;
 	private queryWedge?: ViewWedge;
@@ -538,6 +559,7 @@ export class WebGpuEngine implements Renderer {
 		opts: WebGpuEngineOptions = {},
 	) {
 		this.opts = opts;
+		this.silhouetteGpu = opts.silhouetteGpu ?? true;
 		this.photo = photo;
 		this.aspect = photo.width / photo.height;
 		this.prior = {
@@ -1157,6 +1179,8 @@ export class WebGpuEngine implements Renderer {
 		this.world?.dispose();
 		this.gens.dispose();
 		this.dropGeometrySources();
+		this.silMask?.destroy();
+		this.silMask = null;
 		this.listeners.clear();
 		const g = this.gpu;
 		this.gpu = null;
@@ -2180,18 +2204,34 @@ export class WebGpuEngine implements Renderer {
 		const t0 = performance.now();
 		await this.ready;
 		const srcs = alts.map((_, i) => this.silhouetteSource(i));
-		await Promise.all(alts.map((a, i) => srcs[i]?.render(a.pose)));
+		let sil: SilScores | null = this.silhouetteGpu
+			? await this.silhouetteScoresGpu(alts, srcs)
+			: null;
 		if (this.disposed) return null;
-		const tScore = performance.now();
-		const scored = alts.map((a, i) => {
-			const sil = this.scoreSilhouette(srcs[i]);
-			return { ...a, sil, total: a.score + 0.5 * sil };
-		});
+		if (!sil) {
+			await Promise.all(alts.map((a, i) => srcs[i]?.render(a.pose)));
+			if (this.disposed) return null;
+			const tScore = performance.now();
+			const sils = srcs.map((s) => this.scoreSilhouette(s));
+			let bytes = 0;
+			for (const s of srcs)
+				if (s instanceof WebGpuGeometrySource) bytes += s.readBytes;
+			sil = { sils, tScore, bytes, fallbacks: 0, path: "cpu" };
+		}
+		const sils = sil.sils;
+		const scored = alts.map((a, i) => ({
+			...a,
+			sil: sils[i],
+			total: a.score + 0.5 * sils[i],
+		}));
 		this.silTiming = {
 			renders: alts.length,
 			ms: performance.now() - t0,
 			searchMs: t0 - tSearch,
-			scoreMs: performance.now() - tScore,
+			scoreMs: performance.now() - sil.tScore,
+			path: sil.path,
+			bytes: sil.bytes,
+			fallbacks: sil.fallbacks,
 		};
 		const ranked = scored.sort((a, b) => b.total - a.total);
 		const best = ranked[0];
@@ -2208,6 +2248,59 @@ export class WebGpuEngine implements Renderer {
 			confidence,
 			alternatives: ranked,
 		};
+	}
+
+	/**
+	 * The re-rank's scores from GPU masks (silhouette-gpu.ts, deck/silhouette-mask.ts): every pose
+	 * drawn into its source's targets, one kernel submit + one 18 KB-per-pose readback, then the
+	 * CPU scorer's sum over the set bits. A pose the GPU can't decide is read back and scored on
+	 * the CPU (same render). null = not possible (CPU sources, lost device…): the caller takes the
+	 * CPU path, from scratch.
+	 */
+	private async silhouetteScoresGpu(
+		alts: { pose: Pose }[],
+		srcs: (GeometrySource | null)[],
+	): Promise<SilScores | null> {
+		const gs: WebGpuGeometrySource[] = [];
+		for (const s of srcs) if (s instanceof WebGpuGeometrySource) gs.push(s);
+		if (!gs.length || gs.length !== alts.length) return null;
+		const { width: W, height: H, gpuDevice: device } = gs[0];
+		if (this.silMask?.device !== device) {
+			this.silMask?.destroy();
+			this.silMask = new SilhouetteMaskGpu(device);
+		}
+		const seqs: number[] = [];
+		for (let i = 0; i < alts.length; i++) {
+			if (!gs[i].drawOnly(alts[i].pose)) return null;
+			seqs.push(gs[i].renderSeq);
+		}
+		const nonce = silNonce();
+		const words = await this.silMask.run(
+			gs.map((s) => s.targets.geometry),
+			W,
+			H,
+			nonce,
+		);
+		const edge = this.edge;
+		if (!words || this.disposed || !edge) return null;
+		const tScore = performance.now();
+		let bytes = this.silMask.lastBytes;
+		let fallbacks = 0;
+		const per = silMaskWords(W, H);
+		const sils: number[] = [];
+		for (let i = 0; i < gs.length; i++) {
+			let s = scoreFromMask(words, i * per, W, H, edge, nonce);
+			if (s === null) {
+				fallbacks++;
+				// the same draw the mask read, or nothing (a concurrent autoAlign redrew it)
+				if (!(await gs[i].readDrawn(seqs[i], alts[i].pose)) || this.disposed)
+					return null;
+				bytes += gs[i].readBytes;
+				s = this.scoreSilhouette(gs[i]);
+			}
+			sils.push(s);
+		}
+		return { sils, tScore, bytes, fallbacks, path: "gpu" };
 	}
 
 	private silhouetteSource(i = 0): GeometrySource | null {

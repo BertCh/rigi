@@ -291,6 +291,8 @@ export type ReadbackTiming = {
 	copyMs: number;
 	/** readPixels issued → data in `out`. */
 	readbackMs: number;
+	/** Bytes read back (RED/FLOAT: 4 per pixel; the RGBA/FLOAT fallback: 16). */
+	bytes?: number;
 };
 
 /** An r32float + depth render target with an asynchronous (PBO + fence) readback. */
@@ -414,6 +416,7 @@ export class GeometryTarget {
 			probes: quiet.probes,
 			copyMs: t2 - t1,
 			readbackMs: t2 - t0,
+			bytes,
 		};
 		return true;
 	}
@@ -511,6 +514,10 @@ export class GpuGeometrySource implements GeometrySource {
 	pose: Pose | null = null;
 	/** Timing of the last completed render(). */
 	timing: GeometryTiming | null = null;
+	/** Bytes the last completed readback copied (render() / readDrawn()). */
+	get readBytes() {
+		return this.target.lastRead?.bytes ?? 0;
+	}
 	private target: GeometryTarget;
 	private renderer: TerrainPassRenderer;
 	private raw: Float32Array;
@@ -518,6 +525,8 @@ export class GpuGeometrySource implements GeometrySource {
 	private seq = 0;
 	/** The render() whose result `range` / `pose` hold (== seq: the target holds it too). */
 	private shown = 0;
+	/** The pose the target holds (last drawOnly() / render()). */
+	private drawn: Pose | null = null;
 	/** Draw framebuffer of copyRangeTo (created on first use). */
 	private copyFbo: WebGLFramebuffer | null = null;
 	private disposed = false;
@@ -612,40 +621,72 @@ export class GpuGeometrySource implements GeometrySource {
 		return true;
 	}
 
+	/** The luma device the target lives on (GPU consumers of `texture`). */
+	get device() {
+		return this.target.device;
+	}
+
+	/** Draws issued so far (drawOnly() / render()); readDrawn() takes the value after its draw. */
+	get drawSeq() {
+		return this.seq;
+	}
+
 	/**
 	 * render() without the readback, for GPU consumers of `texture`: draws the terrain through
 	 * `pose` into the target and returns. `range`, `xyz`, `pose` and `timing` keep describing the
-	 * last render() (they are not this draw's), copyRangeTo says no until the next render(), and a
-	 * render() still waiting for its readback is superseded (the target no longer holds it).
+	 * last render() (they are not this draw's) until readDrawn(), copyRangeTo says no until then,
+	 * and a render() still waiting for its readback is superseded (the target no longer holds it).
 	 * false = disposed.
 	 */
 	drawOnly(pose: Pose): boolean {
 		if (this.disposed) return false;
 		++this.seq;
-		const lm = (
-			this.deck as unknown as { layerManager?: { getLayers(): Layer[] } }
-		).layerManager;
-		this.renderer.render(
-			"geometry",
-			lm?.getLayers() ?? [],
-			this.target.fbo,
-			pose,
-			this.eye,
-		);
+		this.drawPass(pose);
 		return true;
 	}
 
-	async render(pose: Pose): Promise<void> {
-		if (this.disposed) return;
-		const seq = ++this.seq;
-		const t0 = performance.now();
+	/**
+	 * Reads back what drawOnly() number `seq` (drawSeq right after it) drew for `pose` (render()'s
+	 * second half), so `range` / `pose` describe it. false = anything else is in the target now (a
+	 * later drawOnly() / render(), e.g. a concurrent autoAlign, or another pose), disposed, lost:
+	 * the caller must not score what it would read.
+	 */
+	async readDrawn(seq: number, pose: Pose): Promise<boolean> {
+		const drawn = this.drawn;
+		if (this.disposed || !drawn || this.seq !== seq) return false;
+		if (
+			drawn.yaw !== pose.yaw ||
+			drawn.pitch !== pose.pitch ||
+			drawn.roll !== pose.roll ||
+			drawn.vfov !== pose.vfov
+		)
+			return false;
+		if (this.shown === seq) return true;
+		const t = performance.now();
+		await this.finish(seq, drawn, t, t);
+		return this.shown === seq;
+	}
+
+	private drawPass(pose: Pose) {
 		// layerManager is protected in the typings but the documented way to reach the live layers
 		const lm = (
 			this.deck as unknown as { layerManager?: { getLayers(): Layer[] } }
 		).layerManager;
 		const layers = lm?.getLayers() ?? [];
 		this.renderer.render("geometry", layers, this.target.fbo, pose, this.eye);
+		this.drawn = { ...pose };
+	}
+
+	async render(pose: Pose): Promise<void> {
+		if (this.disposed) return;
+		const seq = ++this.seq;
+		const t0 = performance.now();
+		this.drawPass(pose);
 		const t1 = performance.now();
+		await this.finish(seq, pose, t0, t1);
+	}
+
+	private async finish(seq: number, pose: Pose, t0: number, t1: number) {
 		const ok = await this.target.read(this.raw);
 		const t2 = performance.now();
 		// a newer render() superseded this one: its buffers win

@@ -179,14 +179,56 @@ export class WebGpuGeometrySource implements GeometrySource {
 		};
 	}
 
-	async render(pose: Pose): Promise<void> {
-		if (this.disposed || this.device.isLost) return;
-		const seq = ++this.seq;
-		const t0 = performance.now();
+	/** The device the targets live on (GPU consumers of `targets.geometry`). */
+	get gpuDevice() {
+		return this.device;
+	}
+
+	/** Bytes the last completed readback copied (render() / readDrawn()). */
+	readBytes = 0;
+
+	/**
+	 * render() without the readback: the geometry pass for `pose` is encoded and submitted now, so
+	 * later submits on this queue see `targets.geometry`. `range` / `pose` are unchanged until
+	 * readDrawn() (or a render()) reads it back. false = disposed / lost (nothing drawn).
+	 */
+	drawOnly(pose: Pose): boolean {
+		if (this.disposed || this.device.isLost) return false;
+		++this.seq;
+		this.drawPass(pose, performance.now());
+		return true;
+	}
+
+	/**
+	 * Reads back what drawOnly() number `seq` (drawSeq right after it) drew for `pose` (render()'s
+	 * second half), so `range` / `pose` describe it. false = anything else is in the target now (a
+	 * later drawOnly() / render(), e.g. a concurrent autoAlign, or another pose), disposed, lost:
+	 * the caller must not score what it would read.
+	 */
+	async readDrawn(seq: number, pose: Pose): Promise<boolean> {
+		const drawn = this.drawn;
+		if (this.disposed || !drawn || this.seq !== seq) return false;
+		if (
+			drawn.yaw !== pose.yaw ||
+			drawn.pitch !== pose.pitch ||
+			drawn.roll !== pose.roll ||
+			drawn.vfov !== pose.vfov
+		)
+			return false;
+		if (this.unpacked === seq) return true;
+		const t = performance.now();
+		await this.finish(seq, drawn, this.drawnCores, t, t);
+		return this.unpacked === seq;
+	}
+
+	private drawn: Pose | null = null;
+	private drawnCores: readonly GpuLayerCore[] = [];
+
+	private drawPass(pose: Pose, time: number) {
 		const cores = this.cores();
 		const frame: FrameState = {
 			frame: ++this.frame,
-			time: t0,
+			time,
 			view: "photo",
 		};
 		runGeometryPass({
@@ -198,7 +240,27 @@ export class WebGpuGeometrySource implements GeometrySource {
 		});
 		// the copy in TextureReader.read is its own queue submit: the pass must be on the queue first
 		this.device.submit();
+		this.drawn = { ...pose };
+		this.drawnCores = cores;
+		return cores;
+	}
+
+	async render(pose: Pose): Promise<void> {
+		if (this.disposed || this.device.isLost) return;
+		const seq = ++this.seq;
+		const t0 = performance.now();
+		const cores = this.drawPass(pose, t0);
 		const t1 = performance.now();
+		await this.finish(seq, pose, cores, t0, t1);
+	}
+
+	private async finish(
+		seq: number,
+		pose: Pose,
+		cores: readonly GpuLayerCore[],
+		t0: number,
+		t1: number,
+	) {
 		const reader = this.readers.pop() ?? new TextureReader(this.device);
 		const data = await reader.read(this.targets.geometry);
 		// keep two readers warm (a render overlapping one in flight); drop extras
@@ -207,6 +269,7 @@ export class WebGpuGeometrySource implements GeometrySource {
 		const t2 = performance.now();
 		// a newer render() superseded this one (its buffers win), or the device went away
 		if (!data || seq !== this.seq || this.disposed) return;
+		this.readBytes = data.byteLength;
 		this.unpack(data);
 		const t3 = performance.now();
 		this.pose = { ...pose };

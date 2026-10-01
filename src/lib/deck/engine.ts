@@ -132,6 +132,13 @@ import {
 	snapPeaksNear,
 } from "./scene";
 import { compositeFor, terrainLookFor } from "./settings-map";
+import { SilhouetteMaskGL } from "./silhouette-gl";
+import {
+	type SilScores,
+	scoreFromMask,
+	silMaskWords,
+	silNonce,
+} from "./silhouette-mask";
 import {
 	type ImagerySource,
 	loadImagery,
@@ -170,6 +177,13 @@ export type DeckEngineOptions = {
 	 * source, the target already re-rendered for a newer pose).
 	 */
 	gpuDrape?: boolean;
+	/**
+	 * autoAlign's silhouette re-rank scored on the GPU (default true): a mask pass over each pose's
+	 * range target and an 18 KB read per pose (silhouette-mask.ts; identical scores by construction)
+	 * instead of reading the range back. false = the CPU scorer, which also runs per pose whenever
+	 * the GPU can't decide (CPU geometry source, context lost, an undecided pixel).
+	 */
+	silhouetteGpu?: boolean;
 };
 
 export type DeckEngineStats = {
@@ -340,8 +354,14 @@ export class DeckEngine implements Renderer {
 		renders: number;
 		ms: number;
 		searchMs: number;
-		/** CPU scoring of the read-back range buffers (part of ms) */
+		/** CPU scoring of the read-back range buffers / GPU masks (part of ms) */
 		scoreMs?: number;
+		/** "gpu" = mask pass (silhouetteGpu), "cpu" = range readback + CPU scorer */
+		path?: "gpu" | "cpu";
+		/** bytes read back from the GPU for the whole re-rank */
+		bytes?: number;
+		/** GPU path: poses re-scored on the CPU (undecided pixel / bad header) */
+		fallbacks?: number;
 	} | null = null;
 	private streamer?: TerrainStreamer;
 	/** Latest streamed set (what the TerrainLayer draws). */
@@ -443,6 +463,9 @@ export class DeckEngine implements Renderer {
 	 */
 	private drapeTex: Texture[] = [];
 	private readonly gpuDrape: boolean;
+	/** DeckEngineOptions.silhouetteGpu (harnesses flip it for the A/B). */
+	silhouetteGpu: boolean;
+	private silMask: SilhouetteMaskGL | null = null;
 	private loadAbort = new AbortController();
 	/** Step Inside (setNearField): the scene and its view options; null = off (the classic views). */
 	private nearField: {
@@ -482,6 +505,7 @@ export class DeckEngine implements Renderer {
 		opts: DeckEngineOptions = {},
 	) {
 		this.gpuDrape = opts.gpuDrape ?? true;
+		this.silhouetteGpu = opts.silhouetteGpu ?? true;
 		this.photo = photo;
 		this.aspect = photo.width / photo.height;
 		this.prior = {
@@ -982,6 +1006,8 @@ export class DeckEngine implements Renderer {
 		for (const r of this.readbackWaiters) r(false);
 		this.readbackWaiters = [];
 		this.dropGeometrySources();
+		this.silMask?.destroy();
+		this.silMask = null;
 		this.compositor.onChange = undefined;
 		this.listeners.clear();
 		this.deck.finalize();
@@ -2108,21 +2134,35 @@ export class DeckEngine implements Renderer {
 		const t0 = performance.now();
 		await this.deckReady;
 		this.flushLayers();
-		// all hypotheses are submitted at once and their async readbacks overlap (three renders and
-		// reads each one back synchronously)
 		const srcs = alts.map((_, i) => this.silhouetteSource(i));
-		await Promise.all(alts.map((a, i) => srcs[i]?.render(a.pose)));
+		let sil: SilScores | null = this.silhouetteGpu
+			? await this.silhouetteScoresGpu(alts, srcs)
+			: null;
 		if (this.disposed) return null;
-		const tScore = performance.now();
+		if (!sil) {
+			// all hypotheses are submitted at once and their async readbacks overlap (three renders
+			// and reads each one back synchronously)
+			await Promise.all(alts.map((a, i) => srcs[i]?.render(a.pose)));
+			if (this.disposed) return null;
+			const tScore = performance.now();
+			const sils = srcs.map((s) => this.scoreSilhouette(s));
+			let bytes = 0;
+			for (const s of srcs)
+				if (s instanceof GpuGeometrySource) bytes += s.readBytes;
+			sil = { sils, tScore, bytes, fallbacks: 0, path: "cpu" };
+		}
 		for (let i = 0; i < alts.length; i++) {
-			const sil = this.scoreSilhouette(srcs[i]);
-			scored.push({ ...alts[i], sil, total: alts[i].score + 0.5 * sil });
+			const s = sil.sils[i];
+			scored.push({ ...alts[i], sil: s, total: alts[i].score + 0.5 * s });
 		}
 		this.silTiming = {
 			renders: alts.length,
 			ms: performance.now() - t0,
 			searchMs: t0 - tSearch,
-			scoreMs: performance.now() - tScore,
+			scoreMs: performance.now() - sil.tScore,
+			path: sil.path,
+			bytes: sil.bytes,
+			fallbacks: sil.fallbacks,
 		};
 		const ranked = scored.sort((a, b) => b.total - a.total);
 		const best = ranked[0];
@@ -2139,6 +2179,58 @@ export class DeckEngine implements Renderer {
 			confidence,
 			alternatives: ranked,
 		};
+	}
+
+	/**
+	 * The re-rank's scores from GPU masks (silhouette-mask.ts): every pose drawn into its source's
+	 * target, one mask pass + one 18 KB-per-pose readback, then the CPU scorer's sum over the set
+	 * bits. A pose the GPU can't decide is read back and scored on the CPU (same render). null =
+	 * not possible (non-GPU sources, context lost…): the caller takes the CPU path, from scratch.
+	 */
+	private async silhouetteScoresGpu(
+		alts: { pose: Pose }[],
+		srcs: (GeometrySource | null)[],
+	): Promise<SilScores | null> {
+		const gs: GpuGeometrySource[] = [];
+		for (const s of srcs) if (s instanceof GpuGeometrySource) gs.push(s);
+		if (!gs.length || gs.length !== alts.length) return null;
+		const { width: W, height: H, device } = gs[0];
+		if (this.silMask?.device !== device) {
+			this.silMask?.destroy();
+			this.silMask = new SilhouetteMaskGL(device);
+		}
+		const seqs: number[] = [];
+		for (let i = 0; i < alts.length; i++) {
+			if (!gs[i].drawOnly(alts[i].pose)) return null;
+			seqs.push(gs[i].drawSeq);
+		}
+		const nonce = silNonce();
+		const words = await this.silMask.run(
+			gs.map((s) => (s.texture as unknown as { handle: WebGLTexture }).handle),
+			W,
+			H,
+			nonce,
+		);
+		const edge = this.edge;
+		if (!words || this.disposed || !edge) return null;
+		const tScore = performance.now();
+		let bytes = this.silMask.lastBytes;
+		let fallbacks = 0;
+		const per = silMaskWords(W, H);
+		const sils: number[] = [];
+		for (let i = 0; i < gs.length; i++) {
+			let s = scoreFromMask(words, i * per, W, H, edge, nonce);
+			if (s === null) {
+				fallbacks++;
+				// the same draw the mask read, or nothing (a concurrent autoAlign redrew it)
+				if (!(await gs[i].readDrawn(seqs[i], alts[i].pose)) || this.disposed)
+					return null;
+				bytes += gs[i].readBytes;
+				s = this.scoreSilhouette(gs[i]);
+			}
+			sils.push(s);
+		}
+		return { sils, tScore, bytes, fallbacks, path: "gpu" };
 	}
 
 	private silhouetteSource(i = 0): GeometrySource | null {
