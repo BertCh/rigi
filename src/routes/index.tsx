@@ -13,18 +13,47 @@ import {
 	ImageIcon,
 	ShieldCheck,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense } from "react";
 import { Compare } from "#/components/site/Compare";
-import { DemoPanorama, useDemoRoll } from "#/components/site/DemoRollViews";
 import { FadeIn } from "#/components/site/FadeIn";
-import { HowItWorksScene } from "#/components/site/how/HowItWorksScene";
-import { LandscapeView } from "#/components/site/LandscapeView";
-import { LiveRollMap } from "#/components/site/LiveRollMap";
 import { RevealLoop } from "#/components/site/RevealLoop";
 import { SITE_THEME, SiteNav } from "#/components/site/SiteNav";
-import { StepInsideDemo } from "#/components/site/StepInsideDemo";
-import { TopoBoard } from "#/components/site/TopoBoard";
-import type { DemoManifest } from "#/lib/demo";
+import { NearViewport } from "#/components/site/useNearViewport";
+
+// Everything below the first two sections is split out and mounted only when near the viewport
+// (NearViewport), with a same-size placeholder, so the hero ships little JS and starts no GPU work.
+const PanoramaSection = lazy(() =>
+	import("#/components/site/DemoSections").then((m) => ({
+		default: m.PanoramaSection,
+	})),
+);
+const TopoSection = lazy(() =>
+	import("#/components/site/DemoSections").then((m) => ({
+		default: m.TopoSection,
+	})),
+);
+const LiveRollMap = lazy(() =>
+	import("#/components/site/LiveRollMap").then((m) => ({
+		default: m.LiveRollMap,
+	})),
+);
+const StepInsideDemo = lazy(() =>
+	import("#/components/site/StepInsideDemo").then((m) => ({
+		default: m.StepInsideDemo,
+	})),
+);
+const HowItWorksScene = lazy(() =>
+	import("#/components/site/how/HowItWorksScene").then((m) => ({
+		default: m.HowItWorksScene,
+	})),
+);
+
+const PLACEHOLDER = "bg-white/[0.03] ring-1 ring-white/10";
+const PANO_BOX = `h-[380px] rounded-xl ${PLACEHOLDER}`;
+const TOPO_BOX = `h-[min(640px,75vh)] rounded-2xl ${PLACEHOLDER}`;
+const LIVE_BOX = `aspect-[16/10] max-h-[78vh] w-full rounded-2xl ${PLACEHOLDER}`;
+const STEP_BOX = `aspect-[16/9] max-h-[78vh] w-full rounded-2xl ${PLACEHOLDER}`;
+const HOW_BOX = `aspect-[16/11] rounded-2xl ${PLACEHOLDER}`;
 
 // The landing page, one scroll: the sample trip (src/lib/demo, a real day on Niederhorn) shows the
 // features live (before/after, the overlay reveal, the photos on the topo map, the roll draped in
@@ -55,8 +84,6 @@ const local = [
 ];
 
 function Home() {
-	const demo = useDemo();
-	const roll = useDemoRoll();
 	return (
 		<main className={`${SITE_THEME} overflow-x-clip pb-10`}>
 			<SiteNav />
@@ -130,13 +157,11 @@ function Home() {
 				title="Twelve photos from one viewpoint."
 				body="Each photo is placed by its solved view direction, against the skyline computed from the elevation model. Gaps are filled with rendered terrain."
 			>
-				<LandscapeView>
-					{roll ? (
-						<DemoPanorama roll={roll} />
-					) : (
-						<div className="h-[380px] rounded-xl bg-white/[0.03] ring-1 ring-white/10" />
-					)}
-				</LandscapeView>
+				<NearViewport placeholder={<div className={PANO_BOX} />} margin={800}>
+					<Suspense fallback={<div className={PANO_BOX} />}>
+						<PanoramaSection />
+					</Suspense>
+				</NearViewport>
 			</Story>
 
 			{/* the topo board */}
@@ -145,14 +170,11 @@ function Home() {
 				title="Positions and view directions."
 				body="Each photo is shown where it was taken, with the direction it faced. Click one to open it."
 			>
-				{demo ? (
-					<TopoBoard
-						demo={demo}
-						className="h-[min(640px,75vh)] rounded-2xl ring-1 ring-white/10"
-					/>
-				) : (
-					<div className="h-[min(640px,75vh)] rounded-2xl bg-white/[0.03] ring-1 ring-white/10" />
-				)}
+				<NearViewport placeholder={<div className={TOPO_BOX} />} margin={800}>
+					<Suspense fallback={<div className={TOPO_BOX} />}>
+						<TopoSection />
+					</Suspense>
+				</NearViewport>
 			</Story>
 
 			{/* the live roll map */}
@@ -161,10 +183,14 @@ function Home() {
 				title="Photos projected onto the terrain."
 				body="Each photo is draped onto the slopes visible in it. This view renders live in your browser. Drag to orbit, click a pin to enter a photo."
 			>
-				<LiveRollMap
-					poster="/demo/shots/drape.jpg"
-					className="aspect-[16/10] max-h-[78vh] w-full rounded-2xl ring-1 ring-white/10"
-				/>
+				<NearViewport placeholder={<div className={LIVE_BOX} />} margin={400}>
+					<Suspense fallback={<div className={LIVE_BOX} />}>
+						<LiveRollMap
+							poster="/demo/shots/drape.jpg"
+							className="aspect-[16/10] max-h-[78vh] w-full rounded-2xl ring-1 ring-white/10"
+						/>
+					</Suspense>
+				</NearViewport>
 			</Story>
 
 			{/* step inside */}
@@ -173,7 +199,11 @@ function Home() {
 				title="Walk into the photo."
 				body="The hiker, the hut and the lift pylon in front of the camera become 3D splats, placed on the terrain by the solved pose. Beyond the photo's frame, Google's photorealistic 3D tiles carry the view on. Drag to look around."
 			>
-				<StepInsideDemo className="aspect-[16/9] max-h-[78vh] w-full rounded-2xl ring-1 ring-white/10" />
+				<NearViewport placeholder={<div className={STEP_BOX} />} margin={400}>
+					<Suspense fallback={<div className={STEP_BOX} />}>
+						<StepInsideDemo className="aspect-[16/9] max-h-[78vh] w-full rounded-2xl ring-1 ring-white/10" />
+					</Suspense>
+				</NearViewport>
 			</Story>
 
 			{/* how */}
@@ -183,7 +213,11 @@ function Home() {
 				title="Guess, measure, correct, snap."
 				body="A phone records position, heading and tilt. The heading is often off by several degrees, which is too much to identify peaks reliably. Rigi renders the expected skyline from the elevation model and adjusts the camera until the rendered and photographed skylines match."
 			>
-				<HowItWorksScene />
+				<NearViewport placeholder={<div className={HOW_BOX} />} margin={600}>
+					<Suspense fallback={<div className={HOW_BOX} />}>
+						<HowItWorksScene />
+					</Suspense>
+				</NearViewport>
 			</Story>
 
 			{/* local */}
@@ -320,7 +354,7 @@ function Story({
 					)}
 				</div>
 			</FadeIn>
-			<FadeIn className="mt-8" delay={120}>
+			<FadeIn className="mt-8" delay={120} plain>
 				{bleed ? (
 					<div className="relative left-1/2 w-[calc(100vw-12px)] -translate-x-1/2">
 						{children}
@@ -374,20 +408,4 @@ function Pitch({
 			</span>
 		</Link>
 	);
-}
-
-/** The sample trip's manifest, fetched after mount (the page itself stays static). */
-function useDemo() {
-	const [m, setM] = useState<DemoManifest | null>(null);
-	useEffect(() => {
-		let live = true;
-		import("#/lib/demo")
-			.then((d) => d.loadDemo())
-			.then((x) => live && setM(x))
-			.catch(() => {});
-		return () => {
-			live = false;
-		};
-	}, []);
-	return m;
 }

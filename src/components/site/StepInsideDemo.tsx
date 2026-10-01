@@ -104,6 +104,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 		let engine: StepEngine | null = null;
 		let raf = 0;
 		let clearFlag: (() => void) | null = null;
+		let stopWatch: (() => void) | null = null;
 		let lastInput = Number.NEGATIVE_INFINITY;
 		const onInput = () => {
 			lastInput = performance.now();
@@ -192,7 +193,24 @@ export function StepInsideDemo({ className }: { className?: string }) {
 			// the sway: a slow figure on the photo-mode orbit, paused while someone drives
 			let shown = { a: 0, b: 0 };
 			let t0 = performance.now();
+			// the sway is the only thing redrawing: stop it offscreen or in a hidden tab, restart from the
+			// camera's current pose (t0 reset, ramped in) on return
+			let onScreen = true;
+			let running = true;
+			const sync = () => {
+				const want = onScreen && !document.hidden;
+				if (want === running) return;
+				running = want;
+				if (want) {
+					shown = { a: 0, b: 0 };
+					t0 = performance.now();
+					raf = requestAnimationFrame(tick);
+				} else {
+					cancelAnimationFrame(raf);
+				}
+			};
 			const tick = (now: number) => {
+				if (!running) return;
 				raf = requestAnimationFrame(tick);
 				const cam = engine?.stepCamera;
 				if (!cam || cam.mode !== "photo") return;
@@ -213,6 +231,17 @@ export function StepInsideDemo({ className }: { className?: string }) {
 				shown = want;
 			};
 			raf = requestAnimationFrame(tick);
+			if (!live) return;
+			const vio = new IntersectionObserver(([e]) => {
+				onScreen = e.isIntersecting;
+				sync();
+			});
+			vio.observe(canvas);
+			document.addEventListener("visibilitychange", sync);
+			stopWatch = () => {
+				vio.disconnect();
+				document.removeEventListener("visibilitychange", sync);
+			};
 		})().catch((e) => {
 			console.warn("[step demo]", e);
 			if (live) setStage(null);
@@ -225,6 +254,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 		return () => {
 			live = false;
 			cancelAnimationFrame(raf);
+			stopWatch?.();
 			ro.disconnect();
 			canvas.removeEventListener("pointerdown", focus);
 			canvas.removeEventListener("pointerdown", onInput);
@@ -247,6 +277,8 @@ export function StepInsideDemo({ className }: { className?: string }) {
 		>
 			<img
 				src={`${BASE}/photo.jpg`}
+				loading="lazy"
+				decoding="async"
 				alt="A hiker on Niederhorn above Lake Thun, the Bernese Alps behind"
 				className={`absolute inset-0 size-full object-contain transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
 			/>

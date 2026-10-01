@@ -220,8 +220,12 @@ export function PanoramaStrip({
 	state.current.hoverId = hover?.id ?? null;
 
 	const frame = useRef(0);
+	// offscreen: skip draws (the strip is event-driven, so this only saves resize/terrain-load redraws);
+	// a redraw is requested when it scrolls back in
+	const onScreen = useRef(true);
 	const draw = useCallback(() => {
 		frame.current = 0;
+		if (!onScreen.current) return;
 		const bg = bgRef.current;
 		const gl = glRef.current;
 		const ov = ovRef.current;
@@ -285,6 +289,20 @@ export function PanoramaStrip({
 	}, [draw]);
 	const requestDrawRef = useRef(requestDraw);
 	requestDrawRef.current = requestDraw;
+
+	useEffect(() => {
+		const el = wrapRef.current;
+		if (!el || typeof IntersectionObserver === "undefined") return;
+		const io = new IntersectionObserver(
+			([e]) => {
+				onScreen.current = e.isIntersecting;
+				if (e.isIntersecting) requestDraw();
+			},
+			{ rootMargin: "100px 0px" },
+		);
+		io.observe(el);
+		return () => io.disconnect();
+	}, [requestDraw]);
 
 	// WebGL lifetime
 	useEffect(() => {

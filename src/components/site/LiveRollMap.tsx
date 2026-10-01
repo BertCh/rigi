@@ -15,6 +15,11 @@ import type { RollMapEngine, RollMapStatus } from "#/lib/roll/map/roll-map";
 const OVERVIEW_M = 3200;
 /** No distance limit on the drapes: every photo paints everything it saw (finite for the shader). */
 const NO_REACH_M = 1e6;
+/** Landing frame cap and pixel ratio: the orbit is slow, so 30 fps at <=1.5x reads the same for much less GPU. */
+const LANDING_FPS = 30;
+const LANDING_PIXEL_RATIO = 1.5;
+/** autoRotate steps per tick, so the pace is scaled by 60 / fps. */
+const ROTATE_SPEED = 0.5 * (60 / LANDING_FPS);
 
 const STAGE_LABEL: Record<RollMapStatus["stage"], string> = {
 	terrain: "Streaming terrain",
@@ -38,6 +43,7 @@ export function LiveRollMap({
 	const [shown, setShown] = useState(false);
 	const [inPhoto, setInPhoto] = useState<string | null>(null);
 	const eng = useRef<RollMapEngine | null>(null);
+	const onScreen = useRef(false);
 
 	// no wheel zoom on the landing page: the wheel scrolls on down the page. A capture listener on the
 	// box keeps the wheel from reaching OrbitControls (which would preventDefault it); drag still orbits.
@@ -52,9 +58,16 @@ export function LiveRollMap({
 	useEffect(() => {
 		const el = box.current;
 		if (!el) return;
+		// the first sighting starts the load (small margin: the heavy load shouldn't begin while the topo
+		// board above is still on screen); after that the render loop follows visibility
 		const io = new IntersectionObserver(
-			([e]) => e.isIntersecting && setVisible(true),
-			{ rootMargin: "200px" },
+			([e]) => {
+				if (e.isIntersecting) setVisible(true);
+				onScreen.current = e.isIntersecting;
+				if (e.isIntersecting) eng.current?.resume();
+				else eng.current?.pause();
+			},
+			{ rootMargin: "50px" },
 		);
 		io.observe(el);
 		return () => io.disconnect();
@@ -82,7 +95,7 @@ export function LiveRollMap({
 					// show the canvas once the terrain is in; photos drape in live from there
 					if (s.stage !== "terrain") {
 						setShown(true);
-						engine?.setAutoRotate(0.5);
+						engine?.setAutoRotate(ROTATE_SPEED);
 					}
 				},
 			});
@@ -91,6 +104,11 @@ export function LiveRollMap({
 				gizmos: true,
 				reachM: NO_REACH_M,
 			});
+			engine.setFrameCap(LANDING_FPS);
+			engine.setPixelRatio(
+				Math.min(window.devicePixelRatio || 1, LANDING_PIXEL_RATIO),
+			);
+			if (!onScreen.current) engine.pause();
 			eng.current = engine;
 			void engine.init();
 		})();
@@ -135,7 +153,7 @@ export function LiveRollMap({
 					type="button"
 					onClick={() => {
 						eng.current?.frameOverview(OVERVIEW_M);
-						eng.current?.setAutoRotate(0.5);
+						eng.current?.setAutoRotate(ROTATE_SPEED);
 					}}
 					className="absolute top-3 right-3 flex items-center gap-1.5 rounded-lg bg-black/55 px-2.5 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur hover:text-white"
 				>

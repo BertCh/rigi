@@ -162,6 +162,8 @@ export function RevealLoop({
 				src={photo}
 				alt={alt}
 				className="absolute inset-0 size-full object-cover"
+				loading="lazy"
+				decoding="async"
 			/>
 			<div ref={layer} className="absolute inset-0">
 				<img
@@ -169,11 +171,15 @@ export function RevealLoop({
 					src={overlay}
 					alt=""
 					className="rigi-reveal-fill absolute inset-0 size-full object-cover"
+					loading="lazy"
+					decoding="async"
 				/>
 				<img
 					src={overlay}
 					alt=""
 					className="rigi-reveal-front absolute inset-0 size-full object-cover"
+					loading="lazy"
+					decoding="async"
 				/>
 			</div>
 		</div>

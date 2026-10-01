@@ -5,6 +5,7 @@
 import { Pause, Play, RotateCcw } from "lucide-react";
 import {
 	type PointerEvent as ReactPointerEvent,
+	type RefObject,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -72,9 +73,28 @@ const beatAt = (t: number) =>
 
 const ramp = (t: number, t0: number, dur: number) => smooth((t - t0) / dur);
 
-function useScene() {
+/** Fetch scene.json (and mount the stage) only once the placeholder is within `margin` of the viewport. */
+function useScene(holder: RefObject<HTMLElement | null>, immediate: boolean) {
 	const [scene, setScene] = useState<Scene | null>(null);
+	const [near, setNear] = useState(immediate);
 	useEffect(() => {
+		const el = holder.current;
+		if (near || !el) return;
+		if (typeof IntersectionObserver === "undefined") {
+			setNear(true);
+			return;
+		}
+		const io = new IntersectionObserver(
+			([e]) => {
+				if (e.isIntersecting) setNear(true);
+			},
+			{ rootMargin: "600px 0px" },
+		);
+		io.observe(el);
+		return () => io.disconnect();
+	}, [near, holder]);
+	useEffect(() => {
+		if (!near) return;
 		let live = true;
 		fetch(SCENE_URL)
 			.then((r) => (r.ok ? (r.json() as Promise<Scene>) : null))
@@ -83,7 +103,7 @@ function useScene() {
 		return () => {
 			live = false;
 		};
-	}, []);
+	}, [near]);
 	return scene;
 }
 
@@ -95,10 +115,12 @@ export function HowItWorksScene({
 	/** Freeze the scene at this time (s), e.g. for screenshots. */
 	at?: number;
 }) {
-	const scene = useScene();
+	const holder = useRef<HTMLDivElement>(null);
+	const scene = useScene(holder, at !== undefined);
 	if (!scene)
 		return (
 			<div
+				ref={holder}
 				className={`aspect-[16/11] animate-pulse rounded-2xl bg-white/5 ring-1 ring-white/8 ${className ?? ""}`}
 			/>
 		);
@@ -144,41 +166,49 @@ function Stage({
 		return () => ro.disconnect();
 	}, []);
 	const started = useRef(false);
+	// In view (any pixel): the clock only runs, and the stage only re-renders, while this is true.
+	const [inView, setInView] = useState(true);
 	useEffect(() => {
 		const el = box.current;
 		if (!el || reduced || at !== undefined) return;
 		const io = new IntersectionObserver(
 			([e]) => {
-				if (e.isIntersecting && !started.current) {
+				setInView(e.isIntersecting);
+				if (e.intersectionRatio >= 0.45 && !started.current) {
 					started.current = true;
 					setPlaying(true);
 				}
 			},
-			{ threshold: 0.45 },
+			{ threshold: [0, 0.45] },
 		);
 		io.observe(el);
 		return () => io.disconnect();
 	}, [reduced, at]);
+	const tRef = useRef(t);
+	tRef.current = t;
 	useEffect(() => {
-		if (!playing) return;
+		if (!playing || !inView) return;
 		let raf = 0;
 		let last = performance.now();
 		const tick = (now: number) => {
+			raf = requestAnimationFrame(tick);
+			// ~30 commits/s: the clock is slow, each commit re-renders SVG, labels and two canvases.
+			if (now - last < 28) return;
 			const dt = Math.min(0.05, (now - last) / 1000);
 			last = now;
-			setT((v) => {
-				const n = v + dt;
-				if (n >= END) {
-					setPlaying(false);
-					return END;
-				}
-				return n;
-			});
-			raf = requestAnimationFrame(tick);
+			const n = tRef.current + dt;
+			tRef.current = n;
+			if (n >= END) {
+				cancelAnimationFrame(raf);
+				setT(END);
+				setPlaying(false);
+				return;
+			}
+			setT(n);
 		};
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
-	}, [playing]);
+	}, [playing, inView]);
 
 	// ---- drag the terrain line off, it springs back ----
 	const [nudge, setNudge] = useState({ yaw: 0, pitch: 0 });
@@ -308,6 +338,7 @@ function Stage({
 	const seek = (b: number) => {
 		cancelAnimationFrame(spring.current);
 		setNudge({ yaw: 0, pitch: 0 });
+		tRef.current = BEATS[b].t0;
 		setT(BEATS[b].t0);
 		setPlaying(true);
 	};
@@ -384,8 +415,10 @@ function Stage({
 		return out.sort((a, b) => a.x - b.x);
 	}, [scene, cam, W, VH, viewW]);
 
-	const sweepMin = Math.min(...sweep.map((s) => s.cost));
-	const sweepMax = Math.max(...sweep.map((s) => s.cost));
+	const [sweepMin, sweepMax] = useMemo(() => {
+		const costs = sweep.map((s) => s.cost);
+		return [Math.min(...costs), Math.max(...costs)];
+	}, [sweep]);
 
 	return (
 		<div
@@ -759,12 +792,17 @@ function Readout({
 	const X = (y: number) => ((y - y0) / (y1 - y0)) * VW;
 	const Y = (c: number) =>
 		8 + (1 - (c - range[0]) / (range[1] - range[0])) * (VHc - 20);
-	const d = sweep
-		.map(
-			(s, i) =>
-				`${i ? "L" : "M"}${X(s.yaw).toFixed(1)} ${Y(s.cost).toFixed(1)}`,
-		)
-		.join("");
+	// biome-ignore lint/correctness/useExhaustiveDependencies: X and Y derive from sweep and range
+	const d = useMemo(
+		() =>
+			sweep
+				.map(
+					(s, i) =>
+						`${i ? "L" : "M"}${X(s.yaw).toFixed(1)} ${Y(s.cost).toFixed(1)}`,
+				)
+				.join(""),
+		[sweep, range[0], range[1]],
+	);
 	const cursor = signedDelta(pose.yaw - scene.prior.yaw);
 
 	return (

@@ -93,7 +93,33 @@ export function TopoBoard({
 		);
 	}, [geo, size.w, size.h]);
 
-	const [pan, setPan] = useState({ x: 0, y: 0 });
+	// Tiles load only once the board is near the viewport (it sits far down the landing page).
+	const [near, setNear] = useState(false);
+	useEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		const io = new IntersectionObserver(
+			([e]) => {
+				if (e.isIntersecting) {
+					setNear(true);
+					io.disconnect();
+				}
+			},
+			{ rootMargin: "300px 0px" },
+		);
+		io.observe(el);
+		return () => io.disconnect();
+	}, []);
+
+	// Dragging mutates the DOM directly (pan layer transform, card position, its line) and commits
+	// to state on release, so a pointer move never re-renders the tiles, wedges and cards.
+	const panRef = useRef({ x: 0, y: 0 });
+	const layerRef = useRef<HTMLDivElement>(null);
+	const cardEls = useRef(new Map<string, HTMLButtonElement>());
+	const lineEls = useRef(new Map<string, SVGLineElement>());
+	const [, setPan] = useState(panRef.current);
+	// tile set follows the pan in whole-tile steps only
+	const [tilePan, setTilePan] = useState({ x: 0, y: 0 });
 	const [active, setActive] = useState<string | null>(null);
 	const [order, setOrder] = useState<string[]>([]);
 	const drag = useRef<{
@@ -115,14 +141,17 @@ export function TopoBoard({
 			id,
 			sx: e.clientX,
 			sy: e.clientY,
-			ox: card ? card.x : pan.x,
-			oy: card ? card.y : pan.y,
+			ox: card ? card.x : panRef.current.x,
+			oy: card ? card.y : panRef.current.y,
 			moved: false,
 		};
-		if (id) {
-			setActive(id);
-			setOrder((o) => [...o.filter((x) => x !== id), id]);
-		}
+		if (ref.current) ref.current.style.cursor = "grabbing";
+		if (id) raise(id);
+	};
+	// hover or grab brings a card to the top of the stack (and it stays there)
+	const raise = (id: string) => {
+		setActive(id);
+		setOrder((o) => (o.at(-1) === id ? o : [...o.filter((x) => x !== id), id]));
 	};
 	const onMove = (e: React.PointerEvent) => {
 		const d = drag.current;
@@ -130,17 +159,40 @@ export function TopoBoard({
 		const dx = e.clientX - d.sx;
 		const dy = e.clientY - d.sy;
 		if (Math.hypot(dx, dy) > 4) d.moved = true;
-		if (d.kind === "map") setPan({ x: d.ox + dx, y: d.oy + dy });
-		else
-			setCards((cs) =>
-				cs.map((c) =>
-					c.id === d.id ? { ...c, x: d.ox + dx, y: d.oy + dy } : c,
-				),
-			);
+		if (d.kind === "map") {
+			const p = { x: d.ox + dx, y: d.oy + dy };
+			panRef.current = p;
+			if (layerRef.current)
+				layerRef.current.style.transform = `translate(${size.w / 2 + p.x}px, ${size.h / 2 + p.y}px)`;
+			const qx = Math.round(p.x / S) * S;
+			const qy = Math.round(p.y / S) * S;
+			setTilePan((t) => (t.x === qx && t.y === qy ? t : { x: qx, y: qy }));
+		} else if (d.id) {
+			// mutate in place: the same objects are committed on release
+			const c = cards.find((k) => k.id === d.id);
+			if (!c) return;
+			c.x = d.ox + dx;
+			c.y = d.oy + dy;
+			const m = cardEls.current.get(c.id);
+			const cam = geo.cams.find((k) => k.id === c.id);
+			if (m && cam) {
+				const w = cam.aspect >= 1 ? 168 : 120;
+				m.style.left = `${c.x - w / 2}px`;
+				m.style.top = `${c.y - w / cam.aspect / 2 - 10}px`;
+			}
+			const ln = lineEls.current.get(c.id);
+			if (ln) {
+				ln.setAttribute("x2", String(c.x));
+				ln.setAttribute("y2", String(c.y));
+			}
+		}
 	};
 	const onUp = () => {
 		const d = drag.current;
 		drag.current = null;
+		if (ref.current) ref.current.style.cursor = "grab";
+		if (d?.kind === "map") setPan({ ...panRef.current });
+		else if (d?.moved) setCards((cs) => [...cs]);
 		if (d?.kind === "card" && d.id && !d.moved)
 			navigate({ to: "/photo/$id", params: { id: d.id } });
 	};
@@ -160,12 +212,13 @@ export function TopoBoard({
 	const S = TILE / 2 ** sharpK;
 
 	// tiles covering the board (plus a margin for panning)
-	const ox = size.w / 2 + pan.x;
-	const oy = size.h / 2 + pan.y;
+	const ox = size.w / 2 + panRef.current.x;
+	const oy = size.h / 2 + panRef.current.y;
 	const tiles = useMemo(() => {
+		if (!near) return [];
 		const out: { x: number; y: number; key: string; url: string }[] = [];
-		const left = geo.c.x - size.w / 2 - pan.x - S;
-		const top = geo.c.y - size.h / 2 - pan.y - S;
+		const left = geo.c.x - size.w / 2 - tilePan.x - S;
+		const top = geo.c.y - size.h / 2 - tilePan.y - S;
 		const tx0 = Math.floor(left / S);
 		const ty0 = Math.floor(top / S);
 		const nx = Math.ceil((size.w + 2 * S) / S) + 1;
@@ -182,7 +235,7 @@ export function TopoBoard({
 				});
 			}
 		return out;
-	}, [geo.c, size, pan, S, sharpK]);
+	}, [geo.c, size, tilePan, S, sharpK, near]);
 
 	const wedgePx = WEDGE_M / geo.mpp;
 	const camOf = (id: string) => geo.cams.find((c) => c.id === id);
@@ -197,29 +250,33 @@ export function TopoBoard({
 			onPointerMove={onMove}
 			onPointerUp={onUp}
 			onPointerCancel={onUp}
-			style={{ cursor: drag.current?.kind === "map" ? "grabbing" : "grab" }}
+			style={{ cursor: "grab" }}
 			data-testid="topo-board"
 		>
 			<div
 				className="absolute"
+				ref={layerRef}
 				style={{ transform: `translate(${ox}px, ${oy}px)` }}
 			>
-				{tiles.map((t) => (
-					<img
-						key={t.key}
-						src={t.url}
-						alt=""
-						draggable={false}
-						className="absolute max-w-none"
-						style={{
-							left: t.x,
-							top: t.y,
-							width: S,
-							height: S,
-							filter: "saturate(0.8) contrast(0.95)",
-						}}
-					/>
-				))}
+				{/* one filter pass over the tile layer instead of one per tile */}
+				<div style={{ filter: "saturate(0.8) contrast(0.95)" }}>
+					{tiles.map((t) => (
+						<img
+							key={t.key}
+							src={t.url}
+							alt=""
+							draggable={false}
+							decoding="async"
+							className="absolute max-w-none"
+							style={{
+								left: t.x,
+								top: t.y,
+								width: S,
+								height: S,
+							}}
+						/>
+					))}
+				</div>
 				<svg
 					className="pointer-events-none absolute overflow-visible"
 					style={{ left: 0, top: 0 }}
@@ -251,6 +308,10 @@ export function TopoBoard({
 						return (
 							<line
 								key={c.id}
+								ref={(el) => {
+									if (el) lineEls.current.set(c.id, el);
+									else lineEls.current.delete(c.id);
+								}}
 								x1={cam.x}
 								y1={cam.y}
 								x2={c.x}
@@ -286,10 +347,14 @@ export function TopoBoard({
 					return (
 						<button
 							key={c.id}
+							ref={(el) => {
+								if (el) cardEls.current.set(c.id, el);
+								else cardEls.current.delete(c.id);
+							}}
 							type="button"
 							aria-label={`Open ${c.id}`}
 							onPointerDown={(e) => onDown(e, c.id)}
-							onPointerEnter={() => !drag.current && setActive(c.id)}
+							onPointerEnter={() => !drag.current && raise(c.id)}
 							onPointerLeave={() => !drag.current && setActive(null)}
 							onKeyDown={(e) =>
 								e.key === "Enter" &&
@@ -308,6 +373,8 @@ export function TopoBoard({
 							<img
 								src={m.thumb}
 								alt=""
+								loading="lazy"
+								decoding="async"
 								draggable={false}
 								className="block w-full"
 								style={{ aspectRatio: cam.aspect }}

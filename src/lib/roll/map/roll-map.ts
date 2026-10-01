@@ -164,6 +164,9 @@ export class RollMapEngine {
 	private raf = 0;
 	private still = 0;
 	private disposed = false;
+	private paused = false;
+	private frameCapMs = 0;
+	private lastTickAt = 0;
 	private ready: Promise<void>;
 	private downAt: { x: number; y: number } | null = null;
 	private hoverId: string | null = null;
@@ -739,11 +742,20 @@ export class RollMapEngine {
 
 	private kick() {
 		this.still = 0;
-		if (this.raf || this.disposed) return;
+		if (this.raf || this.disposed || this.paused) return;
 		const step = () => {
-			if (this.disposed) {
+			if (this.disposed || this.paused) {
 				this.raf = 0;
 				return;
+			}
+			if (this.frameCapMs) {
+				// frame cap: skip the tick (camera + redraw) until the interval has passed
+				const now = performance.now();
+				if (now - this.lastTickAt < this.frameCapMs - 2) {
+					this.raf = requestAnimationFrame(step);
+					return;
+				}
+				this.lastTickAt = now;
 			}
 			const f = this.flying;
 			let moved = this.world.tick(
@@ -766,6 +778,35 @@ export class RollMapEngine {
 			this.raf = inFlight || this.still < 30 ? requestAnimationFrame(step) : 0;
 		};
 		this.raf = requestAnimationFrame(step);
+	}
+
+	/**
+	 * Stop the render loop (e.g. scrolled offscreen); resume() restarts it. Opt-in, default is running.
+	 * Loading carries on; the next resume() redraws once.
+	 */
+	pause() {
+		this.paused = true;
+		cancelAnimationFrame(this.raf);
+		this.raf = 0;
+	}
+
+	resume() {
+		if (!this.paused) return;
+		this.paused = false;
+		this.kick();
+	}
+
+	/**
+	 * Cap the camera/redraw loop at `fps` (null = every display frame). OrbitControls autoRotate steps
+	 * per tick, not per second, so scale setAutoRotate's speed by 60 / fps to keep the pace.
+	 */
+	setFrameCap(fps: number | null) {
+		this.frameCapMs = fps ? 1000 / fps : 0;
+	}
+
+	/** Device-pixel ratio of the canvas (default min(devicePixelRatio, 2)). */
+	setPixelRatio(ratio: number) {
+		this.deck.setProps({ useDevicePixels: ratio } as never);
 	}
 
 	resize() {
