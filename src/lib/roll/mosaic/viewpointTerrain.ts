@@ -15,7 +15,7 @@ import {
 } from "#/lib/horizon-fast/mosaic";
 import { loadRegion } from "#/lib/photos";
 import type { Roll, Viewpoint } from "../types";
-import type { PeakInput, ViewpointTerrain } from "./ridgelines";
+import type { RidgelinePeakInput, ViewpointTerrain } from "./ridgelines";
 import type { RidgeWorkerIn, RidgeWorkerOut } from "./ridgelines.worker";
 
 /** Far enough for the big ranges, near enough to keep the full-circle mosaics ~100 MB. */
@@ -121,15 +121,15 @@ async function run(r: TerrainRequest): Promise<ViewpointTerrain> {
 	}
 }
 
-async function regionPeaks(ids: string[]): Promise<PeakInput[]> {
+async function regionPeaks(ids: string[]): Promise<RidgelinePeakInput[]> {
 	const lists = await Promise.all(
 		ids.map((id) =>
 			loadRegion(id)
-				.then((d) => (d?.peaks ?? []) as PeakInput[])
+				.then((d) => (d?.peaks ?? []) as RidgelinePeakInput[])
 				.catch(() => []),
 		),
 	);
-	const byName = new Map<string, PeakInput>();
+	const byName = new Map<string, RidgelinePeakInput>();
 	for (const p of lists.flat())
 		if (p.name && Number.isFinite(p.ele))
 			byName.set(`${p.name}@${p.lat.toFixed(3)}`, p);

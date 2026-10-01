@@ -70,7 +70,7 @@ export const FINDINGS = [
 	{
 		kind: "homonym",
 		summary:
-			"Same export name, different concept: PhotoMeta (app record vs raw EXIF), SolveResult (geo vs pose6dof), Params (pose6dof vs peakfix), PeakLabel ×3, CompositeLook (style type vs look class), Confidence (refine vs ontology).",
+			"Same export name, different concept: PhotoMeta (app record vs raw EXIF), SolveResult (geo vs pose6dof), Params (pose6dof vs peakfix), PeakLabel ×3, PeakInput ×3, CompositeLook (style type vs look class), Confidence (refine vs ontology). RESOLVED 2026-10-01: ExifPhotoMeta, SkylineSolveResult / GcpSolveResult, FitParams / GcpParams, PeakLabelPx / BaselinePeakLabel (settings PeakLabel keeps the name), GeoJsonPeak / RidgelinePeakInput, CompositeLookStyle, RefineConfidence.",
 		where: [
 			"lib/photos.ts",
 			"lib/geo/photo-meta.ts",
@@ -81,7 +81,7 @@ export const FINDINGS = [
 			"lib/deck/scene.ts",
 		],
 		action:
-			"The catalogue names each by concept (photo vs raw-exif, …); rename on owners' passes.",
+			"Done: each export now has a unique name; the concept words live in lib/ontology/domain.ts.",
 	},
 	{
 		kind: "homonym",

@@ -18,7 +18,7 @@ export type FeatureCollection = {
 	features: Feature[];
 };
 
-export type PeakInput = {
+export type GeoJsonPeak = {
 	name: string;
 	ele: number | null;
 	lat: number;
@@ -36,7 +36,7 @@ export type GeoJsonOptions = {
 	maxRange?: number;
 	/** Arc points along the wedge edge. Default 32. */
 	arcSteps?: number;
-	peaks?: PeakInput[];
+	peaks?: GeoJsonPeak[];
 	/** Include peaks with visible=false too (flagged). Default false. */
 	includeHiddenPeaks?: boolean;
 	/**

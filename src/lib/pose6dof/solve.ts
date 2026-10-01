@@ -26,17 +26,17 @@ import {
 } from "./project";
 import type {
 	Correspondence,
+	GcpSolveResult,
 	Priors,
 	SolveOptions,
-	SolveResult,
 } from "./types";
 
 const D = Math.PI / 180;
 const BEHIND = 1e3; // whitened residual for points behind the camera
 
-export type Params = number[]; // [dx,dy,dz,yaw,pitch,roll,vfov]
+export type GcpParams = number[]; // [dx,dy,dz,yaw,pitch,roll,vfov]
 
-export const toParams = (pose: Pose, eye: ArrayLike<number>): Params => [
+export const toParams = (pose: Pose, eye: ArrayLike<number>): GcpParams => [
 	eye[0],
 	eye[1],
 	eye[2],
@@ -45,7 +45,7 @@ export const toParams = (pose: Pose, eye: ArrayLike<number>): Params => [
 	pose.roll,
 	pose.vfov,
 ];
-export const paramsPose = (p: Params): Pose => ({
+export const paramsPose = (p: GcpParams): Pose => ({
 	yaw: p[3],
 	pitch: p[4],
 	roll: p[5],
@@ -73,7 +73,7 @@ type Block = {
 function block(
 	ctx: Ctx,
 	c: Correspondence,
-	p: Params,
+	p: GcpParams,
 	withJ: boolean,
 	B = basis(p[3], p[4], p[5]),
 ): Block {
@@ -81,7 +81,7 @@ function block(
 	const pose = paramsPose(p);
 	if (c.kind === "level" || c.kind === "azimuth") {
 		// 1-D angular constraint, converted to px: elevation miss × f, or azimuth miss × f·cos(el)
-		const f = (q: Params, Bq?: Basis) => {
+		const f = (q: GcpParams, Bq?: Basis) => {
 			const qp = paramsPose(q);
 			const fpx = focalFromVfov(qp.vfov, ctx.H);
 			const d = unproject(
@@ -211,7 +211,7 @@ const weightOf = (s2: number, k: number, loss: Loss) => {
 };
 
 type LmOut = {
-	p: Params;
+	p: GcpParams;
 	cost: number;
 	iterations: number;
 	converged: boolean;
@@ -223,7 +223,7 @@ type LmOut = {
 /** LM with Huber IRLS on the active parameters. `use[i]` = include correspondence i. */
 export function lmSolve(
 	ctx: Ctx,
-	p0: Params,
+	p0: GcpParams,
 	active: boolean[],
 	use: boolean[],
 	prior: PriorVec,
@@ -234,7 +234,7 @@ export function lmSolve(
 	const idx = PARAM_NAMES.map((_, i) => i).filter((i) => active[i]);
 	const n = idx.length;
 	let p = p0.slice();
-	const evalCost = (q: Params) => {
+	const evalCost = (q: GcpParams) => {
 		const B = basis(q[3], q[4], q[5]);
 		let cost = 0;
 		ctx.corrs.forEach((c, i) => {
@@ -253,7 +253,7 @@ export function lmSolve(
 		}
 		return cost;
 	};
-	const linearise = (q: Params) => {
+	const linearise = (q: GcpParams) => {
 		const B = basis(q[3], q[4], q[5]);
 		const A = Array.from({ length: n }, () => new Array<number>(n).fill(0));
 		const g = new Array<number>(n).fill(0);
@@ -489,7 +489,7 @@ function shuffle<T>(a: T[], rnd: () => number): T[] {
 	return a;
 }
 
-type Hyp = { p: Params; init: string; score: number; use: boolean[] };
+type Hyp = { p: GcpParams; init: string; score: number; use: boolean[] };
 
 /**
  * Solve pose (+ eye offset, vfov) from correspondences and priors.
@@ -499,7 +499,7 @@ export function solvePose6dof(
 	corrs: Correspondence[],
 	priors: Priors,
 	opts: SolveOptions,
-): SolveResult {
+): GcpSolveResult {
 	const W = opts.imageWidth;
 	const H = W / opts.aspect;
 	const sigmaPx = opts.sigmaPx ?? 2;
@@ -541,7 +541,7 @@ export function solvePose6dof(
 	// Hypotheses carry systematic error from the priors they fix (vfov ±3 %, GPS eye), so they are
 	// ranked with a looser threshold; LO then tightens to `th`.
 	const thH = Math.max(th, opts.hypothesisPx ?? 3 * th);
-	const score = (p: Params, t = th) => {
+	const score = (p: GcpParams, t = th) => {
 		const th2 = (t / sigmaPx) ** 2;
 		const B = basis(p[3], p[4], p[5]);
 		let s = 0;
@@ -717,7 +717,7 @@ export function solvePose6dof(
 		seeds.push(h);
 	}
 	let best: {
-		p: Params;
+		p: GcpParams;
 		lm: LmOut;
 		use: boolean[];
 		lad: Ladder;
@@ -828,7 +828,7 @@ export function solvePose6dof(
 
 function finish(
 	ctx: Ctx,
-	p: Params,
+	p: GcpParams,
 	lad: Ladder,
 	fitted: boolean[],
 	init: string,
@@ -837,7 +837,7 @@ function finish(
 	th: number,
 	huberK: number,
 	relaxFactor: number,
-): SolveResult {
+): GcpSolveResult {
 	const px = residualsPx(ctx.corrs, paramsPose(p), p, ctx.aspect, ctx.W);
 	// Inliers / RMS / σ describe exactly the set the final LM fitted (all points when rejection is
 	// disabled below minPointsForRejection); the plain threshold test is reported separately.

@@ -29,7 +29,7 @@ import {
 	TileStore,
 } from "#/lib/horizon-fast/mosaic";
 import {
-	type PeakInput,
+	type RidgelinePeakInput,
 	type RidgeOptions,
 	ridgeSchedule,
 	traceViewpoint,
@@ -43,7 +43,7 @@ export type RidgeWorkerIn = {
 	eyeAlt: number | null;
 	spans: RingSpan[];
 	tiles: { key: TileKey; source: TileKey | null; buf: ArrayBuffer | null }[];
-	peaks: PeakInput[];
+	peaks: RidgelinePeakInput[];
 	/** Trace the ridges on the GPU (gpu/horizon/ridges.ts) when this worker can get a compute device;
 	 * the CPU trace otherwise, and after any GPU failure. Default on (false forces the CPU). */
 	gpu?: boolean;

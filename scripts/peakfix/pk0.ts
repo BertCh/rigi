@@ -13,8 +13,8 @@
 import path from "node:path";
 import {
 	camOf,
+	type FitParams,
 	type Obs,
-	type Params,
 	projectAzEl,
 } from "../../src/lib/peakfix/fit";
 import { layeredHorizon } from "../../src/lib/peakfix/layered";
@@ -96,7 +96,7 @@ for (const photo of photos) {
 	const W = aspect >= 1 ? 1600 : 1600 * aspect;
 	const H = aspect >= 1 ? 1600 / aspect : 1600;
 	const obs: Obs = { W, H, vfov: P.gt.pose.vfov, samples: [], peaks: [] };
-	const p0: Params = [
+	const p0: FitParams = [
 		P.gt.pose.yaw,
 		P.gt.pose.pitch,
 		P.gt.pose.roll,
@@ -116,12 +116,12 @@ for (const photo of photos) {
 		sectorHorizonFrom(P.s, fs_, eyeAt(e, n), A0, A1);
 	const pk = (h: EyeHorizon) =>
 		horizonPeaks(h, A0, A1, { minPromDeg: PROM_PX / ppd, windowDeg: 60 / ppd });
-	const PSTEP: Params = [0.01, 0.01, 0.01, 1e-4];
+	const PSTEP: FitParams = [0.01, 0.01, 0.01, 1e-4];
 	const inFrame = (q: [number, number] | null) =>
 		!!q && q[0] >= 0 && q[0] <= W && q[1] >= 0 && q[1] <= H;
 
 	// --- (a) dense: skyline y at fixed x columns
-	const yAtX = (h: EyeHorizon, p: Params) => {
+	const yAtX = (h: EyeHorizon, p: FitParams) => {
 		const c = camOf(p, obs);
 		const pts: [number, number][] = [];
 		const n = h.elevation.length;
@@ -152,8 +152,8 @@ for (const photo of photos) {
 	const y0 = yAtX(H00, p0);
 	const dCols: number[][] = [];
 	for (let k = 0; k < 4; k++) {
-		const pp = [...p0] as Params;
-		const pm = [...p0] as Params;
+		const pp = [...p0] as FitParams;
+		const pm = [...p0] as FitParams;
 		pp[k] += PSTEP[k];
 		pm[k] -= PSTEP[k];
 		const a = yAtX(H00, pp);
@@ -202,8 +202,8 @@ for (const photo of photos) {
 			const rx: number[] = [];
 			const ry: number[] = [];
 			for (let k = 0; k < 4; k++) {
-				const pp = [...p0] as Params;
-				const pm = [...p0] as Params;
+				const pp = [...p0] as FitParams;
+				const pm = [...p0] as FitParams;
 				pp[k] += PSTEP[k];
 				pm[k] -= PSTEP[k];
 				const a = projectAzEl(camOf(pp, obs), m.az, m.el)!;

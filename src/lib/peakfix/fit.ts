@@ -16,7 +16,7 @@ const D = Math.PI / 180;
 export type Arm = "dense" | "peak" | "both";
 
 /** yaw, pitch, roll (deg), ln fScale. */
-export type Params = [number, number, number, number];
+export type FitParams = [number, number, number, number];
 
 export type Obs = {
 	W: number;
@@ -58,7 +58,7 @@ type Cam = {
 	up: [number, number, number];
 };
 
-function camOf(p: Params, o: Obs): Cam {
+function camOf(p: FitParams, o: Obs): Cam {
 	const b = poseBasis({ yaw: p[0], pitch: p[1], roll: p[2], vfov: o.vfov });
 	return {
 		f: (o.H / 2 / Math.tan((o.vfov * D) / 2)) * Math.exp(p[3]),
@@ -70,7 +70,7 @@ function camOf(p: Params, o: Obs): Cam {
 	};
 }
 
-export function pxPerDeg(p: Params, o: Obs): number {
+export function pxPerDeg(p: FitParams, o: Obs): number {
 	return (o.H / 2 / Math.tan((o.vfov * D) / 2)) * Math.exp(p[3]) * D;
 }
 
@@ -173,7 +173,7 @@ export function associate(
 type Eval = { r: number[]; w: number[]; cost: number };
 
 function denseEval(
-	p: Params,
+	p: FitParams,
 	hz: EyeHorizon,
 	obs: Obs,
 	o: FitOpts,
@@ -203,7 +203,7 @@ function denseEval(
 }
 
 function peakEval(
-	p: Params,
+	p: FitParams,
 	model: WorldPeak[],
 	obs: Obs,
 	o: FitOpts,
@@ -260,7 +260,7 @@ function solve4(A: number[][], b: number[]): number[] | null {
 }
 
 export type FitResult = {
-	p: Params;
+	p: FitParams;
 	cost: number;
 	dense: number;
 	peak: number;
@@ -272,19 +272,19 @@ export type FitResult = {
 
 /** Coarse yaw/pitch scan with the DENSE cost (subsampled), from p0. */
 export function scanStart(
-	p0: Params,
+	p0: FitParams,
 	hz: EyeHorizon,
 	obs: Obs,
 	o: FitOpts,
 	yawHalf = 3,
 	pitchHalf = 1.5,
 	step = 0.25,
-): Params {
+): FitParams {
 	let best = p0;
 	let bc = Number.POSITIVE_INFINITY;
 	for (let dy = -yawHalf; dy <= yawHalf + 1e-9; dy += step)
 		for (let dp = -pitchHalf; dp <= pitchHalf + 1e-9; dp += step) {
-			const p: Params = [p0[0] + dy, p0[1] + dp, p0[2], p0[3]];
+			const p: FitParams = [p0[0] + dy, p0[1] + dp, p0[2], p0[3]];
 			const c = denseEval(p, hz, obs, o, 4).cost;
 			if (c < bc) {
 				bc = c;
@@ -297,7 +297,7 @@ export function scanStart(
 /** Gauss-Newton / LM (IRLS on the truncated loss) for one arm at one eye. */
 export function fitArm(
 	arm: Arm,
-	p0: Params,
+	p0: FitParams,
 	hz: EyeHorizon,
 	model: WorldPeak[],
 	obs: Obs,
@@ -305,7 +305,7 @@ export function fitArm(
 	iters = 8,
 ): FitResult {
 	const H = [0.01, 0.01, 0.01, 1e-4];
-	const total = (p: Params, pairs: Pair[] | null, nItems?: number) => {
+	const total = (p: FitParams, pairs: Pair[] | null, nItems?: number) => {
 		const de = arm === "peak" ? null : denseEval(p, hz, obs, o, 1);
 		const pe =
 			arm === "dense" ? null : peakEval(p, model, obs, o, pairs, nItems);
@@ -337,7 +337,7 @@ export function fitArm(
 			nItems: pe?.nItems ?? 0,
 		};
 	};
-	let p = [...p0] as Params;
+	let p = [...p0] as FitParams;
 	let cur = total(p, null);
 	let lambda = 1e-3;
 	for (let it = 0; it < iters; it++) {
@@ -347,7 +347,7 @@ export function fitArm(
 		if (!m) break;
 		const J: number[][] = [];
 		for (let k = 0; k < 4; k++) {
-			const q = [...p] as Params;
+			const q = [...p] as FitParams;
 			q[k] += H[k];
 			const e = total(q, pairs, cur.nItems);
 			J.push(e.r.map((v, i) => (v - base.r[i]) / H[k]));
@@ -372,7 +372,7 @@ export function fitArm(
 				g.map((v) => -v),
 			);
 			if (!dx) break;
-			const q: Params = [
+			const q: FitParams = [
 				p[0] + dx[0],
 				p[1] + dx[1],
 				p[2] + dx[2],

@@ -25,7 +25,7 @@ import {
 	type PeakView,
 	viewPeaks,
 } from "../src/lib/geo/peaks";
-import { type PhotoMeta, readPhotoMeta } from "../src/lib/geo/photo-meta";
+import { type ExifPhotoMeta, readPhotoMeta } from "../src/lib/geo/photo-meta";
 import { EYE_ABOVE_GROUND } from "../src/lib/geo/pipeline";
 import { loadTerrain, type TerrainSampler } from "../src/lib/geo/terrain";
 import { imagePixelSize, loadTerrariumTileNode, ROOT } from "./lib/node-io";
@@ -40,7 +40,7 @@ export interface Scene {
 	eyeMode: EyeMode;
 	name: string;
 	heic: string;
-	meta: PhotoMeta;
+	meta: ExifPhotoMeta;
 	prior: Camera;
 	terrain: TerrainSampler;
 	ground: number;

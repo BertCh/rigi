@@ -7,7 +7,7 @@ import type { Vec3 } from "#/lib/ontology/core/geometry";
 
 export type { Vec3 };
 
-export interface PhotoMeta {
+export interface ExifPhotoMeta {
 	/**
 	 * Actual stored pixel size (before EXIF orientation) when the caller passed it to
 	 * readPhotoMeta; otherwise the EXIF size (ExifImageWidth/Height). Geometry uses this.
@@ -77,7 +77,7 @@ export function parseAppleGravity(makerNote: Uint8Array): Vec3 | undefined {
 export async function readPhotoMeta(
 	input: string | ArrayBuffer | Uint8Array | Blob,
 	pixels?: { width: number; height: number },
-): Promise<PhotoMeta> {
+): Promise<ExifPhotoMeta> {
 	const d = await exifr.parse(input, {
 		gps: true,
 		makerNote: true,
@@ -130,10 +130,10 @@ export async function readPhotoMeta(
  * <img> naturalWidth/Height of the original file. Lets cameraFromMeta see a crop.
  */
 export function withDisplayPixels(
-	meta: PhotoMeta,
+	meta: ExifPhotoMeta,
 	width: number,
 	height: number,
-): PhotoMeta {
+): ExifPhotoMeta {
 	const swap = meta.orientation >= 5;
 	return swap
 		? { ...meta, width: height, height: width }

@@ -10,7 +10,11 @@ import {
 	project,
 	unproject,
 } from "#/lib/geo/camera";
-import type { HorizonLite, PeakLabel, SkylineObservation } from "./types";
+import type {
+	BaselinePeakLabel,
+	HorizonLite,
+	SkylineObservation,
+} from "./types";
 
 const f1 = (v: number) => v.toFixed(1);
 
@@ -155,14 +159,14 @@ export const labelText = (l: { name: string; ele?: number }) =>
  * `k` = working-image pixels per screen pixel (label sizing).
  */
 export function placeLabels(
-	cands: PeakLabel[],
+	cands: BaselinePeakLabel[],
 	k: number,
 	width: number,
 	maxLabels = 30,
-): PeakLabel[] {
+): BaselinePeakLabel[] {
 	const sorted = [...cands].sort((a, b) => (b.ele ?? 0) - (a.ele ?? 0));
 	const boxes: [number, number, number, number][] = [];
-	const out: PeakLabel[] = [];
+	const out: BaselinePeakLabel[] = [];
 	const lineH = 15 * k;
 	for (const c of sorted) {
 		if (out.length >= maxLabels) break;

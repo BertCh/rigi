@@ -4,7 +4,7 @@
 
 import type { Camera } from "#/lib/geo/camera";
 import type { PeakView } from "#/lib/geo/peaks";
-import type { PhotoMeta } from "#/lib/geo/photo-meta";
+import type { ExifPhotoMeta } from "#/lib/geo/photo-meta";
 import type { SkylineObservation } from "#/lib/geo/skyline";
 import type { RealmGpuOptions } from "#/lib/gpu/core/realm";
 
@@ -13,7 +13,7 @@ export type { PeakView, SkylineObservation };
 export interface SampleEntry {
 	name: string;
 	file: string;
-	meta: PhotoMeta;
+	meta: ExifPhotoMeta;
 }
 
 /** Horizon as shipped to the main thread (ridges flattened into typed arrays). */
@@ -27,7 +27,7 @@ export interface HorizonLite {
 }
 
 /** A placed label in working-image pixels. */
-export interface PeakLabel {
+export interface BaselinePeakLabel {
 	key: string;
 	name: string;
 	ele?: number;

@@ -27,11 +27,11 @@ import {
 	crc32,
 	enuToEcef,
 	fixedAzimuth,
+	type GeoJsonPeak,
 	kmlCameraAngles,
 	lineGeometry,
 	mat3Mul,
 	mat3T,
-	type PeakInput,
 	pointAlong,
 	polygonGeometry,
 	projectEcef,
@@ -393,9 +393,8 @@ function xmlWellFormed(s: string): string | null {
 	const re =
 		/<(\?[\s\S]*?\?|!--[\s\S]*?--|!\[CDATA\[[\s\S]*?\]\]|\/?[A-Za-z_][\w:.-]*(?:\s+[A-Za-z_][\w:.-]*\s*=\s*(?:"[^"<]*"|'[^'<]*'))*\s*\/?)>/g;
 	let last = 0;
-	let m: RegExpExecArray | null;
 	let roots = 0;
-	while ((m = re.exec(body))) {
+	for (let m = re.exec(body); m; m = re.exec(body)) {
 		const text = body.slice(last, m.index);
 		if (/[<>]/.test(text))
 			return `stray < or > near ${m.index}: ${JSON.stringify(text.slice(0, 40))}`;
@@ -722,7 +721,7 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 	};
 	const fr = new EnuFrame(ph.lat, ph.lon, 0);
 	const eye = { x: 0, y: 0, z: eyeAlt };
-	const peaks: PeakInput[] = [];
+	const peaks: GeoJsonPeak[] = [];
 	for (const p of region.peaks) {
 		if (p.ele == null) continue;
 		const w = fr.fromGeo(p.lat, p.lon, p.ele);

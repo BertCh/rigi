@@ -6,7 +6,7 @@ import { FF35_DIAGONAL_MM, focalPxFromF35 } from "../camera/focal";
 import { concordOn } from "../concord/flags";
 import { focalPrior, lensModelFromCamera } from "../concord/priors/focal-table";
 import { DEG } from "../geodesy";
-import type { PhotoMeta, Vec3 } from "./photo-meta";
+import type { ExifPhotoMeta, Vec3 } from "./photo-meta";
 
 /**
  * Pinhole camera in the *display* image frame (after EXIF orientation):
@@ -61,7 +61,7 @@ export function gravityInDisplayFrame(g: Vec3, orientation: number): Vec3 {
 	}
 }
 
-export function displaySize(meta: PhotoMeta) {
+export function displaySize(meta: ExifPhotoMeta) {
 	const swap = meta.orientation >= 5;
 	return swap
 		? { width: meta.height, height: meta.width }
@@ -103,7 +103,7 @@ export function cameraFromGravity(opts: {
 	};
 }
 
-export function cameraFromMeta(meta: PhotoMeta): Camera {
+export function cameraFromMeta(meta: ExifPhotoMeta): Camera {
 	if (!meta.gravity || meta.heading === undefined || !meta.focal35)
 		throw new Error("Photo lacks gravity, heading or focal length");
 	const { width, height } = displaySize(meta);

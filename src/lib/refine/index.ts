@@ -20,9 +20,9 @@ import { type Camera, resizeCamera } from "../geo/camera";
 import type { HorizonProfile } from "../geo/horizon";
 import { wrap180 } from "../geodesy";
 import {
-	type Confidence,
 	type ConfidenceThresholds,
 	computeConfidence,
+	type RefineConfidence,
 } from "./confidence";
 import { DEFAULT_INIT, globalInit, type InitOptions } from "./init";
 import {
@@ -47,7 +47,7 @@ import {
 } from "./robust";
 import { fuseSkylines, rejectSpikes } from "./skyline-clean";
 
-export type { Confidence } from "./confidence";
+export type { RefineConfidence } from "./confidence";
 
 export interface SkylineInput {
 	rows: Float32Array | ArrayLike<number>;
@@ -102,7 +102,7 @@ export interface RefineMode {
 export interface RefineResult {
 	/** Refined camera at the prior's resolution. */
 	camera: Camera;
-	confidence: Confidence;
+	confidence: RefineConfidence;
 	/** Distinct refined modes, best first. */
 	modes: RefineMode[];
 	iterations: number;

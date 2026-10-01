@@ -13,9 +13,9 @@ import {
 	skylinePath,
 } from "./projection";
 import type {
+	BaselinePeakLabel,
 	ControlPoint,
 	HorizonLite,
-	PeakLabel,
 	SkylineObservation,
 } from "./types";
 
@@ -28,7 +28,7 @@ export interface Layers {
 interface Props {
 	cam: Camera;
 	horizon: HorizonLite | null;
-	labels: PeakLabel[];
+	labels: BaselinePeakLabel[];
 	sky: SkylineObservation | null;
 	layers: Layers;
 	points: ControlPoint[];
@@ -38,7 +38,7 @@ interface Props {
 	k: number;
 	onDrag: (dx: number, dy: number, phase: "start" | "move" | "end") => void;
 	onTap: (x: number, y: number) => void;
-	onLabel: (label: PeakLabel) => void;
+	onLabel: (label: BaselinePeakLabel) => void;
 }
 
 export function Overlay({

@@ -37,7 +37,7 @@ import { detectSkyline } from "../src/lib/geo/skyline";
 import {
 	projectSkylineRows,
 	type SkylineRows,
-	type SolveResult,
+	type SkylineSolveResult,
 	solvePose,
 } from "../src/lib/geo/solve";
 import { heicToJpeg, listPhotos, loadRGBA, ROOT } from "./lib/node-io";
@@ -97,7 +97,7 @@ type Solve = (
 	sky: SkylineRows,
 	gpsError?: number,
 	cross?: SkylineRows,
-) => SolveResult;
+) => SkylineSolveResult;
 
 /** Pose solver for the chosen SOLVER variant, adapted to SolveResult. */
 async function makeSolver(): Promise<Solve> {
@@ -137,7 +137,9 @@ async function makeSolver(): Promise<Solve> {
 	 * refine's rejected pose can be 130–175° off with no heading), with
 	 * every candidate attached. Same rule as the /baseline worker.
 	 */
-	const chain = (results: [string, SolveResult][]): SolveResult => {
+	const chain = (
+		results: [string, SkylineSolveResult][],
+	): SkylineSolveResult => {
 		const candidates = results.map(([method, r]) => ({
 			method,
 			camera: r.camera,

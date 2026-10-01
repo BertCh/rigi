@@ -108,7 +108,7 @@ export type SolveOptions = {
 	seed?: number;
 };
 
-export type SolveResult = {
+export type GcpSolveResult = {
 	pose: Pose;
 	/**
 	 * The solved ABSOLUTE eye position in the correspondences' ENU frame, metres [E, N, U]

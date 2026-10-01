@@ -73,7 +73,7 @@ export interface SolveOptions {
 	headingKnown?: boolean;
 }
 
-export interface SolveResult {
+export interface SkylineSolveResult {
 	/** Solved camera at the same resolution as the prior passed in. */
 	camera: Camera;
 	/** 0..1 overall confidence (0 when the tilt gate trips). */
@@ -195,7 +195,7 @@ export function solvePose(
 	horizon: HorizonProfile,
 	sky: SkylineRows,
 	opts: SolveOptions = {},
-): SolveResult {
+): SkylineSolveResult {
 	if (fullOnly(opts))
 		return solveOnce(prior, horizon, sky, fullOpts(opts), "full");
 	const local = solveOnce(prior, horizon, sky, opts, "local");
@@ -229,7 +229,7 @@ export async function solvePoseAsync(
 	sky: SkylineRows,
 	opts: SolveOptions = {},
 	coarse?: CoarseProvider,
-): Promise<SolveResult> {
+): Promise<SkylineSolveResult> {
 	const once = async (o: SolveOptions, search: "local" | "full") =>
 		solveOnce(
 			prior,
@@ -247,7 +247,7 @@ export async function solvePoseAsync(
 
 const fullOnly = (opts: SolveOptions) =>
 	opts.headingKnown === false || (opts.yawRange ?? 25) >= 90;
-const wantsFull = (local: SolveResult, opts: SolveOptions) =>
+const wantsFull = (local: SkylineSolveResult, opts: SolveOptions) =>
 	!(
 		local.accepted ||
 		local.rejectReason === "no-skyline" ||
@@ -256,7 +256,7 @@ const wantsFull = (local: SolveResult, opts: SolveOptions) =>
 // The local threshold must not leak into the fallback.
 const fallbackOpts = (opts: SolveOptions) =>
 	fullOpts({ ...opts, acceptConfidence: undefined });
-const pickFull = (local: SolveResult, full: SolveResult) =>
+const pickFull = (local: SkylineSolveResult, full: SkylineSolveResult) =>
 	full.accepted || full.confidence > local.confidence ? full : local;
 const fullOpts = (o: SolveOptions): SolveOptions => ({
 	...o,
@@ -280,11 +280,11 @@ function solveOnce(
 	opts: SolveOptions,
 	search: "local" | "full",
 	pre: CoarseStage | null = null,
-): SolveResult {
+): SkylineSolveResult {
 	const cam0 = resizeCamera(prior, sky.width);
 	const obs = observations(sky, 1);
 	const coverage = obs.length / sky.width;
-	const empty: SolveResult = {
+	const empty: SkylineSolveResult = {
 		camera: prior,
 		confidence: 0,
 		accepted: false,
@@ -454,11 +454,11 @@ function fineStage(
 	horizon: HorizonProfile,
 	obs: Obs[],
 	coverage: number,
-	empty: SolveResult,
+	empty: SkylineSolveResult,
 	opts: SolveOptions,
 	search: "local" | "full",
 	{ seeds, coarse, ambiguity }: CoarseStage,
-): SolveResult {
+): SkylineSolveResult {
 	const sigma = opts.sigma ?? DEFAULT_SIGMA;
 	const tiltGate = opts.tiltGate ?? 3;
 	const acceptConfidence = opts.acceptConfidence ?? 0.5;

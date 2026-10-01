@@ -3,6 +3,12 @@
 This module names every concept once. It defines the axes along which a value is known (provenance,
 confidence, units, frames, ids, storage) and maps every existing app type and union onto them.
 
+**Start with `domain.ts`.** It is the problem space as types: one exported type per concept (`Photo`,
+`Orientation`, `Horizon`, `Skyline`, `PoseEstimate`, `PeakLabel`, …), grouped by stage (capture → world →
+camera → evidence → estimate → presentation → interchange → system), each bound to its canonical
+realization and documented with the catalogue's definition. Write `import type { Orientation } from
+"#/lib/ontology/domain"` when a signature talks about the concept rather than one module's representation.
+
 - Generated reference: `reports/ontology.md`.
 - Design and review history: `reports/ontology-design.md`.
 
@@ -18,6 +24,7 @@ catalogue/        L4  CONCEPTS (definitions, UI/code/avoid words, parts, realiza
 crosswalk/        L4  app unions → canonical axes (pose, world, presentation); AlignState, Verify, SolveMethod, FormatDescriptor
 checks/           compile-time only: realizations.ts (generated)
 doc.ts            renders reports/ontology.md
+domain.ts         GENERATED: concept name → canonical type (the vocabulary); generate.ts renders it
 ontology.check.ts runtime integrity + "canonical semantics == app behaviour"
 ```
 
@@ -40,7 +47,8 @@ ontology.check.ts runtime integrity + "canonical semantics == app behaviour"
 
 | task | do |
 |---|---|
-| add a concept | Add a row to `catalogue/concepts.ts`, then run `npx tsx scripts/ontology/gen-realizations.ts` and `npx tsx scripts/ontology/doc.ts` |
+| add a concept | Add a row to `catalogue/concepts.ts`, then run `npx tsx scripts/ontology/gen-realizations.ts` (realizations + `domain.ts`) and `npx tsx scripts/ontology/doc.ts` |
+| name a new exported type | Pick a name no other export uses (the check's homonym rule is in `FINDINGS`); if it realizes a concept, add it to that concept's `realizedBy` |
 | add a value to an app union that has a crosswalk | tsc fails in `crosswalk/*`. Classify the new value there. |
 | add a new provenance-like union | Prefer `Provenance` directly. Otherwise add a `satisfies Record<YourUnion, ProvenanceClass>` table and list it in `doc.ts` CROSSWALKS |
 | add a method or algorithm | Add a row to `METHODS` with its agent, evidence, estimates and module |

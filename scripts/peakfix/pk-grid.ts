@@ -14,10 +14,10 @@ import path from "node:path";
 import {
 	type Arm,
 	camOf,
+	type FitParams,
 	type FitResult,
 	fitArm,
 	type Obs,
-	type Params,
 	PK_OPTS,
 	projectAzEl,
 	pxPerDeg,
@@ -94,8 +94,8 @@ const gauss = () =>
 	Math.sqrt(-2 * Math.log(rand())) * Math.cos(2 * Math.PI * rand());
 
 let samples: Obs["samples"];
-let p0: Params;
-const gtP: Params = [
+let p0: FitParams;
+const gtP: FitParams = [
 	P.gt.pose.yaw,
 	P.gt.pose.pitch,
 	P.gt.pose.roll,
@@ -156,7 +156,7 @@ type Cell = {
 	e: number;
 	n: number;
 	z: number;
-	arms: Record<Arm, { cost: number; nMatched: number; p: Params }>;
+	arms: Record<Arm, { cost: number; nMatched: number; p: FitParams }>;
 };
 const memo = new Map<string, Cell>();
 const evalEye = (e: number, n: number): Cell => {

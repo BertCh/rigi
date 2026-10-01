@@ -19,7 +19,7 @@ import {
 import { solveFromControlPoints } from "#/lib/geo/control-points";
 import { layoutPeakLabels } from "#/lib/geo/peaks";
 import {
-	type PhotoMeta,
+	type ExifPhotoMeta,
 	readPhotoMeta,
 	withDisplayPixels,
 } from "#/lib/geo/photo-meta";
@@ -31,7 +31,7 @@ import {
 	placeLabels,
 	RIDGE_BUCKETS,
 } from "./projection";
-import type { ControlPoint, PeakLabel, SampleEntry } from "./types";
+import type { BaselinePeakLabel, ControlPoint, SampleEntry } from "./types";
 import { Button, Notice, Section, Slider, Toggle } from "./ui";
 import { usePipeline } from "./usePipeline";
 
@@ -43,7 +43,7 @@ interface Photo {
 	id: string;
 	name: string;
 	src: string;
-	meta: PhotoMeta | null;
+	meta: ExifPhotoMeta | null;
 	metaError?: string;
 	heic: boolean;
 }
@@ -72,7 +72,7 @@ function pointErrPx(cam: Camera, p: ControlPoint) {
 	return q ? Math.hypot(q[0] - p.x, q[1] - p.y) : 1e4;
 }
 
-function priorCamera(meta: PhotoMeta | null, w: number, h: number) {
+function priorCamera(meta: ExifPhotoMeta | null, w: number, h: number) {
 	const missing: string[] = [];
 	if (meta?.gravity && meta.heading !== undefined && meta.focal35) {
 		const full = cameraFromMeta(meta);
@@ -198,7 +198,7 @@ export function BaselinePage({
 	const openFile = useCallback(
 		async (file: File) => {
 			const heic = /\.hei[cf]$/i.test(file.name) || /hei[cf]/i.test(file.type);
-			let meta: PhotoMeta | null = null;
+			let meta: ExifPhotoMeta | null = null;
 			let metaError: string | undefined;
 			try {
 				meta = await readPhotoMeta(file);
@@ -314,7 +314,7 @@ export function BaselinePage({
 	const k = cam && box ? cam.width / box.w : 1;
 
 	// --- peak labels ---------------------------------------------------------
-	const labels: PeakLabel[] = useMemo(() => {
+	const labels: BaselinePeakLabel[] = useMemo(() => {
 		if (!cam || !state.peaks) return [];
 		// peaks.ts ranks and thins the labels; we stack them to avoid overlaps.
 		const cands = layoutPeakLabels(state.peaks.views, cam, {

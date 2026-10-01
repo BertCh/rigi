@@ -69,7 +69,7 @@ export const CONCEPTS = {
 			"lib/photos.ts#PhotoMeta",
 			"lib/upload/exif.ts#LocalPhotoMeta",
 			"lib/upload/store.ts#PhotoRecord",
-			"lib/geo/photo-meta.ts#PhotoMeta",
+			"lib/geo/photo-meta.ts#ExifPhotoMeta",
 		],
 		ids: "photo",
 		storage: ["uploads"],
@@ -80,10 +80,10 @@ export const CONCEPTS = {
 		domain: "capture",
 		definition:
 			"Tags as read from the file before Rigi interprets them (optional everything, magnetic or true heading, 35 mm focal).",
-		code: ["ExifTags", "PhotoMeta (geo)"],
+		code: ["ExifTags", "ExifPhotoMeta"],
 		realizedBy: [
 			"lib/upload/exif.ts#ExifTags",
-			"lib/geo/photo-meta.ts#PhotoMeta",
+			"lib/geo/photo-meta.ts#ExifPhotoMeta",
 		],
 	},
 	"camera-prior": {
@@ -182,7 +182,7 @@ export const CONCEPTS = {
 			"lib/geo/peaks.ts#Peak",
 			"lib/photos.ts#RegionPeak",
 			"lib/picker/candidates.ts#PoolPeak",
-			"lib/export/geojson.ts#PeakInput",
+			"lib/export/geojson.ts#GeoJsonPeak",
 		],
 		ids: "peak",
 		frame: "wgs84; ele in metres MSL",
@@ -268,6 +268,8 @@ export const CONCEPTS = {
 			"lib/concord/core/types.ts#CameraX",
 			"lib/geo/camera.ts#Camera",
 			"lib/export/camera.ts#CameraModel",
+			"lib/export/camera.ts#CameraInput",
+			"lib/deck-webgpu/camera.ts#CameraState",
 		],
 		note: "Canonical decomposition is CameraX {pose, eye, aspect, intr}. geo Camera is the solvers' pixel form (f in px, axes vectors); bridge with poseToCamera/cameraToPose.",
 	},
@@ -289,7 +291,11 @@ export const CONCEPTS = {
 		definition:
 			"The lens model beyond vfov: focal scale, k1 radial distortion, principal point (normalised). Default: square pixels, centred, no distortion.",
 		code: ["Intrinsics", "f35", "focal", "fScale"],
-		realizedBy: ["lib/concord/core/types.ts#Intrinsics"],
+		realizedBy: [
+			"lib/concord/core/types.ts#Intrinsics",
+			"lib/nearfield/geom.ts#IntrinsicsNorm",
+		],
+		note: "Four shapes, one lens: Intrinsics is a DEVIATION from the pinhole that pose.vfov implies (fScale × focal, k1, normalised centre offset); IntrinsicsNorm is absolute (fx/W, fy/H, cx/W, cy/H; fy = 0.5/tan(vfov/2), fx = fy/aspect); geo Camera f/cx/cy and export CameraModel.K are display-frame pixels (after EXIF orientation).",
 	},
 	eye: {
 		label: "Eye",
@@ -340,6 +346,8 @@ export const CONCEPTS = {
 		realizedBy: [
 			"lib/geo/horizon.ts#HorizonProfile",
 			"lib/pose6dof/eye.ts#EyeHorizon",
+			"lib/horizon-fast/march.ts#FastHorizonProfile",
+			"lib/peakfix/layered.ts#LayeredHorizon",
 		],
 		frame: "azel; elevation degrees at azimuth i·step",
 	},
@@ -367,7 +375,10 @@ export const CONCEPTS = {
 		definition:
 			"Per-pixel P(sky)·255, row 0 = top, from the segmentation model or a colour fallback.",
 		code: ["SkyMask", "SkyMaskLike"],
-		realizedBy: ["lib/sky/index.ts#SkyMask"],
+		realizedBy: [
+			"lib/sky/index.ts#SkyMask",
+			"lib/ontology/core/geometry.ts#ByteMask",
+		],
 	},
 	"foreground-mask": {
 		label: "Foreground mask",
@@ -442,6 +453,7 @@ export const CONCEPTS = {
 			"lib/integration/second-opinion.ts#AppAlign",
 			"lib/integration/unknown-pose.ts#UnknownPoseOutcome",
 			"lib/integration/second-opinion.ts#SecondOpinion",
+			"lib/demo/index.ts#DemoPose",
 		],
 		storage: ["solvedPose"],
 	},
@@ -472,8 +484,8 @@ export const CONCEPTS = {
 		],
 		realizedBy: [
 			"lib/align.ts#AlignResult",
-			"lib/geo/solve.ts#SolveResult",
-			"lib/pose6dof/types.ts#SolveResult",
+			"lib/geo/solve.ts#SkylineSolveResult",
+			"lib/pose6dof/types.ts#GcpSolveResult",
 			"lib/refine/index.ts#RefineResult",
 			"lib/geocam/core/types.ts#MapResult",
 			"lib/matcher-client.ts#MatchResult",
@@ -500,7 +512,7 @@ export const CONCEPTS = {
 		code: ["confidence", "Confidence", "PoseConfidence", "confidenceLevel"],
 		realizedBy: [
 			"lib/ontology/core/confidence.ts#Confidence",
-			"lib/refine/confidence.ts#Confidence",
+			"lib/refine/confidence.ts#RefineConfidence",
 			"lib/concord/app/confidence.ts#PoseConfidence",
 		],
 	},
@@ -579,7 +591,7 @@ export const CONCEPTS = {
 		has: { peak: one("peak") },
 		realizedBy: [
 			"lib/settings.ts#PeakLabel",
-			"lib/geo/peaks.ts#PeakLabel",
+			"lib/geo/peaks.ts#PeakLabelPx",
 			"lib/look/labels/layout.ts#LabelCandidate",
 		],
 		note: "Three exports named PeakLabel (settings.ts, deck/scene.ts, geo/peaks.ts).",

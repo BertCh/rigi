@@ -60,6 +60,7 @@ import {
 	workspaceIsTrustedAuto,
 } from "./crosswalk/pose";
 import { renderOntologyDoc } from "./doc";
+import { renderDomain, renderRealizations } from "./generate";
 
 const ROOT = new URL("../../../", import.meta.url).pathname;
 let fails = 0;
@@ -122,6 +123,28 @@ const readJson = (p: string) =>
 	ok(
 		Object.keys(DOMAINS).every((d) => used.has(d as never)),
 		"catalogue: every domain has concepts",
+	);
+}
+
+// ---- 1b. homonyms ------------------------------------------------------------------------------------
+{
+	// one export name = one concept: two catalogued types may not share a name (read ExifPhotoMeta vs
+	// PhotoMeta, not geo PhotoMeta vs app PhotoMeta)
+	const byName = new Map<string, string[]>();
+	for (const c of Object.values(CONCEPTS) as {
+		realizedBy: readonly string[];
+	}[])
+		for (const key of c.realizedBy) {
+			const name = key.split("#")[1];
+			const paths = byName.get(name) ?? [];
+			if (!paths.includes(key)) paths.push(key);
+			byName.set(name, paths);
+		}
+	const homonyms = [...byName].filter(([, keys]) => keys.length > 1);
+	ok(
+		homonyms.length === 0,
+		`concepts: every realizing type has a unique export name (${byName.size} names)`,
+		homonyms.map(([n, keys]) => `${n}: ${keys.join(", ")}`).join("; "),
 	);
 }
 
@@ -439,6 +462,16 @@ const readJson = (p: string) =>
 
 // ---- 6. docs ------------------------------------------------------------------------------------------
 {
+	for (const [file, render] of [
+		["src/lib/ontology/domain.ts", renderDomain],
+		["src/lib/ontology/checks/realizations.ts", renderRealizations],
+	] as const) {
+		const path = join(ROOT, file);
+		ok(
+			existsSync(path) && readFileSync(path, "utf8") === render(),
+			`generated: ${file} is current (npx tsx scripts/ontology/gen-realizations.ts)`,
+		);
+	}
 	const path = join(ROOT, "reports/ontology.md");
 	const cur = existsSync(path) ? readFileSync(path, "utf8") : "";
 	ok(

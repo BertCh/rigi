@@ -17,7 +17,7 @@ import type { Renderer as PhotoEngine } from "#/lib/renderer";
 import { composeAnnotatedPng } from "./annotate";
 import { buildCameraModel, type CameraModel } from "./camera";
 import { buildColmapZip } from "./colmap";
-import { buildGeoJson, type PeakInput } from "./geojson";
+import { buildGeoJson, type GeoJsonPeak } from "./geojson";
 import { buildKmz, kmzBlob } from "./kml";
 import { buildPoseJson } from "./pose-json";
 import { buildXmp } from "./xmp";
@@ -194,7 +194,7 @@ export async function refreshGeometry(
 export function enginePeaks(
 	engine: PhotoEngine,
 	geometry: GeometryState = geometryBufferState(engine).state,
-): PeakInput[] {
+): GeoJsonPeak[] {
 	const e = engine.eye;
 	// without a buffer that matches the pose, the occlusion test is meaningless: flag as untested
 	const tested = geometry === "fresh";

@@ -13,8 +13,8 @@ import { computeHorizon, type HorizonProfile } from "./horizon";
 import type { SkylineObservation } from "./skyline";
 import {
 	type CoarseProvider,
+	type SkylineSolveResult,
 	type SolveOptions,
-	type SolveResult,
 	solvePose,
 	solvePoseAsync,
 } from "./solve";
@@ -110,7 +110,7 @@ export async function cascadeAsync(
 }
 
 function escalate(
-	s: SolveResult,
+	s: SkylineSolveResult,
 	prior: Camera,
 	horizon: HorizonProfile,
 	sky: SkylineObservation,

@@ -207,7 +207,7 @@ export type WorldStyle = {
 };
 
 /** Photo ⊕ render compositing (overlay and replace). CLASSIC sets no LOOK_* define. */
-export type CompositeLook = {
+export type CompositeLookStyle = {
 	/** guided-filter-refined coverage / cut / people masks (LOOK_REFINE) */
 	refine: boolean;
 	/** Oklab per-distance-band transfer of the replacing layer toward the photo (LOOK_HARMONIZE when > 0) */
@@ -332,7 +332,7 @@ export type ViewStyle = {
 	overlay: OverlayStyle;
 	replace: ReplaceStyle;
 	world: WorldStyle;
-	composite: CompositeLook;
+	composite: CompositeLookStyle;
 	trails: TrailStyle;
 	labels: LabelStyle;
 	terroir: TerroirStyle;

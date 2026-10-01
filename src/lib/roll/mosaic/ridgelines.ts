@@ -49,7 +49,7 @@ export type RidgePeak = {
 	prominence: number | null;
 };
 
-export type PeakInput = {
+export type RidgelinePeakInput = {
 	name: string;
 	lat: number;
 	lon: number;
@@ -150,7 +150,7 @@ export function ridgeTopsCpu(
 export function traceViewpoint(
 	heightAt: HeightAt,
 	eye: { lat: number; lon: number; h: number },
-	peaks: PeakInput[] = [],
+	peaks: RidgelinePeakInput[] = [],
 	o: RidgeOptions = {},
 	/** Precomputed tops (the GPU's), else marched here from heightAt. heightAt still places the peaks. */
 	tops?: RidgeTops,
@@ -283,7 +283,7 @@ export function traceViewpoint(
 
 /** Peaks on the skyline or clear of nearer terrain beyond the viewpoint's own ground (the brand panorama's test). */
 function visiblePeaks(
-	peaks: PeakInput[],
+	peaks: RidgelinePeakInput[],
 	heightAt: HeightAt,
 	eye: { lat: number; lon: number },
 	top: Float32Array,

@@ -13,7 +13,6 @@
 			"scripts/leaderboard.mjs": 5,
 			"scripts/nearfield/smear-report.mjs": 2,
 			"scripts/style-check.ts": 1,
-			"scripts/test-export.ts": 1,
 			"src/lib/export/ExportMenu.tsx": 2,
 			"tools/nearfield/smear/viz.mjs": 1,
 			"tools/nearfield/smear/why.mjs": 1

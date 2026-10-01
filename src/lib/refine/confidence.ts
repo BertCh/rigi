@@ -21,7 +21,7 @@
 import { invertSPD } from "../linalg";
 import { DEG, DEYE, LOGF, NPARAM, PITCH, ROLL, YAW } from "./model";
 
-export interface Confidence {
+export interface RefineConfidence {
 	accept: boolean;
 	/** 0..1. */
 	score: number;
@@ -126,7 +126,7 @@ export interface ConfidenceInput {
 export function computeConfidence(
 	c: ConfidenceInput,
 	th: ConfidenceThresholds = DEFAULT_THRESHOLDS,
-): Confidence {
+): RefineConfidence {
 	// Residual correlation length over inlier columns.
 	const e: number[] = [];
 	for (let i = 0; i < c.residuals.length; i++)

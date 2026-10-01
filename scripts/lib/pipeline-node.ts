@@ -8,7 +8,10 @@ import path from "node:path";
 import { DEM_SOURCES } from "../../src/lib/dem";
 import { type Camera, cameraFromMeta } from "../../src/lib/geo/camera";
 import { computeHorizon, type HorizonProfile } from "../../src/lib/geo/horizon";
-import { type PhotoMeta, readPhotoMeta } from "../../src/lib/geo/photo-meta";
+import {
+	type ExifPhotoMeta,
+	readPhotoMeta,
+} from "../../src/lib/geo/photo-meta";
 import { EYE_ABOVE_GROUND } from "../../src/lib/geo/pipeline";
 import { loadTerrain, type TerrainSampler } from "../../src/lib/geo/terrain";
 import { CACHE, demTileLoaderNode, imagePixelSize } from "./node-io";
@@ -40,7 +43,7 @@ const tileCache = new Map<string, Float32Array>();
 
 export interface PhotoContext {
 	name: string;
-	meta: PhotoMeta;
+	meta: ExifPhotoMeta;
 	prior: Camera;
 	terrain: TerrainSampler;
 	ground: number;

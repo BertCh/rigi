@@ -159,7 +159,7 @@ export function viewPeaks(
 	return out;
 }
 
-export interface PeakLabel extends PeakView {
+export interface PeakLabelPx extends PeakView {
 	x: number;
 	y: number;
 }
@@ -189,10 +189,10 @@ export function layoutPeakLabels(
 	views: PeakView[],
 	cam: Camera,
 	opts: { maxLabels?: number; minSpacingPx?: number } = {},
-): PeakLabel[] {
+): PeakLabelPx[] {
 	const maxLabels = opts.maxLabels ?? 20;
 	const minSpacing = opts.minSpacingPx ?? cam.width * 0.03;
-	const candidates: PeakLabel[] = [];
+	const candidates: PeakLabelPx[] = [];
 	for (const v of views) {
 		if (!v.visible) continue;
 		const p = project(cam, directionENU(v.azimuth, v.elevation));
@@ -202,7 +202,7 @@ export function layoutPeakLabels(
 		candidates.push({ ...v, x, y });
 	}
 	candidates.sort((a, b) => score(b) - score(a));
-	const kept: PeakLabel[] = [];
+	const kept: PeakLabelPx[] = [];
 	for (const c of candidates) {
 		if (kept.length >= maxLabels) break;
 		if (kept.every((k) => Math.abs(k.x - c.x) >= minSpacing)) kept.push(c);

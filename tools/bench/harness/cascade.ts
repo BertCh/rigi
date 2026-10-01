@@ -39,13 +39,13 @@ import {
 } from "../../../src/lib/geo/horizon";
 import { detectSkyline } from "../../../src/lib/geo/skyline";
 import {
+	type SkylineSolveResult,
 	type SolveOptions,
-	type SolveResult,
 	solvePose,
 } from "../../../src/lib/geo/solve";
 import { loadTerrain } from "../../../src/lib/geo/terrain";
 import { type RefineOptions, refinePose } from "../../../src/lib/refine/index";
-import { DEFAULT_INIT } from "../../../src/lib/refine/init";
+import type { DEFAULT_INIT } from "../../../src/lib/refine/init";
 import { DEFAULT_PRIOR_SIGMA } from "../../../src/lib/refine/robust";
 
 /**
@@ -189,7 +189,7 @@ function cascade(
 	return { ...c, stage: c.method, first: summary(first) };
 }
 
-function summary(s: SolveResult) {
+function summary(s: SkylineSolveResult) {
 	return {
 		pose: { yaw: s.camera.yaw, pitch: s.camera.pitch, roll: s.camera.roll },
 		confidence: s.confidence,
