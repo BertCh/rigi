@@ -20,9 +20,11 @@ import { getComputeDevice } from "#/lib/gpu/device";
 import { computeHorizonGpu, warmHorizonGpu } from "#/lib/gpu/horizon";
 import {
 	type HorizonPrecision,
+	lastCertStats,
 	skylineDirs,
 	warmCertifiedAsync,
 } from "#/lib/gpu/horizon/certified";
+import { mergeSpotLedger, spotLedger } from "#/lib/gpu/precision/spot-policy";
 import {
 	computeHorizonFast,
 	type FastHorizonOptions,
@@ -136,6 +138,9 @@ async function march(
 	// ENU unit directions in PhotoEngine's frame (gpu/horizon/dirs-cpu.ts: the f64 stage, moved there
 	// verbatim; certified-f32 gives the same bits through the GPU plus the f64 tie path)
 	const device = on === "gpu" && gpu ? await gpu : null;
+	// the march's tan → degrees stage recorded its stats (certified-f32 requests only)
+	const elev =
+		on === "gpu" && precision !== "f64" ? lastCertStats.elevations : undefined;
 	const { dirs, stats: cert } = await skylineDirs(
 		device,
 		prof,
@@ -174,6 +179,21 @@ async function march(
 							gpuMs: cert.gpuMs,
 							finishMs: cert.finishMs,
 							...(cert.fellBack ? { fellBack: cert.fellBack } : {}),
+							...(cert.spotChecked !== undefined
+								? { spotChecked: cert.spotChecked, spotFull: cert.spotFull }
+								: {}),
+							...(elev
+								? {
+										elevations: {
+											certified: elev.certified,
+											ties: elev.ties,
+											spotChecked: elev.spotChecked,
+											spotFull: elev.spotFull,
+											...(elev.fellBack ? { fellBack: elev.fellBack } : {}),
+										},
+									}
+								: {}),
+							spotLedger: spotLedger(),
 						},
 					}
 				: {}),
@@ -194,6 +214,7 @@ scope.onmessage = async (e: MessageEvent<HorizonWorkerIn>) => {
 		if (m.type === "spans") {
 			spans = m.spans;
 			precision = m.precision ?? "f64";
+			mergeSpotLedger(m.spotLedger);
 			applyRealmGpuOptions(m.gpuOpts);
 			if (m.gpu && !gpu) {
 				gpu = getComputeDevice().then((d) => {

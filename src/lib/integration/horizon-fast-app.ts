@@ -34,6 +34,11 @@ import {
 	horizonPrecisionOptIn,
 } from "#/lib/gpu/horizon/opt-in";
 import {
+	mergeSpotLedger,
+	type SpotLedger,
+	spotLedger,
+} from "#/lib/gpu/precision/spot-policy";
+import {
 	LITE_RINGS,
 	mosaicTileKeys,
 	type Ring,
@@ -54,6 +59,8 @@ export type HorizonWorkerIn =
 			gpuOpts?: RealmGpuOptions;
 			/** Precision of the tan → degrees and ENU stages (opt-in: horizonPrecisionOptIn(); default f64). */
 			precision?: HorizonPrecision;
+			/** The page's certified-f32 spot-check ledger (gpu/precision/spot-policy.ts); certified-f32 only. */
+			spotLedger?: SpotLedger;
 	  }
 	| {
 			type: "tile";
@@ -88,6 +95,19 @@ export type HorizonStats = {
 		gpuMs: number;
 		finishMs: number;
 		fellBack?: string;
+		/** the ENU stage's spot check: outputs re-derived, and whether it was a full check */
+		spotChecked?: number;
+		spotFull?: boolean;
+		/** the tan → degrees stage (gpu/horizon/certified.ts horizonElevations) of this march */
+		elevations?: {
+			certified: number;
+			ties: number;
+			spotChecked?: number;
+			spotFull?: boolean;
+			fellBack?: string;
+		};
+		/** the worker's spot-check ledger after this march (the page merges it) */
+		spotLedger?: SpotLedger;
 	};
 };
 
@@ -170,6 +190,7 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 		const m = e.data;
 		if (m.type === "error") return fail(new Error(m.error));
 		mergeGpuProfile("horizon-worker", m.gpuProfile);
+		mergeSpotLedger(m.stats.precision?.spotLedger);
 		results.set(m.eyeH, m);
 		waiters.get(m.eyeH)?.resolve(m);
 		waiters.delete(m.eyeH);
@@ -191,12 +212,14 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 		);
 		// GPU march is opt-in (?gpuHorizon, on by default; see gpu/horizon/opt-in.ts). The switches live in the page
 		// (URL, localStorage), which the worker can't read.
+		const precision = horizonPrecisionOptIn();
 		post({
 			type: "spans",
 			spans,
 			gpu: gpuHorizonOptIn(),
 			gpuOpts: realmGpuOptions(),
-			precision: horizonPrecisionOptIn(),
+			precision,
+			...(precision !== "f64" ? { spotLedger: spotLedger() } : {}),
 		});
 		const seen = new Set<string>();
 		const keys = spans

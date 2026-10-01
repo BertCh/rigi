@@ -40,6 +40,18 @@ import {
 	setDivSqrtPerturbation,
 	setFlushSubnormals,
 } from "../precision/df32";
+import {
+	mergeSpotLedger,
+	planSpotCheck,
+	recordSpotCheck,
+	resetSpotLedger,
+	SPOT_CHECKS,
+	SPOT_FULL_EVERY,
+	SPOT_FULL_FIRST,
+	SPOT_LIGHT,
+	spotKey,
+	spotLedger,
+} from "../precision/spot-policy";
 import { spotCheckA, spotCheckC } from "./certified";
 import {
 	elevationF64,
@@ -645,6 +657,91 @@ if (real) {
 		!caughtC
 	)
 		fail("per-call spot check");
+}
+
+// 7b. the light spot check (SPOT_LIGHT outputs) and the ledger policy (../precision/spot-policy.ts)
+{
+	const td = stageACases()[0].subarray(0, 2 * 4000);
+	const outA = emuStageA(td, 4000);
+	const badA = outA.slice();
+	for (let i = 0; i < 4000; i++)
+		if (badA[2 * i + 1] & FLAG_CERT) badA[2 * i] ^= 1;
+	const c = synth[0];
+	const { outC } = emuSkylineDirs(c.prof, c.job, c.eyeH);
+	const badC = outC.slice();
+	for (let j = 0; j < GPU_COLUMNS.length; j++)
+		if (badC[4 * j + 3] & FLAG_CERT && !(badC[4 * j + 3] & FLAG_SKIP))
+			badC[4 * j + 2] ^= 1;
+	const lightOk =
+		spotCheckA(td, outA, 4000, SPOT_LIGHT) === SPOT_LIGHT &&
+		spotCheckC(c.prof, c.job, c.eyeH, outC, undefined, SPOT_LIGHT) ===
+			SPOT_LIGHT;
+	const lightCaught =
+		typeof spotCheckA(td, badA, 4000, SPOT_LIGHT) === "string" &&
+		typeof spotCheckC(c.prof, c.job, c.eyeH, badC, undefined, SPOT_LIGHT) ===
+			"string";
+	// policy: the first SPOT_FULL_FIRST calls of a key are full, then light with 1 in SPOT_FULL_EVERY
+	// full (random), a failed check disables the key, keys differ per source and per adapter
+	resetSpotLedger();
+	const dev = (vendor: string) => ({
+		info: { type: "webgpu", vendor, renderer: "r", version: "1", gpu: "apple" },
+		features: new Set(["float32-filterable"]),
+	});
+	const key = spotKey(dev("a") as never, "stage", "wgsl source");
+	const plans = [];
+	let r = 0;
+	const rand = () => [0.5, 0.99, 0.0001][r++ % 3];
+	for (let i = 0; i < SPOT_FULL_FIRST + 6; i++) {
+		const p = planSpotCheck(key, rand);
+		plans.push(p);
+		recordSpotCheck(key, p, p.disabled ? 0 : p.count);
+	}
+	const counts = plans.map((p) => (p.disabled ? -1 : p.count));
+	const firstFull = counts
+		.slice(0, SPOT_FULL_FIRST)
+		.every((n) => n === SPOT_CHECKS);
+	// after qualification: rand 0.5 → light, 0.99 → light, 0.0001 (< 1/32) → full
+	const after = counts.slice(SPOT_FULL_FIRST);
+	const sampled =
+		after.filter((n) => n === SPOT_CHECKS).length === 2 &&
+		after.filter((n) => n === SPOT_LIGHT).length === 4 &&
+		1 / SPOT_FULL_EVERY > 0.0001;
+	const otherSource = planSpotCheck(
+		spotKey(dev("a") as never, "stage", "wgsl source 2"),
+		() => 0.5,
+	);
+	const otherAdapter = planSpotCheck(
+		spotKey(dev("b") as never, "stage", "wgsl source"),
+		() => 0.5,
+	);
+	const fresh =
+		!otherSource.disabled &&
+		otherSource.full &&
+		!otherAdapter.disabled &&
+		otherAdapter.full;
+	const p = planSpotCheck(key, () => 0.5);
+	recordSpotCheck(key, p, "spot check: column 7 differs from the emulation");
+	const disabled = !!planSpotCheck(key).disabled;
+	// a worker's ledger round trip: the page's copy seeds a fresh realm; disabled stays disabled
+	const snap = spotLedger();
+	resetSpotLedger();
+	mergeSpotLedger(snap);
+	mergeSpotLedger({ [key]: { full: 0 } });
+	const merged = !!planSpotCheck(key).disabled && spotLedger()[key].full >= 3;
+	resetSpotLedger();
+	console.log(
+		`spot policy: light check passes ${lightOk}, catches corruption ${lightCaught}; first ${SPOT_FULL_FIRST} full ${firstFull}, then light + 1 in ${SPOT_FULL_EVERY} full ${sampled}; per source / adapter ${fresh}; mismatch disables ${disabled}; ledger merge ${merged}`,
+	);
+	if (
+		!lightOk ||
+		!lightCaught ||
+		!firstFull ||
+		!sampled ||
+		!fresh ||
+		!disabled ||
+		!merged
+	)
+		fail("spot-check policy");
 }
 
 // 5. teeth: an error the bound does not cover must be caught

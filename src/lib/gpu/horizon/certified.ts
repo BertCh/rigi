@@ -24,6 +24,12 @@ import { cachedGraph } from "#/lib/gpu/core/graph";
 import { defineKernel, warmKernelsAsync } from "#/lib/gpu/core/kernel";
 import { pooledStorage, pooledUniform, withLease } from "#/lib/gpu/core/pool";
 import { type IeeeProbe, probeStrictIeee } from "../precision/ieee-probe";
+import {
+	planSpotCheck,
+	recordSpotCheck,
+	SPOT_CHECKS,
+	spotKey,
+} from "../precision/spot-policy";
 import { STAGE_A_WGSL, STAGE_B_WGSL, STAGE_C_WGSL } from "./certified.wgsl";
 import {
 	CERT_MAX_LAT,
@@ -172,11 +178,16 @@ export type CertStats = {
 	finishMs: number;
 	/** GPU-certified outputs re-derived on the CPU emulation this call (all must agree) */
 	spotChecked?: number;
+	/** this call ran the full spot check (SPOT_CHECKS outputs; ../precision/spot-policy.ts) */
+	spotFull?: boolean;
 	probe?: IeeeProbe;
 };
 
-/** Certified outputs per call re-derived on the CPU emulation (README "Per-call spot check"). */
-export const SPOT_CHECKS = 64;
+/**
+ * Certified outputs a full spot check re-derives on the CPU emulation (README "Per-call spot check");
+ * how many a call checks is ../precision/spot-policy.ts's planSpotCheck (full or SPOT_LIGHT, never 0).
+ */
+export { SPOT_CHECKS };
 
 /** Up to k distinct random indices among those where pick(i) holds. */
 function sampleIndices(n: number, k: number, pick: (i: number) => boolean) {
@@ -190,17 +201,18 @@ function sampleIndices(n: number, k: number, pick: (i: number) => boolean) {
 }
 
 /**
- * Stage A spot check: SPOT_CHECKS random GPU-certified samples through the emulation (emuStageA). The
- * GPU's certificates equal the emulation's bit for bit (bench), so any difference means this shader on
- * this device does not compute what the probe and the node check vouched for. Returns the count checked,
- * or a reason string on a mismatch.
+ * Stage A spot check: `k` (default SPOT_CHECKS) random GPU-certified samples through the emulation
+ * (emuStageA). The GPU's certificates equal the emulation's bit for bit (bench), so any difference
+ * means this shader on this device does not compute what the probe and the node check vouched for.
+ * Returns the count checked, or a reason string on a mismatch.
  */
-export function spotCheckA(td: Float32Array, outA: Uint32Array, n: number) {
-	const idx = sampleIndices(
-		n,
-		SPOT_CHECKS,
-		(i) => !!(outA[2 * i + 1] & FLAG_CERT),
-	);
+export function spotCheckA(
+	td: Float32Array,
+	outA: Uint32Array,
+	n: number,
+	k = SPOT_CHECKS,
+) {
+	const idx = sampleIndices(n, k, (i) => !!(outA[2 * i + 1] & FLAG_CERT));
 	const sub = new Float32Array(2 * idx.length);
 	idx.forEach((i, q) => {
 		sub[2 * q] = td[2 * i];
@@ -215,21 +227,21 @@ export function spotCheckA(td: Float32Array, outA: Uint32Array, n: number) {
 	return idx.length;
 }
 
-/** Stages B + C spot check: SPOT_CHECKS random GPU-certified columns, samples emulated on demand. */
+/**
+ * Stages B + C spot check: `k` (default SPOT_CHECKS) random GPU-certified columns, the samples they
+ * read emulated on demand (the cost scales with k: ~64 columns read ~170 samples).
+ */
 export function spotCheckC(
 	prof: SkylineProfile,
 	job: SkylineJob,
 	eyeH: number,
 	outC: Uint32Array,
 	packed: PackedBC = packBC(null, prof, job, eyeH),
+	k = SPOT_CHECKS,
 ) {
 	const n = prof.elevation.length;
 	const nCols = GPU_COLUMNS.length;
-	const cols = sampleIndices(
-		nCols,
-		SPOT_CHECKS,
-		(j) => !!(outC[4 * j + 3] & FLAG_CERT),
-	);
+	const cols = sampleIndices(nCols, k, (j) => !!(outC[4 * j + 3] & FLAG_CERT));
 	const { consts, az, pr } = packed;
 	const lumpEnu = enuLump(job.lat, job.lon);
 	const lumpRel = enuLumpRel(job.lat, job.lon);
@@ -251,8 +263,14 @@ export function spotCheckC(
 	return cols.length;
 }
 
-/** Stats of the latest certified call in this realm (benches). */
+/** Stats of the latest certified-f32 request in this realm, including one that ran f64 (benches, the worker's stats). */
 export let lastCertStats: { elevations?: CertStats; dirs?: CertStats } = {};
+
+/** Ledger keys of the stages' pipelines (../precision/spot-policy.ts spotKey). */
+export const spotKeyA = (device: Device) =>
+	spotKey(device, "horizon-cert-a", STAGE_A_WGSL);
+export const spotKeyBC = (device: Device) =>
+	spotKey(device, "horizon-cert-bc", STAGE_B_WGSL + STAGE_C_WGSL);
 
 /** Why certified-f32 cannot run on `device` (null = it can). */
 async function cannotCertify(device: Device | null) {
@@ -280,27 +298,36 @@ export async function horizonElevations(
 		const t0 = performance.now();
 		const elevation = new Float32Array(n);
 		for (let i = 0; i < n; i++) elevation[i] = elevationF64(td[2 * i]);
-		return {
-			elevation,
-			stats: {
-				precision,
-				...(fellBack ? { fellBack } : {}),
-				certified: 0,
-				ties: n,
-				gpuMs: 0,
-				finishMs: performance.now() - t0,
-				...(probe ? { probe } : {}),
-			},
+		const stats: CertStats = {
+			precision,
+			...(fellBack ? { fellBack } : {}),
+			certified: 0,
+			ties: n,
+			gpuMs: 0,
+			finishMs: performance.now() - t0,
+			...(probe ? { probe } : {}),
 		};
+		// a certified-f32 request that ran f64 is recorded too (the harnesses report why)
+		if (precision !== "f64")
+			lastCertStats = { ...lastCertStats, elevations: stats };
+		return { elevation, stats };
 	};
 	if (precision === "f64" || n === 0) return f64();
 	const { why, probe } = await cannotCertify(device);
 	if (why || !device) return f64(why ?? "no device", probe);
+	const key = spotKeyA(device);
+	const plan = planSpotCheck(key);
+	if (plan.disabled)
+		return f64(
+			`spot check failed earlier on this adapter: ${plan.disabled}`,
+			probe,
+		);
 	try {
 		const t0 = performance.now();
 		const outA = await stageAGpu(device, td, n);
 		const t1 = performance.now();
-		const spot = spotCheckA(td, outA, n);
+		const spot = spotCheckA(td, outA, n, plan.count);
+		recordSpotCheck(key, plan, spot);
 		if (typeof spot === "string") return f64(spot, probe);
 		const { elevation, ties } = finishStageA(td, outA, n);
 		const stats: CertStats = {
@@ -310,6 +337,7 @@ export async function horizonElevations(
 			gpuMs: t1 - t0,
 			finishMs: performance.now() - t1,
 			spotChecked: spot,
+			spotFull: plan.full,
 			probe,
 		};
 		lastCertStats = { ...lastCertStats, elevations: stats };
@@ -436,18 +464,17 @@ export async function skylineDirs(
 	const f64 = (fellBack?: string, probe?: IeeeProbe) => {
 		const t0 = performance.now();
 		const dirs = skylineDirsF64(prof, job, eyeH);
-		return {
-			dirs,
-			stats: {
-				precision,
-				...(fellBack ? { fellBack } : {}),
-				certified: 0,
-				ties: GPU_COLUMNS.length,
-				gpuMs: 0,
-				finishMs: performance.now() - t0,
-				...(probe ? { probe } : {}),
-			},
+		const stats: CertStats = {
+			precision,
+			...(fellBack ? { fellBack } : {}),
+			certified: 0,
+			ties: GPU_COLUMNS.length,
+			gpuMs: 0,
+			finishMs: performance.now() - t0,
+			...(probe ? { probe } : {}),
 		};
+		if (precision !== "f64") lastCertStats = { ...lastCertStats, dirs: stats };
+		return { dirs, stats };
 	};
 	if (precision === "f64") return f64();
 	if (!(Math.abs(job.lat) <= CERT_MAX_LAT))
@@ -456,12 +483,20 @@ export async function skylineDirs(
 		);
 	const { why, probe } = await cannotCertify(device);
 	if (why || !device) return f64(why ?? "no device", probe);
+	const key = spotKeyBC(device);
+	const plan = planSpotCheck(key);
+	if (plan.disabled)
+		return f64(
+			`spot check failed earlier on this adapter: ${plan.disabled}`,
+			probe,
+		);
 	try {
 		const t0 = performance.now();
 		const packed = packBC(device, prof, job, eyeH);
 		const outC = await stageBCGpu(device, prof, job, eyeH, packed);
 		const t1 = performance.now();
-		const spot = spotCheckC(prof, job, eyeH, outC, packed);
+		const spot = spotCheckC(prof, job, eyeH, outC, packed, plan.count);
+		recordSpotCheck(key, plan, spot);
 		if (typeof spot === "string") return f64(spot, probe);
 		const { dirs, ties } = finishStageC(prof, job, eyeH, outC);
 		const stats: CertStats = {
@@ -471,6 +506,7 @@ export async function skylineDirs(
 			gpuMs: t1 - t0,
 			finishMs: performance.now() - t1,
 			spotChecked: spot,
+			spotFull: plan.full,
 			probe,
 		};
 		lastCertStats = { ...lastCertStats, dirs: stats };

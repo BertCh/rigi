@@ -20,8 +20,8 @@
 //   IEEE gradual underflow and flush-to-zero (which WGSL allows) are accepted;
 // - df32 add / mul / div / sqrt within their budgets against f64.
 // It tests samples, and only its own shader module: fma fusion and flushing are decided per compiled
-// shader, so a stage must also spot-check its own outputs (horizon: certified.ts spotCheckA / C, 64
-// outputs per call against the emulation). A pass is evidence about the device, not a proof. The node check
+// shader, so a stage must also spot-check its own outputs (horizon: certified.ts spotCheckA / C against
+// the emulation, 64 or 8 outputs per call as ./spot-policy.ts decides). A pass is evidence about the device, not a proof. The node check
 // ieee-probe.check.ts shows the verifier rejects a re-associated TwoSum, an unfused fma and an
 // 8-ULP division.
 //
