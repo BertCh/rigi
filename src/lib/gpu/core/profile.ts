@@ -14,8 +14,15 @@
 // their own realm. core/realm.ts carries the page's switch to them on their existing messages; each
 // worker hands back takeGpuProfile() with its result, and the page's worker client adds it here with
 // mergeGpuProfile(realm, p) as `${realm}:${label}` (e.g. "horizon-worker:horizon-march").
+//
+// Per graph (WAG W0.2): getGpuGraphProfile() reads the upstream GPUCommandGraphInspector snapshots
+// (core/inspector.ts; graphs are observed while profiling is on, or once /dev/graph inspected them):
+// per-node CPU encode and GPU p50 / p95, transient bytes, aliasing savings and the preflight fit,
+// which the flat label totals above cannot carry. This realm only (worker graphs are not merged).
+// core/inspector.ts registers the snapshot source, so this file stays free of luma runtime imports.
 import type { ComputePassProps, Device, QuerySet } from "@luma.gl/core";
 import { onLost, untilLost } from "./lifecycle";
+import type { GPUCommandGraphInspectorSnapshot } from "./luma";
 
 declare global {
 	var __RIGI_GPU_PROFILE__: boolean | undefined;
@@ -138,4 +145,70 @@ export function mergeGpuProfile(realm: string, p: GpuProfile | undefined) {
 		t.count += v.count;
 		totals[k] = t;
 	}
+}
+
+/** One observed graph's inspector summary (getGpuGraphProfile). Durations are p50 / p95 in ms. */
+export type GpuGraphProfileEntry = {
+	/** the device's luma id (graphs of several devices may share an id) */
+	device: string;
+	graph: string;
+	encodings: number;
+	cpuEncodeMs?: number;
+	gpuMs?: number;
+	gpuP95Ms?: number;
+	transientBytes: number;
+	physicalTransientBytes: number;
+	/** transient bytes saved by lifetime aliasing */
+	reusedTransientBytes: number;
+	fitsDeviceLimits?: boolean;
+	nodes: Record<
+		string,
+		{ samples: number; cpuEncodeMs?: number; gpuMs?: number; gpuP95Ms?: number }
+	>;
+};
+
+type SnapshotSource = () => {
+	device: Device;
+	snapshot: GPUCommandGraphInspectorSnapshot;
+}[];
+let snapshotSource: SnapshotSource | null = null;
+
+/** @internal core/inspector.ts: where getGpuGraphProfile() reads the inspector snapshots. */
+export function setGraphSnapshotSource(source: SnapshotSource) {
+	snapshotSource = source;
+}
+
+/**
+ * Per observed graph of this realm, from the upstream inspector's snapshot: encode count, CPU encode
+ * and GPU p50 (whole graph and per node), GPU p95, transient bytes and aliasing savings, preflight fit.
+ * Empty when nothing was observed (profiling off and /dev/graph never opened).
+ */
+export async function getGpuGraphProfile(): Promise<GpuGraphProfileEntry[]> {
+	await Promise.all([...reads]);
+	const out: GpuGraphProfileEntry[] = [];
+	for (const { device, snapshot } of snapshotSource?.() ?? [])
+		for (const g of snapshot.graphs) {
+			const nodes: GpuGraphProfileEntry["nodes"] = {};
+			for (const n of g.nodes)
+				nodes[n.id] = {
+					samples: Math.max(n.cpu.sampleCount, n.gpu.sampleCount),
+					cpuEncodeMs: n.cpu.p50Milliseconds,
+					gpuMs: n.gpu.p50Milliseconds,
+					gpuP95Ms: n.gpu.p95Milliseconds,
+				};
+			out.push({
+				device: device.id,
+				graph: g.id,
+				encodings: g.encodingCount,
+				cpuEncodeMs: g.totals.cpu.p50Milliseconds,
+				gpuMs: g.totals.gpu.p50Milliseconds,
+				gpuP95Ms: g.totals.gpu.p95Milliseconds,
+				transientBytes: g.stats.logicalTransientBytes,
+				physicalTransientBytes: g.stats.physicalTransientBytes,
+				reusedTransientBytes: g.stats.reusedTransientBytes,
+				fitsDeviceLimits: g.preflight?.fitsDeviceLimits,
+				nodes,
+			});
+		}
+	return out;
 }

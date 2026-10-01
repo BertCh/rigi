@@ -88,6 +88,11 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
    (a chain with clears and a CPU condition), `look/textures.ts` (texture inputs).
 7. Add a bench (`bench.ts` in the module plus `scripts/gpu/<name>-bench.mjs`) that compares against
    the CPU twin and writes small JSON under `out/gpu/**`. Add a row to the table below.
+8. Declare the module in the app graph manifest (`app-graph/manifest.ts`: island I0–I12, its
+   `cachedGraph` groups, resources, cadence, realm, readbacks), then regenerate the island table
+   (`npx tsx scripts/gpu/app-graph-table.ts --write`). The fast-tier checks `app-graph` and
+   `app-graph-table` fail on an undeclared group or a stale table. `/dev/graph` shows the page's
+   live graphs (transient bytes, aliasing savings, preflight fit, timings) next to the manifest.
 
 ## The WebGPU renderer hand-off
 

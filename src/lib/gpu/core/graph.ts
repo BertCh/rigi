@@ -36,6 +36,12 @@
 //   g.addComputePass({ ..., cleared: [acc] }); g.addCopyPass(...); g.addRenderPass(...); // audited raw nodes
 //   g.importFrameTexture(...) + run(p, { frameTextures }); listCachedGraphs(device)
 //
+// W0.2 inspection (opt-in, recording only): g.inspect() / core/inspect.ts inspectGraphs() observe the
+// compiled graph on its device's upstream GPUCommandGraphInspector (core/inspector.ts); profiled
+// encodes observe it too. An observed graph encodes through the observation handle (the same
+// compiled.encode, then the CPU encode times are recorded), and timed runs hand their one timing read
+// to it. Unobserved graphs (the default) encode exactly as before.
+//
 // Transients are NEVER zeroed by the graph, and a transient can alias another one whose lifetime ended
 // earlier in the same encoding (or a previous encoding's bytes): anything read-modify-written
 // (atomics, partial writes, accumulators) needs a clearNode first.
@@ -47,6 +53,7 @@ import {
 	type QuerySet,
 } from "@luma.gl/core";
 import { type ClearAudit, clearLintError } from "./clear-lint";
+import { observeCompiledGraph } from "./inspector";
 import {
 	type BindKind,
 	encodeDispatch,
@@ -66,6 +73,7 @@ import {
 	type GPUCommandGraphEncodeOptions,
 	type GPUCommandGraphEncoding,
 	type GPUCommandGraphGPUIndirectCondition,
+	type GPUCommandGraphInspectorObservation,
 	type GPUCommandGraphNode,
 	type GPUCommandGraphNodeCondition,
 	type GPUCommandGraphNodeWorkloadEstimate,
@@ -86,7 +94,7 @@ import {
 	type GraphTextureViewProps,
 } from "./luma";
 import { clear, withLease } from "./pool";
-import { profiling, recordGpuTime } from "./profile";
+import { profileRequested, profiling, recordGpuTime } from "./profile";
 import { submit } from "./queue";
 import { type ReadRange, type StagedRead, stageReads } from "./readback";
 
@@ -257,6 +265,8 @@ export class ComputeGraph<P = void> {
 		gates: new Map(),
 	};
 	private readNodes = 0;
+	/** the upstream inspector's handle on the compiled graph (null: not observed, the default) */
+	private observation: GPUCommandGraphInspectorObservation<P> | null = null;
 	/** read-node staging of the encoding in progress (set by encodeReads) */
 	private staging: { id: string; staged: StagedRead }[] | null = null;
 
@@ -707,6 +717,28 @@ export class ComputeGraph<P = void> {
 		return this.compiled?.preflight;
 	}
 
+	/** Graph-relevant device capabilities and limits of the compiled graph (undefined before compile). */
+	get capabilities() {
+		return this.compiled?.capabilities;
+	}
+
+	/**
+	 * Observe the compiled graph on its device's GPUCommandGraphInspector (core/inspector.ts) from now
+	 * on: later encodes record their CPU encode times, and timed / profiled runs their GPU node times.
+	 * Recording only: the commands are unchanged. undefined before compile.
+	 */
+	inspect(): GPUCommandGraphInspectorObservation<P> | undefined {
+		if (!this.compiled) return undefined;
+		this.observation ??= observeCompiledGraph(this.compiled);
+		return this.observation;
+	}
+
+	/** What to encode through: the observation when observed (or profiling asks for one), else the graph. */
+	private encoder(compiled: CompiledGPUCommandGraph<P>) {
+		if (!this.observation && profileRequested()) this.inspect();
+		return this.observation ?? compiled;
+	}
+
 	/** Whether the compiled graph's buffers fit the device limits (undefined before compile). */
 	fitsDeviceLimits(): boolean | undefined {
 		return this.compiled?.preflight.fitsDeviceLimits;
@@ -742,7 +774,7 @@ export class ComputeGraph<P = void> {
 			throw new Error(
 				`${this.id}: a graph with read nodes is encoded with encodeReads() or run()`,
 			);
-		return this.compiled.encode(enc, {
+		return this.encoder(this.compiled).encode(enc, {
 			...extras,
 			parameters,
 			buffers,
@@ -768,7 +800,7 @@ export class ComputeGraph<P = void> {
 		this.staging = staging;
 		let encoding: GPUCommandGraphEncoding;
 		try {
-			encoding = this.compiled.encode(enc, {
+			encoding = this.encoder(this.compiled).encode(enc, {
 				...extras,
 				parameters,
 				buffers,
@@ -861,7 +893,17 @@ export class ComputeGraph<P = void> {
 					nodeReads.read(),
 				]);
 				if (!timed || !encoding.canReadGPUTimings) return { data, reads };
-				const timings = await untilLost(this.device, encoding.readTimings());
+				// an observed graph's inspector takes the one timing read (and returns the same report);
+				// undefined (a replaced registration, or a failed read it swallowed) → read it here
+				const obs = this.observation;
+				const timings = await untilLost(
+					this.device,
+					obs
+						? obs
+								.recordGPUTimings(encoding)
+								.then((r) => r ?? encoding.readTimings())
+						: encoding.readTimings(),
+				);
 				if (prof)
 					for (const n of timings.nodes)
 						if (n.gpuTimeMilliseconds !== undefined)
@@ -878,6 +920,8 @@ export class ComputeGraph<P = void> {
 
 	/** Free the compiled graph's transients, pipelines and timestamp slots. */
 	destroy() {
+		this.observation?.detach();
+		this.observation = null;
 		this.compiled?.destroy();
 		this.compiled = null;
 		// a compileAsync still in flight: destroy what it produces

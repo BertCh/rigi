@@ -22,6 +22,8 @@
 //   own MAP_READ slots.
 // - GPUReadbackRing has fixed-size slots; core/readback.ts implements the same ticket pattern with
 //   grow-on-demand slots (re-exported here for callers with a fixed readback size).
+// - GPUCommandGraphInspector (bounded per-node CPU / GPU timing samples over compiled graphs) is used
+//   only by core/inspector.ts (one inspector per device, opt-in; see core/inspect.ts).
 
 import type { Device, DeviceProps } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
@@ -57,6 +59,12 @@ export type {
 	GPUCommandGraphEncodeContext,
 	GPUCommandGraphEncodeOptions,
 	GPUCommandGraphGPUIndirectCondition,
+	GPUCommandGraphInspectorDurationSnapshot,
+	GPUCommandGraphInspectorGraphSnapshot,
+	GPUCommandGraphInspectorNodeSnapshot,
+	GPUCommandGraphInspectorObservation,
+	GPUCommandGraphInspectorProps,
+	GPUCommandGraphInspectorSnapshot,
 	GPUCommandGraphNode,
 	GPUCommandGraphNodeCondition,
 	GPUCommandGraphNodeWorkloadEstimate,
@@ -87,6 +95,7 @@ export {
 	CompiledGPUCommandGraph,
 	GPUCommandGraph,
 	GPUCommandGraphEncoding,
+	GPUCommandGraphInspector,
 	GPUFFT1D,
 	GPUHistogram,
 	GPUReadbackRing,

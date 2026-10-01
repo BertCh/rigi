@@ -42,6 +42,10 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |
 | photoprep | fast | GPU photo prep path (`4 100000` args) | `src/lib/gpu/photoprep/photoprep.check.ts` |
 | photoprep-resident | fast | Photo prep residency: lazy CPU read, memo, pins, LRU, device mismatch (fake device) | `src/lib/gpu/photoprep/resident.check.ts` |
+| gpu-clear-lint | fast | ComputeGraph clear lint: the partial/atomic rule and the GPU-condition rule (same gate, command rewrite, unaudited nodes, whole clears) | `src/lib/gpu/core/clear-lint.check.ts` |
+| gpu-inspect | fast | graph inspection (`gpu/core/inspect.ts`, `inspector.ts`): stats / preflight / inspector-sample summary, observation through the upstream `GPUCommandGraphInspector`, `getGpuGraphProfile`, device-loss cleanup (fake device, no GPU) | `src/lib/gpu/core/inspect.check.ts` |
+| app-graph | fast | app graph manifest ↔ code: every `cachedGraph` group in `src/lib/gpu/**` and `src/lib/deck-webgpu/**` is declared in `gpu/app-graph/manifest.ts` and vice versa; island ids, unique ids, paths | `src/lib/gpu/app-graph/app-graph.check.ts` |
+| app-graph-table | fast | `research_notes/whole-app-graph-2026-10-01/islands.generated.md` matches the manifest (regenerate with `--write`) | `scripts/gpu/app-graph-table.ts --check` |
 | examples | fast | `examples/` type check (`scripts/examples.mjs check`) | `node scripts/examples.mjs check` |
 | ontology | fast | ontology layer: provenance axes, crosswalks | `src/lib/ontology/ontology.check.ts` (needs `public/photos/`) |
 | atlas | fast | `/atlas` graph data | `src/lib/atlas/atlas.check.ts` |

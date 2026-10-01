@@ -4,6 +4,12 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Graph inspection and app graph manifest (WAG W0.2, W0.3; 2026-10-01)
+
+- `gpu/core/inspect.ts` + `inspector.ts`: luma's `GPUCommandGraphInspector` (one per device) and the upstream preflight over every `cachedGraph`; `getGpuGraphProfile()` in `core/profile.ts` reports per-graph and per-node CPU encode / GPU p50 / p95, transient bytes, aliasing savings and the preflight fit. Opt-in (profiling on, or `/dev/graph` open); unobserved graphs encode as before.
+- `/dev/graph` (dev only): the page's live compute graphs per device, joined with the manifest; worker-realm modules are listed as remote.
+- `src/lib/gpu/app-graph/manifest.ts`: islands I0–I12 and the GPU modules (groups, resources, cadence, realm, readbacks), `registerIsland` for dynamic entries. Fast-tier checks `gpu-inspect`, `app-graph` (manifest ↔ `cachedGraph` groups) and `app-graph-table` (`research_notes/whole-app-graph-2026-10-01/islands.generated.md`, from `scripts/gpu/app-graph-table.ts`).
+
 ### Type system (2026-10-01)
 
 Review and open items: `reports/type-system-review-2026-10-01.md`.

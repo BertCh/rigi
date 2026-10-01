@@ -7,7 +7,7 @@
 // bindings), a ComputeGraph with a custom WGSL node feeding GPUReduction, timestamp profiling,
 // adoptRenderDevice, the worker profile protocol, the W0.1 wrapper widening (GPU indirect conditions
 // and their lint, an adopted graph + preflight, raw-node audit, texture bindings with copy / render /
-// frame passthroughs, listCachedGraphs), the W0.5 partial readback map, error checks (and their
+// frame passthroughs, listCachedGraphs), the W0.2 graph inspection, the W0.5 partial readback map, error checks (and their
 // cost), the idle release and device loss (last: they destroy the sidecar). Every GPU result is compared exactly with a CPU
 // computation.
 import { Buffer, type Device, luma, Texture } from "@luma.gl/core";
@@ -29,6 +29,7 @@ import {
 	type GraphTexture,
 	listCachedGraphs,
 } from "./graph";
+import { inspectGraphs } from "./inspect";
 import {
 	defineKernel,
 	dispatch,
@@ -53,7 +54,7 @@ import {
 	poolStats,
 	withLease,
 } from "./pool";
-import { getGpuProfile, resetGpuProfile } from "./profile";
+import { getGpuGraphProfile, getGpuProfile, resetGpuProfile } from "./profile";
 import { GpuValidationError } from "./queue";
 import {
 	readBack,
@@ -906,6 +907,69 @@ export async function coreSelftest(): Promise<{
 				list.every((e) => all.some((x) => x.graph === e.graph)) &&
 				cachedGraphCount(device, "selftest-cache") === 2,
 			list.map(({ key, id, compiled }) => ({ key, id, compiled })),
+		);
+	});
+
+	// W0.2 inspection: inspectGraphs() lists the cached graphs with their stats and preflight and starts
+	// observing them; an observed graph's run is bit-identical to the unobserved one, its encodes are
+	// recorded, and a profiled run's GPU node times reach the inspector and getGpuGraphProfile().
+	await run("graph-inspect", async () => {
+		const [e] = listCachedGraphs(device, "selftest-cache").filter(
+			(x) => x.key === "n=3000",
+		);
+		const n = 3000;
+		const once = async () => {
+			const pBuf = uniform(device, new Uint32Array([n]).buffer);
+			const r = await e.graph.run({ n }, { buffers: { params: pBuf } });
+			release(pBuf);
+			return r;
+		};
+		const before = await once();
+		const rows = inspectGraphs({ device }).filter(
+			(r) => r.group === "selftest-cache",
+		);
+		const row0 = rows.find((r) => r.key === "n=3000");
+		const after = await once();
+		const row1 = inspectGraphs({ device, observe: false }).find(
+			(r) => r.id === e.id,
+		);
+		let gpuTimed: boolean | null = null;
+		if (device.features.has("timestamp-query")) {
+			globalThis.__RIGI_GPU_PROFILE__ = true;
+			try {
+				const timed = await once();
+				const prof = (await getGpuGraphProfile()).find(
+					(p) => p.graph === e.id && p.device === device.id,
+				);
+				gpuTimed =
+					!!timed.timings &&
+					prof?.gpuMs !== undefined &&
+					prof.nodes.fill?.gpuMs !== undefined &&
+					sameBits(timed.reads.read[0], before.reads.read[0]);
+			} finally {
+				globalThis.__RIGI_GPU_PROFILE__ = undefined;
+				resetGpuProfile();
+			}
+		}
+		check(
+			"graph-inspect",
+			rows.length === 2 &&
+				!!row0 &&
+				row0.compiled &&
+				row0.nodeCount >= 2 &&
+				row0.preflight?.fitsDeviceLimits === true &&
+				row0.transient.logicalBufferBytes >= n * 4 &&
+				row0.encodings === 0 &&
+				row1?.encodings === 1 &&
+				(row1?.nodes.find((x) => x.id === "fill")?.cpu.samples ?? 0) === 1 &&
+				sameBits(after.reads.read[0], before.reads.read[0]) &&
+				gpuTimed !== false,
+			{
+				rows: rows.length,
+				transient: row0?.transient,
+				encodings: row1?.encodings,
+				gpuTimed,
+			},
 		);
 	});
 
