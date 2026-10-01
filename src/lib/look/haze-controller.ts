@@ -104,7 +104,9 @@ export class HazeController {
 				? { kind: "xyzr", data }
 				: { kind: "range", data, ray: (x, y) => geo.ray(x * STEP, y * STEP) };
 		const seq = ++this.seq;
-		if (o.bridged || lookGpuOn()) {
+		// lookgpu off: neither the bridge nor the GPU readback runs; the CPU fit below does
+		const bridged = lookGpuOn() ? o.bridged : undefined;
+		if (lookGpuOn()) {
 			const img = o.img;
 			const sky = this.sky;
 			const readback = () =>
@@ -120,15 +122,14 @@ export class HazeController {
 						sunDir: o.sunDir,
 					}),
 				);
-			const fitted = o.bridged
-				? o
-						.bridged({
-							geo: small,
-							sky,
-							fg: o.fg,
-							eyeAlt: o.eyeAlt,
-							sunDir: o.sunDir,
-						})
+			const fitted = bridged
+				? bridged({
+						geo: small,
+						sky,
+						fg: o.fg,
+						eyeAlt: o.eyeAlt,
+						sunDir: o.sunDir,
+					})
 						.catch((e) => {
 							console.warn("[haze] bridged fit failed, reading back", e);
 							return null;
