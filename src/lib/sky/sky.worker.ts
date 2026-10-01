@@ -166,12 +166,22 @@ async function segment(req: SkySegmentRequest) {
 			try {
 				const lw = inf?.width ?? (low as ModelRun).width;
 				const lh = inf?.height ?? (low as ModelRun).height;
-				// the model output stays on the GPU only when ORT runs on this very device
+				// the model output stays on the GPU only when ORT runs on this very device; when ORT kept
+				// its own device (model.ortDevice, attached), refine runs there instead of the shim
+				const shared = model?.sharedDevice === device.handle;
+				const refineDev =
+					inf?.gpuBuffer &&
+					!shared &&
+					model?.ortDevice &&
+					// ORT's device may carry default limits: its biggest refine buffer is ~16 B/px
+					model.ortDevice.limits.maxStorageBufferBindingSize >= W * H * 16
+						? model.ortDevice
+						: device;
 				const onDevice =
-					inf?.gpuBuffer && model?.sharedDevice === device.handle
+					inf?.gpuBuffer && (shared || refineDev !== device)
 						? inf.gpuBuffer
 						: undefined;
-				const out = await refineSkyGpu(device, {
+				const out = await refineSkyGpu(refineDev, {
 					W,
 					H,
 					rgba,

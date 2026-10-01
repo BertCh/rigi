@@ -25,10 +25,10 @@
 //
 // Every caller keeps its CPU twin: null means take the CPU path.
 
-import { type Device, luma } from "@luma.gl/core";
-import { webgpuAdapter } from "@luma.gl/webgpu";
+import type { Device } from "@luma.gl/core";
 import { getFlag } from "#/lib/flags";
 import { idleFor, touch } from "./lifecycle";
+import { attachWebGPUDevice } from "./luma";
 
 /** Optional WebGPU features the sidecar asks for (granted only if the adapter has them). */
 export const COMPUTE_FEATURES = [
@@ -187,45 +187,47 @@ async function create(): Promise<Device | null> {
 		return null;
 	}
 }
-function createSidecar(maxLimits: boolean): Promise<Device> {
-	return luma.createDevice({
-		id: "rigi-compute",
-		type: "webgpu",
-		adapters: [maxLimits ? maxLimitsAdapter() : webgpuAdapter],
-		powerPreference: "high-performance",
-		optionalFeatures: [...COMPUTE_FEATURES],
-	});
-}
 
 type RawAdapter = {
+	features: Set<string>;
 	limits: Record<string, unknown>;
-	requestDevice: (d?: { requiredLimits?: Record<string, number> }) => unknown;
+	requestDevice: (d?: {
+		requiredFeatures?: string[];
+		requiredLimits?: Record<string, number>;
+	}) => Promise<GPUDevice>;
 };
 type RawGpu = { requestAdapter: (o?: unknown) => Promise<RawAdapter | null> };
 
 /**
- * webgpuAdapter with requestDevice patched to ask for RAISED_LIMITS at the adapter's maximum.
- * luma 9.4 raises limits only for featureLevel "max", which would also request every feature.
+ * The sidecar: a raw requestDevice with COMPUTE_FEATURES (those the adapter has) and, with
+ * `maxLimits`, RAISED_LIMITS at the adapter's maximum, wrapped by WebGPUAdapter.attach. luma's own
+ * creation raises limits only for featureLevel "max", which would also request every feature.
+ * `_ownsHandle: true`: destroying the luma Device (idle release, reset) destroys the GPUDevice.
  */
-function maxLimitsAdapter(): typeof webgpuAdapter {
-	const a = Object.create(webgpuAdapter) as typeof webgpuAdapter;
-	(
-		a as unknown as {
-			requestGPUAdapter: (o: unknown) => Promise<RawAdapter | null>;
-		}
-	).requestGPUAdapter = async (options) => {
-		const gpu = (navigator as unknown as { gpu: RawGpu }).gpu;
-		const adapter = await gpu.requestAdapter(options);
-		if (!adapter) return null;
-		const want: Record<string, number> = {};
+async function createSidecar(maxLimits: boolean): Promise<Device> {
+	const gpu = (navigator as unknown as { gpu: RawGpu }).gpu;
+	const adapter = await gpu.requestAdapter({
+		powerPreference: "high-performance",
+		featureLevel: "core",
+	});
+	if (!adapter) throw new Error("Failed to request WebGPU adapter");
+	const requiredLimits: Record<string, number> = {};
+	if (maxLimits)
 		for (const k of RAISED_LIMITS) {
 			const v = adapter.limits[k];
-			if (typeof v === "number") want[k] = v;
+			if (typeof v === "number") requiredLimits[k] = v;
 		}
-		const request = adapter.requestDevice.bind(adapter);
-		adapter.requestDevice = (d) =>
-			request({ ...d, requiredLimits: { ...want, ...d?.requiredLimits } });
-		return adapter;
-	};
-	return a;
+	const handle = await adapter.requestDevice({
+		requiredFeatures: COMPUTE_FEATURES.filter((f) => adapter.features.has(f)),
+		requiredLimits,
+	});
+	try {
+		return await attachWebGPUDevice(handle, {
+			id: "rigi-compute",
+			_ownsHandle: true,
+		});
+	} catch (e) {
+		handle.destroy();
+		throw e;
+	}
 }

@@ -11,12 +11,26 @@
 // - Workarounds retired on the bump: ComputePass.setBindings is abstract (core/kernel.ts no longer
 //   duck-types it); Device.createComputePipelineAsync is native (#3204, core/kernel.ts kernelAsync);
 //   each WebGPUComputePipeline owns its bindings (core/kernel.ts no longer resets them).
-// - Still worked around: adapter limits are only raised with featureLevel "max" (which also
-//   requests every feature), so core/device.ts still patches requestDevice on the adapter;
-//   Buffer.readAsync on a non-MAP_READ buffer still stages per call, so core/readback.ts keeps its
+// - #3312 (props.requiredLimits) and #3313 (WebGPUAdapter.attach) retired the requestDevice patch:
+//   core/device.ts requests the device itself (features + RAISED_LIMITS) and wraps it with
+//   attachWebGPUDevice below; sky/model.ts attaches ORT's device the same way.
+// - Still worked around: Buffer.readAsync on a non-MAP_READ buffer still stages per call, so core/readback.ts keeps its
 //   own MAP_READ slots.
 // - GPUReadbackRing has fixed-size slots; core/readback.ts implements the same ticket pattern with
 //   grow-on-demand slots (re-exported here for callers with a fixed readback size).
+
+import type { Device, DeviceProps } from "@luma.gl/core";
+import { webgpuAdapter } from "@luma.gl/webgpu";
+
+/**
+ * Wraps an app-created GPUDevice as a luma Device (WebGPUAdapter.attach, luma #3313). Call the
+ * adapter directly, not luma.attachDevice. `_ownsHandle: true` makes Device.destroy() destroy the
+ * GPUDevice (releaseWhenIdle relies on it); false (default) leaves it alive, for ORT's device.
+ */
+export const attachWebGPUDevice = (
+	handle: GPUDevice,
+	props: DeviceProps = {},
+): Promise<Device> => webgpuAdapter.attach(handle, props);
 
 export type {
 	GPUCommandGraphComputeExecutable,

@@ -4,6 +4,7 @@
 import { _LayersPass, Deck, project } from "@deck.gl/core";
 import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
+import { RAISED_LIMITS } from "#/lib/gpu/core/device";
 import { adoptRenderDevice } from "#/lib/gpu/device";
 
 /** Features the renderer cannot run without: rgba32float geometry targets and r32float height
@@ -20,6 +21,51 @@ export const OPTIONAL_FEATURES = [
 	"shader-f16",
 	"subgroups",
 ] as const;
+
+/**
+ * Features luma's featureLevel "max" used to request implicitly (every adapter feature) that the
+ * renderer, deck.gl or luma's loaders may rely on: block-compressed textures (tiles3d / KTX2),
+ * depth32float-stencil8, depth-clip-control, indirect-first-instance, bgra8unorm-storage,
+ * clip-distances, dual-source-blending. Requested when the adapter has them, so dropping "max"
+ * for 'core' + requiredLimits changes limits only, not features. Audit 2026-10-01: src/ itself
+ * branches only on float32-filterable, timestamp-query, subgroups, shader-f16 (in OPTIONAL_FEATURES);
+ * the rest is for deck/luma internals.
+ */
+export const IMPLICIT_MAX_FEATURES = [
+	"texture-compression-bc",
+	"texture-compression-bc-sliced-3d",
+	"texture-compression-etc2",
+	"texture-compression-astc",
+	"texture-compression-astc-sliced-3d",
+	"depth32float-stencil8",
+	"depth-clip-control",
+	"indirect-first-instance",
+	"bgra8unorm-storage",
+	"clip-distances",
+	"dual-source-blending",
+] as const;
+
+/**
+ * Render-device limits that 'max' raised: maxTextureArrayLayers (2048 on Apple vs 256 in 'core',
+ * the height arrays) plus the compute RAISED_LIMITS, read from an adapter requested with the
+ * options luma uses for 'core'. Empty when no adapter is available (luma then fails on its own).
+ */
+export async function renderRequiredLimits(): Promise<Record<string, number>> {
+	const out: Record<string, number> = {};
+	try {
+		const a = await (navigator as { gpu?: GPU }).gpu?.requestAdapter({
+			powerPreference: "high-performance",
+			featureLevel: "core",
+		} as GPURequestAdapterOptions);
+		if (!a) return out;
+		const lim = a.limits as unknown as Record<string, unknown>;
+		for (const k of ["maxTextureArrayLayers", ...RAISED_LIMITS]) {
+			const v = lim[k];
+			if (typeof v === "number") out[k] = v;
+		}
+	} catch {}
+	return out;
+}
 
 export type Availability =
 	| { ok: true; adapter: string }
@@ -92,9 +138,10 @@ export async function createRenderDevice(
 		type: "webgpu",
 		adapters: [webgpuAdapter],
 		powerPreference: "high-performance",
-		// every adapter limit (maxTextureArrayLayers 2048 on Apple vs 256 in 'core')
-		featureLevel: "max",
-		optionalFeatures: [...OPTIONAL_FEATURES],
+		// 'core' + explicit limits (maxTextureArrayLayers 2048 on Apple vs 256 in 'core'; luma #3312)
+		featureLevel: "core",
+		requiredLimits: await renderRequiredLimits(),
+		optionalFeatures: [...OPTIONAL_FEATURES, ...IMPLICIT_MAX_FEATURES],
 		createCanvasContext: {
 			canvas,
 			useDevicePixels:
@@ -135,6 +182,7 @@ export async function createWebgpuDeck(
 		throw new Error(
 			"deck.gl was bundled with the `visgl:webgl-only` condition; serve with scripts/deck-webgpu/vite.webgpu.config.ts",
 		);
+	const requiredLimits = await renderRequiredLimits();
 	let settled = false;
 	let resolve!: (d: Device) => void;
 	let reject!: (e: Error) => void;
@@ -170,8 +218,9 @@ export async function createWebgpuDeck(
 			type: "webgpu",
 			adapters: [webgpuAdapter],
 			powerPreference: "high-performance",
-			featureLevel: "max",
-			optionalFeatures: [...OPTIONAL_FEATURES],
+			featureLevel: "core",
+			requiredLimits,
+			optionalFeatures: [...OPTIONAL_FEATURES, ...IMPLICIT_MAX_FEATURES],
 			...(props.deviceProps as object | undefined),
 		},
 		onError: (e: Error) => {

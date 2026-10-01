@@ -3,6 +3,7 @@
  * in a browser worker (WebGPU → WASM) and in node (the package's node build,
  * CPU/WASM), so the eval script exercises exactly the same code.
  */
+import type { Device } from "@luma.gl/core";
 import * as ort from "onnxruntime-web";
 import { type ModelRun, modelSize, normalise, resamplePlanes } from "./core";
 
@@ -33,6 +34,18 @@ export interface SkyModel {
 	 * session then keeps its output on the GPU (inferSkyModel's `gpuBuffer`).
 	 */
 	sharedDevice?: GPUDevice;
+	/**
+	 * ORT's own device, attached to luma (`_ownsHandle: false`: ORT keeps ownership), when the shared
+	 * device was not taken because ORT had already initialised on another one. The output then stays
+	 * on this device (inferSkyModel's `gpuBuffer`) and refine runs on it; the compute shim stays primary.
+	 */
+	ortDevice?: Device;
+}
+
+/** ORT's GPUDevice when its WebGPU EP has already created one (else undefined). */
+function initialisedOrtDevice(): Promise<GPUDevice> | GPUDevice | undefined {
+	const d = Object.getOwnPropertyDescriptor(ort.env.webgpu, "device");
+	return d && "value" in d && d.value ? d.value : undefined;
 }
 
 /**
@@ -112,10 +125,29 @@ export async function createSkyModel(
 				backend === "webgpu" && opts.device
 					? await shareOrtDevice(opts.device)
 					: false;
+			// ORT already runs on another device (not the caller's): attach it for refine (luma #3313),
+			// ORT keeps ownership. Needs its device now, before the session, to keep the output on the GPU.
+			let attached: Device | undefined;
+			if (backend === "webgpu" && opts.device && !shared) {
+				try {
+					const g = await initialisedOrtDevice();
+					if (g && g !== opts.device) {
+						const { attachWebGPUDevice } = await import("#/lib/gpu/core/luma");
+						attached = await attachWebGPUDevice(g, {
+							id: "rigi-ort",
+							_ownsHandle: false,
+						});
+					}
+				} catch (e) {
+					console.warn("[sky] could not attach ORT's device", e);
+				}
+			}
 			const session = await ort.InferenceSession.create(bytes, {
 				executionProviders: [backend],
 				graphOptimizationLevel: "all",
-				...(shared && { preferredOutputLocation: "gpu-buffer" as const }),
+				...((shared || attached) && {
+					preferredOutputLocation: "gpu-buffer" as const,
+				}),
 			});
 			const ortDevice = shared
 				? await (ort.env.webgpu as unknown as { device?: unknown }).device
@@ -127,6 +159,7 @@ export async function createSkyModel(
 				backend,
 				sharedDevice:
 					shared && ortDevice === opts.device ? opts.device : undefined,
+				ortDevice: attached,
 			};
 		} catch (e) {
 			lastErr = e;
