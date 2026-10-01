@@ -104,6 +104,8 @@ async function compare(
 		emu?: EmulateOptions;
 		verifyAll?: boolean;
 		maxCpu?: number;
+		overlap?: boolean;
+		random?: () => number;
 	} = {},
 ) {
 	const yawRange = o.yawRange ?? 25;
@@ -134,6 +136,8 @@ async function compare(
 				// the check audits more than the app (8 per call): 64 EVAL + 32 EVAL2 intervals per call
 				audit: verifyAll ? 1e6 : 64,
 				maxCpuDecisions: o.maxCpu,
+				overlap: o.overlap,
+				random: o.random,
 			});
 		},
 	);
@@ -381,7 +385,47 @@ for (const c of reals) {
 		total.certAccepts + total.certRejects + total.ties + total.unbounded;
 	const cpu = total.ties + total.unbounded;
 	console.log(
-		`note totals: ${dec} decisions; certified ${total.certAccepts + total.certRejects} (accept ${total.certAccepts}, reject ${total.certRejects}): f32 ${total.certAccepts + total.certRejects - total.tier2Decided}, df32 re-check ${total.tier2Decided} (${((100 * total.tier2Decided) / Math.max(1, dec)).toFixed(2)}%); CPU tie path ${cpu} (${((100 * cpu) / Math.max(1, dec)).toFixed(3)}%: ties ${total.ties}, unbounded ${total.unbounded}); start halts ${total.starts}, window halts ${total.windows}; submits ${total.submits}; GPU evals f32 ${total.evals} df32 ${total.tier2Evals}; CPU evals ${total.cpuEvals} (audited ${total.audited}, forced re-decisions ${total.forced}, verified ${total.verified})`,
+		`note totals: ${dec} decisions; certified ${total.certAccepts + total.certRejects} (accept ${total.certAccepts}, reject ${total.certRejects}): f32 ${total.certAccepts + total.certRejects - total.tier2Decided}, df32 re-check ${total.tier2Decided} (${((100 * total.tier2Decided) / Math.max(1, dec)).toFixed(2)}%); CPU tie path ${cpu} (${((100 * cpu) / Math.max(1, dec)).toFixed(3)}%: ties ${total.ties}, unbounded ${total.unbounded}); start halts ${total.starts}, window halts ${total.windows}; submits ${total.submits}; GPU evals f32 ${total.evals} df32 ${total.tier2Evals}; CPU evals ${total.cpuEvals} (audited ${total.audited}, forced re-decisions ${total.forced}, verified ${total.verified}); exact-score CPU ${total.exactMs.toFixed(0)} ms, ${total.overlapMs.toFixed(0)} ms of it (${((100 * total.overlapMs) / Math.max(1e-9, total.exactMs)).toFixed(0)}%) while a submit was in flight (${total.prewarmed} forced decisions prewarmed)`,
+	);
+}
+
+// ---------------- overlap: prewarming the forced re-decisions changes nothing but timing ----------------
+{
+	const s = synthetic();
+	const prior: Pose = { yaw: 124, pitch: 0, roll: 0, vfov: 41 };
+	const seeded = () => {
+		let x = 0x2545f491;
+		return () => {
+			x ^= x << 13;
+			x ^= x >>> 17;
+			x ^= x << 5;
+			return (x >>> 0) / 2 ** 32;
+		};
+	};
+	const on = await compare("overlap on", prior, s.aspect, s.dirs, s.edge, {
+		overlap: true,
+		random: seeded(),
+	});
+	const off = await compare("overlap off", prior, s.aspect, s.dirs, s.edge, {
+		overlap: false,
+		random: seeded(),
+	});
+	const keys = [
+		"cpuEvals",
+		"audited",
+		"forced",
+		"verified",
+		"submits",
+	] as const;
+	check(
+		"overlap: identical result and identical exact-score work with prewarming on and off",
+		same(on.ref, on.got) &&
+			same(off.ref, off.got) &&
+			same(on.got, off.got) &&
+			keys.every((k) => on.st[k] === off.st[k]) &&
+			on.st.prewarmed > 0 &&
+			off.st.prewarmed === 0,
+		`on: prewarmed ${on.st.prewarmed} of ${on.st.forced} forced, ${on.st.overlapMs.toFixed(1)} of ${on.st.exactMs.toFixed(1)} ms exact CPU in flight; off: ${off.st.exactMs.toFixed(1)} ms; ${keys.map((k) => `${k} ${on.st[k]}/${off.st[k]}`).join(", ")}`,
 	);
 }
 

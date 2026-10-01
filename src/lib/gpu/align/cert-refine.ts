@@ -426,6 +426,11 @@ export type CertStats = {
 	forced: number;
 	/** ms awaiting the runner */
 	runMs: number;
+	/** ms in exact f64 scores (ctx.f), and the part of it spent while a submit was in flight */
+	exactMs: number;
+	overlapMs: number;
+	/** forced decisions whose exact scores were computed while the next submit ran (prewarm) */
+	prewarmed: number;
 };
 
 export const newCertStats = (): CertStats => ({
@@ -445,6 +450,9 @@ export const newCertStats = (): CertStats => ({
 	audited: 0,
 	forced: 0,
 	runMs: 0,
+	exactMs: 0,
+	overlapMs: 0,
+	prewarmed: 0,
 });
 
 /** Decides which certified decisions to re-check on the CPU (true: re-check). */
@@ -477,7 +485,30 @@ export type CertRefineOptions = {
 	 * a decision with a larger margin does not lean on the slack. Default 0.25.
 	 */
 	nearFraction?: number;
+	/**
+	 * Compute the exact scores of the forced re-decisions found so far while the next submit runs
+	 * (default true). It only fills the exact-score memo that the final re-decision reads, so the
+	 * result and every check are the same with it off; it hides CPU time behind GPU time.
+	 */
+	overlap?: boolean;
 };
+
+/**
+ * Resolve after the pending microtasks (a runner's lease and submit) and one macrotask turn: a
+ * MessageChannel message, which browsers do not clamp the way they clamp nested setTimeout(0).
+ */
+function yieldToRunner(): Promise<void> {
+	if (typeof MessageChannel === "undefined")
+		return new Promise((r) => setTimeout(r, 0));
+	return new Promise((r) => {
+		const ch = new MessageChannel();
+		ch.port1.onmessage = () => {
+			ch.port1.close();
+			r();
+		};
+		ch.port2.postMessage(0);
+	});
+}
 
 /** Thrown when the GPU's trace is not a valid Descent trace (a GPU error, not a precision issue). */
 export class CertTraceError extends Error {}
@@ -603,7 +634,9 @@ export async function certifiedRefine(
 		const k = probeKey(p, fine);
 		let v = exact.get(k);
 		if (v === undefined) {
+			const t = performance.now();
 			v = ctx.f(p, fine);
+			st.exactMs += performance.now() - t;
 			st.cpuEvals++;
 			exact.set(k, v);
 		}
@@ -636,6 +669,8 @@ export async function certifiedRefine(
 	const auditF = new Float32Array(b.audit.buffer);
 	const auditI = new Int32Array(b.audit.buffer);
 	const forced = new Set<string>();
+	// forced decisions whose exact scores are not computed yet (prewarm's queue), by lane
+	const forcedQueue: string[] = [];
 	const collectAudit = () => {
 		for (let l = 0; l < nLanes; l++) {
 			const n = b.u32[l * LANE_WORDS + L.auditN];
@@ -658,8 +693,11 @@ export async function certifiedRefine(
 					const cHi = auditF[o + 9];
 					const margin = decision === 1 ? lo - cHi : cLo - hi;
 					const near = margin < nearFrac * Math.max(hi - lo, cHi - cLo);
-					if (near || (tier === 2 && decision === 1))
-						forced.add(`${l}:${fine}:${(flags >>> 16) & 63}:${slot}`);
+					const key = `${l}:${fine}:${(flags >>> 16) & 63}:${slot}`;
+					if ((near || (tier === 2 && decision === 1)) && !forced.has(key)) {
+						forced.add(key);
+						forcedQueue.push(key);
+					}
 				}
 				const t = tier === 2 ? 1 : 0;
 				const e: Entry = {
@@ -679,6 +717,44 @@ export async function certifiedRefine(
 			auditSeen[l] = n;
 		}
 	};
+	/**
+	 * While a submit runs: the exact scores (neighbour and current best, at the f64 replay's poses) of
+	 * the forced decisions collected so far. Each lane's move log up to now is a prefix of its final
+	 * log, and a decision already made sees the same poses in a replay of any longer prefix (replayTrace
+	 * is deterministic in the log), so these are the very f() calls the final re-decision makes; it
+	 * finds them memoized. Nothing is decided here: an error is left to the final replay.
+	 */
+	const overlap = opts.overlap ?? true;
+	const prewarm = (log: Uint32Array, nLog: number[]) => {
+		const evals0 = st.exactMs;
+		const byLane = new Map<number, Set<string>>();
+		for (const key of forcedQueue) {
+			const l = Number(key.slice(0, key.indexOf(":")));
+			const set = byLane.get(l) ?? new Set<string>();
+			byLane.set(l, set);
+			set.add(key);
+		}
+		forcedQueue.length = 0;
+		for (const [l, keys] of byLane)
+			try {
+				replayTrace(
+					starts[l],
+					vfov0,
+					log,
+					l * LOG_CAP,
+					nLog[l],
+					(fine, iter, j, best, nb) => {
+						if (!keys.has(`${l}:${fine}:${iter}:${j}`)) return;
+						f(nb, fine === 1);
+						f(best, fine === 1);
+						st.prewarmed++;
+					},
+				);
+			} catch {
+				// the final replay reports a malformed trace
+			}
+		st.overlapMs += st.exactMs - evals0;
+	};
 	for (let submit = 0; ; submit++) {
 		let running = 0;
 		for (let l = 0; l < nLanes; l++)
@@ -695,7 +771,19 @@ export async function certifiedRefine(
 			b.u32[l * LANE_WORDS + L.plan2Count] = 0;
 		}
 		const t0 = performance.now();
-		await opts.runner.run(b, rounds, slack);
+		if (overlap && forcedQueue.length) {
+			// the log as of this submit's start (the runner replaces b.log when it returns)
+			const nLog = Array.from(
+				{ length: nLanes },
+				(_, l) => b.u32[l * LANE_WORDS + L.nLog],
+			);
+			const log = b.log.slice();
+			const pending = opts.runner.run(b, rounds, slack);
+			// let the runner reach its submit before the CPU work (a GPU runner awaits only its readback)
+			await yieldToRunner();
+			prewarm(log, nLog);
+			await pending;
+		} else await opts.runner.run(b, rounds, slack);
 		st.runMs += performance.now() - t0;
 		st.submits++;
 		st.rounds += rounds;
@@ -800,7 +888,9 @@ export async function certifiedRefine(
 			roll: latticeAngle(lat, "roll", e.c[2]),
 			vfov: latticeAngle(lat, "vfov", e.c[3]),
 		};
+		const t = performance.now();
 		const v = ctx.f(pose, e.fine);
+		st.exactMs += performance.now() - t;
 		st.cpuEvals++;
 		st.audited++;
 		if (!(e.lo <= v && v <= e.hi)) throw new RefineBoundViolation(v, e.hi);
