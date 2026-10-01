@@ -39,10 +39,10 @@
 // identical), so no new blind verification is needed. The frozen rule files (tools/bench/t5/
 // RULE_FROZEN*, split.json) are only read.
 //
-// What it cannot cover today: the fused / product-rule arm (matcher service) needs the render worker's
-// "render" command, which the WebGPU engine does not implement (renderPoseView), and the app arm on
-// photos without a heading asks for full terrain (loadFullTerrain, deck only): on webgpu those rows run
-// on the initial terrain in both modes (recorded as fullTerrainUnsupported) and are still compared.
+// Full terrain: the app arm on photos without a heading asks for it (loadFullTerrain). Both engines
+// implement it since WAG3 (WebGpuEngine.loadFullTerrain / renderPoseView), so webgpu rows run on the
+// 360° terrain like deck; a row is recorded as fullTerrainUnsupported only when the engine lacks the hook.
+// The fused / product-rule arm (matcher service, the worker's "render" command) is not run by this gate.
 //
 // Output: <out>/{base,cand}/ (harness results), <out>/summary.json, <out>/summary.md.
 // Exit: 0 PASS, 1 FAIL, 3 INCONCLUSIVE, 2 usage / setup.

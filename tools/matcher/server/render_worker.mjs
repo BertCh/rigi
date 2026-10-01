@@ -35,23 +35,24 @@
 //   The page is opened at /photo/<id> with Playwright request interception only (no app code is
 //   changed): the photos.json module gets the ad-hoc PhotoMeta appended, /photos/<id>.jpg serves
 //   photoFile and /photos/<regionId>.json serves the region (empty if none).
-//   "fullTerrain": true refines the terrain all around the eye (DeckEngine.loadFullTerrain) and
+//   "fullTerrain": true refines the terrain all around the eye (engine.loadFullTerrain) and
 //   re-traces the 360° horizon, once per page: needed for any yaw search beyond the prior wedge.
 // Everything else (logs) goes to stderr.
 //
 // Engine (2026-10-01): pages open on ?renderer=deck (WebGL, deterministic; the three.js PhotoEngine this
-// worker was written for was removed). The views come from DeckEngine's offscreen hooks
-// (src/lib/deck/engine.ts loadSatellite / renderPoseView / loadFullTerrain) and keep the three.js output
+// worker was written for was removed). The views come from the engine's offscreen hooks
+// (loadSatellite / renderPoseView / loadFullTerrain, src/lib/renderer.ts; DeckEngine and, since WAG3,
+// WebGpuEngine) and keep the three.js output
 // contract: <tag>_xyz.f32 = W×H×3 float32 ENU metres in the photo's EnuFrame(lat, lon, 0), row 0 = top,
 // 0,0,0 = sky, W×H = 1024 px on the long side; <tag>_sat.jpg = the satellite drape at W×H, canvas JPEG
 // q 0.92, haze 0.6, sky #b9cde0.
 //
 // Page flags (environment; unset = the behaviour above, unchanged). For gates that must run the app under
 // an opt-in flag, e.g. the certified-f32 precision gate (scripts/gpu/precision-gate.mjs):
-//   MATCHER_RENDERER=deck|webgpu|auto   the ?renderer= the pages open on (default deck). webgpu has no
-//                                       renderPoseView / loadFullTerrain: "render" fails there, and an
-//                                       "align" / "edges" with fullTerrain keeps the initial terrain
-//                                       (meta.fullTerrainUnsupported: true).
+//   MATCHER_RENDERER=deck|webgpu|auto   the ?renderer= the pages open on (default deck). Both engines
+//                                       implement renderPoseView / loadFullTerrain / loadSatellite; an
+//                                       engine without loadFullTerrain (an older build) keeps the initial
+//                                       terrain on "fullTerrain" (meta.fullTerrainUnsupported: true).
 //   MATCHER_HORIZON_PRECISION=f64|certified-f32   → ?horizonPrecision= (src/lib/flags)
 //   MATCHER_ALIGN_PRECISION=f64|certified-f32     → ?alignPrecision=
 // Every reply's meta carries pageFlags (what the page was opened with, the engine that ran from
@@ -333,13 +334,13 @@ async function openPage(id, adhoc = null, key = id) {
 }
 
 // Load the tiles outside the initial wedge and re-trace the 360° horizon (once per page). null: the engine
-// has no loadFullTerrain (MATCHER_RENDERER=webgpu); the page keeps its initial terrain.
+// has no loadFullTerrain (an engine build without the hook); the page keeps its initial terrain.
 async function ensureFullTerrain(page) {
 	return page.evaluate(async () => {
 		const e = window.__engine;
 		if (typeof e.loadFullTerrain !== "function") return null;
 		if (e.__benchFullTerrain) return 0;
-		// DeckEngine: 360° high-detail wedge, query terrain = the complete set, 360° horizon re-traced
+		// 360° high-detail wedge, query terrain = the complete set, 360° horizon re-traced
 		const ms = await e.loadFullTerrain();
 		e.__benchFullTerrain = true;
 		return ms;
@@ -754,9 +755,10 @@ async function renderOnce(req) {
 	const drape = await page.evaluate(
 		async ({ limit }) => {
 			const e = window.__engine;
-			// DeckEngine.loadSatellite: fetch the tiles in range, re-fetch failed ones (2 retries). The
-			// textures upload when renderPoseView builds its layers, and its readback waits for the GPU, so
-			// texUpload (policy t6's forced upload) has nothing left to do.
+			// engine.loadSatellite: fetch the tiles in range, re-fetch failed ones (2 retries). The
+			// textures upload when renderPoseView builds its layers (WebGPU: it waits for the imagery
+			// array's pending uploads), and its readback waits for the GPU, so texUpload (policy t6's
+			// forced upload) has nothing left to do.
 			const draped = !e.__matcherSat;
 			const r = await e.loadSatellite(limit, 2);
 			e.__matcherSat = true;
