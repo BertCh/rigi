@@ -107,6 +107,22 @@ Source: [luma-deck-upstream-2026-10-01.md](luma-deck-upstream-2026-10-01.md). Ea
 | U3 | **Upstream contributions** (report §4): deck WebGPU origin fixes (`getGLViewport` y, pick `scissorY`, picker readback flip, `depth24plus`, `project.wgsl` orientation `select` bug); deck LayersPass clear/depth control and `deck.finalize()` destroying its own device; a review comment on #10740 (stale `@math.gl/core` import); luma `mapAndReadAsync` and `CommandEncoder.clearBuffer`; luma packaging (`patch:` dependency, `~9.4` peer ranges); `Model.draw` `firstInstance` and mipmap `submit` inside a pass; WGSL `&&`/`||` and uniform alignment checks; gpgpu clear/readback graph nodes; support for #3312 and #3313 | None blocking. Not started (posting upstream needs the user's direct OK) |
 | U4 | **Weather and lake water** (upstream-review items called U3/U4 in the report): luma precipitation port and `terrain.albedo.water` → `LOOK_WATER` | Opt-in, deck world view for weather. **Landed 2026-10-01** (5c02363, `style.world.weather`) |
 
+## Whole-app graph (WAG, 2026-10-01)
+
+Source: [whole-app-graph-plan.md](whole-app-graph-plan.md) (evidence in `research_notes/whole-app-graph-2026-10-01/`). Goal: every GPU island runs as a compiled luma graph, islands on the page device fuse per cadence, ingest feeds resident resources once, and one manifest plus the inspector shows the whole app. Rules:
+- WebGPU only; WebGL stays a CPU-crossing fallback.
+- CPU twins stay the reference.
+- Plumbing changes are BIT.
+- Any precision change waits on decision P1.
+
+| # | Item | Gate / state |
+|---|---|---|
+| WAG-0 | Foundations: `ComputeGraph` widening (GPU conditions, adopt an external graph, raw-node clear lint, workload/preflight, render/copy/texture passthroughs); inspector + `/dev/graph`; app graph manifest; **luma rigi.2 = rigi.1 + #3328** (clean on `rigi-vendor`; revertible patch layer, WebGL-guarded); readback "copy capacity, map exact"; post-default re-baseline (`measured-data.md` §5) | selftest, layout, benches BIT. Not started |
+| WAG-1 | Same-device fusions: photoprep planes resident → align (lazy CPU copy); fewer settle submits (masks + band stats in the query encoder; the query keeps its 90 ms debounce); drawIndirect with GPU terrain culling first; VRAM aliasing (350–398 MiB today, target ≤250). Measure first: haze overflow rate, and the sky worker's 67 ms (likely ORT inference, not recoverable). The silhouette GPU score moved under P1 | BIT + Δms/Δbytes/ΔVRAM per item. Not started |
+| WAG-2 | Ingest: DemStore (decode once per realm), `gpu/ingest` adapters + `TextureArrayAtlas`, GPU Terrarium decode (f32-exact), lazy `getCpuHeights`, `GeoTIFFSourceLoader` for `swiss-cog.ts`, `SplatV1Loader` + SPZ/KSPLAT import | Node BIT on heights; `?concord=occl` identical. Not started |
+| WAG-3 | Device consolidation: horizon and eye on the page device over resident heights; align rounds GPU-driven with a certified f32 compare | Needs P1. Not started |
+| WAG-4 | Semantics + upstream: `GPUProgram` lowerings for scalar/vector stages; upstream asks (clear contract, read node, per-run scalars, public `GPUScalar`, texture program values, compute-hash fix) | Posting needs the user's direct OK |
+
 ## Parked
 
 - Multi-photo fusion as a product goal.

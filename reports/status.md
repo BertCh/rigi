@@ -53,6 +53,7 @@
 6. **Completion provenance:** reuse `generated`, or add a new code (which needs the `isMeasurable` allow-list fix)?
 7. **Funding:** one GEN3C rented-GPU run; gated downloads for completion P1 (3DB, SAM 3D).
 8. ~~3D Tiles in Step Inside~~: answered 2026-09-29. US billing; rendering accepted; swisstopo first. Built behind `?tiles3d=` ([step-inside-google-3d-tiles.md](step-inside-google-3d-tiles.md), roadmap S3). Open: T2 (tiles into the split) and the official Google logo before any public URL.
+9. **Whole-app graph** ([whole-app-graph-plan.md](whole-app-graph-plan.md) §5): P1 precision policy for the f64 CPU stages (recommended: certified f32 per stage, horizon first); P2 photo rasterisation parity (defer); P3 WebGL as a CPU-crossing fallback (recommended); P4 vendor luma #3328 before it merges (recommended).
 
 ## Housekeeping
 

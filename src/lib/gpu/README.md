@@ -6,6 +6,7 @@ separate "compute sidecar". When the renderer itself runs on WebGPU (the deck-we
 render device instead, so they share one queue and can read render targets without a copy.
 Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the first workstreams) and
 `research_notes/gpu_next_2026-09-30.md` (the shared core layer and the move toward luma/deck "next").
+Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, readback and device crossing in the app, and the phases toward one manifest-described set of graphs fed by `gpu/ingest`.
 
 ## Layers
 

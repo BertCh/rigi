@@ -25,7 +25,10 @@ This sweep follows `luma-deck-upstream-2026-10-01.md`. The goal is to express th
 2. **The gpgpu "compiler" stack is already in our build.**
    - It is the `jarnevon/*` branches, about 25 of them dated 09-11.
    - Those branches are closed. Their content was squashed into master as #3233, #3237 and #3250, and then into alpha.2, so it is in rigi.1.
-   - `@luma.gl/gpgpu` already exports `GPUProgram`, `GPUProgramCompiler`, `GPUScalar*`, `GPUValueArena`, `GPUConditionalOperation`, `GPULoopOperation`, `GPUIncrementalExecution`, `GPUCommandGraphAutotuner` and `GPUCommandGraphInspector`.
+   - `@luma.gl/gpgpu` already exports `GPUProgram`, `GPUProgramCompiler`, `GPUConditionalOperation`, `GPULoopOperation`, `GPUIncrementalExecution`, `GPUCommandGraphAutotuner` and `GPUCommandGraphInspector`.
+   - **Correction (API audit, same day):** `GPUScalar`, `GPUValueArena` and the dispatch gate are *internal*. They can only be reached through a `GPUProgramCompiler` compilation.
+   - GPU conditions work on compute nodes only. The graph has no clear or read nodes.
+   - See [whole-app-graph-plan.md](whole-app-graph-plan.md) §1 and `research_notes/whole-app-graph-2026-10-01/upstream-api.md`.
    - The next level for us is *using* these. There is nothing new to vendor for them.
 3. **Exactly one upstream change is worth vendoring now: luma #3328, `Model` drawIndirect.**
    - It lets a draw take a GPU-resident instance count.
@@ -49,9 +52,9 @@ When upstream lacks something (texture-valued program values, our clear lint and
 |---|---|---|---|---|
 | 1 | Model drawIndirect | luma #3328 (10-01, open) | **ADOPT-NOW: vendor as rigi.2** | Replaces CPU instance counts at `deck-webgpu/layers/splats.ts:765`, `trail.ts:328` and `batched-terrain.ts:731`. Opt-in, +136 lines in `model.ts`. API may change before merge. WebGL asserts. |
 | 2 | GPUCommandGraphInspector + preflight (`fitsDeviceLimits`, workload bounds) | already in rigi.1 | **ADOPT-NOW** | Whole-app graph introspection. Extends `graph.ts` stats and `profile.ts`. Low risk. |
-| 3 | GPU-side node conditions (`condition:{source:'gpu',mode:'indirect'}`, `GPUScalarDispatchGate`) | rigi.1 | PROTOTYPE | Removes CPU decision trips: the haze head-overflow tail (`look/haze-graph.ts:37-43`) and the solve `foldBlocks` (`solve/graph.ts:236`). Kernels are unchanged, so results should stay bit-identical. |
+| 3 | GPU-side node conditions (`condition:{source:'gpu',mode:'indirect'}`; compute nodes only) | rigi.1 | PROTOTYPE | Our `KernelNode.condition` type blocks them today (WAG W0.1). Sketches show a GPU condition alone does *not* remove the haze overflow round trip: the copy size is still CPU-fixed, so it needs "copy capacity, map exact" (W0.5). The solve fold needs an exact TwoSum compare plus a per-device probe. |
 | 4 | Render and copy nodes in the same graph | rigi.1 | PROTOTYPE | Our wrapper only exposes `addComputePass` (`graph.ts:362`). Look pipeline first, with aliased transients. Deck still owns the frame. |
-| 5 | GPUScalar / GPUValueArena for small results | rigi.1 | PROTOTYPE | For example the haze arg-min (`hazeFitTail`). Re-check NaN/tie semantics against the CPU twin. |
+| 5 | GPUScalar / GPUValueArena for small results | rigi.1 (internal, only via `GPUProgramCompiler`) | WATCH | Not exported. Program literals are baked at compile time, so there are no per-run inputs. An upstream ask (WAG-4). |
 | 6 | GPUProgram with Rigi lowerings | rigi.1 | PROTOTYPE | Gives an operation tree and lowering report for the whole app. Limits: 1-D vectors and scalars only, no textures, and loops are unrolled up to `maximumIterations`. |
 | 7 | Deck `_onFrameTimings` (per-pass GPU timestamps) | deck #10778 (10-01) | PROTOTYPE | Clean onto our deck base, and additive. Needs the `timestamp-query` feature on the render device. |
 | 8 | GeoTIFF raster loader (numeric bands + geodetic metadata) | loaders #4088 (merged 09-30, unreleased) | PROTOTYPE | Could replace the hand-rolled range reads in `concord/occl/swiss-cog.ts:98-115`, with a float raster going to an `r32float` texture. COG range/overview support is unproven. |

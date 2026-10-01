@@ -19,7 +19,7 @@ Self-test: `node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/core-selft
 | `profile.ts` | Opt-in GPU timestamp profiling (`globalThis.__RIGI_GPU_PROFILE__ = true`) and `getGpuProfile()`, including the GPU workers' reports |
 | `realm.ts` | The page → worker protocol for the profiling / error-check switches, and the worker → page profile report. Import-light (no luma runtime) |
 | `lifecycle.ts` | `untilLost`, `onLost` and the activity counters behind the idle release. No luma runtime |
-| `graph.ts` | `ComputeGraph`, a thin wrapper over `GPUCommandGraph` for multi-pass pipelines with GPU-resident intermediates |
+| `graph.ts` | `ComputeGraph`, a thin wrapper over `GPUCommandGraph` for multi-pass pipelines with GPU-resident intermediates. Upstream has GPU indirect conditions (compute nodes only), render and copy nodes, texture transients, preflight and `GPUCommandGraphInspector`; this wrapper doesn't expose them yet (WAG W0.1). The clear lint, `readNode` and `cachedGraph` have no upstream equivalent. Audit: `research_notes/whole-app-graph-2026-10-01/upstream-api.md` |
 | `selftest.ts` | `coreSelftest()` for the browser, which exercises all of the above against CPU results |
 
 ## API (exact signatures)
