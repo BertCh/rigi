@@ -46,6 +46,7 @@ import { ATM_CURV } from "#/lib/look/atmosphere";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
 import type { harmonizeValues } from "#/lib/look/composite";
 import type { ReliefField } from "#/lib/look/relief/field";
+import { WATER_WGSL } from "#/lib/look/water/water";
 import {
 	type DeckTerrainStyle,
 	deckTerrainStyle,
@@ -532,6 +533,8 @@ export type TerrainStyleFeatures = {
 	relief: boolean;
 	tanaka: boolean;
 	atmosphere: boolean;
+	/** LOOK_WATER on top of the alpine tint */
+	water: boolean;
 };
 
 /** Photo view colour pass only (0 elsewhere, see styleUniforms). After every derivative. */
@@ -558,8 +561,13 @@ const LINES = /* wgsl */ `\
 function baseWGSL(style: TerrainStyleName, ft: TerrainStyleFeatures) {
 	const lit = style === "hillshade" || style === "imagery";
 	if (lit) {
+		const grad =
+			"s.dElev / max(length(abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy)), 1e-3)";
+		const alpine = `ts_alpine_albedo(s.elev, n, s.enu.xy, ${grad})`;
 		const albedo = ft.alpine
-			? "ts_alpine_albedo(s.elev, n, s.enu.xy, s.dElev / max(length(abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy)), 1e-3))"
+			? ft.water
+				? `ts_water_shade(${alpine}, s.elev, s.enu.xy, ${grad}, n, normalize(camera.eye - s.enu), s.range)`
+				: alpine
 			: "hypso(s.elev)";
 		const shaded = ft.relief
 			? "ts_relief_shade(albedo, n, s.enu, s.range)"
@@ -672,6 +680,7 @@ export function terrainStyleWGSL(
 	return [
 		COMMON_WGSL,
 		lit && ft.alpine ? ALPINE_WGSL : "",
+		lit && ft.alpine && ft.water ? WATER_WGSL : "",
 		style === "contours" && ft.tanaka ? TANAKA_WGSL : "",
 		style === "slopeClass" ? SLOPE_CLASS_WGSL : "",
 		ft.relief && (lit || style === "elevation") ? RELIEF_WGSL : "",
@@ -692,6 +701,7 @@ export function styleFeatures(
 			(lit || style === "elevation") && d.has("LOOK_RELIEF") && !!look.rel,
 		tanaka: style === "contours" && d.has("LOOK_TANAKA"),
 		atmosphere: lit && d.has("LOOK_ATMOSPHERE") && !!look.atm,
+		water: lit && d.has("LOOK_ALPINE") && d.has("LOOK_WATER"),
 	};
 }
 

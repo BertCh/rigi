@@ -13,7 +13,8 @@ export type LookDefine =
 	| "LOOK_REFINE"
 	| "LOOK_RELIEF"
 	| "LOOK_SLOPE"
-	| "LOOK_TANAKA";
+	| "LOOK_TANAKA"
+	| "LOOK_WATER";
 
 /** Sorted, duplicate-free define list; `lookKey(s).join()` is a stable cache key ('' = classic). */
 export function lookKey(s: ViewStyle): LookDefine[] {
@@ -27,6 +28,10 @@ export function lookKey(s: ViewStyle): LookDefine[] {
 		[s.composite.refine, "LOOK_REFINE"],
 		[s.terrain.relief.mode === "swiss", "LOOK_RELIEF"],
 		[s.overlay.contours.kind === "tanaka", "LOOK_TANAKA"],
+		[
+			s.terrain.albedo.mode === "alpine" && s.terrain.albedo.water,
+			"LOOK_WATER",
+		],
 	];
 	return on.filter(([b]) => b).map(([, d]) => d);
 }

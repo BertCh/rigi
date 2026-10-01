@@ -323,7 +323,12 @@ export async function runTerrainStylesCheck(
 		for (let m = 0; m < 8; m++)
 			combos.push([
 				style,
-				{ alpine: !!(m & 1), relief: !!(m & 2), atmosphere: !!(m & 4) },
+				{
+					alpine: !!(m & 1),
+					relief: !!(m & 2),
+					atmosphere: !!(m & 4),
+					water: m === 1,
+				},
 			]);
 	combos.push(
 		["contours", {}],
@@ -340,6 +345,7 @@ export async function runTerrainStylesCheck(
 			...(ft.relief ? ["LOOK_RELIEF"] : []),
 			...(ft.tanaka ? ["LOOK_TANAKA"] : []),
 			...(ft.atmosphere ? ["LOOK_ATMOSPHERE"] : []),
+			...(ft.water ? ["LOOK_WATER"] : []),
 		] as DeckTerrainStyle["defines"];
 		return {
 			...L,
