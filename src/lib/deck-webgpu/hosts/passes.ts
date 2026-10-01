@@ -135,6 +135,45 @@ export function runColorPass(o: {
 	renderPass.end();
 }
 
+/**
+ * Build the interactive (1×) pipelines of `cores`' colour layers ahead of the first drag: each
+ * core draws once into a tiny reduced scratch target, one core per `yieldIdle` slice, so no slice
+ * holds more than one layer's pipeline builds. The output is discarded. `stale()` aborts (an
+ * interaction began, the host went away); models drawn here are the cached 1× variants.
+ */
+export async function prewarmReducedColor(o: {
+	device: Device;
+	cores: readonly GpuLayerCore[];
+	geometry: GeometryTargets;
+	scratch: ColorTargets;
+	view: CameraPose;
+	frameView: FrameState["view"];
+	yieldIdle: () => Promise<void>;
+	stale: () => boolean;
+}) {
+	o.scratch.setReduced(true);
+	const frame: FrameState = {
+		frame: -1,
+		time: performance.now(),
+		view: o.frameView,
+	};
+	for (const c of o.cores) {
+		if (!c.passes.includes("color")) continue;
+		await o.yieldIdle();
+		if (o.stale()) return false;
+		runColorPass({
+			device: o.device,
+			cores: [c],
+			geometry: o.geometry,
+			color: o.scratch,
+			view: o.view,
+			frame,
+		});
+		o.device.submit();
+	}
+	return true;
+}
+
 export function runOffscreenPasses(o: {
 	device: Device;
 	cores: readonly GpuLayerCore[];

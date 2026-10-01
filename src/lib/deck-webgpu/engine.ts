@@ -182,6 +182,7 @@ import type { Host, HostStats } from "./hosts/direct";
 import {
 	type CameraPose,
 	camerasFor,
+	prewarmReducedColor,
 	runColorPass,
 	runGeometryPass,
 	runScreenPass,
@@ -213,7 +214,13 @@ import {
 	tiles3dCoreOptions,
 } from "./layers/tiles3d";
 import { createTrailCore, type TrailCore } from "./layers/trail";
-import type { FrameState, GpuLayerCore, PassContext, PassKind } from "./pass";
+import {
+	type FrameState,
+	type GpuLayerCore,
+	modelEpoch,
+	type PassContext,
+	type PassKind,
+} from "./pass";
 import { PresentCore, type PresentMode } from "./present";
 import { SilhouetteMaskGpu } from "./silhouette-gpu";
 import { ColorTargets, GeometryTargets, geometrySize, USAGE } from "./targets";
@@ -505,6 +512,10 @@ export class WebGpuEngine implements Renderer {
 	private interactive = false;
 	private lastInputAt = Number.NEGATIVE_INFINITY;
 	private idleTimer = 0;
+	/** scheduleWarm: pass.ts modelEpoch the 1× pipelines were last built for. */
+	private warmedEpoch = -1;
+	private warmTimer = 0;
+	private warming = false;
 	private listeners = new Set<() => void>();
 	private wedgeTimer = 0;
 	private disposed = false;
@@ -980,8 +991,61 @@ export class WebGpuEngine implements Renderer {
 			if (!host || this.disposed || this.lost) return;
 			if (s === "all") this.counters.framesAll++;
 			else this.counters.framesScreen++;
-			void host.nextFrame(s).then(() => this.emit());
+			void host.nextFrame(s).then(() => {
+				this.emit();
+				this.scheduleWarm();
+			});
 		});
+	}
+
+	/**
+	 * Build the interactive 1× colour pipelines once a full frame is up (and again when pass.ts
+	 * modelEpoch says the layer set / a shader variant changed), so the first drag does not stall
+	 * on pipeline creation. luma 10 alpha.2 only compiles async for Models created under
+	 * beginAsyncCompilation, which the layers' draw-time creation cannot use; this runs sync, one
+	 * layer per idle slice, into an 8×8 scratch target (nothing visible, no extra frame).
+	 */
+	private scheduleWarm() {
+		if (this.disposed || this.lost || this.warming) return;
+		if (this.warmedEpoch === modelEpoch()) return;
+		clearTimeout(this.warmTimer);
+		this.warmTimer = window.setTimeout(() => void this.prewarm(), 400);
+	}
+
+	private async prewarm() {
+		const host = this.host;
+		if (!host || this.disposed || this.lost || this.warming) return;
+		if (this.interactive) return; // inputIdle's "all" frame re-arms it
+		this.warming = true;
+		const epoch = modelEpoch();
+		let scratch: ColorTargets | null = null;
+		try {
+			scratch = new ColorTargets(host.device, 8, 8, "rigi-prewarm");
+			const done = await prewarmReducedColor({
+				device: host.device,
+				cores: host.cores,
+				geometry: host.geometry,
+				scratch,
+				view: host.view,
+				frameView: host.frameView,
+				yieldIdle: () =>
+					new Promise<void>((r) =>
+						typeof requestIdleCallback === "function"
+							? requestIdleCallback(() => r(), { timeout: 500 })
+							: setTimeout(r, 16),
+					),
+				stale: () =>
+					this.disposed || this.lost || this.interactive || this.host !== host,
+			});
+			// the epoch read before the pass: models it created at 4× (none) would re-arm
+			if (done) this.warmedEpoch = epoch;
+		} catch (e) {
+			this.warmedEpoch = epoch; // a failing layer must not loop; first drag builds lazily
+			console.warn("[webgpu-engine] prewarm failed", e);
+		} finally {
+			scratch?.destroy();
+			this.warming = false;
+		}
 	}
 
 	onRender(cb: () => void) {
@@ -1197,6 +1261,7 @@ export class WebGpuEngine implements Renderer {
 		clearTimeout(this.statsTimer);
 		clearTimeout(this.lookTimer);
 		clearTimeout(this.idleTimer);
+		clearTimeout(this.warmTimer);
 		clearTimeout(this.wedgeTimer);
 		cancelAnimationFrame(this.worldRaf);
 		this.loadAbort.abort();

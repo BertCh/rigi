@@ -344,7 +344,7 @@ buffers, the MSAA colour target, the per-size geometry targets).
   readback. Pipelines bake the sample count, so `pass.ts` `ModelCache` keeps one Model per
   (key, sample variant): `runColorPass` sets `setColorSamples(1)` while recording and
   `passModelProps("color")` reads it; both variants live side by side, created lazily on first
-  use (the first drag pays one pipeline build per colour layer). The look (`scheduleLook`) is
+  use (`engine.scheduleWarm` builds them on idle, 400 ms after a full frame and whenever `pass.ts modelEpoch` changes: one layer per idle slice drawing into an 8×8 scratch target; luma 10 alpha.2's async compile only covers Models created under `beginAsyncCompilation`, which draw-time creation cannot use). The look (`scheduleLook`) is
   already debounced past the drag. Exports and `renderOffscreen` use fresh targets, always 4×.
 - **Full-resolution export** allocates a 4× MSAA rgba16float target at photo size (hundreds of MB
   at 12 MP, as the WebGL renderImage). Tile it via the camera offset.

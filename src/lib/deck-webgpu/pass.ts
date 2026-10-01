@@ -96,6 +96,13 @@ export const RIGI_WGSL_ASSEMBLER = new WGSLShaderAssembler();
  * MSAA_SAMPLES, so geometry / screen models and everything created elsewhere are unaffected.
  */
 let colorSamples = MSAA_SAMPLES;
+
+/**
+ * Bumped when a MSAA-variant Model is created or any cache is invalidated: the layer set (or a
+ * shader variant) changed, so the interactive 1× variants may be missing (engine prewarm).
+ */
+let modelEpochN = 0;
+export const modelEpoch = () => modelEpochN;
 export function setColorSamples(n: number) {
 	colorSamples = n;
 }
@@ -191,12 +198,14 @@ export class ModelCache {
 		if (!m) {
 			m = make();
 			this.models.set(k, m);
+			if (colorSamples === MSAA_SAMPLES) modelEpochN++;
 		}
 		return m;
 	}
 
 	/** Drop models whose key starts with `prefix` (e.g. after a shader define change). */
 	invalidate(prefix = "") {
+		modelEpochN++;
 		for (const [k, m] of this.models)
 			if (k.startsWith(prefix)) {
 				m.destroy();
