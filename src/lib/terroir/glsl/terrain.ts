@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terroir terrain shading (reports/terroir-cartography.md T0.2, T0.3, phase 1 "three-colour contours"
 // + "replace alpineAlbedo's constants with a class lookup", T2.1/T2.5/T2.6 in part). One GLSL source
 // for both engines (deck terrain-layer.ts, three materials.ts), spliced into the terrain fragment

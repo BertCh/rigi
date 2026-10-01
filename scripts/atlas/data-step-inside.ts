@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Eye-height numbers for the atlas page /atlas/step-inside: the EXIF GPS altitude of each bundled demo photo against the
  * DEM ground under it (both already measured by scripts/atlas/build-data.ts, read back from public/demo/atlas/<id>.json),

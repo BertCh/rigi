@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // What is in view: coarse-grid statistics of the visible terrain (elevation range, land-cover classes
 // present). Pure over a sampler so it checks in node; the Legend throttles it to ~2 Hz.
 import type { CoverGrid } from "../pack";

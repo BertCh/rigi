@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser-side concordance display pass (WP-F DSM occluder), run by PhotoWorkspace once the pose is
 // FINAL (after the second opinion) and only under ?concord=occl. Display-only: it never touches pose,
 // confidence, pins, benchmarks or exports' measurements (it only calls Renderer.setOccluder). At LOW

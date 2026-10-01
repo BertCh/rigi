@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 /** Fades and lifts its children in the first time they scroll into view. */

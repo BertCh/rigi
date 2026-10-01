@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Top-3 picker (roadmap R4): pure candidate maths, no DOM / three.js. Node-testable
 // (src/lib/picker/candidates.check.ts).
 //

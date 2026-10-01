@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 // Small dense linear algebra for the solvers: row-major number[][] (n ≤ 12) and, for the
 // Cholesky routines, flat row-major Float64Array.

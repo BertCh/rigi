@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Baseline georeferencing pass over img/*.HEIC:
  *   EXIF + Apple gravity → prior camera → Terrarium DEM horizon → overlay.

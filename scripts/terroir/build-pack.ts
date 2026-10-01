@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terroir pack builder (reports/terroir-cartography.md §4 phase 1). Contract: src/lib/terroir/types.ts.
 //   npx tsx scripts/terroir/build-pack.ts --id thunersee --bbox 7.35,46.45,8.25,46.95 --name "Thunersee · Bernese Oberland"
 // Env: TERROIR_CACHE = download cache dir (default ~/.cache/rigi/terroir). Everything is fetched by node at build time.

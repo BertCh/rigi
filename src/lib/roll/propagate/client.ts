@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Client for the relative-rotation service (tools/nearfield/propagate/service.py, default :8769).
 // Like matcher-client.ts: degrades to `false` / an error string when the service isn't running; never throws.
 //

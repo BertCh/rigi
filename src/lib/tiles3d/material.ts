@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The one tile material of Step Inside 3D Tiles (three.js ShaderMaterial; deck-layer.ts ports the same
 // fragment logic). Tiles replace their glTF materials with it on load (tiles.ts):
 //   · texture (Google, unlit photogrammetry) or a flat colour with derivative-normal shading

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // npx tsx scripts/ontology/doc.ts — regenerate reports/ontology.md from src/lib/ontology.
 import { writeFileSync } from "node:fs";
 import { renderOntologyDoc } from "../../src/lib/ontology/doc";

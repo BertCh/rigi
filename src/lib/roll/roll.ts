@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Camera roll → rolls: group photos into areas (a roll) and spots (a viewpoint), and give each
 // photo the best pose we have without running a solver: the user's saved pose, the hand-fitted
 // ground truth for the bundled photos, else the EXIF prior (compass + gravity + lens).

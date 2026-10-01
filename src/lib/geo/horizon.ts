@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { destination, EARTH_R, REFRACTION_K } from "../geodesy";
 import type { TerrainSampler } from "./terrain";
 

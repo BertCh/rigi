@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Many photos projected onto the terrain at once: the roll map's drape.
 //
 // terrain-layer.ts drapes ONE photo inside its uber-shader. This layer is drawn over a normal

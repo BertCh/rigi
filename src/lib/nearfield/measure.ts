@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // "Measure anything" (reports/step-inside-design.md): the hover readout on near-field objects.
 //
 // For a pixel the split classed Object, the position comes from the anchored near field itself: the

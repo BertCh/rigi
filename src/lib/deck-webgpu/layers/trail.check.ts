@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // In-browser isolation check for layers/trail.ts (no lab, no region data). Renders synthetic
 // segments through the real colour pass (hosts/passes.ts runColorPass: 4× MSAA rgba16float,
 // reversed-Z, resolve) next to an opaque occluder wall, reads the resolve back and checks:

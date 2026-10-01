@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU-side inputs of the photo-prep kernels that come from align.ts's own float expressions, evaluated
 // here with the CPU's code so the kernels only ever compare integers against them.
 import { stopHasBand } from "#/lib/align";

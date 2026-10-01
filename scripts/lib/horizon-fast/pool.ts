@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Splits azimuth sectors across workers. The main thread loads tiles and
  * snaps peaks, then per sector copies just the wedge of each ring mosaic

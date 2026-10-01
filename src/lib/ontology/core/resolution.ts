@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // L3: resolution policies. When several estimates of one thing exist (a photo's saved, ground-truth,
 // solved and prior poses), WHICH wins depends on the context, not on a global ranking of sources:
 // in evaluation ground truth is an oracle and must never be shown; a "saved" pose is a person's

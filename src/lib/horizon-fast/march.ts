@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Fast CPU horizon: per azimuth, an incremental march in Web-Mercator pixel
  * space over per-ring Float32 mosaics, with max-mipmap block skipping.

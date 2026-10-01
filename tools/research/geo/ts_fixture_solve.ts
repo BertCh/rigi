@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GEO parity harness, TS side: run Agent B's GA1 solveMap (src/lib/geocam/map) on "geocam-map-fixture/1"
 // JSON fixtures and write the result next to each fixture as <name>.ts.json for gtsam_ref.py to compare.
 // Read-only use of src/**; the fixture format is documented in gtsam_ref.py's header.

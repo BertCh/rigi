@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GA1 Laplace covariance at the MAP solution.
 //
 //   Σ = (Σ_f JᵀW J)⁻¹ over the free parameters, W = a·ψ(z) (thinning × IRLS weight at the solution),

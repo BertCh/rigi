@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Peak labels on a 2D canvas (engine.exportImage), fed by ViewStyle.labels (styling.md §2.5).
 // 'classic' is drawPeakLabels; 'panorama' / 'inline' lay out at the export size (layout.ts) and
 // draw like the SVG overlay (PeakLabelsSvg.tsx).

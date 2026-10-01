@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The roll map's basemap presets: what the terrain under the drapes looks like. The muted / dark
 // ones exist so the draped photos stand out: same satellite tiles, desaturated and dimmed through
 // the terrain shader's imagery adjust (ViewStyle ImageryAdjust, LOOK imgAdj).

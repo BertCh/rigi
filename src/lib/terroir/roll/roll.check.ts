@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for the terroir roll/site furniture. Run: npx tsx src/lib/terroir/roll/roll.check.ts
 import {
 	fmtScale,

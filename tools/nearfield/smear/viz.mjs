@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Visual check of one smear grid: photo + label outlines (yellow, dashed = unsure) + per-cell drape state.
 //   red    draped onto terrain with the feature ON (smear left, or ordinary terrain drape where unlabelled: faint)
 //   green  draped OFF, masked ON (removed by the split)

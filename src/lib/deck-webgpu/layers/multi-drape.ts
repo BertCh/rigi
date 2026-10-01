@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The roll map's many-photo drape on WebGPU: the port of roll/map/multi-drape-layer.ts
 // (MultiDrapeLayer + DrapeTileLayer) to a host-agnostic GpuLayerCore (README.md "Layer contract").
 // /roll is its own deck stack and ignores the renderer flag; this core exists for when /roll moves

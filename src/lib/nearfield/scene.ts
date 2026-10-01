@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Scene builder: depth (+ optional service cloud) + the solved renderer pose → NearFieldScene in ENU.
 // Pure TS; the renderer is only read through a structural subset of src/lib/renderer.ts Renderer.
 // Placement: the range-dependent anchor curve (anchor.ts) for every model sample, overridden per object by the DEM

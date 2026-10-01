@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Automatic pose refinement: aligns the photo's detected skyline with the
  * DEM horizon profile. GPS position is held fixed; we solve yaw, pitch,

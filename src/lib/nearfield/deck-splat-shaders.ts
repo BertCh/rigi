@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GLSL for DeckSplatLayer (deck-splat-layer.ts): 3D Gaussians as instanced screen-space quads with
 // EWA covariance projection, premultiplied alpha and the terrain's LOGARITHMIC depth convention
 // (deck/terrain-layer.ts: depth = log2(1 + clip.w) * logDepthFC, logDepthFC =

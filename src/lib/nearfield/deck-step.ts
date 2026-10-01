@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside for the deck backend (DeckEngine.enterStepInside): the pieces three's engine.ts builds
 // inline for its step view.
 //   stepMasks()     the drape mask while stepping (Object pixels that splats really cover, so from the

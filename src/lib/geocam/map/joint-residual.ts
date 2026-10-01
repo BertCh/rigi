@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Cue residual primitives the MAP solver's factors are built on. Moved verbatim from the concord joint
 // solver (src/lib/concord/solve/joint.ts, WP-D), which was removed on 2026-09-30 as a negative result
 // (reports/negative-results.md); only the pieces geocam uses are kept. JOINT_DEFAULTS keeps the joint

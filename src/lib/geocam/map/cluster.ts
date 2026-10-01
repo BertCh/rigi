@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Spatially correlated DEM error for far evidence (GA1; the "all-far ⇒ eye unobserved" criterion).
 //
 // A DEM error that is common to a patch of terrain (a ridge, a tile, the smoothing of a coarse zoom

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // window.__* debug / harness hooks (dev probes, Playwright scripts, the console). All optional: most are
 // set only under import.meta.env.DEV. Hooks whose payload is an ad-hoc object are typed unknown.
 import type { Pose } from "./lib/camera";

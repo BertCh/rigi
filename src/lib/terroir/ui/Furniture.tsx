@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // T0.9 Furniture for the photo views: a compass ribbon across the top (headings through the solved
 // pose), a sun / time chip ("15:39 · 228° / 38°", the photo's own clock), and range ticks at the right
 // edge (distance to the terrain at the image centre column). World mode: only the sun / time chip,

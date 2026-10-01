@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // PEAKFIX peak detection (tools/research/peakfix/PROTOCOL.txt). One detector for both sides:
 // local maxima of a 1D profile with windowed topographic prominence and parabolic sub-sample refinement.
 // World side: the apparent skyline el(az) from an eye (EyeHorizon, 0.05° bins, −90 = no data), so the

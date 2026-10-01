@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { useNavigate } from "@tanstack/react-router";
 import { Maximize2, Minus, Plus, Search, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";

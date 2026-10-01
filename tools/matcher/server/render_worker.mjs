@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Long-lived render worker for the matcher service (tools/matcher/server/app.py).
 //
 // Vendored from ../render.mjs (read-only there): same app-driven render (window.__engine on

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // node: npx tsx src/lib/terroir/viz/viz.check.ts
 import { strict as assert } from "node:assert";
 import { FIXTURE_COVER, FIXTURE_PACK } from "../__fixtures__/pack";

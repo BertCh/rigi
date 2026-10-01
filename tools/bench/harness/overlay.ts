@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Verification overlay: photo + DEM skyline at a pose + top OSM peak labels + a text header.
  *

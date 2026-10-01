@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Roll-spot harness (Step Inside P2): drives the real /roll map in headless Chrome, builds the spot with
 // the fast path (src/lib/nearfield/roll: /multiview DA3 posed → DEM-anchored per-photo lifts → voxel
 // merge) and writes everything the offline leave-one-out comparison needs (tools/nearfield/roll/loo.py):

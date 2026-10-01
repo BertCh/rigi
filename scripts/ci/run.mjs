@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Rigi regression gate (roadmap N1). One runner, two tiers:
 //   fast  no browser, no dev server: tsc, biome (per-file ratchet), every node/tsx unit check.
 //   full  fast + the browser checks (style-baseline = classic / concord-off pixel parity, deck smoke,

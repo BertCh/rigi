@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Near ground around the photo fix (WP-B): DEM height at a horizontal ENU offset (dE, dN) in metres
 // from the GPS fix, the `ground` callback that pose6dof/eye.ts (refineEyeFromSkyline) and the eye
 // priors in ./altitude.ts take. Same vertical datum as the DEM (Mapterhorn: metres above mean sea level).

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { type RefObject, useEffect, useRef, useState } from "react";
 
 /** True once (or while, with `once: false`) the element is on screen. */

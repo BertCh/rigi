@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // In-browser isolation check for layers/composite.ts (no lab, no terrain, no region data).
 // Writes a synthetic scene straight into the foundation targets — geometry (range 1000 m left,
 // 20 km right of a vertical depth jump, sky above row SKY_ROWS) and a premultiplied colour layer —

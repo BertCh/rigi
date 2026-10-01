@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node check for the terroir label helpers: `npx tsx src/lib/terroir/labels/labels.check.ts`
 //  - declutter, reach filter, dedupe against the engine's peaks, typography per class, peakTier
 //  - peak tiers: pack backfill, tier hints reach the panorama layout and the classic layout

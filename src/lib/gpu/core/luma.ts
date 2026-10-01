@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The ONE module that imports @luma.gl/gpgpu/gpu-core. That subpath is experimental in luma 9.4
 // (no semver promise, WebGPU only), so everything else in the repo imports these names from here,
 // and a luma bump touches this file only.

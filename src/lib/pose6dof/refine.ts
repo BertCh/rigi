@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Generic LM refinement of the eye position (and optionally rotation / vfov) against a
 // caller-supplied residual callback — e.g. skyline residuals from re-rendering the horizon at a
 // shifted eye (near-field cliff-edge photos). Numeric forward/central-difference Jacobian, Huber IRLS,

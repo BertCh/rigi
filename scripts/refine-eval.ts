@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Evaluates the alternative refinement (src/lib/refine) against the baseline
  * solver (src/lib/geo/solve.ts) on the photos in data/ground-truth.json.

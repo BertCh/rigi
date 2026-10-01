@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Core shared by the /baseline and unknown-pose workers: DEM → terrain → eye → 360° horizon, and the
  * solvePose → refinePose cascade. Policy (DEM, tile loader, timeouts, solver options) stays with the caller.

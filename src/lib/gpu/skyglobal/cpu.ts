@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU twin (and reference) of tools/matcher/stage1/skyglobal.py: the T6 stage-1 skyline global
 // search. A line-by-line port that reproduces numpy's arithmetic, including the parts that decide
 // ties:

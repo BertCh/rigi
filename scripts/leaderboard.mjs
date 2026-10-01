@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Rigi leaderboard: one command that answers "are we state of the art yet?"
  *

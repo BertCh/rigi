@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * High-level single-thread entry: tiles → mosaics → snapped peaks → march.
  * HorizonPool (pool.ts) does the same across workers.

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // T3.1 "Read this view" place card + T3.3 line-of-sight profile. Tap (not drag) the photo: the card
 // reads the terrain under the pixel through the geometry buffer (elevation, range, slope, aspect), the
 // pack (cover class, lithology, glacier extents, nearest names) and the capture-time sun (does the

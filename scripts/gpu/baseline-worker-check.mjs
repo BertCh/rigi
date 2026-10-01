@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // /baseline's pipeline worker: Auto-align poses with the CPU cascade (solveGpu off) vs the GPU coarse
 // grid (solveGpu on), headless Chromium against a dev server on this tree. Drives the real worker
 // (src/baseline-ui/pipeline.worker.ts) with the messages BaselinePage sends: run, skyline (800 px),

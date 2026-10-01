@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Photo-camera queries on a TerrainSet: eye altitude, peak snapping and occlusion-tested peak labels.
 
 import * as THREE from "three";

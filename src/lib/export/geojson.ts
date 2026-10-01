@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GeoJSON (RFC 7946) for a solved photo: camera point, view ray, horizontal FOV wedge, visible
 // peak labels, and an optional ground footprint sampled through a pixel→geo function.
 import { EARTH_R } from "../geodesy";

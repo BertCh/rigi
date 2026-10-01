@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Camera-roll mode: many photos of one area, viewed together as a mosaic and draped on terrain.
 // Contract shared by the roll data layer (roll.ts), the mosaic UI and the map (roll-map.ts).
 

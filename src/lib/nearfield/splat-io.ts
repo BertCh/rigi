@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Gaussian cloud (de)serialisation: the ".splat-v1" wire format shared with the Python service
 // (tools/nearfield) and a minimal reader for standard 3DGS binary .ply files. Pure TS, no DOM.
 //

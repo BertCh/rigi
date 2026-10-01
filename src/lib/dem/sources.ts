@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terrarium-encoded DEM tile services (h = R·256 + G + B/256 − 32768).
 import type { TileKey } from "./tiles";
 

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // IEEE-754 binary64 arithmetic in u32 integer operations: the JS twin of ./softf64.wgsl.ts, line for
 // line (same function names, same statements, `>>> 0` where WGSL's u32 arithmetic wraps). It exists so
 // node can run exactly what the kernels compute (./emulate.ts, ./photoprep.check.ts); the app never

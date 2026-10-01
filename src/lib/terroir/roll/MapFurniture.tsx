@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Map furniture for the north-up plan maps (terroir T0.9): a scale bar and a north arrow, bottom
 // left, in the same chip style as the maps' credit lines. Used by RollMiniMap and the landing
 // TopoBoard (both web-mercator, north up). `bearing` rotates the arrow for a map that can turn.

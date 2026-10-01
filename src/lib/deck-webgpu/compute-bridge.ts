@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Render targets → look compute, on the GPU (no render → CPU → upload round trip).
 //
 // The look passes of the WebGPU engine used to read their inputs back from the GPU first:

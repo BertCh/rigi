@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside controls on the stage (bottom-left): the 'Step inside' button (disabled with a reason),
 // the status chip ([data-nearfield-status]), the Truth toggle and, while stepping, 'Back to photo'.
 // Renders nothing while the near-field service is down, so the classic view is untouched.

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU twin of look/haze-fit.ts fitHaze. The GPU (haze.wgsl.ts) does the per-pixel work (photo
 // resample, depth edges, dilations, log-range bins), the per-bin 1st / 9th percentiles (exact order
 // statistics by radix select, replacing the CPU's sorts), the representative pixel lists and the

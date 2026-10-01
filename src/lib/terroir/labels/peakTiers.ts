@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Peak label hierarchy by prominence class (style.terroir.peakTiers, reports/terroir-cartography.md
 // T0.4): major ×1.25 / 700, peak ×1 / 600, minor ×0.86 / 500 (classes.ts NAME_TYPO). Prominence the
 // OSM extract lacks is backfilled from the terroir pack's swissNAMES3D peak class (name + distance).

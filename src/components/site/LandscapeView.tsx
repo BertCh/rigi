@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { Maximize2, Minimize2, Smartphone } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 

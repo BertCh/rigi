@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Distance / image-radius bands used by every concordance report.
 import type { DistanceBand, RadiusBand } from "./types";
 

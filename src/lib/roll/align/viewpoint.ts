@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Viewpoint consistency: photos taken from one spot (a roll viewpoint) within minutes of each other
 // share the phone's compass error, which is dominated by a slowly varying bias (hard-iron /
 // calibration state, the way the phone is held). So once one photo at a spot is anchored to the

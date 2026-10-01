@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Engine-aware placement of the terroir pack's names for NamesSvg: project, drop the occluded and
 // out-of-reach, drop peaks the engine already labels, rank, and declutter against each other and the
 // peak labels' screen rects. Returns render items (anchor text, text-on-path, glyphs).

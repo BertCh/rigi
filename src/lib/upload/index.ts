@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser upload path: File → EXIF prior + upright JPEG → PhotoMeta (same as ingest.mjs) →
 // OSM region → IndexedDB. See out/lead/upload/API.md.
 

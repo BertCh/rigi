@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Split a projected polyline into drawable runs: a run breaks at points that are behind the camera,
 // absurdly far off-screen, or flagged hidden (terrain in front). Closed rings merge the run across
 // the seam.

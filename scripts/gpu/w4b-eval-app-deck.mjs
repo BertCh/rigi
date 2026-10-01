@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // scripts/eval-app.mjs on the deck backend: the same control-point scoring of the app's load-time
 // auto-alignment, on /photo/<id>?renderer=deck&terrain=<mode> for each terrain mode (tiles, batched),
 // so the two terrain paths can be compared photo by photo. Photos run a few at a time (not all 19 at

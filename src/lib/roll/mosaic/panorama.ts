@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Panorama math: warp a photo through its camera model onto a cylindrical azimuth × elevation
 // canvas (x = true azimuth, y = elevation, both degrees, equal scale). Each photo becomes a
 // subdivided mesh whose vertices are the rays of a (u, v) grid, so roll rotates the image about

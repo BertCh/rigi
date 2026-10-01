@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Self-check of the hand-written kernel binding layouts (no GPU, no browser): imports every module
 // under src/lib/gpu and src/lib/deck-webgpu that calls defineKernel (through tsx), then reflects each registered spec's WGSL
 // with luma's getShaderLayoutFromWGSL (@luma.gl/webgpu 10.0.0-alpha.2, a thin wrapper of

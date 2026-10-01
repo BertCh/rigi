@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // swisstopo approximate WGS84 <-> LV95 formulas (accuracy ~1 m) and small geometry helpers. No deps.
 export type LonLat = [number, number];
 

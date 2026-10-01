@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU reference for solvePose's coarse stage (src/lib/geo/solve.ts coarseStage, "Coarse: small-angle
 // grid over (dYaw, dPitch)"): the exact score of one yaw row, the whole-grid twin and the selection of
 // seeds / coarse winner / ambiguity.

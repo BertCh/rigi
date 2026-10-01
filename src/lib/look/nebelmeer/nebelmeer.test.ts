@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Synthetic check for the Nebelmeer: the analytic transmittance vs numeric quadrature, the off
 // state as identity, and the style → values path.
 // Run: npx tsx src/lib/look/nebelmeer/nebelmeer.test.ts   (exits 1 on failure)

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser check of the ?picker=on top-3 picker + tap-a-peak (src/lib/picker/README.md).
 // Usage (dev server on :3100, under the render lock):
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/picker-check.mjs IMG_6958 out/picker/6958 [deck|webgpu|auto]

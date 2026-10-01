@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GA1 MAP solve: priors + image factors, outer re-linearisation of eye-dependent predictors, Laplace
 // covariance at the solution (reports/geometry-first-pose.md G3; plan §1 map/solve.ts).
 //

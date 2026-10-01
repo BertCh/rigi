@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Hook smoke test for the opt-in GPU look passes (scripts/gpu/look-bench.mjs --fn lookSmoke
 // --query "lookgpu=1&style=…"): waits for the engine's async results to land and summarises them,
 // so a run with lookgpu=1 can be compared with one without (the CPU path).

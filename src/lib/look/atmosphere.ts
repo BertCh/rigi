@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Aerial perspective for terrain renders (CPU side; the GLSL lives with the renderers): chromatic,
 // altitude-aware haze that replaces the grey exponential `haze()` in materials.ts.
 //   extinction  Rayleigh β_R(λ) (H_R = 8 km) + Mie β_M (H_M = 1.2 km), analytic optical depth

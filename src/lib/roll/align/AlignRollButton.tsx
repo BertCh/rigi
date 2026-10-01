@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // "Align N photos": runs alignRoll over the roll's prior-only photos, with progress, cancel and a
 // summary. Styled for the dark roll page (src/routes/roll.$id.tsx); the page mounts it and
 // re-resolves its poses on onChanged.

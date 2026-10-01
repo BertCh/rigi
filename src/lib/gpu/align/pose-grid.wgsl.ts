@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL twin of align.ts scorePose (with forEachProjected): one workgroup per pose, the whole
 // autoAlign coarse grid (101 yaw × 25 pitch) in one dispatch. Layouts are written by ./pose-grid.ts.
 //

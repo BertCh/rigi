@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // IndexedDB persistence for browser uploads: photo records (meta + JPEG blob + thumbnail) and
 // region data (shared between photos). Everything degrades to "not stored" when IndexedDB is
 // unavailable (private mode, SSR).

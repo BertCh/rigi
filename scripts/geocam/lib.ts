@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GEO evaluation library (Agent B; plan §3). CPU-only, node. Shared by every scripts/geocam/ga*.ts. The API
  * below is STABLE (additive changes only):

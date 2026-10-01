@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Reveal (intro animation) frame-time bench: deck (WebGL), same photo, same preset (the three.js arm was
 // dropped with the three.js renderer, 2026-10-01).
 // For each engine: load /photo/<id>?reveal=off, wait for [data-ready], then run

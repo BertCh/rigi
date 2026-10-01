@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terrain around a camera: quadtree LOD selection of Terrarium DEM tiles, meshed in a
 // camera-local ENU frame (curvature + refraction baked in), plus optional draped imagery.
 import * as THREE from "three";

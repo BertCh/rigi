@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside: the shared contract between the near-field service (tools/nearfield), DEM anchoring,
 // the splat renderers (three + deck), the camera-roll multi-view work and the generative research.
 // Design: reports/step-inside-design.md. Additive fields only once other modules depend on this.

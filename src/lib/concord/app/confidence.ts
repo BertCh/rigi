@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Pose confidence for the concord display pass (moved from the removed field/fit.ts, 2026-09-30).
 // Fail closed: anything not explicitly accepted with enough confidence is LOW.
 

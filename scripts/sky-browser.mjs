@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Runs src/lib/sky in headless Chromium against the dev server (Vite serves
  * the module source directly) and reports backend + timings per photo.

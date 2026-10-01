@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL for the GPU haze fit (twin of look/haze-fit.ts fitHaze). Three groups of kernels:
 //  1. per pixel: the photo box-resampled to linear on the geo grid, the depth-edge test, the
 //     separable dilations (edges, people) and the log-range bin, with per-bin counts;

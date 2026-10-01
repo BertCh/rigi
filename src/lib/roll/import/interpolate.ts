@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Fill in missing GPS from capture time: a photo without a position that was taken between two
 // GPS'd photos (each within MAX_GAP_MS of it) gets the linearly interpolated position. Pure (no
 // DOM), so it runs in node for tests.

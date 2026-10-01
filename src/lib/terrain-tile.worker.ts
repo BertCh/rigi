@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /// <reference lib="webworker" />
 // Terrain tiles off the main thread (terrain.ts fetchTiles): decode + crop + mesh arrays + kept heights,
 // the same buildTile the page would run (terrain-mesh.ts), so the tiles are the same bits.

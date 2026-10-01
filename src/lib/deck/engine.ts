@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // DeckEngine: the PhotoEngine surface (src/lib/renderer.ts) on deck.gl, for `?renderer=deck`.
 // Imperative `Deck` on the canvas PhotoWorkspace hands in (no React), mirroring engine.ts:
 //   photo view (PhotoView, camera-anchored ENU): the streamed Mapterhorn terrain (TerrainLayer)

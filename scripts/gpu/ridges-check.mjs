@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node-side parity check of the GPU ridge-tops kernel (src/lib/gpu/horizon/ridges.wgsl.ts) with no GPU:
 // builds synthetic ring mosaics, runs the CPU twin (ridgelines.ts ridgeTopsCpu, the reference), packs the
 // kernel's real params / uniform with packRidgeMarch and evaluates the WGSL's arithmetic in JS with every

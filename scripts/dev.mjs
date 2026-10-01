@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Dev launcher: the frontend (vite, :3100) plus, optionally, the Python backends.
 //   node scripts/dev.mjs                      # frontend only (same as `npm run dev`)
 //   node scripts/dev.mjs --be                 # + matcher (:8765) + near-field (:8767)

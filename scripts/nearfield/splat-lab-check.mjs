@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Screenshots + fps for /lab/splats (the three.js Gaussian splat renderer). Run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/splat-lab-check.mjs [--n 200000,1000000] [--no-shots] [--query aa=0] [--size 1280x800]
 // Shots land in tools/nearfield/shots/. APP_URL defaults to the private :3110 vite.

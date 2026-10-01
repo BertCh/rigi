@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Self-tests for src/lib/refine:
  *   1. the closed-form back-projection in model.ts matches geo/camera.ts;

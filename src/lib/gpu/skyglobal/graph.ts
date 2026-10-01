@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The skyglobal grid's GPU phase on a core ComputeGraph: the only GPU path of gridGpu (./index.ts;
 // the pooled per-pass dispatches it replaced, bit for bit, were removed on 2026-10-01). The CPU twin
 // is ./cpu.ts.

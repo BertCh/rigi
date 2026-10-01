@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for layers/tiles3d.ts.
 //
 // CPU (node, no GPU):  npx tsx src/lib/deck-webgpu/layers/tiles3d.check.ts

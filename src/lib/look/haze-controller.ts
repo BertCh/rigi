@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Fits the photo's aerial perspective (look/haze-fit) for styles whose atmosphere airlight is
 // 'fitted': once per (pose, eye, sky mask), after a fresh geometry readback. Engine-neutral: each
 // engine hands in its own geometry buffer (three: xyz + range; deck: range + pixel ray), which is

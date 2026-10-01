@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The pack's peak-class index for style.terroir.peakTiers (prominence backfill). Fetches nothing
 // unless `on`; findPack caches the pack, so this shares TerroirLayer's request.
 import { useEffect, useState } from "react";

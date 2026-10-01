@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /// <reference lib="webworker" />
 // Terrarium decode off the main thread (load.ts decodeHeights): the same blobHeights (image.ts:
 // createImageBitmap + OffscreenCanvas + decodeTerrarium) the page ran, so the heights are the same bits.

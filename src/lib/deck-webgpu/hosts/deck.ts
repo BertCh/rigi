@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // deck.gl-on-WebGPU host (the chosen direction, README.md "Approach"). deck owns the device, the
 // canvas, the views / viewports and the frame loop; our offscreen passes run in a deck Effect's
 // preRender (before deck's canvas LayersPass, same command encoder, one submit), and screen

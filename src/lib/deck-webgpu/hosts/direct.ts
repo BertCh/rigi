@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Luma-direct host: no deck.gl. Owns a WebGPU device on the canvas, the targets and the frame
 // loop (on demand: requestRender() schedules one rAF frame). The fallback when deck's full build
 // isn't bundled (app vite.config.ts `visgl:webgl-only`), and the reference the deck host is

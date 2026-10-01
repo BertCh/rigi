@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Waterline "level" cues and shoreline "shore" cues (WP-C).
 //
 // Lakes: polygons in the SCENE frame ([e, n] metres), levelM = ABSOLUTE lake level (m; by default the

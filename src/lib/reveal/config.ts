@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Reveal animation config: the presets, the user's persisted choice and the per-frame uniform state
 // both engines take through Renderer.setReveal (src/lib/renderer.ts). Engine-agnostic, no three/deck.
 //

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Per-pixel terrain geometry seen through the photo camera, for the deck backend.
 //
 // Contract shared by the GPU implementation (src/lib/deck/geometry-pass.ts, built in parallel)

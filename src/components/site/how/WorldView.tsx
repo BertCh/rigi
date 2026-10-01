@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { useEffect, useRef, useState } from "react";
 import { type Angles, horizonDistAt, R_EFF, type Scene } from "./model";
 

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // L3: how Rigi knows a value. Provenance has orthogonal axes, never merged into one string:
 //
 //   agent     WHO produced it         user · sensor · solver · reference · model · rule

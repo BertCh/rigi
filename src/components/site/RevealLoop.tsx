@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Landing-page beat: the overlay export blooms out over its photo from the foreground to the far
 // skyline, with a bright band on the front, then stays lit. It is deliberate rather than ambient:
 // it fires the moment three quarters of the frame is on screen, starts from the bare photo, lunges in

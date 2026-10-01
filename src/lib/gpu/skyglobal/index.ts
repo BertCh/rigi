@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU path of the T6 skyline global search (tools/matcher/stage1/skyglobal.py; CPU twin ./cpu.ts).
 //
 // Only the exhaustive yaw × pitch × roll × FOV grid runs on the GPU (skyglobal.wgsl.ts: CELLS →

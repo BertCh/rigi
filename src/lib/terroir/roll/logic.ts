@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Pure helpers for the terroir roll/site furniture (no DOM, no deck): sun-band colours, scale-bar
 // numbers, pose-source glyphs and the prior-pose uncertainty fan. Checked by roll.check.ts.
 // Display-only: nothing here feeds the matcher or any pose.

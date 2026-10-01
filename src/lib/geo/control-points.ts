@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Control-point pose solver: the user taps known features (peaks, notches)
  * in the photo; we solve yaw/pitch/roll (and optionally f) so the features'

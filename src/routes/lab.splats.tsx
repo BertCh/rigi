@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Dev-only visual test bench for the Step Inside splat renderer (src/lib/nearfield/three-splats.ts).
 // A synthetic cloud (coloured ellipsoid blobs, a ground plane of flat splats, a ring of needle splats and
 // a far blob behind a ridge) over a large terrain mesh drawn with logarithmicDepthBuffer, so occlusion in

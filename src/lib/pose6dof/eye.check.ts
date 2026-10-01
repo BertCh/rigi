@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Analytic self-checks for eye.ts (fitRotationToHorizon, skylineResidualsPx, refineEyeFromSkyline)
 // on a synthetic ridge: the horizon is computed exactly from a known 3-D ridge line, so there is
 // no DEM, no rasterisation and no detector in the loop.

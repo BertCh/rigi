@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Worker side of the GPU prep (gpu/sky/prep.ts): when to use it, and the runtime guard.
  *

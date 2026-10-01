@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Batch pose alignment for camera rolls: see align.ts (the run) and viewpoint.ts (the shared-spot prior).
 
 export { AlignRollButton } from "./AlignRollButton";

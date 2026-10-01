@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The offscreen half of a frame, shared by both hosts: the geometry pass (photo camera) and the
 // MSAA colour pass (view camera) with its resolve (1×, no resolve, while interactive). Hosts differ only in who owns the device /
 // canvas and how the screen pass is driven.

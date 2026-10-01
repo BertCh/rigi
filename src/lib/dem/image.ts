@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terrarium image → heights with createImageBitmap + a 2D canvas: the page (load.ts), the decode pool
 // (decode.worker.ts) and the horizon workers all decode through here.
 import { decodeTerrarium } from "./decode";

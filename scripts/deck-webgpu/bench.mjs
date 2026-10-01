@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WebGPU engine (/lab/deck-webgpu, WebGpuEngine) vs the WebGL DeckEngine (/photo/<id>?renderer=deck),
 // same photo, same pose, same settings, same canvas CSS size, one browser at a time:
 //   - time to first frame (navigation → first onRender with terrain tiles) and to ready

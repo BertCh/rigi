@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Peak label layout for the 'panorama' and 'inline' label styles (ViewStyle.labels.layout): pure TS,
 // no DOM (runs in node for look/__tests__/labels.check.ts). 'classic' is rank.ts + the DOM labels.
 //

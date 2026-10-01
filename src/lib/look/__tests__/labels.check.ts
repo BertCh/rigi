@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node check for the peak labels: `npx tsx src/lib/look/__tests__/labels.check.ts`
 //  - classic: rankPeaks + declutterClassic reproduce the engines' original code byte for byte
 //  - panorama / inline layout: no overlaps, only visible peaks, stable under small moves, < 2 ms

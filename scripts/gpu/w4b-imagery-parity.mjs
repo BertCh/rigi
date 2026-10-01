@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // W4b: imagery-style pixel parity, batched terrain (imagery texture arrays) vs the per-tile path,
 // on the SAME streamed tiles and the SAME imagery bitmaps in one page (__RIGI_TERRAIN_BOTH__
 // builds both representations; __RIGI_FLAGS__.terrain flips the drawing path live).

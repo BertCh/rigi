@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Geometry-first camera (GEO, reports/geometry-first-pose.md): shared types. FROZEN API: additive
 // changes only. Every geocam package (map, priors, lakes, integrity) codes against these.
 //

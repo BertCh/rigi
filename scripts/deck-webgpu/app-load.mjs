@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Does /photo/<id>?renderer=<r> load (data-ready, data-verify settled) with no page errors, and which engine
 // actually ran? One browser, photos one after another. Run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/app-load.mjs --renderer auto [--query webgpu=off] [--no-gpu] [IMG_7086 …]

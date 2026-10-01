@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Fused horizon → solve path of the unknown-pose worker (opt-out: the worker's gpuFused: false).
 //
 // One chain over core command graphs on one device, sharing the solve's resident horizon buffer:

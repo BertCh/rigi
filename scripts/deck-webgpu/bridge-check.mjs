@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Compute bridge (src/lib/deck-webgpu/compute-bridge.ts) check on the WebGPU engine lab:
 // - per-pass parity + micro-timings (compute-bridge.check.ts runBridgeCheck): masks, band stats,
 //   haze prep, the whole haze fit (+ its stale-prep / geo-size guards), bridged vs readback path on

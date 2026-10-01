@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GA5 (reports/geometry-first-pose.md G7): physical and visibility checks on a hypothesised eye, as a
 // VETO only (guard-rail 2: eye priors are vetoes and tie-breaks, never pulls).
 //

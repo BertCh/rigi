@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // defineBlock: one field table → both uniform bindings of a shared GLSL chunk. The shared function
 // bodies only use the accessor macros (`atm_eye`), which each binding #defines:
 //  - three: plain `uniform vec3 uAtmEye;` + `#define atm_eye uAtmEye`, and an IUniform factory/writer;

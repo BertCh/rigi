@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node emulation check of the GPU sky prep (src/lib/gpu/sky/prep*.ts), no GPU, no browser:
 // the shader's u32 soft-float (prep-ref.ts) against native f64 / the CPU functions of sky/core.ts,
 // compared with Object.is (and bit patterns) on every element.

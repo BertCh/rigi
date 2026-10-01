@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL port of the terroir terrain shading (../glsl/terrain.ts is the reference; same four switches, same
 // values from ../glsl/values.ts) for deck-webgpu/layers/terrain-styles.ts. Everything terroir-specific
 // lives here; deck-webgpu only gains small hooks that return its own string / object UNCHANGED while

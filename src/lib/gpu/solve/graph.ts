@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // solve coarse on a core ComputeGraph: the GPU path of coarseGpu / solveCoarse (./index.ts).
 //
 // One shape-keyed graph per (buffer capacities):

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU → CPU readback through reusable MAP_READ staging slots, per device (the GPUReadbackRing
 // pattern, but slots grow on demand because our readback sizes vary per call):
 // - stageReads() records copies of the wanted ranges into ONE slot, packed, on the caller's

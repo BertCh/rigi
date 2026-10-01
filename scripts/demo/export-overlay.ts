@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Overlay exports of demo photos for the landing page: the workspace's own image export (photo
 // resolution, the same frame as the photo, peak labels on) → public/demo/shots/<id>-overlay.jpg.
 //   APP_URL=http://localhost:3161 node scripts/gpu/with-render-lock.mjs -- npx tsx scripts/demo/export-overlay.ts demo-01 [demo-NN…]

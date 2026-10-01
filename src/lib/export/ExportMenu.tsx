@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Drop-in "Export" dropdown for the photo workspace.
 //
 //   <ExportMenu engine={engineRef} disabled={!!status} withLabels={showPeaks} />

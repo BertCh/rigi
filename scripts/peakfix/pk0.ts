@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * PEAKFIX PK0 observability (tools/research/peakfix/PROTOCOL.txt): CRLB of the eye (E, N) jointly with rotation +
  * focal at the GT pose, from (a) the dense skyline, (b) skyline peaks, (c) ORACLE layered peaks (top crest per

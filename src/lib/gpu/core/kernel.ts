@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Compute kernels over luma 10's engine Kernel, generalised from look/kernel.ts:
 // - defineKernel() at module level (WGSL + explicit binding layout, optional entry point and
 //   override constants, a warm-up group); the pipeline is created once per device and cached;

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { sceneAt } from "../harness/lib/geo";

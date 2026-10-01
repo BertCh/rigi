@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Solar position for a photo: NOAA / Meeus low-precision ephemeris (≈0.01° over 1950–2050),
 // plus the direction in the camera-local ENU frame (x east, y north, z up) the terrain uses.
 // takenAt in photos.json is UTC (EXIF DateTimeOriginal + OffsetTime), so no timezone guessing.

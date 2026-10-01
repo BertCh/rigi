@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared look and small formatters for the roll mosaic: viewpoint colours, pose-source labels,
 // compass names and capture times in the photo's own local time.
 

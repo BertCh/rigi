@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Mount for the roll 3D map's terroir layers (RollMap.tsx renders one of these): feeds the engine
 // the halo / prior-uncertainty / names layers (roll-map-extras.ts, loaded on demand so deck stays
 // out of the mosaic bundle) and draws the map's furniture: an attribution line and a north arrow

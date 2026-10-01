@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The GPU → worker fallback state machine of the splat sort, free of luma / DOM so node can test it
 // (scripts/gpu/splat-sort-check.ts). SplatsCore owns one per cloud:
 //   - `fail(reason)` is idempotent and one-way: the first call switches to "worker", records the

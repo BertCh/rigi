@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // W4 parity: the batched terrain path (src/lib/deck/batched-terrain-layer.ts) vs the per-tile path,
 // on the SAME streamed tiles in one page (globalThis.__RIGI_TERRAIN_BOTH__ builds both
 // representations; __RIGI_FLAGS__.terrain flips the drawing path live).

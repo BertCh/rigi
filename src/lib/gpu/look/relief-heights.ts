@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The relief field's height raster gathered on the GPU: look/relief/heights.ts rasterizeHeights
 // (1024² heights sampled from the loaded DEM tiles, ~15 ms of CPU) as a WGSL kernel reading the DEM
 // tiles that deck-webgpu's batched terrain already holds on the render device, feeding the relief

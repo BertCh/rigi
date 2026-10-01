@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Crosswalk: position, time, evidence and world-data provenance words → canonical axes.
 
 import type { InteriorPin } from "#/lib/concord/core/types";

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // W2 gate: GPU pose-grid scoring vs the CPU (align.ts), per photo, in headless Chromium.
 //  - grid: max |GPU − CPU| over the 2525 coarse cells (after the prior's sky fit), CPU grid ms vs GPU ms;
 //    the cold (first) graph run vs the last warm one compared bit for bit (must be 0 diffs)

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Look graphs (src/lib/gpu/look/{relief,guided-filter,color-stats}-graph.ts, the only GPU paths):
 // run-to-run bit-identity over photos × sizes (NaN inputs included), CPU-twin parity (guided, band
 // stats), A → B → A with different data (stale transients), the clear lint, VRAM and median timings.

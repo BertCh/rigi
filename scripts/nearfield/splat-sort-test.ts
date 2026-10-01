@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Unit check of the splat depth sort (sync path): npx tsx scripts/nearfield/splat-sort-test.ts
 import {
 	SplatSorter,

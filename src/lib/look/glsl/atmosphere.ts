@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared GLSL of look/atmosphere.ts (LOOK_ATMOSPHERE): chromatic, altitude-aware aerial perspective
 // and the analytic sky, one source for both engines through ATM_BLOCK's accessors (block.ts).
 //   vec3 applyAtmosphere(vec3 colLinear, vec3 worldPos)   terrain colour → hazed (linear in, linear out)

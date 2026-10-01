@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Photo skyline samples for the eye search, as the W6 bench and scripts/eval.ts build them:
  * detectSkyline on an 800 px wide copy of the photo, every 3rd column with a finite row and weight.

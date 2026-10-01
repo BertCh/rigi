@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The WebGPU photo compositor: the screen-pass core that replaces PresentCore (present.ts). A 1:1
 // port of the WebGL deck composite (deck/composite.ts PhotoCompositor + PhotoCompositeLayer,
 // deck/composite-shader.ts compositeFs, look/glsl/composite.ts, reveal/glsl.ts):

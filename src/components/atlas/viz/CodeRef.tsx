@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { FileCode2, FileText } from "lucide-react";
 import { cn } from "#/lib/utils";
 

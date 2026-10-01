@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { Roll } from "#/lib/roll/types";

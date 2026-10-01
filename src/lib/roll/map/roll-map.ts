@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The roll's 3D map: every photo of a roll draped on the terrain at once, with a frustum per
 // photo, click-to-select, hover cards and a fly-in to any photographer's viewpoint, from which the
 // user can walk to the previous / next photo or to the nearest one ahead (Mapillary-style).

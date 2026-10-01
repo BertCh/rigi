@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Object grounding: place each near-field object at the DEM range where it stands on the terrain.
 //
 // The range-dependent curve (anchor.ts) calibrates the model on terrain, but a monocular model's depth for an

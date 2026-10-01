@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Acceptance checks for the GA1 MAP solver (synthetic scenes; no DEM, no network):
 //   1. recovery: priors + 2D–3D points (10 % gross outliers, Cauchy) + skyline against a synthetic
 //      ridge horizon; start perturbed by 2° / 1° / 1° / 3 % focal / 30 m eye ⇒ truth recovered;

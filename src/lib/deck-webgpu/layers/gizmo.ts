@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WebGPU port of deck/world-view.ts WorldGizmoLayer: the photo camera as seen from the world view
 // ("In map"): the photo on a plane 150 m in front of the photo camera, the frustum edges and the
 // pin at the eye. Colour pass only (never geometry: the gizmo must not occlude the drape's range

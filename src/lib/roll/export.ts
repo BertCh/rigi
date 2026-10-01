@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Roll → GeoJSON: every camera (point + pose), its view wedge, and the day's track, so a roll can
 // be opened in any GIS / web map (QGIS, geojson.io, Mapillary-style viewers).
 import { destination } from "../geodesy";

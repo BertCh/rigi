@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // swissNAMES3D (CSV anchors + shapefile geometry) -> TerroirName[].
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Bench of the sky refine graph (refine-graph.ts, the only GPU refine) against the CPU twin (sky/core.ts
 // refineToWorking + toBytes), run in the page realm by scripts/gpu/sky-graph-bench.mjs. Checks:
 // - CPU parity: float mask max |Δ| and byte mask differences vs the CPU refine (the tolerance of

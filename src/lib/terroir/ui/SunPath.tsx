@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // T3.5 Sun path on the photo: the capture date's sun arc (every 10 min, sunrise to sunset) projected
 // through the solved pose, hour ticks, the sun disc at the capture time, and sunrise / sunset azimuth
 // markers on the horizon. Parts over terrain (sky only is the honest place for the sun) are fainter.

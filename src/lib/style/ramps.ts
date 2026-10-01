@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Named colour ramps. Stops are sRGB; the shader mixes in sRGB and then applies pow(c, 2.2),
 // the same order as today's hypso()/coolRamp() (materials.ts:90–121). Adapters must keep it.
 import { smoothstep } from "../math";

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Integration checks (node, synthetic): npx tsx src/lib/concord/app/app.check.ts
 import type { AlignState } from "#/lib/ontology/crosswalk/pose";
 import { concordFlags, parseConcordFlags } from "../flags";

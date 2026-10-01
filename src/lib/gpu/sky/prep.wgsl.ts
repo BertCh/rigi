@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL for the GPU sky prep: the photo's RGBA bytes at working size → the model's low-res RGB
 // (`rgbLo`, also the refine's guide) and ONNX Runtime's normalised NCHW input, BIT-IDENTICAL to the
 // CPU chain of sky/core.ts: rgbPlanes → resamplePlanes (separable area average) → normalise.

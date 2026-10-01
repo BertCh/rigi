@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Roadmap R5 UI (behind ?propagate=on | dev): suggest poses for a selected anchor's neighbours, and let the
 // user accept or dismiss a suggestion on a target. SUGGESTIONS ONLY: nothing is auto-accepted, nothing is
 // marked high-confidence, and the dev rows say why each neighbour was skipped or rejected by the gate.

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Persistent tile cache + prioritised fetch queue for DEM / imagery tiles.
 //
 //   const res = await cachedFetch(url, { priority: tilePriority(distanceM, z), signal })

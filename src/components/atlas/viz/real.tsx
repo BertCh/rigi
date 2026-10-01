@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { Database } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { cn } from "#/lib/utils";

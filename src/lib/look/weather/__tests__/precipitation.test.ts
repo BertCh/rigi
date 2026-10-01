@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Pins the precipitation lattice: deterministic, inside the volume around the camera, world-anchored
 // (moving the camera by a whole cell changes nothing), and the drift wraps.
 // Run: npx tsx src/lib/look/weather/__tests__/precipitation.test.ts   (exits 1 on failure)

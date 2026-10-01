@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // W5 parity / speed bench for the look passes on the GPU (src/lib/gpu/look/**). For each photo it
 // opens /photo/<id> in headless Chromium with WebGPU, captures the real look-pass inputs from
 // window.__engine (the WebGL deck engine at the ground-truth pose; capture.ts, no band-stats input), then runs every GPU twin against

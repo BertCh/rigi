@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU twin of the roll drape's range-map hand-off (drape-atlas.ts setRange): the geometry pass's
 // range target goes straight into its range-atlas cell on the GPU, and only the COARSE² max-pooled
 // grid the CPU cull needs (1/64 of the texels) is read back. Replaces, per photo, a full readback,

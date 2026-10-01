@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL for the GPU guided filter (twin of look/guided-filter.ts). The CPU takes box means from a
 // float64 summed-area table; here each (2r+1)² clamped box mean is separable (a row mean, then a
 // column mean of row means: every row of the clamped window has the same count), summed directly in

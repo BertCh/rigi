@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Synthetic checks for GA5 integrity (integrity/separation.ts, integrity/viewshed.ts):
 //   1. true camera, eye fixed, point correspondences at 0.3–15 km: every leave-out subset agrees,
 //      PL_yaw / PL_pitch below 1° / 0.5° ⇒ pass;

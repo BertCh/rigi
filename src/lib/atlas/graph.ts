@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The Rigi Atlas: a deliberately tiny, curated graph of the core of Rigi (viewport inference, terrain
 // snapping and what the app does with a pose). Hand-maintained; add a node only if it earns a deep page.
 import type { AtlasNode } from "./types";

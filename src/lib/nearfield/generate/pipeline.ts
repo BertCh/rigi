@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside P3 (research flag only): DEM-conditioned generation along a short trajectory.
 //   for each novel camera (sequential, GEN3C-style: every view sees the splats generated before it):
 //     render the true RGB-D cache → hole mask → LaMa fills ONLY the holes → lift the filled pixels

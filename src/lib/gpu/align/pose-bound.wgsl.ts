@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL: CERTIFIED interval of align.ts scorePose (stride 1, coarse or fine map) for many poses in one
 // dispatch, for autoAlign's coordinate-descent refine (../../align.ts Descent). One workgroup per
 // pose, the same projection and operation order as the CPU and as ./pose-grid.wgsl.ts, but every

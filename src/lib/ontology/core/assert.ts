@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Type-level assertion helpers for the ontology's compile-time checks (crosswalks, realizations).
 // Usage: `export type _x = Assert<Equal<A, B>>;` — exported so noUnusedLocals stays quiet.
 

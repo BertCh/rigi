@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Whole-image concordance: shared types (WP-A, frozen API — see reports/concordance-research.md §4).
 // Additive changes only. Every other concord package codes against these.
 import type { Vec3 } from "#/lib/ontology/core/geometry";

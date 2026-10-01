@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The check registry for scripts/ci/run.mjs (roadmap N1). One entry per check:
 //   id       short name used by --only / --skip and in known-failures.json
 //   tier     "fast" (no browser, no dev server) or "full" (browser; needs the dev server)
@@ -86,6 +90,14 @@ export const CHECKS = [
 		group: "style",
 		cmd: tsx("scripts/style-check.ts"),
 		timeoutS: 300,
+	},
+	{
+		id: "spdx",
+		tier: "fast",
+		group: "static",
+		cmd: ["node", "scripts/ci/spdx.mjs"],
+		note: "every first-party source file carries SPDX-License-Identifier + SPDX-FileCopyrightText (luma.gl convention); files naming another licence are listed for a human",
+		timeoutS: 60,
 	},
 	{
 		id: "examples",

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside P1b: DeckEngine.setNearField end to end on a bundled photo in ?renderer=deck.
 // A synthetic NearFieldScene (camera-anchored ENU splats in front of the solved camera: a red ball
 // on the terrain line, a yellow ball over the sky, a blue post, and a green ball BEHIND the terrain

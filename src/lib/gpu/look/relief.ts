@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU twin of look/relief/field.ts buildReliefField: the heights are still rasterised on the CPU
 // (rasterizeHeights, ~15 ms: tile lookups), then shadow, sky view, curvature and the generalised
 // normal run as WGSL kernels (relief.wgsl.ts) and the two RGBA8 textures are read back. The passes

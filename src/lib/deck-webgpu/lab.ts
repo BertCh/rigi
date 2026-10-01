@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // /lab/deck-webgpu: the foundation end to end. Streams the photo's DEM (deck/terrain-stream.ts,
 // full CPU meshes), drapes imagery (deck/terrain-data.ts loadImagery → ImageryArray) and draws the
 // terrain through the photo camera with the WGSL terrain core, then presents colour or a debug

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Exports the sample photos for the /baseline page:
  *   public/baseline/<name>.jpg   (display-oriented JPEG, max side 2048)

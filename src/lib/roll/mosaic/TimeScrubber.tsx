@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Range slider over capture time. The axis compresses long breaks (overnight, drives) to
 // GAP_CAP_S so bursts of photos stay readable; breaks are marked on the track. Emits the ids of
 // the photos inside the range (undefined = everything, so the map drapes all).

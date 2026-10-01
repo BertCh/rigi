@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The band-stats dispatch of color-stats.ts bandStatsGpu as a core ComputeGraph node: its only GPU
 // path (the pooled single dispatch it replaced, bit for bit, was removed on 2026-10-01).
 //

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU horizon (src/lib/gpu/horizon) vs the CPU horizon-fast march: parity + timing on dev photos' eyes.
 // Runs src/lib/gpu/horizon/bench.ts in headless Chromium (WebGPU) against the dev server.
 //

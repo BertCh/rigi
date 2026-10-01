@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Self-contained checks for the roll-spot core. Run: npx tsx src/lib/nearfield/roll/spot.check.ts
 // Exits 1 when any check fails (prints every failure).
 import type { Pose } from "../../camera";

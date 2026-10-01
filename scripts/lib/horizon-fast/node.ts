@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Node-only: worker_threads ports for HorizonPool (run under tsx). */
 import { Worker } from "node:worker_threads";
 import type { WorkerPort } from "./pool";

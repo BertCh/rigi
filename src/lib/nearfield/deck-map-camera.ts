@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The deck step camera's map mode ("Top-down"): deck's own map camera. A hidden MapView (MAP_VIEW_ID;
 // the engine's layerFilter draws nothing in it) carries deck's MapController: drag pans the ground
 // under the pointer, the wheel zooms about the pointer, right / ctrl drag rotates and tilts, two-finger

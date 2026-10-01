@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Split class of the labelled cells that still smear with the feature on (forced), per label class.
 //   node tools/nearfield/smear/why.mjs [deck|three]   (three = the stored grids of the removed three.js renderer)
 import fs, { existsSync as _ex, readFileSync as _rd } from "node:fs";

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The app's switches: one typed table, one reader. Every page-level option (?renderer=deck, ?gpu=off,
 // ?tiles3d=swisstopo, …) is declared here and read with getFlag(); nothing else parses location.search
 // for them. The router validates and carries these params across navigation (routes/__root.tsx), and

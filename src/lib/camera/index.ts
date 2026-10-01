@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The camera model, pure numbers (no three.js). Pose lives in the camera-anchored ENU frame
 // (x=E, y=N, z=Up): yaw = true heading clockwise from north, pitch up +, roll right side down +,
 // vfov = vertical FOV of the photo, all degrees. Image coords are normalised 0..1, v pointing down.

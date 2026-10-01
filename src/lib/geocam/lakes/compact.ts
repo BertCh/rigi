@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Compact lake geometry (GEO GA0/GA4): OSM natural=water polygons reduced to what the eye floor and the
 // waterline factors need, small enough to keep with an upload region in IndexedDB (region.ts, flag
 // ?geoLakes). Rings are stitched with concord's stitchRings (the same rule as lakesFromOverpass), cut to

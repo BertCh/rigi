@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Self-contained checks for Step Inside 3D Tiles (src/lib/tiles3d). Run: npx tsx src/lib/tiles3d/tiles3d.check.ts
 // Exits 1 on any failure (prints every failure). Covers the pure parts: geoid lookup, the ECEF → ENU
 // placement, the per-source datum, flag parsing and the display-only rules of the source table.

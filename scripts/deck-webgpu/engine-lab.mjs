@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Smoke for the WebGPU engine lab (/lab/deck-webgpu, default mode = WebGpuEngine with every ported
 // layer): loads the photo, waits for body[data-ready], then screenshots the photo view (overlay,
 // replace) and the world view, checks labels / queries, and reports page + WebGPU errors.

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Parity / speed bench of the texture-input look passes (src/lib/gpu/look/textures.ts) against the
 // array path: for each photo it opens /photo/<id> in headless Chromium with WebGPU, captures the
 // real look inputs from window.__engine (WebGL deck, ground-truth pose; no band-stats input on deck), re-creates the engine's

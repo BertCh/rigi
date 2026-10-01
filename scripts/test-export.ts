@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Export/interchange tests + sample outputs.  Run: npx tsx scripts/test-export.ts
  * Writes samples for IMG_7131 (prior pose from public/photos/photos.json) to out/lead/export/.

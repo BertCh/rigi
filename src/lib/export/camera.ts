@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Camera model for export: turns the app's pose (camera-anchored ENU, yaw/pitch/roll/vfov, see
 // ../camera) into standard photogrammetry quantities — intrinsics K, rotations camera→ENU and
 // camera→ECEF, the camera centre in ECEF, and an OpenCV-convention world→camera R,t.

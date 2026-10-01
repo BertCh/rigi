@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Parity / speed / VRAM bench of the GPU haze fit (./haze-graph.ts, its only GPU path) on the look
 // inputs captured from a live engine (capture.ts). Run in the page by
 // scripts/gpu/look-bench.mjs --module /src/lib/gpu/look/haze-graph-bench.ts --fn runHazeGraphBench.

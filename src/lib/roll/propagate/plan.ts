@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Roadmap R5, pure part: which roll photos may anchor, which neighbours to try, and how a relative
 // rotation becomes a SUGGESTION (never an accept). No DOM, no fetch: node-testable (propagate.check.ts).
 //

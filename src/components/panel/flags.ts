@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // How the sidebar's "Experimental & dev" section presents the app's flags: labels, help and grouping.
 // The flags themselves (values, defaults, parsing) live in src/lib/flags; this file is presentation
 // only. A flag missing here still works from the URL, but the panel won't show it.

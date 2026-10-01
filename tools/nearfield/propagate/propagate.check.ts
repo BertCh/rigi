@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks src/lib/nearfield/propagate.ts against the Python study (convention parity + gate).
 // Run: npx tsx tools/nearfield/propagate/propagate.check.ts   (needs tools/nearfield/propagate/raw.json)
 import { readFileSync } from "node:fs";

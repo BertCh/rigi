@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser glue for roll spots: RollMapEngine (DEM range buffers, people masks, poses in the roll frame)
 // + the near-field service (/multiview DA3 with the Rigi poses, or per-photo /depth) → fuseSpot → a
 // DeckSplatLayer on the roll map (the "Spot 3D" toggle in RollMap.tsx). Lazy-loaded; nothing here runs

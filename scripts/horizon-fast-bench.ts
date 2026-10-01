@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Benchmark + accuracy of src/lib/horizon-fast against geo/horizon.ts
  * computeHorizon on the img/ photos.

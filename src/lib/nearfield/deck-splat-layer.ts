@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside (P1b deck parity, reports/step-inside-design.md): a deck.gl 9.4 layer that draws a
 // GaussianCloud in DeckEngine's CARTESIAN, camera-anchored ENU metres (deck/photo-view.ts,
 // deck/world-view.ts).

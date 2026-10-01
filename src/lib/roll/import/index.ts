@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Camera-roll import: many files → drafts (bounded decode concurrency, see pool.ts) → positions
 // (EXIF GPS, time interpolation, or a user pin) → rolls (clusterPhotos) → IndexedDB through the
 // upload module's save path, with one OSM region fetch per roll.

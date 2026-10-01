@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Shared helpers for the annotation / ground-truth scripts: scene loading
  * (EXIF prior, DEM, horizon, OSM peaks), control-point resolution and

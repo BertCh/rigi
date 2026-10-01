@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The sun's day arc at a place: samples every 10 local minutes, rise / set crossings, hour ticks.
 // Pure (look/sun.ts only). Directions are ENU unit vectors (x east, y north, z up).
 import { sunPosition } from "../../look/sun";

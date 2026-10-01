@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Band stats (LOOK_HARMONIZE) probe for the deck engine: per photo, the settled ColorStats of the
 // replace view under a harmonising look preset, hashed, plus (optionally) the settled exportImage
 // hash per preset and the main-thread time the stats readback costs per pose settle.

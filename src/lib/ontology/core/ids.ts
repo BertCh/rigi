@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // L4 identity: how every identifiable thing in Rigi is named. One table of id schemes, ordered most-
 // specific first, so `classifyId` is unambiguous. (Prefix tests used to overlap: `local-region-…` also
 // starts with `local-`, which is the photo prefix.) A reference to anything is `Ref<C>`, and its string

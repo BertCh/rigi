@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Compass prior with magnetic declination (GEO GA0, reports/geometry-first-pose.md §2 "apply magnetic
 // declination when the heading is magnetic").
 //

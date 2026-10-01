@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // ViewStyle: how the photo views look (not per-photo interaction state, which stays in engine
 // `Settings`). Pure data, renderer-agnostic: imports neither three nor deck. Design and the
 // inventory each field transcribes: out/lead/deck-parity/styling.md §1–2.

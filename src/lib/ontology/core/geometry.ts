@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // L1: geometric primitives and frames. Pure types plus a few converters that make an implicit
 // convention explicit (bbox order, lat/lon order). No three.js, no app imports.
 

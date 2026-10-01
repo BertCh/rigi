@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Per-distance-band colour statistics for harmonising a rendered layer to the photo
 // (region-matched Reinhard transfer, Reinhard et al. 2001, stratified by range).
 //

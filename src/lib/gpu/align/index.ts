@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GPU pose scoring for autoAlign (src/lib/align.ts is the CPU twin and the reference).
  *

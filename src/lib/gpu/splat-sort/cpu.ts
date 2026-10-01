@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU twin of the GPU splat sort (./index.ts, ./splat-sort.wgsl.ts). The REFERENCE is the worker's
 // sortSplatsByDepth (nearfield/splat-sort.worker.ts); this file twins the GPU's arithmetic so the
 // identity argument can be checked in node (scripts/gpu/splat-sort-check.ts):

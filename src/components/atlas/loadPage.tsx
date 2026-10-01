@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { Component, type ComponentType, lazy, type ReactNode } from "react";
 import type { AtlasNode } from "#/lib/atlas/types";
 

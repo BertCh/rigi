@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Lake outlines near a photo (GEO GA0/GA4), and the app's lake-floor hook (flag ?geoLakeFloor).
 //
 // lakesNear: the region's compact lakes when it carries them (upload regions fetched under ?geoLakes),

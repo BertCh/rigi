@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GA0 audit (GEO, Agent A; rules in tools/research/geo/PROTOCOL.txt "GA0 - Agent A"). CPU-only, no renders,
  * no live services. DEV GT photos only: holdout ids are refused by assertDevGT (no override).

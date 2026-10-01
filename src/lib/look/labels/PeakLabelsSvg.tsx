@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // SVG sink for the panorama / inline label layouts (layout.ts), themed from ViewStyle.labels: the
 // name and elevation colours, the halo (an outline painted under the text, or a soft shadow), the
 // leader and the summit dot. Labels fade in and out; hover shows the distance.

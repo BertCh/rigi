@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Browser bench + parity of sceneHorizonGpu (./scene-profile.ts) against the unknown-pose worker's CPU
  * 360° horizon (geo/pipeline sceneHorizon), on the worker's own scene (loadScene, Mapterhorn, plain

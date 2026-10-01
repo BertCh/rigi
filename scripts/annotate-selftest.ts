@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Synthetic check of solveFromControlPoints: npx tsx scripts/annotate-selftest.ts */
 import {
 	azimuthElevation,

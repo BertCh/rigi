@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Small presentational pieces for the baseline side panel. */
 import type { ReactNode } from "react";
 

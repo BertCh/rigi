@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Sidebar section for the terroir layers (reports/terroir-cartography.md). Every switch writes a
 // style override (getStyleStore().patch), so it works on top of any preset and survives preset
 // switches; the `terroir` preset turns them all on. Collapsed by default: additive, out of the way.

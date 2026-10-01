@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // autoAlign refine A/B: GPU-bound-screened refine (gpu/align autoAlignAsync, refine "gpu") vs the
 // plain CPU refine, per photo, in headless Chromium. Exactness gate: every alternative's pose
 // (all fields) and score, plus the confidence, compared with Object.is. 0 diffs required.

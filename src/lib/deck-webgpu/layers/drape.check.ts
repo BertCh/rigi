@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU check for layers/drape.ts (no GPU):
 //   1. the terrain colour program with the drape plugin (plain and DRAPE_HARMONIZE) assembles the
 //      way luma's Model does (a fresh WGSLShaderAssembler, like pass.ts RIGI_WGSL_ASSEMBLER), and

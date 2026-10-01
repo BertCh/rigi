@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Client for the optional near-field service (tools/nearfield, default http://127.0.0.1:8767).
 // Like matcher-client.ts: everything degrades to `false` / `null` when the service isn't running; it never throws.
 import { decodeGaussianPly, decodeSplatV1, SPLAT_V1_MAGIC } from "./splat-io";

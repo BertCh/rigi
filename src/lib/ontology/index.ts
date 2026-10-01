@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The Rigi ontology: one vocabulary and one set of semantic primitives for the whole app.
 // See README.md here and the generated reports/ontology.md.
 //

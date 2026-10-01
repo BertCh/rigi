@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside: owner of the splat depth-sort worker, with a synchronous fallback (tests, SSR, or a
 // browser where the module worker fails to start). One sort is in flight at a time; the caller
 // re-requests once it lands (ThreeSplats does this from onBeforeRender), so a fast orbit never

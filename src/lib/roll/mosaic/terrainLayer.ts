@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Canvas drawing for the viewpoint terrain behind the panorama strip's photos: depth-faded ridgelines
 // (the homepage panorama's look) plus a faint ground fill under the skyline, and peak labels that the
 // overlay draws above the photos. Strokes are prebuilt as Path2D in degree space and drawn through the

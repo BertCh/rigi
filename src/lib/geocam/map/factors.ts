@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GA1 factors: priors and image evidence as whitened residual blocks over the GeoState (plan §1
 // map/factors.ts). Every factory returns a core Factor; residuals are dimensionless (σ-normalised).
 //

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // H1 copy of tools/bench/harness/lib/geo.ts: imports made absolute, CACHE redirected (see line ~37). Otherwise unchanged.
 /**
  * Node geo helpers for the harness (import-only use of 0f's src/lib/geo + scripts/lib).

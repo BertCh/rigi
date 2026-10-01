@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Provenance helpers: the "Truth" tint and the export filter. Generated content never enters measurement
 // exports (XYZ readout, GeoJSON, COLMAP, .ply/.splat-v1 exports): every exporter must go through
 // filterForExport.

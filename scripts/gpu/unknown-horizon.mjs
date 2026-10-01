@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Unknown-pose 360° horizon on the GPU (src/lib/gpu/horizon/scene-profile.ts) vs the worker's CPU
 // sceneHorizon, in headless Chromium (WebGPU) against the private dev server.
 //

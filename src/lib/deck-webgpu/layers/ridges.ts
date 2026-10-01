@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Ridge lines, skyline and ink creases for the WebGPU compositor (layers/composite.ts): a WGSL
 // FUNCTION LIBRARY, no draws. Ported 1:1 from the WebGL deck composite:
 //   classic  deck/composite-shader.ts compositeFs: `lr`, the 4-tap log-range discontinuity, the

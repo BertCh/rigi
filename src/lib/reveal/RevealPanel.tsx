@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Sidebar section for the overlay reveal: preset grid, timing / light / texture sliders, replay.
 import { Play, RotateCcw } from "lucide-react";
 import { useState } from "react";

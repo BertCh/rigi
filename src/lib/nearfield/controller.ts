@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside orchestration for one photo in the workspace (reports/step-inside-design.md).
 //
 //   available()  → the optional near-field service is up (nearField.available(); never throws)

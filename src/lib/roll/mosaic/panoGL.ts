@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Tiny WebGL2 renderer for the panorama strip: one textured mesh per photo on the (az, el)
 // canvas, drawn in the given order with a feathered edge so overlaps blend. No dependencies.
 import type { PanoMesh } from "./panorama";

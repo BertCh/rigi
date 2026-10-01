@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Batched terrain for the deck backend (opt-in: terrain-mode.ts, ?terrain=batched).
 //
 // The per-tile path (terrain-layer.ts TerrainTileLayer) is one layer + luma Model + mesh buffers

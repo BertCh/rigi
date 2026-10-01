@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Node geo helpers for the harness (import-only use of 0f's src/lib/geo + scripts/lib).
  *

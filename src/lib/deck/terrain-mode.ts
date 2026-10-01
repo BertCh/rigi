@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Which terrain path the deck backend draws:
 //   "batched" (default since 2026-09-28) one instanced grid per mesh resolution, heights and imagery
 //             in texture arrays, the mesh rebuilt in the vertex shader (batched-terrain-layer.ts).

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Float32 DEM mosaics in Web-Mercator pixel space, one per distance ring
  * (fine near the camera, coarse far away), built from Terrarium tiles, plus

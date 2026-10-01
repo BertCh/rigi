@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Acceptance checks for the concordance core (WP-A):
 //   1. projectX with identity intrinsics ≡ camera/index.ts projectPoint, bitwise, on 10k points
 //      (and unprojectDirX ≡ unprojectDir);

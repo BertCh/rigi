@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Camera modes check (step-camera.ts setMode; CameraModeBar) on the WebGL deck engine: Step Inside →
 // Photo / Orbit / Fly / Top-down → Esc back, then In map → Fly / Top-down / Photo. Screenshots go to
 // tools/nearfield/shots/cam-<renderer>-<id>-*.png; the report prints camera positions per mode.

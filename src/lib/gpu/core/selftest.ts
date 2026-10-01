@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser self-test of src/lib/gpu/core (scripts/gpu/core-selftest.mjs runs it in headless
 // Chromium): device registry, pool + leases, ring readback, kernels (sync / async / pooled, per-pass
 // bindings), a ComputeGraph with a custom WGSL node feeding GPUReduction, timestamp profiling,

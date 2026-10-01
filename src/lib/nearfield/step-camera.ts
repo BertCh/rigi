@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside navigation (reports/step-inside-design.md, "User-facing modes"): a camera that starts
 // exactly at the solved photo camera. Four modes (setMode; keys 1–4), each eased, with an eased
 // transition between them:

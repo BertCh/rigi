@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU twin of look/guided-filter.ts guidedFilter (grey guide, (2r+1)² clamped box means). The batch
 // form filters several masks against one guide in one submit and one readback, which is what
 // CompositeLook.updateMasks needs (coverage, cut, people). The four kernels per job run as one core

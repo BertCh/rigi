@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // EGM2008 geoid undulation N (m): h_ellipsoid = H_msl + N. Rigi's ENU frame carries the DEM's MSL
 // heights as if they were ellipsoidal (export/camera.ts), so ellipsoidal ECEF tilesets must be
 // lowered by N (47–55 m in Switzerland) to sit on the DEM. Grids: scripts/tiles3d/make-geoid.py.

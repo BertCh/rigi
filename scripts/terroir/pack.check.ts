@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Schema + sanity check for public/terroir (pure node): npx tsx scripts/terroir/pack.check.ts
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";

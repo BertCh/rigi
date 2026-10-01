@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terroir pack: per-region, pre-baked place data (reports/terroir-cartography.md §4 phase 1).
 // Built by scripts/terroir/build-pack.ts into public/terroir/<id>/; loaded by ./pack.ts.
 // Display-only: nothing here feeds the matcher, pose, confidence, benchmarks or measurement exports.

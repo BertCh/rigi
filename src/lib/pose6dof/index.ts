@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // 6-DoF ground-control-point solver + generic position refinement. Pure TS, no DOM.
 
 export {

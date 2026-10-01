@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Engine-agnostic projection for terroir overlays: geographic point → stage pixels through the
 // Renderer's pose, with a terrain occlusion test against the geometry buffer (sampleAt). Works for
 // both engines in overlay and Blend (photo camera). In the world view the photo camera is not the

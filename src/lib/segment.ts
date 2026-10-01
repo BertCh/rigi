@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser-side foreground (people) segmentation using MediaPipe ImageSegmenter.
 //
 // segmentForeground() returns a soft 0..255 mask (255 = person, incl. hair,

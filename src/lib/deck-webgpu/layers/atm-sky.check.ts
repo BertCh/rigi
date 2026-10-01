@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU check for layers/atm-sky.ts (browser only; no lab wiring needed). Renders the WGSL port on a
 // standalone WebGPU device through the real colour pass (hosts/passes.ts runColorPass: 4× MSAA
 // rgba16float, reversed-Z, resolve) and compares it with the ORIGINAL GLSL (look/glsl/atmosphere.ts

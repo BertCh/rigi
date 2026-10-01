@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The GPU haze fit's two submits on core ComputeGraphs (fitHazeGpu(device, input) in ./haze.ts; the
 // only GPU path since the pooled dispatch path was removed on 2026-10-01), plus fitHazeFromPrep, which
 // finishes the fit from textures.ts hazePrepTex's GPU-resident outputs, and prepAndFitHazeTex, which

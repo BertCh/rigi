@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terrarium decoding and the 256 m R-channel repair; environment-free.
 
 /** Height written for pixels with no data; never visible in the march. */

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * T6 blinded verification pack (DEV ids only): candidate poses from tools/matcher/stage1 that fall outside
  * every existing dev cluster (0.5° yaw/pitch + eye within 2 m) are drawn with tools/bench/harness/overlay.ts

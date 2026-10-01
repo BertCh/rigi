@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GPU ridgeline tops: the per-(slab, column) maximum elevation angle and its distance that
  * src/lib/roll/mosaic/ridgelines.ts traceViewpoint computes on the CPU (3600 columns x ~1200 fixed

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // DEM anchoring: calibrate the model's depth against the DEM range on terrain pixels (reports/step-inside-design.md,
 // "DEM anchoring"). The model predicts z-depth; the DEM gives ray length (Renderer.sampleAt().range), so
 // every model sample is converted to ray length with the photo's intrinsics before comparing.

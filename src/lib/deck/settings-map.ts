@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // PhotoWorkspace Settings (engine.ts) → the deck photo view, mirroring engine.ts renderNow():
 //   terrainLookFor   → TerrainLayer props (layer pass: style, imagery, haze, contours, near fade)
 //   compositeFor     → PhotoCompositor settings (composite pass uniforms, engine.ts ~:715-729)

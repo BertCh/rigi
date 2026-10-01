@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Parity smoke for the deck engines: the WebGL DeckEngine (src/lib/deck/engine.ts, ?renderer=deck, the
 // fallback and reference) against the engine under test (--renderer: webgpu = WebGpuEngine, the default; auto;
 // or deck = a run-to-run self-check). Until 2026-10-01 the reference arm was the three.js PhotoEngine,

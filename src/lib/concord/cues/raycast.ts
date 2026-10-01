@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU ray cast of a DEM into photo space (GeomBuffer), for cue extraction without a GPU render.
 //
 // Per azimuth bin (step azStepDeg) a height profile is sampled along the ground track from the eye at

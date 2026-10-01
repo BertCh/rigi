@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // COLMAP text model of a roll spot (several photos, one camera each) + the fused cloud as the initial
 // splats, for offline optimisation (tools/nearfield/roll/brush_loo.py trains Brush on it). Reuses the
 // single-photo exporter's conventions (src/lib/export/camera.ts colmapLines: PINHOLE, world→camera

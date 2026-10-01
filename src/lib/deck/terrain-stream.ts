@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // View-driven DEM streaming for the deck.gl path. The high-detail wedge follows the live view
 // heading/FOV: each re-selection queues the missing tiles (near + in-view first, a small
 // concurrency cap), drops queued tiles that went stale, and until a tile's mesh arrives it is

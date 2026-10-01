@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Presets: each is a DeepPartial layered on CLASSIC (styling.md §2.2). Resolved style =
 // merge(CLASSIC, PRESETS[preset], overrides): a preset only changes what it names, and the user's
 // overrides survive a preset switch. Values other than classic are first drafts, tuned in chunk 5.

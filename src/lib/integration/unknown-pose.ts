@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Pose for photos whose heading / gravity / focal is unknown (uploads without a compass, gravity vector
 // or 35 mm focal). reports/bench-ablation.md: the app's autoAlign accepts wrong poses on these (7/11
 // without a heading), so it is never auto-accepted here. Order:

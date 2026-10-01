@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Cached downloads for the terroir build (reruns never re-download).
 import { execFileSync } from "node:child_process";
 import {

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Minimal PNG decode/encode on node:zlib (8-bit gray / gray+alpha / RGB / RGBA / palette, non-interlaced).
 import { deflateSync, inflateSync } from "node:zlib";
 

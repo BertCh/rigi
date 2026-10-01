@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Bakes the data behind the "how it works" scene (src/components/site/how/) from one demo photo:
  * the photo skyline, the DEM horizon around the view, the visible peaks, and a coarse heightfield

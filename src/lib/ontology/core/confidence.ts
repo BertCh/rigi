@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // L3: confidence, scale-aware. Each producer scores on its OWN scale with its own accept rule; scores from
 // different scales are never compared. What IS comparable is the level, read through the scale.
 

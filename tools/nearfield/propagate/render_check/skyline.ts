@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Photo skylines for the propagation DEM-render check (METHOD.txt step 1).
  * The app's sky model exactly as scripts/sky-eval.ts runs it (node, onnxruntime-web WASM, CPU).

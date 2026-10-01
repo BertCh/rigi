@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared GLSL of the cartographic ramps and overlays, one source for both engines. All colours are
 // LINEAR. Only the slope layer has a parameter (SLOPE_BLOCK); the rest take theirs as arguments.
 //   alpineAlbedo(elev, n, xy)   LOOK_ALPINE: Patterson-style natural tint keyed to absolute Alpine

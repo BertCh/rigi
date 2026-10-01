@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Backdrop-adaptive label contrast (labels.halo.adaptive). Each label measures the backdrop under
 // its text box (a small luminance map of the photo, or the export canvas itself) and gets an extra
 // soft glow in the halo colour when the text would otherwise wash out — white names on bright cloud

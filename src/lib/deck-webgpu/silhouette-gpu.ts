@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The silhouette pass mask on WebGPU (WebGpuEngine's autoAlign re-rank): the WGSL twin of
 // deck/silhouette-gl.ts. deck/silhouette-mask.ts has the predicate, the layout and the identity
 // argument. The range lives in each re-rank source's `targets.geometry` (rgba32float, w = range,

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Lake levels (m above sea level) for the eye floor and the waterline factors.
 //
 // Source order (lakeLevelOf):

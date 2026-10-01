@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terrain height under a (lat, lon) through the engine's geometry buffer: scan a vertical line from
 // high to low until the viewing ray through it meets the terrain (sampleAt range ≈ the point's
 // range). Heights are a property of the terrain, so a hit is cached per engine. Names without an

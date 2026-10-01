@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import type { Camera } from "#/lib/geo/camera";
 import type { PeakView } from "#/lib/geo/peaks";
 import type { PhotoMeta } from "#/lib/geo/photo-meta";

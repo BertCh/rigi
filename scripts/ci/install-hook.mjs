@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Optional git pre-push hook that runs the fast tier of the regression gate (scripts/ci/run.mjs).
 // Nothing installs this automatically; run it yourself if you want it:
 //   node scripts/ci/install-hook.mjs              install .git/hooks/pre-push

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Hiking trails for the deck photo view: the port of engine.ts buildTrails() + three's
 // LineSegments2/LineMaterial (screen-space width in target pixels, vertex colours, opacity 0.95).
 // Drawn ONLY in the offscreen colour pass (composite.ts), after the terrain tiles, writing the exact

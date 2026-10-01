@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Small GLSL helpers, one copy each. Every chunk is a complete function definition, so a shader
 // splices in only what it uses. TURBO_GLSL and TO_LINEAR_GLSL are byte-identical to the classic
 // shaders' copies (engine.ts compositeFrag, deck composite-shader.ts, materials.ts, terrain-layer.ts).

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Browser bench + parity of the GPU horizon against horizon-fast's CPU march (the reference). Loaded by
  * scripts/gpu/horizon-bench.mjs inside headless Chromium:

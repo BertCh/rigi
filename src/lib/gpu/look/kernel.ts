@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The look kernels' helpers over the shared compute layer (core/kernel.ts, core/pool.ts,
 // core/readback.ts): `defineKernel` registers a look kernel (group "look", label "look-<id>"), and
 // the pool / readback re-exports are what the look graphs use for their pooled inputs and tail reads.

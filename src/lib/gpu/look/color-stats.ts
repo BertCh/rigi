@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU twin of look/color-stats.ts `reduceBands(...bandInputs(...))`: Oklab, masks and the per-band
 // Σ / Σ² reduction on the GPU (color-stats.wgsl.ts); only 52 floats per workgroup come back.
 // The dispatch runs as a one-node core ComputeGraph (color-stats-graph.ts; the pooled single dispatch

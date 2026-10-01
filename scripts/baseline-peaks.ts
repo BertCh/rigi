@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Skyline + OSM peak labels using the ground-truth camera when available
  * (data/ground-truth.json), else the EXIF prior.

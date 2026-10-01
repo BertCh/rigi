@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Host side of the pose-bound kernel (./pose-bound.wgsl.ts): certified upper bounds of align.ts
 // scorePose (stride 1, coarse or fine map) for a batch of poses, the ScoreBounds provider of
 // align.ts autoAlignRefined (the refine's neighbour pre-screen). The CPU twin and reference is

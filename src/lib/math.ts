@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** x limited to [lo, hi] (NaN passes through). */
 export const clamp = (x: number, lo: number, hi: number) =>
 	Math.min(hi, Math.max(lo, x));

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // T0.1 Legend: a compact key for what the CURRENT view encodes. (a) a vertical elevation ramp in
 // metres with a bracket for the elevation range visible in the photo (or "relative to this view" when
 // the ramp is rescaled per view); (b) the contour interval, index interval and, with ink-by-cover, the

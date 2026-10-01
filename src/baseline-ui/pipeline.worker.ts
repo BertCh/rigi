@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /// <reference lib="webworker" />
 /**
  * Baseline pipeline worker: DEM tiles → horizon → peaks, plus skyline

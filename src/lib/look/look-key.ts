@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The look's shader feature set: which LOOK_* preprocessor defines a style needs. Engines recompile
 // only when this changes (a preset or feature toggle, not a slider drag). CLASSIC needs none, so the
 // shader sources stay byte-identical to the classic ones. The slope layer's LOOK_SLOPE comes from the

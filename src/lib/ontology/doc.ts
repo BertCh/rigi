@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Renders reports/ontology.md from the catalogues (pure: strings in, string out). Written by
 // scripts/ontology/doc.ts; ontology.check.ts fails when the file is stale.
 

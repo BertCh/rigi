@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Synthetic check for fitHaze: render a fake scene with known J, A, β, recover them.
 // Run: npx tsx src/lib/look/__tests__/haze-fit.test.ts   (exits 1 on failure)
 import {

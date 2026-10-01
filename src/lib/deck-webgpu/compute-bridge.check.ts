@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Parity + latency check of compute-bridge.ts inside a live WebGpuEngine (the lab page):
 //   await (await import('/src/lib/deck-webgpu/compute-bridge.check.ts')).runBridgeCheck(window.__engine)
 // For the engine's current pose / style / masks it runs each look pass both ways on the SAME

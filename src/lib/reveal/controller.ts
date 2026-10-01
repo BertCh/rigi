@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Drives a reveal on any Renderer that implements setReveal (both engines): measures the view's
 // distance / elevation windows from the CPU geometry buffer, then animates the front with rAF and
 // hands the shader its per-frame uniforms. Engine-agnostic: only the Renderer interface.

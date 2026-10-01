@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GLSL for the deck photo-view composite: a 1:1 port of engine.ts `compositeFrag` (three.js).
 // All inputs are mixed in LINEAR light and encoded with the sRGB OETF at the end, like three's
 // `#include <colorspace_fragment>`:

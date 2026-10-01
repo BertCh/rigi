@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside 3D Tiles smoke check (src/lib/tiles3d): per photo and renderer, GT pose → step inside →
 // wait for the tiles → screenshots at the photo camera and turned away from it; stats + errors → JSON.
 // The tiles must be absent from every offscreen pass: sampleAt at the frame centre is compared with

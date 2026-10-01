@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * In-the-wild benchmark harness: runs three aligners on ad-hoc photos (JPEG + lat/lon, optional
  * altitude / heading / focal, never a gravity vector unless the manifest carries pitchDeg/rollDeg).

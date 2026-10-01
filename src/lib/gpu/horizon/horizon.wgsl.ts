@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL twin of horizon-fast/march.ts marchRay: one invocation per (eye, azimuth). Layouts are written by
 // ./index.ts (see packParams there); keep the two in sync.
 //

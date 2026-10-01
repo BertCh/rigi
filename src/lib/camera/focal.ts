@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // 35 mm-equivalent focal → focal in pixels, aware of crops. Kept dependency-free so both
 // camera/index.ts (which re-exports it) and geo/camera.ts can import it without a cycle.
 

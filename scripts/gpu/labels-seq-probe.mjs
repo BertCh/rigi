@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Label-sequence probe: records the visible label set (name, u, v, rank) over a scripted sequence
 // (load, settle, nudge the pose, settle, change a label setting) plus time spent in peakLabels and
 // the number of sampleAt calls per frame. Usage (via the render lock):

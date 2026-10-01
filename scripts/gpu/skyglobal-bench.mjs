@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // T6 skyline global search: GPU grid (src/lib/gpu/skyglobal, on its core graph; run to run bit for
 // bit) vs the TS CPU twin vs Python
 // skyglobal.py, parity + timing on the dumped dev fixtures (out/gpu/skyglobal/<id>/, see

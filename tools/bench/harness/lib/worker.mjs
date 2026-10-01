@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Client for tools/matcher/server/render_worker.mjs (one JSON line per request/reply).
 // The harness spawns its own worker (own headless Chromium), independent of the :8765 service.
 import { spawn } from "node:child_process";

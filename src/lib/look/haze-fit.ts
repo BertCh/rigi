@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Fit the photo's aerial perspective against the rendered range buffer.
 // Koschmieder per channel: I = J·t + A(1 − t), t = exp(−β·d). Unlike blind dehazing, the
 // range d is known for every pixel, so this is a small regression:

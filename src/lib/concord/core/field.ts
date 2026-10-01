@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Display residual field W (photo uv → render uv offset, render = photo + W) on a cell-centred
 // grid. Display-only: never feeds pose, confidence, benchmarks or exports.
 import { clamp } from "../../math";

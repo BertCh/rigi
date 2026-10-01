@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Batch pose alignment for a roll ("Align roll"): runs the single-photo skyline cascade
 // (integration/unknown-pose.ts, frozen) over every photo that only has its EXIF prior, and stores
 // the poses the cascade ACCEPTS as 'solved' (roll.ts saveSolvedPose). Rejected photos keep their

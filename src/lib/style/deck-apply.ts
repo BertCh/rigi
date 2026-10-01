@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // ViewStyle → deck.gl uniform values for the deck backend (styling.md §2.6, chunk 7). The deck
 // counterpart of three-apply.ts, with no three.js import: it produces plain numbers the deck layers
 // (src/lib/deck/terrain-layer.ts, composite-shader.ts, trail-layer.ts, world-view.ts) put in their

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Minimal ESRI shapefile (.shp polygon/polyline/point) + dBase (.dbf) reader. No deps.
 import { readFileSync } from "node:fs";
 

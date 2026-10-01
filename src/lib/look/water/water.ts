@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Lake water shading (LOOK_WATER, style terrain.albedo { mode: 'alpine', water: true }): the alpine
 // look's flat lake tint replaced by a depth-tinted body with a Schlick-Fresnel sky-gradient reflection
 // and an optional faint ripple normal (the useful parts of luma PR #3311's water shading, without its

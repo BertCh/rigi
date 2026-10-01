@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Overpass API transport, shared by the upload regions, the /baseline worker, scripts/ and the bench
  * harness. Queries and tag parsing stay with each caller (their `ele` parsers differ on purpose).

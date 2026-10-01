@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Per-photo clear air + exposure for the roll drape (./multi-drape-layer.ts): the data side.
 //
 // Every draped photo carries its own aerial perspective (far ground veiled toward the photo's

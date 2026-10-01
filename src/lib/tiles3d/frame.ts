@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Placing an ECEF (ellipsoidal) 3D Tiles tileset in the photo's ENU frame (geodesy.ts EnuFrame, origin
 // at the photo's lat/lon, h = 0, MSL heights used as-is). float64 on the CPU: the tile meshes reach the
 // GPU relative to their own centres, so ECEF magnitudes never lose precision.

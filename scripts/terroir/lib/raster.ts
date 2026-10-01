@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Scanline polygon fill (even-odd over all rings of one feature) onto a lon/lat grid.
 export type Grid = {
 	w: number;

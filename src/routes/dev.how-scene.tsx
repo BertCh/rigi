@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { createFileRoute } from "@tanstack/react-router";
 import { HowItWorksScene } from "#/components/site/how/HowItWorksScene";
 import { SITE_THEME, SiteNav } from "#/components/site/SiteNav";

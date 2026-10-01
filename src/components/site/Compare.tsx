@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { useRef, useState } from "react";
 
 /** Before / after stills of the same frame with a draggable divider (pointer + keyboard). */

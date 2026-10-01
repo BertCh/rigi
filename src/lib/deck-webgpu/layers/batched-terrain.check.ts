@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // In-browser A/B check for layers/batched-terrain.ts against the per-tile TerrainCore (CPU
 // buildMesh meshes) on the SAME tiles, imagery, look and pose, inside the running lab
 // (/lab/deck-webgpu, any host). The lab streams full meshes (terrain=tiles); this adds each tile's

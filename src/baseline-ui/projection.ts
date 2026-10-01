@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Overlay geometry (SVG paths, label placement) in working-image pixels. */
 import {
 	azimuthElevation,

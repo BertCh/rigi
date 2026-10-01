@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The engine surface PhotoWorkspace (src/components/PhotoWorkspace.tsx) and the export layer
 // (src/lib/export/**) use, so the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts, the default
 // where WebGPU is available) and the WebGL DeckEngine (src/lib/deck/engine.ts, the fallback and

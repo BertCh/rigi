@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Snapshot of every terrain shader program's inputs (deck terrainShaders + luma assembly) and the deck
 // tile draw's uniform values, per preset × mode × layer style, with
 // the terroir switches OFF. Proves the terroir shader work is additive (byte-identical when off):

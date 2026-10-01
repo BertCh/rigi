@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU path of solvePose's coarse (dYaw × dPitch) grid (src/lib/geo/solve.ts solveOnce; CPU twin
 // ./cpu.ts). The skyglobal pattern: the GPU scores every cell in float32 and reduces each yaw row to
 // its minimum (coarse.wgsl.ts, one dispatch); the CPU treats each row minimum as an interval

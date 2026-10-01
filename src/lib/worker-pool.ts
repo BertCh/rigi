@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // A few module workers running one job type, round-robin, for CPU work that only needs to leave the main
 // thread (dem/decode.worker.ts, terrain-tile.worker.ts). Each job's result must equal what `local` returns
 // on the page for the same input: the pool is purely a scheduling choice. Off a page (workers, node) or

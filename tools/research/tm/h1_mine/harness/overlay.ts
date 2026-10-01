@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // H1 copy of tools/bench/harness/overlay.ts: imports made absolute / ./geo. Otherwise unchanged.
 /**
  * Verification overlay: photo + DEM skyline at a pose + top OSM peak labels + a text header.

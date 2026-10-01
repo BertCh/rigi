@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Real roll numbers for the atlas page /atlas/camera-roll, from the bundled Niederhorn demo roll.
  *   npx tsx scripts/atlas/data-camera-roll.ts

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The layer contract (README.md): a layer is a host-agnostic `GpuLayerCore` that draws into one
 // or more pass kinds. Hosts (hosts/direct.ts: plain luma; hosts/deck.ts: deck.gl on WebGPU) own
 // the device, targets and render passes and call `draw(ctx)` once per pass the core takes part in.

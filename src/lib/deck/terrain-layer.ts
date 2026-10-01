@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // deck.gl port of ../materials.ts: one uber-shader per terrain tile.
 //   style 0 hillshade · 1 imagery · 2 contours (transparent, for over the photo) · 4 elevation bands
 //   · 3 geometry (range from the camera, r channel; written by the GPU geometry pass only)

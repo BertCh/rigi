@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { useMemo, useRef } from "react";
 import { type Camera, directionENU, project } from "#/lib/geo/camera";
 import {

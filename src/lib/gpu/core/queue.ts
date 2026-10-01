@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The one submit for core/** users: finishes the encoder, submits it, then lets the pool destroy
 // grown-out buffers and the profiler collect pass timestamps. Use it instead of
 // device.submit(enc.finish()) wherever pooled buffers or profiled passes were recorded.

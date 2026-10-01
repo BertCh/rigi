@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node checks for the R5 roll wiring (plan.ts). Run: npx tsx src/lib/roll/propagate/propagate.check.ts
 // Uses public/photos/photos.json, data/ground-truth.json and the research cache in
 // tools/nearfield/propagate/cache (the study's own rot estimates), so no service is needed.

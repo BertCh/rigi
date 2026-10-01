@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GA5 evaluation (reports/geometry-first-pose.md G6 + G7 / §5 GA5): solution-separation protection level
  * + viewshed veto on the FUND E1 hypotheses (true poses, wrong-basin and displaced-eye decoys).

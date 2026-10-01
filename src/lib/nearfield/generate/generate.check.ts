@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for Step Inside P3 (DEM-conditioned generation). Run: npx tsx src/lib/nearfield/generate/generate.check.ts
 // Exits 1 on any failure. The load-bearing ones: generated splats NEVER reach a measurement export
 // (provenance.filterForExport, export/splat.ts exportableCloud / buildSplatExport in both formats) and the

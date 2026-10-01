@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // PhotoWorkspace's one picker call site. Without ?picker the mount renders nothing and never loads the
 // panel chunk, so the default view (classic included) is untouched.
 import { lazy, Suspense } from "react";

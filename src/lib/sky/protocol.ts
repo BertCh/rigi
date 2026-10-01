@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Messages between index.ts and sky.worker.ts. */
 export interface SkySegmentRequest {
 	type: "segment";

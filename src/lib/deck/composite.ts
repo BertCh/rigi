@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Photo-view compositing for the deck backend: the deck.gl counterpart of engine.ts's
 // geometry pass → layer pass → composite (see composite-shader.ts for the shader port).
 //

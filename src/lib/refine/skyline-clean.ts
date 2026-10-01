@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Skyline clean-up for occluder-prone skylines (e.g. a sky-model mask, which
  * treats lamp posts, buildings and trees on the crest as skyline):

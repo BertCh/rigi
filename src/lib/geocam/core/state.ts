@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GeoState ↔ CameraX (frozen API). logf maps onto intr.fScale = exp(logf) relative to `base`, so concord's
 // projectX / unprojectDirX work unchanged; the eye is absolute in base's frame.
 import type { CameraX } from "../../concord/core";

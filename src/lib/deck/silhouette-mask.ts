@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // autoAlign's silhouette re-rank on the GPU, bit-identical to the CPU scorer.
 //
 // The CPU score (deck/engine.ts and deck-webgpu/engine.ts scoreSilhouette, engine.ts

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Point queries on the geometry target (rgba32float: xyz = ENU m, w = range, 0 = sky, row 0 = top)
 // without a full CPU readback (~12 MB at 1024 px): three small kernels on the render device, each
 // one dispatch + one staged read of a few bytes (core/readback), the same pattern as

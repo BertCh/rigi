@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Viewpoint terrain for the panorama strip: the full 360° view from one eye, as depth-layered ridgelines
 // (the homepage panorama's method, scripts/brand/rigi.ts, run live for any viewpoint). Every distance slab
 // contributes the parts of its top edge that no nearer slab hides, so slopes read as range contours, and

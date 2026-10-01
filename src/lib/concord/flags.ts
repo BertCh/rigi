@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Whole-image concordance feature flags: ?concord=<csv> (eye, occl), read
 // through src/lib/flags. Everything is off by default, and off outside a browser (node pipeline,
 // workers).

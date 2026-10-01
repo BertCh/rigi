@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terroir names in the photo overlay and Blend (reports/terroir-cartography.md T0.5 / phase 1):
 // lakes, glaciers, ridges, massifs, passes, huts, settlements, alps… from the region's pack, typeset
 // by class (labels/names.ts + classes.ts NAME_TYPO), laid out clear of each other and of the peak

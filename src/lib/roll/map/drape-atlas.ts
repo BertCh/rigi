@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU atlases for the roll drape (./multi-drape-layer.ts), filled one photo at a time.
 //
 // The layout is fixed up front from the photos' sizes, so a photo's range map, people mask and

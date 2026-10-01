@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for layers/splats.ts.
 //
 // CPU (node, no GPU):  npx tsx src/lib/deck-webgpu/layers/splats.check.ts

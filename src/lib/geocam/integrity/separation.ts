@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GA5 (reports/geometry-first-pose.md G6): solution-separation integrity (GNSS ARAIM / TRN style).
 //
 // The full MAP solution x0 (covariance Σ0) is compared with re-solves x_k that each leave one subset of

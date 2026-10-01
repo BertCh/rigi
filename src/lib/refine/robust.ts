@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Robust Gauss–Newton / Levenberg–Marquardt on per-column skyline residuals
  * over (yaw, pitch, roll, log f) plus optional refraction k and eye-height

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Compose the photo + overlay layers + an attribution footer into one image Blob.
 // Works with OffscreenCanvas (workers, modern browsers) or HTMLCanvasElement, and with any
 // canvas factory (e.g. @napi-rs/canvas in Node tests).

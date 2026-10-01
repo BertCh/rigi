@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Panorama strip: photos of one viewpoint (or all) warped onto a cylindrical azimuth × elevation
 // canvas at their poses, so overlapping frames stitch. WebGL for the photos, a 2D overlay for the
 // compass ruler, elevation ticks and outlines. Behind the photos, a 2D canvas draws the viewpoint's terrain

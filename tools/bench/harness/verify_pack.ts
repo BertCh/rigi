@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Blinded verification pack for a harness run: per photo, the methods' solved poses are clustered
  * (same cluster = within 0.5° yaw and 0.5° pitch of a member) and one overlay is rendered per

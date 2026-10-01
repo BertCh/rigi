@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Real DEM facts for the atlas pages terrain-snapping, terrain-sampler, dem-source and dem-anchoring.
  *

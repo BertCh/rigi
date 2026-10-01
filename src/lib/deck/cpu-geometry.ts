@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU terrain geometry for the deck backend: the GeometrySource fallback (no GPU), hover
 // sampling and the fallback 360° horizon, all from one per-azimuth terrain profile.
 //

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 
 // Pixel-diff baseline harness for the photo route (styling chunk 0, see out/lead/deck-parity/styling.md §4).
 // It captures /photo/<id>?renderer=deck (the WebGL deck engine) in each view at a fixed pose with the CPU

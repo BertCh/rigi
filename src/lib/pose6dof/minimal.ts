@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Minimal / closed-form pose solvers used to seed the robust LM:
 //  - rotationFromBearings: Horn/Kabsch absolute orientation (≥2 bearings, position fixed)
 //  - yawFromOnePoint: gravity-aided 1-point yaw (pitch/roll from the prior)

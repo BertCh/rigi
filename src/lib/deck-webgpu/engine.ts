@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WebGpuEngine: the Renderer surface (src/lib/renderer.ts) on WebGPU, the port of the WebGL
 // DeckEngine (deck/engine.ts). Same inputs, same queries, same look; the frame is drawn by the
 // host-agnostic WGSL cores of this directory (README.md "Layer contract") on a host:

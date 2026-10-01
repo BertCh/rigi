@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // solvePose coarse grid on the GPU (src/lib/gpu/solve) vs solvePose / its CPU twin, in headless
 // Chromium (WebGPU) against a dev server on this tree.
 //

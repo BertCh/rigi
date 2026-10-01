@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // PEAKFIX eval helpers. sectorHorizonFrom = scripts/geocam/lib.ts sectorHorizon with a near cut (PROTOCOL A1:
 // terrain nearer than dMin does not count), same step rule max(10, 0.004·d), curvature + refraction.
 import type { Vec3 } from "../../src/lib/concord/core";

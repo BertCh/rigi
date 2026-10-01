@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // A/B of autoAlign's silhouette re-rank: GPU masks (silhouetteGpu = true, deck/silhouette-mask.ts)
 // vs the CPU scorer (false), on every eval-app photo (data/control-points.json) and a few perturbed
 // priors per photo, plus one autoAlign(false) from the settled pose. Every field of both AlignResults

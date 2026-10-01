@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // PEAKFIX per-eye rotation + focal fit and the arm costs (tools/research/peakfix/PROTOCOL.txt).
 // Pinhole on a W×H pixel basis (long side 1600 in the evals), principal point centred, no k1:
 // identical to camera/index.ts projectPoint with intrinsics fScale (concord CameraX), written out so

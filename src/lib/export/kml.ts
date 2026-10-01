@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Google Earth PhotoOverlay (KML 2.2) + KMZ packaging.
 // Reference: https://developers.google.com/kml/documentation/kmlreference#photooverlay
 //            https://developers.google.com/kml/documentation/cameras

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // View settings and the small shared engine types, free of any engine so that the UI and the engines
 // can all import them.
 

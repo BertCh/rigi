@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Placement for the 'classic' peak labels (dot + leader + name / sub text block), shared by the DOM
 // labels (PhotoWorkspace) and the export canvas (canvas.ts drawPeakLabels). Pure TS, no DOM.
 //

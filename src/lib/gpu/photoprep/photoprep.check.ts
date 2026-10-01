@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // npx tsx src/lib/gpu/photoprep/photoprep.check.ts [maxPhotos] [fuzzCases]
 // Node check of the GPU photo prep's exactness (no browser, no GPU):
 //  1. soft-float: the JS twin of softf64.wgsl.ts (add, sub, mul, div, divSmall, fround, widenings,

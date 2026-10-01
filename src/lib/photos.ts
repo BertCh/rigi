@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import photosJson from "virtual:photos";
 import { storageKey } from "#/lib/ontology/core/storage";
 import type { Pose } from "./camera";

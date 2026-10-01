@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside: a dependency-free 3D Gaussian splat renderer for three.js (reports/step-inside-design.md).
 //
 // One instanced quad per splat. Splat data lives in an RGBA32UI texture, two texels per splat:

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Minimal iterative radix-2 complex FFT (in place, Float64) and a circular
  * cross-correlation helper. Sizes must be powers of two. Used by init.ts for

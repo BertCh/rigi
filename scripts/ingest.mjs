@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Ingest iPhone HEIC photos from img/ into public/photos/:
 //   - converts to JPEG (macOS `sips`, max 2048px)
 //   - extracts the camera prior: GPS, true-north heading, focal length, and the

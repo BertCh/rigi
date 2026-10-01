@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL for the T6 skyline global search grid (twin: ./cpu.ts SkyGlobal.cellScore / gridCpu, itself
 // a port of tools/matcher/stage1/skyglobal.py SkyGlobal.grid).
 //

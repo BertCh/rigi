@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // npx tsx src/lib/gpu/align/refine-guard.check.ts — node checks of the GPU refine's correctness guards
 // (no browser, no GPU): on a synthetic skyline scene,
 //  1. autoAlignRefined with true bounds (exact score + slack) equals autoAlign bit for bit, with and

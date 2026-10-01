@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Interior cue extraction (WP-C): occluding contours, photo edge DT, waterlines and shorelines.
 export * from "./contours";
 export * from "./edge-dt";

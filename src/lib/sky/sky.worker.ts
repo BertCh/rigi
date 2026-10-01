@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /// <reference lib="webworker" />
 /**
  * Sky segmentation worker: lazily loads the U²-Net-P sky model (WebGPU →

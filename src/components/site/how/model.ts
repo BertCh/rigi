@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Data and math for the "how it works" scene. The scene file (public/demo/how/scene.json) is baked
 // by scripts/howitworks/bake.ts from real src/lib/geo output. The pinhole below mirrors
 // src/lib/geo/camera (cameraFromAngles / project / unproject), inlined so the landing page does not

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Repeat test for the classic peak-label placement (workstream "labels", 2026-09-30).
 // Opens /photo/<id>?renderer=deck N times in fresh browsers exactly like scripts/style-baseline.mjs
 // (SwiftShader, DPR 1, 1120x700, the ground-truth pose injected as the saved pose, Overlay >

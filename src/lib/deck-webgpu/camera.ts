@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared camera for every WebGPU layer: one uniform block (`camera`, bind group 0) that both the
 // photo camera (pose yaw/pitch/roll/vfov at the eye, camera-anchored ENU) and the world orbit
 // camera (world-view.ts WorldViewState: eye / forward / up / camFov) fill.

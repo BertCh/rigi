@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Loads terroir packs (public/terroir/index.json → <path>/pack.json, cover.png). Packs are found by
 // location, not by region id, so every photo inside a pack's bbox gets it (demo, bundled and local).
 // Missing packs resolve to null: every terroir layer then draws nothing.

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Peak summit snapping and occlusion classification (§5). The occlusion
  * angle itself comes from the march (march.ts marches one extra ray at each

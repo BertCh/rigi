@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Global initialisation: 1-D circular correlation of the photo's skyline
  * elevation profile against the 360° DEM horizon, done with FFTs.

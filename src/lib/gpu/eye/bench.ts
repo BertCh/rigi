@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Browser bench + parity of the eye search (pose6dof refineEyeFromSkyline) on the batched GPU horizon.
  * Loaded by scripts/gpu/eye-bench.mjs inside headless Chromium:

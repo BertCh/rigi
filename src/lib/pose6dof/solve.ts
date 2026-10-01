@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Robust 6-DoF (+focal) ground-control-point solver: RANSAC over minimal solvers, then
 // Levenberg–Marquardt with Huber IRLS over [dx,dy,dz,yaw,pitch,roll,vfov] with Gaussian priors.
 import { focalFromVfov, type Pose } from "../camera";

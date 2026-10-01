@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Real data for /atlas/tap-a-peak: runs the real solveFromControlPoints (src/lib/geo/control-points.ts) on a demo
  * photo, starting from the PHONE-SENSOR prior camera, with 1..4 "taps". A tap is a labelled peak at the pixel where

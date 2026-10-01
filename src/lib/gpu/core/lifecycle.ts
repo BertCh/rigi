@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Device-loss and activity bookkeeping shared by the core modules (no luma runtime imports, so the
 // registry, pool, readback and queue can all use it without import cycles):
 // - untilLost(device, p): p, but rejecting as soon as `device` is lost. Readbacks, timestamp reads

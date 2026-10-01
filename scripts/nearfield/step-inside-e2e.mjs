@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside end to end, per deck renderer (headless, real GPU; default WebGL deck). For each photo: GT pose injected as the
 // saved pose (accepted), panel + anchor quality, hover readout on an Object pixel, step inside (start ==
 // photo camera, orbit moves), Truth, back, In map drape with the feature on vs off, the .ply export.

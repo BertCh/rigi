@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WebGPU render device for the deck-webgpu renderer: availability check, device creation (with a
 // canvas context), and the hand-off to the compute sidecar (src/lib/gpu, owned by the GPU compute
 // workstream) so look kernels read our render targets on the SAME device (no copies).

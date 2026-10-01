@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for layers/photo-sky.ts.
 //
 // cpuCheck (node): the direction-only projection equals the WebGL layer's photoPos + dir·20 km

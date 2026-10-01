@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node check of the geometry point queries (src/lib/deck/geo-query.ts, deck-webgpu/geo-query-gpu.ts),
 // no GPU:
 // - (the kernels' binding layouts are covered by scripts/gpu/kernel-layout-check.mjs: defineKernel)

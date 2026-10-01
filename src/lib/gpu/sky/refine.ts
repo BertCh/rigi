@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU twin of sky/core.ts refineToWorking(rgbWork, W, H, low, true, opts) followed by toBytes: the
 // sky worker's guided-filter refine. The low-res P(sky) may be a Float32Array or, when ONNX Runtime
 // runs on this same device (sky/model.ts shareOrtDevice), the model's output GPUBuffer itself, so

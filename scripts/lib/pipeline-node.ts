@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Node helpers shared by baseline scripts: per-photo meta, prior, terrain, cached horizon. */
 import fs from "node:fs";
 import path from "node:path";

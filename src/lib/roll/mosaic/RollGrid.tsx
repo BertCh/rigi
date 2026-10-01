@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Justified-rows photo grid (aspect-preserving rows of equal height, like Google Photos),
 // grouped by viewpoint or by time (a new group per day, or after a two-hour break).
 import { useEffect, useMemo, useRef, useState } from "react";

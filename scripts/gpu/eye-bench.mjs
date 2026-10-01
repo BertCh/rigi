@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // W6: pose6dof eye search (refineEyeFromSkyline) on the batched GPU horizon vs the batched CPU horizon vs
 // the original per-eye path. Runs src/lib/gpu/eye/bench.ts in headless Chromium (WebGPU) against the
 // dev server, on the photos of the lead's eye experiment (out/lead/eye/results.json, Mapterhorn rows:

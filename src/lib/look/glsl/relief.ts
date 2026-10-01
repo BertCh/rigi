@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared GLSL of the Swiss relief (LOOK_RELIEF), one source for both engines through REL_BLOCK's
 // accessors. `reliefShade(albedo, n, worldPos, range)` returns linear colour:
 //   cartographic  Swiss/Imhof multidirectional oblique hillshade (4 lights around the NW main one,

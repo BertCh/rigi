@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 export { HeadingChip, PoseBadge } from "./badges";
 export { LOCAL_ROLL_PREFIX, listUploadRolls, loadRoll } from "./loadRoll";
 export { PanoramaStrip } from "./PanoramaStrip";

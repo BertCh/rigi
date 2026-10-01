@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside P3 (research flag): render the TRUE scene from a novel camera into an RGB-D "3D cache" frame
 // (the GEN3C / Voyager pattern, research_notes/step_inside_models_2026-09.md): DEM terrain + the photo draped
 // onto it from the photo camera (only surfaces the photo saw) + the near-field splats. Whatever is left

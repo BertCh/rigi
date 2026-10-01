@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL for the GPU relief field (twin of look/relief/field.ts: castShadow, skyView,
 // curvatureAndNormal). Same line sweeps, same hull pointers, same byte rounding; f32 instead of the
 // CPU's f64 temporaries, so a byte can differ by 1 where a value sits on a rounding edge.

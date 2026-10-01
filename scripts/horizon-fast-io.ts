@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Node-only DEM source for src/lib/horizon-fast: Mapterhorn 512 px WebP
  * Terrarium tiles with a disk cache (HF_TILE_CACHE; default: this session's

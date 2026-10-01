@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // World view ("In map", settings.mode === 'world') for the deck backend: engine.ts enterWorld /
 // renderWorld / buildFrustum / flyToPhoto, 1:1.
 //   WorldCamera: a THREE.PerspectiveCamera driven by three's own OrbitControls (the same damping,

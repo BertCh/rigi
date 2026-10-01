@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WMM2025_TestValues.txt (NOAA NCEI, in WMM2025COF.zip): [decimal year, alt km (ellipsoidal), geodetic lat,
 // lon, D deg, X nT, Y nT, Z nT] — columns 1–5 and 8–10, verbatim. Used by priors.check.ts only.
 export const WMM2025_TEST_VALUES: readonly (readonly number[])[] = [

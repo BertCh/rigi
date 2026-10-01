@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GLSL for the reveal animation, spliced into both composite shaders (engine.ts compositeFrag and
 // deck/composite-shader.ts). Pure math, no textures or uniforms of its own: each shader passes its
 // own uniforms (packing in config.ts RevealUniforms). Only runs while a reveal is active

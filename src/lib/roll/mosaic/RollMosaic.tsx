@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The mosaic view of a roll: panorama strip on top, then the justified grid next to a plan-view
 // mini map (stacked when `compact`, e.g. the left half of the split view).
 import { Clock, MapPin } from "lucide-react";

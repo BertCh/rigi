@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Lab: Step Inside P3, DEM-conditioned generation (research flag only; reports/step-inside-design.md).
 //   /lab/generate?photo=IMG_7131&nearfield=gen [&step=10] [&width=768] [&stride=2] [&mono=0] [&moves=right,left,fwd]
 // Pipeline (src/lib/nearfield/generate): the photo's ground-truth pose (data/ground-truth.json via roll.resolvePose)

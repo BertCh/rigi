@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import type { SWNE } from "#/lib/ontology/core/geometry";
 // OSM region data for an uploaded photo: named peaks within PEAK_RADIUS_KM and named lakes
 // within TRAIL_RADIUS_KM, fetched from Overpass like scripts/ingest.mjs and shaped as RegionData

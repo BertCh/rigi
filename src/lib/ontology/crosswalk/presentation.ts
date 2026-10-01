@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Crosswalk: presentation and interchange vocabulary. The UI word for each code word lives here, so
 // "replace" is always shown as "Blend" and "world" as "In map".
 

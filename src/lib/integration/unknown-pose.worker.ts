@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /// <reference lib="webworker" />
 /**
  * 0f's CPU cascade (solvePose → refinePose on reject) for photos with unknown heading / gravity /

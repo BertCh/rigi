@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
 // Glue between a live PhotoEngine and the pure export builders in this folder.
 // Browser-only (Blob, fetch, canvas). Uses ONLY the engine's public API:

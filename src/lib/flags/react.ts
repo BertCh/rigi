@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // React readers for the flags that apply live (everything outside RESTART_FLAGS): re-render when the
 // URL changes. Kept out of ./index.ts so workers never pull in the router.
 import { useRouterState } from "@tanstack/react-router";

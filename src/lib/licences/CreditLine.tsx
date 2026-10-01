@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The data-credit line under the photo details. Classic mode renders the app's historic text
 // verbatim (same element, same class); `?attrib=full` renders per-source credits with links.
 import { useMemo } from "react";

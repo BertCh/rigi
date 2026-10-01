@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Eye floor from lakes (GEO GA0: "eye ≥ lake level"; reports/geometry-first-pose.md §2 — would have caught
 // the 6958 GT-eye-under-lake error). A veto-style LOWER BOUND on the eye height, never a pull.
 //

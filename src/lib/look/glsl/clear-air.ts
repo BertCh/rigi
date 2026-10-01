@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared GLSL / WGSL of look/clear-air.ts: invert the photo's own haze along the photo camera's ray
 // on a drape sample (linear in, linear out). One maths for deck WebGL (LOOK_CLEARAIR, world view
 // only, like LOOK_HARMONIZE: an extra uniform block costs the photo-view passes on ANGLE) and the

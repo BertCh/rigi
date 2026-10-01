@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Prints a summary of a built terroir pack: npx tsx scripts/terroir/inspect-pack.ts [id]
 import { readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";

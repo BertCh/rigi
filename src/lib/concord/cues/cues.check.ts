@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Synthetic checks for WP-C cue extraction.
 //   npx tsx src/lib/concord/cues/cues.check.ts
 import { DEG } from "../../geodesy";

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GPU horizon: the horizon-fast ray march (src/lib/horizon-fast/march.ts, the CPU twin and reference) as one
  * WGSL invocation per (eye, azimuth), for batches of eyes that share one ring-mosaic set (pose6dof's eye

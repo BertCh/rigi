@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Layered horizon (recovered verbatim from GA3 src/lib/geocam/tjunc/layered.ts @ a1845f5^ for PEAKFIX PK0): every visible silhouette crest per azimuth,
 // not only the skyline.
 //

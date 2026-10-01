@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside: back-to-front depth sort for Gaussian splats (reports/step-inside-design.md).
 // Runs as a module worker (splat-sort.ts owns it); `sortSplatsByDepth` is also imported directly
 // by splat-sort.ts as the synchronous fallback, so this file must stay free of top-level side

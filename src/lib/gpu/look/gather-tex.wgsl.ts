@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL for the texture-input look passes (textures.ts): gather nodes that read the renderer's
 // targets (geometry rgba32float xyzr or r32float range, colour rgba8unorm(-srgb), masks r8unorm) with textureLoad and rebuild,
 // bit for bit, the arrays the CPU builds before upload (capture.ts / composite.ts / haze.ts), plus

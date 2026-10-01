@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node test of the GPU sky prep's per-photo opacity gate decision (src/lib/sky/prep.ts prepGate).
 //
 //   npx tsx scripts/gpu/sky-prep-gate-check.ts

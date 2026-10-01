@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Synthetic check of solvePose: render the DEM skyline from a known pose
  * (prior perturbed), add noise + fake foreground occluders, solve from the

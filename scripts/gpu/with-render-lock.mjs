@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Run a command under the machine-wide playwright/render lock (see the 2026-09-26 crash notes:
 // 19 GB swap + full disk). Each slot is a directory, created atomically with mkdir; a slot whose
 // owner pid is dead is stolen.

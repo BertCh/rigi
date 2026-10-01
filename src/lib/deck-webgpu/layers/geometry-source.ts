@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Off-frame photo-camera geometry on WebGPU: deck/geometry-source.ts `GeometrySource` for the
 // queries (1024 px long side, with xyz) and autoAlign's silhouette re-rank (384 px, range only).
 // WebGPU port of deck/geometry-pass.ts GpuGeometrySource.

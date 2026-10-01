@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Camera-roll "spot" fusion (Step Inside P2, reports/step-inside-design.md "Roll spots"): several photos
 // taken within VIEWPOINT_RADIUS_M of each other, each with an accepted pose (saved / ground truth / solved),
 // become one ENU splat cloud of the spot's near field. Pure TS (no DOM, no deck).

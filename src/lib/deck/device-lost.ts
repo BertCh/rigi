@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WebGL context loss for DeckEngine (engine.ts). A context is lost to sleep, a GPU switch, a GPU
 // process restart or memory pressure (luma: "too many apps or browser tabs are using the GPU").
 // deck.gl only reports it (onError) and luma logs the restore; neither rebuilds anything.

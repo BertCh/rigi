@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Parity / speed bench of the texture-input look passes (textures.ts) against the array path, on
 // real inputs captured from a live three.js engine (capture.ts). Run in the page by
 // scripts/gpu/textures-bench.mjs. The engine's targets are re-created as textures on the compute

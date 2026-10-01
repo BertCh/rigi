@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // TileCache: memory hot tier → persistent store (Cache API / IndexedDB) → network, with
 // a byte-capped LRU over the persistent store and a priority fetch queue in front of the
 // network. See ./index.ts for the public API.

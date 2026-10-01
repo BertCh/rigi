@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Minimal OSM raster slippy map: drag to pan, wheel/buttons to zoom, click to place a pin.
 // No map dependency. Tiles © OpenStreetMap contributors (tile.openstreetmap.org usage policy:
 // light interactive use with attribution, which is what a one-off pin placement is).

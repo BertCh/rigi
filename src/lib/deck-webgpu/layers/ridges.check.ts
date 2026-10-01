@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Check for layers/ridges.ts.
 //   Node (no GPU):  npx tsx src/lib/deck-webgpu/layers/ridges.check.ts
 //     assembles ridgesModule the way luma's Model does and reflects its binding layout.

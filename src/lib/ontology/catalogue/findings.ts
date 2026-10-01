@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Semantic findings: places where the code disagrees with itself, found by modelling it. Data, so the
 // report lists them and ontology.check.ts pins the ones it can measure (e.g. concord drift).
 

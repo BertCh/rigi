@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Pure helpers for the terroir photo overlays (place card, glacier ghost, sun path, furniture).
 // No DOM, no engine imports: checked in viz.check.ts. Display-only.
 import type { LonLat } from "../types";

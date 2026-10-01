@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Runs the REAL WGSL of the GPU sky prep (src/lib/gpu/sky/prep.wgsl.ts, the kernels exactly as the
 // worker compiles them) on a native WebGPU implementation in node (Dawn, via the `webgpu` npm
 // package) and compares every output with the CPU chain of sky/core.ts, Object.is on each float and

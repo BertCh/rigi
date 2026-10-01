@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // In-browser check for engine.ts (WebGpuEngine) on a real photo, no lab wiring needed. It creates
 // the engine on its own canvas, runs init() (terrain streaming, region, horizon), and checks the
 // Renderer surface end to end:

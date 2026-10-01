@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Per-pixel depth split (reports/step-inside-design.md, "depth split"): the anchored model range is compared
 // with the DEM range at every depth-grid cell.
 //

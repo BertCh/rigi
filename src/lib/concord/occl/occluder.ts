@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WP-F: photo-space occluder range = min(DEM range, DSM object hit, anchored objects, people).
 //
 // Consumers (hooks.patch.txt, flag ?concord=occl) bind it as one texture `tOccl`: trail / contour / ridge

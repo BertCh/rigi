@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GA1 dense Levenberg–Marquardt over the 7-parameter GeoState (reports/geometry-first-pose.md G3).
 //
 // Every Factor carries its own loss; the solver is IRLS: at each linearisation a row with whitened

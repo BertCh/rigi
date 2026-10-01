@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL of the photo-prep kernels (./index.ts runs them; ./emulate.ts is the JS twin, kernel for kernel;
 // src/lib/align.ts edgeMapFromPixels / scanLabels / fitSkyModel are the CPU reference). Every plane is
 // an array<u32>: f32 planes hold binary32 bit patterns, doubles are vec2<u32> (./softf64.wgsl.ts). No

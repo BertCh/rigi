@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Render targets of the WebGPU renderer, with formats and usages fixed here so the compute side
 // (src/lib/gpu look kernels, mt-image-03) can bind them directly on the same device.
 //

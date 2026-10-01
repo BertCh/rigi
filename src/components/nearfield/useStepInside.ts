@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside state for PhotoWorkspace: one NearFieldController per engine, the accepted-pose gate, the
 // step camera enter / back, the Truth toggle and the hover sampler. Everything stays dormant (and the
 // panel invisible) while the near-field service is down or the engine has no setNearField.

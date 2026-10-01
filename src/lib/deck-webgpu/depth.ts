@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Reversed-Z depth: the WebGPU replacement for the GLSL LogDepthExtension / gl_FragDepth trick
 // (deck/world-view.ts, deck/terrain-layer.ts LOG_DEPTH_FAR).
 //

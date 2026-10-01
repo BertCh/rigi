@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Renderer-agnostic terrain for the deck.gl path: the same quadtree tile selection and
 // camera-anchored ENU meshing as ../terrain.ts, but emitted as plain typed arrays, plus
 // CPU queries (height lookup, ray casting, line of sight) for labels, draping and picking.

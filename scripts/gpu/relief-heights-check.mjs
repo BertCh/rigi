@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { register as registerHooks } from "node:module";
 // Node emulation check of the GPU relief height gather (src/lib/gpu/look/relief-heights.ts), no GPU:
 // plans a synthetic DEM tile set (mixed zooms 12 / 13 / 14, sizes 128 / 256 / 512, a no-data corner,

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // IEEE-754 binary64 arithmetic in WGSL u32 integer operations (no float instruction anywhere: the
 // result cannot depend on the device's float precision, FMA contraction, flush-to-zero or fast-math;
 // WGSL defines u32 +, −, *, /, shifts and comparisons exactly). A double is vec2<u32>(lo, hi) of its

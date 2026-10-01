@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside's photo sky on WebGPU: the port of nearfield/deck-step.ts PhotoSkyLayer (itself the
 // deck twin of step-camera.ts makePhotoSky). The photo on a far sphere around the viewing camera,
 // shown only on the photo's Sky pixels (stepMasks().sky, dilated 2 cells), premultiplied over the

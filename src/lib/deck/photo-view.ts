@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // deck.gl view that looks through the photo's camera. World = camera-anchored ENU metres
 // (x east, y north, z up), rendered with COORDINATE_SYSTEM.CARTESIAN. Same pose convention
 // as ../pose.ts so both renderers agree on yaw/pitch/roll/vfov.

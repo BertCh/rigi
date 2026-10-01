@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Minimal store-only (no compression) ZIP writer with CRC-32. Enough for KMZ (JPEG is already
 // compressed; doc.kml is tiny). Supports UTF-8 names, no ZIP64 (entries/total < 4 GiB).
 

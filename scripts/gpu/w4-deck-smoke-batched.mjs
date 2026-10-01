@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // W4 copy of scripts/deck-engine-smoke.mjs: per-tile terrain (?terrain=tiles) vs batched (?terrain=batched,
 // see src/lib/deck/terrain-mode.ts) on the WebGL deck, plus terrain draw calls, main-thread mesh build ms and
 // the silhouette re-rank time. The reference arm is one WebGL deck run per photo with per-tile terrain (it was

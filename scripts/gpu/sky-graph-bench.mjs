@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Sky refine on GPUCommandGraph (src/lib/gpu/sky/refine-graph.ts) vs the CPU refine (sky/core.ts):
 // float / byte parity, bytes-only = floats run, repeated runs with different data across shape-cache
 // hits / misses / evictions, the clear-node rule, transient VRAM and timings. Page realm,

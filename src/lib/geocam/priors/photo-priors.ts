@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Photo metadata → MAP prior factors (GEO GA0/GA1). One adapter so every GEO eval builds the same priors:
 //   gps      horizontal fix ± σH, σH = EXIF hAcc clamped like concord's EyePrior ([5, 100] m, default 20)
 //   alt      GPS altitude (EyePrior altBias / σA), not for pinned positions

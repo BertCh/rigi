@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Guided filter (He, Sun & Tang 2013) on the CPU, grey guide: snaps a soft mask to the guide
 // image's own edges. q = mean(a)·I + mean(b) with a = cov(I, p) / (var(I) + ε), b = mean(p) − a·mean(I),
 // every mean a (2r+1)² box (clamped at the borders) from a summed-area table, so O(N) for any r.

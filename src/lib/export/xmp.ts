@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // XMP sidecar (.xmp) carrying GPS + camera orientation.
 // - GPS: the standard EXIF-in-XMP schema (http://ns.adobe.com/exif/1.0/), readable by exiftool,
 //   Lightroom/Camera Raw, darktable, digiKam.

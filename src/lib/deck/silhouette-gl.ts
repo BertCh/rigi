@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The silhouette pass mask on WebGL2 (deck backend): silhouette-mask.ts has the predicate and the
 // identity argument. One fragment per 96-pixel group reads the pose's r32float range target
 // (GpuGeometrySource.texture, GL rows: row 0 = bottom) and writes an RGBA32UI texel: 3 words of

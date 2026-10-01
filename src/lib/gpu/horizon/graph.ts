@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Horizon march chunks on a core ComputeGraph: the GPU path of computeHorizonGpu (./index.ts).
 //
 // Each chunk is one encoding of a 1-kernel graph:

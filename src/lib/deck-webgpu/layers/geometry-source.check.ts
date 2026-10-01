@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser check for layers/geometry-source.ts. It runs inside /lab/deck-webgpu and needs a real
 // WebGPU device and the lab's streamed terrain. From a playwright page on the lab, once
 // `__deckWebgpuLab.ready`:

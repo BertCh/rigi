@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // PhotoWorkspace's one concord call site (?concord=occl). Without the flag this hook does nothing at all:
 // no import of the display pass, no renderer call. With it, it runs the display pass (display.ts) once the
 // pose is final: the load is done (no status), the second opinion has settled, and the pose is

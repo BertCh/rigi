@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The "Look" panel (styling.md §3): preset chips shared by every view, plus a per-view "Customize"
 // disclosure, and the nested "Label style" / "Trail style" disclosures. Edits go to the style store
 // (src/lib/style/store.ts) as diff-only overrides on the chosen preset; the engine picks them up

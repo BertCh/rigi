@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Client for the optional render-and-match escalation service (tools/matcher/server, default :8765).
 // Everything here degrades to `false` / `null` when the service isn't running: it never throws.
 import type { Pose } from "./camera";

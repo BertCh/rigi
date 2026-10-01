@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Relative EYE refinement for a roll spot (Step Inside P2). Pure TS (no DOM); offline twin + study:
 // tools/nearfield/eyes/refine_eyes.py, results tools/nearfield/eyes/REPORT.txt.
 //

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Batched terrain on WebGPU (port of deck/batched-terrain-layer.ts + batched-terrain-grid.ts;
 // README.md "Ports"). Every streamed DEM tile is drawn by ONE instanced, indexed draw per mesh
 // resolution (64 / 128 / 256 segments) and pass, with no CPU mesh:

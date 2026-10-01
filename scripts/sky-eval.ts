@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Evaluates src/lib/sky on public/photos/*.jpg in node (onnxruntime-web, WASM).
  *

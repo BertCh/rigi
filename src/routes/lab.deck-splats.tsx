@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Lab: DeckSplatLayer (src/lib/nearfield/deck-splat-layer.ts) on its own, no DeckEngine. A synthetic
 // GaussianCloud (person, hut, tree, a half-buried rock, and a red ball hidden behind a hill) over a
 // synthetic tile drawn by the repo's own TerrainLayer (hillshade, log depth), through the same

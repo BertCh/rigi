@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import type { ConceptId } from "#/lib/ontology/catalogue/concepts";
 import type { MethodId } from "#/lib/ontology/core/provenance";
 

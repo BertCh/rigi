@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Multi-pass compute pipelines with GPU-resident intermediates, over gpu-core's GPUCommandGraph
 // (experimental, WebGPU only; imported via core/luma.ts). The graph infers pass ordering from the
 // declared buffer uses, aliases transient scratch across disjoint lifetimes, and times each node.

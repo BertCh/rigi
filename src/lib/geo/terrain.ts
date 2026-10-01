@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Multi-level Terrarium DEM sampler (tiles, sources and decoding: src/lib/dem).
  */

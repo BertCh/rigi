@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { useEffect, useMemo, useState } from "react";
 import {
 	type AtlasPhotoData,

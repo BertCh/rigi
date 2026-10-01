@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Runs the deck-on-WebGPU feasibility spike (/lab/deck-webgpu?spike=1) and prints its report.
 // Needs deck's full build, i.e. the dev server from scripts/deck-webgpu/vite.webgpu.config.ts:
 //   npx vite dev --config scripts/deck-webgpu/vite.webgpu.config.ts --port 3111

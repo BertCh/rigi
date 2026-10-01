@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Type-only assertions (no runtime code is emitted that anything imports): both deck engines satisfy
 // the Renderer interface structurally. `tsc --noEmit` fails here if either drifts.
 import type { DeckEngine } from "./deck/engine";

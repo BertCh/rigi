@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Oklab (Ottosson 2020) in GLSL: the one copy. color-stats' reduce/harmonise and the OKLab band-ramp
 // interpolation (the former studio's rampToOklab/rampFromOklab, same matrices) both use these.
 // linearToOklab clamps negative input to 0 (cube root of a negative LMS is undefined in GLSL pow).

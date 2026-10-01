@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CLASSIC: a literal transcription of today's hard-coded look (styling.md §1). Each value cites
 // the line it comes from (tree as of 2026-09-25 12:55; engine.ts lines after ~690 are re-verified
 // and differ from styling.md, which predates a +7-line edit there). The chunk-0 pixel diff and scripts/style-check.ts

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WP-F: swisstopo surface/terrain model streaming — STAC resolve + minimal Cloud-Optimised GeoTIFF range reader.
 //
 // No geotiff.js (not installed; no new deps): a small TIFF/BigTIFF IFD parser, tiled/stripped layouts,

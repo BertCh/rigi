@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GA0 flag A/B on the app's auto-alignment (a copy of scripts/eval-app.mjs with flag overrides; rules in
 // tools/research/geo/PROTOCOL.txt "GA0 - Agent A"). Runs every control-point photo twice on the SAME
 // harness, flags off (arm A) and with the given flags on (arm B, via globalThis.__RIGI_FLAGS__ in an init

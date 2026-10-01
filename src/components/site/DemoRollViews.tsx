@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { PanoramaStrip } from "#/lib/roll/mosaic/PanoramaStrip";

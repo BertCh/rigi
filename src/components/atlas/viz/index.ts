@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 export { Callout } from "./Callout";
 export { CodeRef } from "./CodeRef";
 export { DEMO_IMAGES, DemoImage, type DemoName } from "./DemoImage";

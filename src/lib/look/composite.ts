@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The look composite's CPU side (P4 amendment: no GPU passes), shared by both engines: the refined
 // masks (LOOK_REFINE: terrain coverage and people guided-filtered on the photo), the per-band colour
 // statistics (LOOK_HARMONIZE) and the photo's noise (LOOK_OUTPUT grain). Each runs once per pose

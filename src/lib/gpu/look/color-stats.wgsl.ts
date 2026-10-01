@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL for the GPU band statistics (twin of look/color-stats.ts bandInputs + reduceBands): per
 // pixel the photo's and the layer's Oklab, the validity mask (terrain beyond minRange, full layer
 // coverage, no people, ≥ 3 px from the sky) and the range band; then per band Σ and Σ² of both

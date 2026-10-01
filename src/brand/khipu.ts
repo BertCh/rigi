@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Rigi's brand palette, drawn from the Brezine Color Chart: Marcia Ascher's khipu cord
 // colour codes as encoded by Carrie Brezine in the Harvard Khipu Database, with the hex
 // swatches published by the Khipu Field Guide (khipufieldguide.com/sketchbook/brezine_colors.html).

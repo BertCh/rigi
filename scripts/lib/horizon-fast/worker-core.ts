@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Environment-agnostic worker job: build mips for sector mosaics, march. */
 import {
 	computeHorizonFast,

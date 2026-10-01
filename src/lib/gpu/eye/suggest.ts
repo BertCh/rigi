@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * The photo page's "Check camera position" suggestion: pose6dof's eye search (refineEyeFromSkyline)
  * on the batched horizon provider (./index.ts: WebGPU when getComputeDevice() gives a device, else the

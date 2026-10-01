@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Tiles3DSet: the 3D Tiles sources of one photo (config.ts), streamed by 3d-tiles-renderer around the
 // Step Inside eye and placed in the photo's ENU frame (frame.ts, geoid.ts). Both engines use it:
 //   · three (engine.ts): `group` joins the scene on TILES3D_LAYER (only the step camera enables it),

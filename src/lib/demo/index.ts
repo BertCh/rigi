@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The bundled sample trip (public/demo/, built by scripts/demo/unpack.mjs from an exported upload
 // roll). Its photos are registered with photos.ts like uploads, so /photo/demo-NN and /roll/demo use
 // the normal workspace and roll code. Each photo ships the pose the roll aligner found on the

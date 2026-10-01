@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Node-only IO for the baseline scripts: tile cache, HEIC→JPEG, image pixels. */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";

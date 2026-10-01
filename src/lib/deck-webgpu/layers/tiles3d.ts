@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside 3D Tiles on WebGPU: the port of tiles3d/deck-layer.ts Tiles3DDeckLayer (itself the deck
 // twin of tiles3d/material.ts) to a host-agnostic GpuLayerCore (README.md "Layer contract"). It draws
 // the visible meshes of a Tiles3DSet (tiles3d/tiles.ts, the same THREE tile selector the WebGL

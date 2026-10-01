@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Score the app's auto-alignment against hand-labelled control points (data/control-points.json).
 // Needs the dev server (default http://localhost:3100).
 // Usage: node scripts/eval-app.mjs [--renderer deck|webgpu|auto] [IMG_xxxx ...]

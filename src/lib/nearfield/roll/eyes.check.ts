@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for the eye refinement (./eyes.ts). Run: npx tsx src/lib/nearfield/roll/eyes.check.ts
 // Synthetic pairs with a known eye difference, the solver's constraints, and parity with the Python study
 // (tools/nearfield/eyes/fixture_IMG_7059_IMG_7063.json, from export_fixture.py). Exits 1 on any failure.

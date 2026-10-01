@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // npx tsx scripts/ontology/gen-realizations.ts — regenerate src/lib/ontology/checks/realizations.ts from
 // the concept catalogue (every realizedBy key → `import("#/…").Export`). tsc then proves each export
 // exists; the Equal<> assert proves the map and the catalogue list the same keys.

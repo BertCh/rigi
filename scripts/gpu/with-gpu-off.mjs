@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Run a playwright script with the app's GPU compute kill switch on in every page it opens
 // (globalThis.__RIGI_FLAGS__.gpu = "off", which survives the scripts' localStorage.clear()).
 // Usage: node scripts/gpu/with-gpu-off.mjs scripts/eval-app.mjs IMG_6958 …

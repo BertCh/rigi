@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /// <reference lib="webworker" />
 // Worker half of client.ts: one eye search (suggest.ts runEyeSearch) per worker; the main thread
 // terminates it afterwards (or on cancel). The page's GPU kill switch is passed in (a worker sees no

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node check of the silhouette mask scheme (src/lib/deck/silhouette-mask.ts), no GPU:
 // - a JS emulation of the mask shaders (deck/silhouette-gl.ts, deck-webgpu/silhouette-gpu.ts: f32
 //   products via Math.fround, the same three-valued tests, the same 96-pixel packing) on synthetic

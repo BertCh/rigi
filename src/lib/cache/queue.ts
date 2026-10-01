@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Priority work queue with in-flight dedupe, a concurrency limit, per-caller AbortSignal
 // cancellation and re-prioritisation. Pure logic (no fetch / DOM), so it runs under node.
 //

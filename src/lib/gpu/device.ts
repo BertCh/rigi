@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared WebGPU compute device. The implementation lives in ./core/device.ts; this module is the
 // stable import path the kernels (and the deck-webgpu renderer) already use.
 //

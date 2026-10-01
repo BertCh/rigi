@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // npx tsx src/lib/picker/candidates.check.ts — pure checks of the picker maths (no browser).
 import { solvePins } from "#/lib/align";
 import { type Pose, projectPoint } from "#/lib/camera";

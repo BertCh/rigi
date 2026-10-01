@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // ViewStyle.labels → CSS custom properties for the DOM peak labels (PhotoWorkspace, styling.md
 // §2.3 / chunk 4). Set on the label layer; the label elements read them through var(). For classic,
 // each value computes to what the old Tailwind classes produced: colours with alpha use the same

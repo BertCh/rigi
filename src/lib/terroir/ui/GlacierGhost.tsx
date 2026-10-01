@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // T3.2 Glacier then and now: a former glacier extent (pack.glaciers, GLAMOS / swisstopo) registered on
 // the photo through the solved pose. Honest default: the ring is draped at TODAY's terrain height (the
 // per-vertex DEM heights in the pack) + a 5 m lift. The 1850 ice surface was higher than today's

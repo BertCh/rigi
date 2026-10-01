@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Does /photo/<id>?renderer=deck[&extra] load (data-ready) without page errors? Run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/deck-load-check.mjs [IMG_7086] [--query terrain=batched]
 import { chromium } from "playwright";

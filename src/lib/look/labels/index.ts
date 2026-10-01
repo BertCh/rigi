@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Peak labels, one module for both engines and the UI: classic rank + declutter (rank.ts), the
 // panorama / inline layouts (layout.ts) and their sinks: DOM CSS variables (css.ts), SVG
 // (PeakLabelsSvg.tsx) and the export canvas (canvas.ts).

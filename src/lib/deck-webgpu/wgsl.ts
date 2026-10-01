@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared WGSL: colour transfer functions, ENU helpers and the fog / atmosphere hook. Plain source
 // strings (no bindings) are concatenated into a layer's shader; modules with uniforms are luma
 // ShaderModules (bind group 0, @binding(auto)).

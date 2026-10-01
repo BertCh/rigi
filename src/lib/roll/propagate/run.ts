@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Roadmap R5 orchestration: one accepted anchor → its neighbours → relative rotation (service) → gate.
 // Gated rows become StoredSuggestions (pending until the user accepts or dismisses). Nothing is accepted here.
 import type { Mat3 } from "../../nearfield/propagate";

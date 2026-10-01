@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // One-call cue extraction (WP-C): occluding contours matched to photo edges + water level/shore cues.
 // CPU-only; the GeomBuffer comes from a GPU render readback or from raycast.ts buildGeomBuffer.
 import type { CameraX, Cue } from "../core";

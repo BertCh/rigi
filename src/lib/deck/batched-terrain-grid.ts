@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU side of the batched terrain path (batched-terrain-layer.ts, opt-in: terrain-mode.ts).
 //
 // A tile is no longer meshed on the main thread. The vertex shader rebuilds exactly what

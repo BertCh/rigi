@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // npx tsx src/lib/ontology/ontology.check.ts — runtime integrity of the ontology and its agreement with
 // the app. The compile-time half (crosswalk exhaustiveness, realizations) is tsc's job (checks/, crosswalk/).
 //   1. catalogue: parents, parts, id schemes and storage refs resolve; words don't collide

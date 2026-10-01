@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Texture helpers shared by the layer ports: the photo (sRGB, mipmapped), byte masks (people,
 // brush, sky), float fields. One place for formats / usages so every port samples the same way.
 import type { Device, Texture } from "@luma.gl/core";

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Clear air: take the photo's own aerial perspective out of a photo drape before the view's haze
 // goes on. A draped photo already carries the haze between the photo camera and the ground; the
 // terrain shader then hazes the fragment again from the viewer, so distant ground was veiled twice

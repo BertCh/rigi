@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The Rigi concept catalogue: every noun the product, the code and the docs use, with its definition,
 // its words (UI / code / avoided), its parts, and the TypeScript types that realize it. Realization keys
 // are "<path under src/>#<ExportName>"; checks/realizations.ts maps every key to the real type with

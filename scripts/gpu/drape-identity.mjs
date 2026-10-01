@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Drape identity check (deck renderer, WebGL2): per photo, settle the app's final pose, then hash
 //   - geometry: the query geometry buffer (geoSrc.range, row 0 = top, Infinity = sky)
 //   - drapeRange: what the world drape samples (the CPU range map's data, or the GPU drape texture

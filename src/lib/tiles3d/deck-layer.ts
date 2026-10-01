@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside 3D Tiles for DeckEngine (deck.gl 9.4, CARTESIAN camera-anchored ENU): draws the visible
 // meshes of a Tiles3DSet (tiles.ts) — the same THREE tile selector as the three engine, driven by the
 // deck world camera (a THREE camera), so both engines show identical tiles.

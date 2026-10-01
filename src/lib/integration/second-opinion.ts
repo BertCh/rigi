@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Second opinion on the app's autoAlign for photos with full metadata (compass + gravity + focal).
 //
 // reports/leaderboard.md: the app's GPU aligner makes 1 confident wrong accept on the GT set (IMG_7130,

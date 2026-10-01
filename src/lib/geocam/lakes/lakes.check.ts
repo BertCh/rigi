@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // npx tsx src/lib/geocam/lakes/lakes.check.ts — synthetic tests for compact / levels / floor / fetch
 // (Agent A's part of src/lib/geocam/lakes; factors.ts has its own lakes-factors.check.ts). Exit 1 on failure.
 import {

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Draped imagery for the WebGPU terrain: one 2D texture ARRAY (rgba8unorm-srgb, 512² layers,
 // mipmapped), one layer per tile. Hardware sRGB decode = linear samples with correct filtering.
 // Tiles arrive as ImageBitmaps from deck/terrain-data.ts loadImagery (256·2^k px mosaics); each is

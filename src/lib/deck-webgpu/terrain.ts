@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The WebGPU terrain layer (first port; README.md "Layer contract"). Draws the streamed DEM tiles
 // (deck/terrain-data.ts TileMesh, full CPU meshes) in two passes:
 //   geometry  → ENU xyz + range, normal + class 0 (GeometryTargets MRT)

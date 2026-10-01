@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // A tiny terroir pack for node checks (Thunersee-ish coordinates).
 import type { TerroirPack } from "../types";
 

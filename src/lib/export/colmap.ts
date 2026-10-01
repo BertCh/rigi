@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // COLMAP text-model export (cameras.txt / images.txt / points3D.txt), packaged as a store-only zip.
 // Format: https://colmap.github.io/format.html#text-format
 // images.txt has TWO lines per image: the pose line and the POINTS2D line. COLMAP's

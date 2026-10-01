@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Pure helpers for the terroir name labels (NamesSvg): reach filter, dedupe against the engine's
 // peak labels, typography, ranking, uncertainty softening and the greedy rectangle declutter.
 // No DOM, no React: run by labels.check.ts in node.

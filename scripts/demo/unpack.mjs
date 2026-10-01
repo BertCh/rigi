@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Turn an exported upload roll (/dev/export-roll → rigi-roll-<id>.json) into the bundled sample trip:
 // public/demo/manifest.json + photos/ + thumbs/. The whole roll is kept except photos with no pose at
 // all (source "prior"; --keep-prior keeps them too); --exclude a,b drops photos by original id.

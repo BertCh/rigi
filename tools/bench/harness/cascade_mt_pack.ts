@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Cascade-on-Mapterhorn follow-up: (a) a new cascade pose inherits an existing verify_v2 cluster when it
  * is within 0.5° yaw and 0.5° pitch of that cluster's pose and its eye is within 2 m of the cluster's

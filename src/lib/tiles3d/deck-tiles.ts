@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // deck/engine.ts's side of Step Inside 3D Tiles: owns the photo's Tiles3DSet,
 // refines it from the deck world camera (a THREE camera) while stepping and hands worldLayers() a
 // Tiles3DDeckLayer. Tile arrivals are coalesced to one layer update per animation frame. The tiles

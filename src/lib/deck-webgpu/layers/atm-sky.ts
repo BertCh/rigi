@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WebGPU port of the world view's sky (deck/world-view.ts AtmSkyLayer + engine.ts's flat
 // `canvas.style.backgroundColor = ws.sky`) and of the physical aerial perspective
 // (look/glsl/atmosphere.ts ATMOSPHERE_FNS, LOOK_ATMOSPHERE) for the terrain colour pass.

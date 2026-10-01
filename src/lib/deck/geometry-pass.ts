@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU geometry pass for the deck backend: the terrain tiles of a live Deck, rendered through the
 // photo camera into a float target that holds the range (m) per pixel. deck.gl port of
 // engine.ts renderGeometry()/geoRT (materials.ts style 3).

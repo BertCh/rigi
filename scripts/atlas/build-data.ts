@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Real data for the atlas explainer pages (/atlas/<id>): runs the CPU baseline pipeline on the bundled
  * Niederhorn demo photos and writes compact artefacts the pages load at runtime.

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GA1 real-data fixtures for the GTSAM parity test (Agent C: tools/research/geo/gtsam_ref.py parity).
  *

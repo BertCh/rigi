@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * PEAKFIX summary + registered verdicts (tools/research/peakfix/PROTOCOL.txt).
  *   npx tsx scripts/peakfix/summarize.ts [--tag x]

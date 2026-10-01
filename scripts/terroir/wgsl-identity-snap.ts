@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL identity proof for the terroir port in deck-webgpu (reports/terroir-cartography.md): with every
 // terroir switch off, the generated terrain-styles WGSL, the pipeline keys, the shader modules and the
 // terrainStyle uniform layout must be byte-identical to before the port.

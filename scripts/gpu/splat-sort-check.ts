@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Node check (no GPU, no browser) of the GPU splat sort's identity with the worker's counting sort:
 //   npx tsx scripts/gpu/splat-sort-check.ts
 // 1. radix == worker: for the worker's EXACT keys (f64 formula), the tiled stable radix order

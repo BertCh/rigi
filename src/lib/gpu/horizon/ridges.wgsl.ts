@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Ridgeline tops: the fixed-distance sampling of src/lib/roll/mosaic/ridgelines.ts (traceViewpoint's
 // 3600 columns x ~1200 distances), as one WGSL invocation per (column, slab). The horizon march
 // (./horizon.wgsl.ts) walks an adaptive, mip-skipping schedule; the ridge trace samples EVERY distance of a

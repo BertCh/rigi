@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Main-thread client for the viewpoint ridgelines (ridgelines.ts, in ridgelines.worker.ts). Tiles go
 // through dem's fetchDemBytes (shared tile cache, missing-tile policy, 0 requests on a warm load); one
 // worker runs at a time (each holds ~100 MB of mosaics), results are memoised per eye for the session.

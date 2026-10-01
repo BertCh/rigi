@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Heights for the relief field: the loaded DEM tiles (both engines keep each tile's size × size grid
 // of metres ASL: three TerrainTile, deck TileMesh) resampled bilinearly onto a square ENU grid, with
 // no heightAt lookups. Finer tiles overwrite coarser ones. Heights are ASL, not ENU z: within the

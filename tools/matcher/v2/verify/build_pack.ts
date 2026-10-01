@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * v2 blind verification pack (DEV ids only). Same protocol as tools/bench/final/addendum/build_pack.ts:
  * Mapterhorn overlay (tools/bench/harness/overlay.ts) at EXACTLY the eye in each candidate, neutral header

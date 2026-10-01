@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WP-F: near-field surface model (DSM) + terrain (DTM) around a photo, resampled to the engine's ENU frame.
 //
 // DSM = swissSURFACE3D Raster (0.5 m product; its 2 m / 1 m COG overview levels are read), DTM = swissALTI3D

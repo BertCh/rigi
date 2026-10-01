@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Summarise tools/nearfield/smear/grid-<renderer>-<id>.json against the blind labels (labels.json).
 // See smear-measure.mjs for the smear definition. No browser.
 //   node scripts/nearfield/smear-report.mjs [--renderer=deck] [--band=0.02]   (stored three grids: --renderer=three)

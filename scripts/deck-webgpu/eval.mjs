@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Load a lab URL, wait for ready, evaluate a JS expression in the page and print the result.
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/eval.mjs "<url>" "<expr>"
 import { chromium } from "playwright";

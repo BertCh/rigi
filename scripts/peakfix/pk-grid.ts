@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * PEAKFIX PK1 / PK2 eye grid search (tools/research/peakfix/PROTOCOL.txt). DEV GT photos only, CPU, no renders.
  *

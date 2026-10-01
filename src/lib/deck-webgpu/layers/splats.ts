@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside's Gaussian splats on WebGPU: the port of nearfield/deck-splat-layer.ts DeckSplatLayer
 // + deck-splat-shaders.ts (GLSL) to a host-agnostic GpuLayerCore (README.md "Layer contract").
 //

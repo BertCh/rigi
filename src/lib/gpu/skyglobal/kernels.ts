@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The skyglobal kernel specs and the GPU phase's helpers (./graph.ts): the lease / pool names, the
 // count-first head sizing and the readback → GpuOut decode (incl. the optional tail read of a long
 // candidate list from the pooled list buffer). Its own module so ./graph.ts can import it without

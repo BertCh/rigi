@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Glaciers (GLAMOS SGI), lithology (swisstopo GK500) and land cover (swisstopo VECTOR25 + OSM + DEM).
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

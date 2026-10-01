@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { storageKey } from "#/lib/ontology/core/storage";

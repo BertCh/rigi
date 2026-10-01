@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The GPU sky refine (refine.ts refineSkyGpu) on gpu-core's GPUCommandGraph, via core/graph.ts
 // ComputeGraph: the only GPU refine since 2026-10-01 (the pooled dispatchAll path it replaced gave
 // bit-identical bytes and floats).

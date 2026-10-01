@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import type { Link } from "#/lib/atlas/graph-utils";
 import { GROUPS } from "#/lib/atlas/graph-utils";
 import type {

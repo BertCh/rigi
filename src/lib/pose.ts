@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // three.js adapter for the camera model in ./camera (Pose conventions are documented there).
 import * as THREE from "three";
 import type { Pose } from "./camera";

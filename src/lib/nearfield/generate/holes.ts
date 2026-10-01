@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside P3 (research flag): the pure-TS half of DEM-conditioned generation.
 //   RGB-D cache view (cache-render.ts) → hole mask → [inpainter fills the holes] → lift ONLY the filled
 //   pixels into Gaussians with provenance `generated`.

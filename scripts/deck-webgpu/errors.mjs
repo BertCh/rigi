@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Print the full WebGPU / page errors of one lab URL (the smoke truncates them).
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/errors.mjs "<url>" [maxErrors]
 import { chromium } from "playwright";

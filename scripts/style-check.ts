@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Self-check for src/lib/style (no test runner in this repo). Run: npx tsx scripts/style-check.ts
 // Exit 0 = all pass. Covers: CLASSIC = today's constants (numbers snapshot; the cross-check against the
 // three.js materials.ts uniforms went with the three.js renderer, 2026-10-01), ramps vs the shader formulas, merge/clamp/

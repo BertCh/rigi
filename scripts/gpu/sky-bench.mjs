@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Sky segmentation on the GPU (src/lib/gpu/sky/**): parity and timing of the GPU refine against the CPU
 // refine (src/lib/sky/core.ts refineToWorking), and end-to-end timing of the real sky worker.
 // Always run it under the render lock:

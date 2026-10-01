@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Browser parity + timing of the GPU coarse grid (./index.ts) against solvePose (geo/solve.ts) and
  * the CPU twin (./cpu.ts), on the unknown-pose worker's own scene (loadScene + sceneHorizon,

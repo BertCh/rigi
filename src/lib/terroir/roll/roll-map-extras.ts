@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Extra deck layers for the roll 3D map (terroir T0.6/T0.8/T0.9/T2.8), added through the engine's
 // setExtraLayers hook so roll-map.ts needs no layer code of its own:
 //   - camera halos (soft rings in pixels, so the cameras are findable at overview zoom)

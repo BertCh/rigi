@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Bench of the look graphs (relief-graph.ts, guided-filter-graph.ts, color-stats-graph.ts; the only GPU
 // paths of relief / guided filter / band stats) in the page realm (scripts/gpu/look-graph-bench.mjs).
 // Checks:

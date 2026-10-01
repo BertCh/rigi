@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU side of the terroir terrain shading (./terrain.ts): which TERROIR_* defines a style needs, the
 // cover texture's ENU → UV mapping, the dated snowline, the Swiss index and the adaptive contour
 // levels, packed as TER_BLOCK values. Engine-agnostic (deck terrain-layer.ts, three engine.ts).

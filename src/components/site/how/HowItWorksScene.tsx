@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { Pause, Play, RotateCcw } from "lucide-react";
 import {
 	type PointerEvent as ReactPointerEvent,

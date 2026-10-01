@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Byte-capped LRU index. Pure bookkeeping (no I/O): it tracks which keys exist, their
 // sizes and recency, and tells the caller which keys to evict. Used both for the
 // persistent tile store's metadata and for the in-memory hot tier.

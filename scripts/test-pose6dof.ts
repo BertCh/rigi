@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Tests for src/lib/pose6dof: consistency with pose.ts, minimal solvers, synthetic sweep,
  * refinePosition, and the real hand-labelled control points.

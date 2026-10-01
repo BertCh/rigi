@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // W5 parity / speed bench: every GPU look twin against its CPU function on the same inputs
 // (captured from a live engine by capture.ts). Run in the page by scripts/gpu/look-bench.mjs.
 // Errors: max / p99 / mean absolute difference (bytes for the relief textures and the mask bytes,

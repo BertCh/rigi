@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GPU photo prep for autoAlign: align.ts buildEdgeMap (after its canvas step) and fitPriorSky on the
  * GPU, BIT-IDENTICAL to the CPU (align.ts edgeMapFromPixels / scanLabels / fitSkyModel are the

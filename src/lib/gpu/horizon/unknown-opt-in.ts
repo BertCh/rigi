@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Opt-in for the unknown-pose worker's GPU 360° horizon (./scene-profile.ts). Off by default.
 //
 // Separate from gpuHorizonOptIn (./opt-in.ts, the app's skyline march for autoAlign): the two feed

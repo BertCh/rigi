@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Camera-roll spot fusion: merge per-photo ENU clouds and drop splats that another photo already covers
 // (multi-resolution voxel hash). Pure TS.
 //

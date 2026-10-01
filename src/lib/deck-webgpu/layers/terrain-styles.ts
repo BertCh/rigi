@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL port of the terrain styles (README.md "Ports": layers/terrain-styles.ts). Plugs into
 // TerrainCore (and the batched terrain port) through the TerrainShaderPart seam, without editing it:
 //

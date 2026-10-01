@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Self-test of src/lib/gpu/core (device registry, pool + leases, ring readback, kernels, command
 // graph + GPUReduction, timestamp profiling, adoptRenderDevice). Runs src/lib/gpu/core/selftest.ts
 // in headless Chromium (WebGPU) against the dev server.

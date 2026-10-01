@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // In-browser isolation check for layers/terrain-styles.ts (no lab, no region data). Draws a
 // synthetic DEM tile (a smooth massif, 1000–3100 m, slopes 0–60°) through the real TerrainCore
 // geometry + MSAA colour passes (hosts/passes.ts) with every style program, reads back the

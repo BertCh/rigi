@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { cn } from "#/lib/utils";
 
 /** Bundled demo imagery (Niederhorn above Lake Thun). Names are stable; all paths live under public/demo. */

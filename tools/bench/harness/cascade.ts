@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Method (B): 0f's CPU cascade (on 0f's MAPTERHORN DEM, see sceneAt0f) (scripts/eval.ts SOLVER=cascade: solvePose → refinePose on reject),
  * fed ad-hoc photo metadata instead of HEIC EXIF. Import-only use of src/lib/geo, src/lib/refine

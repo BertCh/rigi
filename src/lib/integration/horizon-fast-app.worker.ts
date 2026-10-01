@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /// <reference lib="webworker" />
 // Worker half of horizon-fast-app.ts. It decodes the Terrarium tiles that the main thread fetched through
 // the shared tile cache into a horizon-fast TileStore. It then builds the ring mosaics (with max-mips),

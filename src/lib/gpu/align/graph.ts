@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The align kernels (./pose-grid.ts POSE_GRID, ./pose-bound.ts POSE_BOUND) on a core ComputeGraph:
 // the only GPU path of scorePoseGridGpu and poseBoundSession (the pooled single dispatch it replaced,
 // bit for bit, was removed on 2026-10-01). Both are one-pose-per-workgroup kernels with one storage

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU readback of the geometry targets (queries, align, harnesses). WebGPU copies need 256-byte
 // row alignment; rgba32float rows (16 B/px) are aligned whenever width % 16 == 0 (1024, 384 are).
 // Rows come back TOP-first (image order) — the WebGL path's GeometryTarget.read is bottom-first.

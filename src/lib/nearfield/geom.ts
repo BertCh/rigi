@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Shared numeric helpers for the near-field core: intrinsics, z-depth → ray length, mask and DEM
 // lookups on the depth grid. Pure TS (no three/deck).
 import type { Pose } from "../camera";

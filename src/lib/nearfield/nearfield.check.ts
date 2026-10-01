@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Self-contained checks for the near-field core. Run: npx tsx src/lib/nearfield/nearfield.check.ts
 // Exits 1 on the first failed group (prints every failure).
 import type { Pose } from "../camera";

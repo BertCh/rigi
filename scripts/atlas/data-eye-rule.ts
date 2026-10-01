@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Eye-rule data for /atlas/eye-rule: runs the real altitude-contour prior (src/lib/concord/priors/altitude.ts
  * eyePriorFromExif) on the 12 bundled Niederhorn fixes, against two DEMs (Terrarium z13 near the fix, and

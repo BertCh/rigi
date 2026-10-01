@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // R5 browser check: /roll pose-propagation panel on the bundled Niederhorn viewpoint (IMG_7059/7063/7068).
 // Needs the dev server (default :3100) and tools/nearfield/propagate/run_service.sh (:8769).
 // Run under the render lock:

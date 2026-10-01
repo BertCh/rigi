@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WP-B checks (node, synthetic, no network): npx tsx src/lib/concord/priors/priors.check.ts
 import { focalPxFromF35 } from "../../camera/focal";
 import type { Vec3 } from "../core/types";

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /** Node-only Overpass fetch of OSM peaks with a disk cache in .cache/overpass. */
 import fs from "node:fs";
 import path from "node:path";

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Depth-lift: one Gaussian per kept depth-grid block (camera frame), and the camera → ENU transform that
 // places any camera-frame cloud with the app's solved pose.
 //

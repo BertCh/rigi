@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import type { Device } from "@luma.gl/core";
 
 /** The WebGL2 context behind a luma.gl WebGL device (deck.gl's device; not for WebGPU devices). */

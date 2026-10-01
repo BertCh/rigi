@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // 3D map of a roll: every photo draped on the terrain at once (RollMapEngine), with a small
 // control strip: overview / fly into the selected photo, walk between photos from inside one,
 // basemap, drape opacity, reach and blend sharpness, and a hover card on the camera pins.

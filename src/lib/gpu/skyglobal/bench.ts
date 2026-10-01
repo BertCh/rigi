@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Browser parity + timing of the skyline global search: GPU grid (./index.ts, on its core graph; run
  * to run bit for bit) vs the TS CPU twin

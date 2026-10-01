@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // L4: every place Rigi persists something on the user's device, in one table. The check
 // (ontology.check.ts) scans src/ for key literals with Rigi's prefixes and fails on any key that is
 // not registered here, so a new namespace can't appear unnoticed.

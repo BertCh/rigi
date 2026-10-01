@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The look-on-GPU switch, without importing luma.gl: look/** checks this synchronously and only
 // then loads the GPU code (hooks.ts) with a dynamic import, so the CPU path and the node tests never
 // touch WebGPU.

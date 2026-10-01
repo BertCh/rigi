@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The GPU guided filter (guided-filter.ts guidedFiltersGpu) on a core ComputeGraph: its only GPU
 // path (the pooled dispatchAll path it replaced, bit for bit, was removed on 2026-10-01).
 //

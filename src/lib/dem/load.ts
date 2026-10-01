@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Browser DEM loading: decode (image.ts, in a worker pool on the page), a plain uncached fetch and its
 // tile-cached twin, and the app's one Mapterhorn tile policy (shared tile cache; a missing tile is stood
 // in for by its nearest ancestor).

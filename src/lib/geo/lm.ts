@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Small dense Levenberg–Marquardt for a handful of parameters, with a
  * numeric Jacobian and optional Huber/Cauchy weighting (IRLS). Residuals may

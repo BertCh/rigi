@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Batched horizon provider for pose6dof's eye search (refineEyeFromSkyline, src/lib/pose6dof/eye.ts),
  * on the GPU horizon (../horizon, computeHorizonsAuto: WebGPU when available, else the CPU march).

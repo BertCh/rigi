@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Exact u32 emulation of the sky prep's float64 chain (sky/core.ts resamplePlanes + normalise), and
 // the CPU-side tables the GPU kernels (prep.wgsl.ts) read. WGSL has no f64, and the CPU path is an
 // f64 chain stored through f32 (see the file header of prep.wgsl.ts for the argument), so the kernels

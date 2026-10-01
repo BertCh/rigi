@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Confidence for a refined pose. Combines:
  *   - peak-to-sidelobe ratio (PSR) of the yaw correlation (init.ts);

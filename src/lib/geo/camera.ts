@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { FF35_DIAGONAL_MM, focalPxFromF35 } from "../camera/focal";
 import { concordOn } from "../concord/flags";
 import { focalPrior, lensModelFromCamera } from "../concord/priors/focal-table";

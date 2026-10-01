@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL of the GPU splat depth sort (see ./README.md and ./index.ts). Two radix passes of 9 bits over
 // 17-bit keys: the worker's 16-bit key (0..65535) plus one extra key, 65536, for splats the worker
 // drops (view depth <= near), which therefore sort last. Every pass is a STABLE counting sort:

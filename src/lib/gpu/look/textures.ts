@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Texture-input look passes: the guided-filter masks, the band colour stats and the haze prep, fed
 // straight from the renderer's GPU targets instead of CPU arrays read back from them.
 //

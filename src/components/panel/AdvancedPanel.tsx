@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The sidebar's "Experimental & dev" section: every app flag (src/lib/flags) as a control, grouped by
 // concern (./flags.ts). A change is a router navigation: the URL is the only store, the root route
 // carries it to the next page, and the photo route remounts the workspace, so the engine and workers

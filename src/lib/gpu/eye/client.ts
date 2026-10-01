@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Main-thread side of the photo page's eye-position suggestion (suggest.ts, in suggest.worker.ts).
  * Light on purpose: the photo chunk only gets this file; pose6dof / horizon-fast load in the worker.

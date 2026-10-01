@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // 2D plan view of a roll over OSM tiles: one FOV wedge per photo (heading ± hfov/2), coloured by
 // viewpoint. Click a wedge to select its photo. Same tile maths as upload/SlippyMap (which only
 // draws one pin), copied so both can evolve independently.

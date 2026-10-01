@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Per-column skyline from a soft sky mask: the topmost sky→non-sky
  * transition, sub-pixel from the 0.5 crossing of the soft mask, weighted by

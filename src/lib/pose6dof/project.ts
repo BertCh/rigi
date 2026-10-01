@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The ../camera projection with an analytic Jacobian w.r.t. the 7 solver parameters. Equal to it up
 // to rounding (u0 = r0 × f is simplified, unproject normalises with hypot). No allocation-heavy code.
 import type { Pose } from "../camera";

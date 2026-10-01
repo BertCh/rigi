@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside: the hover readout's splat pick, measurable content only. A `generated` Gaussian (P3 hole
 // fill) is never a measurement: the ray passes through it to the first observed / reconstructed / DEM
 // splat behind it, or to nothing (the caller then falls back to Renderer.sampleAt, i.e. the DEM).

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Dev server for the deck-on-WebGPU work (port 3111 by convention).
 //
 // It is the app's vite.config.ts with ONE difference: deck.gl resolves to its full build instead

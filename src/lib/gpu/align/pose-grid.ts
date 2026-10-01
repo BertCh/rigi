@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Host side of the pose-grid kernel (./pose-grid.wgsl.ts): align.ts scorePose for many poses in
 // one dispatch. The CPU twin and reference is align.ts scorePose; the per-cell error is f32
 // rounding only (see the WGSL header), and autoAlign's `grid` option re-scores near-winners on the

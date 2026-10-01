@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Pre-extract OSM peaks (natural~peak|volcano) and viewpoints (tourism=viewpoint) for a bbox into a
 // compact static file that src/lib/osm/extract.ts serves instead of the public Overpass API
 // (roadmap N2; reports/licences.md). Data © OpenStreetMap contributors, ODbL 1.0: the output is a

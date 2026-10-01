@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { createHash } from "node:crypto";
 // Roll drape atlas identity check (/roll map, deck on WebGL2): per roll, wait for every range map,
 // then hash (SHA-256)

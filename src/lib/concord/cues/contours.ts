@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Interior occluding contours from a photo-space range buffer (WP-C).
 //
 // A contour pixel p is a non-sky DEM hit (range ≥ minRangeM) with a non-sky neighbour q that is

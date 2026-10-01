@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside P3 (research flag): the short novel-camera path the DEM-conditioned generator renders.
 // Pure TS. Cameras are Pose (yaw/pitch/roll/vfov, src/lib/camera) + an ENU eye in the engine's frame, so
 // they go straight into pose.ts applyPose() and camera.projectPoint().

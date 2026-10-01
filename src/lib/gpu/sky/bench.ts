@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Parity / speed bench for the GPU sky refine (refine.ts) against the CPU refine (sky/core.ts
 // refineToWorking + toBytes), run in the page realm by scripts/gpu/sky-bench.mjs. It mirrors the sky
 // worker: the luma compute device is handed to ORT (shareOrtDevice), U²-Net-P runs on it with its

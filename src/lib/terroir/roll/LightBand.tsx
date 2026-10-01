@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Light of the day behind the roll scrubber's time track (terroir T3.4): a thin band coloured by
 // the sun's elevation at the roll's location (night navy, blue hour, golden hour amber, pale day),
 // sunrise / sunset / solar-noon ticks where they fall inside the span, and readable labels on the

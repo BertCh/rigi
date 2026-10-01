@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The look-pass selector (W5). The CPU look passes (look/**) stay the default and the reference;
 // a GPU twin runs only when opt-in.ts lookGpuOn() (opt-in set, compute sidecar not killed). With
 // the flag off, selectLook returns null and the caller keeps its synchronous CPU path unchanged.

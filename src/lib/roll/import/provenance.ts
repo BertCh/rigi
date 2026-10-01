@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Where an imported photo's position came from, when it was not EXIF GPS. LocalPhotoMeta only
 // knows 'exif' | 'pin', so interpolation provenance lives here (localStorage, per photo id).
 

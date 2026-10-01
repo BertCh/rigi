@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Photo edges, oriented truncated distance transform and edge-cue matching (WP-C).
 //
 // Edge strength follows src/lib/align.ts buildEdgeMap (luminance + 2× "blueness" gradients) but as a

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // L0: quantities. Soft-branded numbers: a plain `number` is assignable to any of them (adoption is free),
 // but two different units never mix (`Deg` → `Metres` is a type error). Arithmetic yields `number`, which
 // is assignable back, so `const d: Deg = a + b` compiles: the brand documents and guards *interfaces*, it

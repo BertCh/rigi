@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Types for the 6-DoF ground-control-point solver. Conventions follow src/lib/camera exactly:
 // camera-anchored ENU (x=E, y=N, z=Up, metres); yaw = true heading clockwise from north,
 // pitch up +, roll right-side-down +, vfov = vertical FOV — all degrees.

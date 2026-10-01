@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The GPU relief passes (relief.ts reliefPassesGpu / buildReliefFieldGpu) on a core ComputeGraph:
 // their only GPU path (the pooled single-encoder path it replaced, byte for byte, was removed on
 // 2026-10-01).

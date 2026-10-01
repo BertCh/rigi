@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Feasibility spike (2026-09-30): can deck.gl 9.4 drive our custom layers on a WebGPU device?
 // Kept as a reproducible diagnostic: /lab/deck-webgpu?spike=1 runs it and prints the report
 // (window.__deckWebgpuSpike). It needs deck's FULL build: under the app's vite.config.ts

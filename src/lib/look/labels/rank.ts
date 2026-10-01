@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The classic peak label ranking and declutter, shared by both engines (engine.ts peakLabels,
 // deck/engine.ts peakLabels). Order, tie-breaks and thresholds are the original ones: changing
 // them changes which labels classic shows (look/__tests__/labels.check.ts pins the output).

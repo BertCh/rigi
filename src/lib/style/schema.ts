@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Schema for ViewStyle: validation (clamps, hex checks, unknown keys dropped), schema-aware deep
 // merge (tuples / ramps replaced wholesale, discriminated unions switch variant cleanly), pruning of
 // untrusted partials (localStorage) and diffing (so storage keeps diff-only overrides).

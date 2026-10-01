@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import type { LatLon } from "./ontology/core/geometry";
 
 // Geodesy helpers: WGS84 ↔ ECEF ↔ camera-local ENU, spherical great-circle helpers, angle wrapping.

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * OSM peaks: Overpass query/parse, direction + visibility from the eye
  * (consistent with horizon.ts: curvature + refraction as a d² / (2 R_eff)

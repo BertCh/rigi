@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Which engine /photo runs: the ?renderer flag (src/lib/flags) resolved against what this browser can do.
 //
 //   ?renderer=auto    WebGPU deck (src/lib/deck-webgpu WebGpuEngine) when the probe below passes, else the

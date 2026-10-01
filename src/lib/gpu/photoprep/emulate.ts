@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // JS twin of the photo-prep kernels (./kernels.wgsl.ts), kernel for kernel, on the same u32 planes and
 // with the same integer arithmetic (./softf64.ts is the twin of the WGSL soft-float). For node checks
 // (./photoprep.check.ts): this is what the GPU computes, run where it can be compared with align.ts.

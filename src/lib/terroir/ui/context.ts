@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // What every terroir overlay receives from TerroirLayer (one mount point in PhotoWorkspace).
 import type { Renderer } from "#/lib/renderer";
 import type { ViewStyle } from "#/lib/style/types";

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * Pose propagation within a viewpoint (Step Inside P2 exploration; tools/nearfield/propagate/REPORT.txt).
  *

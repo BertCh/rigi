@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Helpers to build correspondences and priors from geographic data (lat/lon/ele, az/el, photo meta).
 import { EnuFrame } from "../geodesy";
 import { dirFromAzEl } from "./project";

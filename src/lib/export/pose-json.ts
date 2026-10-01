@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Versioned, self-describing pose JSON for a solved photo.
 import {
 	buildCameraModel,

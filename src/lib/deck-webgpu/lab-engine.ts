@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // /lab/deck-webgpu (default mode): the whole WebGPU renderer through WebGpuEngine (engine.ts), i.e.
 // every ported layer composed the way PhotoWorkspace would see it:
 //   photo view  terrain (batched or per-tile) + terrain styles + trails → the photo compositor

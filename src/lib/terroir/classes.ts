@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Display tables for the terroir pack: land-cover classes (label, natural colour, contour ink) and
 // name classes (typography, reach, priority). One place so the legend, the labels, the place card
 // and the shaders agree. Colours are sRGB hex; contour inks follow the Swiss three-colour rule

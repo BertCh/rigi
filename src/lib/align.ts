@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Pose refinement.
 //  1. Skyline alignment: the DEM horizon (a set of ENU directions, independent of rotation)
 //     is projected into the photo for a candidate pose and scored against a blurred photo

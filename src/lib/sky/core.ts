@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * DOM-free building blocks of the sky segmenter, shared by the Web Worker and
  * the node evaluation script: resampling, the fast guided filter, model

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Screenshots + summary for /lab/generate (Step Inside P3, DEM-conditioned generation). Run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node tools/nearfield/generate/shots.mjs [--photos IMG_7131,IMG_7086] [--query step=10]
 // Needs the near-field service with /inpaint (tools/nearfield/run.sh) and the private vite on :3110.

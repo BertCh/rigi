@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Correction log for the top-3 picker / tap-a-peak (roadmap R4: "log every correction"). Every event the
 // user causes is appended to a local ring in localStorage so it can later become training / eval data;
 // `downloadPickerLog()` saves it as JSON. Nothing is sent anywhere.

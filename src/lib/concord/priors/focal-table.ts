@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Per-LensModel focal prior (WP-B): replaces the rounded EXIF FocalLengthIn35mmFormat focal with a
 // calibrated mean and a tight σ. The app's convention throughout: f35 over the 35 mm DIAGONAL
 // (camera/focal.ts focalPxFromF35, FF35_DIAGONAL_MM), so fScale = f_true / focalPxFromF35(f35, …).

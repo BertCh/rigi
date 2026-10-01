@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU prep of the sky segmenter's input: an ImageBitmap of the working-size photo → on the compute
 // device, with no CPU pixels:
 //   dense RGBA words   (the refine's full-res guide, refine.ts `rgba`)

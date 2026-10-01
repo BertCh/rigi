@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Step Inside's terrain range near the camera, ONE source for both renderers (three + deck).
 //
 // The anchor fit, the depth split and object grounding all compare the model's depth with the DEM range per

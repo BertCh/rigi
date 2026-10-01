@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The relief field (LOOK_RELIEF), built on the CPU from the DEM tiles each engine already holds and
 // uploaded as two RGBA8 textures (look/glsl/relief.ts samples them):
 //   field  R sun visibility (soft cast shadow), G sky-view factor, B local curvature (0.5 = planar,

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * GA1 evaluation: MAP solve with priors + Laplace covariance on the DEV GT photos (CPU only, no renders).
  * Rule: tools/research/geo/PROTOCOL.txt SECTION GA1 (frozen before scoring).

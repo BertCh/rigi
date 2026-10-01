@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Looping clip of the overlay reveal (src/lib/reveal) over one demo photo, for the landing page:
 // public/demo/video/reveal.{mp4,webm,jpg}. Frames are stepped with the DEV hook __reveal.seek, so
 // the timing is exact even though canvas screenshots stall the GPU.

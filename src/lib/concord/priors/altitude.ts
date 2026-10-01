@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Eye prior from EXIF GPS (WP-B): the GPS altitude as a MEASUREMENT (the "altitude contour"), not only
 // as a floor.
 //

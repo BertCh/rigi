@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Read-only access to what the picker needs from either renderer (PhotoEngine / DeckEngine) without
 // widening the shared Renderer interface (other sessions own engine.ts / deck/engine.ts). Both engines
 // keep, under the same private names:

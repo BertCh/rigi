@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Web-Mercator (slippy map) tile math shared by every DEM consumer.
 import { DEG, EARTH_R } from "../geodesy";
 

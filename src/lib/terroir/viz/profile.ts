@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // T3.3 line-of-sight profile data: terrain elevation from the camera to a point. Heights come from the
 // app's DEM policy (src/lib/dem loadDemTile: Mapterhorn with ancestor fallback, shared tile cache),
 // imported lazily so node checks of the pure helpers never touch the worker pool. Async, display-only.

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Persistent grow-only buffer pool, per device. A kernel module names its buffers once
 // ("look-relief/dem", "horizon/rays", …) and gets the same Buffer back on every call, so warm calls
 // allocate nothing. Capacity grows by powers of two (min 256 B) and never shrinks; everything is

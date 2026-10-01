@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // "Check camera position": the pose6dof eye search as an opt-in, unverified SUGGESTION (matching-v2
 // policy, reports/matching-v2.md). Hidden unless ?eyesearch=on|auto (src/lib/flags)
 // (#/lib/gpu/eye/client.ts). It never applies anything by itself: only the Apply button calls onApply.

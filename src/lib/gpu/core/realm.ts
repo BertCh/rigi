@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The page → GPU worker protocol for the realm-level debug switches. A worker has its own globals,
 // so the page's `__RIGI_GPU_PROFILE__` (core/profile.ts) and `__RIGI_GPU_CHECKS__` (core/queue.ts)
 // do not reach it. The worker clients put realmGpuOptions() on a message they already send

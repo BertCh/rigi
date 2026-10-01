@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // npx tsx src/lib/geocam/priors/priors.check.ts — WMM2025 against NOAA's official test values, the
 // declination-corrected heading prior, and the GEO flags' defaults. Exit 1 on failure.
 import { FLAG_NAMES, FLAG_SCHEMA, RESTART_FLAGS } from "../../flags";

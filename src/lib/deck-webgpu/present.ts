@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Screen pass stand-in until the compositor port (layers/composite.ts) lands: shows the resolved
 // colour target (sRGB-encoded) or a debug view of the geometry targets on the canvas.
 //   color     ColorTargets.color, linear → sRGB

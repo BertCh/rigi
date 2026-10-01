@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Hiking trails on WebGPU: the port of deck/trail-layer.ts (itself engine.ts buildTrails + three's
 // LineSegments2 / LineMaterial). README.md "Layer contract", port row `layers/trail.ts`.
 //

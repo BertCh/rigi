@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CPU-side decision logic for the geometry point queries that the WebGPU engine answers from the
 // geometry target on the GPU instead of reading the whole 1024 px rgba32float target back
 // (deck-webgpu/geo-query-gpu.ts has the kernels; scripts/gpu/geo-query-check.ts emulates them).

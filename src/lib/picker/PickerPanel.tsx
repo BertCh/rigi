@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Top-3 picker + tap-a-peak (roadmap R4), behind ?picker=on (PickerMount). Renderer-agnostic: it only
 // uses the Renderer interface plus the read-only accessors in engine-access.ts, so three and
 // ?renderer=deck behave the same.

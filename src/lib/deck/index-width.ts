@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // 16-bit index buffers for terrain grids that fit (three's BufferGeometry picks Uint16 the same
 // way): half the index bandwidth of Uint32, and the width the GPU's vertex fetch prefers.
 // A (seg + 1)² grid plus its four skirt rows has (seg + 1)² + 4 (seg + 1) vertices, so every

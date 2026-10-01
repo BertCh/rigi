@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * End-to-end evaluation of the automatic baseline:
  *   prior (EXIF + gravity) → detectSkyline → solvePose

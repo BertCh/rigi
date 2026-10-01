@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Checks for layers/multi-drape.ts.
 //
 // Node (no GPU):  npx tsx src/lib/deck-webgpu/layers/multi-drape.check.ts

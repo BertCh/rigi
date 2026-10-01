@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The async look passes the look/** controllers call when opt-in.ts lookGpuOn() is set (they load
 // this module with a dynamic import, so the default path never loads luma.gl's WebGPU adapter).
 // Each runs the GPU twin and falls back to the CPU function on any failure.

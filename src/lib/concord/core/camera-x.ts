@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // CameraX: wraps (never replaces) camera/index.ts with intrinsics (focal scale, radial k1,
 // principal point). Identity intrinsics short-circuit to the exact projectPoint / unprojectDir
 // path, so results are bitwise identical to the app's pinhole.

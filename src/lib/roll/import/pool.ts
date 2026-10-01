@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // A tiny bounded-concurrency task queue: at most `limit` tasks run at once, in FIFO order.
 export function createPool(limit: number) {
 	let running = 0;

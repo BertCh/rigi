@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Crosswalk: every pose-provenance word in the app → canonical Provenance axes. `satisfies Record<Union, …>`
 // makes each table exhaustive: a new member of an app union is a compile error here until classified.
 // Imports from the app are type-only, so this file pulls no app code into a bundle.

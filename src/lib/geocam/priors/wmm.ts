@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { DEG } from "../../geodesy";
 
 // World Magnetic Model 2025 (NOAA NCEI / BGS; public domain, US Government work): magnetic declination

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Run a playwright script with GPU timestamp profiling on in every page it opens
 // (globalThis.__RIGI_GPU_PROFILE__ = true, read by src/lib/gpu/core/profile.ts), and collect each
 // page's getGpuProfile() before it navigates or closes. Totals (summed over pages) go to PROFILE_OUT.

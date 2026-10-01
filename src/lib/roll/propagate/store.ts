@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Per-device record of propagated suggestions and the user's decisions (localStorage; client only).
 // Accepting stores the pose through the roll's own solved-pose slot with method "propagated-suggestion"
 // and confidence 0, so it is never HIGH, never anchors further suggestions (plan.ts anchorKind) and is

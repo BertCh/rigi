@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * The unknown-pose worker's 360° horizon (geo/pipeline sceneHorizon) on the GPU horizon kernel.
  *

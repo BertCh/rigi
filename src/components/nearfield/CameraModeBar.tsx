@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Camera modes for the 3D views (bottom-centre): Photo / Orbit / Fly / Top-down. Step Inside opens in
 // Photo; the In-map view opens in Orbit (its OrbitControls) and hands the world camera to the step
 // camera for the others (step-camera.ts). Keys 1–4 switch too, Esc goes back to the photo.

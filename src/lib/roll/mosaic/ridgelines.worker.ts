@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /// <reference lib="webworker" />
 // Worker half of viewpointTerrain.ts: decode the DEM tiles the main thread fetched (shared tile cache),
 // build horizon-fast ring mosaics over the full circle and trace the viewpoint's ridgelines. One job per

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // In-browser check for layers/gizmo.ts on a bare luma WebGPU device (no canvas, no deck, no
 // terrain): renders the colour pass with the gizmo (and an invisible depth-only "wall") through a
 // world camera, reads the resolved colour target back and compares pixels with the CPU

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 /**
  * H1 copy of tools/matcher/v2/verify/build_pack.ts. Changes (PROTOCOL.txt BLIND PACK): labels, widths and the
  * hashed photo folder come from the input (seeded in make_pack.py); images go to <outDir>/pack/<folder>/; render

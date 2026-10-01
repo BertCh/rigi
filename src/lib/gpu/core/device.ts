@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Compute device registry, one per realm (window or dedicated worker). getComputeDevice() keeps the
 // semantics of src/lib/gpu/device.ts (which will re-export from here): a lazily created luma 9.4
 // WebGPU device, null when WebGPU is missing / disabled (?gpu=off) / lost, never throws.

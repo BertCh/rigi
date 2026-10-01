@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Per-photo exposure / white-balance gains for the roll drape, solved from the overlaps.
 //
 // Two photos of the same ground differ by their camera's exposure and white balance (and by the

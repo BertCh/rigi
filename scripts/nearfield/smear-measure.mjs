@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // P1 exit gate "the split removes >= 80% of person/hut/tree drape smear" (reports/step-inside-design.md).
 // Labels: tools/nearfield/smear/labels.json (hand-drawn blind, before any Step Inside run).
 //

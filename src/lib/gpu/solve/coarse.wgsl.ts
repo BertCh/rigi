@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // solvePose coarse grid (geo/solve.ts solveOnce): one workgroup per (yaw row, block of 256 pitches)
 // scores every cell and writes the block's minimum cost plus the first / last pitch whose cost is
 // within `band` (≥ 2ε) of it. Everything is float32; the CPU turns each row minimum into an interval

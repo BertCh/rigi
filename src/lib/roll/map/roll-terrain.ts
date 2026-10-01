@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Terrain for a roll: a DEM quadtree refined around EVERY viewpoint, not one centre.
 //
 // TerrainStreamer (deck/terrain-stream.ts) refines around its frame origin only, so in a roll

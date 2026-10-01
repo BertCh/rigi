@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // The one mount point for terroir overlays in PhotoWorkspace (reports/terroir-cartography.md).
 // Purely additive: with every style.terroir switch off (CLASSIC and every preset but `terroir`) it
 // renders nothing and loads nothing. It finds the terroir pack by the photo's location, re-renders

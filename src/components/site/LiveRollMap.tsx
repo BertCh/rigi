@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 import { Link } from "@tanstack/react-router";
 import { Cpu, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

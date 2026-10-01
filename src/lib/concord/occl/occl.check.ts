@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WP-F self-check (CPU, offline): npx tsx src/lib/concord/occl/occl.check.ts [--live]
 //  1. LZW decoder vs a reference TIFF-LZW encoder (random, repetitive, KwKwK, width switches, clear codes)
 //  2. synthetic tiled COGs (LZW / Deflate / none, predictor 1 / 2 / 3, 2 levels, BigTIFF) → readWindow exact

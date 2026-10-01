@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Smoke test for the WebGPU renderer foundation: loads /lab/deck-webgpu?core=1&photo=<id> under real-GPU
 // Chromium flags, waits for the first terrain set, and reports first-frame time, steady frame
 // times, geometry-target sanity (CPU re-projection of the read-back ENU points) and page errors.

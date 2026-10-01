@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Persistent byte stores behind the tile cache: Cache API (preferred), IndexedDB
 // (fallback), and memory (last resort / node). Every storage call is wrapped so that a
 // missing API, private mode, quota errors or a corrupted database degrade to "miss"

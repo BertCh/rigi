@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Dev tool: assemble a WGSL program the way luma's Model does (no GPU) and print its binding
 // layout — for "bind group entries don't match" errors.  npx tsx scripts/deck-webgpu/wgsl-layout.ts
 import { ShaderAssembler } from "@luma.gl/shadertools";

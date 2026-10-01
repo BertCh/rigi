@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Eye (camera position) refinement from a detected photo skyline.
 //
 // For near-field cliff-edge photos the GPS fix (±20–40 m) and the DEM height at that fix are

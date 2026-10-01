@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // WGSL for the GPU sky refine (twin of sky/core.ts refineToWorking with refine = true): the fast
 // colour guided filter at model resolution, the band blend, the bilinear upsample to working
 // resolution, and toBytes. Every pass mirrors one CPU loop and rounds to f32 where the CPU stores a

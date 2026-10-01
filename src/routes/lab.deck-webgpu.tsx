@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // Lab: the WebGPU renderer (src/lib/deck-webgpu, README there), no DeckEngine / PhotoWorkspace.
 //   Default: the whole renderer through WebGpuEngine (src/lib/deck-webgpu/lab-engine.ts): photo view
 //     (terrain + styles + trails → photo compositor with ridges / skyline, DOM peak labels) and the

@@ -1,3 +1,7 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // GPU back-to-front sort of Gaussian splats, on the RENDER device (deck-webgpu/layers/splats.ts
 // option `sortBackend: "gpu"`). Replaces the worker round trip of nearfield/splat-sort.ts: the depth
 // keys are computed from the splat storage buffer the draw already reads, a stable two-pass radix

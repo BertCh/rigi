@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
 // In-app check of the refineEyes step (src/lib/nearfield/roll: spot.refineSpotEyes + roll-spot.buildRollSpot):
 // the real /roll map, the measured IMG_7059/IMG_7063 pair from tools/nearfield/eyes/results.json, per-photo
 // MoGe-2 depth. Compares the app's refined eyes with the Python solution and reports the anchor quality and
