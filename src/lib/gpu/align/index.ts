@@ -105,7 +105,7 @@ export type AlignGpuTiming = {
 	residentBytes?: number;
 	/**
 	 * refine: "gpu" (bound-screened descent), "cpu" (plain loop), with its counters, or
-	 * "certified-f32" (the opt-in GPU-driven loop; counters in `cert`)
+	 * "certified-f32" (the GPU-driven loop, default; counters in `cert`)
 	 */
 	refine?: "gpu" | "cpu" | "certified-f32";
 	refineStats?: RefineStats;
@@ -151,7 +151,7 @@ export type CertTiming = {
 export const alignGpuOptions: {
 	refine: "gpu" | "cpu";
 	speculation: RefineSpeculation;
-	/** rounds per submit of the certified-f32 refine (opt-in path) */
+	/** rounds per submit of the certified-f32 refine */
 	certRounds: number;
 	/**
 	 * TEST ONLY, dev builds only (import.meta.env.DEV; absent from production bundles): subtracted
@@ -483,7 +483,7 @@ export async function autoAlignAsync(
 		grid && mode === "gpu" && !devState.disabled ? "gpu" : "cpu";
 	let violation: string | undefined;
 	let cert: CertTiming | undefined;
-	// opt-in: the certified-f32 GPU-driven refine (needs the GPU grid's sky fit and private planes)
+	// alignPrecision certified-f32 (default): the GPU-driven refine (needs the GPU grid's sky fit and private planes)
 	if (precision === "certified-f32" && grid) {
 		const c = await certifiedAlign(
 			device,

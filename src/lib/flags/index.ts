@@ -91,7 +91,7 @@ export const FLAG_SCHEMA = {
 	 */
 	terrainGpuDecode: onOff("on"),
 	/**
-	 * autoAlign's refine precision (WAG P1, src/lib/gpu/align/cert-refine.ts): f64 (default) = exact CPU
+	 * autoAlign's refine precision (WAG P1, src/lib/gpu/align/cert-refine.ts): f64 = exact CPU
 	 * scores decide every move; certified-f32 (default since 2026-10-01) = GPU-driven loop with certified f32
 	 * compares, the CPU deciding only what the bound cannot. Precision gate: no quality difference found
 	 */
