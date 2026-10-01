@@ -297,7 +297,7 @@ export const METHODS = {
 		"rule",
 		"Eye = max(GPS alt, DEM + 1.6 m) (DEM + 1.8 m without altitude in the engine)",
 		["ground", "alt"],
-		"lib/engine.ts, lib/geo/pipeline.ts",
+		"lib/deck/scene.ts, lib/geo/pipeline.ts",
 		["eye-height"],
 	),
 	"alt-contour": m(

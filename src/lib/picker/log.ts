@@ -76,6 +76,7 @@ export type LoggedTap = {
 export type PickerLogEntry = PickerEvent & {
 	t: string;
 	photoId: string;
+	/** "three": entries logged before the three.js renderer was removed (2026-10-01). */
 	renderer: "three" | "deck" | "webgpu";
 	/** app state when the event happened */
 	alignState: AlignState | null;

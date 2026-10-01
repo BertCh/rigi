@@ -41,8 +41,6 @@ export type FlagUI = {
 	group: FlagGroup;
 	/** Display labels / tooltips per value (enum and set flags); unlisted values show as-is. */
 	options?: Record<string, string | { label: string; title: string }>;
-	/** Only matters with the deck.gl engine. */
-	deckOnly?: boolean;
 	/** Number flags. */
 	placeholder?: string;
 	step?: number;
@@ -54,7 +52,7 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "renderer",
 		label: "Engine",
-		help: "Auto (default): deck.gl on WebGPU where the browser supports it, else deck.gl on WebGL. WebGL pins deck.gl on WebGL; three.js is the old engine (each loads on demand).",
+		help: "Auto (default): deck.gl on WebGPU where the browser supports it, else deck.gl on WebGL. WebGL pins deck.gl on WebGL (each loads on demand).",
 		group: "render",
 		options: {
 			auto: { label: "Auto", title: "WebGPU when available, else WebGL" },
@@ -63,7 +61,6 @@ export const FLAG_UI: FlagUI[] = [
 				title: "deck.gl on WebGPU (WebGL if unavailable)",
 			},
 			deck: { label: "WebGL", title: "deck.gl on WebGL2" },
-			three: "three.js",
 		},
 	},
 	{
@@ -78,7 +75,6 @@ export const FLAG_UI: FlagUI[] = [
 		label: "Terrain path",
 		help: "Batched: one instanced grid per resolution (default). Per tile: one mesh per tile.",
 		group: "render",
-		deckOnly: true,
 		options: { batched: "Batched", tiles: "Per tile" },
 	},
 	{

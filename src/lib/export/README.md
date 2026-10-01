@@ -97,7 +97,7 @@ The engine already holds everything needed: `engine.photo`, `engine.pose`, `engi
 
 ```tsx
 import { buildCameraModel, buildPoseJson, buildPhotoOverlayKml, buildKmz, kmzBlob, buildGeoJson, buildXmp, buildColmapZip, composeAnnotatedPng, type PeakInput } from '#/lib/export'
-import type { PhotoEngine } from '#/lib/engine'
+import type { Renderer } from '#/lib/renderer'
 
 function download(data: Blob | string, name: string, type = 'application/octet-stream') {
   const blob = typeof data === 'string' ? new Blob([data], { type }) : data
@@ -108,7 +108,7 @@ function download(data: Blob | string, name: string, type = 'application/octet-s
   setTimeout(() => URL.revokeObjectURL(a.href), 1000)
 }
 
-function cameraModel(engine: PhotoEngine) {
+function cameraModel(engine: Renderer) {
   const p = engine.photo
   return buildCameraModel({
     photoId: p.id,
@@ -124,14 +124,14 @@ function cameraModel(engine: PhotoEngine) {
   })
 }
 
-function peaksFor(engine: PhotoEngine): PeakInput[] {
+function peaksFor(engine: Renderer): PeakInput[] {
   return engine.peakLabels(60).map((l) => {
     const g = engine.frame.toGeo(l.world[0], l.world[1], l.world[2])
     return { name: l.name, ele: l.ele, lat: g.lat, lon: g.lon, u: l.u, v: l.v, visible: l.visible, distKm: l.distKm }
   })
 }
 
-export async function runExport(engine: PhotoEngine, kind: 'pose' | 'kmz' | 'geojson' | 'xmp' | 'colmap' | 'png') {
+export async function runExport(engine: Renderer, kind: 'pose' | 'kmz' | 'geojson' | 'xmp' | 'colmap' | 'png') {
   const m = cameraModel(engine)
   const id = engine.photo.id
   switch (kind) {

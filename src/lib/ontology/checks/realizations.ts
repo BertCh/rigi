@@ -83,7 +83,7 @@ export type Realizations = {
 	"lib/settings.ts#Settings": import("#/lib/settings").Settings;
 	"lib/settings.ts#ViewMode": import("#/lib/settings").ViewMode;
 	"lib/sky/index.ts#SkyMask": import("#/lib/sky/index").SkyMask;
-	"lib/style/three-apply.ts#StyleMode": import("#/lib/style/three-apply").StyleMode;
+	"lib/style/deck-apply.ts#DeckStyleMode": import("#/lib/style/deck-apply").DeckStyleMode;
 	"lib/style/types.ts#PresetId": import("#/lib/style/types").PresetId;
 	"lib/style/types.ts#StyleState": import("#/lib/style/types").StyleState;
 	"lib/style/types.ts#ViewStyle": import("#/lib/style/types").ViewStyle;

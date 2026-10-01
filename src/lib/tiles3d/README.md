@@ -21,7 +21,7 @@ Google needs `VITE_GOOGLE_TILES_KEY` in `.env.local` (gitignored). Without it, G
 | `frame.ts` | ECEF → the photo's ENU frame, minus N for ellipsoidal sources |
 | `tiles.ts` | `Tiles3DSet`: one `3d-tiles-renderer` TilesRenderer per source, a near-field mask plugin (3 km), material swap, credits |
 | `material.ts` | Tile shader (three), plus GLSL shared with deck: fill rule, clear zones, radius fade, log depth with bias |
-| `three-tiles.ts` / `deck-tiles.ts` | The per-engine adapters that `engine.ts` / `deck/engine.ts` call |
+| `three-tiles.ts` / `deck-tiles.ts` | The per-engine adapters: `deck/engine.ts` calls `deck-tiles.ts`; `three-tiles.ts` served the three.js PhotoEngine (removed 2026-10-01) and has no caller now |
 | `deck-layer.ts` | `Tiles3DDeckLayer`: draws the set's visible THREE meshes as luma Models (i3dm instancing, log depth) |
 | `tiles3d.check.ts` | Pure checks (CI `tiles3d`) |
 

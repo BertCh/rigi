@@ -93,7 +93,7 @@ async function findCandidates(
 				sourceRank: i,
 			}));
 	}
-	const res = await (eng.autoAlignAsync?.(true) ?? eng.autoAlign(true));
+	const res = await eng.autoAlign(true);
 	if (!res) return [];
 	const alts = res.alternatives?.length
 		? res.alternatives
@@ -246,9 +246,7 @@ export default function PickerPanel(props: PickerPanelProps) {
 			renderer:
 				(eng as { backend?: string } | null)?.backend === "webgpu"
 					? "webgpu"
-					: eng?.kind === "deck"
-						? "deck"
-						: "three",
+					: "deck",
 			alignState,
 			verify,
 			session,

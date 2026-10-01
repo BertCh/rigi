@@ -3,19 +3,19 @@
 //   ?renderer=auto    WebGPU deck (src/lib/deck-webgpu WebGpuEngine) when the probe below passes, else the
 //                     WebGL deck (src/lib/deck DeckEngine)
 //   ?renderer=webgpu  the same, but asked for explicitly (falls back to WebGL deck with a console warning)
-//   ?renderer=deck    WebGL deck, never WebGPU (today's renderer; the escape hatch)
-//   ?renderer=three   the three.js PhotoEngine
+//   ?renderer=deck    WebGL deck, never WebGPU (the fallback and the escape hatch)
+//   ?renderer=three   retired with the three.js PhotoEngine (2026-10-01): src/lib/flags warns and reads auto
 //
 // ?webgpu=off makes auto / webgpu behave as if navigator.gpu were missing: the switch that proves the WebGL
 // fallback on a WebGPU machine. A WebGpuEngine that fails during start-up also falls back (PhotoWorkspace
 // re-mounts a fresh canvas: one that held a WebGPU context cannot give a WebGL2 one).
 //
-// The resolved engine is on the workspace root as [data-renderer] = webgpu | deck | three, and the reason in
+// The resolved engine is on the workspace root as [data-renderer] = webgpu | deck, and the reason in
 // [data-renderer-reason], so harnesses assert which engine actually ran.
 
 import { getFlag } from "#/lib/flags";
 
-export type ResolvedRenderer = "webgpu" | "deck" | "three";
+export type ResolvedRenderer = "webgpu" | "deck";
 export type RendererChoice = { renderer: ResolvedRenderer; reason: string };
 
 /** Adapter features WebGpuEngine cannot run without: keep equal to deck-webgpu/device.ts REQUIRED_FEATURES
@@ -86,8 +86,7 @@ export function requestedRenderer(): "auto" | ResolvedRenderer {
 /** Resolve ?renderer / ?webgpu to the engine to construct. Never throws. */
 export async function resolveRenderer(): Promise<RendererChoice> {
 	const want = requestedRenderer();
-	if (want === "three" || want === "deck")
-		return { renderer: want, reason: "pinned" };
+	if (want === "deck") return { renderer: want, reason: "pinned" };
 	if (getFlag("webgpu") === "off")
 		return { renderer: "deck", reason: "webgpu=off" };
 	const p = await probeWebGpu();

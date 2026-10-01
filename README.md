@@ -30,13 +30,19 @@ by `npm run generate-routes`).
 | `/lab/splats`, `/lab/deck-splats`, `/lab/generate` | Step Inside dev benches: splats in each renderer, and P3 generation (`?nearfield=gen`, GT poses only) |
 
 **Renderers.** `src/lib/renderer.ts` is the engine interface that PhotoWorkspace and the export layer
-use. There are two backends:
+use. Both backends are deck.gl on luma.gl, picked by `src/lib/renderer-select.ts` and loaded on demand:
 
-- **three.js** (`src/lib/engine.ts`, `terrain.ts`, `materials.ts`) is the default. It draws a quadtree
-  LOD over Mapterhorn tiles, with a geometry pass (ENU xyz + range, read back for `sampleAt`, labels,
-  occlusion and auto-align), a layer pass and a composite pass.
-- **deck.gl** (`src/lib/deck/**`) is chosen with `?renderer=deck` and loaded on demand. It is at
-  parity: `scripts/deck-engine-smoke.mjs` checks Δyaw ≤ 0.5° and label overlap against three.
+- **deck.gl on WebGPU** (`src/lib/deck-webgpu`, `WebGpuEngine`) is the default (`?renderer=auto`) where the
+  browser passes the WebGPU probe.
+- **deck.gl on WebGL2** (`src/lib/deck`, `DeckEngine`) is the automatic fallback and the escape hatch
+  (`?renderer=deck`, or `?webgpu=off`). `scripts/deck-engine-smoke.mjs` checks Δyaw ≤ 0.5° and label
+  overlap between the two.
+
+Each draws Mapterhorn tiles with a geometry pass (ENU xyz + range, read back for `sampleAt`, labels,
+occlusion and auto-align), a layer pass and a composite pass. The three.js PhotoEngine (`?renderer=three`)
+was removed on 2026-10-01; that value now falls back to the default with a console warning. three.js is
+still used where it is the right tool: Step Inside splats (`src/lib/nearfield`), the 3D Tiles adapters
+(`src/lib/tiles3d`), `/lab/splats` and the P3 RGB-D cache (`/lab/generate`).
 
 **Look and style.** Both backends share them.
 
@@ -97,7 +103,7 @@ overlapping photos (`propagate.ts`) is a library, not yet wired into the UI.
 
 | Flag | Effect |
 |---|---|
-| `?renderer=deck` | deck.gl backend |
+| `?renderer=deck` | deck.gl on WebGL only (default `auto`: WebGPU where available) |
 | `?style=<preset>` | View style preset |
 | `?nearfield=off\|on\|sharp` | Step Inside: hide, force on (headless browsers too), or the dev-only SHARP model (research licence). Default `auto` |
 | `?gpu=off` | WebGPU kill switch |
@@ -173,8 +179,8 @@ node scripts/eval-app.mjs [IMG_xxxx ...]     # the app's final pose vs data/cont
 node scripts/leaderboard.mjs                 # every method re-scored on one GT snapshot → reports/leaderboard.md
 
 # regression gates (dev server on :3100 for the browser ones; run one browser job at a time)
-node scripts/style-baseline.mjs check        # 16/16 pass, geometry identical
-node scripts/deck-engine-smoke.mjs           # deck vs three, 4/4 PASS
+node scripts/style-baseline.mjs check        # deck; needs a deck reference first: style-baseline.mjs capture (scripts/ci/README.md)
+node scripts/deck-engine-smoke.mjs           # WebGL deck vs WebGPU deck parity
 npx tsx scripts/test-export.ts               # 29/29
 npx tsx scripts/style-check.ts               # 185 passed (50 known literal-scan warnings)
 npx tsx src/lib/look/__tests__/labels.check.ts

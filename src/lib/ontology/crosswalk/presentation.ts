@@ -5,7 +5,6 @@ import type { ExportKind } from "#/lib/export/engine-export";
 import type { SplatExportKind } from "#/lib/export/splat";
 import type { BlendMethod, ViewMode } from "#/lib/settings";
 import type { DeckStyleMode } from "#/lib/style/deck-apply";
-import type { StyleMode } from "#/lib/style/three-apply";
 import type { Assert, Equal } from "../core/assert";
 
 export const VIEW_MODE = {
@@ -17,8 +16,7 @@ export const VIEW_MODE = {
 	world: { label: "In map", hint: "the photo placed in the 3D world" },
 } as const satisfies Record<ViewMode, { label: string; hint: string }>;
 
-/** The style adapters' mode unions must stay the view mode (they are aliases, not new concepts). */
-export type _styleModeIsViewMode = Assert<Equal<StyleMode, ViewMode>>;
+/** The style adapter's mode union must stay the view mode (an alias, not a new concept). */
 export type _deckStyleModeIsViewMode = Assert<Equal<DeckStyleMode, ViewMode>>;
 
 export const BLEND_METHOD = {

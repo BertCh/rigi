@@ -1,11 +1,13 @@
-// Snapshot of every terrain shader program's inputs (deck terrainShaders + luma assembly, three
-// makeTerrainMaterial) and the deck tile draw's uniform values, per preset × mode × layer style, with
+// Snapshot of every terrain shader program's inputs (deck terrainShaders + luma assembly) and the deck
+// tile draw's uniform values, per preset × mode × layer style, with
 // the terroir switches OFF. Proves the terroir shader work is additive (byte-identical when off):
 //   1. a pre-change copy OUTSIDE the repo (a copy under the repo breaks `tsc -p .`): cp -R src package.json
 //      tsconfig.json scripts/terroir/shader-identity-snap.ts → <scratch>/before/…, restore the pre-change
-//      deck/terrain-layer.ts + materials.ts there, symlink node_modules; run it there > before.txt
+//      deck/terrain-layer.ts there, symlink node_modules; run it there > before.txt
 //   2. here > after.txt; diff before.txt after.txt (must be empty)
 // --on: also splices + luma-assembles every program with every terroir switch on (stderr summary).
+// The three.js half (makeTerrainMaterial / terrainFragment in materials.ts) went with the three.js renderer
+// (2026-10-01): a snapshot taken before that date has `three …` lines this one no longer prints.
 import { createHash } from "node:crypto";
 import { assembleGLSLShaderPair } from "@luma.gl/shadertools";
 import {
@@ -16,11 +18,6 @@ import {
 	terroirFs,
 	withTerrainPass,
 } from "../../src/lib/deck/terrain-layer.ts";
-import { terrainDefines, withSlopeLayer } from "../../src/lib/look/look-key.ts";
-import {
-	makeSharedUniforms,
-	makeTerrainMaterial,
-} from "../../src/lib/materials.ts";
 import { deckTerrainStyle } from "../../src/lib/style/deck-apply.ts";
 import { CLASSIC } from "../../src/lib/style/defaults.ts";
 import { PRESET_IDS, presetStyle } from "../../src/lib/style/presets.ts";
@@ -122,16 +119,6 @@ for (const [id, style] of styles) {
 			);
 		}
 	}
-	// three: the terrain material for the style's terrain defines (± the slope layer)
-	for (const slope of [false, true]) {
-		const d = Object.fromEntries(
-			withSlopeLayer(terrainDefines(style), slope).map((k) => [k, ""]),
-		);
-		const m = makeTerrainMaterial(makeSharedUniforms(), d);
-		lines.push(
-			`three ${id} slope=${slope} frag=${h(m.fragmentShader)} vert=${h(m.vertexShader)} defines=${JSON.stringify(m.defines)} key=${h(m.customProgramCacheKey())}`,
-		);
-	}
 }
 console.log(lines.join("\n"));
 
@@ -142,7 +129,6 @@ if (process.argv.includes("--on")) {
 	const { terroirShader } = await import(
 		"../../src/lib/terroir/glsl/values.ts"
 	);
-	const { terrainFragment } = await import("../../src/lib/materials.ts");
 	const grid = makeGrid([7.35, 46.45, 8.25, 46.95], 9, 7, new Uint8Array(63));
 	const frame = new EnuFrame(46.71, 7.77, 0);
 	let n = 0;
@@ -190,20 +176,6 @@ if (process.argv.includes("--on")) {
 				if (terroirFs({ look, style: st, terroir: null }, batched) !== batched)
 					throw new Error("batched fs changed with terroir off");
 			}
-		}
-		for (const slope of [false, true]) {
-			const d = Object.fromEntries(
-				[
-					...withSlopeLayer(terrainDefines(style), slope),
-					...terroir.defines,
-				].map((k) => [k, ""]),
-			);
-			if (
-				terrainFragment(d) ===
-				makeTerrainMaterial(makeSharedUniforms(), {}).fragmentShader
-			)
-				throw new Error("three fragment not patched");
-			n++;
 		}
 	}
 	console.error(`terroir on: ${n} programs spliced + assembled`);

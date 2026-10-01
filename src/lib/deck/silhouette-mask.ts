@@ -53,8 +53,7 @@
 //
 // Engines: DeckEngine (WebGL2, deck/silhouette-gl.ts) and WebGpuEngine (WGSL, deck-webgpu/
 // silhouette-gpu.ts), both behind their `silhouetteGpu` option (default true; false = the CPU
-// scorer). The three.js PhotoEngine (engine.ts, ?renderer=three) keeps its CPU scorer: its
-// autoAlign() is synchronous for the tools that call it, and it is the last-resort renderer.
+// scorer). (The three.js PhotoEngine, which kept the CPU scorer, was removed on 2026-10-01.)
 // Checks: scripts/gpu/silhouette-mask-check.ts (node: packing, decoder, bounds) and
 // scripts/gpu/silhouette-ab.mjs (browser: GPU vs CPU autoAlign with Object.is).
 import type { EdgeMap } from "../align";

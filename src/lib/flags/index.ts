@@ -1,4 +1,4 @@
-// The app's switches: one typed table, one reader. Every page-level option (?renderer=three, ?gpu=off,
+// The app's switches: one typed table, one reader. Every page-level option (?renderer=deck, ?gpu=off,
 // ?tiles3d=swisstopo, …) is declared here and read with getFlag(); nothing else parses location.search
 // for them. The router validates and carries these params across navigation (routes/__root.tsx), and
 // the sidebar's "Experimental & dev" section sets them (components/panel).
@@ -34,9 +34,10 @@ export const FLAG_SCHEMA = {
 	// render
 	/**
 	 * The /photo engine (src/lib/renderer-select.ts): auto (the default) = WebGPU deck where the browser passes the probe,
-	 * else WebGL deck; webgpu = the same, asked for explicitly; deck = WebGL deck only; three = three.js.
+	 * else WebGL deck; webgpu = the same, asked for explicitly; deck = WebGL deck only. The retired value three
+	 * (the three.js PhotoEngine, removed 2026-10-01) falls back to auto with a warning (RETIRED below).
 	 */
-	renderer: oneOf(["auto", "webgpu", "deck", "three"], "auto"),
+	renderer: oneOf(["auto", "webgpu", "deck"], "auto"),
 	/** off: ?renderer=auto / webgpu act as if navigator.gpu were missing (proves the WebGL fallback) */
 	webgpu: onOff("on"),
 	/** deck only: one instanced grid per resolution, or one mesh per tile */
@@ -97,12 +98,25 @@ export const FLAG_NAMES = Object.keys(FLAG_SCHEMA) as FlagName[];
 
 // ---- parsing ---------------------------------------------------------------------------------------
 
+/** Values that used to be valid: the warning says why they now fall back to the default. */
+const RETIRED: Partial<Record<string, Record<string, string>>> = {
+	renderer: {
+		three:
+			"the three.js renderer was removed (2026-10-01); using the default (deck.gl: WebGPU where available, else WebGL)",
+	},
+};
+
 const warned = new Set<string>();
 function bad(name: string, raw: string) {
 	const k = `${name}=${raw}`;
 	if (warned.has(k)) return;
 	warned.add(k);
-	console.warn(`[flags] ?${k} is not a valid value; using the default`);
+	const why = RETIRED[name]?.[raw.toLowerCase()];
+	console.warn(
+		why
+			? `[flags] ?${k}: ${why}`
+			: `[flags] ?${k} is not a valid value; using the default`,
+	);
 }
 
 /** One raw value (string from the URL, or whatever an override holds) → its typed value. */

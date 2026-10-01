@@ -56,7 +56,7 @@ host). `scripts/deck-webgpu/vite.webgpu.config.ts` is kept for :3111 and is now 
 | `auto` (default) | WebGpuEngine when the probe passes, else the WebGL DeckEngine |
 | `webgpu` | the same, asked for explicitly (a fallback logs a console warning) |
 | `deck` | the WebGL DeckEngine only (the escape hatch) |
-| `three` | the three.js PhotoEngine |
+| `three` | retired (the three.js PhotoEngine was removed 2026-10-01): warns and runs `auto` |
 
 - **Probe** (`probeWebGpu`, cached per page): `navigator.gpu`, a high-performance adapter with
   `float32-filterable` (= `device.ts REQUIRED_FEATURES`; keep them equal), `maxTextureDimension2D`

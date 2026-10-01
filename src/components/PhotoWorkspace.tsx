@@ -112,8 +112,8 @@ import { LabelStylePanel, StylePanel, TrailStylePanel } from "./StylePanel";
 
 // Every backend loads on demand, so /photo downloads only the one it runs (src/lib/renderer-select.ts
 // picks it): the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts) where WebGPU passes the probe, the
-// WebGL DeckEngine (src/lib/deck/engine.ts) otherwise or with ?renderer=deck, the three.js PhotoEngine
-// (src/lib/engine.ts) with ?renderer=three. One promise per backend, started when this module evaluates
+// WebGL DeckEngine (src/lib/deck/engine.ts) otherwise or with ?renderer=deck (the three.js PhotoEngine,
+// ?renderer=three, was removed on 2026-10-01). One promise per backend, started when this module evaluates
 // (below) so the engine chunk downloads alongside the first render instead of after the engine effect runs.
 type MakeRenderer = (c: HTMLCanvasElement, p: PhotoMeta) => Renderer;
 const rendererChunks = new Map<ResolvedRenderer, Promise<MakeRenderer>>();
@@ -127,17 +127,11 @@ function loadRenderer(kind: ResolvedRenderer): Promise<MakeRenderer> {
 							(c, p) =>
 								new WebGpuEngine(c, p),
 					)
-				: kind === "deck"
-					? import("#/lib/deck/engine").then(
-							({ DeckEngine }): MakeRenderer =>
-								(c, p) =>
-									new DeckEngine(c, p),
-						)
-					: import("#/lib/engine").then(
-							({ PhotoEngine }): MakeRenderer =>
-								(c, p) =>
-									new PhotoEngine(c, p),
-						)
+				: import("#/lib/deck/engine").then(
+						({ DeckEngine }): MakeRenderer =>
+							(c, p) =>
+								new DeckEngine(c, p),
+					)
 		).catch((e) => {
 			rendererChunks.delete(kind); // a later mount retries a failed download
 			throw e;
@@ -149,7 +143,6 @@ function loadRenderer(kind: ResolvedRenderer): Promise<MakeRenderer> {
 const RENDERER_NAME: Record<ResolvedRenderer, string> = {
 	webgpu: "WebGPU",
 	deck: "deck",
-	three: "three.js",
 };
 if (typeof window !== "undefined") {
 	// the effect reports failures; auto / webgpu start the WebGPU chunk and the probe together
@@ -573,8 +566,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				} else {
 					setStatus({ msg: "Aligning skyline to terrain", frac: 1 });
 					await new Promise((r) => setTimeout(r, 30));
-					const res = await (engine.autoAlignAsync?.(true) ??
-						engine.autoAlign(true));
+					const res = await engine.autoAlign(true);
 					if (engineRef.current !== engine) return;
 					// autoAlign at confidence > 0.2, else a near-compass alternative, else the prior
 					const pre = choosePreview(res, engine.prior);
@@ -757,8 +749,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 					}
 					try {
 						stop = start(engine);
-						// the stage measure ran before the chunk arrived: PhotoEngine sizes itself only in resize(),
-						// and DeckEngine's constructor read canvas.clientWidth, which may predate layout
+						// the stage measure ran before the chunk arrived: DeckEngine's constructor read canvas.clientWidth, which may predate layout
 						const { w, h } = stageSizeRef.current;
 						if (w && h) engine.resize(w, h);
 					} catch (e) {
@@ -1015,8 +1006,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			return;
 		}
 		setTimeout(async () => {
-			const res = await (eng.autoAlignAsync?.(fromPrior) ??
-				eng.autoAlign(fromPrior));
+			const res = await eng.autoAlign(fromPrior);
 			if (!res || engineRef.current !== eng) return;
 			setPose(res.pose);
 			// a local refinement from a hand-set pose is fine, but not verified when the sensors are missing

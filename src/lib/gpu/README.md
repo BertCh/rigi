@@ -110,10 +110,9 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
 - **Error checks.** `globalThis.__RIGI_GPU_CHECKS__ = true` wraps every core `submit()` in
   validation / out-of-memory error scopes (forwarded to the same workers). A failed submit rejects
   the encoder's staged reads with `GpuValidationError` and the caller takes its CPU path. Opt-in.
-- **three.js on WebGPU.** `src/lib/three-webgpu/` is a spike (not wired): three 0.186's
-  `WebGPURenderer` with the terrain material in TSL renders on `getComputeDevice().handle`
-  ("sidecar" mode), so the render and compute share one device with the 4 GiB limits. Details and
-  traps in its README.
+- **three.js on WebGPU.** The `src/lib/three-webgpu/` spike (three 0.186 `WebGPURenderer` in "sidecar"
+  mode on `getComputeDevice().handle`) was deleted with the three.js PhotoEngine on 2026-10-01; the
+  WebGPU renderer is deck.gl (`src/lib/deck-webgpu`). It is in git history before that date.
 
 ## Kernels
 

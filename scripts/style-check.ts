@@ -1,18 +1,16 @@
 // Self-check for src/lib/style (no test runner in this repo). Run: npx tsx scripts/style-check.ts
-// Exit 0 = all pass. Covers: CLASSIC = today's constants (numbers snapshot + cross-check against
-// materials.ts makeSharedUniforms + source literal scan), ramps vs the shader formulas, merge/clamp/
+// Exit 0 = all pass. Covers: CLASSIC = today's constants (numbers snapshot; the cross-check against the
+// three.js materials.ts uniforms went with the three.js renderer, 2026-10-01), ramps vs the shader formulas, merge/clamp/
 // union semantics, presets resolving to complete styles, storage parsing/fallback, ?style=, cross-tab.
-import * as THREE from "three";
 import { drawPeakLabels } from "../src/lib/look/labels/canvas.ts";
 import { labelCssVars } from "../src/lib/look/labels/css.ts";
 import { lookKey } from "../src/lib/look/look-key.ts";
-import { makeSharedUniforms } from "../src/lib/materials.ts";
+import { hexToRgba01, isHex, toCss } from "../src/lib/style/color.ts";
 import {
-	hazeColorAsRendered,
-	hexToRgba01,
-	isHex,
-	toCss,
-} from "../src/lib/style/color.ts";
+	rawColor,
+	trailClass,
+	trailPalette,
+} from "../src/lib/style/deck-apply.ts";
 import { CLASSIC, NEBELMEER_DEFAULT } from "../src/lib/style/defaults.ts";
 import {
 	LOOK_PRESETS,
@@ -36,14 +34,6 @@ import {
 	STYLE_STORAGE_KEY,
 	urlPreset,
 } from "../src/lib/style/store.ts";
-import {
-	applyCompositeStyle,
-	applyLayerStyle,
-	applyTerrainLook,
-	makeCompositeStyleUniforms,
-	rawColor,
-	trailColor,
-} from "../src/lib/style/three-apply.ts";
 import type { ViewStyle } from "../src/lib/style/types.ts";
 
 let pass = 0;
@@ -355,60 +345,6 @@ ok(
 	toCss(CLASSIC.labels.halo.color),
 );
 
-// ---- 2. cross-check the shader's shared uniforms (materials.ts:13–38) ----------------------------
-{
-	const u = makeSharedUniforms();
-	const sun = new THREE.Vector3(
-		...(CLASSIC.terrain.sun as { dir: [number, number, number] }).dir,
-	).normalize();
-	ok(
-		(u.uSunDir.value as THREE.Vector3).equals(sun),
-		"uSunDir = normalise(CLASSIC sun)",
-	);
-	ok(
-		u.uContourMajorEvery.value === CLASSIC.overlay.contours.majorEvery,
-		"uContourMajorEvery",
-	);
-	ok(u.uContourWidth.value === CLASSIC.overlay.contours.width, "uContourWidth");
-	ok(
-		u.uContourFadeNear.value === CLASSIC.overlay.contours.distFade.near,
-		"uContourFadeNear",
-	);
-	ok(
-		u.uContourFadeFar.value === CLASSIC.overlay.contours.distFade.far,
-		"uContourFadeFar",
-	);
-	// the legacy path: THREE.Color.set(hex) (linearises) → shader toLinear again
-	const hc = u.uHazeColor.value as THREE.Color;
-	ok(
-		hc.equals(new THREE.Color(CLASSIC.terrain.hazeColor as string)),
-		"uHazeColor = Color(CLASSIC hazeColor)",
-	);
-	const asR = hazeColorAsRendered(CLASSIC.terrain.hazeColor);
-	ok(
-		near(asR[0], hc.r ** 2.2, 1e-6) && near(asR[2], hc.b ** 2.2, 1e-6),
-		"hazeColorAsRendered mirrors three + toLinear",
-		[asR, [hc.r, hc.g, hc.b]],
-	);
-	// chunk 2 adds uniforms filled with CLASSIC values; check those that exist
-	const opt: [string, unknown][] = [
-		["uShadeAmbient", CLASSIC.terrain.ambient],
-		["uShadeDirect", CLASSIC.terrain.direct],
-		["uHazeDensity", CLASSIC.terrain.hazeDensity],
-		["uHazeMax", CLASSIC.terrain.hazeMax],
-		["uContourMajorMul", CLASSIC.overlay.contours.majorWidthMul],
-		["uMinorAlpha", CLASSIC.overlay.contours.minorAlpha],
-		["uMajorAlpha", CLASSIC.overlay.contours.majorAlpha],
-		["uFadeFloor", CLASSIC.overlay.contours.distFade.floor],
-		["uBandShadeMin", CLASSIC.overlay.bands.shadeMin],
-		["uBandLineWhiten", CLASSIC.overlay.bands.lineWhiten],
-		["uBandLineAlpha", CLASSIC.overlay.bands.lineAlpha],
-		["uBandAlpha", CLASSIC.overlay.bands.alpha],
-	];
-	for (const [k, v] of opt)
-		if (u[k]) ok(u[k].value === v, `chunk-2 uniform ${k}`, u[k].value);
-}
-
 // ---- 4. ramps reproduce the shader functions ----------------------------------------------------
 {
 	const mix = (a: number[], b: number[], t: number) =>
@@ -417,7 +353,7 @@ ok(
 		const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
 		return t * t * (3 - 2 * t);
 	};
-	// materials.ts:92–105
+	// the classic shader's hypso() (three.js materials.ts, removed 2026-10-01; deck terrain-layer.ts)
 	const hypso = (t: number) => {
 		const c = [
 			[0.36, 0.52, 0.3],
@@ -431,7 +367,7 @@ ok(
 		if (t < 0.72) return mix(c[2], c[3], (t - 0.5) / 0.22);
 		return mix(c[3], c[4], ss(0.72, 0.85, t));
 	};
-	// materials.ts:108–121
+	// the classic shader's coolRamp()
 	const cool = (t: number) => {
 		const c = [
 			[0.1, 0.85, 0.8],
@@ -458,8 +394,8 @@ ok(
 			maxC = Math.max(maxC, Math.abs(c[k] - d[k]));
 		}
 	}
-	ok(maxH < 1e-12, "hypso-classic = materials.ts hypso()", maxH);
-	ok(maxC < 1e-12, "cool = materials.ts coolRamp()", maxC);
+	ok(maxH < 1e-12, "hypso-classic = classic shader hypso()", maxH);
+	ok(maxC < 1e-12, "cool = classic shader coolRamp()", maxC);
 	ok(
 		eq(
 			turbo(0.5).map((x) => +x.toFixed(4)),
@@ -829,80 +765,8 @@ ok(
 	ok(none.getStyle() === CLASSIC, "no storage → classic");
 }
 
-// ---- 7. three.js adapter (chunks 2–4): applying CLASSIC reproduces the classic defaults ----------
+// ---- 7. colour helpers + labels (the three.js adapter checks went with that renderer, 2026-10-01) ----
 {
-	type IU = Record<string, { value: unknown }>;
-	const flat = (v: unknown): unknown => {
-		if (
-			v &&
-			typeof v === "object" &&
-			"toArray" in v &&
-			typeof (v as { toArray: unknown }).toArray === "function"
-		)
-			return (v as { toArray(): number[] }).toArray();
-		if (Array.isArray(v)) return v.map(flat);
-		return v;
-	};
-	const snapU = (u: IU) =>
-		Object.fromEntries(Object.entries(u).map(([k, v]) => [k, flat(v.value)]));
-	const diffKeys = (a: Record<string, unknown>, b: Record<string, unknown>) =>
-		Object.keys(a).filter((k) => !eq(a[k], b[k]));
-
-	const shared = makeSharedUniforms() as IU;
-	ok(
-		eq(flat(shared.uBandShade.value), [
-			CLASSIC.overlay.bands.shadeMin,
-			1 - CLASSIC.overlay.bands.shadeMin,
-		]),
-		"uBandShade = (shadeMin, 1 - shadeMin)",
-	);
-	ok(
-		eq(flat(shared.uCasing.value), [1, 2, 0.45, 0.55]) &&
-			eq(flat(shared.uCasingCol.value), CLASSIC.overlay.contours.casing.color),
-		"casing uniforms = CLASSIC",
-	);
-	ok(
-		eq(flat(shared.uDensityFade.value), CLASSIC.overlay.contours.densityFade),
-		"uDensityFade = CLASSIC",
-	);
-
-	const hazeFor = {
-		overlay: 1,
-		replace: CLASSIC.replace.haze,
-		world: CLASSIC.world.haze,
-	};
-	for (const mode of ["overlay", "replace", "world"] as const) {
-		const u = makeSharedUniforms() as IU;
-		const want = snapU(u);
-		want.uHaze = hazeFor[mode];
-		applyTerrainLook(u as never, CLASSIC.terrain, { localRange: [400, 4200] });
-		applyLayerStyle(u as never, CLASSIC, mode);
-		const d = diffKeys(want, snapU(u));
-		ok(
-			d.length === 0,
-			`adapter: CLASSIC (${mode}) leaves every terrain uniform at its classic default`,
-			d,
-		);
-	}
-	{
-		const cu = makeCompositeStyleUniforms() as IU;
-		const want = snapU(cu);
-		applyCompositeStyle(cu as never, CLASSIC);
-		const d = diffKeys(want, snapU(cu));
-		ok(
-			d.length === 0,
-			"adapter: CLASSIC leaves every composite uniform at its classic default",
-			d,
-		);
-		const f = Math.fround;
-		ok(
-			eq(flat(cu.uDepthLog.value), [
-				f(Math.log(200)),
-				f(1 / f(f(Math.log(80000)) - f(Math.log(200)))),
-			]),
-			"uDepthLog mirrors the folded float32 constants",
-		);
-	}
 	ok(
 		eq(rawColor([0.02, 0.03, 0.06]), [0.02, 0.03, 0.06]) &&
 			eq(rawColor("#ffffff"), [1, 1, 1]),
@@ -917,7 +781,7 @@ ok(
 				"alpine_hiking",
 				"difficult_alpine_hiking",
 				null,
-			].map((s) => trailColor(CLASSIC, s)),
+			].map((s) => trailPalette(CLASSIC)[trailClass(s)]),
 			[
 				[1, 0.82, 0.25],
 				[1, 0.32, 0.36],
@@ -929,24 +793,6 @@ ok(
 		),
 		"trail colours = classic SAC palette",
 	);
-	// every preset goes through the adapter with finite values
-	for (const id of PRESET_IDS) {
-		const st = presetStyle(id);
-		const u = makeSharedUniforms() as IU;
-		const cu = makeCompositeStyleUniforms() as IU;
-		applyTerrainLook(u as never, st.terrain, {
-			localRange: [400, 4200],
-			takenAt: "2025-08-01T15:00:00Z",
-			lat: 46.5,
-			lon: 8,
-		});
-		for (const m of ["overlay", "replace", "world"] as const)
-			applyLayerStyle(u as never, st, m);
-		applyCompositeStyle(cu as never, st);
-		const bad = JSON.stringify([snapU(u), snapU(cu)]).match(/NaN|Infinity/);
-		ok(!bad, `adapter: preset ${id} yields finite uniforms`);
-	}
-
 	// canvas labels: the drawer goes through the shared classic layout (labels/classic.ts), so the
 	// old call-for-call replay no longer applies; check invariants instead.
 	const record = () => {

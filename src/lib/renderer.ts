@@ -1,28 +1,27 @@
 // The engine surface PhotoWorkspace (src/components/PhotoWorkspace.tsx) and the export layer
 // (src/lib/export/**) use, so the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts, the default
-// where WebGPU is available), the WebGL DeckEngine (src/lib/deck/engine.ts, the fallback) and the
-// three.js PhotoEngine (src/lib/engine.ts) are interchangeable behind `?renderer=`
-// (src/lib/renderer-select.ts). WebGpuEngine reports kind 'deck' with backend 'webgpu'.
+// where WebGPU is available) and the WebGL DeckEngine (src/lib/deck/engine.ts, the fallback and
+// ?renderer=deck) are interchangeable behind `?renderer=` (src/lib/renderer-select.ts). WebGpuEngine
+// reports kind 'deck' with backend 'webgpu'. (The three.js PhotoEngine, src/lib/engine.ts, was removed
+// on 2026-10-01; ?renderer=three now falls back to the default with a console warning.)
 //
-// Exactly the members those callers use (grepped 2026-09-25), typed with the existing types.
-// PhotoEngine satisfies it structurally (checked in renderer.check.ts) without edits to
-// engine.ts. Tools that poke three.js internals through window.__engine (eval-app, leaderboard,
-// tools/matcher/*) are NOT covered: gate them on `__engine.kind === 'deck'` (PhotoEngine has no
-// `kind`; undefined means three).
+// Exactly the members those callers use (grepped 2026-09-25), typed with the existing types; the
+// engines satisfy it structurally (checked in renderer.check.ts). Tools that poke engine internals
+// through window.__engine (style-baseline's geoSrc, gpu/look/capture.ts, …) are NOT covered: WebGL-deck
+// internals (deckInstance.layerManager, compositor) must also check `__engine.backend !== 'webgpu'`.
 //
-// One widening versus PhotoEngine: autoAlign() may return a Promise (DeckEngine renders its
-// silhouette hypotheses through an async GeometrySource). Callers should `await` it; awaiting
-// PhotoEngine's synchronous result is harmless.
+// autoAlign() may return a Promise (the deck engines render their silhouette hypotheses through an
+// async GeometrySource): callers `await` it.
 
 import type { AlignResult, Pin } from "./align";
 import type { Pose } from "./camera";
-import type { PeakLabel, Sample, Settings } from "./engine";
 import type { EnuFrame } from "./geodesy";
 import type { Unknowns } from "./integration/unknown-pose";
 import type { NearFieldSample } from "./nearfield/measure";
 import type { NearFieldScene, NearFieldViewOpts } from "./nearfield/types";
 import type { PhotoMeta, RegionData, RegionTrail } from "./photos";
 import type { RevealUniforms } from "./reveal/config";
+import type { PeakLabel, Sample, Settings } from "./settings";
 import type { ViewStyle } from "./style/types";
 
 export type { PeakLabel, Sample, Settings };
@@ -31,8 +30,8 @@ export type { PeakLabel, Sample, Settings };
 export type FgMask = { width: number; height: number; data: Uint8Array };
 
 export interface Renderer {
-	/** 'deck' for DeckEngine; PhotoEngine leaves it undefined (= three). */
-	readonly kind?: "three" | "deck";
+	/** 'deck' for both engines (WebGpuEngine adds backend 'webgpu'). */
+	readonly kind?: "deck";
 
 	// ---- identity & camera (PW, export) ----
 	readonly photo: PhotoMeta;
@@ -122,12 +121,6 @@ export interface Renderer {
 	autoAlign(
 		fromPrior?: boolean,
 	): AlignResult | null | Promise<AlignResult | null>;
-	/**
-	 * autoAlign with the coarse grid on the WebGPU compute device (same result; CPU fallback).
-	 * PhotoEngine only: its autoAlign() stays synchronous for tools; DeckEngine's autoAlign() does
-	 * this already. Callers: `engine.autoAlignAsync?.(x) ?? engine.autoAlign(x)`.
-	 */
-	autoAlignAsync?(fromPrior?: boolean): Promise<AlignResult | null>;
 	solvePins(pins: Pin[], from?: Pose, solveFov?: boolean): Pose;
 
 	// ---- blend brush, world view, export ----
@@ -138,7 +131,7 @@ export interface Renderer {
 	exportImage(withLabels?: boolean): Promise<Blob | null>;
 }
 
-/** Constructor shape both backends share: `new Engine(canvas, photo)`. */
+/** Constructor shape the backends share: `new Engine(canvas, photo)`. */
 export type RendererConstructor = new (
 	canvas: HTMLCanvasElement,
 	photo: PhotoMeta,

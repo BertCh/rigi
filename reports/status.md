@@ -14,6 +14,8 @@
 | **Renderer** (deck.gl default, [deck-default.md](deck-default.md)) | **Flipped 2026-09-30** (3b121ae): deck is the default, `?renderer=three` the fallback. Canvas antialias off at DPR ≥ 2 (408f989) | World orbit 29–39 → 59–60 fps (DPR 2); photo drag / Blend 59–60; eval-app 12/14 on both; DPR 1 frames identical; Firefox headless renders deck and three | Re-capture style-baseline (three-pinned); Windows / Safari smoke; optional line-AA for the world gizmo |
 | **Launch** | Two commits; CI fast tier written (`.github/workflows/ci.yml`, `scripts/ci/`), not yet pushed; licence register + opt-in swaps done, owner decisions open; no iOS path; no hosted matcher | Still nobody else ships automatic post-hoc registration | CI gate + licence swaps before any public URL |
 
+**2026-10-01: three.js renderer removed.** `?renderer=three` (PhotoEngine, `src/lib/engine.ts`) is gone and falls back to the default with a warning; deck.gl is the only /photo renderer (WebGPU default, WebGL `?renderer=deck` fallback). Harnesses retargeted to deck; style-baseline needs a deck re-capture before its pixel check means anything (`scripts/ci/README.md`); the matcher worker renders through DeckEngine's offscreen hooks (`renderPoseView`, unverified in a browser).
+
 ## What the threads teach together
 
 1. **The near field is the shared bottleneck.** Matching fails on foreground-heavy frames, Step Inside's split misses huts and trees at 100–300 m, and concordance finds 18–55% of below-skyline pixels hit non-DEM objects. One signal (swissSURFACE3D minus swissALTI3D, streamable as COGs) serves all three.

@@ -527,18 +527,11 @@ export const CONCEPTS = {
 		definition:
 			"How terrain and photo combine: Overlay (lines on the photo), Blend (terrain replaces parts of it), In map (3D world).",
 		ui: ["Overlay", "Blend", "In map"],
-		code: [
-			"ViewMode",
-			"overlay",
-			"replace",
-			"world",
-			"StyleMode",
-			"DeckStyleMode",
-		],
+		code: ["ViewMode", "overlay", "replace", "world", "DeckStyleMode"],
 		avoid: ["replace (UI: Blend)", "world (UI: In map)"],
 		realizedBy: [
 			"lib/settings.ts#ViewMode",
-			"lib/style/three-apply.ts#StyleMode",
+			"lib/style/deck-apply.ts#DeckStyleMode",
 		],
 	},
 	"blend-method": {
@@ -637,8 +630,8 @@ export const CONCEPTS = {
 		label: "Renderer",
 		domain: "system",
 		definition:
-			"An engine that draws terrain behind/over the photo: deck.gl (default) or three.js; WebGPU deck in progress.",
-		code: ["Renderer", "PhotoEngine", "DeckEngine"],
+			"An engine that draws terrain behind/over the photo: deck.gl on WebGPU (default where available) or on WebGL (fallback).",
+		code: ["Renderer", "WebGpuEngine", "DeckEngine"],
 		realizedBy: ["lib/renderer.ts#Renderer"],
 	},
 	flag: {

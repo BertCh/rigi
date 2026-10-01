@@ -1,6 +1,5 @@
-// View settings and the small shared engine types, free of three.js so that the UI and DeckEngine can
-// import them without pulling the three.js PhotoEngine (src/lib/engine.ts) into their chunks.
-// engine.ts re-exports everything here, so existing `from "#/lib/engine"` imports keep working.
+// View settings and the small shared engine types, free of any engine so that the UI and the engines
+// can all import them.
 
 export type ViewMode = "overlay" | "replace" | "world";
 

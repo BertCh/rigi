@@ -52,7 +52,7 @@ export async function lookSmoke(
 	const L = look();
 	return {
 		label: opts.label,
-		renderer: e.kind ?? "three",
+		renderer: e.kind ?? "deck",
 		lookGpuOn: lookGpuOn(),
 		waitedMs: Math.round(performance.now() - t0),
 		relief: f
@@ -149,7 +149,7 @@ export async function hookParity(
 			: Math.abs(a - b) / Math.max(1e-12, Math.abs(a));
 	return {
 		label: opts.label,
-		renderer: e.kind ?? "three",
+		renderer: e.kind ?? "deck",
 		relief: bytes(cpu.relief, gpu.relief),
 		masks: bytes(cpu.masks, gpu.masks),
 		haze:

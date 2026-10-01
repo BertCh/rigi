@@ -174,7 +174,6 @@ export function AdvancedPanel() {
 		go(Object.fromEntries(FLAG_NAMES.map((k) => [k, undefined])));
 
 	const active = FLAG_UI.filter((ui) => flagSet(ui.name));
-	const deck = getFlag("renderer") !== "three"; // auto / webgpu / deck are all deck.gl
 
 	return (
 		<Section
@@ -222,9 +221,6 @@ export function AdvancedPanel() {
 								key={`${ui.name}:${searchStr}`}
 								ui={ui}
 								onSet={(v) => set(ui.name, v)}
-								disabledReason={
-									ui.deckOnly && !deck ? "Needs the deck.gl engine" : undefined
-								}
 							/>
 						))}
 					</div>
