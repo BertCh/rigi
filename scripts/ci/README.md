@@ -41,6 +41,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | nearfield-core / -export / -generate / -spot / -eyes / -propagate, splat-sort | fast | Step Inside core; generated splats never exported; propagation parity with Python; depth sort | `src/lib/nearfield/**`, `tools/nearfield/propagate/propagate.check.ts`, `scripts/nearfield/splat-sort-test.ts` |
 | tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |
 | photoprep | fast | GPU photo prep path (`4 100000` args) | `src/lib/gpu/photoprep/photoprep.check.ts` |
+| photoprep-resident | fast | Photo prep residency: lazy CPU read, memo, pins, LRU, device mismatch (fake device) | `src/lib/gpu/photoprep/resident.check.ts` |
 | examples | fast | `examples/` type check (`scripts/examples.mjs check`) | `node scripts/examples.mjs check` |
 | ontology | fast | ontology layer: provenance axes, crosswalks | `src/lib/ontology/ontology.check.ts` (needs `public/photos/`) |
 | atlas | fast | `/atlas` graph data | `src/lib/atlas/atlas.check.ts` |

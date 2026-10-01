@@ -9,8 +9,11 @@
 //
 // Input buffers live in the gpu/core pool ("align/…" slots, one lease "align" per grid), so warm
 // calls allocate nothing. The edge map's `coarse` and `fg` planes (~1 MB each at 512 px) never change
-// after buildEdgeMap, so they are uploaded once per photo: a slot remembers which array it holds
-// and skips the write when the same one comes back. `skyCum` is refit IN PLACE by fitPriorSky
+// after buildEdgeMap. When the map comes from a resident photo prep on this device (../photoprep
+// buildPhotoPrepAsync, WAG W1.1) the prep's own buffers are bound directly (pinned for the run): no
+// upload at all. Otherwise (CPU prep, another device, evicted) they are uploaded once per photo: a
+// slot remembers which array it holds and skips the write when the same one comes back. Both hold
+// the same bits (the prep's planes are the map's arrays). `skyCum` is refit IN PLACE by fitPriorSky
 // (it depends on the prior), so it is uploaded on every call.
 //
 // The kernel runs on a core ComputeGraph (./graph.ts), `scores` a cleared graph transient read
@@ -31,6 +34,7 @@ import {
 	pooledUniform,
 	withLease,
 } from "#/lib/gpu/core/pool";
+import { pinResidentPlanes } from "#/lib/gpu/photoprep";
 import { runPoseGraph, STORAGE } from "./graph";
 import { POSE_GRID_WGSL } from "./pose-grid.wgsl";
 
@@ -89,6 +93,8 @@ export function uploadOnce(
 export type PoseGridStats = {
 	/** bytes written to the GPU by this grid (inputs; the cached edge planes count only when uploaded) */
 	uploadBytes: number;
+	/** bytes of edge planes bound from a resident photo prep instead (never uploaded) */
+	residentBytes?: number;
 };
 
 /**
@@ -122,7 +128,10 @@ export function scorePoseGridGpu(
 		} finally {
 			// written while the lease is still held: no other grid's bytes can land in between
 			lastUploadBytes = up.uploadBytes;
-			if (stats) stats.uploadBytes = up.uploadBytes;
+			if (stats) {
+				stats.uploadBytes = up.uploadBytes;
+				stats.residentBytes = up.residentBytes;
+			}
 		}
 	});
 }
@@ -172,17 +181,27 @@ async function scoreOnce(
 
 	// every slot below is read only within its first w·h / nDirs / nPoses entries, and `scores` is
 	// fully overwritten for pi < nPoses, so pool capacity and stale bytes don't reach the result
-	const inputs = {
-		u: pooledUniform(device, "align/u", uw),
-		poses: pooledStorage(device, "align/poses", pose4),
-		dirs: pooledStorage(device, "align/dirs", dirs4),
-		coarse: uploadOnce(device, "align/coarse", edge.coarse, up),
-		fg: uploadOnce(device, "align/fg", edge.fg, up),
-		skyCum: pooledStorage(device, "align/skycum", edge.skyCum),
-	};
-	up.uploadBytes +=
-		32 + pose4.byteLength + dirs4.byteLength + edge.skyCum.byteLength;
-	return new Float32Array(
-		await runPoseGraph(device, POSE_GRID, inputs, "scores", 4, nPoses),
-	);
+	// (the resident planes are exactly w·h entries)
+	const res = pinResidentPlanes(device, edge);
+	try {
+		const inputs = {
+			u: pooledUniform(device, "align/u", uw),
+			poses: pooledStorage(device, "align/poses", pose4),
+			dirs: pooledStorage(device, "align/dirs", dirs4),
+			coarse:
+				res?.coarse ?? uploadOnce(device, "align/coarse", edge.coarse, up),
+			fg: res?.fg ?? uploadOnce(device, "align/fg", edge.fg, up),
+			skyCum: pooledStorage(device, "align/skycum", edge.skyCum),
+		};
+		up.uploadBytes +=
+			32 + pose4.byteLength + dirs4.byteLength + edge.skyCum.byteLength;
+		if (res)
+			up.residentBytes =
+				(up.residentBytes ?? 0) + edge.coarse.byteLength + edge.fg.byteLength;
+		return new Float32Array(
+			await runPoseGraph(device, POSE_GRID, inputs, "scores", 4, nPoses),
+		);
+	} finally {
+		res?.release();
+	}
 }

@@ -224,6 +224,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "photoprep-resident",
+		tier: "fast",
+		group: "pose",
+		cmd: tsx("src/lib/gpu/photoprep/resident.check.ts"),
+		note: "photo prep residency (W1.1): lazy CPU read, memo, pins, LRU eviction, device-mismatch fallback (fake device)",
+		timeoutS: 60,
+	},
+	{
 		id: "export",
 		tier: "fast",
 		group: "export",

@@ -21,7 +21,9 @@
  *
  * Runs on gpu/core: both kernels on a core ComputeGraph (./graph.ts: cleared output transient + read
  * node over the pooled input slots; the only GPU path since 2026-10-01), the edge map's static planes
- * uploaded once per photo, and the core/profile labels "align-pose-grid" and "align-pose-bound".
+ * bound from the resident photo prep when `edge` is a resident prep's map on this device (../photoprep
+ * buildPhotoPrepAsync; no upload), else uploaded once per photo, and the core/profile labels
+ * "align-pose-grid" and "align-pose-bound".
  */
 
 import type { Device } from "@luma.gl/core";
@@ -70,6 +72,8 @@ export type AlignGpuTiming = {
 	rescored: number;
 	/** bytes uploaded for the GPU grid (the edge map's coarse/fg planes only on a photo's first grid) */
 	uploadBytes?: number;
+	/** bytes of edge planes the grid bound from the resident photo prep (not uploaded) */
+	residentBytes?: number;
 	/** refine: "gpu" (bound-screened descent) or "cpu" (plain loop), with its counters */
 	refine?: "gpu" | "cpu";
 	refineStats?: RefineStats;
@@ -230,6 +234,7 @@ export async function autoAlignAsync(
 	let grid: CoarseGridScores | undefined;
 	let error: string | undefined;
 	let uploadBytes: number | undefined;
+	let residentBytes: number | undefined;
 	const tg = performance.now();
 	try {
 		const { poses } = coarseGridPoses(prior, yawRange);
@@ -247,6 +252,7 @@ export async function autoAlignAsync(
 		);
 		grid = { scores, tol: GRID_TOL, skyFitted: true };
 		uploadBytes = st.uploadBytes;
+		residentBytes = st.residentBytes;
 	} catch (e) {
 		error = String(e);
 		console.warn("[gpu] autoAlign grid failed, using the CPU", e);
@@ -312,6 +318,7 @@ export async function autoAlignAsync(
 		gridMs,
 		rescored: grid?.rescored ?? 0,
 		uploadBytes,
+		residentBytes,
 		refine,
 		refineStats: rs,
 		boundStats,

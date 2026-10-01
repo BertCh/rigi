@@ -22,7 +22,9 @@
 //   because scoreFromSum is the CPU's own final expression and monotone in the sum.
 //
 // Buffers: the gpu/core pool under the "align" lease (one graph run per call). The edge planes
-// (coarse, fine, fg) and the stride-1 direction table are uploaded once per photo (uploadOnce);
+// (coarse, fine, fg) are the resident photo prep's own buffers when the map comes from one on this
+// device (../photoprep pinResidentPlanes, pinned for the run; WAG W1.1), else uploaded once per photo
+// (uploadOnce), like the stride-1 direction table;
 // skyCum, refit in place by fitPriorSky, is uploaded once per session (one autoAlign) and again
 // only if another session wrote the slot in between. Readback: 48 B per pose.
 //
@@ -45,6 +47,7 @@ import {
 	pooledUniform,
 	withLease,
 } from "#/lib/gpu/core/pool";
+import { pinResidentPlanes } from "#/lib/gpu/photoprep";
 import { runPoseGraph } from "./graph";
 import { POSE_BOUND_WGSL } from "./pose-bound.wgsl";
 import {
@@ -230,19 +233,33 @@ async function boundOnce(
 	}
 	const table = dirTable(dirs);
 	// every slot is read only within its first w·h / nDirs / nPoses entries, and `out` is fully
-	// overwritten for pi < nPoses, so pool capacity and stale bytes don't reach the result
-	const inputs = {
-		u: pooledUniform(device, "align/refine-u", uw),
-		poses: pooledStorage(device, "align/refine-poses", pose4),
-		dirs: uploadOnce(device, "align/dirs1", table, up),
-		coarse: uploadOnce(device, "align/coarse", edge.coarse, up),
-		fine: uploadOnce(device, "align/fine", edge.fine, up),
-		fg: uploadOnce(device, "align/fg", edge.fg, up),
-		skyCum: sky,
-	};
-	up.uploadBytes += 48 + pose4.byteLength;
-	// throws past maxComputeWorkgroupsPerDimension (core/kernel guard): the caller goes CPU
-	const buf = await runPoseGraph(device, POSE_BOUND, inputs, "out", 48, nPoses);
+	// overwritten for pi < nPoses, so pool capacity and stale bytes don't reach the result (the
+	// resident planes are exactly w·h entries)
+	const res = pinResidentPlanes(device, edge);
+	let buf: ArrayBuffer;
+	try {
+		const inputs = {
+			u: pooledUniform(device, "align/refine-u", uw),
+			poses: pooledStorage(device, "align/refine-poses", pose4),
+			dirs: uploadOnce(device, "align/dirs1", table, up),
+			coarse:
+				res?.coarse ?? uploadOnce(device, "align/coarse", edge.coarse, up),
+			fine: res?.fine ?? uploadOnce(device, "align/fine", edge.fine, up),
+			fg: res?.fg ?? uploadOnce(device, "align/fg", edge.fg, up),
+			skyCum: sky,
+		};
+		up.uploadBytes += 48 + pose4.byteLength;
+		if (res)
+			up.residentBytes =
+				(up.residentBytes ?? 0) +
+				edge.coarse.byteLength +
+				edge.fine.byteLength +
+				edge.fg.byteLength;
+		// throws past maxComputeWorkgroupsPerDimension (core/kernel guard): the caller goes CPU
+		buf = await runPoseGraph(device, POSE_BOUND, inputs, "out", 48, nPoses);
+	} finally {
+		res?.release();
+	}
 	return {
 		f: new Float32Array(buf),
 		u: new Uint32Array(buf),
@@ -301,6 +318,8 @@ export function poseBoundSession(
 				stats.poses += probes.length;
 				stats.unbounded += out.filter((x) => x === undefined).length;
 				stats.uploadBytes += up.uploadBytes;
+				stats.residentBytes =
+					(stats.residentBytes ?? 0) + (up.residentBytes ?? 0);
 				stats.gpuMs += performance.now() - t0;
 			}
 			return out;

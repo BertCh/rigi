@@ -109,7 +109,11 @@ import { priorHeading } from "#/lib/geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import { autoAlignAsync, warmAlignGpu } from "#/lib/gpu/align";
 import { lookIdle } from "#/lib/gpu/look/opt-in";
-import { buildEdgeMapAsync, warmPhotoPrep } from "#/lib/gpu/photoprep";
+import {
+	buildPhotoPrepAsync,
+	type GpuPhotoPrep,
+	warmPhotoPrep,
+} from "#/lib/gpu/photoprep";
 import {
 	type FastHorizon,
 	startFastHorizon,
@@ -554,7 +558,12 @@ export class WebGpuEngine implements Renderer {
 	private occluder: FgMask | null = null;
 	private reveal: RevealUniforms | null = null;
 	private skyMaskStore: SkyMask | null = null;
-	private edge?: EdgeMap;
+	/** the photo prep: edge planes resident on the GPU, CPU EdgeMap read on first use (W1.1) */
+	private photoPrep?: GpuPhotoPrep;
+	/** the CPU EdgeMap (sync readers: the memo, else the CPU reference; same planes as the read) */
+	private get edge(): EdgeMap | undefined {
+		return this.photoPrep?.cpuSync();
+	}
 	private horizonDirs?: Float32Array;
 	private horizonSource: "fast" | "cpu" | null = null;
 	private fastHorizon?: FastHorizon;
@@ -1250,10 +1259,21 @@ export class WebGpuEngine implements Renderer {
 		const fg = await fgPromise;
 		if (this.disposed) return;
 		if (fg) this.setForegroundMask(fg);
-		// buildEdgeMap with the post-canvas work on the GPU (bit-identical; CPU fallback inside)
-		const edge = await buildEdgeMapAsync(img, 512, fg);
-		if (this.disposed) return;
-		this.edge = edge;
+		// buildEdgeMap with the post-canvas work on the GPU (bit-identical; CPU fallback inside); the
+		// planes stay on the device and the CPU map is read when autoAlign first needs it
+		const prep = await buildPhotoPrepAsync(img, 512, fg);
+		if (this.disposed) {
+			prep.retire();
+			return;
+		}
+		this.photoPrep = prep;
+		// read the CPU map in idle time, so sync readers (picker) rarely compute it themselves
+		const prefetch = () => {
+			if (!this.disposed) void prep.cpu();
+		};
+		if (typeof requestIdleCallback === "function")
+			requestIdleCallback(prefetch, { timeout: 2000 });
+		else setTimeout(prefetch, 50);
 		void warmAlignGpu();
 		onProgress?.("Tracing horizon", 1);
 		const dirs = this.takeFastHorizon() ?? (await this.traceHorizon());
@@ -1364,6 +1384,7 @@ export class WebGpuEngine implements Renderer {
 	dispose() {
 		if (this.disposed) return;
 		this.disposed = true;
+		this.photoPrep?.retire();
 		this.tiles3d?.dispose();
 		clearTimeout(this.statsTimer);
 		clearTimeout(this.lookTimer);
@@ -2810,13 +2831,18 @@ export class WebGpuEngine implements Renderer {
 
 	/** deck/engine.ts autoAlign: skyline search, then finalists re-ranked by rendered silhouettes. */
 	async autoAlign(fromPrior = true): Promise<AlignResult | null> {
-		if (!this.horizonDirs || !this.edge) return null;
+		if (!this.horizonDirs || !this.photoPrep) return null;
 		const tSearch = performance.now();
+		// the search's inputs as of this call (the lazy read below awaits)
+		const from = fromPrior ? this.prior : this.pose;
+		const { aspect, horizonDirs } = this;
+		const edge = await this.photoPrep.cpu();
+		if (this.disposed) return null;
 		const res = await autoAlignAsync(
-			fromPrior ? this.prior : this.pose,
-			this.aspect,
-			this.horizonDirs,
-			this.edge,
+			from,
+			aspect,
+			horizonDirs,
+			edge,
 			fromPrior ? 25 : 6,
 		);
 		if (this.disposed) return null;
@@ -2826,14 +2852,14 @@ export class WebGpuEngine implements Renderer {
 		await this.ready;
 		const srcs = alts.map((_, i) => this.silhouetteSource(i));
 		let sil: SilScores | null = this.silhouetteGpu
-			? await this.silhouetteScoresGpu(alts, srcs)
+			? await this.silhouetteScoresGpu(alts, srcs, edge)
 			: null;
 		if (this.disposed) return null;
 		if (!sil) {
 			await Promise.all(alts.map((a, i) => srcs[i]?.render(a.pose)));
 			if (this.disposed) return null;
 			const tScore = performance.now();
-			const sils = srcs.map((s) => this.scoreSilhouette(s));
+			const sils = srcs.map((s) => this.scoreSilhouette(s, edge));
 			let bytes = 0;
 			for (const s of srcs)
 				if (s instanceof WebGpuGeometrySource) bytes += s.readBytes;
@@ -2881,6 +2907,7 @@ export class WebGpuEngine implements Renderer {
 	private async silhouetteScoresGpu(
 		alts: { pose: Pose }[],
 		srcs: (GeometrySource | null)[],
+		edge: EdgeMap,
 	): Promise<SilScores | null> {
 		const gs: WebGpuGeometrySource[] = [];
 		for (const s of srcs) if (s instanceof WebGpuGeometrySource) gs.push(s);
@@ -2902,8 +2929,7 @@ export class WebGpuEngine implements Renderer {
 			H,
 			nonce,
 		);
-		const edge = this.edge;
-		if (!words || this.disposed || !edge) return null;
+		if (!words || this.disposed) return null;
 		const tScore = performance.now();
 		let bytes = this.silMask.lastBytes;
 		let fallbacks = 0;
@@ -2917,7 +2943,7 @@ export class WebGpuEngine implements Renderer {
 				if (!(await gs[i].readDrawn(seqs[i], alts[i].pose)) || this.disposed)
 					return null;
 				bytes += gs[i].readBytes;
-				s = this.scoreSilhouette(gs[i]);
+				s = this.scoreSilhouette(gs[i], edge);
 			}
 			sils.push(s);
 		}
@@ -2942,8 +2968,10 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	/** deck/engine.ts scoreSilhouette (rows top-down). */
-	private scoreSilhouette(src: GeometrySource | null) {
-		const edge = this.edge;
+	private scoreSilhouette(
+		src: GeometrySource | null,
+		edge: EdgeMap | undefined = this.edge,
+	) {
 		if (!edge || !src?.pose) return 0;
 		const W = src.width;
 		const H = src.height;
