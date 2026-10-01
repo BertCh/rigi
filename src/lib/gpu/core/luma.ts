@@ -79,7 +79,10 @@ export type {
 	GPUNode,
 	GPUOperation,
 	GPUOperationLoweringContext,
+	GPUOperationMetadata,
+	GPUProgramBindings,
 	GPUProgramCompilation,
+	GPUProgramLoweringReport,
 	GPUReductionOperation,
 	GPUReductionProps,
 	GPUScalarFormat,
@@ -107,7 +110,9 @@ export {
 	GPUHistogram,
 	GPUProgram,
 	GPUProgramCompiler,
+	GPUProgramCSRMatrix,
 	GPUProgramScalarLiteral,
+	GPUProgramSpMV,
 	GPUReadbackRing,
 	GPUReadbackTicket,
 	GPUReduction,
@@ -120,3 +125,5 @@ export {
 	scalarArithmetic,
 	scalarCompare,
 } from "@luma.gl/gpgpu/gpu-core";
+// GPUData: the buffer-backed chunk that binds a GPUProgram external vector (core/program.ts)
+export { GPUData } from "@luma.gl/gpgpu/gpu-data";

@@ -93,14 +93,14 @@ const resolve = (expr: string, rel: string, depth = 0): string | null => {
 	return values.size === 1 ? [...values][0] : null;
 };
 
-// cachedGraph(device, GROUP, …) call sites (core's; files with their own cachedGraph are skipped)
+// cachedGraph / cachedGraphFrom(device, GROUP, …) call sites (core's; files with their own cachedGraph are skipped)
 const used = new Map<string, string[]>();
 const unresolved: string[] = [];
 for (const f of files) {
 	if (f.rel === "src/lib/gpu/core/graph.ts") continue;
 	if (/\bfunction\s+cachedGraph\b/.test(f.src)) continue;
 	for (const m of f.src.matchAll(
-		/\bcachedGraph\s*(?:<[^()]*?>)?\s*\(\s*[^,()]+,\s*([^,()]+?)\s*,/g,
+		/\bcachedGraph(?:From)?\s*(?:<[^()]*?>)?\s*\(\s*[^,()]+,\s*([^,()]+?)\s*,/g,
 	)) {
 		const group = resolve(m[1].trim(), f.rel);
 		if (group === null) {

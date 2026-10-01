@@ -1042,6 +1042,30 @@ export function cachedGraph<P, X = undefined>(
 	max = MAX_CACHED,
 	create?: (id: string) => ComputeGraph<P>,
 ): CachedGraph<P, X> {
+	return cachedGraphFrom(
+		device,
+		group,
+		key,
+		(id) => {
+			const graph = create ? create(id) : new ComputeGraph<P>(device, id);
+			return { graph, extra: build(graph) };
+		},
+		max,
+	);
+}
+
+/**
+ * cachedGraph for a graph the caller creates itself (e.g. core/program.ts compileProgramGraph, whose
+ * ComputeGraph adopts a program compiler's graph): `make(id)` returns the graph (id `${group}|${key}`,
+ * not compiled) and the extra. Same cache, LRU, lease and device-loss rules as cachedGraph.
+ */
+export function cachedGraphFrom<P, X = undefined>(
+	device: Device,
+	group: string,
+	key: string,
+	make: (id: string) => { graph: ComputeGraph<P>; extra: X },
+	max = MAX_CACHED,
+): CachedGraph<P, X> {
 	let groups = caches.get(device);
 	if (!groups) {
 		const created = new Map<
@@ -1070,11 +1094,7 @@ export function cachedGraph<P, X = undefined>(
 	if (e) {
 		m.delete(key);
 		e.hit = true;
-	} else {
-		const id = `${group}|${key}`;
-		const graph = create ? create(id) : new ComputeGraph<P>(device, id);
-		e = { graph, extra: build(graph), hit: false };
-	}
+	} else e = { ...make(`${group}|${key}`), hit: false };
 	m.set(key, e as CachedGraph<unknown, unknown>);
 	while (m.size > Math.max(1, max)) {
 		const [k0, old] = m.entries().next().value as [
