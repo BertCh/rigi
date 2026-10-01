@@ -523,6 +523,15 @@ export class WebGpuEngine implements Renderer {
 		return webgpuAvailable();
 	}
 
+	/**
+	 * Resolves once the first host (device, canvas context, cores) is up; rejects when it could not be
+	 * built. PhotoWorkspace awaits it before start() and falls back to the WebGL DeckEngine on a fresh
+	 * canvas when it rejects (src/lib/renderer-select.ts).
+	 */
+	whenReady(): Promise<void> {
+		return this.ready;
+	}
+
 	constructor(
 		canvas: HTMLCanvasElement,
 		photo: PhotoMeta,
