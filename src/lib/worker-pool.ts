@@ -49,6 +49,8 @@ export class WorkerPool<In, Out> {
 				};
 				// a worker that cannot start or dies: everything runs here from now on, pending jobs too
 				w.onerror = () => this.fallBack();
+				// a reply that cannot be deserialised would leave its job pending forever: same fallback
+				w.onmessageerror = () => this.fallBack();
 				ws.push(w);
 			}
 			this.workers = ws;

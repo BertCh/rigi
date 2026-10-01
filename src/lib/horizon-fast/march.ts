@@ -203,10 +203,16 @@ function makeCtx(mosaics: Mosaic[], eye: Eye, opts: FastHorizonOptions): Ctx {
 
 /**
  * Marches one azimuth (degrees). Writes c.tBest / c.dBest and, when
- * q > 0, the running max before distance q to c.tQ / c.dQ. Appends ridge
- * crests to `ridges` when given.
+ * q > 0, the running max before distance q to c.tQ / c.dQ (q <= 0 means
+ * nothing lies in front of the stop, so tQ = -Infinity: "visible"). Appends
+ * ridge crests to `ridges` when given.
  */
 function marchRay(c: Ctx, az: number, q: number, ridges: Ridge[] | null) {
+	if (!(q > 0)) {
+		// peaks 50-150 m away have q <= 0: don't leak the previous ray's occluder
+		c.tQ = Number.NEGATIVE_INFINITY;
+		c.dQ = 0;
+	}
 	const sinA = Math.sin(az * DEG);
 	const cosA = Math.cos(az * DEG);
 	const { segD, segRing, sinD, cosD, bx, by, sinP1, cosP1, lon0 } = c;

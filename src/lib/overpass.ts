@@ -35,11 +35,15 @@ export interface OverpassOptions {
 
 const sleep = (ms: number, signal?: AbortSignal) =>
 	new Promise<void>((res, rej) => {
-		const t = setTimeout(res, ms);
-		signal?.addEventListener("abort", () => {
+		const onAbort = () => {
 			clearTimeout(t);
-			rej(signal.reason);
-		});
+			rej(signal?.reason);
+		};
+		const t = setTimeout(() => {
+			signal?.removeEventListener("abort", onAbort);
+			res();
+		}, ms);
+		signal?.addEventListener("abort", onAbort, { once: true });
 	});
 
 /** POSTs `query`, returning the first well-formed `{elements: [...]}` answer. */

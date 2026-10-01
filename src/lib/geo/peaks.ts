@@ -37,7 +37,10 @@ export function overpassPeaksQuery(
 /** Parses "1234", "1234 m", "1,234.5" etc. to metres; undefined if unusable. */
 function parseMetres(v: unknown): number | undefined {
 	if (typeof v !== "string") return undefined;
-	const m = v.replace(/,/g, ".").match(/-?\d+(\.\d+)?/);
+	const m = v
+		.replace(/(?<=\d),(?=\d{3}(?!\d))/g, "")
+		.replace(/,/g, ".")
+		.match(/-?\d+(\.\d+)?/);
 	if (!m) return undefined;
 	let n = Number.parseFloat(m[0]);
 	if (/ft|feet|'/.test(v)) n *= 0.3048;
@@ -103,6 +106,7 @@ function localMax(
 		for (let az = 0; az < 360; az += 45) {
 			const p = destination(lat, lon, az, r);
 			const h = terrain.sampleAt(p.lon, p.lat, distance);
+			if (Number.isNaN(h)) continue;
 			if (!(h <= best)) best = Number.isNaN(best) ? h : Math.max(best, h);
 		}
 	return best;

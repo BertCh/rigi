@@ -3,6 +3,7 @@
 // in for by its nearest ancestor).
 import { cachedFetch, tilePriority } from "../cache";
 import { WorkerPool } from "../worker-pool";
+import { validateTile } from "./decode";
 import { ancestorCrop } from "./grid";
 import { blobHeights } from "./image";
 import { type DemSource, MAPTERHORN } from "./sources";
@@ -74,7 +75,7 @@ async function fetchTile(key: TileKey, o: DemLoadOptions) {
 				priority: o.priority ?? tilePriority(0, key.z),
 				signal: o.signal,
 			});
-			if (res.ok) return res.arrayBuffer();
+			if (res.ok) return await res.arrayBuffer();
 			if (res.status === 404 || res.status === 204) {
 				missing.add(tileId(key));
 				return null;
@@ -129,6 +130,8 @@ export async function loadDemTile(
 	const h = await decodeHeights(r.buf).catch(() => null);
 	if (!h) return null;
 	const size = Math.round(Math.sqrt(h.length));
+	// fills no-data (-32768) pits; jump = ∞ skips the 256 m seam repair (horizon-fast runs that itself)
+	validateTile(h, size, Number.POSITIVE_INFINITY);
 	return {
 		key,
 		source: r.source,

@@ -1,6 +1,7 @@
 // Terrain tile mesh arrays (terrain.ts): the camera-local ENU grid + skirts of one DEM tile, as plain typed
 // arrays, so they can be built in terrain-tile.worker.ts as well as on the page (same code, same bits).
 // Environment-free: no three, no DOM.
+import { validateTile } from "./dem/decode";
 import { ancestorCrop } from "./dem/grid";
 import { type TileKey, tileBounds, tileXToLon, tileYToLat } from "./dem/tiles";
 import { DEG, distanceM, EnuFrame, WGS84 } from "./geodesy";
@@ -196,6 +197,8 @@ export async function buildTile(
 	const h = await decode(job.buf).catch(() => null);
 	if (!h) return null;
 	const size = Math.round(Math.sqrt(h.length));
+	// fills no-data (-32768) pits; jump = ∞ skips the 256 m seam repair (horizon-fast runs that itself)
+	validateTile(h, size, Number.POSITIVE_INFINITY);
 	const heights = ancestorCrop(h, job.source, job.key, size);
 	const frame = new EnuFrame(job.origin.lat, job.origin.lon, job.origin.h);
 	const keep = size / job.keepDiv;

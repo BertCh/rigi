@@ -203,13 +203,27 @@ export function clusterPhotos(
 ): PhotoMeta[][] {
 	const ok = ms.filter((m) => Number.isFinite(m.lat) && Number.isFinite(m.lon));
 	const parent = ok.map((_, i) => i);
+	const size = ok.map(() => 1);
 	const find = (i: number): number => {
-		while (parent[i] !== i) i = parent[i];
-		return i;
+		let r = i;
+		while (parent[r] !== r) r = parent[r];
+		while (parent[i] !== r) {
+			const next = parent[i];
+			parent[i] = r;
+			i = next;
+		}
+		return r;
 	};
 	for (let i = 0; i < ok.length; i++)
 		for (let j = i + 1; j < ok.length; j++)
-			if (distanceM(ok[i], ok[j]) < linkM) parent[find(i)] = find(j);
+			if (distanceM(ok[i], ok[j]) < linkM) {
+				let a = find(i);
+				let b = find(j);
+				if (a === b) continue;
+				if (size[a] < size[b]) [a, b] = [b, a];
+				parent[b] = a;
+				size[a] += size[b];
+			}
 	const groups = new Map<number, PhotoMeta[]>();
 	ok.forEach((m, i) => {
 		const r = find(i);

@@ -73,7 +73,13 @@ const regionCache = new Map<string, Promise<RegionData>>();
 export function loadRegion(id: string) {
 	let p = regionCache.get(id);
 	if (!p) {
-		p = fetch(`/photos/${id}.json`).then((r) => r.json());
+		p = fetch(`/photos/${id}.json`).then((r) => {
+			if (!r.ok) throw new Error(`region ${id}: HTTP ${r.status}`);
+			return r.json() as Promise<RegionData>;
+		});
+		p.catch(() => {
+			if (regionCache.get(id) === p) regionCache.delete(id);
+		});
 		regionCache.set(id, p);
 	}
 	return p;
