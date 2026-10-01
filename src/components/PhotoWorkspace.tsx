@@ -421,10 +421,13 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				if (moved) {
 					setPose(moved.pose, false);
 					setAlignState("manual");
+					// a pose the person chose: a verdict from an earlier (aborted) second opinion no longer applies
+					setVerify(null);
 					setAlignNote(moved.note);
 				} else if (saved) {
 					setPose(saved, false);
 					setAlignState("saved");
+					setVerify(null);
 					setAlignNote("Restored your saved alignment");
 				} else if (solver && engine.photoElement) {
 					// No compass / gravity / focal (uploads): autoAlign searches ±25° around a placeholder prior
