@@ -59,6 +59,9 @@ export interface SegmentSkyOptions {
 const DEFAULT_LONG_SIDE = 1024;
 
 let worker: Worker | null | undefined;
+// worker crashes: the worker may be re-created later, up to a cap (null = cannot start at all)
+let workerErrors = 0;
+const MAX_WORKER_ERRORS = 3;
 let nextId = 1;
 const pending = new Map<
 	number,
@@ -82,7 +85,9 @@ function getWorker(): Worker | null {
 			for (const p of pending.values()) p.reject(new Error(ev.message));
 			pending.clear();
 			worker?.terminate();
-			worker = null;
+			workerErrors++;
+			worker = workerErrors < MAX_WORKER_ERRORS ? undefined : null;
+			preloadPromise = undefined;
 		};
 	} catch (e) {
 		console.warn("[sky] cannot start worker, running fallback inline:", e);
@@ -133,7 +138,12 @@ export function preloadSkyModel(
 				: { backend: null },
 		() => ({ backend: null }),
 	);
-	return preloadPromise;
+	const mine = preloadPromise;
+	// a failed preload is not final: the next call may retry (the worker backs off itself)
+	void mine.then((r) => {
+		if (!r.backend && preloadPromise === mine) preloadPromise = undefined;
+	});
+	return mine;
 }
 
 type Source = HTMLImageElement | ImageBitmap | ImageData;

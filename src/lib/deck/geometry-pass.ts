@@ -201,6 +201,12 @@ export async function gpuDone(device: Device): Promise<boolean> {
 	]);
 	// luma's WebGL fence keeps polling until it signals: deleting it earlier leaves that poll spinning
 	if (ok) fence.destroy();
+	else {
+		// device lost: on a dead context clientWaitSync never reports a signal, so luma's poll would re-arm
+		// its 1 ms timer forever. Swap in a stub that reads as signaled so that poll resolves (stale) and stops.
+		const f = fence as unknown as { gl?: object };
+		if (f.gl) f.gl = { ALREADY_SIGNALED: 1, clientWaitSync: () => 1 };
+	}
 	return ok;
 }
 

@@ -60,6 +60,10 @@ ort.env.logLevel = "error";
 
 const models = new Map<string, Promise<SkyModel | null>>();
 let modelError: string | undefined;
+// A failed load is not cached for good: retry after a growing backoff, up to a cap.
+const failures = new Map<string, { n: number; at: number }>();
+const MAX_LOAD_ATTEMPTS = 4;
+const LOAD_BACKOFF_MS = 2000;
 
 const warmed = new WeakSet<Device>();
 
@@ -85,6 +89,14 @@ function loadModel(
 ): Promise<SkyModel | null> {
 	const key = `${url}|${backend ?? "auto"}`;
 	let p = models.get(key);
+	const f = failures.get(key);
+	if (
+		!p &&
+		f &&
+		(f.n >= MAX_LOAD_ATTEMPTS ||
+			performance.now() - f.at < LOAD_BACKOFF_MS * 2 ** (f.n - 1))
+	)
+		return Promise.resolve(null);
 	if (!p) {
 		p = (async () => {
 			try {
@@ -97,10 +109,17 @@ function loadModel(
 			} catch (e) {
 				modelError = String(e);
 				console.warn("[sky] model unavailable, using classical fallback:", e);
+				failures.set(key, {
+					n: (failures.get(key)?.n ?? 0) + 1,
+					at: performance.now(),
+				});
 				return null;
 			}
 		})();
 		models.set(key, p);
+		p.then((m) => {
+			if (!m && models.get(key) === p) models.delete(key);
+		});
 	}
 	return p;
 }

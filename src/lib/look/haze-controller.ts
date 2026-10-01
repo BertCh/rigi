@@ -47,6 +47,8 @@ export class HazeController {
 	fit: HazeFit | null = null;
 	sky: SkyMask | null = null;
 	private key = "";
+	/** The fg mask the cached fit used: a mask landing later must refit. */
+	private fgRef: SkyMask | null = null;
 	/** Opt-in GPU path (gpu/look, ?lookgpu=1): update returns false and this fires when the fit lands. */
 	onAsync?: (fit: HazeFit | null) => void;
 	private seq = 0;
@@ -84,8 +86,9 @@ export class HazeController {
 		if (!wantsHazeFit(o.style) || !o.img) return false;
 		const p = o.pose;
 		const key = `${p.yaw},${p.pitch},${p.roll},${p.vfov},${o.eyeAlt}`;
-		if (key === this.key) return false;
+		if (key === this.key && o.fg === this.fgRef) return false;
 		this.key = key;
+		this.fgRef = o.fg;
 		const { geo, w, h } = o.geo();
 		const W = Math.floor(w / STEP);
 		const H = Math.floor(h / STEP);

@@ -299,6 +299,8 @@ export class DeckHost implements Host {
 	}
 
 	destroy() {
+		// no frame will ever render: settle pending nextFrame() callers (they only await "a frame happened")
+		for (const r of this.waiters.splice(0)) r();
 		for (const c of this.cores) c.destroy();
 		this.cores = [];
 		this.geometry.destroy();

@@ -410,11 +410,14 @@ export class ComputeGraph<P = void> {
 	 */
 	async compileAsync(): Promise<this> {
 		if (this.compiled) return this;
-		const p = (this.compiling ??= untilLost(
-			this.device,
-			this.graph.compileAsync(),
-		).then((c) => this.linted(c)));
-		const c = await p;
+		this.compiling ??= untilLost(this.device, this.graph.compileAsync()).then(
+			(c) => this.linted(c),
+		);
+		const p = this.compiling;
+		const c = await p.catch((e) => {
+			if (this.compiling === p) this.compiling = null; // a failed compile must be retryable
+			throw e;
+		});
 		if (this.compiling !== p)
 			throw new Error(`${this.id}: destroyed while compiling`);
 		this.compiled ??= c;

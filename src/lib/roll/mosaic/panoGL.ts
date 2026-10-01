@@ -155,11 +155,15 @@ export class PanoGL {
 						})
 					: img;
 			const it = this.items.get(id);
-			if (!this.alive || !it || it.src !== src) return;
+			if (!this.alive || !it || it.src !== src) {
+				if (bmp instanceof ImageBitmap) bmp.close();
+				return;
+			}
 			const gl = this.gl;
 			const tex = gl.createTexture() as WebGLTexture;
 			gl.bindTexture(gl.TEXTURE_2D, tex);
 			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bmp);
+			if (bmp instanceof ImageBitmap) bmp.close(); // uploaded: the bitmap is no longer needed
 			gl.generateMipmap(gl.TEXTURE_2D);
 			gl.texParameteri(
 				gl.TEXTURE_2D,
