@@ -28,6 +28,8 @@ export type TrailSegments = {
 	colors: Float32Array;
 	/** Trail class per segment (deck-apply.ts trailClass: hiking, mountain, alpine, other). */
 	classes: Uint8Array;
+	/** 2 floats per segment: cumulative metres along its trail at the start / end (trailDash). */
+	dist?: Float32Array;
 	count: number;
 };
 
@@ -60,6 +62,7 @@ export function buildTrailSegments(
 	const pos: number[] = [];
 	const col: number[] = [];
 	const cls: number[] = [];
+	const dst: number[] = [];
 	const tmp = [0, 0, 0];
 	const place = (lon: number, lat: number) => {
 		const h = heightAt(lat, lon);
@@ -71,6 +74,8 @@ export function buildTrailSegments(
 		const k = trailClass(tr.sac);
 		const c = palette[k];
 		let prev: number[] | null = null;
+		let along = 0; // metres along this trail, counted over dropped segments too
+		let prevAlong = 0;
 		for (let i = 0; i < tr.coords.length; i++) {
 			const [lon, lat] = tr.coords[i];
 			if (i > 0) {
@@ -78,6 +83,7 @@ export function buildTrailSegments(
 				const seg = distanceM({ lat: plat, lon: plon }, { lat, lon });
 				const n = Math.max(1, Math.ceil(seg / 40));
 				for (let k = 1; k <= n; k++) {
+					const stepAlong = along + (seg * k) / n;
 					const q = place(
 						plon + ((lon - plon) * k) / n,
 						plat + ((lat - plat) * k) / n,
@@ -91,9 +97,12 @@ export function buildTrailSegments(
 						pos.push(prev[0], prev[1], prev[2], q[0], q[1], q[2]);
 						col.push(c[0], c[1], c[2]);
 						cls.push(k);
+						dst.push(prevAlong, stepAlong);
 					}
 					prev = q;
+					prevAlong = stepAlong;
 				}
+				along += seg;
 			} else prev = place(lon, lat);
 		}
 	}
@@ -101,6 +110,7 @@ export function buildTrailSegments(
 		positions: new Float32Array(pos),
 		colors: new Float32Array(col),
 		classes: new Uint8Array(cls),
+		dist: new Float32Array(dst),
 		count: col.length / 3,
 	};
 }
@@ -111,6 +121,8 @@ layout(std140) uniform trailUniforms {
   float opacity;
   float logDepthFC;
   float srgbOut;
+  float dashLength;
+  float gapLength;
 } trail;
 `;
 
@@ -123,6 +135,8 @@ const trailModule = {
 		opacity: "f32",
 		logDepthFC: "f32",
 		srgbOut: "f32",
+		dashLength: "f32",
+		gapLength: "f32",
 	},
 } as const satisfies ShaderModule;
 
@@ -132,13 +146,18 @@ in vec2 positions;
 in vec3 instanceStart;
 in vec3 instanceEnd;
 in vec3 instanceColor;
+in vec2 instanceDist;
 out vec3 vColor;
+out float vDist;
 out float vLogW;
 void main() {
   vec4 pc;
   vec4 a = project_position_to_clipspace(instanceStart, vec3(0.0), vec3(0.0), pc);
   vec4 b = project_position_to_clipspace(instanceEnd, vec3(0.0), vec3(0.0), pc);
   vColor = instanceColor;
+  float da = instanceDist.x;
+  float db = instanceDist.y;
+  vDist = da;
   // trim at the near plane (LineSegments2 does the same) so behind-camera ends don't flip
   const float NEAR = 1.0;
   if (a.w < NEAR && b.w < NEAR) {
@@ -146,8 +165,15 @@ void main() {
     vLogW = 1.0;
     return;
   }
-  if (a.w < NEAR) a = mix(a, b, (NEAR - a.w) / (b.w - a.w));
-  else if (b.w < NEAR) b = mix(b, a, (NEAR - b.w) / (a.w - b.w));
+  if (a.w < NEAR) {
+    float t = (NEAR - a.w) / (b.w - a.w);
+    a = mix(a, b, t);
+    da = mix(da, db, t);
+  } else if (b.w < NEAR) {
+    float t = (NEAR - b.w) / (a.w - b.w);
+    b = mix(b, a, t);
+    db = mix(db, da, t);
+  }
   vec2 half_res = 0.5 * project.viewportSize;
   vec2 sa = a.xy / a.w * half_res;
   vec2 sb = b.xy / b.w * half_res;
@@ -156,6 +182,7 @@ void main() {
   dir = len > 1e-6 ? dir / len : vec2(1.0, 0.0);
   vec2 nrm = vec2(-dir.y, dir.x);
   vec4 p = positions.x < 0.5 ? a : b;
+  vDist = positions.x < 0.5 ? da : db;
   // width in target pixels (three: LineMaterial linewidth at resolution = the render target)
   p.xy += nrm * positions.y * trail.width * 0.5 / half_res * p.w;
   gl_Position = p;
@@ -168,8 +195,25 @@ const fs = /* glsl */ `#version 300 es
 precision highp float;
 in vec3 vColor;
 in float vLogW;
+in float vDist;
 out vec4 fragColor;
+// luma pathDash_getCoverage (visgl/luma.gl #3322): filtered dash coverage of the metres along the path
+float dashIntegral(float coordinate, float fraction) {
+  return floor(coordinate) * fraction + min(fract(coordinate), fraction);
+}
+float dashCoverage(float dist) {
+  float period = max(trail.dashLength + trail.gapLength, 0.0001);
+  float coordinate = dist / period;
+  float extent = max(fwidth(coordinate), 0.0001);
+  float center = fract(coordinate);
+  float fraction = trail.dashLength / period;
+  float coverage = (dashIntegral(center + extent * 0.5, fraction) - dashIntegral(center - extent * 0.5, fraction)) / extent;
+  return clamp(coverage, 0.0, 1.0);
+}
 void main() {
+  // derivatives before any divergent branch; trail.gapLength <= 0 (the default) = solid, coverage unused
+  float dash = dashCoverage(vDist);
+  if (trail.gapLength > 0.0 && dash < 0.004) discard;
   gl_FragDepth = log2(vLogW) * trail.logDepthFC;
   // linear rgb, straight alpha: the colour pass target (composite.ts); sRGB-encoded when drawn
   // straight to the canvas (the world view, like three's LineMaterial colorspace_fragment)
@@ -178,7 +222,7 @@ void main() {
     c = max(c, vec3(0.0));
     c = mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
   }
-  fragColor = vec4(c, trail.opacity);
+  fragColor = vec4(c, trail.opacity * (trail.gapLength > 0.0 ? dash : 1.0));
 }
 `;
 
@@ -188,6 +232,8 @@ export type TrailLayerProps = LayerProps & {
 	widthPx?: number;
 	/** three: 0.95 */
 	lineOpacity?: number;
+	/** [dashM, gapM] metres along the trail (style.trails.dash); absent / gap ≤ 0 = solid. */
+	dash?: readonly [number, number];
 	/**
 	 * Draw in the normal canvas pass (sRGB output) instead of the offscreen colour pass: the world
 	 * view, where the terrain goes straight to the canvas.
@@ -228,7 +274,8 @@ export class TrailLayer extends Layer<TrailLayerProps> {
 			starts.set(seg.positions.subarray(i * 6, i * 6 + 3), i * 3);
 			ends.set(seg.positions.subarray(i * 6 + 3, i * 6 + 6), i * 3);
 		}
-		const buffers = [starts, ends, seg.colors].map((data) =>
+		const dist = seg.dist ?? new Float32Array(n * 2);
+		const buffers = [starts, ends, seg.colors, dist].map((data) =>
 			device.createBuffer({ data }),
 		);
 		const model = new Model(device, {
@@ -247,6 +294,7 @@ export class TrailLayer extends Layer<TrailLayerProps> {
 				{ name: "instanceStart", format: "float32x3", stepMode: "instance" },
 				{ name: "instanceEnd", format: "float32x3", stepMode: "instance" },
 				{ name: "instanceColor", format: "float32x3", stepMode: "instance" },
+				{ name: "instanceDist", format: "float32x2", stepMode: "instance" },
 			],
 			instanceCount: n,
 		});
@@ -254,6 +302,7 @@ export class TrailLayer extends Layer<TrailLayerProps> {
 			instanceStart: buffers[0],
 			instanceEnd: buffers[1],
 			instanceColor: buffers[2],
+			instanceDist: buffers[3],
 		});
 		this.setState({ model, buffers });
 	}
@@ -276,6 +325,8 @@ export class TrailLayer extends Layer<TrailLayerProps> {
 				opacity: this.props.lineOpacity ?? 0.95,
 				logDepthFC: 1 / Math.log2(LOG_DEPTH_FAR + 1),
 				srgbOut: this.props.onCanvas ? 1 : 0,
+				dashLength: this.props.dash?.[0] ?? 0,
+				gapLength: Math.max(0, this.props.dash?.[1] ?? 0),
 			},
 		});
 		model.draw(this.context.renderPass);

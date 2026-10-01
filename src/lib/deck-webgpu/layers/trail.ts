@@ -52,6 +52,8 @@ export type TrailStyle = {
 	width: number;
 	/** Line opacity (three / classic: 0.95). */
 	opacity: number;
+	/** [dashM, gapM] metres along the trail (luma pathDash); absent / gap ≤ 0 = solid (default). */
+	dash?: readonly [number, number];
 };
 
 export const DEFAULT_TRAIL_STYLE: TrailStyle = { width: 2.2, opacity: 0.95 };
@@ -59,8 +61,8 @@ export const DEFAULT_TRAIL_STYLE: TrailStyle = { width: 2.2, opacity: 0.95 };
 /** Relative depth nudge toward the camera (see the header). */
 export const TRAIL_DEPTH_BIAS = 1e-4;
 
-/** Floats per instance in the interleaved buffer: start xyz, end xyz, colour rgb. */
-const STRIDE = 9;
+/** Floats per instance in the interleaved buffer: start xyz, end xyz, colour rgb, dist start/end. */
+const STRIDE = 11;
 
 export type TrailUniforms = {
 	width: number;
@@ -68,8 +70,9 @@ export type TrailUniforms = {
 	depthBias: number;
 	nearTrim: number;
 	viewport: [number, number];
-	pad0: number;
-	pad1: number;
+	/** dash length m (pathDash); gap ≤ 0 = solid */
+	dashM: number;
+	gapM: number;
 };
 
 /** `trail` uniform block: 32 bytes, scalars first so the vec2 lands on offset 16. */
@@ -82,8 +85,8 @@ struct TrailUniforms {
   depthBias: f32,
   nearTrim: f32,
   viewport: vec2<f32>,
-  pad0: f32,
-  pad1: f32,
+  dashM: f32,
+  gapM: f32,
 };
 @group(0) @binding(auto) var<uniform> trail: TrailUniforms;
 `,
@@ -93,8 +96,8 @@ struct TrailUniforms {
 		depthBias: "f32",
 		nearTrim: "f32",
 		viewport: "vec2<f32>",
-		pad0: "f32",
-		pad1: "f32",
+		dashM: "f32",
+		gapM: "f32",
 	},
 	bindingLayout: [{ name: "trail", group: 0 }],
 } as const satisfies ShaderModule;
@@ -104,11 +107,13 @@ struct Instance {
   @location(0) instanceStart: vec3<f32>,
   @location(1) instanceEnd: vec3<f32>,
   @location(2) instanceColor: vec3<f32>,
+  @location(3) instanceDist: vec2<f32>,
 };
 
 struct Varyings {
   @builtin(position) position: vec4<f32>,
   @location(0) color: vec3<f32>,
+  @location(1) dist: f32,
 };
 
 // LineSegments2 quad: x = 0 start / 1 end, y = -1 / +1 across the line (var<private>: indexed
@@ -121,6 +126,9 @@ var<private> QUAD = array<vec2<f32>, 6>(
 @vertex fn vertexMain(@builtin(vertex_index) vi: u32, i: Instance) -> Varyings {
   var o: Varyings;
   o.color = i.instanceColor;
+  var da = i.instanceDist.x;
+  var db = i.instanceDist.y;
+  o.dist = da;
   let corner = QUAD[vi % 6u];
   var a = camera_clip(i.instanceStart);
   var b = camera_clip(i.instanceEnd);
@@ -131,9 +139,13 @@ var<private> QUAD = array<vec2<f32>, 6>(
     return o;
   }
   if (a.w < NEAR) {
-    a = mix(a, b, (NEAR - a.w) / (b.w - a.w));
+    let t = (NEAR - a.w) / (b.w - a.w);
+    a = mix(a, b, t);
+    da = mix(da, db, t);
   } else if (b.w < NEAR) {
-    b = mix(b, a, (NEAR - b.w) / (a.w - b.w));
+    let t = (NEAR - b.w) / (a.w - b.w);
+    b = mix(b, a, t);
+    db = mix(db, da, t);
   }
   let halfRes = 0.5 * trail.viewport;
   let sa = a.xy / a.w * halfRes;
@@ -143,6 +155,7 @@ var<private> QUAD = array<vec2<f32>, 6>(
   dir = select(vec2<f32>(1.0, 0.0), dir / len, len > 1e-6);
   let nrm = vec2<f32>(-dir.y, dir.x);
   var p = select(b, a, corner.x < 0.5);
+  o.dist = select(db, da, corner.x < 0.5);
   // width in target pixels (three: LineMaterial linewidth at resolution = the render target)
   p = vec4<f32>(p.xy + nrm * corner.y * trail.width * 0.5 / halfRes * p.w, p.z, p.w);
   // reversed-Z: a larger depth is closer; relative nudge toward the camera (header)
@@ -151,9 +164,25 @@ var<private> QUAD = array<vec2<f32>, 6>(
   return o;
 }
 
+// luma pathDash_getCoverage (visgl/luma.gl #3322): filtered dash coverage of the metres along the path
+fn dashIntegral(coordinate: f32, fraction: f32) -> f32 {
+  return floor(coordinate) * fraction + min(fract(coordinate), fraction);
+}
+fn dashCoverage(dist: f32) -> f32 {
+  let period = max(trail.dashM + trail.gapM, 0.0001);
+  let coordinate = dist / period;
+  let extent = max(fwidth(coordinate), 0.0001);
+  let center = fract(coordinate);
+  let fraction = trail.dashM / period;
+  let coverage = (dashIntegral(center + extent * 0.5, fraction) - dashIntegral(center - extent * 0.5, fraction)) / extent;
+  return clamp(coverage, 0.0, 1.0);
+}
+
 @fragment fn fragmentMain(v: Varyings) -> @location(0) vec4<f32> {
+  // derivatives in uniform control flow; trail.gapM <= 0 (the default) = solid, coverage unused
+  let dash = dashCoverage(v.dist);
   // linear rgb (vertex colour), premultiplied into the colour target
-  let a = trail.opacity;
+  let a = trail.opacity * select(1.0, dash, trail.gapM > 0.0);
   return vec4<f32>(max(v.color, vec3<f32>(0.0)) * a, a);
 }
 `;
@@ -193,6 +222,7 @@ export class TrailCore implements GpuLayerCore {
 			const o = i * STRIDE;
 			data.set(seg.positions.subarray(i * 6, i * 6 + 6), o);
 			data.set(seg.colors.subarray(i * 3, i * 3 + 3), o + 6);
+			if (seg.dist) data.set(seg.dist.subarray(i * 2, i * 2 + 2), o + 9);
 		}
 		// reuse the buffer when it is big enough (a recolour keeps the count)
 		if (!this.instances || this.instances.byteLength < data.byteLength) {
@@ -213,6 +243,7 @@ export class TrailCore implements GpuLayerCore {
 		this.style = {
 			width: style.width ?? this.style.width,
 			opacity: style.opacity ?? this.style.opacity,
+			dash: "dash" in style ? style.dash : this.style.dash,
 		};
 	}
 
@@ -256,6 +287,11 @@ export class TrailCore implements GpuLayerCore {
 									format: "float32x3",
 									byteOffset: 24,
 								},
+								{
+									attribute: "instanceDist",
+									format: "float32x2",
+									byteOffset: 36,
+								},
 							],
 						},
 					],
@@ -275,8 +311,8 @@ export class TrailCore implements GpuLayerCore {
 			// just past the near plane so the nudged depth stays ≤ 1 (inside the clip volume)
 			nearTrim: ctx.camera.near * (1 + Math.max(1e-3, 2 * this.depthBias)),
 			viewport: [ctx.target.width, ctx.target.height],
-			pad0: 0,
-			pad1: 0,
+			dashM: Math.max(0, this.style.dash?.[0] ?? 0),
+			gapM: Math.max(0, this.style.dash?.[1] ?? 0),
 		};
 	}
 
