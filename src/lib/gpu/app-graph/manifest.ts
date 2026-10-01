@@ -483,18 +483,24 @@ export const GPU_MODULES: readonly GpuModule[] = [
 	{
 		id: "geo-query-gpu",
 		island: "I8",
-		paths: ["src/lib/deck-webgpu/geo-query-gpu.ts"],
-		groups: [],
+		paths: [
+			"src/lib/deck-webgpu/geo-query-gpu.ts",
+			"src/lib/deck-webgpu/graph-texture.ts",
+		],
+		groups: ["geo-query"],
 		realms: ["page"],
 		cadence: "per settle",
-		resources: ["geometry target rgba32float (render device)"],
+		resources: [
+			"geometry target rgba32float (render device; import bound per run)",
+			"per-call uniforms, inputs, outputs (imports, created per call)",
+		],
 		readbacks: [
-			"verdicts 4 B per peak",
-			"gather 16 B per pixel",
-			"skyline 4 B per column",
+			"read: verdicts 4 B per peak + skyline 4 B per column (one graph run)",
+			"read: gather 20 B per pixel (nonce + 4 raw words), only for undecided samples",
 		],
 		status: "default",
-		notes: "single dispatches + core/readback, not ComputeGraphs",
+		notes:
+			"verdicts + skyline share one graph run (one submit, was two); gather runs after it; keyed by kernels and target shape",
 	},
 	{
 		id: "look-guided",

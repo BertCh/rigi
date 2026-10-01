@@ -2460,8 +2460,9 @@ export class WebGpuEngine implements Renderer {
 
 	/**
 	 * The GPU queries of one render (lazy query source, after its geometry pass): occlusion verdicts
-	 * of the snapped peaks and the skyline rows, each one dispatch over targets.geometry and a few
-	 * hundred bytes read. false = a kernel failed (the source then reads the render back in full).
+	 * of the snapped peaks and the skyline rows, one kernel each over targets.geometry in ONE graph
+	 * run (one submit, a few hundred bytes read), then the gather of undecided samples if any.
+	 * false = a kernel failed (the source then reads the render back in full).
 	 */
 	private async queryOnDraw(seq: number, pose: Pose): Promise<boolean> {
 		const src = this.geoSrc;
@@ -2474,10 +2475,11 @@ export class WebGpuEngine implements Renderer {
 		const aspect = this.aspect;
 		const prs = this.inFrameProjections(snapped, pose);
 		const plan: OccPlan = planOcclusion(prs, src.width, src.height);
-		const [codes, rows] = await Promise.all([
-			plan.slots.length ? q.verdicts(tex, plan.words) : new Uint32Array(0),
-			q.skylineRows(tex),
-		]);
+		// one graph run (one submit, one read) for both
+		const { codes, rows } = await q.verdictsAndSkyline(
+			tex,
+			plan.slots.length ? plan.words : new Uint32Array(0),
+		);
 		if (!codes || !rows) {
 			this.dietFail(!rows ? "skyline kernel" : "verdict kernel");
 			return false;
