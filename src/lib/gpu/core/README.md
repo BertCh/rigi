@@ -218,4 +218,12 @@ Numerics do not change. The WGSL, the shader module, the explicit shader layout 
 - graph-cache: hit returns the same graph, LRU eviction destroys (under the lease), runs of cached graphs exact
 - graph-read-leak: a checked submit's validation error after a read node, and a graph kernel node over maxComputeWorkgroupsPerDimension (encodeDispatch's guard applies to graph nodes) thrown mid-encode, both reject run() and leave no readback slot busy; encodeReads' `pending` counts unread slots
 
-Hosting the sky refine's local helpers (mig-sky `refine-graph.ts`): `AuditedGraph.clearNode(id, buf, dependsOn)` = `clearNode(id, buf, { dependsOn })`; `readNode(id, bufs, ranges(p))` = `readNode(id, [{ buffer, size: (p) => … }])` (a size of 0 skips a range, e.g. the optional float mask) with results in `run().reads[id]` instead of a `ReadSink` in the parameters; `writes` / `lintClears` = `KernelNode.writes` + the compile-time lint; `ShapeCache.get(device, key, build) → { value, hit }` = `cachedGraph(device, group, key, build, max) → { graph, extra, hit }`; `(g as unknown as { compiled }).compiled.stats` = `g.stats`.
+The sky refine (`sky/refine-graph.ts`, the sky worker's default `graph: true` path) is ported onto these primitives (2026-10-01, N5). Its local `AuditedGraph`, `lintClears` and `ShapeCache` are gone; old name to core:
+- `AuditedGraph.clearNode(id, buf, dependsOn)` is `clearNode(id, buf, { dependsOn })`.
+- `readNode(id, bufs, ranges(p))` with a `ReadSink` in the parameters is `readNode(id, [{ buffer, size: (p) => … }])`, with results in `run().reads[id]`. A size of 0 skips a range: the refine sizes its float-mask range `p.floats ? N * 4 : 0`. `KernelNode.condition` gates kernels only, not read nodes.
+- `writes` / `lintClears` is `KernelNode.writes` plus the compile-time lint. Every refine kernel writes "full", so the refine needs no clear node.
+- `ShapeCache.get(device, key, build) → { value, hit }` is `cachedGraph(device, "sky-refine", key, build, 2) → { graph, extra, hit }`. Clearing it is `releaseCachedGraphs(device, "sky-refine")`. On device loss, the cached graphs are now destroyed rather than forgotten.
+- `(g as unknown as { compiled }).compiled.stats` is `g.stats`.
+- ORT's output GPUBuffer is still wrapped per run (`device.createBuffer({ handle })`, not owned) and bound through `run({ buffers: { gp } })`.
+
+Gate: `scripts/gpu/sky-graph-bench.mjs` gives 0 differing bytes and 0 differing float bits against the pooled path at every size (up to 4608×3456 = 15.9 Mpx), along the hit/miss/evict sequence and on both uploaded-floats branches. Hit pattern, VRAM stats and the over-limit refusal match the pre-port run.

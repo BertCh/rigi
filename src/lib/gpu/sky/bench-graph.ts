@@ -13,6 +13,7 @@
 import type { Device } from "@luma.gl/core";
 import * as ort from "onnxruntime-web";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
+import { ComputeGraph, cachedGraphCount } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
 import { capacityFor, pooledStorage } from "#/lib/gpu/core/pool";
 import { getComputeDevice } from "#/lib/gpu/device";
@@ -30,10 +31,9 @@ import {
 	warmSkyKernels,
 } from "./refine";
 import {
-	AuditedGraph,
 	lastSkyGraphRun,
-	type ReadSink,
-	skyGraphCache,
+	releaseSkyGraphs,
+	SKY_GRAPH_GROUP,
 	skyScratchBytes,
 } from "./refine-graph";
 
@@ -153,12 +153,11 @@ async function clearTest(device: Device) {
 		{ group: "sky-graph-test", label: "t-half" },
 	);
 	const build = (mode: "clear" | "lint" | "lie") => {
-		const a = new AuditedGraph<ReadSink>(device, `sky-graph-test/${mode}`);
-		const { g } = a;
+		const g = new ComputeGraph(device, `sky-graph-test/${mode}`);
 		const A = g.transientBuffer("A", n * 4);
 		const B = g.transientBuffer("B", n * 4);
 		const out = g.importBuffer("out", n * 4);
-		a.addKernel({
+		g.addKernel({
 			id: "fill",
 			spec: FILL,
 			bindings: { a: A },
@@ -170,24 +169,24 @@ async function clearTest(device: Device) {
 			workgroups: [Math.ceil(n / 64)],
 		});
 		// B only starts after copy has read A, so the planner aliases B onto A's allocation
-		if (mode === "clear") a.clearNode("clear-B", B, ["copy"]);
-		a.addKernel({
+		if (mode === "clear") g.clearNode("clear-B", B, { dependsOn: ["copy"] });
+		g.addKernel({
 			id: "half",
 			dependsOn: ["copy"],
 			spec: HALF,
 			bindings: { b: B },
 			workgroups: [Math.ceil(n / 64)],
 			writes: mode === "lie" ? undefined : { b: "partial" },
-		}).readNode("read", [B], () => [{ buffer: B, size: n * 4 }]);
-		return { a, ...a.compile() };
+		}).readNode("read", [B]);
+		g.compile();
+		return { g, stats: g.stats as NonNullable<typeof g.stats> };
 	};
 	const run = async (mode: "clear" | "lie") => {
-		const { a, stats } = build(mode);
+		const { g, stats } = build(mode);
 		const out = pooledStorage(device, "sky-graph-test/out", n * 4);
-		const p: ReadSink = { reads: [] };
-		await a.g.run(p, { buffers: { out } });
-		const [b] = await p.reads[0].read();
-		a.g.destroy();
+		const { reads } = await g.run(undefined, { buffers: { out } });
+		const [b] = reads.read;
+		g.destroy();
 		const u = new Uint32Array(b);
 		let oddZero = 0;
 		let oddStale = 0;
@@ -281,7 +280,7 @@ export async function runSkyGraphBench(opts: {
 					2048;
 				const ms = { old: [] as number[], graph: [] as number[] };
 				// a cache miss (graph build + compile + transient allocation) on this shape
-				skyGraphCache.clear(device);
+				await releaseSkyGraphs(device);
 				let t = performance.now();
 				await refineSkyGpu(device, { ...input, graph: true });
 				const graphMiss = performance.now() - t;
@@ -332,7 +331,7 @@ export async function runSkyGraphBench(opts: {
 	}
 
 	// the same compiled graphs driven with different data, across cache hits / misses / evictions
-	skyGraphCache.clear(device);
+	await releaseSkyGraphs(device);
 	const seq: [string, number, number][] = [
 		[opts.names[0], 1024, 768],
 		[opts.names[1] ?? opts.names[0], 1024, 768],
@@ -350,7 +349,8 @@ export async function runSkyGraphBench(opts: {
 				name,
 				size: `${W}x${H}`,
 				...(await parity(device, input)),
-				cachedKeys: skyGraphCache.keys(device),
+				cachedKey: lastSkyGraphRun?.key,
+				cachedCount: cachedGraphCount(device, SKY_GRAPH_GROUP),
 			});
 		} finally {
 			inf.release();
