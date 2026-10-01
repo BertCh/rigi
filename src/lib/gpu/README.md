@@ -20,8 +20,14 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
   workarounds its header lists. We stay on luma 9.4.2 for now: deck 10 is not published, and
   10.0.0-alpha.2 has broken packaging.
 - **Kernel modules** (`horizon/`, `align/`, `look/`, `eye/`, `skyglobal/`, `solve/`, `sky/`): each defines
-  its WGSL with `core/kernel` `defineKernel`, pools its buffers under its own lease, submits through
-  `core/queue` and reads back through `core/readback`.
+  its WGSL with `core/kernel` `defineKernel` and runs it as a core `ComputeGraph` (`core/graph`,
+  usually a shape-keyed `cachedGraph` in the module's `graph.ts` / `*-graph.ts`): intermediates and
+  outputs are graph transients read through read nodes, inputs are pooled uploads under the
+  module's lease. **The graph is the only GPU path** (2026-10-01): the pooled single-dispatch /
+  `dispatchAll` paths and every `{ graph: false }` / `gpuGraph` switch are gone. Each module's GPU
+  path is the graph, and its fallback is the CPU twin. Pooled machinery stays where the graphs use
+  it: input slots, leases, readback slots, and the buffers a later readback needs outside the
+  encoding (skyglobal's candidate list, haze's lists, solve's resident `hz`).
 - **`splat-sort/`**: the GPU back-to-front sort of the Step Inside splats on the render device
   (stable radix, order buffer written in place, no readback); see its README for the key identity
   with the worker's counting sort.
@@ -60,18 +66,21 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
 2. `const K = defineKernel(id, WGSL, layout, { group: "<module>", label: "<module>-<pass>" })` at
    module level. The label is what `core/profile` reports. Warm up with
    `warmKernelsAsync(device, "<module>")`.
-3. Use pooled buffers (`pooledStorage`, `pooledUniform`, `acquire`) keyed `"<module>/<slot>"`, and
-   wrap the whole acquire → encode → `submit` → read sequence in `withLease("<module>", …)`. A
-   pooled buffer keeps the previous call's bytes, so zero it (`pooledStorage` with a size, or
-   `clear`) wherever the kernel relied on a fresh, zeroed buffer.
-4. Encode with `dispatch` / `dispatchAll`, which set bindings per pass. Submit with core `submit()`,
-   never `device.submit(enc.finish())`. Stage reads on the same encoder (`stage` / `stageReads`).
+3. Build the passes as a core `ComputeGraph` (`cachedGraph(device, "<module>", shapeKey, build)`):
+   scratch and outputs are `transientBuffer`s read through a `readNode`; inputs are
+   `importBuffer`s bound per run from pooled uploads (`pooledStorage`, `pooledUniform`, `acquire`,
+   keyed `"<module>/<slot>"`). Wrap the upload → run → read sequence in `withLease("<module>", …)`.
+   Transients are never zeroed and alias each other: declare atomic / partial writes
+   (`writes: { out: "atomic" | "partial" }`) and put a `clearNode` before them (compile() lints
+   it). Do not add a second, pooled dispatch path next to the graph: the CPU twin is the fallback.
+4. Use `graph.run()` (one submit, read nodes resolved), or `encodeReads()` + core `submit()` when
+   the encoder is shared. Never `device.submit(enc.finish())`.
 5. Branch on `hasFeature(device, "subgroups" | "shader-f16")`: an adopted render device may not have
    the sidecar's features. Keep a plain path, and check that it matches (see `look/color-stats.ts`
    and `skyglobal` REDUCE_SG).
-6. For multi-pass pipelines whose intermediates stay on the GPU, use `core/graph` `ComputeGraph`
-   (transient buffers, `GPUReduction` / `GPUSort` / `GPUScan` / `GPUHistogram` nodes, per-node
-   timings). `look/textures.ts` is the worked example.
+6. luma primitives (`GPUReduction` / `GPUSort` / `GPUScan` / `GPUHistogram`) are graph nodes too,
+   with per-node timings. Worked examples: `horizon/graph.ts` (one kernel), `look/relief-graph.ts`
+   (a chain with clears and a CPU condition), `look/textures.ts` (texture inputs).
 7. Add a bench (`bench.ts` in the module plus `scripts/gpu/<name>-bench.mjs`) that compares against
    the CPU twin and writes small JSON under `out/gpu/**`. Add a row to the table below.
 
@@ -111,9 +120,9 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
 | Dir | Kernel (pass labels) | Default in the app | CPU twin |
 |---|---|---|---|
 | `horizon/` | batched horizon ray-march over ring mosaics (`horizon-march`). `scene-profile.ts`: 360° unknown-pose horizon, with an opt-in 2-scene cache (`keep`) | on in the horizon-fast-app worker (`?gpuHorizon=off`). Unknown-pose opt-in (`?unknownGpu=on`) | `horizon-fast/march.ts` |
-| `align/` | autoAlign coarse pose-grid scoring (`align-pose-grid`), and certified score bounds for the coordinate-descent refine (`align-pose-bound`, `pose-bound.ts`): one dispatch per round bounds every speculated neighbour of every live hypothesis, the CPU skips only neighbours the bound proves it would reject and decides every move on exact scores, so the result is identical by construction (proof in `align.ts` `Descent`; `scripts/gpu/align-refine-ab.mjs`). The bound's premise (the device's f32 accuracy) is verified at run time: skips that lean on the error allowance, the device's first 64 skips and 1 in 128 after are re-scored on the CPU; a violation turns the GPU refine off for that device and the call re-runs the CPU refine. Pooled buffers; the edge planes are uploaded once per edge set. The silhouette re-rank stays on the CPU | on (`alignGpuOptions.refine = "cpu"` or `autoAlignAsync(…, { refine: "cpu" })` = CPU refine) | `align.ts` |
-| `look/` | relief field, haze fit (radix select, compact readback), guided filter, colour stats (opt-in subgroup path `{subgroups: true}` with a layout check and plain fallback; default plain) (`look-*`). `relief-heights.ts`: the relief height raster gathered in WGSL from the batched terrain's resident DEM tiles (deck-webgpu bridge, CPU raster fallback). `textures.ts`: texture-input masks / stats / haze prep as `ComputeGraph`s, for the WebGPU renderer | on (`?lookgpu=0`). Texture path not wired yet | `look/**` |
+| `align/` | autoAlign coarse pose-grid scoring (`align-pose-grid`), and certified score bounds for the coordinate-descent refine (`align-pose-bound`, `pose-bound.ts`), both on `align/graph.ts`: one graph run per round bounds every speculated neighbour of every live hypothesis, the CPU skips only neighbours the bound proves it would reject and decides every move on exact scores, so the result is identical by construction (proof in `align.ts` `Descent`; `scripts/gpu/align-refine-ab.mjs`). The bound's premise (the device's f32 accuracy) is verified at run time: skips that lean on the error allowance, the device's first 64 skips and 1 in 128 after are re-scored on the CPU; a violation turns the GPU refine off for that device and the call re-runs the CPU refine. Pooled inputs; the edge planes are uploaded once per edge set. The silhouette re-rank stays on the CPU | on (`alignGpuOptions.refine = "cpu"` or `autoAlignAsync(…, { refine: "cpu" })` = CPU refine) | `align.ts` |
+| `look/` | relief field, haze fit (radix select, compact readback), guided filter, colour stats, each on its `*-graph.ts` (opt-in subgroup path `{subgroups: true}` with a layout check and plain fallback; default plain) (`look-*`). `relief-heights.ts`: the relief height raster gathered in WGSL from the batched terrain's resident DEM tiles (deck-webgpu bridge, CPU raster fallback). `textures.ts`: texture-input masks / stats / haze prep as `ComputeGraph`s, for the WebGPU renderer | on (`?lookgpu=0`). Texture path not wired yet | `look/**` |
 | `eye/` | batched horizon provider for the pose6dof eye search (uses `horizon/`; no kernel of its own). Async kernel warm-up | suggestion only (`?eyesearch=1`) | `pose6dof/eye.ts` per-eye path |
-| `skyglobal/` | matcher T6 stage-1 skyline grid (`skyglobal-cells` / `-reduce` / `-cands`). A GPU bound pass (core ComputeGraph by default, `skyglobal/graph.ts`; pooled path via `{ graph: false }`), then the CPU re-scores the candidates exactly; subgroup REDUCE; count-first readback | service only, behind `T6_GPU_GRID=1` | `tools/matcher/stage1/skyglobal.py` (`skyglobal/cpu.ts` is a TS port. Its polish differs from numpy on 3/50 photos due to libm last-bit differences, so only the grid may replace numpy) |
-| `solve/` | solvePose coarse yaw × pitch grid (`solve-coarse`). The GPU gives certified row bounds, then the CPU re-scores the rows that bounded selection cannot settle, so the result is identical by construction | **on** in the unknown-pose worker (`?gpu=off` = CPU); 60/60 identical in the worker A/B | `geo/solve.ts` `planCoarse` / `coarseCost` (re-exported by `solve/cpu.ts`; one copy of the cost since 2026-09-30) |
-| `sky/` | sky-mask guided-filter refine (`sky-refine`), GPU twin of `sky/refine` `refineToWorking` + `toBytes`. Runs in the sky worker on the device ORT also uses (`sky/model.ts` `shareOrtDevice`), reading the model's output buffer directly and reading back only the byte mask | **on** in the sky worker (page `gpuEnabled()` sent as `gpu`) | `sky/refine.ts` (f64 sums vs f32: ≤ 1.2e-5, ≤ 9 mask bytes of 786k differ by 1; `scripts/gpu/sky-bench.mjs`) |
+| `skyglobal/` | matcher T6 stage-1 skyline grid (`skyglobal-cells` / `-reduce` / `-cands`). A GPU bound pass (`skyglobal/graph.ts`), then the CPU re-scores the candidates exactly; subgroup REDUCE; count-first readback | service only, behind `T6_GPU_GRID=1` | `tools/matcher/stage1/skyglobal.py` (`skyglobal/cpu.ts` is a TS port. Its polish differs from numpy on 3/50 photos due to libm last-bit differences, so only the grid may replace numpy) |
+| `solve/` | solvePose coarse yaw × pitch grid (`solve-coarse`). The GPU (`solve/graph.ts`: COARSE + a GPU row fold, resident horizon profile) gives certified row bounds, then the CPU re-scores the rows that bounded selection cannot settle, so the result is identical by construction. A row threshold too close to call in f32 re-runs COARSE and folds the blocks in f64 on the CPU | **on** in the unknown-pose worker (`?gpu=off` = CPU); 60/60 identical in the worker A/B | `geo/solve.ts` `planCoarse` / `coarseCost` (re-exported by `solve/cpu.ts`; one copy of the cost since 2026-09-30) |
+| `sky/` | sky-mask guided-filter refine (`sky-refine`, `sky/refine-graph.ts`), GPU twin of `sky/refine` `refineToWorking` + `toBytes`. Runs in the sky worker on the device ORT also uses (`sky/model.ts` `shareOrtDevice`), reading the model's output buffer directly and reading back only the byte mask | **on** in the sky worker (page `gpuEnabled()` sent as `gpu`) | `sky/refine.ts` (f64 sums vs f32: ≤ 1.2e-5, ≤ 9 mask bytes of 786k differ by 1; `scripts/gpu/sky-bench.mjs`) |

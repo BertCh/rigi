@@ -169,18 +169,9 @@ export function releaseCachedGraphs(device: Device, group?: string): Promise<voi
 6. **Readback.** Use `stage(device, enc, src, bytes)` (one range) or `stageReads(device, enc, ranges)` (several), then call `.read()` after `submit`. Use `readBack(device, build, ranges)` when it can own the encoder. Never call `readAsync` on a non-MAP_READ buffer: luma allocates a temporary buffer and encoder every time.
 7. **Release.** `release(...)` destroys fresh buffers and skips pooled ones, so a mixed list is safe.
 
-### `look/kernel.ts` expressed 1:1 on core
+### `look/kernel.ts`
 
-```ts
-import * as core from "#/lib/gpu/core/kernel";
-export type { BindKind, Kernel, KernelSpec } from "#/lib/gpu/core/kernel";
-export const defineKernel = (id: string, source: string, layout: [string, core.BindKind][]) =>
-	core.defineKernel(id, source, layout, { group: "look", label: `look-${id}` });
-export const kernel = core.kernel;                     // cache keyed by spec object instead of id: same thing for module-level specs
-export const warmKernels = (device: Device) => core.warmKernels(device, "look");
-export const { storage, uniform, dispatch, stage, release } = core; // dispatch: bindings now per pass
-```
-Numerics do not change. The WGSL, the shader module, the explicit shader layout and the `{}` pass props are all the same. `stage().read()` still resolves exactly `bytes` bytes, now through a reused ring slot instead of a fresh MAP_READ buffer.
+`look/kernel.ts` keeps only `defineKernel` (group `"look"`, label `look-<id>`), `warmKernelsAsync` and the pool / readback re-exports the look graphs use. Its pooled-dispatch helpers (`kernel`, `dispatch`, `dispatchAll`, `stage`, `storage`, …) went with the pooled look paths on 2026-10-01: every look kernel runs as a `ComputeGraph` node. `dispatch` / `dispatchAll` / `stage` / `stageReads` stay in core (the self-test and the graph's own encoding use them).
 
 ## Design notes
 
@@ -218,7 +209,7 @@ Numerics do not change. The WGSL, the shader module, the explicit shader layout 
 - graph-cache: hit returns the same graph, LRU eviction destroys (under the lease), runs of cached graphs exact
 - graph-read-leak: a checked submit's validation error after a read node, and a graph kernel node over maxComputeWorkgroupsPerDimension (encodeDispatch's guard applies to graph nodes) thrown mid-encode, both reject run() and leave no readback slot busy; encodeReads' `pending` counts unread slots
 
-The sky refine (`sky/refine-graph.ts`, the sky worker's default `graph: true` path) is ported onto these primitives (2026-10-01, N5). Its local `AuditedGraph`, `lintClears` and `ShapeCache` are gone; old name to core:
+The sky refine (`sky/refine-graph.ts`, now the only GPU refine) is ported onto these primitives (2026-10-01, N5). Its local `AuditedGraph`, `lintClears` and `ShapeCache` are gone; old name to core:
 - `AuditedGraph.clearNode(id, buf, dependsOn)` is `clearNode(id, buf, { dependsOn })`.
 - `readNode(id, bufs, ranges(p))` with a `ReadSink` in the parameters is `readNode(id, [{ buffer, size: (p) => … }])`, with results in `run().reads[id]`. A size of 0 skips a range: the refine sizes its float-mask range `p.floats ? N * 4 : 0`. `KernelNode.condition` gates kernels only, not read nodes.
 - `writes` / `lintClears` is `KernelNode.writes` plus the compile-time lint. Every refine kernel writes "full", so the refine needs no clear node.
@@ -226,4 +217,4 @@ The sky refine (`sky/refine-graph.ts`, the sky worker's default `graph: true` pa
 - `(g as unknown as { compiled }).compiled.stats` is `g.stats`.
 - ORT's output GPUBuffer is still wrapped per run (`device.createBuffer({ handle })`, not owned) and bound through `run({ buffers: { gp } })`.
 
-Gate: `scripts/gpu/sky-graph-bench.mjs` gives 0 differing bytes and 0 differing float bits against the pooled path at every size (up to 4608×3456 = 15.9 Mpx), along the hit/miss/evict sequence and on both uploaded-floats branches. Hit pattern, VRAM stats and the over-limit refusal match the pre-port run.
+Gate (at the port; the pooled path was removed on 2026-10-01 and the bench now compares with the CPU refine): `scripts/gpu/sky-graph-bench.mjs` gave 0 differing bytes and 0 differing float bits against the pooled path at every size (up to 4608×3456 = 15.9 Mpx), along the hit/miss/evict sequence and on both uploaded-floats branches. Hit pattern, VRAM stats and the over-limit refusal match the pre-port run.
