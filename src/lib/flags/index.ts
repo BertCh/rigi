@@ -72,8 +72,14 @@ export const FLAG_SCHEMA = {
 	 * CPU prep. ?gpu=off and WASM ORT always prep on the CPU.
 	 */
 	skyGpuPrep: onOff("on"),
-	/** unknown-pose 360° horizon (off: 0-false-accept rule) */
-	unknownGpu: onOff("off"),
+	/**
+	 * unknown-pose 360° horizon on the GPU march (gpu/horizon/scene-profile.ts, fused with the coarse solve).
+	 * Default on since 2026-10-01: node gate on Dawn (scripts/gpu/unknown-gpu-node.ts), GT-12 × 5 conditions
+	 * and the 17 wild dev photos without heading: 0 new false or unverified accepts; the one changed decision
+	 * (IMG_6971 noheading, the CPU's 0.895 accept at the 0.75 bar) also rejects with the CPU horizon jittered
+	 * by ±3e-4° (3/3 seeds) and in the browser's CPU run. off = the CPU sceneHorizon (also under ?gpu=off).
+	 */
+	unknownGpu: onOff("on"),
 	/**
 	 * WebGPU batched terrain: GPU frustum cull + indirect draws (WAG W1.5; byte-identical frames to the
 	 * CPU cull, scripts/deck-webgpu/terrain-indirect-check.mjs); off = the CPU cull. Default on since

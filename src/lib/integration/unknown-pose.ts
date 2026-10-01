@@ -57,7 +57,7 @@ export type UnknownPosePrepare = {
 	lat: number;
 	lon: number;
 	alt: number | null;
-	/** 360° horizon on the GPU (opt-in: unknownGpuOptIn); the CPU sceneHorizon otherwise and on failure */
+	/** 360° horizon on the GPU (unknownGpuOptIn, default on); the CPU sceneHorizon otherwise and on failure */
 	gpu?: boolean;
 	/** solvePose's coarse grid on the GPU (src/lib/gpu/solve; identical by construction): gpuEnabled() */
 	solveGpu?: boolean;
@@ -146,7 +146,7 @@ export class UnknownPoseSolver {
 		number,
 		{ resolve: (r: UnknownPoseResult) => void; reject: (e: Error) => void }
 	>();
-	/** GPU 360° horizon, opt-in (?unknownGpu=on; off under ?gpu=off) */
+	/** GPU 360° horizon (?unknownGpu, default on; off under ?gpu=off) */
 	private gpu = unknownGpuOptIn();
 	/** GPU coarse grid: on wherever WebGPU is (off under ?gpu=off); the result is the CPU's by construction */
 	private solveGpu = gpuEnabled();

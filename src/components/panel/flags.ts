@@ -200,7 +200,7 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "unknownGpu",
 		label: "Unknown-pose 360° horizon",
-		help: "GPU horizon for photos without compass / GPS. Off by default (0-false-accept rule).",
+		help: "GPU 360° horizon for photos without a compass heading or gravity (off: the CPU march). Same accept decisions within the CPU horizon's own noise.",
 		group: "compute",
 		options: ONOFF,
 	},

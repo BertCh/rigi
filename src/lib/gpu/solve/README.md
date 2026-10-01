@@ -90,7 +90,7 @@ Evidence (`scripts/gpu/solve-bench.mjs`, before the removal): on 5 photos × 4 c
 
 ## Fused horizon → solve chain (`fused.ts`, 2026-10-01)
 
-With the GPU 360° horizon (`?unknownGpu=on`) and the GPU coarse grid on its graph, the worker runs (default; `gpuFused: false` opts out) `fusedSceneHorizon`: the march on its command graph (`horizon/graph.ts`), the CPU's tan → degrees conversion as before, then the solve's resident `hz` buffer written with exactly `packCoarse`'s bits (`profileHz`, `primeResidentHz`). Every coarse graph run of the photo then binds that buffer: the first one no longer uploads (`stats.hzUploaded` false). `prepare` also compiles the fold kernel (`warmFusedSolve`).
+With the GPU 360° horizon (`?unknownGpu`, default on since 2026-10-01) and the GPU coarse grid on its graph, the worker runs (default; `gpuFused: false` opts out) `fusedSceneHorizon`: the march on its command graph (`horizon/graph.ts`), the CPU's tan → degrees conversion as before, then the solve's resident `hz` buffer written with exactly `packCoarse`'s bits (`profileHz`, `primeResidentHz`). Every coarse graph run of the photo then binds that buffer: the first one no longer uploads (`stats.hzUploaded` false). `prepare` also compiles the fold kernel (`warmFusedSolve`).
 
 What stays unfused, and why:
 - **The horizon readback.** The CPU needs the profile anyway: the LM fine stage, refinePose, the exact re-scores and the certified ε (max |hz|, steepest step) all read `horizon.elevation`.

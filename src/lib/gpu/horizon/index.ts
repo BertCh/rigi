@@ -47,8 +47,8 @@
  * wherever WebGPU exists (off with ?gpuHorizon=off or ?gpu=off; see opt-in.ts). autoAlign reacts to
  * last-bit changes in the skyline (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll); that drift was
  * accepted when the default flipped. The eye search (../eye) and the page's eye suggestion use it
- * whenever getComputeDevice() gives a device. Only the unknown-pose 360° horizon (scene-profile.ts) is
- * still opt-in (?unknownGpu=on, unknown-opt-in.ts).
+ * whenever getComputeDevice() gives a device. The unknown-pose 360° horizon (scene-profile.ts) has its
+ * own switch (?unknownGpu, on by default since 2026-10-01; unknown-opt-in.ts).
  */
 import { Buffer, type Device } from "@luma.gl/core";
 import { DEG, EARTH_R, REFRACTION_K } from "#/lib/geodesy";

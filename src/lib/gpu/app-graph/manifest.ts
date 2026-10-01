@@ -322,7 +322,8 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		resources: ["mosaic pages pg0…pgN (imports)", "u, params (imports)"],
 		readbacks: ["read: out nE·nAz·8 B + stats"],
 		status: "default",
-		notes: "each worker owns its own compute device (worker realm)",
+		notes:
+			"each worker owns its own compute device (worker realm); worker:unknown-pose marches its 360° scene here under flag unknownGpu (default on since 2026-10-01; off / ?gpu=off: the CPU sceneHorizon)",
 	},
 	{
 		id: "horizon-cert",
@@ -443,7 +444,8 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"blocks (flagged rows only): nYaw·nBlk·16 B",
 		],
 		status: "default",
-		notes: "certified f32 fold; flagged rows fold on the CPU in f64",
+		notes:
+			"certified f32 fold; flagged rows fold on the CPU in f64; fused with the unknown-pose GPU horizon (resident hz primed by the march) when unknownGpu is on",
 	},
 	{
 		id: "skyglobal",
@@ -474,8 +476,6 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU",
 	},
 	{
-		id: "sky-refine",
-	{
 		id: "sky-prep",
 		island: "I6",
 		paths: [
@@ -500,6 +500,8 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		notes:
 			"cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; flag skyGpuPrep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)",
 	},
+	{
+		id: "sky-refine",
 		island: "I6",
 		paths: ["src/lib/gpu/sky/refine-graph.ts", "src/lib/gpu/sky/refine.ts"],
 		groups: ["sky-refine"],

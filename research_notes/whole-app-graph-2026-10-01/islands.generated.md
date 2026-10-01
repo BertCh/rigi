@@ -62,12 +62,12 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **height-gather**: WAG W2.4 second half, under flag terrainGpuDecode: the WebGPU photo view's CPU height readers (camera DEM height, trails, peak snapping) take lazy tiles' heights from the atlas instead of materialising them; plan + blend on the CPU in f64 (TerrainSet.locate, gridCorners / blendCorners = sampleGrid), the GPU only copies texels, so a result is heightAt's bit for bit; nonce + slot certificate, heightAt fallback. CPU twin: TerrainSet.heightAt / localMax
 - **look-relief-heights**: rasterises the relief height field from the resident tiles; compiles into the "look-relief" group (listed under look-relief)
 - **photoprep**: planes read back and re-uploaded by align (R1, dataflow-map §3)
-- **horizon-march**: each worker owns its own compute device (worker realm)
+- **horizon-march**: each worker owns its own compute device (worker realm); worker:unknown-pose marches its 360° scene here under flag unknownGpu (default on since 2026-10-01; off / ?gpu=off: the CPU sceneHorizon)
 - **horizon-cert**: certified-f32 tan → degrees and ENU / resample (D7, D8); ?horizonPrecision=certified-f32; ties recomputed by the f64 path
 - **precision-probe**: strict-IEEE probe gating every certified-f32 stage (horizon in the horizon-fast worker; align on the page)
 - **align-cert**: certified-f32 coordinate descent (WAG W3.3): R rounds per submit, DECIDE → EVAL (indirect) → EVAL2 double-f32 (indirect); ?alignPrecision=certified-f32
 - **silhouette-gpu**: one kernel node per pose, one submit per re-rank; keyed by pose count and target shape
-- **solve-coarse**: certified f32 fold; flagged rows fold on the CPU in f64
+- **solve-coarse**: certified f32 fold; flagged rows fold on the CPU in f64; fused with the unknown-pose GPU horizon (resident hz primed by the march) when unknownGpu is on
 - **skyglobal**: T6 skyline global search; not wired into the service
 - **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU
 - **sky-prep**: cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; flag skyGpuPrep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)
