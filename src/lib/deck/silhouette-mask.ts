@@ -61,6 +61,7 @@
 // Checks: scripts/gpu/silhouette-mask-check.ts (node: packing, decoder, bounds) and
 // scripts/gpu/silhouette-ab.mjs (browser: GPU vs CPU autoAlign with Object.is).
 import type { EdgeMap } from "../align";
+import type { Pose } from "../camera";
 
 /**
  * Pixels per mask group: 3 u32 of pass bits + 1 u32 header
@@ -100,6 +101,33 @@ let nonceSeq = 0;
 export function silNonce() {
 	nonceSeq = (nonceSeq % 0xfffe) + 1;
 	return nonceSeq;
+}
+
+/** A read-back range (row 0 = top, sky = Infinity or ≤ 0) that holds no terrain texel at all. */
+export function rangeIsBlank(range: Float32Array) {
+	for (let i = 0; i < range.length; i++) {
+		const r = range[i];
+		if (r > 0 && r < Number.POSITIVE_INFINITY) return false;
+	}
+	return true;
+}
+
+/**
+ * A finalist's render that came back blank is drawn once more (render(): draw + readback) before
+ * it is scored. A finalist is a skyline match, so its pose sees terrain; a blank target means the
+ * draw did not happen, not an all-sky view. The first terrain-pass draw of a fresh page can come
+ * back blank (wave-3 precision gate, deck: the first seed's top finalist scored sil 0 on a fresh
+ * page and its real score on every later call, so the f64 baseline differed between runs).
+ * true = it redrew. Whatever the second draw holds is then scored, so a real all-sky view
+ * still scores 0, one render later.
+ */
+export async function redrawIfBlank(
+	src: { range: Float32Array; render(pose: Pose): Promise<void> },
+	pose: Pose,
+): Promise<boolean> {
+	if (!rangeIsBlank(src.range)) return false;
+	await src.render(pose);
+	return true;
 }
 
 /**
@@ -156,5 +184,7 @@ export type SilScores = {
 	bytes: number;
 	/** GPU path: poses re-scored on the CPU (undecided pixel / bad header) */
 	fallbacks: number;
+	/** finalists whose render came back blank and were drawn again (redrawIfBlank) */
+	redraws: number;
 	path: "gpu" | "cpu";
 };

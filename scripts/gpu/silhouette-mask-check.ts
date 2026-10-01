@@ -17,6 +17,8 @@
 import type { EdgeMap } from "../../src/lib/align";
 import { logRange } from "../../src/lib/deck/geometry-source";
 import {
+	rangeIsBlank,
+	redrawIfBlank,
 	SIL_GROUP,
 	scoreFromMask,
 	silGroups,
@@ -193,5 +195,50 @@ for (const adversarial of [false, true])
 		// legitimate (a pixel inside a ~2e-5 band) but should be rare on clean scenes
 		if (!adversarial && got === null) stats.cleanRejected++;
 	}
+// redrawIfBlank: a blank render (the draw did not happen) is drawn again once, anything else is kept
+{
+	const pose = { yaw: 10, pitch: 0, roll: 0, vfov: 20 };
+	const fake = (blankDraws: number) => {
+		let draws = 0;
+		const src = {
+			range: new Float32Array(16).fill(Number.POSITIVE_INFINITY),
+			async render() {
+				draws++;
+				if (draws > blankDraws) src.range[5] = 1234;
+			},
+			get draws() {
+				return draws;
+			},
+		};
+		return src;
+	};
+	if (!rangeIsBlank(new Float32Array(4).fill(Number.POSITIVE_INFINITY)))
+		failures++;
+	if (!rangeIsBlank(new Float32Array(4))) failures++;
+	if (rangeIsBlank(Float32Array.of(0, Number.POSITIVE_INFINITY, 3))) failures++;
+	// first draw blank (render() before), the redraw sees terrain
+	const a = fake(1);
+	await a.render();
+	if (
+		!(await redrawIfBlank(a, pose)) ||
+		a.draws !== 2 ||
+		rangeIsBlank(a.range)
+	) {
+		failures++;
+		console.log("redrawIfBlank did not redraw a blank first draw");
+	}
+	// not blank: no redraw
+	if ((await redrawIfBlank(a, pose)) || a.draws !== 2) {
+		failures++;
+		console.log("redrawIfBlank redrew a non-blank render");
+	}
+	// a real all-sky view stays blank after its one redraw (no loop)
+	const b = fake(99);
+	await b.render();
+	if (!(await redrawIfBlank(b, pose)) || b.draws !== 2) {
+		failures++;
+		console.log("redrawIfBlank: all-sky view not redrawn exactly once");
+	}
+}
 console.log({ ...stats, failures });
 process.exit(failures || stats.cleanRejected > 5 ? 1 : 0);

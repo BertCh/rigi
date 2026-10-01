@@ -146,6 +146,7 @@ import {
 import { compositeFor, terrainLookFor } from "./settings-map";
 import { SilhouetteMaskGL } from "./silhouette-gl";
 import {
+	redrawIfBlank,
 	type SilScores,
 	scoreFromMask,
 	silMaskWords,
@@ -382,6 +383,8 @@ export class DeckEngine implements Renderer {
 		bytes?: number;
 		/** GPU path: poses re-scored on the CPU (undecided pixel / bad header) */
 		fallbacks?: number;
+		/** finalists whose render came back blank and were drawn again (redrawIfBlank) */
+		redraws?: number;
 	} | null = null;
 	private streamer?: TerrainStreamer;
 	/** Latest streamed set (what the TerrainLayer draws). */
@@ -2235,12 +2238,19 @@ export class DeckEngine implements Renderer {
 			// and reads each one back synchronously)
 			await Promise.all(alts.map((a, i) => srcs[i]?.render(a.pose)));
 			if (this.disposed) return null;
+			// a blank render (a draw that did not happen) is drawn again before it is scored
+			let redraws = 0;
+			for (let i = 0; i < alts.length; i++) {
+				const s = srcs[i];
+				if (s && (await redrawIfBlank(s, alts[i].pose))) redraws++;
+			}
+			if (this.disposed) return null;
 			const tScore = performance.now();
 			const sils = srcs.map((s) => this.scoreSilhouette(s));
 			let bytes = 0;
 			for (const s of srcs)
 				if (s instanceof GpuGeometrySource) bytes += s.readBytes;
-			sil = { sils, tScore, bytes, fallbacks: 0, path: "cpu" };
+			sil = { sils, tScore, bytes, fallbacks: 0, redraws, path: "cpu" };
 		}
 		for (let i = 0; i < alts.length; i++) {
 			const s = sil.sils[i];
@@ -2254,6 +2264,7 @@ export class DeckEngine implements Renderer {
 			path: sil.path,
 			bytes: sil.bytes,
 			fallbacks: sil.fallbacks,
+			redraws: sil.redraws,
 		};
 		const ranked = scored.sort((a, b) => b.total - a.total);
 		const best = ranked[0];
@@ -2307,6 +2318,7 @@ export class DeckEngine implements Renderer {
 		const tScore = performance.now();
 		let bytes = this.silMask.lastBytes;
 		let fallbacks = 0;
+		let redraws = 0;
 		const per = silMaskWords(W, H);
 		const sils: number[] = [];
 		for (let i = 0; i < gs.length; i++) {
@@ -2317,11 +2329,17 @@ export class DeckEngine implements Renderer {
 				if (!(await gs[i].readDrawn(seqs[i], alts[i].pose)) || this.disposed)
 					return null;
 				bytes += gs[i].readBytes;
+				// an all-sky mask whose readback is blank too: the draw did not happen, draw it again
+				if (await redrawIfBlank(gs[i], alts[i].pose)) {
+					if (this.disposed) return null;
+					redraws++;
+					bytes += gs[i].readBytes;
+				}
 				s = this.scoreSilhouette(gs[i]);
 			}
 			sils.push(s);
 		}
-		return { sils, tScore, bytes, fallbacks, path: "gpu" };
+		return { sils, tScore, bytes, fallbacks, redraws, path: "gpu" };
 	}
 
 	private silhouetteSource(i = 0): GeometrySource | null {
