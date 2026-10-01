@@ -4,9 +4,10 @@ No published deck.gl release targets luma.gl 10 yet, so `@deck.gl/core` and `@de
 are installed from these tarballs (`package.json`: `file:vendor/deck/<name>.tgz`).
 
 **Swap to npm when deck publishes on luma 10**: point both deps at the published version,
-delete this directory, and re-run `npm install`. Also revisit `.npmrc` (`legacy-peer-deps`) and
-`package.json` `overrides`, which only exist to work around luma `10.0.0-alpha.2`'s broken
-manifests (yarn `patch:` protocol on `@math.gl/core`, `~9.4` peer ranges).
+delete this directory, and re-run `npm install`. Then drop the `package.json` override
+`"@deck.gl/core": "$@deck.gl/core"`, which only exists because `@deck.gl/layers@9.4.0-beta.4` peers
+`@deck.gl/core@~9.4.0`. luma itself is vendored too (see `vendor/luma/README.md`), with fixed
+manifests, so there is no `.npmrc` and no luma or math.gl override.
 
 ## Source
 

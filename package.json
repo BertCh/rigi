@@ -25,12 +25,13 @@
 		"@loaders.gl/images": "^5.0.0-alpha.7",
 		"@loaders.gl/loader-utils": "^5.0.0-alpha.7",
 		"@loaders.gl/schema": "^5.0.0-alpha.7",
-		"@luma.gl/core": "10.0.0-alpha.2",
-		"@luma.gl/engine": "10.0.0-alpha.2",
-		"@luma.gl/gpgpu": "10.0.0-alpha.2",
-		"@luma.gl/shadertools": "10.0.0-alpha.2",
-		"@luma.gl/webgl": "10.0.0-alpha.2",
-		"@luma.gl/webgpu": "10.0.0-alpha.2",
+		"@luma.gl/core": "file:vendor/luma/luma.gl-core-10.0.0-alpha.2-rigi.1.tgz",
+		"@luma.gl/effects": "file:vendor/luma/luma.gl-effects-10.0.0-alpha.2-rigi.1.tgz",
+		"@luma.gl/engine": "file:vendor/luma/luma.gl-engine-10.0.0-alpha.2-rigi.1.tgz",
+		"@luma.gl/gpgpu": "file:vendor/luma/luma.gl-gpgpu-10.0.0-alpha.2-rigi.1.tgz",
+		"@luma.gl/shadertools": "file:vendor/luma/luma.gl-shadertools-10.0.0-alpha.2-rigi.1.tgz",
+		"@luma.gl/webgl": "file:vendor/luma/luma.gl-webgl-10.0.0-alpha.2-rigi.1.tgz",
+		"@luma.gl/webgpu": "file:vendor/luma/luma.gl-webgpu-10.0.0-alpha.2-rigi.1.tgz",
 		"@math.gl/core": "5.0.0-alpha.9",
 		"@math.gl/polygon": "^5.0.0-alpha.9",
 		"@math.gl/web-mercator": "^5.0.0-alpha.9",
@@ -70,12 +71,6 @@
 		"vite": "^8.0.0"
 	},
 	"overrides": {
-		"@math.gl/core": "$@math.gl/core",
-		"@luma.gl/core": "$@luma.gl/core",
-		"@luma.gl/engine": "$@luma.gl/engine",
-		"@luma.gl/shadertools": "$@luma.gl/shadertools",
-		"@luma.gl/webgpu": "$@luma.gl/webgpu",
-		"@luma.gl/webgl": "$@luma.gl/webgl",
-		"@luma.gl/gpgpu": "$@luma.gl/gpgpu"
+		"@deck.gl/core": "$@deck.gl/core"
 	}
 }
