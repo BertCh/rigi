@@ -125,6 +125,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "gpu-clear-lint",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/core/clear-lint.check.ts"),
+		note: "ComputeGraph clear lint (gpu/core/clear-lint.ts): partial/atomic rule, GPU-condition rule (same gate, command rewrite, unaudited nodes, whole clears)",
+		timeoutS: 60,
+	},
+	{
 		id: "labels",
 		tier: "fast",
 		group: "look",

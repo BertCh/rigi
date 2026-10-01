@@ -5,10 +5,12 @@
 // Browser self-test of src/lib/gpu/core (scripts/gpu/core-selftest.mjs runs it in headless
 // Chromium): device registry, pool + leases, ring readback, kernels (sync / async / pooled, per-pass
 // bindings), a ComputeGraph with a custom WGSL node feeding GPUReduction, timestamp profiling,
-// adoptRenderDevice, the worker profile protocol, error checks (and their cost), the idle release and
-// device loss (last: they destroy the sidecar). Every GPU result is compared exactly with a CPU
+// adoptRenderDevice, the worker profile protocol, the W0.1 wrapper widening (GPU indirect conditions
+// and their lint, an adopted graph + preflight, raw-node audit, texture bindings with copy / render /
+// frame passthroughs, listCachedGraphs), the W0.5 partial readback map, error checks (and their
+// cost), the idle release and device loss (last: they destroy the sidecar). Every GPU result is compared exactly with a CPU
 // computation.
-import { Buffer, type Device, luma } from "@luma.gl/core";
+import { Buffer, type Device, luma, Texture } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import { setFlagOverride } from "#/lib/flags";
 import {
@@ -20,11 +22,18 @@ import {
 	RAISED_LIMITS,
 	releaseWhenIdle,
 } from "./device";
-import { ComputeGraph, cachedGraph, cachedGraphCount } from "./graph";
+import {
+	ComputeGraph,
+	cachedGraph,
+	cachedGraphCount,
+	type GraphTexture,
+	listCachedGraphs,
+} from "./graph";
 import {
 	defineKernel,
 	dispatch,
 	dispatchAll,
+	encodeDispatch,
 	kernel,
 	kernelAsync,
 	release,
@@ -35,7 +44,7 @@ import {
 	warmKernelsAsync,
 } from "./kernel";
 import { GpuDeviceLostError, idleFor, onLost } from "./lifecycle";
-import { GPUReduction } from "./luma";
+import { GPUCommandGraph, GPUReduction } from "./luma";
 import {
 	acquire,
 	capacityFor,
@@ -46,7 +55,12 @@ import {
 } from "./pool";
 import { getGpuProfile, resetGpuProfile } from "./profile";
 import { GpuValidationError } from "./queue";
-import { readBack, readbackStats, stageReads } from "./readback";
+import {
+	readBack,
+	readbackStats,
+	stagePartialRead,
+	stageReads,
+} from "./readback";
 import {
 	applyRealmGpuOptions,
 	mergeGpuProfile,
@@ -137,6 +151,45 @@ struct P { n: u32, m: u32 }
 		["p", "uniform"],
 		["x", "read-only-storage"],
 		["acc", "storage"],
+	],
+	{ group: "selftest" },
+);
+// GPU-condition reader: out[i] = v[i] + 1 (same workgroup size as FILL, so one indirect command
+// gates both)
+const K_PLUS1 = defineKernel(
+	"selftest-plus1",
+	/* wgsl */ `
+struct P { n: u32 }
+@group(0) @binding(0) var<uniform> p: P;
+@group(0) @binding(1) var<storage, read> v: array<f32>;
+@group(0) @binding(2) var<storage, read_write> out: array<f32>;
+// @workgroup_size(256): tiny test kernel
+@compute @workgroup_size(256) fn main(@builtin(global_invocation_id) g: vec3u) {
+	if (g.x >= p.n) { return; }
+	out[g.x] = v[g.x] + 1.0;
+}`,
+	[
+		["p", "uniform"],
+		["v", "read-only-storage"],
+		["out", "storage"],
+	],
+	{ group: "selftest" },
+);
+// graph texture binding: out[4i..4i+3] = texel i (row-major)
+const K_TEXLOAD = defineKernel(
+	"selftest-texload",
+	/* wgsl */ `
+@group(0) @binding(0) var t: texture_2d<f32>;
+@group(0) @binding(1) var<storage, read_write> out: array<vec4f>;
+// @workgroup_size(64): tiny test kernel
+@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) g: vec3u) {
+	let d = textureDimensions(t);
+	if (g.x >= d.x * d.y) { return; }
+	out[g.x] = textureLoad(t, vec2u(g.x % d.x, g.x / d.x), 0);
+}`,
+	[
+		["t", "texture"],
+		["out", "storage"],
 	],
 	{ group: "selftest" },
 );
@@ -835,6 +888,27 @@ export async function coreSelftest(): Promise<{
 		);
 	});
 
+	// listCachedGraphs: the two entries graph-cache left, read without touching the LRU order.
+	await run("graph-cache-list", async () => {
+		const list = listCachedGraphs(device, "selftest-cache");
+		const all = listCachedGraphs();
+		check(
+			"graph-cache-list",
+			list.length === 2 &&
+				list.map((e) => e.key).join() === "n=3000,n=2000" &&
+				list.every(
+					(e) =>
+						e.id === `selftest-cache|${e.key}` &&
+						e.compiled &&
+						(e.stats?.nodeCount ?? 0) >= 2 &&
+						e.device === device,
+				) &&
+				list.every((e) => all.some((x) => x.graph === e.graph)) &&
+				cachedGraphCount(device, "selftest-cache") === 2,
+			list.map(({ key, id, compiled }) => ({ key, id, compiled })),
+		);
+	});
+
 	// Read-node slots never leak: (a) a checked submit's validation error (a bad kernel after the read
 	// node) rejects run() and returns every staged slot; (b) a throw while encoding (a graph kernel
 	// node over maxComputeWorkgroupsPerDimension, refused by encodeDispatch's guard) after a read node
@@ -943,6 +1017,396 @@ export async function coreSelftest(): Promise<{
 				pendingAfter,
 				busyC,
 			},
+		);
+	});
+
+	// W0.1 GPU indirect conditions: a GPU-gated fill (x from a GPU command buffer; x = 0 skips it).
+	// Lint: an ungated reader of its transient needs a clear before it (else compile() throws); a
+	// reader gated by the same command needs none. Runs: cleared + ungated read gives fill or zeros;
+	// same-gate reader gives fill + 1 or leaves its import untouched.
+	await run("graph-gpu-condition", async () => {
+		type P = { n: number };
+		const n = 1000;
+		const wg = Math.ceil(n / 256);
+		const CMD = Buffer.INDIRECT | Buffer.COPY_DST | Buffer.STORAGE;
+		const build = (mode: "clear" | "gated" | "bad-read" | "bad-ungated") => {
+			const g = new ComputeGraph<P>(device, `selftest-gpucond-${mode}`);
+			const params = g.importBuffer(
+				"params",
+				16,
+				undefined,
+				Buffer.UNIFORM | Buffer.COPY_DST,
+			);
+			const cmd = g.importBuffer("cmd", 16, undefined, CMD);
+			const v = g.transientBuffer("v", n * 4);
+			const gate = {
+				id: "gate",
+				source: "gpu" as const,
+				mode: "indirect" as const,
+				buffer: cmd,
+			};
+			if (mode === "clear") g.clearNode("clearV", v);
+			g.addKernel({
+				id: "fill",
+				spec: K_FILL,
+				bindings: { p: params, v },
+				workgroups: [wg],
+				condition: gate,
+			});
+			if (mode === "clear" || mode === "bad-read") g.readNode("readV", [v]);
+			else {
+				const out = g.importBuffer("out", n * 4);
+				g.addKernel({
+					id: "plus1",
+					spec: K_PLUS1,
+					bindings: { p: params, v, out },
+					workgroups: [wg],
+					condition:
+						mode === "gated" ? { ...gate, id: "gate-reader" } : undefined,
+				});
+			}
+			return g;
+		};
+		const lintOf = (mode: "bad-read" | "bad-ungated") => {
+			try {
+				build(mode).compile().destroy();
+				return "";
+			} catch (e) {
+				return String((e as Error).message);
+			}
+		};
+		const lint = [lintOf("bad-read"), lintOf("bad-ungated")];
+		const fill = new Float32Array(n);
+		for (let i = 0; i < n; i++) fill[i] = ((i * 7919) % 10007) - 5000;
+		const plus = fill.map((x) => x + 1);
+		const pBuf = uniform(device, new Uint32Array([n]).buffer);
+		const cmdOf = (x: number) =>
+			device.createBuffer({
+				usage: CMD,
+				data: new Uint32Array([x, 1, 1, 0]),
+			});
+		const gc = build("clear").compile();
+		const gg = build("gated").compile();
+		const runs: Record<string, boolean> = {};
+		for (const x of [wg, 0, wg]) {
+			const cmd = cmdOf(x);
+			const rc = await gc.run({ n }, { buffers: { params: pBuf, cmd } });
+			runs[`clear-x${x}`] = sameBits(
+				rc.reads.readV[0],
+				(x ? fill : new Float32Array(n)).buffer,
+			);
+			const out = storage(device, new Float32Array(n).fill(-7));
+			const rg = await gg.run(
+				{ n },
+				{
+					buffers: { params: pBuf, cmd, out },
+					read: [{ buffer: out, size: n * 4 }],
+				},
+			);
+			runs[`gated-x${x}`] = sameBits(
+				rg.data[0],
+				(x ? plus : new Float32Array(n).fill(-7)).buffer,
+			);
+			release(cmd, out);
+		}
+		const preflight = gg.preflight;
+		gc.destroy();
+		gg.destroy();
+		release(pBuf);
+		check(
+			"graph-gpu-condition",
+			lint.every((m) => m.includes("GPU-conditioned fill")) &&
+				Object.values(runs).every(Boolean) &&
+				preflight?.conditionalNodeCount === 2,
+			{
+				lint: lint.map((m) => m.slice(0, 140)),
+				runs,
+				conditional: preflight?.conditionalNodeCount,
+			},
+		);
+	});
+
+	// W0.1 adopt an external GPUCommandGraph; workload annotations reach upstream preflight.
+	await run("graph-adopt-preflight", async () => {
+		type P = { n: number };
+		const n = 3000;
+		const raw = new GPUCommandGraph<P>(device, { id: "selftest-adopt-raw" });
+		const g = new ComputeGraph<P>(device, "selftest-adopt", { graph: raw });
+		const params = g.importBuffer(
+			"params",
+			16,
+			undefined,
+			Buffer.UNIFORM | Buffer.COPY_DST,
+		);
+		const v = g.transientBuffer("v", n * 4);
+		g.addKernel({
+			id: "fill",
+			spec: K_FILL,
+			bindings: { p: params, v },
+			workgroups: [Math.ceil(n / 256)],
+			workload: {
+				operation: "fill",
+				maximumInvocationCount: n,
+				writeByteLength: n * 4,
+			},
+		});
+		g.readNode("read", [v]);
+		g.compile();
+		const pf = g.preflight;
+		const node = pf?.nodes.find((x) => x.id === "fill");
+		const pBuf = uniform(device, new Uint32Array([n]).buffer);
+		const r = await g.run({ n }, { buffers: { params: pBuf } });
+		release(pBuf);
+		g.destroy();
+		const f = new Float32Array(n);
+		for (let i = 0; i < n; i++) f[i] = ((i * 7919) % 10007) - 5000;
+		check(
+			"graph-adopt-preflight",
+			g.graph === raw &&
+				sameBits(r.reads.read[0], f.buffer) &&
+				node?.maximumInvocationCount === n &&
+				node?.writeByteLength === n * 4 &&
+				(pf?.annotatedNodeCount ?? 0) >= 1 &&
+				g.fitsDeviceLimits() === undefined &&
+				pf?.fitsDeviceLimits === true,
+			{
+				annotated: pf?.annotatedNodeCount,
+				node,
+				fits: pf?.fitsDeviceLimits,
+			},
+		);
+	});
+
+	// W0.1 raw nodes join the clear lint (G5): a raw atomic node declaring `cleared` without a clear
+	// node is refused; with one it compiles.
+	await run("graph-raw-audit", async () => {
+		const build = (withClear: boolean) => {
+			const g = new ComputeGraph<void>(device, `selftest-raw-${withClear}`);
+			const p = g.importBuffer(
+				"p",
+				16,
+				undefined,
+				Buffer.UNIFORM | Buffer.COPY_DST,
+			);
+			const x = g.importBuffer("x", 64);
+			const t = g.transientBuffer("T", 64);
+			if (withClear) g.clearNode("clear", t);
+			g.addComputePass({
+				id: "raw-hist",
+				resources: [
+					{ buffer: p, usage: "uniform" },
+					{ buffer: x, usage: "storage-read" },
+					{ buffer: t, usage: "storage-read-write" },
+				],
+				cleared: [t],
+				compile: ({ device: d }) => {
+					const k = kernel(d, K_HIST);
+					return {
+						encode: ({ computePass, getBuffer }) =>
+							encodeDispatch(
+								computePass,
+								k,
+								{ p: getBuffer(p), x: getBuffer(x), acc: getBuffer(t) },
+								1,
+							),
+					};
+				},
+			});
+			g.readNode("read", [t]);
+			return g;
+		};
+		let refused = "";
+		try {
+			build(false).compile().destroy();
+		} catch (e) {
+			refused = String((e as Error).message);
+		}
+		const ok = build(true).compile();
+		const compiled = ok.isCompiled;
+		ok.destroy();
+		check(
+			"graph-raw-audit",
+			refused.includes("without a clear node") && compiled,
+			refused.slice(0, 140),
+		);
+	});
+
+	// W0.1 texture bindings in addKernel: an imported texture, a transient texture filled by a raw copy
+	// node, a transient texture cleared by a raw render node (graph attachments), and a frame texture
+	// supplied per run. Each is read texel-exact by a "texture" layout kernel.
+	await run("graph-texture", async () => {
+		const W = 16;
+		const H = 8;
+		const n = W * H;
+		const texels = Float32Array.from(
+			{ length: n * 4 },
+			(_, i) => i * 0.25 - 100,
+		);
+		const desc = (id: string, usage: number) => ({
+			id,
+			format: "rgba32float" as const,
+			width: W,
+			height: H,
+			usage,
+		});
+		const makeTexture = (data: Float32Array) => {
+			const t = device.createTexture({
+				format: "rgba32float",
+				width: W,
+				height: H,
+				usage: Texture.SAMPLE | Texture.COPY_DST,
+			});
+			t.writeData(data);
+			return t;
+		};
+		const reader = (g: ComputeGraph<void>, src: GraphTexture) => {
+			const out = g.transientBuffer("out", n * 16);
+			g.addKernel({
+				id: "load",
+				spec: K_TEXLOAD,
+				bindings: { t: src, out },
+				workgroups: [Math.ceil(n / 64)],
+			});
+			g.readNode("read", [out]);
+		};
+		const results: Record<string, boolean> = {};
+		// (a) imported
+		const tex = makeTexture(texels);
+		const ga = new ComputeGraph<void>(device, "selftest-tex-import");
+		reader(
+			ga,
+			ga.importTexture(desc("src", Texture.SAMPLE | Texture.COPY_DST), tex),
+		);
+		results.imported = sameBits(
+			(await ga.compile().run(undefined)).reads.read[0],
+			texels.buffer,
+		);
+		ga.destroy();
+		// (b) transient, filled by a copy node (bytesPerRow = 16 × 16 B = 256)
+		const srcBuf = storage(device, texels);
+		const gb = new ComputeGraph<void>(device, "selftest-tex-copy");
+		const sb = gb.importBuffer("srcBuf", n * 16);
+		const tt = gb.transientTexture(
+			desc("tt", Texture.SAMPLE | Texture.COPY_DST),
+		);
+		gb.addCopyPass({
+			id: "upload",
+			resources: [
+				{ buffer: sb, usage: "copy-source" },
+				{ texture: tt, usage: "copy-destination" },
+			],
+			compile: () => ({
+				encode: ({ commandEncoder, getBuffer, getTexture }) =>
+					commandEncoder.copyBufferToTexture({
+						sourceBuffer: getBuffer(sb),
+						destinationTexture: getTexture(tt),
+						bytesPerRow: W * 16,
+						rowsPerImage: H,
+						size: [W, H, 1],
+					}),
+			}),
+		});
+		reader(gb, tt);
+		results.copy = sameBits(
+			(await gb.compile().run(undefined, { buffers: { srcBuf } })).reads
+				.read[0],
+			texels.buffer,
+		);
+		gb.destroy();
+		release(srcBuf);
+		// (c) transient render target cleared by a render node
+		const color = [1.5, -2, 0.25, 8];
+		const gc = new ComputeGraph<void>(device, "selftest-tex-render");
+		const rt = gc.transientTexture(desc("rt", Texture.SAMPLE | Texture.RENDER));
+		gc.addRenderPass({
+			id: "clear-rt",
+			attachments: { colorAttachments: [gc.textureView(rt)] },
+			compile: () => ({
+				getRenderPassProps: () => ({
+					id: "selftest-clear-rt",
+					clearColor: color as [number, number, number, number],
+				}),
+				encode: () => {},
+			}),
+		});
+		reader(gc, rt);
+		const cleared = new Float32Array(n * 4).map((_, i) => color[i % 4]);
+		results.render = sameBits(
+			(await gc.compile().run(undefined)).reads.read[0],
+			cleared.buffer,
+		);
+		gc.destroy();
+		// (d) frame texture, a different texture per run with an increasing frameId
+		const gd = new ComputeGraph<void>(device, "selftest-tex-frame");
+		reader(gd, gd.importFrameTexture(desc("frame", Texture.SAMPLE)));
+		gd.compile();
+		const second = texels.map((x) => -x);
+		const tex2 = makeTexture(second);
+		let frameOk = true;
+		for (const [frameId, t, want] of [
+			[1, tex, texels],
+			[2, tex2, second],
+		] as const) {
+			const r = await gd.run(undefined, {
+				frameTextures: { frame: { texture: t, frameId } },
+			});
+			frameOk &&= sameBits(r.reads.read[0], want.buffer);
+		}
+		results.frame = frameOk;
+		gd.destroy();
+		tex.destroy();
+		tex2.destroy();
+		check("graph-texture", Object.values(results).every(Boolean), results);
+	});
+
+	// W0.5 deferred partial map: header first, then only [0, total); bad totals reject and every slot
+	// is returned.
+	await run("readback-partial", async () => {
+		const capacity = 4096;
+		const words = new Uint32Array(capacity / 4);
+		for (let i = 1; i < words.length; i++) words[i] = Math.imul(i, 2654435761);
+		const src = storage(device, words);
+		const results: Record<string, unknown> = {};
+		let ok = true;
+		for (const count of [37, 0, capacity / 4 - 1]) {
+			words[0] = count;
+			src.write(words.subarray(0, 1));
+			const enc = device.createCommandEncoder({ id: "selftest-partial" });
+			const staged = stagePartialRead(device, enc, {
+				buffer: src,
+				capacity,
+				headerBytes: 4,
+				total: (h) => 4 + new Uint32Array(h)[0] * 4,
+			});
+			submit(device, enc);
+			const r = await staged.read();
+			const total = 4 + count * 4;
+			const good =
+				r.total === total &&
+				r.data.byteLength === total &&
+				r.header.byteLength === 4 &&
+				sameBits(r.data, words.slice(0, total / 4).buffer);
+			results[`count${count}`] = good;
+			ok &&= good;
+		}
+		// a total past the capacity rejects (and returns its slot)
+		const enc = device.createCommandEncoder({ id: "selftest-partial-bad" });
+		const bad = stagePartialRead(device, enc, {
+			buffer: src,
+			capacity,
+			headerBytes: 4,
+			total: () => capacity + 4,
+		});
+		submit(device, enc);
+		const badRead = await settle(bad.read(), 5000);
+		release(src);
+		await sleep(0);
+		const stats = readbackStats(device);
+		results.bad = badRead.state;
+		check(
+			"readback-partial",
+			ok && badRead.state === "rejected" && stats.busy === 0,
+			{ ...results, busy: stats.busy },
 		);
 	});
 

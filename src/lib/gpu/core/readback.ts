@@ -195,6 +195,117 @@ export function stageReads(
 	};
 }
 
+/** A deferred partial-range read: a capacity-sized range whose used length is in its header. */
+export type PartialReadRange = {
+	buffer: Buffer;
+	/** byte offset of the range (a 4-byte multiple) */
+	offset?: number;
+	/** bytes staged (the most the read can return; the copy is this size) */
+	capacity: number;
+	/** bytes of the header at the start of the range, mapped first */
+	headerBytes: number;
+	/**
+	 * Bytes of the range to return, derived from the header (a copy of the first `headerBytes`):
+	 * an integer in [0, capacity], or the read rejects.
+	 */
+	total: (header: ArrayBuffer) => number;
+};
+
+/** stagePartialRead's result: read() resolves the header and the first `total` bytes of the range. */
+export type StagedPartialRead = {
+	read: () => Promise<{
+		header: ArrayBuffer;
+		data: ArrayBuffer;
+		total: number;
+	}>;
+	/** Return the slot unread (only when the encoder was NOT submitted). */
+	cancel: () => void;
+};
+
+/**
+ * Stage `capacity` bytes of `range.buffer` (one copy into a staging slot, on `enc`, like stageReads),
+ * then on read() map only the header first and, after `total(header)`, only [0, total): the bytes
+ * past the used length are copied on the GPU but never mapped or sliced on the CPU. Correctness
+ * contract only; whether the smaller second map is faster is unmeasured (needs a timed bench).
+ */
+export function stagePartialRead(
+	device: Device,
+	enc: CommandEncoder,
+	range: PartialReadRange,
+): StagedPartialRead {
+	const { buffer, offset = 0, capacity, headerBytes } = range;
+	const padded = Math.ceil(capacity / 4) * 4;
+	if (offset % 4 || offset + padded > buffer.byteLength)
+		throw new Error(
+			`partial readback range ${offset}+${capacity} (padded ${padded}) is unaligned or outside ${buffer.id} (${buffer.byteLength} B)`,
+		);
+	if (!(headerBytes > 0 && headerBytes <= capacity))
+		throw new Error(
+			`partial readback header ${headerBytes} B is not in (0, ${capacity}]`,
+		);
+	const slot = reserve(device, padded);
+	enc.copyBufferToBuffer({
+		sourceBuffer: buffer,
+		sourceOffset: offset,
+		destinationBuffer: slot.buffer,
+		destinationOffset: 0,
+		size: padded,
+	});
+	let used = false;
+	const cancel = () => {
+		if (used) return;
+		used = true;
+		giveBack(device, slot);
+	};
+	cancelIfSubmitFails(enc, cancel);
+	return {
+		read: async () => {
+			if (used) throw new Error("readback already read or cancelled");
+			used = true;
+			// two raw maps of the slot (see stageReads.read): [0, header) then [0, total), each 4-byte
+			// padded from offset 0 (mapAsync's offset % 8 / size % 4 rule); the slot is unmapped in
+			// between and given back only once no map is pending
+			const handle = (slot.buffer as unknown as { handle: GPUBuffer }).handle;
+			const mapSlice = async (bytes: number) => {
+				const n = Math.ceil(bytes / 4) * 4;
+				await handle.mapAsync(1 /* GPUMapMode.READ */, 0, n);
+				try {
+					return handle.getMappedRange(0, n).slice(0, bytes);
+				} finally {
+					handle.unmap();
+				}
+			};
+			const mapped = (async () => {
+				const header = await mapSlice(headerBytes);
+				const total = range.total(header.slice(0));
+				if (!Number.isInteger(total) || total < 0 || total > capacity)
+					throw new Error(
+						`partial readback total ${total} is not an integer in [0, ${capacity}]`,
+					);
+				const data =
+					total <= headerBytes ? header.slice(0, total) : await mapSlice(total);
+				return { header, data, total };
+			})().catch((e) => {
+				throw device.isLost ? new GpuDeviceLostError("readback") : e;
+			});
+			let settled = false;
+			try {
+				const [out] = await untilLost(
+					device,
+					Promise.all([mapped, submitted(enc)]),
+				);
+				settled = true;
+				return out;
+			} finally {
+				const back = () => giveBack(device, slot);
+				if (settled || device.isLost) back();
+				else mapped.then(back, back);
+			}
+		},
+		cancel,
+	};
+}
+
 /**
  * Encode with `build`, stage `ranges` (or the ReadRange[] `build` returns) on the same encoder, submit
  * once, and resolve one ArrayBuffer per range.

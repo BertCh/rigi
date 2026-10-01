@@ -19,7 +19,7 @@ Self-test: `node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/core-selft
 | `profile.ts` | Opt-in GPU timestamp profiling (`globalThis.__RIGI_GPU_PROFILE__ = true`) and `getGpuProfile()`, including the GPU workers' reports |
 | `realm.ts` | The page → worker protocol for the profiling / error-check switches, and the worker → page profile report. Import-light (no luma runtime) |
 | `lifecycle.ts` | `untilLost`, `onLost` and the activity counters behind the idle release. No luma runtime |
-| `graph.ts` | `ComputeGraph`, a thin wrapper over `GPUCommandGraph` for multi-pass pipelines with GPU-resident intermediates. Upstream has GPU indirect conditions (compute nodes only), render and copy nodes, texture transients, preflight and `GPUCommandGraphInspector`; this wrapper doesn't expose them yet (WAG W0.1). The clear lint, `readNode` and `cachedGraph` have no upstream equivalent. Audit: `research_notes/whole-app-graph-2026-10-01/upstream-api.md` |
+| `graph.ts` | `ComputeGraph`, a thin wrapper over `GPUCommandGraph` for multi-pass pipelines with GPU-resident intermediates. Since WAG W0.1 it also passes through upstream's GPU indirect conditions (compute nodes only, with a GPU-condition clear lint), render and copy nodes (audited like kernels), transient / frame textures and texture bindings in kernels, `workload` + `preflight`, and adopts an external `GPUCommandGraph` (`{ graph }`); `listCachedGraphs` enumerates the cache. `GPUCommandGraphInspector` is not wired yet (W0.2). The clear lint, `readNode` and `cachedGraph` have no upstream equivalent. Audit: `research_notes/whole-app-graph-2026-10-01/upstream-api.md` |
 | `selftest.ts` | `coreSelftest()` for the browser, which exercises all of the above against CPU results |
 
 ## API (exact signatures)
@@ -55,6 +55,13 @@ export function poolStats(device: Device): { slots: number; bytes: number };
 export type ReadRange = { buffer: Buffer; offset?: number; size: number };  // offset % 4 == 0
 export type StagedRead = { read: () => Promise<ArrayBuffer[]>; cancel: () => void };  // a throwing core submit() cancels
 export function stageReads(device: Device, enc: CommandEncoder, ranges: ReadRange[]): StagedRead;
+// W0.5: deferred partial-range map. One `capacity` copy; read() maps [0, headerBytes) first, then only
+// [0, total(header)) (total an integer in [0, capacity], else read() rejects). Correctness only: unmeasured.
+export type PartialReadRange = { buffer: Buffer; offset?: number; capacity: number; headerBytes: number;
+  total: (header: ArrayBuffer) => number };
+export type StagedPartialRead = { read: () => Promise<{ header: ArrayBuffer; data: ArrayBuffer; total: number }>;
+  cancel: () => void };
+export function stagePartialRead(device: Device, enc: CommandEncoder, range: PartialReadRange): StagedPartialRead;
 export function readBack(device: Device, build: (enc: CommandEncoder) => unknown, ranges?: ReadRange[],
   opts?: { id?: string }): Promise<ArrayBuffer[]>;                   // ranges ?? (ReadRange[] returned by build)
 export function readbackStats(device: Device): { slots: number; busy: number; bytes: number };
@@ -80,7 +87,7 @@ export function applyRealmGpuOptions(o: RealmGpuOptions | undefined): void; // w
 export { takeGpuProfile, mergeGpuProfile } from "./profile";
 
 // kernel.ts
-export type BindKind = "uniform" | "storage" | "read-only-storage" | "texture"; // texture: 2-D unfilterable-float, not in graphs
+export type BindKind = "uniform" | "storage" | "read-only-storage" | "texture"; // texture: 2-D unfilterable-float (graphs: a GraphTexture)
 export type KernelSpec = { id: string; source: string; layout: [string, BindKind][]; entryPoint: string;
   constants?: Record<string, number>; group: string; label: string };
 export type Kernel = { pipeline: ComputePipeline; names: string[]; spec: KernelSpec };
@@ -128,7 +135,8 @@ export class ComputeGraph<P = void> {
   importTexture(descriptor: GraphTextureDescriptor, texture?: GraphImportedTexture): GraphTextureHandle;
   addKernel(node: KernelNode<P>): this;
   addComputePass(node: Omit<GPUCommandGraphComputeNode<P>, "type">): this;
-  add(op: GraphOp<P>): this;                                          // GPUReduction, GPUSort, GPUHistogram, …
+  add(op: GraphOp<P>, opts?: { uses?: GraphBufferHandle[] }): this;  // GPUReduction, GPUSort, …; audited (W0.1)
+  declareNode(id: string, audit: { uses?; writes?; cleared?; condition? }): this; // raw g.graph.* / adopted nodes
   compile(): this;
   encode(enc: CommandEncoder, parameters: P, buffers?: Record<string, GraphImportedBuffer>,
     textures?: Record<string, GraphImportedTexture>): GPUCommandGraphEncoding;
@@ -148,13 +156,33 @@ export class ComputeGraph<P = void> {
   // KernelNode.writes?: Record<binding, "full" | "partial" | "atomic"> (cleared?: string[] = "partial"):
   // compile() lints the scheduled order and throws when such a transient has no clear node before it
   // (or is used before its clear). stats: compiled stats + nodeCount. GraphReads.pending: unread slots.
+  // additive (WAG W0.1, 2026-10-01; graphs not using these encode exactly as before):
+  constructor(device: Device, id: string, opts?: { graph?: GPUCommandGraph<P> }); // adopt (same device)
+  importFrameTexture(descriptor: GraphTextureDescriptor): GraphTextureHandle;   // run({ frameTextures })
+  transientTexture(descriptor: GraphTextureDescriptor): GraphTextureHandle;     // never cleared, aliased
+  textureView(texture: GraphTextureHandle, props?: GraphTextureViewProps): GraphTextureView;
+  addComputePass(node: Omit<GPUCommandGraphComputeNode<P>, "type"> & RawNodeAudit): this; // now audited
+  addCopyPass(node: Omit<GPUCommandGraphCopyNode<P>, "type"> & RawNodeAudit): this;
+  addRenderPass(node: Omit<GPUCommandGraphRenderNode<P>, "type"> & RawNodeAudit): this;
+  readonly preflight: GPUCommandGraphPreflightReport | undefined;  fitsDeviceLimits(): boolean | undefined;
+  encode(enc, parameters, buffers?, textures?, extras?: GraphEncodeExtras<P>); // also encodeReads; run({ frameTextures })
+  // KernelNode.condition: CPU { source: "cpu", evaluate } or GPU { source: "gpu", mode: "indirect", buffer,
+  // byteOffset? } (dispatch → dispatchIndirect; see the GPU-condition lint below). KernelNode.workload →
+  // upstream preflight. KernelNode.bindings: a "texture" layout entry takes a GraphTexture (sampled).
+  // Fixed `workgroups` also set the node's upstream `dispatchWorkgroups` (for program-compiler predicates).
 }
+export type GraphTexture = GraphTextureHandle | GraphTextureView;
+export type KernelCondition<P> = GPUCommandGraphNodeCondition<P>;   // was CPU-only
+export type RawNodeAudit = { cleared?: (GraphBufferHandle | GraphDataView)[] }; // partial / atomic writes
+export type GraphEncodeExtras<P> = Pick<GPUCommandGraphEncodeOptions<P>, "frameTextures" | "externalTextures" | "coalesceComputePasses">;
 export type GraphRange<P> = GraphBufferHandle | GraphDataView
   | { buffer: GraphBufferHandle; offset?: number; size: number | ((p: P) => number) };
 export function cachedGraph<P, X>(device: Device, group: string, key: string,
   build: (g: ComputeGraph<P>) => X, max?: number /* 4 */): { graph: ComputeGraph<P>; extra: X; hit?: boolean }; // LRU per group
 export function cachedGraphCount(device: Device, group?: string): number;
 export function releaseCachedGraphs(device: Device, group?: string): Promise<void>;
+export function listCachedGraphs(device?: Device, group?: string): CachedGraphInfo[]; // LRU order, read-only
+export type CachedGraphInfo = { device; group; key; id; graph: ComputeGraph<unknown>; compiled: boolean; stats };
 ```
 
 ## Rules for migrating a kernel
@@ -188,6 +216,7 @@ export function releaseCachedGraphs(device: Device, group?: string): Promise<voi
 - **Devices per realm (typical `/photo` load).** The page's sidecar, one in the horizon-fast-app worker (created on the `spans` message so creation overlaps the tile work; terminated after the march), and one in the unknown-pose worker (created on `prepare` to warm the solve kernel while the scene loads; terminated after the second opinion, or released after 30 s idle when it is kept for an unknown-pose photo). The eye worker (`?eyesearch`) adds one while a search runs. ONNX Runtime's webgpu EP creates its own in the sky worker when sky segmentation runs; it is outside this registry. Nothing creates a device on import.
 - **Graph.** `ComputeGraph.run` holds a lease on `graph:<id>`, because transients and timestamp slots are shared between runs. A `GraphDataView` is bound with its exact byte range, and its `byteOffset` must be a multiple of 256 (the storage-binding offset alignment). `run({ read })` reads imported buffers; a `readNode` copies transients (or imports) into a readback slot at its point in the graph.
 - **Graph transients are never zeroed, and they alias.** A transient gets the physical buffer of another transient whose lifetime ended earlier (and the previous run's bytes). Anything read-modify-written (atomics, accumulators, partial writes that are later read) needs a `clearNode` before it; declare those bindings in `KernelNode.cleared` and `addKernel` refuses a transient without one. Independent nodes may interleave, so pass `dependsOn` when an ordering matters (the selftest does, to force aliasing).
+- **GPU-conditioned nodes (W0.1).** A GPU indirect condition turns the kernel's one dispatch into `dispatchIndirect(buffer, byteOffset)`; x = 0 skips it and any other x shortens or lengthens it, so its outputs are only partly written. `compile()` therefore treats every transient a GPU-conditioned node writes as written partially when a later node, up to the next whole clear of it, may use it without the same gate: a node not gated by the same indirect command (same buffer and byteOffset), any node after the command buffer is written again (including a clear of it, or the gated writer itself writing it), or a node the lint cannot see. That transient then needs a **whole-buffer** `clearNode` (a handle, or a fixed range / view from offset 0 covering it; parameter-sized ranges never count) before the conditioned node, or `compile()` throws. Readers gated by the same command before any rewrite need no clear (they run with the same x); this assumes they read only what the writer wrote for that x. The lint sees `addKernel`, `clearNode`, `readNode`, `addComputePass` / `addCopyPass` / `addRenderPass` and `add(op)` nodes (flattened like upstream `add`, audited from each command node's declared resources, plus `opts.uses`). Raw `g.graph.*` nodes and nodes already in an adopted graph are invisible unless declared with `declareNode(id, { uses, writes, cleared, condition })`: when a GPU gate exists, an undeclared node after a gated writer counts as an ungated user, and an undeclared GPU-conditioned node (found in `preflight`) is refused. Pure logic in `clear-lint.ts`, node check `clear-lint.check.ts` (CI fast tier `gpu-clear-lint`). Read nodes and copy / render nodes cannot be GPU-gated (WebGPU has no indirect copy), so reading such an output back always needs the clear. CPU conditions are not linted (unchanged). Imports and textures are outside the clear lint. Raw `addComputePass` / `addCopyPass` / `addRenderPass` nodes are audited from their declared buffer resources (writes = `storage-write`, `storage-read-write`, `copy-destination`; `cleared` = partial / atomic writes); `add(op)` nodes are not.
 - **Shape-keyed cache.** `cachedGraph(device, group, key, build)` keeps 4 compiled graphs per group (LRU; an evicted graph is destroyed under its lease). Call it inside the group's own lease and queue the graph's lease synchronously after it. Callers that encode chunks themselves (`encodeReads` + core `submit`) hold `graph.lease()` for the whole sequence.
 
 ## Self-test result (2026-09-30, Apple GPU, headless Chromium)
@@ -208,6 +237,16 @@ export function releaseCachedGraphs(device: Device, group?: string): Promise<voi
 - graph-compile-async: `compileAsync` (createComputePipelineAsync) bit-identical to a sync-compiled graph; concurrent calls share one compilation
 - graph-cache: hit returns the same graph, LRU eviction destroys (under the lease), runs of cached graphs exact
 - graph-read-leak: a checked submit's validation error after a read node, and a graph kernel node over maxComputeWorkgroupsPerDimension (encodeDispatch's guard applies to graph nodes) thrown mid-encode, both reject run() and leave no readback slot busy; encodeReads' `pending` counts unread slots
+
+WAG W0.1 / W0.5 (2026-10-01, Apple GPU, headless Chromium, scripts/gpu/core-selftest.mjs): 29/29 checks pass in about 1.3 s. New checks:
+- graph-cache-list: `listCachedGraphs` returns the two `selftest-cache` entries in LRU order, ids `group|key`, compiled, also in the device-less listing
+- graph-gpu-condition: a fill gated by a GPU indirect command; an ungated read node or kernel reading its transient is refused at compile; with a clear node, x = full gives the fill and x = 0 zeros; a reader gated by the same command needs no clear and gives fill + 1 (x = 0 leaves its import untouched); preflight counts 2 conditional nodes
+- graph-adopt-preflight: `new ComputeGraph(device, id, { graph })` adopts the GPUCommandGraph; `workload` reaches `preflight` (`fitsDeviceLimits` true); runs exact
+- graph-raw-audit: a raw `addComputePass` declaring `cleared` without a clear node is refused; with one it compiles
+- graph-texture: a "texture" kernel binding reads, texel-exact, an imported texture, a transient texture filled by `addCopyPass`, a transient render target cleared by `addRenderPass` (graph attachments), and an `importFrameTexture` supplied per run (frameId 1, 2)
+- readback-partial: `stagePartialRead` maps the header then only [0, total) for totals 4, 152 and 4096 B, exact; a total past the capacity rejects; no slot left busy
+
+The node check `clear-lint.check.ts` (`npx tsx src/lib/gpu/core/clear-lint.check.ts`, CI fast tier `gpu-clear-lint`) covers the lint rules (27 cases, including command rewrites, unaudited nodes and whole vs partial clears) without a GPU.
 
 The sky refine (`sky/refine-graph.ts`, now the only GPU refine) is ported onto these primitives (2026-10-01, N5). Its local `AuditedGraph`, `lintClears` and `ShapeCache` are gone; old name to core:
 - `AuditedGraph.clearNode(id, buf, dependsOn)` is `clearNode(id, buf, { dependsOn })`.

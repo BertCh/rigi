@@ -35,7 +35,8 @@ export { submit } from "./queue";
 
 /**
  * "texture" is a 2-D unfilterable-float sampled texture (textureLoad only; the render device's
- * rgba32float targets): dispatch() binds a luma Texture for it. Not usable in a core graph.
+ * rgba32float targets): dispatch() binds a luma Texture for it; a ComputeGraph kernel node binds a
+ * graph texture or texture view (declared "sampled").
  */
 export type BindKind = "uniform" | "storage" | "read-only-storage" | "texture";
 

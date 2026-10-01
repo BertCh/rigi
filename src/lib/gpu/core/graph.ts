@@ -27,15 +27,26 @@
 //   const e = cachedGraph(device, "solve", key, (g) => {...}); // shape-keyed LRU (transients have fixed sizes)
 //   g.addKernel({ ..., condition: { id: "sun", source: "cpu", evaluate: (p) => !p.flat } }); // per-run skip
 //
+// W0.1 widening (all additive; graphs that do not use these encode exactly as before):
+//   g.addKernel({ ..., condition: { id: "tail", source: "gpu", mode: "indirect", buffer: cmd } });
+//                                                          // GPU-sized / GPU-skipped dispatch (see the GPU-condition lint)
+//   g.addKernel({ ..., bindings: { tex: g.transientTexture({...}) } }); // "texture" layout entries
+//   g.addKernel({ ..., workload: { maximumInvocationCount: n } }); g.preflight?.fitsDeviceLimits
+//   new ComputeGraph(device, id, { graph });               // adopt an external / compiler-made GPUCommandGraph
+//   g.addComputePass({ ..., cleared: [acc] }); g.addCopyPass(...); g.addRenderPass(...); // audited raw nodes
+//   g.importFrameTexture(...) + run(p, { frameTextures }); listCachedGraphs(device)
+//
 // Transients are NEVER zeroed by the graph, and a transient can alias another one whose lifetime ended
 // earlier in the same encoding (or a previous encoding's bytes): anything read-modify-written
 // (atomics, partial writes, accumulators) needs a clearNode first.
 import {
+	type Bindings,
 	Buffer,
 	type CommandEncoder,
 	type Device,
 	type QuerySet,
 } from "@luma.gl/core";
+import { type ClearAudit, clearLintError } from "./clear-lint";
 import {
 	type BindKind,
 	encodeDispatch,
@@ -50,7 +61,16 @@ import {
 	GPUCommandGraph,
 	type GPUCommandGraphComputeExecutable,
 	type GPUCommandGraphComputeNode,
+	type GPUCommandGraphCopyNode,
+	type GPUCommandGraphCPUCondition,
+	type GPUCommandGraphEncodeOptions,
 	type GPUCommandGraphEncoding,
+	type GPUCommandGraphGPUIndirectCondition,
+	type GPUCommandGraphNode,
+	type GPUCommandGraphNodeCondition,
+	type GPUCommandGraphNodeWorkloadEstimate,
+	type GPUCommandGraphPreflightReport,
+	type GPUCommandGraphRenderNode,
 	type GPUCommandGraphTimingReport,
 	type GPUNode,
 	type GPUScalarFormat,
@@ -59,8 +79,11 @@ import {
 	GraphDataView,
 	type GraphImportedBuffer,
 	type GraphImportedTexture,
+	type GraphResourceUse,
 	type GraphTextureDescriptor,
-	type GraphTextureHandle,
+	GraphTextureHandle,
+	GraphTextureView,
+	type GraphTextureViewProps,
 } from "./luma";
 import { clear, withLease } from "./pool";
 import { profiling, recordGpuTime } from "./profile";
@@ -69,6 +92,9 @@ import { type ReadRange, type StagedRead, stageReads } from "./readback";
 
 /** A graph buffer or a typed range of one (range offsets must be multiples of 256). */
 export type GraphBinding = GraphBufferHandle | GraphDataView;
+
+/** A graph texture or a view of one (bound to a kernel's "texture" layout entry, sampled). */
+export type GraphTexture = GraphTextureHandle | GraphTextureView;
 
 export type Workgroups = [number, number?, number?];
 
@@ -80,8 +106,11 @@ export type Workgroups = [number, number?, number?];
 export type KernelNode<P> = {
 	id: string;
 	spec: KernelSpec;
-	/** one graph buffer / view per layout name of `spec` */
-	bindings: Record<string, GraphBinding | GraphRange<P>>;
+	/**
+	 * one graph buffer / view per layout name of `spec`; a "texture" layout entry takes a graph texture
+	 * or texture view (declared "sampled", bound as its TextureView)
+	 */
+	bindings: Record<string, GraphBinding | GraphRange<P> | GraphTexture>;
 	/** fixed, or per run from the parameters */
 	workgroups: Workgroups | ((parameters: P) => Workgroups);
 	/** explicit predecessors beyond the ones inferred from buffer uses */
@@ -96,18 +125,48 @@ export type KernelNode<P> = {
 	/** Shorthand: these bindings are written "partial" (read-modify-write, needs a clear). */
 	cleared?: string[];
 	/**
-	 * Record this dispatch only when `evaluate(parameters)` is true (GPUCommandGraph CPU condition,
-	 * checked per encoding). A skipped node keeps its place in the schedule, so transient lifetimes,
-	 * aliasing and the clear lint are those of the graph with the node; its outputs are then whatever
-	 * the earlier nodes left (e.g. a clear node's zeros).
+	 * CPU condition `{ source: "cpu", evaluate }`: record this dispatch only when `evaluate(parameters)`
+	 * is true (checked per encoding). A skipped node keeps its place in the schedule, so transient
+	 * lifetimes, aliasing and the clear lint are those of the graph with the node; its outputs are then
+	 * whatever the earlier nodes left (e.g. a clear node's zeros).
+	 *
+	 * GPU condition `{ source: "gpu", mode: "indirect", buffer, byteOffset? }`: the dispatch becomes
+	 * dispatchIndirect(buffer, byteOffset) (3 × u32 written on the GPU; x = 0 skips it). `workgroups`
+	 * is still evaluated and limit-checked, but the GPU command decides the count. The graph adds the
+	 * buffer's "indirect" use. GPU-condition lint (compile() throws): a transient this node writes and
+	 * a later node uses must be cleared WHOLE (clearNode of the whole buffer) before this node, since a
+	 * skipped or shortened dispatch leaves aliased garbage in it, unless every later user (up to the
+	 * next whole clear of it) is gated by the same indirect command (same buffer and byteOffset) and
+	 * comes before any rewrite of that command buffer. Nodes the lint cannot see (raw g.graph.* or
+	 * adopted-graph nodes not declared with declareNode) count as ungated users.
+	 * "Same gate" assumes such a reader reads only what the gated writer wrote for that same x (e.g.
+	 * element i < x × workgroup size): a same-gated reader that reads past it reads garbage, and the
+	 * lint cannot see that.
 	 */
 	condition?: KernelCondition<P>;
+	/** Upstream preflight annotation (GPUCommandGraph workload; see ComputeGraph.preflight). */
+	workload?: GPUCommandGraphNodeWorkloadEstimate;
 };
 
-/** A KernelNode's CPU condition (GPUCommandGraph's CPU condition shape). */
-export type KernelCondition<P> = Extract<
-	NonNullable<GPUCommandGraphComputeNode<P>["condition"]>,
-	{ source: "cpu" }
+/** A KernelNode's condition: a CPU condition, or a GPU indirect condition (compute nodes only). */
+export type KernelCondition<P> = GPUCommandGraphNodeCondition<P>;
+export type KernelCPUCondition<P> = GPUCommandGraphCPUCondition<P>;
+export type KernelGPUCondition = GPUCommandGraphGPUIndirectCondition;
+
+/**
+ * Clear-lint declarations for raw nodes (addComputePass / addCopyPass / addRenderPass): the buffers
+ * the node writes partially or atomically (read-modify-write), as KernelNode.cleared. Every declared
+ * buffer use counts for the lint ("storage-write", "storage-read-write" and "copy-destination" as
+ * writes for the GPU-condition rule).
+ */
+export type RawNodeAudit = {
+	cleared?: (GraphBufferHandle | GraphDataView)[];
+};
+
+/** Extra encode options passed through to CompiledGPUCommandGraph.encode. */
+export type GraphEncodeExtras<P> = Pick<
+	GPUCommandGraphEncodeOptions<P>,
+	"frameTextures" | "externalTextures" | "coalesceComputePasses"
 >;
 
 /** How a kernel writes one of its storage bindings (KernelNode.writes). */
@@ -150,6 +209,15 @@ const USE: Record<Exclude<BindKind, "texture">, GraphBufferUsage> = {
 
 const STORAGE = Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST;
 
+const isTexture = (v: unknown): v is GraphTexture =>
+	v instanceof GraphTextureHandle || v instanceof GraphTextureView;
+
+const WRITE_USES = new Set<GraphBufferUsage>([
+	"storage-write",
+	"storage-read-write",
+	"copy-destination",
+]);
+
 const handleOf = <P>(r: GraphRange<P>): GraphBufferHandle =>
 	r instanceof GraphDataView || !(r instanceof GraphBufferHandle)
 		? r.buffer
@@ -176,20 +244,37 @@ export class ComputeGraph<P = void> {
 	private compiled: CompiledGPUCommandGraph<P> | null = null;
 	private compiling: Promise<CompiledGPUCommandGraph<P>> | null = null;
 	private timestamps: QuerySet | null = null;
-	/** clear audit: node id → handles it clears / writes partially or atomically / uses at all */
-	private audit = {
-		clears: new Map<string, GraphBufferHandle[]>(),
-		partial: new Map<string, GraphBufferHandle[]>(),
-		uses: new Map<string, GraphBufferHandle[]>(),
+	/**
+	 * clear audit: node id → handles it clears / writes partially or atomically / uses at all / writes
+	 * at all, and the indirect command of GPU-conditioned nodes
+	 */
+	private audit: ClearAudit<GraphBufferHandle> = {
+		clears: new Map(),
+		wholeClears: new Map(),
+		partial: new Map(),
+		uses: new Map(),
+		writes: new Map(),
+		gates: new Map(),
 	};
 	private readNodes = 0;
 	/** read-node staging of the encoding in progress (set by encodeReads) */
 	private staging: { id: string; staged: StagedRead }[] | null = null;
 
-	constructor(device: Device, id: string) {
+	/**
+	 * `opts.graph` adopts an existing GPUCommandGraph (built elsewhere, e.g. by a program compiler) of
+	 * the same device instead of creating one: this wrapper's nodes are added to it, and compile()
+	 * compiles (and freezes) it. Nodes added to it directly are outside the clear lint.
+	 */
+	constructor(
+		device: Device,
+		id: string,
+		opts: { graph?: GPUCommandGraph<P> } = {},
+	) {
 		this.device = device;
 		this.id = id;
-		this.graph = new GPUCommandGraph<P>(device, { id });
+		if (opts.graph && opts.graph.device !== device)
+			throw new Error(`${id}: the adopted graph is on another device`);
+		this.graph = opts.graph ?? new GPUCommandGraph<P>(device, { id });
 	}
 
 	/** A caller-owned buffer, bound per run by `id` (or once via `buffer`). */
@@ -225,17 +310,73 @@ export class ComputeGraph<P = void> {
 		return this.graph.importTexture(descriptor, texture);
 	}
 
+	/**
+	 * A caller-owned texture supplied on EVERY encode with a strictly increasing frameId
+	 * (run({ frameTextures }) / the encode extras); passthrough to GPUCommandGraph.importFrameTexture.
+	 */
+	importFrameTexture(descriptor: GraphTextureDescriptor): GraphTextureHandle {
+		return this.graph.importFrameTexture(descriptor);
+	}
+
+	/**
+	 * Graph-owned texture scratch (passthrough to createTransientTexture): never cleared, and reused
+	 * by compatible transient textures with disjoint lifetimes (the clear lint covers buffers only).
+	 */
+	transientTexture(descriptor: GraphTextureDescriptor): GraphTextureHandle {
+		return this.graph.createTransientTexture(descriptor);
+	}
+
+	/** A view of a graph texture (mip / layer / aspect range; passthrough to createTextureView). */
+	textureView(
+		texture: GraphTextureHandle,
+		props?: GraphTextureViewProps,
+	): GraphTextureView {
+		return this.graph.createTextureView(texture, props);
+	}
+
+	/** Record a node's buffer uses, writes, partial writes and GPU gate for the clear lint. */
+	private recordAudit(
+		id: string,
+		resources: readonly GraphResourceUse[],
+		partial: GraphBufferHandle[],
+		condition?: { source: "cpu" | "gpu" },
+	) {
+		const uses: GraphBufferHandle[] = [];
+		const writes: GraphBufferHandle[] = [];
+		for (const r of resources)
+			if ("buffer" in r) {
+				const h = handleOf(r.buffer);
+				uses.push(h);
+				if (WRITE_USES.has(r.usage)) writes.push(h);
+			}
+		if (condition?.source === "gpu") {
+			const c = condition as GPUCommandGraphGPUIndirectCondition;
+			uses.push(c.buffer);
+			this.audit.gates.set(id, {
+				buffer: c.buffer,
+				byteOffset: c.byteOffset ?? 0,
+			});
+		}
+		for (const h of partial) if (!uses.includes(h)) uses.push(h);
+		this.audit.uses.set(id, uses);
+		this.audit.writes.set(id, writes);
+		this.audit.partial.set(id, partial);
+	}
+
 	/** Add a compute node that dispatches a core kernel. */
 	addKernel(node: KernelNode<P>): this {
 		const { spec } = node;
-		for (const [name, kind] of spec.layout)
-			if (kind === "texture")
-				throw new Error(
-					`${this.id}/${node.id}: "${name}" is a texture binding (not supported in a graph)`,
-				);
-		for (const [name] of spec.layout)
-			if (!node.bindings[name])
+		for (const [name, kind] of spec.layout) {
+			const v = node.bindings[name];
+			if (!v)
 				throw new Error(`${this.id}/${node.id}: no binding for "${name}"`);
+			if ((kind === "texture") !== isTexture(v))
+				throw new Error(
+					`${this.id}/${node.id}: "${name}" is a ${kind} binding, bound to a ${isTexture(v) ? "texture" : "buffer"}`,
+				);
+		}
+		const buffer = (name: string) =>
+			node.bindings[name] as GraphBinding | GraphRange<P>;
 		const modes: Record<string, WriteMode> = { ...node.writes };
 		for (const name of node.cleared ?? []) modes[name] ??= "partial";
 		const partial: GraphBufferHandle[] = [];
@@ -245,23 +386,30 @@ export class ComputeGraph<P = void> {
 				throw new Error(
 					`${this.id}/${node.id}: "${name}" is not a storage output`,
 				);
-			if (mode !== "full") partial.push(handleOf(node.bindings[name]));
+			if (mode !== "full") partial.push(handleOf(buffer(name)));
 		}
-		this.audit.partial.set(node.id, partial);
-		this.audit.uses.set(
-			node.id,
-			spec.layout.map(([name]) => handleOf(node.bindings[name])),
-		);
+		const resources: GraphResourceUse[] = spec.layout.map(([name, kind]) => {
+			const v = node.bindings[name];
+			if (isTexture(v)) return { texture: v, usage: "sampled" };
+			const b = buffer(name);
+			return {
+				buffer: b instanceof GraphDataView ? b : handleOf(b),
+				usage: USE[kind as keyof typeof USE],
+			};
+		});
+		this.recordAudit(node.id, resources, partial, node.condition);
 		const executable = (k: Kernel): GPUCommandGraphComputeExecutable<P> => ({
-			encode: ({ computePass, getBuffer, parameters }) => {
-				const b: Record<
-					string,
-					{ buffer: Buffer; offset: number; size: number }
-				> = {};
+			encode: ({ computePass, getBuffer, getTextureView, parameters }) => {
+				const b: Bindings = {};
 				for (const [name] of spec.layout) {
 					// handles: their declared byteLength; views: their exact range; explicit ranges: the
-					// run's { offset, size } (a binding narrower than a capacity-keyed buffer)
+					// run's { offset, size } (a binding narrower than a capacity-keyed buffer); textures:
+					// their (or the view's) TextureView
 					const v = node.bindings[name];
+					if (isTexture(v)) {
+						b[name] = getTextureView(v);
+						continue;
+					}
 					b[name] = {
 						buffer: getBuffer(v instanceof GraphDataView ? v : handleOf(v)),
 						...rangeOf(v, parameters),
@@ -274,22 +422,30 @@ export class ComputeGraph<P = void> {
 				encodeDispatch(computePass, k, b, w[0], w[1] ?? 1, w[2] ?? 1);
 			},
 		});
-		this.graph.addComputePass({
+		const computeNode: Omit<GPUCommandGraphComputeNode<P>, "type"> = {
 			id: node.id,
 			dependsOn: node.dependsOn,
 			condition: node.condition,
-			resources: spec.layout.map(([name, kind]) => {
-				const v = node.bindings[name];
-				return {
-					buffer: v instanceof GraphDataView ? v : handleOf(v),
-					usage: USE[kind as keyof typeof USE],
-				};
-			}),
+			resources,
 			compile: ({ device }) => executable(kernel(device, spec)),
 			// same WGSL, module and descriptor as kernel(): identical results (core selftest)
 			compileAsync: async ({ device }) =>
 				executable(await kernelAsync(device, spec)),
-		});
+		};
+		if (node.workload) computeNode.workload = node.workload;
+		// fixed workgroups: the direct-dispatch geometry upstream program compilers read
+		// (setGPUComputeDispatchWorkgroups's field) to put the node under a GPU predicate
+		// (upstream's setter is not exported from @luma.gl/gpgpu/gpu-core; this applies its validation,
+		// non-negative safe integers, but skips the annotation instead of throwing, so an existing node
+		// with other values still compiles exactly as before)
+		if (Array.isArray(node.workgroups)) {
+			const [x, y = 1, z = 1] = node.workgroups;
+			if ([x, y, z].every((v) => Number.isSafeInteger(v) && v >= 0))
+				Object.assign(computeNode, {
+					dispatchWorkgroups: Object.freeze([x, y, z]),
+				});
+		}
+		this.graph.addComputePass(computeNode);
 		return this;
 	}
 
@@ -320,7 +476,20 @@ export class ComputeGraph<P = void> {
 			}),
 		});
 		this.audit.clears.set(id, [h]);
+		// whole-buffer clear (what the GPU-condition rule needs): a handle, or a fixed range / view from
+		// offset 0 covering its byteLength; parameter-sized ranges never count as whole
+		const fixed =
+			target instanceof GraphDataView
+				? rangeOf(target, undefined as P)
+				: target instanceof GraphBufferHandle
+					? { offset: 0, size: h.byteLength }
+					: typeof target.size === "number"
+						? { offset: target.offset ?? 0, size: target.size }
+						: null;
+		const whole = !!fixed && fixed.offset === 0 && fixed.size >= h.byteLength;
+		if (whole) this.audit.wholeClears.set(id, [h]);
 		this.audit.uses.set(id, [h]);
+		this.audit.writes.set(id, [h]);
 		return this;
 	}
 
@@ -362,15 +531,116 @@ export class ComputeGraph<P = void> {
 		return this;
 	}
 
-	/** Add a raw gpu-core compute node (custom encode). */
-	addComputePass(node: Omit<GPUCommandGraphComputeNode<P>, "type">): this {
-		this.graph.addComputePass(node);
+	/**
+	 * Add a raw gpu-core compute node (custom encode). Its declared buffer resources join the clear
+	 * lint (`cleared`: buffers it writes partially / atomically), and a GPU condition gets the
+	 * GPU-condition lint of KernelNode.condition.
+	 */
+	addComputePass(
+		node: Omit<GPUCommandGraphComputeNode<P>, "type"> & RawNodeAudit,
+	): this {
+		const { cleared, ...rest } = node;
+		this.recordAudit(
+			rest.id,
+			rest.resources ?? [],
+			(cleared ?? []).map(handleOf),
+			rest.condition,
+		);
+		this.graph.addComputePass(rest);
+		return this;
+	}
+
+	/** Add a raw copy node (CPU conditions only); audited like addComputePass. */
+	addCopyPass(
+		node: Omit<GPUCommandGraphCopyNode<P>, "type"> & RawNodeAudit,
+	): this {
+		const { cleared, ...rest } = node;
+		this.recordAudit(
+			rest.id,
+			rest.resources ?? [],
+			(cleared ?? []).map(handleOf),
+		);
+		this.graph.addCopyPass(rest);
+		return this;
+	}
+
+	/**
+	 * Add a raw render node (CPU conditions only; graph attachments or a caller framebuffer); its
+	 * buffer resources are audited like addComputePass (textures are outside the clear lint).
+	 */
+	addRenderPass(
+		node: Omit<GPUCommandGraphRenderNode<P>, "type"> & RawNodeAudit,
+	): this {
+		const { cleared, ...rest } = node;
+		this.recordAudit(
+			rest.id,
+			rest.resources ?? [],
+			(cleared ?? []).map(handleOf),
+		);
+		this.graph.addRenderPass(rest);
 		return this;
 	}
 
 	/** Add a gpu-core op (GPUReduction, GPUSort, …) built on this graph's handles. */
-	add(op: GraphOp<P>): this {
-		this.graph.add(op);
+	add(op: GraphOp<P>, opts: { uses?: GraphBufferHandle[] } = {}): this {
+		// flattened the way GPUCommandGraph.add does (getNodes children, getCommandNodes(graph), raw
+		// nodes, arrays; same nodes, same order), so each command node's declared resources and
+		// condition join the clear lint; `uses` adds buffers an op reads without declaring them
+		const flat = (n: GraphOp<P>) => {
+			if ("getNodes" in n) for (const child of n.getNodes()) flat(child);
+			else if ("getCommandNodes" in n)
+				for (const c of n.getCommandNodes(this.graph)) one(c);
+			else if ("type" in n) one(n);
+			else for (const child of n) flat(child);
+		};
+		const one = (c: GPUCommandGraphNode<P>) => {
+			this.recordAudit(
+				c.id,
+				[
+					...(c.resources ?? []),
+					...(opts.uses ?? []).map((buffer) => ({
+						buffer,
+						usage: "storage-read" as const,
+					})),
+				],
+				[],
+				c.condition,
+			);
+			this.graph.add(c);
+		};
+		flat(op);
+		return this;
+	}
+
+	/**
+	 * Declare the buffer uses of a node added to `graph` directly (raw g.graph.* calls, or a node of
+	 * an adopted graph), so the clear lint can see it. Undeclared nodes count as possible ungated
+	 * users of every GPU-gated transient, and an undeclared GPU-conditioned node is refused.
+	 */
+	declareNode(
+		id: string,
+		audit: {
+			uses?: GraphBufferHandle[];
+			writes?: GraphBufferHandle[];
+			cleared?: GraphBufferHandle[];
+			condition?: KernelCondition<P>;
+		},
+	): this {
+		this.recordAudit(
+			id,
+			[
+				...(audit.uses ?? []).map((buffer) => ({
+					buffer,
+					usage: "storage-read" as const,
+				})),
+				...(audit.writes ?? []).map((buffer) => ({
+					buffer,
+					usage: "storage-write" as const,
+				})),
+			],
+			audit.cleared ?? [],
+			audit.condition,
+		);
 		return this;
 	}
 
@@ -384,32 +654,22 @@ export class ComputeGraph<P = void> {
 
 	/**
 	 * The clear rule, against the scheduled order: every transient written "partial" / "atomic" needs a
-	 * clearNode before that write and before any other use of it in the encoding. Destroys and throws.
+	 * clearNode before that write and before any other use of it in the encoding. A transient written
+	 * by a GPU-conditioned node counts as written partially when a later node (up to the next clear
+	 * of it) uses it without being gated by the same indirect command. Destroys and throws.
 	 */
 	private linted(c: CompiledGPUCommandGraph<P>) {
-		const order = c.stats.nodeOrder;
-		const { clears, partial, uses } = this.audit;
-		for (const [node, bufs] of partial)
-			for (const b of bufs) {
-				if (!b.transient) continue;
-				const at = order.indexOf(node);
-				let cleared = false;
-				for (const n of order.slice(0, at)) {
-					if (clears.get(n)?.includes(b)) cleared = true;
-					else if (!cleared && uses.get(n)?.includes(b)) {
-						c.destroy();
-						throw new Error(
-							`${this.id}: clear lint: ${n} uses transient "${b.id}" before its clear node`,
-						);
-					}
-				}
-				if (!cleared) {
-					c.destroy();
-					throw new Error(
-						`${this.id}: clear lint: transient "${b.id}" is written partially / atomically by ${node} without a clear node before it`,
-					);
-				}
-			}
+		const error = clearLintError(
+			c.stats.nodeOrder,
+			this.audit,
+			c.preflight.nodes
+				.filter((n) => n.condition?.source === "gpu")
+				.map((n) => n.id),
+		);
+		if (error) {
+			c.destroy();
+			throw new Error(`${this.id}: clear lint: ${error}`);
+		}
 		return c;
 	}
 
@@ -439,6 +699,20 @@ export class ComputeGraph<P = void> {
 	}
 
 	/**
+	 * Upstream preflight of the compiled graph (undefined before compile): per-node workload and
+	 * condition metadata (KernelNode.workload), totals, the largest buffer and binding, and
+	 * `fitsDeviceLimits`.
+	 */
+	get preflight(): GPUCommandGraphPreflightReport | undefined {
+		return this.compiled?.preflight;
+	}
+
+	/** Whether the compiled graph's buffers fit the device limits (undefined before compile). */
+	fitsDeviceLimits(): boolean | undefined {
+		return this.compiled?.preflight.fitsDeviceLimits;
+	}
+
+	/**
 	 * The compiled graph's stats (undefined before compile): node order and count, logical vs physical
 	 * transient buffers and bytes (aliasing), imported bytes. The public way to inspect a graph.
 	 */
@@ -461,13 +735,19 @@ export class ComputeGraph<P = void> {
 		parameters: P,
 		buffers?: Record<string, GraphImportedBuffer>,
 		textures?: Record<string, GraphImportedTexture>,
+		extras?: GraphEncodeExtras<P>,
 	): GPUCommandGraphEncoding {
 		if (!this.compiled) throw new Error(`${this.id}: compile() first`);
 		if (this.readNodes)
 			throw new Error(
 				`${this.id}: a graph with read nodes is encoded with encodeReads() or run()`,
 			);
-		return this.compiled.encode(enc, { parameters, buffers, textures });
+		return this.compiled.encode(enc, {
+			...extras,
+			parameters,
+			buffers,
+			textures,
+		});
 	}
 
 	/**
@@ -481,13 +761,19 @@ export class ComputeGraph<P = void> {
 		parameters: P,
 		buffers?: Record<string, GraphImportedBuffer>,
 		textures?: Record<string, GraphImportedTexture>,
+		extras?: GraphEncodeExtras<P>,
 	): { encoding: GPUCommandGraphEncoding; reads: GraphReads } {
 		if (!this.compiled) throw new Error(`${this.id}: compile() first`);
 		const staging: { id: string; staged: StagedRead }[] = [];
 		this.staging = staging;
 		let encoding: GPUCommandGraphEncoding;
 		try {
-			encoding = this.compiled.encode(enc, { parameters, buffers, textures });
+			encoding = this.compiled.encode(enc, {
+				...extras,
+				parameters,
+				buffers,
+				textures,
+			});
 		} catch (e) {
 			for (const s of staging) s.staged.cancel();
 			throw e;
@@ -534,6 +820,8 @@ export class ComputeGraph<P = void> {
 			buffers?: Record<string, GraphImportedBuffer>;
 			/** imported textures by id (e.g. render targets), overriding the defaults */
 			textures?: Record<string, GraphImportedTexture>;
+			/** importFrameTexture handles by id ({ texture, frameId }, frameId strictly increasing) */
+			frameTextures?: GraphEncodeExtras<P>["frameTextures"];
 			read?: ReadRange[];
 			timings?: boolean;
 		} = {},
@@ -562,6 +850,7 @@ export class ComputeGraph<P = void> {
 				parameters,
 				opts.buffers,
 				opts.textures,
+				opts.frameTextures ? { frameTextures: opts.frameTextures } : undefined,
 			);
 			let staged: StagedRead | null = null;
 			try {
@@ -621,6 +910,8 @@ const caches = new WeakMap<
 	Device,
 	Map<string, Map<string, CachedGraph<unknown, unknown>>>
 >();
+/** devices with a cache, for listCachedGraphs() without a device (weak: never keeps one alive) */
+const cacheDevices = new Set<WeakRef<Device>>();
 
 /**
  * The graph of (`group`, `key`), built by `build(g)` on a fresh ComputeGraph with id `${group}|${key}`
@@ -643,12 +934,15 @@ export function cachedGraph<P, X = undefined>(
 		>();
 		groups = created;
 		caches.set(device, created);
+		const ref = new WeakRef(device);
+		cacheDevices.add(ref);
 		// the graphs die with the device; drop them so a new device rebuilds
 		onLost(device, () => {
 			for (const m of created.values())
 				for (const e of m.values()) e.graph.destroy();
 			created.clear();
 			caches.delete(device);
+			cacheDevices.delete(ref);
 		});
 	}
 	let m = groups.get(group);
@@ -700,4 +994,51 @@ export async function releaseCachedGraphs(
 			m.clear();
 		}
 	await Promise.all(olds.map((e) => e.graph.lease(() => e.graph.destroy())));
+}
+
+/** One cachedGraph entry, as listCachedGraphs reports it. */
+export type CachedGraphInfo = {
+	device: Device;
+	group: string;
+	key: string;
+	/** the ComputeGraph id (`${group}|${key}`) */
+	id: string;
+	graph: ComputeGraph<unknown>;
+	compiled: boolean;
+	/** ComputeGraph.stats (undefined until compiled) */
+	stats: ComputeGraph<unknown>["stats"];
+};
+
+/**
+ * The cached graphs of `device` (every device with a cache when omitted), optionally of one `group`,
+ * least recently used first within a group. Read-only: does not touch the LRU order (for the graph
+ * inspector and the app graph manifest).
+ */
+export function listCachedGraphs(
+	device?: Device,
+	group?: string,
+): CachedGraphInfo[] {
+	const devices: Device[] = [];
+	if (device) devices.push(device);
+	else
+		for (const ref of cacheDevices) {
+			const d = ref.deref();
+			if (d) devices.push(d);
+			else cacheDevices.delete(ref);
+		}
+	const out: CachedGraphInfo[] = [];
+	for (const d of devices)
+		for (const [g, m] of caches.get(d) ?? [])
+			if (!group || g === group)
+				for (const [key, e] of m)
+					out.push({
+						device: d,
+						group: g,
+						key,
+						id: e.graph.id,
+						graph: e.graph,
+						compiled: e.graph.isCompiled,
+						stats: e.graph.stats,
+					});
+	return out;
 }
