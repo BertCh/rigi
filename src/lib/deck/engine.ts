@@ -983,6 +983,10 @@ export class DeckEngine implements Renderer {
 	}
 
 	private streamerWedge?: ViewWedge;
+	/** loadFullTerrain: the streamer keeps refining all around the eye (setPose no longer narrows it). */
+	private fullWedge?: ViewWedge;
+	/** renderPoseView in progress: the photo-view terrain layer drops its near discard. */
+	private poseView = false;
 
 	private wedgeFor(pose: Pose): ViewWedge {
 		return {
@@ -1122,7 +1126,7 @@ export class DeckEngine implements Renderer {
 		clearTimeout(this.wedgeTimer);
 		this.wedgeTimer = window.setTimeout(() => {
 			if (this.disposed || !this.terrain) return;
-			const w = this.wedgeFor(this.pose);
+			const w = this.fullWedge ?? this.wedgeFor(this.pose);
 			this.streamerWedge = w;
 			this.streamer?.setWedge(w);
 		}, 300);
@@ -1578,7 +1582,8 @@ export class DeckEngine implements Renderer {
 					contourInterval: look.contourInterval,
 					contourOpacity: look.contourOpacity,
 					nearFade: look.nearFade,
-					nearDiscard: nearFadeFor(this.photo.hAccuracy),
+					// renderPoseView: the whole DEM, like the matcher's three.js renders had
+					nearDiscard: this.poseView ? 0 : nearFadeFor(this.photo.hAccuracy),
 					elevRange: deckElevRange(this.style, this.elevRange) ?? undefined,
 					relief: this.relief.field,
 					terroir: this.terroir(),
@@ -3114,6 +3119,175 @@ export class DeckEngine implements Renderer {
 	 * offscreen, composite.ts renderImage) with engine.ts's label drawing, as a JPEG blob.
 	 * In world mode (as three): the current world frame as a PNG, without labels.
 	 */
+	// ---------------- offscreen pose renders (tools/matcher/server/render_worker.mjs) ----------------
+
+	/**
+	 * The terrain all around the eye: the streamer's high-detail wedge becomes 360° (and stays so),
+	 * the CPU queries switch to the complete set, and the horizon is re-traced over 360°. The three.js
+	 * engine's `terrain.loadPending()` + `computeHorizon()` for the matcher's `fullTerrain`. Resolves
+	 * with the ms it took (0 when already done).
+	 */
+	async loadFullTerrain(timeoutMs = 300_000): Promise<number> {
+		if (this.fullWedge) return 0;
+		const t0 = performance.now();
+		await this.deckReady;
+		const streamer = this.streamer;
+		if (!streamer || !this.terrain || this.disposed)
+			throw new Error("loadFullTerrain: no terrain yet");
+		const w: ViewWedge = { headingDeg: this.prior.yaw, halfAngleDeg: 180 };
+		this.fullWedge = w;
+		clearTimeout(this.wedgeTimer);
+		const before = this.renderSet;
+		this.streamerWedge = w;
+		streamer.setWedge(w);
+		// a fresh, complete set (the streamer emits as tiles land; pending 0 = this wedge fully loaded)
+		for (;;) {
+			const set = this.renderSet;
+			if (set && set !== before && (set.stats?.pending ?? 0) === 0) break;
+			if (this.disposed) throw new Error("loadFullTerrain: disposed");
+			if (performance.now() - t0 > timeoutMs)
+				throw new Error("loadFullTerrain: timed out");
+			await new Promise((res) => setTimeout(res, 100));
+		}
+		// maybeSwapQueryTerrain, unconditionally
+		this.terrain = this.renderSet as TerrainSet;
+		this.queryWedge = w;
+		this.snaps.clear();
+		this.vis.clear();
+		this.profiles = undefined;
+		this.dropGeometrySources();
+		this.buildTrails();
+		this.invalidateGeometry();
+		this.horizonDirs = await this.traceHorizon();
+		return Math.round(performance.now() - t0);
+	}
+
+	/**
+	 * Satellite imagery for the render set's tiles within `maxDistM` of the eye (0 = all), fetched now;
+	 * failed tiles are re-fetched up to `retries` times. The three.js engine's
+	 * `terrain.loadImagery("satellite")` for the matcher. Other tiles keep streaming in the background.
+	 */
+	async loadSatellite(maxDistM = 0, retries = 2) {
+		await this.deckReady;
+		const c = this.imagery;
+		const sleep = () => new Promise((res) => setTimeout(res, 100));
+		const want = () =>
+			(this.renderSet?.tiles ?? []).filter(
+				(t) => !(maxDistM > 0) || t.distance < maxDistM,
+			);
+		const missing = () => want().filter((t) => !c.map.has(t.id));
+		let tries = 0;
+		for (;;) {
+			if (this.disposed || !missing().length) break;
+			// a load already running (it may cover these tiles): let it land first
+			while (c.abort && !this.disposed) await sleep();
+			if (this.disposed || !missing().length || tries > retries) break;
+			tries++;
+			this.syncImagery(
+				{ tiles: missing() } as unknown as TerrainSet,
+				"satellite",
+			);
+		}
+		return {
+			tiles: want().length,
+			missing: missing().length,
+			retries: Math.max(0, tries - 1),
+		};
+	}
+
+	/**
+	 * The matcher's view (was the three.js engine's geoRT readback + a canvas render with uStyle 1):
+	 * the satellite drape and the geometry buffer through an arbitrary `pose`, both offscreen at
+	 * width × height (default: the query geometry size, 1024 px on the long side, as three's geoRT).
+	 * Neither the on-screen view nor the engine's pose changes.
+	 *   xyz:  ENU metres in `frame` (EnuFrame(lat, lon, 0)), 3 per pixel, row 0 = top, 0,0,0 = sky
+	 *   rgba: sRGB 8-bit, row 0 = top, opaque; the terrain colour pass in the Blend-satellite look
+	 *         (haze 0.6 = CLASSIC.replace.haze, no contours, trails or near fade), sky = #b9cde0
+	 * Satellite tiles are drawn as far as they are loaded: call loadSatellite first.
+	 */
+	async renderPoseView(
+		pose: Pose,
+		opts: { width?: number; height?: number } = {},
+	): Promise<{
+		width: number;
+		height: number;
+		xyz: Float32Array;
+		rgba: Uint8ClampedArray;
+	} | null> {
+		if (this.world?.controls || this.step)
+			throw new Error("renderPoseView: photo views only");
+		await this.deckReady;
+		if (this.disposed || !this.terrain) return null;
+		const def = geometrySize(this.aspect);
+		const width = opts.width ?? def.width;
+		const height = opts.height ?? def.height;
+		const p = {
+			yaw: pose.yaw,
+			pitch: pose.pitch,
+			roll: pose.roll,
+			vfov: pose.vfov,
+		};
+		const prev = this.settings;
+		this.settings = {
+			...prev,
+			mode: "replace",
+			mapStyle: "satellite",
+			trails: false,
+		};
+		this.poseView = true;
+		let src: GeometrySource | undefined;
+		try {
+			this.updateLayers();
+			this.flushLayers();
+			// geometry: a private source at this size (the query buffer and its pose stay as they are)
+			src = new GpuGeometrySource(this.deck, this.eyeArr, width, height, {
+				xyz: true,
+			});
+			await src.render(p);
+			if (this.disposed) return null;
+			const xyz = new Float32Array(width * height * 3);
+			const sx = src.xyz;
+			for (let i = 0; i < width * height; i++) {
+				if (!(src.range[i] > 0) || !Number.isFinite(src.range[i])) continue;
+				if (sx) {
+					xyz[i * 3] = sx[i * 3];
+					xyz[i * 3 + 1] = sx[i * 3 + 1];
+					xyz[i * 3 + 2] = sx[i * 3 + 2];
+				}
+			}
+			// colour: the terrain colour pass alone, linear + straight alpha → sRGB over the sky colour
+			const lin = await this.compositor.renderColorPixels(
+				this.liveLayers(),
+				p,
+				this.eyeArr,
+				width,
+				height,
+			);
+			if (!lin || this.disposed) return null;
+			const rgba = new Uint8ClampedArray(width * height * 4);
+			const SKY = [0xb9, 0xcd, 0xe0];
+			const oetf = (c: number) =>
+				c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055;
+			for (let i = 0; i < width * height; i++) {
+				const a = Math.min(1, Math.max(0, lin[i * 4 + 3]));
+				for (let k = 0; k < 3; k++) {
+					const c =
+						a > 0 ? oetf(Math.min(1, Math.max(0, lin[i * 4 + k] / a))) : 0;
+					rgba[i * 4 + k] = Math.round(c * a * 255 + SKY[k] * (1 - a));
+				}
+				rgba[i * 4 + 3] = 255;
+			}
+			return { width, height, xyz, rgba };
+		} finally {
+			src?.dispose?.();
+			this.poseView = false;
+			this.settings = prev;
+			this.updateLayers();
+			// the on-screen frame redraws its passes (the offscreen colour pass resized the MSAA buffers)
+			this.deck.redraw("pose-view");
+		}
+	}
+
 	async exportImage(withLabels = true): Promise<Blob | null> {
 		// display-only 3D Tiles (Google) never enter an export (tiles3d/deck-tiles.ts)
 		// as three: the world view, or stepping inside from the photo view (the world view on screen)

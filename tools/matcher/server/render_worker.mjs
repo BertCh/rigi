@@ -2,7 +2,7 @@
 // Long-lived render worker for the matcher service (tools/matcher/server/app.py).
 //
 // Vendored from ../render.mjs (read-only there): same app-driven render (window.__engine on
-// /photo/<ID>, geoRT read back explicitly, satellite drape), but
+// /photo/<ID>, geometry buffer read back explicitly, satellite drape), but
 //   - keeps one headless Chromium and the last few /photo pages warm between requests,
 //   - writes into a caller-supplied directory (never tools/matcher/out/renders),
 //   - renders only the satellite style (hillshade doesn't help, see reports/matcher.md).
@@ -31,9 +31,16 @@
 //   The page is opened at /photo/<id> with Playwright request interception only (no app code is
 //   changed): the photos.json module gets the ad-hoc PhotoMeta appended, /photos/<id>.jpg serves
 //   photoFile and /photos/<regionId>.json serves the region (empty if none).
-//   "fullTerrain": true loads the tiles outside the initial viewing wedge (terrain.loadPending) and
+//   "fullTerrain": true refines the terrain all around the eye (DeckEngine.loadFullTerrain) and
 //   re-traces the 360° horizon, once per page: needed for any yaw search beyond the prior wedge.
 // Everything else (logs) goes to stderr.
+//
+// Engine (2026-10-01): pages open on ?renderer=deck (WebGL, deterministic; the three.js PhotoEngine this
+// worker was written for was removed). The views come from DeckEngine's offscreen hooks
+// (src/lib/deck/engine.ts loadSatellite / renderPoseView / loadFullTerrain) and keep the three.js output
+// contract: <tag>_xyz.f32 = W×H×3 float32 ENU metres in the photo's EnuFrame(lat, lon, 0), row 0 = top,
+// 0,0,0 = sky, W×H = 1024 px on the long side; <tag>_sat.jpg = the satellite drape at W×H, canvas JPEG
+// q 0.92, haze 0.6, sky #b9cde0.
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
@@ -208,12 +215,7 @@ async function openPage(id, adhoc = null, key = id) {
 		// an HMR reload swaps the engine; the flag lives on the engine object, so a new one is re-draped
 		const alive = await hit.page
 			.evaluate(
-				() =>
-					!!(
-						window.__engine?.geoRT &&
-						window.__engine.terrain &&
-						window.__engine.horizonDirs
-					),
+				() => !!(window.__engine?.terrain && window.__engine.horizonDirs),
 			)
 			.catch(() => false);
 		if (alive) {
@@ -241,7 +243,7 @@ async function openPage(id, adhoc = null, key = id) {
 		safe((r) => r.abort()),
 	);
 	if (adhoc) await routeAdhoc(page, adhoc);
-	await page.goto(`${BASE}/photo/${id}?renderer=three`); // pinned: reads three internals (e.renderer, geoRT); f0 owns this file
+	await page.goto(`${BASE}/photo/${id}?renderer=deck`); // pinned: WebGL deck (deterministic, the offscreen hooks); f0 owns this file
 	await page.waitForSelector("[data-ready]", {
 		state: "attached",
 		timeout: 240000,
@@ -271,17 +273,10 @@ async function ensureFullTerrain(page) {
 	return page.evaluate(async () => {
 		const e = window.__engine;
 		if (e.__benchFullTerrain) return 0;
-		const t = performance.now();
-		// don't let loadPending re-drape every tile: reset, and render() drapes again (distance-limited)
-		if (e.__matcherSat) {
-			e.terrain.imagery = "none";
-			e.__matcherSat = false;
-		}
-		if (e.terrain.hasPending) await e.terrain.loadPending();
-		e.horizonDirs = e.computeHorizon();
-		e.geoDirty = true;
+		// DeckEngine: 360° high-detail wedge, query terrain = the complete set, 360° horizon re-traced
+		const ms = await e.loadFullTerrain();
 		e.__benchFullTerrain = true;
-		return Math.round(performance.now() - t);
+		return ms;
 	});
 }
 
@@ -295,7 +290,7 @@ async function align(req) {
 	);
 	const page = entry.page;
 	const fullMs = req.fullTerrain ? await ensureFullTerrain(page) : 0;
-	const r = await page.evaluate((priors) => {
+	const r = await page.evaluate(async (priors) => {
 		const e = window.__engine;
 		const orig = { ...e.prior };
 		const runs = [];
@@ -305,7 +300,7 @@ async function align(req) {
 			for (const pr of priors) {
 				e.prior = { ...orig, ...pr };
 				const t = performance.now();
-				const res = e.autoAlign(true);
+				const res = await e.autoAlign(true); // deck: async
 				runs.push({
 					prior: P(e.prior),
 					ms: Math.round(performance.now() - t),
@@ -526,7 +521,7 @@ async function skyGridRelease() {
 // edge.fine / edge.fg and the refit edge.sky as float32 files. engine.prior is restored.
 async function exportSkyline(page, prior, outDir) {
 	const t0 = Date.now();
-	const r = await page.evaluate((prior) => {
+	const r = await page.evaluate(async (prior) => {
 		const e = window.__engine;
 		if (!e.horizonDirs || !e.edge) return null;
 		const enc = (f) => {
@@ -541,7 +536,7 @@ async function exportSkyline(page, prior, outDir) {
 		try {
 			e.prior = { ...prior };
 			const t = performance.now();
-			const res = e.autoAlign(true);
+			const res = await e.autoAlign(true); // deck: async
 			const ms = performance.now() - t;
 			const near = res?.alternatives?.find(
 				(a) => Math.abs(d(a.pose.yaw, e.prior.yaw)) < 4,
@@ -654,59 +649,17 @@ async function renderOnce(req) {
 	// fetches failed or were aborted renders as bare shaded DEM). Missing tiles are re-draped (up to 2
 	// retries); the count left is reported as timing.imageryMissing.
 	const drape = await page.evaluate(
-		async ({ limit, texUpload }) => {
+		async ({ limit }) => {
 			const e = window.__engine;
-			const inRange = () =>
-				e.terrain.tiles.filter((t) => !(limit > 0) || t.distance < limit);
-			const missing = () =>
-				inRange().filter((t) => !t.mesh.material.uniforms.hasMap?.value);
-			let draped = false;
-			const all = e.terrain.tiles;
-			const drapeTiles = async (tiles) => {
-				e.terrain.tiles = tiles;
-				try {
-					if (e.terrain.imagery === "satellite") e.terrain.imagery = "none"; // loadImagery returns early otherwise
-					await e.terrain.loadImagery(
-						"satellite",
-						undefined,
-						e.renderer.capabilities.getMaxAnisotropy(),
-					);
-				} finally {
-					e.terrain.tiles = all;
-					e.terrain.imagery = "satellite";
-				}
-			};
-			if (!e.__matcherSat) {
-				await drapeTiles(inRange());
-				e.__matcherSat = true;
-				draped = true;
-			}
-			let retries = 0;
-			for (; retries < 2; retries++) {
-				const m = missing();
-				if (!m.length) break;
-				await drapeTiles(m);
-			}
-			if (texUpload && (draped || retries)) {
-				// policy t6 (reports/stage1.md §10.1): a cold first render under memory pressure once came out
-				// untextured; upload the draped textures now and wait for the GPU
-				for (const t of e.terrain.tiles) {
-					const m = t.mesh.material.uniforms.map.value;
-					if (m) e.renderer.initTexture(m);
-				}
-				e.renderer.getContext().finish();
-			}
-			return {
-				draped,
-				retries,
-				missing: missing().length,
-				tiles: inRange().length,
-			};
+			// DeckEngine.loadSatellite: fetch the tiles in range, re-fetch failed ones (2 retries). The
+			// textures upload when renderPoseView builds its layers, and its readback waits for the GPU, so
+			// texUpload (policy t6's forced upload) has nothing left to do.
+			const draped = !e.__matcherSat;
+			const r = await e.loadSatellite(limit, 2);
+			e.__matcherSat = true;
+			return { draped, retries: r.retries, missing: r.missing, tiles: r.tiles };
 		},
-		{
-			limit: req.fullTerrain ? (req.drapeMaxM ?? DRAPE_FULL_M) : 0,
-			texUpload: !!req.texUpload,
-		},
+		{ limit: req.fullTerrain ? (req.drapeMaxM ?? DRAPE_FULL_M) : 0 },
 	);
 	const draped = drape.draped;
 	const imageryMs = Date.now() - tImg;
@@ -737,82 +690,28 @@ async function renderOnce(req) {
 	const views = [];
 	for (const pose of poses) {
 		const renderView = (pose) =>
-			page.evaluate((pose) => {
+			page.evaluate(async (pose) => {
 				const e = window.__engine;
-				const saved = e.pose;
-				const u = e.shared;
-				const keep = {
-					style: u.uStyle.value,
-					haze: u.uHaze.value,
-					op: u.uContourOpacity.value,
-					proj: u.uProjectPhoto.value,
-					nf: u.uNearFade.value,
-					trails: e.trails?.visible,
-					pr: e.renderer.getPixelRatio(),
-					size: e.renderer.getSize(new e.geoRT.texture.offset.constructor()),
-				};
-				const cv = e.renderer.domElement;
-				const cssW = cv.style.width;
-				const cssH = cv.style.height;
-				const bw = cv.width;
-				const bh = cv.height;
-				e.pose = {
+				const r = await e.renderPoseView({
 					yaw: pose.yaw,
 					pitch: pose.pitch,
 					roll: pose.roll,
 					vfov: pose.vfov,
-				};
-				e.renderGeometry();
-				const W = e.geoRT.width;
-				const H = e.geoRT.height;
-				const g = new Float32Array(W * H * 4);
-				e.renderer.readRenderTargetPixels(e.geoRT, 0, 0, W, H, g);
-				const xyz = new Float32Array(W * H * 3);
-				for (let y = 0; y < H; y++) {
-					const src = (H - 1 - y) * W;
-					for (let x = 0; x < W; x++) {
-						const i = (src + x) * 4;
-						const o = (y * W + x) * 3;
-						if (g[i + 3] > 0) {
-							xyz[o] = g[i];
-							xyz[o + 1] = g[i + 1];
-							xyz[o + 2] = g[i + 2];
-						}
-					}
-				}
-				const bytes = new Uint8Array(xyz.buffer);
+				});
+				if (!r) throw new Error("renderPoseView returned nothing");
+				const W = r.width;
+				const H = r.height;
+				const bytes = new Uint8Array(r.xyz.buffer);
 				let bin = "";
 				for (let i = 0; i < bytes.length; i += 0x8000)
 					bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
 				const xyzB64 = btoa(bin);
-				if (e.trails) e.trails.visible = false;
-				e.renderer.setPixelRatio(1);
-				e.renderer.setSize(W, H, false);
-				e.renderer.setRenderTarget(null);
-				e.renderer.setClearColor(0xb9cde0, 1);
-				u.uProjectPhoto.value = 0;
-				u.uNearFade.value = 0;
-				u.uContourOpacity.value = 1;
-				u.uStyle.value = 1;
-				u.uHaze.value = 0.6;
-				e.renderer.clear();
-				e.renderer.render(e.scene, e.cam);
+				// the same encoder as the three.js version (canvas.toDataURL, JPEG q 0.92)
+				const cv = document.createElement("canvas");
+				cv.width = W;
+				cv.height = H;
+				cv.getContext("2d").putImageData(new ImageData(r.rgba, W, H), 0, 0);
 				const sat = cv.toDataURL("image/jpeg", 0.92);
-				u.uStyle.value = keep.style;
-				u.uHaze.value = keep.haze;
-				u.uContourOpacity.value = keep.op;
-				u.uProjectPhoto.value = keep.proj;
-				u.uNearFade.value = keep.nf;
-				if (e.trails) e.trails.visible = keep.trails;
-				e.renderer.setPixelRatio(keep.pr);
-				e.renderer.setSize(keep.size.x, keep.size.y, false);
-				cv.width = bw;
-				cv.height = bh;
-				cv.style.width = cssW;
-				cv.style.height = cssH;
-				e.pose = saved;
-				e.geoDirty = true;
-				e.requestRender();
 				return { W, H, xyzB64, sat };
 			}, pose);
 		// test hook (MATCHER_DEBUG_HOOKS=1): simulate a dev-server reload right before view N of the first attempt
@@ -824,7 +723,7 @@ async function renderOnce(req) {
 			req.__debugDone = true;
 			await page.reload({ waitUntil: "load" }).catch(() => {});
 			await page
-				.waitForFunction(() => !!window.__engine?.geoRT, null, {
+				.waitForFunction(() => !!window.__engine?.terrain, null, {
 					timeout: 120000,
 				})
 				.catch(() => {});

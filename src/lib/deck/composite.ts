@@ -858,6 +858,73 @@ export class PhotoCompositor implements Effect {
 		}
 	}
 
+	/**
+	 * The terrain colour pass alone (no photo, no composite, no trails) through `pose`, offscreen at
+	 * width × height, multisampled like the on-screen colour pass: linear RGB + straight alpha
+	 * (0 = nothing drawn = sky), RGBA float, row 0 = top. DeckEngine.renderPoseView (the matcher's
+	 * satellite drape, tools/matcher/server/render_worker.mjs).
+	 */
+	async renderColorPixels(
+		layers: Layer[],
+		pose: Pose,
+		eye: [number, number, number],
+		width: number,
+		height: number,
+	): Promise<Float32Array | null> {
+		const device = this.device;
+		if (!device) return null;
+		this.renderer ??= new TerrainPassRenderer(device);
+		const tex = device.createTexture({
+			id: "pose-view-color-tex",
+			format: "rgba16float",
+			width,
+			height,
+			sampler: {
+				minFilter: "nearest",
+				magFilter: "nearest",
+				addressModeU: "clamp-to-edge",
+				addressModeV: "clamp-to-edge",
+			},
+		});
+		const fbo = device.createFramebuffer({
+			id: "pose-view-color",
+			width,
+			height,
+			colorAttachments: [tex],
+			depthStencilAttachment: "depth24plus",
+		});
+		try {
+			this.renderColor(
+				layers.filter((l) => isTerrainTile(l)),
+				fbo,
+				pose,
+				eye,
+			);
+			if (!(await gpuDone(device))) return null;
+			const gl = glOf(device);
+			const prev = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+			gl.bindFramebuffer(
+				gl.READ_FRAMEBUFFER,
+				(fbo as unknown as { handle: WebGLFramebuffer }).handle,
+			);
+			const px = new Float32Array(width * height * 4);
+			gl.readPixels(0, 0, width, height, gl.RGBA, gl.FLOAT, px);
+			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prev);
+			// GL rows are bottom-up
+			const row = width * 4;
+			const out = new Float32Array(px.length);
+			for (let y = 0; y < height; y++)
+				out.set(
+					px.subarray((height - 1 - y) * row, (height - y) * row),
+					y * row,
+				);
+			return out;
+		} finally {
+			fbo.destroy();
+			tex.destroy();
+		}
+	}
+
 	/** renderImage's GPU part: draws the export and queues its readback into a new Buffer. */
 	private encodeImage(
 		device: Device,
