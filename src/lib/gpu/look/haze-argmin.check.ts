@@ -12,7 +12,7 @@
 //     candidates (the GPU-gated selection), cells on the f32 neighbours of the f64 tolerance, NaN,
 //     ±∞, ±0, subnormals, negative cells, all-NaN;
 //  2. decodePick's per-call checks reject a tolerance below haze.ts's, a value outside [gMin, tol]
-//     and a pick without the minimum (teeth of the runtime guard);
+//     a pick without the minimum, and an over-cap pick out of rank order (teeth of the runtime guard);
 //  3. the program builds on a stub device (GPUProgramCompiler lowering, no GPU calls): the arena
 //     layout the kernels address, our kernels lowered in order, and the select node the only node
 //     gated, by a GPU indirect condition.
@@ -178,6 +178,26 @@ console.log(
 		if (tamper(edit)) fail(`teeth: decodePick accepts ${label}`);
 		else console.log(`ok   decodePick rejects ${label}`);
 	}
+}
+
+{
+	// past the cap: a gated selection that did not run leaves the cand kernel's slot order
+	const g = new Float32Array(GRID_CELLS).fill(1);
+	const [words, pairs] = emulatePick(g);
+	if (new Uint32Array(words)[2] <= GRID_PICK_CAP || !decodePick(words, pairs))
+		fail("teeth: the all-tie grid's pick is not an accepted over-cap pick");
+	const p = new Uint32Array(pairs.slice(0));
+	const q = new Uint32Array(p.length);
+	for (let i = 0; i < GRID_PICK_CAP; i++) {
+		q[2 * i] = p[2 * (GRID_PICK_CAP - 1 - i)];
+		q[2 * i + 1] = p[2 * (GRID_PICK_CAP - 1 - i) + 1];
+	}
+	if (decodePick(words, q.buffer))
+		fail("teeth: decodePick accepts an over-cap pick out of rank order");
+	else
+		console.log(
+			"ok   decodePick rejects an over-cap pick out of rank order (selection skipped)",
+		);
 }
 
 {

@@ -341,7 +341,8 @@ export function buildArgminProgram<P>(
 
 /**
  * The read node's two ranges (arena words, pick pairs) → a GridPick, with the per-call checks (null:
- * they failed): tol ≥ haze.ts's f64 tolerance, every read value within [gMin, tol], gMin among them.
+ * they failed): tol ≥ haze.ts's f64 tolerance, every read value within [gMin, tol], gMin among them,
+ * and past the cap the pairs in (err, index) order (the gated selection ran).
  */
 export function decodePick(
 	words: ArrayBuffer,
@@ -369,6 +370,14 @@ export function decodePick(
 		if (err[i] === gMin) seenMin = true;
 	}
 	if (!seenMin) return null;
+	// past the cap the gated selection wrote the pairs in rank order: strictly increasing (err,
+	// index), else it did not run (or ran wrong) and the cand kernel's slot order is left
+	if (count > GRID_PICK_CAP)
+		for (let i = 1; i < n; i++)
+			if (
+				!(err[i - 1] < err[i] || (err[i - 1] === err[i] && idx[i - 1] < idx[i]))
+			)
+				return null;
 	return { gMin, count, idx, err };
 }
 

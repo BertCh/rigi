@@ -364,8 +364,15 @@ export function prepGraph(
 		const key = (k: string) => `look-haze/g/${k}`;
 		const up = (k: string, data: ArrayBufferView) =>
 			pooledStorage(device, key(k), data);
+		// outIdx / outVal share fitGpuPart's pooled lists (same size, same lease, read back before
+		// it ends), so running both paths on a device does not hold two copies (2 × 3·N·4 B)
 		const out = (k: string, bytes: number) =>
-			pooledStorage(device, key(k), bytes, { zero: false });
+			pooledStorage(
+				device,
+				k === "outIdx" || k === "outVal" ? `look-haze/p/${k}` : key(k),
+				bytes,
+				{ zero: false },
+			);
 		const head = headFor(device, N, listHead);
 		const buffers = {
 			prm: pooledUniform(device, key("prm"), words),
@@ -1022,8 +1029,15 @@ function fitGpuPartBand(
 		checkPrep(device, prep);
 		const key = (k: string) => `look-haze/b/${k}`;
 		const head = headFor(device, N, listHead);
+		// outIdx / outVal share fitGpuPart's pooled lists (same size, same lease, read back before
+		// it ends), so running both paths on a device does not hold two copies (2 × 3·N·4 B)
 		const out = (k: string, bytes: number) =>
-			pooledStorage(device, key(k), bytes, { zero: false });
+			pooledStorage(
+				device,
+				k === "outIdx" || k === "outVal" ? `look-haze/p/${k}` : key(k),
+				bytes,
+				{ zero: false },
+			);
 		const cols = pickSpotColumns(W);
 		const buffers = {
 			cprm: pooledUniform(
@@ -1140,12 +1154,27 @@ async function fitGpuPartAuto(
 	opts: { listHead?: number; bandGpu?: boolean },
 ): Promise<FitGpu> {
 	let band: typeof hazeGraphStats.band = "cpu";
+	let fault: unknown = null;
 	if (chooseBandGpu(device, prep.W * prep.H, opts.bandGpu)) {
-		const r = await fitGpuPartBand(device, prep, opts.listHead);
-		if (r) return r;
-		band = hazeGraphStats.band;
+		try {
+			const r = await fitGpuPartBand(device, prep, opts.listHead);
+			if (r) return r;
+			band = hazeGraphStats.band;
+		} catch (err) {
+			if (device.isLost) throw err;
+			fault = err;
+			band = "gpu-failed";
+		}
 	}
 	const r = await fitGpuPart(device, prep, opts.listHead);
+	// the CPU band ran on the same prep, so the GPU band's fault was its own (a shader / pipeline
+	// fault, not a stale prep, which fitGpuPart would have rejected too): off for this device
+	if (fault) {
+		bandFailed.add(device);
+		console.warn(
+			`[haze-graph] GPU airlight band faulted (${String((fault as Error)?.message ?? fault).slice(0, 200)}); the CPU band takes over on this device`,
+		);
+	}
 	hazeGraphStats.band = band;
 	return r;
 }
