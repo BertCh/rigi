@@ -167,6 +167,7 @@ ${PARAMS}
 var<workgroup> sh: array<u32, ${TILE}>;
 
 @compute @workgroup_size(${TILE}) fn main(@builtin(local_invocation_index) t: u32) {
+  _ = p; // keep binding 0 in the 'auto' layout: the kernel binds [p, base] like the others
   let s0 = base[2u * t];
   let s1 = base[2u * t + 1u];
   let sum = s0 + s1;
