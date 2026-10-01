@@ -612,6 +612,29 @@ export class GpuGeometrySource implements GeometrySource {
 		return true;
 	}
 
+	/**
+	 * render() without the readback, for GPU consumers of `texture`: draws the terrain through
+	 * `pose` into the target and returns. `range`, `xyz`, `pose` and `timing` keep describing the
+	 * last render() (they are not this draw's), copyRangeTo says no until the next render(), and a
+	 * render() still waiting for its readback is superseded (the target no longer holds it).
+	 * false = disposed.
+	 */
+	drawOnly(pose: Pose): boolean {
+		if (this.disposed) return false;
+		++this.seq;
+		const lm = (
+			this.deck as unknown as { layerManager?: { getLayers(): Layer[] } }
+		).layerManager;
+		this.renderer.render(
+			"geometry",
+			lm?.getLayers() ?? [],
+			this.target.fbo,
+			pose,
+			this.eye,
+		);
+		return true;
+	}
+
 	async render(pose: Pose): Promise<void> {
 		if (this.disposed) return;
 		const seq = ++this.seq;

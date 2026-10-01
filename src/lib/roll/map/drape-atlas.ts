@@ -11,6 +11,7 @@
 // Rects are top-left origin: photo rects in atlas uv, range/mask rects in texels.
 import type { Device, Texture } from "@luma.gl/core";
 import type { ForegroundMask } from "#/lib/segment";
+import type { RangeGpu } from "./range-gpu";
 
 /** Photos in the full-resolution first atlas. */
 export const ATLAS0_PHOTOS = 16;
@@ -219,6 +220,30 @@ export class DrapeAtlas {
 		this.coarse[k] = coarsen(data, w, h);
 		this.hasRange[k] = true;
 		this.markReady(k);
+	}
+
+	/**
+	 * setRange on the GPU: the geometry target `src` (GpuGeometrySource.texture, GL order, sized
+	 * rangeW × rangeH) is copied into the photo's cell with rangeMapFrom's flip and fix-up
+	 * (./range-gpu.ts), and `coarse` (RangeGpu.coarse of the same render) replaces coarsen(): the
+	 * same texels and grid as setRange(rangeMapFrom(src).data), with no readback or re-upload.
+	 * Texels and grid land together, as in setRange. false = nothing written (call setRange).
+	 */
+	setRangeGpu(
+		k: number,
+		gpu: RangeGpu,
+		src: Texture,
+		coarse: CoarseRange,
+	): boolean {
+		const c = this.cells[k];
+		if (this.destroyed || !c || gpu.device !== this.device) return false;
+		const [x, y, w, h] = c.range;
+		if (src.width !== w || src.height !== h) return false;
+		if (!gpu.copyInto(this.range, [x, y], src, w, h)) return false;
+		this.coarse[k] = coarse;
+		this.hasRange[k] = true;
+		this.markReady(k);
+		return true;
 	}
 
 	private markReady(k: number) {

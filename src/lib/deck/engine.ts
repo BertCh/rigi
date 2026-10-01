@@ -39,7 +39,7 @@ import { startLakeFloor } from "../geocam/lakes/fetch";
 import { priorHeading } from "../geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "../geodesy";
 import { autoAlignAsync, warmAlignGpu } from "../gpu/align";
-import { lookIdle } from "../gpu/look/opt-in";
+import { lookIdle, trackLook } from "../gpu/look/opt-in";
 import {
 	type FastHorizon,
 	startFastHorizon,
@@ -293,6 +293,14 @@ export class DeckEngine implements Renderer {
 	/** The look composite's CPU side (refined masks, band stats, photo noise), made at pose settle. */
 	private compLook = new CompositeLook();
 	private statsTimer = 0;
+	/**
+	 * Band stats read synchronously (compositor.readLayer: a readPixels that stalls the GL pipeline,
+	 * the stats land in the timer's own task) instead of fenced (readLayerAsync, the default: they
+	 * land a frame or more later, as the ?lookgpu stats already did). For parity checks / benches.
+	 */
+	syncStats = false;
+	/** The key of the async band-stats read in flight: the same key is not read twice. */
+	private statsPending: string | null = null;
 	/** Bumps whenever the layer's look changes without a pose change (style, haze fit, relief field): the band stats' key. */
 	private layerGen = 0;
 	/** The photo view's terrain + trail layers as updateLayers last built them (updateComposite reuses them). */
@@ -1301,9 +1309,18 @@ export class DeckEngine implements Renderer {
 		});
 	}
 
+	/** The band stats' key: what their layer depends on (geometry, look, mode, imagery so far). */
+	private statsKey() {
+		const s = this.settings;
+		return `${this.geoBufGen}|${this.layerGen}|${s.mode}|${s.mapStyle}|${s.worldStyle}|${this.imagery.key}|${this.imagery.map.size}`;
+	}
+
 	/**
 	 * engine.ts layerStats: band stats (LOOK_HARMONIZE) of the replace layer or the world's own
 	 * render, drawn at ≤ 256 px through the photo camera once the pose settles (and as imagery streams in).
+	 * The layer is read back fenced (compositor.readLayerAsync) unless `syncStats`: the stats land a
+	 * frame or more after the settle frame (with ?lookgpu they already did) and only if the key still
+	 * stands (otherwise the newer state is scheduled); export waits for them (trackLook → lookIdle).
 	 */
 	private scheduleStats() {
 		const s = this.settings;
@@ -1313,12 +1330,13 @@ export class DeckEngine implements Renderer {
 				: s.mode === "replace"
 					? this.style.composite.harmonize
 					: 0;
-		const key = `${this.geoBufGen}|${this.layerGen}|${s.mode}|${s.mapStyle}|${s.worldStyle}|${this.imagery.key}|${this.imagery.map.size}`;
+		const key = this.statsKey();
 		if (
 			!lookKey(this.style).includes("LOOK_HARMONIZE") ||
 			!this.geometryReady() ||
 			!this.photoImg ||
 			!this.compLook.wantsStats(amount, key) ||
+			this.statsPending === key ||
 			this.statsTimer
 		)
 			return;
@@ -1329,27 +1347,72 @@ export class DeckEngine implements Renderer {
 			if (this.disposed || !this.geometryReady() || !grid || !img) return;
 			this.flushLayers();
 			const [w, h] = gridSize(this.aspect, STATS_LONG_SIDE);
-			const layer = this.compositor.readLayer(
-				this.liveLayers(),
-				this.pose,
-				this.eyeArr,
-				w,
-				h,
+			if (this.syncStats) {
+				const layer = this.compositor.readLayer(
+					this.liveLayers(),
+					this.pose,
+					this.eyeArr,
+					w,
+					h,
+				);
+				if (layer) this.landStats(key, layer, w, h, grid, img);
+				return;
+			}
+			// the key of the state this render actually draws (it may have moved on since the schedule)
+			const drawn = this.statsKey();
+			this.statsPending = drawn;
+			trackLook(
+				this.compositor
+					.readLayerAsync(this.liveLayers(), this.pose, this.eyeArr, w, h)
+					.then(
+						(layer) => {
+							if (this.statsPending === drawn) this.statsPending = null;
+							if (this.disposed) return;
+							const g = this.rangeGrid();
+							const im = this.photoImg;
+							if (
+								layer &&
+								this.statsKey() === drawn &&
+								this.geometryReady() &&
+								g &&
+								im
+							)
+								this.landStats(drawn, layer, w, h, g, im);
+							// superseded: the state that stands now asks again (a lost context's
+							// null waits for the rebuild's updateLayers)
+							else if (layer) this.scheduleStats();
+						},
+						(e) => {
+							if (this.statsPending === drawn) this.statsPending = null;
+							if (!this.disposed)
+								console.warn("[deck-engine] band stats readback failed", e);
+						},
+					),
 			);
-			if (!layer) return;
-			this.compLook.setStats({
-				key,
-				img,
-				layer,
-				w,
-				h,
-				geo: grid,
-				fg: this.fgMask,
-				minRange: trustedRange(this.photo.hAccuracy),
-			});
-			this.updateLook();
-			if (this.world?.controls) this.updateLayers();
 		}, 120);
+	}
+
+	/** Hand a band-stats layer (readLayer's GL rows) to the look composite and apply the stats. */
+	private landStats(
+		key: string,
+		layer: Float32Array,
+		w: number,
+		h: number,
+		geo: RangeGrid,
+		img: HTMLImageElement,
+	) {
+		this.compLook.setStats({
+			key,
+			img,
+			layer,
+			w,
+			h,
+			geo,
+			fg: this.fgMask,
+			minRange: trustedRange(this.photo.hAccuracy),
+		});
+		this.updateLook();
+		if (this.world?.controls) this.updateLayers();
 	}
 
 	/** The haze fit (look/haze-controller), for the atmosphere and dev tools. */

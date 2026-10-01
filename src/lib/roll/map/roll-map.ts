@@ -44,6 +44,7 @@ import type { Roll, RollPhoto } from "../types";
 import { basemapLook, basemapSource, type RollBasemap } from "./basemap";
 import { DrapeAtlas, MAX_PHOTOS } from "./drape-atlas";
 import { type DrapePhoto, MultiDrapeLayer } from "./multi-drape-layer";
+import { RangeGpu } from "./range-gpu";
 import { loadRollTerrain } from "./roll-terrain";
 
 /** Range map size (long side, px). The drape only needs it for occlusion. */
@@ -94,7 +95,33 @@ export type RollMapOptions = {
 	onView?: (photoId: string | null) => void;
 	/** A photo joined the drape (count so far). */
 	onDrape?: (n: number) => void;
+	/**
+	 * Range maps go into the drape atlas on the GPU (default true): the geometry target is copied
+	 * into its atlas cell and max-pooled there (./range-gpu.ts), and only the coarse cull grid is
+	 * read back. false = the CPU path (full readback, rangeMapFrom, writeData, coarsen), which
+	 * also runs for any photo the GPU path can't do (programs unavailable, context lost).
+	 */
+	gpuRange?: boolean;
 };
+
+/** Per-path accounting of the range hand-off (debugDrape; EVIDENCE of the GPU path). */
+type RangeStats = {
+	photos: number;
+	/** Main-thread ms after the draw: CPU = readback copy + unpack + rangeMapFrom + writeData +
+	 * coarsen; GPU = max-pool issue + coarse copy-out + atlas copy. */
+	mainMs: number;
+	/** Draw issued → texels and grid in the atlas, summed over photos (overlapping waits). */
+	wallMs: number;
+	bytesDown: number;
+	bytesUp: number;
+};
+const noStats = (): RangeStats => ({
+	photos: 0,
+	mainMs: 0,
+	wallMs: 0,
+	bytesDown: 0,
+	bytesUp: 0,
+});
 
 /** Long side (px) of the working copy of each photo: the largest atlas cell. */
 const PIXELS_LONG = 1024;
@@ -143,6 +170,10 @@ export class RollMapEngine {
 	private rangeWorkers = 0;
 	private rangeCount = { done: 0, total: 0 };
 	private rangesStarted = false;
+	/** opts.gpuRange (the test hook may flip it before re-ranging). */
+	private gpuRange: boolean;
+	private rangeGpu: RangeGpu | null = null;
+	private rangeStats = { cpu: noStats(), gpu: noStats() };
 	/** Extra layers added by opt-in features (setExtraLayers), drawn after the drape and frustums. */
 	private extraLayers = new Map<string, unknown[]>();
 	settings = {
@@ -160,6 +191,7 @@ export class RollMapEngine {
 		private opts: RollMapOptions = {},
 	) {
 		this._roll = roll;
+		this.gpuRange = opts.gpuRange ?? true;
 		this.frame = new EnuFrame(roll.center.lat, roll.center.lon, 0);
 		this.world = new WorldCamera(canvas, () => this.kick());
 		let onLoad = () => {};
@@ -437,17 +469,13 @@ export class RollMapEngine {
 						xyz: false,
 					});
 					try {
-						await src.render(p.pose);
-						if (this.disposed) return;
+						const done = await this.rangeInto(p, rev, src, w, h);
+						if (done === "disposed") return;
 						// moved while rendering (updateRoll): its newer pose is queued again
-						if (p.rev !== rev) {
+						if (done === "moved") {
 							if (!this.rangeQueue.includes(p)) this.rangeQueue.push(p);
 							continue;
 						}
-						this.atlas?.setRange(
-							this.slot.get(p.id) ?? -1,
-							rangeMapFrom(src).data,
-						);
 						const c = this.rangeCount;
 						c.done++;
 						this.opts.onStatus?.({
@@ -471,6 +499,61 @@ export class RollMapEngine {
 		return Promise.all(Array.from({ length: Math.max(0, n) }, worker)).then(
 			() => {},
 		);
+	}
+
+	/**
+	 * Photo p's range map (pose revision `rev`) rendered through `src` (w × h) into its atlas cell:
+	 * on the GPU (gpuRange: draw, max-pool, read back only the coarse grid, copy the target into
+	 * the cell once it lands) or, as before, through a full readback, rangeMapFrom and setRange.
+	 * The cell is written only if p's pose is still `rev` when the result is in (else "moved").
+	 */
+	private async rangeInto(
+		p: Placed,
+		rev: number,
+		src: GpuGeometrySource,
+		w: number,
+		h: number,
+	): Promise<"done" | "moved" | "disposed"> {
+		const k = this.slot.get(p.id) ?? -1;
+		const atlas = this.atlas;
+		if (this.gpuRange && atlas) {
+			this.rangeGpu ??= new RangeGpu(atlas.range.device);
+			const gpu = this.rangeGpu;
+			const t0 = performance.now();
+			if (gpu.ok && src.drawOnly(p.pose)) {
+				const coarse = await gpu.coarse(src.texture, w, h, () => this.disposed);
+				if (this.disposed) return "disposed";
+				if (p.rev !== rev) return "moved";
+				// the target still holds this draw: nothing else renders into a worker's source
+				const t1 = performance.now();
+				if (coarse && atlas.setRangeGpu(k, gpu, src.texture, coarse.grid)) {
+					const s = this.rangeStats.gpu;
+					s.photos++;
+					s.wallMs += performance.now() - t0;
+					s.mainMs += coarse.mainMs + performance.now() - t1;
+					s.bytesDown += coarse.bytes;
+					return "done";
+				}
+			}
+			// no GPU result (programs unavailable, context lost): the CPU path below, as before
+		}
+		const t0 = performance.now();
+		await src.render(p.pose);
+		if (this.disposed) return "disposed";
+		if (p.rev !== rev) return "moved";
+		const t1 = performance.now();
+		this.atlas?.setRange(k, rangeMapFrom(src).data);
+		const s = this.rangeStats.cpu;
+		s.photos++;
+		s.wallMs += performance.now() - t0;
+		s.mainMs +=
+			performance.now() -
+			t1 +
+			(src.timing?.copyMs ?? 0) +
+			(src.timing?.unpackMs ?? 0);
+		s.bytesDown += w * h * 4;
+		s.bytesUp += w * h * 4;
+		return "done";
 	}
 
 	/** People masks (#/lib/segment, cached per photo), one photo at a time. */
@@ -999,6 +1082,10 @@ export class RollMapEngine {
 					draped: a.ready.filter(Boolean).length,
 					atlases: a.photo.map((t) => `${t.width}x${t.height}`),
 					mb: Math.round(a.bytes / 2 ** 20),
+					ranges: {
+						cpu: { ...this.rangeStats.cpu },
+						gpu: { ...this.rangeStats.gpu },
+					},
 				}
 			: null;
 	}
@@ -1018,6 +1105,8 @@ export class RollMapEngine {
 		this.deck.finalize();
 		this.atlas?.destroy();
 		this.atlas = null;
+		this.rangeGpu?.destroy();
+		this.rangeGpu = null;
 		window.clearTimeout(this.atlasTimer);
 		for (const b of [...this.thumbs.values(), ...this.pixels.values()])
 			b.close();
