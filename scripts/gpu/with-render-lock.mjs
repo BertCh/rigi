@@ -174,6 +174,9 @@ for (let waited = 0; ; waited += 1) {
 		why = tryStart();
 		if (!why) break;
 	} else {
+		// an exclusive job that lost the head (a priority ticket arrived) must hand back the slots it
+		// had gathered, or the new head waits on them forever (deadlock seen 2026-10-01)
+		if (held.length) release();
 		why = `queued (${readdirSync(QUEUE).sort().indexOf(ticket)} ahead)`;
 	}
 	if (waited % 30 === 0) console.error(`[render-lock] ${why}`);
