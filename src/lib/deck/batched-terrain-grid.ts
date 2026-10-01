@@ -114,7 +114,8 @@ export function buildBatchGrid(
 	// bounding box over a 9×9 subset of nodes at the lowest (skirt) and highest height
 	let lo = Number.POSITIVE_INFINITY;
 	let hi = Number.NEGATIVE_INFINITY;
-	if (heights instanceof Float32Array)
+	// a typed array (any realm) is scanned; anything else is the exact { lo, hi } of a lazy tile
+	if (ArrayBuffer.isView(heights))
 		for (let i = 0; i < heights.length; i++) {
 			const h = heights[i];
 			if (h < lo) lo = h;

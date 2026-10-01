@@ -280,8 +280,15 @@ export class TerrainStreamer {
 		const build = terrainBuild();
 		let mesh: TileMesh;
 		if (build.mesh) {
-			// the per-tile CPU mesh needs every height: a lazy tile materialises here
-			const r: DemRaster = { ...dem, heights: getCpuHeights(dem) };
+			// the per-tile CPU mesh needs every height: a lazy tile materialises here (first, so the
+			// copy below does not carry the source getCpuHeights has just released)
+			const heights = getCpuHeights(dem);
+			const r: DemRaster = {
+				key: dem.key,
+				source: dem.source,
+				size: dem.size,
+				heights,
+			};
 			mesh = buildMesh(this.frame, r, w.seg, w.distance, w.focus);
 			if (build.grid) mesh.grid = buildBatchGrid(this.frame, r.key, r.heights);
 		} else mesh = buildLiteMesh(this.frame, dem, w.seg, w.distance, w.focus);

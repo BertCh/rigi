@@ -95,6 +95,7 @@ export function gpuDecodeTileLoader(
 				TERRARIUM_BITMAP_OPTIONS,
 			);
 		} catch {
+			terrainGpuDecodeCounters.cpuError++;
 			return cpu(); // an undecodable image: the CPU path's own null
 		}
 		const size = bitmap.width;
