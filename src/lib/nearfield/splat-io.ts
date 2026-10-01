@@ -148,8 +148,11 @@ const PLY_TYPES: Record<string, [number, (dv: DataView, o: number) => number]> =
 		float64: [8, (d, o) => d.getFloat64(o, true)],
 	};
 
-const SH_C0 = 0.28209479177387814;
-const to8 = (x: number) => Math.max(0, Math.min(255, Math.round(x * 255))) | 0;
+/** Degree-0 spherical-harmonic constant: display colour = 0.5 + SH_C0 · f_dc. */
+export const SH_C0 = 0.28209479177387814;
+/** A 0..1 value as a clamped, rounded unorm8. */
+export const to8 = (x: number) =>
+	Math.max(0, Math.min(255, Math.round(x * 255))) | 0;
 
 /**
  * Minimal reader for a standard 3DGS binary .ply (vertex element with x,y,z, f_dc_0..2, opacity (logit),

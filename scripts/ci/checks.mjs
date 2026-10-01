@@ -280,6 +280,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "splat-loaders-ext",
+		tier: "fast",
+		group: "nearfield",
+		cmd: tsx("src/lib/nearfield/splat-loaders-ext.check.ts"),
+		note: "SPZ v2/v3/v4 + KSPLAT 0/1 through @loaders.gl/splats (hand-built fixtures)",
+		timeoutS: 120,
+	},
+	{
 		id: "nearfield-export",
 		tier: "fast",
 		group: "nearfield",
@@ -364,6 +372,24 @@ export const CHECKS = [
 		group: "concord",
 		cmd: tsx("src/lib/concord/occl/occl.check.ts"), // offline; --live is never used here
 		timeoutS: 300,
+	},
+	{
+		id: "cog-reader",
+		tier: "fast",
+		group: "concord",
+		cmd: tsx("src/lib/concord/occl/cog-reader.check.ts"),
+		note: "loaders.gl vs own COG reader on real swisstopo COGs; bytes cached in .cache/swiss-cog by a networked run",
+		// SKIPs until one run with network filled the range cache (then offline)
+		needs: [".cache/swiss-cog", "public/photos/photos.json"],
+		timeoutS: 600,
+	},
+	{
+		id: "cache-range",
+		tier: "fast",
+		group: "concord",
+		cmd: tsx("src/lib/cache/range.check.ts"),
+		note: "tile cache byte ranges (key = url + range), mocked server",
+		timeoutS: 60,
 	},
 
 	// ---- fast: geocam (GEO phase A, src/lib/geocam; synthetic, offline) ----------------------------

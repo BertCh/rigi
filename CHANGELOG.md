@@ -10,6 +10,12 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - `/dev/graph` (dev only): the page's live compute graphs per device, joined with the manifest; worker-realm modules are listed as remote.
 - `src/lib/gpu/app-graph/manifest.ts`: islands I0–I12 and the GPU modules (groups, resources, cadence, realm, readbacks), `registerIsland` for dynamic entries. Fast-tier checks `gpu-inspect`, `app-graph` (manifest ↔ `cachedGraph` groups) and `app-graph-table` (`research_notes/whole-app-graph-2026-10-01/islands.generated.md`, from `scripts/gpu/app-graph-table.ts`).
 
+### loaders.gl data paths (WAG W2.5, W2.6; 2026-10-01)
+
+- `?cogReader=loaders|own` (default `own`): swisstopo COG reads for `?concord=occl` through `@loaders.gl/geotiff` `GeoTIFFSourceLoader` behind the existing `swiss-cog.ts` API, falling back to the own reader when a file cannot be opened. Windows are bit-identical to the own reader on the Swiss dev photos' swissSURFACE3D / swissALTI3D COGs (CI `cog-reader`); under the 4.5 MB byte budget the readers keep different tile sets (64 KiB header blocks), so the default stays `own`.
+- `cachedFetch` / `cachedFetchRange`: HTTP byte ranges through the tile cache, keyed by url + range (a server that ignores Range is sliced).
+- SPZ (v2, v3, v4) and KSPLAT splats import through `@loaders.gl/splats` (`src/lib/nearfield/splat-loaders-ext.ts`), sniffed by `selectSplatLoader` and parsed with the new async `parseSplat`; `splat-loaders.ts` imports the package only on use (CI `splat-loaders-ext`).
+
 ### Type system (2026-10-01)
 
 Review and open items: `reports/type-system-review-2026-10-01.md`.

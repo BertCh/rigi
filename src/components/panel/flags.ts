@@ -217,6 +217,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "cogReader",
+		label: "swisstopo COG reader",
+		help: "Surface-model reads for DSM occluders: loaders.gl (GeoTIFFSourceLoader, tile-cached ranges) or the built-in parser.",
+		group: "data",
+		options: { loaders: "loaders.gl", own: "Built-in" },
+	},
+	{
 		name: "tiles3dGeoid",
 		label: "3D Tiles geoid N (m)",
 		help: "Overrides the geoid undulation applied to ellipsoidal tilesets.",

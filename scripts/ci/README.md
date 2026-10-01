@@ -38,6 +38,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | refine-test | fast | refine Jacobians, FFT, synthetic recovery | `scripts/refine-test.ts` |
 | ingest | fast | GPU Terrarium decode arithmetic: f32 twin bit-equal to `decodeTerrarium` over all 2^24 RGB, f32-exact partials, ingest layout math. The browser byte/height gate is `scripts/gpu/terrarium-ingest-check.mjs` (not in the registry) | `src/lib/gpu/ingest/ingest.check.ts` |
 | export | fast | export/interchange (XMP, GeoJSON, KML, COLMAP…) | `scripts/test-export.ts` (needs `public/photos/`) |
+| splat-loaders / -ext | fast | splat loaders: `.splat-v1` round trip, PLY; SPZ (v2/v3/v4) and KSPLAT (levels 0/1) through `@loaders.gl/splats` on hand-built fixtures | `src/lib/nearfield/splat-loaders*.check.ts` |
 | nearfield-core / -export / -generate / -spot / -eyes / -propagate, splat-sort | fast | Step Inside core; generated splats never exported; propagation parity with Python; depth sort | `src/lib/nearfield/**`, `tools/nearfield/propagate/propagate.check.ts`, `scripts/nearfield/splat-sort-test.ts` |
 | tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |
 | photoprep | fast | GPU photo prep path (`4 100000` args) | `src/lib/gpu/photoprep/photoprep.check.ts` |
@@ -52,6 +53,8 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | terroir-labels / -viz / -roll / -pack | fast | terroir cartography: labels, viz, roll, packs | `src/lib/terroir/*/*.check.ts`, `scripts/terroir/pack.check.ts` |
 | geocam-map / -priors / -lakes / -integrity | fast | geometry-first pose modules (flags off by default) | `src/lib/geocam/*/*.check.ts` |
 | concord-core / -priors / -cues / -app / -occl | fast | concordance modules kept after the 2026-09-30 cleanup (synthetic, offline). The joint, warp and re-match checks went with their code (a1845f5) | `src/lib/concord/*/*.check.ts` |
+| cog-reader | fast | the loaders.gl COG reader (`cogReader=loaders`) vs the own one on real swissSURFACE3D / swissALTI3D COGs under the Swiss dev photos: headers equal, windows bit-identical, `loadNearDsm` grids identical without a byte budget; request / byte counts per reader. Needs `.cache/swiss-cog/` (filled by one networked run, then offline); SKIPs without it | `src/lib/concord/occl/cog-reader.check.ts` |
+| cache-range | fast | tile cache HTTP byte ranges: one entry per url + range, memory repeats, shared in-flight requests, 200-ignoring servers sliced (mocked server) | `src/lib/cache/range.check.ts` |
 | style-baseline | full | **classic pixel identity + geometry hash** on the WebGL deck route (`?renderer=deck`, SwiftShader). No `?style`/`?concord` flag is set, so this row is also the **concord-off parity** gate. **Needs a deck reference** (see below); SKIPs until one exists | `scripts/style-baseline.mjs check --url …` |
 | deck-smoke | full | `?renderer=deck` (WebGL, reference) vs `?renderer=webgpu` parity: \|Δyaw\| ≤ 0.5°, label overlap ≥ 0.6 | `scripts/deck-engine-smoke.mjs --url … --out out/ci/… --renderer webgpu` |
 | eval-app | full | app auto-alignment vs control points on the default engine (`--renderer webgpu`). Gate: `N/M within 1° yaw` ≥ `evalAppWebgpu.minWithin1deg`; advisory until that baseline exists | `scripts/eval-app.mjs --renderer webgpu` (`APP_URL=…`) |

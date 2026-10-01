@@ -47,6 +47,15 @@
 | **Step Inside models** (SHARP, MoGe-2, DA3, LaMa, VGGT, and others) | `tools/nearfield/service/models.py:20` (the in-service licence strings) | **See [`research_notes/step_inside_models_2026-09.md`](../research_notes/step_inside_models_2026-09.md).** In short: MoGe-2 is MIT, DA3-BASE is Apache-2.0, LaMa big-lama is Apache-2.0, **SHARP weights are research-only**, and DA3 Giant, MASt3R, DUSt3R and VGGT-1B (non-Commercial) are NC | SHARP must stay behind a dev flag and never ship. VGGT-1B-Commercial needs the application | Keep this table and that note in sync |
 | Avoid list | — | FABDEM (NC), OrienterNet (CC BY-NC), SegFormer ADE20k (NVIDIA NC), DA3 Large-1.1 (conflicting) | No | Never add these to product paths |
 
+## Register: npm libraries (data loaders)
+
+Libraries that parse data at run time, with their notable transitive dependencies (licences read from the installed `node_modules/*/package.json`, 2026-10-01). Both loaders.gl packages are imported only on demand (dynamic `import()`), so they land in their own chunks.
+
+| Package (version) | Where (file) | Licence | Notable transitive dependencies | Action |
+|---|---|---|---|---|
+| `@loaders.gl/geotiff` (5.0.0-alpha.7) | `src/lib/concord/occl/cog-loaders.ts` (`?cogReader=loaders`; default `own`) | MIT (vis.gl contributors) | `geotiff` 2.1.3 MIT; `lerc` 3.0.0 **Apache-2.0** (Esri LERC decoder; its package ships no licence file); `web-worker` 1.5.0 **Apache-2.0**; `pako` 2.2.0 MIT AND Zlib; `zstddec` 0.1.0 MIT AND BSD-3-Clause; `xml-utils` 1.10.2 CC0-1.0; `@petamoriken/float16`, `quick-lru`, `parse-headers`, `fast-xml-parser` 5.11.2 (+ `strnum`, `fast-xml-builder` …), `@math.gl/crs`, `@loaders.gl/loader-utils` / `schema` / `worker-utils`, `@probe.gl/*`: MIT | Credit Apache-2.0 components (LICENSE text) in a bundle licence report |
+| `@loaders.gl/splats` (5.0.0-alpha.7) | `src/lib/nearfield/splat-loaders-ext.ts` (SPZ / KSPLAT import) | MIT (vis.gl contributors) | `apache-arrow` 21.2.0 **Apache-2.0** (ships `NOTICE.txt`, which must travel with a distributed bundle); `flatbuffers` 25.9.23 **Apache-2.0**; `tslib` 0BSD; `@loaders.gl/compression` MIT with `fflate` 0.7.4, `fzstd` 0.1.1, `hysnappy`, `snappyjs` (MIT); `zod` 4.6.5 MIT | Reproduce the Arrow NOTICE in the credits / licence report |
+
 ## Attribution: what is implemented
 
 `src/lib/licences/attribution.ts` is the single registry:

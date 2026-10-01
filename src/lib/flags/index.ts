@@ -84,6 +84,8 @@ export const FLAG_SCHEMA = {
 	imagery: oneOf(["default", "esri", "swisstopo", "custom"], "default"),
 	attrib: oneOf(["classic", "full"], "classic"),
 	osmextract: onOff("off"),
+	/** swisstopo COG reader for ?concord=occl (src/lib/concord/occl/swiss-cog.ts): loaders.gl or the own parser */
+	cogReader: oneOf(["loaders", "own"], "own"),
 	// /roll
 	propagate: oneOf(["off", "on", "dev"], "off"),
 	// owned by their stores

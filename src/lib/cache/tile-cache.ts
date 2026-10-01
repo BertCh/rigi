@@ -58,7 +58,19 @@ export type CachedFetchOptions = {
 	signal?: AbortSignal;
 	/** Store successful responses persistently (default true). */
 	persist?: boolean;
+	/**
+	 * HTTP byte range [start, end] (inclusive, as in the `Range` header). The body is exactly those bytes
+	 * (shorter at end of file); a server that ignores Range (200) is sliced. Cached, deduped and stored
+	 * under `rangeKey(url, start, end)`, so different ranges of one file are separate entries.
+	 */
+	range?: readonly [start: number, end: number];
 };
+
+/** Cache key of a byte range of `url` (a space never occurs in a URL, so it cannot collide with one). */
+export const rangeKey = (url: string, start: number, end: number) =>
+	`${url} bytes=${start}-${end}`;
+
+const RANGE_KEY = /^(.*) bytes=(\d+)-(\d+)$/;
 
 export type TileCacheStats = {
 	backend: BackendKind | "opening";
@@ -165,8 +177,10 @@ export class TileCache {
 	}
 
 	/** Memory → persistent → network. Resolves with the body; rejects like fetch on network error/abort. */
-	async get(url: string, o: CachedFetchOptions = {}): Promise<CachedBody> {
+	async get(target: string, o: CachedFetchOptions = {}): Promise<CachedBody> {
 		const { signal } = o;
+		// every tier below is keyed by `url`: the target, or the target plus a byte range
+		const url = o.range ? rangeKey(target, o.range[0], o.range[1]) : target;
 		if (signal?.aborted) throw abortError(signal.reason);
 		const m = this.memGet(url);
 		if (m) {
@@ -220,11 +234,20 @@ export class TileCache {
 		return p;
 	}
 
-	private async network(url: string, signal: AbortSignal): Promise<NetResult> {
+	private async network(key: string, signal: AbortSignal): Promise<NetResult> {
 		const f = this.opts.fetch ?? globalThis.fetch.bind(globalThis);
+		const m = RANGE_KEY.exec(key);
+		const url = m ? m[1] : key;
+		const start = m ? Number(m[2]) : 0;
+		const init: RequestInit = { ...this.opts.fetchInit, signal };
+		if (m) {
+			const headers = new Headers(this.opts.fetchInit.headers);
+			headers.set("Range", `bytes=${start}-${m[3]}`);
+			init.headers = headers;
+		}
 		let res: Response;
 		try {
-			res = await f(url, { ...this.opts.fetchInit, signal });
+			res = await f(url, init);
 		} catch (e) {
 			if ((e as Error)?.name !== "AbortError") this.counters.netErrors++;
 			throw e;
@@ -232,11 +255,13 @@ export class TileCache {
 		if (!res.ok) {
 			this.counters.notOk++;
 			if (res.status === 404 || res.status === 204)
-				this.negative.set(url, res.status);
+				this.negative.set(key, res.status);
 			return { body: EMPTY, type: "", status: res.status };
 		}
-		const body = await res.arrayBuffer();
+		let body = await res.arrayBuffer();
 		this.counters.netBytes += body.byteLength;
+		// a server that ignores Range answers 200 with the whole file: keep what was asked
+		if (m && res.status === 200) body = body.slice(start, Number(m[3]) + 1);
 		return {
 			body,
 			type: res.headers.get("content-type") ?? "",

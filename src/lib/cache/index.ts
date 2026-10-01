@@ -36,6 +36,7 @@ export type {
 	TileCacheOptions,
 	TileCacheStats,
 } from "./tile-cache";
+export { rangeKey } from "./tile-cache";
 
 let instance: TileCache | null = null;
 
@@ -79,7 +80,7 @@ export function getTileCache(): TileCache {
  * Drop-in for `fetch(url, { signal })` on tile URLs. Resolves with a fresh `Response`
  * (each caller may consume its body) carrying `x-tile-cache: memory|persistent|network`.
  * Non-2xx responses resolve with that status and an empty body (like fetch); network
- * errors and aborts reject (AbortError) like fetch.
+ * errors and aborts reject (AbortError) like fetch. With `opts.range` the body is that byte range.
  */
 export async function cachedFetch(
 	url: string,
@@ -103,6 +104,22 @@ export async function cachedFetchBuffer(
 ): Promise<ArrayBuffer | null> {
 	const r = await cache().get(url, opts);
 	return r.status >= 200 && r.status < 300 ? r.body.slice(0) : null;
+}
+
+/**
+ * Bytes [start, end] (inclusive) of `url` through the cache (`CachedFetchOptions.range`): each range is
+ * its own entry, keyed by url + range. Rejects on a non-2xx status (like a RangeFetcher must).
+ */
+export async function cachedFetchRange(
+	url: string,
+	start: number,
+	end: number,
+	opts: Omit<CachedFetchOptions, "range"> = {},
+): Promise<Uint8Array> {
+	const r = await cache().get(url, { ...opts, range: [start, end] });
+	if (r.status < 200 || r.status >= 300)
+		throw new Error(`${url} bytes=${start}-${end}: HTTP ${r.status}`);
+	return new Uint8Array(r.body.slice(0));
 }
 
 /**
