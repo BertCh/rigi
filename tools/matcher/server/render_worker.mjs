@@ -45,6 +45,19 @@
 // contract: <tag>_xyz.f32 = W×H×3 float32 ENU metres in the photo's EnuFrame(lat, lon, 0), row 0 = top,
 // 0,0,0 = sky, W×H = 1024 px on the long side; <tag>_sat.jpg = the satellite drape at W×H, canvas JPEG
 // q 0.92, haze 0.6, sky #b9cde0.
+//
+// Page flags (environment; unset = the behaviour above, unchanged). For gates that must run the app under
+// an opt-in flag, e.g. the certified-f32 precision gate (scripts/gpu/precision-gate.mjs):
+//   MATCHER_RENDERER=deck|webgpu|auto   the ?renderer= the pages open on (default deck). webgpu has no
+//                                       renderPoseView / loadFullTerrain: "render" fails there, and an
+//                                       "align" / "edges" with fullTerrain keeps the initial terrain
+//                                       (meta.fullTerrainUnsupported: true).
+//   MATCHER_HORIZON_PRECISION=f64|certified-f32   → ?horizonPrecision= (src/lib/flags)
+//   MATCHER_ALIGN_PRECISION=f64|certified-f32     → ?alignPrecision=
+// Every reply's meta carries pageFlags (what the page was opened with, the engine that ran from
+// [data-renderer]); with a precision flag set, align runs also carry `precision` (the path each stage
+// actually took: lastAlignTiming / the fast horizon's stats), so a run whose certified path fell back
+// is visible.
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
@@ -55,6 +68,49 @@ const BASE = process.env.APP_URL ?? "http://localhost:3100";
 const MATCHER_PORT = String(process.env.MATCHER_PORT ?? 8765);
 const MAX_PAGES = Number(process.env.MATCHER_MAX_PAGES ?? 1); // each draped page holds ~1–1.5 GB in Chromium
 const DRAPE_FULL_M = Number(process.env.MATCHER_DRAPE_FULL_M ?? 40000);
+const oneOf = (name, allowed, fallback) => {
+	const v = process.env[name];
+	if (v == null || v === "") return fallback;
+	if (!allowed.includes(v))
+		throw new Error(`${name}=${v}: expected one of ${allowed.join(", ")}`);
+	return v;
+};
+const PAGE_FLAGS = {
+	renderer: oneOf("MATCHER_RENDERER", ["deck", "webgpu", "auto"], "deck"),
+	horizonPrecision: oneOf(
+		"MATCHER_HORIZON_PRECISION",
+		["f64", "certified-f32"],
+		null,
+	),
+	alignPrecision: oneOf(
+		"MATCHER_ALIGN_PRECISION",
+		["f64", "certified-f32"],
+		null,
+	),
+};
+const PRECISION_SET = !!(
+	PAGE_FLAGS.horizonPrecision || PAGE_FLAGS.alignPrecision
+);
+const pageQuery = () => {
+	const q = new URLSearchParams({ renderer: PAGE_FLAGS.renderer });
+	if (PAGE_FLAGS.horizonPrecision)
+		q.set("horizonPrecision", PAGE_FLAGS.horizonPrecision);
+	if (PAGE_FLAGS.alignPrecision)
+		q.set("alignPrecision", PAGE_FLAGS.alignPrecision);
+	return q.toString();
+};
+// the engine that ran, as the workspace reports it
+const pageFlagsOf = async (page) => ({
+	...PAGE_FLAGS,
+	engine: await page
+		.evaluate(
+			() =>
+				document
+					.querySelector("[data-renderer]")
+					?.getAttribute("data-renderer") ?? null,
+		)
+		.catch(() => null),
+});
 const log = (...a) => console.error("[render-worker]", ...a);
 
 let browser = null;
@@ -65,7 +121,11 @@ async function getBrowser() {
 	if (browser?.isConnected()) return browser;
 	browser = await chromium.launch({
 		headless: true,
-		args: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
+		// WebGPU pages (or a certified-f32 flag, which needs the WebGPU compute device) get the WebGPU flags
+		args:
+			PAGE_FLAGS.renderer !== "deck" || PRECISION_SET
+				? (await import("../../../scripts/deck-webgpu/gpu-args.mjs")).GPU_ARGS
+				: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 	});
 	return browser;
 }
@@ -247,7 +307,7 @@ async function openPage(id, adhoc = null, key = id) {
 		safe((r) => r.abort()),
 	);
 	if (adhoc) await routeAdhoc(page, adhoc);
-	await page.goto(`${BASE}/photo/${id}?renderer=deck`); // pinned: WebGL deck (deterministic, the offscreen hooks); f0 owns this file
+	await page.goto(`${BASE}/photo/${id}?${pageQuery()}`); // default pinned: WebGL deck (deterministic, the offscreen hooks); f0 owns this file
 	await page.waitForSelector("[data-ready]", {
 		state: "attached",
 		timeout: 240000,
@@ -272,10 +332,12 @@ async function openPage(id, adhoc = null, key = id) {
 	return { entry, loadMs: Date.now() - t0, warm: false };
 }
 
-// Load the tiles outside the initial wedge and re-trace the 360° horizon (once per page).
+// Load the tiles outside the initial wedge and re-trace the 360° horizon (once per page). null: the engine
+// has no loadFullTerrain (MATCHER_RENDERER=webgpu); the page keeps its initial terrain.
 async function ensureFullTerrain(page) {
 	return page.evaluate(async () => {
 		const e = window.__engine;
+		if (typeof e.loadFullTerrain !== "function") return null;
 		if (e.__benchFullTerrain) return 0;
 		// DeckEngine: 360° high-detail wedge, query terrain = the complete set, 360° horizon re-traced
 		const ms = await e.loadFullTerrain();
@@ -294,50 +356,85 @@ async function align(req) {
 	);
 	const page = entry.page;
 	const fullMs = req.fullTerrain ? await ensureFullTerrain(page) : 0;
-	const r = await page.evaluate(async (priors) => {
-		const e = window.__engine;
-		const orig = { ...e.prior };
-		const runs = [];
-		const P = (p) =>
-			p ? { yaw: p.yaw, pitch: p.pitch, roll: p.roll, vfov: p.vfov } : null;
-		try {
-			for (const pr of priors) {
-				e.prior = { ...orig, ...pr };
-				const t = performance.now();
-				const res = await e.autoAlign(true); // deck: async
-				runs.push({
-					prior: P(e.prior),
-					ms: Math.round(performance.now() - t),
-					pose: P(res?.pose),
-					score: res?.score ?? null,
-					confidence: res?.confidence ?? null,
-					alternatives: (res?.alternatives ?? []).map((a) => ({
-						pose: P(a.pose),
-						score: a.score,
-						sil: a.sil ?? null,
-						total: a.total ?? a.score,
-					})),
-				});
+	const r = await page.evaluate(
+		async ({ priors, precisionSet }) => {
+			const e = window.__engine;
+			const orig = { ...e.prior };
+			const runs = [];
+			// with a precision flag: the path each certified stage actually took (fell back or not)
+			const alignMod = precisionSet
+				? await import("/src/lib/gpu/align/index.ts").catch(() => null)
+				: null;
+			const horizonMod = precisionSet
+				? await import("/src/lib/integration/horizon-fast-app.ts").catch(
+						() => null,
+					)
+				: null;
+			const precisionOf = () => {
+				const t = alignMod?.lastAlignTiming;
+				return {
+					align: t
+						? {
+								requested: t.precision ?? null,
+								refine: t.refine ?? null,
+								path: t.cert?.path ?? null,
+								reason: t.cert?.reason ?? null,
+								detail: t.cert?.detail ?? null,
+								forced: t.cert?.stats?.forced ?? null,
+								prewarmed: t.cert?.stats?.prewarmed ?? null,
+							}
+						: null,
+					horizon: horizonMod?.lastFastHorizonStats?.precision ?? null,
+				};
+			};
+			const P = (p) =>
+				p ? { yaw: p.yaw, pitch: p.pitch, roll: p.roll, vfov: p.vfov } : null;
+			try {
+				for (const pr of priors) {
+					e.prior = { ...orig, ...pr };
+					const t = performance.now();
+					const res = await e.autoAlign(true); // deck: async
+					runs.push({
+						...(precisionSet ? { precision: precisionOf() } : {}),
+						prior: P(e.prior),
+						ms: Math.round(performance.now() - t),
+						pose: P(res?.pose),
+						score: res?.score ?? null,
+						confidence: res?.confidence ?? null,
+						alternatives: (res?.alternatives ?? []).map((a) => ({
+							pose: P(a.pose),
+							score: a.score,
+							sil: a.sil ?? null,
+							total: a.total ?? a.score,
+						})),
+					});
+				}
+			} finally {
+				e.prior = orig;
 			}
-		} finally {
-			e.prior = orig;
-		}
-		return {
-			runs,
-			meta: {
-				id: e.photo.id,
-				width: e.photo.width,
-				height: e.photo.height,
-				aspect: e.aspect,
-				prior: orig,
-				eye: [e.eye.x, e.eye.y, e.eye.z],
-				demAtCamera: e.demAtCamera,
-				frame: { lat: e.frame.lat, lon: e.frame.lon, h: e.frame.h },
-				fullTerrain: !!e.__benchFullTerrain,
-			},
-		};
-	}, req.priors ?? [{}]);
-	return { ...r, timing: { loadMs, warmPage: warm, fullTerrainMs: fullMs } };
+			return {
+				runs,
+				meta: {
+					id: e.photo.id,
+					width: e.photo.width,
+					height: e.photo.height,
+					aspect: e.aspect,
+					prior: orig,
+					eye: [e.eye.x, e.eye.y, e.eye.z],
+					demAtCamera: e.demAtCamera,
+					frame: { lat: e.frame.lat, lon: e.frame.lon, h: e.frame.h },
+					fullTerrain: !!e.__benchFullTerrain,
+				},
+			};
+		},
+		{ priors: req.priors ?? [{}], precisionSet: PRECISION_SET },
+	);
+	r.meta.pageFlags = await pageFlagsOf(page);
+	if (req.fullTerrain && fullMs === null) r.meta.fullTerrainUnsupported = true;
+	return {
+		...r,
+		timing: { loadMs, warmPage: warm, fullTerrainMs: fullMs ?? 0 },
+	};
 }
 
 // T6 (policy t6): raw photo evidence + 360° horizon, no autoAlign. edge.sky is NOT exported: an earlier
@@ -388,6 +485,8 @@ async function edges(req) {
 		files[k] = path.join(req.outDir, `edges_${k}.bin`);
 		fs.writeFileSync(files[k], Buffer.from(r[k], "base64"));
 	}
+	r.meta.pageFlags = await pageFlagsOf(page);
+	if (req.fullTerrain && fullMs === null) r.meta.fullTerrainUnsupported = true;
 	const skyGrid = req.skyGrid ? await edgesSkyGrid(page, req) : null;
 	if (skyGrid) {
 		files.cands = path.join(req.outDir, "edges_cands.u32");
@@ -399,7 +498,7 @@ async function edges(req) {
 		h: r.h,
 		files,
 		meta: r.meta,
-		timing: { loadMs, warmPage: warm, fullTerrainMs: fullMs },
+		timing: { loadMs, warmPage: warm, fullTerrainMs: fullMs ?? 0 },
 		...(skyGrid ? { skyGrid } : {}),
 	};
 }
@@ -782,12 +881,12 @@ async function renderOnce(req) {
 		views.push({ tag, pose: p, W: r.W, H: r.H, rgb: rgbPath, xyz: xyzPath });
 	}
 	return {
-		meta,
+		meta: { ...meta, pageFlags: await pageFlagsOf(page) },
 		views,
 		skyline,
 		timing: {
 			loadMs,
-			fullTerrainMs,
+			fullTerrainMs: fullTerrainMs ?? 0,
 			imageryMs,
 			skylineMs: skyline?.ms ?? 0,
 			renderMs: Date.now() - tRender,

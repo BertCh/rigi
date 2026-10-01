@@ -219,6 +219,8 @@ async function regionFor(
 // ---------- method A: app ----------
 
 type AlignRun = {
+	/** only when the render worker runs with a precision flag (MATCHER_*_PRECISION) */
+	precision?: unknown;
 	prior: Pose;
 	ms: number;
 	pose: Pose | null;
@@ -382,6 +384,23 @@ async function runApp(
 			prior: nat.prior,
 		},
 		eye: r.meta?.eye,
+		// what the page ran with (render_worker MATCHER_RENDERER / MATCHER_*_PRECISION)
+		page: r.meta?.pageFlags ?? null,
+		...(r.meta?.fullTerrainUnsupported ? { fullTerrainUnsupported: true } : {}),
+		// with a precision flag: every seed's raw result and the path each certified stage took
+		// (scripts/gpu/precision-gate.mjs diffs these bit for bit)
+		...(runs.some((x) => x.precision)
+			? {
+					precisionRuns: runs.map((x) => ({
+						prior: x.prior,
+						pose: x.pose,
+						score: x.score,
+						confidence: x.confidence,
+						alternatives: x.alternatives,
+						precision: x.precision ?? null,
+					})),
+				}
+			: {}),
 	};
 }
 

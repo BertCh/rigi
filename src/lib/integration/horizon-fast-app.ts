@@ -163,6 +163,9 @@ export type FastHorizon = {
 	dispose(): void;
 };
 
+/** Stats of the latest march any fast horizon of this page delivered (harnesses: the precision gate). */
+export let lastFastHorizonStats: HorizonStats | null = null;
+
 export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 	const t0 = performance.now();
 	const az0 = o.az0 ?? 0;
@@ -191,6 +194,7 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 		if (m.type === "error") return fail(new Error(m.error));
 		mergeGpuProfile("horizon-worker", m.gpuProfile);
 		mergeSpotLedger(m.stats.precision?.spotLedger);
+		lastFastHorizonStats = m.stats;
 		results.set(m.eyeH, m);
 		waiters.get(m.eyeH)?.resolve(m);
 		waiters.delete(m.eyeH);
