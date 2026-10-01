@@ -49,7 +49,12 @@
 // Parity (textures-bench.ts, scripts/gpu/textures-bench.mjs): the gathered inputs are bit-identical
 // to the arrays capture.ts / composite.ts / haze.ts build on the CPU, so every downstream kernel
 // output is bit-identical to the array path's.
-import { Buffer, type Device, Texture } from "@luma.gl/core";
+import {
+	Buffer,
+	type CommandEncoder,
+	type Device,
+	Texture,
+} from "@luma.gl/core";
 import { type ColorStats, N_BANDS } from "#/lib/look/color-stats";
 import { gridSize, MASK_LONG_SIDE } from "#/lib/look/composite";
 import { srgbToLinear } from "#/lib/style/color";
@@ -70,6 +75,7 @@ import type {
 	GraphTextureHandle,
 } from "../core/luma";
 import { acquire, withLease } from "../core/pool";
+import { stageReads } from "../core/readback";
 import { finalizeBands } from "./color-stats";
 import { BAND_STATS, BAND_STATS_SG, STATS_VALUES } from "./color-stats.wgsl";
 import {
@@ -683,16 +689,12 @@ function ownTexture(
 	return t;
 }
 
-/**
- * CompositeLook.updateMasks on the GPU from textures: the mask-grid inputs gathered from the
- * geometry / photo / mask textures, the guided filters (same radii and ε as masksAsync), the RGBA8
- * packing, and optionally the texture copy. One submit; nothing read back unless `read`.
- */
-export function masksTex(
+/** masksTex' validated inputs, grid and packing layout (shared by masksTex and encodeMasksTex). */
+function masksPlan(
 	device: Device,
 	input: MasksTexInput,
-	opts: MasksTexOptions = {},
-): Promise<MasksTexResult> {
+	texture: MasksTexOptions["texture"],
+) {
 	const geo = src(input.geometry);
 	const photo = src(input.photo);
 	const sky = input.sky ? src(input.sky) : null;
@@ -707,7 +709,7 @@ export function masksTex(
 	const n = w * h;
 	const cut = input.cut ?? null;
 	if (cut && cut.length !== n) throw new Error("[lookgpu] cut is not w × h");
-	const given = opts.texture instanceof Texture ? opts.texture : null;
+	const given = texture instanceof Texture ? texture : null;
 	if (given) {
 		if (given.device !== device)
 			throw new Error("[lookgpu] mask texture is on another device");
@@ -722,8 +724,8 @@ export function masksTex(
 	}
 	const outFormat: "rgba8unorm" | "r8unorm" | null = given
 		? (given.format as "rgba8unorm" | "r8unorm")
-		: typeof opts.texture === "string"
-			? opts.texture
+		: typeof texture === "string"
+			? texture
 			: null;
 	const fmt = outFormat === "r8unorm" ? 1 : 4;
 	const rowWords = fmt === 4 ? Math.ceil(w / 64) * 64 : Math.ceil(w / 256) * 64;
@@ -750,159 +752,219 @@ export function masksTex(
 		+!!cut,
 		outFormat ?? "-",
 	].join("|");
-	const graphOf = () =>
-		cachedGraph(device, key, () => {
-			const g = new ComputeGraph(device, `look-tex-${key}`);
-			const owned: (Buffer | Texture)[] = [];
-			const c = constants(g, owned);
-			const groups = Math.ceil(n / WG);
-			const words = addPhoto(g, c, photo, w, h, "photo");
-			const sx = gw / w;
-			const sy = gh / h;
-			const ss = Math.max(1, Math.round(sx));
-			const tab = new Uint32Array(4 * w + 4 * h);
-			for (let x = 0; x < w; x++) tab[x] = Math.floor(x * sx);
-			for (let y = 0; y < h; y++) tab[w + y] = Math.floor(y * sy);
-			for (const [m, o] of [
-				[sky, w + h],
-				[fg, 2 * w + 2 * h],
-			] as const)
-				if (m) {
-					for (let x = 0; x < w; x++)
-						tab[o + x] = maskIndex(x, w, m.texture.width);
-					for (let y = 0; y < h; y++)
-						tab[o + w + y] = maskIndex(y, h, m.texture.height);
-				}
-			const gI = g.transientBuffer("gI", n * 4);
-			const cov = g.transientBuffer("cov", n * 4);
-			const fgv = g.transientBuffer("fgv", n * 4);
-			addTexNode(
-				g,
-				"gather",
-				K_TEX_MASKS,
-				{
-					prm: c.uniform(
-						"gather-prm",
-						u32Words(
-							w,
-							h,
-							gw,
-							gh,
-							ss,
-							+geo.flip,
-							+!!sky,
-							+!!sky?.flip,
-							sky?.texture.height ?? 1,
-							+!!fg,
-							+!!fg?.flip,
-							fg?.texture.height ?? 1,
-							+(geo.texture.format === "r32float"),
-							0,
-							0,
-							0,
-						),
-					),
-					tab: c.storage("gather-tab", tab),
-					photo: words,
-					geo: importSampled(g, "geo", geo),
-					skyT: importSampled(g, "sky", sky),
-					fgT: importSampled(g, "fg", fg),
-					gI,
-					cov,
-					fgv,
-				},
-				groups,
-			);
-			const cutIn = cut ? g.importBuffer("cut", n * 4) : null;
-			const qs: GraphBufferHandle[] = [];
-			for (const j of jobs) {
-				const pw = new ArrayBuffer(16);
-				new Uint32Array(pw, 0, 3).set([w, h, j.r]);
-				new Float32Array(pw, 12, 1)[0] = j.eps;
-				const prm = c.uniform(`${j.name}-prm`, pw);
-				const p =
-					j.name === "cov"
-						? cov
-						: j.name === "fg"
-							? fgv
-							: (cutIn as GraphBufferHandle);
-				const t4 = g.transientBuffer(`${j.name}-t4`, n * 16);
-				const ab = g.transientBuffer(`${j.name}-ab`, n * 8);
-				const t2 = g.transientBuffer(`${j.name}-t2`, n * 8);
-				const q = g.importBuffer(`q-${j.name}`, n * 4);
-				qs.push(q);
-				g.addKernel({
-					id: `${j.name}-h0`,
-					spec: K_GF_H0,
-					bindings: { prm, gI, gp: p, outv: t4 },
-					workgroups: [groups],
-				});
-				g.addKernel({
-					id: `${j.name}-v0`,
-					spec: K_GF_V0,
-					bindings: { prm, inv: t4, ab },
-					workgroups: [groups],
-				});
-				g.addKernel({
-					id: `${j.name}-h1`,
-					spec: K_GF_H1,
-					bindings: { prm, ab, outv: t2 },
-					workgroups: [groups],
-				});
-				g.addKernel({
-					id: `${j.name}-v1`,
-					spec: K_GF_V1,
-					bindings: { prm, inv: t2, gI, q },
-					workgroups: [groups],
-				});
+	return {
+		geo,
+		photo,
+		sky,
+		fg,
+		given,
+		outFormat,
+		w,
+		h,
+		n,
+		jobs,
+		rowWords,
+		key,
+		gw,
+		gh,
+		fmt,
+		cut,
+	};
+}
+
+type MasksPlan = ReturnType<typeof masksPlan>;
+
+/**
+ * The compiled masks graph of `plan` (one per key, cached). Call it INSIDE the masks lease (or
+ * synchronously before encoding into the caller's encoder, as encodeMasksTex does): see cachedGraph.
+ */
+function masksGraph(device: Device, plan: MasksPlan) {
+	const {
+		geo,
+		photo,
+		sky,
+		fg,
+		outFormat,
+		w,
+		h,
+		n,
+		jobs,
+		rowWords,
+		key,
+		gw,
+		gh,
+		fmt,
+		cut,
+	} = plan;
+	return cachedGraph(device, key, () => {
+		const g = new ComputeGraph(device, `look-tex-${key}`);
+		const owned: (Buffer | Texture)[] = [];
+		const c = constants(g, owned);
+		const groups = Math.ceil(n / WG);
+		const words = addPhoto(g, c, photo, w, h, "photo");
+		const sx = gw / w;
+		const sy = gh / h;
+		const ss = Math.max(1, Math.round(sx));
+		const tab = new Uint32Array(4 * w + 4 * h);
+		for (let x = 0; x < w; x++) tab[x] = Math.floor(x * sx);
+		for (let y = 0; y < h; y++) tab[w + y] = Math.floor(y * sy);
+		for (const [m, o] of [
+			[sky, w + h],
+			[fg, 2 * w + 2 * h],
+		] as const)
+			if (m) {
+				for (let x = 0; x < w; x++)
+					tab[o + x] = maskIndex(x, w, m.texture.width);
+				for (let y = 0; y < h; y++)
+					tab[o + w + y] = maskIndex(y, h, m.texture.height);
 			}
-			const packed = g.importBuffer("packed", rowWords * h * 4);
-			const qOf = (name: string) =>
-				qs[jobs.findIndex((j) => j.name === name)] ?? qs[0];
+		const gI = g.transientBuffer("gI", n * 4);
+		const cov = g.transientBuffer("cov", n * 4);
+		const fgv = g.transientBuffer("fgv", n * 4);
+		addTexNode(
+			g,
+			"gather",
+			K_TEX_MASKS,
+			{
+				prm: c.uniform(
+					"gather-prm",
+					u32Words(
+						w,
+						h,
+						gw,
+						gh,
+						ss,
+						+geo.flip,
+						+!!sky,
+						+!!sky?.flip,
+						sky?.texture.height ?? 1,
+						+!!fg,
+						+!!fg?.flip,
+						fg?.texture.height ?? 1,
+						+(geo.texture.format === "r32float"),
+						0,
+						0,
+						0,
+					),
+				),
+				tab: c.storage("gather-tab", tab),
+				photo: words,
+				geo: importSampled(g, "geo", geo),
+				skyT: importSampled(g, "sky", sky),
+				fgT: importSampled(g, "fg", fg),
+				gI,
+				cov,
+				fgv,
+			},
+			groups,
+		);
+		const cutIn = cut ? g.importBuffer("cut", n * 4) : null;
+		const qs: GraphBufferHandle[] = [];
+		for (const j of jobs) {
+			const pw = new ArrayBuffer(16);
+			new Uint32Array(pw, 0, 3).set([w, h, j.r]);
+			new Float32Array(pw, 12, 1)[0] = j.eps;
+			const prm = c.uniform(`${j.name}-prm`, pw);
+			const p =
+				j.name === "cov"
+					? cov
+					: j.name === "fg"
+						? fgv
+						: (cutIn as GraphBufferHandle);
+			const t4 = g.transientBuffer(`${j.name}-t4`, n * 16);
+			const ab = g.transientBuffer(`${j.name}-ab`, n * 8);
+			const t2 = g.transientBuffer(`${j.name}-t2`, n * 8);
+			const q = g.importBuffer(`q-${j.name}`, n * 4);
+			qs.push(q);
 			g.addKernel({
-				id: "pack",
-				spec: K_PACK,
-				bindings: {
-					prm: c.uniform(
-						"pack-prm",
-						u32Words(w, h, rowWords, fmt, +!!cut, +!!fg, 0, 0),
-					),
-					qc: qs[0],
-					qg: qOf("cut"),
-					qf: qOf("fg"),
-					outp: packed,
-				},
-				workgroups: [Math.ceil((rowWords * h) / WG)],
+				id: `${j.name}-h0`,
+				spec: K_GF_H0,
+				bindings: { prm, gI, gp: p, outv: t4 },
+				workgroups: [groups],
 			});
-			if (outFormat) {
-				const dst = g.importTexture({
-					id: "out",
-					format: outFormat,
-					width: w,
-					height: h,
-					usage: Texture.COPY_DST,
-				});
-				g.graph.addCopyPass({
-					id: "to-texture",
-					resources: [
-						{ buffer: packed, usage: "copy-source" },
-						{ texture: dst, usage: "copy-destination" },
-					],
-					compile: () => ({
-						encode: ({ commandEncoder, getBuffer, getTexture }) =>
-							commandEncoder.copyBufferToTexture({
-								sourceBuffer: getBuffer(packed),
-								destinationTexture: getTexture(dst),
-								bytesPerRow: rowWords * 4,
-								rowsPerImage: h,
-								size: [w, h, 1],
-							}),
-					}),
-				});
-			}
-			g.compile();
-			return { graph: g as ComputeGraph, owned, extra: null };
+			g.addKernel({
+				id: `${j.name}-v0`,
+				spec: K_GF_V0,
+				bindings: { prm, inv: t4, ab },
+				workgroups: [groups],
+			});
+			g.addKernel({
+				id: `${j.name}-h1`,
+				spec: K_GF_H1,
+				bindings: { prm, ab, outv: t2 },
+				workgroups: [groups],
+			});
+			g.addKernel({
+				id: `${j.name}-v1`,
+				spec: K_GF_V1,
+				bindings: { prm, inv: t2, gI, q },
+				workgroups: [groups],
+			});
+		}
+		const packed = g.importBuffer("packed", rowWords * h * 4);
+		const qOf = (name: string) =>
+			qs[jobs.findIndex((j) => j.name === name)] ?? qs[0];
+		g.addKernel({
+			id: "pack",
+			spec: K_PACK,
+			bindings: {
+				prm: c.uniform(
+					"pack-prm",
+					u32Words(w, h, rowWords, fmt, +!!cut, +!!fg, 0, 0),
+				),
+				qc: qs[0],
+				qg: qOf("cut"),
+				qf: qOf("fg"),
+				outp: packed,
+			},
+			workgroups: [Math.ceil((rowWords * h) / WG)],
 		});
+		if (outFormat) {
+			const dst = g.importTexture({
+				id: "out",
+				format: outFormat,
+				width: w,
+				height: h,
+				usage: Texture.COPY_DST,
+			});
+			g.graph.addCopyPass({
+				id: "to-texture",
+				resources: [
+					{ buffer: packed, usage: "copy-source" },
+					{ texture: dst, usage: "copy-destination" },
+				],
+				compile: () => ({
+					encode: ({ commandEncoder, getBuffer, getTexture }) =>
+						commandEncoder.copyBufferToTexture({
+							sourceBuffer: getBuffer(packed),
+							destinationTexture: getTexture(dst),
+							bytesPerRow: rowWords * 4,
+							rowsPerImage: h,
+							size: [w, h, 1],
+						}),
+				}),
+			});
+		}
+		g.compile();
+		return { graph: g as ComputeGraph, owned, extra: null };
+	});
+}
+
+/**
+ * CompositeLook.updateMasks on the GPU from textures: the mask-grid inputs gathered from the
+ * geometry / photo / mask textures, the guided filters (same radii and ε as masksAsync), the RGBA8
+ * packing, and optionally the texture copy. One submit; nothing read back unless `read`.
+ */
+export function masksTex(
+	device: Device,
+	input: MasksTexInput,
+	opts: MasksTexOptions = {},
+): Promise<MasksTexResult> {
+	const plan = masksPlan(device, input, opts.texture);
+	const { geo, photo, sky, fg, given, outFormat, w, h, n, jobs, rowWords } =
+		plan;
+	const { fmt, cut } = plan;
+	const graphOf = () => masksGraph(device, plan);
 	return withLease(PASS.masks, async () => {
 		assertAlive(device, [geo, photo, sky, fg, given && src(given)]);
 		const outTex =
@@ -967,6 +1029,49 @@ export function masksTex(
 	});
 }
 
+/**
+ * masksTex recorded into the CALLER's encoder: no lease, no submit, nothing read back (WAG W1.2:
+ * the query geometry's own encoder, so the masks ride on the geometry pass's submit). Same plan,
+ * same cached compiled graph and same kernels as masksTex, so the output texture holds the same
+ * bytes masksTex would write from the same input bytes.
+ *
+ * Rules (the caller's, since no lease serialises this path):
+ * - `encoder` is submitted synchronously after this returns (no await in between). Graph
+ *   transients are then shared with masksTex runs only across command buffers, which the queue
+ *   executes in order, and each encoding writes them before it reads them.
+ * - `texture` is the caller's (COPY_DST, the grid's size) and no other queued pass writes it until
+ *   the caller has consumed it.
+ * - No blend cut: its plane is a CPU upload from the range readback, which a draw-time encode does
+ *   not have.
+ * Every check runs before anything is recorded, so a throw leaves `encoder` untouched.
+ */
+export function encodeMasksTex(
+	device: Device,
+	encoder: CommandEncoder,
+	input: Omit<MasksTexInput, "cut">,
+	texture: Texture,
+): { w: number; h: number } {
+	const plan = masksPlan(device, input, texture);
+	const { geo, photo, sky, fg, w, h, n, jobs, rowWords } = plan;
+	assertAlive(device, [geo, photo, sky, fg, src(texture)]);
+	const e = masksGraph(device, plan);
+	if (!e.graph.isCompiled)
+		throw new Error("[lookgpu] masks graph not compiled");
+	// own pooled slots: the masks lease's q / packed may still be in use by a queued masksTex
+	const buffers: Record<string, Buffer> = {};
+	for (const j of jobs)
+		buffers[`q-${j.name}`] = slot(device, "masks-enc", `q-${j.name}`, n * 4);
+	buffers.packed = slot(device, "masks-enc", "packed", rowWords * h * 4);
+	e.graph.encode(encoder, undefined, buffers, {
+		geo: geo.texture,
+		sky: sky?.texture ?? dummyMask(device),
+		fg: fg?.texture ?? dummyMask(device),
+		"photo-tex": photo.texture,
+		out: texture,
+	});
+	return { w, h };
+}
+
 // ── band colour stats ───────────────────────────────────────────────────────────────────────────
 
 export type StatsTexInput = {
@@ -996,16 +1101,12 @@ const SRGB_LUT_STATS = Float32Array.from({ length: 256 }, (_, i) => {
 const SGROUPS = 32;
 const SWG = 64;
 
-/**
- * CompositeLook.setStats' GPU band stats from textures: one submit, 6.6 KB back (or none).
- * `subgroups` as bandStatsGpu's (default off). This path can't see BAND_STATS_SG's -1
- * layout-check partials without reading back, so only opt in where the layout check is known to pass.
- */
-export function bandStatsTex(
+/** bandStatsTex' validated inputs and graph key (shared by bandStatsTex and encodeBandStatsTex). */
+function statsPlan(
 	device: Device,
 	input: StatsTexInput,
-	opts: { read?: boolean; subgroups?: boolean } = {},
-): Promise<StatsTexResult> {
+	opts: { subgroups?: boolean },
+) {
 	const geo = src(input.geometry);
 	const layer = src(input.layer);
 	const photo = src(input.photo);
@@ -1019,7 +1120,6 @@ export function bandStatsTex(
 	const n = w * h;
 	const gw = geo.texture.width;
 	const gh = geo.texture.height;
-	const read = opts.read ?? true;
 	const sg = (opts.subgroups ?? false) && hasFeature(device, "subgroups");
 	const key = [
 		"stats",
@@ -1029,83 +1129,129 @@ export function bandStatsTex(
 		texKey(photo),
 		texKey(fg),
 	].join("|");
-	const graphOf = () =>
-		cachedGraph(device, key, () => {
-			const g = new ComputeGraph(device, `look-tex-${key}`);
-			const owned: (Buffer | Texture)[] = [];
-			const c = constants(g, owned);
-			const words = addPhoto(g, c, photo, w, h, "photo");
-			const tab = new Uint32Array(2 * w + 2 * h);
-			for (let x = 0; x < w; x++) tab[x] = Math.floor(((x + 0.5) * gw) / w);
-			for (let y = 0; y < h; y++) tab[w + y] = Math.floor(((y + 0.5) * gh) / h);
-			if (fg) {
-				for (let x = 0; x < w; x++)
-					tab[w + h + x] = maskIndex(x, w, fg.texture.width);
-				for (let y = 0; y < h; y++)
-					tab[2 * w + h + y] = maskIndex(y, h, fg.texture.height);
-			}
-			const range = g.transientBuffer("range", n * 4);
-			const lay = g.transientBuffer("layer", n * 16);
-			const fgv = g.transientBuffer("fgv", n * 4);
-			addTexNode(
-				g,
-				"gather",
-				K_TEX_STATS,
-				{
-					prm: c.uniform(
-						"gather-prm",
-						u32Words(
-							w,
-							h,
-							gh,
-							+geo.flip,
-							+layer.flip,
-							+!!fg,
-							+!!fg?.flip,
-							fg?.texture.height ?? 1,
-							+(geo.texture.format === "r32float"),
-							0,
-							0,
-							0,
-						),
+	return { geo, layer, photo, fg, w, h, n, gw, gh, sg, key };
+}
+
+type StatsPlan = ReturnType<typeof statsPlan>;
+
+/** The compiled band-stats graph of `plan` (cached; extra = its per-call parameter buffer). */
+function statsGraph(device: Device, plan: StatsPlan) {
+	const { geo, layer, photo, fg, w, h, n, gw, gh, sg, key } = plan;
+	return cachedGraph(device, key, () => {
+		const g = new ComputeGraph(device, `look-tex-${key}`);
+		const owned: (Buffer | Texture)[] = [];
+		const c = constants(g, owned);
+		const words = addPhoto(g, c, photo, w, h, "photo");
+		const tab = new Uint32Array(2 * w + 2 * h);
+		for (let x = 0; x < w; x++) tab[x] = Math.floor(((x + 0.5) * gw) / w);
+		for (let y = 0; y < h; y++) tab[w + y] = Math.floor(((y + 0.5) * gh) / h);
+		if (fg) {
+			for (let x = 0; x < w; x++)
+				tab[w + h + x] = maskIndex(x, w, fg.texture.width);
+			for (let y = 0; y < h; y++)
+				tab[2 * w + h + y] = maskIndex(y, h, fg.texture.height);
+		}
+		const range = g.transientBuffer("range", n * 4);
+		const lay = g.transientBuffer("layer", n * 16);
+		const fgv = g.transientBuffer("fgv", n * 4);
+		addTexNode(
+			g,
+			"gather",
+			K_TEX_STATS,
+			{
+				prm: c.uniform(
+					"gather-prm",
+					u32Words(
+						w,
+						h,
+						gh,
+						+geo.flip,
+						+layer.flip,
+						+!!fg,
+						+!!fg?.flip,
+						fg?.texture.height ?? 1,
+						+(geo.texture.format === "r32float"),
+						0,
+						0,
+						0,
 					),
-					tab: c.storage("gather-tab", tab),
-					geo: importSampled(g, "geo", geo),
-					layerT: importSampled(g, "layer-tex", layer),
-					fgT: importSampled(g, "fg", fg),
-					range,
-					layer: lay,
-					fgv,
-				},
-				Math.ceil(n / WG),
-			);
-			// per call: minRange (bandStatsGpu's words)
-			const prmBuf = uniform(device, new ArrayBuffer(20));
-			owned.push(prmBuf);
-			g.addKernel({
-				id: "band-stats",
-				spec: sg ? K_BAND_STATS_SG : K_BAND_STATS,
-				bindings: {
-					prm: g.importBuffer("stats-prm", prmBuf.byteLength, prmBuf, UNIFORM),
-					photo: words,
-					layer: lay,
-					range,
-					fg: fgv,
-					lut: c.storage("lut", SRGB_LUT_STATS),
-					partial: g.importBuffer("partial", SGROUPS * STATS_VALUES * 4),
-				},
-				workgroups: [SGROUPS],
-			});
-			g.compile();
-			return { graph: g as ComputeGraph, owned, extra: prmBuf };
+				),
+				tab: c.storage("gather-tab", tab),
+				geo: importSampled(g, "geo", geo),
+				layerT: importSampled(g, "layer-tex", layer),
+				fgT: importSampled(g, "fg", fg),
+				range,
+				layer: lay,
+				fgv,
+			},
+			Math.ceil(n / WG),
+		);
+		// per call: minRange (bandStatsGpu's words)
+		const prmBuf = uniform(device, new ArrayBuffer(20));
+		owned.push(prmBuf);
+		g.addKernel({
+			id: "band-stats",
+			spec: sg ? K_BAND_STATS_SG : K_BAND_STATS,
+			bindings: {
+				prm: g.importBuffer("stats-prm", prmBuf.byteLength, prmBuf, UNIFORM),
+				photo: words,
+				layer: lay,
+				range,
+				fg: fgv,
+				lut: c.storage("lut", SRGB_LUT_STATS),
+				partial: g.importBuffer("partial", SGROUPS * STATS_VALUES * 4),
+			},
+			workgroups: [SGROUPS],
 		});
+		g.compile();
+		return { graph: g as ComputeGraph, owned, extra: prmBuf };
+	});
+}
+
+/** bandStatsTex' parameter words (bandStatsGpu's). */
+function statsWords(plan: StatsPlan, minRange: number) {
+	const pw = new ArrayBuffer(20);
+	new Uint32Array(pw, 0, 4).set([
+		plan.w,
+		plan.h,
+		SGROUPS * SWG,
+		plan.fg ? 1 : 0,
+	]);
+	new Float32Array(pw, 16, 1)[0] = minRange;
+	return new Uint8Array(pw);
+}
+
+/** bandStatsGpu's float64 fold of the partials (keep in sync). */
+function foldPartials(data: ArrayBuffer, minCount: number): ColorStats {
+	const p = new Float32Array(data);
+	const acc = new Float64Array(N_BANDS * 12);
+	const cnt = new Uint32Array(N_BANDS);
+	for (let gi = 0; gi < SGROUPS; gi++)
+		for (let b = 0; b < N_BANDS; b++) {
+			const s = gi * STATS_VALUES + b * 13;
+			cnt[b] += Math.round(p[s]);
+			for (let v = 0; v < 12; v++) acc[b * 12 + v] += p[s + 1 + v];
+		}
+	return finalizeBands(acc, cnt, minCount);
+}
+
+/**
+ * CompositeLook.setStats' GPU band stats from textures: one submit, 6.6 KB back (or none).
+ * `subgroups` as bandStatsGpu's (default off). This path can't see BAND_STATS_SG's -1
+ * layout-check partials without reading back, so only opt in where the layout check is known to pass.
+ */
+export function bandStatsTex(
+	device: Device,
+	input: StatsTexInput,
+	opts: { read?: boolean; subgroups?: boolean } = {},
+): Promise<StatsTexResult> {
+	const plan = statsPlan(device, input, opts);
+	const { geo, layer, photo, fg } = plan;
+	const read = opts.read ?? true;
 	return withLease(PASS.stats, async () => {
 		assertAlive(device, [geo, layer, photo, fg]);
-		const e = graphOf();
-		const pw = new ArrayBuffer(20);
-		new Uint32Array(pw, 0, 4).set([w, h, SGROUPS * SWG, fg ? 1 : 0]);
-		new Float32Array(pw, 16, 1)[0] = input.minRange ?? 0;
-		(e.extra as Buffer).write(new Uint8Array(pw));
+		const e = statsGraph(device, plan);
+		(e.extra as Buffer).write(statsWords(plan, input.minRange ?? 0));
 		const bytes = SGROUPS * STATS_VALUES * 4;
 		const partial = slot(device, "stats", "partial", bytes);
 		const { data } = await e.graph.run(undefined, {
@@ -1119,18 +1265,63 @@ export function bandStatsTex(
 			read: read ? reads([[partial, bytes]]) : [],
 		});
 		if (!read) return { partial, stats: null };
-		const p = new Float32Array(data[0]);
-		// bandStatsGpu's float64 fold of the partials (keep in sync)
-		const acc = new Float64Array(N_BANDS * 12);
-		const cnt = new Uint32Array(N_BANDS);
-		for (let gi = 0; gi < SGROUPS; gi++)
-			for (let b = 0; b < N_BANDS; b++) {
-				const s = gi * STATS_VALUES + b * 13;
-				cnt[b] += Math.round(p[s]);
-				for (let v = 0; v < 12; v++) acc[b * 12 + v] += p[s + 1 + v];
-			}
-		return { partial, stats: finalizeBands(acc, cnt, input.minCount ?? 60) };
+		return { partial, stats: foldPartials(data[0], input.minCount ?? 60) };
 	});
+}
+
+/** encodeBandStatsTex's own parameter buffer per device (the graph's is the stats lease's). */
+const encStatsPrm = new WeakMap<Device, Buffer>();
+
+/**
+ * bandStatsTex recorded into the CALLER's encoder, with its 6.6 KB readback staged on it (WAG W1.2:
+ * the stats layer render's own encoder, so render + stats are one submit instead of two). Same plan,
+ * same cached compiled graph, same parameter words and the same f64 fold, so the same ColorStats.
+ * Own parameter / partial buffers (the stats lease's may belong to a queued bandStatsTex).
+ * Submit `encoder` synchronously after this returns (see encodeMasksTex), then call read(); if
+ * the submit throws, call cancel() (it returns the staged readback slot). Every check runs before
+ * anything is recorded.
+ */
+export function encodeBandStatsTex(
+	device: Device,
+	encoder: CommandEncoder,
+	input: StatsTexInput,
+	opts: { subgroups?: boolean } = {},
+): { read: () => Promise<StatsTexResult>; cancel: () => void } {
+	const plan = statsPlan(device, input, opts);
+	const { geo, layer, photo, fg } = plan;
+	assertAlive(device, [geo, layer, photo, fg]);
+	const e = statsGraph(device, plan);
+	if (!e.graph.isCompiled)
+		throw new Error("[lookgpu] stats graph not compiled");
+	const graphPrm = e.extra as Buffer;
+	let prm = encStatsPrm.get(device);
+	if (!prm || prm.destroyed || prm.byteLength !== graphPrm.byteLength) {
+		prm?.destroy();
+		prm = uniform(device, new ArrayBuffer(20));
+		encStatsPrm.set(device, prm);
+	}
+	prm.write(statsWords(plan, input.minRange ?? 0));
+	const bytes = SGROUPS * STATS_VALUES * 4;
+	const partial = slot(device, "stats-enc", "partial", bytes);
+	e.graph.encode(
+		encoder,
+		undefined,
+		{ partial, "stats-prm": prm },
+		{
+			geo: geo.texture,
+			"layer-tex": layer.texture,
+			"photo-tex": photo.texture,
+			fg: fg?.texture ?? dummyMask(device),
+		},
+	);
+	const staged = stageReads(device, encoder, reads([[partial, bytes]]));
+	return {
+		read: async () => {
+			const [data] = await staged.read();
+			return { partial, stats: foldPartials(data, input.minCount ?? 60) };
+		},
+		cancel: () => staged.cancel(),
+	};
 }
 
 // ── haze prep ───────────────────────────────────────────────────────────────────────────────────

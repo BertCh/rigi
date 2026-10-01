@@ -26,6 +26,15 @@
 // For the drape, rangeMapFrom's CPU copy is not needed any more: GPU consumers read `targets.geometry`
 // (rgba32float, w = range, 0 = sky) directly.
 //
+// Fused submit (WAG W1.2): `encodeAfterDraw` records extra GPU work (the engine's prepared look
+// masks) on its OWN command encoder after the geometry pass; core submitWithDefault then submits
+// the render's buffer and that one in a single queue.submit, in that order, so the work sees this
+// render's targets. A throw while recording drops only the extra encoder (the render submits alone,
+// as before, and the work's owner runs its separate pass). It changes nothing about when renders
+// happen: the debounce and renderSeq pairing below are the same with or without it. Only query
+// sources get it: the factory passes it to sources wider than `xyzMinWidth` (512 px), so the
+// 384 px silhouette re-rank sources and any other source ≤ 512 px wide get no fusion.
+//
 // Uniform safety: TerrainCore keeps ONE geometry Model. The luma WebGPU uniform writes go through
 // queue.writeBuffer at draw time. This render encodes and submits its own command buffer before
 // returning, so the frame's geometry pass (encoded later, submitted later) cannot see our photo
@@ -48,12 +57,13 @@
 // - Note: the GeometrySourceFactory signature has no xyz flag. webgpuGeometryFactory skips the xyz
 //   unpack for widths ≤ `xyzMinWidth` (default 512), so the 384 px re-rank stays range-only as in
 //   deck/engine.ts silhouetteSource (makeSource(W, H, false)).
-import type { Device } from "@luma.gl/core";
+import type { CommandEncoder, Device } from "@luma.gl/core";
 import type { Pose } from "#/lib/camera";
 import type {
 	GeometrySource,
 	GeometrySourceFactory,
 } from "#/lib/deck/geometry-source";
+import { submitWithDefault } from "#/lib/gpu/core/queue";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { photoCamera } from "../camera";
 import { type CameraPose, runGeometryPass } from "../hosts/passes";
@@ -102,6 +112,27 @@ export type LazyQueries = {
 	after: (seq: number, pose: Pose) => Promise<boolean>;
 };
 
+/** What an EncodeAfterDraw recorded: told whether it reached the queue with the render. */
+export type FusedWork = {
+	/** submitted in the render's queue.submit (after its geometry pass) */
+	submitted: () => void;
+	/** not submitted (finish failed, device lost): the owner falls back to its separate pass */
+	dropped: () => void;
+};
+
+/**
+ * Extra GPU work for a render (WAG W1.2), called synchronously inside render() / drawOnly() after
+ * the geometry pass, recorded on its own `encoder` (never the device's default one). `seq` is the
+ * render's renderSeq. It must not submit or await. Null (nothing worth submitting) or a throw
+ * (logged) drops `encoder`; the render then submits alone.
+ */
+export type EncodeAfterDraw = (o: {
+	seq: number;
+	pose: Pose;
+	encoder: CommandEncoder;
+	targets: GeometryTargets;
+}) => FusedWork | null;
+
 export type WebGpuGeometryOptions = {
 	device: Device;
 	/** Cores to draw (terrain only). Read on every render, so tile / core swaps apply. */
@@ -110,6 +141,8 @@ export type WebGpuGeometryOptions = {
 	eye: Vec3 | (() => Vec3);
 	/** Lazy queries for the sources wider than `xyzMinWidth` (the 1024 px query source). */
 	lazyQueries?: () => LazyQueries | undefined;
+	/** Extra work on the encoder of each render of the sources wider than `xyzMinWidth`. */
+	encodeAfterDraw?: EncodeAfterDraw;
 	/** Near plane (m); the frame's photo camera uses 1 (lab.ts, deck/geometry-pass.ts). */
 	near?: number;
 };
@@ -131,6 +164,7 @@ export class WebGpuGeometrySource implements GeometrySource {
 	readonly targets: GeometryTargets;
 	private readonly device: Device;
 	private lazy: LazyQueries | null;
+	private readonly encodeAfterDraw: EncodeAfterDraw | null;
 	/** The render() whose readback `range` / `xyz` hold (0 = none yet). */
 	private cpuSeq = 0;
 	private fullRead: { seq: number; p: Promise<boolean> } | null = null;
@@ -160,10 +194,15 @@ export class WebGpuGeometrySource implements GeometrySource {
 		o: Omit<WebGpuGeometryOptions, "eye"> & { eye: Vec3 },
 		width: number,
 		height: number,
-		opts: { xyz?: boolean; lazy?: LazyQueries } = {},
+		opts: {
+			xyz?: boolean;
+			lazy?: LazyQueries;
+			encodeAfterDraw?: EncodeAfterDraw;
+		} = {},
 	) {
 		this.device = o.device;
 		this.lazy = opts.lazy ?? null;
+		this.encodeAfterDraw = opts.encodeAfterDraw ?? null;
 		this.cores = o.cores;
 		this.eye = [o.eye[0], o.eye[1], o.eye[2]];
 		this.near = o.near ?? 1;
@@ -303,10 +342,42 @@ export class WebGpuGeometrySource implements GeometrySource {
 			frame,
 		});
 		// the copy in TextureReader.read is its own queue submit: the pass must be on the queue first
-		this.device.submit();
+		this.submitDraw(pose);
 		this.drawn = { ...pose };
 		this.drawnCores = cores;
 		return cores;
+	}
+
+	/** Submit the geometry pass, with the encodeAfterDraw work in the same queue.submit if any. */
+	private submitDraw(pose: Pose) {
+		if (!this.encodeAfterDraw) return this.device.submit();
+		const encoder = this.device.createCommandEncoder({
+			id: "geometry-source-fused",
+		});
+		let work: FusedWork | null = null;
+		try {
+			work = this.encodeAfterDraw({
+				seq: this.seq,
+				pose: { ...pose },
+				encoder,
+				targets: this.targets,
+			});
+		} catch (e) {
+			console.warn("[geometry-source] encodeAfterDraw failed, dropped", e);
+		}
+		if (!work) {
+			encoder.destroy();
+			return this.device.submit();
+		}
+		let sent = false;
+		try {
+			sent = submitWithDefault(this.device, [encoder]);
+		} catch (e) {
+			// lost device: nothing was submitted (the render is gone with it)
+			console.warn("[geometry-source] fused submit failed", e);
+		}
+		if (sent) work.submitted();
+		else work.dropped();
 	}
 
 	async render(pose: Pose): Promise<void> {
@@ -434,6 +505,9 @@ export function webgpuGeometryFactory(
 				xyz: width > xyzMin,
 				...(width > xyzMin && o.lazyQueries?.()
 					? { lazy: o.lazyQueries() }
+					: {}),
+				...(width > xyzMin && o.encodeAfterDraw
+					? { encodeAfterDraw: o.encodeAfterDraw }
 					: {}),
 			},
 		);

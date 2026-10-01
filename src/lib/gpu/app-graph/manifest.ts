@@ -490,7 +490,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: ["band stats partials; haze head"],
 		status: "default",
 		notes:
-			"texture-input look passes; its own per-key graph cache (not core cachedGraph)",
+			"texture-input look passes; its own per-key graph cache (not core cachedGraph). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)",
 	},
 	{
 		id: "labels",

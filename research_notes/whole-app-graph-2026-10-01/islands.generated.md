@@ -62,7 +62,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **geo-query-gpu**: single dispatches + core/readback, not ComputeGraphs
 - **look-guided**: array-input masks path (WebGL deck + sidecar); ?lookgpu=off keeps the CPU twin
 - **look-haze**: graph breaks for the f64 airlight band / tail on the CPU (D16, D18)
-- **look-textures**: texture-input look passes; its own per-key graph cache (not core cachedGraph)
+- **look-textures**: texture-input look passes; its own per-key graph cache (not core cachedGraph). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)
 - **labels**: CPU / DOM by nature; fed by I8's small readbacks
 - **splat-sort**: deck-webgpu splats sortBackend "gpu"; raw dispatches, not a ComputeGraph
 - **roll-webgl**: WebGL2 only; needs a WebGPU port before it can join a graph

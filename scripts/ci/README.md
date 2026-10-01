@@ -32,6 +32,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | style-check | fast | CLASSIC style = today's constants, ramps, presets, `?style=` | `scripts/style-check.ts` |
 | labels | fast | peak labels: classic byte-identical, no overlaps | `src/lib/look/__tests__/labels.check.ts` |
 | haze-fit | fast | `fitHaze` recovers J, A, β | `src/lib/look/__tests__/haze-fit.test.ts` |
+| bridge-fusion | fast | WAG W1.2 settle fusion: mask texture pool and prepared-masks adoption rules (no GPU) | `src/lib/deck-webgpu/compute-bridge-fusion.check.ts` |
 | annotate-selftest | fast | `solveFromControlPoints` (output `FAIL` counts, since it always exits 0) | `scripts/annotate-selftest.ts` |
 | eye-check | fast | pose6dof eye refinement, analytic ridge | `src/lib/pose6dof/eye.check.ts` |
 | pose6dof | fast | pose6dof solvers + real control points (`--quick`) | `scripts/test-pose6dof.ts` (needs `data/`) |
@@ -57,6 +58,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | cache-range | fast | tile cache HTTP byte ranges: one entry per url + range, memory repeats, shared in-flight requests, 200-ignoring servers sliced (mocked server) | `src/lib/cache/range.check.ts` |
 | style-baseline | full | **classic pixel identity + geometry hash** on the WebGL deck route (`?renderer=deck`, SwiftShader). No `?style`/`?concord` flag is set, so this row is also the **concord-off parity** gate. **Needs a deck reference** (see below); SKIPs until one exists | `scripts/style-baseline.mjs check --url …` |
 | deck-smoke | full | `?renderer=deck` (WebGL, reference) vs `?renderer=webgpu` parity: \|Δyaw\| ≤ 0.5°, label overlap ≥ 0.6 | `scripts/deck-engine-smoke.mjs --url … --out out/ci/… --renderer webgpu` |
+| settle-submits | full | WAG W1.2 settle fusion (`?renderer=webgpu` pinned): masks + band stats byte-identical with `settleFusion` off / on; submits per settle and settle-to-labels latency reported, not gated | `scripts/deck-webgpu/settle-submits.mjs IMG_7086 --url … --renderer webgpu` |
 | eval-app | full | app auto-alignment vs control points on the default engine (`--renderer webgpu`). Gate: `N/M within 1° yaw` ≥ `evalAppWebgpu.minWithin1deg`; advisory until that baseline exists | `scripts/eval-app.mjs --renderer webgpu` (`APP_URL=…`) |
 | eval-app-deck | full | the same accuracy run on the WebGL deck fallback (`--renderer deck`) | `scripts/eval-app.mjs --renderer deck` |
 

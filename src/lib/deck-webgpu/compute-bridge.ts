@@ -31,6 +31,28 @@
 // finished target; results are read only after that submit (graph.run). The host's per-frame
 // targets are never read (a later frame could rewrite them before a queued graph runs).
 //
+// Fewer settle submits (WAG W1.2; engine option settleFusion, default on): two passes are instead
+// recorded on their own command encoder right after the render that produced their input, and
+// core submitWithDefault submits that render's buffer and theirs in ONE queue.submit, render first
+// (the same compiled graphs, so the same bytes). A throw while recording drops only the fused
+// encoder: the render submits alone and the pass runs separately, as before.
+// - masks: prepareMasks() runs inside the query geometry render (WebGpuGeometrySource's
+//   encodeAfterDraw hook; query sources only, i.e. wider than 512 px: the 384 px silhouette
+//   sources get no fusion) and writes a spare mask texture. The query render stays its own
+//   1024 px pass with its 90 ms debounce and GeometryGenerations / renderSeq pairing; nothing about
+//   when it runs changes. Once submitted, updateMasks() ADOPTS that texture instead of running a
+//   pass when its inputs are the prepared ones: the same geometry texture still holding the same
+//   render (renderSeq), the same photo, P(sky) and people masks, and no blend cut (the cut plane is
+//   sampled from the CPU range readback, which a draw-time encode does not have). Anything else
+//   runs the pass as before.
+// - band stats: encodeStats() records bandStatsTex (with its 6.6 KB readback staged) for the stats
+//   layer render: render + stats are one submit instead of two. The stats keep their own render,
+//   timer and key (they wait for the haze fit's CPU range through layerGen); the key is taken only
+//   once the submit went through, so a dropped one is retried.
+// With fusion on, mask outputs are a small pool of textures: the one shown, the prepared one, and
+// any a queued masks pass still writes are never handed out for another write. With it off
+// (fusionOn), the masks pass uses the original two-texture ping-pong unchanged.
+//
 // Gate (createLookBridge): lookGpuOn() (the existing ?lookgpu switch), the device has
 // float32-filterable, and getComputeDevice() === the render device (adoptRenderDevice). Anything
 // else (sidecar device, ?gpu=off, CPU geometry source) keeps the readback path. Select it per
@@ -61,7 +83,7 @@
 // ReliefController.update's `bridged` while the bridge is attached (same gate); a rejection or
 // null (bridge destroyed in flight) falls back to the readback path, and the CPU twin stays the
 // lookgpu-off path.
-import type { Device, Texture } from "@luma.gl/core";
+import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
 import { lookGpuOn, trackLook } from "#/lib/gpu/look/opt-in";
@@ -74,6 +96,8 @@ import {
 } from "#/lib/gpu/look/relief-heights";
 import {
 	bandStatsTex,
+	encodeBandStatsTex,
+	encodeMasksTex,
 	type HazePrepResult,
 	hazePrepTex,
 	masksTex,
@@ -96,6 +120,7 @@ import type {
 	ResidentReliefField,
 } from "#/lib/look/relief/field";
 import type { ViewStyle } from "#/lib/style/types";
+import type { FusedWork } from "./layers/geometry-source";
 import { USAGE } from "./targets";
 
 const LINEAR_CLAMP = {
@@ -113,6 +138,24 @@ export type BridgedMasks = {
 	cut: string;
 	/** rgba8unorm (r coverage, g cut, b people, a 255), row 0 = top; bridge-owned, sample only */
 	texture: Texture;
+};
+
+/** Mask output textures at most (shown + prepared + queued writes; see pickOut). */
+const MAX_MASK_OUTS = 4;
+
+/** A masks pass recorded into a query geometry render (prepareMasks), not yet adopted. */
+type PreparedMasks = {
+	/** WebGpuGeometrySource.renderSeq of the render whose encoder holds it */
+	seq: number;
+	geometry: Texture;
+	img: HTMLImageElement;
+	fg: Mask8 | null;
+	sky: Mask8 | null;
+	w: number;
+	h: number;
+	slot: number;
+	texture: Texture;
+	cpuMs: number;
 };
 
 /** Per-pass timings (ms) of the last runs, for the bench / BRIDGE.md. */
@@ -157,6 +200,9 @@ export class LookBridge {
 	version = 0;
 	/** A pass landed (the engine re-applies the look). */
 	onAsync?: () => void;
+	/** Settle fusion on (the engine's settleFusion option; read per call). Off: no prepared masks,
+	 * nothing adopted, and the separate masks pass uses the old two-texture ping-pong. */
+	fusionOn: () => boolean = () => true;
 	/**
 	 * The batched terrain's resident DEM tiles. Set: the relief field's height raster is gathered
 	 * in WGSL from them (relief-heights.ts) whenever every tile in range is resident, else the CPU
@@ -178,8 +224,14 @@ export class LookBridge {
 	private statsKey = "";
 	private maskSeq = 0;
 	private statsSeq = 0;
-	private flip = 0;
-	private outs: (Texture | null)[] = [null, null];
+	/** mask output textures; `shown` is the one `masks` holds (-1 = none) */
+	private outs: (Texture | null)[] = [];
+	/** queued / in-flight masks passes writing each output texture */
+	private writing: number[] = [];
+	private shown = -1;
+	private prepared: PreparedMasks | null = null;
+	/** masks passes recorded into a geometry render / adopted (settle-submit counters) */
+	readonly fused = { masksPrepared: 0, masksAdopted: 0, statsEncoded: 0 };
 	private photos = new Map<string, { img: HTMLImageElement; tex: Texture }>();
 	private byteMasks = new Map<string, { src: Mask8; tex: Texture }>();
 	private destroyed = false;
@@ -191,6 +243,7 @@ export class LookBridge {
 	/** Forget the inputs (the next update / stats call runs again). */
 	reset() {
 		this.maskIn = [];
+		this.prepared = null;
 		this.statsKey = "";
 		this.maskSeq++;
 		this.statsSeq++;
@@ -209,6 +262,8 @@ export class LookBridge {
 		sky: Mask8 | null;
 		cut: Cut | null;
 		geometry: Texture;
+		/** WebGpuGeometrySource.renderSeq: the render `geometry` holds now (adopts a prepared pass) */
+		geometrySeq?: number;
 		range: () => RangeGrid;
 	}): boolean {
 		const c = o.style.composite;
@@ -220,6 +275,37 @@ export class LookBridge {
 		const t0 = performance.now();
 		const geo = o.geometry;
 		const [w, h] = gridSize(geo.width / geo.height, MASK_LONG_SIDE);
+		const p = this.prepared;
+		if (!this.fusionOn()) this.prepared = null;
+		else if (
+			p &&
+			!o.cut &&
+			o.geometrySeq !== undefined &&
+			p.seq === o.geometrySeq &&
+			p.geometry === geo &&
+			p.img === o.img &&
+			p.fg === o.fg &&
+			p.sky === sky &&
+			p.w === w &&
+			p.h === h &&
+			!p.texture.destroyed
+		) {
+			// the pass this call would run is already on the queue (recorded into that render's
+			// encoder, same graph, same input bytes): take its texture, submit nothing
+			this.prepared = null;
+			this.maskSeq++;
+			this.shown = p.slot;
+			this.masks = { w, h, gen: o.gen, cut: "", texture: p.texture };
+			this.version++;
+			this.fused.masksAdopted++;
+			push(this.timing.masks, { cpuMs: p.cpuMs, totalMs: p.cpuMs });
+			// the engine is applying the look right now; notify as a landed pass would
+			queueMicrotask(() => {
+				if (!this.destroyed && this.masks?.texture === p.texture)
+					this.onAsync?.();
+			});
+			return true;
+		}
 		let cut: Float32Array | null = null;
 		if (o.cut) {
 			// CompositeLook's cut plane, sample for sample (range: the query buffer the CPU also reads)
@@ -240,7 +326,12 @@ export class LookBridge {
 				}
 		}
 		const seq = ++this.maskSeq;
-		const slot = this.flip ^ 1;
+		// settleFusion off: the two-texture ping-pong exactly as before (flip = the last landed slot)
+		const slot = this.fusionOn()
+			? this.pickOut(false)
+			: this.shown === 1
+				? 0
+				: 1;
 		const target = this.outTexture(slot, w, h);
 		const gen = o.gen;
 		const cutKey = o.cut?.key ?? "";
@@ -256,12 +347,14 @@ export class LookBridge {
 			},
 			{ texture: target },
 		);
+		// queued: a prepared write must not take this texture until the pass is done (pickOut)
+		this.writing[slot] = (this.writing[slot] ?? 0) + 1;
 		const cpuMs = performance.now() - t0;
 		trackLook(
 			run
 				.then(() => {
 					if (seq !== this.maskSeq || this.destroyed) return;
-					this.flip = slot;
+					this.shown = slot;
 					this.masks = { w, h, gen, cut: cutKey, texture: target };
 					this.version++;
 					push(this.timing.masks, {
@@ -270,9 +363,97 @@ export class LookBridge {
 					});
 					this.onAsync?.();
 				})
-				.catch((e) => console.warn("[look-bridge] masks failed", e)),
+				.catch((e) => console.warn("[look-bridge] masks failed", e))
+				.finally(() => {
+					this.writing[slot]--;
+				}),
 		);
 		return true;
+	}
+
+	/**
+	 * Record the masks pass for a query geometry render into that render's encoder (WAG W1.2; see the
+	 * header), before its submit. updateMasks adopts it when its inputs turn out to be these. Called
+	 * synchronously from WebGpuGeometrySource's encodeAfterDraw: the caller submits `encoder` right
+	 * after. No cut: with a blend cut, updateMasks runs its own pass as before. False = nothing
+	 * recorded (gated off, or a check failed before anything was encoded).
+	 */
+	prepareMasks(o: {
+		seq: number;
+		style: ViewStyle;
+		img?: HTMLImageElement;
+		fg: Mask8 | null;
+		sky: Mask8 | null;
+		geometry: Texture;
+		encoder: CommandEncoder;
+	}): FusedWork | null {
+		this.prepared = null;
+		const c = o.style.composite;
+		if (this.destroyed || !this.fusionOn() || !c.refine || !o.img) return null;
+		const t0 = performance.now();
+		const sky = c.sky === "photo" ? o.sky : null;
+		const geo = o.geometry;
+		const [w, h] = gridSize(geo.width / geo.height, MASK_LONG_SIDE);
+		const slot = this.pickOut(true);
+		if (slot < 0) return null;
+		try {
+			const target = this.outTexture(slot, w, h);
+			encodeMasksTex(
+				this.device,
+				o.encoder,
+				{
+					geometry: geo,
+					photo: this.photoTexture(o.img, w, h),
+					sky: sky ? this.byteMask("sky", sky) : null,
+					fg: o.fg ? this.byteMask("fg", o.fg) : null,
+					size: [w, h],
+				},
+				target,
+			);
+			const prepared: PreparedMasks = {
+				seq: o.seq,
+				geometry: geo,
+				img: o.img,
+				fg: o.fg,
+				sky,
+				w,
+				h,
+				slot,
+				texture: target,
+				cpuMs: performance.now() - t0,
+			};
+			return {
+				// on the queue right after its render: updateMasks may adopt it from now on
+				submitted: () => {
+					if (this.destroyed) return;
+					this.prepared = prepared;
+					this.fused.masksPrepared++;
+				},
+				// never reached the queue: nothing to adopt, updateMasks runs its own pass
+				dropped: () => {},
+			};
+		} catch (e) {
+			console.warn("[look-bridge] prepared masks failed, separate pass", e);
+			return null;
+		}
+	}
+
+	/**
+	 * An output texture index for a masks write: never the shown one or the prepared one. `idle`
+	 * also skips any a queued pass still writes (a prepared write is submitted at once, so a queued
+	 * pass submitted later would overwrite it); -1 when none is free. A separate pass may share a
+	 * texture with an older queued pass (its later submit wins; maskSeq drops the older result), as
+	 * the ping-pong did.
+	 */
+	private pickOut(idle: boolean): number {
+		const reserved = (i: number) =>
+			i === this.shown || i === this.prepared?.slot;
+		for (let i = 0; i < this.outs.length; i++)
+			if (!reserved(i) && !this.writing[i]) return i;
+		if (this.outs.length < MAX_MASK_OUTS) return this.outs.length;
+		if (idle) return -1;
+		for (let i = 0; i < this.outs.length; i++) if (!reserved(i)) return i;
+		return -1;
 	}
 
 	/** CompositeLook.wantsStats with the bridge's own key. */
@@ -315,6 +496,58 @@ export class LookBridge {
 		push(this.timing.stats, { cpuMs, totalMs: performance.now() - t0 });
 		this.onAsync?.();
 		return r.stats;
+	}
+
+	/**
+	 * setStats recorded into the encoder of the render that drew `layer` (WAG W1.2; see the header):
+	 * record it on its own encoder after that render's passes, submit both together (core
+	 * submitWithDefault), then call `after()` once submitted (it resolves as setStats does) or
+	 * `cancel()` if it was not. Same graph, parameters and
+	 * f64 fold as setStats. Null = nothing recorded (destroyed, or a check failed).
+	 */
+	encodeStats(o: {
+		key: string;
+		img: HTMLImageElement;
+		layer: Texture;
+		geometry: Texture;
+		fg: Mask8 | null;
+		minRange: number;
+		encoder: CommandEncoder;
+	}): { after: () => Promise<ColorStats | null>; cancel: () => void } | null {
+		if (this.destroyed) return null;
+		const t0 = performance.now();
+		const { width: w, height: h } = o.layer;
+		let staged: ReturnType<typeof encodeBandStatsTex>;
+		try {
+			staged = encodeBandStatsTex(this.device, o.encoder, {
+				geometry: o.geometry,
+				layer: o.layer,
+				photo: this.photoTexture(o.img, w, h),
+				fg: o.fg ? this.byteMask("fg", o.fg) : null,
+				minRange: o.minRange,
+			});
+		} catch (e) {
+			console.warn("[look-bridge] encoded band stats failed", e);
+			return null;
+		}
+		const cpuMs = performance.now() - t0;
+		return {
+			// call only once the render + stats submit went through: the key is taken here, so a
+			// dropped / failed submit (cancel) leaves wantsStats true and the stats are retried
+			after: async () => {
+				const seq = ++this.statsSeq;
+				this.statsKey = o.key;
+				this.fused.statsEncoded++;
+				const r = await trackLook(staged.read());
+				if (seq !== this.statsSeq || this.destroyed || !r.stats) return null;
+				this.stats = r.stats;
+				this.version++;
+				push(this.timing.stats, { cpuMs, totalMs: performance.now() - t0 });
+				this.onAsync?.();
+				return r.stats;
+			},
+			cancel: () => staged.cancel(),
+		};
 	}
 
 	/** fitHazeGpu's GPU prep on the geometry texture (HazeController's ×2 decimation). */
@@ -543,12 +776,15 @@ export class LookBridge {
 		this.statsSeq++;
 		this.masks = null;
 		this.stats = null;
+		this.prepared = null;
 		const textures = [
 			...this.outs,
 			...[...this.photos.values()].map((p) => p.tex),
 			...[...this.byteMasks.values()].map((m) => m.tex),
 		];
-		this.outs = [null, null];
+		this.outs = [];
+		this.writing = [];
+		this.shown = -1;
 		this.photos.clear();
 		this.byteMasks.clear();
 		for (const t of textures) t?.destroy();

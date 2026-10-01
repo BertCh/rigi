@@ -199,6 +199,14 @@ export const CHECKS = [
 		cmd: tsx("src/lib/look/__tests__/haze-fit.test.ts"),
 		timeoutS: 300,
 	},
+	{
+		id: "bridge-fusion",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/deck-webgpu/compute-bridge-fusion.check.ts"),
+		note: "WAG W1.2 settle fusion bookkeeping: mask texture pool, prepared-masks adoption rules (no GPU)",
+		timeoutS: 120,
+	},
 
 	// ---- fast: pose / refine / export ----------------------------------------------------------
 	{
@@ -465,6 +473,24 @@ export const CHECKS = [
 		needs: ["public/photos/photos.json"],
 		note: "?renderer=deck (WebGL, reference) vs ?renderer=webgpu (each run checks the engine that ran): |Δyaw| ≤ 0.5°, label overlap ≥ 0.6",
 		timeoutS: 3600,
+	},
+	{
+		id: "settle-submits",
+		tier: "full",
+		group: "parity",
+		browser: true,
+		cmd: lock([
+			"node",
+			"scripts/deck-webgpu/settle-submits.mjs",
+			"IMG_7086",
+			"--url",
+			"{url}",
+			"--renderer",
+			"webgpu",
+		]),
+		needs: ["public/photos/photos.json", "public/photos/IMG_7086.jpg"],
+		note: "WAG W1.2 settle fusion, webgpu-pinned: masks + band stats byte-identical with settleFusion off / on; submits per settle and settle-to-labels latency reported (not gated)",
+		timeoutS: 1800,
 	},
 	{
 		id: "eval-app",

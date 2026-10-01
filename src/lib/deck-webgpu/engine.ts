@@ -49,7 +49,7 @@
 //
 // luma 10: nothing here touches luma beyond Device / Texture / Buffer / Framebuffer; deck only
 // through hosts/deck.ts (dynamically imported).
-import type { Device, Texture } from "@luma.gl/core";
+import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
 import * as THREE from "three";
 import {
 	type AlignResult,
@@ -108,6 +108,7 @@ import { startLakeFloor } from "#/lib/geocam/lakes/fetch";
 import { priorHeading } from "#/lib/geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import { autoAlignAsync, warmAlignGpu } from "#/lib/gpu/align";
+import { submitWithDefault } from "#/lib/gpu/core/queue";
 import { lookIdle } from "#/lib/gpu/look/opt-in";
 import {
 	buildPhotoPrepAsync,
@@ -220,6 +221,7 @@ import {
 import { type CompositeCore, createCompositeCore } from "./layers/composite";
 import { createDrape, type DrapePart } from "./layers/drape";
 import {
+	type FusedWork,
 	GeometryGenerations,
 	WebGpuGeometrySource,
 	webgpuGeometryFactory,
@@ -417,6 +419,13 @@ export type WebGpuEngineOptions = {
 	 * Inside). false = the full readback on every settle, which is also what any failing kernel
 	 * switches to. Harnesses flip it for the A/B. */
 	geometryDiet?: boolean;
+	/** With the bridge on: fewer submits per settle (WAG W1.2, default true). The refined masks are
+	 * recorded on their own encoder and submitted with the query geometry render (one
+	 * queue.submit), then adopted when their inputs still match; the band stats share their layer
+	 * render's submit the same way (compute-bridge.ts header). Same graphs, same bytes. false =
+	 * each pass its own submit and the original two-texture mask ping-pong, as before. Read live;
+	 * harnesses flip it. */
+	settleFusion?: boolean;
 };
 
 export type WebGpuEngineStats = {
@@ -913,6 +922,7 @@ export class WebGpuEngine implements Renderer {
 		if (!b) return;
 		if (this.gpu !== gpu || this.disposed || this.opts.lookBridge === false)
 			return b.destroy();
+		b.fusionOn = () => this.opts.settleFusion !== false;
 		b.onAsync = () => {
 			if (this.disposed) return;
 			this.updateLook();
@@ -1737,6 +1747,10 @@ export class WebGpuEngine implements Renderer {
 				sky: this.skyMaskStore,
 				cut,
 				geometry: geoTex,
+				geometrySeq:
+					this.geoSrc instanceof WebGpuGeometrySource
+						? this.geoSrc.renderSeq
+						: undefined,
 				range: () => grid ?? NO_GRID,
 			});
 			this.compLook.updateNoise(
@@ -1787,6 +1801,41 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	/**
+	 * WAG W1.2: the bridged masks pass for a query render, recorded on `encoder`, which is submitted
+	 * with that render (WebGpuGeometrySource encodeAfterDraw → LookBridge.prepareMasks). updateLook adopts it when
+	 * its inputs still match; otherwise it runs its own pass as before. Skipped where updateLook
+	 * would sample a blend cut (replace mode, range / brush blend).
+	 */
+	private prepareMasks(
+		seq: number,
+		encoder: CommandEncoder,
+		geometry: Texture,
+	): FusedWork | null {
+		const bridge = this.gpu?.bridge;
+		const s = this.settings;
+		if (
+			!bridge ||
+			this.opts.settleFusion === false ||
+			!this.photoImg ||
+			(s.mode === "replace" &&
+				(s.method === "range" || s.method === "brush")) ||
+			!lookKey(this.style).some((d) =>
+				(COMPOSITE_DEFINES as readonly string[]).includes(d),
+			)
+		)
+			return null;
+		return bridge.prepareMasks({
+			seq,
+			style: this.style,
+			img: this.photoImg,
+			fg: this.fgMask,
+			sky: this.skyMaskStore,
+			geometry,
+			encoder,
+		});
+	}
+
+	/**
 	 * deck/engine.ts scheduleStats: LOOK_HARMONIZE band stats of the terrain colour, rendered at
 	 * ≤ 256 px through the photo camera (classic photo-view shading: no drape) once the pose settles.
 	 */
@@ -1818,17 +1867,23 @@ export class WebGpuEngine implements Renderer {
 			const geoTex = this.geometryTexture();
 			if (bridge && geoTex && bridge === this.gpu?.bridge) {
 				this.statsBusy = true;
+				const stats = {
+					key,
+					img,
+					geometry: geoTex,
+					fg: this.fgMask,
+					minRange: trustedRange(this.photo.hAccuracy),
+				};
 				try {
-					await this.renderLayer(w, h, (color) =>
-						bridge.setStats({
-							key,
-							img,
-							layer: color,
-							geometry: geoTex,
-							fg: this.fgMask,
-							minRange: trustedRange(this.photo.hAccuracy),
-						}),
-					);
+					// WAG W1.2: the stats graph on the layer render's own submit
+					if (this.opts.settleFusion !== false)
+						await this.renderLayer(w, h, null, (layer, encoder) =>
+							bridge.encodeStats({ ...stats, layer, encoder }),
+						);
+					else
+						await this.renderLayer(w, h, (layer) =>
+							bridge.setStats({ ...stats, layer }),
+						);
 				} catch (e) {
 					console.warn("[webgpu-engine] bridged band stats failed", e);
 				} finally {
@@ -2244,6 +2299,8 @@ export class WebGpuEngine implements Renderer {
 					this.dietOn()
 						? { after: (seq, pose) => this.queryOnDraw(seq, pose) }
 						: undefined,
+				encodeAfterDraw: (d) =>
+					this.prepareMasks(d.seq, d.encoder, d.targets.geometry),
 			});
 			this.geoSrcEye = this.eyeArr;
 			return { src: factory(width, height), kind: "gpu" };
@@ -3490,6 +3547,10 @@ export class WebGpuEngine implements Renderer {
 		screen: boolean;
 		/** compute bridge: consume the resolved colour target on the GPU instead of reading it back */
 		consume?: (color: Texture) => Promise<unknown>;
+		/** compute bridge, same render submit: record work on the colour target on the given encoder
+		 * (submitted with the render in one queue.submit); `after` is awaited once submitted,
+		 * `cancel` is called if it was not */
+		encode?: (color: Texture, encoder: CommandEncoder) => EncodedWork | null;
 	}): Promise<Uint8Array | Float32Array | null> {
 		await this.ready;
 		const g = this.gpu;
@@ -3556,8 +3617,37 @@ export class WebGpuEngine implements Renderer {
 				pass.end();
 				read = out;
 			}
-			device.submit();
+			let encoded: EncodedWork | null = null;
+			if (o.encode) {
+				// own encoder, one queue.submit with the render (core submitWithDefault); a throw while
+				// recording drops only it
+				const encoder = device.createCommandEncoder({
+					id: "rigi-offscreen-fused",
+				});
+				try {
+					encoded = o.encode(read, encoder);
+				} catch (e) {
+					console.warn("[webgpu-engine] fused offscreen work dropped", e);
+				}
+				if (!encoded) encoder.destroy();
+				else {
+					// false = the fused buffer was dropped and the render submitted alone
+					let sent = false;
+					try {
+						sent = submitWithDefault(device, [encoder]);
+					} finally {
+						if (!sent) encoded.cancel();
+					}
+					if (!sent) return null;
+				}
+			}
+			if (!encoded) device.submit();
 			this.viewOverride = prevOverride;
+			if (o.encode) {
+				// right after the render's submit; the targets live until it resolves
+				await encoded?.after();
+				return null;
+			}
 			if (o.consume) {
 				// right after the render's submit, same queue; the targets live until it resolves
 				await o.consume(read);
@@ -3607,11 +3697,13 @@ export class WebGpuEngine implements Renderer {
 		return out;
 	}
 
-	/** readLayer's render (photo camera, terrain only) with the colour target handed to `consume`. */
+	/** readLayer's render (photo camera, terrain only) with the colour target handed to `consume`
+	 * after the render's submit, or to `encode` before it (the same submit). */
 	private async renderLayer(
 		w: number,
 		h: number,
-		consume: (color: Texture) => Promise<unknown>,
+		consume: ((color: Texture) => Promise<unknown>) | null,
+		encode?: (color: Texture, encoder: CommandEncoder) => EncodedWork | null,
 	) {
 		const g = this.gpu;
 		if (!g) return;
@@ -3621,7 +3713,8 @@ export class WebGpuEngine implements Renderer {
 			view: "photo",
 			cores: [new ViewGate(g.terrain, () => "photo")],
 			screen: false,
-			consume,
+			...(consume ? { consume } : {}),
+			...(encode ? { encode } : {}),
 		});
 	}
 
@@ -3706,6 +3799,9 @@ export class WebGpuEngine implements Renderer {
 
 // ---------------------------------------------------------------------------------------------
 // helpers
+
+/** GPU work recorded into a render's encoder (renderOffscreen `encode`). */
+type EncodedWork = { after: () => Promise<unknown>; cancel: () => void };
 
 /** Stand-in for a range grid nobody will sample (updateLook computed that none is needed). */
 const NO_GRID: RangeGrid = { w: 1, h: 1, at: () => Number.POSITIVE_INFINITY };

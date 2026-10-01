@@ -113,3 +113,114 @@ function finishAndSubmit(device: Device, enc: CommandEncoder) {
  */
 export const submitted = (enc: CommandEncoder): Promise<void> =>
 	checks.get(enc) ?? OK;
+
+/** luma's WebGPU device internals that Device.submit() itself uses (vendored 10.0.0-alpha.2). */
+type LumaSubmitInternals = {
+	_finalizeDefaultCommandEncoderForSubmit?: () => {
+		submittedCommandEncoder: {
+			resolveTimeProfilingQuerySet?: () => Promise<unknown>;
+			_gpuTimeMs?: number;
+		};
+		commandBuffer: { handle: unknown; destroy: () => void };
+	};
+	commandEncoder: { _gpuTimeMs?: number };
+	pushErrorScope: (scope: "validation") => void;
+	popErrorScope: (handler: (error: { message: string }) => void) => unknown;
+	handle: RawDevice & { queue: { submit: (buffers: unknown[]) => void } };
+};
+
+/**
+ * The device's default encoder (what device.submit() would submit: a render's passes and luma's
+ * uniform uploads) followed by `extra`, in ONE queue.submit, in that order (WAG W1.2: a render plus
+ * compute work on its targets). `extra` gets submit()'s semantics: error scopes when checks are on
+ * (submitted() / staged reads reject on an error), the pool and profiler hooks, and its staged
+ * reads cancelled when it is not submitted. The default encoder keeps Device.submit()'s
+ * (luma's validation report, time-profiling resolve).
+ * - Every `extra` is finished BEFORE the default encoder is touched: if one throws, all of `extra`
+ *   is dropped (staged reads cancelled) and the default encoder is submitted alone, exactly as
+ *   device.submit() would: returns false. A throw while recording `extra` is the caller's to catch
+ *   (drop the encoder); nothing here can make the default encoder's work invalid.
+ * - Not a luma WebGPU device (no default-encoder finaliser): device.submit(), then submit() per
+ *   extra (separate submits, same order); returns true.
+ * - A lost device: extras' reads cancelled, GpuDeviceLostError thrown (nothing submitted).
+ * Note: an extra that finishes but is INVALID (a validation error, not a throw) fails the whole
+ * queue.submit per WebGPU, the default encoder's buffer included; extras must be validated
+ * (formats, sizes, live resources) before recording.
+ */
+export function submitWithDefault(
+	device: Device,
+	extra: CommandEncoder[],
+): boolean {
+	if (device.isLost) {
+		for (const e of extra) failed(e);
+		throw new GpuDeviceLostError("submit");
+	}
+	const d = device as unknown as LumaSubmitInternals;
+	if (device.type !== "webgpu" || !d._finalizeDefaultCommandEncoderForSubmit) {
+		device.submit();
+		for (const e of extra) submit(device, e);
+		return true;
+	}
+	touch();
+	const finished: { handle: unknown; destroy: () => void }[] = [];
+	try {
+		for (const e of extra) finished.push(e.finish());
+	} catch (err) {
+		console.warn(
+			"[gpu] extra command buffer dropped, render submitted alone",
+			err,
+		);
+		for (const c of finished) c.destroy();
+		for (const e of extra) failed(e);
+		device.submit();
+		return false;
+	}
+	const { submittedCommandEncoder, commandBuffer } =
+		d._finalizeDefaultCommandEncoderForSubmit();
+	const raw = errorChecks() ? d.handle : null;
+	if (raw) {
+		raw.pushErrorScope("out-of-memory");
+		raw.pushErrorScope("validation");
+	}
+	d.pushErrorScope("validation");
+	let sent = false;
+	try {
+		d.handle.queue.submit([commandBuffer, ...finished].map((c) => c.handle));
+		sent = true;
+	} finally {
+		d.popErrorScope((error) => {
+			device.reportError(
+				new Error(`${device} command submission: ${error.message}`),
+				device,
+			)();
+		});
+		if (raw) {
+			const v = raw.popErrorScope();
+			const m = raw.popErrorScope();
+			const p = Promise.all([v, m]).then(([ve, me]) => {
+				if (ve) throw new GpuValidationError("validation", ve.message, "fused");
+				if (me)
+					throw new GpuValidationError("out-of-memory", me.message, "fused");
+			});
+			p.catch(() => {});
+			for (const e of extra) checks.set(e, p);
+		}
+		// as Device.submit: buffers used by submitted work are freed by WebGPU once it completes
+		commandBuffer.destroy();
+		for (const c of finished) c.destroy();
+		if (!sent) for (const e of extra) failed(e);
+	}
+	for (const e of extra) staged.delete(e);
+	// Device.submit's GPU-time resolve of the default encoder (luma debugGPUTime)
+	queueMicrotask(() => {
+		submittedCommandEncoder
+			.resolveTimeProfilingQuerySet?.()
+			.then(() => {
+				d.commandEncoder._gpuTimeMs = submittedCommandEncoder._gpuTimeMs;
+			})
+			.catch(() => {});
+	});
+	poolAfterSubmit(device);
+	profileAfterSubmit(device);
+	return true;
+}
