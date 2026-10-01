@@ -166,6 +166,8 @@ Order: W0.6 re-baseline first. W1.4 and W1.7 rest on unconfirmed costs, so measu
 
 ## 5. Decisions for the user
 
+**State 2026-10-01:** P1 answered (b), certified f32 per stage, each stage keeping its own EVAL/wild-set gate under the 0-false-accept rule; this unblocks WAG-3. P4 answered: vendor #3328 now as rigi.2. Both answers were relayed by session mt-image-1e, which asked the user directly. P2 and P3 are still open.
+
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
 | P1 | **Precision policy** for f64 CPU stages: horizon atan/ENU, align re-score, haze tail, band-stats fold, label projection | (a) keep exact f64, so each stays a graph break; (b) **certified f32**: GPU f32 with an exact certificate, and CPU f64 only on ties or uncertain cases (what solve already does); (c) re-baseline the CPU twins to f32 | (b) per stage, starting with horizon. Each stage still needs an EVAL/wild-set gate under the 0-false-accept rule |
