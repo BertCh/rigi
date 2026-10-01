@@ -37,7 +37,7 @@ Under WebGPU the render device is also the compute device (`adoptRenderDevice`).
 
 | Area | State |
 |---|---|
-| Looks | The GPU band-stats shader doesn't compile on the WebGPU host, so the CPU fallback runs. World-mode harmonize is unverified. |
+| Looks | Band stats run on the GPU on the WebGPU host: the bridge's `bandStatsTex` graph (plain `BAND_STATS`, subgroups off by default) and the `BAND_STATS_SG` variant both compile on the adopted render device (checked 2026-10-01, IMG_6958, Chrome/Metal; the render device requests `subgroups` and `float32-filterable`). The earlier "doesn't compile" was `BAND_STATS_SG`'s NaN constant, a shader-creation error, fixed in 2af1daf (-1 partials). World-mode harmonize is unverified. |
 | Step Inside (splats, photo sky, 3D tiles) | Code done, never run end to end |
 | Export | Works, but full resolution needs tiling |
 | Device loss | A failed rebuild stays dead; there is no mid-session switch to WebGL |
