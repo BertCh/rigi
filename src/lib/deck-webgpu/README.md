@@ -150,7 +150,12 @@ where nothing else did.
 - `readback.ts`: `TextureReader` (staging buffer, 256-byte row alignment, top-first rows) and
   `readGeometry`.
 - `imagery.ts`: `ImageryArray` is the imagery as one rgba8unorm-srgb 2D array, with 512² layers
-  and per-layer mips. Capacity grows up to `maxTextureArrayLayers` (`featureLevel: 'max'`).
+  and per-layer mips. Capacity grows up to `maxTextureArrayLayers` (`featureLevel: 'max'`). The
+  array is created on the first tile with imagery (the photo view's default look drapes none; until
+  then the terrain binds a 1×1 empty array).
+- `base-slots.ts`: the batched terrain's base-grid storage buffer is packed, one slot of
+  2·(G+1)² vec4 per tile at an offset kept in the tile's table row (`t2.w`), instead of a fixed
+  G = 64 slot per row (WAG W1.6: 47 → ~17 MiB in the photo view, with 15 % headroom). `base-slots.check.ts` (node).
 - `texture-array-atlas.ts`: `TextureArrayAtlas`, the growable 2D array with a layer free list under
   both `ImageryArray` and the batched terrain's r32float height arrays. Layers are written through
   the `gpu/ingest` adapters (`uploadRaster` / `uploadBitmap` with `into`); a grow re-creates the
@@ -158,6 +163,10 @@ where nothing else did.
   The pure math (allocation order, growth, grow copies, the ancestor uv window) is in
   `atlas-layout.ts`, checked by `atlas-layout.check.ts`; the frame gate is
   `scripts/deck-webgpu/atlas-frames-check.mjs`.
+- **VRAM (WAG W1.6)**: `scripts/gpu/vram-attribution.mjs` lists every live WebGPU texture / buffer of
+  the photo view by label and creating call site (an init script wraps `GPUDevice.create*`, dev
+  only), next to luma's totals. The re-rank's 384 px silhouette sources are released 2 s after the
+  last `autoAlign` / `silhouetteScore` (engine `SIL_IDLE_MS`).
 
 ## Layer contract (`pass.ts`)
 

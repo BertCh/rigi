@@ -8,11 +8,12 @@
 //   - heights:   r32float 2d-arrays (TextureArrayAtlas, grown by copy; 256² layers for ≤ 256 px
 //                tiles, 512² for the near tiles), read with textureLoad in the vertex shader (no
 //                filtering; the bilinear is dem/grid.ts sampleGrid, done by hand)
-//   - base grid: a read-only storage buffer, one fixed slot of 2·(BASE_MAX+1)² vec4 per tile row:
-//                per node the ENU of the h = 0 surface (batched-terrain-grid.ts buildBatchGrid) and
-//                the ellipsoid up vector (CPU, double; replaces the WebGL shader's per-vertex trig)
+//   - base grid: a read-only storage buffer, one packed slot of 2·(G+1)² vec4 per tile (offset in
+//                the tile's table row; base-slots.ts, WAG W1.6): per node the ENU of the h = 0
+//                surface (batched-terrain-grid.ts buildBatchGrid) and the ellipsoid up vector (CPU,
+//                double; replaces the WebGL shader's per-vertex trig)
 //   - tile table: a read-only storage buffer, one 48-byte TileRow per tile (height layer, size,
-//                seg, skirt | Mercator / lon params | G, big, imagery layer)
+//                seg, skirt | Mercator / lon params | G, big, imagery layer, base-grid offset)
 //   - instances: per (pass kind, seg) a compact uint32 vertex buffer of the visible tiles' table
 //                rows (CPU-culled with the grid's bounding sphere), step mode "instance". On WebGPU
 //                (flag terrainGpuCull, default on; WAG W1.5) terrain-cull.ts culls and compacts them
@@ -50,6 +51,7 @@ import type { TileMesh } from "#/lib/deck/terrain-data";
 import { getFlag } from "#/lib/flags";
 import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 import { gpuEnabled } from "#/lib/gpu/core/device";
+import { BaseSlotAllocator, baseSlotVec4, placeSlots } from "../base-slots";
 import { type CameraUniforms, sphereInView } from "../camera";
 import type { ImageryArray } from "../imagery";
 import {
@@ -75,8 +77,8 @@ import { type CulledDraw, TerrainGpuCull } from "./terrain-cull";
 
 const SMALL = 256;
 const BIG = 512;
-/** vec4s per base-grid slot: 2 per node (base, up) × the largest grid, (BASE_MAX + 1)². */
-const BASE_SLOT = 2 * (BASE_MAX + 1) * (BASE_MAX + 1);
+/** vec4s of the largest base-grid slot: 2 per node (base, up) × (BASE_MAX + 1)². */
+const BASE_SLOT = baseSlotVec4(BASE_MAX);
 /** Floats per tile-table row (3 × vec4). */
 const ROW_FLOATS = 12;
 /** Offset of the imagery layer inside a row (t2.z). */
@@ -92,7 +94,7 @@ struct TileRow {
   // Mercator angle at the north edge, its span, west lon − frame lon, lon span (rad); unused by
   // the shader (the up vectors are in baseGrid), kept for diagnostics
   geo: vec4<f32>,
-  // base cells G, big (1 = 512² pool), imagery layer (−1 none), 0
+  // base cells G, big (1 = 512² pool), imagery layer (−1 none), base-grid slot offset (vec4)
   t2: vec4<f32>,
 };
 
@@ -103,10 +105,9 @@ struct TileRow {
 
 const BT_EARTH_R: f32 = ${f32(EARTH_R)};
 const BT_REFRACTION_K: f32 = ${f32(REFRACTION_K)};
-const BT_BASE_SLOT: u32 = ${BASE_SLOT}u;
 
 struct BatchTile {
-  row: u32,
+  base: u32,
   layer: i32,
   big: bool,
   size: f32,
@@ -153,7 +154,7 @@ fn bt_surface(t: BatchTile, f: vec2<f32>) -> BtSurface {
   let c = min(floor(g), vec2<f32>(t.g - 1.0));
   let w = g - c;
   let n = u32(t.g + 0.5) + 1u;
-  let o = t.row * BT_BASE_SLOT + 2u * (u32(c.y) * n + u32(c.x));
+  let o = t.base + 2u * (u32(c.y) * n + u32(c.x));
   let o1 = o + 2u * n;
   var r: BtSurface;
   var b = mix(
@@ -187,7 +188,7 @@ fn bt_vertex(t: BatchTile, i: f32, j: f32) -> vec4<f32> {
 ) -> Varyings {
   let r = tileTable[row];
   var t: BatchTile;
-  t.row = row;
+  t.base = u32(r.t2.w);
   t.layer = i32(r.t0.x + 0.5);
   t.size = r.t0.y;
   t.seg = r.t0.z;
@@ -249,7 +250,14 @@ const BUF_USAGE = {
 	STORAGE: 0x0080,
 } as const;
 
-type Slot = { row: number; layer: number; big: boolean };
+/** A resident tile: table row, height layer, base-grid slot (offset −1 = not placed yet). */
+type Slot = {
+	row: number;
+	layer: number;
+	big: boolean;
+	size: number;
+	base: number;
+};
 
 /** A growable r32float 2d-array of `size`² height layers: a TextureArrayAtlas that grows by copy
  * (layers keep their heights; only fresh tiles upload). */
@@ -290,6 +298,9 @@ class TileStore {
 	readonly slots = new Map<TileMesh, Slot>();
 	private readonly maxLayers: number;
 	private readonly maxRows: number;
+	/** the most vec4s the base buffer may hold (binding limit; offsets stay f32-exact) */
+	private readonly maxBase: number;
+	private readonly baseSlots: BaseSlotAllocator;
 	/** Tiles dropped for lack of layers / rows (device limits). */
 	overflow = 0;
 
@@ -299,12 +310,9 @@ class TileStore {
 			maxStorageBufferBindingSize?: number;
 		};
 		this.maxLayers = lim.maxTextureArrayLayers || 256;
-		this.maxRows = Math.max(
-			16,
-			Math.floor(
-				(lim.maxStorageBufferBindingSize ?? 128 * 2 ** 20) / (BASE_SLOT * 16),
-			),
-		);
+		const maxBinding = lim.maxStorageBufferBindingSize ?? 128 * 2 ** 20;
+		this.maxRows = Math.max(16, Math.floor(maxBinding / (BASE_SLOT * 16)));
+		this.maxBase = Math.min(2 ** 24, Math.floor(maxBinding / 16));
 		this.small = heightPool(
 			device,
 			"bterrain-h256",
@@ -315,9 +323,20 @@ class TileStore {
 		this.big = heightPool(device, "bterrain-h512", BIG, 16, this.maxLayers);
 		this.tableData = new Float32Array(0);
 		this.growRows(128);
+		// initial room: 128 tiles of G = 32 (the photo view's common grid)
+		this.baseSlots = new BaseSlotAllocator(128 * baseSlotVec4(32));
+		this.base = this.createBase(this.baseSlots.capacity);
 	}
 
-	/** (Re)create the row buffers for `cap` rows; true when they were re-created. */
+	private createBase(vec4s: number) {
+		return this.device.createBuffer({
+			id: "bterrain-base",
+			usage: BUF_USAGE.STORAGE | BUF_USAGE.COPY_DST,
+			byteLength: vec4s * 16,
+		});
+	}
+
+	/** (Re)create the table buffer for `cap` rows; true when it was re-created. */
 	private growRows(need: number) {
 		if (need <= this.rowsCap) return false;
 		const cap = Math.min(
@@ -325,13 +344,7 @@ class TileStore {
 			Math.max(need, Math.ceil(this.rowsCap * 1.5)),
 		);
 		if (cap === this.rowsCap) return false;
-		this.base?.destroy();
 		this.table?.destroy();
-		this.base = this.device.createBuffer({
-			id: "bterrain-base",
-			usage: BUF_USAGE.STORAGE | BUF_USAGE.COPY_DST,
-			byteLength: cap * BASE_SLOT * 16,
-		});
 		this.table = this.device.createBuffer({
 			id: "bterrain-table",
 			usage: BUF_USAGE.STORAGE | BUF_USAGE.COPY_DST,
@@ -354,16 +367,22 @@ class TileStore {
 				this.slots.delete(m);
 				this.freeRows.push(s.row);
 				(s.big ? this.big : this.small).release(s.layer);
+				if (s.base >= 0) this.baseSlots.release(s.base, s.size);
 			}
 		const fresh = [...want].filter((m) => !this.slots.has(m));
 		if (!fresh.length) return;
+		const freshSlots: Slot[] = [];
 		for (const m of fresh) {
 			const big = m.size > SMALL;
-			this.slots.set(m, {
+			const slot: Slot = {
 				row: this.freeRows.pop() ?? this.nextRow++,
 				layer: (big ? this.big : this.small).alloc(),
 				big,
-			});
+				size: m.grid ? baseSlotVec4(m.grid.G) : 0,
+				base: -1,
+			};
+			this.slots.set(m, slot);
+			freshSlots.push(slot);
 		}
 		let maxSmall = 0;
 		let maxBig = 0;
@@ -377,24 +396,48 @@ class TileStore {
 		this.small.reserve(maxSmall);
 		this.big.reserve(maxBig);
 		const reRows = this.growRows(maxRow);
-		const freshSet = new Set(fresh);
 		this.overflow = 0;
+		const drop = (m: TileMesh, s: Slot) => {
+			// past a device limit: not drawn
+			this.slots.delete(m);
+			this.freeRows.push(s.row);
+			(s.big ? this.big : this.small).release(s.layer);
+			if (s.base >= 0) this.baseSlots.release(s.base, s.size);
+			this.overflow++;
+		};
+		// out of height layers or rows: dropped before the base slots are placed, so they never
+		// take base-grid room from a tile that is drawn
+		for (const [m, s] of this.slots)
+			if (
+				s.layer >= (s.big ? this.big : this.small).capacity ||
+				s.row >= this.rowsCap
+			)
+				drop(m, s);
+		const live = new Set(this.slots.values());
+		const placed = placeSlots(
+			this.baseSlots,
+			live,
+			freshSlots.filter((s) => live.has(s)),
+			this.maxBase,
+		);
+		if (placed.repacked && this.base.byteLength !== placed.capacity * 16) {
+			this.base.destroy();
+			this.base = this.createBase(placed.capacity);
+		}
+		const freshSet = new Set(fresh);
 		for (const [m, s] of this.slots) {
 			const pool = s.big ? this.big : this.small;
-			if (s.layer >= pool.capacity || s.row >= this.rowsCap) {
-				// past a device limit: not drawn
-				this.slots.delete(m);
-				this.freeRows.push(s.row);
-				pool.release(s.layer);
-				this.overflow++;
+			if (s.base < 0) {
+				drop(m, s);
 				continue;
 			}
 			const isFresh = freshSet.has(m);
 			if (isFresh) pool.writeRaster(s.layer, m.heights, m.size);
 			const g = m.grid;
 			if (!g) continue;
-			if (isFresh || reRows) {
-				this.base.write(baseWithUp(g), s.row * BASE_SLOT * 16);
+			if (isFresh || placed.repacked)
+				this.base.write(baseWithUp(g), s.base * 16);
+			if (isFresh || reRows || placed.repacked) {
 				this.tableData.set(
 					[
 						s.layer,
@@ -408,7 +451,7 @@ class TileStore {
 						g.G,
 						s.big ? 1 : 0,
 						layerOf(m.id),
-						0,
+						s.base,
 					],
 					s.row * ROW_FLOATS,
 				);

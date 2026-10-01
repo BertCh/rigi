@@ -282,6 +282,8 @@ const COMPOSITE_ONLY = new Set<string>([
 /** Settings a pointer drives continuously (lens, swipe). */
 const POINTER_SETTINGS = new Set<string>(["lens", "swipe"]);
 
+/** Idle time after which the silhouette re-rank's sources are released (WAG W1.6). */
+const SIL_IDLE_MS = 2000;
 /** Photo camera near plane (deck PhotoView near 1; geometry-source default). */
 const PHOTO_NEAR = 1;
 
@@ -585,6 +587,9 @@ export class WebGpuEngine implements Renderer {
 	private vis = new Map<SnappedPeak, boolean>();
 	private profiles?: TerrainProfiles;
 	private silSources: GeometrySource[] = [];
+	/** silhouette re-ranks in flight; the sources are released SIL_IDLE_MS after the last (W1.6) */
+	private silUsers = 0;
+	private silIdleTimer = 0;
 	private imagery = {
 		key: "",
 		map: new Map<string, ImageBitmap>(),
@@ -1403,6 +1408,7 @@ export class WebGpuEngine implements Renderer {
 		clearTimeout(this.statsTimer);
 		clearTimeout(this.lookTimer);
 		clearTimeout(this.idleTimer);
+		clearTimeout(this.silIdleTimer);
 		clearTimeout(this.warmTimer);
 		clearTimeout(this.wedgeTimer);
 		cancelAnimationFrame(this.worldRaf);
@@ -2892,6 +2898,34 @@ export class WebGpuEngine implements Renderer {
 
 	/** deck/engine.ts autoAlign: skyline search, then finalists re-ranked by rendered silhouettes. */
 	async autoAlign(fromPrior = true): Promise<AlignResult | null> {
+		this.silUsers++;
+		clearTimeout(this.silIdleTimer);
+		try {
+			return await this.autoAlignRanked(fromPrior);
+		} finally {
+			this.silUsers--;
+			this.releaseSilhouetteSourcesWhenIdle();
+		}
+	}
+
+	/**
+	 * The re-rank's 384 px sources (up to one per finalist, ~3 MiB of targets each) are only used
+	 * while an autoAlign runs: drop them once none has run for SIL_IDLE_MS. The next autoAlign
+	 * re-creates them (same size, same renders).
+	 */
+	private releaseSilhouetteSourcesWhenIdle() {
+		clearTimeout(this.silIdleTimer);
+		if (this.silUsers > 0 || this.disposed) return;
+		this.silIdleTimer = window.setTimeout(() => {
+			if (this.silUsers > 0 || this.disposed) return;
+			for (const s of this.silSources) s.dispose?.();
+			this.silSources = [];
+		}, SIL_IDLE_MS);
+	}
+
+	private async autoAlignRanked(
+		fromPrior: boolean,
+	): Promise<AlignResult | null> {
 		if (!this.horizonDirs || !this.photoPrep) return null;
 		const tSearch = performance.now();
 		// the search's inputs as of this call (the lazy read below awaits)
@@ -3022,10 +3056,17 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	async silhouetteScore(pose: Pose) {
-		const src = this.silhouetteSource();
-		if (!src) return 0;
-		await src.render(pose);
-		return this.scoreSilhouette(src);
+		this.silUsers++;
+		clearTimeout(this.silIdleTimer);
+		try {
+			const src = this.silhouetteSource();
+			if (!src) return 0;
+			await src.render(pose);
+			return this.scoreSilhouette(src);
+		} finally {
+			this.silUsers--;
+			this.releaseSilhouetteSourcesWhenIdle();
+		}
 	}
 
 	/** deck/engine.ts scoreSilhouette (rows top-down). */

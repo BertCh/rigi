@@ -181,6 +181,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "base-slots",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/deck-webgpu/base-slots.check.ts"),
+		note: "batched-terrain packed base-grid slots (WAG W1.6): no overlap, inside capacity, f32-exact offsets, 1.5x growth over random pan sequences (browser frame gate: scripts/deck-webgpu/atlas-frames-check.mjs)",
+		timeoutS: 60,
+	},
+	{
 		id: "labels",
 		tier: "fast",
 		group: "look",

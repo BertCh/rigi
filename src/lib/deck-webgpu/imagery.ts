@@ -11,7 +11,11 @@
 // arrays): capacity grows in chunks (copyTextureToTexture keeps every mip of the existing layers) up
 // to the device's maxTextureArrayLayers (256 on 'core' devices, 2048 on Apple with featureLevel
 // 'max'). Tiles that don't fit draw without imagery (hillshade) and are counted in stats.overflow.
-import type { Device } from "@luma.gl/core";
+//
+// The atlas is created on the first tile that has imagery (WAG W1.6): the photo view's default look
+// drapes none, and the 64-layer mipmapped array is 85 MiB. Until then `texture` is null and the
+// terrain binds its 1×1 empty array (every row's layer is −1, so the drape is never shown).
+import type { Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { USAGE } from "./targets";
 import { TextureArrayAtlas } from "./texture-array-atlas";
@@ -33,7 +37,8 @@ const MIP_LEVELS = Math.log2(IMAGERY_LAYER_SIZE) + 1;
 const GROW = 64;
 
 export class ImageryArray {
-	readonly atlas: TextureArrayAtlas;
+	/** null until the first tile with imagery (see the header) */
+	atlas: TextureArrayAtlas | null = null;
 	/** tile id → array layer */
 	private layers = new Map<string, number>();
 	/** tile id → the bitmap the layer holds (identity: a new bitmap re-uploads) */
@@ -53,7 +58,10 @@ export class ImageryArray {
 			(device.limits as { maxTextureArrayLayers?: number })
 				.maxTextureArrayLayers ?? 256,
 		);
-		this.atlas = new TextureArrayAtlas(device, {
+	}
+
+	private createAtlas() {
+		return new TextureArrayAtlas(this.device, {
 			id: "imagery-array",
 			format: "rgba8unorm-srgb",
 			size: IMAGERY_LAYER_SIZE,
@@ -73,9 +81,9 @@ export class ImageryArray {
 		});
 	}
 
-	/** The array texture (re-created when the atlas grows: read it per use). */
+	/** The array texture (re-created when the atlas grows: read it per use); null = no imagery yet. */
 	get texture() {
-		return this.atlas.texture;
+		return this.atlas?.texture ?? null;
 	}
 
 	/** Layer of a tile's imagery, or -1 (none yet / overflow). */
@@ -88,22 +96,25 @@ export class ImageryArray {
 	 * releases layers of dropped tiles, uploads new / changed bitmaps asynchronously.
 	 */
 	sync(images: ReadonlyMap<string, ImageBitmap>, keep: Iterable<string>) {
+		if (this.destroyed) return;
 		const want = new Set(keep);
 		for (const [id, layer] of this.layers)
 			if (!want.has(id) || !images.has(id)) {
 				this.layers.delete(id);
 				this.sources.delete(id);
-				this.atlas.release(layer);
+				this.atlas?.release(layer);
 			}
 		let overflow = 0;
 		for (const id of want) {
 			const bmp = images.get(id);
 			if (!bmp || this.sources.get(id) === bmp || this.pending.get(id) === bmp)
 				continue;
+			this.atlas ??= this.createAtlas();
+			const atlas = this.atlas;
 			if (
 				!this.layers.has(id) &&
-				!this.atlas.available() &&
-				!this.atlas.reserve(this.atlas.capacity + 1)
+				!atlas.available() &&
+				!atlas.reserve(atlas.capacity + 1)
 			) {
 				overflow++;
 				continue;
@@ -113,7 +124,7 @@ export class ImageryArray {
 		}
 		this.stats.overflow = overflow;
 		this.stats.layers = this.layers.size;
-		this.stats.capacity = this.atlas.capacity;
+		this.stats.capacity = this.atlas?.capacity ?? 0;
 	}
 
 	private async upload(id: string, bmp: ImageBitmap) {
@@ -136,26 +147,28 @@ export class ImageryArray {
 			return;
 		}
 		this.pending.delete(id);
+		const atlas = this.atlas;
+		if (!atlas) return; // only sync() starts uploads, after creating the atlas
 		let layer = this.layers.get(id);
 		if (layer === undefined) {
-			layer = this.atlas.allocWithin();
+			layer = atlas.allocWithin();
 			if (layer === undefined) {
 				if (img !== bmp) img.close();
 				return;
 			}
 			this.layers.set(id, layer);
 		}
-		this.atlas.writeBitmap(layer, img);
+		atlas.writeBitmap(layer, img);
 		if (img !== bmp) img.close();
 		this.sources.set(id, bmp);
 		this.stats.uploads++;
 		this.stats.layers = this.layers.size;
-		this.layerMips(layer);
+		this.layerMips(atlas.texture, layer);
 		this.onChange?.();
 	}
 
 	/** Build mip levels 1..n of one array layer (the rest of the array is untouched). */
-	private layerMips(layer: number) {
+	private layerMips(texture: Texture, layer: number) {
 		const d = this.device;
 		this.mipSampler ??= d.createSampler({
 			minFilter: "linear",
@@ -175,14 +188,14 @@ export class ImageryArray {
 		} as never);
 		const views = [];
 		for (let mip = 1; mip < MIP_LEVELS; mip++) {
-			const src = this.texture.createView({
+			const src = texture.createView({
 				dimension: "2d",
 				baseMipLevel: mip - 1,
 				mipLevelCount: 1,
 				baseArrayLayer: layer,
 				arrayLayerCount: 1,
 			});
-			const dst = this.texture.createView({
+			const dst = texture.createView({
 				dimension: "2d",
 				baseMipLevel: mip,
 				mipLevelCount: 1,
@@ -216,7 +229,8 @@ export class ImageryArray {
 		this.destroyed = true;
 		this.mipModel?.destroy();
 		this.mipSampler?.destroy();
-		this.atlas.destroy();
+		this.atlas?.destroy();
+		this.atlas = null;
 		this.layers.clear();
 		this.sources.clear();
 		this.pending.clear();
