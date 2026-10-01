@@ -666,12 +666,18 @@ export class DeckEngine implements Renderer {
 		} catch (e) {
 			console.warn("[deck-engine] finalizing the lost Deck", e);
 		}
+		// the GPU drape's textures die with the context: keep the drape on the CPU buffer, still
+		// readable here, so it isn't blank until the next geometry read
+		if (this.drape?.map.texture) {
+			const src = this.geoSrc;
+			this.drape = src?.pose
+				? { gen: this.drape.gen, map: rangeMapFrom(src) }
+				: null;
+		}
 		try {
 			this.dropGeometrySources();
 		} catch {}
-		// the GPU drape's textures died with the context (the CPU map is re-uploaded by new layers)
 		this.drapeTex = [];
-		if (this.drape?.map.texture) this.drape = null;
 		const prev = this.compositor;
 		prev.onChange = undefined;
 		this.compositor = this.makeCompositor(prev);
@@ -2597,9 +2603,17 @@ export class DeckEngine implements Renderer {
 		if (!device) return null;
 		const { width, height } = src;
 		// the texture the layers may bind until this generation's props reach them
-		const bound = this.drape?.map.texture;
+		// (the last generation may have fallen to CPU, so also the ones the world layers still hold)
+		const bound = new Set<unknown>(
+			this.worldList.map(
+				(l) =>
+					(l as { props?: { photoRange?: PhotoRangeMap | null } } | null)?.props
+						?.photoRange?.texture,
+			),
+		);
+		bound.add(this.drape?.map.texture);
 		let tex = this.drapeTex.find(
-			(t) => t !== bound && t.width === width && t.height === height,
+			(t) => !bound.has(t) && t.width === width && t.height === height,
 		);
 		if (!tex) {
 			tex = device.createTexture({
@@ -2615,7 +2629,7 @@ export class DeckEngine implements Renderer {
 		// older textures (a resize) are no layer's any more
 		const keep = tex;
 		this.drapeTex = this.drapeTex.filter((t) => {
-			if (t === keep || t === bound) return true;
+			if (t === keep || bound.has(t)) return true;
 			t.destroy();
 			return false;
 		});
