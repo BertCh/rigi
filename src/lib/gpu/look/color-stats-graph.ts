@@ -1,5 +1,5 @@
-// The band-stats dispatch (color-stats.ts bandPartials) as a core ComputeGraph node. Opt-in per call:
-// bandStatsGpu(…, { graph: true }); the pooled single-dispatch path stays the default.
+// The band-stats dispatch (color-stats.ts bandPartials) as a core ComputeGraph node: the default of
+// bandStatsGpu(…); { graph: false } runs the pooled single-dispatch path.
 //
 //   BAND_STATS or BAND_STATS_SG (one node, GROUPS workgroups) → partial (transient) → read node
 //

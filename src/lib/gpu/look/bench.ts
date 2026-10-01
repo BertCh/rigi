@@ -124,8 +124,9 @@ export async function runLookBench(
 	opts: { reps?: number; label?: string; graph?: boolean } = {},
 ) {
 	const reps = opts.reps ?? 5;
-	// graph: relief / guided / band stats through their ComputeGraph paths (*-graph.ts)
-	const graph = opts.graph ?? false;
+	// graph (default true, the product default): relief / haze / guided / band stats through their
+	// ComputeGraph paths (*-graph.ts); false: the pooled / dispatch paths
+	const graph = opts.graph ?? true;
 	const device = await getComputeDevice();
 	if (!device) return { error: "no WebGPU compute device" };
 	const inp: LookInputs = captureLookInputs(engine, opts.label);
@@ -163,23 +164,27 @@ export async function runLookBench(
 	if (inp.haze) {
 		const h = inp.haze;
 		const cpu = await time(reps, () => fitHaze(h));
-		const gpu = await time(reps, () => fitHazeGpu(device, h));
+		const gpu = await time(reps, () => fitHazeGpu(device, h, { graph }));
 		const gpuSteps = { ...hazeGpuTimes };
 		// the full lin + bins readback path (compact: false) must give the very same fit
 		const full = await time(reps, () =>
 			fitHazeGpu(device, h, { compact: false }),
 		);
 		const fullSteps = { ...hazeGpuTimes };
-		// the compact path's tail read (lists longer than the first read's estimate), forced with a
-		// 64-slot first read: it must give the very same fit too
+		// the compact dispatch path's tail read (lists longer than the first read's estimate), forced
+		// with a 64-slot first read: it must give the very same fit too
 		const forced = await time(reps, () =>
-			fitHazeGpu(device, h, { listHead: 64 }),
+			fitHazeGpu(device, h, { graph: false, listHead: 64 }),
 		);
 		const forcedSteps = { ...hazeGpuTimes };
-		// the graph path (./haze-graph.ts, opt-in): the very same fit, with its adaptive first read
-		// and with the forced 64-slot one
+		// the compact dispatch path with its own first-read estimate: the very same fit
+		const dispatch = await time(reps, () =>
+			fitHazeGpu(device, h, { graph: false }),
+		);
+		// the graph path (./haze-graph.ts, the default): the very same fit, with its adaptive first
+		// read and with the forced 64-slot one
 		const { hazeGraphStats } = await import("./haze-graph");
-		const graph = await time(reps, () =>
+		const viaGraph = await time(reps, () =>
 			fitHazeGpu(device, h, { graph: true }),
 		);
 		const graphStats = { ...hazeGraphStats };
@@ -204,9 +209,13 @@ export async function runLookBench(
 				readKB: forcedSteps.readKB,
 				identical: sameFit(gpu.out, forced.out),
 			},
+			dispatch: {
+				gpuMs: dispatch.ms,
+				identical: sameFit(gpu.out, dispatch.out),
+			},
 			graph: {
-				gpuMs: graph.ms,
-				identical: sameFit(gpu.out, graph.out),
+				gpuMs: viaGraph.ms,
+				identical: sameFit(gpu.out, viaGraph.out),
 				head: graphStats.head,
 				total: graphStats.total,
 				tailRead: graphStats.tail,
@@ -318,8 +327,14 @@ export async function runLookBenchWarm(
 	return { warmMs, ...(await runLookBench(engine, opts)) };
 }
 
-/** runLookBench with relief / guided / band stats on their ComputeGraph paths (look-bench.mjs --fn runLookBenchGraph). */
+/** runLookBench with relief / haze / guided / band stats on their ComputeGraph paths (the default; look-bench.mjs --fn runLookBenchGraph). */
 export const runLookBenchGraph = (
 	engine: unknown,
 	opts: { reps?: number; label?: string } = {},
 ) => runLookBench(engine, { ...opts, graph: true });
+
+/** runLookBench on the pooled / dispatch paths, graph: false (look-bench.mjs --fn runLookBenchDispatch). */
+export const runLookBenchDispatch = (
+	engine: unknown,
+	opts: { reps?: number; label?: string } = {},
+) => runLookBench(engine, { ...opts, graph: false });

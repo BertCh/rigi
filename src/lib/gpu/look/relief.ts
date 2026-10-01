@@ -68,7 +68,7 @@ const SVF_R = 3000;
 const HOLE = -1e6;
 
 export type ReliefGpuOptions = {
-	/** run the passes on a core ComputeGraph (relief-graph.ts); default false: the pooled path below */
+	/** run the passes on a core ComputeGraph (relief-graph.ts); default true; false: the pooled path below */
 	graph?: boolean;
 };
 
@@ -161,7 +161,7 @@ export async function reliefPassesGpu(
 	f32(1 / (2 * ra * px)); // g
 	f32(SVF_R);
 
-	if (opts.graph)
+	if (opts.graph ?? true)
 		return (await import("./relief-graph")).reliefGraphPasses(
 			device,
 			H,

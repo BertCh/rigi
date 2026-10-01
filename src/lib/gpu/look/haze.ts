@@ -174,8 +174,8 @@ export type HazeGpuOptions = {
 	listHead?: number;
 	/**
 	 * Run both submits on core ComputeGraphs (./haze-graph.ts: shape-keyed cache, aliased transients,
-	 * clear nodes, an adaptive first-read length). Default false (the dispatch path below). Compact
-	 * only: with compact: false the dispatch path runs. The fit is bit-identical either way.
+	 * clear nodes, an adaptive first-read length). Default true; false runs the dispatch path below.
+	 * Compact only: with compact: false the dispatch path runs. The fit is bit-identical either way.
 	 */
 	graph?: boolean;
 };
@@ -652,9 +652,11 @@ export async function fitHazeGpu(
 		fgRad,
 		skyIdx,
 	] as const;
-	// opt-in: both submits on core ComputeGraphs (./haze-graph.ts, compact lists only)
+	// default: both submits on core ComputeGraphs (./haze-graph.ts, compact lists only)
 	const g =
-		opts.graph && (opts.compact ?? true) ? await import("./haze-graph") : null;
+		(opts.graph ?? true) && (opts.compact ?? true)
+			? await import("./haze-graph")
+			: null;
 	const prep = g
 		? await g.prepGraph(...args, opts.listHead)
 		: await prepGpu(...args, opts.compact ?? true, opts.listHead);

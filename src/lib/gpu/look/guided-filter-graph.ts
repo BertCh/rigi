@@ -1,5 +1,5 @@
 // The GPU guided filter (guided-filter.ts guidedFiltersGpu) on a core ComputeGraph. Opt-in per
-// call: guidedFiltersGpu(…, { graph: true }); the pooled dispatchAll path stays the default.
+// call: the default of guidedFiltersGpu(…); { graph: false } runs the pooled dispatchAll path.
 //
 // Per job k (shared guide I):  H0 → t4ₖ → V0 → abₖ → H1 → t2ₖ → V1 → qₖ;  then one read node (all q).
 //

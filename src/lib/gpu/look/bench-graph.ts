@@ -199,7 +199,9 @@ async function reliefCase(
 	res: number,
 	sun: Vec3,
 ) {
-	const a = await reliefPassesGpu(device, H, res, pxOf(res), sun);
+	const a = await reliefPassesGpu(device, H, res, pxOf(res), sun, {
+		graph: false,
+	});
 	const b = await reliefPassesGpu(device, H, res, pxOf(res), sun, {
 		graph: true,
 	});
@@ -217,7 +219,7 @@ async function guidedCase(
 	h: number,
 	jobs: GuidedJob[],
 ) {
-	const a = await guidedFiltersGpu(device, I, w, h, jobs);
+	const a = await guidedFiltersGpu(device, I, w, h, jobs, { graph: false });
 	const b = await guidedFiltersGpu(device, I, w, h, jobs, { graph: true });
 	return {
 		q: a.map((x, k) => differ(x, b[k], true)),
@@ -244,7 +246,7 @@ async function statsCase(device: Device, o: BandStatsInput, sg: boolean) {
 	const pa = await bandPartials(device, o, words, R, sg);
 	const pb = await bandPartialsGraph(device, o, words, R, sg);
 	const hit = lastStatsGraphRun.hit;
-	const sa = await bandStatsGpu(device, o, { subgroups: sg });
+	const sa = await bandStatsGpu(device, o, { subgroups: sg, graph: false });
 	const sb = await bandStatsGpu(device, o, { subgroups: sg, graph: true });
 	let negative = 0;
 	for (let g = 0; g < GROUPS; g++) if (pa[g * STATS_VALUES] < 0) negative++;
@@ -565,6 +567,7 @@ export async function runLookGraphOnEngine(
 			r.frame,
 			r.sunDir,
 			r.yaw,
+			{ graph: false },
 		);
 		const b = await buildReliefFieldGpu(
 			device,

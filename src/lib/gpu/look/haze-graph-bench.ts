@@ -229,7 +229,7 @@ export async function runHazeGraphBench(
 		dims: [h.geoW, h.geoH],
 		geo: h.geo.kind,
 	};
-	const old = await fitHazeGpu(device, h);
+	const old = await fitHazeGpu(device, h, { graph: false });
 	const oldSteps = { ...hazeGpuTimes };
 
 	// 1. graph vs dispatch (first run = the device's first head estimate, then adaptive)
@@ -239,7 +239,10 @@ export async function runHazeGraphBench(
 	const s2 = { ...hazeGraphStats };
 	const gf = await fitHazeGpu(device, h, { graph: true, listHead: 64 });
 	const sf = { ...hazeGraphStats };
-	const oldForced = await fitHazeGpu(device, h, { listHead: 64 });
+	const oldForced = await fitHazeGpu(device, h, {
+		graph: false,
+		listHead: 64,
+	});
 	out.parity = {
 		identical: sameFit(old, g1) && sameFit(old, g2),
 		firstRun: {
@@ -276,7 +279,7 @@ export async function runHazeGraphBench(
 	];
 	const reuse: Record<string, unknown>[] = [];
 	for (const [name, x] of seq) {
-		const a = await fitHazeGpu(device, x);
+		const a = await fitHazeGpu(device, x, { graph: false });
 		const b = await fitHazeGpu(device, x, { graph: true });
 		reuse.push({
 			name,
@@ -391,7 +394,7 @@ export async function runHazeGraphBench(
 	const pG: number[] = [];
 	for (let i = 0; i < 2 * reps; i++) {
 		let t = performance.now();
-		await fitHazeGpu(device, h);
+		await fitHazeGpu(device, h, { graph: false });
 		tD.push(performance.now() - t);
 		pD.push(hazeGpuTimes.gpuPrep);
 		t = performance.now();
@@ -400,7 +403,7 @@ export async function runHazeGraphBench(
 		pG.push(hazeGpuTimes.gpuPrep);
 	}
 	const oldT = { ...hazeGpuTimes };
-	await fitHazeGpu(device, h);
+	await fitHazeGpu(device, h, { graph: false });
 	const dT = { ...hazeGpuTimes };
 	out.ms = {
 		dispatch: +median(tD).toFixed(2),

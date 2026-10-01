@@ -1,5 +1,5 @@
-// The GPU haze fit's two submits on core ComputeGraphs (opt-in: fitHazeGpu(device, input,
-// { graph: true }); the dispatch path in ./haze.ts stays the default), plus fitHazeFromPrep, which
+// The GPU haze fit's two submits on core ComputeGraphs (the default: fitHazeGpu(device, input);
+// { graph: false } runs the dispatch path in ./haze.ts), plus fitHazeFromPrep, which
 // finishes the fit from textures.ts hazePrepTex's GPU-resident outputs, and prepAndFitHazeTex, which
 // runs that prep and the fit's GPU part under ONE haze lease (the safe entry point for textures).
 //

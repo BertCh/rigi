@@ -49,10 +49,11 @@ export async function guidedFiltersGpu(
 	w: number,
 	h: number,
 	jobs: readonly GuidedJob[],
+	/** graph (default true): the core ComputeGraph path; false: the pooled dispatchAll path below */
 	opts: { graph?: boolean } = {},
 ): Promise<Float32Array[]> {
-	// opt-in: the same four kernels per job on a core ComputeGraph (guided-filter-graph.ts)
-	if (opts.graph)
+	// default: the same four kernels per job on a core ComputeGraph (guided-filter-graph.ts)
+	if (opts.graph ?? true)
 		return (await import("./guided-filter-graph")).guidedFiltersGraph(
 			device,
 			I,

@@ -1,6 +1,6 @@
-// The GPU relief passes (relief.ts reliefPassesGpu) on a core ComputeGraph. Opt-in per call:
-// reliefPassesGpu(…, { graph: true }) / buildReliefFieldGpu(…, { graph: true }); the pooled
-// single-encoder path in relief.ts stays the default.
+// The GPU relief passes (relief.ts reliefPassesGpu) on a core ComputeGraph: the default of
+// reliefPassesGpu(…) / buildReliefFieldGpu(…); { graph: false } runs the pooled single-encoder
+// path in relief.ts.
 //
 //   clear shadow → SHADOW (atomicOr)          ┐
 //   DOWN → clear acc8 → SVF → SUM             ├→ PACK → read (field, gen)

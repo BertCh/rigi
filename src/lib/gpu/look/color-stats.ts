@@ -47,7 +47,7 @@ export const K_BAND_STATS_SG = defineKernel(
 export type BandStatsOptions = {
 	/** Use the subgroup reduction when the device has subgroups (default false). */
 	subgroups?: boolean;
-	/** run the BAND_STATS(_SG) dispatch as a core ComputeGraph node (color-stats-graph.ts; default false) */
+	/** run the BAND_STATS(_SG) dispatch as a core ComputeGraph node (color-stats-graph.ts; default true) */
 	graph?: boolean;
 };
 
@@ -94,9 +94,10 @@ export async function bandStatsGpu(
 	new Uint32Array(words, 0, 4).set([w, h, GROUPS * WG, o.fg ? 1 : 0]);
 	new Float32Array(words, 16, 1)[0] = o.minRange ?? 0;
 	const sg = (opts.subgroups ?? false) && hasFeature(device, "subgroups");
-	const partials = opts.graph
-		? (await import("./color-stats-graph")).bandPartialsGraph
-		: bandPartials;
+	const partials =
+		(opts.graph ?? true)
+			? (await import("./color-stats-graph")).bandPartialsGraph
+			: bandPartials;
 	let p = await partials(device, o, words, R, sg);
 	// BAND_STATS_SG writes -1 partials (a negative count) when the subgroup layout isn't what it assumes
 	if (sg && hasNegativeCount(p)) p = await partials(device, o, words, R, false);
