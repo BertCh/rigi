@@ -1641,6 +1641,7 @@ export class WebGpuEngine implements Renderer {
 		g.trails.setStyle({
 			width: this.style.trails.width,
 			opacity: this.style.trails.opacity,
+			dash: this.style.trails.dash,
 		});
 		if (this.relief.field !== g.reliefFrom) {
 			g.styles.setReliefField(this.relief.field);
