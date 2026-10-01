@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Self-check of the hand-written kernel binding layouts (no GPU, no browser): imports every module
-// under src/lib/gpu that calls defineKernel (through tsx), then reflects each registered spec's WGSL
+// under src/lib/gpu and src/lib/deck-webgpu that calls defineKernel (through tsx), then reflects each registered spec's WGSL
 // with luma's getShaderLayoutFromWGSL (@luma.gl/webgpu 10.0.0-alpha.2, a thin wrapper of
 // @luma.gl/shadertools/wgsl scanWGSLInterface) and compares every binding's name, group/slot and
 // kind with spec.layout (core/kernel.ts: name → kind at `@group(0) @binding(i)`, i in order). Also
@@ -19,10 +19,12 @@ import { getShaderLayoutFromWGSL } from "@luma.gl/webgpu";
 import { register } from "tsx/esm/api";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const SRC = path.join(ROOT, "src/lib/gpu");
+const SRC = path.join(ROOT, "src/lib");
+// kernel modules live under src/lib/gpu and, for the render-device kernels, src/lib/deck-webgpu
+const DIRS = ["gpu", "deck-webgpu"].map((d) => path.join(SRC, d));
 const VERBOSE = process.argv.includes("-v");
 // the definitions themselves, not kernels
-const SKIP = new Set(["core/kernel.ts", "look/kernel.ts"]);
+const SKIP = new Set(["gpu/core/kernel.ts", "gpu/look/kernel.ts"]);
 const CALL = /\bdefineKernel\s*\(/g;
 
 // Vite-only specifiers (`x?url`, `x?raw`, `x?worker`): an empty-string default export is enough here
@@ -38,7 +40,9 @@ export async function load(url, ctx, next) {
 register({ tsconfig: path.join(ROOT, "tsconfig.json") });
 // registered last, so it resolves before tsx does
 registerHooks(`data:text/javascript,${encodeURIComponent(stub)}`);
-const core = await import(pathToFileURL(path.join(SRC, "core/kernel.ts")).href);
+const core = await import(
+	pathToFileURL(path.join(SRC, "gpu/core/kernel.ts")).href
+);
 
 function walk(dir) {
 	const out = [];
@@ -61,7 +65,7 @@ const calls = (text) =>
 
 const problems = [];
 const notes = [];
-const files = walk(SRC)
+const files = DIRS.flatMap(walk)
 	.map((file) => ({ file, rel: path.relative(SRC, file) }))
 	.filter(
 		({ file, rel }) => !SKIP.has(rel) && calls(fs.readFileSync(file, "utf8")),

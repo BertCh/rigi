@@ -305,7 +305,7 @@ export function warmTextureKernels(device: Device): number {
 	return failed;
 }
 
-const USE: Record<BindKind, GraphBufferUsage> = {
+const USE: Record<Exclude<BindKind, "texture">, GraphBufferUsage> = {
 	uniform: "uniform",
 	"read-only-storage": "storage-read",
 	storage: "storage-read-write",

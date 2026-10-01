@@ -9,19 +9,14 @@
 // rgba32float range readback.
 // A dispatch that fails validation silently leaves the output untouched: the per-call nonce in
 // every header makes scoreFromMask reject such a mask (that pose is then scored on the CPU).
-import {
-	Buffer,
-	type ComputePipeline,
-	type Device,
-	type Texture,
-} from "@luma.gl/core";
+import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import {
 	SIL_GROUP,
 	silGroups,
 	silhouetteThresholds,
 	silMaskWords,
 } from "#/lib/deck/silhouette-mask";
-import { dispatch, type Kernel, type KernelSpec } from "#/lib/gpu/core/kernel";
+import { defineKernel, dispatch, kernelAsync } from "#/lib/gpu/core/kernel";
 import { submit } from "#/lib/gpu/core/queue";
 import { stageReads } from "#/lib/gpu/core/readback";
 
@@ -105,48 +100,18 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 `;
 
-const pipelines = new WeakMap<Device, Kernel>();
-function silKernel(device: Device): Kernel {
-	let k = pipelines.get(device);
-	if (k) return k;
-	const label = "silhouette-mask";
-	const shader = device.createShader({
-		id: label,
-		source: WGSL,
-		language: "wgsl",
-		stage: "compute",
-	});
-	const pipeline: ComputePipeline = device.createComputePipeline({
-		id: label,
-		shader,
-		entryPoint: "main",
-		shaderLayout: {
-			bindings: [
-				{ name: "prm", type: "uniform", group: 0, location: 0 },
-				{
-					name: "geo",
-					type: "texture",
-					group: 0,
-					location: 1,
-					viewDimension: "2d",
-					sampleType: "unfilterable-float",
-				},
-				{ name: "outp", type: "storage", group: 0, location: 2 },
-			],
-		},
-	});
-	const spec: KernelSpec = {
-		id: label,
-		source: WGSL,
-		layout: [],
-		entryPoint: "main",
-		group: "silhouette",
-		label,
-	};
-	k = { pipeline, names: ["prm", "geo", "outp"], spec };
-	pipelines.set(device, k);
-	return k;
-}
+// gpu/core owns the pipeline: cached per device, compiled with createComputePipelineAsync (no
+// render-thread stall), dropped when the device is lost, and checked by scripts/gpu/kernel-layout-check.
+const SPEC = defineKernel(
+	"silhouette-mask",
+	WGSL,
+	[
+		["prm", "uniform"],
+		["geo", "texture"],
+		["outp", "storage"],
+	],
+	{ group: "silhouette" },
+);
 
 /** One per WebGpuEngine (one render device). */
 export class SilhouetteMaskGpu {
@@ -175,7 +140,9 @@ export class SilhouetteMaskGpu {
 			return null;
 		this.busy = true;
 		try {
-			const k = silKernel(device);
+			const k = await kernelAsync(device, SPEC);
+			// destroyed or lost while the pipeline compiled: nothing to allocate or submit
+			if (this.destroyed || device.isLost) return null;
 			const per = silMaskWords(W, H);
 			const bytes = per * ranges.length * 4;
 			if (!this.out || this.out.byteLength < bytes) {

@@ -80,7 +80,7 @@ export function applyRealmGpuOptions(o: RealmGpuOptions | undefined): void; // w
 export { takeGpuProfile, mergeGpuProfile } from "./profile";
 
 // kernel.ts
-export type BindKind = "uniform" | "storage" | "read-only-storage";
+export type BindKind = "uniform" | "storage" | "read-only-storage" | "texture"; // texture: 2-D unfilterable-float, not in graphs
 export type KernelSpec = { id: string; source: string; layout: [string, BindKind][]; entryPoint: string;
   constants?: Record<string, number>; group: string; label: string };
 export type Kernel = { pipeline: ComputePipeline; names: string[]; spec: KernelSpec };

@@ -138,7 +138,7 @@ export type GraphReads = {
  */
 export type GraphOp<P> = GPUNode<P>;
 
-const USE: Record<BindKind, GraphBufferUsage> = {
+const USE: Record<Exclude<BindKind, "texture">, GraphBufferUsage> = {
 	uniform: "uniform",
 	"read-only-storage": "storage-read",
 	storage: "storage-read-write",
@@ -224,6 +224,11 @@ export class ComputeGraph<P = void> {
 	/** Add a compute node that dispatches a core kernel. */
 	addKernel(node: KernelNode<P>): this {
 		const { spec } = node;
+		for (const [name, kind] of spec.layout)
+			if (kind === "texture")
+				throw new Error(
+					`${this.id}/${node.id}: "${name}" is a texture binding (not supported in a graph)`,
+				);
 		for (const [name] of spec.layout)
 			if (!node.bindings[name])
 				throw new Error(`${this.id}/${node.id}: no binding for "${name}"`);
@@ -273,7 +278,7 @@ export class ComputeGraph<P = void> {
 				const v = node.bindings[name];
 				return {
 					buffer: v instanceof GraphDataView ? v : handleOf(v),
-					usage: USE[kind],
+					usage: USE[kind as keyof typeof USE],
 				};
 			}),
 			compile: ({ device }) => executable(kernel(device, spec)),

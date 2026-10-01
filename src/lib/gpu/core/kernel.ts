@@ -29,7 +29,11 @@ import { stageReads } from "./readback";
 
 export { submit } from "./queue";
 
-export type BindKind = "uniform" | "storage" | "read-only-storage";
+/**
+ * "texture" is a 2-D unfilterable-float sampled texture (textureLoad only; the render device's
+ * rgba32float targets): dispatch() binds a luma Texture for it. Not usable in a core graph.
+ */
+export type BindKind = "uniform" | "storage" | "read-only-storage" | "texture";
 
 /** A kernel's WGSL and binding layout; defineKernel registers it for warmKernels. */
 export type KernelSpec = {
@@ -100,10 +104,19 @@ export const definedKernels = (group?: string) =>
 const shaderLayout = (spec: KernelSpec) => ({
 	bindings: spec.layout.map(
 		([name, type], location): BindingDeclaration =>
-			// the ternary narrows `type` for BindingDeclaration's union
-			type === "uniform"
-				? { name, type, group: 0, location }
-				: { name, type, group: 0, location },
+			// the ternaries narrow `type` for BindingDeclaration's union
+			type === "texture"
+				? {
+						name,
+						type,
+						group: 0,
+						location,
+						viewDimension: "2d",
+						sampleType: "unfilterable-float",
+					}
+				: type === "uniform"
+					? { name, type, group: 0, location }
+					: { name, type, group: 0, location },
 	),
 });
 
