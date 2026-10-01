@@ -1,4 +1,4 @@
-# Vendored luma.gl (`10.0.0-alpha.2-rigi.1`)
+# Vendored luma.gl (`10.0.0-alpha.2-rigi.2`)
 
 The app needs luma.gl fixes that are not in a published alpha yet (`WebGPUAdapter.attach()`,
 `requiredLimits`, the device lifecycle fixes and a compute pipeline cache fix). The published
@@ -7,7 +7,7 @@ The app needs luma.gl fixes that are not in a published alpha yet (`WebGPUAdapte
 (`package.json`: `file:vendor/luma/<name>.tgz`): core, effects, engine, gpgpu, shadertools, webgl,
 webgpu.
 
-The version is `10.0.0-alpha.2-rigi.1`, so npm reinstalls over a cached `10.0.0-alpha.2` and
+The version is `10.0.0-alpha.2-rigi.2`, so npm reinstalls over a cached `10.0.0-alpha.2` and
 `^10.0.0-alpha.2` ranges (deck's) still match. Bump the `rigi.N` suffix on every rebuild.
 
 **Swap to npm when luma publishes these fixes** (all of #3312, #3313, #3302 and #3287, and the
@@ -34,12 +34,21 @@ the old workaround (`.npmrc` `legacy-peer-deps=true` plus `overrides` for every 
     key-sorted override `constants` (upstream as branch `rigi/pipeline-factory-compute-hash`,
     `c80b7ce6`). Without it, two compute specs differing only in entry point or constants share
     one cached `ComputePipeline`.
+- **rigi.2 = rigi.1 + #3328** (`Model.setIndirectBuffer` / `writeIndirectDrawRecord`, WebGPU
+  `drawIndirect` / `drawIndexedIndirect`; WebGL asserts). #3328 head
+  `30f08edae5a86ed013bcbe97bcfe837348c138fc` (base `f96d2467`), merged with `--no-ff` onto `5e1b72ed`
+  (clean, no conflicts) as `4769679c7` in the local build clone. The layer is revertible: the exact
+  diff `5e1b72ed..4769679c7` is `vendor/luma/patches/luma-3328.patch` (to revert, rebuild from
+  `5e1b72ed` as rigi.1). Fetch: `git fetch https://github.com/visgl/luma.gl pull/3328/head`.
+  Check: `scripts/gpu/indirect-draw-check.mjs` (GPU-written indirect count vs direct draw,
+  byte-equal). Sizes: core 161017 B, effects 158759 B, engine 226328 B, gpgpu 1060573 B,
+  shadertools 355781 B, webgl 217051 B, webgpu 83614 B. Only the engine tarball changed in content.
 - **Behaviour change:** `WebGPUDevice.destroy()` destroys the `GPUDevice` only when the luma device
   owns it (`props._ownsHandle`). `luma.createDevice()` sets it; `webgpuAdapter.attach(handle, props)`
   leaves it `false` unless you pass `_ownsHandle: true`. An attached device that the app hands
   over must pass `_ownsHandle: true`, or `destroy()` leaks the GPUDevice.
 - Packed manifests are rewritten (the equivalent of upstream branch `rigi/packaging-manifests`,
-  `f1992fd3`, but pinned): `version` is `10.0.0-alpha.2-rigi.1`; every `@luma.gl/*` dependency and
+  `f1992fd3`, but pinned): `version` is `10.0.0-alpha.2-rigi.2`; every `@luma.gl/*` dependency and
   peer is the exact rigi version; `@math.gl/core` `patch:...` becomes plain `5.0.0-alpha.9`;
   `scripts`, `devDependencies` and `gitHead` are dropped. The yarn patch on `@math.gl/core` only
   adds `vec*`/`mat4` namespace exports that the built luma `dist/` does not import.
@@ -63,8 +72,9 @@ git clone https://github.com/visgl/luma.gl luma-build && cd luma-build
 git fetch ~/mt-image-archive/2026-10-01-luma-deck-upstream/luma-rigi-branches.bundle \
   'refs/heads/*:refs/heads/*'
 git checkout rigi-vendor            # 5e1b72ed; or redo the merges listed above on 7d1d11e9
+git fetch https://github.com/visgl/luma.gl pull/3328/head && git merge --no-ff FETCH_HEAD   # rigi.2 (30f08eda)
 corepack yarn install && corepack yarn build
-V=10.0.0-alpha.2-rigi.1             # bump rigi.N
+V=10.0.0-alpha.2-rigi.2             # bump rigi.N
 for m in core effects engine gpgpu shadertools webgl webgpu; do
   (cd modules/$m && npm pack --ignore-scripts --pack-destination /tmp/luma-tgz)
 done

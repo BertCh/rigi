@@ -37,6 +37,7 @@ GPU compute
 
 Vendored dependencies
 - luma.gl `10.0.0-alpha.2-rigi.1` (built from luma master `7d1d11e9` plus #3312, #3313, #3302, #3287 and a PipelineFactory compute-hash fix) and a deck.gl `9.4.0-beta.4` build (deck PR #10752 on master plus luma's WebGPU deck fixes) are installed from `vendor/`. Rebuild steps: `vendor/luma/README.md`, `vendor/deck/README.md`.
+- luma.gl bumped to `10.0.0-alpha.2-rigi.2` (rigi.1 plus luma PR #3328, `Model.setIndirectBuffer`; patch in `vendor/luma/patches/luma-3328.patch`); `scripts/gpu/indirect-draw-check.mjs` checks a GPU-written indirect draw against a direct draw. Added `@loaders.gl/geotiff` and `@loaders.gl/splats` `^5.0.0-alpha.7` (not imported yet).
 - Adopted luma `requiredLimits` (#3312) and `WebGPUAdapter.attach()` (#3313) for app-created devices.
 
 Look and cartography

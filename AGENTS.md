@@ -56,7 +56,7 @@ The regression gate is `scripts/ci/run.mjs`; the check registry is `scripts/ci/c
 - `src/lib/deck-webgpu` is deck.gl on WebGPU (`WebGpuEngine`, WGSL layers); see its `README.md`. `src/lib/deck` is deck.gl on WebGL2 (`DeckEngine`, GLSL). Features are ported to both: a shader change usually means a GLSL and a WGSL edit, and `scripts/deck-engine-smoke.mjs` checks the two agree (|Δyaw| ≤ 0.5°, label overlap).
 - `src/lib/gpu/core` (see its `README.md`) is the only GPU compute path: `ComputeGraph` over luma's `GPUCommandGraph`, with `defineKernel`/`kernelAsync`, a readback ring and a device pool. Under WebGPU the render device is also the compute device. Add GPU work as a graph, not as a standalone dispatch.
 - `src/lib/flags` is the only reader of URL and harness flags (typed table, `getFlag`, per-realm override `globalThis.__RIGI_FLAGS__ = { gpu: "off" }`). Do not parse `location.search` elsewhere; declare a new flag there.
-- `vendor/luma`, `vendor/deck`: vendored luma.gl `10.0.0-alpha.2-rigi.1` and a deck.gl `9.4.0-beta.4` build. They are not first-party code; rebuild instructions are in their READMEs.
+- `vendor/luma`, `vendor/deck`: vendored luma.gl `10.0.0-alpha.2-rigi.2` and a deck.gl `9.4.0-beta.4` build. They are not first-party code; rebuild instructions are in their READMEs.
 
 ## Renderer selection
 - `?renderer=auto|webgpu|deck`, default `auto`: deck.gl on WebGPU where `navigator.gpu` passes the probe (`float32-filterable`, required limits, a probe device), otherwise deck.gl on WebGL2. `?renderer=webgpu` and `?renderer=deck` pin an engine; `?webgpu=off` makes `auto` behave as if WebGPU were missing; `?gpu=off` is the compute kill switch.
