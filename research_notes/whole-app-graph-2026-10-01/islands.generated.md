@@ -36,7 +36,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | skyglobal | I5 | bench only | bench | bench | `skyglobal` | score maps, profile (pooled imports); cells, red (transients) | candidate list: count + head slots, rare second exact read |
 | sky-model | I6 | external | worker:sky (remote) | per photo | – | ORT WebGPU session (ORT's device, attached to luma) | – |
 | sky-refine | I6 | default | worker:sky (remote) | per photo | `sky-refine` | ORT P(sky) buffer (wrapped per run); guide, rgba, axis taps, LUT (pooled imports) | read: byte mask (+ float mask when asked) |
-| deck-webgpu-frame | I7 | default | page | per frame | – | geometry / colour / photo targets; HeightPool, imagery arrays | – |
+| deck-webgpu-frame | I7 | default | page | per frame | – | geometry / colour / photo targets; TextureArrayAtlas height + imagery arrays | – |
 | terrain-gpu-cull | I7 | default | page | per frame | `terrain-cull-*` (uncached) | tile spheres + rows (import, per tile set); per-pass uniform, instance rows and indexed indirect records (imports, encoder ring); vis flags (transient) | – |
 | geo-query-gpu | I8 | default | page | per settle | – | geometry target rgba32float (render device) | verdicts 4 B per peak; gather 16 B per pixel; skyline 4 B per column |
 | look-guided | I9 | default | page | per settle | `look-guided` | guide I, inputs p0…pk, params (imports); t4, ab, t2, q (transients) | q: n·4 B per filtered mask |

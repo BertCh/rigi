@@ -4,6 +4,12 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### TextureArrayAtlas for the WebGPU terrain heights and imagery (WAG W2.2; 2026-10-01)
+
+- `deck-webgpu/texture-array-atlas.ts`: one growable 2D-array texture with a layer free list under the batched terrain's r32float height arrays (was `HeightPool`) and `ImageryArray`. Layers are written through the `gpu/ingest` adapters (`uploadRaster` / `uploadBitmap` with `into`); a grow copies every mip of the old layers with `copyTextureToTexture`. The height arrays used to be re-created empty and re-uploaded from the CPU on a grow: on a pan that grows the 256² array (measured on IMG_7086, IMG_6958, IMG_3304) that removes 279–342 height uploads (70–86 MiB) and cuts the growing sync from 38–40 ms to 15 ms of main-thread time. Photo load is unchanged (every tile is fresh then). Default on, WebGPU only; WebGL is unchanged.
+- Frames are byte-identical before and after (geometry, normal and colour targets, 21 poses over 3 photos including pans across the grow and the imagery drape): `scripts/deck-webgpu/atlas-frames-check.mjs`. Fast-tier check `atlas-layout` (`atlas-layout.check.ts`). Cost probe: `scripts/deck-webgpu/atlas-cost.mjs`.
+- Not done: the uv-window ancestor fallback. `atlas-layout.ts` `ancestorWindow` gives the window and is checked against `dem/grid.ts` `ancestorCrop` bit for bit, but the CPU height consumers still need the cropped arrays (WAG W2.4), and a shader bilinear over the ancestor would not render the same bits as `ancestorCrop` + `downsample2` + bilinear. `ancestorCrop` costs 0 ms on the two Swiss photos and 55 ms per load / 82–95 ms per pan sequence on IMG_3304 (56–83 fallback tiles).
+
 ### Batched terrain: GPU cull and indirect draws (WAG W1.5; 2026-10-01)
 
 - WebGPU: the batched terrain's per-frame frustum cull moved to a two-node `ComputeGraph` (`deck-webgpu/layers/terrain-cull.ts`): a conservative f32 sphere test, then a stable compaction into per-resolution instance buffers and indexed indirect records, drawn with `Model.setIndirectBuffer` (luma #3328, vendored rigi.2). No count is read back. Frames are byte-identical to the CPU cull (3 photos × 10 poses incl. the world view, geometry + normal + colour targets); the CPU cost per pass is about the same (~17–19 µs vs ~16–21 µs at ~350–390 tiles), so this is not a CPU saving at today's tile counts.

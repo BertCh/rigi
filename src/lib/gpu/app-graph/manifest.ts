@@ -119,7 +119,7 @@ export const ISLANDS: readonly Island[] = [
 		id: "I1",
 		name: "Terrain residency",
 		contents:
-			"HeightPool r32f array + imagery array + mips + batch grid table; terrarium decode",
+			"TextureArrayAtlas r32f height arrays + imagery array + mips + batch grid table; terrarium decode",
 		cadence: ["per tile"],
 		realms: ["page"],
 		graph: true,
@@ -382,7 +382,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		cadence: "per frame",
 		resources: [
 			"geometry / colour / photo targets",
-			"HeightPool, imagery arrays",
+			"TextureArrayAtlas height + imagery arrays",
 		],
 		readbacks: [],
 		status: "default",

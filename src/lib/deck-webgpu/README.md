@@ -151,6 +151,13 @@ where nothing else did.
   `readGeometry`.
 - `imagery.ts`: `ImageryArray` is the imagery as one rgba8unorm-srgb 2D array, with 512² layers
   and per-layer mips. Capacity grows up to `maxTextureArrayLayers` (`featureLevel: 'max'`).
+- `texture-array-atlas.ts`: `TextureArrayAtlas`, the growable 2D array with a layer free list under
+  both `ImageryArray` and the batched terrain's r32float height arrays. Layers are written through
+  the `gpu/ingest` adapters (`uploadRaster` / `uploadBitmap` with `into`); a grow re-creates the
+  texture and copies every mip of the old layers with `copyTextureToTexture`, so nothing re-uploads.
+  The pure math (allocation order, growth, grow copies, the ancestor uv window) is in
+  `atlas-layout.ts`, checked by `atlas-layout.check.ts`; the frame gate is
+  `scripts/deck-webgpu/atlas-frames-check.mjs`.
 
 ## Layer contract (`pass.ts`)
 

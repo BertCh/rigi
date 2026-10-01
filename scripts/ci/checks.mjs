@@ -165,6 +165,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "atlas-layout",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/deck-webgpu/atlas-layout.check.ts"),
+		note: "TextureArrayAtlas math (WAG W2.2): layer order = the old HeightPool / ImageryArray free lists, grow capacities, per-mip grow copies, ancestor uv window == ancestorCrop bits (browser frame gate: scripts/deck-webgpu/atlas-frames-check.mjs)",
+		timeoutS: 60,
+	},
+	{
 		id: "labels",
 		tier: "fast",
 		group: "look",

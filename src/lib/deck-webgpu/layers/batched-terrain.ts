@@ -5,9 +5,9 @@
 // Batched terrain on WebGPU (port of deck/batched-terrain-layer.ts + batched-terrain-grid.ts;
 // README.md "Ports"). Every streamed DEM tile is drawn by ONE instanced, indexed draw per mesh
 // resolution (64 / 128 / 256 segments) and pass, with no CPU mesh:
-//   - heights:   r32float 2d-arrays (256² layers for ≤ 256 px tiles, 512² for the near tiles), read
-//                with textureLoad in the vertex shader (no filtering; the bilinear is dem/grid.ts
-//                sampleGrid, done by hand)
+//   - heights:   r32float 2d-arrays (TextureArrayAtlas, grown by copy; 256² layers for ≤ 256 px
+//                tiles, 512² for the near tiles), read with textureLoad in the vertex shader (no
+//                filtering; the bilinear is dem/grid.ts sampleGrid, done by hand)
 //   - base grid: a read-only storage buffer, one fixed slot of 2·(BASE_MAX+1)² vec4 per tile row:
 //                per node the ENU of the h = 0 surface (batched-terrain-grid.ts buildBatchGrid) and
 //                the ellipsoid up vector (CPU, double; replaces the WebGL shader's per-vertex trig)
@@ -68,6 +68,7 @@ import {
 	terrainModules,
 	terrainSource,
 } from "../terrain";
+import { TextureArrayAtlas } from "../texture-array-atlas";
 import { type CulledDraw, TerrainGpuCull } from "./terrain-cull";
 
 // ---------- WGSL ----------
@@ -250,75 +251,36 @@ const BUF_USAGE = {
 
 type Slot = { row: number; layer: number; big: boolean };
 
-/** A growable r32float 2d-array with a free list of layers. Growing re-creates it (callers
- * re-upload). */
-class HeightPool {
-	tex: Texture;
-	cap: number;
-	private free: number[] = [];
-	private next = 0;
-	constructor(
-		private device: Device,
-		private id: string,
-		readonly size: number,
-		cap: number,
-	) {
-		this.cap = cap;
-		this.tex = this.create(cap);
-	}
-	private create(cap: number) {
-		return this.device.createTexture({
-			id: this.id,
-			dimension: "2d-array",
-			format: "r32float",
-			width: this.size,
-			height: this.size,
-			depth: cap,
-			usage: TEX_USAGE.SAMPLE | TEX_USAGE.COPY_DST | TEX_USAGE.COPY_SRC,
-			sampler: {
-				minFilter: "nearest",
-				magFilter: "nearest",
-				addressModeU: "clamp-to-edge",
-				addressModeV: "clamp-to-edge",
-			},
-		});
-	}
-	alloc() {
-		return this.free.pop() ?? this.next++;
-	}
-	release(i: number) {
-		this.free.push(i);
-	}
-	/** Room for layer indices < need; true = re-created (contents lost). */
-	reserve(need: number, max: number) {
-		if (need <= this.cap) return false;
-		const cap = Math.min(max, Math.max(need, Math.ceil(this.cap * 1.5)));
-		if (cap === this.cap) return false;
-		this.tex.destroy();
-		this.cap = cap;
-		this.tex = this.create(cap);
-		return true;
-	}
-	write(i: number, data: Float32Array, w: number) {
-		this.tex.writeData(data as never, {
-			x: 0,
-			y: 0,
-			z: i,
-			width: w,
-			height: w,
-			depthOrArrayLayers: 1,
-			bytesPerRow: w * 4,
-		});
-	}
-	destroy() {
-		this.tex.destroy();
-	}
+/** A growable r32float 2d-array of `size`² height layers: a TextureArrayAtlas that grows by copy
+ * (layers keep their heights; only fresh tiles upload). */
+function heightPool(
+	device: Device,
+	id: string,
+	size: number,
+	cap: number,
+	max: number,
+) {
+	return new TextureArrayAtlas(device, {
+		id,
+		format: "r32float",
+		size,
+		usage: TEX_USAGE.SAMPLE | TEX_USAGE.COPY_DST | TEX_USAGE.COPY_SRC,
+		sampler: {
+			minFilter: "nearest",
+			magFilter: "nearest",
+			addressModeU: "clamp-to-edge",
+			addressModeV: "clamp-to-edge",
+		},
+		capacity: cap,
+		maxLayers: max,
+		grow: { factor: 1.5 },
+	});
 }
 
 /** Heights, base grids and the tile table for the rendered set (by TileMesh identity). */
 class TileStore {
-	small: HeightPool;
-	big: HeightPool;
+	small: TextureArrayAtlas;
+	big: TextureArrayAtlas;
 	base!: Buffer;
 	table!: Buffer;
 	private tableData: Float32Array;
@@ -343,8 +305,14 @@ class TileStore {
 				(lim.maxStorageBufferBindingSize ?? 128 * 2 ** 20) / (BASE_SLOT * 16),
 			),
 		);
-		this.small = new HeightPool(device, "bterrain-h256", SMALL, 128);
-		this.big = new HeightPool(device, "bterrain-h512", BIG, 16);
+		this.small = heightPool(
+			device,
+			"bterrain-h256",
+			SMALL,
+			128,
+			this.maxLayers,
+		);
+		this.big = heightPool(device, "bterrain-h512", BIG, 16, this.maxLayers);
 		this.tableData = new Float32Array(0);
 		this.growRows(128);
 	}
@@ -405,14 +373,15 @@ class TileStore {
 			else maxSmall = Math.max(maxSmall, s.layer + 1);
 			maxRow = Math.max(maxRow, s.row + 1);
 		}
-		const reSmall = this.small.reserve(maxSmall, this.maxLayers);
-		const reBig = this.big.reserve(maxBig, this.maxLayers);
+		// a grow copies the old layers (TextureArrayAtlas.reserve): only fresh tiles upload
+		this.small.reserve(maxSmall);
+		this.big.reserve(maxBig);
 		const reRows = this.growRows(maxRow);
 		const freshSet = new Set(fresh);
 		this.overflow = 0;
 		for (const [m, s] of this.slots) {
 			const pool = s.big ? this.big : this.small;
-			if (s.layer >= pool.cap || s.row >= this.rowsCap) {
+			if (s.layer >= pool.capacity || s.row >= this.rowsCap) {
 				// past a device limit: not drawn
 				this.slots.delete(m);
 				this.freeRows.push(s.row);
@@ -421,8 +390,7 @@ class TileStore {
 				continue;
 			}
 			const isFresh = freshSet.has(m);
-			if (isFresh || (s.big ? reBig : reSmall))
-				pool.write(s.layer, m.heights, m.size);
+			if (isFresh) pool.writeRaster(s.layer, m.heights, m.size);
 			const g = m.grid;
 			if (!g) continue;
 			if (isFresh || reRows) {
@@ -606,8 +574,8 @@ export class BatchedTerrainCore implements GpuLayerCore {
 	residentHeights(): ResidentHeights {
 		const { small, big, slots } = this.store;
 		return {
-			small: small.tex,
-			big: big.tex,
+			small: small.texture,
+			big: big.texture,
 			slotOf: (t) => {
 				const s = slots.get(t as TileMesh);
 				return s ? { layer: s.layer, big: s.big } : null;
@@ -787,8 +755,8 @@ export class BatchedTerrainCore implements GpuLayerCore {
 			},
 		} as never);
 		const bindings: Record<string, unknown> = {
-			heightSmall: this.store.small.tex,
-			heightBig: this.store.big.tex,
+			heightSmall: this.store.small.texture,
+			heightBig: this.store.big.texture,
 			baseGrid: this.store.base,
 			tileTable: this.store.table,
 		};

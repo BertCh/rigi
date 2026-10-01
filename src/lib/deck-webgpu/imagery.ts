@@ -7,12 +7,14 @@
 // Tiles arrive as ImageBitmaps from deck/terrain-data.ts loadImagery (256·2^k px mosaics); each is
 // resized to the layer size off the main thread (createImageBitmap resize) and copied in.
 //
-// Capacity grows in chunks (copyTextureToTexture keeps existing layers) up to the device's
-// maxTextureArrayLayers (256 on 'core' devices, 2048 on Apple with featureLevel 'max'). Tiles
-// that don't fit draw without imagery (hillshade) and are counted in stats.overflow.
-import type { Device, Texture } from "@luma.gl/core";
+// The layers live in a TextureArrayAtlas (texture-array-atlas.ts, shared with the terrain's height
+// arrays): capacity grows in chunks (copyTextureToTexture keeps every mip of the existing layers) up
+// to the device's maxTextureArrayLayers (256 on 'core' devices, 2048 on Apple with featureLevel
+// 'max'). Tiles that don't fit draw without imagery (hillshade) and are counted in stats.overflow.
+import type { Device } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { USAGE } from "./targets";
+import { TextureArrayAtlas } from "./texture-array-atlas";
 import { fullscreenWGSL } from "./wgsl";
 
 // per-layer mip chain: each level = a linear 2×2 box of the level above (render, sRGB-correct:
@@ -31,14 +33,12 @@ const MIP_LEVELS = Math.log2(IMAGERY_LAYER_SIZE) + 1;
 const GROW = 64;
 
 export class ImageryArray {
-	texture: Texture;
+	readonly atlas: TextureArrayAtlas;
 	/** tile id → array layer */
 	private layers = new Map<string, number>();
 	/** tile id → the bitmap the layer holds (identity: a new bitmap re-uploads) */
 	private sources = new Map<string, ImageBitmap>();
 	private pending = new Map<string, ImageBitmap>();
-	private free: number[] = [];
-	private capacity: number;
 	private mipModel?: Model;
 	private mipSampler?: ReturnType<Device["createSampler"]>;
 	private destroyed = false;
@@ -53,19 +53,10 @@ export class ImageryArray {
 			(device.limits as { maxTextureArrayLayers?: number })
 				.maxTextureArrayLayers ?? 256,
 		);
-		this.capacity = Math.min(GROW, this.maxLayers);
-		this.texture = this.create(this.capacity);
-		this.free = range(this.capacity);
-	}
-
-	private create(depth: number) {
-		return this.device.createTexture({
+		this.atlas = new TextureArrayAtlas(device, {
 			id: "imagery-array",
-			dimension: "2d-array",
 			format: "rgba8unorm-srgb",
-			width: IMAGERY_LAYER_SIZE,
-			height: IMAGERY_LAYER_SIZE,
-			depth,
+			size: IMAGERY_LAYER_SIZE,
 			mipLevels: MIP_LEVELS,
 			usage: USAGE.SAMPLE | USAGE.COPY_DST | USAGE.COPY_SRC | USAGE.RENDER,
 			sampler: {
@@ -76,7 +67,15 @@ export class ImageryArray {
 				addressModeV: "clamp-to-edge",
 				maxAnisotropy: 8,
 			},
+			capacity: Math.min(GROW, this.maxLayers),
+			maxLayers: this.maxLayers,
+			grow: { chunk: GROW },
 		});
+	}
+
+	/** The array texture (re-created when the atlas grows: read it per use). */
+	get texture() {
+		return this.atlas.texture;
 	}
 
 	/** Layer of a tile's imagery, or -1 (none yet / overflow). */
@@ -94,14 +93,18 @@ export class ImageryArray {
 			if (!want.has(id) || !images.has(id)) {
 				this.layers.delete(id);
 				this.sources.delete(id);
-				this.free.push(layer);
+				this.atlas.release(layer);
 			}
 		let overflow = 0;
 		for (const id of want) {
 			const bmp = images.get(id);
 			if (!bmp || this.sources.get(id) === bmp || this.pending.get(id) === bmp)
 				continue;
-			if (!this.layers.has(id) && !this.free.length && !this.grow()) {
+			if (
+				!this.layers.has(id) &&
+				!this.atlas.available() &&
+				!this.atlas.reserve(this.atlas.capacity + 1)
+			) {
 				overflow++;
 				continue;
 			}
@@ -110,33 +113,7 @@ export class ImageryArray {
 		}
 		this.stats.overflow = overflow;
 		this.stats.layers = this.layers.size;
-		this.stats.capacity = this.capacity;
-	}
-
-	private grow() {
-		if (this.capacity >= this.maxLayers) return false;
-		const next = Math.min(this.maxLayers, this.capacity + GROW);
-		const old = this.texture;
-		const tex = this.create(next);
-		const enc = this.device.createCommandEncoder({ id: "imagery-grow" });
-		for (let mip = 0; mip < MIP_LEVELS; mip++) {
-			const s = Math.max(1, IMAGERY_LAYER_SIZE >> mip);
-			enc.copyTextureToTexture({
-				sourceTexture: old,
-				mipLevel: mip,
-				destinationTexture: tex,
-				destinationMipLevel: mip,
-				width: s,
-				height: s,
-				depthOrArrayLayers: this.capacity,
-			});
-		}
-		this.device.submit(enc.finish());
-		old.destroy();
-		this.free.push(...range(next - this.capacity, this.capacity));
-		this.capacity = next;
-		this.texture = tex;
-		return true;
+		this.stats.capacity = this.atlas.capacity;
 	}
 
 	private async upload(id: string, bmp: ImageBitmap) {
@@ -161,19 +138,14 @@ export class ImageryArray {
 		this.pending.delete(id);
 		let layer = this.layers.get(id);
 		if (layer === undefined) {
-			layer = this.free.pop();
+			layer = this.atlas.allocWithin();
 			if (layer === undefined) {
 				if (img !== bmp) img.close();
 				return;
 			}
 			this.layers.set(id, layer);
 		}
-		this.texture.copyExternalImage({
-			image: img,
-			z: layer,
-			width: IMAGERY_LAYER_SIZE,
-			height: IMAGERY_LAYER_SIZE,
-		});
+		this.atlas.writeBitmap(layer, img);
 		if (img !== bmp) img.close();
 		this.sources.set(id, bmp);
 		this.stats.uploads++;
@@ -244,13 +216,9 @@ export class ImageryArray {
 		this.destroyed = true;
 		this.mipModel?.destroy();
 		this.mipSampler?.destroy();
-		this.texture.destroy();
+		this.atlas.destroy();
 		this.layers.clear();
 		this.sources.clear();
 		this.pending.clear();
 	}
-}
-
-function range(n: number, from = 0) {
-	return Array.from({ length: n }, (_, i) => from + n - 1 - i);
 }
