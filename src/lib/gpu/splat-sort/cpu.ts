@@ -37,7 +37,8 @@ export function splatKeysF32(
 				f(c * positions[j + 2]),
 		);
 		const v = -f(s + d);
-		if (v > 0) {
+		// +Inf (a corrupt splat) is dropped too: it would make maxD = Inf and every key NaN
+		if (v > 0 && v < Number.POSITIVE_INFINITY) {
 			dist[i] = v;
 			if (v < minD) minD = v;
 			if (v > maxD) maxD = v;

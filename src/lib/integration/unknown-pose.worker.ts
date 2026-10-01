@@ -168,8 +168,9 @@ async function computeScene(
 		const f = await fusedSceneHorizon(terrain, lat, lon, eye);
 		if (f) return { horizon: f.horizon, eye, horizonOn: "gpu" as const };
 	}
-	// opt-in (unknownGpuOptIn, page side): the same march on the GPU; null → the CPU sceneHorizon below
-	if (gpu) {
+	// opt-in (unknownGpuOptIn, page side): the same march on the GPU; null → the CPU sceneHorizon below.
+	// Not after a failed fused march: that is the same march, so straight to the CPU
+	else if (gpu) {
 		const { sceneHorizonGpu } = await import("#/lib/gpu/horizon/scene-profile");
 		const horizon = await sceneHorizonGpu(terrain, lat, lon, eye, undefined, {
 			graph,

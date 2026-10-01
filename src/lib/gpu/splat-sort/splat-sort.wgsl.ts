@@ -38,8 +38,9 @@ ${PARAMS}
   let t = bitcast<vec4<f32>>(splatData[3u * i]);
   // same association as the worker: ((a x + b y) + c z) + d, but in f32 (see ./README.md)
   let dist = -(((p.row.x * t.x + p.row.y * t.y) + p.row.z * t.z) + p.row.w);
-  if (dist > p.near) {
-    let bits = bitcast<u32>(dist);
+  let bits = bitcast<u32>(dist);
+  // +Inf (a corrupt splat) is dropped too: it would make maxD = Inf and every key NaN
+  if (dist > p.near && bits < 0x7f800000u) {
     depth[i] = bits;
     atomicMax(&mm[0], ~bits);
     atomicMax(&mm[1], bits);

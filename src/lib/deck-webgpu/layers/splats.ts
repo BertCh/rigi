@@ -493,6 +493,9 @@ export class SplatsCore implements GpuLayerCore {
 	onChange?: () => void;
 	private enabled = true;
 	private gpu: Gpu | null = null;
+	/** The GPU-sorted cloud that a device loss fails; one onLost hook per core (hooks are never removed). */
+	private lostTarget: Gpu | null = null;
+	private lostHooked = false;
 	private models = new ModelCache();
 
 	constructor(
@@ -582,9 +585,14 @@ export class SplatsCore implements GpuLayerCore {
 				},
 				() => {},
 			);
-			onLost(d, () => {
-				if (this.gpu === g) g.state.fail("device lost");
-			});
+			this.lostTarget = g;
+			if (!this.lostHooked) {
+				this.lostHooked = true;
+				onLost(d, () => {
+					const t = this.lostTarget;
+					if (t && this.gpu === t) t.state.fail("device lost");
+				});
+			}
 		} catch (e) {
 			g.state.fail(`init: ${e instanceof Error ? e.message : String(e)}`);
 		}
@@ -771,6 +779,7 @@ export class SplatsCore implements GpuLayerCore {
 	private releaseGpu() {
 		const g = this.gpu;
 		if (!g) return;
+		if (this.lostTarget === g) this.lostTarget = null;
 		g.sorter?.dispose();
 		g.gpuSort?.destroy();
 		g.data.destroy();

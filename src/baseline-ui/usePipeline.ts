@@ -122,11 +122,13 @@ export function usePipeline() {
 		(lat: number, lon: number, altitude?: number) => {
 			const id = ids.current.next++;
 			ids.current.run = id;
+			ids.current.align = -1; // an align in flight solved against the old horizon: drop its result
 			setState((s) => ({
 				...s,
 				horizon: null,
 				peaks: null,
 				align: null,
+				aligning: false,
 				progress: { stage: "tiles", message: "Starting…" },
 				errors: {},
 			}));
@@ -139,7 +141,8 @@ export function usePipeline() {
 		(image: ImageData) => {
 			const id = ids.current.next++;
 			ids.current.skyline = id;
-			setState((s) => ({ ...s, sky: null, align: null }));
+			ids.current.align = -1; // an align in flight used the old skyline: drop its result
+			setState((s) => ({ ...s, sky: null, align: null, aligning: false }));
 			const data = image.data;
 			send(
 				{

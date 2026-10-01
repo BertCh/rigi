@@ -1246,7 +1246,7 @@ async function stepMatcher(extra, ids) {
 async function launchBrowser(chromium) {
 	// webgpu / auto need Chromium's WebGPU flags (scripts/deck-webgpu/gpu-args.mjs)
 	const args =
-		RENDERER === "webgpu" || RENDERER === "auto"
+		RENDERER == null || RENDERER === "webgpu" || RENDERER === "auto" // unset = the app default (auto)
 			? GPU_ARGS
 			: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"];
 	try {
