@@ -254,8 +254,15 @@ export async function refreshLocalRegion(
 ) {
 	const rec = await getPhotoRecord(id);
 	if (!rec) throw new Error(`no local photo ${id}`);
+	const old = await getRegion(rec.meta.region).catch(() => null);
+	const fresh = await fetchRegion(rec.meta.lat, rec.meta.lon, {
+		...opts,
+		force: true,
+	});
+	// a partial refetch (trails failed) must not wipe trails the stored region already has
+	const keepTrails = !fresh.trails.length && !!old?.trails?.length;
 	const region = await attachPhotoToRegion(
-		await fetchRegion(rec.meta.lat, rec.meta.lon, { ...opts, force: true }),
+		keepTrails && old ? { ...fresh, trails: old.trails } : fresh,
 		id,
 	);
 	await putPhoto({ ...rec, meta: { ...rec.meta, region: region.id } });

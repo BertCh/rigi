@@ -16,6 +16,8 @@ export function isLowConfidence(c: PoseConfidence | null | undefined): boolean {
 	if (c.level === "low") return true;
 	if (c.accepted === false) return true;
 	if (c.level === "high" || c.level === "medium")
-		return !(c.confidence === undefined || c.confidence >= MIN_CONFIDENCE);
+		return c.confidence === undefined
+			? c.accepted !== true
+			: !(c.confidence >= MIN_CONFIDENCE);
 	return !(typeof c.confidence === "number" && c.confidence >= MIN_CONFIDENCE);
 }

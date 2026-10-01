@@ -328,7 +328,12 @@ export async function protectionLevel(
 			plPitchDeg: dP + K * sepP,
 			sepZ: Math.max(z(dH, sepH), z(dV, sepV), z(dY, sepY), z(dP, sepP)),
 		};
-		if (!r.converged) sub.why = "not converged";
+		if (!r.converged) {
+			// header: a subset that did not converge cannot be verified, so it fails the photo
+			sub.ok = false;
+			sub.why = "not converged";
+			reasons.push(`${s.name} did not converge`);
+		}
 		res.push(sub);
 	}
 	const argmax = (k: "plH" | "plV" | "plYawDeg" | "plPitchDeg") => {

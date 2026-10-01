@@ -291,7 +291,12 @@ export class NearFieldController {
 		if (this.building && this.buildingKey === key0) return this.building;
 		this.buildingKey = key0;
 		const run = (async (): Promise<MeasurableScene | null> => {
-			if (!(await this.available())) return null;
+			// early exits must not leave the phase at "loading" (the button would stay disabled)
+			const bail = (): null => {
+				if (this.state.phase === "loading") this.set({ phase: "idle" });
+				return null;
+			};
+			if (!(await this.available())) return bail();
 			const t0 = performance.now();
 			this.set({
 				phase: "loading",
@@ -301,7 +306,7 @@ export class NearFieldController {
 			});
 			try {
 				const data = await this.fetchPhotoData(signal);
-				if (signal?.aborted || this.disposed) return null;
+				if (signal?.aborted || this.disposed) return bail();
 				if (!data) {
 					this.set({ phase: "error", message: "near-field service failed" });
 					return null;
@@ -309,9 +314,9 @@ export class NearFieldController {
 				this.set({ phase: "loading", message: "Anchoring to the terrain" });
 				await this.host.prepareNearFieldDem?.();
 				// the DEM grid must describe the pose we key on: wait for a fresh geometry buffer
-				if (!(await this.host.readback()) || this.disposed) return null;
+				if (!(await this.host.readback()) || this.disposed) return bail();
 				const key = poseKey(this.host.pose, this.host.eye);
-				if (!this.host.geometryReady()) return null;
+				if (!this.host.geometryReady()) return bail();
 				const { depth } = data;
 				const demAt =
 					this.host.nearFieldDemRange?.(depth.width, depth.height) ??
@@ -352,7 +357,7 @@ export class NearFieldController {
 					const first = this.sceneCache.keys().next().value;
 					if (first !== undefined) this.sceneCache.delete(first);
 				}
-				if (key !== poseKey(this.host.pose, this.host.eye)) return null;
+				if (key !== poseKey(this.host.pose, this.host.eye)) return bail();
 				return this.adopt(scene, key);
 			} catch (e) {
 				console.warn("[nearfield] build failed", e);

@@ -57,7 +57,7 @@ check(
 	"accepted:false ⇒ LOW",
 	isLowConfidence({ accepted: false, level: "high" }),
 );
-check("level only, no confidence ⇒ LOW", isLowConfidence({}));
+check("level only, no confidence ⇒ LOW", isLowConfidence({ level: "high" }));
 
 // LOW confidence: clears, computes nothing
 let calls = 0;

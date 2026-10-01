@@ -370,14 +370,27 @@ export const isLocalRegionId = (id: string) => id.startsWith("local-");
  * Record that `photoId` uses `region` (keeps RegionData.photos meaningful) and persist it.
  * Bundled regions are returned untouched and not persisted: the photo stores only the id.
  */
-export async function attachPhotoToRegion(region: RegionData, photoId: string) {
+let attachChain: Promise<unknown> = Promise.resolve();
+
+export function attachPhotoToRegion(
+	region: RegionData,
+	photoId: string,
+): Promise<LocalRegion> {
+	// serialised, and merged with the stored record's photo ids, so concurrent uploads keep each other's ids
+	const run = attachChain.then(() => attachNow(region, photoId));
+	attachChain = run.catch(() => {});
+	return run;
+}
+
+async function attachNow(region: RegionData, photoId: string) {
 	if (!isLocalRegionId(region.id)) {
 		const { warnings: _w, partial: _p, ...clean } = region as LocalRegion;
 		return clean as LocalRegion;
 	}
-	const photos = region.photos.includes(photoId)
-		? region.photos
-		: [...region.photos, photoId];
+	const stored = await getRegion(region.id).catch(() => null);
+	const photos = [
+		...new Set([...(stored?.photos ?? []), ...region.photos, photoId]),
+	];
 	const { warnings: _w, ...clean } = { ...region, photos } as LocalRegion;
 	await putRegion(clean).catch(() => {});
 	return clean as LocalRegion;

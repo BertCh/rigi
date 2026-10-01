@@ -32,9 +32,23 @@ function db(): Promise<IDBDatabase> {
 			if (!d.objectStoreNames.contains(REGIONS))
 				d.createObjectStore(REGIONS, { keyPath: "id" });
 		};
-		req.onsuccess = () => resolve(req.result);
+		let failed = false;
+		req.onsuccess = () => {
+			const d = req.result;
+			// the open may land after we gave up (blocked): close it instead of leaking the connection
+			if (failed) return d.close();
+			// another tab upgrades / deletes the database: release ours and reopen on next use
+			d.onversionchange = () => {
+				d.close();
+				dbp = null;
+			};
+			resolve(d);
+		};
 		req.onerror = () => reject(req.error);
-		req.onblocked = () => reject(new Error("IndexedDB blocked by another tab"));
+		req.onblocked = () => {
+			failed = true;
+			reject(new Error("IndexedDB blocked by another tab"));
+		};
 	}).catch((e) => {
 		dbp = null;
 		throw e;

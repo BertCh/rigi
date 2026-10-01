@@ -182,6 +182,8 @@ export function useStepInside(opts: {
 	const poseSig = pose
 		? `${pose.yaw}|${pose.pitch}|${pose.roll}|${pose.vfov}`
 		: "";
+	const poseSigRef = useRef(poseSig);
+	poseSigRef.current = poseSig;
 	useEffect(() => {
 		const c = ctlRef.current;
 		if (!c || !poseSig) return;
@@ -217,10 +219,13 @@ export function useStepInside(opts: {
 		const c = ctlRef.current;
 		const engine = engineRef.current as StepEngine | null;
 		if (!c || !engine?.enterStepInside || !acceptedRef.current) return;
+		const sig0 = poseSigRef.current;
 		void (async () => {
 			const scene = await c.build();
 			if (!scene || ctlRef.current !== c || engineRef.current !== engine)
 				return;
+			// the build takes 10-60 s: the pose may have changed (auto-align) or lost its accepted state
+			if (!acceptedRef.current || poseSigRef.current !== sig0) return;
 			c.show({ truth: truthRef.current, maskDrape: true });
 			engine.enterStepInside?.({
 				radius: scene.confidenceRadius,
