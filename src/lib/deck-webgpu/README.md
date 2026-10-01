@@ -328,11 +328,12 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   `dem/grid.ts` `gridCorners` / `blendCorners` = `sampleGrid`); the kernel (core cachedGraph group
   `height-gather`, "texture-array" bindings on the two height arrays) only copies the four corner
   texels of each sample on a resident lazy tile, 8 B per texel (nonce + raw bits), one dispatch per
-  tick. Tiles with CPU heights are sampled in place; a non-resident tile, a bad nonce or a slot that
-  changed between plan and read take heightAt. `replayHeights` records and replays the
+  tick. Tiles with CPU heights are sampled in place; a non-resident tile, a bad nonce, a slot that
+  changed between plan and submit (snapshotted inside the graph's lease, synchronously with the
+  submit) or an atlas grown since the plan take heightAt. `replayHeights` records and replays the
   value-independent readers. Wired in the engine for the camera DEM height (init), `buildTrails`
   and peak snapping (`snapPeaksNear`'s `localMax`; a peak being gathered joins the list on a later
-  call, `settle()` waits for the pose's peaks). `snapOne`, Step Inside's ground / `nearFieldDemRange`
+  call, `settle()` waits for the pose's peaks and for a trail build still gathering). `snapOne`, Step Inside's ground / `nearFieldDemRange`
   and the lake floor (`geoLakeFloor`, off) keep heightAt. Gates: fast check `height-gather`
   (emulated kernel) and `scripts/deck-webgpu/height-gathers-probe.mjs` (counters, atlas bytes, and
   parity of camera height / snapped peaks / trail positions with the CPU readers). Counters:
