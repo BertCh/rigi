@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // W2 gate: GPU pose-grid scoring vs the CPU (align.ts), per photo, in headless Chromium.
 //  - grid: max |GPU − CPU| over the 2525 coarse cells (after the prior's sky fit), CPU grid ms vs GPU ms;
-//    graph (default) vs pooled ({ graph: false }) scores compared bit for bit (must be 0 diffs), ms each
+//    the cold (first) graph run vs the last warm one compared bit for bit (must be 0 diffs)
 //  - search: align.autoAlign vs gpu/align autoAlignAsync, exact equality of every hypothesis, ms
 //  - engine: engine autoAlign with GPU off vs on (three: autoAlign vs autoAlignAsync; deck: autoAlign
 //    under __RIGI_FLAGS__.gpu off/on), final pose Δ and the silhouette re-rank timing (deck stats)
@@ -87,6 +87,7 @@ try {
 				t = performance.now();
 				let gs = await PG.scorePoseGridGpu(dev, poses, aspect, dirs, edge, 3);
 				out.gridGpuColdMs = performance.now() - t;
+				const cold = gs;
 				const gpuMs = [];
 				for (let i = 0; i < REPS; i++) {
 					t = performance.now();
@@ -99,34 +100,13 @@ try {
 				);
 				out.gridCpuMs = performance.now() - t;
 				out.gridGpuMs = med(gpuMs);
-				// ---- graph vs pooled: the same kernel, so bit-identical scores ----
-				const pooledMs = [];
-				let gp;
-				for (let i = 0; i < REPS; i++) {
-					t = performance.now();
-					gp = await PG.scorePoseGridGpu(
-						dev,
-						poses,
-						aspect,
-						dirs,
-						edge,
-						3,
-						undefined,
-						{ graph: false },
-					);
-					pooledMs.push(performance.now() - t);
-				}
+				// ---- run to run: the cold run and the last warm run, bit for bit ----
 				const gb = new Uint32Array(gs.buffer, gs.byteOffset, gs.length);
-				const pb = new Uint32Array(gp.buffer, gp.byteOffset, gp.length);
-				let bitDiffs = gb.length === pb.length ? 0 : -1;
+				const cb = new Uint32Array(cold.buffer, cold.byteOffset, cold.length);
+				let bitDiffs = gb.length === cb.length ? 0 : -1;
 				for (let i = 0; bitDiffs >= 0 && i < gb.length; i++)
-					if (gb[i] !== pb[i]) bitDiffs++;
-				out.graphVsPooled = {
-					cells: gb.length,
-					bitDiffs,
-					graphMs: out.gridGpuMs,
-					pooledMs: med(pooledMs),
-				};
+					if (gb[i] !== cb[i]) bitDiffs++;
+				out.rerun = { cells: gb.length, bitDiffs };
 				let maxErr = 0;
 				let sumErr = 0;
 				for (let i = 0; i < cs.length; i++) {
@@ -153,10 +133,6 @@ try {
 					rg = await G.autoAlignAsync(prior, aspect, dirs, edge, 25);
 					gpuT.push(performance.now() - t);
 				}
-				// the whole search on the pooled path (grid + bounds), which must equal the graph path
-				const rp = await G.autoAlignAsync(prior, aspect, dirs, edge, 25, {
-					graph: false,
-				});
 				const same = (a, b) =>
 					a.length === b.length &&
 					a.every(
@@ -172,7 +148,6 @@ try {
 					gpuTiming: G.lastAlignTiming,
 					hyps: rc.alternatives.length,
 					identical: same(rc.alternatives, rg.alternatives),
-					pooledIdentical: same(rg.alternatives, rp.alternatives),
 					confidence: [rc.confidence, rg.confidence],
 					cpuPose: rc.pose,
 					dYaw: rg.pose.yaw - rc.pose.yaw,
@@ -228,7 +203,7 @@ try {
 		rows.push({ id, ...r, logs: logs.slice(0, 5) });
 		const s = r.search;
 		console.log(
-			`${id} [${RENDERER}] dirs ${r.nDirs}#${r.dirsHash} grid cpu ${r.gridCpuMs?.toFixed(1)} ms gpu ${r.gridGpuMs?.toFixed(1)} ms (cold ${r.gridGpuColdMs?.toFixed(1)}, device ${r.deviceMs?.toFixed(1)}) maxErr ${r.grid?.maxAbsErr?.toExponential(2)} | graph vs pooled bitDiffs ${r.graphVsPooled?.bitDiffs} (${r.graphVsPooled?.graphMs?.toFixed(2)} vs ${r.graphVsPooled?.pooledMs?.toFixed(2)} ms) search=${s?.pooledIdentical} | search cpu ${s?.cpuMs.toFixed(1)} gpu ${s?.gpuMs.toFixed(1)} ms rescored ${s?.gpuTiming?.rescored} identical=${s?.identical} | engine off ${r.engine?.offMs.toFixed(1)} on ${r.engine?.onMs.toFixed(1)} ms Δyaw ${r.engine?.dYaw} sameRanking=${r.engine?.sameRanking}${r.error ? ` ERROR ${r.error}` : ""}`,
+			`${id} [${RENDERER}] dirs ${r.nDirs}#${r.dirsHash} grid cpu ${r.gridCpuMs?.toFixed(1)} ms gpu ${r.gridGpuMs?.toFixed(1)} ms (cold ${r.gridGpuColdMs?.toFixed(1)}, device ${r.deviceMs?.toFixed(1)}) maxErr ${r.grid?.maxAbsErr?.toExponential(2)} | rerun bitDiffs ${r.rerun?.bitDiffs} | search cpu ${s?.cpuMs.toFixed(1)} gpu ${s?.gpuMs.toFixed(1)} ms rescored ${s?.gpuTiming?.rescored} identical=${s?.identical} | engine off ${r.engine?.offMs.toFixed(1)} on ${r.engine?.onMs.toFixed(1)} ms Δyaw ${r.engine?.dYaw} sameRanking=${r.engine?.sameRanking}${r.error ? ` ERROR ${r.error}` : ""}`,
 		);
 		await page.close();
 	}

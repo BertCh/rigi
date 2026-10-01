@@ -15,10 +15,9 @@
  * `alignGpuOptions.refine = "cpu"` (or the `refine` option) keeps the refine on the plain CPU loop.
  * Any GPU failure, no WebGPU, or the kill switch (?gpu=off, src/lib/flags) → plain autoAlign.
  *
- * Runs on gpu/core: both kernels on a core ComputeGraph by default (./graph.ts: cleared output
- * transient + read node over the pooled input slots; bit-identical to the pooled single dispatch,
- * which `graph: false` selects), the edge map's static planes uploaded once per photo, ring
- * readback, and the core/profile labels "align-pose-grid" and "align-pose-bound".
+ * Runs on gpu/core: both kernels on a core ComputeGraph (./graph.ts: cleared output transient + read
+ * node over the pooled input slots; the only GPU path since 2026-10-01), the edge map's static planes
+ * uploaded once per photo, and the core/profile labels "align-pose-grid" and "align-pose-bound".
  */
 
 import type { Device } from "@luma.gl/core";
@@ -68,8 +67,6 @@ export type AlignGpuTiming = {
 	uploadBytes?: number;
 	/** refine: "gpu" (bound-screened descent) or "cpu" (plain loop), with its counters */
 	refine?: "gpu" | "cpu";
-	/** GPU kernels on the core ComputeGraph (true) or the pooled single dispatches (false) */
-	graph?: boolean;
 	refineStats?: RefineStats;
 	/** refine bound dispatches: count, poses, unbounded poses, upload bytes, ms awaiting the GPU */
 	boundStats?: PoseBoundStats;
@@ -86,14 +83,11 @@ export type AlignGpuTiming = {
  */
 export const alignGpuOptions: {
 	refine: "gpu" | "cpu";
-	/** true (default): grid and bounds on a core ComputeGraph; false: the pooled single dispatches */
-	graph: boolean;
 	speculation: RefineSpeculation;
 	/** TEST ONLY: subtracted from every GPU bound (forces a bound violation and the fallback) */
 	faultDeflate: number;
 } = {
 	refine: "gpu",
-	graph: true,
 	speculation: { ...REFINE_SPECULATION },
 	faultDeflate: 0,
 };
@@ -190,11 +184,10 @@ export async function autoAlignAsync(
 	dirs: Float32Array,
 	edge: EdgeMap,
 	yawRange = 25,
-	opts: { refine?: "gpu" | "cpu"; graph?: boolean } = {},
+	opts: { refine?: "gpu" | "cpu" } = {},
 ): Promise<AlignResult> {
 	const t0 = performance.now();
 	const mode = opts.refine ?? alignGpuOptions.refine;
-	const gopts = { graph: opts.graph ?? alignGpuOptions.graph };
 	let device = null;
 	try {
 		device = await getComputeDevice();
@@ -228,7 +221,6 @@ export async function autoAlignAsync(
 			edge,
 			3,
 			st,
-			gopts,
 		);
 		grid = { scores, tol: GRID_TOL, skyFitted: true };
 		uploadBytes = st.uploadBytes;
@@ -266,7 +258,6 @@ export async function autoAlignAsync(
 			dirs,
 			own,
 			boundStats,
-			gopts,
 		);
 		const deflate = alignGpuOptions.faultDeflate;
 		if (deflate) {
@@ -307,7 +298,6 @@ export async function autoAlignAsync(
 		rescored: grid?.rescored ?? 0,
 		uploadBytes,
 		refine,
-		graph: gopts.graph,
 		refineStats: rs,
 		boundStats,
 		searchMs: performance.now() - tr,

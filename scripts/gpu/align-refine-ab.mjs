@@ -9,13 +9,11 @@
 // trajectories). With --check-bounds every certified bound is checked against the exact CPU score
 // (bound ≥ score; violations must be 0) and the slack is summarised. Timing: median of REPS
 // alternating cpu/gpu runs at the photo's own prior.
-// `--graph on|off` (default on) selects the GPU kernels' path (alignGpuOptions.graph: core ComputeGraph
-// or the pooled single dispatches); with --check-bounds every bound batch is also run on the OTHER path
-// and compared with Object.is (graph vs pooled bounds must be identical: pathDiffs 0), and the gpu
-// refine is re-run on the other path (diffOtherPath: 0 diffs required).
+// With --check-bounds every bound batch is also run on a second session and compared with Object.is
+// (run-to-run: identical bounds required, rerunDiffs 0).
 // Usage (under the render lock, own dev server):
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/align-refine-ab.mjs [--url http://localhost:3123]
-//     [--renderer three|deck] [--perturb 6] [--check-bounds] [--graph on|off] [--out out/gpu/align/refine-ab.json] [IMG_xxxx ...]
+//     [--renderer three|deck] [--perturb 6] [--check-bounds] [--out out/gpu/align/refine-ab.json] [IMG_xxxx ...]
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
@@ -35,7 +33,6 @@ const RENDERER = opt("--renderer", "three");
 const PERTURB = Number(opt("--perturb", "6"));
 const OUT = opt("--out", "out/gpu/align/refine-ab.json");
 const CHECK = flag("--check-bounds");
-const GRAPH = opt("--graph", "on") !== "off";
 const REPS = 5;
 const ROOT = resolve(import.meta.dirname, "../..");
 const IDS = argv.length
@@ -78,7 +75,7 @@ try {
 			{ timeout: 240000 },
 		);
 		const r = await page.evaluate(
-			async ({ REPS, PERTURB, CHECK, GRAPH }) => {
+			async ({ REPS, PERTURB, CHECK }) => {
 				const A = await import("/src/lib/align.ts");
 				const G = await import("/src/lib/gpu/align/index.ts");
 				const PB = await import("/src/lib/gpu/align/pose-bound.ts");
@@ -90,8 +87,6 @@ try {
 				const dev = await DEV.getComputeDevice();
 				if (!dev) return { error: "no WebGPU device" };
 				await G.warmAlignGpu();
-				G.alignGpuOptions.graph = GRAPH;
-				const other = { graph: !GRAPH };
 				const med = (xs) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 				const diffs = (a, b) => {
 					const out = [];
@@ -136,7 +131,7 @@ try {
 					violations: 0,
 					minSlack: Infinity,
 					slacks: [],
-					pathDiffs: 0,
+					rerunDiffs: 0,
 				};
 				for (const prior of priors) {
 					const rsRef = A.newRefineStats();
@@ -178,27 +173,11 @@ try {
 					};
 					if (CHECK) {
 						// re-run the bounded refine with a checking provider: each bound vs the exact score
-						const session = PB.poseBoundSession(
-							dev,
-							aspect,
-							dirs,
-							edge,
-							undefined,
-							{
-								graph: GRAPH,
-							},
-						);
-						const twin = PB.poseBoundSession(
-							dev,
-							aspect,
-							dirs,
-							edge,
-							undefined,
-							other,
-						);
+						const session = PB.poseBoundSession(dev, aspect, dirs, edge);
+						const twin = PB.poseBoundSession(dev, aspect, dirs, edge);
 						const checked = async (probes) => {
 							const ub = await session(probes);
-							// the same batch on the other path (graph vs pooled): identical bounds
+							// the same batch on a second session: identical bounds
 							const ub2 = await twin(probes);
 							probes.forEach((_, i) => {
 								const a = ub[i];
@@ -207,7 +186,7 @@ try {
 									!a !== !b ||
 									(a && (!Object.is(a.ub, b.ub) || !Object.is(a.eps, b.eps)))
 								)
-									bc.pathDiffs++;
+									bc.rerunDiffs++;
 							});
 							probes.forEach((q, i) => {
 								if (ub[i] === undefined) return;
@@ -231,8 +210,6 @@ try {
 							dirs,
 							edge,
 							3,
-							undefined,
-							{ graph: GRAPH },
 						);
 						const chk = await A.autoAlignRefined(
 							prior,
@@ -244,11 +221,6 @@ try {
 							checked,
 						);
 						run.diffCheckedVsCpu = diffs(cpu, chk);
-						const oth = await G.autoAlignAsync(prior, aspect, dirs, edge, 25, {
-							refine: "gpu",
-							...other,
-						});
-						run.diffOtherPath = diffs(gpu, oth);
 					}
 					runs.push(run);
 				}
@@ -304,7 +276,6 @@ try {
 					pathAfter: t2.refine,
 				};
 				G.resetGpuRefine(dev);
-				G.alignGpuOptions.graph = true;
 				globalThis.__RIGI_FLAGS__ = {
 					...globalThis.__RIGI_FLAGS__,
 					gpu: undefined,
@@ -330,13 +301,13 @@ try {
 								minSlack: bc.minSlack,
 								medSlack: slacks[slacks.length >> 1],
 								p10Slack: slacks[Math.floor(slacks.length * 0.1)],
-								pathDiffs: bc.pathDiffs,
+								rerunDiffs: bc.rerunDiffs,
 								medEps: bc.eps.sort((a, b) => a - b)[bc.eps.length >> 1],
 							}
 						: undefined,
 				};
 			},
-			{ REPS, PERTURB, CHECK, GRAPH },
+			{ REPS, PERTURB, CHECK },
 		);
 		rows.push({ id, ...r, logs: logs.slice(0, 5) });
 		if (r.error) {
@@ -347,13 +318,12 @@ try {
 					a +
 					x.diffGpuVsCpu.length +
 					x.diffGpuVsRef.length +
-					(x.diffCheckedVsCpu?.length ?? 0) +
-					(x.diffOtherPath?.length ?? 0),
+					(x.diffCheckedVsCpu?.length ?? 0),
 				0,
 			);
 			const sum = (k, f) => r.runs.reduce((a, x) => a + (x[k]?.[f] ?? 0), 0);
 			console.log(
-				`${id} runs ${r.runs.length} diffs ${nd} | iters cpu ${sum("cpuStats", "iters")} gpu ${sum("gpuStats", "iters")} | cpu scorePose ${sum("cpuStats", "cpuEvals")} → ${sum("gpuStats", "cpuEvals")} (skipped ${sum("gpuStats", "skipped")}, rounds ${sum("gpuStats", "rounds")}) | autoAlign cpu-refine ${r.timing.cpu.toFixed(1)} ms → gpu-refine ${r.timing.gpu.toFixed(1)} ms (search ${r.timing.cpuSearch.toFixed(1)} → ${r.timing.gpuSearch.toFixed(1)}, gpu wait ${r.timing.gpuWait.toFixed(1)})| verify first ${r.firstVerify.verified} (${r.firstVerify.ms.toFixed(2)} ms) steady ${r.timing.verified} (${r.timing.verifyMs.toFixed(2)} ms) | fault diffs ${r.fault.diffFaulted.length}+${r.fault.diffAfter.length} viol ${!!r.fault.violation} sticks ${r.fault.disabledAfter && r.fault.pathAfter === "cpu"}${r.boundCheck ? ` | bounds ${r.boundCheck.checked} viol ${r.boundCheck.violations} pathDiffs ${r.boundCheck.pathDiffs} minSlack ${r.boundCheck.minSlack.toExponential(2)} med ${r.boundCheck.medSlack?.toExponential(2)}` : ""}`,
+				`${id} runs ${r.runs.length} diffs ${nd} | iters cpu ${sum("cpuStats", "iters")} gpu ${sum("gpuStats", "iters")} | cpu scorePose ${sum("cpuStats", "cpuEvals")} → ${sum("gpuStats", "cpuEvals")} (skipped ${sum("gpuStats", "skipped")}, rounds ${sum("gpuStats", "rounds")}) | autoAlign cpu-refine ${r.timing.cpu.toFixed(1)} ms → gpu-refine ${r.timing.gpu.toFixed(1)} ms (search ${r.timing.cpuSearch.toFixed(1)} → ${r.timing.gpuSearch.toFixed(1)}, gpu wait ${r.timing.gpuWait.toFixed(1)})| verify first ${r.firstVerify.verified} (${r.firstVerify.ms.toFixed(2)} ms) steady ${r.timing.verified} (${r.timing.verifyMs.toFixed(2)} ms) | fault diffs ${r.fault.diffFaulted.length}+${r.fault.diffAfter.length} viol ${!!r.fault.violation} sticks ${r.fault.disabledAfter && r.fault.pathAfter === "cpu"}${r.boundCheck ? ` | bounds ${r.boundCheck.checked} viol ${r.boundCheck.violations} rerunDiffs ${r.boundCheck.rerunDiffs} minSlack ${r.boundCheck.minSlack.toExponential(2)} med ${r.boundCheck.medSlack?.toExponential(2)}` : ""}`,
 			);
 		}
 		await page.close();
@@ -378,11 +348,10 @@ const bad = rows.filter(
 				x.diffGpuVsCpu.length ||
 				x.diffGpuVsRef.length ||
 				x.diffCheckedVsCpu?.length ||
-				x.diffOtherPath?.length ||
 				x.gpuPath !== "gpu",
 		) ||
 		r.boundCheck?.violations ||
-		r.boundCheck?.pathDiffs ||
+		r.boundCheck?.rerunDiffs ||
 		r.fault.diffFaulted.length ||
 		r.fault.diffAfter.length ||
 		!r.fault.violation ||

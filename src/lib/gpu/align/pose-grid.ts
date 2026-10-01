@@ -3,16 +3,14 @@
 // rounding only (see the WGSL header), and autoAlign's `grid` option re-scores near-winners on the
 // CPU, so callers get the CPU's exact result.
 //
-// Buffers live in the gpu/core pool ("align/…" slots, one lease "align" per grid), so warm calls
-// allocate nothing. The edge map's `coarse` and `fg` planes (~1 MB each at 512 px) never change
+// Input buffers live in the gpu/core pool ("align/…" slots, one lease "align" per grid), so warm
+// calls allocate nothing. The edge map's `coarse` and `fg` planes (~1 MB each at 512 px) never change
 // after buildEdgeMap, so they are uploaded once per photo: a slot remembers which array it holds
 // and skips the write when the same one comes back. `skyCum` is refit IN PLACE by fitPriorSky
 // (it depends on the prior), so it is uploaded on every call.
 //
-// Graph path (default; ./graph.ts): the same kernel on a core ComputeGraph, `scores` a cleared graph
-// transient read through a read node; the pooled single dispatch below stays as `{ graph: false }`.
-//
-// Readback: all scores (nPoses × 4 B, 10 KB for the 2525-pose grid) through a core/readback slot.
+// The kernel runs on a core ComputeGraph (./graph.ts), `scores` a cleared graph transient read
+// through a read node: all scores (nPoses × 4 B, 10 KB for the 2525-pose grid).
 // A GPU top-K would save nothing measurable at that size, and autoAlign needs every column's
 // near-maximum cells anyway.
 import { Buffer, type Device } from "@luma.gl/core";
@@ -20,10 +18,6 @@ import type { EdgeMap } from "#/lib/align";
 import { type Pose, poseBasis } from "#/lib/camera";
 import {
 	defineKernel,
-	dispatch,
-	kernel,
-	stage,
-	submit,
 	warmKernels,
 	warmKernelsAsync,
 } from "#/lib/gpu/core/kernel";
@@ -88,12 +82,6 @@ export function uploadOnce(
 	return b;
 }
 
-/** Path selection of scorePoseGridGpu / poseBoundSession. */
-export type AlignGraphOptions = {
-	/** default (true): a core ComputeGraph encoding (./graph.ts); false: the pooled single dispatch */
-	graph?: boolean;
-};
-
 export type PoseGridStats = {
 	/** bytes written to the GPU by this grid (inputs; the cached edge planes count only when uploaded) */
 	uploadBytes: number;
@@ -112,8 +100,7 @@ export let lastUploadBytes = 0;
  *
  * `edge.coarse` and `edge.fg` must not be modified in place after the first call with this edge map
  * (buildEdgeMap never does); `edge.skyCum` may be (fitPriorSky), it is re-uploaded every call.
- * `stats` (optional) receives this call's upload bytes. `opts.graph: false` takes the pooled single
- * dispatch instead of the graph (bit-identical results).
+ * `stats` (optional) receives this call's upload bytes.
  */
 export function scorePoseGridGpu(
 	device: Device,
@@ -123,22 +110,11 @@ export function scorePoseGridGpu(
 	edge: EdgeMap,
 	stride = 3,
 	stats?: PoseGridStats,
-	opts: AlignGraphOptions = {},
 ): Promise<Float32Array> {
-	const graph = opts.graph !== false;
 	return withLease(ALIGN_GROUP, async () => {
 		const up: PoseGridStats = { uploadBytes: 0 };
 		try {
-			return await scoreOnce(
-				device,
-				poses,
-				aspect,
-				dirs,
-				edge,
-				stride,
-				up,
-				graph,
-			);
+			return await scoreOnce(device, poses, aspect, dirs, edge, stride, up);
 		} finally {
 			// written while the lease is still held: no other grid's bytes can land in between
 			lastUploadBytes = up.uploadBytes;
@@ -155,7 +131,6 @@ async function scoreOnce(
 	edge: EdgeMap,
 	stride: number,
 	up: PoseGridStats,
-	graph: boolean,
 ): Promise<Float32Array> {
 	const nPoses = poses.length;
 	if (!nPoses) return new Float32Array(0);
@@ -203,22 +178,7 @@ async function scoreOnce(
 	};
 	up.uploadBytes +=
 		32 + pose4.byteLength + dirs4.byteLength + edge.skyCum.byteLength;
-	if (graph)
-		return new Float32Array(
-			await runPoseGraph(device, POSE_GRID, inputs, "scores", 4, nPoses),
-		);
-	const bindings = {
-		...inputs,
-		scores: acquire(device, "align/scores", nPoses * 4, STORAGE),
-	};
-	const enc = device.createCommandEncoder({ id: "align-pose-grid" });
-	dispatch(enc, kernel(device, POSE_GRID), bindings, nPoses);
-	const staged = stage(device, enc, bindings.scores, nPoses * 4);
-	try {
-		submit(device, enc);
-	} catch (e) {
-		staged.cancel();
-		throw e;
-	}
-	return new Float32Array(await staged.read());
+	return new Float32Array(
+		await runPoseGraph(device, POSE_GRID, inputs, "scores", 4, nPoses),
+	);
 }

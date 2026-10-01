@@ -1,24 +1,22 @@
 // The align kernels (./pose-grid.ts POSE_GRID, ./pose-bound.ts POSE_BOUND) on a core ComputeGraph:
-// the default path of scorePoseGridGpu and poseBoundSession (`{ graph: false }` keeps the pooled
-// single dispatch). Both are one-pose-per-workgroup kernels with one storage output, so one shape:
+// the only GPU path of scorePoseGridGpu and poseBoundSession (the pooled single dispatch it replaced,
+// bit for bit, was removed on 2026-10-01). Both are one-pose-per-workgroup kernels with one storage
+// output, so one shape:
 //
 //   clear out → KERNEL (unchanged WGSL / spec) → read out[0, nPoses · stride)
 //
-// Inputs stay graph IMPORTS: the very pooled buffers the pooled path binds (u, poses, dirs, the edge
-// planes uploaded once per photo, the sky planes; pose-bound's private per-session skyCum copy keeps
-// its own "align/refine-skycum" slot and session-writer check), bound per run at their full byte
-// length, so every input binding has the pooled path's byte size and contents. The output is a graph
-// TRANSIENT of capacityFor(nPoses · stride) (the pooled slot's size class), read through a read node.
-//
-// Bit-identity with the pooled path: same kernel spec (WGSL, pipeline, layout), same uniform bytes,
-// same input buffers, same nPoses workgroups. Neither kernel calls arrayLength() and both write only
-// out[pi < nPoses], so the output binding's capacity cannot reach a value.
+// Inputs are graph IMPORTS: pooled buffers (u, poses, dirs, the edge planes uploaded once per photo,
+// the sky planes; pose-bound's private per-session skyCum copy keeps its own "align/refine-skycum"
+// slot and session-writer check), bound per run at their full byte length. The output is a graph
+// TRANSIENT of capacityFor(nPoses · stride), read through a read node. Neither kernel calls
+// arrayLength() and both write only out[pi < nPoses], so the output binding's capacity cannot reach
+// a value.
 // Clear: out is written in full for the read range (every workgroup's lane 0 writes its pose's
 // words), but transients are never zeroed and may hold a previous run's bytes, so it is cleared over
 // the read range first (≤ 2525 · 48 B) and declared "partial" (the core clear lint enforces it). For
 // pose-bound this keeps the stale-data guard sound on the graph: a silently skipped dispatch leaves
 // zeros, and the per-call nonce (never 0), the pose-index echo and the tan(vfov/2) echo all reject
-// them, exactly as they reject a stale pooled slot.
+// them.
 //
 // Per-call overhead: static import; the run parameters and buffer record are built once per call;
 // graphs are cached per (kernel, input byte lengths, output capacity) with core cachedGraph, and the
@@ -78,7 +76,7 @@ export async function runPoseGraph(
 		return undefined;
 	});
 	// run() cancels every staged slot it does not hand back, whatever throws (incl. the core
-	// workgroup-limit guard in encodeDispatch: the caller then goes CPU, as on the pooled path)
+	// workgroup-limit guard in encodeDispatch: the caller then goes CPU)
 	const { reads } = await graph.run({ n: nPoses }, { buffers: inputs });
 	const buf = reads.read?.[0];
 	if (!buf) throw new Error(`${graph.id}: read node did not run`);
