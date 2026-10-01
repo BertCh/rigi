@@ -779,6 +779,9 @@ export async function certifiedRefine(
 			);
 			const log = b.log.slice();
 			const pending = opts.runner.run(b, rounds, slack);
+			// a runner that rejects while the CPU works is awaited below; mark it handled so the page
+			// does not report an unhandledrejection (harnesses treat page errors as failures)
+			pending.catch(() => {});
 			// let the runner reach its submit before the CPU work (a GPU runner awaits only its readback)
 			await yieldToRunner();
 			prewarm(log, nLog);
