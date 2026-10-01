@@ -72,7 +72,11 @@ import {
 	terrainModules,
 	terrainSource,
 } from "../terrain";
-import { TextureArrayAtlas } from "../texture-array-atlas";
+import {
+	type AtlasLease,
+	TextureArrayAtlas,
+	TileLayerRef,
+} from "../texture-array-atlas";
 import { type CulledDraw, TerrainGpuCull } from "./terrain-cull";
 
 // ---------- WGSL ----------
@@ -259,6 +263,9 @@ type Slot = {
 	big: boolean;
 	size: number;
 	base: number;
+	/** the layer belongs to the tile (decoded into at load, flag terrainGpuDecode): this slot holds a
+	 * reference instead of owning the layer, and the tile needs no upload */
+	lease?: AtlasLease;
 };
 
 /** A growable r32float 2d-array of `size`² height layers: a TextureArrayAtlas that grows by copy
@@ -361,6 +368,12 @@ class TileStore {
 		return true;
 	}
 
+	/** A slot's height layer goes: its reference on a tile's layer, or the layer itself. */
+	private freeLayer(s: Slot) {
+		if (s.lease) s.lease.release();
+		else (s.big ? this.big : this.small).release(s.layer);
+	}
+
 	/** Upload what's new in `tiles`, free what's gone. `layerOf` = imagery layer per tile id. */
 	sync(tiles: readonly TileMesh[], layerOf: (id: string) => number) {
 		const want = new Set(tiles.filter((t) => t.grid && t.size <= BIG));
@@ -368,7 +381,7 @@ class TileStore {
 			if (!want.has(m)) {
 				this.slots.delete(m);
 				this.freeRows.push(s.row);
-				(s.big ? this.big : this.small).release(s.layer);
+				this.freeLayer(s);
 				if (s.base >= 0) this.baseSlots.release(s.base, s.size);
 			}
 		const fresh = [...want].filter((m) => !this.slots.has(m));
@@ -376,12 +389,23 @@ class TileStore {
 		const freshSlots: Slot[] = [];
 		for (const m of fresh) {
 			const big = m.size > SMALL;
+			const pool = big ? this.big : this.small;
+			// a tile decoded into a layer of this very atlas at load: draw it from there
+			const ref = m.gpuLayer;
+			const lease =
+				ref instanceof TileLayerRef &&
+				ref.lease.live &&
+				ref.lease.atlas === pool
+					? ref.lease
+					: undefined;
+			lease?.retain();
 			const slot: Slot = {
 				row: this.freeRows.pop() ?? this.nextRow++,
-				layer: (big ? this.big : this.small).alloc(),
+				layer: lease ? lease.layer : pool.alloc(),
 				big,
 				size: m.grid ? baseSlotVec4(m.grid.G) : 0,
 				base: -1,
+				lease,
 			};
 			this.slots.set(m, slot);
 			freshSlots.push(slot);
@@ -403,7 +427,7 @@ class TileStore {
 			// past a device limit: not drawn
 			this.slots.delete(m);
 			this.freeRows.push(s.row);
-			(s.big ? this.big : this.small).release(s.layer);
+			this.freeLayer(s);
 			if (s.base >= 0) this.baseSlots.release(s.base, s.size);
 			this.overflow++;
 		};
@@ -434,7 +458,7 @@ class TileStore {
 				continue;
 			}
 			const isFresh = freshSet.has(m);
-			if (isFresh) {
+			if (isFresh && !s.lease) {
 				// a GPU-decoded tile (flag terrainGpuDecode) whose CPU heights nobody asked for yet:
 				// decode its bitmap straight into the layer; else upload the CPU heights
 				const gpu = m.heights ? undefined : m.lazyHeights;
@@ -507,7 +531,8 @@ export type ResidentHeights = {
 	small: Texture;
 	/** r32float 2d-array, BIG² layers (size 257..512) */
 	big: Texture;
-	/** the tile object's slot, or null when it is not resident (no grid, over a device limit, not yet synced) */
+	/** the tile object's slot, or null when it is not resident (no grid, over a device limit, not yet
+	 * synced, and no layer of its own from a load-time GPU decode) */
 	slotOf(tile: object): { layer: number; big: boolean } | null;
 };
 
@@ -633,9 +658,24 @@ export class BatchedTerrainCore implements GpuLayerCore {
 			big: big.texture,
 			slotOf: (t) => {
 				const s = slots.get(t as TileMesh);
-				return s ? { layer: s.layer, big: s.big } : null;
+				if (s) return { layer: s.layer, big: s.big };
+				// not drawn, but decoded into a layer it still holds (terrainGpuDecode)
+				const ref = (t as TileMesh).gpuLayer;
+				if (!(ref instanceof TileLayerRef) || !ref.lease.live) return null;
+				const atlas = ref.lease.atlas;
+				return atlas === small || atlas === big
+					? { layer: ref.lease.layer, big: atlas === big }
+					: null;
 			},
 		};
+	}
+
+	/**
+	 * The two height arrays themselves, for the terrainGpuDecode loader: it decodes each tile into a
+	 * layer it leases there (TextureArrayAtlas.writeTerrariumLeased), which TileStore then draws.
+	 */
+	heightAtlases() {
+		return { small: this.store.small, big: this.store.big };
 	}
 
 	/** Point tiles at their ImageryArray layers (one table write when any changed). */
@@ -817,6 +857,7 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		};
 		if (kind === "color") {
 			bindings.imagery = this.imagery?.texture ?? this.emptyArray();
+			bindings.imagerySmall = this.imagery?.textureSmall ?? this.emptyArray();
 			const uniforms: Record<string, unknown> = {};
 			for (const p of [
 				...(this.shading ? [this.shading] : []),

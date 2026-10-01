@@ -181,6 +181,7 @@ export function buildLiteMesh(
 		size: dem.size,
 		heights: dem.heights,
 		lazyHeights: dem.lazyHeights,
+		gpuLayer: dem.gpuLayer,
 		heightStats: dem.heightStats,
 		sourceZ: dem.source.z,
 		focus,

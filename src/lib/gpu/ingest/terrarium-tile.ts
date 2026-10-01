@@ -5,12 +5,17 @@
 // GPU Terrarium tile ingest (WAG W2.3 wiring, flag terrainGpuDecode): one kernel decodes a Terrarium
 // tile texture, optionally halves it with the streamer's 2× box filter, and reduces the statistics the
 // CPU needs without the heights (validateTile's out-of-range count, lo / hi, the stride-7 lo / hi).
-// Two graphs use it:
-//   - terrariumTileStatsGpu (load time, cachedGraph group "ingest-terrarium-tile"): bitmap → stats
-//     (32 B read back). The caller keeps the CPU path when `invalid` > 0 (validateTile would fill).
-//   - TerrariumLayerWriter (residency, ComputeGraphs "ingest-terrarium-layer|…"): bitmap → heights →
-//     one layer of a TextureArrayAtlas r32float array (copyBufferToTexture), encoded and submitted
-//     synchronously, so the layer is ready for the frame that follows.
+// Three graphs use it:
+//   - terrariumTileStatsGpu (load time without a height atlas, cachedGraph group
+//     "ingest-terrarium-tile"): bitmap → stats (32 B read back). The caller keeps the CPU path when
+//     `invalid` > 0 (validateTile would fill).
+//   - TerrariumLayerWriter.writeWithStats (load time, the default on the WebGPU engine; ComputeGraphs
+//     "ingest-terrarium-layer|…|stats"): bitmap → heights → one layer of a TextureArrayAtlas r32float
+//     array (copyBufferToTexture) + the same stats, one upload of the bitmap. The tile keeps that
+//     layer (a lease) for as long as the streamer keeps its mesh.
+//   - TerrariumLayerWriter.write (residency fallback, "ingest-terrarium-layer|…"): bitmap → layer, for
+//     a tile that has no resident layer in the atlas it enters (e.g. after a device loss).
+// Every write is encoded and submitted synchronously, so the layer is ready for the frame that follows.
 // GpuDecodedHeights is the lazy CPU view of such a tile (dem/cpu-heights.ts LazyCpuHeights): the CPU
 // twin's own code (bitmapHeights = canvas + decodeTerrarium, validateTile, downsampleHeights2) on the
 // same ImageBitmap, run only when a CPU consumer asks.
@@ -261,9 +266,14 @@ export async function terrariumTileStatsGpu(
 
 /**
  * Residency: Terrarium bitmaps → layers of one r32float 2d-array (a TextureArrayAtlas), on the GPU.
- * One ComputeGraph per (source size, down, target descriptor): the atlas re-creates its texture on a
- * grow, so a changed descriptor rebuilds the graph. A staging rgba8unorm texture per source size is
- * reused: copyExternalImageToTexture and the submit that reads it are queue-ordered.
+ * One ComputeGraph per (source size, down, stats read or not, target descriptor): the atlas
+ * re-creates its texture on a grow, so a changed descriptor rebuilds the graph. A staging
+ * rgba8unorm texture per source size is reused: copyExternalImageToTexture and the submit that reads
+ * it are queue-ordered.
+ *   write():          bitmap → layer (a tile re-entering the atlas without a resident layer)
+ *   writeWithStats(): bitmap → layer AND the load-time stats (terrariumTileStatsGpu's 32 B), one
+ *                     upload: the loader decodes a tile straight into the layer it keeps
+ *                     (deck-webgpu/terrain-gpu-decode.ts), so the bitmap is uploaded once per load.
  */
 export class TerrariumLayerWriter {
 	private graphs = new Map<string, ComputeGraph<{ layer: number }>>();
@@ -281,6 +291,63 @@ export class TerrariumLayerWriter {
 		layer: number,
 		src: { bitmap: ImageBitmap; down: 1 | 2 },
 	) {
+		const g = this.graphFor(target, src, false);
+		const stage = this.stage(src.bitmap);
+		const enc = this.device.createCommandEncoder({ id: g.id });
+		g.encode(enc, { layer }, undefined, {
+			rgba: stage.texture,
+			atlas: target,
+		});
+		submit(this.device, enc);
+		this.stats.writes++;
+	}
+
+	/**
+	 * write() plus the tile's statistics, read back (32 B). Encoded and submitted synchronously; the
+	 * layer is written whatever the stats say (the caller releases it when `invalid` > 0).
+	 */
+	async writeWithStats(
+		target: Texture,
+		layer: number,
+		src: { bitmap: ImageBitmap; down: 1 | 2 },
+	): Promise<TerrariumTileStats> {
+		const g = this.graphFor(target, src, true);
+		const stage = this.stage(src.bitmap);
+		const enc = this.device.createCommandEncoder({ id: g.id });
+		const { reads } = g.encodeReads(enc, { layer }, undefined, {
+			rgba: stage.texture,
+			atlas: target,
+		});
+		try {
+			submit(this.device, enc);
+		} catch (e) {
+			reads.cancel();
+			throw e;
+		}
+		this.stats.writes++;
+		const words = new Uint32Array((await reads.read()).read[0]);
+		return decodeTileStats(words);
+	}
+
+	private stage(bitmap: ImageBitmap) {
+		const size = bitmap.width;
+		let stage = this.staging.get(size);
+		if (!stage) {
+			stage = uploadBitmap(this.device, bitmap, { id: "rgba" });
+			this.staging.set(size, stage);
+		} else
+			uploadBitmap(this.device, bitmap, {
+				id: "rgba",
+				into: { texture: stage.texture },
+			});
+		return stage;
+	}
+
+	private graphFor(
+		target: Texture,
+		src: { bitmap: ImageBitmap; down: 1 | 2 },
+		read: boolean,
+	) {
 		const size = src.bitmap.width;
 		const out = size / src.down;
 		// invariant: the atlas layer holds the tile's top-left out × out texels (batched-terrain TileStore)
@@ -294,42 +361,33 @@ export class TerrariumLayerWriter {
 				`${this.id}: cannot write a ${out} px tile into ${target.format} ${target.width}²`,
 			);
 		const atlas = textureDescriptor("atlas", target);
-		const key = `${size}/${src.down}|${atlas.width}x${atlas.height}x${atlas.depth}|${atlas.usage}|${atlas.mipLevels}`;
+		const head = `${size}/${src.down}/${read ? "r" : "w"}|`;
+		const key = `${head}${atlas.width}x${atlas.height}x${atlas.depth}|${atlas.usage}|${atlas.mipLevels}`;
 		let g = this.graphs.get(key);
 		if (!g) {
 			// a grown atlas: the old target's graph is dead
 			for (const [k, old] of this.graphs)
-				if (k.startsWith(`${size}/${src.down}|`)) {
+				if (k.startsWith(head)) {
 					old.destroy();
 					this.graphs.delete(k);
 					this.stats.rebuilds++;
 				}
-			g = this.build(size, src.down, atlas);
+			g = this.build(size, src.down, atlas, read);
 			this.graphs.set(key, g);
 		}
-		let stage = this.staging.get(size);
-		if (!stage) {
-			stage = uploadBitmap(this.device, src.bitmap, { id: "rgba" });
-			this.staging.set(size, stage);
-		} else
-			uploadBitmap(this.device, src.bitmap, {
-				id: "rgba",
-				into: { texture: stage.texture },
-			});
-		const enc = this.device.createCommandEncoder({ id: g.id });
-		g.encode(enc, { layer }, undefined, {
-			rgba: stage.texture,
-			atlas: target,
-		});
-		submit(this.device, enc);
-		this.stats.writes++;
+		return g;
 	}
 
-	private build(size: number, down: 1 | 2, atlas: GraphTextureDescriptor) {
+	private build(
+		size: number,
+		down: 1 | 2,
+		atlas: GraphTextureDescriptor,
+		read: boolean,
+	) {
 		const out = size / down;
 		const g = new ComputeGraph<{ layer: number }>(
 			this.device,
-			`ingest-terrarium-layer|${this.id}|${size}/${down}`,
+			`ingest-terrarium-layer|${this.id}|${size}/${down}${read ? "|stats" : ""}`,
 		);
 		const input = g.importTexture(terrariumInputDescriptor(size, size));
 		const target = g.importTexture(atlas);
@@ -344,6 +402,7 @@ export class TerrariumLayerWriter {
 			height: out,
 			layer: (p) => p.layer,
 		});
+		if (read) g.readNode("read", [stats]);
 		g.compile();
 		return g;
 	}

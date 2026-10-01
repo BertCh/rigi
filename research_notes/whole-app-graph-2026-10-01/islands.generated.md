@@ -9,7 +9,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | island | name | cadence | realms today | modules | cachedGraph groups |
 |---|---|---|---|---|---|
 | I0 | Loaders (not a graph) | per photo, per tile | page, worker:decode | – | – |
-| I1 | Terrain residency | per tile | page | ingest-terrarium, ingest-terrarium-tile, height-gather, look-relief-heights | `ingest-terrarium`, `ingest-terrarium-tile`, `height-gather` |
+| I1 | Terrain residency | per tile | page | ingest-terrarium, ingest-terrarium-tile, atlas-resize, height-gather, look-relief-heights | `ingest-terrarium`, `ingest-terrarium-tile`, `height-gather` |
 | I2 | Photo prep | per photo | page, worker:sky | photoprep | `photoprep` |
 | I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march, horizon-cert, precision-probe | `horizon-march`, `horizon-cert`, `precision-probe` |
 | I4 | Align | per align | page | align-pose, align-cert, silhouette-gpu | `align-pose`, `align-cert`, `silhouette-mask` |
@@ -28,6 +28,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 |---|---|---|---|---|---|---|---|
 | ingest-terrarium | I1 | not wired | page | per tile | `ingest-terrarium` | tile rgba8unorm texture (import); heights f32 (transient) | heights: w·h·4 B (read node) |
 | ingest-terrarium-tile | I1 | default | page | per tile | `ingest-terrarium-tile`, `ingest-terrarium-layer|*` (uncached) | tile rgba8unorm texture (import; staging per source size for the layer writer); heights f32 + stats u32×8 (transients); terrain height atlas r32float 2d-array (import, per-run layer) | stats: 32 B per streamed tile (read node, load time) |
+| atlas-resize | I1 | default | page | per tile | `atlas-resize|*` (uncached) | old + new atlas 2d-array textures (imports; one copy node, every mip, runs of layers) | – |
 | height-gather | I1 | default | page | per view | `height-gather` | terrain height atlas r32float 2d-arrays, small + big (imports, bound per run); per-call uniform, texel words, output (imports, created per call) | read: 8 B per texel (nonce + raw f32 bits), 4 texels per height sample of a lazy tile |
 | look-relief-heights | I1 | default | page | per settle | – | terrain tile heights texture array (import); Mercator nodes, tile rows (imports) | – |
 | photoprep | I2 | default | page | per photo | `photoprep` | rgba, fg, lim, dims (pooled imports); edge / sky scratch (transients) | read: coarse + fine edge planes, sky, sky-cum, select, echo (≈3.5 MB at 512 grid) |
@@ -58,7 +59,8 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 ## Notes
 
 - **ingest-terrarium**: GPU Terrarium decode (W2.3); CPU twin dem/decode.ts decodeTerrarium
-- **ingest-terrarium-tile**: WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default on; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi; residency: decode straight into the TileStore height layer; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2
+- **ingest-terrarium-tile**: WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default on; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) straight into a height-atlas layer the tile leases (TextureArrayAtlas.writeTerrariumLeased, graph ingest-terrarium-layer|…|stats: one upload of the bitmap, layer + validateTile out-of-range count, lo/hi, stride-7 lo/hi); TileStore draws the leased layer with no further upload, also after a pan (spare meshes keep up to 48 leases, deck/terrain-stream.ts spareGpuLayers); without an atlas: the stats graph alone and a decode at draw time; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2
+- **atlas-resize**: WAG perf-vram: TextureArrayAtlas grow (keep every layer) and compaction (live layers down to 0 … n−1 in a smaller texture; ImageryArray on idle, plus dropping an array with no live layer). Exact copies; layout math node-checked in atlas-layout.check.ts. CPU twin: none (texture plumbing)
 - **height-gather**: WAG W2.4 second half, under flag terrainGpuDecode: the WebGPU photo view's CPU height readers (camera DEM height, trails, peak snapping) take lazy tiles' heights from the atlas instead of materialising them; plan + blend on the CPU in f64 (TerrainSet.locate, gridCorners / blendCorners = sampleGrid), the GPU only copies texels, so a result is heightAt's bit for bit; nonce + slot certificate, heightAt fallback. CPU twin: TerrainSet.heightAt / localMax
 - **look-relief-heights**: rasterises the relief height field from the resident tiles; compiles into the "look-relief" group (listed under look-relief)
 - **photoprep**: planes read back and re-uploaded by align (R1, dataflow-map §3)

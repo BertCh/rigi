@@ -193,7 +193,7 @@ export const CHECKS = [
 		tier: "fast",
 		group: "gpu",
 		cmd: tsx("src/lib/deck-webgpu/atlas-layout.check.ts"),
-		note: "TextureArrayAtlas math (WAG W2.2): layer order = the old HeightPool / ImageryArray free lists, grow capacities, per-mip grow copies, ancestor uv window == ancestorCrop bits (browser frame gate: scripts/deck-webgpu/atlas-frames-check.mjs)",
+		note: "TextureArrayAtlas math (WAG W2.2): layer order = the old HeightPool / ImageryArray free lists, grow capacities, per-mip grow copies, ancestor uv window == ancestorCrop bits; WAG perf-vram: compaction plan + emulated copies, imagery tier encoding (= terrain.ts WGSL decode), height-layer leases, spare-mesh lease budget (browser frame gate: scripts/deck-webgpu/atlas-frames-check.mjs)",
 		timeoutS: 60,
 	},
 	{

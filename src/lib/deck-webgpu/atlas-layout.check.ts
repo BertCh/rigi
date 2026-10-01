@@ -13,15 +13,35 @@
 //   4. ancestor window: sampling the ancestor at offset + scale · uv (bilinear on pixel centres)
 //      reproduces dem/grid.ts ancestorCrop bit for bit, for z gaps 0–4 and every child position;
 //      offsets / scales are exact in f32
+//   5. compaction: compactPlan moves every live layer to 0 … n−1 in order, its runs cover exactly
+//      the live layers with no target overlap, capacity is the quantum-rounded count;
+//      LayerAllocator.resetPacked continues at n; the runs, emulated as copies of layer contents
+//      (every mip), put each live layer's texels at its new index
+//   6. imagery tiers: imageryTierOf / encodeImageryLayer / decodeImageryLayer (the WGSL's decode in
+//      terrain.ts) round-trip for every layer up to 2048 in both tiers, encodings are exact f32 and
+//      never collide; the 256² tier's mip 2 vs the old upsampled-512² mip 3 (imgAvg), emulated with
+//      a bilinear 2× upsample and box mips, differ by little (printed; the browser pass judges frames)
+//   7. leases (texture-array-atlas.ts AtlasLease / TileLayerRef): the layer returns to the atlas
+//      exactly once, when the last of tile + TileStore references goes, in either order; a tile ref
+//      releases once; nothing returns to a destroyed atlas
+//   8. spare meshes (deck/terrain-stream.ts spareEviction): the oldest go down to spareMeshes, then all
+//      but the newest spareGpuLayers of the kept ones let go of their GPU heights
+import { spareEviction } from "../deck/terrain-stream";
 import { ancestorCrop } from "../dem/grid";
 import type { TileKey } from "../dem/tiles";
 import {
 	ancestorWindow,
 	atlasBytes,
+	compactPlan,
+	decodeImageryLayer,
+	encodeImageryLayer,
 	growCopies,
 	grownCapacity,
+	IMAGERY_SMALL_TIER_BASE,
+	imageryTierOf,
 	LayerAllocator,
 } from "./atlas-layout";
+import { AtlasLease, TileLayerRef } from "./texture-array-atlas";
 
 let failures = 0;
 const fail = (msg: string) => {
@@ -246,6 +266,219 @@ const rand = () => {
 	console.log(
 		`ancestor window: ${cases} child tiles bit-equal to ancestorCrop`,
 	);
+}
+
+// ---------- 5. compaction ----------
+{
+	for (let trial = 0; trial < 300; trial++) {
+		const cap = 1 + Math.floor(rand() * 300);
+		const live = [...Array(cap).keys()].filter(() => rand() < 0.4);
+		const quantum = 1 + Math.floor(rand() * 64);
+		const plan = compactPlan(live, quantum);
+		const sorted = [...live].sort((a, b) => a - b);
+		sorted.forEach((l, i) => {
+			if (plan.remap.get(l) !== i)
+				fail(`compact trial ${trial}: ${l} → ${plan.remap.get(l)} ≠ ${i}`);
+		});
+		const covered: number[] = [];
+		for (const r of plan.runs)
+			for (let k = 0; k < r.count; k++) {
+				if (plan.remap.get(r.from + k) !== r.to + k)
+					fail(
+						`compact trial ${trial}: run ${JSON.stringify(r)} off the remap`,
+					);
+				covered.push(r.from + k);
+			}
+		if (covered.join() !== sorted.join())
+			fail(
+				`compact trial ${trial}: runs cover ${covered.length} of ${sorted.length}`,
+			);
+		if (
+			plan.capacity % quantum ||
+			plan.capacity < sorted.length ||
+			plan.capacity - sorted.length >= quantum
+		)
+			fail(
+				`compact trial ${trial}: capacity ${plan.capacity} for ${sorted.length} / ${quantum}`,
+			);
+		const a = new LayerAllocator(plan.capacity);
+		a.resetPacked(sorted.length);
+		if (a.used() !== sorted.length || a.alloc() !== sorted.length)
+			fail(`compact trial ${trial}: allocator after resetPacked`);
+		// the copies themselves: layer contents (one tag per layer and mip) through the runs
+		const mips = 1 + Math.floor(rand() * 4);
+		const oldTex = [...Array(cap)].map((_, l) =>
+			[...Array(mips)].map((_, m) => l * 16 + m),
+		);
+		const newTex: number[][] = [...Array(plan.capacity)].map(() =>
+			Array(mips).fill(-1),
+		);
+		for (let m = 0; m < mips; m++)
+			for (const r of plan.runs)
+				for (let k = 0; k < r.count; k++)
+					newTex[r.to + k][m] = oldTex[r.from + k][m];
+		for (const l of sorted) {
+			const to = plan.remap.get(l) ?? -1;
+			for (let m = 0; m < mips; m++)
+				if (newTex[to]?.[m] !== l * 16 + m)
+					fail(`compact trial ${trial}: layer ${l} mip ${m} not at ${to}`);
+		}
+	}
+	console.log("compaction: 300 trials");
+}
+
+// ---------- 6. imagery tiers ----------
+{
+	for (const [w, h, t] of [
+		[256, 256, 256],
+		[128, 256, 256],
+		[257, 256, 512],
+		[512, 512, 512],
+		[1024, 1024, 512],
+	] as const)
+		if (imageryTierOf(w, h) !== t) fail(`tierOf ${w}×${h} ≠ ${t}`);
+	const seen = new Set<number>();
+	for (const tier of [256, 512] as const)
+		for (let layer = 0; layer < 2048; layer++) {
+			const e = encodeImageryLayer(tier, layer);
+			if (Math.fround(e) !== e)
+				fail(`encode ${tier}/${layer} not exact in f32`);
+			if (seen.has(e)) fail(`encode ${tier}/${layer} collides`);
+			seen.add(e);
+			const d = decodeImageryLayer(Math.fround(e));
+			if (d?.tier !== tier || d.layer !== layer)
+				fail(`decode(encode(${tier}, ${layer})) = ${JSON.stringify(d)}`);
+		}
+	if (decodeImageryLayer(-1) !== null) fail("decode(-1) should be none");
+	if (IMAGERY_SMALL_TIER_BASE <= 2048)
+		fail("small tier base inside the 512² range");
+	// imgAvg: native 256² box mip 2 vs bilinear-2×-upsampled 512² box mip 3 (both 64²)
+	const N = 256;
+	const src = new Float32Array(N * N);
+	for (let y = 0; y < N; y++)
+		for (let x = 0; x < N; x++)
+			src[y * N + x] =
+				0.5 +
+				0.25 * Math.sin(x / 7 + y / 11) +
+				0.15 * Math.sin(x / 2.3 - y / 3.1) +
+				0.1 * (rand() - 0.5);
+	const box = (img: Float32Array, n: number) => {
+		const h = n / 2;
+		const out = new Float32Array(h * h);
+		for (let y = 0; y < h; y++)
+			for (let x = 0; x < h; x++)
+				out[y * h + x] =
+					(img[2 * y * n + 2 * x] +
+						img[2 * y * n + 2 * x + 1] +
+						img[(2 * y + 1) * n + 2 * x] +
+						img[(2 * y + 1) * n + 2 * x + 1]) /
+					4;
+		return out;
+	};
+	const up = new Float32Array(4 * N * N);
+	const at = (x: number, y: number) =>
+		src[Math.min(N - 1, Math.max(0, y)) * N + Math.min(N - 1, Math.max(0, x))];
+	for (let y = 0; y < 2 * N; y++)
+		for (let x = 0; x < 2 * N; x++) {
+			const sx = (x + 0.5) / 2 - 0.5;
+			const sy = (y + 0.5) / 2 - 0.5;
+			const x0 = Math.floor(sx);
+			const y0 = Math.floor(sy);
+			const fx = sx - x0;
+			const fy = sy - y0;
+			up[y * 2 * N + x] =
+				(1 - fy) * ((1 - fx) * at(x0, y0) + fx * at(x0 + 1, y0)) +
+				fy * ((1 - fx) * at(x0, y0 + 1) + fx * at(x0 + 1, y0 + 1));
+		}
+	const native2 = box(box(src, N), N / 2);
+	const up3 = box(box(box(up, 2 * N), N), N / 2);
+	let max = 0;
+	let sum = 0;
+	for (let i = 0; i < native2.length; i++) {
+		const d = Math.abs(native2[i] - up3[i]);
+		max = Math.max(max, d);
+		sum += d;
+	}
+	console.log(
+		`imagery tiers: 4096 encodings; imgAvg 256-mip2 vs 512-mip3 |Δ| mean ${(sum / native2.length).toFixed(4)} max ${max.toFixed(4)} (of 1)`,
+	);
+	if (max > 0.03) fail(`imgAvg tiers differ by ${max}`);
+}
+
+// ---------- 7. leases ----------
+{
+	const released: number[] = [];
+	const fake = (destroyed = false) =>
+		({
+			stats: { leases: 0 },
+			destroyed,
+			release: (l: number) => released.push(l),
+		}) as never;
+	for (const order of ["tile-first", "store-first"] as const) {
+		released.length = 0;
+		const atlas = fake();
+		const lease = new AtlasLease(atlas, 7);
+		const ref = new TileLayerRef(lease);
+		lease.retain(); // TileStore draws it
+		const dropTile = () => {
+			ref.release();
+			ref.release(); // idempotent
+		};
+		const dropStore = () => lease.release();
+		if (order === "tile-first") dropTile();
+		else dropStore();
+		if (released.length || !lease.live)
+			fail(`lease ${order}: freed with a holder left`);
+		if (order === "tile-first") dropStore();
+		else dropTile();
+		if (released.join() !== "7" || lease.live)
+			fail(`lease ${order}: released ${JSON.stringify(released)}`);
+		lease.release();
+		if (released.length !== 1)
+			fail(`lease ${order}: double release returned the layer twice`);
+		if ((atlas as { stats: { leases: number } }).stats.leases !== 0)
+			fail(
+				`lease ${order}: stats.leases ${(atlas as { stats: { leases: number } }).stats.leases}`,
+			);
+	}
+	released.length = 0;
+	const dead = fake(true);
+	const l2 = new AtlasLease(dead, 3);
+	if (l2.live) fail("lease on a destroyed atlas is live");
+	l2.release();
+	if (released.length) fail("lease returned a layer to a destroyed atlas");
+	console.log("leases: refcount, idempotent tile ref, destroyed atlas");
+}
+
+// ---------- 8. spare meshes ----------
+{
+	for (let trial = 0; trial < 500; trial++) {
+		const n = Math.floor(rand() * 300);
+		const candidates = [...Array(n).keys()]; // oldest first
+		const spare = n + Math.floor(rand() * 20);
+		const spareMeshes = Math.floor(rand() * 200);
+		const spareGpu = Math.floor(rand() * 80);
+		const { drop, unlease } = spareEviction(
+			candidates,
+			spare,
+			spareMeshes,
+			spareGpu,
+		);
+		const nDrop = Math.min(n, Math.max(0, spare - spareMeshes));
+		const kept = n - nDrop;
+		const nUnlease = Math.max(0, kept - spareGpu);
+		if (drop.join() !== candidates.slice(0, nDrop).join())
+			fail(`spare trial ${trial}: drop ${drop.length} ≠ oldest ${nDrop}`);
+		if (unlease.join() !== candidates.slice(nDrop, nDrop + nUnlease).join())
+			fail(
+				`spare trial ${trial}: unlease ${unlease.length} ≠ ${nUnlease} after the dropped`,
+			);
+		if (kept - unlease.length > spareGpu)
+			fail(
+				`spare trial ${trial}: ${kept - unlease.length} leased spares > ${spareGpu}`,
+			);
+	}
+	console.log("spare meshes: 500 trials");
 }
 
 console.log(failures ? `FAIL (${failures})` : "PASS atlas-layout");

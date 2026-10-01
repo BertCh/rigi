@@ -1383,7 +1383,8 @@ export class WebGpuEngine implements Renderer {
 
 	/**
 	 * The stream's tile loader under flag terrainGpuDecode (batched terrain, ?gpu=on): GPU Terrarium
-	 * decode into the height atlas, CPU heights on demand (terrain-gpu-decode.ts); undefined = the
+	 * decode straight into a height-atlas layer the tile keeps, CPU heights on demand
+	 * (terrain-gpu-decode.ts); undefined = the
 	 * default CPU decode.
 	 */
 	private gpuDecodeLoader() {
@@ -1395,10 +1396,17 @@ export class WebGpuEngine implements Renderer {
 		)
 			return undefined;
 		this.gpuDecodeOn = true;
-		return gpuDecodeTileLoader(async () => {
-			await this.ready.catch(() => {});
-			return this.disposed || this.lost ? null : (this.gpu?.device ?? null);
-		});
+		return gpuDecodeTileLoader(
+			async () => {
+				await this.ready.catch(() => {});
+				return this.disposed || this.lost ? null : (this.gpu?.device ?? null);
+			},
+			// the batched terrain's height arrays: each tile decodes into a layer it keeps
+			() => {
+				const t = this.gpu?.terrain;
+				return t && "heightAtlases" in t ? t.heightAtlases() : null;
+			},
+		);
 	}
 
 	/** deck/engine.ts maybeSwapQueryTerrain. */
@@ -2222,6 +2230,8 @@ export class WebGpuEngine implements Renderer {
 			});
 			if (look.imagery && this.renderSet)
 				this.syncImagery(this.renderSet, look.imagery);
+			// no drape in this look: the imagery layers go after a grace (imagery.ts releaseWhenIdle)
+			else if (!look.imagery) g.imagery.releaseWhenIdle();
 			g.trails.setEnabled(look.trails && !!this.trails?.count);
 			g.gizmo.setProps({ view: "photo" });
 			g.photoSky.setEnabled(false);
@@ -2256,6 +2266,7 @@ export class WebGpuEngine implements Renderer {
 		const src = s.worldStyle === "hillshade" ? null : s.worldStyle;
 		if (src && this.renderSet)
 			this.syncImagery(this.renderSet, src, () => this.worldTileOrder(w));
+		else if (!src) g.imagery.releaseWhenIdle();
 		const wl = this.look("world");
 		g.styles.set({
 			style: src ? "imagery" : "hillshade",

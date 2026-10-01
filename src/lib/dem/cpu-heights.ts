@@ -35,12 +35,22 @@ export type LazyCpuHeights = {
 	release?(): void;
 };
 
+/**
+ * The tile's own hold on GPU-resident heights (flag terrainGpuDecode: the layer of the WebGPU height
+ * atlas it was decoded into, deck-webgpu/texture-array-atlas.ts AtlasLease). Whoever drops the tile
+ * for good (the terrain streamer: replaced, evicted, stale, disposed) calls release() once; it is
+ * idempotent. Independent of `lazyHeights`: materialising CPU heights keeps the GPU layer.
+ */
+export type GpuLayerRef = { release(): void };
+
 /** Anything that holds DEM heights eagerly, lazily, or both. */
 export type CpuHeightsTile = {
 	/** size × size, row-major, row 0 = north edge; undefined until materialised for a lazy tile */
 	heights?: Float32Array;
 	lazyHeights?: LazyCpuHeights;
 	heightStats?: HeightStats;
+	/** GPU-resident heights the tile holds (see GpuLayerRef) */
+	gpuLayer?: GpuLayerRef;
 };
 
 /** Diagnostics: lazy tiles materialised in this realm, and the main-thread ms they took. */

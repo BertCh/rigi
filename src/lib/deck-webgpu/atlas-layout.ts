@@ -30,6 +30,15 @@ export class LayerAllocator {
 	release(layer: number) {
 		this.free.push(layer);
 	}
+	/** Layers handed out and not released. */
+	used() {
+		return this.next - this.free.length;
+	}
+	/** After a compaction: layers 0 … used-1 are taken, nothing is free (see compactPlan). */
+	resetPacked(used: number) {
+		this.free = [];
+		this.next = used;
+	}
 	/** Layers below capacity that allocWithin can still hand out. */
 	available() {
 		return this.free.length + Math.max(0, this.capacity - this.next);
@@ -77,6 +86,55 @@ export function growCopies(size: number, mipLevels: number, layers: number) {
 		});
 	}
 	return out;
+}
+
+/**
+ * A compaction of an atlas: the live layers `live` (any order, distinct) move to 0 … n−1, keeping
+ * their relative order (a layer already in place stays), as runs of consecutive source layers that
+ * land on consecutive targets (one copyTextureToTexture per run and mip). `capacity` is the smallest
+ * multiple of `quantum` holding them (0 when none are live).
+ */
+export function compactPlan(live: readonly number[], quantum: number) {
+	const sorted = [...live].sort((a, b) => a - b);
+	const remap = new Map<number, number>();
+	const runs: { from: number; to: number; count: number }[] = [];
+	sorted.forEach((from, to) => {
+		remap.set(from, to);
+		const r = runs[runs.length - 1];
+		if (r && r.from + r.count === from && r.to + r.count === to) r.count++;
+		else runs.push({ from, to, count: 1 });
+	});
+	const capacity = Math.ceil(sorted.length / quantum) * quantum;
+	return { remap, runs, capacity };
+}
+
+/**
+ * Imagery tiers (imagery.ts ImageryArray): a source of at most 256² keeps its size in the 256²
+ * array; anything larger is resized to 512². A tile's layer, as the terrain rows carry it (f32), is
+ * the 512² layer itself or IMAGERY_SMALL_TIER_BASE + the 256² layer (−1: none); terrain.ts's WGSL
+ * decodes it with the same constant. The base is above any device's maxTextureArrayLayers (2048)
+ * and every encoded value is an exact f32 integer.
+ */
+export const IMAGERY_SMALL_TIER_BASE = 4096;
+export type ImageryTier = 256 | 512;
+export function imageryTierOf(width: number, height: number): ImageryTier {
+	return width <= 256 && height <= 256 ? 256 : 512;
+}
+export function encodeImageryLayer(tier: ImageryTier, layer: number) {
+	return tier === 512 ? layer : IMAGERY_SMALL_TIER_BASE + layer;
+}
+/** The WGSL's decode (terrain.ts terrain_sample), on the CPU: which array, which layer. */
+export function decodeImageryLayer(encoded: number): {
+	tier: ImageryTier;
+	layer: number;
+} | null {
+	if (encoded < 0) return null;
+	return encoded >= IMAGERY_SMALL_TIER_BASE
+		? {
+				tier: 256,
+				layer: Math.trunc(Math.max(encoded - IMAGERY_SMALL_TIER_BASE, 0)),
+			}
+		: { tier: 512, layer: Math.trunc(Math.max(encoded, 0)) };
 }
 
 /** Texel bytes of `layers` layers of a size² array with `mipLevels` mips. */

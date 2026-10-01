@@ -256,7 +256,27 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: ["stats: 32 B per streamed tile (read node, load time)"],
 		status: "default",
 		notes:
-			"WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default on; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) → validateTile out-of-range count, lo/hi, stride-7 lo/hi; residency: decode straight into the TileStore height layer; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
+			"WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default on; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) straight into a height-atlas layer the tile leases (TextureArrayAtlas.writeTerrariumLeased, graph ingest-terrarium-layer|…|stats: one upload of the bitmap, layer + validateTile out-of-range count, lo/hi, stride-7 lo/hi); TileStore draws the leased layer with no further upload, also after a pan (spare meshes keep up to 48 leases, deck/terrain-stream.ts spareGpuLayers); without an atlas: the stats graph alone and a decode at draw time; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
+	},
+	{
+		id: "atlas-resize",
+		island: "I1",
+		paths: [
+			"src/lib/deck-webgpu/texture-array-atlas.ts",
+			"src/lib/deck-webgpu/atlas-layout.ts",
+			"src/lib/deck-webgpu/imagery.ts",
+		],
+		groups: [],
+		graphIdPrefixes: ["atlas-resize|"],
+		realms: ["page"],
+		cadence: "per tile",
+		resources: [
+			"old + new atlas 2d-array textures (imports; one copy node, every mip, runs of layers)",
+		],
+		readbacks: [],
+		status: "default",
+		notes:
+			"WAG perf-vram: TextureArrayAtlas grow (keep every layer) and compaction (live layers down to 0 … n−1 in a smaller texture; ImageryArray on idle, plus dropping an array with no live layer). Exact copies; layout math node-checked in atlas-layout.check.ts. CPU twin: none (texture plumbing)",
 	},
 	{
 		id: "height-gather",

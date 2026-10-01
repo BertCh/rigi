@@ -50,6 +50,12 @@ export type StreamOptions = {
 	/** Meshes kept beyond the rendered set (LRU-ish cache for panning back). */
 	spareMeshes?: number;
 	/**
+	 * Of those spare meshes, how many keep their GPU-resident heights (`gpuLayer`, flag
+	 * terrainGpuDecode), most recently used first; the rest let go of their layer and, when drawn
+	 * again, decode their bitmap into a new one. Bounds the height atlas to the drawn tiles + this.
+	 */
+	spareGpuLayers?: number;
+	/**
 	 * Coarse-first loading (off when unset): the first selection is preceded by the same
 	 * selection capped at this zoom (three's terrain stops at 14), queued ahead of the finer
 	 * tiles and handed to `onPreview` once complete. The full set and its first `onUpdate` are
@@ -168,6 +174,7 @@ export class TerrainStreamer {
 			lodOutside: 0.6,
 			concurrency: 10,
 			spareMeshes: 150,
+			spareGpuLayers: 48,
 			...options,
 		};
 	}
@@ -257,6 +264,7 @@ export class TerrainStreamer {
 		this.queue = [];
 		for (const l of this.loading.values()) l.ac.abort();
 		if (this.emitTimer) clearTimeout(this.emitTimer);
+		for (const m of this.meshes.values()) m.gpuLayer?.release();
 	}
 
 	private priority(w: Want) {
@@ -340,6 +348,7 @@ export class TerrainStreamer {
 		}).catch(() => null); // aborted (stale) or no data anywhere up the pyramid
 		if (!dem || this.disposed || signal.aborted) {
 			dem?.lazyHeights?.release?.();
+			dem?.gpuLayer?.release();
 			return false;
 		}
 		const t0 = performance.now();
@@ -358,8 +367,11 @@ export class TerrainStreamer {
 			};
 			mesh = buildMesh(this.frame, r, w.seg, w.distance, w.focus);
 			if (build.grid) mesh.grid = buildBatchGrid(this.frame, r.key, r.heights);
+			mesh.gpuLayer = dem.gpuLayer;
 		} else mesh = buildLiteMesh(this.frame, dem, w.seg, w.distance, w.focus);
 		this.buildMs += performance.now() - t0;
+		// the replaced mesh (another seg) lets go of its GPU heights; a drawn copy holds its own reference
+		this.meshes.get(w.id)?.gpuLayer?.release();
 		this.meshes.set(w.id, mesh);
 		return true;
 	}
@@ -493,18 +505,44 @@ export class TerrainStreamer {
 	}
 
 	private evict(rendered: Set<string>) {
-		const spare = this.meshes.size - rendered.size;
-		if (spare <= this.o.spareMeshes) return;
+		// oldest first
 		const candidates = [...this.meshes.keys()]
 			.filter((id) => !rendered.has(id) && !this.wantById.has(id))
 			.sort(
 				(a, b) => (this.lastUsed.get(a) ?? 0) - (this.lastUsed.get(b) ?? 0),
 			);
-		for (const id of candidates.slice(0, spare - this.o.spareMeshes)) {
+		const plan = spareEviction(
+			candidates,
+			this.meshes.size - rendered.size,
+			this.o.spareMeshes,
+			this.o.spareGpuLayers,
+		);
+		for (const id of plan.drop) {
+			this.meshes.get(id)?.gpuLayer?.release();
 			this.meshes.delete(id);
 			this.lastUsed.delete(id);
 		}
+		for (const id of plan.unlease) this.meshes.get(id)?.gpuLayer?.release();
 	}
+}
+
+/**
+ * The streamer's spare-mesh policy: of `candidates` (spare meshes that may go, oldest first; `spare`
+ * = all meshes beyond the rendered set), the oldest go until at most `spareMeshes` spare remain
+ * (`drop`), and of the candidates kept, all but the newest `spareGpuLayers` let go of their GPU
+ * heights (`unlease`).
+ */
+export function spareEviction<T>(
+	candidates: readonly T[],
+	spare: number,
+	spareMeshes: number,
+	spareGpuLayers: number,
+) {
+	const n = Math.min(candidates.length, Math.max(0, spare - spareMeshes));
+	const drop = candidates.slice(0, n);
+	const kept = candidates.slice(n);
+	const unlease = kept.slice(0, Math.max(0, kept.length - spareGpuLayers));
+	return { drop, unlease };
 }
 
 /** 2× box-filter downsample (for tiles whose mesh can't use the full 512 px). */

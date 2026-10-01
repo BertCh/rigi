@@ -149,17 +149,27 @@ where nothing else did.
   - `placeholderTextures`
 - `readback.ts`: `TextureReader` (staging buffer, 256-byte row alignment, top-first rows) and
   `readGeometry`.
-- `imagery.ts`: `ImageryArray` is the imagery as one rgba8unorm-srgb 2D array, with 512² layers
-  and per-layer mips. Capacity grows up to `maxTextureArrayLayers` (`featureLevel: 'max'`). The
-  array is created on the first tile with imagery (the photo view's default look drapes none; until
-  then the terrain binds a 1×1 empty array).
+- `imagery.ts`: `ImageryArray` is the imagery as two rgba8unorm-srgb 2D arrays with per-layer mips
+  (WAG perf-vram): 256 px sources keep their size in a 256² array, larger ones are resized to 512²
+  as before (before, every tile took a 512² layer: the matcher drape is ~78 % 256 px tiles). A row's
+  layer encodes the tier (`atlas-layout.ts` `encodeImageryLayer`: 512² layer, or 4096 + 256² layer);
+  `terrain.ts` `terrain_sample` samples both arrays in uniform control flow and selects (imgAvg at
+  mip 3 of 512², mip 2 of 256²). Capacity grows up to `maxTextureArrayLayers` (`featureLevel:
+  'max'`). Each array is created on its first tile (the photo view's default look drapes none;
+  until then the terrain binds a 1×1 empty array). On idle (4 s without an upload or release) an
+  array with a whole chunk of free layers is compacted by copy (`TextureArrayAtlas.compact`, graph
+  `atlas-resize|…`) and one with no live layer is dropped; a look without imagery releases every
+  layer after 10 s (`releaseWhenIdle`, so the matcher's pose views do not re-upload the drape).
 - `base-slots.ts`: the batched terrain's base-grid storage buffer is packed, one slot of
   2·(G+1)² vec4 per tile at an offset kept in the tile's table row (`t2.w`), instead of a fixed
   G = 64 slot per row (WAG W1.6: 47 → ~17 MiB in the photo view, with 15 % headroom). `base-slots.check.ts` (node).
 - `texture-array-atlas.ts`: `TextureArrayAtlas`, the growable 2D array with a layer free list under
   both `ImageryArray` and the batched terrain's r32float height arrays. Layers are written through
   the `gpu/ingest` adapters (`uploadRaster` / `uploadBitmap` with `into`); a grow re-creates the
-  texture and copies every mip of the old layers with `copyTextureToTexture`, so nothing re-uploads.
+  texture and copies every mip of the old layers with `copyTextureToTexture` on a ComputeGraph copy
+  node (`atlas-resize|<id>`), so nothing re-uploads; `compact()` is the reverse (live layers down
+  to 0 … n−1 in a smaller texture). Under `terrainGpuDecode` a tile leases its height layer
+  (`AtlasLease` / `TileLayerRef`, reference-counted between the tile and the TileStore).
   The pure math (allocation order, growth, grow copies, the ancestor uv window) is in
   `atlas-layout.ts`, checked by `atlas-layout.check.ts`; the frame gate is
   `scripts/deck-webgpu/atlas-frames-check.mjs`.
@@ -305,7 +315,7 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   WebGL keep the CPU cull). Gates: `layers/terrain-cull-math.check.ts` (fast tier `terrain-cull`)
   and `scripts/deck-webgpu/terrain-indirect-check.mjs` (byte-equal frames, CPU ms).
 - GPU Terrarium decode (WAG W2.3 wiring + W2.4): `terrain-gpu-decode.ts` is the terrain stream's
-  tile loader under flag `terrainGpuDecode` (default **on** since 2026-10-01, 3225064, after the height gathers below; batched terrain, `?gpu=on`; WebGL and
+  tile loader under flag `terrainGpuDecode` (default **on** since 3225064; batched terrain; WebGL and
   `?gpu=off` keep the CPU decode). A tile that stands for itself (no ancestor crop) and is 256 or
   512 px is decoded from its `ImageBitmap` on the GPU (`gpu/ingest/terrarium-tile.ts`), halved when
   the mesh wants 256 px, and only its statistics come back (validateTile's out-of-range count, exact
@@ -321,7 +331,17 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   materialised on the main thread within 8 s of ready (peaks, trails, lake floor), 298–349 ms in
   total, where the default path decodes in workers; and the small height atlas uploads ~4× the
   bytes (rgba8 512 px sources instead of r32f 256 px heights), plus one upload per tile for the
-  load-time stats. Hence it stayed off until the hot heightAt callers moved to the batched GPU gathers below (the load time with the flag on is not re-measured).
+  load-time stats. (That was the case for default off; the gathers below answer the heightAt callers.)
+  WAG perf-vram (2026-10-01): the loader now decodes each tile straight into a height-atlas layer
+  the tile leases (`TextureArrayAtlas.writeTerrariumLeased`, graph `ingest-terrarium-layer|…|stats`:
+  layer + stats from one upload of the bitmap), so the separate stats upload is gone and TileStore
+  draws the leased layer with no upload at all, also when a tile re-enters after a pan (the
+  streamer's spare meshes keep up to 48 leases, `spareGpuLayers`; older spares let go and decode
+  again from their bitmap when drawn). The rgba8 source upload itself (4 B per source texel) is the
+  GPU decode's input and stays. Measured before the change (WebGPU, IMG_7086 / 6958 / 7018 × 3
+  runs, exclusive lock): ready median 4006 ms on vs 4019 off, terrain generation 2091 vs 2185 ms;
+  atlas bytes at ready 353–416 MB on vs 95–110 off, after a 4-yaw pan 963–1060 vs 248–271 (plus
+  one uncounted stats upload per tile on). After: not yet measured (`scripts/gpu/decode-load-probe.mjs`).
 - GPU height gathers (WAG W2.4 second half, under `terrainGpuDecode`): `height-gather.ts`
   `HeightGather.heightsAt(set, lats, lons)` answers TerrainSet.heightAt bit for bit (NaN = null)
   without materialising lazy tiles. Plan and blend stay on the CPU in f64 (`TerrainSet.locate`,

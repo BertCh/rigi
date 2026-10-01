@@ -11,11 +11,16 @@
 //   2. a tile standing in for a missing one (ancestor crop), an odd size, or more than one 2× step:
 //      the CPU path (demRasterFromBytes + fitStreamTile, the default loader's code);
 //   3. else createImageBitmap(bytes, no colour conversion / premultiply) → GPU decode (+ 2× box
-//      downsample when the mesh wants it) → 32 B of stats back (gpu/ingest terrariumTileStatsGpu);
+//      downsample when the mesh wants it) straight into a layer of the batched terrain's height atlas
+//      (TextureArrayAtlas.writeTerrariumLeased: one upload of the bitmap, 32 B of stats back). The
+//      tile keeps that layer (`gpuLayer`, an AtlasLease) until the streamer drops its mesh, so the
+//      TileStore draws it, and draws it again after a pan, with no further upload. Without an atlas
+//      on this device (or past its layer limit): the stats alone (gpu/ingest terrariumTileStatsGpu),
+//      and the TileStore decodes the bitmap into a layer when the tile is drawn;
 //   4. any sample validateTile would fill → the CPU path; else a lazy raster: `heightStats` (exact
-//      lo / hi for the batch grid, stride-7 lo / hi for the colour ramp) and `lazyHeights`
-//      (GpuDecodedHeights: the bitmap, decoded into the height atlas by the batched terrain's
-//      TileStore, and into CPU heights by getCpuHeights only when a CPU consumer asks).
+//      lo / hi for the batch grid, stride-7 lo / hi for the colour ramp), `gpuLayer` and
+//      `lazyHeights` (GpuDecodedHeights: the bitmap, decoded into CPU heights by getCpuHeights only
+//      when a CPU consumer asks).
 // The heights in the atlas and the lazily materialised CPU heights equal the CPU path's bit for bit when
 // the texture's texel bytes equal the canvas bytes (scripts/gpu/terrarium-ingest-check.mjs; 1871 cached
 // tiles on Apple / Metal, 2026-10-01) and the worker decode equals the page decode (same check).
@@ -39,6 +44,11 @@ import {
 	TERRARIUM_BITMAP_OPTIONS,
 	terrariumTileStatsGpu,
 } from "#/lib/gpu/ingest/terrarium-tile";
+import {
+	type AtlasLease,
+	type TextureArrayAtlas,
+	TileLayerRef,
+} from "./texture-array-atlas";
 
 /** Per-realm counts (globalThis.__rigiTerrainGpuDecode): which path each streamed tile took. */
 export const terrainGpuDecodeCounters = {
@@ -49,6 +59,10 @@ export const terrainGpuDecodeCounters = {
 	cpuSize: 0,
 	cpuInvalid: 0,
 	cpuError: 0,
+	/** of `gpu`: decoded straight into a height-atlas layer the tile keeps */
+	resident: 0,
+	/** rgba8 bytes uploaded by the stats-only graph (no atlas layer; the atlas counts its own writes) */
+	statsOnlyBytes: 0,
 };
 /** Harness view: the path counts, lazy materialisations, certificate misses (must stay 0). */
 (
@@ -65,12 +79,20 @@ export const terrainGpuDecodeCounters = {
 	certificate: gpuDecodedCounters,
 };
 
+/** The batched terrain's height arrays (256² and 512² layers) a loaded tile may decode into. */
+export type HeightAtlases = {
+	small: TextureArrayAtlas;
+	big: TextureArrayAtlas;
+};
+
 /**
  * The stream loader for terrainGpuDecode. `device()` resolves the render device (null: the CPU path
- * for this tile, e.g. while the device is lost).
+ * for this tile, e.g. while the device is lost); `atlases()` the batched terrain's height arrays on
+ * that device (null: no resident decode, the stats alone).
  */
 export function gpuDecodeTileLoader(
 	device: () => Promise<Device | null>,
+	atlases: () => HeightAtlases | null = () => null,
 ): StreamTileLoader {
 	return async (key: TileKey, seg: number, o: DemLoadOptions) => {
 		const r = await fetchDemBytes(key, o);
@@ -106,9 +128,22 @@ export function gpuDecodeTileLoader(
 			return cpu();
 		}
 		const down = steps ? 2 : 1;
+		const out = size / down;
+		const a = atlases();
+		const atlas = a && (out <= a.small.size ? a.small : a.big);
 		let stats: Awaited<ReturnType<typeof terrariumTileStatsGpu>>;
+		let lease: AtlasLease | undefined;
 		try {
-			stats = await terrariumTileStatsGpu(d, bitmap, down);
+			const r =
+				atlas && atlas.device === d && out <= atlas.size
+					? await atlas.writeTerrariumLeased({ bitmap, down })
+					: null;
+			lease = r?.lease;
+			if (r) stats = r.stats;
+			else {
+				terrainGpuDecodeCounters.statsOnlyBytes += size * size * 4;
+				stats = await terrariumTileStatsGpu(d, bitmap, down);
+			}
 		} catch {
 			bitmap.close();
 			terrainGpuDecodeCounters.cpuError++;
@@ -116,11 +151,13 @@ export function gpuDecodeTileLoader(
 		}
 		if (stats.invalid > 0) {
 			// validateTile would fill no-data samples: keep the CPU path's exact fill
+			lease?.release();
 			bitmap.close();
 			terrainGpuDecodeCounters.cpuInvalid++;
 			return cpu();
 		}
 		terrainGpuDecodeCounters.gpu++;
+		if (lease) terrainGpuDecodeCounters.resident++;
 		const tile: StreamRaster = {
 			key,
 			source: r.source,
@@ -132,6 +169,7 @@ export function gpuDecodeTileLoader(
 				hi7: stats.hi7,
 			},
 			lazyHeights: new GpuDecodedHeights(bitmap, down),
+			gpuLayer: lease && new TileLayerRef(lease),
 		};
 		return tile;
 	};

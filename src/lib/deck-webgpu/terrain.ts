@@ -22,6 +22,7 @@ import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import type { DeckRampU } from "#/lib/style/deck-apply";
+import { IMAGERY_SMALL_TIER_BASE } from "./atlas-layout";
 import { cameraModule, sphereInView } from "./camera";
 import type { ImageryArray } from "./imagery";
 import {
@@ -161,6 +162,10 @@ struct GeometryOut {
 #else
 @group(0) @binding(auto) var imagery: texture_2d_array<f32>;
 @group(0) @binding(auto) var imagerySampler: sampler;
+// the 256² tier of the imagery (imagery.ts): a row's layer >= IMAGERY_SMALL_BASE is layer − base there
+@group(0) @binding(auto) var imagerySmall: texture_2d_array<f32>;
+@group(0) @binding(auto) var imagerySmallSampler: sampler;
+const IMAGERY_SMALL_BASE: f32 = ${IMAGERY_SMALL_TIER_BASE}.0;
 
 // Everything a shading function / plugin may need, gathered in UNIFORM control flow (WGSL only
 // allows textureSample / derivatives there): shading and plugins must not call textureSample or
@@ -190,9 +195,17 @@ fn terrain_sample(v: Varyings) -> TerrainSample {
   s.elev = v.elev;
   s.layer = v.layer;
   s.range = camera_range(v.enu);
+  // both tiers sampled in uniform control flow, then selected (an out-of-range index clamps);
+  // the 256² tier's mip 2 is the 512² tier's mip 3 (64 px), so imgAvg means the same in both
+  let small = v.layer >= IMAGERY_SMALL_BASE;
   let layer = i32(max(v.layer, 0.0));
-  s.img = textureSample(imagery, imagerySampler, v.uv, layer).rgb;
-  s.imgAvg = textureSampleLevel(imagery, imagerySampler, v.uv, layer, 3.0).rgb;
+  let layerSmall = i32(max(v.layer - IMAGERY_SMALL_BASE, 0.0));
+  let imgBig = textureSample(imagery, imagerySampler, v.uv, layer).rgb;
+  let imgSmall = textureSample(imagerySmall, imagerySmallSampler, v.uv, layerSmall).rgb;
+  let avgBig = textureSampleLevel(imagery, imagerySampler, v.uv, layer, 3.0).rgb;
+  let avgSmall = textureSampleLevel(imagerySmall, imagerySmallSampler, v.uv, layerSmall, 2.0).rgb;
+  s.img = select(imgBig, imgSmall, small);
+  s.imgAvg = select(avgBig, avgSmall, small);
   s.hasImg = v.layer >= 0.0;
   s.dElev = fwidth(v.elev);
   s.dEnuDx = dpdx(v.enu);
@@ -498,6 +511,7 @@ export class TerrainCore implements GpuLayerCore {
 		if (kind === "color") {
 			const bindings: Record<string, unknown> = {
 				imagery: this.imagery?.texture ?? this.emptyArray(),
+				imagerySmall: this.imagery?.textureSmall ?? this.emptyArray(),
 			};
 			const uniforms: Record<string, unknown> = {};
 			for (const p of [
