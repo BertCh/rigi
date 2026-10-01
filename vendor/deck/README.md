@@ -71,6 +71,9 @@ for m in core layers; do
     && npm pack --ignore-scripts --pack-destination <repo>/vendor/deck)
 done
 cd <repo> && npm install     # refreshes the lockfile integrity hashes
+# the tarball version string is unchanged, so npm reports "up to date" and keeps the old copies:
+rm -rf node_modules/@deck.gl/core node_modules/@deck.gl/layers && npm install
+git diff package-lock.json   # the two `integrity` hashes must have changed
 ```
 
 (`sed -i ''` is the BSD/macOS form; use `sed -i` on GNU.)
