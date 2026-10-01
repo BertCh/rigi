@@ -74,6 +74,7 @@ export function createSummitViewScene(
     tilesRequested: tiles.length,
     tilesLoaded: 0,
     tilesFailed: 0,
+    photoLoaded: false,
     labels
   };
 
@@ -253,9 +254,13 @@ export function createSummitViewScene(
     });
   }
 
+  /** The photo is optional: without it (a fresh clone, see README) the render and labels still run. */
   async function loadPhoto(): Promise<void> {
     const response = await fetch(PHOTO_URL, {signal: abortController.signal});
-    photo = await createImageBitmap(await response.blob());
+    const blob = await response.blob();
+    if (!response.ok || !blob.type.startsWith('image/')) return;
+    photo = await createImageBitmap(blob);
+    diagnostics.photoLoaded = true;
   }
 
   /** Streams the selected tiles, nearest first, into their texture array layers. */

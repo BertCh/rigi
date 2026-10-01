@@ -91,6 +91,7 @@ export its `CommonViewState` type by name, so `summit-view.ts` infers it from `V
   swisstopo swissALTI3D (Swiss OGD) and Copernicus GLO-30. Credit: © Mapterhorn.
 - **Peaks**: OpenStreetMap `natural=peak` nodes, © OpenStreetMap contributors, available under
   the [ODbL](https://www.openstreetmap.org/copyright).
+- **Photo availability**: Rigi keeps photos out of git (`*.jpg` is ignored) until their licence is settled, so a fresh clone has no `niederhorn.jpg`. The example then runs render-only: the Photo blend control is disabled, `diagnostics.photoLoaded` is false, and the smoke test skips the blend check. Copy `public/demo/photos/demo-01.jpg` here to enable it.
 - **Photo and pose**: `niederhorn.jpg` is Rigi demo photo `demo-01` (`public/demo/manifest.json`).
   The yaw, pitch, roll and field of view were solved by Rigi's skyline matcher against the
   Mapterhorn DEM.

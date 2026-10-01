@@ -32,6 +32,10 @@ scene.ready
   .then(() => {
     const {tilesLoaded, tilesRequested} = scene.diagnostics;
     status.textContent = `${tilesLoaded} of ${tilesRequested} DEM tiles loaded.`;
+    if (!scene.diagnostics.photoLoaded) {
+      photoBlend.disabled = true;
+      status.textContent += ' Photo not found (niederhorn.jpg), render only.';
+    }
     document.body.dataset['ready'] = 'true';
   })
   .catch(error => {
