@@ -1958,7 +1958,7 @@ export class DeckEngine implements Renderer {
 		if (!t) return [];
 		const snapped = this.snapped(this.pose);
 		const eyeV = new THREE.Vector3(...this.eyeArr);
-		if (this.geometryReady())
+		if (this.geometryReady() && !this.occlusionFresh(snapped))
 			for (const p of snapped) {
 				const pr = projectPoint(this.pose, this.aspect, eyeV, p.position);
 				if (!pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1) continue;
@@ -1999,6 +1999,48 @@ export class DeckEngine implements Renderer {
 				visible: true,
 				world: l.position,
 			}));
+	}
+
+	/**
+	 * What the occlusion verdicts in `vis` were computed from: the geometry buffer (generation + source),
+	 * the pose, eye and aspect the peaks are projected with, and the snapped peak objects themselves
+	 * (`vis` is keyed by identity, so a re-snap or a terrain swap changes the list). The loop reads
+	 * nothing else (protectPeople / the people mask / max / declutter apply after it).
+	 */
+	private occKey?: {
+		gen: number;
+		src: unknown;
+		pose: Pose;
+		eye: { x: number; y: number; z: number };
+		aspect: number;
+		snapped: SnappedPeak[];
+	};
+
+	/** True when the cached verdicts still match every input; otherwise records the new key (the caller recomputes). */
+	private occlusionFresh(snapped: SnappedPeak[]) {
+		const k = this.occKey;
+		if (
+			k &&
+			k.gen === this.geoBufGen &&
+			k.src === this.geoSrc &&
+			samePose(k.pose, this.pose) &&
+			k.eye.x === this.eye.x &&
+			k.eye.y === this.eye.y &&
+			k.eye.z === this.eye.z &&
+			k.aspect === this.aspect &&
+			k.snapped.length === snapped.length &&
+			k.snapped.every((p, i) => p === snapped[i])
+		)
+			return true;
+		this.occKey = {
+			gen: this.geoBufGen,
+			src: this.geoSrc,
+			pose: { ...this.pose },
+			eye: { ...this.eye },
+			aspect: this.aspect,
+			snapped,
+		};
+		return false;
 	}
 
 	private skyCache?: { gen: number; sky: Float32Array };
