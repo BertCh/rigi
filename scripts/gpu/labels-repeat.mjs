@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Repeat test for the classic peak-label placement (workstream "labels", 2026-09-30).
-// Opens /photo/<id>?renderer=three N times in fresh browsers exactly like scripts/style-baseline.mjs
+// Opens /photo/<id>?renderer=deck N times in fresh browsers exactly like scripts/style-baseline.mjs
 // (SwiftShader, DPR 1, 1120x700, the ground-truth pose injected as the saved pose, Overlay >
 // Contours), waits until the canvas and label layer are stable, then records:
 //   - every DOM label block (text + rect, rounded to 0.01 px) and a hash of them
@@ -129,7 +129,7 @@ async function once(run) {
 				{ rate: cpu },
 			);
 		const t0 = Date.now();
-		await page.goto(`${BASE_URL}/photo/${id}?renderer=three`, {
+		await page.goto(`${BASE_URL}/photo/${id}?renderer=deck`, {
 			waitUntil: "load",
 			timeout: 120000,
 		});

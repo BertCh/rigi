@@ -3,11 +3,10 @@
 //  - grid: max |GPU − CPU| over the 2525 coarse cells (after the prior's sky fit), CPU grid ms vs GPU ms;
 //    the cold (first) graph run vs the last warm one compared bit for bit (must be 0 diffs)
 //  - search: align.autoAlign vs gpu/align autoAlignAsync, exact equality of every hypothesis, ms
-//  - engine: engine autoAlign with GPU off vs on (three: autoAlign vs autoAlignAsync; deck: autoAlign
-//    under __RIGI_FLAGS__.gpu off/on), final pose Δ and the silhouette re-rank timing (deck stats)
+//  - engine: engine autoAlign under __RIGI_FLAGS__.gpu off/on (deck), final pose Δ and the silhouette re-rank timing (deck stats)
 // Usage (under the render lock):
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/w2-align-parity.mjs [--renderer deck]
-//     [--url http://localhost:3110] [--out out/gpu/w2/parity-three.json] [IMG_xxxx ...]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/w2-align-parity.mjs [--renderer deck|webgpu|auto]
+//     [--url http://localhost:3110] [--out out/gpu/w2/parity-deck.json] [IMG_xxxx ...]
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { chromium } from "playwright";
@@ -18,7 +17,7 @@ const opt = (k, d) => {
 	return i >= 0 ? argv.splice(i, 2)[1] : d;
 };
 const BASE = opt("--url", process.env.APP_URL ?? "http://localhost:3110");
-const RENDERER = opt("--renderer", "three");
+const RENDERER = opt("--renderer", "deck");
 // --app-gpu on: load the app with the GPU on (other workstreams' kernels, e.g. the GPU horizon, active)
 const APP_GPU = opt("--app-gpu", "off");
 const OUT = opt("--out", `out/gpu/w2/parity-${RENDERER}.json`);
@@ -60,7 +59,7 @@ try {
 			{ timeout: 240000 },
 		);
 		const r = await page.evaluate(
-			async ({ REPS, RENDERER }) => {
+			async ({ REPS }) => {
 				const A = await import("/src/lib/align.ts");
 				const G = await import("/src/lib/gpu/align/index.ts");
 				const PG = await import("/src/lib/gpu/align/pose-grid.ts");
@@ -163,10 +162,7 @@ try {
 					let sil = null;
 					for (let i = 0; i < 3; i++) {
 						const t0 = performance.now();
-						res =
-							RENDERER === "three" && mode === "on"
-								? await e.autoAlignAsync(true)
-								: await e.autoAlign(true);
+						res = await e.autoAlign(true);
 						ts.push(performance.now() - t0);
 						if (e.stats?.silhouette) sil = { ...e.stats.silhouette };
 					}
@@ -198,7 +194,7 @@ try {
 				};
 				return out;
 			},
-			{ REPS, RENDERER },
+			{ REPS },
 		);
 		rows.push({ id, ...r, logs: logs.slice(0, 5) });
 		const s = r.search;

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Score the app's auto-alignment against hand-labelled control points (data/control-points.json).
 // Needs the dev server (default http://localhost:3100).
-// Usage: node scripts/eval-app.mjs [--renderer three|deck|webgpu|auto] [IMG_xxxx ...]
+// Usage: node scripts/eval-app.mjs [--renderer deck|webgpu|auto] [IMG_xxxx ...]
 // --renderer pins the engine (?renderer=; deck = WebGL deck, webgpu = deck on WebGPU, auto = WebGPU where
 // available else WebGL deck); without it the app default runs. Either way each row records the engine that
-// actually ran (__engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu"; cross-checked against
+// actually ran (__engine.kind, "deck"; "webgpu" when __engine.backend is "webgpu"; cross-checked against
 // the workspace's [data-renderer]) and the summary names it. A pinned engine that did not run fails the
 // run (webgpu falling back to WebGL deck included); auto only reports what ran.
 // webgpu / auto launch Chromium with the WebGPU flags (scripts/deck-webgpu/gpu-args.mjs).
@@ -27,12 +27,9 @@ for (let i = 0; i < argv.length; i++) {
 	else if (a.startsWith("--renderer=")) renderer = a.slice(11);
 	else only.push(a);
 }
-if (
-	renderer != null &&
-	!["three", "deck", "webgpu", "auto"].includes(renderer)
-) {
+if (renderer != null && !["deck", "webgpu", "auto"].includes(renderer)) {
 	console.error(
-		`--renderer must be three, deck, webgpu or auto (got ${renderer})`,
+		`--renderer must be deck, webgpu or auto (got ${renderer}; the three.js renderer was removed)`,
 	);
 	process.exit(2);
 }
@@ -75,7 +72,7 @@ await Promise.all(
 			const auto = e.pose;
 			const d = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
 			return {
-				engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three"),
+				engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "unknown"),
 				dataRenderer:
 					document
 						.querySelector("[data-renderer]")

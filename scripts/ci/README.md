@@ -27,7 +27,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 
 | id | tier | what it guards | command |
 |---|---|---|---|
-| tsc | fast | types across `src/`, `scripts/`, `tools/` (this includes `src/lib/renderer.check.ts`: both engines satisfy `Renderer`) | `tsc --noEmit --pretty false` |
+| tsc | fast | types across `src/`, `scripts/`, `tools/` (this includes `src/lib/renderer.check.ts`: the deck engines satisfy `Renderer`) | `tsc --noEmit --pretty false` |
 | biome | fast | lint + format + import order, as a per-file ratchet | `biome check --reporter=json <files>` |
 | style-check | fast | CLASSIC style = today's constants, ramps, presets, `?style=` | `scripts/style-check.ts` |
 | labels | fast | peak labels: classic byte-identical, no overlaps | `src/lib/look/__tests__/labels.check.ts` |
@@ -39,9 +39,9 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | export | fast | export/interchange (XMP, GeoJSON, KML, COLMAP…) | `scripts/test-export.ts` (needs `public/photos/`) |
 | nearfield-core / -export / -generate / -spot / -eyes / -propagate, splat-sort | fast | Step Inside core; generated splats never exported; propagation parity with Python; depth sort | `src/lib/nearfield/**`, `tools/nearfield/propagate/propagate.check.ts`, `scripts/nearfield/splat-sort-test.ts` |
 | concord-core / -priors / -cues / -joint / -field / -occl | fast | concordance WP-A..F (synthetic, offline). `field` also asserts `?concord` defaults off | `src/lib/concord/*/*.check.ts` |
-| style-baseline | full | **classic pixel identity + geometry hash** on the three.js route. No `?style`/`?concord`/`?renderer` flag is set, so this row is also the **concord-off parity** gate | `scripts/style-baseline.mjs check --url …` |
-| deck-smoke | full | three vs `?renderer=deck` parity: \|Δyaw\| ≤ 0.5°, label overlap ≥ 0.6 | `scripts/deck-engine-smoke.mjs --url … --out out/ci/…` |
-| eval-app | full | app auto-alignment vs control points. Gate: `N/M within 1° yaw` ≥ `evalApp.minWithin1deg` | `scripts/eval-app.mjs` (`APP_URL=…`) |
+| style-baseline | full | **classic pixel identity + geometry hash** on the WebGL deck route (`?renderer=deck`, SwiftShader). No `?style`/`?concord` flag is set, so this row is also the **concord-off parity** gate. **Needs a deck reference** (see below); SKIPs until one exists | `scripts/style-baseline.mjs check --url …` |
+| deck-smoke | full | `?renderer=deck` (WebGL, reference) vs `?renderer=webgpu` parity: \|Δyaw\| ≤ 0.5°, label overlap ≥ 0.6 | `scripts/deck-engine-smoke.mjs --url … --out out/ci/… --renderer webgpu` |
+| eval-app | full | app auto-alignment vs control points on the default engine (`--renderer webgpu`). Gate: `N/M within 1° yaw` ≥ `evalAppWebgpu.minWithin1deg`; advisory until that baseline exists | `scripts/eval-app.mjs --renderer webgpu` (`APP_URL=…`) |
 
 Full-tier checks run one at a time through `node scripts/gpu/with-render-lock.mjs -- …`. That wrapper
 waits for the machine-wide render lock and for memory headroom, and the wait counts against the check's
@@ -75,7 +75,7 @@ Baseline as of 2026-09-29, taken while other sessions were editing the tree:
 | style-baseline, deck-smoke, eval-app | Not run in CI: they need the photos, DEM tiles over the network, and the stored ~10 MB pixel baseline | n/a |
 
 To update the baseline, run `node scripts/ci/run.mjs full --biome all --update-baseline`. It rewrites
-`biome.errors` (only with `--biome all`) and, for each eval-app row that ran, `evalApp` / `evalAppDeck`:
+`biome.errors` (only with `--biome all`) and, for each eval-app row that ran, `evalAppWebgpu` / `evalAppDeck`:
 `minWithin1deg` becomes the observed count minus one (noise margin), `lastObserved` records the run, and
 other hand-written fields (`note`) are kept. Review the diff before keeping it: a bad run lowers the
 minimum. To record only the deck baseline, add `evalAppDeck` by hand (observed − 1) rather than
@@ -86,8 +86,27 @@ gates like `eval-app` against `evalAppDeck`. Without an `evalAppDeck` entry it w
 failure, including a crash, a timeout or an engine mismatch, reports KNOWN and does not fail the gate.
 
 `eval-app` metrics are noisy from run to run (background second opinion, tile timing), so
-`minWithin1deg` is set a little below the observed count. See `evalApp` in the JSON for the last
+`minWithin1deg` is set a little below the observed count. See `evalAppDeck` in the JSON for the last
 observed value.
+
+### three.js renderer removed (2026-10-01)
+
+The three.js PhotoEngine (`?renderer=three`) is gone, and the rows that pinned it were retargeted:
+
+- `eval-app` now pins `--renderer webgpu` (the app default) against a new `evalAppWebgpu` key. The old
+  `evalApp` minimum (a three.js number) was deleted, so the row is advisory until a webgpu run records
+  `evalAppWebgpu` (`--update-baseline`, or by hand: observed − 1).
+- `deck-smoke`'s reference arm is the WebGL deck instead of three.js, compared with WebGPU.
+- `style-baseline` runs `?renderer=deck`. **Its reference must be recaptured on deck before the classic
+  pixel check means anything again.** The three.js-era baseline stays in `out/lead/style-baseline`
+  (untouched); the harness now defaults to `out/lead/style-baseline-deck`, which starts empty, so the row
+  SKIPs until someone captures it once, deliberately, on a tree whose classic look is known good:
+
+  ```sh
+  node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture --url http://localhost:3100
+  ```
+
+  `check` refuses a `baseline.json` that does not say `"renderer": "deck"`.
 
 ## Biome scope
 

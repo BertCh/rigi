@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Parity / speed bench of the texture-input look passes (src/lib/gpu/look/textures.ts) against the
 // array path: for each photo it opens /photo/<id> in headless Chromium with WebGPU, captures the
-// real look inputs from window.__engine (three.js, ground-truth pose), re-creates the engine's
+// real look inputs from window.__engine (WebGL deck, ground-truth pose; no band-stats input on deck), re-creates the engine's
 // targets as textures on the compute device and runs runTexturesBench (textures-bench.ts): masks,
 // band stats and haze prep, bit-exact checks and ms. Always run it under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/textures-bench.mjs [--photos IMG_7086,IMG_6958]
@@ -23,11 +23,11 @@ const REPS = Number(arg("reps", "5"));
 const MOD = "/src/lib/gpu/look/textures-bench.ts";
 const FN = "runTexturesBench";
 // extra page query, e.g. "lookgpu=1&style=swiss&renderer=deck" (lookSmoke checks the hooks)
-// renderer=three unless the query names one: captureLookInputs needs the three.js engine
+// renderer=deck (WebGL) unless the query names one (webgpu / auto work too: captureLookInputs reads either deck engine)
 const QUERY_ARG = arg("query", "");
 const QUERY = /(^|&)renderer=/.test(QUERY_ARG)
 	? QUERY_ARG
-	: ["renderer=three", QUERY_ARG].filter(Boolean).join("&");
+	: ["renderer=deck", QUERY_ARG].filter(Boolean).join("&");
 const TAG = arg("tag", "");
 const SETTINGS = JSON.parse(
 	arg("settings", '{"mode":"replace","mapStyle":"hillshade"}'),

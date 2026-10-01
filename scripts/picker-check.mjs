@@ -1,6 +1,6 @@
 // Browser check of the ?picker=on top-3 picker + tap-a-peak (src/lib/picker/README.md).
 // Usage (dev server on :3100, under the render lock):
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/picker-check.mjs IMG_6958 out/picker/6958 [three|deck]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/picker-check.mjs IMG_6958 out/picker/6958 [deck|webgpu|auto]
 // Loads the photo, waits for the candidates, previews a wrong candidate, taps a visible labelled peak at
 // its shown position, picks its name, checks the tap re-solve returns to the shown pose, confirms, and
 // prints the log event kinds. Screenshots: <prefix>-panel/-preview/-tap/-confirmed.png.
@@ -10,10 +10,12 @@ import { dirname } from "node:path";
 import { chromium } from "playwright";
 
 const [id, out, rendererArg] = process.argv.slice(2);
-// renderer always explicit (three unless "deck" is given): the app default may be either
-const renderer = rendererArg ?? "three";
+// renderer always explicit (WebGL deck unless another is given): the app default may be either
+const renderer = rendererArg ?? "deck";
 if (!id || !out) {
-	console.error("usage: picker-check.mjs <photoId> <outPrefix> [three|deck]");
+	console.error(
+		"usage: picker-check.mjs <photoId> <outPrefix> [deck|webgpu|auto]",
+	);
 	process.exit(1);
 }
 mkdirSync(dirname(out), { recursive: true });

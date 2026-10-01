@@ -13,7 +13,7 @@
 // (run-to-run: identical bounds required, rerunDiffs 0).
 // Usage (under the render lock, own dev server):
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/align-refine-ab.mjs [--url http://localhost:3123]
-//     [--renderer three|deck] [--perturb 6] [--check-bounds] [--out out/gpu/align/refine-ab.json] [IMG_xxxx ...]
+//     [--renderer deck|webgpu|auto] [--perturb 6] [--check-bounds] [--out out/gpu/align/refine-ab.json] [IMG_xxxx ...]
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
@@ -29,7 +29,7 @@ const flag = (k) => {
 	return i >= 0;
 };
 const BASE = opt("--url", process.env.APP_URL ?? "http://localhost:3110");
-const RENDERER = opt("--renderer", "three");
+const RENDERER = opt("--renderer", "deck");
 const PERTURB = Number(opt("--perturb", "6"));
 const OUT = opt("--out", "out/gpu/align/refine-ab.json");
 const CHECK = flag("--check-bounds");

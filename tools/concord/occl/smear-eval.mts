@@ -1,5 +1,5 @@
 // WP-F CPU evaluation: does the DSM occluder stop the Step Inside drape smear? DEV photos only.
-//   npx tsx tools/concord/occl/smear-eval.mts [--renderer=three|deck] [--dtm=4|2] [--radius=2000]
+//   npx tsx tools/concord/occl/smear-eval.mts [--renderer=deck|three]  (three = stored grids of the removed three.js renderer) [--dtm=4|2] [--radius=2000]
 //        [--maxTiles=N] [--minObj=2.5] [--near=15] [--nowedge]
 //
 // Inputs (read-only): tools/nearfield/smear/grid-<renderer>-<id>.json.gz (per-cell app range, classic drape
@@ -43,7 +43,7 @@ const ROOT = path.resolve(import.meta.dirname, "../../..");
 const SMEAR = path.join(ROOT, "tools/nearfield/smear");
 const arg = (k: string, d?: string) =>
 	process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1] ?? d;
-const renderer = arg("renderer", "three") as string;
+const renderer = arg("renderer", "deck") as string;
 const dtmRes = Number(arg("dtm", "4")) as 2 | 4;
 const radius = Number(arg("radius", "2000"));
 const maxTiles = arg("maxTiles") ? Number(arg("maxTiles")) : undefined;

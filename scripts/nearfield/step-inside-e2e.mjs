@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Step Inside end to end, both renderers (headless, real GPU). For each photo: GT pose injected as the
+// Step Inside end to end, per deck renderer (headless, real GPU; default WebGL deck). For each photo: GT pose injected as the
 // saved pose (accepted), panel + anchor quality, hover readout on an Object pixel, step inside (start ==
 // photo camera, orbit moves), Truth, back, In map drape with the feature on vs off, the .ply export.
 // Screenshots → tools/nearfield/shots/e2e-<renderer>-<id>-*.png, numbers → e2e-report-<renderer>.json.
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs --renderer=deck IMG_7018
-//   --survey: only build every GT photo (quality / Object pixels), three renderer
+//   --survey: only build every GT photo (quality / Object pixels)
 //   --dead: service URL pointed at a dead port (window.__nearfieldUrl) → the panel must stay invisible
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -19,7 +19,7 @@ const gt = JSON.parse(
 );
 const arg = (k, d) =>
 	process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1] ?? d;
-const renderer = arg("renderer", "three");
+const renderer = arg("renderer", "deck");
 const survey = process.argv.includes("--survey");
 let ids = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 if (survey && !ids.length) ids = Object.keys(gt).sort();

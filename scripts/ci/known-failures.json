@@ -19,12 +19,6 @@
 			"tools/nearfield/smear/why.mjs": 1
 		}
 	},
-	"evalApp": {
-		"minWithin1deg": 11,
-		"of": 14,
-		"lastObserved": "12/14 within 1\u00b0 yaw, median 6.5 px (2026-09-29, :3130)",
-		"note": "1 below observed for run-to-run noise; status.md: App 12/14"
-	},
 	"evalAppDeck": {
 		"minWithin1deg": 11,
 		"of": 14,

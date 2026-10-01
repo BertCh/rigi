@@ -115,7 +115,7 @@ async function inPage(o) {
 	Object.assign(e.prior, prior0);
 	e.silhouetteGpu = true;
 	// the engine that actually ran (webgpu-app may fall back to the WebGL deck)
-	const ran = e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three");
+	const ran = e.backend === "webgpu" ? "webgpu" : (e.kind ?? "unknown");
 	dispose();
 	return { diffs, calls, ran };
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Reveal (intro animation) frame-time bench: three.js vs deck, same photo, same preset.
+// Reveal (intro animation) frame-time bench: deck (WebGL), same photo, same preset (the three.js arm was
+// dropped with the three.js renderer, 2026-10-01).
 // For each engine: load /photo/<id>?reveal=off, wait for [data-ready], then run
 // window.__reveal.play() and record every rAF interval while it plays.
 // deck is run twice: as shipped, and "legacy" (compositor.onChange → updateLayers, i.e. every
@@ -99,7 +100,6 @@ async function run(id, renderer, legacy) {
 
 for (const id of IDS) {
 	for (const [label, renderer, legacy] of [
-		["three", "three", false],
 		["deck (legacy)", "deck", true],
 		["deck", "deck", false],
 	]) {

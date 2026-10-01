@@ -1,14 +1,14 @@
-// Real look-pass inputs read back from a live three.js PhotoEngine (window.__engine on
+// Real look-pass inputs read back from a live deck engine (DeckEngine or WebGpuEngine; window.__engine on
 // /photo/<id> in dev), for the W5 parity bench (bench.ts, scripts/gpu/look-bench.mjs). It pokes
-// engine internals, so it is dev-only and three-only (the deck engine keeps other buffers).
+// engine internals (the private geometry source, haze controller, photo and masks), so it is dev-only.
+// Ported from the three.js PhotoEngine (removed 2026-10-01): relief, haze and masks are built from deck's
+// geometry buffer exactly as the engine's own passes build them; the band-stats input is not captured
+// (deck renders the stats layer inside its compositor, with no CPU hook), so `stats` is null.
+import type { Pose } from "../../camera";
 import type { EnuFrame } from "../../geodesy";
 import type { Vec3 } from "../../look/atmosphere";
-import {
-	gridSize,
-	MASK_LONG_SIDE,
-	photoPixels,
-	trustedRange,
-} from "../../look/composite";
+import { gridSize, MASK_LONG_SIDE, photoPixels } from "../../look/composite";
+import { rangeGeo } from "../../look/haze-controller";
 import type { HazeFitInput, SkyMask } from "../../look/haze-fit";
 import type { HeightTile } from "../../look/relief/heights";
 
@@ -52,17 +52,18 @@ type Engine = {
 	photo: { hAccuracy?: number | null };
 	terrain?: { tiles: HeightTile[] };
 	geometryReady(): boolean;
-	// internals
-	geoBuf: Float32Array;
-	geoRT: { width: number; height: number };
+	// internals (private in DeckEngine / WebGpuEngine; same names in both)
+	geoSrc?: {
+		width: number;
+		height: number;
+		/** metres, row 0 = top, Infinity = sky */
+		range: Float32Array;
+		pose?: Pose | null;
+	};
 	photoImg?: HTMLImageElement;
 	fgMask: SkyMask | null;
 	haze: { sky: SkyMask | null };
-	shared: { uSunDir: { value: { toArray(): number[] } } };
-	look: { setStats: (o: unknown) => void; statsKey: string };
-	layerStats(amount: number): void;
-	/** engine: read the stats layer synchronously (layerStats is otherwise fenced / async) */
-	syncReads: boolean;
+	look(mode: "overlay"): { sunDir: Vec3 };
 };
 
 const maskAt = (m: SkyMask, u: number, v: number) =>
@@ -71,19 +72,23 @@ const maskAt = (m: SkyMask, u: number, v: number) =>
 			Math.min(m.width - 1, Math.floor(u * m.width))
 	] / 255;
 
-/** Inputs of the four look passes as the three engine would build them at this pose. */
+/** Inputs of the look passes as the deck engine builds them at this pose (stats: null, see above). */
 export function captureLookInputs(engine: unknown, label = "live"): LookInputs {
 	const e = engine as Engine;
-	if (e.kind === "deck") throw new Error("capture needs the three.js engine");
+	if (e.kind !== "deck") throw new Error("capture needs a deck engine");
 	if (!e.geometryReady()) throw new Error("geometry not ready");
+	const src = e.geoSrc;
+	if (!src?.pose) throw new Error("no geometry buffer");
 	const img = e.photoImg;
 	if (!img) throw new Error("no photo");
-	const sunDir = e.shared.uSunDir.value.toArray() as Vec3;
-	const gw = e.geoRT.width;
-	const gh = e.geoRT.height;
-	const geo = e.geoBuf;
-	// range grid, row 0 = top (engine.ts rangeGrid)
-	const at = (x: number, y: number) => geo[((gh - 1 - y) * gw + x) * 4 + 3];
+	const sunDir = [...e.look("overlay").sunDir] as Vec3;
+	const gw = src.width;
+	const gh = src.height;
+	// range grid, row 0 = top, 0 = sky (deck: Infinity = sky)
+	const at = (x: number, y: number) => {
+		const r = src.range[y * gw + x];
+		return Number.isFinite(r) ? r : 0;
+	};
 
 	const relief: ReliefIn | null = e.terrain?.tiles.length
 		? {
@@ -94,18 +99,23 @@ export function captureLookInputs(engine: unknown, label = "live"): LookInputs {
 			}
 		: null;
 
-	// haze-controller.ts: the buffer decimated ×2, the photo at twice that
+	// haze-controller.ts: rangeGeo of the buffer (row 0 = bottom), decimated ×2, the photo at twice that
 	const STEP = 2;
 	const W = Math.floor(gw / STEP);
 	const H = Math.floor(gh / STEP);
-	const small = new Float32Array(W * H * 4);
+	const full = rangeGeo(src.range, gw, gh, src.pose);
+	if (full.kind !== "range") throw new Error("unexpected haze geo");
+	const small = new Float32Array(W * H);
 	for (let y = 0; y < H; y++)
 		for (let x = 0; x < W; x++)
-			for (let c = 0; c < 4; c++)
-				small[(y * W + x) * 4 + c] = geo[(y * STEP * gw + x * STEP) * 4 + c];
+			small[y * W + x] = full.data[y * STEP * gw + x * STEP];
 	const haze: HazeFitInput = {
 		photo: photoPixels(img, W * 2, H * 2),
-		geo: { kind: "xyzr", data: small },
+		geo: {
+			kind: "range",
+			data: small,
+			ray: (x, y) => full.ray(x * STEP, y * STEP),
+		},
 		geoW: W,
 		geoH: H,
 		sky: e.haze.sky,
@@ -139,7 +149,7 @@ export function captureLookInputs(engine: unknown, label = "live"): LookInputs {
 						Math.min(gw - 1, Math.floor(x * sx) + dx),
 						Math.min(gh - 1, Math.floor(y * sy) + dy),
 					);
-					t += r > 0 && Number.isFinite(r) ? 1 : 0;
+					t += r > 0 ? 1 : 0;
 				}
 			const u = (x + 0.5) / w;
 			const v = (y + 0.5) / h;
@@ -147,63 +157,11 @@ export function captureLookInputs(engine: unknown, label = "live"): LookInputs {
 			if (fg && fgm) fg[i] = maskAt(fgm, u, v);
 		}
 
-	// the layer the engine renders for band stats: intercept CompositeLook.setStats around layerStats
-	let stats: StatsIn | null = null;
-	const look = e.look;
-	const orig = look.setStats;
-	try {
-		look.setStats = (o: unknown) => {
-			const s = o as {
-				img: HTMLImageElement;
-				layer: Float32Array;
-				w: number;
-				h: number;
-				minRange: number;
-			};
-			const { w: lw, h: lh } = s;
-			const layer = new Float32Array(s.layer.length);
-			for (let y = 0; y < lh; y++)
-				layer.set(
-					s.layer.subarray((lh - 1 - y) * lw * 4, (lh - y) * lw * 4),
-					y * lw * 4,
-				);
-			const range = new Float32Array(lw * lh);
-			const fl = fgm ? new Float32Array(lw * lh) : null;
-			for (let y = 0; y < lh; y++)
-				for (let x = 0; x < lw; x++) {
-					const r = at(
-						Math.floor(((x + 0.5) * gw) / lw),
-						Math.floor(((y + 0.5) * gh) / lh),
-					);
-					range[y * lw + x] = r > 0 && Number.isFinite(r) ? r : 0;
-					if (fl && fgm)
-						fl[y * lw + x] = maskAt(fgm, (x + 0.5) / lw, (y + 0.5) / lh);
-				}
-			stats = {
-				photo: photoPixels(s.img, lw, lh).data,
-				layer,
-				w: lw,
-				h: lh,
-				range,
-				fg: fl,
-				minRange: s.minRange ?? trustedRange(e.photo.hAccuracy),
-			};
-		};
-		// force the render even if these stats were already taken
-		look.statsKey = "";
-		e.syncReads = true;
-		e.layerStats(1);
-	} catch (err) {
-		console.warn("[lookgpu] stats capture failed", err);
-	} finally {
-		e.syncReads = false;
-		look.setStats = orig;
-	}
 	return {
 		source: label,
 		relief,
 		haze,
 		masks: { I, cov, fg, w, h },
-		stats,
+		stats: null,
 	};
 }

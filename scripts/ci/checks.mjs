@@ -15,8 +15,9 @@
 const tsx = (file, ...args) => ["npx", "tsx", file, ...args];
 
 // Renderer pinning: every browser check names its engine explicitly (?renderer= / --renderer), so a
-// change of the app's default renderer never silently changes what a gate measures. The three-pinned
-// rows are the historical baselines; the deck rows are their explicit deck counterparts.
+// change of the app's default renderer never silently changes what a gate measures. The three.js renderer
+// was removed (2026-10-01): its rows were retargeted to deck (style-baseline, deck-smoke's reference arm)
+// or to the WebGPU default (eval-app).
 
 /** eval-app gate: the pinned engine really ran, and 'N/M within 1° yaw' ≥ the baseline for that engine. */
 const evalAppGate = (renderer, baselineKey) => (out, ctx) => {
@@ -310,9 +311,11 @@ export const CHECKS = [
 		tier: "full",
 		group: "parity",
 		browser: true,
-		// The script pins ?renderer=three (it reads three internals, e.g. e.geoBuf) and sets no ?style /
-		// ?concord flag, so this row is also the concord-off (and look-off) parity gate: classic must
-		// stay pixel-identical with flags off.
+		// The script pins ?renderer=deck (WebGL on SwiftShader; it reads deck's geometry source) and sets no
+		// ?style / ?concord flag, so this row is also the concord-off (and look-off) parity gate: classic
+		// must stay pixel-identical with flags off. Its reference moved to out/lead/style-baseline-deck and
+		// must be captured once on deck (`node scripts/gpu/with-render-lock.mjs -- node
+		// scripts/style-baseline.mjs capture`); until then `needs` is missing and the row SKIPs.
 		cmd: lock([
 			"node",
 			"scripts/style-baseline.mjs",
@@ -321,10 +324,10 @@ export const CHECKS = [
 			"{url}",
 		]),
 		needs: [
-			"out/lead/style-baseline/baseline.json",
+			"out/lead/style-baseline-deck/baseline.json",
 			"public/photos/photos.json",
 		],
-		note: "three-pinned: classic pixel identity + geometry hash; = concord-off parity (no style/concord flag)",
+		note: "deck-pinned (WebGL): classic pixel identity + geometry hash; = concord-off parity (no style/concord flag). SKIPs until the deck reference is captured",
 		timeoutS: 3600,
 	},
 	{
@@ -339,9 +342,11 @@ export const CHECKS = [
 			"{url}",
 			"--out",
 			"out/ci/deck-engine-smoke.json",
+			"--renderer",
+			"webgpu",
 		]),
 		needs: ["public/photos/photos.json"],
-		note: "?renderer=three vs ?renderer=deck (each run checks __engine.kind): |Δyaw| ≤ 0.5°, label overlap ≥ 0.6",
+		note: "?renderer=deck (WebGL, reference) vs ?renderer=webgpu (each run checks the engine that ran): |Δyaw| ≤ 0.5°, label overlap ≥ 0.6",
 		timeoutS: 3600,
 	},
 	{
@@ -349,15 +354,18 @@ export const CHECKS = [
 		tier: "full",
 		group: "accuracy",
 		browser: true,
-		cmd: lock(["node", "scripts/eval-app.mjs", "--renderer", "three"]),
+		cmd: lock(["node", "scripts/eval-app.mjs", "--renderer", "webgpu"]),
 		// one retry on a crash: the first run on 2026-09-29 died in playwright's launch
 		// ("SyntaxError: Unexpected end of JSON input" in coreBundle.js) and passed on re-run
 		retries: 1,
 		env: { APP_URL: "{url}" },
 		needs: ["data/control-points.json", "public/photos/photos.json"],
-		note: "three-pinned; gate: 'N/M within 1° yaw' ≥ known-failures.json evalApp.minWithin1deg",
+		note: "webgpu-pinned (the app default; was three-pinned until 2026-10-01); gate: 'N/M within 1° yaw' ≥ known-failures.json evalAppWebgpu.minWithin1deg",
 		timeoutS: 3600,
-		gate: evalAppGate("three", "evalApp"),
+		// advisory until a webgpu run records evalAppWebgpu (run.mjs --update-baseline); the old evalApp
+		// minimum was a three.js number and was dropped with that renderer
+		advisoryUntil: "evalAppWebgpu",
+		gate: evalAppGate("webgpu", "evalAppWebgpu"),
 	},
 	{
 		id: "eval-app-deck",

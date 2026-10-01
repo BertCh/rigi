@@ -2,19 +2,19 @@
 // P1 exit gate "the split removes >= 80% of person/hut/tree drape smear" (reports/step-inside-design.md).
 // Labels: tools/nearfield/smear/labels.json (hand-drawn blind, before any Step Inside run).
 //
-// Smear is computed from the engine's own drape visibility rule (materials.ts / deck terrain-layer.ts):
+// Smear is computed from the engine's own drape visibility rule (deck terrain-layer.ts):
 // a terrain fragment takes photo pixel puv when
 //     seen(puv) > 0  &&  r < seen*1.015 + 15  &&  r > minProjectRange  &&  !(photoFg(puv) > 0.5)
 // For photo pixel puv the fragment that passes is the first DEM hit along the ray (r == seen), so the
 // photo pixel is painted onto terrain ("smeared", when the pixel shows an object standing above the
 // ground) iff  seen > minProjectRange && mask(puv) <= 0.5 . `seen` = engine.sampleAt(u, v).range (the
 // readback of the same GPU range buffer the shader samples); the mask is the texture the drape binds
-// in the world view (off: people mask when protectPeople; on: three nf.masks.worldFg|worldObj,
-// deck drapeMask().photoFg), bilinear like the GPU sampler.
+// in the world view (off: people mask when protectPeople; on: deck
+// drapeMask().photoFg), bilinear like the GPU sampler.
 // Which of those terrain points a given offset viewer then sees is a visibility question of the
 // viewer, not of the drape: the photo-space fraction is the viewpoint-independent smear.
 //
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/smear-measure.mjs [--renderer=deck] [ids…]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/smear-measure.mjs [--renderer=deck|webgpu] [ids…]
 // Output: tools/nearfield/smear/grid-<renderer>-<id>.json (per-cell arrays) + summary via smear-report.mjs
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -30,7 +30,7 @@ const gt = JSON.parse(
 const labels = JSON.parse(readFileSync(join(OUT, "labels.json"), "utf8"));
 const arg = (k, d) =>
 	process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1] ?? d;
-const renderer = arg("renderer", "three");
+const renderer = arg("renderer", "deck");
 const GW = Number(arg("grid", "320"));
 const VARIANTS = arg("variants", "").split(",").filter(Boolean).map(Number);
 let ids = process.argv.slice(2).filter((a) => !a.startsWith("--"));
@@ -87,7 +87,7 @@ for (const id of ids) {
 		}
 		await sleep(1000);
 		const res = await page.evaluate(
-			async ({ GW, renderer, VARIANTS }) => {
+			async ({ GW, VARIANTS }) => {
 				const eng = window.__engine;
 				const nf = window.__nearfield;
 				const bilinear = (m, u, v) => {
@@ -129,20 +129,8 @@ for (const id of ids) {
 					await new Promise((r) =>
 						requestAnimationFrame(() => requestAnimationFrame(r)),
 					);
-					if (renderer === "three") {
-						const m = eng.nf?.masks;
-						const t = m && (protect ? m.worldFg : m.worldObj);
-						if (t)
-							onMask = {
-								width: t.image.width,
-								height: t.image.height,
-								data: t.image.data,
-								stride: 4,
-							};
-					} else {
-						const dm = eng.drapeMask();
-						onMask = dm.protectPeople ? dm.photoFg : null;
-					}
+					const dm = eng.drapeMask();
+					onMask = dm.protectPeople ? dm.photoFg : null;
 				}
 				// sensitivity (diagnostic only, not the product): the same scene build with a larger nearRadius;
 				// drape mask = split Object cells (3x3 dilated, as engine.ts worldFg) OR the people mask
@@ -247,7 +235,7 @@ for (const id of ids) {
 					cls,
 				};
 			},
-			{ GW, renderer, VARIANTS },
+			{ GW, VARIANTS },
 		);
 		res.id = id;
 		res.renderer = renderer;

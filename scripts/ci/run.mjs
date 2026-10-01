@@ -484,7 +484,7 @@ if (updateBaseline) {
 	const EVAL_NOISE = 1;
 	const day = new Date().toISOString().slice(0, 10);
 	for (const [id, key] of [
-		["eval-app", "evalApp"],
+		["eval-app", "evalAppWebgpu"],
 		["eval-app-deck", "evalAppDeck"],
 	]) {
 		const m = results.get(id)?.metrics;

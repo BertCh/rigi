@@ -1,7 +1,8 @@
-// Camera modes check (step-camera.ts setMode; CameraModeBar): for each renderer, Step Inside →
+// Camera modes check (step-camera.ts setMode; CameraModeBar) on the WebGL deck engine: Step Inside →
 // Photo / Orbit / Fly / Top-down → Esc back, then In map → Fly / Top-down / Photo. Screenshots go to
 // tools/nearfield/shots/cam-<renderer>-<id>-*.png; the report prints camera positions per mode.
-// Usage: node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/camera-modes-check.mjs [id] [--deck]
+// Usage: node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/camera-modes-check.mjs [id]
+// (--deck is accepted and ignored: the three.js arm went with the three.js renderer, 2026-10-01)
 import { mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
@@ -14,8 +15,7 @@ const gt = JSON.parse(
 	readFileSync(join(ROOT, "data/ground-truth.json"), "utf8"),
 );
 const id = process.argv.slice(2).find((a) => !a.startsWith("--")) ?? "IMG_7018";
-const deck = process.argv.includes("--deck");
-const tag = deck ? "deck" : "three";
+const tag = "deck";
 const g = gt[id];
 const pose = {
 	yaw: g.yaw,

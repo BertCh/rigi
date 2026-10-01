@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // W5 parity / speed bench for the look passes on the GPU (src/lib/gpu/look/**). For each photo it
 // opens /photo/<id> in headless Chromium with WebGPU, captures the real look-pass inputs from
-// window.__engine (the three.js engine at the ground-truth pose), then runs every GPU twin against
+// window.__engine (the WebGL deck engine at the ground-truth pose; capture.ts, no band-stats input), then runs every GPU twin against
 // its CPU function (src/lib/gpu/look/bench.ts) and prints max / p99 / mean abs error and ms.
 // Always run it under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/look-bench.mjs [--photos IMG_7086,IMG_6958]
@@ -25,11 +25,11 @@ const REPS = Number(arg("reps", "5"));
 const MOD = arg("module", "/src/lib/gpu/look/bench.ts");
 const FN = arg("fn", "runLookBench");
 // extra page query, e.g. "lookgpu=1&style=swiss&renderer=deck" (lookSmoke checks the hooks)
-// renderer=three unless the query names one: captureLookInputs needs the three.js engine
+// renderer=deck (WebGL) unless the query names one (webgpu / auto work too: captureLookInputs reads either deck engine)
 const QUERY_ARG = arg("query", "");
 const QUERY = /(^|&)renderer=/.test(QUERY_ARG)
 	? QUERY_ARG
-	: ["renderer=three", QUERY_ARG].filter(Boolean).join("&");
+	: ["renderer=deck", QUERY_ARG].filter(Boolean).join("&");
 const TAG = arg("tag", "");
 const SETTINGS = JSON.parse(
 	arg("settings", '{"mode":"replace","mapStyle":"hillshade"}'),

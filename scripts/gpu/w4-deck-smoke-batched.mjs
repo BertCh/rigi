@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// W4 copy of scripts/deck-engine-smoke.mjs: the same three.js-vs-deck check, with the deck run done
-// twice per photo, per-tile terrain (default) and batched (?terrain=batched, see
-// src/lib/deck/terrain-mode.ts), plus terrain draw calls, main-thread mesh build ms and the
-// silhouette re-rank time. Same pass rule, applied to each deck mode.
+// W4 copy of scripts/deck-engine-smoke.mjs: per-tile terrain (?terrain=tiles) vs batched (?terrain=batched,
+// see src/lib/deck/terrain-mode.ts) on the WebGL deck, plus terrain draw calls, main-thread mesh build ms and
+// the silhouette re-rank time. The reference arm is one WebGL deck run per photo with per-tile terrain (it was
+// the three.js PhotoEngine until that renderer was removed, 2026-10-01); each mode in --modes is compared
+// with it, so the "tiles" row is a run-to-run self-check. Same pass rule, applied to each deck mode.
 // Usage: node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/w4-deck-smoke-batched.mjs \
 //          --url http://localhost:3110 --out out/gpu/w4/deck-smoke-batched.json
 //
@@ -48,9 +49,9 @@ const overlap = (a, b, marginsA = {}, marginsB = {}) => {
 	const B = new Set(b);
 	const inter = [...A].filter((x) => B.has(x)).length;
 	const union = new Set([...A, ...B]).size;
-	const onlyThree = [...A].filter((x) => !B.has(x));
+	const onlyRef = [...A].filter((x) => !B.has(x));
 	const onlyDeck = [...B].filter((x) => !A.has(x));
-	const tolerated = [...onlyThree, ...onlyDeck].filter(
+	const tolerated = [...onlyRef, ...onlyDeck].filter(
 		(x) => borderline(marginsA[x]) || borderline(marginsB[x]),
 	);
 	return {
@@ -58,11 +59,11 @@ const overlap = (a, b, marginsA = {}, marginsB = {}) => {
 		strictJaccard: union ? inter / union : 1,
 		ofMin: Math.min(A.size, B.size) ? inter / Math.min(A.size, B.size) : 1,
 		inter,
-		onlyThree,
+		onlyRef,
 		onlyDeck,
 		tolerated: tolerated.map((x) => ({
 			name: x,
-			three: marginsA[x] ?? null,
+			ref: marginsA[x] ?? null,
 			deck: marginsB[x] ?? null,
 		})),
 	};
@@ -73,7 +74,7 @@ const browser = await chromium.launch({
 	args: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 });
 
-async function run(id, renderer, threePose = null, terrain = null) {
+async function run(id, renderer, refPose = null, terrain = null) {
 	const page = await browser.newPage({
 		viewport: { width: 1400, height: 900 },
 	});
@@ -125,13 +126,13 @@ async function run(id, renderer, threePose = null, terrain = null) {
 		await e.readback();
 		const labels = e.peakLabels().map((l) => l.name);
 		const ownMargins = margins();
-		let atThree = null;
-		let atThreeMargins = null;
+		let atRef = null;
+		let atRefMargins = null;
 		if (tp) {
 			e.setPose(tp);
 			await e.readback();
-			atThree = e.peakLabels().map((l) => l.name);
-			atThreeMargins = margins();
+			atRef = e.peakLabels().map((l) => l.name);
+			atRefMargins = margins();
 		}
 		return {
 			pose: res.pose,
@@ -142,64 +143,64 @@ async function run(id, renderer, threePose = null, terrain = null) {
 			eyeZ: e.eye.z,
 			labels,
 			margins: ownMargins,
-			atThree,
-			atThreeMargins,
+			atRef,
+			atRefMargins,
 			stats: e.stats ?? null,
 		};
-	}, threePose);
+	}, refPose);
 	await page.close();
 	return { readyMs, ...r, logs };
 }
 
 const rows = [];
 const MODES = arg("modes", "tiles,batched").split(",");
-const threeRuns = new Map();
+const refRuns = new Map();
 for (const id of IDS)
 	for (const mode of MODES) {
 		process.stdout.write(`${id} [${mode}]: `);
-		// three runs once per photo (both deck modes compare against the same three pose)
-		if (!threeRuns.has(id)) {
-			process.stdout.write("three… ");
-			threeRuns.set(
+		// the reference runs once per photo (every mode compares against the same ref pose)
+		if (!refRuns.has(id)) {
+			process.stdout.write("ref (tiles)… ");
+			refRuns.set(
 				id,
-				await run(id, "three").catch((e) => ({ error: String(e) })),
+				await run(id, "deck", null, "tiles").catch((e) => ({
+					error: String(e),
+				})),
 			);
 		}
-		const three = threeRuns.get(id);
+		const ref = refRuns.get(id);
 		process.stdout.write("deck… ");
-		const deck = await run(id, "deck", three?.pose ?? null, mode).catch(
-			(e) => ({
-				error: String(e),
-			}),
-		);
+		const deck = await run(id, "deck", ref?.pose ?? null, mode).catch((e) => ({
+			error: String(e),
+		}));
 		const dPose = deck?.pose;
-		const row = { id, mode, three, deck };
-		if (three?.pose && dPose) {
-			row.dYaw = angle(dPose.yaw, three.pose.yaw);
-			row.dPitch = dPose.pitch - three.pose.pitch;
-			row.dRoll = dPose.roll - three.pose.roll;
-			row.dVfov = dPose.vfov - three.pose.vfov;
-			row.labelsAtThreePose = overlap(
-				three.labels,
-				deck.atThree ?? [],
-				three.margins,
-				deck.atThreeMargins ?? {},
+		const row = { id, mode, ref, deck };
+		if (ref?.pose && dPose) {
+			row.dYaw = angle(dPose.yaw, ref.pose.yaw);
+			row.dPitch = dPose.pitch - ref.pose.pitch;
+			row.dRoll = dPose.roll - ref.pose.roll;
+			row.dVfov = dPose.vfov - ref.pose.vfov;
+			row.labelsAtRefPose = overlap(
+				ref.labels,
+				deck.atRef ?? [],
+				ref.margins,
+				deck.atRefMargins ?? {},
 			);
 			row.labelsOwnPose = overlap(
-				three.labels,
+				ref.labels,
 				deck.labels ?? [],
-				three.margins,
+				ref.margins,
 				deck.margins,
 			);
 			row.pass =
 				Math.abs(row.dYaw) <= YAW_TOL &&
-				row.labelsAtThreePose.jaccard >= OVERLAP_MIN;
+				row.labelsAtRefPose.jaccard >= OVERLAP_MIN;
 		} else row.pass = false;
 		rows.push(row);
 		console.log(
 			row.dYaw != null
-				? `Δyaw ${row.dYaw.toFixed(2)}° Δpitch ${row.dPitch.toFixed(2)}° Δroll ${row.dRoll.toFixed(2)}° Δvfov ${row.dVfov.toFixed(2)}° | labels@three J=${row.labelsAtThreePose.jaccard.toFixed(2)} (strict ${row.labelsAtThreePose.strictJaccard.toFixed(2)}, ${row.labelsAtThreePose.tolerated.length} borderline; ${row.labelsAtThreePose.inter}/${three.labels.length}/${deck.atThree.length}) own J=${row.labelsOwnPose.jaccard.toFixed(2)} | deck ready ${deck.readyMs} ms align ${Math.round(deck.alignMs)} ms (three align ${Math.round(three.alignMs)} ms) horizon=${deck.stats?.horizonSource} sil ${Math.round(deck.stats?.silhouette?.ms ?? -1)} ms draws/align ${deck.alignDraws} build ${deck.terrainStats?.buildMs} ms ${row.pass ? "PASS" : "FAIL"}`
-				: `FAIL ${three?.error ?? ""} ${deck?.error ?? ""}`,
+				? `Δyaw ${row.dYaw.toFixed(2)}° Δpitch ${row.dPitch.toFixed(2)}° Δroll ${row.dRoll.toFixed(2)}° Δvfov ${row.dVfov.toFixed(2)}° | labels@ref J=${row.labelsAtRefPose.jaccard.toFixed(2)} (strict ${row.labelsAtRefPose.strictJaccard.toFixed(2)}, ${row.labelsAtRefPose.tolerated.length} borderline; ${row.labelsAtRefPose.inter}/${ref.labels.length}/${deck.atRef.length}) own J=${row.labelsOwnPose.jaccard.toFixed(2)} | deck ready ${deck.readyMs} ms align ${Math.round(deck.alignMs)} ms (ref align ${Math.round(ref.alignMs)} ms) horizon=${deck.stats?.horizonSource} sil ${Math.round(deck.stats?.silhouette?.ms ?? -1)} ms draws/align ${deck.alignDraws} build ${deck.terrainStats?.buildMs} ms ${row.pass ? "PASS" : "FAIL"}`
+				: `FAIL ${ref?.error ?? ""} ${deck?.error ?? ""}`,
 		);
 	}
 await browser.close();

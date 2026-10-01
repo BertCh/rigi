@@ -4,7 +4,7 @@
 // The tiles must be absent from every offscreen pass: sampleAt at the frame centre is compared with
 // the tiles off vs on (same pose), and must be identical.
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/tiles3d/step-tiles-check.mjs \
-//     --renderer=three --tiles=swisstopo --blend=over IMG_7018
+//     --renderer=deck --tiles=swisstopo --blend=over IMG_7018
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { chromium } from "playwright";
@@ -18,7 +18,7 @@ const gt = JSON.parse(
 );
 const arg = (k, d) =>
 	process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1] ?? d;
-const renderer = arg("renderer", "three");
+const renderer = arg("renderer", "deck");
 const tiles = arg("tiles", "swisstopo");
 const blend = arg("blend", "fill");
 const turns = arg("turns", "0,60,-60").split(",").map(Number);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Summarise tools/nearfield/smear/grid-<renderer>-<id>.json against the blind labels (labels.json).
 // See smear-measure.mjs for the smear definition. No browser.
-//   node scripts/nearfield/smear-report.mjs [--renderer=three] [--band=0.02]
+//   node scripts/nearfield/smear-report.mjs [--renderer=deck] [--band=0.02]   (stored three grids: --renderer=three)
 // Writes tools/nearfield/smear/summary-<renderer>.json and prints a table.
 import {
 	existsSync as _ex,
@@ -23,7 +23,7 @@ const ROOT = resolve(import.meta.dirname, "../..");
 const DIR = join(ROOT, "tools/nearfield/smear");
 const arg = (k, d) =>
 	process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1] ?? d;
-const renderer = arg("renderer", "three");
+const renderer = arg("renderer", "deck");
 const BAND = Number(arg("band", "0.02")); // label-edge band excluded from collateral (fraction of width)
 const labels = JSON.parse(readFileSync(join(DIR, "labels.json"), "utf8"));
 const CLASSES = [

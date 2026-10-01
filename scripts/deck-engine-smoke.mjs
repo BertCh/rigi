@@ -1,23 +1,25 @@
 #!/usr/bin/env node
-// Smoke test for DeckEngine (src/lib/deck/engine.ts) against the three.js PhotoEngine.
+// Parity smoke for the deck engines: the WebGL DeckEngine (src/lib/deck/engine.ts, ?renderer=deck, the
+// fallback and reference) against the engine under test (--renderer: webgpu = WebGpuEngine, the default; auto;
+// or deck = a run-to-run self-check). Until 2026-10-01 the reference arm was the three.js PhotoEngine,
+// which has been removed; rows now carry `ref` (WebGL deck) and `deck` (the engine under test).
 // For each photo:
-//   three: /photo/<id>?renderer=three (fresh localStorage), wait for [data-ready] and for the background
+//   ref:   /photo/<id>?renderer=deck (fresh localStorage), wait for [data-ready] and for the background
 //          second opinion to settle ([data-verify] not "pending"), then window.__engine.autoAlign(true)
 //          (the same call PhotoWorkspace makes on load, without the second opinion) and its labels
 //          at that pose.
-//   deck:  the same on /photo/<id>?renderer=<--renderer: deck (WebGL, default) | webgpu | auto>, plus its
-//          labels at three's pose. webgpu / auto launch Chromium with the WebGPU flags (gpu-args.mjs).
-// Pass: |Δyaw| ≤ 0.5° and label overlap (|A∩B| / |A∪B| at three's pose) ≥ 0.6, where a peak labelled
-// by one engine only still counts as agreeing when its occlusion margin (engine.ts peakLabels: terrain
-// range below the summit minus range·0.97 − 50) is within max(50 m, 1% of range) of that threshold in
-// either engine: the DEMs differ in resolution (z14 vs z17) and far-tile smoothing, so such a verdict
-// is a coin toss.
+//   deck:  the same on /photo/<id>?renderer=<--renderer: webgpu (default) | auto | deck>, plus its
+//          labels at the ref pose. webgpu / auto launch Chromium with the WebGPU flags (gpu-args.mjs).
+// Pass: |Δyaw| ≤ 0.5° and label overlap (|A∩B| / |A∪B| at the ref pose) ≥ 0.6, where a peak labelled
+// by one engine only still counts as agreeing when its occlusion margin (peakLabels: terrain range
+// below the summit minus range·0.97 − 50) is within max(50 m, 1% of range) of that threshold in
+// either engine (a borderline verdict is a coin toss).
 //
 // Usage: node scripts/deck-engine-smoke.mjs [--url http://localhost:3100] [--photos IMG_6958,...]
-//        [--out out/lead/deck-parity/deck-engine-smoke.json] [--headed] [--renderer deck|webgpu|auto]
+//        [--out out/lead/deck-parity/deck-engine-smoke.json] [--headed] [--renderer webgpu|auto|deck]
 // Needs the vite dev server (window.__engine is DEV-only). Exit 0 = all pass, 3 = some fail.
 // Both arms pass ?renderer= explicitly (the app default may be either) and each row records the
-// engine that actually ran (__engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu", checked
+// engine that actually ran ("webgpu" when __engine.backend is "webgpu", else __engine.kind, checked
 // against [data-renderer]); a run whose engine is not the one asked for fails (auto: whatever resolved).
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -37,7 +39,7 @@ const OUT = resolve(
 	ROOT,
 	arg("out", "out/lead/deck-parity/deck-engine-smoke.json"),
 );
-const DECK = arg("renderer", "deck");
+const DECK = arg("renderer", "webgpu");
 if (!["deck", "webgpu", "auto"].includes(DECK)) {
 	console.error(`--renderer must be deck, webgpu or auto (got ${DECK})`);
 	process.exit(2);
@@ -54,9 +56,9 @@ const overlap = (a, b, marginsA = {}, marginsB = {}) => {
 	const B = new Set(b);
 	const inter = [...A].filter((x) => B.has(x)).length;
 	const union = new Set([...A, ...B]).size;
-	const onlyThree = [...A].filter((x) => !B.has(x));
+	const onlyRef = [...A].filter((x) => !B.has(x));
 	const onlyDeck = [...B].filter((x) => !A.has(x));
-	const tolerated = [...onlyThree, ...onlyDeck].filter(
+	const tolerated = [...onlyRef, ...onlyDeck].filter(
 		(x) => borderline(marginsA[x]) || borderline(marginsB[x]),
 	);
 	return {
@@ -64,11 +66,11 @@ const overlap = (a, b, marginsA = {}, marginsB = {}) => {
 		strictJaccard: union ? inter / union : 1,
 		ofMin: Math.min(A.size, B.size) ? inter / Math.min(A.size, B.size) : 1,
 		inter,
-		onlyThree,
+		onlyRef,
 		onlyDeck,
 		tolerated: tolerated.map((x) => ({
 			name: x,
-			three: marginsA[x] ?? null,
+			ref: marginsA[x] ?? null,
 			deck: marginsB[x] ?? null,
 		})),
 	};
@@ -82,7 +84,7 @@ const browser = await chromium.launch({
 			: GPU_ARGS,
 });
 
-async function run(id, renderer, threePose = null) {
+async function run(id, renderer, refPose = null) {
 	const page = await browser.newPage({
 		viewport: { width: 1400, height: 900 },
 	});
@@ -111,7 +113,8 @@ async function run(id, renderer, threePose = null) {
 	);
 	const r = await page.evaluate(async (tp) => {
 		const e = window.__engine;
-		const engineKind = e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three");
+		const engineKind =
+			e.backend === "webgpu" ? "webgpu" : (e.kind ?? "unknown");
 		const dataRenderer =
 			document
 				.querySelector("[data-renderer]")
@@ -158,12 +161,12 @@ async function run(id, renderer, threePose = null) {
 		await settle(res.pose);
 		const labels = e.peakLabels().map((l) => l.name);
 		const ownMargins = margins();
-		let atThree = null;
-		let atThreeMargins = null;
+		let atRef = null;
+		let atRefMargins = null;
 		if (tp) {
 			await settle(tp);
-			atThree = e.peakLabels().map((l) => l.name);
-			atThreeMargins = margins();
+			atRef = e.peakLabels().map((l) => l.name);
+			atRefMargins = margins();
 		}
 		return {
 			engineKind,
@@ -174,12 +177,12 @@ async function run(id, renderer, threePose = null) {
 			eyeZ: e.eye.z,
 			labels,
 			margins: ownMargins,
-			atThree,
-			atThreeMargins,
+			atRef,
+			atRefMargins,
 			poseRetries,
 			stats: e.stats ?? null,
 		};
-	}, threePose);
+	}, refPose);
 	await page.close();
 	if (r?.dataRenderer && r.dataRenderer !== r.engineKind)
 		throw new Error(
@@ -194,40 +197,40 @@ async function run(id, renderer, threePose = null) {
 
 const rows = [];
 for (const id of IDS) {
-	process.stdout.write(`${id}: three… `);
-	const three = await run(id, "three").catch((e) => ({ error: String(e) }));
+	process.stdout.write(`${id}: ref (deck)… `);
+	const ref = await run(id, "deck").catch((e) => ({ error: String(e) }));
 	process.stdout.write(`${DECK}… `);
-	const deck = await run(id, DECK, three?.pose ?? null).catch((e) => ({
+	const deck = await run(id, DECK, ref?.pose ?? null).catch((e) => ({
 		error: String(e),
 	}));
 	const dPose = deck?.pose;
-	const row = { id, three, deck };
-	if (three?.pose && dPose) {
-		row.dYaw = angle(dPose.yaw, three.pose.yaw);
-		row.dPitch = dPose.pitch - three.pose.pitch;
-		row.dRoll = dPose.roll - three.pose.roll;
-		row.dVfov = dPose.vfov - three.pose.vfov;
-		row.labelsAtThreePose = overlap(
-			three.labels,
-			deck.atThree ?? [],
-			three.margins,
-			deck.atThreeMargins ?? {},
+	const row = { id, ref, deck };
+	if (ref?.pose && dPose) {
+		row.dYaw = angle(dPose.yaw, ref.pose.yaw);
+		row.dPitch = dPose.pitch - ref.pose.pitch;
+		row.dRoll = dPose.roll - ref.pose.roll;
+		row.dVfov = dPose.vfov - ref.pose.vfov;
+		row.labelsAtRefPose = overlap(
+			ref.labels,
+			deck.atRef ?? [],
+			ref.margins,
+			deck.atRefMargins ?? {},
 		);
 		row.labelsOwnPose = overlap(
-			three.labels,
+			ref.labels,
 			deck.labels ?? [],
-			three.margins,
+			ref.margins,
 			deck.margins,
 		);
 		row.pass =
 			Math.abs(row.dYaw) <= YAW_TOL &&
-			row.labelsAtThreePose.jaccard >= OVERLAP_MIN;
+			row.labelsAtRefPose.jaccard >= OVERLAP_MIN;
 	} else row.pass = false;
 	rows.push(row);
 	console.log(
 		row.dYaw != null
-			? `Δyaw ${row.dYaw.toFixed(2)}° Δpitch ${row.dPitch.toFixed(2)}° Δroll ${row.dRoll.toFixed(2)}° Δvfov ${row.dVfov.toFixed(2)}° | labels@three J=${row.labelsAtThreePose.jaccard.toFixed(2)} (strict ${row.labelsAtThreePose.strictJaccard.toFixed(2)}, ${row.labelsAtThreePose.tolerated.length} borderline; ${row.labelsAtThreePose.inter}/${three.labels.length}/${deck.atThree.length}) own J=${row.labelsOwnPose.jaccard.toFixed(2)} | deck ready ${deck.readyMs} ms align ${Math.round(deck.alignMs)} ms (three align ${Math.round(three.alignMs)} ms) horizon=${deck.stats?.horizonSource} engines=${three.engineKind}/${deck.engineKind} ${row.pass ? "PASS" : "FAIL"}`
-			: `FAIL ${three?.error ?? ""} ${deck?.error ?? ""}`,
+			? `Δyaw ${row.dYaw.toFixed(2)}° Δpitch ${row.dPitch.toFixed(2)}° Δroll ${row.dRoll.toFixed(2)}° Δvfov ${row.dVfov.toFixed(2)}° | labels@ref J=${row.labelsAtRefPose.jaccard.toFixed(2)} (strict ${row.labelsAtRefPose.strictJaccard.toFixed(2)}, ${row.labelsAtRefPose.tolerated.length} borderline; ${row.labelsAtRefPose.inter}/${ref.labels.length}/${deck.atRef.length}) own J=${row.labelsOwnPose.jaccard.toFixed(2)} | deck ready ${deck.readyMs} ms align ${Math.round(deck.alignMs)} ms (ref align ${Math.round(ref.alignMs)} ms) horizon=${deck.stats?.horizonSource} engines=${ref.engineKind}/${deck.engineKind} ${row.pass ? "PASS" : "FAIL"}`
+			: `FAIL ${ref?.error ?? ""} ${deck?.error ?? ""}`,
 	);
 }
 await browser.close();

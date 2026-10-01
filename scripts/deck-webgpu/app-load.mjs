@@ -3,11 +3,11 @@
 // actually ran? One browser, photos one after another. Run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/app-load.mjs --renderer auto [--query webgpu=off] [--no-gpu] [IMG_7086 …]
 // No ids = every photo in data/control-points.json (the 19 ground-truth photos).
-// --renderer auto|webgpu|deck|three (always explicit). --no-gpu hides navigator.gpu (an init script makes it
+// --renderer auto|webgpu|deck (always explicit; ?renderer=three was removed and falls back to auto). --no-gpu hides navigator.gpu (an init script makes it
 // undefined; Chromium's --disable-features=WebGPU does not remove it), the "browser without WebGPU" case.
 // Per photo: data-renderer / data-renderer-reason (src/lib/renderer-select.ts), __engine kind/backend,
 // whether the compute device is the render device (adoptRenderDevice), ready ms, page / console errors.
-// Exit 1 when any photo has page errors, never got ready, or (webgpu / deck / three) ran another engine.
+// Exit 1 when any photo has page errors, never got ready, or (webgpu / deck) ran another engine.
 import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -21,8 +21,8 @@ const opt = (k) => {
 	return i >= 0 ? argv[i + 1] : undefined;
 };
 const renderer = opt("renderer");
-if (!["auto", "webgpu", "deck", "three"].includes(renderer)) {
-	console.error("--renderer auto|webgpu|deck|three is required");
+if (!["auto", "webgpu", "deck"].includes(renderer)) {
+	console.error("--renderer auto|webgpu|deck is required");
 	process.exit(2);
 }
 const extra = opt("query") ? `&${opt("query")}` : "";
@@ -101,7 +101,7 @@ try {
 				engine: e
 					? e.backend === "webgpu"
 						? "webgpu"
-						: (e.kind ?? "three")
+						: (e.kind ?? "unknown")
 					: null,
 				host: e?.stats?.host ?? null,
 				computeIsRender,

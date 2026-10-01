@@ -42,8 +42,8 @@
  *   --photos IMG_a,IMG_b              restrict the accuracy passes to these photos
  *   --perf-photos IMG_a,IMG_b,IMG_c   photos for the perf step (default: first, middle, last)
  *   --app-url http://localhost:3100   dev server (env APP_URL also works)
- *   --renderer three|deck|webgpu|auto pin the engine on every /photo open (?renderer=; also passed to eval-app.mjs).
- *                                     Default: the app default. The engine that ran (__engine.kind ?? 'three'; 'webgpu' when __engine.backend is 'webgpu') is
+ *   --renderer deck|webgpu|auto       pin the engine on every /photo open (?renderer=; also passed to eval-app.mjs).
+ *                                     Default: the app default. The engine that ran (__engine.kind, 'deck'; 'webgpu' when __engine.backend is 'webgpu') is
  *                                     recorded per app/perf row and evalapp row, and as `engines` on those steps.
  *   --concurrency 3                   parallel pages in the app pass
  *   --timeout-scale 1                 multiply every step timeout
@@ -60,7 +60,7 @@
  *
  * ── reports/leaderboard.json, schemaVersion 2 (v1 + ranking, ensemble, recommendation, inputs.files) ──
  * {
- *   schemaVersion: 2, generatedAt: ISO, durationMs, appUrl, renderer: 'three'|'deck'|'app-default', argv: string[],
+ *   schemaVersion: 2, generatedAt: ISO, durationMs, appUrl, renderer: 'deck'|'webgpu'|'auto'|'app-default' (older files: 'three'), argv: string[],
  *   targets: { medianYawDeg, success1Rate, meanYawSotaDeg, success1SotaRate, coldReadyMs },
  *   steps: {
  *     <step>: { status: 'ok'|'partial'|'fail'|'timeout'|'skipped'|'error', ms, note?, stale?: ISO (carried over; engine steps only from a run with the same renderer), ...step fields }
@@ -1385,7 +1385,7 @@ async function loadPhoto(
 			engine: window.__engine
 				? window.__engine.backend === "webgpu"
 					? "webgpu"
-					: (window.__engine.kind ?? "three")
+					: (window.__engine.kind ?? "unknown")
 				: null,
 			loadMs: nav?.loadEventEnd || null,
 			// responseEnd is exposed cross-origin even without Timing-Allow-Origin; transferSize is not
@@ -1465,7 +1465,7 @@ async function stepApp(scale, appUrl, ids, ctxFor, concurrency) {
 								error: "window.__engine missing (needs a DEV build of the app)",
 							};
 						const out = {
-							engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three"),
+							engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "unknown"),
 							prior: { ...e.prior },
 							final: { ...e.pose },
 							aspect: e.aspect,
@@ -3719,9 +3719,9 @@ function parseArgs(argv) {
 		else if (a === "--app-url") o.appUrl = next();
 		else if (a === "--renderer") {
 			o.renderer = next();
-			if (!["three", "deck", "webgpu", "auto"].includes(o.renderer))
+			if (!["deck", "webgpu", "auto"].includes(o.renderer))
 				throw new Error(
-					`--renderer must be three, deck, webgpu or auto (got ${o.renderer})`,
+					`--renderer must be deck, webgpu or auto (got ${o.renderer}; the three.js renderer was removed)`,
 				);
 		} else if (a === "--concurrency") o.concurrency = Number(next());
 		else if (a === "--timeout-scale") o.scale = Number(next());

@@ -1,8 +1,17 @@
 #!/usr/bin/env node
-// Pixel-diff baseline harness for the three.js photo route (styling chunk 0, see
-// out/lead/deck-parity/styling.md §4). It captures /photo/<id> in each view at a fixed pose with
-// the CPU WebGL backend (SwiftShader), then compares the captures against the stored baseline so
-// each styling chunk can show that "classic" is still pixel-identical.
+
+// Pixel-diff baseline harness for the photo route (styling chunk 0, see out/lead/deck-parity/styling.md §4).
+// It captures /photo/<id>?renderer=deck (the WebGL deck engine) in each view at a fixed pose with the CPU
+// WebGL backend (SwiftShader), then compares the captures against the stored baseline so each styling
+// chunk can show that "classic" is still pixel-identical.
+//
+// RECAPTURE REQUIRED (2026-10-01): until then this harness ran the three.js PhotoEngine (?renderer=three),
+// which has been removed. Its baseline (out/lead/style-baseline) is a three.js reference and means nothing
+// for deck, so the default root moved to out/lead/style-baseline-deck, which starts empty: `check` exits 1
+// ("no baseline") and the CI row (scripts/ci/checks.mjs style-baseline) SKIPs until someone captures the
+// deck reference ONCE, deliberately, on a tree whose classic look is known good:
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture --url http://localhost:3100
+// Only after that is the classic pixel check (and the geometry hash) meaningful again.
 //
 // Usage (the vite dev server must be on :3100, because the harness needs window.__engine):
 //   node scripts/style-baseline.mjs check               capture and diff against the baseline (the normal run)
@@ -19,16 +28,16 @@
 //   --tol 0                        per-channel tolerance (0..255) when counting differing pixels
 //   --noise 0.01                   % of a capture's pixels that may differ and still count as run-to-run
 //                                  noise (status "noise", exit 0). --noise 0 demands exact identity.
-//   --out out/lead/style-baseline  root directory
+//   --out out/lead/style-baseline-deck  root directory (the three.js-era baseline is in out/lead/style-baseline)
 //
 // Disk use (the disk is often nearly full): the baseline is about 10 MB. `check` keeps no copy of
 // its captures. It compares in memory and writes only report.json, plus a <name>.diff.png (differing
 // pixels in red over a grey copy) for each capture with status "diff" (not for noise). Old diff images are removed when a
 // check starts.
 //
-// What it also checks: the STYLE.geometry pass (uStyle == 3: ENU xyz + range, read by align.ts,
-// sampleAt, labels and occlusion). It hashes the engine's CPU copy of the geometry buffer for each
-// photo and compares it with baseline.json; the range channel is also stored (baseline/<id>__geometry-range.f32.gz)
+// What it also checks: the geometry pass (ENU xyz + range, read by align.ts, sampleAt, labels and
+// occlusion). It hashes the engine's CPU copy of the geometry buffer (deck: the GeometrySource's range +
+// xyz, row 0 = top) for each photo and compares it with baseline.json; the range (sky = 0) is also stored (baseline/<id>__geometry-range.f32.gz)
 // so a mismatch reports how many pixels differ and by how much (m). Owner requirement (session 9e): style chunks must never
 // change the geometry output, so a geometry-hash mismatch is always a failure.
 //
@@ -49,6 +58,7 @@
 // "noise", not "diff". The exact counts are always printed. A real regression must show "diff".
 // Exit code: 0 = everything identical, 3 = differences, 1 or 2 = errors.
 
+import { createHash } from "node:crypto";
 import {
 	existsSync,
 	mkdirSync,
@@ -114,7 +124,7 @@ if (!["capture", "check"].includes(cmd)) {
 	process.exit(1);
 }
 const BASE_URL = (opt.url ?? "http://localhost:3100").replace(/\/$/, "");
-const OUT = resolve(ROOT, opt.out ?? "out/lead/style-baseline");
+const OUT = resolve(ROOT, opt.out ?? "out/lead/style-baseline-deck");
 const BASE_DIR = join(OUT, "baseline");
 const DIFF_DIR = join(OUT, "diff");
 const META = join(OUT, "baseline.json");
@@ -301,9 +311,10 @@ async function runPhoto(id, sink) {
 		plog(
 			`goto (yaw ${pose.yaw.toFixed(2)} pitch ${pose.pitch.toFixed(2)} roll ${pose.roll.toFixed(2)} vfov ${pose.vfov.toFixed(2)})`,
 		);
-		// renderer pinned to three: the baseline is of the three.js route and this harness reads its
-		// internals (e.geoBuf); ?renderer=three is the only renderer flag on the URL (no style/concord).
-		await page.goto(`${BASE_URL}/photo/${id}?renderer=three`, {
+		// renderer pinned to the WebGL deck (SwiftShader has no WebGPU, and the baseline must not follow the
+		// app default); ?renderer=deck is the only flag on the URL (no style/concord). Reads the private
+		// geometry source (e.geoSrc) for the geometry hash.
+		await page.goto(`${BASE_URL}/photo/${id}?renderer=deck`, {
 			waitUntil: "load",
 			timeout: 120000,
 		});
@@ -318,11 +329,11 @@ async function runPhoto(id, sink) {
 		const kind = await page.evaluate(() =>
 			window.__engine.backend === "webgpu"
 				? "webgpu"
-				: (window.__engine.kind ?? "three"),
+				: (window.__engine.kind ?? "unknown"),
 		);
-		if (kind !== "three")
+		if (kind !== "deck")
 			throw new Error(
-				`renderer=three was asked for but __engine.kind is ${kind}`,
+				`renderer=deck was asked for but __engine.kind is ${kind}`,
 			);
 		plog("ready");
 
@@ -336,21 +347,23 @@ async function runPhoto(id, sink) {
 					same = 0;
 					continue;
 				}
-				const h = await page.evaluate(() => {
-					const c = document.querySelector("canvas");
-					const gl = c?.getContext("webgl2");
-					if (!c || !gl) return "nocanvas";
-					const px = new Uint8Array(c.width * c.height * 4);
-					gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
-					let a = 0x811c9dc5;
-					for (let i = 0; i < px.length; i++)
-						a = Math.imul(a ^ px[i], 0x01000193);
-					const lbl = c.nextElementSibling?.innerHTML ?? "";
-					let b = 0x811c9dc5;
-					for (let i = 0; i < lbl.length; i++)
-						b = Math.imul(b ^ lbl.charCodeAt(i), 0x01000193);
-					return `${c.width}x${c.height}:${a >>> 0}:${b >>> 0}:${window.__engine?.isFlying ? 1 : 0}`;
+				// deck draws without preserveDrawingBuffer, so the canvas cannot be read back between frames:
+				// hash a screenshot of the stage (canvas + the DOM label layer above it) instead
+				const box = await page.locator("canvas").first().boundingBox();
+				if (!box) {
+					last = "nocanvas";
+					same = 0;
+					continue;
+				}
+				const shot = await page.screenshot({
+					clip: box,
+					animations: "disabled",
+					caret: "hide",
 				});
+				const flying = await page.evaluate(() =>
+					window.__engine?.isFlying ? 1 : 0,
+				);
+				const h = `${Math.round(box.width)}x${Math.round(box.height)}:${createHash("sha1").update(shot).digest("hex")}:${flying}`;
 				if (h === last) {
 					if (++same >= 3) return;
 				} else {
@@ -366,27 +379,31 @@ async function runPhoto(id, sink) {
 				.first()
 				.click({ timeout: 20000 });
 
-		// geometry pass (uStyle 3) for the fixed pose: sha1 of the CPU copy, taken before any mode switch
+		// geometry pass for the fixed pose: sha1 of the CPU copy, taken before any mode switch
 		await click("Overlay");
 		await click("Contours");
 		await waitStable("geometry");
 		const g = await page.evaluate(async () => {
 			const e = window.__engine;
 			await e.readback();
-			const f = e.geoBuf;
-			const d = await crypto.subtle.digest(
-				"SHA-1",
-				new Uint8Array(f.buffer, f.byteOffset, f.byteLength),
-			);
-			// the range channel (xyz is eye + ray·range), for the pixel count of a mismatch
-			const r = new Float32Array(f.length / 4);
-			for (let i = 0; i < r.length; i++) r[i] = f[i * 4 + 3];
+			// deck's query GeometrySource (private): range (m, row 0 = top, Infinity = sky) + xyz (NaN = sky)
+			const src = e.geoSrc;
+			if (!src?.range) throw new Error("no deck geometry source (e.geoSrc)");
+			const xyz = src.xyz ?? new Float32Array(0);
+			const all = new Float32Array(src.range.length + xyz.length);
+			all.set(src.range);
+			all.set(xyz, src.range.length);
+			const d = await crypto.subtle.digest("SHA-1", new Uint8Array(all.buffer));
+			// the range (sky = 0), for the pixel count of a mismatch
+			const r = new Float32Array(src.range.length);
+			for (let i = 0; i < r.length; i++)
+				r[i] = Number.isFinite(src.range[i]) ? src.range[i] : 0;
 			const u = new Uint8Array(r.buffer);
 			let b = "";
 			for (let i = 0; i < u.length; i += 0x8000)
 				b += String.fromCharCode(...u.subarray(i, i + 0x8000));
 			return {
-				hash: `${f.length}:${[...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("")}`,
+				hash: `${src.width}x${src.height}:${[...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, "0")).join("")}`,
 				range: btoa(b),
 			};
 		});
@@ -486,7 +503,7 @@ if (cmd === "capture") {
 	}
 	writeFileSync(
 		META,
-		`${JSON.stringify({ capturedAt: new Date().toISOString(), url: BASE_URL, viewport: [W, H], photos, views: views.map((v) => v.id), export: withExport, poses: Object.fromEntries(photos.map((p) => [p, fixedPose(p)])), geometry }, null, 2)}\n`,
+		`${JSON.stringify({ capturedAt: new Date().toISOString(), renderer: "deck", url: BASE_URL, viewport: [W, H], photos, views: views.map((v) => v.id), export: withExport, poses: Object.fromEntries(photos.map((p) => [p, fixedPose(p)])), geometry }, null, 2)}\n`,
 	);
 	log(
 		`baseline in ${BASE_DIR}${failures.length ? `; FAILED: ${failures.join(",")}` : ""}`,
@@ -497,10 +514,18 @@ if (cmd === "capture") {
 
 // check
 if (!existsSync(META)) {
-	console.error(`no baseline at ${OUT}; run capture first`);
+	console.error(
+		`no baseline at ${OUT}; capture the deck reference first (the three.js-era one does not apply):\n  node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture`,
+	);
 	process.exit(1);
 }
 const meta = JSON.parse(readFileSync(META, "utf8"));
+if (meta.renderer !== "deck") {
+	console.error(
+		`${META} was captured on ${meta.renderer ?? "three.js"}, not the deck engine this harness now runs; recapture it on deck first:\n  node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture --out ${OUT}${OUT.endsWith("style-baseline") ? " --force" : ""}`,
+	);
+	process.exit(1);
+}
 rmSync(DIFF_DIR, { recursive: true, force: true });
 const rows = [];
 const geo = [];

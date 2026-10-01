@@ -1,5 +1,5 @@
 // Split class of the labelled cells that still smear with the feature on (forced), per label class.
-//   node tools/nearfield/smear/why.mjs [three|deck]
+//   node tools/nearfield/smear/why.mjs [deck|three]   (three = the stored grids of the removed three.js renderer)
 import fs, { existsSync as _ex, readFileSync as _rd } from "node:fs";
 import { gunzipSync } from "node:zlib";
 
@@ -10,7 +10,7 @@ const readGrid = (f) =>
 		: JSON.parse(gunzipSync(_rd(`${f}.gz`)).toString("utf8"));
 const gridExists = (f) => _ex(f) || _ex(`${f}.gz`);
 const dir = new URL(".", import.meta.url).pathname;
-const r = process.argv[2] ?? "three";
+const r = process.argv[2] ?? "deck";
 const L = JSON.parse(fs.readFileSync(`${dir}labels.json`, "utf8")).photos;
 const inPoly = (p, x, y) => {
 	let s = false;
