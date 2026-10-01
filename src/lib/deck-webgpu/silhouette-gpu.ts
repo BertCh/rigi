@@ -187,7 +187,12 @@ export class SilhouetteMaskGpu {
 		try {
 			const per = silMaskWords(W, H);
 			const bytes = per * ranges.length * 4;
-			const shapes = [...new Set(ranges.map(textureShapeKey))].join(",");
+			// gpu-core validates each geo<i> import exactly, so the key fixes the shape of EVERY pose (one
+			// shape when they all agree, the normal case; else the per-pose list in pose order)
+			const poseShapes = ranges.map(textureShapeKey);
+			const shapes = poseShapes.every((s) => s === poseShapes[0])
+				? poseShapes[0]
+				: poseShapes.join(",");
 			// the lookup right before run() queues the graph's lease in the same tick (core cachedGraph's
 			// rule); an eviction between the two lookups only rebuilds the graph, compiled by run() from
 			// the per-device pipeline cache

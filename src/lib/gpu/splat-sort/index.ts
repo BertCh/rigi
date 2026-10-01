@@ -291,9 +291,11 @@ export class GpuSplatSorter {
 		this.buffers = { ...own, data, order };
 		this.graphKey = `${count}:${data.byteLength}:${order.byteLength}`;
 		// async compile (createComputePipelineAsync; rejects on a failed pipeline); sort() is refused
-		// until it lands
-		this.ready = this.graph()
-			.compileAsync()
+		// until it lands. The graph lookup runs inside the promise, so a throwing build (a lost device,
+		// an import the graph rejects) rejects `ready` too: the layer then fails over to the worker and
+		// destroy()s the buffers above instead of the constructor throwing past them
+		this.ready = Promise.resolve()
+			.then(() => this.graph().compileAsync())
 			.then(() => {
 				this.compiled = true;
 			});
