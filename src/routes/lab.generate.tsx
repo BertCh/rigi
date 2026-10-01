@@ -7,10 +7,15 @@
 // Gaussians with provenance `generated` → merge. Panels: cache, holes, filled, merged (Truth: generated =
 // magenta), merged (colour). Needs the near-field service (tools/nearfield/run.sh). Dev only.
 // Harness hook: window.__genLab { done, error, summary, panels } (tools/nearfield/generate/shots.mjs).
+// Engines (2026-10-01, the three.js PhotoEngine was removed): the WebGL DeckEngine on the visible canvas
+// answers the queries (eye, readback, sampleAt for the scene build); the RGB-D cache (cache-render.ts,
+// three.js) draws its own three Terrain meshes (src/lib/terrain.ts, same ENU frame) on a private offscreen
+// WebGLRenderer.
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
 import { hfovFromAspect } from "#/lib/camera";
-import { PhotoEngine } from "#/lib/engine";
+import { DeckEngine } from "#/lib/deck/engine";
 import { exportableCloud } from "#/lib/export/splat";
 import { nearField } from "#/lib/nearfield/client";
 import { CacheRenderer } from "#/lib/nearfield/generate/cache-render";
@@ -40,6 +45,7 @@ import {
 import { getPhoto, loadRegion } from "#/lib/photos";
 import type { FgMask } from "#/lib/renderer";
 import { resolvePose } from "#/lib/roll/roll";
+import { Terrain } from "#/lib/terrain";
 
 type Search = {
 	photo?: string;
@@ -191,8 +197,10 @@ function LabGenerate() {
 		const photoId = search.photo ?? "IMG_7131";
 		const lab: GenLab = { done: false, panels: [] };
 		window.__genLab = lab;
-		let engine: PhotoEngine | null = null;
+		let engine: DeckEngine | null = null;
 		let cache: CacheRenderer | null = null;
+		let cacheGl: THREE.WebGLRenderer | null = null;
+		let cacheTerrain: Terrain | null = null;
 		let cancelled = false;
 		const ctl = new AbortController();
 		const fail = (msg: string) => {
@@ -210,7 +218,7 @@ function LabGenerate() {
 				);
 			const t0 = performance.now();
 			setStatus("loading photo + terrain");
-			engine = new PhotoEngine(canvas, photo);
+			engine = new DeckEngine(canvas, photo);
 			engine.resize(canvas.clientWidth || 480, canvas.clientHeight || 360);
 			let fg: FgMask | null = null;
 			const seg = import("#/lib/segment");
@@ -231,15 +239,42 @@ function LabGenerate() {
 					`${photoId} has no ground-truth pose (source ${rp.source}); P3 runs on accepted poses only`,
 				);
 			if (rp.eyeAlt != null) {
-				eng.eye.z = rp.eyeAlt;
-				eng.eyeAlt = rp.eyeAlt;
+				// the ground-truth eye: DeckEngine keeps its geometry sources per eye, so drop them (private)
+				const internal = eng as unknown as {
+					eye: { x: number; y: number; z: number };
+					eyeAlt: number;
+					dropGeometrySources(): void;
+				};
+				internal.eye = { x: 0, y: 0, z: rp.eyeAlt };
+				internal.eyeAlt = rp.eyeAlt;
+				internal.dropGeometrySources();
 			}
 			eng.setPose(rp.pose);
-			eng.renderNow();
 			if (!(await eng.readback())) return fail("geometry readback failed");
 			const img = eng.photoElement;
-			const terrain = eng.terrain;
-			if (!img || !terrain) return fail("engine not ready");
+			if (!img || !eng.terrain) return fail("engine not ready");
+			// the cache's own three.js terrain + renderer (cache-render.ts overrides every material)
+			setStatus("terrain for the RGB-D cache");
+			cacheGl = new THREE.WebGLRenderer({
+				canvas: document.createElement("canvas"),
+				antialias: false,
+				logarithmicDepthBuffer: true,
+				alpha: false,
+			});
+			cacheGl.outputColorSpace = THREE.SRGBColorSpace;
+			cacheTerrain = await Terrain.load(
+				eng.frame,
+				{},
+				(u) => new THREE.ShaderMaterial({ uniforms: u }),
+				{
+					wedge: {
+						center: rp.pose.yaw,
+						halfWidth: hfovFromAspect(rp.pose.vfov, eng.aspect) / 2 + 32,
+					},
+					signal: ctl.signal,
+				},
+			);
+			if (cancelled) return;
 			setStatus("MoGe-2 depth (service)");
 			const hfov = hfovFromAspect(rp.pose.vfov, eng.aspect);
 			const blob = await (await fetch(photo.src)).blob();
@@ -290,8 +325,8 @@ function LabGenerate() {
 					drop[j * SW + i] = o ? 1 : 0;
 				}
 			cache = new CacheRenderer({
-				renderer: eng.renderer,
-				terrain: terrain.group,
+				renderer: cacheGl,
+				terrain: cacheTerrain.group,
 				photoImage: img,
 				photoRGBA,
 				photoPose: rp.pose,
@@ -496,6 +531,8 @@ function LabGenerate() {
 			cancelled = true;
 			ctl.abort();
 			cache?.dispose();
+			cacheTerrain?.dispose();
+			cacheGl?.dispose();
 			engine?.dispose();
 		};
 	}, [
