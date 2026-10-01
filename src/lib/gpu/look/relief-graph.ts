@@ -1,6 +1,6 @@
-// The GPU relief passes (relief.ts reliefPassesGpu) on a core ComputeGraph: the default of
-// reliefPassesGpu(…) / buildReliefFieldGpu(…); { graph: false } runs the pooled single-encoder
-// path in relief.ts.
+// The GPU relief passes (relief.ts reliefPassesGpu / buildReliefFieldGpu) on a core ComputeGraph:
+// their only GPU path (the pooled single-encoder path it replaced, byte for byte, was removed on
+// 2026-10-01).
 //
 //   clear shadow → SHADOW (atomicOr)          ┐
 //   DOWN → clear acc8 → SVF → SUM             ├→ PACK → read (field, gen)
@@ -14,28 +14,27 @@
 // so the texture contents are the readback path's, byte for byte; no format conversion exists on
 // either path. res·4 must be a multiple of 256 (copyBufferToTexture's row pitch): res % 64 == 0.
 //
-// Same five KernelSpecs as relief.ts (unchanged WGSL: RELIEF_SUM keeps its fixed k = 0..7 f32 order,
-// the CPU's Float32Array order), same uniform words (built by relief.ts), same workgroup counts. What
-// changes: shadow, Hh, hull, acc8, acc, field and gen are graph TRANSIENTS sized exactly and aliased
-// by lifetime (hull / Hh / acc8 die before field / gen are born); H and the uniforms are pooled
-// imports; field and gen come back through a read node (one readback slot, as before).
+// The five KernelSpecs of relief.ts (RELIEF_SUM keeps its fixed k = 0..7 f32 order, the CPU's
+// Float32Array order), the uniform words built by relief.ts. shadow, Hh, hull, acc8, acc, field and
+// gen are graph TRANSIENTS sized exactly and aliased by lifetime (hull / Hh / acc8 die before field /
+// gen are born); H and the uniforms are pooled imports; field and gen come back through a read node
+// (one readback slot).
 //
 // Clear audit (graph transients are never zeroed and alias other transients' bytes):
 // - shadow: written with atomicOr ("atomic") → clear node, always. ONE graph serves every sun: the
 //   SHADOW node carries a CPU condition on the run's `degenerate` parameter (below the horizon /
-//   zenith), so a degenerate sun skips that dispatch as the old path does, and the cleared shadow
+//   zenith), so a degenerate sun skips that dispatch, and the cleared shadow
 //   transient reaches PACK (which binds it but writes the constant byte);
 // - acc8: SVF writes every element of all 8 direction planes (every texel lies on exactly one sweep
-//   line per direction), but the old path clears it, so it is declared "partial" and cleared here
-//   too (zero-cost insurance, and the clear lint then guards it);
+//   line per direction), but it is declared "partial" and cleared anyway (zero-cost insurance, and
+//   the clear lint then guards it);
 // - hull: fully written by SVF before any read (a line reads only hull entries it wrote) → "full";
 // - Hh, acc, field, gen: one write per element (i < count, the dispatch covers the count) → "full".
 // The lint in core/graph.ts throws at compile() if a declared atomic / partial transient has no
 // clear node before it.
 //
-// NaN semantics: unchanged kernels, so exactly the old GPU path's (a NaN height is not ≤ HOLE, so it
-// is not a hole; it propagates through the f32 maths and the u32() casts of PACK). The bench compares
-// outputs as raw bytes, NaN inputs included.
+// NaN semantics: a NaN height is not ≤ HOLE, so it is not a hole; it propagates through the f32
+// maths and the u32() casts of PACK.
 import { Buffer, type Device, Texture } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
 import type { GraphBufferHandle } from "../core/luma";
@@ -54,7 +53,7 @@ type Params = { degenerate: boolean };
 const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
 export const RELIEF_GRAPH_GROUP = "look-relief";
 
-/** Exact byte sizes of the relief intermediates at `res` (the old path pools each at pow2 capacity). */
+/** Exact byte sizes of the relief intermediates at `res` (a pool would hold each at pow2 capacity). */
 export function reliefScratchBytes(res: number) {
 	const N = res * res;
 	const NH = (res >> 1) * (res >> 1);

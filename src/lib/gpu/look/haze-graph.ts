@@ -1,5 +1,5 @@
-// The GPU haze fit's two submits on core ComputeGraphs (the default: fitHazeGpu(device, input);
-// { graph: false } runs the dispatch path in ./haze.ts), plus fitHazeFromPrep, which
+// The GPU haze fit's two submits on core ComputeGraphs (fitHazeGpu(device, input) in ./haze.ts; the
+// only GPU path since the pooled dispatch path was removed on 2026-10-01), plus fitHazeFromPrep, which
 // finishes the fit from textures.ts hazePrepTex's GPU-resident outputs, and prepAndFitHazeTex, which
 // runs that prep and the fit's GPU part under ONE haze lease (the safe entry point for textures).
 //
@@ -13,34 +13,31 @@
 // Between them the CPU middle stage and after submit 2 the arg-min + refinement run in f64 on the CPU,
 // unchanged (haze.ts hazeFitTail): the round trip is inherent (the grid's inputs come from f64 code).
 //
-// Bit-identity with the dispatch path, by construction:
-// - Every node is the dispatch path's kernel spec (same WGSL, pipeline, uniforms), in the same order
-//   with the same workgroup counts. Consecutive nodes share a compute pass; WebGPU orders dispatches
-//   and their storage writes within a pass exactly as across passes.
-// - Custom kernels plus one luma primitive, the lists' exclusive GPUScan (haze.ts addListOffsets,
-//   shared with the dispatch path): u32 adds only, so subgroup / tree order cannot change a bit. No
-//   float sums. Radix select (288 concurrent selections) and the 72-way compaction do not map onto
+// Determinism (the removed dispatch path gave the same bits; look-bench compares with the CPU fit):
+// - Every node is one of haze.ts's kernel specs, in a fixed order with fixed workgroup counts.
+//   Consecutive nodes share a compute pass; WebGPU orders dispatches and their storage writes within
+//   a pass exactly as across passes.
+// - Custom kernels plus one luma primitive, the lists' exclusive GPUScan (haze.ts addListOffsets):
+//   u32 adds only, so subgroup / tree order cannot change a bit. No float sums. Radix select (288 concurrent selections) and the 72-way compaction do not map onto
 //   GPUHistogram / GPUCompaction (luma-master-design §2.4).
 // - Transients are never zeroed and alias: counts and hist are the only read-modify-write transients
-//   (atomics), each has a clear node before every use (compile() lints it: writes: "atomic"); counts
-//   was a zeroed pooled buffer, hist was cleared per pass, exactly what the clear nodes do. Every
+//   (atomics), each has a clear node before every use (compile() lints it: writes: "atomic"). Every
 //   other transient is fully written by the node that first touches it (lin, flags, flagsH, bins per
 //   pixel; state per selection; blk per (list, block) by cnt; offs per (list, block) by the scan;
 //   starts by starts), so aliased bytes are never read.
 // - Imports (inputs and the lists, which the tail read may need after the submit) are pooled buffers
 //   bound with the run's exact byte ranges. No kernel uses arrayLength(), so the binding size does
-//   not reach the numerics (the dispatch path binds the pooled capacity).
+//   not reach the numerics.
 // - Min / max / NaN: the graph adds no min/max. The kernels' own min/max/clamp are integer (indices,
 //   bins, digits) except the grid's clamp(select(0, num/den, den > 1e-12), 0, A), unchanged. The
-//   f32 order statistics are selected on u32 bit patterns (lin ≥ 0). The grid's arg-min stays the
-//   dispatch path's JS code: `e < gMin` / `e <= tol` are false for NaN, so NaN cells are never
+//   f32 order statistics are selected on u32 bit patterns (lin ≥ 0). The grid's arg-min is JS
+//   (haze.ts hazeFitTail): `e < gMin` / `e <= tol` are false for NaN, so NaN cells are never
 //   candidates (all NaN: no candidate, the default start), as before.
 //
 // The first read (head) holds `head` list slots; lists longer than that need a second, exact-length
-// read (one more round trip). The dispatch path guesses 0.27·N + 512. Here the head is adaptive: the
-// last run's list total per device (as a fraction of N) × 1.5 + 1 024 (the look
-// photos' totals span 0.050–0.070·N, so a switch between photos rarely overflows it), the dispatch path's guess on a
-// device's first run. The fit does not depend on the head (the tail read completes the lists; the
+// read (one more round trip). The head is adaptive: the last run's list total per device (as a
+// fraction of N) × 1.5 + 1 024 (the look photos' totals span 0.050–0.070·N, so a switch between
+// photos rarely overflows it), 0.27·N + 512 on a device's first run. The fit does not depend on the head (the tail read completes the lists; the
 // look bench forces a 64-slot head). No GPU condition / indirect dispatch: the only remaining round
 // trips end in CPU reads whose sizes are CPU-side (WebGPU copy sizes), and every GPU consumer's
 // dispatch size is already known on the CPU.
@@ -290,7 +287,7 @@ function prepGraphFor(
 	);
 }
 
-/** Submit 1 on the graph: prepGpu(…, compact = true, listHead) of ./haze.ts, bit for bit. */
+/** Submit 1: per-pixel prep, bins, the percentile order statistics and the compacted lists. */
 export function prepGraph(
 	device: Device,
 	photo: HazeFitInput["photo"],
@@ -432,7 +429,7 @@ function gridGraphFor(device: Device): CachedGraph<GridParams, undefined> {
 	);
 }
 
-/** Submit 2 on the graph: gridGpu of ./haze.ts, bit for bit (a GridFn). */
+/** Submit 2: the physical grid's cost per cell (a GridFn, ./haze.ts). */
 export function gridGraph(
 	device: Device,
 	reps: Float64Array[][],

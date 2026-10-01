@@ -1,10 +1,11 @@
-// Parity / speed / VRAM bench of the haze graph path (./haze-graph.ts) against the dispatch path
-// (./haze.ts), on the look inputs captured from a live engine (capture.ts). Run in the page by
+// Parity / speed / VRAM bench of the GPU haze fit (./haze-graph.ts, its only GPU path) on the look
+// inputs captured from a live engine (capture.ts). Run in the page by
 // scripts/gpu/look-bench.mjs --module /src/lib/gpu/look/haze-graph-bench.ts --fn runHazeGraphBench.
 // "identical" = the two HazeFits are equal number for number (JSON, samples included).
-// - graph vs dispatch on the captured input, with the adaptive head and with a forced 64-slot head;
+// - the first fit (the device's first head estimate) vs later ones (adaptive head) and a forced
+//   64-slot head (the tail read), and vs the CPU fitHaze (max relative difference);
 // - reuse with different data: the same N (a perturbed photo / sky: cache hit) and another N (a crop:
-//   a second cached graph), interleaved, each against the dispatch path on the same input;
+//   a second cached graph), interleaved, each against that input's own first fit (stale transients);
 // - fitHazeFromPrep on textures.ts's prep (array path and texture path) vs fitHazeGpu, and vs the CPU;
 // - the clear rule: the prep graph without its clear nodes must fail compile();
 // - ms: median of `reps` after a warm-up; VRAM: pooled bytes + graph transients (physical).
@@ -229,22 +230,16 @@ export async function runHazeGraphBench(
 		dims: [h.geoW, h.geoH],
 		geo: h.geo.kind,
 	};
-	const old = await fitHazeGpu(device, h, { graph: false });
-	const oldSteps = { ...hazeGpuTimes };
-
-	// 1. graph vs dispatch (first run = the device's first head estimate, then adaptive)
-	const g1 = await fitHazeGpu(device, h, { graph: true });
+	// 1. the first fit (the device's first head estimate), then adaptive, then a forced tail read
+	const old = await fitHazeGpu(device, h);
 	const s1 = { ...hazeGraphStats };
-	const g2 = await fitHazeGpu(device, h, { graph: true });
+	const firstSteps = { ...hazeGpuTimes };
+	const g2 = await fitHazeGpu(device, h);
 	const s2 = { ...hazeGraphStats };
-	const gf = await fitHazeGpu(device, h, { graph: true, listHead: 64 });
+	const gf = await fitHazeGpu(device, h, { listHead: 64 });
 	const sf = { ...hazeGraphStats };
-	const oldForced = await fitHazeGpu(device, h, {
-		graph: false,
-		listHead: 64,
-	});
 	out.parity = {
-		identical: sameFit(old, g1) && sameFit(old, g2),
+		identical: sameFit(old, g2),
 		firstRun: {
 			head: s1.head,
 			total: s1.total,
@@ -261,15 +256,19 @@ export async function runHazeGraphBench(
 			head: sf.head,
 			tail: sf.tail,
 			identical: sameFit(old, gf),
-			dispatchForcedIdentical: sameFit(old, oldForced),
 		},
 		samples: old.samples.length,
-		vsCpuMaxRel: maxRel(fitHaze(h), g1),
+		vsCpuMaxRel: maxRel(fitHaze(h), old),
 	};
 
-	// 2. reuse with different data and shapes (interleaved; each vs the dispatch path)
+	// 2. reuse with different data and shapes (interleaved; each vs that input's first fit)
 	const B = perturb(h);
 	const C = crop(h, 37, 21);
+	const refs = new Map<HazeFitInput, HazeFit>([
+		[h, old],
+		[B, await fitHazeGpu(device, B)],
+		[C, await fitHazeGpu(device, C)],
+	]);
 	const seq: [string, HazeFitInput][] = [
 		["B same N", B],
 		["C other N", C],
@@ -279,16 +278,16 @@ export async function runHazeGraphBench(
 	];
 	const reuse: Record<string, unknown>[] = [];
 	for (const [name, x] of seq) {
-		const a = await fitHazeGpu(device, x, { graph: false });
-		const b = await fitHazeGpu(device, x, { graph: true });
+		const a = refs.get(x) as HazeFit;
+		const b = await fitHazeGpu(device, x);
 		reuse.push({
 			name,
 			N: x.geoW * x.geoH,
 			hit: hazeGraphStats.cacheHit,
 			tail: hazeGraphStats.tail,
-			samples: a.samples.length,
+			samples: b.samples.length,
 			identical: sameFit(a, b),
-			differsFromA: !sameFit(a, old),
+			differsFromA: !sameFit(b, old),
 		});
 	}
 	out.reuse = reuse;
@@ -387,49 +386,34 @@ export async function runHazeGraphBench(
 	// 4. the clear rule
 	out.clearLint = clearLint(device);
 
-	// 5. timings: dispatch and graph interleaved (cached graph, adaptive head), median of 2·reps each
-	const tD: number[] = [];
+	// 5. timings (cached graph, adaptive head), median of 2·reps
 	const tG: number[] = [];
-	const pD: number[] = [];
 	const pG: number[] = [];
 	for (let i = 0; i < 2 * reps; i++) {
-		let t = performance.now();
-		await fitHazeGpu(device, h, { graph: false });
-		tD.push(performance.now() - t);
-		pD.push(hazeGpuTimes.gpuPrep);
-		t = performance.now();
-		await fitHazeGpu(device, h, { graph: true });
+		const t = performance.now();
+		await fitHazeGpu(device, h);
 		tG.push(performance.now() - t);
 		pG.push(hazeGpuTimes.gpuPrep);
 	}
-	const oldT = { ...hazeGpuTimes };
-	await fitHazeGpu(device, h, { graph: false });
-	const dT = { ...hazeGpuTimes };
+	const lastT = { ...hazeGpuTimes };
 	out.ms = {
-		dispatch: +median(tD).toFixed(2),
 		graph: +median(tG).toFixed(2),
-		dispatchPrep: +median(pD).toFixed(2),
 		graphPrep: +median(pG).toFixed(2),
-		dispatchReadKB: dT.readKB,
-		graphReadKB: oldT.readKB,
-		graphTail: oldT.tailRead,
-		firstDispatchReadKB: oldSteps.readKB,
+		graphReadKB: lastT.readKB,
+		graphTail: lastT.tailRead,
+		firstReadKB: firstSteps.readKB,
 	};
 
-	// 6. VRAM: pooled bytes (+ graph transients) of one fit on each path, from a released state
-	const vram = async (graph: boolean) => {
+	// 6. VRAM: pooled bytes + graph transients of one fit, from a released state
+	const vram = async () => {
 		releasePool(device, "look-haze/");
 		await releaseCachedGraphs(device, "look-haze-prep");
 		await releaseCachedGraphs(device, "look-haze-grid");
 		const base = poolStats(device).bytes;
-		await fitHazeGpu(device, h, { graph });
+		await fitHazeGpu(device, h);
 		const pooled = poolStats(device).bytes - base;
-		const tr = graph
-			? (hazeGraphStats.transientBytes?.physical ?? 0) + 5550 * 4
-			: 0;
-		const logical = graph
-			? (hazeGraphStats.transientBytes?.logical ?? 0) + 5550 * 4
-			: 0;
+		const tr = (hazeGraphStats.transientBytes?.physical ?? 0) + 5550 * 4;
+		const logical = (hazeGraphStats.transientBytes?.logical ?? 0) + 5550 * 4;
 		return {
 			pooled,
 			transientPhysical: tr,
@@ -437,6 +421,6 @@ export async function runHazeGraphBench(
 			total: pooled + tr,
 		};
 	};
-	out.vram = { dispatch: await vram(false), graph: await vram(true) };
+	out.vram = { graph: await vram() };
 	return out;
 }

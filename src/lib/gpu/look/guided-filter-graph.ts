@@ -1,14 +1,13 @@
-// The GPU guided filter (guided-filter.ts guidedFiltersGpu) on a core ComputeGraph. Opt-in per
-// call: the default of guidedFiltersGpu(…); { graph: false } runs the pooled dispatchAll path.
+// The GPU guided filter (guided-filter.ts guidedFiltersGpu) on a core ComputeGraph: its only GPU
+// path (the pooled dispatchAll path it replaced, bit for bit, was removed on 2026-10-01).
 //
 // Per job k (shared guide I):  H0 → t4ₖ → V0 → abₖ → H1 → t2ₖ → V1 → qₖ;  then one read node (all q).
 //
 // Same four KernelSpecs (unchanged WGSL), same uniforms, same workgroup counts, same dispatch order
 // (job k+1's H0 depends on job k's V1: without it the scheduler interleaves the jobs, which keeps
 // every job's t4 alive at once). Each job's t4 / ab / t2 are their OWN logical transients: the graph
-// aliases them by lifetime (job k+1's t4 reuses a buffer job k is done with), where the old path
-// shared one pooled slot per role and relied on in-pass ordering. The q planes are transients too, read by one read node (one readback slot, as
-// the old stageReads). GPUConvolution is not used: its tap order / borders are not ours and the a/b
+// aliases them by lifetime (job k+1's t4 reuses a buffer job k is done with). The q planes are
+// transients too, read by one read node (one readback slot). GPUConvolution is not used: its tap order / borders are not ours and the a/b
 // maths sits between the passes.
 //
 // Clear audit: every kernel writes every element i < w·h of its output exactly once (the dispatch
@@ -16,7 +15,7 @@
 // in the chain, so all outputs are "full" and no clear node is needed; the core lint would refuse a
 // partial / atomic transient without one.
 //
-// NaN semantics: unchanged kernels, so the old GPU path's: a NaN in I or p spreads to every box mean
+// NaN semantics: a NaN in I or p spreads to every box mean
 // whose window contains it; clamp(NaN, 0, 1) is implementation-defined in WGSL but it is the same
 // pipeline on the same device (on Apple / Metal it returns a finite value: no NaN reaches q). The
 // bench compares q as raw f32 bits, NaN inputs included.
@@ -90,7 +89,7 @@ export const lastGuidedGraphRun: {
 	stats?: ComputeGraph<Params>["stats"];
 } = {};
 
-/** guidedFiltersGpu on the graph: the same q planes, bit for bit. */
+/** guidedFiltersGpu's body: the q planes of every job. */
 export function guidedFiltersGraph(
 	device: Device,
 	I: Float32Array,

@@ -121,12 +121,9 @@ function statsErrors(c: ColorStats, g: ColorStats) {
 
 export async function runLookBench(
 	engine: unknown,
-	opts: { reps?: number; label?: string; graph?: boolean } = {},
+	opts: { reps?: number; label?: string } = {},
 ) {
 	const reps = opts.reps ?? 5;
-	// graph (default true, the product default): relief / haze / guided / band stats through their
-	// ComputeGraph paths (*-graph.ts); false: the pooled / dispatch paths
-	const graph = opts.graph ?? true;
 	const device = await getComputeDevice();
 	if (!device) return { error: "no WebGPU compute device" };
 	const inp: LookInputs = captureLookInputs(engine, opts.label);
@@ -138,7 +135,7 @@ export async function runLookBench(
 			buildReliefField(r.tiles, r.frame, r.sunDir, r.yaw),
 		);
 		const gpu = await time(reps, () =>
-			buildReliefFieldGpu(device, r.tiles, r.frame, r.sunDir, r.yaw, { graph }),
+			buildReliefFieldGpu(device, r.tiles, r.frame, r.sunDir, r.yaw),
 		);
 		const a = cpu.out;
 		const b = gpu.out;
@@ -164,66 +161,30 @@ export async function runLookBench(
 	if (inp.haze) {
 		const h = inp.haze;
 		const cpu = await time(reps, () => fitHaze(h));
-		const gpu = await time(reps, () => fitHazeGpu(device, h, { graph }));
+		const { hazeGraphStats } = await import("./haze-graph");
+		const gpu = await time(reps, () => fitHazeGpu(device, h));
 		const gpuSteps = { ...hazeGpuTimes };
-		// the full lin + bins readback path (compact: false) must give the very same fit
-		const full = await time(reps, () =>
-			fitHazeGpu(device, h, { compact: false }),
-		);
-		const fullSteps = { ...hazeGpuTimes };
-		// the compact dispatch path's tail read (lists longer than the first read's estimate), forced
-		// with a 64-slot first read: it must give the very same fit too
+		const graphStats = { ...hazeGraphStats };
+		// the tail read (lists longer than the first read's estimate), forced with a 64-slot first
+		// read: it must give the very same fit
 		const forced = await time(reps, () =>
-			fitHazeGpu(device, h, { graph: false, listHead: 64 }),
+			fitHazeGpu(device, h, { listHead: 64 }),
 		);
 		const forcedSteps = { ...hazeGpuTimes };
-		// the compact dispatch path with its own first-read estimate: the very same fit
-		const dispatch = await time(reps, () =>
-			fitHazeGpu(device, h, { graph: false }),
-		);
-		// the graph path (./haze-graph.ts, the default): the very same fit, with its adaptive first
-		// read and with the forced 64-slot one
-		const { hazeGraphStats } = await import("./haze-graph");
-		const viaGraph = await time(reps, () =>
-			fitHazeGpu(device, h, { graph: true }),
-		);
-		const graphStats = { ...hazeGraphStats };
-		const graphForced = await time(reps, () =>
-			fitHazeGpu(device, h, { graph: true, listHead: 64 }),
-		);
-		const graphForcedStats = { ...hazeGraphStats };
 		out.haze = {
 			dims: [h.geoW, h.geoH],
 			cpuMs: cpu.ms,
 			gpuMs: gpu.ms,
 			gpuSteps,
-			fullReadback: {
-				gpuMs: full.ms,
-				gpuSteps: fullSteps,
-				identical: sameFit(gpu.out, full.out),
-			},
+			head: graphStats.head,
+			total: graphStats.total,
+			tailRead: graphStats.tail,
 			forcedTail: {
 				listHead: 64,
 				gpuMs: forced.ms,
 				tailRead: forcedSteps.tailRead,
 				readKB: forcedSteps.readKB,
 				identical: sameFit(gpu.out, forced.out),
-			},
-			dispatch: {
-				gpuMs: dispatch.ms,
-				identical: sameFit(gpu.out, dispatch.out),
-			},
-			graph: {
-				gpuMs: viaGraph.ms,
-				identical: sameFit(gpu.out, viaGraph.out),
-				head: graphStats.head,
-				total: graphStats.total,
-				tailRead: graphStats.tail,
-				forcedTail: {
-					listHead: 64,
-					tailRead: graphForcedStats.tail,
-					identical: sameFit(gpu.out, graphForced.out),
-				},
 			},
 			...hazeErrors(cpu.out, gpu.out),
 		};
@@ -241,7 +202,7 @@ export async function runLookBench(
 			jobs.map((j) => guidedFilter(m.I, j.p, m.w, m.h, j.r, j.eps)),
 		);
 		const gpu = await time(reps, () =>
-			guidedFiltersGpu(device, m.I, m.w, m.h, jobs, { graph }),
+			guidedFiltersGpu(device, m.I, m.w, m.h, jobs),
 		);
 		const n = m.w * m.h;
 		out.guided = {
@@ -282,13 +243,11 @@ export async function runLookBench(
 			);
 			return reduceBands(a, b, s.w * s.h);
 		});
-		const gpu = await time(reps, () => bandStatsGpu(device, s, { graph }));
+		const gpu = await time(reps, () => bandStatsGpu(device, s));
 		const subgroups = hasFeature(device, "subgroups");
 		// the opt-in subgroup reduction: its reassociation drift vs the default shared-memory tree
 		const withSg = subgroups
-			? await time(reps, () =>
-					bandStatsGpu(device, s, { subgroups: true, graph }),
-				)
+			? await time(reps, () => bandStatsGpu(device, s, { subgroups: true }))
 			: null;
 		out.stats = {
 			dims: [s.w, s.h],
@@ -326,15 +285,3 @@ export async function runLookBenchWarm(
 	const warmMs = await warmLook();
 	return { warmMs, ...(await runLookBench(engine, opts)) };
 }
-
-/** runLookBench with relief / haze / guided / band stats on their ComputeGraph paths (the default; look-bench.mjs --fn runLookBenchGraph). */
-export const runLookBenchGraph = (
-	engine: unknown,
-	opts: { reps?: number; label?: string } = {},
-) => runLookBench(engine, { ...opts, graph: true });
-
-/** runLookBench on the pooled / dispatch paths, graph: false (look-bench.mjs --fn runLookBenchDispatch). */
-export const runLookBenchDispatch = (
-	engine: unknown,
-	opts: { reps?: number; label?: string } = {},
-) => runLookBench(engine, { ...opts, graph: false });

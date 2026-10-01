@@ -1,12 +1,12 @@
-// The band-stats dispatch (color-stats.ts bandPartials) as a core ComputeGraph node: the default of
-// bandStatsGpu(…); { graph: false } runs the pooled single-dispatch path.
+// The band-stats dispatch of color-stats.ts bandStatsGpu as a core ComputeGraph node: its only GPU
+// path (the pooled single dispatch it replaced, bit for bit, was removed on 2026-10-01).
 //
 //   BAND_STATS or BAND_STATS_SG (one node, GROUPS workgroups) → partial (transient) → read node
 //
 // Only the dispatch moves onto the graph. The per-workgroup partials (GROUPS × 52 f32) still come back
 // to the CPU and bandStatsGpu folds them in float64, in the same order, then finalizeBands: no luma
 // float-sum primitive (GPUReduction / GPUSegmentedReduction would sum in f32, and GPUReduction switches
-// to subgroupAdd on devices with subgroups), so the result is bit-identical to the old path.
+// to subgroupAdd on devices with subgroups).
 //
 // Subgroup variant: BAND_STATS_SG writes -1 partials when its subgroup-layout check fails (2af1daf);
 // bandStatsGpu's hasNegativeCount check is shared and re-runs through this function with sg = false.
@@ -14,8 +14,7 @@
 // Clear audit: `partial` is written fully (BAND_STATS: invocation 0 of each of the GROUPS workgroups
 // writes its 52 values; BAND_STATS_SG: invocations 0..51 of each write one each), so "full", no clear.
 //
-// NaN semantics: unchanged kernel. range is sanitised on the CPU (≤ 0 or non-finite → 0 = sky) before
-// upload, as in the old path; a NaN layer alpha fails `L.a > 0.98` (pixel skipped); a NaN people value
+// NaN semantics: range is sanitised on the CPU (≤ 0 or non-finite → 0 = sky) before upload; a NaN layer alpha fails `L.a > 0.98` (pixel skipped); a NaN people value
 // fails `fg >= 0.3` (pixel kept); a NaN layer colour with alpha > 0.98 reaches the sums (as before).
 import { Buffer, type Device } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
@@ -62,7 +61,7 @@ export const lastStatsGraphRun: {
 	stats?: ComputeGraph<Params>["stats"];
 } = {};
 
-/** bandPartials on the graph: the GROUPS × STATS_VALUES per-workgroup partials, same bits. */
+/** One BAND_STATS(_SG) run: the GROUPS × STATS_VALUES per-workgroup partials. */
 export function bandPartialsGraph(
 	device: Device,
 	o: BandStatsInput,
@@ -78,7 +77,7 @@ export function bandPartialsGraph(
 			photo: up("photo", o.photo),
 			layer: up("layer", o.layer),
 			range: up("range", R),
-			// 4 zero bytes when there is no people mask (hasFg = 0: never read), as the old path
+			// 4 zero bytes when there is no people mask (hasFg = 0: never read)
 			fg: up("fg", o.fg ?? 4),
 			lut: up("lut", SRGB_LUT),
 		};

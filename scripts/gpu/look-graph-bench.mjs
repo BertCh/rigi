@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Look graphs (src/lib/gpu/look/{relief,guided-filter,color-stats}-graph.ts) vs the pooled default
-// paths: bit-identity over photos × sizes (NaN inputs included), runs twice+ with different data,
-// the clear lint, VRAM and interleaved median timings. Page realm, src/lib/gpu/look/bench-graph.ts.
+// Look graphs (src/lib/gpu/look/{relief,guided-filter,color-stats}-graph.ts, the only GPU paths):
+// run-to-run bit-identity over photos × sizes (NaN inputs included), CPU-twin parity (guided, band
+// stats), A → B → A with different data (stale transients), the clear lint, VRAM and median timings.
+// Page realm, src/lib/gpu/look/bench-graph.ts.
 // Always under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/look-graph-bench.mjs [--url http://localhost:3220]
 //     [--photos IMG_6958,IMG_7086,IMG_7131,IMG_7155] [--reps 9] [--tag x]

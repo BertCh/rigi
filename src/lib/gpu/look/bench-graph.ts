@@ -1,24 +1,26 @@
-// Migration bench for the look graphs (relief-graph.ts, guided-filter-graph.ts, color-stats-graph.ts)
-// against the pooled default paths, in the page realm (scripts/gpu/look-graph-bench.mjs). Checks:
-// - bit-identity old GPU path vs graph path over many photos × sizes (relief field/gen bytes, guided q
-//   as f32 bits, band-stats per-workgroup partials as f32 bits AND the folded ColorStats as f64 bits),
-//   NaN-injected inputs included, subgroup variant included where the device has subgroups;
-// - every graph run twice (and more) with different data: same shape (cache hit) A → B → A, and a
-//   shape sequence that misses / evicts the LRU, each run compared to the old path;
+// Bench of the look graphs (relief-graph.ts, guided-filter-graph.ts, color-stats-graph.ts; the only GPU
+// paths of relief / guided filter / band stats) in the page realm (scripts/gpu/look-graph-bench.mjs).
+// Checks:
+// - determinism over many photos × sizes: every case run twice back to back must give the same bits
+//   (relief field/gen bytes, guided q as f32 bits, band-stats per-workgroup partials as f32 bits AND
+//   the folded ColorStats as f64 bits), NaN-injected inputs included, subgroup variant included where
+//   the device has subgroups;
+// - CPU parity (reported): guided q and band stats vs their CPU twins (look/guided-filter.ts
+//   guidedFilter, look/color-stats.ts bandInputs + reduceBands), max |Δ|; the relief CPU parity on
+//   real tiles is look-bench.mjs (runLookBench);
+// - stale transients: the same shape (cache hit) A → B → A, where the second A must equal the first,
+//   bit for bit;
 // - the clear rule: the relief graph without its clear nodes must fail the compile-time lint;
-// - VRAM: old pooled bytes (pow2 capacities) vs graph imports + physical transients (after aliasing);
-// - timing: interleaved old / graph calls, medians.
+// - VRAM: pooled-equivalent bytes (pow2 capacities) vs graph imports + physical transients (after
+//   aliasing);
+// - timing: medians of graph calls.
 import type { Device } from "@luma.gl/core";
+import { bandInputs, reduceBands } from "../../look/color-stats";
+import { guidedFilter } from "../../look/guided-filter";
 import { ComputeGraph } from "../core/graph";
 import { capacityFor } from "../core/pool";
 import { getComputeDevice, hasFeature } from "../device";
-import {
-	type BandStatsInput,
-	bandPartials,
-	bandStatsGpu,
-	GROUPS,
-	WG,
-} from "./color-stats";
+import { type BandStatsInput, bandStatsGpu, GROUPS, WG } from "./color-stats";
 import { STATS_VALUES } from "./color-stats.wgsl";
 import { bandPartialsGraph, lastStatsGraphRun } from "./color-stats-graph";
 import { type GuidedJob, guidedFiltersGpu } from "./guided-filter";
@@ -193,22 +195,33 @@ const SUNS: Record<string, Vec3> = {
 
 // ---------- per-pipeline comparisons ----------
 
+/** Max |a − b| over pairs where both are finite, and the pairs where exactly one is NaN. */
+function maxAbs(a: ArrayLike<number>, b: ArrayLike<number>) {
+	let m = 0;
+	let nan = 0;
+	for (let i = 0; i < a.length; i++) {
+		if (Number.isNaN(a[i]) !== Number.isNaN(b[i])) nan++;
+		const d = Math.abs(a[i] - b[i]);
+		if (d > m) m = d;
+	}
+	return { max: m, nanMismatch: nan };
+}
+
 async function reliefCase(
 	device: Device,
 	H: Float32Array,
 	res: number,
 	sun: Vec3,
+	ref?: { field: Uint8Array; gen: Uint8Array },
 ) {
-	const a = await reliefPassesGpu(device, H, res, pxOf(res), sun, {
-		graph: false,
-	});
-	const b = await reliefPassesGpu(device, H, res, pxOf(res), sun, {
-		graph: true,
-	});
+	const a = await reliefPassesGpu(device, H, res, pxOf(res), sun);
+	const hit = lastReliefGraphRun.hit;
+	const b = ref ?? (await reliefPassesGpu(device, H, res, pxOf(res), sun));
 	return {
 		field: differ(a.field, b.field, false),
 		gen: differ(a.gen, b.gen, false),
-		hit: lastReliefGraphRun.hit,
+		hit,
+		out: a,
 	};
 }
 
@@ -218,13 +231,21 @@ async function guidedCase(
 	w: number,
 	h: number,
 	jobs: GuidedJob[],
+	ref?: Float32Array[],
 ) {
-	const a = await guidedFiltersGpu(device, I, w, h, jobs, { graph: false });
-	const b = await guidedFiltersGpu(device, I, w, h, jobs, { graph: true });
+	const a = await guidedFiltersGpu(device, I, w, h, jobs);
+	const hit = lastGuidedGraphRun.hit;
+	const b = ref ?? (await guidedFiltersGpu(device, I, w, h, jobs));
+	const cpu = jobs.map((j, k) =>
+		maxAbs(a[k], guidedFilter(I, j.p, w, h, j.r, j.eps)),
+	);
 	return {
 		q: a.map((x, k) => differ(x, b[k], true)),
 		nanQ: a.map(nanCount),
-		hit: lastGuidedGraphRun.hit,
+		cpuMaxAbs: cpu.map((c) => c.max),
+		cpuNaNMismatch: cpu.map((c) => c.nanMismatch),
+		hit,
+		out: a,
 	};
 }
 
@@ -241,22 +262,45 @@ function statsWords(o: BandStatsInput) {
 	return { words, R };
 }
 
-async function statsCase(device: Device, o: BandStatsInput, sg: boolean) {
+async function statsCase(
+	device: Device,
+	o: BandStatsInput,
+	sg: boolean,
+	ref?: { partials: Float32Array; stats: object },
+) {
 	const { words, R } = statsWords(o);
-	const pa = await bandPartials(device, o, words, R, sg);
-	const pb = await bandPartialsGraph(device, o, words, R, sg);
+	const pa = await bandPartialsGraph(device, o, words, R, sg);
 	const hit = lastStatsGraphRun.hit;
-	const sa = await bandStatsGpu(device, o, { subgroups: sg, graph: false });
-	const sb = await bandStatsGpu(device, o, { subgroups: sg, graph: true });
+	const pb =
+		ref?.partials ?? (await bandPartialsGraph(device, o, words, R, sg));
+	const sa = await bandStatsGpu(device, o, { subgroups: sg });
+	const sb = ref?.stats ?? (await bandStatsGpu(device, o, { subgroups: sg }));
+	const { a, b } = bandInputs(
+		o.photo as Uint8ClampedArray,
+		o.layer,
+		o.w,
+		o.h,
+		(x, y) => o.range[y * o.w + x],
+		o.fg ? (x, y) => (o.fg as Float32Array)[y * o.w + x] : undefined,
+		o.minRange,
+	);
+	const cpu = reduceBands(a, b, o.w * o.h, o.minCount);
 	let negative = 0;
 	for (let g = 0; g < GROUPS; g++) if (pa[g * STATS_VALUES] < 0) negative++;
 	return {
 		partials: differ(pa, pb, true),
 		stats: differStats(sa, sb),
+		cpuMaxAbs: Math.max(
+			...(["photoMean", "photoStd", "layerMean", "layerStd"] as const).map(
+				(k) => maxAbs(sa[k], cpu[k]).max,
+			),
+		),
+		cpuSameCounts: sa.count.join() === cpu.count.join(),
 		sgCheckFailedGroups: negative,
 		valid: sa.valid,
 		counts: Array.from(sa.count),
 		hit,
+		out: { partials: pa, stats: sa },
 	};
 }
 
@@ -287,7 +331,7 @@ async function lintTest(device: Device) {
 function vram(device: Device) {
 	const cap = (xs: number[]) => xs.reduce((s, b) => s + capacityFor(b), 0);
 	const out: Record<string, unknown> = {};
-	// relief at 1024: old = H + 7 scratch slots (+ prm) at pow2 capacity
+	// relief at 1024: pooled equivalent = H + 7 scratch slots (+ prm) at pow2 capacity
 	{
 		const res = 1024;
 		const s = reliefScratchBytes(res);
@@ -295,7 +339,7 @@ function vram(device: Device) {
 		const st = lastReliefGraphRun.stats;
 		out.relief = {
 			res,
-			oldPooledBytes: oldB,
+			pooledEquivalentBytes: oldB,
 			graphImportBytes: cap([res * res * 4, 80]),
 			graphLogicalTransientBytes: st?.logicalTransientBytes,
 			graphPhysicalTransientBytes: st?.physicalTransientBytes,
@@ -318,7 +362,7 @@ export async function runLookGraphBench(
 	const sg = hasFeature(device, "subgroups");
 	const out: Record<string, unknown> = { subgroups: sg };
 	const fail: string[] = [];
-	const check = (tag: string, r: Record<string, unknown>) => {
+	const check = (tag: string, { out: _, ...r }: Record<string, unknown>) => {
 		const bad = Object.entries(r).some(
 			([k, v]) =>
 				(k === "field" || k === "gen" || k === "partials" || k === "stats") &&
@@ -347,23 +391,18 @@ export async function runLookGraphBench(
 			}
 		}
 	}
-	// twice with different data at one shape: A → B → A (hits), each against the old path
+	// twice with different data at one shape: A → B → A (hits); the second A against the first
 	{
 		const A = await reliefInput(names[0], 512, false);
 		const B = await reliefInput(names[1], 512, false);
-		const seq = [];
-		for (const [t, H] of [
-			["A", A],
-			["B", B],
-			["A", A],
-		] as const)
-			seq.push(
-				check(
-					`relief twice ${t}`,
-					await reliefCase(device, H, 512, SUNS.xMajorLow),
-				),
-			);
-		out.reliefTwice = seq;
+		const first = await reliefCase(device, A, 512, SUNS.xMajorLow);
+		const mid = await reliefCase(device, B, 512, SUNS.xMajorLow);
+		const again = await reliefCase(device, A, 512, SUNS.xMajorLow, first.out);
+		out.reliefTwice = [
+			check("relief twice A", first),
+			check("relief twice B", mid),
+			check("relief twice A vs first A", again),
+		];
 	}
 	out.relief = relief;
 
@@ -399,21 +438,16 @@ export async function runLookGraphBench(
 			}
 		}
 	{
-		const seq = [];
 		const A = await guidedInput(names[0], 512, 384, 2);
 		const B = await guidedInput(names[1], 512, 384, 2);
-		for (const [t, x] of [
-			["A", A],
-			["B", B],
-			["A", A],
-		] as const)
-			seq.push(
-				check(
-					`guided twice ${t}`,
-					await guidedCase(device, x.I, 512, 384, x.jobs),
-				),
-			);
-		out.guidedTwice = seq;
+		const first = await guidedCase(device, A.I, 512, 384, A.jobs);
+		const mid = await guidedCase(device, B.I, 512, 384, B.jobs);
+		const again = await guidedCase(device, A.I, 512, 384, A.jobs, first.out);
+		out.guidedTwice = [
+			check("guided twice A", first),
+			check("guided twice B", mid),
+			check("guided twice A vs first A", again),
+		];
 	}
 	out.guided = guided;
 
@@ -445,12 +479,15 @@ export async function runLookGraphBench(
 		const seq = [];
 		const A = await statsInput(names[0], names[1], 512, 384, {});
 		const B = await statsInput(names[2], names[3], 512, 384, { fg: true });
-		for (const [t, x] of [
-			["A", A],
-			["B", B],
-			["A", A],
-		] as const)
-			seq.push(check(`stats twice ${t}`, await statsCase(device, x, false)));
+		const first = await statsCase(device, A, false);
+		seq.push(check("stats twice A", first));
+		seq.push(check("stats twice B", await statsCase(device, B, false)));
+		seq.push(
+			check(
+				"stats twice A vs first A",
+				await statsCase(device, A, false, first.out),
+			),
+		);
 		out.statsTwice = seq;
 	}
 	out.stats = stats;
@@ -458,42 +495,37 @@ export async function runLookGraphBench(
 	out.lint = await lintTest(device);
 	if (!(out.lint as { ok: boolean }).ok) fail.push("lint");
 
-	// ---------- timings (interleaved, medians; typical app sizes) ----------
+	// ---------- timings (medians; typical app sizes) ----------
 	const timing = async (
-		f: (graph: boolean) => Promise<unknown>,
-	): Promise<{ oldMs: number; graphMs: number }> => {
-		await f(false);
-		await f(true);
+		f: () => Promise<unknown>,
+	): Promise<{ graphMs: number }> => {
+		await f();
 		const a: number[] = [];
-		const b: number[] = [];
 		for (let i = 0; i < reps; i++) {
-			let t = performance.now();
-			await f(false);
+			const t = performance.now();
+			await f();
 			a.push(performance.now() - t);
-			t = performance.now();
-			await f(true);
-			b.push(performance.now() - t);
 		}
-		return { oldMs: +med(a).toFixed(2), graphMs: +med(b).toFixed(2) };
+		return { graphMs: +med(a).toFixed(2) };
 	};
 	const H = await reliefInput(names[0], 1024, false);
 	const gi = await guidedInput(names[0], 512, 384, 2);
 	const gi2 = await guidedInput(names[0], 1024, 768, 2);
 	const so = await statsInput(names[0], names[1], 512, 384, { fg: true });
 	out.timings = {
-		relief1024: await timing((graph) =>
-			reliefPassesGpu(device, H, 1024, pxOf(1024), SUNS.xMajorLow, { graph }),
+		relief1024: await timing(() =>
+			reliefPassesGpu(device, H, 1024, pxOf(1024), SUNS.xMajorLow),
 		),
-		guided512x384x2: await timing((graph) =>
-			guidedFiltersGpu(device, gi.I, 512, 384, gi.jobs, { graph }),
+		guided512x384x2: await timing(() =>
+			guidedFiltersGpu(device, gi.I, 512, 384, gi.jobs),
 		),
-		guided1024x768x2: await timing((graph) =>
-			guidedFiltersGpu(device, gi2.I, 1024, 768, gi2.jobs, { graph }),
+		guided1024x768x2: await timing(() =>
+			guidedFiltersGpu(device, gi2.I, 1024, 768, gi2.jobs),
 		),
-		stats512x384: await timing((graph) => bandStatsGpu(device, so, { graph })),
+		stats512x384: await timing(() => bandStatsGpu(device, so)),
 		...(sg && {
-			stats512x384sg: await timing((graph) =>
-				bandStatsGpu(device, so, { graph, subgroups: true }),
+			stats512x384sg: await timing(() =>
+				bandStatsGpu(device, so, { subgroups: true }),
 			),
 		}),
 	};
@@ -507,7 +539,7 @@ export async function runLookGraphBench(
 		const cap = (xs: number[]) => xs.reduce((s, b) => s + capacityFor(b), 0);
 		return {
 			shape: "1024x768, 2 jobs",
-			oldPooledBytes: cap([...imports, ...oldScratch]),
+			pooledEquivalentBytes: cap([...imports, ...oldScratch]),
 			graphImportBytes: cap(imports),
 			graphLogicalTransientBytes: st?.logicalTransientBytes,
 			graphPhysicalTransientBytes: st?.physicalTransientBytes,
@@ -522,7 +554,7 @@ export async function runLookGraphBench(
 		const imports = [20, n * 4, n * 16, n * 4, n * 4, 1024];
 		return {
 			shape: "512x384 fg",
-			oldPooledBytes: cap([...imports, GROUPS * STATS_VALUES * 4]),
+			pooledEquivalentBytes: cap([...imports, GROUPS * STATS_VALUES * 4]),
 			graphTotal: cap(imports) + (st?.physicalTransientBytes ?? 0),
 			graphPhysicalTransientBytes: st?.physicalTransientBytes,
 		};
@@ -540,77 +572,5 @@ export async function runLookGraphBench(
 	};
 	out.failures = fail;
 	out.ok = fail.length === 0;
-	return out;
-}
-
-/**
- * Old GPU path vs graph path on the REAL look inputs of a live engine (captureLookInputs: tiles at the
- * ground-truth pose, the engine's guide / masks / stats layer). Run per photo by
- * `look-bench.mjs --module /src/lib/gpu/look/bench-graph.ts --fn runLookGraphOnEngine`.
- */
-export async function runLookGraphOnEngine(
-	engine: unknown,
-	opts: { label?: string } = {},
-) {
-	const device = await getComputeDevice();
-	if (!device) return { error: "no WebGPU compute device" };
-	const { captureLookInputs } = await import("./capture");
-	const { buildReliefFieldGpu } = await import("./relief");
-	const inp = captureLookInputs(engine, opts.label);
-	const out: Record<string, unknown> = { source: inp.source };
-	let ok = true;
-	if (inp.relief) {
-		const r = inp.relief;
-		const a = await buildReliefFieldGpu(
-			device,
-			r.tiles,
-			r.frame,
-			r.sunDir,
-			r.yaw,
-			{ graph: false },
-		);
-		const b = await buildReliefFieldGpu(
-			device,
-			r.tiles,
-			r.frame,
-			r.sunDir,
-			r.yaw,
-			{
-				graph: true,
-			},
-		);
-		const d = {
-			res: a.res,
-			field: differ(a.field, b.field, false),
-			gen: differ(a.gen, b.gen, false),
-		};
-		ok &&= d.field === 0 && d.gen === 0;
-		out.relief = d;
-	}
-	if (inp.masks) {
-		const m = inp.masks;
-		const jobs = [
-			{ p: m.cov, r: Math.max(2, Math.round(m.w * 0.008)), eps: 4e-4 },
-			...(m.fg
-				? [{ p: m.fg, r: Math.max(3, Math.round(m.w * 0.012)), eps: 1e-3 }]
-				: []),
-		];
-		const d = await guidedCase(device, m.I, m.w, m.h, jobs);
-		ok &&= d.q.every((x) => x === 0);
-		out.guided = { dims: [m.w, m.h], ...d };
-	}
-	if (inp.stats) {
-		const s = inp.stats;
-		const rows = [];
-		for (const sg of hasFeature(device, "subgroups")
-			? [false, true]
-			: [false]) {
-			const d = await statsCase(device, s, sg);
-			ok &&= d.partials === 0 && d.stats === 0;
-			rows.push({ sg, ...d });
-		}
-		out.stats = { dims: [s.w, s.h], rows };
-	}
-	out.ok = ok;
 	return out;
 }

@@ -1,6 +1,7 @@
 // GPU twin of look/color-stats.ts `reduceBands(...bandInputs(...))`: Oklab, masks and the per-band
 // Σ / Σ² reduction on the GPU (color-stats.wgsl.ts); only 52 floats per workgroup come back.
-// Buffers are pooled (lease "look-stats"). Opt-in ({subgroups: true}, on a device with subgroups):
+// The dispatch runs as a one-node core ComputeGraph (color-stats-graph.ts; the pooled single dispatch
+// was removed on 2026-10-01); the partials are folded here in float64. Opt-in ({subgroups: true}, on a device with subgroups):
 // the per-workgroup reduction by subgroupAdd (BAND_STATS_SG), equal to the shared-memory tree up to
 // float-sum reassociation (look-bench reports the difference). Off by default: it measured no
 // faster at 1 ms and isn't bit-identical.
@@ -12,16 +13,7 @@ import {
 } from "../../look/color-stats";
 import { hasFeature } from "../device";
 import { BAND_STATS, BAND_STATS_SG, STATS_VALUES } from "./color-stats.wgsl";
-import {
-	defineKernel,
-	dispatch,
-	kernel,
-	pooledStorage,
-	pooledUniform,
-	stageReads,
-	submit,
-	withLease,
-} from "./kernel";
+import { defineKernel } from "./kernel";
 
 const LAYOUT: Parameters<typeof defineKernel>[2] = [
 	["prm", "uniform"],
@@ -47,8 +39,6 @@ export const K_BAND_STATS_SG = defineKernel(
 export type BandStatsOptions = {
 	/** Use the subgroup reduction when the device has subgroups (default false). */
 	subgroups?: boolean;
-	/** run the BAND_STATS(_SG) dispatch as a core ComputeGraph node (color-stats-graph.ts; default true) */
-	graph?: boolean;
 };
 
 export type BandStatsInput = {
@@ -94,10 +84,8 @@ export async function bandStatsGpu(
 	new Uint32Array(words, 0, 4).set([w, h, GROUPS * WG, o.fg ? 1 : 0]);
 	new Float32Array(words, 16, 1)[0] = o.minRange ?? 0;
 	const sg = (opts.subgroups ?? false) && hasFeature(device, "subgroups");
-	const partials =
-		(opts.graph ?? true)
-			? (await import("./color-stats-graph")).bandPartialsGraph
-			: bandPartials;
+	// color-stats-graph.ts imports this module's specs and constants (hence the dynamic import)
+	const partials = (await import("./color-stats-graph")).bandPartialsGraph;
 	let p = await partials(device, o, words, R, sg);
 	// BAND_STATS_SG writes -1 partials (a negative count) when the subgroup layout isn't what it assumes
 	if (sg && hasNegativeCount(p)) p = await partials(device, o, words, R, false);
@@ -119,41 +107,6 @@ const hasNegativeCount = (p: Float32Array) => {
 			if (p[g * STATS_VALUES + b * 13] < 0) return true;
 	return false;
 };
-
-/** One BAND_STATS(_SG) dispatch: the GROUPS × STATS_VALUES per-workgroup partials. */
-export function bandPartials(
-	device: Device,
-	o: BandStatsInput,
-	words: ArrayBuffer,
-	R: Float32Array,
-	sg: boolean,
-): Promise<Float32Array> {
-	const k = kernel(device, sg ? K_BAND_STATS_SG : K_BAND_STATS);
-	return withLease("look-stats", async () => {
-		const up = (key: string, data: ArrayBufferView | number) =>
-			pooledStorage(device, `look-stats/${key}`, data);
-		const prm = pooledUniform(device, "look-stats/prm", words);
-		const photo = up("photo", o.photo);
-		const layer = up("layer", o.layer);
-		const range = up("range", R);
-		const fg = up("fg", o.fg ?? 4);
-		const lut = up("lut", SRGB_LUT);
-		// every workgroup writes its 52 partials
-		const partial = pooledStorage(
-			device,
-			"look-stats/partial",
-			GROUPS * STATS_VALUES * 4,
-			{ zero: false },
-		);
-		const enc = device.createCommandEncoder({ id: "look-band-stats" });
-		dispatch(enc, k, { prm, photo, layer, range, fg, lut, partial }, GROUPS);
-		const rd = stageReads(device, enc, [
-			{ buffer: partial, size: GROUPS * STATS_VALUES * 4 },
-		]);
-		submit(device, enc);
-		return new Float32Array((await rd.read())[0]);
-	});
-}
 
 /** reduceBands' tail (color-stats.ts; keep in sync): means, floored stds, empty-band back-fill. */
 export function finalizeBands(

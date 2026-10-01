@@ -518,7 +518,7 @@ const u32Words = (...v: number[]) => new Uint32Array(v).buffer;
 
 /**
  * Box footprints [x0, x1) of each of `n` output pixels over `size` source texels, in f64 as
- * haze.ts prepGpu (1 texel each when n = size).
+ * haze.ts prepUploads (1 texel each when n = size).
  */
 function footprints(n: number, size: number): Uint32Array {
 	const s = size / n;
@@ -1300,7 +1300,7 @@ function hazeGraph(
 			photo = g.importBuffer("photo", pw * ph * 4);
 			fgm = g.importBuffer("fgm", Math.ceil(N / 32) * 4);
 		}
-		// prepGpu, node for node
+		// haze-graph.ts prepGraph, node for node
 		const pxScale = W / 1024;
 		const rad = Math.max(1, Math.round(3 * pxScale));
 		const fgRad = d.hasFg ? Math.max(2, Math.round(8 * pxScale)) : 0;
@@ -1343,7 +1343,7 @@ function hazeGraph(
 			bindings: { prm, flags, outf: flagsH },
 			workgroups: [groups],
 		});
-		// prepGpu's counts come from a fresh (zeroed) buffer
+		// the counts must start at zero (haze-graph.ts prepGraph clears them)
 		g.addKernel({
 			id: "zero-counts",
 			spec: K_ZERO,

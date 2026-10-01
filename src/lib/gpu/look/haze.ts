@@ -5,8 +5,9 @@
 // the physical fit's 5 550-cell grid scan. The CPU keeps what is small or sequential: the airlight
 // statistics, the dark-subset sums and representative paths, the free-β IRLS, the refinement
 // passes and the quality terms. Those parts mirror haze-fit.ts line for line (keep in sync;
-// look-bench.mjs catches drift). Buffers are pooled (lease "look-haze").
-import { Buffer, type Device } from "@luma.gl/core";
+// look-bench.mjs catches drift). Both submits run as core ComputeGraphs (./haze-graph.ts); the pooled
+// dispatch path and its full-readback (compact: false) mode were removed on 2026-10-01.
+import type { Device } from "@luma.gl/core";
 import {
 	ATM_CURV,
 	atmPath,
@@ -30,15 +31,9 @@ import {
 } from "../../look/haze-fit";
 import { sunColor } from "../../look/sun";
 import { srgbToLinear } from "../../style/color";
-import {
-	type ComputeGraph,
-	cachedGraph,
-	type GraphBinding,
-} from "../core/graph";
+import type { ComputeGraph, GraphBinding } from "../core/graph";
 import { GPUScan, type GraphBufferHandle } from "../core/luma";
 import {
-	BLOCK,
-	BUCKETS,
 	HZ_BIN,
 	HZ_CNT,
 	HZ_DILH,
@@ -53,19 +48,7 @@ import {
 	LISTS,
 	SEL,
 } from "./haze.wgsl";
-import {
-	clear,
-	defineKernel,
-	dispatch,
-	kernel,
-	pooledStorage,
-	pooledUniform,
-	type ReadRange,
-	readBack,
-	stageReads,
-	submit,
-	withLease,
-} from "./kernel";
+import { defineKernel } from "./kernel";
 
 export const K_HZ_PREP = defineKernel("hz-prep", HZ_PREP, [
 	["prm", "uniform"],
@@ -180,41 +163,6 @@ export function addListOffsets<P>(
 	});
 }
 
-/** addListOffsets for the dispatch path: a cached graph per nBlk, recorded into `enc`. */
-function encodeListOffsets(
-	device: Device,
-	enc: ReturnType<Device["createCommandEncoder"]>,
-	nBlk: number,
-	buffers: { cprm: Buffer; blk: Buffer; offs: Buffer; starts: Buffer },
-) {
-	const e = cachedGraph<void, undefined>(
-		device,
-		"look-haze-offs",
-		`b${nBlk}`,
-		(g) => {
-			const bytes = LISTS * nBlk * 4;
-			addListOffsets(
-				g,
-				{
-					cprm: g.importBuffer(
-						"cprm",
-						16,
-						undefined,
-						Buffer.UNIFORM | Buffer.COPY_DST,
-					),
-					blk: g.importBuffer("blk", bytes),
-					offs: g.importBuffer("offs", bytes),
-					starts: g.importBuffer("starts", (LISTS + 1) * 4),
-				},
-				nBlk,
-			);
-			return undefined;
-		},
-		2,
-	);
-	e.graph.compile().encode(enc, undefined, buffers);
-}
-
 // mirror of haze-fit.ts (keep in sync)
 export const NBINS = 24;
 const DMIN = 200;
@@ -235,26 +183,14 @@ export const HM_PRIOR = Float32Array.from(
 /** Timings of the last fitHazeGpu (ms), for the bench. */
 export const hazeGpuTimes: Record<string, number> = {};
 
-/** How fitHazeGpu gets the per-pixel results to the CPU. */
+/** fitHazeGpu's test hooks. Only the representative lists and the airlight band's values come back (the GPU compacts them). */
 export type HazeGpuOptions = {
 	/**
-	 * true (default): only the representative lists and the airlight band's values come back (the
-	 * GPU compacts them). false: the whole lin + bins come back and the CPU walks every pixel, as
-	 * before (kept for the bench; the result is the same).
-	 */
-	compact?: boolean;
-	/**
-	 * Test hook (compact only): list slots in the first readback instead of the 0.27·N + 512
-	 * estimate. A small value forces the second, exact-length tail read (the bench checks it gives
-	 * the very same fit).
+	 * Test hook: list slots in the first readback instead of the adaptive estimate
+	 * (./haze-graph.ts headFor). A small value forces the second, exact-length tail read (the bench
+	 * checks it gives the very same fit).
 	 */
 	listHead?: number;
-	/**
-	 * Run both submits on core ComputeGraphs (./haze-graph.ts: shape-keyed cache, aliased transients,
-	 * clear nodes, an adaptive first-read length). Default true; false runs the dispatch path below.
-	 * Compact only: with compact: false the dispatch path runs. The fit is bit-identical either way.
-	 */
-	graph?: boolean;
 };
 
 /** One (bin, channel)'s candidate pixels in pixel order: indices and their lin values. */
@@ -315,235 +251,6 @@ export function prepUploads(
 	return { xb, yb, words };
 }
 
-/** Submit 1: per-pixel prep, bins, the percentile order statistics and (compact) the lists. */
-function prepGpu(
-	device: Device,
-	photo: HazeFitInput["photo"],
-	W: number,
-	H: number,
-	range: Float32Array,
-	pSky: Float32Array,
-	fgBits: Uint32Array,
-	rad: number,
-	fgRad: number,
-	skyIdx: Uint32Array,
-	compact: boolean,
-	listHead?: number,
-): Promise<Prep> {
-	const N = W * H;
-	const { xb, yb, words } = prepUploads(photo, W, H, rad, fgRad);
-	const K = skyIdx.length;
-	const nBlk = Math.ceil(N / BLOCK);
-	return withLease("look-haze", async () => {
-		const up = (key: string, data: ArrayBufferView | number) =>
-			pooledStorage(device, `look-haze/${key}`, data);
-		// outputs every pixel / slot of which its kernel writes: no zeroing needed
-		const scratch = (key: string, bytes: number) =>
-			pooledStorage(device, `look-haze/${key}`, bytes, { zero: false });
-		const prm = pooledUniform(device, "look-haze/prm", words);
-		const gPhoto = up(
-			"photo",
-			new Uint8Array(
-				photo.data.buffer,
-				photo.data.byteOffset,
-				photo.data.byteLength,
-			),
-		);
-		const gxb = up("xb", xb);
-		const gyb = up("yb", yb);
-		const lut = up("lut", SRGB_LUT);
-		const gRange = up("range", range);
-		const gSky = up("psky", pSky);
-		const gFg = up("fgm", fgBits);
-		const lin = scratch("lin", N * 12);
-		const flags = scratch("flags", N * 4);
-		const flagsH = scratch("flagsH", N * 4);
-		const bins = scratch("bins", N * 4);
-		const counts = up("counts", NBINS * 4); // atomics: zeroed
-		const state = scratch("state", SEL * 8);
-		const hist = scratch("hist", SEL * BUCKETS * 4); // cleared per pass
-		// one uniform per radix pass: all three are recorded before the submit
-		const passPrm = [0, 1, 2].map((p) =>
-			pooledUniform(
-				device,
-				`look-haze/pass${p}`,
-				new Uint32Array([W, H, p, 0]),
-			),
-		);
-		const groups = Math.ceil(N / 256);
-		const enc = device.createCommandEncoder({ id: "look-haze-prep" });
-		dispatch(
-			enc,
-			kernel(device, K_HZ_PREP),
-			{
-				prm,
-				photo: gPhoto,
-				xb: gxb,
-				yb: gyb,
-				lut,
-				range: gRange,
-				fgm: gFg,
-				lin,
-				flags,
-			},
-			groups,
-		);
-		dispatch(
-			enc,
-			kernel(device, K_HZ_DILH),
-			{ prm, flags, outf: flagsH },
-			groups,
-		);
-		dispatch(
-			enc,
-			kernel(device, K_HZ_BIN),
-			{ prm, flagsH, range: gRange, psky: gSky, bins, counts },
-			groups,
-		);
-		dispatch(
-			enc,
-			kernel(device, K_HZ_SEL_INIT),
-			{ counts, state },
-			Math.ceil(SEL / 64),
-		);
-		const kHist = kernel(device, K_HZ_HIST);
-		const kScan = kernel(device, K_HZ_SCAN);
-		for (let p = 0; p < 3; p++) {
-			clear(enc, hist, 0, SEL * BUCKETS * 4);
-			dispatch(enc, kHist, { prm: passPrm[p], bins, lin, state, hist }, groups);
-			dispatch(enc, kScan, { prm: passPrm[p], hist, state }, SCAN_GROUPS);
-		}
-		const head: ReadRange[] = [
-			{ buffer: counts, size: NBINS * 4 },
-			{ buffer: state, size: SEL * 8 },
-		];
-		if (!compact) {
-			head.push({ buffer: lin, size: N * 12 }, { buffer: bins, size: N * 4 });
-			const rd = stageReads(device, enc, head);
-			submit(device, enc);
-			const [c, s, l, b] = await rd.read();
-			const linF = new Float32Array(l);
-			const binsI = new Int32Array(b);
-			const cnt = new Uint32Array(c);
-			// the CPU's walk: every pixel of the bin, in pixel order
-			const start = new Int32Array(NBINS + 1);
-			for (let k = 0; k < NBINS; k++) start[k + 1] = start[k] + cnt[k];
-			const fill = start.slice(0, NBINS);
-			const order = new Int32Array(start[NBINS]);
-			for (let i = 0; i < N; i++)
-				if (binsI[i] >= 0) order[fill[binsI[i]]++] = i;
-			const sky = new Float32Array(3 * K);
-			for (let k = 0; k < K; k++)
-				for (let ch = 0; ch < 3; ch++)
-					sky[3 * k + ch] = linF[skyIdx[k] * 3 + ch];
-			return {
-				counts: cnt,
-				stat: statOf(s),
-				sky,
-				list: (L: number) => {
-					const bin = Math.floor(L / 3);
-					const ch = L - bin * 3;
-					const idx = order.subarray(start[bin], start[bin + 1]);
-					const val = new Float32Array(idx.length);
-					for (let k = 0; k < idx.length; k++) val[k] = linF[idx[k] * 3 + ch];
-					return { idx, val };
-				},
-				bytes: NBINS * 4 + SEL * 8 + N * 16,
-				tail: false,
-			};
-		}
-		// compact: the lists' block counts → starts → scatter, and the airlight band gather
-		const cprm = pooledUniform(
-			device,
-			"look-haze/cprm",
-			new Uint32Array([N, nBlk, K, 0]),
-		);
-		const blk = scratch("blk", nBlk * LISTS * 4);
-		const offs = scratch("offs", nBlk * LISTS * 4);
-		const starts = scratch("starts", (LISTS + 1) * 4);
-		// capacity: every binned pixel in all three channels' lists
-		const outIdx = scratch("outIdx", 3 * N * 4);
-		const outVal = scratch("outVal", 3 * N * 4);
-		const blocks = Math.ceil(nBlk / 64);
-		dispatch(
-			enc,
-			kernel(device, K_HZ_CNT),
-			{ prm: cprm, bins, lin, state, blk },
-			blocks,
-		);
-		encodeListOffsets(device, enc, nBlk, { cprm, blk, offs, starts });
-		dispatch(
-			enc,
-			kernel(device, K_HZ_SCATTER),
-			{ prm: cprm, bins, lin, state, offs, outIdx, outVal },
-			blocks,
-		);
-		let skyOut = null;
-		if (K) {
-			const idx = up("skyIdx", skyIdx);
-			skyOut = scratch("skyOut", 3 * K * 4);
-			dispatch(
-				enc,
-				kernel(device, K_HZ_GATHER),
-				{ prm: cprm, idx, lin, outv: skyOut },
-				Math.ceil(K / 64),
-			);
-		}
-		// the lists hold ~8 % of the binned pixels per channel (+ ties): read a guess with the rest,
-		// then whatever did not fit
-		const guess = Math.min(
-			3 * N,
-			Math.max(1, Math.floor(listHead ?? Math.ceil(0.27 * N) + 512)),
-		);
-		head.push(
-			{ buffer: starts, size: (LISTS + 1) * 4 },
-			{ buffer: outIdx, size: guess * 4 },
-			{ buffer: outVal, size: guess * 4 },
-		);
-		if (skyOut) head.push({ buffer: skyOut, size: 3 * K * 4 });
-		const rd = stageReads(device, enc, head);
-		submit(device, enc);
-		const got = await rd.read();
-		const st = new Uint32Array(got[2]);
-		const total = st[LISTS];
-		let idxAll = new Uint32Array(got[3]);
-		let valAll = new Float32Array(got[4]);
-		let bytes = NBINS * 4 + SEL * 8 + (LISTS + 1) * 4 + guess * 8 + 12 * K;
-		if (total > guess) {
-			const rest = (total - guess) * 4;
-			const [ti, tv] = await readBack(
-				device,
-				() => {},
-				[
-					{ buffer: outIdx, offset: guess * 4, size: rest },
-					{ buffer: outVal, offset: guess * 4, size: rest },
-				],
-				{ id: "look-haze-tail" },
-			);
-			const i2 = new Uint32Array(total);
-			i2.set(idxAll);
-			i2.set(new Uint32Array(ti), guess);
-			const v2 = new Float32Array(total);
-			v2.set(valAll);
-			v2.set(new Float32Array(tv), guess);
-			idxAll = i2;
-			valAll = v2;
-			bytes += 2 * rest;
-		}
-		return {
-			counts: new Uint32Array(got[0]),
-			stat: statOf(got[1]),
-			sky: skyOut ? new Float32Array(got[5]) : new Float32Array(0),
-			list: (L: number) => ({
-				idx: idxAll.subarray(st[L], st[L + 1]),
-				val: valAll.subarray(st[L], st[L + 1]),
-			}),
-			bytes,
-			tail: total > guess,
-		};
-	});
-}
-
 /** The selected f32 bit patterns out of the radix-select state (prefix, remaining rank) pairs. */
 export function statOf(state: ArrayBuffer): Float32Array {
 	const st = new Uint32Array(state);
@@ -601,11 +308,8 @@ export function gridUploads(
 	return { flat, off, iw, words, cells };
 }
 
-/** The grid's signature (submit 2), for ./haze-graph.ts's twin. */
-export type GridFn = typeof gridGpu;
-
-/** Submit 2: the physical grid's cost per cell (index = (hk·25 + a)·37 + b). */
-async function gridGpu(
+/** Submit 2: the physical grid's cost per cell (index = (hk·25 + a)·37 + b); ./haze-graph.ts gridGraph. */
+export type GridFn = (
 	device: Device,
 	reps: Float64Array[][],
 	Ic: number[][],
@@ -614,43 +318,7 @@ async function gridGpu(
 	lam: number,
 	jBar: number,
 	priorK: number,
-): Promise<Float32Array> {
-	const { flat, off, iw, words, cells } = gridUploads(
-		reps,
-		Ic,
-		wp,
-		airlight,
-		lam,
-		jBar,
-		priorK,
-	);
-	return withLease("look-haze", async () => {
-		const up = (key: string, data: ArrayBufferView) =>
-			pooledStorage(device, `look-haze/${key}`, data);
-		const prm = pooledUniform(device, "look-haze/gprm", words);
-		const gReps = up("reps", flat);
-		const gOff = up("repOff", off);
-		const gIw = up("Iw", iw);
-		const hm = up("hmPrior", HM_PRIOR);
-		// every cell is written
-		const err = pooledStorage(device, "look-haze/err", cells * 4, {
-			zero: false,
-		});
-		const [e] = await readBack(
-			device,
-			(enc) =>
-				dispatch(
-					enc,
-					kernel(device, K_HZ_GRID),
-					{ prm, reps: gReps, repOff: gOff, Iw: gIw, hmPrior: hm, err },
-					Math.ceil(cells / 64),
-				),
-			[{ buffer: err, size: cells * 4 }],
-			{ id: "look-haze-grid" },
-		);
-		return new Float32Array(e);
-	});
-}
+) => Promise<Float32Array>;
 
 /** GPU twin of fitHaze(input): the same HazeFit, up to f32 rounding in the GPU parts. */
 export async function fitHazeGpu(
@@ -725,20 +393,15 @@ export async function fitHazeGpu(
 		fgRad,
 		skyIdx,
 	] as const;
-	// default: both submits on core ComputeGraphs (./haze-graph.ts, compact lists only)
-	const g =
-		(opts.graph ?? true) && (opts.compact ?? true)
-			? await import("./haze-graph")
-			: null;
-	const prep = g
-		? await g.prepGraph(...args, opts.listHead)
-		: await prepGpu(...args, opts.compact ?? true, opts.listHead);
+	// both submits on core ComputeGraphs (./haze-graph.ts imports this module, hence the dynamic import)
+	const g = await import("./haze-graph");
+	const prep = await g.prepGraph(...args, opts.listHead);
 	const t2 = performance.now();
 	return hazeFitTail(
 		device,
 		{ range, skyIdx, pointAt, eyeAlt, sunDir: input.sunDir, T0, t1, t2 },
 		prep,
-		g ? g.gridGraph : gridGpu,
+		g.gridGraph,
 	);
 }
 
