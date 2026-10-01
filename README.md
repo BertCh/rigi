@@ -15,6 +15,27 @@ People in the foreground are segmented in the browser (MediaPipe `selfie_multicl
 skip them, blends keep them in front, and the projection doesn't smear them over the ground. Poses
 export as pose JSON, XMP, COLMAP, KML/KMZ, GeoJSON footprints and annotated images (`src/lib/export`).
 
+## Built with luma.gl and deck.gl
+
+Rigi is an application, and also a worked example of the luma.gl 10 / deck.gl stack on both GPU backends. What it exercises:
+
+- **luma.gl 10 on WebGPU and WebGL2.** One luma `Device` per page. Under WebGPU the render device is also the compute device (`adoptRenderDevice`, `WebGPUAdapter.attach()` with `requiredLimits`), so GPU results feed rendering with no CPU round trip.
+- **`GPUCommandGraph` compute.** `src/lib/gpu/core` wraps luma's `GPUCommandGraph` as a `ComputeGraph`: multi-pass compute with GPU-resident intermediates, built on luma's engine `Kernel`, `GPUScan`, a readback ring and a device pool. Horizon marching, pose search, haze/relief/band-stats look passes, sky refinement and splat sorting all run as graphs, and the graph is the only GPU path.
+- **deck.gl custom views and layers on WebGPU and WebGL2.** Photo-matched camera views, a batched terrain layer, a geometry pass that writes range to a float target, composite and drape layers, trails, labels and Gaussian splats. `src/lib/deck-webgpu` (WGSL) and `src/lib/deck` (GLSL) implement one `Renderer` interface and are checked against each other (`scripts/deck-engine-smoke.mjs`).
+- **WGSL and GLSL dual shaders.** Layers are written once per backend; `src/lib/deck-webgpu/layers/*.check.ts` compare the WGSL output with a CPU port of the GLSL.
+- **Vendored luma.gl 10 alpha.** `vendor/luma` (`10.0.0-alpha.2-rigi.1`) and `vendor/deck` (a deck.gl `9.4.0-beta.4` build) carry the upstream fixes the app needs until they are published; each README lists the exact commits and how to rebuild.
+- Shader modules ported from luma.gl (height fog, precipitation; MIT, vis.gl contributors) drive the "Nebelmeer" and weather looks; see `NOTICE.md`.
+
+Repository conventions follow luma.gl: `AGENTS.md`, `CONTRIBUTING.md` (including AI-assisted contributions), `CODE_OF_CONDUCT.md`, `.github` templates, SPDX headers (`node scripts/ci/spdx.mjs`) and a `CHANGELOG.md`.
+
+## Examples
+
+Standalone luma.gl / deck.gl examples live in [`examples/`](examples/README.md): a deck.gl summit view on WebGPU and WebGL2, and a luma `GPUCommandGraph` horizon compute graph. See `examples/README.md` for the index and run commands.
+
+## License
+
+The code is MIT, Copyright (c) 2026 Robert Christie and Rigi contributors: see [`LICENSE`](LICENSE). Photographs, map data and tiles, ML models, the vendored luma.gl and deck.gl builds, and code ported from other projects have their own terms: see [`NOTICE.md`](NOTICE.md). Contributions: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Architecture
 
 Vite + React 19 + TanStack Router/Start (file routes in `src/routes`, `src/routeTree.gen.ts` generated
@@ -28,7 +49,7 @@ by `npm run generate-routes`).
 | `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (owned by session mt-image-fc, `src/lib/roll/**`): a whole day's photos clustered into rolls and spots, with a mosaic, per-spot panoramas, and every photo draped on one deck.gl terrain map |
 | `/baseline` | Debug UI for the CPU pipeline (`src/baseline-ui`): horizon, skyline detection, solve, peaks |
 | `/lab/splats`, `/lab/deck-splats`, `/lab/generate` | Step Inside dev benches: splats in each renderer, and P3 generation (`?nearfield=gen`, GT poses only) |
-| `/lab/deck-webgpu` | The WebGPU deck renderer (`WebGpuEngine`, `src/lib/deck-webgpu`); not yet used by the app |
+| `/lab/deck-webgpu` | The WebGPU deck renderer in isolation (`WebGpuEngine`, `src/lib/deck-webgpu`); the app uses it by default via `?renderer=auto` |
 
 **Renderers.** `src/lib/renderer.ts` is the engine interface that PhotoWorkspace and the export layer
 use. Both backends are deck.gl on luma.gl, picked by `src/lib/renderer-select.ts` and loaded on demand:
@@ -95,7 +116,7 @@ overlapping photos is wired into `/roll` as suggestions only, behind `?propagate
 
 **Other modules.**
 
-- `src/lib/gpu`: an optional WebGPU compute sidecar for the auto-align grid, horizon, look passes, batched deck terrain and eye search. See its README.
+- `src/lib/gpu`: GPU compute on luma's `GPUCommandGraph` (`src/lib/gpu/core` `ComputeGraph`): auto-align grid, horizon, eye search, solve, look passes, sky refine, splat sort. It is the only GPU path (the CPU twin is the fallback), and under WebGPU it runs on the render device. See its README.
 - `src/lib/concord`: whole-image concordance (focal-table eye prior, DSM occluder). See `reports/concordance-research.md`; the killed parts are listed in `reports/negative-results.md`.
 - `src/lib/reveal`: the overlay bloom-in on load.
 - `src/lib/cache`: the tile cache.
@@ -105,10 +126,10 @@ overlapping photos is wired into `/roll` as suggestions only, behind `?propagate
 
 | Flag | Effect |
 |---|---|
-| `?renderer=deck` | deck.gl on WebGL only (default `auto`: WebGPU where available) |
+| `?renderer=auto\|webgpu\|deck` | Engine: `auto` (default) = deck.gl on WebGPU where the browser passes the probe, else WebGL2; `webgpu` / `deck` pin one. `?backend=webgpu\|webgl` is luma.gl's example-style alias. `?webgpu=off` forces the WebGL fallback |
 | `?style=<preset>` | View style preset |
 | `?nearfield=off\|on\|sharp` | Step Inside: hide, force on (headless browsers too), or the dev-only SHARP model (research licence). Default `auto` |
-| `?gpu=off` | WebGPU kill switch |
+| `?gpu=off` | GPU compute kill switch (CPU twins everywhere) |
 | `?gpuHorizon=off`, `?lookgpu=off` | Turn off the GPU horizon or the GPU look passes (both on by default) |
 | `?eyesearch=on\|auto`, `?unknownGpu=on` | Opt-in GPU eye search / GPU unknown-pose horizon |
 | `?terrain=tiles` | deck: per-tile terrain instead of batched |
@@ -173,6 +194,8 @@ npm run dev               # dev server on http://localhost:3100
 npm run dev:all           # dev server + matcher (:8765) + near-field (:8767); reuses anything already up,
                           #   skips a backend without tools/matcher/.venv. Pick some: node scripts/dev.mjs --be=nearfield
 npm run build             # production build (nitro)
+node scripts/examples.mjs list   # standalone luma.gl/deck.gl examples: start <id> | check | build | smoke
+node scripts/ci/spdx.mjs  # SPDX headers on first-party files
 npx tsc --noEmit          # typecheck
 npx biome format --write .   # format (biome.json: src, scripts, tools/**/*.{ts,mjs,js})
 
