@@ -59,6 +59,7 @@ import { observeCompiledGraph } from "./inspector";
 import {
 	type BindKind,
 	encodeDispatch,
+	isTextureKind,
 	type Kernel,
 	type KernelSpec,
 	kernel,
@@ -230,7 +231,10 @@ export type GraphRunResult = {
 	timings?: GPUCommandGraphTimingReport;
 };
 
-const USE: Record<Exclude<BindKind, "texture">, GraphBufferUsage> = {
+const USE: Record<
+	Exclude<BindKind, "texture" | "texture-array">,
+	GraphBufferUsage
+> = {
 	uniform: "uniform",
 	"read-only-storage": "storage-read",
 	storage: "storage-read-write",
@@ -403,7 +407,7 @@ export class ComputeGraph<P = void> {
 			const v = node.bindings[name];
 			if (!v)
 				throw new Error(`${this.id}/${node.id}: no binding for "${name}"`);
-			if ((kind === "texture") !== isTexture(v))
+			if (isTextureKind(kind) !== isTexture(v))
 				throw new Error(
 					`${this.id}/${node.id}: "${name}" is a ${kind} binding, bound to a ${isTexture(v) ? "texture" : "buffer"}`,
 				);

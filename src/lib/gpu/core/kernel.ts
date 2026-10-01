@@ -36,9 +36,19 @@ export { submit } from "./queue";
 /**
  * "texture" is a 2-D unfilterable-float sampled texture (textureLoad only; the render device's
  * rgba32float targets): dispatch() binds a luma Texture for it; a ComputeGraph kernel node binds a
- * graph texture or texture view (declared "sampled").
+ * graph texture or texture view (declared "sampled"). "texture-array" is the same over a 2-D array
+ * (WGSL texture_2d_array<f32>; e.g. the batched terrain's r32float height arrays).
  */
-export type BindKind = "uniform" | "storage" | "read-only-storage" | "texture";
+export type BindKind =
+	| "uniform"
+	| "storage"
+	| "read-only-storage"
+	| "texture"
+	| "texture-array";
+
+/** True for the sampled-texture binding kinds. */
+export const isTextureKind = (kind: BindKind) =>
+	kind === "texture" || kind === "texture-array";
 
 /** A kernel's WGSL and binding layout; defineKernel registers it for warmKernels. */
 export type KernelSpec = {
@@ -110,13 +120,13 @@ const shaderLayout = (spec: KernelSpec) => ({
 	bindings: spec.layout.map(
 		([name, type], location): BindingDeclaration =>
 			// the ternaries narrow `type` for BindingDeclaration's union
-			type === "texture"
+			isTextureKind(type)
 				? {
 						name,
-						type,
+						type: "texture",
 						group: 0,
 						location,
-						viewDimension: "2d",
+						viewDimension: type === "texture-array" ? "2d-array" : "2d",
 						sampleType: "unfilterable-float",
 					}
 				: type === "uniform"

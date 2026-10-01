@@ -197,8 +197,17 @@ function check(spec) {
 		}
 		if (b.name !== name)
 			out.push(`slot ${i}: layout name "${name}", WGSL "${b.name}"`);
-		if (b.type !== kind)
+		// core/kernel.ts: "texture" binds a 2-D view, "texture-array" a 2-D array view
+		const texture = kind === "texture" || kind === "texture-array";
+		if (b.type !== (texture ? "texture" : kind))
 			out.push(`slot ${i} "${name}": layout kind ${kind}, WGSL ${b.type}`);
+		else if (
+			texture &&
+			b.viewDimension !== (kind === "texture-array" ? "2d-array" : "2d")
+		)
+			out.push(
+				`slot ${i} "${name}": layout kind ${kind}, WGSL view ${b.viewDimension}`,
+			);
 	});
 	for (const [loc, b] of byLoc)
 		if (loc >= spec.layout.length)

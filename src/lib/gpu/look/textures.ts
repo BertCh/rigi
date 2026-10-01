@@ -202,7 +202,8 @@ const K_HZ_SCAN = buf("hz-scan", HZ_SCAN, [
 // Kernels that read textures: core/kernel's layout covers buffers only, so these build their own
 // pipeline (explicit layout for the name → location map; the WGSL's auto layout makes the
 // textureLoad-only textures 'unfilterable-float', which accepts rgba32float and unorm formats).
-type TexBind = BindKind | "texture";
+/** this file's kernels bind 2-D textures only */
+type TexBind = Exclude<BindKind, "texture-array">;
 type TexSpec = { id: string; source: string; layout: [string, TexBind][] };
 const texSpecs: TexSpec[] = [];
 const texSpec = (id: string, source: string, layout: [string, TexBind][]) => {
@@ -315,7 +316,7 @@ export function warmTextureKernels(device: Device): number {
 	return failed;
 }
 
-const USE: Record<Exclude<BindKind, "texture">, GraphBufferUsage> = {
+const USE: Record<Exclude<TexBind, "texture">, GraphBufferUsage> = {
 	uniform: "uniform",
 	"read-only-storage": "storage-read",
 	storage: "storage-read-write",
