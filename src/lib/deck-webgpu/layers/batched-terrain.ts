@@ -228,7 +228,7 @@ fn bt_vertex(t: BatchTile, i: f32, j: f32) -> vec4<f32> {
 
 // ---------- GPU store: height arrays, base grid + tile table buffers ----------
 
-const TEX_USAGE = { SAMPLE: 0x04, COPY_DST: 0x02 } as const;
+const TEX_USAGE = { SAMPLE: 0x04, COPY_DST: 0x02, COPY_SRC: 0x01 } as const;
 const BUF_USAGE = {
 	INDEX: 0x0010,
 	VERTEX: 0x0020,
@@ -262,7 +262,7 @@ class HeightPool {
 			width: this.size,
 			height: this.size,
 			depth: cap,
-			usage: TEX_USAGE.SAMPLE | TEX_USAGE.COPY_DST,
+			usage: TEX_USAGE.SAMPLE | TEX_USAGE.COPY_DST | TEX_USAGE.COPY_SRC,
 			sampler: {
 				minFilter: "nearest",
 				magFilter: "nearest",
@@ -466,6 +466,16 @@ class TileStore {
 /** A compact instance buffer (uint32 table rows) for one (pass kind, seg). */
 type InstBuf = { buf: Buffer; cap: number; rows?: Uint32Array };
 
+/** Where the batched terrain keeps each tile's heights (BatchedTerrainCore.residentHeights). */
+export type ResidentHeights = {
+	/** r32float 2d-array, SMALL² layers (tiles of size <= 256; a tile of size S fills the top-left S x S) */
+	small: Texture;
+	/** r32float 2d-array, BIG² layers (size 257..512) */
+	big: Texture;
+	/** the tile object's slot, or null when it is not resident (no grid, over a device limit, not yet synced) */
+	slotOf(tile: object): { layer: number; big: boolean } | null;
+};
+
 export type BatchedTerrainStats = {
 	tiles: number;
 	overflow: number;
@@ -549,6 +559,23 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		this.stats.tiles = this.store.slots.size;
 		this.stats.overflow = this.store.overflow;
 		this.stats.uploadMs += performance.now() - t0;
+	}
+
+	/**
+	 * The DEM heights resident on this device, for GPU consumers that gather from them (the relief
+	 * field's height raster, gpu/look/relief-heights.ts): the two r32float height arrays (COPY_SRC)
+	 * and each tile's slot. The arrays are re-created when they grow, so ask again per use.
+	 */
+	residentHeights(): ResidentHeights {
+		const { small, big, slots } = this.store;
+		return {
+			small: small.tex,
+			big: big.tex,
+			slotOf: (t) => {
+				const s = slots.get(t as TileMesh);
+				return s ? { layer: s.layer, big: s.big } : null;
+			},
+		};
 	}
 
 	/** Point tiles at their ImageryArray layers (one table write when any changed). */

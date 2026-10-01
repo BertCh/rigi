@@ -38,6 +38,7 @@
 // outputs as raw bytes, NaN inputs included.
 import { Buffer, type Device, Texture } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
+import type { GraphBufferHandle } from "../core/luma";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import {
 	K_RELIEF_DOWN,
@@ -83,12 +84,14 @@ export function buildReliefGraph<P extends Params | undefined = Params>(
 	_degenerate?: boolean,
 	unsafeSkipClears = false,
 	out: "read" | "texture" = "read",
+	/** heights produced earlier in this graph (relief-heights.ts); default: an imported "H" */
+	hIn?: GraphBufferHandle,
 ) {
 	const resH = res >> 1;
 	const NH = resH * resH;
 	const sz = reliefScratchBytes(res);
 	const prm = g.importBuffer("prm", prmBytes, undefined, UNIFORM);
-	const H = g.importBuffer("H", hBytes);
+	const H = hIn ?? g.importBuffer("H", hBytes);
 	const t = (id: keyof typeof sz) => g.transientBuffer(id, sz[id]);
 	const shadow = t("shadow");
 	const Hh = t("Hh");

@@ -64,6 +64,11 @@ import { lookGpuOn, trackLook } from "#/lib/gpu/look/opt-in";
 import { reliefHeights, reliefWords } from "#/lib/gpu/look/relief";
 import { reliefGraphToTextures } from "#/lib/gpu/look/relief-graph";
 import {
+	type HeightResidency,
+	planReliefHeights,
+	reliefGraphToTexturesGpuHeights,
+} from "#/lib/gpu/look/relief-heights";
+import {
 	bandStatsTex,
 	type HazePrepResult,
 	hazePrepTex,
@@ -148,6 +153,12 @@ export class LookBridge {
 	version = 0;
 	/** A pass landed (the engine re-applies the look). */
 	onAsync?: () => void;
+	/**
+	 * The batched terrain's resident DEM tiles. Set: the relief field's height raster is gathered
+	 * in WGSL from them (relief-heights.ts) whenever every tile in range is resident, else the CPU
+	 * raster (reliefHeights) is used for that build. Null: always the CPU raster.
+	 */
+	heightSource: (() => HeightResidency) | null = null;
 	readonly timing: {
 		masks: BridgeTiming[];
 		stats: BridgeTiming[];
@@ -380,7 +391,13 @@ export class LookBridge {
 	): Promise<ResidentReliefField | null> {
 		if (this.destroyed) return null;
 		const t0 = performance.now();
-		const { res, extent, px, H } = reliefHeights(o.tiles, o.frame, o.yawDeg);
+		const resident = this.heightSource?.() ?? null;
+		const gather = resident
+			? planReliefHeights(this.device, o.tiles, o.frame, o.yawDeg, resident)
+			: null;
+		// the CPU raster only when the GPU gather cannot run (or fails below)
+		let cpu = gather ? null : reliefHeights(o.tiles, o.frame, o.yawDeg);
+		const { res, extent, px } = gather ?? (cpu as NonNullable<typeof cpu>);
 		const { words, degenerate } = reliefWords(res, px, o.sunDir);
 		const tex = (id: string) =>
 			this.device.createTexture({
@@ -398,14 +415,30 @@ export class LookBridge {
 		};
 		const cpuMs = performance.now() - t0;
 		try {
-			await reliefGraphToTextures(
-				this.device,
-				H,
-				res,
-				words,
-				degenerate,
-				textures,
-			);
+			if (gather && resident) {
+				try {
+					await reliefGraphToTexturesGpuHeights(
+						this.device,
+						gather,
+						resident,
+						words,
+						degenerate,
+						textures,
+					);
+				} catch (e) {
+					console.warn("[relief] GPU height gather failed, CPU raster", e);
+					cpu = reliefHeights(o.tiles, o.frame, o.yawDeg);
+				}
+			}
+			if (cpu)
+				await reliefGraphToTextures(
+					this.device,
+					cpu.H,
+					res,
+					words,
+					degenerate,
+					textures,
+				);
 		} catch (e) {
 			dispose();
 			throw e;

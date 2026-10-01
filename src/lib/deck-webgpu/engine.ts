@@ -377,6 +377,10 @@ export type WebGpuEngineOptions = {
 	/** With the bridge on: the fitted haze on the geometry target too (default true; false = the
 	 * haze fit keeps the range readback path while masks / stats stay bridged). See setHazeBridge. */
 	hazeBridge?: boolean;
+	/** With the bridge on: the relief field's height raster gathered in WGSL from the batched
+	 * terrain's resident DEM tiles ("gpu", default; falls back per build to the CPU raster when a
+	 * tile is not resident) or always rasterised on the CPU ("cpu"). */
+	reliefHeights?: "gpu" | "cpu";
 	/** autoAlign's silhouette re-rank scored by a WGSL mask kernel on the geometry targets
 	 * (default true; deck/silhouette-mask.ts: identical scores by construction, 18 KB read per
 	 * pose instead of the rgba32float range). false = the CPU scorer, which also runs per pose
@@ -812,6 +816,9 @@ export class WebGpuEngine implements Renderer {
 			this.updateLook();
 			if (this.world?.controls) this.sync();
 		};
+		const terrain = gpu.terrain;
+		if (this.opts.reliefHeights !== "cpu" && "residentHeights" in terrain)
+			b.heightSource = () => terrain.residentHeights();
 		gpu.bridge = b;
 		this.compLook.setSky(this.skyMaskStore);
 		this.refitHaze();
