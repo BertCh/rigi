@@ -594,13 +594,23 @@ export const GPU_MODULES: readonly GpuModule[] = [
 	{
 		id: "look-stats",
 		island: "I9",
-		paths: ["src/lib/gpu/look/color-stats-graph.ts"],
+		paths: [
+			"src/lib/gpu/look/color-stats-graph.ts",
+			"src/lib/gpu/look/color-stats-fold.ts",
+		],
 		groups: ["look-stats"],
 		realms: ["page"],
 		cadence: "per settle",
-		resources: ["photo, layer, range, fg, LUT (imports)"],
-		readbacks: ["partial: band stats partial sums (f64 fold on the CPU)"],
+		resources: [
+			"photo, layer, range, fg, LUT, params (imports)",
+			"partial, folded (GPUProgram vectors), stats (transient)",
+		],
+		readbacks: [
+			"stats: folded ColorStats 256 B (?statsFold=f64: the 6.6 KB partials, f64 fold on the CPU)",
+		],
 		status: "default",
+		notes:
+			"WAG-4: a luma GPUProgram lowered onto one ComputeGraph (core/program.ts): BAND_STATS(_SG) → GPUProgramSpMV fold → BAND_FINALIZE (f32); subgroups by default where available",
 	},
 	{
 		id: "look-haze",
@@ -666,7 +676,9 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		resources: [
 			"renderer targets (geometry, photo, sky / fg masks, layer) as textures",
 		],
-		readbacks: ["band stats partials; haze head"],
+		readbacks: [
+			"band stats: folded ColorStats 256 B (f64: partials); haze head",
+		],
 		status: "default",
 		notes:
 			"texture-input look passes; its own per-key graph cache (not core cachedGraph). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)",

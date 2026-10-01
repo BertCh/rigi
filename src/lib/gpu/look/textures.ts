@@ -58,7 +58,6 @@ import {
 import { type ColorStats, N_BANDS } from "#/lib/look/color-stats";
 import { gridSize, MASK_LONG_SIDE } from "#/lib/look/composite";
 import { srgbToLinear } from "#/lib/style/color";
-import { hasFeature } from "../core/device";
 import { ComputeGraph, type GraphBinding } from "../core/graph";
 import {
 	type BindKind,
@@ -76,8 +75,20 @@ import type {
 } from "../core/luma";
 import { acquire, withLease } from "../core/pool";
 import { stageReads } from "../core/readback";
-import { finalizeBands } from "./color-stats";
+import {
+	finalizeBands,
+	statsParamWords,
+	statsSubgroupsOn,
+} from "./color-stats";
 import { BAND_STATS, BAND_STATS_SG, STATS_VALUES } from "./color-stats.wgsl";
+import {
+	buildFoldGraph,
+	markFoldFailed,
+	STATS_BYTES,
+	statsFoldOn,
+	statsFromWords,
+	subgroupLayoutFailed,
+} from "./color-stats-fold";
 import {
 	PACK_MASKS,
 	TEX_FGBITS,
@@ -1089,8 +1100,14 @@ export type StatsTexInput = {
 };
 
 export type StatsTexResult = {
-	/** per-workgroup partial sums (32 × 52 f32) on the GPU */
-	partial: Buffer;
+	/**
+	 * the result on the GPU: with the GPU fold (?statsFold=gpu, the default) the folded ColorStats words
+	 * (STATS_WORDS f32, color-stats-fold.wgsl.ts STATS_LAYOUT); with ?statsFold=f64 the per-workgroup
+	 * partial sums (32 × 52 f32)
+	 */
+	buffer: Buffer;
+	/** which of the two `buffer` holds */
+	fold: "gpu" | "f64";
 	/** with `read` (default true): the ColorStats CompositeLook.stats holds */
 	stats: ColorStats | null;
 };
@@ -1099,14 +1116,15 @@ const SRGB_LUT_STATS = Float32Array.from({ length: 256 }, (_, i) => {
 	const c = i / 255;
 	return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 });
+// color-stats.ts GROUPS (statsParamWords dispatches GROUPS × WG invocations)
 const SGROUPS = 32;
-const SWG = 64;
+const PARTIAL_BYTES = SGROUPS * STATS_VALUES * 4;
 
 /** bandStatsTex' validated inputs and graph key (shared by bandStatsTex and encodeBandStatsTex). */
 function statsPlan(
 	device: Device,
 	input: StatsTexInput,
-	opts: { subgroups?: boolean },
+	opts: { subgroups?: boolean; fold?: "gpu" | "f64" },
 ) {
 	const geo = src(input.geometry);
 	const layer = src(input.layer);
@@ -1121,108 +1139,137 @@ function statsPlan(
 	const n = w * h;
 	const gw = geo.texture.width;
 	const gh = geo.texture.height;
-	const sg = (opts.subgroups ?? false) && hasFeature(device, "subgroups");
+	const sg = statsSubgroupsOn(device, opts.subgroups);
+	const fold: "gpu" | "f64" = statsFoldOn(device, opts.fold) ? "gpu" : "f64";
 	const key = [
 		"stats",
+		fold,
 		+sg,
 		texKey(geo),
 		texKey(layer),
 		texKey(photo),
 		texKey(fg),
 	].join("|");
-	return { geo, layer, photo, fg, w, h, n, gw, gh, sg, key };
+	const outBytes = fold === "gpu" ? STATS_BYTES : PARTIAL_BYTES;
+	return { geo, layer, photo, fg, w, h, n, gw, gh, sg, fold, key, outBytes };
 }
 
 type StatsPlan = ReturnType<typeof statsPlan>;
 
-/** The compiled band-stats graph of `plan` (cached; extra = its per-call parameter buffer). */
-function statsGraph(device: Device, plan: StatsPlan) {
-	const { geo, layer, photo, fg, w, h, n, gw, gh, sg, key } = plan;
-	return cachedGraph(device, key, () => {
-		const g = new ComputeGraph(device, `look-tex-${key}`);
-		const owned: (Buffer | Texture)[] = [];
-		const c = constants(g, owned);
-		const words = addPhoto(g, c, photo, w, h, "photo");
-		const tab = new Uint32Array(2 * w + 2 * h);
-		for (let x = 0; x < w; x++) tab[x] = Math.floor(((x + 0.5) * gw) / w);
-		for (let y = 0; y < h; y++) tab[w + y] = Math.floor(((y + 0.5) * gh) / h);
-		if (fg) {
-			for (let x = 0; x < w; x++)
-				tab[w + h + x] = maskIndex(x, w, fg.texture.width);
-			for (let y = 0; y < h; y++)
-				tab[2 * w + h + y] = maskIndex(y, h, fg.texture.height);
-		}
-		const range = g.transientBuffer("range", n * 4);
-		const lay = g.transientBuffer("layer", n * 16);
-		const fgv = g.transientBuffer("fgv", n * 4);
-		addTexNode(
-			g,
-			"gather",
-			K_TEX_STATS,
-			{
-				prm: c.uniform(
-					"gather-prm",
-					u32Words(
-						w,
-						h,
-						gh,
-						+geo.flip,
-						+layer.flip,
-						+!!fg,
-						+!!fg?.flip,
-						fg?.texture.height ?? 1,
-						+(geo.texture.format === "r32float"),
-						0,
-						0,
-						0,
-					),
+/** The gather node and the band-stats node of `plan` on `g`, writing `partial`. */
+function addStatsNodes(
+	g: ComputeGraph,
+	c: ReturnType<typeof constants>,
+	plan: StatsPlan,
+	prm: GraphBinding,
+	partial: GraphBinding,
+) {
+	const { geo, layer, photo, fg, w, h, n, gw, gh, sg } = plan;
+	const words = addPhoto(g, c, photo, w, h, "photo");
+	const tab = new Uint32Array(2 * w + 2 * h);
+	for (let x = 0; x < w; x++) tab[x] = Math.floor(((x + 0.5) * gw) / w);
+	for (let y = 0; y < h; y++) tab[w + y] = Math.floor(((y + 0.5) * gh) / h);
+	if (fg) {
+		for (let x = 0; x < w; x++)
+			tab[w + h + x] = maskIndex(x, w, fg.texture.width);
+		for (let y = 0; y < h; y++)
+			tab[2 * w + h + y] = maskIndex(y, h, fg.texture.height);
+	}
+	const range = g.transientBuffer("range", n * 4);
+	const lay = g.transientBuffer("layer", n * 16);
+	const fgv = g.transientBuffer("fgv", n * 4);
+	addTexNode(
+		g,
+		"gather",
+		K_TEX_STATS,
+		{
+			prm: c.uniform(
+				"gather-prm",
+				u32Words(
+					w,
+					h,
+					gh,
+					+geo.flip,
+					+layer.flip,
+					+!!fg,
+					+!!fg?.flip,
+					fg?.texture.height ?? 1,
+					+(geo.texture.format === "r32float"),
+					0,
+					0,
+					0,
 				),
-				tab: c.storage("gather-tab", tab),
-				geo: importSampled(g, "geo", geo),
-				layerT: importSampled(g, "layer-tex", layer),
-				fgT: importSampled(g, "fg", fg),
-				range,
-				layer: lay,
-				fgv,
-			},
-			Math.ceil(n / WG),
-		);
-		// per call: minRange (bandStatsGpu's words)
-		const prmBuf = uniform(device, new ArrayBuffer(20));
+			),
+			tab: c.storage("gather-tab", tab),
+			geo: importSampled(g, "geo", geo),
+			layerT: importSampled(g, "layer-tex", layer),
+			fgT: importSampled(g, "fg", fg),
+			range,
+			layer: lay,
+			fgv,
+		},
+		Math.ceil(n / WG),
+	);
+	g.addKernel({
+		id: "band-stats",
+		spec: sg ? K_BAND_STATS_SG : K_BAND_STATS,
+		bindings: {
+			prm,
+			photo: words,
+			layer: lay,
+			range,
+			fg: fgv,
+			lut: c.storage("lut", SRGB_LUT_STATS),
+			partial,
+		},
+		workgroups: [SGROUPS],
+	});
+}
+
+/**
+ * The compiled band-stats graph of `plan` (cached; extra = its per-call parameter buffer). The output
+ * import "out" (bound per run) receives the folded ColorStats words (GPU fold: a GPUProgram lowered
+ * onto the graph, color-stats-fold.ts) or the partials (?statsFold=f64).
+ */
+function statsGraph(device: Device, plan: StatsPlan) {
+	return cachedGraph(device, plan.key, () => {
+		const owned: (Buffer | Texture)[] = [];
+		// per call: minRange / minCount (bandStatsGpu's words)
+		const prmBuf = uniform(device, new ArrayBuffer(24));
 		owned.push(prmBuf);
-		g.addKernel({
-			id: "band-stats",
-			spec: sg ? K_BAND_STATS_SG : K_BAND_STATS,
-			bindings: {
-				prm: g.importBuffer("stats-prm", prmBuf.byteLength, prmBuf, UNIFORM),
-				photo: words,
-				layer: lay,
-				range,
-				fg: fgv,
-				lut: c.storage("lut", SRGB_LUT_STATS),
-				partial: g.importBuffer("partial", SGROUPS * STATS_VALUES * 4),
-			},
-			workgroups: [SGROUPS],
-		});
+		const importPrm = (g: ComputeGraph) =>
+			g.importBuffer("stats-prm", prmBuf.byteLength, prmBuf, UNIFORM);
+		let g: ComputeGraph;
+		if (plan.fold === "gpu") {
+			g = buildFoldGraph(device, `look-tex-${plan.key}`, SGROUPS, {
+				params: importPrm,
+				produce: (pg, partial, prm) =>
+					addStatsNodes(pg, constants(pg, owned), plan, prm, partial),
+				output: (pg) => pg.importBuffer("out", STATS_BYTES),
+			}).graph;
+		} else {
+			g = new ComputeGraph(device, `look-tex-${plan.key}`);
+			addStatsNodes(
+				g,
+				constants(g, owned),
+				plan,
+				importPrm(g),
+				g.importBuffer("out", PARTIAL_BYTES),
+			);
+		}
 		g.compile();
-		return { graph: g as ComputeGraph, owned, extra: prmBuf };
+		return { graph: g, owned, extra: prmBuf };
 	});
 }
 
 /** bandStatsTex' parameter words (bandStatsGpu's). */
-function statsWords(plan: StatsPlan, minRange: number) {
-	const pw = new ArrayBuffer(20);
-	new Uint32Array(pw, 0, 4).set([
-		plan.w,
-		plan.h,
-		SGROUPS * SWG,
-		plan.fg ? 1 : 0,
-	]);
-	new Float32Array(pw, 16, 1)[0] = minRange;
-	return new Uint8Array(pw);
+function statsWords(plan: StatsPlan, minRange: number, minCount: number) {
+	return new Uint8Array(
+		statsParamWords(plan.w, plan.h, !!plan.fg, minRange, minCount),
+	);
 }
 
-/** bandStatsGpu's float64 fold of the partials (keep in sync). */
+/** bandStatsGpu's float64 fold of the partials (keep in sync; ?statsFold=f64). */
 function foldPartials(data: ArrayBuffer, minCount: number): ColorStats {
 	const p = new Float32Array(data);
 	const acc = new Float64Array(N_BANDS * 12);
@@ -1236,78 +1283,113 @@ function foldPartials(data: ArrayBuffer, minCount: number): ColorStats {
 	return finalizeBands(acc, cnt, minCount);
 }
 
+/** The read-back result as ColorStats; null when BAND_STATS_SG's layout check failed. */
+function statsOf(plan: StatsPlan, data: ArrayBuffer, minCount: number) {
+	if (plan.fold === "gpu")
+		return plan.sg && subgroupLayoutFailed(data) ? null : statsFromWords(data);
+	if (plan.sg && new Float32Array(data).some((v, i) => i % 13 === 0 && v < 0))
+		return null;
+	return foldPartials(data, minCount);
+}
+
 /**
- * CompositeLook.setStats' GPU band stats from textures: one submit, 6.6 KB back (or none).
- * `subgroups` as bandStatsGpu's (default off). This path can't see BAND_STATS_SG's -1
- * layout-check partials without reading back, so only opt in where the layout check is known to pass.
+ * CompositeLook.setStats' GPU band stats from textures: one submit, 256 B back with the GPU fold (the
+ * default; 6.6 KB with ?statsFold=f64), or none (`read: false`: the result stays in `buffer`).
+ * `subgroups` as bandStatsGpu's (default ?statsSubgroups, on where the device has them). When
+ * BAND_STATS_SG's layout check fails, a read call re-runs without subgroups; without a read, the
+ * folded words say valid = -1 (a GPU consumer treats them as invalid stats).
  */
 export function bandStatsTex(
 	device: Device,
 	input: StatsTexInput,
-	opts: { read?: boolean; subgroups?: boolean } = {},
+	opts: { read?: boolean; subgroups?: boolean; fold?: "gpu" | "f64" } = {},
 ): Promise<StatsTexResult> {
 	const plan = statsPlan(device, input, opts);
-	const { geo, layer, photo, fg } = plan;
+	const { geo, layer, photo, fg, fold, outBytes } = plan;
 	const read = opts.read ?? true;
+	const minCount = input.minCount ?? 60;
 	return withLease(PASS.stats, async () => {
 		assertAlive(device, [geo, layer, photo, fg]);
 		const e = statsGraph(device, plan);
-		(e.extra as Buffer).write(statsWords(plan, input.minRange ?? 0));
-		const bytes = SGROUPS * STATS_VALUES * 4;
-		const partial = slot(device, "stats", "partial", bytes);
+		(e.extra as Buffer).write(statsWords(plan, input.minRange ?? 0, minCount));
+		const buffer = slot(device, "stats", `out-${fold}`, outBytes);
 		const { data } = await e.graph.run(undefined, {
-			buffers: { partial },
+			buffers: { out: buffer },
 			textures: {
 				geo: geo.texture,
 				"layer-tex": layer.texture,
 				"photo-tex": photo.texture,
 				fg: fg?.texture ?? dummyMask(device),
 			},
-			read: read ? reads([[partial, bytes]]) : [],
+			read: read ? reads([[buffer, outBytes]]) : [],
 		});
-		if (!read) return { partial, stats: null };
-		return { partial, stats: foldPartials(data[0], input.minCount ?? 60) };
-	});
+		if (!read) return { buffer, fold, stats: null };
+		const stats = statsOf(plan, data[0], minCount);
+		if (stats) return { buffer, fold, stats };
+		// the subgroup layout check failed: the plain reduction (outside this lease: re-queue)
+		return null;
+	}).then(
+		(r) =>
+			r ??
+			bandStatsTex(device, input, { ...opts, subgroups: false, read: true }),
+		(e) => {
+			if (fold !== "gpu") throw e;
+			// the fold graph faulted: the f64 fold (and from now on, on this device)
+			markFoldFailed(device, e);
+			return bandStatsTex(device, input, { ...opts, fold: "f64" });
+		},
+	);
 }
 
 /** encodeBandStatsTex's own parameter buffer per device (the graph's is the stats lease's). */
 const encStatsPrm = new WeakMap<Device, Buffer>();
 
 /**
- * bandStatsTex recorded into the CALLER's encoder, with its 6.6 KB readback staged on it (WAG W1.2:
- * the stats layer render's own encoder, so render + stats are one submit instead of two). Same plan,
- * same cached compiled graph, same parameter words and the same f64 fold, so the same ColorStats.
- * Own parameter / partial buffers (the stats lease's may belong to a queued bandStatsTex).
+ * bandStatsTex recorded into the CALLER's encoder, with its readback (256 B with the GPU fold) staged
+ * on it (WAG W1.2: the stats layer render's own encoder, so render + stats are one submit instead of
+ * two). Same plan, same cached compiled graph, same parameter words and the same fold, so the same
+ * ColorStats. Own parameter / output buffers (the stats lease's may belong to a queued bandStatsTex).
  * Submit `encoder` synchronously after this returns (see encodeMasksTex), then call read(); if
  * the submit throws, call cancel() (it returns the staged readback slot). Every check runs before
- * anything is recorded.
+ * anything is recorded. A failed subgroup layout check resolves through a bandStatsTex re-run
+ * without subgroups (the textures must still be alive: they are until read() resolves).
  */
 export function encodeBandStatsTex(
 	device: Device,
 	encoder: CommandEncoder,
 	input: StatsTexInput,
-	opts: { subgroups?: boolean } = {},
+	opts: { subgroups?: boolean; fold?: "gpu" | "f64" } = {},
 ): { read: () => Promise<StatsTexResult>; cancel: () => void } {
-	const plan = statsPlan(device, input, opts);
+	let plan = statsPlan(device, input, opts);
 	const { geo, layer, photo, fg } = plan;
 	assertAlive(device, [geo, layer, photo, fg]);
-	const e = statsGraph(device, plan);
+	let e: ReturnType<typeof statsGraph>;
+	try {
+		e = statsGraph(device, plan);
+	} catch (err) {
+		if (plan.fold !== "gpu") throw err;
+		// building the fold graph faulted: the f64 fold (and from now on, on this device)
+		markFoldFailed(device, err);
+		plan = statsPlan(device, input, { ...opts, fold: "f64" });
+		e = statsGraph(device, plan);
+	}
+	const { fold, outBytes } = plan;
 	if (!e.graph.isCompiled)
 		throw new Error("[lookgpu] stats graph not compiled");
 	const graphPrm = e.extra as Buffer;
 	let prm = encStatsPrm.get(device);
 	if (!prm || prm.destroyed || prm.byteLength !== graphPrm.byteLength) {
 		prm?.destroy();
-		prm = uniform(device, new ArrayBuffer(20));
+		prm = uniform(device, new ArrayBuffer(24));
 		encStatsPrm.set(device, prm);
 	}
-	prm.write(statsWords(plan, input.minRange ?? 0));
-	const bytes = SGROUPS * STATS_VALUES * 4;
-	const partial = slot(device, "stats-enc", "partial", bytes);
+	const minCount = input.minCount ?? 60;
+	prm.write(statsWords(plan, input.minRange ?? 0, minCount));
+	const buffer = slot(device, "stats-enc", `out-${fold}`, outBytes);
 	e.graph.encode(
 		encoder,
 		undefined,
-		{ partial, "stats-prm": prm },
+		{ out: buffer, "stats-prm": prm },
 		{
 			geo: geo.texture,
 			"layer-tex": layer.texture,
@@ -1315,11 +1397,17 @@ export function encodeBandStatsTex(
 			fg: fg?.texture ?? dummyMask(device),
 		},
 	);
-	const staged = stageReads(device, encoder, reads([[partial, bytes]]));
+	const staged = stageReads(device, encoder, reads([[buffer, outBytes]]));
 	return {
 		read: async () => {
 			const [data] = await staged.read();
-			return { partial, stats: foldPartials(data, input.minCount ?? 60) };
+			const stats = statsOf(plan, data, minCount);
+			if (stats) return { buffer, fold, stats };
+			return bandStatsTex(device, input, {
+				...opts,
+				subgroups: false,
+				read: true,
+			});
 		},
 		cancel: () => staged.cancel(),
 	};

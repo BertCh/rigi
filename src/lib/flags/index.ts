@@ -81,6 +81,18 @@ export const FLAG_SCHEMA = {
 	 */
 	unknownGpu: onOff("on"),
 	/**
+	 * band colour stats (LOOK_HARMONIZE, src/lib/gpu/look/color-stats-fold.ts): gpu (default since
+	 * 2026-10-01) = the per-workgroup partials are folded and finalized on the GPU (luma GPUProgramSpMV +
+	 * a finalize node, f32) and only the ColorStats (256 B) is read back; f64 = the partials (6.6 KB) come
+	 * back and the CPU folds them in float64. Same composite in the measured photos (see the README).
+	 */
+	statsFold: oneOf(["f64", "gpu"], "gpu"),
+	/**
+	 * band colour stats: the per-workgroup reduction by subgroupAdd where the device has subgroups
+	 * (BAND_STATS_SG, with its layout check and plain fallback); off = the shared-memory tree
+	 */
+	statsSubgroups: onOff("on"),
+	/**
 	 * WebGPU batched terrain: GPU frustum cull + indirect draws (WAG W1.5; byte-identical frames to the
 	 * CPU cull, scripts/deck-webgpu/terrain-indirect-check.mjs); off = the CPU cull. Default on since
 	 * 2026-10-01 (GPU-graph first; no CPU saving at ~350–390 tiles, but no loss). WebGL and ?gpu=off

@@ -198,6 +198,20 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "statsFold",
+		label: "Band stats fold",
+		help: "gpu: the colour-harmonise band stats are folded and finalized on the GPU (f32, luma GPUProgram) and only 256 B come back; f64: the partial sums are folded on the CPU.",
+		group: "compute",
+		options: { gpu: "GPU (default)", f64: "f64 (CPU)" },
+	},
+	{
+		name: "statsSubgroups",
+		label: "Band stats subgroups",
+		help: "Reduce the band stats per workgroup with subgroupAdd where the device has subgroups (layout-checked, plain fallback).",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
 		name: "unknownGpu",
 		label: "Unknown-pose 360° horizon",
 		help: "GPU 360° horizon for photos without a compass heading or gravity (off: the CPU march). Same accept decisions within the CPU horizon's own noise.",

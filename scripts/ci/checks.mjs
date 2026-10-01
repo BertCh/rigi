@@ -272,6 +272,14 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "stats-fold",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/gpu/look/color-stats-fold.check.ts", "12"),
+		note: "band-stats fold on the GPU (?statsFold=gpu, WAG-4): CPU emulation of BAND_STATS(_SG) partials + f32 SpMV fold + BAND_FINALIZE vs reduceBands f64 on 12 synthetic scenes (|Δ| ≤ 2e-5, harmonize bytes ≤ 1 LSB on < 0.5 %); CSR partition; finalize edge cases; subgroup-marker; teeth (no GPU)",
+		timeoutS: 120,
+	},
+	{
 		id: "bridge-fusion",
 		tier: "fast",
 		group: "look",

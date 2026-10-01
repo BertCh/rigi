@@ -45,7 +45,7 @@
 //   render (renderSeq), the same photo, P(sky) and people masks, and no blend cut (the cut plane is
 //   sampled from the CPU range readback, which a draw-time encode does not have). Anything else
 //   runs the pass as before.
-// - band stats: encodeStats() records bandStatsTex (with its 6.6 KB readback staged) for the stats
+// - band stats: encodeStats() records bandStatsTex (with its 256 B readback staged) for the stats
 //   layer render: render + stats are one submit instead of two. The stats keep their own render,
 //   timer and key (they wait for the haze fit's CPU range through layerGen); the key is taken only
 //   once the submit went through, so a dropped one is retried.
@@ -503,7 +503,7 @@ export class LookBridge {
 	 * record it on its own encoder after that render's passes, submit both together (core
 	 * submitWithDefault), then call `after()` once submitted (it resolves as setStats does) or
 	 * `cancel()` if it was not. Same graph, parameters and
-	 * f64 fold as setStats. Null = nothing recorded (destroyed, or a check failed).
+	 * fold as setStats. Null = nothing recorded (destroyed, or a check failed).
 	 */
 	encodeStats(o: {
 		key: string;

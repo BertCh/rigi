@@ -5,8 +5,9 @@
 // WGSL for the GPU band statistics (twin of look/color-stats.ts bandInputs + reduceBands): per
 // pixel the photo's and the layer's Oklab, the validity mask (terrain beyond minRange, full layer
 // coverage, no people, ≥ 3 px from the sky) and the range band; then per band Σ and Σ² of both
-// Oklab triples and the count, reduced per workgroup. The CPU sums the per-workgroup partials in
-// float64 and applies reduceBands' std floors and empty-band back-fill.
+// Oklab triples and the count, reduced per workgroup. The per-workgroup partials are folded and
+// finalized (reduceBands' std floors and empty-band back-fill) on the GPU by default
+// (color-stats-fold.ts, f32), or read back and folded on the CPU in float64 (?statsFold=f64).
 // @workgroup_size(64): 13 × 4 bands = 52 partial sums per invocation in workgroup memory
 // (64 × 52 × 4 B = 13 KB, under the 16 KB limit); each invocation strides over ~20 pixels first.
 // BAND_STATS_SG is the same with subgroup reductions (needs the "subgroups" feature): equal up to
@@ -90,7 +91,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
  * workgroup memory, then invocation k < 52 adds sum k over the subgroups. Rows are indexed by
  * local_invocation_index / subgroup_size, which assumes subgroups are contiguous runs of it. That
  * holds for 1-D workgroups on Metal / Vulkan / D3D but WGSL doesn't guarantee it, so each subgroup
- * checks it and writes -1 partials when it fails (bandStatsGpu then re-runs BAND_STATS).
+ * checks it and writes -1e20 partials when it fails (bandStatsGpu then re-runs BAND_STATS).
  * The pixel loop runs in uniform control flow (the subgroup ops require it).
  */
 export const BAND_STATS_SG = /* wgsl */ `enable subgroups;
@@ -162,11 +163,13 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
   let sg = lid / ssz;
   // every lane of this subgroup in the same row (rows then map 1:1 to subgroups)
   let ok = subgroupAll(sg == subgroupBroadcastFirst(lid) / ssz);
-  // on a failed check every partial is -1 (a count is never negative). Not NaN: a NaN constant is a
-  // WGSL shader-creation error, and WGSL implementations may assume floats are never NaN
+  // on a failed check this subgroup's sums are all -1e20, so its workgroup's partials and any fold of
+  // them are hugely negative (a count is never negative, and no real count can offset -1e20). Not NaN:
+  // a NaN constant is a WGSL shader-creation error, and WGSL implementations may assume floats are
+  // never NaN
   for (var k = 0u; k < 52u; k++) {
     let v = subgroupAdd(acc[k]);
-    if (sid == 0u) { sh[sg][k] = select(-1.0, v, ok); }
+    if (sid == 0u) { sh[sg][k] = select(-1e20, v, ok); }
   }
   workgroupBarrier();
   if (lid < 52u) {
