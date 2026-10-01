@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 // Score the app's auto-alignment against hand-labelled control points (data/control-points.json).
 // Needs the dev server (default http://localhost:3100).
-// Usage: node scripts/eval-app.mjs [--renderer three|deck] [IMG_xxxx ...]
-// --renderer pins the engine (?renderer=); without it the app default runs. Either way each row records
-// the engine that actually ran (__engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu") and the summary names it.
+// Usage: node scripts/eval-app.mjs [--renderer three|deck|webgpu|auto] [IMG_xxxx ...]
+// --renderer pins the engine (?renderer=; deck = WebGL deck, webgpu = deck on WebGPU, auto = WebGPU where
+// available else WebGL deck); without it the app default runs. Either way each row records the engine that
+// actually ran (__engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu"; cross-checked against
+// the workspace's [data-renderer]) and the summary names it. A pinned engine that did not run fails the
+// run (webgpu falling back to WebGL deck included); auto only reports what ran.
+// webgpu / auto launch Chromium with the WebGPU flags (scripts/deck-webgpu/gpu-args.mjs).
 import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
+import { GPU_ARGS } from "./deck-webgpu/gpu-args.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const BASE = process.env.APP_URL ?? "http://localhost:3100";
@@ -22,8 +27,13 @@ for (let i = 0; i < argv.length; i++) {
 	else if (a.startsWith("--renderer=")) renderer = a.slice(11);
 	else only.push(a);
 }
-if (renderer != null && !["three", "deck"].includes(renderer)) {
-	console.error(`--renderer must be three or deck (got ${renderer})`);
+if (
+	renderer != null &&
+	!["three", "deck", "webgpu", "auto"].includes(renderer)
+) {
+	console.error(
+		`--renderer must be three, deck, webgpu or auto (got ${renderer})`,
+	);
 	process.exit(2);
 }
 const query = renderer ? `?renderer=${renderer}` : "";
@@ -31,7 +41,10 @@ const ids = Object.keys(cps).filter((id) => !only.length || only.includes(id));
 
 const browser = await chromium.launch({
 	headless: true,
-	args: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
+	args:
+		renderer === "webgpu" || renderer === "auto"
+			? GPU_ARGS
+			: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 });
 const rows = [];
 await Promise.all(
@@ -63,6 +76,10 @@ await Promise.all(
 			const d = (a, b) => ((((a - b) % 360) + 540) % 360) - 180;
 			return {
 				engine: e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three"),
+				dataRenderer:
+					document
+						.querySelector("[data-renderer]")
+						?.getAttribute("data-renderer") ?? null,
 				pins: n,
 				gtResid: e.pinError(gt, pins, cp.basis).mean,
 				priorErr: e.pinError(e.prior, pins, cp.basis).mean,
@@ -80,7 +97,16 @@ await Promise.all(
 );
 await browser.close();
 const engines = [...new Set(rows.map((r) => r.engine))];
-if (renderer && engines.some((k) => k !== renderer)) {
+const mismatch = rows.filter(
+	(r) => r.dataRenderer && r.dataRenderer !== r.engine,
+);
+if (mismatch.length) {
+	console.error(
+		`[data-renderer] disagrees with __engine on ${mismatch.map((r) => `${r.id} (${r.dataRenderer} vs ${r.engine})`).join(", ")}`,
+	);
+	process.exit(1);
+}
+if (renderer && renderer !== "auto" && engines.some((k) => k !== renderer)) {
 	console.error(
 		`--renderer ${renderer} asked for, but engines ran: ${engines.join(",")}`,
 	);
@@ -89,7 +115,7 @@ if (renderer && engines.some((k) => k !== renderer)) {
 rows.sort((a, b) => a.id.localeCompare(b.id));
 const f = (x, n = 2) => (Number.isFinite(x) ? x.toFixed(n) : "∞");
 console.log(
-	`engine: ${engines.join(",") || "-"}${renderer ? " (pinned)" : " (app default)"}`,
+	`engine: ${engines.join(",") || "-"}${renderer === "auto" ? " (auto)" : renderer ? " (pinned)" : " (app default)"}`,
 );
 console.log(
 	"photo     pins  gt-resid  prior-px  auto-px  Δyaw(prior) Δyaw(auto) Δpitch Δroll  gt-yaw-vs-prior  engine",

@@ -42,7 +42,7 @@
  *   --photos IMG_a,IMG_b              restrict the accuracy passes to these photos
  *   --perf-photos IMG_a,IMG_b,IMG_c   photos for the perf step (default: first, middle, last)
  *   --app-url http://localhost:3100   dev server (env APP_URL also works)
- *   --renderer three|deck             pin the engine on every /photo open (?renderer=; also passed to eval-app.mjs).
+ *   --renderer three|deck|webgpu|auto pin the engine on every /photo open (?renderer=; also passed to eval-app.mjs).
  *                                     Default: the app default. The engine that ran (__engine.kind ?? 'three'; 'webgpu' when __engine.backend is 'webgpu') is
  *                                     recorded per app/perf row and evalapp row, and as `engines` on those steps.
  *   --concurrency 3                   parallel pages in the app pass
@@ -148,6 +148,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+import { GPU_ARGS } from "./deck-webgpu/gpu-args.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 /** --renderer: pins ?renderer= on every /photo open (null = the app default). Set once in main(). */
@@ -1243,7 +1244,11 @@ async function stepMatcher(extra, ids) {
 }
 
 async function launchBrowser(chromium) {
-	const args = ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"];
+	// webgpu / auto need Chromium's WebGPU flags (scripts/deck-webgpu/gpu-args.mjs)
+	const args =
+		RENDERER === "webgpu" || RENDERER === "auto"
+			? GPU_ARGS
+			: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"];
 	try {
 		return await chromium.launch({ headless: true, args });
 	} catch {
@@ -3714,8 +3719,10 @@ function parseArgs(argv) {
 		else if (a === "--app-url") o.appUrl = next();
 		else if (a === "--renderer") {
 			o.renderer = next();
-			if (!["three", "deck"].includes(o.renderer))
-				throw new Error(`--renderer must be three or deck (got ${o.renderer})`);
+			if (!["three", "deck", "webgpu", "auto"].includes(o.renderer))
+				throw new Error(
+					`--renderer must be three, deck, webgpu or auto (got ${o.renderer})`,
+				);
 		} else if (a === "--concurrency") o.concurrency = Number(next());
 		else if (a === "--timeout-scale") o.scale = Number(next());
 		else if (a === "--out") o.out = next();

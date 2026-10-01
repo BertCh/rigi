@@ -5,7 +5,8 @@
 //          second opinion to settle ([data-verify] not "pending"), then window.__engine.autoAlign(true)
 //          (the same call PhotoWorkspace makes on load, without the second opinion) and its labels
 //          at that pose.
-//   deck:  the same on /photo/<id>?renderer=deck, plus its labels at three's pose.
+//   deck:  the same on /photo/<id>?renderer=<--renderer: deck (WebGL, default) | webgpu | auto>, plus its
+//          labels at three's pose. webgpu / auto launch Chromium with the WebGPU flags (gpu-args.mjs).
 // Pass: |Δyaw| ≤ 0.5° and label overlap (|A∩B| / |A∪B| at three's pose) ≥ 0.6, where a peak labelled
 // by one engine only still counts as agreeing when its occlusion margin (engine.ts peakLabels: terrain
 // range below the summit minus range·0.97 − 50) is within max(50 m, 1% of range) of that threshold in
@@ -13,15 +14,17 @@
 // is a coin toss.
 //
 // Usage: node scripts/deck-engine-smoke.mjs [--url http://localhost:3100] [--photos IMG_6958,...]
-//        [--out out/lead/deck-parity/deck-engine-smoke.json] [--headed]
+//        [--out out/lead/deck-parity/deck-engine-smoke.json] [--headed] [--renderer deck|webgpu|auto]
 // Needs the vite dev server (window.__engine is DEV-only). Exit 0 = all pass, 3 = some fail.
 // Both arms pass ?renderer= explicitly (the app default may be either) and each row records the
-// engine that actually ran (__engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu"); a run whose engine is not the one asked for fails.
+// engine that actually ran (__engine.kind ?? "three"; "webgpu" when __engine.backend is "webgpu", checked
+// against [data-renderer]); a run whose engine is not the one asked for fails (auto: whatever resolved).
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { GPU_ARGS } from "./deck-webgpu/gpu-args.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (k, d) => {
@@ -34,6 +37,11 @@ const OUT = resolve(
 	ROOT,
 	arg("out", "out/lead/deck-parity/deck-engine-smoke.json"),
 );
+const DECK = arg("renderer", "deck");
+if (!["deck", "webgpu", "auto"].includes(DECK)) {
+	console.error(`--renderer must be deck, webgpu or auto (got ${DECK})`);
+	process.exit(2);
+}
 const YAW_TOL = 0.5;
 const OVERLAP_MIN = 0.6;
 
@@ -68,7 +76,10 @@ const overlap = (a, b, marginsA = {}, marginsB = {}) => {
 
 const browser = await chromium.launch({
 	headless: !process.argv.includes("--headed"),
-	args: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
+	args:
+		DECK === "deck"
+			? ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"]
+			: GPU_ARGS,
 });
 
 async function run(id, renderer, threePose = null) {
@@ -101,6 +112,10 @@ async function run(id, renderer, threePose = null) {
 	const r = await page.evaluate(async (tp) => {
 		const e = window.__engine;
 		const engineKind = e.backend === "webgpu" ? "webgpu" : (e.kind ?? "three");
+		const dataRenderer =
+			document
+				.querySelector("[data-renderer]")
+				?.getAttribute("data-renderer") ?? null;
 		// occlusion margin per in-frame peak (m; > 0 = visible), as peakLabels tests it
 		const margins = () => {
 			const out = {};
@@ -152,6 +167,7 @@ async function run(id, renderer, threePose = null) {
 		}
 		return {
 			engineKind,
+			dataRenderer,
 			pose: res.pose,
 			confidence: res.confidence,
 			alignMs,
@@ -165,7 +181,11 @@ async function run(id, renderer, threePose = null) {
 		};
 	}, threePose);
 	await page.close();
-	if (r && r.engineKind !== renderer)
+	if (r?.dataRenderer && r.dataRenderer !== r.engineKind)
+		throw new Error(
+			`[data-renderer] ${r.dataRenderer} but __engine is ${r.engineKind}`,
+		);
+	if (r && renderer !== "auto" && r.engineKind !== renderer)
 		throw new Error(
 			`asked for renderer=${renderer} but __engine.kind is ${r.engineKind}`,
 		);
@@ -176,8 +196,8 @@ const rows = [];
 for (const id of IDS) {
 	process.stdout.write(`${id}: three… `);
 	const three = await run(id, "three").catch((e) => ({ error: String(e) }));
-	process.stdout.write("deck… ");
-	const deck = await run(id, "deck", three?.pose ?? null).catch((e) => ({
+	process.stdout.write(`${DECK}… `);
+	const deck = await run(id, DECK, three?.pose ?? null).catch((e) => ({
 		error: String(e),
 	}));
 	const dPose = deck?.pose;

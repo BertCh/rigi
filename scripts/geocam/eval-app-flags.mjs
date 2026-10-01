@@ -16,6 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chromium } from "playwright";
+import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const BASE = process.env.APP_URL;
@@ -35,8 +36,13 @@ const renderer = rendererEq
 	: args.includes("--renderer")
 		? args[args.indexOf("--renderer") + 1]
 		: null;
-if (renderer != null && !["three", "deck"].includes(renderer)) {
-	console.error(`--renderer must be three or deck (got ${renderer})`);
+if (
+	renderer != null &&
+	!["three", "deck", "webgpu", "auto"].includes(renderer)
+) {
+	console.error(
+		`--renderer must be three, deck, webgpu or auto (got ${renderer})`,
+	);
 	process.exit(2);
 }
 const rendererQuery = renderer ? `?renderer=${renderer}` : "";
@@ -84,7 +90,10 @@ const waterBody = JSON.stringify({ version: 0.6, elements: water });
 
 const browser = await chromium.launch({
 	headless: true,
-	args: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
+	args:
+		renderer === "webgpu" || renderer === "auto"
+			? GPU_ARGS
+			: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 });
 
 async function runArm(arm, armFlags) {
