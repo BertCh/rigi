@@ -469,9 +469,9 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"vis flags (transient)",
 		],
 		readbacks: [],
-		status: "default",
+		status: "opt-in",
 		notes:
-			"WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default on, WebGPU only; off / ?gpu=off / WebGL: the CPU twin visibleRows)",
+			"WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default off: no CPU saving measured; ?terrainGpuCull=on, WebGPU only; off / ?gpu=off / WebGL: the CPU twin visibleRows)",
 	},
 	{
 		id: "geo-query-gpu",

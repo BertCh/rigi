@@ -40,7 +40,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | sky-model | I6 | external | worker:sky (remote) | per photo | – | ORT WebGPU session (ORT's device, attached to luma) | – |
 | sky-refine | I6 | default | worker:sky (remote) | per photo | `sky-refine` | ORT P(sky) buffer (wrapped per run); guide, rgba, axis taps, LUT (pooled imports) | read: byte mask (+ float mask when asked) |
 | deck-webgpu-frame | I7 | default | page | per frame | – | geometry / colour / photo targets; TextureArrayAtlas height + imagery arrays | – |
-| terrain-gpu-cull | I7 | default | page | per frame | `terrain-cull-*` (uncached) | tile spheres + rows (import, per tile set); per-pass uniform, instance rows and indexed indirect records (imports, encoder ring); vis flags (transient) | – |
+| terrain-gpu-cull | I7 | opt-in | page | per frame | `terrain-cull-*` (uncached) | tile spheres + rows (import, per tile set); per-pass uniform, instance rows and indexed indirect records (imports, encoder ring); vis flags (transient) | – |
 | geo-query-gpu | I8 | default | page | per settle | – | geometry target rgba32float (render device) | verdicts 4 B per peak; gather 16 B per pixel; skyline 4 B per column |
 | look-guided | I9 | default | page | per settle | `look-guided` | guide I, inputs p0…pk, params (imports); t4, ab, t2, q (transients) | q: n·4 B per filtered mask |
 | look-stats | I9 | default | page | per settle | `look-stats` | photo, layer, range, fg, LUT (imports) | partial: band stats partial sums (f64 fold on the CPU) |
@@ -66,7 +66,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **skyglobal**: T6 skyline global search; not wired into the service
 - **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU
 - **deck-webgpu-frame**: deck.gl layers in one encoder; not a ComputeGraph
-- **terrain-gpu-cull**: WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default on, WebGPU only; off / ?gpu=off / WebGL: the CPU twin visibleRows)
+- **terrain-gpu-cull**: WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default off: no CPU saving measured; ?terrainGpuCull=on, WebGPU only; off / ?gpu=off / WebGL: the CPU twin visibleRows)
 - **geo-query-gpu**: single dispatches + core/readback, not ComputeGraphs
 - **look-guided**: array-input masks path (WebGL deck + sidecar); ?lookgpu=off keeps the CPU twin
 - **look-haze**: graph breaks for the f64 airlight band / tail on the CPU (D16, D18)
