@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
@@ -18,13 +19,29 @@ const OUT = resolve(ROOT, arg("out", "out/gpu/labels-seq/run.json"));
 const renderer = arg("renderer", "deck");
 const browser = await chromium.launch({
 	headless: true,
-	args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
+	args: [
+		"--use-angle=swiftshader",
+		"--enable-unsafe-swiftshader",
+		"--ignore-gpu-blocklist",
+	],
 });
-const ctx = await browser.newContext({ viewport: { width: 1120, height: 700 }, deviceScaleFactor: 1 });
-await ctx.routeWebSocket((u) => u.origin === new URL(BASE).origin.replace(/^http/, "ws"), () => {});
+const ctx = await browser.newContext({
+	viewport: { width: 1120, height: 700 },
+	deviceScaleFactor: 1,
+});
+await ctx.routeWebSocket(
+	(u) => u.origin === new URL(BASE).origin.replace(/^http/, "ws"),
+	() => {},
+);
 const page = await ctx.newPage();
-await page.goto(`${BASE}/photo/${id}?renderer=${renderer}`, { waitUntil: "load", timeout: 120000 });
-await page.waitForSelector("[data-ready]", { state: "attached", timeout: 300000 });
+await page.goto(`${BASE}/photo/${id}?renderer=${renderer}`, {
+	waitUntil: "load",
+	timeout: 120000,
+});
+await page.waitForSelector("[data-ready]", {
+	state: "attached",
+	timeout: 300000,
+});
 await page.evaluate(() => {
 	const e = window.__engine;
 	const s = { calls: 0, ms: 0, sample: 0 };
@@ -44,7 +61,8 @@ await page.evaluate(() => {
 const settle = async (ms = 4000) => {
 	await page.waitForTimeout(ms);
 	await page.evaluate(async () => {
-		for (let i = 0; i < 40 && !window.__engine.geometryReady?.(); i++) await new Promise((r) => setTimeout(r, 250));
+		for (let i = 0; i < 40 && !window.__engine.geometryReady?.(); i++)
+			await new Promise((r) => setTimeout(r, 250));
 	});
 	await page.waitForTimeout(1000);
 };
@@ -52,8 +70,9 @@ const snap = (label) =>
 	page.evaluate((label) => {
 		const e = window.__engine;
 		const r = (v) => Math.round(v * 1e6) / 1e6;
-		const mk = (a) => a.map((l) => [l.name, l.ele, r(l.u), r(l.v), r(l.rank), r(l.distKm)]);
-		const p = window.__probe;
+		const mk = (a) =>
+			a.map((l) => [l.name, l.ele, r(l.u), r(l.v), r(l.rank), r(l.distKm)]);
+		const _p = window.__probe;
 		const out = {
 			label,
 			ready: e.geometryReady?.(),
@@ -61,7 +80,11 @@ const snap = (label) =>
 			panorama: mk(e.peakLabels(100, { declutter: false })),
 			dom: [...document.querySelectorAll(".whitespace-nowrap")].map((el) => {
 				const b = el.getBoundingClientRect();
-				return [el.textContent, Math.round(b.left * 100) / 100, Math.round(b.top * 100) / 100];
+				return [
+					el.textContent,
+					Math.round(b.left * 100) / 100,
+					Math.round(b.top * 100) / 100,
+				];
 			}),
 			// frame cost over 3 s of idle frames after this snapshot
 			stats: null,
@@ -69,7 +92,9 @@ const snap = (label) =>
 		return out;
 	}, label);
 const frames = async (ms) => {
-	await page.evaluate(() => Object.assign(window.__probe, { calls: 0, ms: 0, sample: 0 }));
+	await page.evaluate(() =>
+		Object.assign(window.__probe, { calls: 0, ms: 0, sample: 0 }),
+	);
 	await page.waitForTimeout(ms);
 	return page.evaluate(() => ({ ...window.__probe }));
 };
@@ -84,7 +109,13 @@ const micro = await page.evaluate(() => {
 	Object.assign(s, { calls: 0, ms: 0, sample: 0 });
 	const t = performance.now();
 	for (let i = 0; i < 200; i++) e.peakLabels(e.style.labels.maxLabels);
-	return { frames: 200, wallMs: performance.now() - t, inPeakLabelsMs: s.ms, sampleAtCalls: s.sample, msPerFrame: s.ms / 200 };
+	return {
+		frames: 200,
+		wallMs: performance.now() - t,
+		inPeakLabelsMs: s.ms,
+		sampleAtCalls: s.sample,
+		msPerFrame: s.ms / 200,
+	};
 });
 console.log("micro", JSON.stringify(micro));
 steps.micro = micro;
@@ -115,6 +146,16 @@ await page.evaluate(() => {
 await settle(2000);
 steps.push({ ...(await snap("protectPeople-toggled")) });
 mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, JSON.stringify({ photo: id, renderer, micro, steps }, null, 1));
-console.log(steps.map((s) => `${s.label}: ready=${s.ready} classic=${s.classic.length} pano=${s.panorama.length} dom=${s.dom.length}` + (s.idle ? ` idle: ${s.idle.calls} calls, ${(s.idle.ms / Math.max(1, s.idle.calls)).toFixed(3)} ms/call, ${s.idle.sample} sampleAt` : "")).join("\n"));
+writeFileSync(
+	OUT,
+	JSON.stringify({ photo: id, renderer, micro, steps }, null, 1),
+);
+console.log(
+	steps
+		.map(
+			(s) =>
+				`${s.label}: ready=${s.ready} classic=${s.classic.length} pano=${s.panorama.length} dom=${s.dom.length}${s.idle ? ` idle: ${s.idle.calls} calls, ${(s.idle.ms / Math.max(1, s.idle.calls)).toFixed(3)} ms/call, ${s.idle.sample} sampleAt` : ""}`,
+		)
+		.join("\n"),
+);
 await browser.close();
