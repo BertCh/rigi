@@ -549,6 +549,22 @@ export const CHECKS = [
 		timeoutS: 1800,
 	},
 	{
+		id: "graph-plumbing-ab",
+		tier: "full",
+		group: "parity",
+		browser: true,
+		cmd: lock([
+			"node",
+			"scripts/gpu/graph-plumbing-ab.mjs",
+			"--url",
+			"{url}",
+			"--renderer",
+			"webgpu",
+		]),
+		note: "WAG graph plumbing, webgpu-pinned: silhouette-gpu, geo-query-gpu and splat-sort on core ComputeGraphs vs a replica of their former raw dispatches, byte-identical read-backs and order buffers; timing reported (not gated)",
+		timeoutS: 600,
+	},
+	{
 		id: "eval-app",
 		tier: "full",
 		group: "accuracy",
