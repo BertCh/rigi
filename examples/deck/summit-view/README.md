@@ -11,6 +11,8 @@ shoreline, ridges and skyline line up to within a pixel or two. Peak labels mark
 are both in the frame and not hidden behind nearer terrain. Earth curvature toggles the curvature
 drop and refraction lift. With it off, distant ridges rise above their position in the photo.
 
+The examples resolve `@luma.gl/*` and `@deck.gl/*` from this repository's vendored tarballs (`vendor/`), so run them from this repository (after `npm install` at the root); they are not meant to be copied out on their own.
+
 Run `npm start` from this folder (npm adds the ancestor `node_modules/.bin`, so the repository
 root's Vite is used), or `npx vite examples/deck/summit-view` from the repository root. Select
 the backend with `?backend=webgpu` or `?backend=webgl`. Without a query, the example uses
@@ -91,7 +93,7 @@ export its `CommonViewState` type by name, so `summit-view.ts` infers it from `V
   swisstopo swissALTI3D (Swiss OGD) and Copernicus GLO-30. Credit: © Mapterhorn.
 - **Peaks**: OpenStreetMap `natural=peak` nodes, © OpenStreetMap contributors, available under
   the [ODbL](https://www.openstreetmap.org/copyright).
-- **Photo availability**: Rigi keeps photos out of git (`*.jpg` is ignored) until their licence is settled, so a fresh clone has no `niederhorn.jpg`. The example then runs render-only: the Photo blend control is disabled, `diagnostics.photoLoaded` is false, and the smoke test skips the blend check. Copy `public/demo/photos/demo-01.jpg` here to enable it.
+- **Photo availability**: the photo is not distributed in the example directory; copy `public/demo/photos/demo-01.jpg` to `examples/deck/summit-view/niederhorn.jpg` to enable the photo layer (it stays gitignored there). Without it the example runs render-only: the Photo blend control is disabled, `diagnostics.photoLoaded` is false, and the smoke test skips the blend check. The pose in `scene-data.ts` is solved for the Niederhorn viewpoint, so use a photo taken there.
 - **Photo and pose**: `niederhorn.jpg` is Rigi demo photo `demo-01` (`public/demo/manifest.json`).
   The yaw, pitch, roll and field of view were solved by Rigi's skyline matcher against the
   Mapterhorn DEM.

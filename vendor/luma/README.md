@@ -19,9 +19,8 @@ the old workaround (`.npmrc` `legacy-peer-deps=true` plus `overrides` for every 
 ## Source
 
 - Repo: https://github.com/visgl/luma.gl
-- Build commit: `5e1b72ed20b3fd8e1fa94d1a60c713661d0642a6` (local branch `rigi-vendor`, not on
-  GitHub; archived in `~/mt-image-archive/2026-10-01-luma-deck-upstream/luma-rigi-branches.bundle`).
-  It is luma master `7d1d11e91d8c0936b1bf32a302dc760c04e7a0ae` ("Add height fog, rain, and snow with
+- Build commit: `5e1b72ed20b3fd8e1fa94d1a60c713661d0642a6` (an unofficial build, not an upstream release or
+  commit). It is luma master `7d1d11e91d8c0936b1bf32a302dc760c04e7a0ae` ("Add height fog, rain, and snow with
   a riverfront example (#3325)", 2026-09-30) with these PRs merged in order:
   - #3312 head `3981234311d5077b062a7a48436b41caf7d4b707`: `requiredLimits` in `DeviceProps`;
   - #3313 head `cc9e4b2ca6d26fa0460843a267727c5f2a4e4eda`: `WebGPUAdapter.attach()` for
@@ -58,6 +57,22 @@ the old workaround (`.npmrc` `legacy-peer-deps=true` plus `overrides` for every 
 - Gate: `npm ls @luma.gl/core @luma.gl/webgpu @math.gl/core` shows one copy of each, and
   `npm install` prints no peer warnings.
 
+## Licence
+
+MIT, Copyright (c) vis.gl contributors: see `LICENSE` in this directory (verbatim from upstream luma.gl).
+
+## Checksums (SHA-256)
+
+```
+ae42cbeb99638df14c5c624d1e1a1ade3a161148cde0bb595e8d4bdb17a9e8a5  vendor/luma/luma.gl-core-10.0.0-alpha.2-rigi.2.tgz
+8713541d69ab62aa924c7011cd8ac0b237eff58f3646d12242a9af69e2ebe9d0  vendor/luma/luma.gl-effects-10.0.0-alpha.2-rigi.2.tgz
+62afb08c0862f592ff67db7ea2854cb5a2367d038f321994cb0054be03432190  vendor/luma/luma.gl-engine-10.0.0-alpha.2-rigi.2.tgz
+6795ca59d04909642b0e2de8d0ea437d8ca3a3f7944c197dc85de07430f44a9c  vendor/luma/luma.gl-gpgpu-10.0.0-alpha.2-rigi.2.tgz
+1c1661bb26dcaac75bf673737d8593e7388dabc11b96957bd7f01a654d04306a  vendor/luma/luma.gl-shadertools-10.0.0-alpha.2-rigi.2.tgz
+5f183056197f6689f3a4ea47cc5ca5a322c78af9acd93c02e10a2c1dd44d7a6f  vendor/luma/luma.gl-webgl-10.0.0-alpha.2-rigi.2.tgz
+667f332536fd2de591e300f552d121abc0904c2f421080cb3144ee1900ff52cc  vendor/luma/luma.gl-webgpu-10.0.0-alpha.2-rigi.2.tgz
+```
+
 ## Contents
 
 Only `dist/`, `package.json` and `README.md`.
@@ -69,9 +84,9 @@ webgl 217049 B, webgpu 83612 B.
 
 ```sh
 git clone https://github.com/visgl/luma.gl luma-build && cd luma-build
-git fetch ~/mt-image-archive/2026-10-01-luma-deck-upstream/luma-rigi-branches.bundle \
-  'refs/heads/*:refs/heads/*'
-git checkout rigi-vendor            # 5e1b72ed; or redo the merges listed above on 7d1d11e9
+git checkout 7d1d11e91d8c0936b1bf32a302dc760c04e7a0ae
+# merge, in order, the heads of PRs #3312, #3313, #3302 and #3287 (git fetch origin pull/<n>/head),
+# then apply the PipelineFactory compute-hash change described above (5e1b72ed)
 git fetch https://github.com/visgl/luma.gl pull/3328/head && git merge --no-ff FETCH_HEAD   # rigi.2 (30f08eda)
 corepack yarn install && corepack yarn build
 V=10.0.0-alpha.2-rigi.2             # bump rigi.N

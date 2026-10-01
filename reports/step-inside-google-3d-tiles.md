@@ -28,7 +28,7 @@ The display-only rules (no measurement, no exports, no persistent cache, attribu
 **Results:**
 - **Datum.** Google is ellipsoidal: the p25 of (mesh − DEM) is −0.35 m with N = 50.4 m. swisstopo stores MSL, so it needs N = 0 (building bases a median 2.8 m below the DEM). The investigation's assumption that swisstopo was ellipsoidal was wrong and is corrected in §4.2.
 - **Isolation.** `sampleAt` is bit-identical with tiles on and off in both engines. eval-app is unchanged (12/14 within 1°, median 6.5 px). deck smoke passes. Fast CI passes 22/22 plus 1 known failure.
-- **style-baseline 0/16, not from this work.** Every diff is missing hiking trails, caused by the `trails: false` default committed in 71e846e by another session. The geometry is identical and the tiles code is inert with the flag off. The baseline needs re-capturing for the trails change.
+- **style-baseline 0/16, not from this work.** Every diff is missing hiking trails, caused by the `trails: false` default committed in 71e846e. The geometry is identical and the tiles code is inert with the flag off. The baseline needs re-capturing for the trails change.
 - **Frame rate** (IMG_7018, about 39k splats, 4 s orbit, headless Metal):
   - three.js: 60 fps with and without Google (vsync-capped).
   - deck.gl: 16.2 fps without tiles and 15.4 fps with Google. The deck step view is already slow with splats, so that cost comes from the view, not the tiles.
@@ -236,7 +236,7 @@ Research use gives no shelter here. The Map Tiles policies have no research exem
 | Vegetation 3D | `…/ch.swisstopo.vegetation.3d/v1/tileset.json` (200, JSON, `refine: ADD`) | Tree positions and heights to class and ground tree splats |
 | swissTLM3D | `…/ch.swisstopo.swisstlm3d.3d/v1/tileset.json` (200) | Poles, lifts, infrastructure |
 | swisstopo terrain | `…/ch.swisstopo.terrain.3d/v1/layer.json` (200; quantized-mesh-1.0, `octvertexnormals`, maxzoom 18, version 20250101) | Alternative near-camera DEM for the cliff-lip anchoring (finding 6) |
-| swissSURFACE3D Raster minus swissALTI3D | 0.5 m COGs over CORS, which stream with no local tiling ([roadmap.md](roadmap.md) C4, owned by session f3 as concordance WP-F) | An nDSM heights-above-ground mask for the smear split, both in and beyond 150 m. **Reuse C4's signal; don't build a second one** |
+| swissSURFACE3D Raster minus swissALTI3D | 0.5 m COGs over CORS, which stream with no local tiling ([roadmap.md](roadmap.md) C4, owned elsewhere as concordance WP-F) | An nDSM heights-above-ground mask for the smear split, both in and beyond 150 m. **Reuse C4's signal; don't build a second one** |
 
 - Licence: swisstopo OGD allows data to be "used, distributed and made accessible… enriched and processed and also used commercially", with the attribution "© swisstopo" ([terms](https://www.swisstopo.admin.ch/en/terms-of-use-free-geodata-and-geoservices)). FSDI fair use is about 20k users/day ([FSDI](https://www.geo.admin.ch/en/general-terms-of-use-fsdi)).
 - Outside Switzerland:
@@ -283,7 +283,7 @@ Research use gives no shelter here. The Map Tiles policies have no research exem
 1. **Billing entity.** Google 3D Tiles are only available to a **non-EEA** billing account (CH or UK), and a new EEA project gets a 403. Do you have, or want, a Swiss or UK GCP billing account for this? If it's Austria-based or another EEA country, T3 is off the table: only the closed `Map3DElement` remains, and that can't host our splats or DEM.
 2. **The "non-Google map" clause.** Under the global ToS, T3 needs a written answer from Google (open question 1 below). Do you want to ask, or drop T3?
 3. **The dependency.** Is it OK to add `3d-tiles-renderer@0.5.3` (Apache-2.0) to package.json? It's needed for T0 whichever data source we use.
-4. **Sequencing.** T2 overlaps with roadmap C4 (the shared nDSM near-field study, session f3) and S1 (smear v1.1). Proposal: T2 uses C4's nDSM mask plus the streamed building and vegetation tiles as S1's Object signal. That could stand in for S1's missing segmenter inside Switzerland. Should T0–T2 go ahead as part of S1?
+4. **Sequencing.** T2 overlaps with roadmap C4 (the shared nDSM near-field study) and S1 (smear v1.1). Proposal: T2 uses C4's nDSM mask plus the streamed building and vegetation tiles as S1's Object signal. That could stand in for S1's missing segmenter inside Switzerland. Should T0–T2 go ahead as part of S1?
 
 ## Open questions for Google (sales or legal)
 
@@ -320,5 +320,4 @@ swisstopo:
 - [terrain service](https://docs.geo.admin.ch/visualize-data/terrain-service.html)
 
 Prior Rigi decisions:
-- [Rigi competitive landscape and roadmap.md](<Rigi competitive landscape and roadmap.md>) (risk register: "Never use for alignment or exports")
-- [research_notes/Rigi competitive landscape and roadmap/platforms_infrastructure.md](<../research_notes/Rigi competitive landscape and roadmap/platforms_infrastructure.md>) §6
+- Earlier risk register decision: never use Google data for alignment or exports (see [licences.md](licences.md))

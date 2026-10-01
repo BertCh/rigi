@@ -49,7 +49,8 @@ for (const [id, list] of Object.entries(L)) {
 				)
 					h = l;
 			if (!h || !(g.range[k] > g.minRange) || g.off[k] || g.on[k]) continue;
-			const o = (out[h.cls] ??= {});
+			out[h.cls] ??= {};
+			const o = out[h.cls];
 			const n = names[g.cls[k]] ?? "none";
 			o[n] = (o[n] ?? 0) + 1;
 		}

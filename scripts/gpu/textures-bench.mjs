@@ -71,7 +71,7 @@ async function runOne(browser, id) {
 				},
 				[`mt-image:pose:${id}`, JSON.stringify(pose)],
 			);
-		// no HMR: other sessions edit the tree; a hot update mid-run would remount the workspace
+		// no HMR: the tree is edited concurrently; a hot update mid-run would remount the workspace
 		await ctx.routeWebSocket(
 			(u) => u.origin === new URL(URL0).origin.replace(/^http/, "ws"),
 			() => {},

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import tempfile
 import sys
 from pathlib import Path
 
@@ -11,8 +12,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 TM = ROOT / "tools/research/tm"
 H1 = TM / "h1_mine"
-SCR = Path(os.environ.get("E1_SCRATCH", "/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/"
-                                         "f5495a3b-2ed1-4bba-8c27-9bc20cbfbc05/scratchpad/e1"))
+SCR = Path(os.environ.get("E1_SCRATCH", os.path.join(tempfile.gettempdir(), "rigi-e1")))
 os.environ["H1_SCRATCH"] = str(SCR)
 os.environ["STAGE1_PORT"] = os.environ.get("E1_PORT", "8796")
 SCR.mkdir(parents=True, exist_ok=True)

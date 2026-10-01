@@ -29,7 +29,7 @@ D2  2026-09-30T00:10Z (UTC) - infrastructure only, before any statistic.
     except empty state.json stubs, which gen.py resumes from). Fix: a private Vite dev server for E1 only on :3196
     (npx vite dev --config scripts/gpu/vite.gpu.config.ts --port 3196 --strictPort; same app, no tools/** watching),
     APP_URL=http://localhost:3196 for gen.py. It is killed when generation ends. Caveat: the app is served from the
-    current working tree, which other sessions may have edited since the pre-crash photos were rendered; renders of
+    current working tree, which may have been edited since the pre-crash photos were rendered; renders of
     photos 1-5 and 6-35 may therefore come from slightly different app code (not controllable; noted, not tested).
 
 D3  2026-09-30T02:45Z (UTC) - bookkeeping, after scoring (none of it changes a decision).

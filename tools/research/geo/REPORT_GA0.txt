@@ -36,7 +36,7 @@ lake floor never binds.
       - priorHeading returns photo.heading;
       - startLakeFloor returns null, so there is no await, no fetch and no eye change;
       - the region and matcher hooks spread {}.
-    The style-baseline failure therefore belongs to another session's uncommitted change (trail rendering).
+    The style-baseline failure therefore belongs to an uncommitted change (trail rendering).
     OPEN for the lead.
 
 3. FLAG-ON A/B (eval-app-flags.mjs, geoDecl+geoLakeFloor+geoLakes on; cached water union; holdout refused)

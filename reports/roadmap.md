@@ -1,6 +1,6 @@
 # Rigi roadmap
 
-*Consolidated 2026-09-29; N7 added 2026-09-30. This replaces `next-gen-roadmap.md` (now in [archive/](archive/)) and the sequencing in the [competitive roadmap](<Rigi competitive landscape and roadmap.md>), which is kept as the dated market analysis. Current state and open decisions are in [status.md](status.md), and dead ends are in [negative-results.md](negative-results.md).*
+*Consolidated 2026-09-29; N7 added 2026-09-30. This replaces `next-gen-roadmap.md` (now in [archive/](archive/)) and the sequencing in an earlier competitive roadmap that is no longer published. Current state and open decisions are in [status.md](status.md), and dead ends are in [negative-results.md](negative-results.md).*
 
 ## Position
 
@@ -59,7 +59,7 @@ Plan and kill criteria: [geometry-first-pose.md](geometry-first-pose.md) §5; ph
 
 | # | Item | State |
 |---|---|---|
-| GA0 | Quick fixes: magnetic declination, GPS hAcc prior, eye ≥ lake level, matcher inliers returned to app | **Built** behind `geoDecl`/`geoLakeFloor`/`geoLakes` (off); no regression, no gain on dev (all true-north). Matcher patch proposed to f0; the unused `geoInliers` request flag was removed 2026-09-30 |
+| GA0 | Quick fixes: magnetic declination, GPS hAcc prior, eye ≥ lake level, matcher inliers returned to app | **Built** behind `geoDecl`/`geoLakeFloor`/`geoLakes` (off); no regression, no gain on dev (all true-north). Matcher patch proposed; the unused `geoInliers` request flag was removed 2026-09-30 |
 | GA1 | One MAP solver (GPS/gravity/compass/focal priors) with Laplace covariance; pycolmap test → GTSAM reference → TS port | **Built** (`src/lib/geocam/map`, GTSAM parity 2e-5°). Pitch pass; σ ~2.5× over-confident (not killed). Not wired to the pose. pycolmap free-eye test negative |
 | GA2 | Per-photo observability (CRLB) gate: the eye moves only where observable | **Killed** (ρ 0.498 < 0.5) |
 | GA3 | Occlusion-crossing (T-junction) eye cue: novel, render-only test first | **Killed** on real photos (wrong eye wins 93%); works on renders. Needs a learned contour detector (GC3) |
@@ -69,7 +69,7 @@ Plan and kill criteria: [geometry-first-pose.md](geometry-first-pose.md) §5; ph
 
 ## Next: whole-image concordance and the near field (0–4 months, parallel)
 
-The skyline is accurate, but it can't see eye-position error. Interior error grows as 1/distance, so valleys and villages drift while the ridgelines fit. Plan: [concordance-research.md](concordance-research.md) (session f3).
+The skyline is accurate, but it can't see eye-position error. Interior error grows as 1/distance, so valleys and villages drift while the ridgelines fit. Plan: [concordance-research.md](concordance-research.md) 
 
 | # | Item | State |
 |---|---|---|

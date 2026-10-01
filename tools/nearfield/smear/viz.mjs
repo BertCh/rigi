@@ -16,7 +16,6 @@ const readGrid = (f) =>
 	_ex(f)
 		? JSON.parse(_rd(f, "utf8"))
 		: JSON.parse(gunzipSync(_rd(`${f}.gz`)).toString("utf8"));
-const gridExists = (f) => _ex(f) || _ex(`${f}.gz`);
 
 const [, , renderer, id, out] = process.argv;
 const dir = new URL(".", import.meta.url).pathname;
@@ -59,9 +58,10 @@ for (const l of labels) {
 			(l.box[3] - l.box[1]) * H,
 		);
 	else {
-		l.poly.forEach(([px, py], n) =>
-			n ? x.lineTo(px * W, py * H) : x.moveTo(px * W, py * H),
-		);
+		l.poly.forEach(([px, py], n) => {
+			if (n) x.lineTo(px * W, py * H);
+			else x.moveTo(px * W, py * H);
+		});
 		x.closePath();
 	}
 	x.stroke();

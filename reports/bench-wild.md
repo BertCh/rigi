@@ -17,7 +17,7 @@
 
 The main remaining losses are photos with no heading (16 of 42 solvable), low light, haze and near-field terrain. Fused is also over-cautious: 20 of its LOW poses are correct.
 
-> **Why v2.** The first verification pass (v1) drew overlays from the Terrarium DEM using 0f's eye-height rule. The methods solve on Mapterhorn at their own eye, which is up to about 40 m higher on this set, and Terrarium ground differs from Mapterhorn by up to 114 m. On near-field skylines the drawn line moved by 1–27% of image height (median about 1.3% on the spot-checked photos), which made many correct poses look like "near-misses" or "wrong". v2 draws every candidate on Mapterhorn at the eye its method actually used, and all 100 photos were re-verified blind. v1 is kept for comparison below. The v1 numbers (fused 33 correct, HIGH precision 0.72) were **wrong**, and so was their story that parallax from bad GPS explains the near-misses. That explanation came mostly from the overlays.
+> **Why v2.** The first verification pass (v1) drew overlays from the Terrarium DEM using the app pipeline's eye-height rule. The methods solve on Mapterhorn at their own eye, which is up to about 40 m higher on this set, and Terrarium ground differs from Mapterhorn by up to 114 m. On near-field skylines the drawn line moved by 1–27% of image height (median about 1.3% on the spot-checked photos), which made many correct poses look like "near-misses" or "wrong". v2 draws every candidate on Mapterhorn at the eye its method actually used, and all 100 photos were re-verified blind. v1 is kept for comparison below. The v1 numbers (fused 33 correct, HIGH precision 0.72) were **wrong**, and so was their story that parallax from bad GPS explains the near-misses. That explanation came mostly from the overlays.
 
 ## Set and protocol
 
@@ -27,7 +27,7 @@ The main remaining losses are photos with no heading (16 of 42 solvable), low li
 - **Strata:** position source is EXIF GPS for 43 and hand-placed for 57. The skyline is near for 57 and far for 43 (a visual estimate). A heading is known for 58, mostly coarse compass letters, and unknown for 42. No photo has gravity. 44 are tagged hard.
 - **Methods** (run with `tools/bench/harness/run.sh … --weak-heading`):
   - `app`: the app's `autoAlign`, plus a harness 360° seed wrapper.
-  - `cascade`: 0f's `solvePose` → `refinePose`, with the unknowns declared. In this run it solved on the **Terrarium** DEM (0f has since added Mapterhorn), and it's drawn at its eye rule re-applied on Mapterhorn. That mismatch may understate the cascade a little.
+  - `cascade`: the app pipeline's `solvePose` → `refinePose`, with the unknowns declared. In this run it solved on the **Terrarium** DEM (Mapterhorn has since been added), and it's drawn at its eye rule re-applied on Mapterhorn. That mismatch may understate the cascade a little.
   - `fused`: the matcher service's two-stage mode (a 360° match sweep, or app-skyline seeds when the sweep finds under 30 matches), then the skyline+match joint LM, using the confidence rule fixed in advance in `reports/fusion.md`.
 - **Ground truth: blind visual verification.**
   - Poses within 0.5° of each other form one cluster, and each cluster becomes one overlay (DEM skyline plus OSM peaks) with a random A/B/C label.
@@ -64,7 +64,7 @@ How to read the cells:
 - **Fused LOW is conservative:** 20 LOW poses are correct. HIGH covers 30 of fused's 50 correct poses, so there's recall to gain.
 - **Independence from the app seed:** in the 61 runs seeded by the app skyline, fused HIGH is 10 / 10 correct, while the app's own accepts on the same photos are 0.55 precise with 13 gross errors. The fused rule re-checks the seed and doesn't inherit the app's verdict.
 - **Cross-method agreement:** fused and the cascade share a pose cluster on 13 photos, and all **13 / 13 are correct**.
-- **Product rule (adopted by the lead):** fused HIGH and (EXIF GPS or agreement with the cascade within 0.5°). That's **16 accepts, 16 correct**, and everything else goes to "please confirm".
+- **Product rule (adopted):** fused HIGH and (EXIF GPS or agreement with the cascade within 0.5°). That's **16 accepts, 16 correct**, and everything else goes to "please confirm".
   - The cost is recall. Fused HIGH alone is 30 correct with 1 wrong, so the rule gives up 14 correct accepts to avoid that single error.
   - Once the basin-gap trigger has been validated on dev, a looser rule becomes reasonable: fused HIGH plus basin-gap, when there's no EXIF GPS.
 - **App accept** (`autoAlign` plus the 360° wrapper): 0.64 precision with 19 gross errors. Never auto-accept it on uploads.
@@ -132,8 +132,8 @@ The fused cold time is mostly imagery drape, which is now limited to 40 km on 36
 - **No metric ground truth:** the verdicts are visual. C2's 1.5% of height works out to about 0.3° at a 20° vfov and 1° at a 67° vfov.
 - **Near-misses count as wrong.** Adding the ≈ columns gives the lenient reading.
 - **Coarse strata:** hand-placed coordinates and compass-letter headings are coarse, and the skyline-distance tags are visual estimates.
-- **Cascade on Terrarium:** the cascade row reflects Terrarium solving. It should be re-run on 0f's Mapterhorn loader.
-- **Terrarium ground truth:** the 12-photo ground truth used elsewhere was fitted against Terrarium DEM notches (0f), so the GT-12 leaderboard numbers carry a small Terrarium bias.
+- **Cascade on Terrarium:** the cascade row reflects Terrarium solving. It should be re-run on the Mapterhorn loader.
+- **Terrarium ground truth:** the 12-photo ground truth used elsewhere was fitted against Terrarium DEM notches (app pipeline), so the GT-12 leaderboard numbers carry a small Terrarium bias.
 
 ## Files
 
@@ -149,7 +149,7 @@ The fused cold time is mostly imagery drape, which is now limited to 40 km on 36
 
 ## Update: cascade re-run on Mapterhorn (2026-09-25)
 
-The cascade was re-run on 0f's Mapterhorn loader (`demTileLoaderNode(MAPTERHORN)`, eye from `terrain.ground()` on the same DEM) for all 100 photos (`tools/bench/harness/out/runs/wild-cascade-mt/`).
+The cascade was re-run on the Mapterhorn loader (`demTileLoaderNode(MAPTERHORN)`, eye from `terrain.ground()` on the same DEM) for all 100 photos (`tools/bench/harness/out/runs/wild-cascade-mt/`).
 - **Verdicts:** 34 poses inherit a v2 verdict (within 0.5° in yaw and pitch, eye within 2 m of the verdicted cluster). The other 66 were blind-verified on Mapterhorn overlays at the cascade's own eye.
 - **Rule-deviation override:** one verifier passed wc_0055 despite a 2–3% offset (citing tree height). The checklist treats that offset as a near-miss, so it is scored **unsure**.
 - **Scores:** `tools/bench/score/cascade_mt_scores.json`

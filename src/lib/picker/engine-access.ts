@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Read-only access to what the picker needs from either renderer (PhotoEngine / DeckEngine) without
-// widening the shared Renderer interface (other sessions own engine.ts / deck/engine.ts). Both engines
+// widening the shared Renderer interface (engine.ts and deck/engine.ts stay unchanged). Both engines
 // keep, under the same private names:
 //   horizonDirs: Float32Array  unit ENU directions of the traced 360° horizon (xyz triples)
 //   edge: EdgeMap              the photo's edge / sky model that autoAlign scores against

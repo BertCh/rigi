@@ -14,7 +14,10 @@ import { photoContext } from "./lib/pipeline-node";
 
 const W = 800;
 let seed = 1;
-const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const rand = () => {
+	seed = (seed * 16807) % 2147483647;
+	return seed / 2147483647;
+};
 
 for (const { name, heic } of listPhotos(process.argv.slice(2))) {
 	const ctx = await photoContext(name, heic);

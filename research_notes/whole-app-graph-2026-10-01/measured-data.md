@@ -4,14 +4,14 @@ Compiled 2026-10-01, read-only. Everything is Chrome / Apple GPU (Metal), headle
 M = measured (file cited), E = estimated or inferred by me. Dates are the file/commit date.
 Staleness warning: most out/gpu benches ran 2026-09-30, BEFORE the graph became the only/default GPU path
 (haze/relief/guided/band stats e407c14, horizon 00c027e, align e4fb573/e97879d, skyglobal cc818b0 on 2026-10-01).
-Only ~/mt-image-archive/.../gate/data (2026-10-01, HEAD 320b87d) post-dates some of them.
+Only a local gate-data archive (not published; 2026-10-01, HEAD 320b87d) post-dates some of them.
 No browser run has happened since the user put testing on hold, so every 10-01 commit with "browser gates pending"
 (silhouette GPU re-rank, geometry diet, relief bridge, band-stats fenced readback, photoprep GPU, sky prep) has NO timing.
 
 ## 1. Per-stage table
 
 Sources abbreviated: P = out/gpu/core/profile.json (2026-09-30, timestamp-query kernel ms); LB = out/gpu/followups/integ/look-bench.json
-(09-30); G = ~/mt-image-archive/2026-10-01-luma-deck-upstream/gate/data (10-01); TB = out/gpu/core/textures-bench-profile.json (09-30).
+(09-30); G = a local gate-data archive, not published (10-01); TB = out/gpu/core/textures-bench-profile.json (09-30).
 
 | Stage | GPU ms | CPU-twin ms | Readback (count, bytes, ms) | VRAM | Image / size | Source, date, M/E |
 |---|---|---|---|---|---|---|

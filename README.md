@@ -15,6 +15,17 @@ People in the foreground are segmented in the browser (MediaPipe `selfie_multicl
 skip them, blends keep them in front, and the projection doesn't smear them over the ground. Poses
 export as pose JSON, XMP, COLMAP, KML/KMZ, GeoJSON footprints and annotated images (`src/lib/export`).
 
+## Quick start
+
+Requirements: Node 22 and a browser with WebGPU (recent Chrome, Edge or Safari) for the default engine; any WebGL2 browser gets the fallback engine. The Python matcher and near-field services are optional.
+
+```bash
+npm install
+npm run dev     # http://localhost:3100
+```
+
+What works on a bare clone: the app builds and runs, `/upload` aligns any photo you drop in (HEIC or JPEG, processed in the browser against Mapterhorn DEM tiles fetched over the network), `/roll/import` builds a camera roll from your photos, `/atlas` and the `/lab/*` benches open, and the standalone [examples](examples/README.md) run. What needs more: the home page and `/library` list the photos in `public/photos/`, which you create with `npm run ingest` from HEIC files in `img/`. The evaluation harnesses (`scripts/eval*.ts`, `scripts/leaderboard.mjs`), `/baseline` and some CI checks read research data under `data/`, `public/photos/` and `public/baseline/`; these are gitignored, so without them those checks report SKIP in `node scripts/ci/run.mjs`. The Niederhorn demo set in `public/demo/` is included in the repository (all rights reserved, see NOTICE.md), so the landing page demo works on a bare clone. Step Inside and the matcher need their Python services (`npm run dev:all`).
+
 ## Built with luma.gl and deck.gl
 
 Rigi is an application, and also a worked example of the luma.gl 10 / deck.gl stack on both GPU backends. What it exercises:
@@ -30,7 +41,7 @@ Repository conventions follow luma.gl: `AGENTS.md`, `CONTRIBUTING.md` (including
 
 ## Examples
 
-Standalone luma.gl / deck.gl examples live in [`examples/`](examples/README.md): a deck.gl summit view on WebGPU and WebGL2, and a luma `GPUCommandGraph` horizon compute graph. See `examples/README.md` for the index and run commands.
+Standalone luma.gl / deck.gl examples live in [`examples/`](examples/README.md): a deck.gl summit view on WebGPU and WebGL2 (`deck/summit-view`), a photo drape with a shadow-map effect and a fly-into-the-photo orbit view (`deck/photo-drape`), and a luma `GPUCommandGraph` horizon compute graph (`gpgpu/horizon-graph`). See `examples/README.md` for the index and run commands.
 
 ## License
 
@@ -46,7 +57,7 @@ by `npm run generate-routes`).
 | `/` | Home: bundled photos by region, local uploads, the brand panorama |
 | `/photo/$id` | The workspace (`src/components/PhotoWorkspace.tsx`): auto-align, second opinion, manual align, modes, style, export |
 | `/upload` | Upload any photo (HEIC via libheif in a worker, EXIF via exifr). Photos with no compass, gravity or focal take the unknown-pose path |
-| `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (owned by session mt-image-fc, `src/lib/roll/**`): a whole day's photos clustered into rolls and spots, with a mosaic, per-spot panoramas, and every photo draped on one deck.gl terrain map |
+| `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (`src/lib/roll/**`): a whole day's photos clustered into rolls and spots, with a mosaic, per-spot panoramas, and every photo draped on one deck.gl terrain map |
 | `/baseline` | Debug UI for the CPU pipeline (`src/baseline-ui`): horizon, skyline detection, solve, peaks |
 | `/lab/splats`, `/lab/deck-splats`, `/lab/generate` | Step Inside dev benches: splats in each renderer, and P3 generation (`?nearfield=gen`, GT poses only) |
 | `/lab/deck-webgpu` | The WebGPU deck renderer in isolation (`WebGpuEngine`, `src/lib/deck-webgpu`); the app uses it by default via `?renderer=auto` |
@@ -94,7 +105,7 @@ on its own 360° Mapterhorn scene. It serves two cases:
    through the solver options: a 360° yaw search, free tilt, and three focal seeds, with a stricter
    0.75 accept bar.
 
-**Matcher service** (`tools/matcher`, owned by session f0; `reports/matcher-service-v040.md`). This is
+**Matcher service** (`tools/matcher`; `reports/matcher-service-v040.md`). This is
 an optional Python service on :8765 that does render-and-match (ALIKED + LightGlue against app
 renders from a headless Chromium worker), fused with the skyline cue. The app reaches it through
 `src/lib/matcher-client.ts` (`VITE_MATCHER_URL`) and degrades silently when it is down.
@@ -177,9 +188,9 @@ and pitch, two add roll, three add FOV).
 | Same, `node scripts/eval-app.mjs` (2026-09-26) | 19 rows, 14 with pins | 12/14 within 1° yaw; median auto px error 6.5 (1600 px) | P5 consolidation run |
 | Pipeline variants `cascade`, `skyfirst`, `wide` | same 14 | none better. cascade and skyfirst had a worse median, wide gained nothing. The variants were removed; `current` is the only path | `reports/pipeline-ab.md` |
 | CPU classic+cascade (the second-opinion solver) | 12 GT photos | 11/12 correct accepts, 0 false, median 0.20° | `reports/leaderboard.md` |
-| App GPU aligner alone | 12 GT photos | 10/12, 1 false accept (IMG_7130, 2.98°) that the second opinion fixes | `reports/leaderboard.md` |
-| Matcher, held-out test (v034 logic, arm A) | 50 frozen wild photos | 29/50 correct, HIGH 17/17 (precision 1.00), product rule 11/11, median 35 s | `reports/test-results.md` |
-| T6 (arm B) | same | 30/50, HIGH 22/24 with 2 unsure. Post hoc, 1 of the 2 was judged wrong, so v034 stays the default | `reports/test-results.md`, `test-addendum.md` |
+| App GPU aligner alone | 12 GT photos | 10/12, 1 false accept (one photo, 2.98° off) that the second opinion fixes | `reports/leaderboard.md` |
+| Matcher, held-out test (`v034` policy) | 50 frozen wild photos | 29/50 correct, HIGH 17/17 (precision 1.00), product rule 11/11, median 35 s | `reports/test-results.md` |
+| Matcher, `t6` policy | same | 30/50, HIGH 22/24 with 2 unsure. Post hoc, 1 of the 2 was judged wrong, so v034 stays the default | `reports/test-results.md`, `test-addendum.md` |
 | Matching v2 (eye fallback, calibration priors, LoMa) | 50 dev photos | not shipped: each adds gross HIGHs or nothing | `reports/matching-v2.md` |
 
 The leaderboard (12 GT photos, 2026-09-25) and eval-app (14 pinned photos) use different sets and
@@ -193,16 +204,17 @@ npm run ingest            # img/*.HEIC → public/photos/*.jpg + photos.json + r
 npm run dev               # dev server on http://localhost:3100
 npm run dev:all           # dev server + matcher (:8765) + near-field (:8767); reuses anything already up,
                           #   skips a backend without tools/matcher/.venv. Pick some: node scripts/dev.mjs --be=nearfield
-npm run build             # production build (nitro)
+npm run build             # production build (vite build)
 node scripts/examples.mjs list   # standalone luma.gl/deck.gl examples: start <id> | check | build | smoke
 node scripts/ci/spdx.mjs  # SPDX headers on first-party files
-npx tsc --noEmit          # typecheck
-npx biome format --write .   # format (biome.json: src, scripts, tools/**/*.{ts,mjs,js})
+npx tsc --noEmit -p .     # typecheck
+npm run check             # biome check on the whole configured tree (biome.json: src, scripts, tools/**/*.{ts,mjs,js})
+npx biome check --write <files>   # format and lint the files you changed
 
 # accuracy
 npx tsx scripts/eval.ts                      # CPU solvePose vs data/ground-truth.json → out/eval/
 SOLVER=cascade npx tsx scripts/eval.ts       # the cascade (also: skyfirst; HORIZON=fast; DEM=mapterhorn)
-node scripts/eval-app.mjs [IMG_xxxx ...]     # the app's final pose vs data/control-points.json (needs :3100)
+node scripts/eval-app.mjs [photoId ...]      # the app's final pose vs data/control-points.json (needs :3100)
 node scripts/leaderboard.mjs                 # every method re-scored on one GT snapshot → reports/leaderboard.md
 
 # regression gate (scripts/ci/README.md): one runner for every check
@@ -215,7 +227,7 @@ tools/matcher/server/run.sh --port 8765      # env MATCHER_POLICY=v034|t6
 
 node scripts/shot.mjs <url> out.png --wait-for "[data-ready]"   # headless WebGL screenshot
 node scripts/gpu/with-render-lock.mjs -- <cmd>                # wrap every browser job: one GPU job at a time
-#   FIFO queue; RENDER_LOCK_PRIORITY=1 jumps it for a job someone is waiting on. Never omit the `--` (CR-01)
+#   FIFO queue; RENDER_LOCK_PRIORITY=1 jumps it for a job someone is waiting on. Never omit the `--`
 node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs [--renderer=deck] [--dead] <ids>
 ```
 
@@ -223,10 +235,10 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.
 
 ## Docs
 
-- [reports/status.md](reports/status.md): where every thread stands, and the decisions waiting on you.
+- [reports/status.md](reports/status.md): where every thread stands, and the open decisions.
 - [reports/roadmap.md](reports/roadmap.md): the plan.
 - [reports/negative-results.md](reports/negative-results.md): what didn't work.
-- [reports/code-review-2026-09-30.md](reports/code-review-2026-09-30.md): the code-health backlog (CR-01…).
+- [reports/code-review-2026-09-30.md](reports/code-review-2026-09-30.md): the code-health backlog (numbered CR-nn items).
 - [reports/README.md](reports/README.md): an index of every report, research note and module README.
 
 Data: terrain © Mapterhorn, imagery © swisstopo / Esri, peaks & trails © OpenStreetMap contributors.

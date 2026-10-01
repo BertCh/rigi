@@ -52,7 +52,7 @@ async function withPage(gpuOff, fn) {
 		await ctx.addInitScript(() => {
 			globalThis.__RIGI_FLAGS__ = { ...globalThis.__RIGI_FLAGS__, gpu: "off" };
 		});
-	// no HMR: other sessions edit the tree
+	// no HMR: the tree is edited concurrently
 	await ctx.routeWebSocket(
 		(u) => u.origin === new URL(URL0).origin.replace(/^http/, "ws"),
 		() => {},

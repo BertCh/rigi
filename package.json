@@ -1,5 +1,11 @@
 {
 	"name": "rigi",
+	"description": "Rigi: photo-to-terrain camera pose, matching and rendering on luma.gl and deck.gl (WebGPU with WebGL2 fallback).",
+	"license": "MIT",
+	"repository": { "type": "git", "url": "https://github.com/BertCh/rigi.git" },
+	"homepage": "https://github.com/BertCh/rigi",
+	"bugs": { "url": "https://github.com/BertCh/rigi/issues" },
+	"engines": { "node": ">=22" },
 	"private": true,
 	"type": "module",
 	"imports": {

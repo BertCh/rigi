@@ -100,7 +100,9 @@ export function ExportMenu({
 	className,
 	align = "right",
 	onExported,
-	...opts
+	withLabels,
+	geoidUndulation,
+	maxRange,
 }: ExportMenuProps) {
 	const [open, setOpen] = useState(false);
 	const [busy, setBusy] = useState<ExportKind | SplatExportKind | null>(null);
@@ -166,7 +168,7 @@ export function ExportMenu({
 			setMsg(null);
 			try {
 				const r = exportSplatsFromEngine(eng, kind, {
-					geoidUndulation: opts.geoidUndulation,
+					geoidUndulation,
 				});
 				downloadBlob(r.blob, r.filename);
 				setMsg({ text: [`Saved ${r.filename}`, ...r.notes].join(" · ") });
@@ -180,7 +182,7 @@ export function ExportMenu({
 				setMsg({ text: `Export failed: ${(e as Error).message}`, error: true });
 			}
 		},
-		[engine, onExported, opts.geoidUndulation],
+		[engine, onExported, geoidUndulation],
 	);
 
 	const run = useCallback(
@@ -196,7 +198,11 @@ export function ExportMenu({
 			setBusy(kind);
 			setMsg(null);
 			try {
-				const r = await exportFromEngine(eng, kind, opts);
+				const r = await exportFromEngine(eng, kind, {
+					withLabels,
+					geoidUndulation,
+					maxRange,
+				});
 				downloadBlob(r.blob, r.filename);
 				setMsg({ text: [`Saved ${r.filename}`, ...r.notes].join(" · ") });
 				onExported?.({
@@ -211,9 +217,7 @@ export function ExportMenu({
 				setBusy(null);
 			}
 		},
-		// opts is a fresh object each render; its fields are what matter
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[engine, onExported, opts.withLabels, opts.geoidUndulation, opts.maxRange],
+		[engine, onExported, withLabels, geoidUndulation, maxRange],
 	);
 
 	return (

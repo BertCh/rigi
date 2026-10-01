@@ -7,13 +7,15 @@ from __future__ import annotations
 import json
 import re
 import sys
+import os
+import tempfile
 from pathlib import Path
 
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-DEFAULT = Path("/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/75c91a88-da3f-430c-b0e0-21fa75f9d390/scratchpad/loma/runs/main")
+DEFAULT = Path(os.environ.get("LOMA_SCRATCH", os.path.join(tempfile.gettempdir(), "rigi-loma"))) / "runs" / "main"
 KINDS = ("aliked", "loma", "loma4096")
 NAMES = {"aliked": "ALIKED+LG 4096", "loma": "LoMa-B 2048", "loma4096": "LoMa-B 4096"}
 RUN = DEFAULT

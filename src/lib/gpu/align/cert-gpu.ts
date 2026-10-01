@@ -13,7 +13,7 @@
 // CPU round trip). All buffers are pooled IMPORTS ("align/cert-*" slots and the shared align input
 // slots): the lane state persists across submits on the CPU (uploaded every run: ≤ 8 × 192 B), the
 // move log and the lattice tables are uploaded only when the CPU changed them (a tie-path move, a
-// re-centred window) or another session wrote the slot. The GPU-condition clear lint covers transients
+// re-centred window) or another writer wrote the slot. The GPU-condition clear lint covers transients
 // only; nothing here is a transient. Stale results cannot pass: each result echoes its job's serial
 // (per-submit nonce, lane, sequence) and DECIDE halts the lane (REASON.stale → GPU error → the f64
 // path) on a mismatch. Read back per submit: the lane states, the move logs and the audit rings

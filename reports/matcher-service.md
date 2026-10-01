@@ -58,7 +58,7 @@
 
 ## v0.3.4 (fair queue tickets, empty-view retry, stage-1 keypoints back to 4096)
 
-This version keeps the lead's `routeAdhoc` fix, which intercepts Vite's `virtual:photos` module.
+This version keeps the app pipeline's `routeAdhoc` fix, which intercepts Vite's `virtual:photos` module.
 
 ### Queue tickets (for clients)
 
@@ -83,7 +83,7 @@ This version keeps the lead's `routeAdhoc` fix, which intercepts Vite's `virtual
 
 ### Empty views
 
-A `502 "empty render for y+10"` (IMG_7068 in the lead's e2e) has two possible causes:
+A `502 "empty render for y+10"` (IMG_7068 in the app's end-to-end run) has two possible causes:
 - the app page's `__engine` was swapped mid-render by a dev-server reload (HMR or full reload, e.g. when `photos.ts` changed at 13:14). The new engine has no drape and no loaded geometry, so its geometry buffer is all zeros;
 - or a view with genuinely no terrain.
 
@@ -345,7 +345,7 @@ type MatchRequest =
 
 - **`MatchResult`** gains optional fields: `method`, `confidenceLevel`, `confidenceChecks`, `cues`, `fusionScore`, `matchConfidence` and `skylineUnavailable`. The v0.1 fields are unchanged.
 - **Graceful degradation is unchanged:** the client returns `null` when the service is down, times out, is aborted, returns an HTTP error or finds no pose. It never throws.
-- **`shouldEscalate` was changed by another session** since v0.1. It no longer compares against the compass prior, which fired on about half the photos. It now escalates when:
+- **`shouldEscalate` was changed elsewhere** since v0.1. It no longer compares against the compass prior, which fired on about half the photos. It now escalates when:
   - there is no skyline result;
   - skyline confidence is below 0.5;
   - an optional second skyline solver disagrees by more than 1° in yaw or pitch.
@@ -416,7 +416,7 @@ type MatchRequest =
   - Killing the server while "up" was cached: `requestMatch` returned `null` in 9 ms.
   - A fresh process with the server down: `matcherAvailable` returned false in 14 ms, and `requestMatch` returned `null` in 0 ms.
 
-## Note for the app owner (session mt-image-9e)
+## Note for the app owner
 
 **Apply a match only when `confidenceLevel === "high"`.** `matchIsConfident(m)` does this, and falls back to `m.confidence >= 0.5` for a v0.1 server. HIGH maps to `confidence` 0.9 and LOW to 0.2, so an existing `m.confidence < 0.5` gate keeps working.
 

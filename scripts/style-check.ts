@@ -667,9 +667,12 @@ ok(
 	let ext = null as ((v: string | null) => void) | null;
 	const env = {
 		storage,
-		onExternalChange: (_k: string, cb: (v: string | null) => void) => (
-			(ext = cb), () => (ext = null)
-		),
+		onExternalChange: (_k: string, cb: (v: string | null) => void) => {
+			ext = cb;
+			return () => {
+				ext = null;
+			};
+		},
 	};
 	const s = createStyleStore(env);
 	let n = 0;

@@ -187,7 +187,7 @@
  "version": "matcher-service/0.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16+lightglue on sat renders, LightGlue flash off on MPS; basin-gap LOW trigger for untrusted positions)",
  "id": "wc_0006",
  "request": {
-  "photoPath": "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/photos/wc_0006.jpg",
+  "photoPath": "tools/bench/data/photos/wc_0006.jpg",
   "meta": {
    "lat": 46.94556,
    "lon": 9.29333,

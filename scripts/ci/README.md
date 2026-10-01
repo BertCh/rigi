@@ -91,7 +91,7 @@ The gate compares each run against this baseline. It does not demand zero: pre-e
 belong to other owners are recorded here, and only new ones fail. Fix the cause, then delete the entry.
 Don't add an entry just to get your own change through.
 
-Baseline as of 2026-09-29, taken while other sessions were editing the tree:
+Baseline as of 2026-09-29, taken while the shared tree was being edited concurrently:
 
 | check | known failure | where |
 |---|---|---|
@@ -161,10 +161,10 @@ automatically.
 
 ## First runs (2026-09-29)
 
-These runs were on the shared working tree while other sessions had uncommitted edits in `src/`.
+These runs were on the shared working tree while other contributors had uncommitted edits in `src/`.
 
 - **fast (local)**: 21 pass, 1 KNOWN (style-check), 1 FAIL (biome). The biome failure is new unformatted
-  or unsorted-import code in files other sessions are editing right now (`src/lib/licences/attribution.ts`,
+  or unsorted-import code in files being edited concurrently (`src/lib/licences/attribution.ts`,
   `src/lib/dem/sources.ts`, `src/lib/deck/terrain-data.ts`, …). The gate caught it as designed, and it was
   left alone. About 27 s.
 - **fast (fresh-checkout simulation, `CI=1`)**: tsc KNOWN (the gitignored `data/ground-truth.json`
@@ -175,14 +175,14 @@ These runs were on the shared working tree while other sessions had uncommitted 
     attempt crashed inside Playwright's launch, which is why eval-app now retries once.
   - style-baseline: **FAIL**, 0/16 images identical, geometry hash identical. Diffs are 0.5–3.8% of
     pixels, along the draped map/overlay lines. The harness warned that `src/` changed during the run.
-    At the time, `engine.ts`, `terrain.ts`, `dem/sources.ts`, `deck/*` and `export/engine-export.ts`
-    had uncommitted edits from other sessions. It is not yet known whether this is a real classic-view
+    At the time, the three.js engine, `terrain.ts`, `dem/sources.ts`, `deck/*` and `export/engine-export.ts`
+    had uncommitted edits from concurrent work. It is not yet known whether this is a real classic-view
     regression from that work or remote-tile drift. Re-run `node scripts/ci/run.mjs full --only
     style-baseline` on a quiet tree and look at `out/lead/style-baseline/diff/`. It is deliberately
     **not** recorded as a known failure.
 - **fast, re-run about 20 min later**: 20 pass, 1 KNOWN, 2 FAIL. Both failures come from new in-flight work
-  by other sessions. tsc: `scripts/licences-check.ts:155-156` TS2352 (`OsmElement[]` cast to `{id:number}[]`).
-  biome: format/import order in `src/lib/tiles3d/*`, `src/lib/concord/flags.ts`, `src/lib/engine.ts`,
+  by concurrent edits. tsc: `scripts/licences-check.ts:155-156` TS2352 (`OsmElement[]` cast to `{id:number}[]`).
+  biome: format/import order in `src/lib/tiles3d/*`, `src/lib/concord/flags.ts`,
   `src/lib/deck/{engine,composite-shader}.ts`, `scripts/tiles3d/step-tiles-check.mjs` and
   `scripts/licences-check.ts`. The new peer checks (`scripts/licences-check.ts`,
   `scripts/tiles3d/step-tiles-check.mjs`) should be added to `checks.mjs` once their owners call them stable.

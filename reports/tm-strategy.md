@@ -1,6 +1,6 @@
 # Terrain matching: execution plan for the five next steps, and a broader view of the problem
 
-*2026-09-28 · session mt-image-58 · follows `reports/terrain-matching-research.md` (§7). Dev only; data_v3 untouched.*
+*2026-09-28 · follows `reports/terrain-matching-research.md` (§7). Dev only; data_v3 untouched.*
 
 ## Part A — what is running now
 
@@ -56,7 +56,7 @@ The current framing is: *single photo in, one pose out, automatically accepted o
 - **Suggested metric:**
   - auto-accept precision at 1.0, *plus* recall@3 with one tap;
   - `unknown-pose.worker` and `/roll` are the natural places for it.
-- **Owner:** this is the lead's (app pipeline) and 9e's decision, not a research result. Proposed, not built.
+- **Owner:** this is an app-pipeline decision, not a research result. Proposed, not built.
 
 ### 2. Make eye position a model-selection question, not a search
 
@@ -155,7 +155,7 @@ It flags **6 of the 30 photos that are already solved correctly** (about 20%). T
 2. Run T6 at the two credible proposals, as a suggestion.
 3. Title-based triage covers about half of Commons photos and ~0 app uploads (GT-12 has no titles), which supports B§5. The product analogue is a map-tap "where were you standing?" prompt.
 
-### Enabler for B§2 (global basin gap), from mt-image-bc, 2026-09-28
+### Enabler for B§2 (global basin gap), 2026-09-28
 
 **API:** a batched-eye GPU horizon, `computeHorizonsAuto(mosaics, eyes, opts)` in `src/lib/gpu/horizon/index.ts`.
 - **Where it runs:** browser or worker only, using WebGPU. It falls back to CPU automatically.
@@ -167,7 +167,7 @@ It flags **6 of the 30 photos that are already solved correctly** (about 20%). T
 
 **Still to come:** a batched eye-search provider (`src/lib/gpu/eye`) is in progress.
 
-**Update (mt-image-bc):** the batched eye-search provider is done.
+**Update:** the batched eye-search provider is done.
 
 - **API:** `src/lib/gpu/eye`, with `createEyeHorizonProvider`, `loadEyeMosaics` and `sectorForPose`.
 - **Where it runs:** browser only. It falls back to CPU automatically.

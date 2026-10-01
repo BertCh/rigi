@@ -10,6 +10,8 @@ Standalone examples in the style of the [luma.gl](https://github.com/visgl/luma.
 
 Each folder has its own `package.json` like a luma.gl example, but packages resolve from the root install (one lockfile; luma.gl uses yarn workspaces instead), so do not `npm install` inside an example. `npm start` inside the folder also works, because npm puts the ancestor `node_modules/.bin` on the path. `node scripts/examples.mjs list | check | build | smoke [id…]` type-checks, builds (into `out/examples/`) or runs each example's `scripts/visual-smoke.mjs` on WebGPU and WebGL2 under the render lock. Deck examples take `?backend=webgpu|webgl`. `node scripts/examples.mjs site` builds every example plus a gallery page (`out/examples-site/index.html`, like luma.gl's website examples page) from each README's title and first paragraph, `mobile-support.ts` backends and `thumbnail.jpg` (a 480 px render of open map data; never a photo).
 
+The examples resolve `@luma.gl/*` and `@deck.gl/*` from this repository's vendored tarballs (`vendor/`), so run them from this repository (after `npm install` at the root); they are not meant to be copied out on their own.
+
 Check each example's own `README.md` for its exact run command and browser requirements (WebGPU needs a recent Chrome, Edge or Safari).
 
 ## Shared files and licences

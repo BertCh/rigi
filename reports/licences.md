@@ -1,6 +1,6 @@
 # Licence register (roadmap N2)
 
-> 2026-09-29. This is the gate before any public URL (roadmap N2 → L1). It covers every external data, tile, API and model source that the app, the pipeline and the tools call. Model licences for Step Inside are recorded in [`research_notes/step_inside_models_2026-09.md`](../research_notes/step_inside_models_2026-09.md). This page links to them and does not copy them. The earlier short table is the "Licensing and data risk register" in `reports/Rigi competitive landscape and roadmap.md`, and this page replaces it.
+> 2026-09-29. This is the gate before any public URL (roadmap N2 → L1). It covers every external data, tile, API and model source that the app, the pipeline and the tools call. Model licences for Step Inside are recorded in [`research_notes/step_inside_models_2026-09.md`](../research_notes/step_inside_models_2026-09.md). This page links to them and does not copy them. This page replaces an earlier short licensing and data risk register.
 >
 > Code for this item is in `src/lib/licences/` (attribution, imagery providers and flags), `src/lib/osm/extract.ts` and `tools/osm/extract-peaks.mjs` (the Overpass pre-extract), and `scripts/licences-check.ts` (the checks). **Every new behaviour is opt-in, and the defaults are unchanged.**
 
@@ -55,6 +55,16 @@ Libraries that parse data at run time, with their notable transitive dependencie
 |---|---|---|---|---|
 | `@loaders.gl/geotiff` (5.0.0-alpha.7) | `src/lib/concord/occl/cog-loaders.ts` (`?cogReader=loaders`; default `own`) | MIT (vis.gl contributors) | `geotiff` 2.1.3 MIT; `lerc` 3.0.0 **Apache-2.0** (Esri LERC decoder; its package ships no licence file); `web-worker` 1.5.0 **Apache-2.0**; `pako` 2.2.0 MIT AND Zlib; `zstddec` 0.1.0 MIT AND BSD-3-Clause; `xml-utils` 1.10.2 CC0-1.0; `@petamoriken/float16`, `quick-lru`, `parse-headers`, `fast-xml-parser` 5.11.2 (+ `strnum`, `fast-xml-builder` …), `@math.gl/crs`, `@loaders.gl/loader-utils` / `schema` / `worker-utils`, `@probe.gl/*`: MIT | Credit Apache-2.0 components (LICENSE text) in a bundle licence report |
 | `@loaders.gl/splats` (5.0.0-alpha.7) | `src/lib/nearfield/splat-loaders-ext.ts` (SPZ / KSPLAT import) | MIT (vis.gl contributors) | `apache-arrow` 21.2.0 **Apache-2.0** (ships `NOTICE.txt`, which must travel with a distributed bundle); `flatbuffers` 25.9.23 **Apache-2.0**; `tslib` 0BSD; `@loaders.gl/compression` MIT with `fflate` 0.7.4, `fzstd` 0.1.1, `hysnappy`, `snappyjs` (MIT); `zod` 4.6.5 MIT | Reproduce the Arrow NOTICE in the credits / licence report |
+
+## Register: vendored and bundled files (added 2026-10-01)
+
+| Item | Source | Licence / terms | Status |
+|---|---|---|---|
+| `vendor/luma/*.tgz`, `vendor/deck/*.tgz` | Unofficial builds of visgl/luma.gl and visgl/deck.gl (commits and PRs in each README) | MIT, vis.gl contributors; texts in `vendor/luma/LICENSE` and `vendor/deck/LICENSE`, verbatim from upstream | Closed: licence files added; SHA-256 sums are in each README |
+| `public/tiles3d/draco/` (`draco_decoder.wasm`, `draco_wasm_wrapper.js`) | Google Draco, copied byte-identical from three.js 0.186.1 `examples/jsm/libs/draco/` | Apache-2.0; `LICENSE` and `README.md` in the folder | Closed. Draco release number is not stated in the files |
+| `examples/**/thumbnail.jpg` | 480 px renders of the example scenes; photo-drape and summit-view inspected: hillshaded Mapterhorn terrain, no photograph | Mapterhorn and underlying DEM terms | horizon-graph thumbnail not inspected |
+| `public/terroir/thunersee/cover.png` | Baked by `scripts/terroir/build-pack.ts` from swisstopo VECTOR25/GK500, OSM, AWS Terrarium, GLAMOS | swisstopo OGD, ODbL, Mapzen attribution, CC BY 4.0 (see `pack.json`) | Attribution required |
+| `src/lib/tiles3d/geoid-data.ts` | `scripts/tiles3d/make-geoid.py`: EGM2008 (NGA) from PROJ's `us_nga_egm08_25` grid | EGM2008 is a US-government NGA product; PROJ-data grid licensing per the PROJ-data README | Closed on the evidence in the generating script |
 
 ## Attribution: what is implemented
 

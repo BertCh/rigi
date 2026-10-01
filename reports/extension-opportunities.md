@@ -1,6 +1,6 @@
 # Rigi: where the mountain app goes next
 
-*2026-09-30. A review of how Rigi can extend across art, science, sport, adventure, tourism, and transport and modalities. Researched in four web passes. Mirrors the shared doc at https://claude.ai/code/artifact/ab6bf954-3d00-4e41-9e27-7a73d8c6c054. If they disagree, the shared doc is newer. Figures marked "snippet" come from search results, not opened pages. Sequencing here is advisory; [roadmap.md](roadmap.md) remains the plan of record.*
+*2026-09-30. A review of how Rigi can extend across art, science, sport, adventure, tourism, and transport and modalities. Researched in four web passes. Figures marked "snippet" come from search results, not opened pages. Sequencing here is advisory; [roadmap.md](roadmap.md) remains the plan of record.*
 
 Rigi turns an ordinary mountain photo into a calibrated camera on real terrain. That one asset extends into art, science, sport, adventure, tourism and transport, because each domain only needs different data drawn through the same camera.
 
@@ -181,4 +181,4 @@ Placement by impact and effort (author's judgement from the research, not a meas
 
 ## Sources
 
-Links sit beside each claim above. Repo context comes from `README.md`, [status.md](status.md), [roadmap.md](roadmap.md) and [Rigi competitive landscape and roadmap.md](<Rigi competitive landscape and roadmap.md>).
+Links sit beside each claim above. Repo context comes from `README.md`, [status.md](status.md) and [roadmap.md](roadmap.md).

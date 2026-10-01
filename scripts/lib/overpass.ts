@@ -14,7 +14,7 @@ import { OVERPASS, overpass } from "../../src/lib/overpass";
 import { CACHE } from "./node-io";
 
 const USER_AGENT =
-	"mt-image-baseline/0.1 (mountain photo georeferencing research)";
+	"rigi-baseline/0.1 (+https://github.com/BertCh/rigi; mountain photo georeferencing research)";
 
 /** Peaks within `radiusM` of (lat, lon); cached per rounded location. */
 export async function fetchPeaks(

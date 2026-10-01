@@ -26,7 +26,7 @@
     "tools/bench/harness/run.ts": 2
    },
    "sample": [
-    "tools/bench/harness/run.ts(37,24): error TS7016: Could not find a declaration file for module './lib/worker.mjs'. '/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/harness/lib/worker.mjs' implicitly has an 'any' type.",
+    "tools/bench/harness/run.ts(37,24): error TS7016: Could not find a declaration file for module './lib/worker.mjs'. 'tools/bench/harness/lib/worker.mjs' implicitly has an 'any' type.",
     "tools/bench/harness/run.ts(409,31): error TS2783: 'method' is specified more than once, so this usage will be overwritten."
    ]
   },

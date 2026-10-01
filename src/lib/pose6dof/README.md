@@ -1,6 +1,6 @@
 # pose6dof: ground-control-point solver and position refinement
 
-> Moved from the lead's API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
+> Moved from an API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
 
 `src/lib/pose6dof/` is pure TypeScript. It has no DOM or three.js dependency and runs in the browser and in node. It imports only `src/lib/geodesy.ts`, and only from `geo.ts`.
 Tests: `npx tsx scripts/test-pose6dof.ts [--quick]`. Results were in the gitignored `out/lead/pose6dof/results.md`.

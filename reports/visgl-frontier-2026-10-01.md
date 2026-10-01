@@ -8,7 +8,7 @@ This sweep follows `luma-deck-upstream-2026-10-01.md`. The goal is to express th
 - `git merge-tree` against our vendored bases:
   - luma `rigi-vendor` 5e1b72ed
   - deck ce0808d0 + #10752 0d8b1664
-- Four parallel review agents. Notes are in the session scratchpad.
+- Four parallel review agents. Notes are in a local scratch directory (not published).
 
 ## Headline
 

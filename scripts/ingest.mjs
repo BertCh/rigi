@@ -180,7 +180,7 @@ const overpass = (query) =>
 		endpoints: process.env.OVERPASS_URL
 			? [process.env.OVERPASS_URL]
 			: undefined,
-		userAgent: "mt-image-ingest/0.1",
+		userAgent: "rigi-ingest/0.1 (+https://github.com/BertCh/rigi)",
 		backoffMs: 5000,
 	});
 

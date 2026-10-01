@@ -1,6 +1,6 @@
 # WebGPU as the default renderer
 
-*2026-10-01. **Decision: flipped** (b520b1d). `renderer` is `oneOf(["auto","webgpu","deck"], "auto")` in `src/lib/flags/index.ts` (three.js removed 2026-10-01, 583e2b7), and `src/lib/renderer-select.ts` resolves `auto`. The user's direction was "we should be on GPU unless strictly necessary", followed by "push to flip now". They accepted that parity regressions get fixed after the flip. Unlike [deck-default.md](deck-default.md), **this flip was made without a browser gate.** The user put browser testing on hold while many sessions were landing work in parallel. The consolidated pass that will run later is described at the end.*
+*2026-10-01. **Decision: flipped** (b520b1d). `renderer` is `oneOf(["auto","webgpu","deck"], "auto")` in `src/lib/flags/index.ts` (three.js removed 2026-10-01, 583e2b7), and `src/lib/renderer-select.ts` resolves `auto`. The user's direction was "we should be on GPU unless strictly necessary", followed by "push to flip now". They accepted that parity regressions get fixed after the flip. Unlike [deck-default.md](deck-default.md), **this flip was made without a browser gate.** The user put browser testing on hold while much work was landing in parallel. The consolidated pass that will run later is described at the end.*
 
 ## What `auto` does
 
@@ -42,7 +42,7 @@ Under WebGPU the render device is also the compute device (`adoptRenderDevice`).
 | Export | Works, but full resolution needs tiling |
 | Device loss | A failed rebuild stays dead; there is no mid-session switch to WebGL |
 | Interactive composite | No cheaper drag mode |
-| Terroir (mt-image-f0) | In neither engine on WebGPU yet: needs a WGSL port or a per-feature WebGL route |
+| Terroir | In neither engine on WebGPU yet: needs a WGSL port or a per-feature WebGL route |
 | `lookSmoke` | Reads stale `compLook` stats while the look bridge is on |
 | Memory | Photo-view GPU memory is about 2× WebGL's |
 
@@ -53,7 +53,7 @@ Under WebGPU the render device is also the compute device (`adoptRenderDevice`).
 
 `?renderer=deck` is the escape hatch for Step Inside with splats or 3D tiles, and for 12 MP export, until those are verified.
 
-## Consolidated pass (on hold, owner mt-image-0a)
+## Consolidated pass (on hold)
 
 When the user asks for it, run the battery once per renderer: webgpu/auto, deck, and forced fallback (three.js was also in this list before its removal).
 

@@ -1,6 +1,6 @@
 # Terrain-matching deep research: what limits photo↔terrain matching, and what to try next
 
-*2026-09-28 · session mt-image-58 · the TM program in `tools/research/tm/` (rules in its README). There is one report per study; this document combines them.*
+*2026-09-28 · the TM program in `tools/research/tm/` (rules in its README). There is one report per study; this document combines them.*
 
 **Scope.**
 - Only the 50 DEV ids were used. The spent test half and `data_v3` were not touched, the live services were not called, and no shared code was edited.

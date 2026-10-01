@@ -4,18 +4,18 @@
 
 /**
  * Node-only DEM source for src/lib/horizon-fast: Mapterhorn 512 px WebP
- * Terrarium tiles with a disk cache (HF_TILE_CACHE; default: this session's
- * scratchpad, since .cache/ belongs to the baseline owner).
+ * Terrarium tiles with a disk cache (HF_TILE_CACHE; default: under HF_OUT,
+ * so the shared .cache/ is left alone).
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { MAPTERHORN, type TileKey, tileId } from "../src/lib/dem";
 import type { TileSource } from "../src/lib/horizon-fast/mosaic";
 import { fileHeights } from "./lib/node-io";
 
 export const HF_OUT =
-	process.env.HF_OUT ??
-	"/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/a1611531-32b0-4db2-a884-e5bbc3808e2d/scratchpad/horizon-fast";
+	process.env.HF_OUT ?? path.join(os.tmpdir(), "rigi-horizon-fast");
 export const MAPTERHORN_CACHE =
 	process.env.HF_TILE_CACHE ?? path.join(HF_OUT, "tiles");
 

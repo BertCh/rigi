@@ -2,7 +2,7 @@
 
 *2026-09-26 · code in `tools/matcher/stage1/` · outputs in `tools/bench/t6/` · frozen rule sha1 `292fb74f35f6f402b5e81f1b832bac565edd6807` (`tools/bench/t6/RULE_FROZEN.sha1`)*
 
-Scope: everything here uses only the 50 dev ids of `tools/bench/split.json`, plus the 12 app GT photos. Verdicts come only from `tools/bench/t6/dev_verdicts.json` (clusters plus `cascadeMapterhorn`) and from blind verdicts the lead gave later on dev poses (`tools/bench/t6/baseline_cpu_partial.json`, `verify_cpu_partial/`). No test photo was run, opened or scored. `pipeline.py` refuses test ids unless `--allow-test` is passed (`STAGE1_ALLOW_TEST=1` for `run.sh`).
+Scope: everything here uses only the 50 dev ids of `tools/bench/split.json`, plus the 12 app GT photos. Verdicts come only from `tools/bench/t6/dev_verdicts.json` (clusters plus `cascadeMapterhorn`) and from blind verdicts given later on dev poses (`tools/bench/t6/baseline_cpu_partial.json`, `verify_cpu_partial/`). No test photo was run, opened or scored. `pipeline.py` refuses test ids unless `--allow-test` is passed (`STAGE1_ALLOW_TEST=1` for `run.sh`).
 
 ## Verdict
 
@@ -19,7 +19,7 @@ The blind pack (`tools/bench/t6/verify/verdicts.json`) came back: wc_0046, wc_00
 - **The a-priori HIGH set grows from 16 to 20 with no wrong HIGH among inherited verdicts.** Two of the 20 (wc_0094, wc_0076) have no clean verdict yet. The only gross error, wc_0069, goes LOW.
 - **Correct poses: 23 (GPU-era) → 25 (CPU replay) → 26 (T6).** The replay gains come from deterministic CPU matching (+ wc_0046, 0072, 0094; − wc_0076, which moves to a pose verified unsure). T6 adds wc_0011, a new correct HIGH found by the fine sweep and the skyline search, which agrees with the blind-verified Mapterhorn cascade.
 - **Stage-1 search is not the main blocker I expected (goal 1a).** At the verified-correct pose, ALIKED+LightGlue on the satellite render gets ≥ 30 inliers on **23 of 24** dev photos. Appearance (season, haze, lighting) is not what makes the sweep fail. The failures that are real search failures remain unsolved by every generator I tried, and the verified dev set can't tell whether they're solvable at all (25 dev photos have no correct pose from any method).
-- **Two infrastructure bugs explain part of the "< 30 inliers" story.** Fixes are in the vendored copies, and the lead has ported them to the service:
+- **Two infrastructure bugs explain part of the "< 30 inliers" story.** Fixes are in the vendored copies, and they have been ported to the service:
   1. **LightGlue on MPS is non-deterministic.** Its point pruning (`width_confidence`) intermittently returns 0–17 matches instead of about 1000 on an identical pair after a pair of a different size. This is reproduced in isolation: 3/12 and 9/20 failures, against 0/20 on CPU or with pruning off. **6 of the 30 dev photos whose wild sweep had < 30 inliers reach ≥ 30 with deterministic matching.** Four of them (wc_0028, 0047, 0088, 0099) are photos where the sweep then finds the verified pose. The service now runs LightGlue on CPU (v0.3.x), and so does T6.
   2. **The ad-hoc route broke at 13:14 on 09-25.** The app switched to the `virtual:photos` module, so injected photos 404'd. The failure showed up as a 240 s page timeout. Fixed, with a 90 s fail-fast that captures the page console.
 - **GT-12 (heading and gravity removed, pin GT): no false HIGH, 11/11 within 1° of yaw (ablation: 10/11), HIGH 9 (ablation: 7).** IMG_7018 is fixed: 105° → 0.20°, HIGH. But median |Δyaw| goes from 0.146° (replay) / 0.162° (ablation) to **0.196°**, because the frozen selection sometimes returns a different stage-2 solve in the same basin (IMG_6971 0.06 → 0.26°, IMG_7059 0.21 → 0.61°, LOW). See "Known issue" below.
@@ -245,7 +245,7 @@ STAGE1_ALLOW_TEST=1 tools/matcher/stage1/run.sh wc_XXXX wc_YYYY ...
 
 ## 10. Integration note for `tools/matcher/server` (patch description; the server itself was not touched)
 
-1. **Already ported by the lead:**
+1. **Already ported:**
    - the `virtual:photos` interception;
    - the 8765–8769 port block;
    - SWEEP_KP back to 4096;

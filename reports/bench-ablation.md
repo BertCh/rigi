@@ -13,14 +13,14 @@
   - Natively, 3/11 are within 1° without a heading and 2/11 without heading or gravity. Worse, 7 and 8 of those wrong poses are *accepted* (confidence > 0.2).
   - A harness wrapper fixes most of this. It loads the full terrain, uses 9 yaw seeds × 3 pitch seeds and picks the best by the app's own score. That gives 10/11 without heading and 7/11 without either, with 1 false accept each (IMG_7086).
 - **Without gravity alone, the native app loses 4/11** (7/11 within 1°, 3 false accepts). The cause is its ±6° pitch grid and σ = 2.5° pitch penalty. Pitch seeds bring it back to 8/11 with 0 false accepts.
-- **0f's cascade supports everything via options, not by default.**
+- **the app pipeline's cascade supports everything via options, not by default.**
   - With the unknowns declared (360° yaw, free pitch/roll, no tilt gate), it gets 10, 10, 9 and 8 of 11 within 1°, with **0 false accepts in every condition**.
   - With default options, it degrades to 3/11 when both are missing. It never falsely accepts, though: it rejects instead.
 - **What the upload path should do:** treat a photo without heading or gravity as a fused-service job (two-stage 360° sweep, ≈ 11–22 s). If the service isn't there, run the cascade with the unknowns declared (≈ 0.7–2.4 s). The app's own `autoAlign` should not be trusted without a heading: it accepts wrong poses.
 
 ## What each method supports natively
 
-| unknown | app (`engine.autoAlign(true)`) | cascade (0f: `solvePose` → `refinePose`) | fused (`/match`, before this change) |
+| unknown | app (`engine.autoAlign(true)`) | cascade (`solvePose` → `refinePose`) | fused (`/match`, before this change) |
 |---|---|---|---|
 | **heading (yaw)** | **No 360°.** Prior yaw = `photo.heading ?? 0`. Grid ±25° around it (engine passes `yawRange = 25`), yaw penalty σ ≈ 20°. Terrain loads only a wedge of ±(hfov/2 + 32°) around the prior yaw, so the horizon outside it is empty. | **Partial.** `solvePose` searches ±25° (σ 15°). When the local search *rejects*, it retries a full 360° search and accepts at confidence ≥ 0.75 (`fullSearchFallback`). Configurable: `yawRange: 180` + σ yaw. `refinePose` FFT init ±30°, configurable up to 180°. | **No.** It takes a prior plus ≤ 9 yaw offsets. The skyline cue is the app's ±25° search. The match cue (2-point rotation RANSAC) needs no yaw prior, but only sees the rendered fan. |
 | **gravity (pitch/roll)** | **Partial.** Pitch grid ±6° (σ 2.5° penalty). Roll only in coordinate descent (σ 4°). Fine for |pitch| ≲ 5°, not beyond. | **Configurable, off by default.** `solvePose`: pitch ±3°, σ 1.5°, and **`tiltGate = 3°` rejects any solve that tilts > 3° from the prior**. `refinePose`: prior σ pitch/roll 0.7°. All of these are exposed as options. | **Match cue: yes**, because the rotation is solved freely. Skyline cue: as the app. |
@@ -44,7 +44,7 @@ The wrappers sit at the harness/server level. No method's source was modified: `
   - **Confidence:** recomputed with the engine's margin formula over all seeds' hypotheses (runner-up ≥ 3° away). The app acceptance rule (confidence > 0.2, or near-compass only when the compass exists) is applied.
   - **`app, native`:** the single run the app itself would do.
   - **Command:** new render-worker command `align`.
-- **Cascade:** `tools/bench/harness/cascade.ts` calls 0f's functions with the photo's JPEG and metadata, using the same eye rule and Terrarium DEM. There are two variants:
+- **Cascade:** `tools/bench/harness/cascade.ts` calls the app pipeline's functions with the photo's JPEG and metadata, using the same eye rule and Terrarium DEM. There are two variants:
   - **native:** eval.ts defaults, with unknowns set to 0;
   - **configured:** the unknowns are declared through the public options:
     - no gravity → `pitchRange 15`, σ pitch/roll 10°, `tiltGate 90`, refine init and prior σ 10°;
@@ -214,7 +214,7 @@ app = in-page autoAlign compute summed over seeds (page load excluded); cascade 
   - Fused "full" and "heading removed" include the cold page load for the page they open first. Without heading, that's a new page because the terrain wedge differs, plus loading all tiles (≈ 1–3 s) and draping imagery.
   - Warm fused requests are ≈ 7–9 s single-stage and ≈ 10–12 s two-stage.
   - App times are in-page compute only. Page load (≈ 4–15 s) is excluded, as in the leaderboard.
-- **Shared dev server.** One request (IMG_7130, heading removed, fused) died on an HMR reload triggered by another session. It was re-run on resume, and the harness now retries once.
+- **Shared dev server.** One request (IMG_7130, heading removed, fused) died on an HMR reload triggered by other work on the shared dev server. It was re-run on resume, and the harness now retries once.
 
 ## CLI
 
@@ -306,7 +306,7 @@ node tools/bench/harness/export_results.mjs tools/bench/harness/out/runs/wild   
 
 ### Overlay DEM fix (verify_v2)
 
-- **What was wrong:** v1 overlays (`runs/wild/verify/`) drew the skyline on the Terrarium DEM (AWS, 256 px, z13/11/10) with 0f's eye rule on that DEM. The app and fused solve on Mapterhorn.
+- **What was wrong:** v1 overlays (`runs/wild/verify/`) drew the skyline on the Terrarium DEM (AWS, 256 px, z13/11/10) with the app pipeline's eye rule on that DEM. The app and fused solve on Mapterhorn.
 - **The fix:**
   - `lib/geo.ts` now uses Mapterhorn only. Levels are z16 ≤ 0.8 km … z10 ≤ 150 km, loaded ring by ring, with a parent-tile fallback on 404. Tiles are cached in `out/cache/mapterhorn`, LRU-trimmed at 1 GB.
   - Every candidate is drawn at the eye its method used: fused and app from `row.eye[2]` (the engine eye, `max(GPS alt, DEM + 1.6)`, else DEM + 1.8).
@@ -315,9 +315,9 @@ node tools/bench/harness/export_results.mjs tools/bench/harness/out/runs/wild   
 - **Size of the error:** on near-field photos, v1 vs v2 differ by a median 1.0–1.5 % of image height, up to 26 % on wc_0077.
 - **New packs:** `runs/wild/verify_v2/` (same clusters, new labels, `key_v2.json`) and `tools/bench/t5/verify_v2/` (dev ids only).
 
-## Cascade on Mapterhorn (0f's loader): strip ablation and wild re-run
+## Cascade on Mapterhorn (the app pipeline's loader): strip ablation and wild re-run
 
-- **Recipe:** 0f's MAPTERHORN source:
+- **Recipe:** the app pipeline's MAPTERHORN source:
   - `demTileLoaderNode(MAPTERHORN)`, with `MAPTERHORN.levels` (z15 ≤ 1 km … z9 ≤ 150 km) and 512 px tiles;
   - eye from `eyeHeight(GPS alt, terrain.ground())` on that DEM;
   - `solvePose`, then `refinePose` on reject, exactly as `scripts/eval.ts` SOLVER=cascade.
@@ -328,7 +328,7 @@ node tools/bench/harness/export_results.mjs tools/bench/harness/out/runs/wild   
   - wild: `runs/wild-cascade-mt/`, with `inherit.json` and the blinded `verify/` for the 66 poses that match no verify_v2 cluster.
 - **Answer: "0 false accepts in every condition" no longer holds on Mapterhorn.** There is **one** false accept, in the heading-removed condition.
   - IMG_7053 was accepted at Δyaw −123.7°, confidence 0.66. Its solvePose 360° search came in above the default 0.5 accept threshold.
-  - The harness's configured 360° mode uses solvePose's `acceptConfidence` default (0.5). 0f's own full-search fallback accepts only at `fullSearchConfidence` 0.75, which would have rejected this pose.
+  - The harness's configured 360° mode uses solvePose's `acceptConfidence` default (0.5). the app pipeline's own full-search fallback accepts only at `fullSearchConfidence` 0.75, which would have rejected this pose.
   - Raising the harness's 360° threshold to 0.75 is the obvious fix. It is now applied, mirroring the app; see "0.75 yaw-unknown gate" below. The tables in this section are the 0.5 run.
   - Both-removed and gravity-removed have 0 false accepts on Mapterhorn. The default-options cascade has 0 in every condition.
 - **Accepts:** with full metadata the cascade accepts 10/11 on Mapterhorn against 8/11 on Terrarium (pin GT), with the same 10/11 within 1°. Within-1° counts otherwise move by −1…+1 photo per condition.
@@ -339,47 +339,47 @@ node tools/bench/harness/export_results.mjs tools/bench/harness/out/runs/wild   
 | condition | method | DEM | median \|Δyaw\| | ≤1° yaw | acc | false acc (≥1°) | worst Δyaw |
 |---|---|---|---|---|---|---|---|
 | full metadata | configured | Terrarium (earlier run) | 0.18 | 10/11 | 8/11 | 0 | 5.2 |
-| full metadata | configured | Mapterhorn (0f loader) | 0.21 | 10/11 | 10/11 | 0 | -1.4 |
+| full metadata | configured | Mapterhorn (app loader) | 0.21 | 10/11 | 10/11 | 0 | -1.4 |
 | full metadata | native defaults | Terrarium (earlier run) | 0.18 | 10/11 | 8/11 | 0 | 5.2 |
-| full metadata | native defaults | Mapterhorn (0f loader) | 0.21 | 10/11 | 10/11 | 0 | -1.4 |
+| full metadata | native defaults | Mapterhorn (app loader) | 0.21 | 10/11 | 10/11 | 0 | -1.4 |
 | gravity removed | configured | Terrarium (earlier run) | 0.18 | 10/11 | 9/11 | 0 | 5.3 |
-| gravity removed | configured | Mapterhorn (0f loader) | 0.09 | 10/11 | 8/11 | 0 | -11.7 |
+| gravity removed | configured | Mapterhorn (app loader) | 0.09 | 10/11 | 8/11 | 0 | -11.7 |
 | gravity removed | native defaults | Terrarium (earlier run) | 0.18 | 10/11 | 9/11 | 0 | 5.0 |
-| gravity removed | native defaults | Mapterhorn (0f loader) | 0.23 | 10/11 | 8/11 | 0 | 14.6 |
+| gravity removed | native defaults | Mapterhorn (app loader) | 0.23 | 10/11 | 8/11 | 0 | 14.6 |
 | heading removed (360°) | configured | Terrarium (earlier run) | 0.22 | 9/11 | 8/11 | 0 | 99.7 |
-| heading removed (360°) | configured | Mapterhorn (0f loader) | 0.29 | 9/11 | 9/11 | 1 | -123.6 |
+| heading removed (360°) | configured | Mapterhorn (app loader) | 0.29 | 9/11 | 9/11 | 1 | -123.6 |
 | heading removed (360°) | native defaults | Terrarium (earlier run) | 0.26 | 8/11 | 5/11 | 0 | -139.5 |
-| heading removed (360°) | native defaults | Mapterhorn (0f loader) | 0.29 | 7/11 | 5/11 | 0 | -138.5 |
+| heading removed (360°) | native defaults | Mapterhorn (app loader) | 0.29 | 7/11 | 5/11 | 0 | -138.5 |
 | both removed | configured | Terrarium (earlier run) | 0.46 | 8/11 | 6/11 | 0 | -168.1 |
-| both removed | configured | Mapterhorn (0f loader) | 0.49 | 7/11 | 6/11 | 0 | 151.9 |
+| both removed | configured | Mapterhorn (app loader) | 0.49 | 7/11 | 6/11 | 0 | 151.9 |
 | both removed | native defaults | Terrarium (earlier run) | 56.31 | 3/11 | 3/11 | 0 | -156.6 |
-| both removed | native defaults | Mapterhorn (0f loader) | 24.45 | 4/11 | 2/11 | 0 | -162.1 |
+| both removed | native defaults | Mapterhorn (app loader) | 24.45 | 4/11 | 2/11 | 0 | -162.1 |
 
 #### Against data/ground-truth.json (12 photos)
 
 | condition | method | DEM | median \|Δyaw\| | ≤1° yaw | acc | false acc (≥1°) | worst Δyaw |
 |---|---|---|---|---|---|---|---|
 | full metadata | configured | Terrarium (earlier run) | 0.17 | 11/12 | 9/12 | 0 | 5.5 |
-| full metadata | configured | Mapterhorn (0f loader) | 0.16 | 11/12 | 11/12 | 0 | -1.2 |
+| full metadata | configured | Mapterhorn (app loader) | 0.16 | 11/12 | 11/12 | 0 | -1.2 |
 | full metadata | native defaults | Terrarium (earlier run) | 0.17 | 11/12 | 9/12 | 0 | 5.5 |
-| full metadata | native defaults | Mapterhorn (0f loader) | 0.16 | 11/12 | 11/12 | 0 | -1.2 |
+| full metadata | native defaults | Mapterhorn (app loader) | 0.16 | 11/12 | 11/12 | 0 | -1.2 |
 | gravity removed | configured | Terrarium (earlier run) | 0.15 | 11/12 | 10/12 | 0 | 5.5 |
-| gravity removed | configured | Mapterhorn (0f loader) | 0.10 | 11/12 | 9/12 | 0 | -11.5 |
+| gravity removed | configured | Mapterhorn (app loader) | 0.10 | 11/12 | 9/12 | 0 | -11.5 |
 | gravity removed | native defaults | Terrarium (earlier run) | 0.28 | 11/12 | 9/12 | 0 | 5.3 |
-| gravity removed | native defaults | Mapterhorn (0f loader) | 0.26 | 11/12 | 8/12 | 0 | 14.8 |
+| gravity removed | native defaults | Mapterhorn (app loader) | 0.26 | 11/12 | 8/12 | 0 | 14.8 |
 | heading removed (360°) | configured | Terrarium (earlier run) | 0.21 | 10/12 | 9/12 | 0 | 99.6 |
-| heading removed (360°) | configured | Mapterhorn (0f loader) | 0.28 | 9/12 | 9/12 | 1 | -123.7 |
+| heading removed (360°) | configured | Mapterhorn (app loader) | 0.28 | 9/12 | 9/12 | 1 | -123.7 |
 | heading removed (360°) | native defaults | Terrarium (earlier run) | 0.28 | 8/12 | 5/12 | 0 | 177.4 |
-| heading removed (360°) | native defaults | Mapterhorn (0f loader) | 0.45 | 7/12 | 5/12 | 0 | -158.8 |
+| heading removed (360°) | native defaults | Mapterhorn (app loader) | 0.45 | 7/12 | 5/12 | 0 | -158.8 |
 | both removed | configured | Terrarium (earlier run) | 0.32 | 9/12 | 6/12 | 0 | -168.1 |
-| both removed | configured | Mapterhorn (0f loader) | 0.47 | 8/12 | 6/12 | 0 | 151.9 |
+| both removed | configured | Mapterhorn (app loader) | 0.47 | 8/12 | 6/12 | 0 | 151.9 |
 | both removed | native defaults | Terrarium (earlier run) | 38.03 | 4/12 | 3/12 | 0 | -156.6 |
-| both removed | native defaults | Mapterhorn (0f loader) | 33.73 | 4/12 | 2/12 | 0 | -162.1 |
+| both removed | native defaults | Mapterhorn (app loader) | 33.73 | 4/12 | 2/12 | 0 | -162.1 |
 
 #### Accepts more than 1° off
 
-- pin GT (11 photos), heading removed (360°), cascade, Mapterhorn (0f loader): IMG_7053 Δyaw -123.65° (confidence 0.66)
-- data/ground-truth.json (12 photos), heading removed (360°), cascade, Mapterhorn (0f loader): IMG_7053 Δyaw -123.68° (confidence 0.66)
+- pin GT (11 photos), heading removed (360°), cascade, Mapterhorn (app loader): IMG_7053 Δyaw -123.65° (confidence 0.66)
+- data/ground-truth.json (12 photos), heading removed (360°), cascade, Mapterhorn (app loader): IMG_7053 Δyaw -123.68° (confidence 0.66)
 
 - **Wild re-run (100 photos, `--weak-heading`, no gravity):**
   - 100/100 completed; 27 accepted (17 on Terrarium).
@@ -394,7 +394,7 @@ node tools/bench/harness/export_results.mjs tools/bench/harness/out/runs/wild   
   - `accepted = b.accepted && !ambiguous && !(unknown.yaw && b.confidence < 0.75)`;
   - `ambiguous` is the app's unknown-focal check: another accepting focal seed more than 1° of yaw away, or best confidence < 0.75. Focal is known in this ablation, so it never fires here.
   - Rows keep `detail.acceptedRaw` and `detail.gate`.
-- **Run:** `tools/bench/harness/out/runs/ablation-cascade-mt-g75/`, Mapterhorn with 0f's loader, compared with the 0.5 run above.
+- **Run:** `tools/bench/harness/out/runs/ablation-cascade-mt-g75/`, Mapterhorn with the app pipeline's loader, compared with the 0.5 run above.
 - **Result: false accepts are 0 in every condition, against both GTs.**
   - The cost is recall in the yaw-unknown conditions: accepts go 9 → 5 with no heading and 6 → 3 with neither (pin GT).
   - The runs with a heading are unchanged.
@@ -442,7 +442,7 @@ Confidences of yaw-unknown accepts at 0.5: [('refine', 1), ('refine', 1), ('solv
 
 - **Rule:** accept at confidence ≥ 0.5 only when the best basin beats the best basin more than 20° away by a margin M; otherwise apply the 0.75 gate.
 - **Margin:** `solvePose` does not expose its coarse basins (only `ambiguity`, with a runner-up just 2° away), so `tools/bench/harness/margin.ts` re-scores solvePose's coarse cost around the final pose:
-  - truncated L1 at 12 px, pitch refit in ±3°, 0.2° yaw grid over 360°, on 0f's Mapterhorn horizon;
+  - truncated L1 at 12 px, pitch refit in ±3°, 0.2° yaw grid over 360°, on the app pipeline's Mapterhorn horizon;
   - margin = (alt20 − best) / (median − best).
 - **Choosing M, on GT-12 only** (Mapterhorn strip ablation, no heading and neither):
   - In the 0.5–0.75 band, the one wrong raw accept (IMG_7053 no heading, Δyaw −123.7°) has the **highest** margin, 0.598.
@@ -477,7 +477,7 @@ Confidences of yaw-unknown accepts at 0.5: [('refine', 1), ('refine', 1), ('solv
 
 Dev cascade-mt rows: 50; with an inherited verdict: 11; without (uncounted): 39.
 
-- **0f's `solvePose({headingKnown: false})`** (0.75 bar applied inside solvePose; harness gate now a no-op flag, `HARNESS_UNKNOWN_GATE=1`, default off): re-run in `tools/bench/harness/out/runs/ablation-cascade-mt-hk/`.
+- **the app pipeline's `solvePose({headingKnown: false})`** (0.75 bar applied inside solvePose; harness gate now a no-op flag, `HARNESS_UNKNOWN_GATE=1`, default off): re-run in `tools/bench/harness/out/runs/ablation-cascade-mt-hk/`.
   - **Matches g75 on safety:** 0 false accepts in every condition against both GTs.
   - **Accepts (pin GT):** 10 / 8 / **7** / 3, against g75's 10 / 8 / 5 / 3.
   - **Why the change:** sub-0.75 360° solves now *reject inside* solvePose, so the cascade escalates them to refinePose. Before, they were accepted at 0.5 and gated after.

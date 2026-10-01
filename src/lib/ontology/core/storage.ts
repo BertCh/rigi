@@ -159,7 +159,7 @@ export const STORAGE = {
 } as const satisfies Record<string, StorageEntry>;
 export type StorageId = keyof typeof STORAGE;
 
-/** Key prefixes the storage lint scans for. */
+/** Key prefixes the storage lint scans for. The `mt-image` prefixes predate the Rigi rename and are kept for saved-data compatibility. */
 export const STORAGE_PREFIXES = [
 	"mt-image:",
 	"mt-image.",

@@ -12,6 +12,8 @@ actually saw receive photo pixels. Slopes hidden behind ridges keep a plain hill
 shadowed areas** tints them. **Fly into the photo** animates the orbit camera into the photo
 camera: at the end of the flight the canvas is the photo again, now drawn on terrain.
 
+The examples resolve `@luma.gl/*` and `@deck.gl/*` from this repository's vendored tarballs (`vendor/`), so run them from this repository (after `npm install` at the root); they are not meant to be copied out on their own.
+
 Run `npm start` from this folder (npm adds the ancestor `node_modules/.bin`, so the repository
 root's Vite is used), or `npx vite examples/deck/photo-drape` from the repository root. Select the
 backend with `?backend=webgpu` or `?backend=webgl`. Without a query, the example uses WebGPU when
@@ -130,11 +132,10 @@ API observations from this example, collected for deck.gl and luma.gl:
   (`https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`). The data carries each source's licence, see
   [mapterhorn.com/attribution](https://mapterhorn.com/attribution). This view is drawn mainly from
   swisstopo swissALTI3D (Swiss OGD) and Copernicus GLO-30. Credit: © Mapterhorn.
-- **Photo availability**: Rigi keeps photos out of git (`*.jpg` is ignored) until their licence is
-  settled, so a fresh clone has no `niederhorn.jpg`. The example then runs render-only. The shadow
+- **Photo availability**: the photo is not distributed in the example directory; copy `public/demo/photos/demo-01.jpg` to `examples/deck/photo-drape/niederhorn.jpg` to enable the photo layer (it stays gitignored there). Without it the example runs render-only. The shadow
   map is still drawn, and Show shadowed areas still works, but there is no drape: the Drape opacity
   control is disabled, `diagnostics.photoLoaded` is false, and the smoke test skips the photo
-  checks. Copy `public/demo/photos/demo-01.jpg` here to enable it.
+  checks. The pose in `scene-data.ts` is solved for the Niederhorn viewpoint, so use a photo taken there.
 - **Photo and pose**: `niederhorn.jpg` is Rigi demo photo `demo-01` (`public/demo/manifest.json`).
   The yaw, pitch, roll and field of view were solved by Rigi's skyline matcher against the
   Mapterhorn DEM.

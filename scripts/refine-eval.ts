@@ -18,12 +18,13 @@
  * yaw is perturbed by ±5/±10/±15° and a run counts as converged when its yaw
  * error is < 0.5°.
  *
- * Writes (scratch) $REFINE_OUT or /private/tmp/.../scratchpad/refine:
+ * Writes (scratch) $REFINE_OUT or <os tmpdir>/rigi-refine:
  * report.md, report.json, overlays <name>.jpg (white = GT, cyan = (a),
  * green = (b), orange = (c), yellow = detected skyline); and
  * out/refine/results.json (one row per photo for the leaderboard).
  */
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { vfovFromFocal } from "../src/lib/camera";
@@ -53,9 +54,7 @@ const has = (k: string) => {
 };
 const NO_SKY = has("--no-sky");
 const NO_ROBUST = has("--no-robust");
-const SCRATCH =
-	process.env.REFINE_OUT ??
-	"/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/a1611531-32b0-4db2-a884-e5bbc3808e2d/scratchpad/refine";
+const SCRATCH = process.env.REFINE_OUT ?? path.join(os.tmpdir(), "rigi-refine");
 const OUT_RESULTS = path.join(ROOT, "out", "refine");
 const GT_FILE = path.join(ROOT, "data", "ground-truth.json");
 const WORK_WIDTH = Number(process.env.REFINE_WORK ?? 800);

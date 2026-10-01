@@ -1,6 +1,6 @@
 # Pre-registration DRAFT: one-shot evaluation on the frozen held-out set `data_v3`
 
-**Status: DRAFT, NOT FROZEN, NOT EXECUTED.** Written 2026-09-26 by session f0. Running it spends `tools/bench/data_v3` and needs the user's sign-off. No `data_v3` photo has been opened, rendered, matched or overlaid by this session. The only things read were `README.md`, `FROZEN.sha1` and the manifest's hash and stratum counts.
+**Status: DRAFT, NOT FROZEN, NOT EXECUTED.** Written 2026-09-26. Running it spends `tools/bench/data_v3` and needs the user's sign-off. No `data_v3` photo has been opened, rendered, matched or overlaid by this session. The only things read were `README.md`, `FROZEN.sha1` and the manifest's hash and stratum counts.
 
 The draft is frozen by filling in the `‹…›` fields, committing it, and recording its sha1 on the first line of every arm's run log. After that, any change goes in `reports/v3-prereg-addenda.md` and is labelled post hoc.
 

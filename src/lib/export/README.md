@@ -1,6 +1,6 @@
 # Export / interchange: `src/lib/export`
 
-> Moved from the lead's API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
+> Moved from an API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
 
 These are pure TypeScript modules with no UI and no new dependencies. They turn a solved photo into formats other tools can read:
 

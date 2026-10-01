@@ -83,7 +83,7 @@ export const Route = createFileRoute("/lab/deck-webgpu")({
 				: undefined,
 	}),
 	head: () => ({ meta: [{ title: "Lab · deck WebGPU" }] }),
-	component: LabDeckWebgpu,
+	component: LabDeckWebgpuGate,
 });
 
 let chain: Promise<void> = Promise.resolve();
@@ -92,6 +92,12 @@ const MODES = ["overlay", "replace", "world"] as const;
 const OVERLAYS = ["contours", "bands", "slope", "none"] as const;
 const MAPS = ["satellite", "topo", "hillshade", "bands"] as const;
 const DEBUGS = ["color", "geometry", "normal", "depth"] as const;
+
+// dev-only: the production build shows a stub (same gate as dev.graph / lab.splats)
+function LabDeckWebgpuGate() {
+	if (!import.meta.env.DEV) return <p>dev only</p>;
+	return <LabDeckWebgpu />;
+}
 
 function LabDeckWebgpu() {
 	const search = Route.useSearch();

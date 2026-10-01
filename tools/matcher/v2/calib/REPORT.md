@@ -2,7 +2,7 @@
 
 **Scope.** 2026-09-26, DEV ids only: 30 dev photos with a verified ref, plus the 12 app GT photos, 42 scored in all. No test-split or `data_v3` photo was opened.
 
-**Setup.** Predictions for all 63 photos are in `pred_dev.json` and `pred_anycalib.json`. Accuracy is measured on CPU. The machine had a load average of about 16 from other sessions during the runs.
+**Setup.** Predictions for all 63 photos are in `pred_dev.json` and `pred_anycalib.json`. Accuracy is measured on CPU. The machine had a load average of about 16 from concurrent jobs during the runs.
 
 - **GeoCalib:** pinhole v1.0. Code Apache-2.0, weights CC-BY-4.0, 116 MB.
 - **AnyCalib:** pinhole v1.0.0, DINOv2-L. Apache-2.0, 1.28 GB. It gives focal only, no gravity.

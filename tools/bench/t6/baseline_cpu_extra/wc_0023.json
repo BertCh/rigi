@@ -249,7 +249,7 @@
  "version": "matcher-service/0.3.3 (fused skyline+render-match via fusion.py, \u03bb=1; aliked-n16 on MPS + lightglue on CPU; basin-gap LOW trigger for untrusted positions; bounded queue, client-cancel)",
  "id": "wc_0023",
  "request": {
-  "photoPath": "/Users/robertchristie/Documents/GitHub/mt-image/tools/bench/data/photos/wc_0023.jpg",
+  "photoPath": "tools/bench/data/photos/wc_0023.jpg",
   "meta": {
    "lat": 46.374722,
    "lon": 7.977222,

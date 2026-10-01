@@ -1,6 +1,6 @@
 """Opt-in GPU skyline grid for policy t6 (env T6_GPU_GRID=1; DEFAULT OFF).
 
-Added by session mt-image-bc on 2026-09-28 (tools/matcher/** is owned by session f0; this module is additive).
+Added on 2026-09-28; this module is additive to tools/matcher.
 The render worker's `edges` command, given skyGrid={vfov0, focalKnown, aspect}, runs the WebGPU port of the
 stage-1 grid (src/lib/gpu/skyglobal) in the page and writes the certified candidate cells (combo × nYaw + yaw,
 u32). grid_from_cands() re-scores exactly those cells in numpy with skyglobal.grid()'s own expressions, so the

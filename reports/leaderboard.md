@@ -28,7 +28,7 @@ Derived from accept counts, false accepts, > 2° errors and escalation rates onl
 - App GPU aligner (final) and CPU classic+cascade (0f recommended default) disagree by > 1° yaw on 1/13 photos (IMG_7130 3°). Where GT exists the first is closer on 0/1.
 - Load (median of n=3, carried over from 2026-09-25T03:31:38.380Z): cold 11.1 s with 59.5 MiB on the wire (all origins, incl. DEM tiles and the segmentation model); warm reload 6.2 s with 8 KiB on the wire (472/512 requests from cache). The warm load barely touches the network yet stays slow, so the time is in-browser compute (horizon renders, segmentation, alignment).
 - The two GT sources disagree by > 0.3° yaw on IMG_6958 (0.376°), IMG_7155 (-0.334°). Reconcile them before trusting sub-degree numbers.
-- The control-point GT (secondary column) is solved in-page from a subset of the labelled points: engine.controlPins has no level constraint for lake waterlines and no OSM-node-id lookup (region JSON carries no ids), so IMG_6958 drops 2 level, IMG_6971 drops 2 level, IMG_7059 drops 1 node/<id>, IMG_7131 drops 1 node/<id>. The primary GT (ground-truth.json, 0f's solve with all points) is unaffected.
+- The control-point GT (secondary column) is solved in-page from a subset of the labelled points: engine.controlPins has no level constraint for lake waterlines and no OSM-node-id lookup (region JSON carries no ids), so IMG_6958 drops 2 level, IMG_6971 drops 2 level, IMG_7059 drops 1 node/<id>, IMG_7131 drops 1 node/<id>. The primary GT (ground-truth.json, the app pipeline's solve with all points) is unaffected.
 - tsc: 2 errors (f0 2).
 - biome: 94 errors (d1 28, 9e 17, lead 33, f0 1, unowned 17).
 - Cold time-to-ready median 11.1 s (n=3) is over the 10 s target.
@@ -58,7 +58,7 @@ Every method is re-scored here against one GT snapshot (`out/lead/leaderboard/gt
 | = | CPU skyline solver (final), out/eval | | | | | | | | | | | | same results as CPU classic+solve, HORIZON=fast |
 | ref | Prior (compass + gravity) | 12 | – | – | – | 7 | 3/4 of 12 | 3.31° | 4.46° | 10.28° | 113.5 | 0 | – |
 
-¹ No accept/reject signal in the source, so it counts as always accepting (every error clearly ≥ 1° is a false accept). 'Correct/false accepts' use the method's own accept flag (app: confidence > 0.2; CPU variants: 0f's accept; refine and matcher contract files: their `accepted`; fused from fusion_default.json: confidence level HIGH). '> 2°' and '≤ 1°' score the pose as shown: a rejected CPU photo shows the prior, the app shows its fallback, external methods (refine, matcher) are scored on the pose in their file even when they rejected it. Median ms: CPU = skyline + solve on Node; app = autoAlign in the browser; matcher = match + solve on the MPS GPU, rendering excluded.
+¹ No accept/reject signal in the source, so it counts as always accepting (every error clearly ≥ 1° is a false accept). 'Correct/false accepts' use the method's own accept flag (app: confidence > 0.2; CPU variants: the app pipeline's accept; refine and matcher contract files: their `accepted`; fused from fusion_default.json: confidence level HIGH). '> 2°' and '≤ 1°' score the pose as shown: a rejected CPU photo shows the prior, the app shows its fallback, external methods (refine, matcher) are scored on the pose in their file even when they rejected it. Median ms: CPU = skyline + solve on Node; app = autoAlign in the browser; matcher = match + solve on the MPS GPU, rendering excluded.
 
 ## Oracle / ensemble (product decision input)
 
@@ -199,7 +199,7 @@ AUROC is blank until the set has both successes and failures. Spearman should be
 
 Headline methods only; every method's per-photo errors are in leaderboard.json. Cells without GT show the method's absolute yaw instead of an error. **Bold** = more than 1° off or more than 1° of disagreement.
 
-### f0's own matcher summary (from report, not re-scored; tools/matcher/out/report_tables.md)
+### the app pipeline's own matcher summary (from report, not re-scored; tools/matcher/out/report_tables.md)
 
 | method | n | median \|Δyaw\| | median \|Δpitch\| | median \|Δroll\| | median pin px | within 1° |
 |---|---|---|---|---|---|---|
@@ -207,7 +207,7 @@ Headline methods only; every method's per-photo errors are in leaderboard.json. 
 | skyline auto | 11 | 0.30° | 0.26° | 0.34° | 7.9 | 11/11 |
 | render-match | 11 | 0.16° | 0.07° | 0.23° | 10.5 | 11/11 |
 
-Against f0's in-page control-point solve (engine.solvePins). Our re-score of render-match against the same kind of GT (the cp column): n=11, median |yaw| 0.16°, 11/11 within 1° (differences come from the GT snapshot and pin set).
+Against the app pipeline's in-page control-point solve (engine.solvePins). Our re-score of render-match against the same kind of GT (the cp column): n=11, median |yaw| 0.16°, 11/11 within 1° (differences come from the GT snapshot and pin set).
 
 ### scripts/eval-app.mjs as printed (cross-check)
 
@@ -289,7 +289,7 @@ Build side effects outside out/lead/leaderboard/: node_modules/.nitro/last-build
 Step notes:
 
 - **biome**: biome.json includes only **/src/** (plus vite.config.ts), so scripts/ is ignored by config
-- **evalcpu**: read-only: 0f's out/eval*/report.json as last written (pass --run-evalcpu to regenerate out/eval/)
+- **evalcpu**: read-only: the app pipeline's out/eval*/report.json as last written (pass --run-evalcpu to regenerate out/eval/)
 - **app**: ready times here are under concurrent load; use the perf step for clean timings. app 'accepted' mirrors PhotoWorkspace (confidence > 0.2).
 - **perf**: cold = fresh on-disk browser profile (empty HTTP cache/storage; the Vite dev server's own transform cache may be warm); warm = reload in the same profile. Sequential, one page at a time. Bytes = on-the-wire bytes of every response, cross-origin included (Chrome DevTools protocol). A load with >1 document request was reloaded mid-measurement (e.g. dev-server HMR) and is flagged.
 
@@ -326,19 +326,19 @@ Default mode runs no other session's evaluator: it reads their latest outputs (r
 - **Prior (compass + gravity)**: EXIF heading, Apple gravity pitch/roll, f35 focal: the baseline to beat
 - **App GPU aligner (final)**: 9e src/lib/align.ts via the app: the pose the UI shows after load (conf > 0.2 → aligned, else near-compass alt or prior)
 - **App GPU aligner (raw)**: engine.autoAlign(true) best pose, whatever its confidence
-- **CPU classic+cascade (0f recommended default)**: detectSkyline → solvePose → on reject refinePose; what /baseline Auto-align runs (SOLVER=cascade). 0f's out/eval-classic-cascade/report.json (written 2026-09-25T03:27:49.828Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
-- **CPU classic+skyfirst (0f high-accuracy mode)**: refine with ONNX sky cross-check, else cascade; always loads the 4.5 MB sky model (SOLVER=skyfirst). 0f's out/eval-classic-skyfirst/report.json (written 2026-09-25T03:35:20.663Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
-- **CPU skyline solver (final), out/eval**: 0f: solved if accepted, else prior (what the baseline pipeline would show). out/eval/report.json = 0f's last default run (written 2026-09-25T03:53:38.758Z); its results match out/eval-classic-solve-fasth
-- **CPU skyline solver (raw), out/eval**: 0f scripts/eval.ts: detectSkyline + solvePose, always the solved pose. out/eval/report.json = 0f's last default run (written 2026-09-25T03:53:38.758Z); its results match out/eval-classic-solve-fasth
-- **CPU classic+cascade, HORIZON=fast**: the cascade on d1's horizon-fast horizon (what the browser runs). 0f's out/eval-classic-cascade-fasth/report.json (written 2026-09-25T03:36:26.827Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
-- **CPU classic+cascade2**: solve → refine with sky cross-check → refine. 0f's out/eval-classic-cascade2/report.json (written 2026-09-25T03:34:51.569Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
-- **CPU classic+refine**: classic skyline, refinePose only. 0f's out/eval-classic-refine/report.json (written 2026-09-25T03:26:13.586Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
-- **CPU classic+solve, HORIZON=fast**: simple solvePose core on the horizon-fast horizon. 0f's out/eval-classic-solve-fasth/report.json (written 2026-09-25T03:36:13.958Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
-- **CPU ONNX sky+refine**: ONNX sky-model skyline, refinePose. 0f's out/eval-model-refine/report.json (written 2026-09-25T03:26:48.852Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
-- **CPU ONNX sky+solve**: ONNX sky-model skyline, solvePose (0f: do not pair these). 0f's out/eval-model-solve/report.json (written 2026-09-25T03:25:57.203Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
+- **CPU classic+cascade (0f recommended default)**: detectSkyline → solvePose → on reject refinePose; what /baseline Auto-align runs (SOLVER=cascade). the app pipeline's out/eval-classic-cascade/report.json (written 2026-09-25T03:27:49.828Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
+- **CPU classic+skyfirst (0f high-accuracy mode)**: refine with ONNX sky cross-check, else cascade; always loads the 4.5 MB sky model (SOLVER=skyfirst). the app pipeline's out/eval-classic-skyfirst/report.json (written 2026-09-25T03:35:20.663Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
+- **CPU skyline solver (final), out/eval**: 0f: solved if accepted, else prior (what the baseline pipeline would show). out/eval/report.json = the app pipeline's last default run (written 2026-09-25T03:53:38.758Z); its results match out/eval-classic-solve-fasth
+- **CPU skyline solver (raw), out/eval**: 0f scripts/eval.ts: detectSkyline + solvePose, always the solved pose. out/eval/report.json = the app pipeline's last default run (written 2026-09-25T03:53:38.758Z); its results match out/eval-classic-solve-fasth
+- **CPU classic+cascade, HORIZON=fast**: the cascade on d1's horizon-fast horizon (what the browser runs). the app pipeline's out/eval-classic-cascade-fasth/report.json (written 2026-09-25T03:36:26.827Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
+- **CPU classic+cascade2**: solve → refine with sky cross-check → refine. the app pipeline's out/eval-classic-cascade2/report.json (written 2026-09-25T03:34:51.569Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
+- **CPU classic+refine**: classic skyline, refinePose only. the app pipeline's out/eval-classic-refine/report.json (written 2026-09-25T03:26:13.586Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
+- **CPU classic+solve, HORIZON=fast**: simple solvePose core on the horizon-fast horizon. the app pipeline's out/eval-classic-solve-fasth/report.json (written 2026-09-25T03:36:13.958Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
+- **CPU ONNX sky+refine**: ONNX sky-model skyline, refinePose. the app pipeline's out/eval-model-refine/report.json (written 2026-09-25T03:26:48.852Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
+- **CPU ONNX sky+solve**: ONNX sky-model skyline, solvePose (do not pair these). the app pipeline's out/eval-model-solve/report.json (written 2026-09-25T03:25:57.203Z); final pose = solved if accepted, else prior; re-scored here from prior + delta
 - **d1 refine**: d1 src/lib/refine: robust skyline refinement from the prior (out/refine/results.json, method 'refine')
 - **d1 refine+sky**: d1 src/lib/refine with the ONNX sky mask (out/refine/results.json, method 'refine+sky')
-- **f0 fusion (skyline + render-match)**: f0 tools/matcher/results-fusion.json (contract file): joint skyline + render-match refinement (fusion.py), with f0's confidence / accepted
-- **f0 render-match (ALIKED+LightGlue, sat, rot_fixf)**: f0 tools/matcher: satellite-draped DEM renders at prior yaw ±20°, ALIKED+LightGlue, rotation-only solve at the GPS eye (f0's headline config). From tools/matcher/results.json (with f0's confidence / accepted) when present, else re-derived from out/results/<id>_initial.json (then it always 'accepts'); ms = match+solve, rendering excluded
+- **f0 fusion (skyline + render-match)**: f0 tools/matcher/results-fusion.json (contract file): joint skyline + render-match refinement (fusion.py), with the app pipeline's confidence / accepted
+- **f0 render-match (ALIKED+LightGlue, sat, rot_fixf)**: f0 tools/matcher: satellite-draped DEM renders at prior yaw ±20°, ALIKED+LightGlue, rotation-only solve at the GPS eye (the app pipeline's headline config). From tools/matcher/results.json (with the app pipeline's confidence / accepted) when present, else re-derived from out/results/<id>_initial.json (then it always 'accepts'); ms = match+solve, rendering excluded
 - **f0 render-match + 1 refinement render**: f0 tools/matcher refine stage (it1): one more render at the solved pose, same config. Always 'accepts'
 

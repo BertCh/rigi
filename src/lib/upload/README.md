@@ -1,6 +1,6 @@
 # Upload track: API note
 
-> Moved from the lead's API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
+> Moved from an API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
 
 Browser photo upload for Rigi. `/upload` takes a JPEG, HEIC, PNG, WebP or AVIF (RAW/TIFF are rejected with an export hint), builds the same `PhotoMeta` that `scripts/ingest.mjs` builds, gets OSM peaks, trails and lakes, stores everything in IndexedDB, and opens the photo in the existing `PhotoWorkspace` at `/photo/local-<hash>`.
 
@@ -97,7 +97,7 @@ If a browser's classic workers can't run dynamic `import()`, the decode falls ba
   - Deleting the pinned upload removes its now-unreferenced `local-region-*` record.
   - No page errors. Page errors are logged with URL and stack.
   - Screenshots: `out/lead/upload/{jpeg,heic,nogps-before,nogps-pinned,workspace,workspace-cold}.jpg`.
-  - verify.mjs stubs the Vite HMR websocket. Without that, other sessions' edits full-reload the page in the middle of a test.
+  - verify.mjs stubs the Vite HMR websocket. Without that, concurrent edits full-reload the page in the middle of a test.
 
 ## Known limitations
 

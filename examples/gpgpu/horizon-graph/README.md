@@ -5,6 +5,8 @@ Switzerland) on the GPU with `GPUCommandGraph`, checks it against an f32 CPU twi
 panorama silhouette with a luma.gl `Model`. The Eiger, Mönch and Jungfrau, 23–24 km away at
 130–143°, form the highest part of the southern skyline.
 
+The examples resolve `@luma.gl/*` and `@deck.gl/*` from this repository's vendored tarballs (`vendor/`), so run them from this repository (after `npm install` at the root); they are not meant to be copied out on their own.
+
 Run `npm start` in this folder (npm puts the ancestor `node_modules/.bin` on `PATH`), or run
 `npx vite examples/gpgpu/horizon-graph` from the repository root. The example needs network access
 to fetch terrain tiles. `npm run test:visual` runs `scripts/visual-smoke.mjs` (in Rigi, wrap it in

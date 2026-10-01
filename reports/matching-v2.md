@@ -1,6 +1,6 @@
 # Matching v2: eye-position fallback, calibration priors, LoMa (dev only)
 
-*2026-09-26 · session f0 (resumed after the ~16:02 UTC outage) · code in `tools/matcher/v2/` · research in `research_notes/matching_v2_research.md`*
+*2026-09-26 · (resumed after the ~16:02 UTC outage) · code in `tools/matcher/v2/` · research in `research_notes/matching_v2_research.md`*
 
 **Scope.** Only the 50 DEV ids of `tools/bench/split.json` were used. The spent test half was never opened, and no `data_v3` photo was opened, rendered or run. Verdicts come from the existing verified dev refs (`tools/bench/gt/t6`, through `stage1/evaluate.py`) plus the new blind pack in `tools/matcher/v2/verify/`. The frozen T6 rule was used unchanged (`292fb74f…`), and the pipeline code stamp was `c2d406ea3c557e6e`.
 
@@ -62,7 +62,7 @@
 | **v2** (T6 + eye fallback) | 26 | 19 / **1** / 1 | 9/9 | 12/12, 12/30 | 19/21 (**1**), 19/30 | **196 s / 432 s** |
 
 - **Fallback activity:** on the 30 non-HIGH photos it ran a median of 214 s (p90 427 s, max 472 s).
-- **Machine load:** the timings were taken while another v2 shard, the LoMa arm and other sessions' services were running (load average 10–17), so treat them as upper bounds.
+- **Machine load:** the timings were taken while another v2 shard, the LoMa arm and other services were running (load average 10–17), so treat them as upper bounds.
 - **Moved-eye runs:** full T6 was run at a moved eye on only 2 of the 30 photos (wc_0074, wc_0086). All the others were stopped by the 3× / 100-inlier gate.
 
 **What the fallback saw (30 non-HIGH photos):**
@@ -180,4 +180,4 @@
   - `out/dev_loma/`.
   - `.cache/eyeprobe/`.
   - `verify/{PROTOCOL.md, cands*.json, key.json, round2/key.json, raw/, verdicts_keyed.json, verdicts.json}`.
-- **Scratch:** logs and `prior_ab.json` are in `/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/75c91a88-da3f-430c-b0e0-21fa75f9d390/scratchpad/v2/`.
+- **Scratch:** logs and `prior_ab.json` are in a local scratch directory.

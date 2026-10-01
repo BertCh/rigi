@@ -200,7 +200,7 @@ def overpass_nearest(lat, lon, radius=3000):
     q = (f"[out:json][timeout:25];(node(around:{radius},{lat},{lon})[natural=peak][name];"
          f"node(around:{radius},{lat},{lon})[tourism=viewpoint][name];);out body;")
     url = "https://overpass-api.de/api/interpreter?data=" + urllib.parse.quote(q)
-    req = urllib.request.Request(url, headers={"User-Agent": "mt-image-research/0.1"})
+    req = urllib.request.Request(url, headers={"User-Agent": "rigi-research/0.1 (+https://github.com/BertCh/rigi)"})
     js = json.load(urllib.request.urlopen(req, timeout=40))
     best = None
     for el in js.get("elements", []):

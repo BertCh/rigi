@@ -58,6 +58,7 @@ await ctx.addInitScript(
 			localStorage.setItem(k, v);
 		} catch {}
 	},
+	// The "mt-image" key predates the Rigi rename and is kept for saved-data compatibility.
 	[`mt-image:pose:${id}`, JSON.stringify(pose)],
 );
 const page = await ctx.newPage();

@@ -1,4 +1,4 @@
-P1 - POSITION TRIAGE BEFORE MATCHING (TM program, dev only)            2026-09-28, session mt-image-58 subagent
+P1 - POSITION TRIAGE BEFORE MATCHING (TM program, dev only)            2026-09-28, subagent
 =====================================================================================================================
 Question: using only metadata (Commons title, stated lat/lon, EXIF altitude, heading) + Mapterhorn DEM + OSM, can we
 flag "position suspect" before matching and propose candidate eyes, cheaply?

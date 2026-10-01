@@ -5,14 +5,14 @@ import inspect
 import json
 import math
 import os
+import tempfile
 import sys
 import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TM = HERE.parent
-SCRATCH = Path(os.environ.get("H1_SCRATCH", "/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/"
-                                            "7c1a30aa-cc2d-419d-8481-cfc760239e03/scratchpad/h1"))
+SCRATCH = Path(os.environ.get("H1_SCRATCH", os.path.join(tempfile.gettempdir(), "rigi-h1")))
 os.environ["STAGE1_TMP"] = str(SCRATCH / "tmp")
 os.environ.setdefault("STAGE1_PORT", "8793")
 (SCRATCH / "tmp").mkdir(parents=True, exist_ok=True)

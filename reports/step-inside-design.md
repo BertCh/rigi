@@ -100,7 +100,7 @@ That turns the paste's "plausible world completion" into "plausible texture on t
 - **Depth compositing in deck.** The terrain writes log depth to `gl_FragDepth`, so the splat shader must match it, or splats will pop through the mountains.
 - **iOS.** Splat sorting and rendering on iOS WebGL2 inherits the known float-target gap.
 - **Disk and GPU.** Model checkpoints are GB-scale; `df -h` shows 15 GB free right now. Follow the render-lock rule: one GPU job at a time.
-- **Ownership.** New code goes in new paths (`src/lib/nearfield/**`, `tools/nearfield/**`). `renderer.ts` needs an optional `setNearField()` (message the lead). Adding Spark to `package.json` needs your OK.
+- **Ownership.** New code goes in new paths (`src/lib/nearfield/**`, `tools/nearfield/**`). `renderer.ts` needs an optional `setNearField()` (a change to the app pipeline). Adding Spark to `package.json` needs your OK.
 
 ## Decisions needed
 

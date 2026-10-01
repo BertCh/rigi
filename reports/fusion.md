@@ -219,7 +219,7 @@ for v in IMG_7155@r1000 IMG_7131@r1000; do (cd ../.. && node tools/matcher/expor
 
 ## Files added or changed
 
-All paths are under `/Users/robertchristie/Documents/GitHub/mt-image/`.
+All paths are under ``.
 
 - `tools/matcher/`:
   - New: `fusion.py`, `fusion_report.py`, `gtjson_check.py`, `export_skyline.mjs`, `gps_offset.mjs`, `collect_corr.py`, `fusion_prep.sh`, `write_leaderboard.py`, `results.json`, `results-fusion.json`.

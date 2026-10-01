@@ -52,7 +52,7 @@ export const Route = createFileRoute("/lab/deck-splats")({
 		z: num(s.z),
 	}),
 	head: () => ({ meta: [{ title: "Lab · deck splats" }] }),
-	component: LabDeckSplats,
+	component: LabDeckSplatsGate,
 });
 
 // ---------------- synthetic world ----------------
@@ -415,6 +415,12 @@ type LabHook = {
 };
 
 // ---------------- page ----------------
+
+// dev-only: the production build shows a stub (same gate as dev.graph / lab.splats)
+function LabDeckSplatsGate() {
+	if (!import.meta.env.DEV) return <p>dev only</p>;
+	return <LabDeckSplats />;
+}
 
 function LabDeckSplats() {
 	const search = Route.useSearch();

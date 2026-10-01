@@ -162,12 +162,13 @@ for (const [id, list] of Object.entries(labels.photos)) {
 			for (const R of [300, 500]) {
 				const vv = g.variants?.[R];
 				if (!vv) continue;
-				const c = (coll[`v${R}`] ??= {
+				coll[`v${R}`] ??= {
 					draped: 0,
 					removed: 0,
 					removedBand: 0,
 					drapedBand: 0,
-				});
+				};
+				const c = coll[`v${R}`];
 				if (nearLabel) {
 					c.drapedBand++;
 					if (vv.on[k]) c.removedBand++;
@@ -181,10 +182,11 @@ for (const [id, list] of Object.entries(labels.photos)) {
 				["forced", !sForced],
 			]) {
 				const c = coll[key];
-				const cc = (pp.coll ??= {
+				pp.coll ??= {
 					product: { draped: 0, removed: 0, removedBand: 0, drapedBand: 0 },
 					forced: { draped: 0, removed: 0, removedBand: 0, drapedBand: 0 },
-				})[key];
+				};
+				const cc = pp.coll[key];
 				if (nearLabel) {
 					c.drapedBand++;
 					cc.drapedBand++;

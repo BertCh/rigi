@@ -1,6 +1,6 @@
 # Whole-app graph (WAG): plan
 
-> **Implementation status (2026-10-01, session mt-image-1e).** WAG-0 done; WAG-1/2 mostly landed; certified-f32 horizon landed opt-in. Two of this plan's premises did not hold when measured: the DEM is not "decoded 5+ times" per tile (451 distinct tiles, 97 repeats per load, so DemStore was not landed), and the page device cannot host the horizon march (it holds none of the needed heights at native resolution when the march runs). Per-item state and commits: the roadmap's WAG rows; numbers: `research_notes/whole-app-graph-2026-10-01/baseline-2026-10-01.md` and [negative-results.md](negative-results.md#gpu-and-performance).
+> **Implementation status (2026-10-01).** WAG-0 done; WAG-1/2 mostly landed; certified-f32 horizon landed opt-in. Two of this plan's premises did not hold when measured: the DEM is not "decoded 5+ times" per tile (451 distinct tiles, 97 repeats per load, so DemStore was not landed), and the page device cannot host the horizon march (it holds none of the needed heights at native resolution when the march runs). Per-item state and commits: the roadmap's WAG rows; numbers: `research_notes/whole-app-graph-2026-10-01/baseline-2026-10-01.md` and [negative-results.md](negative-results.md#gpu-and-performance).
 
 *Revised the same day after an adversarial review against the code. The corrections are folded in: W1.2, W1.3, W1.4, W1.5, W1.7 and W2.1 changed; claims are now verified with file:line. Some islands are thin in the crossing table: relief bridge, tiles3d, Step Inside splats.*
 
@@ -15,7 +15,6 @@ This plan builds on [visgl-frontier-2026-10-01.md](visgl-frontier-2026-10-01.md)
 | `upstream-api.md` | Exact luma gpgpu graph/program API and a gap analysis against `gpu/core/graph.ts` |
 | `splats-3328.md` | luma splats compute+render graph and PR #3328 drawIndirect |
 | `data-sources.md` | Every external source, duplicate decodes, hands-on loaders.gl results, ingest adapter design |
-| `proto/` | Two typecheck-only migration sketches: haze tail and solve fold |
 
 ## 1. What "whole app as one graph" can and cannot mean
 
@@ -129,7 +128,7 @@ Order: W0.6 re-baseline first. W1.4 and W1.7 rest on unconfirmed costs, so measu
 | W1.1 | Photoprep planes stay resident and align imports them (R1/R2). The CPU copy becomes a lazy read. **First list the CPU consumers** (claim 1 row in §2) and move or keep each one. Verification moves out-of-band | Removes the once-per-photo re-upload; the 3.5 MB read becomes lazy, not gone |
 | W1.2 | **Fewer settle submits**: put the masks and band-stats kernels in the query geometry's encoder. The query render is its own 1024 px pass, debounced 90 ms with `GeometryGenerations`/renderSeq pairing (`geometry-source.ts:65,497`). It is **not** the visible frame's pass, so keep it separate. Occlusion keeps its dependent CPU step (`resolveOcclusion` → gather, f64 label projection). The stats stall depends on haze's CPU range (P1) | Fewer submits per settle. Not one submit |
 | W1.3 | ~~Silhouette score kernel~~. Already a GPU mask plus a CPU f64 scorer (202f767). A GPU score breaks bit identity, so it moves under P1 | — |
-| W1.4 | Haze head overflow. A GPU condition alone cannot remove it (`proto/haze-tail.ts.txt`), and a full-capacity copy every run (up to N·8 B) is likely a net loss, because the adaptive head rarely overflows (`haze-graph.ts:41-45`). **Measure the overflow rate first.** Act only if overflows are common | Probably leave as is |
+| W1.4 | Haze head overflow. A GPU condition alone cannot remove it (the typecheck-only haze-tail sketch, not published), and a full-capacity copy every run (up to N·8 B) is likely a net loss, because the adaptive head rarely overflows (`haze-graph.ts:41-45`). **Measure the overflow rate first.** Act only if overflows are common | Probably leave as is |
 | W1.5 | `drawIndirect` with GPU-written counts. **Batched-terrain first**: `visibleRows` (`batched-terrain.ts:660`, draw at `:734`) is the only real per-frame CPU culling. GPU frustum cull → compact → indirect count. Splats (`splats.ts:768`) draw a constant `cloud.count` and already cull in the vertex shader; a cull-compact pass is only a perf option there. Trails (`trail.ts:331`) have a data-time count, so nothing is gained | Removes CPU culling for terrain |
 | W1.6 | VRAM: graph-managed transients and aliasing for geometry, MSAA and look targets | Target ≤250 MiB in the photo view (estimated) |
 | W1.7 | Sky worker: profile the 67 ms first. The evidence points to ORT inference landing in the first refine call, which no residency change recovers. Hand over a texture instead of a u8 post only if the profile shows readback cost | Likely ~0 |
@@ -151,7 +150,7 @@ Order: W0.6 re-baseline first. W1.4 and W1.7 rest on unconfirmed costs, so measu
 |---|---|---|
 | W3.1 | Horizon on the page device over the resident I1 heights. Retires the horizon-fast worker device, its mosaics and its duplicate DEM decode | f64 atan/ENU (D7/D8) → P1 |
 | W3.2 | Eye search on the page device, fused horizon → residual | P1; LM stays on the CPU |
-| W3.3 | Align rounds as a GPU-driven fixed-round loop with indirect dispatch; the exact f64 re-score becomes a certified f32 compare plus a CPU tie path (the solve-fold pattern, `proto/solve-fold.ts.txt`) | P1; a per-device strict-IEEE probe; **wild-set gate under the 0-false-accept rule** (identical accept/reject decisions) |
+| W3.3 | Align rounds as a GPU-driven fixed-round loop with indirect dispatch; the exact f64 re-score becomes a certified f32 compare plus a CPU tie path (the solve-fold pattern, described in upstream-api.md §8) | P1; a per-device strict-IEEE probe; **wild-set gate under the 0-false-accept rule** (identical accept/reject decisions) |
 | — | Stays separate by design: I5 unknown-pose worker (f64 LM/refine, policy), I6 ORT, MediaPipe, I12 roll until a WebGPU port | — |
 
 ### WAG-4: semantics and upstream
@@ -170,7 +169,7 @@ Order: W0.6 re-baseline first. W1.4 and W1.7 rest on unconfirmed costs, so measu
 
 ## 5. Decisions for the user
 
-**State 2026-10-01:** P1 answered (b), certified f32 per stage, each stage keeping its own EVAL/wild-set gate under the 0-false-accept rule; this unblocks WAG-3. P4 answered: vendor #3328 now as rigi.2. Both answers were relayed by session mt-image-1e, which asked the user directly. P2 and P3 are still open.
+**State 2026-10-01:** P1 answered (b), certified f32 per stage, each stage keeping its own EVAL/wild-set gate under the 0-false-accept rule; this unblocks WAG-3. P4 answered: vendor #3328 now as rigi.2. Both answers were relayed to the user directly. P2 and P3 are still open.
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|

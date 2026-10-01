@@ -14,8 +14,14 @@ export const Route = createFileRoute("/dev/how-scene")({
 		t: s.t === undefined ? undefined : Number(s.t),
 	}),
 	head: () => ({ meta: [{ title: "How Rigi works" }] }),
-	component: Preview,
+	component: PreviewGate,
 });
+
+// dev-only: the production build shows a stub (same gate as dev.graph / lab.splats)
+function PreviewGate() {
+	if (!import.meta.env.DEV) return <p>dev only</p>;
+	return <Preview />;
+}
 
 function Preview() {
 	const { t } = Route.useSearch();

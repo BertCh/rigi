@@ -154,6 +154,11 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { GPU_ARGS } from "./deck-webgpu/gpu-args.mjs";
 
+// ANSI colour escapes, built from a string so the ESC control character is not a regex literal
+const ANSI_COLOR_PATTERN = new RegExp(
+	`${String.fromCharCode(27)}\\[[0-9;]*m`,
+	"g",
+);
 const ROOT = path.resolve(import.meta.dirname, "..");
 /** --renderer: pins ?renderer= on every /photo open (null = the app default). Set once in main(). */
 let RENDERER = null;
@@ -274,7 +279,7 @@ const OWNERS = [
 		},
 	],
 ];
-/** Other lead tracks (out/lead/<track>/ exists) are assumed to own src/lib/<track>/ too. */
+/** Other tracks (out/lead/<track>/ exists) are assumed to own src/lib/<track>/ too. */
 function leadTracks() {
 	try {
 		return fs
@@ -471,7 +476,7 @@ export const parseJsonLenient = (txt) =>
 		txt.replace(/([:[,]\s*)-?(?:Infinity|NaN)(?=\s*[,\]}])/g, "$1null"),
 	);
 /**
- * Reads a JSON file another session may be rewriting right now. `validate(json)` returns true, or a string saying
+ * Reads a JSON file another process may be rewriting right now. `validate(json)` returns true, or a string saying
  * why the content looks incomplete (e.g. fewer rows than expected); the read is retried `tries` times, `delayMs`
  * apart. After the last try the latest parse is returned with a warning (never throws).
  */
@@ -710,7 +715,7 @@ async function stepBuild(scale) {
 	if (outputStamp !== after)
 		notes.push("WARNING: shared .output/ changed during the build");
 	if (r.code !== 0)
-		notes.push(tail(`${r.err}\n${r.out}`.replace(/\x1b\[[0-9;]*m/g, ""), 800));
+		notes.push(tail(`${r.err}\n${r.out}`.replace(ANSI_COLOR_PATTERN, ""), 800));
 	const assetsDir = path.join(outDir, "public", "assets");
 	if (fs.existsSync(assetsDir)) {
 		const assets = fs
@@ -861,7 +866,10 @@ async function stepEvalCpu(scale, runIt, nExpected) {
 				if (!o || o.accepted !== r.accepted) same = false;
 				else s += Math.abs((o.delta?.yaw ?? 0) - (r.delta?.yaw ?? 0));
 			}
-			if (same && s < 0.5) (res.evalMatches ??= []).push(k);
+			if (same && s < 0.5) {
+				res.evalMatches ??= [];
+				res.evalMatches.push(k);
+			}
 		}
 	const m = mtimeOf(EVAL_REPORT);
 	res.ms = Date.now() - t0;
@@ -969,7 +977,8 @@ async function stepMatcher(extra, ids) {
 	const files = [];
 	const warn = [];
 	const add = (key, id, row, file, mtimeMs) => {
-		const m = (methods[key] ??= { rows: {}, files: new Set(), mtimeMs: 0 });
+		methods[key] ??= { rows: {}, files: new Set(), mtimeMs: 0 };
+		const m = methods[key];
 		m.rows[id] = row;
 		m.files.add(file);
 		m.mtimeMs = Math.max(m.mtimeMs, mtimeMs ?? 0);
@@ -1125,7 +1134,7 @@ async function stepMatcher(extra, ids) {
 						ms,
 						inliers: sol.inliers ?? null,
 					},
-					path.relative(ROOT, rdir) + `/*_${suffix}.json`,
+					`${path.relative(ROOT, rdir)}/*_${suffix}.json`,
 					r.mtimeMs,
 				);
 				n++;
@@ -1273,11 +1282,10 @@ async function netTracker(page) {
 	let reqs = new Map();
 	const get = (id) => {
 		let r = reqs.get(id);
-		if (!r)
-			reqs.set(
-				id,
-				(r = { url: "", bytes: 0, cached: false, done: false, failed: false }),
-			);
+		if (!r) {
+			r = { url: "", bytes: 0, cached: false, done: false, failed: false };
+			reqs.set(id, r);
+		}
 		return r;
 	};
 	let documents = 0;
@@ -1321,7 +1329,8 @@ async function netTracker(page) {
 			for (const r of reqs.values()) {
 				if (!/^https?:/.test(r.url)) continue;
 				const o = new URL(r.url).origin;
-				const b = (byOrigin[o] ??= { requests: 0, cached: 0, networkKiB: 0 });
+				byOrigin[o] ??= { requests: 0, cached: 0, networkKiB: 0 };
+				const b = byOrigin[o];
 				b.requests++;
 				n++;
 				if (r.cached) {
@@ -2724,7 +2733,7 @@ function deriveBlocking(L) {
 	);
 	if (reloaded.length)
 		b.push(
-			`Perf: the page reloaded during ${reloaded.join(", ")} (dev-server HMR from another session's edit?), so those times and bytes are inflated; re-run the perf step.`,
+			`Perf: the page reloaded during ${reloaded.join(", ")} (dev-server HMR from a concurrent edit?), so those times and bytes are inflated; re-run the perf step.`,
 		);
 	if (steps.perf?.failed?.length && !steps.perf.stale)
 		b.push(
@@ -2740,7 +2749,7 @@ function deriveBlocking(L) {
 		);
 	if (L.inputs?.changed?.length)
 		b.push(
-			`Inputs changed during the run (other sessions editing): ${L.inputs.changed.join(", ")}. Every score uses the GT snapshot taken at the start (out/lead/leaderboard/gt-snapshot/), but a method file rewritten mid-run may mix versions; re-run if it matters.`,
+			`Inputs changed during the run (concurrent edits): ${L.inputs.changed.join(", ")}. Every score uses the GT snapshot taken at the start (out/lead/leaderboard/gt-snapshot/), but a method file rewritten mid-run may mix versions; re-run if it matters.`,
 		);
 	const gtDis = photos.filter(
 		(p) => p.gtAgreement && Math.abs(p.gtAgreement.yaw) > 0.3,
@@ -3228,7 +3237,7 @@ function renderMd(L) {
 	}
 	o.push("## Inputs and their age", "");
 	o.push(
-		"Default mode runs no other session's evaluator: it reads their latest outputs (retrying a read while a file looks mid-rewrite).",
+		"Default mode runs no other track's evaluator: it reads their latest outputs (retrying a read while a file looks mid-rewrite).",
 		"",
 	);
 	o.push(
@@ -3844,7 +3853,7 @@ async function main() {
 		}
 		if (opt.skip.has(k))
 			steps[k].note =
-				`${steps[k].note ? `${steps[k].note}; ` : ""}listed as skipped, but the step only reads other sessions' files, so it was read anyway`;
+				`${steps[k].note ? `${steps[k].note}; ` : ""}listed as skipped, but the step only reads other tracks' files, so it was read anyway`;
 		log(
 			`step ${k}: ${steps[k].status}${steps[k].ms != null ? ` (${(steps[k].ms / 1000).toFixed(1)} s)` : ""}`,
 		);
@@ -3853,7 +3862,7 @@ async function main() {
 	await guard("tsc", () => stepTsc(opt.scale));
 	await guard("biome", () => stepBiome(opt.scale));
 	await guard("build", () => stepBuild(opt.scale));
-	// evalcpu / matcher are read-only (retrying reads of files another session may be rewriting), so always read
+	// evalcpu / matcher are read-only (retrying reads of files another process may be rewriting), so always read
 	await guard("evalcpu", () => stepEvalCpu(opt.scale, opt.runEvalCpu, nAll), {
 		alwaysRead: true,
 	});

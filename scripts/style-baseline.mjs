@@ -157,7 +157,7 @@ function srcStamp() {
 const stamp0 = srcStamp();
 const srcWarning = () =>
 	srcStamp() !== stamp0
-		? "WARN: files under src/ changed during this run (another session?); re-run before trusting a diff"
+		? "WARN: files under src/ changed during this run (concurrent edit?); re-run before trusting a diff"
 		: null;
 const log = (...m) =>
 	console.log(
@@ -278,7 +278,7 @@ async function runPhoto(id, sink) {
 			},
 			[`mt-image:pose:${id}`, JSON.stringify(pose)],
 		);
-		// no HMR: other sessions edit this shared tree, and a hot update mid-run would re-render or
+		// no HMR: this shared tree may be edited concurrently, and a hot update mid-run would re-render or
 		// remount the workspace. The HMR socket is answered by a silent mock instead of vite.
 		await ctx.routeWebSocket(
 			(u) => u.origin === new URL(BASE_URL).origin.replace(/^http/, "ws"),

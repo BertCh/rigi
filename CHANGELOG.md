@@ -4,6 +4,14 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Publication readiness (2026-10-01)
+
+- A fresh clone builds and type-checks without the gitignored data: `photos.json` falls back to an empty list, and `data/ground-truth.json` loads through an optional `import.meta.glob`. CI gains a `vite build` step, `permissions: contents: read` and a `master`-only push trigger; the tsc `ciAllowed` and Biome error baselines are now empty.
+- The Niederhorn demo set in `public/demo` (photos, thumbs, shots, step, atlas renders) is tracked, so the landing page works on a clone; it stays © Robert Christie, all rights reserved (NOTICE.md).
+- Licences: upstream LICENSE files for the vendored luma.gl and deck.gl tarballs, plus their SHA-256 sums and rebuild recipe; Draco decoder (Apache-2.0) licence and source; NOTICE rows for the example thumbnails, the terroir cover and the EGM2008 geoid. `package.json` has licence, repository and engines metadata; `.gitattributes` and `.editorconfig` added.
+- Docs: README quick start and requirements; internal coordination wording, session ids and machine-local paths removed from code comments, READMEs, reports and tool outputs; market/competitive notes and raw prototype dumps removed from `reports/` and `research_notes/`. User-Agent strings name the repository instead of a personal address (`RIGI_CONTACT` adds one); research scripts default to the system temp directory.
+- The `/lab/deck-webgpu`, `/lab/deck-splats` and `/dev/how-scene` routes are dev-only, like the other dev and lab routes. Examples import `examples/gpu-args.mjs` instead of a repo script.
+
 ### WAG next wave: graph plumbing, precision gate, lazy CPU heights, haze tail (2026-10-01)
 
 - silhouette-gpu, geo-query-gpu and the WebGPU splat sort run as core ComputeGraphs (`cachedGraph` groups `silhouette-mask`, `geo-query`, `splat-sort`) and appear in `/dev/graph`; outputs byte-identical (full-tier check `graph-plumbing-ab`). `GeoQueryGpu.verdictsAndSkyline()` replaces `verdicts()` + `skylineRows()`: one submit and one read per settle instead of two. Splat-sort profiling is reported per node. The manifest now marks terrain-gpu-cull opt-in, matching its flag.

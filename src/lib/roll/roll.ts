@@ -10,7 +10,6 @@
 // single-linkage on distance (ROLL_LINK_M) so a day's hike stays one roll.
 
 import { storageKey } from "#/lib/ontology/core/storage";
-import groundTruth from "../../../data/ground-truth.json";
 import { hfovFromAspect, type Pose, vfovFromFocal } from "../camera";
 import { distanceM } from "../geodesy";
 import { loadSavedPose, type PhotoMeta, photos, regionNames } from "../photos";
@@ -32,7 +31,12 @@ export type GtEntry = {
 	eye: number | null;
 	quality: string;
 };
-const GT = groundTruth as Record<string, GtEntry>;
+// data/ground-truth.json is gitignored: a fresh clone builds with an empty table.
+const groundTruthModules = import.meta.glob("../../../data/ground-truth.json", {
+	eager: true,
+	import: "default",
+}) as Record<string, Record<string, GtEntry>>;
+const GT: Record<string, GtEntry> = Object.values(groundTruthModules)[0] ?? {};
 
 const SOLVED_KEY = (id: string) => storageKey("solvedPose", id);
 

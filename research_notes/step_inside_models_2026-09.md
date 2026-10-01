@@ -2,7 +2,7 @@
 
 Nearly every fact below was checked today against primary sources: GitHub API licence and dates, Hugging Face API file sizes and licence tags (`?blobs=true`), repo READMEs and LICENSE files, and an HTTP HEAD on the SHARP checkpoint. Anything I could not check is marked **UNVERIFIED**. I downloaded no weights and ran no new inference. The MPS timings for MoGe-2 and DA3-Base come from existing local logs (`tools/research/tm/x2_geom/timing_mps.jsonl`, 50 images each).
 
-**File written:** `/Users/robertchristie/Documents/GitHub/mt-image/tools/nearfield/research/models.json` holds the same data in machine-readable form. `types.ts` is unchanged.
+**File written:** `tools/nearfield/research/models.json` holds the same data in machine-readable form. `types.ts` is unchanged.
 
 ## 1. Single-photo and depth models (for P1)
 

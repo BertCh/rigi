@@ -1,6 +1,6 @@
 # Code review, 2026-09-30
 
-*A whole-repo review by session mt-image-ab: nine read-only reviewers, one per area, each re-reading the code behind its findings before reporting. Lines refer to `HEAD` at 0544df0 unless the row says WIP. This is the code-health backlog: when you fix an item, set its **State** to `fixed <commit>`, and don't delete the row. The plan item is [roadmap.md](roadmap.md) N7.*
+*A whole-repo review: nine read-only reviewers, one per area, each re-reading the code behind its findings before reporting. Lines refer to `HEAD` at 0544df0 unless the row says WIP. This is the code-health backlog: when you fix an item, set its **State** to `fixed <commit>`, and don't delete the row. The plan item is [roadmap.md](roadmap.md) N7.*
 
 Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 of 27 checks; the biome ratchet fails, but only on uncommitted files (`scripts/dev.mjs`, `scripts/demo/*`, `scripts/peakfix/*`, `src/lib/peakfix/*`, `src/components/site/LiveRollMap.tsx`). No critical bugs were found. The deck/deck-webgpu sub-reviewers' findings (CR-13, CR-14, CR-40–CR-46) were not re-checked line by line.
 
@@ -87,7 +87,7 @@ Nits not tracked here: unwrapped yaw out of `align.ts`, per-frame allocations in
 
 Suggested commit split for that work: dev launcher; three.js near-eye cut; RollCard; roll-map options; demo plumbing; landing + library; peakfix (separately, after lint).
 
-## Follow-up review, 2026-10-01 (the 43 commits d84cf69..25d0e24, mt-image-58)
+## Follow-up review, 2026-10-01 (the 43 commits d84cf69..25d0e24)
 
 | # | Where | Issue | State |
 |---|---|---|---|

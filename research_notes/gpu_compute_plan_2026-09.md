@@ -1,4 +1,4 @@
-# GPU compute plan (2026-09-28, session mt-image-bc)
+# GPU compute plan (2026-09-28)
 
 This plan follows a review of deck.gl 9.4.0 and luma.gl 9.4.2, the last v9 releases. deck v10 has no alpha yet; luma 10.0.0-alpha.2 is on npm's `beta` tag.
 
@@ -37,7 +37,7 @@ Every GPU path has a CPU fallback and honours `?gpu=off`. The typecheck is clean
 | W5 | look passes (`gpu/look`) | opt-in (`?lookgpu=1`) | Relief takes 32 ms vs 69 ms and haze 28 ms vs 71 ms. Parity is ≤1 byte or ~1e-6. Results arrive one frame late |
 | W6 | eye search (`gpu/eye` plus the `horizonsAtEyes` option) | library only | 6 photos take 4.3 s vs 28.8 s. 5/6 give the same eye; IMG_7063 moves 0.86 m, within the LM 1σ |
 
-**Pre-existing failure.** `style-baseline` fails 1–2/16 on peak labels, and the pre-GPU backup (`~/mt-image-archive/2026-09-28-pre-gpu.tgz`) fails identically. The label placement also varies from run to run (IMG_7068 gave 7,870 px vs 11,251 px). This regression came before the GPU work, and nobody owns fixing it yet.
+**Pre-existing failure.** `style-baseline` fails 1–2/16 on peak labels, and the pre-GPU backup (kept in a local archive, not published) fails identically. The label placement also varies from run to run (IMG_7068 gave 7,870 px vs 11,251 px). This regression came before the GPU work, and nobody owns fixing it yet.
 
 **Next steps:**
 - Imagery texture array for batched terrain.
@@ -60,6 +60,6 @@ The user accepted small numeric drift in exchange for speed, so these paths are 
 **Still opt-in:**
 - **Eye suggestion** (`?eyesearch=1` shows a "Check camera position" button in the Camera panel; `=auto` also runs the check once in the background). The result is suggestion-only, with Apply and Revert. On IMG_7063 it moves the eye 6 m and the skyline error goes from 4.18 to 4.02 px, in 2.8–3.0 s on the GPU.
 - **Unknown-pose GPU horizon** (`?unknownGpu=1`). The ablation gives 0 false accepts and 0 lost accepts, and gains 1 true accept (IMG_6958 with nothing known). It saves only about 120 ms per photo, and the focal-seed confidence is sensitive to the horizon, so the CPU stays the default.
-- **T6 skyline grid on WebGPU** (`src/lib/gpu/skyglobal`, library only). Its top-4 is identical to the frozen Python on 50/50 dev photos when the GPU candidates are re-scored in numpy. The grid takes ~17 ms vs 3.6–7.6 s in numpy, which saves ~5 s of a median 85 s T6 request (~6%). The polish must stay in numpy: the TS port flips 3/50 because of libm last-bit differences. Wiring it in needs f0: an optional `skyGrid` on render_worker `edges`, plus `grid_from_cands` in t6.py behind an env flag that defaults to off (the recipe is in `tools/matcher/gpu_port/verify_gpu_cands.py`). The fixtures in `out/gpu/skyglobal/` take 264 MB.
-- **T6 GPU grid wired** behind `T6_GPU_GRID=1` (off by default; files: `tools/matcher/server/{render_worker.mjs,t6.py,sky_gpu.py}`, all additive; this is f0's code, so f0 should review before flipping). Live on 4 dev photos, off vs on: selected poses are bit-identical, and so are levels and the full candidate lists. The grid drops from 3.5–8.1 s to 5–23 ms, and the sky stage is ~7 s faster per photo.
-- **style-baseline re-captured** 2026-09-28 (the old one is in `~/mt-image-archive/2026-09-28-style-baseline-pre-recapture.tgz`; the diffs were only the 2026-09-27 classic-label pixels, and geometry was identical). Two checks since then both passed 16/16 exact. The harness sometimes errors on one photo under load; re-run it when that happens.
+- **T6 skyline grid on WebGPU** (`src/lib/gpu/skyglobal`, library only). Its top-4 is identical to the frozen Python on 50/50 dev photos when the GPU candidates are re-scored in numpy. The grid takes ~17 ms vs 3.6–7.6 s in numpy, which saves ~5 s of a median 85 s T6 request (~6%). The polish must stay in numpy: the TS port flips 3/50 because of libm last-bit differences. Wiring it in needs the matcher maintainers: an optional `skyGrid` on render_worker `edges`, plus `grid_from_cands` in t6.py behind an env flag that defaults to off (the recipe is in `tools/matcher/gpu_port/verify_gpu_cands.py`). The fixtures in `out/gpu/skyglobal/` take 264 MB.
+- **T6 GPU grid wired** behind `T6_GPU_GRID=1` (off by default; files: `tools/matcher/server/{render_worker.mjs,t6.py,sky_gpu.py}`, all additive; this is the app pipeline's code, so the app-pipeline maintainer should review before flipping). Live on 4 dev photos, off vs on: selected poses are bit-identical, and so are levels and the full candidate lists. The grid drops from 3.5–8.1 s to 5–23 ms, and the sky stage is ~7 s faster per photo.
+- **style-baseline re-captured** 2026-09-28 (the old one is in a local archive, not published; the diffs were only the 2026-09-27 classic-label pixels, and geometry was identical). Two checks since then both passed 16/16 exact. The harness sometimes errors on one photo under load; re-run it when that happens.

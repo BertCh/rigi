@@ -26,7 +26,7 @@
 // device (../photoprep pinResidentPlanes, pinned for the run; WAG W1.1), else uploaded once per photo
 // (uploadOnce), like the stride-1 direction table;
 // skyCum, refit in place by fitPriorSky, is uploaded once per session (one autoAlign) and again
-// only if another session wrote the slot in between. Readback: 48 B per pose.
+// only if another writer wrote the slot in between. Readback: 48 B per pose.
 //
 // The kernel runs on a core ComputeGraph (./graph.ts) over those pooled input slots; `out` is a graph
 // transient CLEARED before the kernel and read through a read node, so the nonce / pose-index /

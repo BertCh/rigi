@@ -101,7 +101,7 @@ E3 ──┴─> E4 step 2 (eye)          E5 (independent, simplification)
   1. Approve phase 0 (E0–E3). It is dev-only and uses no new licences: GFSC and Sentinel-2 are free for commercial use with attribution.
   2. Webcam outreach: Roundshot/Seitz and foto-webcam.eu for ML-training permission.
   3. MatchAnything was ruled out earlier as a "registration licence". Its terms actually allow free commercial project use *once registered*, so it is worth reconsidering as an E7 baseline.
-  4. If E5 passes, whether the matcher's geometry moves off headless Chromium. That is f0's call.
+  4. If E5 passes, whether the matcher's geometry moves off headless Chromium. That is the app pipeline's call.
 
 ## 5. Sources (new in this sweep)
 

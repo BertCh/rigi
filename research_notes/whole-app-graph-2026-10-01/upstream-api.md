@@ -358,17 +358,17 @@ Hazard order is automatic, since indirect counts as a read. Render nodes cannot 
 - Add `addRenderPass` / `addCopyPass` / `importFrameTexture` / `transientTexture` passthroughs.
 - Allow texture bindings in `addKernel` (`GraphTextureUse`, `getTextureView`).
 
-## 8. Migration sketches (scratchpad/proto, typecheck-only)
+## 8. Migration sketches (typecheck-only; the sketch files are not published)
 
 Setup:
-- `proto/tsconfig.json` mirrors the repo's strict tsconfig, with `#/*` paths to the repo src and the repo `vite/client` types.
-- `proto/node_modules` is a symlink to the repo node_modules.
+- The sketch tsconfig mirrored the repo's strict tsconfig, with `#/*` paths to the repo src and the repo `vite/client` types.
+- The sketch directory symlinked the repo node_modules.
 - Command: `npx tsc -p tsconfig.json --noEmit`.
 - **Result: both files typecheck with 0 errors**, including the transitively checked repo files.
 - A deliberate negative test file failed as expected, which confirms the files really are checked.
 - **The WGSL is NOT validated** (no naga or tint available) and nothing ran on a GPU.
 
-### (a) proto/haze-tail.ts: the haze head-overflow tail
+### (a) haze-tail sketch: the haze head-overflow tail
 
 New nodes after `gather`:
 - `hz-ctl` (1 thread) reads `starts[LISTS]` and a uniform `{head, cap}`. It writes `ctl = [total, overflow, ⌈min(total−head,cap)/64⌉, 1, 1]` into a `STORAGE|INDIRECT` transient.
@@ -389,7 +389,7 @@ New nodes after `gather`:
 
 This needs `core/readback` to support a deferred, partial-range map of a second slot. The trade-off is copy bandwidth, roughly 26 MB at N≈1.1 M: near-free on unified memory, ~2 ms over PCIe.
 
-### (b) proto/solve-fold.ts: the solve `foldBlocks` CPU fold
+### (b) solve-fold sketch: the solve `foldBlocks` CPU fold
 
 `K_FOLD_EXACT` keeps the f32 fast path. When the f32 margin test is inconclusive, it decides `v > g + 2ε` **exactly** on the GPU:
 - 2ε (f64) is split on the CPU into `e0+e1+e2` f32 (`packFoldUniform`). It returns null when the split is inexact; the old path is kept for that case.

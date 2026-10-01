@@ -1,6 +1,6 @@
 # Rigi data sources, loaders.gl check, loader-to-luma adapter design (2026-10-01)
 
-Read-only study of /Users/robertchristie/Documents/GitHub/mt-image. Prototypes in scratchpad/proto-loaders (t1..t4.mjs).
+Read-only study of the repository. Prototypes in scratchpad/proto-loaders (t1..t4.mjs).
 
 ## 1. Data-source inventory
 

@@ -1,6 +1,6 @@
 # Rigi next-generation roadmap: after Step Inside
 
-Date: 2026-09-29. This document covers where the "photo → navigable 3D world" line of thinking (world models, splats, multi-view reconstruction) leaves Rigi now that Step Inside has been built and measured. It supplements the dated competitive roadmap (`Rigi competitive landscape and roadmap.md`), which is left unedited. The evidence is in `step-inside-results.md`, and the design is in `step-inside-design.md`. For how this fits with the registration research and the launch items, see [status.md](status.md).
+Date: 2026-09-29. This document covers where the "photo → navigable 3D world" line of thinking (world models, splats, multi-view reconstruction) leaves Rigi now that Step Inside has been built and measured. It supplemented an earlier competitive roadmap that is no longer published. The evidence is in `step-inside-results.md`, and the design is in `step-inside-design.md`. For how this fits with the registration research and the launch items, see [status.md](../status.md).
 
 ## Bottom line
 
@@ -12,7 +12,7 @@ Rigi's asset is **geometric truth**: a verified camera pose plus the real DEM. E
   - Near-field service: `tools/nearfield/service` (:8767), with endpoints for depth, Gaussians, multiview and inpainting.
   - Classic view is pixel-identical and eval-app is unchanged.
 - **Explorations:** camera-roll fused splats (Brush, DA3), eye refinement, pose propagation, and DEM-conditioned hole-filling with LaMa. The code has adapters for GEN3C and LingBot but they have never been run.
-- **Licence survey:** `research_notes/step_inside_models_2026-09.md`. A separate object-completion survey by another session is in `research_notes/{completion_integration,object_completion_models,human_completion_models}_2026-09.md`.
+- **Licence survey:** `research_notes/step_inside_models_2026-09.md`. A separate object-completion survey is in `research_notes/{completion_integration,object_completion_models,human_completion_models}_2026-09.md`.
 
 ## Evidence
 
@@ -51,7 +51,7 @@ The original pipeline (a world model generates views, VGGT reconstructs geometry
 | # | Item | Gate or decision | Status |
 |---|---|---|---|
 | 1 | **Pose propagation on camera rolls**: an accepted photo anchors its overlapping neighbours as suggestions, then escalates to accepts after validation | Your sign-off on `tools/nearfield/propagate/PREREG_DRAFT.txt`. It needs a new held-out set of your own camera-roll viewpoints, because data_v3 has too few co-located pairs. Blind protocol, frozen rule | Code and gate built (`src/lib/nearfield/propagate.ts`); suggestion only |
-| 2 | **Step Inside v1.1 opt-in beta** (the share moment for the web beta) | Semantic plus depth split, re-measured against the existing blind labels (`tools/nearfield/smear/labels.json`); fix anchoring at cliff lips (IMG_7059) and near the camera (selfies); ship only at anchor quality ≥ 0.35. In Switzerland, also test swissSURFACE3D minus swissALTI3D as the object signal, a study shared with the matcher's near-field failures ([status.md](status.md)) | v1 built; gate not met |
+| 2 | **Step Inside v1.1 opt-in beta** (the share moment for the web beta) | Semantic plus depth split, re-measured against the existing blind labels (`tools/nearfield/smear/labels.json`); fix anchoring at cliff lips (IMG_7059) and near the camera (selfies); ship only at anchor quality ≥ 0.35. In Switzerland, also test swissSURFACE3D minus swissALTI3D as the object signal, a study shared with the matcher's near-field failures ([status.md](../status.md)) | v1 built; gate not met |
 | 3 | **Object completion** (full 3D for people and huts, not 2.5D shells) | See the object-completion notes. Prerequisite: per-splat group ids (dropped in `scene.ts` today). Keep completed content under the `generated` provenance code so the existing export exclusion applies | Research only |
 | 4 | **GEN3C geometry-fidelity experiment** | The pass criterion above, then go or no-go | Adapter ready, never run |
 | 5 | **Licensing** | Esri World Imagery and Overpass reviews are still open. SHARP stays dev-only; the commercial default stack is MoGe-2, DA3-Base, LaMa, ALIKED/LightGlue and Brush | Carried over |

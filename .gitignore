@@ -92,3 +92,10 @@ tools/nearfield/**/*.ply
 
 # vendored python site-packages for research scripts
 .pylib/
+
+# Niederhorn demo set (tracked on purpose; meta/ is intentionally not listed here)
+!public/demo/photos/**
+!public/demo/thumbs/**
+!public/demo/shots/**
+!public/demo/step/**
+!public/demo/atlas/**

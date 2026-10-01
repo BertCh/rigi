@@ -14,6 +14,7 @@ s1.correspond). Callers pass the photo already resized to the render image size.
 from __future__ import annotations
 
 import os
+import tempfile
 import sys
 import time
 from pathlib import Path
@@ -27,7 +28,7 @@ os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 os.environ.setdefault("LOMA_DEVICE", "mps")
 os.environ.setdefault("LOMA_PREC", "fp32")
 os.environ.setdefault("LOMA_KP", "4096")
-os.environ.setdefault("STAGE1_TMP", "/private/tmp/claude-501/x3_stage1_tmp")
+os.environ.setdefault("STAGE1_TMP", os.path.join(tempfile.gettempdir(), "rigi-x3-stage1-tmp"))
 Path(os.environ["STAGE1_TMP"]).mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(TM))
 import tm_common  # noqa: E402,F401  (stage1 + v2 on sys.path)

@@ -1,6 +1,6 @@
 # Rigi current visual/rendering system: baseline audit (codebase, 2026-09-30)
 
-Scope: this is a read-only audit of the working tree at `/Users/robertchristie/Documents/GitHub/mt-image` (branch master, HEAD 0544df0, with uncommitted landing/demo work). Every source below is a repo path, with `:line` where useful, relative to the repo root. No dev server was run, so statements about how things look on screen are inferred from code and comments, not from screenshots.
+Scope: this is a read-only audit of the working tree at the repository root (branch master, HEAD 0544df0, with uncommitted landing/demo work). Every source below is a repo path, with `:line` where useful, relative to the repo root. No dev server was run, so statements about how things look on screen are inferred from code and comments, not from screenshots.
 
 ---
 

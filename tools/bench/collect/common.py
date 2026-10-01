@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 
 API = "https://commons.wikimedia.org/w/api.php"
-UA = "SummitLensBench/0.1 (photo-to-DEM georeferencing benchmark; contact rgcgeog@gmail.com)"
+UA = "rigi-bench/0.1 (photo-to-DEM georeferencing benchmark; +https://github.com/BertCh/rigi" + (("; " + os.environ["RIGI_CONTACT"]) if os.environ.get("RIGI_CONTACT") else "") + ")"
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.dirname(HERE)
 DATA = os.path.join(BENCH, "data")

@@ -1,6 +1,6 @@
 P1 - position triage before matching - PRE-REGISTERED PROTOCOL
 Written 2026-09-28T17:48Z (UTC), before any title was parsed, any gazetteer was fetched or any flag was computed.
-Author: TM program subagent (session mt-image-58). Anything changed after this timestamp is labelled POST HOC in REPORT.txt.
+Author: TM program subagent. Anything changed after this timestamp is labelled POST HOC in REPORT.txt.
 
 Prior knowledge disclosure (not blind): I have read F1 (REPORT.md, taxonomy.json), which names a few titles/causes
 (wc_0073 "Matthorn from pilatus", wc_0069 "... from Fronalpstock", wc_0002 "Gandstock, Plattengrat, Guldergrat",

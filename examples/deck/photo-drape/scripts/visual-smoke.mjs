@@ -9,7 +9,7 @@ import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
 import {createServer} from 'vite';
-import {GPU_ARGS} from '../../../../scripts/deck-webgpu/gpu-args.mjs';
+import {GPU_ARGS} from '../../../gpu-args.mjs';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const screenshotDirectory = process.env.PHOTO_DRAPE_SCREENSHOTS || join(tmpdir(), 'photo-drape');

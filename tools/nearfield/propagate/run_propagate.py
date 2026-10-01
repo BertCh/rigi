@@ -208,7 +208,7 @@ def da3(images: list[Image.Image]):
     body, ct = multipart([("images", f"{i}.jpg", jpeg(im), "image/jpeg") for i, im in enumerate(images)], {})
     req = urllib.request.Request(NF + "/multiview", data=body, headers={"Content-Type": ct}, method="POST")
     t0 = time.time()
-    for attempt in range(4):  # the shared service may be restarted by other sessions
+    for attempt in range(4):  # the shared service may be restarted by other users
         try:
             with urllib.request.urlopen(req, timeout=1800) as r:
                 w = json.loads(r.read())

@@ -2,7 +2,7 @@
 
 > **2026-09-30:** the WP-D joint solve, WP-E display warp and WP-G re-match code named in this plan was removed as negative or unconsumed; see [negative-results.md](negative-results.md#code-removed-in-the-2026-09-30-cleanup) for the numbers and the recovery commit. WP-A core, WP-B priors, WP-C cues and WP-F occluder remain.
 
-Status: research synthesis, 2026-09-29. It is read-only: no repo files were changed. All pixel figures are at the **1600 px basis** unless marked "@4032". The measurements come from the CPU audit (scratch `/private/tmp/claude-501/concord-audit/`) run on the 14 photos with ground-truth poses, plus figures from the five SoTA streams.
+Status: research synthesis, 2026-09-29. It is read-only: no repo files were changed. All pixel figures are at the **1600 px basis** unless marked "@4032". The measurements come from the CPU audit (local scratch, not published) run on the 14 photos with ground-truth poses, plus figures from the five SoTA streams.
 
 ---
 
@@ -542,7 +542,7 @@ Renders run under the render lock. Stop when the median change is < 0.5 px or af
   - SGI2016 and BAFU terms are unverified; prefer RGI7 (CC-BY).
 - **Disk:** no downloads in this phase. DSM is streamed per photo, not bulk-tiled. MapAnything, DA3-Large and SAM 3 are deferred.
 - **Don't adopt OrienterNet-family BEV localisers** or single-image calibrators for EXIF photos; they are worse than EXIF.
-- **Ownership:** `engine.ts`, `deck/**`, `horizon-fast`, `align.ts` and `tools/matcher` belong to other sessions. Edits are the listed flagged hooks only; the semantics-aware horizon waits for the owner.
+- **Ownership:** `engine.ts`, `deck/**`, `horizon-fast`, `align.ts` and `tools/matcher` are owned by other work streams. Edits are the listed flagged hooks only; the semantics-aware horizon waits for the owner.
 - **Don't trust confident flow or cross-modal matches in snow or haze** without forward-backward checks, bounds and LOO gating.
 
 ---
@@ -569,7 +569,7 @@ Renders run under the render lock. Stop when the median change is < 0.5 px or af
 - `reports/{status,step-inside-results,terrain-matching-research,matching-v2,v3-prereg}.md`
 - `research_notes/{current_state_audit,tm_literature_2026-09,analysis_algorithms_sota_2026,matching_v2_research,rendering_aesthetics_sota,step_inside_models_2026-09}.md`
 - `research_notes/Mountain photo georeferencing SoTA/iphone_metadata_dem_geodesy.md`
-- Audit scratch: `/private/tmp/claude-501/concord-audit/{audit.mts,shore.mts,out/audit.json,out/shore_IMG_7033.png,out/shore_IMG_7018.png}`
+- Audit scratch: a local scratch directory (not published)
 
 **Registration, calibration, monoplotting**
 - OrthoLoC: arxiv.org/html/2509.18350v2; github.com/deepscenario/OrthoLoC
@@ -708,4 +708,4 @@ Seven packages were built in parallel by workflow agents. An integration agent t
 2. Re-score C/D/E on those pins.
 3. Redesign D's gate so it only accepts on held-out pins or independent matcher points.
 4. Move the focal table into the app's prior (`photos.json` path).
-5. Add the occluder to the drape and labels (`materials.ts`, owned by another session).
+5. Add the occluder to the drape and labels (`materials.ts`, owned by other work).

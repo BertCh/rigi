@@ -19,14 +19,14 @@ import argparse
 import json
 import math
 import os
+import tempfile
 import sys
 import time
 import traceback
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SCRATCH = Path(os.environ.get("LOMA_SCRATCH", "/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/"
-                                              "75c91a88-da3f-430c-b0e0-21fa75f9d390/scratchpad/loma"))
+SCRATCH = Path(os.environ.get("LOMA_SCRATCH", os.path.join(tempfile.gettempdir(), "rigi-loma")))
 os.environ.setdefault("STAGE1_TMP", str(SCRATCH / "tmp"))
 os.environ.setdefault("STAGE1_PORT", "8771")
 (SCRATCH / "tmp").mkdir(parents=True, exist_ok=True)

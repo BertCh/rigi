@@ -1,6 +1,6 @@
 # Step Inside: results
 
-Date: 2026-09-29. This covers the build of [step-inside-design.md](step-inside-design.md), phases P0 to P3, done by session mt-image-14 with three workflows and about 30 agents. Every workstream had its own skeptical reviewer. What this means for the roadmap is in [roadmap.md](roadmap.md); the cross-project picture is in [status.md](status.md).
+Date: 2026-09-29. This covers the build of [step-inside-design.md](step-inside-design.md), phases P0 to P3, done with three workflows and about 30 agents. Every workstream had its own skeptical reviewer. What this means for the roadmap is in [roadmap.md](roadmap.md); the cross-project picture is in [status.md](status.md).
 
 ## Verdict
 

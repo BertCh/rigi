@@ -2,7 +2,7 @@ Concordance adversarial review + fix (2026-09-29)
 
 Scope: src/lib/concord/**, scripts/concord/**, tools/concord/**, and the flagged shared-file hunks
 (engine.ts, deck/composite-shader.ts, deck/composite.ts, deck/engine.ts, renderer.ts, geo/camera.ts,
-PhotoWorkspace.tsx). tiles3d / licences / CreditLine hunks in the same files belong to other sessions.
+PhotoWorkspace.tsx). tiles3d / licences / CreditLine hunks in the same files belong to concurrent work.
 
 FINDINGS
  F1 FIXED  scripts/concord/lib.ts: waterline (level) control-point pins were converted wrongly.

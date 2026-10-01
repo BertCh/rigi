@@ -14,7 +14,7 @@ manifests, so there is no `.npmrc` and no luma or math.gl override.
 Built from a local merge of deck PR #10752 into deck master, plus luma.gl's deck WebGPU fixes:
 
 - Repo: https://github.com/visgl/deck.gl
-- Build commit: `f1bc66cede34768f6c10fa15681119bc669a2efb` (local, not on GitHub). It sits on top of the
+- Build commit: `f1bc66cede34768f6c10fa15681119bc669a2efb` (an unofficial local build, not an upstream release or commit). It sits on top of the
   merge commit `620e849c75c5ed1527455245f0b93b4161f3f204`, whose parents are:
   - `0d8b1664723dec15315dd31686078b1b3b142b79`: PR #10752 head (branch `codex/bump-luma-10-alpha-1`,
     "fix(mesh-layers): normalize signed Arrow mesh indices for GPU buffers", 2026-09-26);
@@ -43,6 +43,17 @@ Built from a local merge of deck PR #10752 into deck master, plus luma.gl's deck
 - Version string inside the packages: `9.4.0-beta.4`. (The `gitHead` field in the packed
   package.json, `13ace64…`, is a stale value carried in deck's repo, not the build commit.)
 - Built against `@luma.gl/*@10.0.0-alpha.2`, `@math.gl/*@5.0.0-alpha.9`, `@loaders.gl/*@5.0.0-alpha.7`.
+
+## Licence
+
+MIT, Copyright Vis.gl contributors: see `LICENSE` in this directory (verbatim from upstream deck.gl).
+
+## Checksums (SHA-256)
+
+```
+269ad67665100fafbfdda3127992e5bc545d988cfa838b91d3df328adb521e69  vendor/deck/deck.gl-core-9.4.0-beta.4.tgz
+451f9e6ed7efbe1c1d53e3b4c4b8d971d5d4ea94a93de3e76d89e00819df35da  vendor/deck/deck.gl-layers-9.4.0-beta.4.tgz
+```
 
 ## Contents
 

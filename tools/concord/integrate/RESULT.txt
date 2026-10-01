@@ -28,7 +28,7 @@ Skipped (reasons)
 
 Gates: tsc no new errors; test-export 29/29; test-pose6dof ALL PASS; style-check crashes pre-existing
 (look/labels/canvas.ts ctx.save vs style-check recorder mock; both unmodified); style-baseline 0/16 both WITH and
-WITHOUT these hooks with identical per-image diff counts (trail-data change from another session), geometry identical;
+WITHOUT these hooks with identical per-image diff counts (trail-data change from concurrent work), geometry identical;
 deck-engine-smoke 4/4 PASS.
 Runtime IMG_7018 (dev): three warp 135 cues, max 4.6 px, 668 ms; occl 11.5 % of terrain cells dimmed, 3.61 MB, 2.1 s.
                         deck  warp 96 cues, max 4.2 px, 606 ms; occl 10.8 %, 3.61 MB, 1.5 s.

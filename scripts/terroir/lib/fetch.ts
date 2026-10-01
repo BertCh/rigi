@@ -16,8 +16,9 @@ import { dirname, join } from "node:path";
 
 export const CACHE =
 	process.env.TERROIR_CACHE ?? join(homedir(), ".cache", "rigi", "terroir");
-export const UA =
-	"rigi-terroir-build/1.0 (https://github.com; contact rgcgeog@gmail.com)";
+export const UA = `rigi-terroir-build/1.0 (+https://github.com/BertCh/rigi${
+	process.env.RIGI_CONTACT ? `; ${process.env.RIGI_CONTACT}` : ""
+})`;
 mkdirSync(CACHE, { recursive: true });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

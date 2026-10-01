@@ -4,11 +4,11 @@
 
 - **Written:** 2026-09-26 15:03 UTC, before any overlay in this addendum was rendered or judged.
 - **Scope:** arm B's final poses for **wc_0003** and **wc_0038**, both HIGH and accepted, both EXIF GPS, both verdicted "unsure" in the test run.
-- **Decided by:** the lead and the user.
+- **Decided by:** the project owner and the user.
 
 ## Decision rule (stated before any verdict was collected)
 
-- **Both correct:** if both photos are confirmed correct by both verifiers, the lead flips the service default to **t6**.
+- **Both correct:** if both photos are confirmed correct by both verifiers, the project owner flips the service default to **t6**.
 - **Either wrong:** if either photo is judged wrong, the default stays **v034**.
 - **Disagreement:** if the verifiers disagree, the photo stays unsure and the default stays **v034**.
 
@@ -66,4 +66,4 @@ A verdict that rests on an image the verifier did not see ("not-seen") counts as
 
 - **Result:** one photo, wc_0038, is judged **wrong** by both verifiers, and the other, wc_0003, stays **unsure** because the verifiers disagree. Either one alone is enough, under the rule stated above, for the **service default to stay v034**. The flip to t6 is not triggered.
 - **For information only (POST-HOC, does not change the pre-registered scoring):** if wc_0038 counted as a gross HIGH error, B's EXIF HIGH precision would be 9/10 = 0.90 with one gross error, and B would fail pre-registered criteria 1 (≥ 0.95, 0 gross) and 2 (product-rule precision 1.00). `reports/test-results.md` and `tools/bench/final/scores.json` are unchanged.
-- **Record location:** `reports/test-results.md` pointed any adjudication to `reports/test-prereg-addenda.md`. This record is in `reports/test-addendum.md`, as the lead and the user instructed.
+- **Record location:** `reports/test-results.md` pointed any adjudication to `reports/test-prereg-addenda.md`. This record is in `reports/test-addendum.md`, as the project owner and the user instructed.

@@ -6,6 +6,8 @@ CPU only (numpy).  Waits for cache/<pid>/DONE and geom/<pid>.*.npz.
 from __future__ import annotations
 import _env  # noqa: F401
 import argparse, json, math, time, sys
+import os
+import tempfile
 from pathlib import Path
 import numpy as np
 import tm_common
@@ -15,8 +17,7 @@ from geomscore import C
 OUT = _env.HERE / "results"
 GEOM = _env.HERE / "geom"
 MODELS = ["moge_l", "moge_b", "da3_b"]
-LOMA = Path("/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/75c91a88-da3f-430c-b0e0-21fa75f9d390/"
-            "scratchpad/loma/runs/main")
+LOMA = Path(os.environ.get("LOMA_SCRATCH", os.path.join(tempfile.gettempdir(), "rigi-loma"))) / "runs" / "main"
 V2OUT = _env.TM.parents[1] / "matcher/v2/out"
 SCAN_STEP = 1.0     # full-circle yaw scan step (deg)
 NORM_STEP = 5.0     # null-distribution scan step for normalising a pose's score

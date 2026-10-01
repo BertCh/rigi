@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TM = HERE.parent
 os.environ["STAGE1_PORT"] = "8791"
-os.environ.setdefault("STAGE1_TMP", "/private/tmp/claude-501/x5_stage1_tmp")
+os.environ.setdefault("STAGE1_TMP", os.path.join(tempfile.gettempdir(), "rigi-x5-stage1-tmp"))
 Path(os.environ["STAGE1_TMP"]).mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(TM))
 sys.path.insert(0, str(TM / "c0_cache"))

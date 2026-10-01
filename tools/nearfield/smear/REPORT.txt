@@ -16,7 +16,7 @@ Setup
 - "prod" = the product: a photo under ANCHOR_MIN_QUALITY shows no scene, so ON == OFF. "forced" = the
   scene's mask applied anyway.
 - Code fingerprint 572f71d7a5b8 (fingerprint.sh), stable across the final three and deck runs (run-log.txt).
-  Earlier runs made while other sessions were editing scene.ts/ground.ts/near-dem.ts gave different
+  Earlier runs made while the tree was being edited concurrently while scene.ts/ground.ts/near-dem.ts gave different
   numbers. One transient deck state marked the whole 4-11 km mountainside Object on IMG_6958, with 83%
   collateral. Treat this as a moving target.
 

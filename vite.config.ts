@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
@@ -24,7 +24,8 @@ function photosJson(): Plugin {
 		load(s) {
 			if (s !== "\0" + id) return;
 			this.addWatchFile(file);
-			return `export default ${readFileSync(file, "utf8")}`;
+			// A fresh clone has no gitignored photos: fall back to an empty list.
+			return `export default ${existsSync(file) ? readFileSync(file, "utf8") : "[]"}`;
 		},
 	};
 }
