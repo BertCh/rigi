@@ -21,6 +21,12 @@
 // (coarse, fine, fg) and the stride-1 direction table are uploaded once per photo (uploadOnce);
 // skyCum, refit in place by fitPriorSky, is uploaded once per session (one autoAlign) and again
 // only if another session wrote the slot in between. Readback: 48 B per pose via core/readback.
+//
+// Graph path (default; ./graph.ts): the same kernel and the same pooled input slots (the session's
+// private skyCum copy included) on a core ComputeGraph; `out` is a graph transient CLEARED before the
+// kernel and read through a read node, so the nonce / pose-index / tan(vfov/2) echo check below sees
+// either this dispatch's words or zeros (rejected: the nonce is never 0). `{ graph: false }` keeps the
+// pooled single dispatch.
 import type { Device } from "@luma.gl/core";
 import {
 	type EdgeMap,
@@ -42,9 +48,11 @@ import {
 	pooledUniform,
 	withLease,
 } from "#/lib/gpu/core/pool";
+import { runPoseGraph } from "./graph";
 import { POSE_BOUND_WGSL } from "./pose-bound.wgsl";
 import {
 	ALIGN_GROUP,
+	type AlignGraphOptions,
 	type PoseGridStats,
 	STORAGE,
 	uploadOnce,
@@ -181,6 +189,7 @@ async function boundOnce(
 	dirs: Float32Array,
 	edge: EdgeMap,
 	up: PoseGridStats,
+	graph: boolean,
 ): Promise<PoseBoundRaw> {
 	const nPoses = probes.length;
 	const { w, h } = edge;
@@ -227,7 +236,7 @@ async function boundOnce(
 	const table = dirTable(dirs);
 	// every slot is read only within its first w·h / nDirs / nPoses entries, and `out` is fully
 	// overwritten for pi < nPoses, so pool capacity and stale bytes don't reach the result
-	const bindings = {
+	const inputs = {
 		u: pooledUniform(device, "align/refine-u", uw),
 		poses: pooledStorage(device, "align/refine-poses", pose4),
 		dirs: uploadOnce(device, "align/dirs1", table, up),
@@ -235,21 +244,29 @@ async function boundOnce(
 		fine: uploadOnce(device, "align/fine", edge.fine, up),
 		fg: uploadOnce(device, "align/fg", edge.fg, up),
 		skyCum: sky,
-		out: acquire(device, "align/refine-out", nPoses * 48, STORAGE),
 	};
 	up.uploadBytes += 48 + pose4.byteLength;
-	const enc = device.createCommandEncoder({ id: "align-pose-bound" });
-	let staged: ReturnType<typeof stage> | undefined;
-	try {
-		// throws past maxComputeWorkgroupsPerDimension (core/kernel guard): the caller goes CPU
-		dispatch(enc, kernel(device, POSE_BOUND), bindings, nPoses);
-		staged = stage(device, enc, bindings.out, nPoses * 48);
-		submit(device, enc);
-	} catch (e) {
-		staged?.cancel();
-		throw e;
+	let buf: ArrayBuffer;
+	if (graph)
+		buf = await runPoseGraph(device, POSE_BOUND, inputs, "out", 48, nPoses);
+	else {
+		const bindings = {
+			...inputs,
+			out: acquire(device, "align/refine-out", nPoses * 48, STORAGE),
+		};
+		const enc = device.createCommandEncoder({ id: "align-pose-bound" });
+		let staged: ReturnType<typeof stage> | undefined;
+		try {
+			// throws past maxComputeWorkgroupsPerDimension (core/kernel guard): the caller goes CPU
+			dispatch(enc, kernel(device, POSE_BOUND), bindings, nPoses);
+			staged = stage(device, enc, bindings.out, nPoses * 48);
+			submit(device, enc);
+		} catch (e) {
+			staged?.cancel();
+			throw e;
+		}
+		buf = await staged.read();
 	}
-	const buf = await staged.read();
 	return {
 		f: new Float32Array(buf),
 		u: new Uint32Array(buf),
@@ -272,6 +289,7 @@ export type PoseBoundStats = PoseGridStats & {
 /**
  * A ScoreBounds provider for one autoAlign on this photo (align.ts autoAlignRefined). Call it after
  * fitPriorSky: skyCum is taken as constant for the session's lifetime. Rejects on GPU errors.
+ * `opts.graph: false` dispatches on the pooled path instead of the graph (bit-identical outputs).
  */
 export function poseBoundSession(
 	device: Device,
@@ -279,8 +297,10 @@ export function poseBoundSession(
 	dirs: Float32Array,
 	edge: EdgeMap,
 	stats?: PoseBoundStats,
+	opts: AlignGraphOptions = {},
 ): ScoreBounds {
 	const session = {};
+	const graph = opts.graph !== false;
 	const nDirs = Math.floor(dirs.length / 3);
 	return (probes) => {
 		if (!probes.length) return Promise.resolve([]);
@@ -299,6 +319,7 @@ export function poseBoundSession(
 				dirs,
 				edge,
 				up,
+				graph,
 			);
 			const out = probes.map((q, i) =>
 				certifiedUpper(raw, i, nDirs, q.pose.vfov, aspect),
