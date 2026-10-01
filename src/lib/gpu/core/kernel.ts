@@ -1,8 +1,11 @@
-// Compute kernels over luma 10's stable API, generalised from look/kernel.ts:
+// Compute kernels over luma 10's engine Kernel, generalised from look/kernel.ts:
 // - defineKernel() at module level (WGSL + explicit binding layout, optional entry point and
 //   override constants, a warm-up group); the pipeline is created once per device and cached;
-// - kernelAsync()/warmKernelsAsync() compile with Device.createComputePipelineAsync (luma 10,
-//   visgl/luma.gl#3204) so warm-up does not block the thread;
+// - the pipeline is built by the engine `Kernel` (sync constructor) / `Kernel.createAsync` (luma
+//   10.0.0-alpha.2, #3281), which compile through Device.createComputePipeline[Async] so warm-up
+//   does not block the thread. Each spec gets its OWN PipelineFactory per device: luma's compute
+//   pipeline cache key is shader source + shaderLayout only (entryPoint and constants are not
+//   hashed), so the shared default factory could alias two specs that differ only in those;
 // - dispatch() sets the bindings on the PASS, never on the shared pipeline object, so concurrent
 //   callers of one kernel cannot see each other's bindings, and labels the pass for core/profile;
 // - storage()/uniform()/stage()/release() keep look/kernel.ts's API; the pooled variants are in
@@ -16,8 +19,9 @@ import {
 	type ComputePass,
 	type ComputePipeline,
 	type Device,
-	type Shader,
+	PipelineFactory,
 } from "@luma.gl/core";
+import { Kernel as EngineKernel } from "@luma.gl/engine";
 import { onLost, untilLost } from "./lifecycle";
 import { isPooled } from "./pool";
 import { passProps } from "./profile";
@@ -44,6 +48,10 @@ export type KernelSpec = {
 
 export type Kernel = {
 	pipeline: ComputePipeline;
+	/** The device the pipeline lives on (absent on hand-built look/textures kernels). */
+	device?: Device;
+	/** The engine Kernel (absent on hand-built look/textures kernels). */
+	engine?: EngineKernel;
 	names: string[];
 	spec: KernelSpec;
 };
@@ -108,22 +116,34 @@ function cacheOf(device: Device) {
 		onLost(device, () => {
 			cache.delete(device);
 			building.delete(device);
+			factories.delete(device);
 		});
 	}
 	return m;
 }
 
-const makeShader = (device: Device, spec: KernelSpec): Shader =>
-	device.createShader({
-		id: spec.label,
-		source: spec.source,
-		language: "wgsl",
-		stage: "compute",
-	});
+const factories = new WeakMap<Device, Map<KernelSpec, PipelineFactory>>();
 
-const pipelineProps = (spec: KernelSpec, shader: Shader) => ({
+/** One PipelineFactory per (device, spec): luma's compute cache key ignores entryPoint/constants. */
+function factoryOf(device: Device, spec: KernelSpec): PipelineFactory {
+	let m = factories.get(device);
+	if (!m) {
+		m = new Map();
+		factories.set(device, m);
+	}
+	let f = m.get(spec);
+	if (!f) {
+		f = new PipelineFactory(device);
+		m.set(spec, f);
+	}
+	return f;
+}
+
+// the engine Kernel creates its own shader (default ShaderFactory, keyed by stage + source)
+const kernelProps = (device: Device, spec: KernelSpec) => ({
 	id: spec.label,
-	shader,
+	source: spec.source,
+	pipelineFactory: factoryOf(device, spec),
 	entryPoint: spec.entryPoint,
 	...(spec.constants ? { constants: spec.constants } : {}),
 	shaderLayout: shaderLayout(spec),
@@ -131,8 +151,10 @@ const pipelineProps = (spec: KernelSpec, shader: Shader) => ({
 
 // luma 9.4 shared one module-level bindings object across every WebGPUComputePipeline (we reset
 // `_bindingsByGroup` here); luma 10 gives each pipeline its own, so no workaround is needed.
-const wrap = (spec: KernelSpec, pipeline: ComputePipeline): Kernel => ({
-	pipeline,
+const wrap = (spec: KernelSpec, engine: EngineKernel): Kernel => ({
+	pipeline: engine.pipeline,
+	device: engine.device,
+	engine,
 	names: spec.layout.map(([n]) => n),
 	spec,
 });
@@ -142,19 +164,14 @@ export function kernel(device: Device, spec: KernelSpec): Kernel {
 	const m = cacheOf(device);
 	let k = m.get(spec);
 	if (!k) {
-		k = wrap(
-			spec,
-			device.createComputePipeline(
-				pipelineProps(spec, makeShader(device, spec)),
-			),
-		);
+		k = wrap(spec, new EngineKernel(device, kernelProps(device, spec)));
 		m.set(spec, k);
 	}
 	return k;
 }
 
 /**
- * Like kernel(), but compiles with Device.createComputePipelineAsync (GPUDevice.
+ * Like kernel(), but compiles with Kernel.createAsync (Device.createComputePipelineAsync, GPUDevice.
  * createComputePipelineAsync on WebGPU; the sync path elsewhere), so the thread is not blocked.
  * Same WGSL, same module, same descriptor: identical results to kernel().
  */
@@ -171,12 +188,11 @@ export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel> {
 	if (!p) {
 		const inflight = b;
 		p = (async () => {
-			const shader = makeShader(device, spec);
 			const k = wrap(
 				spec,
 				await untilLost(
 					device,
-					device.createComputePipelineAsync(pipelineProps(spec, shader)),
+					EngineKernel.createAsync(device, kernelProps(device, spec)),
 				),
 			);
 			const m = cacheOf(device);
@@ -233,7 +249,7 @@ export async function warmKernelsAsync(
  */
 function checkWorkgroups(k: Kernel, x: number, y: number, z: number) {
 	const max =
-		(k.pipeline as unknown as { device?: Device }).device?.limits
+		(k.device ?? (k.pipeline as unknown as { device?: Device }).device)?.limits
 			.maxComputeWorkgroupsPerDimension ?? 65535;
 	if (x > max || y > max || z > max)
 		throw new Error(
