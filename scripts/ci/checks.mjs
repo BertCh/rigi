@@ -172,6 +172,14 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "photoprep",
+		tier: "fast",
+		group: "pose",
+		cmd: tsx("src/lib/gpu/photoprep/photoprep.check.ts", "4", "100000"),
+		note: "GPU photo prep (edge map + prior-sky refit): integer-f64 twin vs V8 doubles, kernel twins vs align.ts",
+		timeoutS: 120,
+	},
+	{
 		id: "export",
 		tier: "fast",
 		group: "export",

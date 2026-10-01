@@ -49,7 +49,6 @@ import type { Device, Texture } from "@luma.gl/core";
 import * as THREE from "three";
 import {
 	type AlignResult,
-	buildEdgeMap,
 	type EdgeMap,
 	type Pin,
 	solvePins,
@@ -106,6 +105,7 @@ import { priorHeading } from "#/lib/geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import { autoAlignAsync, warmAlignGpu } from "#/lib/gpu/align";
 import { lookIdle } from "#/lib/gpu/look/opt-in";
+import { buildEdgeMapAsync, warmPhotoPrep } from "#/lib/gpu/photoprep";
 import {
 	type FastHorizon,
 	startFastHorizon,
@@ -1194,6 +1194,8 @@ export class WebGpuEngine implements Renderer {
 		img.src = this.photo.src;
 		await Promise.all([img.decode(), this.ready]);
 		if (this.disposed) return;
+		// edge-map kernels compile while the terrain streams (buildEdgeMapAsync never waits for them)
+		void warmPhotoPrep();
 		this.photoImg = img;
 		this.ensurePhotoTexture();
 		const fgPromise = segment
@@ -1239,7 +1241,10 @@ export class WebGpuEngine implements Renderer {
 		const fg = await fgPromise;
 		if (this.disposed) return;
 		if (fg) this.setForegroundMask(fg);
-		this.edge = buildEdgeMap(img, 512, fg);
+		// buildEdgeMap with the post-canvas work on the GPU (bit-identical; CPU fallback inside)
+		const edge = await buildEdgeMapAsync(img, 512, fg);
+		if (this.disposed) return;
+		this.edge = edge;
 		void warmAlignGpu();
 		onProgress?.("Tracing horizon", 1);
 		const dirs = this.takeFastHorizon() ?? (await this.traceHorizon());

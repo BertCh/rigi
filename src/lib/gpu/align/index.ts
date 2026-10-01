@@ -39,6 +39,7 @@ import {
 } from "#/lib/align";
 import type { Pose } from "#/lib/camera";
 import { getComputeDevice } from "#/lib/gpu/core/device";
+import { fitPriorSkyGpu } from "#/lib/gpu/photoprep";
 import { type PoseBoundStats, poseBoundSession } from "./pose-bound";
 import {
 	type PoseGridStats,
@@ -205,8 +206,14 @@ export async function autoAlignAsync(
 		};
 		return res;
 	}
-	// the grid scores depend on the prior's sky fit, so fit first (autoAlign then skips it)
-	fitPriorSky(prior, aspect, dirs, edge);
+	// the grid scores depend on the prior's sky fit, so fit first (autoAlign then skips it). The GPU
+	// fit (../photoprep, bit-identical) leaves `edge` alone while it runs; its planes are written into
+	// `edge` here, exactly where (and as) the CPU fit writes them, with no await until the copy below
+	const fit = await fitPriorSkyGpu(device, prior, aspect, dirs, edge);
+	if (fit) {
+		edge.sky = fit.sky;
+		edge.skyCum.set(fit.skyCum);
+	} else fitPriorSky(prior, aspect, dirs, edge);
 	// Everything below awaits, and a concurrent autoAlign's fitPriorSky rewrites the sky planes in
 	// place: take a private copy NOW (no await since the fit), where the synchronous autoAlign would
 	// read them, and use it for the grid, the bounds, the refine and every CPU fallback (coarse /

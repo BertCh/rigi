@@ -49,7 +49,7 @@ function boxBlur(src: Float32Array, w: number, h: number, r: number) {
 	return out;
 }
 
-type FgMask = { width: number; height: number; data: Uint8Array };
+export type FgMask = { width: number; height: number; data: Uint8Array };
 
 /** Edge map tuned for sky/terrain boundaries: luminance + "blueness" gradients, sky-above favoured. */
 export function buildEdgeMap(
@@ -57,6 +57,15 @@ export function buildEdgeMap(
 	width = 512,
 	fgMask?: FgMask | null,
 ): EdgeMap {
+	const { d, w, h } = photoPixels(img, width);
+	return edgeMapFromPixels(d, w, h, edgeMapFg(w, h, fgMask));
+}
+
+/**
+ * The photo at `width` px (height by aspect) as RGBA bytes, through a 2D canvas: the browser's
+ * drawImage downscale defines every edge-map plane (src/lib/gpu/photoprep keeps it for that reason).
+ */
+export function photoPixels(img: HTMLImageElement | ImageBitmap, width = 512) {
 	const w = width;
 	const h = Math.round((width * img.height) / img.width);
 	const c = document.createElement("canvas");
@@ -66,7 +75,11 @@ export function buildEdgeMap(
 		willReadFrequently: true,
 	}) as CanvasRenderingContext2D;
 	ctx.drawImage(img, 0, 0, w, h);
-	const d = ctx.getImageData(0, 0, w, h).data;
+	return { d: ctx.getImageData(0, 0, w, h).data, w, h };
+}
+
+/** The foreground (people) mask resampled to the edge map (nearest), 0..1; zeros without a mask. */
+export function edgeMapFg(w: number, h: number, fgMask?: FgMask | null) {
 	const fg = new Float32Array(w * h);
 	if (fgMask)
 		for (let y = 0; y < h; y++)
@@ -81,6 +94,19 @@ export function buildEdgeMap(
 				);
 				fg[y * w + x] = fgMask.data[my * fgMask.width + mx] / 255;
 			}
+	return fg;
+}
+
+/**
+ * buildEdgeMap after the canvas: RGBA bytes `d` (w × h) and the resampled foreground `fg` → the edge
+ * map (the CPU reference of src/lib/gpu/photoprep, which reproduces every plane bit for bit).
+ */
+export function edgeMapFromPixels(
+	d: Uint8ClampedArray,
+	w: number,
+	h: number,
+	fg: Float32Array,
+): EdgeMap {
 	const L = new Float32Array(w * h);
 	const B = new Float32Array(w * h);
 	for (let i = 0; i < w * h; i++) {
@@ -125,7 +151,7 @@ export function buildEdgeMap(
  * edge), and a band just below the stop is terrain, which teaches the model what snow and
  * distant haze look like. Bottom of the frame is terrain too.
  */
-function scanLabels(map: EdgeMap, priorRows?: Float32Array) {
+export function scanLabels(map: EdgeMap, priorRows?: Float32Array) {
 	const { w, h, rgb, fg } = map;
 	const lbl = new Int8Array(w * h);
 	const diff = (x: number, y0: number, y1: number) => {
@@ -149,16 +175,26 @@ function scanLabels(map: EdgeMap, priorRows?: Float32Array) {
 		}
 		const top = stop < 0 ? Math.round(h * 0.12) : stop;
 		for (let y = 0; y < top - 2; y++) lbl[y * w + x] = 1;
-		// a stop far from where the prior pose puts the skyline is a cloud edge, not a ridge
-		const plausible =
-			!priorRows ||
-			(priorRows[x] >= 0 && Math.abs(stop - priorRows[x]) < h * 0.1);
-		if (plausible && stop > h * 0.04 && stop < h * 0.85)
+		if (stopHasBand(stop, x, h, priorRows))
 			for (let y = stop + 3; y < Math.min(h, stop + 3 + band); y++)
 				lbl[y * w + x] = -1;
 		for (let y = Math.round(h * 0.8); y < h; y++) lbl[y * w + x] = -1;
 	}
 	return lbl;
+}
+
+/** scanLabels: does column x's colour stop at row `stop` get a terrain band below it? */
+export function stopHasBand(
+	stop: number,
+	x: number,
+	h: number,
+	priorRows?: Float32Array,
+) {
+	// a stop far from where the prior pose puts the skyline is a cloud edge, not a ridge
+	const plausible =
+		!priorRows ||
+		(priorRows[x] >= 0 && Math.abs(stop - priorRows[x]) < h * 0.1);
+	return plausible && stop > h * 0.04 && stop < h * 0.85;
 }
 
 const BINS = 12;
@@ -208,7 +244,7 @@ export function fitSkyModel(map: EdgeMap, lbl: Int8Array) {
 }
 
 /** Rendered skyline row per edge-map column for a pose (-1 where no horizon point projects). */
-function skylineRows(
+export function skylineRows(
 	p: Pose,
 	aspect: number,
 	dirs: Float32Array,
