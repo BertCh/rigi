@@ -29,7 +29,8 @@ import { capacityFor } from "#/lib/gpu/core/pool";
 
 type Params = { n: number };
 
-const STORAGE = Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC;
+/** Usage of every align storage buffer (pose-grid re-exports it). */
+export const STORAGE = Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC;
 const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
 
 /** cachedGraph group of the align graphs. */

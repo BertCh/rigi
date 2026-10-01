@@ -84,12 +84,15 @@ export type AlignGpuTiming = {
 export const alignGpuOptions: {
 	refine: "gpu" | "cpu";
 	speculation: RefineSpeculation;
-	/** TEST ONLY: subtracted from every GPU bound (forces a bound violation and the fallback) */
-	faultDeflate: number;
+	/**
+	 * TEST ONLY, dev builds only (import.meta.env.DEV; absent from production bundles): subtracted
+	 * from every GPU bound (forces a bound violation and the fallback). scripts/gpu/align-refine-ab.mjs.
+	 */
+	faultDeflate?: number;
 } = {
 	refine: "gpu",
 	speculation: { ...REFINE_SPECULATION },
-	faultDeflate: 0,
+	...(import.meta.env?.DEV ? { faultDeflate: 0 } : {}),
 };
 
 /**
@@ -260,7 +263,7 @@ export async function autoAlignAsync(
 			own,
 			boundStats,
 		);
-		const deflate = alignGpuOptions.faultDeflate;
+		const deflate = import.meta.env?.DEV ? alignGpuOptions.faultDeflate : 0;
 		if (deflate) {
 			const inner = bounds;
 			bounds = async (probes) =>

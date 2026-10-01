@@ -13,7 +13,7 @@
 // through a read node: all scores (nPoses × 4 B, 10 KB for the 2525-pose grid).
 // A GPU top-K would save nothing measurable at that size, and autoAlign needs every column's
 // near-maximum cells anyway.
-import { Buffer, type Device } from "@luma.gl/core";
+import type { Buffer, Device } from "@luma.gl/core";
 import type { EdgeMap } from "#/lib/align";
 import { type Pose, poseBasis } from "#/lib/camera";
 import {
@@ -27,7 +27,7 @@ import {
 	pooledUniform,
 	withLease,
 } from "#/lib/gpu/core/pool";
-import { runPoseGraph } from "./graph";
+import { runPoseGraph, STORAGE } from "./graph";
 import { POSE_GRID_WGSL } from "./pose-grid.wgsl";
 
 const D = Math.PI / 180;
@@ -61,7 +61,7 @@ export function warmPoseGrid(device: Device) {
 export const warmPoseGridAsync = (device: Device) =>
 	warmKernelsAsync(device, ALIGN_GROUP);
 
-export const STORAGE = Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC;
+export { STORAGE };
 
 // pooled buffer → the array last written into it (the edge-map planes that don't change)
 const resident = new WeakMap<Buffer, Float32Array>();
