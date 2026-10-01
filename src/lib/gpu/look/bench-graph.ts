@@ -21,6 +21,7 @@
 import type { Device } from "@luma.gl/core";
 import { bandInputs, reduceBands } from "../../look/color-stats";
 import { guidedFilter } from "../../look/guided-filter";
+import type { Vec3 } from "../../ontology/core/geometry";
 import { ComputeGraph } from "../core/graph";
 import { capacityFor } from "../core/pool";
 import { getComputeDevice, hasFeature } from "../device";
@@ -36,7 +37,6 @@ import {
 	reliefScratchBytes,
 } from "./relief-graph";
 
-type Vec3 = [number, number, number];
 const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 
 async function rasterise(name: string, W: number, H: number) {

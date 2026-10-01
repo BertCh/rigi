@@ -36,6 +36,7 @@
 import type { Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import type { ByteMask } from "#/lib/ontology/core/geometry";
 import {
 	type CameraUniforms,
 	cameraModule,
@@ -53,7 +54,7 @@ import { imageTexture, maskTexture } from "../textures";
 import { fullscreenWGSL } from "../wgsl";
 
 /** Byte mask, row 0 = top, 0 / 255 (nearfield/deck-step.ts ByteMask; stepMasks().sky). */
-export type SkyMask = { width: number; height: number; data: Uint8Array };
+export type SkyMask = ByteMask;
 
 export type PhotoSource =
 	| ImageBitmap

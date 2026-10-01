@@ -34,9 +34,9 @@
 import { unprojectDir } from "#/lib/camera";
 import { photoViewProjection } from "#/lib/deck/photo-view";
 import { type ClearAirValues, clearAirPixel } from "#/lib/look/clear-air";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { srgbToLinear } from "#/lib/style/color";
 
-type Vec3 = [number, number, number];
 type Cam = {
 	pose: Parameters<typeof photoViewProjection>[0];
 	eye: [number, number, number];

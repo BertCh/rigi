@@ -18,18 +18,17 @@
 //   - `viewport` is the render target size in pixels (not CSS pixels).
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { type Pose, poseBasis } from "#/lib/camera";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { REVERSED_Z } from "./depth";
-
-type V3 = [number, number, number];
 
 /** The generic camera every WebGPU layer is drawn with. */
 export type CameraState = {
 	/** ENU metres (camera-anchored frame). */
-	eye: V3;
+	eye: Vec3;
 	/** Unit view direction (ENU). */
-	forward: V3;
+	forward: Vec3;
 	/** Unit up vector (ENU), orthogonal to forward. */
-	up: V3;
+	up: Vec3;
 	/** Vertical field of view, degrees. */
 	vfov: number;
 	/** Render target size, pixels. */
@@ -44,7 +43,7 @@ export type CameraState = {
 /** The photo camera: pose at `eye` (deck/photo-view.ts PhotoViewport). */
 export function photoCamera(p: {
 	pose: Pose;
-	eye: V3;
+	eye: Vec3;
 	width: number;
 	height: number;
 	near?: number;
@@ -63,9 +62,9 @@ export function photoCamera(p: {
 
 /** The world orbit camera (deck/world-view.ts WorldViewState / WorldCamera.viewState()). */
 export function worldCamera(p: {
-	eye: V3;
-	forward: V3;
-	up: V3;
+	eye: Vec3;
+	forward: Vec3;
+	up: Vec3;
 	camFov: number;
 	width: number;
 	height: number;
@@ -87,13 +86,13 @@ export function worldCamera(p: {
 
 export type CameraUniforms = {
 	viewProj: number[];
-	eye: V3;
+	eye: Vec3;
 	near: number;
-	right: V3;
+	right: Vec3;
 	aspect: number;
-	up: V3;
+	up: Vec3;
 	tanHalfY: number;
-	forward: V3;
+	forward: Vec3;
 	tanHalfX: number;
 	viewport: [number, number];
 	offset: [number, number];
@@ -149,8 +148,8 @@ export function cameraUniforms(c: CameraState): CameraUniforms {
  * CPU twin of camera_clip + the viewport transform: ENU point → target pixel (x right, y DOWN,
  * row 0 = top) and reversed-Z depth; null behind the camera. Harnesses use it to check shaders.
  */
-export function projectToPixel(u: CameraUniforms, p: V3) {
-	const d: V3 = [p[0] - u.eye[0], p[1] - u.eye[1], p[2] - u.eye[2]];
+export function projectToPixel(u: CameraUniforms, p: Vec3) {
+	const d: Vec3 = [p[0] - u.eye[0], p[1] - u.eye[1], p[2] - u.eye[2]];
 	const m = u.viewProj;
 	const cx = m[0] * d[0] + m[4] * d[1] + m[8] * d[2];
 	const cy = m[1] * d[0] + m[5] * d[1] + m[9] * d[2];
@@ -239,7 +238,7 @@ export const depthAtViewDepth = (near: number, viewDepth: number) =>
 
 export { REVERSED_Z };
 
-function cross(a: V3 | readonly number[], b: V3 | readonly number[]): V3 {
+function cross(a: Vec3 | readonly number[], b: Vec3 | readonly number[]): Vec3 {
 	return [
 		a[1] * b[2] - a[2] * b[1],
 		a[2] * b[0] - a[0] * b[2],
@@ -247,7 +246,7 @@ function cross(a: V3 | readonly number[], b: V3 | readonly number[]): V3 {
 	];
 }
 
-function norm(a: V3 | readonly number[]): V3 {
+function norm(a: Vec3 | readonly number[]): Vec3 {
 	const l = Math.hypot(a[0], a[1], a[2]) || 1;
 	return [a[0] / l, a[1] / l, a[2] / l];
 }
@@ -260,7 +259,7 @@ export function sphereInView(
 	u: CameraUniforms,
 	s: readonly [number, number, number, number],
 ): boolean {
-	const d: V3 = [s[0] - u.eye[0], s[1] - u.eye[1], s[2] - u.eye[2]];
+	const d: Vec3 = [s[0] - u.eye[0], s[1] - u.eye[1], s[2] - u.eye[2]];
 	const r = s[3];
 	const z = d[0] * u.forward[0] + d[1] * u.forward[1] + d[2] * u.forward[2];
 	if (z < u.near - r) return false;

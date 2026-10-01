@@ -15,6 +15,7 @@
 import { type Device, luma, type Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { webgpuAdapter } from "@luma.gl/webgpu";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { cameraModule, projectToPixel } from "../camera";
 import { camerasFor, runColorPass } from "../hosts/passes";
 import {
@@ -25,8 +26,6 @@ import {
 } from "../pass";
 import { ColorTargets, GeometryTargets } from "../targets";
 import { TrailCore, type TrailSegments } from "./trail";
-
-type V3 = [number, number, number];
 
 /** Opaque wall in the plane y = WALL_Y, x ∈ [-1000, 0], z ∈ [-200, 300], blue. */
 const WALL_Y = 500;
@@ -66,7 +65,7 @@ var<private> P = array<vec2<f32>, 6>(
 	}
 }
 
-function segments(list: { a: V3; b: V3; c: V3 }[]): TrailSegments {
+function segments(list: { a: Vec3; b: Vec3; c: Vec3 }[]): TrailSegments {
 	const positions = new Float32Array(list.length * 6);
 	const colors = new Float32Array(list.length * 3);
 	list.forEach((s, i) => {
@@ -136,9 +135,9 @@ export async function runTrailCheck(
 	const wall = new WallCore(device);
 	const trails = new TrailCore(device, "trail-check");
 	trails.setStyle({ width: lineWidth, opacity });
-	const RED: V3 = [1, 0, 0];
-	const GREEN: V3 = [0, 1, 0];
-	const WHITE: V3 = [1, 1, 1];
+	const RED: Vec3 = [1, 0, 0];
+	const GREEN: Vec3 = [0, 1, 0];
+	const WHITE: Vec3 = [1, 1, 1];
 	trails.setSegments(
 		segments([
 			// east-west at 1 km north, 20 m up: left half behind the wall, right half in the open
@@ -150,9 +149,9 @@ export async function runTrailCheck(
 		]),
 	);
 	const view = {
-		eye: [0, 0, 0] as V3,
-		forward: [0, 1, 0] as V3,
-		up: [0, 0, 1] as V3,
+		eye: [0, 0, 0] as Vec3,
+		forward: [0, 1, 0] as Vec3,
+		up: [0, 0, 1] as Vec3,
 		vfov: 40,
 		near: 1,
 	};

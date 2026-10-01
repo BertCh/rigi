@@ -23,6 +23,7 @@ import type { EnuFrame } from "./geodesy";
 import type { Unknowns } from "./integration/unknown-pose";
 import type { NearFieldSample } from "./nearfield/measure";
 import type { NearFieldScene, NearFieldViewOpts } from "./nearfield/types";
+import type { ByteMask } from "./ontology/core/geometry";
 import type { PhotoMeta, RegionData, RegionTrail } from "./photos";
 import type { RevealUniforms } from "./reveal/config";
 import type { PeakLabel, Sample, Settings } from "./settings";
@@ -31,7 +32,8 @@ import type { ViewStyle } from "./style/types";
 export type { PeakLabel, Sample, Settings };
 
 /** Person / foreground mask, row 0 = top (segment.ts ForegroundMask is structurally one). */
-export type FgMask = { width: number; height: number; data: Uint8Array };
+/** Foreground (person) mask over the photo. */
+export type FgMask = ByteMask;
 
 export interface Renderer {
 	/** 'deck' for both engines (WebGpuEngine adds backend 'webgpu'). */

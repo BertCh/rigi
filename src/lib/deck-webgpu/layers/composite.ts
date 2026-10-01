@@ -47,6 +47,7 @@ import type {
 } from "#/lib/deck/composite";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
 import type { LookDefine } from "#/lib/look/look-key";
+import type { ByteMask } from "#/lib/ontology/core/geometry";
 import type { RevealUniforms } from "#/lib/reveal/config";
 import {
 	type DeckCompositeStyle,
@@ -96,7 +97,7 @@ const METHOD: Record<BlendMethod, number> = {
 };
 
 /** A byte mask, row 0 = top (people mask, concord occluder). */
-export type ByteMask = { width: number; height: number; data: Uint8Array };
+export type { ByteMask };
 
 type Vec4 = [number, number, number, number];
 

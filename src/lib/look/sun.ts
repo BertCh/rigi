@@ -5,9 +5,10 @@
 // Solar position for a photo: NOAA / Meeus low-precision ephemeris (≈0.01° over 1950–2050),
 // plus the direction in the camera-local ENU frame (x east, y north, z up) the terrain uses.
 // takenAt in photos.json is UTC (EXIF DateTimeOriginal + OffsetTime), so no timezone guessing.
+
+import type { Vec3 } from "../ontology/core/geometry";
 import type { Sun } from "../style/types";
 
-type V3 = [number, number, number];
 const D = Math.PI / 180;
 
 export type SunPosition = {
@@ -91,7 +92,7 @@ export function sunPosition(
  * Rayleigh + a little Mie along the Kasten–Young air mass, normalised so the high sun is ~white.
  * Low sun turns warm on its own.
  */
-export function sunColor(sun: number | V3): V3 {
+export function sunColor(sun: number | Vec3): Vec3 {
 	const elev =
 		typeof sun === "number"
 			? sun
@@ -122,7 +123,7 @@ export type SunContext = {
 };
 
 /** ENU unit vector toward the style's sun. Normalised like THREE.Vector3.normalize (the classic uSunDir). */
-export function sunDirFromStyle(sun: Sun, ctx: SunContext = {}): V3 {
+export function sunDirFromStyle(sun: Sun, ctx: SunContext = {}): Vec3 {
 	if (sun.mode === "azel") {
 		const az = sun.azimuthDeg * D;
 		const el = sun.elevationDeg * D;
@@ -154,7 +155,7 @@ export function sunDirFromStyle(sun: Sun, ctx: SunContext = {}): V3 {
 	return norm(sun.mode === "fixed" ? sun.dir : [-0.5, -0.4, 0.75]);
 }
 
-function norm(v: V3): V3 {
+function norm(v: Vec3): Vec3 {
 	const k = 1 / (Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1);
 	return [v[0] * k, v[1] * k, v[2] * k];
 }

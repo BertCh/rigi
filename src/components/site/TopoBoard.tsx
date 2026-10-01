@@ -7,13 +7,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BRAND, brandAlpha } from "#/brand/khipu";
 import type { DemoManifest } from "#/lib/demo";
 import { pixelkarteUrl } from "#/lib/licences/imagery";
+import { storageKey } from "#/lib/ontology/core/storage";
 import { MapFurniture } from "#/lib/terroir/roll/MapFurniture";
 
 // Landing-page board: the sample trip's photos as cards on the swisstopo map, each tied to where
 // it was taken by a line and a view wedge (its solved heading and field of view). Drag a card to
 // move it, drag the map to pan, click a card to open the photo.
 
-const SHARP_KEY = "rigi:topoSharp";
+const SHARP_KEY = storageKey("topoSharp");
 const Z = 14;
 const TILE = 256;
 const WEDGE_M = 1100;

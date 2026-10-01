@@ -110,6 +110,14 @@ export const STORAGE = {
 		version: null,
 		module: "components/controls.tsx",
 	},
+	topoSharp: {
+		medium: "localStorage",
+		key: "rigi:topoSharp",
+		holds: "landing topo board sharp/soft toggle",
+		version: null,
+		module: "components/site/TopoBoard.tsx",
+		note: "colon separator predates the rigi. convention; kept so the saved toggle survives",
+	},
 	uploads: {
 		medium: "indexedDB",
 		key: "mt-image-uploads",
@@ -157,6 +165,7 @@ export const STORAGE_PREFIXES = [
 	"mt-image.",
 	"mt-image-",
 	"rigi.",
+	"rigi:",
 ];
 
 /** RegExp matching concrete keys of an entry (`<x>` → one or more chars). */

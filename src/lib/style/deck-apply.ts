@@ -17,6 +17,7 @@
 //  - sky, photo-frame lines and pin: displayed sRGB (three's THREE.Color → output encoding round
 //    trip), i.e. the colour itself as 0..255 bytes / CSS.
 
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { ViewMode } from "#/lib/settings";
 import {
 	type AtmosphereParams,
@@ -44,10 +45,9 @@ import type {
 } from "./types";
 
 export type DeckStyleMode = ViewMode;
-type V3 = [number, number, number];
 
 /** A "raw" shader colour: float tuples exact, hex strings sRGB → linear (three-apply.ts rawColor). */
-export function rawColor(c: Hex): V3 {
+export function rawColor(c: Hex): Vec3 {
 	const [r, g, b] = hexToRgb01(c);
 	return typeof c === "string"
 		? [srgbToLinear(r), srgbToLinear(g), srgbToLinear(b)]
@@ -76,7 +76,7 @@ export function rampU(r: RampRef): DeckRampU {
 		ramp.kind === "turbo"
 			? Array.from({ length: 8 }, (_, i) => ({
 					t: i / 7,
-					c: turbo(i / 7) as V3,
+					c: turbo(i / 7) as Vec3,
 					smooth: false,
 				}))
 			: ramp.stops.map((s) => ({
@@ -101,11 +101,11 @@ export function rampU(r: RampRef): DeckRampU {
 
 /** Everything the terrain shader (terrain-layer.ts) reads from the style, for one view. */
 export type DeckTerrainStyle = {
-	sunDir: V3;
+	sunDir: Vec3;
 	/** ambient, direct */
 	shade: [number, number];
 	/** linear, like THREE.Color(hex); the shader re-linearises it (see header) */
-	hazeColor: V3;
+	hazeColor: Vec3;
 	/** uHaze: overlay 1, replace / world from the style */
 	haze: number;
 	/** density, max */
@@ -123,25 +123,25 @@ export type DeckTerrainStyle = {
 	fadeFar: number;
 	fadeFloor: number;
 	contourSolid: number;
-	contourMinorCol: V3;
-	contourMajorCol: V3;
+	contourMinorCol: Vec3;
+	contourMajorCol: Vec3;
 	/** on, extra px, minor multiplier, alpha */
 	casing: [number, number, number, number];
-	casingCol: V3;
+	casingCol: Vec3;
 	/** shadeMin, 1 - shadeMin */
 	bandShade: [number, number];
 	bandLineWhiten: number;
-	bandLineCol: V3;
+	bandLineCol: Vec3;
 	bandAlpha: number;
 	bandLineAlpha: number;
 	bandGroundFade: [number, number];
 	imgOn: number;
 	/** saturation, brightness, contrast */
-	imgAdj: V3;
+	imgAdj: Vec3;
 	/** linear rgb + amount */
 	imgTint: [number, number, number, number];
 	photoTint: number;
-	photoTintCol: V3;
+	photoTintCol: Vec3;
 	/** The terrain's LOOK_* defines (look-key.ts terrainDefines): the terrain program is rebuilt when they change. */
 	defines: LookDefine[];
 	/** ATM_BLOCK values (eye filled in at draw time), when the terrain or the world sky needs them. */
@@ -151,7 +151,7 @@ export type DeckTerrainStyle = {
 	/** SLOPE_BLOCK alpha (the slope layer, LOOK_SLOPE) */
 	slopeAlpha: number;
 	/** the four slope class colours, linear */
-	slopeColors: V3[];
+	slopeColors: Vec3[];
 };
 
 const IDENTITY_IMAGERY: ImageryAdjust = {
@@ -264,7 +264,7 @@ export function deckTerrainStyle(
 		slopeAlpha: style.overlay.slope.alpha,
 		slopeColors: style.overlay.slope.colors.map((x) => {
 			const [r, g, bl] = hexToRgb01(x);
-			return [r ** 2.2, g ** 2.2, bl ** 2.2] as V3;
+			return [r ** 2.2, g ** 2.2, bl ** 2.2] as Vec3;
 		}),
 		rel: defines.includes("LOOK_RELIEF")
 			? reliefValues(style, mode === "world", sunDir)
@@ -285,11 +285,11 @@ export function deckElevRange(
 
 /** The composite shader's style uniforms (composite-shader.ts), three-apply.ts applyCompositeStyle. */
 export type DeckCompositeStyle = {
-	ridgeInner: V3;
-	ridgeSky: V3;
+	ridgeInner: Vec3;
+	ridgeSky: Vec3;
 	ridgeThr: [number, number];
 	ridgeGainO: number;
-	ridgeInnerR: V3;
+	ridgeInnerR: Vec3;
 	ridgeGainR: number;
 	/** rgb + alpha */
 	hair: [number, number, number, number];
@@ -352,7 +352,7 @@ export function trailClass(sac: string | null | undefined): number {
 }
 
 /** Linear vertex colour per trail class (index = trailClass()). */
-export function trailPalette(style: ViewStyle): V3[] {
+export function trailPalette(style: ViewStyle): Vec3[] {
 	return TRAIL_CLASSES.map((k) => rawColor(style.trails.colors[k]));
 }
 

@@ -24,6 +24,7 @@ import {
 	Tag,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { storageKey } from "../../ontology/core/storage";
 import { RollMapTerroir } from "../../terroir/roll/RollMapTerroir";
 import { HeadingChip } from "../mosaic/badges";
 import { aspectOf, fmtDay, fmtTime } from "../mosaic/style";
@@ -468,7 +469,7 @@ export function RollMap({
 	);
 }
 
-const BASEMAP_KEY = "mt-image:rollBasemap";
+const BASEMAP_KEY = storageKey("rollBasemap");
 
 function loadBasemap(): RollBasemap {
 	try {

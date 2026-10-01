@@ -16,6 +16,7 @@ import { Model } from "@luma.gl/engine";
 import { makeTexture, maskTexture } from "../deck/terrain-layer";
 import { SKY_VS, skyRayMatrix } from "../look/glsl/atmosphere";
 import { defineBlock } from "../look/glsl/block";
+import type { ByteMask } from "../ontology/core/geometry";
 import {
 	buildMeasureGrid,
 	type MeasurableScene,
@@ -23,7 +24,7 @@ import {
 } from "./measure";
 import { type NearFieldScene, PixelClass } from "./types";
 
-export type ByteMask = { width: number; height: number; data: Uint8Array };
+export type { ByteMask };
 
 function dilate(src: Uint8Array, W: number, H: number, r: number) {
 	const out = new Uint8Array(W * H);

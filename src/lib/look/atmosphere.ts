@@ -12,12 +12,13 @@
 // World frame is the camera-anchored ENU frame: z is metres ASL minus the curvature drop that
 // terrain.ts bakes into the vertices, so altitude = z + (x² + y²)·(1 − k)/2R.
 import { EARTH_R, REFRACTION_K } from "../geodesy";
+import type { Vec3 } from "../ontology/core/geometry";
 import { hexToRgb01, srgbToLinear } from "../style/color";
 import type { ViewStyle } from "../style/types";
 import { nebelRayTransmittance } from "./nebelmeer";
 import { sunColor } from "./sun";
 
-export type Vec3 = [number, number, number];
+export type { Vec3 };
 
 export type AtmosphereParams = {
 	/** Rayleigh scattering at sea level, 1/m. */

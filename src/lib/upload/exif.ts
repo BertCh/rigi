@@ -4,6 +4,7 @@
 // Pose convention (src/lib/pose.ts): yaw = true heading clockwise from north, pitch up +,
 // roll right-side-down +, vfov = vertical FOV of the displayed (upright) image, degrees.
 import exifr from "exifr";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { focalPxFromF35, type PixelSize } from "../camera/focal";
 import type { PhotoMeta } from "../photos";
 
@@ -146,8 +147,7 @@ export function appleGravity(
 	return g && g.length === 3 ? g : null;
 }
 
-type V3 = [number, number, number];
-const CANDIDATES: { name: Holding; right: V3; up: V3 }[] = [
+const CANDIDATES: { name: Holding; right: Vec3; up: Vec3 }[] = [
 	{ name: "landscape-left", right: [0, 1, 0], up: [-1, 0, 0] },
 	{ name: "landscape-right", right: [0, -1, 0], up: [1, 0, 0] },
 	{ name: "portrait", right: [1, 0, 0], up: [0, 1, 0] },
@@ -168,8 +168,8 @@ export function orientationFromGravity(
 	if (!g) return null;
 	const [gx, gy, gz] = g;
 	const norm = Math.hypot(gx, gy, gz) || 1;
-	const d: V3 = [gx / norm, gy / norm, gz / norm];
-	const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+	const d: Vec3 = [gx / norm, gy / norm, gz / norm];
+	const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 	const displayLandscape = width >= height;
 	let best: (typeof CANDIDATES)[number] | null = null;
 	let bestDown = Number.NEGATIVE_INFINITY;
@@ -182,7 +182,7 @@ export function orientationFromGravity(
 		}
 	}
 	if (!best) return null;
-	const fwd: V3 = [0, 0, -1];
+	const fwd: Vec3 = [0, 0, -1];
 	const pitch =
 		(Math.asin(Math.max(-1, Math.min(1, -dot(fwd, d)))) * 180) / Math.PI;
 	const roll =

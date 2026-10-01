@@ -17,6 +17,8 @@
 // The search is split so a GPU grid can replace the CPU one: plan() → grid (gridCpu, or the GPU's
 // certified grid in ./index.ts) → peaks() → polish() (coordinate descent, CPU only).
 
+import type { Pose } from "../../camera";
+
 export const BINS = 12;
 const DEG = 180 / Math.PI; // np.degrees / math.degrees
 const RAD = Math.PI / 180; // np.radians / math.radians
@@ -36,7 +38,8 @@ export type EdgeInputs = {
 	rgb: Uint8Array;
 };
 
-export type Pose = { yaw: number; pitch: number; roll: number; vfov: number };
+/** The camera Pose (yaw/pitch/roll/vfov, degrees); re-exported for the bench. */
+export type { Pose };
 export type Hyp = { pose: Pose; score: number; coarse: number };
 export type Peak = Pose & { coarse: number };
 

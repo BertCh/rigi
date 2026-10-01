@@ -22,19 +22,10 @@
  * DA3 /multiview relative rotations had no usable confidence signal and are gated out by default).
  */
 import { type Pose, poseBasis } from "../camera";
+import type { Mat3 } from "../ontology/core/geometry";
 
-/** 3×3 row-major. */
-export type Mat3 = [
-	number,
-	number,
-	number,
-	number,
-	number,
-	number,
-	number,
-	number,
-	number,
-];
+/** 3×3 row-major (the canonical ontology Mat3). */
+export type { Mat3 };
 
 const D = Math.PI / 180;
 

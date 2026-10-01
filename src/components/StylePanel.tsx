@@ -8,6 +8,7 @@
 // through PhotoWorkspace's useViewStyle → engine.setStyle.
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { storageKey } from "#/lib/ontology/core/storage";
 import type { Settings } from "#/lib/settings";
 import {
 	ABSOLUTE_RAMP_RANGE,
@@ -476,7 +477,7 @@ function LayerCard({
 	children: ReactNode;
 }) {
 	const [open, setOpen] = useRemembered(
-		`mt-image.look.layer.${def.id}`,
+		storageKey("lookLayer", def.id),
 		active === true,
 	);
 	const custom = def.paths.some((p) => getAt(state.overrides, p) !== undefined);
@@ -738,7 +739,7 @@ function LineShape({
 
 function ContourControls({ style }: { style: ViewStyle }) {
 	const c = style.overlay.contours;
-	const [more, setMore] = useRemembered("mt-image.look.lines-more", false);
+	const [more, setMore] = useRemembered(storageKey("lookLinesMore"), false);
 	const tanaka = c.kind === "tanaka";
 	return (
 		<>

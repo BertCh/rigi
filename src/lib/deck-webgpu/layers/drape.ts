@@ -77,13 +77,12 @@ import {
 	clearAirUniforms,
 } from "#/lib/look/glsl/clear-air";
 import { PROVENANCE_COLORS } from "#/lib/nearfield/provenance";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { type CameraUniforms, photoCameraModule } from "../camera";
 import type { PassContext } from "../pass";
 import { USAGE } from "../targets";
 import type { TerrainShaderPart } from "../terrain";
 import { imageTexture, maskTexture, placeholderTextures } from "../textures";
-
-type V3 = [number, number, number];
 
 /** multi-drape-layer.ts MIN_SIN_INC: the slope bias grows as 1/sin(incidence) down to ≈ 0.7°. */
 export const MIN_SIN_INC = 0.012;
@@ -97,7 +96,7 @@ export type DrapeSettings = {
 	protectPeople: boolean;
 	/** The style's projection tint amount (deckTerrainStyle(...).photoTint) and colour. */
 	tint: number;
-	tintColor: V3;
+	tintColor: Vec3;
 	/** Step Inside Truth: 0 = off, else the provenance tint's mix (PROVENANCE_TINT_MIX). */
 	truth: number;
 	/** LOOK_HARMONIZE band stats (look/composite.ts harmonizeValues), null = off. */

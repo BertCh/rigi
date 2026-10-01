@@ -4,6 +4,7 @@
 
 // Pure helpers for the terroir photo overlays (place card, glacier ghost, sun path, furniture).
 // No DOM, no engine imports: checked in viz.check.ts. Display-only.
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { LonLat } from "../types";
 
 const D = Math.PI / 180;
@@ -48,7 +49,7 @@ const WORDS = [
 export const aspectWord = (deg: number) =>
 	WORDS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
 
-export type Vec3 = [number, number, number];
+export type { Vec3 };
 
 /**
  * Slope (deg from horizontal) and aspect (deg clockwise from north, the direction the surface faces)

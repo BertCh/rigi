@@ -16,6 +16,7 @@ import {
 	TextLayer,
 } from "@deck.gl/layers";
 import { LogDepthExtension } from "#/lib/deck/world-view";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { loadRegion, type RegionPeak } from "#/lib/photos";
 import { poseBasis } from "#/lib/pose";
 import type { RollMapEngine } from "../../roll/map/roll-map";
@@ -27,7 +28,6 @@ import { findPack, packCredit } from "../pack";
 import type { NameClass, TerroirName } from "../types";
 import { isUncertainPose, PRIOR_FAN_DEG } from "./logic";
 
-type V3 = [number, number, number];
 const DEPTH_OFF = { depthCompare: "always", depthWriteEnabled: false } as const;
 const BASE_PX = 13;
 /** Never draw a label smaller than this (drop it instead of shrinking). */
@@ -85,14 +85,14 @@ export type ExtrasOptions = {
 const upperSpaced = (s: string, tracking: number) =>
 	tracking >= 0.1 ? [...s.toUpperCase()].join(" ") : s.toUpperCase();
 
-function dashed(a: V3, b: V3, dash: number): V3[][] {
+function dashed(a: Vec3, b: Vec3, dash: number): Vec3[][] {
 	const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
 	const n = Math.max(1, Math.floor(len / (2 * dash)));
-	const out: V3[][] = [];
+	const out: Vec3[][] = [];
 	for (let i = 0; i < n; i++) {
 		const t0 = (i * 2 * dash) / len;
 		const t1 = Math.min(1, ((i * 2 + 1) * dash) / len);
-		const at = (t: number): V3 => [
+		const at = (t: number): Vec3 => [
 			a[0] + (b[0] - a[0]) * t,
 			a[1] + (b[1] - a[1]) * t,
 			a[2] + (b[2] - a[2]) * t,
@@ -266,19 +266,19 @@ export class RollMapExtras {
 			(r) => r.photo && isUncertainPose(r.photo.poseSource),
 		);
 		if (priors.length) {
-			const fans: { polygon: V3[]; col: V3 }[] = [];
-			const dashes: { path: V3[] }[] = [];
+			const fans: { polygon: Vec3[]; col: Vec3 }[] = [];
+			const dashes: { path: Vec3[] }[] = [];
 			for (const r of priors) {
 				const aspect = r.photo ? r.photo.meta.width / r.photo.meta.height : 1.5;
 				const hf = hfovOf(r.pose, aspect);
 				const half = hf / 2 + PRIOR_FAN_DEG;
 				const L = 320;
-				const pt = (yaw: number): V3 => [
+				const pt = (yaw: number): Vec3 => [
 					r.eye[0] + L * Math.sin((yaw * Math.PI) / 180),
 					r.eye[1] + L * Math.cos((yaw * Math.PI) / 180),
 					r.eye[2],
 				];
-				const poly: V3[] = [r.eye];
+				const poly: Vec3[] = [r.eye];
 				for (let k = 0; k <= 12; k++)
 					poly.push(pt(r.pose.yaw - half + (2 * half * k) / 12));
 				fans.push({
@@ -290,7 +290,7 @@ export class RollMapExtras {
 				const dist = 150;
 				const hh = Math.tan((r.pose.vfov * Math.PI) / 360) * dist;
 				const hw = hh * aspect;
-				const corner = (sx: number, sy: number): V3 => [
+				const corner = (sx: number, sy: number): Vec3 => [
 					r.eye[0] + forward.x * dist + right.x * sx * hw + up.x * sy * hh,
 					r.eye[1] + forward.y * dist + right.y * sx * hw + up.y * sy * hh,
 					r.eye[2] + forward.z * dist + right.z * sx * hw + up.z * sy * hh,
@@ -310,7 +310,7 @@ export class RollMapExtras {
 					[tr, br],
 					[br, bl],
 					[bl, tl],
-				] as [V3, V3][])
+				] as [Vec3, Vec3][])
 					for (const d of dashed(a, b, 5)) dashes.push({ path: d });
 			}
 			layers.push(
@@ -362,7 +362,7 @@ export class RollMapExtras {
 		const frame = this.engine.frame;
 		type Item = {
 			c: Cand;
-			pos: V3;
+			pos: Vec3;
 			sx: number;
 			sy: number;
 			size: number;
@@ -381,7 +381,7 @@ export class RollMapExtras {
 				if (c.ele != null || dem != null) this.z.set(`${c.lat},${c.lon}`, h);
 			}
 			const e = frame.fromGeo(c.lat, c.lon, h + 6);
-			const pos: V3 = [e[0], e[1], e[2]];
+			const pos: Vec3 = [e[0], e[1], e[2]];
 			const d = Math.hypot(pos[0] - cam.x, pos[1] - cam.y, pos[2] - cam.z);
 			if (d > Math.min(typo.nearReachM, REACH_M[c.cls] ?? Infinity)) continue;
 			const [sx, sy, sz] = vp.project(pos);

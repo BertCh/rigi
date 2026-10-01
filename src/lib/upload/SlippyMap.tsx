@@ -6,6 +6,7 @@
 // No map dependency. Tiles © OpenStreetMap contributors (tile.openstreetmap.org usage policy:
 // light interactive use with attribution, which is what a one-off pin placement is).
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { LatLon } from "#/lib/ontology/core/geometry";
 
 const TILE = 256;
 const MAX_Z = 18;
@@ -22,7 +23,7 @@ const y2lat = (y: number, z: number) => {
 	return (180 / Math.PI) * Math.atan(Math.sinh(n));
 };
 
-export type LatLon = { lat: number; lon: number };
+export type { LatLon };
 
 export function SlippyMap({
 	center,

@@ -20,6 +20,7 @@ import { Model } from "@luma.gl/engine";
 import { ShaderAssembler } from "@luma.gl/shadertools";
 import { sortSplatsByDepth } from "#/lib/nearfield/splat-sort";
 import type { GaussianCloud } from "#/lib/nearfield/types";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
 	type CameraState,
 	type CameraUniforms,
@@ -40,11 +41,9 @@ import {
 	splatsWGSL,
 } from "./splats";
 
-type V3 = [number, number, number];
-
 // ---------------------------------------------------------------- synthetic cloud
 
-function rotQuat(axis: V3, deg: number): [number, number, number, number] {
+function rotQuat(axis: Vec3, deg: number): [number, number, number, number] {
 	const l = Math.hypot(...axis) || 1;
 	const h = (deg * Math.PI) / 360;
 	const s = Math.sin(h) / l;
@@ -54,8 +53,8 @@ function rotQuat(axis: V3, deg: number): [number, number, number, number] {
 /** A handful of splats in front of an eye at the origin looking north (+y). */
 export function syntheticCloud(): GaussianCloud {
 	const S: {
-		p: V3;
-		s: V3;
+		p: Vec3;
+		s: Vec3;
 		q: [number, number, number, number];
 		c: [number, number, number, number];
 		prov: number;
@@ -140,7 +139,7 @@ const srgbDecode = (c: number) =>
 function covOf(f: Float32Array, i: number) {
 	const o = i * SPLAT_WORDS;
 	return {
-		p: [f[o], f[o + 1], f[o + 2]] as V3,
+		p: [f[o], f[o + 1], f[o + 2]] as Vec3,
 		code: f[o + 3],
 		S: [
 			[f[o + 4], f[o + 5], f[o + 6]],
@@ -181,7 +180,7 @@ export function cpuSplatImage(
 	for (let k = 0; k < n; k++) {
 		const i = order[k];
 		const { p, code, S } = covOf(f, i);
-		const d: V3 = [p[0] - cam.eye[0], p[1] - cam.eye[1], p[2] - cam.eye[2]];
+		const d: Vec3 = [p[0] - cam.eye[0], p[1] - cam.eye[1], p[2] - cam.eye[2]];
 		const cx = m[0] * d[0] + m[4] * d[1] + m[8] * d[2];
 		const cy = m[1] * d[0] + m[5] * d[1] + m[9] * d[2];
 		const w = m[3] * d[0] + m[7] * d[1] + m[11] * d[2];
@@ -592,7 +591,7 @@ export async function runSplatsGpuCheck(
 	});
 	const centres: unknown[] = [];
 	for (let i = 0; i < cloud.count; i++) {
-		const p = Array.from(cloud.positions.subarray(3 * i, 3 * i + 3)) as V3;
+		const p = Array.from(cloud.positions.subarray(3 * i, 3 * i + 3)) as Vec3;
 		const px = projectToPixel(gcam, p);
 		if (
 			!px ||

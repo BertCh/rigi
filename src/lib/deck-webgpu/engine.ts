@@ -159,6 +159,7 @@ import {
 	type NearFieldViewOpts,
 	PixelClass,
 } from "#/lib/nearfield/types";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { PhotoMeta, RegionData, RegionTrail } from "#/lib/photos";
 import { unprojectDir } from "#/lib/pose";
 import type {
@@ -246,7 +247,6 @@ import { ColorTargets, GeometryTargets, geometrySize, USAGE } from "./targets";
 import { TerrainCore } from "./terrain";
 import { imageTexture } from "./textures";
 
-type V3 = [number, number, number];
 type View = "photo" | "world";
 
 const angleDiff = (a: number, b: number) =>
@@ -500,7 +500,7 @@ export class WebGpuEngine implements Renderer {
 	private pendingTrails?: RegionTrail[];
 	private geoSrc?: GeometrySource;
 	private geoSrcKind: "gpu" | "cpu" | null = null;
-	private geoSrcEye: V3 | null = null;
+	private geoSrcEye: Vec3 | null = null;
 	private gens: GeometryGenerations;
 	private geoBufGen = -1;
 	private silTiming: {
@@ -525,7 +525,7 @@ export class WebGpuEngine implements Renderer {
 	private occGpu: {
 		seq: number;
 		pose: Pose;
-		eye: V3;
+		eye: Vec3;
 		aspect: number;
 		snapped: SnappedPeak[];
 		vis: Map<SnappedPeak, boolean>;
@@ -694,7 +694,7 @@ export class WebGpuEngine implements Renderer {
 		return this.viewOverride ?? (this.world?.controls ? "world" : "photo");
 	}
 
-	private get eyeArr(): V3 {
+	private get eyeArr(): Vec3 {
 		return [this.eye.x, this.eye.y, this.eye.z];
 	}
 
@@ -1978,7 +1978,7 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	/** The photo's forward direction (unit ENU) for clear air's physical airlight. */
-	private photoForward(): V3 {
+	private photoForward(): Vec3 {
 		const d = unprojectDir(this.pose, this.aspect, 0.5, 0.5);
 		return [d.x, d.y, d.z];
 	}
@@ -2008,7 +2008,7 @@ export class WebGpuEngine implements Renderer {
 			minRange: stepView ? 1 : s.minProjectRange,
 			protectPeople: dm.protectPeople,
 			tint: wl.photoTint,
-			tintColor: [...wl.photoTintCol] as V3,
+			tintColor: [...wl.photoTintCol] as Vec3,
 			truth: this.nearField?.opts.truth ? PROVENANCE_TINT_MIX : 0,
 			harmonize: this.harmonize(this.style.world.drapeHarmonize),
 			// the photo's haze inverted on the drape sample (fit = the photo-pose geometry's)
@@ -2482,7 +2482,7 @@ export class WebGpuEngine implements Renderer {
 	private sampleFromTexel(t: ArrayLike<number>): Sample | null {
 		const range = t[3] > 0 ? t[3] : Number.POSITIVE_INFINITY;
 		if (!(range > 0) || !Number.isFinite(range)) return null;
-		const world: V3 = [t[0], t[1], t[2]];
+		const world: Vec3 = [t[0], t[1], t[2]];
 		const g = this.frame.toGeo(world[0], world[1], world[2]);
 		return { lat: g.lat, lon: g.lon, h: g.h, range, world };
 	}
@@ -2589,7 +2589,7 @@ export class WebGpuEngine implements Renderer {
 		const i = y * w + x;
 		const range = src.range[i];
 		if (!(range > 0) || !Number.isFinite(range)) return null;
-		let world: V3;
+		let world: Vec3;
 		if (src.xyz)
 			world = [src.xyz[i * 3], src.xyz[i * 3 + 1], src.xyz[i * 3 + 2]];
 		else {
@@ -2722,7 +2722,7 @@ export class WebGpuEngine implements Renderer {
 		gen: number;
 		src: GeometrySource | undefined;
 		pose: Pose;
-		eye: V3;
+		eye: Vec3;
 		aspect: number;
 		snapped: SnappedPeak[];
 	};
@@ -2999,7 +2999,7 @@ export class WebGpuEngine implements Renderer {
 		const pins: Pin[] = [];
 		const t = this.terrain;
 		for (const pt of cp.points) {
-			let world: V3 | null = null;
+			let world: Vec3 | null = null;
 			if (pt.peak && t) {
 				const ray = unprojectDir(
 					this.prior,

@@ -27,6 +27,7 @@ import {
 	type Framebuffer,
 	type Texture,
 } from "@luma.gl/core";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { Pose } from "../camera";
 import { poseBasis } from "../pose";
 import type { GeometrySource } from "./geometry-source";
@@ -50,8 +51,6 @@ export function geometrySize(aspect: number, longSide = GEOMETRY_LONG_SIDE) {
 		? { width: longSide, height: Math.round(longSide / aspect) }
 		: { width: Math.round(longSide * aspect), height: longSide };
 }
-
-type Eye = [number, number, number];
 
 class TerrainLayersPass extends LayersPass {
 	shouldDrawLayer(layer: Layer) {
@@ -87,7 +86,7 @@ export class TerrainPassRenderer {
 		layers: Layer[],
 		target: Framebuffer,
 		pose: Pose,
-		eye: Eye,
+		eye: Vec3,
 		near = 1,
 		far = 400_000,
 	) {
@@ -159,7 +158,7 @@ function tileSphere(m: TileMesh) {
 }
 
 /** true = the mesh's bounding sphere lies entirely outside the photo camera's frustum. */
-function frustumCuller(pose: Pose, eye: Eye, aspect: number) {
+function frustumCuller(pose: Pose, eye: Vec3, aspect: number) {
 	const { forward: f, right: r, up: u } = poseBasis(pose);
 	const ty = Math.tan((pose.vfov * Math.PI) / 360);
 	const tx = ty * aspect;
@@ -543,7 +542,7 @@ export class GpuGeometrySource implements GeometrySource {
 
 	constructor(
 		private deck: Deck,
-		private eye: Eye,
+		private eye: Vec3,
 		width: number,
 		height: number,
 		opts: { xyz?: boolean } = {},

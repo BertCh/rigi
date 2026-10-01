@@ -14,6 +14,7 @@
 //      through: the same trade multi-drape-layer.ts makes, hence the behind samples start 400 m back.)
 //   npx tsx src/lib/deck-webgpu/layers/drape.check.ts
 import { WGSLShaderAssembler } from "@luma.gl/shadertools";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { cameraUniforms, photoCamera, projectToPixel } from "../camera";
 import {
 	TILE_VERTEX_WGSL,
@@ -22,8 +23,6 @@ import {
 	terrainSource,
 } from "../terrain";
 import { DrapePart, drapeSlack, drapeVisibilityCpu } from "./drape";
-
-type V3 = [number, number, number];
 
 // ---- 1. assembly + layout ----
 const asm = new WGSLShaderAssembler();
@@ -97,12 +96,12 @@ for (const harmonize of [false, true]) {
 const W = 1024;
 const H = 683;
 const pose = { yaw: 0, pitch: -0.5, roll: 0, vfov: 40 };
-const eye: V3 = [0, 0, 10];
+const eye: Vec3 = [0, 0, 10];
 const u = cameraUniforms(photoCamera({ pose, eye, width: W, height: H }));
 const WALL_Y = 1500;
 const WALL_H = 40;
 /** First hit of the ray: ground z = 0, or the wall y = WALL_Y (0 < z < WALL_H). */
-function cast(dir: V3): number {
+function cast(dir: Vec3): number {
 	let best = 0;
 	if (dir[2] < 0) best = -eye[2] / dir[2];
 	if (dir[1] > 0) {
@@ -117,7 +116,7 @@ for (let y = 0; y < H; y++)
 	for (let x = 0; x < W; x++) {
 		const nx = ((x + 0.5) / W) * 2 - 1;
 		const ny = 1 - ((y + 0.5) / H) * 2;
-		const d: V3 = [0, 0, 0];
+		const d: Vec3 = [0, 0, 0];
 		for (let k = 0; k < 3; k++)
 			d[k] =
 				u.forward[k] + nx * u.tanHalfX * u.right[k] + ny * u.tanHalfY * u.up[k];
@@ -134,11 +133,11 @@ const stats = {
 	open: { n: 0, classicRejected: 0, voteRejected: 0, voteSoft: 0 },
 	behind: { n: 0, classicLeak: 0, voteLeak: 0 },
 };
-const n: V3 = [0, 0, 1];
+const n: Vec3 = [0, 0, 1];
 for (let k = 0; k < 40000; k++) {
 	// ground points in front of the wall (open) and well behind it (occluded)
 	const behind = k % 2 === 1;
-	const p: V3 = [
+	const p: Vec3 = [
 		(rnd() - 0.5) * 1200,
 		behind ? WALL_Y + 400 + rnd() * 1000 : 150 + rnd() * (WALL_Y - 160),
 		0,

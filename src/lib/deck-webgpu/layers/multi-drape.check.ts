@@ -30,6 +30,7 @@
 import type { Device, Texture } from "@luma.gl/core";
 import type { Pose } from "#/lib/camera";
 import type { TileMesh } from "#/lib/deck/terrain-data";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
 	type CameraUniforms,
 	cameraModule,
@@ -46,8 +47,6 @@ import {
 	slotData,
 	TOP_K,
 } from "./multi-drape";
-
-type V3 = [number, number, number];
 
 // ---------------------------------------------------------------------------------------------
 // shared scene helpers
@@ -125,16 +124,20 @@ function worldViewProj(u: CameraUniforms): number[] {
 type PhotoSpec = {
 	id: string;
 	pose: Pose;
-	eye: V3;
+	eye: Vec3;
 	gain: number;
 	/** sRGB bytes of the solid-colour photo. */
-	rgb: V3;
+	rgb: Vec3;
 };
 
 /** Photographers on low vantage points around the hill (all look roughly north); a–e and g–i
  * overlap south of the hill so more than TOP_K compete there. */
 function photoSpecs(): PhotoSpec[] {
-	const at = (x: number, y: number, up = 25): V3 => [x, y, heightAt(x, y) + up];
+	const at = (x: number, y: number, up = 25): Vec3 => [
+		x,
+		y,
+		heightAt(x, y) + up,
+	];
 	return [
 		{
 			id: "a",
@@ -235,11 +238,11 @@ const srgbDecode = (c: number) =>
 
 type TwinPhoto = {
 	slot: Float32Array; // slotData
-	rgb: V3; // 0..1 sRGB
+	rgb: Vec3; // 0..1 sRGB
 };
 
 type TwinOut = {
-	rgbSrgb: V3;
+	rgbSrgb: Vec3;
 	alpha: number;
 	/** min distance of any winner's uv to its frame edge (mip bleed guard) */
 	minEdge: number;
@@ -249,9 +252,9 @@ type TwinOut = {
 };
 
 function twinFragment(
-	p: V3,
-	n0: V3,
-	viewEye: V3,
+	p: Vec3,
+	n0: Vec3,
+	viewEye: Vec3,
 	list: number[],
 	photos: TwinPhoto[],
 	range: Float32Array,
@@ -265,7 +268,7 @@ function twinFragment(
 	},
 ): TwinOut | null {
 	const nl = Math.hypot(...n0) || 1;
-	const n: V3 = [n0[0] / nl, n0[1] / nl, n0[2] / nl];
+	const n: Vec3 = [n0[0] / nl, n0[1] / nl, n0[2] / nl];
 	const vd = [p[0] - viewEye[0], p[1] - viewEye[1], p[2] - viewEye[2]];
 	const vl = Math.hypot(vd[0], vd[1], vd[2]);
 	const view = [vd[0] / vl, vd[1] / vl, vd[2] / vl];
@@ -369,7 +372,7 @@ function twinFragment(
 		winners++;
 	}
 	if (wsum <= 0) return null;
-	let col: V3 = [acc[0] / wsum, acc[1] / wsum, acc[2] / wsum];
+	let col: Vec3 = [acc[0] / wsum, acc[1] / wsum, acc[2] / wsum];
 	if (s.outline > 0) {
 		const k = edge * s.outline;
 		col = [
@@ -623,7 +626,7 @@ async function readRgba(device: Device, tex: Texture) {
 	return out;
 }
 
-async function solidPhoto(rgb: V3) {
+async function solidPhoto(rgb: Vec3) {
 	const c = new OffscreenCanvas(300, 200);
 	const g = c.getContext("2d");
 	if (!g) throw new Error("no 2d context");
@@ -729,8 +732,8 @@ export async function runMultiDrapeCheck(
 	}
 
 	// 2. the view: oblique, from above and behind the photographers
-	const viewEye: V3 = [-200, -300, 800];
-	const target: V3 = [0, 1400, 0];
+	const viewEye: Vec3 = [-200, -300, 800];
+	const target: Vec3 = [0, 1400, 0];
 	const f = norm(sub(target, viewEye));
 	const r0 = norm(cross(f, [0, 0, 1]));
 	const view = {
@@ -787,7 +790,7 @@ export async function runMultiDrapeCheck(
 		: [];
 	const twinPhotos: TwinPhoto[] = tables.atlasIndex.map((k) => ({
 		slot: slotData(atlas, k, photos[k]),
-		rgb: specs[k].rgb.map((c) => c / 255) as V3,
+		rgb: specs[k].rgb.map((c) => c / 255) as Vec3,
 	}));
 	const s = drape.settings;
 	const errs: number[] = [];
@@ -821,8 +824,8 @@ export async function runMultiDrapeCheck(
 				if (rn <= 0 || Math.abs(rn - rc) > 0.03 * rc) edgePx = true;
 			}
 			if (edgePx) continue;
-			const p: V3 = [geo[i], geo[i + 1], geo[i + 2]];
-			const n: V3 = [nrm[i], nrm[i + 1], nrm[i + 2]];
+			const p: Vec3 = [geo[i], geo[i + 1], geo[i + 2]];
+			const n: Vec3 = [nrm[i], nrm[i + 1], nrm[i + 2]];
 			const t = twinFragment(
 				p,
 				n,
@@ -911,17 +914,17 @@ export async function runMultiDrapeCheck(
 	};
 }
 
-function sub(a: V3, b: V3): V3 {
+function sub(a: Vec3, b: Vec3): Vec3 {
 	return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
-function cross(a: V3, b: V3): V3 {
+function cross(a: Vec3, b: Vec3): Vec3 {
 	return [
 		a[1] * b[2] - a[2] * b[1],
 		a[2] * b[0] - a[0] * b[2],
 		a[0] * b[1] - a[1] * b[0],
 	];
 }
-function norm(a: V3): V3 {
+function norm(a: Vec3): Vec3 {
 	const l = Math.hypot(...a) || 1;
 	return [a[0] / l, a[1] / l, a[2] / l];
 }

@@ -5,10 +5,13 @@
 // 35 mm-equivalent focal → focal in pixels, aware of crops. Kept dependency-free so both
 // camera/index.ts (which re-exports it) and geo/camera.ts can import it without a cycle.
 
+import type { Size } from "../ontology/core/geometry";
+
 /** Diagonal of a 36×24 mm frame, √(36² + 24²); the one constant for every 35 mm-equivalent conversion. */
 export const FF35_DIAGONAL_MM = 43.2666;
 
-export type PixelSize = { width: number; height: number };
+/** Image size in pixels (the canonical ontology Size). */
+export type PixelSize = Size;
 
 /** Relative aspect difference still read as a uniform resample (rounding of a downscale). */
 export const CROP_ASPECT_TOL = 0.005;

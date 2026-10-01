@@ -10,6 +10,7 @@
 import { type Pose, poseBasis, projectPoint } from "./camera";
 import { gaussJordan } from "./linalg";
 import { kthSmallest } from "./math";
+import type { FgMask } from "./renderer";
 
 export type EdgeMap = {
 	w: number;
@@ -53,7 +54,7 @@ function boxBlur(src: Float32Array, w: number, h: number, r: number) {
 	return out;
 }
 
-export type FgMask = { width: number; height: number; data: Uint8Array };
+export type { FgMask };
 
 /** Edge map tuned for sky/terrain boundaries: luminance + "blueness" gradients, sky-above favoured. */
 export function buildEdgeMap(

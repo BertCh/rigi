@@ -12,6 +12,7 @@
 import { Loader2, Maximize2, Mountain } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BRAND } from "#/brand/khipu";
+import { storageKey } from "#/lib/ontology/core/storage";
 import type { Roll, RollPhoto } from "../types";
 import { PanoGL } from "./panoGL";
 import {
@@ -50,7 +51,7 @@ type View = { az0: number; elc: number; ppd: number };
 
 const RULER = 22;
 const TERRAIN_FADE_MS = 700;
-const TERRAIN_KEY = "mt-image:roll:pano-terrain";
+const TERRAIN_KEY = storageKey("panoTerrain");
 
 type PeakLabel = ReturnType<typeof drawPeakLabels>[number];
 const MAX_PPD = 80;

@@ -14,13 +14,10 @@ import {
 } from "@mediapipe/tasks-vision";
 import { cachedFetchBuffer } from "./cache";
 import { smoothstep } from "./math";
+import type { ByteMask } from "./ontology/core/geometry";
 
-export type ForegroundMask = {
-	width: number;
-	height: number;
-	/** 0..255, 255 = foreground person; row-major, row 0 = TOP of image */
-	data: Uint8Array;
-};
+/** 0..255, 255 = foreground person (a ByteMask: row-major, row 0 = TOP of image). */
+export type ForegroundMask = ByteMask;
 
 export type SegmentModel = "multiclass" | "deeplab" | "combined";
 

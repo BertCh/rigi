@@ -21,6 +21,7 @@ import { type Device, luma, type Texture } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import { atmosphereValues } from "#/lib/look/atmosphere";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
 	type DeckTerrainStyle,
 	deckTerrainStyle,
@@ -37,8 +38,6 @@ import {
 	type TerrainStyleName,
 	TerrainStyles,
 } from "./terrain-styles";
-
-type V3 = [number, number, number];
 
 // ---- synthetic DEM tile -------------------------------------------------------------------------
 
@@ -111,14 +110,14 @@ const srgbDecode = (c: number) =>
 function rampEval(
 	r: { c0: number[]; c1: number[]; de: number[]; n: number },
 	t: number,
-): V3 {
+): Vec3 {
 	const stop = (i: number) =>
 		i < 4 ? r.c0.slice(i * 4, i * 4 + 4) : r.c1.slice((i - 4) * 4, i * 4 - 12);
 	const div = (i: number) => r.de[i];
 	const ease = (i: number) => r.de[8 + i];
 	const n = Math.round(r.n);
 	let prev = stop(0);
-	let c: V3 = [prev[0], prev[1], prev[2]];
+	let c: Vec3 = [prev[0], prev[1], prev[2]];
 	for (let i = 1; i < 8 && i < n; i++) {
 		const s = stop(i);
 		if (t < s[3] || i === n - 1) {
@@ -126,7 +125,7 @@ function rampEval(
 				ease(i) > 0.5
 					? smooth(prev[3], s[3], t)
 					: clamp01((t - prev[3]) / div(i));
-			c = [0, 1, 2].map((k) => prev[k] + (s[k] - prev[k]) * f) as V3;
+			c = [0, 1, 2].map((k) => prev[k] + (s[k] - prev[k]) * f) as Vec3;
 			break;
 		}
 		prev = s;
@@ -134,7 +133,7 @@ function rampEval(
 	return c;
 }
 
-function shade(L: DeckTerrainStyle, n: V3) {
+function shade(L: DeckTerrainStyle, n: Vec3) {
 	const l = Math.max(
 		n[0] * L.sunDir[0] + n[1] * L.sunDir[1] + n[2] * L.sunDir[2],
 		0,
@@ -142,12 +141,12 @@ function shade(L: DeckTerrainStyle, n: V3) {
 	return L.shade[0] * (0.5 + 0.5 * n[2]) + L.shade[1] * l;
 }
 
-function haze(L: DeckTerrainStyle, c: V3, range: number): V3 {
+function haze(L: DeckTerrainStyle, c: Vec3, range: number): Vec3 {
 	const f = Math.min(
 		1 - Math.exp(-range * L.hazeParams[0] * L.haze),
 		L.hazeParams[1],
 	);
-	return c.map((x, k) => x + (toLin(L.hazeColor[k]) - x) * f) as V3;
+	return c.map((x, k) => x + (toLin(L.hazeColor[k]) - x) * f) as Vec3;
 }
 
 // ---- readback -----------------------------------------------------------------------------------
@@ -231,15 +230,15 @@ export async function runTerrainStylesCheck(
 	const styles = new TerrainStyles(device);
 	const elevRange: [number, number] = [900, 3300];
 
-	const eye: V3 = [0, -1500, 3400];
-	const target: V3 = [300, 3800, 1800];
-	const d = target.map((t, k) => t - eye[k]) as V3;
+	const eye: Vec3 = [0, -1500, 3400];
+	const target: Vec3 = [300, 3800, 1800];
+	const d = target.map((t, k) => t - eye[k]) as Vec3;
 	const dl = Math.hypot(...d);
-	const forward = d.map((x) => x / dl) as V3;
+	const forward = d.map((x) => x / dl) as Vec3;
 	const right = [forward[1], -forward[0], 0];
 	const rl = Math.hypot(...right);
-	const r3 = right.map((x) => x / rl) as V3;
-	const up: V3 = [
+	const r3 = right.map((x) => x / rl) as Vec3;
+	const up: Vec3 = [
 		r3[1] * forward[2] - r3[2] * forward[1],
 		r3[2] * forward[0] - r3[0] * forward[2],
 		r3[0] * forward[1] - r3[1] * forward[0],
@@ -302,16 +301,16 @@ export async function runTerrainStylesCheck(
 			}
 		return out;
 	};
-	const nrm = (fr: Frame, i: number): V3 => {
-		const n: V3 = [
+	const nrm = (fr: Frame, i: number): Vec3 => {
+		const n: Vec3 = [
 			fr.normal[i * 4],
 			fr.normal[i * 4 + 1],
 			fr.normal[i * 4 + 2],
 		];
 		const l = Math.hypot(...n) || 1;
-		return n.map((x) => x / l) as V3;
+		return n.map((x) => x / l) as Vec3;
 	};
-	const slopeDeg = (n: V3) => (Math.acos(clamp01(n[2])) * 180) / Math.PI;
+	const slopeDeg = (n: Vec3) => (Math.acos(clamp01(n[2])) * 180) / Math.PI;
 	const rgba = (fr: Frame, i: number) =>
 		Array.from(fr.color.slice(i * 4, i * 4 + 4));
 	const finite = (fr: Frame) => fr.color.every((v) => Number.isFinite(v));
@@ -417,9 +416,9 @@ export async function runTerrainStylesCheck(
 			const nn = nrm(fr, i);
 			const z = fr.xyzr[i * 4 + 2];
 			const t = clamp01((z - elevRange[0]) / (elevRange[1] - elevRange[0]));
-			const alb = rampEval(L.relief, t).map(toLin) as V3;
+			const alb = rampEval(L.relief, t).map(toLin) as Vec3;
 			const s = shade(L, nn);
-			const want = haze(L, alb.map((c) => c * s) as V3, fr.xyzr[i * 4 + 3]);
+			const want = haze(L, alb.map((c) => c * s) as Vec3, fr.xyzr[i * 4 + 3]);
 			const got = rgba(fr, i);
 			const e = Math.max(
 				...want.map((w, k) => Math.abs(got[k] - w) / Math.max(w, 0.02)),
@@ -442,7 +441,7 @@ export async function runTerrainStylesCheck(
 	{
 		const L = classicReplace;
 		const fr = await render({ style: "imagery", look: L });
-		const img = IMG.map((c) => srgbDecode(c / 255)) as V3;
+		const img = IMG.map((c) => srgbDecode(c / 255)) as Vec3;
 		let n = 0;
 		let maxErr = 0;
 		let worst: unknown = null;
@@ -451,7 +450,7 @@ export async function runTerrainStylesCheck(
 			const steep = 1 - smooth(0.17, 0.34, nn[2]);
 			const base = img.map(
 				(c) => c + (c * (0.7 + 0.45 * shade(L, nn)) - c) * 0.5 * steep,
-			) as V3;
+			) as Vec3;
 			const want = haze(L, base, fr.xyzr[i * 4 + 3]);
 			const got = rgba(fr, i);
 			const e = Math.max(

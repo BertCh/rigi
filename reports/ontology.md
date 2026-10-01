@@ -586,6 +586,7 @@ Scores are only comparable within one scale. Levels can be compared across scale
 | `cascade` | unknown-pose cascade | no | 0.5 | 0.5 | accepted && !ambiguous && !weak360; the bar rises to 0.75 when focal or yaw is unknown (unknown-pose.worker.ts) | lib/integration/unknown-pose.ts |
 | `refine` | refine score (product of six ramps) | no | 0.5 | 0.5 | score ≥ 0.5 && !hardFail (refine/confidence.ts) | lib/refine/confidence.ts |
 | `matcher` | matcher level (0.9 = HIGH, 0.2 = LOW) | no | 0.9 | 0.9 | HIGH && (position trusted \|\| cascade within MATCH_AGREE_DEG) (matcher-client.ts matchAccepted) | lib/matcher-client.ts |
+| `matcher-v01` | matcher v0.1 render-match heuristic (no confidenceLevel on the response) | no | 0.5 | 0.5 | confidence ≥ 0.5 counts as the service's HIGH (matcher-client.ts matchIsConfident) | lib/matcher-client.ts |
 | `concord` | concordance display confidence | no | 0.5 | 0.5 | fail closed below 0.5 (concord/app MIN_CONFIDENCE) | lib/concord/app/confidence.ts |
 | `roll` | roll solved-pose confidence (the cascade's) | no | 0.5 | 0.5 | only accepted poses are stored; propagated suggestions store 0 (never HIGH) | lib/roll/align/align.ts |
 
@@ -679,6 +680,7 @@ Every key Rigi persists. The check fails on any `mt-image:` / `mt-image.` / `mt-
 | `reveal` | localStorage | `rigi.reveal.v1` | RevealConfig | v1 | lib/reveal/config.ts |
 | `pickerLog` | localStorage | `rigi.picker.log.v1` | PickerLogEntry[] | v1 | lib/picker/log.ts |
 | `panel` | localStorage | `rigi.panel.<id>` | sidebar section open/closed | none | components/controls.tsx |
+| `topoSharp` | localStorage | `rigi:topoSharp` | landing topo board sharp/soft toggle (colon separator predates the rigi. convention; kept so the saved toggle survives) | none | components/site/TopoBoard.tsx |
 | `uploads` | indexedDB | `mt-image-uploads` | PhotoRecord (photos store) + LocalRegion (regions store) | v1 | lib/upload/store.ts |
 | `tileCache` | cacheStorage | `summit-lens-tiles-v1` | DEM / imagery tile bytes (IndexedDB fallback of the same name) (legacy brand kept: renaming would orphan every user's cache) | v1 | lib/cache/tile-cache.ts |
 | `flags` | url | `?<flag>=<value>` | Flags (lib/flags FLAG_SCHEMA) | none | lib/flags |

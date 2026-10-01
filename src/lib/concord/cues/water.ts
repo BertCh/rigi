@@ -20,6 +20,7 @@
 //   "shore" (0.3–3 km): u, v = observed pixel; lakeM; shoreDist(e, n) = signed distance (m) to the
 //          lake outline (negative inside the water) of the observed ray's lake-plane intersection.
 import { DEG } from "../../geodesy";
+import type { LatLon } from "../../ontology/core/geometry";
 import { type CameraX, type Cue, unprojectDirX, type Vec3 } from "../core";
 import { focal1600 } from "./contours";
 import { searchAlongNormal, thinEdgesMemo } from "./edge-dt";
@@ -44,7 +45,7 @@ export type WaterCue = Cue & {
 
 // ---------------------------------------------------------------- OSM → rings
 
-type LL = { lat: number; lon: number };
+type LL = LatLon;
 type OsmEl = {
 	type: string;
 	id?: number;

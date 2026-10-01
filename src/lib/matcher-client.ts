@@ -5,6 +5,7 @@
 // Client for the optional render-and-match escalation service (tools/matcher/server, default :8765).
 // Everything here degrades to `false` / `null` when the service isn't running: it never throws.
 import type { Pose } from "./camera";
+import { levelOf } from "./ontology/core/confidence";
 
 const BASE = (
 	import.meta.env?.VITE_MATCHER_URL ?? "http://localhost:8765"
@@ -128,7 +129,9 @@ export type MatchResult = {
 
 /** The service's own verdict: HIGH (fused) or, with fused:false, the v0.1 heuristic. Not enough on its own to apply a pose. */
 export const matchIsConfident = (m: MatchResult) =>
-	m.confidenceLevel ? m.confidenceLevel === "high" : m.confidence >= 0.5;
+	m.confidenceLevel
+		? m.confidenceLevel === "high"
+		: levelOf("matcher-v01", m.confidence) === "high";
 
 /** Agreement tolerance between the match and the app's skyline cascade for the product rule. */
 export const MATCH_AGREE_DEG = 0.5;

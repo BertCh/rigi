@@ -20,6 +20,7 @@
 //   7. timing of an off-frame 1024 and 384 render.
 import type { Pose } from "#/lib/camera";
 import { skylineRows } from "#/lib/deck/geometry-source";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { cameraUniforms, photoCamera, projectToPixel } from "../camera";
 import type { GpuLayerCore } from "../pass";
 import { rangeOf, TextureReader } from "../readback";
@@ -32,7 +33,6 @@ import {
 	webgpuGeometryFactory,
 } from "./geometry-source";
 
-type Eye = [number, number, number];
 type LabDebug = {
 	host: {
 		device: import("@luma.gl/core").Device;
@@ -46,7 +46,7 @@ export async function checkGeometrySource() {
 	if (!lab?.ready) throw new Error("lab not ready");
 	const dbg = (lab as unknown as { _debug: LabDebug })._debug;
 	const { host } = dbg;
-	const st = lab.stats() as { pose: Pose; eye: Eye };
+	const st = lab.stats() as { pose: Pose; eye: Vec3 };
 	const pose = { ...st.pose };
 	const eye = st.eye;
 	const failures: string[] = [];
@@ -105,7 +105,7 @@ export async function checkGeometrySource() {
 			for (let x = 0; x < q.width; x += 3) {
 				const i = y * q.width + x;
 				const r = q.range[i];
-				const p: Eye = [xyz[i * 3], xyz[i * 3 + 1], xyz[i * 3 + 2]];
+				const p: Vec3 = [xyz[i * 3], xyz[i * 3 + 1], xyz[i * 3 + 2]];
 				if (r === 0 || Number.isNaN(r)) bad++;
 				if (!Number.isFinite(r)) {
 					sky++;

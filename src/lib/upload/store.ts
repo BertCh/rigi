@@ -5,10 +5,11 @@
 // IndexedDB persistence for browser uploads: photo records (meta + JPEG blob + thumbnail) and
 // region data (shared between photos). Everything degrades to "not stored" when IndexedDB is
 // unavailable (private mode, SSR).
+import { storageKey } from "../ontology/core/storage";
 import type { RegionData } from "../photos";
 import type { LocalPhotoMeta } from "./exif";
 
-const DB_NAME = "mt-image-uploads";
+const DB_NAME = storageKey("uploads");
 const DB_VERSION = 1;
 const PHOTOS = "photos";
 const REGIONS = "regions";

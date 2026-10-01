@@ -32,6 +32,12 @@ export type Mat3 = [
 /** Image size in pixels (always `width`/`height`, never w/h/W/H in public types). */
 export type Size = { width: number; height: number };
 
+/**
+ * One byte per pixel, row-major, row 0 = TOP of the image. What a byte means (sky, foreground person,
+ * occluder) belongs to the field or type that holds the mask, e.g. ForegroundMask (255 = person).
+ */
+export type ByteMask = Size & { data: Uint8Array };
+
 /** Horizontal WGS84 position. Argument order in Rigi is always (lat, lon) unless a name says lon-first. */
 export type LatLon = { lat: Deg; lon: Deg };
 

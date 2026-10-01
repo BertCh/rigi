@@ -225,20 +225,33 @@ const readJson = (p: string) =>
 	);
 	const lit = new RegExp(`["'\`]((?:${prefix})[^"'\`\\s]*)["'\`]`, "g");
 	const unregistered: string[] = [];
+	const handBuilt: string[] = [];
 	const hit = new Set<StorageId>();
 	for (const f of files) {
 		const src = readFileSync(f, "utf8");
 		for (const m of src.matchAll(lit)) {
 			const key = m[1].replace(/\$\{[^}]*\}/g, "x");
 			const id = storageEntryOf(key);
-			if (id) hit.add(id);
-			else unregistered.push(`${relative(ROOT, f)}: ${m[1]}`);
+			const at = `${relative(ROOT, f)}: ${m[1]}`;
+			if (!id) unregistered.push(at);
+			else {
+				hit.add(id);
+				// a registered key written out by hand drifts silently when the row is versioned;
+				// comments and a file-format schema id that reuses the key's spelling may stay literal
+				const line = src.slice(src.lastIndexOf("\n", m.index) + 1, m.index);
+				if (!/^\s*(\/\/|\*)|schema:\s*$/.test(line)) handBuilt.push(at);
+			}
 		}
 	}
 	ok(
 		unregistered.length === 0,
 		`storage: every Rigi-prefixed key literal in src/ is registered (${files.length} files)`,
 		unregistered.join("; "),
+	);
+	ok(
+		handBuilt.length === 0,
+		"storage: registered keys are built with storageKey(), never spelled out",
+		handBuilt.join("; "),
 	);
 	ok(
 		storageKey("savedPose", "IMG_1") === "mt-image:pose:IMG_1" &&

@@ -32,6 +32,7 @@ import {
 	PROVENANCE_COLORS,
 	PROVENANCE_TINT_MIX,
 } from "#/lib/nearfield/provenance";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
 	makeTileMaterial,
 	makeTileSharedUniforms,
@@ -59,8 +60,6 @@ import {
 import { TextureReader } from "../readback";
 import { ColorTargets, GeometryTargets } from "../targets";
 import { createTiles3DCore, tiles3dModule, tiles3dWGSL } from "./tiles3d";
-
-type V3 = [number, number, number];
 
 // ---------------------------------------------------------------- CPU: program layouts
 
@@ -286,8 +285,8 @@ export async function runTiles3DGpuCheck(
 	shared.uEye.value.set(0, 0, 0);
 	const buildings = { displayOnly: false, depthBias: 0.97 };
 	const google = { displayOnly: true, depthBias: 0.97 };
-	const ALBEDO: V3 = [0.8, 0.4, 0.2];
-	const mat = (color: V3, map: THREE.Texture | null = null, bias = 0.97) =>
+	const ALBEDO: Vec3 = [0.8, 0.4, 0.2];
+	const mat = (color: Vec3, map: THREE.Texture | null = null, bias = 0.97) =>
 		makeTileMaterial(shared, {
 			map,
 			color,
@@ -310,7 +309,7 @@ export async function runTiles3DGpuCheck(
 	const B = new THREE.Mesh(quadGeometry(50, 150, -40, 40), mat([1, 1, 1], tex));
 	B.position.set(0, 500, 0);
 	// C: i3dm, a 20 m quad at two instances (−100, 500, 70) and (100, 500, 70)
-	const GREEN: V3 = [0.2, 0.7, 0.3];
+	const GREEN: Vec3 = [0.2, 0.7, 0.3];
 	const C = new THREE.InstancedMesh(
 		quadGeometry(-10, 10, -10, 10),
 		mat(GREEN),
@@ -394,7 +393,7 @@ export async function runTiles3DGpuCheck(
 		device.submit();
 		return readRgba16f(device, color.color);
 	};
-	const px = (buf: Float32Array, p: V3) => {
+	const px = (buf: Float32Array, p: Vec3) => {
 		const q = projectToPixel(cam, p);
 		if (!q) return [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
 		const i = (Math.floor(q.y) * W + Math.floor(q.x)) * 4;
@@ -402,7 +401,7 @@ export async function runTiles3DGpuCheck(
 	};
 	const near = (a: number[], b: number[], tol = 0.012) =>
 		a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= tol);
-	const lin = (c: V3, k = 1) => [...c.map((v) => srgbDecode(v * k)), 1];
+	const lin = (c: Vec3, k = 1) => [...c.map((v) => srgbDecode(v * k)), 1];
 	const SKY = [0, 0, 0, 0];
 	const checks: Tiles3DGpuCheck["checks"] = {};
 
@@ -501,7 +500,7 @@ export async function runTiles3DGpuCheck(
 	await render();
 	const geo = await reader.read(geometry.geometry);
 	const nrm = await readRgba16f(device, geometry.normal);
-	const gpx = (p: V3) => {
+	const gpx = (p: Vec3) => {
 		const q = projectToPixel(photoCam, p);
 		if (!q || !geo) return null;
 		const i = (Math.floor(q.y) * geometry.width + Math.floor(q.x)) * 4;

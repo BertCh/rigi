@@ -17,6 +17,7 @@
 //   await (await import('/src/lib/deck-webgpu/layers/photo-sky.check.ts')).gpuCheck()
 import type { Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
 	type CameraUniforms,
 	cameraUniforms,
@@ -26,8 +27,6 @@ import {
 import type { FrameState, GpuLayerCore, PassContext } from "../pass";
 import { passModelProps } from "../pass";
 import { PhotoSkyCore, photoSkyUv } from "./photo-sky";
-
-type V3 = [number, number, number];
 
 export function cpuCheck() {
 	let seed = 7;
@@ -45,7 +44,7 @@ export function cpuCheck() {
 			roll: (rnd() - 0.5) * 20,
 			vfov: 20 + rnd() * 60,
 		};
-		const eye: V3 = [
+		const eye: Vec3 = [
 			(rnd() - 0.5) * 2e5,
 			(rnd() - 0.5) * 2e5,
 			500 + rnd() * 4000,
@@ -53,9 +52,9 @@ export function cpuCheck() {
 		const W = 1024;
 		const H = Math.round(1024 / (0.5 + rnd() * 1.5));
 		const u = cameraUniforms(photoCamera({ pose, eye, width: W, height: H }));
-		const d: V3 = [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5];
+		const d: Vec3 = [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5];
 		const l = Math.hypot(...d);
-		const dir: V3 = [d[0] / l, d[1] / l, d[2] / l];
+		const dir: Vec3 = [d[0] / l, d[1] / l, d[2] / l];
 		const a = photoSkyUv(u, dir);
 		const b = projectToPixel(u, [
 			eye[0] + dir[0] * 20000,
@@ -149,10 +148,10 @@ const srgbToLinear = (c: number) =>
 	c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 
 /** CPU camera_ray for pixel centre (x, y) of the view target (row 0 = top). */
-function viewRay(u: CameraUniforms, x: number, y: number): V3 {
+function viewRay(u: CameraUniforms, x: number, y: number): Vec3 {
 	const nx = ((x + 0.5) / u.viewport[0]) * 2 - 1 - u.offset[0];
 	const ny = 1 - ((y + 0.5) / u.viewport[1]) * 2 - u.offset[1];
-	const d: V3 = [0, 0, 0];
+	const d: Vec3 = [0, 0, 0];
 	for (let i = 0; i < 3; i++)
 		d[i] =
 			u.forward[i] + nx * u.tanHalfX * u.right[i] + ny * u.tanHalfY * u.up[i];
@@ -192,7 +191,7 @@ export async function gpuCheck() {
 	for (let y = 0; y < PH / 2; y++) maskData.fill(255, y * PW, (y + 1) * PW);
 
 	const pose = { yaw: 30, pitch: 5, roll: 0, vfov: 40 };
-	const eye: V3 = [1000, -2000, 800];
+	const eye: Vec3 = [1000, -2000, 800];
 	const photoCam = cameraUniforms(
 		photoCamera({ pose, eye, width: 1024, height: 768 }),
 	);
@@ -209,7 +208,7 @@ export async function gpuCheck() {
 	// view: a world camera turned a little right and up from the photo camera with a wider FOV,
 	// so frame edges and feather are in shot; a different eye (direction-only: must not matter)
 	const viewPose = { yaw: 36, pitch: 8, roll: 0, vfov: 60 };
-	const viewEye: V3 = [1500, -1500, 900];
+	const viewEye: Vec3 = [1500, -1500, 900];
 	const view = {
 		...photoCamera({ pose: viewPose, eye: viewEye, width: W, height: H }),
 		near: 5,

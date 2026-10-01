@@ -39,6 +39,7 @@ import {
 	SKY_VS,
 	skyRayMatrix,
 } from "#/lib/look/glsl/atmosphere";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
 	type CameraPose,
 	runColorPass,
@@ -57,7 +58,6 @@ import { AtmSkyCore, atmosphereFogPart, WORLD_SKY } from "./atm-sky";
 
 const W = 256;
 const H = 160;
-type V3 = [number, number, number];
 
 export type AtmSkyCheckResult = {
 	ok: boolean;
@@ -69,7 +69,7 @@ export type AtmSkyCheckResult = {
 
 // ---------- small helpers ----------
 
-function atmOf(sunDir: V3, over: Partial<AtmValues> = {}): AtmValues {
+function atmOf(sunDir: Vec3, over: Partial<AtmValues> = {}): AtmValues {
 	const p = defaultAtmosphere(sunDir);
 	return {
 		eye: [0, 0, 0],
@@ -86,7 +86,7 @@ function atmOf(sunDir: V3, over: Partial<AtmValues> = {}): AtmValues {
 	};
 }
 
-function norm(a: V3): V3 {
+function norm(a: Vec3): Vec3 {
 	const l = Math.hypot(a[0], a[1], a[2]) || 1;
 	return [a[0] / l, a[1] / l, a[2] / l];
 }
@@ -223,7 +223,7 @@ void main() {
 		return p;
 	}
 
-	private setAtm(p: WebGLProgram, atm: AtmValues, eye: V3) {
+	private setAtm(p: WebGLProgram, atm: AtmValues, eye: Vec3) {
 		const gl = this.gl;
 		const v = { ...atm, eye } as Record<string, number | readonly number[]>;
 		for (const [k, type] of Object.entries(ATM_BLOCK.fields)) {
@@ -250,7 +250,7 @@ void main() {
 		const gl = this.gl;
 		const use = gl.useProgram.bind(gl);
 		use(this.sky);
-		this.setAtm(this.sky, atm, cam.position.toArray() as V3);
+		this.setAtm(this.sky, atm, cam.position.toArray() as Vec3);
 		gl.uniformMatrix4fv(
 			gl.getUniformLocation(this.sky, SKY_BLOCK.uniformName("ray")),
 			false,
@@ -267,7 +267,7 @@ void main() {
 	}
 
 	/** applyAtmosphere(col[i], pos[i]) per texel (same row order in and out). */
-	renderApply(atm: AtmValues, eye: V3, col: Float32Array, pos: Float32Array) {
+	renderApply(atm: AtmValues, eye: Vec3, col: Float32Array, pos: Float32Array) {
 		const gl = this.gl;
 		const use = gl.useProgram.bind(gl);
 		use(this.apply);
@@ -334,14 +334,14 @@ class QuadCore implements GpuLayerCore {
 
 // ---------- scenes ----------
 
-const EYE: V3 = [0, 0, 1500];
+const EYE: Vec3 = [0, 0, 1500];
 const VFOV = 70;
 
 function pose(pitchDeg: number): CameraPose {
 	const p = (pitchDeg * Math.PI) / 180;
 	const forward = norm([0, Math.cos(p), Math.sin(p)]);
-	const right: V3 = [1, 0, 0];
-	const up: V3 = [
+	const right: Vec3 = [1, 0, 0];
+	const up: Vec3 = [
 		right[1] * forward[2] - right[2] * forward[1],
 		right[2] * forward[0] - right[0] * forward[2],
 		right[0] * forward[1] - right[1] * forward[0],
@@ -604,7 +604,7 @@ export async function runAtmSkyCheck(): Promise<AtmSkyCheckResult> {
 		const raw = await renderColor([noFog], view);
 		const got = await renderColor([withFog], view);
 		if (!xyzr) throw new Error("geometry readback failed");
-		const want = ref.renderApply(fogAtm, view.eye as V3, raw, xyzr);
+		const want = ref.renderApply(fogAtm, view.eye as Vec3, raw, xyzr);
 		let n = 0;
 		let bad = 0;
 		let maxAbs = 0;

@@ -18,10 +18,11 @@
 // d²/(2·R_eff), R_eff = R/(1 − k), k = 0.13 (src/lib/geodesy) into z, so the default leaves heights
 // alone; `curvature: "apply"` subtracts it here for a plain-altitude HeightFn.
 import type { Vec3 } from "../concord/core";
+import type { HeightFn } from "../concord/cues/raycast";
 import { DEG, EARTH_R, REFRACTION_K } from "../geodesy";
 
-/** Scene-frame z at ENU (e, n); d = horizontal distance from the eye (DEM level choice). NaN ⇒ no data. */
-export type HeightFn = (e: number, n: number, d: number) => number;
+/** Scene-frame z at ENU (e, n); see concord/cues/raycast HeightFn. */
+export type { HeightFn };
 
 export type Crest = {
 	/** Azimuth (deg, clockwise from north). */

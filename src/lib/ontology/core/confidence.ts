@@ -69,6 +69,16 @@ export const CONFIDENCE_SCALES = {
 		module: "lib/matcher-client.ts",
 		levelOnly: true,
 	},
+	"matcher-v01": {
+		label:
+			"matcher v0.1 render-match heuristic (no confidenceLevel on the response)",
+		calibrated: false,
+		high: 0.5,
+		medium: 0.5,
+		accept:
+			"confidence ≥ 0.5 counts as the service's HIGH (matcher-client.ts matchIsConfident)",
+		module: "lib/matcher-client.ts",
+	},
 	concord: {
 		label: "concordance display confidence",
 		calibrated: false,

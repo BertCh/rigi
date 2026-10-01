@@ -43,6 +43,7 @@ import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { ATM_CURV, type AtmValues } from "#/lib/look/atmosphere";
 import { NEBELMEER_WGSL } from "#/lib/look/nebelmeer";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { cameraModule } from "../camera";
 import {
 	type GpuLayerCore,
@@ -58,26 +59,24 @@ import { fullscreenWGSL } from "../wgsl";
 /** engine.ts renderWorld's scene.background (deck/world-view.ts WORLD_SKY; style default). */
 export const WORLD_SKY = "#a9c2da";
 
-type V3 = [number, number, number];
-
 // ---------- the atmosphere uniform module (ATM_BLOCK) ----------
 
 /** WGSL layout of ATM_BLOCK: each vec3 shares its 16-byte slot with a scalar (no std140 vec4 trap). */
 export type AtmosphereUniforms = {
-	eye: V3;
+	eye: Vec3;
 	strength: number;
-	betaR: V3;
+	betaR: Vec3;
 	betaM: number;
-	sunDir: V3;
+	sunDir: Vec3;
 	mieG: number;
-	sunColor: V3;
+	sunColor: Vec3;
 	airlightMix: number;
-	airlight: V3;
+	airlight: Vec3;
 	pad0: number;
 	h: [number, number];
 	pad1: number;
 	pad2: number;
-	nebelColor: V3;
+	nebelColor: Vec3;
 	nebelTop: number;
 	nebelDensity: number;
 	nebelFalloff: number;
@@ -90,7 +89,7 @@ export function atmosphereUniforms(
 	atm: AtmValues,
 	eye: readonly number[],
 ): AtmosphereUniforms {
-	const v3 = (a: readonly number[]): V3 => [a[0], a[1], a[2]];
+	const v3 = (a: readonly number[]): Vec3 => [a[0], a[1], a[2]];
 	return {
 		eye: v3(eye),
 		strength: atm.strength,
@@ -345,7 +344,7 @@ export type AtmSkyProps = {
  * Accepts '#rgb' / '#rrggbb[aa]' and CSS 'rgb(r, g, b)' / 'rgba(r, g, b, a)' (deckWorldStyle().sky
  * is a CSS rgb() string); anything unparseable falls back to WORLD_SKY instead of a NaN sky.
  */
-export function hexToLinear(hex: string): V3 {
+export function hexToLinear(hex: string): Vec3 {
 	const dec = (v: number) => {
 		const c = Math.min(255, Math.max(0, v)) / 255;
 		return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -358,7 +357,7 @@ export function hexToLinear(hex: string): V3 {
 	return hexDigitsToLinear(h, dec);
 }
 
-function hexDigitsToLinear(h: string, dec: (v: number) => number): V3 {
+function hexDigitsToLinear(h: string, dec: (v: number) => number): Vec3 {
 	const n = Number.parseInt(
 		h.length === 3
 			? h
@@ -377,7 +376,7 @@ export class AtmSkyCore implements GpuLayerCore {
 	readonly order = 90;
 	private models = new ModelCache();
 	private props: AtmSkyProps = { mode: "flat", atm: null };
-	private flatLinear: V3 = hexToLinear(WORLD_SKY);
+	private flatLinear: Vec3 = hexToLinear(WORLD_SKY);
 	/** The view the next frames render (null = rely on ctx.frame.view alone). */
 	private view: "photo" | "world" | null = null;
 	enabled = true;

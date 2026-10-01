@@ -36,6 +36,7 @@ import type { Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { type Pose, poseBasis } from "#/lib/camera";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { cameraModule } from "../camera";
 import {
 	type GpuLayerCore,
@@ -46,7 +47,6 @@ import {
 } from "../pass";
 import { imageTexture } from "../textures";
 
-type V3 = [number, number, number];
 type RGBA255 = [number, number, number, number];
 type ImageLike =
 	| ImageBitmap
@@ -60,7 +60,7 @@ export type GizmoProps = {
 	/** Photo camera pose (yaw / pitch / roll / vfov, degrees). */
 	pose: Pose | null;
 	/** Photo camera eye, ENU metres (the pin). */
-	eye: V3 | null;
+	eye: Vec3 | null;
 	/** Photo aspect (width / height): the plane's shape. */
 	aspect: number;
 	/** The photo: an image (uploaded here, sRGB + mips) or a luma Texture owned by the caller
@@ -294,11 +294,11 @@ export function gizmoCorners(
 	eye: readonly number[],
 	aspect: number,
 	dist = 150,
-): [V3, V3, V3, V3] {
+): [Vec3, Vec3, Vec3, Vec3] {
 	const { forward, right, up } = poseBasis(pose);
 	const hh = Math.tan((pose.vfov * Math.PI) / 360) * dist;
 	const hw = hh * aspect;
-	const corner = (sx: number, sy: number): V3 => [
+	const corner = (sx: number, sy: number): Vec3 => [
 		eye[0] + forward[0] * dist + right[0] * sx * hw + up[0] * sy * hh,
 		eye[1] + forward[1] * dist + right[1] * sx * hw + up[1] * sy * hh,
 		eye[2] + forward[2] * dist + right[2] * sx * hw + up[2] * sy * hh,

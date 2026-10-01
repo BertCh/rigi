@@ -6,6 +6,7 @@
 // (EXIF GPS, time interpolation, or a user pin) → rolls (clusterPhotos) → IndexedDB through the
 // upload module's save path, with one OSM region fetch per roll.
 import { distanceM } from "#/lib/geodesy";
+import type { LatLon } from "#/lib/ontology/core/geometry";
 import type { RegionData } from "#/lib/photos";
 import {
 	hasPosition,
@@ -42,7 +43,7 @@ export { loadProvenance, type PositionProvenance } from "./provenance";
 /** Decodes in flight at once (HEIC decode is heavy: ~100 MB of pixels per 12 MP frame). */
 export const DECODE_CONCURRENCY = 2;
 
-export type LatLon = { lat: number; lon: number };
+export type { LatLon };
 
 // ---- duplicates -------------------------------------------------------------------------
 

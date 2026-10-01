@@ -14,6 +14,7 @@ import { Model } from "@luma.gl/engine";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import type { Pose } from "#/lib/camera";
 import { poseBasis } from "#/lib/camera";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { cameraUniforms, projectToPixel, worldCamera } from "../camera";
 import { runColorPass } from "../hosts/passes";
 import {
@@ -24,8 +25,6 @@ import {
 } from "../pass";
 import { ColorTargets, GeometryTargets } from "../targets";
 import { createGizmoCore, linearRGBA } from "./gizmo";
-
-type V3 = [number, number, number];
 
 /** A full-screen, colourless quad at a fixed view depth that only writes depth (an occluder). */
 class WallCore implements GpuLayerCore {
@@ -146,7 +145,7 @@ export async function runGizmoCheck(
 	const geometry = new GeometryTargets(device, 64, 48);
 	const color = new ColorTargets(device, W, H);
 	const pose: Pose = { yaw: 30, pitch: -2, roll: 3, vfov: 40 };
-	const eye: V3 = [100, 200, 1500];
+	const eye: Vec3 = [100, 200, 1500];
 	const pinColor: [number, number, number, number] = [255, 85, 51, 255];
 	const lineColor: [number, number, number, number] = [255, 255, 255, 230];
 	const gizmo = createGizmoCore(device, {
@@ -165,13 +164,13 @@ export async function runGizmoCheck(
 	const wall = new WallCore();
 	const cores = [wall, gizmo];
 	const { forward } = poseBasis(pose);
-	const f: V3 = [forward[0], forward[1], 0];
+	const f: Vec3 = [forward[0], forward[1], 0];
 	const fl = Math.hypot(f[0], f[1]);
 	f[0] /= fl;
 	f[1] /= fl;
-	const camEye: V3 = [eye[0] - f[0] * 400, eye[1] - f[1] * 400, eye[2] + 150];
-	const look: V3 = [eye[0] + f[0] * 75, eye[1] + f[1] * 75, eye[2]];
-	const fwd: V3 = [
+	const camEye: Vec3 = [eye[0] - f[0] * 400, eye[1] - f[1] * 400, eye[2] + 150];
+	const look: Vec3 = [eye[0] + f[0] * 75, eye[1] + f[1] * 75, eye[2]];
+	const fwd: Vec3 = [
 		look[0] - camEye[0],
 		look[1] - camEye[1],
 		look[2] - camEye[2],
@@ -198,7 +197,7 @@ export async function runGizmoCheck(
 		device.submit();
 		return readRGBA16F(device, color.color);
 	};
-	const px = (img: Float32Array, p: V3) => {
+	const px = (img: Float32Array, p: Vec3) => {
 		const q = projectToPixel(u, p);
 		if (!q) return null;
 		const x = Math.floor(q.x);
@@ -215,8 +214,8 @@ export async function runGizmoCheck(
 	const near = (a: number[], b: number[], tol = 0.03) =>
 		a.every((v, i) => Math.abs(v - b[i]) <= tol);
 	const checks: Check[] = [];
-	const c = gizmo.corners() as [V3, V3, V3, V3];
-	const lerp = (a: V3, b: V3, t: number): V3 => [
+	const c = gizmo.corners() as [Vec3, Vec3, Vec3, Vec3];
+	const lerp = (a: Vec3, b: Vec3, t: number): Vec3 => [
 		a[0] + (b[0] - a[0]) * t,
 		a[1] + (b[1] - a[1]) * t,
 		a[2] + (b[2] - a[2]) * t,

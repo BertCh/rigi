@@ -4,6 +4,8 @@
 
 // Resolve rolls on the client: built-in regions, the bundled sample trip (src/lib/demo), or `local-roll-<hash>` from the uploads in
 // IndexedDB. The upload module is imported lazily so bundled rolls never pull in the HEIC/EXIF code.
+
+import { storageKey } from "../../ontology/core/storage";
 import {
 	getBuiltinRoll,
 	legacyUploadRollIndex,
@@ -68,7 +70,7 @@ export async function deleteUploadRoll(roll: Roll) {
 		saveSolvedPose(id, null);
 		saveProvenance(id, null);
 		try {
-			localStorage.removeItem(`mt-image:pose:${id}`);
+			localStorage.removeItem(storageKey("savedPose", id));
 		} catch {
 			// storage unavailable
 		}

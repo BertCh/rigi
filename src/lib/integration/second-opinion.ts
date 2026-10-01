@@ -30,6 +30,7 @@ import {
 	requestMatchOrDefer,
 	shouldEscalate,
 } from "#/lib/matcher-client";
+import { levelOf } from "#/lib/ontology/core/confidence";
 import { photoKind } from "#/lib/ontology/core/ids";
 import type { PhotoMeta } from "#/lib/photos";
 import {
@@ -83,7 +84,7 @@ export function choosePreview(
 	res: AlignResult | null,
 	prior: Pose,
 ): { app: AppAlign; note: string } {
-	if (res && res.confidence > 0.2)
+	if (res && levelOf("skyline-align", res.confidence) === "medium")
 		return {
 			app: { pose: res.pose, confidence: res.confidence, state: "auto" },
 			note: `Auto-aligned to skyline · confidence ${(res.confidence * 100).toFixed(0)}%`,

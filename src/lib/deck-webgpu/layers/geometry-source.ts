@@ -54,13 +54,12 @@ import type {
 	GeometrySource,
 	GeometrySourceFactory,
 } from "#/lib/deck/geometry-source";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { photoCamera } from "../camera";
 import { type CameraPose, runGeometryPass } from "../hosts/passes";
 import type { FrameState, GpuLayerCore } from "../pass";
 import { TextureReader } from "../readback";
 import { GeometryTargets } from "../targets";
-
-type Eye = [number, number, number];
 
 /** deck/engine.ts invalidateGeometry: the buffer is re-read this long after the last change. */
 export const GEOMETRY_DEBOUNCE_MS = 90;
@@ -108,7 +107,7 @@ export type WebGpuGeometryOptions = {
 	/** Cores to draw (terrain only). Read on every render, so tile / core swaps apply. */
 	cores: () => readonly GpuLayerCore[];
 	/** Photo eye (ENU m). Read once per source: a source describes the eye it was made with. */
-	eye: Eye | (() => Eye);
+	eye: Vec3 | (() => Vec3);
 	/** Lazy queries for the sources wider than `xyzMinWidth` (the 1024 px query source). */
 	lazyQueries?: () => LazyQueries | undefined;
 	/** Near plane (m); the frame's photo camera uses 1 (lab.ts, deck/geometry-pass.ts). */
@@ -136,7 +135,7 @@ export class WebGpuGeometrySource implements GeometrySource {
 	private cpuSeq = 0;
 	private fullRead: { seq: number; p: Promise<boolean> } | null = null;
 	private readonly cores: () => readonly GpuLayerCore[];
-	private readonly eye: Eye;
+	private readonly eye: Vec3;
 	private readonly near: number;
 	/** Idle readers. TextureReader refuses a second read while one is in flight, and an older
 	 * render may still be mapping when a newer one starts, so each read takes its own reader. */
@@ -158,7 +157,7 @@ export class WebGpuGeometrySource implements GeometrySource {
 	}
 
 	constructor(
-		o: Omit<WebGpuGeometryOptions, "eye"> & { eye: Eye },
+		o: Omit<WebGpuGeometryOptions, "eye"> & { eye: Vec3 },
 		width: number,
 		height: number,
 		opts: { xyz?: boolean; lazy?: LazyQueries } = {},

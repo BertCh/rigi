@@ -7,12 +7,13 @@
 // default) and the tags the app's parsers read. Anything outside every extract returns null so
 // the caller falls back to Overpass. Opt-in: callers check osmExtractEnabled() (licences/config).
 // Data: © OpenStreetMap contributors, ODbL 1.0.
+import type { SWNE } from "../ontology/core/geometry";
 import type { OsmElement } from "../overpass";
 
 export const EXTRACT_FORMAT = "rigi-osm-extract/1";
 
-/** [south, west, north, east], Overpass order. */
-export type SWNE = [number, number, number, number];
+/** [south, west, north, east], Overpass order (the canonical ontology SWNE). */
+export type { SWNE };
 
 /** One node: [id, lat, lon, tags]. Tags hold only EXTRACT_TAGS keys that are present. */
 export type ExtractNode = [number, number, number, Record<string, string>];
