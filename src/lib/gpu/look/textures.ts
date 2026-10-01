@@ -1309,36 +1309,48 @@ export function bandStatsTex(
 	const read = opts.read ?? true;
 	const minCount = input.minCount ?? 60;
 	return withLease(PASS.stats, async () => {
+		// a dead input or device is not a fold fault: it rejects as is (no f64 switch below)
 		assertAlive(device, [geo, layer, photo, fg]);
-		const e = statsGraph(device, plan);
-		(e.extra as Buffer).write(statsWords(plan, input.minRange ?? 0, minCount));
+		let data: ArrayBuffer[];
 		const buffer = slot(device, "stats", `out-${fold}`, outBytes);
-		const { data } = await e.graph.run(undefined, {
-			buffers: { out: buffer },
-			textures: {
-				geo: geo.texture,
-				"layer-tex": layer.texture,
-				"photo-tex": photo.texture,
-				fg: fg?.texture ?? dummyMask(device),
-			},
-			read: read ? reads([[buffer, outBytes]]) : [],
-		});
+		try {
+			const e = statsGraph(device, plan);
+			(e.extra as Buffer).write(
+				statsWords(plan, input.minRange ?? 0, minCount),
+			);
+			({ data } = await e.graph.run(undefined, {
+				buffers: { out: buffer },
+				textures: {
+					geo: geo.texture,
+					"layer-tex": layer.texture,
+					"photo-tex": photo.texture,
+					fg: fg?.texture ?? dummyMask(device),
+				},
+				read: read ? reads([[buffer, outBytes]]) : [],
+			}));
+		} catch (error) {
+			if (fold !== "gpu" || device.isLost) throw error;
+			return { foldFault: error };
+		}
 		if (!read) return { buffer, fold, stats: null };
 		const stats = statsOf(plan, data[0], minCount);
 		if (stats) return { buffer, fold, stats };
 		// the subgroup layout check failed: the plain reduction (outside this lease: re-queue)
 		return null;
-	}).then(
-		(r) =>
-			r ??
-			bandStatsTex(device, input, { ...opts, subgroups: false, read: true }),
-		(e) => {
-			if (fold !== "gpu") throw e;
+	}).then((r) => {
+		if (!r)
+			return bandStatsTex(device, input, {
+				...opts,
+				subgroups: false,
+				read: true,
+			});
+		if ("foldFault" in r) {
 			// the fold graph faulted: the f64 fold (and from now on, on this device)
-			markFoldFailed(device, e);
+			markFoldFailed(device, r.foldFault);
 			return bandStatsTex(device, input, { ...opts, fold: "f64" });
-		},
-	);
+		}
+		return r;
+	});
 }
 
 /** encodeBandStatsTex's own parameter buffer per device (the graph's is the stats lease's). */

@@ -128,6 +128,8 @@ export async function bandStatsGpu(
 				d = await graphs.bandFoldedGraph(device, o, words, R, false);
 			return statsFromWords(d);
 		} catch (e) {
+			// a lost device is not a fold fault (the f64 run below rejects too)
+			if (device.isLost) throw e;
 			// the fold graph faulted: the f64 fold below (and from now on, on this device)
 			markFoldFailed(device, e);
 		}
