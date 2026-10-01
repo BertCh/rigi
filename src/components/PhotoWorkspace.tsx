@@ -713,6 +713,10 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 							await (engine as WebGpuEngine).whenReady();
 						} catch (e) {
 							engine.dispose();
+							// the failed boot destroyed its device; compute must not keep it adopted
+							import("#/lib/gpu/device")
+								.then((m) => m.resetComputeDevice())
+								.catch(() => {});
 							if (cancelled) return;
 							const why = `WebGPU init failed: ${(e as Error)?.message ?? e}`;
 							console.warn(`[renderer] ${why}; falling back to WebGL deck`);

@@ -179,7 +179,7 @@ import {
 	worldCamera,
 } from "./camera";
 import { createLookBridge, type LookBridge } from "./compute-bridge";
-import { deckBuild, webgpuAvailable } from "./device";
+import { deckBuild, releaseForCompute, webgpuAvailable } from "./device";
 import type { Host, HostStats } from "./hosts/direct";
 import {
 	type CameraPose,
@@ -738,80 +738,113 @@ export class WebGpuEngine implements Renderer {
 			host.destroy();
 			return;
 		}
-		host.setPhotoAspect(this.aspect);
-		const device = host.device;
-		const imagery = new ImageryArray(device);
-		const batched = (this.opts.terrain ?? terrainMode()) === "batched";
-		const terrain = batched
-			? createBatchedTerrain(device, imagery)
-			: new TerrainCore(device, imagery);
-		const styles = createTerrainStyles(device);
-		const drape = createDrape(device);
-		const trails = createTrailCore(device);
-		const composite = createCompositeCore({
-			aspect: this.aspect,
-			requestRender: (s) => this.schedule(s),
-		});
-		if (brushFrom)
-			composite.brushCanvas.getContext("2d")?.drawImage(brushFrom, 0, 0);
-		const present = new PresentCore("world-present");
-		present.mode = "color";
-		const debug = new PresentCore("debug-present");
-		const atmSky = new AtmSkyCore();
-		const photoSky = createPhotoSkyCore();
-		const gizmo = createGizmoCore(device);
-		const splats = createSplatsCore(device);
-		splats.onChange = () => this.schedule("all");
-		const t3cfg = this.tiles3d ? tiles3dConfig() : null;
-		const tiles3d = this.tiles3d
-			? createTiles3DCore(device, tiles3dCoreOptions(t3cfg))
-			: null;
-		const gpu: Gpu = {
-			host,
-			device,
-			imagery,
-			terrain,
-			styles,
-			drape,
-			trails,
-			composite,
-			present,
-			debug,
-			debugMode: null,
-			atmSky,
-			photoSky,
-			gizmo,
-			splats,
-			tiles3d,
-			photoTex: null,
-			photoTexFrom: null,
-			reliefFrom: null,
-			bridge: null,
+		// A throw while the cores are built (or applyState) must not leak the device and the cores
+		// already created: undo them, release the device, and let compute drop the adopted one.
+		const built: { destroy(): void }[] = [];
+		const made = <T extends { destroy(): void } | null>(c: T): T => {
+			if (c) built.push(c);
+			return c;
 		};
-		const view = () => this.view;
-		const inPhoto = () => this.view === "photo";
-		const inWorld = () => this.view === "world";
-		host.cores = [
-			new ViewGate(terrain, view),
-			new ViewGate(trails, view),
-			...(tiles3d ? [new ViewGate(tiles3d, view, inWorld)] : []),
-			new ViewGate(gizmo, view, inWorld),
-			new ViewGate(atmSky, view, inWorld),
-			new ViewGate(photoSky, view, inWorld),
-			new ViewGate(splats, view, inWorld),
-			new ViewGate(composite, view, inPhoto),
-			new ViewGate(present, view, inWorld),
-			new ViewGate(debug, view, () => inPhoto() && !!gpu.debugMode),
-		];
-		imagery.onChange = () => {
-			terrain.syncImageryLayers();
-			this.schedule("all");
-		};
-		host.device.lost.then((info) => this.onDeviceLost(host, info));
-		this.host = host;
-		this.gpu = gpu;
-		this.applyState();
-		if (this.opts.lookBridge !== false) void this.attachBridge(gpu);
+		try {
+			host.setPhotoAspect(this.aspect);
+			const device = host.device;
+			const imagery = made(new ImageryArray(device));
+			const batched = (this.opts.terrain ?? terrainMode()) === "batched";
+			const terrain = made(
+				batched
+					? createBatchedTerrain(device, imagery)
+					: new TerrainCore(device, imagery),
+			);
+			const styles = made(createTerrainStyles(device));
+			const drape = made(createDrape(device));
+			const trails = made(createTrailCore(device));
+			const composite = made(
+				createCompositeCore({
+					aspect: this.aspect,
+					requestRender: (s) => this.schedule(s),
+				}),
+			);
+			if (brushFrom)
+				composite.brushCanvas.getContext("2d")?.drawImage(brushFrom, 0, 0);
+			const present = made(new PresentCore("world-present"));
+			present.mode = "color";
+			const debug = made(new PresentCore("debug-present"));
+			const atmSky = made(new AtmSkyCore());
+			const photoSky = made(createPhotoSkyCore());
+			const gizmo = made(createGizmoCore(device));
+			const splats = made(createSplatsCore(device));
+			splats.onChange = () => this.schedule("all");
+			const t3cfg = this.tiles3d ? tiles3dConfig() : null;
+			const tiles3d = made(
+				this.tiles3d
+					? createTiles3DCore(device, tiles3dCoreOptions(t3cfg))
+					: null,
+			);
+			const gpu: Gpu = {
+				host,
+				device,
+				imagery,
+				terrain,
+				styles,
+				drape,
+				trails,
+				composite,
+				present,
+				debug,
+				debugMode: null,
+				atmSky,
+				photoSky,
+				gizmo,
+				splats,
+				tiles3d,
+				photoTex: null,
+				photoTexFrom: null,
+				reliefFrom: null,
+				bridge: null,
+			};
+			const view = () => this.view;
+			const inPhoto = () => this.view === "photo";
+			const inWorld = () => this.view === "world";
+			host.cores = [
+				new ViewGate(terrain, view),
+				new ViewGate(trails, view),
+				...(tiles3d ? [new ViewGate(tiles3d, view, inWorld)] : []),
+				new ViewGate(gizmo, view, inWorld),
+				new ViewGate(atmSky, view, inWorld),
+				new ViewGate(photoSky, view, inWorld),
+				new ViewGate(splats, view, inWorld),
+				new ViewGate(composite, view, inPhoto),
+				new ViewGate(present, view, inWorld),
+				new ViewGate(debug, view, () => inPhoto() && !!gpu.debugMode),
+			];
+			imagery.onChange = () => {
+				terrain.syncImageryLayers();
+				this.schedule("all");
+			};
+			host.device.lost.then((info) => this.onDeviceLost(host, info));
+			this.host = host;
+			this.gpu = gpu;
+			this.applyState();
+			if (this.opts.lookBridge !== false) void this.attachBridge(gpu);
+		} catch (e) {
+			if (this.host === host) this.host = null;
+			this.gpu = null;
+			host.cores = []; // the cores are destroyed below, not by host.destroy()
+			for (const c of built.reverse())
+				try {
+					c.destroy();
+				} catch {}
+			try {
+				host.destroy(); // destroys the device (luma created it, so _ownsHandle)
+			} catch (err) {
+				console.warn(
+					"[webgpu-engine] destroying the host after a failed boot",
+					err,
+				);
+			}
+			releaseForCompute();
+			throw e;
+		}
 	}
 
 	/** compute-bridge.ts on this device when its gate passes (else the readback path stays). */

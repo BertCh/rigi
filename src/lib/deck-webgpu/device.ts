@@ -4,7 +4,7 @@
 import { _LayersPass, Deck, project } from "@deck.gl/core";
 import { type Device, luma } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
-import { RAISED_LIMITS } from "#/lib/gpu/core/device";
+import { RAISED_LIMITS, resetComputeDevice } from "#/lib/gpu/core/device";
 import { adoptRenderDevice } from "#/lib/gpu/device";
 
 /** Features the renderer cannot run without: rgba32float geometry targets and r32float height
@@ -263,4 +263,12 @@ export async function createWebgpuDeck(
  */
 export function adoptForCompute(device: Device) {
 	adoptRenderDevice(device);
+}
+
+/**
+ * Undo adoptForCompute after a render device was destroyed on a failed boot: compute forgets the
+ * adopted device (the sidecar is created on the next use) instead of keeping a dead one.
+ */
+export function releaseForCompute() {
+	resetComputeDevice();
 }
