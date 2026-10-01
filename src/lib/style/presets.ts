@@ -339,7 +339,11 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 		terrain: {
 			sun: { mode: "photo-time" },
 			reliefRamp: "berann",
-			rampRange: { mode: "absolute", lo: ABSOLUTE_RAMP_RANGE.lo, hi: ABSOLUTE_RAMP_RANGE.hi },
+			rampRange: {
+				mode: "absolute",
+				lo: ABSOLUTE_RAMP_RANGE.lo,
+				hi: ABSOLUTE_RAMP_RANGE.hi,
+			},
 			relief: { mode: "swiss", realism: 0.3, generalize: 0.5, curvature: 0.4 },
 			albedo: { mode: "alpine" },
 			atmosphere: { mode: "physical", strength: 0.8, airlight: "physical" },
@@ -351,18 +355,35 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 				majorAlpha: 0.9,
 				width: 1.0,
 				majorWidthMul: 1.9,
-				casing: { on: true, color: [0.12, 0.08, 0.04], extraPx: 1.2, alpha: 0.35 },
+				casing: {
+					on: true,
+					color: [0.12, 0.08, 0.04],
+					extraPx: 1.2,
+					alpha: 0.35,
+				},
 			},
 			bands: { ramp: "berann" },
 		},
 		replace: { haze: 0.75 },
 		world: { haze: 0.75 },
-		composite: { ridges: "ink", ink: { strength: 0.55, inner: [0.16, 0.11, 0.07], skyline: [0.1, 0.07, 0.05] } },
+		composite: {
+			ridges: "ink",
+			ink: {
+				strength: 0.55,
+				inner: [0.16, 0.11, 0.07],
+				skyline: [0.1, 0.07, 0.05],
+			},
+		},
 		// classic placement (upright, wrapped, above the summit) with prominence tiers reads calmer than the
 		// rotated panorama layout once place names share the frame
 		labels: { maxLabels: 18, export: null },
 		terroir: {
-			names: { on: true, reach: "near", language: "local+usual", maxLabels: 16 },
+			names: {
+				on: true,
+				reach: "near",
+				language: "local+usual",
+				maxLabels: 16,
+			},
 			peakTiers: true,
 			subPill: true,
 			contours: { adaptive: true, swissIndex: true, inkByCover: true },
