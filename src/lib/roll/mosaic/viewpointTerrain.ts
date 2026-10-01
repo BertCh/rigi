@@ -3,6 +3,7 @@
 // worker runs at a time (each holds ~100 MB of mosaics), results are memoised per eye for the session.
 import { tilePriority } from "#/lib/cache";
 import { fetchDemBytes, MAPTERHORN, tileId } from "#/lib/dem";
+import { realmGpuOptions } from "#/lib/gpu/core/realm";
 import {
 	LITE_RINGS,
 	mosaicTileKeys,
@@ -22,6 +23,8 @@ export type TerrainRequest = {
 	eyeAlt: number | null;
 	/** Region ids whose OSM peaks may be labelled. */
 	regions: string[];
+	/** Trace the ridges on the GPU in the worker (falls back to the CPU); default on, false forces the CPU. */
+	gpu?: boolean;
 };
 
 /** The eye a viewpoint's photos share: its centroid, at the median known eye altitude. */
@@ -39,6 +42,9 @@ export function viewpointEye(roll: Roll, vp: Viewpoint): TerrainRequest {
 		regions: [...new Set(photos.map((p) => p.meta.region).filter(Boolean))],
 	};
 }
+
+/** A worker's ridge kernel failed for good (not a device loss): later viewpoints trace on the CPU. */
+let gpuBroken = false;
 
 const memo = new Map<string, Promise<ViewpointTerrain>>();
 let queue: Promise<unknown> = Promise.resolve();
@@ -81,12 +87,15 @@ async function run(r: TerrainRequest): Promise<ViewpointTerrain> {
 			type: "module",
 		},
 	);
+	const gpu = (r.gpu ?? true) && !gpuBroken;
 	try {
 		return await new Promise<ViewpointTerrain>((resolve, reject) => {
-			worker.onmessage = (e: MessageEvent<RidgeWorkerOut>) =>
-				e.data.type === "done"
-					? resolve(e.data.terrain)
-					: reject(new Error(e.data.error));
+			worker.onmessage = (e: MessageEvent<RidgeWorkerOut>) => {
+				if (e.data.type !== "done") return reject(new Error(e.data.error));
+				// a kernel/pipeline failure is per device, not per viewpoint: later workers go straight to the CPU
+				if (e.data.gpuFailed) gpuBroken = true;
+				resolve(e.data.terrain);
+			};
 			worker.onerror = (e) =>
 				reject(new Error(`ridgelines worker: ${e.message}`));
 			worker.postMessage(
@@ -97,6 +106,8 @@ async function run(r: TerrainRequest): Promise<ViewpointTerrain> {
 					spans,
 					tiles,
 					peaks,
+					gpu,
+					gpuOpts: gpu ? realmGpuOptions() : undefined,
 				} satisfies RidgeWorkerIn,
 				tiles.flatMap((t) => (t.buf ? [t.buf] : [])),
 			);

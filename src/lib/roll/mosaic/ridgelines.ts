@@ -81,22 +81,14 @@ export type ViewpointTerrain = {
 /** Peaks closer than this (m) are the one underfoot, not a label. */
 const MIN_PEAK_D = 60;
 
-export function traceViewpoint(
-	heightAt: HeightAt,
-	eye: { lat: number; lon: number; h: number },
-	peaks: PeakInput[] = [],
-	o: RidgeOptions = {},
-): ViewpointTerrain {
+/** The trace's sampling schedule (shared by the CPU march below and the GPU kernel, gpu/horizon/ridges.ts). */
+export function ridgeSchedule(o: RidgeOptions = {}) {
 	const step = o.step ?? 0.1;
 	const S = o.slabs ?? 56;
 	const dMin = o.dMin ?? 40;
 	const dMax = o.dMax ?? 120_000;
-	const elMin = o.elMin ?? -40;
-	const tol = o.tolerance ?? 0.012;
-	const occludeFrom = o.occludeFrom ?? 250;
 	const inv2R = (1 - (o.k ?? REFRACTION_K)) / (2 * EARTH_R);
 	const cols = Math.round(360 / step);
-
 	const edge = (i: number) => dMin * (dMax / dMin) ** (i / S);
 	const dists: number[] = [];
 	for (let d = dMin; d < dMax; d += Math.max(10, d * 0.004)) dists.push(d);
@@ -105,10 +97,23 @@ export function traceViewpoint(
 		while (s < S - 1 && dists[i] >= edge(s + 1)) s++;
 		slabOf[i] = s;
 	}
+	return { step, S, dMin, dMax, inv2R, cols, edge, dists, slabOf };
+}
+
+/** Per (slab, column): the top edge's elevation angle (degrees, −∞ = no data) and its distance, laid
+ * out slab · cols + column. The CPU fills them from heightAt; the GPU path (gpu/horizon/ridges.ts) can
+ * supply them to traceViewpoint instead. */
+export type RidgeTops = { top: Float32Array; topD: Float32Array };
+
+/** The CPU march: every sample distance along every column, one heightAt each (the GPU kernel's twin). */
+export function ridgeTopsCpu(
+	heightAt: HeightAt,
+	eye: { lat: number; lon: number; h: number },
+	o: RidgeOptions = {},
+): RidgeTops {
+	const { step, S, inv2R, cols, dists, slabOf } = ridgeSchedule(o);
 	const angle = (h: number, d: number) =>
 		Math.atan2(h - eye.h - d * d * inv2R, d) / DEG;
-
-	// top edge (and its distance) of every slab, per column
 	const top = new Float32Array(S * cols).fill(Number.NEGATIVE_INFINITY);
 	const topD = new Float32Array(S * cols);
 	const φ1 = eye.lat * DEG;
@@ -135,6 +140,26 @@ export function traceViewpoint(
 			}
 		}
 	}
+	return { top, topD };
+}
+
+export function traceViewpoint(
+	heightAt: HeightAt,
+	eye: { lat: number; lon: number; h: number },
+	peaks: PeakInput[] = [],
+	o: RidgeOptions = {},
+	/** Precomputed tops (the GPU's), else marched here from heightAt. heightAt still places the peaks. */
+	tops?: RidgeTops,
+): ViewpointTerrain {
+	const { step, S, dMin, dMax, inv2R, cols, edge } = ridgeSchedule(o);
+	const elMin = o.elMin ?? -40;
+	const tol = o.tolerance ?? 0.012;
+	const occludeFrom = o.occludeFrom ?? 250;
+	const angle = (h: number, d: number) =>
+		Math.atan2(h - eye.h - d * d * inv2R, d) / DEG;
+
+	// top edge (and its distance) of every slab, per column
+	const { top, topD } = tops ?? ridgeTopsCpu(heightAt, eye, o);
 
 	// visible runs of each slab's top edge, hidden only by slabs from `fromSlab` on; the loop runs one
 	// column past 360° so rings close

@@ -11,6 +11,12 @@ import {
 	validateTile,
 } from "#/lib/dem";
 import {
+	applyRealmGpuOptions,
+	type RealmGpuOptions,
+} from "#/lib/gpu/core/realm";
+import { releaseHorizonGpu } from "#/lib/gpu/horizon";
+import { computeRidgeTopsAuto, ridgeGpuFailed } from "#/lib/gpu/horizon/ridges";
+import {
 	buildMosaic,
 	mosaicFor,
 	mosaicHeight,
@@ -20,6 +26,8 @@ import {
 } from "#/lib/horizon-fast/mosaic";
 import {
 	type PeakInput,
+	type RidgeOptions,
+	ridgeSchedule,
 	traceViewpoint,
 	type ViewpointTerrain,
 } from "./ridgelines";
@@ -32,10 +40,22 @@ export type RidgeWorkerIn = {
 	spans: RingSpan[];
 	tiles: { key: TileKey; source: TileKey | null; buf: ArrayBuffer | null }[];
 	peaks: PeakInput[];
+	/** Trace the ridges on the GPU (gpu/horizon/ridges.ts) when this worker can get a compute device;
+	 * the CPU trace otherwise, and after any GPU failure. Default on (false forces the CPU). */
+	gpu?: boolean;
+	/** The page's GPU profiling / error-check switches (gpu/core/realm). */
+	gpuOpts?: RealmGpuOptions;
 };
 
 export type RidgeWorkerOut =
-	| { type: "done"; terrain: ViewpointTerrain; ms: number }
+	| {
+			type: "done";
+			terrain: ViewpointTerrain;
+			ms: number;
+			on?: "gpu" | "cpu";
+			/** the ridge kernel failed for good in this worker (not a device loss): do not ask again */
+			gpuFailed?: boolean;
+	  }
 	| { type: "error"; error: string };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -87,17 +107,41 @@ scope.onmessage = async (e: MessageEvent<RidgeWorkerIn>) => {
 			: j.eyeAlt != null
 				? Math.max(j.eyeAlt, dem + 1.6)
 				: dem + 1.8;
+		const eye = { lat: j.lat, lon: j.lon, h };
+		const opts: RidgeOptions = { dMax: j.spans.at(-1)?.maxDistance };
+		const heightAt = (lat: number, lon: number, d: number) =>
+			mosaicHeight(mosaicFor(mosaics, d), lon, lat);
+		// the sampling march on the GPU when asked (device registry: getComputeDevice in this realm, device
+		// loss and failures give null), else on the CPU inside traceViewpoint; run extraction stays here
+		let tops = null;
+		if (j.gpu !== false) {
+			applyRealmGpuOptions(j.gpuOpts);
+			const sch = ridgeSchedule(opts);
+			tops = await computeRidgeTopsAuto(mosaics, {
+				eye,
+				cols: sch.cols,
+				step: sch.step,
+				inv2R: sch.inv2R,
+				slabs: sch.S,
+				dists: sch.dists,
+				slabOf: sch.slabOf,
+			});
+			releaseHorizonGpu(mosaics);
+		}
 		const terrain = traceViewpoint(
-			(lat, lon, d) => mosaicHeight(mosaicFor(mosaics, d), lon, lat),
-			{ lat: j.lat, lon: j.lon, h },
+			heightAt,
+			eye,
 			j.peaks,
-			{ dMax: j.spans.at(-1)?.maxDistance },
+			opts,
+			tops ?? undefined,
 		);
 		scope.postMessage(
 			{
 				type: "done",
 				terrain,
 				ms: performance.now() - t0,
+				on: tops ? "gpu" : "cpu",
+				gpuFailed: ridgeGpuFailed(),
 			} satisfies RidgeWorkerOut,
 			[
 				terrain.pts.buffer,
