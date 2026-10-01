@@ -2040,7 +2040,7 @@ export class WebGpuEngine implements Renderer {
 	): PeakLabel[] {
 		if (!this.terrain) return [];
 		const snapped = this.snapped(this.pose);
-		if (this.geometryReady())
+		if (this.geometryReady() && !this.occlusionFresh(snapped))
 			for (const p of snapped) {
 				const pr = this.projectToPhoto(p.position);
 				if (!pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1) continue;
@@ -2076,6 +2076,53 @@ export class WebGpuEngine implements Renderer {
 				visible: true,
 				world: l.position,
 			}));
+	}
+
+	/**
+	 * What the occlusion verdicts in `vis` were computed from: the geometry buffer (generation + source;
+	 * sampleAt reads its range / xyz / pose), the pose and eye projectToPhoto uses (and sampleAt's
+	 * no-xyz unprojection), the aspect, and the snapped peak objects (`vis` is keyed by identity, so a
+	 * re-snap or terrain swap changes the list). photo size is readonly; protectPeople / fgMask / max /
+	 * declutter apply after the loop.
+	 */
+	private occKey?: {
+		gen: number;
+		src: GeometrySource | undefined;
+		pose: Pose;
+		eye: V3;
+		aspect: number;
+		snapped: SnappedPeak[];
+	};
+
+	/** True when the cached verdicts match every input; otherwise records the new key (the caller recomputes). */
+	private occlusionFresh(snapped: SnappedPeak[]) {
+		const k = this.occKey;
+		const p = this.pose;
+		if (
+			k &&
+			k.gen === this.geoBufGen &&
+			k.src === this.geoSrc &&
+			k.pose.yaw === p.yaw &&
+			k.pose.pitch === p.pitch &&
+			k.pose.roll === p.roll &&
+			k.pose.vfov === p.vfov &&
+			k.eye[0] === this.eye.x &&
+			k.eye[1] === this.eye.y &&
+			k.eye[2] === this.eye.z &&
+			k.aspect === this.aspect &&
+			k.snapped.length === snapped.length &&
+			k.snapped.every((q, i) => q === snapped[i])
+		)
+			return true;
+		this.occKey = {
+			gen: this.geoBufGen,
+			src: this.geoSrc,
+			pose: { ...p },
+			eye: this.eyeArr,
+			aspect: this.aspect,
+			snapped,
+		};
+		return false;
 	}
 
 	skyline(): Float32Array | null {
