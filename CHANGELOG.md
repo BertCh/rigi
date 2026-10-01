@@ -4,6 +4,17 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Whole-app graph foundations, fusions and fixes (WAG; 2026-10-01)
+
+- `gpu/core` `ComputeGraph` (06f7c27): GPU indirect conditions on kernel nodes, with a clear lint for skipped nodes (aliased outputs need a whole clear or same-gate readers; rewriting the indirect command breaks "same gate"; undeclared nodes count as users); adopting an external `GPUCommandGraph`; `add()` / raw / copy / render nodes audited (`declareNode` for raw `g.graph` nodes); `workload` + `preflight` / `fitsDeviceLimits`; texture passthroughs and texture bindings in `addKernel`; `listCachedGraphs`. Readback `stagePartialRead` (capacity copy, header map, then `[0,total)`). Existing graphs encode unchanged. Fast-tier check `gpu-clear-lint`.
+- `gpu/ingest` (4d18dec): upload adapters and a Terrarium rgba8 → f32 heights kernel, f32-exact (0 heights and 0 RGBA bytes differ from the canvas/CPU decode on 1,155 cached tiles). No callers yet besides the atlas adapters.
+- Photo prep planes stay resident on the WebGPU device and align's pose grid / pose bound bind them (00e1cca); the CPU `EdgeMap` is read lazily (idle prefetch after load) and only verified planes are ever bound. Upload per grid 2.53 → 0.95 MB; outputs bit-identical. Fast-tier check `photoprep-resident`.
+- Settle fusion (ccc5722): the masks pass rides the query-geometry render's submit and band stats the stats render's (`queue.submit([render, work])` via the new `gpu/core` `submitWithDefault`, which calls luma default-encoder internals: recheck on the next luma bump). Non-frame submits per settle 9 → 7, masks and stats byte-identical, settle → labels latency unchanged. Engine option `settleFusion` (default on; `false` restores the old path). Checks `bridge-fusion` (fast), `settle-submits` (full, WebGPU).
+- `SplatV1Loader` / `SplatPlyLoader` on the loaders.gl Loader contract (c388c48), fast-tier check `splat-loaders`.
+- Fix (4d92d3f): `splatsort-scan-totals` declared a params binding its WGSL never read, so the `auto` layout dropped it and Dawn rejected the bind group: the default GPU splat sort always fell back to the worker. It runs on the GPU again (1M splats 3.1 ms). The kernel-layout check now runs in CI with a binding-use lint (`kernel-binding-use`, 58e2888).
+- Post-default re-baseline and probes (819155d): `research_notes/whole-app-graph-2026-10-01/baseline-2026-10-01.md`; `scripts/gpu/{sky-worker-profile,splat-sort-bench,vram-probe,longtask-probe,haze-overflow-probe}.mjs`.
+- `biome.json` migrated to the locked Biome CLI 2.4.5 (566e4e7).
+
 ### TextureArrayAtlas for the WebGPU terrain heights and imagery (WAG W2.2; 2026-10-01)
 
 - `deck-webgpu/texture-array-atlas.ts`: one growable 2D-array texture with a layer free list under the batched terrain's r32float height arrays (was `HeightPool`) and `ImageryArray`. Layers are written through the `gpu/ingest` adapters (`uploadRaster` / `uploadBitmap` with `into`); a grow copies every mip of the old layers with `copyTextureToTexture`. The height arrays used to be re-created empty and re-uploaded from the CPU on a grow: on a pan that grows the 256² array (measured on IMG_7086, IMG_6958, IMG_3304) that removes 279–342 height uploads (70–86 MiB) and cuts the growing sync from 38–40 ms to 15 ms of main-thread time. Photo load is unchanged (every tile is fresh then). Default on, WebGPU only; WebGL is unchanged.

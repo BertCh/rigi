@@ -1,5 +1,7 @@
 # Whole-app graph (WAG): plan
 
+> **Implementation status (2026-10-01, session mt-image-1e).** WAG-0 done; WAG-1/2 mostly landed; certified-f32 horizon landed opt-in. Two of this plan's premises did not hold when measured: the DEM is not "decoded 5+ times" per tile (451 distinct tiles, 97 repeats per load, so DemStore was not landed), and the page device cannot host the horizon march (it holds none of the needed heights at native resolution when the march runs). Per-item state and commits: the roadmap's WAG rows; numbers: `research_notes/whole-app-graph-2026-10-01/baseline-2026-10-01.md` and [negative-results.md](negative-results.md#gpu-and-performance).
+
 *Revised the same day after an adversarial review against the code. The corrections are folded in: W1.2, W1.3, W1.4, W1.5, W1.7 and W2.1 changed; claims are now verified with file:line. Some islands are thin in the crossing table: relief bridge, tiles3d, Step Inside splats.*
 
 2026-10-01. Goal (the user's): express the whole app as a luma.gl GPU command graph that loaders.gl-style ingest feeds, on the bleeding edge of luma, deck and loaders.
