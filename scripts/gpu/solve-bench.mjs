@@ -71,9 +71,9 @@ try {
 				c.stressSame &&
 				c.twinVsSolvePose &&
 				!c.fellBack &&
-				c.graph.same &&
-				c.graph.sameStress &&
-				c.graph.forcedFallback;
+				c.fold.same &&
+				c.fold.sameStress &&
+				c.fold.forcedCpuFold;
 			if (!ok) fail++;
 			const warm = c.gpu.slice(1).map((g) => g.ms);
 			console.log(
@@ -84,9 +84,9 @@ try {
 					`(${f(100 * c.gridFraction)}% of solvePose ${f(c.solvePoseMs)} ms) | ` +
 					`GPU cold ${f(c.gpu[0].ms)} warm ${warm.map((x) => f(x)).join("/")} ms ` +
 					`(gpu ${f(c.gpu.at(-1).gpuMs)} select ${f(c.gpu.at(-1).selectMs)}) | ` +
-					`graph=old ${c.graph.same} stress ${c.graph.sameStress} forcedFallback ${c.graph.forcedFallback} digest ${c.graph.digest} fellBack ${c.graph.graphFellBack} ` +
-					`hz uploads ${c.graph.hzUploads.filter(Boolean).length}/${c.graph.hzUploads.length} read ${c.graph.oldReadBytes}→${c.graph.graphReadBytes} B ` +
-					`med old ${f(c.graph.oldMedMs, 2)} graph ${f(c.graph.graphMedMs, 2)} ms`,
+					`gpuFold=cpuFold ${c.fold.same} stress ${c.fold.sameStress} forced ${c.fold.forcedCpuFold} digest ${c.fold.digest} cpuFolds ${c.fold.cpuFolds} ` +
+					`hz uploads ${c.fold.hzUploads.filter(Boolean).length}/${c.fold.hzUploads.length} read ${c.fold.readBytes} (cpu fold ${c.fold.cpuFoldReadBytes}) B ` +
+					`med gpu fold ${f(c.fold.gpuFoldMedMs, 2)} cpu fold ${f(c.fold.cpuFoldMedMs, 2)} ms`,
 			);
 		}
 	}

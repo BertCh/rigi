@@ -88,12 +88,12 @@ function options(yawKnown: boolean, gravKnown: boolean) {
 }
 
 /**
- * The fused horizon → solve chain (gpu/solve/fused.ts): only with the GPU horizon and the GPU coarse grid
- * on the graph path. The default there (identical by construction: same kernels, the resident profile
- * is bit-checked on every coarse call); gpuFused: false or gpuGraph: false opt out.
+ * The fused horizon → solve chain (gpu/solve/fused.ts): only with the GPU horizon and the GPU coarse
+ * grid. The default there (identical by construction: same kernels, the resident profile is
+ * bit-checked on every coarse call); gpuFused: false opts out.
  */
 const fusedFor = (m: UnknownPosePrepare | UnknownPoseRequest) =>
-	!!m.gpu && !!m.solveGpu && m.gpuGraph !== false && m.gpuFused !== false;
+	!!m.gpu && !!m.solveGpu && m.gpuFused !== false;
 
 let horizonCache: {
 	key: string;
@@ -110,12 +110,11 @@ function horizonAt(
 	lon: number,
 	alt: number | null,
 	gpu = false,
-	graph = true,
 	fused = false,
 ) {
-	const key = `${lat.toFixed(6)},${lon.toFixed(6)},${alt ?? ""},${gpu ? "gpu" : ""}${graph ? "+graph" : ""}${fused ? "+fused" : ""}`;
+	const key = `${lat.toFixed(6)},${lon.toFixed(6)},${alt ?? ""},${gpu ? "gpu" : ""}${fused ? "+fused" : ""}`;
 	if (horizonCache?.key !== key) {
-		const promise = computeScene(lat, lon, alt, gpu, graph, fused);
+		const promise = computeScene(lat, lon, alt, gpu, fused);
 		promise.catch(() => {
 			if (horizonCache?.promise === promise) horizonCache = null;
 		});
@@ -144,7 +143,6 @@ async function computeScene(
 	lon: number,
 	alt: number | null,
 	gpu = false,
-	graph = true,
 	fused = false,
 ) {
 	const signal = AbortSignal.timeout(SCENE_TIMEOUT_MS);
@@ -172,9 +170,7 @@ async function computeScene(
 	// Not after a failed fused march: that is the same march, so straight to the CPU
 	else if (gpu) {
 		const { sceneHorizonGpu } = await import("#/lib/gpu/horizon/scene-profile");
-		const horizon = await sceneHorizonGpu(terrain, lat, lon, eye, undefined, {
-			graph,
-		});
+		const horizon = await sceneHorizonGpu(terrain, lat, lon, eye);
 		if (horizon) return { horizon, eye, horizonOn: "gpu" as const };
 	}
 	return {
@@ -191,7 +187,6 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 		req.lon,
 		req.alt,
 		req.gpu,
-		req.gpuGraph,
 		fusedFor(req),
 	);
 	const tHorizon = performance.now() - t0;
@@ -224,11 +219,7 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 	const on = new Set<"gpu" | "cpu">();
 	const coarse: CoarseProvider | undefined = req.solveGpu
 		? async (prior, horizon, sky, o) => {
-				const r = await solveCoarse(prior, horizon, sky, o, {
-					// the command-graph path (GPU row fold, resident horizon profile) unless the page
-					// asked for the pooled paths (gpuGraph: false); the 360° horizon likewise (horizonAt)
-					graph: req.gpuGraph !== false,
-				});
+				const r = await solveCoarse(prior, horizon, sky, o);
 				if (r) on.add(r.on);
 				return r;
 			}
@@ -314,7 +305,6 @@ ctx.onmessage = async (
 			ev.data.lon,
 			ev.data.alt,
 			ev.data.gpu,
-			ev.data.gpuGraph,
 			fusedFor(ev.data),
 		).catch(() => {});
 		if (ev.data.solveGpu) {

@@ -57,14 +57,9 @@ export type UnknownPosePrepare = {
 	/** solvePose's coarse grid on the GPU (src/lib/gpu/solve; identical by construction): gpuEnabled() */
 	solveGpu?: boolean;
 	/**
-	 * GPU plumbing only (identical results): true or unset = coarse grid and 360° horizon on core
-	 * command graphs; false = both on the pooled paths.
-	 */
-	gpuGraph?: boolean;
-	/**
 	 * The fused horizon → solve chain (src/lib/gpu/solve/fused.ts; identical results): with gpu and
 	 * solveGpu, the march on its command graph primes the coarse graph's resident profile. Default on;
-	 * false opts out (the march then follows gpuGraph).
+	 * false opts out (the march then runs on its own, the profile uploaded by the first coarse call).
 	 */
 	gpuFused?: boolean;
 	/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
@@ -87,8 +82,6 @@ export type UnknownPoseRequest = {
 	gpu?: boolean;
 	/** as UnknownPosePrepare.solveGpu */
 	solveGpu?: boolean;
-	/** as UnknownPosePrepare.gpuGraph */
-	gpuGraph?: boolean;
 	/** as UnknownPosePrepare.gpuFused */
 	gpuFused?: boolean;
 	/** as UnknownPosePrepare.gpuOpts */
@@ -155,8 +148,8 @@ export class UnknownPoseSolver {
 
 	constructor(
 		private photo: PhotoMeta,
-		/** graph: false = GPU work on the pooled paths (A/B of the plumbing; default core command graphs); fused: the fused horizon → solve chain */
-		private opts: { graph?: boolean; fused?: boolean } = {},
+		/** fused: the fused horizon → solve chain (default on; false opts out) */
+		private opts: { fused?: boolean } = {},
 	) {
 		this.worker = new Worker(
 			new URL("./unknown-pose.worker.ts", import.meta.url),
@@ -179,7 +172,6 @@ export class UnknownPoseSolver {
 			alt: photo.alt,
 			gpu: this.gpu,
 			solveGpu: this.solveGpu,
-			gpuGraph: opts.graph,
 			gpuFused: opts.fused,
 			gpuOpts: realmGpuOptions(),
 		};
@@ -244,7 +236,6 @@ export class UnknownPoseSolver {
 				image: { width: w, height: h, data },
 				gpu: this.gpu,
 				solveGpu: this.solveGpu,
-				gpuGraph: this.opts.graph,
 				gpuFused: this.opts.fused,
 				gpuOpts: realmGpuOptions(),
 			};

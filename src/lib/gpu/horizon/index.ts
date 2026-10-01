@@ -17,23 +17,16 @@
  * early (otherwise it's freed when the device goes away).
  *
  * Plumbing (src/lib/gpu/core): the kernel is a core defineKernel (group "horizon", pass label
- * "horizon-march" for core/profile); the per-call buffers (uniform, params, output, stats) are pooled
- * slots under "horizon/…", reused by every chunk (WebGPU orders a chunk's writeBuffer after the previous
- * chunk's dispatch and staging copy, so no second set is needed); chunk c+1 is packed and submitted before
- * chunk c is collected, so the CPU packing overlaps the GPU march. (core/readback.ts maps with the raw
- * mapAsync, so collecting chunk c waits only for chunk c's work, not for c+1.)
- * Readback goes through core/readback's staging slots on the dispatch's own encoder;
- * bindings are set per pass. A call holds the "horizon" lease from upload to its last read, so
- * overlapping callers (several eye heights in the worker, the eye search) run one after another
- * instead of sharing buffers, and releaseHorizonGpu destroys pages only after in-flight calls finish.
- * Pooled slots are bound with their original byte sizes (core range()), so the kernel sees exactly
- * what it saw with per-call buffers: outputs are bit-identical to the pre-core path.
- * Default plumbing (since 2026-10-01): each chunk is one encoding of a cached core ComputeGraph
- * (./graph.ts: out / stats as graph transients read through a read node, stats cleared, the same
- * kernel, bindings of the same byte sizes, the same chunk overlap). The pooled single dispatch above is
- * the explicit fallback: computeHorizonGpu(…, { graph: false }) (computeHorizonsAuto 4th arg,
- * sceneHorizonGpu opts.graph, the eye provider's `graph`). Both are bit-identical
- * (scripts/gpu/horizon-bench.mjs diffs them bit for bit and times them alternated).
+ * "horizon-march" for core/profile). Each chunk is one encoding of a cached core ComputeGraph
+ * (./graph.ts: out / stats as graph transients read through a read node, stats cleared); the uniform
+ * and params are pooled slots under "horizon/…", rewritten per chunk (WebGPU orders a chunk's
+ * writeBuffer after the previous chunk's dispatch and read copy). Chunk c+1 is packed and submitted
+ * before chunk c is collected, so the CPU packing overlaps the GPU march (core/readback maps with the
+ * raw mapAsync, so collecting chunk c waits only for chunk c's work). A call holds the "horizon" lease
+ * from upload to its last read, so overlapping callers (several eye heights in the worker, the eye
+ * search) run one after another, and releaseHorizonGpu destroys pages only after in-flight calls
+ * finish. The graph is the only GPU path since 2026-10-01 (the pooled single dispatch it replaced
+ * was bit-identical); parity vs the CPU twin is scripts/gpu/horizon-bench.mjs.
  *
  * Ridges and peaks (decision): the GPU doesn't record ridges. Ridge lists are variable-length per azimuth
  * and only the Overlay / refine paths use them; the app worker and eye search pass noRidges. So
@@ -53,20 +46,11 @@ import { Buffer, type Device } from "@luma.gl/core";
 import { DEG, EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 import {
 	defineKernel,
-	dispatch,
-	kernel,
-	submit,
 	warmKernels,
 	warmKernelsAsync,
 } from "#/lib/gpu/core/kernel";
-import {
-	acquire,
-	pooledStorage,
-	pooledUniform,
-	range,
-	withLease,
-} from "#/lib/gpu/core/pool";
-import { type StagedRead, stageReads } from "#/lib/gpu/core/readback";
+import { acquire, range, withLease } from "#/lib/gpu/core/pool";
+import type { StagedRead } from "#/lib/gpu/core/readback";
 import {
 	computeHorizonFast,
 	type Eye,
@@ -269,12 +253,6 @@ export interface GpuHorizonTiming {
 	chunks: number;
 }
 
-/** Plumbing options of the GPU march (not numerics: every path gives the same bits). */
-export interface HorizonGpuOptions {
-	/** false: the pooled single dispatch per chunk; default (true): a core ComputeGraph encoding (./graph.ts) */
-	graph?: boolean;
-}
-
 /** Timing of the latest computeHorizonGpu call in this realm (benchmarks). */
 export let lastGpuHorizonTiming: GpuHorizonTiming | null = null;
 
@@ -288,12 +266,11 @@ export async function computeHorizonGpu(
 	mosaics: Mosaic[],
 	eyes: Eye[],
 	opts: FastHorizonOptions = {},
-	gpu: HorizonGpuOptions = {},
 ): Promise<FastHorizonProfile[]> {
 	const t0 = performance.now();
 	if (!eyes.length) return [];
 	const out = await withLease(LEASE, () =>
-		marchLocked(device, mosaics, eyes, opts, t0, gpu),
+		marchLocked(device, mosaics, eyes, opts, t0),
 	);
 	if (opts.peaks)
 		for (let j = 0; j < eyes.length; j++)
@@ -302,26 +279,6 @@ export async function computeHorizonGpu(
 	for (const p of out) p.stats.ms = (t2 - t0) / eyes.length;
 	if (lastGpuHorizonTiming) lastGpuHorizonTiming.totalMs = t2 - t0;
 	return out;
-}
-
-/** The per-call slots, shared by every chunk of a call (queue order keeps chunks apart). */
-function slots(device: Device, paramsBytes: number, outBytes: number) {
-	return {
-		u: `${LEASE}/u`,
-		params: acquire(
-			device,
-			`${LEASE}/params`,
-			paramsBytes,
-			Buffer.STORAGE | Buffer.COPY_DST,
-		),
-		out: acquire(
-			device,
-			`${LEASE}/out`,
-			outBytes,
-			Buffer.STORAGE | Buffer.COPY_SRC,
-		),
-		stats: `${LEASE}/stats`,
-	};
 }
 
 /** A submitted chunk: its readback and where its eyes go in the output. */
@@ -338,13 +295,11 @@ async function marchLocked(
 	eyes: Eye[],
 	opts: FastHorizonOptions,
 	t0: number,
-	gpu: HorizonGpuOptions = {},
 ): Promise<FastHorizonProfile[]> {
 	const tu = performance.now();
 	const set = uploadMosaics(device, mosaics);
 	const t1 = performance.now();
 	const uploadMs = t1 - tu;
-	const k = kernel(device, MARCH);
 	// unused pages bind a 16-byte dummy, as before
 	const dummy = range(
 		acquire(device, `${LEASE}/dummy`, 16, Buffer.STORAGE),
@@ -419,19 +374,16 @@ async function marchLocked(
 	const ub = new ArrayBuffer(64);
 	const uu = new Uint32Array(ub);
 	const uf = new Float32Array(ub);
-	// graph path (default): one ComputeGraph encoding per chunk (same kernel, same bytes; ./graph.ts)
-	const chunker =
-		gpu.graph !== false
-			? await graphChunker(device, LEASE, {
-					spec: MARCH,
-					pages: pages.map((b) =>
-						b instanceof Buffer ? { buffer: b, size: b.byteLength } : b,
-					),
-					paramsBytes,
-					outBytes,
-					statsBytes,
-				})
-			: null;
+	// one ComputeGraph encoding per chunk (./graph.ts)
+	const chunker = await graphChunker(device, LEASE, {
+		spec: MARCH,
+		pages: pages.map((b) =>
+			b instanceof Buffer ? { buffer: b, size: b.byteLength } : b,
+		),
+		paramsBytes,
+		outBytes,
+		statsBytes,
+	});
 
 	const out: FastHorizonProfile[] = new Array(eyes.length);
 	let chunks = 0;
@@ -519,49 +471,12 @@ async function marchLocked(
 			uf[10] = (1 - kR) / (2 * EARTH_R);
 			uu[11] = 1_000_000;
 			uu[12] = 0; // U.zero
-			let read: StagedRead;
-			if (chunker)
-				read = chunker.submit(
-					ub,
-					new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4),
-					nAz,
-					nE,
-				);
-			else {
-				// Same slots every chunk: this chunk's writes queue after the previous chunk's dispatch + copy.
-				const sl = slots(device, paramsBytes, outBytes);
-				const u = pooledUniform(device, sl.u, ub);
-				sl.params.write(new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4));
-				const stats = pooledStorage(device, sl.stats, statsBytes); // zeroed
-				const enc = device.createCommandEncoder({ id: "horizon-march" });
-				dispatch(
-					enc,
-					k,
-					{
-						u,
-						params: range(sl.params, paramsBytes),
-						pg0: pages[0],
-						pg1: pages[1],
-						pg2: pages[2],
-						pg3: pages[3],
-						outTD: range(sl.out, outBytes),
-						stats: range(stats, statsBytes),
-					},
-					Math.ceil(nAz / 64),
-					nE,
-					1,
-				);
-				read = stageReads(device, enc, [
-					{ buffer: sl.out, size: nE * nAz * 8 },
-					{ buffer: stats, size: nE * 12 },
-				]);
-				try {
-					submit(device, enc);
-				} catch (e) {
-					read.cancel();
-					throw e;
-				}
-			}
+			const read = chunker.submit(
+				ub,
+				new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4),
+				nAz,
+				nE,
+			);
 			const cur: Pending = { c0, nE, read };
 			// Collect the previous chunk now that this one is packed and submitted.
 			const p = prev;
@@ -575,7 +490,7 @@ async function marchLocked(
 		// an error left a chunk submitted: wait for it (and return its staging slot) before the
 		// lease lets anyone else reuse the slots
 		if (prev) await prev.read.read().catch(() => {});
-		chunker?.release();
+		chunker.release();
 	}
 	const t2 = performance.now();
 	lastGpuHorizonTiming = {
@@ -607,13 +522,12 @@ export async function computeHorizonsAuto(
 	mosaics: Mosaic[],
 	eyes: Eye[],
 	opts: FastHorizonOptions = {},
-	gpu: HorizonGpuOptions = {},
 ): Promise<FastHorizonProfile[]> {
 	if (gpuCanServe(opts)) {
 		const device = await getComputeDevice();
 		if (device) {
 			try {
-				return await computeHorizonGpu(device, mosaics, eyes, opts, gpu);
+				return await computeHorizonGpu(device, mosaics, eyes, opts);
 			} catch (e) {
 				console.warn("[gpu] horizon kernel failed, using the CPU", e);
 			}

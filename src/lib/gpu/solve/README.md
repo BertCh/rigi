@@ -15,11 +15,11 @@ The unknown-pose cascade is where the grid gets big: 360° of yaw, and ±15° of
 | File | What it does |
 |---|---|
 | `cpu.ts` | Re-exports `planCoarse` (solveOnce's inputs: observations, accumulated yaw/pitch grids, truncation, sigmas) and `coarseCost` (one cell) from `geo/solve.ts`, which its own `coarseStage` uses, so there is no copy to drift. `coarseRow` scores a row exactly. `coarseCpu` is the whole-grid twin. `selectCoarse` / `finish` do solveOnce's selection and ambiguity. `fullSearchOptions` gives the 360° pass's options. |
-| `coarse.wgsl.ts` | One dispatch. Each workgroup takes one yaw row and one block of 256 pitches, and writes the block's minimum cost plus the first/last pitch within 2.5ε of it. |
-| `index.ts` | `coarseGpu(device, plan)` returns `CoarseResult` + stats. `solveCoarse(prior, horizon, sky, opts)` is the drop-in: GPU when there is a compute device, CPU otherwise, `null` when there is no skyline. Also `warmSolveGpu` and `costBound`. |
-| `graph.ts` | Opt-in command-graph path (`coarseGpu(…, { graph: true })`, `solveCoarse(…, { graph: true })`; default off). See below. |
+| `coarse.wgsl.ts` | The COARSE kernel. Each workgroup takes one yaw row and one block of 256 pitches, and writes the block's minimum cost plus the first/last pitch within 2.5ε of it. |
+| `index.ts` | `coarseGpu(device, plan)` returns `CoarseResult` + stats. `solveCoarse(prior, horizon, sky, opts)` is the drop-in: GPU when there is a compute device, CPU otherwise, `null` when there is no skyline. Also `warmSolveGpu`, `costBound` and `selectBounded`. |
+| `graph.ts` | The GPU path: a core command graph (COARSE → GPU row fold, resident horizon profile) and `foldBlocks`, the f64 CPU fold it falls back to. See below. |
 | `fused.ts` | The unknown-pose worker's fused horizon → solve chain (`gpuFused`). See below. |
-| `bench.ts` | The browser side of `scripts/gpu/solve-bench.mjs`. Also compares the two GPU paths, and `benchFold` checks the GPU row fold on adversarial blocks. |
+| `bench.ts` | The browser side of `scripts/gpu/solve-bench.mjs`. Also compares the GPU row fold with the CPU f64 fold of the same blocks (`forceCpuFold`), and `benchFold` checks the GPU row fold on adversarial blocks. |
 
 ## Why the result is identical by construction
 
@@ -40,7 +40,7 @@ This follows the same pattern as skyglobal: the GPU bounds and scores, then the 
 
 Typical re-scoring work is 4–33 rows and about 1 cell per row. The bench also runs every case with ε × 100: up to 2706 of 3601 rows get re-scored, and the result is still identical, which exercises every branch.
 
-Readback is 16 B per (row, pitch block), at most 60 KB. A top-K readback (GPUSort) was not used because the selection needs the whole yaw curve: local minima and the median.
+Readback is 16 B per row (the GPU fold); the CPU-fold rerun reads 16 B per (row, pitch block), at most 60 KB. A top-K readback (GPUSort) was not used because the selection needs the whole yaw curve: local minima and the median.
 
 ## Bench (`scripts/gpu/solve-bench.mjs`, 2026-09-30, Apple GPU, headless Chromium)
 
@@ -76,15 +76,17 @@ A cold call, which includes the pipeline compile on the first photo, takes 6–1
    - more than 65535 yaw rows,
    - a selection inconsistency, which would mean the bound was violated. This has never been seen, and `stats.fellBack` records it.
 
-## Command-graph path (`graph.ts`, opt-in, 2026-09-30)
+## Command-graph path (`graph.ts`; opt-in 2026-09-30, the only GPU path since 2026-10-01)
 
 A shape-keyed core `ComputeGraph` (`cachedGraph`, group `solve-coarse`, keyed on buffer capacities):
 `clear blocks → COARSE (same spec) → clear rows → FOLD → read rows`. `blocks` and `rows` are graph transients read through a read node; `u` / `obs` / `yaws` / `pitch` stay pooled imports. What changes:
 - **Horizon profile resident on the GPU.** One `hz` buffer per device, compared bitwise with a CPU copy on every call and re-uploaded only when it changed. On the bench, one upload per photo serves all 4 conditions (the worker's 3 focal seeds × cascade stages share one profile). The profile is not imported from scene-profile's march output: that is converted with `atan` to degrees in f64 on the CPU, which a GPU node would not reproduce bit for bit.
-- **Per-row fold on the GPU** (one thread per row). g is the minimum over the row's blocks on ordered f32 bits, which is `Math.min`'s total order for non-NaN values (−0 < +0 included); a NaN block minimum sets an explicit flag (WGSL `min` is NaN-indeterminate), and the CPU turns it into g = NaN, i.e. the old path's non-finite → CPU fallback. The band union needs the CPU's f64 test `v > g + 2ε`: the fold decides it in f32 only when |v − (g + f32(2ε))| > 4u(|g| + 2ε), at least 2× the f32/f64 threshold error; a closer block flags its row and the call reruns on the single-dispatch path (`stats.graphFellBack`). Readback drops to 16 B per row when nBlk > 1.
-- The COARSE WGSL, the certified ε, `selectBounded` and its exact re-scores are shared and unchanged.
+- **Per-row fold on the GPU** (one thread per row). g is the minimum over the row's blocks on ordered f32 bits, which is `Math.min`'s total order for non-NaN values (−0 < +0 included); a NaN block minimum sets an explicit flag (WGSL `min` is NaN-indeterminate), and the CPU turns it into g = NaN, i.e. the non-finite → CPU-grid fallback. The band union needs the CPU's f64 test `v > g + 2ε`: the fold decides it in f32 only when |v − (g + f32(2ε))| > 4u(|g| + 2ε), at least 2× the f32/f64 threshold error; a closer block flags its row, and the call reruns COARSE on the graph's blocks variant (`clear blocks → COARSE → read blocks`: the same kernel on the same inputs, `hz` still resident) and folds the blocks in f64 on the CPU (`foldBlocks`, `stats.cpuFold`). That is exactly the fold the removed single-dispatch path ran on the same kernel's output, so the rows the selection sees do not depend on which fold ran. (Re-running the whole CPU grid would also give the identical result, by the argument above, but costs up to ~5 s on "none".) Readback drops to 16 B per row when nBlk > 1.
+- The COARSE WGSL, the certified ε, `selectBounded` and its exact re-scores are the same for both folds.
 
-Evidence (`scripts/gpu/solve-bench.mjs`): on 5 photos × 4 conditions, the graph path equals the single-dispatch path in the result, the per-row digest of (g, from, to) and every non-timing stat (rescored rows/cells, ε, maxErr, fellBack), at ε × 1 and ε × 100; 0 graph fallbacks. `benchFold` (20 000 + 14 000 adversarial rows, NaN / ±inf / ±0 / empty bands / minima within ±6 ulps of the threshold, run twice with different data): 0 mismatches; every row where a naive f32 threshold would differ from the CPU (539 and 515) is flagged.
+The pooled single-dispatch path (COARSE + CPU fold, pooled `hz`) was removed on 2026-10-01; `{ graph }` is gone from `coarseGpu` / `solveCoarse`, and the worker's `gpuGraph` with it.
+
+Evidence (`scripts/gpu/solve-bench.mjs`, before the removal): on 5 photos × 4 conditions, the graph path equalled the single-dispatch path in the result, the per-row digest of (g, from, to) and every non-timing stat (rescored rows/cells, ε, maxErr, fellBack), at ε × 1 and ε × 100; 0 fallbacks. The bench now checks the GPU fold against the forced CPU fold (`forceCpuFold`) the same way, and both against the CPU twin. `benchFold` (20 000 + 14 000 adversarial rows, NaN / ±inf / ±0 / empty bands / minima within ±6 ulps of the threshold, run twice with different data): 0 mismatches; every row where a naive f32 threshold would differ from the CPU (539 and 515) is flagged.
 
 ## Fused horizon → solve chain (`fused.ts`, 2026-10-01)
 

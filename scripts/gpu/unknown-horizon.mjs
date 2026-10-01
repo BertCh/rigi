@@ -98,7 +98,7 @@ try {
 			for (const e of manifest) {
 				const t0 = Date.now();
 				const res = await page.evaluate(
-					async ({ e, conds, graph, fused }) => {
+					async ({ e, conds, fused }) => {
 						const m = await import("/src/lib/integration/unknown-pose.ts");
 						// the host page is an SVG document (no app): make createElement("canvas") an HTML canvas
 						if (!(document instanceof HTMLDocument)) {
@@ -123,9 +123,8 @@ try {
 							width: e.width,
 							height: e.height,
 						};
-						// ABL_GRAPH=0: GPU work on the pooled paths (plumbing A/B; default core command graphs)
 						// ABL_FUSED=1/0: the fused horizon → solve chain on / off (unset: the worker default)
-						const s = new m.UnknownPoseSolver(photo, { graph, fused });
+						const s = new m.UnknownPoseSolver(photo, { fused });
 						const out = [];
 						try {
 							for (const [cond, u] of conds) {
@@ -164,11 +163,6 @@ try {
 					{
 						e,
 						conds: CONDS,
-						// ABL_GRAPH=default: leave gpuGraph unset (the worker's own default)
-						graph:
-							process.env.ABL_GRAPH === "default"
-								? undefined
-								: process.env.ABL_GRAPH !== "0",
 						fused:
 							process.env.ABL_FUSED === undefined
 								? undefined

@@ -1,5 +1,4 @@
-// Horizon march chunks on a core ComputeGraph: the default path of computeHorizonGpu (the pooled
-// single-dispatch path in ./index.ts is the explicit fallback, `{ graph: false }`).
+// Horizon march chunks on a core ComputeGraph: the GPU path of computeHorizonGpu (./index.ts).
 //
 // Each chunk is one encoding of a 1-kernel graph:
 //   clear stats → MARCH (./horizon.wgsl.ts, unchanged) → read [out, stats] (one slot)
@@ -9,17 +8,16 @@
 // u / params / the mosaic pages stay imports: params and u are pooled uploads written per chunk, the
 // pages are the persistent per-mosaic-set buffers.
 //
-// Bit-identity with the pooled path: same kernel spec, same uniforms and params bytes, and every
-// binding has the old path's byte size (params / out / stats are bound as per-run ranges of exactly
-// paramsBytes / outBytes / statsBytes, although the graph is keyed on their power-of-two capacities).
+// Bindings: params / out / stats are bound as per-run ranges of exactly paramsBytes / outBytes /
+// statsBytes, although the graph is keyed on their power-of-two capacities (this kept the outputs
+// bit-identical to the pooled single dispatch this replaced, removed 2026-10-01).
 //
 // Chunk overlap is kept: index.ts packs and submits chunk c+1 before collecting chunk c. Chunks share
 // the graph's transients and the pooled u / params; WebGPU queue order puts chunk c's read copy before
 // chunk c+1's writeBuffer / clear. core/readback maps with the raw mapAsync, so collecting c waits for
 // c only. The graph's lease is held for the whole call (inside the "horizon" lease).
 //
-// Per-call overhead vs the pooled path: ./index.ts imports this module statically (no per-call
-// dynamic import()), the u slot is only sized here (not written twice), and the run parameters and
+// Per-call overhead: the u slot is only sized here (not written twice), and the run parameters and
 // bindings record are built once per call and reused by every chunk.
 import { Buffer, type Device } from "@luma.gl/core";
 import { cachedGraph } from "#/lib/gpu/core/graph";
@@ -141,7 +139,7 @@ export async function graphChunker(
 	};
 	return {
 		submit(ub, params, nAz, nE) {
-			// the same pooled slots as the pooled path (same lease), written per chunk
+			// pooled u / params slots (the "horizon" lease), written per chunk
 			bufs.u = pooledUniform(device, `${lease}/u`, ub);
 			bufs.params = acquire(device, `${lease}/params`, s.paramsBytes, PARAMS);
 			bufs.params.write(params);

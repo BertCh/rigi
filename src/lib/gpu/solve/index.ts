@@ -11,16 +11,15 @@
 // Readback is the row minima with their pitch bands (16 B per row, ≤ 60 KB for a 360° search), not the grid: the selection
 // needs the whole yaw curve (local minima, median), and a top-K would not certify the median.
 //
-// Library only: not wired into geo/ or integration/ (see ./README.md for the integration note).
-// Plumbing (src/lib/gpu/core): pooled buffers under the "solve" lease, bindings per pass, one submit.
-import { Buffer, type Device } from "@luma.gl/core";
+// Plumbing (src/lib/gpu/core): a core ComputeGraph (./graph.ts: COARSE then a GPU row fold, the horizon
+// profile resident) under the "solve" lease; the graph is the only GPU path since 2026-10-01.
+import type { Device } from "@luma.gl/core";
 import type { Camera } from "#/lib/geo/camera";
 import type { HorizonProfile } from "#/lib/geo/horizon";
 import type { SkylineRows, SolveOptions } from "#/lib/geo/solve";
 import { getComputeDevice } from "../core/device";
-import { defineKernel, dispatch, kernel, kernelAsync } from "../core/kernel";
-import { acquire, pooledStorage, pooledUniform, withLease } from "../core/pool";
-import { readBack } from "../core/readback";
+import { defineKernel, kernelAsync } from "../core/kernel";
+import { withLease } from "../core/pool";
 import { COARSE_WGSL, PITCH_BLOCK } from "./coarse.wgsl";
 import {
 	type CoarsePlan,
@@ -79,10 +78,10 @@ export type CoarseGpuStats = {
 	/** true when the GPU could not be used for this plan and the CPU grid ran instead */
 	fellBack: boolean;
 	readBytes: number;
-	/** graph path (./graph.ts): whether this call uploaded the horizon profile (false = resident) */
+	/** whether this call uploaded the horizon profile (false = resident, ./graph.ts) */
 	hzUploaded?: boolean;
-	/** graph path: the GPU row fold flagged a threshold too close to call in f32; the old path ran */
-	graphFellBack?: boolean;
+	/** the GPU row fold flagged a threshold too close to call in f32; the blocks were folded on the CPU */
+	cpuFold?: boolean;
 	/** opts.digest: FNV-1a of the per-row (g, from, to) the selection starts from */
 	digest?: string;
 };
@@ -93,8 +92,6 @@ export type CoarseGpuResult = CoarseResult & {
 };
 
 const OWNER = "solve";
-const key = (slot: string) => `${OWNER}/${slot}`;
-const STORAGE = Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC;
 /** Most yaw rows one dispatch takes (workgroups per dimension). */
 const MAX_ROWS = 65535;
 
@@ -139,9 +136,7 @@ export function coarseGpu(
 	o: CoarseGpuOptions = {},
 ): Promise<CoarseGpuResult> {
 	return withLease(OWNER, async () =>
-		o.graph
-			? (await import("./graph")).coarseGraphOnce(device, p, o)
-			: coarseOnce(device, p, o),
+		(await import("./graph")).coarseGraphOnce(device, p, o),
 	);
 }
 
@@ -151,14 +146,9 @@ export type CoarseGpuOptions = {
 	 * re-score many more rows and cells, which exercises its every branch. The result stays identical.
 	 */
 	epsScale?: number;
-	/**
-	 * Run on the command-graph path (./graph.ts: GPU row fold, resident horizon profile) instead of
-	 * the single dispatch + CPU fold. Same WGSL, same selection; the result is bit-identical.
-	 */
-	graph?: boolean;
-	/** Graph path, tests only: treat every row as flagged "too close", so the old-path rerun runs. */
-	forceGraphFallback?: boolean;
-	/** Record stats.digest (bench parity of the per-row intervals between paths). */
+	/** Tests only: treat every row as flagged "too close", so the blocks rerun + CPU f64 fold runs. */
+	forceCpuFold?: boolean;
+	/** Record stats.digest (bench parity of the per-row intervals between the GPU and CPU folds). */
 	digest?: boolean;
 };
 
@@ -193,7 +183,7 @@ export function profileHz(h: HorizonProfile): Float32Array | null {
 	return hz;
 }
 
-/** The coarse kernel's inputs for plan `p` (shared by both paths), or null when the GPU can't serve it. */
+/** The coarse kernel's inputs for plan `p`, or null when the GPU can't serve it. */
 export function packCoarse(p: CoarsePlan, o: CoarseGpuOptions) {
 	const h = p.horizon;
 	const nH = h.elevation.length;
@@ -250,90 +240,6 @@ export function packCoarse(p: CoarsePlan, o: CoarseGpuOptions) {
 	// 2ε, plus 0.5ε of slack for the f32 rounding of (minimum + band), which is ≤ u·max cost ≪ ε
 	uF[7] = 2.5 * eps;
 	return { nH, nObs, nYaw, nPitch, nBlk, hz, obU, yU, pitch, ub, eps };
-}
-
-/** The single-dispatch path (call under the "solve" lease). */
-export async function coarseOnce(
-	device: Device,
-	p: CoarsePlan,
-	o: CoarseGpuOptions,
-): Promise<CoarseGpuResult> {
-	const t0 = performance.now();
-	const nYaw = p.dys.length;
-	const nPitch = p.dps.length;
-	const stats: CoarseGpuStats = {
-		uploadMs: 0,
-		gpuMs: 0,
-		selectMs: 0,
-		nCells: nYaw * nPitch,
-		rescored: 0,
-		rescoredCells: 0,
-		eps: 0,
-		maxErr: 0,
-		fellBack: false,
-		readBytes: 0,
-	};
-	const fallback = () => {
-		stats.fellBack = true;
-		return { ...coarseCpu(p), ms: performance.now() - t0, stats };
-	};
-	const pk = packCoarse(p, o);
-	if (!pk) return fallback();
-	const { nBlk, hz, obU, yU, pitch, ub } = pk;
-	stats.eps = pk.eps;
-
-	const outBytes = nYaw * nBlk * 16;
-	const rowMin = acquire(device, key("rowMin"), outBytes, STORAGE);
-	const bind = {
-		u: pooledUniform(device, key("u"), ub),
-		obs: pooledStorage(device, key("obs"), obU),
-		yaws: pooledStorage(device, key("yaws"), yU),
-		pitch: pooledStorage(device, key("pitch"), pitch),
-		hz: pooledStorage(device, key("hz"), hz),
-		rowMin,
-	};
-	const k = kernel(device, K_COARSE);
-	const t1 = performance.now();
-	const [out] = await readBack(
-		device,
-		(enc) => dispatch(enc, k, bind, nYaw, nBlk),
-		[{ buffer: rowMin, size: outBytes }],
-		{ id: "solve-coarse" },
-	);
-	const t2 = performance.now();
-	stats.uploadMs = t1 - t0;
-	stats.gpuMs = t2 - t1;
-	stats.readBytes = outBytes;
-	const bu = new Uint32Array(out);
-	const bf = new Float32Array(out);
-	const g = new Float64Array(nYaw);
-	for (let r = 0; r < nYaw; r++) {
-		let m = Number.POSITIVE_INFINITY;
-		for (let b = 0; b < nBlk; b++) m = Math.min(m, bf[(r * nBlk + b) * 4]);
-		g[r] = m;
-	}
-	if (!g.every(Number.isFinite)) return fallback();
-	// the row's band: the union of its blocks' bands whose minimum is within 2ε of the row's (a block
-	// with a higher minimum measured its band from that, so it still covers every pitch ≤ g + 2ε)
-	const from = new Int32Array(nYaw).fill(nPitch);
-	const to = new Int32Array(nYaw).fill(-1);
-	for (let r = 0; r < nYaw; r++)
-		for (let b = 0; b < nBlk; b++) {
-			const o = (r * nBlk + b) * 4;
-			if (bf[o] > g[r] + 2 * stats.eps || bu[o + 1] > bu[o + 2]) continue;
-			from[r] = Math.min(from[r], bu[o + 1]);
-			to[r] = Math.max(to[r], bu[o + 2]);
-		}
-	if (o.digest) stats.digest = rowsDigest(g, from, to);
-	let res: CoarseResult;
-	try {
-		res = selectBounded(p, g, from, to, stats);
-	} catch (e) {
-		console.warn("[solve] bounded selection failed, using the CPU grid", e);
-		return fallback();
-	}
-	stats.selectMs = performance.now() - t2;
-	return { ...res, ms: performance.now() - t0, stats };
 }
 
 /**
@@ -452,8 +358,6 @@ export function selectBounded(
 export type SolveCoarseOptions = {
 	/** undefined: getComputeDevice(); null: the CPU grid */
 	device?: Device | null;
-	/** the command-graph path (CoarseGpuOptions.graph); default: the single-dispatch path */
-	graph?: boolean;
 };
 
 /**
@@ -473,7 +377,7 @@ export async function solveCoarse(
 	const device = o.device === undefined ? await getComputeDevice() : o.device;
 	if (device)
 		try {
-			const r = await coarseGpu(device, p, { graph: o.graph });
+			const r = await coarseGpu(device, p);
 			return { ...r, on: r.stats.fellBack ? "cpu" : "gpu" };
 		} catch (e) {
 			console.warn("[solve] GPU coarse grid failed, using the CPU", e);

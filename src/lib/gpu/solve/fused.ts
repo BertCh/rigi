@@ -78,9 +78,7 @@ export async function fusedSceneHorizon(
 	eye: number,
 ): Promise<FusedHorizon | null> {
 	const { sceneHorizonGpu } = await import("../horizon/scene-profile");
-	const horizon = await sceneHorizonGpu(terrain, lat, lon, eye, undefined, {
-		graph: true,
-	});
+	const horizon = await sceneHorizonGpu(terrain, lat, lon, eye);
 	if (!horizon) return null;
 	const device = await getComputeDevice();
 	const primed = device ? await primeSolveHorizon(device, horizon) : false;

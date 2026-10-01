@@ -1,21 +1,21 @@
-// solve coarse on a core ComputeGraph (opt-in: coarseGpu(device, plan, { graph: true }) or
-// solveCoarse(…, { graph: true }); the single-dispatch path in ./index.ts stays the default).
+// solve coarse on a core ComputeGraph: the GPU path of coarseGpu / solveCoarse (./index.ts).
 //
 // One shape-keyed graph per (buffer capacities):
-//   clear blocks → COARSE (./coarse.wgsl.ts, unchanged: per (row, 256-pitch block) min + band)
-//   → clear rows → FOLD (one thread per row: the CPU's block fold, exactly) → read rows (16 B/row)
+//   clear blocks → COARSE (./coarse.wgsl.ts: per (row, 256-pitch block) min + band)
+//   → clear rows → FOLD (one thread per row: the f64 block fold below, exactly) → read rows (16 B/row)
 // `blocks` and `rows` are graph transients (never imports), read through a read node.
 //
-// Bit-identity with the single-dispatch path, by construction:
-// - COARSE is the same kernel spec (same WGSL, pipeline, uniforms, bindings of the same sizes).
+// The rows equal the f64 CPU fold of the blocks (foldBlocks), by construction:
 // - The row minimum g is folded on ordered bits (a total order that equals Math.min's on non-NaN
 //   values, -0 < +0 included), not with WGSL min (NaN-indeterminate). Any NaN block minimum is flagged
-//   explicitly, and the CPU then sets g = NaN, which takes the old path's own non-finite → CPU fallback.
+//   explicitly, and the CPU then sets g = NaN, which takes the non-finite → CPU-grid fallback.
 // - The band union needs `v > g + 2ε` with the CPU's f64 threshold. The fold decides it in f32 only when
 //   |v − (g + f32(2ε))| exceeds 4u·(|g| + 2ε) (≥ 2× the f32-vs-f64 threshold error). A block within
-//   that margin flags its row; any flagged row reruns the whole call on the single-dispatch path
-//   (stats.graphFellBack), so the rows the selection sees are always the old path's.
-// - The CPU selection (index.ts selectBounded) and its exact f64 re-scores are shared, unchanged.
+//   that margin flags its row; any flagged row reruns the call on the blocks variant of the graph
+//   (clear blocks → COARSE → read blocks, the same kernel on the same inputs) and folds the blocks on
+//   the CPU in f64 (foldBlocks; stats.cpuFold). That is the fold the removed single-dispatch path ran
+//   on the same kernel's output, so the rows the selection sees are the same either way.
+// - The CPU selection (index.ts selectBounded) and its exact f64 re-scores are the same for both.
 //
 // The horizon profile (hz) stays on the GPU: one resident buffer per device, re-uploaded only when the
 // profile's bits change (the unknown-pose worker solves 3 focal seeds × cascade stages on one profile).
@@ -32,7 +32,6 @@ import {
 	type CoarseGpuOptions,
 	type CoarseGpuResult,
 	type CoarseGpuStats,
-	coarseOnce,
 	K_COARSE,
 	packCoarse,
 	rowsDigest,
@@ -166,25 +165,28 @@ export function releaseResidentHz(device: Device) {
 
 // ---------- the graph ----------
 
+/**
+ * The coarse graph for these buffers. `fold` (default): COARSE → FOLD → read rows; false: the blocks
+ * variant, COARSE → read blocks (the CPU folds them in f64; `bufs.fu` is not used).
+ */
 function graphFor(
 	device: Device,
 	bufs: Record<string, Buffer>,
 	blocksBytes: number,
 	rowsBytes: number,
+	fold = true,
 ) {
 	const sizes = Object.entries(bufs).map(([k, b]) => `${k}${b.byteLength}`);
-	const k = `${sizes.join(",")},blk${blocksBytes},rows${rowsBytes}`;
+	const k = `${sizes.join(",")},blk${blocksBytes},${fold ? `rows${rowsBytes}` : "blocks"}`;
 	return cachedGraph<Params>(device, "solve-coarse", k, (g) => {
 		const imp = (id: string, usage = STORAGE) =>
 			g.importBuffer(id, bufs[id].byteLength, undefined, usage);
 		const u = imp("u", UNIFORM);
-		const fu = imp("fu", UNIFORM);
 		const obs = imp("obs");
 		const yaws = imp("yaws");
 		const pitch = imp("pitch");
 		const hz = imp("hz");
 		const blocks = g.transientBuffer("blocks", blocksBytes);
-		const rows = g.transientBuffer("rows", rowsBytes);
 		// COARSE writes every (row, block) entry it dispatches and FOLD every row, and the read covers
 		// only those: the clears are the house rule for aliasing transients (cheap: ≤ 120 KB)
 		g.clearNode("clear-blocks", {
@@ -198,6 +200,15 @@ function graphFor(
 			workgroups: (p) => [p.nYaw, p.nBlk],
 			writes: { rowMin: "partial" },
 		});
+		if (!fold) {
+			g.readNode("blocks", [
+				{ buffer: blocks, size: (p) => p.nYaw * p.nBlk * 16 },
+			]);
+			g.compile();
+			return undefined;
+		}
+		const fu = imp("fu", UNIFORM);
+		const rows = g.transientBuffer("rows", rowsBytes);
 		g.clearNode("clear-rows", { buffer: rows, size: (p) => p.nYaw * 16 });
 		g.addKernel({
 			id: "fold",
@@ -212,7 +223,40 @@ function graphFor(
 	});
 }
 
-/** coarseOnce on the graph (call under the "solve" lease, as coarseGpu does). */
+/**
+ * The f64 CPU fold of COARSE's blocks (nYaw × nBlk × (min, first, last, 0)) into the per-row
+ * (g, band from, band to) the selection starts from: g is the minimum block minimum; the band is the
+ * union of the bands of the blocks whose minimum is within 2ε of g (a block with a higher minimum
+ * measured its band from that, so it still covers every pitch ≤ g + 2ε).
+ */
+export function foldBlocks(
+	out: ArrayBuffer,
+	nYaw: number,
+	nBlk: number,
+	nPitch: number,
+	eps: number,
+) {
+	const bu = new Uint32Array(out);
+	const bf = new Float32Array(out);
+	const g = new Float64Array(nYaw);
+	for (let r = 0; r < nYaw; r++) {
+		let m = Number.POSITIVE_INFINITY;
+		for (let b = 0; b < nBlk; b++) m = Math.min(m, bf[(r * nBlk + b) * 4]);
+		g[r] = m;
+	}
+	const from = new Int32Array(nYaw).fill(nPitch);
+	const to = new Int32Array(nYaw).fill(-1);
+	for (let r = 0; r < nYaw; r++)
+		for (let b = 0; b < nBlk; b++) {
+			const o = (r * nBlk + b) * 4;
+			if (bf[o] > g[r] + 2 * eps || bu[o + 1] > bu[o + 2]) continue;
+			from[r] = Math.min(from[r], bu[o + 1]);
+			to[r] = Math.max(to[r], bu[o + 2]);
+		}
+	return { g, from, to };
+}
+
+/** coarseGpu's body (call under the "solve" lease, as coarseGpu does). */
 export async function coarseGraphOnce(
 	device: Device,
 	p: CoarsePlan,
@@ -270,9 +314,9 @@ export async function coarseGraphOnce(
 	const out = reads.rows[0];
 	const ru = new Uint32Array(out);
 	const rf = new Float32Array(out);
-	const g = new Float64Array(nYaw);
-	const from = new Int32Array(nYaw);
-	const to = new Int32Array(nYaw);
+	let g = new Float64Array(nYaw);
+	let from = new Int32Array(nYaw);
+	let to = new Int32Array(nYaw);
 	let close = false;
 	for (let r = 0; r < nYaw; r++) {
 		const f = ru[r * 4 + 3];
@@ -283,11 +327,28 @@ export async function coarseGraphOnce(
 		if (f & 2) close = true;
 	}
 	if (!g.every(Number.isFinite)) return fallback();
-	if (close || o.forceGraphFallback) {
-		// a band threshold f32 cannot call: the old path folds this call in f64 on the CPU
-		const r = await coarseOnce(device, p, o);
-		r.stats.graphFellBack = true;
-		return r;
+	if (close || o.forceCpuFold) {
+		// a band threshold f32 cannot call: re-run COARSE on the blocks variant (same kernel, same
+		// inputs, hz still resident) and fold its blocks in f64 on the CPU
+		stats.cpuFold = true;
+		const { fu: _, ...coarseBufs } = bufs;
+		const blocks = graphFor(
+			device,
+			coarseBufs,
+			capacityFor(nYaw * nBlk * 16),
+			capacityFor(nYaw * 16),
+			false,
+		).graph;
+		const r = await blocks.run({ nYaw, nBlk }, { buffers: coarseBufs });
+		stats.readBytes += nYaw * nBlk * 16;
+		({ g, from, to } = foldBlocks(
+			r.reads.blocks[0],
+			nYaw,
+			nBlk,
+			nPitch,
+			stats.eps,
+		));
+		if (!g.every(Number.isFinite)) return fallback();
 	}
 	if (o.digest) stats.digest = rowsDigest(g, from, to);
 	let res: CoarseResult;

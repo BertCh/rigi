@@ -209,9 +209,7 @@ ctx.onmessage = async (ev: MessageEvent<ToWorker>) => {
 			const on = new Set<"gpu" | "cpu">();
 			const coarse: CoarseProvider | undefined = msg.solveGpu
 				? async (prior, horizon, sky, o) => {
-						const g = await solveCoarse(prior, horizon, sky, o, {
-							graph: true,
-						});
+						const g = await solveCoarse(prior, horizon, sky, o);
 						if (g) on.add(g.on);
 						return g;
 					}

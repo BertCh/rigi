@@ -227,33 +227,7 @@ export async function benchPhoto(o: BenchIn) {
 			g = (await computeHorizonGpu(device, mosaics, [eye], opts))[0];
 			warm.push(lastGpuHorizonTiming?.totalMs ?? Number.NaN);
 		}
-		// the command-graph path (./graph.ts, the default) against the pooled path ({ graph: false }):
-		// bit-identical, alternated timings
-		const oldMs: number[] = [];
-		const graphMs: number[] = [];
-		let diff = bitDiff(
-			[g],
-			await computeHorizonGpu(device, mosaics, [eye], opts, { graph: false }),
-		);
-		for (let r = 0; r < 5; r++) {
-			const a = await computeHorizonGpu(device, mosaics, [eye], opts, {
-				graph: false,
-			});
-			oldMs.push(lastGpuHorizonTiming?.totalMs ?? Number.NaN);
-			const b = await computeHorizonGpu(device, mosaics, [eye], opts, {
-				graph: true,
-			});
-			graphMs.push(lastGpuHorizonTiming?.totalMs ?? Number.NaN);
-			const d = bitDiff(a, b);
-			diff = {
-				el: diff.el + d.el,
-				dist: diff.dist + d.dist,
-				stats: diff.stats + d.stats,
-				n: diff.n + d.n,
-			};
-		}
 		res[name] = {
-			graph: { diff, oldMedMs: median(oldMs), graphMedMs: median(graphMs) },
 			cpuMs,
 			gpuColdMs: coldT?.totalMs,
 			gpuWarmMs: Math.min(...warm),
@@ -272,22 +246,17 @@ export async function benchPhoto(o: BenchIn) {
 	const bOpts = configs.app;
 	const eyes = eyeGrid(eye, o.batch ?? 343);
 	const b0 = performance.now();
-	const batch = await computeHorizonGpu(device, mosaics, eyes, bOpts, {
-		graph: false,
-	});
+	const batch = await computeHorizonGpu(device, mosaics, eyes, bOpts);
 	const batchMs = performance.now() - b0;
 	const batchChunks = lastGpuHorizonTiming?.chunks;
-	// `batch` is the pooled path; the graph path on the batch (15 chunks of 24 eyes at 343 eyes: the
-	// chunk overlap), alternated
-	const bOld: number[] = [batchMs];
-	const bGraph: number[] = [];
+	// warm re-runs of the batch (15 chunks of 24 eyes at 343 eyes: the chunk overlap): timed, and
+	// diffed bit for bit against the first run (run-to-run determinism)
+	const bWarm: number[] = [];
 	let batchDiff = { el: 0, dist: 0, stats: 0, n: 0 };
 	for (let r = 0; r < 3; r++) {
 		const t = performance.now();
-		const gb = await computeHorizonGpu(device, mosaics, eyes, bOpts, {
-			graph: true,
-		});
-		bGraph.push(performance.now() - t);
+		const gb = await computeHorizonGpu(device, mosaics, eyes, bOpts);
+		bWarm.push(performance.now() - t);
 		const d = bitDiff(batch, gb);
 		batchDiff = {
 			el: batchDiff.el + d.el,
@@ -295,17 +264,6 @@ export async function benchPhoto(o: BenchIn) {
 			stats: batchDiff.stats + d.stats,
 			n: batchDiff.n + d.n,
 		};
-		if (r < 2) {
-			const t2 = performance.now();
-			const ob = await computeHorizonGpu(device, mosaics, eyes, bOpts, {
-				graph: false,
-			});
-			bOld.push(performance.now() - t2);
-			const d2 = bitDiff(batch, ob);
-			batchDiff.el += d2.el;
-			batchDiff.dist += d2.dist;
-			batchDiff.stats += d2.stats;
-		}
 	}
 	const sampleN = Math.min(eyes.length, o.cpuSample ?? 6);
 	const stride = Math.max(1, Math.floor(eyes.length / sampleN));
@@ -334,11 +292,7 @@ export async function benchPhoto(o: BenchIn) {
 		gpuMs: batchMs,
 		gpuMsPerEye: batchMs / eyes.length,
 		chunks: batchChunks,
-		graph: {
-			diff: batchDiff,
-			oldMedMs: median(bOld),
-			graphMedMs: median(bGraph),
-		},
+		rerun: { diff: batchDiff, warmMedMs: median(bWarm) },
 		cpuMsPerEye: cpuMs / sampleN,
 		cpuMsExtrapolated: (cpuMs / sampleN) * eyes.length,
 		speedup: ((cpuMs / sampleN) * eyes.length) / batchMs,

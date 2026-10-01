@@ -157,9 +157,10 @@ export async function benchPhoto(e: Entry, reps = 3) {
 		const g = gpu as NonNullable<typeof gpu>;
 		// stress: ε × STRESS makes the selection decide far more from exact re-scores (same result)
 		const stress = await coarseGpu(device, plan, { epsScale: STRESS });
-		// old single-dispatch path vs the command-graph path (./graph.ts): result, per-row intervals
-		// (digest of g / band from / to) and every non-timing stat must be identical; alternate the two
-		// so both see the same warm state; median warm times.
+		// the GPU row fold vs the CPU f64 fold of the same COARSE blocks (forceCpuFold: the "too close
+		// to call in f32" rerun, which never triggers on real data): result, per-row intervals (digest of
+		// g / band from / to) and every non-timing stat must be identical, at ε × 1 and ε × STRESS;
+		// alternated so both see the same warm state; median warm times.
 		const sameStats = (a: CoarseGpuStats, b: CoarseGpuStats) =>
 			a.rescored === b.rescored &&
 			a.rescoredCells === b.rescoredCells &&
@@ -171,26 +172,30 @@ export async function benchPhoto(e: Entry, reps = 3) {
 		const cmp = {
 			same: true,
 			sameStress: true,
-			oldMs: [] as number[],
-			graphMs: [] as number[],
+			gpuFoldMs: [] as number[],
+			cpuFoldMs: [] as number[],
 			hzUploads: [] as boolean[],
-			graphFellBack: 0,
-			forcedFallback: false,
-			oldReadBytes: 0,
-			graphReadBytes: 0,
+			cpuFolds: 0,
+			forcedCpuFold: true,
+			readBytes: 0,
+			cpuFoldReadBytes: 0,
 			digest: "",
 		};
 		for (let r = 0; r < Math.max(reps, 5); r++) {
 			const a = await coarseGpu(device, plan, { digest: true });
-			const b = await coarseGpu(device, plan, { digest: true, graph: true });
-			cmp.same &&= same(a, b) && same(b, cpu) && sameStats(a.stats, b.stats);
-			cmp.oldMs.push(a.ms);
-			cmp.graphMs.push(b.ms);
-			cmp.hzUploads.push(!!b.stats.hzUploaded);
-			if (b.stats.graphFellBack) cmp.graphFellBack++;
-			cmp.oldReadBytes = a.stats.readBytes;
-			cmp.graphReadBytes = b.stats.readBytes;
-			cmp.digest = b.stats.digest ?? "";
+			const b = await coarseGpu(device, plan, {
+				digest: true,
+				forceCpuFold: true,
+			});
+			cmp.same &&= same(a, b) && same(a, cpu) && sameStats(a.stats, b.stats);
+			cmp.gpuFoldMs.push(a.ms);
+			cmp.cpuFoldMs.push(b.ms);
+			cmp.hzUploads.push(!!a.stats.hzUploaded);
+			if (a.stats.cpuFold) cmp.cpuFolds++;
+			cmp.forcedCpuFold &&= !!b.stats.cpuFold;
+			cmp.readBytes = a.stats.readBytes;
+			cmp.cpuFoldReadBytes = b.stats.readBytes;
+			cmp.digest = a.stats.digest ?? "";
 		}
 		{
 			const a = await coarseGpu(device, plan, {
@@ -200,17 +205,10 @@ export async function benchPhoto(e: Entry, reps = 3) {
 			const b = await coarseGpu(device, plan, {
 				digest: true,
 				epsScale: STRESS,
-				graph: true,
+				forceCpuFold: true,
 			});
-			cmp.sameStress = same(a, b) && sameStats(a.stats, b.stats);
-		}
-		{
-			// the "too close to call in f32" rerun never triggers on real data: force it
-			const b = await coarseGpu(device, plan, {
-				graph: true,
-				forceGraphFallback: true,
-			});
-			cmp.forcedFallback = !!b.stats.graphFellBack && same(b, cpu);
+			cmp.sameStress =
+				same(a, b) && same(a, cpu) && sameStats(a.stats, b.stats);
 		}
 		const med = (x: number[]) =>
 			[...x].sort((p, q) => p - q)[Math.floor(x.length / 2)];
@@ -242,17 +240,17 @@ export async function benchPhoto(e: Entry, reps = 3) {
 			gridCpuMs: cpuMs,
 			gridFraction: cpuMs / solveMs,
 			gpu: gpuRuns,
-			graph: {
+			fold: {
 				same: cmp.same,
 				sameStress: cmp.sameStress,
-				forcedFallback: cmp.forcedFallback,
+				forcedCpuFold: cmp.forcedCpuFold,
 				digest: cmp.digest,
-				graphFellBack: cmp.graphFellBack,
+				cpuFolds: cmp.cpuFolds,
 				hzUploads: cmp.hzUploads,
-				oldReadBytes: cmp.oldReadBytes,
-				graphReadBytes: cmp.graphReadBytes,
-				oldMedMs: med(cmp.oldMs),
-				graphMedMs: med(cmp.graphMs),
+				readBytes: cmp.readBytes,
+				cpuFoldReadBytes: cmp.cpuFoldReadBytes,
+				gpuFoldMedMs: med(cmp.gpuFoldMs),
+				cpuFoldMedMs: med(cmp.cpuFoldMs),
 			},
 			solveConfidence: sp.confidence,
 			solveAccepted: sp.accepted,
@@ -262,10 +260,10 @@ export async function benchPhoto(e: Entry, reps = 3) {
 }
 
 /**
- * The GPU row fold (./graph.ts FOLD) against the single-dispatch path's CPU fold on adversarial blocks:
+ * The GPU row fold (./graph.ts FOLD) against the f64 CPU fold (./graph.ts foldBlocks) on adversarial blocks:
  * NaN / ±inf / ±0 minima, empty bands (first > last), and block minima within a few ulps of the f64
  * threshold g + 2ε. Every row must either match the CPU fold bit for bit (g bits incl. the sign of 0,
- * band from / to) or carry the "too close" flag (which makes the graph path rerun the old path); a
+ * band from / to) or carry the "too close" flag (which makes coarseGpu fold the blocks on the CPU); a
  * NaN block must set the NaN flag. Also runs the fold graph twice with different data (stale transients).
  */
 export async function benchFold(nYaw = 20000, nBlk = 3) {
@@ -379,7 +377,7 @@ export async function benchFold(nYaw = 20000, nBlk = 3) {
 		let bad = 0;
 		let naiveWrong = 0;
 		for (let r = 0; r < n; r++) {
-			// the single-dispatch path's CPU fold (index.ts coarseOnce), verbatim semantics
+			// the f64 CPU fold (./graph.ts foldBlocks), verbatim semantics
 			let m = Number.POSITIVE_INFINITY;
 			for (let b = 0; b < nBlk; b++) m = Math.min(m, bf[(r * nBlk + b) * 4]);
 			let from = nPitch;
