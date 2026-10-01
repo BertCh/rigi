@@ -2,6 +2,7 @@ import type { Camera } from "#/lib/geo/camera";
 import type { PeakView } from "#/lib/geo/peaks";
 import type { PhotoMeta } from "#/lib/geo/photo-meta";
 import type { SkylineObservation } from "#/lib/geo/skyline";
+import type { RealmGpuOptions } from "#/lib/gpu/core/realm";
 
 export type { PeakView, SkylineObservation };
 
@@ -45,6 +46,8 @@ export interface AlignResult {
 	rejectReason?: string;
 	/** Which tier produced the pose: solvePose, or refinePose after a reject. */
 	method?: "solve" | "refine";
+	/** Where the coarse grid ran (diagnostic; the pose is identical either way). */
+	solveOn?: "gpu" | "cpu" | "mixed";
 }
 
 export interface ControlPoint {
@@ -69,7 +72,18 @@ export type ToWorker =
 			id: number;
 			image: { width: number; height: number; data: Uint8ClampedArray };
 	  }
-	| { type: "align"; id: number; prior: Camera };
+	| {
+			type: "align";
+			id: number;
+			prior: Camera;
+			/**
+			 * solvePose's coarse grid on the GPU (identical result by construction; the page sends
+			 * gpuEnabled()). Falsy or absent: the synchronous CPU cascade.
+			 */
+			solveGpu?: boolean;
+			/** The page's GPU profiling / error-check switches (core/realm.ts). */
+			gpuOpts?: RealmGpuOptions;
+	  };
 
 export type Stage = "tiles" | "horizon" | "peaks" | "skyline" | "align";
 

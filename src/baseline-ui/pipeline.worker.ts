@@ -10,8 +10,17 @@ import {
 	parseOverpassPeaks,
 	viewPeaks,
 } from "#/lib/geo/peaks";
-import { cascade, loadScene, sceneHorizon } from "#/lib/geo/pipeline";
+import {
+	cascade,
+	cascadeAsync,
+	loadScene,
+	sceneHorizon,
+} from "#/lib/geo/pipeline";
 import { detectSkyline } from "#/lib/geo/skyline";
+import type { CoarseProvider } from "#/lib/geo/solve";
+import { applyRealmGpuOptions } from "#/lib/gpu/core/realm";
+import { releaseWhenIdle } from "#/lib/gpu/device";
+import { solveCoarse } from "#/lib/gpu/solve";
 import { OVERPASS, overpassMemo } from "#/lib/overpass";
 import type {
 	AlignResult,
@@ -28,6 +37,12 @@ const MAX_CACHED_TILES = 1500;
 const OVERPASS_ENDPOINTS = [OVERPASS.main, OVERPASS.coffee, OVERPASS.mailru];
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
+/**
+ * The worker lives as long as the page and uses the GPU in bursts (one solve per Auto-align):
+ * destroy the WebGPU device after this long without GPU use; the next solve recreates it.
+ */
+const GPU_IDLE_MS = 30_000;
+releaseWhenIdle(GPU_IDLE_MS);
 const post = (msg: FromWorker, transfer: Transferable[] = []) =>
 	ctx.postMessage(msg, transfer);
 
@@ -175,6 +190,7 @@ async function run(id: number, lat: number, lon: number, altitude?: number) {
 
 ctx.onmessage = async (ev: MessageEvent<ToWorker>) => {
 	const msg = ev.data;
+	if (msg.type === "align") applyRealmGpuOptions(msg.gpuOpts);
 	try {
 		if (msg.type === "run") {
 			await run(msg.id, msg.lat, msg.lon, msg.altitude);
@@ -188,7 +204,21 @@ ctx.onmessage = async (ev: MessageEvent<ToWorker>) => {
 			if (!sky) throw new Error("Photo skyline not detected yet");
 			// Cascade (scored best in scripts/eval.ts: 11/12 accepted, 0 false
 			// accepts) with default options: rejects escalate to refinePose.
-			const r = cascade(msg.prior, current.horizon, sky);
+			// solveGpu: solvePose's coarse grid on the GPU (src/lib/gpu/solve, identical to the CPU
+			// grid by construction; falls back to it without a device). Otherwise the sync reference.
+			const on = new Set<"gpu" | "cpu">();
+			const coarse: CoarseProvider | undefined = msg.solveGpu
+				? async (prior, horizon, sky, o) => {
+						const g = await solveCoarse(prior, horizon, sky, o, {
+							graph: true,
+						});
+						if (g) on.add(g.on);
+						return g;
+					}
+				: undefined;
+			const r = coarse
+				? await cascadeAsync(msg.prior, current.horizon, sky, {}, coarse)
+				: cascade(msg.prior, current.horizon, sky);
 			const result: AlignResult = {
 				camera: r.camera,
 				confidence: r.confidence,
@@ -196,6 +226,7 @@ ctx.onmessage = async (ev: MessageEvent<ToWorker>) => {
 				accepted: r.accepted,
 				rejectReason: r.rejectReason,
 				method: r.stage,
+				solveOn: on.size === 2 ? "mixed" : on.has("gpu") ? "gpu" : "cpu",
 			};
 			post({ type: "align", id: msg.id, result });
 		}

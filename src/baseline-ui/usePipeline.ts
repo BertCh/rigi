@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Camera } from "#/lib/geo/camera";
+import { realmGpuOptions } from "#/lib/gpu/core/realm";
+import { gpuEnabled } from "#/lib/gpu/device";
 import type {
 	AlignResult,
 	FromWorker,
@@ -160,7 +162,13 @@ export function usePipeline() {
 				aligning: true,
 				errors: { ...s.errors, align: undefined },
 			}));
-			send({ type: "align", id, prior });
+			send({
+				type: "align",
+				id,
+				prior,
+				solveGpu: gpuEnabled(),
+				gpuOpts: realmGpuOptions(),
+			});
 		},
 		[send],
 	);
