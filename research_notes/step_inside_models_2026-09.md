@@ -4,6 +4,8 @@ Nearly every fact below was checked today against primary sources: GitHub API li
 
 **File written:** `tools/nearfield/research/models.json` holds the same data in machine-readable form. `types.ts` is unchanged.
 
+> **Update (2026-10-01):** the §4/§6 renderer pick (Spark) was not adopted. Step Inside ships its own dependency-free EWA splat layers (deck.gl WebGL2 `src/lib/nearfield/deck-splat-layer.ts`, WebGPU `src/lib/deck-webgpu/layers/splats.ts`), and the three.js engine Spark targeted was removed (583e2b7). What was adopted is in `reports/step-inside-results.md` (Licences).
+
 ## 1. Single-photo and depth models (for P1)
 
 | Model | Repo / HF | Released | Code licence | **Weights licence** | Commercial? | Checkpoint | In → Out | Apple Silicon |

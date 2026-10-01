@@ -1,5 +1,7 @@
 # visgl frontier sweep: luma, deck, loaders, math (2026-10-01, late)
 
+*Archived 2026-10-01: its ranked plan was carried into [../whole-app-graph-plan.md](../whole-app-graph-plan.md) (WAG phases), and most items have landed; see the roadmap's WAG rows.*
+
 This sweep follows `luma-deck-upstream-2026-10-01.md`. The goal is to express the whole app as a luma GPU graph, fed by loaders.gl, using the bleeding edge of the visgl stack.
 
 **Method:**
@@ -9,6 +11,8 @@ This sweep follows `luma-deck-upstream-2026-10-01.md`. The goal is to express th
   - luma `rigi-vendor` 5e1b72ed
   - deck ce0808d0 + #10752 0d8b1664
 - Four parallel review agents. Notes are in a local scratch directory (not published).
+
+*Update (2026-10-01, later): item 1 is vendored as rigi.2 (c5b2aa1) and drives the GPU terrain cull's indirect draws (6d6160a); item 2's inspector and `/dev/graph` landed (927cb01); item 8 landed as the opt-in `?cogReader=loaders` (9d8a307); item 9's splat loaders landed (c388c48, 9d8a307), so `src/` now imports loaders.gl (`nearfield/splat-loaders*.ts`, `concord/occl/cog-loaders.ts`). The upstream asks stay local by the user's choice. Current state: the WAG rows in [roadmap.md](../roadmap.md).*
 
 ## Headline
 
@@ -28,7 +32,7 @@ This sweep follows `luma-deck-upstream-2026-10-01.md`. The goal is to express th
    - `@luma.gl/gpgpu` already exports `GPUProgram`, `GPUProgramCompiler`, `GPUConditionalOperation`, `GPULoopOperation`, `GPUIncrementalExecution`, `GPUCommandGraphAutotuner` and `GPUCommandGraphInspector`.
    - **Correction (API audit, same day):** `GPUScalar`, `GPUValueArena` and the dispatch gate are *internal*. They can only be reached through a `GPUProgramCompiler` compilation.
    - GPU conditions work on compute nodes only. The graph has no clear or read nodes.
-   - See [whole-app-graph-plan.md](whole-app-graph-plan.md) §1 and `research_notes/whole-app-graph-2026-10-01/upstream-api.md`.
+   - See [whole-app-graph-plan.md](../whole-app-graph-plan.md) §1 and `research_notes/whole-app-graph-2026-10-01/upstream-api.md`.
    - The next level for us is *using* these. There is nothing new to vendor for them.
 3. **Exactly one upstream change is worth vendoring now: luma #3328, `Model` drawIndirect.**
    - It lets a draw take a GPU-resident instance count.

@@ -1,4 +1,6 @@
-# TM: terrain-matching deep research program (session mt-image-58, started 2026-09-27)
+# TM: terrain-matching deep research program (started 2026-09-27)
+
+*Update (2026-10-01): the program is finished; the synthesis is `reports/terrain-matching-research.md`, the follow-on plan `reports/terrain-matching-research.md` (final section). `research_notes/matching_v2_research.md` was removed 2026-09-29 (`git show 384df44:<path>`). The dev server is now on :3100, not :3000.*
 
 Goal: understand *why* photo↔terrain matching fails, and test technical ideas that prior work (reports/matching-v2.md,
 tools/matcher/v2/loma/REPORT.md, research_notes/matching_v2_research.md) proposed but never measured.

@@ -3,7 +3,9 @@
 *2026-09-29. Dev split only; nothing here spends `data_v3`. Inputs:*
 - *a code audit of rendering and matching;*
 - *two new literature and data sweeps. These deliberately skipped everything [tm_literature_2026-09.md](../research_notes/tm_literature_2026-09.md) already covers;*
-- *the existing records: [status.md](status.md), [terrain-matching-research.md](terrain-matching-research.md), [tm-strategy.md](tm-strategy.md), [concordance-research.md](concordance-research.md) and [negative-results.md](negative-results.md).*
+- *the existing records: [status.md](status.md), [terrain-matching-research.md](terrain-matching-research.md), [terrain-matching-research.md](terrain-matching-research.md) (final section), [concordance-research.md](concordance-research.md) and [negative-results.md](negative-results.md).*
+
+> **Update (2026-10-01):** phase 0 ran on 2026-09-29 and **all four studies were killed** (E0–E3; reports in `tools/research/fund/*/REPORT.txt`, rows in [negative-results.md](negative-results.md)). E1 accepted 10/56 displaced-eye decoys, so it does **not** absorb R1/R2 as §4 proposed: the H1 → H2 veto plan stands, and the displaced-eye decoys are the test any future veto must pass. E4 and E5 are open, pending a phase-1 decision ([status.md](status.md)). In §1's audit, the three.js renderer was removed 2026-10-01 (583e2b7); the matcher's renders now come from the deck engines (5dbdfc5).
 
 ## 1. The short answer
 
@@ -65,7 +67,7 @@ Rules:
 | **E2 Date-matched appearance** | Most of the appearance gap is physics we can predict: snow on the day, sun direction, haze | At the ref pose, render 4 variants: (i) current; (ii) × hillshade lit by the photo-time sun (`look/sun.ts` already computes it; matcher renders use a fixed sun and a default date); (iii) + Copernicus GFSC snow mask (60 m daily, gap-filled, free for commercial use) tinting the ortho; (iv) + nearest clear Sentinel-2 L2A (CORS-open via Earth Search). Not the same as X3, whose snow and haze were generic, unfitted post-processing | LoMa and ALIKED inliers at the true pose, and true-vs-decoy separation (E1 score) | Median inlier gain < 15% **and** no separation gain | 2 days |
 | **E3 Near-field fidelity** | Rendering the near and mid field properly makes the eye observable and recovers the matching bucket | Within 2 km: swissALTI3D at z17 plus the swissSURFACE3D DSM (the C4 COG reader exists), SWISSIMAGE at 25 cm, and drop the 250 m match cut. Measure mid/near inliers, then run a free-centre solve on **mid-band** correspondences with the far-fixed rotation | (a) inliers < 2 km; (b) eye error vs ref eye compared with GPS error, on the 30 refs; (c) F1 matching-bucket photos that gain support | No gain in (a), **or** (b) not better than GPS on ≥ 60% of refs | 3 days |
 
-E0 decides where the effort goes. If position failures are predicted by low I_eye, E3 is the lever. If rotation failures are predicted by FOV/w\*, the lever is more field of view: multi-photo, or the pano solve from roadmap R5/tm-strategy B§3. E0 also becomes a product signal, "ask for a second photo".
+E0 decides where the effort goes. If position failures are predicted by low I_eye, E3 is the lever. If rotation failures are predicted by FOV/w\*, the lever is more field of view: multi-photo, or the pano solve from roadmap R5/terrain-matching-research (strategy, B§3). E0 also becomes a product signal, "ask for a second photo".
 
 ### Phase 1: the core techniques (≈ 2–3 weeks, gated on phase 0)
 
@@ -80,7 +82,7 @@ E4 and E5 are independent. E4 can run on the C0 cache immediately. E5 is a code-
 
 | ID | Method | Kill criterion |
 |---|---|---|
-| **E6 Data engine** | (a) **Render↔render appearance pairs** at identical poses (summer ortho / GFSC snow / Sentinel-2 / haze / sun). This is unlimited and licence-clean, the MARTIAN and AerialMegaDepth recipe. (b) **Webcams:** fixed pose, thousands of frames across seasons, weather and light, which is exactly our failure mix. Solve each camera once; perturbed and neighbouring-camera poses then give hard negatives with known truth. Needs written permission (Roundshot §5.7 research clause, foto-webcam.eu). (c) **CC crowd photos** (Commons, Flickr CC-BY/BY-SA, Mapillary for the near field), auto-posed, with only disagreements blind-verified (the tm-strategy §6 flywheel). Keep the frozen dev/test regions out of every training pool | (a) is always possible. (b) and (c) are your decisions |
+| **E6 Data engine** | (a) **Render↔render appearance pairs** at identical poses (summer ortho / GFSC snow / Sentinel-2 / haze / sun). This is unlimited and licence-clean, the MARTIAN and AerialMegaDepth recipe. (b) **Webcams:** fixed pose, thousands of frames across seasons, weather and light, which is exactly our failure mix. Solve each camera once; perturbed and neighbouring-camera poses then give hard negatives with known truth. Needs written permission (Roundshot §5.7 research clause, foto-webcam.eu). (c) **CC crowd photos** (Commons, Flickr CC-BY/BY-SA, Mapillary for the near field), auto-posed, with only disagreements blind-verified (the terrain-matching-research strategy flywheel). Keep the frozen dev/test regions out of every training pool | (a) is always possible. (b) and (c) are your decisions |
 | **E7 Domain adapter** | A small adapter in front of the frozen matcher (the AeroMap3D recipe: 62→99% registration from ~34k synthetic pairs), or feature fine-tuning for E4. Train on E6(a) first, then (b) and (c) | < 10% relative gain in dev inliers or accepted recall |
 | **E8 Learned likelihood** | Replace E1's hand-chosen test statistic with a pair scorer trained on E6 negatives (the Doppelgangers idea, clean backbone). E1's decoy null stays as the calibration | No gain over E1 at 0 gross |
 

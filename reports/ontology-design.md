@@ -180,6 +180,8 @@ haze/relief/guided/color-stats files, `nearfield/deck-map-camera.ts` and `packag
 6. `ExportFormat` and `SplatExportFormat` become one `FormatDescriptor<K>`.
 7. The ontology `/dev/ontology` page browses the catalogue.
 
+*Update (2026-10-01): items 1–6 landed (39da866, edc485a, fac786f, 8fd383d); `DeckStyleMode` now aliases `ViewMode`, and `ExportFormat`/`SplatExportFormat` are both `FormatDescriptor<K>`. Item 7 was not built: the catalogue is browsed through the explainer's `OntologyPanel` and the generated `reports/ontology.md`. The stale-verdict app bug in 1b was fixed in b9d29b1. The current vocabulary entry point is `domain.ts` ([type-system-review-2026-10-01.md](type-system-review-2026-10-01.md)).*
+
 ## 6. Open questions (v1; resolved in v2, see 1b)
 - Should `Status` be a lattice (with join) or a flat union?
 - Is the `asserted` tier above `reference`? A user-saved pose beats ground truth in the roll today, so yes.

@@ -26,7 +26,7 @@ Rigi's core asset is geometric truth: a verified camera pose for an ordinary pho
 | Unknown-pose path (360° yaw search, free tilt, focal seeds) and tap-a-peak picker | `integration/unknown-pose`, `picker` | Archive, scanned and historical photos with no metadata |
 | Overlay: contours, peaks, SAC trails, distance tint, per-pixel lat/lon/elevation/distance | `look`, `style`, `osm` | Any vector layer can be drawn into a photo: routes, rail lines, hazard zones |
 | Blend: satellite, topo, relief and bands from the same viewpoint | both renderers | Then-vs-now, map-vs-reality, art styles |
-| In-map drape with occlusion shadow map; fly into the photo | `deck`, `engine.ts` | Photos as 3D content; monoplotting for science |
+| In-map drape with occlusion shadow map; fly into the photo | `deck`, `deck-webgpu` | Photos as 3D content; monoplotting for science |
 | Camera rolls: a day of photos on one map, spot panoramas, pose propagation | `src/lib/roll` | Trip stories, sport recaps, condition reports |
 | Step Inside near-field splats, Google/swisstopo 3D Tiles | `nearfield`, `tiles3d` | Villages, huts, stations and cable-car terminals in 3D |
 | Style presets incl. berann, topo-ink, swiss, night | `src/lib/style` | Art prints and panorama-painting output |

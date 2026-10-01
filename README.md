@@ -54,13 +54,15 @@ by `npm run generate-routes`).
 
 | Route | What it is |
 |---|---|
-| `/` | Home: bundled photos by region, local uploads, the brand panorama |
+| `/` | Landing page: a scroll showcase on the bundled Niederhorn demo roll (`public/demo/`) |
+| `/library` | Bundled photos by region and local uploads |
 | `/photo/$id` | The workspace (`src/components/PhotoWorkspace.tsx`): auto-align, second opinion, manual align, modes, style, export |
 | `/upload` | Upload any photo (HEIC via libheif in a worker, EXIF via exifr). Photos with no compass, gravity or focal take the unknown-pose path |
 | `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (`src/lib/roll/**`): a whole day's photos clustered into rolls and spots, with a mosaic, per-spot panoramas, and every photo draped on one deck.gl terrain map |
 | `/baseline` | Debug UI for the CPU pipeline (`src/baseline-ui`): horizon, skyline detection, solve, peaks |
 | `/lab/splats`, `/lab/deck-splats`, `/lab/generate` | Step Inside dev benches: splats in each renderer, and P3 generation (`?nearfield=gen`, GT poses only) |
 | `/lab/deck-webgpu` | The WebGPU deck renderer in isolation (`WebGpuEngine`, `src/lib/deck-webgpu`); the app uses it by default via `?renderer=auto` |
+| `/dev/graph`, `/dev/meta`, `/dev/how-scene`, `/dev/export-roll` | Dev pages: the GPU app-graph inspector, the explainer figures, the "how it works" scene, and the demo-roll exporter |
 
 **Renderers.** `src/lib/renderer.ts` is the engine interface that PhotoWorkspace and the export layer
 use. Both backends are deck.gl on luma.gl, picked by `src/lib/renderer-select.ts` and loaded on demand:
@@ -105,7 +107,7 @@ on its own 360° Mapterhorn scene. It serves two cases:
    through the solver options: a 360° yaw search, free tilt, and three focal seeds, with a stricter
    0.75 accept bar.
 
-**Matcher service** (`tools/matcher`; `reports/matcher-service-v040.md`). This is
+**Matcher service** (`tools/matcher`; `reports/matcher-service.md`). This is
 an optional Python service on :8765 that does render-and-match (ALIKED + LightGlue against app
 renders from a headless Chromium worker), fused with the skyline cue. The app reaches it through
 `src/lib/matcher-client.ts` (`VITE_MATCHER_URL`) and degrades silently when it is down.
@@ -146,6 +148,12 @@ overlapping photos is wired into `/roll` as suggestions only, behind `?propagate
 | `?terrain=tiles` | deck: per-tile terrain instead of batched |
 | `?reveal=off\|<preset>` | Load animation |
 | `?concord=eye,occl` | Concordance: focal-table eye prior, DSM occluder dimming |
+| `?horizonPrecision=f64`, `?alignPrecision=f64` | Opt out of the certified-f32 GPU horizon / align refine (default `certified-f32`) |
+| `?terrainGpuCull=off`, `?terrainGpuDecode=off` | WebGPU: CPU terrain culling / CPU Terrarium decode (GPU paths on by default) |
+| `?picker=on\|always` | Top-3 picker / tap-a-peak (`src/lib/picker`) |
+| `?propagate=on` | `/roll`: pose propagation suggestions (needs its service) |
+| `?tiles3d=buildings\|swisstopo\|google\|all` | 3D Tiles in Step Inside (`src/lib/tiles3d`) |
+| `?cogReader=loaders` | loaders.gl COG reader instead of the built-in one |
 
 Every flag is declared in `src/lib/flags` (typed, the only reader), carried across navigation by the root route, and settable from the photo sidebar's **Experimental & dev** section. Booleans are `on`/`off`. Harnesses override per realm with `globalThis.__RIGI_FLAGS__ = { gpu: "off", … }`.
 
@@ -218,8 +226,8 @@ node scripts/eval-app.mjs [photoId ...]      # the app's final pose vs data/cont
 node scripts/leaderboard.mjs                 # every method re-scored on one GT snapshot → reports/leaderboard.md
 
 # regression gate (scripts/ci/README.md): one runner for every check
-node scripts/ci/run.mjs fast                 # ~30 s: tsc, biome ratchet, ~34 unit checks
-node scripts/ci/run.mjs full                 # + browser checks (style-baseline, deck smoke, eval-app, eval-app-deck), via the render lock
+node scripts/ci/run.mjs fast                 # ~30 s: tsc, biome ratchet, unit checks (57 fast ids)
+node scripts/ci/run.mjs full                 # + 6 browser checks (style-baseline, deck smoke, eval-app, eval-app-deck, settle-submits, graph-plumbing-ab), via the render lock
 node scripts/ci/run.mjs --list               # every check, its command and inputs
 
 # matcher service (optional; needs tools/matcher/.venv and weights)

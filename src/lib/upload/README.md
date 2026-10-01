@@ -55,11 +55,13 @@ registerWithWorkspace(saved.meta, saved.region); navigate({ to: '/photo/$id', pa
 
 ## Integration status
 
-Session 9e has already landed the hook:
+The workspace hook has landed:
 - `photos.ts` exports `registerLocalPhoto(meta, region)`. `getPhoto` checks `localPhotos` first, and `regionCache` is seeded.
 - `photo.$id.tsx` loader: for an unknown `local-*` id it lazy-loads `src/lib/upload/index.ts` via `import.meta.glob` and calls `ensureLocalPhotoRegistered(id)`. Cold reloads of `/photo/local-…` therefore restore from IndexedDB, and verify.mjs checks this.
 
-Still wanted from session 9e for uploads with no heading (`(photo as LocalPhotoMeta).local?.yawUnknown`, equivalently `photo.heading == null`):
+*Update (2026-10-01): both items below are done. `src/lib/integration/unknown-pose.ts` runs a 360° yaw search (CPU cascade, then the fused `/match` sweep) when the heading is unknown, and the Heading slider in `PhotoWorkspace.tsx` spans 0–360° when `unknowns.yaw`. The original request is kept for the record.*
+
+Originally wanted for uploads with no heading (`(photo as LocalPhotoMeta).local?.yawUnknown`, equivalently `photo.heading == null`):
 1. **Solver** (`align.ts` / `deck/engine.ts`): run the coarse yaw grid over the full 360° instead of ±25° around `heading ?? 0`. When this was written, the since-removed three.js `engine.ts` used `yaw: photo.heading ?? 0` (check `align.ts` and `deck/engine.ts` for the current seed) with the ±25° window, so these uploads usually misalign.
 2. **Manual Heading slider** (`PhotoWorkspace.tsx:599`): its range is `(photo.heading ?? 0) - 40` to `(photo.heading ?? 0) + 40`, so with no heading the user cannot set anything outside about ±40° of north and cannot fix the alignment by hand either. When `heading == null`, use the full 0–360° range (wrap-around).
 
@@ -101,7 +103,7 @@ If a browser's classic workers can't run dynamic `import()`, the decode falls ba
 
 ## Known limitations
 
-- The yawUnknown 360° search is not implemented on the solver side yet (see above).
+- ~~The yawUnknown 360° search is not implemented on the solver side yet~~ (done: `integration/unknown-pose.ts`, see above).
 - The OSM tile server is used directly for the pin map: light use with attribution is fine, but heavy use would need our own tiles or a provider.
 - Overpass latency varies from about 5 s to over 2 minutes under load. Peaks are needed for labels; if they fail, the photo is saved with an empty region and **Retry** or `refreshLocalRegion` fills it in later.
 - Uploads live only in this browser's IndexedDB. There is no server sync and no quota handling beyond the errors being surfaced.
@@ -110,8 +112,8 @@ If a browser's classic workers can't run dynamic `import()`, the decode falls ba
 - The time-zone guess from longitude is coarse (no tz database).
 - The non-secure-context hash fallback samples bytes. It is fine for ids but is not a cryptographic hash.
 
-## Unknown-parameter flags (added after f0's ablation, reports/bench-ablation.md)
+## Unknown-parameter flags (added after the ablation in reports/bench-ablation.md)
 
 `meta.local` carries `yawUnknown` (no EXIF heading), `pitchRollUnknown` (no Apple gravity vector: pitch/roll are 0 placeholders) and `focalUnknown` (no 35 mm focal: f35/vfov are the iPhone default).
 Solvers must free the corresponding parameters instead of trusting the placeholders. For any of them, the app's autoAlign must not auto-accept its result.
-Route these uploads to the fused `/match` service when `matcherAvailable()`. Otherwise use 0f's cascade with the unknowns declared, which gave 0 false accepts across all ablation conditions.
+Route these uploads to the fused `/match` service when `matcherAvailable()`. Otherwise use the CPU cascade with the unknowns declared, which gave 0 false accepts across all ablation conditions.

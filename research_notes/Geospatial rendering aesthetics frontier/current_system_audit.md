@@ -2,6 +2,8 @@
 
 Scope: this is a read-only audit of the working tree at the repository root (branch master, HEAD 0544df0, with uncommitted landing/demo work). Every source below is a repo path, with `:line` where useful, relative to the repo root. No dev server was run, so statements about how things look on screen are inferred from code and comments, not from screenshots.
 
+*Update (2026-10-01): a snapshot at 0544df0. The three.js `PhotoEngine` it cites (`src/lib/engine.ts`, `src/lib/materials.ts`) was removed in 583e2b7, and deck.gl on WebGPU is now the default renderer.*
+
 ---
 
 ## 1. What visual layers exist, and what is on by default versus behind flags or presets?

@@ -102,6 +102,8 @@ applyPose(camera, res.pose, aspect, engine.eye)
 
 ## Integration steps for session 9e (owner of align.ts, deck/engine.ts and photo.$id.tsx)
 
+*Update (2026-10-01): steps 1–2 are proposals that were not wired: `align.ts solvePins` is still the app's pin solver. What did ship is `refineEyeFromSkyline` (below), as the "Check camera position" suggestion behind `?eyesearch=` (`src/lib/gpu/eye/suggest.ts`, `src/components/EyeSuggestion.tsx`).*
+
 1. **Pins.** Replace or extend `align.ts solvePins(prior, aspect, eye, pins, W, H, solveFov)`. Engine `Pin.world` is already in the engine frame, so convert each `Pin {u, v, world}` directly to `{kind:'point', u, v, world}`, or to `{kind:'dir', …}` for sky or DEM-direction pins.
    - **Priors:** build them with `priorsFromPhoto(photo, { eye })`, where `eye` is the same `eye` vector that solvePins receives (engine.eye = `(0, 0, eyeAlt)`). Do **not** use the default `[0,0,0]`: that is sea level in the engine frame.
    - **Solve:** call `solvePose6dof(corrs, priors, {aspect, imageWidth: W, solveFov})`.

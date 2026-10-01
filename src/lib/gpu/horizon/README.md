@@ -18,7 +18,7 @@ The app's skyline has two f64 stages on the CPU after the GPU march (dataflow D7
 - **A (D7)**: `index.ts` collect turns the march's `tBest` (f32) into elevation degrees: `t ≤ −3e38 ? −90 : Math.atan(t) / DEG`, stored as f32. 7200 samples per eye.
 - **B + C (D8)**: the horizon-fast-app worker takes each sample (elevation f32, distance f32) back to its geographic point (`destination`), through WGS84 `EnuFrame.fromGeo` to an ENU azimuth / elevation in f64 (B). It then interpolates the profile at the 8192 `GPU_COLUMNS` azimuths and writes unit directions as f32, skipping columns whose bracketing samples hit no terrain (C).
 
-`precision: "certified-f32"` runs these stages on the GPU in f32 arithmetic and certifies each output. The default stays `"f64"` (the CPU code, unchanged).
+`precision: "certified-f32"` runs these stages on the GPU in f32 arithmetic and certifies each output. The library default stays `"f64"` (the CPU code, unchanged); the app passes `"certified-f32"` by default since 2026-10-01 (3225064, flag `horizonPrecision`, `opt-in.ts`; `?horizonPrecision=f64` restores the CPU stages).
 
 ### What "certified" means
 
@@ -194,11 +194,11 @@ At d = 2 m the f64 path's own ECEF rounding (≈ 10⁻⁸ m) is 5·10⁻⁹ rad 
   - Spot-check ledger (2026-10-01): node timing of the spot check on a 7200-sample profile, packed buffers reused: stage C 1.75 ms with 64 columns, 0.27 ms with 8; stage A 0.10 / 0.07 ms (the scan for certified indices dominates). After the 3 qualifying calls per adapter, a call pays the 8-sample check, and 1 in 32 calls the 64-sample one. The browser finish was not re-measured.
   - All figures include the uploads (td / prof 57.6 KB, az 230 KB, cols 256 KB) and readbacks.
 
-### Wiring and what stays opt-in
+### Wiring and the default
 
 - `computeHorizonGpu(device, mosaics, eyes, { …, precision: "certified-f32" })` gives elevations through stage A. The march output is read back as before and uploaded to the stage-A graph.
 - `skylineDirs(device, prof, job, eyeH, precision)` gives the worker's directions.
-- The horizon-fast-app worker uses both when the page sets `?horizonPrecision=certified-f32` (`src/lib/flags`) and the GPU march is on (`horizonPrecisionOptIn()`). Its `stats.precision` reports ties and timings.
-- The default is `f64`. A certified-f32 stage does not become the default until its EVAL / wild-set gate passes (P1).
+- The horizon-fast-app worker uses both when the `horizonPrecision` flag is `certified-f32` (`src/lib/flags`, the default) and the GPU march is on (`horizonPrecisionOptIn()`). Its `stats.precision` reports ties and timings.
+- The flag default is `certified-f32` since 2026-10-01 (3225064): the precision gate (50 dev photos, deck and webgpu, plus GT-12) found no quality difference, though the f64 baseline itself was not reproducible run to run, so decisions were judged on quality rather than bit identity. `?horizonPrecision=f64` keeps the CPU stages.
 - The gate: `node scripts/gpu/precision-gate.mjs [--stage horizon|align|both] [--eval]` runs the frozen dev split through the wild harness's app method twice (f64 vs certified-f32, `--renderer webgpu` pinned, one render-lock step per chunk of photos) and requires identical decisions, poses and per-seed results, and that the certified path really ran. The render worker takes the flags from `MATCHER_RENDERER` / `MATCHER_HORIZON_PRECISION` / `MATCHER_ALIGN_PRECISION`; `scripts/eval-app.mjs` takes `--horizon-precision` / `--align-precision` / `--json`. Each records the path the stages took (`lastFastHorizonStats` in `horizon-fast-app.ts`, `lastAlignTiming` in `../align`).
 - The kernels read plain storage buffers (`td` = the march's [t, d] pairs, `prof` = [elevation, distance]). The page-device horizon (W3.1's device half) can then bind the march's output transient directly and fuse A → B → C into one graph. B needs A's exact elevations, so the fused graph would propagate A's uncertainty into B, marking a sample uncertain when A is. Today A finishes on the CPU before B runs.

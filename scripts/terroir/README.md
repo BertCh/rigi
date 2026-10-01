@@ -12,6 +12,12 @@ npx tsx scripts/terroir/inspect-pack.ts thunersee   # counts, top names, histogr
 npx tsx scripts/terroir/pack.check.ts               # schema + sanity points (pure node)
 ```
 
+`pack.check.ts` runs in the CI fast tier as `terroir-pack`.
+
+Shader identity proofs (not pack tools): `shader-identity-snap.ts` (deck WebGL terrain shaders) and
+`wgsl-identity-snap.ts` (deck-webgpu terrain-styles WGSL) dump the terrain programs with every terroir switch off;
+diffing a run before and after a change proves the terroir shading is additive. Usage is in each file's header.
+
 Output: `public/terroir/index.json` (entries merged by id, others kept) and `public/terroir/<id>/{pack.json,cover.png}`.
 Everything is fetched by node at build time and cached in `TERROIR_CACHE` (default `~/.cache/rigi/terroir`; about 350 MB
 extracted, of which the swissNAMES3D shapefiles are most). Delete the cache dir to free disk; the next run re-downloads.

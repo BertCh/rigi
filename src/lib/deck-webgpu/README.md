@@ -39,7 +39,7 @@ Hence:
   MRT, MSAA resolve and pipeline state.
 - deck's canvas pass draws only the screen cores, through one thin `CoreLayer`.
 
-We are on luma 10.0.0-alpha.2 with deck vendored from PR #10752. Moving to a published deck 10
+We are on luma 10.0.0-alpha.2 (vendored as `10.0.0-alpha.2-rigi.2`, `vendor/luma/README.md`) with deck vendored from PR #10752. Moving to a published deck 10
 should be mechanical: only `hosts/deck.ts` and `device.ts` touch deck. Cores use `Model`,
 `ShaderModule` and `RenderPass` and nothing else, and build their Models with pass.ts's own
 `WGSLShaderAssembler`, so deck's default-assembler state never reaches them.
@@ -67,7 +67,7 @@ host). `scripts/deck-webgpu/vite.webgpu.config.ts` is kept for :3111 and is now 
 - **Init failure**: PhotoWorkspace awaits `engine.whenReady()` before starting the engine. If the
   host fails to boot, the engine is disposed, the canvas is re-mounted (a canvas that held a WebGPU
   context cannot give a WebGL2 one) and DeckEngine runs on it.
-- **What ran**: the workspace root carries `data-renderer` = `webgpu` | `deck` | `three` and
+- **What ran**: the workspace root carries `data-renderer` = `webgpu` | `deck` and
   `data-renderer-reason` (`pinned`, `auto: <adapter>`, `webgpu=off`, `fallback: <why>`).
   `__engine.backend === "webgpu"` tells WebGpuEngine apart from DeckEngine (both have kind `deck`).
 - **Compute**: both hosts hand their device to `src/lib/gpu/device.adoptRenderDevice`, so
@@ -288,24 +288,24 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
 - On :3100 / :3110 (app vite config, deck `visgl:webgl-only`) everything falls back to the
   direct host automatically.
 
-## Compute interop (mt-image-03, src/lib/gpu)
+## Compute interop (src/lib/gpu)
 
 - `device.ts adoptForCompute(device)` is the only coupling point. It calls
   `src/lib/gpu/device.adoptRenderDevice(device)` for both hosts, so look kernels run on the render
   device and bind the targets above directly: `STORAGE_BINDING` is set on geometry, normal and
   colour.
 - `SplatsCore`'s order buffer is written by the GPU radix sort with `sortBackend: "gpu"`
-  (`src/lib/gpu/splat-sort`, the worker stays the default and fallback).
+  (`src/lib/gpu/splat-sort`; the GPU sort is the default, the worker the fallback, `layers/splats.ts`).
 - GPU cull + indirect draws (WAG W1.5): `layers/terrain-cull.ts` culls the batched terrain's tiles
   (conservative f32 twin of `sphereInView`), compacts the visible rows in the CPU path's order and
   writes one indexed indirect record per mesh resolution; `BatchedTerrainCore.draw` draws them with
   luma's `Model.setIndirectBuffer` (#3328). It is recorded by the optional
   `GpuLayerCore.prepass(ctx)`, which `hosts/passes.ts` calls on the pass's encoder right before the
-  geometry / colour render pass. Flag `terrainGpuCull` (default **off**: byte-identical, but no CPU saving at ~350–390 tiles, 0.15–0.19 vs 0.12–0.14 ms per frame; WebGPU only, `?gpu=off` and
+  geometry / colour render pass. Flag `terrainGpuCull` (default **on** since 2026-10-01, 3225064: byte-identical, no CPU saving at ~350–390 tiles, 0.15–0.19 vs 0.12–0.14 ms per frame, but GPU-graph first; WebGPU only, `?gpu=off` and
   WebGL keep the CPU cull). Gates: `layers/terrain-cull-math.check.ts` (fast tier `terrain-cull`)
   and `scripts/deck-webgpu/terrain-indirect-check.mjs` (byte-equal frames, CPU ms).
 - GPU Terrarium decode (WAG W2.3 wiring + W2.4): `terrain-gpu-decode.ts` is the terrain stream's
-  tile loader under flag `terrainGpuDecode` (default **off**; batched terrain, `?gpu=on`; WebGL and
+  tile loader under flag `terrainGpuDecode` (default **on** since 2026-10-01, 3225064, after the height gathers below; batched terrain, `?gpu=on`; WebGL and
   `?gpu=off` keep the CPU decode). A tile that stands for itself (no ancestor crop) and is 256 or
   512 px is decoded from its `ImageBitmap` on the GPU (`gpu/ingest/terrarium-tile.ts`), halved when
   the mesh wants 256 px, and only its statistics come back (validateTile's out-of-range count, exact
@@ -321,7 +321,7 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   materialised on the main thread within 8 s of ready (peaks, trails, lake floor), 298–349 ms in
   total, where the default path decodes in workers; and the small height atlas uploads ~4× the
   bytes (rgba8 512 px sources instead of r32f 256 px heights), plus one upload per tile for the
-  load-time stats. Hence default off: the hot heightAt callers need batched GPU gathers first.
+  load-time stats. Hence it stayed off until the hot heightAt callers moved to the batched GPU gathers below (the load time with the flag on is not re-measured).
 - GPU height gathers (WAG W2.4 second half, under `terrainGpuDecode`): `height-gather.ts`
   `HeightGather.heightsAt(set, lats, lons)` answers TerrainSet.heightAt bit for bit (NaN = null)
   without materialising lazy tiles. Plan and blend stay on the CPU in f64 (`TerrainSet.locate`,
@@ -431,7 +431,7 @@ IMG_7130 with `fullTerrain` and views at ±90°: autoAlign pose bit-identical, m
 ## Known gaps
 
 - **Renderer interface.** `WebGpuEngine` implements all of `Renderer`; deviations:
-  `kind` is `'deck'` (the type only allows three / deck) with `backend: 'webgpu'`, so tools that
+  `kind` is `'deck'` (the only value since three.js was removed) with `backend: 'webgpu'`, so tools that
   poke WebGL deck internals (`deckInstance.layerManager`, compositor) must check `backend`.
 - **Step Inside map mode** runs on deck's MapController only on the deck host (`setExtraViews`,
   now implemented); on the direct host `StepCamera` runs its own map mode.
@@ -454,15 +454,15 @@ IMG_7130 with `fullTerrain` and views at ±90°: autoAlign pose bit-identical, m
 - **Device features:** `float32-filterable` is required (rule 14); Chrome on Apple Metal is the
   only tested platform.
 - **Band stats** (LOOK_HARMONIZE) in world mode render without the drape (as WebGL roughly did);
-  exact parity unverified. The compute band-stats shader `look-band-stats-sg` in src/lib/gpu fails
-  to compile on the adopted device (`value nan cannot be represented as 'f32'`), so the CPU path is
-  used (mt-image-03).
+  exact parity unverified. The compute band stats run on the GPU on the adopted device (the plain
+  `BAND_STATS` graph by default; the earlier `look-band-stats-sg` NaN-constant compile failure was
+  fixed in 2af1daf, see `reports/webgpu-default.md`).
 
 ## Staged plan to replace the WebGL DeckEngine
 
 1. **Now (done):** every layer ported with an isolation check; `WebGpuEngine` implements
    `Renderer`; lab + bench (`bench.mjs`) against `/photo/<id>?renderer=deck`.
-2. **Opt-in in the app** (owners of PhotoWorkspace / flags / vite.config): add `?renderer=webgpu`
+2. **Opt-in in the app (done; `src/lib/renderer-select.ts`, the snippet below is historical)**: add `?renderer=webgpu`
    (snippet in `engine.ts` WIRING and below), falling back to the WebGL DeckEngine when
    `WebGpuEngine.available()` is not ok. Make the `visgl:webgl-only` condition conditional (or
    drop it: about +124 KB on the WebGL deck path) so the deck host runs in the app.
@@ -476,8 +476,8 @@ IMG_7130 with `fullTerrain` and views at ±90°: autoAlign pose bit-identical, m
 5. **Retire WebGL deck layers** (terrain-layer, batched-terrain-layer, composite*, trail-layer,
    world-view layers, deck-splat-layer, tiles3d deck-layer, geometry-pass) once Safari / Firefox
    ship WebGPU on the supported OS versions; move `/roll` last (`layers/multi-drape.ts` is ready).
-6. **luma 10 / deck 10:** we run luma 10.0.0-alpha.2 with deck vendored from PR #10752 (its
-   packaging needs the `.npmrc` / `overrides` workarounds, `vendor/deck/README.md`). Only
+6. **luma 10 / deck 10:** we run vendored luma `10.0.0-alpha.2-rigi.2` with deck vendored from PR #10752
+   (one `@deck.gl/core` override remains; no `.npmrc`; `vendor/deck/README.md`, `vendor/luma/README.md`). Only
    `hosts/deck.ts` and `device.ts` touch deck; swap to npm when deck publishes on luma 10, then
    drop the workarounds listed below.
 
@@ -519,9 +519,9 @@ vendor). Each open one has a local workaround.
    from the exported shader modules' `source` (`project`, then `project32`, `picking`), null in
    webgl-only).
 
-*Pending re-vendor* (fixed in luma's own deck patch, `.yarn/patches/@deck.gl-core-npm-9.4.0-707f3fb147.patch`
+*Re-vendored in b7ed88a* (fixed in luma's own deck patch, `.yarn/patches/@deck.gl-core-npm-9.4.0-707f3fb147.patch`
 from luma #3325 / `7d1d11e9`; not in deck master, #10752 or any open deck PR; dormant for us today
-— full-canvas views, no picking — but needed before the WebGPU renderer ships): WebGPU Y-origin in
+— full-canvas views, no picking; now in our vendored deck, still upstream-only): WebGPU Y-origin in
 `getGLViewport`, the pick pass `scissorY`, the `DeckPicker` readback flip / row order, a
 `depth24plus` attachment on `deck-renderbuffer-0`, and the `project.wgsl`
 `project_get_orientation_matrix` `select` argument order (NaN for a vertical up vector).

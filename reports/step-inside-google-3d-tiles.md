@@ -4,6 +4,8 @@ Date: 2026-09-29. It started as a research-only investigation, and the same day 
 
 ## Build status (2026-09-29)
 
+> **Update (2026-10-01):** the three.js engine was removed (583e2b7), so the "three.js" rows and the three.js frame-rate and load-time figures below describe a path that no longer ships, and §4.3 (`engine.ts`, `materials.ts` line references) is historical. 3D Tiles now render in deck.gl WebGL2 (`tiles3d/deck-layer.ts`) and in the WebGPU engine (`deck-webgpu/layers/tiles3d.ts`, same `Tiles3DSet` selector; per-layer checks only, no browser A/B yet). The Draco decoder is served from `public/tiles3d/draco/` rather than `three/examples` (§4.1). Still open: T2 and the official Google logo.
+
 **Your decisions:**
 1. Billing is a **US** Google Cloud account, which is non-EEA, so the tiles are served (root.json returns 200). The key was copied from poopdeck-presentation into `.env.local` as `VITE_GOOGLE_TILES_KEY`. It has no referrer restriction.
 2. Rendering Google tiles in deck.gl or three.js is fine by you. The ToS "non-Google map" question is **not pursued**.

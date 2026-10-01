@@ -53,6 +53,13 @@ Under WebGPU the render device is also the compute device (`adoptRenderDevice`).
 
 `?renderer=deck` is the escape hatch for Step Inside with splats or 3D tiles, and for 12 MP export, until those are verified.
 
+*Update (2026-10-01, later), against the two tables above:*
+- *Terroir: ported to WGSL on the WebGPU engine (366ab83); `auto` no longer routes terroir styles to WebGL.*
+- *Memory: photo-view VRAM on WebGPU went 371 → 241 MiB (dc4fa28, WAG W1.6), against 175–188 MiB on WebGL.*
+- *Matcher: `WebGpuEngine` now has `loadFullTerrain`, `loadSatellite` and `renderPoseView` (0753897, 1fdd1da), and the render worker uses them on WebGPU (5dbdfc5); parity numbers are in `src/lib/deck-webgpu/README.md`.*
+- *The precision gate ran the 50-photo dev split on webgpu as well as deck (3225064's message: webgpu accepts identical); the eval-app GT row in "Partial evidence" is otherwise still unrun as a renderer gate.*
+- *luma is now the vendored `10.0.0-alpha.2-rigi.2` (d0969e2, c5b2aa1).*
+
 ## Consolidated pass (on hold)
 
 When the user asks for it, run the battery once per renderer: webgpu/auto, deck, and forced fallback (three.js was also in this list before its removal).

@@ -1,8 +1,12 @@
+Archived 2026-10-01: folded into [../terrain-matching-research.md](../terrain-matching-research.md) ("Strategy carried forward").
+
 # Terrain matching: execution plan for the five next steps, and a broader view of the problem
 
 *2026-09-28 · follows `reports/terrain-matching-research.md` (§7). Dev only; data_v3 untouched.*
 
 ## Part A — what is running now
+
+> **Update (2026-10-01):** the statuses below are as of 2026-09-28. Since then: H1 is done (`tools/research/tm/h1_mine/REPORT.txt`; the blind pack holds 120 overlays across 27 photos), P1 is done (Part C, negative), step 1b blind verification is ready but not started (roadmap R1), and steps 2, 3 and 5 still wait on it (R2, R3, R6). From Part B, §1's top-3 picker / tap-a-peak is built behind `?picker=on` (R4, `src/lib/picker/README.md`), and §4's near-field render option was tested as FUND E3 and killed ([negative-results.md](../negative-results.md)). Current state: [status.md](../status.md), [roadmap.md](../roadmap.md).
 
 | step | study | dir | status |
 |---|---|---|---|

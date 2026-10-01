@@ -28,6 +28,7 @@ OSM peaks ─► viewPeaks ─► layoutPeakLabels
 | `solve.ts` | `solvePose` and `projectSkylineRows`. Pitch/roll outside ±3° of gravity are rejected ("tilt") |
 | `peaks.ts` | OSM `natural=peak` query/parse, visibility against the DEM, label layout |
 | `control-points.ts` | Tap-the-peaks solver: 1 point → yaw+pitch, 2 → +roll, ≥3 → +f |
+| `pipeline.ts` | Core shared by the `/baseline` and unknown-pose workers: DEM → terrain → eye → 360° horizon, and the solvePose → refinePose cascade |
 
 ## Commands
 
@@ -83,8 +84,8 @@ Mapterhorn is right about the ground: at IMG_7059, Terrarium is 80 m low (1,863 
 
 ## Known limitations
 
-- **DEM:** Terrarium is 40–85 m low on the Niederhorn cliffs and smooths near summits. That's the main error on ridge-top photos. Better DEMs are the next step: Mapterhorn, or swissALTI3D in Switzerland.
-- **Eye height:** `max(GPS alt, ground+1.6 m)`. Neither fixed rule wins; solving Δh is being tried in `src/lib/refine/`.
+- **DEM:** Terrarium is 40–85 m low on the Niederhorn cliffs and smooths near summits. That's the main error on ridge-top photos. Mapterhorn (swissALTI3D in Switzerland) is wired in (see above) and is what the app and matcher solve on; the eval default waits on the ground-truth re-annotation (roadmap N5).
+- **Eye height:** `max(GPS alt, ground+1.6 m)`. Neither fixed rule wins; `refinePose` (`src/lib/refine/`) fits an eye-height offset only where the near/far parallax makes it observable (`eyeFitted`, `eyeSensitivityPx`).
 - **Focal length:** EXIF 26 mm (iPhone 11 Pro) reads about 2% short. The solver absorbs this within its ±8% f clamp.
 - **No compass heading:** pass `solvePose(..., { headingKnown: false })` (or any `yawRange` ≥ 90°). It goes straight to the full-360° search with the stricter 0.75 bar. In the wild benchmark, a 360° first pass at 0.5 falsely accepted IMG_7053 at −123.7°. Synthetic test (`BIG_YAW=1 NO_HEADING=1 npm run baseline:synth`): 10/13 accepted, all correct.
 - **Wild benchmark (f0, 100 Commons photos, Mapterhorn, blind-verified):** the cascade gets 25 correct (14 on Terrarium). At the 0.75 bar it makes 22 accepts, all correct.

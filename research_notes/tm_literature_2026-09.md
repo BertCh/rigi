@@ -2,8 +2,8 @@
 
 Scope: what the 2024–2026 literature adds beyond what this repo already covers. The existing coverage is in:
 - `reports/Mountain photo georeferencing SoTA.md`
-- `research_notes/matching_v2_research.md`
-- `research_notes/analysis_algorithms_sota_2026.md`
+- `research_notes/matching_v2_research.md` (removed 2026-09-29; `git show 384df44:<path>`)
+- `research_notes/analysis_algorithms_sota_2026.md` (removed 2026-09-29; same)
 - `reports/matching-v2.md`
 - `tools/matcher/v2/loma/REPORT.md`
 - `reports/stage1.md`

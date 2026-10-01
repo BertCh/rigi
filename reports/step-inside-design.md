@@ -3,6 +3,8 @@
 Status: BUILT 2026-09-29. Results and the gate outcomes are in [step-inside-results.md](step-inside-results.md); the follow-on plan is in [roadmap.md](roadmap.md).
 
 > **Corrections since this was written:** the splat renderer is dependency-free (Spark was never added); the SHARP and VGGT licence questions are resolved (`research_notes/step_inside_models_2026-09.md`); the "people/huts on 8/12" P0 gate could not be tested, because the set has no people.
+>
+> **Update (2026-10-01):** the three.js PhotoEngine was removed (583e2b7), so the "three.js first" P1 row, the P1b parity row and decision 2 below are moot. Step Inside now runs on the two deck.gl engines: WebGL2 (`src/lib/nearfield/deck-splat-layer.ts`) and WebGPU (`src/lib/deck-webgpu/layers/splats.ts`, the default renderer, not yet exercised end to end). `three-splats.ts` survives only for `/lab/splats` and the P3 cache renderer.
 
 ## Thesis
 

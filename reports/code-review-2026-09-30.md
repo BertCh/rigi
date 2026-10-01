@@ -4,6 +4,8 @@
 
 Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 of 27 checks; the biome ratchet fails, but only on uncommitted files (`scripts/dev.mjs`, `scripts/demo/*`, `scripts/peakfix/*`, `src/lib/peakfix/*`, `src/components/site/LiveRollMap.tsx`). No critical bugs were found. The deck/deck-webgpu sub-reviewers' findings (CR-13, CR-14, CR-40–CR-46) were not re-checked line by line.
 
+*Update (2026-10-01): rows re-checked against `git log` after the three.js `PhotoEngine` was removed (583e2b7). Rows that pointed at `src/lib/engine.ts` (three.js) are marked obsolete; the CR-54–CR-68 fixes are cited by commit. CR-69's `relief-graph.ts` is `src/lib/gpu/look/relief-graph.ts`.*
+
 ## Fix first
 
 | ID | Sev | Where | Problem → failure | Fix | State |
@@ -36,7 +38,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 | CR-21 | `src/lib/photos.ts:71-77` | `loadRegion` doesn't check `r.ok` and caches the rejected promise → one transient error breaks the region for the session | fixed 9b2a4e9 |
 | CR-22 | `geo/peaks.ts:106` | One NaN sample makes `best` NaN in `localMax` | fixed 9b2a4e9 |
 | CR-23 | `cache/tile-cache.ts:151-157, 325-336` | Each tab overwrites the shared index; orphaned bodies are never evicted, so the store grows past its 300 MB cap | open |
-| CR-24 | `engine.ts:1473-1491, 2351-2371` | Frustum gizmo isn't hidden in the normal/silhouette passes → stale ink creases after a world-mode visit (three.js) | open |
+| CR-24 | `engine.ts:1473-1491, 2351-2371` | Frustum gizmo isn't hidden in the normal/silhouette passes → stale ink creases after a world-mode visit (three.js) | obsolete: three.js `engine.ts` removed (583e2b7) |
 | CR-25 | `scripts/ci/run.mjs:97, 252-309` | Ctrl-C leaves detached checks running (and holding the render lock); concurrent `full` runs share :3130 and one kills the other's server | fixed 9388eef |
 | CR-26 | `roll/roll.ts:8`, `vite.config.ts:17-27`; repo | A fresh clone can't build: gitignored `data/ground-truth.json` and `public/photos/photos.json` are imported. No `requirements*.txt` for the Python services | open |
 | CR-27 | `gpu/look/hooks.ts:93` | `warmKernelsAsync(device)` without a group compiles every kernel, including subgroup kernels on devices without `subgroups` | open |
@@ -46,13 +48,13 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 | ID | Where | Problem | State |
 |---|---|---|---|
 | CR-28 | `geo/peaks.ts:39` | `parseMetres("4,478")` = 4.478 | fixed 9b2a4e9 |
-| CR-29 | `engine.ts:1796, 1839-1844, 2549-2576` | World-mode group, trail material and several render targets aren't disposed | open |
+| CR-29 | `engine.ts:1796, 1839-1844, 2549-2576` | World-mode group, trail material and several render targets aren't disposed | obsolete: three.js `engine.ts` removed (583e2b7) |
 | CR-30 | `dem/load.ts` `fetchTile` | `return res.arrayBuffer()` without `await` escapes the retry, so one dropped body fails `Terrain.load` | fixed 9b2a4e9 |
 | CR-31 | `worker-pool.ts:43-51` | No `onmessageerror` or timeout; a job can hang forever | fixed 9b2a4e9 |
 | CR-32 | `cache/store.ts:133-139`, `upload/store.ts:37` | Late IndexedDB opens leak; no `onversionchange` | fixed a584a62 (upload/store; cache/store open) |
 | CR-33 | `upload/region.ts:376-386` | `attachPhotoToRegion` writes from memory, so concurrent uploads lose ids; `refreshLocalRegion` drops trails | fixed a584a62 |
 | CR-34 | `overpass.ts:36-43,73`, `integration/unknown-pose.ts:202-205` | Abort listener leak; abort doesn't stop the worker's 360° search | fixed 9b2a4e9 (overpass half) |
-| CR-35 | `engine.ts:2491-2503` | `exportImage` has no try/finally (renderer left at export size on OOM) | open |
+| CR-35 | `engine.ts:2491-2503` | `exportImage` has no try/finally (renderer left at export size on OOM) | obsolete: three.js `engine.ts` removed (583e2b7) |
 | CR-36 | `refine/robust.ts:394-456, 802-809` | Covariance mixes the IRLS weights of one pose with the Jacobian of the next | open |
 | CR-37 | `gpu/look/textures.ts` | ~20 kernels redefined under "look-tex" → double compile, synchronous on the render thread; subgroup −1 partials wrap to 4.29e9 (`:1125`) | open |
 | CR-38 | `gpu/core/graph.ts:398-401` | A rejected `compileAsync` is never cleared, so the graph can't be retried | fixed fec0515 |
@@ -64,7 +66,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 | CR-44 | `deck-webgpu/hosts/direct.ts:117-122`, `hosts/deck.ts:229-234` | `nextFrame` waiters never settle after destroy | fixed fec0515 |
 | CR-45 | `deck/batched-terrain-layer.ts:265, 516-521` | At the texture-array layer cap, a slot is dropped without releasing its row, forcing full re-uploads | open |
 | CR-46 | `deck-webgpu/imagery.ts`, `layers/composite.ts:979,1223`, `hosts/*` `setPhotoAspect` | Pending-upload leak, borrowed/owned photo texture handling, uncleared targets after an aspect change | open |
-| CR-47 | `nearfield/generate/inpaint-client.ts:114-196`; `routes/lab.generate.tsx:207-213` | Duplicate client paths with weaker abort handling; lab leaks a PhotoEngine on re-run | open |
+| CR-47 | `nearfield/generate/inpaint-client.ts:114-196`; `routes/lab.generate.tsx:207-213` | Duplicate client paths with weaker abort handling; lab leaks a PhotoEngine on re-run | open (lab PhotoEngine half obsolete: lab uses DeckEngine since 583e2b7) |
 | CR-48 | `export/splat.ts:368-370` | SHARP (research licence) splats can be exported with a note, not blocked | open |
 | CR-49 | `linalg/index.ts:131-144` | `invSym` reports σ = 0 for unobservable parameters (fails open in integrity) | open |
 | CR-50 | `pose6dof/solve.ts:588-592` | RANSAC adaptive stop uses an inlier ratio over all correspondence kinds → may stop early (read, not reproduced) | open |
@@ -91,21 +93,21 @@ Suggested commit split for that work: dev launcher; three.js near-eye cut; RollC
 
 | # | Where | Issue | State |
 |---|---|---|---|
-| CR-54 | `deck/engine.ts:682-730` `onContextRestored`, `deck/silhouette-gl.ts` | `silMask` not reset on context restore → every re-rank runs on dead GL handles, reads zeros and falls back to the CPU (correct, slow, GL spam). Fix: `silMask?.destroy(); silMask = null` | open (deck/engine.ts had uncommitted edits) |
+| CR-54 | `deck/engine.ts:682-730` `onContextRestored`, `deck/silhouette-gl.ts` | `silMask` not reset on context restore → every re-rank runs on dead GL handles, reads zeros and falls back to the CPU (correct, slow, GL spam). Fix: `silMask?.destroy(); silMask = null` | fixed 9e1a637 |
 | CR-55 | `deck-webgpu/layers/splats.ts:585` | `onLost` per `setCloud` (never removed) retained each old cloud | fixed b41658f |
 | CR-56 | `baseline-ui/pipeline.worker.ts:203-231`, `usePipeline.ts` | Align now awaits `cascadeAsync`; `run`/`detectSkyline` didn't invalidate it → stale pose lands | fixed b41658f |
-| CR-57 | `deck-webgpu/engine.ts:711-790` `boot` | A throw between `createHost()` and `this.host = host` leaks the device + built cores (the init fallback to WebGL leaves a live WebGPU device) | open |
-| CR-58 | `gpu/align/index.ts:213,223,258-261` | The private sky copy (`own`) is taken after `await scorePoseGridGpu`, not after `fitPriorSky` → concurrent autoAligns on one EdgeMap can score against each other's sky fit | open |
-| CR-59 | `renderer-select.ts:25-33,108` | "terroir → WebGL deck" is resolved only at mount; switching to a terroir style on WebGPU silently drops the shading | open |
-| CR-60 | `deck/engine.ts:1545,2911` | WebGL `TrailLayer` never gets `dash` (1152622 wired only WebGPU) | open (deck/engine.ts had uncommitted edits) |
+| CR-57 | `deck-webgpu/engine.ts:711-790` `boot` | A throw between `createHost()` and `this.host = host` leaks the device + built cores (the init fallback to WebGL leaves a live WebGPU device) | fixed bb0f9a8 |
+| CR-58 | `gpu/align/index.ts:213,223,258-261` | The private sky copy (`own`) is taken after `await scorePoseGridGpu`, not after `fitPriorSky` → concurrent autoAligns on one EdgeMap can score against each other's sky fit | fixed a6ac3a7 |
+| CR-59 | `renderer-select.ts:25-33,108` | "terroir → WebGL deck" is resolved only at mount; switching to a terroir style on WebGPU silently drops the shading | fixed 366ab83 (WGSL terroir port; 2f9ffd5 was the interim WebGL route) |
+| CR-60 | `deck/engine.ts:1545,2911` | WebGL `TrailLayer` never gets `dash` (1152622 wired only WebGPU) | fixed c72fea1 |
 | CR-61 | `scripts/eval-app.mjs`, `scripts/leaderboard.mjs` | Unset `--renderer` (= auto) launched Chromium without GPU_ARGS → measured WebGL | fixed b41658f |
 | CR-62 | `integration/unknown-pose.worker.ts:166-176` | Failed fused march re-ran the same GPU march before the CPU | fixed b41658f |
-| CR-63 | `look/haze-controller.ts:104-134` | Failed/stale bridged fit falls back to `hazeFitAsync` (GPU) even with `?lookgpu=0` | open |
+| CR-63 | `look/haze-controller.ts:104-134` | Failed/stale bridged fit falls back to `hazeFitAsync` (GPU) even with `?lookgpu=0` | fixed 6c5e872 |
 | CR-64 | `gpu/splat-sort/splat-sort.wgsl.ts:64-69` (+ cpu twin) | +Inf depth → `maxD = Inf`, every key NaN | fixed b41658f |
-| CR-65 | `deck/weather-layer.ts`; `style.weather` | Dead in HEAD: no importer, no engine reads the field (5c02363 says wiring "follows") | open |
-| CR-66 | `deck-webgpu/silhouette-gpu.ts:110-150` | Hand-built pipeline with a fake empty-layout KernelSpec: sync compile on the render thread, invisible to kernel-layout-check | open |
+| CR-65 | `deck/weather-layer.ts`; `style.weather` | Dead in HEAD: no importer, no engine reads the field (5c02363 says wiring "follows") | fixed c72fea1 (deck WebGL world view reads `style.world.weather`) |
+| CR-66 | `deck-webgpu/silhouette-gpu.ts:110-150` | Hand-built pipeline with a fake empty-layout KernelSpec: sync compile on the render thread, invisible to kernel-layout-check | fixed bffe801 |
 | CR-67 | both engines | `silhouetteScoresGpu`, `drawOnly`/`readDrawn` + 4-field pose compare, `occlusionFresh` duplicated across deck/deck-webgpu | open |
-| CR-68 | `gpu/align/index.ts:93,98,271`; `gpu/align/graph.ts:34`; `pose-bound.ts:100-107` | Test-only `faultDeflate` global ships in prod; `STORAGE` redefined; `PoseBoundRaw.n` unread | open |
+| CR-68 | `gpu/align/index.ts:93,98,271`; `gpu/align/graph.ts:34`; `pose-bound.ts:100-107` | Test-only `faultDeflate` global ships in prod; `STORAGE` redefined; `PoseBoundRaw.n` unread | fixed ac07d45 (faultDeflate DEV-gated, STORAGE deduped; `PoseBoundRaw.n` not rechecked) |
 | CR-69 | `relief-graph.ts:80-90`; `SilhouetteMaskGL.compile()`; `look/relief/field.ts:369-381` | Dead `_degenerate` param; link failure leaks shaders/program/VAO; `resident` replaced without dispose (device-loss rebuild only) | open |
 
 ## Checked and correct

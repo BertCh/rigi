@@ -1,6 +1,6 @@
 # tiles3d: 3D Tiles in Step Inside
 
-OGC 3D Tiles (Google Photorealistic, swisstopo buildings and vegetation) around the eye while you step inside a photo, in both engines. Off by default. Design and licence analysis: [reports/step-inside-google-3d-tiles.md](../../../reports/step-inside-google-3d-tiles.md).
+OGC 3D Tiles (Google Photorealistic, swisstopo buildings and vegetation) around the eye while you step inside a photo, in both deck.gl engines (WebGL2 `deck/engine.ts` and WebGPU `deck-webgpu/engine.ts`). Off by default. Design and licence analysis: [reports/step-inside-google-3d-tiles.md](../../../reports/step-inside-google-3d-tiles.md).
 
 ## Flags
 
@@ -21,13 +21,14 @@ Google needs `VITE_GOOGLE_TILES_KEY` in `.env.local` (gitignored). Without it, G
 | `frame.ts` | ECEF → the photo's ENU frame, minus N for ellipsoidal sources |
 | `tiles.ts` | `Tiles3DSet`: one `3d-tiles-renderer` TilesRenderer per source, a near-field mask plugin (3 km), material swap, credits |
 | `material.ts` | Tile shader (three), plus GLSL shared with deck: fill rule, clear zones, radius fade, log depth with bias |
-| `deck-tiles.ts` | The engine adapter: `deck/engine.ts` calls it (the three.js twin `three-tiles.ts` was removed in the 2026-10-01 cleanup) |
+| `deck-tiles.ts` | The engine adapter: `deck/engine.ts` and `deck-webgpu/engine.ts` call it (the three.js twin `three-tiles.ts` was removed in the 2026-10-01 cleanup) |
 | `deck-layer.ts` | `Tiles3DDeckLayer`: draws the set's visible THREE meshes as luma Models (i3dm instancing, log depth) |
+| `../deck-webgpu/layers/tiles3d.ts` | The WebGPU port of `Tiles3DDeckLayer` (WGSL, reversed-Z depth), fed by the same `Tiles3DSet` |
 | `tiles3d.check.ts` | Pure checks (CI `tiles3d`) |
 
 ## Rules (don't break them)
 
-- **Layer isolation.** Tiles live on THREE layer 8 (`TILES3D_LAYER`), which only the world/step camera enables. In deck, the layer isn't a terrain tile, so `PhotoCompositor` and the geometry pass skip it. `sampleAt`, horizon, silhouette, align, anchoring and concordance never see tiles. `scripts/tiles3d/step-tiles-check.mjs` asserts `sampleAt` is identical with tiles on and off.
+- **Layer isolation.** The selector's THREE group sits on layer 8 (`TILES3D_LAYER`); the tile layers draw only in the world/step view. In both deck engines, the layer isn't a terrain tile, so `PhotoCompositor` and the geometry pass skip it. `sampleAt`, horizon, silhouette, align, anchoring and concordance never see tiles. `scripts/tiles3d/step-tiles-check.mjs` asserts `sampleAt` is identical with tiles on and off.
 - **Google is display-only.** It's hidden in the Truth view and in every export (`withoutDisplayOnly`), never read back and never cached beyond the browser's HTTP cache. Its credits come from `GoogleCloudAuthPlugin` (per-tile `asset.copyright`, sorted by occurrence) and show in `components/nearfield/Tiles3DCredit.tsx`. **Before any public URL, add the official Google Maps logo** (16–19 dp; not bundled yet).
 - **Datum.** Google uses true ellipsoidal heights, so it's lowered by N. swisstopo's Cesium tilesets store MSL in the ellipsoid slot, as Rigi does, so N = 0. Both were measured at IMG_7018: Google's p25 (mesh − DEM) was −0.35 m, and swisstopo building bases sat a median −2.8 m.
 - **Fill rule** (`TILE_GLSL_COMMON.tileCoveredByPhoto`): a tile fragment is dropped where the photo camera sees that surface (or sky), with a 0.4% edge feather. It's kept where the photo is occluded (a margin of 8% + 25 m) or masked (people and Object pixels). So the photo stays the truth inside its frame, and tiles fill beyond the frame and behind people.

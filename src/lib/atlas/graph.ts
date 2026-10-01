@@ -461,7 +461,7 @@ export const ATLAS_NODES: AtlasNode[] = [
 			"src/lib/align.ts",
 			"src/lib/picker/PickerPanel.tsx",
 		],
-		reports: ["reports/roadmap.md", "reports/tm-strategy.md"],
+		reports: ["reports/roadmap.md", "reports/terrain-matching-research.md"],
 		visual:
 			"Peak chips on a photo; each tap locks a degree of freedom on a side panel and tightens the overlay.",
 		ontologyId: "pin",

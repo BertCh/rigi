@@ -13,7 +13,7 @@ Chromium and recently used /photo pages open. Jobs are serialised (one GPU, one 
                       tilt, missing vfov/hfov → 50° hfov + free focal (two-stage, see match_adhoc)
                       policy?: "v034" | "t6"  ad-hoc two-stage search/confidence policy (default: env
                       MATCHER_POLICY, else v034). v034 = the v0.3.x search and a-priori HIGH + basin gap;
-                      t6 = the T6 stage-1 search + frozen T6 rule (t6.py, reports/matcher-service-v040.md)
+                      t6 = the T6 stage-1 search + frozen T6 rule (t6.py, reports/matcher-service.md)
                 multipart/form-data with parts
                   request  JSON {prior, eye:[x,y,z], views:[{tag, pose:{yaw,pitch,roll,vfov}, W, H}], freeFocal?, timeoutMs?}
                            or, for an ad-hoc photo, {meta, prior?, ...} without views (same as the JSON ad-hoc mode)
@@ -764,7 +764,7 @@ def parse_hint_seeds(body: dict) -> list:
 BASIN_GAP_MIN = float(os.environ.get("MATCHER_BASIN_GAP_MIN", 0.20))
 POLICIES = ("v034", "t6")
 # force the GPU upload of freshly draped textures (+ gl.finish) on every ad-hoc render; policy t6 always does.
-# Off by default so that v034 renders exactly as v0.3.5 (reports/matcher-service-v040.md, "wc_0018").
+# Off by default so that v034 renders exactly as v0.3.5 (reports/matcher-service.md, "wc_0018").
 TEX_UPLOAD = os.environ.get("MATCHER_TEX_UPLOAD") == "1"
 DEFAULT_POLICY = os.environ.get("MATCHER_POLICY", "v034")
 POSITION_UNCERTAIN_M = 50.0

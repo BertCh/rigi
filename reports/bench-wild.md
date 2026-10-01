@@ -15,6 +15,8 @@
 | Product accept rule (fused HIGH and (EXIF GPS or agreement with the cascade)) | **16 / 16 correct** |
 | App aligner, accepted poses | 0.64 precision, 19 gross errors (don't auto-accept it) |
 
+> **Update (2026-10-01):** for the cascade, use the Mapterhorn re-run at the end of this file (25 correct, 22/22 at the 0.75 gate), not the Terrarium row in this table. The held-out test half was spent on 2026-09-26 ([test-results.md](test-results.md), [test-addendum.md](test-addendum.md)); current registration numbers are in [status.md](status.md).
+
 The main remaining losses are photos with no heading (16 of 42 solvable), low light, haze and near-field terrain. Fused is also over-cautious: 20 of its LOW poses are correct.
 
 > **Why v2.** The first verification pass (v1) drew overlays from the Terrarium DEM using the app pipeline's eye-height rule. The methods solve on Mapterhorn at their own eye, which is up to about 40 m higher on this set, and Terrarium ground differs from Mapterhorn by up to 114 m. On near-field skylines the drawn line moved by 1–27% of image height (median about 1.3% on the spot-checked photos), which made many correct poses look like "near-misses" or "wrong". v2 draws every candidate on Mapterhorn at the eye its method actually used, and all 100 photos were re-verified blind. v1 is kept for comparison below. The v1 numbers (fused 33 correct, HIGH precision 0.72) were **wrong**, and so was their story that parallax from bad GPS explains the near-misses. That explanation came mostly from the overlays.
@@ -60,7 +62,7 @@ How to read the cells:
 
 ## Confidence calibration
 
-- **Fused HIGH:** 30 of 31 are correct. The single gross error is wc_0069: hand-placed position, far skyline, tagged near-field terrain and parallax-mismatch. It's the kind of case the basin-gap LOW trigger from T5 targets; that trigger is being added to the service now. On EXIF-GPS photos, on near skylines, with no heading, and when seeded from the app skyline, fused HIGH has **no errors**.
+- **Fused HIGH:** 30 of 31 are correct. The single gross error is wc_0069: hand-placed position, far skyline, tagged near-field terrain and parallax-mismatch. It's the kind of case the basin-gap LOW trigger from T5 targets; that trigger has since shipped in matcher v0.3 ([matcher-service.md](matcher-service.md)), but wc_0069's gap (≈ 0.21) passes it (roadmap N4). On EXIF-GPS photos, on near skylines, with no heading, and when seeded from the app skyline, fused HIGH has **no errors**.
 - **Fused LOW is conservative:** 20 LOW poses are correct. HIGH covers 30 of fused's 50 correct poses, so there's recall to gain.
 - **Independence from the app seed:** in the 61 runs seeded by the app skyline, fused HIGH is 10 / 10 correct, while the app's own accepts on the same photos are 0.55 precise with 13 gross errors. The fused rule re-checks the seed and doesn't inherit the app's verdict.
 - **Cross-method agreement:** fused and the cascade share a pose cluster on 13 photos, and all **13 / 13 are correct**.
@@ -138,7 +140,7 @@ The fused cold time is mostly imagery drape, which is now limited to 40 km on 36
 ## Files
 
 - **Data:** `tools/bench/data/{manifest.json, ATTRIBUTION.md, photos/}`
-- **Frozen split:** `tools/bench/split.json` (50 dev and 50 test, read-only). T5 was developed on dev only, and test hasn't been touched yet.
+- **Frozen split:** `tools/bench/split.json` (50 dev and 50 test, read-only). T5 was developed on dev only. The test half was spent once, on 2026-09-26 ([test-results.md](test-results.md)).
 - **Harness:** `tools/bench/harness/run.sh`, with outputs in `tools/bench/harness/out/runs/wild/`:
   - `results/`
   - `verify/` + `verdicts/` (v1)

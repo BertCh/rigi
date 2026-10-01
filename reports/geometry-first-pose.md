@@ -1,6 +1,6 @@
 # Geometry-first camera: using the 3D geodata to pin the whole camera
 
-> **2026-09-30:** the GA2 (`geocam/observe`), GA3 (`geocam/tjunc`) and GA4 (`geocam/lakes/factors.ts`) code and the `geoInliers` flag were removed; GA1 (`map`), GA5 (`integrity`), `priors` and `lakes` remain. See [negative-results.md](negative-results.md#code-removed-in-the-2026-09-30-cleanup).
+> **2026-09-30:** the GA2 (`geocam/observe`), GA3 (`geocam/tjunc`) and GA4 (`geocam/lakes/factors.ts`) code and the `geoInliers` flag were removed; GA1 (`map`), GA5 (`integrity`), `priors` and `lakes` remain. See [negative-results.md](negative-results.md#code-removed-in-the-2026-09-30-cleanup). The unread `geoMap` flag was also dropped (0fd6933), so of the flags named in §8 only `geoDecl`, `geoLakeFloor` and `geoLakes` exist (all off), and 4 geocam check suites remain in CI (`geocam-map`, `-priors`, `-lakes`, `-integrity`). *(Update 2026-10-01: the matcher client named in §1 lives at `src/lib/matcher-client.ts`.)*
 
 *2026-09-29. This report rests on four research sweeps run in parallel:*
 - *geometric cues beyond the skyline;*

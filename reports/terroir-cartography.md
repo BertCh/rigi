@@ -275,7 +275,7 @@ Everything is **additive**. It lives in a new `terroir` section of `ViewStyle` (
 | T0.5–T0.6 names | Built on the photo views: lakes and glaciers on their visible surface; settlements, passes, huts, ridges, massifs typed by class; reach limits; dedupe against peaks. On the /roll 3D map as a TextLayer. **Not in In map** (the world camera is not exposed through `Renderer`) | `terroir/labels/placeNames.ts`, `ui/NamesSvg.tsx`, `terroir/roll/` |
 | T0.7–T0.8 colour grammar, uncertainty | Partly built. Built: pose-source glyphs; prior poses dashed with ±10° fans (minimap, 3D map); softened labels while unverified. Not done: re-picked viewpoint palette and unified UI tokens (they would replace existing colours) | `terroir/roll/`, `PhotoWorkspace.tsx` label hooks |
 | T0.9 furniture | Built: compass ribbon, sun/time chip, range ticks; scale bar and north arrow on the minimap and TopoBoard; attribution, north arrow and camera halos on the roll 3D map | `ui/Furniture.tsx`, `terroir/roll/MapFurniture.tsx` |
-| T0.12 trail blazes | Not built. df's trail `dash` (U2) landed separately | — |
+| T0.12 trail blazes | Not built. The trail `dash` (U2: layers in 1152622, WebGL engine wiring in c72fea1) landed separately | — |
 | Phase 1 three-colour contours | Built (deck WebGL): ink from the cover class; no lines on water | `TERROIR_CONTOUR_INK` |
 | T2 cover albedo, snow for the date, warm/cool light | Built (deck WebGL): class colours with canopy/scree texture and organic edges; date snowline ±125 m by aspect; cliff cross-fade on satellite imagery | `TERROIR_COVER`, `TERROIR_SNOW` |
 | T2.8 roll map as a map | Partly built: names, attribution, compass, halos. Basemap default unchanged | `terroir/roll/RollMapTerroir.tsx` |
@@ -284,8 +284,8 @@ Everything is **additive**. It lives in a new `terroir` section of `ViewStyle` (
 | T3.4 light of the day | Built: sun-elevation band, sunrise/noon/sunset ticks, labelled gaps on the roll scrubber | `terroir/roll/LightBand.tsx` |
 | T3.5 sun path | Built: arc for the capture date with hour ticks and sunrise/sunset azimuths | `ui/SunPath.tsx` |
 | T3.6–T3.7 geology section, seasonal presets | Not built | — |
-| WebGPU renderer | **Ported** (cover, snow, contour ink, adaptive contours, Swiss index): WGSL in `src/lib/terroir/wgsl/terrain.ts`, hooks in `deck-webgpu/layers/terrain-styles.ts` + `engine.ts`; terroir-off WGSL byte-identical (`scripts/terroir/wgsl-identity-snap.ts`). The interim `auto` → WebGL-deck route (2f9ffd5) is reverted by the same patch | landed via 7e |
-| three.js | Hooks landed in c72fea1; dropped with the three engine (nothree) | — |
+| WebGPU renderer | **Ported** (cover, snow, contour ink, adaptive contours, Swiss index): WGSL in `src/lib/terroir/wgsl/terrain.ts`, hooks in `deck-webgpu/layers/terrain-styles.ts` + `engine.ts`; terroir-off WGSL byte-identical (`scripts/terroir/wgsl-identity-snap.ts`). The interim `auto` → WebGL-deck route (2f9ffd5) is reverted by the same patch | 366ab83 |
+| three.js | Hooks landed in c72fea1; dropped with the three.js engine (583e2b7) | — |
 
 **Checks.** The CI fast tier gains `terroir-labels`, `terroir-viz`, `terroir-roll` and `terroir-pack`.
 

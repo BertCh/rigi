@@ -4,8 +4,8 @@ One runner for every check the repo already had. It works with any number of con
 the tree and never changes app behaviour.
 
 ```sh
-node scripts/ci/run.mjs fast                  # ~30 s: tsc, biome ratchet, ~34 node/tsx unit checks (36 fast ids, 4 full)
-node scripts/ci/run.mjs full                  # + browser: style-baseline, deck smoke, eval-app, eval-app-deck (~minutes)
+node scripts/ci/run.mjs fast                  # ~30 s: tsc, biome ratchet, node/tsx unit checks (57 fast ids, 6 full)
+node scripts/ci/run.mjs full                  # + browser: style-baseline, deck smoke, eval-app, eval-app-deck, settle-submits, graph-plumbing-ab (~minutes)
 node scripts/ci/run.mjs full --only deck-smoke,style-baseline
 node scripts/ci/run.mjs fast --skip concord-occl --jobs 8
 node scripts/ci/run.mjs --list                # every check id, tier, command and untracked inputs

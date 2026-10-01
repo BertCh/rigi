@@ -18,6 +18,8 @@
   - With default options, it degrades to 3/11 when both are missing. It never falsely accepts, though: it rejects instead.
 - **What the upload path should do:** treat a photo without heading or gravity as a fused-service job (two-stage 360° sweep, ≈ 11–22 s). If the service isn't there, run the cascade with the unknowns declared (≈ 0.7–2.4 s). The app's own `autoAlign` should not be trusted without a heading: it accepts wrong poses.
 
+> **Update (2026-10-01):** the upload-path recommendation above is implemented in `src/lib/integration/unknown-pose.ts` (cascade with the unknowns declared and the 0.75 yaw-unknown gate, then fused `/match`, else "unverified"). The "app" rows describe the three.js PhotoEngine's `autoAlign`, removed 583e2b7; the deck engines share the `Renderer` contract (`src/lib/renderer.ts`) but these numbers were not re-measured on them.
+
 ## What each method supports natively
 
 | unknown | app (`engine.autoAlign(true)`) | cascade (`solvePose` → `refinePose`) | fused (`/match`, before this change) |

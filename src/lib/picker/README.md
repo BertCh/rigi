@@ -1,10 +1,10 @@
 # picker: top-3 candidates + tap-a-peak (roadmap R4)
 
-Opt-in behind `?picker=on` on `/photo/<id>` (works with `?renderer=deck`). Without the flag nothing is
+Opt-in behind `?picker=on` on `/photo/<id>` (both deck engines: WebGPU, the default, and WebGL `?renderer=deck`). Without the flag nothing is
 rendered and the panel chunk is never loaded, so the default view, classic included, is unchanged.
 
 Why: the matcher's top-4 contains the right pose 27/30 times, while only ~20/50 photos are a safe HIGH
-(`reports/tm-strategy.md` Part B §1). Ranking is easier than verification, and a person easily rejects a
+(`reports/terrain-matching-research.md`, "Strategy carried forward"). Ranking is easier than verification, and a person easily rejects a
 wrong skyline once they can compare.
 
 ## Flags
@@ -22,8 +22,8 @@ wrong skyline once they can compare.
 
 1. **Candidates.** Once `[data-ready]` is set and the second opinion is not pending, it asks the app's own
    solver for its ranked hypotheses. With full metadata that is `engine.autoAlign(true)` alternatives
-   (skyline search + silhouette re-rank, up to 5, the same call the load makes; GPU grid via
-   `autoAlignAsync` on three, and deck's own). With a missing compass / gravity / lens it is the unknown-pose
+   (skyline search + silhouette re-rank, up to 5, the same call the load makes; the GPU grid is the
+   engine's own; `autoAlignAsync` went with the three.js engine, removed 2026-10-01). With a missing compass / gravity / lens it is the unknown-pose
    cascade's `candidates` (a re-run of the solver PhotoWorkspace already holds). `topDistinct` keeps the
    first 3 that are more than 0.5° apart (`poseSepDeg` = max of optical-axis angle, |Δroll| and |Δvfov|).
    If the pose on screen is not among them (e.g. the second opinion refined it), it gets its own "shown" tile.
@@ -57,15 +57,15 @@ to be blind-verified before it enters any benchmark.
 
 | file | |
 |---|---|
-| `flags.ts` | `?picker=` parsing |
+| `flags.ts` | `?picker=` via `src/lib/flags` (`flagFrom`) |
 | `candidates.ts` | pure maths: `poseSepDeg`, `topDistinct`, `nearbyPeaks`, `rerankWithTaps`, `isAutoHigh` |
-| `engine-access.ts` | read-only access to both engines' `horizonDirs`, `edge` and peaks (three `peaks[].world`, deck `snapped(pose)`), without widening `Renderer`; missing fields turn features off |
+| `engine-access.ts` | read-only access to both engines' `horizonDirs`, `edge` and peaks (deck `snapped(pose)`; the three `peaks[].world` branch is dead since the three.js engine was removed), without widening `Renderer`; missing fields turn features off |
 | `log.ts` | the correction log |
 | `PickerPanel.tsx` | UI (lazy chunk) |
 | `PickerMount.tsx` | the one PhotoWorkspace call site; null without the flag |
 | `candidates.check.ts` | `npx tsx src/lib/picker/candidates.check.ts` |
 
-Browser check: `node scripts/gpu/with-render-lock.mjs -- node scripts/picker-check.mjs IMG_6958 out/picker/6958 [deck]`
+Browser check: `node scripts/gpu/with-render-lock.mjs -- node scripts/picker-check.mjs IMG_6958 out/picker/6958 [deck|webgpu]` (default `deck`)
 (previews a wrong candidate, taps a visible labelled peak where it is under the shown pose, picks its name,
 checks the re-solve returns to the shown pose, confirms, prints the log).
 
@@ -74,7 +74,7 @@ checks the re-solve returns to the shown pose, confirms, prints the log).
 - Candidate sources: the app's `autoAlign` alternatives or the cascade's. The matcher's ranked views (where
   the 27/30 top-4 number comes from) are not exposed by the match service yet; adding them needs a service
   field (top-k fused poses) and a `source: "matcher"`.
-- The recall@3-with-one-tap metric from tm-strategy is not measured yet; the log is the data source for it.
+- The recall@3-with-one-tap metric from the archived tm-strategy is not measured yet; the log is the data source for it.
 - Tap-a-peak solves rotation only (eye fixed). An eye error shows up as a large residual on a second tap;
   `pose6dof` could solve position from 3+ taps later.
 - The unknown-pose (upload) path is type-checked but was not browser-tested: every bundled photo has a compass.

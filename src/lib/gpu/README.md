@@ -1,9 +1,10 @@
 # src/lib/gpu — WebGPU compute
 
-The compute kernels in this directory run on a luma.gl 10 (`10.0.0-alpha.2`) WebGPU device. Today that device is a
-separate "compute sidecar". When the renderer itself runs on WebGPU (the deck-webgpu port,
-`src/lib/deck-webgpu/**`) and hands its device over with `adoptRenderDevice`, the kernels run on the
-render device instead, so they share one queue and can read render targets without a copy.
+The compute kernels in this directory run on a luma.gl 10 (vendored `10.0.0-alpha.2-rigi.2`) WebGPU device.
+Under the default WebGPU renderer (`src/lib/deck-webgpu/**`, the default since 2026-10-01) the renderer
+hands its device over with `adoptRenderDevice`, so the kernels run on the render device: one queue,
+and render targets are read without a copy. Under the WebGL fallback (`?renderer=deck`) and in
+workers, the device is a separate "compute sidecar".
 Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the first workstreams) and
 `research_notes/gpu_next_2026-09-30.md` (the shared core layer and the move toward luma/deck "next").
 Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, readback and device crossing in the app, and the phases toward one manifest-described set of graphs fed by `gpu/ingest`.
@@ -19,11 +20,9 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
   `GPUCommandGraph`, `GPUReduction`, `GPUSort`, `GPUHistogram`, `GPUScan`, `GPUFFT1D`,
   `GraphDataView` and the rest from there. A luma 10 bump should touch this file plus the
   workarounds its header lists. The app moved to luma `10.0.0-alpha.2` on 2026-09-30 (098d9f2),
-  with deck.gl vendored from PR #10752 (`vendor/deck/README.md`); the alpha's broken manifests are
-  worked around with `package.json` overrides and `.npmrc` `legacy-peer-deps`.
-- **Command graphs.** `GPUCommandGraph` is the default path for sky refine (41b79fd) and the solve
-  coarse grid (227d79a). Horizon (b115334), haze (c1b7544) and relief / guided filter / band stats
-  (0feeb38) are on graphs too, but opt-in (`graph: true`).
+  with deck.gl vendored from PR #10752 (`vendor/deck/README.md`). luma itself is vendored as
+  `10.0.0-alpha.2-rigi.2` since 2026-10-01 (d0969e2, c5b2aa1; `vendor/luma/README.md`), which fixed
+  the manifests, so the overrides and `.npmrc` are gone.
 - **Kernel modules** (`horizon/`, `align/`, `look/`, `eye/`, `skyglobal/`, `solve/`, `sky/`): each defines
   its WGSL with `core/kernel` `defineKernel` and runs it as a core `ComputeGraph` (`core/graph`,
   usually a shape-keyed `cachedGraph` in the module's `graph.ts` / `*-graph.ts`): intermediates and
@@ -50,8 +49,8 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
   and also inside workers), or run the script through `scripts/gpu/with-gpu-off.mjs`. With the switch
   on, `getComputeDevice()` returns null even when a render device has been adopted.
 - **Stable luma APIs only**, except through `core/luma.ts`. Raw WebGPU calls (`clearBuffer`,
-  `createComputePipelineAsync`, `setBindings` duck-typing, the adapter-limit patch) live only in
-  `core/**`. The `core/luma.ts` header lists each one for the luma 10 bump.
+  the MAP_READ readback slots, the device request that `attachWebGPUDevice` wraps) live only in
+  `core/**`. The `core/luma.ts` header lists the remaining workarounds.
 - **Keep readbacks small.** Reduce on the GPU and read back winners and scalars (skyglobal reads
   ~28 KB instead of 273 KB, and haze reads ~480 KB instead of ~3 MB).
 - **Test with headless Chromium** under the render lock, one job at a time:
@@ -108,7 +107,7 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
   - **When to call them.** Only when `await getComputeDevice() === yourDevice`; otherwise use the
     array path.
   - **Parity.** They are bit-identical to the array path (`scripts/gpu/textures-bench.mjs`).
-  - **Status.** Nothing in the app calls them yet.
+  - **Status.** The deck-webgpu compute bridge (`src/lib/deck-webgpu/compute-bridge.ts`) calls them.
   - **Contract.** The API note at the top of `look/textures.ts` covers input liveness, `flipY` and
     how long outputs stay valid.
 - **Profiling.** Set `globalThis.__RIGI_GPU_PROFILE__ = true`, then call
@@ -128,10 +127,10 @@ Forward plan: `reports/whole-app-graph-plan.md` (WAG). It covers every island, r
 
 | Dir | Kernel (pass labels) | Default in the app | CPU twin |
 |---|---|---|---|
-| `horizon/` | batched horizon ray-march over ring mosaics (`horizon-march`). `scene-profile.ts`: 360° unknown-pose horizon, with an opt-in 2-scene cache (`keep`) | on in the horizon-fast-app worker (`?gpuHorizon=off`). Unknown-pose opt-in (`?unknownGpu=on`) | `horizon-fast/march.ts` |
-| `align/` | autoAlign coarse pose-grid scoring (`align-pose-grid`), and certified score bounds for the coordinate-descent refine (`align-pose-bound`, `pose-bound.ts`), both on `align/graph.ts`: one graph run per round bounds every speculated neighbour of every live hypothesis, the CPU skips only neighbours the bound proves it would reject and decides every move on exact scores, so the result is identical by construction (proof in `align.ts` `Descent`; `scripts/gpu/align-refine-ab.mjs`). The bound's premise (the device's f32 accuracy) is verified at run time: skips that lean on the error allowance, the device's first 64 skips and 1 in 128 after are re-scored on the CPU; a violation turns the GPU refine off for that device and the call re-runs the CPU refine. Pooled inputs; the edge planes are uploaded once per edge set. The silhouette re-rank stays on the CPU. Opt-in (WAG W3.3, precision P1): the certified-f32 refine (`cert-refine.ts`, `cert.wgsl.ts`, `cert-gpu.ts`, graph group `align-cert`), a GPU-driven fixed-round loop (DECIDE → EVAL indirect → EVAL2 double-f32 indirect, 48 rounds per submit) whose f32 interval compares are certified by a written error bound, with a double-f32 re-check and the CPU f64 tie path for what the bound cannot decide; the f64 path's AlignResult as long as every certified decision is correct, which rests on the bound and the device premise (the shared strict-IEEE probe in `../precision`, plus the same probe inside EVAL2's module) and is sampled by per-call runtime checks | on (`alignGpuOptions.refine = "cpu"` or `autoAlignAsync(…, { refine: "cpu" })` = CPU refine); certified-f32 opt-in (`?alignPrecision=certified-f32` or `{ alignPrecision: "certified-f32" }`) | `align.ts` |
-| `look/` | relief field, haze fit (radix select, compact readback), guided filter, colour stats, each on its `*-graph.ts` (opt-in subgroup path `{subgroups: true}` with a layout check and plain fallback; default plain) (`look-*`). `relief-heights.ts`: the relief height raster gathered in WGSL from the batched terrain's resident DEM tiles (deck-webgpu bridge, CPU raster fallback). `textures.ts`: texture-input masks / stats / haze prep as `ComputeGraph`s, for the WebGPU renderer | on (`?lookgpu=0`). Texture path not wired yet | `look/**` |
-| `eye/` | batched horizon provider for the pose6dof eye search (uses `horizon/`; no kernel of its own). Async kernel warm-up | suggestion only (`?eyesearch=1`) | `pose6dof/eye.ts` per-eye path |
+| `horizon/` | batched horizon ray-march over ring mosaics (`horizon-march`). `scene-profile.ts`: 360° unknown-pose horizon, with an opt-in 2-scene cache (`keep`) | on in the horizon-fast-app worker (`?gpuHorizon=off`), with the certified-f32 skyline stages on by default since 3225064 (`?horizonPrecision=f64` = CPU f64 stages). Unknown-pose opt-in (`?unknownGpu=on`) | `horizon-fast/march.ts` |
+| `align/` | autoAlign coarse pose-grid scoring (`align-pose-grid`), and certified score bounds for the coordinate-descent refine (`align-pose-bound`, `pose-bound.ts`), both on `align/graph.ts`: one graph run per round bounds every speculated neighbour of every live hypothesis, the CPU skips only neighbours the bound proves it would reject and decides every move on exact scores, so the result is identical by construction (proof in `align.ts` `Descent`; `scripts/gpu/align-refine-ab.mjs`). The bound's premise (the device's f32 accuracy) is verified at run time: skips that lean on the error allowance, the device's first 64 skips and 1 in 128 after are re-scored on the CPU; a violation turns the GPU refine off for that device and the call re-runs the CPU refine. Pooled inputs; the edge planes are uploaded once per edge set. The silhouette re-rank stays on the CPU. Default since 2026-10-01 (3225064; WAG W3.3, precision P1): the certified-f32 refine (`cert-refine.ts`, `cert.wgsl.ts`, `cert-gpu.ts`, graph group `align-cert`), a GPU-driven fixed-round loop (DECIDE → EVAL indirect → EVAL2 double-f32 indirect, 48 rounds per submit) whose f32 interval compares are certified by a written error bound, with a double-f32 re-check and the CPU f64 tie path for what the bound cannot decide; the f64 path's AlignResult as long as every certified decision is correct, which rests on the bound and the device premise (the shared strict-IEEE probe in `../precision`, plus the same probe inside EVAL2's module) and is sampled by per-call runtime checks | on (`alignGpuOptions.refine = "cpu"` or `autoAlignAsync(…, { refine: "cpu" })` = CPU refine); certified-f32 on by default in the app (`?alignPrecision=f64` = exact f64 refine; library option `{ alignPrecision }`) | `align.ts` |
+| `look/` | relief field, haze fit (radix select, compact readback), guided filter, colour stats, each on its `*-graph.ts` (opt-in subgroup path `{subgroups: true}` with a layout check and plain fallback; default plain) (`look-*`). `relief-heights.ts`: the relief height raster gathered in WGSL from the batched terrain's resident DEM tiles (deck-webgpu bridge, CPU raster fallback). `textures.ts`: texture-input masks / stats / haze prep as `ComputeGraph`s, for the WebGPU renderer | on (`?lookgpu=off`). Texture path on under WebGPU (compute bridge) | `look/**` |
+| `eye/` | batched horizon provider for the pose6dof eye search (uses `horizon/`; no kernel of its own). Async kernel warm-up | suggestion only (`?eyesearch=on`) | `pose6dof/eye.ts` per-eye path |
 | `skyglobal/` | matcher T6 stage-1 skyline grid (`skyglobal-cells` / `-reduce` / `-cands`). A GPU bound pass (`skyglobal/graph.ts`), then the CPU re-scores the candidates exactly; subgroup REDUCE; count-first readback | service only, behind `T6_GPU_GRID=1` | `tools/matcher/stage1/skyglobal.py` (`skyglobal/cpu.ts` is a TS port. Its polish differs from numpy on 3/50 photos due to libm last-bit differences, so only the grid may replace numpy) |
 | `solve/` | solvePose coarse yaw × pitch grid (`solve-coarse`). The GPU (`solve/graph.ts`: COARSE + a GPU row fold, resident horizon profile) gives certified row bounds, then the CPU re-scores the rows that bounded selection cannot settle, so the result is identical by construction. A row threshold too close to call in f32 re-runs COARSE and folds the blocks in f64 on the CPU | **on** in the unknown-pose worker (`?gpu=off` = CPU); 60/60 identical in the worker A/B | `geo/solve.ts` `planCoarse` / `coarseCost` (re-exported by `solve/cpu.ts`; one copy of the cost since 2026-09-30) |
 | `sky/` | sky-mask guided-filter refine (`sky-refine`, `sky/refine-graph.ts`), GPU twin of `sky/refine` `refineToWorking` + `toBytes`; plus the opt-in input prep (`sky-prep-*`: ImageBitmap → RGBA words, `rgbLo`, ORT's normalised input, bit-identical to `sky/core.ts` through an exact u32 soft-float of its f64 chain, verified per device at runtime; `sky/prep*.ts`). Runs in the sky worker on the device ORT also uses (`sky/model.ts` `shareOrtDevice`), reading the model's output buffer directly and reading back only the byte mask | **on** in the sky worker (page `gpuEnabled()` sent as `gpu`) | `sky/refine.ts` (f64 sums vs f32: ≤ 1.2e-5, ≤ 9 mask bytes of 786k differ by 1; `scripts/gpu/sky-bench.mjs`) |

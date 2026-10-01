@@ -2,6 +2,8 @@
 
 *2026-09-26 · code in `tools/matcher/stage1/` · outputs in `tools/bench/t6/` · frozen rule sha1 `292fb74f35f6f402b5e81f1b832bac565edd6807` (`tools/bench/t6/RULE_FROZEN.sha1`)*
 
+> **Update (2026-10-01):** T6 was scored on the test half as arm B (30/50, HIGH 22/24; see [test-addendum.md](test-addendum.md)) and shipped only as the opt-in service policy `t6` (v0.4.0, [matcher-service.md](matcher-service.md)); v034 stays the default, and §10.5's selection refinement was not applied. The vendored workers this pipeline runs on (`stage1/vendor/worker.mjs`, `stage1/vendor_v03/render_worker.mjs`) drive the three.js PhotoEngine API (`e.renderer`, `geoRT`), which was removed 583e2b7, so `pipeline.py`, `tools/bench/final/` and the research harnesses that use `s1.py`'s worker cannot re-run against the current app without a port. The service's own `render_worker.mjs` was ported to the deck engines.
+
 Scope: everything here uses only the 50 dev ids of `tools/bench/split.json`, plus the 12 app GT photos. Verdicts come only from `tools/bench/t6/dev_verdicts.json` (clusters plus `cascadeMapterhorn`) and from blind verdicts given later on dev poses (`tools/bench/t6/baseline_cpu_partial.json`, `verify_cpu_partial/`). No test photo was run, opened or scored. `pipeline.py` refuses test ids unless `--allow-test` is passed (`STAGE1_ALLOW_TEST=1` for `run.sh`).
 
 ## Verdict
@@ -262,6 +264,8 @@ STAGE1_ALLOW_TEST=1 tools/matcher/stage1/run.sh wc_XXXX wc_YYYY ...
 6. **Latency:** about +50 s per ad-hoc request at median. Worth it only for two-stage requests. Photos with heading, gravity and focal known keep the single fused stage.
 
 ## Files
+
+*Update (2026-10-01): of `tools/matcher/stage1/`, only `pipeline.py`, `s1.py`, `skyglobal.py`, `rule.py`, `policy.py`, `evaluate.py`, `finalize.py`, `run.sh`, `vendor/` and `vendor_v03/` are in the repository; the diagnostic, baseline and evaluation scripts listed below were never committed.*
 
 - `tools/matcher/stage1/`:
   - `pipeline.py`: generators, verification, cap, stamp.

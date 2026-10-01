@@ -14,7 +14,7 @@ const sky = skylineFromSky(mask); // { width, height, rows, weight }: same shape
 ## Pipeline
 
 1. The main thread rasterises the photo at the working size (long side 1024) and posts it to a module worker (`sky.worker.ts`).
-2. The worker lazily loads `public/models/skyseg-u2netp.onnx` with onnxruntime-web: WebGPU when `navigator.gpu` exists, otherwise WASM. The input is ImageNet-normalised RGB, with long side 512 on WebGPU and 384 on WASM, rounded to multiples of 32. The output is sigmoid P(sky).
+2. The worker lazily loads `public/models/skyseg-u2netp.873ea284.onnx` (`MODEL_FILE` in `model.ts`) with onnxruntime-web: WebGPU when `navigator.gpu` exists, otherwise WASM. The input is ImageNet-normalised RGB, with long side 512 on WebGPU and 384 on WASM, rounded to multiples of 32. The output is sigmoid P(sky).
 3. Refinement uses a fast colour guided filter (He, Sun & Tang; He & Sun 2015). The a and b coefficients are solved at model resolution (r=3, eps=2e-3) with the downsampled photo as guide, upsampled bilinearly, and applied to the full-resolution photo. The filtered value is used only in a band around the model's 0.5 contour or where the model is unsure. Everywhere else the upsampled model output is kept, so snow and cloud texture far from the ridge can't leak into the mask.
 4. GPU (default when the page's `gpuEnabled()` allows it; the page sends the answer as `gpu` in the worker messages, so `?gpu=off` turns it off). The worker creates its luma compute device first and hands it to ORT (`shareOrtDevice` in `model.ts`), so the model and the refine run on ONE `GPUDevice`. The session keeps its output on the GPU (`preferredOutputLocation: "gpu-buffer"`), and `src/lib/gpu/sky/refine.ts` (the GPU twin of `refineToWorking` + `toBytes`) reads that buffer and reads back only the byte mask. ORT 1.30's JSEP bundle ignores `env.webgpu.device` when it initialises (it always calls `adapter.requestDevice()`), so the device goes in through `env.webgpu.adapter`, an adapter shim whose `requestDevice` resolves our device. The first WebGPU session fixes ORT's device for the worker's life. If it is ORT's own device, or the backend is WASM or the classical fallback, the GPU refine takes the downloaded P(sky). The CPU refine is the reference and the fallback when there is no WebGPU, with `?gpu=off`, and on any GPU error. The response reports `refineOn` (`gpu`/`cpu`) and `ortDevice` (`shared`/`own`).
 
@@ -33,7 +33,7 @@ const sky = skylineFromSky(mask); // { width, height, rows, weight }: same shape
 
 The dataset the sky model was trained on isn't documented. The weights are released under MIT by their author.
 
-**Conversion.** `tools/ncnn2onnx.py` rebuilds the graph from the ncnn param/bin (Conv+ReLU, MaxPool, bilinear Resize to the skip tensor's shape, Concat, Add) with dynamic H/W, keeping only the fused output. MaxPool uses `ceil_mode=0` because WebGPU lacks ceil mode, and the result is identical for inputs that are multiples of 32. The output hash is reproducible: sha256 `873ea284…c94a`.
+**Conversion.** `src/lib/sky/tools/ncnn2onnx.py` rebuilds the graph from the ncnn param/bin (Conv+ReLU, MaxPool, bilinear Resize to the skip tensor's shape, Concat, Add) with dynamic H/W, keeping only the fused output. MaxPool uses `ceil_mode=0` because WebGPU lacks ceil mode, and the result is identical for inputs that are multiples of 32. The output hash is reproducible: sha256 `873ea284…c94a`.
 
 ## Measured (M3 Pro, machine under heavy load from other jobs)
 

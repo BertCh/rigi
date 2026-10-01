@@ -1,5 +1,7 @@
 # GPU compute plan (2026-09-28)
 
+*Update (2026-10-01): historical. The "renderers stay on WebGL2" decision was reversed: WebGPU deck is the default (b520b1d) and the render device is also the compute device. Compute now runs only through `src/lib/gpu/core` graphs (042ea54), on vendored luma `10.0.0-alpha.2-rigi.2`. Flags take `on`/`off` (`?gpuHorizon=off`, `?lookgpu=off`), not `1`/`0`. Current state: [reports/status.md](../reports/status.md) and `src/lib/gpu/README.md`.*
+
 This plan follows a review of deck.gl 9.4.0 and luma.gl 9.4.2, the last v9 releases. deck v10 has no alpha yet; luma 10.0.0-alpha.2 is on npm's `beta` tag.
 
 **Decision.** The renderers stay on WebGL2. deck-on-WebGPU is blocked by our GLSL log-depth hook, TerrainExtension being WebGL-only, and about 140 raw `gl` calls. Compute runs on a separate luma WebGPU device, `src/lib/gpu/device.ts`, and every kernel has a CPU fallback. The CPU stays the accuracy reference.

@@ -28,6 +28,8 @@ The plan below (§2–§3) was carried out the same day. Each work package (WP) 
   - J2: the compute sidecar via `WebGPUAdapter.attach`, the render device with explicit limits, and ORT device attach as a fallback. The `deck-webgpu/device.ts` hunk waits for the flip.
 - U3 deck/engine.ts wiring and U4 deck/terrain-layer.ts wiring go through the terroir maintainers, after their shader edits.
 
+*Update (2026-10-01, later): J1 landed as d0969e2 (`10.0.0-alpha.2-rigi.1`, `.npmrc` and the luma/math.gl overrides dropped) and J2 as d79ed36 (#3312 `requiredLimits` and #3313 `attach` adopted in gpu/core, sky and deck-webgpu). The vendored build is now `10.0.0-alpha.2-rigi.2` = rigi.1 + #3328 `Model.setIndirectBuffer` (c5b2aa1); see `vendor/luma/README.md`. The three.js renderer was removed (583e2b7), so "all three renderers" below now means WebGPU deck and WebGL deck. The upstream asks stay local by the user's choice (roadmap WAG-4).*
+
 **Gates.** Batch 1 ran per package before the user put browser testing on hold:
 - HEAD 320b87d: selftest 23/23, layout 59/59, eval-app 12/14 on both deck and three.
 - A: haze-fit, haze-graph, textures and look benches all identical. look-graph-bench showed 12 band-stats counts off by ±1–2 on one 61×97 input. C's run of the same bench showed none, so this matches the known deck band-stats nondeterminism, not A.

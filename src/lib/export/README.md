@@ -91,7 +91,9 @@ Reference: https://developers.google.com/kml/documentation/kmlreference#camera a
   - Per the GPano spec, "as roll increases, the horizon rotates counterclockwise in the image". That happens when the camera's right side goes down, so GPano roll = our roll.
 - **Full model:** a custom namespace `slens` = `https://summit-lens.app/ns/pose/1.0/`. It holds yaw, pitch and roll, vfov and hfov, focal length in pixels, image size, MSL and ellipsoidal altitude, the ECEF centre and the row-major camera→ECEF rotation.
 
-## Integration for session 9e: adding an "Export" menu to PhotoWorkspace
+## Integration: adding an "Export" menu to PhotoWorkspace
+
+*Update (2026-10-01): this is the original integration sketch. The menu is wired: `PhotoWorkspace.tsx` mounts `<ExportMenu engine={engineRef} disabled={exportLocked} withLabels={showPeaks} photo={photo} />` (see [ExportMenu integration](#exportmenu-integration)). Splat export (`splat.ts`: `.ply` / `.splat-v1`, with a per-model licence gate) is not covered by this note.*
 
 The engine already holds everything needed: `engine.photo`, `engine.pose`, `engine.frame`, `engine.eye`, `engine.demAtCamera`, `engine.peakLabels()`/`peaksInFrame()` and `engine.sampleAt(u,v)` (monoplotting). The only data it lacks is lat/lon for each peak: `PeakLabel` holds `world` (ENU) but no lat/lon. Convert it with `engine.frame.toGeo(...world)`, as in the snippet below.
 
@@ -155,7 +157,7 @@ export async function runExport(engine: Renderer, kind: 'pose' | 'kmz' | 'geojso
       const rendered = await engine.exportImage(true)
       if (!rendered) return
       const bmp = await createImageBitmap(rendered)
-      return download(await composeAnnotatedPng(bmp, [], { title: `${id} · Summit Lens` }), `${id}.annotated.png`)
+      return download(await composeAnnotatedPng(bmp, [], { title: `${id} · Rigi` }), `${id}.annotated.png`)
     }
   }
 }
@@ -238,9 +240,9 @@ Samples in `out/lead/export/`, using the IMG_7131 prior pose:
 
 The runtime glue is in `src/lib/export/engine-export.ts`: `exportFromEngine(engine, kind, opts) → {blob, filename, notes}`, `engineCameraModel`, `enginePeaks`, `engineReady`, `geometryBufferState`, `refreshGeometry`, `downloadBlob` and `EXPORT_FORMATS`. It is also re-exported from the `#/lib/export` barrel. `ExportMenu.tsx` itself is NOT in the barrel, so the Node tests don't pull in React.
 
-### The one line (for session 9e)
+### The one line
 
-In `src/components/PhotoWorkspace.tsx`, inside `<header …>`, directly after the existing "Save image" `<button>` (currently line ~279, just before `</header>`):
+*Done; the workspace now gates the menu on `exportLocked` rather than `!!status`.* As originally proposed, in `src/components/PhotoWorkspace.tsx`, inside `<header …>`, directly after the then "Save image" `<button>`:
 
 ```tsx
 <ExportMenu engine={engineRef} disabled={!!status} withLabels={showPeaks} />
@@ -262,8 +264,8 @@ import { ExportMenu } from '#/lib/export/ExportMenu'
 
 `engine.photo`, `pose`, `aspect`, `frame` (lat/lon/h + `toGeo`), `eye`, `demAtCamera`, `terrain` (necessary for readiness, not sufficient), `settings.{protectPeople,mode}`, `peaksInFrame()`, `sampleAt(u,v)`, `isForeground(u,v)`, `exportImage(withLabels)`, `photoElement` and `setPose()` (called with the *same* pose only to force a geometry refresh).
 
-- **Peaks:** `enginePeaks` takes `peaksInFrame()`, keeps those inside [0,1]², and re-applies the same occlusion test `peakLabels()` uses (geometry-buffer range just below the summit, plus the people mask). It does this without `peakLabels`' label decluttering, so the GeoJSON gets every visible peak (10 for IMG_7131, where the decluttered overlay shows only 5 labels). If 9e ever exposes an undecluttered visibility accessor (e.g. `engine.visiblePeaks()`), `enginePeaks` should switch to it so the two can't drift apart.
-- **Geometry-buffer freshness (applies to peaks and footprint):** `sampleAt` reads a CPU copy that the engine refreshes only 90 ms after the last pose change. Right after a nudge or drag it therefore describes the previous pose, and before the first readback it is all zeros. The old peak test then marked every in-frame peak `visible: true` through its `!s` branch. `geometryBufferState(engine)` now checks freshness directly: on a 24×24 grid, the direction from the eye to each hit's `world` must match the current pose's pixel ray (median < 0.15°; a fresh buffer measures 0.036°, and a +2° nudge measures 1.92°). The GeoJSON export first calls `refreshGeometry`, which re-sets the same pose to force a render and readback, then polls for up to 1.5 s. If the buffer is still stale or empty, the export leaves out **both** the footprint and the peaks, and says why in the status line. `enginePeaks` on its own returns `visible: null` (untested) when the buffer isn't fresh, and `PeakInput.visible` is now `boolean | null`. A future `await engine.readback()` from 9e would replace the poll.
+- **Peaks:** `enginePeaks` takes `peaksInFrame()`, keeps those inside [0,1]², and re-applies the same occlusion test `peakLabels()` uses (geometry-buffer range just below the summit, plus the people mask). It does this without `peakLabels`' label decluttering, so the GeoJSON gets every visible peak (10 for IMG_7131, where the decluttered overlay shows only 5 labels). If the engine ever exposes an undecluttered visibility accessor (e.g. `engine.visiblePeaks()`), `enginePeaks` should switch to it so the two can't drift apart.
+- **Geometry-buffer freshness (applies to peaks and footprint):** `sampleAt` reads a CPU copy that the engine refreshes only 90 ms after the last pose change. Right after a nudge or drag it therefore describes the previous pose, and before the first readback it is all zeros. The old peak test then marked every in-frame peak `visible: true` through its `!s` branch. `geometryBufferState(engine)` now checks freshness directly: on a 24×24 grid, the direction from the eye to each hit's `world` must match the current pose's pixel ray (median < 0.15°; a fresh buffer measures 0.036°, and a +2° nudge measures 1.92°). The GeoJSON export first calls `refreshGeometry`, which re-sets the same pose to force a render and readback, then polls for up to 1.5 s. If the buffer is still stale or empty, the export leaves out **both** the footprint and the peaks, and says why in the status line. `enginePeaks` on its own returns `visible: null` (untested) when the buffer isn't fresh, and `PeakInput.visible` is now `boolean | null`. A future `await engine.readback()` on the engine would replace the poll.
 - **Footprint:** monoplotted with `engine.sampleAt`, skipping people pixels, and only from a fresh buffer.
 - **Annotated image:** `engine.exportImage` returns a JPEG (the docstring says PNG), which is then decoded and recomposed as PNG. In world mode it renders the 3D map view, and the status line notes that. A `engine.exportImage({ mode: 'overlay' })` override would allow a photo export from any mode.
 

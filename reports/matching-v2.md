@@ -1,8 +1,10 @@
 # Matching v2: eye-position fallback, calibration priors, LoMa (dev only)
 
-*2026-09-26 · (resumed after the ~16:02 UTC outage) · code in `tools/matcher/v2/` · research in `research_notes/matching_v2_research.md`*
+*2026-09-26 · (resumed after the ~16:02 UTC outage) · code in `tools/matcher/v2/` · research in `research_notes/matching_v2_research.md` (removed 2026-09-29; `git show 384df44:research_notes/matching_v2_research.md`)*
 
 **Scope.** Only the 50 DEV ids of `tools/bench/split.json` were used. The spent test half was never opened, and no `data_v3` photo was opened, rendered or run. Verdicts come from the existing verified dev refs (`tools/bench/gt/t6`, through `stage1/evaluate.py`) plus the new blind pack in `tools/matcher/v2/verify/`. The frozen T6 rule was used unchanged (`292fb74f…`), and the pipeline code stamp was `c2d406ea3c557e6e`.
+
+> **Update (2026-10-01):** the follow-ups ran in the TM programme ([terrain-matching-research.md](terrain-matching-research.md)): the LoMa-specific rule (recommendation 4) is roadmap R3 and waits on the H2 veto (R2), which waits on H1 blind verification (R1). In the app, the suggestion-only eye policy is followed by the "Check camera position" aid behind `?eyesearch=on|auto` (default off; `src/lib/gpu/eye/suggest.ts`), a skyline eye refinement, not this render-match fallback.
 
 ## Verdict
 

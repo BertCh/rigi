@@ -2,6 +2,8 @@
 
 **Status: DRAFT, NOT FROZEN, NOT EXECUTED.** Written 2026-09-26. Running it spends `tools/bench/data_v3` and needs the user's sign-off. No `data_v3` photo has been opened, rendered, matched or overlaid by this session. The only things read were `README.md`, `FROZEN.sha1` and the manifest's hash and stratum counts.
 
+> **Update (2026-10-01):** still a draft (roadmap R6), and still unexecuted; `data_v3` is sealed. Two things changed under it. (1) The arms' runner cannot execute as written: `tools/matcher/stage1/vendor/worker.mjs` and `vendor_v03/render_worker.mjs` drive the three.js PhotoEngine API, removed 583e2b7 (deck/WebGPU is now the only renderer), so freezing needs either a pinned pre-583e2b7 app checkout for the private worker or a port to the deck engines and new code stamps. (2) The status hub plans to fold in the H2 veto (R2) and recall-lever (R3) winners first, and to collect and seal a ~100-photo set before `data_v3` is opened (roadmap N3). The `STAGE1_MANIFEST` switch (step 1 below) is still missing; `V2_SUGGEST_ONLY` exists in `run_v2.py` but has not had its dry run.
+
 The draft is frozen by filling in the `‹…›` fields, committing it, and recording its sha1 on the first line of every arm's run log. After that, any change goes in `reports/v3-prereg-addenda.md` and is labelled post hoc.
 
 ## Set

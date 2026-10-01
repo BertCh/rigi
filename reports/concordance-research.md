@@ -1,6 +1,8 @@
 # Whole-image concordance: research and plan
 
 > **2026-09-30:** the WP-D joint solve, WP-E display warp and WP-G re-match code named in this plan was removed as negative or unconsumed; see [negative-results.md](negative-results.md#code-removed-in-the-2026-09-30-cleanup) for the numbers and the recovery commit. WP-A core, WP-B priors, WP-C cues and WP-F occluder remain.
+>
+> **Update (2026-10-01):** the three.js engine was removed (583e2b7), so `src/lib/engine.ts` and `src/lib/materials.ts`, named as hook sites in §4 and in §7 "Next" item 5, no longer exist; the "deck-vs-three parity" rules in §4 no longer apply. `?concord` now accepts only `eye,occl` (`src/lib/flags/index.ts`). The WP-F occluder dims overlays in both deck.gl composites (WebGL2 `deck/composite-shader.ts`, WebGPU `deck-webgpu/layers/composite.ts`); a drape hook would now go into the deck terrain/drape layers. §7 "Next" items 2–3 (re-score D/E, redesign D's gate) would need the code restored from `a1845f5`.
 
 Status: research synthesis, 2026-09-29. It is read-only: no repo files were changed. All pixel figures are at the **1600 px basis** unless marked "@4032". The measurements come from the CPU audit (local scratch, not published) run on the 14 photos with ground-truth poses, plus figures from the five SoTA streams.
 

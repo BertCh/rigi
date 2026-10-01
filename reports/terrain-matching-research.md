@@ -83,6 +83,8 @@ T6 already has 0 wrong HIGHs at the stated eye. The payoff from verification is 
 
 ## 7. Recommended next steps (ranked)
 
+> **Update (2026-10-01):** step 1's mining ran as H1 (`tools/research/tm/h1_mine/REPORT.txt`: 166 kept candidates, a 120-overlay blind pack across 27 photos); the blind verification is ready but not started (roadmap R1), so steps 2–3 still wait (R2, R3) and step 5 is roadmap R6. Step 4's title triage ran as P1 and was not shippable (precision 0.25; [terrain-matching-research.md](terrain-matching-research.md), final section). Execution plan (folded into the final section below) and the top-3 picker (built behind `?picker=on`): [roadmap.md](roadmap.md).
+
 1. **Mine a hard-negative set on dev** before any verifier work.
    - Run LoMa-sat plus the X1 feature hypotheses plus the v2 eye-search finals on all 50 dev photos, and keep every ≥ 100-inlier pose.
    - Blind-verify the new ones with the existing protocol (padded packs, neutral headers).
@@ -115,4 +117,41 @@ Quick, cheap items that can be done independently:
 | X4 skyline search | `tools/research/tm/x4_bnb/REPORT.md` | `results/x4_results.json` |
 | X5 verifier | `tools/research/tm/x5_verifier/REPORT.txt` | `features*.json`, `combo_veto.json` |
 
-Disk: 7.4 GB under `tools/research/tm/`. Of that, the cache is 2.6 GB and the weights and packages about 3.5 GB, which can be pruned.
+Disk: 7.4 GB under `tools/research/tm/`. Of that, the cache is 2.6 GB and the weights and packages about 3.5 GB, which can be pruned. *(Update 2026-10-01: after the 2026-09-30 prune, 5.2 GB remain: cache 2.4 GB, `weights/x2` 2.1 GB plus `.pylib_x2`, which the near-field service loads, so keep them. `c0_cache/` and `cache/` are gitignored, so their REPORT/FORMAT files exist only locally.)*
+
+## Strategy carried forward (from tm-strategy, 2026-10-01)
+
+The 2026-09-28 execution plan (`tm-strategy.md`, now `archive/tm-strategy.md`) is folded in here; the live plan is [roadmap.md](roadmap.md).
+
+**Construction negatives.** A photo has one orientation, so a candidate at the same eye (within 2 m) as a verified-correct pose and more than 3° away is wrong by construction. Two cheap labelled sources: the masked-basin rerun (suppress the correct basin, ±10° yaw, in stage 1 and keep T6+LoMa's best alternative; S5) and every other stated-eye candidate more than 3° from a correct ref. Blind verification is then needed only for moved-eye poses (S3/S4) and photos without a correct ref, which is also where the dangerous near-misses live (wc_0086, wc_0074); a random 20% of construction labels still goes through the pack to measure label noise. Caveat: construction negatives are wrong-basin errors, while the eye-error traps (wc_0001, 0070, 0086) exist only in the verified moved-eye set, so a veto must be reported per negative kind, never as one pooled AUROC.
+
+**Miss-rate bound.** With *n* hard negatives and 0 accepted, the 95% upper bound on the veto's miss rate is about 3/*n*:
+
+| hard negatives | miss rate at most |
+|---|---|
+| 7 (at the time) | ~43% |
+| 30 | ~10% |
+| 60 | ~5% |
+
+Freeze thresholds by a written rule (e.g. the minimum over leave-one-photo-out folds of the correct-ref score, minus a margin), report per negative kind, and treat "0 wrong accepted on dev" as necessary, not sufficient; data_v3 supplies the evidence.
+
+**B§2, the global basin gap (open).** The traps are wrong eyes that still collect 300 to 1800 inliers, and today's basin gap compares orientations at one eye only. Proposal: accept a pose only if it beats the best explanation found anywhere in the plausible eye region by a margin (stated eye; v2 eyes within 400 m; P1's title-geocoded eyes; OSM viewpoints within 1 to 3 km). Eye search then stops being a recall lever that creates gross HIGHs (wc_0086) and becomes a verifier: if another eye explains the photo about as well, abstain. v2's `AMBIG_DEG` is a narrow version; H1's S3 records supply the test data. The batched-eye GPU horizon and eye provider (above) make hundreds of eyes affordable as a pre-filter that decides where T6 runs, not as a pose accept; any margin must be much wider than the GPU-vs-CPU horizon difference (up to about 1e-2°).
+
+**P1 results (position triage, done, negative; `tools/research/tm/p1_position/REPORT.txt`).** 29 of the 50 dev titles are usable (19 have a "from X" phrase, 16 of those match an OSM feature; 21 name a peak within 40 km). The pre-registered flag (far or low or not-visible) flags 12 photos: against F1's 9 position failures 3 correct, 9 wrong, 6 missed (precision 0.25, recall 0.33); against the 5 errors over 400 m, 3 of 5. It also flags 6 of the 30 already-solved photos (about 20%), so the full rule is not shippable.
+- Far (named viewpoint more than 400 m away): 6 flags, 1 on a solved photo; catches both headline cases (wc_0069: Fronalpstock 1.08 km away, eye 575 m too low; wc_0073: Pilatus Kulm 17.5 km away, eye 1621 m too low). Not-visible: 5 of 6 flags on solved photos (pass and railway names, "Viewpoint Target" titles, headings that disagree with the named peak). Low: never fired.
+- Post-hoc (n = 2, needs a fresh split): far plus "viewpoint at least 150 m above the eye" flags 3 photos, 2 real failures, 0 on solved photos.
+- Proposals: only the wc_0069 and wc_0073 candidate eyes are credible; the wc_0017 proposal would be harmful (2.2 km away, 811 m below a verified-correct eye). Overpass was slow, so place areas were dropped for all 50 photos (decided before results).
+- Use: a "don't auto-accept, suggest the eye" signal, never an automatic eye move. Title triage covers about half of Commons photos and about 0 app uploads (GT-12 has no titles); the product analogue is a map-tap "where were you standing?" prompt.
+
+**Part A statuses (as of 2026-10-01).**
+
+| step | study | status |
+|---|---|---|
+| 1 hard negatives | H1 mining (`h1_mine/`: stated-eye T6+LoMa, X1 seeds, masked-basin rerun, v2 eyes, displaced-eye pilot; pool >= 100 fixed in `PROTOCOL.txt`) | done: 166 kept candidates, 120-overlay blind pack across 27 photos |
+| 4 position | P1 triage (`p1_position/`) | done, negative (above) |
+| 1b verify | blind verifiers on the H1 pack (neutral headers, padded overlays, duplicates, decoys, positive controls) | ready, not started (roadmap R1) |
+| 2 veto prereg | panel (MoGe-2 `combo_int.z`, fused `pnp_rel`, 3-strip agreement, XoFTR-depth support), thresholds frozen by a prior rule | waits on 1b (R2) |
+| 3 recall levers | LoMa, X1 seeds, ALIKED+dehaze, a LoMa-specific rule, under the frozen veto | waits on 2 (R3) |
+| 5 data_v3 | fold into [v3-prereg.md](v3-prereg.md) | needs the user's sign-off (R6) |
+
+Part B's other items: the top-3 picker / tap-a-peak is built behind `?picker=on` (R4, `src/lib/picker/README.md`); the near-field render option was tested as FUND E3 and killed ([negative-results.md](negative-results.md)); more field of view (panorama/burst joint solve, `tools/matcher/v2/pano.py`) is untested on the single-photo benchmark; the label flywheel (silver labels from pipeline agreement, only disagreements blind-verified) and a sealed data_v4 remain proposals.

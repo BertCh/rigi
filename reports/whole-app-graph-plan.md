@@ -1,12 +1,12 @@
 # Whole-app graph (WAG): plan
 
-> **Implementation status (2026-10-01).** WAG-0 done; WAG-1/2 mostly landed; certified-f32 horizon landed opt-in. Two of this plan's premises did not hold when measured: the DEM is not "decoded 5+ times" per tile (451 distinct tiles, 97 repeats per load, so DemStore was not landed), and the page device cannot host the horizon march (it holds none of the needed heights at native resolution when the march runs). Per-item state and commits: the roadmap's WAG rows; numbers: `research_notes/whole-app-graph-2026-10-01/baseline-2026-10-01.md` and [negative-results.md](negative-results.md#gpu-and-performance).
+> **Implementation status (2026-10-01).** WAG-0 done; WAG-1/2 mostly landed; certified-f32 horizon and align, `terrainGpuCull` and `terrainGpuDecode` are default on since 3225064 (wave 3; `f64` / `off` stay reachable through the flags). Two of this plan's premises did not hold when measured: the DEM is not "decoded 5+ times" per tile (451 distinct tiles, 97 repeats per load, so DemStore was not landed), and the page device cannot host the horizon march (it holds none of the needed heights at native resolution when the march runs). Per-item state and commits: the roadmap's WAG rows; numbers: `research_notes/whole-app-graph-2026-10-01/baseline-2026-10-01.md` and [negative-results.md](negative-results.md#gpu-and-performance).
 
 *Revised the same day after an adversarial review against the code. The corrections are folded in: W1.2, W1.3, W1.4, W1.5, W1.7 and W2.1 changed; claims are now verified with file:line. Some islands are thin in the crossing table: relief bridge, tiles3d, Step Inside splats.*
 
 2026-10-01. Goal (the user's): express the whole app as a luma.gl GPU command graph that loaders.gl-style ingest feeds, on the bleeding edge of luma, deck and loaders.
 
-This plan builds on [visgl-frontier-2026-10-01.md](visgl-frontier-2026-10-01.md), the upstream sweep. The evidence is in `research_notes/whole-app-graph-2026-10-01/`:
+This plan builds on [archive/visgl-frontier-2026-10-01.md](archive/visgl-frontier-2026-10-01.md), the upstream sweep. The evidence is in `research_notes/whole-app-graph-2026-10-01/`:
 
 | Note | Contents |
 |---|---|
@@ -105,7 +105,7 @@ External islands, by design: I5 unknown-pose worker (f64 LM), I6 ORT sky, MediaP
 
 ## 4. Phases
 
-Every item is built in a sandbox and lands on the fast gates (tsc, biome, node checks, kernel-layout) per [dev over test]. Browser and GPU gates run in a batch per phase when testing un-holds. "BIT" means byte-equal against the current GPU path and its CPU twin.
+Every item is built in a sandbox and lands on the fast gates (tsc, biome, node checks, kernel-layout) per the "dev over test" rule. Browser and GPU gates run in a batch per phase when testing un-holds. "BIT" means byte-equal against the current GPU path and its CPU twin.
 
 ### WAG-0: foundations (no behaviour change)
 
@@ -158,7 +158,7 @@ Order: W0.6 re-baseline first. W1.4 and W1.7 rest on unconfirmed costs, so measu
 > **2026-10-01, the user's decision:** nothing is posted upstream (no PRs or issues to visgl). The candidates below stay local, in this repo and the vendored rigi builds.
 
 - `GPUProgram` lowerings for the scalar and vector stages (band-stats fold, haze grid argmin), once a per-run-input story exists.
-- Upstream candidates. **Post only with the user's direct OK.** Peers' relays don't count; see [luma-alignment-coordination].
+- Upstream candidates. **Post only with the user's direct OK.** Peers' relays don't count.
   - a transient initialisation contract (our clear lint)
   - a graph read node
   - uniform-backed (per-run) program scalars

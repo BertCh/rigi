@@ -13,7 +13,7 @@ Rigi is a Vite + React + TanStack Start app built on luma.gl 10 and deck.gl (Web
 ## Test and check commands
 The regression gate is `scripts/ci/run.mjs`; the check registry is `scripts/ci/checks.mjs` and the table is in `scripts/ci/README.md`.
 - Fast tier (no browser, about 30 s: tsc, biome ratchet, node/tsx unit checks): `node scripts/ci/run.mjs fast`
-- Full tier (adds the browser checks style-baseline, deck-smoke, eval-app, eval-app-deck): `node scripts/ci/run.mjs full`
+- Full tier (adds the browser checks style-baseline, deck-smoke, settle-submits, graph-plumbing-ab, eval-app, eval-app-deck): `node scripts/ci/run.mjs full`
 - One or a few checks: `node scripts/ci/run.mjs fast --only labels,haze-fit`; `--skip a,b` drops some; `--list` prints every id, tier and command.
 - A single unit check is a plain tsx script, for example `npx tsx src/lib/look/__tests__/labels.check.ts`.
 - Statuses PASS / FAIL / KNOWN / FIXED / SKIP: KNOWN failures are baselined in `scripts/ci/known-failures.json`; SKIP means a gitignored input (`data/`, `public/photos/`) is missing.

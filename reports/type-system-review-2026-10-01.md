@@ -30,7 +30,8 @@ Under the domain layer, the ontology core provides the axes:
 | fac786f | One canonical `Vec3`/`Mat3`/`LatLon`/`SWNE`/`Size`. It replaced 21 local `V3`/`Eye` aliases and 9 exported copies. A new `ByteMask` covers `FgMask`, `ForegroundMask`, two `ByteMask` copies and the photo-sky `SkyMask`. `HeightFn` is now declared once. Six hand-built storage keys now go through `storageKey()`, and the check fails on any spelled-out key. Two confidence bars are now read through `levelOf`. |
 | 8fd383d | `domain.ts` vocabulary, rendered by `generate.ts` and checked current in CI. Same-name exports are renamed: `ExifPhotoMeta`, `SkylineSolveResult`/`GcpSolveResult`, `RefineConfidence`, `PeakLabelPx`/`BaselinePeakLabel`, `GeoJsonPeak`/`RidgelinePeakInput`, `FitParams`/`GcpParams` and `CompositeLookStyle`. A new rule requires catalogued types to have unique names. Missing realizations were added, with a note on the four intrinsics shapes. |
 | a477911 | `CascadeStage` is declared once (it had 4 copies). `?style=` is read through `lib/flags`. The relative-rotation and spot-depth unions are crosswalked to `METHODS`. 35 exports with no importer are now module-local. |
-| (renderer) | The `Renderer` interface requires the nine members both engines implement, so call sites drop `?.`. The dead `nearFieldSampleAt` member, which nothing implemented or called, is removed. |
+| 724ed81 | The `Renderer` interface requires the nine members both engines implement, so call sites drop `?.`. The dead `nearFieldSampleAt` member, which nothing implemented or called, is removed. |
+| f44f27d, b7abc46 | World heights carry their datum: `Height<"msl">` on the sampler and peak/photo heights; `DemRaster.heights` documents MSL (see open item 1). |
 
 ## Open, by value
 

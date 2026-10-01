@@ -1,3 +1,5 @@
+Archived 2026-10-01: merged into [../matcher-service.md](../matcher-service.md).
+
 # Matcher service v0.4.0: T6 stage-1 search and frozen rule behind a policy switch
 
 *2026-09-26 · code in `tools/matcher/server/` (`app.py`, `t6.py`, `render_worker.mjs`, `replay_final.py`) · method in `reports/stage1.md` · frozen rule sha1 `292fb74f35f6f402b5e81f1b832bac565edd6807`*
@@ -195,6 +197,7 @@ Env knobs:
 - `MATCHER_POLICY` (`v034` | `t6`).
 - `MATCHER_TEX_UPLOAD=1`: v034 texture upload, off by default.
 - Unchanged from v0.3.5: `MATCHER_BASIN_GAP_MIN`, `MATCHER_TIMEOUT_MS` (default 120 s), `MATCHER_QUEUE_WAIT_S`, `APP_URL`.
+- Update (2026-10-01), render worker: `MATCHER_MAX_PAGES` (default 1), `MATCHER_RENDERER` (`deck` default \| `webgpu` \| `auto`; the three.js PhotoEngine these replays ran on was removed 583e2b7), `MATCHER_HORIZON_PRECISION` / `MATCHER_ALIGN_PRECISION` (`f64` \| `certified-f32`, for `scripts/gpu/precision-gate.mjs`), and `T6_GPU_GRID=1` (GPU skyline grid in the t6 edges command, off). The nondeterminism measurements above predate the deck renderer and have not been repeated on it.
 
 ## Caveats
 

@@ -2,6 +2,8 @@
 
 Date: 2026-09-29. This covers the build of [step-inside-design.md](step-inside-design.md), phases P0 to P3, done with three workflows and about 30 agents. Every workstream had its own skeptical reviewer. What this means for the roadmap is in [roadmap.md](roadmap.md); the cross-project picture is in [status.md](status.md).
 
+> **Update (2026-10-01):** "both renderers" below means three.js and deck.gl WebGL2. The three.js PhotoEngine has since been removed (583e2b7), together with `engine.ts` and `materials.ts` named in the build table; the three-only smear figure (4%) no longer describes a shipped path. Step Inside now runs on deck.gl WebGL2 and on the WebGPU engine (`src/lib/deck-webgpu/layers/splats.ts`, `layers/photo-sky.ts`). The WebGPU path passes its per-layer checks but has not been run end to end and its smear gate is unmeasured (`src/lib/deck-webgpu/README.md`). `three-splats.ts` remains for `/lab/splats` and the P3 cache renderer only.
+
 ## Verdict
 
 Step Inside works end to end in both renderers. A photo with a solved pose gets near-field Gaussian splats placed on the DEM. You can step into the photo from its exact camera, and the Truth view tints every surface by where it came from. Georeferenced `.ply` and `.splat` exports carry the anchor quality and the model licence. The feature is off, and invisible, when the near-field service is down. Classic stays pixel-identical (style-baseline 16/16) and the eval-app numbers are unchanged.

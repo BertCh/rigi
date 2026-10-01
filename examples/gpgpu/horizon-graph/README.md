@@ -107,7 +107,8 @@ API observations from this example, collected for luma.gl:
   helper (an `opaque`/`exact` function bound to a zero uniform) and a note in the GPGPU docs would
   save the next author some time.
 - Known: in 10.0.0-alpha.2, the `PipelineFactory` compute-pipeline cache ignores
-  `entryPoint`/`constants`. This example does not depend on override constants. Every kernel has
+  `entryPoint`/`constants` (fixed in Rigi's vendored `10.0.0-alpha.2-rigi.2` build, not yet upstream).
+  This example does not depend on override constants. Every kernel has
   its own source.
 
 ## Data sources and licences
