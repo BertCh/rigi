@@ -883,7 +883,14 @@ async function renderOnce(req) {
 		views.push({ tag, pose: p, W: r.W, H: r.H, rgb: rgbPath, xyz: xyzPath });
 	}
 	return {
-		meta: { ...meta, pageFlags: await pageFlagsOf(page) },
+		meta: {
+			...meta,
+			pageFlags: await pageFlagsOf(page),
+			// as align / edges: an engine without loadFullTerrain rendered on its initial terrain
+			...(req.fullTerrain && fullTerrainMs === null
+				? { fullTerrainUnsupported: true }
+				: {}),
+		},
 		views,
 		skyline,
 		timing: {

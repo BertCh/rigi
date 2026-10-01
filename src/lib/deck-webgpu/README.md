@@ -396,6 +396,38 @@ Full write-up, screenshots and diff heat maps: the session's `deck-webgpu-result
 (re-run `bench.mjs` to regenerate). Memory is the first thing to shrink (batched-terrain
 buffers, the MSAA colour target, the per-size geometry targets).
 
+## Matcher hooks (`loadFullTerrain`, `loadSatellite`, `renderPoseView`; WAG3)
+
+The matcher's render worker (`tools/matcher/server/render_worker.mjs`, `MATCHER_RENDERER=webgpu`)
+and the precision gate call these on either engine (`src/lib/renderer.ts`, optional members;
+`renderer.check.ts` asserts both engines have them). Same contract as `deck/engine.ts`:
+- `loadFullTerrain()`: the streamer's wedge becomes 360° and stays so (`fullWedge`; `setPose` no
+  longer narrows it), the query terrain swaps to the complete set, the horizon is re-traced over
+  360° (CPU profiles, as deck). Tiles go through the usual residency: the batched height atlas
+  grows by copy; past `maxTextureArrayLayers` tiles are dropped and counted in
+  `metrics().terrain.overflow`.
+- `loadSatellite(maxDistM, retries)`: fetches the render set's satellite tiles in range.
+- `renderPoseView(pose)`: geometry from a private `WebGpuGeometrySource` (xyz, sky = 0), colour from
+  `renderOffscreen({pose, cores: [terrain]})` (rgba16float, linear premultiplied) converted with
+  `poseViewRgba` (deck's arithmetic, sky #b9cde0). Near discard is off while it runs (`poseView`),
+  the look is replace + satellite, and it waits for the imagery array's pending uploads first.
+
+Parity, `scripts/deck-webgpu/pose-view-parity.mjs` (2026-10-01, IMG_7155 / 6958 / 7018, yaw
+offsets −20 / 0 / +20 on the full terrain, Apple Metal): the same tiles (534–539) and a
+bit-identical 360° horizon on both engines; terrain/sky masks identical (no pixel drawn by one
+engine only); |Δxyz| p95 0.005–0.020 m (≤ 1.1e-4 of the range); RGB mean |Δ| 0.9–2.9 / 255
+(0.1–3.6 % of channels over 16); autoAlign on the full terrain bit-identical (|Δyaw| 0).
+VRAM (luma "GPU Memory"): the full terrain adds 41–94 MiB to the photo view (296–339 MiB, deck
+247–303); the satellite drape for the matcher then takes it to 978–1021 MiB (deck 726–783): the
+imagery array keeps every tile at 512² with mips (≈ 1.33 MiB a layer, 490–534 layers). On devices
+with `maxTextureArrayLayers` 256 the far tiles beyond 256 layers draw without imagery
+(`metrics().imagery.overflow`).
+Matcher service (`/match`, photoId, fused; one run per engine, run-to-run noise not measured):
+IMG_7155 / 6958 / 7018 accept HIGH on both engines, fused poses within 0.018° yaw / 0.005° pitch /
+0.012° vfov of deck's, inliers within 3 %, vs ground truth |ΔdYaw| ≤ 0.017°. Render worker on
+IMG_7130 with `fullTerrain` and views at ±90°: autoAlign pose bit-identical, masks identical,
+|Δxyz| p95 ≤ 0.011 m (single depth-edge pixels up to hundreds of metres).
+
 ## Known gaps
 
 - **Renderer interface.** `WebGpuEngine` implements all of `Renderer`; deviations:
