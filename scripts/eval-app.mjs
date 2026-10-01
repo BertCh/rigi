@@ -66,7 +66,12 @@ const ids = Object.keys(cps).filter((id) => !only.length || only.includes(id));
 const browser = await chromium.launch({
 	headless: true,
 	args:
-		renderer == null || renderer === "webgpu" || renderer === "auto" // unset = the app default (auto)
+		renderer == null ||
+		renderer === "webgpu" ||
+		renderer === "auto" || // unset = the app default (auto)
+		// certified-f32 runs on the WebGPU compute device, on the deck renderer too
+		horizonPrecision === "certified-f32" ||
+		alignPrecision === "certified-f32"
 			? GPU_ARGS
 			: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 });

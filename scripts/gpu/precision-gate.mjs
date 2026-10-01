@@ -3,52 +3,72 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Wild-set / EVAL gate for the opt-in certified-f32 stages (precision policy P1; WAG W3.1 horizon,
-// W3.3 align). A certified-f32 stage may become a default only after this gate passes.
+// Wild-set / GT gate for the certified-f32 stages (precision policy P1; WAG W3.1 horizon, W3.3 align),
+// judged on QUALITY (user, 2026-10-01): certified-f32 is the default since 3225064, and it stays so
+// unless this gate shows it worse than f64.
 //
-//   node scripts/gpu/precision-gate.mjs [--stage both|horizon|align] [--renderer webgpu|deck|auto]
-//       [--ids a,b | --limit N] [--chunk N] [--out DIR] [--eval] [--diff-only] [--no-lock]
-//       [--manifest tools/bench/data/manifest.json] [--split tools/bench/split.json]
-//       [--lock-script PATH]
-//   Needs the dev server (APP_URL, default http://localhost:3100) and the gitignored wild set
-//   (tools/bench/data: manifest.json + photos) plus the harness's tools/matcher/.venv (photo normalising).
-//   2-photo smoke: --limit 2.
+//   node scripts/gpu/precision-gate.mjs [--stage both|horizon|align] [--renderer webgpu|deck|auto|both]
+//       [--ids a,b | --limit N] [--chunk N] [--out DIR] [--no-eval] [--no-noise] [--settle-ms N]
+//       [--diff-only] [--no-lock] [--manifest tools/bench/data/manifest.json]
+//       [--split tools/bench/split.json] [--lock-script PATH]
+//   Needs the dev server (APP_URL, default http://localhost:3100), the gitignored wild set
+//   (tools/bench/data: manifest.json + photos), the harness's tools/matcher/.venv (photo normalising)
+//   and, for the eval arm, data/control-points.json. 2-photo smoke: --limit 2 --no-eval.
 //
-// What it runs: the FROZEN dev split (tools/bench/split.json "dev", read-only; the test half is spent and
-// is never used here) through the wild harness's "app" method (tools/bench/harness/run.ts: the app's own
-// autoAlign in the headless app with the harness's seed wrapper and accept rule, condition "given"),
-// twice:
-//   base: ?horizonPrecision=f64&alignPrecision=f64         (the defaults)
-//   cand: ?horizonPrecision=certified-f32 and/or ?alignPrecision=certified-f32 (--stage)
-// both pinned to --renderer (default webgpu), through the render worker's page-flag pass-through
-// (tools/matcher/server/render_worker.mjs MATCHER_RENDERER / MATCHER_*_PRECISION). Every chunk of
-// --chunk photos (default 5) is one step under the machine-wide render lock (FIFO, shared).
-// --eval adds the GT-12 arm: scripts/eval-app.mjs on data/control-points.json, base vs cand.
+// Why one page per photo. The first version ran base and cand as two separate harness runs and
+// demanded bit identity. It could never pass: the f64 baseline itself differed between runs (wave 3:
+// 7/8 deck, 21/22 webgpu of the differing photos were f64 vs f64). Two causes, both fixed with this
+// version: (1) the first terrain-pass draw of a fresh page can come back blank, so the first seed's
+// top silhouette finalist scored sil 0 on one run and its real score on another (now redrawn:
+// deck/silhouette-mask.ts redrawIfBlank); (2) a full-terrain load that timed out left a row computed on
+// the initial terrain (now an error row: render_worker ensureFullTerrain, DeckEngine.loadFullTerrain;
+// and the stall itself is fixed: terrain-stream.ts gives up on an always-failing tile, the tile cache
+// times out a stalled fetch). And the design no longer depends on run-to-run determinism at all:
 //
-// The rule. The certified stages claim outputs bit-identical to the f64 path, so the gate is identity:
-//   PASS  every photo: the same accept / reject decision (and accept kind), the same final, shown and
-//         native poses and confidence, and every seed's raw autoAlign result (pose, score, confidence,
-//         alternatives) bit for bit (Object.is); the pinned engine ran in both; the certified path
-//         really ran in cand (at least one seed per requested stage took it; fallbacks are counted).
-//   FAIL  any difference. A cand accept that base rejects is a NEW ACCEPT: under the frozen
-//         0-false-accept rule it counts as a potential false accept (it has no blind verdict), so it
-//         fails the gate whatever its pose. A changed pose on an accepted row fails the same way.
-//   INCONCLUSIVE (exit 3)  a photo errored in either run, or cand never took a certified path (the
-//         probe failed, every call fell back): nothing was tested.
-// With identity, the false-accept count of cand equals base's by construction (the rule's inputs are
-// identical), so no new blind verification is needed. The frozen rule files (tools/bench/t5/
-// RULE_FROZEN*, split.json) are only read.
+// What it runs: the FROZEN dev split (tools/bench/split.json "dev", read-only; the test half is spent
+// and never used here) through the wild harness's "app" method (tools/bench/harness/run.ts, condition
+// "given": the app's own autoAlign with the harness's seed wrapper and accept rule), once per photo
+// and renderer, with every precision mode on the SAME page and terrain (HARNESS_ALIGN_MODES → the
+// render worker's align "modes": the precision is switched per mode through the page's live flag
+// overrides, the horizon re-traced under it, all seeds re-run):
+//   base   ?horizonPrecision=f64&alignPrecision=f64
+//   cand   certified-f32 for the --stage(s) (the defaults)
+//   base2  f64 again: the noise floor (what f64 vs f64 differs by on one page; --no-noise drops it)
+// The terrain stream is let settle (--settle-ms, default 500) before each mode, and each mode records
+// the terrain and horizon it ran on (hashes), so a mode that ran on other data is visible.
 //
-// Full terrain: the app arm on photos without a heading asks for it (loadFullTerrain). Both engines
-// implement it since WAG3 (WebGpuEngine.loadFullTerrain / renderPoseView), so webgpu rows run on the
-// 360° terrain like deck; a row is recorded as fullTerrainUnsupported only when the engine lacks the hook.
-// The fused / product-rule arm (matcher service, the worker's "render" command) is not run by this gate.
+// Arms and rule (precision-gate-score.mjs):
+//   quality  each mode's accepted poses against the wild set's blind verdicts (tools/bench/gt/wild
+//            verify_v2, t5/verify_v2, gt/final; same pose = within VERIFY_TOL): verified-correct /
+//            -wrong / unsure / unverified accepts per mode.
+//   eval     (default on; --no-eval) the GT-12 arm: scripts/eval-app.mjs on data/control-points.json,
+//            f64 vs the defaults: photos within 1° yaw, median px error.
+//   identity reported, not gated: identical / within the f64 noise / differs.
+//   FAIL  cand has more verified-wrong accepts (a false accept) or fewer verified-correct ones, or
+//         fewer GT-12 photos within 1°, or a GT-12 median error > 0.5 px worse.
+//   NEEDS-VERIFY (exit 4)  cand accepts a pose base did not accept and no blind verdict covers it
+//         (a potential false accept under the frozen 0-false-accept rule until blind-verified).
+//   INCONCLUSIVE (exit 3)  a photo errored, an eval run is missing, or cand never took a certified
+//         path (every call fell back: nothing was tested).
+//   PASS  otherwise.
+// The frozen rule files (tools/bench/t5/RULE_FROZEN*, split.json) are only read.
 //
-// Output: <out>/{base,cand}/ (harness results), <out>/summary.json, <out>/summary.md.
-// Exit: 0 PASS, 1 FAIL, 3 INCONCLUSIVE, 2 usage / setup.
+// Full terrain: photos without a heading ask for it (loadFullTerrain), on both engines. A load that
+// fails twice (fresh page on the retry) is an error row, never a row on the initial terrain.
+// The fused / product-rule arm (matcher service, the worker's "render" command) is not run here.
+//
+// Output: <out>/<renderer>/results (harness rows, with every mode), <out>/eval-<renderer>-{base,cand}
+// .json, <out>/summary.json, <out>/summary.md.
+// Exit: 0 PASS, 1 FAIL, 3 INCONCLUSIVE, 4 NEEDS-VERIFY, 2 usage / setup.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import {
+	decide,
+	EXIT,
+	loadVerifiedPoses,
+	scorePhoto,
+} from "./precision-gate-score.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const argv = process.argv.slice(2);
@@ -66,15 +86,17 @@ const log = (...a) => console.error("[precision-gate]", ...a);
 const stage = opt("stage", "both");
 if (!["both", "horizon", "align"].includes(stage))
 	fail(`--stage must be both, horizon or align (got ${stage})`);
-const renderer = opt("renderer", "webgpu");
-if (!["webgpu", "deck", "auto"].includes(renderer))
-	fail(`--renderer must be webgpu, deck or auto (got ${renderer})`);
+const rendererOpt = opt("renderer", "both");
+if (!["webgpu", "deck", "auto", "both"].includes(rendererOpt))
+	fail(`--renderer must be webgpu, deck, auto or both (got ${rendererOpt})`);
+const renderers = rendererOpt === "both" ? ["deck", "webgpu"] : [rendererOpt];
 const manifest = path.resolve(
 	ROOT,
 	opt("manifest", "tools/bench/data/manifest.json"),
 );
 const splitFile = path.resolve(ROOT, opt("split", "tools/bench/split.json"));
 const chunk = Math.max(1, Number(opt("chunk", "5")));
+const settleMs = Math.max(0, Number(opt("settle-ms", "500")));
 const lockScript = path.resolve(
 	ROOT,
 	opt("lock-script", "scripts/gpu/with-render-lock.mjs"),
@@ -90,14 +112,18 @@ const out = path.resolve(
 	),
 );
 const appUrl = process.env.APP_URL ?? "http://localhost:3100";
+const withEval = !has("no-eval");
 
-const MODES = {
-	base: { horizon: "f64", align: "f64" },
-	cand: {
-		horizon: stage === "align" ? "f64" : "certified-f32",
-		align: stage === "horizon" ? "f64" : "certified-f32",
-	},
+const BASE = { horizonPrecision: "f64", alignPrecision: "f64" };
+const CAND = {
+	horizonPrecision: stage === "align" ? "f64" : "certified-f32",
+	alignPrecision: stage === "horizon" ? "f64" : "certified-f32",
 };
+const MODES = [
+	{ name: "base", ...BASE },
+	{ name: "cand", ...CAND },
+	...(has("no-noise") ? [] : [{ name: "base2", ...BASE }]),
+];
 
 // ---------- the photo list: the frozen dev split ∩ the manifest ----------
 if (!fs.existsSync(manifest))
@@ -136,19 +162,14 @@ function step(label, cmd, env) {
 	);
 	return r.status ?? 1;
 }
-const modeEnv = (m) => ({
-	MATCHER_RENDERER: renderer,
-	MATCHER_HORIZON_PRECISION: MODES[m].horizon,
-	MATCHER_ALIGN_PRECISION: MODES[m].align,
-});
 fs.mkdirSync(out, { recursive: true });
 if (!has("diff-only"))
-	for (const m of ["base", "cand"])
+	for (const renderer of renderers) {
 		for (let i = 0; i < ids.length; i += chunk) {
 			const part = ids.slice(i, i + chunk);
 			// the harness skips photos whose result is already ok, so a re-run resumes
 			step(
-				`${m} ${i / chunk + 1}/${Math.ceil(ids.length / chunk)}`,
+				`${renderer} ${i / chunk + 1}/${Math.ceil(ids.length / chunk)}`,
 				locked([
 					"bash",
 					"tools/bench/harness/run.sh",
@@ -160,59 +181,56 @@ if (!has("diff-only"))
 					"--ids",
 					part.join(","),
 					"--out",
-					path.join(out, m),
+					path.join(out, renderer),
 					"--no-overlay",
 				]),
-				modeEnv(m),
+				{
+					MATCHER_RENDERER: renderer,
+					// WebGPU flags on deck too: the certified stages need the compute device
+					MATCHER_GPU_COMPUTE: "1",
+					// the page's own flags stay at their defaults; the modes switch precision per call
+					MATCHER_HORIZON_PRECISION: "",
+					MATCHER_ALIGN_PRECISION: "",
+					HARNESS_ALIGN_MODES: JSON.stringify(MODES),
+					HARNESS_SETTLE_MS: String(settleMs),
+				},
 			);
 		}
-if (has("eval") && !has("diff-only"))
-	for (const m of ["base", "cand"])
-		step(
-			`eval ${m}`,
-			locked([
-				"node",
-				"scripts/eval-app.mjs",
-				"--renderer",
-				renderer,
-				"--horizon-precision",
-				MODES[m].horizon,
-				"--align-precision",
-				MODES[m].align,
-				"--json",
-				path.join(out, `eval-${m}.json`),
-			]),
-			{},
-		);
+		if (withEval)
+			for (const [m, p] of [
+				["base", BASE],
+				["cand", CAND],
+			])
+				step(
+					`eval ${renderer} ${m}`,
+					locked([
+						"node",
+						"scripts/eval-app.mjs",
+						"--renderer",
+						renderer,
+						"--horizon-precision",
+						p.horizonPrecision,
+						"--align-precision",
+						p.alignPrecision,
+						"--json",
+						path.join(out, `eval-${renderer}-${m}.json`),
+					]),
+					{},
+				);
+	}
 
-// ---------- diff ----------
-const POSE = ["yaw", "pitch", "roll", "vfov"];
-const samePose = (a, b) =>
-	(a == null && b == null) ||
-	(a != null && b != null && POSE.every((k) => Object.is(a[k], b[k])));
-const sameRun = (a, b) =>
-	samePose(a.pose, b.pose) &&
-	Object.is(a.score, b.score) &&
-	Object.is(a.confidence, b.confidence) &&
-	(a.alternatives ?? []).length === (b.alternatives ?? []).length &&
-	(a.alternatives ?? []).every(
-		(x, i) =>
-			samePose(x.pose, b.alternatives[i].pose) &&
-			Object.is(x.score, b.alternatives[i].score) &&
-			Object.is(x.total, b.alternatives[i].total) &&
-			Object.is(x.sil, b.alternatives[i].sil),
-	);
-const read = (m, id) => {
-	const f = path.join(out, m, "results", safe(id), "given.app.json");
+// ---------- score ----------
+const verified = loadVerifiedPoses(ROOT);
+const read = (renderer, id) => {
+	const f = path.join(out, renderer, "results", safe(id), "given.app.json");
 	try {
 		return JSON.parse(fs.readFileSync(f, "utf8"));
 	} catch {
 		return null;
 	}
 };
-/** How the cand's certified stages ran over its seeds. */
-function certifiedUse(row) {
-	const runs = row?.precisionRuns ?? [];
+/** How cand's certified stages ran over its seeds. */
+function certifiedUse(runs) {
 	const c = {
 		seeds: runs.length,
 		alignCert: 0,
@@ -237,75 +255,16 @@ function certifiedUse(row) {
 	}
 	return c;
 }
-
-const rows = [];
-for (const id of ids) {
-	const b = read("base", id);
-	const c = read("cand", id);
-	const row = { id, issues: [] };
-	rows.push(row);
-	if (!b?.ok || !c?.ok) {
-		row.status = "error";
-		row.issues.push(
-			`missing or failed result: base ${b ? (b.ok ? "ok" : b.error) : "none"}, cand ${c ? (c.ok ? "ok" : c.error) : "none"}`,
-		);
-		continue;
-	}
-	for (const [m, r] of [
-		["base", b],
-		["cand", c],
-	]) {
-		const pf = r.page ?? {};
-		if (renderer !== "auto" && pf.engine !== renderer)
-			row.issues.push(`${m}: engine ${pf.engine} ran, ${renderer} pinned`);
-		if (
-			pf.horizonPrecision !== MODES[m].horizon ||
-			pf.alignPrecision !== MODES[m].align
-		)
-			row.issues.push(`${m}: page flags ${JSON.stringify(pf)}`);
-	}
-	row.base = { accepted: b.accepted, kind: b.acceptKind };
-	row.cand = { accepted: c.accepted, kind: c.acceptKind };
-	row.newAccept = !b.accepted && c.accepted;
-	row.lostAccept = b.accepted && !c.accepted;
-	row.decisionSame = b.accepted === c.accepted && b.acceptKind === c.acceptKind;
-	const poses = [
-		["pose", b.pose, c.pose],
-		["shownPose", b.shownPose, c.shownPose],
-		["native.pose", b.native?.pose, c.native?.pose],
-		["native.shownPose", b.native?.shownPose, c.native?.shownPose],
-	];
-	row.poseDiffs = poses.filter(([, x, y]) => !samePose(x, y)).map(([k]) => k);
-	if (!Object.is(b.confidence, c.confidence)) row.poseDiffs.push("confidence");
-	const br = b.precisionRuns ?? [];
-	const cr = c.precisionRuns ?? [];
-	row.seedDiffs =
-		br.length !== cr.length || !br.length
-			? -1
-			: br.filter((x, i) => !sameRun(x, cr[i])).length;
-	row.use = certifiedUse(c);
-	row.fullTerrainUnsupported = !!(
-		b.fullTerrainUnsupported || c.fullTerrainUnsupported
-	);
-	if (!row.decisionSame) row.issues.push("decision differs");
-	if (row.newAccept) row.issues.push("NEW ACCEPT (potential false accept)");
-	if (row.poseDiffs.length) row.issues.push(`differs: ${row.poseDiffs}`);
-	if (row.seedDiffs !== 0)
-		row.issues.push(
-			row.seedDiffs < 0
-				? "seed runs missing (render worker without the precision pass-through?)"
-				: `${row.seedDiffs} seed results differ`,
-		);
-	row.status = row.issues.length ? "fail" : "same";
-}
-
-// eval arm
-let evalDiff = null;
-if (has("eval")) {
+const median = (xs) => {
+	const s = xs.filter(Number.isFinite).sort((a, b) => a - b);
+	return s.length ? s[s.length >> 1] : Number.NaN;
+};
+function evalArmOf(renderer) {
+	if (!withEval) return null;
 	const ev = (m) => {
 		try {
 			return JSON.parse(
-				fs.readFileSync(path.join(out, `eval-${m}.json`), "utf8"),
+				fs.readFileSync(path.join(out, `eval-${renderer}-${m}.json`), "utf8"),
 			);
 		} catch {
 			return null;
@@ -313,103 +272,129 @@ if (has("eval")) {
 	};
 	const eb = ev("base");
 	const ec = ev("cand");
-	if (!eb || !ec) evalDiff = { error: "eval output missing" };
-	else {
-		const byId = new Map(ec.rows.map((r) => [r.id, r]));
-		const diffs = eb.rows
-			.filter((r) => !samePose(r.autoPose, byId.get(r.id)?.autoPose))
-			.map((r) => r.id);
-		evalDiff = {
-			photos: eb.rows.length,
-			poseDiffs: diffs,
-			within1deg: [eb.within1deg, ec.within1deg],
-			alignCertified: ec.rows.filter(
-				(r) => r.precision?.align?.path === "certified-f32",
-			).length,
-			horizonCertified: ec.rows.filter(
-				(r) =>
-					r.precision?.horizon?.mode === "certified-f32" &&
-					!r.precision.horizon.fellBack,
-			).length,
-		};
-	}
+	if (!eb || !ec) return { error: "eval output missing" };
+	const byId = new Map(ec.rows.map((r) => [r.id, r]));
+	return {
+		photos: eb.rows.length,
+		within1deg: [eb.within1deg, ec.within1deg],
+		medianAutoErr: [
+			median(eb.rows.map((r) => r.autoErr)),
+			median(ec.rows.map((r) => r.autoErr)),
+		],
+		poseDiffs: eb.rows
+			.filter((r) => {
+				const c = byId.get(r.id)?.autoPose;
+				const b = r.autoPose;
+				return !(
+					b &&
+					c &&
+					["yaw", "pitch", "roll", "vfov"].every((k) => Object.is(b[k], c[k]))
+				);
+			})
+			.map((r) => r.id),
+		alignCertified: ec.rows.filter(
+			(r) => r.precision?.align?.path === "certified-f32",
+		).length,
+	};
 }
 
-// verdict
-const errors = rows.filter((r) => r.status === "error");
-const failed = rows.filter((r) => r.status === "fail");
-const totals = rows.reduce(
-	(t, r) => {
-		if (!r.use) return t;
-		t.seeds += r.use.seeds;
-		t.alignCert += r.use.alignCert;
-		t.horizonCert += r.use.horizonCert;
-		return t;
-	},
-	{ seeds: 0, alignCert: 0, horizonCert: 0 },
-);
-const vacuous = [];
-if (MODES.cand.align === "certified-f32" && totals.alignCert === 0)
-	vacuous.push("align: no seed took the certified path");
-if (MODES.cand.horizon === "certified-f32" && totals.horizonCert === 0)
-	vacuous.push("horizon: no march took the certified path");
-const evalFail =
-	evalDiff &&
-	(evalDiff.error ||
-		evalDiff.poseDiffs.length ||
-		evalDiff.within1deg[0] !== evalDiff.within1deg[1]);
-const verdict =
-	failed.length || evalFail
-		? "FAIL"
-		: errors.length || vacuous.length
-			? "INCONCLUSIVE"
-			: "PASS";
+const reports = {};
+for (const renderer of renderers) {
+	const rows = [];
+	const totals = { seeds: 0, alignCert: 0, horizonCert: 0 };
+	for (const id of ids) {
+		const r = read(renderer, id);
+		if (!r?.ok || !r.modes?.base || !r.modes?.cand) {
+			rows.push({
+				id,
+				status: "error",
+				issues: [
+					r
+						? r.ok
+							? "row without modes (old harness / worker?)"
+							: r.error
+						: "no result",
+				],
+			});
+			continue;
+		}
+		const row = scorePhoto(id, r.modes, verified);
+		const pf = r.page ?? {};
+		if (renderer !== "auto" && pf.engine !== renderer)
+			row.issues.push(`engine ${pf.engine} ran, ${renderer} pinned`);
+		// every mode on the same data: terrain and (for equal precision) horizon hashes
+		const m = r.modes;
+		const tIds = new Set(Object.values(m).map((x) => x.terrain?.ids));
+		if (tIds.size > 1) row.issues.push("modes ran on different terrain sets");
+		if (m.base2 && m.base.horizon?.hash !== m.base2.horizon?.hash)
+			row.issues.push("f64 horizon differs between base and base2");
+		row.use = certifiedUse(m.cand.runs ?? []);
+		totals.seeds += row.use.seeds;
+		totals.alignCert += row.use.alignCert;
+		totals.horizonCert += row.use.horizonCert;
+		row.fullTerrainUnsupported = !!r.fullTerrainUnsupported;
+		rows.push(row);
+	}
+	const vacuous = [];
+	if (CAND.alignPrecision === "certified-f32" && totals.alignCert === 0)
+		vacuous.push("align: no seed took the certified path");
+	if (CAND.horizonPrecision === "certified-f32" && totals.horizonCert === 0)
+		vacuous.push("horizon: no march took the certified path");
+	const evalArm = evalArmOf(renderer);
+	const d = decide({ rows, evalArm, vacuous });
+	reports[renderer] = { ...d, certified: totals, vacuous, eval: evalArm, rows };
+}
+
+const order = ["FAIL", "INCONCLUSIVE", "NEEDS-VERIFY", "PASS"];
+const verdict = Object.values(reports)
+	.map((r) => r.verdict)
+	.sort((a, b) => order.indexOf(a) - order.indexOf(b))[0];
 const summary = {
 	verdict,
 	stage,
-	renderer,
+	renderers,
 	modes: MODES,
+	settleMs,
 	photos: ids.length,
-	same: rows.filter((r) => r.status === "same").length,
-	failed: failed.map((r) => r.id),
-	errors: errors.map((r) => r.id),
-	newAccepts: rows.filter((r) => r.newAccept).map((r) => r.id),
-	lostAccepts: rows.filter((r) => r.lostAccept).map((r) => r.id),
-	accepts: {
-		base: rows.filter((r) => r.base?.accepted).length,
-		cand: rows.filter((r) => r.cand?.accepted).length,
-	},
-	certified: totals,
-	vacuous,
-	fullTerrainUnsupported: rows.filter((r) => r.fullTerrainUnsupported).length,
-	eval: evalDiff,
-	rows,
+	verifiedPoses: verified.length,
+	reports,
 };
 fs.writeFileSync(
 	path.join(out, "summary.json"),
 	JSON.stringify(summary, null, 1),
 );
+const q = (c) =>
+	`${c.accepts} accepts: ${c.correct} correct, ${c.wrong} wrong, ${c.unsure} unsure, ${c.unverified} unverified`;
 const md = [
 	`# certified-f32 precision gate: ${verdict}`,
 	"",
-	`stage ${stage}, renderer ${renderer} pinned, ${ids.length} dev photos (frozen split), condition "given", app method.`,
-	`base ${JSON.stringify(MODES.base)} vs cand ${JSON.stringify(MODES.cand)}.`,
+	`stage ${stage}, ${ids.length} dev photos (frozen split), condition "given", app method; modes on one page per photo: ${MODES.map((m) => `${m.name} ${m.horizonPrecision}/${m.alignPrecision}`).join(", ")}; settle ${settleMs} ms. ${verified.length} blind-verified poses.`,
 	"",
-	`- identical: ${summary.same}/${ids.length}; failed: ${summary.failed.join(", ") || "none"}; errors: ${summary.errors.join(", ") || "none"}`,
-	`- accepts: base ${summary.accepts.base}, cand ${summary.accepts.cand}; new accepts (potential false accepts): ${summary.newAccepts.join(", ") || "none"}; lost accepts: ${summary.lostAccepts.join(", ") || "none"}`,
-	`- certified path taken: align ${totals.alignCert}/${totals.seeds} seeds, horizon ${totals.horizonCert}/${totals.seeds}${vacuous.length ? ` (${vacuous.join("; ")})` : ""}`,
-	`- rows on the initial terrain (no loadFullTerrain on this engine): ${summary.fullTerrainUnsupported}`,
-	evalDiff
-		? `- EVAL (GT-12): ${evalDiff.error ?? `${evalDiff.photos} photos, pose differences ${evalDiff.poseDiffs.join(", ") || "none"}, within 1° ${evalDiff.within1deg.join(" vs ")}, cand certified align ${evalDiff.alignCertified} / horizon ${evalDiff.horizonCertified}`}`
-		: "- EVAL (GT-12): not run (--eval)",
-	"",
-	"| photo | status | base | cand | certified align / horizon / seeds | issues |",
-	"|---|---|---|---|---|---|",
-	...rows.map(
-		(r) =>
-			`| ${r.id} | ${r.status} | ${r.base?.kind ?? "–"} | ${r.cand?.kind ?? "–"} | ${r.use ? `${r.use.alignCert} / ${r.use.horizonCert} / ${r.use.seeds}` : "–"} | ${r.issues.join("; ")} |`,
-	),
+	...Object.entries(reports).flatMap(([renderer, r]) => [
+		`## ${renderer}: ${r.verdict}${r.reasons.length ? ` (${r.reasons.join("; ")})` : ""}`,
+		"",
+		`- quality, base (f64): ${q(r.quality.base)}`,
+		`- quality, cand: ${q(r.quality.cand)}`,
+		...(MODES.length > 2
+			? [`- quality, base2 (f64): ${q(r.quality.base2)}`]
+			: []),
+		`- new accepts without a blind verdict: ${r.unverifiedNewAccepts.join(", ") || "none"}`,
+		`- identity (reported): ${r.identity.identical} identical, ${r.identity.withinNoise} within f64 noise, differs: ${r.identity.differs.join(", ") || "none"}; f64 noisy (base ≠ base2): ${r.identity.noisy.join(", ") || "none"}`,
+		`- certified path taken: align ${r.certified.alignCert}/${r.certified.seeds} seeds, horizon ${r.certified.horizonCert}/${r.certified.seeds}${r.vacuous.length ? ` (${r.vacuous.join("; ")})` : ""}`,
+		`- errors: ${r.errors.join(", ") || "none"}`,
+		r.eval
+			? `- EVAL (GT-12): ${r.eval.error ?? `${r.eval.photos} photos, within 1° ${r.eval.within1deg.join(" vs ")}, median px error ${r.eval.medianAutoErr.map((x) => x.toFixed(1)).join(" vs ")}, pose differences ${r.eval.poseDiffs.join(", ") || "none"}, cand certified align ${r.eval.alignCertified}`}`
+			: "- EVAL (GT-12): not run (--no-eval)",
+		"",
+		"| photo | status | base | cand | cand verdict | certified align / horizon / seeds | issues |",
+		"|---|---|---|---|---|---|---|",
+		...r.rows.map(
+			(x) =>
+				`| ${x.id} | ${x.status} | ${x.quality?.base.kind ?? "–"} | ${x.quality?.cand.kind ?? "–"} | ${x.quality?.cand.verdict ?? "–"} | ${x.use ? `${x.use.alignCert} / ${x.use.horizonCert} / ${x.use.seeds}` : "–"} | ${x.issues.join("; ")} |`,
+		),
+		"",
+	]),
 ].join("\n");
 fs.writeFileSync(path.join(out, "summary.md"), `${md}\n`);
 console.log(md);
-process.exit(verdict === "PASS" ? 0 : verdict === "FAIL" ? 1 : 3);
+process.exit(EXIT[verdict]);

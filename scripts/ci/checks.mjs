@@ -479,6 +479,30 @@ export const CHECKS = [
 		note: "tile cache byte ranges (key = url + range), mocked server",
 		timeoutS: 60,
 	},
+	{
+		id: "terrain-stall",
+		tier: "fast",
+		group: "concord",
+		cmd: tsx("src/lib/deck/terrain-stream.check.ts"),
+		note: "terrain loads that never complete: the streamer retries then gives up on an always-failing tile (set completes, stats.failed), tile-cache fetch stall timeout (TimeoutError), DEM ancestor fallback after a stall",
+		timeoutS: 60,
+	},
+	{
+		id: "silhouette-mask",
+		tier: "fast",
+		group: "concord",
+		cmd: tsx("scripts/gpu/silhouette-mask-check.ts"),
+		note: "silhouette re-rank mask: CPU emulation of the GPU predicate vs the CPU scorer (Object.is), zero-texture and stale-nonce fallbacks, redrawIfBlank (a blank finalist render is drawn once more)",
+		timeoutS: 120,
+	},
+	{
+		id: "precision-gate-score",
+		tier: "fast",
+		group: "concord",
+		cmd: ["node", "scripts/gpu/precision-gate.check.mjs"],
+		note: "precision gate scoring (precision-gate-score.mjs): identity vs the f64 noise floor, quality arm against the tracked blind verdicts (false accepts, lost correct accepts, unverified new accepts), GT-12 arm, verdict",
+		timeoutS: 60,
+	},
 
 	// ---- fast: geocam (GEO phase A, src/lib/geocam; synthetic, offline) ----------------------------
 	{
