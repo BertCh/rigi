@@ -62,6 +62,7 @@ import type { SkyMask } from "../look/haze-fit";
 import { drawExportLabels, skylineAt } from "../look/labels";
 import { lookKey } from "../look/look-key";
 import { ReliefController } from "../look/relief/field";
+import { precipitationFor } from "../look/weather/precipitation";
 import { DeckMapCamera, MAP_VIEW_ID } from "../nearfield/deck-map-camera";
 import {
 	DeckSplatLayer,
@@ -111,6 +112,8 @@ import {
 import { CLASSIC } from "../style/defaults";
 import type { ViewStyle } from "../style/types";
 import { heightFromTile } from "../terrain";
+import { type TerroirShader, terroirShader } from "../terroir/glsl/values";
+import type { CoverGrid } from "../terroir/pack";
 import { DeckTiles3D } from "../tiles3d/deck-tiles";
 import { PhotoCompositor } from "./composite";
 import { CpuGeometrySource, TerrainProfiles } from "./cpu-geometry";
@@ -158,6 +161,7 @@ import {
 	TrailLayer,
 	type TrailSegments,
 } from "./trail-layer";
+import { WeatherLayer } from "./weather-layer";
 import {
 	AtmSkyLayer,
 	poseQuaternion,
@@ -317,6 +321,13 @@ export class DeckEngine implements Renderer {
 	private statsPending: string | null = null;
 	/** Bumps whenever the layer's look changes without a pose change (style, haze fit, relief field): the band stats' key. */
 	private layerGen = 0;
+	/** Terroir land cover (setTerroirCover) and the terroir shading of it + the style (src/lib/terroir/glsl). */
+	private terroirGrid: CoverGrid | null = null;
+	private terroirMemo: {
+		style: ViewStyle;
+		grid: CoverGrid | null;
+		t: TerroirShader | null;
+	} | null = null;
 	/** The photo view's terrain + trail layers as updateLayers last built them (updateComposite reuses them). */
 	private sceneLayers: Layer[] = [];
 	/** Brush strokes so far (the refined cut's key) and the debounce for re-refining after an edit. */
@@ -449,6 +460,8 @@ export class DeckEngine implements Renderer {
 	/** World view camera (three's OrbitControls + fly-in), made on the first enterWorld. */
 	private world?: WorldCamera;
 	private worldRaf = 0;
+	/** World-view rain / snow animation (style.world.weather): a redraw per frame while it is on. */
+	private weatherRaf = 0;
 	private worldStill = 0;
 	/** The layers the last worldLayers built, and the gizmo plane opacity they (or a flight frame) used. */
 	private worldList: unknown[] = [];
@@ -664,6 +677,7 @@ export class DeckEngine implements Renderer {
 		console.warn("[deck-engine] WebGL context lost; waiting for the restore");
 		cancelAnimationFrame(this.worldRaf);
 		this.worldRaf = 0;
+		this.syncWeatherTick(false);
 		clearTimeout(this.geoTimer);
 		this.geoTimer = 0;
 		clearTimeout(this.statsTimer);
@@ -1000,6 +1014,7 @@ export class DeckEngine implements Renderer {
 		clearTimeout(this.geoTimer);
 		clearTimeout(this.wedgeTimer);
 		cancelAnimationFrame(this.worldRaf);
+		cancelAnimationFrame(this.weatherRaf);
 		this.step?.cam.dispose();
 		this.step = null;
 		this.world?.dispose();
@@ -1245,6 +1260,32 @@ export class DeckEngine implements Renderer {
 		});
 		if (built) this.layerGen++;
 		return built;
+	}
+
+	/**
+	 * Terroir land cover (src/lib/terroir, Renderer.setTerroirCover): the pack's class grid for
+	 * style.terroir.cover / contours.inkByCover; null = off. Display-only: it reaches the terrain's
+	 * colour programs (TERROIR_* defines), never the geometry pass's range.
+	 */
+	setTerroirCover(grid: CoverGrid | null) {
+		if (grid === this.terroirGrid) return;
+		this.terroirGrid = grid;
+		this.layerGen++;
+		this.updateLayers();
+	}
+
+	/** The terroir shading for the current style and cover (null = off: the classic programs). */
+	private terroir(): TerroirShader | null {
+		const m = this.terroirMemo;
+		if (m && m.style === this.style && m.grid === this.terroirGrid) return m.t;
+		const t = terroirShader(
+			this.style,
+			this.terroirGrid,
+			this.frame,
+			this.photo.takenAt,
+		);
+		this.terroirMemo = { style: this.style, grid: this.terroirGrid, t };
+		return t;
 	}
 
 	/** concord DSM occluder dim mask (?concord=occl; row 0 = top, 255 = dim); null = off. Composite-only. */
@@ -1534,6 +1575,7 @@ export class DeckEngine implements Renderer {
 					nearDiscard: nearFadeFor(this.photo.hAccuracy),
 					elevRange: deckElevRange(this.style, this.elevRange) ?? undefined,
 					relief: this.relief.field,
+					terroir: this.terroir(),
 					offscreen: true,
 					// the world drape's texture, kept across mode switches (the photo view never samples
 					// it: projectPhoto is 0 in its offscreen passes); see warmPhotoTexture
@@ -1547,6 +1589,7 @@ export class DeckEngine implements Renderer {
 						segments: this.trails,
 						widthPx: this.style.trails.width,
 						lineOpacity: this.style.trails.opacity,
+						dash: this.style.trails.dash,
 					}),
 				);
 		}
@@ -2723,6 +2766,7 @@ export class DeckEngine implements Renderer {
 		this.world?.exit();
 		cancelAnimationFrame(this.worldRaf);
 		this.worldRaf = 0;
+		this.syncWeatherTick(false);
 		this.compositor.enabled = true;
 		this.canvas.style.backgroundColor = "";
 		this.deck.setProps({ views: this.photoViews } as never);
@@ -2891,6 +2935,7 @@ export class DeckEngine implements Renderer {
 				// photo-camera geometry pass only (the range map the drape tests); the canvas draw keeps it all
 				nearDiscard: nearFadeFor(this.photo.hAccuracy),
 				relief: this.relief.field,
+				terroir: this.terroir(),
 				offscreen: false,
 				photo: this.photoImg ?? null,
 				photoRange: this.drapeRange(),
@@ -2913,6 +2958,7 @@ export class DeckEngine implements Renderer {
 					segments: this.trails,
 					widthPx: this.style.trails.width,
 					lineOpacity: this.style.trails.opacity,
+					dash: this.style.trails.dash,
 					onCanvas: true,
 				}),
 			);
@@ -2934,8 +2980,37 @@ export class DeckEngine implements Renderer {
 		// the depth buffer first (the trails would otherwise draw over them)
 		const nf = this.nearFieldLayer();
 		if (nf) out.push(nf);
+		// opt-in rain / snow (style.world.weather, default off): last, it blends without writing depth
+		const wx = precipitationFor(this.style.world.weather);
+		this.syncWeatherTick(!!wx);
+		if (wx)
+			out.push(
+				this.keepLayer(WeatherLayer, {
+					id: "world-weather",
+					precipitation: wx,
+				}),
+			);
 		this.worldList = out.filter(Boolean);
 		return this.worldList;
+	}
+
+	/** Start / stop the weather animation: one deck redraw per frame while the world view shows weather. */
+	private syncWeatherTick(on: boolean) {
+		if (!on || this.disposed) {
+			cancelAnimationFrame(this.weatherRaf);
+			this.weatherRaf = 0;
+			return;
+		}
+		if (this.weatherRaf) return;
+		const step = () => {
+			if (this.disposed || !this.world?.controls) {
+				this.weatherRaf = 0;
+				return;
+			}
+			this.deck.redraw("weather");
+			this.weatherRaf = requestAnimationFrame(step);
+		};
+		this.weatherRaf = requestAnimationFrame(step);
 	}
 
 	/** The photo-camera gizmo (null once the plane has faded: engine.ts hides the frustum then). */

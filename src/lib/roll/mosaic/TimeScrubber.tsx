@@ -3,6 +3,7 @@
 // the photos inside the range (undefined = everything, so the map drapes all).
 import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LightBand } from "../../terroir/roll/LightBand";
 import type { Roll } from "../types";
 import { dayKey, fmtDay, fmtTime, vpColor } from "./style";
 
@@ -141,6 +142,14 @@ export function TimeScrubber({
 					active.current = null;
 				}}
 			>
+				<LightBand
+					photos={ps}
+					pos={pos}
+					total={total}
+					gapCap={GAP_CAP_S}
+					lat={roll.center.lat}
+					lon={roll.center.lon}
+				/>
 				<div className="absolute inset-x-0 top-3.5 h-1 rounded-full bg-white/10" />
 				<div
 					className="absolute top-3.5 h-1 rounded-full bg-[var(--rigi-glow)]/60"

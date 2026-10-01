@@ -1,0 +1,16 @@
+{
+	"v": 1,
+	"packs": [
+		{
+			"id": "thunersee",
+			"name": "thunersee",
+			"bbox": [
+				7.35,
+				46.45,
+				8.25,
+				46.95
+			],
+			"path": "thunersee"
+		}
+	]
+}

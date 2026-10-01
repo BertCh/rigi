@@ -102,6 +102,35 @@ export const CHECKS = [
 		cmd: tsx("src/lib/look/__tests__/labels.check.ts"),
 		timeoutS: 300,
 	},
+	// terroir cartography (src/lib/terroir, reports/terroir-cartography.md): pure-node checks
+	{
+		id: "terroir-labels",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/terroir/labels/labels.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "terroir-viz",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/terroir/viz/viz.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "terroir-roll",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/terroir/roll/roll.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "terroir-pack",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("scripts/terroir/pack.check.ts"),
+		timeoutS: 120,
+	},
 	{
 		id: "haze-fit",
 		tier: "fast",

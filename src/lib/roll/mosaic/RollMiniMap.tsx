@@ -3,6 +3,13 @@
 // draws one pin), copied so both can evolve independently.
 import { Crosshair } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	isUncertainPose,
+	mercatorLat,
+	mercatorMPerPx,
+	priorFanPath,
+} from "../../terroir/roll/logic";
+import { MapFurniture } from "../../terroir/roll/MapFurniture";
 import { hfovOf } from "../roll";
 import type { Roll, RollPhoto } from "../types";
 import { aspectOf, vpColor } from "./style";
@@ -269,6 +276,17 @@ export function RollMiniMap({
 								className="pointer-events-auto cursor-pointer [&:hover>path]:fill-opacity-60"
 							>
 								<title>{p.meta.id}</title>
+								{isUncertainPose(p.poseSource) && (
+									<path
+										d={priorFanPath(c.x, c.y, r * 1.12, p.pose.yaw, hf)}
+										fill={col}
+										fillOpacity={dim ? 0.03 : 0.09}
+										stroke={col}
+										strokeOpacity={dim ? 0.15 : 0.4}
+										strokeDasharray="2 3"
+										className="pointer-events-none"
+									/>
+								)}
 								<path
 									d={`M${c.x},${c.y} L${pt(a0)} A${r},${r} 0 0 1 ${pt(a1)} Z`}
 									fill={col}
@@ -276,6 +294,9 @@ export function RollMiniMap({
 									stroke={sel ? "#fff" : col}
 									strokeOpacity={dim ? 0.45 : 0.95}
 									strokeWidth={sel ? 2 : 1.25}
+									strokeDasharray={
+										isUncertainPose(p.poseSource) ? "4 3" : undefined
+									}
 								/>
 								<circle
 									cx={c.x}
@@ -321,6 +342,16 @@ export function RollMiniMap({
 					</button>
 				))}
 			</div>
+			{view && (
+				<MapFurniture
+					mPerPx={mercatorMPerPx(mercatorLat(view.y, view.z), view.z)}
+					note={
+						photos.some((p) => isUncertainPose(p.poseSource))
+							? "dashed + fan: EXIF-only heading, ±10° or more"
+							: undefined
+					}
+				/>
+			)}
 			<div className="absolute right-0 bottom-0 bg-white/80 px-1.5 py-0.5 text-[10px] text-black/80">
 				©{" "}
 				<a

@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toCss } from "../../style/color";
 import type { LabelStyle } from "../../style/types";
+import { uncertainOpacity } from "../../terroir/labels/names";
 import { eleSuffix, type PlacedLabel, tierFonts } from "./layout";
 
 export type PeakLabelsSvgProps = {
@@ -14,6 +15,10 @@ export type PeakLabelsSvgProps = {
 	onHover?: (label: PlacedLabel | null) => void;
 	onClick?: (label: PlacedLabel) => void;
 	className?: string;
+	/** terroir.subPill: a stronger halo under the elevation text so it reads on bright cloud */
+	subPill?: boolean;
+	/** terroir.uncertainty with a guessed pose: softer labels (far first) and dashed leaders */
+	uncertain?: boolean;
 };
 
 const FADE_MS = 220;
@@ -29,6 +34,8 @@ export function PeakLabelsSvg({
 	onHover,
 	onClick,
 	className,
+	subPill,
+	uncertain,
 }: PeakLabelsSvgProps) {
 	const fontPx = st.name.px;
 	const fontFamily = st.fontFamily;
@@ -92,7 +99,7 @@ export function PeakLabelsSvg({
         .pk-hit { pointer-events: visiblePainted; cursor: pointer; }
       `}</style>
 			{all.map((l) => {
-				const f = tierFonts(l.tier, fontPx, fontFamily);
+				const f = tierFonts(l.tier, fontPx * (l.sizeMul ?? 1), fontFamily);
 				const ele = showEle ? eleSuffix(l) : "";
 				const isHover = hover === l.id;
 				const halo =
@@ -101,13 +108,20 @@ export function PeakLabelsSvg({
 						: st.halo.kind === "shadow"
 							? Math.max(2.5, f.size * 0.19)
 							: 0;
-				const op = l.leaving ? 0 : isHover ? 1 : l.opacity;
+				const op = l.leaving
+					? 0
+					: isHover
+						? 1
+						: uncertain
+							? Math.min(l.opacity, uncertainOpacity(l.distKm))
+							: l.opacity;
 				const dotR =
 					(st.dot.px / 2) * (l.tier === 0 ? 1 : l.tier === 1 ? 0.85 : 0.7);
 				return (
 					<g
 						key={l.id}
 						className="pk-g"
+						data-peak-label={l.id}
 						style={{
 							opacity: op,
 							filter:
@@ -127,6 +141,7 @@ export function PeakLabelsSvg({
 									strokeOpacity={0.5}
 									strokeWidth={st.leader.widthPx + 2}
 									strokeLinecap="round"
+									strokeDasharray={uncertain ? "3 3" : undefined}
 								/>
 								<line
 									x1={l.leader[0]}
@@ -136,6 +151,7 @@ export function PeakLabelsSvg({
 									stroke={isHover ? ACCENT : t.line}
 									strokeWidth={st.leader.widthPx}
 									shapeRendering="geometricPrecision"
+									strokeDasharray={uncertain ? "3 3" : undefined}
 								/>
 							</>
 						)}
@@ -183,6 +199,8 @@ export function PeakLabelsSvg({
 									fontSize={f.eleSize}
 									fontWeight={st.sub.weight}
 									dx={f.gap}
+									stroke={subPill ? t.halo : undefined}
+									strokeWidth={subPill ? Math.max(halo, 2) + 3 : undefined}
 								>
 									{ele}
 								</tspan>

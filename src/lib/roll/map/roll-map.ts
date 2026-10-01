@@ -636,6 +636,11 @@ export class RollMapEngine {
 		return !!this.flying;
 	}
 
+	/** Terrain height (m MSL) under a point once the roll terrain is loaded, else null (terroir names). */
+	heightAt(lat: number, lon: number): number | null {
+		return this.renderSet?.heightAt(lat, lon) ?? null;
+	}
+
 	/** The photo whose viewpoint the camera is at (or flying into). */
 	get photoId() {
 		return this.flying?.id ?? null;

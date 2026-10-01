@@ -25,6 +25,10 @@ export type LabelCandidate = {
 	visible: boolean;
 	/** skyline y (px) at this x, if known */
 	skylineY?: number;
+	/** terroir peakTiers: a fixed tier (0 major / 1 peak / 2 minor) instead of the rank tier */
+	tierHint?: 0 | 1 | 2;
+	/** terroir peakTiers: font size factor on top of the tier's own size (1 = unchanged) */
+	sizeMul?: number;
 };
 
 export type LayoutKind = "panorama" | "inline";
@@ -553,8 +557,9 @@ export function layoutLabels(
 		const rankTier = tierFor(rank, maxLabels);
 		// keep the previous tier unless the rank moved by more than one tier (no size popping)
 		const tier =
-			s.prev && Math.abs(s.prev.tier - rankTier) < 2 ? s.prev.tier : rankTier;
-		const f = tierFonts(tier, fontPx, family);
+			c.tierHint ??
+			(s.prev && Math.abs(s.prev.tier - rankTier) < 2 ? s.prev.tier : rankTier);
+		const f = tierFonts(tier, fontPx * (c.sizeMul ?? 1), family);
 		const eleStr = eleSuffix(c);
 		const textW =
 			measure(c.name, f.name) + (eleStr ? f.gap + measure(eleStr, f.ele) : 0);

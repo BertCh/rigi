@@ -1,3 +1,4 @@
+import { POSE_GLYPH } from "../../terroir/roll/logic";
 import type { RollPhoto } from "../types";
 import {
 	compassPoint,
@@ -19,6 +20,9 @@ export function PoseBadge({
 			title={POSE_SOURCE_HINT[photo.poseSource]}
 			className={`rounded px-1.5 py-px text-[9.5px] font-semibold tracking-wide uppercase ${POSE_SOURCE_CLASS[photo.poseSource]} ${className}`}
 		>
+			<span aria-hidden="true" className="mr-0.5">
+				{POSE_GLYPH[photo.poseSource]}
+			</span>
 			{POSE_SOURCE_LABEL[photo.poseSource]}
 		</span>
 	);

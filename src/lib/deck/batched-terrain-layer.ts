@@ -32,6 +32,7 @@ import {
 	setTerrainShaderProps,
 	type TerrainDrawProps,
 	terrainShaders,
+	terroirFs,
 } from "./terrain-layer";
 import { terrainDrawStats } from "./terrain-mode";
 
@@ -775,7 +776,7 @@ export class BatchedTerrainTileLayer extends Layer<BatchedTerrainProps> {
 	getShaders() {
 		return super.getShaders({
 			...terrainShaders(this.props, vs, [batchModule]),
-			fs: fsBatched(),
+			fs: terroirFs(this.props, fsBatched()),
 		});
 	}
 

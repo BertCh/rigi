@@ -22,6 +22,7 @@ import {
 	TANAKA_FNS,
 } from "./look/glsl/ramps";
 import { REL_BLOCK, RELIEF_FNS } from "./look/glsl/relief";
+import { TER_BLOCK, terroirTerrainFs } from "./terroir/glsl/terrain";
 
 /** slopeClass (6): the slope layer, only in a LOOK_SLOPE program; normal (7): the ink creases' normal pass, only under LOOK_INK. */
 export const STYLE = {
@@ -179,6 +180,9 @@ export function makeSharedUniforms(): Record<string, THREE.IUniform> {
 		// the relief field (look/relief/field.ts); A = 0 (no coverage) until one is built
 		reliefField: { value: emptyTexture() },
 		reliefGen: { value: emptyTexture() },
+		// terroir shading (src/lib/terroir/glsl), read only under a TERROIR_* define
+		...TER_BLOCK.threeUniforms(),
+		terroirCover: { value: emptyTexture() },
 	};
 }
 
@@ -525,10 +529,15 @@ export function makeTerrainMaterial(
 		uniforms,
 		defines,
 		vertexShader: vertex,
-		fragmentShader: fragment,
+		fragmentShader: terrainFragment(defines),
 		transparent: false,
 		side: THREE.FrontSide,
 	});
+}
+
+/** The terrain fragment shader for a define set: the classic source unless a TERROIR_* define is on. */
+export function terrainFragment(defines: Record<string, string>) {
+	return terroirTerrainFs("three", fragment, Object.keys(defines));
 }
 
 /** World view background for world.sky.mode 'atmosphere': look/glsl atmSky on a fullscreen triangle. */

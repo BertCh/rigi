@@ -358,9 +358,11 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 		replace: { haze: 0.75 },
 		world: { haze: 0.75 },
 		composite: { ridges: "ink", ink: { strength: 0.55, inner: [0.16, 0.11, 0.07], skyline: [0.1, 0.07, 0.05] } },
-		labels: { layout: "panorama", export: null },
+		// classic placement (upright, wrapped, above the summit) with prominence tiers reads calmer than the
+		// rotated panorama layout once place names share the frame
+		labels: { maxLabels: 18, export: null },
 		terroir: {
-			names: { on: true, reach: "near", language: "local+usual", maxLabels: 24 },
+			names: { on: true, reach: "near", language: "local+usual", maxLabels: 16 },
 			peakTiers: true,
 			subPill: true,
 			contours: { adaptive: true, swissIndex: true, inkByCover: true },
@@ -378,6 +380,16 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 /** The photo-view layer (Settings.overlayStyle) a preset switches to when it is chosen. */
 export const PRESET_OVERLAY_LAYER: Partial<Record<PresetId, "slope">> = {
 	slope: "slope",
+};
+
+/**
+ * Map layers (Settings.mapStyle / worldStyle) a preset switches to when it is chosen: the terroir land
+ * cover shows on the relief rendering, not on satellite imagery. The user can still pick another one.
+ */
+export const PRESET_MAP_LAYERS: Partial<
+	Record<PresetId, { mapStyle?: "hillshade"; worldStyle?: "hillshade" }>
+> = {
+	terroir: { mapStyle: "hillshade", worldStyle: "hillshade" },
 };
 
 /** Presets that switch on look features (LOOK_* defines, look-key.ts); the rest stay classic-compatible. */

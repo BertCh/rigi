@@ -24,11 +24,23 @@ import {
 	TANAKA_FNS,
 } from "../look/glsl/ramps";
 import { REL_BLOCK, REL_LUMA_MODULE } from "../look/glsl/relief";
-import { type LookDefine, withSlopeLayer } from "../look/look-key";
+import { withSlopeLayer } from "../look/look-key";
 import type { ReliefField } from "../look/relief/field";
+import { WATER_FNS } from "../look/water/water";
 import { PROVENANCE_COLORS } from "../nearfield/provenance";
 import { type DeckTerrainStyle, deckTerrainStyle } from "../style/deck-apply";
 import { CLASSIC } from "../style/defaults";
+import {
+	TER_BLOCK,
+	TERROIR_LUMA_MODULE,
+	terroirTerrainFs,
+} from "../terroir/glsl/terrain";
+import {
+	coverTexels,
+	type TerroirShader,
+	terroirBlockValues,
+	terroirMajorEvery,
+} from "../terroir/glsl/values";
 import { BatchedTerrainTileLayer } from "./batched-terrain-layer";
 import { narrowIndices } from "./index-width";
 import type { TileMesh } from "./terrain-data";
@@ -350,6 +362,9 @@ vec3 hypso(float h) {
 #ifdef LOOK_ALPINE
 ${ALPINE_FNS}
 #endif
+#ifdef LOOK_WATER
+${WATER_FNS}
+#endif
 #ifdef LOOK_TANAKA
 ${TANAKA_FNS}
 #endif
@@ -359,7 +374,11 @@ ${HARMONIZE_FNS}
 
 // the hillshade albedo: the relief ramp, or the Alpine tint (LOOK_ALPINE)
 #ifdef LOOK_ALPINE
+#ifdef LOOK_WATER
+#define ALBEDO(n) waterShade(alpineAlbedo(vElev, n, vWorld.xy), vElev, vWorld.xy, n, normalize(vCamera - vWorld), range)
+#else
 #define ALBEDO(n) alpineAlbedo(vElev, n, vWorld.xy)
+#endif
 #else
 #define ALBEDO(n) hypso(vElev)
 #endif
@@ -607,6 +626,8 @@ export type TerrainUniformProps = {
 	harmonize: ReturnType<typeof harmonizeValues> | null;
 	/** Step Inside Truth toggle (world drape only): 0 = off, else the provenance tint's mix. */
 	truth: number;
+	/** Terroir shading (src/lib/terroir/glsl; TERROIR_* defines): null = off, the classic programs. */
+	terroir: TerroirShader | null;
 };
 
 type TileLayerProps = LayerProps &
@@ -619,6 +640,8 @@ type TileLayerProps = LayerProps &
 		emptyTexture: Texture;
 		/** The relief field's textures (LOOK_RELIEF), null until built. */
 		reliefTex: { field: Texture; gen: Texture; extent: number[] } | null;
+		/** The terroir cover classes (TERROIR_COVER / _INK), null until uploaded. */
+		terroirTex?: Texture | null;
 	};
 
 class TerrainTileLayer extends Layer<TileLayerProps> {
@@ -716,6 +739,8 @@ export type TerrainDrawProps = TerrainUniformProps & {
 	emptyTexture: Texture;
 	/** The relief field's textures (LOOK_RELIEF), null until built. */
 	reliefTex: { field: Texture; gen: Texture; extent: number[] } | null;
+	/** The terroir cover classes (r8, nearest; TERROIR_COVER / _INK), null until uploaded. */
+	terroirTex?: Texture | null;
 };
 
 /**
@@ -751,7 +776,9 @@ const terrainLogDepthModule = {
  * uniform module and the look's LOOK_* defines (none for classic: the classic program is unchanged).
  */
 export function terrainShaders(
-	p: Pick<TerrainUniformProps, "look" | "style">,
+	p: Pick<TerrainUniformProps, "look" | "style"> & {
+		terroir?: TerroirShader | null;
+	},
 	vs: string,
 	extraModules: ShaderModule[] = [],
 ) {
@@ -765,13 +792,29 @@ export function terrainShaders(
 		d.includes("LOOK_RELIEF") && REL_LUMA_MODULE,
 		d.includes("LOOK_SLOPE") && SLOPE_LUMA_MODULE,
 		d.includes("LOOK_HARMONIZE") && HARM_BLOCK.lumaModule,
+		!!p.terroir?.defines.length && TERROIR_LUMA_MODULE,
 	].filter((m) => !!m);
 	return {
 		vs,
-		fs,
+		fs: terroirFs(p, fs),
 		modules: [...base, ...look],
 		defines: Object.fromEntries(d.map((k) => [k, true])),
 	};
+}
+
+/**
+ * `src` (the terrain fragment shader, or a variant of it: batched-terrain-layer.ts fsBatched) with
+ * the terroir code spliced in for `p`'s TERROIR_* defines; `src` itself when terroir is off.
+ */
+export function terroirFs(
+	p: Pick<TerrainUniformProps, "look" | "style"> & {
+		terroir?: TerroirShader | null;
+	},
+	src: string,
+) {
+	return p.terroir?.defines.length
+		? terroirTerrainFs("deck", src, tileDefines(p))
+		: src;
 }
 
 /**
@@ -889,13 +932,39 @@ export function setTerrainShaderProps(
 			},
 		});
 	}
+	// terroir (src/lib/terroir/glsl): the Swiss index on the contour pass, the TER_BLOCK values
+	const T = p.terroir;
+	if (T) {
+		if (T.swissIndex && p.style === "contours")
+			model.shaderInputs.setProps({
+				terrain: {
+					contourMajorEvery: terroirMajorEvery(
+						T,
+						p.contourInterval,
+						L.contourMajorEvery,
+					),
+				},
+			});
+		if (T.defines.length)
+			model.shaderInputs.setProps({
+				terroir: {
+					...TER_BLOCK.pack(
+						terroirBlockValues(T, p.contourInterval, L.contourMajorEvery),
+					),
+					terroirCover: p.terroirTex ?? empty,
+				},
+			});
+	}
 }
 
-/** The style's LOOK_* defines, plus LOOK_SLOPE while the tile draws the slope layer. */
+/** The style's LOOK_* defines, plus LOOK_SLOPE while the tile draws the slope layer (+ TERROIR_*). */
 function tileDefines(
-	p: Pick<TerrainUniformProps, "look" | "style">,
-): LookDefine[] {
-	return withSlopeLayer(p.look.defines, p.style === "slopeClass");
+	p: Pick<TerrainUniformProps, "look" | "style"> & {
+		terroir?: TerroirShader | null;
+	},
+): string[] {
+	const d: string[] = withSlopeLayer(p.look.defines, p.style === "slopeClass");
+	return p.terroir?.defines.length ? [...d, ...p.terroir.defines] : d;
 }
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
@@ -982,6 +1051,7 @@ const DEFAULTS: TerrainUniformProps = {
 	protectPeople: true,
 	harmonize: null,
 	truth: 0,
+	terroir: null,
 };
 
 /**
@@ -1018,6 +1088,9 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 		relief?: { field: Texture; gen: Texture; extent: number[] };
 		/** terrain-mode.ts path the sublayers were rendered for. */
 		mode?: TerrainMode;
+		/** the terroir cover classes (r8 nearest) and the grid they were uploaded from */
+		terroirTex?: Texture;
+		terroirGrid?: unknown;
 	};
 
 	/** Re-render the sublayers when the terrain path flips (harnesses flip __RIGI_FLAGS__.terrain live). */
@@ -1075,6 +1148,30 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 					: undefined,
 			});
 		}
+		// terroir cover classes: uploaded once per grid (texels padded to the fit's row width)
+		const tg = props.terroir?.fit ? props.terroir.grid : null;
+		if (tg !== (this.state.terroirGrid ?? null)) {
+			this.state.terroirTex?.destroy();
+			const fit = props.terroir?.fit;
+			this.setState({
+				terroirGrid: tg,
+				terroirTex:
+					tg && fit
+						? device.createTexture({
+								data: coverTexels(tg, fit.texWidth),
+								width: fit.texWidth,
+								height: tg.height,
+								format: "r8unorm",
+								sampler: {
+									minFilter: "nearest",
+									magFilter: "nearest",
+									addressModeU: "clamp-to-edge",
+									addressModeV: "clamp-to-edge",
+								},
+							})
+						: undefined,
+			});
+		}
 		if (props.photoRange !== oldProps.photoRange) {
 			if (this.state.rangeOwned) this.state.range?.destroy();
 			const r = props.photoRange;
@@ -1092,6 +1189,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 		if (this.state.rangeOwned) this.state.range?.destroy();
 		this.state.fg?.destroy();
 		this.destroyRelief();
+		this.state.terroirTex?.destroy();
 	}
 
 	private destroyRelief() {
@@ -1105,7 +1203,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 	}
 
 	renderLayers() {
-		const { empty, photo, range, fg, relief } = this.state;
+		const { empty, photo, range, fg, relief, terroirTex } = this.state;
 		if (!empty) return [];
 		const u: TerrainUniformProps = { ...DEFAULTS };
 		for (const k of Object.keys(DEFAULTS) as (keyof TerrainUniformProps)[]) {
@@ -1132,6 +1230,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 					photoFg: fg ?? null,
 					emptyTexture: empty,
 					reliefTex: relief ?? null,
+					terroirTex: terroirTex ?? null,
 				}),
 			];
 		return this.props.tiles.map(
@@ -1149,6 +1248,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 					photoFg: fg ?? null,
 					emptyTexture: empty,
 					reliefTex: relief ?? null,
+					terroirTex: terroirTex ?? null,
 				}),
 		);
 	}

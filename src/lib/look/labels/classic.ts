@@ -24,6 +24,8 @@ export type ClassicInput = {
 	/** summit, px */
 	x: number;
 	y: number;
+	/** terroir peakTiers: text size factor (widths and line heights), default 1 */
+	scale?: number;
 };
 
 export type ClassicOptions = {
@@ -183,8 +185,9 @@ type Shape = {
 
 function shapesFor(l: ClassicInput, o: ClassicOptions): Shape[] {
 	const pad = 2; // halo / measuring slack
-	const wn = (s: string) => o.measure(s, o.nameFont) + pad;
-	const ws = (s: string) => o.measure(s, o.subFont) + pad;
+	const sc = l.scale ?? 1;
+	const wn = (s: string) => o.measure(s, o.nameFont) * sc + pad;
+	const ws = (s: string) => o.measure(s, o.subFont) * sc + pad;
 	const subVariants: string[][] = l.sub ? [[l.sub]] : [[]];
 	if (l.sub.includes(" · ")) subVariants.push(l.sub.split(" · "));
 	const out: Shape[] = [];
@@ -201,7 +204,7 @@ function shapesFor(l: ClassicInput, o: ClassicOptions): Shape[] {
 				subLines: sub,
 				subInline: false,
 				w,
-				h: lines.length * o.nameLineH + sub.length * o.subLineH,
+				h: (lines.length * o.nameLineH + sub.length * o.subLineH) * sc,
 				cost: (n - 1) * 0.9 + k * 0.7,
 				key: `${n}${k}`,
 			});
@@ -215,7 +218,7 @@ function shapesFor(l: ClassicInput, o: ClassicOptions): Shape[] {
 			subLines: [l.sub],
 			subInline: true,
 			w: wn(name) + inlineGap(o) + ws(l.sub),
-			h: o.nameLineH,
+			h: o.nameLineH * sc,
 			cost: 1,
 			key: "i",
 		});
@@ -225,7 +228,7 @@ function shapesFor(l: ClassicInput, o: ClassicOptions): Shape[] {
 			subLines: [],
 			subInline: false,
 			w: wn(name),
-			h: o.nameLineH,
+			h: o.nameLineH * sc,
 			cost: 5,
 			key: "n",
 		});

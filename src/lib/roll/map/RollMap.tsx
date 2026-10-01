@@ -17,8 +17,10 @@ import {
 	Loader2,
 	Maximize,
 	Shapes,
+	Tag,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { RollMapTerroir } from "../../terroir/roll/RollMapTerroir";
 import { HeadingChip } from "../mosaic/badges";
 import { aspectOf, fmtDay, fmtTime } from "../mosaic/style";
 import type { Roll } from "../types";
@@ -56,6 +58,8 @@ export function RollMap({
 	const [opacity, setOpacity] = useState(1);
 	const [sharp, setSharp] = useState(3);
 	const [gizmos, setGizmos] = useState(true);
+	/** Place names on the map (terroir pack + the roll region's peaks). */
+	const [names, setNames] = useState(true);
 	const [reachKm, setReachKm] = useState(8);
 	const [basemap, setBasemap] = useState<RollBasemap>(loadBasemap);
 	/** The photo whose viewpoint the camera is at (or flying into); null = orbit view. */
@@ -244,6 +248,14 @@ export function RollMap({
 				ref={canvasRef}
 				className="absolute inset-0 size-full touch-none"
 			/>
+			<RollMapTerroir
+				engine={engine}
+				roll={roll}
+				basemap={basemap}
+				names={names}
+				inView={!!viewId}
+				visibleIds={visibleIds}
+			/>
 			{status.stage !== "ready" && (
 				<div className="pointer-events-none absolute top-3 left-3 flex items-center gap-2 rounded-md bg-black/55 px-2.5 py-1.5 text-[11px] text-white/85 backdrop-blur">
 					<Loader2 className="size-3.5 animate-spin" />
@@ -351,6 +363,16 @@ export function RollMap({
 					title="Camera frustums"
 				>
 					<Frame className="size-3.5" /> Cameras
+				</button>
+				<button
+					type="button"
+					onClick={() => setNames((v) => !v)}
+					className={`flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-white/10 ${names ? "" : "opacity-50"}`}
+					title="Place names"
+					aria-pressed={names}
+					data-testid="roll-names"
+				>
+					<Tag className="size-3.5" /> Names
 				</button>
 				<button
 					type="button"

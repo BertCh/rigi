@@ -79,7 +79,20 @@ import {
 	type Sample,
 	type Settings,
 } from "#/lib/settings";
-import { PRESET_OVERLAY_LAYER, useViewStyle } from "#/lib/style";
+import {
+	PRESET_MAP_LAYERS,
+	PRESET_OVERLAY_LAYER,
+	useViewStyle,
+} from "#/lib/style";
+import { uncertainOpacity, uncertainPrefix } from "#/lib/terroir/labels/names";
+import {
+	classicTier,
+	decorateCandidates,
+	resolvePeakClass,
+} from "#/lib/terroir/labels/peakTiers";
+import { useTierIndex } from "#/lib/terroir/labels/useTierIndex";
+import { TerroirLayer } from "#/lib/terroir/ui/TerroirLayer";
+import { TerroirPanel } from "#/lib/terroir/ui/TerroirPanel";
 import { cn } from "#/lib/utils";
 import {
 	Button,
@@ -150,6 +163,14 @@ if (typeof window !== "undefined") {
 }
 
 type Tool = "inspect" | "align" | "pin";
+/** terroir.subPill: a soft dark backing under the elevation · distance line */
+const SUB_PILL = {
+	display: "inline-block",
+	background: "rgba(0,0,0,.35)",
+	borderRadius: 6,
+	padding: "0 4px",
+} as const;
+
 /** Same length and, per item, the same own fields (Object.is; array fields compared element-wise). */
 function sameRecords<T extends object>(a: readonly T[], b: readonly T[]) {
 	if (a === b) return true;
@@ -266,6 +287,27 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			.then((mask) => engineRef.current === engine && engine.setSkyMask?.(mask))
 			.catch((e) => console.warn("[sky] segmentation failed", e));
 	}, []);
+	// terroir label options (peakTiers / subPill / uncertainty): inert unless their style.terroir switch is on
+	const tierIdx = useTierIndex(
+		photo.lat,
+		photo.lon,
+		viewStyle.terroir.peakTiers,
+	);
+	const labelsUncertain =
+		viewStyle.terroir.uncertainty &&
+		(alignState === "unverified" || alignState === "prior");
+	const labelsSubPill = viewStyle.terroir.subPill;
+	const peakClassOf = useMemo(
+		() =>
+			viewStyle.terroir.peakTiers
+				? (l: PeakLabel) => {
+						const w = l.world;
+						const g = engineRef.current?.frame.toGeo(w[0], w[1], w[2]) ?? null;
+						return resolvePeakClass(tierIdx, l, g);
+					}
+				: null,
+		[viewStyle.terroir.peakTiers, tierIdx],
+	);
 	const labelVars = useMemo(
 		() => labelCssVars(viewStyle.labels),
 		[viewStyle.labels],
@@ -290,13 +332,24 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			maxLabels: ls.maxLabels,
 			fontFamily: ls.fontFamily,
 		};
+		const cands = candidatesFrom(labels, stageSize.w, stageSize.h, skyline);
 		placedRef.current = layoutLabels(
-			candidatesFrom(labels, stageSize.w, stageSize.h, skyline),
+			peakClassOf || labelsUncertain
+				? decorateCandidates(cands, labels, peakClassOf, labelsUncertain)
+				: cands,
 			opts,
 			placedRef.current,
 		);
 		return placedRef.current;
-	}, [labels, stageSize.w, stageSize.h, viewStyle.labels, fontEpoch]);
+	}, [
+		labels,
+		stageSize.w,
+		stageSize.h,
+		viewStyle.labels,
+		fontEpoch,
+		peakClassOf,
+		labelsUncertain,
+	]);
 	/** classic: wrapped, edge-clamped text blocks kept above their summits (look/labels/classic.ts) */
 	const classicRef = useRef<ClassicPlaced[]>([]);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: fontEpoch invalidates cached text widths
@@ -306,10 +359,11 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 		classicRef.current = layoutClassic(
 			labels.map((l) => ({
 				id: l.name + l.world[0],
-				name: l.name,
+				name: labelsUncertain ? uncertainPrefix(l.distKm) + l.name : l.name,
 				sub: labelSubText(l, ls.sub.show),
 				x: l.u * stageSize.w,
 				y: l.v * stageSize.h,
+				...(peakClassOf ? { scale: classicTier(peakClassOf(l)).scale } : null),
 			})),
 			{
 				width: stageSize.w,
@@ -325,7 +379,15 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			classicRef.current,
 		);
 		return classicRef.current;
-	}, [labels, stageSize.w, stageSize.h, viewStyle.labels, fontEpoch]);
+	}, [
+		labels,
+		stageSize.w,
+		stageSize.h,
+		viewStyle.labels,
+		fontEpoch,
+		peakClassOf,
+		labelsUncertain,
+	]);
 	const classicById = useMemo(
 		() => new Map(classicPlaced.map((c) => [c.id, c])),
 		[classicPlaced],
@@ -347,6 +409,8 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 	useEffect(() => {
 		const layer = PRESET_OVERLAY_LAYER[styleState.preset];
 		if (layer) update({ overlayStyle: layer });
+		const maps = PRESET_MAP_LAYERS[styleState.preset];
+		if (maps) update(maps);
 	}, [styleState.preset, update]);
 
 	const setPose = useCallback(
@@ -1051,9 +1115,18 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				width={stageSize.w}
 				height={stageSize.h}
 				style={viewStyle.labels}
+				subPill={labelsSubPill || undefined}
+				uncertain={labelsUncertain || undefined}
 			/>
 		),
-		[placed, stageSize.w, stageSize.h, viewStyle.labels],
+		[
+			placed,
+			stageSize.w,
+			stageSize.h,
+			viewStyle.labels,
+			labelsSubPill,
+			labelsUncertain,
+		],
 	);
 	const classicLabels = useMemo(
 		() =>
@@ -1065,6 +1138,10 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				const ldy = c.leader[3] - c.leader[1];
 				const len = Math.hypot(ldx, ldy);
 				const deg = (Math.atan2(ldx, Math.abs(ldy)) * 180) / Math.PI;
+				// terroir: prominence-class size / weight, softened guessed-pose labels (all null when off)
+				const ct = peakClassOf ? classicTier(peakClassOf(l)) : null;
+				const dash =
+					"repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 6px)";
 				return (
 					<div
 						key={c.id}
@@ -1073,6 +1150,14 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 							left: c.x,
 							top: c.y,
 							...revealLabels?.of(l),
+							...(labelsUncertain
+								? {
+										opacity: Math.min(
+											revealLabels?.of(l).opacity ?? 1,
+											uncertainOpacity(l.distKm),
+										),
+									}
+								: null),
 						}}
 					>
 						{/* sizes and colours come from style.labels via the --lbl-* variables (labelCssVars) */}
@@ -1085,6 +1170,9 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 								transform: `translateX(-50%) rotate(${c.below ? -deg : deg}deg)`,
 								transformOrigin: c.below ? "50% 0" : "50% 100%",
 								backgroundImage: `linear-gradient(${c.below ? "to bottom" : "to top"} in oklab, var(--lbl-lead-from) 0%, var(--lbl-lead-to) 100%)`,
+								...(labelsUncertain
+									? { maskImage: dash, WebkitMaskImage: dash }
+									: null),
 							}}
 						/>
 						<div
@@ -1098,6 +1186,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 						/>
 						<div
 							className="absolute whitespace-nowrap"
+							data-peak-label={c.id}
 							style={{
 								left: c.anchorX - c.x,
 								[c.below ? "top" : "bottom"]: c.lead,
@@ -1122,8 +1211,10 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 									key={t}
 									className="leading-tight"
 									style={{
-										fontSize: "var(--lbl-name-px)",
-										fontWeight: "var(--lbl-name-w)",
+										fontSize: ct
+											? `calc(var(--lbl-name-px) * ${ct.scale})`
+											: "var(--lbl-name-px)",
+										fontWeight: ct ? ct.weight : "var(--lbl-name-w)",
 										color: "var(--lbl-name-c)",
 									}}
 								>
@@ -1132,9 +1223,12 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 										<span
 											style={{
 												marginLeft: "0.3em",
-												fontSize: "var(--lbl-sub-px)",
+												fontSize: ct
+													? `calc(var(--lbl-sub-px) * ${ct.scale})`
+													: "var(--lbl-sub-px)",
 												fontWeight: "var(--lbl-sub-w)",
 												color: "var(--lbl-sub-c)",
+												...(labelsSubPill ? SUB_PILL : null),
 											}}
 										>
 											{c.subLines[0]}
@@ -1148,9 +1242,14 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 										key={t}
 										className="leading-tight"
 										style={{
-											fontSize: "var(--lbl-sub-px)",
+											fontSize: ct
+												? `calc(var(--lbl-sub-px) * ${ct.scale})`
+												: "var(--lbl-sub-px)",
 											fontWeight: "var(--lbl-sub-w)",
 											color: "var(--lbl-sub-c)",
+											...(labelsSubPill
+												? { ...SUB_PILL, margin: "0 -4px" }
+												: null),
 										}}
 									>
 										{t}
@@ -1160,7 +1259,15 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 					</div>
 				);
 			}),
-		[labels, classicById, revealLabels, viewStyle.labels.halo.kind],
+		[
+			labels,
+			classicById,
+			revealLabels,
+			viewStyle.labels.halo.kind,
+			peakClassOf,
+			labelsUncertain,
+			labelsSubPill,
+		],
 	);
 
 	const place = regionNames[photo.region] ?? photo.region;
@@ -1304,6 +1411,36 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 									)}
 								</div>
 							)}
+						</div>
+					)}
+					{/* terroir layers (src/lib/terroir, reports/terroir-cartography.md): renders nothing unless a
+					    style.terroir switch is on (only the `terroir` preset sets any) */}
+					{!si.stepping && (
+						<div
+							className="pointer-events-none absolute"
+							data-terroir
+							style={{
+								left: stageSize.left,
+								top: stageSize.top,
+								width: stageSize.w,
+								height: stageSize.h,
+							}}
+						>
+							<TerroirLayer
+								engine={engineRef.current}
+								style={viewStyle}
+								mode={settings.mode}
+								w={stageSize.w}
+								h={stageSize.h}
+								uncertain={
+									alignState === "unverified" || alignState === "prior"
+								}
+								lat={photo.lat}
+								lon={photo.lon}
+								takenAt={photo.takenAtUtc ?? photo.takenAt ?? null}
+								stageEl={stageRef.current}
+								tick={labels}
+							/>
 						</div>
 					)}
 					{/* ?picker=on (src/lib/picker): top-3 candidates + tap-a-peak; renders nothing without the flag */}
@@ -1717,6 +1854,8 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 						style={viewStyle}
 						state={styleState}
 					/>
+
+					<TerroirPanel style={viewStyle} mode={settings.mode} />
 
 					{settings.mode !== "world" &&
 						revealRef.current?.supported !== false && (

@@ -73,6 +73,11 @@ export interface Renderer {
 	setSkyMask?(m: FgMask | null): void;
 	/** Step Inside 3D Tiles (src/lib/tiles3d, ?tiles3d=): the on-screen credit line while stepping, or null. */
 	tiles3dAttribution?(): string | null;
+	/**
+	 * Terroir land cover (src/lib/terroir, reports/terroir-cartography.md): the pack's class grid for
+	 * style.terroir.cover / contours.inkByCover; null = off (bit-identical to before). Display-only.
+	 */
+	setTerroirCover?(grid: import("./terroir/pack").CoverGrid | null): void;
 	/** Replace the region's hiking paths (loaded on demand when the trails layer is switched on). */
 	setTrails?(trails: RegionTrail[]): void;
 	/** One frame of the overlay reveal (src/lib/reveal); null = off (the classic composite, untouched). */
