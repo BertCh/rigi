@@ -1,6 +1,7 @@
 // Shared look and small formatters for the roll mosaic: viewpoint colours, pose-source labels,
 // compass names and capture times in the photo's own local time.
 
+import { BRAND } from "#/brand/khipu";
 import { rankUnder } from "#/lib/ontology/core/resolution";
 import { POSE_SOURCE } from "#/lib/ontology/crosswalk/pose";
 import type { PhotoMeta } from "../../photos";
@@ -8,7 +9,7 @@ import type { PoseSource, RollPhoto } from "../types";
 
 /** One colour per viewpoint (index mod length); first is the Rigi glow. */
 export const VIEWPOINT_COLORS = [
-	"#dca27a",
+	BRAND.glow,
 	"#6cc3d5",
 	"#9ad07a",
 	"#d58bd8",

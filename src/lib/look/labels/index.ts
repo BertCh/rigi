@@ -4,6 +4,7 @@
 
 export * from "./canvas";
 export * from "./classic";
+export * from "./contrast";
 export * from "./css";
 export * from "./layout";
 export * from "./rank";

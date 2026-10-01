@@ -1,8 +1,10 @@
 // 2D plan view of a roll over OSM tiles: one FOV wedge per photo (heading ± hfov/2), coloured by
 // viewpoint. Click a wedge to select its photo. Same tile maths as upload/SlippyMap (which only
 // draws one pin), copied so both can evolve independently.
+
 import { Crosshair } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BRAND } from "#/brand/khipu";
 import {
 	isUncertainPose,
 	mercatorLat,
@@ -210,7 +212,7 @@ export function RollMiniMap({
 			role="application"
 			aria-label="Plan view of the roll: click a wedge to select a photo"
 			data-testid="roll-minimap"
-			className={`relative touch-none overflow-hidden rounded-xl bg-[#1a2330] ring-1 ring-white/8 select-none cursor-grab ${className}`}
+			className={`relative touch-none overflow-hidden rounded-xl bg-[var(--rigi-slate)] ring-1 ring-white/8 select-none cursor-grab ${className}`}
 			style={{ height }}
 			onPointerDown={onPointerDown}
 			onPointerMove={onPointerMove}
@@ -251,7 +253,7 @@ export function RollMiniMap({
 								.map((p) => `${at(p.meta).x},${at(p.meta).y}`)
 								.join(" ")}
 							fill="none"
-							stroke="#ece6da"
+							stroke={BRAND.paper}
 							strokeOpacity={0.55}
 							strokeWidth={1.5}
 							strokeDasharray="4 4"
@@ -303,7 +305,7 @@ export function RollMiniMap({
 									cy={c.y}
 									r={3.5}
 									fill={col}
-									stroke="#0e1012"
+									stroke={BRAND.ink}
 									strokeWidth={1.5}
 								/>
 							</g>

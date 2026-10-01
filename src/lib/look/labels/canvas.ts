@@ -7,6 +7,7 @@
 import { hexToRgba01, toCss } from "../../style/color";
 import type { LabelStyle } from "../../style/types";
 import { inlineGap, layoutClassic } from "./classic";
+import { canvasBoxLuma, contrastGlow, contrastNeed } from "./contrast";
 import {
 	candidatesFrom,
 	canvasMeasure,
@@ -92,9 +93,14 @@ export function drawPeakLabels(
 	const halo = st.halo;
 	const [sr, sg, sb] = hexToRgba01(st.sub.color);
 	const subColor = ex ? toCss([sr, sg, sb, ex.subAlpha]) : toCss(st.sub.color);
+	// backdrop under each block, read before any label is drawn (labels/contrast.ts)
+	const glows = placed.map((c) =>
+		contrastGlow(st, contrastNeed(st, canvasBoxLuma(ctx, c.box)), namePx),
+	);
 	ctx.save();
 	ctx.textBaseline = "middle";
-	for (const c of placed) {
+	for (const [ci, c] of placed.entries()) {
+		const glow = glows[ci];
 		const [x0, y0, x1, y1] = c.leader;
 		if (lead > 0 && leadW > 0) {
 			const g = ctx.createLinearGradient(x0, y0, x1, y1);
@@ -131,6 +137,14 @@ export function drawPeakLabels(
 			tx = c.anchorX,
 		) => {
 			ctx.font = font;
+			if (glow) {
+				// bright backdrop: a soft glow pass under the normal draw
+				ctx.shadowColor = glow.color;
+				ctx.shadowBlur = glow.blur;
+				ctx.fillStyle = color;
+				ctx.fillText(t, tx, ty);
+				ctx.shadowBlur = 0;
+			}
 			if (ex) {
 				const [hr, hg, hb] = hexToRgba01(halo.color);
 				ctx.shadowColor = toCss([hr, hg, hb, ex.haloAlpha]);
@@ -191,7 +205,25 @@ export function drawPlacedLabels(
 	ctx.lineJoin = "round";
 	ctx.lineCap = "round";
 	ctx.textBaseline = "alphabetic";
+	// backdrop under each text box, read before any label is drawn (labels/contrast.ts)
+	const glows = new Map(
+		labels.map((l) => {
+			const xs = l.quad.map((q) => q[0]);
+			const ys = l.quad.map((q) => q[1]);
+			const box = {
+				x0: Math.min(...xs),
+				y0: Math.min(...ys),
+				x1: Math.max(...xs),
+				y1: Math.max(...ys),
+			};
+			return [
+				l,
+				contrastGlow(st, contrastNeed(st, canvasBoxLuma(ctx, box)), fontPx),
+			];
+		}),
+	);
 	for (const l of [...labels].sort((a, b) => b.tier - a.tier)) {
+		const glow = glows.get(l);
 		ctx.globalAlpha = l.opacity;
 		if (l.leader) {
 			const [x0, y0, x1, y1] = l.leader;
@@ -239,6 +271,13 @@ export function drawPlacedLabels(
 		ctx.textAlign = "left";
 		const text = (t: string, font: string, color: string) => {
 			ctx.font = font;
+			if (glow) {
+				ctx.shadowColor = glow.color;
+				ctx.shadowBlur = glow.blur;
+				ctx.fillStyle = color;
+				ctx.fillText(t, x, 0);
+				ctx.shadowBlur = 0;
+			}
 			if (st.halo.kind === "shadow") {
 				ctx.shadowColor = halo as string;
 				ctx.shadowBlur = st.halo.blurPx * k;

@@ -97,6 +97,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "atlas",
+		tier: "fast",
+		group: "static",
+		cmd: tsx("src/lib/atlas/atlas.check.ts"),
+		note: "Atlas graph integrity + ontology link (ids, uniqueness, taxonomy agreement, import boundary)",
+		timeoutS: 60,
+	},
+	{
 		id: "labels",
 		tier: "fast",
 		group: "look",

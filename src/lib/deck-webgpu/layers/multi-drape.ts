@@ -36,7 +36,7 @@
 //     frag_depth write), so hidden ground and the tile skirts are rejected before the photo loop.
 //   - per-tile data: WebGL bound a 48 × 8-vec4 range of one shared UNIFORM buffer per tile draw
 //     (the photos' parameters copied inline). WebGPU writes uniforms once per submit (README rule
-//     2), so here the photos' parameters live ONCE in a read-only storage table (8 vec4 per photo),
+//     2), so here the photos' parameters live ONCE in a read-only storage table (9 vec4 per photo),
 //     each tile's candidates are a run of photo indices in a second storage buffer, and the tile's
 //     (first, count, cellM) is a per-instance vertex attribute. One Model, one bind group, one draw
 //     per tile, nothing per draw but the vertex buffers.
@@ -62,6 +62,8 @@
 //   drape.setPhotos(drapePhotos);                         // DrapePhoto[] (keep the identity while
 //                                                         // nothing changed, as roll-map does)
 //   drape.setSettings({ opacity, sharpness, reachM, people: protectPeople ? 1 : 0 });
+//   drape.setClearAir(clear.texture, clearAir);           // roll/map/drape-clear.ts DrapeClear: per-photo
+//                                                         // clear air + exposure (mdParams, WGSL = CLEAR_AIR_WGSL)
 //   atlas.setPhoto / setRange / setMask as today; host.requestRender() on atlas.version changes.
 // The view camera (orbit / fly-in) is the colour pass's `camera`; the photos' cameras come from
 // DrapePhoto.viewProj (deck/photo-view.ts photoViewProjection, roll ENU frame = the host frame).
@@ -70,6 +72,7 @@ import type { Buffer, Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { TileMesh } from "#/lib/deck/terrain-data";
+import { CLEAR_AIR_WGSL } from "#/lib/look/glsl/clear-air";
 import { COARSE, DrapeAtlas, type DrapeItem } from "#/lib/roll/map/drape-atlas";
 import { cameraModule, sphereInView } from "../camera";
 import {
@@ -87,7 +90,7 @@ export const MIN_SIN_INC = 0.012;
 /** Photos blended per fragment (the best by weight). */
 export const TOP_K = 4;
 /** vec4s per photo in the storage table (multi-drape-layer.ts SLOT_W). */
-export const SLOT_W = 8;
+export const SLOT_W = 9;
 /** Most candidates per tile (nearest kept). */
 export const MAX_PER_TILE = 48;
 /** Constant relative forward pull of the drape's depth (the WebGL 2e-6 of the normalised log
@@ -193,7 +196,7 @@ struct MDrapeUniforms {
   outline: f32,
   reachM: f32,
   people: f32,
-  pad0: f32,
+  clear: f32,
   pad1: f32,
 };
 @group(0) @binding(auto) var<uniform> mdrape: MDrapeUniforms;
@@ -205,7 +208,7 @@ struct MDrapeUniforms {
 		outline: "f32",
 		reachM: "f32",
 		people: "f32",
-		pad0: "f32",
+		clear: "f32",
 		pad1: "f32",
 	},
 	bindingLayout: [{ name: "mdrape", group: 0 }],
@@ -214,12 +217,13 @@ struct MDrapeUniforms {
 /** The program (camera + mdrape modules in scope). */
 export const MULTI_DRAPE_WGSL = /* wgsl */ `\
 ${colorWGSL}
+${CLEAR_AIR_WGSL}
 
 const TOP_K: i32 = ${TOP_K};
 const MIN_SIN_INC: f32 = ${MIN_SIN_INC};
 const DEPTH_SLACK: f32 = ${DEPTH_SLACK};
 
-// one photo (multi-drape-layer.ts slotData, 8 vec4)
+// one photo (multi-drape-layer.ts slotData, 9 vec4)
 struct MDrapeSlot {
   // camera-relative view-projection: clip = m · (p − eye, 1)
   m: mat4x4<f32>,
@@ -231,6 +235,8 @@ struct MDrapeSlot {
   rangeRect: vec4<f32>,
   // minRange, aspect, range-map rad/px, atlas index
   ex: vec4<f32>,
+  // x = atlas slot k = row of the photo's mdParams texels (DrapeClear), yzw unused
+  params: vec4<f32>,
 };
 
 @group(0) @binding(auto) var<storage, read> mdrapeSlots: array<MDrapeSlot>;
@@ -246,6 +252,9 @@ struct MDrapeSlot {
 @group(0) @binding(auto) var mdRange: texture_2d<f32>;
 @group(0) @binding(auto) var mdMask: texture_2d<f32>;
 @group(0) @binding(auto) var mdMaskSampler: sampler;
+// per-photo clear air + exposure (roll/map/drape-clear.ts DrapeClear.texture: 4 rgba32float texels
+// per atlas slot k, row k): [airlight.rgb, amount], [betaR.rgb, betaM], [hR, hM, floor, 0], [exposure.rgb, 0]
+@group(0) @binding(auto) var mdParams: texture_2d<f32>;
 
 struct MDAttributes {
   @location(0) positions: vec3<f32>,
@@ -294,6 +303,36 @@ fn md_photo_texel(a: i32, uv: vec2<f32>, gx: vec2<f32>, gy: vec2<f32>) -> vec3<f
   if (a == 1) { return textureSampleGrad(mdPhoto1, mdPhoto1Sampler, uv, gx, gy).rgb; }
   if (a == 2) { return textureSampleGrad(mdPhoto2, mdPhoto2Sampler, uv, gx, gy).rgb; }
   return textureSampleGrad(mdPhoto3, mdPhoto3Sampler, uv, gx, gy).rgb;
+}
+
+// the photo's ClearAirUniforms from its params texels (look/glsl/clear-air.ts clear_air_photo takes it)
+fn md_clear_u(k: i32) -> ClearAirUniforms {
+  let a = textureLoad(mdParams, vec2<i32>(0, k), 0);
+  let b = textureLoad(mdParams, vec2<i32>(1, k), 0);
+  let c = textureLoad(mdParams, vec2<i32>(2, k), 0);
+  return ClearAirUniforms(a.xyz, a.w, b.xyz, b.w, c.xy, c.z, 0.0);
+}
+
+// per-channel transmittance from the photo eye to p (1 when the photo has no fit: amount 0)
+fn md_transmittance(k: i32, p: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
+  let u = md_clear_u(k);
+  if (u.amount <= 0.0) { return vec3<f32>(1.0); }
+  let L = length(p - eye);
+  let h0 = clr_altitude(eye);
+  let h1 = clr_altitude(p);
+  return exp(-(u.betaR * clr_path(h0, h1, L, u.h.x) + vec3<f32>(u.betaM * clr_path(h0, h1, L, u.h.y))));
+}
+
+// one winner's photo texel (sRGB) -> linear -> clear air -> exposure -> sRGB
+fn md_clear_and_expose(s: vec3<f32>, p: vec3<f32>, eye: vec3<f32>, k: i32) -> vec3<f32> {
+  let u = md_clear_u(k);
+  let g = textureLoad(mdParams, vec2<i32>(3, k), 0).rgb;
+  let fixT = u.amount > 0.0;
+  let fixG = any(g != vec3<f32>(1.0));
+  if (!fixT && !fixG) { return s; }
+  var pc = srgb_decode(s);
+  if (fixT) { pc = clear_air_photo(pc, p, eye, u); }
+  return srgb_encode(pc * g);
 }
 
 // one range texel's vote: visible from the photo camera (range test + bias)
@@ -373,7 +412,11 @@ fn md_visibility(rr: vec4<f32>, uv: vec2<f32>, r: f32, slack: f32) -> f32 {
     let keep = 1.0 - mdrape.people * smoothstep(0.25, 0.6, textureSampleLevel(mdMask, mdMaskSampler, muv, 0.0).r);
     let seen = smoothstep(0.0, 0.75, vis) * keep;
     if (seen <= 0.0) { continue; }
-    let w = md_pow(wBase * seen, mdrape.sharpness);
+    // prefer the clearer view: sqrt of the green transmittance from this photo's eye (<= 1, so the
+    // pruning bounds above hold)
+    var tw = 1.0;
+    if (mdrape.clear > 0.5) { tw = sqrt(max(md_transmittance(i32(mdrapeSlots[i].params.x + 0.5), v.world, eye.xyz).g, 0.05)); }
+    let w = md_pow(wBase * seen * tw, mdrape.sharpness);
     wmax = max(wmax, cover * seen);
     // a thin frame line where this photo's footprint ends (selection outline)
     if (eye.w > 1.5) { edge = max(edge, 1.0 - smoothstep(0.0, 0.006, min(e2.x, e2.y))); }
@@ -402,7 +445,11 @@ fn md_visibility(rr: vec4<f32>, uv: vec2<f32>, r: f32, slack: f32) -> f32 {
     let gx = (md_photo_uv(m, d + dwx).xy - uv) * pr.zw;
     let gy = (md_photo_uv(m, d + dwy).xy - uv) * pr.zw;
     let auv = pr.xy + clamp(uv, vec2<f32>(0.001), vec2<f32>(0.999)) * pr.zw;
-    acc += md_photo_texel(atlas, auv, gx, gy) * topW[j];
+    var texel = md_photo_texel(atlas, auv, gx, gy);
+    if (mdrape.clear > 0.5) {
+      texel = md_clear_and_expose(texel, v.world, mdrapeSlots[i].eye.xyz, i32(mdrapeSlots[i].params.x + 0.5));
+    }
+    acc += texel * topW[j];
     wsum += topW[j];
   }
   if (wsum <= 0.0) { discard; }
@@ -464,6 +511,8 @@ export function slotData(atlas: MultiDrapeAtlas, k: number, p: DrapePhoto) {
 		[p.minRange, p.aspect, (p.vfov * Math.PI) / 180 / c.range[3], c.atlas],
 		28,
 	);
+	// atlas slot = row of this photo's params texels
+	out[32] = k;
 	return out;
 }
 
@@ -640,6 +689,11 @@ export class MultiDrapeCore implements GpuLayerCore {
 	private atlas: MultiDrapeAtlas | null = null;
 	private photos: readonly DrapePhoto[] = [];
 	private models = new ModelCache();
+	/** Per-photo clear air + exposure (DrapeClear.texture), null = raw photos. */
+	private params: Texture | null = null;
+	private clearOn = true;
+	/** Stand-in params (amount 0, exposure 1) bound when the host gives none. */
+	private blank: Texture | null = null;
 	private slotBuf: Buffer | null = null;
 	private listBuf: Buffer | null = null;
 	/** What the tables were built for (rebuilt lazily in draw when any of it moves). */
@@ -669,6 +723,17 @@ export class MultiDrapeCore implements GpuLayerCore {
 
 	setSettings(s: Partial<MultiDrapeSettings>) {
 		this.settings = { ...this.settings, ...s };
+	}
+
+	/**
+	 * Per-photo clear air + exposure from roll/map/drape-clear.ts DrapeClear: pass its `texture`
+	 * (rgba32float, 4 × slots; DrapeClear rewrites it in place, so no version is needed here:
+	 * request a render from DrapeClear's onChange). Null = blend the raw photos. `on` = the roll
+	 * map's `clearAir` flag (default true).
+	 */
+	setClearAir(params: Texture | null, on = true) {
+		this.params = params;
+		this.clearOn = on;
 	}
 
 	/** The terrain tile meshes (full CPU vertices). Keeps GPU buffers of unchanged mesh objects. */
@@ -806,6 +871,23 @@ export class MultiDrapeCore implements GpuLayerCore {
 		this.stats.buildMs = performance.now() - t0;
 	}
 
+	/** A 4 × 1 texture, amount 0 / exposure 1 (clamped rows serve every slot; unused when clear = 0). */
+	private blankParams() {
+		if (!this.blank) {
+			const t = new Float32Array(16);
+			t.set([1, 1, 1, 1], 12);
+			this.blank = this.device.createTexture({
+				id: `${this.id}-params-blank`,
+				width: 4,
+				height: 1,
+				format: "rgba32float",
+				data: t,
+				sampler: { minFilter: "nearest", magFilter: "nearest" },
+			});
+		}
+		return this.blank;
+	}
+
 	private model(ctx: PassContext) {
 		return this.models.get(
 			targetKey(ctx),
@@ -850,7 +932,7 @@ export class MultiDrapeCore implements GpuLayerCore {
 				outline: s.outline,
 				reachM: s.reachM,
 				people: s.people,
-				pad0: 0,
+				clear: this.params && this.clearOn ? 1 : 0,
 				pad1: 0,
 			},
 		} as never);
@@ -864,6 +946,7 @@ export class MultiDrapeCore implements GpuLayerCore {
 			mdPhoto3: ph(3),
 			mdRange: a.range,
 			mdMask: a.mask,
+			mdParams: this.params ?? this.blankParams(),
 		} as never);
 		let drawn = 0;
 		for (const t of this.tiles.values()) {
@@ -883,6 +966,8 @@ export class MultiDrapeCore implements GpuLayerCore {
 		this.slotBuf?.destroy();
 		this.listBuf?.destroy();
 		this.slotBuf = this.listBuf = null;
+		this.blank?.destroy();
+		this.blank = null;
 		this.models.destroy();
 	}
 }

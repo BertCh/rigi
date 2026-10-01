@@ -129,6 +129,11 @@ import {
 	rangeGeo,
 } from "#/lib/look/haze-controller";
 import type { SkyMask } from "#/lib/look/haze-fit";
+import {
+	clearAirOn,
+	clearAirValues,
+	wantsClearAirFit,
+} from "#/lib/look/clear-air";
 import { drawExportLabels, skylineAt } from "#/lib/look/labels";
 import { lookKey } from "#/lib/look/look-key";
 import { ReliefController } from "#/lib/look/relief/field";
@@ -1843,6 +1848,9 @@ export class WebGpuEngine implements Renderer {
 		const src = this.geoSrc;
 		if (!this.geometryReady() || !src?.pose) return;
 		const pose = src.pose;
+		// clear air wants the fit in the world view only; geoSrc is always the PHOTO-pose geometry
+		// pass (the drape's range map), never an orbit-pose render
+		const want = wantsClearAirFit(this.style) && !!this.world?.controls;
 		const bridge = this.gpu?.bridge ?? null;
 		const img = this.photoImg;
 		// the fit's CPU input is the range ×2 decimated: read the full copy first (only for a fitted
@@ -1856,6 +1864,7 @@ export class WebGpuEngine implements Renderer {
 				img,
 				eyeAlt: this.eyeAlt,
 				fg: this.fgMask,
+				want,
 			})
 		) {
 			void this.needFull().then((ok) => ok && this.fitHaze());
@@ -1888,6 +1897,7 @@ export class WebGpuEngine implements Renderer {
 			eyeAlt: this.eyeAlt,
 			sunDir: this.look("overlay").sunDir,
 			fg: this.fgMask,
+			want,
 			geo: () => ({
 				geo: rangeGeo(src.range, src.width, src.height, pose),
 				w: src.width,
@@ -1963,6 +1973,12 @@ export class WebGpuEngine implements Renderer {
 		this.scheduleStats();
 	}
 
+	/** The photo's forward direction (unit ENU) for clear air's physical airlight. */
+	private photoForward(): V3 {
+		const d = unprojectDir(this.pose, this.aspect, 0.5, 0.5);
+		return [d.x, d.y, d.z];
+	}
+
 	private syncWorld(g: Gpu, photoU: CameraUniforms, nearDiscard: number) {
 		const w = this.world as WorldCamera;
 		const s = this.settings;
@@ -1991,6 +2007,13 @@ export class WebGpuEngine implements Renderer {
 			tintColor: [...wl.photoTintCol] as V3,
 			truth: this.nearField?.opts.truth ? PROVENANCE_TINT_MIX : 0,
 			harmonize: this.harmonize(this.style.world.drapeHarmonize),
+			// the photo's haze inverted on the drape sample (fit = the photo-pose geometry's)
+			clearAir: clearAirOn(this.style)
+				? clearAirValues(this.style, this.haze.fit, wl.sunDir, {
+						eyeAlt: this.eyeAlt,
+						dir: this.photoForward(),
+					})
+				: null,
 			views: ["world"],
 		});
 		g.trails.setEnabled(s.trails && !!this.trails?.count);
@@ -3332,6 +3355,7 @@ export class WebGpuEngine implements Renderer {
 		this.canvas.style.backgroundColor = ws.sky;
 		// the drape reads this frame's geometry target; labels / masks want the CPU buffer too
 		if (!this.geometryReady()) void this.readback();
+		this.fitHaze(); // clear air's fit (world view only)
 		this.sync();
 		this.kickWorld();
 	}

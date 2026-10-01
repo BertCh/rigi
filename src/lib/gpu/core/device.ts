@@ -202,7 +202,7 @@ type RawGpu = { requestAdapter: (o?: unknown) => Promise<RawAdapter | null> };
  * The sidecar: a raw requestDevice with COMPUTE_FEATURES (those the adapter has) and, with
  * `maxLimits`, RAISED_LIMITS at the adapter's maximum, wrapped by WebGPUAdapter.attach. luma's own
  * creation raises limits only for featureLevel "max", which would also request every feature.
- * `_ownsHandle: true`: destroying the luma Device (idle release, reset) destroys the GPUDevice.
+ * `ownsHandle`: destroying the luma Device (idle release, reset) destroys the GPUDevice.
  */
 async function createSidecar(maxLimits: boolean): Promise<Device> {
 	const gpu = (navigator as unknown as { gpu: RawGpu }).gpu;
@@ -222,10 +222,7 @@ async function createSidecar(maxLimits: boolean): Promise<Device> {
 		requiredLimits,
 	});
 	try {
-		return await attachWebGPUDevice(handle, {
-			id: "rigi-compute",
-			_ownsHandle: true,
-		});
+		return await attachWebGPUDevice(handle, { id: "rigi-compute" }, true);
 	} catch (e) {
 		handle.destroy();
 		throw e;

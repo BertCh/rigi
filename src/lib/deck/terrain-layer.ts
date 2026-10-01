@@ -3,6 +3,8 @@
 //   · 3 geometry (range from the camera, r channel; written by the GPU geometry pass only)
 // plus projective photo draping (uProjectPhoto) masked by the photo camera's range map, and a
 // logarithmic depth buffer so 5 m → 150 km share one frustum without z-fighting.
+// World view only (LOOK_CLEARAIR): the drape sample has the photo's own haze inverted along the photo
+// camera ray (look/clear-air) before the view's haze goes on, so far ground is not hazed twice.
 import {
 	COORDINATE_SYSTEM,
 	CompositeLayer,
@@ -14,8 +16,11 @@ import {
 import type { Device, Texture } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import type { ClearAirValues } from "../look/clear-air";
+import { CLEAR_AIR_OFF } from "../look/clear-air";
 import type { harmonizeValues } from "../look/composite";
 import { ATM_BLOCK, ATM_LUMA_MODULE } from "../look/glsl/atmosphere";
+import { CLEAR_AIR_BLOCK, CLEAR_AIR_LUMA_MODULE } from "../look/glsl/clear-air";
 import { HARM_BLOCK, HARMONIZE_FNS } from "../look/glsl/composite";
 import {
 	ALPINE_FNS,
@@ -557,6 +562,10 @@ void main() {
         if (terrain.photoFgOn > 0.5 && texture(photoFg, puv).r > 0.5) visible = false;
         if (visible) {
           vec3 pc = srgbDecode(textureGrad(photoTexture, puv, pdx, pdy).rgb);
+#ifdef LOOK_CLEARAIR
+          // the photo's own haze off (look/clear-air): the view's haze goes on below, once
+          if (terrain.projectPhoto < 1.5) pc = clearAirPhoto(pc, vWorld, terrain.photoPos.xyz);
+#endif
           vec3 ray = normalize(vWorld - terrain.photoPos.xyz);
           float inc = clamp(-dot(ray, n) * 3.0, 0.0, 1.0);
           // projectPhoto > 1.5: Step Inside (seen from the photo camera the drape is the photo itself)
@@ -624,6 +633,8 @@ export type TerrainUniformProps = {
 	protectPeople: boolean;
 	/** The drape's band stats (world.drapeHarmonize, LOOK_HARMONIZE): look/composite.ts harmonizeValues. */
 	harmonize: ReturnType<typeof harmonizeValues> | null;
+	/** The photo's haze inversion on the drape (world.clearAir, LOOK_CLEARAIR): look/clear-air.ts clearAirValues. */
+	clearAir?: ClearAirValues | null;
 	/** Step Inside Truth toggle (world drape only): 0 = off, else the provenance tint's mix. */
 	truth: number;
 	/** Terroir shading (src/lib/terroir/glsl; TERROIR_* defines): null = off, the classic programs. */
@@ -792,6 +803,7 @@ export function terrainShaders(
 		d.includes("LOOK_RELIEF") && REL_LUMA_MODULE,
 		d.includes("LOOK_SLOPE") && SLOPE_LUMA_MODULE,
 		d.includes("LOOK_HARMONIZE") && HARM_BLOCK.lumaModule,
+		d.includes("LOOK_CLEARAIR") && CLEAR_AIR_LUMA_MODULE,
 		!!p.terroir?.defines.length && TERROIR_LUMA_MODULE,
 	].filter((m) => !!m);
 	return {
@@ -911,6 +923,10 @@ export function setTerrainShaderProps(
 	if (L.defines.includes("LOOK_HARMONIZE") && p.harmonize && !pass)
 		model.shaderInputs.setProps({
 			[HARM_BLOCK.name]: HARM_BLOCK.pack(p.harmonize),
+		});
+	if (L.defines.includes("LOOK_CLEARAIR") && !pass)
+		model.shaderInputs.setProps({
+			[CLEAR_AIR_BLOCK.name]: CLEAR_AIR_BLOCK.pack(p.clearAir ?? CLEAR_AIR_OFF),
 		});
 	if (p.style === "slopeClass")
 		model.shaderInputs.setProps({
@@ -1050,6 +1066,7 @@ const DEFAULTS: TerrainUniformProps = {
 	nearDiscard: 0,
 	protectPeople: true,
 	harmonize: null,
+	clearAir: null,
 	truth: 0,
 	terroir: null,
 };

@@ -111,6 +111,7 @@ export const CLASSIC: ViewStyle = {
 		},
 		projectionTint: { color: [1, 0.85, 0.6], amount: 0 }, // materials.ts:208, :34 (uPhotoTint always 0)
 		drapeHarmonize: 0,
+		clearAir: { mode: "fitted", amount: 0.85, floor: 0.3 },
 		weather: { mode: "off" },
 	},
 	composite: {
@@ -149,6 +150,7 @@ export const CLASSIC: ViewStyle = {
 			blurPx: 3,
 			offsetY: 1,
 			strokePx: 0,
+			adaptive: 1, // labels/contrast.ts: a stronger glow where the backdrop is bright (cloud, snow)
 		}, // PhotoWorkspace.tsx:479 drop-shadow(0 1px 3px rgba(0,0,0,0.9))
 		leader: { lengthPx: 28, widthPx: 1, color: [1, 1, 1, 0.9], fade: true }, // PhotoWorkspace.tsx:471–474 h-7 w-px from-white/90 to-white/0
 		dot: { px: 6, color: "#ffffff", glow: [0, 0, 0, 0.6], glowPx: 6 }, // PhotoWorkspace.tsx:476 size-1.5 bg-white shadow-[0_0_6px_rgba(0,0,0,0.6)]

@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { contours } from "d3-contour";
+import { BRAND, brandAlpha } from "../../src/brand/khipu";
 import {
 	latToTileY,
 	lonToTileX,
@@ -526,7 +527,7 @@ async function main() {
 	);
 	fs.writeFileSync(
 		path.join(ROOT, "public", "favicon.svg"),
-		markSvg(m, { stroke: "#ece6da", bg: "#14171a" }),
+		markSvg(m, { stroke: BRAND.paper, bg: BRAND.ink }),
 	);
 	console.log(`mark: ${m.paths.length} levels`);
 
@@ -586,7 +587,7 @@ async function preview(
 	const H = Math.round((p.view.elMax - p.view.elMin) * sx * 2.2);
 	const c = createCanvas(W, H);
 	const g = c.getContext("2d");
-	g.fillStyle = "#f4f1ea";
+	g.fillStyle = BRAND.paper;
 	g.fillRect(0, 0, W, H);
 	const X = (az: number) => (az - p.view.az0) * sx;
 	const Y = (el: number) => (p.view.elMax - el) * sx * 2.2;
@@ -595,7 +596,7 @@ async function preview(
 		let x = st[2] / 1000;
 		let y = st[3] / 1000;
 		const t = s / VIEW.slabs;
-		g.strokeStyle = `rgba(29,42,46,${(ridge ? 0.95 : 0.5) * (1 - 0.75 * t)})`;
+		g.strokeStyle = brandAlpha("ink", (ridge ? 0.95 : 0.5) * (1 - 0.75 * t));
 		g.lineWidth = ridge ? 2.2 - t : 1;
 		g.beginPath();
 		g.moveTo(X(x), Y(y));
@@ -606,7 +607,7 @@ async function preview(
 		}
 		g.stroke();
 	}
-	g.fillStyle = "#1d2a2e";
+	g.fillStyle = BRAND.ink;
 	g.font = "20px sans-serif";
 	for (const pk of p.peaks) {
 		g.fillRect(X(pk.az), Y(pk.el) - 40, 1, 30);
@@ -615,7 +616,7 @@ async function preview(
 	fs.writeFileSync(path.join(OUT, "panorama.png"), c.toBuffer("image/png"));
 	fs.writeFileSync(
 		path.join(OUT, "mark.svg"),
-		markSvg(m, { stroke: "#1d2a2e", bg: "#f4f1ea" }),
+		markSvg(m, { stroke: BRAND.ink, bg: BRAND.paper }),
 	);
 	console.log(`preview → ${OUT}`);
 }

@@ -40,13 +40,18 @@ import {
 } from "#/lib/integration/unknown-pose";
 import { CreditLine } from "#/lib/licences/CreditLine";
 import {
+	boxLuma,
 	type ClassicPlaced,
 	candidatesFrom,
 	canvasMeasure,
+	contrastFilter,
+	contrastNeed,
+	type LumaMap,
 	labelCssVars,
 	labelSubText,
 	layoutClassic,
 	layoutLabels,
+	lumaMapFrom,
 	type PlacedLabel,
 } from "#/lib/look/labels";
 import { PeakLabelsSvg } from "#/lib/look/labels/PeakLabelsSvg";
@@ -79,11 +84,7 @@ import {
 	type Sample,
 	type Settings,
 } from "#/lib/settings";
-import {
-	PRESET_MAP_LAYERS,
-	PRESET_OVERLAY_LAYER,
-	useViewStyle,
-} from "#/lib/style";
+import { PRESET_MAP_LAYERS, PRESET_OVERLAY_LAYER, useViewStyle } from "#/lib/style";
 import { uncertainOpacity, uncertainPrefix } from "#/lib/terroir/labels/names";
 import {
 	classicTier,
@@ -189,7 +190,14 @@ function sameRecords<T extends object>(a: readonly T[], b: readonly T[]) {
 	return true;
 }
 
-export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
+export function PhotoWorkspace({
+	photo: photoIn,
+	bundledPose = null,
+}: {
+	photo: PhotoMeta;
+	/** A pose shipped with the photo (the sample trip): used like a saved pose when there is none. */
+	bundledPose?: Pose | null;
+}) {
 	// opt-in eye-position suggestion (EyeSuggestion.tsx): an applied move re-creates the engine at the
 	// moved eye with the re-fitted rotation; null = the photo's own GPS position
 	const [eyeMove, setEyeMove] = useState<{
@@ -300,6 +308,31 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 					}
 				: null,
 		[viewStyle.terroir.peakTiers, tierIdx],
+	);
+	/** a small luminance map of the photo: labels on bright cloud / snow get a stronger halo */
+	const [lumaMap, setLumaMap] = useState<LumaMap | null>(null);
+	const labelNeed = useCallback(
+		(box: { x0: number; y0: number; x1: number; y1: number }) =>
+			lumaMap && stageSize.w
+				? contrastNeed(
+						viewStyle.labels,
+						boxLuma(lumaMap, box, stageSize.w, stageSize.h),
+					)
+				: 0,
+		[lumaMap, stageSize.w, stageSize.h, viewStyle.labels],
+	);
+	const placedNeed = useCallback(
+		(l: PlacedLabel) => {
+			const xs = l.quad.map((q) => q[0]);
+			const ys = l.quad.map((q) => q[1]);
+			return labelNeed({
+				x0: Math.min(...xs),
+				y0: Math.min(...ys),
+				x1: Math.max(...xs),
+				y1: Math.max(...ys),
+			});
+		},
+		[labelNeed],
 	);
 	const labelVars = useMemo(
 		() => labelCssVars(viewStyle.labels),
@@ -447,7 +480,9 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			// full metadata, no saved pose: the second opinion's worker starts its 360° terrain + horizon now,
 			// in parallel with engine.init (a different tile origin, all off the main thread)
 			let verifySolver =
-				!solver && !eyeMoveRef.current && !loadSavedPose(photo.id)
+				!solver &&
+				!eyeMoveRef.current &&
+				!(loadSavedPose(photo.id) ?? bundledPose)
 					? new UnknownPoseSolver(photo)
 					: null;
 			if (import.meta.env.DEV) window.__engine = engine;
@@ -501,7 +536,11 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				// StrictMode / fast navigation: a superseded engine must not touch shared state
 				if (engineRef.current !== engine) return;
 				loadSky(engine);
-				const saved = loadSavedPose(photo.id);
+				// the photo's luminance, for backdrop-adaptive label contrast (labels/contrast.ts)
+				const img = engine.photoElement;
+				setLumaMap(img ? lumaMapFrom(img) : null);
+				const ownSave = loadSavedPose(photo.id);
+				const saved = ownSave ?? bundledPose;
 				const moved = eyeMoveRef.current;
 				let startVerify: (() => void) | null = null;
 				const carried = carryRef.current;
@@ -519,7 +558,11 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 					setPose(saved, false);
 					setAlignState("saved");
 					setVerify(null);
-					setAlignNote("Restored your saved alignment");
+					setAlignNote(
+						ownSave
+							? "Restored your saved alignment"
+							: "Sample alignment, solved on-device by the roll aligner",
+					);
 				} else if (solver && engine.photoElement) {
 					// No compass / gravity / focal (uploads): autoAlign searches ±25° around a placeholder prior
 					// and accepts wrong poses (reports/bench-ablation.md), so it is never trusted here.
@@ -779,7 +822,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			stop?.();
 			window.__RIGI_FORCE_DEVICE_LOSS__ = undefined;
 		};
-	}, [photo, setPose, loadSky, rendererFallback]);
+	}, [photo, setPose, loadSky, bundledPose, rendererFallback]);
 
 	useEffect(() => {
 		engineRef.current?.setSettings(settings);
@@ -1124,9 +1167,11 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				style={viewStyle.labels}
 				subPill={labelsSubPill || undefined}
 				uncertain={labelsUncertain || undefined}
+				contrast={placedNeed}
 			/>
 		),
 		[
+			placedNeed,
 			placed,
 			stageSize.w,
 			stageSize.h,
@@ -1149,6 +1194,12 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 				const ct = peakClassOf ? classicTier(peakClassOf(l)) : null;
 				const dash =
 					"repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 6px)";
+				// bright backdrop under the block: an extra glow on text, leader and dot (labels/contrast.ts)
+				const glow = contrastFilter(
+					viewStyle.labels,
+					labelNeed(c.box),
+					viewStyle.labels.name.px * (ct?.scale ?? 1),
+				);
 				return (
 					<div
 						key={c.id}
@@ -1180,6 +1231,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 								...(labelsUncertain
 									? { maskImage: dash, WebkitMaskImage: dash }
 									: null),
+								...(glow ? { filter: glow } : null),
 							}}
 						/>
 						<div
@@ -1189,6 +1241,7 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 								height: "var(--lbl-dot)",
 								backgroundColor: "var(--lbl-dot-c)",
 								boxShadow: "var(--lbl-dot-shadow)",
+								...(glow ? { filter: glow } : null),
 							}}
 						/>
 						<div
@@ -1204,7 +1257,10 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 										: c.align === "right"
 											? "translateX(-100%)"
 											: undefined,
-								filter: "var(--lbl-halo)",
+								filter:
+									glow && viewStyle.labels.halo.kind === "shadow"
+										? `var(--lbl-halo) ${glow}`
+										: glow || "var(--lbl-halo)",
 								...(viewStyle.labels.halo.kind === "stroke"
 									? {
 											WebkitTextStroke: "var(--lbl-stroke)",
@@ -1270,7 +1326,8 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			labels,
 			classicById,
 			revealLabels,
-			viewStyle.labels.halo.kind,
+			viewStyle.labels,
+			labelNeed,
 			peakClassOf,
 			labelsUncertain,
 			labelsSubPill,
@@ -1293,10 +1350,10 @@ export function PhotoWorkspace({ photo: photoIn }: { photo: PhotoMeta }) {
 			<div className="relative min-h-0 flex-1">
 				<header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 p-3">
 					<Link
-						to="/"
+						to="/library"
 						className="pointer-events-auto flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 ring-1 ring-white/10 backdrop-blur hover:text-white"
 					>
-						<ArrowLeft className="size-3.5" /> Photos
+						<ArrowLeft className="size-3.5" /> Library
 					</Link>
 					<div className="rounded-lg bg-black/50 px-2.5 py-1.5 text-xs text-white/70 ring-1 ring-white/10 backdrop-blur">
 						<span className="font-semibold text-white">{place}</span> · {taken}{" "}

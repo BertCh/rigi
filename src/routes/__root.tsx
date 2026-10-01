@@ -4,6 +4,7 @@ import {
 	retainSearchParams,
 	Scripts,
 } from "@tanstack/react-router";
+import { BRAND } from "#/brand/khipu";
 import { FLAG_NAMES, type FlagSearch, flagSearch } from "#/lib/flags";
 
 import appCss from "../styles.css?url";
@@ -29,11 +30,11 @@ export const Route = createRootRoute({
 			},
 			{
 				name: "description",
-				content: "Mountain photos, placed in the terrain they show.",
+				content: "Mountain photos aligned to a terrain model, in the browser.",
 			},
 			{
 				name: "theme-color",
-				content: "#0e1012",
+				content: BRAND.ink,
 			},
 		],
 		links: [

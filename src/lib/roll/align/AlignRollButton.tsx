@@ -70,7 +70,7 @@ export function AlignRollButton({
 				data-testid="align-roll"
 				aria-live="polite"
 			>
-				<Loader2 className="size-3.5 shrink-0 animate-spin text-[var(--rigi-glow,#dca27a)]" />
+				<Loader2 className="size-3.5 shrink-0 animate-spin text-[var(--rigi-glow)]" />
 				<div className="min-w-0 flex-1">
 					<div className="flex items-baseline justify-between gap-2 text-xs">
 						<span className="truncate text-white/80">
@@ -88,7 +88,7 @@ export function AlignRollButton({
 					</div>
 					<div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
 						<div
-							className="h-full rounded-full bg-[var(--rigi-glow,#dca27a)] transition-[width] duration-500"
+							className="h-full rounded-full bg-[var(--rigi-glow)] transition-[width] duration-500"
 							style={{ width: `${Math.max(3, frac * 100)}%` }}
 						/>
 					</div>
@@ -116,7 +116,7 @@ export function AlignRollButton({
 					? "Every photo already has a saved, fitted or solved pose"
 					: "Match each photo’s skyline to the terrain. Only confident matches are kept; the rest stay on their compass prior for review."
 			}
-			className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--rigi-glow,#dca27a)] px-3 py-1.5 text-xs font-semibold text-[var(--rigi-ink,#0e1012)] hover:brightness-110 disabled:cursor-default disabled:bg-white/[0.06] disabled:text-white/40 disabled:hover:brightness-100"
+			className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--rigi-glow)] px-3 py-1.5 text-xs font-semibold text-[var(--rigi-ink)] hover:brightness-110 disabled:cursor-default disabled:bg-white/[0.06] disabled:text-white/40 disabled:hover:brightness-100"
 			data-testid="align-roll"
 		>
 			<Crosshair className="size-3.5" />

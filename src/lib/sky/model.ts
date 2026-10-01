@@ -35,7 +35,7 @@ export interface SkyModel {
 	 */
 	sharedDevice?: GPUDevice;
 	/**
-	 * ORT's own device, attached to luma (`_ownsHandle: false`: ORT keeps ownership), when the shared
+	 * ORT's own device, attached to luma (not owned: ORT keeps ownership), when the shared
 	 * device was not taken because ORT had already initialised on another one. The output then stays
 	 * on this device (inferSkyModel's `gpuBuffer`) and refine runs on it; the compute shim stays primary.
 	 */
@@ -133,10 +133,7 @@ export async function createSkyModel(
 					const g = await initialisedOrtDevice();
 					if (g && g !== opts.device) {
 						const { attachWebGPUDevice } = await import("#/lib/gpu/core/luma");
-						attached = await attachWebGPUDevice(g, {
-							id: "rigi-ort",
-							_ownsHandle: false,
-						});
+						attached = await attachWebGPUDevice(g, { id: "rigi-ort" });
 					}
 				} catch (e) {
 					console.warn("[sky] could not attach ORT's device", e);

@@ -1316,6 +1316,7 @@ const L = {
 		title: "Photo drape",
 		paths: [
 			["world", "drapeHarmonize"],
+			["world", "clearAir"],
 			["world", "projectionTint"],
 		],
 	},
@@ -1470,6 +1471,27 @@ function WorldLayers({ settings, style, state }: ViewProps) {
 					max={1}
 					onChange={(drapeHarmonize) => patch({ world: { drapeHarmonize } })}
 				/>
+				{/* look/clear-air: the photo's own haze off the drape, so far ground isn't veiled twice */}
+				<Segmented
+					size="sm"
+					value={w.clearAir.mode}
+					onChange={(mode) => patch({ world: { clearAir: { mode } } })}
+					options={[
+						{ value: "off", label: "Hazy" },
+						{ value: "consistent", label: "No double haze" },
+						{ value: "fitted", label: "Clear air" },
+					]}
+				/>
+				{w.clearAir.mode !== "off" && (
+					<Slider
+						label="Haze removed"
+						value={w.clearAir.amount}
+						min={0}
+						max={1}
+						format={pct}
+						onChange={(amount) => patch({ world: { clearAir: { amount } } })}
+					/>
+				)}
 				<ColorSwatch
 					label="Projection tint"
 					value={rawHex(w.projectionTint.color)}

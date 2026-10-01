@@ -1,0 +1,38 @@
+# Rigi CHANGELOG
+
+Entries are factual and ordered newest first. There are no tagged releases yet; everything is under Unreleased until the first tag.
+
+## Unreleased
+
+### luma.gl 10 and WebGPU by default (2026-09-28 to 2026-10-01)
+
+Rendering
+- WebGPU is the default renderer: `?renderer=auto` (the default) runs deck.gl on WebGPU (`WebGpuEngine`, `src/lib/deck-webgpu`) where the browser passes the probe, and deck.gl on WebGL2 (`DeckEngine`, `src/lib/deck`) otherwise. `?renderer=webgpu|deck` pins an engine, `?webgpu=off` forces the fallback. Decision record and open regression list: `reports/webgpu-default.md`.
+- The three.js `PhotoEngine` and `?renderer=three` are removed. three.js remains for Step Inside splats, the 3D Tiles adapters and the P3 RGB-D cache.
+- A mid-session WebGPU device loss that cannot rebuild switches `/photo` to the WebGL deck engine; `auto` routes terroir-styled views (land cover, contours) through WGSL on WebGPU.
+- deck-webgpu: geometry diet; GPU label occlusion, skyline and point queries instead of a full 1024 px readback per settle; cached peak-label occlusion verdicts; no-MSAA colour pass while interacting with 4x MSAA on settle; idle prewarm of the interactive pipelines; trail dash; GPU splat sort with a worker fallback.
+- Offscreen pose renders for the matcher and `lab.generate` run on the deck engines; every harness that pinned three is retargeted to deck/WebGPU.
+
+GPU compute
+- Compute runs on luma's `GPUCommandGraph` through the `ComputeGraph` in `src/lib/gpu/core`, and the graph is the only GPU path: horizon, eye search, solve, look passes (relief, haze, guided filter, band stats), sky refine, align pose grid and bounds, skyglobal grid, silhouette masks, GPU splat sort and ridgeline tracing. The pooled dispatch paths are removed.
+- Pipelines are built through luma's engine `Kernel`/`Kernel.createAsync`; haze scan and offset steps use luma `GPUScan`.
+- Under WebGPU the render device is also the compute device (`adoptRenderDevice`); look passes run on render targets with no CPU round trip. Auto-align refine pre-screens with certified score bounds and re-ranks silhouettes on the GPU.
+
+Vendored dependencies
+- luma.gl `10.0.0-alpha.2-rigi.1` (built from luma master `7d1d11e9` plus #3312, #3313, #3302, #3287 and a PipelineFactory compute-hash fix) and a deck.gl `9.4.0-beta.4` build (deck PR #10752 on master plus luma's WebGPU deck fixes) are installed from `vendor/`. Rebuild steps: `vendor/luma/README.md`, `vendor/deck/README.md`.
+- Adopted luma `requiredLimits` (#3312) and `WebGPUAdapter.attach()` (#3313) for app-created devices.
+
+Look and cartography
+- Terroir cartography: land-cover shading and contours, legend, place card and roll hooks.
+- Height-fog ("Nebelmeer") and precipitation looks ported from luma.gl #3325 (MIT, vis.gl contributors); see `NOTICE.md`.
+
+Tooling
+- `scripts/ci/run.mjs` regression gate (fast and full tiers) with a per-file Biome ratchet; render lock is a FIFO queue; CI child cleanup and its own dev port.
+- Repository conventions follow luma.gl: `LICENSE` (MIT), `NOTICE.md`, `AGENTS.md`, `CONTRIBUTING.md` (with AI-assisted contributions), `CODE_OF_CONDUCT.md`, `.github` templates, SPDX headers, `examples/`.
+
+Fixes
+- Review fixes CR-54 to CR-68 (WebGL context restore, device free on boot failure, private sky copy before the grid await, silhouette-mask kernel on `gpu/core`, `faultDeflate` hook gated to dev); retryable `compileAsync`; DEM no-data fill and fetch retry; Step Inside pose re-check; upload region races.
+
+### Earlier
+
+- 2026-09-28: initial commit: Rigi app, pose pipeline, matcher, benchmark and research tooling, reports.

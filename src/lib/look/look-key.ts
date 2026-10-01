@@ -7,6 +7,7 @@ import type { ViewStyle } from "../style/types";
 export type LookDefine =
 	| "LOOK_ALPINE"
 	| "LOOK_ATMOSPHERE"
+	| "LOOK_CLEARAIR"
 	| "LOOK_HARMONIZE"
 	| "LOOK_INK"
 	| "LOOK_OUTPUT"

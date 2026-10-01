@@ -57,6 +57,11 @@ import {
 	trustedRange,
 } from "../look/composite";
 import { COMPOSITE_DEFINES } from "../look/glsl/composite";
+import {
+	type ClearAirValues,
+	clearAirValues,
+	wantsClearAirFit,
+} from "../look/clear-air";
 import { HazeController, rangeGeo } from "../look/haze-controller";
 import type { SkyMask } from "../look/haze-fit";
 import { drawExportLabels, skylineAt } from "../look/labels";
@@ -419,6 +424,12 @@ export class DeckEngine implements Renderer {
 	/** photoViewProjection for the current pose (memoised: a stable array for the layer props). */
 	private pvp?: { key: number[]; arr: number[] };
 	/** harmonizeValues memo (a stable object for the layer props). */
+	private clearAirMemo?: {
+		style: ViewStyle;
+		fit: unknown;
+		key: string;
+		value: ClearAirValues;
+	};
 	private harm?: {
 		stats: unknown;
 		amount: unknown;
@@ -1502,12 +1513,17 @@ export class DeckEngine implements Renderer {
 		const src = this.geoSrc;
 		if (!this.geometryReady() || !src?.pose) return;
 		const pose = src.pose;
+		// the fit reads the PHOTO-pose buffer (geoSrc only ever renders this.pose; orbit readbacks
+		// use other sources): skip a buffer left over from a pose the photo has since left
+		if (this.world?.controls && !samePose(pose, this.pose)) return;
 		const fitted = this.haze.update({
 			style: this.style,
 			pose,
 			img: this.photoImg,
 			eyeAlt: this.eyeAlt,
 			sunDir: this.look("overlay").sunDir,
+			// clear air needs the fit in the world view too (never fitted just for it elsewhere)
+			want: !!this.world?.controls && wantsClearAirFit(this.style),
 			fg: this.fgMask,
 			geo: () => ({
 				geo: rangeGeo(src.range, src.width, src.height, pose),
@@ -1649,6 +1665,23 @@ export class DeckEngine implements Renderer {
 				arr: Array.from(photoViewProjection(p, this.eyeArr, this.aspect)),
 			};
 		return this.pvp.arr;
+	}
+
+	/** clearAirValues (world drape) memoised on its inputs: a stable object for layer props. */
+	private clearAir() {
+		const fit = this.haze.fit;
+		const p = this.pose;
+		const key = `${p.yaw},${p.pitch},${p.roll},${p.vfov},${this.aspect},${this.eyeAlt}`;
+		const c = this.clearAirMemo;
+		if (c && c.style === this.style && c.fit === fit && c.key === key)
+			return c.value;
+		const d = unprojectDir(this.pose, this.aspect, 0.5, 0.5);
+		const value = clearAirValues(this.style, fit, this.look("world").sunDir, {
+			eyeAlt: this.eyeAlt,
+			dir: [d.x, d.y, d.z],
+		});
+		this.clearAirMemo = { style: this.style, fit, key, value };
+		return value;
 	}
 
 	/** harmonizeValues memoised on its inputs (a stable object for layer props). */
@@ -2755,6 +2788,8 @@ export class DeckEngine implements Renderer {
 		this.compositor.enabled = false;
 		this.canvas.style.backgroundColor = ws.sky;
 		this.deck.setProps({ views: this.worldViews } as never);
+		// clear air's haze fit (the world view only; no-op until the geometry is ready)
+		this.fitHaze();
 		// the drape needs the range buffer for the current pose
 		if (!this.geometryReady()) void this.readback();
 		this.kickWorld();
@@ -2958,6 +2993,9 @@ export class DeckEngine implements Renderer {
 				// from the photo camera the near terrain drapes exactly: no grazing-angle cut-off (engine.ts)
 				photoMinRange: this.step?.view === "step" ? 1 : s.minProjectRange,
 				harmonize: this.harmonize(this.style.world.drapeHarmonize),
+				clearAir: this.look("world").defines.includes("LOOK_CLEARAIR")
+					? this.clearAir()
+					: null,
 				// Truth toggle: the terrain tinted by provenance too (terrain-layer.ts truth; 0 = classic)
 				truth: this.nearField?.opts.truth ? PROVENANCE_TINT_MIX : 0,
 			}),

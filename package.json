@@ -7,6 +7,7 @@
 	},
 	"scripts": {
 		"dev": "vite dev --port 3100",
+		"dev:all": "node scripts/dev.mjs --be",
 		"generate-routes": "tsr generate",
 		"build": "vite build",
 		"preview": "vite preview",

@@ -71,8 +71,10 @@ export class HazeController {
 		img: HTMLImageElement | undefined;
 		eyeAlt: number;
 		fg: SkyMask | null;
+		/** Fit even when the style's atmosphere doesn't ask for it (world-view clear air: look/clear-air). */
+		want?: boolean;
 	}): boolean {
-		if (!wantsHazeFit(o.style) || !o.img) return false;
+		if (!(wantsHazeFit(o.style) || o.want) || !o.img) return false;
 		const p = o.pose;
 		return (
 			`${p.yaw},${p.pitch},${p.roll},${p.vfov},${o.eyeAlt}` !== this.key ||
@@ -98,8 +100,10 @@ export class HazeController {
 		 * null / a rejection falls back to it. Async like the GPU path (onAsync).
 		 */
 		bridged?: BridgedHazeFit;
+		/** Fit even when the style's atmosphere doesn't ask for it (world-view clear air: look/clear-air). */
+		want?: boolean;
 	}): boolean {
-		if (!wantsHazeFit(o.style) || !o.img) return false;
+		if (!(wantsHazeFit(o.style) || o.want) || !o.img) return false;
 		const p = o.pose;
 		const key = `${p.yaw},${p.pitch},${p.roll},${p.vfov},${o.eyeAlt}`;
 		if (key === this.key && o.fg === this.fgRef) return false;

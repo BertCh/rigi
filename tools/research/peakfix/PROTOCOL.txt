@@ -1,0 +1,83 @@
+PEAKFIX (PK): multi-distance peak resection for the eye position             written 2026-09-30, BEFORE any PK number
+==================================================================================================================
+Question (user, 2026-09-30): can peaks identified exactly, at several layers of distance, position the camera more
+exactly? A peak at distance d moves sideways by about δ/d radians when the eye moves δ metres, while a far peak barely
+moves. A near/far pair therefore separates eye translation from rotation. That is resection on point landmarks.
+
+Prior art in this repo:
+  - GA3 (T-junctions) was killed because interior photo edges are not measurable.
+  - E3: near-field matcher points barely exist.
+  - REPORT_PNP: free-centre PnP on matcher points drifts by hundreds of metres.
+PK differs because its photo measurement is the SKYLINE ONLY. Skyline peaks are local maxima of the sky boundary, the
+one contour that is measured reliably, and a skyline often mixes near and far ridges. Interior layers are studied only
+as an ORACLE (PK0), to price a future interior detector.
+
+Data: the 10 DEV GT photos (scripts/geocam/lib.ts GT_DEV; tools/concord/pins/PROTOCOL.txt split). Holdout photos,
+data_v3 and the wild test set are NOT touched. DEM: Mapterhorn (z17 ≤ 300 m, then the MAPTERHORN levels). Eye truth
+= the GT eye (the GPS fix plus the GT eye-height rule) = scene origin [0,0,0]. This is NOT independent truth: iPhone
+hAcc is typically 5–35 m, which floors any real-data error. hAcc is reported per photo.
+
+Eye model: horizontal (E, N) free. Height = DEM ground(E, N) + (GT eye height above ground at the origin).
+Rotation (yaw, pitch, roll) and focal scale are free per eye (focal within ±8 %). No k1 or principal point.
+
+Arms (identical inner rotation solver; only the eye cost differs):
+  DENSE  vertical skyline residual at every photo skyline sample (the existing information source).
+  PEAK   2D residuals of skyline peaks: photo local maxima vs DEM apparent-skyline local maxima, which are recomputed at
+         every candidate eye, so the shift of the silhouette point is modelled. Symmetric nearest-neighbour
+         association with hysteresis thresholds; truncated quadratic loss.
+  BOTH   DENSE + PEAK, each normalised to its own mean.
+Loss: truncated quadratic (σ 1.5 px, truncation 6σ). Pixels on the 1600 px long-side basis.
+
+Search: global grid E, N ∈ [−400, 400] m at 20 m. Then a 5 m grid ±25 m around each arm's grid minimum. The arm's
+estimate is the refined minimum. Rotation at each eye: coarse yaw/pitch scan with the DENSE cost from the app start
+pose, then Gauss-Newton per arm.
+
+PK0 observability (GT pose, no photo, no search). Fisher information of (rotation, focal, E, N) by central differences
+(±5 m eye, re-marched), σ 1.5 px, from:
+  (a) DENSE skyline;
+  (b) skyline peaks;
+  (c) ORACLE layered peaks: crest profiles in distance layers <1, 1–3, 3–10, 10–30, >30 km. Each layer's top crest per
+      azimuth forms a profile; the peaks of every layer profile are counted.
+Report CRLB σ_E, σ_N and the horizontal σ for each source, plus the distances of the peaks.
+
+PK1 synthetic (sanity gate; tests the solver, not the world). The "photo" skyline is the GT-eye DEM horizon projected
+with the GT camera: samples every 2 px, Gaussian noise σ 1 px vertical. The start rotation is the GT rotation
+perturbed by +0.6° yaw, −0.3° pitch, +0.3° roll and +2 % focal. The same grid search is used.
+  PK1 FAIL if the PEAK arm's median horizontal error > 15 m over the 10 photos. The method is then dead, whatever PK2
+  shows.
+
+PK2 real dev photos. Photo skyline = skySamples(photo) (detectSkyline at 1600 px, every 2nd column, weight ≥ 0.3).
+Start rotation = the app solve. Per photo: error = |estimated (E, N) − GT eye| for each arm.
+  A photo is NO-CALL for an arm if fewer than 3 photo peaks are matched at its estimate (PEAK and BOTH only). A
+  no-call counts as a failure in the recall line and is excluded from the precision line.
+  PK2 SURVIVES (worth building on) only if ALL of:
+    1. PEAK or BOTH: median horizontal error ≤ 40 m over the 10 photos (no-calls counted as 400 m);
+    2. that arm is within 25 m on ≥ 5/10 photos;
+    3. that arm's median error ≤ 0.75 × the DENSE median.
+  Otherwise KILLED as registered. Report everything, including the arm that failed.
+  Secondary (descriptive, no kill): error vs the nearest matched peak's distance; the cost-landscape basin (the second
+  minimum ≥ 60 m from the best, and its cost ratio).
+
+Fixed before scoring: σ, truncation, grid, peak prominence (photo ≥ 6 px; model ≥ 6 px at the start focal, with
+hysteresis 0.6×), the association gate of 25 px, and the arms. Any change after a PK2 number is a labelled amendment,
+and the frozen run is kept.
+
+Code: src/lib/peakfix/** (pure). scripts/peakfix/** (evals). Output: out/peakfix/. Report: tools/research/peakfix/REPORT.txt.
+
+AMENDMENT A1 (2026-09-30, written BEFORE any PK1/PK2 number existed; the aborted first launch wrote no result files)
+  Finding (smoke test + PK0 debug on IMG_7053, GT pose): with the march starting at 20 m (geo/horizon.ts), moving the
+  eye 5 m puts the photographer's immediate ground (z17 DEM lip at the Niederhorn edge) in front of the camera at
+  +3.6° and hides the whole far skyline. The eye cost is then dominated by the unmodellable near field: the exact
+  standing spot, railings, eye height and the 1 m DEM within a few tens of metres.
+  Change: every horizon / layered march ignores terrain nearer than 150 m (dMin = 150 m) in PK0, PK1 and PK2. Same
+  idea as roll/mosaic/ridgelines.ts occludeFrom (250 m there). Peaks nearer than 150 m are out of scope.
+  Nothing else changes.
+
+AMENDMENT A2 (2026-09-30, POST HOC: written AFTER the frozen PK1 and PK2 numbers were seen; it cannot rescue the
+registered verdict)
+  Finding: in PK1, the PEAK arm's inner rotation fit fails AT THE TRUE EYE (IMG_7018: 7/27 items matched, cost 20.9
+  vs 7.0 at ±40 m). The yaw/pitch scan leaves the +2 % focal and +0.3° roll start error. Edge peaks are 10–16 px
+  off, beyond the 9 px truncation, so IRLS never pulls them in. This is a solver-initialisation defect, not geometry.
+  Change (diagnostic run tag _a2 only): PEAK and BOTH start from the DENSE arm's fitted rotation at the same eye
+  (scan → DENSE GN → arm GN). DENSE is unchanged. Everything else is identical. The registered verdict is the frozen
+  run; _a2 is reported as a labelled post-hoc diagnostic.

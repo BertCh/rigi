@@ -368,7 +368,7 @@ function ImportPage() {
 
 	return (
 		<main
-			className="min-h-dvh bg-[var(--rigi-ink)] px-4 pb-16 text-[var(--rigi-paper)] [--rigi-glow:#dca27a] [--rigi-ink:#0e1012] [--rigi-paper:#ece6da] sm:px-8"
+			className="min-h-dvh bg-[var(--rigi-ink)] px-4 pb-16 text-[var(--rigi-paper)] sm:px-8"
 			data-testid="roll-import"
 		>
 			<header className="mx-auto max-w-6xl pt-8 pb-6">

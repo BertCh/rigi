@@ -1,6 +1,6 @@
 # src/lib/gpu — WebGPU compute
 
-The compute kernels in this directory run on a luma.gl 9.4 WebGPU device. Today that device is a
+The compute kernels in this directory run on a luma.gl 10 (`10.0.0-alpha.2`) WebGPU device. Today that device is a
 separate "compute sidecar". When the renderer itself runs on WebGPU (the deck-webgpu port,
 `src/lib/deck-webgpu/**`) and hands its device over with `adoptRenderDevice`, the kernels run on the
 render device instead, so they share one queue and can read render targets without a copy.
@@ -17,8 +17,12 @@ Background: `research_notes/gpu_compute_plan_2026-09.md` (the sidecar and the fi
   the experimental, WebGPU-only subpath that has no semver promise. Everything else imports
   `GPUCommandGraph`, `GPUReduction`, `GPUSort`, `GPUHistogram`, `GPUScan`, `GPUFFT1D`,
   `GraphDataView` and the rest from there. A luma 10 bump should touch this file plus the
-  workarounds its header lists. We stay on luma 9.4.2 for now: deck 10 is not published, and
-  10.0.0-alpha.2 has broken packaging.
+  workarounds its header lists. The app moved to luma `10.0.0-alpha.2` on 2026-09-30 (098d9f2),
+  with deck.gl vendored from PR #10752 (`vendor/deck/README.md`); the alpha's broken manifests are
+  worked around with `package.json` overrides and `.npmrc` `legacy-peer-deps`.
+- **Command graphs.** `GPUCommandGraph` is the default path for sky refine (41b79fd) and the solve
+  coarse grid (227d79a). Horizon (b115334), haze (c1b7544) and relief / guided filter / band stats
+  (0feeb38) are on graphs too, but opt-in (`graph: true`).
 - **Kernel modules** (`horizon/`, `align/`, `look/`, `eye/`, `skyglobal/`, `solve/`, `sky/`): each defines
   its WGSL with `core/kernel` `defineKernel` and runs it as a core `ComputeGraph` (`core/graph`,
   usually a shape-keyed `cachedGraph` in the module's `graph.ts` / `*-graph.ts`): intermediates and

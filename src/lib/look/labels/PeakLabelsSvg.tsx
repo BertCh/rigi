@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { toCss } from "../../style/color";
 import type { LabelStyle } from "../../style/types";
 import { uncertainOpacity } from "../../terroir/labels/names";
+import { contrastFilter } from "./contrast";
 import { eleSuffix, type PlacedLabel, tierFonts } from "./layout";
 
 export type PeakLabelsSvgProps = {
@@ -19,6 +20,8 @@ export type PeakLabelsSvgProps = {
 	subPill?: boolean;
 	/** terroir.uncertainty with a guessed pose: softer labels (far first) and dashed leaders */
 	uncertain?: boolean;
+	/** halo.adaptive: 0..1 extra glow per label from the backdrop under it (labels/contrast.ts) */
+	contrast?: (label: PlacedLabel) => number;
 };
 
 const FADE_MS = 220;
@@ -36,6 +39,7 @@ export function PeakLabelsSvg({
 	className,
 	subPill,
 	uncertain,
+	contrast,
 }: PeakLabelsSvgProps) {
 	const fontPx = st.name.px;
 	const fontFamily = st.fontFamily;
@@ -117,6 +121,11 @@ export function PeakLabelsSvg({
 							: l.opacity;
 				const dotR =
 					(st.dot.px / 2) * (l.tier === 0 ? 1 : l.tier === 1 ? 0.85 : 0.7);
+				const glow = contrast ? contrastFilter(st, contrast(l), f.size) : "";
+				const shadow =
+					st.halo.kind === "shadow"
+						? `drop-shadow(0 ${st.halo.offsetY}px ${st.halo.blurPx * 0.6}px ${t.halo})`
+						: "";
 				return (
 					<g
 						key={l.id}
@@ -124,10 +133,7 @@ export function PeakLabelsSvg({
 						data-peak-label={l.id}
 						style={{
 							opacity: op,
-							filter:
-								st.halo.kind === "shadow"
-									? `drop-shadow(0 ${st.halo.offsetY}px ${st.halo.blurPx * 0.6}px ${t.halo})`
-									: undefined,
+							filter: [shadow, glow].filter(Boolean).join(" ") || undefined,
 						}}
 					>
 						{l.leader && (

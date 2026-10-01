@@ -146,7 +146,7 @@ function RollPage() {
 
 	return (
 		<main
-			className="min-h-dvh bg-[var(--rigi-ink)] text-[var(--rigi-paper)] [--rigi-glow:#dca27a] [--rigi-ink:#0e1012] [--rigi-paper:#ece6da]"
+			className="min-h-dvh bg-[var(--rigi-ink)] text-[var(--rigi-paper)]"
 			data-testid="roll-page"
 		>
 			<header className="mx-auto flex max-w-[1600px] flex-wrap items-end gap-x-6 gap-y-3 px-4 pt-6 pb-4 sm:px-8">

@@ -28,6 +28,7 @@ by `npm run generate-routes`).
 | `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (owned by session mt-image-fc, `src/lib/roll/**`): a whole day's photos clustered into rolls and spots, with a mosaic, per-spot panoramas, and every photo draped on one deck.gl terrain map |
 | `/baseline` | Debug UI for the CPU pipeline (`src/baseline-ui`): horizon, skyline detection, solve, peaks |
 | `/lab/splats`, `/lab/deck-splats`, `/lab/generate` | Step Inside dev benches: splats in each renderer, and P3 generation (`?nearfield=gen`, GT poses only) |
+| `/lab/deck-webgpu` | The WebGPU deck renderer (`WebGpuEngine`, `src/lib/deck-webgpu`); not yet used by the app |
 
 **Renderers.** `src/lib/renderer.ts` is the engine interface that PhotoWorkspace and the export layer
 use. Both backends are deck.gl on luma.gl, picked by `src/lib/renderer-select.ts` and loaded on demand:
@@ -89,7 +90,8 @@ to the DEM with a per-photo depth curve and object grounding, a step-in camera t
 Truth tint, a hover readout on objects, and georeferenced `.ply`/`.splat` export (generated content is
 always stripped). It is on by default in both renderers and needs the near-field service
 (`tools/nearfield/run.sh`, :8767: depth, Gaussians, multiview, inpainting). Pose propagation between
-overlapping photos (`propagate.ts`) is a library, not yet wired into the UI.
+overlapping photos is wired into `/roll` as suggestions only, behind `?propagate=on`
+(`src/lib/roll/propagate/README.md`).
 
 **Other modules.**
 
@@ -117,7 +119,7 @@ Every flag is declared in `src/lib/flags` (typed, the only reader), carried acro
 
 | Port | Service |
 |---|---|
-| 3100 | Dev server (`npm run dev`) |
+| 3100 | Dev server (`npm run dev`, or `npm run dev:all` with both backends) |
 | 3110 | Private Vite server for GPU and near-field browser checks (`scripts/gpu/vite.gpu.config.ts`) |
 | 8765 | Matcher (`tools/matcher/server/run.sh`) |
 | 8767 | Near-field service (`tools/nearfield/run.sh`) |
@@ -168,6 +170,8 @@ harnesses, so don't compare their numbers directly.
 npm install
 npm run ingest            # img/*.HEIC → public/photos/*.jpg + photos.json + region-*.json (SKIP_OSM=1: no Overpass)
 npm run dev               # dev server on http://localhost:3100
+npm run dev:all           # dev server + matcher (:8765) + near-field (:8767); reuses anything already up,
+                          #   skips a backend without tools/matcher/.venv. Pick some: node scripts/dev.mjs --be=nearfield
 npm run build             # production build (nitro)
 npx tsc --noEmit          # typecheck
 npx biome format --write .   # format (biome.json: src, scripts, tools/**/*.{ts,mjs,js})
@@ -178,19 +182,17 @@ SOLVER=cascade npx tsx scripts/eval.ts       # the cascade (also: skyfirst; HORI
 node scripts/eval-app.mjs [IMG_xxxx ...]     # the app's final pose vs data/control-points.json (needs :3100)
 node scripts/leaderboard.mjs                 # every method re-scored on one GT snapshot → reports/leaderboard.md
 
-# regression gates (dev server on :3100 for the browser ones; run one browser job at a time)
-node scripts/style-baseline.mjs check        # deck; needs a deck reference first: style-baseline.mjs capture (scripts/ci/README.md)
-node scripts/deck-engine-smoke.mjs           # WebGL deck vs WebGPU deck parity
-npx tsx scripts/test-export.ts               # 29/29
-npx tsx scripts/style-check.ts               # 185 passed (50 known literal-scan warnings)
-npx tsx src/lib/look/__tests__/labels.check.ts
-npx tsx scripts/test-pose6dof.ts
+# regression gate (scripts/ci/README.md): one runner for every check
+node scripts/ci/run.mjs fast                 # ~30 s: tsc, biome ratchet, ~25 unit checks
+node scripts/ci/run.mjs full                 # + browser checks (style-baseline, deck smoke, eval-app), via the render lock
+node scripts/ci/run.mjs --list               # every check, its command and inputs
 
 # matcher service (optional; needs tools/matcher/.venv and weights)
 tools/matcher/server/run.sh --port 8765      # env MATCHER_POLICY=v034|t6
 
 node scripts/shot.mjs <url> out.png --wait-for "[data-ready]"   # headless WebGL screenshot
 node scripts/gpu/with-render-lock.mjs -- <cmd>                # wrap every browser job: one GPU job at a time
+#   FIFO queue; RENDER_LOCK_PRIORITY=1 jumps it for a job someone is waiting on. Never omit the `--` (CR-01)
 node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs [--renderer=deck] [--dead] <ids>
 ```
 
@@ -201,6 +203,7 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.
 - [reports/status.md](reports/status.md): where every thread stands, and the decisions waiting on you.
 - [reports/roadmap.md](reports/roadmap.md): the plan.
 - [reports/negative-results.md](reports/negative-results.md): what didn't work.
-- [reports/README.md](reports/README.md): an index of every report and research note.
+- [reports/code-review-2026-09-30.md](reports/code-review-2026-09-30.md): the code-health backlog (CR-01…).
+- [reports/README.md](reports/README.md): an index of every report, research note and module README.
 
 Data: terrain © Mapterhorn, imagery © swisstopo / Esri, peaks & trails © OpenStreetMap contributors.

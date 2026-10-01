@@ -38,6 +38,11 @@ export const FLAG_SCHEMA = {
 	 * (the three.js PhotoEngine, removed 2026-10-01) falls back to auto with a warning (RETIRED below).
 	 */
 	renderer: oneOf(["auto", "webgpu", "deck"], "auto"),
+	/**
+	 * luma.gl/deck.gl example convention (?backend=webgpu|webgl, as in luma's examples/deck/*): an alias that
+	 * overrides ?renderer when set. webgpu = renderer webgpu; webgl = renderer deck (deck.gl on WebGL2).
+	 */
+	backend: oneOf(["auto", "webgpu", "webgl"], "auto"),
 	/** off: ?renderer=auto / webgpu act as if navigator.gpu were missing (proves the WebGL fallback) */
 	webgpu: onOff("on"),
 	/** deck only: one instanced grid per resolution, or one mesh per tile */
@@ -277,6 +282,7 @@ export type { FlagDef };
  */
 export const RESTART_FLAGS: readonly FlagName[] = [
 	"renderer",
+	"backend",
 	"webgpu",
 	"terrain",
 	"gpu",

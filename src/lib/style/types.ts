@@ -184,6 +184,18 @@ export type WorldStyle = {
 	projectionTint: { color: Hex; amount: number };
 	/** Oklab band transfer of the photo drape toward the photo's own statistics. 0 = off. */
 	drapeHarmonize: number;
+	/**
+	 * Clear air (look/clear-air): take the photo's own haze out of the drape along the photo camera's
+	 * rays before the view's haze goes on, so distant ground isn't hazed twice. 'consistent' inverts
+	 * the render's own haze model as the photo eye sees it (no fit needed); 'fitted' inverts the
+	 * photo's haze fit (look/haze-fit) and falls back to 'consistent' on a weak fit. `amount` blends
+	 * the result, `floor` is the lowest transmittance divided by (caps the gain at 1/floor).
+	 */
+	clearAir: {
+		mode: "off" | "consistent" | "fitted";
+		amount: number;
+		floor: number;
+	};
 	/** Rain / snow in the deck world view and landing scenes (look/weather); never the photo overlay. */
 	weather:
 		| { mode: "off" }
@@ -225,6 +237,8 @@ export type LabelHalo = {
 	blurPx: number;
 	offsetY: number;
 	strokePx: number;
+	/** backdrop-adaptive contrast (labels/contrast.ts): extra glow on bright backdrops, 0 = off, 1 = full */
+	adaptive: number;
 };
 
 /** Canvas export metrics (engine.ts exportImage). Every length is at scaleRef px of output width. */

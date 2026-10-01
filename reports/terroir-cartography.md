@@ -284,8 +284,8 @@ Everything is **additive**. It lives in a new `terroir` section of `ViewStyle` (
 | T3.4 light of the day | Built: sun-elevation band, sunrise/noon/sunset ticks, labelled gaps on the roll scrubber | `terroir/roll/LightBand.tsx` |
 | T3.5 sun path | Built: arc for the capture date with hour ticks and sunrise/sunset azimuths | `ui/SunPath.tsx` |
 | T3.6–T3.7 geology section, seasonal presets | Not built | — |
-| WebGPU renderer | **Shading pending.** While a terroir shading switch is on, `auto` resolves to WebGL deck (2f9ffd5); a WGSL port is in progress. The SVG overlays work on every engine | `src/lib/renderer-select.ts` |
-| three.js | Hooks were written but are being dropped with the three engine (nothree) | — |
+| WebGPU renderer | **Ported** (cover, snow, contour ink, adaptive contours, Swiss index): WGSL in `src/lib/terroir/wgsl/terrain.ts`, hooks in `deck-webgpu/layers/terrain-styles.ts` + `engine.ts`; terroir-off WGSL byte-identical (`scripts/terroir/wgsl-identity-snap.ts`). The interim `auto` → WebGL-deck route (2f9ffd5) is reverted by the same patch | landed via 7e |
+| three.js | Hooks landed in c72fea1; dropped with the three engine (nothree) | — |
 
 **Checks.** The CI fast tier gains `terroir-labels`, `terroir-viz`, `terroir-roll` and `terroir-pack`.
 

@@ -21,6 +21,7 @@ import {
 } from "../look/atmosphere";
 import { type LookDefine, terrainDefines } from "../look/look-key";
 import { type RelValues, reliefValues } from "../look/relief/field";
+import { clearAirOn } from "../look/clear-air";
 import { type SunContext, sunDirFromStyle } from "../look/sun";
 import {
 	hexToLinearLikeThree,
@@ -202,6 +203,9 @@ export function deckTerrainStyle(
 	const defines = terrainDefines(style).filter(
 		(d) => d !== "LOOK_HARMONIZE" || mode === "world",
 	);
+	// likewise the photo's clear-air inversion (look/clear-air; never in lookKey: no composite or
+	// overlay program wants it): it exists only in the world view's drape
+	if (mode === "world" && clearAirOn(style)) defines.push("LOOK_CLEARAIR");
 	const atm =
 		defines.includes("LOOK_ATMOSPHERE") ||
 		(mode === "world" && style.world.sky.mode === "atmosphere");

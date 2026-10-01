@@ -37,6 +37,11 @@
 //   truth         Step Inside Truth: mix toward observed (seen) / dem (not seen) provenance colours
 //   harmonize     LOOK_HARMONIZE band stats (look/composite.ts harmonizeValues) or null; toggling
 //                 it rebuilds the terrain colour pipeline (a define), values are uniforms
+//   clearAir      look/clear-air.ts clearAirValues() or null (= CLEAR_AIR_OFF, amount 0 = identity):
+//                 the photo's own haze inverted along the PHOTO camera's ray (photoCam.eye → the
+//                 fragment) on the linear photo sample, before it blends (not in Step Inside), so
+//                 the terrain's fog_apply doesn't haze distant ground twice. Own module (clearAir),
+//                 values are uniforms, always bound
 //
 // Wiring (assembler / engine port):
 //   const drape = new DrapePart(device);
@@ -53,13 +58,20 @@
 //     tint: look.photoTint, tintColor: look.photoTintCol,
 //     truth: nf?.opts.truth ? PROVENANCE_TINT_MIX : 0,
 //     harmonize: engine.harmonize(style.world.drapeHarmonize),
+//     clearAir: clearAirOn(style) ? clearAirValues(style, haze.fit, sunDir, {eyeAlt, dir}) : null,
 //   });
 // The drape is drawn in the views listed in settings.views (default: world only — the photo
 // view's colour pass stays classic, as the WebGL offscreen passes forced projectPhoto 0).
 import type { Device, Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import { type ClearAirValues, CLEAR_AIR_OFF } from "#/lib/look/clear-air";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
 import type { harmonizeValues } from "#/lib/look/composite";
+import {
+	CLEAR_AIR_UNIFORM_TYPES,
+	CLEAR_AIR_WGSL,
+	clearAirUniforms,
+} from "#/lib/look/glsl/clear-air";
 import { PROVENANCE_COLORS } from "#/lib/nearfield/provenance";
 import { type CameraUniforms, photoCameraModule } from "../camera";
 import type { PassContext } from "../pass";
@@ -86,6 +98,8 @@ export type DrapeSettings = {
 	truth: number;
 	/** LOOK_HARMONIZE band stats (look/composite.ts harmonizeValues), null = off. */
 	harmonize: ReturnType<typeof harmonizeValues> | null;
+	/** Clear air (look/clear-air.ts clearAirValues): the photo's haze inverted on the drape sample. null = off. */
+	clearAir: ClearAirValues | null;
 	/** Soft 2×2 vote + slope bias (true) or the classic single-texel binary test (false). */
 	vote: boolean;
 	/** Views the drape is drawn in (FrameState.view). */
@@ -100,6 +114,7 @@ export const DEFAULT_DRAPE: DrapeSettings = {
 	tintColor: [1, 1, 1],
 	truth: 0,
 	harmonize: null,
+	clearAir: null,
 	vote: true,
 	views: ["world"],
 };
@@ -139,6 +154,17 @@ struct DrapeUniforms {
 		pad1: "f32",
 	},
 	bindingLayout: [{ name: "drape", group: 0 }],
+} as const satisfies ShaderModule;
+
+/** Clear air (look/glsl/clear-air.ts): struct + clear_air_photo(); the uniform is `clearAir`. */
+export const clearAirModule = {
+	name: "clearAir",
+	source: /* wgsl */ `\
+${CLEAR_AIR_WGSL}
+@group(0) @binding(auto) var<uniform> clearAir: ClearAirUniforms;
+`,
+	uniformTypes: CLEAR_AIR_UNIFORM_TYPES,
+	bindingLayout: [{ name: "clearAir", group: 0 }],
 } as const satisfies ShaderModule;
 
 /** LOOK_HARMONIZE band stats (look/glsl/composite.ts HARM_BLOCK; column k = band k, Oklab xyz). */
@@ -290,7 +316,9 @@ fn drape_apply(c: vec4<f32>, s: TerrainSample) -> vec4<f32> {
       }
     }
     if (seen > 0.0) {
-      let pc = textureSampleGrad(drapePhoto, drapePhotoSampler, p.xy, pdx, pdy).rgb;
+      var pc = textureSampleGrad(drapePhoto, drapePhotoSampler, p.xy, pdx, pdy).rgb;
+      // clear air: undo the photo's own haze along its ray (the terrain fog goes on after)
+      if (drape.amount < 1.5) { pc = clear_air_photo(pc, s.enu, photoCam.eye, clearAir); }
       let inc = clamp(sinInc * 3.0, 0.0, 1.0);
       let amt = select(drape.amount * mix(0.35, 1.0, inc), 1.0, drape.amount > 1.5);
       base = mix(base, pc, amt * seen);
@@ -404,6 +432,7 @@ export class DrapePart {
 			modules: [
 				photoCameraModule as unknown as ShaderModule,
 				drapeModule as unknown as ShaderModule,
+				clearAirModule as unknown as ShaderModule,
 				...(harmonize ? [drapeHarmonizeModule as unknown as ShaderModule] : []),
 			],
 			defines: harmonize ? { DRAPE_HARMONIZE: true } : {},
@@ -431,6 +460,9 @@ export class DrapePart {
 		const uniforms: Record<string, unknown> = {
 			// never null in the pipeline: an unused camera when off
 			photoCam: this.photoCam ?? ctx.camera,
+			clearAir: clearAirUniforms(
+				on ? (s.clearAir ?? CLEAR_AIR_OFF) : CLEAR_AIR_OFF,
+			),
 			drape: {
 				tintCol: [...s.tintColor, 1],
 				truthObs: TRUTH_OBS,

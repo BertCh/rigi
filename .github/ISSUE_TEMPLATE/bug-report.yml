@@ -1,0 +1,63 @@
+name: Open a Bug Report (GitHub Issue)
+description: GitHub Issues are for confirmed bugs or approved feature requests ONLY. Please ask generic questions or request help via GitHub Discussions.
+title: "[Bug]"
+labels: bug
+body:
+- type: markdown
+  attributes:
+    value: |
+      Thank you for taking the time to report a bug!
+- type: markdown
+  attributes:
+    value: |
+      **Warning: to avoid drowning in unactionable issues, anything that is not clearly an actionable bug may be closed.**
+      Please start in Discussions rather than opening an issue if you are, for example,
+      - not yet sure whether you are hitting a bug or using the app wrong,
+      - having trouble with your own build environment that is not yet root-caused,
+      - wanting to discuss a new feature proposal.
+- type: markdown
+  attributes:
+    value: |
+      Tips: check [existing issues](https://github.com/BertCh/rigi/issues) to avoid filing duplicates.
+      If the problem is in luma.gl or deck.gl themselves (for example the vendored builds under `vendor/`), say so; we will reproduce it upstream.
+- type: textarea
+  id: area
+  attributes:
+    label: Area
+    description: Which part of Rigi? For example the WebGPU renderer (`src/lib/deck-webgpu`), the WebGL deck renderer (`src/lib/deck`), the GPU compute graph (`src/lib/gpu`), pose solving, an example under `examples/`.
+- type: textarea
+  attributes:
+    label: Description
+    description: What you are experiencing.
+  validations:
+    required: true
+- type: textarea
+  attributes:
+    label: Expected Behavior
+    description: What you expect to see.
+  validations:
+    required: false
+- type: textarea
+  attributes:
+    label: Steps to Reproduce
+    description: |
+      Include the URL with its flags (for example `?renderer=webgpu`), the photo or example involved, and whether it reproduces with `?renderer=deck`.
+  validations:
+    required: true
+- type: textarea
+  attributes:
+    label: Environment
+    value: |
+        - Rigi commit:
+        - Renderer shown in `data-renderer` (webgpu / deck):
+        - Browser and version:
+        - GPU / OS:
+        - Node:
+  validations:
+    required: true
+- type: textarea
+  attributes:
+    label: Logs
+    description: Check the browser console for errors or warnings (WebGPU validation errors are especially useful).
+  validations:
+    required: false

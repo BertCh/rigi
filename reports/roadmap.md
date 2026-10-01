@@ -1,6 +1,6 @@
 # Rigi roadmap
 
-*Consolidated 2026-09-29. This replaces `next-gen-roadmap.md` (now in [archive/](archive/)) and the sequencing in the [competitive roadmap](<Rigi competitive landscape and roadmap.md>), which is kept as the dated market analysis. Current state and open decisions are in [status.md](status.md), and dead ends are in [negative-results.md](negative-results.md).*
+*Consolidated 2026-09-29; N7 added 2026-09-30. This replaces `next-gen-roadmap.md` (now in [archive/](archive/)) and the sequencing in the [competitive roadmap](<Rigi competitive landscape and roadmap.md>), which is kept as the dated market analysis. Current state and open decisions are in [status.md](status.md), and dead ends are in [negative-results.md](negative-results.md).*
 
 ## Position
 
@@ -26,6 +26,7 @@
 | N4 | **Fix the basin-gap calibration.** v034's 0.20 gap was tuned on v1 verdicts that later flipped: it rejects the correct wc_0063 (gap ≈ 0.18) and keeps the gross wc_0069 (≈ 0.21), and the threshold sits inside run-to-run noise (0.139–0.182) | Re-derive in the H2 veto prereg; don't hand-tune | Found in consolidation |
 | N5 | **Re-annotate ground truth on Mapterhorn.** The GT poses and `demGround` were fitted on Terrarium, which is up to 81 m low at Niederhorn. That biases every comparison toward Terrarium and keeps the CPU eval default on it (`src/lib/geo/README.md`) | Then switch the eval and `/baseline` defaults | Not started |
 | N6 | **deck.gl as the default renderer** ([deck-default.md](deck-default.md)). Flip `renderer` to `deck`, keep `?renderer=three` as the escape hatch | Flip gate: photo interactions ≥ 55 fps, world orbit ≥ 45, eval-app deck ≥ three, correctness checks pass | **Done 2026-09-30** (3b121ae). Canvas antialias off at DPR ≥ 2 (408f989) took world orbit to 59–60 fps; eval-app 12/14 both; Firefox headless renders. `eval-app-deck` is in the CI full tier. Open: style-baseline re-capture, Windows/Safari. WebGPU renderer is a separate track (`src/lib/deck-webgpu/README.md`) |
+| N7 | **Code-review fixes** ([code-review-2026-09-30.md](code-review-2026-09-30.md)). First: render lock (CR-01, CR-02, CR-25), roll-import clustering (CR-03), export geoid (CR-04), local-service origin checks (CR-05, CR-06), DEM validation in the mesh path (CR-07). Then a clean-clone build (CR-26) | Each fix sets its row to `fixed <commit>`; no new biome or tsc failures | 0 / 59 fixed |
 
 ## Next: registration trust and recall (0–3 months)
 
@@ -94,6 +95,16 @@ The skyline is accurate, but it can't see eye-position error. Interior error gro
 | L7 | Completion P1 (3DB/MHR people, SAM 3D Objects, TripoSplat) | S2; gated downloads |
 | L8 | **GEN3C geometry-fidelity test**: one rented-GPU run on 3–5 accepted photos. Pass = generated ridgelines stay within a few px of the DEM projection → "fly beyond the frame", labelled `generated`. Fail → stop | Your funding decision; adapter ready in `src/lib/nearfield/generate/` |
 | L9 | Native/AR app | Only if pilots demand it |
+
+## Backlog: upstream-alignment follow-ups (2026-10-01)
+
+Source: [luma-deck-upstream-2026-10-01.md](luma-deck-upstream-2026-10-01.md). Each needs an owner opt-in and stays off the overlay and accuracy path.
+
+| # | Item | Gate / state |
+|---|---|---|
+| U1 | **`nebelmeer-fog-layer`** (M, look/**): port the MIT `heightFog_getRayTransmittance` (GLSL and WGSL) into `look/glsl/atmosphere.ts`, `look/atmosphere.ts` and `deck-webgpu/layers/atm-sky.ts`, fed the curvature-corrected `enuAltitude`. Opt-in style, density 0 by default. Frozen haze-fit and accuracy paths untouched. Later `fog-wisps-animation`, only after this | STYLE pixel-identical with the layer off; EVAL unchanged. Not started |
+| U2 | **`trail-pathdash`** (M): pathDash coverage only, via a cumulative-distance attribute in `deck/trail-layer.ts` and `deck-webgpu/layers/trail.ts`. Not `makeStrokeGeometry`. Behind a style option | STYLE pixel-identical with it off. Not started |
+| U3 | **Upstream contributions** (report §4): deck WebGPU origin fixes (`getGLViewport` y, pick `scissorY`, picker readback flip, `depth24plus`, `project.wgsl` orientation `select` bug); deck LayersPass clear/depth control and `deck.finalize()` destroying its own device; a review comment on #10740 (stale `@math.gl/core` import); luma `mapAndReadAsync` and `CommandEncoder.clearBuffer`; luma packaging (`patch:` dependency, `~9.4` peer ranges); `Model.draw` `firstInstance` and mipmap `submit` inside a pass; WGSL `&&`/`||` and uniform alignment checks; gpgpu clear/readback graph nodes; support for #3312 and #3313 | None blocking. Not started |
 
 ## Parked
 

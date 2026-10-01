@@ -239,6 +239,7 @@ const snap: [string, unknown, unknown][] = [
 				blurPx: 3,
 				offsetY: 1,
 				strokePx: 0,
+				adaptive: 1, // 2026-10-01: backdrop-adaptive glow (labels/contrast.ts), user-requested default
 			},
 			{ lengthPx: 28, widthPx: 1, color: [1, 1, 1, 0.9], fade: true },
 			{ px: 6, color: "#ffffff", glow: [0, 0, 0, 0.6], glowPx: 6 },

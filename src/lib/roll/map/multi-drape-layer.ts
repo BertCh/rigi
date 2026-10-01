@@ -29,6 +29,19 @@
 //     pruning), and only the winners' pixels are sampled (the anisotropic reads). With the
 //     default sharpness (weights cubed) photos outside the top 4 add a few percent at most.
 //
+// Clear air + exposure (./drape-clear.ts, ./drape-gains.ts). Raw photo texels carry each photo's own
+// haze (far ground veiled toward its airlight) and its own exposure / white balance, so overlaps
+// seamed and far ground washed out. Each photo has 4 RGBA32F texels in the `photoParams` texture
+// (row = its atlas slot k, kept in slot texel 8): [airlight.rgb, amount], [betaR.rgb, betaM],
+// [hR, hM, floor, 0], [exposure.rgb, 0]. A winner's texel is decoded to linear, inverted along ITS
+// camera's ray (look/clear-air.ts: J = (I - A)/max(T, floor) + A, T = exp(-∫β ds) from the photo eye
+// to the fragment, altitude-aware), multiplied by its exposure gain and re-encoded, all before the
+// weighted sum, so overlapping photos agree and the blend carries the ground's own colour. The
+// frame is the roll's ENU frame at the roll centre (origin at sea level, curvature + refraction
+// baked into z by EnuFrame), the same as the clear-air maths assumes: altitude = z + (x² + y²)·ATM_CURV.
+// Candidates are also weighted by sqrt(green T) (photos that see the fragment through less haze win
+// overlaps), applied after the exact-pruning bounds, which stay valid since T ≤ 1.
+//
 // Occlusion ("drape acne"). The range map is point-sampled at 512 px: at every silhouette the
 // nearest texel flips between the near ridge and the far ground, and the old one-texel min-dilation
 // widened that into a 1–2 texel band behind every hummock where the photo was rejected, so the
@@ -50,6 +63,7 @@ import { Geometry, Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import { LOG_DEPTH_FAR } from "#/lib/deck/terrain-layer";
+import { ATM_CURV } from "#/lib/look/atmosphere";
 import { COARSE, type DrapeAtlas } from "./drape-atlas";
 
 /**
@@ -61,7 +75,7 @@ const MIN_SIN_INC = 0.012;
 /** Photos blended per fragment (the best by weight; see the header). */
 const TOP_K = 4;
 /** Texels per candidate in a tile's row. */
-const SLOT_W = 8;
+const SLOT_W = 9;
 /** Most candidates per tile (nearest kept): bounds the row width and the worst-case loop. */
 const MAX_PER_TILE = 48;
 
@@ -91,6 +105,7 @@ layout(std140) uniform drapeUniforms {
   float people;
   float tileCount;
   float cellM;
+  float clear;
 } drape;
 `;
 
@@ -104,6 +119,8 @@ type DrapeModuleProps = {
 	people: number;
 	tileCount: number;
 	cellM: number;
+	clear: number;
+	photoParams: Texture;
 	photo0: Texture;
 	photo1: Texture;
 	photo2: Texture;
@@ -126,6 +143,7 @@ const drapeModule = {
 		people: "f32",
 		tileCount: "f32",
 		cellM: "f32",
+		clear: "f32",
 	},
 } as const satisfies ShaderModule;
 
@@ -181,6 +199,7 @@ uniform sampler2D photo2;
 uniform sampler2D photo3;
 uniform highp sampler2D rangeAtlas;
 uniform sampler2D maskAtlas;
+uniform highp sampler2D photoParams; // 4 texels × photo slot (see the header)
 // this tile's candidates, SLOT_W vec4 each (a range of one shared uniform buffer)
 layout(std140) uniform tileSlots {
   vec4 slots[MAX_PER_TILE * SLOT_W];
@@ -210,6 +229,52 @@ vec3 photoTexel(int a, vec2 uv, vec2 gx, vec2 gy) {
   if (a == 1) return textureGrad(photo1, uv, gx, gy).rgb;
   if (a == 2) return textureGrad(photo2, uv, gx, gy).rgb;
   return textureGrad(photo3, uv, gx, gy).rgb;
+}
+
+vec3 srgbToLin(vec3 c) {
+  return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+}
+vec3 linToSrgb(vec3 c) {
+  c = clamp(c, 0.0, 1.0);
+  return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
+}
+
+// look/clear-air.ts altitude / optical path (the clr_* macros of its block would need one uniform
+// block for all photos; here the values are per photo, from photoParams)
+float dcAlt(vec3 p) {
+  return p.z + dot(p.xy, p.xy) * ${ATM_CURV.toExponential(9)};
+}
+float dcPath(float h0, float h1, float L, float H) {
+  float x = (h1 - h0) / H;
+  float f = abs(x) < 1e-3 ? 1.0 - 0.5 * x : (1.0 - exp(-x)) / x;
+  return exp(-h0 / H) * L * f;
+}
+// per-channel transmittance from the photo eye to p (1 when the photo has no fit: amount 0)
+vec3 dcTransmittance(int k, vec3 p, vec3 eye) {
+  vec4 a = texelFetch(photoParams, ivec2(0, k), 0);
+  if (a.w <= 0.0) return vec3(1.0);
+  vec4 b = texelFetch(photoParams, ivec2(1, k), 0);
+  vec4 c = texelFetch(photoParams, ivec2(2, k), 0);
+  float L = length(p - eye);
+  float h0 = dcAlt(eye);
+  float h1 = dcAlt(p);
+  return exp(-(b.rgb * dcPath(h0, h1, L, c.x) + vec3(b.w * dcPath(h0, h1, L, c.y))));
+}
+// one winner's photo texel (sRGB) → clear air → exposure → sRGB
+vec3 clearAndExpose(vec3 s, vec3 p, vec3 eye, int k) {
+  vec4 a = texelFetch(photoParams, ivec2(0, k), 0);
+  vec3 g = texelFetch(photoParams, ivec2(3, k), 0).rgb;
+  bool fixT = a.w > 0.0;
+  bool fixG = any(notEqual(g, vec3(1.0)));
+  if (!fixT && !fixG) return s;
+  vec3 pc = srgbToLin(s);
+  if (fixT) {
+    float floorT = texelFetch(photoParams, ivec2(2, k), 0).z;
+    vec3 T = dcTransmittance(k, p, eye);
+    vec3 J = clamp((pc - a.rgb) / max(T, vec3(floorT)) + a.rgb, 0.0, 1.0);
+    pc = mix(pc, J, a.w);
+  }
+  return linToSrgb(pc * g);
 }
 
 // one range texel's vote: visible from the photo camera (range test of terrain-layer.ts + bias)
@@ -289,7 +354,11 @@ void main() {
     float keep = 1.0 - drape.people * smoothstep(0.25, 0.6, texture(maskAtlas, muv).r);
     float seen = smoothstep(0.0, 0.75, vis) * keep;
     if (seen <= 0.0) continue;
-    float w = pow(wBase * seen, drape.sharpness);
+    // prefer the clearer view: sqrt of the green transmittance from this photo's eye (≤ 1, so the
+    // pruning bounds above hold)
+    float tw = 1.0;
+    if (drape.clear > 0.5) tw = sqrt(max(dcTransmittance(int(slot(i, 8).x), vWorld, eye.xyz).g, 0.05));
+    float w = pow(wBase * seen * tw, drape.sharpness);
     wmax = max(wmax, cover * seen);
     // a thin frame line where this photo's footprint ends (selection outline)
     if (eye.w > 1.5) edge = max(edge, 1.0 - smoothstep(0.0, 0.006, min(e2.x, e2.y)));
@@ -318,7 +387,9 @@ void main() {
     vec2 gx = (photoUv(M, vWorld + dwx, cwx) - uv) * pr.zw;
     vec2 gy = (photoUv(M, vWorld + dwy, cwy) - uv) * pr.zw;
     vec2 auv = pr.xy + clamp(uv, vec2(0.001), vec2(0.999)) * pr.zw;
-    acc += photoTexel(int(atlas), auv, gx, gy) * topW[j];
+    vec3 texel = photoTexel(int(atlas), auv, gx, gy);
+    if (drape.clear > 0.5) texel = clearAndExpose(texel, vWorld, slot(i, 4).xyz, int(slot(i, 8).x));
+    acc += texel * topW[j];
     wsum += topW[j];
   }
   if (wsum <= 0.0) discard;
@@ -330,7 +401,13 @@ void main() {
 
 type Textures = Pick<
 	DrapeModuleProps,
-	"photo0" | "photo1" | "photo2" | "photo3" | "rangeAtlas" | "maskAtlas"
+	| "photo0"
+	| "photo1"
+	| "photo2"
+	| "photo3"
+	| "rangeAtlas"
+	| "maskAtlas"
+	| "photoParams"
 >;
 
 /** Bytes of one tile's slot block (the std140 vec4 array). */
@@ -347,9 +424,12 @@ type TileProps = LayerProps & {
 	outline: number;
 	reachM: number;
 	people: number;
+	/** 1 = clear air + exposure + clearer-view weighting on (the roll map's `clearAir`). */
+	clear: number;
 	textures: Textures;
 	/** Atlas contents version (redraw when a photo lands). */
 	version: number;
+	paramsVersion: number;
 };
 
 class DrapeTileLayer extends Layer<TileProps> {
@@ -410,6 +490,7 @@ class DrapeTileLayer extends Layer<TileProps> {
 				people: p.people,
 				tileCount: p.tileCount,
 				cellM: cellSize(p.mesh),
+				clear: p.clear,
 				...p.textures,
 			} satisfies DrapeModuleProps,
 		});
@@ -438,6 +519,15 @@ export type MultiDrapeLayerProps = LayerProps & {
 	reachM?: number;
 	/** 0..1: how strongly people masks cut photos out of the drape. */
 	people?: number;
+	/**
+	 * Per-photo clear air + exposure (DrapeClear.texture: 4 RGBA32F texels × atlas slot, see the
+	 * header). Null = never fitted: the raw photos are blended.
+	 */
+	photoParams?: Texture | null;
+	/** Bump when photoParams' contents change (DrapeClear.version). */
+	paramsVersion?: number;
+	/** Apply photoParams (default true when photoParams is set). */
+	clearAir?: boolean;
 };
 
 type State = {
@@ -446,6 +536,8 @@ type State = {
 	tileRows: Map<string, [number, number]>;
 	/** DrapeAtlas.readyVersion the rows were built for. */
 	readyVersion: number;
+	/** Stand-in photoParams (all photos unfitted) when the host gives none. */
+	blank?: Texture;
 };
 
 export class MultiDrapeLayer extends CompositeLayer<MultiDrapeLayerProps> {
@@ -485,6 +577,7 @@ export class MultiDrapeLayer extends CompositeLayer<MultiDrapeLayerProps> {
 	finalizeState(context: Parameters<Layer["finalizeState"]>[0]) {
 		super.finalizeState(context);
 		this.state.slotBuffer?.destroy();
+		this.state.blank?.destroy();
 	}
 
 	/** Canvas only: never in the offscreen terrain passes (it would pollute the range maps). */
@@ -498,6 +591,19 @@ export class MultiDrapeLayer extends CompositeLayer<MultiDrapeLayerProps> {
 		if (!a || !slotBuffer) return [];
 		const p = this.props;
 		const ph = (i: number) => a.photo[Math.min(i, a.photo.length - 1)];
+		if (!p.photoParams && !this.state.blank) {
+			// amount 0 / exposure 1 for every photo: a 4 × 1 texture, clamped rows
+			const t = new Float32Array(16);
+			t.set([1, 1, 1, 1], 12);
+			this.state.blank = this.context.device.createTexture({
+				width: 4,
+				height: 1,
+				format: "rgba32float",
+				data: t,
+				sampler: { minFilter: "nearest", magFilter: "nearest" },
+			});
+		}
+		const params = p.photoParams ?? (this.state.blank as Texture);
 		const textures: Textures = {
 			photo0: ph(0),
 			photo1: ph(1),
@@ -505,6 +611,7 @@ export class MultiDrapeLayer extends CompositeLayer<MultiDrapeLayerProps> {
 			photo3: ph(3),
 			rangeAtlas: a.range,
 			maskAtlas: a.mask,
+			photoParams: params,
 		};
 		const out: DrapeTileLayer[] = [];
 		for (const mesh of p.tiles) {
@@ -538,8 +645,10 @@ export class MultiDrapeLayer extends CompositeLayer<MultiDrapeLayerProps> {
 					outline: p.outline ?? 1,
 					reachM: p.reachM ?? 8000,
 					people: p.people ?? 1,
+					clear: p.clearAir !== false && p.photoParams ? 1 : 0,
 					textures,
 					version: p.atlasVersion ?? 0,
+					paramsVersion: p.paramsVersion ?? 0,
 				}),
 			);
 		}
@@ -589,6 +698,8 @@ function slotData(atlas: DrapeAtlas, k: number, p: DrapePhoto) {
 		[p.minRange, p.aspect, (p.vfov * Math.PI) / 180 / c.range[3], c.atlas],
 		28,
 	);
+	// atlas slot = row of this photo's photoParams texels
+	out[32] = k;
 	return out;
 }
 

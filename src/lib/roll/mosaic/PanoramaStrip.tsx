@@ -3,9 +3,11 @@
 // compass ruler, elevation ticks and outlines. Behind the photos, a 2D canvas draws the viewpoint's terrain
 // (DEM ridgelines traced from its eye, ridgelines.ts) in the same frame, so the view continues between
 // frames and the photos can be checked against the real skyline; peak names ride on the overlay.
-// Drag pans (wraps at 0/360), wheel zooms, click selects.
+// Drag pans (wraps at 0/360), wheel zooms (unless zoom={false}), click selects.
+
 import { Loader2, Maximize2, Mountain } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BRAND } from "#/brand/khipu";
 import type { Roll, RollPhoto } from "../types";
 import { PanoGL } from "./panoGL";
 import {
@@ -33,6 +35,10 @@ type Props = {
 	onSelect: (id: string | null) => void;
 	className?: string;
 	height?: number;
+	/** Size the strip's height to the photos at the fitted zoom, so the default view crops none of them. */
+	fitHeight?: boolean;
+	/** Wheel zoom. Off (landing page) the wheel and vertical swipes scroll the page; drag still pans. */
+	zoom?: boolean;
 };
 
 type Mode = number | "all";
@@ -64,7 +70,10 @@ export function PanoramaStrip({
 	onSelect,
 	className = "",
 	height = 300,
+	fitHeight = false,
+	zoom = true,
 }: Props) {
+	const [autoH, setAutoH] = useState<number | null>(null);
 	const wrapRef = useRef<HTMLDivElement>(null);
 	const bgRef = useRef<HTMLCanvasElement>(null);
 	const glRef = useRef<HTMLCanvasElement>(null);
@@ -317,21 +326,25 @@ export function PanoramaStrip({
 		const elMax = Math.max(...ms.map((m) => m.elMax));
 		const pad = 1.06;
 		// never wider than one turn, so nothing shows twice
-		const ppd = Math.max(
-			w / 360,
-			Math.min(
-				MAX_PPD,
-				w / (span * pad),
-				(h - RULER) / ((elMax - elMin) * pad),
-			),
-		);
+		const wFit = Math.max(w / 360, Math.min(MAX_PPD, w / (span * pad)));
+		const ppd = fitHeight
+			? wFit
+			: Math.max(
+					w / 360,
+					Math.min(
+						MAX_PPD,
+						w / (span * pad),
+						(h - RULER) / ((elMax - elMin) * pad),
+					),
+				);
+		if (fitHeight) setAutoH(Math.round(RULER + (elMax - elMin) * pad * ppd));
 		view.current = {
 			az0: start + span / 2 - w / ppd / 2,
 			elc: (elMin + elMax) / 2 + RULER / 2 / ppd,
 			ppd,
 		};
 		requestDraw();
-	}, [requestDraw]);
+	}, [requestDraw, fitHeight]);
 
 	// refit on a group switch (or when the strip goes from empty to shown); NOT on every time-filter
 	// step, which made the view jump while dragging the scrubber
@@ -378,15 +391,17 @@ export function PanoramaStrip({
 		if (!el) return;
 		let first = true;
 		const ro = new ResizeObserver(([e]) => {
+			const wChanged = e.contentRect.width !== size.current.w;
 			size.current = { w: e.contentRect.width, h: e.contentRect.height };
-			if (first) {
+			// fitHeight: the height follows the width, so a new width refits
+			if (first || (fitHeight && wChanged)) {
 				first = false;
 				fit();
 			} else requestDraw();
 		});
 		ro.observe(el);
 		return () => ro.disconnect();
-	}, [fit, requestDraw]);
+	}, [fit, requestDraw, fitHeight]);
 
 	// pointer → (az, el) and hit test (top-most first)
 	const pick = useCallback((x: number, y: number) => {
@@ -462,7 +477,7 @@ export function PanoramaStrip({
 	// non-passive wheel: zoom about the cursor
 	useEffect(() => {
 		const el = wrapRef.current;
-		if (!el) return;
+		if (!el || !zoom) return;
 		const onWheel = (e: WheelEvent) => {
 			e.preventDefault();
 			const r = el.getBoundingClientRect();
@@ -486,7 +501,7 @@ export function PanoramaStrip({
 		};
 		el.addEventListener("wheel", onWheel, { passive: false });
 		return () => el.removeEventListener("wheel", onWheel);
-	}, [requestDraw]);
+	}, [requestDraw, zoom]);
 
 	const hovered = hover
 		? roll.photos.find((p) => p.meta.id === hover.id)
@@ -531,7 +546,7 @@ export function PanoramaStrip({
 					}
 					className={`ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition ${
 						terrainOn
-							? "text-[var(--rigi-glow,#dca27a)] hover:bg-white/8"
+							? "text-[var(--rigi-glow)] hover:bg-white/8"
 							: "text-white/45 hover:bg-white/8 hover:text-white"
 					} ${terrainStatus === "none" ? "opacity-50" : ""}`}
 				>
@@ -555,9 +570,9 @@ export function PanoramaStrip({
 			<div
 				ref={wrapRef}
 				role="application"
-				aria-label="Panorama: drag to pan, wheel to zoom, click a photo to select it"
-				className="relative cursor-grab touch-none select-none active:cursor-grabbing"
-				style={{ height }}
+				aria-label={`Panorama: drag to pan${zoom ? ", wheel to zoom" : ""}, click a photo to select it`}
+				className={`relative cursor-grab select-none active:cursor-grabbing ${zoom ? "touch-none" : "touch-pan-y"}`}
+				style={{ height: (fitHeight && autoH) || height }}
 				onPointerDown={onPointerDown}
 				onPointerMove={onPointerMove}
 				onPointerUp={onPointerUp}
@@ -714,7 +729,7 @@ function drawOverlay(
 			outline(p, vpColor(p.viewpoint), 1);
 	g.globalAlpha = 1;
 	const sel = order.find((p) => p.meta.id === selectedId);
-	if (sel) outline(sel, "#dca27a", 2.5);
+	if (sel) outline(sel, BRAND.glow, 2.5);
 	const hov = order.find((p) => p.meta.id === hoverId);
 	if (hov) outline(hov, "#ffffff", 2);
 
@@ -755,7 +770,7 @@ function drawOverlay(
 		const x = Math.round(X(a));
 		const deg = ((Math.round(a) % 360) + 360) % 360;
 		const card = CARDINAL[deg];
-		g.fillStyle = card ? "#dca27a" : "rgba(255,255,255,0.55)";
+		g.fillStyle = card ? BRAND.glow : "rgba(255,255,255,0.55)";
 		g.fillRect(x, RULER - 7, 1, 6);
 		g.fillText(card ?? `${deg}°`, x, 12);
 	}

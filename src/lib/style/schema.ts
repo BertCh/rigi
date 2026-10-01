@@ -253,6 +253,11 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 		}),
 		projectionTint: obj({ color: hex, amount: unit }),
 		drapeHarmonize: unit,
+		clearAir: obj({
+			mode: en("off", "consistent", "fitted"),
+			amount: unit,
+			floor: num(0.05, 1),
+		}),
 		weather: {
 			k: "union",
 			tag: "mode",
@@ -305,6 +310,7 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 			blurPx: num(0, 20),
 			offsetY: num(-10, 10),
 			strokePx: num(0, 10),
+			adaptive: unit,
 		}),
 		leader: obj({
 			lengthPx: num(0, 100),

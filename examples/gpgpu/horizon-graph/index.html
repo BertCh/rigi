@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<!-- SPDX-FileCopyrightText: Copyright (c) Rigi contributors -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title>Horizon graph · luma.gl</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="scene" aria-label="360° skyline from the Niederhorn"></div>
+    <aside class="luma-example-infobox luma-example-infobox--overlay">
+      <div class="eyebrow">LUMA.GL GPGPU</div>
+      <h1>Horizon graph</h1>
+      <section class="control-card">
+        <h2>March</h2>
+        <label>
+          <span>Azimuth bins</span>
+          <select id="bins">
+            <option value="512">512</option>
+            <option value="1024">1024</option>
+            <option value="2048" selected>2048</option>
+            <option value="4096">4096</option>
+            <option value="8192">8192</option>
+          </select>
+        </label>
+        <label>
+          <span>Max distance <span id="max-distance-value">40 km</span></span>
+          <input id="max-distance" type="range" min="5" max="45" step="1" value="40">
+        </label>
+        <label>
+          <span>Heading</span>
+          <input id="heading" type="range" min="0" max="359" step="1" value="180">
+        </label>
+        <label>
+          <span>Field of view</span>
+          <input id="field-of-view" type="range" min="30" max="360" step="5" value="360">
+        </label>
+      </section>
+      <section class="control-card">
+        <h2>GPU vs CPU twin</h2>
+        <dl class="metrics">
+          <dt>Graph GPU</dt>
+          <dd id="gpu-time">–</dd>
+          <dt>CPU twin</dt>
+          <dd id="cpu-time">–</dd>
+          <dt>max |Δ|</dt>
+          <dd id="max-delta">–</dd>
+          <dt>Mismatched</dt>
+          <dd id="mismatched">–</dd>
+        </dl>
+      </section>
+      <section class="control-card">
+        <h2>GPUCommandGraph nodes</h2>
+        <table class="nodes">
+          <thead>
+            <tr>
+              <th>Node</th>
+              <th>GPU ms</th>
+            </tr>
+          </thead>
+          <tbody id="graph-nodes"></tbody>
+        </table>
+      </section>
+      <div id="status" class="hint" role="status">Starting…</div>
+      <p class="hint">
+        Terrain © <a href="https://mapterhorn.com/attribution">Mapterhorn</a> · Peaks ©
+        <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>
+        contributors
+      </p>
+    </aside>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

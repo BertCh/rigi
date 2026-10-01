@@ -24,13 +24,26 @@ import { webgpuAdapter } from "@luma.gl/webgpu";
 
 /**
  * Wraps an app-created GPUDevice as a luma Device (WebGPUAdapter.attach, luma #3313). Call the
- * adapter directly, not luma.attachDevice. `_ownsHandle: true` makes Device.destroy() destroy the
- * GPUDevice (releaseWhenIdle relies on it); false (default) leaves it alive, for ORT's device.
+ * adapter directly, not luma.attachDevice. `ownsHandle` makes Device.destroy() also destroy the
+ * GPUDevice (releaseWhenIdle relies on it); false leaves it alive, for ORT's device. We do this
+ * ourselves because #3313 dropped its `_ownsHandle` prop (b1728918): attached devices always
+ * belong to the app upstream, so passing the prop would silently leak on the npm release.
  */
-export const attachWebGPUDevice = (
+export const attachWebGPUDevice = async (
 	handle: GPUDevice,
 	props: DeviceProps = {},
-): Promise<Device> => webgpuAdapter.attach(handle, props);
+	ownsHandle = false,
+): Promise<Device> => {
+	const device = await webgpuAdapter.attach(handle, props);
+	if (ownsHandle) {
+		const destroy = device.destroy.bind(device);
+		device.destroy = () => {
+			destroy();
+			handle.destroy();
+		};
+	}
+	return device;
+};
 
 export type {
 	GPUCommandGraphComputeExecutable,

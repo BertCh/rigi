@@ -11,7 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BaselineRouteImport } from './routes/baseline'
+import { Route as LibraryRouteImport } from './routes/library'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as AtlasIndexRouteImport } from './routes/atlas.index'
+import { Route as AtlasConceptRouteImport } from './routes/atlas.$concept'
+import { Route as DevExportRollRouteImport } from './routes/dev.export-roll'
+import { Route as DevHowSceneRouteImport } from './routes/dev.how-scene'
 import { Route as LabDeckSplatsRouteImport } from './routes/lab.deck-splats'
 import { Route as LabDeckWebgpuRouteImport } from './routes/lab.deck-webgpu'
 import { Route as LabGenerateRouteImport } from './routes/lab.generate'
@@ -31,9 +36,34 @@ const BaselineRoute = BaselineRouteImport.update({
   path: '/baseline',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
   path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtlasIndexRoute = AtlasIndexRouteImport.update({
+  id: '/atlas/',
+  path: '/atlas/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtlasConceptRoute = AtlasConceptRouteImport.update({
+  id: '/atlas/$concept',
+  path: '/atlas/$concept',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevExportRollRoute = DevExportRollRouteImport.update({
+  id: '/dev/export-roll',
+  path: '/dev/export-roll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevHowSceneRoute = DevHowSceneRouteImport.update({
+  id: '/dev/how-scene',
+  path: '/dev/how-scene',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LabDeckSplatsRoute = LabDeckSplatsRouteImport.update({
@@ -80,7 +110,11 @@ const RollImportRoute = RollImportRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
+  '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
+  '/atlas/$concept': typeof AtlasConceptRoute
+  '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/how-scene': typeof DevHowSceneRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -88,12 +122,17 @@ export interface FileRoutesByFullPath {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
+  '/atlas/': typeof AtlasIndexRoute
   '/roll/': typeof RollIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
+  '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
+  '/atlas/$concept': typeof AtlasConceptRoute
+  '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/how-scene': typeof DevHowSceneRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -101,13 +140,18 @@ export interface FileRoutesByTo {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
+  '/atlas': typeof AtlasIndexRoute
   '/roll': typeof RollIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
+  '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
+  '/atlas/$concept': typeof AtlasConceptRoute
+  '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/how-scene': typeof DevHowSceneRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
   '/lab/generate': typeof LabGenerateRoute
@@ -115,6 +159,7 @@ export interface FileRoutesById {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
+  '/atlas/': typeof AtlasIndexRoute
   '/roll/': typeof RollIndexRoute
 }
 export interface FileRouteTypes {
@@ -122,7 +167,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/baseline'
+    | '/library'
     | '/upload'
+    | '/atlas/$concept'
+    | '/dev/export-roll'
+    | '/dev/how-scene'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -130,12 +179,17 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
+    | '/atlas/'
     | '/roll/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/baseline'
+    | '/library'
     | '/upload'
+    | '/atlas/$concept'
+    | '/dev/export-roll'
+    | '/dev/how-scene'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -143,12 +197,17 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
+    | '/atlas'
     | '/roll'
   id:
     | '__root__'
     | '/'
     | '/baseline'
+    | '/library'
     | '/upload'
+    | '/atlas/$concept'
+    | '/dev/export-roll'
+    | '/dev/how-scene'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
     | '/lab/generate'
@@ -156,13 +215,18 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
+    | '/atlas/'
     | '/roll/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BaselineRoute: typeof BaselineRoute
+  LibraryRoute: typeof LibraryRoute
   UploadRoute: typeof UploadRoute
+  AtlasConceptRoute: typeof AtlasConceptRoute
+  DevExportRollRoute: typeof DevExportRollRoute
+  DevHowSceneRoute: typeof DevHowSceneRoute
   LabDeckSplatsRoute: typeof LabDeckSplatsRoute
   LabDeckWebgpuRoute: typeof LabDeckWebgpuRoute
   LabGenerateRoute: typeof LabGenerateRoute
@@ -170,6 +234,7 @@ export interface RootRouteChildren {
   PhotoIdRoute: typeof PhotoIdRoute
   RollIdRoute: typeof RollIdRoute
   RollImportRoute: typeof RollImportRoute
+  AtlasIndexRoute: typeof AtlasIndexRoute
   RollIndexRoute: typeof RollIndexRoute
 }
 
@@ -189,11 +254,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BaselineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/upload': {
       id: '/upload'
       path: '/upload'
       fullPath: '/upload'
       preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/atlas/': {
+      id: '/atlas/'
+      path: '/atlas'
+      fullPath: '/atlas/'
+      preLoaderRoute: typeof AtlasIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/atlas/$concept': {
+      id: '/atlas/$concept'
+      path: '/atlas/$concept'
+      fullPath: '/atlas/$concept'
+      preLoaderRoute: typeof AtlasConceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/export-roll': {
+      id: '/dev/export-roll'
+      path: '/dev/export-roll'
+      fullPath: '/dev/export-roll'
+      preLoaderRoute: typeof DevExportRollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/how-scene': {
+      id: '/dev/how-scene'
+      path: '/dev/how-scene'
+      fullPath: '/dev/how-scene'
+      preLoaderRoute: typeof DevHowSceneRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lab/deck-splats': {
@@ -258,7 +358,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BaselineRoute: BaselineRoute,
+  LibraryRoute: LibraryRoute,
   UploadRoute: UploadRoute,
+  AtlasConceptRoute: AtlasConceptRoute,
+  DevExportRollRoute: DevExportRollRoute,
+  DevHowSceneRoute: DevHowSceneRoute,
   LabDeckSplatsRoute: LabDeckSplatsRoute,
   LabDeckWebgpuRoute: LabDeckWebgpuRoute,
   LabGenerateRoute: LabGenerateRoute,
@@ -266,6 +370,7 @@ const rootRouteChildren: RootRouteChildren = {
   PhotoIdRoute: PhotoIdRoute,
   RollIdRoute: RollIdRoute,
   RollImportRoute: RollImportRoute,
+  AtlasIndexRoute: AtlasIndexRoute,
   RollIndexRoute: RollIndexRoute,
 }
 export const routeTree = rootRouteImport

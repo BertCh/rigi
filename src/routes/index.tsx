@@ -1,281 +1,389 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+	ArrowDown,
+	ArrowRight,
+	Cpu,
+	Database,
 	GalleryHorizontalEnd,
-	Layers,
-	Map as MapIcon,
-	Sparkles,
-	Upload,
-	Wrench,
+	Globe,
+	ImageIcon,
+	ShieldCheck,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { RigiMark } from "#/brand/RigiMark";
-import { RigiPanorama, VEX } from "#/brand/RigiPanorama";
-import { photos, regionNames } from "#/lib/photos";
-import type { LocalPhotoSummary } from "#/lib/upload";
+import { type ReactNode, useEffect, useState } from "react";
+import { Compare } from "#/components/site/Compare";
+import { DemoPanorama, useDemoRoll } from "#/components/site/DemoRollViews";
+import { FadeIn } from "#/components/site/FadeIn";
+import { HowItWorksScene } from "#/components/site/how/HowItWorksScene";
+import { LandscapeView } from "#/components/site/LandscapeView";
+import { LiveRollMap } from "#/components/site/LiveRollMap";
+import { RevealLoop } from "#/components/site/RevealLoop";
+import { SITE_THEME, SiteNav } from "#/components/site/SiteNav";
+import { StepInsideDemo } from "#/components/site/StepInsideDemo";
+import { TopoBoard } from "#/components/site/TopoBoard";
+import type { DemoManifest } from "#/lib/demo";
 
+// The landing page, one scroll: the sample trip (src/lib/demo, a real day on Niederhorn) shows the
+// features live (before/after, the overlay reveal, the photos on the topo map, the roll draped in
+// 3D), then the local-only angle, then the pitch split evenly between one photo and a whole roll.
 export const Route = createFileRoute("/")({ component: Home });
 
-const tools = [
+const local = [
 	{
-		to: "/roll",
-		title: "Camera rolls",
-		body: "A whole day’s photos at once: mosaic, per-spot panoramas and every photo draped on the 3D terrain.",
+		icon: ShieldCheck,
+		title: "No upload",
+		body: "Photos are decoded and stored in this browser. No account is needed.",
 	},
 	{
-		to: "/baseline",
-		title: "Georeferencing baseline",
-		body: "Core CPU pipeline: horizon, skyline detection, pose solve and peak matching.",
-	},
-] as const;
-
-const modes = [
-	{
-		icon: Layers,
-		title: "Overlay",
-		body: "Contours, elevation bands, ridgelines, peak names and hiking trails drawn from the camera’s exact viewpoint.",
+		icon: Cpu,
+		title: "Local computation",
+		body: "Skyline detection, terrain matching and rendering run in Web Workers and on your GPU, through luma.gl and its arisia.gl compute layer. Bring your own lens.",
 	},
 	{
-		icon: Sparkles,
-		title: "Blend",
-		body: "Swap parts of the photo for a 3D satellite or topo map with a lens, a swipe, a distance cut-off or a brush.",
+		icon: Database,
+		title: "Local storage",
+		body: "Photos and camera poses are kept in browser storage. Deleting a photo removes it.",
 	},
 	{
-		icon: MapIcon,
-		title: "In map",
-		body: "Project the photo onto 3D terrain, orbit around it, then fly back into the photographer’s viewpoint.",
+		icon: Globe,
+		title: "Public data only",
+		body: "Elevation, maps, peaks and trails are downloaded for the area in view. Nothing about you is sent.",
 	},
 ];
 
 function Home() {
-	const groups = Object.entries(
-		photos.reduce<Record<string, typeof photos>>((acc, p) => {
-			acc[p.region] ??= [];
-			acc[p.region].push(p);
-			return acc;
-		}, {}),
-	);
-	const local = useLocalPhotos();
+	const demo = useDemo();
+	const roll = useDemoRoll();
 	return (
-		<main className="min-h-dvh bg-[var(--rigi-ink)] pb-16 text-[var(--rigi-paper)] [--rigi-glow:#dca27a] [--rigi-ink:#0e1012] [--rigi-paper:#ece6da]">
-			<nav className="mx-auto flex max-w-6xl items-center justify-between px-4 pt-6 sm:px-8">
-				<Link to="/" className="flex items-center gap-2.5">
-					<RigiMark className="size-7" />
-					<span className="text-[17px] font-semibold tracking-[-0.01em]">
-						Rigi
-					</span>
-				</Link>
-				<Link
-					to="/upload"
-					className="text-xs font-medium text-white/55 transition hover:text-[var(--rigi-paper)]"
-				>
-					Upload a photo
-				</Link>
-			</nav>
-			<figure className="mt-6">
-				<RigiPanorama className="h-[clamp(220px,25vw,340px)] w-full text-[var(--rigi-paper)]" />
-				<figcaption className="mx-auto flex max-w-6xl flex-wrap justify-between gap-x-6 gap-y-1 px-4 pt-3 font-mono text-[10.5px] text-white/35 sm:px-8">
-					<span>
-						View south from Rigi Kulm · 1797 m
-						<span className="hidden sm:inline"> · 47.0567° N 8.4853° E</span>
-					</span>
-					<span>
-						swissALTI3D via Mapterhorn · peaks © OpenStreetMap · vertical ×{VEX}
-					</span>
-				</figcaption>
-			</figure>
-			<header className="mx-auto max-w-6xl px-4 pt-14 pb-10 sm:px-8">
-				<h1 className="max-w-3xl text-3xl leading-[1.1] font-semibold tracking-[-0.02em] sm:text-[2.6rem]">
-					Mountain photos, placed in the terrain they show.
-				</h1>
-				<p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-white/55">
-					Each photo is placed from its GPS position, compass heading, gravity
-					sensor and lens. The skyline is then matched against a 3D elevation
-					model, and that one camera model powers three ways to combine the
-					photo with map data.
-				</p>
-				<div className="mt-10 grid gap-px overflow-hidden rounded-xl bg-white/8 ring-1 ring-white/8 sm:grid-cols-3">
-					{modes.map((m) => (
-						<div key={m.title} className="bg-[var(--rigi-ink)] p-5">
-							<m.icon
+		<main className={`${SITE_THEME} overflow-x-clip pb-10`}>
+			<SiteNav />
+
+			{/* hero */}
+			<header className="mx-auto grid max-w-6xl items-center gap-10 px-4 pt-12 pb-20 sm:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:pt-16">
+				<FadeIn>
+					<p className="mb-4 font-mono text-[11px] tracking-[0.18em] text-[var(--rigi-glow)] uppercase">
+						Photo-to-terrain alignment, in the browser
+					</p>
+					<h1 className="text-[2.2rem] leading-[1.05] font-semibold tracking-[-0.025em] sm:text-5xl">
+						Mountain photos, aligned to a terrain model.
+					</h1>
+					<p className="mt-5 max-w-lg text-[15px] leading-relaxed text-white/60">
+						Rigi estimates where a photo was taken and where the camera pointed
+						by matching its skyline to a 3D elevation model. With the pose
+						known, peaks, contours and trails can be drawn into the image.
+					</p>
+					<div className="mt-8 flex flex-wrap items-center gap-3">
+						<a
+							href="#start"
+							className="inline-flex items-center gap-2 rounded-lg bg-[var(--rigi-glow)] px-4 py-2.5 text-sm font-semibold text-[var(--rigi-ink)] hover:brightness-110"
+						>
+							Try it with your photos <ArrowRight className="size-4" />
+						</a>
+						<a
+							href="#story"
+							className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white/70 ring-1 ring-white/15 hover:text-[var(--rigi-paper)] hover:ring-white/30"
+						>
+							See an example <ArrowDown className="size-4" />
+						</a>
+					</div>
+				</FadeIn>
+				<FadeIn delay={150}>
+					<figure>
+						<Compare
+							before="/demo/photos/demo-09.jpg"
+							after="/demo/shots/hero.jpg"
+							alt="A photo from Niederhorn with the Bernese Alps' peaks named"
+							aspect={4 / 3}
+							className="rounded-xl ring-1 ring-white/10"
+						/>
+						<figcaption className="mt-2.5 font-mono text-[10.5px] text-white/40">
+							Niederhorn, Lake Thun · iPhone photo · drag to compare
+						</figcaption>
+					</figure>
+				</FadeIn>
+			</header>
+
+			{/* the overlay reveal */}
+			<Story
+				id="story"
+				eyebrow="01 · Single photo"
+				title="Map data, drawn into the photo."
+				body="Once the camera pose is solved, contours, ridgelines and peak names are projected from the terrain model into the image."
+				cta={{ to: "demo-01", label: "Open this photo" }}
+			>
+				<RevealLoop
+					photo="/demo/photos/demo-01.jpg"
+					overlay="/demo/shots/demo-01-overlay.jpg"
+					alt="Contours, ridgelines and peak names blooming out over Lake Thun"
+					aspect={4 / 3}
+					className="rounded-2xl ring-1 ring-white/10"
+				/>
+			</Story>
+
+			{/* the panorama */}
+			<Story
+				eyebrow="02 · Panorama"
+				bleed
+				title="Twelve photos from one viewpoint."
+				body="Each photo is placed by its solved view direction, against the skyline computed from the elevation model. Gaps are filled with rendered terrain."
+			>
+				<LandscapeView>
+					{roll ? (
+						<DemoPanorama roll={roll} />
+					) : (
+						<div className="h-[380px] rounded-xl bg-white/[0.03] ring-1 ring-white/10" />
+					)}
+				</LandscapeView>
+			</Story>
+
+			{/* the topo board */}
+			<Story
+				eyebrow="03 · Map"
+				title="Positions and view directions."
+				body="Each photo is shown where it was taken, with the direction it faced. Click one to open it."
+			>
+				{demo ? (
+					<TopoBoard
+						demo={demo}
+						className="h-[min(640px,75vh)] rounded-2xl ring-1 ring-white/10"
+					/>
+				) : (
+					<div className="h-[min(640px,75vh)] rounded-2xl bg-white/[0.03] ring-1 ring-white/10" />
+				)}
+			</Story>
+
+			{/* the live roll map */}
+			<Story
+				eyebrow="04 · 3D"
+				title="Photos projected onto the terrain."
+				body="Each photo is draped onto the slopes visible in it. This view renders live in your browser. Drag to orbit, click a pin to enter a photo."
+			>
+				<LiveRollMap
+					poster="/demo/shots/drape.jpg"
+					className="aspect-[16/10] max-h-[78vh] w-full rounded-2xl ring-1 ring-white/10"
+				/>
+			</Story>
+
+			{/* step inside */}
+			<Story
+				eyebrow="05 · Step inside"
+				title="Walk into the photo."
+				body="The hiker, the hut and the lift pylon in front of the camera become 3D splats, placed on the terrain by the solved pose. Beyond the photo's frame, Google's photorealistic 3D tiles carry the view on. Drag to look around."
+			>
+				<StepInsideDemo className="aspect-[16/9] max-h-[78vh] w-full rounded-2xl ring-1 ring-white/10" />
+			</Story>
+
+			{/* how */}
+			<Story
+				id="how"
+				eyebrow="06 · Method"
+				title="Guess, measure, correct, snap."
+				body="A phone records position, heading and tilt. The heading is often off by several degrees, which is too much to identify peaks reliably. Rigi renders the expected skyline from the elevation model and adjusts the camera until the rendered and photographed skylines match."
+			>
+				<HowItWorksScene />
+			</Story>
+
+			{/* local */}
+			<Story
+				eyebrow="07 · Data"
+				title="Processing is local."
+				body="Every step shown above ran in this tab. Your own photos are processed the same way and stay on your device."
+			>
+				<div className="grid gap-px overflow-hidden rounded-2xl bg-white/8 ring-1 ring-white/8 sm:grid-cols-2 lg:grid-cols-4">
+					{local.map((f) => (
+						<div key={f.title} className="bg-[var(--rigi-ink)] p-5">
+							<f.icon
 								className="mb-3 size-4 text-[var(--rigi-glow)]"
 								strokeWidth={1.5}
 							/>
-							<h2 className="text-sm font-semibold">{m.title}</h2>
+							<h3 className="text-sm font-semibold">{f.title}</h3>
 							<p className="mt-1.5 text-xs leading-relaxed text-white/50">
-								{m.body}
+								{f.body}
 							</p>
 						</div>
 					))}
 				</div>
-				<Link
-					to="/upload"
-					data-testid="upload-card"
-					className="group mt-3 flex items-center gap-4 rounded-xl p-4 ring-1 ring-white/10 transition hover:bg-white/[0.03] hover:ring-[var(--rigi-glow)]/50"
-				>
-					<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--rigi-glow)]/12 text-[var(--rigi-glow)]">
-						<Upload className="size-5" strokeWidth={1.5} />
-					</span>
-					<span className="min-w-0 flex-1">
-						<span className="block text-sm font-semibold">
-							Upload your photo
-						</span>
-						<span className="mt-0.5 block text-xs leading-relaxed text-white/50">
-							JPEG, HEIC, PNG, WebP or AVIF from any phone or camera. It stays
-							in this browser; GPS, compass and lens come from the EXIF, and you
-							can pin the position on a map if GPS is missing.
-						</span>
-					</span>
-					<span className="text-xs font-medium text-white/50 transition group-hover:text-[var(--rigi-glow)]">
-						Upload →
-					</span>
-				</Link>
-				<Link
-					to="/roll"
-					data-testid="roll-card"
-					className="group mt-3 flex items-center gap-4 rounded-xl p-4 ring-1 ring-white/10 transition hover:bg-white/[0.03] hover:ring-[var(--rigi-glow)]/50"
-				>
-					<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--rigi-glow)]/12 text-[var(--rigi-glow)]">
-						<GalleryHorizontalEnd className="size-5" strokeWidth={1.5} />
-					</span>
-					<span className="min-w-0 flex-1">
-						<span className="block text-sm font-semibold">Camera rolls</span>
-						<span className="mt-0.5 block text-xs leading-relaxed text-white/50">
-							See a whole day's photos at once: a mosaic, panoramas stitched
-							from each spot, and every photo draped on the 3D terrain.
-						</span>
-					</span>
-					<span className="text-xs font-medium text-white/50 transition group-hover:text-[var(--rigi-glow)]">
-						Open →
-					</span>
-				</Link>
-			</header>
-			{local.length > 0 && (
-				<section
-					className="mx-auto max-w-6xl px-4 pb-10 sm:px-8"
-					data-testid="local-photos"
-				>
-					<h2 className="mb-4 text-sm font-semibold text-white/70">
-						Your uploads{" "}
-						<span className="text-white/35">
-							· {local.length} on this device
-						</span>
-					</h2>
-					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-						{local.map((p) => (
-							<Link
-								key={p.id}
-								to="/photo/$id"
-								params={{ id: p.id }}
-								className="group overflow-hidden rounded-xl bg-white/[0.04] ring-1 ring-white/8 transition hover:ring-[var(--rigi-glow)]/50"
-							>
-								<div className="aspect-[4/3] overflow-hidden bg-black">
-									{p.thumbUrl && (
-										<img
-											src={p.thumbUrl}
-											alt={p.id}
-											loading="lazy"
-											className="size-full object-cover transition duration-500 group-hover:scale-[1.03]"
-										/>
-									)}
-								</div>
-								<div className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] text-white/55">
-									<span
-										className="truncate font-mono"
-										title={p.meta.local?.fileName}
-									>
-										{p.meta.local?.fileName || p.id}
-									</span>
-									<span className="shrink-0">
-										{p.meta.heading == null
-											? "no compass"
-											: `${Math.round(p.meta.heading)}°`}
-										{p.meta.alt != null && ` · ${Math.round(p.meta.alt)} m`}
-									</span>
-								</div>
-							</Link>
-						))}
-					</div>
-				</section>
-			)}
-			{groups.map(([region, list]) => (
-				<section key={region} className="mx-auto max-w-6xl px-4 pb-10 sm:px-8">
-					<h2 className="mb-4 text-sm font-semibold text-white/70">
-						{regionNames[region] ?? region}{" "}
-						<span className="text-white/35">· {list.length} photos</span>
-					</h2>
-					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-						{list.map((p) => (
-							<Link
-								key={p.id}
-								to="/photo/$id"
-								params={{ id: p.id }}
-								className="group overflow-hidden rounded-xl bg-white/[0.04] ring-1 ring-white/8 transition hover:ring-[var(--rigi-glow)]/50"
-							>
-								<div className="aspect-[4/3] overflow-hidden bg-black">
-									<img
-										src={p.src}
-										alt={p.id}
-										loading="lazy"
-										className="size-full object-cover transition duration-500 group-hover:scale-[1.03]"
-									/>
-								</div>
-								<div className="flex items-center justify-between px-3 py-2 text-[11px] text-white/55">
-									<span className="font-mono">{p.id}</span>
-									<span>
-										{Math.round(p.heading ?? 0)}° · {p.f35} mm ·{" "}
-										{Math.round(p.alt ?? 0)} m
-									</span>
-								</div>
-							</Link>
-						))}
-					</div>
-				</section>
-			))}
+			</Story>
+
+			{/* the pitch: one photo or the whole roll */}
 			<section
-				className="mx-auto max-w-6xl px-4 pb-10 sm:px-8"
-				data-testid="tools"
+				id="start"
+				className="mx-auto max-w-6xl scroll-mt-8 px-4 pt-6 pb-16 sm:px-8"
+				data-testid="pitch"
 			>
-				<h2 className="mb-4 text-sm font-semibold text-white/70">
-					<Wrench
-						className="mr-1.5 inline size-3.5 text-[var(--rigi-glow)]"
-						strokeWidth={1.5}
-					/>{" "}
-					Tools
-				</h2>
-				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-					{tools.map((t) => (
-						<a
-							key={t.to}
-							href={t.to}
-							className="rounded-xl bg-white/[0.04] p-4 ring-1 ring-white/8 transition hover:bg-white/[0.07] hover:ring-[var(--rigi-glow)]/50"
-						>
-							<span className="block text-sm font-semibold">{t.title}</span>
-							<span className="mt-1 block text-xs leading-relaxed text-white/55">
-								{t.body}
-							</span>
-							<span className="mt-2 block font-mono text-[11px] text-[var(--rigi-glow)]/70">
-								{t.to}
-							</span>
-						</a>
-					))}
+				<FadeIn>
+					<h2 className="text-center text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
+						Use your own photos.
+					</h2>
+					<p className="mx-auto mt-3 max-w-xl text-center text-sm leading-relaxed text-white/55">
+						A single photo, or a full camera roll.
+					</p>
+				</FadeIn>
+				<div className="mt-10 grid gap-4 md:grid-cols-2">
+					<FadeIn>
+						<Pitch
+							to="/upload"
+							testId="upload-card"
+							icon={ImageIcon}
+							title="One photo"
+							body="Add a photo to identify the peaks in it and overlay contours and trails."
+							points={[
+								"JPEG, HEIC, PNG, WebP, AVIF",
+								"Result in seconds",
+								"Export the annotated image",
+							]}
+							cta="Add a photo"
+						/>
+					</FadeIn>
+					<FadeIn delay={120}>
+						<Pitch
+							to="/roll/import"
+							testId="roll-card"
+							icon={GalleryHorizontalEnd}
+							title="A whole camera roll"
+							body="Import a hike or a trip. Photos are grouped by location, aligned together, and shown on the map and in 3D."
+							points={[
+								"Hundreds of photos per import",
+								"Panoramas per viewpoint",
+								"GeoJSON export",
+							]}
+							cta="Import a roll"
+						/>
+					</FadeIn>
 				</div>
+				<p className="mt-8 text-center text-xs text-white/45">
+					Returning?{" "}
+					<Link
+						to="/library"
+						className="text-[var(--rigi-glow)] hover:underline"
+					>
+						Open library →
+					</Link>
+				</p>
 			</section>
+
+			<footer className="mx-auto max-w-6xl border-t border-white/8 px-4 pt-6 font-mono text-[10.5px] leading-relaxed text-white/35 sm:px-8">
+				Elevation via Mapterhorn · maps © swisstopo · peaks and trails ©
+				OpenStreetMap contributors · imagery credited in the app.
+			</footer>
 		</main>
 	);
 }
 
-/** Uploads stored in this browser (IndexedDB). Loaded after mount, so SSR and the bundled gallery never wait on it. */
-function useLocalPhotos() {
-	const [list, setList] = useState<LocalPhotoSummary[]>([]);
+function Story({
+	id,
+	eyebrow,
+	title,
+	body,
+	cta,
+	bleed = false,
+	children,
+}: {
+	id?: string;
+	/** children run edge to edge (a hair of padding), the heading stays in the column */
+	bleed?: boolean;
+	eyebrow: string;
+	title: string;
+	body: string;
+	cta?: { to: string; label: string };
+	children: ReactNode;
+}) {
+	return (
+		<section
+			id={id}
+			className="mx-auto max-w-6xl scroll-mt-8 px-4 pb-28 sm:px-8"
+		>
+			<FadeIn>
+				<p className="mb-3 font-mono text-[11px] tracking-[0.18em] text-[var(--rigi-glow)] uppercase">
+					{eyebrow}
+				</p>
+				<div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+					<div className="max-w-2xl">
+						<h2 className="text-3xl leading-tight font-semibold tracking-[-0.02em] sm:text-4xl">
+							{title}
+						</h2>
+						<p className="mt-3 text-[15px] leading-relaxed text-white/55">
+							{body}
+						</p>
+					</div>
+					{cta && (
+						<Link
+							to="/photo/$id"
+							params={{ id: cta.to }}
+							className="inline-flex items-center gap-1 text-xs font-medium text-[var(--rigi-glow)]/80 hover:text-[var(--rigi-glow)]"
+						>
+							{cta.label} <ArrowRight className="size-3.5" />
+						</Link>
+					)}
+				</div>
+			</FadeIn>
+			<FadeIn className="mt-8" delay={120}>
+				{bleed ? (
+					<div className="relative left-1/2 w-[calc(100vw-12px)] -translate-x-1/2">
+						{children}
+					</div>
+				) : (
+					children
+				)}
+			</FadeIn>
+		</section>
+	);
+}
+
+function Pitch({
+	to,
+	testId,
+	icon: Icon,
+	title,
+	body,
+	points,
+	cta,
+}: {
+	to: "/upload" | "/roll/import";
+	testId: string;
+	icon: typeof ImageIcon;
+	title: string;
+	body: string;
+	points: string[];
+	cta: string;
+}) {
+	return (
+		<Link
+			to={to}
+			data-testid={testId}
+			className="group flex h-full flex-col rounded-2xl bg-white/[0.03] p-6 ring-1 ring-white/10 transition hover:bg-white/[0.05] hover:ring-[var(--rigi-glow)]/50"
+		>
+			<span className="flex size-11 items-center justify-center rounded-xl bg-[var(--rigi-glow)]/12 text-[var(--rigi-glow)]">
+				<Icon className="size-5" strokeWidth={1.5} />
+			</span>
+			<span className="mt-5 text-lg font-semibold">{title}</span>
+			<span className="mt-2 text-sm leading-relaxed text-white/55">{body}</span>
+			<ul className="mt-4 flex-1 space-y-1.5 text-xs text-white/50">
+				{points.map((p) => (
+					<li key={p} className="flex items-center gap-2">
+						<span className="size-1 rounded-full bg-[var(--rigi-glow)]" />
+						{p}
+					</li>
+				))}
+			</ul>
+			<span className="mt-6 inline-flex w-fit items-center gap-1.5 rounded-lg bg-[var(--rigi-glow)] px-3.5 py-2 text-sm font-semibold text-[var(--rigi-ink)] transition group-hover:brightness-110">
+				{cta} <ArrowRight className="size-4" />
+			</span>
+		</Link>
+	);
+}
+
+/** The sample trip's manifest, fetched after mount (the page itself stays static). */
+function useDemo() {
+	const [m, setM] = useState<DemoManifest | null>(null);
 	useEffect(() => {
 		let live = true;
-		import("#/lib/upload")
-			.then((m) => m.listLocalPhotos())
-			.then((l) => live && setList(l))
+		import("#/lib/demo")
+			.then((d) => d.loadDemo())
+			.then((x) => live && setM(x))
 			.catch(() => {});
 		return () => {
 			live = false;
 		};
 	}, []);
-	return list;
+	return m;
 }

@@ -215,7 +215,7 @@ Samples in `out/lead/export/`, using the IMG_7131 prior pose:
 - **Google Earth rendering not checked:** the KML angles are derived from the KML reference and checked against an independent rotation built from that reference, but I did not open them in Google Earth.
   - One thing to confirm in Google Earth Pro: whether it honours `<Camera><roll>` when placing the PhotoOverlay rectangle, or only when flying to the view. If it only uses roll for flying, set `<rotation>` = roll as well.
   - Roll is below 1° for most photos, so the practical effect is small.
-- **Geoid:** there is no geoid model. ECEF is only truly ellipsoidal when the caller passes `geoidUndulation`. Everything else (KML absolute altitude, XMP GPSAltitude, `altMsl`) is correctly MSL.
+- **Geoid:** the export layer has no geoid model of its own. ECEF is only truly ellipsoidal when the caller passes `geoidUndulation`, and the app's ExportMenu doesn't pass it yet, so app exports are ~50 m low in ECEF and XMP `AltitudeEllipsoid` ([code review](../../../reports/code-review-2026-09-30.md) CR-04; `src/lib/tiles3d/geoid.ts` has an EGM2008 grid to use). Everything else (KML absolute altitude, XMP GPSAltitude, `altMsl`) is correctly MSL.
 - **FOV wedge:** it is the horizontal FOV about the yaw bearing and ignores roll and pitch. The footprint is a per-column near/far outline, so it can be ragged across occluded valleys. It is not a true viewshed.
 - **Hidden peaks:** only peaks the caller marks visible are exported, unless `includeHiddenPeaks` is set.
 - **ZIP limits:** the writer is store-only with no ZIP64, so it handles up to 65535 entries and 4 GiB. That is fine for KMZ.

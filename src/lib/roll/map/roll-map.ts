@@ -43,6 +43,7 @@ import { vpColor } from "../mosaic/style";
 import type { Roll, RollPhoto } from "../types";
 import { basemapLook, basemapSource, type RollBasemap } from "./basemap";
 import { DrapeAtlas, MAX_PHOTOS } from "./drape-atlas";
+import { DrapeClear } from "./drape-clear";
 import { type DrapePhoto, MultiDrapeLayer } from "./multi-drape-layer";
 import { RangeGpu } from "./range-gpu";
 import { loadRollTerrain } from "./roll-terrain";
@@ -95,6 +96,8 @@ export type RollMapOptions = {
 	onView?: (photoId: string | null) => void;
 	/** A photo joined the drape (count so far). */
 	onDrape?: (n: number) => void;
+	/** Distance (m) of the first overview, instead of frameOverview's default. */
+	overviewM?: number;
 	/**
 	 * Range maps go into the drape atlas on the GPU (default true): the geometry target is copied
 	 * into its atlas cell and max-pooled there (./range-gpu.ts), and only the coarse cull grid is
@@ -147,6 +150,8 @@ export class RollMapEngine {
 	private draped = 0;
 	private drapePhotos: DrapePhoto[] = [];
 	private drapeKey = "";
+	/** Per-photo clear air + exposure (./drape-clear.ts): the drape's params texture. */
+	private clear = new DrapeClear(() => this.atlasChanged());
 	private selected: string | null = null;
 	private visible: ReadonlySet<string> | null = null;
 	private flying: Placed | null = null;
@@ -178,6 +183,8 @@ export class RollMapEngine {
 	private extraLayers = new Map<string, unknown[]>();
 	settings = {
 		drapeOpacity: 1,
+		/** Per-photo clear air, exposure gains and clearer-view weighting in the drape. */
+		clearAir: true,
 		sharpness: 3,
 		gizmos: true,
 		reachM: 8000,
@@ -235,7 +242,7 @@ export class RollMapEngine {
 		const set = await this.startStreaming();
 		if (!set || this.disposed) return;
 		this.placePhotos(set);
-		this.frameOverview();
+		this.frameOverview(this.opts.overviewM);
 		await this.ready;
 		if (this.disposed) return;
 		this.makeAtlas();
@@ -323,6 +330,7 @@ export class RollMapEngine {
 					status?.({ stage: "photos", frac: ++done / n });
 					if (!px || this.disposed) return px?.close();
 					if (thumb) this.thumbs.set(p.meta.id, thumb);
+					this.clear.setPixels(p.meta.id, px);
 					this.pixels.set(p.meta.id, px);
 					await this.uploadPhoto(p.meta.id);
 				}),
@@ -353,6 +361,11 @@ export class RollMapEngine {
 			}),
 		);
 		for (const [k, p] of photos.entries()) this.slot.set(p.meta.id, k);
+		this.clear.setEnabled(this.settings.clearAir);
+		this.clear.init(
+			device,
+			photos.map((p) => p.meta.id),
+		);
 		// whatever arrived before the GPU was up
 		for (const id of this.pixels.keys()) void this.uploadPhoto(id);
 		for (const [id, m] of this.masks)
@@ -521,6 +534,7 @@ export class RollMapEngine {
 			const gpu = this.rangeGpu;
 			const t0 = performance.now();
 			if (gpu.ok && src.drawOnly(p.pose)) {
+				const drawSeq = src.drawSeq;
 				const coarse = await gpu.coarse(src.texture, w, h, () => this.disposed);
 				if (this.disposed) return "disposed";
 				if (p.rev !== rev) return "moved";
@@ -532,6 +546,14 @@ export class RollMapEngine {
 					s.wallMs += performance.now() - t0;
 					s.mainMs += coarse.mainMs + performance.now() - t1;
 					s.bytesDown += coarse.bytes;
+					// clear air fits the photo on a decimated copy of this range map: one more
+					// readback of the (still intact) target, only while clearAir is on
+					if (this.settings.clearAir && !this.clear.hasRange(p.id)) {
+						const ok = await src.readDrawn(drawSeq, p.pose);
+						if (this.disposed) return "disposed";
+						if (p.rev !== rev) return "moved";
+						if (ok) this.clearRange(p, src.range, w, h);
+					}
 					return "done";
 				}
 			}
@@ -542,7 +564,9 @@ export class RollMapEngine {
 		if (this.disposed) return "disposed";
 		if (p.rev !== rev) return "moved";
 		const t1 = performance.now();
-		this.atlas?.setRange(k, rangeMapFrom(src).data);
+		const map = rangeMapFrom(src).data;
+		this.atlas?.setRange(k, map);
+		if (this.settings.clearAir) this.clearRange(p, map, w, h);
 		const s = this.rangeStats.cpu;
 		s.photos++;
 		s.wallMs += performance.now() - t0;
@@ -556,6 +580,17 @@ export class RollMapEngine {
 		return "done";
 	}
 
+	/** Hand photo p's range map (row 0 = top, sky 0 or Infinity) to the clear-air fit. */
+	private clearRange(p: Placed, data: Float32Array, w: number, h: number) {
+		this.clear.setRange(
+			p.id,
+			{ pose: p.pose, eye: p.eye, aspect: p.aspect },
+			data,
+			w,
+			h,
+		);
+	}
+
 	/** People masks (#/lib/segment, cached per photo), one photo at a time. */
 	private async segmentAll() {
 		const n = this.roll.photos.length;
@@ -567,6 +602,7 @@ export class RollMapEngine {
 			const { segmentForeground } = await import("#/lib/segment");
 			const m = await segmentForeground(px);
 			this.masks.set(id, m);
+			this.clear.setForeground(id, m);
 			const k = this.slot.get(id);
 			if (this.atlas && k !== undefined && m) {
 				this.atlas.setMask(k, m);
@@ -589,8 +625,8 @@ export class RollMapEngine {
 
 	// ---------------- camera ----------------
 
-	/** Oblique overview of the whole roll from the south. */
-	frameOverview() {
+	/** Oblique overview of the whole roll from the south; `distM` overrides the default distance. */
+	frameOverview(distM?: number) {
 		const p0 = this.placed[0];
 		// WorldCamera.enter builds the OrbitControls; the framing is then replaced by the overview
 		this.world.setAspect(
@@ -602,13 +638,28 @@ export class RollMapEngine {
 		);
 		const c = this.world.controls;
 		if (!c) return;
-		const d = Math.max(7000, this.roll.radiusM * 2.6);
+		const d = distM ?? Math.max(7000, this.roll.radiusM * 2.6);
 		c.target.set(0, 0, this.centerZ);
 		this.world.cam.position.set(0, -d * 0.8, this.centerZ + d * 0.75);
 		c.update();
 		const was = this.flying;
 		this.flying = null;
 		if (was) this.opts.onView?.(null);
+		this.kick();
+	}
+
+	/**
+	 * Slowly orbit the overview (OrbitControls autoRotate, deg/s ≈ 6 × speed); null stops. Any drag on
+	 * the map stops it too. Used by the landing page's live map.
+	 */
+	setAutoRotate(speed: number | null) {
+		const c = this.world.controls;
+		if (!c) return;
+		c.autoRotate = speed != null;
+		if (speed != null) c.autoRotateSpeed = speed;
+		c.addEventListener("start", () => {
+			c.autoRotate = false;
+		});
 		this.kick();
 	}
 
@@ -734,7 +785,18 @@ export class RollMapEngine {
 	}
 
 	setSettings(s: Partial<RollMapEngine["settings"]>) {
+		const clearWas = this.settings.clearAir;
 		Object.assign(this.settings, s);
+		if (this.settings.clearAir !== clearWas) {
+			this.clear.setEnabled(this.settings.clearAir);
+			// range maps are only read back for the fit while it is on: fetch the missing ones
+			if (this.settings.clearAir && this.rangesStarted)
+				void this.enqueueRanges(
+					this.placed.filter(
+						(p) => this.slot.has(p.id) && !this.clear.hasRange(p.id),
+					),
+				);
+		}
 		this.updateLayers();
 	}
 
@@ -870,6 +932,9 @@ export class RollMapEngine {
 					sharpness: this.settings.sharpness,
 					reachM: this.settings.reachM,
 					people: this.settings.protectPeople ? 1 : 0,
+					photoParams: this.clear.texture,
+					paramsVersion: this.clear.version,
+					clearAir: this.settings.clearAir,
 				}),
 		];
 		const flyingIn = this.flying && w.flight;
@@ -1110,6 +1175,7 @@ export class RollMapEngine {
 		this.deck.finalize();
 		this.atlas?.destroy();
 		this.atlas = null;
+		this.clear.dispose();
 		this.rangeGpu?.destroy();
 		this.rangeGpu = null;
 		window.clearTimeout(this.atlasTimer);

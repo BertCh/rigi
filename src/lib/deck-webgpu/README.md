@@ -296,7 +296,7 @@ path; "in-app A/B" means compared inside the running engine against `/photo/<id>
 | `terrain.ts` TerrainCore | TerrainTileLayer | geometry, color | reference for batched | yes (`?terrain=tiles`) | — |
 | `layers/batched-terrain.ts` | batched-terrain-layer | geometry, color | 99.84–99.97 % identical px vs TerrainCore, reproj ≤ 0.053 px | yes (default) | CPU cull; needs float32-filterable |
 | `layers/terrain-styles.ts` | terrain-layer fs, look GLSL | (shading part) | 22/22 programs; hillshade ≤ 0.18 %, imagery ≤ 0.08 % vs CPU port of the GLSL | yes (overlay / replace styles) | atmosphere eye convention to confirm |
-| `layers/drape.ts` | projectPhoto / truth | (plugin) | Step Inside frame reproduces the photo; grazing acne 17.7 % → 0 % | world view screenshots | no pixel A/B of the world drape |
+| `layers/drape.ts` | projectPhoto / truth | (plugin) | Step Inside frame reproduces the photo; grazing acne 17.7 % → 0 % | world view screenshots | no pixel A/B of the world drape; `clearAir` module inverts the photo haze on the sample (world view only, look/clear-air.ts) |
 | `layers/trail.ts` | TrailLayer (LineSegments2) | color | position / width / occlusion / premul checks | yes (`&trails=1`) | class-1 normal write undecided |
 | `layers/composite.ts` | PhotoCompositor + composite shader | screen | ≤ 0.53/255 vs CPU copy of the GLSL, 20/20 cases | yes (export diff, see Measured) | interactive: colour pass 1× (below) |
 | `layers/ridges.ts` | composite ridges / skyline / ink | (WGSL lib) | 0 bad px, max err 1e-5 vs GLSL CPU port | via composite | texel-edge ties shift 1 row |
@@ -306,7 +306,7 @@ path; "in-app A/B" means compared inside the running engine against `/photo/<id>
 | `layers/splats.ts` | DeckSplatLayer + SplatColorPass | color (+ geometry class 2, off) | 0 px > 2/255 vs CPU model | not run (needs :8767 scene) | worker sort untested on WebGPU; smear gate unmeasured |
 | `layers/tiles3d.ts` | Tiles3DDeckLayer | color (+ geometry class 3, off) | 15/15 checks | not run (needs `?tiles3d=`) | class-3 default is a product call |
 | `layers/geometry-source.ts` | GpuGeometrySource (geometry-pass.ts) | geometry, off-frame | exact vs the frame pass; reproj 0.052 px | yes (queries, labels) | direct host only for the check |
-| `layers/multi-drape.ts` | /roll MultiDrapeLayer | color | median 1.2e-4 vs CPU copy of the GLSL | n/a (/roll stays WebGL) | only if /roll moves |
+| `layers/multi-drape.ts` | /roll MultiDrapeLayer | color | median 1.2e-4 vs CPU copy of the GLSL | n/a (/roll stays WebGL) | only if /roll moves; clear air + exposure via `setClearAir(DrapeClear.texture)` (unmeasured on GPU) |
 | `engine.ts` WebGpuEngine | DeckEngine | — | ranges identical to WebGL (median/p90 diff 0), 14/14 labels | lab + bench | see gaps |
 | `lab-engine.ts` + route | — | — | `engine-lab.mjs`: errors [] | — | — |
 

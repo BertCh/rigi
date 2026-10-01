@@ -3,10 +3,12 @@
 // a far blob behind a ridge) over a large terrain mesh drawn with logarithmicDepthBuffer, so occlusion in
 // both directions is visible. Query: ?n=200000&logdepth=1&truth=0&aa=1. A .splat-v1 or 3DGS .ply can be
 // loaded from the file input. Playwright hook: window.__splatLab (scripts/nearfield/splat-lab-check.mjs).
+
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { BRAND } from "#/brand/khipu";
 import { decodeGaussianPly, decodeSplatV1 } from "#/lib/nearfield/splat-io";
 import { ThreeSplats } from "#/lib/nearfield/three-splats";
 import { type GaussianCloud, PROVENANCE_CODE } from "#/lib/nearfield/types";
@@ -473,7 +475,7 @@ function SplatLab() {
 	if (!import.meta.env.DEV)
 		return <p style={{ padding: 16 }}>The splat lab is dev-only.</p>;
 	return (
-		<div style={{ position: "fixed", inset: 0, background: "#0e1012" }}>
+		<div style={{ position: "fixed", inset: 0, background: BRAND.ink }}>
 			<canvas
 				ref={canvasRef}
 				style={{ width: "100%", height: "100%", display: "block" }}
