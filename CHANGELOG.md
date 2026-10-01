@@ -4,6 +4,15 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### GPU graph paths on by default; WAG wave 3 (2026-10-01)
+
+- **Defaults flipped** (each flag still turns the path off): certified-f32 horizon and align (`horizonPrecision`, `alignPrecision` = `certified-f32`), `terrainGpuCull` = on, `terrainGpuDecode` = on. WebGL and `?gpu=off` keep the CPU paths.
+- Precision gate (`scripts/gpu/precision-gate.mjs`, 50 dev photos): INCONCLUSIVE by its bit-identity rule because the f64 baseline itself is not reproducible run to run (f64 vs f64 differs on 7/8 deck and 21/22 webgpu differing photos). GT-12 eval 12/12 identical in both modes; webgpu accepts 32 = 32; the deck "new accepts" are baseline noise (wc_0055) and a `loadFullTerrain` timeout on the initial terrain (wc_0052). Judged on quality, no difference, so certified-f32 became the default.
+- WebGpuEngine gains `loadFullTerrain`, `loadSatellite` and `renderPoseView` (same contract as DeckEngine). The matcher render worker and the precision gate run full terrain and the fused render arm on `MATCHER_RENDERER=webgpu`. Against deck: masks identical (IoU 1), horizon Δ0 over 1800 directions, autoAlign Δyaw/Δpitch 0, geometry p95 ≤ 2 cm. The matcher satellite drape uses ~250 MiB more VRAM on WebGPU. Parity harness in `deck-webgpu`.
+- Batched DEM height gathers from the resident height atlas: camera height, trails and peak snapping read heights on the GPU under `terrainGpuDecode`, bit-exact against `heightAt` (858 + 311 + 99 peaks and all trail vertices, 0 differences). Main-thread tile decodes at load 165–206 → 0. New core binding kind `texture-array`.
+- geo-query-gpu on persistent pool slots via the new `ComputeGraph.runNow` (unleased run for transient-free graphs): 0.39 → 0.34 ms (verdicts + skyline) and 0.285 → 0.25 ms (gather) per call, byte-identical.
+- Browser batch on e496c73: full tier 59 pass (graph-plumbing-ab only timed out in the lock queue; timeout raised to 3600 s), deck-smoke Δ0.00° WebGL vs WebGPU, eval-app 12/14 on both renderers, settle-submits confirms geo-query 2 → 1 submit per settle.
+
 ### Publication readiness (2026-10-01)
 
 - A fresh clone builds and type-checks without the gitignored data: `photos.json` falls back to an empty list, and `data/ground-truth.json` loads through an optional `import.meta.glob`. CI gains a `vite build` step, `permissions: contents: read` and a `master`-only push trigger; the tsc `ciAllowed` and Biome error baselines are now empty.
