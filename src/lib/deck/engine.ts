@@ -1003,6 +1003,8 @@ export class DeckEngine implements Renderer {
 	private streamerWedge?: ViewWedge;
 	/** loadFullTerrain: the streamer keeps refining all around the eye (setPose no longer narrows it). */
 	private fullWedge?: ViewWedge;
+	/** loadFullTerrain completed (the query terrain is the 360° set and the horizon re-traced). */
+	private fullTerrainDone = false;
 	/** renderPoseView in progress: the photo-view terrain layer drops its near discard. */
 	private poseView = false;
 
@@ -3181,6 +3183,21 @@ export class DeckEngine implements Renderer {
 	 */
 	// ---------------- offscreen pose renders (tools/matcher/server/render_worker.mjs) ----------------
 
+	/** renderer.ts retraceHorizon: the horizon re-traced under the current flags (precision gates). */
+	async retraceHorizon(): Promise<"fast" | "cpu" | null> {
+		await this.deckReady;
+		if (!this.horizonDirs || this.disposed) return null;
+		// as init (horizon-fast over the initial wedge) or as loadFullTerrain (the CPU horizon, 360° set)
+		if (!this.fullTerrainDone) {
+			this.fastHorizon?.dispose();
+			this.fastHorizon = this.startFastHorizon();
+		}
+		const dirs = await this.traceHorizon();
+		if (this.disposed) return null;
+		this.horizonDirs = dirs;
+		return this.horizonSource;
+	}
+
 	/**
 	 * The terrain all around the eye: the streamer's high-detail wedge becomes 360° (and stays so),
 	 * the CPU queries switch to the complete set, and the horizon is re-traced over 360°. The three.js
@@ -3188,7 +3205,9 @@ export class DeckEngine implements Renderer {
 	 * with the ms it took (0 when already done).
 	 */
 	async loadFullTerrain(timeoutMs = 300_000): Promise<number> {
-		if (this.fullWedge) return 0;
+		// done once it completed: a call that threw (timeout) leaves the wedge at 360°, and the retry
+		// waits for that wedge's set again (`already` below) instead of reporting success
+		if (this.fullTerrainDone) return 0;
 		const t0 = performance.now();
 		await this.deckReady;
 		const streamer = this.streamer;
@@ -3199,11 +3218,14 @@ export class DeckEngine implements Renderer {
 		clearTimeout(this.wedgeTimer);
 		const before = this.renderSet;
 		this.streamerWedge = w;
-		streamer.setWedge(w);
+		// the streamer already selected 360° (an unknown-heading photo's initial wedge, or a call that
+		// timed out): setWedge is a no-op and emits no new set, so the current one counts once complete
+		const already = !streamer.setWedge(w);
 		// a fresh, complete set (the streamer emits as tiles land; pending 0 = this wedge fully loaded)
 		for (;;) {
 			const set = this.renderSet;
-			if (set && set !== before && (set.stats?.pending ?? 0) === 0) break;
+			if (set && (set !== before || already) && (set.stats?.pending ?? 0) === 0)
+				break;
 			if (this.disposed) throw new Error("loadFullTerrain: disposed");
 			if (performance.now() - t0 > timeoutMs)
 				throw new Error("loadFullTerrain: timed out");
@@ -3219,6 +3241,7 @@ export class DeckEngine implements Renderer {
 		this.buildTrails();
 		this.invalidateGeometry();
 		this.horizonDirs = await this.traceHorizon();
+		this.fullTerrainDone = true;
 		return Math.round(performance.now() - t0);
 	}
 

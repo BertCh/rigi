@@ -140,6 +140,13 @@ export interface Renderer {
 	 * set, the horizon re-traced over 360°. Resolves with the ms it took (0 when already done).
 	 */
 	loadFullTerrain?(timeoutMs?: number): Promise<number>;
+	/**
+	 * Re-traces the horizon autoAlign reads under the current flags (?horizonPrecision, read live from
+	 * `__RIGI_FLAGS__`), as init traced it: horizon-fast over the initial wedge, or, after loadFullTerrain,
+	 * the CPU horizon over the 360° set. For gates that compare precision modes on one page and terrain.
+	 * Resolves with the source that produced it.
+	 */
+	retraceHorizon?(): Promise<"fast" | "cpu" | null>;
 	/** Satellite imagery for the render set's tiles within `maxDistM` of the eye (0 = all), fetched now. */
 	loadSatellite?(
 		maxDistM?: number,

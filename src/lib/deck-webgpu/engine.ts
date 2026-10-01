@@ -3789,6 +3789,21 @@ export class WebGpuEngine implements Renderer {
 	// =============================================================================================
 	// offscreen pose renders (tools/matcher/server/render_worker.mjs): deck/engine.ts contract
 
+	/** renderer.ts retraceHorizon: the horizon re-traced under the current flags (precision gates). */
+	async retraceHorizon(): Promise<"fast" | "cpu" | null> {
+		await this.ready;
+		if (!this.horizonDirs || this.disposed) return null;
+		// as init (horizon-fast over the initial wedge) or as loadFullTerrain (the CPU horizon, 360° set)
+		if (!this.fullTerrainDone) {
+			this.fastHorizon?.dispose();
+			this.fastHorizon = this.startFastHorizon();
+		}
+		const dirs = await this.traceHorizon();
+		if (this.disposed) return null;
+		this.horizonDirs = dirs;
+		return this.horizonSource;
+	}
+
 	/**
 	 * deck/engine.ts loadFullTerrain: the terrain all around the eye. The streamer's high-detail wedge
 	 * becomes 360° (and stays so: setPose no longer narrows it), the CPU queries switch to the complete
@@ -3807,14 +3822,13 @@ export class WebGpuEngine implements Renderer {
 		if (!streamer || !this.terrain || this.disposed)
 			throw new Error("loadFullTerrain: no terrain yet");
 		const w: ViewWedge = { headingDeg: this.prior.yaw, halfAngleDeg: 180 };
-		// the streamer already selects 360° (an unknown-heading photo's initial wedge): setWedge is a
-		// no-op and emits no new set, so the current one counts once it is complete
-		const already = (this.streamerWedge?.halfAngleDeg ?? 0) >= 180;
 		this.fullWedge = w;
 		clearTimeout(this.wedgeTimer);
 		const before = this.renderSet;
 		this.streamerWedge = w;
-		streamer.setWedge(w);
+		// the streamer already selected 360° (an unknown-heading photo's initial wedge, or a call that
+		// timed out): setWedge is a no-op and emits no new set, so the current one counts once complete
+		const already = !streamer.setWedge(w);
 		// a fresh, complete set (the streamer emits as tiles land; pending 0 = this wedge fully loaded)
 		for (;;) {
 			const set = this.renderSet;

@@ -29,6 +29,12 @@
 //   → {"id":3,"ok":true,"meta":{...},"runs":[{prior, pose, score, confidence, alternatives, ms}],"timing":{...}}
 //     (engine.autoAlign(true) once per prior, engine.prior swapped in memory; used by
 //      tools/bench/harness for multi-seed / 360° wrappers)
+//   align also takes "modes":[{name, horizonPrecision?, alignPrecision?}] and "settleMs"?: every mode runs
+//     all priors on the SAME page and terrain, its precision set through the page's live flag overrides
+//     (__RIGI_FLAGS__) and the horizon re-traced under it (engine.retraceHorizon); settleMs waits for the
+//     terrain stream to be idle that long before each mode. → reply "modes":{name:{runs, horizon:{hash,
+//     source, precision}, terrain:{tiles, generation, pending, ids}, terrainAfter, settledMs}}; "runs" =
+//     the first mode's (scripts/gpu/precision-gate.mjs)
 // Ad-hoc photos (not in public/photos/photos.json), on render and align:
 //   "adhoc": {"id":"bench-x","photoFile":"/abs/upright.jpg","meta":{lat,lon,alt,width,height,heading,
 //             pitch,roll,vfov,f35},"region":{...RegionData}|null}
@@ -55,6 +61,7 @@
 //                                       terrain on "fullTerrain" (meta.fullTerrainUnsupported: true).
 //   MATCHER_HORIZON_PRECISION=f64|certified-f32   → ?horizonPrecision= (src/lib/flags)
 //   MATCHER_ALIGN_PRECISION=f64|certified-f32     → ?alignPrecision=
+//   MATCHER_GPU_COMPUTE=1                         → WebGPU Chromium flags on the deck renderer too
 // Every reply's meta carries pageFlags (what the page was opened with, the engine that ran from
 // [data-renderer]); with a precision flag set, align runs also carry `precision` (the path each stage
 // actually took: lastAlignTiming / the fast horizon's stats), so a run whose certified path fell back
@@ -92,6 +99,10 @@ const PAGE_FLAGS = {
 const PRECISION_SET = !!(
 	PAGE_FLAGS.horizonPrecision || PAGE_FLAGS.alignPrecision
 );
+// MATCHER_GPU_COMPUTE=1: launch with the WebGPU flags on the deck renderer too, so the page has the
+// WebGPU compute device the certified-f32 stages need (scripts/gpu/precision-gate.mjs, whose modes set
+// the precision per call, after launch)
+const GPU_COMPUTE = process.env.MATCHER_GPU_COMPUTE === "1";
 const pageQuery = () => {
 	const q = new URLSearchParams({ renderer: PAGE_FLAGS.renderer });
 	if (PAGE_FLAGS.horizonPrecision)
@@ -124,7 +135,7 @@ async function getBrowser() {
 		headless: true,
 		// WebGPU pages (or a certified-f32 flag, which needs the WebGPU compute device) get the WebGPU flags
 		args:
-			PAGE_FLAGS.renderer !== "deck" || PRECISION_SET
+			PAGE_FLAGS.renderer !== "deck" || PRECISION_SET || GPU_COMPUTE
 				? (await import("../../../scripts/deck-webgpu/gpu-args.mjs")).GPU_ARGS
 				: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],
 	});
@@ -335,16 +346,23 @@ async function openPage(id, adhoc = null, key = id) {
 
 // Load the tiles outside the initial wedge and re-trace the 360° horizon (once per page). null: the engine
 // has no loadFullTerrain (an engine build without the hook); the page keeps its initial terrain.
-async function ensureFullTerrain(page) {
-	return page.evaluate(async () => {
-		const e = window.__engine;
-		if (typeof e.loadFullTerrain !== "function") return null;
-		if (e.__benchFullTerrain) return 0;
-		// 360° high-detail wedge, query terrain = the complete set, 360° horizon re-traced
-		const ms = await e.loadFullTerrain();
-		e.__benchFullTerrain = true;
-		return ms;
-	});
+// A failed load (timeout, disposed) closes the page and throws: the caller's retry gets a fresh page, and a
+// second failure is an error row, never a row silently computed on the initial terrain.
+async function ensureFullTerrain(page, key) {
+	try {
+		return await page.evaluate(async () => {
+			const e = window.__engine;
+			if (typeof e.loadFullTerrain !== "function") return null;
+			if (e.__benchFullTerrain) return 0;
+			// 360° high-detail wedge, query terrain = the complete set, 360° horizon re-traced
+			const ms = await e.loadFullTerrain();
+			e.__benchFullTerrain = true;
+			return ms;
+		});
+	} catch (err) {
+		await dropPage(key);
+		throw new Error(`fullTerrain failed: ${String(err?.message ?? err)}`);
+	}
 }
 
 async function align(req) {
@@ -356,21 +374,25 @@ async function align(req) {
 		pageKey(req),
 	);
 	const page = entry.page;
-	const fullMs = req.fullTerrain ? await ensureFullTerrain(page) : 0;
+	const fullMs = req.fullTerrain
+		? await ensureFullTerrain(page, pageKey(req))
+		: 0;
+	const modes = req.modes ?? null;
 	const r = await page.evaluate(
-		async ({ priors, precisionSet }) => {
+		async ({ priors, precisionSet, modes, settleMs }) => {
 			const e = window.__engine;
 			const orig = { ...e.prior };
-			const runs = [];
-			// with a precision flag: the path each certified stage actually took (fell back or not)
-			const alignMod = precisionSet
-				? await import("/src/lib/gpu/align/index.ts").catch(() => null)
-				: null;
-			const horizonMod = precisionSet
-				? await import("/src/lib/integration/horizon-fast-app.ts").catch(
-						() => null,
-					)
-				: null;
+			// with a precision flag or modes: the path each certified stage actually took (fell back or not)
+			const alignMod =
+				precisionSet || modes
+					? await import("/src/lib/gpu/align/index.ts").catch(() => null)
+					: null;
+			const horizonMod =
+				precisionSet || modes
+					? await import("/src/lib/integration/horizon-fast-app.ts").catch(
+							() => null,
+						)
+					: null;
 			const precisionOf = () => {
 				const t = alignMod?.lastAlignTiming;
 				return {
@@ -390,13 +412,54 @@ async function align(req) {
 			};
 			const P = (p) =>
 				p ? { yaw: p.yaw, pitch: p.pitch, roll: p.roll, vfov: p.vfov } : null;
-			try {
+			// FNV-1a over the bytes: which horizon / terrain a mode's seeds ran on
+			const hash = (f) => {
+				if (!f) return null;
+				const u = new Uint8Array(f.buffer, f.byteOffset, f.byteLength);
+				let h = 0x811c9dc5;
+				for (let i = 0; i < u.length; i++)
+					h = Math.imul(h ^ u[i], 0x01000193) >>> 0;
+				return h.toString(16);
+			};
+			const terrainState = () => {
+				const set = e.renderSet;
+				return {
+					tiles: set?.tiles?.length ?? 0,
+					generation: set?.stats?.generation ?? null,
+					pending: set?.stats?.pending ?? null,
+					ids: hash(
+						new TextEncoder().encode(
+							(set?.tiles ?? []).map((t) => `${t.id}:${t.seg}`).join(","),
+						),
+					),
+				};
+			};
+			// streaming idle: the render set unchanged and complete for settleMs (bounded at 60 s)
+			const settle = async () => {
+				if (!settleMs) return 0;
+				const t0 = performance.now();
+				let last = e.renderSet;
+				let since = t0;
+				while (performance.now() - t0 < 60_000) {
+					await new Promise((res) => setTimeout(res, 50));
+					const cur = e.renderSet;
+					if (cur !== last || (cur?.stats?.pending ?? 0) > 0) {
+						last = cur;
+						since = performance.now();
+					} else if (performance.now() - since >= settleMs) break;
+				}
+				return Math.round(performance.now() - t0);
+			};
+			const runSeeds = async () => {
+				const runs = [];
 				for (const pr of priors) {
 					e.prior = { ...orig, ...pr };
 					const t = performance.now();
 					const res = await e.autoAlign(true); // deck: async
 					runs.push({
-						...(precisionSet ? { precision: precisionOf() } : {}),
+						...(precisionSet || modes
+							? { precision: precisionOf(), silTiming: e.silTiming ?? null }
+							: {}),
 						prior: P(e.prior),
 						ms: Math.round(performance.now() - t),
 						pose: P(res?.pose),
@@ -410,11 +473,52 @@ async function align(req) {
 						})),
 					});
 				}
+				return runs;
+			};
+			let runs = [];
+			const byMode = {};
+			globalThis.__RIGI_FLAGS__ ??= {};
+			const flags = globalThis.__RIGI_FLAGS__;
+			const saved = { ...flags };
+			try {
+				if (!modes) runs = await runSeeds();
+				else
+					for (const m of modes) {
+						// per-mode precision through the live flag overrides (src/lib/flags getFlag)
+						for (const k of ["horizonPrecision", "alignPrecision"])
+							if (m[k]) flags[k] = m[k];
+							else delete flags[k];
+						const settledMs = await settle();
+						const t = performance.now();
+						const horizonSource = e.retraceHorizon
+							? await e.retraceHorizon()
+							: "unsupported";
+						const retraceMs = Math.round(performance.now() - t);
+						const horizonPrecision = precisionOf().horizon;
+						const terrain = terrainState();
+						const mr = await runSeeds();
+						byMode[m.name] = {
+							runs: mr,
+							horizon: {
+								hash: hash(e.horizonDirs),
+								source: horizonSource,
+								precision: horizonPrecision,
+								retraceMs,
+							},
+							terrain,
+							terrainAfter: terrainState(),
+							settledMs,
+						};
+					}
 			} finally {
 				e.prior = orig;
+				for (const k of Object.keys(flags)) delete flags[k];
+				Object.assign(flags, saved);
 			}
+			if (modes) runs = byMode[modes[0].name].runs;
 			return {
 				runs,
+				...(modes ? { modes: byMode } : {}),
 				meta: {
 					id: e.photo.id,
 					width: e.photo.width,
@@ -428,7 +532,12 @@ async function align(req) {
 				},
 			};
 		},
-		{ priors: req.priors ?? [{}], precisionSet: PRECISION_SET },
+		{
+			priors: req.priors ?? [{}],
+			precisionSet: PRECISION_SET,
+			modes,
+			settleMs: req.settleMs ?? 0,
+		},
 	);
 	r.meta.pageFlags = await pageFlagsOf(page);
 	if (req.fullTerrain && fullMs === null) r.meta.fullTerrainUnsupported = true;
@@ -449,7 +558,9 @@ async function edges(req) {
 		pageKey(req),
 	);
 	const page = entry.page;
-	const fullMs = req.fullTerrain ? await ensureFullTerrain(page) : 0;
+	const fullMs = req.fullTerrain
+		? await ensureFullTerrain(page, pageKey(req))
+		: 0;
 	const r = await page.evaluate(() => {
 		const e = window.__engine;
 		const enc = (f) => {
@@ -719,7 +830,9 @@ async function renderOnce(req) {
 		() => (window.__engine.__wid ??= Math.random().toString(36).slice(2)),
 	);
 	let emptyRetries = 0;
-	const fullTerrainMs = req.fullTerrain ? await ensureFullTerrain(page) : 0;
+	const fullTerrainMs = req.fullTerrain
+		? await ensureFullTerrain(page, key)
+		: 0;
 	const cp = req.adhoc ? null : (controlPoints()[id] ?? null);
 	const meta = await page.evaluate((cp) => {
 		const e = window.__engine;
