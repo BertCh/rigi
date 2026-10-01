@@ -14,23 +14,6 @@
 // [data-renderer-reason], so harnesses assert which engine actually ran.
 
 import { getFlag } from "#/lib/flags";
-import { resolveStyle } from "#/lib/style/presets";
-import { getStyleStore } from "#/lib/style/store";
-
-/**
- * Terroir shading (src/lib/terroir/glsl: contour ink by ground, range-adaptive contours, real land cover,
- * snow for the date) exists in the WebGL deck and three engines only, not yet in deck-webgpu. While the
- * current style uses any of it, `auto` resolves to WebGL deck so the look renders (the SVG terroir
- * overlays work on every engine). Remove once deck-webgpu ports it.
- */
-function terroirNeedsWebGl(): boolean {
-	try {
-		const t = resolveStyle(getStyleStore().getState()).terroir;
-		return t.cover.on || t.contours.inkByCover || t.contours.adaptive;
-	} catch {
-		return false;
-	}
-}
 
 export type ResolvedRenderer = "webgpu" | "deck" | "three";
 export type RendererChoice = { renderer: ResolvedRenderer; reason: string };
@@ -107,8 +90,6 @@ export async function resolveRenderer(): Promise<RendererChoice> {
 		return { renderer: want, reason: "pinned" };
 	if (getFlag("webgpu") === "off")
 		return { renderer: "deck", reason: "webgpu=off" };
-	if (want === "auto" && terroirNeedsWebGl())
-		return { renderer: "deck", reason: "auto: terroir shading is WebGL-only" };
 	const p = await probeWebGpu();
 	if (p.ok)
 		return {

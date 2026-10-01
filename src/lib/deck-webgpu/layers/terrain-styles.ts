@@ -52,6 +52,19 @@ import {
 	deckTerrainStyle,
 } from "#/lib/style/deck-apply";
 import { CLASSIC } from "#/lib/style/defaults";
+import { coverTexels, terroirBlockValues, terroirMajorEvery, type TerroirShader } from "#/lib/terroir/glsl/values";
+import {
+	TERROIR_CONTOUR_TAIL,
+	type TerroirFeatures,
+	terroirAlbedoExpr,
+	terroirFeatures,
+	terroirNeedsCover,
+	terroirOn,
+	terroirSteepStmt,
+	terroirUniformModule,
+	terroirWGSL,
+} from "#/lib/terroir/wgsl/terrain";
+import { TER_BLOCK } from "#/lib/terroir/glsl/terrain";
 import type { PassContext } from "../pass";
 import { USAGE } from "../targets";
 import type { TerrainLook, TerrainShaderPart } from "../terrain";
@@ -535,7 +548,7 @@ export type TerrainStyleFeatures = {
 	atmosphere: boolean;
 	/** LOOK_WATER on top of the alpine tint */
 	water: boolean;
-};
+} & TerroirFeatures; // src/lib/terroir/wgsl: absent keys while every terroir switch is off
 
 /** Photo view colour pass only (0 elsewhere, see styleUniforms). After every derivative. */
 const DISCARD = `  if (s.range < terrainStyle.nearDiscard) { discard; }`;
@@ -564,11 +577,12 @@ function baseWGSL(style: TerrainStyleName, ft: TerrainStyleFeatures) {
 		const grad =
 			"s.dElev / max(length(abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy)), 1e-3)";
 		const alpine = `ts_alpine_albedo(s.elev, n, s.enu.xy, ${grad})`;
+		const terAlpine = terroirAlbedoExpr(ft, alpine);
 		const albedo = ft.alpine
 			? ft.water
-				? `ts_water_shade(${alpine}, s.elev, s.enu.xy, ${grad}, n, normalize(camera.eye - s.enu), s.range)`
-				: alpine
-			: "hypso(s.elev)";
+				? `ts_water_shade(${terAlpine}, s.elev, s.enu.xy, ${grad}, n, normalize(camera.eye - s.enu), s.range)`
+				: terAlpine
+			: terroirAlbedoExpr(ft, "hypso(s.elev)");
 		const shaded = ft.relief
 			? "ts_relief_shade(albedo, n, s.enu, s.range)"
 			: "albedo * fog_shade(n)";
@@ -590,7 +604,7 @@ function baseWGSL(style: TerrainStyleName, ft: TerrainStyleFeatures) {
       let tl = max(luminance(terrainStyle.imgTint.rgb), 1e-3);
       base = mix(base, terrainStyle.imgTint.rgb * (luminance(base) / tl), terrainStyle.imgTint.a);
     }
-  }
+${terroirSteepStmt(ft, shaded)}  }
 `
 				: "";
 		return /* wgsl */ `\
@@ -649,7 +663,9 @@ ${LINES}
   let tk = ts_tanaka_lines(s.elev, s.dElev, I, terrainStyle.contourMajorEvery, s.normal, fog.sun.xyz, s.enu, camera.eye, s.range);
   return ts_premul(tk.rgb, tk.a * dist * near * terrainStyle.contourOpacity);
 `
-		: /* wgsl */ `\
+		: ft.terInk || ft.terAdaptive
+			? TERROIR_CONTOUR_TAIL
+			: /* wgsl */ `\
   var lc = ts_line_ramp(ts_elev_t(s.elev));
   if (terrainStyle.contourSolid > 0.5) {
     lc = to_linear(select(terrainStyle.contourMinorCol.rgb, terrainStyle.contourMajorCol.rgb,
@@ -679,6 +695,9 @@ export function terrainStyleWGSL(
 	const lit = style === "hillshade" || style === "imagery";
 	return [
 		COMMON_WGSL,
+		...(terroirOn(ft)
+			? [terroirWGSL(ft, { relief: ft.relief, water: ft.water })]
+			: []),
 		lit && ft.alpine ? ALPINE_WGSL : "",
 		lit && ft.alpine && ft.water ? WATER_WGSL : "",
 		style === "contours" && ft.tanaka ? TANAKA_WGSL : "",
@@ -692,6 +711,7 @@ export function terrainStyleWGSL(
 export function styleFeatures(
 	style: TerrainStyleName,
 	look: Pick<DeckTerrainStyle, "defines" | "rel" | "atm">,
+	terroir?: TerroirShader | null,
 ): TerrainStyleFeatures {
 	const d = new Set<string>(look.defines);
 	const lit = style === "hillshade" || style === "imagery";
@@ -702,6 +722,11 @@ export function styleFeatures(
 		tanaka: style === "contours" && d.has("LOOK_TANAKA"),
 		atmosphere: lit && d.has("LOOK_ATMOSPHERE") && !!look.atm,
 		water: lit && d.has("LOOK_ALPINE") && d.has("LOOK_WATER"),
+		...terroirFeatures(
+			style,
+			terroir,
+			style === "contours" && d.has("LOOK_TANAKA"),
+		),
 	};
 }
 
@@ -726,6 +751,8 @@ export type TerrainStyleProps = {
 	 * / 2, the same value as TerrainLook.nearDiscard, which drives the geometry pass). 0 = off.
 	 */
 	nearDiscard: number;
+	/** Terroir shading (src/lib/terroir/glsl/values.ts terroirShader): null / absent = off, the classic programs. */
+	terroir?: TerroirShader | null;
 };
 
 export const DEFAULT_TERRAIN_STYLE_PROPS: TerrainStyleProps = {
@@ -758,6 +785,8 @@ export class TerrainStyles {
 	private p: TerrainStyleProps;
 	private relief: ReliefTextures | null = null;
 	private zero: Texture | null = null;
+	/** terroir cover classes (r8 nearest) and the grid they were uploaded from */
+	private cover: { grid: unknown; tex: Texture } | null = null;
 	private parts: {
 		key: string;
 		shading: TerrainShaderPart;
@@ -783,7 +812,7 @@ export class TerrainStyles {
 	}
 
 	get features(): TerrainStyleFeatures {
-		return styleFeatures(this.p.style, this.p.look);
+		return styleFeatures(this.p.style, this.p.look, this.p.terroir);
 	}
 
 	/** Pipeline identity: style + the features it compiles in. */
@@ -947,7 +976,14 @@ export class TerrainStyles {
 			slopeC2: v4(sc[2]),
 			slopeC3: v4(sc[3]),
 			contourInterval: p.contourInterval,
-			contourMajorEvery: L.contourMajorEvery,
+			contourMajorEvery:
+				this.p.terroir?.swissIndex && p.style === "contours"
+					? terroirMajorEvery(
+							this.p.terroir,
+							p.contourInterval,
+							L.contourMajorEvery,
+						)
+					: L.contourMajorEvery,
 			contourWidth: L.contourWidth,
 			contourOpacity: p.contourOpacity,
 			fadeNear: L.fadeNear,
@@ -969,6 +1005,36 @@ export class TerrainStyles {
 		};
 	}
 
+	/** The cover class texture (padded to the fit's row width), uploaded once per grid. */
+	private coverTexture(): Texture {
+		const T = this.p.terroir;
+		const grid = T?.fit ? T.grid : null;
+		if (this.cover?.grid === grid && grid) return this.cover.tex;
+		this.cover?.tex.destroy();
+		this.cover = null;
+		if (!T || !grid || !T.fit) return this.zeroTexture();
+		const tex = this.device.createTexture({
+			id: "terroir-cover",
+			format: "r8unorm",
+			width: T.fit.texWidth,
+			height: grid.height,
+			usage: USAGE.SAMPLE | USAGE.COPY_DST,
+			sampler: {
+				minFilter: "nearest",
+				magFilter: "nearest",
+				addressModeU: "clamp-to-edge",
+				addressModeV: "clamp-to-edge",
+			},
+		});
+		tex.writeData(coverTexels(grid, T.fit.texWidth) as never, {
+			width: T.fit.texWidth,
+			height: grid.height,
+			bytesPerRow: T.fit.texWidth,
+		});
+		this.cover = { grid, tex };
+		return tex;
+	}
+
 	private reliefUniforms() {
 		const R = this.p.look.rel;
 		return {
@@ -980,6 +1046,14 @@ export class TerrainStyles {
 			curvature: R?.curvature ?? 0,
 			edge: R?.edge ?? 0.08,
 		};
+	}
+
+	private terroirUniforms() {
+		const T = this.p.terroir;
+		if (!T) return {};
+		return TER_BLOCK.pack(
+			terroirBlockValues(T, this.p.contourInterval, this.p.look.contourMajorEvery),
+		);
 	}
 
 	private atmUniforms() {
@@ -1011,6 +1085,7 @@ export class TerrainStyles {
 			modules: [
 				terrainStyleModule as unknown as ShaderModule,
 				...(ft.relief ? [terrainReliefModule as unknown as ShaderModule] : []),
+				...(terroirOn(ft) ? [terroirUniformModule] : []),
 			],
 			defines: {
 				TERRAIN_SHADING: true,
@@ -1022,13 +1097,17 @@ export class TerrainStyles {
 				uniforms: {
 					terrainStyle: this.styleUniforms(ctx),
 					...(ft.relief ? { terrainRelief: this.reliefUniforms() } : {}),
+					...(terroirOn(ft) ? { terroir: this.terroirUniforms() } : {}),
 				},
-				bindings: ft.relief
-					? {
-							reliefField: this.relief?.field ?? this.zeroTexture(),
-							reliefGen: this.relief?.gen ?? this.zeroTexture(),
-						}
-					: {},
+				bindings: {
+					...(ft.relief
+						? {
+								reliefField: this.relief?.field ?? this.zeroTexture(),
+								reliefGen: this.relief?.gen ?? this.zeroTexture(),
+							}
+						: {}),
+					...(terroirNeedsCover(ft) ? { terroirCover: this.coverTexture() } : {}),
+				},
 			}),
 		};
 		const finish: TerrainShaderPart | null = ft.atmosphere
@@ -1048,6 +1127,8 @@ export class TerrainStyles {
 		this.setReliefField(null);
 		this.zero?.destroy();
 		this.zero = null;
+		this.cover?.tex.destroy();
+		this.cover = null;
 		this.parts = null;
 	}
 }

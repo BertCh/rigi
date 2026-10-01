@@ -97,6 +97,8 @@ import { tileBounds } from "#/lib/dem";
 import { startLakeFloor } from "#/lib/geocam/lakes/fetch";
 import { priorHeading } from "#/lib/geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
+import { type TerroirShader, terroirShader } from "#/lib/terroir/glsl/values";
+import type { CoverGrid } from "#/lib/terroir/pack";
 import { autoAlignAsync, warmAlignGpu } from "#/lib/gpu/align";
 import { lookIdle } from "#/lib/gpu/look/opt-in";
 import {
@@ -455,6 +457,13 @@ export class WebGpuEngine implements Renderer {
 	private looks = new Map<string, DeckTerrainStyle>();
 	private haze = new HazeController();
 	private relief = new ReliefController();
+	/** Terroir land cover (setTerroirCover) and the terroir shading of it + the style. */
+	private terroirGrid: CoverGrid | null = null;
+	private terroirMemo: {
+		style: ViewStyle;
+		grid: CoverGrid | null;
+		t: TerroirShader | null;
+	} | null = null;
 	private compLook = new CompositeLook();
 	private statsTimer = 0;
 	private statsBusy = false;
@@ -1467,6 +1476,27 @@ export class WebGpuEngine implements Renderer {
 		this.lookTimer = window.setTimeout(() => this.updateLook(), 150);
 	}
 
+	/** deck/engine.ts setTerroirCover: the pack's class grid (r8 texture in TerrainStyles); null = off. */
+	setTerroirCover(grid: CoverGrid | null) {
+		if (grid === this.terroirGrid) return;
+		this.terroirGrid = grid;
+		this.sync();
+	}
+
+	/** The terroir shading for the current style and cover (null = off: the classic programs). */
+	private terroir(): TerroirShader | null {
+		const m = this.terroirMemo;
+		if (m && m.style === this.style && m.grid === this.terroirGrid) return m.t;
+		const t = terroirShader(
+			this.style,
+			this.terroirGrid,
+			this.frame,
+			this.photo.takenAt,
+		);
+		this.terroirMemo = { style: this.style, grid: this.terroirGrid, t };
+		return t;
+	}
+
 	/** deck/engine.ts setStyle: uniforms for every core; programs rebuild only on define changes. */
 	setStyle(style: ViewStyle) {
 		if (style === this.style) return;
@@ -1778,6 +1808,7 @@ export class WebGpuEngine implements Renderer {
 				contourOpacity: look.contourOpacity,
 				nearFade: look.nearFade,
 				nearDiscard,
+				terroir: this.terroir(),
 			});
 			if (look.imagery && this.renderSet)
 				this.syncImagery(this.renderSet, look.imagery);
@@ -1818,6 +1849,7 @@ export class WebGpuEngine implements Renderer {
 			nearFade: 0,
 			// only the photo camera's geometry pass discards (the range map the drape tests)
 			nearDiscard,
+			terroir: this.terroir(),
 		});
 		const stepView = this.step?.view === "step";
 		const dm = this.drapeMask();
