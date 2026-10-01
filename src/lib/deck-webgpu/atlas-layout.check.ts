@@ -40,6 +40,7 @@ import {
 	IMAGERY_SMALL_TIER_BASE,
 	imageryTierOf,
 	LayerAllocator,
+	leaseFits,
 } from "./atlas-layout";
 import { AtlasLease, TileLayerRef } from "./texture-array-atlas";
 
@@ -447,7 +448,16 @@ const rand = () => {
 	if (l2.live) fail("lease on a destroyed atlas is live");
 	l2.release();
 	if (released.length) fail("lease returned a layer to a destroyed atlas");
-	console.log("leases: refcount, idempotent tile ref, destroyed atlas");
+	// headroom: on a 256-layer device the leases stop 64 layers short of the limit
+	if (!leaseFits(0, 256) || !leaseFits(191, 256) || leaseFits(192, 256))
+		fail("leaseFits: 256-layer headroom is not 64");
+	if (!leaseFits(1983, 2048) || leaseFits(1984, 2048))
+		fail("leaseFits: 2048-layer headroom is not 64");
+	if (leaseFits(12, 16) || !leaseFits(11, 16))
+		fail("leaseFits: small-limit headroom is not a quarter");
+	console.log(
+		"leases: refcount, idempotent tile ref, destroyed atlas, layer headroom",
+	);
 }
 
 // ---------- 8. spare meshes ----------

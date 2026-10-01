@@ -38,6 +38,7 @@ import {
 	growCopies,
 	grownCapacity,
 	LayerAllocator,
+	leaseFits,
 } from "./atlas-layout";
 
 export type TextureArrayAtlasProps = {
@@ -267,13 +268,16 @@ export class TextureArrayAtlas {
 	/**
 	 * Load time (flag terrainGpuDecode): allocate a layer (growing the atlas by copy when needed),
 	 * decode the Terrarium `src` into it and read back its statistics, with one upload of the bitmap.
-	 * Returns the lease on the layer and the stats, or null when no layer fits (device limit). The
+	 * Returns the lease on the layer and the stats, or null when no layer fits (device limit, with
+	 * leaseFits' headroom). The
 	 * caller releases the lease when the stats send the tile to the CPU path.
 	 */
 	async writeTerrariumLeased(src: {
 		bitmap: ImageBitmap;
 		down: 1 | 2;
 	}): Promise<{ lease: AtlasLease; stats: TerrariumTileStats } | null> {
+		// near the device's layer limit: no lease (atlas-layout.ts leaseFits)
+		if (!leaseFits(this.used(), this.maxLayers)) return null;
 		const layer = this.alloc();
 		if (layer >= this.capacity) this.reserve(layer + 1);
 		if (layer >= this.capacity) {

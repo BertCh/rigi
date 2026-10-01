@@ -2228,6 +2228,7 @@ export class WebGpuEngine implements Renderer {
 				nearDiscard,
 				terroir: this.terroir(),
 			});
+			this.imageryDraped = !!look.imagery;
 			if (look.imagery && this.renderSet)
 				this.syncImagery(this.renderSet, look.imagery);
 			// no drape in this look: the imagery layers go after a grace (imagery.ts releaseWhenIdle)
@@ -2264,6 +2265,7 @@ export class WebGpuEngine implements Renderer {
 		const w = this.world as WorldCamera;
 		const s = this.settings;
 		const src = s.worldStyle === "hillshade" ? null : s.worldStyle;
+		this.imageryDraped = !!src;
 		if (src && this.renderSet)
 			this.syncImagery(this.renderSet, src, () => this.worldTileOrder(w));
 		else if (!src) g.imagery.releaseWhenIdle();
@@ -2390,11 +2392,16 @@ export class WebGpuEngine implements Renderer {
 		this.pushImagery();
 	}
 
+	/** The current look drapes imagery (set by sync(); pushImagery uploads only then). */
+	private imageryDraped = false;
+
 	/** The imagery bitmaps → the texture array (async uploads; imagery.onChange redraws). */
 	private pushImagery() {
 		const g = this.gpu;
 		const set = this.renderSet;
-		if (!g || !set || !this.imagery.key) return;
+		// a look without a drape uploads nothing: a stream update (pan) would otherwise cancel
+		// releaseWhenIdle and re-upload the last drape (imagery.ts); the bitmaps stay cached here
+		if (!g || !set || !this.imagery.key || !this.imageryDraped) return;
 		g.imagery.sync(
 			this.imagery.map,
 			set.tiles.map((t) => t.id),

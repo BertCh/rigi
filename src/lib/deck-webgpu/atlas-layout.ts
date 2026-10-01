@@ -109,6 +109,18 @@ export function compactPlan(live: readonly number[], quantum: number) {
 }
 
 /**
+ * Load-time leases (texture-array-atlas.ts writeTerrariumLeased) take a layer only while the atlas
+ * keeps this many layers free below maxLayers. Leased spare tiles (deck/terrain-stream.ts
+ * spareGpuLayers, 48) and in-flight loads (concurrency 10) must never take the layer a drawn tile
+ * needs on a device with few array layers (256 on 'core' limits): near the limit the loader falls
+ * back to the stats-only graph and the TileStore decodes at draw time, as before the leases.
+ */
+export function leaseFits(used: number, maxLayers: number) {
+	const headroom = Math.min(64, Math.floor(maxLayers / 4));
+	return used + headroom < maxLayers;
+}
+
+/**
  * Imagery tiers (imagery.ts ImageryArray): a source of at most 256² keeps its size in the 256²
  * array; anything larger is resized to 512². A tile's layer, as the terrain rows carry it (f32), is
  * the 512² layer itself or IMAGERY_SMALL_TIER_BASE + the 256² layer (−1: none); terrain.ts's WGSL
