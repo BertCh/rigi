@@ -4,6 +4,19 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### WAG wave 4: more of the app on the luma graph, more GPU defaults (2026-10-01)
+
+Built without browser runs (user's call: no render-lock waits); evidence is node checks, several on luma.gl's WebGPU device over Dawn in node. Every item below is **browser-unverified** until the consolidated pass (`research_notes/whole-app-graph-2026-10-01/consolidated-pass-wave4.md`); a regression there reverts that default.
+- **First real luma `GPUProgram` users.** The haze grid arg-min (`haze-argmin.ts`, group `look-haze-argmin`): scalar ops for the tolerance, a `GPUConditionalOperation` gating the past-the-cap selection by GPU indirect dispatch, our kernels lowered into the program's graph; reads 2 KiB instead of 22 KiB (`?hazeArgminGpu=off`). The band-stats fold (`?statsFold=gpu|f64`): BAND_STATS → `GPUProgramSpMV` → BAND_FINALIZE in f32 on one graph, 256 B read back instead of 6.6 KB; f32 vs f64 stays under 1 LSB in emulation. New `gpu/core/program.ts` (`compileProgramGraph`, `GraphOperation`), `cachedGraphFrom`, and `cachedGraph(…, create)` for graphs that adopt a program compiler's graph. Band-stats subgroup reduction on by default where available (`?statsSubgroups=off`).
+- **GPU airlight band** for the haze fit on the WebGPU texture path, default on (`?hazeBandGpu=off`): one submit, no range / P(sky) planes read back (graph break D16 removed); spot-checked per call, CPU band on a fault.
+- **Sky GPU prep on by default** (`?skyGpuPrep`, replaces `DEFAULT_GPU_PREP`), now on a core ComputeGraph; fixes an upload-texture usage bug that made every browser prep fall back to the CPU. Earlier browser A/B (pre-port): 69/69 masks identical, segmentSky 88.1 → 77.6 ms median.
+- **`unknownGpu` on by default**: the unknown-pose 360° horizon on the GPU march. Node gate on Dawn (`scripts/gpu/unknown-gpu-node.ts`, the worker's own code now in `src/lib/integration/unknown-pose-core.ts`): 0 new false or unverified accepts on GT-12 × 5 conditions and the 17 wild dev photos without heading; one knife-edge true accept lost (IMG_6971 noheading, which a ±3e-4° horizon jitter of the CPU path also loses).
+- **Terrain loading no longer hangs**: tile fetches time out after 30 s (ancestor fallback), a tile that keeps failing is given up after 3 tries and drawn with a stand-in, and `DeckEngine.loadFullTerrain` reports success only once complete; the render worker / harness turn a failed full-terrain load into an error, never a row on the initial terrain.
+- **Silhouette re-rank redraws a blank finalist** before scoring, on both engines: the main source of f64-vs-f64 differences between precision-gate runs.
+- **Precision gate redesigned**: base, cand and a second base run on the same page per photo, judged on quality (accepts vs 304 blind-verified poses plus the GT-12 arm); identity is reported, not gated. New fast checks `terrain-stall`, `silhouette-mask`, `precision-gate-score`.
+- **WebGPU terrain VRAM / uploads**: GPU-decoded tiles decode straight into a height-atlas layer they lease (one upload for layer + stats, no re-upload after a pan; ≤ 48 spare leases). Draped imagery gets a 256² tier for 256 px sources, compacts on idle via a graph copy node and releases 10 s after the look stops draping.
+- New fast checks: `haze-band`, `haze-argmin`, `stats-fold`. Method: luma.gl's WebGPU device runs in node over Dawn (`webgpu` package), so real ComputeGraph code can be gated without a browser or the render lock.
+
 ### GPU graph paths on by default; WAG wave 3 (2026-10-01)
 
 - **Defaults flipped** (each flag still turns the path off): certified-f32 horizon and align (`horizonPrecision`, `alignPrecision` = `certified-f32`), `terrainGpuCull` = on, `terrainGpuDecode` = on. WebGL and `?gpu=off` keep the CPU paths.

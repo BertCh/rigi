@@ -101,7 +101,7 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | Tried | Result | Source |
 |---|---|---|
 | GPU silhouette re-rank | 3–10 ms saved; judged not worth it on 2026-09-28. **Superseded:** the re-rank runs on the GPU since 202f767 (identical scores) | `research_notes/gpu_compute_plan_2026-09.md` |
-| GPU horizon for unknown-pose | ~120 ms saved; stays opt-in (`?unknownGpu=on`) under the 0-false-accept rule | gpu_compute_plan |
+| GPU horizon for unknown-pose | ~120 ms saved; was opt-in under the 0-false-accept rule until 2026-10-01, now default on (node gate on Dawn: 0 new false or unverified accepts; browser-unverified) | gpu_compute_plan |
 | TS port of the skyglobal polish | Flips 3/50 results; stays in numpy | gpu_compute_plan |
 | deck: world-camera frustum culling alone (`matrixCuller`, no back-face cull) | World orbit 12.5 / 10.1 / 8.9 → 12.6 / 10.2 / 8.4 fps: fill-bound, not vertex-bound. Kept (cheap) but the gain came from back-face culling + vertex log depth | [deck-default.md](deck-default.md) |
 | deck: 16-bit far-tile indices (`index-width.ts`) | Photo drag 27.0 / 21.0 / 20.7 vs 27.0 / 21.3 / 20.7 fps, world orbit identical; kept, harmless | deck-default.md |
@@ -124,6 +124,9 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | 2026-10-01: GPU airlight band (D16), exact integer kernels | Built, bit-identical on 4 photos, not landed: gpuPrep median difference ~−0.1 ms against ±5 ms noise on Apple GPU. Patch not published | WAG haze-cert work, [whole-app-graph-plan.md](whole-app-graph-plan.md) |
 | 2026-10-01: GPU Terrarium decode into the height atlas (W2.3, `terrainGpuDecode`) | Landed off. Heights and frames are byte-identical, but synchronous CPU readers (camera height, lake floor, trails, peak snapping) still decode ~50% of query tiles within 8 s, now on the main thread (298–349 ms per photo vs workers today), and the small atlas uploads ~4× the bytes (1.17 vs 0.29 GB over a 7-pose walk). Needs GPU gathers for the hot `heightAt` callers first. **Update:** gathers landed for camera height, trails and peak snapping (7f6f62b, 1e18f79; main-thread decodes at load → 0) and the flag is on by default since 3225064; still open: ~4× upload bytes, load time unmeasured | e686c1c, 4a4000b |
 | 2026-10-01: precision gate with a bit-identity rule (f64 vs certified-f32 on the frozen dev split) | Unusable as a rule: the f64 baseline itself differs run to run (7/8 deck and 21/22 WebGPU differing photos are f64-vs-f64 noise). GT-12 12/12 identical in both modes; judged on quality instead, and certified-f32 became the default. A redesign (same-page base and candidate) is open | 3225064, `scripts/gpu/precision-gate.mjs`, CHANGELOG "WAG wave 3" |
+| 2026-10-01: readback-free ColorStats on WebGPU (composite reads a storage buffer) | Not built. After the GPU fold the 256 B readback costs nothing measurable (0.44 vs 0.44 ms per call, 1 photo) and it would touch three WGSL harmonize consumers | WAG wave 4 stats-graph |
+| 2026-10-01: a GPU indirect condition for the haze head-overflow read | Does not fit: WebGPU copy and map sizes must be known on the CPU, so a GPU gate could only skip work the CPU already skips; the round trip stays | WAG wave 4 haze-graph |
+| 2026-10-01: GPU decode writing only the 256 px r32f result to cut the 4× upload bytes | Premise false: the decode already writes only the r32f layer; the 4× is its rgba8 512² input. The duplicate uploads (load-time stats, draw-time decode, re-entry after pans) were removed instead | WAG wave 4 perf-vram |
 
 ## Rejected directions (strategy)
 
