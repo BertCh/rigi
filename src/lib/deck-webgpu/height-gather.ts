@@ -19,8 +19,10 @@
 // So a gathered height equals heightAt's whenever the atlas layer holds the tile's CPU heights, which
 // is the terrainGpuDecode premise itself (texel bytes == canvas bytes; terrarium-tile.ts). Requests of
 // one tick share one dispatch. Every result is certified before use: each word carries the call's
-// nonce (a failed dispatch leaves zeros), and each tile must still hold the slot the plan read (a tile
-// evicted, or its layer re-used, between plan and submit) — else that sample takes heightAt.
+// nonce (a failed dispatch leaves zeros), and each tile must hold the slot the plan read at the moment
+// the gather is submitted (taken inside the graph's lease, synchronously with the submit: a tile
+// evicted, or its layer re-used, between plan and submit fails it) — else that sample takes heightAt.
+// The gather is skipped (all heightAt) when the atlas arrays were re-created (grown) since the plan.
 import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import type {
 	TerrainSet,
@@ -34,7 +36,7 @@ import {
 	sampleGrid,
 } from "#/lib/dem";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
-import { defineKernel } from "#/lib/gpu/core/kernel";
+import { defineKernel, submit } from "#/lib/gpu/core/kernel";
 import { importSampledTexture, textureShapeKey } from "./graph-texture";
 import type { ResidentHeights } from "./layers/batched-terrain";
 
@@ -234,8 +236,8 @@ export function planHeights(
 /**
  * The CPU half after the gather: `bits` holds (nonce, texel bits) word pairs for every plan of the
  * batch, this plan's from texel `first`; null = the gather failed. A gathered sample whose words carry
- * the nonce and whose tile still holds the planned slot is blended (blendCorners = sampleGrid); any
- * other goes to heightAt.
+ * the nonce and whose tile held the planned slot when the gather was submitted (`slotOf`: that
+ * snapshot) is blended (blendCorners = sampleGrid); any other goes to heightAt.
  */
 export function finishHeights(
 	p: HeightPlan,
@@ -290,6 +292,8 @@ export function finishHeights(
 }
 
 type Pending = { plan: HeightPlan; resolve: (v: Float64Array) => void };
+/** A gather's texel words and its certificate: each tile's slot when the gather was submitted. */
+type Gathered = { bits: Uint32Array; slotOf: NonNullable<SlotOf> };
 
 /**
  * Heights of `points` on a TerrainSet, equal to TerrainSet.heightAt bit for bit (NaN where heightAt
@@ -342,7 +346,7 @@ export class HeightGather {
 		this.queue = [];
 		let total = 0;
 		for (const { plan } of batch) total += plan.words.length;
-		let bits: Uint32Array | null = null;
+		let gathered: Gathered | null = null;
 		this.nonce = (this.nonce % 0x7ffffffe) + 1;
 		const nonce = this.nonce;
 		if (total <= MAX_TEXELS) {
@@ -352,34 +356,49 @@ export class HeightGather {
 				words.set(plan.words, o);
 				o += plan.words.length;
 			}
-			bits = await this.run(words, nonce);
+			gathered = await this.run(words, nonce, batch);
 		}
 		const t0 = performance.now();
-		const slotOf = this.slotOf();
 		let first = 0;
 		for (const { plan, resolve } of batch) {
-			resolve(finishHeights(plan, bits, first, nonce, slotOf));
+			resolve(
+				finishHeights(
+					plan,
+					gathered?.bits ?? null,
+					first,
+					nonce,
+					gathered?.slotOf ?? null,
+				),
+			);
 			first += plan.words.length;
 		}
 		heightGatherCounters.ms += performance.now() - t0;
 	}
 
-	/** One graph run over `words` texels: 2 words (nonce, bits) per texel, or null on failure. */
-	private async run(words: Uint32Array, nonce: number) {
+	/**
+	 * One graph run over `words` texels: 2 words (nonce, bits) per texel and the slots of `batch`'s
+	 * tiles as they were when the gather was submitted, or null on failure (or when the atlas arrays
+	 * were re-created since the plan).
+	 */
+	private async run(
+		words: Uint32Array,
+		nonce: number,
+		batch: Pending[],
+	): Promise<Gathered | null> {
 		const device = this.device;
-		const res = this.destroyed || device.isLost ? null : this.resident();
-		if (!res) return null;
-		const { small, big } = res;
+		const planned = this.destroyed || device.isLost ? null : this.resident();
+		if (!planned) return null;
+		const { small, big } = planned;
+		const graphOf = () =>
+			cachedGraph<GatherRun, void>(
+				device,
+				GROUP,
+				`${textureShapeKey(small)}|${textureShapeKey(big)}`,
+				(g) => buildGatherGraph(g, small, big),
+				4,
+			).graph;
 		const bufs: Buffer[] = [];
 		try {
-			const graphOf = () =>
-				cachedGraph<GatherRun, void>(
-					device,
-					GROUP,
-					`${textureShapeKey(small)}|${textureShapeKey(big)}`,
-					(g) => buildGatherGraph(g, small, big),
-					4,
-				).graph;
 			await graphOf().compileAsync();
 			const n = words.length;
 			const prm = device.createBuffer({
@@ -399,13 +418,46 @@ export class HeightGather {
 				usage: Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST,
 			});
 			bufs.push(prm, q, out);
-			const { reads } = await graphOf().run(
-				{ n, inBytes: q.byteLength, outBytes },
-				{ buffers: { prm, q, out }, textures: { small, big } },
-			);
+			// core cachedGraph's rule: the lookup right before the graph's lease, in the same tick
+			const graph = graphOf();
+			const submitted = await graph.lease(() => {
+				// the certificate is taken here, synchronously with the submit: every atlas write is a
+				// synchronous queue submit (TileStore.sync), so a tile holding its planned slot NOW has its
+				// heights in that layer ahead of this gather in queue order; a later eviction or re-use of
+				// the layer is queued after it (a check after the readback would miss an evict / re-add
+				// of the same tile to the same layer in between)
+				const res = this.destroyed || device.isLost ? null : this.resident();
+				// the atlas grew (arrays re-created, the old ones destroyed) since the plan: heightAt
+				if (!res || res.small !== small || res.big !== big) return null;
+				const slots = new Map<object, Slot | null>();
+				for (const { plan } of batch)
+					for (const t of plan.tiles)
+						if (!slots.has(t)) slots.set(t, res.slotOf(t));
+				graph.compile();
+				const enc = device.createCommandEncoder({ id: graph.id });
+				const { reads } = graph.encodeReads(
+					enc,
+					{ n, inBytes: q.byteLength, outBytes },
+					{ prm, q, out },
+					{ small, big },
+				);
+				try {
+					submit(device, enc);
+				} catch (e) {
+					reads.cancel();
+					throw e;
+				}
+				return { reads, slots };
+			});
+			if (!submitted) return null;
+			const r = await submitted.reads.read();
 			heightGatherCounters.dispatches++;
 			heightGatherCounters.bytesRead += outBytes;
-			return new Uint32Array(reads[READ_NODE][0].slice(0, outBytes));
+			const { slots } = submitted;
+			return {
+				bits: new Uint32Array(r[READ_NODE][0].slice(0, outBytes)),
+				slotOf: (t) => slots.get(t) ?? null,
+			};
 		} catch (e) {
 			heightGatherCounters.failures++;
 			console.warn("[height-gather] gather failed, CPU heights", e);
