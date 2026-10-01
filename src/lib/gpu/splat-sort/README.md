@@ -18,6 +18,17 @@ queue runs it before the frame encoder that is still recording the draw, so the 
 the new order (the worker path draws the previous order and redraws when the new one lands).
 `cpu.ts` is the CPU twin of every kernel; `splat-sort.wgsl.ts` the WGSL.
 
+The ten dispatches are kernel nodes of one core `ComputeGraph` (`cachedGraph` group `splat-sort`,
+keyed by the buffer sizes, registered in `gpu/app-graph/manifest.ts`, so `/dev/graph` lists it):
+a clear node of the min/max words, then depth → keys → two radix passes, with the bindings of the
+former `dispatchAll` call for call. Every buffer is an import bound per encode, so sorters of one
+size share one compiled graph, and the graph coalesces the nodes into one compute pass. `sort()`
+encodes and submits synchronously on the sorter's own encoder (no lease and no `run()`: the submit
+must precede the frame submit), so a cache eviction, queued under the graph's lease, never lands in
+the middle of a sort; an evicted graph is rebuilt and compiled at the next sort from the per-device
+pipeline cache. With `__RIGI_GPU_PROFILE__` the GPU time is reported per node as
+`splat-sort|<key>/<node>` (it was one `splatsort` pass).
+
 ## Identity with the worker's order
 
 The worker keys: `dist = -(a x + b y + c z + d)` (kept when `dist > 0`), range `[minD, maxD]` over the
@@ -50,7 +61,7 @@ sort over the keys that scatters in ascending index, so **ties keep ascending in
 
 Per cloud, a one-way state machine (`SortBackendState`, node-tested) switches the layer to the
 worker sorter on ANY of: an incapable device (`gpuSplatSortSupported`), a pipeline compile failure
-(`kernelAsync` rejects), a validation / out-of-memory error on the first two sorts (core
+(the graph's `compileAsync` rejects), a validation / out-of-memory error on the first two sorts (core
 `submitted(enc)` when `__RIGI_GPU_CHECKS__` is on, else a push/popErrorScope pair around the
 submit), a throwing `sort()`, or device loss (`gpu/core/lifecycle` `onLost`). It warns once and sets
 `stats.sortBackend = "worker"` and `stats.sortFallbackReason`. Until the pipelines have compiled

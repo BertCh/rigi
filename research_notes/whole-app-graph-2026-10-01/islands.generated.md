@@ -19,7 +19,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I8 | Queries | per settle | page | geo-query-gpu | `geo-query` |
 | I9 | Look | per settle, per style | page | look-guided, look-stats, look-haze, look-relief, look-textures | `look-guided`, `look-stats`, `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-relief` |
 | I10 | Labels (not a graph) | per emit | page | labels | – |
-| I11 | Nearfield | per view | page | splat-sort | – |
+| I11 | Nearfield | per view | page | splat-sort | `splat-sort` |
 | I12 | Roll | per photo, per frame | page, worker:ridgelines | horizon-ridges, roll-webgl | `horizon-ridges` |
 
 ## Modules
@@ -48,7 +48,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | look-relief | I9 | default | page | per style | `look-relief` | height field H (import or relief-heights transient); params | field + gen (array path only); texture path writes textures, no readback |
 | look-textures | I9 | default | page | per settle | `look-tex-*` (uncached) | renderer targets (geometry, photo, sky / fg masks, layer) as textures | band stats partials; haze head |
 | labels | I10 | cpu | page | per emit | – | – | – |
-| splat-sort | I11 | default | page | per view | – | splat storage buffer, order buffer (render device) | – |
+| splat-sort | I11 | default | page | per view | `splat-sort` | splat storage buffer, order buffer (render device; imports bound per encode); params, depth, mm, keys, rank, tmp, hist, base (imports, owned by each GpuSplatSorter) | – |
 | horizon-ridges | I12 | default | worker:ridgelines (remote) | per photo | `horizon-ridges` | mosaic pages (imports); u, params | read: ridge tops outBytes |
 | roll-webgl | I12 | cpu | page | per frame | – | deck WebGL2 + raw GL2 programs | range maps |
 
@@ -72,7 +72,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **look-haze**: graph breaks for the f64 airlight band / tail on the CPU (D16, D18)
 - **look-textures**: texture-input look passes; its own per-key graph cache (not core cachedGraph). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)
 - **labels**: CPU / DOM by nature; fed by I8's small readbacks
-- **splat-sort**: deck-webgpu splats sortBackend "gpu"; raw dispatches, not a ComputeGraph
+- **splat-sort**: deck-webgpu splats sortBackend "gpu"; clear + 10 kernel nodes in one compute pass, encoded and submitted synchronously on the sorter's encoder (no lease); keyed by buffer sizes
 - **roll-webgl**: WebGL2 only; needs a WebGPU port before it can join a graph
 
 Test and bench groups (not islands): `selftest-cache`, `look-haze-lint`.

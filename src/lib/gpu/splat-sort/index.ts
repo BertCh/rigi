@@ -18,21 +18,19 @@
 // does. So: same order wherever the keys agree; keys can differ by 1 at bin edges (not provably
 // zero in WGSL).
 //
+// The ten dispatches are kernel nodes of one core ComputeGraph (cachedGraph group "splat-sort", keyed
+// by the buffer sizes; every buffer is an import, bound per encode, so sorters of one size share the
+// compiled graph): a clear node of the min/max words, then the nodes in the order of the former
+// dispatchAll, coalesced by the graph into ONE compute pass, on the sorter's own encoder and submit.
+//
 // The order buffer holds ALL `count` splats: those at or behind the camera plane (the worker drops
 // them) are given the key 65536 and sort to the end (ascending index among themselves), where the
 // vertex shader's `clip.w < nearW` cull discards them. The caller therefore always draws `count`
 // instances; there is no kept-count readback.
-import type { Binding, Buffer, Device } from "@luma.gl/core";
-import {
-	type BindKind,
-	type DispatchCall,
-	defineKernel,
-	dispatchAll,
-	type Kernel,
-	kernelAsync,
-	submit,
-} from "../core/kernel";
-import { clear, range } from "../core/pool";
+import type { Buffer, Device, QuerySet } from "@luma.gl/core";
+import { type ComputeGraph, cachedGraph } from "../core/graph";
+import { type BindKind, defineKernel, submit } from "../core/kernel";
+import { profiling, recordGpuTime } from "../core/profile";
 import { errorChecks, submitted } from "../core/queue";
 import {
 	DEPTH_WGSL,
@@ -46,6 +44,7 @@ import {
 	TILE_WGSL,
 } from "./splat-sort.wgsl";
 
+/** The kernels' group and the core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "splat-sort"). */
 const GROUP = "splat-sort";
 /** GPUBufferUsage bits (as deck-webgpu/layers/splats.ts). */
 const STORAGE = 0x0080;
@@ -126,6 +125,9 @@ const SCAN_TOTALS = defineKernel(
 	{ group: GROUP },
 );
 
+/** Distinct sorter sizes kept compiled per device (one per live splat cloud, normally one). */
+const MAX_GRAPHS = 4;
+
 /** How many first sorts get an error check (a broken kernel fails on the first). */
 const CHECKED_SORTS = 2;
 
@@ -151,20 +153,107 @@ export function gpuSplatSortSupported(device: Device): boolean {
 	);
 }
 
+/** The sorter's buffers by graph import id. */
+type SortBuffers = Record<
+	| "params"
+	| "data"
+	| "order"
+	| "depth"
+	| "mm"
+	| "keys"
+	| "rank"
+	| "tmp"
+	| "hist"
+	| "base",
+	Buffer
+>;
+
+/**
+ * The sort graph for buffers of these sizes: a clear of `mm`, then depth → keys → two radix passes
+ * (tile → scan-digit → scan-totals → scatter), the bindings of the former dispatchAll call for call
+ * (whole buffers, except the index arrays bound to exactly `count` words).
+ */
+function buildSortGraph(
+	g: ComputeGraph,
+	buffers: SortBuffers,
+	count: number,
+	blocks: number,
+) {
+	const imp = (id: keyof SortBuffers, usage = STORAGE | COPY_DST) =>
+		g.importBuffer(id, buffers[id].byteLength, undefined, usage);
+	const p = imp("params", UNIFORM);
+	const splatData = imp("data", STORAGE);
+	const order = imp("order");
+	const depth = imp("depth");
+	const mm = imp("mm");
+	const keys = imp("keys");
+	const rank = imp("rank");
+	const tmp = imp("tmp");
+	const hist = imp("hist");
+	const base = imp("base");
+	const bytes = count * 4;
+	const orderRange = { buffer: order, size: bytes };
+	const tmpRange = { buffer: tmp, size: bytes };
+	g.clearNode("clear-mm", mm);
+	g.addKernel({
+		id: "depth",
+		spec: DEPTH,
+		bindings: { p, splatData, depth, mm },
+		workgroups: [blocks],
+	});
+	g.addKernel({
+		id: "keys",
+		spec: KEYS,
+		bindings: { p, depth, mm, keys },
+		workgroups: [blocks],
+	});
+	// pass 0 reads the identity (FIRST) into tmp; pass 1 reads tmp into the order buffer
+	const pass = (
+		k: 0 | 1,
+		inIdx: typeof orderRange,
+		outIdx: typeof orderRange,
+	) => {
+		g.addKernel({
+			id: `tile${k}`,
+			spec: k ? TILE1 : TILE0,
+			bindings: { p, keys, inIdx, rank, hist },
+			workgroups: [blocks],
+		});
+		g.addKernel({
+			id: `scan-digit${k}`,
+			spec: SCAN_DIGIT,
+			bindings: { p, hist, base },
+			workgroups: [DIGITS],
+		});
+		g.addKernel({
+			id: `scan-totals${k}`,
+			spec: SCAN_TOTALS,
+			bindings: { p, base },
+			workgroups: [1],
+		});
+		g.addKernel({
+			id: `scatter${k}`,
+			spec: k ? SCATTER1 : SCATTER0,
+			bindings: { p, keys, inIdx, rank, hist, base, outIdx },
+			workgroups: [blocks],
+		});
+	};
+	pass(0, orderRange, tmpRange);
+	pass(1, tmpRange, orderRange);
+}
+
 export class GpuSplatSorter {
 	readonly stats: GpuSplatSortStats = { sorts: 0, lastEncodeMs: 0 };
 	private readonly blocks: number;
 	private readonly params: Buffer;
-	private readonly depth: Buffer;
-	private readonly mm: Buffer;
-	private readonly keys: Buffer;
-	private readonly rank: Buffer;
-	private readonly tmp: Buffer;
-	private readonly hist: Buffer;
-	private readonly base: Buffer;
+	private readonly buffers: SortBuffers;
 	private readonly owned: Buffer[];
-	private ks: Kernel[] | null = null;
-	/** Resolves when every pipeline is compiled; rejects if one fails (caller falls back). */
+	/** cachedGraph key: the buffer sizes (the graph's import capacities and bindings) */
+	private readonly graphKey: string;
+	private compiled = false;
+	/** timestamp slots of profiled sorts (core profile, opt-in) */
+	private timestamps: QuerySet | null = null;
+	/** Resolves when the graph is compiled; rejects if a pipeline fails (caller falls back). */
 	readonly ready: Promise<void>;
 	private checked = 0;
 
@@ -175,8 +264,8 @@ export class GpuSplatSorter {
 	 */
 	constructor(
 		readonly device: Device,
-		private readonly data: Buffer,
-		private readonly order: Buffer,
+		data: Buffer,
+		order: Buffer,
 		readonly count: number,
 	) {
 		this.blocks = Math.max(1, Math.ceil(count / TILE));
@@ -188,43 +277,42 @@ export class GpuSplatSorter {
 				usage: usage | COPY_DST,
 			});
 		this.params = mk("params", 32, UNIFORM);
-		this.depth = mk("depth", n4);
-		this.mm = mk("mm", 8);
-		this.keys = mk("keys", n4);
-		this.rank = mk("rank", n4);
-		this.tmp = mk("tmp", n4);
-		this.hist = mk("hist", DIGITS * this.blocks * 4);
-		this.base = mk("base", DIGITS * 4);
-		this.owned = [
-			this.params,
-			this.depth,
-			this.mm,
-			this.keys,
-			this.rank,
-			this.tmp,
-			this.hist,
-			this.base,
-		];
-		// async compile (kernelAsync rejects on a failed pipeline); sort() is refused until it lands
-		this.ready = Promise.all(
-			[
-				DEPTH,
-				KEYS,
-				TILE0,
-				SCATTER0,
-				TILE1,
-				SCATTER1,
-				SCAN_DIGIT,
-				SCAN_TOTALS,
-			].map((s) => kernelAsync(device, s)),
-		).then((ks) => {
-			this.ks = ks;
-		});
+		const own = {
+			params: this.params,
+			depth: mk("depth", n4),
+			mm: mk("mm", 8),
+			keys: mk("keys", n4),
+			rank: mk("rank", n4),
+			tmp: mk("tmp", n4),
+			hist: mk("hist", DIGITS * this.blocks * 4),
+			base: mk("base", DIGITS * 4),
+		};
+		this.owned = Object.values(own);
+		this.buffers = { ...own, data, order };
+		this.graphKey = `${count}:${data.byteLength}:${order.byteLength}`;
+		// async compile (createComputePipelineAsync; rejects on a failed pipeline); sort() is refused
+		// until it lands
+		this.ready = this.graph()
+			.compileAsync()
+			.then(() => {
+				this.compiled = true;
+			});
+	}
+
+	/** This sorter's graph (a hit after the first lookup; rebuilt if an LRU eviction dropped it). */
+	private graph(): ComputeGraph {
+		return cachedGraph<void, void>(
+			this.device,
+			GROUP,
+			this.graphKey,
+			(g) => buildSortGraph(g, this.buffers, this.count, this.blocks),
+			MAX_GRAPHS,
+		).graph;
 	}
 
 	/** Pipelines compiled: sort() may be called. */
 	get isReady(): boolean {
-		return this.ks !== null;
+		return this.compiled;
 	}
 
 	/**
@@ -239,7 +327,7 @@ export class GpuSplatSorter {
 	sort(
 		row: readonly [number, number, number, number],
 	): Promise<void> | undefined {
-		if (!this.ks) throw new Error("[splat-sort] sort() before ready");
+		if (!this.compiled) throw new Error("[splat-sort] sort() before ready");
 		const t0 = performance.now();
 		const { device, blocks, count } = this;
 		const w = new ArrayBuffer(32);
@@ -250,86 +338,23 @@ export class GpuSplatSorter {
 		u[5] = count;
 		u[6] = blocks;
 		this.params.write(new Uint8Array(w));
-		const [
-			kDepth,
-			kKeys,
-			kTile0,
-			kScatter0,
-			kTile1,
-			kScatter1,
-			kScanDigit,
-			kScanTotals,
-		] = this.ks;
-		const enc = device.createCommandEncoder({ id: "splatsort" });
-		clear(enc, this.mm);
-		const p = this.params;
-		const bytes = count * 4;
-		const pass = (
-			kTile: Kernel,
-			kScatter: Kernel,
-			inIdx: Binding,
-			outIdx: Binding,
-		): DispatchCall[] => [
-			{
-				k: kTile,
-				bindings: {
-					p,
-					keys: this.keys,
-					inIdx,
-					rank: this.rank,
-					hist: this.hist,
-				},
-				x: blocks,
-			},
-			{
-				k: kScanDigit,
-				bindings: { p, hist: this.hist, base: this.base },
-				x: DIGITS,
-			},
-			{ k: kScanTotals, bindings: { p, base: this.base }, x: 1 },
-			{
-				k: kScatter,
-				bindings: {
-					p,
-					keys: this.keys,
-					inIdx,
-					rank: this.rank,
-					hist: this.hist,
-					base: this.base,
-					outIdx,
-				},
-				x: blocks,
-			},
-		];
-		dispatchAll(
-			enc,
-			[
-				{
-					k: kDepth,
-					bindings: { p, splatData: this.data, depth: this.depth, mm: this.mm },
-					x: blocks,
-				},
-				{
-					k: kKeys,
-					bindings: { p, depth: this.depth, mm: this.mm, keys: this.keys },
-					x: blocks,
-				},
-				// pass 0 reads the identity (FIRST) into tmp; pass 1 reads tmp into the order buffer
-				...pass(
-					kTile0,
-					kScatter0,
-					range(this.order, bytes),
-					range(this.tmp, bytes),
-				),
-				...pass(
-					kTile1,
-					kScatter1,
-					range(this.tmp, bytes),
-					range(this.order, bytes),
-				),
-			],
-			"splatsort",
-		);
+		// encoded and submitted synchronously, so a cache eviction (a destroy queued under the graph's
+		// lease) can never land in between; a graph rebuilt after one compiles here from the
+		// per-device pipeline cache the first compileAsync filled (throws while another sorter's
+		// compileAsync of the same key is in flight: the caller then falls back to the worker)
+		const graph = this.graph();
+		graph.compile();
+		const timed = profiling(device);
+		if (timed)
+			this.timestamps ??= device.createQuerySet({
+				type: "timestamp",
+				count: 2 * (graph.stats?.nodeCount ?? 0) + 2,
+			});
+		const enc = device.createCommandEncoder({
+			id: "splatsort",
+			...(timed ? { timeProfilingQuerySet: this.timestamps } : {}),
+		});
+		const encoding = graph.encode(enc, undefined, this.buffers);
 		const check = this.checked++ < CHECKED_SORTS;
 		let verdict: Promise<void> | undefined;
 		if (check && !errorChecks()) {
@@ -349,6 +374,24 @@ export class GpuSplatSorter {
 			submit(device, enc);
 			if (check) verdict = submitted(enc);
 		}
+		// profiling only (opt-in): per-node GPU ms under `${graph.id}/${node}`, as ComputeGraph.run
+		// reports them (an observed graph's inspector takes the one timing read)
+		if (timed && encoding.canReadGPUTimings) {
+			const observation = graph.inspect();
+			(observation
+				? observation
+						.recordGPUTimings(encoding)
+						.then((r) => r ?? encoding.readTimings())
+				: encoding.readTimings()
+			).then(
+				(timings) => {
+					for (const n of timings.nodes)
+						if (n.gpuTimeMilliseconds !== undefined)
+							recordGpuTime(`${graph.id}/${n.id}`, n.gpuTimeMilliseconds);
+				},
+				() => {},
+			);
+		}
 		this.stats.sorts++;
 		this.stats.lastEncodeMs = performance.now() - t0;
 		return verdict;
@@ -356,5 +399,7 @@ export class GpuSplatSorter {
 
 	destroy(): void {
 		for (const b of this.owned) b.destroy();
+		this.timestamps?.destroy();
+		this.timestamps = null;
 	}
 }

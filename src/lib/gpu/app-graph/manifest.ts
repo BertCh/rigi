@@ -606,14 +606,17 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		id: "splat-sort",
 		island: "I11",
 		paths: ["src/lib/gpu/splat-sort/index.ts"],
-		groups: [],
+		groups: ["splat-sort"],
 		realms: ["page"],
 		cadence: "per view",
-		resources: ["splat storage buffer, order buffer (render device)"],
+		resources: [
+			"splat storage buffer, order buffer (render device; imports bound per encode)",
+			"params, depth, mm, keys, rank, tmp, hist, base (imports, owned by each GpuSplatSorter)",
+		],
 		readbacks: [],
 		status: "default",
 		notes:
-			'deck-webgpu splats sortBackend "gpu"; raw dispatches, not a ComputeGraph',
+			'deck-webgpu splats sortBackend "gpu"; clear + 10 kernel nodes in one compute pass, encoded and submitted synchronously on the sorter\'s encoder (no lease); keyed by buffer sizes',
 	},
 	{
 		id: "horizon-ridges",
