@@ -28,10 +28,12 @@
  * instead of sharing buffers, and releaseHorizonGpu destroys pages only after in-flight calls finish.
  * Pooled slots are bound with their original byte sizes (core range()), so the kernel sees exactly
  * what it saw with per-call buffers: outputs are bit-identical to the pre-core path.
- * Opt-in (computeHorizonGpu(…, { graph: true }), computeHorizonsAuto 4th arg, sceneHorizonGpu opts.graph):
- * each chunk is one encoding of a cached core ComputeGraph instead (./graph.ts: out / stats as cleared
- * graph transients read through a read node, the same kernel, bindings of the same byte sizes, the
- * same chunk overlap); bit-identical to the default pooled path (scripts/gpu/horizon-bench.mjs).
+ * Default plumbing (since 2026-10-01): each chunk is one encoding of a cached core ComputeGraph
+ * (./graph.ts: out / stats as graph transients read through a read node, stats cleared, the same
+ * kernel, bindings of the same byte sizes, the same chunk overlap). The pooled single dispatch above is
+ * the explicit fallback: computeHorizonGpu(…, { graph: false }) (computeHorizonsAuto 4th arg,
+ * sceneHorizonGpu opts.graph, the eye provider's `graph`). Both are bit-identical
+ * (scripts/gpu/horizon-bench.mjs diffs them bit for bit and times them alternated).
  *
  * Ridges and peaks (decision): the GPU doesn't record ridges. Ridge lists are variable-length per azimuth
  * and only the Overlay / refine paths use them; the app worker and eye search pass noRidges. So
@@ -74,6 +76,7 @@ import {
 } from "#/lib/horizon-fast/march";
 import { buildMips, type Mosaic } from "#/lib/horizon-fast/mosaic";
 import { getComputeDevice } from "../device";
+import { graphChunker } from "./graph";
 import { HORIZON_WGSL } from "./horizon.wgsl";
 
 const RING_STRIDE = 40;
@@ -268,7 +271,7 @@ export interface GpuHorizonTiming {
 
 /** Plumbing options of the GPU march (not numerics: every path gives the same bits). */
 export interface HorizonGpuOptions {
-	/** march each chunk as a core ComputeGraph encoding (./graph.ts); default: pooled single dispatch */
+	/** false: the pooled single dispatch per chunk; default (true): a core ComputeGraph encoding (./graph.ts) */
 	graph?: boolean;
 }
 
@@ -416,18 +419,19 @@ async function marchLocked(
 	const ub = new ArrayBuffer(64);
 	const uu = new Uint32Array(ub);
 	const uf = new Float32Array(ub);
-	// graph path: one ComputeGraph encoding per chunk (same kernel, same bytes; ./graph.ts)
-	const chunker = gpu.graph
-		? await (await import("./graph")).graphChunker(device, LEASE, {
-				spec: MARCH,
-				pages: pages.map((b) =>
-					b instanceof Buffer ? { buffer: b, size: b.byteLength } : b,
-				),
-				paramsBytes,
-				outBytes,
-				statsBytes,
-			})
-		: null;
+	// graph path (default): one ComputeGraph encoding per chunk (same kernel, same bytes; ./graph.ts)
+	const chunker =
+		gpu.graph !== false
+			? await graphChunker(device, LEASE, {
+					spec: MARCH,
+					pages: pages.map((b) =>
+						b instanceof Buffer ? { buffer: b, size: b.byteLength } : b,
+					),
+					paramsBytes,
+					outBytes,
+					statsBytes,
+				})
+			: null;
 
 	const out: FastHorizonProfile[] = new Array(eyes.length);
 	let chunks = 0;

@@ -118,7 +118,7 @@ export interface EyeHorizonProviderOptions {
 	 * step 0.05°, minDistance 2 m, maxDistance 120 km.
 	 */
 	horizon?: FastHorizonOptions;
-	/** GPU march plumbing: each chunk as a core ComputeGraph (identical bits; default the pooled path) */
+	/** GPU march plumbing: false = the pooled path; default each chunk as a core ComputeGraph (identical bits) */
 	graph?: boolean;
 }
 

@@ -123,7 +123,7 @@ try {
 							width: e.width,
 							height: e.height,
 						};
-						// ABL_GRAPH=1: GPU work on core command graphs (plumbing A/B)
+						// ABL_GRAPH=0: GPU work on the pooled paths (plumbing A/B; default core command graphs)
 						// ABL_FUSED=1/0: the fused horizon → solve chain on / off (unset: the worker default)
 						const s = new m.UnknownPoseSolver(photo, { graph, fused });
 						const out = [];
@@ -168,7 +168,7 @@ try {
 						graph:
 							process.env.ABL_GRAPH === "default"
 								? undefined
-								: process.env.ABL_GRAPH === "1",
+								: process.env.ABL_GRAPH !== "0",
 						fused:
 							process.env.ABL_FUSED === undefined
 								? undefined

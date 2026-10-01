@@ -54,7 +54,7 @@ export interface EyeBenchIn {
 	/** Photo URL (served by the dev server). */
 	img: string;
 	modes?: Mode[];
-	/** GPU horizon on the command-graph path (./horizon/graph.ts) */
+	/** false: GPU horizon on the pooled path; default the command-graph path (../horizon/graph.ts) */
 	graph?: boolean;
 }
 

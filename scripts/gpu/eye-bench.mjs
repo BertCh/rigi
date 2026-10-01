@@ -69,8 +69,8 @@ try {
 				},
 				img: `/photos/${id}.jpg`,
 				modes: MODES,
-				// HGRAPH=1: the GPU horizon on the command-graph path (A/B against the default)
-				graph: process.env.HGRAPH === "1",
+				// HGRAPH=0: the GPU horizon on the pooled path (A/B against the default command graph)
+				graph: process.env.HGRAPH !== "0",
 			},
 		);
 		r.lead = { refinedShift: l.refinedShift, moved: l.moved, ms: l.ms };

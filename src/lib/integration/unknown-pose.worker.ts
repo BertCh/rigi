@@ -110,7 +110,7 @@ function horizonAt(
 	lon: number,
 	alt: number | null,
 	gpu = false,
-	graph = false,
+	graph = true,
 	fused = false,
 ) {
 	const key = `${lat.toFixed(6)},${lon.toFixed(6)},${alt ?? ""},${gpu ? "gpu" : ""}${graph ? "+graph" : ""}${fused ? "+fused" : ""}`;
@@ -144,7 +144,7 @@ async function computeScene(
 	lon: number,
 	alt: number | null,
 	gpu = false,
-	graph = false,
+	graph = true,
 	fused = false,
 ) {
 	const signal = AbortSignal.timeout(SCENE_TIMEOUT_MS);
@@ -225,7 +225,7 @@ async function solve(req: UnknownPoseRequest): Promise<UnknownPoseResult> {
 		? async (prior, horizon, sky, o) => {
 				const r = await solveCoarse(prior, horizon, sky, o, {
 					// the command-graph path (GPU row fold, resident horizon profile) unless the page
-					// asked for the pooled paths (gpuGraph: false); the 360° horizon's graph stays opt-in
+					// asked for the pooled paths (gpuGraph: false); the 360° horizon likewise (horizonAt)
 					graph: req.gpuGraph !== false,
 				});
 				if (r) on.add(r.on);

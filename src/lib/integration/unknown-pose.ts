@@ -57,8 +57,8 @@ export type UnknownPosePrepare = {
 	/** solvePose's coarse grid on the GPU (src/lib/gpu/solve; identical by construction): gpuEnabled() */
 	solveGpu?: boolean;
 	/**
-	 * GPU plumbing only (identical results): true = coarse grid and 360° horizon on core command
-	 * graphs; false = both on the pooled paths; unset = coarse grid on the graph, horizon pooled.
+	 * GPU plumbing only (identical results): true or unset = coarse grid and 360° horizon on core
+	 * command graphs; false = both on the pooled paths.
 	 */
 	gpuGraph?: boolean;
 	/**
@@ -155,7 +155,7 @@ export class UnknownPoseSolver {
 
 	constructor(
 		private photo: PhotoMeta,
-		/** graph: GPU work on core command graphs (A/B of the plumbing; default the pooled paths) */
+		/** graph: false = GPU work on the pooled paths (A/B of the plumbing; default core command graphs); fused: the fused horizon → solve chain */
 		private opts: { graph?: boolean; fused?: boolean } = {},
 	) {
 		this.worker = new Worker(

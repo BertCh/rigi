@@ -1,12 +1,13 @@
-// Horizon march chunks on a core ComputeGraph (opt-in: computeHorizonGpu(…, { graph: true }); the
-// pooled single-dispatch path in ./index.ts stays the default).
+// Horizon march chunks on a core ComputeGraph: the default path of computeHorizonGpu (the pooled
+// single-dispatch path in ./index.ts is the explicit fallback, `{ graph: false }`).
 //
 // Each chunk is one encoding of a 1-kernel graph:
-//   clear out, clear stats → MARCH (./horizon.wgsl.ts, unchanged) → read [out, stats] (one slot)
-// `out` and `stats` are graph transients (stats is atomically accumulated, so its clear is required;
-// out is fully written for the read range, and cleared anyway by the house rule). u / params / the
-// mosaic pages stay imports: params and u are pooled uploads written per chunk, the pages are the
-// persistent per-mosaic-set buffers.
+//   clear stats → MARCH (./horizon.wgsl.ts, unchanged) → read [out, stats] (one slot)
+// `out` and `stats` are graph transients. stats is atomically accumulated, so its clear is required.
+// out needs no clear: every in-range invocation writes both of its words (the kernel's only early
+// return is the out-of-range guard), so the read range [0, nE·nAz·8) is fully written ("full").
+// u / params / the mosaic pages stay imports: params and u are pooled uploads written per chunk, the
+// pages are the persistent per-mosaic-set buffers.
 //
 // Bit-identity with the pooled path: same kernel spec, same uniforms and params bytes, and every
 // binding has the old path's byte size (params / out / stats are bound as per-run ranges of exactly
@@ -16,6 +17,10 @@
 // the graph's transients and the pooled u / params; WebGPU queue order puts chunk c's read copy before
 // chunk c+1's writeBuffer / clear. core/readback maps with the raw mapAsync, so collecting c waits for
 // c only. The graph's lease is held for the whole call (inside the "horizon" lease).
+//
+// Per-call overhead vs the pooled path: ./index.ts imports this module statically (no per-call
+// dynamic import()), the u slot is only sized here (not written twice), and the run parameters and
+// bindings record are built once per call and reused by every chunk.
 import { Buffer, type Device } from "@luma.gl/core";
 import { cachedGraph } from "#/lib/gpu/core/graph";
 import type { KernelSpec } from "#/lib/gpu/core/kernel";
@@ -62,6 +67,9 @@ function hold(lease: (fn: () => Promise<void>) => Promise<void>) {
 	});
 }
 
+const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
+const PARAMS = Buffer.STORAGE | Buffer.COPY_DST;
+
 /**
  * The chunk runner of one computeHorizonGpu call. Call inside the "horizon" lease (the pooled u /
  * params slots and the cached graphs of group "horizon-march" are only touched under it).
@@ -71,36 +79,23 @@ export async function graphChunker(
 	lease: string,
 	s: ChunkShape,
 ): Promise<Chunker> {
-	const u0 = pooledUniform(device, `${lease}/u`, new ArrayBuffer(64));
+	// the u slot as pooledUniform(64 B) sizes it (no write here: submit() writes it per chunk)
+	const uBytes = acquire(device, `${lease}/u`, 64, UNIFORM).byteLength;
 	const paramsCap = capacityFor(s.paramsBytes);
 	const outCap = capacityFor(s.outBytes);
 	const statsCap = capacityFor(s.statsBytes);
-	const key = [
-		`u${u0.byteLength}`,
-		`p${paramsCap}`,
-		`o${outCap}`,
-		`s${statsCap}`,
-		...s.pages.map((p, i) => `pg${i}:${p.buffer.byteLength}/${p.size}`),
-	].join(",");
+	let key = `u${uBytes},p${paramsCap},o${outCap},s${statsCap}`;
+	for (let i = 0; i < s.pages.length; i++)
+		key += `,pg${i}:${s.pages[i].buffer.byteLength}/${s.pages[i].size}`;
 	const { graph } = cachedGraph<Params>(device, "horizon-march", key, (g) => {
-		const u = g.importBuffer(
-			"u",
-			u0.byteLength,
-			undefined,
-			Buffer.UNIFORM | Buffer.COPY_DST,
-		);
-		const params = g.importBuffer(
-			"params",
-			paramsCap,
-			undefined,
-			Buffer.STORAGE | Buffer.COPY_DST,
-		);
+		const u = g.importBuffer("u", uBytes, undefined, UNIFORM);
+		const params = g.importBuffer("params", paramsCap, undefined, PARAMS);
 		const pg = s.pages.map((p, i) =>
 			g.importBuffer(`pg${i}`, p.buffer.byteLength, undefined, Buffer.STORAGE),
 		);
 		const out = g.transientBuffer("out", outCap, STORAGE);
 		const stats = g.transientBuffer("stats", statsCap, STORAGE);
-		g.clearNode("clear-out", { buffer: out, size: (p) => p.nE * p.nAz * 8 });
+		// out: no clear (fully written for the read range, see the header); stats: atomics
 		g.clearNode("clear-stats", { buffer: stats, size: (p) => p.statsBytes });
 		g.addKernel({
 			id: "march",
@@ -116,7 +111,7 @@ export async function graphChunker(
 				stats: { buffer: stats, size: (p) => p.statsBytes },
 			},
 			workgroups: (p) => [Math.ceil(p.nAz / 64), p.nE, 1],
-			writes: { stats: "atomic", outTD: "partial" },
+			writes: { stats: "atomic" },
 		});
 		g.readNode("read", [
 			{ buffer: out, size: (p) => p.nE * p.nAz * 8 },
@@ -131,33 +126,29 @@ export async function graphChunker(
 		release();
 		throw e;
 	}
-	const bufs: Record<string, Buffer> = {};
-	s.pages.forEach((p, i) => {
-		bufs[`pg${i}`] = p.buffer;
-	});
+	const bufs: Record<string, Buffer> = {
+		pg0: s.pages[0].buffer,
+		pg1: s.pages[1].buffer,
+		pg2: s.pages[2].buffer,
+		pg3: s.pages[3].buffer,
+	};
+	const p: Params = {
+		nAz: 0,
+		nE: 0,
+		paramsBytes: s.paramsBytes,
+		outBytes: s.outBytes,
+		statsBytes: s.statsBytes,
+	};
 	return {
 		submit(ub, params, nAz, nE) {
-			// the same pooled slots as the default path (same lease), written per chunk
+			// the same pooled slots as the pooled path (same lease), written per chunk
 			bufs.u = pooledUniform(device, `${lease}/u`, ub);
-			bufs.params = acquire(
-				device,
-				`${lease}/params`,
-				s.paramsBytes,
-				Buffer.STORAGE | Buffer.COPY_DST,
-			);
+			bufs.params = acquire(device, `${lease}/params`, s.paramsBytes, PARAMS);
 			bufs.params.write(params);
+			p.nAz = nAz;
+			p.nE = nE;
 			const enc = device.createCommandEncoder({ id: "horizon-march" });
-			const { reads } = graph.encodeReads(
-				enc,
-				{
-					nAz,
-					nE,
-					paramsBytes: s.paramsBytes,
-					outBytes: s.outBytes,
-					statsBytes: s.statsBytes,
-				},
-				bufs,
-			);
+			const { reads } = graph.encodeReads(enc, p, bufs);
 			submit(device, enc); // a throwing submit cancels the staged read
 			return {
 				read: async () => (await reads.read()).read,

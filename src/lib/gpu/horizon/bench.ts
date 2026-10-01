@@ -227,15 +227,18 @@ export async function benchPhoto(o: BenchIn) {
 			g = (await computeHorizonGpu(device, mosaics, [eye], opts))[0];
 			warm.push(lastGpuHorizonTiming?.totalMs ?? Number.NaN);
 		}
-		// the command-graph path (./graph.ts) against the pooled path: bit-identical, alternated timings
+		// the command-graph path (./graph.ts, the default) against the pooled path ({ graph: false }):
+		// bit-identical, alternated timings
 		const oldMs: number[] = [];
 		const graphMs: number[] = [];
 		let diff = bitDiff(
 			[g],
-			await computeHorizonGpu(device, mosaics, [eye], opts, { graph: true }),
+			await computeHorizonGpu(device, mosaics, [eye], opts, { graph: false }),
 		);
 		for (let r = 0; r < 5; r++) {
-			const a = await computeHorizonGpu(device, mosaics, [eye], opts);
+			const a = await computeHorizonGpu(device, mosaics, [eye], opts, {
+				graph: false,
+			});
 			oldMs.push(lastGpuHorizonTiming?.totalMs ?? Number.NaN);
 			const b = await computeHorizonGpu(device, mosaics, [eye], opts, {
 				graph: true,
@@ -269,10 +272,13 @@ export async function benchPhoto(o: BenchIn) {
 	const bOpts = configs.app;
 	const eyes = eyeGrid(eye, o.batch ?? 343);
 	const b0 = performance.now();
-	const batch = await computeHorizonGpu(device, mosaics, eyes, bOpts);
+	const batch = await computeHorizonGpu(device, mosaics, eyes, bOpts, {
+		graph: false,
+	});
 	const batchMs = performance.now() - b0;
 	const batchChunks = lastGpuHorizonTiming?.chunks;
-	// graph path on the batch (15 chunks of 24 eyes at 343 eyes: the chunk overlap), alternated
+	// `batch` is the pooled path; the graph path on the batch (15 chunks of 24 eyes at 343 eyes: the
+	// chunk overlap), alternated
 	const bOld: number[] = [batchMs];
 	const bGraph: number[] = [];
 	let batchDiff = { el: 0, dist: 0, stats: 0, n: 0 };
@@ -291,7 +297,9 @@ export async function benchPhoto(o: BenchIn) {
 		};
 		if (r < 2) {
 			const t2 = performance.now();
-			const ob = await computeHorizonGpu(device, mosaics, eyes, bOpts);
+			const ob = await computeHorizonGpu(device, mosaics, eyes, bOpts, {
+				graph: false,
+			});
 			bOld.push(performance.now() - t2);
 			const d2 = bitDiff(batch, ob);
 			batchDiff.el += d2.el;
