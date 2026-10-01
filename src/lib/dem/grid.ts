@@ -25,6 +25,42 @@ export function sampleGrid(h: Float32Array, S: number, px: number, py: number) {
 }
 
 /**
+ * sampleGrid in two halves, for callers whose four heights come from elsewhere (the GPU height gathers,
+ * deck-webgpu/height-gather.ts): gridCorners writes sampleGrid's sample positions and weights to `out`
+ * ([x0, y0, x1, y1, fx, fy]; index = y·S + x), blendCorners combines the four heights. Together they
+ * are sampleGrid bit for bit (the same operations in the same order on the same float32 values):
+ *   blendCorners(h[y0·S+x0], h[y0·S+x1], h[y1·S+x0], h[y1·S+x1], fx, fy) === sampleGrid(h, S, px, py)
+ */
+export function gridCorners(S: number, px: number, py: number, out: number[]) {
+	const m = S - 1;
+	const x = Math.min(Math.max(px - 0.5, 0), m);
+	const y = Math.min(Math.max(py - 0.5, 0), m);
+	const x0 = Math.floor(x);
+	const y0 = Math.floor(y);
+	out[0] = x0;
+	out[1] = y0;
+	out[2] = Math.min(x0 + 1, m);
+	out[3] = Math.min(y0 + 1, m);
+	out[4] = x - x0;
+	out[5] = y - y0;
+	return out;
+}
+
+/** The blend half of sampleGrid (see gridCorners): h00 = (x0, y0), h01 = (x1, y0), h10 = (x0, y1). */
+export function blendCorners(
+	h00: number,
+	h01: number,
+	h10: number,
+	h11: number,
+	fx: number,
+	fy: number,
+) {
+	const a = h00 * (1 - fx) + h01 * fx;
+	const b = h10 * (1 - fx) + h11 * fx;
+	return a * (1 - fy) + b * fy;
+}
+
+/**
  * The part of ancestor tile `source` (heights `h`, S×S) under `key`, bilinear-resampled to size×size
  * (pixel centres; the ancestor's pixels just outside the quadrant feed its edges). `h` itself when
  * key = source and the size matches.

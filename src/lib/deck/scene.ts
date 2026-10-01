@@ -108,7 +108,9 @@ export type SnappedPeak = {
  * min(250, 60 + dist·0.004) m. Lazily: three snaps every peak up front, but on deck's z17 set
  * that is ~2 s for a region's ~2.6k peaks, so only peaks near the frame (15 % margin: snapping
  * moves a summit ≤ 250 m) are snapped, and the verdict is cached in `cache` (per terrain).
- * Returns every peak snapped so far.
+ * Returns every peak snapped so far. `localMax` replaces terrain.localMax (the WebGPU engine's GPU
+ * height gathers, deck-webgpu/height-gather.ts); undefined from it = not known yet (the peak is
+ * retried on a later call, like a peak outside the frame).
  */
 export function snapPeaksNear(
 	terrain: TerrainSet,
@@ -118,6 +120,10 @@ export function snapPeaksNear(
 	eye: [number, number, number],
 	aspect: number,
 	cache: Map<Peak, SnappedPeak | null>,
+	localMax?: (
+		p: Peak,
+		radiusM: number,
+	) => { lat: number; lon: number; h: number } | undefined,
 ): SnappedPeak[] {
 	const eyeV = new THREE.Vector3(...eye);
 	const m = 0.15;
@@ -132,11 +138,11 @@ export function snapPeaksNear(
 		const pr = projectPoint(pose, aspect, eyeV, raw);
 		if (!pr || pr.u < -m || pr.u > 1 + m || pr.v < -m - 0.3 || pr.v > 1 + m)
 			continue; // not now; maybe once the view turns
-		const snap = terrain.localMax(
-			p.lat,
-			p.lon,
-			Math.min(250, 60 + dist * 0.004),
-		);
+		const radiusM = Math.min(250, 60 + dist * 0.004);
+		const snap = localMax
+			? localMax(p, radiusM)
+			: terrain.localMax(p.lat, p.lon, radiusM);
+		if (!snap) continue; // not known yet
 		if (!Number.isFinite(snap.h)) {
 			cache.set(p, null);
 			continue;

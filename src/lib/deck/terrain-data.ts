@@ -88,6 +88,36 @@ export type TerrainStats = {
 	buildMs?: number;
 };
 
+/** TerrainSet.locate's result (reused across calls by the caller). */
+export type TileLocation = { tile: TileMesh; px: number; py: number };
+
+/**
+ * TerrainSet.localMax over any height lookup: the start point, then a 9 × 9 grid over ±radiusM, in
+ * this order (the GPU gathers record and replay these calls, deck-webgpu/height-gather.ts).
+ */
+export function localMaxOf(
+	heightAt: (lat: number, lon: number) => number | null,
+	lat: number,
+	lon: number,
+	radiusM = 150,
+) {
+	let best = {
+		lat,
+		lon,
+		h: heightAt(lat, lon) ?? Number.NEGATIVE_INFINITY,
+	};
+	const dLat = radiusM / M_PER_DEG_LAT;
+	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
+	for (let i = -4; i <= 4; i++)
+		for (let j = -4; j <= 4; j++) {
+			const la = lat + (i / 4) * dLat;
+			const lo = lon + (j / 4) * dLon;
+			const h = heightAt(la, lo);
+			if (h != null && h > best.h) best = { lat: la, lon: lo, h };
+		}
+	return best;
+}
+
 async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
 	let i = 0;
 	await Promise.all(
@@ -134,23 +164,33 @@ export class TerrainSet {
 		return null;
 	}
 
+	/**
+	 * heightAt's lookup without the heights: the finest loaded tile at (lat, lon) and the pixel position
+	 * heightAt hands sampleGrid, written to `out` (same arithmetic as heightAt); null outside coverage.
+	 * heightAt(lat, lon) === sampleGrid(getCpuHeights(out.tile), out.tile.size, out.px, out.py).
+	 */
+	locate(lat: number, lon: number, out: TileLocation): TileLocation | null {
+		const mx = lonToTileX(lon, 0);
+		const my = latToTileY(lat, 0);
+		for (const z of this.zooms) {
+			const fx = mx * 2 ** z;
+			const fy = my * 2 ** z;
+			const x = Math.floor(fx);
+			const y = Math.floor(fy);
+			const t = this.byId.get(tileNum(z, x, y));
+			if (t) {
+				out.tile = t;
+				out.px = (fx - x) * t.size;
+				out.py = (fy - y) * t.size;
+				return out;
+			}
+		}
+		return null;
+	}
+
 	/** Highest DEM point within `radiusM` (snaps OSM peak nodes onto the DEM summit). */
 	localMax(lat: number, lon: number, radiusM = 150) {
-		let best = {
-			lat,
-			lon,
-			h: this.heightAt(lat, lon) ?? Number.NEGATIVE_INFINITY,
-		};
-		const dLat = radiusM / M_PER_DEG_LAT;
-		const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
-		for (let i = -4; i <= 4; i++)
-			for (let j = -4; j <= 4; j++) {
-				const la = lat + (i / 4) * dLat;
-				const lo = lon + (j / 4) * dLon;
-				const h = this.heightAt(la, lo);
-				if (h != null && h > best.h) best = { lat: la, lon: lo, h };
-			}
-		return best;
+		return localMaxOf((la, lo) => this.heightAt(la, lo), lat, lon, radiusM);
 	}
 
 	/**
