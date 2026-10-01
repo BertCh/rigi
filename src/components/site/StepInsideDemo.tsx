@@ -123,7 +123,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 					import("#/lib/demo").then((d) => d.loadDemo()),
 					import("#/lib/flags"),
 					import("#/lib/renderer-select"),
-					import("#/lib/nearfield/splat-io"),
+					import("#/lib/nearfield/splat-loaders"),
 					import("#/lib/nearfield/measure"),
 				]);
 			if (!live) return;
@@ -157,7 +157,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 			if (!live) return;
 			engine.setPose(baked.pose);
 			if (!(await engine.readback()) || !live) return;
-			const splats = splatIo.decodeSplatV1(splatBuf);
+			const splats = splatIo.SplatV1Loader.parseSync(splatBuf);
 			const cls = bytesFromBase64(baked.split.cls);
 			const scene: import("#/lib/nearfield/measure").MeasurableScene = {
 				photoId: photo.id,

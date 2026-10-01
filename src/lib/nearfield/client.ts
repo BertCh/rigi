@@ -4,7 +4,7 @@
 
 // Client for the optional near-field service (tools/nearfield, default http://127.0.0.1:8767).
 // Like matcher-client.ts: everything degrades to `false` / `null` when the service isn't running; it never throws.
-import { decodeGaussianPly, decodeSplatV1, SPLAT_V1_MAGIC } from "./splat-io";
+import { parseSplatSync } from "./splat-loaders";
 import {
 	type GaussianCloud,
 	type MultiViewWire,
@@ -98,14 +98,8 @@ export function decodeDepthWire(
 }
 
 /** A /gaussians body: .splat-v1 (magic RIGISPL1) or a standard 3DGS binary .ply. Throws if neither. */
-function decodeGaussianBody(buf: ArrayBuffer): GaussianCloud {
-	const head = new TextDecoder("latin1").decode(
-		new Uint8Array(buf, 0, Math.min(8, buf.byteLength)),
-	);
-	if (head === SPLAT_V1_MAGIC) return decodeSplatV1(buf);
-	if (head.startsWith("ply")) return decodeGaussianPly(buf);
-	throw new Error("nearfield: unknown gaussian format");
-}
+const decodeGaussianBody = (buf: ArrayBuffer): GaussianCloud =>
+	parseSplatSync(buf);
 
 // ---- transport ----
 

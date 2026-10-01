@@ -225,6 +225,13 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "splat-loaders",
+		tier: "fast",
+		group: "nearfield",
+		cmd: tsx("src/lib/nearfield/splat-loaders.check.ts"),
+		timeoutS: 120,
+	},
+	{
 		id: "nearfield-export",
 		tier: "fast",
 		group: "nearfield",

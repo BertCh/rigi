@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { BRAND } from "#/brand/khipu";
-import { decodeGaussianPly, decodeSplatV1 } from "#/lib/nearfield/splat-io";
+import { SplatPlyLoader, SplatV1Loader } from "#/lib/nearfield/splat-loaders";
 import { ThreeSplats } from "#/lib/nearfield/three-splats";
 import { type GaussianCloud, PROVENANCE_CODE } from "#/lib/nearfield/types";
 
@@ -468,8 +468,8 @@ function SplatLab() {
 		try {
 			const buf = await f.arrayBuffer();
 			const cloud = f.name.toLowerCase().endsWith(".ply")
-				? decodeGaussianPly(buf, { frame: "camera" })
-				: decodeSplatV1(buf);
+				? SplatPlyLoader.parseSync(buf, { "splat-ply": { frame: "camera" } })
+				: SplatV1Loader.parseSync(buf);
 			apiRef.current?.load(cloud, cloud.frame);
 		} catch (e) {
 			setInfo(`load failed: ${(e as Error).message}`);
