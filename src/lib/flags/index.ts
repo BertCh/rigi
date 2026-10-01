@@ -64,6 +64,14 @@ export const FLAG_SCHEMA = {
 	horizonPrecision: oneOf(["f64", "certified-f32"], "certified-f32"),
 	/** relief / haze look passes */
 	lookgpu: onOff("on"),
+	/**
+	 * sky worker: the segmentation input (resample + normalise) prepared on the GPU from an ImageBitmap
+	 * (src/lib/gpu/sky/prep.ts), bit-identical to the CPU prep; the first 3 photos per device are compared
+	 * in full with the CPU chain. Default on since 2026-10-01 (browser A/B: 69/69 masks identical, ~10 ms
+	 * faster; its ComputeGraph port bit-identical on Dawn, sky-prep-dawn.ts --graph); off = getImageData + the
+	 * CPU prep. ?gpu=off and WASM ORT always prep on the CPU.
+	 */
+	skyGpuPrep: onOff("on"),
 	/** unknown-pose 360° horizon (off: 0-false-accept rule) */
 	unknownGpu: onOff("off"),
 	/**

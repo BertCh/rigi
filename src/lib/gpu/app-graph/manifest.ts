@@ -475,6 +475,31 @@ export const GPU_MODULES: readonly GpuModule[] = [
 	},
 	{
 		id: "sky-refine",
+	{
+		id: "sky-prep",
+		island: "I6",
+		paths: [
+			"src/lib/gpu/sky/prep.ts",
+			"src/lib/gpu/sky/prep.wgsl.ts",
+			"src/lib/sky/prep.ts",
+		],
+		groups: ["sky-prep"],
+		realms: ["worker:sky"],
+		cadence: "per photo",
+		resources: [
+			"ImageBitmap → rgba8unorm texture (per photo)",
+			"tmp (transient)",
+			"axis taps, constants, LUT (pooled imports)",
+			"rgba, rgbLo, ORT input (handed to the model and sky-refine)",
+		],
+		readbacks: [
+			"opacity flag (4 B)",
+			"first 3 photos per device: rgba + rgbLo + input (verification)",
+		],
+		status: "default",
+		notes:
+			"cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; flag skyGpuPrep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)",
+	},
 		island: "I6",
 		paths: ["src/lib/gpu/sky/refine-graph.ts", "src/lib/gpu/sky/refine.ts"],
 		groups: ["sky-refine"],

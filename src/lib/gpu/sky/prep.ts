@@ -12,18 +12,21 @@
 // twin. Nothing here reads back unless the caller verifies (readPrep / readRgba).
 //
 // Steps: copyExternalImageToTexture (rgba8unorm, no colour conversion, unpremultiplied) →
-// copyTextureToBuffer (rows padded to 256 B) → unpack → H pass → V pass → normalise, one submit
-// after the texture copy. The pixels equal getImageData's only if the bitmap was made from the same
+// copyTextureToBuffer (rows padded to 256 B) → unpack → H pass → V pass → normalise, the kernels on
+// a core ComputeGraph per shape (buildPrepGraph, cachedGraph group "sky-prep"; since 2026-10-01, it was
+// a dispatchAll chain) submitted after the texture copy. The pixels equal getImageData's only if the bitmap was made from the same
 // raster with premultiplyAlpha/colorSpaceConversion 'none' (sky/index.ts); the first photos per
 // device are compared byte-for-byte against the CPU pixels (sky/prep.ts), never trusted blindly.
-import type { Buffer, Device } from "@luma.gl/core";
+import { Buffer, type Device } from "@luma.gl/core";
+import {
+	type ComputeGraph,
+	cachedGraph,
+	releaseCachedGraphs,
+} from "#/lib/gpu/core/graph";
 import {
 	type BindKind,
 	defineKernel,
-	dispatchAll,
-	kernel,
 	storage,
-	submit,
 	uniform,
 } from "#/lib/gpu/core/kernel";
 import { pooledStorage, withLease } from "#/lib/gpu/core/pool";
@@ -156,6 +159,79 @@ function tables(W: number, H: number, lw: number, lh: number) {
 
 const handleOf = (b: Buffer) => (b as unknown as { handle: GPUBuffer }).handle;
 
+type Params = Record<string, never>;
+
+/** Compiled prep graphs kept per device (one per photo shape; each holds its `tmp` transient). */
+const MAX_GRAPHS = 2;
+
+/**
+ * The five prep kernels for one shape as a core ComputeGraph (cachedGraph group "sky-prep"; one compute
+ * pass). Imports, bound per run: the params, the padded rows, the pooled tables and the four outputs
+ * (caller-owned: ORT and the refine wrap them after the run). The H pass's `tmp` is the graph's only
+ * transient; every kernel writes every element of its output range, except prep-alpha, which only sets
+ * `flag` (an import created zeroed per run).
+ */
+export function buildPrepGraph(
+	g: ComputeGraph<Params>,
+	W: number,
+	H: number,
+	lw: number,
+	lh: number,
+): void {
+	const n = lw * lh;
+	const N = W * H;
+	const rowBytes = Math.ceil((W * 4) / 256) * 256;
+	const t = tables(W, H, lw, lh);
+	const imp = (id: string, bytes: number, usage = Buffer.STORAGE) =>
+		g.importBuffer(id, bytes, undefined, usage);
+	const prm = imp("prm", 32, Buffer.UNIFORM | Buffer.COPY_DST);
+	const pad = imp("pad", rowBytes * H);
+	const axH = imp("axH", t.axH.byteLength);
+	const axV = imp("axV", t.axV.byteLength);
+	const cst = imp("cst", t.cst.byteLength);
+	const lut = imp("lut", 512 * 4);
+	const rgba = imp("rgba", N * 4);
+	const flag = imp("flag", 4);
+	const rgbLo = imp("rgbLo", 3 * n * 4);
+	const input = imp("input", 3 * n * 4);
+	const tmp = g.transientBuffer("tmp", 3 * H * lw * 4);
+	g.addKernel({
+		id: "unpack",
+		spec: K_PREP_UNPACK,
+		bindings: { prm, pad, rgba },
+		workgroups: [Math.ceil(N / WG)],
+	})
+		.addKernel({
+			id: "alpha",
+			spec: K_PREP_ALPHA,
+			bindings: { prm, rgba, flag },
+			workgroups: [Math.ceil(N / WG)],
+		})
+		.addKernel({
+			id: "h",
+			spec: K_PREP_H,
+			bindings: { prm, axH, cst, lut, rgba, tmp },
+			workgroups: [Math.ceil((3 * H * lw) / WG)],
+		})
+		.addKernel({
+			id: "v",
+			spec: K_PREP_V,
+			bindings: { prm, axV, cst, tmp, lo: rgbLo },
+			workgroups: [Math.ceil((3 * n) / WG)],
+		})
+		.addKernel({
+			id: "norm",
+			spec: K_PREP_NORM,
+			bindings: { prm, cst, lo: rgbLo, inp: input },
+			workgroups: [Math.ceil((3 * n) / WG)],
+		});
+}
+
+/** Destroy this device's cached prep graphs (each after its runs). */
+export function releasePrepGraphs(device: Device): Promise<void> {
+	return releaseCachedGraphs(device, GROUP);
+}
+
 /**
  * Upload `bitmap` (exactly W × H, consumed by the caller afterwards) and run the prep on `device`.
  * Throws when unsupported or on any GPU error: the caller then runs the CPU path.
@@ -176,15 +252,67 @@ export function prepSkyGpu(
 				`sky prep: bitmap ${bitmap.width}x${bitmap.height} is not ${W}x${H}`,
 			),
 		);
-	const kUnpack = kernel(device, K_PREP_UNPACK);
-	const kAlpha = kernel(device, K_PREP_ALPHA);
-	const kH = kernel(device, K_PREP_H);
-	const kV = kernel(device, K_PREP_V);
-	const kNorm = kernel(device, K_PREP_NORM);
-	return withLease(GROUP, () => {
+	const gd = device.handle as GPUDevice;
+	// pixels → texture (no conversion, unpremultiplied) → padded rows in `pad`
+	return runPrep(device, W, H, lw, lh, (pad, rowBytes) => {
+		const tex = gd.createTexture({
+			size: [W, H, 1],
+			format: "rgba8unorm",
+			// copyExternalImageToTexture needs COPY_DST | RENDER_ATTACHMENT on the destination, and the
+			// copy into `pad` needs COPY_SRC. (These were TEXTURE_BINDING | STORAGE_BINDING |
+			// RENDER_ATTACHMENT before 2026-10-01: every browser prep failed validation and fell back.)
+			// GPUTextureUsage bits: COPY_SRC 0x01 | COPY_DST 0x02 | RENDER_ATTACHMENT 0x10
+			usage: 0x01 | 0x02 | 0x10,
+		});
+		try {
+			gd.queue.copyExternalImageToTexture(
+				{ source: bitmap, flipY: false },
+				{ texture: tex, premultipliedAlpha: false, colorSpace: "srgb" },
+				[W, H],
+			);
+			const enc0 = gd.createCommandEncoder();
+			enc0.copyTextureToBuffer(
+				{ texture: tex },
+				{ buffer: handleOf(pad), bytesPerRow: rowBytes },
+				[W, H],
+			);
+			gd.queue.submit([enc0.finish()]);
+		} finally {
+			tex.destroy();
+		}
+	});
+}
+
+/**
+ * The prep from RGBA rows already padded to 256 B (`padded`: rowBytes · H bytes, rowBytes =
+ * ceil(4W / 256) · 256), written with a queue write instead of the bitmap upload: the same graph and
+ * outputs as prepSkyGpu, for node checks without ImageBitmap (scripts/gpu/sky-prep-dawn.ts --graph).
+ */
+export function prepSkyGpuFromRows(
+	device: Device,
+	padded: Uint8Array,
+	W: number,
+	H: number,
+	lw: number,
+	lh: number,
+): Promise<SkyPrepGpu> {
+	const why = skyPrepUnsupported(device, W, H, lw, lh);
+	if (why) return Promise.reject(new Error(`sky prep: ${why}`));
+	return runPrep(device, W, H, lw, lh, (pad) => pad.write(padded));
+}
+
+/** The prep after `fill` wrote the padded rows into `pad` (queue order puts the graph after it). */
+function runPrep(
+	device: Device,
+	W: number,
+	H: number,
+	lw: number,
+	lh: number,
+	fill: (pad: Buffer, rowBytes: number) => void,
+): Promise<SkyPrepGpu> {
+	return withLease(GROUP, async () => {
 		const n = lw * lh;
 		const N = W * H;
-		const gd = device.handle as GPUDevice;
 		const rowBytes = Math.ceil((W * 4) / 256) * 256;
 		const t = tables(W, H, lw, lh);
 		const words = new Uint32Array(8);
@@ -196,70 +324,29 @@ export function prepSkyGpu(
 		const lut = pooledStorage(device, "sky-prep/lut", lutTable());
 		const pad = storage(device, rowBytes * H);
 		const rgba = storage(device, N * 4);
-		const tmp = storage(device, 3 * H * lw * 4);
 		const flag = storage(device, 4);
 		const rgbLo = storage(device, 3 * n * 4);
 		const input = storage(device, 3 * n * 4);
-		const scratch = [prm, pad, tmp];
+		const scratch = [prm, pad];
 		const keep = [flag];
 		const outs = [rgba, rgbLo, input];
 		try {
-			// pixels → texture (no conversion, unpremultiplied) → padded rows in `pad`
-			const tex = gd.createTexture({
-				size: [W, H, 1],
-				format: "rgba8unorm",
-				// COPY_SRC | COPY_DST | RENDER_ATTACHMENT (copyExternalImageToTexture renders into it)
-				usage: 0x04 | 0x08 | 0x10,
-			});
-			try {
-				gd.queue.copyExternalImageToTexture(
-					{ source: bitmap, flipY: false },
-					{ texture: tex, premultipliedAlpha: false, colorSpace: "srgb" },
-					[W, H],
-				);
-				const enc0 = gd.createCommandEncoder();
-				enc0.copyTextureToBuffer(
-					{ texture: tex },
-					{ buffer: handleOf(pad), bytesPerRow: rowBytes },
-					[W, H],
-				);
-				gd.queue.submit([enc0.finish()]);
-			} finally {
-				tex.destroy();
-			}
-			const enc = device.createCommandEncoder({ id: "sky-prep" });
-			dispatchAll(
-				enc,
-				[
-					{
-						k: kUnpack,
-						bindings: { prm, pad, rgba },
-						x: Math.ceil(N / WG),
-					},
-					{
-						k: kAlpha,
-						bindings: { prm, rgba, flag },
-						x: Math.ceil(N / WG),
-					},
-					{
-						k: kH,
-						bindings: { prm, axH, cst, lut, rgba, tmp },
-						x: Math.ceil((3 * H * lw) / WG),
-					},
-					{
-						k: kV,
-						bindings: { prm, axV, cst, tmp, lo: rgbLo },
-						x: Math.ceil((3 * n) / WG),
-					},
-					{
-						k: kNorm,
-						bindings: { prm, cst, lo: rgbLo, inp: input },
-						x: Math.ceil((3 * n) / WG),
-					},
-				],
-				"sky-prep",
+			fill(pad, rowBytes);
+			// the kernels on the shape's cached graph (queue order puts them after the copy above);
+			// cachedGraph inside the group's lease, run() right after it (no await between)
+			const { graph } = cachedGraph<Params, void>(
+				device,
+				GROUP,
+				`${W}x${H}>${lw}x${lh}`,
+				(g) => buildPrepGraph(g, W, H, lw, lh),
+				MAX_GRAPHS,
 			);
-			submit(device, enc);
+			await graph.run(
+				{},
+				{
+					buffers: { prm, pad, axH, axV, cst, lut, rgba, flag, rgbLo, input },
+				},
+			);
 		} catch (e) {
 			for (const b of [...scratch, ...keep, ...outs]) b.destroy();
 			throw e;

@@ -191,6 +191,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "skyGpuPrep",
+		label: "Sky input prep",
+		help: "The sky model's input resampled and normalised on the GPU from the photo bitmap (same bytes as the CPU prep).",
+		group: "compute",
+		options: ONOFF,
+	},
+	{
 		name: "unknownGpu",
 		label: "Unknown-pose 360° horizon",
 		help: "GPU horizon for photos without compass / GPS. Off by default (0-false-accept rule).",

@@ -14,7 +14,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I3 | Horizon | per eye | worker:horizon-fast, worker:unknown-pose, worker:eye | horizon-march, horizon-cert, precision-probe | `horizon-march`, `horizon-cert`, `precision-probe` |
 | I4 | Align | per align | page | align-pose, align-cert, silhouette-gpu | `align-pose`, `align-cert`, `silhouette-mask` |
 | I5 | Unknown-pose solve | per photo | worker:unknown-pose, worker:pipeline | solve-coarse, skyglobal | `solve-coarse`, `skyglobal` |
-| I6 | Sky model | per photo | worker:sky | sky-model, sky-refine | `sky-refine` |
+| I6 | Sky model | per photo | worker:sky | sky-model, sky-prep, sky-refine | `sky-prep`, `sky-refine` |
 | I7 | Frame | per frame | page | deck-webgpu-frame, terrain-gpu-cull | – |
 | I8 | Queries | per settle | page | geo-query-gpu | `geo-query` |
 | I9 | Look | per settle, per style | page | look-guided, look-stats, look-haze, look-relief, look-textures | `look-guided`, `look-stats`, `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-relief` |
@@ -40,6 +40,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | solve-coarse | I5 | default | worker:unknown-pose, worker:pipeline (remote) | per photo | `solve-coarse` | resident horizon profile hz (per device); u, grid imports | rows: 16 B per yaw row; blocks (flagged rows only): nYaw·nBlk·16 B |
 | skyglobal | I5 | bench only | bench | bench | `skyglobal` | score maps, profile (pooled imports); cells, red (transients) | candidate list: count + head slots, rare second exact read |
 | sky-model | I6 | external | worker:sky (remote) | per photo | – | ORT WebGPU session (ORT's device, attached to luma) | – |
+| sky-prep | I6 | default | worker:sky (remote) | per photo | `sky-prep` | ImageBitmap → rgba8unorm texture (per photo); tmp (transient); axis taps, constants, LUT (pooled imports); rgba, rgbLo, ORT input (handed to the model and sky-refine) | opacity flag (4 B); first 3 photos per device: rgba + rgbLo + input (verification) |
 | sky-refine | I6 | default | worker:sky (remote) | per photo | `sky-refine` | ORT P(sky) buffer (wrapped per run); guide, rgba, axis taps, LUT (pooled imports) | read: byte mask (+ float mask when asked) |
 | deck-webgpu-frame | I7 | default | page | per frame | – | geometry / colour / photo targets; TextureArrayAtlas height + imagery arrays | matcher only (renderPoseView, offline): xyzr rgba32f + colour rgba16f per pose view |
 | terrain-gpu-cull | I7 | default | page | per frame | `terrain-cull-*` (uncached) | tile spheres + rows (import, per tile set); per-pass uniform, instance rows and indexed indirect records (imports, encoder ring); vis flags (transient) | – |
@@ -69,6 +70,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **solve-coarse**: certified f32 fold; flagged rows fold on the CPU in f64
 - **skyglobal**: T6 skyline global search; not wired into the service
 - **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU
+- **sky-prep**: cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; flag skyGpuPrep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)
 - **deck-webgpu-frame**: deck.gl layers in one encoder; not a ComputeGraph
 - **terrain-gpu-cull**: WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default on, WebGPU only; ?terrainGpuCull=off, off / ?gpu=off / WebGL: the CPU twin visibleRows)
 - **geo-query-gpu**: verdicts + skyline share one graph run (one submit, was two); gather runs after it; keyed by kernels and target shape

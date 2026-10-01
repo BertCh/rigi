@@ -12,16 +12,22 @@
 // `webgpu` is deliberately not a dependency of the app; install it anywhere and point DAWN_DIR at it:
 //   (mkdir /tmp/dawn && cd /tmp/dawn && npm i webgpu@0.3.0)   # 0.3.x loads on macOS 14; newer wants 26
 //   DAWN_DIR=/tmp/dawn npx tsx scripts/gpu/sky-prep-dawn.ts [--quick] [--photos N]
+// --graph runs the app's own path instead of hand-made bind groups: prepSkyGpuFromRows (src/lib/gpu/sky/
+// prep.ts), i.e. the cachedGraph "sky-prep" ComputeGraph on a luma.gl WebGPU device over the same Dawn,
+// its readbacks (readAll) and the opacity flag (isOpaque); only the ImageBitmap upload is replaced by a
+// queue write of the padded rows.
 // Exit 1 on any mismatch, 2 when no adapter/package is available.
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import type { Device } from "@luma.gl/core";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import {
 	K_PREP_H,
 	K_PREP_NORM,
 	K_PREP_UNPACK,
 	K_PREP_V,
+	prepSkyGpuFromRows,
 } from "../../src/lib/gpu/sky/prep";
 import { axisTapsF64, constsTable } from "../../src/lib/gpu/sky/prep-ref";
 import { lutTable } from "../../src/lib/gpu/sky/refine";
@@ -35,6 +41,7 @@ import {
 
 const argv = process.argv.slice(2);
 const QUICK = argv.includes("--quick");
+const GRAPH = argv.includes("--graph");
 const pi = argv.indexOf("--photos");
 const MAX_PHOTOS = pi >= 0 ? Number(argv[pi + 1]) : 99;
 const ROOT = path.resolve(import.meta.dirname, "../..");
@@ -56,6 +63,21 @@ if (!adapter) {
 }
 const device: GPUDevice = await adapter.requestDevice();
 console.log("adapter:", JSON.stringify(adapter.info ?? {}));
+let lumaDevice: Device | null = null;
+if (GRAPH) {
+	Object.defineProperty(globalThis, "navigator", {
+		value: { gpu, userAgent: "node" },
+		configurable: true,
+	});
+	const { luma } = await import("@luma.gl/core");
+	const { webgpuAdapter } = await import("@luma.gl/webgpu");
+	lumaDevice = await luma.createDevice({
+		type: "webgpu",
+		adapters: [webgpuAdapter],
+		createCanvasContext: false,
+	} as never);
+	console.log("mode: --graph (prepSkyGpuFromRows on a luma.gl device)");
+}
 
 // GPUBufferUsage flags (the globals only exist once the dawn package installs them)
 const U = {
@@ -130,6 +152,22 @@ async function runGpu(
 	const padded = new Uint8Array(rowBytes * H);
 	for (let y = 0; y < H; y++)
 		padded.set(rgba.subarray(4 * y * W, 4 * (y + 1) * W), y * rowBytes);
+	if (lumaDevice) {
+		const prep = await prepSkyGpuFromRows(lumaDevice, padded, W, H, lw, lh);
+		try {
+			const all = await prep.readAll();
+			let opaque = true;
+			for (let i = 3; i < rgba.length; i += 4)
+				if (rgba[i] !== 255) opaque = false;
+			if ((await prep.isOpaque()) !== opaque) {
+				console.log(`FAIL isOpaque: expected ${opaque}`);
+				fails++;
+			}
+			return { rgba: all.rgba, lo: all.rgbLo, inp: all.input };
+		} finally {
+			prep.dispose();
+		}
+	}
 	const prm = buf(
 		32,
 		U.UNIFORM | U.COPY_DST,
