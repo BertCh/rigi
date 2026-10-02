@@ -9,7 +9,9 @@
 
 import { storageKey } from "#/lib/ontology/core/storage";
 import type { Pose } from "../../camera";
+import { loadSavedPose } from "../../photos";
 import { loadSolvedPose, saveSolvedPose } from "../roll";
+import type { RollPhoto } from "../types";
 import { ACCEPTED_METHOD, type AnchorKind, type PROVENANCE } from "./plan";
 
 export type StoredSuggestion = {
@@ -75,8 +77,18 @@ export function dropPending(anchorId: string, targetId: string) {
 	writeAll(all);
 }
 
-/** User accepts: the pose becomes the photo's solved pose with provenance kept. */
-export function acceptSuggestion(s: StoredSuggestion) {
+/**
+ * User accepts: the pose becomes the photo's solved pose with provenance kept. Refused (returns false, nothing
+ * written) when the photo already has a saved, ground-truth or solved pose: `poseSource` is the photo's current
+ * source when the caller knows it, and the saved and solved slots are checked here regardless. A second
+ * suggestion therefore needs the first accept undone (revertAccepted) first.
+ */
+export function acceptSuggestion(
+	s: StoredSuggestion,
+	poseSource?: RollPhoto["poseSource"],
+): boolean {
+	if (poseSource !== undefined && poseSource !== "prior") return false;
+	if (loadSolvedPose(s.targetId) || loadSavedPose(s.targetId)) return false;
 	saveSolvedPose(s.targetId, {
 		pose: s.pose,
 		confidence: 0,
@@ -86,6 +98,7 @@ export function acceptSuggestion(s: StoredSuggestion) {
 	const all = readAll();
 	all[k(s.anchorId, s.targetId)] = { ...s, status: "accepted" };
 	writeAll(all);
+	return true;
 }
 
 export function dismissSuggestion(s: StoredSuggestion) {
@@ -96,7 +109,9 @@ export function dismissSuggestion(s: StoredSuggestion) {
 
 /** Undo an accept: remove the solved pose only if it is still the propagated one. */
 export function revertAccepted(s: StoredSuggestion) {
-	if (loadSolvedPose(s.targetId)?.method === ACCEPTED_METHOD)
+	// only the accepted record owns the solved slot: undo of another suggestion for this target must not clear it
+	const mine = readAll()[k(s.anchorId, s.targetId)]?.status === "accepted";
+	if (mine && loadSolvedPose(s.targetId)?.method === ACCEPTED_METHOD)
 		saveSolvedPose(s.targetId, null);
 	const all = readAll();
 	all[k(s.anchorId, s.targetId)] = { ...s, status: "pending" };

@@ -201,7 +201,9 @@ export function PropagatePanel({
 						<TargetSuggestions
 							photo={selected}
 							items={targetSuggestions}
-							onAccept={(s) => act(acceptSuggestion, s)}
+							onAccept={(s) =>
+								act((x) => acceptSuggestion(x, selected.poseSource), s)
+							}
 							onDismiss={(s) => act(dismissSuggestion, s)}
 							onRevert={(s) => act(revertAccepted, s)}
 						/>
