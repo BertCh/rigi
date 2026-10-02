@@ -160,10 +160,12 @@ describe("ColorTargets", () => {
 		expect(made.every((r) => r.destroyed)).toBe(true);
 	});
 
-	it("rg11b10 colour target: resolve loses STORAGE, MSAA stays render-only", () => {
+	it("rg11b10 colour target (rg11b10-unsafe): resolve loses STORAGE, MSAA stays render-only", () => {
+		// plain "rg11b10" is downgraded to rgba16float since bd6cc97 (no destination alpha); only the
+		// explicit unsafe request honours it
 		applyColorTargetFormat(
 			{ features: new Set(["rg11b10ufloat-renderable"]) } as never,
-			"rg11b10",
+			"rg11b10-unsafe",
 		);
 		const { device, byId } = fakeDevice();
 		new ColorTargets(device, 8, 8);
