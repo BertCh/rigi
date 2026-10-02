@@ -209,20 +209,6 @@ const angleDiff = (a: number, b: number) => Math.abs(wrap180(a - b));
 export type DeckEngineOptions = {
 	/** Upper bound on the canvas' device pixel ratio (default 2). The landing's Step Inside passes 1.5. */
 	pixelRatioCap?: number;
-	/**
-	 * The world drape's range map straight from the GPU geometry target (default true): a GPU copy
-	 * (GpuGeometrySource.copyRangeTo) instead of rangeMapFrom() over the read-back buffer and a
-	 * re-upload. false = the CPU path; it also runs whenever the GPU copy can't (CPU geometry
-	 * source, the target already re-rendered for a newer pose).
-	 */
-	gpuDrape?: boolean;
-	/**
-	 * autoAlign's silhouette re-rank scored on the GPU (default true): a mask pass over each pose's
-	 * range target and an 18 KB read per pose (silhouette-mask.ts; identical scores by construction)
-	 * instead of reading the range back. false = the CPU scorer, which also runs per pose whenever
-	 * the GPU can't decide (CPU geometry source, context lost, an undecided pixel).
-	 */
-	silhouetteGpu?: boolean;
 };
 
 export type DeckEngineStats = {
@@ -345,12 +331,6 @@ export class DeckEngine implements Renderer {
 	/** The look composite's CPU side (refined masks, band stats, photo noise), made at pose settle. */
 	private compLook = new CompositeLook();
 	private statsTimer = 0;
-	/**
-	 * Band stats read synchronously (compositor.readLayer: a readPixels that stalls the GL pipeline,
-	 * the stats land in the timer's own task) instead of fenced (readLayerAsync, the default: they
-	 * land a frame or more later, as the ?lookgpu stats already did). For parity checks / benches.
-	 */
-	syncStats = false;
 	/** The key of the async band-stats read in flight: the same key is not read twice. */
 	private statsPending: string | null = null;
 	/** Bumps whenever the layer's look changes without a pose change (style, haze fit, relief field): the band stats' key. */
@@ -402,7 +382,7 @@ export class DeckEngine implements Renderer {
 		searchMs: number;
 		/** CPU scoring of the read-back range buffers / GPU masks (part of ms) */
 		scoreMs?: number;
-		/** "gpu" = mask pass (silhouetteGpu), "cpu" = range readback + CPU scorer */
+		/** "gpu" = mask pass, "cpu" = range readback + CPU scorer */
 		path?: "gpu" | "cpu";
 		/** bytes read back from the GPU for the whole re-rank */
 		bytes?: number;
@@ -537,10 +517,7 @@ export class DeckEngine implements Renderer {
 	 * reallocating its target never touches the texture the drape samples.
 	 */
 	private drapeTex: Texture[] = [];
-	private readonly gpuDrape: boolean;
 	private readonly pixelRatioCap: number;
-	/** DeckEngineOptions.silhouetteGpu (harnesses flip it for the A/B). */
-	silhouetteGpu: boolean;
 	private silMask: SilhouetteMaskGL | null = null;
 	private loadAbort = new AbortController();
 	/** Step Inside (setNearField): the scene and its view options; null = off (the classic views). */
@@ -580,9 +557,7 @@ export class DeckEngine implements Renderer {
 		photo: PhotoMeta,
 		opts: DeckEngineOptions = {},
 	) {
-		this.gpuDrape = opts.gpuDrape ?? true;
 		this.pixelRatioCap = opts.pixelRatioCap ?? 2;
-		this.silhouetteGpu = opts.silhouetteGpu ?? true;
 		this.photo = photo;
 		this.aspect = photo.width / photo.height;
 		this.prior = {
@@ -1500,7 +1475,7 @@ export class DeckEngine implements Renderer {
 	/**
 	 * engine.ts layerStats: band stats (LOOK_HARMONIZE) of the replace layer or the world's own
 	 * render, drawn at ≤ 256 px through the photo camera once the pose settles (and as imagery streams in).
-	 * The layer is read back fenced (compositor.readLayerAsync) unless `syncStats`: the stats land a
+	 * The layer is read back fenced (compositor.readLayerAsync): the stats land a
 	 * frame or more after the settle frame (with ?lookgpu they already did) and only if the key still
 	 * stands (otherwise the newer state is scheduled); export waits for them (trackLook → lookIdle).
 	 */
@@ -1529,17 +1504,6 @@ export class DeckEngine implements Renderer {
 			if (this.disposed || !this.geometryReady() || !grid || !img) return;
 			this.flushLayers();
 			const [w, h] = gridSize(this.aspect, STATS_LONG_SIDE);
-			if (this.syncStats) {
-				const layer = this.compositor.readLayer(
-					this.liveLayers(),
-					this.pose,
-					this.eyeArr,
-					w,
-					h,
-				);
-				if (layer) this.landStats(key, layer, w, h, grid, img);
-				return;
-			}
 			// the key of the state this render actually draws (it may have moved on since the schedule)
 			const drawn = this.statsKey();
 			this.statsPending = drawn;
@@ -2353,9 +2317,7 @@ export class DeckEngine implements Renderer {
 		await this.deckReady;
 		this.flushLayers();
 		const srcs = alts.map((_, i) => this.silhouetteSource(i));
-		let sil: SilScores | null = this.silhouetteGpu
-			? await this.silhouetteScoresGpu(alts, srcs)
-			: null;
+		let sil: SilScores | null = await this.silhouetteScoresGpu(alts, srcs);
 		if (this.disposed) return null;
 		if (!sil) {
 			// all hypotheses are submitted at once and their async readbacks overlap (three renders
@@ -3033,12 +2995,12 @@ export class DeckEngine implements Renderer {
 	}
 
 	/**
-	 * The query buffer's range map as a GPU copy of the geometry target (gpuDrape), the same texels
-	 * rangeMapFrom would upload; null = take the CPU path (option off, a CPU source, or the target
+	 * The query buffer's range map as a GPU copy of the geometry target, the same texels
+	 * rangeMapFrom would upload; null = take the CPU path (a CPU source, or the target
 	 * no longer holds the buffer's render).
 	 */
 	private gpuDrapeRange(src: GeometrySource): PhotoRangeMap | null {
-		if (!this.gpuDrape || !(src instanceof GpuGeometrySource)) return null;
+		if (!(src instanceof GpuGeometrySource)) return null;
 		const device = (this.deck as unknown as { device?: Device }).device;
 		if (!device) return null;
 		const { width, height } = src;

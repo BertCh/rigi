@@ -564,38 +564,16 @@ export class PhotoCompositor implements Effect {
 		return fbo;
 	}
 
-	/**
-	 * The colour pass of `layers` through `pose` at width × height, read back (linear RGBA floats,
-	 * premultiplied as the colour pass leaves them, GL rows): the band stats' layer
-	 * (look/composite.ts, LOOK_HARMONIZE). Synchronous (readPixels stalls the GL pipeline), ≤ 256 px:
-	 * deck/engine.ts uses it only when `syncStats` is set; readLayerAsync is the default.
-	 */
-	readLayer(
-		layers: Layer[],
-		pose: Pose,
-		eye: [number, number, number],
-		width: number,
-		height: number,
-	): Float32Array | null {
-		const device = this.device;
-		if (!device) return null;
-		const fbo = this.renderLayer(device, layers, pose, eye, width, height);
-		try {
-			const data = fbo.colorAttachments[0].texture.readDataSyncWebGL();
-			return new Float32Array(data as ArrayBuffer);
-		} finally {
-			destroyTarget(fbo);
-		}
-	}
-
 	/** Timing of the last readLayerAsync that landed, ms. */
 	lastStatsRead: ReadbackTiming | null = null;
 
 	/**
-	 * readLayer without the stall: the same render and the same RGBA/FLOAT readPixels (so the same
-	 * bytes: texture.readBuffer reads in the texture's own format), into a pack buffer copied out
-	 * once a fence behind it signalled and the GPU queue is short (readTextureQuiet). Resolves a frame or more later;
-	 * null = no device, context lost, or the compositor's device changed meanwhile.
+	 * The colour pass of `layers` through `pose` at width × height, read back (linear RGBA floats,
+	 * premultiplied as the colour pass leaves them, GL rows): the band stats' layer (look/composite.ts,
+	 * LOOK_HARMONIZE), ≤ 256 px. An RGBA/FLOAT readPixels (texture.readBuffer reads in the texture's
+	 * own format) into a pack buffer copied out once a fence behind it signalled and the GPU queue is
+	 * short (readTextureQuiet). Resolves a frame or more later; null = no device, context lost, or
+	 * the compositor's device changed meanwhile.
 	 */
 	async readLayerAsync(
 		layers: Layer[],

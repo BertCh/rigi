@@ -86,9 +86,7 @@ describe("autoAlignAsync CPU fallbacks", () => {
 		gpu.device = {};
 		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 		const want = autoAlign(prior, ASPECT, dirs, freshMap(), 10);
-		const got = await autoAlignAsync(prior, ASPECT, dirs, freshMap(), 10, {
-			refine: "cpu",
-		});
+		const got = await autoAlignAsync(prior, ASPECT, dirs, freshMap(), 10);
 		warn.mockRestore();
 		expect(got).toEqual(want);
 		expect(lastAlignTiming?.path).toBe("cpu");

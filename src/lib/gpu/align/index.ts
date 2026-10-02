@@ -16,7 +16,6 @@
  * live hypothesis; the CPU skips only neighbours whose bound proves it would reject them, and
  * scores every other one exactly, deciding each move with its own rule. Final poses and scores are
  * bit-identical to autoAlign (the proof is in align.ts Descent; the bound's in pose-bound.ts).
- * `alignGpuOptions.refine = "cpu"` (or the `refine` option) keeps the refine on the plain CPU loop.
  * Any GPU failure, no WebGPU, or the kill switch (?gpu=off, src/lib/flags) → plain autoAlign.
  *
  * DEFAULT (WAG W3.3, precision policy P1): `alignPrecision: "certified-f32"` runs the refine as a
@@ -83,7 +82,7 @@ import {
 /**
  * Re-score window around each yaw column's GPU maximum. f32 error per cell is ~1e-4 at worst (a
  * direction flipping into the neighbouring pixel changes one of ~1k samples); measured max
- * |GPU − CPU| over the 4 eval photos is in scripts/gpu/w2-align-parity.mjs. The window must be
+ * |GPU − CPU| over the 4 eval photos came from the retired w2-align-parity gate (git history). The window must be
  * ≥ 2 × that error for exact parity; wider only costs a few extra CPU cells.
  */
 export const GRID_TOL = 5e-3;
@@ -102,7 +101,7 @@ export type AlignGpuTiming = {
 	/** bytes of edge planes the grid bound from the resident photo prep (not uploaded) */
 	residentBytes?: number;
 	/**
-	 * refine: "gpu" (bound-screened descent), "cpu" (plain loop), with its counters, or
+	 * refine: "gpu" (bound-screened descent, ?alignPrecision=f64), "cpu" (plain loop), with its counters, or
 	 * "certified-f32" (the GPU-driven loop, default; counters in `cert`)
 	 */
 	refine?: "gpu" | "cpu" | "certified-f32";
@@ -142,18 +141,14 @@ export type CertTiming = {
 	gpu?: CertGpuStats;
 };
 
-/**
- * Process-wide default of autoAlignAsync's refine: "gpu" = neighbours pre-screened by certified GPU
- * bounds (same result), "cpu" = the plain CPU loop. For A/B harnesses; not a src/lib/flags flag.
- */
+/** Process-wide GPU align tuning and dev-only fault injection; not a src/lib/flags flag. */
 export const alignGpuOptions: {
-	refine: "gpu" | "cpu";
 	speculation: RefineSpeculation;
 	/** rounds per submit of the certified-f32 refine */
 	certRounds: number;
 	/**
 	 * TEST ONLY, dev builds only (import.meta.env.DEV; absent from production bundles): subtracted
-	 * from every GPU bound (forces a bound violation and the fallback). scripts/gpu/align-refine-ab.mjs.
+	 * from every GPU bound (forces a bound violation and the fallback). the refine-guard check.
 	 */
 	faultDeflate?: number;
 	/**
@@ -162,7 +157,6 @@ export const alignGpuOptions: {
 	 */
 	certFault?: number;
 } = {
-	refine: "gpu",
 	speculation: { ...REFINE_SPECULATION },
 	certRounds: 48,
 	...(import.meta.env?.DEV ? { faultDeflate: 0, certFault: 0 } : {}),
@@ -403,10 +397,9 @@ export async function autoAlignAsync(
 	dirs: Float32Array,
 	edge: EdgeMap,
 	yawRange = 25,
-	opts: { refine?: "gpu" | "cpu"; alignPrecision?: AlignPrecision } = {},
+	opts: { alignPrecision?: AlignPrecision } = {},
 ): Promise<AlignResult> {
 	const t0 = performance.now();
-	const mode = opts.refine ?? alignGpuOptions.refine;
 	const precision = opts.alignPrecision ?? "certified-f32";
 	let device = null;
 	try {
@@ -478,7 +471,7 @@ export async function autoAlignAsync(
 	let boundStats: PoseBoundStats | undefined;
 	const devState = refineState(device);
 	let refine: "gpu" | "cpu" | "certified-f32" =
-		grid && mode === "gpu" && !devState.disabled ? "gpu" : "cpu";
+		grid && !devState.disabled ? "gpu" : "cpu";
 	let violation: string | undefined;
 	let cert: CertTiming | undefined;
 	// alignPrecision certified-f32 (the default): the GPU-driven refine (needs the GPU grid's sky fit and private planes)

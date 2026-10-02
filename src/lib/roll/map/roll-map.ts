@@ -120,13 +120,6 @@ export type RollMapOptions = {
 	/** Distance (m) of the first overview, instead of frameOverview's default. */
 	overviewM?: number;
 	/**
-	 * Range maps go into the drape atlas on the GPU (default true): the geometry target is copied
-	 * into its atlas cell and max-pooled there (./range-gpu.ts), and only the coarse cull grid is
-	 * read back. false = the CPU path (full readback, rangeMapFrom, writeData, coarsen), which
-	 * also runs for any photo the GPU path can't do (programs unavailable, context lost).
-	 */
-	gpuRange?: boolean;
-	/**
 	 * People masks computed ahead of time (by photo id; null = segmentForeground found none), e.g.
 	 * the sample trip's bake (#/lib/demo/people-masks). They fill the engine's masks before any
 	 * segmentation, so segmentAll skips those photos and, when every photo is covered, never loads
@@ -215,8 +208,6 @@ export class RollMapEngine {
 	private rangeWorkers = 0;
 	private rangeCount = { done: 0, total: 0 };
 	private rangesStarted = false;
-	/** opts.gpuRange (the test hook may flip it before re-ranging). */
-	private gpuRange: boolean;
 	private rangeGpu: RangeGpu | null = null;
 	private rangeStats = { cpu: noStats(), gpu: noStats(), seeded: 0 };
 	/** opts.seed.photos once loaded (only photos whose pose and eye match are used). */
@@ -246,7 +237,6 @@ export class RollMapEngine {
 		private opts: RollMapOptions = {},
 	) {
 		this._roll = roll;
-		this.gpuRange = opts.gpuRange ?? true;
 		this.frame = new EnuFrame(roll.center.lat, roll.center.lon, 0);
 		this.world = new WorldCamera(canvas, () => this.kick());
 		let onLoad = () => {};
@@ -609,8 +599,9 @@ export class RollMapEngine {
 
 	/**
 	 * Photo p's range map (pose revision `rev`) rendered through `src` (w × h) into its atlas cell:
-	 * on the GPU (gpuRange: draw, max-pool, read back only the coarse grid, copy the target into
-	 * the cell once it lands) or, as before, through a full readback, rangeMapFrom and setRange.
+	 * on the GPU (draw, max-pool, read back only the coarse grid, copy the target into the cell
+	 * once it lands) or, where the GPU path cannot (programs unavailable, context lost), through a
+	 * full readback, rangeMapFrom and setRange.
 	 * The cell is written only if p's pose is still `rev` when the result is in (else "moved").
 	 */
 	private async rangeInto(
@@ -622,7 +613,7 @@ export class RollMapEngine {
 	): Promise<"done" | "moved" | "disposed"> {
 		const k = this.slot.get(p.id) ?? -1;
 		const atlas = this.atlas;
-		if (this.gpuRange && atlas) {
+		if (atlas) {
 			this.rangeGpu ??= new RangeGpu(atlas.range.device);
 			const gpu = this.rangeGpu;
 			const t0 = performance.now();

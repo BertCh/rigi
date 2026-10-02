@@ -12,7 +12,7 @@
 // - a mask whose headers carry another nonce (a dispatch that did not run) must be rejected, and so
 //   must the mask of an all-zero texture under a valid nonce (the zero-texture guard).
 // It checks the packing, the decoder's order and the bound logic; it cannot check a GPU's f32
-// arithmetic (the browser A/B, scripts/gpu/silhouette-ab.mjs, does).
+// arithmetic.
 //   npx tsx scripts/gpu/silhouette-mask-check.ts
 import type { EdgeMap } from "../../src/lib/align";
 import { logRange } from "../../src/lib/deck/geometry-source";
