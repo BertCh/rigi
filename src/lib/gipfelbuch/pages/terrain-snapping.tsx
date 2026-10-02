@@ -988,11 +988,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
-			<PhotoStory
-				number="Fig. 2"
-				title="Names snap onto their summits"
-				focus="snap"
-			/>
+			<PhotoStory number="Fig. 2" title="Names snap onto their summits" />
 
 			<Beat
 				kicker="Peaks"

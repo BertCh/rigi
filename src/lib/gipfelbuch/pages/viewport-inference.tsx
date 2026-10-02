@@ -2351,9 +2351,9 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<PhotoStory
+				focus="search"
 				number="2"
 				title="Guess, search, snap"
-				focus="search"
 				caption={<ViewportStoryCaption />}
 			/>
 
