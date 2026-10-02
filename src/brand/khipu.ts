@@ -143,9 +143,13 @@ export const BRAND = Object.fromEntries(
 	Object.entries(BRAND_CODES).map(([role, code]) => [role, BREZINE[code].hex]),
 ) as { [R in BrandRole]: string };
 
-/** `rgba()` of a brand role, for translucent canvas fills. */
-export function brandAlpha(role: BrandRole, a: number): string {
-	const h = BRAND[role];
+/** `rgba()` of a brand role, for translucent canvas fills; pass `"light"` for the light-theme value. */
+export function brandAlpha(
+	role: BrandRole,
+	a: number,
+	theme: "dark" | "light" = "dark",
+): string {
+	const h = (theme === "light" ? BRAND_LIGHT : BRAND)[role];
 	const n = Number.parseInt(h.slice(1), 16);
 	return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
 }

@@ -144,3 +144,14 @@ Not run: every browser check. Nothing has been rendered yet.
 - KR11 (page lint) landed in `gipfelbuch.check.ts` (session 25). All 19 pages pass it.
 - Some synthetic Details figures still use sketch strokes for measured-looking lines: camera-roll's `RollLinker`, `ViewpointWalk` and `CompassBias`.
 - `PageBoundary` and other shell pieces are unchanged. `MarginNote` is still unused by pages.
+
+## 5. Superseded by the hand pass (f5e51f3, session 16)
+
+This restore was committed inside f5e51f3, together with session 16's user-requested hand pass. That pass changes some rules above:
+
+- the body face is Playpen Sans, and print is kept for code and math only;
+- `PrintLabel` is renamed `HandLabel`;
+- `data` marks are now a pen pass within 0.5 px, no longer exact geometry;
+- the page lint now requires at least 6 hand notes per page and bans raw `<text>`.
+
+The current rules are in `src/components/gipfelbuch/README.md` and `reports/gipfelbuch-hand-sketch-2026-10-01.md`. The geo bleed, `PAGE_HERO`, plates and the notebook shell from this pass carry over.

@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { BRAND, BRAND_LIGHT, brandAlpha } from "#/brand/khipu";
+import type { ResolvedTheme } from "#/lib/theme";
+import { useTheme } from "#/lib/theme/react";
 import { type Angles, horizonDistAt, R_EFF, type Scene } from "./model";
 
 // The little world: the baked heightfield as ridgelines seen from behind and above the
@@ -65,6 +68,12 @@ export function WorldView({
 	const over = useRef<HTMLCanvasElement>(null);
 	const viewer = useRef<Viewer | null>(null);
 	const [size, setSize] = useState(0);
+	// The page theme, unless an ancestor island pins one (the Gipfelbuch embeds this scene in a dark island).
+	const pageTheme = useTheme().resolved;
+	const [theme, setTheme] = useState<ResolvedTheme>(pageTheme);
+	useLayoutEffect(() => {
+		setTheme(islandTheme(wrap.current, pageTheme));
+	}, [pageTheme]);
 
 	// Terrain: drawn once per size.
 	useEffect(() => {
@@ -118,9 +127,18 @@ export function WorldView({
 				g.lineTo(x1, h + 10);
 				g.lineTo(x0, h + 10);
 				g.closePath();
-				g.fillStyle = `rgb(${19 + 10 * (1 - near)},${19 + 14 * (1 - near)},${19 + 17 * (1 - near)})`;
+				// far rows fade towards the haze: lighter on the dark ground, darker on the light one
+				const far = 1 - near;
+				g.fillStyle =
+					theme === "light"
+						? `rgb(${244 - 20 * far},${244 - 17 * far},${244 - 13 * far})`
+						: `rgb(${19 + 10 * far},${19 + 14 * far},${19 + 17 * far})`;
 				g.fill();
-				g.strokeStyle = `rgba(244,244,244,${0.1 + 0.32 * near})`;
+				g.strokeStyle = brandAlpha(
+					"paper",
+					(theme === "light" ? 0.14 : 0.1) + 0.32 * near,
+					theme,
+				);
 				g.lineWidth = 0.6 + 0.5 * near;
 				g.stroke();
 			}
@@ -130,7 +148,7 @@ export function WorldView({
 		const ro = new ResizeObserver(draw);
 		ro.observe(el);
 		return () => ro.disconnect();
-	}, [scene]);
+	}, [scene, theme]);
 
 	// Overlays: every state change, and again after the canvases are resized (size).
 	// biome-ignore lint/correctness/useExhaustiveDependencies: size is the resize trigger
@@ -143,6 +161,9 @@ export function WorldView({
 		const dpr = cv.width / V.w;
 		g.setTransform(dpr, 0, 0, dpr, 0, 0);
 		g.clearRect(0, 0, V.w, V.h);
+		const ink = (role: "paper" | "trap" | "glow", a: number) =>
+			brandAlpha(role, a, theme);
+		const solid = theme === "light" ? BRAND_LIGHT : BRAND;
 		const eye = scene.eye;
 		const at = (u: number, v: number, z: number) => toScreen(V, eye, u, v, z);
 		const cam = at(0, 0, eye);
@@ -172,11 +193,7 @@ export function WorldView({
 		const yaw0 = scene.prior.yaw;
 		if (state.uncertainty > 0) {
 			g.globalAlpha = state.uncertainty;
-			fan(
-				yaw0 - state.fan - hh,
-				yaw0 + state.fan + hh,
-				"rgba(238,144,134,0.07)",
-			);
+			fan(yaw0 - state.fan - hh, yaw0 + state.fan + hh, ink("trap", 0.07));
 			g.setLineDash([3, 4]);
 			for (const a of [yaw0 - state.fan - hh, yaw0 + state.fan + hh]) {
 				const [u, v] = polar(scene, a, R);
@@ -185,7 +202,7 @@ export function WorldView({
 				g.beginPath();
 				g.moveTo(cam[0], cam[1]);
 				g.lineTo(p[0], p[1]);
-				g.strokeStyle = "rgba(238,144,134,0.55)";
+				g.strokeStyle = ink("trap", 0.55);
 				g.stroke();
 			}
 			g.setLineDash([]);
@@ -196,8 +213,8 @@ export function WorldView({
 			fan(
 				state.pose.yaw - hh,
 				state.pose.yaw + hh,
-				"rgba(187,139,84,0.16)",
-				"rgba(187,139,84,0.75)",
+				ink("glow", 0.16),
+				ink("glow", 0.75),
 			);
 		}
 
@@ -222,7 +239,7 @@ export function WorldView({
 					g.beginPath();
 					g.moveTo(prev[0], prev[1]);
 					g.lineTo(p[0], p[1]);
-					g.strokeStyle = "rgba(244,244,244,0.95)";
+					g.strokeStyle = ink("paper", 0.95);
 					g.lineWidth = 2;
 					g.stroke();
 				}
@@ -240,7 +257,7 @@ export function WorldView({
 				g.beginPath();
 				g.moveTo(cam[0], cam[1]);
 				g.lineTo(p[0], p[1]);
-				g.strokeStyle = "rgba(244,244,244,0.28)";
+				g.strokeStyle = ink("paper", 0.28);
 				g.stroke();
 			}
 		}
@@ -280,18 +297,18 @@ export function WorldView({
 					return true;
 				});
 				const top = p[1] - 12 - Math.max(0, row) * 12;
-				g.strokeStyle = "rgba(187,139,84,0.9)";
+				g.strokeStyle = ink("glow", 0.9);
 				g.lineWidth = 1;
 				g.beginPath();
 				g.moveTo(p[0], p[1]);
 				g.lineTo(p[0], top);
 				g.stroke();
-				g.fillStyle = "#bb8b54";
+				g.fillStyle = solid.glow;
 				g.beginPath();
 				g.arc(p[0], p[1], 2.2, 0, Math.PI * 2);
 				g.fill();
 				if (row < 0) continue;
-				g.fillStyle = "rgba(244,244,244,0.85)";
+				g.fillStyle = ink("paper", 0.85);
 				g.fillText(name, p[0], top - 3);
 			}
 		}
@@ -305,27 +322,27 @@ export function WorldView({
 			const ghost = at(0, 0, gps);
 			if (ghost) {
 				g.setLineDash([2, 3]);
-				g.strokeStyle = "rgba(238,144,134,0.8)";
+				g.strokeStyle = ink("trap", 0.8);
 				g.beginPath();
 				g.moveTo(ghost[0], ghost[1]);
 				g.lineTo(cam[0], cam[1]);
 				g.stroke();
 				g.setLineDash([]);
-				g.strokeStyle = "rgba(238,144,134,0.9)";
+				g.strokeStyle = ink("trap", 0.9);
 				g.beginPath();
 				g.arc(ghost[0], ghost[1], 3.5, 0, Math.PI * 2);
 				g.stroke();
 				g.font = "500 9.5px ui-monospace, SFMono-Regular, Menlo, monospace";
 				g.textAlign = "left";
-				g.fillStyle = "rgba(238,144,134,0.95)";
+				g.fillStyle = ink("trap", 0.95);
 				g.fillText(`GPS ${Math.round(gps)} m`, ghost[0] + 8, ghost[1] + 3);
 			}
 		}
-		g.fillStyle = "#f4f4f4";
+		g.fillStyle = solid.paper;
 		g.beginPath();
 		g.arc(here[0], here[1], 4, 0, Math.PI * 2);
 		g.fill();
-		g.strokeStyle = "rgba(244,244,244,0.35)";
+		g.strokeStyle = ink("paper", 0.35);
 		g.lineWidth = 1;
 		g.beginPath();
 		g.arc(here[0], here[1], 9, 0, Math.PI * 2);
@@ -333,10 +350,10 @@ export function WorldView({
 		if (state.eyeSnap > 0.5) {
 			g.font = "500 9.5px ui-monospace, SFMono-Regular, Menlo, monospace";
 			g.textAlign = "right";
-			g.fillStyle = "rgba(244,244,244,0.8)";
+			g.fillStyle = ink("paper", 0.8);
 			g.fillText(`eye ${Math.round(eye)} m`, here[0] - 13, here[1] + 3);
 		}
-	}, [scene, state, size]);
+	}, [scene, state, size, theme]);
 
 	return (
 		<div ref={wrap} className={`relative ${className ?? ""}`}>
@@ -361,4 +378,15 @@ function groundZ(s: Scene, u: number, v: number) {
 		(H(i, j) * (1 - tx) + H(i + 1, j) * tx) * (1 - ty) +
 		(H(i, j + 1) * (1 - tx) + H(i + 1, j + 1) * tx) * ty;
 	return h - (v * v) / (2 * R_EFF);
+}
+
+/** The nearest `data-theme` island above `el`; <html> itself may lag the page theme, so it defers to `page`. */
+function islandTheme(
+	el: HTMLElement | null,
+	page: ResolvedTheme,
+): ResolvedTheme {
+	const island = el?.parentElement?.closest("[data-theme]");
+	if (!island || island === document.documentElement) return page;
+	const t = island.getAttribute("data-theme");
+	return t === "light" || t === "dark" ? t : page;
 }

@@ -12,6 +12,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { brandVar } from "#/brand/khipu";
 import { type SurroundBake, SurroundLayer } from "../Surround";
 import {
 	type Angles,
@@ -41,12 +42,14 @@ const SCENE_URL = "/demo/how/scene.json";
 const CROP = 0.5;
 const SWEEP = 30;
 
+// Theme-aware: the photo viewport is an always-dark island, so these resolve to the dark inks there
+// and to the light inks on the chapter bar, the world view and the readout under the light theme.
 const C = {
-	photo: "#e59e1f", // --rigi-lesson
-	terrain: "#f4f4f4", // --rigi-paper
-	glow: "#bb8b54",
-	bad: "#ee9086", // --rigi-trap
-	good: "#8d917a", // --rigi-result
+	photo: brandVar("lesson"),
+	terrain: brandVar("paper"),
+	glow: brandVar("glow"),
+	bad: brandVar("trap"),
+	good: brandVar("result"),
 };
 
 type BeatKey = "guess" | "skyline" | "terrain" | "measure" | "correct" | "snap";
@@ -462,7 +465,6 @@ function Stage({
 			)}
 			<div
 				ref={box}
-				data-theme="dark"
 				className={`overflow-hidden rounded-md bg-black/30 ${className ?? ""}`}
 			>
 				{/* chapters */}
@@ -512,8 +514,8 @@ function Stage({
 					</button>
 				</div>
 
-				{/* the viewport */}
-				<div className="relative">
+				{/* the viewport: a photo, so always dark */}
+				<div className="relative" data-theme="dark">
 					<div
 						ref={viewport}
 						className={`relative overflow-hidden select-none ${done ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -567,7 +569,7 @@ function Stage({
 											x2={o.x}
 											y1={o.y}
 											y2={o.y + r * vis.ticks}
-											stroke={Math.abs(r) < 8 ? C.good : C.bad}
+											style={{ stroke: Math.abs(r) < 8 ? C.good : C.bad }}
 											strokeOpacity={0.35 + 0.6 * a}
 											strokeWidth={1.4}
 											vectorEffect="non-scaling-stroke"
@@ -588,7 +590,7 @@ function Stage({
 								<path
 									d={photoPath}
 									fill="none"
-									stroke={C.photo}
+									style={{ stroke: C.photo }}
 									strokeWidth={2.4}
 									strokeLinejoin="round"
 									vectorEffect="non-scaling-stroke"
@@ -617,7 +619,7 @@ function Stage({
 											<path
 												d={d}
 												fill="none"
-												stroke={C.terrain}
+												style={{ stroke: C.terrain }}
 												strokeWidth={1.8}
 												strokeDasharray={done && !off ? undefined : "7 5"}
 												vectorEffect="non-scaling-stroke"
@@ -647,7 +649,7 @@ function Stage({
 										style={{
 											bottom: 0,
 											height: stem,
-											background: solid ? C.glow : "rgba(244,244,244,0.5)",
+											background: solid ? C.glow : brandVar("paper", 0.5),
 										}}
 									/>
 									<span
@@ -657,9 +659,9 @@ function Stage({
 											background: solid ? C.glow : "transparent",
 											border: solid
 												? "none"
-												: "1px solid rgba(244,244,244,0.7)",
+												: `1px solid ${brandVar("paper", 0.7)}`,
 											boxShadow: solid
-												? `0 0 0 ${4 * (1 - vis.labelsSolid) + 2}px rgba(187,139,84,${0.5 * (1 - vis.labelsSolid) + 0.15})`
+												? `0 0 0 ${4 * (1 - vis.labelsSolid) + 2}px ${brandVar("glow", 0.5 * (1 - vis.labelsSolid) + 0.15)}`
 												: "none",
 										}}
 									/>
@@ -756,7 +758,7 @@ function Stage({
 							<span>
 								<i
 									className="mr-1 inline-block h-2 w-3 align-middle"
-									style={{ background: "rgba(187,139,84,0.5)" }}
+									style={{ background: brandVar("glow", 0.5) }}
 								/>
 								view
 								{world.uncertainty > 0.05 && (
@@ -878,9 +880,7 @@ function Readout({
 									className="py-1 text-right"
 									style={{
 										color:
-											Math.abs(delta) > 0.05
-												? "#e59e1f"
-												: "rgba(244,244,244,0.8)",
+											Math.abs(delta) > 0.05 ? C.photo : brandVar("paper", 0.8),
 									}}
 								>
 									{r.b.toFixed(1)}
@@ -899,8 +899,8 @@ function Readout({
 							style={{
 								color:
 									eyeSnap > 0.02 && eyeSnap < 1
-										? "#e59e1f"
-										: "rgba(244,244,244,0.8)",
+										? C.photo
+										: brandVar("paper", 0.8),
 							}}
 						>
 							{Math.round(eyeNow)} m
@@ -941,21 +941,21 @@ function Readout({
 						x2={VW}
 						y1={VHc - 10}
 						y2={VHc - 10}
-						stroke="rgba(255,255,255,0.12)"
+						style={{ stroke: brandVar("paper", 0.12) }}
 					/>
 					<line
 						x1={X(scene.prior.yaw)}
 						x2={X(scene.prior.yaw)}
 						y1="2"
 						y2={VHc - 10}
-						stroke={C.bad}
+						style={{ stroke: C.bad }}
 						strokeDasharray="2 3"
 						strokeOpacity={0.8}
 					/>
 					<text
 						x={X(scene.prior.yaw) + 4}
 						y="10"
-						fill={C.bad}
+						style={{ fill: C.bad }}
 						fontSize="9"
 						fontFamily="ui-monospace, monospace"
 					>
@@ -964,7 +964,7 @@ function Readout({
 					<path
 						d={d}
 						fill="none"
-						stroke={C.terrain}
+						style={{ stroke: C.terrain }}
 						strokeWidth="1.5"
 						clipPath="url(#how-curve-clip)"
 					/>
@@ -975,13 +975,13 @@ function Readout({
 								x2={X(coarse.yaw)}
 								y1="2"
 								y2={VHc - 10}
-								stroke={C.glow}
+								style={{ stroke: C.glow }}
 								strokeOpacity={0.9}
 							/>
 							<text
 								x={X(coarse.yaw) - 4}
 								y="10"
-								fill={C.glow}
+								style={{ fill: C.glow }}
 								fontSize="9"
 								textAnchor="end"
 								fontFamily="ui-monospace, monospace"
@@ -995,13 +995,13 @@ function Readout({
 							cx={X(scene.prior.yaw + cursor)}
 							cy={VHc - 10}
 							r="3"
-							fill="#e59e1f"
+							style={{ fill: C.photo }}
 						/>
 					)}
 					<text
 						x="0"
 						y={VHc}
-						fill="rgba(255,255,255,0.35)"
+						style={{ fill: brandVar("paper", 0.35) }}
 						fontSize="9"
 						fontFamily="ui-monospace, monospace"
 					>
@@ -1010,7 +1010,7 @@ function Readout({
 					<text
 						x={VW}
 						y={VHc}
-						fill="rgba(255,255,255,0.35)"
+						style={{ fill: brandVar("paper", 0.35) }}
 						fontSize="9"
 						textAnchor="end"
 						fontFamily="ui-monospace, monospace"
@@ -1024,13 +1024,13 @@ function Readout({
 				className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 ring-1 transition"
 				style={{
 					opacity: 0.25 + 0.75 * accepted,
-					background: `rgba(141,145,122,${0.16 * accepted})`,
-					boxShadow: `inset 0 0 0 1px rgba(141,145,122,${0.2 + 0.5 * accepted})`,
+					background: brandVar("result", 0.16 * accepted),
+					boxShadow: `inset 0 0 0 1px ${brandVar("result", 0.2 + 0.5 * accepted)}`,
 				}}
 			>
 				<span
 					className="text-[12.5px] font-semibold"
-					style={{ color: accepted > 0.5 ? C.good : "rgba(244,244,244,0.5)" }}
+					style={{ color: accepted > 0.5 ? C.good : brandVar("paper", 0.5) }}
 				>
 					{accepted > 0.5 ? "Pose accepted" : "Not yet accepted"}
 				</span>

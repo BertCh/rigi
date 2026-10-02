@@ -36,8 +36,11 @@ import {
 
 const dir = process.env.DAWN_DIR;
 if (!dir) {
-	console.error("set DAWN_DIR to a directory with `npm i webgpu@0.3.0`");
-	process.exit(2);
+	// SKIP like the other Dawn checks, so the fast tier passes on machines without Dawn
+	console.log(
+		"SKIP render-bundle-dawn: DAWN_DIR is not set (npm i webgpu@0.3.0 somewhere and point DAWN_DIR at it)",
+	);
+	process.exit(0);
 }
 const { create, globals } = await import(
 	pathToFileURL(path.join(dir, "node_modules/webgpu/index.js")).href
