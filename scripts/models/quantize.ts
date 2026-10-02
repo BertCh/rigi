@@ -65,6 +65,19 @@ const PRESETS: Record<string, Preset> = {
 	},
 };
 
+const VITPOSE_FP16 = "vitpose-b.71b52d25.safetensors";
+// The ViT linears (qkv / proj / fc1 / fc2) go to int8; the patch conv, the head conv, norms, biases and the
+// folded pos embed stay fp16 (together about 3 MB; the head conv feeds the heatmaps directly).
+const VITPOSE_KEEP = /^patch\.|^head\.|pos_embed|^norm\.|\.ln\d\.|\.bias$/;
+PRESETS["vitpose-q8"] = {
+	input: VITPOSE_FP16,
+	name: "vitpose-b-q8",
+	group: 0,
+	keep: VITPOSE_KEEP,
+	licence: "Apache-2.0",
+	source: `${VITPOSE_FP16} (ViTPose-B simple, HF usyd-community/vitpose-base-simple @ a93ac0c6, Apache-2.0; ViTPose code Apache-2.0), int8 weights with one scale per row`,
+};
+
 const MIN_NUMEL = 4096;
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const MODELS = path.join(ROOT, "public/models");

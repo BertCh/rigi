@@ -102,5 +102,13 @@
 		"licence": "MIT AND Apache-2.0",
 		"source": "moge2-vits-normal.6d404d23.safetensors (MoGe-2 ViT-S normal, Ruicheng/moge-2-vits-normal @ 26b477f4, MIT; DINOv2-S Apache-2.0), normal head dropped, int8 weights with one scale per row",
 		"producer": "scripts/models/quantize.ts --preset moge2-q8lite"
+	},
+	{
+		"file": "vitpose-b-q8.cd86f1f4.safetensors",
+		"sha256": "cd86f1f442301799c86e66ddee97aa31783f3019a5b76caa82f9e8919fcac62b",
+		"bytes": 87075946,
+		"licence": "Apache-2.0",
+		"source": "vitpose-b.71b52d25.safetensors (ViTPose-B simple, HF usyd-community/vitpose-base-simple @ a93ac0c6, Apache-2.0; ViTPose code Apache-2.0), int8 weights with one scale per row",
+		"producer": "scripts/models/quantize.ts --preset vitpose-q8"
 	}
 ]

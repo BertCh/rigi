@@ -137,6 +137,11 @@ export const FLAG_SCHEMA = {
 	nearfield: oneOf(["auto", "on", "complete", "off"], "auto"),
 	/** Under nearfield=complete: people volumes take their back from a body fit (ViTPose on nn + Anny, src/lib/body). */
 	peopleBody: onOff("off"),
+	/**
+	 * ViTPose-B weights for peopleBody (body/vitpose.ts VITPOSE_WEIGHTS): q8 = int8 ViT linears expanded to f16 on the
+	 * GPU (87 MB download), fp16 = the checkpoint (172 MB, the parity reference).
+	 */
+	peopleBodyWeights: oneOf(["q8", "fp16"], "q8"),
 	/** Step Inside anchor: exclude cliff-lip DEM range discontinuities from the fit (nearfield/cliff-lip.ts). */
 	anchorCliff: onOff("off"),
 	/**
@@ -389,6 +394,7 @@ export const RESTART_FLAGS: readonly FlagName[] = [
 	"nearfield",
 	"nearfieldWeights",
 	"peopleBody",
+	"peopleBodyWeights",
 	"anchorCliff",
 	"concord",
 	"imagery",

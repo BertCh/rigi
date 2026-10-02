@@ -151,7 +151,7 @@ const pv = await refArr("pixel_values");
 
 // 2. per layer from the reference pixel_values (eager on the CPU; one graph per stage on the GPU)
 const t0 = performance.now();
-const net = await VitPose.load(nn);
+const net = await VitPose.load(nn, { weights: "fp16" });
 const [IH, IW] = VITPOSE_B.input;
 const x = nn.fromArray(pv, [1, 3, IH, IW]);
 const emb = await nn.forward(() => net.embed(x));

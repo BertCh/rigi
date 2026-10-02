@@ -13,10 +13,23 @@
 //   → ReLU → bilinear ×4 → 3 × 3 conv → 17 heatmaps 64 × 48
 //   → argmax + DARK refinement (Gaussian σ 0.8 radius 5, log, Newton step) → photo pixels.
 // Everything up to the heatmaps is one nn forward per person; the decode is CPU (17 × 3072 values).
+import { getFlag } from "#/lib/flags";
 import type { Nn, Tensor, Weights } from "#/lib/nn";
 
+/**
+ * Weight files of the same network, chosen by the `peopleBodyWeights` flag. `fp16` is the checkpoint as dumped
+ * (172 MB, the parity reference of vitpose.check.ts); `q8` is scripts/models/quantize.ts --preset vitpose-q8
+ * (int8 ViT linears, one scale per row, expanded to f16 on the GPU at load). Parity: reports/step-inside-download.md.
+ */
+export const VITPOSE_WEIGHTS = {
+	fp16: "vitpose-b.71b52d25.safetensors",
+	q8: "vitpose-b-q8.cd86f1f4.safetensors",
+} as const;
+export type VitPoseWeights = keyof typeof VITPOSE_WEIGHTS;
+
 export const VITPOSE_B = {
-	file: "vitpose-b.71b52d25.safetensors",
+	/** the fp16 checkpoint (VITPOSE_WEIGHTS.fp16) */
+	file: VITPOSE_WEIGHTS.fp16,
 	dim: 768,
 	heads: 12,
 	depth: 12,
@@ -263,9 +276,12 @@ export class VitPose {
 		opts: {
 			signal?: AbortSignal;
 			onProgress?: (loaded: number, total: number) => void;
+			/** default: the `peopleBodyWeights` flag */
+			weights?: VitPoseWeights;
 		} = {},
 	): Promise<VitPose> {
-		return new VitPose(nn, await nn.loadWeights(VITPOSE_B.file, opts));
+		const file = VITPOSE_WEIGHTS[opts.weights ?? getFlag("peopleBodyWeights")];
+		return new VitPose(nn, await nn.loadWeights(file, opts));
 	}
 
 	private w(name: string): Tensor {
