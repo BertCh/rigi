@@ -143,9 +143,10 @@ describe("TextureReader", () => {
 		const out = await new TextureReader(device).read(tex);
 		expect(out).toBeInstanceOf(Float32Array);
 		expect(out?.length).toBe(16 * 2 * 4);
-		expect(
-			new Uint8Array(out!.buffer, out!.byteOffset, out!.byteLength),
-		).toEqual(expected);
+		if (!out) throw new Error("no readback");
+		expect(new Uint8Array(out.buffer, out.byteOffset, out.byteLength)).toEqual(
+			expected,
+		);
 	});
 
 	it("reads r32float as one float per pixel", async () => {

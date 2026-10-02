@@ -68,14 +68,14 @@ describe("buildTrailSegments", () => {
 		for (let i = 1; i < s.count; i++) {
 			for (let k = 0; k < 3; k++)
 				expect(s.positions[i * 6 + k]).toBe(s.positions[(i - 1) * 6 + 3 + k]);
-			expect(s.dist![i * 2]).toBe(s.dist![(i - 1) * 2 + 1]);
+			expect(s.dist?.[i * 2]).toBe(s.dist?.[(i - 1) * 2 + 1]);
 		}
-		expect(s.dist![0]).toBe(0);
+		expect(s.dist?.[0]).toBe(0);
 		const total = distanceM(
 			{ lat: LAT, lon: LON + 0.01 },
 			{ lat: LAT, lon: LON + 0.02 },
 		);
-		expect(s.dist![s.count * 2 - 1]).toBeCloseTo(total, 3);
+		expect(s.dist?.[s.count * 2 - 1]).toBeCloseTo(total, 3);
 	});
 
 	it("drapes at DEM + 2 m + 0.06 % of the distance from the camera", () => {
@@ -170,8 +170,8 @@ describe("buildTrailSegments", () => {
 		);
 		expect(s.count).toBeLessThan(whole.count);
 		// the along-trail counter keeps running over the hole
-		expect(s.dist![s.count * 2 - 1]).toBeCloseTo(
-			whole.dist![whole.count * 2 - 1],
+		expect(s.dist?.[s.count * 2 - 1]).toBeCloseTo(
+			whole.dist?.[whole.count * 2 - 1] ?? Number.NaN,
 			3,
 		);
 	});
@@ -198,7 +198,7 @@ describe("buildTrailSegments", () => {
 			PALETTE,
 		);
 		expect(two.count).toBe(one.count * 2);
-		expect(two.dist![one.count * 2]).toBe(0);
+		expect(two.dist?.[one.count * 2]).toBe(0);
 	});
 });
 
