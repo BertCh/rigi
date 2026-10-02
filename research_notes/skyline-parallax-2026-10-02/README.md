@@ -12,6 +12,7 @@
   150 m 10/29, 400 m 11/27. Abstention 220/787 overall, 19/33 POS, 17/56 NE-dec. AUROC 0.61.
 - **Why:** chi2 is uncalibrated (all 14 non-abstained POS exceed the threshold, median 2404), the first-order model
   breaks at 150-400 m against a 2-4 km ridge, and most correct poses have a far-only skyline.
-- **Survives:** `src/lib/geocam/integrity/skyline-parallax.ts` with specs (not wired, no flag), plus
-  `scripts/geocam/skypar-eval.ts`.
+- **Code:** removed after the kill (cleanup rule: no killed code in `src/`). Recover the module, its specs and
+  the eval script with `git show 31752b8:src/lib/geocam/integrity/skyline-parallax.ts` (and `…/__tests__/skyline-parallax.spec.ts`,
+  `…:scripts/geocam/skypar-eval.ts`).
 - **Follow-up (not started):** a per-photo calibrated null and a re-marched Gauss-Newton fit, under a new prereg.

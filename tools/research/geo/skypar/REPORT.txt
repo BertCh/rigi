@@ -1,6 +1,7 @@
 SKYPAR - SKYLINE PARALLAX WRONG-EYE TEST                                                   2026-10-02
 Protocol: PROTOCOL.txt (committed a89bf25 before any score; AMENDMENT 0 written before scoring, slope definition only).
-Code: src/lib/geocam/integrity/skyline-parallax.ts (+ __tests__), scripts/geocam/skypar-eval.ts, analyze.py.
+Code: src/lib/geocam/integrity/skyline-parallax.ts (+ __tests__), scripts/geocam/skypar-eval.ts (removed after the kill;
+  recover with git show 31752b8:<path>), analyze.py.
 Machine-readable: results.json (per hypothesis), analysis.txt (all tables). DEV ONLY, n = 787 hypotheses over 35 dev
 photos, NOT A RESULT.
 
@@ -35,6 +36,6 @@ WHY IT FAILS (descriptive; POST HOC labels below never change the verdict)
     (negative-results: "True eye ranks 43rd of 113") in another form.
 
 WHAT SURVIVES
-  The module, its Jacobians (exact pinhole derivative, finite-difference tested) and specs. Not wired, no flag.
+  The module, its Jacobians (exact pinhole derivative, finite-difference tested) and specs, at commit 31752b8 only.
   Follow-up only if someone preregisters a calibrated null (per-photo permutation / block bootstrap of the
   skyline residual) and a nonlinear (re-marched) fit; this protocol's point is killed.
