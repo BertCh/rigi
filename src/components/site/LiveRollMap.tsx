@@ -9,6 +9,7 @@ import { MapAttribution } from "#/lib/licences/MapAttribution";
 import type { RollMapEngine, RollMapStatus } from "#/lib/roll/map/roll-map";
 import { LiveLines } from "./LiveLines";
 import { type Lines, viewOfCamera } from "./lineArt";
+import { useNearViewport } from "./useNearViewport";
 
 // Landing-page live map: the sample trip draped on 3D terrain by the real roll engine, started only
 // once the section scrolls into view, slowly orbiting until someone grabs it. Clicking a camera pin
@@ -39,9 +40,18 @@ export function LiveRollMap({
 	poster?: string;
 	className?: string;
 }) {
+	// the first sighting starts the load (small margin: the heavy load shouldn't begin while the topo
+	// board above is still on screen); far away for a few seconds, the engine is disposed (its GPU
+	// context freed) and the poster shows again
 	const box = useRef<HTMLDivElement>(null);
+	const { near: visible } = useNearViewport(50, {
+		releaseWhenFar: true,
+		ref: box,
+	});
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const [visible, setVisible] = useState(false);
+	// a fresh <canvas> per engine: a released canvas keeps its old context type
+	const [generation, setGeneration] = useState(0);
+	const started = useRef(false);
 	const [status, setStatus] = useState<RollMapStatus | null>(null);
 	const [shown, setShown] = useState(false);
 	const [inPhoto, setInPhoto] = useState<string | null>(null);
@@ -65,11 +75,9 @@ export function LiveRollMap({
 	useEffect(() => {
 		const el = box.current;
 		if (!el) return;
-		// the first sighting starts the load (small margin: the heavy load shouldn't begin while the topo
-		// board above is still on screen); after that the render loop follows visibility
+		// the render loop follows visibility
 		const io = new IntersectionObserver(
 			([e]) => {
-				if (e.isIntersecting) setVisible(true);
 				onScreen.current = e.isIntersecting;
 				if (e.isIntersecting) eng.current?.resume();
 				else eng.current?.pause();
@@ -143,6 +151,18 @@ export function LiveRollMap({
 		};
 	}, [visible]);
 
+	useEffect(() => {
+		if (visible) {
+			started.current = true;
+		} else if (started.current) {
+			started.current = false;
+			setGeneration((g) => g + 1);
+			setShown(false);
+			setStatus(null);
+			setInPhoto(null);
+		}
+	}, [visible]);
+
 	const busy = status && status.stage !== "ready";
 	// the sides: contour lines through the orbiting camera, once the terrain is in; the engine's frame
 	// is centred on the roll, the bake's on the demo viewpoint, so the camera is shifted onto the bake's
@@ -178,6 +198,7 @@ export function LiveRollMap({
 					/>
 				)}
 				<canvas
+					key={generation}
 					ref={canvasRef}
 					className={`absolute inset-0 size-full !touch-pan-y transition-opacity duration-700 ${shown ? "opacity-100" : "opacity-0"}`}
 				/>

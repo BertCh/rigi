@@ -10,6 +10,7 @@ import type { PhotoMeta } from "#/lib/photos";
 import type { Renderer } from "#/lib/renderer";
 import { LiveLines } from "./LiveLines";
 import { type Lines, viewOfCamera } from "./lineArt";
+import { useNearViewport } from "./useNearViewport";
 
 // Landing-page Step Inside: a photo from the sample trip (IMG_7086, Niederhorn) with its near field
 // baked by scripts/demo/bake-step.mjs (the anchored splats and the depth split the Step Inside button
@@ -64,10 +65,18 @@ function bytesFromBase64(b64: string): Uint8Array {
 }
 
 export function StepInsideDemo({ className }: { className?: string }) {
+	// starts near the viewport (200 px); far away for a few seconds, the engine is disposed (its GPU
+	// context freed) and the photo poster shows again
 	const box = useRef<HTMLDivElement>(null);
+	const { near: visible } = useNearViewport(200, {
+		releaseWhenFar: true,
+		ref: box,
+	});
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const engineRef = useRef<StepEngine | null>(null);
-	const [visible, setVisible] = useState(false);
+	// a fresh <canvas> per engine: a released canvas keeps its old context type
+	const [generation, setGeneration] = useState(0);
+	const started = useRef(false);
 	const [stage, setStage] = useState<string | null>(null);
 	const [stepping, setStepping] = useState(false);
 
@@ -89,17 +98,6 @@ export function StepInsideDemo({ className }: { className?: string }) {
 			window.removeEventListener("keydown", keys, { capture: true });
 			window.removeEventListener("keyup", keys, { capture: true });
 		};
-	}, []);
-
-	useEffect(() => {
-		const el = box.current;
-		if (!el) return;
-		const io = new IntersectionObserver(
-			([e]) => e.isIntersecting && setVisible(true),
-			{ rootMargin: "200px" },
-		);
-		io.observe(el);
-		return () => io.disconnect();
 	}, []);
 
 	useEffect(() => {
@@ -278,6 +276,16 @@ export function StepInsideDemo({ className }: { className?: string }) {
 		};
 	}, [visible]);
 
+	useEffect(() => {
+		if (visible) {
+			started.current = true;
+		} else if (started.current) {
+			started.current = false;
+			setGeneration((g) => g + 1);
+			setStage(null);
+		}
+	}, [visible]);
+
 	const ready = stage === "ready";
 	// the sides: the photo's ridgelines through the step camera (at the photo's pose until it is up)
 	const stepView = (lines: Lines) => {
@@ -308,6 +316,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 					className={`absolute inset-0 size-full object-contain transition-opacity duration-700 ${ready ? "opacity-0" : "opacity-100"}`}
 				/>
 				<canvas
+					key={generation}
 					ref={canvasRef}
 					tabIndex={-1}
 					className={`absolute inset-0 size-full !touch-pan-y outline-none transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}

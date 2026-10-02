@@ -17,6 +17,20 @@ function context2d(w: number, h: number) {
 	return c.getContext("2d", { willReadFrequently: true });
 }
 
+// One scratch 2D context per realm, reused while the tile size repeats (every DEM tile is the same
+// size); a new size makes a new one. bitmapHeights is synchronous, so there is no overlap.
+let scratch: {
+	w: number;
+	h: number;
+	ctx: ReturnType<typeof context2d>;
+} | null = null;
+
+function scratchContext(w: number, h: number) {
+	if (!scratch || scratch.w !== w || scratch.h !== h || !scratch.ctx)
+		scratch = { w, h, ctx: context2d(w, h) };
+	return scratch.ctx;
+}
+
 /**
  * Whether 2D-canvas readback returns the pixels drawn. Anti-fingerprinting modes (Brave's canvas
  * farbling, Safari's Advanced Fingerprinting Protection, Firefox resistFingerprinting) add noise to
@@ -98,8 +112,9 @@ export function probeCanvasReadback(): Promise<CanvasReadback> {
  * heights are decodeTerrarium's, bit for bit.
  */
 export function bitmapHeights(bmp: ImageBitmap) {
-	const ctx = context2d(bmp.width, bmp.height);
+	const ctx = scratchContext(bmp.width, bmp.height);
 	if (!ctx) throw new Error("2D canvas unavailable for DEM decode");
+	ctx.clearRect(0, 0, bmp.width, bmp.height); // a reused canvas must start transparent, like a new one
 	ctx.drawImage(bmp, 0, 0);
 	const h = decodeTerrarium(ctx.getImageData(0, 0, bmp.width, bmp.height).data);
 	if (readback === "noised" && bmp.width === bmp.height)

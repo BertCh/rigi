@@ -59,6 +59,7 @@ beforeEach(() => {
 			getContext() {
 				let src: Uint8ClampedArray = new Uint8ClampedArray(0);
 				return {
+					clearRect() {},
 					drawImage: (b: { data: Uint8ClampedArray }) => {
 						src = b.data;
 					},

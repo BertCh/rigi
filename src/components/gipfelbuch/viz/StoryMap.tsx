@@ -71,11 +71,15 @@ function useSearchSweep(
 		const period = 5200;
 		const t0 = performance.now();
 		let raf = 0;
+		let lastFrame = Number.NEGATIVE_INFINITY;
 		const tick = (now: number) => {
+			raf = requestAnimationFrame(tick);
+			// 30 fps cap: a state update per display frame (120 Hz) re-renders the map for no visible gain
+			if (now - lastFrame < 1000 / 30 - 2) return;
+			lastFrame = now;
 			const u = ((now - t0) % period) / (period * 0.72);
 			// from the guess, overshoot both ways, settle; then hold on the solution
 			setT(u >= 1 ? 1 : 1 - Math.cos(3 * Math.PI * u) * (1 - u) ** 1.4);
-			raf = requestAnimationFrame(tick);
 		};
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);

@@ -52,6 +52,14 @@ export const Route = createRootRoute({
 				type: "font/woff2",
 				crossOrigin: "anonymous",
 			},
+			// the landing hero h1 is Fira Sans 600
+			{
+				rel: "preload",
+				href: "/fonts/gipfelbuch/fira-sans-normal-600-latin.woff2",
+				as: "font",
+				type: "font/woff2",
+				crossOrigin: "anonymous",
+			},
 			{
 				rel: "stylesheet",
 				href: appCss,

@@ -46,6 +46,7 @@ function stubCanvas(noise: Noise) {
 			getContext() {
 				let src: Uint8ClampedArray<ArrayBufferLike> = new Uint8ClampedArray(0);
 				return {
+					clearRect() {},
 					drawImage: (b: { data: Uint8ClampedArray }) => {
 						src = b.data;
 					},
@@ -69,6 +70,48 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllGlobals();
 	vi.restoreAllMocks();
+});
+
+describe("bitmapHeights scratch canvas", () => {
+	it("reuses one canvas per size, clears it before each draw, and decodes as before", async () => {
+		let made = 0;
+		let cleared = 0;
+		stubCanvas((d) => d);
+		const Base = globalThis.OffscreenCanvas as unknown as new () => {
+			getContext(): Record<string, unknown>;
+		};
+		vi.stubGlobal(
+			"OffscreenCanvas",
+			class extends Base {
+				constructor() {
+					super();
+					made++;
+				}
+				getContext() {
+					const c = super.getContext();
+					c.clearRect = () => cleared++;
+					return c;
+				}
+			},
+		);
+		const { bitmapHeights } = await import("../image");
+		const bitmap = (n: number, h: number) => ({
+			width: n,
+			height: n,
+			close() {},
+			data: new Uint8ClampedArray(
+				Array.from({ length: n * n }, () => px(h)).flat(),
+			),
+		});
+		for (let i = 0; i < 3; i++) {
+			const h = bitmapHeights(bitmap(4, 1000 + i) as unknown as ImageBitmap);
+			expect(h[7]).toBe(1000 + i);
+		}
+		expect(made).toBe(1);
+		expect(cleared).toBe(3);
+		bitmapHeights(bitmap(8, 500) as unknown as ImageBitmap);
+		expect(made).toBe(2);
+	});
 });
 
 describe("readback probe helpers", () => {

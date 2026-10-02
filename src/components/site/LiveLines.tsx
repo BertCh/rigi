@@ -18,9 +18,13 @@ const BLEED = 0.5;
 const TOP = 0.06;
 const BOTTOM = 0.12;
 const FPS = 30;
+/** Frame rate while nobody is dragging, zooming or typing (the autorotate keeps moving the view). */
+const IDLE_FPS = 15;
+const IDLE_AFTER_MS = 1500;
 /** Distance-fade buckets for strokes (contours). */
 const FADE_BUCKETS = 6;
-const DPR_MAX = 1.5;
+// 1: the side strokes are faded hairlines, so a retina backing store only costs fill rate
+const DPR_MAX = 1;
 const LABEL_FONT = "600 10.5px ui-sans-serif, system-ui, sans-serif";
 const SUB_FONT = "9.5px ui-monospace, monospace";
 
@@ -58,6 +62,25 @@ export function LiveLines({
 		let onScreen = false;
 		let raf = 0;
 		let last = 0;
+		// last pointer-held / wheel / key time: full frame rate only while the user drives the view
+		let held = false;
+		let lastInput = -Infinity;
+		const input = () => {
+			lastInput = performance.now();
+		};
+		const down = () => {
+			held = true;
+			input();
+		};
+		const up = () => {
+			held = false;
+			input();
+		};
+		window.addEventListener("pointerdown", down, { passive: true });
+		window.addEventListener("pointerup", up, { passive: true });
+		window.addEventListener("pointercancel", up, { passive: true });
+		window.addEventListener("wheel", input, { passive: true });
+		window.addEventListener("keydown", input, { passive: true });
 		// what the last draw was made from: redraw only when one of these changed
 		const seen = new Float64Array(13);
 		let seenValid = false;
@@ -89,7 +112,8 @@ export function LiveLines({
 		scheme.addEventListener("change", refreshInk);
 		const tick = (now: number) => {
 			raf = requestAnimationFrame(tick);
-			if (now - last < 1000 / FPS - 2) return;
+			const fps = held || now - lastInput < IDLE_AFTER_MS ? FPS : IDLE_FPS;
+			if (now - last < 1000 / fps - 2) return;
 			last = now;
 			if (!lines) return;
 			const v = viewRef.current(lines);
@@ -151,6 +175,11 @@ export function LiveLines({
 		wide.addEventListener("change", sync);
 		document.addEventListener("visibilitychange", sync);
 		return () => {
+			window.removeEventListener("pointerdown", down);
+			window.removeEventListener("pointerup", up);
+			window.removeEventListener("pointercancel", up);
+			window.removeEventListener("wheel", input);
+			window.removeEventListener("keydown", input);
 			nearIo.disconnect();
 			io.disconnect();
 			resizeObserver.disconnect();
@@ -313,6 +342,15 @@ function draw(
 		const r = group[i];
 		if (r >= 0) order[cursor[r]++] = i;
 	}
+	// stroke only outside the frame (even-odd clip), so nothing is drawn just to be erased; the
+	// frame keeps its own rectangle empty (its rounded corners show the page)
+	const fx0 = BLEED * fw * dpr;
+	const fy0 = TOP * fh * dpr;
+	g.save();
+	g.beginPath();
+	g.rect(0, 0, W, H);
+	g.rect(fx0, fy0, fw * dpr, fh * dpr);
+	g.clip("evenodd");
 	g.lineJoin = "round";
 	g.lineCap = "round";
 	for (let r = 0; r < nGroups; r++) {
@@ -354,10 +392,7 @@ function draw(
 		g.stroke();
 	}
 
-	// the frame covers its own rectangle: keep it empty (its rounded corners show the page)
-	const fx0 = BLEED * fw * dpr;
-	const fy0 = TOP * fh * dpr;
-	g.clearRect(fx0, fy0, fw * dpr, fh * dpr);
+	g.restore();
 
 	// peak names past the frame, on short leaders, greedily by rank without overlaps
 	if (!L.labels.length) return;
