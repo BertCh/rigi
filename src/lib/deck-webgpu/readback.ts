@@ -24,14 +24,42 @@ async function copyTextureRows(
 	bytesPerPixel: number,
 ): Promise<Uint8Array> {
 	const layout = tex.computeMemoryLayout();
+	// readBuffer submits the copy now (its own queue.submit), so the map below waits for it. luma's
+	// readAsync would first await queue.onSubmittedWorkDone() (every frame submitted since) and
+	// slice the padded range; waitForSubmittedWork:false maps once this copy is done, and the rows
+	// are packed straight out of the mapped range (valid only inside the callback). The staging
+	// buffer is MAP_READ and the range starts at 0 with a 256-multiple size, so it maps in place.
 	tex.readBuffer({}, buf);
-	const data = await buf.readAsync(0, layout.byteLength);
-	const row = tex.width * bytesPerPixel;
-	const out = new Uint8Array(row * tex.height);
-	for (let y = 0; y < tex.height; y++)
+	return await buf.mapAndReadAsync(
+		(mapped) =>
+			packRows(
+				new Uint8Array(mapped),
+				layout.bytesPerRow,
+				tex.width * bytesPerPixel,
+				tex.height,
+			),
+		0,
+		layout.byteLength,
+		{ waitForSubmittedWork: false },
+	);
+}
+
+/**
+ * `height` rows of `rowBytes` out of `src` (rows `bytesPerRow` apart) as a fresh tightly packed
+ * array; one slice when the rows are already tight.
+ */
+export function packRows(
+	src: Uint8Array,
+	bytesPerRow: number,
+	rowBytes: number,
+	height: number,
+): Uint8Array {
+	if (bytesPerRow === rowBytes) return src.slice(0, rowBytes * height);
+	const out = new Uint8Array(rowBytes * height);
+	for (let y = 0; y < height; y++)
 		out.set(
-			data.subarray(y * layout.bytesPerRow, y * layout.bytesPerRow + row),
-			y * row,
+			src.subarray(y * bytesPerRow, y * bytesPerRow + rowBytes),
+			y * rowBytes,
 		);
 	return out;
 }

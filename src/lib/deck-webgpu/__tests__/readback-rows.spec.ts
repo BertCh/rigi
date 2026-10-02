@@ -5,6 +5,7 @@
 import type { Buffer, Device, Texture } from "@luma.gl/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+	packRows,
 	rangeOf,
 	readGeometry,
 	readTextureBytes,
@@ -68,6 +69,17 @@ class FakeBuffer {
 	async readAsync(offset: number, length: number) {
 		return this.__fill.subarray(offset, offset + length);
 	}
+	mapAndReadAsync<T>(
+		cb: (mapped: ArrayBuffer) => T,
+		offset: number,
+		length: number,
+		options?: { waitForSubmittedWork?: boolean },
+	) {
+		this.mapOptions = options;
+		const bytes = this.__fill.slice(offset, offset + length);
+		return Promise.resolve(cb(bytes.buffer));
+	}
+	mapOptions?: { waitForSubmittedWork?: boolean };
 	destroy() {
 		this.destroyed = true;
 	}
@@ -209,5 +221,34 @@ describe("rangeOf / readGeometry", () => {
 		const pending = reader.read(tex);
 		expect(await readGeometry(reader, g)).toBeNull();
 		await pending;
+	});
+});
+
+describe("packRows", () => {
+	it("copies tight rows as one independent slice", () => {
+		const src = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
+		const out = packRows(src, 4, 4, 2);
+		expect(out).toEqual(src);
+		out[0] = 99;
+		expect(src[0]).toBe(1);
+	});
+
+	it("drops row padding", () => {
+		const src = Uint8Array.from([1, 2, 0, 0, 3, 4, 0, 0, 5, 6, 0, 0]);
+		expect(packRows(src, 4, 2, 3)).toEqual(Uint8Array.from([1, 2, 3, 4, 5, 6]));
+	});
+
+	it("ignores trailing bytes past the last row", () => {
+		const src = Uint8Array.from([1, 2, 9, 9, 3, 4, 9, 9, 7, 7, 7, 7]);
+		expect(packRows(src, 4, 2, 2)).toEqual(Uint8Array.from([1, 2, 3, 4]));
+	});
+});
+
+describe("copyTextureRows map options", () => {
+	it("maps without waiting for later submitted work", async () => {
+		const { tex } = fakeTexture(4, 3, 4, 256);
+		const { device, created } = fakeDevice();
+		await readTextureBytes(device, tex, 4);
+		expect(created[0].mapOptions).toEqual({ waitForSubmittedWork: false });
 	});
 });

@@ -65,6 +65,12 @@ import {
 import { USAGE } from "../targets";
 import { imageTexture, maskTexture } from "../textures";
 import { colorWGSL, fullscreenWGSL, rampWGSL } from "../wgsl";
+import {
+	circleRect,
+	extractRed,
+	type PixelRect,
+	unionRect,
+} from "./brush-rect";
 import { ridgesModule, ridgeUniforms } from "./ridges";
 
 export type { BlendMethod, CompositeSettings, DeckCompositeLook };
@@ -920,6 +926,8 @@ export class CompositeCore implements GpuLayerCore {
 	private occlDirty = false;
 	private brushTex?: Texture;
 	private brushDirty = true;
+	/** Painted since the last upload (null with brushDirty = the whole canvas must upload). */
+	private brushRect: PixelRect | null = null;
 	private maskTex?: Texture;
 	private maskSrc: Uint8Array | null = null;
 	/** refined masks already on the GPU (compute-bridge.ts); not owned, wins over look.mask */
@@ -1040,6 +1048,12 @@ export class CompositeCore implements GpuLayerCore {
 		ctx.beginPath();
 		ctx.arc(x, y, r, 0, Math.PI * 2);
 		ctx.fill();
+		// a stroke frame uploads only its rectangle, unless the whole canvas is already pending
+		if (!this.brushDirty || this.brushRect)
+			this.brushRect = unionRect(
+				this.brushDirty ? this.brushRect : null,
+				circleRect(x, y, r, this.brushCanvas.width, this.brushCanvas.height),
+			);
 		this.brushDirty = true;
 		this.bump();
 	}
@@ -1050,6 +1064,7 @@ export class CompositeCore implements GpuLayerCore {
 		}) as CanvasRenderingContext2D;
 		ctx.fillStyle = fill ? "#fff" : "#000";
 		ctx.fillRect(0, 0, this.brushCanvas.width, this.brushCanvas.height);
+		this.brushRect = null;
 		this.brushDirty = true;
 		this.bump();
 	}
@@ -1186,27 +1201,39 @@ export class CompositeCore implements GpuLayerCore {
 		}
 		if (this.brushDirty) {
 			const { width, height } = this.brushCanvas;
-			const rgba = (
-				this.brushCanvas.getContext("2d", {
-					willReadFrequently: true,
-				}) as CanvasRenderingContext2D
-			).getImageData(0, 0, width, height).data;
-			const r = new Uint8Array(width * height);
-			for (let i = 0; i < r.length; i++) r[i] = rgba[i * 4];
-			if (!this.brushTex)
-				this.brushTex = maskTexture(
-					device,
-					r,
-					width,
-					height,
-					`${this.id}-brush`,
-				);
-			else
-				this.brushTex.writeData(r as never, {
-					width,
-					height,
-					bytesPerRow: width,
-				});
+			// the first upload, a clear and a texture release upload everything (brushRect null);
+			// a paint() frame only its dirty rectangle
+			const rect =
+				this.brushTex && this.brushRect
+					? this.brushRect
+					: { x0: 0, y0: 0, x1: width, y1: height };
+			const rw = rect.x1 - rect.x0;
+			const rh = rect.y1 - rect.y0;
+			if (rw > 0 && rh > 0) {
+				const rgba = (
+					this.brushCanvas.getContext("2d", {
+						willReadFrequently: true,
+					}) as CanvasRenderingContext2D
+				).getImageData(rect.x0, rect.y0, rw, rh).data;
+				const r = extractRed(rgba, { x0: 0, y0: 0, x1: rw, y1: rh }, rw);
+				if (!this.brushTex)
+					this.brushTex = maskTexture(
+						device,
+						r,
+						width,
+						height,
+						`${this.id}-brush`,
+					);
+				else
+					this.brushTex.writeData(r as never, {
+						x: rect.x0,
+						y: rect.y0,
+						width: rw,
+						height: rh,
+						bytesPerRow: rw,
+					});
+			}
+			this.brushRect = null;
 			this.brushDirty = false;
 		}
 		const lm = this.look.mask;
@@ -1235,6 +1262,7 @@ export class CompositeCore implements GpuLayerCore {
 		this.fgDirty = !!this.fgMask;
 		this.occlDirty = !!this.occlMask;
 		this.brushDirty = true;
+		this.brushRect = null;
 		if (this.placeholders)
 			for (const t of Object.values(this.placeholders)) t.destroy();
 		this.placeholders = undefined;
