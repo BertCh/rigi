@@ -5,21 +5,8 @@
 // CR-49: invSymCov reports +Infinity variance for parameters in the null space of the information,
 // where the pseudo-inverse invSym reports 0 (σ = 0 would make an integrity test fail open).
 import { describe, expect, it } from "vitest";
+import { seededRandom, uniform } from "#/test/helpers";
 import { invSym, invSymCov } from "../index";
-
-/** mulberry32, as in src/test/helpers.ts (inlined until that module is committed). */
-function seededRandom(seed: number): () => number {
-	let s = seed >>> 0;
-	return () => {
-		s = (s + 0x6d2b79f5) >>> 0;
-		let t = s;
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
-const uniform = (rand: () => number, lo: number, hi: number) =>
-	lo + (hi - lo) * rand();
 
 function randomSPD(rand: () => number, n: number) {
 	const B = Array.from({ length: n }, () =>
