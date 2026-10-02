@@ -1,0 +1,345 @@
+// Rigi
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+
+// The GPU backend's runtime: lazy tensors, recordings and their lowering onto ONE core ComputeGraph
+// per forward.
+// - An op records a node (kernel spec, input / output storages, parameter words, workgroups) and
+//   returns tensors whose storage is pending.
+// - flush() turns a recording into a graph: storages that already hold a buffer (weights, fromArray,
+//   earlier outputs) are imports, the recording's outputs are imports bound to buffers from the
+//   runtime's free list, everything else is a graph transient (aliased by the graph compiler, so a
+//   forward reuses scratch). Parameter words of all nodes live in one constant buffer owned by the
+//   graph. Graphs are cached by their structure (cachedGraph group "nn"), so a repeated forward with
+//   the same shapes re-encodes a compiled graph.
+// - Every GPU step (writes, graph runs, readback copies) goes through one promise chain, so queue
+//   order is program order and buffers can be recycled as soon as a tensor is disposed.
+
+import { Buffer, type Device } from "@luma.gl/core";
+import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
+import type { KernelSpec } from "#/lib/gpu/core/kernel";
+import { submit } from "#/lib/gpu/core/queue";
+import { stageReads } from "#/lib/gpu/core/readback";
+import { numel } from "../shape";
+import type { DType, Tensor } from "../types";
+
+const STORAGE = Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST;
+
+export type StorageState = "pending" | "ready" | "dead" | "disposed";
+
+export class Storage {
+	static next = 0;
+	readonly id = Storage.next++;
+	buffer: Buffer | null = null;
+	state: StorageState;
+	/** recording that produces it (pending only) */
+	rec: Recording | null;
+	/** user disposed it while pending: not an output of an implicit flush */
+	dropped = false;
+	/** weights: freed with their Weights, not by dispose(tensor) */
+	pinned = false;
+	constructor(
+		readonly bytes: number,
+		readonly dtype: DType,
+		rec: Recording | null,
+	) {
+		this.rec = rec;
+		this.state = rec ? "pending" : "ready";
+	}
+}
+
+export class GpuTensor implements Tensor {
+	constructor(
+		readonly shape: readonly number[],
+		readonly dtype: DType,
+		readonly st: Storage,
+	) {}
+}
+
+export type Node = {
+	spec: KernelSpec;
+	inputs: Storage[];
+	outputs: Storage[];
+	meta: number[];
+	wg: [number, number, number];
+};
+
+export class Recording {
+	nodes: Node[] = [];
+	produced: Storage[] = [];
+}
+
+/** 53-bit string hash (cyrb53). */
+function hash(s: string): string {
+	let h1 = 0xdeadbeef;
+	let h2 = 0x41c6ce57;
+	for (let i = 0; i < s.length; i++) {
+		const c = s.charCodeAt(i);
+		h1 = Math.imul(h1 ^ c, 2654435761);
+		h2 = Math.imul(h2 ^ c, 1597334677);
+	}
+	h1 =
+		Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^
+		Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+	h2 =
+		Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^
+		Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+	return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+const pad4 = (n: number) => Math.max(4, Math.ceil(n / 4) * 4);
+
+export type RuntimeStats = {
+	graphs: number;
+	graphHits: number;
+	nodes: number;
+	freeBuffers: number;
+	liveBytes: number;
+};
+
+export class Runtime {
+	private chain: Promise<unknown> = Promise.resolve();
+	private free = new Map<number, Buffer[]>();
+	private align: number;
+	readonly stats: RuntimeStats = {
+		graphs: 0,
+		graphHits: 0,
+		nodes: 0,
+		freeBuffers: 0,
+		liveBytes: 0,
+	};
+
+	constructor(readonly device: Device) {
+		this.align = device.limits.minStorageBufferOffsetAlignment || 256;
+	}
+
+	/** Run `step` after every earlier step; its error goes to its caller only. */
+	enqueue<T>(step: () => T | Promise<T>): Promise<T> {
+		const p = this.chain.then(step);
+		this.chain = p.catch(() => {});
+		return p;
+	}
+
+	/** A buffer of at least `bytes` from the free list (power-of-two capacities). */
+	allocate(bytes: number): Buffer {
+		const cap = 2 ** Math.ceil(Math.log2(Math.max(256, bytes)));
+		const list = this.free.get(cap);
+		const b = list?.pop();
+		if (b) {
+			this.stats.freeBuffers--;
+			return b;
+		}
+		this.stats.liveBytes += cap;
+		return this.device.createBuffer({
+			id: "nn-tensor",
+			usage: STORAGE,
+			byteLength: cap,
+		});
+	}
+
+	/** Return a buffer to the free list (later steps reuse it in queue order). */
+	recycle(b: Buffer) {
+		const cap = b.byteLength;
+		let list = this.free.get(cap);
+		if (!list) {
+			list = [];
+			this.free.set(cap, list);
+		}
+		list.push(b);
+		this.stats.freeBuffers++;
+	}
+
+	/** Destroy every free buffer (memory pressure / teardown). */
+	trim() {
+		for (const list of this.free.values())
+			for (const b of list) {
+				this.stats.liveBytes -= b.byteLength;
+				b.destroy();
+			}
+		this.free.clear();
+		this.stats.freeBuffers = 0;
+	}
+
+	/** A ready storage holding `data` (written in queue order). */
+	upload(data: ArrayBufferView, dtype: DType, exact = false): Storage {
+		const st = new Storage(pad4(data.byteLength), dtype, null);
+		if (exact) {
+			st.buffer = this.device.createBuffer({
+				id: "nn-weight",
+				usage: STORAGE,
+				byteLength: st.bytes,
+			});
+		} else st.buffer = this.allocate(st.bytes);
+		const buf = st.buffer;
+		let bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+		if (bytes.byteLength % 4) {
+			const p = new Uint8Array(pad4(bytes.byteLength));
+			p.set(bytes);
+			bytes = p;
+		}
+		const copy = bytes.slice();
+		void this.enqueue(() => buf.write(copy));
+		return st;
+	}
+
+	/** Copy a storage back (queued after every earlier step). */
+	read(st: Storage): Promise<ArrayBuffer> {
+		const buf = st.buffer;
+		if (!buf) throw new Error("nn: read of a tensor without storage");
+		return this.enqueue(() => {
+			const enc = this.device.createCommandEncoder({ id: "nn-read" });
+			const staged = stageReads(this.device, enc, [
+				{ buffer: buf, size: st.bytes },
+			]);
+			try {
+				submit(this.device, enc);
+			} catch (e) {
+				staged.cancel();
+				throw e;
+			}
+			// the copy is in the queue: later steps may proceed while this maps
+			return { read: staged.read };
+		}).then(async ({ read }) => (await read())[0]);
+	}
+
+	/**
+	 * Lower `rec` onto a ComputeGraph and queue its run. `outputs` (storages produced by `rec`) get
+	 * buffers now; every other produced storage becomes dead scratch.
+	 */
+	flush(rec: Recording, outputs: Set<Storage>): Promise<void> {
+		// dead-code elimination: keep nodes that (transitively) feed an output
+		const live = new Set<Storage>(outputs);
+		const keep: Node[] = [];
+		for (let i = rec.nodes.length - 1; i >= 0; i--) {
+			const n = rec.nodes[i];
+			if (!n.outputs.some((o) => live.has(o))) continue;
+			keep.push(n);
+			for (const s of n.inputs) live.add(s);
+		}
+		keep.reverse();
+		const produced = new Set(rec.produced);
+		for (const s of rec.produced) {
+			s.rec = null;
+			if (outputs.has(s)) {
+				s.buffer = this.allocate(s.bytes);
+				s.state = "ready";
+			} else s.state = "dead";
+		}
+		if (!keep.length) return Promise.resolve();
+
+		// slots: imports (x), outputs (o), transients (t), in first-use order
+		const slot = new Map<Storage, string>();
+		const decl: string[] = [];
+		const imports: Storage[] = [];
+		const outs: Storage[] = [];
+		const trans: Storage[] = [];
+		const name = (s: Storage) => {
+			let n = slot.get(s);
+			if (n) return n;
+			if (outputs.has(s)) {
+				n = `o${outs.length}`;
+				outs.push(s);
+			} else if (s.state === "ready" && !produced.has(s)) {
+				n = `x${imports.length}`;
+				imports.push(s);
+			} else if (s.state === "dead" && produced.has(s)) {
+				n = `t${trans.length}`;
+				trans.push(s);
+			} else
+				throw new Error(
+					`nn: a forward used a tensor that is ${s.state} (disposed, or scratch of an earlier forward)`,
+				);
+			slot.set(s, n);
+			decl.push(`${n}:${s.bytes}`);
+			return n;
+		};
+		const words = this.align / 4;
+		const metaOffsets: number[] = [];
+		let metaWords = 0;
+		const parts: string[] = [];
+		for (const n of keep) {
+			const ins = n.inputs.map(name).join(",");
+			const os = n.outputs.map(name).join(",");
+			metaOffsets.push(metaWords);
+			metaWords += Math.ceil(Math.max(1, n.meta.length) / words) * words;
+			parts.push(
+				`${n.spec.id}(${ins})>${os}@${n.meta.join(",")}/${n.wg.join(",")}`,
+			);
+		}
+		const full = `${decl.join(" ")}\n${parts.join("\n")}`;
+		const key = hash(full);
+		this.stats.nodes += keep.length;
+
+		const meta = new Uint32Array(metaWords);
+		keep.forEach((n, i) => {
+			meta.set(n.meta, metaOffsets[i]);
+		});
+		const device = this.device;
+		const build = (g: ComputeGraph<void>) => {
+			const handles = new Map<
+				string,
+				ReturnType<ComputeGraph["importBuffer"]>
+			>();
+			for (const [s, n] of slot) {
+				const bytes = s.bytes;
+				handles.set(
+					n,
+					n[0] === "t" ? g.transientBuffer(n, bytes) : g.importBuffer(n, bytes),
+				);
+			}
+			const metaBuf = device.createBuffer({
+				id: "nn-meta",
+				usage: STORAGE,
+				data: meta,
+			});
+			g.own([metaBuf]);
+			const mh = g.importBuffer("meta", meta.byteLength, metaBuf);
+			keep.forEach((n, i) => {
+				const bindings: Record<string, unknown> = {
+					M: g.view(
+						mh,
+						"uint32",
+						Math.max(1, n.meta.length),
+						metaOffsets[i] * 4,
+					),
+				};
+				const names = n.spec.layout.map(([nm]) => nm).slice(1);
+				const all = [...n.inputs, ...n.outputs];
+				names.forEach((nm, j) => {
+					bindings[nm] = handles.get(slot.get(all[j]) as string);
+				});
+				g.addKernel({
+					id: `n${i}`,
+					spec: n.spec,
+					bindings: bindings as never,
+					workgroups: n.wg,
+				});
+			});
+			return full;
+		};
+		let k = key;
+		let c = cachedGraph<void, string>(device, "nn", k, build, 48);
+		// a hash collision: rebuild under a disambiguated key
+		for (let j = 1; c.extra !== full; j++) {
+			k = `${key}~${j}`;
+			c = cachedGraph<void, string>(device, "nn", k, build, 48);
+		}
+		if (c.hit) this.stats.graphHits++;
+		else this.stats.graphs++;
+		const graph = c.graph;
+		const buffers: Record<string, Buffer> = {};
+		imports.forEach((s, i) => {
+			buffers[`x${i}`] = s.buffer as Buffer;
+		});
+		outs.forEach((s, i) => {
+			buffers[`o${i}`] = s.buffer as Buffer;
+		});
+		return this.enqueue(async () => {
+			if (!graph.isCompiled) await graph.compileAsync();
+			await graph.run(undefined, { buffers });
+		});
+	}
+}
+
+/** Bytes of an f32 tensor of `shape`. */
+export const f32Bytes = (shape: readonly number[]) => pad4(numel(shape) * 4);

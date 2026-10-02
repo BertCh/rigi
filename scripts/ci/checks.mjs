@@ -1250,5 +1250,11 @@ export const CHECKS = [
 		cmd: tsx("scripts/gpu/ransac-dawn.ts"),
 		note: "GPU RANSAC scoring (src/lib/gpu/ransac: K hypotheses x N correspondences, arg-max on the GPU, winner read back) on Dawn vs the f64 CPU twin for the chord / angular / reproj modes incl. a 2-D grid past 65535 hypotheses, and the async solvers vs the sync ones; SKIP without DAWN_DIR",
 		timeoutS: 180,
+		id: "nn-parity",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/nn/parity.check.ts"),
+		note: "src/lib/nn GPU backend (WGSL kernels on one ComputeGraph per forward) vs the CPU reference on seeded random tensors over Dawn: every op family incl. implicit-GEMM conv / convT / deformable conv, flash attention, topk, a transformer block in one forward, f16 weights; max rel error <= 1e-4; SKIP without DAWN_DIR",
+		timeoutS: 300,
 	},
 ];

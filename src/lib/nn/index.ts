@@ -32,8 +32,16 @@ export type CreateNnOptions = {
 export async function createNn(opts: CreateNnOptions = {}): Promise<Nn> {
 	const want = opts.backend ?? "auto";
 	if (want === "cpu") return new CpuNn();
-	// the GPU backend (gpu/) lands next; until then "auto" is the CPU reference
-	void opts.device;
-	if (want === "gpu") throw new Error("nn: the GPU backend is not built yet");
+	let device = opts.device ?? null;
+	if (!device) {
+		const { getComputeDevice } = await import("#/lib/gpu/device");
+		device = await getComputeDevice();
+	}
+	if (device?.type === "webgpu") {
+		const { GpuNn } = await import("./gpu/gpu-nn");
+		return new GpuNn(device);
+	}
+	if (want === "gpu")
+		throw new Error("nn: the GPU backend needs a WebGPU device");
 	return new CpuNn();
 }
