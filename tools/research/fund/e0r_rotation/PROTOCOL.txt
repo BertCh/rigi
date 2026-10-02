@@ -1,0 +1,52 @@
+FUND E0r -- rotation half of E0 re-tested with an UNCLIPPED 360 degree skyline: PROTOCOL
+Frozen: 2026-10-02 (committed before any AUROC of the new skyline was computed). Dev split only (the 50 E0 dev ids). No rendering.
+
+0. Why
+   E0 (tools/research/fund/e0_observability) was killed (rotation AUROC 0.599, position 0.503), but its rotation predictor
+   hfov/w* was confounded: the pitch-0 ring cache clipped the skyline, so 13/13 photos with >= 50% clipped bins got
+   w* = 360 ("never unique"). The rotation half is therefore untested. Here the 360 degree skyline comes straight from the
+   DEM with the app's horizon-fast march (src/lib/horizon-fast, node, Mapterhorn tiles), which has no vertical clipping.
+
+1. What is held fixed from E0 (primary analysis A)
+   - Photo set: the 50 ids in E0's results.json per_photo (= tools/bench/split.json dev).
+   - Labels: E0's per_photo "label" (F1 taxonomy): SUCCESS 19, ROT 16 (stage search/matching/refine), POS 9, OTHER 6.
+   - hfov source: E0's per_photo "hfov0" (stored rounded to 0.1 deg; E0's features.json is gone). Unchanged.
+   - w* definition: copied verbatim from compute.py (minres_table / wstar). Skyline resampled to 0.25 deg; window of width w
+     centred at a0; widths {2,4,...,60,70,80,90,105,120,150,180}; candidates a with circular |a-a0| > 3 deg; residual =
+     RMS of S(a+t) - P0(t) with the best constant offset removed; >= 70% of samples valid; w* = smallest w whose minimum
+     residual over wrong azimuths exceeds the floor, else 360. a0 = 72 azimuths (0,5,...,355); w* = median over a0.
+   - Floor primary 0.10 deg RMS. Predictor score = -hfov/w* (higher = predicted ROT failure).
+   - AUROC = Mann-Whitney with ties 0.5; positive = ROT, negative = SUCCESS. 95% percentile bootstrap, 4000 resamples,
+     one-sided permutation p with 10000 permutations, numpy default_rng(seed 0) started fresh (E0's rng stream was shared
+     with its earlier calls, so CI limits are not bit-identical to E0's; the point AUROC is what gates).
+
+2. What changes (the only change): the skyline source
+   - Eye (stated eye, the app's rule, src/lib/geo/pipeline.ts EYE_ABOVE_GROUND = 1.6 and scripts/lib/pipeline-node.ts
+     eyeHeight): h = max(altitudeM, ground + 1.6 m) when the manifest has a GPS altitude, else ground + 1.6 m.
+     lat, lon, altitudeM from tools/bench/data/manifest.json. ground = Mapterhorn height at (lat, lon) from the finest
+     ring of horizon-fast's tile store. E0's cache meta.json (eye z) survives only for wc_0054 and is used to check the rule.
+   - Skyline: computeHorizonFast over Mapterhorn mosaics (DEFAULT_RINGS, maxDistance 150 km, default refraction k, azimuth
+     step 0.1 deg = 3600 azimuths). Elevation is the angle above the horizontal at the eye (curvature and refraction
+     included). 0.25 deg resampling = max of the overlapping 0.1 deg bins (as E0). A bin whose march found no terrain
+     (elevation -90) is invalid; no other invalidation (no clipping exists).
+   - Horizon elevation is referenced to the horizontal; E0's ring elevations were also horizontal-referenced. The residual
+     removes a constant offset anyway.
+
+3. Fixed kill criterion (verbatim)
+   "KILL if AUROC(ROT vs SUCCESS, predictor -hfov/w*, analysis A at the stated eye, floor 0.10 deg, horizon-fast 360 degree
+   skyline) < 0.65. Otherwise PASS (dev only; n = 16 vs 19)."
+
+4. Reported before the verdict (sanity)
+   - Recompute E0's original AUROC from E0's stored per-photo features (A_wstar, hfov0): expect 0.599.
+   - E0's per-azimuth ring skylines and the C0 render cache are gone (only wc_0054 meta remains), so the
+     horizon-fast vs ring median |delta| on unclipped azimuths cannot be computed; stated and skipped.
+   - Rule check: eye of wc_0054 vs its cache meta eye z (910.298).
+   - Share of photos with w* = 360 and the median w* per group, new vs E0.
+
+5. Secondary (not gating)
+   - Floor sweep 0.05 / 0.1 / 0.2 / 0.3 / 0.5 deg, ROT vs rest (and ROT vs SUCCESS for reference).
+   - AUROC (ROT vs SUCCESS, floor 0.10) restricted to the photos E0 found < 30% clipped (E0 per_photo sky_invalid < 0.30).
+   - Anything decided after seeing numbers is labelled POST HOC and cannot change the verdict.
+
+6. Files: scripts/research/e0r-skyline.ts (node, writes out/research/e0r/<id>.json), e0r_evaluate.py (this dir),
+   REPORT.txt, results.json.
