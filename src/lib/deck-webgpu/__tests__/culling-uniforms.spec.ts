@@ -114,7 +114,7 @@ describe("terrain-cull-math", () => {
 		expect(outside).toBeGreaterThan(50);
 	});
 
-	it("compactTwin orders slots by first visible candidate and counts rows", () => {
+	it("compactTwin gives one slot per seg with its rows in candidate order and a record", () => {
 		const segs = [
 			{ indexCount: 100, firstIndex: 0 },
 			{ indexCount: 200, firstIndex: 100 },
@@ -128,16 +128,17 @@ describe("terrain-cull-math", () => {
 		];
 		const r = compactTwin(cands, [true, false, true, true], segs);
 		expect(r.slots.length).toBe(CULL_SLOTS);
-		expect(r.slots[0]).toEqual({ seg: 2, rows: [10, 12] });
+		expect(r.slots[0]).toEqual({ seg: 0, rows: [] });
 		expect(r.slots[1]).toEqual({ seg: 1, rows: [13] });
-		expect(r.slots[2].seg).toBe(-1);
-		expect(Array.from(r.args.slice(0, 3))).toEqual([300, 2, 300]);
+		expect(r.slots[2]).toEqual({ seg: 2, rows: [10, 12] });
+		expect(r.slots[3].seg).toBe(-1);
+		expect(Array.from(r.args.slice(0, 3))).toEqual([100, 0, 0]);
 		expect(Array.from(r.args.slice(RECORD_WORDS, RECORD_WORDS + 3))).toEqual([
 			200, 1, 100,
 		]);
 		const none = compactTwin(cands, [false, false, false, false], segs);
-		expect(none.slots.every((s) => s.seg === -1)).toBe(true);
-		expect(none.args.every((x) => x === 0)).toBe(true);
+		expect(none.slots.every((s) => s.rows.length === 0)).toBe(true);
+		expect(none.args[1]).toBe(0);
 	});
 });
 

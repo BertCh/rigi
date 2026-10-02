@@ -8,13 +8,15 @@
 //      keeps (camera.ts sphereInView on the padded sphere, f64, BatchedTerrainCore.visibleRows'
 //      test) is kept by the f32 twin of the WGSL in_view on the packed f32 inputs
 //   2. tight: the twin keeps few extras on random spheres (reported; bounded)
-//   3. order: the compaction twin gives visibleRows' groups (seg order = first visible tile) and rows
-//   4. layout: both WGSL entry points parse (luma's WGSL reflection) with the kernels' binding
-//      layouts, and the packed uniform block is 80 B with n in word 19
+//   3. groups: the per-slot compaction twin gives visibleRows' groups as sets, rows in tile order
+//      (the draw order differs: slot = seg index, not first visible tile; opaque terrain). The GPU
+//      side (luma GPUCompaction) is compared in scripts/gpu/terrain-cull-dawn.ts
+//   4. layout: the WGSL entry point parses (luma's WGSL reflection) with the kernel's binding
+//      layout, and the packed uniform block is 80 B with n in word 19
 import { getShaderLayoutFromWGSL } from "@luma.gl/webgpu";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { type CameraUniforms, cameraUniforms, sphereInView } from "../camera";
-import { COMPACT_KERNEL, CULL_KERNEL } from "./terrain-cull";
+import { CULL_KERNEL } from "./terrain-cull";
 import { CULL_SLOTS, RECORD_WORDS } from "./terrain-cull.wgsl";
 import {
 	type CullCandidate,
@@ -150,7 +152,7 @@ for (let c = 0; c < 300; c++) {
 }
 console.log(`adversarial: ${adv} on-plane spheres, GPU extra ${advExtra}`);
 
-// ---- 3: compaction order = visibleRows' groups ----------------------------------------------------
+// ---- 3: per-slot compaction = visibleRows' groups -------------------------------------------------
 const SEGS = [64, 128, 256];
 for (let trial = 0; trial < 2000; trial++) {
 	const n = 1 + Math.floor(rnd() * 600);
@@ -181,33 +183,30 @@ for (let trial = 0; trial < 2000; trial++) {
 		firstIndex: 1000 * k,
 	}));
 	const out = compactTwin(cands, vis, segs);
-	const want = [...groups.entries()];
-	for (let s = 0; s < CULL_SLOTS; s++) {
-		const got = out.slots[s];
-		const w = want[s];
+	for (let k = 0; k < CULL_SLOTS; k++) {
+		const got = out.slots[k];
 		const rec = [
-			...out.args.subarray(s * RECORD_WORDS, (s + 1) * RECORD_WORDS),
+			...out.args.subarray(k * RECORD_WORDS, (k + 1) * RECORD_WORDS),
 		];
-		if (!w) {
+		if (k >= segValues.length) {
 			if (got.seg !== -1 || got.rows.length || rec.some((x) => x !== 0))
-				fail(`order trial ${trial}: slot ${s} should be empty`);
+				fail(`groups trial ${trial}: slot ${k} should be unused`);
 			continue;
 		}
-		const k = segValues.indexOf(w[0]);
-		if (got.seg !== k)
-			fail(`order trial ${trial}: slot ${s} seg ${got.seg} ≠ ${k}`);
-		if (got.rows.join() !== w[1].join())
-			fail(`order trial ${trial}: slot ${s} rows differ`);
+		const want = groups.get(segValues[k]) ?? [];
+		if (got.seg !== k) fail(`groups trial ${trial}: slot ${k} seg ${got.seg}`);
+		if (got.rows.join() !== want.join())
+			fail(`groups trial ${trial}: slot ${k} rows differ`);
 		if (
 			rec.join() !==
-			[segs[k].indexCount, w[1].length, segs[k].firstIndex, 0, 0].join()
+			[segs[k].indexCount, want.length, segs[k].firstIndex, 0, 0].join()
 		)
-			fail(`order trial ${trial}: slot ${s} record ${rec}`);
+			fail(`groups trial ${trial}: slot ${k} record ${rec}`);
 	}
 }
 
 // ---- 4: WGSL layouts ------------------------------------------------------------------------------
-for (const k of [CULL_KERNEL, COMPACT_KERNEL]) {
+for (const k of [CULL_KERNEL]) {
 	const b = (getShaderLayoutFromWGSL(k.source)?.bindings ?? []).map((x) => [
 		x.name,
 		x.type,

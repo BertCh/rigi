@@ -317,13 +317,20 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/smoke.mjs IMG_
 - `SplatsCore`'s order buffer is written by the GPU radix sort with `sortBackend: "gpu"`
   (`src/lib/gpu/splat-sort`; the GPU sort is the default, the worker the fallback, `layers/splats.ts`).
 - GPU cull + indirect draws (WAG W1.5): `layers/terrain-cull.ts` culls the batched terrain's tiles
-  (conservative f32 twin of `sphereInView`), compacts the visible rows in the CPU path's order and
-  writes one indexed indirect record per mesh resolution; `BatchedTerrainCore.draw` draws them with
-  luma's `Model.setIndirectBuffer` (#3328). It is recorded by the optional
+  (conservative f32 twin of `sphereInView`) into one flag array per mesh resolution, then one luma
+  `GPUCompaction` per resolution (draw slot = the seg's index) compacts the visible table rows into
+  the slot's instance buffer and writes its count into word 1 of the slot's indirect record (the
+  other record words are static per seg set, written from the CPU). `BatchedTerrainCore.draw` draws
+  them with luma's `Model.setIndirectBuffer` (#3328), in seg order (not the CPU path's first visible
+  tile order; the terrain is opaque and depth tested). It is recorded by the optional
   `GpuLayerCore.prepass(ctx)`, which `hosts/passes.ts` calls on the pass's encoder right before the
-  geometry / colour render pass. On by default (3225064: byte-identical, no CPU saving at ~350–390 tiles, 0.15–0.19 vs 0.12–0.14 ms per frame, but GPU-graph first; WebGPU only, `?gpu=off` and
-  WebGL keep the CPU cull). Gates: `layers/terrain-cull-math.check.ts` (fast tier `terrain-cull`)
-  and `scripts/deck-webgpu/terrain-indirect-check.mjs` (byte-equal frames, CPU ms).
+  geometry / colour render pass. On by default (WebGPU only, `?gpu=off` and WebGL keep the CPU
+  cull). Node + Dawn evidence (no browser): `scripts/gpu/terrain-cull-dawn.ts` (fast tier
+  `terrain-cull-dawn`) compares the instance lists and records with the CPU twin (exact, stable
+  order) and times it: the graph is 13-17 compute passes instead of 2, ~0.4-0.9 ms vs ~0.15-0.3 ms
+  encode + submit per prepass at 400 tiles (noisy machine). Gates: `layers/terrain-cull-math.check.ts`
+  (fast tier `terrain-cull`) and `scripts/deck-webgpu/terrain-indirect-check.mjs` (browser batch:
+  frames, CPU ms).
 - GPU Terrarium decode (WAG W2.3 wiring + W2.4): `terrain-gpu-decode.ts` is the terrain stream's
   tile loader (on by default since 3225064; WebGL and
   `?gpu=off` keep the CPU decode). A tile that stands for itself (no ancestor crop) and is 256 or

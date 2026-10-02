@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Pure logic of the batched terrain's GPU cull (terrain-cull.ts, terrain-cull.wgsl.ts), node-safe:
-// the buffer packing and the CPU twins of both kernels. terrain-cull-math.check.ts runs them against
+// the buffer packing and the CPU twins of the cull and the compaction. terrain-cull-math.check.ts runs them against
 // BatchedTerrainCore.visibleRows' test (camera.ts sphereInView) without a GPU.
 import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 import type { CameraUniforms } from "../camera";
@@ -132,38 +132,43 @@ export function inViewF32(p: CullParamsF32, s: readonly number[]): boolean {
 	return true;
 }
 
-/** The compaction's result: per draw slot the seg and its rows (CPU twin of COMPACT_WGSL). */
+/**
+ * The compaction's result: per draw slot (= seg index) its rows and the indirect records. The GPU
+ * side is luma's GPUCompaction per slot (stable: rows keep candidate order), checked against this by
+ * scripts/gpu/terrain-cull-dawn.ts.
+ */
 export type CompactResult = {
-	/** per draw slot: seg index or -1, and the visible rows in candidate order */
+	/** per draw slot: the visible rows of that seg in candidate order */
 	slots: { seg: number; rows: number[] }[];
 	/** the indirect records, CULL_SLOTS × RECORD_WORDS words */
 	args: Uint32Array;
 };
 
-/** CPU twin of COMPACT_WGSL given the visibility flags. */
+/** CPU twin of the per-slot flags: flags[k][i] = vis[i] && seg(i) == k (what the cull kernel writes). */
+export function slotFlagsTwin(
+	cands: readonly CullCandidate[],
+	vis: readonly boolean[],
+): number[][] {
+	return Array.from({ length: CULL_SLOTS }, (_, k) =>
+		cands.map((c, i) => (vis[i] && c.seg === k ? 1 : 0)),
+	);
+}
+
+/** CPU twin of the per-slot compaction and the records, given the visibility flags. */
 export function compactTwin(
 	cands: readonly CullCandidate[],
 	vis: readonly boolean[],
 	segs: readonly { indexCount: number; firstIndex: number }[],
 ): CompactResult {
-	const first = new Array<number>(CULL_SLOTS).fill(Infinity);
-	const rows: number[][] = Array.from({ length: CULL_SLOTS }, () => []);
-	cands.forEach((c, i) => {
-		if (!vis[i]) return;
-		first[c.seg] = Math.min(first[c.seg], i);
-		rows[c.seg].push(c.row);
-	});
-	const order = [...first.keys()]
-		.filter((k) => first[k] < Infinity)
-		.sort((a, b) => first[a] - first[b]);
+	const flags = slotFlagsTwin(cands, vis);
 	const args = new Uint32Array(CULL_SLOTS * RECORD_WORDS);
-	const slots = Array.from({ length: CULL_SLOTS }, (_, s) => {
-		const k = order[s];
-		if (k === undefined) return { seg: -1, rows: [] as number[] };
-		args[s * RECORD_WORDS] = segs[k].indexCount;
-		args[s * RECORD_WORDS + 1] = rows[k].length;
-		args[s * RECORD_WORDS + 2] = segs[k].firstIndex;
-		return { seg: k, rows: rows[k] };
+	const slots = Array.from({ length: CULL_SLOTS }, (_, k) => {
+		const rows = cands.filter((_c, i) => flags[k][i]).map((c) => c.row);
+		if (k >= segs.length) return { seg: -1, rows };
+		args[k * RECORD_WORDS] = segs[k].indexCount;
+		args[k * RECORD_WORDS + 1] = rows.length;
+		args[k * RECORD_WORDS + 2] = segs[k].firstIndex;
+		return { seg: k, rows };
 	});
 	return { slots, args };
 }

@@ -3,14 +3,20 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // GPU frustum cull + indirect draws for the batched terrain (WAG W1.5; on).
-// Per pass (geometry, colour) a two-node ComputeGraph on the RENDER device, recorded on the pass's
-// command encoder right before its render pass (GpuLayerCore.prepass):
-//   cull     one invocation per resident tile: the conservative f32 twin of sphereInView → vis[i]
-//   compact  one workgroup: per seg the visible count and first visible tile, the draw slots in the
-//            CPU path's group order, the indexed indirect records, and a stable compaction of the
-//            visible table rows into the slot's instance buffer
-// BatchedTerrainCore.draw then issues CULL_SLOTS (at most the distinct segs) drawIndexedIndirect
-// calls through luma's Model.setIndirectBuffer (luma #3328, vendored since rigi.2). The index buffer is the
+// Per pass (geometry, colour) a ComputeGraph on the RENDER device, recorded on the pass's command
+// encoder right before its render pass (GpuLayerCore.prepass):
+//   cull     one invocation per candidate slot: the conservative f32 twin of sphereInView, written as
+//            one flag array per draw slot (vis && seg == slot)
+//   compact  one luma GPUCompaction per draw slot (the draw slot IS the seg's index in the seg
+//            table): a stable scan + scatter of the candidates' table rows into the slot's instance
+//            buffer, with the accepted count landing in word 1 (instanceCount) of the slot's indirect
+//            record
+// The record's other words (indexCount, firstIndex, baseVertex 0, firstInstance 0) are static per seg
+// set and written from the CPU when it changes. Draw order is the seg table's order (first seen),
+// not the CPU path's first-visible-tile order: the terrain is opaque and depth tested, so only early
+// depth rejection could differ.
+// BatchedTerrainCore.draw then issues one drawIndexedIndirect per seg (at most CULL_SLOTS) through
+// luma's Model.setIndirectBuffer (luma #3328, vendored since rigi.2). The index buffer is the
 // segs' gridMesh indices concatenated (firstIndex selects the seg; baseVertex = firstInstance = 0).
 // No count is read back. WebGPU only; the CPU cull stays the path for WebGL, ?gpu=off,
 // a custom `cull` hook, > CULL_SLOTS segs, and any failure here.
@@ -23,13 +29,13 @@ import { Buffer, type CommandEncoder, type Device } from "@luma.gl/core";
 import { gridMesh } from "#/lib/deck/batched-terrain-grid";
 import { ComputeGraph } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
+import { GPUCompaction } from "#/lib/gpu/core/luma";
 import type { CameraUniforms } from "../camera";
 import {
 	CAND_BYTES,
-	COMPACT_WGSL,
 	CULL_PARAMS_BYTES,
 	CULL_SLOTS,
-	CULL_WGSL,
+	cullWgsl,
 	RECORD_WORDS,
 } from "./terrain-cull.wgsl";
 import {
@@ -39,43 +45,46 @@ import {
 } from "./terrain-cull-math";
 
 const GROUP = "terrain-cull";
-export const CULL_KERNEL = defineKernel(
-	"terrain-cull",
-	CULL_WGSL,
-	[
-		["prm", "uniform"],
-		["cand", "read-only-storage"],
-		["vis", "storage"],
-	],
-	{ group: GROUP, label: "terrain-cull" },
-);
-export const COMPACT_KERNEL = defineKernel(
-	"terrain-compact",
-	COMPACT_WGSL,
-	[
-		["prm", "uniform"],
-		["cand", "read-only-storage"],
-		["vis", "read-only-storage"],
-		["segs", "read-only-storage"],
-		["args", "storage"],
-		["inst0", "storage"],
-		["inst1", "storage"],
-		["inst2", "storage"],
-		["inst3", "storage"],
-	],
-	{ group: GROUP, label: "terrain-compact" },
-);
+const CULL_LAYOUT: [string, "uniform" | "read-only-storage" | "storage"][] = [
+	["prm", "uniform"],
+	["cand", "read-only-storage"],
+	["flags", "storage"],
+];
+const cullKernels = new Map<number, ReturnType<typeof defineKernel>>();
+/** The cull kernel for a candidate capacity (the capacity is a WGSL constant). */
+export function cullKernel(capacity: number) {
+	let k = cullKernels.get(capacity);
+	if (!k) {
+		k = defineKernel(
+			`terrain-cull-${capacity}`,
+			cullWgsl(capacity),
+			CULL_LAYOUT,
+			{ group: GROUP, label: `terrain-cull-${capacity}` },
+		);
+		cullKernels.set(capacity, k);
+	}
+	return k;
+}
+/** The smallest capacity's kernel (the node check and wgsl-compile). */
+export const CULL_KERNEL = cullKernel(64);
 
 const RECORD_BYTES = RECORD_WORDS * 4;
 const U = {
 	params: Buffer.UNIFORM | Buffer.COPY_DST,
 	storage: Buffer.STORAGE | Buffer.COPY_DST,
-	args: Buffer.INDIRECT | Buffer.STORAGE | Buffer.COPY_DST,
-	inst: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST,
+	// COPY_SRC: the Dawn script reads the records and instance lists back
+	args: Buffer.INDIRECT | Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC,
+	inst: Buffer.VERTEX | Buffer.STORAGE | Buffer.COPY_DST | Buffer.COPY_SRC,
 };
 
 type Params = { n: number };
-type Entry = { params: Buffer; args: Buffer; inst: Buffer[] };
+type Entry = {
+	params: Buffer;
+	args: Buffer;
+	inst: Buffer[];
+	/** the seg-set generation whose static record words `args` holds */
+	records: number;
+};
 
 /** What BatchedTerrainCore.draw needs for one culled pass. */
 export type CulledDraw = {
@@ -95,10 +104,12 @@ export class TerrainGpuCull {
 	/** seg value per seg index (append-only, ≤ CULL_SLOTS) */
 	private segValues: number[] = [];
 	private index: { buf: Buffer; count: number } | null = null;
-	private segTable: Buffer | null = null;
 	private cand: Buffer | null = null;
+	private rows: Buffer | null = null;
+	/** records' static words (indexCount, 0, firstIndex, 0, 0 per seg), CULL_SLOTS records */
+	private recordWords = new Uint32Array(CULL_SLOTS * RECORD_WORDS);
+	private recordGeneration = 0;
 	private n = 0;
-	private activeSlots = 0;
 	private cap = 0;
 	private graph: ComputeGraph<Params> | null = null;
 	private ready = false;
@@ -129,30 +140,36 @@ export class TerrainGpuCull {
 		if (segs.length !== this.segValues.length) {
 			this.segValues = segs;
 			this.buildIndex();
+			this.recordGeneration++;
+			// one compaction per seg: the graph is rebuilt for the new seg count (CPU cull meanwhile)
+			this.dropGraph();
 		}
 		const cands: CullCandidate[] = tiles.map((t) => ({
 			sphere: t.sphere,
 			row: t.row,
 			seg: this.segValues.indexOf(t.seg),
 		}));
-		this.activeSlots = new Set(cands.map((c) => c.seg)).size;
 		this.n = cands.length;
 		if (this.n > this.cap) this.grow(this.n);
 		this.cand?.write(packCandidates(cands, this.cap));
+		const rowWords = new Uint32Array(this.cap);
+		cands.forEach((c, i) => {
+			rowWords[i] = c.row;
+		});
+		this.rows?.write(rowWords);
 		return true;
 	}
 
-	/** Index buffer (segs' gridMesh indices concatenated) and the seg table [count, first]. */
+	/** Index buffer (segs' gridMesh indices concatenated) and the records' static words. */
 	private buildIndex() {
 		const parts = this.segValues.map((s) => gridMesh(s).indices);
 		const count = parts.reduce((a, p) => a + p.length, 0);
 		const all = new Uint32Array(count);
-		const table = new Uint32Array(CULL_SLOTS * 4);
 		let o = 0;
 		parts.forEach((p, k) => {
 			all.set(p, o);
-			table[k * 4] = p.length;
-			table[k * 4 + 1] = o;
+			this.recordWords[k * RECORD_WORDS] = p.length;
+			this.recordWords[k * RECORD_WORDS + 2] = o;
 			o += p.length;
 		});
 		this.retire(this.index?.buf);
@@ -164,12 +181,6 @@ export class TerrainGpuCull {
 			}),
 			count,
 		};
-		this.segTable ??= this.device.createBuffer({
-			id: "terrain-cull-segs",
-			usage: U.storage,
-			byteLength: table.byteLength,
-		});
-		this.segTable.write(table);
 	}
 
 	/** Room for `need` candidates: new candidate buffer, ring and graph (compiled async). */
@@ -177,26 +188,35 @@ export class TerrainGpuCull {
 		let cap = Math.max(64, this.cap);
 		while (cap < need) cap *= 2;
 		this.cap = cap;
-		this.retire(this.cand);
+		this.retire(this.cand, this.rows);
 		this.cand = this.device.createBuffer({
 			id: "terrain-cull-cand",
 			usage: U.storage,
 			byteLength: cap * CAND_BYTES,
 		});
+		this.rows = this.device.createBuffer({
+			id: "terrain-cull-rows",
+			usage: U.storage,
+			byteLength: cap * 4,
+		});
 		for (const e of this.ring) this.retire(e.params, e.args, ...e.inst);
 		this.ring = [];
 		this.ringNext = 0;
+		this.dropGraph();
+	}
+
+	private dropGraph() {
 		this.retire(this.graph);
 		this.graph = null;
 		this.ready = false;
 		this.compiling = null;
 	}
 
-	private buildGraph(cap: number) {
+	private buildGraph(cap: number, slots: number) {
 		const g = new ComputeGraph<Params>(this.device, `terrain-cull-${cap}`);
 		const prm = g.importBuffer("prm", CULL_PARAMS_BYTES, undefined, U.params);
 		const cand = g.importBuffer("cand", cap * CAND_BYTES, undefined, U.storage);
-		const segs = g.importBuffer("segs", CULL_SLOTS * 16, undefined, U.storage);
+		const rows = g.importBuffer("rows", cap * 4, undefined, U.storage);
 		const args = g.importBuffer(
 			"args",
 			CULL_SLOTS * RECORD_BYTES,
@@ -206,31 +226,28 @@ export class TerrainGpuCull {
 		const inst = [0, 1, 2, 3].map((k) =>
 			g.importBuffer(`inst${k}`, cap * 4, undefined, U.inst),
 		);
-		const vis = g.transientBuffer("vis", cap * 4);
+		const flags = g.transientBuffer("flags", CULL_SLOTS * cap * 4);
 		g.addKernel({
 			id: "cull",
-			spec: CULL_KERNEL,
-			bindings: { prm, cand, vis },
-			workgroups: (p) => [Math.max(1, Math.ceil(p.n / 64))],
-			// every vis[i < n] is written; compact reads no other
-			writes: { vis: "full" },
+			spec: cullKernel(cap),
+			bindings: { prm, cand, flags },
+			workgroups: [Math.ceil(cap / 64)],
+			// every flag of every slot is written (zero past n)
+			writes: { flags: "full" },
 		});
-		g.addKernel({
-			id: "compact",
-			spec: COMPACT_KERNEL,
-			bindings: {
-				prm,
-				cand,
-				vis,
-				segs,
-				args,
-				inst0: inst[0],
-				inst1: inst[1],
-				inst2: inst[2],
-				inst3: inst[3],
-			},
-			workgroups: [1],
-		});
+		const rowsView = g.view(rows, "uint32", cap);
+		for (let k = 0; k < slots; k++)
+			g.add(
+				new GPUCompaction({
+					id: `terrain-cull-compact${k}`,
+					input: rowsView,
+					flags: g.view(flags, "uint32", cap, k * cap * 4),
+					output: g.view(inst[k], "uint32", cap),
+					// word 1 of the slot's record: instanceCount
+					count: g.view(args, "uint32", 1, (k * RECORD_WORDS + 1) * 4),
+				}),
+				{ uses: [rows, flags] },
+			);
 		return g;
 	}
 
@@ -240,7 +257,7 @@ export class TerrainGpuCull {
 		if (this.ready) return true;
 		if (!this.compiling) {
 			const cap = this.cap;
-			const g = this.buildGraph(cap);
+			const g = this.buildGraph(cap, this.segValues.length);
 			this.graph = g;
 			this.compiling = g.compileAsync().then(
 				() => {
@@ -277,6 +294,7 @@ export class TerrainGpuCull {
 					usage: U.args,
 					byteLength: CULL_SLOTS * RECORD_BYTES,
 				}),
+				records: -1,
 				inst: [0, 1, 2, 3].map((k) =>
 					this.device.createBuffer({
 						id: `terrain-cull-inst-${i}-${k}`,
@@ -288,6 +306,10 @@ export class TerrainGpuCull {
 			this.ring.push(e);
 		}
 		this.ringNext++;
+		if (e.records !== this.recordGeneration) {
+			e.args.write(this.recordWords);
+			e.records = this.recordGeneration;
+		}
 		return e;
 	}
 
@@ -296,7 +318,7 @@ export class TerrainGpuCull {
 	 * graph compiles asynchronously), nothing to cull, or failed; the caller culls on the CPU.
 	 */
 	prepare(enc: CommandEncoder, camera: CameraUniforms): CulledDraw | null {
-		if (!this.n || !this.index || !this.segTable || !this.cand) return null;
+		if (!this.n || !this.index || !this.cand || !this.rows) return null;
 		if (!this.usable() || !this.graph) return null;
 		try {
 			const e = this.entry(enc);
@@ -307,7 +329,7 @@ export class TerrainGpuCull {
 				{
 					prm: e.params,
 					cand: this.cand,
-					segs: this.segTable,
+					rows: this.rows,
 					args: e.args,
 					inst0: e.inst[0],
 					inst1: e.inst[1],
@@ -321,7 +343,7 @@ export class TerrainGpuCull {
 				args: e.args,
 				recordBytes: RECORD_BYTES,
 				inst: e.inst,
-				slots: this.activeSlots,
+				slots: this.segValues.length,
 			};
 		} catch (err) {
 			console.warn("terrain GPU cull: encode failed, CPU cull", err);
@@ -344,10 +366,10 @@ export class TerrainGpuCull {
 		for (const b of this.graveyard) b.destroy();
 		this.graveyard = [];
 		this.index?.buf.destroy();
-		this.segTable?.destroy();
 		this.cand?.destroy();
+		this.rows?.destroy();
 		this.index = null;
-		this.segTable = null;
 		this.cand = null;
+		this.rows = null;
 	}
 }

@@ -1074,6 +1074,13 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "terrain-cull-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/terrain-cull-dawn.ts"),
+		timeoutS: 180,
+	},
+	{
 		id: "haze-argmin-dawn",
 		tier: "fast",
 		group: "look",
