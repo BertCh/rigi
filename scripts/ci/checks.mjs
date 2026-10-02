@@ -218,6 +218,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "gpu-uniform-block-b",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/core/uniform-block-b.check.ts"),
+		note: "horizon march / skyglobal / skyline / sky prep+refine / splat-sort uniform packers (gpu/*/uniforms.ts) are byte-identical to the former hand-packed words (-0, NaN payloads, subnormals, u32 max)",
+		timeoutS: 60,
+	},
+	{
 		id: "gpu-inspect",
 		tier: "fast",
 		group: "gpu",
