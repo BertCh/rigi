@@ -562,6 +562,18 @@ export function solvePose6dof(
 	};
 	const hyps: Hyp[] = [];
 	const posActive = lad0.active[0];
+	// Sampling pools: rot2 / DLT draw bearings (point + dir), P3P draws finite points. The adaptive
+	// stop measures each pool's own inlier ratio (CR-50): inliers of other kinds (azimuth, level, …)
+	// say nothing about the chance of an all-inlier sample from the pool, and counted over all
+	// correspondences they could stop a sampler early.
+	const poolIndex = {
+		bear: corrs.flatMap((c, i) =>
+			c.kind === "point" || c.kind === "dir" ? [i] : [],
+		),
+		fin: corrs.flatMap((c, i) => (c.kind === "point" ? [i] : [])),
+	};
+	type Pool = keyof typeof poolIndex;
+	const bestInl: Record<Pool, number> = { bear: 0, fin: 0 };
 	const push = (pose: Pose, eye: ArrayLike<number>, init: string) => {
 		if (
 			![
@@ -585,12 +597,19 @@ export function solvePose6dof(
 		for (let k = 0; k < NP; k++) if (held[k]) p[k] = prior0.mean[k];
 		const { s, use } = score(p, thH);
 		hyps.push({ p, init, score: s, use });
-		bestInl = Math.max(bestInl, use.filter(Boolean).length);
+		for (const pool of Object.keys(poolIndex) as Pool[]) {
+			let n = 0;
+			for (const i of poolIndex[pool]) if (use[i]) n++;
+			bestInl[pool] = Math.max(bestInl[pool], n);
+		}
 	};
-	let bestInl = 0;
-	// adaptive RANSAC stopping: enough samples of size k for 99.9 % confidence at the best inlier ratio
-	const enough = (m: number, k: number) => {
-		const w = Math.min(0.999, bestInl / Math.max(1, corrs.length));
+	// adaptive RANSAC stopping: enough samples of size k from `pool` for 99.9 % confidence at the
+	// best inlier ratio within that pool
+	const enough = (m: number, k: number, pool: Pool) => {
+		const w = Math.min(
+			0.999,
+			bestInl[pool] / Math.max(1, poolIndex[pool].length),
+		);
 		if (m < 12 || w <= 0) return false;
 		return m >= Math.log(0.001) / Math.log(1 - w ** k);
 	};
@@ -632,7 +651,7 @@ export function solvePose6dof(
 			[...subsets(bear.length, 2, maxHyp, rnd)],
 			rnd,
 		).entries()) {
-			if (enough(m, 2)) break;
+			if (enough(m, 2, "bear")) break;
 			const pair = s.map((k) => bear[k].c);
 			const dirs = pair.map((c) => dirOf(c, eye0) as Vec3);
 			const uv = pair.map((c) => [c.u, c.v] as [number, number]);
@@ -665,7 +684,7 @@ export function solvePose6dof(
 			[...subsets(fin.length, 3, maxHyp, rnd)],
 			rnd,
 		).entries()) {
-			if (enough(m, 3)) break;
+			if (enough(m, 3, "fin")) break;
 			const tri = s.map((k) => fin[k].c) as Extract<
 				Correspondence,
 				{ kind: "point" }
@@ -691,7 +710,7 @@ export function solvePose6dof(
 			[...subsets(bear.length, 6, Math.floor(maxHyp / 2), rnd)],
 			rnd,
 		).entries()) {
-			if (enough(m, 6)) break;
+			if (enough(m, 6, "bear")) break;
 			const sub = s.map((k) => inp[k]);
 			const r = dlt(sub, opts.aspect);
 			if (r) push(r.pose, r.eye, "dlt6");

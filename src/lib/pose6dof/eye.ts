@@ -424,6 +424,23 @@ export async function refineEyeFromSkyline(
 		const g = groundAt(ec);
 		return Number.isFinite(g) ? Math.max(0, ec[2] - g - aglRef) / aglSigma : 0;
 	};
+	const hStep = opts.positionStep ?? 2;
+	/**
+	 * Ground rows for the LM objective (σ units, CR-15), on the raw (unclamped) eye so the LM sees a
+	 * gradient where the clamp makes the skyline cost flat. Row 1 is the one-sided AGL prior above
+	 * `aglRef` (equal to `aglResid` between the floor and the cap), so the LM optimises the same
+	 * prior the grid and the final pick use. Row 2 pushes back an eye more than one Jacobian step
+	 * below the floor (ground + clearance); the dead zone keeps the ±step probes around an eye on or
+	 * above the floor at 0, so an LM run that stays above ground is unchanged.
+	 */
+	const groundRows = (e: ArrayLike<number>): [number, number] => {
+		const g = groundAt(e);
+		if (!Number.isFinite(g)) return [0, 0];
+		return [
+			agl ? Math.max(0, e[2] - g - aglRef) / aglSigma : 0,
+			Math.max(0, g + clearance - hStep - e[2]) / aglSigma,
+		];
+	};
 	const fitOpts: RotationFitOptions = {
 		...opts,
 		priorPose: opts.priorPose ?? pose0,
@@ -494,7 +511,6 @@ export async function refineEyeFromSkyline(
 	const rs = opts.rotationSigma ?? {};
 	const sR = [rs.yaw ?? 5, rs.pitch ?? 3, rs.roll ?? 3];
 	const pm = fitOpts.priorPose as Pose;
-	const hStep = opts.positionStep ?? 2;
 	// refinePosition's Jacobian probes a point p as p+s·x̂ first, then p−s·x̂, p±s·ŷ, p±s·ẑ (central).
 	// Seeing p+s·x̂ for an already-evaluated p, fetch the whole set in one batch.
 	const evaluated: Vec3[] = [];
@@ -533,6 +549,8 @@ export async function refineEyeFromSkyline(
 				(f.pose.pitch - pm.pitch) / sR[1],
 				(f.pose.roll - pm.roll) / sR[2],
 			);
+			// Constant row count per run (the Jacobian indexes rows), so only when a DEM is supplied.
+			if (opts.ground) t.push(...groundRows(e));
 			return t;
 		},
 		{
@@ -547,7 +565,7 @@ export async function refineEyeFromSkyline(
 			maxIterations: opts.maxIterations ?? 12,
 		},
 	);
-	// Pick the better of the LM result and its start (the clamp is outside the LM's view).
+	// Pick the better of the LM result and its start (the clamp itself is still outside the LM's view).
 	let finalEye = clampEye(lm.eye);
 	let after = await fitAt(finalEye, startPose);
 	let afterCost = after.cost + posPrior(finalEye);
