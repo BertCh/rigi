@@ -598,6 +598,22 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "nearfield-service",
+		tier: "fast",
+		group: "nearfield",
+		cmd: [
+			"tools/matcher/.venv/bin/python",
+			"-m",
+			"unittest",
+			"discover",
+			"-s",
+			"tools/nearfield/service/tests",
+		],
+		needs: ["tools/matcher/.venv/bin/python"],
+		note: "near-field service CR-05 caps and error paths, in-process (no torch, no model load); SKIPs without the matcher venv",
+		timeoutS: 120,
+	},
+	{
 		id: "splat-sort",
 		tier: "fast",
 		group: "nearfield",

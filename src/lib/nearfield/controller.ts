@@ -33,6 +33,7 @@ import {
 	type NearFieldSample,
 	nearFieldSampleAt,
 } from "./measure";
+import { prepareObjectPrior } from "./object-evidence";
 import { buildNearFieldScene, imageToRGBA } from "./scene";
 import {
 	ANCHOR_MIN_QUALITY,
@@ -331,6 +332,21 @@ export class NearFieldController {
 					this.host.nearFieldDemRange?.(depth.width, depth.height) ??
 					((u: number, v: number) => this.host.sampleAt(u, v)?.range ?? null);
 				const demGrid = sampleDemGrid(depth.width, depth.height, demAt);
+				// T2 (?tiles3dObjects=on only): nDSM evidence for the object prior; null = no prior, silently
+				const objectPrior =
+					getFlag("tiles3dObjects") === "on"
+						? await prepareObjectPrior({
+								width: depth.width,
+								height: depth.height,
+								demGrid,
+								K: intrinsicsFromPose(this.host.pose, this.host.aspect),
+								pose: this.host.pose,
+								eye: this.host.eye,
+								frame: this.host.frame,
+								signal,
+							})
+						: null;
+				if (signal?.aborted || this.disposed) return bail();
 				const img = this.host.photoElement;
 				const photo = !data.cloud && img ? imageToRGBA(img, 1024) : null;
 				// ?nearfield=complete: the P0 completion heuristics (display-only; complete/index.ts)
@@ -350,6 +366,7 @@ export class NearFieldController {
 					...(getFlag("anchorCliff") === "on"
 						? { anchor: { cliffLip: true } }
 						: {}),
+					...(objectPrior ? { objectPrior } : {}),
 					...(complete
 						? { lift: completionLiftOpts(this.host.foregroundMask ?? null) }
 						: {}),
