@@ -11,18 +11,14 @@
 		"privateMember": 1,
 		"why": "dev tool debug hook (audit-gpu A11)"
 	},
-	"src/lib/deck-webgpu/render-bundle.ts": {
-		"handle": 1,
-		"why": "MSAA render-bundle encoder: luma validation rejects sampleCount>1 (audit-render R4); flag off"
-	},
 	"src/lib/deck-webgpu/spike.ts": {
 		"rawWebGpu": 1,
 		"handle": 6,
 		"why": "dev spike, raw WebGPU on purpose"
 	},
 	"src/lib/deck/composite.ts": {
-		"handle": 3,
-		"rawGl": 111,
+		"handle": 2,
+		"rawGl": 75,
 		"why": "WebGL2 fallback: MSAA renderbuffer/blit + PBO readback; luma has no multisample resolve (audit-render R1)"
 	},
 	"src/lib/deck/device-lost.ts": {
@@ -34,13 +30,9 @@
 		"why": "WebGL2 engine host"
 	},
 	"src/lib/deck/geometry-pass.ts": {
-		"handle": 2,
-		"rawGl": 104,
-		"why": "WebGL2 fallback: PBO pool + blit flip (audit-render R1)"
-	},
-	"src/lib/deck/silhouette-gl.ts": {
-		"rawGl": 135,
-		"why": "WebGL2 fallback: raw GLSL programs (audit-render R1)"
+		"handle": 3,
+		"rawGl": 85,
+		"why": "WebGL2 fallback: MSAA renderbuffer + blit, glFence/readbackQuiet probes, the RGBA/FLOAT readPixels fallback (luma readBuffer reads only the texture's own format); PBO pool retired in 888be38"
 	},
 	"src/lib/gpu/core/device.ts": {
 		"rawWebGpu": 1,
@@ -50,18 +42,9 @@
 		"handle": 1,
 		"why": "WebGPUAdapter.attach(handle: GPUDevice) wrapper for ORT / ownsHandle; the one sanctioned attach point"
 	},
-	"src/lib/gpu/core/pool.ts": {
-		"handle": 2,
-		"why": "raw encoder.clearBuffer via handle; luma has no CommandEncoder.clearBuffer (audit-gpu A6)"
-	},
 	"src/lib/gpu/core/queue.ts": {
 		"handle": 2,
-		"privateMember": 1,
 		"why": "submitWithDefault: private WebGPUDevice finalize + multi-buffer queue.submit and opt-in error scopes; needs a luma submit(buffers[]) patch (audit-gpu A7/A8)"
-	},
-	"src/lib/gpu/core/readback.ts": {
-		"handle": 4,
-		"why": "raw mapAsync: Buffer.mapAndReadAsync awaits onSubmittedWorkDone first; needs a luma waitForQueue:false option (audit-gpu A9)"
 	},
 	"src/lib/gpu/core/selftest.ts": {
 		"rawWebGpu": 1,
@@ -98,11 +81,6 @@
 	"src/lib/renderer-select.ts": {
 		"rawWebGpu": 3,
 		"why": "engine probe: navigator.gpu + a probe device, the one place that decides WebGPU vs WebGL2"
-	},
-	"src/lib/roll/map/range-gpu.ts": {
-		"handle": 1,
-		"rawGl": 167,
-		"why": "two raw WebGL2 programs of their own (audit-render R1)"
 	},
 	"src/lib/roll/mosaic/panoGL.ts": {
 		"rawGl": 96,
