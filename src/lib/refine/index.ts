@@ -24,7 +24,14 @@ import {
 	computeConfidence,
 	type RefineConfidence,
 } from "./confidence";
-import { DEFAULT_INIT, globalInit, type InitOptions } from "./init";
+import {
+	DEFAULT_INIT,
+	globalInit,
+	globalInitAsync,
+	type InitCorrelator,
+	type InitOptions,
+	type InitResult,
+} from "./init";
 import {
 	cameraFromParams,
 	columnsFromSkyline,
@@ -122,7 +129,24 @@ export interface RefineResult {
 	init: { psr: number; ms: number; seeds: number };
 }
 
-export function refinePose(input: RefineInput): RefineResult {
+/** What refinePose / refinePoseAsync share between the setup and the finish step. */
+interface RefineContext {
+	t0: number;
+	input: RefineInput;
+	prior: Camera;
+	horizon: HorizonProfile;
+	W: number;
+	geom: Geometry;
+	cols: ReturnType<typeof columnsFromSkyline>;
+	priorState: Float64Array;
+	ropts: ReturnType<typeof defaultRobustOptions>;
+	initOptions: InitOptions;
+}
+
+/** The skyline columns, geometry and robust options; or the early "no usable skyline" result. */
+function setupRefine(
+	input: RefineInput,
+): { early: RefineResult } | { ctx: RefineContext } {
 	const t0 = performance.now();
 	const { camera: prior, horizon } = input;
 	const skyline: SkylineInput = input.crossCheck
@@ -156,7 +180,7 @@ export function refinePose(input: RefineInput): RefineResult {
 	};
 
 	if (cols.length < Math.max(20, 0.05 * W)) {
-		return {
+		const early: RefineResult = {
 			camera: prior,
 			confidence: {
 				accept: false,
@@ -192,7 +216,102 @@ export function refinePose(input: RefineInput): RefineResult {
 			ransac: false,
 			init: { psr: 0, ms: 0, seeds: 0 },
 		};
+		return { early };
 	}
+	return {
+		ctx: {
+			t0,
+			input,
+			prior,
+			horizon,
+			W,
+			geom,
+			cols,
+			priorState,
+			ropts,
+			initOptions: { ...DEFAULT_INIT, ...input.options?.init },
+		},
+	};
+}
+
+export function refinePose(input: RefineInput): RefineResult {
+	const s = setupRefine(input);
+	if ("early" in s) return s.early;
+	const { ctx } = s;
+	const init = input.options?.localOnly
+		? undefined
+		: globalInit(
+				ctx.priorState,
+				ctx.geom,
+				ctx.cols,
+				ctx.horizon,
+				ctx.initOptions,
+			);
+	return finishRefine(ctx, init);
+}
+
+/**
+ * refinePose with the global yaw correlation on the GPU (four-step FFT in a core ComputeGraph,
+ * fft-gpu.ts) when a compute device resolves (?gpu=off respected) and the grid fits; otherwise, or
+ * on any GPU error, the CPU correlation. Never throws because of the GPU. The result agrees with
+ * refinePose within the f32 correlation tolerance (refine-fft-dawn.ts), not bit for bit.
+ */
+export async function refinePoseAsync(
+	input: RefineInput,
+): Promise<RefineResult> {
+	const s = setupRefine(input);
+	if ("early" in s) return s.early;
+	const { ctx } = s;
+	let init: InitResult | undefined;
+	if (!input.options?.localOnly) {
+		const correlate = await gpuCorrelator(ctx.initOptions.gridSize);
+		const args = [
+			ctx.priorState,
+			ctx.geom,
+			ctx.cols,
+			ctx.horizon,
+			ctx.initOptions,
+		] as const;
+		if (correlate) {
+			try {
+				init = await globalInitAsync(...args, correlate);
+			} catch (e) {
+				warnGpuFallbackOnce(e);
+			}
+		}
+		init ??= globalInit(...args);
+	}
+	return finishRefine(ctx, init);
+}
+
+let warnedGpu = false;
+function warnGpuFallbackOnce(e: unknown) {
+	if (warnedGpu) return;
+	warnedGpu = true;
+	console.debug("[refine] GPU correlation failed, using the CPU", e);
+}
+
+/** The GPU correlator, or null (no device, ?gpu=off, grid unsupported, module failed to load). */
+async function gpuCorrelator(gridSize: number): Promise<InitCorrelator | null> {
+	try {
+		const { getComputeDevice } = await import("../gpu/device");
+		const device = await getComputeDevice();
+		if (!device) return null;
+		const { correlateGpu, gpuCorrelationSupported } = await import("./fft-gpu");
+		if (!gpuCorrelationSupported(gridSize)) return null;
+		return (prep) => correlateGpu(device, prep);
+	} catch (e) {
+		warnGpuFallbackOnce(e);
+		return null;
+	}
+}
+
+/** The seeds, robust refinement, mode selection and confidence, given the correlation result. */
+function finishRefine(
+	ctx: RefineContext,
+	init: InitResult | undefined,
+): RefineResult {
+	const { t0, input, prior, geom, cols, priorState, ropts, W, horizon } = ctx;
 
 	// Seeds: the prior itself plus the correlation modes.
 	const seeds: { p: Float64Array; seed: RefineMode["seed"] }[] = [
@@ -200,11 +319,7 @@ export function refinePose(input: RefineInput): RefineResult {
 	];
 	let psr = 0;
 	let initMs = 0;
-	if (!input.options?.localOnly) {
-		const init = globalInit(priorState, geom, cols, horizon, {
-			...DEFAULT_INIT,
-			...input.options?.init,
-		});
+	if (init) {
 		psr = init.psr;
 		initMs = init.ms;
 		for (const m of init.modes) {

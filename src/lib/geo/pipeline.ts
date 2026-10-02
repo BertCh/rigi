@@ -7,7 +7,12 @@
  * solvePose → refinePose cascade. Policy (DEM, tile loader, timeouts, solver options) stays with the caller.
  */
 import type { DemSource } from "../dem";
-import { type RefineOptions, refinePose } from "../refine/index";
+import {
+	type RefineOptions,
+	type RefineResult,
+	refinePose,
+	refinePoseAsync,
+} from "../refine/index";
 import type { Camera } from "./camera";
 import { EYE_ABOVE_GROUND, eyeAltitude } from "./eye-rule";
 import { computeHorizon, type HorizonProfile } from "./horizon";
@@ -101,7 +106,7 @@ export function cascade(
 	);
 }
 
-/** cascade with solvePose's coarse grid from `coarse` (the GPU grid, src/lib/gpu/solve); refine stays on the CPU. */
+/** cascade with solvePose's coarse grid from `coarse` (the GPU grid, src/lib/gpu/solve) and refinePose's yaw correlation on the GPU (refinePoseAsync, CPU when unavailable). */
 export async function cascadeAsync(
 	prior: Camera,
 	horizon: HorizonProfile,
@@ -110,8 +115,26 @@ export async function cascadeAsync(
 	coarse?: CoarseProvider,
 ) {
 	const s = await solvePoseAsync(prior, horizon, sky, o.solve, coarse);
-	return escalate(s, prior, horizon, sky, o);
+	return shapeCascade(
+		s,
+		s.accepted
+			? undefined
+			: await refinePoseAsync(refineInput(prior, horizon, sky, o)),
+	);
 }
+
+const refineInput = (
+	prior: Camera,
+	horizon: HorizonProfile,
+	sky: SkylineObservation,
+	o: CascadeOptions,
+) => ({
+	camera: prior,
+	horizon,
+	skyline: sky,
+	gpsAccuracy: o.gpsAccuracy,
+	options: o.refine,
+});
 
 function escalate(
 	s: SkylineSolveResult,
@@ -120,6 +143,14 @@ function escalate(
 	sky: SkylineObservation,
 	o: CascadeOptions,
 ) {
+	return shapeCascade(
+		s,
+		s.accepted ? undefined : refinePose(refineInput(prior, horizon, sky, o)),
+	);
+}
+
+/** The cascade result from solve's result and, when solve rejected, refine's. */
+function shapeCascade(s: SkylineSolveResult, r: RefineResult | undefined) {
 	const { camera, confidence, accepted, residualPx, rejectReason } = s;
 	const solve = {
 		stage: "solve" as CascadeStage,
@@ -129,14 +160,7 @@ function escalate(
 		residualPx,
 		rejectReason,
 	};
-	if (accepted) return { ...solve, candidates: [solve] };
-	const r = refinePose({
-		camera: prior,
-		horizon,
-		skyline: sky,
-		gpsAccuracy: o.gpsAccuracy,
-		options: o.refine,
-	});
+	if (!r) return { ...solve, candidates: [solve] };
 	const refine = {
 		stage: "refine" as CascadeStage,
 		camera: r.camera,

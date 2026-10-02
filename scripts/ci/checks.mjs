@@ -1122,4 +1122,11 @@ export const CHECKS = [
 		cmd: tsx("scripts/gpu/skyline-conv-dawn.ts"),
 		timeoutS: 120,
 	},
+	{
+		id: "refine-fft-dawn",
+		tier: "fast",
+		group: "pose",
+		cmd: tsx("scripts/gpu/refine-fft-dawn.ts"),
+		timeoutS: 120,
+	},
 ];

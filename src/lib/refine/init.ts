@@ -21,6 +21,14 @@
  * within τ = 0.25° of the DEM, Epanechnikov kernel) is evaluated for every
  * shift; its top K local maxima more than 1° apart are the modes, and its
  * peak-to-sidelobe ratio is the correlation confidence.
+ *
+ * globalInit is three steps: prepareInit (horizon grid, binned skylines),
+ * a correlation provider (correlateCpu: the f64 radix-2 FFT reference in
+ * fft.ts, which is what globalInit and refinePose always use; or the GPU
+ * four-step FFT of fft-gpu.ts through globalInitAsync / refinePoseAsync,
+ * f32, equal to the CPU within ~1e-6 of max|C|), and finishInit (cost
+ * loop, robust score curve, modes, PSR). The provider contract is the
+ * four correlations per focal scale at the 2S+1 needed shifts, index k+S.
  */
 
 import type { HorizonProfile } from "../geo/horizon";
@@ -107,7 +115,7 @@ export interface InitResult {
 	ms: number;
 }
 
-interface Binned {
+export interface Binned {
 	W: Float64Array;
 	WP: Float64Array;
 	WX: Float64Array;
@@ -188,18 +196,44 @@ function binColumns(
 	};
 }
 
+/** Everything the correlation step needs, plus what the finish step reuses. */
+export interface InitPrep {
+	/** Azimuth grid size and step (degrees). */
+	M: number;
+	step: number;
+	/** Shift half-width in grid steps; 2S+1 shifts are needed. */
+	S: number;
+	nShift: number;
+	/** Horizon resampled on the grid (degrees) and its square. */
+	H: Float64Array;
+	H2: Float64Array;
+	/** One binned skyline per focal-length scale. */
+	binned: Binned[];
+}
+
 /**
- * Finds the top yaw modes. `p` is the prior state (model.ts layout) at the
- * working geometry; `cols` the observed skyline columns.
+ * The four circular correlations of one focal scale at the needed shifts,
+ * index k+S for shift k in [-S, S] (grid index s = (k + M) % M):
+ * C1 = Σ w P H(+Δ), C2 = Σ w H, C3 = Σ w H², C4 = Σ w x H.
  */
-export function globalInit(
+export interface InitCorrelations {
+	C1: Float64Array;
+	C2: Float64Array;
+	C3: Float64Array;
+	C4: Float64Array;
+}
+
+/** Provider of the correlations, one entry per `prep.binned` (same order). */
+export type InitCorrelator = (prep: InitPrep) => Promise<InitCorrelations[]>;
+
+/** Step (a): the horizon grid and the per-fScale binned skylines. */
+export function prepareInit(
 	p: Float64Array,
 	geom: Geometry,
 	cols: Column[],
 	horizon: HorizonProfile,
-	o: InitOptions = DEFAULT_INIT,
-): InitResult {
-	const t0 = performance.now();
+	o: InitOptions,
+): InitPrep {
 	const M = o.gridSize;
 	const step = 360 / M;
 	// Horizon resampled onto the power-of-two grid (degrees).
@@ -212,18 +246,7 @@ export function globalInit(
 		H[j] = (t.el[i0] * (1 - f) + t.el[(i0 + 1) % t.n] * f) / DEG;
 	}
 	const H2 = H.map((v) => v * v);
-	const FH = rfft(H);
-	const FH2 = rfft(H2);
-
 	const S = Math.round(o.yawRange / step);
-	const nShift = 2 * S + 1;
-	const bestCost = new Float64Array(nShift).fill(Number.POSITIVE_INFINITY);
-	const bestArg = new Int32Array(nShift);
-	const bestAB: [number, number][] = new Array(nShift);
-	const alpha = 1 / (o.noiseDeg * o.noiseDeg * o.corrLength);
-	const la = 1 / (o.pitchSigmaDeg * o.pitchSigmaDeg);
-	const sb = o.rollSigmaDeg * DEG; // roll tilt b ≈ −Δroll (rad) per degree of azimuth
-	const lb = 1 / (sb * sb);
 	// The azimuth grid of the photo is fixed by the flat (unsmoothed) profile;
 	// the horizon table passed to evalColumn only matters for residuals, which
 	// aren't used here.
@@ -234,20 +257,88 @@ export function globalInit(
 		const B = binColumns(q, geom, cols, M, t);
 		B.stride = Math.max(1, Math.floor(cols.length / o.scoreColumns));
 		binned.push(B);
+	}
+	return { M, step, S, nShift: 2 * S + 1, H, H2, binned };
+}
+
+/** Step (b), CPU: f64 radix-2 FFT correlation (fft.ts), the reference. */
+export function correlateCpu(prep: InitPrep): InitCorrelations[] {
+	const { M, S, nShift } = prep;
+	const FH = rfft(prep.H);
+	const FH2 = rfft(prep.H2);
+	const pick = (C: Float64Array) => {
+		const out = new Float64Array(nShift);
+		for (let k = -S; k <= S; k++) out[k + S] = C[(k + M) % M];
+		return out;
+	};
+	return prep.binned.map((B) => {
 		const FW = rfft(B.W);
 		const FWP = rfft(B.WP);
 		const FWX = rfft(B.WX);
-		const C1 = correlateSpectra(FWP, FH); // Σ w P H(+Δ)
-		const C2 = correlateSpectra(FW, FH); // Σ w H
-		const C3 = correlateSpectra(FW, FH2); // Σ w H²
-		const C4 = correlateSpectra(FWX, FH); // Σ w x H
+		return {
+			C1: pick(correlateSpectra(FWP, FH)),
+			C2: pick(correlateSpectra(FW, FH)),
+			C3: pick(correlateSpectra(FW, FH2)),
+			C4: pick(correlateSpectra(FWX, FH)),
+		};
+	});
+}
+
+/**
+ * Finds the top yaw modes. `p` is the prior state (model.ts layout) at the
+ * working geometry; `cols` the observed skyline columns.
+ */
+export function globalInit(
+	p: Float64Array,
+	geom: Geometry,
+	cols: Column[],
+	horizon: HorizonProfile,
+	o: InitOptions = DEFAULT_INIT,
+): InitResult {
+	const t0 = performance.now();
+	const prep = prepareInit(p, geom, cols, horizon, o);
+	return finishInit(prep, correlateCpu(prep), o, t0);
+}
+
+/** globalInit with the correlations from `correlate` (e.g. the GPU four-step FFT, fft-gpu.ts). */
+export async function globalInitAsync(
+	p: Float64Array,
+	geom: Geometry,
+	cols: Column[],
+	horizon: HorizonProfile,
+	o: InitOptions,
+	correlate: InitCorrelator,
+): Promise<InitResult> {
+	const t0 = performance.now();
+	const prep = prepareInit(p, geom, cols, horizon, o);
+	return finishInit(prep, await correlate(prep), o, t0);
+}
+
+/** Step (c): cost loop over the focal scales, robust score curve, modes, PSR. */
+export function finishInit(
+	prep: InitPrep,
+	corr: InitCorrelations[],
+	o: InitOptions,
+	t0: number,
+): InitResult {
+	const { M, step, S, nShift, H, binned } = prep;
+	const bestCost = new Float64Array(nShift).fill(Number.POSITIVE_INFINITY);
+	const bestArg = new Int32Array(nShift);
+	const bestAB: [number, number][] = new Array(nShift);
+	const alpha = 1 / (o.noiseDeg * o.noiseDeg * o.corrLength);
+	const la = 1 / (o.pitchSigmaDeg * o.pitchSigmaDeg);
+	const sb = o.rollSigmaDeg * DEG; // roll tilt b ≈ −Δroll (rad) per degree of azimuth
+	const lb = 1 / (sb * sb);
+	for (let fi = 0; fi < binned.length; fi++) {
+		const B = binned[fi];
+		const { C1, C2, C3, C4 } = corr[fi];
 		// (αM + Λ) is the same for every shift.
 		const m00 = alpha * B.S_w + la;
 		const m01 = alpha * B.S_x;
 		const m11 = alpha * B.S_xx + lb;
 		const det = m00 * m11 - m01 * m01;
 		for (let k = -S; k <= S; k++) {
-			const s = (k + M) % M;
+			const s = k + S;
 			const sumR2 = C3[s] - 2 * C1[s] + B.S_PP;
 			const g0 = alpha * (C2[s] - B.S_P);
 			const g1 = alpha * (C4[s] - B.S_XP);
@@ -257,7 +348,7 @@ export function globalInit(
 			const dy = k * step;
 			const cost =
 				alpha * sumR2 - (g0 * a + g1 * b) + 0.5 * (dy / o.yawSigmaDeg) ** 2;
-			const idx = k + S;
+			const idx = s;
 			if (cost < bestCost[idx]) {
 				bestCost[idx] = cost;
 				bestArg[idx] = fi;
