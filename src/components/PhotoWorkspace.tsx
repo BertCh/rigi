@@ -121,6 +121,7 @@ import {
 	Slider,
 	Toggle,
 } from "./controls";
+import { EyeHeightRow } from "./EyeHeightRow";
 import { EyeSuggestion } from "./EyeSuggestion";
 import { CameraModeBar } from "./nearfield/CameraModeBar";
 import { StepInsidePanel } from "./nearfield/StepInsidePanel";
@@ -2144,12 +2145,14 @@ export function PhotoWorkspace({
 							<dd className="text-right font-mono text-white/75">
 								{photoIn.alt ? `${Math.round(photoIn.alt)} m` : "—"}
 							</dd>
-							<dt className="text-white/40">Eye (DEM-snapped)</dt>
-							<dd className="text-right font-mono text-white/75">
-								{engineRef.current?.eyeAlt
-									? `${Math.round(engineRef.current.eyeAlt)} m`
-									: "—"}
-							</dd>
+							<EyeHeightRow
+								alt={photo.alt}
+								ground={engineRef.current?.demAtCamera ?? Number.NaN}
+								eyeAlt={engineRef.current?.eyeAlt ?? 0}
+								model={photo.model}
+								lat={photo.lat}
+								lon={photo.lon}
+							/>
 							<dt className="text-white/40">Compass</dt>
 							<dd className="text-right font-mono text-white/75">
 								{photo.heading != null
