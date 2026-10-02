@@ -538,7 +538,7 @@ export class DeckEngine implements Renderer {
 	 * reallocating its target never touches the texture the drape samples.
 	 */
 	private drapeTex: Texture[] = [];
-	private readonly pixelRatioCap: number;
+	private pixelRatioCap: number;
 	private readonly terrainTileWrap: DeckEngineOptions["terrainTileWrap"];
 	private silMask: SilhouetteMaskGL | null = null;
 	private loadAbort = new AbortController();
@@ -919,6 +919,14 @@ export class DeckEngine implements Renderer {
 				if (this.liveSource === source && !this.disposed) this.pushLiveFrame();
 			});
 		this.pushLiveFrame();
+	}
+
+	setPixelRatioCap(cap: number) {
+		if (cap === this.pixelRatioCap) return;
+		this.pixelRatioCap = cap;
+		this.deck.setProps({
+			useDevicePixels: Math.min(window.devicePixelRatio || 1, cap),
+		} as never);
 	}
 
 	setLiveMode(on: boolean) {

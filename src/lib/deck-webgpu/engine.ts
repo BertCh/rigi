@@ -1116,6 +1116,13 @@ export class WebGpuEngine implements Renderer {
 		this.pushLiveFrame();
 	}
 
+	setPixelRatioCap(cap: number) {
+		if (cap === this.opts.pixelRatioCap) return;
+		this.opts = { ...this.opts, pixelRatioCap: cap };
+		this.host?.setPixelRatioCap?.(cap);
+		this.schedule("all");
+	}
+
 	setLiveMode(on: boolean) {
 		if (on === this.liveMode) return;
 		this.liveMode = on;

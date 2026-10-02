@@ -2,20 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Builds the /live engine through the same resolver as /photo (src/lib/renderer-select.ts). The live
-// additions (setLiveSource / setLiveMode, src/lib/live/contract.ts LiveRendererApi) are optional on the
-// returned type until both engines implement them.
+// Builds the /live engine through the same resolver as /photo (src/lib/renderer-select.ts). Both engines
+// implement the live additions (src/lib/live/contract.ts LiveRendererApi) through Renderer.
 
-import type { LiveRendererApi } from "#/lib/live/contract";
 import type { PhotoMeta } from "#/lib/photos";
 import type { Renderer } from "#/lib/renderer";
 import { type ResolvedRenderer, resolveRenderer } from "#/lib/renderer-select";
 
-export type LiveEngine = Renderer &
-	Partial<LiveRendererApi> & {
-		/** Optional: the governor's pixel ratio cap, when the engine can change it at run time. */
-		setPixelRatioCap?(cap: number): void;
-	};
+export type LiveEngine = Renderer;
 
 export type LiveEngineHandle = {
 	engine: LiveEngine;

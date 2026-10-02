@@ -264,9 +264,9 @@ export function useLiveSession() {
 					: Promise.resolve(null);
 				await engine.init(regionData, (message) => patch({ message }));
 				if (cancelled) return;
-				engine.setLiveMode?.(true);
-				engine.setLiveSource?.(video);
-				cleanups.push(() => engine.setLiveSource?.(null));
+				engine.setLiveMode(true);
+				engine.setLiveSource(video);
+				cleanups.push(() => engine.setLiveSource(null));
 				const resize = () => {
 					const stage = stageRef.current;
 					if (stage) engine.resize(stage.clientWidth, stage.clientHeight);
@@ -313,7 +313,7 @@ export function useLiveSession() {
 						frames++;
 						if (governor.record(frame.time - lastDelivered, frame.time)) {
 							const g = governor.state;
-							engine.setPixelRatioCap?.(g.maxPixelRatio);
+							engine.setPixelRatioCap(g.maxPixelRatio);
 							patch({ thermal: g.thermal, pixelRatio: g.maxPixelRatio });
 						}
 						lastDelivered = frame.time;

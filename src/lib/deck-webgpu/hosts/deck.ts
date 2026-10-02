@@ -251,6 +251,12 @@ export class DeckHost implements Host {
 		if (this.color.setReduced(active)) this.offscreenDirty.markColor();
 	}
 
+	setPixelRatioCap(cap: number) {
+		this.deck.setProps({
+			useDevicePixels: Math.min(window.devicePixelRatio || 1, cap),
+		} as never);
+	}
+
 	nextFrame(scope: FrameScope = "all") {
 		return new Promise<void>((r) => {
 			this.waiters.push(r);

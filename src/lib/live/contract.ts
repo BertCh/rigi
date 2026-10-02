@@ -76,6 +76,8 @@ export interface LiveRendererApi {
 	setLiveSource(source: LiveSource | null): void;
 	/** Live mode: skip per-pose photo fits (haze, masks), keep MSAA off, throttle label work. */
 	setLiveMode(on: boolean): void;
+	/** Frame governor: cap the canvas device-pixel ratio (takes effect on the next frame). */
+	setPixelRatioCap(cap: number): void;
 }
 
 /** Simple frame governor knobs shared by the pump and the engines. */

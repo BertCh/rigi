@@ -60,6 +60,8 @@ export interface Host {
 	 * changes the mode; the caller requests the full-quality "all" frame (it also fires onRender).
 	 */
 	setInteractive(active: boolean): void;
+	/** Cap the canvas device-pixel ratio (the live frame governor); hosts without one ignore it. */
+	setPixelRatioCap?(cap: number): void;
 	/** Resolves after the next frame's GPU work completes. */
 	nextFrame(scope?: FrameScope): Promise<void>;
 	destroy(): void;
