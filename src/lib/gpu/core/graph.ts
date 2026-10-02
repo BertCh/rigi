@@ -747,6 +747,11 @@ export class ComputeGraph<P = void> {
 		return this;
 	}
 
+	/** Whether a compileAsync() is in flight (compile() throws until it settles). */
+	get isCompiling() {
+		return this.compiling !== null;
+	}
+
 	/** Whether compile() / compileAsync() has finished. */
 	get isCompiled() {
 		return !!this.compiled;

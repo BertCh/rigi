@@ -195,13 +195,10 @@ export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel> {
 	if (!p) {
 		const inflight = b;
 		p = (async () => {
-			const k = wrap(
-				spec,
-				await untilLost(
-					device,
-					EngineKernel.createAsync(device, kernelProps(spec)),
-				),
-			);
+			const created = EngineKernel.createAsync(device, kernelProps(spec));
+			// untilLost may throw before it awaits `created`: never leave its rejection unhandled
+			created.catch(() => {});
+			const k = wrap(spec, await untilLost(device, created));
 			const m = cacheOf(device);
 			// a sync kernel() may have won meanwhile: keep the first
 			const won = m.get(spec);

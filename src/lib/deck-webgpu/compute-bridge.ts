@@ -102,6 +102,7 @@ import {
 	hazePrepTex,
 	masksTex,
 	releaseTextureGraphs,
+	warmTextureKernelsAsync,
 } from "#/lib/gpu/look/textures";
 import type { Vec3 } from "#/lib/look/atmosphere";
 import type { ColorStats } from "#/lib/look/color-stats";
@@ -239,6 +240,10 @@ export class LookBridge {
 
 	constructor(device: Device) {
 		this.device = device;
+		// build the texture-look pipelines off the main thread, so the first fused encode compiles cheaply
+		Promise.resolve(device)
+			.then(warmTextureKernelsAsync)
+			.catch(() => {});
 	}
 
 	/** Forget the inputs (the next update / stats call runs again). */

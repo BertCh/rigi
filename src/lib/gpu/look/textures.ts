@@ -276,9 +276,15 @@ export function warmTextureKernels(device: Device): number {
 	return warmKernels(device, GROUP);
 }
 
+/** Devices whose texture-look pipelines are all built (a sync graph compile then only looks them up). */
+const warmDevices = new WeakSet<Device>();
+
 /** warmTextureKernels without blocking the thread: call it when the render device is adopted. */
 export function warmTextureKernelsAsync(device: Device): Promise<number> {
-	return warmKernelsAsync(device, GROUP);
+	return warmKernelsAsync(device, GROUP).then((n) => {
+		warmDevices.add(device);
+		return n;
+	});
 }
 
 /**
@@ -293,6 +299,11 @@ function assertCompiled(
 	onFail?: (error: unknown) => void,
 ) {
 	if (graph.isCompiled) return;
+	// pipelines already cached: the sync compile builds no pipeline on the main thread
+	if (warmDevices.has(graph.device) && !graph.isCompiling) {
+		graph.compile();
+		return;
+	}
 	graph.compileAsync().catch((error) => {
 		console.warn(`[lookgpu] ${what} graph compile failed`, error);
 		onFail?.(error);
