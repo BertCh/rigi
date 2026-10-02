@@ -56,13 +56,19 @@
 	position: relative;
 	color: var(--gb-ink);
 	background-color: var(--gb-paper);
-	font-family: var(--gb-font-sans);
+	/* Hand pass: the whole sheet is written by hand (body in GB Hand Body). */
+	font-family: var(--gb-font-body);
 	-webkit-font-smoothing: auto;
 }
 
 /* `@theme inline` bakes the site font into font-sans, so override the utilities here. */
 .gb-swiss .font-sans {
-	font-family: var(--gb-font-sans);
+	font-family: var(--gb-font-body);
+}
+
+/* The escape hatch for a passage that must read as type (long tables, legal text). */
+.gb-swiss .gb-print {
+	font-family: var(--gb-font-print);
 }
 
 .gb-swiss .font-mono,
@@ -73,22 +79,25 @@
 	font-variant-numeric: tabular-nums;
 }
 
-.gb-swiss .display-title {
-	font-family: var(--gb-font-serif);
-	font-optical-sizing: auto;
-	font-weight: 600;
+/* Titles are hand lettering (Caveat 700). Caveat's x-height is about 0.40 em, so ex-height
+ * adjustment brings it to the visual size the TYPE scale was set for. */
+.gb-swiss .display-title,
+.gb-swiss :is(h2, h3):not(.gb-print) {
+	font-family: var(--gb-font-letter);
+	font-weight: 700;
+	font-size-adjust: ex-height 0.5;
 	text-wrap: balance;
-	letter-spacing: -0.005em;
+	letter-spacing: 0;
 	color: var(--gb-ink);
 }
 
-/* Spaced condensed caps for kickers and regions. */
+/* Hand block capitals for kickers, labels and regions (Patrick Hand SC; architects' lettering). */
 .gb-swiss .gb-caps {
-	font-family: var(--gb-font-condensed);
-	font-weight: 500;
+	font-family: var(--gb-font-caps);
+	font-weight: 400;
 	text-transform: uppercase;
-	letter-spacing: 0.12em;
-	font-feature-settings: "case" 1;
+	letter-spacing: 0.08em;
+	font-size-adjust: cap-height 0.78;
 }
 
 /* Hydrological names are set in italic water ink. */
@@ -99,7 +108,7 @@
 
 @layer components {
 	.gb-swiss .gb-coord {
-		font-family: var(--font-mono);
+		font-family: var(--gb-font-figure);
 		font-variant-numeric: tabular-nums;
 		font-size: 0.6875rem;
 		letter-spacing: 0.02em;
@@ -166,8 +175,9 @@
 }
 
 @layer components {
+	/* Numbers are written by hand too (a field book's figures), in tabular columns. */
 	.gb-swiss .gb-num {
-		font-family: var(--gb-font-sans);
+		font-family: var(--gb-font-figure);
 		font-variant-numeric: tabular-nums lining-nums;
 	}
 }
@@ -200,15 +210,19 @@
 }
 
 .gb-swiss .gb-table th {
-	font-family: var(--gb-font-condensed);
-	font-weight: 500;
+	font-family: var(--gb-font-caps);
+	font-weight: 400;
 	text-transform: uppercase;
-	letter-spacing: 0.12em;
-	font-feature-settings: "case" 1;
-	font-size: 11px;
+	letter-spacing: 0.08em;
+	font-size: 13px;
 	text-align: left;
 	padding-block: 6px;
-	border-bottom: 1px solid var(--gb-ink);
+	/* Hand pass: a pen-ruled header line (a slightly wandering stroke), not a crisp border. */
+	border-bottom: 0;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 4' preserveAspectRatio='none'%3E%3Cpath d='M0.5 2.4C40 1.6 90 2.9 140 1.9S190 2.3 199.5 1.6' stroke='%23131313' stroke-width='1.2' fill='none' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: 0 100%;
+	background-size: 100% 4px;
 }
 
 .gb-swiss .gb-table td {
@@ -247,6 +261,11 @@
 }
 
 @media (forced-colors: active) {
+	.gb-swiss .gb-table th {
+		background-image: none;
+		border-bottom: 1px solid CanvasText;
+	}
+
 	.gb-swiss [filter],
 	.nb-book [filter] {
 		filter: none;
@@ -277,7 +296,8 @@
 	}
 
 	.gb-swiss .gb-table th {
-		border-bottom-width: 2px;
+		background-image: none;
+		border-bottom: 2px solid var(--gb-ink);
 	}
 }
 
@@ -301,5 +321,25 @@
 
 	::view-transition-group(gb-sheet) {
 		animation-duration: 260ms;
+	}
+}
+
+/* A dotted hand leader (table of contents): irregular pen dots, repeated along the line. */
+.gb-swiss .gb-leader {
+	flex: 1 1 auto;
+	min-width: 24px;
+	height: 6px;
+	align-self: flex-end;
+	margin-bottom: 0.45em;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='6' viewBox='0 0 36 6'%3E%3Cg fill='%2349423d'%3E%3Ccircle cx='3' cy='3.2' r='1.05'/%3E%3Ccircle cx='10.4' cy='2.8' r='0.9'/%3E%3Ccircle cx='17.6' cy='3.4' r='1.1'/%3E%3Ccircle cx='25.1' cy='3' r='0.85'/%3E%3Ccircle cx='32.2' cy='3.3' r='1'/%3E%3C/g%3E%3C/svg%3E");
+	background-repeat: repeat-x;
+	background-position: 0 50%;
+	opacity: 0.75;
+}
+
+@media (forced-colors: active) {
+	.gb-swiss .gb-leader {
+		background-image: none;
+		border-bottom: 2px dotted CanvasText;
 	}
 }

@@ -11,7 +11,14 @@ import {
 	type NotebookStep,
 	STEP_NUMBER,
 } from "./entries";
-import { HandText, PenArrow, PenCircle, PenLine } from "./Ink";
+import {
+	HandText,
+	PenArrow,
+	PenCircle,
+	PenLine,
+	PenRule,
+	StepNumber,
+} from "./Ink";
 import { noteFor, Term, useNotebookContext } from "./notes";
 import { PhotoStrip } from "./PhotoStrip";
 import { useNotebookPhoto } from "./useNotebookPhoto";
@@ -72,10 +79,20 @@ export function FieldNotes({
 				"nb-book my-6 min-w-0 px-4 py-3 lg:col-[margin-start/full-end] lg:row-start-1 lg:my-0"
 			}
 		>
-			<p className="nb-label text-[11px] leading-[12px] text-[var(--nb-brown)]">
-				Feldbuch · p.{entryNumber}
-				{step ? ` · step ${STEP_NUMBER.get(step.id)}` : ""} · {entry.question}
-			</p>
+			<div className="inline-block max-w-full">
+				<p className="nb-label text-[11px] leading-[12px] text-[var(--nb-brown)]">
+					Feldbuch · p.{entryNumber}
+					{step ? ` · step ${STEP_NUMBER.get(step.id)}` : ""} · {entry.question}
+				</p>
+				<div className="mt-1 w-2/5">
+					<PenRule
+						seed={`fieldnotes-rule-${entryNumber}`}
+						color="red"
+						opacity={0.7}
+						width={1.2}
+					/>
+				</div>
+			</div>
 			{strip && (
 				<div className="mt-3">
 					<PhotoStrip
@@ -88,12 +105,15 @@ export function FieldNotes({
 			)}
 			<ul className="mt-3 space-y-1.5">
 				{steps.map((current) => (
-					<li key={current.id} className={`${TYPE.caption} flex gap-2`}>
-						<span
-							className="nb-hand w-6 shrink-0 text-[18px] leading-[18px] text-[var(--nb-red)]"
-							aria-hidden
-						>
-							({STEP_NUMBER.get(current.id)})
+					<li
+						key={current.id}
+						className={`${TYPE.caption} flex items-start gap-1`}
+					>
+						<span className="-mt-1.5 -ml-1.5 shrink-0">
+							<StepNumber
+								value={String(STEP_NUMBER.get(current.id))}
+								color="red"
+							/>
 						</span>
 						<span>
 							{step ? null : (
@@ -235,6 +255,29 @@ export function NotebookTrail({ id }: { id: string }) {
 						</g>
 					);
 				})}
+				{here ? (
+					<g>
+						<HandText
+							x={here[0]}
+							y={here[1] - 78}
+							anchor="middle"
+							color="red"
+							size={17}
+							rotate={-2}
+						>
+							you are here
+						</HandText>
+						<PenArrow
+							seed={`trail-here-${id}`}
+							from={[here[0], here[1] - 70]}
+							to={[here[0], here[1] - 29]}
+							bend={0.2}
+							color="red"
+							width={1.4}
+							delay={500}
+						/>
+					</g>
+				) : null}
 				{here
 					? needs.map((need, index) => {
 							const textY = here[1] - 56 - index * 24;

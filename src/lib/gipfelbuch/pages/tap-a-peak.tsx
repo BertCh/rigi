@@ -5,11 +5,21 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+	CircledKey,
+	CircledNumber,
+	HandMark,
+	PencilLayer,
+	Wash,
+} from "#/components/gipfelbuch/notebook";
+import {
 	Hachure,
 	HandDot,
-	inkColor,
+	HandText,
+	PenArrow,
 	PenCircle,
 	PenLine,
+	SketchPath,
+	SketchPolyline,
 } from "#/components/gipfelbuch/notebook/Ink";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
@@ -23,11 +33,12 @@ import {
 	Flow,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
+	HandNote,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
 	PhotoPicker,
-	PrintLabel,
-	PrintNote,
 	RealPhoto,
 	Section,
 	Steps,
@@ -310,13 +321,13 @@ function PinLock() {
 					</defs>
 					<rect width={W} height={H} fill="url(#tp-sky)" />
 					<path d={`${line(truthRidge)} L${W} ${H} L0 ${H} Z`} fill="#1f2a38" />
-					<path
-						d={line(truthRidge)}
-						fill="none"
-						stroke="#e8e2d4"
-						strokeWidth={1.6}
-						strokeDasharray="4 4"
-						strokeLinejoin="round"
+					<SketchPolyline
+						points={truthRidge}
+						seed="tp-truth"
+						data
+						color={PLATE_TEXT}
+						width={1.6}
+						dash="4 4"
 					/>
 					<path
 						d={`M0 ${H} L0 262 C 120 246 260 270 400 256 S 560 250 ${W} 262 L${W} ${H} Z`}
@@ -324,12 +335,12 @@ function PinLock() {
 					/>
 
 					{/* predicted skyline */}
-					<path
-						d={line(pred)}
-						fill="none"
-						stroke={LAYER_STYLE.solved.color}
-						strokeWidth={2.4}
-						strokeLinejoin="round"
+					<SketchPolyline
+						points={pred}
+						seed="tp-pred"
+						data
+						color={LAYER_STYLE.solved.color}
+						width={2.4}
 					/>
 
 					{/* summit labels under the current pose */}
@@ -339,14 +350,13 @@ function PinLock() {
 						const on = pinned.has(i);
 						return (
 							<g key={p.name}>
-								<path
+								<SketchPath
 									d={`M${q[0]} ${q[1] - 1} l5 -9 l-10 0 Z`}
-									fill="none"
-									stroke={on ? PLATE_RED : PLATE_TEXT}
-									strokeWidth={1.4}
-									strokeLinejoin="round"
+									seed={`tp-tri-${p.name}`}
+									color={on ? PLATE_RED : PLATE_TEXT}
+									width={1.4}
 								/>
-								<PrintLabel
+								<HandLabel
 									x={q[0]}
 									y={q[1] - 16}
 									anchor="middle"
@@ -355,7 +365,7 @@ function PinLock() {
 									haloColor={PLATE_HALO}
 								>
 									{p.name}
-								</PrintLabel>
+								</HandLabel>
 							</g>
 						);
 					})}
@@ -366,23 +376,33 @@ function PinLock() {
 						return (
 							<g key={tp.peak}>
 								{q && (
-									<path
-										d={`M${q[0]} ${q[1]}L${tp.x} ${tp.y}`}
-										stroke={PLATE_TEXT}
-										strokeWidth={1.5}
-										fill="none"
+									<PenLine
+										from={[q[0], q[1]]}
+										to={[tp.x, tp.y]}
+										seed={`tp-res-${tp.peak}`}
+										data
+										color={PLATE_TEXT}
+										width={1.5}
 									/>
 								)}
-								<circle
-									cx={tp.x}
-									cy={tp.y}
-									r={9}
-									fill="none"
-									stroke={PLATE_RED}
-									strokeWidth={1.8}
+								<PenCircle
+									center={[tp.x, tp.y]}
+									radiusX={9}
+									seed={`tp-ring-${tp.peak}`}
+									data
+									color={PLATE_RED}
+									width={1.8}
 								/>
-								<circle cx={tp.x} cy={tp.y} r={2.2} fill={PLATE_RED} />
-								<PrintLabel
+								<HandDot
+									x={tp.x}
+									y={tp.y}
+									r={2.2}
+									seed={`tp-dot-${tp.peak}`}
+									data
+									color={PLATE_RED}
+									opacity={1}
+								/>
+								<HandLabel
 									x={tp.x + 13}
 									y={tp.y + 4}
 									size={11.5}
@@ -390,11 +410,11 @@ function PinLock() {
 									haloColor={PLATE_HALO}
 								>
 									tap {n + 1}
-								</PrintLabel>
+								</HandLabel>
 							</g>
 						);
 					})}
-					<PrintLabel
+					<HandLabel
 						x={W - 10}
 						y={20}
 						anchor="end"
@@ -405,7 +425,39 @@ function PinLock() {
 						{stage === 0
 							? "sensor prior"
 							: `${stage} pin${stage > 1 ? "s" : ""}`}
-					</PrintLabel>
+					</HandLabel>
+					<HandText
+						x={14}
+						y={44}
+						size={17}
+						color={PLATE_TEXT}
+						rotate={-2}
+						halo={false}
+					>
+						{stage === 0
+							? "cyan misses the dashed ridge: 6.5° off in yaw"
+							: "pinned summits now sit on my fingertip"}
+					</HandText>
+					<PenArrow
+						from={[150, 52]}
+						to={[190, 110]}
+						seed="tp-note-arrow"
+						color={PLATE_TEXT}
+						width={1.3}
+					/>
+					{stage >= 2 && (
+						<HandText
+							x={W - 14}
+							y={H - 22}
+							size={16}
+							anchor="end"
+							color={PLATE_RED}
+							rotate={2}
+							halo={false}
+						>
+							two far pins pin the horizon slope: roll ✓
+						</HandText>
+					)}
 				</svg>
 			</div>
 
@@ -554,13 +606,12 @@ function PeakChooser() {
 						const top = 20 + i * 6;
 						return (
 							<g key={c.name}>
-								<rect
-									x={x0}
-									y={top}
-									width={x1 - x0}
-									height={138 - top}
-									style={{ fill: inkColor(c.tone) }}
-									opacity={0.13}
+								<Wash
+									d={`M${x0} ${top} H${x1} V138 H${x0} Z`}
+									seed={`pc-wash-${c.name}`}
+									color={c.tone}
+									layers={6}
+									opacity={0.05}
 								/>
 								<Hachure
 									d={`M${x0} ${top} H${x1} V138 H${x0} Z`}
@@ -588,29 +639,28 @@ function PeakChooser() {
 								seed={`pc-tick-${a}`}
 								width={1}
 							/>
-							<text
+							<HandLabel
 								x={X(a)}
-								y="157"
-								textAnchor="middle"
-								className="nb-num"
-								fontSize={11.5}
-								style={{ fill: "var(--gb-secondary)" }}
+								y={157}
+								anchor="middle"
+								size={11.5}
+								color="var(--gb-secondary)"
 							>
-								{a}°
-							</text>
+								{`${a}°`}
+							</HandLabel>
 						</g>
 					))}
 					{CANDS.map((c, i) => (
 						<g key={c.name}>
-							<line
-								x1={X(rays[i])}
-								x2={X(rays[i])}
-								y1={20 + i * 6}
-								y2={138}
-								style={{ stroke: inkColor(c.tone) }}
-								strokeWidth={2}
+							<PenLine
+								from={[X(rays[i]), 20 + i * 6]}
+								to={[X(rays[i]), 138]}
+								seed={`pc-ray-${c.name}`}
+								data
+								color={c.tone}
+								width={2}
 							/>
-							<PrintLabel
+							<HandLabel
 								x={X(rays[i])}
 								y={14 + i * 6}
 								anchor="middle"
@@ -624,7 +674,7 @@ function PeakChooser() {
 								}
 							>
 								{c.name}
-							</PrintLabel>
+							</HandLabel>
 						</g>
 					))}
 					{POOL.map((p) => {
@@ -644,7 +694,7 @@ function PeakChooser() {
 									data
 								/>
 								{inWin && (
-									<PrintLabel
+									<HandLabel
 										x={X(p.az)}
 										y={cy - rad - 4}
 										anchor="middle"
@@ -652,14 +702,38 @@ function PeakChooser() {
 										color={r === 1 ? "var(--gb-red)" : "var(--gb-ink)"}
 									>
 										{r}
-									</PrintLabel>
+									</HandLabel>
 								)}
 							</g>
 						);
 					})}
-					<PrintNote x={24} y={180} size={11.5}>
+					<HandNote x={24} y={180} size={11.5}>
 						azimuth · dot size = prominence
-					</PrintNote>
+					</HandNote>
+					<PencilLayer>
+						<PenLine
+							from={[24, 20]}
+							to={[616, 20]}
+							seed="pc-guide-top"
+							width={0.8}
+						/>
+						<PenLine
+							from={[24, 20]}
+							to={[24, 138]}
+							seed="pc-guide-left"
+							width={0.8}
+						/>
+					</PencilLayer>
+					<HandText x={X(197) - 6} y={92} size={16} anchor="end" rotate={-3}>
+						B and C are 0.6° apart: the taller one wins
+					</HandText>
+					<PenArrow
+						from={[X(197) - 2, 98]}
+						to={[X(208.6), 118]}
+						seed="pc-note-arrow"
+						width={1.2}
+					/>
+					<CircledKey x={X(rays[0]) + 14} y={34} value="1" seed="pc-key-1" />
 				</svg>
 				<label
 					className={`mt-1 flex items-center gap-3 font-mono gb-secondary ${TYPE.micro}`}
@@ -817,42 +891,43 @@ function TapFrame({
 										color={SWISS.paper}
 										width={1.4 * k}
 									/>
-									<circle
-										cx={g[0]}
-										cy={g[1]}
-										r={4.5 * k}
-										fill="none"
-										stroke={PHOTO_DARK}
-										strokeWidth={3.2 * k}
+									<PenCircle
+										center={[g[0], g[1]]}
+										radiusX={4.5 * k}
+										seed={`tf-g-dark-${id}-${i}`}
+										data
+										color={PHOTO_DARK}
+										width={3.2 * k}
 									/>
-									<circle
-										cx={g[0]}
-										cy={g[1]}
-										r={4.5 * k}
-										fill="none"
-										stroke={solvedColor}
-										strokeWidth={1.6 * k}
+									<PenCircle
+										center={[g[0], g[1]]}
+										radiusX={4.5 * k}
+										seed={`tf-g-${id}-${i}`}
+										data
+										color={solvedColor}
+										width={1.6 * k}
 									/>
-									<circle
-										cx={q[0]}
-										cy={q[1]}
+									<HandDot
+										x={q[0]}
+										y={q[1]}
 										r={2.8 * k}
-										fill={SWISS.paper}
-										stroke={PHOTO_DARK}
-										strokeWidth={1 * k}
+										seed={`tf-q-${id}-${i}`}
+										data
+										color={SWISS.paper}
+										opacity={1}
 									/>
 								</g>
 							);
 						})}
 						{tapped.map((t) => (
 							<g key={t.name}>
-								<circle
-									cx={t.x}
-									cy={t.y}
-									r={10 * k}
-									fill="none"
-									stroke={PHOTO_DARK}
-									strokeWidth={5 * k}
+								<PenCircle
+									center={[t.x, t.y]}
+									radiusX={10 * k}
+									seed={`tf-dark-${id}-${t.name}`}
+									data
+									color={PHOTO_DARK}
+									width={5 * k}
 								/>
 								<PenCircle
 									center={[t.x, t.y]}
@@ -861,8 +936,16 @@ function TapFrame({
 									color="red"
 									width={2.8 * k}
 								/>
-								<circle cx={t.x} cy={t.y} r={2.8 * k} fill={SWISS.red} />
-								<PrintLabel
+								<HandDot
+									x={t.x}
+									y={t.y}
+									r={2.8 * k}
+									seed={`tf-dot-${id}-${t.name}`}
+									data
+									color={SWISS.red}
+									opacity={1}
+								/>
+								<HandLabel
 									x={t.x}
 									y={t.y - 15 * k}
 									anchor="middle"
@@ -870,7 +953,7 @@ function TapFrame({
 									color="var(--gb-red)"
 								>
 									{t.name.split(" /")[0]}
-								</PrintLabel>
+								</HandLabel>
 							</g>
 						))}
 					</g>
@@ -1084,14 +1167,14 @@ function OneTap() {
 							color={SWISS.paper}
 							width={1.6 * k}
 						/>
-						<PrintLabel
+						<HandLabel
 							x={cx + 12 * k}
 							y={cy - 4 * k}
 							size={(13 * (ONE_CROP[2] - ONE_CROP[0])) / 720}
 							color="var(--gb-ink)"
 						>
 							image centre
-						</PrintLabel>
+						</HandLabel>
 						<CrispLine
 							d={`M${cx} ${t.y}H${t.x}`}
 							color={SWISS.red}
@@ -1110,23 +1193,40 @@ function OneTap() {
 							color="red"
 							width={2.2 * k}
 						/>
-						<PrintLabel
+						<HandText
+							x={cx + 20 * k}
+							y={cy + 26 * k}
+							size={17 * k}
+							color={SWISS.paper}
+							rotate={-2}
+							halo={false}
+						>
+							these two offsets are the whole measurement
+						</HandText>
+						<PenArrow
+							from={[cx + 60 * k, cy + 14 * k]}
+							to={[cx + 40 * k, cy + 2 * k]}
+							seed="ot-note-arrow"
+							color={SWISS.paper}
+							width={1.4 * k}
+						/>
+						<HandLabel
 							x={t.x + 14 * k}
 							y={t.y - 10 * k}
 							size={(13 * (ONE_CROP[2] - ONE_CROP[0])) / 720}
 							color="var(--gb-red)"
 						>
 							tap: {t.name}
-						</PrintLabel>
-						<PrintLabel
+						</HandLabel>
+						<HandLabel
 							x={t.x + 6 * k}
 							y={(t.y + cy) / 2}
 							size={(13 * (ONE_CROP[2] - ONE_CROP[0])) / 720}
 							color={SWISS.red}
 						>
 							{Math.round(dy)} px up
-						</PrintLabel>
-						<PrintLabel
+						</HandLabel>
+						<HandLabel
 							x={cx - 4 * k}
 							y={t.y - 6 * k}
 							anchor="end"
@@ -1134,7 +1234,7 @@ function OneTap() {
 							color={SWISS.red}
 						>
 							{Math.round(dx)} px right
-						</PrintLabel>
+						</HandLabel>
 					</g>
 				)}
 			</RealPhoto>
@@ -1194,31 +1294,34 @@ function MissBar({
 			role="img"
 			aria-hidden="true"
 		>
-			<rect
-				x={x0}
-				y={87 - h}
-				width={x1 - x0}
-				height={h}
-				style={{
-					fill: faint
-						? "color-mix(in srgb, var(--gb-secondary) 55%, var(--gb-paper))"
-						: "var(--gb-red)",
-				}}
+			<Wash
+				d={`M${x0} ${87 - h} H${x1} V87 H${x0} Z`}
+				seed={`${seed}-wash`}
+				color={faint ? "pencil" : "blue"}
+				layers={6}
+				opacity={0.07}
 			/>
 			<Hachure
 				d={`M${x0} ${87 - h} H${x1} V87 H${x0} Z`}
 				seed={seed}
-				color="ink"
-				gap={4}
+				color={faint ? "pencil" : "blue"}
+				gap={3.5}
 				angle={-45}
-				opacity={0.18}
-				width={0.8}
+				opacity={0.75}
+				width={1}
 			/>
-			<path
-				d={`M${x0 - 4} 87H${x1 + 4}`}
-				stroke={SWISS.ink}
-				strokeWidth={1.4}
-				fill="none"
+			<SketchPath
+				d={`M${x0} 87 V${87 - h} H${x1} V87`}
+				seed={`${seed}-top`}
+				data
+				color={faint ? "pencil" : "blue"}
+				width={1.4}
+			/>
+			<PenLine
+				from={[x0 - 4, 87]}
+				to={[x1 + 4, 87]}
+				seed={`${seed}-base`}
+				width={1.4}
 			/>
 		</svg>
 	);
@@ -1304,8 +1407,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			<Beat kicker="The idea" title="A tap is a measurement with a name on it.">
 				<p>You point at a summit you know and say which one it is.</p>
 				<p>
-					That pairs one pixel with one known direction. The pixel&apos;s
-					distance from the centre is an angle.
+					<HandMark type="highlight">
+						That pairs one pixel with one known direction.
+					</HandMark>{" "}
+					The pixel&apos;s distance from the centre is an angle.
 				</p>
 			</Beat>
 
@@ -1346,14 +1451,22 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Labels far from the tap drift:{" "}
-					{S ? `${S[1].peakShift.median} px` : "…"} median after one tap on
-					demo-10.
+					<HandMark type="underline">
+						{S ? `${S[1].peakShift.median} px` : "…"} median
+					</HandMark>{" "}
+					after one tap on demo-10.
+					{S && (
+						<MarginNote mark="a">
+							{`First guess: one tap fixes everything. Wrong: median miss ${S[0].peakShift.median} px, then ${S[1].peakShift.median} px.`}
+						</MarginNote>
+					)}
 				</p>
 				<p>
 					A loose finger counts too. 5 px off is about{" "}
-					{S ? (Math.atan(5 / S[1].cam.f) / DEG).toFixed(1) : "…"}° of yaw. And
-					naming the wrong summit is worse: the picker offers only nearby named
-					peaks and re-checks each against the skyline.
+					{S ? (Math.atan(5 / S[1].cam.f) / DEG).toFixed(1) : "…"}° of yaw. And{" "}
+					<HandMark type="wavy">naming the wrong summit is worse</HandMark>: the
+					picker offers only nearby named peaks and re-checks each against the
+					skyline.
 				</p>
 			</Beat>
 
@@ -1405,11 +1518,17 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 							the optical axis points. Roll and focal keep their sensor values,
 							so the overlay is exact at the pin and tilts or stretches away
 							from it.
+							<MarginNote mark="b">
+								Why does the lens only come with the third pin? Two points give
+								a baseline, not a width.
+							</MarginNote>
 						</li>
 						<li>
-							<strong>2 pins: and roll.</strong> Two points far apart give a
-							baseline: the line between them must have the right slope. Only
-							the focal error remains.
+							<strong>
+								<HandMark type="double">2 pins: and roll.</HandMark>
+							</strong>{" "}
+							Two points far apart give a baseline: the line between them must
+							have the right slope. Only the focal error remains.
 						</li>
 						<li>
 							<strong>3 pins: and focal.</strong> A third point makes field of
@@ -1436,7 +1555,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						is not the one in the world. The picker therefore treats the tap as
 						a ray under <em>every</em> candidate pose and lets each one vote.
 						Only named OSM summits inside the window are offered, so a tap never
-						turns into a pin on something unnameable.
+						turns into a pin on something unnameable. In Fig. D2 the pose on
+						screen is ray <CircledNumber value={1} seed="tp-prose-1" />.
+						<MarginNote mark="c">
+							I notice the hard part is the name, not the maths.
+						</MarginNote>
 					</p>
 				</Section>
 
@@ -1522,6 +1645,14 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						<CodeRef path="src/lib/picker/PickerPanel.tsx" />
 						<CodeRef path="src/lib/picker/README.md" />
 					</div>
+					<p>
+						<HandMark type="circle">TAP_MAX_PX = 12</HandMark> on a 1000 px
+						image is the gate for &ldquo;tap-consistent&rdquo;.
+						<MarginNote mark="d">
+							12 px of 1000 is about 0.7° of a 57.6° view: a finger, not a
+							solver, sets the tolerance.
+						</MarginNote>
+					</p>
 					<ul>
 						<li>
 							<code>solveFromControlPoints(initial, points, opts)</code> returns

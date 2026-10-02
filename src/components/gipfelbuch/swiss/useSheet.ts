@@ -17,6 +17,9 @@ export interface SheetData {
 		/** Sun-tone and cool-shade masks (greyscale, luminance = strength). */
 		sun: string;
 		shade: string;
+		/** Elevation over the land normalised 0..255 (lake 0), low resolution; tintRange is its metre range. */
+		tint?: string;
+		tintRange?: [number, number];
 		source: string;
 		width: number;
 		height: number;

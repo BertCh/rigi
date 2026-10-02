@@ -7,7 +7,7 @@ import {
 	Hachure,
 	type InkColor,
 	inkColor,
-	PenLine,
+	PenArrow,
 	SketchPath,
 } from "../notebook/Ink";
 
@@ -24,7 +24,7 @@ export interface PlotScale {
 	box: { x0: number; y0: number; x1: number; y1: number };
 }
 
-/** A data series on a Plot: exact (L1, data is never wobbled), series tier 1.6 px. */
+/** A data series on a Plot: one hand pen pass within DATA_TOLERANCE of the data (hand pass), 1.6 px. */
 export function PlotSeries({
 	d,
 	seed,
@@ -76,8 +76,8 @@ export function PlotArea({
 }
 
 /**
- * Minimal responsive SVG plot drawn by hand: one baseline and one left rule (pen lines), a faint pencil
- * grid on the y axis only, mono tick numbers. `children` is a render function that gets
+ * Minimal responsive SVG plot drawn by hand: two pen axes that stop short of the origin, short pen ticks,
+ * hand tick figures, hand axis titles with a small arrow, and a faint dashed pencil grid on y only. `children` is a render function that gets
  * scales and returns SVG elements in data space:
  *   <Plot x={[0, 10]} y={[0, 1]} xLabel="px" yLabel="score">
  *     {(s) => <PlotSeries d={s.line(pts)} seed="score" color="red" />}
@@ -146,18 +146,34 @@ export function Plot({
 			box.x0 + ((v - x[0]) / (x[1] - x[0] || 1)) * (box.x1 - box.x0);
 		const sym = (v: number) =>
 			box.y1 - ((v - y[0]) / (y[1] - y[0] || 1)) * (box.y1 - box.y0);
+		// Axes stop short of the corner (a hand never closes the origin) and overshoot a little at the far end.
+		const gapAtOrigin = 5;
+		const tickPath = [
+			...xs.map(
+				(v, i) =>
+					`M${sxm(v).toFixed(1)} ${box.y1 + 1}L${(sxm(v) + (i % 2 ? 0.6 : -0.4)).toFixed(1)} ${box.y1 + 5 + (i % 3) * 0.6}`,
+			),
+			...ys.map(
+				(v, i) =>
+					`M${box.x0 - 1} ${sym(v).toFixed(1)}L${box.x0 - 5 - (i % 3) * 0.6} ${(sym(v) + (i % 2 ? 0.5 : -0.3)).toFixed(1)}`,
+			),
+		].join("");
+		const xMid = (box.x0 + box.x1) / 2;
+		const yMid = (box.y0 + box.y1) / 2;
 		return (
 			<>
-				<g opacity={0.4}>
+				<g opacity={0.5}>
 					{ys.map((v, i) =>
 						i === 0 ? null : (
-							<PenLine
+							<SketchPath
 								key={`gy${v}`}
 								seed={`${id}-gy${i}`}
+								d={`M${box.x0 + 3} ${sym(v)}L${box.x1} ${sym(v)}`}
 								color="pencil"
-								width={0.5}
-								from={[box.x0, sym(v)]}
-								to={[box.x1, sym(v)]}
+								width={0.6}
+								passes={1}
+								tolerance={0.7}
+								dash="2 5"
 							/>
 						),
 					)}
@@ -169,70 +185,98 @@ export function Plot({
 						y={sym(v)}
 						textAnchor="end"
 						dominantBaseline="middle"
-						className="gb-coord"
+						className="nb-num"
 						style={{ fill: "var(--gb-secondary,#4a545c)" }}
-						fontSize="11"
+						fontSize="12"
 					>
 						{yLabels[i]}
 					</text>
 				))}
 				{xs.map((v, i) => (
-					<g key={`x${v}`}>
-						<PenLine
-							seed={`${id}-tx${i}`}
-							color="ink"
-							width={1}
-							from={[sxm(v), box.y1]}
-							to={[sxm(v), box.y1 + 4 + (i % 2) * 0.8]}
-						/>
-						<text
-							x={sxm(v)}
-							y={box.y1 + 16}
-							textAnchor="middle"
-							className="gb-coord"
-							style={{ fill: "var(--gb-secondary,#4a545c)" }}
-							fontSize="11"
-						>
-							{xLabels[i]}
-						</text>
-					</g>
+					<text
+						key={`x${v}`}
+						x={sxm(v)}
+						y={box.y1 + 17}
+						textAnchor="middle"
+						className="nb-num"
+						style={{ fill: "var(--gb-secondary,#4a545c)" }}
+						fontSize="12"
+					>
+						{xLabels[i]}
+					</text>
 				))}
-				<PenLine
-					seed={`${id}-axis-x`}
+				<SketchPath
+					seed={`${id}-ticks`}
+					d={tickPath}
 					color="ink"
-					width={1.2}
-					from={[box.x0 - 4, box.y1]}
-					to={[box.x1, box.y1]}
+					width={1}
+					passes={1}
+					tolerance={0.4}
 				/>
-				<PenLine
-					seed={`${id}-axis-y`}
+				<SketchPath
+					seed={`${id}-axis-x`}
+					d={`M${box.x0 + gapAtOrigin} ${box.y1}L${box.x1 + 3} ${box.y1}`}
 					color="ink"
-					width={1.2}
-					from={[box.x0, box.y1 + 4]}
-					to={[box.x0, box.y0]}
+					width={1.3}
+					passes={2}
+					tolerance={1}
+				/>
+				<SketchPath
+					seed={`${id}-axis-y`}
+					d={`M${box.x0} ${box.y1 - gapAtOrigin}L${box.x0} ${box.y0 - 3}`}
+					color="ink"
+					width={1.3}
+					passes={2}
+					tolerance={1}
 				/>
 				{xLabel && (
-					<text
-						x={(box.x0 + box.x1) / 2}
-						y={height - 4}
-						textAnchor="middle"
-						className="gb-caps"
-						style={{ fill: "var(--gb-secondary,#4a545c)" }}
-						fontSize="11"
-					>
-						{xLabel}
-					</text>
+					<g>
+						<text
+							x={xMid}
+							y={height - 3}
+							textAnchor="middle"
+							className="nb-hand"
+							style={{ fill: "var(--gb-pencil,#49423d)" }}
+							fontSize="17"
+						>
+							{xLabel}
+						</text>
+						{xMid + xLabel.length * 3.6 + 30 < width && (
+							<PenArrow
+								seed={`${id}-xlabel-arrow`}
+								from={[xMid + xLabel.length * 3.6 + 6, height - 8]}
+								to={[xMid + xLabel.length * 3.6 + 28, height - 9]}
+								bend={0.1}
+								head={5}
+								color="pencil"
+								width={1}
+							/>
+						)}
+					</g>
 				)}
 				{yLabel && (
-					<text
-						transform={`translate(11 ${(box.y0 + box.y1) / 2}) rotate(-90)`}
-						textAnchor="middle"
-						className="gb-caps"
-						style={{ fill: "var(--gb-secondary,#4a545c)" }}
-						fontSize="11"
-					>
-						{yLabel}
-					</text>
+					<g>
+						<text
+							transform={`translate(13 ${yMid}) rotate(-90)`}
+							textAnchor="middle"
+							className="nb-hand"
+							style={{ fill: "var(--gb-pencil,#49423d)" }}
+							fontSize="17"
+						>
+							{yLabel}
+						</text>
+						{yMid - yLabel.length * 3.6 - 28 > 0 && (
+							<PenArrow
+								seed={`${id}-ylabel-arrow`}
+								from={[8, yMid - yLabel.length * 3.6 - 6]}
+								to={[7, yMid - yLabel.length * 3.6 - 26]}
+								bend={0.1}
+								head={5}
+								color="pencil"
+								width={1}
+							/>
+						)}
+					</g>
 				)}
 			</>
 		);

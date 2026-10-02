@@ -5,8 +5,18 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+	CircledKey,
+	CircledNumber,
+	HandMark,
+	HandScaleBar,
+	KrokiTitle,
+	NorthArrow,
+	PencilLayer,
+} from "#/components/gipfelbuch/notebook";
+import {
 	Hachure,
 	HandDot,
+	HandText,
 	PenArrow,
 	PenCircle,
 	PenLine,
@@ -19,8 +29,9 @@ import {
 	CodeRef,
 	Eq,
 	Figure,
+	HandLabel,
+	MarginNote,
 	Measured as PhotoMeasured,
-	PrintLabel,
 	RealPhoto,
 	Sym,
 	useGipfelbuchPhoto,
@@ -100,8 +111,6 @@ let terrainCache: Promise<TerrainData> | null = null;
 // fontSize = px * viewBox width / rendered width (~720 px full width, ~340 px per half column).
 const EYE_LABEL = (11 * 560) / 800;
 // solid fills encode the two ground models (Mapterhorn brown, Terrarium pencil grey); a light hatch rides on top as decoration only
-const EYE_M = "var(--gb-contour)";
-const EYE_T = "var(--gb-relief)";
 
 function useTerrainData() {
 	const [d, setD] = useState<TerrainData | null>(null);
@@ -201,7 +210,7 @@ function RealEye({ d }: { d: TerrainData | null }) {
 							color="faint"
 							width={0.5}
 						/>
-						<PrintLabel
+						<HandLabel
 							x={bx(v)}
 							y={20}
 							anchor="middle"
@@ -210,7 +219,7 @@ function RealEye({ d }: { d: TerrainData | null }) {
 							halo={0}
 						>
 							{v} m
-						</PrintLabel>
+						</HandLabel>
 					</g>
 				))}
 				{rows.map((r, i) => {
@@ -218,7 +227,7 @@ function RealEye({ d }: { d: TerrainData | null }) {
 					const big = r.liftT > MAX;
 					return (
 						<g key={r.id}>
-							<PrintLabel
+							<HandLabel
 								x={X0 - 8}
 								y={y + 11}
 								anchor="end"
@@ -227,47 +236,50 @@ function RealEye({ d }: { d: TerrainData | null }) {
 								halo={0}
 							>
 								{r.id}
-							</PrintLabel>
+							</HandLabel>
 							{bx(r.liftM) - X0 > 0.5 && (
 								<g>
-									<rect
-										x={X0}
-										y={y}
-										width={bx(r.liftM) - X0}
-										height={8}
-										style={{ fill: EYE_M }}
-									/>
 									<Hachure
 										d={rectPath(X0, y, bx(r.liftM) - X0, 8)}
 										seed={`eye-m-${r.id}`}
-										color="ink"
-										gap={2.6}
-										width={0.8}
-										opacity={0.18}
+										color="brown"
+										gap={2.2}
+										width={0.9}
+										opacity={0.85}
+									/>
+									<PenLine
+										data
+										from={[bx(r.liftM), y - 1]}
+										to={[bx(r.liftM), y + 9]}
+										seed={`eye-m-end-${r.id}`}
+										color="brown"
+										width={1.6}
 									/>
 								</g>
 							)}
 							{bx(r.liftT) - X0 > 0.5 && (
 								<g>
-									<rect
-										x={X0}
-										y={y + 9}
-										width={bx(r.liftT) - X0}
-										height={8}
-										style={{ fill: EYE_T }}
-									/>
 									<Hachure
 										d={rectPath(X0, y + 9, bx(r.liftT) - X0, 8)}
 										seed={`eye-t-${r.id}`}
-										color="ink"
-										gap={2.6}
-										width={0.8}
-										opacity={0.18}
+										color="forest"
+										angle={45}
+										gap={2.2}
+										width={0.9}
+										opacity={0.85}
+									/>
+									<PenLine
+										data
+										from={[bx(r.liftT), y + 8]}
+										to={[bx(r.liftT), y + 18]}
+										seed={`eye-t-end-${r.id}`}
+										color="forest"
+										width={1.6}
 									/>
 								</g>
 							)}
 							{big && (
-								<PrintLabel
+								<HandLabel
 									x={X1 + 10}
 									y={y + 12}
 									size={EYE_LABEL}
@@ -276,10 +288,10 @@ function RealEye({ d }: { d: TerrainData | null }) {
 								>
 									+{r.liftT.toFixed(0)} m: alt {r.alt.toFixed(0)} vs ground{" "}
 									{r.groundTerrarium.toFixed(0)}
-								</PrintLabel>
+								</HandLabel>
 							)}
 							{!big && r.liftM > 0 && (
-								<PrintLabel
+								<HandLabel
 									x={bx(r.liftM) + 4}
 									y={y + 7}
 									size={EYE_LABEL}
@@ -287,41 +299,63 @@ function RealEye({ d }: { d: TerrainData | null }) {
 									halo={0}
 								>
 									{r.liftM.toFixed(0)}
-								</PrintLabel>
+								</HandLabel>
 							)}
 						</g>
 					);
 				})}
-				<g fontSize={EYE_LABEL} className="font-mono">
-					<rect
-						x={X0}
-						y={40 + rows.length * RH}
-						width={9}
-						height={9}
-						style={{ fill: EYE_M }}
+				<g>
+					<Hachure
+						d={rectPath(X0, 40 + rows.length * RH, 9, 9)}
+						seed="eye-key-m"
+						color="brown"
+						gap={2.2}
+						width={0.9}
+						opacity={0.85}
 					/>
-					<text
+					<HandLabel
 						x={X0 + 14}
 						y={48 + rows.length * RH}
-						fill="var(--gb-secondary)"
+						size={EYE_LABEL}
+						color="var(--gb-secondary)"
 					>
 						Mapterhorn ground
-					</text>
-					<rect
-						x={X0 + 150}
-						y={40 + rows.length * RH}
-						width={9}
-						height={9}
-						style={{ fill: EYE_T }}
+					</HandLabel>
+					<Hachure
+						d={rectPath(X0 + 150, 40 + rows.length * RH, 9, 9)}
+						seed="eye-key-t"
+						color="forest"
+						angle={45}
+						gap={2.2}
+						width={0.9}
+						opacity={0.85}
 					/>
-					<text
+					<HandLabel
 						x={X0 + 164}
 						y={48 + rows.length * RH}
-						fill="var(--gb-secondary)"
+						size={EYE_LABEL}
+						color="var(--gb-secondary)"
 					>
 						Terrarium ground
-					</text>
+					</HandLabel>
 				</g>
+				<PencilLayer>
+					<PenLine
+						from={[X0, 28 + rows.length * RH]}
+						to={[X1, 28 + rows.length * RH]}
+						seed="eye-base-guide"
+						width={0.8}
+					/>
+				</PencilLayer>
+				<HandText x={X1 + 14} y={36 + 5 * RH} size={14} rotate={-2}>
+					finer map, higher crest: Mapterhorn lifts {nM} of {rows.length}
+				</HandText>
+				<PenArrow
+					from={[X1 + 10, 32 + 5 * RH]}
+					to={[X1 - 60, 28 + 5 * RH]}
+					seed="eye-note-arrow"
+					width={1.2}
+				/>
 			</svg>
 			<p className={`mt-3 ${TYPE.caption}`}>
 				Bar = metres the eye is lifted above the raw GPS altitude. On Mapterhorn
@@ -412,57 +446,50 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 						width={ex.px}
 						height={ex.px}
 					/>
-					<rect
-						x={ex.osmPx[0] - sr}
-						y={ex.osmPx[1] - sr}
-						width={2 * sr}
-						height={2 * sr}
-						fill="none"
-						style={{ stroke: "var(--gb-paper)" }}
-						strokeOpacity={0.8}
-						strokeWidth={3.4}
+					<SketchPath
+						d={rectPath(ex.osmPx[0] - sr, ex.osmPx[1] - sr, 2 * sr, 2 * sr)}
+						seed="snap-sq-casing"
+						data
+						color="var(--gb-paper)"
+						opacity={0.8}
+						width={3.4}
 					/>
-					<rect
-						x={ex.osmPx[0] - sr}
-						y={ex.osmPx[1] - sr}
-						width={2 * sr}
-						height={2 * sr}
-						fill="none"
-						style={{ stroke: "var(--gb-ink)" }}
-						strokeWidth={1.4}
-						strokeDasharray="4 3"
+					<SketchPath
+						d={rectPath(ex.osmPx[0] - sr, ex.osmPx[1] - sr, 2 * sr, 2 * sr)}
+						seed="snap-sq"
+						data
+						color="ink"
+						width={1.4}
+						dash="4 3"
 					/>
 					{ex.grid.map(([x, y, h]) => (
-						<circle
+						<HandDot
 							key={`${x}-${y}`}
-							cx={x}
-							cy={y}
+							x={x}
+							y={y}
 							r={h === hi ? 4.2 : 3}
-							style={{
-								fill: h === hi ? "var(--gb-red)" : "var(--gb-ink)",
-								stroke: "var(--gb-paper)",
-								strokeWidth: 1.4,
-								opacity:
-									h === hi ? 1 : 0.45 + 0.55 * ((h - lo) / (hi - lo || 1)),
-							}}
+							seed={`snap-g-${x}-${y}`}
+							data
+							color={h === hi ? "red" : "ink"}
+							opacity={h === hi ? 1 : 0.45 + 0.55 * ((h - lo) / (hi - lo || 1))}
 						/>
 					))}
-					<line
-						x1={ex.osmPx[0]}
-						y1={ex.osmPx[1]}
-						x2={ex.snapPx[0]}
-						y2={ex.snapPx[1]}
-						style={{ stroke: "var(--gb-paper)" }}
-						strokeOpacity={0.8}
-						strokeWidth={3.6}
+					<PenLine
+						data
+						from={[ex.osmPx[0], ex.osmPx[1]]}
+						to={[ex.snapPx[0], ex.snapPx[1]]}
+						seed="snap-move-casing"
+						color="var(--gb-paper)"
+						opacity={0.8}
+						width={3.6}
 					/>
-					<line
-						x1={ex.osmPx[0]}
-						y1={ex.osmPx[1]}
-						x2={ex.snapPx[0]}
-						y2={ex.snapPx[1]}
-						style={{ stroke: "var(--gb-red)" }}
-						strokeWidth={1.8}
+					<PenLine
+						data
+						from={[ex.osmPx[0], ex.osmPx[1]]}
+						to={[ex.snapPx[0], ex.snapPx[1]]}
+						seed="snap-move"
+						color="red"
+						width={1.8}
 					/>
 					<PenCircle
 						seed="snap-osm"
@@ -471,19 +498,74 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 						color="pencil"
 						width={1.8}
 					/>
-					<circle
-						cx={ex.snapPx[0]}
-						cy={ex.snapPx[1]}
-						r={4.2}
-						style={{
-							fill: "var(--gb-red)",
-							stroke: "var(--gb-paper)",
-							strokeWidth: 1.4,
-						}}
+					<PenCircle
+						seed="snap-top-ring"
+						data
+						center={ex.snapPx}
+						radiusX={5.4}
+						color="var(--gb-paper)"
+						width={1.6}
 					/>
-					<PrintLabel x={8} y={ex.px - 8} size={snapLabel} color={SWISS.ink}>
-						{ex.halfM * 2} m across
-					</PrintLabel>
+					<HandDot
+						x={ex.snapPx[0]}
+						y={ex.snapPx[1]}
+						r={4.2}
+						seed="snap-top"
+						data
+						color="red"
+						opacity={1}
+					/>
+					<HandLabel
+						x={ex.snapPx[0] + 8}
+						y={ex.snapPx[1] - 8}
+						size={snapLabel * 0.9}
+						italic
+						color={SWISS.ink}
+					>
+						{ex.snapH.toFixed(1)}
+					</HandLabel>
+					<KrokiTitle
+						x={8}
+						y={snapLabel * 1.7}
+						title={ex.name}
+						size={snapLabel * 1.5}
+						seed="snap-title"
+					/>
+					<NorthArrow x={ex.px - 22} y={snapLabel * 4.2} seed="snap-north" />
+					<HandScaleBar
+						x={10}
+						y={ex.px - 14}
+						metersPerPixel={(ex.halfM * 2) / ex.px}
+						maxWidth={ex.px * 0.3}
+						seed="snap-scale"
+					/>
+					<HandText
+						x={ex.px - 10}
+						y={ex.px - 12}
+						size={snapLabel * 1.1}
+						anchor="end"
+						rotate={-2}
+					>
+						OSM node here, summit 9 by 9 samples away
+					</HandText>
+					<CircledKey
+						x={ex.osmPx[0] - 14}
+						y={ex.osmPx[1] + 14}
+						value="1"
+						seed="snap-key-1"
+						color="ink"
+						r={7 * (ex.px / 420)}
+					/>
+					<CircledKey
+						x={ex.snapPx[0] - 14}
+						y={ex.snapPx[1] - 10}
+						value="2"
+						seed="snap-key-2"
+						r={7 * (ex.px / 420)}
+					/>
+					<HandLabel x={8} y={ex.px - 30} size={snapLabel} color={SWISS.ink}>
+						{`${ex.halfM * 2} m across`}
+					</HandLabel>
 				</svg>
 				<div className={`w-full font-mono gb-secondary ${TYPE.micro}`}>
 					<div className="bg-[var(--gb-paper-deep)] p-3">
@@ -669,7 +751,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 						{peak && (
 							<>
 								<Mark x={peak[0]} y={peak[1]} n={2} k={2} />
-								<PrintLabel
+								<HandLabel
 									x={peak[0] - 26}
 									y={peak[1] + 8}
 									anchor="end"
@@ -681,10 +763,18 @@ function Hero({ d }: { d: TerrainData | null }) {
 									condensed
 								>
 									Blüemlisalphorn
-								</PrintLabel>
+								</HandLabel>
 							</>
 						)}
 						<Mark x={300} y={790} n={3} k={2} />
+						<HandText x={420} y={846} size={22} rotate={-2}>
+							eye never below the ground
+						</HandText>
+						{d && (
+							<HandText x={300} y={760} size={22} anchor="end" rotate={2}>
+								{`typical peak climbs ${d.peakRule.medianMoveMapterhorn} m`}
+							</HandText>
+						)}
 					</g>
 				)}
 			</RealPhoto>
@@ -718,7 +808,7 @@ function MiniSvg({
 	return (
 		<svg
 			viewBox="0 0 200 130"
-			className="block h-auto w-full bg-[var(--gb-paper-deep)]"
+			className="block h-auto w-full"
 			role="img"
 			aria-label={label}
 		>
@@ -763,6 +853,12 @@ function MiniSnap() {
 				color="red"
 				opacity={1}
 			/>
+			<HandLabel x={152} y={52} size={12} color="var(--gb-secondary)">
+				OSM node
+			</HandLabel>
+			<HandLabel x={100} y={24} anchor="middle" size={12}>
+				summit
+			</HandLabel>
 		</MiniSvg>
 	);
 }
@@ -812,6 +908,18 @@ function MiniBound() {
 				color="red"
 				opacity={1}
 			/>
+			<HandLabel
+				x={196}
+				y={64}
+				anchor="end"
+				size={12}
+				color="var(--gb-secondary)"
+			>
+				level + 0.3 m
+			</HandLabel>
+			<HandLabel x={196} y={100} anchor="end" size={12} color="var(--gb-blue)">
+				lake
+			</HandLabel>
 		</MiniSvg>
 	);
 }
@@ -845,6 +953,9 @@ function MiniPrior() {
 				width={1}
 				dash="3 3"
 			/>
+			<HandLabel x={106} y={26} size={12}>
+				soft hint
+			</HandLabel>
 		</MiniSvg>
 	);
 }
@@ -866,8 +977,18 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					them agree exactly with the terrain the solver measures.
 				</p>
 				<p>
-					We trust the map only where it is plainly better. Elsewhere it gives a
-					floor or a hint.
+					<HandMark type="highlight">
+						We trust the map only where it is plainly better.
+					</HandMark>{" "}
+					Elsewhere it gives a floor or a hint. In Fig. 1,{" "}
+					<CircledNumber value={1} seed="ts-p1" /> is the camera,{" "}
+					<CircledNumber value={2} seed="ts-p2" /> a peak and{" "}
+					<CircledNumber value={3} seed="ts-p3" /> the depth.
+					{d && (
+						<MarginNote mark="a">
+							{`I notice a typical peak moves ${d.peakRule.medianMoveMapterhorn} m, the 90th percentile ${d.peakRule.p90MoveMapterhorn} m.`}
+						</MarginNote>
+					)}
 				</p>
 			</Beat>
 
@@ -900,7 +1021,14 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<p>
 					Named peaks come from OpenStreetMap, often a few dozen metres off the
 					real top. We look in a square around the node, wider for far peaks,
-					and move it to the highest map point.
+					and move it to the{" "}
+					<HandMark type="underline">highest map point</HandMark>. In Fig. 2,{" "}
+					<CircledNumber value={1} color="ink" seed="ts-p-n1" /> is the OSM node
+					and <CircledNumber value={2} seed="ts-p-n2" /> the summit it climbs
+					to.
+					<MarginNote mark="b">
+						Why 9 by 9? Enough samples to find the crest inside the square.
+					</MarginNote>
 				</p>
 				<SnapEquation d={d} />
 			</Beat>
@@ -913,9 +1041,26 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Two elevation maps put the same spot at different heights. The eye
-					lift changes with them. Treating a hint as a snap would throw the
-					measurement away.
+					lift changes with them.{" "}
+					<HandMark type="double">
+						Treating a hint as a snap would throw the measurement away.
+					</HandMark>
+					<MarginNote mark="c">
+						Which map is right? Neither is a true eye height, so none can score
+						the lift.
+					</MarginNote>
 				</p>
+				{gaps && (
+					<p>
+						<HandMark type="strike">Ground is ground, whichever map.</HandMark>{" "}
+						<span
+							className="nb-hand"
+							style={{ color: "var(--nb-red)", fontSize: "1.25em" }}
+						>
+							{`They differ by ${Math.round(Math.min(...gaps))} to ${Math.round(Math.max(...gaps))} m.`}
+						</span>
+					</p>
+				)}
 			</Beat>
 
 			<RealEye d={d} />

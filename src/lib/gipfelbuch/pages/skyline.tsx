@@ -4,10 +4,20 @@
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
+	CircledKey,
+	CircledNumber,
+	HandMark,
+	PencilLayer,
+} from "#/components/gipfelbuch/notebook";
+import {
 	exactPolyline,
 	Hachure,
 	HandDot,
+	HandText,
+	PenArrow,
+	PenCross,
 	PenLine,
+	SketchPath,
 } from "#/components/gipfelbuch/notebook/Ink";
 import type { Point } from "#/components/gipfelbuch/notebook/sketch";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
@@ -19,11 +29,12 @@ import {
 	Figure,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
 	HandRange,
+	MarginNote,
 	Measured,
 	Op,
 	PhotoPicker,
-	PrintLabel,
 	RealPhoto,
 	Sym,
 	useGipfelbuchIndex,
@@ -457,11 +468,9 @@ function ViterbiScan() {
 		return { boundD: exactPolyline(bound), ok, low, bad, marks };
 	}, [det]);
 	const casing = {
-		fill: "none",
-		stroke: SWISS.paper,
-		strokeOpacity: 0.85,
-		strokeLinejoin: "round" as const,
-		strokeLinecap: "round" as const,
+		color: SWISS.paper,
+		opacity: 0.85,
+		data: true,
 	};
 	const cursorX = (cursor + 0.5) * OS;
 	const lobeD = lobe.map((q, i) => `${i ? "L" : "M"}${q[0]} ${q[1]}`).join("");
@@ -508,10 +517,11 @@ function ViterbiScan() {
 						</defs>
 						{(sweeping || backK < 1) && (
 							<>
-								<path
+								<SketchPath
 									d={`M${cursorX} 0V${H * OS}`}
+									seed="sk-cursor-casing"
 									{...casing}
-									strokeWidth={4}
+									width={4}
 								/>
 								<PenLine
 									seed="sk-cursor"
@@ -520,24 +530,34 @@ function ViterbiScan() {
 									color="blue"
 									width={1.3}
 								/>
-								<path d={lobeD} {...casing} strokeWidth={5} />
-								<path
+								<SketchPath
 									d={lobeD}
-									fill="none"
-									stroke={SWISS.water}
-									strokeWidth={2}
-									strokeLinejoin="round"
+									seed="sk-lobe-casing"
+									{...casing}
+									width={5}
+								/>
+								<SketchPath
+									d={lobeD}
+									seed="sk-lobe"
+									data
+									color={SWISS.water}
+									width={2}
 								/>
 							</>
 						)}
 						<g clipPath="url(#vit-reveal)">
-							<path d={overlay.boundD} {...casing} strokeWidth={5} />
-							<path
+							<SketchPath
 								d={overlay.boundD}
-								fill="none"
-								stroke={SWISS.forest}
-								strokeWidth={2.4}
-								strokeLinejoin="round"
+								seed="sk-bound-casing"
+								{...casing}
+								width={5}
+							/>
+							<SketchPath
+								d={overlay.boundD}
+								seed="sk-bound"
+								data
+								color={SWISS.forest}
+								width={2.4}
 							/>
 							{overlay.marks.map((m) => (
 								<HandDot
@@ -566,31 +586,38 @@ function ViterbiScan() {
 								<rect x={revealX} y={0} width={W * OS - revealX} height={84} />
 							</clipPath>
 						</defs>
-						<path
+						<SketchPath
 							d={overlay.ok}
-							stroke={SWISS.forest}
-							strokeWidth={4.6}
-							fill="none"
+							seed="sk-w-ok"
+							data
+							color={SWISS.forest}
+							width={4.6}
 						/>
-						<path
+						<SketchPath
 							d={overlay.low}
-							stroke={SWISS.pencil}
-							strokeWidth={4.6}
-							fill="none"
+							seed="sk-w-low"
+							data
+							color={SWISS.pencil}
+							width={4.6}
 						/>
-						<path
+						<SketchPath
 							d={overlay.bad}
-							stroke={SWISS.red}
-							strokeWidth={4.6}
-							fill="none"
+							seed="sk-w-bad"
+							data
+							color={SWISS.red}
+							width={4.6}
 						/>
 					</g>
-					<path
-						d={`M0 81H${W * OS}`}
-						stroke={SWISS.pencil}
-						strokeWidth={1.2}
-						fill="none"
+					<PenLine
+						from={[0, 81]}
+						to={[W * OS, 81]}
+						seed="sk-w-base"
+						color={SWISS.pencil}
+						width={1.2}
 					/>
+					<HandText x={8} y={20} size={17} rotate={-2}>
+						tall green stub = trusted; short red = zeroed spike
+					</HandText>
 				</svg>
 				<div
 					className={`mt-1 flex justify-between font-mono gb-secondary ${TYPE.micro}`}
@@ -835,49 +862,72 @@ function CleanAndFuse() {
 					opacity={0.35}
 					width={0.8}
 				/>
-				<path
+				<SketchPath
 					d={secPts.join(" ")}
-					fill="none"
-					stroke={SWISS.pencil}
-					strokeWidth={1.6}
-					strokeDasharray="4 3"
-					strokeLinejoin="round"
+					seed="sk-fuse-second"
+					data
+					color={SWISS.pencil}
+					width={1.6}
+					dash="4 3"
 				/>
 				{Array.from({ length: W2 }, (_, x) => {
 					const alive = valid(out, x);
 					const cx = (x + 0.5) * SX;
 					const cy = PRIMARY.rows[x] * SY;
 					return alive ? (
-						<circle
+						<HandDot
 							key={`ok-${cx}`}
-							cx={cx}
-							cy={cy}
+							x={cx}
+							y={cy}
 							r={2.6}
-							fill={SWISS.forest}
+							seed={`sk-ok-${x}`}
+							data
+							color={SWISS.forest}
+							opacity={1}
 						/>
 					) : (
-						<path
+						<PenCross
 							key={`bad-${cx}`}
-							d={`M${cx - 2.4} ${cy - 2.4}L${cx + 2.4} ${cy + 2.4}M${cx - 2.4} ${cy + 2.4}L${cx + 2.4} ${cy - 2.4}`}
-							stroke={SWISS.red}
-							strokeWidth={1.4}
-							fill="none"
+							center={[cx, cy]}
+							size={2.4}
+							seed={`sk-bad-${x}`}
+							color={SWISS.red}
+							width={1.4}
 						/>
 					);
 				})}
 				{/* surviving weights */}
-				<path
+				<SketchPath
 					d={weightBars.ok}
-					stroke={SWISS.forest}
-					strokeWidth={3}
-					fill="none"
+					seed="sk-fuse-ok"
+					data
+					color={SWISS.forest}
+					width={3}
 				/>
-				<path
+				<SketchPath
 					d={weightBars.bad}
-					stroke={SWISS.red}
-					strokeWidth={3}
-					strokeOpacity={0.6}
-					fill="none"
+					seed="sk-fuse-bad"
+					data
+					color={SWISS.red}
+					opacity={0.6}
+					width={3}
+				/>
+				<PencilLayer>
+					<PenLine
+						from={[0, H2 * SY + 30]}
+						to={[W2 * SX, H2 * SY + 30]}
+						seed="sk-fuse-guide"
+						width={0.8}
+					/>
+				</PencilLayer>
+				<HandText x={W2 * SX - 8} y={H2 * SY + 14} size={15} anchor="end">
+					second detector disagrees: those columns go quiet
+				</HandText>
+				<PenArrow
+					from={[W2 * SX - 150, H2 * SY + 8]}
+					to={[84 * SX, T2(84) * SY + 8]}
+					seed="sk-fuse-note-arrow"
+					width={1.2}
 				/>
 				{(
 					[
@@ -887,16 +937,25 @@ function CleanAndFuse() {
 						["gap", 102, 2],
 					] as const
 				).map(([label, x, lift]) => (
-					<PrintLabel
-						key={label}
-						x={x * SX}
-						y={(T2(x) - lift) * SY - 8}
-						anchor="middle"
-						color="var(--gb-ink)"
-						size={12}
-					>
-						{label}
-					</PrintLabel>
+					<g key={label}>
+						<HandLabel
+							x={x * SX}
+							y={(T2(x) - lift) * SY - 8}
+							anchor="middle"
+							color="var(--gb-ink)"
+							size={12}
+						>
+							{label}
+						</HandLabel>
+						{(label === "post" || label === "chalet") && (
+							<CircledKey
+								x={x * SX}
+								y={Math.max(12, (T2(x) - lift) * SY - 30)}
+								value={label === "post" ? 1 : 2}
+								seed={`sk-key-${label}`}
+							/>
+						)}
+					</g>
 				))}
 			</svg>
 			<div
@@ -965,59 +1024,56 @@ function WeightStrip({ d }: { d: GipfelbuchPhotoData }) {
 			role="img"
 			aria-label="Per-column confidence, aligned with the photo above"
 		>
-			<path
-				d={`M0 4H${n}`}
-				stroke={SWISS.pencil}
-				strokeOpacity={0.5}
-				strokeWidth={0.8}
-				strokeDasharray="3 5"
-				fill="none"
-			/>
-			<path
+			<PencilLayer>
+				<PenLine
+					from={[0, 4]}
+					to={[n, 4]}
+					seed="sk-strip-guide"
+					width={0.8}
+					dash="3 5"
+				/>
+			</PencilLayer>
+			<SketchPath
 				d={bars}
-				fill="none"
-				strokeWidth={1.02}
-				style={{
-					stroke: "color-mix(in srgb, var(--gb-water) 45%, var(--gb-paper))",
-				}}
+				seed="sk-strip-bars"
+				data
+				color={SWISS.water}
+				opacity={0.45}
+				width={1.02}
 			/>
-			<path d={silent} fill="none" stroke={SWISS.red} strokeWidth={1.02} />
-			<path
+			<SketchPath
+				d={silent}
+				seed="sk-strip-silent"
+				data
+				color={SWISS.red}
+				width={1.02}
+			/>
+			<SketchPath
 				d={pts}
-				fill="none"
-				stroke={SWISS.water}
-				strokeWidth={1.8}
-				strokeLinejoin="round"
+				seed="sk-strip-top"
+				data
+				color={SWISS.water}
+				width={1.8}
 			/>
-			<path
-				d={`M0 44.5H${n}`}
-				stroke={SWISS.ink}
-				strokeWidth={1.2}
-				fill="none"
+			<PenLine
+				from={[0, 44.5]}
+				to={[n, 44.5]}
+				seed="sk-strip-base"
+				color={SWISS.ink}
+				width={1.2}
 			/>
-			<text
-				x={4}
-				y={16}
-				fontSize={(12 * n) / 860}
-				fill={SWISS.pencil}
-				className="gb-num"
-				paintOrder="stroke"
-				stroke={SWISS.paper}
-				strokeWidth={3}
-				strokeLinejoin="round"
-			>
+			<HandLabel x={4} y={16} size={(12 * n) / 860} color={SWISS.pencil}>
 				weight 1.0
-			</text>
-			<text
+			</HandLabel>
+			<HandLabel
 				x={n - 4}
 				y={51}
-				textAnchor="end"
-				fontSize={(12 * n) / 860}
-				fill={SWISS.red}
-				className="gb-num"
+				anchor="end"
+				size={(12 * n) / 860}
+				color={SWISS.red}
 			>
 				red stub: column abstains
-			</text>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -1217,8 +1273,15 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					the height of the sky line, plus how much to trust it.
 				</p>
 				<p>
-					A good detector is <strong>honest per column</strong>: sure on a clean
-					crest, silent behind a roof.
+					<HandMark type="highlight">
+						A good detector is <strong>honest per column</strong>: sure on a
+						clean crest, silent behind a roof.
+					</HandMark>
+					{skMed != null && (
+						<MarginNote mark="a">
+							{`I notice the median is ${Math.round(skMed)} ms a photo on the CPU, with no model download.`}
+						</MarginNote>
+					)}
 				</p>
 			</Beat>
 
@@ -1255,8 +1318,15 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Sweeping left to right, the search keeps the cheapest way to reach
-					every row. At the end it walks back from the best finish, so one cloud
-					cannot drag a single column off on its own.
+					every row. At the end it walks back from the best finish, so{" "}
+					<HandMark type="underline">
+						one cloud cannot drag a single column off on its own
+					</HandMark>
+					.
+					<MarginNote mark="b">
+						The jump cost is 2 px a row, capped at 80 px: a wobble costs, a
+						cliff is allowed.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1305,8 +1375,26 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Glare and dark foregrounds just remove votes. A person on the ridge is
-					worse: it looks like a real edge. On 100 wild photos, no method found
-					the right pose for 8 of 10 dusk shots or 21 of 36 hazy ones.
+					worse: it looks like a real edge.{" "}
+					<HandMark type="wavy">
+						On 100 wild photos, no method found the right pose for 8 of 10 dusk
+						shots or 21 of 36 hazy ones.
+					</HandMark>
+				</p>
+				<p>
+					Median yaw error after alignment on the 11 curated photos:{" "}
+					<HandMark type="strike">3.0°</HandMark>{" "}
+					<span
+						className="nb-hand"
+						style={{ color: "var(--nb-red)", fontSize: "1.25em" }}
+					>
+						0.30°
+					</span>
+					. A small curated set, not a held-out one.
+					<MarginNote mark="c">
+						Why does the head on the ridge fool it? It looks exactly like a real
+						edge.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1396,6 +1484,13 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 					other:
 				</p>
 				<CleanAndFuse />
+				<p>
+					Read the figure with its keys:{" "}
+					<CircledNumber value={1} seed="sk-p1" /> the post is a spike, so{" "}
+					<code>rejectSpikes</code> drops it;{" "}
+					<CircledNumber value={2} seed="sk-p2" /> only one detector vouches for
+					the chalet, so <HandMark type="double">fusion drops it too</HandMark>.
+				</p>
 				<h3>Code</h3>
 				<div className="flex flex-wrap gap-2">
 					<CodeRef path="src/lib/geo/skyline.ts" />

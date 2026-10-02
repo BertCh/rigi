@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import { PenRule } from "#/components/gipfelbuch/notebook/Ink";
 import { cn } from "#/lib/utils";
+import { HandSideRule } from "./hand";
 import { LAYER_STYLE, type PhotoLayer } from "./real";
 
 // Math kit: small, dependency-free equation typesetting for explainer pages. The point is to tie each
@@ -22,8 +23,8 @@ const PAPER_INK: Partial<Record<PhotoLayer, string>> = {
 	priorPeaks: "#ab343a", // RM
 	sky: "var(--gb-navy, #002f55)",
 };
-/** Math is set in the page serif (lane A's --gb-font-serif), not the browser default. */
-const SERIF = "font-[family-name:var(--gb-font-serif,serif)]";
+/** Math stays in print (the one typeset face on a hand page), not the browser default. */
+const SERIF = "font-[family-name:var(--gb-font-math,serif)]";
 
 const colorOf = (c?: PhotoLayer | string) =>
 	c == null
@@ -99,14 +100,16 @@ export function Eq({
 	className?: string;
 }) {
 	return (
-		<figure
-			className={cn(
-				"my-6 bg-[var(--gb-paper-deep,transparent)] px-4 py-4 sm:px-6",
-				className,
-			)}
-		>
+		<figure className={cn("relative my-6 py-2 pr-4 pl-6 sm:pr-6", className)}>
+			{/* the equation is the one typeset thing on a hand page: a pen bracket marks it off */}
+			<HandSideRule
+				seed={`eq-side-${label ?? "eq"}`}
+				color="brown"
+				width={1.6}
+				opacity={0.8}
+			/>
 			{label && (
-				<p className="gb-caps mb-2 text-[11px] text-[var(--gb-contour,currentColor)]">
+				<p className="nb-hand mb-1 text-[20px] leading-[24px] font-bold text-[var(--gb-contour,currentColor)]">
 					{label}
 				</p>
 			)}

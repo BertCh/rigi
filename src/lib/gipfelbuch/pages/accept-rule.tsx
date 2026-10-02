@@ -8,12 +8,18 @@ import {
 	Hachure,
 	HandDot,
 	HandText,
+	PenArrow,
 	PenCircle,
 	PenCross,
 	PenLine,
 	SketchPath,
 	SketchPolyline,
 } from "#/components/gipfelbuch/notebook/Ink";
+import {
+	CircledNumber,
+	HandMark,
+	Wash,
+} from "#/components/gipfelbuch/notebook/marks";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
@@ -25,10 +31,11 @@ import {
 	type GipfelbuchIndex,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
+	MarginNote,
 	Measured,
 	PhotoPicker,
 	Plot,
-	PrintLabel,
 	RealPhoto,
 	Section,
 	Stat,
@@ -162,12 +169,14 @@ function HandBar({
 					aria-hidden="true"
 					role="presentation"
 				>
-					<rect
-						x={0}
-						y={1}
-						width={200}
-						height={9}
-						style={{ fill: INK_FILL[color], opacity: Math.max(0.7, opacity) }}
+					<Wash
+						d="M0 1H200V10H0Z"
+						color={color}
+						seed={`${seed}-wash`}
+						layers={9}
+						opacity={Math.max(0.09, opacity * 0.11)}
+						spread={1.2}
+						offset={[0, 0]}
 					/>
 					<Hachure
 						d="M0 1H200V10H0Z"
@@ -211,12 +220,14 @@ function Bar({
 					aria-hidden="true"
 					role="presentation"
 				>
-					<rect
-						x={1}
-						y={2}
-						width={38}
-						height={98}
-						style={{ fill: INK_FILL[inkName] }}
+					<Wash
+						d="M1 2H39V100H1Z"
+						color={inkName}
+						seed={`ar-bar-wash-${p.id}`}
+						layers={9}
+						opacity={0.1}
+						spread={1.5}
+						offset={[0, 0]}
 					/>
 					<Hachure
 						d="M1 2H39V100H1Z"
@@ -283,15 +294,13 @@ function RealDecisions() {
 					aria-hidden="true"
 					role="presentation"
 				>
-					<line
-						x1={0}
-						x2={400}
-						y1={4}
-						y2={4}
-						style={{ stroke: "var(--gb-ink)" }}
-						strokeWidth={1.2}
-						strokeDasharray="6 5"
-						vectorEffect="non-scaling-stroke"
+					<PenLine
+						seed="ar-bar-line"
+						from={[0, 4]}
+						to={[400, 4]}
+						color="ink"
+						width={1.2}
+						dash="6 5"
 					/>
 				</svg>
 				<div
@@ -422,6 +431,19 @@ function ConfidenceVsError() {
 	);
 	const [hover, setHover] = useState<string | null>(null);
 	const hov = rows.find((r) => r.name === hover);
+	const costly = rows.find((r) => r.name.includes("7063"));
+	const worst = rows
+		.filter((r) => !r.accepted)
+		.sort(
+			(a, b) =>
+				Math.abs(b.solvedError?.yaw ?? 0) - Math.abs(a.solvedError?.yaw ?? 0),
+		)[0];
+	const best = rows
+		.filter((r) => r.accepted)
+		.sort(
+			(a, b) =>
+				Math.abs(b.solvedError?.yaw ?? 0) - Math.abs(a.solvedError?.yaw ?? 0),
+		)[0];
 	return (
 		<Figure
 			label="Fig. 3"
@@ -448,14 +470,12 @@ function ConfidenceVsError() {
 			>
 				{(s) => (
 					<>
-						<rect
-							x={s.x(0.5)}
-							y={s.box.y0}
-							width={s.x(1) - s.x(0.5)}
-							height={s.box.y1 - s.box.y0}
-							style={{
-								fill: "color-mix(in srgb, var(--gb-forest) 16%, var(--gb-paper))",
-							}}
+						<Wash
+							d={`M${s.x(0.5)} ${s.box.y0}H${s.x(1)}V${s.box.y1}H${s.x(0.5)}Z`}
+							color="forest"
+							seed="ar-accept-wash"
+							layers={9}
+							opacity={0.08}
 						/>
 						<Hachure
 							d={`M${s.x(0.5)} ${s.box.y0}H${s.x(1)}V${s.box.y1}H${s.x(0.5)}Z`}
@@ -471,9 +491,70 @@ function ConfidenceVsError() {
 							dash="5 4"
 							passes={1}
 						/>
-						<PrintLabel x={s.x(0.5) + 8} y={s.box.y0 + 16} color={SWISS.forest}>
+						<HandLabel x={s.x(0.5) + 8} y={s.box.y0 + 16} color={SWISS.forest}>
 							accept ≥ 0.5
-						</PrintLabel>
+						</HandLabel>
+						{worst && (
+							<>
+								<HandText
+									x={s.x(Math.max(0.04, worst.confidence - 0.34))}
+									y={s.y(Math.abs(worst.solvedError?.yaw ?? 0)) + 4}
+									size={13}
+									color="red"
+								>
+									{`refused, ${Math.abs(worst.solvedError?.yaw ?? 0).toFixed(1)}° off`}
+								</HandText>
+								<PenArrow
+									from={[
+										s.x(Math.max(0.04, worst.confidence - 0.34)) + 96,
+										s.y(Math.abs(worst.solvedError?.yaw ?? 0)),
+									]}
+									to={[
+										s.x(worst.confidence) - 9,
+										s.y(Math.abs(worst.solvedError?.yaw ?? 0)),
+									]}
+									seed="ar-note-worst"
+									color="red"
+									width={1.3}
+								/>
+							</>
+						)}
+						{costly && (
+							<>
+								<HandText
+									x={s.x(0.08)}
+									y={s.y(Math.abs(costly.solvedError?.yaw ?? 0)) - 34}
+									size={13}
+									color="pencil"
+								>
+									{`${costly.name.replace(".jpg", "")} ${costly.confidence}: right, but the bar costs it`}
+								</HandText>
+								<PenArrow
+									from={[
+										s.x(0.32),
+										s.y(Math.abs(costly.solvedError?.yaw ?? 0)) - 28,
+									]}
+									to={[
+										s.x(costly.confidence) - 3,
+										s.y(Math.abs(costly.solvedError?.yaw ?? 0)) - 9,
+									]}
+									seed="ar-note-costly"
+									color="pencil"
+									width={1.2}
+								/>
+							</>
+						)}
+						{best && (
+							<HandText
+								x={s.x(1) - 8}
+								y={s.y(Math.abs(best.solvedError?.yaw ?? 0)) - 40}
+								anchor="end"
+								size={13}
+								color="forest"
+							>
+								{`worst accepted: ${Math.abs(best.solvedError?.yaw ?? 0).toFixed(2)}° ✓`}
+							</HandText>
+						)}
 						{rows.map((r) => {
 							const cx = s.x(r.confidence);
 							const cy = s.y(Math.abs(r.solvedError?.yaw ?? 0));
@@ -1070,20 +1151,15 @@ function VerdictTree() {
 									passes={act ? 2 : 1}
 								/>
 								{e.label && (
-									<text
+									<HandLabel
 										x={e.lx ?? 0}
 										y={e.ly ?? 0}
-										textAnchor="middle"
-										fontSize={LABEL}
-										fill="var(--gb-ink)"
-										fillOpacity={act ? 1 : 0.6}
-										paintOrder="stroke"
-										stroke="var(--gb-paper)"
-										strokeWidth={3}
-										strokeLinejoin="round"
+										anchor="middle"
+										size={LABEL}
+										color={act ? "var(--gb-ink)" : "var(--gb-secondary)"}
 									>
 										{e.label}
-									</text>
+									</HandLabel>
 								)}
 							</g>
 						);
@@ -1093,36 +1169,43 @@ function VerdictTree() {
 							res.path.includes(n.id) || res.path.includes(`${n.id}n`);
 						return (
 							<g key={n.id}>
-								<rect
-									x={n.x}
-									y={n.y}
-									width={n.w}
-									height={NH}
-									style={{
-										fill: act
-											? "color-mix(in srgb, var(--gb-sign) 38%, var(--gb-paper))"
-											: "var(--gb-paper-deep)",
-									}}
-								/>
-								<text
+								{act ? (
+									<Wash
+										d={`M${n.x} ${n.y}H${n.x + n.w}V${n.y + NH}H${n.x}Z`}
+										color="brown"
+										seed={`ar-node-wash-${n.id}`}
+										layers={8}
+										opacity={0.07}
+										spread={2}
+									/>
+								) : (
+									<Hachure
+										d={`M${n.x} ${n.y}H${n.x + n.w}V${n.y + NH}H${n.x}Z`}
+										seed={`ar-node-hatch-${n.id}`}
+										color="faint"
+										gap={7}
+										opacity={0.4}
+									/>
+								)}
+								<HandLabel
 									x={n.x + 4}
 									y={n.y + (n.sub ? 18 : 26)}
-									fontSize={LABEL}
-									fill="var(--gb-ink)"
-									fillOpacity={act ? 1 : 0.6}
+									size={LABEL}
+									mono={false}
+									color={act ? "var(--gb-ink)" : "var(--gb-secondary)"}
 								>
 									{n.text}
-								</text>
+								</HandLabel>
 								{n.sub && (
-									<text
+									<HandLabel
 										x={n.x + 4}
 										y={n.y + 33}
-										fontSize={LABEL - 1}
-										fill="var(--gb-ink)"
-										fillOpacity={act ? 0.8 : 0.55}
+										size={LABEL - 1}
+										mono={false}
+										color="var(--gb-secondary)"
 									>
 										{n.sub}
-									</text>
+									</HandLabel>
 								)}
 								<PenLine
 									seed={`ar-node-${n.id}`}
@@ -1157,17 +1240,18 @@ function VerdictTree() {
 										width={0.9}
 									/>
 								)}
-								<text
+								<HandLabel
 									x={o.x + OW / 2}
 									y={o.y + 22}
-									textAnchor="middle"
-									fontSize={LABEL}
-									fontWeight={act ? 600 : 400}
-									fill="var(--gb-ink)"
-									fillOpacity={act ? 1 : 0.5}
+									anchor="middle"
+									size={LABEL}
+									mono={false}
+									caps={act}
+									weight={act ? 700 : 400}
+									color={act ? "var(--gb-ink)" : "var(--gb-secondary)"}
 								>
 									{o.label}
-								</text>
+								</HandLabel>
 							</g>
 						);
 					})}
@@ -1217,6 +1301,19 @@ function VerdictTree() {
 					})()}
 					<HandText x={14} y={30} color="pencil" size={15}>
 						after first paint: second opinion
+					</HandText>
+					<HandText x={470} y={170} color="forest" size={15}>
+						only these two ever show as certain
+					</HandText>
+					<PenArrow
+						from={[560, 176]}
+						to={[560, 214]}
+						seed="ar-note-certain"
+						color="forest"
+						width={1.3}
+					/>
+					<HandText x={232} y={346} color="red" size={15}>
+						a lone answer stays “please confirm”
 					</HandText>
 				</svg>
 			</div>
@@ -1513,7 +1610,7 @@ function BarScale() {
 						dash="4 3"
 						passes={1}
 					/>
-					<PrintLabel
+					<HandLabel
 						x={4}
 						y={y(v) + 3}
 						size={9}
@@ -1521,7 +1618,7 @@ function BarScale() {
 						halo={0}
 					>
 						{v.toFixed(2)}
-					</PrintLabel>
+					</HandLabel>
 				</g>
 			))}
 			{idx?.photos.map((p, i) => (
@@ -1630,7 +1727,9 @@ function ScoreFit() {
 				<>
 					Red ticks mark columns where the photo&rsquo;s skyline sits over 4 px
 					from the map&rsquo;s. Hair and heads make them, and they pull the
-					first check below 1. Tap a photo. <Measured data={d ?? index} />
+					first check below 1. Tap a photo: <CircledNumber value={1} /> is where
+					the two skylines drift furthest apart, <CircledNumber value={2} />{" "}
+					where they agree. <Measured data={d ?? index} />
 				</>
 			}
 		>
@@ -1796,20 +1895,35 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 		<>
 			<Beat kicker="The idea" title="A wrong pose is worse than no pose.">
 				<p>
-					A wrong pose draws confident names on the wrong mountains. A missing
-					pose just asks the user to tap a peak.
+					<HandMark type="highlight">
+						A wrong pose draws confident names on the wrong mountains.
+					</HandMark>{" "}
+					A missing pose just asks the user to tap a peak.
+					<MarginNote mark="a">
+						A tap costs a second. A wrong label costs trust: 19 of 60 accepts
+						were wrong.
+					</MarginNote>
 				</p>
 				<p>
 					So Rigi calls a pose certain only if a solver accepted it and its
-					confidence clears a bar. Everything else is a guess, and says so. Even
-					a pose that looks right can be refused.
+					confidence clears a bar. Everything else is a guess, and says so.{" "}
+					<HandMark type="wavy" color="red">
+						Even a pose that looks right can be refused.
+					</HandMark>
 				</p>
 			</Beat>
 
 			<Beat kicker="How it works" title="Four checks multiply into one score.">
 				<p>
-					A weak check drags the whole product down. Heads and hair count
-					against the fit, so a photo with a person on the ridge can be refused.
+					<HandMark type="underline">
+						A weak check drags the whole product down.
+					</HandMark>{" "}
+					Heads and hair count against the fit, so a photo with a person on the
+					ridge can be refused.
+					<MarginNote mark="b">
+						Four factors, each 0 to 1. One zero and the product is zero: I check
+						which one fell.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1842,8 +1956,23 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 				title="The price is correct poses we do not show."
 			>
 				<p>
-					Tighter rules throw away good answers on purpose. Each dot below is
-					one of 100 photos with a known right answer.
+					<HandMark type="double">
+						Tighter rules throw away good answers on purpose.
+					</HandMark>{" "}
+					Each dot below is one of 100 photos with a known right answer.
+				</p>
+				<p>
+					First guess:{" "}
+					<HandMark type="strike">0.5 is a high enough bar.</HandMark>{" "}
+					<span className="nb-hand" style={{ color: "var(--gb-red)" }}>
+						0.75 once the heading is unknown
+					</span>
+					: the two wrong accepts sat between 0.5 and 0.75, and the new bar
+					costs 3 correct poses.
+					<MarginNote mark="c">
+						Escalation wins back 2 of those 3. Is the third worth a wrong label?
+						I say no.
+					</MarginNote>
 				</p>
 			</Beat>
 

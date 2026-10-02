@@ -12,8 +12,10 @@ import {
 	GB_THEME,
 	SheetFrame,
 	SheetMap,
+	SheetStamp,
 	useSheet,
 } from "#/components/gipfelbuch/swiss";
+import { MarkerUnderline } from "#/components/gipfelbuch/swiss/hand";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import { GIPFELBUCH_NODES } from "#/lib/gipfelbuch/graph";
 import { GROUP_BY_ID } from "#/lib/gipfelbuch/graph-utils";
@@ -42,13 +44,30 @@ function SheetBody({ node, number }: { node: GipfelbuchNode; number: string }) {
 				sheet={number}
 				total={TOTAL}
 				title={node.title}
-				imprint={`Rigi Gipfelbuch · Blatt ${number} · Ausgabe 2026 · Stand ${STAND} · Relief © swisstopo · DEM Mapterhorn`}
+				imprint={`Rigi Gipfelbuch · Blatt ${number} · Ausgabe 2026 · Stand ${STAND} · Grundlage © swisstopo (OGD) · DEM Mapterhorn`}
 			>
-				<header className="px-6 pt-12 pb-6">
-					<p className={`${TYPE.kicker} tracking-[0.2em]`}>{group.label}</p>
-					<h2 id={`sheet-${node.id}`} className={`${TYPE.h1} mt-3`}>
-						{node.title}
-					</h2>
+				<header className="relative px-6 pt-12 pb-6">
+					<div className="absolute top-10 right-6">
+						<SheetStamp
+							sheet={number}
+							status={node.status}
+							date={STAND.split("-").reverse().join(".")}
+							seed={node.id}
+							size={80}
+						/>
+					</div>
+					<p className="nb-hand m-0 text-[20px] leading-[24px] text-[var(--gb-contour)]">
+						{group.label}
+					</p>
+					<div className="relative mt-2 inline-block max-w-[calc(100%-96px)]">
+						<h2 id={`sheet-${node.id}`} className={`${TYPE.h1} m-0`}>
+							{node.title}
+						</h2>
+						<MarkerUnderline seed={`print-${node.id}`} />
+					</div>
+					<p className="nb-hand mt-2 text-[22px] leading-[26px] text-[var(--gb-water)]">
+						{node.claim ?? node.tagline}
+					</p>
 					<p className={`${TYPE.lead} mt-6 max-w-[66ch]`}>
 						{node.lede ?? node.summary}
 					</p>

@@ -4,22 +4,34 @@
 
 import { useEffect, useState } from "react";
 import {
+	CircledKey,
+	CircledNumber,
+	HandMark,
+	PencilLayer,
+	Wash,
+} from "#/components/gipfelbuch/notebook";
+import {
 	Hachure,
-	inkColor,
+	HandText,
 	PenArrow,
+	PenCircle,
+	PenDimension,
 	PenLine,
 	SketchPath,
+	SketchPolyline,
 	Stipple,
 } from "#/components/gipfelbuch/notebook/Ink";
+
 import {
 	Callout,
 	CodeRef,
 	Eq,
 	Figure,
 	Flow,
+	HandLabel,
+	MarginNote,
 	Measured,
 	Plot,
-	PrintLabel,
 	Steps,
 	Sym,
 } from "#/components/gipfelbuch/viz";
@@ -200,45 +212,75 @@ function Hero({ d }: { d: TerrainData | null }) {
 						role="img"
 						aria-label="West-east height profile through the highest pixel, Terrarium versus Mapterhorn"
 					>
-						<polyline
-							points={line(pf.mapterhorn)
-								.map((q) => q.join(","))
-								.join(" ")}
-							fill="none"
-							style={{ stroke: "var(--gb-forest)" }}
-							strokeWidth={1.5}
-							strokeLinejoin="round"
+						<PencilLayer>
+							<PenLine
+								seed="dem-hero-top-terr"
+								from={[0, Y(box.terrarium.max)]}
+								to={[360, Y(box.terrarium.max)]}
+								color="ink"
+								width={0.7}
+							/>
+							<PenLine
+								seed="dem-hero-top-map"
+								from={[0, Y(box.mapterhorn.max)]}
+								to={[360, Y(box.mapterhorn.max)]}
+								color="ink"
+								width={0.7}
+							/>
+						</PencilLayer>
+						<SketchPolyline
+							points={line(pf.mapterhorn)}
+							seed="dem-hero-mapterhorn"
+							data
+							color="var(--gb-forest)"
+							width={1.5}
 						/>
-						<polyline
-							points={line(pf.terrarium)
-								.map((q) => q.join(","))
-								.join(" ")}
-							fill="none"
-							style={{ stroke: "var(--gb-red)" }}
-							strokeWidth={1.7}
-							strokeLinejoin="round"
+						<SketchPolyline
+							points={line(pf.terrarium)}
+							seed="dem-hero-terrarium"
+							data
+							color="var(--gb-red)"
+							width={1.7}
 						/>
-						<text
-							x="4"
-							y="82"
-							fontSize={HERO_LABEL}
-							fill={inkColor("faint")}
-							className="nb-num"
-						>
+						<HandLabel x={4} y={82} size={HERO_LABEL} color="var(--gb-faint)">
 							west
-						</text>
-						<text
-							x="356"
-							y="82"
-							textAnchor="end"
-							fontSize={HERO_LABEL}
-							fill={inkColor("faint")}
-							className="nb-num"
+						</HandLabel>
+						<HandLabel
+							x={356}
+							y={82}
+							anchor="end"
+							size={HERO_LABEL}
+							color="var(--gb-faint)"
 						>
 							east
-						</text>
+						</HandLabel>
+						<PenDimension
+							seed="dem-hero-gap"
+							from={[
+								Math.min(
+									355,
+									X(topAt(pf.mapterhorn), pf.mapterhorn.length) + 4,
+								),
+								Y(box.terrarium.max),
+							]}
+							to={[
+								Math.min(
+									355,
+									X(topAt(pf.mapterhorn), pf.mapterhorn.length) + 4,
+								),
+								Y(box.mapterhorn.max),
+							]}
+							color="red"
+							width={1}
+						/>
+						<HandText x={6} y={11} size={8} rotate={-1.5} halo={false}>
+							I notice: a {gap?.toFixed(0)} m pit where the summit should be
+						</HandText>
+						<HandText x={6} y={24} size={7} color="forest" halo={false}>
+							same box, same pixel, different map
+						</HandText>
 						{/* labels sit left of their own summits (the peaks are near the right edge): Mapterhorn above the line, Terrarium below */}
-						<PrintLabel
+						<HandLabel
 							x={X(topAt(pf.mapterhorn), pf.mapterhorn.length) - 7}
 							y={Y(Math.max(...pf.mapterhorn)) - 4}
 							anchor="end"
@@ -246,8 +288,8 @@ function Hero({ d }: { d: TerrainData | null }) {
 							color="var(--gb-forest)"
 						>
 							Mapterhorn peaks at {fmt(box.mapterhorn.max)} m
-						</PrintLabel>
-						<PrintLabel
+						</HandLabel>
+						<HandLabel
 							x={X(topAt(pf.terrarium), pf.terrarium.length) - 7}
 							y={Y(Math.max(...pf.terrarium)) + 16}
 							anchor="end"
@@ -255,7 +297,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 							color="var(--gb-red)"
 						>
 							Terrarium peaks at {fmt(box.terrarium.max)} m
-						</PrintLabel>
+						</HandLabel>
 					</svg>
 					<p className="mx-auto mt-1 max-w-[640px] text-[13px] gb-secondary">
 						<Key color={TERRA}>Terrarium</Key> and{" "}
@@ -333,6 +375,15 @@ function Disagree({ d }: { d: TerrainData | null }) {
 							width={1.2}
 							dash="4 3"
 						/>
+						<HandText
+							x={s.x(0.4)}
+							y={s.y(2250)}
+							size={15}
+							color="ink"
+							rotate={-2}
+						>
+							the two maps agree on the shape, not the height
+						</HandText>
 					</>
 				)}
 			</Plot>
@@ -364,6 +415,42 @@ function Disagree({ d }: { d: TerrainData | null }) {
 							color="ink"
 							width={1.5}
 						/>
+						<CircledKey
+							x={s.x(km[worst]) - 20}
+							y={s.y(diff[worst])}
+							value={1}
+							seed="dem-diff-key"
+						/>
+						<PenCircle
+							seed="dem-diff-worst"
+							center={[s.x(km[worst]), s.y(diff[worst])]}
+							radiusX={9}
+							radiusY={9}
+							color="red"
+							width={1.3}
+						/>
+						<HandText
+							x={Math.min(s.x(km[worst]) + 28, s.box.x1 - 150)}
+							y={s.y(diff[worst]) + (diff[worst] < 0 ? -14 : 24)}
+							size={16}
+							color="red"
+							rotate={-2}
+						>
+							worst: {diff[worst].toFixed(0)} m at {km[worst].toFixed(1)} km
+						</HandText>
+						<PenArrow
+							seed="dem-diff-worst-arrow"
+							from={[
+								Math.min(s.x(km[worst]) + 26, s.box.x1 - 152),
+								s.y(diff[worst]) + (diff[worst] < 0 ? -18 : 20),
+							]}
+							to={[
+								s.x(km[worst]) + 8,
+								s.y(diff[worst]) + (diff[worst] < 0 ? -5 : 5),
+							]}
+							color="red"
+							width={1.1}
+						/>
 					</>
 				)}
 			</Plot>
@@ -386,6 +473,7 @@ function GroundGap({ d }: { d: TerrainData | null }) {
 		gap: e.groundMapterhorn - e.groundTerrarium,
 	}));
 	const max = Math.max(...rows.map((r) => r.gap));
+	const maxAt = rows.findIndex((r) => r.gap === max);
 	return (
 		<Figure
 			label="Fig. 4"
@@ -415,33 +503,58 @@ function GroundGap({ d }: { d: TerrainData | null }) {
 					const bar = rectPath(60, i * 15 + 5, w, 10);
 					return (
 						<g key={r.id}>
-							<text
-								x="0"
+							<HandLabel
+								x={0}
 								y={i * 15 + 13}
-								fontSize={BAR_LABEL}
-								fill={inkColor("pencil")}
-								className="nb-num"
+								size={BAR_LABEL}
+								color="var(--gb-pencil)"
 							>
 								{r.id}
-							</text>
-							<path
+							</HandLabel>
+							<Hachure
 								d={bar}
-								style={{
-									fill: "color-mix(in srgb, var(--gb-red) 55%, var(--gb-paper))",
-								}}
+								seed={`dem-gap-hatch-${r.id}`}
+								color="red"
+								gap={3}
+								width={0.9}
+								opacity={0.8}
 							/>
-							<text
+							<SketchPath
+								d={bar}
+								seed={`dem-gap-bar-${r.id}`}
+								data
+								color="red"
+								width={1.2}
+							/>
+							<HandLabel
 								x={60 + w + 6}
 								y={i * 15 + 13}
-								fontSize={BAR_LABEL}
-								fill={inkColor("ink")}
-								className="nb-num"
+								size={BAR_LABEL}
+								color="var(--gb-ink)"
 							>
 								{r.gap.toFixed(0)} m
-							</text>
+							</HandLabel>
 						</g>
 					);
 				})}
+				<HandText x={470} y={150} size={16} color="ink" rotate={-2}>
+					every bar leans the same way: Terrarium is low
+				</HandText>
+				<PenArrow
+					seed="dem-gap-note-arrow"
+					from={[600, 134]}
+					to={[60 + (rows[maxAt].gap / max) * 520 - 6, maxAt * 15 + 22]}
+					color="ink"
+					width={1.1}
+				/>
+				<PenCircle
+					seed="dem-gap-max"
+					center={[60 + (rows[maxAt].gap / max) * 520 + 24, maxAt * 15 + 10]}
+					radiusX={24}
+					radiusY={9}
+					color="red"
+					width={1.2}
+				/>
 			</svg>
 		</Figure>
 	);
@@ -508,35 +621,43 @@ function BandsMini({ d }: { d: TerrainData | null }) {
 							passes={1}
 							tolerance={0.5}
 						/>
-						<text
+						<HandLabel
 							x={(x0 + x1) / 2}
 							y={98}
-							textAnchor="middle"
-							fontSize="13"
-							fill={inkColor("ink")}
-							className="nb-num"
+							anchor="middle"
+							size={13}
+							color="var(--gb-ink)"
 						>
 							z{l.z}
-						</text>
-						<text
-							style={{ fill: "var(--gb-secondary)" }}
+						</HandLabel>
+						<HandLabel
 							x={(x0 + x1) / 2}
 							y={113}
-							textAnchor="middle"
-							fontSize="11"
-							className="nb-num"
+							anchor="middle"
+							size={11}
+							color="var(--gb-secondary)"
 						>
 							{l.mPerPx.toFixed(l.mPerPx < 10 ? 1 : 0)} m
-						</text>
+						</HandLabel>
 					</g>
 				);
 			})}
-			<PrintLabel x={10} y={19} size={14}>
+			<HandLabel x={10} y={19} size={14}>
 				near
-			</PrintLabel>
-			<PrintLabel x={290} y={19} anchor="end" size={14}>
+			</HandLabel>
+			<HandLabel x={290} y={19} anchor="end" size={14}>
 				far
-			</PrintLabel>
+			</HandLabel>
+			<PenArrow
+				seed="dem-bands-arrow"
+				from={[52, 12]}
+				to={[246, 12]}
+				color="pencil"
+				width={1}
+			/>
+			<HandText x={150} y={8} anchor="middle" size={11} halo={false}>
+				{lv[0].mPerPx} m per pixel, then {lv[lv.length - 1].mPerPx.toFixed(0)} m
+			</HandText>
 		</svg>
 	);
 }
@@ -563,9 +684,15 @@ function FallbackMini() {
 				spacing={6}
 				size={1.6}
 			/>
-			<PrintLabel x={60} y={112} anchor="middle" size={14}>
+			<HandLabel x={60} y={112} anchor="middle" size={14}>
 				fine tile missing
-			</PrintLabel>
+			</HandLabel>
+			<HandText x={60} y={66} anchor="middle" size={15} color="red" rotate={-3}>
+				NaN
+			</HandText>
+			<HandText x={117} y={46} anchor="middle" size={12} rotate={-2}>
+				sampleAt tries the next level up
+			</HandText>
 			<PenArrow
 				seed="dem-fallback-arrow"
 				from={[96, 60]}
@@ -586,15 +713,9 @@ function FallbackMini() {
 				color="forest"
 				width={1.4}
 			/>
-			<PrintLabel
-				x={200}
-				y={66}
-				anchor="middle"
-				size={15}
-				color="var(--gb-ink)"
-			>
+			<HandLabel x={200} y={66} anchor="middle" size={15} color="var(--gb-ink)">
 				coarser tile
-			</PrintLabel>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -620,21 +741,30 @@ function Ladder({ d: data }: { d: TerrainData | null }) {
 		const sel = pick(levels);
 		return (
 			<g key={name}>
-				<PrintLabel x={0} y={y - 7} size={LADDER_LABEL + 1} color={col}>
+				<HandLabel x={0} y={y - 7} size={LADDER_LABEL + 1} color={col}>
 					{name}
-				</PrintLabel>
+				</HandLabel>
 				{levels.map((l, i) => {
 					const x0 = i === 0 ? lx(100) : lx(levels[i - 1].maxDistance);
 					const x1 = lx(l.maxDistance);
 					return (
 						<g key={l.z}>
-							{/* R2: the lit band is a solid fill, the others a light wash; the hatch is decoration */}
-							<path
-								d={rectPath(x0 + 1, y, Math.max(1, x1 - x0 - 2), 26)}
-								style={{
-									fill: `color-mix(in srgb, ${col} ${i === sel ? 85 : 12}%, var(--gb-paper))`,
-								}}
-							/>
+							{i === sel ? (
+								<Hachure
+									d={rectPath(x0 + 1, y, Math.max(1, x1 - x0 - 2), 26)}
+									seed={`dem-ladder-lit-${name}-${l.z}`}
+									color={col}
+									gap={2.4}
+									width={1.3}
+									opacity={0.9}
+								/>
+							) : (
+								<Wash
+									d={rectPath(x0 + 1, y, Math.max(1, x1 - x0 - 2), 26)}
+									seed={`dem-ladder-wash-${name}-${l.z}`}
+									color={col}
+								/>
+							)}
 							<SketchPath
 								d={rectPath(x0 + 1, y, Math.max(1, x1 - x0 - 2), 26)}
 								seed={`dem-ladder-edge-${name}-${l.z}`}
@@ -644,29 +774,25 @@ function Ladder({ d: data }: { d: TerrainData | null }) {
 								passes={1}
 								tolerance={0.6}
 							/>
-							<text
-								style={{
-									fill: i === sel ? "var(--gb-paper)" : "var(--gb-ink)",
-								}}
+							<HandLabel
 								x={(x0 + x1) / 2}
 								y={y + 16}
-								fontSize={LADDER_LABEL}
-								textAnchor="middle"
-								fontWeight={i === sel ? 700 : 400}
-								className="nb-num"
+								anchor="middle"
+								size={LADDER_LABEL}
+								color="var(--gb-ink)"
+								weight={i === sel ? 700 : 400}
 							>
 								z{l.z}
-							</text>
-							<text
-								style={{ fill: "var(--gb-secondary)" }}
+							</HandLabel>
+							<HandLabel
 								x={(x0 + x1) / 2}
 								y={y + 40}
-								fontSize={LADDER_LABEL}
-								textAnchor="middle"
-								className="nb-num"
+								anchor="middle"
+								size={LADDER_LABEL}
+								color="var(--gb-secondary)"
 							>
 								{mPerPx(l.z, tile).toFixed(1)} m
-							</text>
+							</HandLabel>
 						</g>
 					);
 				})}
@@ -696,16 +822,15 @@ function Ladder({ d: data }: { d: TerrainData | null }) {
 							color="faint"
 							width={0.6}
 						/>
-						<text
-							style={{ fill: "var(--gb-secondary)" }}
+						<HandLabel
 							x={lx(m)}
-							y="148"
-							fontSize={LADDER_LABEL}
-							textAnchor="middle"
-							className="nb-num"
+							y={148}
+							anchor="middle"
+							size={LADDER_LABEL}
+							color="var(--gb-secondary)"
 						>
 							{m >= 1000 ? `${m / 1000} km` : `${m} m`}
-						</text>
+						</HandLabel>
 					</g>
 				))}
 				<PenLine
@@ -715,6 +840,24 @@ function Ladder({ d: data }: { d: TerrainData | null }) {
 					to={[lx(d), 138]}
 					color="ink"
 					width={1.7}
+				/>
+				<HandText
+					x={lx(d) + (lx(d) > 300 ? -20 : 20)}
+					y={75}
+					anchor={lx(d) > 300 ? "end" : "start"}
+					size={8}
+					rotate={-1.5}
+				>
+					probe: Mapterhorn z{MAPTERHORN.levels[pick(MAPTERHORN.levels)].z},
+					Terrarium z{TERRAIN_LEVELS[pick(TERRAIN_LEVELS)].z}
+				</HandText>
+				<PenArrow
+					seed="dem-ladder-probe-arrow"
+					from={[lx(d) + (lx(d) > 300 ? -17 : 17), 72]}
+					to={[lx(d) + (lx(d) > 300 ? -2 : 2), 70]}
+					color="ink"
+					width={1}
+					head={4}
 				/>
 			</svg>
 			<label className="mt-2 flex items-center gap-3 font-mono text-[11px] gb-secondary">
@@ -847,16 +990,24 @@ export default function Page(_: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Both are pictures where each pixel&rsquo;s colour is a height.
-					Mapterhorn is the map Rigi uses: global 30 m data, plus national
-					surveys such as Swiss lidar. Terrarium is the older map we compare
-					against.
+					<HandMark type="highlight">Mapterhorn is the map Rigi uses</HandMark>:
+					global 30 m data, plus national surveys such as Swiss lidar. Terrarium
+					is the older map we compare against.
 				</p>
 				{d && (
 					<p>
 						At their finest, tile pixels are {d.box.mapterhorn.nativeMPerPx} m
 						wide in Mapterhorn and {d.box.terrarium.nativeMPerPx} m in
 						Terrarium. Pixel size is only the grid: Terrarium is built from
-						coarser surveys, so its grid is finer than its detail.
+						coarser surveys, so its{" "}
+						<HandMark type="wavy">grid is finer than its detail</HandMark>
+						<MarginNote mark="a">
+							{d
+								? `Same box, ${(d.box.mapterhorn.max - d.box.terrarium.max).toFixed(0)} m apart at the top. Why?`
+								: "Same box, different summit. Why?"}
+						</MarginNote>
+						. The widest gap on the 12 km line is marked{" "}
+						<CircledNumber value={1} /> in Fig. 2.
 					</p>
 				)}
 			</Beat>
@@ -902,11 +1053,19 @@ export default function Page(_: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Heights feed the skyline we match. In the benchmark, drawing on the
-					wrong map moved the skyline by 1 to 27% of image height.
+					wrong map moved the skyline by{" "}
+					<HandMark type="double">1 to 27% of image height</HandMark>.
+					<MarginNote mark="b">
+						My first verification drew on Terrarium. It was wrong.
+					</MarginNote>
 				</p>
 				<p>
 					Fine tiles also exist only where surveys do. Elsewhere we fall back to
-					coarser ones.
+					coarser ones. Cascade result: <HandMark type="strike">14</HandMark>{" "}
+					<span className="nb-hand" style={{ color: "var(--gb-red)" }}>
+						25
+					</span>{" "}
+					correct poses once the map was Mapterhorn.
 				</p>
 			</Beat>
 

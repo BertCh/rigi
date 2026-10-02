@@ -3,11 +3,20 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
+import {
+	CircledKey,
+	CircledNumber,
+	HandMark,
+	HandScaleBar,
+	KrokiTitle,
+	Wash,
+} from "#/components/gipfelbuch/notebook";
 import {
 	Hachure,
 	HandDot,
-	inkColor,
+	HandText,
+	PenArrow,
 	PenCircle,
 	PenLine,
 	SketchPath,
@@ -18,22 +27,24 @@ import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPh
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
+	AlignmentStoryProvider,
 	Callout,
 	CodeRef,
-	DemPatch,
 	Figure,
 	Flow,
 	GIPFELBUCH_PHOTO_IDS,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
 	PhotoPicker,
-	PrintLabel,
 	RealPhoto,
 	Section,
 	Stat,
 	Steps,
+	StoryMap,
 	useGipfelbuchIndex,
 	useGipfelbuchPhoto,
 	useTime,
@@ -123,11 +134,6 @@ function skyBand(d: GipfelbuchPhotoData): [number, number, number, number] {
 const sgn = (v: number, n = 1) =>
 	`${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(n)}`;
 
-/** Flat tint of an ink on paper, for bands and fills that carry a value (hatch only decorates). */
-const tint = (ink: string, pct: number) => ({
-	fill: `color-mix(in srgb, var(--gb-${ink}) ${pct}%, var(--gb-paper))`,
-});
-
 function RealPrior({
 	id,
 	setId,
@@ -164,17 +170,19 @@ function RealPrior({
 					) : null;
 				}}
 			/>
-			<div className="grid gap-4 lg:grid-cols-[1.55fr_1fr] lg:items-start">
-				<RealPhoto
-					key={id}
-					data={d}
-					layers={["skyline", "prior", "solved", "priorPeaks", "peaks"]}
-					toggles={["skyline", "prior", "solved", "priorPeaks", "peaks"]}
-					crop={d ? skyBand(d) : undefined}
-					maxLabels={4}
-				/>
-				<DemPatch data={d} peaks={false} />
-			</div>
+			<AlignmentStoryProvider key={id} initial={1}>
+				<div className="grid gap-4 lg:grid-cols-[1.55fr_1fr] lg:items-start">
+					<RealPhoto
+						key={id}
+						data={d}
+						layers={["skyline", "prior", "solved", "priorPeaks", "peaks"]}
+						toggles={["skyline", "prior", "solved", "priorPeaks", "peaks"]}
+						crop={d ? skyBand(d) : undefined}
+						maxLabels={4}
+					/>
+					<StoryMap data={d} />
+				</div>
+			</AlignmentStoryProvider>
 			{d && (
 				<div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
 					<Stat
@@ -219,6 +227,7 @@ function Strip({
 	onPick,
 	fmt = (v: number) => `${v}`,
 	band,
+	note,
 }: /** One horizontal strip: the 12 photos' errors as dots, with the prior's 1σ and 2σ bands stippled behind. */
 {
 	title: string;
@@ -230,6 +239,8 @@ function Strip({
 	sel: GipfelbuchPhotoId;
 	onPick: (i: GipfelbuchPhotoId) => void;
 	fmt?: (v: number) => string;
+	/** A hand note under the strip, from the measured values. */
+	note?: ReactNode;
 }) {
 	const W = STRIP_W;
 	const x0 = 14;
@@ -254,54 +265,40 @@ function Strip({
 			role="img"
 			aria-label={`${title}: measured error per photo`}
 		>
-			<text
-				x={x0}
-				y={14}
-				fontSize={STRIP_LABEL}
-				fill={SWISS.ink}
-				className="gb-num"
-			>
+			<HandLabel x={x0} y={14} size={STRIP_LABEL} color={SWISS.ink}>
 				{title}
-			</text>
+			</HandLabel>
 			{sigma != null && (
 				<>
-					<rect
-						x={X(-2 * sigma)}
-						y={22}
-						width={X(2 * sigma) - X(-2 * sigma)}
-						height={60}
-						style={tint("ink", 6)}
+					<Wash
+						d={rectD(X(-2 * sigma), 22, X(2 * sigma), 82)}
+						color="ink"
+						seed={`strip-${title}-2sigma`}
+						opacity={0.03}
 					/>
-					<rect
-						x={X(-sigma)}
-						y={22}
-						width={X(sigma) - X(-sigma)}
-						height={60}
-						style={tint("ink", 13)}
+					<Wash
+						d={rectD(X(-sigma), 22, X(sigma), 82)}
+						color="ink"
+						seed={`strip-${title}-1sigma`}
+						opacity={0.05}
 					/>
-					<text
+					<HandLabel
 						x={X(sigma) - 3}
 						y={34}
-						textAnchor="end"
-						fontSize={STRIP_LABEL}
-						fill={SWISS.secondary}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						anchor="end"
+						size={STRIP_LABEL}
+						color={SWISS.secondary}
 					>
 						±1σ = {sigma.toFixed(1)}
-					</text>
+					</HandLabel>
 				</>
 			)}
 			{band && (
-				<rect
-					x={X(band[0])}
-					y={22}
-					width={X(band[1]) - X(band[0])}
-					height={60}
-					style={tint("ink", 11)}
+				<Wash
+					d={rectD(X(band[0]), 22, X(band[1]), 82)}
+					color="ink"
+					seed={`strip-${title}-band`}
+					opacity={0.05}
 				/>
 			)}
 			<PenLine
@@ -323,16 +320,15 @@ function Strip({
 						color="pencil"
 						width={1}
 					/>
-					<text
+					<HandLabel
 						x={X(v)}
 						y={y + 48}
-						textAnchor="middle"
-						className="nb-num"
-						fontSize={STRIP_LABEL_SMALL}
-						fill={SWISS.secondary}
+						anchor="middle"
+						size={STRIP_LABEL_SMALL}
+						color={SWISS.secondary}
 					>
 						{fmt(v)}
-					</text>
+					</HandLabel>
 				</g>
 			))}
 			{range[0] < 0 && (
@@ -345,16 +341,15 @@ function Strip({
 					dash="2 3"
 				/>
 			)}
-			<text
+			<HandLabel
 				x={x1}
-				y="14"
-				textAnchor="end"
-				className="nb-num"
-				fontSize={STRIP_LABEL_SMALL}
-				fill={SWISS.secondary}
+				y={14}
+				anchor="end"
+				size={STRIP_LABEL_SMALL}
+				color={SWISS.secondary}
 			>
 				{unit}
-			</text>
+			</HandLabel>
 			{sorted.map((p, i) => {
 				const cy = y + 18 - lane[i] * 11;
 				const on = p.id === sel;
@@ -370,28 +365,50 @@ function Strip({
 						className="cursor-pointer"
 					>
 						<circle cx={X(p.v)} cy={cy} r={9} fill="transparent" />
-						<circle
-							cx={X(p.v)}
-							cy={cy}
+						<HandDot
+							x={X(p.v)}
+							y={cy}
 							r={on ? 6.8 : 4.6}
-							fill={on ? inkColor("red") : SWISS.ink}
+							seed={`strip-${title}-dot-${p.id}`}
+							data
+							color={on ? "red" : SWISS.ink}
 							opacity={on ? 1 : 0.85}
 						/>
 						{on && (
-							<text
-								x={X(p.v)}
-								y={cy - 10}
-								textAnchor="middle"
-								className="nb-num"
-								fontSize={STRIP_LABEL_SMALL}
-								fill={inkColor("red")}
-							>
-								{p.id.slice(-2)} · {fmt(p.v)}
-							</text>
+							<>
+								<PenCircle
+									seed={`strip-${title}-sel-${p.id}`}
+									center={[X(p.v), cy]}
+									radiusX={9.5}
+									color="red"
+									width={1}
+								/>
+								<HandLabel
+									x={X(p.v)}
+									y={cy - 13}
+									anchor="middle"
+									size={STRIP_LABEL_SMALL}
+									color="var(--gb-red)"
+								>
+									{p.id.slice(-2)} · {fmt(p.v)}
+								</HandLabel>
+							</>
 						)}
 					</g>
 				);
 			})}
+			{note && (
+				<HandText
+					x={x1}
+					y={104}
+					anchor="end"
+					size={10.5}
+					rotate={-1}
+					halo={false}
+				>
+					{note}
+				</HandText>
+			)}
 		</svg>
 	);
 }
@@ -440,6 +457,7 @@ function PriorErrors({
 					sel={sel}
 					onPick={onPick}
 					fmt={(v) => sgn(v, 1)}
+					note={`${yaw.filter((p) => Math.abs(p.v) > SIG_YAW).length} of 12 outside 1σ. Is the compass lying?`}
 				/>
 				<Strip
 					title="Gravity pitch error"
@@ -449,6 +467,7 @@ function PriorErrors({
 					sigma={SIG_G}
 					sel={sel}
 					onPick={onPick}
+					note={`${pit.filter((p) => Math.abs(p.v) > SIG_G).length} photos beyond ${SIG_G}°: gravity is tighter`}
 				/>
 				<Strip
 					title="Gravity roll error"
@@ -466,6 +485,7 @@ function PriorErrors({
 						vals={GIPFELBUCH_PHOTO_IDS.map((id) => ({ id, v: hacc[id] }))}
 						range={[0, 140]}
 						band={[H_MIN, H_MAX]}
+						note="clamped to 5–100 m before use"
 						sel={sel}
 						onPick={onPick}
 						fmt={(v) => `${v}`}
@@ -522,19 +542,9 @@ const LAB_NORTH = (
 			color="faint"
 			width={0.8}
 		/>
-		<text
-			x={LAB_CX + 8}
-			y={24}
-			fontSize={13}
-			fill={SWISS.secondary}
-			paintOrder="stroke"
-			stroke={SWISS.paper}
-			strokeWidth={3}
-			strokeLinejoin="round"
-			className="gb-num"
-		>
+		<HandLabel x={LAB_CX + 8} y={24} size={13} color={SWISS.secondary}>
 			N
-		</text>
+		</HandLabel>
 	</g>
 );
 const LAB_PIVOT = (
@@ -682,16 +692,15 @@ function PriorLab(_props: { accent: string }) {
 						<g clipPath="url(#cp-clip)">
 							{LAB_RINGS}
 							{[100, 200].map((r) => (
-								<text
+								<HandLabel
 									key={r}
 									x={cx + 4}
 									y={cy - r * pxPerM - 4}
-									className="nb-num"
-									fontSize="11"
-									fill={SWISS.secondary}
+									size={11}
+									color={SWISS.secondary}
 								>
 									{r} m
-								</text>
+								</HandLabel>
 							))}
 							{/* yaw wedge: stipple, denser toward the centre of belief */}
 							{on.compass ? (
@@ -823,11 +832,40 @@ function PriorLab(_props: { accent: string }) {
 								{LAB_PIVOT}
 							</g>
 						</g>
-						<PrintLabel x={14} y={368} color="var(--gb-secondary)">
+						<KrokiTitle
+							x={14}
+							y={26}
+							title="Plan: where the prior says I stand"
+							author=""
+							seed="lab-title"
+							size={16}
+						/>
+						<HandScaleBar
+							x={400}
+							y={356}
+							metersPerPixel={1 / pxPerM}
+							meters={100}
+							segments={2}
+							seed="lab-scale"
+						/>
+						<HandText x={cx + 16} y={cy + 34} size={15} rotate={-3}>
+							{on.gps
+								? "I am somewhere in this disc"
+								: "no GPS: I could be anywhere"}
+						</HandText>
+						<PenArrow
+							seed="lab-camera-arrow"
+							from={[cx + 24, cy + 20]}
+							to={[cx + 7, cy + 7]}
+							color="ink"
+							width={1.1}
+							head={5}
+						/>
+						<HandLabel x={14} y={368} color="var(--gb-secondary)">
 							{on.gps
 								? `sigmaH ${sigH.toFixed(0)} m (hAcc ${hAcc})`
 								: "position: any (no GPS prior)"}
-						</PrintLabel>
+						</HandLabel>
 					</svg>
 
 					<div className="flex flex-col gap-3">
@@ -870,7 +908,7 @@ function PriorLab(_props: { accent: string }) {
 									/>
 								)}
 							</g>
-							<PrintLabel
+							<HandLabel
 								x={100}
 								y={28}
 								anchor="middle"
@@ -879,17 +917,16 @@ function PriorLab(_props: { accent: string }) {
 								{on.gravity
 									? `pitch, roll +/- ${SIG_G} deg`
 									: "pitch, roll: unconstrained"}
-							</PrintLabel>
-							<text
+							</HandLabel>
+							<HandLabel
 								x={100}
 								y={184}
-								textAnchor="middle"
-								fontSize={13}
-								fill={SWISS.secondary}
-								className="gb-num"
+								anchor="middle"
+								size={13}
+								color={SWISS.secondary}
 							>
 								accelerometer, gravity vector
-							</text>
+							</HandLabel>
 						</svg>
 
 						<div className="bg-[var(--gb-paper-deep)] p-3">
@@ -961,13 +998,23 @@ function PriorLab(_props: { accent: string }) {
 						width={0.9}
 					/>
 					{nOn > 0 && (
-						<rect
-							x={0}
-							y={2}
-							width={(nOn / total) * 600}
-							height={8}
-							style={tint("ink", 80)}
-						/>
+						<>
+							<Hachure
+								d={rectD(0, 2, (nOn / total) * 600, 10)}
+								seed="lab-progress-hatch"
+								color="ink"
+								gap={2.4}
+								width={1.1}
+								opacity={0.9}
+							/>
+							<SketchPath
+								d={rectD(0, 2, (nOn / total) * 600, 10)}
+								seed="lab-progress-bar"
+								data
+								color="ink"
+								width={1.2}
+							/>
+						</>
 					)}
 				</svg>
 			</div>
@@ -1032,13 +1079,14 @@ function Deep({ accent }: { accent: string }) {
 				</p>
 				<p>
 					Against the real photos (Fig. 2) the compass really is the weak
-					sensor. The median absolute heading error on the 12 demo photos is
-					7.9°, six of them sit beyond the assumed 1σ of 7.1° and the worst,
-					demo-10, is 19.0° off (2.7σ), which is exactly why the tails are
-					Student-t rather than Gaussian. Gravity is much tighter: median pitch
-					error 0.76° and roll 0.68°, but three photos exceed the 1.5° σ in
-					pitch (−2.7° on portrait demo-11, +2.6° on ultra-wide demo-02, −2.2°
-					on portrait demo-12).
+					sensor. The median absolute heading error on the 12 demo photos is{" "}
+					<HandMark type="underline">7.9°</HandMark>, six of them sit beyond the
+					assumed 1σ of 7.1° and the worst, demo-10, is{" "}
+					<HandMark type="double">19.0° off (2.7σ)</HandMark>, which is exactly
+					why the tails are Student-t rather than Gaussian. Gravity is much
+					tighter: median pitch error 0.76° and roll 0.68°, but three photos
+					exceed the 1.5° σ in pitch (−2.7° on portrait demo-11, +2.6° on
+					ultra-wide demo-02, −2.2° on portrait demo-12).
 				</p>
 			</Section>
 			<Figure
@@ -1120,8 +1168,9 @@ function Deep({ accent }: { accent: string }) {
 					</li>
 					<li>
 						<strong>Over-confidence.</strong> MAP sigma is not calibrated yet:
-						rotation (err/sigma)^2 is 6.0 against a target of 0.5 to 2. See{" "}
-						{A("map-solver", "the MAP solver")}.
+						rotation (err/sigma)^2 is{" "}
+						<HandMark type="wavy">6.0 against a target of 0.5 to 2</HandMark>.
+						See {A("map-solver", "the MAP solver")}.
 					</li>
 					<li>
 						<strong>Magnetic versus true.</strong> iPhones store true north;
@@ -1190,22 +1239,32 @@ function HeroCompare() {
 				</>
 			}
 		>
-			<Compare
-				beforeLabel="sensors only"
-				afterLabel="solved"
-				start={0.5}
-				before={
-					<RealPhoto bleed data={d} layers={["skyline", "prior"]} crop={crop} />
-				}
-				after={
-					<RealPhoto
-						bleed
-						data={d}
-						layers={["skyline", "solved"]}
-						crop={crop}
+			<AlignmentStoryProvider>
+				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
+					<Compare
+						beforeLabel="sensors only"
+						afterLabel="solved"
+						start={0.5}
+						before={
+							<RealPhoto
+								bleed
+								data={d}
+								layers={["skyline", "prior"]}
+								crop={crop}
+							/>
+						}
+						after={
+							<RealPhoto
+								bleed
+								data={d}
+								layers={["skyline", "solved"]}
+								crop={crop}
+							/>
+						}
 					/>
-				}
-			/>
+					<StoryMap data={d} />
+				</div>
+			</AlignmentStoryProvider>
 		</Figure>
 	);
 }
@@ -1256,6 +1315,12 @@ function YawBars() {
 	const bw = 38;
 	const step = (W - 40) / 12;
 	const photos = idx.photos;
+	const worstAt = photos.reduce(
+		(best, p, i) =>
+			Math.abs(p.delta.yaw) > Math.abs(photos[best].delta.yaw) ? i : best,
+		0,
+	);
+	const worstYaw = photos[worstAt];
 	return (
 		<Figure
 			label="Fig. 2"
@@ -1275,29 +1340,33 @@ function YawBars() {
 				role="img"
 				aria-label="Compass error per photo"
 			>
-				<rect
-					x={20}
-					y={zero - SOLVE_SIGMA_YAW * k}
-					width={W - 40}
-					height={2 * SOLVE_SIGMA_YAW * k}
-					style={tint("ink", 8)}
+				<Wash
+					d={rectD(
+						20,
+						zero - SOLVE_SIGMA_YAW * k,
+						W - 20,
+						zero + SOLVE_SIGMA_YAW * k,
+					)}
+					color="ink"
+					seed="yawbars-sigma"
+					opacity={0.04}
 				/>
-				<line
-					x1={20}
-					x2={W - 20}
-					y1={zero}
-					y2={zero}
-					stroke={SWISS.ink}
-					strokeWidth={1.2}
+				<PenLine
+					seed="yawbars-zero"
+					data
+					from={[20, zero]}
+					to={[W - 20, zero]}
+					color="ink"
+					width={1.2}
 				/>
-				<PrintLabel
+				<HandLabel
 					x={24}
 					y={zero - SOLVE_SIGMA_YAW * k - 6}
 					size={YAWBARS_LABEL}
 					color="var(--gb-secondary)"
 				>
 					solver prior σ = {SOLVE_SIGMA_YAW}°
-				</PrintLabel>
+				</HandLabel>
 				{photos.map((p, i) => {
 					const v = p.delta.yaw;
 					const x = 20 + step * i + (step - bw) / 2;
@@ -1306,27 +1375,23 @@ function YawBars() {
 					return (
 						<g key={p.id}>
 							{p.accepted ? (
-								<rect
-									x={x}
-									y={top}
-									width={bw}
-									height={h}
-									style={tint("ink", 85)}
+								<Hachure
+									d={rectD(x, top, x + bw, top + h)}
+									seed={`yawbars-hatch-${p.id}`}
+									color="ink"
+									gap={2.6}
+									width={1.2}
+									opacity={0.85}
 								/>
-							) : (
-								<rect
-									x={x}
-									y={top}
-									width={bw}
-									height={h}
-									style={{
-										fill: "var(--gb-paper)",
-										stroke: "var(--gb-red)",
-										strokeWidth: 1.2,
-									}}
-								/>
-							)}
-							<PrintLabel
+							) : null}
+							<SketchPath
+								d={rectD(x, top, x + bw, top + h)}
+								seed={`yawbars-bar-${p.id}`}
+								data
+								color={p.accepted ? "ink" : "red"}
+								width={p.accepted ? 1.2 : 1.5}
+							/>
+							<HandLabel
 								x={x + bw / 2}
 								y={v >= 0 ? top - 6 : top + h + 14}
 								anchor="middle"
@@ -1334,8 +1399,8 @@ function YawBars() {
 								color={SWISS.ink}
 							>
 								{sgn(v, 1)}
-							</PrintLabel>
-							<PrintLabel
+							</HandLabel>
+							<HandLabel
 								x={x + bw / 2}
 								y={244}
 								anchor="middle"
@@ -1343,10 +1408,24 @@ function YawBars() {
 								color="var(--gb-secondary)"
 							>
 								{p.id.slice(-2)}
-							</PrintLabel>
+							</HandLabel>
 						</g>
 					);
 				})}
+				<CircledKey x={W - 48} y={34} value={1} seed="yawbars-key" />
+				<HandText x={W - 62} y={60} anchor="end" size={14} rotate={-2}>
+					worst: {worstYaw.id.slice(-2)}, {sgn(worstYaw.delta.yaw, 1)}°
+				</HandText>
+				<PenArrow
+					seed="yawbars-worst-arrow"
+					from={[W - 130, 66]}
+					to={[
+						20 + step * worstAt + step / 2,
+						zero + Math.abs(worstYaw.delta.yaw) * k + 22,
+					]}
+					color="ink"
+					width={1.1}
+				/>
 			</svg>
 		</Figure>
 	);
@@ -1397,16 +1476,19 @@ function PriorTrio() {
 								color="red"
 								opacity={1}
 							/>
-							<text
+							<HandText x={52} y={46} size={5} halo={false}>
+								fix
+							</HandText>
+							<HandLabel
 								x={50}
 								y={73}
-								textAnchor="middle"
-								fontSize={4.2}
-								fill={SWISS.secondary}
-								className="gb-num"
+								anchor="middle"
+								size={4.2}
+								halo={0}
+								color={SWISS.secondary}
 							>
 								{hacc ? `±${hacc.toFixed(0)} m` : ""}
-							</text>
+							</HandLabel>
 						</svg>
 					),
 				},
@@ -1443,16 +1525,19 @@ function PriorTrio() {
 										/>
 									);
 								})}
-							<text
+							<HandText x={4} y={10} size={5.5} rotate={-2} halo={false}>
+								{d ? "what it said vs what was true" : ""}
+							</HandText>
+							<HandLabel
 								x={50}
 								y={73}
-								textAnchor="middle"
-								fontSize={4.2}
-								fill={SWISS.secondary}
-								className="gb-num"
+								anchor="middle"
+								size={4.2}
+								halo={0}
+								color={SWISS.secondary}
 							>
 								{d ? `${sgn(d.solved.delta.yaw)}° apart` : ""}
-							</text>
+							</HandLabel>
 						</svg>
 					),
 				},
@@ -1490,18 +1575,18 @@ function PriorTrio() {
 										/>
 									);
 								})}
-							<text
+							<HandLabel
 								x={50}
 								y={73}
-								textAnchor="middle"
-								fontSize={4.2}
-								fill={SWISS.secondary}
-								className="gb-num"
+								anchor="middle"
+								size={4.2}
+								halo={0}
+								color={SWISS.secondary}
 							>
 								{d
 									? `${d.prior.hfov.toFixed(0)}° vs ${d.solved.hfov.toFixed(0)}° wide`
 									: ""}
-							</text>
+							</HandLabel>
 						</svg>
 					),
 				},
@@ -1564,7 +1649,15 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					camera is and where it points. That first guess is the{" "}
 					<strong>camera prior</strong>.
 				</p>
-				<p>Yaw, the way the camera points, is the weakest part.</p>
+				<p>
+					<HandMark type="highlight">
+						Yaw, the way the camera points, is the weakest part.
+					</HandMark>{" "}
+					The worst photo is marked <CircledNumber value={1} /> in Fig. 2.
+					<MarginNote mark="a">
+						Why is one phone 19° off while another is within 2°?
+					</MarginNote>
+				</p>
 			</Beat>
 
 			<YawBars />
@@ -1581,9 +1674,16 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="A prior is a place to start, never proof."
 			>
 				<p>
-					We tried trusting the phone's altitude more. On held-out photos the
-					skyline gap got worse: median 12.0 to 13.4 px. So the prior only seeds
-					the search.
+					We tried{" "}
+					<HandMark type="strike">
+						trusting the phone&rsquo;s altitude more
+					</HandMark>
+					<MarginNote mark="b">
+						Scratch that: eye priors are vetoes, not pulls.
+					</MarginNote>
+					. On held-out photos the skyline gap got worse:{" "}
+					<HandMark type="double">median 12.0 to 13.4 px</HandMark>. So the
+					prior only seeds the search.
 				</p>
 			</Beat>
 

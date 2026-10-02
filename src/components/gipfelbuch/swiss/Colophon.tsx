@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { BREZINE } from "#/brand/khipu";
+import { MarkerUnderline } from "./hand";
+import { paintPolygon } from "./paint";
 import { SWISS } from "./palette";
 import { TYPE } from "./type";
 
@@ -23,42 +25,57 @@ const INKS: InkRole[] = [
 	{ role: "Wegweiser, light", code: "YY", hex: SWISS.signLight },
 ];
 
+// Hand is the form, print the exception (reports/gipfelbuch-hand-sketch-2026-10-01.md §1): four hand
+// faces write the book; print survives only for code and equations.
 const FACES = [
 	{
-		name: "GB Serif",
-		source: "Source Serif 4",
-		use: "Titles, cartouche",
-		family: "var(--gb-font-serif)",
-	},
-	{
-		name: "GB Sans",
-		source: "Fira Sans",
-		use: "Text, captions",
-		family: "var(--gb-font-sans)",
-	},
-	{
-		name: "GB Sans Condensed",
-		source: "Fira Sans Condensed",
-		use: "Caps heads, kickers",
-		family: "var(--gb-font-condensed)",
-	},
-	{
-		name: "GB Mono",
-		source: "Fira Mono",
-		use: "Figures, coordinates",
-		family: "var(--gb-font-mono)",
+		name: "GB Hand Body",
+		source: "Playpen Sans",
+		use: "The written text of every sheet",
+		family: "var(--gb-font-body)",
+		print: false,
 	},
 	{
 		name: "GB Hand",
 		source: "Caveat",
-		use: "Field notes",
+		use: "Lettered titles, headings, field notes",
 		family: "var(--gb-font-hand)",
+		print: false,
+	},
+	{
+		name: "GB Hand Caps",
+		source: "Patrick Hand SC",
+		use: "Block capitals: peaks, places, labels",
+		family: "var(--gb-font-caps)",
+		print: false,
 	},
 	{
 		name: "GB Hand Small",
 		source: "Shantell Sans",
-		use: "Small hand notes",
-		family: "var(--gb-font-hand-small)",
+		use: "Hand figures, heights, coordinates",
+		family: "var(--gb-font-figure)",
+		print: false,
+	},
+	{
+		name: "GB Mono",
+		source: "Fira Mono",
+		use: "Print, only for code",
+		family: "var(--gb-font-mono)",
+		print: true,
+	},
+	{
+		name: "GB Serif",
+		source: "Source Serif 4",
+		use: "Print, only for equations",
+		family: "var(--gb-font-math)",
+		print: true,
+	},
+	{
+		name: "GB Sans",
+		source: "Fira Sans",
+		use: "Print, the opt-in .gb-print escape",
+		family: "var(--gb-font-print)",
+		print: true,
 	},
 ];
 
@@ -96,11 +113,42 @@ const SOURCES = [
 	},
 ];
 
+/** A painted colour dab, as on a colour-match chart in a field journal (never a crisp square). */
+function Dab({ color, seed }: { color: string; seed: string }) {
+	return (
+		<svg
+			width="20"
+			height="16"
+			viewBox="0 0 20 16"
+			aria-hidden="true"
+			className="shrink-0"
+		>
+			<path
+				d={paintPolygon(
+					[
+						[2, 3],
+						[10, 1.5],
+						[18, 3],
+						[18.5, 12],
+						[10, 14.5],
+						[1.5, 12.5],
+					],
+					`dab-${seed}`,
+					1.1,
+				)}
+				fill={color}
+			/>
+		</svg>
+	);
+}
+
+/** A lettered section heading with a partial marker underline. */
 function Heading({ children }: { children: string }) {
 	return (
-		<h2 className={`${TYPE.kicker} mt-12 mb-3 tracking-[0.18em]`}>
-			{children}
-		</h2>
+		<div className="relative mt-12 mb-3 inline-block min-w-[8rem]">
+			<h2 className={`${TYPE.h2} m-0`}>{children}</h2>
+			<MarkerUnderline seed={`colophon-${children}`} />
+		</div>
 	);
 }
 
@@ -111,33 +159,47 @@ export function Colophon({ className }: { className?: string }) {
 			aria-labelledby="colophon-title"
 			className={`gb-colophon max-w-[66ch] ${className ?? ""}`}
 		>
-			<p className={`${TYPE.kicker} tracking-[0.2em]`}>
+			<p className={`${TYPE.kicker} tracking-[0.14em]`}>
 				Gipfelbuch · Ausgabe 2026
 			</p>
-			<h1 id="colophon-title" className={`${TYPE.h1} mt-3`}>
-				Colophon
-			</h1>
+			<div className="relative mt-3 inline-block">
+				<h1 id="colophon-title" className={`${TYPE.h1} m-0`}>
+					Colophon
+				</h1>
+				<MarkerUnderline seed="colophon-title" coverage={0.7} />
+			</div>
 			<p className={`${TYPE.body} mt-6`}>
-				Set according to{" "}
-				<code className="gb-num">reports/gipfelbuch-design-book.md</code>.
+				Written by hand after{" "}
+				<code className="gb-num">
+					reports/gipfelbuch-hand-sketch-2026-10-01.md
+				</code>
+				: hand is the form, print only for code and equations.
 			</p>
 
 			<Heading>Faces</Heading>
-			<table className="gb-table">
-				<tbody>
-					{FACES.map((f) => (
-						<tr key={f.name} className="h-6">
-							<th scope="row" className="py-0 text-left font-normal">
-								<span className={TYPE.body} style={{ fontFamily: f.family }}>
-									{f.name}
+			<ul className="m-0 list-none space-y-3 p-0">
+				{FACES.map((f) => (
+					<li
+						key={f.name}
+						className="grid gap-x-6 sm:grid-cols-[12rem_minmax(0,1fr)]"
+					>
+						<span
+							className="text-[20px] leading-[26px]"
+							style={{ fontFamily: f.family }}
+						>
+							{f.name}
+						</span>
+						<span className={TYPE.caption}>
+							{f.source} · {f.use}
+							{f.print ? (
+								<span className="nb-hand ml-2 text-[17px] text-[var(--gb-red)]">
+									(print)
 								</span>
-							</th>
-							<td>{f.source}</td>
-							<td className="gb-secondary">{f.use}</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
+							) : null}
+						</span>
+					</li>
+				))}
+			</ul>
 			<p className={`${TYPE.caption} mt-3`}>
 				All faces are SIL Open Font License 1.1, self-hosted from
 				public/fonts/gipfelbuch (see its LICENSES.md).
@@ -146,21 +208,13 @@ export function Colophon({ className }: { className?: string }) {
 			<Heading>Inks</Heading>
 			<ul className="m-0 grid list-none gap-x-6 p-0 sm:grid-cols-2">
 				<li className="flex h-6 items-center gap-3">
-					<span
-						aria-hidden="true"
-						className="inline-block size-4 shrink-0"
-						style={{ background: SWISS.paper }}
-					/>
-					<span className={TYPE.caption}>Paper (W 90 %, YY 10 %)</span>
+					<Dab color={SWISS.paper} seed="paper" />
+					<span className={TYPE.caption}>Paper (W 96 %, YY 4 %)</span>
 					<span className={`${TYPE.micro} ml-auto`}>{SWISS.paper}</span>
 				</li>
 				{INKS.map((ink) => (
 					<li key={ink.code} className="flex h-6 items-center gap-3">
-						<span
-							aria-hidden="true"
-							className="inline-block size-4 shrink-0"
-							style={{ background: ink.hex }}
-						/>
+						<Dab color={ink.hex} seed={ink.code} />
 						<span className={TYPE.caption}>{ink.role}</span>
 						<span className={`${TYPE.micro} ml-auto`}>
 							{ink.code} · {BREZINE[ink.code].name} · {ink.hex}

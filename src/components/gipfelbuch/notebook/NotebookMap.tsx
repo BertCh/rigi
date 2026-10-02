@@ -21,8 +21,15 @@ import {
 	TallyMarks,
 	TallySketch,
 } from "./figures";
-import { SketchDefs, StepNumber } from "./Ink";
-import { NeedsNote, noteFor, Term, useNotebookContext, Value } from "./notes";
+import { PenArrow, PenRule, SketchDefs, SketchPath, StepNumber } from "./Ink";
+import {
+	NeedsNote,
+	noteFor,
+	Struck,
+	Term,
+	useNotebookContext,
+	Value,
+} from "./notes";
 import { PhotoStrip } from "./PhotoStrip";
 import { useNotebookPhoto } from "./useNotebookPhoto";
 import "./notebook.css";
@@ -32,17 +39,49 @@ import "./notebook.css";
 // public/demo/gipfelbuch (scripts/gipfelbuch/build-data.ts and friends); picking another photo
 // rewrites them all.
 
-function StepRow({ step, note }: { step: NotebookStep; note: ReactNode }) {
+function StepRow({
+	step,
+	note,
+	next,
+}: {
+	step: NotebookStep;
+	note: ReactNode;
+	/** A following main step: a short pen arrow runs down to it. */
+	next?: boolean;
+}) {
 	const number = STEP_NUMBER.get(step.id) ?? 0;
+	// A refuted approach is struck through with a red hand note beside it.
+	const status = byId.get(step.id)?.status;
+	const refuted = status === "killed";
+	const flagged = status === "flagged";
 	return (
 		<li
 			id={stepAnchor(step.id)}
-			className={`flex scroll-mt-24 gap-3 ${step.fallback ? "ml-6" : ""}`}
+			className={`relative flex scroll-mt-24 gap-3 ${step.fallback ? "ml-6" : ""}`}
 		>
 			<StepNumber
 				value={String(number)}
 				color={step.fallback ? "pencil" : "red"}
 			/>
+			{next ? (
+				<svg
+					viewBox="0 0 20 18"
+					width={20}
+					height={18}
+					className="pointer-events-none absolute top-[38px] left-2 overflow-visible"
+					aria-hidden="true"
+				>
+					<PenArrow
+						seed={`step-next-${step.id}`}
+						from={[10, 1]}
+						to={[10, 16]}
+						head={5}
+						bend={0.15}
+						color="pencil"
+						width={1.2}
+					/>
+				</svg>
+			) : null}
 			<div className="min-w-0 pt-0.5">
 				<p className="text-[16px] leading-snug">
 					{step.fallback ? (
@@ -50,7 +89,22 @@ function StepRow({ step, note }: { step: NotebookStep; note: ReactNode }) {
 							if refused →
 						</span>
 					) : null}
-					<Term id={step.id}>{step.label}</Term>
+					<Term id={step.id}>
+						{refuted ? (
+							<Struck plain seed={`killed-${step.id}`}>
+								{step.label}
+							</Struck>
+						) : (
+							step.label
+						)}
+					</Term>
+					{refuted || flagged ? (
+						<span
+							className={`nb-hand ml-2 text-[17px] ${refuted ? "text-[var(--nb-red)]" : "text-[var(--nb-brown)]"}`}
+						>
+							{refuted ? "killed" : "flagged"}
+						</span>
+					) : null}
 				</p>
 				<p className="mt-0.5 text-[13px] leading-relaxed text-[color-mix(in_srgb,var(--nb-ink)_78%,transparent)]">
 					{note}
@@ -101,19 +155,30 @@ function Entry({
 				/>
 			))}
 			<p
-				className="nb-hand absolute top-9 left-2 hidden text-[24px] leading-none text-[var(--nb-red)] md:block"
+				className="absolute top-7 left-2 hidden items-center md:flex"
 				aria-hidden
 			>
-				p.{number}
+				<span className="nb-hand text-[22px] leading-none text-[var(--nb-red)]">
+					p.
+				</span>
+				<StepNumber value={String(number)} />
 			</p>
 			<header className="mb-6 max-w-3xl">
 				<h2
 					id={`nb-entry-${entry.key}`}
-					className="text-[24px] leading-[30px] font-semibold"
+					className="nb-hand text-[36px] leading-[38px] font-normal"
 				>
 					<Term id={entry.hub}>{entry.title}</Term>
 				</h2>
-				<p className="mt-1 text-[16px] leading-[24px] text-[var(--gb-secondary,#4a545c)]">
+				<div className="mt-1 w-1/3 max-w-[220px]">
+					<PenRule
+						seed={`entry-rule-${entry.key}`}
+						color="red"
+						opacity={0.7}
+						width={1.3}
+					/>
+				</div>
+				<p className="nb-hand mt-1.5 text-[21px] leading-[26px] text-[var(--nb-pencil)]">
 					{entry.question}
 				</p>
 				{hub?.lede ? (
@@ -307,14 +372,14 @@ function Legend({ refused }: { refused: boolean }) {
 					className="nb-hand flex items-center gap-2 text-[16px]"
 				>
 					<svg width="34" height="8" aria-hidden="true">
-						<line
-							x1="1"
-							x2="33"
-							y1="4"
-							y2="4"
-							stroke={item.stroke}
-							strokeWidth={item.width}
-							strokeDasharray={item.dash}
+						<SketchPath
+							d="M1 4L33 4"
+							seed={`legend-${item.label}`}
+							color={item.stroke}
+							width={item.width}
+							dash={item.dash}
+							passes={1}
+							data
 						/>
 					</svg>
 					{item.label}

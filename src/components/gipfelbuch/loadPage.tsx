@@ -43,7 +43,7 @@ export class PageBoundary extends Component<
 			return (
 				<>
 					{this.props.fallback}
-					<p className="mt-4 font-mono text-[11px] text-[var(--rigi-trap)]/80">
+					<p className="nb-hand mt-4 text-[18px] leading-[22px] text-[var(--rigi-trap)]">
 						This page's custom visual failed to render: {this.state.err.message}
 					</p>
 				</>

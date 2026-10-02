@@ -5,13 +5,25 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+	CircledKey,
+	CircledNumber,
+	HandMark,
+	HandScaleBar,
+	KrokiTitle,
+	NorthArrow,
+	PencilLayer,
+	Wash,
+} from "#/components/gipfelbuch/notebook";
+import {
 	Hachure,
 	HandDot,
+	HandText,
 	PenArrow,
 	PenCircle,
 	PenCross,
 	PenLine,
 	SketchPath,
+	SketchRect,
 } from "#/components/gipfelbuch/notebook/Ink";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
@@ -21,9 +33,10 @@ import {
 	Eq,
 	Figure,
 	Flow,
+	HandLabel,
+	MarginNote,
 	Measured,
 	Plot,
-	PrintLabel,
 	Steps,
 	Sym,
 	useTime,
@@ -245,21 +258,14 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 								: circleD(CX, CY, rOuter);
 						return (
 							<g key={l.z}>
-								{/* R2: the fill is graded by level (finest darkest); the hatch on top is decoration */}
-								<path
-									d={band}
-									fillRule="evenodd"
-									style={{
-										fill: `color-mix(in srgb, var(--gb-forest) ${on ? 62 : 40 - 6 * i}%, var(--gb-paper))`,
-									}}
-								/>
+								{/* R2: hatch density is graded by level (finest densest); the answering band is denser still */}
 								<Hachure
 									d={band}
 									seed={`ts-ring-${l.z}`}
-									color="brown"
-									gap={on ? 4 : 9}
-									width={on ? 1 : 0.8}
-									opacity={on ? 0.35 : 0.2}
+									color={on ? "forest" : "brown"}
+									gap={on ? 3.2 : 5 + 1.6 * i}
+									width={on ? 1.1 : 0.8}
+									opacity={on ? 0.75 : 0.4}
 								/>
 								<SketchPath
 									d={circleD(CX, CY, rOuter)}
@@ -282,22 +288,44 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 						);
 					})}
 					{LEVELS.map((l, i) => (
-						<text
-							style={{ fill: "var(--gb-ink)", stroke: "var(--nb-paper)" }}
+						<HandLabel
 							key={l.z}
 							x={CX}
 							y={CY - rOf(l.maxDistance) + 11}
-							textAnchor="middle"
-							className="nb-num"
-							fontSize="11"
-							fontWeight={i === hit ? 700 : 400}
-							fillOpacity={i === hit ? 1 : 0.6}
-							strokeWidth="3"
-							paintOrder="stroke"
+							anchor="middle"
+							size={11}
+							weight={i === hit ? 700 : 400}
+							color={i === hit ? "var(--gb-ink)" : "var(--gb-secondary)"}
 						>
-							z{l.z}
-						</text>
+							{`z${l.z}`}
+						</HandLabel>
 					))}
+					<KrokiTitle
+						x={8}
+						y={22}
+						title="Which map answers?"
+						size={18}
+						seed="ts-rings-title"
+						date="01.10.2026"
+					/>
+					<NorthArrow x={318} y={48} seed="ts-rings-north" />
+					<HandText x={170} y={336} size={14} anchor="middle" color="brown">
+						log-spaced: far rings squeeze
+					</HandText>
+					<PencilLayer>
+						<PenLine
+							from={[CX - R, CY]}
+							to={[CX + R, CY]}
+							seed="ts-guide-h"
+							width={0.8}
+						/>
+						<PenLine
+							from={[CX, CY - R]}
+							to={[CX, CY + R]}
+							seed="ts-guide-v"
+							width={0.8}
+						/>
+					</PencilLayer>
 					{/* probe ray */}
 					<PenLine
 						seed="ts-probe-ray"
@@ -344,9 +372,10 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 							opacity={1}
 						/>
 					)}
-					<PrintLabel x={CX + 8} y={CY + 17} size={11}>
+					<HandLabel x={CX + 8} y={CY + 17} size={11}>
 						camera
-					</PrintLabel>
+					</HandLabel>
+					<CircledKey x={CX - 22} y={CY + 22} value="1" seed="ts-rings-key" />
 				</svg>
 
 				<div className={`min-w-[250px] flex-1 font-mono ${TYPE.micro}`}>
@@ -548,34 +577,19 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 									/>
 								) : (
 									<>
-										<path
-											d={cell}
-											style={{
-												fill: `color-mix(in srgb, var(--gb-contour) ${10 + 38 * k}%, var(--gb-paper))`,
-											}}
-										/>
 										<Hachure
 											d={cell}
 											seed={`ts-cell-${id}`}
 											color="brown"
-											gap={15 - 9 * k}
-											width={0.8}
-											opacity={0.3}
+											gap={14 - 9 * k}
+											width={0.9}
+											opacity={0.28 + 0.3 * k}
 										/>
 									</>
 								)}
-								<text
-									style={{ fill: "var(--gb-ink)", stroke: "var(--nb-paper)" }}
-									x={cx(gx)}
-									y={cy(gy) + 14}
-									textAnchor="middle"
-									className="nb-num"
-									fontSize="11"
-									strokeWidth="3"
-									paintOrder="stroke"
-								>
+								<HandLabel x={cx(gx)} y={cy(gy) + 14} anchor="middle" size={11}>
 									{gone ? "NaN" : h.toFixed(1)}
-								</text>
+								</HandLabel>
 							</g>
 						);
 					})}
@@ -592,18 +606,33 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 						const ox = c.gx === x0 ? cx(x0 + 1) : cx(x0);
 						const oy = c.gy === y0 ? cy(y0 + 1) : cy(y0);
 						return (
-							<rect
-								key={`w${c.gx}-${c.gy}`}
-								x={Math.min(sx, ox)}
-								y={Math.min(sy, oy)}
-								width={Math.abs(sx - ox)}
-								height={Math.abs(sy - oy)}
-								style={{ fill: "var(--gb-forest)", stroke: "var(--gb-forest)" }}
-								fillOpacity={0.06 + 0.3 * c.w}
-								strokeOpacity={0.6}
-								strokeWidth={0.8}
-								strokeDasharray="3 3"
-							/>
+							<g key={`w${c.gx}-${c.gy}`}>
+								<Wash
+									d={rectD(
+										Math.min(sx, ox),
+										Math.min(sy, oy),
+										Math.max(sx, ox),
+										Math.max(sy, oy),
+									)}
+									seed={`ts-w-${c.gx - x0}-${c.gy - y0}`}
+									color="forest"
+									layers={6}
+									opacity={0.012 + 0.07 * c.w}
+									offset={[0, 0]}
+								/>
+								<SketchRect
+									x={Math.min(sx, ox)}
+									y={Math.min(sy, oy)}
+									width={Math.abs(sx - ox)}
+									height={Math.abs(sy - oy)}
+									seed={`ts-wr-${c.gx - x0}-${c.gy - y0}`}
+									color="forest"
+									opacity={0.6}
+									penWidth={0.8}
+									dash="3 3"
+									passes={1}
+								/>
+							</g>
 						);
 					})}
 					{/* tile seam */}
@@ -616,24 +645,20 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 						width={1.5}
 						dash="5 3"
 					/>
-					<PrintLabel
+					<HandLabel
 						x={OX + SEAM * CELL - 5}
 						y={OY + GH * CELL + 14}
 						anchor="end"
 						size={12}
 					>
 						tile A
-					</PrintLabel>
-					<PrintLabel
-						x={OX + SEAM * CELL + 5}
-						y={OY + GH * CELL + 14}
-						size={12}
-					>
+					</HandLabel>
+					<HandLabel x={OX + SEAM * CELL + 5} y={OY + GH * CELL + 14} size={12}>
 						tile B
-					</PrintLabel>
+					</HandLabel>
 					{/* the four pixel centres and the probe */}
 					{corner.map((c, n) => (
-						<PrintLabel
+						<HandLabel
 							key={`n${c.gx}-${c.gy}`}
 							x={cx(c.gx) - 8}
 							y={cy(c.gy) - 6}
@@ -642,7 +667,7 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 							color="var(--gb-forest)"
 						>
 							{n + 1}
-						</PrintLabel>
+						</HandLabel>
 					))}
 					{corner.map((c) => (
 						<HandDot
@@ -904,6 +929,25 @@ function LevelCost({ data }: { data: TerrainData | null }) {
 							color="ink"
 							width={2}
 						/>
+						<HandText
+							x={s.x(3.2)}
+							y={s.y(-44)}
+							size={16}
+							rotate={-2}
+							color="red"
+						>
+							{`band rule stays within ${Math.max(...picked.map(Math.abs)).toFixed(0)} m`}
+						</HandText>
+						<PenArrow
+							from={[s.x(3.1), s.y(-40)]}
+							to={[
+								s.x(2.2),
+								s.y(picked[idx.findIndex((i) => km[i] >= 2.2)] ?? 0),
+							]}
+							seed="ts-answer-arrow"
+							color="red"
+							width={1.2}
+						/>
 					</>
 				)}
 			</Plot>
@@ -1015,6 +1059,17 @@ function AskTheMap({ d }: { d: TerrainData | null }) {
 						preserveAspectRatio="none"
 					/>
 					<CrispLine d={`M0 ${y}H300`} color="#fff" width={1.4} dash="4 4" />
+					<HandScaleBar
+						x={14}
+						y={288}
+						metersPerPixel={cell}
+						maxWidth={110}
+						seed="ts-hero-scale"
+					/>
+					<NorthArrow x={278} y={52} seed="ts-hero-north" />
+					<HandText x={168} y={y - 6} size={15} color="#fff" halo={false}>
+						the profile below is read along this line
+					</HandText>
 					{pts.map((p) => (
 						<Mark key={p.n} x={p.x} y={p.y} n={p.n} k={0.75} />
 					))}
@@ -1026,18 +1081,12 @@ function AskTheMap({ d }: { d: TerrainData | null }) {
 						role="img"
 						aria-label="Ground height along the dashed line, west to east"
 					>
-						<path
-							d={`M0 100L${row.map((v, x) => `${PX(x).toFixed(1)} ${PY(v).toFixed(1)}`).join("L")}L360 100Z`}
-							style={{
-								fill: "color-mix(in srgb, var(--gb-contour) 32%, var(--gb-paper))",
-							}}
-						/>
 						<Hachure
 							d={`M0 100L${row.map((v, x) => `${PX(x).toFixed(1)} ${PY(v).toFixed(1)}`).join("L")}L360 100Z`}
 							seed="ts-hero-profile-fill"
 							color="brown"
 							gap={4}
-							opacity={0.3}
+							opacity={0.5}
 						/>
 						<SketchPath
 							d={`M${row.map((v, x) => `${PX(x).toFixed(1)} ${PY(v).toFixed(1)}`).join("L")}`}
@@ -1049,6 +1098,9 @@ function AskTheMap({ d }: { d: TerrainData | null }) {
 						{pts.slice(1).map((p) => (
 							<Mark key={p.n} x={PX(p.x - 0.5)} y={PY(p.h)} n={p.n} k={1.1} />
 						))}
+						<HandText x={PX(midX) + 8} y={PY(row[midX]) - 18} size={15}>
+							{`falls ${drop.toFixed(0)} m already`}
+						</HandText>
 					</svg>
 					<p className={`mt-1 gb-secondary ${TYPE.caption}`}>
 						Height along the dashed line, west to east (170 m north of the
@@ -1109,36 +1161,30 @@ function LevelsMini({ d }: { d: TerrainData | null }) {
 							width={0.9}
 							opacity={0.7}
 						/>
-						<text
-							style={{ fill: "var(--gb-ink)" }}
-							x={(x0 + x1) / 2}
-							y={97}
-							textAnchor="middle"
-							className="nb-num"
-							fontSize="14"
-						>
-							z{l.z}
-						</text>
-						<text
-							style={{ fill: "var(--gb-ink)" }}
+						<HandLabel x={(x0 + x1) / 2} y={97} anchor="middle" size={14}>
+							{`z${l.z}`}
+						</HandLabel>
+						<HandLabel
 							x={(x0 + x1) / 2}
 							y={109}
-							textAnchor="middle"
-							className="nb-num"
-							fontSize="13"
-							fillOpacity=".75"
+							anchor="middle"
+							size={13}
+							color="var(--gb-secondary)"
 						>
-							{l.mPerPx.toFixed(l.mPerPx < 10 ? 1 : 0)} m
-						</text>
+							{`${l.mPerPx.toFixed(l.mPerPx < 10 ? 1 : 0)} m`}
+						</HandLabel>
 					</g>
 				);
 			})}
-			<PrintLabel x={10} y={18} size={14}>
+			<HandLabel x={10} y={18} size={14}>
 				near
-			</PrintLabel>
-			<PrintLabel x={290} y={18} anchor="end" size={14}>
+			</HandLabel>
+			<HandText x={150} y={20} size={15} anchor="middle" rotate={-2}>
+				log-spaced bands
+			</HandText>
+			<HandLabel x={290} y={18} anchor="end" size={14}>
 				far
-			</PrintLabel>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -1184,17 +1230,9 @@ function BlendMini({ d }: { d: TerrainData | null }) {
 							width={0.9}
 							opacity={0.65}
 						/>
-						<text
-							style={{ fill: "var(--gb-ink)", stroke: "var(--nb-paper)" }}
-							x={O + i * C + 5}
-							y={15 + j * C + 13}
-							className="nb-num"
-							fontSize="13"
-							strokeWidth="3"
-							paintOrder="stroke"
-						>
+						<HandLabel x={O + i * C + 5} y={15 + j * C + 13} size={13}>
 							{v.toFixed(1)}
-						</text>
+						</HandLabel>
 					</g>
 				)),
 			)}
@@ -1220,18 +1258,12 @@ function BlendMini({ d }: { d: TerrainData | null }) {
 				color="red"
 				opacity={1}
 			/>
-			<PrintLabel x={O + 2 * C + 16} y={75} size={14}>
+			<HandLabel x={O + 2 * C + 16} y={75} size={14}>
 				answer
-			</PrintLabel>
-			<text
-				x={O + 2 * C + 16}
-				y={94}
-				className="nb-num"
-				fontSize="14"
-				fill={ANSWER}
-			>
-				{s.sampled.toFixed(2)} m
-			</text>
+			</HandLabel>
+			<HandLabel x={O + 2 * C + 16} y={94} size={14} color={ANSWER}>
+				{`${s.sampled.toFixed(2)} m`}
+			</HandLabel>
 		</svg>
 	);
 }
@@ -1260,9 +1292,9 @@ function HoleMini() {
 				dash="3 3"
 				passes={1}
 			/>
-			<PrintLabel x={60} y={112} anchor="middle" size={14}>
+			<HandLabel x={60} y={112} anchor="middle" size={14}>
 				fine tile missing
-			</PrintLabel>
+			</HandLabel>
 			<PenArrow
 				seed="mini-hole-arrow"
 				from={[96, 60]}
@@ -1279,15 +1311,9 @@ function HoleMini() {
 				width={1}
 				opacity={0.7}
 			/>
-			<PrintLabel
-				x={200}
-				y={65}
-				anchor="middle"
-				size={15}
-				color="var(--gb-ink)"
-			>
+			<HandLabel x={200} y={65} anchor="middle" size={15} color="var(--gb-ink)">
 				coarser tile
-			</PrintLabel>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -1319,8 +1345,16 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					metres.
 				</p>
 				<p>
-					Near spots read a sharp map. Far spots read a coarse one. That keeps
-					the answer fast and the nearby detail intact.
+					<HandMark type="highlight">
+						Near spots read a sharp map. Far spots read a coarse one.
+					</HandMark>{" "}
+					That keeps the answer fast and the nearby detail intact. In the rings
+					below, the camera is <CircledNumber value={1} seed="ts-prose-1" />.
+					{lv && (
+						<MarginNote mark="a">
+							{`I notice the nearest map is ${lv[0].mPerPx.toFixed(1)} m a pixel and the farthest ${Math.round(lv[lv.length - 1].mPerPx)} m.`}
+						</MarginNote>
+					)}
 				</p>
 			</Beat>
 
@@ -1354,7 +1388,11 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			<Beat kicker="Blend" title="Each answer blends the four nearest pixels.">
 				<p>
 					A spot rarely sits on a pixel centre. Each neighbour counts in
-					proportion to the area opposite it.
+					proportion to{" "}
+					<HandMark type="underline">the area opposite it</HandMark>.
+					<MarginNote mark="b">
+						Cross the seam with tile B unloaded and the answer turns NaN.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1369,10 +1407,33 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				}
 			>
 				<p>
-					Sharp tiles near us, coarse tiles far away. That caps the error
-					without loading every tile sharp.
+					Sharp tiles near us, coarse tiles far away.{" "}
+					<HandMark type="double">
+						That caps the error without loading every tile sharp.
+					</HandMark>
+					{cost && (
+						<MarginNote mark="c">
+							{`First guess: coarse everywhere is fine. Wrong, up to ${cost.coarse.toFixed(0)} m off. Band rule: ${cost.picked.toFixed(0)} m.`}
+						</MarginNote>
+					)}
 				</p>
-				<p>At sea the map reads 0 m, so a coast looks like sea level.</p>
+				{cost && (
+					<p>
+						<HandMark type="strike">
+							The coarse map is off by {cost.coarse.toFixed(0)} m.
+						</HandMark>{" "}
+						<span
+							className="nb-hand"
+							style={{ color: "var(--nb-red)", fontSize: "1.25em" }}
+						>
+							{cost.picked.toFixed(0)} m with the band rule.
+						</span>
+					</p>
+				)}
+				<p>
+					At sea the map reads 0 m, so{" "}
+					<HandMark type="wavy">a coast looks like sea level</HandMark>.
+				</p>
 			</Beat>
 
 			<LevelCost data={data} />

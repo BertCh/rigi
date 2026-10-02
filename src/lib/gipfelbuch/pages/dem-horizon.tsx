@@ -5,14 +5,26 @@
 import { Link } from "@tanstack/react-router";
 import { memo, useMemo, useState } from "react";
 import {
+	CircledKey,
+	HandScaleBar,
+	NorthArrow,
+} from "#/components/gipfelbuch/notebook/carto";
+import {
 	exactPolyline,
 	Hachure,
 	HandDot,
 	HandText,
+	PenArrow,
 	PenCircle,
 	PenLine,
+	SketchPath,
 	Stipple,
 } from "#/components/gipfelbuch/notebook/Ink";
+import {
+	CircledNumber,
+	HandMark,
+	Wash,
+} from "#/components/gipfelbuch/notebook/marks";
 import type { Point } from "#/components/gipfelbuch/notebook/sketch";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
@@ -26,8 +38,10 @@ import {
 	Frac,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
 	PhotoPicker,
 	Plot,
@@ -56,7 +70,7 @@ import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 /** Dark under-stroke for anything drawn on a photograph. */
 const PHOTO_DARK = "rgba(12, 14, 18, 0.85)";
 
-/** A measured line: a plain `<path>` (colour through style, so tokens and hsl() resolve). */
+/** A measured line: one bounded pen pass on its pixels (SketchPath data). */
 function DataLine({
 	d,
 	color,
@@ -71,15 +85,14 @@ function DataLine({
 	opacity?: number;
 }) {
 	return (
-		<path
+		<SketchPath
 			d={d}
-			fill="none"
-			style={{ stroke: color }}
-			strokeWidth={width}
-			strokeDasharray={dash}
-			strokeOpacity={opacity}
-			strokeLinecap="round"
-			strokeLinejoin="round"
+			seed={`dh-data-${d.length}-${d.slice(0, 40)}`}
+			data
+			color={color}
+			width={width}
+			dash={dash}
+			opacity={opacity}
 		/>
 	);
 }
@@ -288,17 +301,17 @@ function RayMarch() {
 								color="faint"
 								width={0.5}
 							/>
-							<text
+							<HandLabel
 								x={xD(km * 1000)}
 								y={BOT.y1 + 16}
-								textAnchor="middle"
-								fontSize={RM_LABEL_SMALL}
-								className="nb-num"
-								fill={SWISS.pencil}
+								anchor="middle"
+								size={RM_LABEL_SMALL}
+								color={SWISS.pencil}
+								halo={0}
 							>
 								{km}
 								{km === 60 ? " km" : ""}
-							</text>
+							</HandLabel>
 						</g>
 					))}
 					<PenLine
@@ -390,33 +403,23 @@ function RayMarch() {
 						/>
 					</g>
 					<HandDot x={xD(0)} y={yH(EYE)} r={4} seed="dh-rm-eye" color="ink" />
-					<text
+					<HandLabel
 						x={PX0 + 10}
 						y={yH(EYE) - 9}
-						fontSize={RM_LABEL}
-						fill={SWISS.ink}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						size={RM_LABEL}
+						color={SWISS.ink}
 					>
 						eye
-					</text>
-					<text
+					</HandLabel>
+					<HandLabel
 						x={PX1 - 4}
 						y={TOP.y0 + 10}
-						textAnchor="end"
-						fontSize={RM_LABEL}
-						fill={SWISS.secondary}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						anchor="end"
+						size={RM_LABEL}
+						color={SWISS.secondary}
 					>
 						{curv ? "height minus d²/2R′" : "height (flat earth)"}
-					</text>
+					</HandLabel>
 					{/* bottom panel */}
 					{[0, 2, 4].map((a) => (
 						<g key={a}>
@@ -427,16 +430,16 @@ function RayMarch() {
 								color="faint"
 								width={0.5}
 							/>
-							<text
+							<HandLabel
 								x={PX0 - 6}
 								y={yA(a) + 3}
-								textAnchor="end"
-								fontSize={RM_LABEL_SMALL}
-								className="nb-num"
-								fill={SWISS.pencil}
+								anchor="end"
+								size={RM_LABEL_SMALL}
+								color={SWISS.pencil}
+								halo={0}
 							>
 								{a}&deg;
-							</text>
+							</HandLabel>
 						</g>
 					))}
 					<g clipPath="url(#dh-prog)">
@@ -467,19 +470,43 @@ function RayMarch() {
 					>
 						running max = skyline
 					</HandText>
-					<text
+					<PenArrow
+						from={[xD(S.bestD) + 46, TOP.y0 + 34]}
+						to={[xD(S.bestD) + 6, yH(EYE + S.bestD * tanB) - 6]}
+						seed="dh-rm-best-arrow"
+						color="pencil"
+						width={1}
+					/>
+					<HandText
+						x={xD(S.bestD) + 50}
+						y={TOP.y0 + 32}
+						size={16}
+						color="pencil"
+						rotate={-2}
+					>
+						{`best so far: ${S.best.toFixed(2)}° at ${(S.bestD / 1000).toFixed(1)} km`}
+					</HandText>
+					{flips && done && (
+						<>
+							<CircledKey
+								x={PX0 + 20}
+								y={BOT.y1 - 16}
+								value={1}
+								seed="dh-rm-key1"
+							/>
+							<HandText x={PX0 + 36} y={BOT.y1 - 10} size={16} color="pencil">
+								flat earth would crown a different ridge
+							</HandText>
+						</>
+					)}
+					<HandLabel
 						x={PX0 + 6}
 						y={BOT.y0 + 10}
-						fontSize={RM_LABEL}
-						fill={SWISS.secondary}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						size={RM_LABEL}
+						color={SWISS.secondary}
 					>
 						elevation angle of each sample
-					</text>
+					</HandLabel>
 				</svg>
 
 				<div className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-[1fr_auto]">
@@ -701,23 +728,27 @@ const SweepMapBase = memo(function SweepMapBase() {
 			{[0, 1, 2, 3].map((q) => {
 				const a = (q * Math.PI) / 2;
 				return (
-					<text
+					<HandLabel
 						key={q}
 						x={MS / 2 + Math.sin(a) * (MR + 11)}
 						y={MS / 2 - Math.cos(a) * (MR + 11) + 5}
-						textAnchor="middle"
-						fontSize={13}
-						fill={SWISS.secondary}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						anchor="middle"
+						size={13}
+						color={SWISS.secondary}
 					>
 						{cardinal[q]}
-					</text>
+					</HandLabel>
 				);
 			})}
+			<NorthArrow x={22} y={52} length={24} seed="dh-sw-north" />
+			<HandScaleBar
+				x={MS - 92}
+				y={MS - 12}
+				metersPerPixel={(MAXKM * 1000) / MR}
+				maxWidth={80}
+				segments={2}
+				seed="dh-sw-scale"
+			/>
 		</g>
 	);
 });
@@ -735,30 +766,30 @@ const SweepAxesBase = memo(function SweepAxesBase() {
 						color={a === 0 ? "ink" : "faint"}
 						width={a === 0 ? 1.2 : 0.5}
 					/>
-					<text
-						x="23"
+					<HandLabel
+						x={23}
 						y={ay(a) + 3}
-						textAnchor="end"
-						fontSize="11"
-						className="nb-num"
-						fill={SWISS.pencil}
+						anchor="end"
+						size={11}
+						color={SWISS.pencil}
+						halo={0}
 					>
 						{a}&deg;
-					</text>
+					</HandLabel>
 				</g>
 			))}
 			{[0, 90, 180, 270, 360].map((a) => (
-				<text
+				<HandLabel
 					key={a}
 					x={ax((a / 360) * NAZ)}
 					y={PH - 8}
-					textAnchor="middle"
-					fontSize="11"
-					className="nb-num"
-					fill={SWISS.pencil}
+					anchor="middle"
+					size={11}
+					color={SWISS.pencil}
+					halo={0}
 				>
 					{a}&deg;
-				</text>
+				</HandLabel>
 			))}
 		</g>
 	);
@@ -871,12 +902,7 @@ function Sweep() {
 						</defs>
 						<SweepAxesBase />
 						<g clipPath="url(#dh-sw-prog)">
-							<path
-								d={geo.area}
-								style={{
-									fill: "color-mix(in srgb, var(--gb-contour) 24%, var(--gb-paper))",
-								}}
-							/>
+							<Wash d={geo.area} color="brown" seed="dh-wash-1" />
 							<Hachure
 								d={geo.area}
 								seed="dh-sw-area"
@@ -1101,13 +1127,14 @@ function HorizonOverlay({
 				);
 			})}
 			{geo.dots.map((dot) => (
-				<circle
+				<HandDot
 					key={`r${dot.az}-${dot.dd}`}
-					cx={dot.q[0]}
-					cy={dot.q[1]}
-					r={2.6 * k}
-					style={{ fill: distColor(dot.dd), stroke: "var(--gb-ink)" }}
-					strokeWidth={1 * k}
+					x={dot.q[0]}
+					y={dot.q[1]}
+					r={3 * k}
+					seed={`dh-ridge-dot-${dot.az}-${dot.dd}`}
+					data
+					color={distColor(dot.dd)}
 				/>
 			))}
 		</g>
@@ -1147,12 +1174,7 @@ function ProfilePlot({ d }: { d: GipfelbuchPhotoData }) {
 				);
 				return (
 					<g>
-						<path
-							d={band}
-							style={{
-								fill: "color-mix(in srgb, var(--gb-water) 16%, var(--gb-paper))",
-							}}
-						/>
+						<Wash d={band} color="blue" seed="dh-wash-2" />
 						<HandText
 							x={s.x(yaw)}
 							y={s.box.y0 + 14}
@@ -1162,17 +1184,28 @@ function ProfilePlot({ d }: { d: GipfelbuchPhotoData }) {
 						>
 							in the photo
 						</HandText>
+						<HandText
+							x={s.x(yaw - half) - 8}
+							y={s.box.y1 - 12}
+							anchor="end"
+							size={15}
+							color="pencil"
+							rotate={-2}
+						>
+							cool dots = far ridges: they pin the compass
+						</HandText>
 						{prof.flatMap((p, i) =>
 							p.ridges
 								.filter(([el]) => el > ymin)
 								.map(([el, dd]) => (
-									<circle
+									<HandDot
 										key={`${p.az}-${dd}`}
-										cx={s.x(xs[i])}
-										cy={s.y(el)}
-										r={2.4}
-										style={{ fill: distColor(dd), stroke: "var(--gb-ink)" }}
-										strokeWidth={0.8}
+										x={s.x(xs[i])}
+										y={s.y(el)}
+										r={2.6}
+										seed={`dh-prof-dot-${p.az}-${dd}`}
+										data
+										color={distColor(dd)}
 									/>
 								)),
 						)}
@@ -1408,22 +1441,22 @@ function Ladder() {
 							<HorizonOverlay d={dd} cam={cam} k={k} />
 							{q && (
 								<>
-									<line
-										x1={q[0]}
-										x2={q[0]}
-										y1={0}
-										y2={dd.photo.height}
-										stroke={PHOTO_DARK}
-										strokeWidth={4 * k}
+									<PenLine
+										from={[q[0], 0]}
+										to={[q[0], dd.photo.height]}
+										seed="dh-col-dark"
+										data
+										color={PHOTO_DARK}
+										width={4 * k}
 									/>
-									<line
-										x1={q[0]}
-										x2={q[0]}
-										y1={0}
-										y2={dd.photo.height}
-										stroke={SWISS.paper}
-										strokeWidth={1.8 * k}
-										strokeDasharray={`${5 * k} ${5 * k}`}
+									<PenLine
+										from={[q[0], 0]}
+										to={[q[0], dd.photo.height]}
+										seed="dh-col-light"
+										data
+										color={SWISS.paper}
+										width={1.8 * k}
+										dash={`${5 * k} ${5 * k}`}
 									/>
 									<Mark x={q[0]} y={q[1]} n={2} k={1.4 * k} />
 								</>
@@ -1444,12 +1477,7 @@ function Ladder() {
 					>
 						{(s) => (
 							<g>
-								<path
-									d={s.area(pts, ymin)}
-									style={{
-										fill: "color-mix(in srgb, var(--gb-contour) 24%, var(--gb-paper))",
-									}}
-								/>
+								<Wash d={s.area(pts, ymin)} color="brown" seed="dh-wash-3" />
 								<Hachure
 									d={s.area(pts, ymin)}
 									seed="dh-ladder-ground"
@@ -1624,11 +1652,10 @@ function MiniGround() {
 			role="img"
 			aria-label="Ground height along one bearing"
 		>
-			<path
+			<Wash
 				d={`M0 180L${line.join("L")}L300 180Z`}
-				style={{
-					fill: "color-mix(in srgb, var(--gb-contour) 24%, var(--gb-paper))",
-				}}
+				color="brown"
+				seed="dh-wash-4"
 			/>
 			<Hachure
 				d={`M0 180L${line.join("L")}L300 180Z`}
@@ -1673,20 +1700,26 @@ function WorstTenth({ d, k }: { d: GipfelbuchPhotoData; k: number }) {
 	const stems = useMemo(() => {
 		const rows = d.skyline.rows;
 		const sx = d.photo.width / rows.length;
+		// One stem per ~1/120 of the width: drawing every column fused the stems into a solid slab over the occluder.
+		const stride = Math.max(1, Math.round(rows.length / 120));
 		const out: string[] = [];
-		for (let x = 0; x < rows.length; x++) {
+		for (let x = Math.floor(stride / 2); x < rows.length; x += stride) {
 			const a = rows[x];
 			const b = d.solvedRows[x];
 			if (a == null || b == null) continue;
 			if (Math.abs(a - b) < d.residual.solved.p90) continue;
 			out.push(`M${((x + 0.5) * sx).toFixed(1)} ${a}V${b}`);
 		}
-		return out.join("");
+		return { d: out.join(""), w: stride * sx };
 	}, [d]);
 	return (
-		<g fill="none" strokeLinecap="butt">
-			<path d={stems} stroke="rgba(12,14,18,.85)" strokeWidth={3.4 * k} />
-			<path d={stems} stroke={SWISS.red} strokeWidth={1.8 * k} />
+		<g fill="none" strokeLinecap="round">
+			<path
+				d={stems.d}
+				stroke="rgba(12,14,18,.55)"
+				strokeWidth={0.5 * stems.w * k}
+			/>
+			<path d={stems.d} stroke={SWISS.red} strokeWidth={0.28 * stems.w * k} />
 		</g>
 	);
 }
@@ -1765,13 +1798,17 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					From the camera, we shoot a ray at every compass bearing. Each ray
-					climbs over the terrain and remembers its steepest angle. Anything
+					climbs over the terrain and remembers{" "}
+					<HandMark type="highlight">its steepest angle</HandMark>. Anything
 					flatter hides behind that crest.
 				</p>
 				<p>
 					Together the angles form a 360° skyline curve. Distant ground sinks
 					below the line of sight, so we lower it first. Then we slide the curve
 					against the photo.
+					<MarginNote mark="a">
+						{`At 50 km the ground has sagged ${drop(50_000).toFixed(0)} m. Not a rounding error.`}
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1803,13 +1840,17 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat kicker="Why it works" title="Far ridges are the fingerprint.">
 				<p>
-					A 25 m GPS error shifts a ridge 2 km away by up to 0.7°, about 10 px
-					at this photo&rsquo;s focal length. A ridge 25 km away moves under 1
-					px.
+					A 25 m GPS error shifts a ridge 2 km away by up to{" "}
+					<HandMark type="double">0.7°, about 10 px</HandMark> at this
+					photo&rsquo;s focal length. A ridge 25 km away moves under 1 px.
+					<MarginNote mark="b">
+						So near ridges forgive nothing and far ones forgive everything.
+					</MarginNote>
 				</p>
 				<p>
 					In Fig. 3 the cool, far parts of the line stay put when the position
-					is off. They pin the compass bearing.
+					is off.{" "}
+					<HandMark type="underline">They pin the compass bearing.</HandMark>
 				</p>
 			</Beat>
 
@@ -1819,11 +1860,16 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Trees and people on the ridge are in the photo but not in the map.
-					Those columns disagree, by a lot.
+					Those columns <HandMark type="wavy">disagree, by a lot</HandMark>.
+					<MarginNote mark="c">
+						{idx
+							? `Median gap is only ${gap?.toFixed(1)} px; the worst tenth is what hurts.`
+							: "The median looks fine; the worst tenth is what hurts."}
+					</MarginNote>
 				</p>
 				<p>
-					The solver gives such columns less weight. If too many disagree, it
-					rejects the photo instead of guessing.
+					The solver gives such columns less weight. If too many disagree, it{" "}
+					<HandMark type="box">rejects the photo instead of guessing</HandMark>.
 				</p>
 			</Beat>
 
@@ -1940,6 +1986,12 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 				<RayMarch />
 				<Sweep />
+				<p>
+					<CircledNumber value={1} /> First run: flat Earth, skyline on the{" "}
+					<HandMark type="strike">50 km summit</HandMark>{" "}
+					<span className="nb-hand text-[var(--gb-red)]">26 km ridge</span> once
+					the Earth drops.
+				</p>
 				<Callout tone="result" title="Why curvature earns its place">
 					In the synthetic ray the same eye puts the skyline on the 26 km ridge
 					with the Earth&rsquo;s drop and on a 50 km summit without it. On the

@@ -8,6 +8,7 @@ export { Cartouche, type CartoucheProps } from "./Cartouche";
 export { Colophon } from "./Colophon";
 export { ContourField, type ContourFieldProps } from "./ContourField";
 export { HachureRule, type HachureRuleProps } from "./HachureRule";
+export { HandRule, ListArrow, MarkerUnderline } from "./hand";
 export {
 	ContourSymbol,
 	GlacierSymbol,
@@ -21,9 +22,23 @@ export {
 	ViewpointSymbol,
 	WaterSymbol,
 } from "./Legend";
-export { Grade, HutBullet, SpotHeight, StationStamp, TrigPoint } from "./Marks";
+export {
+	Grade,
+	HutBullet,
+	SheetStamp,
+	SpotHeight,
+	StationStamp,
+	stampWordForStatus,
+	TrigPoint,
+} from "./Marks";
 export { GB_THEME, SWISS } from "./palette";
-export { RegisterLine, Standortfeld, TestimonyLine } from "./Register";
+export {
+	RegisterEntry,
+	type RegisterEntryProps,
+	RegisterLine,
+	Standortfeld,
+	TestimonyLine,
+} from "./Register";
 export {
 	niceScaleLength,
 	ScaleBar,

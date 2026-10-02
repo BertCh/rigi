@@ -4,7 +4,59 @@
 
 import type { ReactNode } from "react";
 import { cn } from "#/lib/utils";
-import { TYPE } from "../swiss/type";
+import { HandUnderline, seedUnit } from "./hand";
+
+/**
+ * Hand-lettered heading sizes: h2 is Caveat 700 with `font-size-adjust: ex-height 0.5` (theme.css),
+ * which renders Caveat about 1.25x its nominal size, so 24/27 px nominal reads at about 30/34 px.
+ */
+const LETTERED =
+	"text-[24px] leading-[32px] sm:text-[27px] sm:leading-[36px] font-bold text-[var(--gb-ink)]";
+
+/**
+ * A lettered heading with a partial marker underline (60–80 % of the title's width, seeded by the
+ * title), red or brown by seed. Shared by Section and Beat.
+ */
+export function HandHeading({
+	title,
+	className,
+	color,
+}: {
+	title: string;
+	className?: string;
+	/** Underline ink; default red or brown, chosen by the title's seed. */
+	color?: string;
+}) {
+	const ink = color ?? (seedUnit(title, 11) < 0.6 ? "red" : "brown");
+	return (
+		<h2 className={cn(LETTERED, className)}>
+			<span className="relative inline-block max-w-full pb-1">
+				{title}
+				<HandUnderline seed={`h-${title}`} color={ink} width={2.6} />
+			</span>
+		</h2>
+	);
+}
+
+/** A kicker in hand block capitals, in the contour brown. */
+export function HandKicker({
+	children,
+	className,
+}: {
+	children: ReactNode;
+	className?: string;
+}) {
+	return (
+		<p
+			className={cn(
+				"gb-caps text-[13px] leading-[18px] text-[var(--gb-contour,var(--accent))]",
+				className,
+			)}
+		>
+			{children}
+		</p>
+	);
+}
 
 /** A titled prose section. Body text gets editorial styling; use <p>, <ul>, <code>, <strong> freely inside. */
 export function Section({
@@ -21,14 +73,8 @@ export function Section({
 	// G9: sections are separated by space (two lines), not by a rule.
 	return (
 		<section className={cn("mt-12 first:mt-0", className)}>
-			{kicker && (
-				<p
-					className={`${TYPE.kicker} mb-3 text-[var(--gb-contour,var(--accent))]`}
-				>
-					{kicker}
-				</p>
-			)}
-			<h2 className={`${TYPE.h2} text-[var(--gb-ink)]`}>{title}</h2>
+			{kicker && <HandKicker className="mb-2">{kicker}</HandKicker>}
+			<HandHeading title={title} />
 			<div className={PROSE}>{children}</div>
 		</section>
 	);
@@ -41,6 +87,7 @@ export const PROSE =
  * Big-number stat, e.g. <Stat value="0.43°" label="median horizon error" />. Group in a flex/grid, ideally
  * `grid-template-columns: repeat(auto-fit, minmax(110px, 1fr))`. The cell is its own size container, so the
  * numeral scales with the cell (26 to 40 px) and never wraps; `size="hero"` keeps the 56 px ledger numeral.
+ * The value is written in hand figures over a short pencil stroke; the label is a hand note.
  */
 export function Stat({
 	value,
@@ -59,15 +106,25 @@ export function Stat({
 		>
 			<div
 				className={cn(
-					"gb-num font-light whitespace-nowrap text-[var(--gb-ink)]",
+					"gb-num relative inline-block whitespace-nowrap text-[var(--gb-ink)]",
 					size === "hero"
 						? "text-[40px] leading-[48px] sm:text-[56px] sm:leading-[60px]"
 						: "text-[clamp(26px,14cqi,40px)] leading-[1.2]",
 				)}
 			>
 				{value}
+				<HandUnderline
+					seed={`stat-${label}`}
+					color="pencil"
+					width={1.2}
+					coverage={0.9}
+					opacity={0.55}
+					offset={-4}
+				/>
 			</div>
-			<div className={`${TYPE.kicker} gb-secondary mt-1.5`}>{label}</div>
+			<div className="nb-hand gb-secondary mt-1.5 text-[19px] leading-[22px]">
+				{label}
+			</div>
 		</div>
 	);
 }

@@ -6,33 +6,42 @@ import { Link } from "@tanstack/react-router";
 import { memo, useMemo, useState } from "react";
 import {
 	Hachure,
+	HandDot,
 	HandText,
+	PenArrow,
 	PenCircle,
 	PenLine,
 	SketchPath,
 } from "#/components/gipfelbuch/notebook/Ink";
+import {
+	CircledNumber,
+	HandMark,
+	Wash,
+} from "#/components/gipfelbuch/notebook/marks";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
+	AlignmentStoryProvider,
 	Callout,
 	CodeRef,
-	DemPatch,
 	Figure,
 	Flow,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
 	type PhotoLayer,
 	PhotoPicker,
 	Plot,
-	PrintLabel,
 	RealPhoto,
 	Section,
 	Stat,
 	Steps,
+	StoryMap,
 	useGipfelbuchIndex,
 	useGipfelbuchPhoto,
 	useReducedMotion,
@@ -217,20 +226,9 @@ const HORIZON_SKETCH_D = (() => {
 		d += `${d ? "L" : "M"}${(((v + HFOV / 2) / HFOV) * W).toFixed(1)} ${yOf(horizon(v)).toFixed(1)}`;
 	return d;
 })();
-/** A residual stem: a plain vertical segment whose length is the exact residual. */
-const stemPath = (x: number, y1: number, y2: number) =>
-	`M${x.toFixed(1)} ${y1.toFixed(1)}V${y2.toFixed(1)}`;
-
 const LockScene = memo(function LockScene() {
 	return (
 		<g>
-			<rect
-				x={0}
-				y={0}
-				width={W}
-				height={300}
-				style={tint("paper-deep", 100)}
-			/>
 			<Hachure
 				d={ridgeClosed}
 				seed="vi-ridge"
@@ -245,16 +243,32 @@ const LockScene = memo(function LockScene() {
 				gap={4.5}
 				opacity={0.55}
 			/>
-			<path
+			<SketchPath
 				d={`M${FINE.near.map(([x, y]) => `${x} ${y.toFixed(1)}`).join("L")}`}
-				fill="none"
-				stroke={SWISS.forest}
-				strokeWidth={1.3}
-				strokeLinejoin="round"
+				seed="vi-near-line"
+				data
+				color="forest"
+				width={1.3}
+				passes={1}
 			/>
 			{TREE_SHAPES.map((d, k) => (
 				<g key={d}>
-					<path d={d} style={tint("ink", 88)} />
+					<Wash
+						d={d}
+						color="ink"
+						seed={`vi-tree-wash-${k}`}
+						layers={8}
+						opacity={0.1}
+						spread={2}
+						offset={[0, 0]}
+					/>
+					<Hachure
+						d={d}
+						seed={`vi-tree-hatch-${k}`}
+						color="forest"
+						gap={2.6}
+						opacity={0.6}
+					/>
 					<SketchPath
 						d={d}
 						seed={`vi-tree-edge-${k}`}
@@ -263,9 +277,14 @@ const LockScene = memo(function LockScene() {
 					/>
 				</g>
 			))}
-			<path
+			<Wash
 				d={`M0 0 L${ROOF_X1} 0 L${ROOF_X1} 300 L0 300 Z`}
-				style={tint("ink", 14)}
+				color="ink"
+				seed="vi-roof-wash"
+				layers={6}
+				opacity={0.04}
+				spread={2}
+				offset={[0, 0]}
 			/>
 			<Hachure
 				d={`M0 0 L${ROOF_X1} 0 L${ROOF_X1} 300 L0 300 Z`}
@@ -281,31 +300,35 @@ const LockScene = memo(function LockScene() {
 				width={2}
 			/>
 			{/* the photo's skyline, with one dot per measured column */}
-			<path
+			<SketchPath
 				d={`M${FINE.pts.map(([x, y]) => `${x} ${y.toFixed(1)}`).join("L")}`}
-				fill="none"
-				stroke={SWISS.ink}
-				strokeWidth={1.8}
-				strokeLinejoin="round"
+				seed="vi-skyline-trace"
+				data
+				color="ink"
+				width={1.8}
+				passes={1}
 			/>
 			{VALID.map((v) => (
-				<circle
+				<HandDot
 					key={v.i}
-					cx={xOf(v.o)}
-					cy={yOf(v.e)}
+					x={xOf(v.o)}
+					y={yOf(v.e)}
 					r={2.6}
-					fill={SWISS.ink}
+					seed={`vi-col-${v.i}`}
+					color="ink"
+					opacity={1}
+					data
 				/>
 			))}
-			<PrintLabel
+			<HandLabel
 				x={ROOF_X1 + 10}
 				y={290}
 				size={13 * (W / 720)}
 				color="var(--gb-secondary)"
 			>
 				roof · no sky · no vote
-			</PrintLabel>
-			<PrintLabel
+			</HandLabel>
+			<HandLabel
 				x={TREE_X0 - 4}
 				y={290}
 				anchor="end"
@@ -313,7 +336,7 @@ const LockScene = memo(function LockScene() {
 				size={13 * (W / 720)}
 			>
 				tree · outliers
-			</PrintLabel>
+			</HandLabel>
 		</g>
 	);
 });
@@ -378,14 +401,15 @@ function HorizonLock() {
 							const w = 1 / (1 + (r / CAUCHY) ** 2);
 							const inlier = Math.abs(r) < CAUCHY;
 							return (
-								<path
+								<PenLine
 									key={v.i}
-									d={stemPath(xOf(v.o), yOf(v.e), yOf(v.e) + r)}
-									style={{
-										stroke: inlier ? "var(--nb-blue)" : "var(--nb-red)",
-									}}
-									strokeOpacity={0.3 + 0.7 * w}
-									strokeWidth={inlier ? 2.2 : 1.4}
+									data
+									seed={`vi-stem-${v.i}`}
+									from={[xOf(v.o), yOf(v.e)]}
+									to={[xOf(v.o), yOf(v.e) + r]}
+									color={inlier ? "blue" : "red"}
+									opacity={0.3 + 0.7 * w}
+									width={inlier ? 2.2 : 1.4}
 								/>
 							);
 						})}
@@ -404,18 +428,36 @@ function HorizonLock() {
 								stroke: "color-mix(in srgb, var(--gb-paper) 70%, transparent)",
 							}}
 						/>
-						<path
+						<SketchPath
 							d={HORIZON_SKETCH_D}
-							fill="none"
-							stroke={SWISS.contour}
-							strokeWidth={2.8}
-							strokeLinecap="round"
-							strokeLinejoin="round"
+							seed="vi-dem-horizon"
+							data
+							color="brown"
+							width={2.8}
+							passes={1}
 						/>
 					</g>
 					<HandText x={W - 10} y={20} anchor="end" color="pencil" size={16}>
 						{phaseLabel}
 					</HandText>
+					<HandText x={14} y={24} color="pencil" size={15}>
+						{`truth here: compass ${TRUTH.dy}° off, gravity ${TRUTH.dp}°`}
+					</HandText>
+					<HandText
+						x={Math.min(W - 150, TREE_X1 + 26)}
+						y={TREE_TOP - 34}
+						color="red"
+						size={15}
+					>
+						the tree: the loss stops listening
+					</HandText>
+					<PenArrow
+						from={[Math.min(W - 150, TREE_X1 + 26) + 10, TREE_TOP - 28]}
+						to={[(TREE_X0 + TREE_X1) / 2 + 6, TREE_TOP - 4]}
+						seed="vi-note-tree"
+						color="red"
+						width={1.3}
+					/>
 				</svg>
 			</div>
 
@@ -472,19 +514,29 @@ function HorizonLock() {
 								className="block h-3 w-full"
 								aria-hidden="true"
 							>
-								<rect
-									x={0}
-									y={2}
-									width={220}
-									height={8}
-									style={tint("paper-deep", 100)}
+								<PenLine
+									seed="vi-cost-track"
+									from={[0, 10]}
+									to={[220, 10]}
+									color="faint"
+									width={0.9}
 								/>
-								<rect
-									x={0}
-									y={2}
-									width={220 * (0.04 + 0.96 * costBar)}
-									height={8}
-									style={tint("contour", 85)}
+								<Wash
+									d={`M0 2H${220 * (0.04 + 0.96 * costBar)}V10H0Z`}
+									color="brown"
+									seed="vi-cost-wash"
+									layers={8}
+									opacity={0.12}
+									spread={1}
+									offset={[0, 0]}
+								/>
+								<PenLine
+									seed="vi-cost-fill"
+									data
+									from={[0, 6]}
+									to={[220 * (0.04 + 0.96 * costBar), 6]}
+									color="brown"
+									width={4}
 								/>
 							</svg>
 						</dd>
@@ -751,14 +803,14 @@ function CostLandscape() {
 							style={tint("contour", heatPct(level))}
 						/>
 					))}
-					<PrintLabel
+					<HandLabel
 						x={x0 + HEAT_LEVELS * 9 + 8}
 						y={325}
 						size={9.78}
 						color="var(--gb-secondary)"
 					>
 						cheaper → dearer
-					</PrintLabel>
+					</HandLabel>
 					{/* open map corner instead of a box */}
 					<PenLine
 						seed="vi-cost-left"
@@ -775,21 +827,22 @@ function CostLandscape() {
 						width={1}
 					/>
 					{/* prior crosshair */}
-					<path
-						d={`M${sx(0)} ${y0}V${p1}`}
-						fill="none"
-						stroke={SWISS.secondary}
-						strokeWidth={1.2}
-						strokeDasharray="3 4"
+					<PenLine
+						seed="vi-prior-line"
+						from={[sx(0), y0]}
+						to={[sx(0), p1]}
+						color="pencil"
+						width={1.2}
+						dash="3 4"
 					/>
-					<PrintLabel
+					<HandLabel
 						x={sx(0) + 6}
 						y={y0 + 13}
 						size={11.56}
 						color="var(--gb-secondary)"
 					>
 						prior
-					</PrintLabel>
+					</HandLabel>
 					{/* LM paths */}
 					{paths.map((p, k) => {
 						const n = Math.max(1, Math.round(prog * (p.pts.length - 1)));
@@ -800,19 +853,23 @@ function CostLandscape() {
 						const isWin = k === win;
 						return (
 							<g key={`lm${p.pts[0][0]}`}>
-								<path
+								<SketchPath
 									d={`M${pts.map(([a, b]) => `${a.toFixed(1)} ${b.toFixed(1)}`).join("L")}`}
-									fill="none"
-									stroke={isWin ? SWISS.red : SWISS.ink}
-									strokeOpacity={isWin ? 1 : 0.65}
-									strokeWidth={isWin ? 2.4 : 1.4}
-									strokeLinejoin="round"
+									seed={`vi-lm-${k}`}
+									data
+									color={isWin ? "red" : "ink"}
+									opacity={isWin ? 1 : 0.65}
+									width={isWin ? 2.4 : 1.4}
+									passes={1}
 								/>
-								<circle
-									cx={sx(end[0])}
-									cy={sy(end[1])}
+								<HandDot
+									x={sx(end[0])}
+									y={sy(end[1])}
 									r={isWin ? 4 : 3}
-									fill={isWin ? SWISS.red : SWISS.ink}
+									seed={`vi-lm-end-${k}`}
+									color={isWin ? "red" : "ink"}
+									opacity={1}
+									data
 								/>
 							</g>
 						);
@@ -825,7 +882,7 @@ function CostLandscape() {
 								seed={`vi-seed-${s.dy}`}
 								width={1.3}
 							/>
-							<PrintLabel
+							<HandLabel
 								x={sx(s.dy)}
 								y={sy(s.dp) - 12}
 								anchor="middle"
@@ -833,23 +890,18 @@ function CostLandscape() {
 								size={11.56}
 							>
 								{`seed ${k + 1}`}
-							</PrintLabel>
+							</HandLabel>
 						</g>
 					))}
 					{prog >= 1 && (
-						<text
+						<HandLabel
 							x={sx(paths[win].pts[paths[win].pts.length - 1][0]) + 9}
 							y={sy(paths[win].pts[paths[win].pts.length - 1][1]) + 18}
-							fontSize={(13 * 640) / 720}
-							fill={SWISS.red}
-							className="gb-num"
-							paintOrder="stroke"
-							stroke={SWISS.paper}
-							strokeWidth={3}
-							strokeLinejoin="round"
+							size={(13 * 640) / 720}
+							color={SWISS.red}
 						>
 							{`solved ${fmt(paths[win].pts[paths[win].pts.length - 1][0])}° yaw`}
-						</text>
+						</HandLabel>
 					)}
 					{/* axes */}
 					<g
@@ -858,17 +910,29 @@ function CostLandscape() {
 						style={{ fill: tickFill }}
 					>
 						{[-3, 0, 3].map((v) => (
-							<text key={v} x={x0 - 6} y={sy(v) + 3} textAnchor="end">
+							<HandLabel
+								key={v}
+								x={x0 - 6}
+								y={sy(v) + 3}
+								anchor="end"
+								size={9.8}
+							>
 								{`${v > 0 ? "+" : ""}${v}°`}
-							</text>
+							</HandLabel>
 						))}
 						{[-25, -15, -5, 5, 15, 25].map((v) => (
-							<text key={v} x={sx(v)} y={p1 + 14} textAnchor="middle">
+							<HandLabel
+								key={v}
+								x={sx(v)}
+								y={p1 + 14}
+								anchor="middle"
+								size={9.8}
+							>
 								{`${v > 0 ? "+" : ""}${v}°`}
-							</text>
+							</HandLabel>
 						))}
 					</g>
-					<PrintLabel
+					<HandLabel
 						x={12}
 						y={(y0 + y1) / 2}
 						rotate={-90}
@@ -877,8 +941,8 @@ function CostLandscape() {
 						color="var(--gb-secondary)"
 					>
 						Δ pitch
-					</PrintLabel>
-					<PrintLabel
+					</HandLabel>
+					<HandLabel
 						x={x1}
 						y={p0 - 6}
 						anchor="end"
@@ -886,23 +950,30 @@ function CostLandscape() {
 						color="var(--gb-secondary)"
 					>
 						best cost per yaw ↓
-					</PrintLabel>
-					<path
+					</HandLabel>
+					<SketchPath
 						d={prof}
-						fill="none"
-						stroke={SWISS.ink}
-						strokeWidth={1.8}
-						strokeLinejoin="round"
+						seed="vi-yaw-profile"
+						data
+						color="ink"
+						width={1.8}
+						passes={1}
 					/>
 					{seeds.map((s) => (
-						<circle
+						<HandDot
 							key={`p${s.dy}`}
-							cx={sx(s.dy)}
-							cy={py(s.c)}
+							x={sx(s.dy)}
+							y={py(s.c)}
 							r={3.2}
-							fill={SWISS.ink}
+							seed={`vi-prof-seed-${s.dy}`}
+							color="ink"
+							opacity={1}
+							data
 						/>
 					))}
+					<HandText x={x0 + 8} y={p0 + 8} size={15} color="red">
+						{`runner-up minimum: ambiguity ${ambiguity.toFixed(2)}`}
+					</HandText>
 				</svg>
 			</div>
 		</Figure>
@@ -978,7 +1049,15 @@ function FullCircle() {
 						width={0.9}
 					/>
 					{/* the ±25° wedge the local search sees */}
-					<path d={wedge(-25, 25, r1 + 8)} style={tint("contour", 14)} />
+					<Wash
+						d={wedge(-25, 25, r1 + 8)}
+						color="brown"
+						seed="vi-window-wash"
+						layers={7}
+						opacity={0.05}
+						spread={2}
+						offset={[0, 0]}
+					/>
 					<Hachure
 						d={wedge(-25, 25, r1 + 8)}
 						seed="vi-window"
@@ -996,32 +1075,52 @@ function FullCircle() {
 							opacity={0.55}
 						/>
 					</g>
-					<path d={d} style={tint("contour", 34)} />
-					<path
+					<Wash
 						d={d}
-						fill="none"
-						stroke={SWISS.contour}
-						strokeWidth={1.6}
-						strokeLinejoin="round"
+						color="brown"
+						seed="vi-ring-wash"
+						layers={8}
+						opacity={0.08}
+						spread={1.5}
+						offset={[0, 0]}
 					/>
-					<line
-						x1={cx}
-						y1={cy}
-						x2={bx}
-						y2={by}
-						stroke={SWISS.ink}
-						strokeWidth={1.4}
+					<SketchPath
+						d={d}
+						seed="vi-ring-cost"
+						data
+						color="brown"
+						width={1.6}
+						passes={1}
 					/>
-					<circle cx={bx} cy={by} r={4} fill={SWISS.ink} />
-					<line
-						x1={cx}
-						y1={cy}
-						x2={ax}
-						y2={ay}
-						stroke={SWISS.red}
-						strokeWidth={1.4}
-						strokeDasharray="3 3"
+					<PenLine
+						data
+						seed="vi-ring-best"
+						from={[cx, cy]}
+						to={[bx, by]}
+						color="ink"
+						width={1.4}
 					/>
+					<HandDot
+						x={bx}
+						y={by}
+						r={4}
+						seed="vi-ring-best-dot"
+						color="ink"
+						opacity={1}
+						data
+					/>
+					<PenLine
+						data
+						seed="vi-ring-alias"
+						from={[cx, cy]}
+						to={[ax, ay]}
+						color="red"
+						width={1.4}
+						dash="3 3"
+					/>
+					<HandText x={8} y={300} size={14} color="red">
+						IMG_7053: this alias won at the 0.5 bar
+					</HandText>
 					<PenCircle
 						center={[ax, ay]}
 						radiusX={4.5}
@@ -1029,17 +1128,17 @@ function FullCircle() {
 						color="red"
 						width={1.3}
 					/>
-					<PrintLabel x={cx} y={14} anchor="middle" color="var(--gb-secondary)">
+					<HandLabel x={cx} y={14} anchor="middle" color="var(--gb-secondary)">
 						compass
-					</PrintLabel>
-					<PrintLabel
+					</HandLabel>
+					<HandLabel
 						x={cx}
 						y={cy + 5}
 						anchor="middle"
 						color="var(--gb-secondary)"
 					>
 						360°
-					</PrintLabel>
+					</HandLabel>
 				</svg>
 				<div className={`space-y-3 gb-secondary ${TYPE.caption}`}>
 					<p>
@@ -1201,23 +1300,40 @@ function GateBar({
 				aria-hidden="true"
 			>
 				{kind === "track" ? (
-					<rect
-						x={0}
-						y={0}
-						width={400}
-						height={16}
-						style={tint("paper-deep", 100)}
+					<PenLine
+						seed="vi-gatebar-track"
+						from={[0, 14]}
+						to={[400, 14]}
+						color="faint"
+						width={0.9}
 					/>
 				) : kind === "factor" ? (
-					<rect
-						x={0}
-						y={1}
-						width={400}
-						height={14}
-						style={tint("contour", 62)}
-					/>
+					<>
+						<Wash
+							d="M0 1H400V15H0Z"
+							color="brown"
+							seed="vi-gatebar-wash"
+							layers={8}
+							opacity={0.1}
+							spread={1.2}
+							offset={[0, 0]}
+						/>
+						<Hachure
+							d="M0 1H400V15H0Z"
+							seed="vi-gatebar-hatch"
+							color="brown"
+							gap={9}
+							opacity={0.5}
+						/>
+					</>
 				) : (
-					<rect x={0} y={6} width={400} height={4} style={tint("ink", 95)} />
+					<PenLine
+						seed="vi-gatebar-run"
+						from={[0, 8]}
+						to={[400, 8]}
+						color="ink"
+						width={3}
+					/>
 				)}
 			</svg>
 		</div>
@@ -1552,7 +1668,24 @@ function RealGate() {
 							const d = `M${x - w / 2} ${top}H${x + w / 2}V${base}H${x - w / 2}Z`;
 							return (
 								<g key={p.id}>
-									<path d={d} style={tint(p.accepted ? "water" : "red", 85)} />
+									<Wash
+										d={d}
+										color={color}
+										seed={`vi-gate-wash-${p.id}`}
+										layers={8}
+										opacity={0.12}
+										spread={1.2}
+										offset={[0, 0]}
+									/>
+									{!refine && (
+										<Hachure
+											d={d}
+											seed={`vi-gate-solid-${p.id}`}
+											color={color}
+											gap={5}
+											opacity={0.5}
+										/>
+									)}
 									{refine && (
 										<Hachure
 											d={d}
@@ -1563,16 +1696,15 @@ function RealGate() {
 											angle={45}
 										/>
 									)}
-									<text
+									<HandLabel
 										x={x}
 										y={top - 5}
-										textAnchor="middle"
-										fontSize={10}
-										fill={SWISS.ink}
-										className="gb-num"
+										anchor="middle"
+										size={10}
+										color={SWISS.ink}
 									>
 										{p.confidence.toFixed(2)}
-									</text>
+									</HandLabel>
 									<PenLine
 										seed={`vi-gate-top-${p.id}`}
 										from={[x - w / 2, top]}
@@ -1583,29 +1715,24 @@ function RealGate() {
 								</g>
 							);
 						})}
-						<line
-							x1={s.box.x0}
-							x2={s.box.x1}
-							y1={s.y(0.5)}
-							y2={s.y(0.5)}
-							stroke={SWISS.ink}
-							strokeWidth={1.4}
-							strokeDasharray="5 4"
+						<PenLine
+							data
+							seed="vi-gate-bar-line"
+							from={[s.box.x0, s.y(0.5)]}
+							to={[s.box.x1, s.y(0.5)]}
+							color="ink"
+							width={1.4}
+							dash="5 4"
 						/>
-						<text
+						<HandLabel
 							x={s.box.x1 - 2}
 							y={s.y(0.5) - 9}
-							textAnchor="end"
-							fontSize={11}
-							fill={SWISS.ink}
-							className="gb-num"
-							paintOrder="stroke"
-							stroke={SWISS.paper}
-							strokeWidth={3}
-							strokeLinejoin="round"
+							anchor="end"
+							size={11}
+							color={SWISS.ink}
 						>
 							accept bar 0.5 (local)
-						</text>
+						</HandLabel>
 					</g>
 				)}
 			</Plot>
@@ -1888,47 +2015,38 @@ function ResidualStrip({ d }: { d: GipfelbuchPhotoData }) {
 				color="pencil"
 				width={1}
 			/>
-			<line
-				x1={0}
-				x2={n}
-				y1={4}
-				y2={4}
-				stroke={SWISS.secondary}
-				strokeOpacity={0.5}
-				strokeWidth={0.8}
-				strokeDasharray="3 5"
+			<PenLine
+				seed="vi-strip-cap"
+				from={[0, 4]}
+				to={[n, 4]}
+				color="pencil"
+				opacity={0.5}
+				width={0.8}
+				dash="3 5"
 			/>
-			<path
+			<SketchPath
 				d={path(d.priorRows)}
-				fill="none"
-				stroke={PRIOR_C}
-				strokeWidth={Math.max(1.4, n / 480)}
-				strokeDasharray="5 3"
-				strokeLinejoin="round"
+				seed="vi-strip-prior"
+				data
+				color={PRIOR_C}
+				width={Math.max(1.4, n / 480)}
+				dash="5 3"
+				passes={1}
 			/>
-			<path
+			<SketchPath
 				d={path(d.solvedRows)}
-				fill="none"
-				stroke={SOLVED_C}
-				strokeWidth={Math.max(1.6, n / 440)}
-				strokeLinejoin="round"
+				seed="vi-strip-solved"
+				data
+				color={SOLVED_C}
+				width={Math.max(1.6, n / 440)}
+				passes={1}
 			/>
-			<PrintLabel
-				x={4}
-				y={16}
-				size={11 * (n / 720)}
-				color="var(--gb-secondary)"
-			>
+			<HandLabel x={4} y={16} size={11 * (n / 720)} color="var(--gb-secondary)">
 				gap {CAP} px
-			</PrintLabel>
-			<PrintLabel
-				x={4}
-				y={55}
-				size={11 * (n / 720)}
-				color="var(--gb-secondary)"
-			>
+			</HandLabel>
+			<HandLabel x={4} y={55} size={11 * (n / 720)} color="var(--gb-secondary)">
 				0
-			</PrintLabel>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -1955,22 +2073,32 @@ function HeroCompare() {
 				</>
 			}
 		>
-			<Compare
-				before={
-					<RealPhoto data={d} layers={["skyline", "prior"]} crop={crop} bleed />
-				}
-				after={
-					<RealPhoto
-						data={d}
-						layers={["skyline", "solved"]}
-						crop={crop}
-						bleed
+			<AlignmentStoryProvider>
+				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
+					<Compare
+						before={
+							<RealPhoto
+								data={d}
+								layers={["skyline", "prior"]}
+								crop={crop}
+								bleed
+							/>
+						}
+						after={
+							<RealPhoto
+								data={d}
+								layers={["skyline", "solved"]}
+								crop={crop}
+								bleed
+							/>
+						}
+						beforeLabel="phone's guess"
+						afterLabel="solved"
+						start={0.5}
 					/>
-				}
-				beforeLabel="phone's guess"
-				afterLabel="solved"
-				start={0.5}
-			/>
+					<StoryMap data={d} />
+				</div>
+			</AlignmentStoryProvider>
 			{d && (
 				<>
 					<ResidualStrip d={d} />
@@ -2077,7 +2205,7 @@ function MiniMap({ id }: { id: GipfelbuchPhotoId }) {
 	return (
 		<div className="relative aspect-[4/3] overflow-hidden">
 			<div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
-				<DemPatch data={d} peaks={false} />
+				<StoryMap data={d} search readout={false} />
 			</div>
 		</div>
 	);
@@ -2145,11 +2273,26 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 			<Beat kicker="The idea" title="The compass guesses. The ridge does not.">
 				<p>
 					A phone knows where it stands. Its compass is often several degrees
-					off.
+					off.{" "}
+					{medYaw != null && (
+						<>
+							<HandMark type="strike">Close enough.</HandMark>{" "}
+							<span className="nb-hand" style={{ color: "var(--nb-red)" }}>
+								{medYaw.toFixed(1)}° median error
+							</span>
+						</>
+					)}
+					<MarginNote mark="a">
+						Compass first guess, then the ridge. Which one do I trust when they
+						disagree?
+					</MarginNote>
 				</p>
 				<p>
 					The photo has a skyline. The map predicts the same skyline from that
-					spot. We slide the map's line until it lands on the photo's.
+					spot.{" "}
+					<HandMark type="highlight">
+						We slide the map's line until it lands on the photo's.
+					</HandMark>
 				</p>
 				<p>
 					<strong>Yaw</strong> is which way the camera points. Pitch is up or
@@ -2159,6 +2302,15 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Beat kicker="How it works" title="Guess, search, polish.">
+				<p>
+					<CircledNumber value={1} /> sensors give a first view,{" "}
+					<CircledNumber value={2} /> a small grid of turns scores it,{" "}
+					<CircledNumber value={3} /> the winner is polished.
+					<MarginNote mark="b">
+						Only four numbers move: yaw, pitch, roll and focal. GPS fixes the
+						spot.
+					</MarginNote>
+				</p>
 				<Trio
 					steps={[
 						{
@@ -2182,12 +2334,18 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat kicker="Where it fails" title="When the fit is weak, we say so.">
 				<p>
-					A person or a tree can pull the detected line off the ridge. Then too
-					few columns agree.
+					<HandMark type="wavy" color="red">
+						A person or a tree can pull the detected line off the ridge.
+					</HandMark>{" "}
+					Then too few columns agree.
 				</p>
 				<p>
-					We reject the photo and keep the phone's guess. We do not show it as
-					certain.
+					We reject the photo and keep the phone's guess.{" "}
+					<HandMark type="double">We do not show it as certain.</HandMark>
+					<MarginNote mark="c">
+						0 false accepts on 12 hand-registered photos, 0.22° median yaw
+						error. Accepted ✓, but only when it earns it.
+					</MarginNote>
 				</p>
 			</Beat>
 

@@ -3,14 +3,15 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { useMemo } from "react";
-import {
-	byId,
-	GROUP_BY_ID,
-	groupColor,
-	neighbourhood,
-} from "#/lib/gipfelbuch/graph-utils";
+import { byId, groupColor, neighbourhood } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
-import { HandDot, HandText, SketchPath, Stipple } from "./notebook/Ink";
+import {
+	HandDot,
+	HandText,
+	PenLine,
+	SketchPath,
+	Stipple,
+} from "./notebook/Ink";
 import { useTime } from "./viz/hooks";
 
 const circlePath = (cx: number, cy: number, r: number) =>
@@ -70,7 +71,6 @@ export function AutoVisual({
 				.slice(0, 14),
 		[node.id],
 	);
-	const Icon = GROUP_BY_ID[node.group].icon;
 	return (
 		<svg
 			ref={ref}
@@ -108,16 +108,14 @@ export function AutoVisual({
 				const c = groupColor(n.group);
 				return (
 					<g key={n.id}>
-						<line
-							x1="0"
-							y1="0"
-							x2={x}
-							y2={y}
-							stroke={c}
-							strokeOpacity="0.4"
-							strokeWidth="1"
-							strokeLinecap="round"
-							strokeDasharray="2 4"
+						<PenLine
+							from={[0, 0]}
+							to={[x, y]}
+							seed={`${node.id}-ray-${n.id}`}
+							color={c}
+							opacity={0.4}
+							width={1}
+							dash="2 4"
 						/>
 						{n.status === "live" ? (
 							<HandDot
@@ -150,14 +148,9 @@ export function AutoVisual({
 				color={col}
 				width={1.5}
 			/>
-			<foreignObject x="-11" y="-11" width="22" height="22">
-				<div
-					className="grid size-[22px] place-items-center"
-					style={{ color: col }}
-				>
-					<Icon className="size-[14px]" strokeWidth={1.5} />
-				</div>
-			</foreignObject>
+			<HandText x={0} y={5} size={15} anchor="middle" color={col} halo={false}>
+				here
+			</HandText>
 		</svg>
 	);
 }

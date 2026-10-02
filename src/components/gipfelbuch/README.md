@@ -3,6 +3,32 @@
 The gipfelbuch lives at `/gipfelbuch` (graph index) and `/gipfelbuch/<id>` (one page per concept).
 Data: `src/lib/gipfelbuch/graph.ts` (`GIPFELBUCH_NODES`), helpers: `src/lib/gipfelbuch/graph-utils.ts`.
 
+## Hand pass, 2026-10-01 night (session 16): this section overrides older rules below
+
+Spec: `reports/gipfelbuch-hand-sketch-2026-10-01.md`. Research: `reports/gipfelbuch-hand-sketch-research/` (sketch style, Swiss cartography and swisstopo, an audit of what was lost).
+
+- **Hand is the form; print is the exception.** The whole sheet is written by hand:
+  - body: Playpen Sans (`--gb-font-body`);
+  - titles and `h2`/`h3`: Caveat 700 lettering (`--gb-font-letter`);
+  - kickers, labels and peak names: Patrick Hand SC block capitals (`--gb-font-caps`, `.gb-caps`, `.nb-label`);
+  - numbers: hand figures, Shantell Sans with tabular figures (`--gb-font-figure`, `.gb-num`, `.nb-num`);
+  - notes: Caveat (`HandText`, `MarginNote`).
+
+  Print survives only for code (mono), equations (`--gb-font-math`) and an opt-in `.gb-print`. Never name a face inline.
+- **Figure labels** are `HandLabel` / `HandNote` (`viz/labels.tsx`; formerly PrintLabel/PrintNote). Use `caps` for names and `italic` for heights and derived values (LK rule).
+- **Data stays on its pixels, but it is drawn by hand.** `data` on `SketchPath`/`SketchPolyline`/`PenLine`/`PenCircle`/`HandDot` is one constant-width pen pass within `DATA_TOLERANCE` (0.5 px). Furniture gets two passes and more roughness. Photos and DEM rasters are still never filtered.
+- **Notes are required, not capped.** Every page carries hand notes with leaders, struck first guesses with red corrections, and circled numbers keyed to figures (`gipfelbuch.check.ts` enforces a minimum). Hand notes may lean up to 4°; labels on drawings stay upright.
+- **Swiss field-sketch vocabulary** lives in `notebook/carto.tsx`:
+  - Kroki title, north arrow and hand scale bar on map-like figures;
+  - trig triangle, spot ×, italic heights;
+  - rock hachure, scree, Kroki hatch (forest diagonal, buildings vertical, water horizontal);
+  - trail lines and blazes, grade boxes;
+  - peak leaders and station rays;
+  - contour scribbles and profile sketches.
+
+  Hand marks for prose (underline, double, wavy, circle, box, strike, highlight), washes and a pencil construction layer live in `notebook/marks.tsx`.
+- **Still out** (user, 2026-10-01): paper grain, tape, tilted photos, the red margin rule and sheet-edge ticks. The soft grid stays.
+
 ## Restore pass, 2026-10-01 (sessions 2d and 25)
 
 The record is `reports/gipfelbuch-restore-2026-10-01.md`, and the spec is `reports/gipfelbuch-best-of-both.md` §2.
@@ -10,8 +36,8 @@ The record is `reports/gipfelbuch-restore-2026-10-01.md`, and the spec is `repor
 - **One hero per sheet.** A page whose Fig. 1 is a real photo drawn with `RealPhoto bleed` is listed in `PAGE_HERO` (`tafel/sheets.tsx`), and the shell then skips its Tafel. Every other sheet keeps the shell Tafel.
 - **Geo bleed.** `RealPhoto bleed` (true = 0.14 of the frame per side) carries the photo's measured world past the frame onto paper. That means the Tafel bake's ridge strokes in contour brown, a compass ruler and the summits outside the frame, all faded to the edges. Use it on one big photo per wide figure. Never use it in Trio, Gallery or thumbnails; in a Compare, give both sides the same `bleed`.
 - **Plate.** `<Figure plate>` is a paper-deep ground across the full track for the hero.
-- **Data is exact.** `data` on `SketchPath`, `SketchPolyline`, `PenLine`, `PenCircle` and `HandDot` returns the exact geometry. `PlotSeries` is exact, and `PlotArea` is a tint with hatch on top.
-- **Shared figure helpers.** `PrintLabel`, `PrintNote` and `HandRange` live in `viz/labels.tsx`. `CrispLine` (the photo-overlay triple) lives in `viz/real.tsx`.
+- **Data on its pixels.** `data` on `SketchPath`, `SketchPolyline`, `PenLine`, `PenCircle` and `HandDot` draws one pen pass within 0.5 px (hand pass; it was exact geometry). `PlotSeries` is exact, and `PlotArea` is a tint with hatch on top.
+- **Shared figure helpers.** `HandLabel`, `HandNote` and `HandRange` live in `viz/labels.tsx`. `CrispLine` (the photo-overlay triple) lives in `viz/real.tsx`.
 - **Galleries.** `Gallery tone` adds a result/failure tag. `RealPhoto` imprint is off by default.
 - **Shell.** The ContourField sits behind the title, and FieldNotes sits under the Ledger. One HandRule closes the header. "Where it sits" (NotebookTrail + Leads to / Referenced by) is the sheet's only route device, and Signposts follow it. The soft grid is the SheetFrame ground (`nb-book`). The index is the Blattübersicht, then the Feldbuch (NotebookMap).
 - **Inks for node code.** `SWISS` lives in `swiss/inks.ts`, which has no CSS import, so node checks can load modules that draw with it.
@@ -52,12 +78,11 @@ Short form for page authors:
   `SheetScaleBar` under the sheet map), and a page's legend lists only its own symbols
   (`legendItems.tsx`, `LEGEND_BY_CONCEPT`). A figure can carry an `imprint` (Aufnahme / Revision / Stich, F2);
   `RealPhoto` and `DemPatch` set theirs from the measured data.
-- **Data is exact, furniture wobbles (L2, L4, L6).** Photos and DEM rasters are never filtered. Measured lines are
-  at least 1.2 px, constant width, one pass (`data` prop on `SketchPath` / `SketchPolyline`). Certainty is line
+- **Data on its pixels, everything by hand (hand pass).** Photos and DEM rasters are never filtered. Measured lines are
+  at least 1.2 px, constant width, one pen pass within 0.5 px (`data` prop on `SketchPath` / `SketchPolyline`). Certainty is line
   style (solid measured, dashed 4/2 modelled, dotted open), never wobble.
-- **The hand states decisions, not numbers (H1, H4).** `HandText` sets digits in print; hand rotation is at most
-  2 degrees, a pasted print at most 4.
-- **Type and ink (T1, I1).** Only `TYPE` sizes; text is ink, `gb-secondary` or a semantic ink, never an alpha ladder.
+- **The hand writes everything (hand pass).** Notes lean at most 4 degrees; photos sit square.
+- **Type and ink (T1, I1).** Faces come from the hand role tokens (see Hand pass). Only `TYPE` sizes; text is ink, `gb-secondary` or a semantic ink, never an alpha ladder.
 - **Grid and space (G1, G9).** A 6 px unit and a 24 px line; blocks sit a multiple of 24 px apart; sections are
   separated by space (48 px, chapters 72 px), not rules, boxes or rings. Body measure is at most 66 ch.
   `ConceptPage` uses named grid lines: Standortfeld, text, then margin and rail.
@@ -81,7 +106,7 @@ water blue) plus route red, and map furniture around the content. Every ink is a
   Wegweiser yellow, `--gb-paper` / `--gb-paper-deep` grounds. Canvas and anywhere a CSS var can't reach:
   `SWISS.*`. `var(--accent)` is still the concept's group colour (`groupColor`, paper-tuned hex).
 - **Type.** Seven sizes only, from the `TYPE` map in `swiss/type.ts` (micro, kicker, caption, body, lead,
-  h3, h2, h1, stat). Titles use `.display-title` / `TYPE.h1` (GB Serif, Source Serif 4); body GB Sans
+  h3, h2, h1, stat). Titles use `.display-title` / `TYPE.h1` (hand lettering, Caveat 700, since the hand pass); body GB Hand Body
   (Fira Sans); `.gb-caps` condensed caps for kickers; `.gb-coord` / `.gb-num` GB Mono with tabular figures.
   Never name a font inline: use the `--gb-font-*` tokens. Italic marks a category (water, derived values),
   never ornament.
@@ -98,12 +123,12 @@ water blue) plus route red, and map furniture around the content. Every ink is a
 
 The full rationale and sources are in `reports/gipfelbuch-field-notebook-design.md` §2. In short:
 - Type sizes come only from `swiss/type.ts` (`TYPE.micro|kicker|caption|body|lead|h3|h2|h1|stat`).
-- Fraunces is used only for the H1.
+- Hand pass: the H1 and section heads are Caveat 700 lettering; there is no serif except in equations.
 - Secondary text uses `var(--gb-secondary,#4a545c)` and never BL.
 - Italic (`.gb-derived`) marks an estimated or derived value.
 - Tables use `.gb-table`: one header rule, right-aligned tabular numbers.
 - Line style encodes certainty: solid = measured, dashed = approximate or model, dotted = open.
-- Hand notes are Caveat at 18 px or more, with at most 12 words. Figure labels use `variant="label"` (Shantell Sans). Digits inside `HandText` render in print automatically.
+- Hand notes are Caveat at 18 px or more, up to about 20 words each, as many as the page needs. Figure labels use `variant="label"` (Shantell Sans). Digits inside `HandText` render in print automatically.
 - Kitsch test: every material element (stamp, waymark) must carry a fact. No shadows.
 - Soft sheet (user, 2026-10-01): no paper texture and no notebook props. The ground is flat warm white (`--gb-paper`, W 96% + YY 4%) with a faint grid (`--nb-grid` 6 %, index ruling 8 %). There is no grain, tape, tilted prints, red margin rule or sheet-edge ticks. Prints sit square on a thin white mat. Hand notes, circled numbers and sketched figures stay.
 - `gipfelbuch.check.ts` lints the pages for the text contrast floor (`text-white/65` or higher), half-pixel sizes, rounded pills and `display-title`. To exempt a line, put `// gb-lint-allow` on it.
@@ -133,7 +158,7 @@ The whole Gipfelbuch is one look: a Swiss topographer's field book. That means m
 - There is at most one red (route) emphasis per figure, plus red for "the answer" against a struck grey guess.
 - Ink roles: ink is axes, series and text. Pencil/relief is the prior or uncertainty. Brown is DEM and terrain. Water is image-measured quantities. Forest is results. Navy is peaks.
 - Stroke tiers in an 800-px SVG: grid 0.5, index grid 0.9, axis 1.2, series 1.6, route 2.2.
-- Hand vs print: print is the form (headings, body, tables, tick numbers), and the hand is the observer (annotations, callouts, margin notes, captions, circled numbers). Never use hand for body paragraphs or subtitles.
+- Hand vs print (hand pass): everything is hand, including headings, body, tables and tick numbers. Print is only for code and equations.
 - HTML containers: no `border`/`ring`/`outline` boxes and no rounded cards. Separate by paper fill (`bg-[var(--gb-paper-deep)]`) and spacing. Strokes stay only for state (focus, selected tab).
 - Interactive and animated figures keep their behaviour, ARIA and keyboard handling. Generate sketch paths in `useMemo`, and inside rAF loops reuse precomputed paths where possible.
 - Step notes in `NotebookMap.tsx` (`notes.tsx`) are written from the selected photo's measured JSON. `useNotebookPhoto` shares the selected photo across the index and the concept pages.

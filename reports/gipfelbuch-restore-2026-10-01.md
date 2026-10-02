@@ -129,7 +129,13 @@ Session 25 ran four Sonnet packages (PK-A to PK-D) against `reports/gipfelbuch-b
 - `npx biome check --write` on every file touched.
 - Two node checks were re-run, only to confirm fixes for breakage this pass caused (the `SWISS` move): `tafel/sheets.check.ts` OK, and `swiss/contrast.check.ts` OK.
 
-Not run: the fast tier, `spdx`, and every browser check.
+- Final gate (session 25, after the last edits):
+  - the fast tier passed: 73 pass, 0 fail, 1 skip;
+  - `tsc` reported 0 errors;
+  - SPDX was clean;
+  - all five Gipfelbuch and Tafel checks passed.
+
+Not run: every browser check. Nothing has been rendered yet.
 
 ## 4. Open items
 

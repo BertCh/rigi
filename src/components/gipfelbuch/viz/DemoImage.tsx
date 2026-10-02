@@ -17,18 +17,21 @@ export const DEMO_IMAGES = {
 } as const;
 export type DemoName = keyof typeof DEMO_IMAGES;
 
-/** A demo photo or app screenshot, cover-cropped to `aspect` (CSS aspect-ratio, default 4/3). */
+/**
+ * A demo photo or app screenshot, cover-cropped to `aspect` (CSS aspect-ratio, default 4/3). A pasted
+ * print: square corners and never filtered (`rounded` is kept for old call sites and ignored).
+ */
 export function DemoImage({
 	name,
 	aspect = "4 / 3",
 	alt = "",
 	className,
-	rounded = false,
 }: {
 	name: DemoName;
 	aspect?: string;
 	alt?: string;
 	className?: string;
+	/** Ignored (hand pass: prints have square corners). */
 	rounded?: boolean;
 }) {
 	return (
@@ -38,7 +41,7 @@ export function DemoImage({
 			loading="lazy"
 			decoding="async"
 			style={{ aspectRatio: aspect }}
-			className={cn("w-full object-cover", rounded && "rounded-sm", className)}
+			className={cn("w-full object-cover", className)}
 		/>
 	);
 }

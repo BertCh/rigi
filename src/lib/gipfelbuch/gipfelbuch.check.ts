@@ -318,6 +318,11 @@ const PAGE_RULES: { rule: string; re: RegExp }[] = [
 		re: /var\(--rigi-paper\)/,
 	},
 	{ rule: "tilted print (softer sheet)", re: /(?<![\w-])rotate-\d/ },
+	// Hand pass: every figure label is written by hand.
+	{
+		rule: "raw SVG <text> in a page (use HandLabel, HandNote or HandText)",
+		re: /<text\b/,
+	},
 	{ rule: "ring outline (strokes only for state)", re: /(?<![\w-])ring-1\b/ },
 	{ rule: '"Next:" line (the shell has the route device)', re: /\bNext:/ },
 	{
@@ -325,7 +330,7 @@ const PAGE_RULES: { rule: string; re: RegExp }[] = [
 		re: /\b[a-z]+=\{?["'`]color-mix/,
 	},
 ];
-const MAX_HAND_NOTES = 3;
+const MIN_HAND_NOTES = 6;
 const PAGES_DIR = resolve(ROOT, "src/lib/gipfelbuch/pages");
 for (const f of readdirSync(PAGES_DIR).filter((n) => n.endsWith(".tsx"))) {
 	const file = rel(resolve(PAGES_DIR, f));
@@ -348,10 +353,13 @@ for (const f of readdirSync(PAGES_DIR).filter((n) => n.endsWith(".tsx"))) {
 	);
 	for (const label of new Set(duplicates))
 		err(`${file}: duplicate figure label "${label}" (number in DOM order)`);
-	const handNotes = source.match(/<HandText\b/g)?.length ?? 0;
-	if (handNotes > MAX_HAND_NOTES)
+	// Hand pass (reports/gipfelbuch-hand-sketch-2026-10-01.md): a sheet is a page of field notes,
+	// so it needs hand notes, not a cap on them.
+	const handNotes =
+		source.match(/<(?:HandText|MarginNote|HandMark)\b/g)?.length ?? 0;
+	if (handNotes < MIN_HAND_NOTES)
 		err(
-			`${file}: ${handNotes} hand notes (at most ${MAX_HAND_NOTES} per page)`,
+			`${file}: ${handNotes} hand notes (at least ${MIN_HAND_NOTES} per page: HandText, MarginNote or HandMark)`,
 		);
 }
 

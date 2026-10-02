@@ -4,6 +4,15 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import {
+	Hachure,
+	HandDot,
+	PenCircle,
+	PenLine,
+	SketchPath,
+	SketchRect,
+} from "../notebook/Ink";
+import { HandLabel } from "../viz/labels";
+import {
 	GIPFELBUCH_PHOTO_IDS,
 	type GipfelbuchPeak,
 	type GipfelbuchPhotoData,
@@ -172,11 +181,13 @@ function Stroke({
 	color,
 	width,
 	dash,
+	seed,
 }: {
 	d: string;
 	color: string;
 	width: number;
 	dash?: string;
+	seed?: string;
 }) {
 	return (
 		<g fill="none" strokeLinejoin="round" strokeLinecap="round">
@@ -186,17 +197,25 @@ function Stroke({
 				strokeOpacity={0.35}
 				strokeWidth={width + 2.2}
 			/>
-			<path d={d} stroke={color} strokeWidth={width} strokeDasharray={dash} />
+			<SketchPath
+				d={d}
+				data
+				seed={seed ?? `stroke-${d.length}-${d.slice(0, 40)}`}
+				color={color}
+				width={width}
+				dash={dash}
+			/>
 		</g>
 	);
 }
 
 type TextKind = "micro" | "name" | "stat";
 const TEXT_CLASS: Record<TextKind, string> = {
-	micro: "gb-coord text-[11px]",
-	name: "gb-num text-[13px] font-semibold",
-	stat: "gb-num text-[24px] font-light",
+	micro: "nb-hand-small",
+	name: "nb-label",
+	stat: "nb-hand-small",
 };
+const TEXT_SIZE: Record<TextKind, number> = { micro: 12, name: 14, stat: 26 };
 function Txt({
 	x,
 	y,
@@ -214,13 +233,17 @@ function Txt({
 	kind?: TextKind;
 	onPhoto?: boolean;
 }) {
-	const style: CSSProperties = { paintOrder: "stroke" };
+	const style: CSSProperties = {
+		paintOrder: "stroke",
+		fill: onPhoto ? "#fff" : fill,
+		fontVariantNumeric: "tabular-nums",
+	};
 	return (
 		<text
 			x={x}
 			y={y}
 			className={TEXT_CLASS[kind]}
-			fill={onPhoto ? "#fff" : fill}
+			fontSize={TEXT_SIZE[kind]}
 			textAnchor={anchor}
 			style={style}
 			strokeLinejoin="round"
@@ -232,8 +255,8 @@ function Txt({
 }
 
 /** Width of a mono 11 px string, for clamping labels inside the band. */
-const monoWidth = (s: string) => s.length * 6.7;
-const nameWidth = (s: string) => s.length * 7.3;
+const monoWidth = (s: string) => s.length * 7.4;
+const nameWidth = (s: string) => s.length * 8;
 
 function Ground({
 	w,
@@ -336,13 +359,19 @@ function weightTicks(d: GipfelbuchPhotoData, len: number, step = 2): string {
 
 const tafelSkyline: TafelLayer = ({ d, s }) => (
 	<g>
-		<path
+		<SketchPath
 			d={weightTicks(d, 14 / s)}
-			stroke={SKYLINE_COLOR}
-			strokeWidth={wpx(s, 1.2)}
-			fill="none"
+			data
+			seed={`tafel-skyline-ticks-${d.id}`}
+			color={SKYLINE_COLOR}
+			width={wpx(s, 1.2)}
 		/>
-		<Stroke d={votedRowsPath(d)} color={SKYLINE_COLOR} width={wpx(s, 2)} />
+		<Stroke
+			d={votedRowsPath(d)}
+			seed={`tafel-skyline-${d.id}`}
+			color={SKYLINE_COLOR}
+			width={wpx(s, 2)}
+		/>
 	</g>
 );
 
@@ -386,11 +415,12 @@ function priorVsSolved(
 				width={wpx(s, 2)}
 			/>
 			{arrow && y1 != null && y2 != null && Math.abs(y2 - y1) > 4 / s && (
-				<path
+				<SketchPath
 					d={`M${c} ${y1}L${c} ${y2}M${c - head * 0.6} ${y2 - Math.sign(y2 - y1) * head}L${c} ${y2}L${c + head * 0.6} ${y2 - Math.sign(y2 - y1) * head}`}
-					stroke="#fff"
-					strokeWidth={wpx(s, 1.6)}
-					fill="none"
+					data
+					seed={`tafel-delta-arrow-${d.id}`}
+					color="#fff"
+					width={wpx(s, 1.6)}
 				/>
 			)}
 		</g>
@@ -412,7 +442,13 @@ const tafelPose: TafelLayer = ({ d, s }) => {
 				color={SOLVED_COLOR}
 				width={wpx(s, 2)}
 			/>
-			<path d={ticks} stroke="#fff" strokeWidth={wpx(s, 1.2)} fill="none" />
+			<SketchPath
+				d={ticks}
+				data
+				seed={`tafel-pose-ticks-${d.id}`}
+				color="#fff"
+				width={wpx(s, 1.2)}
+			/>
 		</g>
 	);
 };
@@ -438,12 +474,19 @@ const tafelAccept: TafelLayer = ({ d, s }) => {
 				width={wpx(s, 1.6)}
 				dash={d.solved.accepted ? undefined : `${4 / s} ${4 / s}`}
 			/>
-			<path d={inlier} stroke="#fff" strokeWidth={wpx(s, 1.2)} fill="none" />
-			<path
+			<SketchPath
+				d={inlier}
+				data
+				seed={`tafel-accept-in-${d.id}`}
+				color="#fff"
+				width={wpx(s, 1.2)}
+			/>
+			<SketchPath
 				d={outlier}
-				stroke={PRIOR_COLOR}
-				strokeWidth={wpx(s, 1.6)}
-				fill="none"
+				data
+				seed={`tafel-accept-out-${d.id}`}
+				color={PRIOR_COLOR}
+				width={wpx(s, 1.6)}
 			/>
 		</g>
 	);
@@ -460,43 +503,49 @@ const tafelPeak: TafelLayer = ({ d, s }) => {
 				const isTop = d.peaks[top] === p;
 				return (
 					<g key={`${p.name}-${p.az}`}>
-						<circle cx={x} cy={y} r={4 / s} fill="#fff" />
+						<HandDot
+							x={x}
+							y={y}
+							r={4 / s}
+							data
+							seed={`tafel-peak-dot-${p.name}-${p.az}`}
+							color="#fff"
+							opacity={1}
+						/>
 						{isTop && y > 60 / s && (
 							<g>
-								<line
-									x1={x}
-									x2={x}
-									y1={y - 34 / s}
-									y2={y - 5 / s}
-									stroke="#fff"
-									strokeWidth={wpx(s, 1)}
+								<PenLine
+									from={[x, y - 34 / s]}
+									to={[x, y - 5 / s]}
+									data
+									seed={`tafel-peak-leader-${p.name}-${p.az}`}
+									color="#fff"
+									width={wpx(s, 1)}
 								/>
-								<text
+								<HandLabel
 									x={x}
 									y={y - 50 / s}
-									textAnchor="middle"
-									fill="#fff"
-									className="gb-num font-semibold"
-									fontSize={13 / s}
-									{...SHADOW}
-									strokeWidth={3 / s}
-									style={{ paintOrder: "stroke" }}
+									anchor="middle"
+									size={13 / s}
+									caps
+									color="#fff"
+									halo={3 / s}
+									haloColor="rgba(0,0,0,0.55)"
 								>
 									{p.name}
-								</text>
-								<text
+								</HandLabel>
+								<HandLabel
 									x={x}
 									y={y - 38 / s}
-									textAnchor="middle"
-									fill="#fff"
-									className="gb-coord"
-									fontSize={11 / s}
-									{...SHADOW}
-									strokeWidth={3 / s}
-									style={{ paintOrder: "stroke" }}
+									anchor="middle"
+									size={11 / s}
+									italic
+									color="#fff"
+									halo={3 / s}
+									haloColor="rgba(0,0,0,0.55)"
 								>
 									{`${Math.round(p.dem)} m · ${(p.distance / 1000).toFixed(0)} km`}
-								</text>
+								</HandLabel>
 							</g>
 						)}
 					</g>
@@ -515,27 +564,33 @@ const tafelTap: TafelLayer = ({ d, s }) => {
 		<g>
 			{pins.map((p, i) => (
 				<g key={`${p.name}-${p.az}`}>
-					<circle
-						cx={p.solved[0]}
-						cy={p.solved[1]}
-						r={11 / s}
-						fill="none"
-						stroke="#fff"
-						strokeWidth={wpx(s, 1.8)}
+					<PenCircle
+						center={[p.solved[0], p.solved[1]]}
+						radiusX={11 / s}
+						data
+						seed={`tafel-tap-ring-${p.name}-${p.az}`}
+						color="#fff"
+						width={wpx(s, 1.8)}
 					/>
-					<circle cx={p.solved[0]} cy={p.solved[1]} r={2.4 / s} fill="#fff" />
-					<text
+					<HandDot
+						x={p.solved[0]}
+						y={p.solved[1]}
+						r={2.4 / s}
+						data
+						seed={`tafel-tap-dot-${p.name}-${p.az}`}
+						color="#fff"
+						opacity={1}
+					/>
+					<HandLabel
 						x={p.solved[0] + 15 / s}
 						y={p.solved[1] - 9 / s}
-						fill="#fff"
-						className="gb-coord"
-						fontSize={11 / s}
-						{...SHADOW}
-						strokeWidth={3 / s}
-						style={{ paintOrder: "stroke" }}
+						size={11 / s}
+						color="#fff"
+						halo={3 / s}
+						haloColor="rgba(0,0,0,0.55)"
 					>
-						{i + 1}
-					</text>
+						{String(i + 1)}
+					</HandLabel>
 				</g>
 			))}
 		</g>
@@ -564,7 +619,13 @@ const bandSkyline = ({ d, w, h }: BandCtx) => {
 	return (
 		<>
 			<PhotoImage d={d} g={g} />
-			<path d={ticks} stroke={SKYLINE_COLOR} strokeWidth={1.2} fill="none" />
+			<SketchPath
+				d={ticks}
+				data
+				seed={`band-skyline-ticks-${d.id}`}
+				color={SKYLINE_COLOR}
+				width={1.2}
+			/>
 			<Stroke
 				d={linePath(d.skyline.rows, g, d.skyline.weight)}
 				color={SKYLINE_COLOR}
@@ -599,26 +660,28 @@ const bandCameraPrior = ({ d, w, h }: BandCtx) => {
 	const cy = h / 2;
 	const R = 52;
 	const arm = (deg: number, color: string, dash?: string) => (
-		<line
-			x1={cx}
-			y1={cy}
-			x2={cx + Math.sin((deg * Math.PI) / 180) * R}
-			y2={cy - Math.cos((deg * Math.PI) / 180) * R}
-			stroke={color}
-			strokeWidth={2}
-			strokeDasharray={dash}
+		<PenLine
+			from={[cx, cy]}
+			to={[
+				cx + Math.sin((deg * Math.PI) / 180) * R,
+				cy - Math.cos((deg * Math.PI) / 180) * R,
+			]}
+			data
+			seed={`band-cp-arm-${color}`}
+			color={color}
+			width={2}
+			dash={dash}
 		/>
 	);
 	return (
 		<>
 			<Ground w={w} h={h} />
-			<circle
-				cx={cx}
-				cy={cy}
-				r={R}
-				fill="none"
-				stroke={HAIRLINE}
-				strokeWidth={1}
+			<PenCircle
+				center={[cx, cy]}
+				radiusX={R}
+				seed="band-cp-ring"
+				color={HAIRLINE}
+				width={1}
 			/>
 			{["N", "E", "S", "W"].map((c, i) => (
 				<Txt
@@ -663,39 +726,27 @@ const bandDemHorizon = ({ d, w, h }: BandCtx) => {
 	const line = pts
 		.map(([u, e], i) => `${i ? "L" : "M"}${X(u).toFixed(1)} ${Y(e).toFixed(1)}`)
 		.join("");
-	const id = `gb-ix-hz-${d.id}`;
 	const fx0 = clamp(X(-hf), 0, w);
 	const fx1 = clamp(X(hf), 0, w);
 	return (
 		<>
 			<Ground w={w} h={h} />
 			<rect x={fx0} y={0} width={fx1 - fx0} height={h} fill={PAPER_DEEP} />
-			<defs>
-				<pattern
-					id={id}
-					width={6}
-					height={6}
-					patternUnits="userSpaceOnUse"
-					patternTransform="rotate(-45)"
-				>
-					<line
-						x1={0}
-						y1={0}
-						x2={0}
-						y2={6}
-						stroke={TERRAIN}
-						strokeWidth={1}
-						strokeOpacity={0.5}
-					/>
-				</pattern>
-			</defs>
-			<path d={`${line}L${w} ${h}L0 ${h}Z`} fill={`url(#${id})`} />
-			<path
+			<Hachure
+				d={`${line}L${w} ${h}L0 ${h}Z`}
+				seed={`band-hz-fill-${d.id}`}
+				color={TERRAIN}
+				width={1}
+				opacity={0.5}
+				angle={-45}
+				gap={6}
+			/>
+			<SketchPath
 				d={line}
-				stroke={INK}
-				strokeWidth={1.6}
-				fill="none"
-				strokeLinejoin="round"
+				data
+				seed={`band-hz-line-${d.id}`}
+				color={INK}
+				width={1.6}
 			/>
 			<Txt x={(fx0 + fx1) / 2} y={14} anchor="middle" fill={SECONDARY}>
 				photo frame
@@ -721,11 +772,12 @@ const bandViewport = ({ d, w, h }: BandCtx) => {
 			/>
 			<Stroke d={linePath(d.solvedRows, g)} color={SOLVED_COLOR} width={2} />
 			{y1 != null && y2 != null && Math.abs(y2 - y1) * g.k > 5 && (
-				<path
+				<SketchPath
 					d={`M${x} ${g.oy + y1 * g.k}L${x} ${g.oy + y2 * g.k}M${x - 3.5} ${g.oy + y2 * g.k - Math.sign(y2 - y1) * 6}L${x} ${g.oy + y2 * g.k}L${x + 3.5} ${g.oy + y2 * g.k - Math.sign(y2 - y1) * 6}`}
-					stroke="#fff"
-					strokeWidth={1.6}
-					fill="none"
+					data
+					seed={`band-vp-arrow-${d.id}`}
+					color="#fff"
+					width={1.6}
 				/>
 			)}
 		</>
@@ -737,6 +789,8 @@ const bandPose = ({ d, w, h }: BandCtx) => {
 	const bw = w / bars;
 	const base = h - 24;
 	const out: ReactNode[] = [];
+	let inlierEdges = "";
+	let outlierEdges = "";
 	for (let i = 0; i < bars; i++) {
 		const c = i * 4;
 		const a = d.skyline.rows[c];
@@ -754,18 +808,40 @@ const bandPose = ({ d, w, h }: BandCtx) => {
 				fill={r < INLIER_PX ? RESULT : ROUTE}
 			/>,
 		);
+		const edge = `M${(i * bw).toFixed(2)} ${base}V${(base - bh).toFixed(2)}h${(bw * 0.7).toFixed(2)}V${base}`;
+		if (r < INLIER_PX) inlierEdges += edge;
+		else outlierEdges += edge;
 	}
 	return (
 		<>
 			<Ground w={w} h={h} />
 			{out}
-			<line
-				x1={0}
-				x2={w}
-				y1={base - INLIER_PX * 6}
-				y2={base - INLIER_PX * 6}
-				stroke={SECONDARY}
-				strokeDasharray="3 3"
+			{inlierEdges && (
+				<SketchPath
+					d={inlierEdges}
+					data
+					seed={`band-pose-in-${d.id}`}
+					color={RESULT}
+					width={1.2}
+				/>
+			)}
+			{outlierEdges && (
+				<SketchPath
+					d={outlierEdges}
+					data
+					seed={`band-pose-out-${d.id}`}
+					color={ROUTE}
+					width={1.2}
+				/>
+			)}
+			<PenLine
+				from={[0, base - INLIER_PX * 6]}
+				to={[w, base - INLIER_PX * 6]}
+				data
+				seed="band-pose-threshold"
+				color={SECONDARY}
+				width={1}
+				dash="3 3"
 			/>
 			<Txt x={w} y={base - INLIER_PX * 6 - 4} anchor="end" fill={SECONDARY}>
 				5 px
@@ -779,14 +855,13 @@ const bandPose = ({ d, w, h }: BandCtx) => {
 
 function Mark({ x, y, ok }: { x: number; y: number; ok: boolean }) {
 	return (
-		<path
+		<SketchPath
 			d={
 				ok ? `M${x} ${y}l3 3l6 -7` : `M${x} ${y - 6}l7 7M${x + 7} ${y - 6}l-7 7`
 			}
-			stroke={ok ? RESULT : ROUTE}
-			strokeWidth={1.8}
-			fill="none"
-			strokeLinecap="round"
+			seed={`band-mark-${ok ? "ok" : "no"}`}
+			color={ok ? RESULT : ROUTE}
+			width={1.8}
 		/>
 	);
 }
@@ -824,41 +899,57 @@ const bandAccept = ({ d, all, w, h }: BandCtx) => {
 	return (
 		<>
 			<Ground w={w} h={h} />
-			<line
-				x1={x0}
-				x2={x1}
-				y1={rail}
-				y2={rail}
-				stroke={HAIRLINE}
-				strokeWidth={1}
+			<PenLine
+				from={[x0, rail]}
+				to={[x1, rail]}
+				seed="band-accept-rail"
+				color={HAIRLINE}
+				width={1}
 			/>
 			{[0, 0.5, 1].map((t) => (
 				<g key={t}>
-					<line x1={X(t)} x2={X(t)} y1={rail} y2={rail + 4} stroke={HAIRLINE} />
+					<PenLine
+						from={[X(t), rail]}
+						to={[X(t), rail + 4]}
+						seed={`band-accept-tick-${t}`}
+						color={HAIRLINE}
+						width={1}
+					/>
 					<Txt x={X(t)} y={rail + 17} anchor="middle" fill={SECONDARY}>
 						{t.toFixed(1)}
 					</Txt>
 				</g>
 			))}
 			{placed.map((q) => (
-				<circle
-					key={q.p.id}
-					cx={q.x}
-					cy={q.y}
-					r={q.r}
-					fill={q.p.solved.accepted ? RESULT : ROUTE}
-					stroke={q.p.id === d.id ? INK : "none"}
-					strokeWidth={1.5}
-				/>
+				<g key={q.p.id}>
+					<HandDot
+						x={q.x}
+						y={q.y}
+						r={q.r}
+						data
+						seed={`band-accept-dot-${q.p.id}`}
+						color={q.p.solved.accepted ? RESULT : ROUTE}
+						opacity={1}
+					/>
+					{q.p.id === d.id && (
+						<PenCircle
+							center={[q.x, q.y]}
+							radiusX={q.r}
+							data
+							seed={`band-accept-me-${q.p.id}`}
+							color={INK}
+							width={1.5}
+						/>
+					)}
+				</g>
 			))}
 			{me && (
-				<line
-					x1={me.x}
-					x2={me.x}
-					y1={34}
-					y2={me.y - me.r - 2}
-					stroke={HAIRLINE}
-					strokeWidth={1}
+				<PenLine
+					from={[me.x, 34]}
+					to={[me.x, me.y - me.r - 2]}
+					seed="band-accept-lead"
+					color={HAIRLINE}
+					width={1}
 				/>
 			)}
 			<Mark x={lx - half} y={28} ok={d.solved.accepted} />
@@ -892,15 +983,23 @@ const bandTap = ({ d, w, h }: BandCtx) => {
 			<PhotoImage d={d} g={g} />
 			{picked.map((o, i) => (
 				<g key={`${o.p.name}-${o.p.az}`}>
-					<circle
-						cx={o.x}
-						cy={o.y}
-						r={R}
-						fill="none"
-						stroke="#fff"
-						strokeWidth={1.8}
+					<PenCircle
+						center={[o.x, o.y]}
+						radiusX={R}
+						data
+						seed={`band-tap-ring-${o.p.name}-${o.p.az}`}
+						color="#fff"
+						width={1.8}
 					/>
-					<circle cx={o.x} cy={o.y} r={2.4} fill="#fff" />
+					<HandDot
+						x={o.x}
+						y={o.y}
+						r={2.4}
+						data
+						seed={`band-tap-dot-${o.p.name}-${o.p.az}`}
+						color="#fff"
+						opacity={1}
+					/>
 					<Txt x={o.x + R + 4} y={o.y - R + 2} onPhoto>
 						{String(i + 1)}
 					</Txt>
@@ -936,6 +1035,15 @@ const bandPipeline = ({ d, w, h }: BandCtx) => {
 							{name}
 						</Txt>
 						<rect x={x0} y={y} width={len} height={14} fill={color} />
+						<SketchRect
+							x={x0}
+							y={y}
+							width={len}
+							height={14}
+							seed={`band-pipe-${name}`}
+							color={color}
+							penWidth={1.2}
+						/>
 						<Txt x={x0 + len + 6} y={y + 10} fill={INK}>
 							{`${ms} ms`}
 						</Txt>
@@ -984,15 +1092,15 @@ const bandDemSource = ({ d, w, h }: BandCtx) => {
 				const a = (deg * Math.PI) / 180;
 				return (
 					<g key={km}>
-						<circle
-							cx={cx}
-							cy={cy}
-							r={r}
-							fill="none"
-							stroke="#fff"
-							strokeOpacity={0.85}
-							strokeWidth={1.2}
-							strokeDasharray="3 3"
+						<PenCircle
+							center={[cx, cy]}
+							radiusX={r}
+							data
+							seed={`band-dems-ring-${km}`}
+							color="#fff"
+							opacity={0.85}
+							width={1.2}
+							dash="3 3"
 						/>
 						<Txt
 							x={cx + Math.cos(a) * r + 4}
@@ -1004,7 +1112,15 @@ const bandDemSource = ({ d, w, h }: BandCtx) => {
 					</g>
 				);
 			})}
-			<circle cx={cx} cy={cy} r={2.4} fill="#fff" />
+			<HandDot
+				x={cx}
+				y={cy}
+				r={2.4}
+				data
+				seed="band-dems-centre"
+				color="#fff"
+				opacity={1}
+			/>
 		</>
 	);
 };
@@ -1026,20 +1142,20 @@ const bandSampler = ({ d, w, h }: BandCtx) => {
 				preserveAspectRatio="none"
 				style={{ imageRendering: "pixelated" }}
 			/>
-			<rect
+			<SketchRect
 				x={cx - zoom / 2}
 				y={cy - zoom / 2}
 				width={zoom}
 				height={zoom}
-				fill="none"
-				stroke="#fff"
-				strokeWidth={1.4}
+				seed="band-sampler-cell"
+				color="#fff"
+				penWidth={1.4}
 			/>
-			<path
+			<SketchPath
 				d={`M${cx - 28} ${cy}h18M${cx + 10} ${cy}h18M${cx} ${cy - 28}v18M${cx} ${cy + 10}v18`}
-				stroke="#fff"
-				strokeWidth={1.4}
-				fill="none"
+				seed="band-sampler-cross"
+				color="#fff"
+				width={1.4}
 			/>
 			<Txt x={cx + 34} y={cy - 4} onPhoto>
 				{`heightAt() = ${f1(d.gps.ground)} m`}
@@ -1083,41 +1199,49 @@ const bandEye = ({ d, w, h }: BandCtx) => {
 		<>
 			<Ground w={w} h={h} />
 			<rect x={0} y={Y(g)} width={w} height={h - Y(g)} fill={PAPER_DEEP} />
-			<line
-				x1={0}
-				x2={xe}
-				y1={Y(g)}
-				y2={Y(g)}
-				stroke={TERRAIN}
-				strokeWidth={1.6}
+			<PenLine
+				from={[0, Y(g)]}
+				to={[xe, Y(g)]}
+				data
+				seed="band-eye-ground"
+				color={TERRAIN}
+				width={1.6}
 			/>
-			<line
-				x1={xs}
-				x2={xe}
-				y1={Y(g + 1.6)}
-				y2={Y(g + 1.6)}
-				stroke={SECONDARY}
-				strokeWidth={1.2}
-				strokeDasharray="3 3"
+			<PenLine
+				from={[xs, Y(g + 1.6)]}
+				to={[xe, Y(g + 1.6)]}
+				data
+				seed="band-eye-plus"
+				color={SECONDARY}
+				width={1.2}
+				dash="3 3"
 			/>
-			<line
-				x1={xs}
-				x2={xe}
-				y1={Y(a)}
-				y2={Y(a)}
-				stroke={MEASURE}
-				strokeWidth={1.2}
-				strokeDasharray="6 3"
+			<PenLine
+				from={[xs, Y(a)]}
+				to={[xe, Y(a)]}
+				data
+				seed="band-eye-gps"
+				color={MEASURE}
+				width={1.2}
+				dash="6 3"
 			/>
-			<line
-				x1={stemX}
-				x2={stemX}
-				y1={Y(g)}
-				y2={Y(eye)}
-				stroke={ROUTE}
-				strokeWidth={2}
+			<PenLine
+				from={[stemX, Y(g)]}
+				to={[stemX, Y(eye)]}
+				data
+				seed="band-eye-stem"
+				color={ROUTE}
+				width={2}
 			/>
-			<circle cx={stemX} cy={Y(eye)} r={4.5} fill={ROUTE} />
+			<HandDot
+				x={stemX}
+				y={Y(eye)}
+				r={4.5}
+				data
+				seed="band-eye-dot"
+				color={ROUTE}
+				opacity={1}
+			/>
 			<Txt x={stemX + 10} y={mid + 4} fill={ROUTE}>
 				eye
 			</Txt>
@@ -1153,15 +1277,22 @@ const bandPeak = ({ d, w, h }: BandCtx) => {
 	return (
 		<>
 			<PhotoImage d={d} g={g} />
-			<line
-				x1={c.x}
-				x2={c.x}
-				y1={c.y + (below ? 4 : -4)}
-				y2={below ? nameY - 12 : subY + 4}
-				stroke="#fff"
-				strokeWidth={1.2}
+			<PenLine
+				from={[c.x, c.y + (below ? 4 : -4)]}
+				to={[c.x, below ? nameY - 12 : subY + 4]}
+				seed={`band-peak-leader-${name}`}
+				color="#fff"
+				width={1.2}
 			/>
-			<circle cx={c.x} cy={c.y} r={3} fill="#fff" />
+			<HandDot
+				x={c.x}
+				y={c.y}
+				r={3}
+				data
+				seed={`band-peak-dot-${name}`}
+				color="#fff"
+				opacity={1}
+			/>
 			<Txt x={tx} y={nameY} anchor="middle" kind="name" onPhoto>
 				{name}
 			</Txt>
@@ -1189,16 +1320,30 @@ const bandSnapping = ({ d, w, h }: BandCtx) => {
 				d={`M${cx} ${cy}L${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}Z`}
 				fill={ROUTE}
 				fillOpacity={0.28}
-				stroke="#fff"
-				strokeWidth={1.4}
 			/>
-			<circle
-				cx={cx}
-				cy={cy}
+			<SketchPath
+				d={`M${cx} ${cy}L${x1.toFixed(1)} ${y1.toFixed(1)}L${x2.toFixed(1)} ${y2.toFixed(1)}Z`}
+				data
+				seed={`band-snap-cone-${d.id}`}
+				color="#fff"
+				width={1.4}
+			/>
+			<HandDot
+				x={cx}
+				y={cy}
 				r={3.5}
-				fill={ROUTE}
-				stroke="#fff"
-				strokeWidth={1.2}
+				data
+				seed="band-snap-centre"
+				color={ROUTE}
+				opacity={1}
+			/>
+			<PenCircle
+				center={[cx, cy]}
+				radiusX={3.5}
+				data
+				seed="band-snap-centre-ring"
+				color="#fff"
+				width={1.2}
 			/>
 			<Txt x={10} y={h - 10} onPhoto>
 				{`view cone ${d.solved.hfov.toFixed(0)}° at ${d.solved.yaw.toFixed(0)}°`}
@@ -1230,30 +1375,29 @@ const bandAnchoring = ({ d, w, h }: BandCtx) => {
 			<Txt x={left} y={14} fill={SECONDARY}>
 				ground along the view, log distance
 			</Txt>
-			<line
-				x1={left}
-				x2={right}
-				y1={axis}
-				y2={axis}
-				stroke={HAIRLINE}
-				strokeWidth={1}
+			<PenLine
+				from={[left, axis]}
+				to={[right, axis]}
+				seed="band-anchor-axis"
+				color={HAIRLINE}
+				width={1}
 			/>
-			<path
+			<SketchPath
 				d={line}
-				stroke={TERRAIN}
-				strokeWidth={1.6}
-				fill="none"
-				strokeLinejoin="round"
+				data
+				seed={`band-anchor-line-${d.id}`}
+				color={TERRAIN}
+				width={1.6}
 			/>
 			{[100, 1000, 10000].map((m) =>
 				m > dmax ? null : (
 					<g key={m}>
-						<line
-							x1={xs(m)}
-							x2={xs(m)}
-							y1={axis}
-							y2={axis + 5}
-							stroke={HAIRLINE}
+						<PenLine
+							from={[xs(m), axis]}
+							to={[xs(m), axis + 5]}
+							seed={`band-anchor-tick-${m}`}
+							color={HAIRLINE}
+							width={1}
 						/>
 						<Txt x={xs(m)} y={axis + 18} anchor="middle" fill={SECONDARY}>
 							{m >= 1000 ? `${m / 1000} km` : `${m} m`}
@@ -1290,16 +1434,25 @@ const bandWorkspace = ({ d, w, h }: BandCtx) => {
 				{framePeaks(d, { labelledOnly: true })
 					.slice(0, 6)
 					.map((p) => (
-						<circle
+						<HandDot
 							key={`${p.name}-${p.az}`}
-							cx={g.ox + p.solved[0] * g.k}
-							cy={g.oy + p.solved[1] * g.k}
+							x={g.ox + p.solved[0] * g.k}
+							y={g.oy + p.solved[1] * g.k}
 							r={2.4}
-							fill="#fff"
+							data
+							seed={`band-ws-dot-${p.name}-${p.az}`}
+							color="#fff"
+							opacity={1}
 						/>
 					))}
 			</g>
-			<line x1={split} x2={split} y1={0} y2={h} stroke="#fff" strokeWidth={2} />
+			<PenLine
+				from={[split, 0]}
+				to={[split, h]}
+				seed={`band-ws-split-${d.id}`}
+				color="#fff"
+				width={2}
+			/>
 		</>
 	);
 };
@@ -1327,12 +1480,12 @@ const bandRoll = ({ d, all, w, h }: BandCtx) => {
 		)[card];
 		ticks.push(
 			<g key={v}>
-				<line
-					x1={X(v)}
-					x2={X(v)}
-					y1={rule}
-					y2={rule + (name ? 6 : 3)}
-					stroke={HAIRLINE}
+				<PenLine
+					from={[X(v), rule]}
+					to={[X(v), rule + (name ? 6 : 3)]}
+					seed={`band-roll-tick-${v}`}
+					color={HAIRLINE}
+					width={1}
 				/>
 				{name && (
 					<Txt x={X(v)} y={rule - 6} anchor="middle" fill={ROUTE}>
@@ -1347,13 +1500,12 @@ const bandRoll = ({ d, all, w, h }: BandCtx) => {
 	return (
 		<>
 			<Ground w={w} h={h} />
-			<line
-				x1={left}
-				x2={right}
-				y1={rule}
-				y2={rule}
-				stroke={HAIRLINE}
-				strokeWidth={1}
+			<PenLine
+				from={[left, rule]}
+				to={[right, rule]}
+				seed="band-roll-rule"
+				color={HAIRLINE}
+				width={1}
 			/>
 			{ticks}
 			{photos.map((p) => {
@@ -1365,13 +1517,12 @@ const bandRoll = ({ d, all, w, h }: BandCtx) => {
 				const th = (tw * p.photo.height) / p.photo.width;
 				return (
 					<g key={p.id} opacity={p.solved.accepted ? 1 : 0.5}>
-						<line
-							x1={x}
-							x2={x}
-							y1={rule}
-							y2={y}
-							stroke={HAIRLINE}
-							strokeWidth={0.8}
+						<PenLine
+							from={[x, rule]}
+							to={[x, y]}
+							seed={`band-roll-stem-${p.id}`}
+							color={HAIRLINE}
+							width={0.8}
 						/>
 						<image
 							href={p.photo.thumb}
@@ -1382,14 +1533,14 @@ const bandRoll = ({ d, all, w, h }: BandCtx) => {
 							preserveAspectRatio="xMidYMid slice"
 						/>
 						{p.id === d.id && (
-							<rect
+							<SketchRect
 								x={x - tw / 2 - 2}
 								y={y - 2}
 								width={tw + 4}
 								height={th + 4}
-								fill="none"
-								stroke={ROUTE}
-								strokeWidth={1.5}
+								seed={`band-roll-me-${p.id}`}
+								color={ROUTE}
+								penWidth={1.5}
 							/>
 						)}
 					</g>

@@ -75,7 +75,7 @@ export function layoutLabels(sheet: SheetData, sizes: SheetLabelSizes) {
 		(a, b) => (a.cls === "town" ? 0 : 1) - (b.cls === "town" ? 0 : 1),
 	);
 	for (const p of towns) {
-		const w = p.name.length * sizes.place * 0.78;
+		const w = p.name.length * sizes.place * 0.62;
 		if (
 			tryPlace({
 				x0: p.x - 8,
@@ -91,7 +91,7 @@ export function layoutLabels(sheet: SheetData, sizes: SheetLabelSizes) {
 	for (const p of ordered) {
 		const flipDefault = p.x > sheet.width - 360;
 		const w = Math.max(
-			p.name.length * sizes.peak * 0.56,
+			p.name.length * sizes.peak * 0.64,
 			String(p.ele).length * sizes.spot * 0.6,
 		);
 		for (const flip of [flipDefault, !flipDefault]) {

@@ -12,11 +12,13 @@ import {
 	HutBullet,
 	Legend,
 	PeakSymbol,
+	RegisterEntry,
 	RegisterLine,
 	RockSymbol,
 	RouteSymbol,
 	ScaleBar,
 	SheetFrame,
+	SheetStamp,
 	Signpost,
 	SpotHeight,
 	Standortfeld,
@@ -70,12 +72,16 @@ export function FurnitureSheet() {
 							kicker="Weiter"
 							title="Pose solver"
 							subtitle="ca. 6 min"
+							here={{ name: "Niederhorn", detail: "1963 m" }}
 						/>
 					</div>
 					<div className="flex flex-wrap items-center gap-6">
 						<SpotHeight value="1963" />
 						<SpotHeight value="1950" unit="m" />
+						<SpotHeight value="387" mark="x" />
+						<SpotHeight value="558" water />
 						<TrigPoint />
+						<TrigPoint height="1949.6" />
 						<TrigPoint size={12} filled />
 						<span className="inline-flex items-center gap-1">
 							<HutBullet /> <span className="text-[13px]">Hut</span>
@@ -84,14 +90,24 @@ export function FurnitureSheet() {
 							<HutBullet current /> <span className="text-[13px]">Current</span>
 						</span>
 						<Grade>T3</Grade>
-						<Grade>WS</Grade>
+						<Grade crux>WS+</Grade>
 						<StationStamp
 							place="Niederhorn"
 							date="26-09-14"
 							seed="niederhorn"
 						/>
+						<SheetStamp sheet="07" status="live" date="1.10.2026" seed="a" />
+						<SheetStamp sheet="12" status="killed" date="1.10.2026" seed="b" />
 					</div>
 					<div className="flex flex-col gap-3">
+						<RegisterEntry
+							date="7.9.2026"
+							time="15:28"
+							place="Niederhorn"
+							altitude={1886}
+							initials="R. C."
+							route="Viewport inference ③ Photo skyline"
+						/>
 						<Standortfeld place="Niederhorn" altitude={1963} />
 						<RegisterLine
 							items={[

@@ -9,8 +9,10 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { HandDot, PenLine, SketchPath } from "../notebook/Ink";
 import { TYPE } from "../swiss/type";
 import { useInView } from "../viz/hooks";
+import { HandLabel } from "../viz/labels";
 import {
 	type GipfelbuchPeak,
 	type GipfelbuchPhotoData,
@@ -107,7 +109,13 @@ function defaultLayer({ d, s }: TafelCtx) {
 	return (
 		<g fill="none" strokeLinejoin="round" strokeLinecap="round">
 			<path d={path} stroke="#fff" strokeOpacity={0.75} strokeWidth={4.5 / s} />
-			<path d={path} stroke={LAYER_STYLE.skyline.color} strokeWidth={2 / s} />
+			<SketchPath
+				d={path}
+				data
+				seed={`tafel-default-skyline-${d.id}`}
+				color={LAYER_STYLE.skyline.color}
+				width={2 / s}
+			/>
 		</g>
 	);
 }
@@ -259,7 +267,7 @@ export function Tafel({
 				className="mt-3 flex flex-col gap-1.5 sm:flex-row sm:justify-between sm:gap-6"
 				style={{ marginLeft: ox, width: photoW }}
 			>
-				<span className={TYPE.caption}>
+				<span className={`${TYPE.caption} nb-hand`}>
 					{caption ??
 						"The photo band with its measured skyline; the terrain carries on past the frame."}
 				</span>
@@ -435,35 +443,33 @@ function TafelStage(props: {
 				width={W}
 				height={rulerY + 14}
 			>
-				<line
-					x1={0}
-					x2={W}
-					y1={rulerY}
-					y2={rulerY}
-					stroke="var(--gb-relief)"
-					strokeWidth={1}
+				<PenLine
+					from={[0, rulerY]}
+					to={[W, rulerY]}
+					seed="tafel-ruler"
+					color="var(--gb-secondary)"
+					width={1}
 				/>
 				{ticks.map((t) => (
 					<g key={t.az}>
-						<line
-							x1={t.x}
-							x2={t.x}
-							y1={rulerY}
-							y2={rulerY + (t.label ? 8 : 4)}
-							stroke={t.cardinal ? "var(--gb-red)" : "var(--gb-secondary)"}
-							strokeWidth={1}
+						<PenLine
+							from={[t.x, rulerY]}
+							to={[t.x, rulerY + (t.label ? 8 : 4)]}
+							seed={`tafel-ruler-tick-${t.az}`}
+							color={t.cardinal ? "var(--gb-red)" : "var(--gb-secondary)"}
+							width={1}
 						/>
 						{t.label && (
-							<text
+							<HandLabel
 								x={t.x}
 								y={rulerY - 8}
-								textAnchor="middle"
-								className={TYPE.micro}
-								fill={t.cardinal ? "var(--gb-red)" : "var(--gb-secondary)"}
-								fontWeight={t.cardinal ? 500 : 400}
+								anchor="middle"
+								size={12}
+								caps={t.cardinal}
+								color={t.cardinal ? "var(--gb-red)" : "var(--gb-secondary)"}
 							>
 								{t.label}
-							</text>
+							</HandLabel>
 						)}
 					</g>
 				))}
@@ -507,47 +513,63 @@ function TafelStage(props: {
 									fill="#fff"
 									textAnchor="middle"
 								>
-									<line
-										x1={wx}
-										x2={wx}
-										y1={ly + 4 * u}
-										y2={y - 3 * u}
-										stroke="#fff"
-										strokeOpacity={0.7}
-										strokeWidth={0.8 * u}
+									<PenLine
+										from={[wx, ly + 4 * u]}
+										to={[wx, y - 3 * u]}
+										seed={`tafel-peak-leader-${p.name}`}
+										color="#fff"
+										opacity={0.7}
+										width={0.8 * u}
 									/>
-									<circle cx={wx} cy={y} r={2.4 * u} />
-									<text
+									<HandDot
+										x={wx}
+										y={y}
+										r={2.4 * u}
+										data
+										seed={`tafel-peak-dot-${p.name}`}
+										color="#fff"
+										opacity={1}
+									/>
+									<HandLabel
 										x={wx}
 										y={ly - 11 * u}
-										fontSize={13 * u}
-										fontWeight={600}
-										fontFamily="var(--gb-font-sans)"
+										anchor="middle"
+										size={13 * u}
+										caps
+										color="#fff"
+										halo={3 * u}
+										haloColor="rgba(0,0,0,0.55)"
 									>
 										{p.name}
-									</text>
-									<text
+									</HandLabel>
+									<HandLabel
 										x={wx}
 										y={ly + 1 * u}
-										fontSize={11 * u}
-										fontFamily="var(--gb-font-mono)"
+										anchor="middle"
+										size={11 * u}
+										italic
+										color="#fff"
+										halo={3 * u}
+										haloColor="rgba(0,0,0,0.55)"
 									>
 										{`${Math.round(p.ele ?? p.dem)} m · ${kmText(p.distance)} km`}
-									</text>
+									</HandLabel>
 								</g>
 							);
 						})}
 						{noteList.map((n) => (
-							<text
+							<HandLabel
 								key={n.text}
 								x={n.at[0]}
 								y={n.at[1]}
-								className="tafel-hand tafel-onphoto"
-								fontSize={16 * u}
-								fill={NOTE_COLOR[n.tone ?? "photo"]}
+								size={16 * u}
+								mono={false}
+								color={NOTE_COLOR[n.tone ?? "photo"]}
+								halo={3 * u}
+								haloColor="rgba(0,0,0,0.55)"
 							>
 								{n.text}
-							</text>
+							</HandLabel>
 						))}
 					</g>
 				</svg>
@@ -565,37 +587,45 @@ function TafelStage(props: {
 						const ly = y - 24 - tier * 30;
 						return (
 							<g key={p.name} textAnchor="middle">
-								<line
-									x1={x}
-									x2={x}
-									y1={ly + 4}
-									y2={y - 3}
-									stroke="var(--gb-navy)"
-									strokeOpacity={0.7}
-									strokeWidth={0.8}
+								<PenLine
+									from={[x, ly + 4]}
+									to={[x, y - 3]}
+									seed={`tafel-spill-leader-${p.name}`}
+									color="var(--gb-navy)"
+									opacity={0.7}
+									width={0.8}
 								/>
-								<circle cx={x} cy={y} r={2.4} fill="var(--gb-navy)" />
-								<text
+								<HandDot
+									x={x}
+									y={y}
+									r={2.4}
+									data
+									seed={`tafel-spill-dot-${p.name}`}
+									color="var(--gb-navy)"
+									opacity={1}
+								/>
+								<HandLabel
 									x={x}
 									y={ly - 11}
-									fontSize={13}
-									fontWeight={600}
-									fontFamily="var(--gb-font-sans)"
-									fill="var(--gb-navy)"
-									className="tafel-halo"
+									anchor="middle"
+									size={13}
+									caps
+									color="var(--gb-navy)"
+									haloColor="var(--gb-paper-deep)"
 								>
 									{p.name}
-								</text>
-								<text
+								</HandLabel>
+								<HandLabel
 									x={x}
 									y={ly + 1}
-									fontSize={11}
-									fontFamily="var(--gb-font-mono)"
-									fill="var(--gb-secondary)"
-									className="tafel-halo"
+									anchor="middle"
+									size={11}
+									italic
+									color="var(--gb-secondary)"
+									haloColor="var(--gb-paper-deep)"
 								>
 									{`${Math.round(p.ele)} m · ${kmText(p.km * 1000)} km`}
-								</text>
+								</HandLabel>
 							</g>
 						);
 					})}

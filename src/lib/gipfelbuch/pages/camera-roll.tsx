@@ -10,11 +10,13 @@ import {
 	HandText,
 	type InkColor,
 	inkColor,
+	PenArrow,
 	PenCircle,
 	PenLine,
 	SketchPath,
 	SketchRect,
 } from "#/components/gipfelbuch/notebook/Ink";
+import { HandMark, Wash } from "#/components/gipfelbuch/notebook/marks";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
@@ -25,12 +27,14 @@ import {
 	Eq,
 	Figure,
 	type GipfelbuchPhotoData,
+	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
-	PrintLabel,
 	RealPhoto,
 	Steps,
+	StoryMap,
 	Sym,
 	useGipfelbuchPhoto,
 	useTime,
@@ -95,22 +99,19 @@ function RayLabel({
 	// keep the text upright; `side` stays on the same geometric side of the ray
 	if (Math.cos(rot * D) < 0) rot += 180;
 	const off = side;
+	const lx = x + at * Math.sin(a) + off * nx;
+	const ly = y - at * Math.cos(a) + off * ny;
 	return (
-		<text
-			x={x + at * Math.sin(a) + off * nx}
-			y={y - at * Math.cos(a) + off * ny}
-			textAnchor="middle"
-			fontSize={size <= 12 ? 11 : 13}
-			fill={inkColor(color)}
-			transform={`rotate(${rot} ${x + at * Math.sin(a) + off * nx} ${y - at * Math.cos(a) + off * ny})`}
-			paintOrder="stroke"
-			stroke={SWISS.paper}
-			strokeWidth={3}
-			strokeLinejoin="round"
-			className="gb-num"
+		<HandLabel
+			x={lx}
+			y={ly}
+			anchor="middle"
+			size={size <= 12 ? 11 : 13}
+			color={inkColor(color)}
+			rotate={rot}
 		>
 			{children}
-		</text>
+		</HandLabel>
 	);
 }
 const CHIP_ON =
@@ -320,19 +321,14 @@ function RollLinker() {
 						seed="rl-scale-b"
 						width={1.3}
 					/>
-					<text
+					<HandLabel
 						x={28 + linkKm * KS}
 						y={230}
-						fontSize={FIG_LABEL}
-						fill={SWISS.secondary}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						size={FIG_LABEL}
+						color={SWISS.secondary}
 					>
 						{`link < ${linkKm.toFixed(0)} km`}
-					</text>
+					</HandLabel>
 					{/* links: the dashes crawl along the pen line */}
 					<g strokeDashoffset={-t * 8}>
 						{links.map(([i, j]) => (
@@ -363,20 +359,15 @@ function RollLinker() {
 								color={PAL[k % PAL.length]}
 								width={1.4}
 							/>
-							<text
+							<HandLabel
 								x={r.c.x * KS}
 								y={r.c.y * KS - Math.max(10, r.r * KS + 12) - 6}
-								textAnchor="middle"
-								fontSize={FIG_LABEL}
-								fill={inkColor(PAL[k % PAL.length])}
-								paintOrder="stroke"
-								stroke={SWISS.paper}
-								strokeWidth={3}
-								strokeLinejoin="round"
-								className="gb-num"
+								anchor="middle"
+								size={FIG_LABEL}
+								color={inkColor(PAL[k % PAL.length])}
 							>
 								{`roll ${k + 1} · ${r.n} photo${r.n > 1 ? "s" : ""} · r ${r.r.toFixed(1)} km`}
-							</text>
+							</HandLabel>
 						</g>
 					))}
 					{pts.map((p, i) => (
@@ -390,6 +381,26 @@ function RollLinker() {
 							opacity={1}
 						/>
 					))}
+					<HandText x={150} y={44} size={15} color="pencil">
+						at 15 km a whole hike is one roll
+					</HandText>
+					<PenArrow
+						from={[205, 54]}
+						to={[130, 120]}
+						seed="rl-note-hike"
+						color="pencil"
+						width={1.1}
+					/>
+					<HandText x={400} y={44} size={15} color="pencil">
+						the valley, 17 km on: its own roll
+					</HandText>
+					<PenArrow
+						from={[470, 54]}
+						to={[490, 132]}
+						seed="rl-note-valley"
+						color="pencil"
+						width={1.1}
+					/>
 					{pass && (
 						<HandText
 							x={PASS.x * KS}
@@ -516,14 +527,10 @@ function ViewpointWalk() {
 						const c = WALK[q.first];
 						return (
 							<g key={`vp-${q.first}`}>
-								<circle
-									cx={c.x * VS}
-									cy={c.y * VS + 40}
-									r={VP_M * VS}
-									style={{
-										fill: `color-mix(in srgb, ${inkColor(PAL[k % PAL.length])} 12%, var(--gb-paper))`,
-										mixBlendMode: "multiply",
-									}}
+								<Wash
+									d={`M${c.x * VS - VP_M * VS} ${c.y * VS + 40}a${VP_M * VS} ${VP_M * VS} 0 1 0 ${2 * VP_M * VS} 0a${VP_M * VS} ${VP_M * VS} 0 1 0 ${-2 * VP_M * VS} 0Z`}
+									color={PAL[k % PAL.length]}
+									seed={`vw-wash-${q.first}`}
 								/>
 								<PenCircle
 									center={[c.x * VS, c.y * VS + 40]}
@@ -533,20 +540,15 @@ function ViewpointWalk() {
 									width={1.4}
 									dash="5 4"
 								/>
-								<text
+								<HandLabel
 									x={c.x * VS}
 									y={c.y * VS + 40 - VP_M * VS + 14}
-									textAnchor="middle"
-									fontSize={FIG_LABEL}
-									fill={inkColor(PAL[k % PAL.length])}
-									paintOrder="stroke"
-									stroke={SWISS.paper}
-									strokeWidth={3}
-									strokeLinejoin="round"
-									className="gb-num"
+									anchor="middle"
+									size={FIG_LABEL}
+									color={inkColor(PAL[k % PAL.length])}
 								>
 									{`viewpoint ${k + 1} · ${q.members.length}`}
-								</text>
+								</HandLabel>
 							</g>
 						);
 					})}
@@ -560,19 +562,14 @@ function ViewpointWalk() {
 								color={PAL[owner[i] % PAL.length]}
 								opacity={1}
 							/>
-							<text
+							<HandLabel
 								x={p.x * VS + 8}
 								y={p.y * VS + 40 + 4}
-								fontSize={FIG_LABEL}
-								fill={SWISS.ink}
-								paintOrder="stroke"
-								stroke={SWISS.paper}
-								strokeWidth={3}
-								strokeLinejoin="round"
-								className="gb-num"
+								size={FIG_LABEL}
+								color={SWISS.ink}
 							>
 								{p.name}
-							</text>
+							</HandLabel>
 						</g>
 					))}
 					{done &&
@@ -586,6 +583,9 @@ function ViewpointWalk() {
 								passes={1}
 							/>
 						))}
+					<HandText x={330} y={-8} size={14} color="pencil">
+						the first photo within 250 m opens a viewpoint, not the nearest
+					</HandText>
 					{n >= 6 && owner[5] !== nearest(5) && (
 						<HandText x={14} y={290} size={14} color="pencil">
 							f joined viewpoint {owner[5] + 1} (first within 250 m), not the
@@ -866,34 +866,27 @@ function CompassBias() {
 						width={1.6}
 						passes={1}
 					/>
-					<text
+					<HandLabel
 						x={cx}
 						y={16}
-						textAnchor="middle"
-						fontSize={13}
-						fill={SWISS.secondary}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						anchor="middle"
+						size={13}
+						color={SWISS.secondary}
 					>
 						N
-					</text>
-					<text
+					</HandLabel>
+					<HandLabel
 						x={cx}
 						y={cy + 26}
-						textAnchor="middle"
-						fontSize={13}
-						fill={SWISS.ink}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						anchor="middle"
+						size={13}
+						color={SWISS.ink}
 					>
 						{inside ? "in window" : "outside"}
-					</text>
+					</HandLabel>
+					<HandText x={150} y={290} size={14} color="pencil" anchor="middle">
+						photo d is 70 min old, outside the 45 min window
+					</HandText>
 				</svg>
 				<div className="space-y-3">
 					<div
@@ -1186,27 +1179,23 @@ function PanoramaStrip() {
 						</g>
 					))}
 					{[0, 30, 60, 90].map((a) => (
-						<text
+						<HandLabel
 							key={a}
 							x={px(a)}
 							y={PH - 8}
-							textAnchor="middle"
-							className="nb-num"
-							fontSize={FIG_LABEL_SMALL}
-							fill="var(--nb-faint)"
+							anchor="middle"
+							size={FIG_LABEL_SMALL}
+							color="var(--nb-faint)"
 						>
 							{`${a}°`}
-						</text>
+						</HandLabel>
 					))}
-					<text
-						x={10}
-						y={18}
-						fontSize={FIG_LABEL}
-						fill={SWISS.secondary}
-						className="gb-num"
-					>
+					<HandLabel x={10} y={18} size={FIG_LABEL} color={SWISS.secondary}>
 						azimuth → · elevation ↑
-					</text>
+					</HandLabel>
+					<HandText x={10} y={40} size={14} color="pencil">
+						the DEM ridge drawn over each photo is the match cue
+					</HandText>
 					<HandText
 						x={PW - 10}
 						y={18}
@@ -1393,14 +1382,15 @@ function RealRoll() {
 									preserveAspectRatio="xMidYMid slice"
 									opacity={on ? 1 : 0.6}
 								/>
-								<rect
+								<SketchRect
 									x={i * slot + 2}
 									y={4}
 									width={slot - 4}
 									height={th}
-									fill="none"
-									stroke={r.accepted ? LAYER_STYLE.solved.color : SWISS.contour}
-									strokeWidth={on ? 2.4 : 1.2}
+									seed={`rr-frame-${r.id}`}
+									color={r.accepted ? LAYER_STYLE.solved.color : SWISS.contour}
+									penWidth={on ? 2.4 : 1.2}
+									passes={1}
 								/>
 								{on && (
 									<SketchRect
@@ -1432,16 +1422,15 @@ function RealRoll() {
 							seed={`rr-tick-${m}`}
 							width={1}
 						/>
-						<text
+						<HandLabel
 							x={tx(m * 60)}
 							y={139}
-							textAnchor="middle"
-							fontSize="11"
-							className="nb-num"
-							fill="var(--nb-faint)"
+							anchor="middle"
+							size={11}
+							color="var(--nb-faint)"
 						>
 							+{m} min
-						</text>
+						</HandLabel>
 					</g>
 				))}
 			</svg>
@@ -1573,12 +1562,12 @@ function RealRoll() {
 						seed="rr-scale"
 						width={1.6}
 					/>
-					<PrintLabel x={16} y={S - 22} color={SWISS.secondary}>
+					<HandLabel x={16} y={S - 22} color={SWISS.secondary}>
 						100 m
-					</PrintLabel>
-					<PrintLabel x={S - 8} y={18} anchor="end" color={SWISS.secondary}>
+					</HandLabel>
+					<HandLabel x={S - 8} y={18} anchor="end" color={SWISS.secondary}>
 						N↑ · dashed ring = 250 m
-					</PrintLabel>
+					</HandLabel>
 				</svg>
 				<div
 					className={`min-w-0 space-y-3 font-mono ${TYPE.micro} gb-secondary`}
@@ -1673,17 +1662,16 @@ function RealBias() {
 							color={v === 0 ? "ink" : "faint"}
 							width={v === 0 ? 1.2 : 0.5}
 						/>
-						<text
+						<HandLabel
 							x={L - 6}
 							y={Y(v) + 3.5}
-							textAnchor="end"
-							fontSize="11"
-							className="nb-num"
-							fill="var(--nb-faint)"
+							anchor="end"
+							size={11}
+							color="var(--nb-faint)"
 						>
 							{v > 0 ? "+" : v < 0 ? "−" : ""}
 							{Math.abs(v)}°
-						</text>
+						</HandLabel>
 					</g>
 				))}
 				{rows.map((r, i) => (
@@ -1728,26 +1716,24 @@ function RealBias() {
 								width={1.8}
 							/>
 						)}
-						<text
+						<HandLabel
 							x={X(i)}
 							y={H - 24}
-							textAnchor="middle"
-							fontSize="11"
-							className="nb-num"
-							fill="var(--nb-ink)"
+							anchor="middle"
+							size={11}
+							color="var(--nb-ink)"
 						>
 							{num(r.id)}
-						</text>
-						<text
+						</HandLabel>
+						<HandLabel
 							x={X(i)}
 							y={H - 10}
-							textAnchor="middle"
-							fontSize="11"
-							className="nb-num"
-							fill="var(--nb-faint)"
+							anchor="middle"
+							size={11}
+							color="var(--nb-faint)"
 						>
 							{mmss(r.t)}
-						</text>
+						</HandLabel>
 					</g>
 				))}
 			</svg>
@@ -1884,14 +1870,20 @@ function HeroStages() {
 														? LAYER_STYLE.solved.color
 														: SWISS.contour;
 													return (
-														<path
-															key={r.id}
-															d={d}
-															fill={tone}
-															fillOpacity={0.12}
-															stroke={tone}
-															strokeWidth={1.3}
-														/>
+														<g key={r.id}>
+															<Wash
+																d={d}
+																color={tone}
+																seed={`hs-cone-${r.id}`}
+															/>
+															<SketchPath
+																d={d}
+																data
+																seed={`hs-cone-edge-${r.id}`}
+																color={tone}
+																width={1.3}
+															/>
+														</g>
 													);
 												})}
 											</g>
@@ -1963,7 +1955,7 @@ function MiniPlan() {
 function MiniAim() {
 	const [photo] = useNotebookPhoto();
 	const d = useGipfelbuchPhoto(photo);
-	return <DemPatch data={d} cone={["prior", "solved"]} peaks={false} />;
+	return <StoryMap data={d} search readout={false} />;
 }
 
 function RollNumbers() {
@@ -2020,8 +2012,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					in the right place.
 				</p>
 				<p>
-					The phone's compass is the weak part. Slide it below and watch every
-					photo settle onto the terrain's skyline.
+					<HandMark type="highlight">
+						The phone's compass is the weak part.
+					</HandMark>{" "}
+					Slide it below and watch every photo settle onto the terrain's
+					skyline.
 				</p>
 			</Beat>
 
@@ -2031,6 +2026,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<p>
 					Each photo sits on the plan at its true GPS time and place. The big
 					circles are how far the phone's GPS could be off.
+					<MarginNote mark="a">
+						all 12 positions lie within about 110 m, so the pins pile up
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -2095,7 +2093,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Photos from one spot often share a compass error. Here it does for a
-					while, then the heading changes.
+					while, <HandMark type="wavy">then the heading changes</HandMark>.
+					<MarginNote mark="b">
+						so a bias from 45 minutes ago is already doubtful
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -2107,9 +2108,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<p>
 					A <code>Roll</code> is derived on the fly from photo metadata plus
 					whatever poses the browser already remembers. Two small distance rules
-					structure it, and a pose ladder aims each photo. Solving a pose from
-					scratch is the job of {A("viewport-inference", "viewport inference")},
-					so the roll never repeats it just to draw a screen.
+					structure it, and a <HandMark type="underline">pose ladder</HandMark>{" "}
+					aims each photo. Solving a pose from scratch is the job of{" "}
+					{A("viewport-inference", "viewport inference")}, so the roll never
+					repeats it just to draw a screen.
 				</p>
 
 				<RollLinker />
@@ -2159,10 +2161,14 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 						phone's compass bias, so every anchored photo gives its neighbours a
 						better starting prior (the real roll below shows where that holds
 						and where it does not). The estimate is the median of the anchors'
-						yaw offsets, so a single wrong anchor cannot drag it. It is used
-						only between 1° and 90°, and only for anchors within 45 minutes (
-						<code>BIAS_WINDOW_S</code>). A photo rejected before its spot had an
-						anchor gets one retry when the new bias differs by at least 2°.
+						yaw offsets,{" "}
+						<HandMark type="double">
+							so a single wrong anchor cannot drag it
+						</HandMark>
+						. It is used only between 1° and 90°, and only for anchors within 45
+						minutes (<code>BIAS_WINDOW_S</code>). A photo rejected before its
+						spot had an anchor gets one retry when the new bias differs by at
+						least 2°.
 					</p>
 				</div>
 

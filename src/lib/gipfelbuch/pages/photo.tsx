@@ -4,26 +4,29 @@
 
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
+import { NorthArrow } from "#/components/gipfelbuch/notebook/carto";
 import {
 	Hachure,
 	HandDot,
 	HandText,
+	PenArrow,
 	PenLine,
 	SketchPath,
 } from "#/components/gipfelbuch/notebook/Ink";
+import { HandMark } from "#/components/gipfelbuch/notebook/marks";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import {
 	Callout,
 	CodeRef,
-	CrispLine,
 	Figure,
 	GIPFELBUCH_PHOTO_IDS,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
 	PhotoPicker,
-	PrintLabel,
 	RealPhoto,
 	Section,
 	Steps,
@@ -249,15 +252,6 @@ function Anatomy({
 						const y = H * 0.13 + Math.floor(k / 2) * H * 0.23;
 						return (
 							<g key={s}>
-								<rect
-									x={x - 2}
-									y={y + 6}
-									width={s.length * 6.2 + 10}
-									height={17}
-									style={{
-										fill: "color-mix(in srgb, var(--gb-paper) 85%, transparent)",
-									}}
-								/>
 								<PenLine
 									seed={`ph-exif-${s}`}
 									from={[x, y + 26]}
@@ -265,30 +259,39 @@ function Anatomy({
 									color="ink"
 									width={1.2}
 								/>
-								<PrintLabel
-									x={x + 2}
-									y={y + 20}
-									size={10}
-									color="var(--gb-ink)"
-								>
+								<HandLabel x={x + 2} y={y + 20} size={10} color="var(--gb-ink)">
 									{s}
-								</PrintLabel>
+								</HandLabel>
 							</g>
 						);
 					})}
 				</g>
+				<g style={{ transition: tr, opacity: i === 1 ? 1 : 0 }}>
+					<HandText
+						x={W - 14}
+						y={H - 16}
+						size={16}
+						anchor="end"
+						color="red"
+						rotate={-2}
+					>
+						no solved pose yet, only what it wrote
+					</HandText>
+				</g>
 				{/* derived prior: horizon, centre cross, fov brackets */}
 				<g style={{ transition: tr, opacity: i === 2 ? 1 : 0 }}>
 					<g transform={`rotate(${-P.roll} ${W / 2} ${H / 2})`}>
-						<CrispLine
+						<SketchPath
 							d={`M-40 ${horizonY}H${W + 40}`}
+							seed={`ph-prior-horizon-${id}`}
+							data
 							color={LAYER_STYLE.prior.color}
 							width={2.2}
 							dash="6 5"
 						/>
-						<PrintLabel x={10} y={horizonY - 6} color={LAYER_STYLE.prior.color}>
+						<HandLabel x={10} y={horizonY - 6} color={LAYER_STYLE.prior.color}>
 							prior horizon
-						</PrintLabel>
+						</HandLabel>
 					</g>
 					<PenLine
 						seed="ph-cross-h"
@@ -326,17 +329,22 @@ function Anatomy({
 						to={[W - 14, H - 14]}
 						width={1.3}
 					/>
-					<PrintLabel x={W - 22} y={H / 2} anchor="end" color="var(--gb-ink)">
+					<HandText x={20} y={H * 0.3} size={16} color="pencil" rotate={-2}>
+						gravity set this line: does it level?
+					</HandText>
+					<PenArrow
+						seed="ph-note-horizon"
+						from={[60, H * 0.3 + 6]}
+						to={[70, horizonY - 12]}
+						color="pencil"
+						width={1.1}
+					/>
+					<HandLabel x={W - 22} y={H / 2} anchor="end" color="var(--gb-ink)">
 						vfov {P.vfov.toFixed(1)}°
-					</PrintLabel>
-					<PrintLabel
-						x={W / 2}
-						y={H - 22}
-						anchor="middle"
-						color="var(--gb-ink)"
-					>
+					</HandLabel>
+					<HandLabel x={W / 2} y={H - 22} anchor="middle" color="var(--gb-ink)">
 						hfov {HFOV.toFixed(1)}°
-					</PrintLabel>
+					</HandLabel>
 				</g>
 				{/* region map: the photo fades to paper and the view cone is hatched */}
 				<g style={{ transition: tr, opacity: on(3) && mapMode ? 1 : 0 }}>
@@ -375,15 +383,16 @@ function Anatomy({
 						width={1.4}
 					/>
 					<HandDot x={cx} y={cy} r={4.5} seed={`ph-camera-${id}`} color="ink" />
-					<PrintLabel x={cx + 12} y={cy + 5} color="var(--gb-ink)">
+					<HandLabel x={cx + 12} y={cy + 5} color="var(--gb-ink)">
 						photo, ±{P.hAcc.toFixed(0)} m
-					</PrintLabel>
-					<PrintLabel x={352} y={H - 38} anchor="end" color="var(--gb-water)">
+					</HandLabel>
+					<HandLabel x={352} y={H - 38} anchor="end" color="var(--gb-water)">
 						yaw {P.heading.toFixed(0)}° · hfov {HFOV.toFixed(0)}°
-					</PrintLabel>
-					<PrintLabel x={200} y={40} anchor="middle" color="var(--gb-ink)">
-						N
-					</PrintLabel>
+					</HandLabel>
+					<NorthArrow x={340} y={96} length={30} seed="ph-north" color="ink" />
+					<HandText x={cx + 8} y={cy - 130} size={15} color="red">
+						heading is a prior, not the truth
+					</HandText>
 				</g>
 			</svg>
 
@@ -841,6 +850,23 @@ function HeroMarks() {
 						<Mark x={W / 2} y={H * 0.5} n={4} k={1.9} />
 						<Mark x={W * 0.9} y={H * 0.5} n={5} k={1.9} />
 						<Mark x={W * 0.9} y={H - 50} n={6} k={1.9} />
+						<HandText
+							x={W / 2 + 70}
+							y={H * 0.32}
+							size={34}
+							color="red"
+							rotate={-2}
+						>
+							up to 19° off on the demo set
+						</HandText>
+						<PenArrow
+							seed="ph-hero-compass"
+							from={[W / 2 + 90, H * 0.32 + 14]}
+							to={[W / 2 + 18, H * 0.5 - 24]}
+							color="red"
+							width={2.4}
+							head={14}
+						/>
 					</>
 				)}
 			</RealPhoto>
@@ -930,12 +956,16 @@ function TiltMini({ d }: { d: GipfelbuchPhotoData | null }) {
 				<SketchPath
 					d={`M0 ${y}H160`}
 					seed="ph-tilt-horizon"
+					data
 					color="blue"
 					width={2}
 					dash="5 3"
 				/>
 			</g>
-			<PrintLabel
+			<HandText x={96} y={36} size={13} color="pencil" rotate={-3}>
+				horizon slopes with roll
+			</HandText>
+			<HandLabel
 				x={80}
 				y={116}
 				anchor="middle"
@@ -943,7 +973,7 @@ function TiltMini({ d }: { d: GipfelbuchPhotoData | null }) {
 				color="var(--gb-secondary)"
 			>
 				pitch {signed(pitch)}° · roll {signed(roll)}°
-			</PrintLabel>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -962,7 +992,7 @@ function LensMini({ d }: { d: GipfelbuchPhotoData | null }) {
 			<Hachure d={wedge} seed="ph-lens-fill" color="blue" gap={5} />
 			<SketchPath d={wedge} seed="ph-lens-edge" color="blue" width={1.4} />
 			<HandDot x={80} y={108} r={3.4} seed="ph-lens-eye" />
-			<PrintLabel
+			<HandLabel
 				x={80}
 				y={64}
 				anchor="middle"
@@ -970,7 +1000,7 @@ function LensMini({ d }: { d: GipfelbuchPhotoData | null }) {
 				color="var(--gb-ink)"
 			>
 				{d.prior.hfov.toFixed(0)}° wide
-			</PrintLabel>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -1016,9 +1046,7 @@ function AltitudeCheck() {
 					Math.abs(d.gps.alt - d.gps.ground) > 200 ? "failure" : "neutral"
 				}
 				tile={(d) => (
-					<div
-						className={`overflow-hidden ${Math.abs(d.gps.alt - d.gps.ground) > 200 ? "ring-2 ring-[var(--gb-red)]" : ""}`}
-					>
+					<div className="overflow-hidden">
 						<RealPhoto data={d} layers={[]} crop={ridgeCrop(d)} />
 					</div>
 				)}
@@ -1147,10 +1175,18 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="A photo is pixels plus what the phone knew."
 			>
 				<p>
-					The phone writes down where it was and how it was held. That is a good
-					first guess, not an answer.
+					The phone writes down where it was and how it was held.{" "}
+					<HandMark type="highlight">
+						That is a good first guess, not an answer.
+					</HandMark>
+					<MarginNote mark="a">
+						I notice six facts, and none came from the pixels.
+					</MarginNote>
 				</p>
-				<p>Only the pixels can say which way the camera really pointed.</p>
+				<p>
+					Only the <HandMark type="underline">pixels</HandMark> can say which
+					way the camera really pointed.
+				</p>
 			</Beat>
 
 			<Beat
@@ -1177,6 +1213,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					]}
 				/>
 				<LensEquation />
+				<p>
+					<HandMark type="underline">Gravity</HandMark> fixes pitch and roll,
+					and focal fixes the field of view.
+					<MarginNote mark="d">
+						So only yaw and position are left to find.
+					</MarginNote>
+				</p>
 			</Beat>
 
 			<Beat
@@ -1184,10 +1227,18 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="A tag can lie, so one tag never decides alone."
 			>
 				<p>
-					Demo-09 says it was 730 m below the ground. We take the higher of the
-					GPS height and the ground plus 1.6 m.
+					Demo-09 says it was{" "}
+					<HandMark type="wavy">730 m below the ground</HandMark>. We take the
+					higher of the GPS height and the ground plus 1.6 m.
+					<MarginNote mark="b">
+						730 m under the rock? Then the tag is wrong, not the map.
+					</MarginNote>
 				</p>
-				<p>If a tag is missing, we search for that value instead.</p>
+				<p>
+					If a tag is missing, we{" "}
+					<HandMark type="double">search for that value instead</HandMark>.
+					<MarginNote mark="c">Missing is fine; made up is not.</MarginNote>
+				</p>
 			</Beat>
 
 			<AltitudeCheck />

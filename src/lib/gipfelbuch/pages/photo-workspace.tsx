@@ -5,11 +5,17 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
+	CircledNumber,
+	HandMark,
+	Wash,
+} from "#/components/gipfelbuch/notebook";
+import {
 	Hachure,
 	HandDot,
 	HandText,
 	type InkColor,
 	inkColor,
+	PenArrow,
 	PenCircle,
 	PenLine,
 	SketchPolyline,
@@ -17,20 +23,23 @@ import {
 } from "#/components/gipfelbuch/notebook/Ink";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import {
+	AlignmentStoryProvider,
 	Callout,
 	CodeRef,
 	Eq,
 	Figure,
 	Frac,
+	HandLabel,
+	HandNote,
 	HandRange,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
-	PrintLabel,
-	PrintNote,
 	RealPhoto,
 	Section,
 	Stat,
 	Steps,
+	StoryMap,
 	Sym,
 	useGipfelbuchPhoto,
 	useReducedMotion,
@@ -64,7 +73,6 @@ const ease = (k: number) => {
 	return x * x * (3 - 2 * x);
 };
 
-const PAPER = "var(--nb-paper)";
 const CHIP_ON =
 	"bg-[var(--nb-highlight,var(--accent))] text-[var(--gb-ink)] underline decoration-[var(--nb-red)] decoration-2 underline-offset-4";
 const INKVAR: Record<string, string> = {
@@ -77,9 +85,6 @@ const INKVAR: Record<string, string> = {
 	ink: "var(--gb-ink)",
 	neutral: "var(--nb-pencil)",
 };
-/** A solid graded tint of an ink for value-carrying marks (hatch decorates on top). */
-const tintOf = (color: string, pct: number) =>
-	`color-mix(in srgb, ${color} ${pct}%, var(--gb-paper))`;
 const CHIP_OFF =
 	"bg-[var(--nb-paper-deep)] text-[color-mix(in_oklab,var(--gb-ink)_80%,transparent)]";
 
@@ -314,9 +319,11 @@ function PoseJourney() {
 					</defs>
 					<g clipPath="url(#pw-clip)">
 						{/* the photo's skyline: hachured ground under a pencil crest */}
-						<path
+						<Wash
 							d={RIDGE_FILL}
-							style={{ fill: tintOf("var(--nb-pencil)", 18) }}
+							color="var(--nb-pencil)"
+							seed="pw-wash-1"
+							layers={5}
 						/>
 						<Hachure
 							d={RIDGE_FILL}
@@ -401,9 +408,11 @@ function PoseJourney() {
 						)}
 						{banner && (
 							<g>
-								<path
+								<Wash
 									d={BOX(120, 12, 400, 38)}
-									style={{ fill: tintOf(INKVAR.brown, 30) }}
+									color={INKVAR.brown}
+									seed="pw-wash-2"
+									layers={5}
 								/>
 								<Hachure
 									d={BOX(120, 12, 400, 38)}
@@ -416,18 +425,56 @@ function PoseJourney() {
 								<HandText x={132} y={30} size={15} color="ink">
 									Unverified alignment.
 								</HandText>
-								<PrintNote x={132} y={45} size={FIG_NAME} color="var(--gb-ink)">
+								<HandNote x={132} y={45} size={FIG_NAME} color="var(--gb-ink)">
 									The skyline solvers disagree: drag, use Heading, or pin a
 									peak.
-								</PrintNote>
+								</HandNote>
 							</g>
 						)}
-						<PrintNote x={W - 10} y={140} anchor="end" size={FIG_LABEL}>
+						<HandNote x={W - 10} y={140} anchor="end" size={FIG_LABEL}>
 							{overlayOp > 0.05
 								? `overlay yaw error ${off >= 0 ? "+" : "−"}${Math.abs(off).toFixed(2)}°`
 								: "overlay held"}
-						</PrintNote>
+						</HandNote>
 					</g>
+
+					{/* hand note: what this scenario shows, keyed to its last state */}
+					{(() => {
+						const lastA = sc.segs[sc.segs.length - 1].a;
+						const left = lastA >= 4;
+						const hx = left ? xT(lastA) - 10 : xT(lastA) + 16;
+						const text =
+							(
+								{
+									saved: "nothing re-solved: exports open at once",
+									verified: "two solvers within 1°: agreed ✓",
+									refined: "first guess +2.98° off, cascade says −0.02°",
+									unverified: "weak skyline: ask the match service",
+								} as Record<string, string>
+							)[sc.id] ?? "";
+						return (
+							<g>
+								<HandText
+									x={hx}
+									y={178}
+									anchor={left ? "end" : "start"}
+									size={15}
+									color={sc.id === "refined" ? "red" : "ink"}
+									rotate={-1.5}
+								>
+									{text}
+								</HandText>
+								<PenArrow
+									seed={`pj-note-arrow-${sc.id}`}
+									from={[xT(lastA) + (left ? 4 : 12), 184]}
+									to={[xT(lastA) + 12, rows.pose - 3]}
+									color={sc.id === "refined" ? "red" : "ink"}
+									width={1.1}
+									head={5}
+								/>
+							</g>
+						);
+					})()}
 
 					{/* timeline */}
 					<g>
@@ -436,19 +483,21 @@ function PoseJourney() {
 							["lock", rows.lock, "exports"],
 							["work", rows.work, "solvers"],
 						].map(([k, y, l]) => (
-							<PrintNote
+							<HandNote
 								key={k as string}
 								x={0}
 								y={(y as number) + 15}
 								size={FIG_LABEL}
 							>
 								{l}
-							</PrintNote>
+							</HandNote>
 						))}
 						{/* pose row */}
-						<path
+						<Wash
 							d={BOX(xT(0), rows.pose, xT(sc.loadEnd) - xT(0), 20)}
-							style={{ fill: tintOf(INKVAR.pencil, 30) }}
+							color={INKVAR.pencil}
+							seed="pw-wash-3"
+							layers={5}
 						/>
 						<Hachure
 							d={BOX(xT(0), rows.pose, xT(sc.loadEnd) - xT(0), 20)}
@@ -458,24 +507,26 @@ function PoseJourney() {
 							angle={-45}
 							opacity={0.5}
 						/>
-						<PrintNote
+						<HandNote
 							x={xT(0) + 6}
 							y={rows.pose + 15}
 							size={FIG_LABEL}
 							color="var(--gb-ink)"
 						>
 							loading
-						</PrintNote>
+						</HandNote>
 						{sc.segs.map((s) => (
 							<g key={s.a}>
-								<path
+								<Wash
 									d={BOX(
 										xT(s.a),
 										rows.pose,
 										Math.max(0, xT(s.b) - xT(s.a) - 2),
 										20,
 									)}
-									style={{ fill: tintOf(INKVAR[TONE[s.tone]], 30) }}
+									color={INKVAR[TONE[s.tone]]}
+									seed={`pw-wash-seg-${sc.id}-${s.a}`}
+									layers={5}
 								/>
 								<Hachure
 									d={BOX(
@@ -490,20 +541,22 @@ function PoseJourney() {
 									angle={-45}
 									opacity={s.tone === "neutral" ? 0.45 : 0.6}
 								/>
-								<PrintNote
+								<HandNote
 									x={xT(s.a) + 6}
 									y={rows.pose + 15}
 									size={FIG_LABEL}
 									color="var(--gb-ink)"
 								>
 									{s.label}
-								</PrintNote>
+								</HandNote>
 							</g>
 						))}
 						{/* export lock row */}
-						<path
+						<Wash
 							d={BOX(xT(0), rows.lock, xT(sc.lockEnd) - xT(0), 20)}
-							style={{ fill: tintOf(INKVAR.pencil, 30) }}
+							color={INKVAR.pencil}
+							seed="pw-wash-5"
+							layers={5}
 						/>
 						<Hachure
 							d={BOX(xT(0), rows.lock, xT(sc.lockEnd) - xT(0), 20)}
@@ -513,21 +566,19 @@ function PoseJourney() {
 							angle={-45}
 							opacity={0.5}
 						/>
-						<text
+						<HandNote
 							x={xT(0) + 6}
 							y={rows.lock + 14}
-							className="nb-num"
-							fontSize={FIG_LABEL}
-							fill="var(--nb-ink)"
-							stroke={PAPER}
-							strokeWidth="3"
-							paintOrder="stroke"
+							size={FIG_LABEL}
+							color="var(--nb-ink)"
 						>
 							locked: !!status || verify === "pending"
-						</text>
-						<path
+						</HandNote>
+						<Wash
 							d={BOX(xT(sc.lockEnd), rows.lock, xT(LOOP) - xT(sc.lockEnd), 20)}
-							style={{ fill: tintOf(INKVAR.forest, 30) }}
+							color={INKVAR.forest}
+							seed="pw-wash-6"
+							layers={5}
 						/>
 						<Hachure
 							d={BOX(xT(sc.lockEnd), rows.lock, xT(LOOP) - xT(sc.lockEnd), 20)}
@@ -537,23 +588,25 @@ function PoseJourney() {
 							angle={-45}
 							opacity={0.6}
 						/>
-						<PrintNote
+						<HandNote
 							x={xT(sc.lockEnd) + 6}
 							y={rows.lock + 15}
 							size={FIG_LABEL}
 							color="var(--gb-ink)"
 						>
 							export on
-						</PrintNote>
+						</HandNote>
 						{/* workers */}
 						{sc.workers.map((w) => {
 							const run = clamp01((T - w.a) / (w.b - w.a));
 							const width = xT(w.b) - xT(w.a) - 2;
 							return (
 								<g key={w.a}>
-									<path
+									<Wash
 										d={BOX(xT(w.a), rows.work, width, 20)}
-										style={{ fill: tintOf(INKVAR.pencil, 30) }}
+										color={INKVAR.pencil}
+										seed="pw-wash-7"
+										layers={5}
 									/>
 									<Hachure
 										d={BOX(xT(w.a), rows.work, width, 20)}
@@ -572,9 +625,11 @@ function PoseJourney() {
 										/>
 									</clipPath>
 									<g clipPath={`url(#pj-run-${w.a})`}>
-										<path
+										<Wash
 											d={BOX(xT(w.a), rows.work, width, 20)}
-											style={{ fill: tintOf(INKVAR.ink, 30) }}
+											color={INKVAR.ink}
+											seed="pw-wash-8"
+											layers={5}
 										/>
 										<Hachure
 											d={BOX(xT(w.a), rows.work, width, 20)}
@@ -585,26 +640,26 @@ function PoseJourney() {
 											opacity={0.6}
 										/>
 									</g>
-									<PrintNote
+									<HandNote
 										x={xT(w.a) + 6}
 										y={rows.work + 15}
 										size={FIG_LABEL}
 										color="var(--gb-ink)"
 									>
 										{w.label}
-									</PrintNote>
+									</HandNote>
 								</g>
 							);
 						})}
 						{sc.axisBreak && (
-							<PrintNote
+							<HandNote
 								x={xT(6.5)}
 								y={rows.work + 42}
 								anchor="middle"
 								size={FIG_LABEL}
 							>
 								~ not to scale: match ≈ 45–77 s when idle ~
-							</PrintNote>
+							</HandNote>
 						)}
 						{/* playhead: sketched once at x = 0, slid along the timeline */}
 						<g transform={`translate(${px.toFixed(2)} 0)`}>
@@ -624,9 +679,9 @@ function PoseJourney() {
 							/>
 						</g>
 						{!sc.axisBreak && (
-							<PrintNote x={xT(0)} y={rows.work + 42} size={FIG_LABEL}>
+							<HandNote x={xT(0)} y={rows.work + 42} size={FIG_LABEL}>
 								schematic time →
-							</PrintNote>
+							</HandNote>
 						)}
 					</g>
 				</svg>
@@ -842,9 +897,11 @@ function PinSolve() {
 					role="img"
 					aria-label="Overlay horizon converging on the photo skyline as peaks are pinned"
 				>
-					<path
+					<Wash
 						d={photoFill}
-						style={{ fill: tintOf("var(--nb-pencil)", 18) }}
+						color="var(--nb-pencil)"
+						seed="pw-wash-9"
+						layers={5}
 					/>
 					<Hachure
 						d={photoFill}
@@ -916,7 +973,7 @@ function PinSolve() {
 										color={on ? "forest" : "ink"}
 										width={on ? 2 : 1.6}
 									/>
-									<PrintNote
+									<HandNote
 										x={tx}
 										y={ty - 19}
 										anchor="middle"
@@ -924,14 +981,36 @@ function PinSolve() {
 										color={inkColor(on ? "forest" : "navy")}
 									>
 										{PEAK_NAMES[i]}
-									</PrintNote>
+									</HandNote>
 								</g>
 							</g>
 						);
 					})}
-					<PrintNote x={SW - 10} y={20} anchor="end" size={FIG_LABEL}>
+					<HandNote x={SW - 10} y={20} anchor="end" size={FIG_LABEL}>
 						mean skyline error {err.toFixed(1)} px
-					</PrintNote>
+					</HandNote>
+					<HandText x={10} y={26} size={15} rotate={-1.5}>
+						{
+							[
+								"no pins: I only trust the compass",
+								"1 pin: yaw and pitch move",
+								"2 pins: roll comes too",
+								"3 or more: the focal as well",
+								"4 pins: all four parameters solved",
+							][pinned.length]
+						}
+					</HandText>
+					<PenArrow
+						seed="ps-note-arrow"
+						from={[250, 22]}
+						to={[
+							proj(PEAKS[0].az, PEAKS[0].el, TRUTH)[0] - 14,
+							proj(PEAKS[0].az, PEAKS[0].el, TRUTH)[1] - 30,
+						]}
+						color="ink"
+						width={1.1}
+						head={5}
+					/>
 				</svg>
 				<div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
 					{KEYS.map((k) => {
@@ -1036,6 +1115,40 @@ function AnnotatedWorkspace() {
 				{PARTS.map((p) => (
 					<Mark key={p.n} x={p.x} y={p.y} n={p.n} k={3.2} />
 				))}
+				<HandText
+					x={PARTS[2].x - 560}
+					y={PARTS[2].y - 210}
+					size={52}
+					color="#fff"
+					rotate={-2}
+				>
+					the far skyline hugs the ridge: proof ✓
+				</HandText>
+				<PenArrow
+					seed="aw-arrow-far"
+					from={[PARTS[2].x - 150, PARTS[2].y - 190]}
+					to={[PARTS[2].x - 40, PARTS[2].y - 40]}
+					color="#fff"
+					width={4}
+					head={22}
+				/>
+				<HandText
+					x={PARTS[0].x - 700}
+					y={PARTS[0].y - 70}
+					size={48}
+					color="#fff"
+					rotate={2}
+				>
+					Stockhorn: 2,190 m, 18.2 km
+				</HandText>
+				<PenArrow
+					seed="aw-arrow-label"
+					from={[PARTS[0].x - 180, PARTS[0].y - 70]}
+					to={[PARTS[0].x - 40, PARTS[0].y - 20]}
+					color="#fff"
+					width={4}
+					head={22}
+				/>
 			</svg>
 			<MarkList
 				items={PARTS.map((p) => (
@@ -1189,49 +1302,69 @@ function PeakProjection() {
 					const [sx, sy] = peak.solved as [number, number];
 					return (
 						<g>
-							<line
-								x1={px}
-								y1={py}
-								x2={sx}
-								y2={sy}
-								stroke="rgba(12, 14, 18, 0.85)"
-								strokeWidth={3.4}
-								strokeDasharray="4 3"
+							<PenLine
+								seed="pp-link-casing"
+								data
+								from={[px, py]}
+								to={[sx, sy]}
+								color="rgba(12, 14, 18, 0.85)"
+								width={3.4}
+								dash="4 3"
 							/>
-							<line
-								x1={px}
-								y1={py}
-								x2={sx}
-								y2={sy}
-								stroke="#fff"
-								strokeWidth={1.5}
-								strokeDasharray="4 3"
+							<PenLine
+								seed="pp-link"
+								data
+								from={[px, py]}
+								to={[sx, sy]}
+								color="#fff"
+								width={1.5}
+								dash="4 3"
 							/>
-							<circle
-								cx={px}
-								cy={py}
-								r={6}
-								fill="none"
-								stroke="rgba(12, 14, 18, 0.85)"
-								strokeWidth={4.4}
+							<PenCircle
+								seed="pp-prior-casing"
+								data
+								center={[px, py]}
+								radiusX={6}
+								color="rgba(12, 14, 18, 0.85)"
+								width={4.4}
 							/>
-							<circle
-								cx={px}
-								cy={py}
-								r={6}
-								fill="none"
-								stroke={LAYER_STYLE.prior.color}
-								strokeWidth={2.2}
+							<PenCircle
+								seed="pp-prior-ring"
+								data
+								center={[px, py]}
+								radiusX={6}
+								color={LAYER_STYLE.prior.color}
+								width={2.2}
 							/>
-							<circle
-								cx={sx}
-								cy={sy}
-								r={5.5}
-								fill={LAYER_STYLE.solved.color}
-								stroke="#fff"
-								strokeWidth={1.5}
+							<HandDot
+								x={sx}
+								y={sy}
+								r={6.4}
+								seed="pp-solved-halo"
+								data
+								color="#fff"
+								opacity={1}
 							/>
-							<PrintLabel
+							<HandDot
+								x={sx}
+								y={sy}
+								r={4.6}
+								seed="pp-solved"
+								data
+								color={LAYER_STYLE.solved.color}
+								opacity={1}
+							/>
+							<HandText
+								x={Math.min(px, sx) - 8}
+								y={Math.max(py, sy) + 26}
+								anchor="end"
+								size={16}
+								color="#fff"
+								rotate={-2}
+							>
+								{Math.abs(dx).toFixed(0)} px apart
+							</HandText>
+							<HandLabel
 								x={sx + 10}
 								y={sy - 12}
 								size={18}
@@ -1241,7 +1374,7 @@ function PeakProjection() {
 								mono={false}
 							>
 								{peak.name}
-							</PrintLabel>
+							</HandLabel>
 						</g>
 					);
 				}}
@@ -1275,61 +1408,68 @@ function HeroJourney() {
 				</>
 			}
 		>
-			<Stages
-				stages={[
-					{
-						label: "Fallback: phone's guess",
-						caption: `If the first solve is weak, the cockpit opens here. The map skyline misses by ${d?.residual.prior.median ?? "…"} px.`,
-						render: () => (
-							<RealPhoto
-								bleed={0.1}
-								data={d}
-								layers={["skyline", "prior"]}
-								crop={crop}
-							/>
-						),
-					},
-					{
-						label: "Preview: solved pose",
-						caption: `A solve replaces it. The miss falls to ${d?.residual.solved.median ?? "…"} px.`,
-						render: () => (
-							<RealPhoto
-								bleed={0.1}
-								data={d}
-								layers={["skyline", "solved"]}
-								crop={crop}
-							/>
-						),
-					},
-					{
-						label: "Second opinion",
-						caption: `A separate solve runs after first paint. The two yaws agree to ${agree}°.`,
-						render: () => (
-							<RealPhoto
-								bleed={0.1}
-								data={d}
-								layers={["solved", "peaks"]}
-								crop={crop}
-								maxLabels={8}
-							/>
-						),
-					},
-					{
-						label: "Export unlocked",
-						caption:
-							"Only now can you save the picture. Your own edits always win.",
-						render: () => (
-							<RealPhoto
-								bleed={0.1}
-								data={d}
-								layers={["peaks"]}
-								crop={crop}
-								maxLabels={12}
-							/>
-						),
-					},
-				]}
-			/>
+			<AlignmentStoryProvider initial={0}>
+				<Stages
+					aside={<StoryMap data={d} />}
+					stages={[
+						{
+							label: "Fallback: phone's guess",
+							pose: 0,
+							caption: `If the first solve is weak, the cockpit opens here. The map skyline misses by ${d?.residual.prior.median ?? "…"} px.`,
+							render: () => (
+								<RealPhoto
+									bleed={0.1}
+									data={d}
+									layers={["skyline", "prior"]}
+									crop={crop}
+								/>
+							),
+						},
+						{
+							label: "Preview: solved pose",
+							pose: 1,
+							caption: `A solve replaces it. The miss falls to ${d?.residual.solved.median ?? "…"} px.`,
+							render: () => (
+								<RealPhoto
+									bleed={0.1}
+									data={d}
+									layers={["skyline", "solved"]}
+									crop={crop}
+								/>
+							),
+						},
+						{
+							label: "Second opinion",
+							pose: 1,
+							caption: `A separate solve runs after first paint. The two yaws agree to ${agree}°.`,
+							render: () => (
+								<RealPhoto
+									bleed={0.1}
+									data={d}
+									layers={["solved", "peaks"]}
+									crop={crop}
+									maxLabels={8}
+								/>
+							),
+						},
+						{
+							label: "Export unlocked",
+							pose: 1,
+							caption:
+								"Only now can you save the picture. Your own edits always win.",
+							render: () => (
+								<RealPhoto
+									bleed={0.1}
+									data={d}
+									layers={["peaks"]}
+									crop={crop}
+									maxLabels={12}
+								/>
+							),
+						},
+					]}
+				/>
+			</AlignmentStoryProvider>
 		</Figure>
 	);
 }
@@ -1368,10 +1508,20 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<Beat kicker="The idea" title="Show a pose fast. Certify it later.">
 				<p>
-					The workspace decides where the pose comes from. It paints a preview
-					at once, then lets a second solver check it.
+					<HandMark type="highlight">
+						The workspace decides where the pose comes from.
+					</HandMark>{" "}
+					It paints a preview at once, then lets a second solver check it.
 				</p>
-				<p>Exports stay locked until the pose is final.</p>
+				<p>
+					Exports stay locked until the pose is{" "}
+					<HandMark type="underline">final</HandMark>. In the timeline of{" "}
+					<CircledNumber value={1} />, the lock row is the only thing that
+					waits.
+					<MarginNote mark="a">
+						I would wait 20 s for a pose I can trust.
+					</MarginNote>
+				</p>
 			</Beat>
 
 			<Beat
@@ -1380,7 +1530,11 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					The terrain model knows where each summit is. The solved pose says
-					where the camera points. Together they give a pixel.
+					where the camera points.{" "}
+					<HandMark type="circle">Together they give a pixel.</HandMark>
+					<MarginNote mark="c">
+						Same peak, two yaws: the label moves with the compass error.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1465,8 +1619,16 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				title="The fast solve can be confidently wrong."
 			>
 				<p>
-					One real photo fooled it: 2.98° off, at confidence 0.40. The second
-					opinion put it within 0.02°.
+					One real photo fooled it: <HandMark type="strike">2.98° off</HandMark>
+					<span className="nb-hand" style={{ color: "var(--gb-red)" }}>
+						{" "}
+						−0.02°
+					</span>
+					, at confidence 0.40. The second opinion put it within{" "}
+					<HandMark type="double">0.02°</HandMark>.
+					<MarginNote mark="b">
+						Confident and wrong: 0.397 passed the 0.2 bar.
+					</MarginNote>
 				</p>
 				<p>
 					That disagreement is what the Refined badge shows. Your own drag or

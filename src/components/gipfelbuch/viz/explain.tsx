@@ -3,13 +3,6 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import {
-	ChevronDown,
-	ChevronLeft,
-	ChevronRight,
-	Pause,
-	Play,
-} from "lucide-react";
-import {
 	type KeyboardEvent,
 	type PointerEvent,
 	type ReactNode,
@@ -18,8 +11,15 @@ import {
 	useState,
 } from "react";
 import { cn } from "#/lib/utils";
-import { PenCircle, SketchPath, StepNumber } from "../notebook/Ink";
+import {
+	HandDot,
+	PenArrow,
+	PenCircle,
+	SketchPath,
+	StepNumber,
+} from "../notebook/Ink";
 import { TYPE } from "../swiss/type";
+import { HandFrame, HandLoop, HandSideRule, HandUnderline } from "./hand";
 import { useInView, useReducedMotion } from "./hooks";
 import {
 	GIPFELBUCH_PHOTO_IDS,
@@ -28,13 +28,15 @@ import {
 	NoImprint,
 	useGipfelbuchPhoto,
 } from "./real";
+import { HandHeading, HandKicker } from "./Section";
+import { useAlignmentStory } from "./story";
 
 // Explainer kit: the building blocks of a concise, visual-first concept page.
 // The recipe (see README "Explainer pages"): a hero figure on a real photo whose caption is the claim,
 // then 2-4 short beats (headline = claim, 1-3 sentences, one figure each), and the engineering detail
 // folded into <Details>. Copy in beats stays plain: no code identifiers, one number per sentence.
 
-/** Short beat: a headline that states the claim, up to three sentences, then its figure. */
+/** Short beat: a lettered headline that states the claim, up to three sentences, then its figure. */
 export function Beat({
 	kicker,
 	title,
@@ -50,14 +52,8 @@ export function Beat({
 }) {
 	return (
 		<section className={cn("mt-12 first:mt-2", className)}>
-			{kicker && (
-				<p className="gb-caps mb-2 text-[11px] leading-[12px] text-[var(--gb-contour,var(--accent))]">
-					{kicker}
-				</p>
-			)}
-			<h2 className={`${TYPE.claim} max-w-2xl text-[var(--gb-ink)]`}>
-				{title}
-			</h2>
+			{kicker && <HandKicker className="mb-2">{kicker}</HandKicker>}
+			<HandHeading title={title} className="max-w-2xl" />
 			{children && (
 				<div className="mt-3 max-w-[66ch] space-y-3 text-[16px] leading-[24px] text-[var(--gb-ink)] [&_strong]:font-semibold [&_strong]:text-[var(--gb-ink)] [&_em]:text-[var(--gb-ink)] [&_a]:text-[var(--gb-water,var(--accent))] hover:[&_a]:underline">
 					{children}
@@ -79,22 +75,39 @@ export function Details({
 	className?: string;
 }) {
 	return (
-		<details
-			className={cn(
-				"group mt-12 bg-[var(--gb-paper-deep,transparent)]/50 open:bg-[var(--gb-paper-deep,transparent)]",
-				className,
-			)}
-		>
-			<summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 select-none [&::-webkit-details-marker]:hidden">
-				<ChevronDown
-					className="size-4 text-[var(--gb-red,var(--accent))] transition group-open:rotate-180 motion-reduce:transition-none"
-					strokeWidth={1.8}
-				/>
-				<span className="gb-caps text-[11px] text-[var(--gb-ink)]">
+		<details className={cn("group relative mt-12", className)}>
+			<summary className="flex cursor-pointer list-none items-center gap-3 py-2 pr-5 select-none [&::-webkit-details-marker]:hidden">
+				<svg
+					viewBox="0 0 14 14"
+					className="size-3.5 shrink-0 overflow-visible transition group-open:rotate-90 motion-reduce:transition-none"
+					aria-hidden="true"
+				>
+					<SketchPath
+						d="M3 1.5L11.5 7L3 12.5Z"
+						seed={`details-${title}`}
+						color="red"
+						width={1.4}
+						tolerance={0.5}
+					/>
+				</svg>
+				<span className="nb-hand relative text-[22px] leading-[26px] font-bold text-[var(--gb-ink)]">
 					{title}
+					<HandUnderline
+						seed={`details-${title}`}
+						color="pencil"
+						width={1.1}
+						opacity={0.6}
+						offset={-3}
+					/>
 				</span>
 			</summary>
-			<div className="space-y-4 px-5 pb-6 text-[13px] leading-[1.7] text-[var(--gb-ink)] [&_a]:text-[var(--gb-water,var(--accent))] [&_code]:bg-[var(--gb-paper-deep)] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-[var(--gb-ink)] [&_kbd]:bg-[var(--gb-paper-deep)] [&_kbd]:px-1.5 [&_kbd]:font-mono [&_kbd]:text-[13px] [&_h3]:mt-6 [&_h3]:font-semibold [&_h3]:text-[var(--gb-ink)] [&_li]:pl-1 [&_ol]:list-decimal [&_ol]:space-y-1.5 [&_ol]:pl-5 [&_strong]:text-[var(--gb-ink)] [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-5">
+			<div className="relative mt-2 space-y-4 pr-2 pb-6 pl-6 text-[13px] leading-[1.7] text-[var(--gb-ink)] [&_a]:text-[var(--gb-water,var(--accent))] [&_code]:bg-[var(--gb-paper-deep)] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[13px] [&_code]:text-[var(--gb-ink)] [&_kbd]:bg-[var(--gb-paper-deep)] [&_kbd]:px-1.5 [&_kbd]:font-mono [&_kbd]:text-[13px] [&_h3]:mt-6 [&_h3]:font-semibold [&_h3]:text-[var(--gb-ink)] [&_li]:pl-1 [&_ol]:list-decimal [&_ol]:space-y-1.5 [&_ol]:pl-5 [&_strong]:text-[var(--gb-ink)] [&_ul]:list-disc [&_ul]:space-y-1.5 [&_ul]:pl-5">
+				<HandSideRule
+					seed={`details-side-${title}`}
+					color="pencil"
+					width={1.2}
+					opacity={0.55}
+				/>
 				{children}
 			</div>
 		</details>
@@ -122,7 +135,13 @@ export function Compare({
 }) {
 	const [ref, inView] = useInView();
 	const reduce = useReducedMotion();
-	const [x, setX] = useState(start);
+	// inside an alignment story the wipe is the story's position (x = 1 - t: all "after" at x = 0)
+	const story = useAlignmentStory();
+	const [localX, setLocalX] = useState(start);
+	const x = story ? 1 - story.t : localX;
+	const setXRef = useRef((v: number) => setLocalX(v));
+	setXRef.current = (v: number) => (story ? story.setT(1 - v) : setLocalX(v));
+	const setX = (v: number) => setXRef.current(v);
 	const touched = useRef(false);
 	const box = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -132,9 +151,9 @@ export function Compare({
 		const tick = (now: number) => {
 			if (touched.current) return;
 			const t = (now - t0) / 2600;
-			if (t >= 1) return setX(start);
+			if (t >= 1) return setXRef.current(start);
 			// out to the right, back past the left, settle at `start`
-			setX(start + 0.4 * Math.sin(t * Math.PI * 2) * (1 - t));
+			setXRef.current(start + 0.4 * Math.sin(t * Math.PI * 2) * (1 - t));
 			raf = requestAnimationFrame(tick);
 		};
 		raf = requestAnimationFrame(tick);
@@ -151,7 +170,7 @@ export function Compare({
 		if (!d) return;
 		e.preventDefault();
 		touched.current = true;
-		setX((v) => Math.min(1, Math.max(0, v + d)));
+		setX(Math.min(1, Math.max(0, x + d)));
 	};
 	return (
 		<div ref={ref} className={className}>
@@ -206,13 +225,21 @@ export function Compare({
 							aria-valuemax={100}
 							aria-valuenow={Math.round(x * 100)}
 							onKeyDown={key}
-							className="absolute top-1/2 left-1/2 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[var(--gb-paper,var(--rigi-ink))] text-[var(--gb-ink,currentColor)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--gb-red,var(--accent))]"
+							className="absolute top-1/2 left-1/2 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center text-[var(--gb-ink,currentColor)] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--gb-red,var(--accent))]"
 						>
 							<svg
 								viewBox="0 0 36 36"
 								className="pointer-events-none absolute inset-0 overflow-visible"
 								aria-hidden="true"
 							>
+								<HandDot
+									x={18}
+									y={18}
+									r={16}
+									seed="compare-blot"
+									color="var(--gb-paper, #ece6da)"
+									opacity={0.95}
+								/>
 								<PenCircle
 									center={[18, 18]}
 									radiusX={14}
@@ -220,17 +247,27 @@ export function Compare({
 									color="red"
 									width={1.6}
 								/>
+								<PenArrow
+									seed="compare-left"
+									from={[16, 18]}
+									to={[8, 18]}
+									bend={0.05}
+									head={4}
+									width={1.3}
+								/>
+								<PenArrow
+									seed="compare-right"
+									from={[20, 18]}
+									to={[28, 18]}
+									bend={0.05}
+									head={4}
+									width={1.3}
+								/>
 							</svg>
-							<ChevronLeft className="size-3.5" />
-							<ChevronRight className="-ml-1 size-3.5" />
 						</div>
 					</div>
-					<span className="pointer-events-none absolute top-2 left-2 bg-[var(--gb-paper,#ece6da)]/90 px-2 py-0.5 text-[11px] tracking-[0.1em] text-[var(--gb-ink,#131313)] gb-caps">
-						{beforeLabel}
-					</span>
-					<span className="pointer-events-none absolute top-2 right-2 bg-[var(--gb-paper,#ece6da)]/90 px-2 py-0.5 text-[11px] tracking-[0.1em] text-[var(--gb-ink,#131313)] gb-caps">
-						{afterLabel}
-					</span>
+					<span className={`${PHOTO_LABEL} left-2`}>{beforeLabel}</span>
+					<span className={`${PHOTO_LABEL} right-2`}>{afterLabel}</span>
 				</div>
 			</NoImprint>
 		</div>
@@ -242,19 +279,49 @@ export interface Stage {
 	/** One sentence: what this stage adds. */
 	caption: ReactNode;
 	render: () => ReactNode;
+	/** Where this stage sits in an enclosing alignment story: 0 = phone's guess, 1 = solved. */
+	pose?: number;
 }
 
+/** A short pen arrow as a button glyph (prev/next); drawn in currentColor. */
+function HandArrowIcon({ seed, dir }: { seed: string; dir: 1 | -1 }) {
+	return (
+		<svg
+			viewBox="0 0 24 16"
+			className="h-4 w-6 overflow-visible"
+			aria-hidden="true"
+		>
+			<PenArrow
+				seed={seed}
+				from={dir > 0 ? [3, 9] : [21, 9]}
+				to={dir > 0 ? [21, 8] : [3, 8]}
+				bend={0.12}
+				head={6}
+				color="currentColor"
+				width={1.5}
+			/>
+		</svg>
+	);
+}
+
+/** Labels on a photo: hand block capitals with a paper halo (no chip). */
+const PHOTO_LABEL =
+	"gb-caps pointer-events-none absolute top-2 text-[13px] leading-[16px] text-[var(--gb-ink,#131313)] [text-shadow:0_0_2px_var(--gb-paper,#ece6da),0_0_3px_var(--gb-paper,#ece6da),0_0_5px_var(--gb-paper,#ece6da),0_0_7px_var(--gb-paper,#ece6da)]";
+
 /**
- * Step through stages of one process on the same frame (tabs + prev/next). Auto-advances while on screen
+ * Step through stages of one process on the same frame (tabs circled by hand + pen-arrow prev/next). Auto-advances while on screen
  * until the reader touches it; frozen on the last stage under reduced motion.
  */
 export function Stages({
 	stages,
 	interval = 3200,
+	aside,
 	className,
 }: {
 	stages: Stage[];
 	interval?: number;
+	/** A view kept beside the frame across stages, e.g. the story's side map. */
+	aside?: ReactNode;
 	className?: string;
 }) {
 	const [ref, inView] = useInView({ once: false });
@@ -274,13 +341,39 @@ export function Stages({
 		setI((n + stages.length) % stages.length);
 	};
 	const s = stages[i];
+	// a stage with a pose moves the enclosing alignment story there ...
+	const story = useAlignmentStory();
+	const setStoryT = story?.setT;
+	useEffect(() => {
+		if (setStoryT && s.pose != null) setStoryT(s.pose);
+	}, [s.pose, setStoryT]);
+	// ... and a reader turning the story elsewhere (the side map) brings up the matching stage
+	const storyT = story?.t;
+	const posed = useRef({ stages, pose: s.pose });
+	posed.current = { stages, pose: s.pose };
+	useEffect(() => {
+		const { stages: all, pose } = posed.current;
+		if (storyT == null || pose == null || Math.abs(storyT - pose) <= 0.5)
+			return;
+		let best = -1;
+		all.forEach((st, n) => {
+			if (
+				st.pose != null &&
+				(best < 0 ||
+					Math.abs(st.pose - storyT) <
+						Math.abs((all[best].pose as number) - storyT))
+			)
+				best = n;
+		});
+		if (best >= 0) {
+			setPlaying(false);
+			setI(best);
+		}
+	}, [storyT]);
 	return (
 		<div
 			ref={ref}
-			className={cn(
-				"bg-[var(--gb-paper-deep,transparent)] p-4 [container-type:inline-size]",
-				className,
-			)}
+			className={cn("py-2 [container-type:inline-size]", className)}
 		>
 			<div className="mb-3 flex items-start gap-1.5">
 				{/* one row of equal tabs from 560 px of container width, two columns below */}
@@ -292,32 +385,23 @@ export function Stages({
 							onClick={() => go(n)}
 							aria-pressed={n === i}
 							className={cn(
-								"gb-caps relative min-w-0 px-2.5 pt-1 pb-2 text-left text-[11px] tracking-[0.08em] transition",
+								"gb-caps relative min-w-0 px-3 pt-1.5 pb-2 text-left text-[13px] leading-[16px] transition-colors motion-reduce:transition-none",
 								n === i
 									? "text-[var(--gb-ink)]"
 									: "text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]",
 							)}
 						>
-							<span className="gb-coord mr-1.5 text-[var(--gb-contour,inherit)]">
-								Bl.{String(n + 1).padStart(2, "0")}
+							<span className="nb-num mr-1.5 text-[var(--gb-contour,inherit)] normal-case">
+								{n + 1}.
 							</span>
 							{st.label}
 							{n === i && (
-								<svg
-									viewBox="0 0 100 4"
-									preserveAspectRatio="none"
-									className="absolute inset-x-1 bottom-0.5 h-1 w-[calc(100%-8px)] overflow-visible [&_path]:[vector-effect:non-scaling-stroke]"
-									aria-hidden="true"
-								>
-									<SketchPath
-										d="M0 2L100 2"
-										seed={`stage-tab-${st.label}`}
-										color="red"
-										width={1.8}
-										passes={1}
-										tolerance={0.6}
-									/>
-								</svg>
+								<HandLoop
+									seed={`stage-tab-${st.label}`}
+									color="red"
+									width={1.6}
+									inset={-1}
+								/>
 							)}
 						</button>
 					))}
@@ -326,33 +410,47 @@ export function Stages({
 					type="button"
 					onClick={() => setPlaying((p) => !p)}
 					aria-label={playing ? "Pause" : "Play"}
-					className="shrink-0 p-1.5 text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)] focus-visible:ring-2 focus-visible:ring-[var(--gb-red,var(--accent))]"
+					className="nb-hand relative mt-0.5 mr-1 shrink-0 px-2 text-[18px] leading-[24px] text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]"
 				>
-					{playing ? <Pause className="size-3" /> : <Play className="size-3" />}
+					{playing ? "pause" : "play"}
+					<HandFrame
+						seed="stages-play"
+						color="pencil"
+						width={1.1}
+						overshoot={4}
+					/>
 				</button>
 			</div>
-			<div key={i} className="animate-[gipfelbuch-fade_420ms_ease-out]">
-				<NoImprint>{s.render()}</NoImprint>
+			<div
+				className={cn(
+					aside &&
+						"grid gap-3 [@container(min-width:720px)]:grid-cols-[minmax(0,1fr)_15rem] [@container(min-width:720px)]:items-start",
+				)}
+			>
+				<div key={i} className="animate-[gipfelbuch-fade_420ms_ease-out]">
+					<NoImprint>{s.render()}</NoImprint>
+				</div>
+				{aside && <NoImprint>{aside}</NoImprint>}
 			</div>
 			<div className="mt-3 flex items-start gap-3">
 				<button
 					type="button"
 					onClick={() => go(i - 1)}
 					aria-label="Previous stage"
-					className="p-1 text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)] focus-visible:ring-2 focus-visible:ring-[var(--gb-red,var(--accent))]"
+					className="p-1 text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]"
 				>
-					<ChevronLeft className="size-4" />
+					<HandArrowIcon seed="stages-prev" dir={-1} />
 				</button>
-				<p className="min-h-[2.8em] flex-1 text-[13px] leading-snug text-[var(--gb-ink)]">
+				<p className="nb-hand min-h-[2.8em] flex-1 text-[19px] leading-[23px] text-[var(--gb-pencil,var(--gb-ink))]">
 					{s.caption}
 				</p>
 				<button
 					type="button"
 					onClick={() => go(i + 1)}
 					aria-label="Next stage"
-					className="p-1 text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)] focus-visible:ring-2 focus-visible:ring-[var(--gb-red,var(--accent))]"
+					className="p-1 text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]"
 				>
-					<ChevronRight className="size-4" />
+					<HandArrowIcon seed="stages-next" dir={1} />
 				</button>
 			</div>
 			<style>
@@ -398,7 +496,7 @@ export function Trio({
 					<div className="mt-3 flex items-start gap-2">
 						<StepNumber value={String(n + 1)} />
 						<div>
-							<div className="pt-1 text-[13px] font-semibold text-[var(--gb-ink)]">
+							<div className="nb-hand pt-0.5 text-[21px] leading-[24px] font-bold text-[var(--gb-ink)]">
 								{s.title}
 							</div>
 							<div className="mt-0.5 text-[13px] leading-snug text-[var(--gb-secondary,#4a545c)]">
@@ -503,10 +601,20 @@ function GalleryTile({
 			)}
 			{tag && (
 				<p
-					className={`${TYPE.kicker} mt-2 tracking-[0.14em]`}
+					className="gb-caps relative mt-2 inline-block text-[13px] leading-[16px]"
 					style={{ color: tag.color }}
 				>
+					{tag.text === "result" ? "✓ " : "✗ "}
 					{tag.text}
+					<HandUnderline
+						seed={`gallery-${id}-${tag.text}`}
+						color={tag.color}
+						width={1.3}
+						coverage={1}
+						double={tag.text === "result"}
+						wavy={tag.text === "failure"}
+						offset={-3}
+					/>
 				</p>
 			)}
 			{d && label && (
@@ -537,12 +645,13 @@ export function Mark({
 }) {
 	return (
 		<g>
-			<circle
-				cx={x}
-				cy={y}
-				r={10 * k}
-				fill="var(--gb-paper, #ece6da)"
-				fillOpacity={0.92}
+			<HandDot
+				x={x}
+				y={y}
+				r={10.5 * k}
+				seed={`mark-blot-${n}`}
+				color="var(--gb-paper, #ece6da)"
+				opacity={0.92}
 			/>
 			<SketchPath
 				d={`M${x - 9 * k} ${y}a${9 * k} ${9 * k} 0 1 0 ${18 * k} 0a${9 * k} ${9 * k} 0 1 0 ${-18 * k} 0`}
@@ -554,12 +663,12 @@ export function Mark({
 			/>
 			<text
 				x={x}
-				y={y + 3.6 * k}
+				y={y + 4.6 * k}
 				textAnchor="middle"
-				fontSize={10.5 * k}
+				fontSize={15 * k}
 				fontWeight={700}
-				fill="var(--gb-ink, #131313)"
-				fontFamily="var(--gb-font-mono, 'Fira Mono'), ui-monospace, monospace"
+				className="nb-hand"
+				style={{ fill: "var(--gb-ink, #131313)" }}
 			>
 				{n}
 			</text>
@@ -585,7 +694,7 @@ export function MarkList({
 					key={num}
 					className="flex gap-2.5 text-[13px] leading-snug text-[var(--gb-ink)]"
 				>
-					<span className="relative mt-px flex size-6 shrink-0 items-center justify-center font-mono text-[11px] font-bold text-[var(--gb-ink,inherit)]">
+					<span className="nb-hand relative mt-px flex size-6 shrink-0 items-center justify-center text-[17px] font-bold text-[var(--gb-ink,inherit)]">
 						<svg
 							viewBox="0 0 24 24"
 							className="absolute inset-0 overflow-visible"

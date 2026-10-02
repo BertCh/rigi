@@ -3,7 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import type { ReactNode } from "react";
-import { HandDot, PenLine, SketchPath } from "../notebook/Ink";
+import { Hachure, HandDot, PenLine, SketchPath } from "../notebook/Ink";
+import { MarkerUnderline } from "./hand";
 import { TYPE } from "./type";
 
 export interface LegendItem {
@@ -17,7 +18,7 @@ export interface LegendProps {
 	className?: string;
 }
 
-/** Zeichenerklärung panel: symbol and label rows in a responsive grid. Lists only what the page shows (F1). */
+/** Zeichenerklärung: a lettered heading and hand rows, no panel. Lists only what the page shows (F1). */
 export function Legend({
 	items,
 	title = "Zeichenerklärung · Legend",
@@ -25,13 +26,11 @@ export function Legend({
 }: LegendProps) {
 	if (items.length === 0) return null;
 	return (
-		<section
-			className={`px-6 py-6 ${className ?? ""}`}
-			style={{
-				background: "var(--gb-paper-deep)",
-			}}
-		>
-			<h3 className={`${TYPE.kicker} mb-3 tracking-[0.18em]`}>{title}</h3>
+		<section className={`px-6 py-6 ${className ?? ""}`}>
+			<div className="relative mb-3 inline-block">
+				<h3 className={`${TYPE.h3} m-0 text-[20px] leading-[24px]`}>{title}</h3>
+				<MarkerUnderline seed={`legend-${title}`} color="var(--gb-contour)" />
+			</div>
 			<ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-1.5 p-0 sm:grid-cols-2 lg:grid-cols-3">
 				{items.map((item) => (
 					<li
@@ -100,7 +99,7 @@ export function RouteSymbol() {
 	);
 }
 
-/** LK spot height: a measured dot with its elevation in mono, not a triangle. */
+/** LK spot height: a hand dot with its elevation in italic hand figures. */
 export function PeakSymbol() {
 	return (
 		<svg width="36" height="20" viewBox="0 0 36 20" aria-hidden="true">
@@ -111,14 +110,21 @@ export function PeakSymbol() {
 				seed="legend-peak-dot"
 				color="var(--gb-ink)"
 			/>
-			<text x="10" y="14" fontSize="9" fill="var(--gb-ink)" className="nb-num">
+			<text
+				x="10"
+				y="14"
+				fontSize="10"
+				fill="var(--gb-ink)"
+				className="nb-num"
+				style={{ fontStyle: "italic" }}
+			>
 				1963
 			</text>
 		</svg>
 	);
 }
 
-/** LK trigonometric point: an open equilateral triangle (side 7) with a centre dot. */
+/** LK trigonometric point (S4): a 7 px triangle in three pen strokes, apex overshooting, a centre dot. */
 export function TrigPointSymbol() {
 	const side = 7;
 	const height = (side * Math.sqrt(3)) / 2;
@@ -127,14 +133,25 @@ export function TrigPointSymbol() {
 	const bottom = top + height;
 	return (
 		<svg width="36" height="20" viewBox="0 0 36 20" aria-hidden="true">
-			<path
-				d={`M${cx} ${top.toFixed(2)}L${cx + side / 2} ${bottom.toFixed(2)}H${cx - side / 2}Z`}
-				fill="none"
-				stroke="var(--gb-ink)"
-				strokeWidth={0.9}
-				strokeLinejoin="round"
+			<PenLine
+				from={[cx - side / 2 - 0.4, bottom]}
+				to={[cx + 0.3, top - 0.8]}
+				seed="legend-trig-l"
+				width={1}
 			/>
-			<circle cx={cx} cy={10} r={1.2} fill="var(--gb-ink)" />
+			<PenLine
+				from={[cx - 0.3, top - 0.8]}
+				to={[cx + side / 2 + 0.4, bottom]}
+				seed="legend-trig-r"
+				width={1}
+			/>
+			<PenLine
+				from={[cx + side / 2 + 0.6, bottom]}
+				to={[cx - side / 2 - 0.6, bottom]}
+				seed="legend-trig-b"
+				width={1}
+			/>
+			<HandDot x={cx} y={10} r={1.2} seed="legend-trig-dot" opacity={1} />
 		</svg>
 	);
 }
@@ -206,12 +223,20 @@ export function RockSymbol() {
 	);
 }
 
-/** LK glacier: a flat water tint (about 15 %), two inner contours and crevasses; no outline. */
+/** LK glacier (S9): a pale blue pencil hatch along the flow, two inner contours and crevasses; no outline. */
 export function GlacierSymbol() {
 	const shape = "M3 4H33L30 17H6Z";
 	return (
 		<svg width="36" height="20" viewBox="0 0 36 20" aria-hidden="true">
-			<path d={shape} fill="color-mix(in srgb, var(--gb-paper) 85%, #30626b)" />
+			<Hachure
+				d={shape}
+				seed="legend-glacier-wash"
+				color="blue"
+				width={0.6}
+				opacity={0.35}
+				angle={-8}
+				gap={2.2}
+			/>
 			<SketchPath
 				d="M6 8C13 6 22 10 31 7.5"
 				seed="legend-glacier-contour-a"

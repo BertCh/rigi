@@ -4,16 +4,23 @@
 
 import { Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { CircledKey } from "#/components/gipfelbuch/notebook/carto";
 import {
 	Hachure,
 	HandDot,
 	HandText,
 	inkColor,
+	PenArrow,
 	PenCircle,
 	PenCross,
 	PenLine,
+	SketchPath,
 	SketchPolyline,
 } from "#/components/gipfelbuch/notebook/Ink";
+import {
+	CircledNumber,
+	HandMark,
+} from "#/components/gipfelbuch/notebook/marks";
 import type { Point } from "#/components/gipfelbuch/notebook/sketch";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import {
@@ -26,12 +33,14 @@ import {
 	Frac,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
+	HandNote,
 	HandRange,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
 	Op,
 	PhotoPicker,
-	PrintNote,
 	RealPhoto,
 	Section,
 	Steps,
@@ -218,15 +227,9 @@ function RayMarch() {
 								color="faint"
 								width={0.5}
 							/>
-							<text
-								x="24"
-								y={fy(m) - 3}
-								fontSize={FIG_LABEL}
-								className="nb-num"
-								fill="var(--nb-pencil)"
-							>
+							<HandLabel x={24} y={fy(m) - 3} size={FIG_LABEL} halo={0}>
 								{m} m
-							</text>
+							</HandLabel>
 						</g>
 					))}
 					<Hachure
@@ -261,7 +264,7 @@ function RayMarch() {
 								seed={`pk-rm-summit-${p.id}`}
 								color={p.id === sel ? (visible ? accent : bad) : "pencil"}
 							/>
-							<PrintNote
+							<HandNote
 								x={fx(p.km)}
 								y={fy(p.ele) - 10}
 								anchor="middle"
@@ -269,11 +272,11 @@ function RayMarch() {
 								color={inkColor("navy")}
 							>
 								{p.id} · {p.name}
-							</PrintNote>
+							</HandNote>
 						</g>
 					))}
 					{SHOULDERS.map((sh) => (
-						<PrintNote
+						<HandNote
 							key={sh.km}
 							x={fx(sh.km)}
 							y={fy(sh.ele) - 8}
@@ -281,7 +284,7 @@ function RayMarch() {
 							size={FIG_LABEL}
 						>
 							unnamed ridge
-						</PrintNote>
+						</HandNote>
 					))}
 
 					{/* sight line */}
@@ -324,7 +327,7 @@ function RayMarch() {
 								color="red"
 								width={2}
 							/>
-							<PrintNote
+							<HandNote
 								x={fx(cur.blocked.d / 1000)}
 								y={fy(cur.blocked.h) + 24}
 								anchor="middle"
@@ -332,7 +335,7 @@ function RayMarch() {
 								color={inkColor("red")}
 							>
 								blocked at {(cur.blocked.d / 1000).toFixed(1)} km
-							</PrintNote>
+							</HandNote>
 						</g>
 					)}
 
@@ -346,23 +349,47 @@ function RayMarch() {
 						dash="2 3"
 					/>
 					<HandDot x={fx(0)} y={fy(eye)} r={4.5} seed="pk-rm-eye" color="ink" />
-					<PrintNote x={fx(0) + 9} y={fy(eye) + 16} size={FIG_NAME}>
+					<HandNote x={fx(0) + 9} y={fy(eye) + 16} size={FIG_NAME}>
 						eye {eye} m
-					</PrintNote>
-					<text
+					</HandNote>
+					<HandLabel
 						x={26}
 						y={FH - 10}
-						fontSize={FIG_LABEL}
-						className="nb-num"
-						fill="var(--gb-ink)"
-						stroke="var(--gb-paper)"
-						strokeWidth={3}
-						strokeLinejoin="round"
-						paintOrder="stroke"
+						size={FIG_LABEL}
+						color="var(--gb-ink)"
+						caps
 					>
-						{sweeping ? "MARCHING" : full.blocked ? "HIDDEN" : "VISIBLE"} ·{" "}
-						{cur.n} samples
-					</text>
+						{`${sweeping ? "MARCHING" : full.blocked ? "HIDDEN" : "VISIBLE"} · ${cur.n} samples`}
+					</HandLabel>
+					<PenArrow
+						from={[fx(s.km) - 60, 30]}
+						to={[fx(s.km) - 8, fy(s.ele) - 22]}
+						seed="pk-rm-note-arrow"
+						color="pencil"
+						width={1}
+					/>
+					<HandText
+						x={fx(s.km) - 64}
+						y={26}
+						size={17}
+						anchor="end"
+						color="pencil"
+					>
+						{THRESH[s.id] != null
+							? THRESH[s.id] === 800
+								? `${s.name}: any eye sees it`
+								: `${s.name}: needs an eye ≥ ${THRESH[s.id]} m`
+							: `${s.name}: never seen from here`}
+					</HandText>
+					<HandText
+						x={fx(0) + 12}
+						y={fy(eye) - 14}
+						size={16}
+						color="pencil"
+						rotate={-2}
+					>
+						earth drops {dropAtPeak.toFixed(0)} m by {s.km} km
+					</HandText>
 				</svg>
 			</div>
 
@@ -684,14 +711,14 @@ function LabelLayout() {
 								width={1.2}
 								dash="2 2"
 							/>
-							<PrintNote
+							<HandNote
 								x={c.x * PW}
 								y={py(c.el) + 18}
 								anchor="middle"
 								size={FIG_LABEL}
 							>
 								hidden
-							</PrintNote>
+							</HandNote>
 						</g>
 					))}
 
@@ -713,7 +740,7 @@ function LabelLayout() {
 											width={1}
 										/>
 										<HandDot x={x} y={y} r={4.5} seed={seed} color="navy" />
-										<PrintNote
+										<HandNote
 											x={x}
 											y={ty}
 											anchor="middle"
@@ -721,17 +748,16 @@ function LabelLayout() {
 											color={inkColor("navy")}
 										>
 											{v.c.name ?? "·"}
-										</PrintNote>
-										<text
+										</HandNote>
+										<HandLabel
 											x={x}
 											y={ty - 12}
-											textAnchor="middle"
-											fontSize={FIG_LABEL}
-											className="nb-num"
-											fill="var(--nb-pencil)"
+											anchor="middle"
+											size={FIG_LABEL}
+											halo={0}
 										>
 											{`#${i + 1}`}
-										</text>
+										</HandLabel>
 									</>
 								) : (
 									<>
@@ -754,17 +780,15 @@ function LabelLayout() {
 							</g>
 						);
 					})}
-					<text
+					<HandLabel
 						x={PW - 8}
 						y={PH + 14}
-						textAnchor="end"
-						fontSize={FIG_LABEL}
-						className="nb-num"
-						fill="var(--nb-pencil)"
+						anchor="end"
+						size={FIG_LABEL}
+						halo={0}
 					>
-						{shown.filter((v) => v.state === "kept").length} labels · min
-						spacing {Math.round((sp / 100) * PW)} px of {PW}
-					</text>
+						{`${shown.filter((v) => v.state === "kept").length} labels · min spacing ${Math.round((sp / 100) * PW)} px of ${PW}`}
+					</HandLabel>
 				</svg>
 			</div>
 
@@ -924,7 +948,8 @@ function HiddenSummit() {
 					{pr ? (
 						<>
 							{pr.name} ({pr.height} m, {(pr.distance / 1000).toFixed(0)} km)
-							would sit {gapDeg.toFixed(1)}° below the ridge{" "}
+							<CircledNumber value={1} color="blue" /> would sit{" "}
+							{gapDeg.toFixed(1)}° below the ridge <CircledNumber value={2} />{" "}
 							{(pr.highestAngle[0] / 1000).toFixed(0)} km in front of it, so it
 							gets no label.{" "}
 						</>
@@ -954,22 +979,22 @@ function HiddenSummit() {
 								color="blue"
 								width={2 * k}
 							/>
-							<PrintNote
+							<HandNote
 								x={q[0] + 10 * k}
 								y={q[1] + 22 * k}
 								size={12.5 * k}
 								color={inkColor("blue")}
 							>
 								{pr?.name}, hidden
-							</PrintNote>
-							<PrintNote
+							</HandNote>
+							<HandNote
 								x={q[0] + 10 * k}
 								y={(q[1] + skyY) / 2 + 4 * k}
 								size={12.5 * k}
 								color={inkColor("red")}
 							>
 								{Math.round(q[1] - skyY)} px of ridge
-							</PrintNote>
+							</HandNote>
 						</g>
 					) : null
 				}
@@ -981,7 +1006,6 @@ function HiddenSummit() {
 					role="img"
 					aria-label="Side view along the bearing to the hidden summit: the sight line to the ridge passes above the summit"
 				>
-					<path d={terr} style={{ fill: "var(--gb-paper-deep)" }} />
 					<Hachure
 						d={terr}
 						seed="pk-hs-terrain"
@@ -989,28 +1013,45 @@ function HiddenSummit() {
 						gap={5}
 						opacity={0.55}
 					/>
-					<path
+					<SketchPath
 						d={`M${pr.terrain.map(([m, h]) => `${fx(m).toFixed(1)} ${fy(h).toFixed(1)}`).join("L")}`}
-						fill="none"
-						stroke={SWISS.contour}
-						strokeWidth={1.8}
-						strokeLinejoin="round"
+						seed="pk-hs-ridge"
+						data
+						color="brown"
+						width={1.8}
 					/>
-					<path
+					<SketchPath
 						d={line(pr.elevationDeg, pr.distance)}
-						fill="none"
-						stroke={SWISS.water}
-						strokeWidth={1.8}
-						strokeLinejoin="round"
-						strokeDasharray="5 4"
+						seed="pk-hs-sight-summit"
+						data
+						color="blue"
+						width={1.8}
+						dash="5 4"
 					/>
-					<path
+					<SketchPath
 						d={line(ridgeDeg, pr.distance)}
-						fill="none"
-						stroke={SWISS.red}
-						strokeWidth={2}
-						strokeLinejoin="round"
+						seed="pk-hs-sight-ridge"
+						data
+						color="red"
+						width={2}
 					/>
+					<PenArrow
+						from={[fx(pr.distance) - 150, fy(pr.height) - 52]}
+						to={[fx(pr.distance) - 14, fy(pr.height) - 6]}
+						seed="pk-hs-gap-arrow"
+						color="pencil"
+						width={1}
+					/>
+					<HandText
+						x={fx(pr.distance) - 154}
+						y={fy(pr.height) - 56}
+						anchor="end"
+						size={17}
+						color="pencil"
+						rotate={-2}
+					>
+						{`only ${gapDeg.toFixed(1)}° too low to clear it`}
+					</HandText>
 					<HandDot
 						x={fx(0)}
 						y={fy(pr.eye)}
@@ -1028,7 +1069,7 @@ function HiddenSummit() {
 						color="red"
 						width={2}
 					/>
-					<PrintNote
+					<HandNote
 						x={fx(pr.highestAngle[0]) - 4}
 						y={fy(pr.highestAngle[1]) + 24}
 						anchor="end"
@@ -1036,7 +1077,7 @@ function HiddenSummit() {
 						color={inkColor("red")}
 					>
 						ridge, {(pr.highestAngle[0] / 1000).toFixed(0)} km
-					</PrintNote>
+					</HandNote>
 					<PenCircle
 						center={[fx(pr.distance), fy(pr.height)]}
 						radiusX={4.5}
@@ -1044,7 +1085,20 @@ function HiddenSummit() {
 						color="blue"
 						width={1.8}
 					/>
-					<PrintNote
+					<CircledKey
+						x={fx(pr.distance) + 18}
+						y={fy(pr.height) - 4}
+						value={1}
+						color="blue"
+						seed="pk-hs-key1"
+					/>
+					<CircledKey
+						x={fx(pr.highestAngle[0]) + 16}
+						y={fy(pr.highestAngle[1]) - 8}
+						value={2}
+						seed="pk-hs-key2"
+					/>
+					<HandNote
 						x={fx(pr.distance) - 9}
 						y={fy(pr.height) - 12}
 						anchor="end"
@@ -1052,7 +1106,7 @@ function HiddenSummit() {
 						color={inkColor("blue")}
 					>
 						{pr.name}, {(pr.distance / 1000).toFixed(0)} km
-					</PrintNote>
+					</HandNote>
 				</svg>
 			)}
 			{pr && (
@@ -1195,7 +1249,7 @@ function YawSlide() {
 										seed={`pk-yaw-dot-${p.name}`}
 										color="ink"
 									/>
-									<PrintNote
+									<HandNote
 										x={q[0]}
 										y={q[1] - 12}
 										anchor="middle"
@@ -1203,7 +1257,7 @@ function YawSlide() {
 										color={inkColor("navy")}
 									>
 										{p.name}
-									</PrintNote>
+									</HandNote>
 								</g>
 							);
 						})}
@@ -1365,16 +1419,16 @@ function RealSummits() {
 							list.map((p) => {
 								const q = toPx(p.az, Math.min(p.distance, 60_000));
 								return (
-									<line
+									<PenLine
 										key={`${p.name}-${p.az}`}
-										x1={o[0]}
-										y1={o[1]}
-										x2={q[0]}
-										y2={q[1]}
-										stroke={color}
-										strokeWidth={1.4}
-										strokeOpacity={0.95}
-										strokeDasharray={dash}
+										from={[o[0], o[1]]}
+										to={[q[0], q[1]]}
+										seed={`pk-ray-${p.name}-${p.az}`}
+										data
+										color={color}
+										opacity={0.95}
+										width={1.4}
+										dash={dash}
 									/>
 								);
 							});
@@ -1502,16 +1556,15 @@ function RealOcclusion() {
 								color="faint"
 								width={0.5}
 							/>
-							<text
+							<HandLabel
 								x={28}
 								y={y(e) + 3}
-								textAnchor="end"
-								fontSize={FIG_LABEL}
-								className="nb-num"
-								fill="var(--nb-pencil)"
+								anchor="end"
+								size={FIG_LABEL}
+								halo={0}
 							>
-								{e}°
-							</text>
+								{`${e}°`}
+							</HandLabel>
 						</g>
 					))}
 				<PenLine
@@ -1520,12 +1573,12 @@ function RealOcclusion() {
 					seed="pk-ro-axis"
 					width={1.2}
 				/>
-				<path
+				<SketchPath
 					d={`M${P.map((q) => `${x(q.az).toFixed(1)} ${y(q.el).toFixed(1)}`).join("L")}`}
-					fill="none"
-					stroke={SWISS.contour}
-					strokeWidth={2}
-					strokeLinejoin="round"
+					seed="pk-ro-skyline"
+					data
+					color="brown"
+					width={2}
 				/>
 				{hid.map((p) => (
 					<g key={`${p.name}-${p.az}`}>
@@ -1536,52 +1589,63 @@ function RealOcclusion() {
 							color="faint"
 							width={0.9}
 						/>
-						<circle
-							cx={x(p.az)}
-							cy={y(p.el)}
-							r={4.8}
-							style={{
-								fill: "color-mix(in srgb, var(--gb-red) 12%, var(--gb-paper))",
-								stroke: "var(--gb-red)",
-								strokeWidth: 1.8,
-							}}
+						<PenCircle
+							center={[x(p.az), y(p.el)]}
+							radiusX={4.8}
+							seed={`pk-ro-hid-${p.name}-${p.az}`}
+							data
+							color="red"
+							width={1.8}
 						/>
 					</g>
 				))}
 				{vis.map((p) => (
-					<circle
+					<HandDot
 						key={`${p.name}-${p.az}`}
-						cx={x(p.az)}
-						cy={y(p.el)}
+						x={x(p.az)}
+						y={y(p.el)}
 						r={p.labelled ? 4.2 : 3.4}
-						style={{
-							fill: p.labelled
-								? "var(--gb-forest)"
-								: "color-mix(in srgb, var(--gb-ink) 40%, var(--gb-paper))",
-						}}
+						seed={`pk-ro-vis-${p.name}-${p.az}`}
+						data
+						color={p.labelled ? "forest" : "pencil"}
 					/>
 				))}
 				{named && (
-					<PrintNote
+					<HandNote
 						x={x(named.az) + 7}
 						y={y(named.el) - 6}
 						size={FIG_NAME}
 						color={inkColor("red")}
 					>
 						{named.name}
-					</PrintNote>
+					</HandNote>
 				)}
-				<text
-					x={W - 14}
-					y={H - 6}
-					textAnchor="end"
-					fontSize={FIG_LABEL}
-					className="nb-num"
-					fill="var(--nb-pencil)"
-				>
-					azimuth {a0.toFixed(0)}°–{a1.toFixed(0)}° · skyline step{" "}
-					{d.horizon.step}°
-				</text>
+				<HandLabel x={W - 14} y={H - 6} anchor="end" size={FIG_LABEL} halo={0}>
+					{`azimuth ${a0.toFixed(0)}°–${a1.toFixed(0)}° · skyline step ${d.horizon.step}°`}
+				</HandLabel>
+				{worst && (
+					<>
+						<PenArrow
+							from={[x(worst.az) + 70, y(worst.el) - 34]}
+							to={[x(worst.az) + 8, y(worst.el) - 4]}
+							seed="pk-ro-worst-arrow"
+							color="pencil"
+							width={1}
+						/>
+						<HandText
+							x={x(worst.az) + 74}
+							y={y(worst.el) - 38}
+							size={17}
+							color="pencil"
+							rotate={-2}
+						>
+							{`${worst.name}: ${Math.abs(gap(worst)).toFixed(2)}° under the skyline`}
+						</HandText>
+					</>
+				)}
+				<HandText x={40} y={H - 34} size={16} color="pencil" rotate={-1.5}>
+					skyline = steepest ground in every direction
+				</HandText>
 			</svg>
 			<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] gb-secondary">
 				<span>
@@ -1670,11 +1734,19 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				kicker="The idea"
 				title="A summit becomes a label only if the eye can see it."
 			>
-				<p>A map says a mountain exists. It does not say you can see it.</p>
+				<p>
+					A map says a mountain exists.{" "}
+					<HandMark type="highlight">It does not say you can see it.</HandMark>
+				</p>
 				<p>
 					For each summit we ask: how high, which way, is it hidden, is it worth
 					the space? Each summit is first {link("terrain-snapping", "snapped")}{" "}
 					onto the real ridge.
+					<MarginNote mark="a">
+						{movedMedian
+							? `Compass ${Math.abs(d1?.solved.delta.yaw ?? 0).toFixed(1)}° off: the median summit slid ${movedMedian.toFixed(0)} px. Hmm.`
+							: "A bad pose slides every summit sideways. Hmm."}
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1740,13 +1812,24 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat kicker="Why it is hidden" title="Terrain hides most named summits.">
 				<p>
-					{pc
-						? `Of ${pc.inFrame} named peaks in demo-10's frame, ${pc.hidden} sit behind a nearer ridge.`
-						: "Most named peaks in the frame sit behind a nearer ridge."}
+					{pc ? (
+						<>
+							Of {pc.inFrame} named peaks in demo-10's frame,{" "}
+							<HandMark type="double">
+								{pc.hidden} sit behind a nearer ridge
+							</HandMark>
+							.
+						</>
+					) : (
+						"Most named peaks in the frame sit behind a nearer ridge."
+					)}
 				</p>
 				<p>
-					We compare angles: a summit is hidden if any ground on the way looks
-					higher than it does.
+					We compare angles: a summit is hidden if{" "}
+					<HandMark type="underline">
+						any ground on the way looks higher
+					</HandMark>{" "}
+					than it does.
 				</p>
 			</Beat>
 
@@ -1759,7 +1842,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="A few degrees of compass error put every name on the wrong ridge."
 			>
 				<p>
-					Every label moves by the same {pxDeg ? `${pxDeg.toFixed(0)} px` : "…"}{" "}
+					Every label moves by the same{" "}
+					<HandMark type="wavy">
+						{pxDeg ? `${pxDeg.toFixed(0)} px` : "…"}
+					</HandMark>{" "}
 					per degree. That is why the {link("accept-rule", "accept rule")} comes
 					first.
 				</p>
@@ -1768,7 +1854,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					{pc && visible10 != null
 						? `only ${pc.labelled} of the ${visible10} visible summits`
 						: "few visible summits"}{" "}
-					get a label. Spacing and a 20-label cap drop the rest.
+					get a label.{" "}
+					<HandMark type="underline">
+						Spacing and a 20-label cap drop the rest.
+					</HandMark>
 				</p>
 			</Beat>
 
@@ -1837,10 +1926,15 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						To become a label in the photo it has to answer: how high is it, in
 						which direction and at what angle from this eye, can the eye
 						actually see it, and is it worth the pixels. All four live in{" "}
-						<code>geo/peaks.ts</code>, in about two hundred lines. The{" "}
-						{link("terrain-snapping", "snapping page")} covers the first half of
-						question one (moving the node onto the DEM summit); this page
-						follows a peak from there to the screen.
+						<code>geo/peaks.ts</code>,{" "}
+						<HandMark type="circle">about two hundred lines</HandMark>.
+						<MarginNote mark="b">
+							Four questions, four steps below. The third is the one that drops
+							most.
+						</MarginNote>{" "}
+						The {link("terrain-snapping", "snapping page")} covers the first
+						half of question one (moving the node onto the DEM summit); this
+						page follows a peak from there to the screen.
 					</p>
 				</Section>
 				<Section title="The mechanism, in isolation" kicker="Schematic">
@@ -1942,8 +2036,15 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						peak worth a page, a missing name is nearly disqualifying, and{" "}
 						<code>400 · elevation</code> favours summits that stand tall in the
 						frame, which is what a person would point at. Distance only breaks
-						ties. The result is that the biggest, best-known, best-seen summits
-						get the first claim on screen space.
+						ties. The result is that{" "}
+						<HandMark type="highlight">
+							the biggest, best-known, best-seen summits get the first claim on
+							screen space
+						</HandMark>
+						.
+						<MarginNote mark="c">
+							Unnamed costs 3000: that is a veto, not a ranking.
+						</MarginNote>
 					</p>
 				</Section>
 

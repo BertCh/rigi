@@ -4,6 +4,7 @@
 
 import { Link } from "@tanstack/react-router";
 import { memo, useEffect, useMemo, useState } from "react";
+import { HandMark, Wash } from "#/components/gipfelbuch/notebook";
 import {
 	Hachure,
 	HandDot,
@@ -18,6 +19,7 @@ import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPh
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
+	AlignmentStoryProvider,
 	Callout,
 	CodeRef,
 	CrispLine,
@@ -27,15 +29,18 @@ import {
 	type GipfelbuchIndex,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
+	HandNote,
+	MarginNote,
 	Measured,
 	Op,
 	PhotoPicker,
-	PrintNote,
 	RealPhoto,
 	rowsPath,
 	Section,
 	Stat,
 	Steps,
+	StoryMap,
 	Sym,
 	useGipfelbuchIndex,
 	useGipfelbuchPhoto,
@@ -146,16 +151,11 @@ const StationMarks = memo(function StationMarks({
 }) {
 	return (
 		<g>
-			<rect
-				x={0}
-				y={0}
-				width={PW}
-				height={140}
-				style={{
-					fill: on
-						? "color-mix(in srgb, var(--gb-red) 14%, var(--gb-paper))"
-						: "color-mix(in srgb, var(--gb-ink) 5%, var(--gb-paper))",
-				}}
+			<Wash
+				d={`M0 0H${PW}V140H0Z`}
+				seed={`conv-wash-${i}`}
+				color={on ? "red" : "pencil"}
+				opacity={on ? 0.06 : 0.03}
 			/>
 			<PenLine
 				seed={`conv-top-${i}`}
@@ -313,11 +313,11 @@ function Conveyor() {
 							<rect x="0" y="170" width={tokenX} height="52" />
 						</clipPath>
 					</defs>
-					<text x={0} y={16} fontSize={13} fill={SWISS.ink} className="gb-num">
+					<HandLabel x={0} y={16} size={13} color={SWISS.ink}>
 						{reject
 							? "run B · solvePose rejects, refinePose rescues"
 							: "run A · solvePose accepts"}
-					</text>
+					</HandLabel>
 					{/* rail */}
 					{RAIL_GHOST}
 					<g clipPath="url(#conv-progress)">{RAIL_ROUTE}</g>
@@ -341,52 +341,43 @@ function Conveyor() {
 										/>
 									)}
 								</g>
-								<text
-									x={10}
-									y={138}
-									fontSize={13}
-									fill={SWISS.secondary}
-									className="gb-num"
-								>
+								<HandLabel x={10} y={138} size={13} color={SWISS.secondary}>
 									{s.out}
-								</text>
+								</HandLabel>
 							</g>
 						);
 					})}
 					{/* labels under rail */}
 					{STAGES.map((s, i) => (
 						<g key={s.fn} transform={`translate(${px(i)} 0)`}>
-							<text
+							<HandLabel
 								x={PW / 2}
-								y="226"
-								textAnchor="middle"
-								fontSize="13"
-								fill={PAPER}
-								className="gb-num"
+								y={226}
+								anchor="middle"
+								size={13}
+								color={PAPER}
 							>
 								{s.fn}
-							</text>
-							<text
+							</HandLabel>
+							<HandLabel
 								x={PW / 2}
 								y={242}
-								textAnchor="middle"
-								fontSize={13}
-								fill={SWISS.secondary}
-								className="gb-num"
+								anchor="middle"
+								size={13}
+								color={SWISS.secondary}
 							>
 								{s.sub}
-							</text>
+							</HandLabel>
 							{s.cost && (
-								<text
+								<HandLabel
 									x={PW / 2}
-									y="257"
-									textAnchor="middle"
-									className="nb-num"
-									fontSize="11"
-									fill={inkColor("blue")}
+									y={257}
+									anchor="middle"
+									size={11}
+									color={inkColor("blue")}
 								>
 									{s.cost}
-								</text>
+								</HandLabel>
 							)}
 						</g>
 					))}
@@ -405,18 +396,12 @@ function Conveyor() {
 							width={reject && atGate ? 2 : 1.2}
 							color={reject && atGate ? "ink" : "pencil"}
 						/>
-						<text x="2" y="31" fontSize="13" fill={PAPER} className="gb-num">
+						<HandLabel x={2} y={31} size={13} color={PAPER}>
 							refinePose
-						</text>
-						<text
-							x={2}
-							y={48}
-							fontSize={13}
-							fill={SWISS.secondary}
-							className="gb-num"
-						>
+						</HandLabel>
+						<HandLabel x={2} y={48} size={13} color={SWISS.secondary}>
 							FFT yaw ring · robust IRLS · 0.4–1.3 s measured
-						</text>
+						</HandLabel>
 						{refineT > 0.02 && (
 							<PenLine
 								seed="conv-refine-bar"
@@ -427,20 +412,30 @@ function Conveyor() {
 							/>
 						)}
 					</g>
-					<text x="0" y="368" fontSize="11" fill={SWISS.secondary}>
+					<HandText
+						x={W - 4}
+						y={14}
+						size={16}
+						color="red"
+						anchor="end"
+						rotate={-2}
+					>
+						a reject is an answer, not a crash
+					</HandText>
+					<HandLabel x={0} y={368} size={11} color={SWISS.secondary}>
 						No stage ever returns a pose without a verdict. If both reject, the
 						prior is shown as unverified and the user taps peaks.
-					</text>
+					</HandLabel>
 					{/* the two outcomes */}
 					<g transform={`translate(0 386)`}>
 						<HandDot x={6} y={6} r={4.5} seed="conv-key-win" color="forest" />
-						<PrintNote x={18} y={11} size={13} color="var(--gb-ink)" halo={0}>
+						<HandNote x={18} y={11} size={13} color="var(--gb-ink)" halo={0}>
 							first accepting stage wins
-						</PrintNote>
+						</HandNote>
 						<HandDot x={290} y={6} r={4.5} seed="conv-key-rej" color="red" />
-						<PrintNote x={302} y={11} size={13} color="var(--gb-ink)" halo={0}>
+						<HandNote x={302} y={11} size={13} color="var(--gb-ink)" halo={0}>
 							reject → next stage, then manual
-						</PrintNote>
+						</HandNote>
 					</g>
 				</svg>
 			</div>
@@ -462,9 +457,9 @@ function MetaArtefact({ t }: { t: number }) {
 						color="blue"
 						opacity={0.35 + 0.55 * Math.max(0, Math.sin(t * 2 - i))}
 					/>
-					<text x={10} y={11} fontSize={11} fill={SWISS.ink} className="gb-num">
+					<HandLabel x={10} y={11} size={11} color={SWISS.ink}>
 						{c}
-					</text>
+					</HandLabel>
 					<PenLine
 						seed={`meta-rule-${c}`}
 						from={[0, 15]}
@@ -483,15 +478,9 @@ function MetaArtefact({ t }: { t: number }) {
 				color="ink"
 				width={1.2}
 			/>
-			<text
-				x={0}
-				y={84}
-				fontSize={11}
-				fill={SWISS.secondary}
-				className="gb-num"
-			>
+			<HandLabel x={0} y={84} size={11} color={SWISS.secondary}>
 				pinhole prior
-			</text>
+			</HandLabel>
 		</g>
 	);
 }
@@ -529,15 +518,9 @@ function HorizonArtefact({
 				width={1}
 				dash="2 3"
 			/>
-			<text
-				x={0}
-				y={98}
-				fontSize={11}
-				fill={SWISS.secondary}
-				className="gb-num"
-			>
+			<HandLabel x={0} y={98} size={11} color={SWISS.secondary}>
 				7,200 azimuths
-			</text>
+			</HandLabel>
 		</g>
 	);
 }
@@ -574,15 +557,9 @@ function SkylineArtefact({ ridge }: { ridge: [number, number][] }) {
 				width={1.5}
 				data
 			/>
-			<text
-				x={0}
-				y={98}
-				fontSize={11}
-				fill={SWISS.secondary}
-				className="gb-num"
-			>
+			<HandLabel x={0} y={98} size={11} color={SWISS.secondary}>
 				one row per column
-			</text>
+			</HandLabel>
 		</g>
 	);
 }
@@ -648,25 +625,13 @@ function GridArtefact({ t, u }: { t: number; u: number }) {
 				color="ink"
 				width={1.5}
 			/>
-			<text
-				x={0}
-				y={86}
-				fontSize={11}
-				fill={SWISS.secondary}
-				className="gb-num"
-			>
+			<HandLabel x={0} y={86} size={11} color={SWISS.secondary}>
 				±25° yaw · ±3° pitch
-			</text>
+			</HandLabel>
 			<g opacity={0.65 + 0.3 * Math.sin(t)}>
-				<text
-					x={0}
-					y={98}
-					fontSize={11}
-					fill={SWISS.secondary}
-					className="gb-num"
-				>
+				<HandLabel x={0} y={98} size={11} color={SWISS.secondary}>
 					≤ 3 seeds → LM
-				</text>
+				</HandLabel>
 			</g>
 		</g>
 	);
@@ -710,16 +675,9 @@ function GateArtefact({
 				color="ink"
 				width={1.2}
 			/>
-			<text
-				x="50"
-				y="5"
-				textAnchor="middle"
-				className="nb-num"
-				fontSize="11"
-				fill={PAPER}
-			>
+			<HandLabel x={50} y={5} anchor="middle" size={11} color={PAPER}>
 				0.5
-			</text>
+			</HandLabel>
 			<HandText x={0} y={52} size={14} color={tone} halo={false}>
 				{!showing
 					? "confidence?"
@@ -729,34 +687,15 @@ function GateArtefact({
 							? "REJECT → refine"
 							: "…"}
 			</HandText>
-			<text
-				x="0"
-				y="66"
-				className="nb-num"
-				fontSize="11"
-				fill={PAPER}
-				fillOpacity=".6"
-			>
+			<HandLabel x={0} y={66} size={11} color={PAPER}>
 				{showing ? `confidence ${conf.toFixed(2)}` : " "}
-			</text>
-			<text
-				x={0}
-				y={86}
-				fontSize={11}
-				fill={SWISS.secondary}
-				className="gb-num"
-			>
+			</HandLabel>
+			<HandLabel x={0} y={86} size={11} color={SWISS.secondary}>
 				tilt &gt; 3° vs gravity
-			</text>
-			<text
-				x={0}
-				y={98}
-				fontSize={11}
-				fill={SWISS.secondary}
-				className="gb-num"
-			>
+			</HandLabel>
+			<HandLabel x={0} y={98} size={11} color={SWISS.secondary}>
 				is also a reject
-			</text>
+			</HandLabel>
 		</g>
 	);
 }
@@ -827,18 +766,14 @@ function CascadeFlow() {
 						gap={6}
 						opacity={0.3}
 					/>
-					<text
-						x="214"
-						y="217"
-						fontSize={CASCADE_LABEL}
-						fill="var(--gb-forest)"
-						className="gb-num"
-						stroke="var(--nb-paper)"
-						strokeWidth={4}
-						paintOrder="stroke"
+					<HandLabel
+						x={214}
+						y={217}
+						size={CASCADE_LABEL}
+						color="var(--gb-forest)"
 					>
 						accepted 11 / 12 · false accepts 0 · worst yaw 0.47°
-					</text>
+					</HandLabel>
 					{PHOTO_ROWS.map(({ dest, id }, i) => {
 						const T = 14; // seconds per loop
 						const k = (t / T + i * 0.04) % 1;
@@ -912,26 +847,24 @@ function Box({
 				color="pencil"
 				width={1}
 			/>
-			<text
+			<HandLabel
 				x={x + w / 2}
 				y={y + 22}
-				textAnchor="middle"
-				fontSize={CASCADE_LABEL}
-				fill={PAPER}
-				className="gb-num"
+				anchor="middle"
+				size={CASCADE_LABEL}
+				color={PAPER}
 			>
 				{label}
-			</text>
-			<text
+			</HandLabel>
+			<HandLabel
 				x={x + w / 2}
 				y={y + 40}
-				textAnchor="middle"
-				fontSize={CASCADE_LABEL}
-				fill={SWISS.secondary}
-				className="gb-num"
+				anchor="middle"
+				size={CASCADE_LABEL}
+				color={SWISS.secondary}
 			>
 				{sub}
-			</text>
+			</HandLabel>
 		</g>
 	);
 }
@@ -995,17 +928,24 @@ function Variants() {
 									width={0.9}
 								/>
 								{barW > 3 && (
-									<rect
-										x={0}
-										y={4}
-										width={barW}
-										height={10}
-										style={{
-											fill: v.hot
-												? "var(--gb-red)"
-												: "color-mix(in srgb, var(--gb-ink) 45%, var(--gb-paper))",
-										}}
-									/>
+									<>
+										<Hachure
+											d={`M0 4H${barW}V14H0Z`}
+											seed={`variant-bar-${v.name}`}
+											color={v.hot ? "red" : "pencil"}
+											gap={2}
+											width={1}
+											opacity={0.85}
+										/>
+										<PenLine
+											seed={`variant-bar-edge-${v.name}`}
+											from={[barW, 4]}
+											to={[barW, 14]}
+											color={v.hot ? "red" : "pencil"}
+											width={1.2}
+											data
+										/>
+									</>
 								)}
 								<PenLine
 									seed={`variant-tick-${v.name}`}
@@ -1118,23 +1058,24 @@ function TimeBar({ d }: { d: GipfelbuchPhotoData }) {
 							const w = Math.max(3, (p.v / total) * 600);
 							acc.items.push(
 								<g key={p.k}>
-									<rect
-										x={acc.x}
-										y={2}
-										width={Math.max(1, w - 1)}
-										height={18}
-										style={{ fill: p.c }}
+									<Hachure
+										d={`M${acc.x} 2H${acc.x + Math.max(1, w - 1)}V20H${acc.x}Z`}
+										seed={`stage-time-${p.k}`}
+										color={p.c}
+										gap={1.8}
+										width={1.1}
+										opacity={0.9}
 									/>
 									{w > 120 && (
-										<text
+										<HandLabel
+											halo={0}
 											x={acc.x + 6}
 											y={15}
-											fontSize={11}
-											className="gb-num"
-											style={{ fill: "var(--gb-paper)" }}
+											size={11}
+											color="var(--gb-paper)"
 										>
 											{p.k} {Math.round((p.v / total) * 100)} %
-										</text>
+										</HandLabel>
 									)}
 								</g>,
 							);
@@ -1368,25 +1309,33 @@ function AllTwelve({
 												className="shrink-0"
 												aria-hidden="true"
 											>
-												<rect
-													x={0}
-													y={1}
-													height={4.5}
-													width={Math.max(
-														3,
-														(p.residual.prior.median / maxRes) * 112,
-													)}
-													style={{ fill: "var(--gb-red)" }}
+												<PenLine
+													seed={`res-prior-${p.id}`}
+													from={[0, 3.2]}
+													to={[
+														Math.max(
+															3,
+															(p.residual.prior.median / maxRes) * 112,
+														),
+														3.2,
+													]}
+													color="red"
+													width={4}
+													data
 												/>
-												<rect
-													x={0}
-													y={7.5}
-													height={4.5}
-													width={Math.max(
-														3,
-														(p.residual.solved.median / maxRes) * 112,
-													)}
-													style={{ fill: "var(--gb-navy)" }}
+												<PenLine
+													seed={`res-solved-${p.id}`}
+													from={[0, 9.8]}
+													to={[
+														Math.max(
+															3,
+															(p.residual.solved.median / maxRes) * 112,
+														),
+														9.8,
+													]}
+													color="navy"
+													width={4}
+													data
 												/>
 											</svg>
 											<span className={`${TYPE.micro} gb-secondary`}>
@@ -1469,21 +1418,23 @@ function GroundTruthEval({ idx }: { idx: GipfelbuchIndex | null }) {
 										width={0.8}
 									/>
 									{r.accepted && (
-										<rect
-											x={1}
-											y={2}
-											width={11}
-											height={11}
-											style={{ fill: "var(--gb-navy)" }}
+										<Hachure
+											d="M1 2H12V13H1Z"
+											seed={`gt-box-1-${r.name}`}
+											color="navy"
+											gap={1.6}
+											width={1.1}
+											opacity={0.95}
 										/>
 									)}
 									{c.accepted && (
-										<rect
-											x={14}
-											y={2}
-											width={11}
-											height={11}
-											style={{ fill: "var(--gb-navy)" }}
+										<Hachure
+											d="M14 2H25V13H14Z"
+											seed={`gt-box-14-${r.name}`}
+											color="navy"
+											gap={1.6}
+											width={1.1}
+											opacity={0.95}
 										/>
 									)}
 								</svg>
@@ -1697,61 +1648,70 @@ function HeroStages() {
 				</>
 			}
 		>
-			<Stages
-				interval={3600}
-				stages={[
-					{
-						label: "Photo",
-						caption: "We start with the photo and what the phone recorded.",
-						render: () => <RealPhoto bleed data={d} layers={[]} crop={crop} />,
-					},
-					{
-						label: "Skyline from the map",
-						caption: `From the GPS fix we predict the skyline the terrain should make. This takes ${t(d?.ms.horizon)}.`,
-						render: () => (
-							<RealPhoto bleed data={d} layers={["prior"]} crop={crop} />
-						),
-					},
-					{
-						label: "Skyline in the pixels",
-						caption: `We find the skyline in the photo itself. This takes ${t(d?.ms.skyline)}.`,
-						render: () => (
-							<RealPhoto
-								bleed
-								data={d}
-								layers={["prior", "skyline"]}
-								crop={crop}
-							/>
-						),
-					},
-					{
-						label: "Slide to match",
-						caption: `We turn the camera until the two lines overlap, then check how sure we are. ${t(d?.ms.solve)}.`,
-						render: () => (
-							<RealPhoto
-								bleed
-								data={d}
-								layers={["skyline", "solved"]}
-								crop={crop}
-							/>
-						),
-					},
-					{
-						label: "Label",
-						caption:
-							"Once the pose is trusted, we name the peaks that line up.",
-						render: () => (
-							<RealPhoto
-								bleed
-								data={d}
-								layers={["peaks"]}
-								crop={crop}
-								maxLabels={6}
-							/>
-						),
-					},
-				]}
-			/>
+			<AlignmentStoryProvider initial={0}>
+				<Stages
+					interval={3600}
+					aside={<StoryMap data={d} />}
+					stages={[
+						{
+							label: "Photo",
+							caption: "We start with the photo and what the phone recorded.",
+							render: () => (
+								<RealPhoto bleed data={d} layers={[]} crop={crop} />
+							),
+						},
+						{
+							label: "Skyline from the map",
+							pose: 0,
+							caption: `From the GPS fix we predict the skyline the terrain should make. This takes ${t(d?.ms.horizon)}.`,
+							render: () => (
+								<RealPhoto bleed data={d} layers={["prior"]} crop={crop} />
+							),
+						},
+						{
+							label: "Skyline in the pixels",
+							pose: 0,
+							caption: `We find the skyline in the photo itself. This takes ${t(d?.ms.skyline)}.`,
+							render: () => (
+								<RealPhoto
+									bleed
+									data={d}
+									layers={["prior", "skyline"]}
+									crop={crop}
+								/>
+							),
+						},
+						{
+							label: "Slide to match",
+							pose: 1,
+							caption: `We turn the camera until the two lines overlap, then check how sure we are. ${t(d?.ms.solve)}.`,
+							render: () => (
+								<RealPhoto
+									bleed
+									data={d}
+									layers={["skyline", "solved"]}
+									crop={crop}
+								/>
+							),
+						},
+						{
+							label: "Label",
+							pose: 1,
+							caption:
+								"Once the pose is trusted, we name the peaks that line up.",
+							render: () => (
+								<RealPhoto
+									bleed
+									data={d}
+									layers={["peaks"]}
+									crop={crop}
+									maxLabels={6}
+								/>
+							),
+						},
+					]}
+				/>
+			</AlignmentStoryProvider>
 			{d && <TimeBar d={d} />}
 		</Figure>
 	);
@@ -1955,20 +1915,15 @@ function YawSearch() {
 					width={0.9}
 					dash="2 4"
 				/>
-				<text
+				<HandLabel
 					x={W - m.r}
 					y={sy(cm) + 16}
-					textAnchor="end"
-					fontSize={YAW_LABEL}
-					fill={SWISS.secondary}
-					paintOrder="stroke"
-					stroke={SWISS.paper}
-					strokeWidth={3}
-					strokeLinejoin="round"
-					className="gb-num"
+					anchor="end"
+					size={YAW_LABEL}
+					color={SWISS.secondary}
 				>
 					typical yaw {cm.toFixed(1)} px
-				</text>
+				</HandLabel>
 				{marks.map(
 					(mk) =>
 						mk.on && (
@@ -1984,12 +1939,12 @@ function YawSearch() {
 							</g>
 						),
 				)}
-				<path
+				<SketchPath
 					d={pts.join("")}
-					fill="none"
-					stroke={SWISS.ink}
-					strokeWidth={1.7}
-					strokeLinejoin="round"
+					seed={`yaw-curve-${id}`}
+					color="ink"
+					width={1.7}
+					data
 				/>
 				{[
 					[curve.win, "blue", "best"],
@@ -2010,50 +1965,76 @@ function YawSearch() {
 						)
 					);
 				})}
+				{curve.win && (
+					<>
+						<HandText
+							x={Math.min(
+								W - m.r - 4,
+								Math.max(m.l + 90, sx(curve.win.dy) + 70),
+							)}
+							y={Math.max(m.t + 18, sy(px(curve.win.cost)) - 44)}
+							size={15}
+							color="blue"
+							anchor="middle"
+							rotate={-2}
+						>
+							deepest dip, my answer
+						</HandText>
+						<PenArrow
+							seed={`yaw-note-${id}-${full}`}
+							from={[
+								Math.min(
+									W - m.r - 30,
+									Math.max(m.l + 60, sx(curve.win.dy) + 50),
+								),
+								Math.max(m.t + 24, sy(px(curve.win.cost)) - 36),
+							]}
+							to={[sx(curve.win.dy), sy(px(curve.win.cost)) - 8]}
+							color="blue"
+							width={1.1}
+						/>
+					</>
+				)}
 				{(full ? [-180, -90, 0, 90, 180] : [-25, -10, 0, 10, 25]).map((v) => (
-					<text
+					<HandLabel
 						key={v}
 						x={sx(v)}
 						y={H - 16}
-						textAnchor="middle"
-						className="nb-num"
-						fontSize={YAW_LABEL_SMALL}
-						fill={SWISS.secondary}
+						anchor="middle"
+						size={YAW_LABEL_SMALL}
+						color={SWISS.secondary}
 					>
 						{v > 0 ? "+" : v < 0 ? "−" : ""}
 						{Math.abs(v)}°
-					</text>
+					</HandLabel>
 				))}
-				<text
+				<HandLabel
 					x={(m.l + W - m.r) / 2}
 					y={H - 2}
-					textAnchor="middle"
-					fontSize={YAW_LABEL}
-					fill={SWISS.secondary}
-					className="gb-num"
+					anchor="middle"
+					size={YAW_LABEL}
+					color={SWISS.secondary}
 				>
 					yaw offset from the compass
-				</text>
-				<text
+				</HandLabel>
+				<HandLabel
 					x={m.l - 6}
 					y={sy(ymax * 0.5)}
-					textAnchor="end"
-					className="nb-num"
-					fontSize={YAW_LABEL_SMALL}
-					fill={SWISS.secondary}
+					anchor="end"
+					size={YAW_LABEL_SMALL}
+					color={SWISS.secondary}
 				>
 					{(ymax * 0.5).toFixed(0)} px
-				</text>
-				<text
+				</HandLabel>
+				<HandLabel
 					x={m.l - 6}
 					y={sy(0) + 3}
-					textAnchor="end"
-					className="nb-num"
-					fontSize={YAW_LABEL_SMALL}
-					fill={SWISS.secondary}
+					anchor="end"
+					size={YAW_LABEL_SMALL}
+					color={SWISS.secondary}
 				>
 					0
-				</text>
+				</HandLabel>
 			</svg>
 		);
 		const a = curve.ambiguity;
@@ -2233,7 +2214,11 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Everything runs in the browser, with no neural network. The last step
-					is a gate that is allowed to say <em>I don&rsquo;t know</em>.
+					is a gate that is allowed to say{" "}
+					<HandMark type="highlight">
+						<em>I don&rsquo;t know</em>
+					</HandMark>
+					.
 				</p>
 			</Beat>
 
@@ -2243,7 +2228,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					compass. Each one scores how far the two skylines sit apart.
 				</p>
 				<p>
-					The lowest score wins. The nearest rival tells us how far to trust it.
+					<HandMark type="double">The lowest score wins.</HandMark> The nearest
+					rival tells us how far to trust it.
 				</p>
 			</Beat>
 
@@ -2285,8 +2271,14 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="When the skyline is wrong, we reject instead of guess."
 			>
 				<p>
-					A head or a hand on the ridge looks like a real edge. Confidence stays
-					low, so the photo is rejected.
+					<HandMark type="wavy" color="red">
+						A head or a hand on the ridge looks like a real edge.
+					</HandMark>{" "}
+					Confidence stays low, so the photo is rejected.
+					<MarginNote mark="a">
+						demo-11 rejected, demo-12 rescued: same head, two verdicts. Why does
+						the second solver cope?
+					</MarginNote>
 				</p>
 			</Beat>
 

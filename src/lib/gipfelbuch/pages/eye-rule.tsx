@@ -4,11 +4,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+	CircledKey,
+	CircledNumber,
+	HandMark,
+	PencilLayer,
+} from "#/components/gipfelbuch/notebook";
+import {
 	Hachure,
 	HandDot,
 	HandText,
 	type InkColor,
+	PenArrow,
 	PenCircle,
+	PenDimension,
 	PenLine,
 	SketchPath,
 	SketchPolyline,
@@ -22,10 +30,11 @@ import {
 	Figure,
 	Flow,
 	type GipfelbuchPhotoData,
+	HandLabel,
 	HandRange,
+	MarginNote,
 	Measured,
 	Plot,
-	PrintLabel,
 	RealPhoto,
 	Sym,
 	useGipfelbuchIndex,
@@ -274,14 +283,14 @@ function Hero() {
 						width={1.2}
 						dash="4 5"
 					/>
-					<PrintLabel
+					<HandLabel
 						x={px(X1) - 4}
 						y={py(alt) - 7}
 						anchor="end"
 						size={HERO_LABEL}
 					>
 						GPS altitude {noAlt ? "(none)" : `${alt.toFixed(0)} m`}
-					</PrintLabel>
+					</HandLabel>
 					{/* 2 sigma_H disk */}
 					<PenLine
 						data
@@ -307,9 +316,9 @@ function Hero() {
 						color="pencil"
 						width={1}
 					/>
-					<PrintLabel x={px(0)} y={Hh - 8} anchor="middle" size={HERO_LABEL}>
+					<HandLabel x={px(0)} y={Hh - 8} anchor="middle" size={HERO_LABEL}>
 						2σH = ±{(2 * sH).toFixed(0)} m horizontal
-					</PrintLabel>
+					</HandLabel>
 					{/* iso-band */}
 					{s.band.length > 1 && (
 						<SketchPolyline
@@ -332,7 +341,7 @@ function Hero() {
 						width={0.9}
 						dash="2 3"
 					/>
-					<PrintLabel
+					<HandLabel
 						x={px(0)}
 						y={Hh - 44}
 						anchor="middle"
@@ -340,7 +349,7 @@ function Hero() {
 						color={SWISS.pencil}
 					>
 						GPS fix
-					</PrintLabel>
+					</HandLabel>
 					{/* floor eye */}
 					<PenLine
 						data
@@ -352,7 +361,7 @@ function Hero() {
 					/>
 					{fig(0, s.floorEye, "ink", "floor")}
 					{/* the two eye labels sit on opposite sides of the fix and are staggered when the eyes are close */}
-					<PrintLabel
+					<HandLabel
 						x={px(0) - 10}
 						y={py(s.floorEye) - 4}
 						anchor="end"
@@ -360,8 +369,46 @@ function Hero() {
 						color={SWISS.ink}
 					>
 						max rule {s.floorEye.toFixed(1)} m
-					</PrintLabel>
+					</HandLabel>
 					{/* MAP eye */}
+					<PencilLayer>
+						<PenLine
+							from={[px(X0), py(ground(0) + H)]}
+							to={[px(X1), py(ground(0) + H)]}
+							seed="er-hero-guide-eye"
+							width={0.8}
+						/>
+					</PencilLayer>
+					<PenDimension
+						from={[px(0) + 14, py(ground(0))]}
+						to={[px(0) + 14, py(ground(0) + H)]}
+						seed="er-hero-dim"
+						color="pencil"
+						width={1}
+						tick={3}
+					/>
+					<HandText
+						x={px(0) + 20}
+						y={py(ground(0) + H / 2) + 4}
+						size={14}
+						color="pencil"
+					>
+						1.6 m standing eye
+					</HandText>
+					<HandText x={14} y={22} size={15} rotate={-2}>
+						{err == null
+							? "no match on the contour: the old rule stands"
+							: `max rule is ${Math.abs(err).toFixed(1)} m too ${err >= 0 ? "high" : "low"} here`}
+					</HandText>
+					<HandText
+						x={W - 14}
+						y={Hh - 54}
+						size={14}
+						anchor="end"
+						color="pencil"
+					>
+						red band: where DEM + 1.6 m matches the altitude
+					</HandText>
 					{s.mapEye != null && s.mapX != null && (
 						<g>
 							<PenCircle
@@ -382,7 +429,7 @@ function Hero() {
 								width={2}
 							/>
 							{/* right of the dot (or left near the edge) and above; below it when the MAP eye is left of the fix, so it never meets the "max rule" label */}
-							<PrintLabel
+							<HandLabel
 								x={px(s.mapX) + (mapRight && !mapFlip ? 10 : -10)}
 								y={py(s.mapEye) + (mapRight ? -11 : 19)}
 								anchor={mapRight && !mapFlip ? "start" : "end"}
@@ -390,7 +437,7 @@ function Hero() {
 								color={SWISS.red}
 							>
 								contour MAP {s.mapEye.toFixed(1)} m
-							</PrintLabel>
+							</HandLabel>
 						</g>
 					)}
 				</svg>
@@ -578,16 +625,15 @@ function RealOffsets() {
 							color={v === 0 ? "pencil" : "faint"}
 							width={v === 0 ? 0.9 : 0.5}
 						/>
-						<text
+						<HandLabel
 							x={px(v)}
 							y={top + 12 * rowH + 14}
-							textAnchor="middle"
-							fontSize={OFFSETS_LABEL}
-							className="nb-num"
-							fill="var(--nb-pencil)"
+							anchor="middle"
+							size={OFFSETS_LABEL}
+							color="var(--nb-pencil)"
 						>
-							{v > 0 ? `+${v}` : v}
-						</text>
+							{v > 0 ? `+${v}` : `${v}`}
+						</HandLabel>
 					</g>
 				))}
 				<PenLine
@@ -598,33 +644,32 @@ function RealOffsets() {
 					color="ink"
 					width={1.5}
 				/>
-				<PrintLabel
+				<HandLabel
 					x={px(1.6) - 5}
 					y={top - 14}
 					anchor="end"
 					size={OFFSETS_LABEL + 1}
 				>
 					altitude ignored
-				</PrintLabel>
-				<PrintLabel x={px(1.6) + 5} y={top - 14} size={OFFSETS_LABEL + 1}>
+				</HandLabel>
+				<HandLabel x={px(1.6) + 5} y={top - 14} size={OFFSETS_LABEL + 1}>
 					altitude used
-				</PrintLabel>
+				</HandLabel>
 				{rows.map((r, i) => {
 					const y = top + i * rowH + rowH / 2 - 4;
 					const a = r.t.alt - r.t.ground;
 					const b = r.m.alt - r.m.ground;
 					return (
 						<g key={r.t.id}>
-							<text
+							<HandLabel
 								x={x0 - 8}
 								y={y + 3.5}
-								textAnchor="end"
-								fontSize={OFFSETS_LABEL}
-								className="nb-num"
-								fill="var(--nb-pencil)"
+								anchor="end"
+								size={OFFSETS_LABEL}
+								color="var(--nb-pencil)"
 							>
-								{r.t.id.slice(5)} ±{Math.round(r.t.hAcc)}m
-							</text>
+								{`${r.t.id.slice(5)} ±${Math.round(r.t.hAcc)}m`}
+							</HandLabel>
 							<PenLine
 								data
 								from={[px(a), y]}
@@ -633,17 +678,34 @@ function RealOffsets() {
 								color="faint"
 								width={0.9}
 							/>
-							<circle
-								cx={px(a)}
-								cy={y}
+							<HandDot
+								x={px(a)}
+								y={y}
 								r={5}
-								style={{ fill: TERRA }}
-								stroke="var(--gb-ink)"
-								strokeWidth={1}
+								seed={`er-ro-t-${r.t.id}`}
+								data
+								color={TERRA}
+								opacity={1}
 							/>
-							<circle cx={px(b)} cy={y} r={5} style={{ fill: MAPH }} />
+							<PenCircle
+								center={[px(a), y]}
+								radiusX={5}
+								seed={`er-ro-tr-${r.t.id}`}
+								data
+								color="ink"
+								width={1}
+							/>
+							<HandDot
+								x={px(b)}
+								y={y}
+								r={5}
+								seed={`er-ro-m-${r.t.id}`}
+								data
+								color={MAPH}
+								opacity={1}
+							/>
 							{(a < -200 || b < -200) && (
-								<PrintLabel
+								<HandLabel
 									x={x0 + 14}
 									y={y + 4}
 									size={OFFSETS_LABEL}
@@ -651,27 +713,54 @@ function RealOffsets() {
 									halo={6}
 								>
 									◂ alt {r.t.alt.toFixed(0)} m: {a.toFixed(0)} m (off scale)
-								</PrintLabel>
+								</HandLabel>
 							)}
 						</g>
 					);
 				})}
+				<HandText
+					x={x1}
+					y={top + 12 * rowH + 36}
+					size={14}
+					anchor="end"
+					color="pencil"
+					rotate={-2}
+				>
+					the two maps disagree about where the ground is
+				</HandText>
+				<HandText x={px(1.6) + 14} y={top + 6 * rowH} size={14} color="pencil">
+					{`${dropM} of 12 land left on Mapterhorn`}
+				</HandText>
 				<g>
-					<circle
-						cx={x0}
-						cy={H - 9}
+					<HandDot
+						x={x0}
+						y={H - 9}
 						r={5}
-						style={{ fill: TERRA }}
-						stroke="var(--gb-ink)"
-						strokeWidth={1}
+						seed="er-ro-key-t"
+						color={TERRA}
+						opacity={1}
 					/>
-					<PrintLabel x={x0 + 10} y={H - 5} size={OFFSETS_LABEL}>
+					<PenCircle
+						center={[x0, H - 9]}
+						radiusX={5}
+						seed="er-ro-key-tr"
+						color="ink"
+						width={1}
+					/>
+					<HandLabel x={x0 + 10} y={H - 5} size={OFFSETS_LABEL}>
 						Terrarium z13
-					</PrintLabel>
-					<circle cx={x0 + 140} cy={H - 9} r={5} style={{ fill: MAPH }} />
-					<PrintLabel x={x0 + 150} y={H - 5} size={OFFSETS_LABEL}>
+					</HandLabel>
+					<HandDot
+						x={x0 + 140}
+						y={H - 9}
+						r={5}
+						seed="er-ro-key-m"
+						color={MAPH}
+						opacity={1}
+					/>
+					<HandLabel x={x0 + 150} y={H - 5} size={OFFSETS_LABEL}>
 						Mapterhorn z15
-					</PrintLabel>
+					</HandLabel>
 				</g>
 			</svg>
 			{glitch && (
@@ -697,6 +786,11 @@ function RealContour() {
 		.filter((r) => r.mapEye != null)
 		.map((r) => r.floorEye - (r.mapEye as number));
 	const maxAbs = 16;
+	const CW = 640;
+	const CROW = 22;
+	const CH = 30 + rows.length * CROW;
+	const cxm = 330;
+	const CW_HALF = 230;
 	return (
 		<Figure
 			label="Fig. 3"
@@ -709,85 +803,138 @@ function RealContour() {
 				</>
 			}
 		>
-			<div className="space-y-1.5">
-				<div className="grid grid-cols-[2.6rem_1fr_3.6rem_3.2rem] items-center gap-x-3 font-mono text-[11px] gb-secondary uppercase tracking-wider">
-					<span>photo</span>
-					<span className="flex justify-between normal-case tracking-normal">
-						<span>
-							<span
-								className="mr-1.5 inline-block size-2.5 align-baseline"
-								style={{ background: "var(--gb-navy)" }}
-							/>
-							contour higher
-						</span>
-						<span>
-							contour lower
-							<span
-								className="ml-1.5 inline-block size-2.5 align-baseline"
-								style={{ background: "var(--gb-red)" }}
-							/>
-						</span>
-					</span>
-					<span className="text-right">band</span>
-					<span className="text-right">shift</span>
-				</div>
-				{rows.map((r) => {
+			<svg
+				viewBox={`0 0 ${CW} ${CH}`}
+				className="block h-auto w-full"
+				role="img"
+				aria-label="Standing-rule eye minus contour-prior eye for 12 photos, Mapterhorn"
+			>
+				<HandLabel x={8} y={14} size={10} caps color="var(--gb-secondary)">
+					photo
+				</HandLabel>
+				<HandLabel
+					x={cxm - 8}
+					y={14}
+					anchor="end"
+					size={10.5}
+					color="var(--gb-navy)"
+				>
+					◂ contour higher
+				</HandLabel>
+				<HandLabel x={cxm + 8} y={14} size={10.5} color="var(--gb-red)">
+					contour lower ▸
+				</HandLabel>
+				<HandLabel
+					x={CW - 66}
+					y={14}
+					anchor="end"
+					size={10}
+					caps
+					color="var(--gb-secondary)"
+				>
+					band
+				</HandLabel>
+				<HandLabel
+					x={CW - 6}
+					y={14}
+					anchor="end"
+					size={10}
+					caps
+					color="var(--gb-secondary)"
+				>
+					shift
+				</HandLabel>
+				<PenLine
+					from={[cxm, 22]}
+					to={[cxm, 22 + rows.length * CROW]}
+					seed="er-rc-axis"
+					color="pencil"
+					width={1}
+				/>
+				{rows.map((r, i) => {
 					const d = r.mapEye == null ? null : r.floorEye - r.mapEye;
-					const ink = d != null && d < 0 ? "var(--gb-navy)" : "var(--gb-red)";
+					const ink: InkColor = d != null && d < 0 ? "navy" : "red";
+					const y = 22 + i * CROW + CROW / 2;
+					const x1 = d == null ? cxm : cxm + (d / maxAbs) * CW_HALF;
+					const bar =
+						d == null ? "" : `M${cxm} ${y - 5}H${x1}V${y + 5}H${cxm}Z`;
 					return (
-						<div
-							key={r.id}
-							className="grid grid-cols-[2.6rem_1fr_3.6rem_3.2rem] items-center gap-x-3 font-mono text-[11px] gb-secondary"
-						>
-							<span>{r.id.slice(5)}</span>
-							<div className="relative h-4">
-								<div
-									className="absolute inset-y-0 left-1/2 w-px"
-									style={{ background: "var(--gb-pencil)" }}
-								/>
-								{d != null && (
-									<div
-										className="absolute inset-y-[2px]"
-										style={{
-											background: `color-mix(in srgb, ${ink} 55%, var(--gb-paper))`,
-											borderLeft: d < 0 ? `2px solid ${ink}` : undefined,
-											borderRight: d >= 0 ? `2px solid ${ink}` : undefined,
-											left: d >= 0 ? "50%" : `${50 + (d / maxAbs) * 50}%`,
-											width: `${(Math.abs(d) / maxAbs) * 50}%`,
-										}}
+						<g key={r.id}>
+							<HandLabel x={8} y={y + 4} size={11} color="var(--gb-secondary)">
+								{r.id.slice(5)}
+							</HandLabel>
+							{d != null && (
+								<>
+									<Hachure
+										d={bar}
+										seed={`er-rc-bar-${r.id}`}
+										color={ink}
+										gap={2.6}
+										width={0.9}
+										opacity={0.8}
 									/>
-								)}
-								<span
-									className="absolute top-0 bg-[var(--gb-paper)] px-1 text-[11px] gb-secondary"
-									style={{
-										left:
-											d == null
-												? "50%"
-												: d >= 0
-													? `${50 + (d / maxAbs) * 50 + 1.5}%`
-													: undefined,
-										right:
-											d != null && d < 0
-												? `${50 + (-d / maxAbs) * 50 + 1.5}%`
-												: undefined,
-										transform: d == null ? "translateX(-50%)" : undefined,
-									}}
-								>
-									{d == null
-										? "fallback"
-										: `${d > 0 ? "+" : ""}${d.toFixed(1)}`}
-								</span>
-							</div>
-							<span className="text-right">
+									<PenLine
+										data
+										from={[x1, y - 6]}
+										to={[x1, y + 6]}
+										seed={`er-rc-end-${r.id}`}
+										color={ink}
+										width={2}
+									/>
+								</>
+							)}
+							<HandLabel
+								x={d == null ? cxm + 8 : d >= 0 ? x1 + 6 : x1 - 6}
+								y={y + 4}
+								anchor={d != null && d < 0 ? "end" : "start"}
+								size={11}
+								color="var(--gb-secondary)"
+							>
+								{d == null ? "fallback" : `${d > 0 ? "+" : ""}${d.toFixed(1)}`}
+							</HandLabel>
+							<HandLabel
+								x={CW - 66}
+								y={y + 4}
+								anchor="end"
+								size={11}
+								color="var(--gb-secondary)"
+							>
 								{r.bandFrac ? `${(r.bandFrac * 100).toFixed(0)}%` : "0%"}
-							</span>
-							<span className="text-right">
+							</HandLabel>
+							<HandLabel
+								x={CW - 6}
+								y={y + 4}
+								anchor="end"
+								size={11}
+								color="var(--gb-secondary)"
+							>
 								{r.mapShiftM == null ? "–" : `${r.mapShiftM.toFixed(0)} m`}
-							</span>
-						</div>
+							</HandLabel>
+						</g>
 					);
 				})}
-			</div>
+				{(() => {
+					const fb = rows.findIndex((r) => r.mapEye == null);
+					return fb >= 0 ? (
+						<>
+							<HandText
+								x={cxm + 70}
+								y={22 + fb * CROW + CROW / 2 + 22}
+								size={14}
+								rotate={-2}
+							>
+								{`photo ${rows[fb].id.slice(5)}: no match, the old rule stands`}
+							</HandText>
+							<PenArrow
+								from={[cxm + 66, 22 + fb * CROW + CROW / 2 + 16]}
+								to={[cxm + 30, 22 + fb * CROW + CROW / 2 + 4]}
+								seed="er-rc-note-arrow"
+								width={1.2}
+							/>
+						</>
+					) : null;
+				})()}
+			</svg>
 			<p className="mt-3 text-[13px] leading-relaxed gb-secondary">
 				“band” is the fraction of the 2σH disk where DEM + 1.6 m is within σA of
 				the altitude; “shift” is how far the MAP eye moves from the GPS fix.
@@ -839,22 +986,34 @@ function DriftPlot() {
 						/>
 						{[2, 3, 4].map((lg) => (
 							<g key={lg}>
-								<circle
-									cx={sc.x(lg)}
-									cy={sc.y(W * F * Math.atan(0.2 / 10 ** lg))}
+								<HandDot
+									x={sc.x(lg)}
+									y={sc.y(W * F * Math.atan(0.2 / 10 ** lg))}
 									r={4.5}
-									style={{ fill: "var(--gb-red)" }}
+									seed={`er-drift-dot-${lg}`}
+									data
+									color="red"
+									opacity={1}
 								/>
-								<PrintLabel
+								<HandLabel
 									x={sc.x(lg) + 9}
 									y={sc.y(W * F * Math.atan(0.2 / 10 ** lg)) - 8}
 									size={13}
 									color={SWISS.ink}
 								>
 									{(W * F * Math.atan(0.2 / 10 ** lg)).toFixed(2)} px
-								</PrintLabel>
+								</HandLabel>
 							</g>
 						))}
+						<HandText
+							x={sc.x(2.9)}
+							y={sc.y(40)}
+							size={16}
+							anchor="end"
+							rotate={-3}
+						>
+							only the foreground cares
+						</HandText>
 					</>
 				)}
 			</Plot>
@@ -914,14 +1073,14 @@ function SideView({
 				width={1.7}
 				passes={1}
 			/>
-			<PrintLabel
+			<HandLabel
 				x={W - 16}
 				y={py(pts[pts.length - 1][1]) - 8}
 				anchor="end"
 				size={SIDE_LABEL}
 			>
 				ground along the view
-			</PrintLabel>
+			</HandLabel>
 			<HandText x={px(60)} y={Ht - 10} size={17} color="pencil">
 				inside the mountain
 			</HandText>
@@ -937,23 +1096,30 @@ function SideView({
 				/>
 			)}
 			<HandDot data x={px(0)} y={py(fix)} r={6} seed="er-sv-fix" color="red" />
-			<PrintLabel
+			<CircledKey
+				x={px(0) - 20}
+				y={py(fix) + 4}
+				value="1"
+				seed="er-sv-key1"
+				color="pencil"
+			/>
+			<HandLabel
 				x={px(0) + 15}
 				y={py(fix) + 5}
 				size={SIDE_LABEL + 1}
 				color={SWISS.red}
 			>
 				phone says {fix.toFixed(0)} m
-			</PrintLabel>
+			</HandLabel>
 			{stage >= 1 && (
-				<PrintLabel
+				<HandLabel
 					x={px(0) + 15}
 					y={(py(fix) + py(eye)) / 2}
 					size={SIDE_LABEL}
 					color={SWISS.ink}
 				>
 					+{under} m
-				</PrintLabel>
+				</HandLabel>
 			)}
 			<HandDot
 				data
@@ -963,11 +1129,28 @@ function SideView({
 				seed="er-sv-ground-dot"
 				color="ink"
 			/>
-			<PrintLabel x={px(0) + 15} y={py(ground) + 19} size={SIDE_LABEL}>
+			<HandLabel x={px(0) + 15} y={py(ground) + 19} size={SIDE_LABEL}>
 				ground {ground.toFixed(0)} m
-			</PrintLabel>
+			</HandLabel>
+			<HandText
+				x={W - 16}
+				y={Ht - 40}
+				size={13}
+				anchor="end"
+				color="pencil"
+				rotate={-2}
+			>
+				{`a phone ${under} m under the ground cannot be right`}
+			</HandText>
 			{stage >= 2 && (
 				<g>
+					<CircledKey
+						x={px(0) - 20}
+						y={py(eye) + 4}
+						value="2"
+						seed="er-sv-key2"
+						color="pencil"
+					/>
 					<HandDot
 						data
 						x={px(0)}
@@ -976,14 +1159,14 @@ function SideView({
 						seed="er-sv-eye"
 						color="forest"
 					/>
-					<PrintLabel
+					<HandLabel
 						x={px(0) + 15}
 						y={py(eye) - 9}
 						size={SIDE_LABEL + 1}
 						color={SWISS.forest}
 					>
 						eye {eye.toFixed(1)} m = ground + 1.6
-					</PrintLabel>
+					</HandLabel>
 				</g>
 			)}
 		</svg>
@@ -1115,11 +1298,23 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Every photo needs a camera height. We take the higher of two numbers:
-					the phone's altitude, or the ground plus 1.6 m, a standing eye.
+					the phone's altitude, or the ground plus 1.6 m, a standing eye. In
+					Fig. 1, <CircledNumber value={1} color="pencil" seed="er-p1" /> is
+					what the phone says and{" "}
+					<CircledNumber value={2} color="pencil" seed="er-p2" /> is the eye we
+					use.
 				</p>
 				<p>
-					GPS height is the weakest GPS number: its error is usually 1.5 to 3
-					times the sideways error. The ground cannot move, so it sets a floor.
+					<HandMark type="highlight">
+						GPS height is the weakest GPS number: its error is usually 1.5 to 3
+						times the sideways error.
+					</HandMark>{" "}
+					The ground cannot move, so it sets a floor.
+					{bad && (
+						<MarginNote mark="a">
+							{`I notice demo-09 says ${bad.t.alt.toFixed(0)} m, ${Math.round(bad.t.ground - bad.t.alt)} m under the ground.`}
+						</MarginNote>
+					)}
 				</p>
 				<EyeEquation />
 			</Beat>
@@ -1172,7 +1367,12 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Near a summit the GPS spot can land up-slope. The ground there is
-					higher, so the eye is too high by metres.
+					higher, so{" "}
+					<HandMark type="wavy">the eye is too high by metres</HandMark>.
+					<MarginNote mark="b">
+						Which is right, the rule or the contour? No true eye height to score
+						either against.
+					</MarginNote>
 				</p>
 				<p>
 					A second, optional prior treats the altitude as a measurement and
@@ -1243,7 +1443,14 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					mixing the two datums would look like a 50 m altitude error. On the
 					twelve Niederhorn fixes it does against Mapterhorn but not Terrarium
 					(Fig. 2), so the photographer most likely stood where{" "}
-					<code>DEM + 1.6 ≈ alt</code> inside the horizontal error disk.
+					<code>DEM + 1.6 ≈ alt</code> inside the horizontal error disk.{" "}
+					<HandMark type="strike">Phone altitude is a floor.</HandMark>{" "}
+					<span
+						className="nb-hand"
+						style={{ color: "var(--nb-red)", fontSize: "1.25em" }}
+					>
+						Phone altitude is evidence.
+					</span>
 				</p>
 				<p>
 					The prior in <code>altitude.ts</code> minimises{" "}

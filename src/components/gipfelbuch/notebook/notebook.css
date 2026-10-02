@@ -50,7 +50,7 @@
 		24px 24px,
 		24px 24px;
 	background-position: -1px -1px;
-	font-family: var(--gb-font-sans);
+	font-family: var(--gb-font-body);
 }
 
 .nb-hand {
@@ -72,17 +72,17 @@
 	font-variant-numeric: tabular-nums;
 }
 
-/* Same label as .gb-caps (design book T7): condensed 500, +0.12em, case-sensitive forms. */
+/* Same label as .gb-caps: hand block capitals. */
 .nb-label {
-	font-family: var(--gb-font-condensed);
-	font-weight: 500;
+	font-family: var(--gb-font-caps);
+	font-weight: 400;
 	text-transform: uppercase;
-	letter-spacing: 0.12em;
-	font-feature-settings: "case" 1;
+	letter-spacing: 0.08em;
 }
 
+/* Figures in a figure are written by hand, in tabular columns. */
 .nb-num {
-	font-family: var(--gb-font-mono);
+	font-family: var(--gb-font-figure);
 	font-variant-numeric: tabular-nums;
 }
 
@@ -259,5 +259,178 @@
 @media (forced-colors: active) {
 	.nb-book {
 		background-image: none;
+	}
+}
+
+/* ---- K-A hand pass: cartographic sketch kit and hand marks (carto.tsx, marks.tsx) ----------
+ * reports/gipfelbuch-hand-sketch-research/sketch-style.md §4.3 and swiss-cartography.md §5. */
+
+.gb-swiss,
+.nb-book {
+	/* Alpinwanderweg blue (RAL 5015 ≈ #2874b2, [U]): the one non-Brezine spot ink, blaze bands only. */
+	--nb-alpine: #2874b2;
+}
+
+/* LK heights are sloped: italic tabular hand figures (HeightFigure, PeakLeader, StationRays). */
+.nb-height {
+	font-family: var(--gb-font-figure);
+	font-style: italic;
+	font-synthesis: style;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Static hand underline for a term (an SVG path stretched under the text). */
+.nb-u {
+	background:
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 6' preserveAspectRatio='none'%3E%3Cpath d='M1 4 C 30 2.6, 60 5, 99 3.2' stroke='%23bf2233' stroke-width='1.6' fill='none' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+		0 100% / 100% 0.4em no-repeat;
+	padding-bottom: 0.15em;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+/* Double underline for a result: the second stroke shorter and 3 px lower. */
+.nb-u2 {
+	background:
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 6' preserveAspectRatio='none'%3E%3Cpath d='M1 3 C 30 2, 60 4, 99 2.6' stroke='%23bf2233' stroke-width='1.5' fill='none' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+		0 calc(100% - 3px) / 100% 0.35em no-repeat,
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 6' preserveAspectRatio='none'%3E%3Cpath d='M6 3.4 C 35 2.4, 65 4, 92 3' stroke='%23bf2233' stroke-width='1.2' fill='none' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+		0 100% / 100% 0.35em no-repeat;
+	padding-bottom: 0.3em;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+/* Doubt: a wavy pen underline. */
+.nb-doubt {
+	text-decoration-line: underline;
+	text-decoration-style: wavy;
+	text-decoration-color: color-mix(in srgb, var(--nb-red) 60%, transparent);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 4px;
+}
+
+/* A wrong guess, struck once and left readable; the correction follows in red hand. */
+.nb-struck {
+	text-decoration: line-through 1.5px var(--nb-red);
+	color: var(--nb-faint);
+}
+
+/* HandMark: the span carries a CSS fallback (server render, first paint, no JS) until the sketched
+ * overlay is measured; .nb-hm-on then drops the fallback. --nb-hm-ink is set inline per mark. */
+.nb-hm {
+	position: relative;
+	--nb-hm-ink: var(--nb-red);
+}
+
+.nb-hm-underline:not(.nb-hm-on) {
+	text-decoration: underline 1.5px var(--nb-hm-ink);
+	text-underline-offset: 3px;
+}
+
+.nb-hm-double:not(.nb-hm-on) {
+	text-decoration: underline double 1px var(--nb-hm-ink);
+	text-underline-offset: 3px;
+}
+
+.nb-hm-wavy:not(.nb-hm-on) {
+	text-decoration: underline wavy 1px var(--nb-hm-ink);
+	text-underline-offset: 4px;
+}
+
+.nb-hm-strike {
+	color: var(--nb-faint);
+}
+
+.nb-hm-strike:not(.nb-hm-on) {
+	text-decoration: line-through 1.5px var(--nb-hm-ink);
+}
+
+.nb-hm-highlight:not(.nb-hm-on) {
+	background-image: linear-gradient(
+		100deg,
+		transparent 0.2em,
+		var(--nb-highlight) 0.4em,
+		var(--nb-highlight) calc(100% - 0.3em),
+		transparent 100%
+	);
+	background-size: 100% 0.62em;
+	background-position: 0 72%;
+	background-repeat: no-repeat;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+.nb-hm-circle:not(.nb-hm-on),
+.nb-hm-box:not(.nb-hm-on) {
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--nb-hm-ink) 70%, transparent);
+	border-radius: 0.2em;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+.nb-hm-circle:not(.nb-hm-on) {
+	border-radius: 1em;
+}
+
+.nb-hm-bracket:not(.nb-hm-on) {
+	box-shadow: -6px 0 0 -4px var(--nb-hm-ink);
+}
+
+.nb-hm-svg {
+	position: absolute;
+	overflow: visible;
+	pointer-events: none;
+}
+
+/* A short wipe-in, once. HandMark only adds .nb-hm-anim outside reduced motion and webdriver. */
+.nb-hm-anim {
+	animation: nb-hm-wipe 520ms cubic-bezier(0.55, 0.1, 0.3, 1) both;
+}
+
+@keyframes nb-hm-wipe {
+	from {
+		clip-path: inset(-20% 100% -20% -10%);
+	}
+	to {
+		clip-path: inset(-20% -10% -20% -10%);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nb-hm-anim {
+		animation: none;
+	}
+}
+
+/* CircledNumber: ① inline, sized to the text. */
+.nb-circled {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.35em;
+	height: 1.35em;
+	vertical-align: -0.3em;
+	line-height: 1;
+}
+
+.nb-circled > svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+
+.nb-circled > span {
+	position: relative;
+	font-size: 0.78em;
+}
+
+@media (forced-colors: active) {
+	.nb-hm-svg,
+	.nb-circled > svg {
+		forced-color-adjust: auto;
 	}
 }

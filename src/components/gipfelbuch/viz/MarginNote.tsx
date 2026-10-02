@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { type CSSProperties, type ReactNode, useId } from "react";
-import { splitPrintRuns } from "../notebook/Ink";
+import { PenArrow, splitPrintRuns } from "../notebook/Ink";
 import { TYPE } from "../swiss/type";
 import "./margin-note.css";
 
@@ -13,16 +13,19 @@ import "./margin-note.css";
  * note. At >= 1024px the note sits in the page margin level with its mark (CSS anchor
  * positioning, floated Tufte-style where unsupported); below that it is an indented inline note.
  *
- * Rules: at most 3 per entry; a `hand` note is 12 words or fewer, and its digits are set in print.
+ * Hand pass: a note is written in the Caveat hand by default (`hand={false}` sets it in the caption
+ * face), with its digits in hand figures. In the margin a curved pen leader points back to the mark.
+ * Keep notes to about 20 words.
  * The prose column must be positioned (ConceptPage's is) and no transformed ancestor may sit
  * between it and the note. Notes are not stacked: keep them short and apart.
  */
 export function MarginNote({
 	mark,
-	hand,
+	hand = true,
 	children,
 }: {
 	mark: string;
+	/** Caveat hand (default true). */
 	hand?: boolean;
 	children: ReactNode;
 }) {
@@ -54,9 +57,24 @@ export function MarginNote({
 			<span
 				id={noteId}
 				role="note"
-				className={`gb-mn-note ${hand ? "nb-hand text-[18px] leading-[24px] text-[var(--gb-pencil)]" : TYPE.caption}`}
+				className={`gb-mn-note ${hand ? "nb-hand text-[20px] leading-[24px] text-[var(--gb-pencil)]" : TYPE.caption}`}
 				style={{ "--gb-mn-anchor": anchor } as CSSProperties}
 			>
+				<svg
+					viewBox="0 0 44 24"
+					className="gb-mn-leader overflow-visible"
+					aria-hidden="true"
+				>
+					<PenArrow
+						seed={`mn-${mark}`}
+						from={[42, 12]}
+						to={[4, 6]}
+						bend={-0.28}
+						head={6}
+						color="red"
+						width={1.2}
+					/>
+				</svg>
 				<span className={`gb-mn-ref ${TYPE.micro} gb-num`} aria-hidden>
 					{mark}
 				</span>

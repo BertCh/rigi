@@ -4,18 +4,18 @@
 
 import type { ReactNode } from "react";
 import { cn } from "#/lib/utils";
-import { HandDot, PenArrow, SketchPath } from "../notebook/Ink";
+import { PenArrow, SketchPath, StepNumber } from "../notebook/Ink";
 import { useInView } from "./hooks";
 
 export interface FlowNode {
 	label: string;
 	sub?: string;
-	/** CSS colour for the node's dot; defaults to the page accent. */
+	/** CSS colour (or ink name) for the node's circled number; defaults to the red pen. */
 	color?: string;
 }
 
 /**
- * Pipeline of paper-deep boxed nodes joined by pen arrows attached to the boxes. Horizontal from 560 px of
+ * Pipeline of hand stations (a circled number and a lettered name, no boxes) joined by pen arrows. Horizontal from 560 px of
  * container width, vertical (arrows pointing down) below.
  *   <Flow nodes={[{label:"EXIF", sub:"GPS + lens"},{label:"Solve"},{label:"Overlay"}]} />
  */
@@ -37,37 +37,24 @@ export function Flow({
 					>
 						<div
 							className={cn(
-								"min-w-[104px] bg-[var(--gb-paper-deep,transparent)] px-3.5 py-2.5 transition duration-700 motion-reduce:transition-none [@container(min-width:560px)]:h-full",
+								"flex min-w-[104px] items-start gap-2 px-2 py-2 transition duration-700 motion-reduce:transition-none [@container(min-width:560px)]:h-full",
 								on
 									? "translate-y-0 opacity-100"
 									: "translate-y-3 opacity-0 print:translate-y-0 print:opacity-100",
 							)}
 							style={{ transitionDelay: `${i * 110}ms` }}
 						>
-							<div className="flex items-center gap-2 text-[13px] font-semibold text-[var(--gb-ink)]">
-								<svg
-									width="9"
-									height="9"
-									viewBox="0 0 9 9"
-									className="shrink-0"
-									aria-hidden="true"
-								>
-									<HandDot
-										x={4.5}
-										y={4.5}
-										r={3.4}
-										seed={`flow-dot-${n.label}`}
-										color={n.color ?? "var(--accent)"}
-										opacity={1}
-									/>
-								</svg>
-								{n.label}
-							</div>
-							{n.sub && (
-								<div className="mt-0.5 text-[13px] leading-[18px] text-[var(--gb-secondary,#4a545c)]">
-									{n.sub}
+							<StepNumber value={String(i + 1)} color={n.color ?? "red"} />
+							<div className="min-w-0 pt-0.5">
+								<div className="nb-hand text-[21px] leading-[24px] font-bold text-[var(--gb-ink)]">
+									{n.label}
 								</div>
-							)}
+								{n.sub && (
+									<div className="mt-0.5 text-[13px] leading-[18px] text-[var(--gb-secondary,#4a545c)]">
+										{n.sub}
+									</div>
+								)}
+							</div>
 						</div>
 						{i < nodes.length - 1 && (
 							<>
@@ -128,9 +115,9 @@ const CERTAINTY_DASH = {
 } as const;
 
 /**
- * A route topo (SAC style): a continuous red route line, an open belay circle per step with its number to
- * the left and an optional grade at the right. The segment below a step is solid (measured), dashed
- * (approximate) or dotted (open); the last step is the summit register, a filled belay.
+ * A route topo (SAC style) drawn by hand: a red pen route line down the left, a circled hand station
+ * number per step and an optional grade at the right. The segment below a step is solid (measured),
+ * dashed (approximate) or dotted (open); the last station is the summit register, circled in ink.
  */
 export function Steps({
 	steps,
@@ -146,53 +133,36 @@ export function Steps({
 				return (
 					<li
 						key={s.title}
-						className="relative grid grid-cols-[20px_16px_minmax(0,1fr)] gap-x-3 pb-8 last:pb-0"
+						className="relative grid grid-cols-[36px_minmax(0,1fr)] gap-x-3 pb-8 last:pb-0"
 					>
-						<span className="nb-num pt-[6px] text-right text-[11px]">
-							{i + 1}
-						</span>
 						<div className="relative">
 							{!last && (
 								<svg
 									viewBox="0 0 16 100"
 									preserveAspectRatio="none"
-									className="absolute top-[18px] -bottom-[6px] left-0 w-4 overflow-visible [&_path]:[vector-effect:non-scaling-stroke]"
+									className="absolute top-[38px] -bottom-[2px] left-[10px] w-4 overflow-visible [&_path]:[vector-effect:non-scaling-stroke]"
 									aria-hidden="true"
 								>
 									<SketchPath
 										d="M8 0L8 100"
 										seed={`steps-route-${s.title}`}
 										color="var(--gb-red)"
-										width={2.2}
+										width={2}
 										dash={CERTAINTY_DASH[s.certainty ?? "measured"]}
-										passes={1}
+										passes={s.certainty === "open" ? 1 : 2}
+										tolerance={1.1}
 									/>
 								</svg>
 							)}
-							<svg
-								width="16"
-								height="16"
-								viewBox="0 0 16 16"
-								className="absolute top-[6px] left-0"
-								aria-hidden="true"
-							>
-								<circle
-									cx="8"
-									cy="8"
-									r="4"
-									stroke="var(--gb-ink)"
-									strokeWidth="1"
-									fill={last ? "var(--gb-ink)" : "var(--gb-paper)"}
-								/>
-							</svg>
+							<StepNumber value={String(i + 1)} color={last ? "ink" : "red"} />
 						</div>
-						<div className="min-w-0">
+						<div className="min-w-0 pt-0.5">
 							<div className="flex items-baseline justify-between gap-3">
-								<h4 className="text-[16px] leading-[24px] font-semibold text-[var(--gb-ink)]">
+								<h4 className="nb-hand text-[22px] leading-[28px] font-bold text-[var(--gb-ink)]">
 									{s.title}
 								</h4>
 								{s.grade && (
-									<span className="nb-num shrink-0 text-[11px] text-[var(--gb-secondary,#4a545c)]">
+									<span className="nb-num shrink-0 text-[13px] text-[var(--gb-secondary,#4a545c)]">
 										{s.grade}
 									</span>
 								)}

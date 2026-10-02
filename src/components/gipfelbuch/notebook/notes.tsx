@@ -12,6 +12,7 @@ import {
 } from "#/components/gipfelbuch/viz/real";
 import { byId } from "#/lib/gipfelbuch/graph-utils";
 import { type NotebookStep, STEP_NUMBER, stepAnchor } from "./entries";
+import { SketchPath } from "./Ink";
 import { useNotebookPhoto } from "./useNotebookPhoto";
 
 // Measured notes for notebook steps, shared by the index notebook and the concept pages. Each note is
@@ -62,27 +63,74 @@ export const Value = ({ children }: { children: ReactNode }) => (
 	<span className="nb-num text-[13px] text-[var(--nb-ink)]">{children}</span>
 );
 /**
- * A guess the notebook corrected: struck through in red, the measured value written after it.
- * `by` is the run id or check id that signs the correction.
+ * A guess the notebook corrected: a pen stroke through the old value, then (optionally) the
+ * correction written in red, with the initials and date that sign it. `by` is the run id or check id
+ * that signs the correction. `plain` keeps the surrounding type instead of the data face.
  */
 export const Struck = ({
 	children,
 	by,
+	correction,
+	initials,
+	date,
+	plain,
+	seed,
 }: {
 	children: ReactNode;
 	by?: string;
-}) => (
-	<>
-		<s className="nb-num text-[13px] text-[var(--nb-ink)]/70 decoration-[var(--nb-red)] decoration-1">
-			{children}
-		</s>
-		{by ? (
-			<sup className="nb-num ml-0.5 text-[11px] text-[var(--gb-secondary,#4a545c)]">
-				{by}
-			</sup>
-		) : null}
-	</>
-);
+	/** The value that replaced the struck one, written in red beside it. */
+	correction?: ReactNode;
+	initials?: string;
+	date?: string;
+	plain?: boolean;
+	/** Stable key for the pen stroke; defaults to the text. */
+	seed?: string;
+}) => {
+	const key =
+		seed ??
+		`struck-${typeof children === "string" ? children : (by ?? "value")}`;
+	return (
+		<>
+			<span className="relative inline-block">
+				<span
+					className={`${plain ? "" : "nb-num text-[13px] "}text-[var(--nb-ink)]/70`}
+				>
+					{children}
+				</span>
+				<svg
+					viewBox="0 0 100 10"
+					preserveAspectRatio="none"
+					className="pointer-events-none absolute inset-0 size-full overflow-visible [&_path]:[vector-effect:non-scaling-stroke]"
+					aria-hidden="true"
+				>
+					<SketchPath
+						d="M-3 6L103 3.5"
+						seed={key}
+						color="red"
+						width={1.4}
+						passes={1}
+						tolerance={0.5}
+					/>
+				</svg>
+			</span>
+			{by ? (
+				<sup className="nb-num ml-0.5 text-[11px] text-[var(--gb-secondary,#4a545c)]">
+					{by}
+				</sup>
+			) : null}
+			{correction != null ? (
+				<span className="nb-hand ml-1.5 text-[17px] leading-none text-[var(--nb-red)]">
+					{correction}
+					{initials || date ? (
+						<span className="nb-hand-small ml-1 text-[10px] text-[var(--nb-pencil)]">
+							{[initials, date].filter(Boolean).join(" ")}
+						</span>
+					) : null}
+				</span>
+			) : null}
+		</>
+	);
+};
 
 export function Term({ id, children }: { id: string; children?: ReactNode }) {
 	const node = byId.get(id);

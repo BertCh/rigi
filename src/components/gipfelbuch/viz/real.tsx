@@ -9,14 +9,19 @@ import {
 	useContext,
 	useEffect,
 	useId,
+	useMemo,
 	useState,
 } from "react";
 import { cn } from "#/lib/utils";
 import { HandDot, SketchPath } from "../notebook/Ink";
+import { sketchify } from "../notebook/sketchify";
+import { IMHOF_SHADING_STOPS, ImhofRampFilter } from "../swiss/imhof";
 import { SWISS } from "../swiss/inks";
 import { TYPE } from "../swiss/type";
 import { type TafelBake, useTafelBake } from "../tafel/useTafelBake";
 import type { FigureImprint } from "./Figure";
+import { HandStrike } from "./hand";
+import { poseAt, useAlignmentStory } from "./story";
 
 // Measured data for gipfelbuch pages: the real CPU pipeline run on the bundled Niederhorn demo photos by
 // scripts/gipfelbuch/build-data.ts → public/demo/gipfelbuch/*. Pages render these instead of synthetic stand-ins.
@@ -246,17 +251,22 @@ export const LAYER_STYLE: Record<PhotoLayer, { label: string; color: string }> =
 		sky: { label: "sky probability", color: "#7aa7ff" },
 	};
 
-const CONDENSED_STACK =
-	"var(--gb-font-condensed, 'Fira Sans Condensed'), ui-sans-serif, system-ui, sans-serif";
-const MONO_STACK = "var(--gb-font-mono, 'Fira Mono'), ui-monospace, monospace";
+/** Hand block capitals (peak and place names) and hand figures (values), per the hand pass. */
+const CAPS_STACK = "var(--gb-font-caps), var(--gb-font-hand), cursive";
+const FIGURE_STACK = "var(--gb-font-figure), var(--gb-font-hand), cursive";
+/** A measured line on a photo: one pen pass whose sideways jitter stays within this many px (Ink DATA_TOLERANCE). */
+const PHOTO_PEN_TOLERANCE = 0.5;
 /** Halo behind labels and strokes drawn on photos (Heim/Imfeld panorama style: dark name, paper halo). */
 const HALO = "var(--gb-paper, #ece6da)";
-/** Dark under-stroke and text halo for anything drawn on a photograph. */
+/** Dark under-stroke for anything drawn on a photograph. */
 const PHOTO_DARK = "rgba(12, 14, 18, 0.85)";
+/** Lettering ink on a photo (over the paper halo). */
+const PHOTO_INK = "var(--gb-ink, #131313)";
 
 /**
- * KR6: a measured line drawn over a photograph, in the crisp triple (paper halo at 0.55, a thin dark
- * under-stroke, then the colour). Exact geometry, no wobble. `d` in the photo's own px.
+ * KR6 + hand pass: a measured line drawn over a photograph, in the triple (paper halo at 0.55, a thin dark
+ * under-stroke on the exact path, then the colour as one hand pen pass within 0.5 px of the data, so it
+ * stays on the measured pixels and inside the dark under-stroke). `d` in the photo's own px.
  */
 export function CrispLine({
 	d,
@@ -264,17 +274,20 @@ export function CrispLine({
 	width = 2.2,
 	dash,
 	opacity,
+	seed = "crisp",
 }: {
 	d: string;
 	color: string;
 	width?: number;
 	dash?: string;
 	opacity?: number;
+	/** Stable key for the pen's jitter (default shared); give animated lines a fixed seed. */
+	seed?: string;
 }) {
 	return (
 		<PhotoLine
 			d={d}
-			seed="crisp"
+			seed={seed}
 			color={color}
 			width={width}
 			halo={width + 4}
@@ -287,7 +300,7 @@ export function CrispLine({
 
 /**
  * A measured line over a photo or raster: a plain paper halo under a hand-drawn stroke. The stroke stays
- * within 0.65 px of the data, so it still sits on the measured pixels.
+ * within PHOTO_PEN_TOLERANCE px of the data, so it still sits on the measured pixels.
  */
 function PhotoLine({
 	d,
@@ -306,9 +319,23 @@ function PhotoLine({
 	halo: number;
 	dash?: string;
 	opacity?: number;
-	/** On a photograph: a plain path (no wobble) over a paper halo and a thin dark under-stroke. */
+	/** On a photograph: a paper halo and a thin dark under-stroke on the exact path, the pen pass on top. */
 	crisp?: boolean;
 }) {
+	// The colour stroke is a single hand pen pass within PHOTO_PEN_TOLERANCE (memoised: a story only
+	// changes the opacity, so a long skyline is not redrawn per frame).
+	const pen = useMemo(
+		() =>
+			crisp
+				? sketchify(d, seed, {
+						tolerance: PHOTO_PEN_TOLERANCE,
+						passes: 1,
+						// no overshoot: the pen ends where the measurement ends, inside the dark under-stroke
+						overshoot: 0,
+					})[0] || d
+				: d,
+		[crisp, d, seed],
+	);
 	if (crisp)
 		return (
 			<g fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -325,7 +352,7 @@ function PhotoLine({
 					strokeDasharray={dash}
 				/>
 				<path
-					d={d}
+					d={pen}
 					style={{ stroke: color }}
 					strokeWidth={width}
 					strokeDasharray={dash}
@@ -351,7 +378,7 @@ function PhotoLine({
 				width={width}
 				dash={dash}
 				opacity={opacity}
-				tolerance={0.65}
+				tolerance={PHOTO_PEN_TOLERANCE}
 				passes={1}
 			/>
 		</g>
@@ -441,6 +468,7 @@ export function RealPhoto({
 }) {
 	const imprintDefault = useContext(ImprintContext);
 	const imprint = imprintProp ?? imprintDefault;
+	const story = useAlignmentStory();
 	const [off, setOff] = useState<Set<PhotoLayer>>(new Set());
 	const clipId = `gipfelbuch-clip-${useId().replace(/:/g, "")}`;
 	const bleedFraction = bleed === true ? 0.14 : bleed || 0;
@@ -458,6 +486,20 @@ export function RealPhoto({
 	const [x0, y0, x1, y1] = crop ?? [0, 0, W, H];
 	const k = (x1 - x0) / W; // < 1 when zoomed: keeps strokes and text a constant on-screen size
 	const on = (l: PhotoLayer) => layers.includes(l) && !off.has(l);
+	// the pose the bleed is drawn at: the guess when only the guess is shown, else the story's or solved
+	const showsPrior = on("prior") || on("priorPeaks");
+	const showsSolved = on("solved") || on("peaks");
+	const bleedT =
+		showsPrior && !showsSolved
+			? 0
+			: showsSolved && !showsPrior
+				? 1
+				: (story?.t ?? 1);
+	// with both lines on in a story, the story's end of the correction is the one inked
+	const lineOpacity = (l: "prior" | "solved" | "skyline") =>
+		!story || l === "skyline" || !(on("prior") && on("solved"))
+			? undefined
+			: 0.3 + 0.7 * (l === "solved" ? story.t : 1 - story.t);
 	const inCrop = (q: [number, number] | null) =>
 		!!q && q[0] >= x0 && q[0] <= x1 && q[1] >= y0 && q[1] <= y1;
 	const solvedLabels = data.peaks
@@ -500,6 +542,7 @@ export function RealPhoto({
 						view={view as [number, number, number, number]}
 						k={k}
 						id={clipId}
+						t={bleedT}
 					/>
 				)}
 				<defs>
@@ -543,6 +586,7 @@ export function RealPhoto({
 										width={(l === "skyline" ? 1.7 : 2.2) * k}
 										halo={(l === "skyline" ? 4 : 4.6) * k}
 										dash={l === "prior" ? `${6 * k} ${5 * k}` : undefined}
+										opacity={lineOpacity(l)}
 										crisp
 									/>
 								),
@@ -610,21 +654,34 @@ export function RealPhoto({
 									return n;
 								})
 							}
+							aria-pressed={!off.has(l)}
 							className={cn(
-								"gb-caps inline-flex items-center gap-1.5 px-2 py-1 text-[11px] tracking-[0.08em] transition",
+								"gb-caps inline-flex items-center gap-1.5 px-2 py-1 text-[13px] leading-[16px] transition-colors motion-reduce:transition-none",
 								off.has(l)
-									? "text-[var(--gb-secondary,#4a545c)] line-through decoration-[var(--gb-red,currentColor)]/70"
+									? "text-[var(--gb-secondary,#4a545c)]"
 									: "text-[var(--gb-ink)]",
 							)}
 						>
-							<span
-								className="size-2 rounded-full"
-								style={{
-									background: LAYER_STYLE[l].color,
-									opacity: off.has(l) ? 0.3 : 1,
-								}}
-							/>
-							{LAYER_STYLE[l].label}
+							<svg
+								viewBox="0 0 10 10"
+								className="size-2.5 shrink-0"
+								aria-hidden="true"
+							>
+								<HandDot
+									x={5}
+									y={5}
+									r={3.8}
+									seed={`toggle-${l}`}
+									color={LAYER_STYLE[l].color}
+									opacity={off.has(l) ? 0.3 : 1}
+								/>
+							</svg>
+							<span className="relative">
+								{LAYER_STYLE[l].label}
+								{off.has(l) && (
+									<HandStrike seed={`toggle-${l}`} color="red" width={1.3} />
+								)}
+							</span>
 						</button>
 					))}
 				</div>
@@ -649,14 +706,15 @@ function PeakLabels({
 	left: number;
 	right: number;
 }) {
-	const fs = 13 * k;
+	const fs = 14 * k;
 	const rowH = (items.some((i) => i.sub) ? 26 : 15) * k;
 	// KR8: place in priority order (the data's ranking), on up to three rows. A label's box is its
 	// real extent for its anchor plus the leader stub; a summit whose name fits no row keeps its dot
 	// and loses the name, so two close summits never overprint.
 	const rows: [number, number][][] = [[], [], []];
 	const placed = items.map((it) => {
-		const w = it.name.length * fs * 0.58 + 8 * k;
+		// hand block capitals with 0.08 em tracking run wider than the old condensed face
+		const w = it.name.length * fs * 0.7 + 8 * k;
 		const anchor: "start" | "middle" | "end" =
 			it.at[0] + w / 2 > right
 				? "end"
@@ -677,17 +735,18 @@ function PeakLabels({
 		return { it, anchor, row };
 	});
 	return (
-		<g fontFamily={CONDENSED_STACK}>
+		<g>
 			{placed.map(({ it, anchor, row }) => {
 				if (row < 0)
 					return (
 						<g key={it.name}>
-							<circle
-								cx={it.at[0]}
-								cy={it.at[1]}
+							<HandDot
+								x={it.at[0]}
+								y={it.at[1]}
 								r={3.9 * k}
-								fill={HALO}
-								fillOpacity={0.85}
+								seed={`peak-halo-${it.name}`}
+								color={HALO}
+								opacity={0.85}
 							/>
 							<HandDot
 								x={it.at[0]}
@@ -716,12 +775,13 @@ function PeakLabels({
 							opacity={0.95}
 							crisp
 						/>
-						<circle
-							cx={it.at[0]}
-							cy={it.at[1]}
+						<HandDot
+							x={it.at[0]}
+							y={it.at[1]}
 							r={3.9 * k}
-							fill={HALO}
-							fillOpacity={0.85}
+							seed={`peak-halo-${it.name}`}
+							color={HALO}
+							opacity={0.85}
 						/>
 						<HandDot
 							x={it.at[0]}
@@ -732,33 +792,38 @@ function PeakLabels({
 							opacity={1}
 							data
 						/>
+						{/* Heim/Imfeld panorama lettering: a dark hand name on a paper halo */}
 						<text
 							x={it.at[0]}
 							y={ty}
 							textAnchor={anchor}
 							fontSize={fs}
-							fill="#fff"
-							stroke={PHOTO_DARK}
-							strokeWidth={3.4 * k}
+							className="nb-label"
+							stroke={HALO}
+							strokeWidth={3.6 * k}
 							strokeLinejoin="round"
 							paintOrder="stroke"
-							style={{ fontWeight: 600, letterSpacing: "0.03em" }}
+							style={{ fill: PHOTO_INK, fontFamily: CAPS_STACK }}
 						>
 							{it.name}
 						</text>
 						{it.sub && (
 							<text
 								x={it.at[0]}
-								y={ty - 13 * k}
+								y={ty - 14 * k}
 								textAnchor={anchor}
-								fontSize={9 * k}
-								fill="#fff"
-								stroke={PHOTO_DARK}
-								strokeWidth={2.8 * k}
+								fontSize={10.5 * k}
+								className="nb-num"
+								stroke={HALO}
+								strokeWidth={3 * k}
 								strokeLinejoin="round"
 								paintOrder="stroke"
-								fontFamily={MONO_STACK}
-								style={{ fontVariantNumeric: "tabular-nums" }}
+								style={{
+									fill: PHOTO_INK,
+									fontFamily: FIGURE_STACK,
+									fontStyle: "italic",
+									fontVariantNumeric: "tabular-nums",
+								}}
 							>
 								{it.sub}
 							</text>
@@ -833,9 +898,16 @@ export function DemPatch({
 				aria-label={`Relief map around ${data.id} with the camera's view cone`}
 			>
 				<rect width={S} height={S} fill="var(--gb-paper, #ece6da)" />
-				{/* hillshade multiplied onto paper: relief reads as printed shading */}
+				<defs>
+					<ImhofRampFilter
+						id={`${data.id}-imhof`}
+						stops={IMHOF_SHADING_STOPS}
+					/>
+				</defs>
+				{/* hillshade through an Imhof ramp (warm lit, cool shade), multiplied onto paper (wave5 D2) */}
 				<image
 					href={data.demPatch.src}
+					filter={`url(#${data.id}-imhof)`}
 					width={S}
 					height={S}
 					preserveAspectRatio="none"
@@ -870,12 +942,13 @@ export function DemPatch({
 							const flip = x > S - 90;
 							return (
 								<g key={p.name}>
-									<circle
-										cx={x}
-										cy={y}
+									<HandDot
+										x={x}
+										y={y}
 										r={3.6}
-										fill={HALO}
-										fillOpacity={0.85}
+										seed={`dem-halo-${p.name}`}
+										color={HALO}
+										opacity={0.85}
 									/>
 									<HandDot
 										x={x}
@@ -889,21 +962,27 @@ export function DemPatch({
 										x={flip ? x - 6 : x + 6}
 										y={y + 2}
 										textAnchor={flip ? "end" : "start"}
-										fontSize={10.5}
-										fill="var(--gb-ink, #131313)"
+										fontSize={11.5}
+										className="nb-label"
 										stroke={HALO}
-										strokeWidth={2.5}
+										strokeWidth={2.8}
 										strokeLinejoin="round"
 										paintOrder="stroke"
-										fontFamily={CONDENSED_STACK}
-										style={{ fontWeight: 600 }}
+										style={{ fill: PHOTO_INK, fontFamily: CAPS_STACK }}
 									>
 										{p.name}
 									</text>
 								</g>
 							);
 						})}
-				<circle cx={S / 2} cy={S / 2} r={6.5} fill={HALO} fillOpacity={0.85} />
+				<HandDot
+					x={S / 2}
+					y={S / 2}
+					r={6.5}
+					seed={`${data.id}-camera-halo`}
+					color={HALO}
+					opacity={0.85}
+				/>
 				<HandDot
 					x={S / 2}
 					y={S / 2}
@@ -915,12 +994,15 @@ export function DemPatch({
 				{children?.(data, toPx)}
 				<text
 					x={S - 8}
-					y={16}
+					y={17}
 					textAnchor="end"
-					fontSize={10}
-					fill="var(--gb-ink, #131313)"
-					fillOpacity={0.75}
-					fontFamily={MONO_STACK}
+					fontSize={12}
+					className="nb-num"
+					stroke={HALO}
+					strokeWidth={2.6}
+					strokeLinejoin="round"
+					paintOrder="stroke"
+					style={{ fill: PHOTO_INK, fontFamily: FIGURE_STACK }}
 				>
 					N↑ · {2 * data.demPatch.halfKm} km · {data.demPatch.min}–
 					{data.demPatch.max} m
@@ -1040,6 +1122,7 @@ function GeoBleed({
 	view,
 	k,
 	id,
+	t = 1,
 }: {
 	data: GipfelbuchPhotoData;
 	bake: TafelBake | null;
@@ -1047,6 +1130,8 @@ function GeoBleed({
 	view: [number, number, number, number];
 	k: number;
 	id: string;
+	/** Alignment story position: 0 draws the world where the phone's guess puts it, 1 at the solved pose. */
+	t?: number;
 }) {
 	if (!bake) return null;
 	const [x0, y0, x1, y1] = frame;
@@ -1062,11 +1147,20 @@ function GeoBleed({
 	const fadeR = (x1 - vx) / vw;
 	const rulerY = y0 - 14 * k;
 	const norm = (a: number) => ((a % 360) + 360) % 360;
+	// the bake is drawn at its own camera; at another pose the world slides by f·tan(Δyaw) across and
+	// f·tan(pitch) down (roll and the focal change are small here and left out)
+	const pose = poseAt(data, t);
+	const RAD = Math.PI / 180;
+	const dYaw = ((((bake.camera.yaw - pose.yaw + 180) % 360) + 360) % 360) - 180;
+	const dx = pose.f * Math.tan(dYaw * RAD);
+	const dy =
+		pose.f * Math.tan(pose.pitch * RAD) -
+		bake.camera.f * Math.tan(bake.camera.pitch * RAD);
 	const ticks = bake.ticks
-		.map((t) => ({ ...t, wx: cx + t.x * cw, a: norm(t.az) }))
+		.map((t) => ({ ...t, wx: cx + t.x * cw + dx, a: norm(t.az) }))
 		.filter((t) => t.wx >= vx && t.wx <= vx + vw);
 	const outside = bake.peaks
-		.map((p) => ({ ...p, wx: cx + p.x * cw, wy: cy + p.y * ch }))
+		.map((p) => ({ ...p, wx: cx + p.x * cw + dx, wy: cy + p.y * ch + dy }))
 		.filter(
 			(p) =>
 				(p.wx < x0 - 6 * k || p.wx > x1 + 6 * k) &&
@@ -1111,79 +1205,103 @@ function GeoBleed({
 			<g mask={`url(#${id}-mask)`}>
 				<image
 					href={bake.src}
-					x={cx}
-					y={cy}
+					x={cx + dx}
+					y={cy + dy}
 					width={cw}
 					height={ch}
 					preserveAspectRatio="none"
 					filter={`url(#${id}-ink)`}
 					opacity={0.9}
 				/>
-				{/* compass ruler: every 5°, labelled every 15° and at the cardinals */}
-				<line
-					x1={vx}
-					x2={vx + vw}
-					y1={rulerY}
-					y2={rulerY}
-					stroke={SWISS.ink}
-					strokeWidth={0.8 * k}
-					opacity={0.55}
+				{/* compass ruler drawn by hand: every 5°, lettered every 15° and at the cardinals */}
+				<SketchPath
+					d={`M${vx.toFixed(1)} ${rulerY.toFixed(1)}L${(vx + vw).toFixed(1)} ${rulerY.toFixed(1)}`}
+					seed={`${data.id}-ruler`}
+					color={SWISS.ink}
+					width={0.9 * k}
+					opacity={0.6}
+					passes={2}
+					tolerance={0.9 * k}
+				/>
+				<SketchPath
+					d={ticks
+						.map((t) => {
+							const major = t.a % 15 === 0 || !!CARDINAL[t.a];
+							return `M${t.wx.toFixed(1)} ${rulerY.toFixed(1)}L${t.wx.toFixed(1)} ${(rulerY + (major ? 7 : 4) * k).toFixed(1)}`;
+						})
+						.join("")}
+					seed={`${data.id}-ruler-ticks`}
+					color={SWISS.ink}
+					width={0.9 * k}
+					opacity={0.7}
+					passes={1}
+					tolerance={0.4 * k}
 				/>
 				{ticks.map((t) => {
 					const cardinal = CARDINAL[t.a];
 					const major = t.a % 15 === 0 || !!cardinal;
 					return (
-						<g key={t.az}>
-							<line
-								x1={t.wx}
-								x2={t.wx}
-								y1={rulerY}
-								y2={rulerY + (major ? 7 : 4) * k}
-								stroke={SWISS.ink}
-								strokeWidth={(major ? 1 : 0.7) * k}
-								opacity={0.7}
-							/>
-							{major && (
-								<text
-									x={t.wx}
-									y={rulerY - 4 * k}
-									textAnchor="middle"
-									fontSize={10 * k}
-									fill={cardinal ? SWISS.red : SWISS.secondary}
-									className="gb-num"
-								>
-									{cardinal ?? `${t.a}°`}
-								</text>
-							)}
-						</g>
+						major && (
+							<text
+								key={t.az}
+								x={t.wx}
+								y={rulerY - 4 * k}
+								textAnchor="middle"
+								fontSize={(cardinal ? 12 : 10.5) * k}
+								className={cardinal ? "nb-label" : "nb-num"}
+								style={{
+									fill: cardinal ? SWISS.red : SWISS.secondary,
+									fontFamily: cardinal ? CAPS_STACK : FIGURE_STACK,
+								}}
+							>
+								{cardinal ?? `${t.a}°`}
+							</text>
+						)
 					);
 				})}
 			</g>
 			{/* summits beyond the frame, named in the margin like a Panoramatafel */}
 			{outside.map((p) => (
 				<g key={p.name}>
+					{/* a summit triangle by hand: a pen outline over a light fill */}
 					<path
 						d={`M${p.wx} ${p.wy - 1 * k}l${-3.2 * k} ${5.5 * k}h${6.4 * k}z`}
 						fill={SWISS.navy}
+						fillOpacity={0.35}
+					/>
+					<SketchPath
+						d={`M${p.wx} ${p.wy - 1 * k}l${-3.2 * k} ${5.5 * k}h${6.4 * k}z`}
+						seed={`bleed-peak-${p.name}`}
+						color={SWISS.navy}
+						width={1.1 * k}
+						passes={2}
+						tolerance={0.5 * k}
 					/>
 					<text
 						x={p.wx}
 						y={p.wy - 5 * k}
 						textAnchor="middle"
-						fontSize={10.5 * k}
-						fill={SWISS.navy}
+						fontSize={11.5 * k}
+						className="nb-label"
 						stroke={SWISS.paper}
-						strokeWidth={2.6 * k}
+						strokeWidth={2.8 * k}
 						paintOrder="stroke"
 						strokeLinejoin="round"
+						style={{ fill: SWISS.navy, fontFamily: CAPS_STACK }}
 					>
 						{p.name}
 						<tspan
 							x={p.wx}
-							dy={-11 * k}
-							fontSize={9 * k}
-							fill={SWISS.secondary}
-							className="gb-num"
+							dy={-12 * k}
+							fontSize={10 * k}
+							className="nb-num"
+							style={{
+								fill: SWISS.secondary,
+								fontFamily: FIGURE_STACK,
+								fontStyle: "italic",
+								textTransform: "none",
+								letterSpacing: 0,
+							}}
 						>
 							{p.ele} m · {p.km.toFixed(0)} km
 						</tspan>

@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import { cn } from "#/lib/utils";
 import { TYPE } from "../swiss/type";
+import { HandSideRule, HandUnderline, seedUnit } from "./hand";
 import { useInView } from "./hooks";
 
 /** Provenance roles: Aufnahme (source), Revision (measuring stage), Stich (renderer). */
@@ -24,9 +25,10 @@ const formatImprint = (imprint: FigureImprint) =>
 		.join(" · ");
 
 /**
- * A drawing on the sheet, separated by space: no fill, no padding, no outline. A caption (label in print
- * caps, text as is) sits under it. Fades in on first view. `bleed` lets it span wider than prose.
- * `well` gives an interactive figure the paper-deep ground, where the ground carries state.
+ * A drawing on the sheet, separated by space: no fill, no padding, no outline. Hand pass: "Fig. n" (the
+ * `number`, else the `label`) is lettered by hand at the figure's top-left, and the caption is a hand
+ * note under it (Caveat), not a typeset line. Fades in on first view. `bleed` lets it span wider than
+ * prose. `well` gives an interactive figure the paper-deep ground, where the ground carries state.
  */
 export function Figure({
 	children,
@@ -41,6 +43,7 @@ export function Figure({
 	reading,
 	number,
 	imprint,
+	printCaption = false,
 }: {
 	children: ReactNode;
 	caption?: ReactNode;
@@ -63,8 +66,12 @@ export function Figure({
 	number?: string;
 	/** Siegfried imprint (F2): provenance as one micro line under the caption. */
 	imprint?: FigureImprint;
+	/** Set a long, dense caption in the body hand (Playpen) instead of the Caveat note hand. */
+	printCaption?: boolean;
 }) {
 	const [ref, on] = useInView();
+	const lettering = number ?? label;
+	const seed = `fig-${lettering ?? ""}-${typeof caption === "string" ? caption.slice(0, 24) : ""}`;
 	return (
 		<figure
 			ref={ref}
@@ -81,6 +88,25 @@ export function Figure({
 				className,
 			)}
 		>
+			{lettering && (
+				<p
+					className="nb-hand mb-2 inline-block origin-bottom-left px-0.5 text-[22px] leading-[26px] font-bold text-[var(--gb-ink)]"
+					style={{ rotate: `${(seedUnit(seed) - 0.7) * 2.4}deg` }}
+				>
+					<span className="relative inline-block">
+						{/^(fig|abb|tab|taf)/i.test(lettering)
+							? lettering
+							: `Fig. ${lettering}`}
+						<HandUnderline
+							seed={seed}
+							color="red"
+							width={1.8}
+							coverage={0.92}
+							offset={-3}
+						/>
+					</span>
+				</p>
+			)}
 			<div
 				className={cn(
 					"relative",
@@ -91,17 +117,21 @@ export function Figure({
 			>
 				{children}
 			</div>
-			{(caption || label || number || source) && (
+			{(caption || source || imprint) && (
 				<figcaption className="mt-3 px-0.5">
-					<div className="flex gap-3">
-						{(number || label) && (
+					<div className="flex items-baseline gap-3">
+						{caption && (
 							<span
-								className={`${TYPE.kicker} shrink-0 whitespace-nowrap text-[var(--gb-ink)]`}
+								className={cn(
+									"min-w-0 max-w-[72ch] text-[var(--gb-pencil,var(--gb-ink))]",
+									printCaption
+										? "text-[14px] leading-[20px]"
+										: "nb-hand text-[20px] leading-[24px]",
+								)}
 							>
-								{number ?? label}
+								{caption}
 							</span>
 						)}
-						<span className={`${TYPE.caption} min-w-0`}>{caption}</span>
 						{source && (
 							<span
 								className={`${TYPE.micro} ml-auto shrink-0 pl-3 text-right`}
@@ -118,10 +148,11 @@ export function Figure({
 				</figcaption>
 			)}
 			{reading && (
-				<div
-					className={`${TYPE.caption} mt-3 bg-[var(--gb-paper-deep)] px-3 py-2`}
-				>
-					<p className={`${TYPE.kicker} mb-1`}>How to read</p>
+				<div className="relative mt-4 py-1 pl-5 text-[14px] leading-[20px] text-[var(--gb-ink)]">
+					<HandSideRule seed={`${seed}-reading`} color="pencil" width={1.4} />
+					<p className="nb-hand mb-0.5 text-[20px] leading-[24px] text-[var(--gb-contour,var(--gb-ink))]">
+						how to read it →
+					</p>
 					{reading}
 				</div>
 			)}

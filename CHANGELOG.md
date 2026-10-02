@@ -4,6 +4,25 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Gipfelbuch hand pass (2026-10-01, night)
+
+Spec: `reports/gipfelbuch-hand-sketch-2026-10-01.md`. Research: `reports/gipfelbuch-hand-sketch-research/` (sketch style, Swiss cartography and swisstopo, an audit of what was lost). Browser-unverified.
+
+- **Written by hand.** The Gipfelbuch is now an informal field notebook:
+  - body in Playpen Sans, titles in Caveat 700 lettering, labels in Patrick Hand SC block capitals, figures in Shantell Sans (all self-hosted, OFL);
+  - print remains only for code and equations.
+- **Figure labels.** `PrintLabel`/`PrintNote` are now `HandLabel`/`HandNote`.
+- **Measured lines.** They are drawn as one pen pass within 0.5 px of the data.
+- **Swiss field-sketch kit.** New `notebook/carto.tsx` (Kroki title, north arrow, hand scale bar, trig and spot heights in italics, rock hachure, Kroki hatch, trail lines, blazes, grade boxes, peak leaders, station rays, contour scribbles, profile sketches). New `notebook/marks.tsx` (hand underline, circle, strike and highlight for prose; watercolour washes; a pencil construction layer).
+- **Shell.**
+  - Each sheet opens with a summit-register entry and carries one sheet stamp.
+  - Prev/next are hand-drawn Wegweiser.
+  - The index is a hand table of contents and a hand-ruled Blattübersicht.
+  - Map furniture (scale bar, LV95 corners, contours, spot heights) is drawn by hand.
+- **Pages.** All 19 are sketched, with hand notes, struck first guesses with red corrections, and circled numbers keyed to figures.
+- **Page lint.** It now requires at least 6 hand notes per page and bans raw SVG `<text>`.
+- **Also in the commit.** The Gipfelbuch alignment story (one prior → solved value shared by Compare, Stages, the new `StoryMap` and the geo bleed), and Imhof colouring on the sheet map and DEM patch (wave 5 D2).
+
 ### Wave 5: Swiss signature on the luma frontier, wave 1 (2026-10-02)
 
 Plan: `reports/wave5-plan-2026-10-02.md`. 14 streams, each implemented and independently reviewed. All browser-unverified; the batch-ledger rows say what the consolidated pass must look at.

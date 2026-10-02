@@ -489,6 +489,21 @@ async function main() {
 	const reliefImg = writeGrey("relief.jpg", rel.tone, GW, GH, 1400, 72);
 	const sunImg = writeGrey("sun.jpg", rel.sun, GW, GH, 700, 70);
 	const shadeImg = writeGrey("shade.jpg", rel.shade, GW, GH, 700, 70);
+	// Imhof hypsometric tint: elevation normalised over the land (lake = 0), low-res because it only tints
+	let zMin = Number.POSITIVE_INFINITY;
+	let zMax = Number.NEGATIVE_INFINITY;
+	for (let i = 0; i < GW * GH; i++) {
+		if (grid[i] <= LAKE_LEVEL + 1) continue;
+		zMin = Math.min(zMin, grid[i]);
+		zMax = Math.max(zMax, grid[i]);
+	}
+	const tintData = new Uint8ClampedArray(GW * GH);
+	for (let i = 0; i < GW * GH; i++)
+		tintData[i] =
+			grid[i] <= LAKE_LEVEL + 1
+				? 0
+				: Math.round((255 * (grid[i] - zMin)) / (zMax - zMin));
+	writeGrey("tint.jpg", tintData, GW, GH, 350, 70);
 	const reliefSource =
 		"own Swiss-style relief from the Mapterhorn z13 DEM (generalised, NW light bent locally, aerial perspective, sky illumination)";
 
@@ -514,6 +529,8 @@ async function main() {
 			src: "/demo/gipfelbuch/sheet/relief.jpg",
 			sun: "/demo/gipfelbuch/sheet/sun.jpg",
 			shade: "/demo/gipfelbuch/sheet/shade.jpg",
+			tint: "/demo/gipfelbuch/sheet/tint.jpg",
+			tintRange: [Math.round(zMin), Math.round(zMax)],
 			source: reliefSource,
 			width: reliefImg.width,
 			height: reliefImg.height,

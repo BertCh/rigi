@@ -8,11 +8,17 @@ import {
 	Hachure,
 	HandDot,
 	HandText,
+	PenArrow,
 	PenCircle,
 	PenDimension,
 	PenLine,
 	SketchPath,
 } from "#/components/gipfelbuch/notebook/Ink";
+import {
+	CircledNumber,
+	HandMark,
+	Wash,
+} from "#/components/gipfelbuch/notebook/marks";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
@@ -25,10 +31,11 @@ import {
 	Flow,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
 	HandRange,
+	MarginNote,
 	Measured,
 	PhotoPicker,
-	PrintLabel,
 	RealPhoto,
 	Stat,
 	Steps,
@@ -60,9 +67,6 @@ import { PROVENANCE_COLORS } from "#/lib/nearfield/provenance";
 const PAPER = "var(--gb-ink)";
 const DEM_C = "var(--nb-brown)"; // provenance 'dem'
 const OBS_C = "var(--nb-forest)"; // provenance 'observed'
-/** A solid graded tint of an ink, for value-carrying marks (hatch only decorates on top). */
-const tintOf = (color: string, pct = 55) =>
-	`color-mix(in srgb, ${color} ${pct}%, var(--gb-paper))`;
 const rectPath = (x: number, y: number, w: number, h: number) =>
 	`M${x} ${y}H${x + w}V${y + h}H${x}Z`;
 /** A closed polygon approximating a circle, for hachure fills. */
@@ -176,14 +180,16 @@ function SplitRuler() {
 					aria-label="Range ruler showing per-pixel classification into terrain, object and far"
 				>
 					{/* far region */}
-					<path
+					<Wash
 						d={rectPath(
 							rx(radius),
 							top - 8,
 							AX1 + 14 - rx(radius),
 							rows.length * RH + 8,
 						)}
-						style={{ fill: tintOf(DEM_C, 14) }}
+						color="brown"
+						seed="si-wash-1"
+						opacity={0.04}
 					/>
 					<Hachure
 						d={rectPath(
@@ -206,14 +212,14 @@ function SplitRuler() {
 						width={1.3}
 						dash="4 3"
 					/>
-					<PrintLabel
+					<HandLabel
 						x={rx(radius)}
 						y={top - 20}
 						anchor="middle"
 						color="var(--gb-contour)"
 					>
 						nearRadius {radius} m
-					</PrintLabel>
+					</HandLabel>
 					{/* axis */}
 					{ticks.map((v) => (
 						<g key={v}>
@@ -224,21 +230,37 @@ function SplitRuler() {
 								color="faint"
 								width={0.5}
 							/>
-							<text
+							<HandLabel
 								x={rx(v)}
 								y={H - 26}
-								textAnchor="middle"
-								fontSize="13"
-								className="nb-num font-mono"
-								fill="var(--gb-secondary)"
+								anchor="middle"
+								size={13}
+								color="var(--gb-secondary)"
+								halo={0}
 							>
 								{v} m
-							</text>
+							</HandLabel>
 						</g>
 					))}
-					<PrintLabel x={AX0} y={H - 4}>
+					<HandLabel x={AX0} y={H - 4}>
 						range along the pixel ray (log scale)
-					</PrintLabel>
+					</HandLabel>
+					<PenArrow
+						from={[rx(probe.range), H - 56]}
+						to={[rx(probe.range), top + (rows.length - 1) * RH + RH / 2 + 12]}
+						seed="si-probe-arrow"
+						color="pencil"
+						width={1}
+					/>
+					<HandText
+						x={rx(probe.range) + 8}
+						y={H - 52}
+						size={16}
+						color="pencil"
+						rotate={-2}
+					>
+						{`probe: model ${probe.range.toFixed(0)} m, terrain ${probeDem} m, so ${classes[classes.length - 1]}`}
+					</HandText>
 
 					{rows.map((r, i) => {
 						const y = top + i * RH + RH / 2;
@@ -253,17 +275,19 @@ function SplitRuler() {
 								: 0;
 						return (
 							<g key={r.label}>
-								<PrintLabel x={8} y={y - 2} size={14}>
+								<HandLabel x={8} y={y - 2} size={14}>
 									{r.label}
-								</PrintLabel>
-								<PrintLabel x={8} y={y + 12} size={12}>
+								</HandLabel>
+								<HandLabel x={8} y={y + 12} size={12}>
 									{r.sub}
-								</PrintLabel>
+								</HandLabel>
 								{/* object zone */}
 								{zoneW > 2 && (
-									<path
+									<Wash
 										d={rectPath(AX0, y - 8, zoneW, 16)}
-										style={{ fill: tintOf(OBS_C, 30) }}
+										color="forest"
+										seed="si-wash-2"
+										opacity={0.07}
 									/>
 								)}
 								{zoneW > 2 && (
@@ -298,7 +322,7 @@ function SplitRuler() {
 										/>
 									</g>
 								) : (
-									<PrintLabel
+									<HandLabel
 										x={AX1 + 4}
 										y={y - 12}
 										anchor="end"
@@ -306,7 +330,7 @@ function SplitRuler() {
 										color={DEM_C}
 									>
 										no DEM hit
-									</PrintLabel>
+									</HandLabel>
 								)}
 								{/* model dot */}
 								<HandDot
@@ -326,9 +350,9 @@ function SplitRuler() {
 									width={1.2}
 								/>
 								{/* verdict */}
-								<PrintLabel x={AX1 + 22} y={y + 4} color={CLS_COLOR[c]}>
+								<HandLabel x={AX1 + 22} y={y + 4} color={CLS_COLOR[c]}>
 									{c} · {CLS_NOTE[c]}
-								</PrintLabel>
+								</HandLabel>
 							</g>
 						);
 					})}
@@ -471,11 +495,11 @@ function ConfidenceDisc() {
 						opacity={0.8}
 					/>
 					{/* confidence disc */}
-					<circle
-						cx={ex}
-						cy={ey}
-						r={m2(r)}
-						style={{ fill: tintOf(OBS_C, 16) }}
+					<Wash
+						d={discPath(ex, ey, m2(r))}
+						color="forest"
+						seed="si-wash-disc"
+						opacity={0.045}
 					/>
 					<Hachure
 						d={discPath(ex, ey, m2(r))}
@@ -493,19 +517,14 @@ function ConfidenceDisc() {
 						color="forest"
 						width={1.5}
 					/>
-					<text
+					<HandLabel
 						x={ex + m2(r) * 0.72 + 6}
 						y={ey - m2(r) * 0.72 - 4}
-						fontSize={13}
-						fill={SWISS.forest}
-						className="gb-num"
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
+						size={13}
+						color={SWISS.forest}
 					>
 						r = {r.toFixed(0)} m
-					</text>
+					</HandLabel>
 					{/* median ring */}
 					<PenCircle
 						data
@@ -516,13 +535,13 @@ function ConfidenceDisc() {
 						width={1}
 						dash="1 5"
 					/>
-					<PrintLabel
+					<HandLabel
 						x={ex - m2(med) * 0.86 - 4}
 						y={ey - m2(med) * 0.5}
 						anchor="end"
 					>
 						median object range {med} m
-					</PrintLabel>
+					</HandLabel>
 					{/* object splats */}
 					{MULT.map((mu, i) => {
 						const a = (ANG[i] * Math.PI) / 180;
@@ -548,9 +567,9 @@ function ConfidenceDisc() {
 						color="brown"
 						width={1.6}
 					/>
-					<PrintLabel x={ex} y={46} anchor="middle" color={DEM_C}>
+					<HandLabel x={ex} y={46} anchor="middle" color={DEM_C}>
 						far field: DEM terrain, never moves
-					</PrintLabel>
+					</HandLabel>
 					{/* roaming camera */}
 					<PenLine
 						seed="si-roam"
@@ -590,9 +609,26 @@ function ConfidenceDisc() {
 						color="ink"
 						width={1.6}
 					/>
-					<PrintLabel x={ex + 9} y={ey + 16}>
+					<HandLabel x={ex + 9} y={ey + 16}>
 						photo eye
-					</PrintLabel>
+					</HandLabel>
+					<PenArrow
+						from={[ex - m2(r) * 0.95 - 4, ey - m2(r) * 0.2 - 40]}
+						to={[ex - m2(r) * 0.72, ey - m2(r) * 0.72 + 6]}
+						seed="si-disc-note-arrow"
+						color="pencil"
+						width={1}
+					/>
+					<HandText
+						x={ex - m2(r) * 0.95 - 8}
+						y={ey - m2(r) * 0.2 - 44}
+						anchor="end"
+						size={16}
+						color="pencil"
+						rotate={-2}
+					>
+						{`median ${med} m, so only ${r.toFixed(0)} m to roam`}
+					</HandText>
 					{/* scale */}
 					<g transform={`translate(14 ${H - 14})`}>
 						<PenDimension
@@ -603,15 +639,15 @@ function ConfidenceDisc() {
 							color="pencil"
 							width={1.1}
 						/>
-						<text
+						<HandLabel
 							x={m2(nice) + 6}
-							y="3"
-							fontSize="11"
-							className="nb-num font-mono"
-							fill="var(--gb-secondary)"
+							y={3}
+							size={11}
+							color="var(--gb-secondary)"
+							halo={0}
 						>
 							{nice} m
-						</text>
+						</HandLabel>
 					</g>
 					{clamped && (
 						<HandText
@@ -984,16 +1020,16 @@ function RealEye() {
 							color="faint"
 							width={0.5}
 						/>
-						<text
+						<HandLabel
 							x={X(v)}
 							y={H - 6}
-							textAnchor="middle"
-							fontSize="11"
-							className="nb-num font-mono"
-							fill="var(--gb-secondary)"
+							anchor="middle"
+							size={11}
+							color="var(--gb-secondary)"
+							halo={0}
 						>
 							{v} m
-						</text>
+						</HandLabel>
 					</g>
 				))}
 				{rows.map((r, i) => {
@@ -1001,24 +1037,26 @@ function RealEye() {
 					const ok = r.above > 0 && r.above < 200;
 					return (
 						<g key={r.id}>
-							<text
+							<HandLabel
 								x={L - 8}
 								y={y + 13}
-								textAnchor="end"
-								fontSize="11"
-								className="nb-num font-mono"
-								fill="var(--gb-secondary)"
+								anchor="end"
+								size={11}
+								color="var(--gb-secondary)"
+								halo={0}
 							>
 								{r.id}
-							</text>
-							<path
+							</HandLabel>
+							<Wash
 								d={rectPath(
 									L,
 									y + 3,
 									Math.max(2, X(Math.min(80, Math.max(0, r.above))) - L),
 									rh - 8,
 								)}
-								style={{ fill: tintOf(ok ? OBS_C : "var(--nb-red)", 55) }}
+								color={ok ? "forest" : "red"}
+								seed="si-wash-3"
+								opacity={0.1}
 							/>
 							<Hachure
 								d={rectPath(
@@ -1042,20 +1080,10 @@ function RealEye() {
 								width={2}
 							/>
 							{!ok && (
-								<text
-									x={L + 8}
-									y={y + 14}
-									fontSize={13}
-									fill={SWISS.red}
-									className="gb-num"
-									paintOrder="stroke"
-									stroke={SWISS.paper}
-									strokeWidth={3}
-									strokeLinejoin="round"
-								>
+								<HandLabel x={L + 8} y={y + 14} size={13} color={SWISS.red}>
 									EXIF {r.gpsAlt.toFixed(0)} m vs ground {r.ground.toFixed(0)}{" "}
 									m: eye clamped to ground + 1.6
-								</text>
+								</HandLabel>
 							)}
 						</g>
 					);
@@ -1109,33 +1137,35 @@ function RealCompression() {
 							color="faint"
 							width={0.5}
 						/>
-						<text
+						<HandLabel
 							x={X(v)}
 							y={118}
-							textAnchor="middle"
-							fontSize="11"
-							className="nb-num font-mono"
-							fill="var(--gb-secondary)"
+							anchor="middle"
+							size={11}
+							color="var(--gb-secondary)"
+							halo={0}
 						>
 							{v}×
-						</text>
+						</HandLabel>
 					</g>
 				))}
 				{bands.map((b, i) => (
 					<g key={b.band}>
-						<text
+						<HandLabel
 							x={L - 10}
 							y={30 + i * 30}
-							textAnchor="end"
-							fontSize="11"
-							className="nb-num font-mono"
-							fill="var(--gb-secondary)"
+							anchor="end"
+							size={11}
+							color="var(--gb-secondary)"
+							halo={0}
 						>
 							{b.band}
-						</text>
-						<path
+						</HandLabel>
+						<Wash
 							d={rectPath(L, 18 + i * 30, X(b.ratio) - L, 18)}
-							style={{ fill: tintOf(OBS_C, 45 + i * 20) }}
+							color="forest"
+							seed="si-wash-4"
+							opacity={0.05 + i * 0.02}
 						/>
 						<Hachure
 							d={rectPath(L, 18 + i * 30, X(b.ratio) - L, 18)}
@@ -1145,9 +1175,9 @@ function RealCompression() {
 							width={1}
 							opacity={0.9}
 						/>
-						<PrintLabel x={X(b.ratio) + 8} y={31 + i * 30}>
+						<HandLabel x={X(b.ratio) + 8} y={31 + i * 30}>
 							{b.ratio}×
-						</PrintLabel>
+						</HandLabel>
 					</g>
 				))}
 			</svg>
@@ -1382,26 +1412,26 @@ function AnchorCurve({ d }: { d: SplitData }) {
 						color="faint"
 						width={0.5}
 					/>
-					<text
+					<HandLabel
 						x={X(Math.log(t))}
 						y={H - B + 14}
-						textAnchor={t === 3000 ? "end" : "middle"}
-						fontSize="11"
-						className="nb-num font-mono"
-						fill="var(--gb-secondary)"
+						anchor={t === 3000 ? "end" : "middle"}
+						size={11}
+						color="var(--gb-secondary)"
+						halo={0}
 					>
 						{t >= 1000 ? `${t / 1000} km` : `${t} m`}
-					</text>
-					<text
+					</HandLabel>
+					<HandLabel
 						x={L - 5}
 						y={Y(Math.log(t)) + 3}
-						textAnchor="end"
-						fontSize="11"
-						className="nb-num font-mono"
-						fill="var(--gb-secondary)"
+						anchor="end"
+						size={11}
+						color="var(--gb-secondary)"
+						halo={0}
 					>
 						{t >= 1000 ? `${t / 1000} km` : `${t} m`}
-					</text>
+					</HandLabel>
 				</g>
 			))}
 			<PenLine
@@ -1414,9 +1444,9 @@ function AnchorCurve({ d }: { d: SplitData }) {
 				dash="4 4"
 			/>
 			<g transform={`rotate(-38 ${X(Math.log(700))} ${Y(Math.log(520))})`}>
-				<PrintLabel x={X(Math.log(700))} y={Y(Math.log(520))}>
+				<HandLabel x={X(Math.log(700))} y={Y(Math.log(520))}>
 					model as is
-				</PrintLabel>
+				</HandLabel>
 			</g>
 			<PenLine
 				data
@@ -1427,20 +1457,15 @@ function AnchorCurve({ d }: { d: SplitData }) {
 				width={1.2}
 				dash="3 3"
 			/>
-			<text
+			<HandLabel
 				x={W - 10}
 				y={Y(near) - 5}
-				textAnchor="end"
-				fontSize={13}
-				fill={SWISS.forest}
-				className="gb-num"
-				paintOrder="stroke"
-				stroke={SWISS.paper}
-				strokeWidth={3}
-				strokeLinejoin="round"
+				anchor="end"
+				size={13}
+				color={SWISS.forest}
 			>
 				150 m near radius
-			</text>
+			</HandLabel>
 			<SketchPath
 				d={curvePath}
 				seed="si-ac-curve"
@@ -1450,7 +1475,15 @@ function AnchorCurve({ d }: { d: SplitData }) {
 				passes={1}
 			/>
 			{x.map((a, i) => (
-				<circle key={a} cx={X(a)} cy={Y(y[i])} r={3.6} fill={SWISS.contour} />
+				<HandDot
+					key={a}
+					x={X(a)}
+					y={Y(y[i])}
+					r={3.6}
+					seed={`si-ac-dot-${a}`}
+					data
+					color={SWISS.contour}
+				/>
 			))}
 			{crossModel != null && (
 				<PenLine
@@ -1462,18 +1495,18 @@ function AnchorCurve({ d }: { d: SplitData }) {
 					width={1.2}
 				/>
 			)}
-			<PrintLabel x={(L + W) / 2} y={H - 4} anchor="middle">
+			<HandLabel x={(L + W) / 2} y={H - 4} anchor="middle">
 				range the depth model says
-			</PrintLabel>
+			</HandLabel>
 			<g transform={`rotate(-90 10 ${(H - B) / 2})`}>
-				<PrintLabel
+				<HandLabel
 					x={10}
 					y={(H - B) / 2}
 					anchor="middle"
 					color="var(--gb-contour)"
 				>
 					range after anchoring to the terrain
-				</PrintLabel>
+				</HandLabel>
 			</g>
 		</svg>
 	);
@@ -1558,17 +1591,19 @@ function MiniBars() {
 			aria-label="The terrain range divided by the depth-model range grows with distance: 1 times at 20 metres, 6.6 times at 300 to 1000 metres"
 		>
 			<title>Terrain range divided by depth-model range, by distance</title>
-			<PrintLabel x={8} y={14}>
+			<HandLabel x={8} y={14}>
 				terrain ÷ model range
-			</PrintLabel>
+			</HandLabel>
 			{bands.map((b, i) => (
 				<g key={b.band}>
-					<PrintLabel x={8} y={31 + i * 38}>
+					<HandLabel x={8} y={31 + i * 38}>
 						{b.band}
-					</PrintLabel>
-					<path
+					</HandLabel>
+					<Wash
 						d={rectPath(8, 36 + i * 38, Math.max(6, (b.ratio / 6.6) * 150), 14)}
-						style={{ fill: tintOf(OBS_C, 45 + i * 20) }}
+						color="forest"
+						seed="si-wash-5"
+						opacity={0.05 + i * 0.02}
 					/>
 					<Hachure
 						d={rectPath(8, 36 + i * 38, Math.max(6, (b.ratio / 6.6) * 150), 14)}
@@ -1578,12 +1613,12 @@ function MiniBars() {
 						width={1}
 						opacity={0.9}
 					/>
-					<PrintLabel
+					<HandLabel
 						x={Math.max(6, (b.ratio / 6.6) * 150) + 14}
 						y={48 + i * 38}
 					>
 						{b.ratio}×
-					</PrintLabel>
+					</HandLabel>
 				</g>
 			))}
 		</svg>
@@ -1626,13 +1661,22 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="Far mountains are measured. Only near things are rebuilt."
 			>
 				<p>
-					The terrain model knows where the mountains are. It does not know the
-					hut ten metres away.
+					The terrain model knows where the mountains are.{" "}
+					<HandMark type="highlight">
+						It does not know the hut ten metres away.
+					</HandMark>
 				</p>
 				<p>
 					So we keep the terrain for the terrain, and lift only what stands in
-					front of it into 3D. Then the camera starts exactly where the photo
-					was taken.
+					front of it into 3D. Then the camera starts{" "}
+					<HandMark type="underline">
+						exactly where the photo was taken
+					</HandMark>
+					.
+					<MarginNote mark="a">
+						The 150 m radius is the whole bargain: inside it we rebuild, outside
+						it we trust the map.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1644,7 +1688,13 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Pick a photo. The stripe beside it marks each row of the central
-					column: green is inside 150 m, brown is far, blue is sky.
+					column: <CircledNumber value={1} color="forest" /> green is inside 150
+					m, <CircledNumber value={2} color="brown" /> brown is far, blue is
+					sky.
+					<MarginNote mark="b">
+						Rows near the bottom are close ground; the stripe turns brown
+						quickly as the eye climbs.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1717,8 +1767,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="Depth alone cannot tell a hut from the hill behind it."
 			>
 				<p>
-					Beyond 100 m the depth model drifts, and objects blur into the slope.
-					The start point is also uncertain, because phone GPS height is rough.
+					<HandMark type="wavy">Beyond 100 m the depth model drifts</HandMark>,
+					and objects blur into the slope. The start point is also uncertain,
+					because phone GPS height is rough.
+					<MarginNote mark="c">Why trust a hut at 200 m? We do not.</MarginNote>
 				</p>
 			</Beat>
 
@@ -1749,10 +1801,11 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<h3>How it works</h3>
 				<div className="space-y-3">
 					<p>
-						The split in Fig. 2 is the heart of it: the per-pixel decision in{" "}
-						<code>split.ts</code>. The rest of the pipeline exists to make that
-						comparison meaningful and to turn its answer into something you can
-						walk around.
+						The split in Fig. 2 is{" "}
+						<HandMark type="circle">the heart of it</HandMark>: the per-pixel
+						decision in <code>split.ts</code>. The rest of the pipeline exists
+						to make that comparison meaningful and to turn its answer into
+						something you can walk around.
 					</p>
 				</div>
 				<Steps
@@ -1882,20 +1935,24 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					title="The headline gate is not met"
 					className="!mt-0"
 				>
-					Measured against hand labels, the split removed about 15 % of the
-					non-person drape smear on accepted photos with deck.gl (4 % with the
-					since-removed three.js engine), against an 80 % target: depth cannot
-					separate huts and trees at 100–300 m from the terrain behind them. The
-					feature works end to end and is honest about provenance, but this part
-					of the claim is still open (reports/step-inside-results.md, verdict
-					and finding 5).
+					Measured against hand labels, the split removed about{" "}
+					<HandMark type="double">15 %</HandMark> of the non-person drape smear
+					on accepted photos with deck.gl (4 % with the since-removed three.js
+					engine), against an <HandMark type="strike">80 %</HandMark>{" "}
+					<span className="nb-hand text-[var(--gb-red)]">gate not met</span>{" "}
+					target: depth cannot separate huts and trees at 100–300 m from the
+					terrain behind them. The feature works end to end and is honest about
+					provenance, but this part of the claim is still open
+					(reports/step-inside-results.md, verdict and finding 5).
 				</Callout>
 
 				<Callout tone="note" title="Why the depth model alone is never trusted">
 					The scene is only as good as the pose and the anchor beneath it. A
 					scene is not drawn when the pose was not accepted, and the anchor
-					residual decides whether it is shown, badged or hidden. Nothing
-					generated is ever exported as a measurement.
+					residual decides whether it is shown, badged or hidden.{" "}
+					<HandMark type="box">
+						Nothing generated is ever exported as a measurement.
+					</HandMark>
 				</Callout>
 
 				<h3>In the code</h3>

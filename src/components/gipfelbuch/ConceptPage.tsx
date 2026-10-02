@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 import { Suspense } from "react";
 import { SiteNav } from "#/components/site/SiteNav";
 import { GIPFELBUCH_NODES } from "#/lib/gipfelbuch/graph";
@@ -20,25 +19,34 @@ import { conceptView, findingsFor } from "#/lib/gipfelbuch/ontology";
 import type { GipfelbuchEdge, GipfelbuchNode } from "#/lib/gipfelbuch/types";
 import { AutoVisual } from "./AutoVisual";
 import { bespokePage, PageBoundary } from "./loadPage";
-import { FieldNotes, NotebookTrail } from "./notebook/ConceptNotes";
-import { SketchDefs, SketchPath } from "./notebook/Ink";
+import {
+	FieldNotes,
+	NotebookTrail,
+	placeConcept,
+} from "./notebook/ConceptNotes";
+import { STEP_NUMBER } from "./notebook/entries";
+import { SketchDefs } from "./notebook/Ink";
 import { useNotebookPhoto } from "./notebook/useNotebookPhoto";
 import { OntologyPanel } from "./OntologyPanel";
 import {
 	ContourField,
 	GB_THEME,
+	RegisterEntry,
 	SheetFrame,
+	SheetStamp,
 	Signpost,
 	useSheet,
 	Waymark,
 	waymarkForStatus,
 } from "./swiss";
+import { HandRule, ListArrow, MarkerUnderline } from "./swiss/hand";
 import { TYPE } from "./swiss/type";
 import { Ledger, PAGE_HERO, SHEETS, SheetColophon, Tafel } from "./tafel";
 import { Figure } from "./viz";
 import { sheetTransition } from "./viz/hooks";
 import { Reveal } from "./viz/Reveal";
 import {
+	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
 	PhotoPicker,
 	useGipfelbuchIndex,
@@ -47,6 +55,9 @@ import {
 
 /** Data stand shown in the imprint. Update on each data bake. */
 const STAND = "2026-10";
+
+/** The register initials of whoever took the demo photographs and keeps the book. */
+const REGISTER_INITIALS = "R. C.";
 
 /** Wegweiser rule: every sign states a distance, here in sheets along the book. */
 function signpostDistance(fromId: string, toId: string): string {
@@ -58,9 +69,10 @@ function signpostDistance(fromId: string, toId: string): string {
 }
 
 // G5/G6: page grid on named lines (design book). Columns 3-8 carry the text (at most 66 ch); the
-// margin (9-12) is MarginNote's lane beside the prose. The peak-notebook shell (reports/
-// peak-notebook-plan.md §6) puts the sheet's one big real thing first: name, claim dek and ledger,
-// then the full-bleed Tafel; the old rail and Standortfeld moved to the colophon at the foot.
+// margin (9-12) is MarginNote's lane beside the prose. The hand pass (reports/gipfelbuch-hand-sketch-
+// 2026-10-01.md, K-C) opens every sheet as a summit-register entry: the register line, the lettered
+// name with a marker underline, the claim as a hand note and the sheet's one stamp, then the
+// full-bleed Tafel.
 const PAGE_GRID =
 	"grid gap-x-6 px-6 pt-12 lg:grid-cols-[[full-start]repeat(2,minmax(0,1fr))[content-start]repeat(6,minmax(0,1fr))[margin-start]repeat(4,minmax(0,1fr))[full-end]]";
 
@@ -76,6 +88,58 @@ function readingNeighbours(id: string) {
 	};
 }
 
+/** ① .. ⑳: the notebook's circled step numbers, as written in the margin. */
+const circled = (n: number) =>
+	n >= 1 && n <= 20 ? String.fromCharCode(0x2460 + n - 1) : `(${n})`;
+
+/** "Route:" of the register entry: the notebook entry and the pipeline step this sheet records. */
+function registerRoute(id: string): string | undefined {
+	const placement = placeConcept(id);
+	if (!placement) return undefined;
+	const { entry, step } = placement;
+	if (!step) return entry.title;
+	const number = STEP_NUMBER.get(step.id);
+	return `${entry.title} ${number ? `${circled(number)} ` : ""}${step.label}`;
+}
+
+const SWISS_DATE = new Intl.DateTimeFormat("de-CH", {
+	timeZone: "Europe/Zurich",
+	day: "numeric",
+	month: "numeric",
+	year: "numeric",
+});
+const SWISS_TIME = new Intl.DateTimeFormat("de-CH", {
+	timeZone: "Europe/Zurich",
+	hour: "2-digit",
+	minute: "2-digit",
+	hourCycle: "h23",
+});
+
+/** A register date ("7.9.2026") from an ISO string; undefined when it does not parse. */
+function registerDate(iso: string | undefined): string | undefined {
+	if (!iso) return undefined;
+	const date = new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso);
+	return Number.isNaN(date.getTime()) ? undefined : SWISS_DATE.format(date);
+}
+
+/**
+ * The register line from the photo the reader follows: when it was taken (local Swiss time),
+ * where (the demo place and the measured ground altitude at the camera) and by whom. No weather was
+ * recorded with the demo photos, so none is written.
+ */
+function useRegister(data: GipfelbuchPhotoData | null) {
+	const index = useGipfelbuchIndex();
+	const place = index?.place.split(" · ")[0]?.replace(/ above .*$/, "");
+	const taken = data?.photo.takenAt ? new Date(data.photo.takenAt) : null;
+	const valid = taken && !Number.isNaN(taken.getTime());
+	return {
+		date: valid ? SWISS_DATE.format(taken) : undefined,
+		time: valid ? SWISS_TIME.format(taken) : undefined,
+		place,
+		altitude: data?.gps.ground,
+	};
+}
+
 export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 	const col = groupColor(node.group);
 	const G = GROUP_BY_ID[node.group];
@@ -84,6 +148,7 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 	const { sheet } = useSheet();
 	const [photoId, setPhotoId] = useNotebookPhoto();
 	const data = useGipfelbuchPhoto(photoId);
+	const register = useRegister(data);
 	const figures = SHEETS[node.id];
 	const total = GIPFELBUCH_NODES.length;
 	const sheetNo = String(
@@ -113,6 +178,13 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 			</div>
 		</Figure>
 	);
+	// the stamp dates the sheet by its data stand: the day the measured run was baked
+	const stampDate =
+		registerDate(data?.generated) ?? STAND.split("-").reverse().join(".");
+	const here = {
+		name: node.title,
+		detail: `Blatt ${sheetNo} / ${total}`,
+	};
 
 	return (
 		<main
@@ -124,27 +196,38 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 			<SheetFrame
 				className="mt-4"
 				corners={corners}
-				imprint={`Rigi Gipfelbuch · Blatt ${sheetNo} · Ausgabe 2026 · Stand ${STAND} · Relief © swisstopo · DEM Mapterhorn`}
+				imprint={`Rigi Gipfelbuch · Blatt ${sheetNo} · Ausgabe 2026 · Stand ${STAND} · Grundlage © swisstopo (OGD) · DEM Mapterhorn`}
 			>
-				<header className="relative grid gap-x-6 gap-y-12 overflow-hidden px-6 pt-12 pb-12 lg:grid-cols-12 lg:items-start">
-					{/* the sheet's own contour lines behind the title: a different crop on every sheet */}
-					<ContourField seed={node.id} opacity={0.2} />
+				<header className="relative grid gap-x-6 gap-y-10 overflow-hidden px-6 pt-10 pb-12 lg:grid-cols-12 lg:items-start">
+					{/* the sheet's own pencil contours behind the title: a different crop on every sheet */}
+					<ContourField seed={node.id} opacity={0.22} />
+					<div className="relative min-w-0 lg:col-span-12">
+						{/* the summit-register entry that opens the sheet */}
+						<RegisterEntry
+							date={register.date}
+							time={register.time}
+							place={register.place}
+							altitude={register.altitude}
+							initials={REGISTER_INITIALS}
+							route={registerRoute(node.id)}
+						/>
+					</div>
 					<div className="relative min-w-0 lg:col-span-8">
 						<nav
 							aria-label="Breadcrumb"
-							className={`${TYPE.kicker} flex flex-wrap items-center gap-x-3 gap-y-1.5`}
+							className="flex flex-wrap items-center gap-x-4 gap-y-1.5"
 						>
 							<Link
 								to="/gipfelbuch"
 								viewTransition={sheetTransition()}
-								className="gb-num text-[var(--gb-red)] hover:underline"
+								className="nb-num text-[15px] text-[var(--gb-red)] hover:underline"
 							>
 								Blatt {sheetNo} / {total}
 							</Link>
 							<Link
 								to="/gipfelbuch"
 								hash={`chapter-${node.id}`}
-								className="hover:underline"
+								className="nb-label text-[13px] tracking-[0.1em] hover:underline"
 								style={{ color: col }}
 							>
 								{G.label}
@@ -153,15 +236,30 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 								{STATUS_META[node.status].label}
 							</Waymark>
 						</nav>
-						<h1 className={`${TYPE.display} mt-6`}>{node.title}</h1>
-						<p className="display-title mt-1.5 text-[20px] leading-[24px] font-normal italic sm:text-[24px] sm:leading-[30px]">
+						<div className="relative mt-4 inline-block max-w-full">
+							<h1
+								className={`${TYPE.display} m-0 sm:text-[72px] sm:leading-[72px]`}
+							>
+								{node.title}
+							</h1>
+							<MarkerUnderline seed={`title-${node.id}`} />
+						</div>
+						<p className="nb-hand mt-3 max-w-[40ch] origin-left -rotate-1 text-[24px] leading-[28px] text-[var(--gb-water)] sm:text-[28px] sm:leading-[32px]">
 							{node.claim ?? node.tagline}
 						</p>
-						<p className={`${TYPE.lead} gb-secondary mt-6 max-w-[640px]`}>
+						<p className={`${TYPE.lead} mt-6 max-w-[640px]`}>
 							{node.lede ?? node.summary}
 						</p>
 					</div>
 					<div className="relative min-w-0 space-y-6 lg:col-span-4">
+						<div className="flex justify-end">
+							<SheetStamp
+								sheet={sheetNo}
+								status={node.status}
+								date={stampDate}
+								seed={node.id}
+							/>
+						</div>
 						{figures && data && (
 							<Ledger
 								items={figures.ledger(data)}
@@ -171,7 +269,7 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 						<FieldNotes
 							id={node.id}
 							strip={false}
-							className="min-w-0 bg-[var(--gb-paper-deep)] px-4 py-3"
+							className="relative min-w-0 py-3"
 						/>
 					</div>
 				</header>
@@ -189,7 +287,7 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 						onChange={setPhotoId}
 						mark={(id) => <PhotoMark id={id} />}
 					/>
-					<p className={`${TYPE.caption}`}>
+					<p className={`${TYPE.hand} gb-secondary mt-1`}>
 						Follow another photo: every number on this sheet is re-read from its
 						measured run.
 					</p>
@@ -254,6 +352,8 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 									kicker={`${dir === "prev" ? "Previous" : "Next"} sheet`}
 									title={n.title}
 									subtitle={signpostDistance(node.id, n.id)}
+									// one Standortfeld under the post: on the next sign, or on the last sheet's back sign
+									here={dir === "next" || !next ? here : undefined}
 								/>
 							</Link>
 						) : null,
@@ -262,15 +362,14 @@ export function ConceptPage({ node }: { node: GipfelbuchNode }) {
 			)}
 
 			<footer className="mx-auto mt-12 max-w-6xl px-4 sm:px-0">
-				<div>
-					<Link
-						to="/gipfelbuch"
-						viewTransition={sheetTransition()}
-						className={`${TYPE.caption} inline-flex items-center gap-2 text-[var(--gb-ink)] hover:text-[var(--gb-red)]`}
-					>
-						<ArrowLeft className="size-4" /> Back to the Gipfelbuch
-					</Link>
-				</div>
+				<Link
+					to="/gipfelbuch"
+					viewTransition={sheetTransition()}
+					className="nb-hand inline-flex items-center gap-2 text-[20px] text-[var(--gb-ink)] hover:text-[var(--gb-red)]"
+				>
+					<ListArrow seed="back-to-book" dir="in" color="ink" /> Back to the
+					Gipfelbuch
+				</Link>
 			</footer>
 		</main>
 	);
@@ -283,14 +382,14 @@ function PhotoMark({ id }: { id: GipfelbuchPhotoId }) {
 	if (!row) return null;
 	return (
 		<span
-			className={`${TYPE.micro} px-0.5 ${row.accepted ? "text-[var(--gb-forest)]" : "text-[var(--gb-red)]"} bg-[var(--gb-paper)]`}
+			className={`nb-hand px-0.5 text-[16px] leading-none ${row.accepted ? "text-[var(--gb-forest)]" : "text-[var(--gb-red)]"} bg-[var(--gb-paper)]`}
 		>
 			{row.accepted ? "✓" : "✗"}
 		</span>
 	);
 }
 
-/** A rich link card to another sheet. */
+/** A link to another sheet, written as a line in a hand list: pen arrow, lettered title, the claim as a note. */
 export function NodeCard({
 	node,
 	rel,
@@ -302,36 +401,48 @@ export function NodeCard({
 }) {
 	const c = groupColor(node.group);
 	const G = GROUP_BY_ID[node.group];
+	const blatt = GIPFELBUCH_NODES.findIndex((n) => n.id === node.id) + 1;
 	return (
 		<Link
 			to="/gipfelbuch/$concept"
 			params={{ concept: node.id }}
 			viewTransition={sheetTransition()}
-			className="group relative block py-3 pr-2 transition hover:bg-[var(--gb-paper-deep)]"
+			className="group relative flex items-start gap-2 py-2 pr-2"
 		>
-			<div
-				className={`${TYPE.kicker} flex items-center gap-1.5 tracking-[0.14em]`}
-				style={{ color: c }}
-			>
-				<G.icon className="size-3" strokeWidth={1.6} />
-				{G.label}
-				<span className="ml-auto flex items-center gap-1.5 text-[var(--gb-ink)]">
+			<span className="mt-1.5">
+				<ListArrow
+					seed={`link-${dir ?? "out"}-${node.id}`}
+					dir={dir === "in" ? "in" : "out"}
+				/>
+			</span>
+			<span className="min-w-0">
+				<span className="flex flex-wrap items-baseline gap-x-3">
+					<span className="nb-hand text-[24px] leading-[28px] text-[var(--gb-ink)] group-hover:text-[var(--gb-red)] group-hover:underline group-hover:decoration-[var(--gb-red)] group-hover:underline-offset-4">
+						{node.title}
+					</span>
+					<span className="nb-num text-[12px] italic text-[var(--gb-secondary)]">
+						Blatt {String(blatt).padStart(2, "0")}
+					</span>
+					<span
+						className="nb-label text-[12px] tracking-[0.08em]"
+						style={{ color: c }}
+					>
+						{G.label}
+					</span>
 					<Waymark variant={waymarkForStatus(node.status)}>
-						{STATUS_META[node.status].label}
+						<span className="sr-only">{STATUS_META[node.status].label}</span>
 					</Waymark>
 				</span>
-			</div>
-			<div className={`${TYPE.h3} mt-1 flex items-start gap-1`}>
-				{node.title}
-				<ArrowUpRight className="mt-1 size-3.5 shrink-0 opacity-30 transition group-hover:opacity-80" />
-			</div>
-			<p className={`${TYPE.caption} mt-0.5`}>{node.claim ?? node.tagline}</p>
-			{rel && (
-				<p className={`${TYPE.micro} mt-1.5`}>
-					{dir === "in" ? "← " : "→ "}
-					{rel}
-				</p>
-			)}
+				<span className={`${TYPE.caption} block`}>
+					{node.claim ?? node.tagline}
+				</span>
+				{rel && (
+					<span className="nb-hand block text-[17px] leading-[20px] text-[var(--gb-pencil)]">
+						{dir === "in" ? "← " : "→ "}
+						{rel}
+					</span>
+				)}
+			</span>
 		</Link>
 	);
 }
@@ -348,38 +459,37 @@ function ConnectionGroup({
 	if (!edges.length) return null;
 	return (
 		<div>
-			<h3
-				className={`${TYPE.kicker} relative mb-4 flex items-center gap-2 pb-2 tracking-[0.16em]`}
-			>
-				{dir === "out" ? (
-					<ArrowRight className="size-3.5 text-[var(--accent)]" />
-				) : (
-					<ArrowLeft className="size-3.5 text-[var(--accent)]" />
-				)}
-				{title}
-				<span className="gb-coord">{edges.length}</span>
-			</h3>
-			<div className="space-y-5">
+			<div className="relative mb-3 inline-block pr-6">
+				<h3 className={`${TYPE.h3} m-0 text-[24px] leading-[28px]`}>
+					{title}{" "}
+					<span className="nb-num text-[14px] font-normal italic text-[var(--gb-secondary)]">
+						({edges.length})
+					</span>
+				</h3>
+				<MarkerUnderline seed={`where-${dir}`} color="var(--gb-contour)" />
+			</div>
+			<div className="space-y-4">
 				{groupByRel(edges).map(([rel, es]) => (
 					<div key={rel}>
-						<p className={`${TYPE.caption} mb-1 italic`}>
-							{dir === "out" ? `this ${rel}` : `${rel} this`}
+						<p className="nb-hand m-0 text-[18px] leading-[22px] text-[var(--gb-secondary)]">
+							{dir === "out" ? `this ${rel} …` : `… ${rel} this`}
 						</p>
-						<div className="grid sm:grid-cols-2 sm:gap-x-6">
+						<ul className="m-0 list-none p-0">
 							{es.map((e) => {
 								const n = byId.get(e.id);
 								return n ? (
-									<NodeCard
-										key={e.id}
-										node={n}
-										rel={
-											e.origin === "ontology" ? `${rel} · from ontology` : rel
-										}
-										dir={dir}
-									/>
+									<li key={e.id}>
+										<NodeCard
+											node={n}
+											rel={
+												e.origin === "ontology" ? `${rel} · from ontology` : rel
+											}
+											dir={dir}
+										/>
+									</li>
 								) : null;
 							})}
-						</div>
+						</ul>
 					</div>
 				))}
 			</div>
@@ -387,21 +497,22 @@ function ConnectionGroup({
 	);
 }
 
-/** "Where it sits": the notebook trail around this sheet, then its curated links in and out. */
+/** "Where it sits": the notebook trail around this sheet, then its curated links in and out, as hand lists. */
 function WhereItSits({ node }: { node: GipfelbuchNode }) {
 	const out = outgoing(node.id);
 	const back = backlinks(node.id);
 	return (
 		<section className="px-6 pt-8 pb-10" aria-labelledby="connections">
 			<Reveal>
-				<p
-					className={`${TYPE.kicker} mb-2 tracking-[0.18em] text-[var(--gb-red)]`}
-				>
-					Where it sits
+				<p className="nb-hand m-0 text-[20px] leading-[24px] text-[var(--gb-red)]">
+					where it sits
 				</p>
-				<h2 id="connections" className={TYPE.h2}>
-					Connections
-				</h2>
+				<div className="relative inline-block">
+					<h2 id="connections" className={`${TYPE.h2} m-0`}>
+						Connections
+					</h2>
+					<MarkerUnderline seed={`connections-${node.id}`} />
+				</div>
 			</Reveal>
 			<Reveal className="mt-6">
 				<NotebookTrail id={node.id} />
@@ -413,32 +524,5 @@ function WhereItSits({ node }: { node: GipfelbuchNode }) {
 				</div>
 			)}
 		</section>
-	);
-}
-
-/** A pen-ruled underline across its (relative) parent, in place of a crisp border. */
-function HandRule({
-	seed,
-	color = "ink",
-}: {
-	seed: string;
-	color?: "ink" | "brown";
-}) {
-	return (
-		<svg
-			className="pointer-events-none absolute inset-x-0 bottom-0 h-[4px] w-full overflow-visible"
-			viewBox="0 0 400 4"
-			preserveAspectRatio="none"
-			aria-hidden="true"
-		>
-			<SketchPath
-				d="M0 2L400 2"
-				seed={seed}
-				color={color}
-				width={1}
-				opacity={0.7}
-				passes={1}
-			/>
-		</svg>
 	);
 }

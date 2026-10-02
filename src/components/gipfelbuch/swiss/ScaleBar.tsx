@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { type RefObject, useEffect, useState } from "react";
-import { Hachure, PenLine, SketchPolyline } from "../notebook/Ink";
+import { Hachure, PenLine } from "../notebook/Ink";
 import type { SheetData } from "./useSheet";
 
 export interface ScaleBarProps {
@@ -34,7 +34,10 @@ export function niceScaleLength(
 const formatLength = (metres: number) =>
 	metres >= 1000 ? `${metres / 1000} km` : `${metres} m`;
 
-/** Sketched scale bar whose length is true to its figure; alternate segments hachured. Pure SVG. */
+/**
+ * Hand scale bar (S12): a hand-ruled double rail, alternate segments filled with pencil hatch, end
+ * ticks overshooting the rails, labels in italic hand figures. Its length is true to its figure (F1).
+ */
 export function ScaleBar({
 	metresPerPixel,
 	maxWidth = 160,
@@ -47,14 +50,17 @@ export function ScaleBar({
 	const half = formatLength(metres / 2).replace(/ (km|m)$/, "");
 	const segment = width / segments;
 	const left = 8;
+	const top = 13;
+	const bottom = 18;
 	return (
 		<figure className={`m-0 inline-block ${className ?? ""}`}>
 			<svg
-				viewBox={`0 0 ${width + 28} 30`}
+				viewBox={`0 0 ${width + 28} 32`}
 				width={width + 28}
-				height="30"
+				height="32"
 				role="img"
 				aria-label={`Scale bar, ${formatLength(metres)}`}
+				className="overflow-visible"
 				style={{ maxWidth: "100%" }}
 			>
 				{Array.from({ length: segments }, (_, i) =>
@@ -62,47 +68,52 @@ export function ScaleBar({
 						<Hachure
 							// biome-ignore lint/suspicious/noArrayIndexKey: fixed-length static segments
 							key={i}
-							d={`M${left + i * segment} 12h${segment}v6h-${segment}Z`}
+							d={`M${left + i * segment} ${top}h${segment}v${bottom - top}h-${segment}Z`}
 							seed={`scale-seg-${i}`}
-							color="ink"
-							gap={1.7}
+							color="pencil"
+							gap={1.6}
 							width={0.8}
-							opacity={0.85}
-							angle={-50}
+							opacity={0.9}
+							angle={-55}
 						/>
 					),
 				)}
-				<SketchPolyline
-					points={[
-						[left, 12],
-						[left + width, 12],
-						[left + width, 18],
-						[left, 18],
-					]}
-					closed
-					seed="scale-bar"
+				{/* the two rails, each ruled a little past the end ticks */}
+				<PenLine
+					from={[left - 1.5, top]}
+					to={[left + width + 1.5, top]}
+					seed="scale-rail-top"
 					width={0.9}
-					tolerance={0.5}
 				/>
-				{Array.from({ length: segments - 1 }, (_, i) => (
-					<PenLine
-						// biome-ignore lint/suspicious/noArrayIndexKey: fixed-length static ticks
-						key={i}
-						from={[left + (i + 1) * segment, 11]}
-						to={[left + (i + 1) * segment, 19]}
-						seed={`scale-tick-${i}`}
-						width={0.7}
-					/>
-				))}
+				<PenLine
+					from={[left - 1, bottom]}
+					to={[left + width + 2, bottom]}
+					seed="scale-rail-bottom"
+					width={0.9}
+				/>
+				{Array.from({ length: segments + 1 }, (_, i) => {
+					const end = i === 0 || i === segments;
+					return (
+						<PenLine
+							// biome-ignore lint/suspicious/noArrayIndexKey: fixed-length static ticks
+							key={i}
+							from={[left + i * segment, top - (end ? 3 : 1.5)]}
+							to={[left + i * segment, bottom + (end ? 3 : 1.5)]}
+							seed={`scale-tick-${i}`}
+							width={end ? 1 : 0.7}
+						/>
+					);
+				})}
 				{["0", half, formatLength(metres)].map((tick, i) => (
 					<text
 						key={tick}
 						x={left + (i * width) / 2}
-						y="9"
-						fontSize="8"
+						y="8"
+						fontSize="10"
 						textAnchor="middle"
 						fill="var(--gb-ink)"
-						className="gb-num"
+						className="nb-num"
+						style={{ fontStyle: "italic" }}
 					>
 						{tick}
 					</text>
@@ -110,10 +121,10 @@ export function ScaleBar({
 				{label ? (
 					<text
 						x={left}
-						y="28"
-						fontSize="7"
+						y="30"
+						fontSize="10"
 						fill="var(--gb-secondary)"
-						style={{ letterSpacing: "0.12em" }}
+						className="nb-hand-small"
 					>
 						{label}
 					</text>

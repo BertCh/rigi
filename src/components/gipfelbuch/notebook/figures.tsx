@@ -9,10 +9,12 @@ import {
 	type GipfelbuchPhotoId,
 	rowsPath,
 } from "#/components/gipfelbuch/viz/real";
+import { STEP_NUMBER } from "./entries";
 import {
 	Hachure,
 	HandDot,
 	HandText,
+	type InkColor,
 	inkColor,
 	PenArrow,
 	PenCircle,
@@ -21,6 +23,7 @@ import {
 	PenLine,
 	SketchPath,
 } from "./Ink";
+import type { Point } from "./sketch";
 import { hachureLines, hashSeed } from "./sketch";
 
 // Notebook figures. Rule: anything that encodes a measurement (skylines, horizons, view cones,
@@ -31,6 +34,108 @@ const clamp = (value: number, low: number, high: number) =>
 	Math.min(high, Math.max(low, value));
 const signed = (value: number, digits = 1) =>
 	`${value > 0 ? "+" : value < 0 ? "−" : "±"}${Math.abs(value).toFixed(digits)}`;
+
+/** A hand numeral inside a pen loop, keyed to the step numbers in the margin of the notebook. */
+function Circled({
+	at,
+	step,
+	color = "red",
+	size = 20,
+	seed,
+}: {
+	at: Point;
+	/** Notebook step id; its number in the book is written. */
+	step: string;
+	color?: InkColor;
+	size?: number;
+	seed: string;
+}) {
+	const value = STEP_NUMBER.get(step);
+	if (value == null) return null;
+	return (
+		<g>
+			<PenCircle
+				seed={seed}
+				center={[at[0], at[1] - size * 0.32]}
+				radiusX={size * 0.78}
+				radiusY={size * 0.72}
+				color={color}
+				width={1.4}
+			/>
+			<HandText
+				x={at[0]}
+				y={at[1]}
+				anchor="middle"
+				size={size}
+				color={color}
+				halo={false}
+			>
+				{String(value)}
+			</HandText>
+		</g>
+	);
+}
+
+/**
+ * A first guess struck out with a pen stroke and the corrected value written in red beside it.
+ * Width is estimated from the character count, which is enough for a pen stroke.
+ */
+function StruckHand({
+	x,
+	y,
+	size = 20,
+	anchor = "start",
+	seed,
+	old,
+	correction,
+	color = "ink",
+}: {
+	x: number;
+	y: number;
+	size?: number;
+	anchor?: "start" | "middle" | "end";
+	seed: string;
+	old: string;
+	correction: string;
+	color?: InkColor;
+}) {
+	const oldWidth = old.length * size * 0.42;
+	const gap = correction ? size * 0.5 : 0;
+	const total = oldWidth + gap + correction.length * size * 0.42;
+	const start =
+		anchor === "end" ? x - total : anchor === "middle" ? x - total / 2 : x;
+	return (
+		<g>
+			<HandText x={start} y={y} size={size} color={color}>
+				{old}
+			</HandText>
+			<PenLine
+				seed={`${seed}-strike`}
+				from={[start - 3, y - size * 0.22]}
+				to={[start + oldWidth + 3, y - size * 0.4]}
+				color="red"
+				width={1.6}
+				delay={300}
+			/>
+			{correction ? (
+				<HandText x={start + oldWidth + gap} y={y} size={size} color="red">
+					{correction}
+				</HandText>
+			) : null}
+		</g>
+	);
+}
+
+/** The point on a skyline rows array nearest column `column` that has a value. */
+function rowAt(rows: (number | null)[], column: number): number | null {
+	for (let offset = 0; offset < 40; offset++) {
+		for (const x of [column - offset, column + offset]) {
+			const value = rows[x];
+			if (value != null) return value;
+		}
+	}
+	return null;
+}
 
 /** A print set into the notebook: square to the page, on a thin white mat (no tape, no tilt). */
 export function PastedPrint({
@@ -112,6 +217,44 @@ export function SkylineSketch({ data }: { data: GipfelbuchPhotoData }) {
 		strokeLinejoin: "round" as const,
 		strokeLinecap: "round" as const,
 	};
+	// Notes with a leader to one of the three lines, at columns clear of the gap and peak notes.
+	const noteSpecs = [
+		{
+			rows: data.skyline.rows,
+			step: "skyline",
+			text: "traced in the photo",
+			color: "ink" as InkColor,
+		},
+		{
+			rows: data.priorRows,
+			step: "camera-prior",
+			text: "compass guess",
+			color: "blue" as InkColor,
+		},
+		{
+			rows: data.solvedRows,
+			step: "pose-estimate",
+			text: data.solved.accepted ? "solved pose" : "refused solve",
+			color: "red" as InkColor,
+		},
+	];
+	const freeColumns = [0.1, 0.3, 0.5, 0.7, 0.88]
+		.map((fraction) => Math.round(width * fraction))
+		.filter(
+			(column) =>
+				Math.abs(column - gapColumn) > 340 &&
+				(!peak?.solved || Math.abs(column - peak.solved[0]) > 260),
+		);
+	const lineNotes = noteSpecs.flatMap((spec, order) => {
+		const column = freeColumns[order];
+		if (column == null) return [];
+		const row = rowAt(spec.rows, column);
+		return row == null ? [] : [{ ...spec, column, row }];
+	});
+	// A pencil guide through the summit row of the traced skyline (construction layer).
+	const summitRow = Math.min(
+		...data.skyline.rows.filter((row): row is number => row != null),
+	);
 	const detected = rowsPath(data.skyline.rows);
 	const priorPath = rowsPath(data.priorRows);
 	const solvedPath = rowsPath(data.solvedRows);
@@ -123,6 +266,17 @@ export function SkylineSketch({ data }: { data: GipfelbuchPhotoData }) {
 			aria-label={`Photo ${data.id} with three skylines: the one traced in the photo, the terrain's at the compass guess, and the terrain's at the solved pose.`}
 		>
 			<image href={data.photo.src} x={0} y={0} width={width} height={height} />
+			{Number.isFinite(summitRow) ? (
+				<SketchPath
+					d={`M16 ${summitRow}L${width - 16} ${summitRow}`}
+					seed={`${data.id}-summit-guide`}
+					color="pencil"
+					opacity={0.4}
+					width={1.2}
+					dash="2 9"
+					passes={1}
+				/>
+			) : null}
 			<path d={priorPath} {...casing} strokeWidth={5} />
 			<SketchPath
 				d={priorPath}
@@ -181,6 +335,50 @@ export function SkylineSketch({ data }: { data: GipfelbuchPhotoData }) {
 					</HandText>
 				</g>
 			) : null}
+			{lineNotes.map((note) => {
+				const noteY = Math.max(top + 44, note.row - 74);
+				return (
+					<g key={note.step}>
+						<Circled
+							at={[note.column, noteY]}
+							step={note.step}
+							color={note.color}
+							size={26}
+							seed={`${data.id}-note-${note.step}`}
+						/>
+						<HandText
+							x={note.column + 28}
+							y={noteY - 4}
+							size={26}
+							color={note.color}
+							rotate={-2}
+						>
+							{note.text}
+						</HandText>
+						<PenArrow
+							seed={`${data.id}-lead-${note.step}`}
+							from={[note.column, noteY + 12]}
+							to={[note.column, note.row - 6]}
+							bend={0.2}
+							color={note.color}
+							width={1.3}
+							delay={500}
+						/>
+					</g>
+				);
+			})}
+			{data.residual.prior.median !== data.residual.solved.median ? (
+				<StruckHand
+					x={noteOnLeft ? width - 24 : 24}
+					y={top + 40}
+					anchor={noteOnLeft ? "end" : "start"}
+					size={28}
+					seed={`${data.id}-median`}
+					old={`${data.residual.prior.median.toFixed(1)} px`}
+					correction={`${data.residual.solved.median.toFixed(1)} px median miss`}
+					color="blue"
+				/>
+			) : null}
 			{peak?.solved ? (
 				<g>
 					<SketchPath
@@ -213,84 +411,118 @@ export function MissSketch({ data }: { data: GipfelbuchPhotoData }) {
 	const x = (value: number) => 24 + (value / max) * 330;
 	const ticks = Array.from({ length: max / 5 + 1 }, (_, i) => i * 5);
 	const far = Math.abs(x(before) - x(after)) > 26;
+	const wide = Math.abs(x(before) - x(after)) > 120;
 	return (
 		<svg
-			viewBox="0 0 380 82"
+			viewBox="0 0 380 108"
 			className="block w-full max-w-[380px]"
 			role="img"
 			aria-label={`Median miss per sky column: ${before.toFixed(1)} px at the compass guess, ${after.toFixed(1)} px after the solve.`}
 		>
-			<PenLine
-				seed={`${data.id}-axis`}
-				from={[20, 58]}
-				to={[360, 58]}
-				color="pencil"
-				width={1.1}
+			<Circled
+				at={[16, 22]}
+				step="baseline-pipeline"
+				size={17}
+				seed={`${data.id}-miss-step`}
 			/>
-			{ticks.map((tick) => (
-				<g key={tick}>
-					<PenLine
-						seed={`miss-tick-${tick}`}
-						from={[x(tick), 55]}
-						to={[x(tick), 61]}
-						color="pencil"
-						width={1}
-					/>
-					<text
-						x={x(tick)}
-						y={76}
-						textAnchor="middle"
-						className="nb-num"
-						fontSize={10}
-						fill={inkColor("faint")}
-					>
-						{tick}
-					</text>
-				</g>
-			))}
-			{far ? (
-				<PenArrow
-					seed={`${data.id}-miss`}
-					from={[x(before) + (before > after ? -8 : 8), 46]}
-					to={[x(after) + (before > after ? 9 : -9), 50]}
-					bend={0.22}
-					width={1.2}
-					color="ink"
-					delay={400}
+			<HandText x={34} y={20} size={18} color="pencil">
+				gap between the two skylines
+			</HandText>
+			<g transform="translate(0 26)">
+				<PenLine
+					seed={`${data.id}-axis`}
+					from={[20, 58]}
+					to={[360, 58]}
+					color="pencil"
+					width={1.1}
 				/>
-			) : null}
-			<PenCircle
-				seed={`${data.id}-before`}
-				center={[x(before), 58]}
-				radiusX={4.5}
-				color="blue"
-				width={1.8}
-			/>
-			<HandDot
-				x={x(after)}
-				y={58}
-				r={4.6}
-				seed={`${data.id}-after`}
-				color="red"
-			/>
-			<HandText
-				x={x(before)}
-				y={far ? 22 : 18}
-				anchor="middle"
-				color="blue"
-				size={18}
-			>
-				{before.toFixed(1)} px
-			</HandText>
-			<HandText
-				x={x(after)}
-				y={far ? 22 : 38}
-				anchor="middle"
-				color="red"
-				size={18}
-			>
-				{after.toFixed(1)} px
-			</HandText>
+				{ticks.map((tick) => (
+					<g key={tick}>
+						<PenLine
+							seed={`miss-tick-${tick}`}
+							from={[x(tick), 55]}
+							to={[x(tick), 61]}
+							color="pencil"
+							width={1}
+						/>
+						<HandText
+							x={x(tick)}
+							y={76}
+							anchor="middle"
+							size={11}
+							color="faint"
+							halo={false}
+						>
+							{String(tick)}
+						</HandText>
+					</g>
+				))}
+				{[before, after].map((value, order) => (
+					<SketchPath
+						key={order === 0 ? "guide-before" : "guide-after"}
+						d={`M${x(value)} 24L${x(value)} 50`}
+						seed={`${data.id}-miss-guide-${order}`}
+						color="pencil"
+						opacity={0.4}
+						width={1}
+						dash="2 4"
+						passes={1}
+					/>
+				))}
+				{far ? (
+					<PenArrow
+						seed={`${data.id}-miss`}
+						from={[x(before) + (before > after ? -8 : 8), 46]}
+						to={[x(after) + (before > after ? 9 : -9), 50]}
+						bend={0.22}
+						width={1.2}
+						color="ink"
+						delay={400}
+					/>
+				) : null}
+				<PenCircle
+					seed={`${data.id}-before`}
+					center={[x(before), 58]}
+					radiusX={4.5}
+					color="blue"
+					width={1.8}
+				/>
+				<HandDot
+					x={x(after)}
+					y={58}
+					r={4.6}
+					seed={`${data.id}-after`}
+					color="red"
+				/>
+				{wide ? (
+					<>
+						<StruckHand
+							x={x(before)}
+							y={20}
+							anchor="middle"
+							size={18}
+							seed={`${data.id}-miss-before`}
+							old={`${before.toFixed(1)} px`}
+							correction=""
+							color="blue"
+						/>
+						<HandText x={x(after)} y={20} anchor="middle" color="red" size={18}>
+							{after.toFixed(1)} px
+						</HandText>
+					</>
+				) : (
+					<StruckHand
+						x={(x(before) + x(after)) / 2}
+						y={20}
+						anchor="middle"
+						size={18}
+						seed={`${data.id}-miss-before`}
+						old={`${before.toFixed(1)} px`}
+						correction={`${after.toFixed(1)} px`}
+						color="blue"
+					/>
+				)}
+			</g>
 		</svg>
 	);
 }
@@ -319,6 +551,15 @@ export function DemSketch({ data }: { data: GipfelbuchPhotoData }) {
 		.sort((a, b) => a.distance - b.distance)
 		.slice(0, 3);
 	const tenKm = 10 * pxPerKm;
+	const inkSide = data.solved.yaw + 180;
+	const eyeNote = toXY(inkSide, 70 / pxPerKm);
+	const eyeNoteStart = toXY(inkSide, 40 / pxPerKm);
+	const coneEdge = toXY(data.solved.yaw + data.solved.hfov / 2, reach * 0.5);
+	const coneNote = toXY(
+		data.solved.yaw + data.solved.hfov / 2 + 14,
+		reach * 0.62,
+	);
+	const coneNoteRight = coneNote[0] >= coneEdge[0];
 	const cone = `M${center} ${center}L${left[0]} ${left[1]}L${right[0]} ${right[1]}Z`;
 	return (
 		<svg
@@ -328,6 +569,18 @@ export function DemSketch({ data }: { data: GipfelbuchPhotoData }) {
 			aria-label={`Terrain within ${data.demPatch.halfKm} km of the camera, north up, with the solved view cone at ${data.solved.yaw.toFixed(1)}° and the compass heading at ${data.prior.yaw.toFixed(1)}°.`}
 		>
 			<image href={data.demPatch.src} x={0} y={0} width={size} height={size} />
+			{[5, 10].map((km) => (
+				<SketchPath
+					key={km}
+					d={`M${center - km * pxPerKm} ${center}a${km * pxPerKm} ${km * pxPerKm} 0 1 0 ${2 * km * pxPerKm} 0a${km * pxPerKm} ${km * pxPerKm} 0 1 0 ${-2 * km * pxPerKm} 0Z`}
+					seed={`${data.id}-ring-${km}`}
+					color="pencil"
+					opacity={0.4}
+					width={1.2}
+					dash="2 8"
+					passes={1}
+				/>
+			))}
 			<Hachure
 				d={cone}
 				seed={`${data.id}-cone-fill`}
@@ -342,14 +595,14 @@ export function DemSketch({ data }: { data: GipfelbuchPhotoData }) {
 				color="red"
 				width={1.8}
 			/>
-			<line
-				x1={center}
-				y1={center}
-				x2={heading[0]}
-				y2={heading[1]}
-				stroke="var(--nb-paper)"
-				strokeWidth={4}
-				strokeOpacity={0.8}
+			<SketchPath
+				d={`M${center} ${center}L${heading[0]} ${heading[1]}`}
+				seed={`${data.id}-heading-casing`}
+				color="var(--nb-paper)"
+				width={4}
+				opacity={0.8}
+				passes={1}
+				data
 			/>
 			<SketchPath
 				d={`M${center} ${center}L${heading[0]} ${heading[1]}`}
@@ -359,15 +612,28 @@ export function DemSketch({ data }: { data: GipfelbuchPhotoData }) {
 				dash="7 5"
 				passes={1}
 			/>
-			<HandText
-				x={headingTip[0]}
-				y={headingTip[1]}
-				anchor={headingTip[0] < center ? "start" : "end"}
-				color="blue"
-				size={26}
-			>
-				compass {data.prior.yaw.toFixed(0)}°
-			</HandText>
+			{data.solved.accepted ? (
+				<StruckHand
+					x={headingTip[0]}
+					y={headingTip[1]}
+					anchor={headingTip[0] < center ? "start" : "end"}
+					size={26}
+					seed={`${data.id}-compass`}
+					old={`compass ${data.prior.yaw.toFixed(0)}°`}
+					correction=""
+					color="blue"
+				/>
+			) : (
+				<HandText
+					x={headingTip[0]}
+					y={headingTip[1]}
+					anchor={headingTip[0] < center ? "start" : "end"}
+					color="blue"
+					size={26}
+				>
+					compass {data.prior.yaw.toFixed(0)}°
+				</HandText>
+			)}
 			{peaks.map((peak, index) => {
 				const [px, py] = toXY(peak.az, peak.distance);
 				return (
@@ -405,8 +671,61 @@ export function DemSketch({ data }: { data: GipfelbuchPhotoData }) {
 			>
 				{data.solved.yaw.toFixed(1)}°
 			</HandText>
-			<HandText x={18} y={40} size={32}>
-				N ↑
+			<PenArrow
+				seed={`${data.id}-north`}
+				from={[34, 76]}
+				to={[34, 26]}
+				bend={0.12}
+				width={1.8}
+			/>
+			<HandText x={50} y={46} size={30}>
+				N
+			</HandText>
+			<PenArrow
+				seed={`${data.id}-eye-lead`}
+				from={eyeNoteStart}
+				to={[
+					center - (eyeNoteStart[0] - center) * 0.22,
+					center - (eyeNoteStart[1] - center) * 0.22,
+				]}
+				bend={0.2}
+				width={1.3}
+				delay={400}
+			/>
+			<HandText x={eyeNote[0]} y={eyeNote[1] + 22} anchor="middle" size={26}>
+				camera
+			</HandText>
+			<Circled
+				at={[eyeNote[0], eyeNote[1] + 52]}
+				step="eye-rule"
+				size={22}
+				color="ink"
+				seed={`${data.id}-eye-step`}
+			/>
+			<PenArrow
+				seed={`${data.id}-cone-lead`}
+				from={[coneNote[0] + (coneNoteRight ? -6 : 6), coneNote[1] + 4]}
+				to={coneEdge}
+				bend={0.2}
+				color="red"
+				width={1.3}
+				delay={400}
+			/>
+			<Circled
+				at={[coneNote[0] + (coneNoteRight ? 22 : -22), coneNote[1] + 34]}
+				step="pose-estimate"
+				size={22}
+				seed={`${data.id}-cone-step`}
+			/>
+			<HandText
+				x={coneNote[0]}
+				y={coneNote[1]}
+				anchor={coneNoteRight ? "start" : "end"}
+				color="red"
+				size={26}
+				rotate={2}
+			>
+				{data.solved.accepted ? "solved view" : "refused view"}
 			</HandText>
 			<PenDimension
 				seed={`${data.id}-scale`}
@@ -471,6 +790,12 @@ export function SectionSketch({ data }: { data: GipfelbuchPhotoData }) {
 	const crests = horizon.ridges.filter(
 		([, distance]) => distance > 1500 && distance < lastDistance * 0.97,
 	);
+	const crestPick = crests.find(
+		([, distance]) => Math.abs(x(distance) - skyPoint[0]) > 110,
+	);
+	const crestNote = crestPick
+		? { x: x(crestPick[1]), y: y(heightAt(crestPick[1])) }
+		: null;
 	const clipId = `nb-section-${data.id}`;
 	const ticks = Array.from(
 		{ length: Math.floor(lastDistance / 10000) + 1 },
@@ -495,6 +820,15 @@ export function SectionSketch({ data }: { data: GipfelbuchPhotoData }) {
 				strokeOpacity={0.45}
 				strokeWidth={0.9}
 			/>
+			<SketchPath
+				d={`M${eyePoint[0]} ${eyePoint[1]}L${right} ${eyePoint[1]}`}
+				seed={`${clipId}-eye-level`}
+				color="pencil"
+				opacity={0.4}
+				width={1}
+				dash="2 6"
+				passes={1}
+			/>
 			<SketchPath d={line} seed={`${clipId}-line`} width={1.7} />
 			<PenLine
 				seed={`${clipId}-base`}
@@ -504,17 +838,17 @@ export function SectionSketch({ data }: { data: GipfelbuchPhotoData }) {
 				width={1}
 			/>
 			{ticks.map((tick) => (
-				<text
+				<HandText
 					key={tick}
 					x={x(tick)}
 					y={base + 16}
-					textAnchor="middle"
-					className="nb-num"
-					fontSize={10}
-					fill={inkColor("faint")}
+					anchor="middle"
+					size={11}
+					color="faint"
+					halo={false}
 				>
-					{tick / 1000} km
-				</text>
+					{`${tick / 1000} km`}
+				</HandText>
 			))}
 			{crests.map(([, distance]) => (
 				<PenLine
@@ -545,7 +879,7 @@ export function SectionSketch({ data }: { data: GipfelbuchPhotoData }) {
 				delay={400}
 			/>
 			<HandText
-				x={skyPoint[0]}
+				x={skyPoint[0] - 30}
 				y={skyPoint[1] - 18}
 				anchor="end"
 				color="red"
@@ -553,9 +887,65 @@ export function SectionSketch({ data }: { data: GipfelbuchPhotoData }) {
 			>
 				skyline ridge, {(horizon.d / 1000).toFixed(1)} km
 			</HandText>
-			<HandText x={eyePoint[0] + 8} y={eyePoint[1] - 12} size={19}>
-				eye {data.gps.eye.toFixed(0)} m
-			</HandText>
+			<Circled
+				at={[skyPoint[0] - 14, skyPoint[1] - 16]}
+				step="dem-horizon"
+				size={17}
+				seed={`${clipId}-horizon-step`}
+			/>
+			<PenArrow
+				seed={`${clipId}-sky-lead`}
+				from={[skyPoint[0] - 12, skyPoint[1] - 8]}
+				to={[skyPoint[0] - 5, skyPoint[1] - 3]}
+				bend={0.2}
+				color="red"
+				width={1.2}
+				head={4}
+			/>
+			{Math.abs(data.gps.alt - data.gps.eye) > 0.5 ? (
+				<StruckHand
+					x={eyePoint[0] + 8}
+					y={eyePoint[1] - 34}
+					size={19}
+					seed={`${clipId}-gps-alt`}
+					old={`GPS ${data.gps.alt.toFixed(0)} m`}
+					correction={`eye ${data.gps.eye.toFixed(0)} m`}
+				/>
+			) : (
+				<HandText x={eyePoint[0] + 8} y={eyePoint[1] - 12} size={19}>
+					eye {data.gps.eye.toFixed(0)} m
+				</HandText>
+			)}
+			<PenArrow
+				seed={`${clipId}-eye-lead`}
+				from={[eyePoint[0] + 14, eyePoint[1] - 28]}
+				to={[eyePoint[0] + 3, eyePoint[1] - 6]}
+				bend={0.25}
+				width={1.2}
+				head={4}
+			/>
+			{crestNote ? (
+				<g>
+					<HandText
+						x={crestNote.x}
+						y={Math.max(18, crestNote.y - 34)}
+						anchor="middle"
+						color="brown"
+						size={17}
+					>
+						ridge crests
+					</HandText>
+					<PenArrow
+						seed={`${clipId}-crest-lead`}
+						from={[crestNote.x, Math.max(18, crestNote.y - 34) + 6]}
+						to={[crestNote.x, crestNote.y - 13]}
+						bend={0.2}
+						color="brown"
+						width={1.1}
+						head={4}
+					/>
+				</g>
+			) : null}
 			<HandText x={right} y={heightPx - 4} anchor="end" color="faint" size={17}>
 				heights ×{exaggeration}, looking {yaw.toFixed(0)}°
 			</HandText>
@@ -607,6 +997,11 @@ export function TallySketch({
 		);
 	const lowest = placed[0];
 	const highest = placed[placed.length - 1];
+	const pickedDot = placed.find((dot) => dot.photo.id === selected);
+	const refusedDot = placed.find(
+		(dot) => !dot.photo.accepted && dot.photo.id !== selected,
+	);
+	const sideOf = (cx: number) => (cx > widthPx / 2 ? -1 : 1);
 	return (
 		<svg
 			viewBox={`0 0 ${widthPx} 160`}
@@ -632,17 +1027,17 @@ export function TallySketch({
 				compass was right
 			</HandText>
 			{ticks.map((tick) => (
-				<text
+				<HandText
 					key={tick}
 					x={x(tick)}
 					y={axisY + 18}
-					textAnchor="middle"
-					className="nb-num"
-					fontSize={10}
-					fill={inkColor("faint")}
+					anchor="middle"
+					size={11}
+					color="faint"
+					halo={false}
 				>
-					{signed(tick, 0)}°
-				</text>
+					{`${signed(tick, 0)}°`}
+				</HandText>
 			))}
 			{placed.map(({ photo, cx, cy }) => {
 				const isSelected = photo.id === selected;
@@ -704,6 +1099,78 @@ export function TallySketch({
 					</g>
 				);
 			})}
+			<PenLine
+				seed="tally-axis-end-left"
+				from={[24, axisY - 5]}
+				to={[24, axisY + 5]}
+				color="pencil"
+				opacity={0.4}
+				width={1}
+			/>
+			<PenLine
+				seed="tally-axis-end-right"
+				from={[widthPx - 24, axisY - 5]}
+				to={[widthPx - 24, axisY + 5]}
+				color="pencil"
+				opacity={0.4}
+				width={1}
+			/>
+			{pickedDot ? (
+				<g>
+					<StruckHand
+						x={pickedDot.cx + sideOf(pickedDot.cx) * 34}
+						y={Math.max(52, stackTop(pickedDot.cx) - 34)}
+						anchor={sideOf(pickedDot.cx) < 0 ? "end" : "start"}
+						size={18}
+						seed={`tally-pick-${pickedDot.photo.id}`}
+						old="0°"
+						correction={`${signed(pickedDot.photo.delta.yaw)}°`}
+					/>
+					<PenArrow
+						seed={`tally-pick-lead-${pickedDot.photo.id}`}
+						from={[
+							pickedDot.cx + sideOf(pickedDot.cx) * 30,
+							Math.max(52, stackTop(pickedDot.cx) - 34) + 4,
+						]}
+						to={[
+							pickedDot.cx + sideOf(pickedDot.cx) * 4,
+							stackTop(pickedDot.cx) - 14,
+						]}
+						bend={0.25}
+						color="red"
+						width={1.2}
+						head={5}
+					/>
+				</g>
+			) : null}
+			{refusedDot ? (
+				<g>
+					<Circled
+						at={[refusedDot.cx + sideOf(refusedDot.cx) * 48, 82]}
+						step="accept-rule"
+						size={17}
+						seed="tally-refused-step"
+					/>
+					<HandText
+						x={refusedDot.cx + sideOf(refusedDot.cx) * 66}
+						y={78}
+						anchor={sideOf(refusedDot.cx) < 0 ? "end" : "start"}
+						size={17}
+						color="red"
+					>
+						refused
+					</HandText>
+					<PenArrow
+						seed="tally-refused-lead"
+						from={[refusedDot.cx + sideOf(refusedDot.cx) * 36, 84]}
+						to={[refusedDot.cx + sideOf(refusedDot.cx) * 8, refusedDot.cy - 8]}
+						bend={0.25}
+						color="red"
+						width={1.2}
+						head={5}
+					/>
+				</g>
+			) : null}
 			{lowest && highest ? (
 				<>
 					<HandText

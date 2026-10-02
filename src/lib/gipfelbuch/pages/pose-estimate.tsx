@@ -5,8 +5,17 @@
 import { Link } from "@tanstack/react-router";
 import { memo, useMemo, useState } from "react";
 import {
+	CircledNumber,
+	HandMark,
+	HandScaleBar,
+	NorthArrow,
+	Wash,
+} from "#/components/gipfelbuch/notebook";
+import {
 	Hachure,
 	HandDot,
+	HandText,
+	PenArrow,
 	PenCircle,
 	PenLine,
 	SketchPath,
@@ -17,18 +26,18 @@ import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import {
 	Callout,
 	CodeRef,
-	CrispLine,
 	Eq,
 	Figure,
 	type GipfelbuchPhotoData,
 	type GipfelbuchPhotoId,
+	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
 	type PhotoLayer,
 	PhotoPicker,
 	Plot,
-	PrintLabel,
 	RealPhoto,
 	Section,
 	Stat,
@@ -285,9 +294,9 @@ function PoseExplorer() {
 					</defs>
 
 					{/* ---- plan ---- */}
-					<PrintLabel x={14} y={22} size={11.56} color="var(--gb-secondary)">
+					<HandLabel x={14} y={22} size={11.56} color="var(--gb-secondary)">
 						plan · ENU, eye at centre
-					</PrintLabel>
+					</HandLabel>
 					{[0.33, 0.66, 1].map((k) => (
 						<PenCircle
 							key={k}
@@ -312,7 +321,7 @@ function PoseExplorer() {
 						color="faint"
 						width={0.9}
 					/>
-					<PrintLabel
+					<HandLabel
 						x={CX}
 						y={CY - R - 10}
 						anchor="middle"
@@ -320,7 +329,7 @@ function PoseExplorer() {
 						color="var(--gb-secondary)"
 					>
 						N
-					</PrintLabel>
+					</HandLabel>
 					{/* the view wedge: fixed hand hatching revealed through the moving wedge */}
 					<g clipPath="url(#pe-wedge)">
 						<Hachure
@@ -357,44 +366,60 @@ function PoseExplorer() {
 									width={1.5}
 									passes={1}
 								/>
-								<PrintLabel
+								<HandLabel
 									x={x + 8}
 									y={y + 5}
 									color="var(--gb-navy)"
 									size={11.56}
 								>
 									{s.k}
-								</PrintLabel>
+								</HandLabel>
 							</g>
 						);
 					})}
 					<HandDot x={CX} y={CY} r={3.6} seed="pe-eye" />
-					<text
+					<HandLabel
 						x={CX}
 						y={CY + R + 26}
-						textAnchor="middle"
-						fontSize={(11 * 640) / 720}
-						className="gb-num"
-						style={{ fill: "var(--gb-secondary)" }}
+						anchor="middle"
+						size={(11 * 640) / 720}
+						color="var(--gb-secondary)"
 					>
 						yaw {fmt(wrap360(pose.yaw), 0)}° {compass(pose.yaw)} · hfov{" "}
 						{hfov.toFixed(0)}°
-					</text>
+					</HandLabel>
+					<NorthArrow x={26} y={74} length={24} seed="pe-north" />
+					<HandScaleBar
+						x={14}
+						y={314}
+						metersPerPixel={200}
+						meters={10000}
+						segments={2}
+						seed="pe-plan-scale"
+					/>
+					<HandText x={14} y={262} size={13} rotate={-3}>
+						red ray: where I point
+					</HandText>
+					<PenArrow
+						seed="pe-yaw-note-arrow"
+						from={[78, 254]}
+						to={at(pose.yaw, 52)}
+						color="ink"
+						width={1}
+						head={5}
+					/>
 
 					{/* ---- image ---- */}
-					<PrintLabel x={FX} y={22} size={11.56} color="var(--gb-secondary)">
+					<HandLabel x={FX} y={22} size={11.56} color="var(--gb-secondary)">
 						the image · {ASPECT}:1
-					</PrintLabel>
+					</HandLabel>
 					<g clipPath="url(#pe-clip)">
 						<g clipPath="url(#pe-land)">
-							<rect
-								x={FX}
-								y={FY}
-								width={FW}
-								height={FH}
-								style={{
-									fill: "color-mix(in srgb, var(--gb-ink) 14%, var(--gb-paper))",
-								}}
+							<Wash
+								d={`M${FX} ${FY}h${FW}v${FH}h${-FW}Z`}
+								color="ink"
+								seed="pe-land-wash"
+								layers={5}
 							/>
 							<Hachure
 								d={`M${FX} ${FY}h${FW}v${FH}h${-FW}Z`}
@@ -405,22 +430,22 @@ function PoseExplorer() {
 							/>
 						</g>
 						{sky.length > 0 && (
-							<path
+							<SketchPath
 								d={sky.join(" ")}
-								fill="none"
-								stroke={SWISS.ink}
-								strokeWidth={1.8}
-								strokeLinejoin="round"
+								seed="pe-skyline"
+								data
+								color={SWISS.ink}
+								width={1.8}
 							/>
 						)}
 						{hor.length > 0 && (
-							<path
+							<SketchPath
 								d={hor.join(" ")}
-								fill="none"
-								stroke={SWISS.contour}
-								strokeWidth={1.8}
-								strokeDasharray="5 4"
-								strokeLinejoin="round"
+								seed="pe-horizon"
+								data
+								color={SWISS.contour}
+								width={1.8}
+								dash="5 4"
 							/>
 						)}
 						{marks.map(
@@ -434,7 +459,7 @@ function PoseExplorer() {
 											color="navy"
 											width={1.2}
 										/>
-										<PrintLabel
+										<HandLabel
 											x={sx(m.p.u)}
 											y={sy(m.p.v) - 18}
 											anchor="middle"
@@ -442,7 +467,7 @@ function PoseExplorer() {
 											size={11.56}
 										>
 											{m.k}
-										</PrintLabel>
+										</HandLabel>
 									</g>
 								),
 						)}
@@ -469,7 +494,7 @@ function PoseExplorer() {
 						seed="pe-frame"
 						color="pencil"
 					/>
-					<PrintLabel
+					<HandLabel
 						x={FX}
 						y={FY + FH + 18}
 						size={11.56}
@@ -477,17 +502,19 @@ function PoseExplorer() {
 					>
 						<tspan style={{ fill: "var(--gb-contour)" }}>- - -</tspan> true
 						horizon (elevation 0) · ink: skyline
-					</PrintLabel>
-					<text
+					</HandLabel>
+					<HandLabel
 						x={FX + FW}
 						y={FY + FH + 38}
-						textAnchor="end"
-						fontSize={(11 * 640) / 720}
-						className="gb-num"
-						style={{ fill: "var(--gb-secondary)" }}
+						anchor="end"
+						size={(11 * 640) / 720}
+						color="var(--gb-secondary)"
 					>
 						pitch {fmt(pose.pitch)}° · roll {fmt(pose.roll)}°
-					</text>
+					</HandLabel>
+					<HandText x={FX} y={326} size={14} rotate={-1}>
+						pitch slides the horizon, roll tilts it, FOV scales it all
+					</HandText>
 				</svg>
 				<div className="grid gap-x-6 gap-y-1.5 px-4 pb-4 pt-3 sm:grid-cols-2">
 					<Slider
@@ -1024,6 +1051,11 @@ function PoseResiduals({
 	if (!idx)
 		return <div className="h-64 animate-pulse bg-[var(--gb-paper-deep)]" />;
 	const P = idx.photos;
+	const worstAt = P.reduce(
+		(best, p, i) =>
+			p.residual.prior.median > P[best].residual.prior.median ? i : best,
+		0,
+	);
 	const meds = P.filter((p) => p.accepted)
 		.map((p) => p.residual.solved.median)
 		.sort((a, b) => a - b);
@@ -1052,33 +1084,39 @@ function PoseResiduals({
 			>
 				{(s) => (
 					<g>
-						<g fontSize={11} className="gb-num">
-							<circle
-								cx={s.box.x1 - 150}
-								cy={s.box.y0 + 12}
+						<g>
+							<HandDot
+								x={s.box.x1 - 150}
+								y={s.box.y0 + 12}
 								r={4.5}
-								style={{ fill: "var(--gb-red)" }}
+								seed="pe-leg-prior"
+								color="red"
+								opacity={1}
 							/>
-							<text
+							<HandLabel
 								x={s.box.x1 - 140}
 								y={s.box.y0 + 16}
-								style={{ fill: "var(--gb-ink)" }}
+								size={11}
+								color="var(--gb-ink)"
 							>
 								sensor prior
-							</text>
-							<circle
-								cx={s.box.x1 - 150}
-								cy={s.box.y0 + 30}
+							</HandLabel>
+							<HandDot
+								x={s.box.x1 - 150}
+								y={s.box.y0 + 30}
 								r={4.5}
-								style={{ fill: "var(--gb-navy)" }}
+								seed="pe-leg-solved"
+								color="navy"
+								opacity={1}
 							/>
-							<text
+							<HandLabel
 								x={s.box.x1 - 140}
 								y={s.box.y0 + 34}
-								style={{ fill: "var(--gb-ink)" }}
+								size={11}
+								color="var(--gb-ink)"
 							>
 								solved (hollow: rejected)
-							</text>
+							</HandLabel>
 						</g>
 						{P.map((p, i) => {
 							const x = s.x(i + 1);
@@ -1095,14 +1133,11 @@ function PoseResiduals({
 									className="cursor-pointer"
 								>
 									{on && (
-										<rect
-											x={x - 13}
-											y={s.box.y0}
-											width={26}
-											height={s.box.y1 - s.box.y0}
-											style={{
-												fill: "color-mix(in srgb, var(--gb-sign) 30%, var(--gb-paper))",
-											}}
+										<Wash
+											d={`M${x - 13} ${s.box.y0}H${x + 13}V${s.box.y1}H${x - 13}Z`}
+											color="red"
+											seed={`pe-res-sel-${p.id}`}
+											layers={5}
 										/>
 									)}
 									{/* transparent hit area for the whole column */}
@@ -1120,34 +1155,63 @@ function PoseResiduals({
 										color="faint"
 										width={1.2}
 									/>
-									<circle
-										cx={x}
-										cy={s.y(p.residual.prior.median)}
+									<HandDot
+										x={x}
+										y={s.y(p.residual.prior.median)}
 										r={6}
-										style={{ fill: "var(--gb-red)" }}
+										seed={`pe-res-prior-${p.id}`}
+										data
+										color="red"
+										opacity={1}
 									/>
 									{p.accepted ? (
-										<circle
-											cx={x}
-											cy={s.y(p.residual.solved.median)}
+										<HandDot
+											x={x}
+											y={s.y(p.residual.solved.median)}
 											r={6}
-											style={{ fill: "var(--gb-navy)" }}
+											seed={`pe-res-solved-${p.id}`}
+											data
+											color="navy"
+											opacity={1}
 										/>
 									) : (
-										<circle
-											cx={x}
-											cy={s.y(p.residual.solved.median)}
-											r={5.5}
-											style={{
-												fill: "var(--gb-paper)",
-												stroke: "var(--gb-navy)",
-												strokeWidth: 2.2,
-											}}
+										<PenCircle
+											seed={`pe-res-rej-${p.id}`}
+											data
+											center={[x, s.y(p.residual.solved.median)]}
+											radiusX={5.5}
+											color="navy"
+											width={2.2}
 										/>
 									)}
 								</g>
 							);
 						})}
+						<HandText
+							x={s.x(worstAt + 1) + 22}
+							y={s.y(P[worstAt].residual.prior.median) + 4}
+							size={16}
+							color="ink"
+							rotate={-2}
+						>
+							demo-{String(worstAt + 1).padStart(2, "0")}:{" "}
+							{P[worstAt].residual.prior.median.toFixed(0)} px off, then{" "}
+							{P[worstAt].residual.solved.median.toFixed(1)}
+						</HandText>
+						<PenArrow
+							seed="pe-res-note-arrow"
+							from={[
+								s.x(worstAt + 1) + 18,
+								s.y(P[worstAt].residual.prior.median) + 8,
+							]}
+							to={[
+								s.x(worstAt + 1) + 8,
+								s.y(P[worstAt].residual.prior.median) + 3,
+							]}
+							color="ink"
+							width={1}
+							head={4}
+						/>
 					</g>
 				)}
 			</Plot>
@@ -1204,12 +1268,14 @@ function Legacy() {
 					0..1 with y down.
 				</p>
 				<p>
-					The value of such a small object is that it is a single convention.
-					The skyline matcher, the pin solver, the renderer, the roll aligner
-					and the 6-DoF solver all read and write it, and the pose6dof tests
-					check its projection against <code>pose.ts</code> to 7e-15 and its
-					angles against <code>geo/camera.ts</code> to 1e-12 px. A pose from any
-					one of them can be dropped into any other.
+					The value of such a small object is that it is{" "}
+					<HandMark type="underline">a single convention</HandMark>. The skyline
+					matcher, the pin solver, the renderer, the roll aligner and the 6-DoF
+					solver all read and write it, and the pose6dof tests check its
+					projection against <code>pose.ts</code> to{" "}
+					<HandMark type="double">7e-15</HandMark> and its angles against{" "}
+					<code>geo/camera.ts</code> to 1e-12 px. A pose from any one of them
+					can be dropped into any other.
 				</p>
 			</Section>
 
@@ -1449,27 +1515,65 @@ function HeroPose() {
 					const K = 2.4;
 					return (
 						<g>
-							<CrispLine
-								d={`M0 ${mid[1]}H${geo.W}`}
+							<PenLine
+								seed="pe-hero-level-casing"
+								data
+								from={[0, mid[1]]}
+								to={[geo.W, mid[1]]}
+								color="rgba(12, 14, 18, 0.7)"
+								width={4.4}
+								dash="3 6"
+							/>
+							<PenLine
+								seed="pe-hero-level"
+								data
+								from={[0, mid[1]]}
+								to={[geo.W, mid[1]]}
+								color={LINE_LIGHT}
 								width={2.4}
 								dash="3 6"
-								color={LINE_LIGHT}
 							/>
-							<CrispLine
-								d={`M${a[0]} ${a[1]}L${b[0]} ${b[1]}`}
+							<PenLine
+								seed="pe-hero-horizon-casing"
+								data
+								from={a}
+								to={b}
+								color="rgba(12, 14, 18, 0.7)"
+								width={5.2}
+								dash="8 5"
+							/>
+							<PenLine
+								seed="pe-hero-horizon"
+								data
+								from={a}
+								to={b}
+								color={LAYER_STYLE.prior.color}
 								width={3.2}
 								dash="8 5"
-								color={LAYER_STYLE.prior.color}
 							/>
-							<CrispLine
-								d={`M${geo.W / 2} ${geo.H / 2}V${mid[1]}`}
+							<PenLine
+								seed="pe-hero-pitch"
+								data
+								from={[geo.W / 2, geo.H / 2]}
+								to={[geo.W / 2, mid[1]]}
+								color={LINE_LIGHT}
 								width={2.4}
-								color={LINE_LIGHT}
 							/>
-							<CrispLine
-								d={`M${geo.W / 2 - 14} ${geo.H / 2}h28M${geo.W / 2} ${geo.H / 2 - 14}v28`}
-								width={2.8}
+							<PenLine
+								seed="pe-hero-cross-h"
+								data
+								from={[geo.W / 2 - 14, geo.H / 2]}
+								to={[geo.W / 2 + 14, geo.H / 2]}
 								color={LINE_LIGHT}
+								width={2.8}
+							/>
+							<PenLine
+								seed="pe-hero-cross-v"
+								data
+								from={[geo.W / 2, geo.H / 2 - 14]}
+								to={[geo.W / 2, geo.H / 2 + 14]}
+								color={LINE_LIGHT}
+								width={2.8}
 							/>
 							<Mark x={geo.W / 2 + 26} y={geo.H / 2 + 26} n={1} k={K} />
 							<Mark
@@ -1479,12 +1583,52 @@ function HeroPose() {
 								k={K}
 							/>
 							<Mark x={b[0] - 34} y={b[1] - 26} n={3} k={K} />
-							<CrispLine
-								d={`M26 8v${geo.H - 16}M18 16l8 -8l8 8M18 ${geo.H - 16}l8 8l8 -8`}
-								width={2.6}
+							<PenArrow
+								seed="pe-hero-vfov"
+								data
+								from={[26, geo.H / 2]}
+								to={[26, 8]}
 								color={LINE_LIGHT}
+								width={2.6}
+								head={9}
+							/>
+							<PenArrow
+								seed="pe-hero-vfov-down"
+								data
+								from={[26, geo.H / 2]}
+								to={[26, geo.H - 8]}
+								color={LINE_LIGHT}
+								width={2.6}
+								head={9}
 							/>
 							<Mark x={52} y={geo.H / 2} n={4} k={K} />
+							<HandText
+								x={geo.W / 2 + 60}
+								y={mid[1] + 36}
+								size={20}
+								color={LINE_LIGHT}
+								rotate={-2}
+							>
+								pitch {fmt(geo.pose.pitch)}°: the cross sits below the dashes
+							</HandText>
+							<PenArrow
+								seed="pe-hero-note-arrow"
+								from={[geo.W / 2 + 56, mid[1] + 28]}
+								to={[geo.W / 2 + 18, geo.H / 2 + 6]}
+								color={LINE_LIGHT}
+								width={2}
+								head={8}
+							/>
+							<HandText
+								x={geo.W - 20}
+								y={geo.H - 30}
+								anchor="end"
+								size={20}
+								color={LINE_LIGHT}
+								rotate={1.5}
+							>
+								roll {fmt(geo.pose.roll)}°: tiny, but the dashes lean
+							</HandText>
 						</g>
 					);
 				}}
@@ -1542,53 +1686,62 @@ function Dial({ d }: { d: GipfelbuchPhotoData }) {
 				color="faint"
 				width={0.9}
 			/>
-			<text
+			<HandLabel
 				x={50}
 				y={10}
-				textAnchor="middle"
-				fontSize={5.5}
-				className="gb-num"
-				fill={SWISS.secondary}
+				anchor="middle"
+				size={5.5}
+				halo={0}
+				color={SWISS.secondary}
 			>
 				N
-			</text>
-			<path
+			</HandLabel>
+			<SketchPath
 				d={arc}
-				fill="none"
-				stroke={SWISS.secondary}
-				strokeOpacity={0.4}
-				strokeWidth={3.2}
+				seed={`pe-dial-arc-${d.id}`}
+				data
+				color={SWISS.secondary}
+				opacity={0.4}
+				width={3.2}
 			/>
-			<line
-				x1={50}
-				y1={46}
-				x2={ax}
-				y2={ay}
-				stroke={PRIOR_C}
-				strokeWidth={2}
-				strokeDasharray="4 3"
+			<PenLine
+				seed={`pe-dial-prior-${d.id}`}
+				data
+				from={[50, 46]}
+				to={[ax, ay]}
+				color={PRIOR_C}
+				width={2}
+				dash="4 3"
 			/>
-			<line
-				x1={50}
-				y1={46}
-				x2={bx}
-				y2={by}
-				stroke={SOLVED_C}
-				strokeWidth={2.6}
+			<PenLine
+				seed={`pe-dial-solved-${d.id}`}
+				data
+				from={[50, 46]}
+				to={[bx, by]}
+				color={SOLVED_C}
+				width={2.6}
 			/>
-			<circle cx={50} cy={46} r={2.6} fill={SWISS.ink} />
-			<text
+			<HandDot
+				x={50}
+				y={46}
+				r={2.6}
+				seed={`pe-dial-eye-${d.id}`}
+				data
+				color="ink"
+				opacity={1}
+			/>
+			<HandLabel
 				x={50}
 				y={99}
-				textAnchor="middle"
-				fontSize={6}
-				fontWeight={700}
-				className="nb-num"
-				fill={SWISS.ink}
+				anchor="middle"
+				size={6}
+				halo={0}
+				weight={700}
+				color={SWISS.ink}
 			>
 				{dl > 0 ? "+" : "−"}
 				{Math.abs(dl).toFixed(1)}°
-			</text>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -1734,10 +1887,18 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 			<Beat kicker="The idea" title="One small record is the whole camera.">
 				<p>
 					Four angles and a position say where a photo was taken and where it
-					looks. Every part of Rigi reads and writes that same record.
+					looks.{" "}
+					<HandMark type="highlight">
+						Every part of Rigi reads and writes that same record.
+					</HandMark>{" "}
+					The four angles are numbered <CircledNumber value={1} /> to{" "}
+					<CircledNumber value={4} /> on the photo.
 				</p>
 				<p>
 					So a pose from the phone, a solver or a person can swap in anywhere.
+					<MarginNote mark="a">
+						One convention, so nothing needs translating. I like that.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1768,8 +1929,12 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				title="Phone compasses are wrong by degrees, not by hair."
 			>
 				<p>
-					Here the phone pointed 19° off on two photos. Trust it blindly and
-					every peak name lands on the wrong summit.
+					Here the phone pointed <HandMark type="double">19° off</HandMark> on
+					two photos. Trust it blindly and every peak name lands on the wrong
+					summit.
+					<MarginNote mark="b">
+						Why do two photos err by the same 19°?
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -1782,8 +1947,13 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				title="A weak solve never overwrites the guess."
 			>
 				<p>
-					On these two photos the fit was too weak. The pose stays the phone's
+					On these two photos the fit was{" "}
+					<HandMark type="wavy">too weak</HandMark>. The pose stays the phone's
 					own, marked unverified.
+					<MarginNote mark="c">
+						Confidence under 0.5: refused, not trusted. Accepted ✓ on the other
+						ten.
+					</MarginNote>
 				</p>
 			</Beat>
 

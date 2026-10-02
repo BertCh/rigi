@@ -13,6 +13,7 @@ import {
 	type PartView,
 } from "#/lib/gipfelbuch/ontology";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
+import { MarkerUnderline } from "./swiss/hand";
 import { CodeRef as BaseCodeRef } from "./viz";
 
 /** viz CodeRef with the global `code` border/padding/background reset (styles.css leaks onto it). */
@@ -21,7 +22,7 @@ const CodeRef = ({ path }: { path: string }) => (
 );
 
 const Label = ({ children }: { children: ReactNode }) => (
-	<h4 className="gb-caps mb-2 text-[11px] text-[var(--gb-contour,currentColor)]">
+	<h4 className="nb-hand mb-1 text-[19px] leading-[22px] font-normal text-[var(--gb-contour,currentColor)]">
 		{children}
 	</h4>
 );
@@ -44,7 +45,7 @@ const Word = ({
 }) => (
 	<span
 		title={title}
-		className={`bg-[var(--gb-paper-deep)] px-2 py-1 font-mono text-[11px] leading-none ${strike ? "text-[var(--gb-secondary,#4a545c)] line-through decoration-[var(--gb-secondary)]" : "text-[var(--gb-secondary,#4a545c)]"}`}
+		className={`px-1 py-1 font-mono text-[11px] leading-none ${strike ? "text-[var(--gb-secondary,#4a545c)] line-through decoration-[var(--gb-red)] decoration-[1.5px]" : "text-[var(--gb-secondary,#4a545c)]"}`}
 	>
 		{children}
 	</span>
@@ -67,7 +68,7 @@ function Ref({ r }: { r: ConceptRef }) {
 }
 
 const Card = ({ card }: { card: string }) => (
-	<span className="px-1.5 py-0.5 font-mono text-[11px] bg-[color-mix(in_oklab,var(--gb-red,var(--accent))_14%,transparent)] text-[var(--gb-red,var(--accent))]">
+	<span className="nb-hand text-[18px] leading-none text-[var(--gb-red,var(--accent))]">
 		{card}
 	</span>
 );
@@ -117,19 +118,22 @@ export function OntologyPanel({ node }: { node: GipfelbuchNode }) {
 		<section
 			id="ontology"
 			aria-labelledby="ontology-h"
-			className="scroll-mt-6 bg-[var(--gb-paper-deep,transparent)] p-6"
+			className="scroll-mt-6 py-6"
 		>
-			<p className="gb-caps mb-1 text-[11px] text-[var(--gb-contour,var(--accent))]">
+			<p className="nb-hand mb-1 text-[20px] leading-[24px] text-[var(--gb-contour,var(--accent))]">
 				Ontology{c ? ` · ${c.domain}` : ""}
 			</p>
 			{c && (
 				<>
-					<h2
-						id="ontology-h"
-						className="text-[20px] leading-[24px] sm:text-[24px] sm:leading-[30px] font-semibold"
-					>
-						{c.label}
-					</h2>
+					<div className="relative inline-block">
+						<h2
+							id="ontology-h"
+							className="m-0 text-[24px] leading-[28px] sm:text-[30px] sm:leading-[34px]"
+						>
+							{c.label}
+						</h2>
+						<MarkerUnderline seed={`ontology-${c.label}`} />
+					</div>
 					<p className="mt-3 max-w-[62ch] text-[16px] leading-[24px] text-[var(--gb-secondary,#4a545c)]">
 						{c.definition}
 					</p>
@@ -139,12 +143,15 @@ export function OntologyPanel({ node }: { node: GipfelbuchNode }) {
 				</>
 			)}
 			{!c && (
-				<h2
-					id="ontology-h"
-					className="text-[20px] leading-[24px] sm:text-[24px] sm:leading-[30px] font-semibold"
-				>
-					How it is made
-				</h2>
+				<div className="relative inline-block">
+					<h2
+						id="ontology-h"
+						className="m-0 text-[24px] leading-[28px] sm:text-[30px] sm:leading-[34px]"
+					>
+						How it is made
+					</h2>
+					<MarkerUnderline seed="ontology-how" />
+				</div>
 			)}
 
 			<div className="mt-7 space-y-6 pt-6">
@@ -220,7 +227,7 @@ export function OntologyPanel({ node }: { node: GipfelbuchNode }) {
 									</span>
 									<CodeRef path={r.file} />
 									{r.canonical && homonym && (
-										<span className="gb-caps text-[11px] tracking-[0.12em] text-[var(--gb-contour,var(--accent))]">
+										<span className="nb-hand text-[18px] text-[var(--gb-contour,var(--accent))]">
 											canonical
 										</span>
 									)}
@@ -258,10 +265,10 @@ export function OntologyPanel({ node }: { node: GipfelbuchNode }) {
 									className="text-[13px] text-[var(--gb-secondary,#4a545c)]"
 								>
 									<span className="text-[var(--gb-ink)]">{i.kind}</span>
-									<span className="ml-2 bg-[var(--gb-paper-deep)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--gb-secondary,#4a545c)]">
+									<span className="ml-2 px-1.5 py-0.5 font-mono text-[11px] text-[var(--gb-secondary,#4a545c)]">
 										{i.example}
 									</span>
-									<span className="ml-2 font-mono text-[11px] text-[var(--gb-secondary,#4a545c)]">
+									<span className="nb-hand ml-2 text-[17px] text-[var(--gb-secondary,#4a545c)]">
 										{i.stable ? "stable" : "not stable"} · {i.mintedBy}
 									</span>
 									{i.note && (
@@ -307,12 +314,12 @@ export function OntologyPanel({ node }: { node: GipfelbuchNode }) {
 							{methods.map((m) => (
 								<div key={m.id}>
 									<div className="flex flex-wrap items-center gap-2">
-										<span className="text-[16px] leading-[24px] font-semibold text-[var(--rigi-paper)]">
+										<span className="nb-hand text-[22px] leading-[26px] text-[var(--rigi-paper)]">
 											{m.label}
 										</span>
 										<span
 											title={m.agentBlurb}
-											className="px-2.5 py-1 font-mono text-[11px] tracking-[0.06em] bg-[color-mix(in_oklab,var(--gb-red,var(--accent))_14%,transparent)] text-[var(--gb-red,var(--accent))]"
+											className="nb-hand px-1 text-[19px] leading-none text-[var(--gb-red,var(--accent))]"
 										>
 											{m.agent}
 										</span>
@@ -348,7 +355,7 @@ export function OntologyPanel({ node }: { node: GipfelbuchNode }) {
 						<ul className="space-y-4">
 							{findings.map((f) => (
 								<li key={f.summary} className="pl-4">
-									<span className="gb-caps text-[11px] tracking-[0.14em] text-[var(--gb-contour,var(--accent))]">
+									<span className="nb-hand text-[19px] text-[var(--gb-red,var(--accent))]">
 										{f.kind}
 									</span>
 									<p className="mt-1 max-w-[62ch] text-[13px] leading-relaxed text-[var(--gb-secondary,#4a545c)]">

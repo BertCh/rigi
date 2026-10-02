@@ -4,7 +4,7 @@ Self-hosted latin and latin-ext WOFF2 subsets, served as downloaded from the Goo
 (`fonts.googleapis.com/css2`, fetched 2026-10-01). All faces are licensed under the SIL Open Font
 License 1.1 (https://openfontlicense.org). They are used unmodified (subsetting by Google Fonts);
 the reserved font names remain with their authors, and the CSS uses the aliases `GB Sans`, `GB Sans
-Condensed`, `GB Mono`, `GB Serif`, `GB Hand` and `GB Hand Small` only as local family labels.
+Condensed`, `GB Mono`, `GB Serif`, `GB Hand`, `GB Hand Small`, `GB Hand Body` and `GB Hand Caps` only as local family labels.
 
 | Alias | Font | Files | Licence | Source |
 | --- | --- | --- | --- | --- |
@@ -14,6 +14,8 @@ Condensed`, `GB Mono`, `GB Serif`, `GB Hand` and `GB Hand Small` only as local f
 | GB Serif | Source Serif 4 (variable, wght 400-700 with opsz) | `source-serif-4-*` | OFL 1.1, (c) Adobe | https://github.com/adobe-fonts/source-serif, https://fonts.google.com/specimen/Source+Serif+4 |
 | GB Hand | Caveat (variable, wght 400-700) | `caveat-*` | OFL 1.1, (c) The Caveat Project Authors | https://github.com/googlefonts/caveat, https://fonts.google.com/specimen/Caveat |
 | GB Hand Small | Shantell Sans (variable, wght 300-800; BNCE, INFM, SPAC axes) | `shantell-sans-*` | OFL 1.1, (c) The Shantell Sans Project Authors | https://github.com/arrowtype/shantell-sans, https://fonts.google.com/specimen/Shantell+Sans |
+| GB Hand Body | Playpen Sans (variable, wght 300-700; contextual alternates) | `playpen-sans-*` | OFL 1.1, (c) 2023 The Playpen Sans Project Authors | https://github.com/TypeTogether/Playpen-Sans, https://fonts.google.com/specimen/Playpen+Sans |
+| GB Hand Caps | Patrick Hand SC 400 | `patrick-hand-sc-*` | OFL 1.1, (c) 2010-2012 Patrick Wagesreiter | https://fonts.google.com/specimen/Patrick+Hand+SC |
 
 ## OFL note
 

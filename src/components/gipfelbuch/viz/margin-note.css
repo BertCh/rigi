@@ -17,8 +17,14 @@
 }
 
 .gb-mn-note {
+	position: relative;
 	display: block;
 	margin: 6px 0 6px 24px;
+}
+
+/* The pen leader: a curved arrow from the note back towards its mark, shown only in the margin. */
+.gb-mn-leader {
+	display: none;
 }
 
 .gb-mn-note > .gb-mn-ref {
@@ -33,6 +39,16 @@
 		clear: right;
 		width: calc(33.333% - 16px);
 		margin: 0 calc(-66.667% - 16px) 0 0;
+	}
+
+	.gb-mn-leader {
+		display: block;
+		position: absolute;
+		top: 2px;
+		left: -48px;
+		width: 44px;
+		height: 24px;
+		pointer-events: none;
 	}
 
 	/* Gwern/Baseline path: pin the note to its mark. Needs a positioned prose column. */
@@ -55,5 +71,9 @@
 		float: none;
 		width: auto;
 		margin: 6px 0 6px 24px;
+	}
+
+	.gb-mn-leader {
+		display: none;
 	}
 }

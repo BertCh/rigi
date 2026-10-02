@@ -3,16 +3,19 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import type { ReactNode } from "react";
+import { HandDot, PenCircle, SketchPath } from "../notebook/Ink";
 
-// KR6 (reports/gipfelbuch-best-of-both.md): the printed label every page drew for itself. Print, not
-// hand: a figure label states a value or names a thing; the hand is kept for doubts and decisions.
+// Figure labels (hand pass, reports/gipfelbuch-hand-sketch-2026-10-01.md): every label in a figure
+// is written by hand. Values and names use the small hand (Shantell Sans, tabular figures); peak and
+// place names use hand block capitals (`caps`), after the LK lettering hierarchy. Only code and
+// equations stay in print.
 
 /**
- * A printed SVG label on paper with a paper halo. `size` is in viewBox units: pick it so the label
- * renders at 11–13 px (size × renderedWidth / viewBoxWidth). Colours go through `style`, so tokens
- * resolve in every engine.
+ * A hand-lettered SVG label on paper with a paper halo. `size` is in viewBox units: pick it so the
+ * label renders at 12–14 px (size × renderedWidth / viewBoxWidth). Colours go through `style`, so
+ * tokens resolve in every engine.
  */
-export function PrintLabel({
+export function HandLabel({
 	x,
 	y,
 	anchor = "start",
@@ -23,6 +26,8 @@ export function PrintLabel({
 	weight,
 	mono = true,
 	condensed = false,
+	caps = condensed,
+	italic = false,
 	rotate,
 	children,
 }: {
@@ -35,10 +40,14 @@ export function PrintLabel({
 	halo?: number;
 	haloColor?: string;
 	weight?: number;
-	/** Tabular figures (default); false sets the sans. */
+	/** Tabular hand figures (default) so columns of values line up. */
 	mono?: boolean;
-	/** The condensed face (peak names, tight axes); overrides `mono`. */
+	/** Former condensed print face: now the hand block capitals (same as `caps`). */
 	condensed?: boolean;
+	/** Hand block capitals (names of peaks, places, regions). */
+	caps?: boolean;
+	/** Italic marks a height figure or a derived value (LK rule). */
+	italic?: boolean;
 	/** Degrees, about the label's own anchor point (x, y). */
 	rotate?: number;
 	children: ReactNode;
@@ -49,16 +58,17 @@ export function PrintLabel({
 			x={x}
 			y={y}
 			textAnchor={anchor}
-			fontSize={size}
+			fontSize={caps ? size * 1.08 : size}
 			strokeWidth={halo}
 			strokeLinejoin="round"
 			paintOrder="stroke"
-			className={condensed ? undefined : mono ? "gb-num" : undefined}
+			className={caps ? "nb-label" : "nb-hand-small"}
 			style={{
-				fontFamily: condensed ? "var(--gb-font-condensed)" : undefined,
 				fill: color,
 				stroke: halo ? haloColor : "none",
 				fontWeight: weight,
+				fontStyle: italic ? "italic" : undefined,
+				fontVariantNumeric: mono ? "tabular-nums" : undefined,
 			}}
 		>
 			{children}
@@ -66,18 +76,19 @@ export function PrintLabel({
 	);
 }
 
-/** A longer printed note in a figure: PrintLabel in the sans, secondary ink by default. */
-export function PrintNote(props: Parameters<typeof PrintLabel>[0]) {
+/** A longer hand note in a figure: HandLabel in secondary ink, proportional figures. */
+export function HandNote(props: Parameters<typeof HandLabel>[0]) {
 	return (
-		<PrintLabel color="var(--gb-secondary)" mono={false} {...props}>
+		<HandLabel color="var(--gb-secondary)" mono={false} {...props}>
 			{props.children}
-		</PrintLabel>
+		</HandLabel>
 	);
 }
 
 /**
- * A slider in the sheet's inks: a pencil track, a red filled run up to the value and a red belay
- * handle. A native range input underneath keeps keyboard and touch.
+ * A slider drawn by hand: a pencil track, a red pen run up to the value and a hand-drawn belay handle (a
+ * paper blot, a red pen loop and a red dot). A native range input underneath keeps keyboard, touch and
+ * ARIA; the drawing is aria-hidden.
  */
 export function HandRange({
 	value,
@@ -97,21 +108,43 @@ export function HandRange({
 	const frac = Math.min(1, Math.max(0, (value - min) / (max - min || 1)));
 	return (
 		<span className="relative mt-1 block h-6 w-full">
-			<span
-				className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2"
-				style={{
-					background: "color-mix(in srgb, var(--gb-ink) 22%, var(--gb-paper))",
-				}}
+			<svg
+				viewBox="0 0 300 10"
+				preserveAspectRatio="none"
+				className="pointer-events-none absolute inset-x-0 top-1/2 h-2.5 w-full -translate-y-1/2 overflow-visible [&_path]:[vector-effect:non-scaling-stroke]"
 				aria-hidden="true"
-			/>
+			>
+				<SketchPath
+					d="M2 5L298 5"
+					seed={`range-track-${label}`}
+					color="pencil"
+					width={1.2}
+					opacity={0.6}
+					passes={2}
+					tolerance={0.7}
+				/>
+			</svg>
 			<span
-				className="absolute top-1/2 left-0 h-[3px] -translate-y-1/2"
-				style={{
-					width: `calc(12px + (100% - 24px) * ${frac})`,
-					background: "var(--gb-red)",
-				}}
+				className="pointer-events-none absolute top-1/2 left-0 h-2.5 -translate-y-1/2"
+				style={{ width: `calc(12px + (100% - 24px) * ${frac})` }}
 				aria-hidden="true"
-			/>
+			>
+				<svg
+					viewBox="0 0 300 10"
+					preserveAspectRatio="none"
+					className="absolute inset-0 h-full w-full overflow-visible [&_path]:[vector-effect:non-scaling-stroke]"
+					aria-hidden="true"
+				>
+					<SketchPath
+						d="M2 5L300 5"
+						seed={`range-run-${label}`}
+						color="red"
+						width={2.4}
+						passes={1}
+						tolerance={0.5}
+					/>
+				</svg>
+			</span>
 			<input
 				type="range"
 				min={min}
@@ -123,13 +156,35 @@ export function HandRange({
 				className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
 			/>
 			<svg
-				viewBox="-12 -12 24 24"
-				className="pointer-events-none absolute top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 transition-transform peer-focus-visible:scale-125"
+				viewBox="-14 -14 28 28"
+				className="pointer-events-none absolute top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 overflow-visible transition-transform peer-focus-visible:scale-125 motion-reduce:transition-none"
 				style={{ left: `calc(12px + (100% - 24px) * ${frac})` }}
 				aria-hidden="true"
 			>
-				<circle r={12} style={{ fill: "var(--gb-paper)" }} />
-				<circle r={9} style={{ fill: "var(--gb-red)" }} />
+				<HandDot
+					x={0}
+					y={0}
+					r={11}
+					seed={`range-blot-${label}`}
+					color="var(--gb-paper)"
+					opacity={1}
+				/>
+				<PenCircle
+					center={[0, 0]}
+					radiusX={8.5}
+					radiusY={8}
+					seed={`range-loop-${label}`}
+					color="red"
+					width={1.6}
+				/>
+				<HandDot
+					x={0}
+					y={0}
+					r={4}
+					seed={`range-dot-${label}`}
+					color="var(--gb-red)"
+					opacity={1}
+				/>
 			</svg>
 		</span>
 	);

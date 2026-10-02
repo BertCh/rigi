@@ -16,7 +16,10 @@ export interface WaymarkProps {
 	className?: string;
 }
 
-/** A painted blaze: an irregular filled polygon with a faint pencilled edge. */
+/**
+ * Paint on rock (S18): two coats of an irregular polygon, the second a little off and thinner, and a
+ * pencilled edge only along the top and left (where the painter's brush started), never a full outline.
+ */
 function Painted({
 	points,
 	seed,
@@ -28,18 +31,28 @@ function Painted({
 	fill: string;
 	edge?: number;
 }) {
+	const [first, second] = points;
+	const last = points[points.length - 1];
 	return (
 		<>
-			<path d={paintPolygon(points, seed, 0.55)} fill={fill} />
-			<SketchPolyline
-				points={points}
-				closed
-				seed={seed}
-				color="ink"
-				width={0.7}
-				opacity={edge}
-				tolerance={0.5}
+			<path d={paintPolygon(points, seed, 0.7)} fill={fill} />
+			<path
+				d={paintPolygon(points, `${seed}-coat`, 0.9)}
+				fill={fill}
+				fillOpacity={0.55}
+				transform="translate(0.4 0.3)"
 			/>
+			{edge > 0 ? (
+				<SketchPolyline
+					points={[last, first, second]}
+					seed={`${seed}-edge`}
+					color="ink"
+					width={0.7}
+					opacity={edge}
+					tolerance={0.5}
+					passes={1}
+				/>
+			) : null}
 		</>
 	);
 }
@@ -114,7 +127,7 @@ function Blaze({ variant }: { variant: WaymarkVariant }) {
 export function Waymark({ variant, children, className }: WaymarkProps) {
 	return (
 		<span
-			className={`gb-caps inline-flex items-center gap-1.5 whitespace-nowrap align-middle text-[11px] leading-none tracking-[0.12em] ${className ?? ""}`}
+			className={`nb-label inline-flex items-center gap-1.5 whitespace-nowrap align-middle text-[12px] leading-none tracking-[0.1em] ${className ?? ""}`}
 		>
 			<Blaze variant={variant} />
 			{children}

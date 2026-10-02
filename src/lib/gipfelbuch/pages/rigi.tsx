@@ -4,22 +4,34 @@
 
 import { Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { CircledKey } from "#/components/gipfelbuch/notebook/carto";
 import {
 	Hachure,
+	HandText,
 	type InkColor,
 	inkColor,
+	PenArrow,
 	PenLine,
+	SketchPath,
 } from "#/components/gipfelbuch/notebook/Ink";
-import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import {
+	CircledNumber,
+	HandMark,
+	PencilLayer,
+	Wash,
+} from "#/components/gipfelbuch/notebook/marks";
+import {
+	AlignmentStoryProvider,
 	CodeRef,
 	Figure,
 	type GipfelbuchPhotoData,
+	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	MarginNote,
 	Measured,
-	PrintLabel,
 	RealPhoto,
+	StoryMap,
 	useGipfelbuchIndex,
 	useGipfelbuchPhoto,
 	useReducedMotion,
@@ -117,6 +129,33 @@ function Registration() {
 					role="img"
 					aria-label="A photographed skyline and the DEM horizon being aligned"
 				>
+					{/* pencil construction: the guide lines the ridge was laid out on */}
+					<PencilLayer>
+						<PenLine
+							seed="rigi-guide-top"
+							from={[0, BASE - 150]}
+							to={[W, BASE - 150]}
+							color="pencil"
+							width={0.8}
+						/>
+						<PenLine
+							seed="rigi-guide-mid"
+							from={[0, BASE - 92]}
+							to={[W, BASE - 92]}
+							color="pencil"
+							width={0.8}
+						/>
+						{[1, 3, 5, 7, 9, 11].map((i) => (
+							<PenLine
+								key={`guide-${i}`}
+								seed={`rigi-guide-v${i}`}
+								from={[40 + i * 60, BASE - 150]}
+								to={[40 + i * 60, BASE]}
+								color="pencil"
+								width={0.7}
+							/>
+						))}
+					</PencilLayer>
 					<Hachure
 						d={rockPath}
 						seed="rigi-rock"
@@ -126,43 +165,22 @@ function Registration() {
 						opacity={0.3}
 						width={0.7}
 					/>
-					<path
-						d={residual}
-						style={{
-							fill: `color-mix(in srgb, var(--gb-${tone === "forest" ? "forest" : "red"}) 35%, var(--gb-paper))`,
-						}}
-						fillOpacity={0.8}
-					/>
-					{/* measured lines are exact: paper halo, then the colour (data, not furniture) */}
-					<path
+					{/* the residual band: a wash, red when off, forest when within 1 degree */}
+					<Wash d={residual} seed="rigi-residual" color={tone} opacity={0.12} />
+					{/* measured lines stay on their pixels: one pen pass each */}
+					<SketchPath
 						d={photoPath}
-						fill="none"
-						stroke={SWISS.paper}
-						strokeOpacity={0.55}
-						strokeWidth={5.4}
-						strokeLinejoin="round"
+						seed="rigi-photo-skyline"
+						data
+						color="ink"
+						width={2.2}
 					/>
-					<path
-						d={photoPath}
-						fill="none"
-						stroke={SWISS.ink}
-						strokeWidth={2.2}
-						strokeLinejoin="round"
-					/>
-					<path
+					<SketchPath
 						d={candidatePath}
-						fill="none"
-						stroke={SWISS.paper}
-						strokeOpacity={0.55}
-						strokeWidth={5.8}
-						strokeLinejoin="round"
-					/>
-					<path
-						d={candidatePath}
-						fill="none"
-						stroke={LAYER_STYLE.solved.color}
-						strokeWidth={2.8}
-						strokeLinejoin="round"
+						seed="rigi-candidate"
+						data
+						color={LAYER_STYLE.solved.color}
+						width={2.8}
 					/>
 					{/* ground strip: the DEM-side readout */}
 					<PenLine
@@ -185,45 +203,42 @@ function Registration() {
 									width={1}
 								/>
 								{i % 2 === 0 && (
-									<text
+									<HandLabel
 										x={x}
 										y={BASE + 22}
-										textAnchor="middle"
-										fontSize={LABEL_SMALL}
-										fill={inkColor("faint")}
-										className="nb-num"
+										anchor="middle"
+										size={LABEL_SMALL}
+										color={inkColor("faint")}
 									>
 										{`${((i - 6) * 4.6) | 0}°`}
-									</text>
+									</HandLabel>
 								)}
 							</g>
 						);
 					})}
 					{/* legend */}
-					<line
-						x1={16}
-						x2={40}
-						y1={22}
-						y2={22}
-						stroke={SWISS.ink}
-						strokeWidth={2.2}
+					<PenLine
+						seed="rigi-key-photo"
+						from={[16, 22]}
+						to={[40, 22]}
+						color="ink"
+						width={2.2}
 					/>
-					<PrintLabel x={48} y={27} size={LABEL} color="var(--gb-secondary)">
+					<HandLabel x={48} y={27} size={LABEL} color="var(--gb-secondary)">
 						photo skyline (segmented)
-					</PrintLabel>
-					<line
-						x1={16}
-						x2={40}
-						y1={42}
-						y2={42}
-						stroke={LAYER_STYLE.solved.color}
-						strokeWidth={2.8}
+					</HandLabel>
+					<PenLine
+						seed="rigi-key-dem"
+						from={[16, 42]}
+						to={[40, 42]}
+						color={LAYER_STYLE.solved.color}
+						width={2.8}
 					/>
-					<PrintLabel x={48} y={47} size={LABEL} color="var(--gb-secondary)">
+					<HandLabel x={48} y={47} size={LABEL} color="var(--gb-secondary)">
 						DEM horizon at the candidate pose
-					</PrintLabel>
+					</HandLabel>
 					{/* verdict */}
-					<PrintLabel
+					<HandLabel
 						x={W - 16}
 						y={27}
 						size={LABEL}
@@ -231,16 +246,26 @@ function Registration() {
 						color={tone === "forest" ? "var(--gb-forest)" : "var(--gb-red)"}
 					>
 						{ok ? "within 1°: show it" : "off: don't claim"}
-					</PrintLabel>
-					<PrintLabel
-						x={16}
-						y={H - 10}
-						size={LABEL}
-						color="var(--gb-secondary)"
-					>
+					</HandLabel>
+					<HandLabel x={16} y={H - 10} size={LABEL} color="var(--gb-secondary)">
 						yaw error {off.toFixed(2)}° ≈ {resid.toFixed(0)} px at this field of
 						view
-					</PrintLabel>
+					</HandLabel>
+					{/* hand notes with leaders */}
+					<HandText x={470} y={92} size={19} color="pencil" rotate={-2}>
+						the band between the lines is the error
+					</HandText>
+					<PenArrow
+						seed="rigi-note-band"
+						from={[560, 100]}
+						to={[600, BASE - ridge(600) - 6]}
+						color="pencil"
+						width={1.1}
+					/>
+					<HandText x={300} y={H - 38} size={19} color="pencil" rotate={1.5}>
+						{ok ? "lines coincide: accepted ✓" : "why does 3° look so big?"}
+					</HandText>
+					<CircledKey x={W - 30} y={62} value={1} seed="rigi-key-1" />
 				</svg>
 			</div>
 			<div className="mt-4 flex min-w-0 max-w-full flex-wrap items-center gap-3 font-mono text-[13px] gb-secondary">
@@ -389,71 +414,82 @@ function HeroStages() {
 				</>
 			}
 		>
-			<Stages
-				stages={[
-					{
-						label: "Photo",
-						caption:
-							"Rigi starts with the photo and what the phone noted down.",
-						render: () => <RealPhoto bleed data={d} layers={[]} crop={crop} />,
-					},
-					{
-						label: "Phone's guess",
-						caption: (
-							<>
-								The compass guess draws{" "}
-								<Key color={LAYER_STYLE.prior.color} dashed>
-									the terrain's skyline
-								</Key>{" "}
-								beside{" "}
-								<Key color={LAYER_STYLE.skyline.color}>the photo's skyline</Key>
-								. They disagree.
-							</>
-						),
-						render: () => (
-							<RealPhoto
-								bleed
-								data={d}
-								layers={["skyline", "prior"]}
-								crop={crop}
-							/>
-						),
-					},
-					{
-						label: "Solved",
-						caption: (
-							<>
-								We turn the camera until{" "}
-								<Key color={LAYER_STYLE.solved.color}>
-									the terrain's skyline
-								</Key>{" "}
-								lies on the photo's.
-							</>
-						),
-						render: () => (
-							<RealPhoto
-								bleed
-								data={d}
-								layers={["skyline", "solved"]}
-								crop={crop}
-							/>
-						),
-					},
-					{
-						label: "Labels",
-						caption: "With the pose known, every peak in view gets its name.",
-						render: () => (
-							<RealPhoto
-								bleed
-								data={d}
-								layers={["peaks"]}
-								crop={crop}
-								maxLabels={12}
-							/>
-						),
-					},
-				]}
-			/>
+			<AlignmentStoryProvider initial={0}>
+				<Stages
+					aside={<StoryMap data={d} />}
+					stages={[
+						{
+							label: "Photo",
+							pose: 0,
+							caption:
+								"Rigi starts with the photo and what the phone noted down.",
+							render: () => (
+								<RealPhoto bleed data={d} layers={[]} crop={crop} />
+							),
+						},
+						{
+							label: "Phone's guess",
+							pose: 0,
+							caption: (
+								<>
+									The compass guess draws{" "}
+									<Key color={LAYER_STYLE.prior.color} dashed>
+										the terrain's skyline
+									</Key>{" "}
+									beside{" "}
+									<Key color={LAYER_STYLE.skyline.color}>
+										the photo's skyline
+									</Key>
+									. They disagree.
+								</>
+							),
+							render: () => (
+								<RealPhoto
+									bleed
+									data={d}
+									layers={["skyline", "prior"]}
+									crop={crop}
+								/>
+							),
+						},
+						{
+							label: "Solved",
+							pose: 1,
+							caption: (
+								<>
+									We turn the camera until{" "}
+									<Key color={LAYER_STYLE.solved.color}>
+										the terrain's skyline
+									</Key>{" "}
+									lies on the photo's.
+								</>
+							),
+							render: () => (
+								<RealPhoto
+									bleed
+									data={d}
+									layers={["skyline", "solved"]}
+									crop={crop}
+								/>
+							),
+						},
+						{
+							label: "Labels",
+							pose: 1,
+							caption: "With the pose known, every peak in view gets its name.",
+							render: () => (
+								<RealPhoto
+									bleed
+									data={d}
+									layers={["peaks"]}
+									crop={crop}
+									maxLabels={12}
+								/>
+							),
+						},
+					]}
+				/>
+			</AlignmentStoryProvider>
 		</Figure>
 	);
 }
@@ -608,12 +644,21 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="The skyline tells us where the camera stood."
 			>
 				<p>
-					Every mountain photo has a skyline. The terrain model predicts one for
-					any camera pose.
+					Every mountain photo has a{" "}
+					<HandMark type="underline">skyline</HandMark>. The terrain model
+					predicts one for any camera pose.
+					<MarginNote mark="a">
+						I notice the skyline is the only line both sides can draw.
+					</MarginNote>
 				</p>
 				<p>
-					We search for the pose where the two lines overlap. Yaw, which way the
-					camera points, is the part the phone gets wrong.
+					<HandMark type="highlight">
+						We search for the pose where the two lines overlap.
+					</HandMark>{" "}
+					Yaw, which way the camera points, is the part the phone gets wrong.
+					<MarginNote mark="b">
+						Yaw is what the compass gets wrong; the rest of the pose holds.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -622,7 +667,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			<Beat kicker="Watch it solve" title="Guess, measure, correct, snap.">
 				<p>
 					One real photo, six beats. Drag the terrain line afterwards to feel
-					the match.
+					the match <CircledNumber value={1} />.
+					<MarginNote mark="c">
+						Slide it off by 3° and see how big the error looks.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -638,7 +686,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 
 			<Beat kicker="What you get" title="One pose unlocks three things.">
 				<p>
-					Once the camera is known, everything else is drawing from it.{" "}
+					Once the camera is known,{" "}
+					<HandMark type="double">everything else is drawing from it</HandMark>.{" "}
 					<A id="photo-workspace">Labels</A>, a{" "}
 					<A id="camera-roll">camera roll</A> on a map, and{" "}
 					<A id="step-inside">stepping inside</A> the scene.
@@ -652,9 +701,14 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				title="Rigi would rather say nothing than show a wrong pose."
 			>
 				<p>
-					A person in the frame can break the match. Two photos here were
-					rejected as low confidence, and we ask you to confirm or to tap a
-					peak.
+					A person in the frame can break the match.{" "}
+					<HandMark type="wavy">
+						Two photos here were rejected as low confidence
+					</HandMark>
+					, and we ask you to confirm or to tap a peak.
+					<MarginNote mark="d">
+						Better a question than a wrong label: accepted only when sure.
+					</MarginNote>
 				</p>
 			</Beat>
 

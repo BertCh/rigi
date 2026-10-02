@@ -10,6 +10,7 @@ import {
 	SketchPath,
 	SketchPolyline,
 } from "../notebook/Ink";
+import { IMHOF_TINT_STOPS, ImhofRampFilter } from "./imhof";
 import { paintPolygon } from "./paint";
 import { SheetContourRuns } from "./sheet-contour-runs";
 import { labelSizes, layoutLabels } from "./sheet-labels";
@@ -94,6 +95,9 @@ function Sheet({
 				<clipPath id={`${uid}-inner`}>
 					<rect x={3} y={3} width={W - 6} height={H - 6} />
 				</clipPath>
+				{sheet.relief.tint && (
+					<ImhofRampFilter id={`${uid}-hypso`} stops={IMHOF_TINT_STOPS} />
+				)}
 				{mask(`${uid}-sun`, sheet.relief.sun)}
 				{mask(`${uid}-shade`, sheet.relief.shade)}
 				{sheet.contours.labels.map((l, i) => (
@@ -101,6 +105,18 @@ function Sheet({
 				))}
 			</defs>
 			<rect width={W} height={H} fill="var(--gb-paper)" />
+			{/* Imhof hypsometric tint: valley green-yellow, warm mid-slopes, cool summits, under the lake and relief */}
+			{sheet.relief.tint && (
+				<image
+					href={sheet.relief.tint}
+					width={W}
+					height={H}
+					preserveAspectRatio="none"
+					filter={`url(#${uid}-hypso)`}
+					opacity={0.55}
+					style={{ mixBlendMode: "multiply" }}
+				/>
+			)}
 			{/* lake tint under the relief so the flat water grey multiplies into it */}
 			<path d={sheet.lake.d} fill={lakeTint} />
 			{/* I4 / I6: grey relief, then a cool ink through the shade mask and a warm ink through the sun mask, as overprint */}
@@ -139,12 +155,13 @@ function Sheet({
 				<path d={sheet.lake.d} strokeWidth={22} opacity={0.14} />
 				<path d={sheet.lake.d} strokeWidth={12} opacity={0.2} />
 			</g>
-			<path
+			{/* the shoreline is measured: one bounded pen pass */}
+			<SketchPath
 				d={sheet.lake.d}
-				fill="none"
-				stroke="var(--gb-water)"
-				strokeWidth={2.4}
-				strokeLinejoin="round"
+				seed="sheet-shore"
+				data
+				color="var(--gb-water)"
+				width={2.4}
 			/>
 			{/* R7 / R8: rock hachures and scree, integer quarter-unit paths */}
 			{rock && (
@@ -174,8 +191,8 @@ function Sheet({
 			{scale > 0.22 && (
 				<g
 					fill="var(--gb-contour)"
-					className="gb-coord"
-					style={{ fontSize: sizes.contour }}
+					className="nb-num"
+					style={{ fontSize: sizes.contour, fontStyle: "italic" }}
 				>
 					{sheet.contours.labels.map((l, i) => (
 						<text
@@ -199,19 +216,20 @@ function Sheet({
 				x={sheet.lake.label[0]}
 				y={sheet.lake.label[1]}
 				textAnchor="middle"
-				className="gb-water"
+				className="nb-hand"
 				fill="var(--gb-water)"
+				transform={`skewX(-10) translate(${(sheet.lake.label[1] * Math.tan(Math.PI / 18)).toFixed(1)} 0)`}
 				style={{
 					fontSize: sizes.lake,
-					letterSpacing: "0.32em",
-					fontStyle: "italic",
+					letterSpacing: "0.22em",
 				}}
 			>
 				{sheet.lake.name}
 			</text>
+			{/* LK lettering classes by hand (S20): places upright mixed case in ink */}
 			<g
 				fill="var(--gb-ink)"
-				className="gb-caps"
+				className="nb-hand-small"
 				style={{ fontSize: sizes.place }}
 			>
 				{placed.places.map((p) => (
@@ -252,12 +270,14 @@ function Sheet({
 							textAnchor={p.flip ? "end" : "start"}
 							fill="var(--gb-navy)"
 						>
+							{/* peaks: hand block capitals in navy, height in italic hand figures (E1) */}
 							<text
 								x={x}
 								y={p.y - 7}
+								className="nb-label"
 								style={{
 									fontSize: sizes.peak,
-									fontWeight: 500,
+									letterSpacing: "0.04em",
 									...HALO,
 									strokeWidth: sizes.peak * 0.26,
 								}}
@@ -267,9 +287,10 @@ function Sheet({
 							<text
 								x={x}
 								y={p.y - 7 + sizes.spot * 1.1}
-								className="gb-coord"
+								className="nb-num"
 								style={{
 									fontSize: sizes.spot,
+									fontStyle: "italic",
 									...HALO,
 									strokeWidth: sizes.spot * 0.3,
 								}}
@@ -350,8 +371,9 @@ function Sheet({
 				x={W - 14}
 				y={H - 14}
 				textAnchor="end"
-				fill="var(--gb-ink)"
-				opacity={0.32}
+				fill="var(--gb-pencil)"
+				opacity={0.6}
+				className="nb-hand-small"
 				style={{ fontSize: sizes.credit, ...HALO, strokeWidth: 5 }}
 			>
 				{sheet.credit}

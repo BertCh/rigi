@@ -33,7 +33,26 @@ export function formatLv95(value: string | number): string {
 }
 
 /**
- * Map-sheet identity without strokes: LV95 corner labels, a typographic Blatt number and an imprint line.
+ * An LV95 corner value written by hand (S14): italic hand figures in pencil, the leading 2 or 1
+ * a size smaller, as on the old LK sheet ticks.
+ */
+function HandCoordinate({ value, axis }: { value: string; axis: "E" | "N" }) {
+	const text = formatLv95(value);
+	return (
+		<span
+			className="nb-num whitespace-nowrap text-[13px] leading-none italic"
+			style={{ color: "var(--gb-pencil)" }}
+		>
+			<span className="nb-label mr-1 not-italic text-[11px]">{axis}</span>
+			<span className="text-[10px]">{text.slice(0, 1)}</span>
+			{text.slice(1)}
+		</span>
+	);
+}
+
+/**
+ * Map-sheet identity without strokes, written by hand: the LV95 corner values in pencil (corners
+ * only, no ticks along the edges), a hand-lettered Blatt number and a pencil imprint line (S30).
  */
 export function SheetFrame({
 	children,
@@ -62,23 +81,17 @@ export function SheetFrame({
 				<div className="relative sm:p-[22px]">
 					{corners ? (
 						<>
-							<span
-								className="gb-coord absolute left-[30px] top-[8px] hidden whitespace-nowrap bg-[var(--gb-paper)] px-1 text-[11px] leading-none sm:block"
-								style={{ color: "var(--gb-secondary,#4a545c)" }}
-							>
-								{formatLv95(corners.east)}
+							<span className="absolute left-[30px] top-[6px] hidden bg-[var(--gb-paper)] px-1 sm:block">
+								<HandCoordinate value={corners.east} axis="E" />
 							</span>
-							<span
-								className="gb-coord absolute bottom-[8px] right-[30px] hidden whitespace-nowrap bg-[var(--gb-paper)] px-1 text-[11px] leading-none sm:block"
-								style={{ color: "var(--gb-secondary,#4a545c)" }}
-							>
-								{formatLv95(corners.north)}
+							<span className="absolute bottom-[6px] right-[30px] hidden bg-[var(--gb-paper)] px-1 sm:block">
+								<HandCoordinate value={corners.north} axis="N" />
 							</span>
 						</>
 					) : null}
 					{crossRefs?.prev ? (
 						<span
-							className="gb-caps absolute left-[10px] top-1/2 hidden -translate-y-1/2 rotate-180 whitespace-nowrap text-[11px] leading-none sm:block"
+							className="nb-hand absolute left-[10px] top-1/2 hidden -translate-y-1/2 rotate-180 whitespace-nowrap text-[16px] leading-none text-[var(--gb-pencil)] sm:block"
 							style={{ writingMode: "vertical-rl" }}
 						>
 							{crossRefs.prev}
@@ -86,7 +99,7 @@ export function SheetFrame({
 					) : null}
 					{crossRefs?.next ? (
 						<span
-							className="gb-caps absolute right-[10px] top-1/2 hidden -translate-y-1/2 whitespace-nowrap text-[11px] leading-none sm:block"
+							className="nb-hand absolute right-[10px] top-1/2 hidden -translate-y-1/2 whitespace-nowrap text-[16px] leading-none text-[var(--gb-pencil)] sm:block"
 							style={{ writingMode: "vertical-rl" }}
 						>
 							{crossRefs.next}
@@ -95,23 +108,20 @@ export function SheetFrame({
 					<div className="relative">
 						{sheet ? (
 							<div
-								className="gb-caps absolute right-0 top-0 z-10 hidden flex-col items-center px-3 py-1.5 text-center sm:flex"
+								className="absolute right-0 top-0 z-10 hidden flex-col items-center px-3 py-1.5 text-center sm:flex"
 								style={{ background: "var(--gb-paper)" }}
 							>
-								<span className="mb-0.5 text-[11px] tracking-[0.18em]">
+								<span className="nb-label mb-0.5 text-[12px] tracking-[0.14em]">
 									Blatt
 								</span>
-								<span
-									className="gb-coord text-[20px] leading-none"
-									style={{ fontWeight: 600, color: "var(--gb-ink)" }}
-								>
+								<span className="nb-num text-[24px] leading-none">
 									<span className="mx-1 text-[var(--gb-red)]">{sheet}</span>
 									{total ? (
-										<span className="gb-secondary"> / {total}</span>
+										<span className="gb-secondary text-[16px]"> / {total}</span>
 									) : null}
 								</span>
 								{title ? (
-									<span className="mt-0.5 max-w-[11rem] truncate text-[11px] tracking-[0.12em]">
+									<span className="nb-hand mt-0.5 max-w-[11rem] truncate text-[17px] leading-[20px]">
 										{title}
 									</span>
 								) : null}
@@ -120,7 +130,10 @@ export function SheetFrame({
 						{children}
 					</div>
 					{imprintLine ? (
-						<p className="gb-caps gb-secondary mt-3 text-left text-[11px] leading-snug tracking-[0.14em] sm:pb-0.5">
+						<p
+							className="nb-hand-small mt-3 text-left text-[12px] leading-snug sm:pb-0.5"
+							style={{ color: "var(--gb-pencil)" }}
+						>
 							{imprintLine}
 						</p>
 					) : null}

@@ -58,7 +58,7 @@ const PRINT_SCALE = 0.8;
 
 interface StrokeProps {
 	seed: string;
-	/** A measured mark: drawn exact (plain geometry, constant width), never by hand. */
+	/** A measured mark: one constant-width pen pass that stays within DATA_TOLERANCE px of the data. */
 	data?: boolean;
 	color?: InkColor | (string & {});
 	opacity?: number;
@@ -131,7 +131,14 @@ export function PenLine({
 	return <Stroke d={sketchLine(from, to, hashSeed(props.seed))} {...props} />;
 }
 
-/** A measured mark: the plain path at constant width (L1). */
+/**
+ * Hand pass (reports/gipfelbuch-hand-sketch-2026-10-01.md): a measured mark is drawn by hand too,
+ * but with one pen pass whose sideways jitter is bounded by this many px, so it stays on its
+ * measured pixels (notebook.check.ts tests the bound). Width stays constant (L2).
+ */
+export const DATA_TOLERANCE = 0.5;
+
+/** A measured mark: one constant-width pen pass within DATA_TOLERANCE of the path. */
 function ExactStroke({
 	d,
 	color = "ink",
@@ -139,9 +146,15 @@ function ExactStroke({
 	width = 1.4,
 	dash,
 }: { d: string } & Omit<StrokeProps, "seed" | "data">) {
+	const pen = useMemo(
+		() =>
+			sketchify(d, hashSeed(d), { tolerance: DATA_TOLERANCE, passes: 1 })[0] ||
+			d,
+		[d],
+	);
 	return (
 		<path
-			d={d}
+			d={pen}
 			fill="none"
 			style={{ stroke: strokeColor(color) }}
 			strokeOpacity={opacity}
@@ -272,8 +285,8 @@ export function splitPrintRuns(
 	return runs;
 }
 
-/** H4: hand lettering leans at most 2 degrees. */
-const MAX_HAND_TILT = 2;
+/** Hand notes lean at most 4 degrees (hand pass; labels stay upright). */
+const MAX_HAND_TILT = 4;
 
 const PRINT_RUN =
 	/(?<![A-Za-z\d])(?:[-−+±≥≤<>~≈]\s?)?\d[\d.,:'’\u00a0\u202f ]*\d?\s?(?:°|%|px|km|mm|ms|m|s|×)?(?![A-Za-z])/gu;
@@ -454,9 +467,12 @@ export function SketchPath({
 	data,
 	...props
 }: SketchStrokeProps & { d: string; data?: boolean }) {
-	// L1: a measured line is exact. `data` returns the input path untouched (one constant pass).
+	// A measured line is one pen pass within DATA_TOLERANCE (constant width); furniture gets two.
 	const strokes = useMemo(
-		() => (data ? [d] : sketchify(d, seed, { tolerance, passes })),
+		() =>
+			data
+				? sketchify(d, seed, { tolerance: DATA_TOLERANCE, passes: 1 })
+				: sketchify(d, seed, { tolerance, passes }),
 		[d, seed, tolerance, passes, data],
 	);
 	return <Passes strokes={strokes} {...props} />;
@@ -466,7 +482,7 @@ export function SketchPath({
 export const exactPolyline = (points: Point[], closed?: boolean) =>
 	`${points.map((point, i) => `${i ? "L" : "M"}${point[0].toFixed(2)} ${point[1].toFixed(2)}`).join("")}${closed ? "Z" : ""}`;
 
-/** A measured series as points, redrawn by hand within `tolerance` px (default 0.9); `data` draws it exact. */
+/** A measured series as points, redrawn by hand within `tolerance` px (default 0.9); `data` draws one pass within DATA_TOLERANCE. */
 export function SketchPolyline({
 	points,
 	seed,
@@ -480,7 +496,11 @@ export function SketchPolyline({
 	const strokes = useMemo(
 		() =>
 			data
-				? [exactPolyline(points, closed)]
+				? sketchPolyline(points, seed, {
+						tolerance: DATA_TOLERANCE,
+						passes: 1,
+						closed,
+					})
 				: sketchPolyline(points, seed, { tolerance, passes: used, closed }),
 		[points, seed, tolerance, used, closed, data],
 	);
@@ -590,16 +610,17 @@ export function HandDot({
 	seed: string | number;
 	color?: InkStroke;
 	opacity?: number;
-	/** A measured point: an exact circle. */
+	/** A measured point: a hand dot centred exactly on (x, y) whose edge wavers by under 6 %. */
 	data?: boolean;
 }) {
 	const d = useMemo(() => {
-		if (data)
-			return `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
 		const random = createRandom(seedOf(seed));
-		const points: Point[] = Array.from({ length: 7 }, (_, i) => {
-			const angle = (i / 7) * Math.PI * 2;
-			const radius = r * (0.82 + random() * 0.3);
+		const sides = data ? 10 : 7;
+		const points: Point[] = Array.from({ length: sides }, (_, i) => {
+			const angle = (i / sides) * Math.PI * 2;
+			const radius = data
+				? r * (0.94 + random() * 0.12)
+				: r * (0.82 + random() * 0.3);
 			return [x + Math.cos(angle) * radius, y + Math.sin(angle) * radius];
 		});
 		return `${points.map((point, i) => `${i ? "L" : "M"}${point[0].toFixed(2)} ${point[1].toFixed(2)}`).join("")}Z`;
@@ -674,6 +695,96 @@ export function SketchDefs() {
 						xChannelSelector="R"
 						yChannelSelector="G"
 					/>
+				</filter>
+				{/* Pencil (graphite) layer for construction lines (PencilLayer in marks.tsx): high-frequency
+				    displacement plus a grain mask breaks strokes into graphite fragments. Never on text. */}
+				<filter id="nb-pencil" x="-2%" y="-2%" width="104%" height="104%">
+					<feTurbulence
+						type="fractalNoise"
+						baseFrequency="0.6"
+						numOctaves="1"
+						seed="5"
+						result="n"
+					/>
+					<feDisplacementMap
+						in="SourceGraphic"
+						in2="n"
+						scale="2.2"
+						xChannelSelector="R"
+						yChannelSelector="G"
+						result="d"
+					/>
+					<feTurbulence
+						type="fractalNoise"
+						baseFrequency="1.1"
+						numOctaves="1"
+						seed="9"
+						result="g"
+					/>
+					<feColorMatrix
+						in="g"
+						type="matrix"
+						values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.8 1.45"
+						result="mask"
+					/>
+					<feComposite in="d" in2="mask" operator="in" />
+				</filter>
+				{/* Watercolour wash (Wash method="filter"): displaced fill, darker rim, paper tooth. Costly:
+				    three turbulences; keep at most three on a page. The default Wash needs no filter. */}
+				<filter
+					id="nb-wash"
+					x="-6%"
+					y="-6%"
+					width="112%"
+					height="112%"
+					colorInterpolationFilters="sRGB"
+				>
+					<feTurbulence
+						type="fractalNoise"
+						baseFrequency="0.018"
+						numOctaves="3"
+						seed="21"
+						result="flow"
+					/>
+					<feDisplacementMap
+						in="SourceGraphic"
+						in2="flow"
+						scale="10"
+						xChannelSelector="R"
+						yChannelSelector="G"
+						result="shape"
+					/>
+					<feMorphology
+						in="shape"
+						operator="erode"
+						radius="2.5"
+						result="core"
+					/>
+					<feComposite in="shape" in2="core" operator="out" result="rim" />
+					<feComponentTransfer in="rim" result="rimDark">
+						<feFuncA type="linear" slope="0.55" />
+					</feComponentTransfer>
+					<feComponentTransfer in="shape" result="body">
+						<feFuncA type="linear" slope="0.32" />
+					</feComponentTransfer>
+					<feTurbulence
+						type="fractalNoise"
+						baseFrequency="0.85"
+						numOctaves="2"
+						seed="4"
+						result="paper"
+					/>
+					<feColorMatrix
+						in="paper"
+						type="matrix"
+						values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.9 1.2"
+						result="tooth"
+					/>
+					<feMerge result="pigment">
+						<feMergeNode in="body" />
+						<feMergeNode in="rimDark" />
+					</feMerge>
+					<feComposite in="pigment" in2="tooth" operator="in" />
 				</filter>
 			</defs>
 		</svg>

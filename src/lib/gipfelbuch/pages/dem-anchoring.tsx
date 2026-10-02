@@ -10,11 +10,17 @@ import {
 	HandText,
 	type InkColor,
 	inkColor,
+	PenArrow,
 	PenCircle,
 	PenLine,
 	SketchPath,
 	SketchRect,
 } from "#/components/gipfelbuch/notebook/Ink";
+import {
+	CircledNumber,
+	HandMark,
+	Wash,
+} from "#/components/gipfelbuch/notebook/marks";
 import { hachureFill } from "#/components/gipfelbuch/notebook/sketchify";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
@@ -22,6 +28,8 @@ import {
 	CodeRef,
 	Eq,
 	Figure,
+	HandLabel,
+	MarginNote,
 	Op,
 	Measured as PhotoMeasured,
 	Plot,
@@ -493,16 +501,15 @@ function CurveFigure() {
 								color="faint"
 								width={0.5}
 							/>
-							<text
+							<HandLabel
 								x={PADL - 8}
 								y={sy(Math.log(v)) + 4}
-								textAnchor="end"
-								fontSize={LABEL}
-								fill="var(--nb-faint)"
-								className="nb-num font-mono"
+								anchor="end"
+								size={LABEL}
+								color="var(--nb-faint)"
 							>
 								{v >= 1000 ? `${v / 1000} km` : `${v} m`}
-							</text>
+							</HandLabel>
 						</g>
 					))}
 					{XT.map((v) => (
@@ -515,47 +522,36 @@ function CurveFigure() {
 								color="faint"
 								width={0.5}
 							/>
-							<text
+							<HandLabel
 								x={sx(Math.log(v))}
 								y={FH - PADB + 18}
-								textAnchor="middle"
-								fontSize={LABEL}
-								fill="var(--nb-faint)"
-								className="nb-num font-mono"
+								anchor="middle"
+								size={LABEL}
+								color="var(--nb-faint)"
 							>
 								{v} m
-							</text>
+							</HandLabel>
 						</g>
 					))}
-					<text
+					<HandLabel
 						x={(PADL + FW - PADR) / 2}
 						y={FH - 20}
-						textAnchor="middle"
-						fontSize={LABEL}
-						fill={SWISS.ink}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						anchor="middle"
+						size={LABEL}
+						color={SWISS.ink}
 					>
 						model ray length (m)
-					</text>
-					<text
+					</HandLabel>
+					<HandLabel
 						x={9}
 						y={(PADT + FH - PADB) / 2}
-						textAnchor="middle"
-						fontSize={LABEL}
-						fill={SWISS.ink}
-						transform={`rotate(${-90} ${9} ${(PADT + FH - PADB) / 2})`}
-						paintOrder="stroke"
-						stroke={SWISS.paper}
-						strokeWidth={3}
-						strokeLinejoin="round"
-						className="gb-num"
+						anchor="middle"
+						size={LABEL}
+						color={SWISS.ink}
+						rotate={-90}
 					>
 						DEM range (m)
-					</text>
+					</HandLabel>
 
 					<g clipPath={`url(#${clipId})`}>
 						{/* identity: what "metric depth taken at face value" would be */}
@@ -569,15 +565,18 @@ function CurveFigure() {
 							passes={1}
 						/>
 						{/* the +-25 % band: a light forest wash between two pencil edges */}
-						<path
+						<Wash
 							d={`${path(cur, BAND)}L${path(cur, -BAND)
 								.split(/(?=[ML])/)
 								.map((c) => c.replace(/^[ML]/, ""))
 								.reverse()
 								.join("L")}Z`}
-							style={{
-								fill: "color-mix(in srgb, var(--gb-forest) 12%, transparent)",
-							}}
+							color="forest"
+							seed="da-band-wash"
+							layers={5}
+							opacity={0.06}
+							spread={1.5}
+							offset={[0, 0]}
 						/>
 						<SketchPath
 							d={path(cur, BAND)}
@@ -655,6 +654,24 @@ function CurveFigure() {
 							/>
 						</g>
 					))}
+					<HandText x={PADL + 14} y={PADT + 24} size={13} color="red">
+						{`one scale ${scaleStats.err.toFixed(2)}, the curve ${fitStats.err.toFixed(2)}`}
+					</HandText>
+					<PenArrow
+						from={[PADL + 150, PADT + 30]}
+						to={[sx(Math.log(300)) - 8, sy(curveLog(cur, Math.log(300))) - 8]}
+						seed="da-note-curve"
+						color="red"
+						width={1.3}
+					/>
+					<HandText
+						x={sx(Math.log(12))}
+						y={FH - PADB - 16}
+						size={13}
+						color="pencil"
+					>
+						knots pin the bend (at most 6)
+					</HandText>
 					{(() => {
 						// the label follows the identity diagonal, set just below it
 						const a = Math.atan2(
@@ -664,21 +681,16 @@ function CurveFigure() {
 						const x = sx(Math.log(110)) - Math.sin(a) * 20;
 						const y = sy(Math.log(110)) + Math.cos(a) * 20;
 						return (
-							<text
+							<HandLabel
 								x={x}
 								y={y}
-								textAnchor="middle"
-								fontSize={LABEL}
-								fill={SWISS.pencil}
-								transform={`rotate(${(a * 180) / Math.PI} ${x} ${y})`}
-								paintOrder="stroke"
-								stroke={SWISS.paper}
-								strokeWidth={3}
-								strokeLinejoin="round"
-								className="gb-num"
+								anchor="middle"
+								size={LABEL}
+								color={SWISS.pencil}
+								rotate={(a * 180) / Math.PI}
 							>
 								depth taken at face value
-							</text>
+							</HandLabel>
 						);
 					})()}
 				</svg>
@@ -747,16 +759,6 @@ const CELL_INK: Record<Cell, { color: InkColor; gap: number; width: number }> =
 		far: { color: "pencil", gap: 5.2, width: 0.9 },
 		kept: { color: "forest", gap: 3, width: 1.1 },
 	};
-// R2: the class is carried by a solid fill (one ink per class); the hatch above is decoration.
-const CELL_TINT: Record<Cell, string> = {
-	sky: "var(--gb-water)",
-	person: "var(--gb-sign)",
-	near: "var(--gb-red)",
-	far: "var(--gb-relief)",
-	kept: "var(--gb-forest)",
-};
-const cellFill = (c: Cell, pct: number) =>
-	`color-mix(in srgb, ${CELL_TINT[c]} ${pct}%, var(--gb-paper))`;
 /** Row-run rectangles of every cell kind, as one path per kind. */
 const CELL_FILL: Record<Cell, string> = (() => {
 	const out = {} as Record<Cell, string>;
@@ -863,10 +865,15 @@ function CandidateFigure() {
 						</defs>
 						<g clipPath="url(#da-sweep-clip)">
 							{(Object.keys(CELL_INK) as Cell[]).map((c) => (
-								<path
+								<Wash
 									key={`fill-${c}`}
 									d={CELL_FILL[c]}
-									style={{ fill: cellFill(c, c === "kept" ? 55 : 42) }}
+									color={CELL_INK[c].color}
+									seed={`da-cell-wash-${c}`}
+									layers={5}
+									opacity={c === "kept" ? 0.1 : 0.08}
+									spread={1.2}
+									offset={[0, 0]}
 								/>
 							))}
 							{(Object.keys(CELL_INK) as Cell[]).map((c) => (
@@ -889,6 +896,16 @@ function CandidateFigure() {
 							seed="da-photo-frame"
 							color="pencil"
 						/>
+						<HandText x={232} y={118} size={13} color="brown">
+							a head is not ground
+						</HandText>
+						<PenArrow
+							from={[250, 124]}
+							to={[222, 146]}
+							seed="da-note-person"
+							color="brown"
+							width={1.2}
+						/>
 						{sweep < 1 && (
 							<PenLine
 								data
@@ -904,20 +921,25 @@ function CandidateFigure() {
 								key={c}
 								transform={`translate(${(i % 3) * 108 + 2} ${206 + Math.floor(i / 3) * 20})`}
 							>
-								<rect
-									width={11}
-									height={11}
-									style={{ fill: cellFill(c, c === "kept" ? 55 : 42) }}
+								<Wash
+									d="M0 0H11V11H0Z"
+									color={CELL_INK[c].color}
+									seed={`da-key-wash-${c}`}
+									layers={6}
+									opacity={0.12}
+									spread={1}
+									offset={[0, 0]}
 								/>
-								<text
-									x={16}
-									y={10}
-									fontSize={10}
-									fill={SWISS.ink}
-									className="gb-num"
-								>
+								<Hachure
+									d="M0 0H11V11H0Z"
+									seed={`da-key-hatch-${c}`}
+									color={CELL_INK[c].color}
+									gap={3.2}
+									opacity={0.6}
+								/>
+								<HandLabel x={16} y={10} size={10} color={SWISS.ink}>
 									{CELL_LABEL[c]} {counts[c]}
-								</text>
+								</HandLabel>
 							</g>
 						))}
 					</svg>
@@ -938,19 +960,14 @@ function CandidateFigure() {
 							width={1}
 							dash="2 4"
 						/>
-						<text
+						<HandLabel
 							x={cx + 6}
 							y={cy - zl - 27}
-							fontSize={10}
-							fill={SWISS.secondary}
-							paintOrder="stroke"
-							stroke={SWISS.paper}
-							strokeWidth={3}
-							strokeLinejoin="round"
-							className="gb-num"
+							size={10}
+							color={SWISS.secondary}
 						>
 							optical axis
-						</text>
+						</HandLabel>
 						{/* image plane */}
 						<PenLine
 							data
@@ -960,19 +977,14 @@ function CandidateFigure() {
 							color="ink"
 							width={1.8}
 						/>
-						<text
+						<HandLabel
 							x={cx + 60}
 							y={cy - 34}
-							fontSize={10}
-							fill={SWISS.secondary}
-							paintOrder="stroke"
-							stroke={SWISS.paper}
-							strokeWidth={3}
-							strokeLinejoin="round"
-							className="gb-num"
+							size={10}
+							color={SWISS.secondary}
 						>
 							image
-						</text>
+						</HandLabel>
 						{/* depth leg + ray */}
 						<PenLine
 							data
@@ -1017,48 +1029,36 @@ function CandidateFigure() {
 							color="red"
 							opacity={1}
 						/>
-						<text
+						<HandLabel
 							x={cx - 8}
 							y={cy - zl / 2}
-							textAnchor="end"
-							fontSize={10}
-							fill={SWISS.contour}
-							paintOrder="stroke"
-							stroke={SWISS.paper}
-							strokeWidth={3}
-							strokeLinejoin="round"
-							className="gb-num"
+							anchor="end"
+							size={10}
+							color={SWISS.contour}
 						>
 							z (model)
-						</text>
-						<text
+						</HandLabel>
+						<HandLabel
 							x={(cx + px) / 2 + (th > 0 ? 10 : -10)}
 							y={cy - zl / 2 + 16}
-							textAnchor={th > 0 ? "start" : "end"}
-							fontSize={10}
-							fill={SWISS.red}
-							paintOrder="stroke"
-							stroke={SWISS.paper}
-							strokeWidth={3}
-							strokeLinejoin="round"
-							className="gb-num"
+							anchor={th > 0 ? "start" : "end"}
+							size={10}
+							color={SWISS.red}
 						>
 							|ray| (DEM)
-						</text>
-						<text
+						</HandLabel>
+						<HandText x={cx + 74} y={cy - 18} size={13} color="red">
+							{`${fac.toFixed(2)}× longer than z`}
+						</HandText>
+						<HandLabel
 							x={160}
 							y={236}
-							textAnchor="middle"
-							fontSize={10}
-							fill={SWISS.ink}
-							paintOrder="stroke"
-							stroke={SWISS.paper}
-							strokeWidth={3}
-							strokeLinejoin="round"
-							className="gb-num"
+							anchor="middle"
+							size={10}
+							color={SWISS.ink}
 						>
 							|ray| = z · √(1 + x² + y²) = z × {fac.toFixed(2)}
-						</text>
+						</HandLabel>
 					</svg>
 				</div>
 			</div>
@@ -1095,11 +1095,13 @@ function GaugeFigure() {
 				role="img"
 				aria-label="Anchor quality as a function of median residual"
 			>
-				<path
+				<Wash
 					d={rectPath(46, qy(0.15), QW - 62, qy(0) - qy(0.15))}
-					style={{
-						fill: "color-mix(in srgb, var(--nb-red) 16%, var(--gb-paper))",
-					}}
+					color="red"
+					seed="da-wash-1"
+					layers={9}
+					opacity={0.08}
+					spread={2}
 				/>
 				<Hachure
 					d={rectPath(46, qy(0.15), QW - 62, qy(0) - qy(0.15))}
@@ -1108,11 +1110,13 @@ function GaugeFigure() {
 					gap={5}
 					opacity={0.6}
 				/>
-				<path
+				<Wash
 					d={rectPath(46, qy(0.35), QW - 62, qy(0.15) - qy(0.35))}
-					style={{
-						fill: "color-mix(in srgb, var(--nb-brown) 16%, var(--gb-paper))",
-					}}
+					color="brown"
+					seed="da-wash-2"
+					layers={9}
+					opacity={0.08}
+					spread={2}
 				/>
 				<Hachure
 					d={rectPath(46, qy(0.35), QW - 62, qy(0.15) - qy(0.35))}
@@ -1121,11 +1125,13 @@ function GaugeFigure() {
 					gap={5}
 					opacity={0.6}
 				/>
-				<path
+				<Wash
 					d={rectPath(46, qy(1), QW - 62, qy(0.35) - qy(1))}
-					style={{
-						fill: "color-mix(in srgb, var(--nb-forest) 16%, var(--gb-paper))",
-					}}
+					color="forest"
+					seed="da-wash-3"
+					layers={9}
+					opacity={0.08}
+					spread={2}
 				/>
 				<Hachure
 					d={rectPath(46, qy(1), QW - 62, qy(0.35) - qy(1))}
@@ -1145,32 +1151,29 @@ function GaugeFigure() {
 							width={1}
 							dash="3 4"
 						/>
-						<text
+						<HandLabel
 							x={40}
 							y={qy(v) + 4}
-							textAnchor="end"
-							fontSize={LABEL_SMALL}
-							fill="var(--nb-faint)"
-							className="nb-num font-mono"
+							anchor="end"
+							size={LABEL_SMALL}
+							color="var(--nb-faint)"
 						>
 							{v}
-						</text>
+						</HandLabel>
 					</g>
 				))}
-				<text
+				<HandLabel
 					x={QW - 22}
 					y={qy(0.07)}
-					textAnchor="end"
-					fontSize={LABEL}
-					fill={SWISS.red}
-					paintOrder="stroke"
-					stroke={SWISS.paper}
-					strokeWidth={3}
-					strokeLinejoin="round"
-					className="gb-num"
+					anchor="end"
+					size={LABEL}
+					color={SWISS.red}
 				>
 					hidden
-				</text>
+				</HandLabel>
+				<HandText x={60} y={qy(0.07) - 14} size={13} color="red">
+					below 0.15 I hide the whole scene
+				</HandText>
 				<HandText
 					x={QW - 22}
 					y={qy(0.25) + 4}
@@ -1180,47 +1183,36 @@ function GaugeFigure() {
 				>
 					labelled low trust, faded
 				</HandText>
-				<text
+				<HandLabel
 					x={QW - 22}
 					y={qy(0.6)}
-					textAnchor="end"
-					fontSize={LABEL}
-					fill={SWISS.forest}
-					paintOrder="stroke"
-					stroke={SWISS.paper}
-					strokeWidth={3}
-					strokeLinejoin="round"
-					className="gb-num"
+					anchor="end"
+					size={LABEL}
+					color={SWISS.forest}
 				>
 					shown
-				</text>
+				</HandLabel>
 				{[0, 0.1, 0.2, 0.3, 0.4, 0.5].map((e) => (
-					<text
+					<HandLabel
 						key={e}
 						x={qx(e)}
 						y={244}
-						textAnchor="middle"
-						fontSize={LABEL_SMALL}
-						fill="var(--nb-faint)"
-						className="nb-num font-mono"
+						anchor="middle"
+						size={LABEL_SMALL}
+						color="var(--nb-faint)"
 					>
 						{e.toFixed(1)}
-					</text>
+					</HandLabel>
 				))}
-				<text
+				<HandLabel
 					x={(46 + QW - 16) / 2}
 					y={264}
-					textAnchor="middle"
-					fontSize={LABEL}
-					fill={SWISS.ink}
-					paintOrder="stroke"
-					stroke={SWISS.paper}
-					strokeWidth={3}
-					strokeLinejoin="round"
-					className="gb-num"
+					anchor="middle"
+					size={LABEL}
+					color={SWISS.ink}
 				>
 					median |log residual| over all candidates
-				</text>
+				</HandLabel>
 				{[
 					[0.13, "curve 0.13"],
 					[0.34, "one scale 0.34"],
@@ -1235,19 +1227,14 @@ function GaugeFigure() {
 							width={1}
 							dash="2 4"
 						/>
-						<text
+						<HandLabel
 							x={qx(e as number) + 4}
 							y={qy(1) + 12}
-							fontSize={LABEL}
-							fill={SWISS.secondary}
-							paintOrder="stroke"
-							stroke={SWISS.paper}
-							strokeWidth={3}
-							strokeLinejoin="round"
-							className="gb-num"
+							size={LABEL}
+							color={SWISS.secondary}
 						>
 							{l as string}
-						</text>
+						</HandLabel>
 					</g>
 				))}
 				<SketchPath
@@ -1565,17 +1552,21 @@ function MiniQuality({ d }: { d: TerrainData | null }) {
 			role="img"
 			aria-label="Each real photo's anchor quality against the hide and low-trust lines"
 		>
-			<path
+			<Wash
 				d={rectPath(X(0), 20, X(0.15) - X(0), 80)}
-				style={{
-					fill: "color-mix(in srgb, var(--nb-red) 16%, var(--gb-paper))",
-				}}
+				color="red"
+				seed="da-wash-4"
+				layers={9}
+				opacity={0.08}
+				spread={2}
 			/>
-			<path
+			<Wash
 				d={rectPath(X(0.15), 20, X(0.35) - X(0.15), 80)}
-				style={{
-					fill: "color-mix(in srgb, var(--nb-brown) 16%, var(--gb-paper))",
-				}}
+				color="brown"
+				seed="da-wash-5"
+				layers={9}
+				opacity={0.08}
+				spread={2}
 			/>
 			<Hachure
 				d={rectPath(X(0), 20, X(0.15) - X(0), 80)}
@@ -1605,34 +1596,24 @@ function MiniQuality({ d }: { d: TerrainData | null }) {
 					opacity={1}
 				/>
 			))}
-			<text
+			<HandLabel
 				x={X(0.075)}
 				y={14}
-				textAnchor="middle"
-				fontSize={13}
-				fill={SWISS.red}
-				paintOrder="stroke"
-				stroke={SWISS.paper}
-				strokeWidth={3}
-				strokeLinejoin="round"
-				className="gb-num"
+				anchor="middle"
+				size={13}
+				color={SWISS.red}
 			>
 				hide
-			</text>
-			<text
+			</HandLabel>
+			<HandLabel
 				x={X(0.6)}
 				y={14}
-				textAnchor="middle"
-				fontSize={13}
-				fill={SWISS.forest}
-				paintOrder="stroke"
-				stroke={SWISS.paper}
-				strokeWidth={3}
-				strokeLinejoin="round"
-				className="gb-num"
+				anchor="middle"
+				size={13}
+				color={SWISS.forest}
 			>
 				show
-			</text>
+			</HandLabel>
 		</svg>
 	);
 }
@@ -1808,7 +1789,7 @@ function RealQuality({ d }: { d: TerrainData | null }) {
 	).length;
 	const ok = sorted.length - hidden - low;
 	const W = 560;
-	const H = 150;
+	const H = 176;
 	const bx = (q: number) => 30 + q * (W - 50);
 	return (
 		<Figure
@@ -1835,7 +1816,7 @@ function RealQuality({ d }: { d: TerrainData | null }) {
 					[0.15, 0.35, "brown"],
 					[0.35, 1, "forest"],
 				].map(([a, b, c]) => (
-					<path
+					<Wash
 						key={String(c)}
 						d={rectPath(
 							bx(a as number),
@@ -1843,9 +1824,11 @@ function RealQuality({ d }: { d: TerrainData | null }) {
 							bx(b as number) - bx(a as number),
 							70,
 						)}
-						style={{
-							fill: `color-mix(in srgb, var(--nb-${c}) 14%, var(--gb-paper))`,
-						}}
+						color={c as InkColor}
+						seed={`da-rq-wash-${String(c)}`}
+						layers={9}
+						opacity={0.07}
+						spread={2}
 					/>
 				))}
 				<Hachure
@@ -1863,21 +1846,17 @@ function RealQuality({ d }: { d: TerrainData | null }) {
 					opacity={0.3}
 				/>
 				{sorted.map((f, i) => (
-					<circle
+					<HandDot
+						data
 						key={f.id}
-						cx={bx(f.quality)}
-						cy={70 - (i % 4) * 12}
+						x={bx(f.quality)}
+						y={70 - (i % 4) * 12}
 						r={4.8}
-						style={{
-							fill:
-								f.quality < 0.15
-									? "var(--nb-red)"
-									: f.quality < 0.35
-										? "var(--nb-brown)"
-										: "var(--nb-forest)",
-						}}
-						stroke="var(--gb-paper)"
-						strokeWidth={1}
+						seed={`rq-dot-${f.id}`}
+						color={
+							f.quality < 0.15 ? "red" : f.quality < 0.35 ? "brown" : "forest"
+						}
+						opacity={1}
 					/>
 				))}
 				{[0, 0.15, 0.35, 0.5, 1].map((v) => (
@@ -1890,74 +1869,56 @@ function RealQuality({ d }: { d: TerrainData | null }) {
 							color="faint"
 							width={0.5}
 						/>
-						<text
+						<HandLabel
 							x={bx(v)}
 							y={108}
-							textAnchor="middle"
-							fontSize={LABEL_SMALL}
-							fill="var(--nb-faint)"
-							className="nb-num font-mono"
+							anchor="middle"
+							size={LABEL_SMALL}
+							color="var(--nb-faint)"
 						>
 							{v}
-						</text>
+						</HandLabel>
 					</g>
 				))}
-				<text
+				<HandLabel
 					x={bx(0.075)}
 					y={14}
-					textAnchor="middle"
-					fontSize={LABEL}
-					fill={SWISS.red}
-					paintOrder="stroke"
-					stroke={SWISS.paper}
-					strokeWidth={3}
-					strokeLinejoin="round"
-					className="gb-num"
+					anchor="middle"
+					size={LABEL}
+					color={SWISS.red}
 				>
 					hidden
-				</text>
-				<text
+				</HandLabel>
+				<HandLabel
 					x={bx(0.25)}
 					y={14}
-					textAnchor="middle"
-					fontSize={LABEL}
-					fill={SWISS.contour}
-					paintOrder="stroke"
-					stroke={SWISS.paper}
-					strokeWidth={3}
-					strokeLinejoin="round"
-					className="gb-num"
+					anchor="middle"
+					size={LABEL}
+					color={SWISS.contour}
 				>
 					low trust
-				</text>
-				<text
+				</HandLabel>
+				<HandLabel
 					x={bx(0.68)}
 					y={14}
-					textAnchor="middle"
-					fontSize={LABEL}
-					fill={SWISS.forest}
-					paintOrder="stroke"
-					stroke={SWISS.paper}
-					strokeWidth={3}
-					strokeLinejoin="round"
-					className="gb-num"
+					anchor="middle"
+					size={LABEL}
+					color={SWISS.forest}
 				>
 					shown
-				</text>
-				<text
+				</HandLabel>
+				<HandLabel
 					x={W / 2}
 					y={132}
-					textAnchor="middle"
-					fontSize={LABEL}
-					fill={SWISS.ink}
-					paintOrder="stroke"
-					stroke={SWISS.paper}
-					strokeWidth={3}
-					strokeLinejoin="round"
-					className="gb-num"
+					anchor="middle"
+					size={LABEL}
+					color={SWISS.ink}
 				>
 					anchor quality
-				</text>
+				</HandLabel>
+				<HandText x={W / 2} y={164} anchor="middle" size={13} color="pencil">
+					{`${hidden} hidden, ${low} low trust: it scores the depth fit, not the camera`}
+				</HandText>
 			</svg>
 			<p className={`mt-2 font-mono ${TYPE.micro} gb-secondary`}>
 				{ok} shown, {low} low trust, {hidden} hidden of {sp.nFitted} fitted
@@ -1982,11 +1943,19 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					A depth model gets shape right and metres wrong. Near the camera it is
-					roughly right. Far away it squeezes distance.
+					roughly right.{" "}
+					<HandMark type="underline">Far away it squeezes distance.</HandMark>
 				</p>
 				<p>
-					Once the camera is solved, the map knows the true distance to the
-					ground. We bend the model's depth onto that ruler.
+					<HandMark type="highlight">
+						Once the camera is solved, the map knows the true distance to the
+						ground.
+					</HandMark>{" "}
+					We bend the model's depth onto that ruler.
+					<MarginNote mark="a">
+						I notice the DEM/model ratio is about 1 at 15 to 30 m and about 2.9
+						at 100 to 300 m.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -2025,6 +1994,20 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					Switch between one scale and the fitted curve to see the difference.
+					Play it: <CircledNumber value={1} /> one global scale,{" "}
+					<CircledNumber value={2} /> knots pull the line onto the map,{" "}
+					<CircledNumber value={3} /> a monotone curve.
+				</p>
+				<p>
+					First guess: <HandMark type="strike">one scale per photo.</HandMark>{" "}
+					<span className="nb-hand" style={{ color: "var(--nb-red)" }}>
+						a curve: median log error 0.34 falls to 0.13
+					</span>
+					.
+					<MarginNote mark="b">
+						Why does the foreground break first? The model squeezes near range
+						least.
+					</MarginNote>
 				</p>
 			</Beat>
 
@@ -2036,8 +2019,14 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			>
 				<p>
 					When model and map disagree, the near-field scene is hidden or
-					labelled low trust. The score checks the depth fit. It cannot tell a
-					right camera from a wrong one.
+					labelled low trust. The score checks the depth fit.{" "}
+					<HandMark type="wavy" color="red">
+						It cannot tell a right camera from a wrong one.
+					</HandMark>
+					<MarginNote mark="c">
+						AUC 0.73 as a pose check. Too weak to lean on, so it only gates the
+						scene.
+					</MarginNote>
 				</p>
 			</Beat>
 
