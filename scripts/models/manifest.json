@@ -48,6 +48,22 @@
 		"producer": "scripts/models/u2netp.py"
 	},
 	{
+		"file": "deeplab-v3-nn.70580c5b.safetensors",
+		"sha256": "70580c5b19dff622316f87043c89525ddc426e79ba7b95e2a9f09c607235d1ea",
+		"bytes": 1406196,
+		"licence": "Apache-2.0",
+		"source": "MediaPipe DeepLab v3 segmenter (deeplab_v3.ff36e24d.tflite, Apache-2.0) convs as fp16 safetensors + graph program",
+		"producer": "scripts/models/mediapipe-seg.py"
+	},
+	{
+		"file": "selfie-multiclass-nn.c64d6152.safetensors",
+		"sha256": "c64d615246285b59b1d15bfa0a01507673de8841fa5201046959d829b850894b",
+		"bytes": 8202856,
+		"licence": "Apache-2.0",
+		"source": "MediaPipe selfie multiclass segmenter (selfie_multiclass_256x256.c6748b12.tflite, Apache-2.0) convs as fp16 safetensors + graph program",
+		"producer": "scripts/models/mediapipe-seg.py"
+	},
+	{
 		"file": "moge2-vits-normal.6d404d23.safetensors",
 		"sha256": "6d404d2320d2f6113a81b8d7dda0d71711297cb9bdcc41e4b9557ff5acdcc363",
 		"bytes": 70243040,

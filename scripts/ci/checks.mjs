@@ -1322,4 +1322,24 @@ export const CHECKS = [
 		note: "sky U2-Net-P on src/lib/nn (CPU reference; WebGPU over Dawn when DAWN_DIR is set) vs onnxruntime-web wasm in node: per-stage and final-mask abs error on demo photos; mask max <= 0.03, mean <= 0.003 (fp16 weights); stage table needs the python venv with onnx",
 		timeoutS: 300,
 	},
+	{
+		id: "people-parity",
+		tier: "fast",
+		group: "nn",
+		cmd: tsx(
+			"src/lib/segment/__tests__/people-parity.check.ts",
+			"--images",
+			"demo-01",
+			"--no-cpu",
+		),
+		needs: [
+			"public/models/deeplab-v3-nn.70580c5b.safetensors",
+			"public/models/selfie-multiclass-nn.c64d6152.safetensors",
+			"public/models/deeplab_v3.ff36e24d.tflite",
+			"public/models/selfie_multiclass_256x256.c6748b12.tflite",
+			"public/demo/photos-1024/demo-01.jpg",
+		],
+		note: "people segmentation (DeepLab v3, selfie multiclass) on src/lib/nn vs the TFLite interpreter (ai_edge_litert in the venv) on a demo photo: per-stage, logit and P(person) abs error on WebGPU over Dawn (CPU backend with --no-cpu dropped; slow for the selfie model); P(person) max <= 0.05, mean <= 0.003 (fp16 weights); SKIP without DAWN_DIR rows, weights, tflite or the venv packages",
+		timeoutS: 300,
+	},
 ];

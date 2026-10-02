@@ -41,8 +41,9 @@ array (one row per model version; remove a row when nothing loads that file any 
 | file | licence | used by |
 |---|---|---|
 | `skyseg-u2netp.873ea284.onnx` | MIT | sky mask (`src/lib/sky`, ONNX Runtime). Producer `skyseg.mjs` converts the pinned ncnn weights with `src/lib/sky/tools/ncnn2onnx.py` (needs `onnx` + `numpy`). |
-| `selfie_multiclass_256x256.c6748b12.tflite` | Apache-2.0 | people mask (`src/lib/segment.ts`, MediaPipe) |
-| `deeplab_v3.ff36e24d.tflite` | Apache-2.0 | people mask, `deeplab` / `combined` mode (`src/lib/segment.ts`) |
+| `selfie_multiclass_256x256.c6748b12.tflite` | Apache-2.0 | source of `selfie-multiclass-nn.*` only (read by `mediapipe-seg.py`, not loaded at runtime) |
+| `deeplab_v3.ff36e24d.tflite` | Apache-2.0 | source of `deeplab-v3-nn.*` only (read by `mediapipe-seg.py`, not loaded at runtime) |
+| `selfie-multiclass-nn.c64d6152.safetensors`, `deeplab-v3-nn.70580c5b.safetensors` | Apache-2.0 | people mask (`src/lib/segment`, on `src/lib/nn`). Producer `mediapipe-seg.py` converts the two .tflite files (fp16 convs + the TFLite op list; needs `tflite` + `ai-edge-litert` in the venv for the parity reference). |
 | `aliked-n16.dc5fb7d3.safetensors` | BSD-3-Clause | ALIKED-n16 keypoints (`src/lib/features`, `src/lib/nn`). Producer `aliked-lightglue.py` (BN folded, fp16); it also writes the parity fixtures (`fixtures`). |
 | `lightglue-aliked.f35aee62.safetensors` | Apache-2.0 | LightGlue matcher for ALIKED (`src/lib/features`). Same producer (Wqkv regrouped, fp16). |
 

@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { modelEntry } from "../fetch";
 
-const LOADERS = ["../../segment.ts", "../../sky/model.ts"];
+const LOADERS = ["../../segment/people.ts", "../../sky/model.ts"];
 
 describe("self-hosted models", () => {
 	for (const rel of LOADERS) {

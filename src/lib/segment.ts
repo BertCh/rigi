@@ -2,156 +2,85 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Browser-side foreground (people) segmentation using MediaPipe ImageSegmenter.
+// Browser-side foreground (people) segmentation on src/lib/nn: the MediaPipe selfie-multiclass and
+// DeepLab v3 networks as WGSL kernels on one luma compute graph per forward (WebGPU), or the nn CPU
+// reference backend where there is no WebGPU (see segment/people.ts, scripts/models/mediapipe-seg.py).
 //
 // segmentForeground() returns a soft 0..255 mask (255 = person, incl. hair,
 // clothes and held accessories) at long side MASK_LONG_SIDE, row 0 = top.
 
-import {
-	FilesetResolver,
-	ImageSegmenter,
-	type ImageSegmenterResult,
-} from "@mediapipe/tasks-vision";
 import { smoothstep } from "./math";
-import { fetchModel, modelUrl } from "./models";
+import { createNn, type Nn } from "./nn";
 import type { ByteMask } from "./ontology/core/geometry";
+import {
+	loadPeopleNet,
+	type PeopleModel,
+	type PeopleNet,
+	runPeopleNet,
+} from "./segment/people";
 
 /** 0..255, 255 = foreground person (a ByteMask: row-major, row 0 = TOP of image). */
 export type ForegroundMask = ByteMask;
 
-export type SegmentModel = "multiclass" | "deeplab" | "combined";
+export type SegmentModel = PeopleModel | "combined";
 
 const MASK_LONG_SIDE = 512;
-// Self-hosted: the tasks-vision wasm comes from the installed npm package (Vite `?url` assets, imported
-// lazily so node never loads them) and the .tflite models from public/models (scripts/models/manifest.json,
-// fetched by scripts/models/fetch.mjs). No third-party host at runtime.
-const MODEL_FILES: Record<"multiclass" | "deeplab", string> = {
-	multiclass: "selfie_multiclass_256x256.c6748b12.tflite",
-	deeplab: "deeplab_v3.ff36e24d.tflite",
-};
-/** Pascal VOC "person" class index in deeplab_v3. */
-const DEEPLAB_PERSON = 15;
 
 const DEFAULT_MODEL: SegmentModel = "multiclass";
 
-type Loaded = "multiclass" | "deeplab";
-const segmenters = new Map<Loaded, Promise<ImageSegmenter>>();
+type Loaded = PeopleModel;
+let nnPromise: Promise<Nn> | null = null;
+const nets = new Map<Loaded, Promise<PeopleNet>>();
 
-/**
- * createFromOptions loads the wasm loader script and then the .wasm only once the model buffer is in:
- * preload both as soon as their URLs are known so the three downloads run side by side. The link
- * attributes match what MediaPipe requests (script crossOrigin=anonymous; emscripten's cors fetch),
- * so the browser reuses the preloaded responses.
- */
-let wasmPreloaded = false;
-function preloadWasm(fileset: {
-	wasmLoaderPath: string;
-	wasmBinaryPath: string;
-}) {
-	if (wasmPreloaded || typeof document === "undefined") return;
-	wasmPreloaded = true;
-	for (const [href, as] of [
-		[fileset.wasmLoaderPath, "script"],
-		[fileset.wasmBinaryPath, "fetch"],
-	]) {
-		const link = document.createElement("link");
-		link.rel = "preload";
-		link.as = as;
-		link.href = href;
-		link.crossOrigin = "anonymous";
-		document.head.appendChild(link);
-	}
+/** The shared nn runtime: the page's WebGPU compute device when there is one, else the CPU backend. */
+function getNn(): Promise<Nn> {
+	nnPromise ??= createNn().catch((err) => {
+		console.warn("[segment] GPU nn unavailable, using the CPU backend", err);
+		return createNn({ backend: "cpu" });
+	});
+	return nnPromise;
 }
 
-/** The tasks-vision wasm loader + binary, served from our own build (SIMD unless the browser lacks it). */
-async function visionFileset(): Promise<{
-	wasmLoaderPath: string;
-	wasmBinaryPath: string;
-}> {
-	if (await FilesetResolver.isSimdSupported()) {
-		const [loader, binary] = await Promise.all([
-			import("@mediapipe/tasks-vision/vision_wasm_internal.js?url"),
-			import("@mediapipe/tasks-vision/vision_wasm_internal.wasm?url"),
-		]);
-		return { wasmLoaderPath: loader.default, wasmBinaryPath: binary.default };
-	}
-	const [loader, binary] = await Promise.all([
-		import("@mediapipe/tasks-vision/vision_wasm_nosimd_internal.js?url"),
-		import("@mediapipe/tasks-vision/vision_wasm_nosimd_internal.wasm?url"),
-	]);
-	return { wasmLoaderPath: loader.default, wasmBinaryPath: binary.default };
-}
-
-async function createSegmenter(model: Loaded): Promise<ImageSegmenter> {
-	const [fileset, buf] = await Promise.all([
-		visionFileset().then((f) => {
-			preloadWasm(f);
-			return f;
-		}),
-		// 16 MB model: Cache Storage backed (fetchModel). Any failure → MediaPipe fetches the URL itself.
-		fetchModel(MODEL_FILES[model]).catch(() => null),
-	]);
-	const make = (delegate: "GPU" | "CPU") =>
-		ImageSegmenter.createFromOptions(fileset, {
-			baseOptions: buf
-				? { modelAssetBuffer: new Uint8Array(buf), delegate }
-				: { modelAssetPath: modelUrl(MODEL_FILES[model]), delegate },
-			runningMode: "IMAGE",
-			outputConfidenceMasks: true,
-			outputCategoryMask: false,
-		});
-	try {
-		return await make("GPU");
-	} catch (err) {
-		console.warn(
-			`[segment] GPU delegate failed for ${model}, falling back to CPU`,
-			err,
-		);
-		return make("CPU");
-	}
-}
-
-function getSegmenter(model: Loaded): Promise<ImageSegmenter> {
-	let p = segmenters.get(model);
+function getNet(model: Loaded): Promise<PeopleNet> {
+	let p = nets.get(model);
 	if (!p) {
-		p = createSegmenter(model);
+		p = getNn().then((nn) => loadPeopleNet(nn, model));
 		// Don't cache failures; allow a retry on the next call.
-		p.catch(() => segmenters.delete(model));
-		segmenters.set(model, p);
+		p.catch(() => nets.delete(model));
+		nets.set(model, p);
 	}
 	return p;
 }
 
 /**
- * Start loading the wasm runtime + model (and GPU delegate init) without an image, so it overlaps
- * the photo decode / region JSON / tiles. Idempotent; never throws.
+ * Start loading the weights (and the compute device) without an image, so it overlaps the photo decode /
+ * region JSON / tiles. Idempotent; never throws.
  */
 export function preloadSegmenter(model: SegmentModel = DEFAULT_MODEL): void {
 	const models: Loaded[] =
 		model === "combined" ? ["multiclass", "deeplab"] : [model];
-	for (const m of models) getSegmenter(m).catch(() => {});
+	for (const m of models) getNet(m).catch(() => {});
 }
 
-/** Person probability (0..1) per pixel from one model run. */
-function runModel(
-	seg: ImageSegmenter,
+/** Person probability (0..1) per pixel from one model run, at w x h. */
+async function runModel(
 	model: Loaded,
-	src: HTMLCanvasElement,
-): Float32Array {
-	const result: ImageSegmenterResult = seg.segment(src);
+	rgba: Uint8ClampedArray,
+	w: number,
+	h: number,
+): Promise<Float32Array> {
 	try {
-		const masks = result.confidenceMasks;
-		if (!masks || masks.length === 0) throw new Error("no confidence masks");
-		if (model === "multiclass") {
-			// class 0 = background; everything else (hair, skin, clothes, others) = person
-			const bg = masks[0].getAsFloat32Array();
-			const out = new Float32Array(bg.length);
-			for (let i = 0; i < bg.length; i++) out[i] = 1 - bg[i];
-			return out;
-		}
-		return Float32Array.from(masks[DEEPLAB_PERSON].getAsFloat32Array());
-	} finally {
-		result.close();
+		return await runPeopleNet(await getNet(model), rgba, w, h, w, h);
+	} catch (err) {
+		if ((await getNn()).backend.kind === "cpu") throw err;
+		// a WebGPU failure (device lost, unsupported limit): redo this and every later call on the CPU backend
+		console.warn(
+			"[segment] GPU forward failed, falling back to the CPU backend",
+			err,
+		);
+		nnPromise = createNn({ backend: "cpu" });
+		nets.clear();
+		return runPeopleNet(await getNet(model), rgba, w, h, w, h);
 	}
 }
 
@@ -247,12 +176,12 @@ export async function segmentForeground(
 		if (!ctx) throw new Error("no 2d context");
 		ctx.drawImage(img, 0, 0, w, h);
 
+		const rgba = ctx.getImageData(0, 0, w, h).data;
 		const models: Loaded[] =
 			model === "combined" ? ["multiclass", "deeplab"] : [model];
 		const probs: Float32Array[] = [];
 		for (const m of models) {
-			const seg = await getSegmenter(m);
-			const p = runModel(seg, m, canvas);
+			const p = await runModel(m, rgba, w, h);
 			if (p.length !== w * h)
 				throw new Error(`mask size ${p.length} != ${w}x${h}`);
 			probs.push(p);
