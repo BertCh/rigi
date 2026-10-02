@@ -186,6 +186,7 @@ import { solvePinsForApp } from "#/lib/pins/seed";
 import { poseQuaternion, unprojectDir } from "#/lib/pose";
 import type {
 	FgMask,
+	MatchEvidence,
 	PeakLabel,
 	Renderer,
 	Sample,
@@ -3301,7 +3302,10 @@ export class WebGpuEngine implements Renderer {
 		this.silUsers++;
 		clearTimeout(this.silIdleTimer);
 		try {
-			return await this.autoAlignRanked(fromPrior);
+			return await this.autoAlignRanked(
+				fromPrior ? this.prior : this.pose,
+				fromPrior ? 25 : 6,
+			);
 		} finally {
 			this.silUsers--;
 			this.releaseSilhouetteSourcesWhenIdle();
@@ -3323,23 +3327,18 @@ export class WebGpuEngine implements Renderer {
 		}, SIL_IDLE_MS);
 	}
 
+	/** autoAlign from an explicit start pose (`window` = the yaw search half-range, deg). */
 	private async autoAlignRanked(
-		fromPrior: boolean,
+		from: Pose,
+		window: number,
 	): Promise<AlignResult | null> {
 		if (!this.horizonDirs || !this.photoPrep) return null;
 		const tSearch = performance.now();
 		// the search's inputs as of this call (the lazy read below awaits)
-		const from = fromPrior ? this.prior : this.pose;
 		const { aspect, horizonDirs } = this;
 		const edge = await this.photoPrep.cpu();
 		if (this.disposed) return null;
-		const res = await autoAlignAsync(
-			from,
-			aspect,
-			horizonDirs,
-			edge,
-			fromPrior ? 25 : 6,
-		);
+		const res = await autoAlignAsync(from, aspect, horizonDirs, edge, window);
 		if (this.disposed) return null;
 		const alts = res.alternatives;
 		if (!alts || alts.length < 2) return res;
@@ -4114,6 +4113,40 @@ export class WebGpuEngine implements Renderer {
 			tiles: want().length,
 			missing: missing().length,
 			retries: Math.max(0, tries - 1),
+		};
+	}
+
+	/**
+	 * Renderer.matchEvidence (deck/engine.ts): the matcher's skyline evidence; with `alignFrom`,
+	 * autoAlign(true) from that pose first. Prior and pose are untouched.
+	 */
+	async matchEvidence(alignFrom?: Pose): Promise<MatchEvidence | null> {
+		if (!this.horizonDirs || !this.photoPrep) return null;
+		let align: AlignResult | null = null;
+		if (alignFrom) {
+			this.silUsers++;
+			clearTimeout(this.silIdleTimer);
+			try {
+				align = await this.autoAlignRanked(alignFrom, 25);
+			} finally {
+				this.silUsers--;
+				this.releaseSilhouetteSourcesWhenIdle();
+			}
+		}
+		const prep = this.photoPrep;
+		if (this.disposed || !prep || !this.horizonDirs) return null;
+		const e = await prep.cpu();
+		if (this.disposed || !this.horizonDirs) return null;
+		return {
+			w: e.w,
+			h: e.h,
+			horizon: Float32Array.from(this.horizonDirs),
+			fine: Float32Array.from(e.fine),
+			coarse: Float32Array.from(e.coarse),
+			fg: Float32Array.from(e.fg),
+			sky: Float32Array.from(e.sky),
+			rgb: Uint8ClampedArray.from(e.rgb),
+			align,
 		};
 	}
 

@@ -171,7 +171,30 @@ export interface Renderer {
 		pose: Pose,
 		opts?: { width?: number; height?: number },
 	): Promise<PoseView | null>;
+	/**
+	 * The in-browser matcher's skyline evidence (src/lib/matcher, formerly the render worker's skyline
+	 * export): copies of the photo's edge planes and the DEM horizon directions. With `alignFrom`,
+	 * autoAlign(true) runs from that pose first and its result is returned as `align`; the engine's
+	 * prior and pose are untouched (the edge map's sky model is refit, as any autoAlign does).
+	 * null before the horizon and edge map exist.
+	 */
+	matchEvidence(alignFrom?: Pose): Promise<MatchEvidence | null>;
 }
+
+/** Renderer.matchEvidence's output: edge planes at w × h (row 0 = top) and horizonDirs (N × 3). */
+export type MatchEvidence = {
+	w: number;
+	h: number;
+	horizon: Float32Array;
+	fine: Float32Array;
+	coarse: Float32Array;
+	fg: Float32Array;
+	/** P(sky) after the (optional) autoAlign's refit */
+	sky: Float32Array;
+	/** edge-map RGBA */
+	rgb: Uint8ClampedArray;
+	align: AlignResult | null;
+};
 
 /** renderPoseView's output (see Renderer.renderPoseView). */
 export type PoseView = {

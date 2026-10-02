@@ -114,7 +114,7 @@ import {
 import type { PhotoMeta, RegionData, RegionTrail } from "../photos";
 import { solvePinsForApp } from "../pins/seed";
 import { poseQuaternion, unprojectDir } from "../pose";
-import type { FgMask, Renderer } from "../renderer";
+import type { FgMask, MatchEvidence, Renderer } from "../renderer";
 import type { RevealUniforms } from "../reveal/config";
 import {
 	defaultSettings,
@@ -2310,15 +2310,26 @@ export class DeckEngine implements Renderer {
 	 * pose), then the finalists re-ranked with inner silhouettes rendered into a GeometrySource.
 	 */
 	async autoAlign(fromPrior = true): Promise<AlignResult | null> {
+		return this.autoAlignFrom(
+			fromPrior ? this.prior : this.pose,
+			fromPrior ? 25 : 6,
+		);
+	}
+
+	/** autoAlign from an explicit start pose (`window` = the yaw search half-range, deg). */
+	private async autoAlignFrom(
+		from: Pose,
+		window: number,
+	): Promise<AlignResult | null> {
 		if (!this.horizonDirs || !this.edge) return null;
 		const tSearch = performance.now();
 		// coarse grid on the WebGPU compute device when available (CPU otherwise; same result)
 		const res = await autoAlignAsync(
-			fromPrior ? this.prior : this.pose,
+			from,
 			this.aspect,
 			this.horizonDirs,
 			this.edge,
-			fromPrior ? 25 : 6,
+			window,
 		);
 		if (this.disposed) return null;
 		const alts = res.alternatives;
@@ -3453,6 +3464,29 @@ export class DeckEngine implements Renderer {
 			tiles: want().length,
 			missing: missing().length,
 			retries: Math.max(0, tries - 1),
+		};
+	}
+
+	/**
+	 * Renderer.matchEvidence: the matcher's skyline evidence (src/lib/matcher). With `alignFrom`,
+	 * autoAlign(true) from that pose first (the request prior of the matcher's skyline export); the
+	 * engine's prior and pose are untouched, the edge map's sky model is refit as autoAlign does.
+	 */
+	async matchEvidence(alignFrom?: Pose): Promise<MatchEvidence | null> {
+		if (!this.horizonDirs || !this.edge) return null;
+		const align = alignFrom ? await this.autoAlignFrom(alignFrom, 25) : null;
+		const e = this.edge;
+		if (this.disposed || !e || !this.horizonDirs) return null;
+		return {
+			w: e.w,
+			h: e.h,
+			horizon: Float32Array.from(this.horizonDirs),
+			fine: Float32Array.from(e.fine),
+			coarse: Float32Array.from(e.coarse),
+			fg: Float32Array.from(e.fg),
+			sky: Float32Array.from(e.sky),
+			rgb: Uint8ClampedArray.from(e.rgb),
+			align,
 		};
 	}
 
