@@ -483,6 +483,25 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		notes: "T6 skyline global search; not wired into the service",
 	},
 	{
+		id: "skyline",
+		island: "I5",
+		paths: [
+			"src/lib/gpu/skyline/index.ts",
+			"src/lib/gpu/skyline/skyline.wgsl.ts",
+		],
+		groups: ["skyline"],
+		realms: ["worker:unknown-pose", "worker:eye"],
+		cadence: "per photo",
+		resources: [
+			"photo planes (rgba, pooled import)",
+			"features, prior, sky-model cost images (transients)",
+		],
+		readbacks: ["cost images for the CPU Viterbi + sky-model refit"],
+		status: "opt-in",
+		notes:
+			"detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default off: 1 of 77 unknown-pose accept decisions flipped in the node A/B)",
+	},
+	{
 		id: "sky-model",
 		island: "I6",
 		paths: ["src/lib/sky/sky.worker.ts"],

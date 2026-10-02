@@ -4,6 +4,35 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Wave 5: Swiss signature on the luma frontier, wave 1 (2026-10-02)
+
+Plan: `reports/wave5-plan-2026-10-02.md`. 14 streams, each implemented and independently reviewed. All browser-unverified; the batch-ledger rows say what the consolidated pass must look at.
+
+- **Imhof relief.** New `terrain.relief.mode = "imhof"`: the swiss relief plus multi-scale normal generalisation blended by range, aspect-swung light, Imhof warm/cool colour, elevation tint and aerial perspective (fields `swing`, `tint`, `aerial`). WGSL and GLSL; opt-in.
+- **Terroir hatch v2.** New `style.terroir.hatchStyle` (`classic` | `landeskarte`). `landeskarte` draws rock hachures that are denser and darker on the shadow side, tapered and hash-thinned, plus scree stipple and blue glacier lines. Spacing is in ground metres, with two octaves blended by screen footprint so the lines do not swim. Off by default.
+- **swisstopo labels.** `SWISSTOPO_NAME_TYPO` / `SWISSTOPO_LABELS` preset constants (`src/lib/terroir/labels/swisstopo.ts`), not yet wired into a preset.
+- **Colour grammar.** Roll viewpoints use a six-colour colour-blind-safe Brezine palette (min CIEDE2000 7 under protanopia, deuteranopia and tritanopia; `palette-cvd` check). Orange is reserved for selection.
+- **One chrome.** Landing, upload, library and roll lose their card outlines, gradient surfaces and decorative shadows. Dead lagoon/shadcn tokens are removed. `SiteNav` takes `variant="paper"`. The upload page says Rigi, not Summit Lens.
+- **Self-hosted fonts.** Fira Sans for UI and labels, Source Serif 4 for display and IBM Plex Mono for code, all from `public/fonts`. The Google Fonts link, Manrope and Fraunces are gone; label layout and canvas export use Fira Sans.
+- **WGSL compile gate.** `scripts/gpu/wgsl-compile-all.ts` (check `wgsl-compile`) compiles 242 variants on Dawn through luma: terrain style × look × terroir (presets, one-hot, pairwise, plugin chains), the composite defines, every layer program and every `defineKernel` kernel. It fails on any validation or pipeline-creation error. It would have caught c586866.
+- **Subgroups.** The haze radix-select scan has a subgroup variant (`HZ_SCAN_SG`), bit-identical to the shared-memory scan, used when the device has subgroups.
+- **Peak snaps.** On WebGPU, pin peak snaps use the batched GPU height gather before the CPU `localMax`. The CPU path stays the reference and the fallback.
+- **GPU skyline.** The detector's per-pixel feature, prior and sky-model images run on the GPU (`src/lib/gpu/skyline`, `detectSkylineAsync`) behind `?skylineGpu`, default off. On Dawn, rows are within 5e-5 px of the CPU on GT-12 and 17 wild dev photos, but 1 of 77 unknown-pose accept decisions flipped.
+- **Render bundles.** `src/lib/deck-webgpu/render-bundle.ts` (1x and 4x variants, invalidation keys), with a Dawn pixel test and a wiring plan in `research_notes/wave5/render-bundles.md`. Not wired.
+- **Node precision gate.** `scripts/gpu/precision-gate-node.ts` runs the certified-f32 vs f64 gate on the dev split over Dawn (base/cand/base2). Built, not yet run.
+- **Publication.**
+  - `vite build` leaves out `/dev/*` and `/lab/*` (`RIGI_ROUTES=all` keeps them).
+  - The onnxruntime LICENSE and ThirdPartyNotices and the libheif LGPL text are served at `/licenses/`.
+  - There is a Google Maps logo slot for tiles3d.
+  - NOTICE and licences are refreshed, and `tools/matcher/README.md` lists the Python requirements.
+- **Fixes.**
+  - CR-02: the render-lock wrapper kills the job's process group and frees the slot only after the job exits.
+  - CR-04: exports default the geoid undulation to EGM2008, so ECEF and ellipsoidal altitudes were 47-55 m low and are now correct.
+  - CR-06: the matcher checks Host, Origin and Content-Type, and confines photo paths.
+  - deck #10753 audit: no padding is needed.
+- **Stage 1.** The matcher's stage-1 render workers are re-based on the deck/WebGPU service worker, so three.js is gone from that path (`stage1-worker-snapshot` check).
+- **New fast checks:** `wgsl-compile`, `imhof`, `palette-cvd`, `haze-scan-sg`, `skyline-stages`, `render-lock-signals`, `export-geoid-default`, `stage1-worker-snapshot`, `render-bundle-dawn`. The Dawn checks print SKIP without `DAWN_DIR`.
+
 ### Examples: Landeskarte Abendlicht (2026-10-01)
 
 - New flagship example `examples/deck/landeskarte`: the Niederhorn above Lake Thun as a Swiss Landeskarte sheet (Imhof multidirectional relief, own hypsometric palette, three-ink contours, rock and scree, LV95 ticks, scale bar from camera resolution, legend of drawn symbols only) that lifts into the summit panorama and ends exactly on the solved frame of photo demo-01.
