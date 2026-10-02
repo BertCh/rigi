@@ -251,7 +251,7 @@ export function refinePose(input: RefineInput): RefineResult {
 }
 
 /**
- * refinePose with the global yaw correlation on the GPU (four-step FFT in a core ComputeGraph,
+ * refinePose with the global yaw correlation on the GPU (luma GPUFFT1D in a core ComputeGraph,
  * fft-gpu.ts) when a compute device resolves (?gpu=off respected) and the grid fits; otherwise, or
  * on any GPU error, the CPU correlation. Never throws because of the GPU. The result agrees with
  * refinePose within the f32 correlation tolerance (refine-fft-dawn.ts), not bit for bit.

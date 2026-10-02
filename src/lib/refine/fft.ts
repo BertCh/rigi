@@ -6,8 +6,8 @@
  * Minimal iterative radix-2 complex FFT (in place, Float64) and a circular
  * cross-correlation helper. Sizes must be powers of two. Used by init.ts for
  * the 1-D yaw correlation of the photo skyline against the 360° horizon. This
- * is the CPU reference: the GPU twin (fft-gpu.ts, index algebra in
- * fourstep.ts) is checked against it.
+ * is the CPU reference: the GPU twin (fft-gpu.ts, luma GPUFFT1D) is
+ * checked against it.
  */
 
 export const isPow2 = (n: number) => n > 0 && (n & (n - 1)) === 0;

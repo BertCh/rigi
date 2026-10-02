@@ -1198,6 +1198,13 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "fft1d-lengths-dawn",
+		tier: "fast",
+		group: "pose",
+		cmd: tsx("scripts/gpu/fft1d-lengths-dawn.ts"),
+		timeoutS: 120,
+	},
+	{
 		id: "photo-look-dawn",
 		tier: "fast",
 		group: "gpu",

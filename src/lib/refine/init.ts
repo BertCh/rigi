@@ -25,7 +25,7 @@
  * globalInit is three steps: prepareInit (horizon grid, binned skylines),
  * a correlation provider (correlateCpu: the f64 radix-2 FFT reference in
  * fft.ts, which is what globalInit and refinePose always use; or the GPU
- * four-step FFT of fft-gpu.ts through globalInitAsync / refinePoseAsync,
+ * FFT of fft-gpu.ts through globalInitAsync / refinePoseAsync,
  * f32, equal to the CPU within ~1e-6 of max|C|), and finishInit (cost
  * loop, robust score curve, modes, PSR). The provider contract is the
  * four correlations per focal scale at the 2S+1 needed shifts, index k+S.
@@ -300,7 +300,7 @@ export function globalInit(
 	return finishInit(prep, correlateCpu(prep), o, t0);
 }
 
-/** globalInit with the correlations from `correlate` (e.g. the GPU four-step FFT, fft-gpu.ts). */
+/** globalInit with the correlations from `correlate` (e.g. the GPU FFT, fft-gpu.ts). */
 export async function globalInitAsync(
 	p: Float64Array,
 	geom: Geometry,
