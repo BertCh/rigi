@@ -9,6 +9,7 @@
 // Pose convention (src/lib/pose.ts): yaw = true heading clockwise from north, pitch up +,
 // roll right-side-down +, vfov = vertical FOV of the displayed (upright) image, degrees.
 import exifr from "exifr";
+import { wrap360 } from "#/lib/geodesy";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { focalPxFromF35, type PixelSize } from "../camera/focal";
 import type { PhotoMeta } from "../photos";
@@ -335,7 +336,7 @@ export function exifPosition(t: ExifTags): { lat: number; lon: number } | null {
 export function exifHeading(t: ExifTags): number | null {
 	const h = t.GPSImgDirection;
 	if (!finite(h)) return null;
-	return h >= 0 && h < 360 ? h : ((h % 360) + 360) % 360;
+	return h >= 0 && h < 360 ? h : wrap360(h);
 }
 
 export type BuildOptions = {

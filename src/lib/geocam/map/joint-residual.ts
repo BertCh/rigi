@@ -7,6 +7,7 @@
 // (reports/negative-results.md); only the pieces geocam uses are kept. JOINT_DEFAULTS keeps the joint
 // solver's values for the fields the factors read.
 
+import { wrap360 } from "#/lib/geodesy";
 import {
 	type CameraX,
 	type Cue,
@@ -57,14 +58,14 @@ export function focalPx1600(cam: CameraX): number {
 }
 
 const azEl = (d: ArrayLike<number>): [number, number] => [
-	(((Math.atan2(d[0], d[1]) / D) % 360) + 360) % 360,
+	wrap360(Math.atan2(d[0], d[1]) / D),
 	Math.asin(Math.max(-1, Math.min(1, d[2]))) / D,
 ];
 
 /** Horizon elevation at an azimuth (linear interpolation; NaN on no-data ≤ −89). */
 export function horizonEl(h: EyeHorizon, az: number): number {
 	const n = h.elevation.length;
-	const t = (((az % 360) + 360) % 360) / h.step;
+	const t = wrap360(az) / h.step;
 	const i = Math.floor(t);
 	const f = t - i;
 	const a = h.elevation[i % n];

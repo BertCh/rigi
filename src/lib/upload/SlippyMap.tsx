@@ -6,6 +6,7 @@
 // No map dependency. Tiles © OpenStreetMap contributors (tile.openstreetmap.org usage policy:
 // light interactive use with attribution, which is what a one-off pin placement is).
 import { useCallback, useEffect, useRef, useState } from "react";
+import { wrap180 } from "#/lib/geodesy";
 import {
 	latToWorldY as lat2y,
 	lonToWorldX as lon2x,
@@ -173,7 +174,7 @@ export function SlippyMap({
 		const py = top + (e.clientY - r.top);
 		onPick({
 			lat: y2lat(py, z),
-			lon: ((((x2lon(px, z) + 180) % 360) + 360) % 360) - 180,
+			lon: wrap180(x2lon(px, z)),
 		});
 	};
 

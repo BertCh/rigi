@@ -55,6 +55,7 @@ import {
 	distanceBearing,
 	EARTH_R,
 	REFRACTION_K,
+	wrap360,
 } from "../../src/lib/geodesy";
 import {
 	demTileLoaderNode,
@@ -426,7 +427,7 @@ async function waterlineShore(
 }
 
 const azEl = (d: ArrayLike<number>) => [
-	(((Math.atan2(d[0], d[1]) / DEG) % 360) + 360) % 360,
+	wrap360(Math.atan2(d[0], d[1]) / DEG),
 	Math.asin(Math.max(-1, Math.min(1, d[2]))) / DEG,
 ];
 
@@ -510,9 +511,7 @@ export async function controlPointPins(
 			});
 		} else if (sp.az !== undefined) {
 			const hz = s.horizon;
-			const k =
-				Math.round((((sp.az % 360) + 360) % 360) / hz.step) %
-				hz.elevation.length;
+			const k = Math.round(wrap360(sp.az) / hz.step) % hz.elevation.length;
 			const el = sp.el ?? hz.elevation[k];
 			const d = hz.distance[k];
 			const p = destination(s.lat, s.lon, sp.az, d);

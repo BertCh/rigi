@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import type { LatLon } from "./ontology/core/geometry";
+import { DEG } from "./ontology/core/quantity";
 
 // Geodesy helpers: WGS84 ↔ ECEF ↔ camera-local ENU, spherical great-circle helpers, angle wrapping.
 // All ENU work is float64 on the CPU; only camera-relative offsets reach the GPU. Tile math: src/lib/dem.
@@ -19,8 +20,8 @@ export const M_PER_DEG_LAT = 111320;
 /** Coefficient of atmospheric refraction used to lift distant terrain (k ≈ 0.13). */
 export const REFRACTION_K = 0.13;
 
-/** Degrees → radians. */
-export const DEG = Math.PI / 180;
+/** Degrees → radians (canonical definition: ontology/core/quantity.ts). */
+export { DEG };
 
 export type { LatLon };
 

@@ -28,7 +28,13 @@ import { computeHorizon } from "../../src/lib/geo/horizon";
 import { EYE_ABOVE_GROUND } from "../../src/lib/geo/pipeline";
 import { detectSkyline } from "../../src/lib/geo/skyline";
 import { loadTerrain, type TerrainSampler } from "../../src/lib/geo/terrain";
-import { destination, EARTH_R, REFRACTION_K } from "../../src/lib/geodesy";
+import {
+	DEG,
+	destination,
+	EARTH_R,
+	REFRACTION_K,
+	wrap360,
+} from "../../src/lib/geodesy";
 import { demTileLoaderNode, loadRGBA, ROOT } from "../lib/node-io";
 
 const HERO = process.argv[2] ?? "demo-09";
@@ -40,7 +46,6 @@ const DEM = DEM_SOURCES.mapterhorn;
 const loadTile = demTileLoaderNode(DEM);
 const tiles = new Map<string, Float32Array>();
 const R_EFF = EARTH_R / (1 - REFRACTION_K);
-const DEG = Math.PI / 180;
 const MAP_HALF_KM = 45;
 const MAP_PX = 720;
 
@@ -187,7 +192,7 @@ async function main() {
 			vfov: r(p.vfov, 3),
 		};
 		const solved: Angles = {
-			yaw: r(((pose.yaw % 360) + 360) % 360, 3),
+			yaw: r(wrap360(pose.yaw), 3),
 			pitch: r(pose.pitch, 3),
 			roll: r(pose.roll, 3),
 			vfov: r(pose.vfov, 3),
@@ -287,7 +292,7 @@ async function bakeHero(
 		const i = pick(az);
 		const reach = Math.min(140_000, Math.max(3_000, horizon.distance[i] * 1.2));
 		sections.push({
-			az: r(((az % 360) + 360) % 360, 2),
+			az: r(wrap360(az), 2),
 			skyline: {
 				el: r(horizon.elevation[i], 3),
 				d: Math.round(horizon.distance[i]),

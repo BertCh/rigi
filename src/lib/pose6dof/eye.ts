@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { DEG as D, wrap360 } from "#/lib/geodesy";
 // Eye (camera position) refinement from a detected photo skyline.
 //
 // For near-field cliff-edge photos the GPS fix (±20–40 m) and the DEM height at that fix are
@@ -82,11 +83,9 @@ export interface SkylineFit {
 	iterations: number;
 }
 
-const D = Math.PI / 180;
-
 function horizonEl(h: EyeHorizon, az: number) {
 	const n = h.elevation.length;
-	const t = (((az % 360) + 360) % 360) / h.step;
+	const t = wrap360(az) / h.step;
 	const i = Math.floor(t);
 	const f = t - i;
 	const a = h.elevation[i % n];
@@ -226,7 +225,7 @@ export function fitRotationToHorizon(
 		if (!accepted || small) break;
 	}
 	const pose: Pose = {
-		yaw: ((p[0] % 360) + 360) % 360,
+		yaw: wrap360(p[0]),
 		pitch: p[1],
 		roll: p[2],
 		vfov: start.vfov,

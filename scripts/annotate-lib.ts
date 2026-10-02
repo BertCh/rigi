@@ -28,6 +28,7 @@ import {
 import { type ExifPhotoMeta, readPhotoMeta } from "../src/lib/geo/photo-meta";
 import { EYE_ABOVE_GROUND } from "../src/lib/geo/pipeline";
 import { loadTerrain, type TerrainSampler } from "../src/lib/geo/terrain";
+import { wrap360 } from "../src/lib/geodesy";
 import { imagePixelSize, loadTerrariumTileNode, ROOT } from "./lib/node-io";
 import { fetchPeaks } from "./lib/overpass";
 
@@ -106,7 +107,7 @@ export async function loadScene(
 /** Skyline elevation (deg) and distance at azimuth, linearly interpolated. */
 export function skylineAt(h: HorizonProfile, az: number) {
 	const n = h.elevation.length;
-	const f = ((((az % 360) + 360) % 360) / h.step) % n;
+	const f = (wrap360(az) / h.step) % n;
 	const i = Math.floor(f);
 	const t = f - i;
 	const j = (i + 1) % n;

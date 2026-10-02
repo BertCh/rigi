@@ -1,6 +1,7 @@
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+import { wrap180, wrap360 } from "#/lib/geodesy";
 
 // Temporal filter on the three angles. Each axis is one of two scalar Kalman filters:
 //  - with a sensor reading: the state is the sensor's OFFSET (true angle minus reading), a slow
@@ -12,7 +13,7 @@
 // evaluate the state at an earlier frame.
 
 /** Wrap a difference of angles to [-180, 180). */
-export const wrapDelta = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
+export const wrapDelta = (d: number) => wrap180(d);
 
 export interface AxisConfig {
 	/** Offset random-walk σ, deg per sqrt(s) (sensor mode). */
@@ -72,7 +73,7 @@ export class AxisFilter {
 			this.mode === "offset" && sensor !== null
 				? sensor + this.x
 				: this.x + this.v * (t - this.t);
-		return this.config.wrap ? ((a % 360) + 360) % 360 : a;
+		return this.config.wrap ? wrap360(a) : a;
 	}
 
 	/** Advance the covariance (and a velocity-mode state) to time t. */

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 // Synthetic live sequences for the tracker's evidence: a ridge-line horizon profile (or a real one),
 // a camera trajectory, sensor readings with noise, bias and drift, and rendered RGBA frames with a
 // sky gradient, clouds, hazy ground, screen-fixed occluders and pixel noise. Pure CPU and
@@ -75,7 +76,7 @@ export function makeRidgeProfile(seed = 1, step = 0.1): HorizonProfile {
 /** Horizon elevation (deg) at azimuth, linear interpolation. */
 export function horizonAt(h: HorizonProfile, azDeg: number): number {
 	const n = h.elevation.length;
-	const u = (((azDeg % 360) + 360) % 360) / h.step;
+	const u = wrap360(azDeg) / h.step;
 	const i = Math.floor(u) % n;
 	const f = u - Math.floor(u);
 	return h.elevation[i] * (1 - f) + h.elevation[(i + 1) % n] * f;
@@ -227,7 +228,7 @@ export function renderFrame(
 			const de = forward[0] + X * right[0] - Y * up[0];
 			const dn = forward[1] + X * right[1] - Y * up[1];
 			const dz = forward[2] + X * right[2] - Y * up[2];
-			const az = (((Math.atan2(de, dn) / DEG) % 360) + 360) % 360;
+			const az = wrap360(Math.atan2(de, dn) / DEG);
 			const el = Math.asin(dz / Math.hypot(de, dn, dz)) / DEG;
 			const u = az / profile.step;
 			const i0 = Math.floor(u) % n;

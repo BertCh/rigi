@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { DEG as D, M_PER_DEG_LAT } from "#/lib/geodesy";
+import { DEG as D, M_PER_DEG_LAT, wrap360 } from "#/lib/geodesy";
 // Pure helpers for the terroir photo overlays (place card, glacier ghost, sun path, furniture).
 // No DOM, no engine imports: checked in viz.check.ts. Display-only.
 import type { Vec3 } from "#/lib/ontology/core/geometry";
@@ -46,7 +46,7 @@ const WORDS = [
 ];
 /** Compass word of a bearing in degrees (the way a slope faces). */
 export const aspectWord = (deg: number) =>
-	WORDS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+	WORDS[Math.round(wrap360(deg) / 45) % 8];
 
 export type { Vec3 };
 
@@ -73,7 +73,7 @@ export function surfaceNormal(
 	n = [n[0] / l, n[1] / l, n[2] / l];
 	if (n[2] < 0) n = [-n[0], -n[1], -n[2]];
 	const slope = Math.acos(Math.min(1, Math.max(-1, n[2]))) / D;
-	const aspect = (((Math.atan2(n[0], n[1]) / D) % 360) + 360) % 360;
+	const aspect = wrap360(Math.atan2(n[0], n[1]) / D);
 	return { slope, aspect, normal: n };
 }
 

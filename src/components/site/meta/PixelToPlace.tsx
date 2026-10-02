@@ -19,6 +19,7 @@ import {
 	R_EFF,
 	type Scene,
 } from "#/components/site/how/model";
+import { DEG } from "#/lib/geodesy";
 import { type Hero, useHero } from "./data";
 
 // "Every pixel is a place": with the pose solved, each pixel of the photo is a ray from the
@@ -27,7 +28,6 @@ import { type Hero, useHero } from "./data";
 // so each part of the photo finds its patch of ground. The hovered pixel's ray runs from the
 // camera to its landing point.
 
-const DEG = Math.PI / 180;
 const PEAKS_URL = "/demo/how/scene.json";
 /** Below this distance the ray is in the foreground the terrain model knows only as bare ground. */
 const NEAR_M = 150;

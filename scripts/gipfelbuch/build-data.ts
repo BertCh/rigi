@@ -37,7 +37,7 @@ import { EYE_ABOVE_GROUND } from "../../src/lib/geo/pipeline";
 import { detectSkyline } from "../../src/lib/geo/skyline";
 import { projectSkylineRows, solvePose } from "../../src/lib/geo/solve";
 import { loadTerrain } from "../../src/lib/geo/terrain";
-import { destination } from "../../src/lib/geodesy";
+import { destination, wrap360 } from "../../src/lib/geodesy";
 import { refinePose } from "../../src/lib/refine/index";
 import { demTileLoaderNode, loadRGBA, ROOT } from "../lib/node-io";
 
@@ -90,7 +90,7 @@ const angleDiff = (a: number, b: number) => ((a - b + 540) % 360) - 180;
 const fFromVfov = (h: number, vfov: number) =>
 	h / 2 / Math.tan((vfov * Math.PI) / 360);
 const camJson = (c: Camera) => ({
-	yaw: r2(((c.yaw % 360) + 360) % 360),
+	yaw: r2(wrap360(c.yaw)),
 	pitch: r2(c.pitch),
 	roll: r2(c.roll),
 	f: r1(c.f),
@@ -193,7 +193,7 @@ async function build(p: ManifestPhoto) {
 	const nAz = Math.round((2 * span) / 0.5);
 	const n = horizon.elevation.length;
 	const profile = Array.from({ length: nAz + 1 }, (_, k) => {
-		const az = (((az0 + k * 0.5) % 360) + 360) % 360;
+		const az = wrap360(az0 + k * 0.5);
 		const i = Math.round(az / horizon.step) % n;
 		const ridges = (horizon.ridges[i] ?? [])
 			.slice(0, 4)
@@ -246,7 +246,7 @@ async function build(p: ManifestPhoto) {
 	const hidden = peaks.filter((v) => !v.visible && v.solved).slice(0, 40);
 
 	// Terrain profile along the solved view axis, out to the horizon distance there.
-	const axisI = Math.round((((cam.yaw % 360) + 360) % 360) / horizon.step) % n;
+	const axisI = Math.round(wrap360(cam.yaw) / horizon.step) % n;
 	const reach = Math.min(
 		120_000,
 		Math.max(2_000, horizon.distance[axisI] * 1.15),

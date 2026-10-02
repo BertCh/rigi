@@ -26,6 +26,7 @@ import {
 	tileId,
 } from "../../src/lib/dem";
 import { simplifyPointIndices } from "../../src/lib/geo/simplify";
+import { DEG, wrap360 } from "../../src/lib/geodesy";
 import { fileHeights } from "../lib/node-io";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
@@ -33,7 +34,6 @@ const OUT = process.env.BRAND_OUT ?? path.join(ROOT, ".cache", "brand");
 const TILES = path.join(OUT, "tiles");
 const PUBLIC = path.join(ROOT, "public", "brand");
 
-const DEG = Math.PI / 180;
 const R = 6_371_000;
 const K_REFRACTION = 0.13;
 
@@ -270,7 +270,7 @@ function bearing(lat1: number, lon1: number, lat2: number, lon2: number) {
 	const y = Math.sin(Δλ) * Math.cos(φ2);
 	const x =
 		Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-	return (((Math.atan2(y, x) / DEG) % 360) + 360) % 360;
+	return wrap360(Math.atan2(y, x) / DEG);
 }
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {

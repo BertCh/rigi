@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 // GA1 factors: priors and image evidence as whitened residual blocks over the GeoState (plan §1
 // map/factors.ts). Every factory returns a core Factor; residuals are dimensionless (σ-normalised).
 //
@@ -61,7 +62,7 @@ import {
 } from "./joint-residual";
 
 const azEl = (d: ArrayLike<number>): [number, number] => [
-	(((Math.atan2(d[0], d[1]) / D) % 360) + 360) % 360,
+	wrap360(Math.atan2(d[0], d[1]) / D),
 	Math.asin(Math.max(-1, Math.min(1, d[2]))) / D,
 ];
 
@@ -252,7 +253,7 @@ export function linHorizonEl(lin: HzLin, az: number, eye: ArrayLike<number>) {
 function horizonDist(h: EyeHorizon, az: number): number {
 	if (!h.distance) return Number.NaN;
 	const n = h.distance.length;
-	const i = Math.round((((az % 360) + 360) % 360) / h.step) % n;
+	const i = Math.round(wrap360(az) / h.step) % n;
 	const d = h.distance[i];
 	return d > 0 ? d : Number.NaN;
 }

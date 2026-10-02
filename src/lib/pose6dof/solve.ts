@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { DEG as D, wrap360 } from "#/lib/geodesy";
 // Robust 6-DoF (+focal) ground-control-point solver: RANSAC over minimal solvers, then
 // Levenberg–Marquardt with Huber IRLS over [dx,dy,dz,yaw,pitch,roll,vfov] with Gaussian priors.
 import { focalFromVfov, type Pose } from "../camera";
@@ -31,7 +32,6 @@ import type {
 	SolveOptions,
 } from "./types";
 
-const D = Math.PI / 180;
 const BEHIND = 1e3; // whitened residual for points behind the camera
 
 export type GcpParams = number[]; // [dx,dy,dz,yaw,pitch,roll,vfov]
@@ -920,7 +920,7 @@ function finish(
 			sigma[k] = Math.sqrt(Math.max(cov[a][a], 0));
 		});
 	}
-	const yaw = ((p[3] % 360) + 360) % 360;
+	const yaw = wrap360(p[3]);
 	return {
 		pose: { yaw, pitch: p[4], roll: p[5], vfov: p[6] },
 		eyeOffset: [p[0], p[1], p[2]],

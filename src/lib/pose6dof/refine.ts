@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 // Generic LM refinement of the eye position (and optionally rotation / vfov) against a
 // caller-supplied residual callback — e.g. skyline residuals from re-rendering the horizon at a
 // shifted eye (near-field cliff-edge photos). Numeric forward/central-difference Jacobian, Huber IRLS,
@@ -276,7 +277,7 @@ export async function refinePosition(
 		});
 	}
 	return {
-		pose: { ...paramsPose(p), yaw: ((p[3] % 360) + 360) % 360 },
+		pose: { ...paramsPose(p), yaw: wrap360(p[3]) },
 		eye: [p[0], p[1], p[2]],
 		cost,
 		initialCost,

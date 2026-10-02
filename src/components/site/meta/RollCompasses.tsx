@@ -20,6 +20,7 @@ import {
 	lerpAngles,
 	smooth,
 } from "#/components/site/how/model";
+import { DEG } from "#/lib/geodesy";
 import {
 	horizonEl,
 	type RollPhoto,
@@ -45,7 +46,6 @@ const C = {
 	ink: BRAND.ink,
 };
 
-const DEG = Math.PI / 180;
 /** Vertical strips per photo: each is placed at its own azimuth, so the pinhole's tan() and the
  * camera roll are honoured to a fraction of a degree. */
 const STRIPS = 14;

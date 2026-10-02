@@ -4,6 +4,7 @@
 
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BRAND, BRAND_LIGHT, brandAlpha } from "#/brand/khipu";
+import { DEG } from "#/lib/geodesy";
 import type { ResolvedTheme } from "#/lib/theme";
 import { useTheme } from "#/lib/theme/react";
 import { type Angles, horizonDistAt, R_EFF, type Scene } from "./model";
@@ -26,7 +27,6 @@ export type WorldState = {
 };
 
 const VEX = 1.7;
-const DEG = Math.PI / 180;
 
 type Viewer = {
 	w: number;

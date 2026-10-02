@@ -18,6 +18,7 @@
  *      can't fix yaw).
  */
 
+import { wrap360 } from "#/lib/geodesy";
 import { DEG } from "../geodesy";
 import { clamp01 } from "../math";
 import {
@@ -112,7 +113,7 @@ export interface SkylineSolveResult {
 /** Skyline elevation (deg) at an azimuth, linearly interpolated with wrap. */
 export function horizonAt(h: HorizonProfile, azimuth: number) {
 	const n = h.elevation.length;
-	const t = (((azimuth % 360) + 360) % 360) / h.step;
+	const t = wrap360(azimuth) / h.step;
 	const i = Math.floor(t);
 	const f = t - i;
 	return h.elevation[i % n] * (1 - f) + h.elevation[(i + 1) % n] * f;

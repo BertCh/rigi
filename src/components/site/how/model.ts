@@ -1,6 +1,7 @@
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+import { DEG, wrap360 } from "#/lib/geodesy";
 
 // Data and math for the "how it works" scene. The scene file (public/demo/how/scene.json) is baked
 // by scripts/howitworks/bake.ts from real src/lib/geo output. The pinhole below mirrors
@@ -46,7 +47,6 @@ export type Scene = {
 	dem: string;
 };
 
-const DEG = Math.PI / 180;
 /** Matches geodesy.ts: curvature with refraction k = 0.13. */
 export const R_EFF = 6371008.8 / (1 - 0.13);
 
@@ -115,10 +115,7 @@ export function project(cam: Cam, d: V3): [number, number] | null {
 export function azEl(cam: Cam, px: number, py: number): [number, number] {
 	const c = norm([(px - cam.w / 2) / cam.f, (py - cam.h / 2) / cam.f, 1]);
 	const d: V3 = [dot(cam.east, c), dot(cam.north, c), dot(cam.up, c)];
-	return [
-		(((Math.atan2(d[0], d[1]) / DEG) % 360) + 360) % 360,
-		Math.asin(d[2]) / DEG,
-	];
+	return [wrap360(Math.atan2(d[0], d[1]) / DEG), Math.asin(d[2]) / DEG];
 }
 
 const wrap = (az: number) => (((az % 360) + 540) % 360) - 180;
@@ -126,7 +123,7 @@ const wrap = (az: number) => (((az % 360) + 540) % 360) - 180;
 /** DEM skyline elevation at an azimuth (deg), NaN outside the baked window. */
 export function horizonAt(s: Scene, az: number): number {
 	const { az0, step, elevation } = s.horizon;
-	const t = ((((az - az0) % 360) + 360) % 360) / step;
+	const t = wrap360(az - az0) / step;
 	const i = Math.floor(t);
 	if (i < 0 || i >= elevation.length - 1) return Number.NaN;
 	return elevation[i] + (elevation[i + 1] - elevation[i]) * (t - i);
@@ -134,7 +131,7 @@ export function horizonAt(s: Scene, az: number): number {
 
 export function horizonDistAt(s: Scene, az: number): number {
 	const { az0, step, distance } = s.horizon;
-	const i = Math.round(((((az - az0) % 360) + 360) % 360) / step);
+	const i = Math.round(wrap360(az - az0) / step);
 	return i < distance.length ? distance[i] : Number.NaN;
 }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { DEG as D, wrap360 } from "#/lib/geodesy";
 // Acceptance checks for the GA1 MAP solver (synthetic scenes; no DEM, no network):
 //   1. recovery: priors + 2D–3D points (10 % gross outliers, Cauchy) + skyline against a synthetic
 //      ridge horizon; start perturbed by 2° / 1° / 1° / 3 % focal / 30 m eye ⇒ truth recovered;
@@ -65,7 +66,6 @@ const check = (name: string, ok: boolean, detail: string) => {
 	console.log(`${ok ? "PASS" : "FAIL"}  ${name}  ${detail}`);
 	if (!ok) failed++;
 };
-const D = Math.PI / 180;
 
 // ---------------------------------------------------------------- synthetic scene
 
@@ -98,8 +98,8 @@ function horizonOf(R: Vec3[], eye: Vec3): EyeHorizon {
 	const elevation = new Float32Array(n).fill(-90);
 	const distance = new Float32Array(n);
 	// exact per bin: interpolate the ridge polyline at the bin centre azimuth
-	const az = R.map(
-		(p) => (((Math.atan2(p[0] - eye[0], p[1] - eye[1]) / D) % 360) + 360) % 360,
+	const az = R.map((p) =>
+		wrap360(Math.atan2(p[0] - eye[0], p[1] - eye[1]) / D),
 	);
 	for (let i = 0; i + 1 < R.length; i++) {
 		const a0 = az[i];
@@ -142,7 +142,7 @@ function provider(R: Vec3[]): HorizonsAtEyes & { calls: () => number } {
 }
 
 const hzEl = (h: EyeHorizon, az: number) => {
-	const t = (((az % 360) + 360) % 360) / h.step;
+	const t = wrap360(az) / h.step;
 	const i = Math.floor(t);
 	const fr = t - i;
 	const a = h.elevation[i % 7200];
@@ -157,7 +157,7 @@ function skylineOf(cam: CameraX, h: EyeHorizon, nCol = 100): SkylineSample[] {
 		const u = (c + 0.5) / nCol;
 		const g = (v: number) => {
 			const d = unprojectDirX(cam, u, v);
-			const az = (((Math.atan2(d[0], d[1]) / D) % 360) + 360) % 360;
+			const az = wrap360(Math.atan2(d[0], d[1]) / D);
 			return Math.asin(d[2]) / D - hzEl(h, az);
 		};
 		let lo = 0;

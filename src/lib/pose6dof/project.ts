@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { DEG as D, wrap360 } from "#/lib/geodesy";
 // The ../camera projection with an analytic Jacobian w.r.t. the 7 solver parameters. Equal to it up
 // to rounding (u0 = r0 × f is simplified, unproject normalises with hypot). No allocation-heavy code.
 import type { Pose } from "../camera";
 import type { Vec3 } from "../linalg";
-
-const D = Math.PI / 180;
 
 /** Parameter vector order used everywhere in this module. */
 export const PARAM_NAMES = [
@@ -223,7 +222,7 @@ export function poseFromAxes(
 	vfov: number,
 ): Pose {
 	const pitch = Math.asin(Math.max(-1, Math.min(1, forward[2]))) / D;
-	const yaw = (((Math.atan2(forward[0], forward[1]) / D) % 360) + 360) % 360;
+	const yaw = wrap360(Math.atan2(forward[0], forward[1]) / D);
 	const roll = Math.atan2(-right[2], up[2]) / D;
 	return { yaw, pitch, roll, vfov };
 }

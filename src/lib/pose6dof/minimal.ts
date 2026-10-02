@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { DEG as D, wrap360 } from "#/lib/geodesy";
 // Minimal / closed-form pose solvers used to seed the robust LM:
 //  - rotationFromBearings: Horn/Kabsch absolute orientation (≥2 bearings, position fixed)
 //  - yawFromOnePoint: gravity-aided 1-point yaw (pitch/roll from the prior)
@@ -20,8 +21,6 @@ import {
 	type Vec3,
 } from "../linalg";
 import { azElFromDir, basis, poseFromAxes, unproject } from "./project";
-
-const D = Math.PI / 180;
 
 /**
  * Camera-frame bearing for normalised image coords, in the right-handed camera frame
@@ -160,7 +159,7 @@ export function yawFromOnePoint(
 	const d0 = unproject({ ...prior, yaw: 0 }, aspect, u, v);
 	const [az0] = azElFromDir(d0);
 	const [az] = azElFromDir(worldDir);
-	return (((az - az0) % 360) + 360) % 360;
+	return wrap360(az - az0);
 }
 
 /**

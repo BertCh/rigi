@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { DEG as D } from "#/lib/geodesy";
 // Analytic self-checks for eye.ts (fitRotationToHorizon, skylineResidualsPx, refineEyeFromSkyline)
 // on a synthetic ridge: the horizon is computed exactly from a known 3-D ridge line, so there is
 // no DEM, no rasterisation and no detector in the loop.
@@ -21,7 +22,6 @@ import {
 } from "./eye";
 import { azElFromDir, dirFromAzEl, project } from "./project";
 
-const D = Math.PI / 180;
 const STEP = 0.1;
 const ASPECT = 4 / 3;
 const H = 600;

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 // The tracker's own wide-window skyline search, the default relocaliser. A yaw sweep over the
 // whole circle (or a window around a trusted prior yaw) times a small pitch/roll grid around the
 // prior, scored by a truncated-quadratic cost of the skyline columns against the smoothed horizon,
@@ -95,7 +96,7 @@ export async function searchSkyline(
 	const best: Candidate[] = [];
 	let sliceStart = performance.now();
 	for (let dy = -half; dy < half; dy += yawStep) {
-		const yaw = (((centreYaw + dy) % 360) + 360) % 360;
+		const yaw = wrap360(centreYaw + dy);
 		let bestHere: Candidate | null = null;
 		for (const roll of rolls) {
 			// pitch is a near-vertical shift of the whole skyline: solve it per (yaw, roll) as the

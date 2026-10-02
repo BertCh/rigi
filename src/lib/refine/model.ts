@@ -119,7 +119,7 @@ export function sampleHorizon(
 	azDeg: number,
 	out: HorizonSample,
 ) {
-	const u = (((azDeg % 360) + 360) % 360) / t.step;
+	const u = wrap360(azDeg) / t.step;
 	const i = Math.floor(u) % t.n;
 	const j = (i + 1) % t.n;
 	const f = u - Math.floor(u);
@@ -200,7 +200,7 @@ export function evalColumn(
 		(dk * dd) / (2 * EARTH_R) +
 		(p[DEYE] * cos2 * dd) / (d * d);
 	out.r = g.f0 * (el - H);
-	out.az = ((azDeg % 360) + 360) % 360;
+	out.az = wrap360(azDeg);
 	out.el = el;
 	out.H = H;
 	out.slope = hs.slope;

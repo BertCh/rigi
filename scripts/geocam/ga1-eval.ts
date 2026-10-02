@@ -45,7 +45,7 @@ import {
 	skylineFactor,
 	solveMap,
 } from "../../src/lib/geocam/map";
-import { DEG as D } from "../../src/lib/geodesy";
+import { DEG as D, wrap360 } from "../../src/lib/geodesy";
 import type { EyeHorizon } from "../../src/lib/pose6dof/eye";
 import {
 	devGTPhotos,
@@ -94,7 +94,7 @@ const randn = () =>
 function horizonDist(h: EyeHorizon, az: number) {
 	if (!h.distance) return Number.NaN;
 	const n = h.distance.length;
-	const i = Math.round((((az % 360) + 360) % 360) / h.step) % n;
+	const i = Math.round(wrap360(az) / h.step) % n;
 	return h.distance[i] > 0 ? h.distance[i] : Number.NaN;
 }
 
@@ -204,7 +204,7 @@ for (const photo of photos) {
 	]);
 	const dists = S.skyline.map((s) => {
 		const d = unprojectDirX(base, s.u, s.v);
-		const az = (((Math.atan2(d[0], d[1]) / D) % 360) + 360) % 360;
+		const az = wrap360(Math.atan2(d[0], d[1]) / D);
 		return Number.isFinite(horizonEl(h0, az))
 			? horizonDist(h0, az)
 			: Number.NaN;

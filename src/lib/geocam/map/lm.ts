@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 // GA1 dense Levenberg–Marquardt over the 7-parameter GeoState (reports/geometry-first-pose.md G3).
 //
 // Every Factor carries its own loss; the solver is IRLS: at each linearisation a row with whitened
@@ -61,7 +62,7 @@ export function lossWeight(l: Loss, z: number): number {
 const nanPenalty = (l: Loss) =>
 	lossRho(l, 3 * (l.kind === "huber" || l.kind === "cauchy" ? l.c : 1));
 
-export const wrapYaw = (y: number) => ((y % 360) + 360) % 360;
+export const wrapYaw = (y: number) => wrap360(y);
 
 /** Boolean mask of the free parameters of a problem (rotation always free). */
 export function freeMask(free: { focal: boolean; eye: boolean }): boolean[] {

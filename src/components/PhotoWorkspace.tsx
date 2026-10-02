@@ -34,6 +34,7 @@ import {
 	headingControlWindow,
 	priorHeading,
 } from "#/lib/geocam/priors/heading";
+import { wrap360 } from "#/lib/geodesy";
 import {
 	type EyeSearchResult,
 	persistPosition,
@@ -2219,7 +2220,7 @@ export function PhotoWorkspace({
 												pose.yaw,
 											)}
 											step={0.05}
-											format={(v) => `${(((v % 360) + 360) % 360).toFixed(2)}°`}
+											format={(v) => `${(wrap360(v)).toFixed(2)}°`}
 											onChange={(yaw) => setPose({ ...pose, yaw })}
 										/>
 										<Slider

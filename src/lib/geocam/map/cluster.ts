@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 // Spatially correlated DEM error for far evidence (GA1; the "all-far ⇒ eye unobserved" criterion).
 //
 // A DEM error that is common to a patch of terrain (a ridge, a tile, the smoothing of a coarse zoom
@@ -27,7 +28,7 @@ export const CLUSTER_DEFAULTS = { rho: 0.5, sectorDeg: 15 };
 
 /** Cluster key of a row seen at azimuth az (deg) and distance d (m). */
 export const clusterKey = (az: number, d: number, sectorDeg: number) =>
-	`${Math.floor((((az % 360) + 360) % 360) / sectorDeg)}|${distanceBand(d)}`;
+	`${Math.floor(wrap360(az) / sectorDeg)}|${distanceBand(d)}`;
 
 export type ClusterWhitener = {
 	/**

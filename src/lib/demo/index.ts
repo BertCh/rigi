@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 // The bundled sample trip (public/demo/, built by scripts/demo/unpack.mjs from an exported upload
 // roll). Its photos are registered with photos.ts like uploads, so /photo/demo-NN and /roll/demo use
 // the normal workspace and roll code. Each photo ships the pose the roll aligner found on the
@@ -135,7 +136,7 @@ export function panoramaPxPerDeg(roll: Roll, deviceWidth: number): number {
 	for (const p of roll.photos) {
 		const half = horizontalFovDeg(p.meta, p.pose.vfov) / 2;
 		for (let k = 0; k < 720; k++) {
-			const d = ((((k / 2 - p.pose.yaw + 540) % 360) + 360) % 360) - 180;
+			const d = wrap360(k / 2 - p.pose.yaw + 540) - 180;
 			if (Math.abs(d) <= half) covered[k] = 1;
 		}
 	}

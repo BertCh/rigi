@@ -21,6 +21,7 @@ import {
 	project,
 	smooth,
 } from "#/components/site/how/model";
+import { DEG } from "#/lib/geodesy";
 import {
 	fullSweep,
 	horizonDist,
@@ -49,7 +50,6 @@ const SEARCH = 30;
 /** Mismatch shown in the "good" tone. */
 const GOOD_PX = 8;
 const MONO = "var(--font-mono, ui-monospace)";
-const DEG = Math.PI / 180;
 const f1 = (v: number) => v.toFixed(1);
 
 type Sweep = ReturnType<typeof fullSweep>;

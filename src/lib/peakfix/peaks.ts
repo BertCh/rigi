@@ -7,6 +7,7 @@
 // World side: the apparent skyline el(az) from an eye (EyeHorizon, 0.05° bins, −90 = no data), so the
 // silhouette point is recomputed for every candidate eye. Photo side: the sky boundary y(x), peak = minimum y.
 
+import { wrap360 } from "#/lib/geodesy";
 import type { EyeHorizon } from "../pose6dof/eye";
 
 export type ProfilePeak = {
@@ -118,7 +119,7 @@ export function horizonPeaks(
 	const win = Math.max(3, Math.round(o.windowDeg / hz.step));
 	return profilePeaks(vals, { minProm: o.minPromDeg, window: win }).map((p) => {
 		const k = Math.round(p.i) + k0;
-		const az = ((((p.i + k0) * hz.step) % 360) + 360) % 360;
+		const az = wrap360((p.i + k0) * hz.step);
 		return {
 			az,
 			el: p.value,

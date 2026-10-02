@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 // Live pose tracker: `createTracker(options)` implements the `Tracker` contract of
 // src/lib/live/contract.ts. See tracker.ts for the loop and reports/tracker-gate-draft.md for how it
 // is meant to be validated. Output stays a suggestion.
@@ -107,9 +108,7 @@ export function createTracker(options: TrackerOptions): LiveTracker {
 		);
 	};
 	const shift = (s: SensorSample | undefined): SensorSample | undefined =>
-		s && s.yaw !== null
-			? { ...s, yaw: (((s.yaw + yawOffset) % 360) + 360) % 360 }
-			: s;
+		s && s.yaw !== null ? { ...s, yaw: wrap360(s.yaw + yawOffset) } : s;
 	return {
 		get phase() {
 			return core?.phase ?? "init";

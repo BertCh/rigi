@@ -8,10 +8,10 @@
 // down its own −z, camera y is up, vfov is in degrees, matrices are column-major (WebGL clip, −1..1
 // depth). `quaternion` rotates camera space into the ENU world.
 import { Matrix4, Quaternion, Vector3 } from "@math.gl/core";
+import { DEG } from "#/lib/geodesy";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 
 const WORLD_UP: Vec3 = [0, 0, 1];
-const DEG = Math.PI / 180;
 
 /** What a view consumer (3D Tiles selection, a deck viewport) needs of a camera, as plain numbers. */
 export type CameraView = {

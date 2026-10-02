@@ -10,6 +10,7 @@ import {
 	project,
 	unproject,
 } from "#/lib/geo/camera";
+import { wrap360 } from "#/lib/geodesy";
 import type {
 	BaselinePeakLabel,
 	HorizonLite,
@@ -99,7 +100,7 @@ export function ridgePaths(cam: Camera, h: HorizonLite): string[] {
 	const [start, span] = viewAzimuthRange(cam);
 	const out: string[][] = Array.from({ length: RIDGE_BUCKETS }, () => []);
 	for (let i = 0; i < h.ridgeAz.length; i++) {
-		const rel = (((h.ridgeAz[i] - start) % 360) + 360) % 360;
+		const rel = wrap360(h.ridgeAz[i] - start);
 		if (rel > span) continue;
 		const p = project(cam, directionENU(h.ridgeAz[i], h.ridgeEl[i]));
 		if (!p || p[0] < 0 || p[0] > cam.width || p[1] < 0 || p[1] > cam.height)

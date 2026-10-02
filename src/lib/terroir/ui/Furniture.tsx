@@ -8,7 +8,7 @@
 // since the photo camera is not the view camera there. Display-only.
 import { useMemo } from "react";
 import { projectPoint } from "#/lib/camera";
-import { DEG as D } from "#/lib/geodesy";
+import { DEG as D, wrap360 } from "#/lib/geodesy";
 import { sunPosition } from "#/lib/look/sun";
 import { clockHM, formatDist, parseTz } from "../viz/geo";
 import { FONT, INK, PAPER, SUN } from "../viz/ink";
@@ -82,7 +82,7 @@ export function Furniture({ ctx }: { ctx: TerroirCtx }) {
 			const s = engine.sampleAt(0.5, v);
 			return s ? [{ y: v * h, range: s.range }] : [];
 		});
-		return { ticks, ranges, heading: ((pose.yaw % 360) + 360) % 360 };
+		return { ticks, ranges, heading: wrap360(pose.yaw) };
 	}, [ctx.frame, engine, w, h, world]);
 
 	const chipEl = chip && (

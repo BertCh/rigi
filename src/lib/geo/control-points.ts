@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { wrap360 } from "#/lib/geodesy";
 /**
  * Control-point pose solver: the user taps known features (peaks, notches)
  * in the photo; we solve yaw/pitch/roll (and optionally f) so the features'
@@ -80,7 +81,7 @@ export function solveFromControlPoints(
 		cameraFromAngles({
 			width,
 			height,
-			yaw: ((q[0] % 360) + 360) % 360,
+			yaw: wrap360(q[0]),
 			pitch: q[1],
 			roll: solveRoll ? q[2] : initial.roll,
 			f: solvedFocal ? q[3] : initial.f,

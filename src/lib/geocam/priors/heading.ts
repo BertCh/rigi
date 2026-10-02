@@ -38,7 +38,7 @@ export function priorHeading(
 	if (!isMagneticRef(photo.local?.headingRef)) return h;
 	const d = headingDeclination(photo);
 	if (d == null) return h;
-	return (((h + d) % 360) + 360) % 360;
+	return wrap360(h + d);
 }
 
 /** Declination at the photo (deg, east +), or null without a usable position. */

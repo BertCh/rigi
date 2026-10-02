@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
+
 // Glue between a live Renderer and the pure export builders in this folder.
 // Browser-only (Blob, fetch, canvas). Uses ONLY the engine's public API:
 //   engine.photo, pose, frame, eye, demAtCamera, terrain (readiness), settings.protectPeople,
@@ -10,6 +11,7 @@ import type { FormatDescriptor } from "#/lib/ontology/crosswalk/presentation";
 //   onRender(), setPose(). Nothing here changes engine state: exportImage() restores itself, and
 //   refreshGeometry() re-sets the SAME pose only to force a fresh geometry-buffer readback.
 
+import { wrap360 } from "#/lib/geodesy";
 import { attributionLine, fullAttribution } from "#/lib/licences/attribution";
 import type { PhotoMeta } from "#/lib/photos";
 import { unprojectDir } from "#/lib/pose";
@@ -373,7 +375,7 @@ export async function exportFromEngine(
 				notes.push("world view: exported the 3D map view, not the photo");
 			const bmp = await createImageBitmap(rendered);
 			try {
-				const title = `${engine.photo.id} · heading ${(((engine.pose.yaw % 360) + 360) % 360).toFixed(1)}° · Rigi`;
+				const title = `${engine.photo.id} · heading ${(wrap360(engine.pose.yaw)).toFixed(1)}° · Rigi`;
 				return {
 					blob: await composeAnnotatedPng(bmp, [], {
 						title,

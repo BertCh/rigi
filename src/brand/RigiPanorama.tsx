@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { wrap360 } from "#/lib/geodesy";
 
 /**
  * The view south from Rigi Kulm, drawn as depth-layered ridgelines from the DEM
@@ -271,7 +272,7 @@ export function RigiPanorama({ className }: { className?: string }) {
 								strokeWidth={0.75}
 							/>
 							<text x={hover + 5} y={size.h - 26} fill="currentColor">
-								{(((hoverAz % 360) + 360) % 360).toFixed(1)}°
+								{wrap360(hoverAz).toFixed(1)}°
 							</text>
 						</g>
 					)}

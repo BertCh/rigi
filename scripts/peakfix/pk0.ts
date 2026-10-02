@@ -11,6 +11,7 @@
  *   npx tsx scripts/peakfix/pk0.ts [IMG_xxxx ...]
  */
 import path from "node:path";
+import { wrap360 } from "../../src/lib/geodesy";
 import {
 	camOf,
 	type FitParams,
@@ -104,7 +105,7 @@ for (const photo of photos) {
 	];
 	const ppd = camOf(p0, obs).f * (Math.PI / 180);
 	const halfAz = halfDiagFovDeg(P.gt) + 3;
-	const A0 = (((P.gt.pose.yaw - halfAz) % 360) + 360) % 360;
+	const A0 = wrap360(P.gt.pose.yaw - halfAz);
 	const A1 = A0 + 2 * halfAz;
 	const h0 = -P.ground(0, 0);
 	const eyeAt = (e: number, n: number): [number, number, number] => [
