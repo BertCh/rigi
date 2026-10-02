@@ -30,7 +30,7 @@ import type { Device } from "@luma.gl/core";
 import * as ort from "onnxruntime-web";
 import wasmUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
 import { getComputeDevice } from "#/lib/gpu/device";
-import type { SkyPrepGpu } from "#/lib/gpu/sky/prep";
+import { releasePrepGraphs, type SkyPrepGpu } from "#/lib/gpu/sky/prep";
 import { refineSkyGpu, warmSkyKernels } from "#/lib/gpu/sky/refine";
 import {
 	classicalSky,
@@ -41,6 +41,7 @@ import {
 	rgbPlanes,
 	toBytes,
 } from "./core";
+import { createIdleRelease } from "./graph-idle";
 import {
 	type Backend,
 	createSkyModel,
@@ -75,11 +76,24 @@ const MAX_LOAD_ATTEMPTS = 4;
 const LOAD_BACKOFF_MS = 2000;
 
 const warmed = new WeakSet<Device>();
+let lastDevice: Device | undefined;
+
+// The prep and refine graphs are cached per shape; free them after this long without a request (the
+// device itself stays: ORT shares it). A later request rebuilds the same graphs.
+const SKY_GRAPH_IDLE_MS = 30_000;
+const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, async () => {
+	const device = lastDevice;
+	if (!device) return;
+	// refine-graph is loaded on demand by refine.ts (import cycle); the cache is empty if it never was
+	const { releaseSkyGraphs } = await import("#/lib/gpu/sky/refine-graph");
+	await Promise.all([releasePrepGraphs(device), releaseSkyGraphs(device)]);
+});
 
 /** The worker's luma compute device when the page allows the GPU (null: CPU refine). */
 async function computeDevice(gpu: boolean | undefined): Promise<Device | null> {
 	if (!gpu) return null;
 	const device = await getComputeDevice();
+	if (device) lastDevice = device;
 	if (device && !warmed.has(device)) {
 		warmed.add(device);
 		void warmSkyKernels(device);
@@ -322,6 +336,7 @@ async function segmentWith(
 let queue: Promise<void> = Promise.resolve();
 
 async function handle(req: SkyWorkerRequest) {
+	idle.begin();
 	try {
 		if (req.type === "preload") await preload(req);
 		else await segment(req);
@@ -333,6 +348,8 @@ async function handle(req: SkyWorkerRequest) {
 			needPixels: e instanceof NeedPixels || undefined,
 		};
 		scope.postMessage(msg);
+	} finally {
+		idle.end();
 	}
 }
 

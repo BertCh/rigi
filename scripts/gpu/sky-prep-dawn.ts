@@ -16,18 +16,22 @@
 // prep.ts), i.e. the cachedGraph "sky-prep" ComputeGraph on a luma.gl WebGPU device over the same Dawn,
 // its readbacks (readAll) and the opacity flag (isOpaque); only the ImageBitmap upload is replaced by a
 // queue write of the padded rows.
+// --graph --release also frees the cached graphs (releasePrepGraphs) and reruns two shapes: the cache
+// empties, the rerun rebuilds (no cache hit) and its outputs are bit-identical to the first run.
 // Exit 1 on any mismatch, 2 when no adapter/package is available.
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Device } from "@luma.gl/core";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
+import { cachedGraphCount } from "../../src/lib/gpu/core/graph";
 import {
 	K_PREP_H,
 	K_PREP_NORM,
 	K_PREP_UNPACK,
 	K_PREP_V,
 	prepSkyGpuFromRows,
+	releasePrepGraphs,
 } from "../../src/lib/gpu/sky/prep";
 import { axisTapsF64, constsTable } from "../../src/lib/gpu/sky/prep-ref";
 import { lutTable } from "../../src/lib/gpu/sky/refine";
@@ -42,6 +46,7 @@ import {
 const argv = process.argv.slice(2);
 const QUICK = argv.includes("--quick");
 const GRAPH = argv.includes("--graph");
+const RELEASE = argv.includes("--release");
 const pi = argv.indexOf("--photos");
 const MAX_PHOTOS = pi >= 0 ? Number(argv[pi + 1]) : 99;
 const ROOT = path.resolve(import.meta.dirname, "../..");
@@ -349,6 +354,63 @@ for (const [W, H, ls] of sizes) {
 		await chain(f, u8, W, H, 512);
 		if (!QUICK) await chain(`${f}@384`, u8, W, H, 384);
 	}
+}
+if (RELEASE && lumaDevice) {
+	// two shapes, release, the same two again: bit-identical outputs from freshly built graphs
+	const shapes: [number, number, number][] = [
+		[1024, 683, 512],
+		[600, 450, 512],
+	];
+	const run = async () => {
+		const outs = [];
+		for (const [W, H, ls] of shapes) {
+			const { width: lw, height: lh } = modelSize(W, H, ls);
+			const px = synth(W, H, (x, y, c) => x * 3 + y * 5 + c * 41);
+			const rowBytes = Math.ceil((W * 4) / 256) * 256;
+			const padded = new Uint8Array(rowBytes * H);
+			for (let y = 0; y < H; y++)
+				padded.set(px.subarray(4 * y * W, 4 * (y + 1) * W), y * rowBytes);
+			const prep = await prepSkyGpuFromRows(lumaDevice, padded, W, H, lw, lh);
+			try {
+				outs.push(await prep.readAll());
+			} finally {
+				prep.dispose();
+			}
+		}
+		return outs;
+	};
+	const same = (a: ArrayBufferView, b: ArrayBufferView) =>
+		Buffer.compare(
+			Buffer.from(a.buffer, a.byteOffset, a.byteLength),
+			Buffer.from(b.buffer, b.byteOffset, b.byteLength),
+		) === 0;
+	const expect = (name: string, ok: boolean) => {
+		console.log(`${ok ? "ok  " : "FAIL"} release: ${name}`);
+		if (!ok) fails++;
+	};
+	await releasePrepGraphs(lumaDevice);
+	const first = await run();
+	expect(
+		`2 cached graphs after two shapes (${cachedGraphCount(lumaDevice, "sky-prep")})`,
+		cachedGraphCount(lumaDevice, "sky-prep") === 2,
+	);
+	await releasePrepGraphs(lumaDevice);
+	expect(
+		"0 after releasePrepGraphs",
+		cachedGraphCount(lumaDevice, "sky-prep") === 0,
+	);
+	const again = await run();
+	expect("2 rebuilt graphs", cachedGraphCount(lumaDevice, "sky-prep") === 2);
+	expect(
+		"outputs bit-identical (rgba, rgbLo, input)",
+		first.every(
+			(f, i) =>
+				same(f.rgba, again[i].rgba) &&
+				same(f.rgbLo, again[i].rgbLo) &&
+				same(f.input, again[i].input),
+		),
+	);
+	await releasePrepGraphs(lumaDevice);
 }
 console.log(`${checks} float comparisons, ${fails} failing cases`);
 process.exit(fails ? 1 : 0);

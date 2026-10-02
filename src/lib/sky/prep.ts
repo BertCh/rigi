@@ -19,7 +19,11 @@
  * model session and a shape the kernels support (downsampling; limits). Anything else is the CPU path.
  */
 import type { Device } from "@luma.gl/core";
-import { prepSkyGpu, type SkyPrepGpu } from "#/lib/gpu/sky/prep";
+import {
+	prepSkyGpu,
+	releasePrepGraphs,
+	type SkyPrepGpu,
+} from "#/lib/gpu/sky/prep";
 import { modelSize, normalise, resamplePlanes, rgbPlanes } from "./core";
 import type { SkyModel } from "./model";
 import type { SkyPrepStatus } from "./protocol";
@@ -118,6 +122,12 @@ export function prepGate(
 	return "gpu";
 }
 
+/** Disable the GPU prep for this device and free its cached graphs (they will not run again). */
+function disable(device: Device, st: { disabled?: string }, why: string) {
+	st.disabled = why;
+	void releasePrepGraphs(device).catch(() => {});
+}
+
 /**
  * The GPU prep of `bitmap` for `model`, or undefined when this photo takes the CPU path (not eligible,
  * unsupported shape, GPU error, a translucent photo, or a failed verification — `rgba` then carries the photo). Throws
@@ -144,7 +154,7 @@ export async function prepareGpu(
 	} catch (e) {
 		const unsupported = String(e).includes("sky prep:");
 		if (!unsupported && ++st.errors >= MAX_ERRORS)
-			st.disabled = `GPU prep failed ${st.errors} times: ${String(e)}`;
+			disable(device, st, `GPU prep failed ${st.errors} times: ${String(e)}`);
 		console.warn("[sky] GPU prep unavailable, using the CPU prep:", e);
 		return undefined;
 	}
@@ -167,7 +177,7 @@ export async function prepareGpu(
 			diff = `verification failed: ${String(e)}`;
 		}
 		if (diff) {
-			st.disabled = diff;
+			disable(device, st, diff);
 			console.warn(
 				"[sky] GPU prep differs from the CPU chain, disabled for this device:",
 				diff,
