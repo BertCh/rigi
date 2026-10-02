@@ -4,6 +4,40 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- **Consolidation pass after the luma-graph / math.gl / browser-only moves (2026-10-02, browser-unverified).** Review and outcome table: `reports/consolidation-review-2026-10-02.md`.
+  - **GPU-only features:** feature matching, people masks, Step Inside and the ViTPose demo now need WebGPU; no nn CPU forward runs on the main thread, and Step Inside shows "needs WebGPU" when it is missing.
+  - **nn runtime:**
+    - `getNn(consumer, device)` registry (`src/lib/nn/registry.ts`), rebuilt after device loss;
+    - per-consumer graph caches;
+    - `nn.warm` compiles the first forward ahead of time;
+    - shared-download abort refcount and download progress from workers;
+    - parity-only `.onnx` / `.tflite` files are no longer in the build.
+  - **On the compute graph:**
+    - sky prep → U²-Net → refine as one graph (`forwardInto`);
+    - people masks in one forward;
+    - ALIKED in one forward;
+    - Step Inside depth, compose, normals and lift, reading back only 64² samples;
+    - skyline fits, Viterbi and column finish (`skylineGpu` now on by default);
+    - look photo grids resampled on the GPU;
+    - roll clear-air range decimated on the GPU.
+  - **Step Inside:** structured errors, timeout and abort, single-flight per-photo jobs, idle unload, a persistent per-photo depth cache (`nearfieldDepthCache`, Cache Storage, 256 MB LRU), ViTPose-B int8 by default (87 MB), and resident int8 weights as an option (`quantResident`).
+  - **gpu/core:**
+    - AbortSignal on `withLease`, `ComputeGraph.run` / `runNow` and `readBack`;
+    - one shared buffer pool (nn included) with a `deviceBytes()` ledger, a graph-cache byte budget and an OOM purge;
+    - one `core/wgsl/reduce.ts` used by 11 reductions;
+    - shared box-sum, `span` and Terrarium decode;
+    - duplicate look kernel specs removed.
+  - **Rendering:**
+    - rain and snow on the WebGPU engine (luma `precipitation`);
+    - the WebGL drape uses the WebGPU 2×2 range vote;
+    - one sRGB / noise snippet per language, and `src/lib/color/srgb.ts`;
+    - terrain tile ordering on the loaders.gl `RequestScheduler` (`terrainScheduler`).
+  - **Math:**
+    - pose↔R, cam→ENU, ENU / ECEF, 3×3 and quaternion helpers in `camera/`, `geodesy`, `linalg`;
+    - shared Web-Mercator, distances, LV95 (`geo/lv95.ts`) and Douglas–Peucker (`geo/simplify.ts`);
+    - one `DEG`, and `Mat3F64`;
+    - each move is pinned by specs against the old copies.
+  - **CI:** 23 check rows registered (161 → 184), SKIP rows say how to regenerate their inputs, new matcher specs. The dead `nearfield=sharp` option is removed.
 - Live Step Inside draws only the live splats: the WebGPU splat layer sorts the live prefix on the GPU (counting sort, indirect dispatch from the compaction counter) and issues `drawIndirect` with the kept count (`gpu/splat-sort` live mode); still-photo clouds are unchanged.
 
 - **Live camera mode `/live` (2026-10-02, browser-unverified).**
