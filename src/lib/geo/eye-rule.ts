@@ -52,6 +52,8 @@ export const ALTITUDE_CHECK = {
 } as const;
 
 export type AltitudeVerdict =
+	/** No DEM height at the fix: nothing to compare with. */
+	| "no-ground"
 	/** No altitude: the eye stands on the DEM. */
 	| "missing"
 	/** The altitude is below ground + eye: the floor wins. */
@@ -67,9 +69,9 @@ export type AltitudeVerdict =
 
 export type AltitudeCheck = {
 	verdict: AltitudeVerdict;
-	/** alt − (ground + EYE_ABOVE_GROUND), m; NaN when missing. */
+	/** alt − (ground + EYE_ABOVE_GROUND), m; NaN when missing or no-ground. */
 	excessM: number;
-	/** The eye the rule gives (eyeAltitude). */
+	/** The eye the rule gives (eyeAltitude; a non-finite altitude counts as none). */
 	eye: number;
 };
 
@@ -77,16 +79,19 @@ export type AltitudeCheck = {
  * How the GPS altitude sits against the ground at the fix. `geoidN` (m, EGM2008 at the fix,
  * tiles3d/geoid.ts) and `model` (EXIF Model) enable the ellipsoid test: Android writes
  * Location.getAltitude(), which is above the WGS84 ellipsoid, about 47–55 m over MSL in Switzerland;
- * iPhones write MSL. Diagnostic only.
+ * iPhones write MSL. The test runs only above ALTITUDE_CHECK.standingM, which suits geoid heights well
+ * above it (the Alps); `model` without "iPhone"/"iPad" counts as non-Apple (drones too). Diagnostic only.
  */
 export function checkAltitude(
 	alt: number | null | undefined,
 	ground: number,
 	o: { model?: string | null; geoidN?: number | null } = {},
 ): AltitudeCheck {
-	const eye = eyeAltitude(alt, ground);
-	if (alt == null || !Number.isFinite(alt))
-		return { verdict: "missing", excessM: Number.NaN, eye };
+	const known = alt != null && Number.isFinite(alt);
+	const eye = eyeAltitude(known ? alt : null, ground);
+	if (!Number.isFinite(ground))
+		return { verdict: "no-ground", excessM: Number.NaN, eye };
+	if (!known) return { verdict: "missing", excessM: Number.NaN, eye };
 	const excessM = alt - (ground + EYE_ABOVE_GROUND);
 	const verdict: AltitudeVerdict =
 		excessM < 0

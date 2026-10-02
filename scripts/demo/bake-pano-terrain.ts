@@ -17,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { MAPTERHORN } from "../../src/lib/dem";
+import { eyeAltitude } from "../../src/lib/geo/eye-rule";
 import { distanceM } from "../../src/lib/geodesy";
 import {
 	buildMosaic,
@@ -108,13 +109,11 @@ for (const [i, g] of groups.entries()) {
 	const mosaics = spans.map((s) =>
 		buildMosaic(store, ringWindow(r.lat, r.lon, s, T, 0, 360), s, r.lat, false),
 	);
-	// ridgelines.worker.ts's eye rule
+	// ridgelines.worker.ts's use of the eye rule
 	const dem = mosaicHeight(mosaics[0], r.lon, r.lat);
 	const h = Number.isNaN(dem)
 		? (r.eyeAlt as number)
-		: r.eyeAlt != null
-			? Math.max(r.eyeAlt, dem + 1.6)
-			: dem + 1.8;
+		: eyeAltitude(r.eyeAlt, dem);
 	const terrain = traceViewpoint(
 		(lat, lon, d) => mosaicHeight(mosaicFor(mosaics, d), lon, lat),
 		{ lat: r.lat, lon: r.lon, h },

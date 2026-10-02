@@ -99,6 +99,13 @@ describe("checkAltitude", () => {
 		).toBe("raised");
 	});
 
+	it("reports no ground for a NaN DEM, and a NaN altitude as missing", () => {
+		expect(checkAltitude(1200, Number.NaN).verdict).toBe("no-ground");
+		const c = checkAltitude(Number.NaN, g);
+		expect(c.verdict).toBe("missing");
+		expect(c.eye).toBe(g + 1.8);
+	});
+
 	it("returns the eye the rule uses", () => {
 		expect(checkAltitude(g + 30, g).eye).toBe(g + 30);
 	});
