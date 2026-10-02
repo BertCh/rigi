@@ -418,7 +418,7 @@ function applyFrame(c: FilmCtx, n: FilmNodes, f: FilmFrame) {
 		opacityOf(el, s.opacity);
 	});
 	// the pose note is a number tied to the guess: it ghosts with it (and returns in a refused story)
-	opacityOf(n.poseNote, f.poseNote * (1 - f.priorGhost));
+	opacityOf(n.poseNote, f.poseNote * (1 - 0.65 * f.priorGhost));
 	opacityOf(n.eyeNote, f.poseNote);
 	if (accepted)
 		c.riders.forEach((_, i) => {
@@ -871,7 +871,10 @@ const Film = memo(function Film({
 						);
 					})}
 				{layout.length > 0 && (
-					<g ref={reg("poseNote")} opacity={f0.poseNote * (1 - f0.priorGhost)}>
+					<g
+						ref={reg("poseNote")}
+						opacity={f0.poseNote * (1 - 0.65 * f0.priorGhost)}
+					>
 						<HandLabel
 							x={x0 + 8 * k}
 							y={y1 - 12 * k}
