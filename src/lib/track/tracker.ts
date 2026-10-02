@@ -12,8 +12,9 @@
 //     yaw/pitch/roll against the resident horizon, fuse the result into the filters, emit with
 //     source "skyline". A run of failed solves moves to LOST; LOST and INIT run `relocalise`
 //     asynchronously on the keyframe's skyline.
-//   Every N frames an optional heavy skyline (sky segmentation) replaces the cheap scan as a
-//     drift-correction source.
+//   Every ~2 s an optional heavy skyline (sky segmentation, async, one in flight) is solved too and
+//     applied when it lands (dropped if older than 1 s): it enters the filters with extra weight and
+//     teaches the tracker the cheap scan's bias.
 // Everything is a suggestion (`suggestion: true`) until the tracker gate in reports/ passes.
 import type { Pose } from "../camera";
 import type { HorizonProfile } from "../geo/horizon";
@@ -32,7 +33,7 @@ import {
 	type HorizonTable,
 	horizonTable,
 } from "../refine/model";
-import { AxisFilter } from "./filter";
+import { AxisFilter, wrapDelta } from "./filter";
 import { TrackStateMachine } from "./machine";
 import { createSkylineRelocaliser } from "./search";
 import type { ScanResult } from "./skyline-cpu";
@@ -60,6 +61,11 @@ export const DEFAULT_TUNING: TrackerTuning = {
 	maxSensorAgeSeconds: 0.5,
 };
 
+/** Share of the heavy-versus-filter offset moved into the cheap-scan bias per heavy observation. */
+const BIAS_GAIN = 0.6;
+/** The cheap-scan bias estimate is clamped to this, degrees (a bigger one is more likely a bad heavy solve). */
+const MAX_CHEAP_BIAS_DEG = 4;
+
 type AxisName = keyof Angles;
 const AXES: AxisName[] = ["yaw", "pitch", "roll"];
 
@@ -80,7 +86,9 @@ export function createTrackerCore(options: TrackerCoreOptions): Tracker {
 	const tuning: TrackerTuning = { ...DEFAULT_TUNING, ...options.tuning };
 	const scanner = options.scanner;
 	const maxInFlight = options.maxInFlight ?? 2;
-	const heavyEvery = options.heavySkylineEvery ?? 30;
+	const heavyEveryMs = options.heavySkylineEveryMs ?? 2000;
+	const heavyMaxAgeMs = options.heavySkylineMaxAgeMs ?? 1000;
+	const heavyWeight = Math.max(1, options.heavySkylineWeight ?? 4);
 	const table: HorizonTable = horizonTable(options.horizon, 0);
 	const relocalise: Relocaliser =
 		options.relocalise ?? createSkylineRelocaliser(tuning);
@@ -111,7 +119,10 @@ export function createTrackerCore(options: TrackerCoreOptions): Tracker {
 	const listeners = new Set<(p: TrackedPose) => void>();
 	let epoch = 0;
 	let disposed = false;
-	let frameCount = 0;
+	let heavyBusy = false;
+	let heavyStartedAt = Number.NEGATIVE_INFINITY;
+	/** Estimated bias of the cheap scan per axis (degrees), learned from heavy observations. */
+	const cheapBias: Record<AxisName, number> = { yaw: 0, pitch: 0, roll: 0 };
 	let lastSensor: Record<AxisName, number | null> = {
 		yaw: null,
 		pitch: null,
@@ -313,7 +324,7 @@ export function createTrackerCore(options: TrackerCoreOptions): Tracker {
 		for (const a of AXES) {
 			const sigma = Math.hypot(solved.sigmaDeg[a], tuning.measurementFloorDeg);
 			filters[a].update(
-				solved.angles[a],
+				solved.angles[a] - cheapBias[a],
 				sensorFor(a, sensor),
 				sigma * sigma,
 				t,
@@ -323,13 +334,64 @@ export function createTrackerCore(options: TrackerCoreOptions): Tracker {
 		emitPose(frame.time, fused, solved.residualDeg, "skyline");
 	};
 
+	/**
+	 * A heavy (sky-model) skyline landed. It is the better observation, so it enters the filters with
+	 * `heavyWeight` times the information, and the offset between it and the filter (which has been
+	 * following the cheap scan) is taken as the cheap scan's bias and removed from later cheap solves.
+	 */
+	const applyHeavy = (
+		job: { time: number; sensor?: SensorSample },
+		scan: ScanResult,
+	) => {
+		if (machine.phase !== "track") return;
+		if (lastFrameTime - job.time > heavyMaxAgeMs) return;
+		const sensor = sensorAngles(job.sensor);
+		const prior = poseAt(job.time, sensor);
+		if (!prior) return;
+		const geom = geometryOf(scan);
+		const columns = columnsFromSkyline({
+			rows: scan.rows,
+			weight: scan.weights,
+			width: scan.width,
+		});
+		if (columns.filter((c) => c.w > 0.15).length < tuning.minColumns) return;
+		const solved = solvePose(table, geom, columns, {
+			prior,
+			priorSigmaDeg: tuning.priorSigmaDeg,
+			sigmaPx: tuning.sigmaPx,
+			effectiveColumns: tuning.effectiveColumns,
+		});
+		if (
+			!solved ||
+			solved.inlierFraction < tuning.minInlierFraction ||
+			solved.residualDeg > tuning.maxResidualDeg
+		)
+			return;
+		const t = job.time / 1000;
+		for (const a of AXES) {
+			const delta = wrapDelta(prior[a] - solved.angles[a]);
+			cheapBias[a] = Math.max(
+				-MAX_CHEAP_BIAS_DEG,
+				Math.min(MAX_CHEAP_BIAS_DEG, cheapBias[a] + BIAS_GAIN * delta),
+			);
+			const sigma = Math.hypot(solved.sigmaDeg[a], tuning.measurementFloorDeg);
+			filters[a].update(
+				solved.angles[a],
+				sensorFor(a, sensor),
+				(sigma * sigma) / heavyWeight,
+				t,
+			);
+		}
+		const fused = poseAt(lastFrameTime, lastSensorForNow());
+		if (fused) emitPose(lastFrameTime, fused, solved.residualDeg, "skyline");
+	};
+
 	const api: Tracker = {
 		get phase(): TrackerPhase {
 			return machine.phase;
 		},
 		pushFrame(frame: TrackFrame) {
 			if (disposed) return;
-			frameCount++;
 			lastFrameTime = frame.time;
 			if (frame.sensor) {
 				if (
@@ -352,19 +414,28 @@ export function createTrackerCore(options: TrackerCoreOptions): Tracker {
 			}
 			if (options.keyframeBitmap) keyframeSource = frame.source;
 			const myEpoch = epoch;
-			const heavyDue =
-				!!options.heavySkyline &&
-				heavyEvery > 0 &&
-				frameCount % heavyEvery === 0;
 			const job = { time: frame.time, sensor: frame.sensor };
 			const settle = (scan: ScanResult | null) => {
 				if (disposed || myEpoch !== epoch) return;
 				if (scan) processScan(job, scan);
 				else emitPropagated(frame);
 			};
-			if (heavyDue && options.heavySkyline) {
-				options.heavySkyline(frame).then(settle, () => settle(null));
-				return;
+			if (
+				options.heavySkyline &&
+				heavyEveryMs > 0 &&
+				!heavyBusy &&
+				machine.phase === "track" &&
+				frame.time - heavyStartedAt >= heavyEveryMs
+			) {
+				heavyBusy = true;
+				heavyStartedAt = frame.time;
+				const done = () => {
+					heavyBusy = false;
+				};
+				options.heavySkyline(frame).then((scan) => {
+					done();
+					if (scan && !disposed && myEpoch === epoch) applyHeavy(job, scan);
+				}, done);
 			}
 			if (scanner.inFlight >= maxInFlight) {
 				emitPropagated(frame);
@@ -382,6 +453,8 @@ export function createTrackerCore(options: TrackerCoreOptions): Tracker {
 			for (const a of AXES) filters[a].initialised = false;
 			lastColumns = null;
 			resetPrior = prior;
+			for (const a of AXES) cheapBias[a] = 0;
+			heavyBusy = false;
 		},
 		dispose() {
 			disposed = true;

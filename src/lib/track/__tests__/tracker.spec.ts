@@ -4,7 +4,12 @@
 
 import { describe, expect, it } from "vitest";
 import type { TrackedPose, TrackFrame } from "../../live/contract";
-import { createCpuScanner, createTracker, createTrackerCore } from "../index";
+import {
+	createCpuScanner,
+	createTracker,
+	createTrackerCore,
+	scanColumnsCpu,
+} from "../index";
 import type { RgbaImage } from "../skyline-cpu";
 import {
 	makeRidgeProfile,
@@ -185,7 +190,117 @@ describe("tracker", () => {
 	});
 });
 
+describe("heavy skyline", () => {
+	const biased = (current: { img: RgbaImage | null }) => {
+		const inner = createCpuScanner(W, () => current.img);
+		return {
+			...inner,
+			scan: async (f: TrackFrame) => {
+				const r = await inner.scan(f);
+				return r && { ...r, rows: r.rows.map((y) => y + 4) };
+			},
+		};
+	};
+	const run = async (latencyFrames: number) => {
+		const current = { img: null as RgbaImage | null };
+		let calls = 0;
+		let frameIndex = 0;
+		const queue: { at: number; go: () => void }[] = [];
+		const tracker = createTrackerCore({
+			horizon: profile,
+			vfov: 50,
+			workingWidth: W,
+			scanner: biased(current),
+			heavySkylineEveryMs: 1000,
+			heavySkyline: () => {
+				calls++;
+				const clean = current.img ? scanColumnsCpu(current.img, W) : null;
+				return new Promise((resolve) =>
+					queue.push({
+						at: frameIndex + latencyFrames,
+						go: () => resolve(clean),
+					}),
+				);
+			},
+		});
+		const poses: TrackedPose[] = [];
+		tracker.onPose((p) => poses.push(p));
+		const sensorOf = makeSensor({ yawBias: 8 });
+		const rand = rng(3);
+		for (let k = 0; k < 12 * 15; k++) {
+			frameIndex = k;
+			const t = k / 15;
+			current.img = renderFrame(
+				profile,
+				truth(t),
+				W,
+				H,
+				{ clouds: true },
+				rand,
+				t,
+			);
+			tracker.pushFrame({
+				time: t * 1000,
+				width: W,
+				height: H,
+				source: {} as TrackFrame["source"],
+				sensor: sensorOf(truth(t), t),
+			});
+			for (let q = queue.length - 1; q >= 0; q--)
+				if (queue[q].at <= k) queue.splice(q, 1)[0].go();
+			await flush();
+		}
+		tracker.dispose();
+		const late = poses
+			.filter((p) => p.phase === "track" && p.time > 8000)
+			.map(errorOf)
+			.sort((a, b) => a - b);
+		return { calls, median: late[late.length >> 1] };
+	};
+
+	it("corrects a biased cheap scan, at a low rate, one in flight", async () => {
+		const withHeavy = await run(4);
+		expect(withHeavy.calls).toBeGreaterThanOrEqual(3);
+		expect(withHeavy.calls).toBeLessThanOrEqual(12);
+		expect(withHeavy.median).toBeLessThan(0.8);
+	});
+
+	it("drops results older than the max age (the bias stays)", async () => {
+		// 20 frames at 15 fps = 1.33 s > 1 s
+		const stale = await run(20);
+		expect(stale.median).toBeGreaterThan(0.8);
+	});
+});
+
 describe("createTracker (live wrapper)", () => {
+	it("setEye drops to sensor-only and reloads the horizon for the new eye", async () => {
+		const loads: number[] = [];
+		const tracker = createTracker({
+			eye: { lat: 46.7, lon: 7.8, accuracy: 10, time: 0 },
+			vfov: 50,
+			workingWidth: W,
+			readPixels: () => null,
+			loadHorizon: async (eye) => {
+				loads.push(eye.lat);
+				return profile;
+			},
+		});
+		const frame = {
+			time: 0,
+			width: W,
+			height: H,
+			source: {} as TrackFrame["source"],
+			sensor: { time: 0, yaw: 100, pitch: 3, roll: 0 },
+		};
+		tracker.pushFrame(frame);
+		await flush();
+		tracker.setEye({ lat: 47.1, lon: 8, accuracy: 10, time: 1 });
+		tracker.pushFrame(frame);
+		await flush();
+		expect(loads).toEqual([46.7, 47.1]);
+		tracker.dispose();
+	});
+
 	it("is sensor-only until the horizon loads from the eye, then tracks; yawOffset applies", async () => {
 		const current = { img: null as RgbaImage | null };
 		let loads = 0;

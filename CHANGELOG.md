@@ -12,7 +12,8 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
     - a frame governor.
   - Every tracked pose is a suggestion until `reports/tracker-gate-draft.md` is signed off and passed. On synthetic skylines the tracker holds 0.20–0.47° median, against about 10° from raw sensors.
   - Renderers: `setLiveSource`, `setLiveMode` and `setPixelRatioCap` on both engines. The video texture is allocated once, live mode skips the per-photo fits and throttles labels, and a placeholder photo is `src: ""`.
-  - Flags: `live`, `liveFps`, `liveVfov`, `liveSource`, `liveDeclination`, `liveStep`.
+  - Flags: `live`, `liveFps`, `liveVfov`, `liveSource`, `liveDeclination`, `liveStep`, `liveSky`.
+  - The tracker uses the WebGPU render device (GPU column scan, `copyExternalImageToTexture` upload; WebGL2 keeps the CPU reader), the DEM horizon starts at the first location fix (`src/lib/live/horizon-warm.ts`; `setEye` re-prepares past 100 m), and `?liveSky=auto|on|off` runs the sky segmenter every ~2 s as a heavy skyline that corrects the cheap scan's bias (synthetic haze scenario: 1.64 to 0.33 deg median). Browser-unverified.
   - `?liveStep=on` (WebGPU) adds live Step Inside:
     - MoGe-2 `liveFast` (256 tokens, batched heads, `headStopLevel` 3) runs every 4 frames into `src/lib/nearfield/live`, one graph from depth to splats with no CPU readback;
     - colours refresh from the video every frame.

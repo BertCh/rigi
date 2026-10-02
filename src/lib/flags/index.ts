@@ -183,6 +183,11 @@ export const FLAG_SCHEMA = {
 	liveStep: onOff("off"),
 	/** /live: fixed magnetic declination in degrees east; unset = WMM2025 at the eye (src/lib/live/declination.ts) */
 	liveDeclination: num,
+	/**
+	 * /live: run the sky segmenter (src/lib/sky) every ~2 s as the tracker's heavy skyline, a drift and bias
+	 * correction for the cheap column scan (src/lib/live/heavy-skyline.ts). auto = on with the WebGPU engine, off on WebGL2.
+	 */
+	liveSky: oneOf(["auto", "on", "off"], "auto"),
 	// appearance: applies live (not a RESTART_FLAG); precedence and the boot script are in ./theme-boot.ts
 	theme: oneOf(["auto", "light", "dark"], "auto"),
 	// owned by their stores

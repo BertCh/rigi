@@ -25,6 +25,7 @@ import type {
 import { makeEyePhoto, nearestRegion } from "#/lib/live/eye-photo";
 import { type LocationFeed, startLocation } from "#/lib/live/geolocation";
 import { FrameGovernor } from "#/lib/live/governor";
+import { createHorizonWarmer } from "#/lib/live/horizon-warm";
 import {
 	loadReplay,
 	openReplayVideo,
@@ -110,7 +111,11 @@ export function useLiveSession() {
 	const lockedRef = useRef(false);
 	const yawOffsetRef = useRef(0);
 	const trackerRef = useRef<
-		(Tracker & { setYawOffset?(deg: number): void }) | null
+		| (Tracker & {
+				setYawOffset?(deg: number): void;
+				setEye?(eye: EyeFix): void;
+		  })
+		| null
 	>(null);
 	const lastPoseRef = useRef<TrackedPose | null>(null);
 	const stepRef = useRef<LiveStep | null>(null);
@@ -156,6 +161,9 @@ export function useLiveSession() {
 				let camera: LiveCamera | null = null;
 				let replay: ReplayFeed | null = null;
 				const history = new SensorHistory();
+				// the DEM horizon starts loading at the first fix, during the camera permission prompt
+				const horizonWarmer = createHorizonWarmer();
+				cleanups.push(() => horizonWarmer.dispose());
 				let fix: EyeFix | null = null;
 
 				if (source) {
@@ -169,6 +177,7 @@ export function useLiveSession() {
 						sensorKind: "replay",
 					});
 					fix = replay.eye(performance.now());
+					if (fix) horizonWarmer.offer(fix);
 					cleanups.push(() => {
 						video.pause();
 						video.removeAttribute("src");
@@ -208,8 +217,10 @@ export function useLiveSession() {
 						onFix: (f) => {
 							fix = f;
 							sensors?.setPosition(f.lat, f.lon);
+							horizonWarmer.offer(f);
 						},
 						onMoved: (f) => {
+							trackerRef.current?.setEye?.(f);
 							trackerRef.current?.reset();
 							patch({
 								message: `Moved over 100 m: re-localising at ${f.lat.toFixed(4)}, ${f.lon.toFixed(4)}`,
@@ -263,12 +274,14 @@ export function useLiveSession() {
 					region ?? "live",
 				);
 				let engine: LiveEngine;
+				let webgpuEngine = false;
 				try {
 					const made = await createLiveEngine(canvas, meta, {
 						pixelRatioCap: maxPixelRatio,
 						forceDeck,
 					});
 					engine = made.engine;
+					webgpuEngine = made.backend === "webgpu";
 					patch({
 						backend: made.backend,
 						stepReason: liveStepUnavailableReason(made.backend, made.engine),
@@ -300,7 +313,12 @@ export function useLiveSession() {
 				if (stageRef.current) observer.observe(stageRef.current);
 				cleanups.push(() => observer.disconnect());
 
-				const loaded = await loadTracker({ eye, vfov });
+				const loaded = await loadTracker({
+					eye,
+					vfov,
+					gpu: webgpuEngine,
+					loadHorizon: horizonWarmer.load,
+				});
 				trackerRef.current = loaded.tracker;
 				cleanups.push(() => loaded.tracker.dispose());
 				patch({ realTracker: loaded.real });

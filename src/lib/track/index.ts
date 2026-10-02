@@ -8,7 +8,12 @@ import { wrap360 } from "#/lib/geodesy";
 // is meant to be validated. Output stays a suggestion.
 import type { Pose } from "../camera";
 import type { HorizonProfile } from "../geo/horizon";
-import type { SensorSample, TrackedPose, Tracker } from "../live/contract";
+import type {
+	EyeFix,
+	SensorSample,
+	TrackedPose,
+	Tracker,
+} from "../live/contract";
 import { prepareTrackerHorizon } from "./horizon";
 import { type RgbaImage, scanColumnsCpu } from "./skyline-cpu";
 import { GpuColumnScanner } from "./skyline-gpu";
@@ -64,7 +69,14 @@ function canvasPixelReader(outWidth: number) {
 	};
 }
 
-export type LiveTracker = Tracker & { setYawOffset(deg: number): void };
+export type LiveTracker = Tracker & {
+	setYawOffset(deg: number): void;
+	/**
+	 * The eye moved: drop to sensor-only, load the horizon for the new eye (`loadHorizon`) and rebuild.
+	 * Without it the tracker keeps the horizon it was built with.
+	 */
+	setEye(eye: EyeFix): void;
+};
 
 /**
  * The live tracker. Pass `horizon` (resident profile) or just `eye`: then the horizon is loaded in
@@ -79,11 +91,14 @@ export function createTracker(options: TrackerOptions): LiveTracker {
 	let core: Tracker | null = null;
 	let disposed = false;
 	let loading = false;
+	let eye = options.eye;
+	let loadToken = 0;
 	let pendingReset: Partial<Pose> | undefined;
 	const forward = (p: TrackedPose) => {
 		for (const cb of listeners) cb(p);
 	};
 	const build = (horizon: HorizonProfile) => {
+		core?.dispose();
 		const scanner =
 			options.scanner ??
 			(options.device
@@ -98,13 +113,20 @@ export function createTracker(options: TrackerOptions): LiveTracker {
 	};
 	if (options.horizon) build(options.horizon);
 	const start = () => {
-		if (core || loading || disposed || !options.eye) return;
+		if (core || loading || disposed || !eye) return;
 		loading = true;
-		(options.loadHorizon ?? prepareTrackerHorizon)(options.eye).then(
+		const token = ++loadToken;
+		(options.loadHorizon ?? prepareTrackerHorizon)(eye).then(
 			(h) => {
+				if (token !== loadToken) return;
+				loading = false;
 				if (!disposed) build(h);
 			},
-			(e) => console.warn("[track] horizon unavailable, sensor-only", e),
+			(e) => {
+				if (token !== loadToken) return;
+				// stay "loading": a failed horizon is not retried every frame; setEye retries
+				console.warn("[track] horizon unavailable, sensor-only", e);
+			},
 		);
 	};
 	const shift = (s: SensorSample | undefined): SensorSample | undefined =>
@@ -115,6 +137,16 @@ export function createTracker(options: TrackerOptions): LiveTracker {
 		},
 		setYawOffset(deg) {
 			yawOffset = deg;
+		},
+		setEye(next) {
+			eye = next;
+			pendingReset = undefined;
+			if (disposed) return;
+			core?.dispose();
+			core = null;
+			loading = false;
+			loadToken++;
+			// the next pushFrame starts the load (a fresh eye is the only reason to be here)
 		},
 		pushFrame(frame) {
 			if (disposed) return;

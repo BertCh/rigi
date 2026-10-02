@@ -41,6 +41,17 @@ export interface Scenario {
 	/** [start, end] seconds the lens is covered. */
 	blackouts?: [number, number][];
 	trajectory?: TrajectoryOptions;
+	/**
+	 * Haze: the cheap column scan is biased (rows shifted by this many px at the 320x180 working grid,
+	 * weights scaled by `cheapWeightScale`, default 0.6 for the low sky/ground contrast).
+	 */
+	cheapBiasPx?: number;
+	cheapWeightScale?: number;
+	/**
+	 * A heavy (sky-model) skyline runs beside the cheap scan: here the unbiased scan of the same frame,
+	 * delivered after `latencyFrames` further frames (the real segmenter takes 0.1 to 0.7 s).
+	 */
+	heavy?: { latencyFrames: number; everyMs?: number };
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -64,6 +75,19 @@ export const SCENARIOS: Scenario[] = [
 		sensor: { yawBias: 10, yawJumps: [[25, 1e9, 40]] },
 		style: { clouds: true, occluders: true },
 		blackouts: [[25, 28]],
+	},
+	{
+		name: "haze",
+		sensor: { yawBias: 10, yawWalk: 0.3 },
+		style: { clouds: true, occluders: true },
+		cheapBiasPx: 5,
+	},
+	{
+		name: "haze-heavy",
+		sensor: { yawBias: 10, yawWalk: 0.3 },
+		style: { clouds: true, occluders: true },
+		cheapBiasPx: 5,
+		heavy: { latencyFrames: 8 },
 	},
 	{
 		name: "fast-noisy",
@@ -128,8 +152,48 @@ export async function runScenario(
 	const frameBuffer = { current: null as RgbaImage | null };
 	const read = (_f: TrackFrame) => frameBuffer.current;
 	const baseScanner = createCpuScanner(width, read);
-	const scanner = o.makeScanner?.(read) ?? baseScanner;
-	const tracker = createTrackerCore({ horizon: profile, vfov, scanner });
+	const innerScanner = o.makeScanner?.(read) ?? baseScanner;
+	const scanner: typeof innerScanner = sc.cheapBiasPx
+		? {
+				get inFlight() {
+					return innerScanner.inFlight;
+				},
+				dispose: () => innerScanner.dispose(),
+				scan: async (f) => {
+					const r = await innerScanner.scan(f);
+					if (!r) return r;
+					const scale = sc.cheapWeightScale ?? 0.6;
+					return {
+						...r,
+						rows: r.rows.map((y) => y + (sc.cheapBiasPx as number)),
+						weights: r.weights.map((w) => w * scale),
+					};
+				},
+			}
+		: innerScanner;
+	// heavy results are released `latencyFrames` frames after the frame they were taken from
+	const heavyQueue: { release: number; resolve: () => void }[] = [];
+	let frameIndex = 0;
+	const heavySkyline = sc.heavy
+		? (_f: TrackFrame) => {
+				const clean = frameBuffer.current
+					? scanColumnsCpu(frameBuffer.current, width)
+					: null;
+				return new Promise<typeof clean>((resolve) =>
+					heavyQueue.push({
+						release: frameIndex + (sc.heavy?.latencyFrames ?? 0),
+						resolve: () => resolve(clean),
+					}),
+				);
+			}
+		: undefined;
+	const tracker = createTrackerCore({
+		horizon: profile,
+		vfov,
+		scanner,
+		heavySkyline,
+		heavySkylineEveryMs: sc.heavy?.everyMs,
+	});
 	const poses: TrackedPose[] = [];
 	tracker.onPose((p) => poses.push(p));
 	const pushMs: number[] = [];
@@ -174,7 +238,10 @@ export async function runScenario(
 			sensor,
 		};
 		const a = performance.now();
+		frameIndex = k;
 		tracker.pushFrame(frame);
+		for (let q = heavyQueue.length - 1; q >= 0; q--)
+			if (heavyQueue[q].release <= k) heavyQueue.splice(q, 1)[0].resolve();
 		const b = performance.now();
 		await flush();
 		const c = performance.now();

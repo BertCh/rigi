@@ -105,9 +105,17 @@ export interface TrackerOptions {
 	) => void;
 	/** Replaces the scanner entirely (tests). */
 	scanner?: ColumnScanner;
+	/**
+	 * Sky-model skyline, run beside the cheap scan at a low rate (never blocks pushFrame). It must read
+	 * `frame.source` synchronously (the pixels are snapshotted at the call), then resolve later.
+	 */
 	heavySkyline?: HeavySkyline;
-	/** Run `heavySkyline` every N frames (default 30). */
-	heavySkylineEvery?: number;
+	/** Start a `heavySkyline` run at most this often, ms of frame time (default 2000); one in flight at a time. */
+	heavySkylineEveryMs?: number;
+	/** Drop a heavy result that is older than this when it lands, ms of frame time (default 1000). */
+	heavySkylineMaxAgeMs?: number;
+	/** The heavy observation counts as this many times the information of a cheap solve (default 4). */
+	heavySkylineWeight?: number;
 	/** Hand relocalise a createImageBitmap of the keyframe. */
 	keyframeBitmap?: boolean;
 	/** Scans allowed in flight (default 2). */

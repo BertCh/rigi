@@ -7,6 +7,9 @@
 // `loadTracker` loads the skyline tracker (createTracker from src/lib/track/index.ts); this one is its fallback.
 
 import type { Pose } from "../camera";
+import { getFlag } from "../flags";
+import type { HorizonProfile } from "../geo/horizon";
+import { adoptedRenderDevice, gpuEnabled } from "../gpu/device";
 import type {
 	EyeFix,
 	TrackedPose,
@@ -14,6 +17,19 @@ import type {
 	TrackerPhase,
 	TrackFrame,
 } from "./contract";
+
+/** What loadTracker adds on top of the sensor tracker's options (all optional; the sensor tracker ignores them). */
+export type LoadTrackerOptions = LiveTrackerOptions & {
+	/**
+	 * The live engine is WebGPU: give the tracker the render device (the GPU column scanner, frames
+	 * uploaded with copyExternalImageToTexture). False / absent keeps the CPU pixel reader (WebGL2).
+	 */
+	gpu?: boolean;
+	/** Shares an early horizon load with the tracker (src/lib/live/horizon-warm.ts `load`). */
+	loadHorizon?: (eye: EyeFix) => Promise<HorizonProfile>;
+	/** Run the sky segmenter as the heavy skyline; undefined = flag `liveSky` (auto: on with the GPU). */
+	sky?: boolean;
+};
 
 export type LiveTrackerOptions = {
 	eye: EyeFix;
@@ -78,13 +94,27 @@ export function createSensorTracker(
 }
 
 /** The skyline tracker (src/lib/track), falling back to the sensor-only tracker when it fails to load. `real` says which one you got. */
-export async function loadTracker(options: LiveTrackerOptions): Promise<{
-	tracker: Tracker & { setYawOffset?(deg: number): void };
+export async function loadTracker(options: LoadTrackerOptions): Promise<{
+	tracker: Tracker & {
+		setYawOffset?(deg: number): void;
+		setEye?(eye: EyeFix): void;
+	};
 	real: boolean;
 }> {
 	try {
 		const { createTracker } = await import("../track/index");
-		return { tracker: createTracker(options), real: true };
+		const device = options.gpu && gpuEnabled() ? adoptedRenderDevice() : null;
+		const liveSky = getFlag("liveSky");
+		const sky =
+			options.sky ?? (liveSky === "auto" ? !!device : liveSky === "on");
+		const heavySkyline = sky
+			? (await import("./heavy-skyline")).createHeavySkyline()
+			: undefined;
+		const { gpu: _gpu, sky: _sky, ...rest } = options;
+		return {
+			tracker: createTracker({ ...rest, device, heavySkyline }),
+			real: true,
+		};
 	} catch (e) {
 		console.warn("[live] tracker failed to load; using sensors only", e);
 	}
