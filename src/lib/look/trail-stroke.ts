@@ -28,16 +28,16 @@ export const TRAIL_STROKE_MODE: Record<TrailStrokeKind, number> = {
 };
 
 /** Pencil: jitter of the centre, fraction of the width (sketchStroke `jitter` 0.7 px at width 2). */
-export const PENCIL_JITTER = 0.35;
-export const PENCIL_VARIATION = 0.35;
+export const PENCIL_JITTER = 0.2;
+export const PENCIL_VARIATION = 0.25;
 export const PENCIL_GRAIN = 0.45;
 /** Minimum antialias width in px (sketchStroke `minimumAntialias`). */
 export const PENCIL_MIN_AA = 0.7;
 /** Metres per sketchStroke "segment": noise cells are 1 / 17 of it. */
-export const PENCIL_ALONG_M = 100;
+export const PENCIL_ALONG_M = 250;
 /** Glow: Gaussian halo scale in widths (alpha exp(-2 (d/reach)^2)); peak halo alpha. */
-export const GLOW_REACH = 1.6;
-export const GLOW_HALO = 0.6;
+export const GLOW_REACH = 1.0;
+export const GLOW_HALO = 0.4;
 export const GLOW_CORE_WHITEN = 0.35;
 
 export function strokeKind(v: string | undefined): TrailStrokeKind {

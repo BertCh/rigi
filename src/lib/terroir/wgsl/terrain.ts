@@ -252,6 +252,9 @@ ${
 	if (ft.terCover || ft.terSnow || ft.terHatch)
 		parts.push(/* wgsl */ `\
 // ---- cover albedo, snow, warm light / cool shade ----
+${
+	ft.terCover || ft.terSnow
+		? /* wgsl */ `\
 // px = ground metres per pixel: detail fades before it aliases. The noise domain leans with the
 // height, so cliffs get texture across the face instead of vertical streaks.
 fn ter_cover_albedo(c: i32, p: vec2<f32>, px: f32, elev: f32) -> vec3<f32> {
@@ -281,7 +284,9 @@ fn ter_snow(elev: f32, n: vec3<f32>, slopeDeg: f32, xy: vec2<f32>) -> f32 {
   let shed = 1.0 - smoothstep(terroir.snow.z, terroir.snow.w, slopeDeg + (ter_noise(xy / 50.0) - 0.5) * 10.0);
   return above * shed * terroir.snowCol.a;
 }
-${ft.terPattern ? PATTERN_WGSL : ft.terHatch ? PATTERN_KERNEL_WGSL : ""}${ft.terHatch ? HATCH_WGSL : ""}// fb = the look's albedo (alpine belts or the relief ramp) where there is no class
+`
+		: ""
+}${ft.terPattern ? PATTERN_WGSL : ft.terHatch ? PATTERN_KERNEL_WGSL : ""}${ft.terHatch ? HATCH_WGSL : ""}// fb = the look's albedo (alpine belts or the relief ramp) where there is no class
 fn ter_albedo(fb: vec3<f32>, n: vec3<f32>, s: TerrainSample) -> vec3<f32> {
   let xy = s.enu.xy;
   let px = max(length(abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy)), 1e-3);

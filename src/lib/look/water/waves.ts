@@ -27,9 +27,9 @@ export const WAVE_TABLE = [
 /** Wave-space units per metre: the longest packet is 2π / (2.1 · 0.12) ≈ 25 m, the shortest ≈ 3 m. */
 export const WAVE_SCALE = 0.12;
 /** The material's normalStrength · 3.2, halved: lakes are calmer than a river. */
-export const WAVE_TILT = 1.6;
+export const WAVE_TILT = 2.4;
 /** Rough angle of one pixel (rad): range · this = the footprint that fades packets finer than it. */
-export const WAVE_PIXEL = 0.0012;
+export const WAVE_PIXEL = 0.0004;
 /** Time the harnesses see (s): waves are present but still. */
 export const WAVE_STILL_TIME = 12.5;
 /** Playback speed relative to the river material. */

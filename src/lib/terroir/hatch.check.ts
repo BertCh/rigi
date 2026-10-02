@@ -39,6 +39,11 @@ const wgsl = terroirWGSL({ terHatch: true }, { relief: false, water: false });
 assert.ok(
 	wgsl.includes("fn ter_hatch(") && wgsl.includes("ter_hatch(n, xy, s.elev"),
 );
+// hatch without a pack has no ter_pal (cover binds it), so the cover albedo must not be emitted (WGSL compile error)
+assert.ok(
+	!wgsl.includes("ter_cover_albedo") && !wgsl.includes("ter_pal("),
+	"hatch-only WGSL references nothing from the cover pack",
+);
 const nums = (s: string) => (s.match(/\d+\.\d+/g) ?? []).join(" ");
 assert.equal(
 	nums(HATCH_GLSL),
