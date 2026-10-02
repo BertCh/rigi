@@ -8,10 +8,9 @@
 // the camera basis is computed once per evaluation.
 
 import { poseBasis } from "../camera";
+import { DEG as D } from "../geodesy";
 import type { EyeHorizon } from "../pose6dof/eye";
 import type { ImgPeak, WorldPeak } from "./peaks";
-
-const D = Math.PI / 180;
 
 export type Arm = "dense" | "peak" | "both";
 

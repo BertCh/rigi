@@ -36,7 +36,7 @@ import {
 	pointFactor,
 	solveMap,
 } from "../../src/lib/geocam/map";
-import { destination } from "../../src/lib/geodesy";
+import { DEG, destination } from "../../src/lib/geodesy";
 import { demTileLoaderNode } from "../lib/node-io";
 import {
 	assertWildDev,
@@ -47,7 +47,6 @@ import {
 	writeJson,
 } from "./lib";
 
-const DEG = Math.PI / 180;
 const OUT = path.join(GEO_OUT, "ga5");
 const DECOYS = path.join(GEO_OUT, "decoys");
 const ALERT = { yaw: 1.0, pitch: 0.5, H: 50, V: 25 };

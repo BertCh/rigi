@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { DEG as D } from "../geodesy";
 // Static OSM pre-extracts (roadmap N2): answer peak queries from a file under public/osm/ instead of
 // the public Overpass API (~10k queries/day shared by everyone) when the query area lies wholly
 // inside an extract. Built by tools/osm/extract-peaks.mjs; listed in public/osm/extracts.json.
@@ -160,7 +161,6 @@ export async function namedPeaksInBBox(
 // 20,000 km (R = 2e7/π m), not WGS84's 6378137 m
 const R_OVERPASS = 20_000_000 / Math.PI;
 function greatCircleM(lat0: number, lon0: number, lat1: number, lon1: number) {
-	const D = Math.PI / 180;
 	const a =
 		Math.sin(((lat1 - lat0) * D) / 2) ** 2 +
 		Math.cos(lat0 * D) *

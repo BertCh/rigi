@@ -6,6 +6,7 @@
 // distance / elevation windows from the CPU geometry buffer, then animates the front with rAF and
 // hands the shader its per-frame uniforms. Engine-agnostic: only the Renderer interface.
 import { poseBasis } from "../camera";
+import { DEG as D } from "../geodesy";
 import type { Renderer } from "../renderer";
 import {
 	EASE,
@@ -32,8 +33,6 @@ export type RevealFrame = {
 		eleM: number | null,
 	) => number;
 };
-
-const D = Math.PI / 180;
 
 function percentile(sorted: number[], q: number) {
 	if (!sorted.length) return 0;

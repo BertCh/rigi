@@ -18,6 +18,7 @@
 //
 // Frames: `eye` and `pose` must be in ONE ENU frame (the roll map's frame: RollMapEngine.debugPlaced()).
 import type { Pose } from "../../camera";
+import type { Mat3 } from "../../ontology/core/geometry";
 import {
 	ANCHOR_QUALITY_CONSTS,
 	type AnchorOpts,
@@ -38,6 +39,7 @@ import {
 	type RGBAImage,
 	toEnu,
 } from "../lift";
+import { mul3 as mulMat3, transpose3 } from "../propagate";
 import { splitPixels } from "../split";
 import {
 	type AnchorFit,
@@ -545,24 +547,10 @@ export function toEnuMatrix(
 	};
 }
 
+// number[] views of propagate.ts's Mat3 helpers (row-major 3×3)
 const mul3 = (a: number[], b: number[]) =>
-	[0, 1, 2].flatMap((i) =>
-		[0, 1, 2].map(
-			(j) =>
-				a[3 * i] * b[j] + a[3 * i + 1] * b[3 + j] + a[3 * i + 2] * b[6 + j],
-		),
-	);
-const tr3 = (a: number[]) => [
-	a[0],
-	a[3],
-	a[6],
-	a[1],
-	a[4],
-	a[7],
-	a[2],
-	a[5],
-	a[8],
-];
+	mulMat3(a as Mat3, b as Mat3) as number[];
+const tr3 = (a: number[]) => transpose3(a as Mat3) as number[];
 const mv3 = (a: number[], v: number[]) =>
 	[0, 1, 2].map(
 		(i) => a[3 * i] * v[0] + a[3 * i + 1] * v[1] + a[3 * i + 2] * v[2],

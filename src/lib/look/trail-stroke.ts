@@ -16,6 +16,7 @@
 // screen-space quads built per frame from segment ends, so only the shading is shared.
 // One set of constants feeds the TS reference (checks), the GLSL (deck/trail-layer.ts) and the WGSL
 // (deck-webgpu/layers/trail.ts) text.
+import { smoothstep } from "../math";
 import { sketchNoise } from "./sketch-ridges";
 
 export type TrailStrokeKind = "solid" | "pencil" | "glow";
@@ -51,11 +52,6 @@ export function strokePadPx(kind: TrailStrokeKind, widthPx: number): number {
 	if (kind === "glow") return widthPx * GLOW_REACH * 1.5 + 1;
 	return 0;
 }
-
-const smoothstep = (a: number, b: number, x: number) => {
-	const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-	return t * t * (3 - 2 * t);
-};
 
 /**
  * Reference coverage (0..1) of the stroke at `side` px across the centre and `along` metres along

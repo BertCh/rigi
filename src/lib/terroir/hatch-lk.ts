@@ -17,7 +17,9 @@
 // The result is ink colour + coverage, mixed over the albedo before snow, so snow hides it.
 // Display only. LKH_* constants are shared by GLSL, WGSL and the CPU reference below.
 
-const RAD = Math.PI / 180;
+import { DEG as RAD } from "../geodesy";
+import { fract, smoothstep } from "../math";
+import { COVER_INK, hexToBytes } from "../style/palette";
 
 export const HATCH_LK = {
 	// Hachure: stripe period in pixels on shadow / lit faces, stroke width (px), stroke length
@@ -64,10 +66,10 @@ export const HATCH_LK = {
 	LIT_HI: 0.55,
 } as const;
 
-/** Brezine ink roles (src/brand/khipu.ts): rock black-grey #2b2724, ice blue #3f7fb3. */
+/** Hachure ink bytes: the rock and ice line inks of style/palette.ts COVER_INK (#2b2724, #3f7fb3). */
 export const HATCH_LK_INK = {
-	ROCK: [43, 39, 36],
-	ICE: [63, 127, 179],
+	ROCK: hexToBytes(COVER_INK.rock),
+	ICE: hexToBytes(COVER_INK.ice),
 } as const;
 
 const LK_SEED = 0x4e1d_0907;
@@ -276,13 +278,6 @@ fn ter_hatch_lk(n: vec3<f32>, xy: vec2<f32>, elev: f32, fw: vec2<f32>, lit: f32,
 `;
 
 // ---- CPU reference (hatch.check.ts) -------------------------------------------------------------
-
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-const smoothstep = (a: number, b: number, x: number) => {
-	const t = clamp01((x - a) / (b - a));
-	return t * t * (3 - 2 * t);
-};
-const fract = (x: number) => x - Math.floor(x);
 
 /** The integer cell hash of the shaders, [0, 1). */
 export function lkhHash(cx: number, cy: number, salt: number): number {

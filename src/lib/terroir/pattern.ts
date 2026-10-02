@@ -15,6 +15,7 @@
 //   branching) as ground metres and rotated here, instead of fwidth of the rotated phase.
 // GLSL (WebGL2 terrain), WGSL (deck-webgpu terrain) and the CPU mirror below share one set of
 // constants; src/lib/terroir/pattern.check.ts keeps them honest.
+import { clamp, fract, smoothstep } from "../math";
 
 /** Hatch and dot parameters per cover class (metres, fractions of a cell, radians). */
 export const TERROIR_PATTERN_PARAMS = {
@@ -30,14 +31,6 @@ export const TERROIR_PATTERN_PARAMS = {
 } as const;
 
 // ---- CPU mirror ----
-
-const fract = (x: number) => x - Math.floor(x);
-const clamp = (x: number, lo: number, hi: number) =>
-	Math.min(Math.max(x, lo), hi);
-const smoothstep = (a: number, b: number, x: number) => {
-	const t = clamp((x - a) / (b - a), 0, 1);
-	return t * t * (3 - 2 * t);
-};
 
 /** Integral of a unit-period pulse of the given width (0..1) from 0. */
 export function patternIntegral(coordinate: number, width: number): number {

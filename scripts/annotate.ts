@@ -36,7 +36,7 @@ import {
 	solveFromControlPoints,
 } from "../src/lib/geo/control-points";
 import { apparentElevation, layoutPeakLabels } from "../src/lib/geo/peaks";
-import { destination } from "../src/lib/geodesy";
+import { destination, wrap180 } from "../src/lib/geodesy";
 import {
 	CP_FILE,
 	cameraWith,
@@ -63,7 +63,7 @@ function arg(name: string) {
 }
 const flag = (name: string) => process.argv.includes(name);
 const nums = (s: string) => s.split(",").map(Number);
-const angDiff = (a: number, b: number) => ((a - b + 540) % 360) - 180;
+const angDiff = (a: number, b: number) => wrap180(a - b);
 
 async function main() {
 	const name = process.argv[2];

@@ -22,7 +22,7 @@ import {
 	type Pose,
 	poseToOpenCV,
 } from "../camera";
-import { toEcef, WGS84 } from "../geodesy";
+import { DEG as D, toEcef, WGS84 } from "../geodesy";
 
 export type { Vec3 };
 
@@ -97,8 +97,6 @@ export type CameraModel = {
 	q_w2c_ecef: [number, number, number, number];
 	q_w2c_enu: [number, number, number, number];
 };
-
-const D = Math.PI / 180;
 
 function mat3FromCols(
 	a: ArrayLike<number>,

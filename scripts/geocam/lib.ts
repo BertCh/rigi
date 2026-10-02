@@ -62,6 +62,7 @@ import { detectSkyline } from "../../src/lib/geo/skyline";
 import { loadTerrain, type TerrainSampler } from "../../src/lib/geo/terrain";
 import type { JointCue } from "../../src/lib/geocam/map";
 import {
+	DEG,
 	destination,
 	distanceBearing as distBear,
 } from "../../src/lib/geodesy";
@@ -106,7 +107,6 @@ export {
 	skylineRms,
 } from "../concord/lib";
 
-const DEG = Math.PI / 180;
 export const GEO_OUT = path.join(ROOT, "out", "geocam");
 const HZ_CACHE = path.join(GEO_OUT, "ga1", "hzcache");
 

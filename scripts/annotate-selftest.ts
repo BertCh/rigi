@@ -13,8 +13,9 @@ import {
 	type ControlPoint,
 	solveFromControlPoints,
 } from "../src/lib/geo/control-points";
+import { wrap180 } from "../src/lib/geodesy";
 
-const angDiff = (a: number, b: number) => ((a - b + 540) % 360) - 180;
+const angDiff = (a: number, b: number) => wrap180(a - b);
 let worst = 0;
 for (const truth of [
 	{ width: 4032, height: 3024, f: 3200, yaw: 358, pitch: -4, roll: 1.5 },

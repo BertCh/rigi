@@ -12,6 +12,7 @@
 //  3. Imhof colour: warm yellowish lit slopes, cool blue-grey shade, an elevation tint (lowlands
 //     greener-grey, high alpine lighter) and aerial lightening / desaturation with range.
 // Display only: no pose, confidence or export reads this.
+import { mix, smoothstep } from "../math";
 //
 // One set of constants feeds the TS reference below (checks), the GLSL (look/glsl/relief.ts) and the
 // WGSL (deck-webgpu/layers/terrain-styles.ts) text, so the engines agree by construction. The two
@@ -42,13 +43,6 @@ export const IMHOF_AIR_DESATURATE = 0.55;
 
 type V3 = readonly [number, number, number];
 
-const clamp = (x: number, lo: number, hi: number) =>
-	Math.min(Math.max(x, lo), hi);
-const smoothstep = (a: number, b: number, x: number) => {
-	const t = clamp((x - a) / (b - a), 0, 1);
-	return t * t * (3 - 2 * t);
-};
-const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const mix3 = (a: V3, b: V3, t: number): [number, number, number] => [
 	mix(a[0], b[0], t),
 	mix(a[1], b[1], t),

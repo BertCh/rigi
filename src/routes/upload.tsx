@@ -18,7 +18,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ThemeToggle } from "#/components/site/ThemeToggle";
 import { hfovFromVfov } from "#/lib/camera";
-import { EARTH_R } from "#/lib/geodesy";
+import { DEG as D, EARTH_R } from "#/lib/geodesy";
 import type { RegionData } from "#/lib/photos";
 import {
 	deleteLocalPhoto,
@@ -64,7 +64,6 @@ const STAGE_LABEL: Record<UploadStage, string> = {
 	done: "Done",
 };
 
-const D = Math.PI / 180;
 function distBearing(lat0: number, lon0: number, lat1: number, lon1: number) {
 	const dLat = (lat1 - lat0) * D;
 	const dLon = (lon1 - lon0) * D;

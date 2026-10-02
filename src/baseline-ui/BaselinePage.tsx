@@ -23,7 +23,7 @@ import {
 	readPhotoMeta,
 	withDisplayPixels,
 } from "#/lib/geo/photo-meta";
-import { wrap360 } from "#/lib/geodesy";
+import { wrap180, wrap360 } from "#/lib/geodesy";
 import { type Layers, Overlay } from "./Overlay";
 import {
 	bucketColor,
@@ -62,7 +62,6 @@ interface Pending {
 	elevation: number;
 }
 
-const wrap180 = (a: number) => ((a + 540) % 360) - 180;
 const hfov = (p: CameraParams) => 2 * Math.atan(p.width / 2 / p.f) * DEG;
 
 /** Prior camera at the working-image size; falls back to level + heading. */

@@ -135,7 +135,6 @@ export const POSE_GLYPH: Record<PoseSource, string> = {
 	solved: "▲",
 	prior: "○",
 };
-export const POSE_SOURCES_ALL = Object.keys(POSE_GLYPH) as PoseSource[];
 
 /** EXIF-only headings can be off by 10° or more (POSE_SOURCE_HINT.prior). */
 export const PRIOR_FAN_DEG = 10;

@@ -8,6 +8,7 @@
 //     edge map. Coarse grid over yaw/pitch, then coordinate descent over yaw/pitch/roll/fov.
 //  2. Pin solve: Levenberg–Marquardt on user "this peak is here" pins.
 import { type Pose, poseBasis, projectPoint } from "./camera";
+import { DEG as D } from "./geodesy";
 import { gaussJordan } from "./linalg";
 import { kthSmallest } from "./math";
 import type { FgMask } from "./renderer";
@@ -288,8 +289,6 @@ function forEachProjected(
 		cb(u, v);
 	}
 }
-
-const D = Math.PI / 180;
 
 /**
  * Score = along the projected DEM skyline, edge strength plus sky/terrain contrast

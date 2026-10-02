@@ -6,12 +6,11 @@
 // terrain nearer than dMin does not count), same step rule max(10, 0.004·d), curvature + refraction.
 import type { Vec3 } from "../../src/lib/concord/core";
 import { offsetLatLon } from "../../src/lib/concord/priors/ground";
-import { destination } from "../../src/lib/geodesy";
+import { DEG, destination } from "../../src/lib/geodesy";
 import type { EyeHorizon } from "../../src/lib/pose6dof/eye";
 import { type FastSampler, HZ_STEP, R_EFF, type Scene } from "../geocam/lib";
 
 export const D_MIN = 150;
-const DEG = Math.PI / 180;
 
 type RayTable = {
 	k0: number;

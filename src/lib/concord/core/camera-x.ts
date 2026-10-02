@@ -11,9 +11,8 @@
 // t = tan(vfov/2). With intrinsics: X = fScale·xd/t, Y = fScale·yd/t, (xd,yd) = (xn,yn)·(1 + k1·r²),
 // then u += cx, v += cy.
 import { projectPoint, unprojectDir } from "../../camera";
+import { DEG as D } from "../../geodesy";
 import type { CameraX, Intrinsics, Vec3 } from "./types";
-
-const D = Math.PI / 180;
 
 export const isIdentity = (i: Intrinsics): boolean =>
 	i.fScale === 1 && i.k1 === 0 && i.cx === 0 && i.cy === 0;

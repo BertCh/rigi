@@ -9,6 +9,7 @@
 import { Crosshair } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BRAND } from "#/brand/khipu";
+import { latToWorldY as lat2y, lonToWorldX as lon2x } from "#/lib/mercator";
 import {
 	isUncertainPose,
 	mercatorLat,
@@ -25,12 +26,6 @@ const MAX_Z = 18;
 const MIN_Z = 3;
 /** Wedge radius, px. */
 const R = 46;
-
-const lon2x = (lon: number, z: number) => ((lon + 180) / 360) * TILE * 2 ** z;
-const lat2y = (lat: number, z: number) => {
-	const s = Math.sin((Math.max(-85.05, Math.min(85.05, lat)) * Math.PI) / 180);
-	return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * TILE * 2 ** z;
-};
 
 type Props = {
 	roll: Roll;

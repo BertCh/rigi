@@ -40,6 +40,7 @@ import {
 } from "../src/lib/export";
 import {
 	bearingDeg,
+	DEG as D,
 	EARTH_R,
 	EnuFrame,
 	REFRACTION_K,
@@ -72,7 +73,6 @@ const rnd = () => {
 	seed = (seed * 1664525 + 1013904223) >>> 0;
 	return seed / 2 ** 32;
 };
-const D = Math.PI / 180;
 
 // ---------------------------------------------------------------- 1. projection round trip
 {

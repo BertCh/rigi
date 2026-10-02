@@ -41,6 +41,7 @@ import {
 	type SkylineRows,
 	solvePose,
 } from "../src/lib/geo/solve";
+import { wrap180 } from "../src/lib/geodesy";
 import { type RefineResult, refinePose } from "../src/lib/refine/index";
 import { fuseSkylines, rejectSpikes } from "../src/lib/refine/skyline-clean";
 import { heicToJpeg, listPhotos, loadRGBA, ROOT } from "./lib/node-io";
@@ -87,7 +88,7 @@ interface GroundTruth {
 	quality: "good" | "approx" | "none";
 }
 
-const angleDiff = (a: number, b: number) => ((a - b + 540) % 360) - 180;
+const angleDiff = (a: number, b: number) => wrap180(a - b);
 const r3 = (v: number) => (Number.isFinite(v) ? +v.toFixed(3) : null);
 
 /** Mean |row difference| (px at `width`) between two cameras' DEM skylines (as scripts/eval.ts). */

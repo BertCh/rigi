@@ -23,6 +23,7 @@ import {
 import type { HorizonProfile } from "../../src/lib/geo/horizon";
 import { detectSkyline } from "../../src/lib/geo/skyline";
 import { projectSkylineRows, solvePose } from "../../src/lib/geo/solve";
+import { DEG as D, wrap180 } from "../../src/lib/geodesy";
 import { heicToJpeg, listPhotos, loadRGBA, ROOT } from "../lib/node-io";
 import { DEM, photoContext } from "../lib/pipeline-node";
 import {
@@ -38,7 +39,6 @@ import {
 
 const BASIS = 1600;
 const OUT = path.join(ROOT, "out", "vsweep");
-const D = Math.PI / 180;
 const PERTURB = [-1, -0.5, 0.5, 1];
 
 type GT = {
@@ -55,7 +55,7 @@ const gtAll: Record<string, GT> = JSON.parse(
 	fs.readFileSync(path.join(ROOT, "data/ground-truth.json"), "utf8"),
 );
 
-const angleDiff = (a: number, b: number) => ((a - b + 540) % 360) - 180;
+const angleDiff = (a: number, b: number) => wrap180(a - b);
 const median = (a: number[]) => {
 	const s = a.filter(Number.isFinite).sort((x, y) => x - y);
 	if (!s.length) return Number.NaN;

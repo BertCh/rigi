@@ -9,6 +9,12 @@ export const clamp = (x: number, lo: number, hi: number) =>
 /** v limited to [0, 1] (NaN passes through). */
 export const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
+/** Fractional part, x − floor(x) (GLSL fract). */
+export const fract = (x: number) => x - Math.floor(x);
+
+/** Linear interpolation a → b at t (GLSL mix). */
+export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+
 /** Hermite 0..1 step between edges a and b (GLSL smoothstep). */
 export function smoothstep(a: number, b: number, x: number) {
 	const t = Math.min(1, Math.max(0, (x - a) / (b - a)));

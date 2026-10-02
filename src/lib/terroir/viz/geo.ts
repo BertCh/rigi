@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { DEG as D } from "#/lib/geodesy";
 // Pure helpers for the terroir photo overlays (place card, glacier ghost, sun path, furniture).
 // No DOM, no engine imports: checked in viz.check.ts. Display-only.
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { LonLat } from "../types";
-
-const D = Math.PI / 180;
 
 /** Ray-casting point-in-ring (ring of [lon, lat]; open or closed). */
 export function pointInRing(lon: number, lat: number, ring: LonLat[]): boolean {

@@ -50,6 +50,7 @@ import { detectSkyline } from "../../src/lib/geo/skyline";
 import { horizonAt, solvePose } from "../../src/lib/geo/solve";
 import { loadTerrain, type TerrainSampler } from "../../src/lib/geo/terrain";
 import {
+	DEG,
 	destination,
 	distanceBearing,
 	EARTH_R,
@@ -63,7 +64,6 @@ import {
 	ROOT,
 } from "../lib/node-io";
 
-const DEG = Math.PI / 180;
 export const R_EFF = EARTH_R / (1 - REFRACTION_K);
 export const PINS_DIR = path.join(ROOT, "tools", "concord", "pins");
 export const PROTOCOL_FILE = path.join(PINS_DIR, "PROTOCOL.txt");

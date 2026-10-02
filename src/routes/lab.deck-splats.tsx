@@ -17,6 +17,7 @@ import { PhotoView } from "#/lib/deck/photo-view";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import { TerrainLayer } from "#/lib/deck/terrain-layer";
 import { setFlagOverride } from "#/lib/flags";
+import { DEG as D } from "#/lib/geodesy";
 import { DeckSplatLayer, splatStats } from "#/lib/nearfield/deck-splat-layer";
 import { type GaussianCloud, PROVENANCE_CODE } from "#/lib/nearfield/types";
 
@@ -385,8 +386,6 @@ type Cam = {
 	el: number;
 	dist: number;
 };
-
-const D = Math.PI / 180;
 
 function orbitView(c: Cam) {
 	const t: [number, number, number] = [HUT.x, HUT.y, groundZ(HUT.x, HUT.y) + 2];

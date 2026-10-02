@@ -10,13 +10,11 @@
 import type { Mat3 } from "#/lib/ontology/core/geometry";
 import type { Deg } from "#/lib/ontology/core/quantity";
 import { type Camera, cameraFromAngles } from "../geo/camera";
-import { wrap360 } from "../geodesy";
+import { DEG as D, wrap360 } from "../geodesy";
 import { cross3, dot3, type Vec3 } from "../linalg";
 
 export type Pose = { yaw: Deg; pitch: Deg; roll: Deg; vfov: Deg };
 export type { Mat3 };
-
-const D = Math.PI / 180;
 
 /** Camera axes in ENU (same operation order as three.js vector math, so pose.ts is bitwise equal). */
 export function poseBasis(p: Pose): { forward: Vec3; right: Vec3; up: Vec3 } {

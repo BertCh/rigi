@@ -6,10 +6,9 @@
 // plus the direction in the camera-local ENU frame (x east, y north, z up) the terrain uses.
 // takenAt in photos.json is UTC (EXIF DateTimeOriginal + OffsetTime), so no timezone guessing.
 
+import { DEG as D } from "../geodesy";
 import type { Vec3 } from "../ontology/core/geometry";
 import type { Sun } from "../style/types";
-
-const D = Math.PI / 180;
 
 export type SunPosition = {
 	/** Degrees clockwise from true north. */

@@ -6,22 +6,17 @@
 // No map dependency. Tiles © OpenStreetMap contributors (tile.openstreetmap.org usage policy:
 // light interactive use with attribution, which is what a one-off pin placement is).
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	latToWorldY as lat2y,
+	lonToWorldX as lon2x,
+	worldXToLon as x2lon,
+	worldYToLat as y2lat,
+} from "#/lib/mercator";
 import type { LatLon } from "#/lib/ontology/core/geometry";
 
 const TILE = 256;
 const MAX_Z = 18;
 const MIN_Z = 2;
-
-const lon2x = (lon: number, z: number) => ((lon + 180) / 360) * TILE * 2 ** z;
-const lat2y = (lat: number, z: number) => {
-	const s = Math.sin((Math.max(-85.05, Math.min(85.05, lat)) * Math.PI) / 180);
-	return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * TILE * 2 ** z;
-};
-const x2lon = (x: number, z: number) => (x / (TILE * 2 ** z)) * 360 - 180;
-const y2lat = (y: number, z: number) => {
-	const n = Math.PI - (2 * Math.PI * y) / (TILE * 2 ** z);
-	return (180 / Math.PI) * Math.atan(Math.sinh(n));
-};
 
 export type { LatLon };
 

@@ -8,12 +8,12 @@
 // since the photo camera is not the view camera there. Display-only.
 import { useMemo } from "react";
 import { projectPoint } from "#/lib/camera";
+import { DEG as D } from "#/lib/geodesy";
 import { sunPosition } from "#/lib/look/sun";
 import { clockHM, formatDist, parseTz } from "../viz/geo";
 import { FONT, INK, PAPER, SUN } from "../viz/ink";
 import type { TerroirCtx } from "./context";
 
-const D = Math.PI / 180;
 const LETTERS: Record<number, string> = {
 	0: "N",
 	45: "NE",

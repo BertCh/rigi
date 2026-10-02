@@ -42,7 +42,7 @@ import { tileBounds } from "../dem";
 import { heightFromTile } from "../dem/height-from-tile";
 import { startLakeFloor } from "../geocam/lakes/fetch";
 import { priorHeading } from "../geocam/priors/heading";
-import { distanceM, EnuFrame, M_PER_DEG_LAT } from "../geodesy";
+import { distanceM, EnuFrame, M_PER_DEG_LAT, wrap180 } from "../geodesy";
 import { autoAlignAsync, warmAlignGpu } from "../gpu/align";
 import { lookIdle, trackLook } from "../gpu/look/opt-in";
 import {
@@ -192,8 +192,7 @@ import {
 	WorldView,
 } from "./world-view";
 
-const angleDiff = (a: number, b: number) =>
-	Math.abs(((a - b + 540) % 360) - 180);
+const angleDiff = (a: number, b: number) => Math.abs(wrap180(a - b));
 
 export type DeckEngineOptions = {
 	/** Upper bound on the canvas' device pixel ratio (default 2). The landing's Step Inside passes 1.5. */
@@ -3360,8 +3359,8 @@ export class DeckEngine implements Renderer {
 
 	/**
 	 * The terrain all around the eye: the streamer's high-detail wedge becomes 360° (and stays so),
-	 * the CPU queries switch to the complete set, and the horizon is re-traced over 360°. The three.js
-	 * engine's `terrain.loadPending()` + `computeHorizon()` for the matcher's `fullTerrain`. Resolves
+	 * the CPU queries switch to the complete set, and the horizon is re-traced over 360°. The matcher's
+	 * `fullTerrain` (the former three.js `terrain.loadPending()` + `computeHorizon()`). Resolves
 	 * with the ms it took (0 when already done).
 	 */
 	async loadFullTerrain(timeoutMs = 300_000): Promise<number> {
@@ -3407,8 +3406,8 @@ export class DeckEngine implements Renderer {
 
 	/**
 	 * Satellite imagery for the render set's tiles within `maxDistM` of the eye (0 = all), fetched now;
-	 * failed tiles are re-fetched up to `retries` times. The three.js engine's
-	 * `terrain.loadImagery("satellite")` for the matcher. Other tiles keep streaming in the background.
+	 * failed tiles are re-fetched up to `retries` times. The matcher's
+	 * satellite imagery load (the former three.js `terrain.loadImagery("satellite")`). Other tiles keep streaming in the background.
 	 */
 	async loadSatellite(maxDistM = 0, retries = 2) {
 		await this.deckReady;
@@ -3439,7 +3438,7 @@ export class DeckEngine implements Renderer {
 	}
 
 	/**
-	 * The matcher's view (was the three.js engine's geoRT readback + a canvas render with uStyle 1):
+	 * The matcher's view (the removed three.js engine's geoRT readback + a canvas render with uStyle 1):
 	 * the satellite drape and the geometry buffer through an arbitrary `pose`, both offscreen at
 	 * width × height (default: the query geometry size, 1024 px on the long side, as three's geoRT).
 	 * Neither the on-screen view nor the engine's pose changes.

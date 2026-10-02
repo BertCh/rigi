@@ -45,6 +45,7 @@ import {
 	skylineFactor,
 	solveMap,
 } from "../../src/lib/geocam/map";
+import { DEG as D } from "../../src/lib/geodesy";
 import type { EyeHorizon } from "../../src/lib/pose6dof/eye";
 import {
 	devGTPhotos,
@@ -58,7 +59,6 @@ import {
 	writeJson,
 } from "./lib";
 
-const D = Math.PI / 180;
 const args = process.argv.slice(2);
 const opt = (k: string, d: string) => {
 	const i = args.indexOf(k);

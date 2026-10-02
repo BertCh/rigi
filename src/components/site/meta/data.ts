@@ -98,9 +98,9 @@ function useJson<T>(url: string) {
 export const useRoll = () => useJson<Roll>("/demo/meta/roll.json");
 export const useHero = () => useJson<Hero>("/demo/meta/hero.json");
 
-export const wrap360 = (a: number) => ((a % 360) + 360) % 360;
-export const wrap180 = (a: number) =>
-	((((a % 360) + 540) % 360) - 180) as number;
+import { wrap180, wrap360 } from "#/lib/geodesy";
+
+export { wrap180, wrap360 };
 
 /** DEM skyline elevation (deg) at any azimuth, linearly interpolated round the full circle. */
 export function horizonEl(p: RollPhoto, az: number) {

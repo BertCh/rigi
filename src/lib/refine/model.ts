@@ -30,7 +30,7 @@
  */
 import { type Camera, cameraFromAngles } from "../geo/camera";
 import type { HorizonProfile } from "../geo/horizon";
-import { EARTH_R, REFRACTION_K, wrap360 } from "../geodesy";
+import { DEG, EARTH_R, REFRACTION_K, wrap360 } from "../geodesy";
 
 export const YAW = 0;
 export const PITCH = 1;
@@ -48,7 +48,7 @@ export const PARAM_NAMES = [
 	"dEye",
 ] as const;
 
-export const DEG = Math.PI / 180;
+export { DEG } from "../geodesy";
 
 /** Working image geometry: principal point and the fixed px-per-radian f0. */
 export interface Geometry {

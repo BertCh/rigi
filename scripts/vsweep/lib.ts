@@ -15,10 +15,9 @@ import {
 } from "../../src/lib/geo/camera";
 import type { HorizonProfile } from "../../src/lib/geo/horizon";
 import { horizonAt, projectSkylineRows } from "../../src/lib/geo/solve";
+import { DEG } from "../../src/lib/geodesy";
 import type { Vec3 } from "../../src/lib/linalg";
 import { profilePeaks } from "../../src/lib/peakfix/peaks";
-
-const DEG = Math.PI / 180;
 
 export type Skyline = { rows: Float32Array; weight: Float32Array };
 

@@ -14,9 +14,8 @@ import {
 	unprojectDirX,
 	type Vec3,
 } from "../../concord/core";
+import { DEG as D } from "../../geodesy";
 import type { EyeHorizon } from "../../pose6dof/eye";
-
-const D = Math.PI / 180;
 
 /**
  * A cue as the factors consume it. `residualPx` (WP-C MatchedCue) is only read for "edge" cues: their

@@ -4,6 +4,7 @@
 
 // Colour-vision-deficiency simulation (Machado, Oliveira & Fernandes 2009, severity 1.0) and the
 // CIEDE2000 colour difference, for checking that categorical palettes stay separable. Pure TS.
+import { srgbToLinear } from "../../style/color";
 
 export type Rgb255 = readonly [number, number, number];
 export type Lab = readonly [number, number, number];
@@ -42,10 +43,7 @@ export function hexToRgb255(hex: string): Rgb255 {
 	return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-const toLinear = (c: number) => {
-	const x = c / 255;
-	return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-};
+const toLinear = (c: number) => srgbToLinear(c / 255);
 const toGamma = (x: number) => {
 	const c = Math.min(1, Math.max(0, x));
 	return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);

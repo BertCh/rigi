@@ -8,10 +8,9 @@
 // its centre and wide lenses bend correctly. Azimuths inside one mesh are unwrapped around the
 // photo's yaw (continuous across 0/360); the renderer repeats meshes every 360° for wraparound.
 import { type Pose, projectPoint, unprojectDir } from "../../camera";
-import { wrap180, wrap360 } from "../../geodesy";
+import { DEG as D2R, wrap180, wrap360 } from "../../geodesy";
 
 const R2D = 180 / Math.PI;
-const D2R = Math.PI / 180;
 
 export type PanoMesh = {
 	/** (az, el) per vertex, degrees; az unwrapped around the photo's yaw. */

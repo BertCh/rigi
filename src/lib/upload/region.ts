@@ -11,7 +11,7 @@ import type { SWNE } from "#/lib/ontology/core/geometry";
 // region.
 import { getFlag } from "../flags";
 import { compactLakes, type LakeGeo } from "../geocam/lakes/compact";
-import { EARTH_R } from "../geodesy";
+import { distanceBearing } from "../geodesy";
 import { osmExtractEnabled } from "../licences/config";
 import { namedPeaksInBBox, parseBBox } from "../osm/extract";
 import { type OsmElement, overpass } from "../overpass";
@@ -111,16 +111,6 @@ export function parseTrails(els: OsmElement[]): RegionTrail[] {
 /** A photo this close (km) to a bundled region's centre reuses public/photos/region-*.json. */
 export const BUNDLED_REUSE_KM = 6;
 
-function haversineKm(lat0: number, lon0: number, lat1: number, lon1: number) {
-	const D = Math.PI / 180;
-	const a =
-		Math.sin(((lat1 - lat0) * D) / 2) ** 2 +
-		Math.cos(lat0 * D) *
-			Math.cos(lat1 * D) *
-			Math.sin(((lon1 - lon0) * D) / 2) ** 2;
-	return 2 * (EARTH_R / 1000) * Math.asin(Math.min(1, Math.sqrt(a)));
-}
-
 /**
  * Bundled region covering (lat, lon), if any. ingest.mjs centres a region on its first photo
  * and fetches trails within 12 km of that centre, so only reuse it close to the centre.
@@ -130,7 +120,10 @@ export function bundledRegionIdFor(lat: number, lon: number): string | null {
 	for (const p of bundledPhotos) {
 		if (!p.region || seen.has(p.region)) continue;
 		seen.add(p.region); // first photo of each region = its centre
-		if (haversineKm(lat, lon, p.lat, p.lon) <= BUNDLED_REUSE_KM)
+		if (
+			distanceBearing(lat, lon, p.lat, p.lon).distance / 1000 <=
+			BUNDLED_REUSE_KM
+		)
 			return p.region;
 	}
 	return null;

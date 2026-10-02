@@ -23,6 +23,7 @@ import { viewPeaks } from "../src/lib/geo/peaks";
 import { readPhotoMeta } from "../src/lib/geo/photo-meta";
 import { loadTerrain } from "../src/lib/geo/terrain";
 import {
+	DEG,
 	destination,
 	distanceBearing,
 	EARTH_R,
@@ -59,7 +60,6 @@ import {
 import { fetchPeaks } from "./lib/overpass";
 import { eyeHeight } from "./lib/pipeline-node";
 
-const DEG = Math.PI / 180;
 const POOL = Number(process.env.POOL ?? 8);
 const BRUTE_RANDOM = Number(process.env.BRUTE_RANDOM ?? 36);
 const BRUTE_DIFF = Number(process.env.BRUTE_DIFF ?? 40);
