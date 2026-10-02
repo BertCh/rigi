@@ -102,7 +102,17 @@ export async function readExif(
 			.parse(input as never, { reviveValues: false, gps: true, exif: true })
 			.catch(() => undefined),
 	]);
-	return { tags: (tags ?? {}) as ExifTags, raw: (raw ?? {}) as RawTimeTags };
+	return {
+		tags: withoutErrors(tags) as ExifTags,
+		raw: withoutErrors(raw) as RawTimeTags,
+	};
+}
+
+/** exifr's silentErrors puts parse failures at `errors`: drop it so a broken file reads as "no EXIF". */
+function withoutErrors(out: unknown): Record<string, unknown> {
+	if (!out || typeof out !== "object") return {};
+	const { errors: _errors, ...rest } = out as Record<string, unknown>;
+	return rest;
 }
 
 /**
@@ -143,13 +153,22 @@ export function parseAppleMakerNote(buf: Uint8Array): Record<number, number[]> {
 	return out;
 }
 
-/** Apple MakerNote tag 0x0008 AccelerationVector (units of g, CoreMotion device frame). */
+/** |g| range (units of g) read as a real gravity reading; a zeroed or garbled vector is outside it. */
+export const GRAVITY_NORM_RANGE = [0.5, 2] as const;
+
+/**
+ * Apple MakerNote tag 0x0008 AccelerationVector (units of g, CoreMotion device frame), or null
+ * when absent or implausible (non-finite, or |g| outside GRAVITY_NORM_RANGE: e.g. all-zero
+ * denominators read as 0). Null makes pitch/roll unknown instead of a trusted 0/180° placeholder.
+ */
 function appleGravity(
 	makerNote: Uint8Array | undefined | null,
 ): number[] | null {
 	if (!makerNote) return null;
 	const g = parseAppleMakerNote(makerNote)[0x0008];
-	return g && g.length === 3 ? g : null;
+	if (!g || g.length !== 3 || !g.every(Number.isFinite)) return null;
+	const n = Math.hypot(g[0], g[1], g[2]);
+	return n >= GRAVITY_NORM_RANGE[0] && n <= GRAVITY_NORM_RANGE[1] ? g : null;
 }
 
 const CANDIDATES: { name: Holding; right: Vec3; up: Vec3 }[] = [
@@ -176,10 +195,13 @@ export function orientationFromGravity(
 	const d: Vec3 = [gx / norm, gy / norm, gz / norm];
 	const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 	const displayLandscape = width >= height;
+	// a square image (e.g. a square crop) does not tell the holding apart: let gravity decide
+	const square = width === height;
 	let best: (typeof CANDIDATES)[number] | null = null;
 	let bestDown = Number.NEGATIVE_INFINITY;
 	for (const c of CANDIDATES) {
-		if (c.name.startsWith("landscape") !== displayLandscape) continue;
+		if (!square && c.name.startsWith("landscape") !== displayLandscape)
+			continue;
 		const downDot = -dot(c.up, d);
 		if (downDot > bestDown) {
 			best = c;
@@ -225,6 +247,9 @@ export function outputSize(
 	return { width: Math.round(w * s), height: Math.round(h * s) };
 }
 
+/** GPS week numbering starts in 1980; an earlier GPSDateStamp year is a placeholder. */
+const MIN_GPS_YEAR = 1980;
+
 /**
  * Capture instant as a UTC ISO string: GPS date+time (UTC) first, else DateTimeOriginal +
  * OffsetTimeOriginal (port of ingest.mjs captureTime; raw strings avoid local-zone revival).
@@ -238,6 +263,9 @@ export function captureTime(raw: RawTimeTags): {
 	if (raw.GPSDateStamp && Array.isArray(raw.GPSTimeStamp)) {
 		const [Y, M, D] = raw.GPSDateStamp.split(":").map(Number);
 		const [h, m, sec] = raw.GPSTimeStamp;
+		// a zeroed stamp ("0000:00:00", seen on cameras without a fix) is not a time: fall through
+		const plausible =
+			Y >= MIN_GPS_YEAR && M >= 1 && M <= 12 && D >= 1 && D <= 31;
 		const ms = Date.UTC(
 			Y,
 			M - 1,
@@ -247,7 +275,7 @@ export function captureTime(raw: RawTimeTags): {
 			Math.floor(sec),
 			Math.round((sec % 1) * 1000),
 		);
-		if (Number.isFinite(ms))
+		if (plausible && Number.isFinite(ms))
 			return { utc: new Date(ms).toISOString(), offset, source: "gps" };
 	}
 	if (raw.DateTimeOriginal) {
@@ -281,6 +309,34 @@ function altitudeOf(t: ExifTags): number | null {
 const finite = (v: unknown): v is number =>
 	typeof v === "number" && Number.isFinite(v);
 
+/** FocalLengthIn35mmFormat range read as a real lens (phone ultrawides ≈ 13 mm, superzooms ≈ 3000 mm). */
+export const F35_RANGE = [5, 3000] as const;
+
+/** The EXIF 35 mm-equivalent focal, or null when absent or outside F35_RANGE (0, 1, 65535 placeholders). */
+export function exifF35(t: ExifTags): number | null {
+	const f = t.FocalLengthIn35mmFormat;
+	return finite(f) && f >= F35_RANGE[0] && f <= F35_RANGE[1] ? f : null;
+}
+
+/**
+ * EXIF GPS position, or null when absent or implausible: out of range, or exactly (0, 0)
+ * ("null island", what a receiver without a fix writes). Null asks the user for a pin.
+ */
+export function exifPosition(t: ExifTags): { lat: number; lon: number } | null {
+	const { latitude: lat, longitude: lon } = t;
+	if (!finite(lat) || !finite(lon)) return null;
+	if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+	if (lat === 0 && lon === 0) return null;
+	return { lat, lon };
+}
+
+/** EXIF GPSImgDirection in [0, 360), or null. In-range values are returned unchanged. */
+export function exifHeading(t: ExifTags): number | null {
+	const h = t.GPSImgDirection;
+	if (!finite(h)) return null;
+	return h >= 0 && h < 360 ? h : ((h % 360) + 360) % 360;
+}
+
 export type BuildOptions = {
 	id: string;
 	/** Displayed pixel size of the stored JPEG (after orientation and resize). */
@@ -309,10 +365,8 @@ export function buildPhotoMeta(
 ): LocalPhotoMeta {
 	const { width: w, height: h } = o;
 	const gravity = appleGravity(tags.makerNote);
-	const f35 =
-		finite(tags.FocalLengthIn35mmFormat) && tags.FocalLengthIn35mmFormat > 0
-			? tags.FocalLengthIn35mmFormat
-			: DEFAULT_F35;
+	const exifFocal = exifF35(tags);
+	const f35 = exifFocal ?? DEFAULT_F35;
 	const sensor = { width: tags.ExifImageWidth, height: tags.ExifImageHeight };
 	const source =
 		finite(o.sourceWidth) && finite(o.sourceHeight)
@@ -321,16 +375,12 @@ export function buildPhotoMeta(
 	const vfov = vfovFromF35(f35, w, h, sensor, source);
 	const orient = orientationFromGravity(gravity, w, h);
 	const time = captureTime(raw);
-	const hasGps = finite(tags.latitude) && finite(tags.longitude);
-	const pos =
-		o.position ??
-		(hasGps
-			? { lat: tags.latitude as number, lon: tags.longitude as number }
-			: null);
-	const fromPin = !!o.position || !hasGps;
-	const heading = finite(tags.GPSImgDirection) ? tags.GPSImgDirection : null;
-	let takenAt =
-		time.utc ?? new Date(o.fallbackTime ?? Date.now()).toISOString();
+	const gps = exifPosition(tags);
+	const pos = o.position ?? gps;
+	const fromPin = !!o.position || !gps;
+	const heading = exifHeading(tags);
+	const fallback = finite(o.fallbackTime) ? o.fallbackTime : Date.now();
+	let takenAt = time.utc ?? new Date(fallback).toISOString();
 	let tzOffset = time.offset;
 	let tzEstimated = false;
 	// zone-less wall-clock time: shift from "read as UTC" by a longitude-based zone guess
@@ -375,9 +425,7 @@ export function buildPhotoMeta(
 		local: {
 			yawUnknown: heading == null,
 			pitchRollUnknown: gravity == null,
-			focalUnknown: !(
-				finite(tags.FocalLengthIn35mmFormat) && tags.FocalLengthIn35mmFormat > 0
-			),
+			focalUnknown: exifFocal == null,
 			positionSource: fromPin ? "pin" : "exif",
 			timeSource: time.source ?? "file",
 			...(tzEstimated ? { tzEstimated } : {}),
@@ -395,10 +443,15 @@ export function exifDiagnostics(tags: ExifTags, raw?: RawTimeTags) {
 	const gravity = appleGravity(tags.makerNote);
 	return {
 		hasExif: Object.keys(tags).length > 0,
-		hasGps: finite(tags.latitude) && finite(tags.longitude),
+		hasGps: exifPosition(tags) != null,
+		/** GPS tags present but implausible (out of range or exactly 0, 0): ignored, a pin is needed. */
+		gpsRejected:
+			finite(tags.latitude) &&
+			finite(tags.longitude) &&
+			exifPosition(tags) == null,
 		hasHeading: finite(tags.GPSImgDirection),
 		hasGravity: !!gravity,
-		hasF35: finite(tags.FocalLengthIn35mmFormat),
+		hasF35: exifF35(tags) != null,
 		isApple: /apple/i.test(tags.Make ?? ""),
 		model: tags.Model ?? null,
 		headingMagnetic: tags.GPSImgDirectionRef === "M",

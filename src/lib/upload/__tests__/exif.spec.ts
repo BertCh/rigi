@@ -8,6 +8,9 @@ import {
 	captureTime,
 	DEFAULT_F35,
 	exifDiagnostics,
+	exifF35,
+	exifHeading,
+	exifPosition,
 	MAX_PX,
 	offsetFromLongitude,
 	orientationFromGravity,
@@ -444,6 +447,7 @@ describe("exifDiagnostics", () => {
 		expect(d).toEqual({
 			hasExif: true,
 			hasGps: true,
+			gpsRejected: false,
 			hasHeading: true,
 			hasGravity: true,
 			hasF35: true,
@@ -482,5 +486,116 @@ describe("readExif", () => {
 	it("returns empty tags for bytes that are not an image", async () => {
 		const r = await readExif(Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]));
 		expect(r).toEqual({ tags: {}, raw: {} });
+	});
+});
+
+describe("implausible EXIF values", () => {
+	const o = { id: "x", width: 2048, height: 1536 };
+	it("exifPosition rejects null island and out-of-range coordinates", () => {
+		expect(exifPosition({ latitude: 46.9, longitude: 8.2 })).toEqual({
+			lat: 46.9,
+			lon: 8.2,
+		});
+		expect(exifPosition({ latitude: 0, longitude: 0 })).toBeNull();
+		expect(exifPosition({ latitude: 0, longitude: 8.2 })).not.toBeNull();
+		expect(exifPosition({ latitude: 95, longitude: 8 })).toBeNull();
+		expect(exifPosition({ latitude: 46, longitude: 181 })).toBeNull();
+		expect(exifPosition({ latitude: 46 })).toBeNull();
+	});
+	it("a null-island fix reads as no GPS: pin needed, no altitude trusted", () => {
+		const m = buildPhotoMeta(
+			{ latitude: 0, longitude: 0, GPSAltitude: 0 },
+			{},
+			o,
+		);
+		expect(Number.isNaN(m.lat)).toBe(true);
+		expect(m.alt).toBeNull();
+		expect(m.local.positionSource).toBe("pin");
+		const d = exifDiagnostics({ latitude: 0, longitude: 0 });
+		expect(d.hasGps).toBe(false);
+		expect(d.gpsRejected).toBe(true);
+	});
+	it("exifHeading keeps in-range values bit-identical and wraps the rest", () => {
+		expect(exifHeading({ GPSImgDirection: 123.456789123 })).toBe(123.456789123);
+		expect(exifHeading({ GPSImgDirection: 0 })).toBe(0);
+		expect(exifHeading({ GPSImgDirection: 360 })).toBe(0);
+		expect(exifHeading({ GPSImgDirection: -5 })).toBe(355);
+		expect(exifHeading({ GPSImgDirection: 725 })).toBe(5);
+		expect(exifHeading({ GPSImgDirection: Number.NaN })).toBeNull();
+		expect(buildPhotoMeta({ GPSImgDirection: 360 }, {}, o).heading).toBe(0);
+	});
+	it("an implausible 35 mm focal is unknown and falls back to the default", () => {
+		for (const f of [0, 1, 65535, Number.NaN]) {
+			expect(exifF35({ FocalLengthIn35mmFormat: f })).toBeNull();
+			const m = buildPhotoMeta({ FocalLengthIn35mmFormat: f }, {}, o);
+			expect(m.f35).toBe(DEFAULT_F35);
+			expect(m.local.focalUnknown).toBe(true);
+			expect(exifDiagnostics({ FocalLengthIn35mmFormat: f }).hasF35).toBe(
+				false,
+			);
+		}
+		expect(exifF35({ FocalLengthIn35mmFormat: 13 })).toBe(13);
+		expect(exifF35({ FocalLengthIn35mmFormat: 240 })).toBe(240);
+	});
+	it("a zeroed or garbled gravity vector is unknown, not a level placeholder", () => {
+		for (const g of [
+			[0, 0, 0],
+			[0, -0.1, 0],
+			[0, -5, 0],
+		]) {
+			const m = buildPhotoMeta({ makerNote: makerNote(0x0008, g) }, {}, o);
+			expect(m.gravity).toBeNull();
+			expect(m.local.pitchRollUnknown).toBe(true);
+			expect(m.holding).toBeNull();
+		}
+		const ok = buildPhotoMeta(
+			{ makerNote: makerNote(0x0008, [-1, 0.02, -0.1]) },
+			{},
+			o,
+		);
+		expect(ok.local.pitchRollUnknown).toBe(false);
+		expect(ok.gravity).not.toBeNull();
+	});
+	it("a zeroed GPS date stamp falls through to DateTimeOriginal", () => {
+		const r = captureTime({
+			GPSDateStamp: "0000:00:00",
+			GPSTimeStamp: [0, 0, 0],
+			DateTimeOriginal: "2023:07:01 12:20:30",
+			OffsetTimeOriginal: "+02:00",
+		});
+		expect(r).toEqual({
+			utc: "2023-07-01T10:20:30.000Z",
+			offset: "+02:00",
+			source: "exif",
+		});
+		expect(
+			captureTime({ GPSDateStamp: "1970:01:01", GPSTimeStamp: [0, 0, 0] }).utc,
+		).toBeNull();
+	});
+	it("a non-finite fallback time does not throw", () => {
+		const m = buildPhotoMeta({}, {}, { ...o, fallbackTime: Number.NaN });
+		expect(Number.isFinite(Date.parse(m.takenAt))).toBe(true);
+		expect(m.local.timeSource).toBe("file");
+	});
+	it("a square image lets gravity choose the holding", () => {
+		// portrait-held phone, camera level: device +y is up, gravity along -y
+		expect(orientationFromGravity([0, -1, 0], 1000, 1000)?.holding).toBe(
+			"portrait",
+		);
+		expect(orientationFromGravity([-1, 0, 0], 1000, 1000)?.holding).toMatch(
+			/^landscape/,
+		);
+	});
+});
+
+describe("readExif error output", () => {
+	it("drops exifr's silent `errors` so a broken file reads as no EXIF", async () => {
+		const broken = Uint8Array.from([
+			0xff, 0xd8, 0xff, 0xe1, 0, 10, 0x45, 0x78, 0x69, 0x66, 0, 0, 1, 2,
+		]);
+		const r = await readExif(broken);
+		expect(r.tags).not.toHaveProperty("errors");
+		expect(r.raw).not.toHaveProperty("errors");
+		expect(exifDiagnostics(r.tags).hasExif).toBe(false);
 	});
 });

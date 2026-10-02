@@ -147,10 +147,10 @@ export const regionNames: Record<string, string> = {
 	"region-7": "White Mountains · Mt Washington",
 };
 
-/** Capture time in the photo's own local time (not the viewer's). */
+/** Capture time in the photo's own local time (not the viewer's). The offset may be "+05:30" or EXIF's colon-less "+0530". */
 export function formatTakenAt(p: PhotoMeta) {
 	const d = new Date(p.takenAt);
-	const m = p.tzOffset?.match(/([+-])(\d\d):(\d\d)/);
+	const m = p.tzOffset?.match(/([+-])(\d\d):?(\d\d)/);
 	const offMin = m
 		? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3]))
 		: 0;

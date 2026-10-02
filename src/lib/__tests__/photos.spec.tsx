@@ -175,6 +175,11 @@ describe("formatTakenAt", () => {
 			/Jul 2, 2023|2 Jul 2023|02\.07\.2023|2023/,
 		);
 	});
+	it("accepts EXIF's colon-less offset", () => {
+		expect(fmt("2023-07-01T10:00:00Z", "+0530")).toBe(
+			fmt("2023-07-01T10:00:00Z", "+05:30"),
+		);
+	});
 	it("treats a malformed offset as UTC", () => {
 		expect(fmt("2023-07-01T10:00:00Z", "CEST")).toBe(
 			fmt("2023-07-01T10:00:00Z", null),
