@@ -13,6 +13,9 @@ import { FLAG_NAMES, type FlagSearch, flagSearch } from "#/lib/flags";
 
 import appCss from "../styles.css?url";
 
+const FONTS_HREF =
+	"https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap";
+
 export const Route = createRootRoute({
 	// the app's flags (?renderer, ?gpu, ?tiles3d, …; src/lib/flags) are validated here and carried
 	// across in-app navigation, so a switch set on one page stays on for the next
@@ -42,6 +45,14 @@ export const Route = createRootRoute({
 			},
 		],
 		links: [
+			// fonts load from the head, not an @import in the stylesheet (which chains and blocks render)
+			{ rel: "preconnect", href: "https://fonts.googleapis.com" },
+			{
+				rel: "preconnect",
+				href: "https://fonts.gstatic.com",
+				crossOrigin: "anonymous",
+			},
+			{ rel: "stylesheet", href: FONTS_HREF },
 			{
 				rel: "stylesheet",
 				href: appCss,

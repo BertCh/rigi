@@ -79,14 +79,19 @@ export function LiveRollMap({
 		let live = true;
 		let engine: RollMapEngine | null = null;
 		(async () => {
-			const [{ loadDemoRoll }, { RollMapEngine }] = await Promise.all([
-				import("#/lib/demo"),
-				import("#/lib/roll/map/roll-map"),
-			]);
-			const roll = await loadDemoRoll();
+			const [{ loadDemoRoll }, { loadDemoPeopleMasks }, { RollMapEngine }] =
+				await Promise.all([
+					import("#/lib/demo"),
+					import("#/lib/demo/people-masks"),
+					import("#/lib/roll/map/roll-map"),
+				]);
+			// the landing's 1024 px copies (the engine works at 1024 px anyway), no trails
+			const roll = await loadDemoRoll({ core: true, smallPhotos: true });
 			if (!live) return;
 			engine = new RollMapEngine(canvas, roll, {
 				overviewM: OVERVIEW_M,
+				// baked people masks (scripts/demo/bake-people-masks.mjs): no MediaPipe download
+				peopleMasks: loadDemoPeopleMasks,
 				onSelect: (id) => id && engine?.flyTo(id),
 				onView: (id) => live && setInPhoto(id),
 				onStatus: (s) => {

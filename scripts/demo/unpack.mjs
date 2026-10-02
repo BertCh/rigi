@@ -3,9 +3,11 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Turn an exported upload roll (/dev/export-roll → rigi-roll-<id>.json) into the bundled sample trip:
-// public/demo/manifest.json + photos/ + thumbs/. The whole roll is kept except photos with no pose at
+// public/demo/manifest.json + trails.json + photos/ + thumbs/ (+ photos-1024/, the landing's copies;
+// re-run scripts/demo/bake-people-masks.mjs after a re-unpack). The whole roll is kept except photos with no pose at
 // all (source "prior"; --keep-prior keeps them too); --exclude a,b drops photos by original id.
 //   node scripts/demo/unpack.mjs ~/Downloads/rigi-roll-local-roll-c675ff057c.json --name "…" --place "…"
+import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -85,14 +87,37 @@ function dedupe(xs, key) {
 	return [...m.values()];
 }
 
+// the trails (≈ 90 % of the region) go in their own file, fetched only by what draws them
+// (src/lib/demo: loadDemo merges them back; loadDemoCore leaves them out)
+const { trails, ...regionCore } = region;
 const manifest = {
 	name: opt("name", bundle.roll.name),
 	place: opt("place", ""),
 	photos,
 	poses,
-	region,
+	region: regionCore,
 };
 writeFileSync(join(out, "manifest.json"), JSON.stringify(manifest));
+writeFileSync(join(out, "trails.json"), JSON.stringify(trails));
+
+// the landing's panorama and live map take 1024 px copies (src/lib/demo DEMO_LANDING_LONG); sips
+// quality 65 quantises as finely as the 2048 px originals (IJG ~86)
+rmSync(join(out, "photos-1024"), { recursive: true, force: true });
+mkdirSync(join(out, "photos-1024"), { recursive: true });
+for (const p of photos)
+	execFileSync("sips", [
+		"-Z",
+		"1024",
+		"-s",
+		"format",
+		"jpeg",
+		"-s",
+		"formatOptions",
+		"65",
+		join(out, "photos", `${p.id}.jpg`),
+		"--out",
+		join(out, "photos-1024", `${p.id}.jpg`),
+	]);
 console.log(
 	`kept ${photos.length}, dropped ${dropped.length}: ${dropped.map((p) => `${p.meta.id} (${p.poseSource})`).join(", ")}`,
 );

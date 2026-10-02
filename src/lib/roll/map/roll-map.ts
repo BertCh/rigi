@@ -109,6 +109,13 @@ export type RollMapOptions = {
 	 * also runs for any photo the GPU path can't do (programs unavailable, context lost).
 	 */
 	gpuRange?: boolean;
+	/**
+	 * People masks computed ahead of time (by photo id; null = segmentForeground found none), e.g.
+	 * the sample trip's bake (#/lib/demo/people-masks). They fill the engine's masks before any
+	 * segmentation, so segmentAll skips those photos and, when every photo is covered, never loads
+	 * MediaPipe (#/lib/segment). A rejection falls back to live segmentation. Default: none.
+	 */
+	peopleMasks?: () => Promise<ReadonlyMap<string, ForegroundMask | null>>;
 };
 
 /** Per-path accounting of the range hand-off (debugDrape; EVIDENCE of the GPU path). */
@@ -242,8 +249,10 @@ export class RollMapEngine {
 		const status = this.opts.onStatus;
 		status?.({ stage: "terrain", frac: 0 });
 		const photosP = this.loadPhotos();
-		// people masks need only the pixels: segment them while the terrain streams
-		const masksP = photosP.then(() => this.segmentAll());
+		// people masks need only the pixels: segment them while the terrain streams (after any
+		// precomputed masks are in, so those photos are skipped)
+		const bakedP = this.applyBakedMasks();
+		const masksP = Promise.all([photosP, bakedP]).then(() => this.segmentAll());
 		// the atlas layout needs only the photo sizes: allocate it as soon as the GPU is up
 		void this.ready.then(() => this.makeAtlas());
 		const set = await this.startStreaming();
@@ -596,6 +605,30 @@ export class RollMapEngine {
 			w,
 			h,
 		);
+	}
+
+	/** opts.peopleMasks: the precomputed masks into this.masks, the clear-air fit and the atlas. */
+	private async applyBakedMasks() {
+		const load = this.opts.peopleMasks;
+		if (!load) return;
+		const baked = await load().catch((e) => {
+			console.warn("[roll-map] precomputed people masks unavailable", e);
+			return null;
+		});
+		if (!baked || this.disposed) return;
+		for (const p of this.roll.photos) {
+			const id = p.meta.id;
+			if (!baked.has(id) || this.masks.has(id)) continue;
+			const m = baked.get(id) ?? null;
+			this.masks.set(id, m);
+			this.clear.setForeground(id, m);
+			const k = this.slot.get(id);
+			if (this.atlas && k !== undefined && m) {
+				this.atlas.setMask(k, m);
+				this.atlasChanged();
+			}
+			this.release(id);
+		}
 	}
 
 	/** People masks (#/lib/segment, cached per photo), one photo at a time. */

@@ -15,7 +15,19 @@ export function useDemoRoll() {
 	useEffect(() => {
 		let live = true;
 		import("#/lib/demo")
-			.then((m) => m.loadDemoRoll())
+			// no trails; a photo's 1024 px copy wherever it is as sharp as the full size at the strip's
+			// widest (the screen's long side: the strip is full-bleed, and full screen on a phone)
+			.then((m) =>
+				m.loadDemoRoll({
+					core: true,
+					smallPhotos: (r) =>
+						m.panoramaPxPerDeg(
+							r,
+							Math.max(window.screen.width, window.screen.height) *
+								(window.devicePixelRatio || 1),
+						),
+				}),
+			)
 			.then((r) => live && setRoll(r))
 			.catch(() => {});
 		return () => {

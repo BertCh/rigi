@@ -95,6 +95,8 @@ tools/nearfield/**/*.ply
 
 # Niederhorn demo set (tracked on purpose)
 !public/demo/photos/**
+!public/demo/photos-1024/**
+!public/demo/w/**
 !public/demo/thumbs/**
 !public/demo/shots/**
 !public/demo/step/**

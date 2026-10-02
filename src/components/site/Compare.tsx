@@ -11,6 +11,10 @@ export function Compare({
 	alt,
 	aspect,
 	className,
+	beforeSet,
+	afterSet,
+	sizes,
+	priority = false,
 }: {
 	before: string;
 	after: string;
@@ -18,6 +22,12 @@ export function Compare({
 	/** width / height of both images */
 	aspect: number;
 	className?: string;
+	/** `srcset` of each image; give both the same width candidates (and `sizes`) so they line up. */
+	beforeSet?: string;
+	afterSet?: string;
+	sizes?: string;
+	/** Above the fold: the "before" image is fetched at high priority too (never lazy either way). */
+	priority?: boolean;
 }) {
 	// the divider position lives in refs and is written straight to the DOM: a drag moves a clip
 	// and a CSS left, with no React render per pointer move
@@ -59,6 +69,8 @@ export function Compare({
 		>
 			<img
 				src={after}
+				srcSet={afterSet}
+				sizes={sizes}
 				alt={alt}
 				className="absolute inset-0 size-full object-cover"
 				fetchPriority="high"
@@ -68,6 +80,9 @@ export function Compare({
 			<img
 				ref={clip}
 				src={before}
+				srcSet={beforeSet}
+				sizes={sizes}
+				fetchPriority={priority ? "high" : undefined}
 				alt=""
 				className="absolute inset-0 size-full object-cover"
 				style={{ clipPath: "inset(0 58% 0 0)" }}

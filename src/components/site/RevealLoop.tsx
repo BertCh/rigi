@@ -52,12 +52,19 @@ export function RevealLoop({
 	alt,
 	aspect,
 	className,
+	photoSet,
+	overlaySet,
+	sizes,
 }: {
 	photo: string;
 	overlay: string;
 	alt: string;
 	aspect: number;
 	className?: string;
+	/** `srcset` of the photo and overlay; same width candidates (and `sizes`) so the masks line up. */
+	photoSet?: string;
+	overlaySet?: string;
+	sizes?: string;
 }) {
 	const frame = useRef<HTMLDivElement>(null);
 	const layer = useRef<HTMLDivElement>(null);
@@ -67,9 +74,21 @@ export function RevealLoop({
 		const el = layer.current;
 		const img = over.current;
 		if (!root || !el || !img) return;
+		// skip the style write when neither value moved: the radius to 0.1% (about 0.25 px of the
+		// box's radius), the opacity to 0.01
+		let lastR = Number.NaN;
+		let lastO = Number.NaN;
 		const set = (r: number, o: number) => {
-			el.style.setProperty("--rigi-reveal", `${r}%`);
-			el.style.opacity = String(o);
+			const rq = Math.round(r * 10);
+			const oq = Math.round(o * 100);
+			if (rq !== lastR) {
+				lastR = rq;
+				el.style.setProperty("--rigi-reveal", `${r}%`);
+			}
+			if (oq !== lastO) {
+				lastO = oq;
+				el.style.opacity = String(o);
+			}
 		};
 		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
 			set(FULL, 1);
@@ -160,6 +179,8 @@ export function RevealLoop({
 			<style>{CSS}</style>
 			<img
 				src={photo}
+				srcSet={photoSet}
+				sizes={sizes}
 				alt={alt}
 				className="absolute inset-0 size-full object-cover"
 				loading="lazy"
@@ -169,6 +190,8 @@ export function RevealLoop({
 				<img
 					ref={over}
 					src={overlay}
+					srcSet={overlaySet}
+					sizes={sizes}
 					alt=""
 					className="rigi-reveal-fill absolute inset-0 size-full object-cover"
 					loading="lazy"
@@ -176,6 +199,8 @@ export function RevealLoop({
 				/>
 				<img
 					src={overlay}
+					srcSet={overlaySet}
+					sizes={sizes}
 					alt=""
 					className="rigi-reveal-front absolute inset-0 size-full object-cover"
 					loading="lazy"

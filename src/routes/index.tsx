@@ -49,6 +49,14 @@ const HowItWorksScene = lazy(() =>
 );
 
 const PLACEHOLDER = "bg-white/[0.03] ring-1 ring-white/10";
+/** Width variants of the hero and story stills (scripts/demo/make-landing-variants.sh). */
+const variantSet = (name: string) =>
+	[640, 1024, 1440].map((w) => `/demo/w/${name}-${w}.jpg ${w}w`).join(", ");
+const HERO_SIZES =
+	"(min-width: 1024px) 611px, (min-width: 640px) calc(100vw - 64px), calc(100vw - 32px)";
+const STORY_SIZES =
+	"(min-width: 1280px) 1088px, (min-width: 640px) calc(100vw - 64px), calc(100vw - 32px)";
+
 const PANO_BOX = `h-[380px] rounded-xl ${PLACEHOLDER}`;
 const TOPO_BOX = `h-[min(640px,75vh)] rounded-2xl ${PLACEHOLDER}`;
 const LIVE_BOX = `aspect-[16/10] max-h-[78vh] w-full rounded-2xl ${PLACEHOLDER}`;
@@ -90,7 +98,7 @@ function Home() {
 
 			{/* hero */}
 			<header className="mx-auto grid max-w-6xl items-center gap-10 px-4 pt-12 pb-20 sm:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:pt-16">
-				<FadeIn>
+				<FadeIn cssOnly>
 					<p className="mb-4 font-mono text-[11px] tracking-[0.18em] text-[var(--rigi-glow)] uppercase">
 						Photo-to-terrain alignment, in the browser
 					</p>
@@ -117,11 +125,15 @@ function Home() {
 						</a>
 					</div>
 				</FadeIn>
-				<FadeIn delay={150}>
+				<FadeIn delay={150} cssOnly>
 					<figure>
 						<Compare
 							before="/demo/photos/demo-09.jpg"
 							after="/demo/shots/hero.jpg"
+							beforeSet={variantSet("demo-09")}
+							afterSet={variantSet("hero")}
+							sizes={HERO_SIZES}
+							priority
 							alt="A photo from Niederhorn with the Bernese Alps' peaks named"
 							aspect={4 / 3}
 							className="rounded-xl ring-1 ring-white/10"
@@ -144,6 +156,9 @@ function Home() {
 				<RevealLoop
 					photo="/demo/photos/demo-01.jpg"
 					overlay="/demo/shots/demo-01-overlay.jpg"
+					photoSet={variantSet("demo-01")}
+					overlaySet={variantSet("demo-01-overlay")}
+					sizes={STORY_SIZES}
 					alt="Contours, ridgelines and peak names blooming out over Lake Thun"
 					aspect={4 / 3}
 					className="rounded-2xl ring-1 ring-white/10"

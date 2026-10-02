@@ -7,25 +7,29 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 /**
  * Fades and lifts its children in the first time they scroll into view. `plain` fades opacity only
  * (no transform, so a subtree holding canvases or video is not re-rastered). The transition is
- * dropped once it has finished, so nothing keeps a compositor layer afterwards.
+ * dropped once it has finished, so nothing keeps a compositor layer afterwards. `cssOnly` is for
+ * above-the-fold content: the same fade as a CSS keyframe animation that starts at first paint, so
+ * the server-rendered markup can be the Largest Contentful Paint without waiting for hydration.
  */
 export function FadeIn({
 	children,
 	className,
 	delay = 0,
 	plain = false,
+	cssOnly = false,
 }: {
 	children: ReactNode;
 	className?: string;
 	delay?: number;
 	plain?: boolean;
+	cssOnly?: boolean;
 }) {
 	const ref = useRef<HTMLDivElement>(null);
 	const [on, setOn] = useState(false);
 	const [done, setDone] = useState(false);
 	useEffect(() => {
 		const el = ref.current;
-		if (!el) return;
+		if (!el || cssOnly) return;
 		const io = new IntersectionObserver(
 			([e]) => {
 				if (e.isIntersecting) {
@@ -37,7 +41,16 @@ export function FadeIn({
 		);
 		io.observe(el);
 		return () => io.disconnect();
-	}, []);
+	}, [cssOnly]);
+	if (cssOnly)
+		return (
+			<div
+				className={`${plain ? "rigi-fade-plain" : "rigi-fade-up"} ${className ?? ""}`}
+				style={{ animationDelay: `${delay}ms` }}
+			>
+				{children}
+			</div>
+		);
 	// after the fade, strip every transition/transform class so no layer is promoted
 	const hidden = plain ? "opacity-0" : "translate-y-6 opacity-0";
 	const shown = plain ? "opacity-100" : "translate-y-0 opacity-100";

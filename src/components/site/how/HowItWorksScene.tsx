@@ -483,15 +483,21 @@ function Stage({
 					onPointerUp={onUp}
 					onPointerCancel={onUp}
 				>
-					<img
-						src={scene.photo}
-						alt="Looking south-east from Niederhorn towards the Eiger, Mönch and Jungfrau"
-						draggable={false}
-						className="absolute inset-x-0 top-0 w-full"
-						style={{
-							filter: `brightness(${0.92 - 0.2 * vis.photoLine}) saturate(0.9)`,
-						}}
-					/>
+					{/* brightness(b) = a black overlay at 1 - b (b <= 1), and it commutes with the
+					    saturate: the photo is filtered once, only the overlay's opacity animates */}
+					<div className="absolute inset-x-0 top-0">
+						<img
+							src={scene.photo}
+							alt="Looking south-east from Niederhorn towards the Eiger, Mönch and Jungfrau"
+							draggable={false}
+							className="block w-full"
+							style={{ filter: "saturate(0.9)" }}
+						/>
+						<div
+							className="absolute inset-0 bg-black"
+							style={{ opacity: 0.08 + 0.2 * vis.photoLine }}
+						/>
+					</div>
 					<svg
 						viewBox={`0 0 ${W} ${VH}`}
 						preserveAspectRatio="none"

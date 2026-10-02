@@ -3,7 +3,6 @@
  * SPDX-FileCopyrightText: Copyright (c) Rigi contributors
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
@@ -320,6 +319,43 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* FadeIn `cssOnly`: the transition-based fade (1000 ms ease-out, 1.5rem lift) as a keyframe
+   animation, so it runs from first paint without JS. */
+.rigi-fade-up {
+  animation: rigi-fade-up 1000ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+.rigi-fade-plain {
+  animation: rigi-fade-plain 1000ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+@keyframes rigi-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rigi-fade-plain {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rigi-fade-up,
+  .rigi-fade-plain {
+    animation: none;
   }
 }
 

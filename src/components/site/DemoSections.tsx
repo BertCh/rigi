@@ -30,7 +30,8 @@ export function TopoSection() {
 	useEffect(() => {
 		let live = true;
 		import("#/lib/demo")
-			.then((d) => d.loadDemo())
+			// the board draws photos and poses only: no trails
+			.then((d) => d.loadDemoCore())
 			.then((x) => live && setDemo(x))
 			.catch(() => {});
 		return () => {

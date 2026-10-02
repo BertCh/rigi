@@ -34,25 +34,58 @@ export type DemoManifest = {
 	region: RegionData;
 };
 
-let manifest: Promise<DemoManifest> | null = null;
+let core: Promise<DemoManifest> | null = null;
+let full: Promise<DemoManifest> | null = null;
 
-/** Fetch the manifest once and register every photo (and the shared region) with photos.ts. */
-export function loadDemo(): Promise<DemoManifest> {
-	manifest ??= fetch("/demo/manifest.json")
+/**
+ * The manifest without the region's trails (public/demo/manifest.json, ≈ 0.24 MB; the trails are
+ * public/demo/trails.json, ≈ 2.7 MB): photos, poses, peaks. Registers the photos with photos.ts but
+ * not the region, so loadRegion() never sees a region without its trails; loadDemo() registers it.
+ * For views that draw no trails (the landing's panorama, topo board and live map).
+ */
+export function loadDemoCore(): Promise<DemoManifest> {
+	core ??= fetch("/demo/manifest.json")
 		.then((r) => {
 			if (!r.ok) throw new Error(`demo manifest: HTTP ${r.status}`);
-			return r.json() as Promise<DemoManifest>;
+			return r.json() as Promise<
+				Omit<DemoManifest, "region"> & {
+					region: Omit<RegionData, "trails"> & {
+						trails?: RegionData["trails"];
+					};
+				}
+			>;
 		})
-		.then((m) => {
+		.then((m): DemoManifest => {
 			regionNames[m.region.id] = m.name;
-			for (const p of m.photos) registerLocalPhoto(p, m.region);
-			return m;
+			for (const p of m.photos) registerLocalPhoto(p, null);
+			return { ...m, region: { ...m.region, trails: m.region.trails ?? [] } };
 		})
 		.catch((e) => {
-			manifest = null;
+			core = null;
 			throw e;
 		});
-	return manifest;
+	return core;
+}
+
+/** Fetch the manifest and the trails once and register every photo (and the shared region) with photos.ts. */
+export function loadDemo(): Promise<DemoManifest> {
+	full ??= Promise.all([
+		loadDemoCore(),
+		fetch("/demo/trails.json").then((r) => {
+			if (!r.ok) throw new Error(`demo trails: HTTP ${r.status}`);
+			return r.json() as Promise<RegionData["trails"]>;
+		}),
+	])
+		.then(([m, trails]) => {
+			const region: RegionData = { ...m.region, trails };
+			for (const p of m.photos) registerLocalPhoto(p, region);
+			return { ...m, region };
+		})
+		.catch((e) => {
+			full = null;
+			throw e;
+		});
+	return full;
 }
 
 /** The bundled pose for a demo photo (null for any other id, or before loadDemo). */
@@ -61,13 +94,72 @@ export async function demoPose(id: string): Promise<Pose | null> {
 	return (await loadDemo()).poses[id]?.pose ?? null;
 }
 
+/** Long side (px) of the landing's photo copies (public/demo/photos-1024, from scripts/demo/unpack.mjs). */
+export const DEMO_SMALL_LONG = 1024;
+
+export type DemoRollOptions = {
+	/** The core manifest (loadDemoCore: no trails, region not registered). Landing only. */
+	core?: boolean;
+	/**
+	 * Landing only: point photos' `src` at their 1024 px copies. `true` = every photo (the 3D map,
+	 * whose working copies are 1024 px anyway). A function = the device px per degree the built roll
+	 * will be shown at (e.g. panoramaPxPerDeg): a photo takes its copy only when the copy's texel
+	 * density at its centre is at least that, so the on-screen sharpness never drops (the wide 0.5× shots keep the full size on
+	 * a 2× screen). width/height, and so every layout, stay the originals'; the registered metas
+	 * (photos.ts, /photo/demo-NN) keep the full-size src. /roll/demo passes nothing.
+	 */
+	smallPhotos?: true | ((roll: Roll) => number);
+};
+
+/** PanoramaStrip's fit() pad around the photos' azimuth span. */
+const PANO_FIT_PAD = 1.06;
+
+/**
+ * Device px per degree of a full-width fitted PanoramaStrip of `roll` that is `deviceWidth` px wide:
+ * fit() spreads the photos' azimuth span (×1.06) over the width. The span is measured from the
+ * yaw ± half the horizontal fov of each photo, a lower bound of the meshes' extent (so an upper
+ * bound of the density).
+ */
+export function panoramaPxPerDeg(roll: Roll, deviceWidth: number): number {
+	const covered = new Uint8Array(720);
+	for (const p of roll.photos) {
+		const half = horizontalFovDeg(p.meta, p.pose.vfov) / 2;
+		for (let k = 0; k < 720; k++) {
+			const d = ((((k / 2 - p.pose.yaw + 540) % 360) + 360) % 360) - 180;
+			if (Math.abs(d) <= half) covered[k] = 1;
+		}
+	}
+	let gap = 0;
+	let run = 0;
+	for (let k = 0; k < 1440; k++) {
+		run = covered[k % 720] ? 0 : run + 1;
+		gap = Math.max(gap, run);
+	}
+	const span = Math.max(1, 360 - Math.min(gap, 720) / 2);
+	return deviceWidth / Math.min(360, span * PANO_FIT_PAD);
+}
+
+function horizontalFovDeg(meta: PhotoMeta, vfov: number) {
+	const t = Math.tan((vfov * Math.PI) / 360) * (meta.width / meta.height);
+	return (360 / Math.PI) * Math.atan(t);
+}
+
+/** Texels per degree at the centre of a photo's 1024 px copy (pinhole: the focal length in px). */
+function smallCopyPxPerDeg(meta: PhotoMeta, vfov: number) {
+	const heightPx =
+		(meta.height * DEMO_SMALL_LONG) / Math.max(meta.width, meta.height);
+	return (heightPx / 2 / Math.tan((vfov * Math.PI) / 360)) * (Math.PI / 180);
+}
+
 /** The sample trip as a roll. Photos the user has not touched take the bundled pose. */
-export async function loadDemoRoll(): Promise<Roll> {
+export async function loadDemoRoll(opts: DemoRollOptions = {}): Promise<Roll> {
 	const [m, { makeRoll }] = await Promise.all([
-		loadDemo(),
+		opts.core ? loadDemoCore() : loadDemo(),
 		import("../roll/roll"),
 	]);
-	const roll = makeRoll(DEMO_ROLL_ID, m.name, m.photos, m.region.id);
+	// copies of the metas: the registered ones (photos.ts) keep the full-size src
+	const metas = opts.smallPhotos ? m.photos.map((p) => ({ ...p })) : m.photos;
+	const roll = makeRoll(DEMO_ROLL_ID, m.name, metas, m.region.id);
 	for (const p of roll.photos) {
 		const b = m.poses[p.meta.id];
 		if (!b || p.poseSource === "saved") continue;
@@ -75,5 +167,13 @@ export async function loadDemoRoll(): Promise<Roll> {
 		p.poseSource = b.source;
 		p.confidence = b.confidence;
 	}
+	const need =
+		typeof opts.smallPhotos === "function"
+			? opts.smallPhotos(roll)
+			: opts.smallPhotos;
+	if (need)
+		for (const p of roll.photos)
+			if (need === true || smallCopyPxPerDeg(p.meta, p.pose.vfov) >= need)
+				p.meta.src = `/demo/photos-${DEMO_SMALL_LONG}/${p.meta.id}.jpg`;
 	return roll;
 }
