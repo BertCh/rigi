@@ -43,6 +43,7 @@ import {
 	GPUConditionalOperation,
 	type GPUOperation,
 	GPUProgram,
+	type GPUProgramCompilation,
 	GPUProgramCompiler,
 	GPUProgramScalarLiteral,
 	type GraphBufferHandle,
@@ -66,6 +67,8 @@ const W_GMIN = 0;
 const W_TOL = 1;
 const W_COUNT = 2;
 export const PICK_ARENA_WORDS = 4;
+/** Arena word indices of the read node's first range (scripts/gpu/haze-argmin-dawn.ts). */
+export const PICK_WORDS = { gMin: W_GMIN, tol: W_TOL, count: W_COUNT, over: 3 };
 
 const KEYS = /* wgsl */ `
 fn isNan(b: u32) -> bool { return (b & 0x7fffffffu) > 0x7f800000u; }
@@ -182,11 +185,13 @@ class GraphStep<P> implements GPUOperation {
  * and returns that buffer) on a ComputeGraph adopting the compiler's lowering graph (not compiled).
  * Its read node "pick" holds arena words 0–3 (gMin, tol, count, over), then GRID_PICK_CAP (index,
  * err bits) pairs. Throws when the compiler's arena layout is not the one the kernels address.
+ * `onCompiled` receives the compilation (its lowering report), for the Dawn evidence script.
  */
 export function buildArgminProgram<P>(
 	device: Device,
 	id: string,
 	grid: (g: ComputeGraph<P>) => GraphBufferHandle,
+	onCompiled?: (compilation: GPUProgramCompilation<P>) => void,
 ): ComputeGraph<P> {
 	const program = new GPUProgram({ id });
 	// declared first: arena words 0–3 (checked after compile)
@@ -336,6 +341,7 @@ export function buildArgminProgram<P>(
 	);
 	if (words.some((w, i) => w !== i) || !cg)
 		throw new Error(`${id}: unexpected arena layout ${words.join(",")}`);
+	onCompiled?.(compilation);
 	return cg;
 }
 
