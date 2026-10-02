@@ -1,0 +1,65 @@
+SKYLINE PARALLAX (SKYPAR): wrong-EYE rejection from a depth-mixed skyline        written 2026-10-02, BEFORE any score
+Unit "skypar" (Pod C, wildcard). Study dir tools/research/geo/skypar/. Everything below is frozen before any
+number is computed; amendments go in a timestamped AMENDMENT section at the end, never above. Post-hoc findings
+are labelled POST HOC in REPORT.txt and never change the verdict.
+
+IDEA
+The far skyline cannot see the eye only when every skyline point is at about the same depth. When the skyline mixes
+depths (a near ridge at 2 km, peaks at 30 km) an eye error delta leaves a residual proportional to 1/d per column,
+which rotation cannot absorb. Fit it; reject hypotheses with a significant eye-shaped residual.
+
+KILL CRITERION (fixed, verbatim from the manager)
+"KILL if ANY positive (label POS) that the current gate accepts (e1CUR true) is rejected, OR fewer than 30% of the
+primary NE-dec displaced-eye decoys are rejected, OR fewer than 5 of the 10 E1-NFA-accepted displaced-eye decoys
+(e1AC1, NE-dec) are rejected. Abstentions count as not rejected. Otherwise PASS (dev only)."
+
+DATA (dev only; no test id, no data_v3, no blind pack)
+- out/geocam/decoys/*.json of the main tree (format geocam-decoys/1, E1 hypotheses; 35 dev photos), read-only.
+  Primary cut: secondary == false; drop labels UNL and AMB. Expected n = 787 (POS 33, NB-con 93, NB-dec 597,
+  NE-dec 56, NE-inh 5, NB-inh 3). Per hypothesis: eye {lat,lon,h}, pose {yaw,pitch,roll,vfov} (src/lib/camera
+  convention), image W x H from the file.
+- out/geocam/ga5/hyps.json (read-only) supplies e1CUR (accepted by the current gate) and e1AC1 (accepted by E1's NFA).
+- Photos: tools/bench/data/photos/<pid>.jpg (dev ids only; assertion against tools/bench/split.json dev).
+- DEM: Mapterhorn via scripts/lib/node-io.ts (z17 within 300 m, then MAPTERHORN levels), cache copied from the main
+  tree's .cache/dem-mapterhorn into the worktree.
+
+MODEL
+1. Photo skyline: the app's own sky pipeline run in node: photo resized to W px wide (as in the decoy file),
+   src/lib/sky U2-Net-P model (onnxruntime-web, wasm) -> core.refineToWorking(refine = true) -> toBytes ->
+   skylineFromSky(mask) with its default options (NaN where weight < 0.05). One skyline per photo. No other skyline
+   extractor is tried, no weights are used in the fit.
+2. DEM horizon at the hypothesis eye: computeHorizonFast (src/lib/horizon-fast/march.ts), step 0.05 deg, maxDistance
+   150 km, noRidges, elevation e (deg) and distance d (m) per azimuth, eye = h.eye (lat, lon, h MSL). One horizon per
+   distinct eye (cached).
+3. Predicted skyline: each horizon sample direction directionENU(az, e) is projected with h's pose (pinhole, f =
+   (H/2)/tan(vfov/2), centred principal point, no distortion). Consecutive samples are linearly interpolated to
+   integer columns (topmost row wins); 1/d is interpolated linearly. Output per column: predicted row y_p, slope
+   s = dy/dx of the predicted curve, 1/d.
+4. Valid column: photo row finite, predicted row exists, 1/d finite. No other gating (no hard outlier cut).
+5. Residual r(col) = y_photo - y_pred (px). Linear model, unknown vector theta = [p0, p1, p2, dE, dN, dU]:
+     r = p0 + p1*(x - cx) + p2*s + dE*gE + dN*gN + dU*gU
+   p0 = pitch, p1 = roll, p2 = yaw nuisances (first-order, as specified). g_k(col) is the exact first-order change of
+   the predicted skyline ROW at fixed column per metre of eye displacement along ENU axis k, derived analytically:
+   for the skyline point X = eye + d u (u = unit direction), moving the eye by delta changes the direction by
+   du = -(delta - (u.delta) u)/d, hence the pixel by (dx, dy) = Jproj * R * du, and the row at fixed column by
+   (dy - s dx). Residual sign: a displaced hypothesis eye (hypothesis = truth + delta) has r = -(change) so the
+   fit returns delta-hat = hypothesis eye minus fitted true eye with the sign handled in code and unit-tested.
+   The Jacobians are unit-tested against finite differences of the projection.
+6. Fit: Huber IRLS (k = 1.345), residual scale = 1.4826 * MAD of the residuals (floor 0.5 px) re-estimated every
+   iteration, 40 iterations. Covariance C = scale^2 (A^T W A)^-1 with the final Huber weights. chi2_eye =
+   delta-hat^T C_eye^-1 delta-hat with C_eye the 3x3 eye block; |delta-hat| = Euclid norm in metres.
+7. Abstain (not rejected) when fewer than 60 valid columns, or P90(1/d) - P10(1/d) over valid columns <
+   1/8000 - 1/40000 m^-1 (= 1.0e-4), or the normal matrix is singular.
+8. REJECT iff chi2_eye > chi2_3(0.999) = 16.2662 AND |delta-hat| > 50 m (and not abstained).
+Constants fixed now and not tuned: Huber k 1.345, MAD floor 0.5 px, step 0.05 deg, maxDistance 150 km, 60 columns,
+50 m, 16.2662, depth-diversity 1/8000 - 1/40000.
+
+REPORTED (not gating; all with the same rule)
+- all 33 POS loss; NB-con rejection; NE-dec rejection per displacement distance (150 / 400 m); abstention rate per
+  label; AUROC of chi2_eye for NE-dec vs POS (abstained = chi2 0), descriptive; Clopper-Pearson 95% intervals.
+- Sanity (descriptive): median |r| after fit on POS, to prove the pose/skyline conventions agree.
+
+OUTPUTS
+src/lib/geocam/integrity/skyline-parallax.ts (pure TS, not wired, no flag) + specs; scripts/geocam/skypar-eval.ts;
+tools/research/geo/skypar/{PROTOCOL.txt, REPORT.txt, results.json}; research_notes/skyline-parallax-2026-10-02/README.md.
+Dev numbers are never quoted as results: "dev, n = ..., not a result". No seeds (deterministic).
