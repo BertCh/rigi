@@ -69,13 +69,13 @@ const GIZMO_THUMB = 384;
 /** WorldCamera's fixed arc over the terrain on a fly-in (world-view.ts tick). */
 const WORLD_ARC_M = 600;
 
-/** The mosaic's viewpoint colour (#/lib/roll/mosaic/style) as 0..255 sRGB. */
 /** The selected pin's ring: the brand orange, reserved for selection (viewpoints never use it). */
 const SELECTION_RGBA: [number, number, number, number] = [
 	...(hexToRgb255(BRAND.glow) as unknown as [number, number, number]),
 	255,
 ];
 
+/** The mosaic's viewpoint colour (#/lib/roll/mosaic/style) as 0..255 sRGB. */
 export const viewpointColor = (i: number): [number, number, number] => {
 	const h = vpColor(i);
 	return [1, 3, 5].map((k) => Number.parseInt(h.slice(k, k + 2), 16)) as [
