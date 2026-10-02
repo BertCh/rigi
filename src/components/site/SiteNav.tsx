@@ -54,7 +54,7 @@ export function SiteNav({
 			</Link>
 			<div className="flex items-center gap-1">
 				{/* phones: the three links and the toggle do not fit beside the mark */}
-				<a href="/#how" className={cn(item(false), "max-sm:hidden")}>
+				<Link to="/" hash="how" className={cn(item(false), "max-sm:hidden")}>
 					How it works
 				</a>
 				<Link to="/library" className={item(active === "library")}>
