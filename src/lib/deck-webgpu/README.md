@@ -521,8 +521,9 @@ if (wantWebGpu) {
 ## Upstream: luma.gl / deck.gl issues and PR ideas
 
 Found on deck.gl 9.4.0 / luma.gl 9.4.2, Chrome, Apple Metal; re-checked against luma
-10.0.0-alpha.2 (= luma master `7d1d11e9` in core / webgpu / engine) and deck PR #10752 (what we
-vendor). Each open one has a local workaround.
+10.0.0-alpha.2 (= luma master `7d1d11e9` in core / webgpu / engine), again on
+`10.0.0-alpha.2-rigi.3` (LF7, master `7289d961` + #3313 #3302 #3287 #3328 #3333 #3334 #3330; items 7–12
+are all unchanged, see each) and deck PR #10752 (what we vendor). Each open one has a local workaround.
 
 **deck.gl**
 1. *View `clear: true` on WebGPU opens a render pass inside the open one* → invalid command
@@ -553,24 +554,29 @@ from luma #3325 / `7d1d11e9`; not in deck master, #10752 or any open deck PR; do
 **luma.gl**
 7. *`Model.draw()` does not forward `firstInstance` / `baseVertex`* to `renderPass.draw` → one
    compact instance buffer per group instead of offsets into one (batched terrain). Still present
-   in 10.0.0-alpha.2.
+   in rigi.3: #3333 added `firstIndex` / `instanceCount ?? 1` handling, but `Model.draw` still passes
+   only `firstVertex` / `firstIndex` (`WebGPURenderPass.draw` does accept `firstInstance` /
+   `baseVertex`).
 8. *`generateMipmapsWebGPU` encodes its own passes and submits* → calling it while a render pass
    is open breaks the frame. PR: take a `CommandEncoder` (or queue the work for the next submit);
-   at least document it. Still present in 10.0.0-alpha.2.
+   at least document it. Still present in rigi.3 (`device.submit()` inside the helper).
 9. *WGSL reflection maps `texture_2d<f32>` to sampleType `'float'`* → `r32float` / `rgba32float`
    bindings need `float32-filterable`. PR: derive `unfilterable-float` when the WGSL only uses
-   `textureLoad` on it, or accept a per-binding `sampleType` override in `shaderLayout`.
+   `textureLoad` on it, or accept a per-binding `sampleType` override in `shaderLayout`. Rigi.3: the `shaderLayout`
+   binding type carries `sampleType` and `WebGPUPipelineLayout` honours it (our layers pass it
+   explicitly); reflection itself still derives `'float'`.
 10. *Uniform writes are `queue.writeBuffer`*: a Model drawn twice in one submit with different
     uniforms shows the last values in both draws. PR: a dynamic-offset uniform ring in
-    `UniformStore` (per-draw uniforms without one Model per pass / one buffer per object).
+    `UniformStore` (per-draw uniforms without one Model per pass / one buffer per object). Rigi.3: unchanged (`WebGPUBuffer.write` is `queue.writeBuffer`).
 11. *WGSL preprocessor has no compound expressions*: `#ifdef` / `#ifndef` / `#else` and a simple
     `#if NAME` / `#if !NAME` / `#if defined(NAME)` work in 10.0.0-alpha.2, but `&&` / `||` / `==` do
     not → combined defines are still computed on the CPU (`compositeDefines()`). PR: expression
-    support as in the GLSL path.
+    support as in the GLSL path. Rigi.3: the `#if` evaluator gained `!defined(NAME)` and boolean /
+    numeric literals only; `&&` / `||` / `==` still throw "Unsupported #if expression".
 12. *Uniform layout validation:* since 10.0.0-alpha.2 field names and order are checked against
     the WGSL struct (`validateShaderModuleUniformLayout`, which throws); std140 vs WGSL alignment
     and field types are still unchecked and fail silently (vec3 + scalar packing). PR: extend the
-    check to types and offsets.
+    check to types and offsets. Rigi.3: unchanged (names and order only).
 13. *`copyExternalImage` with an `HTMLImageElement`* uses the given width / height; callers pass
     `.width` (layout size in the DOM). Doc note: prefer `naturalWidth`.
 14. *`TextureReader`-style async readback* (staging buffer pool, 256-byte rows) is re-implemented

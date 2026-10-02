@@ -472,7 +472,7 @@ export class ComputeGraph<P = void> {
 		if (node.workload) computeNode.workload = node.workload;
 		// fixed workgroups: the direct-dispatch geometry upstream program compilers read
 		// (setGPUComputeDispatchWorkgroups's field) to put the node under a GPU predicate
-		// (upstream's setter is not exported from @luma.gl/gpgpu/gpu-core; this applies its validation,
+		// (upstream's setter is not exported from @luma.gl/gpgpu/gpu-core, re-checked on rigi.3; this applies its validation,
 		// non-negative safe integers, but skips the annotation instead of throwing, so an existing node
 		// with other values still compiles exactly as before)
 		if (Array.isArray(node.workgroups)) {

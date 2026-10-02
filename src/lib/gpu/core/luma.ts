@@ -18,10 +18,21 @@
 // - #3312 (props.requiredLimits) and #3313 (WebGPUAdapter.attach) retired the requestDevice patch:
 //   core/device.ts requests the device itself (features + RAISED_LIMITS) and wraps it with
 //   attachWebGPUDevice below; sky/model.ts attaches ORT's device the same way.
-// - Still worked around: Buffer.readAsync on a non-MAP_READ buffer still stages per call, so core/readback.ts keeps its
-//   own MAP_READ slots.
-// - GPUReadbackRing has fixed-size slots; core/readback.ts implements the same ticket pattern with
-//   grow-on-demand slots (re-exported here for callers with a fixed readback size).
+// - rigi.3 re-audit (LF7, vs luma master 7289d961 + #3313 #3302 #3287 #3328 #3333 #3334 #3330):
+//   retired nothing, each item below was re-read in node_modules/@luma.gl/*/dist.
+//   - Buffer.readAsync on a non-MAP_READ buffer: #3330 stages only the requested range, but it still
+//     creates a temporary buffer, waits on onSubmittedWorkDone and submits its own encoder per call.
+//     core/readback.ts keeps its own MAP_READ slots on the caller's encoder (one submit, no allocation).
+//   - GPUReadbackRing has fixed-size slots (byteLength per ring) and its tickets go through
+//     Buffer.readAsync; core/readback.ts implements the same ticket pattern with grow-on-demand slots
+//     (the ring is re-exported here for callers with a fixed readback size).
+//   - core/queue.ts submitWithDefault still calls WebGPUDevice._finalizeDefaultCommandEncoderForSubmit
+//     and reads CommandEncoder._gpuTimeMs (both unchanged in rigi.3; Device.submit's transient upload
+//     buffers are freed by commandBuffer.destroy(), which we also call). deck/device-lost.ts still
+//     reads WebGLDevice._resolveContextLost/_isLost/_lossWasRequested/extensions, gl.lumaState and
+//     the default PipelineFactory's _sharedRenderPipelineCache (unchanged by #3287).
+//   - setGPUComputeDispatchWorkgroups is still not exported from @luma.gl/gpgpu/gpu-core, so
+//     core/graph.ts applies its validation by hand.
 // - GPUProgram / GPUProgramCompiler (semantic scalar ops, literals baked at compile, GPU predicates
 //   lowered to indirect-dispatch gates) are used by look/haze-argmin.ts, with our kernels lowered
 //   into the program's graph through a registered lowering (core/graph.ts ComputeGraph adopts it).

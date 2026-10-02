@@ -114,7 +114,7 @@ function finishAndSubmit(device: Device, enc: CommandEncoder) {
 export const submitted = (enc: CommandEncoder): Promise<void> =>
 	checks.get(enc) ?? OK;
 
-/** luma's WebGPU device internals that Device.submit() itself uses (vendored 10.0.0-alpha.2). */
+/** luma's WebGPU device internals that Device.submit() itself uses (vendored 10.0.0-alpha.2-rigi.3, re-checked LF7; see luma.ts). */
 type LumaSubmitInternals = {
 	_finalizeDefaultCommandEncoderForSubmit?: () => {
 		submittedCommandEncoder: {
