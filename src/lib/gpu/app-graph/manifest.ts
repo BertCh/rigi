@@ -484,6 +484,22 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"certified f32 fold; flagged rows fold on the CPU in f64; fused with the unknown-pose GPU horizon (resident hz primed by the march) on the GPU path",
 	},
 	{
+		id: "ransac",
+		island: "I5",
+		paths: ["src/lib/gpu/ransac/score.ts", "src/lib/pose6dof/ransac/async.ts"],
+		groups: ["ransac"],
+		realms: ["page"],
+		cadence: "per align",
+		resources: [
+			"prm uniform, correspondences N × 32 B, hypotheses K × 64 B (pooled imports)",
+			"score K × 8 B, best 16 B (transients)",
+		],
+		readbacks: ["best: 16 B per batch (winner index, count, cost)"],
+		status: "default",
+		notes:
+			"pose6dof *RansacAsync: K hypotheses × N correspondences per dispatch, arg-max on the GPU; batches under 2^19 work items and missing devices score on the CPU twin (scoreBatchCpu)",
+	},
+	{
 		id: "skyglobal",
 		island: "I5",
 		paths: ["src/lib/gpu/skyglobal/graph.ts", "src/lib/gpu/skyglobal/index.ts"],
