@@ -42,7 +42,8 @@
  *  - p (the 97th percentile): math.ts kthSmallest returns the k-th smallest VALUE; E ≥ +0 and never NaN
  *    (a sum of max(·,0), |·| and products of them with positive constants, stored from +0), so values
  *    order like their u32 bit patterns, and a 3-digit radix select on integer counts finds that
- *    pattern exactly; `|| 1` is applied to the result.
+ *    pattern exactly; `|| 1` is applied to the result. The digit histograms are luma GPUHistogram
+ *    (kernels.wgsl.ts explains why its equal-width binning of u32 keys is the digit exactly).
  *  - coarse, fine (and the sky blur): boxBlur's running float64 accumulator is REPLAYED, one thread per
  *    row / column, acc = 0, ⊕ the 2r+1 clamped taps, then per pixel fround(acc ⊘ k) and
  *    acc ⊕ (a ⊖ b). Integer window sums are not enough: the CPU's accumulator may round (a window
@@ -53,7 +54,8 @@
  *    the CPU) except fg > 0.3 (binary32 widened, compared with the double 0.3: integer compare of bit
  *    patterns) and the prior-row test, which plan.ts bandLimits evaluates with align.ts stopHasBand
  *    itself for every candidate stop (the kernel only tests stop ∈ [lo, hi]).
- *  - colour counts: integer atomics (order-free); the CPU's Float32Array counts are exact below 2^24.
+ *  - colour counts: a luma GPUGroupAggregation count over a key column (integer atomics, order-free);
+ *    the CPU's Float32Array counts are exact below 2^24.
  *  - sky (S then blur), skyCum: fitSkyModel's per-pixel P(sky) depends on the colour bin only, so the
  *    table evaluates its exact double expression once per bin; S gathers it (0.5 under fg > 0.3);
  *    the blur and the column sums replay the CPU accumulators.
@@ -95,6 +97,7 @@ import {
 	defineKernel,
 	warmKernelsAsync,
 } from "#/lib/gpu/core/kernel";
+import { GPUGroupAggregation, GPUHistogram } from "#/lib/gpu/core/luma";
 import { acquire, pooledUniform, withLease } from "#/lib/gpu/core/pool";
 import { readBack } from "#/lib/gpu/core/readback";
 import { getComputeDevice } from "#/lib/gpu/device";
@@ -136,23 +139,14 @@ const EDGE = def("edge", K.EDGE_WGSL, [
 	["blu", ro],
 	["edge", rw],
 ]);
-const HIST0 = def("hist0", K.histWgsl(0), [
-	["dims", un],
-	["edge", ro],
-	["hist", rw],
-]);
-const HIST1 = def("hist1", K.histWgsl(1), [
+const keyLayout: [string, BindKind][] = [
 	["dims", un],
 	["edge", ro],
 	["sel", ro],
-	["hist", rw],
-]);
-const HIST2 = def("hist2", K.histWgsl(2), [
-	["dims", un],
-	["edge", ro],
-	["sel", ro],
-	["hist", rw],
-]);
+	["keys", rw],
+];
+const KEY1 = def("key1", K.radixKeyWgsl(1), keyLayout);
+const KEY2 = def("key2", K.radixKeyWgsl(2), keyLayout);
 const selLayout: [string, BindKind][] = [
 	["dims", un],
 	["hist", ro],
@@ -184,13 +178,14 @@ const SCAN = def("scan", K.SCAN_WGSL, [
 	["lim", ro],
 	["lbl", rw],
 ]);
-const SKY_HIST = def("sky-hist", K.SKY_HIST_WGSL, [
+const SKY_KEY = def("sky-key", K.SKY_KEY_WGSL, [
 	["dims", un],
 	["rgba", ro],
 	["fg", ro],
 	["lbl", ro],
-	["sh", rw],
+	["keys", rw],
 ]);
+const SKY_TOTALS = def("sky-totals", K.SKY_TOTALS_WGSL, [["sh", rw]]);
 const SKY_TABLE = def("sky-table", K.SKY_TABLE_WGSL, [
 	["sh", ro],
 	["table", rw],
@@ -371,13 +366,27 @@ function skyNodes(
 		bindings: { dims, rgba, fg, lim, lbl },
 		workgroups: [cdiv(w, K.WG)],
 	});
-	g.clearNode("clear-sky-counts", sh);
+	// the colour counts: keys → luma GPUGroupAggregation count (hs, ht = words 0..3455; it clears them),
+	// then the two totals ns, nt (words 3456, 3457), so every word of `sh` is written each run
+	const skyKeys = g.transientBuffer("sky-keys", n * 4, STORAGE);
 	g.addKernel({
-		id: "sky-hist",
-		spec: SKY_HIST,
-		bindings: { dims, rgba, fg, lbl, sh },
-		workgroups: [K.HIST_WG],
-		writes: { sh: "atomic" },
+		id: "sky-key",
+		spec: SKY_KEY,
+		bindings: { dims, rgba, fg, lbl, keys: skyKeys },
+		workgroups: [cdiv(n, K.WG)],
+	});
+	g.add(
+		new GPUGroupAggregation({
+			id: "sky-hist",
+			keys: g.view(skyKeys, "uint32", n),
+			output: g.view(sh, "uint32", K.SKY_KEY_COUNT),
+		}),
+	);
+	g.addKernel({
+		id: "sky-totals",
+		spec: SKY_TOTALS,
+		bindings: { sh },
+		workgroups: [1],
 	});
 	g.addKernel({
 		id: "sky-table",
@@ -442,31 +451,38 @@ function buildEdgeGraph(g: G, b: EdgeInputs, w: number, h: number) {
 		bindings: { dims, lum, blu, edge },
 		workgroups: [cdiv(n, K.WG)],
 	});
-	const specs = [
-		[HIST0, SELECT0],
-		[HIST1, SELECT1],
-		[HIST2, SELECT2],
-	] as const;
-	specs.forEach(([hs, ss], p) => {
-		g.clearNode(`clear-hist${p}`, hist[p]);
+	// radix select: pass 0 is a luma GPUHistogram over the edge bits themselves; passes 1 and 2 over a key
+	// column (the digit of the elements matching sel's prefix, else KEY_NONE). Every histogram clears its
+	// own output, so no clear nodes; every select writes all four words of sel (later passes from the
+	// earlier ones' values)
+	const selects = [SELECT0, SELECT1, SELECT2] as const;
+	const keyKernels = [null, KEY1, KEY2] as const;
+	for (const pass of [0, 1, 2] as const) {
+		const bins = K.radixBins(pass);
+		const keys = keyKernels[pass] ? t(`keys${pass}`, n * 4) : null;
+		const spec = keyKernels[pass];
+		if (spec && keys)
+			g.addKernel({
+				id: `key${pass}`,
+				spec,
+				bindings: { dims, edge, sel, keys },
+				workgroups: [cdiv(n, K.WG)],
+			});
+		g.add(
+			new GPUHistogram({
+				id: `hist${pass}`,
+				input: g.view(keys ?? edge, "uint32", n),
+				domain: keys ? [0, bins] : [0, 0xffffffff],
+				output: g.view(hist[pass], "uint32", bins),
+			}),
+		);
 		g.addKernel({
-			id: `hist${p}`,
-			spec: hs,
-			bindings:
-				p === 0
-					? { dims, edge, hist: hist[p] }
-					: { dims, edge, sel, hist: hist[p] },
-			workgroups: [K.HIST_WG],
-			writes: { hist: "atomic" },
-		});
-		// every select writes all four words of sel (later passes from the earlier ones' values)
-		g.addKernel({
-			id: `select${p}`,
-			spec: ss,
-			bindings: { dims, hist: hist[p], sel },
+			id: `select${pass}`,
+			spec: selects[pass],
+			bindings: { dims, hist: hist[pass], sel },
 			workgroups: [1],
 		});
-	});
+	}
 	g.addKernel({
 		id: "norm",
 		spec: NORM,
@@ -595,8 +611,8 @@ function samePlanes(a: EdgeMap, b: EdgeMap, keys: readonly (keyof EdgeMap)[]) {
 	return "";
 }
 
-/** The prep's own buffers: the four outputs and the fg input (written here, once). */
-function allocPlanes(
+/** The prep's own buffers: the four outputs and the fg input (written here, once). Exported for scripts/gpu/photoprep-hist-dawn.ts. */
+export function allocPlanes(
 	device: Device,
 	w: number,
 	h: number,
@@ -632,8 +648,9 @@ function allocPlanes(
 /**
  * The edge graph into `planes` (the prep's buffers): resolves once the run's nonce echoes are back
  * (the percentile chain and the sky chain both ran this time). Throws on GPU errors or a stale echo.
+ * Exported for scripts/gpu/photoprep-hist-dawn.ts.
  */
-async function runEdgeGpu(
+export async function runEdgeGpu(
 	device: Device,
 	rgb: Uint8ClampedArray,
 	w: number,

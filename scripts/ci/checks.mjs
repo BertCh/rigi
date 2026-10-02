@@ -1187,4 +1187,12 @@ export const CHECKS = [
 		note: "GPU relief field on Dawn at res 512 / 1024 / 2048 vs the CPU twin (byte-diff histogram per channel; <= 0.5 % of texels off by > 2, identical coverage), the normal's GPUFiniteDifference2D gradient on phase planes, median wall times, and the texture path's bytes equal the read path's; SKIP without DAWN_DIR",
 		timeoutS: 300,
 	},
+	{
+		id: "photoprep-hist-dawn",
+		tier: "fast",
+		group: "pose",
+		cmd: tsx("scripts/gpu/photoprep-hist-dawn.ts", "3"),
+		note: "the GPU photo prep's edge graph on Dawn at 512x384 / 1024x768 / 2048x1536: radix-select digit histograms (luma GPUHistogram) and sky colour counts (GPUGroupAggregation count) leave the planes Object.is-equal to emulate.ts; median wall times; SKIP without DAWN_DIR",
+		timeoutS: 300,
+	},
 ];

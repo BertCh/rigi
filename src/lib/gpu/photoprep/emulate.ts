@@ -5,7 +5,8 @@
 // JS twin of the photo-prep kernels (./kernels.wgsl.ts), kernel for kernel, on the same u32 planes and
 // with the same integer arithmetic (./softf64.ts is the twin of the WGSL soft-float). For node checks
 // (./photoprep.check.ts): this is what the GPU computes, run where it can be compared with align.ts.
-// Atomic histograms are order-free integer counts, so plain counting is their exact twin.
+// Atomic histograms (luma GPUHistogram / GPUGroupAggregation count here) are order-free integer counts,
+// so plain counting is their exact twin.
 import { NBINS, RADIX_BINS, SKY_HIST_WORDS } from "./kernels.wgsl";
 import * as F from "./softf64";
 

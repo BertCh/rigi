@@ -38,13 +38,13 @@ const LIB = SOFTF64_WGSL + CONSTS;
 
 /** Threads per workgroup of the per-pixel kernels (1-D grid of ⌈n / 64⌉ workgroups). */
 export const WG = 64;
-/** Workgroups of the grid-stride histogram kernels (each flushes its local bins once). */
-export const HIST_WG = 64;
-/** Threads per workgroup of the histogram kernels. */
-export const HIST_THREADS = 256;
 /** Colour bins of align.ts colorBin (12³) and the sky histogram's words (sky, terrain, ns, nt). */
 export const NBINS = 1728;
 export const SKY_HIST_WORDS = 2 * NBINS + 2;
+/** Group keys of the sky colour counts: hs bins, then ht bins (the totals ns, nt follow them in the words). */
+export const SKY_KEY_COUNT = 2 * NBINS;
+/** A key / digit column entry that every luma histogram / aggregation here ignores (outside its domain). */
+export const KEY_NONE = 0xffffffff;
 
 // fg > 0.3 exactly as the CPU compares it: the binary32 value widened (exactly) to binary64 against
 // the double 0.3; fg ≥ +0, so bit patterns order like values
@@ -118,6 +118,12 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 // never NaN, so the order of the values is the order of their u32 bit patterns, and a 3-pass radix
 // select over the digits [31:21], [20:10], [9:0] finds that pattern from integer counts alone.
 // sel = [prefix, rank left, p bits, nonce]; p = the value, or 1.0 when it is 0 (buildEdgeMap's `|| 1`).
+// The digit histograms are luma GPUHistogram over `edge` itself (pass 0: the u32 domain [0, 2^32 - 1] in
+// 2048 equal-width bins maps a value v to bin ⌊v · 2048 / (2^32 - 1)⌋ = v >> 21 exactly: write
+// v = q 2^21 + r, then v 2^11 / (2^32 - 1) = q + (q + r 2^11) / (2^32 - 1) and the fraction is < 1
+// except for v = 2^32 - 1, which the histogram puts in the last bin, as v >> 21) or over a key column
+// (passes 1 and 2: radixKeyWgsl writes the digit when the higher digits equal sel's prefix, else KEY_NONE,
+// which lies outside the domain [0, bins] and is ignored; d · bins / bins = d exactly).
 const RADIX = [
 	{ shift: 21, bits: 11 },
 	{ shift: 10, bits: 11 },
@@ -125,36 +131,23 @@ const RADIX = [
 ] as const;
 /** Radix-select histogram bins (the widest digit). */
 export const RADIX_BINS = 2048;
+/** Bins of the digit histogram of pass `pass` (2048, 2048, 1024). */
+export const radixBins = (pass: 0 | 1 | 2) => 1 << RADIX[pass].bits;
 
-/** Histogram of digit `pass` over the elements whose higher digits equal sel's prefix. */
-export const histWgsl = (pass: 0 | 1 | 2) => {
+/** keys[i] = digit `pass` of edge[i] when its higher digits equal sel's prefix, else KEY_NONE (passes 1 and 2). */
+export const radixKeyWgsl = (pass: 1 | 2) => {
 	const { shift, bits } = RADIX[pass];
-	const match =
-		pass === 0 ? "true" : `(v >> ${RADIX[pass - 1].shift}u) == sel[0]`;
-	// pass 0 has no prefix, so no `sel` binding (layout: dims, edge, hist)
-	const bindings =
-		pass === 0
-			? "@group(0) @binding(2) var<storage, read_write> hist: array<atomic<u32>>;"
-			: "@group(0) @binding(2) var<storage, read> sel: array<u32>;\n@group(0) @binding(3) var<storage, read_write> hist: array<atomic<u32>>;";
 	return /* wgsl */ `${DIMS}
 @group(0) @binding(0) var<uniform> dims: Dims;
 @group(0) @binding(1) var<storage, read> edge: array<u32>;
-${bindings}
-var<workgroup> wg_bins: array<atomic<u32>, ${1 << bits}>;
-@compute @workgroup_size(${HIST_THREADS})
-fn main(@builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wg: vec3<u32>) {
-	for (var j = li; j < ${1 << bits}u; j += ${HIST_THREADS}u) { atomicStore(&wg_bins[j], 0u); }
-	workgroupBarrier();
-	let stride = ${HIST_WG * HIST_THREADS}u;
-	for (var i = wg.x * ${HIST_THREADS}u + li; i < dims.n; i += stride) {
-		let v = edge[i];
-		if (${match}) { atomicAdd(&wg_bins[(v >> ${shift}u) & ${(1 << bits) - 1}u], 1u); }
-	}
-	workgroupBarrier();
-	for (var j = li; j < ${1 << bits}u; j += ${HIST_THREADS}u) {
-		let c = atomicLoad(&wg_bins[j]);
-		if (c != 0u) { atomicAdd(&hist[j], c); }
-	}
+@group(0) @binding(2) var<storage, read> sel: array<u32>;
+@group(0) @binding(3) var<storage, read_write> keys: array<u32>;
+@compute @workgroup_size(${WG})
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+	let i = gid.x;
+	if (i >= dims.n) { return; }
+	let v = edge[i];
+	keys[i] = select(${KEY_NONE}u, (v >> ${shift}u) & ${(1 << bits) - 1}u, (v >> ${RADIX[pass - 1].shift}u) == sel[0]);
 }
 `;
 };
@@ -310,37 +303,39 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
-/** align.ts fitSkyModel's counts: hs (words 0..1727), ht (1728..3455), ns (3456), nt (3457). */
-export const SKY_HIST_WGSL = /* wgsl */ `${DIMS}${LIB}${FG}${BIN}
+/**
+ * align.ts fitSkyModel's counts as group keys: keys[i] = the colour bin of a labelled pixel outside the
+ * mask, in [0, NBINS) for sky and [NBINS, 2 NBINS) for terrain, else KEY_NONE. A luma
+ * GPUGroupAggregation count over them gives hs (words 0..1727) and ht (1728..3455); SKY_TOTALS_WGSL adds
+ * ns and nt (words 3456, 3457).
+ */
+export const SKY_KEY_WGSL = /* wgsl */ `${DIMS}${LIB}${FG}${BIN}
 @group(0) @binding(0) var<uniform> dims: Dims;
 @group(0) @binding(1) var<storage, read> rgba: array<u32>;
 @group(0) @binding(2) var<storage, read> fg: array<u32>;
 @group(0) @binding(3) var<storage, read> lbl: array<u32>;
-@group(0) @binding(4) var<storage, read_write> sh: array<atomic<u32>>;
-var<workgroup> wg_bins: array<atomic<u32>, ${SKY_HIST_WORDS}>;
-@compute @workgroup_size(${HIST_THREADS})
-fn main(@builtin(local_invocation_index) li: u32, @builtin(workgroup_id) wg: vec3<u32>) {
-	for (var j = li; j < ${SKY_HIST_WORDS}u; j += ${HIST_THREADS}u) { atomicStore(&wg_bins[j], 0u); }
-	workgroupBarrier();
-	let stride = ${HIST_WG * HIST_THREADS}u;
-	for (var i = wg.x * ${HIST_THREADS}u + li; i < dims.n; i += stride) {
-		let l = lbl[i];
-		if (l != 0u && !fg_gt03(fg[i])) {
-			let b = color_bin(rgba[i]);
-			if (l == 1u) {
-				atomicAdd(&wg_bins[b], 1u);
-				atomicAdd(&wg_bins[${2 * NBINS}u], 1u);
-			} else {
-				atomicAdd(&wg_bins[${NBINS}u + b], 1u);
-				atomicAdd(&wg_bins[${2 * NBINS + 1}u], 1u);
-			}
-		}
+@group(0) @binding(4) var<storage, read_write> keys: array<u32>;
+@compute @workgroup_size(${WG})
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+	let i = gid.x;
+	if (i >= dims.n) { return; }
+	let l = lbl[i];
+	var key = ${KEY_NONE}u;
+	if (l != 0u && !fg_gt03(fg[i])) {
+		key = color_bin(rgba[i]) + select(${NBINS}u, 0u, l == 1u);
 	}
-	workgroupBarrier();
-	for (var j = li; j < ${SKY_HIST_WORDS}u; j += ${HIST_THREADS}u) {
-		let c = atomicLoad(&wg_bins[j]);
-		if (c != 0u) { atomicAdd(&sh[j], c); }
-	}
+	keys[i] = key;
+}
+`;
+
+/** ns = Σ hs, nt = Σ ht into words 3456 and 3457 (exact integer sums of the counted bins); two threads. */
+export const SKY_TOTALS_WGSL = /* wgsl */ `
+@group(0) @binding(0) var<storage, read_write> sh: array<u32>;
+@compute @workgroup_size(2)
+fn main(@builtin(local_invocation_index) t: u32) {
+	var total = 0u;
+	for (var b = 0u; b < ${NBINS}u; b++) { total += sh[t * ${NBINS}u + b]; }
+	sh[${2 * NBINS}u + t] = total;
 }
 `;
 
