@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BaselineRouteImport } from './routes/baseline'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as LiveRouteImport } from './routes/live'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as DevExportRollRouteImport } from './routes/dev.export-roll'
 import { Route as DevGipfelbuchLiveRouteImport } from './routes/dev.gipfelbuch-live'
@@ -44,6 +45,11 @@ const BaselineRoute = BaselineRouteImport.update({
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveRoute = LiveRouteImport.update({
+  id: '/live',
+  path: '/live',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UploadRoute = UploadRouteImport.update({
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
   '/library': typeof LibraryRoute
+  '/live': typeof LiveRoute
   '/upload': typeof UploadRoute
   '/dev/export-roll': typeof DevExportRollRoute
   '/dev/gipfelbuch-live': typeof DevGipfelbuchLiveRoute
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
   '/library': typeof LibraryRoute
+  '/live': typeof LiveRoute
   '/upload': typeof UploadRoute
   '/dev/export-roll': typeof DevExportRollRoute
   '/dev/gipfelbuch-live': typeof DevGipfelbuchLiveRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/baseline': typeof BaselineRoute
   '/library': typeof LibraryRoute
+  '/live': typeof LiveRoute
   '/upload': typeof UploadRoute
   '/dev/export-roll': typeof DevExportRollRoute
   '/dev/gipfelbuch-live': typeof DevGipfelbuchLiveRoute
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/'
     | '/baseline'
     | '/library'
+    | '/live'
     | '/upload'
     | '/dev/export-roll'
     | '/dev/gipfelbuch-live'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/'
     | '/baseline'
     | '/library'
+    | '/live'
     | '/upload'
     | '/dev/export-roll'
     | '/dev/gipfelbuch-live'
@@ -259,6 +270,7 @@ export interface FileRouteTypes {
     | '/'
     | '/baseline'
     | '/library'
+    | '/live'
     | '/upload'
     | '/dev/export-roll'
     | '/dev/gipfelbuch-live'
@@ -283,6 +295,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BaselineRoute: typeof BaselineRoute
   LibraryRoute: typeof LibraryRoute
+  LiveRoute: typeof LiveRoute
   UploadRoute: typeof UploadRoute
   DevExportRollRoute: typeof DevExportRollRoute
   DevGipfelbuchLiveRoute: typeof DevGipfelbuchLiveRoute
@@ -324,6 +337,13 @@ declare module '@tanstack/react-router' {
       path: '/library'
       fullPath: '/library'
       preLoaderRoute: typeof LibraryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live': {
+      id: '/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof LiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/upload': {
@@ -459,6 +479,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BaselineRoute: BaselineRoute,
   LibraryRoute: LibraryRoute,
+  LiveRoute: LiveRoute,
   UploadRoute: UploadRoute,
   DevExportRollRoute: DevExportRollRoute,
   DevGipfelbuchLiveRoute: DevGipfelbuchLiveRoute,
@@ -481,12 +502,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

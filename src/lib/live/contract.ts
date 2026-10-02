@@ -17,6 +17,8 @@ export interface SensorSample {
 	time: number;
 	/** Heading clockwise from true north (declination applied), or null when the reading is relative only. */
 	yaw: number | null;
+	/** Heading from a relative (non-compass) source, kept when `yaw` is null; arbitrary zero. */
+	yawRelative?: number;
 	pitch: number;
 	roll: number;
 	/** Reported compass accuracy in degrees when the platform gives one. */

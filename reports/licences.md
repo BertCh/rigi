@@ -65,6 +65,12 @@ Owner instruction: "whatever makes the most sense". Primary sources were read on
 | **Near-field research models** (SHARP, MoGe-2 ViT-L, DA3, LaMa, VGGT, and others; research only, none shipped since the near-field service was removed 2026-10-02) | `tools/nearfield/*` studies | **See [`research_notes/step_inside_models_2026-09.md`](../research_notes/step_inside_models_2026-09.md).** In short: MoGe-2 is MIT, DA3-BASE is Apache-2.0, LaMa big-lama is Apache-2.0, **SHARP weights are research-only**, and DA3 Giant, MASt3R, DUSt3R and VGGT-1B (non-Commercial) are NC | Not shipped (`?nearfield=sharp` removed); SHARP must never ship. VGGT-1B-Commercial needs the application | Keep this table and that note in sync |
 | Avoid list | — | FABDEM (NC), OrienterNet (CC BY-NC), SegFormer ADE20k (NVIDIA NC), DA3 Large-1.1 (conflicting) | No | Never add these to product paths |
 
+## Register: model coefficients (added 2026-10-02)
+
+| Item | Where | Licence | Note |
+|---|---|---|---|
+| **World Magnetic Model** (WMM2020, degree and order 4 Gauss coefficients and secular variation, epoch 2020.0) | `src/lib/live/declination.ts` (magnetic declination for the /live compass) | Public domain (NOAA NCEI and BGS, US and UK government work) | Truncated model, about 1 degree in the Alps and up to about 3 degrees elsewhere; coefficients typed from the published model, checked only against published declinations for eight cities (`src/lib/live/__tests__/declination.spec.ts`), not against the official `WMM.COF` file. Replace with the full WMM2025 file before relying on it. |
+
 ## Register: npm libraries (data loaders)
 
 Libraries that parse data at run time, with their notable transitive dependencies (licences read from the installed `node_modules/*/package.json`, 2026-10-01). Both loaders.gl packages are imported only on demand (dynamic `import()`), so they land in their own chunks.

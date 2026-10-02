@@ -151,6 +151,17 @@ export const FLAG_SCHEMA = {
 	propagate: oneOf(["off", "on", "dev"], "off"),
 	/** Align roll: compass-bias anchor window, s (roll/align/viewpoint.ts; unset = BIAS_WINDOW_S, 45 min) */
 	rollBiasWindow: num,
+	// /live (src/routes/live.tsx, src/lib/live): the real-time camera view
+	/** on = /live is offered (route is reachable by URL either way; this gates the sidebar link and tracker wiring) */
+	live: onOff("off"),
+	/** /live target frame rate (default 30; the governor may step below it when throttled) */
+	liveFps: num,
+	/** /live vertical field of view in degrees; unset = phone main-camera default (src/lib/live/camera.ts) */
+	liveVfov: num,
+	/** /live: URL of a recorded clip used as the camera; `<url>.sensors.json` replays sensors (src/lib/live/replay.ts) */
+	liveSource: text,
+	/** /live: fixed magnetic declination in degrees east; unset = compact WMM model at the eye (src/lib/live/declination.ts) */
+	liveDeclination: num,
 	// appearance: applies live (not a RESTART_FLAG); precedence and the boot script are in ./theme-boot.ts
 	theme: oneOf(["auto", "light", "dark"], "auto"),
 	// owned by their stores
