@@ -30,6 +30,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { isStaleOwner } from "./render-lock-lib.mjs";
 
 const DIR =
 	process.env.RIGI_RENDER_LOCK_DIR || join(homedir(), ".cache", "rigi");
@@ -113,8 +114,10 @@ const holder = (dir) => {
 	try {
 		recorded = readFileSync(`${dir}/start`, "utf8").trim();
 	} catch {}
-	const recycled = pid && recorded && alive(pid) && startTime(pid) !== recorded;
-	if (pid && (!alive(pid) || recycled)) {
+	// An unknown current start time (ps failed) never counts as a mismatch: see isStaleOwner.
+	const isAlive = alive(pid);
+	const current = recorded && isAlive ? startTime(pid) : "";
+	if (isStaleOwner({ pid, alive: isAlive, recorded, current })) {
 		rmSync(dir, { recursive: true, force: true });
 		return null;
 	}
