@@ -65,6 +65,7 @@ import {
 	skylineBand,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import { SCENE, sectionHeight } from "#/components/gipfelbuch/viz/scene";
 import { cameraFromAngles, directionENU, project } from "#/lib/geo/camera";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -117,26 +118,13 @@ const sgn = (v: number, d = 1) =>
 	`${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}`;
 
 // =====================================================================================
-// Fig. 1: one ray, marched
+// Fig. D1: one ray, marched over real ground: demo-09's terrain section along its solved bearing (116.1°)
+// from the Niederhorn towards the Schreckhorn (viz/scene.ts, pod D rule D1). The march loop is the
+// code's; only its step is coarser (1 % of distance, the app 0.4 %).
 // =====================================================================================
-const EYE = 1500;
-const DMAX = 60_000;
-// [centre m, summit m, half-width km]
-const RIDGES: [number, number, number][] = [
-	[3500, 1650, 0.7],
-	[10_000, 1900, 1.0],
-	[16_500, 2050, 1.2],
-	[26_000, 2900, 1.6],
-	[50_000, 4200, 1.8],
-];
-function terrainH(d: number) {
-	let e = 1250 + 250 * Math.sin(d / 2300) + 180 * Math.sin(d / 890 + 1);
-	for (const [c, H, w] of RIDGES) {
-		const z = (d - c) / (w * 1000);
-		if (Math.abs(z) < 4) e = Math.max(e, H * Math.exp(-z * z));
-	}
-	return e;
-}
+const EYE = SCENE.eye.m;
+const DMAX = SCENE.section.points[SCENE.section.points.length - 1][0];
+const terrainH = (d: number) => sectionHeight(d);
 
 interface Sample {
 	d: number;
@@ -185,7 +173,7 @@ const RM_LABEL_SMALL = Math.round(((11 * FW) / 720) * 2) / 2;
 const RM_LABEL = Math.round(((13 * FW) / 720) * 2) / 2;
 const PX0 = 46;
 const PX1 = 628;
-const TOP = { y0: 16, y1: 206, lo: 900, hi: 4500 };
+const TOP = { y0: 16, y1: 206, lo: 300, hi: 4000 };
 const BOT = { y0: 252, y1: 344, lo: -1.5, hi: 4.5 };
 const xD = (d: number) => PX0 + (d / DMAX) * (PX1 - PX0);
 const yH = (h: number) =>
@@ -254,7 +242,8 @@ function RayMarch() {
 		<Figure
 			label="Fig. D1"
 			bleed
-			caption="Invented terrain, real method (the real ray is Fig. 2). One bearing, marched step by step (here every 1 % of distance, in the app 0.4 %). Top: ground height with Earth curvature and refraction, and the best sight line so far. Bottom: the elevation angle of each sample; the running maximum becomes the horizon. Scrub the slider; toggle the Earth to watch the horizon jump."
+			pinned={SCENE.id}
+			caption={`Real ground, real method: the terrain under the landing photo's view, from the Niederhorn (${SCENE.eye.m.toLocaleString("en")} m) across Lake Thun, along the solved bearing (116.1°, 0.9° left of the Schreckhorn). One bearing, marched step by step (here every 1 % of distance, in the app 0.4 %). Top: ground height with Earth curvature and refraction, and the best sight line so far. Bottom: the elevation angle of each sample; the running maximum becomes the horizon. Curvature lowers this horizon from ${RAY.off.samples[RAY.off.samples.length - 1].best.toFixed(2)}° to ${RAY.on.samples[RAY.on.samples.length - 1].best.toFixed(2)}°.`}
 		>
 			<div ref={ref}>
 				<svg
@@ -293,7 +282,7 @@ function RayMarch() {
 						</clipPath>
 					</defs>
 					{/* grid: faint pen rules, tick numbers in mono */}
-					{[0, 10, 20, 30, 40, 50, 60].map((km) => (
+					{[0, 5, 10, 15, 20, 25, 30].map((km) => (
 						<g key={km}>
 							<PenLine
 								from={[xD(km * 1000), TOP.y0 - 6]}
@@ -311,7 +300,7 @@ function RayMarch() {
 								halo={0}
 							>
 								{km}
-								{km === 60 ? " km" : ""}
+								{km === 30 ? " km" : ""}
 							</HandLabel>
 						</g>
 					))}
@@ -410,7 +399,7 @@ function RayMarch() {
 						size={RM_LABEL}
 						color={SWISS.ink}
 					>
-						camera
+						Niederhorn
 					</HandLabel>
 					<HandLabel
 						x={PX1 - 4}
@@ -547,7 +536,7 @@ function RayMarch() {
 								onClick={() => setManual(null)}
 								className="bg-[var(--gb-paper-deep)] px-3 py-1.5 gb-secondary hover:text-[var(--gb-ink)]"
 							>
-								play
+								release
 							</button>
 						)}
 					</div>
@@ -1917,8 +1906,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					The horizon is a 360° curve: for every bearing, the highest elevation
 					angle at which land meets sky. A ray marches outward over the terrain
 					and keeps the steepest angle; everything flatter is hidden behind it.
-					Fig. 3 shows it on a real photo. The two figures below use invented
-					terrain and the same method.
+					Fig. 3 shows it on a real photo. Below, Fig. D1 marches the real
+					ground under that photo; Fig. D2 sweeps invented terrain with the same
+					method.
 				</p>
 				<Steps
 					steps={[
@@ -1994,15 +1984,16 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<RayMarch />
 				<Sweep />
 				<p>
-					<CircledNumber value={1} /> First run: flat Earth, horizon on the{" "}
-					<HandMark type="strike">50 km summit</HandMark>{" "}
-					<span className="nb-hand text-[var(--gb-red)]">26 km ridge</span> once
-					the Earth drops.
+					<CircledNumber value={1} /> Flat Earth: the horizon at{" "}
+					<HandMark type="strike">3.23°</HandMark>{" "}
+					<span className="nb-hand text-[var(--gb-red)]">3.11°</span> once the
+					Earth drops, on the same crest 29 km out.
 				</p>
 				<Callout tone="result" title="Why curvature earns its place">
-					In the invented ray, the horizon sits on the 26 km ridge with the
-					Earth&rsquo;s drop and on a 50 km summit without it. On the real photo
-					in Fig. 2 the curve moves it by about 1.5 px. The angular shift is
+					On the real ground of Fig. D1 the drop lowers the 29 km crest by 0.11°
+					and keeps the same crest; with farther, lower ridges behind it, the
+					drop can hand the horizon to a nearer ridge. On the real photo in Fig.
+					2 the curve moves it by about 1.5 px. The angular shift is
 					d/2R&prime;, linear in distance (about 0.004° per km), so far horizons
 					and long lenses are where it bites.
 				</Callout>

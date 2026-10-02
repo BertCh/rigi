@@ -24,6 +24,16 @@ describe("useScript", () => {
 		expect(result.current.playing).toBe(false);
 	});
 
+	it("lets a static reader step: each step shows its own beat, finished", () => {
+		const { result } = renderHook(() => useScript(SCRIPT));
+		for (const i of [0, 1, 2]) {
+			act(() => result.current.seek(i));
+			expect(result.current.manual).toBe(true);
+			expect(result.current.beat.index).toBe(i);
+			expect(result.current.beat.u).toBeGreaterThan(0.99);
+		}
+	});
+
 	it("play keeps the static frame on the result", () => {
 		const { result } = renderHook(() => useScript(SCRIPT));
 		act(() => result.current.play());

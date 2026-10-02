@@ -194,7 +194,7 @@ const EXPLORE_NOTE: Record<string, string> = {
 	guess: "the phone's compass and gravity: a guess",
 	skyline: "the skyline the photo really shows",
 	yaw: `yaw turns the wedge: ${fmt(SOLVED.yaw - PRIOR.yaw)}°, the big error`,
-	pitch: `pitch lifts the line: ${fmt(SOLVED.pitch - PRIOR.pitch)}°`,
+	pitch: `pitch tilts the view up ${fmt(SOLVED.pitch - PRIOR.pitch)}°: the line drops`,
 	roll: `roll tilts it: ${fmt(SOLVED.roll - PRIOR.roll)}°`,
 	focal: `focal length scales it: ${fmt(SCENE.solved.f - SCENE.prior.f, 0)} px`,
 	solved: "four numbers, one pose: the lines agree",
@@ -562,19 +562,20 @@ function PoseExplorer() {
 						</g>
 						<g data-layer="notes">
 							{marks.map(
-								(m) =>
+								(m, i) =>
 									m.p && (
 										<g key={m.name}>
 											<PenLine
 												seed={`pe-mark-${m.name}`}
 												from={[peSx(m.p.u), peSy(m.p.v) - 3]}
-												to={[peSx(m.p.u), peSy(m.p.v) - 15]}
+												to={[peSx(m.p.u), peSy(m.p.v) - (i % 2 ? 29 : 15)]}
 												color="navy"
 												width={1}
 											/>
 											<HandLabel
 												x={peSx(m.p.u)}
-												y={peSy(m.p.v) - 19}
+												// neighbours alternate rows: Finsteraarhorn, Eiger and Mönch sit 4–5° apart
+												y={peSy(m.p.v) - (i % 2 ? 33 : 19)}
 												anchor="middle"
 												caps
 												color="var(--gb-navy)"
@@ -651,8 +652,9 @@ function PoseExplorer() {
 					<Slider
 						label="yaw"
 						value={wrap360(pose.yaw)}
-						min={60}
-						max={200}
+						// the baked horizon spans 31–201°: keep the view inside it
+						min={70}
+						max={165}
 						step={0.5}
 						unit="°"
 						onChange={set("yaw")}

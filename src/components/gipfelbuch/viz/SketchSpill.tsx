@@ -43,7 +43,6 @@ const SAMPLES_PER_SIDE = 90;
 const MAX_SUMMITS_PER_SIDE = 4;
 const SUMMIT_GAP = 6;
 const SUMMIT_LEADER = 14;
-const REVEAL_TRANSITION = "opacity 420ms cubic-bezier(0.33,1,0.68,1)";
 const RIDGE_INK = `var(--fig-terrain-ink, ${SWISS.contour})`;
 const RULER_INK = `var(--fig-horizon-ink, ${SWISS.ink})`;
 const KEY_PROBES = [-0.5, 0, 0.25, 0.5, 0.75, 1, 1.5];
@@ -313,7 +312,7 @@ function Spill({
 		<div
 			aria-hidden
 			data-testid="gb-sketch-spill"
-			className="pointer-events-none absolute -z-10 select-none motion-reduce:transition-none"
+			className="pointer-events-none absolute -z-10 select-none transition-opacity duration-[420ms] ease-[cubic-bezier(0.33,1,0.68,1)] motion-reduce:transition-none"
 			style={{
 				left: -L,
 				top: -RULER_BAND,
@@ -322,7 +321,6 @@ function Spill({
 				maskImage: sides,
 				WebkitMaskImage: sides,
 				opacity: Math.min(1, Math.max(0, reveal)),
-				transition: REVEAL_TRANSITION,
 			}}
 		>
 			<svg

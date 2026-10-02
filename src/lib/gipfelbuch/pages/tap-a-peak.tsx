@@ -44,7 +44,6 @@ import {
 	Steps,
 	Sym,
 	useGipfelbuchPhoto,
-	useTime,
 } from "#/components/gipfelbuch/viz";
 import {
 	Beat,
@@ -57,6 +56,19 @@ import {
 import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
 import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
 import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
+import {
+	horizonEl,
+	peak,
+	SCENE,
+	summitOnSkyline,
+} from "#/components/gipfelbuch/viz/scene";
+import {
+	defineScript,
+	easeOut,
+	ramp,
+	reached,
+} from "#/components/gipfelbuch/viz/script";
+import { useScript } from "#/components/gipfelbuch/viz/useScript";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Tap-a-peak: how a few user taps turn into a pose.
@@ -87,18 +99,29 @@ const CY = 168;
 
 type Cam = { yaw: number; pitch: number; roll: number; f: number };
 
-// ---------- the world: six named summits as (azimuth, apparent elevation) from the eye ----------
+// ---------- the world: six real summits of demo-09 (the landing photo) as (azimuth, apparent elevation) ----------
+// The mountains are real (the DEM horizon and the named summits of viz/scene.ts, pod D rule D1); the camera
+// is synthetic: a schematic frame chosen so all six summits sit inside the plate with margin.
 const PEAKS = [
-	{ name: "A", az: 196, el: 6.1 },
-	{ name: "B", az: 203, el: 4.3 },
-	{ name: "C", az: 209.5, el: 7.4 },
-	{ name: "D", az: 217, el: 5.2 },
-	{ name: "E", az: 224, el: 8.4 },
-	{ name: "F", az: 231, el: 5.6 },
-];
-const TRUTH: Cam = { yaw: 214, pitch: 1.0, roll: 2.2, f: 600 };
-// what the sensors say: compass 6.5 deg off, gravity 1.4 deg off, no roll, lens 7 % short
-const START: Cam = { yaw: 220.5, pitch: -0.4, roll: 0, f: 558 };
+	"Wetterhorn",
+	"Schreckhorn",
+	"Finsteraarhorn",
+	"Eiger",
+	"Mönch",
+	"Jungfrau",
+].map((name) => {
+	const p = peak(name);
+	return { name, ele: p.ele, km: p.km, ...summitOnSkyline(p) };
+});
+// the synthetic camera: it frames the six summits (bearings 107 to 143) with the ridge across the plate
+const TRUTH: Cam = { yaw: 125, pitch: 1.5, roll: 0, f: 600 };
+// what the sensors say: demo-09's real errors (compass, gravity, roll, lens) applied to the synthetic camera
+const START: Cam = {
+	yaw: TRUTH.yaw + (SCENE.prior.yaw - SCENE.solved.yaw),
+	pitch: TRUTH.pitch + (SCENE.prior.pitch - SCENE.solved.pitch),
+	roll: TRUTH.roll + (SCENE.prior.roll - SCENE.solved.roll),
+	f: (TRUTH.f * SCENE.prior.f) / SCENE.solved.f,
+};
 // tap order: far left, far right, then the middle one (roll needs a baseline; focal needs a third)
 const TAP_ORDER = [0, 5, 3];
 // the user's finger is not exact: fixed jitter in px
@@ -210,19 +233,13 @@ function solveTaps(n: number): Cam {
 	return p;
 }
 
-// ---------- the ridge between the summits ----------
-function ridgeEl(az: number) {
-	let e = 1.4 + 0.5 * Math.sin(az * 0.31) + 0.25 * Math.sin(az * 0.83 + 1);
-	for (const p of PEAKS) {
-		const d = (az - p.az) / 2.3;
-		if (Math.abs(d) < 4) e = Math.max(e, p.el * Math.exp(-d * d));
-	}
-	return e;
-}
+// ---------- the ridge between the summits: demo-09's DEM horizon ----------
 function ridgePts(c: Cam) {
 	const pts: [number, number][] = [];
-	for (let az = 168; az <= 262; az += 0.5) {
-		const q = project(c, az, ridgeEl(az));
+	for (let az = c.yaw - 70; az <= c.yaw + 70; az += 0.5) {
+		const el = horizonEl(az);
+		if (el == null) continue;
+		const q = project(c, az, el);
 		if (q && q[0] > -30 && q[0] < W + 30) pts.push(q);
 	}
 	return pts.sort((a, b) => a[0] - b[0]);
@@ -231,7 +248,9 @@ function ridgePts(c: Cam) {
 function ridgeRowAt(c: Cam): (u: number) => number | null {
 	const pts: [number, number][] = [];
 	for (let az = c.yaw - 80; az <= c.yaw + 80; az += 0.5) {
-		const q = project(c, az, ridgeEl(az));
+		const el = horizonEl(az);
+		if (el == null) continue;
+		const q = project(c, az, el);
 		if (q) pts.push(q);
 	}
 	pts.sort((a, b) => a[0] - b[0]);
@@ -253,11 +272,66 @@ const line = (pts: [number, number][]) =>
 		.join("");
 
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
-const ease = (k: number) => k * k * (3 - 2 * k);
 const fmtS = (v: number, d = 1) =>
 	`${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(d)}`;
 
-const STAGE_S = 3.6;
+// The story plays once: the guess, then each tap lands (evidence) and the solver locks more of the pose
+// (change). The kinds keep the script's causal order (a tap after a lock is still part of the solver loop).
+const PINS = defineScript([
+	{ id: "guess", kind: "setup", dur: 2.8, label: "phone's guess" },
+	{ id: "tap-1", kind: "evidence", dur: 1.2, label: "tap 1" },
+	{ id: "lock-1", kind: "change", dur: 1.4, label: "yaw + pitch" },
+	{ id: "tap-2", kind: "change", dur: 1.2, label: "tap 2" },
+	{ id: "lock-2", kind: "change", dur: 1.4, label: "roll" },
+	{ id: "tap-3", kind: "change", dur: 1.2, label: "tap 3" },
+	{ id: "lock-3", kind: "change", dur: 1.4, label: "focal" },
+	{ id: "solved", kind: "result", dur: 4.5, label: "solved" },
+]);
+/** Index of the beat where n taps are locked (the stepper's target for "n taps"). */
+const lockIndex = (n: number) => (n === 0 ? 0 : 2 * n);
+const TAP_FADE_S = 0.42;
+const LOCK_S = 1.4;
+const lerpCam = (a: Cam, b: Cam, k: number): Cam => ({
+	yaw: lerp(a.yaw, b.yaw, k),
+	pitch: lerp(a.pitch, b.pitch, k),
+	roll: lerp(a.roll, b.roll, k),
+	f: lerp(a.f, b.f, k),
+});
+/** The summits of the whole scene as spill labels, placed by the synthetic camera (the margins show those past the frame). */
+const SPILL_SUMMITS = (() => {
+	const six = new Set(PEAKS.map((p) => p.name));
+	const all = [
+		...PEAKS.map((p) => ({
+			name: p.name,
+			az: p.az,
+			el: p.el,
+			ele: p.ele,
+			km: p.km,
+		})),
+		...SCENE.peaks
+			.filter((p) => !six.has(p.name))
+			.map((p) => ({ name: p.name, az: p.az, el: p.el, ele: p.ele, km: p.km })),
+	];
+	return all.flatMap((p) => {
+		const q = project(TRUTH, p.az, p.el);
+		return q
+			? [
+					{
+						u: q[0] / W,
+						row: q[1] / H,
+						name: p.name,
+						sub: `${p.ele} m · ${p.km} km`,
+					},
+				]
+			: [];
+	});
+})();
+const ERR = {
+	yaw: START.yaw - TRUTH.yaw,
+	pitch: START.pitch - TRUTH.pitch,
+	roll: START.roll - TRUTH.roll,
+	lens: (1 - START.f / TRUTH.f) * 100,
+};
 const DOF = [
 	{ key: "yaw" as const, label: "yaw", unlock: 1, unit: "°" },
 	{ key: "pitch" as const, label: "pitch", unlock: 1, unit: "°" },
@@ -269,36 +343,30 @@ const DOF = [
 // Fig. 1: the hero. Each tap locks degrees of freedom; the skyline overlay tightens.
 // ======================================================================================
 function PinLock() {
-	const [ref, t] = useTime<HTMLDivElement>(STAGE_S * 3 + 2.4);
-	const [manual, setManual] = useState<number | null>(null);
+	const clock = useScript<HTMLDivElement>(PINS);
+	const t = clock.t;
 	const poses = useMemo(() => [0, 1, 2, 3].map(solveTaps), []);
 	const truthRidge = useMemo(() => ridgePts(TRUTH), []);
+	const startRidge = useMemo(() => ridgePts(START), []);
 
-	const cyc = t % (STAGE_S * 4);
-	const si = Math.min(3, Math.floor(cyc / STAGE_S));
-	const local = cyc - si * STAGE_S;
-	const k = ease(Math.min(1, local / 1.1));
-	let cam: Cam;
-	let stage: number;
-	if (manual != null) {
-		cam = poses[manual];
-		stage = manual;
-	} else {
-		const prev = poses[Math.max(0, si - 1)];
-		cam = {
-			yaw: lerp(prev.yaw, poses[si].yaw, k),
-			pitch: lerp(prev.pitch, poses[si].pitch, k),
-			roll: lerp(prev.roll, poses[si].roll, k),
-			f: lerp(prev.f, poses[si].f, k),
-		};
-		stage = si;
+	// every overlay is a function of the clock: taps land in their evidence beat, locks ease the pose
+	const stage = [1, 2, 3].filter((n) => reached(PINS, t, `lock-${n}`)).length;
+	const tapsShown = [1, 2, 3].filter((n) =>
+		reached(PINS, t, `tap-${n}`),
+	).length;
+	let cam: Cam = poses[0];
+	for (const n of [1, 2, 3]) {
+		const k = ramp(PINS, t, `lock-${n}`, 0, LOCK_S, easeOut);
+		if (k > 0) cam = lerpCam(poses[n - 1], poses[n], k);
 	}
 	const { yaw, pitch, roll, f } = cam;
 	const pred = useMemo(
 		() => ridgePts({ yaw, pitch, roll, f }),
 		[yaw, pitch, roll, f],
 	);
-	const shown = TAPS.slice(0, stage);
+	const shown = TAPS.slice(0, tapsShown);
+	const tapFade = (n: number) => ramp(PINS, t, `tap-${n + 1}`, 0, TAP_FADE_S);
+	const ghost = ramp(PINS, t, "solved", 0, TAP_FADE_S);
 	const pinned = new Set(shown.map((s) => s.peak));
 	const truthXY = PEAKS.map(
 		(p) => project(TRUTH, p.az, p.el) as [number, number],
@@ -320,20 +388,33 @@ function PinLock() {
 			const g = truthXY[i];
 			return s + (q ? Math.hypot(q[0] - g[0], q[1] - g[1]) : 0);
 		}, 0) / Math.max(1, others.length);
+	// the spill's cursor follows the latest tap while the story runs (the settled frame shows none)
+	const lastTap = shown[shown.length - 1];
+	const cursor =
+		lastTap && clock.beat.beat.id !== "solved"
+			? {
+					u: lastTap.x / W,
+					label: `${Math.round((((TRUTH.yaw + Math.atan((lastTap.x - CX) / TRUTH.f) / DEG) % 360) + 360) % 360)}°`,
+				}
+			: null;
 
 	return (
 		<Figure
 			label="Fig. D1"
 			bleed
+			pinned={SCENE.id}
 			source="Skizze"
-			caption="One made-up photo and six named summits. The phone sensors start the overlay 6.5° off in yaw and 1.4° off in pitch, with a lens 7 % too short. Each tap adds a pin: the ring is your finger, the filled marker is where that summit lands now, the line between them is the miss. Solid cyan: horizon modelled from the terrain. Dashed: the real skyline."
+			caption={`Real mountains (demo-09, the landing photo), synthetic camera. The phone starts ${Math.abs(ERR.yaw).toFixed(1)}° off in yaw, ${Math.abs(ERR.pitch).toFixed(1)}° in pitch and ${Math.abs(ERR.roll).toFixed(1)}° in roll, with a lens ${Math.abs(ERR.lens).toFixed(1)} % too short. Each tap adds a pin: the ring is your finger, the filled marker is where that summit lands now, the line between them is the miss. Solid cyan: horizon modelled from the terrain. Dashed: the real skyline. Faint cyan after the last lock: where the phone started.`}
 		>
-			<div ref={ref} className="-m-1 sm:-m-2">
+			<div ref={clock.ref} className="-m-1 sm:-m-2">
 				{/* the made-up range runs on past the frame: the real ridge stays, the modelled one follows the pins */}
 				<SketchSpill
 					seed="tap-pinlock"
 					bearing={(u) => TRUTH.yaw + Math.atan((u * W - CX) / TRUTH.f) / DEG}
 					label={(deg) => `${(((deg % 360) + 360) % 360).toFixed(0)}°`}
+					summits={SPILL_SUMMITS}
+					cursor={cursor}
+					reveal={1}
 					ridges={[
 						{
 							at: ridgeRowAt(TRUTH),
@@ -363,148 +444,166 @@ function PinLock() {
 								<stop offset="1" stopColor="#7d8da3" />
 							</linearGradient>
 						</defs>
-						<rect width={W} height={H} fill="url(#tp-sky)" />
-						<path
-							d={`${line(truthRidge)} L${W} ${H} L0 ${H} Z`}
-							fill="#1f2a38"
-						/>
-						<SketchPolyline
-							points={truthRidge}
-							seed="tp-truth"
-							data
-							color={PLATE_TEXT}
-							width={1.6}
-							dash="4 4"
-						/>
-						<path
-							d={`M0 ${H} L0 262 C 120 246 260 270 400 256 S 560 250 ${W} 262 L${W} ${H} Z`}
-							fill="#0d1218"
-						/>
+						<g data-layer="ground">
+							<rect width={W} height={H} fill="url(#tp-sky)" />
+							<path
+								d={`${line(truthRidge)} L${W} ${H} L0 ${H} Z`}
+								fill="#1f2a38"
+							/>
+							<path
+								d={`M0 ${H} L0 262 C 120 246 260 270 400 256 S 560 250 ${W} 262 L${W} ${H} Z`}
+								fill="#0d1218"
+							/>
+						</g>
 
-						{/* predicted skyline */}
-						<SketchPolyline
-							points={pred}
-							seed="tp-pred"
-							data
-							color={LAYER_STYLE.solved.color}
-							width={2.4}
-						/>
-
-						{/* summit labels under the current pose */}
-						{PEAKS.map((p, i) => {
-							const q = predXY[i];
-							if (!q) return null;
-							const on = pinned.has(i);
-							return (
-								<g key={p.name}>
-									<SketchPath
-										d={`M${q[0]} ${q[1] - 1} l5 -9 l-10 0 Z`}
-										seed={`tp-tri-${p.name}`}
-										color={on ? PLATE_RED : PLATE_TEXT}
-										width={1.4}
-									/>
-									<HandLabel
-										x={q[0]}
-										y={q[1] - 16}
-										anchor="middle"
-										size={11.5}
-										color={on ? PLATE_RED : PLATE_TEXT}
-										haloColor={PLATE_HALO}
-									>
-										{p.name}
-									</HandLabel>
-								</g>
-							);
-						})}
-
-						{/* taps and residual segments */}
-						{shown.map((tp, n) => {
-							const q = predXY[tp.peak];
-							return (
-								<g key={tp.peak}>
-									{q && (
-										<PenLine
-											from={[q[0], q[1]]}
-											to={[tp.x, tp.y]}
-											seed={`tp-res-${tp.peak}`}
-											data
-											color={PLATE_TEXT}
-											width={1.5}
+						{/* derived: the predicted skyline, the start-pose ghost and the summit marks under the current pose */}
+						<g data-layer="derived">
+							{ghost > 0 && (
+								<SketchPolyline
+									points={startRidge}
+									seed="tp-start"
+									color={LAYER_STYLE.solved.color}
+									width={1.8}
+									dash="3 4"
+									opacity={0.35 * ghost}
+								/>
+							)}
+							<SketchPolyline
+								points={pred}
+								seed="tp-pred"
+								data
+								color={LAYER_STYLE.solved.color}
+								width={2.4}
+							/>
+							{PEAKS.map((p, i) => {
+								const q = predXY[i];
+								if (!q) return null;
+								const on = pinned.has(i);
+								return (
+									<g key={p.name}>
+										<SketchPath
+											d={`M${q[0]} ${q[1] - 1} l5 -9 l-10 0 Z`}
+											seed={`tp-tri-${p.name}`}
+											color={on ? PLATE_RED : PLATE_TEXT}
+											width={1.4}
 										/>
-									)}
-									<PenCircle
-										center={[tp.x, tp.y]}
-										radiusX={9}
-										seed={`tp-ring-${tp.peak}`}
-										data
-										color={PLATE_RED}
-										width={1.8}
-									/>
-									<HandDot
-										x={tp.x}
-										y={tp.y}
-										r={2.2}
-										seed={`tp-dot-${tp.peak}`}
-										data
-										color={PLATE_RED}
-										opacity={1}
-									/>
-									<HandLabel
-										x={tp.x + 13}
-										y={tp.y + 4}
-										size={11.5}
-										color={PLATE_RED}
-										haloColor={PLATE_HALO}
-									>
-										tap {n + 1}
-									</HandLabel>
-								</g>
-							);
-						})}
-						<HandLabel
-							x={W - 10}
-							y={20}
-							anchor="end"
-							size={12.5}
-							color={PLATE_TEXT}
-							haloColor={PLATE_HALO}
-						>
-							{stage === 0
-								? "phone sensors"
-								: `${stage} pin${stage > 1 ? "s" : ""}`}
-						</HandLabel>
-						<HandText
-							x={14}
-							y={44}
-							size={17}
-							color={PLATE_TEXT}
-							rotate={-2}
-							halo={false}
-						>
-							{stage === 0
-								? "cyan misses the ridge: 6.5° off in yaw"
-								: "pinned summits now sit under the finger"}
-						</HandText>
-						<PenArrow
-							from={[150, 52]}
-							to={[190, 110]}
-							seed="tp-note-arrow"
-							color={PLATE_TEXT}
-							width={1.3}
-						/>
-						{stage >= 2 && (
-							<HandText
-								x={W - 14}
-								y={H - 22}
-								size={16}
+										<HandLabel
+											x={q[0]}
+											// neighbours alternate between two rows: the six names sit 4–6° apart
+											y={q[1] - (i % 2 ? 30 : 16)}
+											anchor="middle"
+											size={11.5}
+											caps
+											color={on ? PLATE_RED : PLATE_TEXT}
+											haloColor={PLATE_HALO}
+										>
+											{p.name}
+										</HandLabel>
+									</g>
+								);
+							})}
+						</g>
+
+						{/* measured: the real ridge (dashed) and the taps with their residual segments */}
+						<g data-layer="measured">
+							<SketchPolyline
+								points={truthRidge}
+								seed="tp-truth"
+								data
+								color={PLATE_TEXT}
+								width={1.6}
+								dash="4 4"
+							/>
+							{shown.map((tp, n) => {
+								const q = predXY[tp.peak];
+								return (
+									<g key={tp.peak} opacity={tapFade(n)}>
+										{q && (
+											<PenLine
+												from={[q[0], q[1]]}
+												to={[tp.x, tp.y]}
+												seed={`tp-res-${tp.peak}`}
+												data
+												color={PLATE_TEXT}
+												width={1.5}
+											/>
+										)}
+										<PenCircle
+											center={[tp.x, tp.y]}
+											radiusX={9}
+											seed={`tp-ring-${tp.peak}`}
+											data
+											color={PLATE_RED}
+											width={1.8}
+										/>
+										<HandDot
+											x={tp.x}
+											y={tp.y}
+											r={2.2}
+											seed={`tp-dot-${tp.peak}`}
+											data
+											color={PLATE_RED}
+											opacity={1}
+										/>
+										<HandLabel
+											x={tp.x + 13}
+											y={tp.y + 4}
+											size={11.5}
+											color={PLATE_RED}
+											haloColor={PLATE_HALO}
+										>
+											tap {n + 1}
+										</HandLabel>
+									</g>
+								);
+							})}
+						</g>
+						<g data-layer="notes">
+							<HandLabel
+								x={W - 10}
+								y={20}
 								anchor="end"
-								color={PLATE_RED}
-								rotate={2}
+								size={12.5}
+								color={PLATE_TEXT}
+								haloColor={PLATE_HALO}
+							>
+								{tapsShown === 0
+									? "phone sensors"
+									: `${tapsShown} pin${tapsShown > 1 ? "s" : ""}`}
+							</HandLabel>
+							<HandText
+								x={14}
+								y={44}
+								size={17}
+								color={PLATE_TEXT}
+								rotate={-2}
 								halo={false}
 							>
-								two far-apart pins fix the tilt: roll ✓
+								{tapsShown === 0
+									? `cyan misses the ridge: ${Math.abs(ERR.yaw).toFixed(1)}° off in yaw`
+									: "pinned summits now sit under the finger"}
 							</HandText>
-						)}
+							<PenArrow
+								from={[150, 52]}
+								to={[190, 110]}
+								seed="tp-note-arrow"
+								color={PLATE_TEXT}
+								width={1.3}
+							/>
+							{stage >= 2 && (
+								<HandText
+									x={W - 14}
+									y={H - 22}
+									size={16}
+									anchor="end"
+									color={PLATE_RED}
+									rotate={2}
+									halo={false}
+								>
+									two far-apart pins fix the tilt: roll ✓
+								</HandText>
+							)}
+						</g>
 					</svg>
 				</SketchSpill>
 			</div>
@@ -520,8 +619,8 @@ function PinLock() {
 							<button
 								key={n}
 								type="button"
-								aria-pressed={stage === n && manual != null}
-								onClick={() => setManual(n)}
+								aria-pressed={stage === n && clock.manual}
+								onClick={() => clock.seek(lockIndex(n))}
 								className={`px-3 py-1 font-mono transition ${
 									stage === n
 										? "bg-[var(--nb-highlight,var(--accent))] gb-ink underline decoration-[var(--nb-red)] decoration-2 underline-offset-4"
@@ -533,10 +632,10 @@ function PinLock() {
 						))}
 						<button
 							type="button"
-							onClick={() => setManual(null)}
-							className={`bg-[var(--nb-paper-deep)] px-3 py-1 font-mono gb-secondary transition ${TYPE.micro}`}
+							onClick={() => clock.play()}
+							className={`bg-[var(--nb-paper-deep)] px-3 py-1 font-mono gb-secondary transition print:hidden ${TYPE.micro}`}
 						>
-							{manual != null ? "↻ autoplay" : "auto-playing"}
+							▶ again
 						</button>
 					</div>
 					<ul className="grid list-none grid-cols-2 gap-2 sm:grid-cols-4">

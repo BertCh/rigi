@@ -42,6 +42,7 @@ import {
 	StoryMap,
 	Sym,
 	useGipfelbuchPhoto,
+	useMotionAllowed,
 	useReducedMotion,
 	useTime,
 } from "#/components/gipfelbuch/viz";
@@ -255,6 +256,7 @@ const FIG_NAME = 13.5;
 
 function PoseJourney() {
 	const reduce = useReducedMotion();
+	const motion = useMotionAllowed();
 	const [ref, t] = useTime<HTMLDivElement>(LOOP - 0.5);
 	const [sel, setSel] = useState(1);
 	const [clock0, setClock0] = useState(0);
@@ -265,7 +267,8 @@ function PoseJourney() {
 	const pick = (i: number) => {
 		setSel(i);
 		setManual(null);
-		setClock0(t);
+		// a static figure (webdriver, print) is pinned at its end: picking shows that end, not t = 0
+		setClock0(motion ? t : 0);
 	};
 
 	const off = offsetAt(sc, T);
@@ -697,7 +700,7 @@ function PoseJourney() {
 						readout={`${T.toFixed(1)} s`}
 						manual={manual != null}
 						onResume={() => {
-							setClock0(t);
+							setClock0(motion ? t : 0);
 							setManual(null);
 						}}
 					/>

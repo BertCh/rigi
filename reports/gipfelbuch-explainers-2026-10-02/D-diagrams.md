@@ -94,13 +94,13 @@ The landing explains one thing: the guess, measure, correct, snap of one photo. 
 
 ## 2. The overlay stack for diagrams
 
-This is grammar §2 mapped to drawn diagrams. One `<g data-layer=…>` per role, in this order:
+This is grammar §2 (v0.2: derived under measured, so the thin data line draws over the thicker model line) mapped to drawn diagrams. One `<g data-layer=…>` per role, in this order:
 
 | z | Role | In a diagram | Ink, weight | Provenance |
 | --- | --- | --- | --- | --- |
 | 0 | `ground` | Wash, sky hachure, **construction pencil** (grid, axes, range rings, frame, construction rays) | Pencil or faint, 0.5–0.9; hachure 0.7 | Furniture |
-| 2 | `measured` | What the (synthetic) sensor saw: the photo's skyline, tap rings, observed columns, terrain section | Measured ink 1.7, one pen pass (`data`) | Measured on the real scene, or synthetic and said so |
-| 3 | `derived` | The model at the current state: horizon at a pose, running maximum, residual stems, cost bar, wedge | Derived ink 2.2, `prior` dashed | Computed per frame from the clock |
+| 2 | `derived` | The model at the current state: horizon at a pose, running maximum, residual stems, cost bar, wedge | Derived ink 2.2, `prior` dashed | Computed per frame from the clock |
+| 3 | `measured` | What the (synthetic) sensor saw: the photo's skyline, tap rings, observed columns, terrain section | Measured ink 1.7, one pen pass (`data`) | Measured on the real scene, or synthetic and said so |
 | 4 | `furniture` | Arrows, rings, strikes, leaders, the correction arc | Pencil 1.2; one red per figure | Furniture |
 | 5 | `notes` | HandLabel, HandNote, circled keys, live readouts on the drawing | Ink; red numbers | – |
 | 6 | `interaction` | Cursor, scrub head, the "again" button | Ink | – |
@@ -111,7 +111,7 @@ This is grammar §2 mapped to drawn diagrams. One `<g data-layer=…>` per role,
 
 ## 3. The animation script
 
-- **Clock.** Pod G's `useBeatClock(beats, { playback: "once", fps: 30, arm: ARM_SEQUENCE })`, which lands in motion.ts. Until then the same contract is in pod D's `viz/script.ts` and `viz/useScript.ts`, to be deleted when it lands.
+- **Clock.** Pod G's `useBeatClock(beats, { playback: "once", fps: 30, arm: ARM_SEQUENCE })` (motion.ts, d9b7320). Pod D's interim `viz/script.ts` / `viz/useScript.ts` are folded into it and deleted.
 - **Commits.** The clock commits at most 30 times a second, only while a beat plays, and stops at the result.
 - **Arm and replay.** It arms at a 0.45 visible share, pauses off screen, and replays on return after the share drops below 0.2, on a hover rest of 350 ms, on a tap, or from the "again" button.
 - **Beats** (grammar §1.3). One idea per beat:
@@ -130,7 +130,7 @@ This is grammar §2 mapped to drawn diagrams. One `<g data-layer=…>` per role,
 | Figure | Beats (kind: what changes) | Settled frame |
 | --- | --- | --- |
 | pose-estimate `PoseExplorer` (main-body hero) | setup: the plan wedge and the image at the real phone prior (134.6°), summits named → evidence: the photo's skyline draws on (the horizon at the solved pose, measured ink) → change yaw: 134.6 → 116.1, the wedge turns and the model slides 18.5° → change pitch: −13.6 → −12.6 → change roll: −0.2 → +0.7 → change focal: 601 → 613 px → result: the lines coincide, the guess becomes a ghost, the note reads "the compass was 18.5° off; gravity and lens nearly right" | The solved pose with the guess ghost; the sliders are live |
-| tap-a-peak `PinLock` | setup: guess at the real prior → evidence: tap 1 on Eiger (ring) → change: yaw and pitch lock → evidence: tap 2 on Wetterhorn → change: roll locks → evidence: tap 3 on Jungfrau → change: focal locks → result. The spill cursor marks each tap bearing. | 3 taps, all locked, ghost of the prior line |
+| tap-a-peak `PinLock` | setup: guess at the real prior → evidence: tap 1 on Wetterhorn (ring) → change: yaw and pitch lock → evidence: tap 2 on Jungfrau → change: roll locks → evidence: tap 3 on Eiger → change: focal locks → result. The spill cursor marks each tap bearing. | 3 taps, all locked, ghost of the prior line |
 | dem-horizon `RayMarch` | setup: the real demo-09 section along 116.1° from Niederhorn, eye 1,915 m → change: the march runs 0 → 33 km (linear in story time), the running max climbs → result: the horizon point and angle, ghost of the flat-earth answer when curvature changes it | End of the march |
 | dem-horizon `Sweep` | setup → change: 360° sweep → result. A distance legend is added and the profile is chunked (perf). | Full profile |
 | rigi `Registration` | setup: 3.4° off → change: converge → result: hold (the drift-away phase is cut) | Within 1°, verdict |

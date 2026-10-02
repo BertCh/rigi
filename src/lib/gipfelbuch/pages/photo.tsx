@@ -205,7 +205,8 @@ function Anatomy({
 	const [ref, t] = useTime<HTMLDivElement>(9.6);
 	const [picked, setPicked] = useState<number | null>(null);
 	// plays the four layers once, then rests on the last
-	const auto = reduced ? 3 : Math.min(Math.floor(t / 3.2), 3);
+	// + 1e-6: 9.6 / 3.2 is 2.9999999999999996 in floats, and the still frame must reach the last layer
+	const auto = reduced ? 3 : Math.min(Math.floor(t / 3.2 + 1e-6), 3);
 	const i = picked ?? auto;
 	const L = LAYERS[i];
 	const W = 400;

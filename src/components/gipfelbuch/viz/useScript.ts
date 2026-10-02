@@ -63,6 +63,8 @@ export function useScript<T extends Element = HTMLDivElement>(
 	const [playing, setPlaying] = useState(false);
 	const [manual, setManual] = useState(false);
 	const visible = useRef(false);
+	// the reader's step or scrub: the observer must neither restart nor resume the story over it
+	const manualRef = useRef(false);
 	const elapsed = useRef(0);
 	const played = useRef(false);
 	const raf = useRef(0);
@@ -128,6 +130,7 @@ export function useScript<T extends Element = HTMLDivElement>(
 					elapsed.current >= settle
 				)
 					played.current = false; // scrolled away after the end: replay on return
+				if (manualRef.current) return;
 				if (r >= SCRIPT_START_RATIO && !played.current) {
 					played.current = true;
 					elapsed.current = 0;
@@ -152,16 +155,13 @@ export function useScript<T extends Element = HTMLDivElement>(
 		// the reader's manual state is read through refs; the observer is set up once per script
 	}, [settle, run]);
 
-	// a manual step or scrub must not be overridden by the observer's resume
-	useEffect(() => {
-		if (manual) played.current = true;
-	}, [manual]);
-
 	const seek = useCallback(
 		(index: number) => {
 			stop();
+			manualRef.current = true;
 			setManual(true);
-			elapsed.current = stepTime(script, index);
+			// just inside the beat's end, so it samples as that beat, finished
+			elapsed.current = Math.max(0, stepTime(script, index) - 1e-3);
 			setT(elapsed.current);
 		},
 		[script, stop],
@@ -169,6 +169,7 @@ export function useScript<T extends Element = HTMLDivElement>(
 	const scrub = useCallback(
 		(v: number) => {
 			stop();
+			manualRef.current = true;
 			setManual(true);
 			elapsed.current = Math.max(0, Math.min(settle, v));
 			setT(elapsed.current);
@@ -176,6 +177,7 @@ export function useScript<T extends Element = HTMLDivElement>(
 		[settle, stop],
 	);
 	const play = useCallback(() => {
+		manualRef.current = false;
 		setManual(false);
 		played.current = true;
 		elapsed.current = 0;
@@ -191,8 +193,9 @@ export function useScript<T extends Element = HTMLDivElement>(
 
 	return {
 		ref,
-		t: still ? settle : t,
-		beat: beatAt(script, still ? settle : t),
+		// static shows the result until the reader steps or scrubs
+		t: still && !manual ? settle : t,
+		beat: beatAt(script, still && !manual ? settle : t),
 		playing,
 		still,
 		manual,
