@@ -4,7 +4,7 @@
 
 // The mosaic view of a roll: panorama strip on top, then the justified grid next to a plan-view
 // mini map (stacked when `compact`, e.g. the left half of the split view).
-import { Clock, MapPin } from "lucide-react";
+import { Clock, MapPin, Palette } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Roll } from "../types";
 import { PanoramaStrip } from "./PanoramaStrip";
@@ -88,6 +88,7 @@ export function RollMosaic({
 								[
 									["viewpoint", "Viewpoint", MapPin],
 									["time", "Time", Clock],
+									["look", "Look", Palette],
 								] as const
 							).map(([k, label, Icon]) => (
 								<button

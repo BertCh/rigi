@@ -3,13 +3,16 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Justified-rows photo grid (aspect-preserving rows of equal height, like Google Photos),
-// grouped by viewpoint or by time (a new group per day, or after a two-hour break).
+// grouped by viewpoint, by time (a new group per day, or after a two-hour break) or by look (k-means
+// over each photo's colour embedding, read lazily from its thumbnail; time grouping until it is ready).
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { PaletteColor } from "#/lib/gpu/palette";
+import { useLookGroups } from "../look/useLookGroups";
 import type { Roll, RollPhoto } from "../types";
 import { HeadingChip, PoseBadge } from "./badges";
 import { aspectOf, dayKey, fmtDay, fmtTime, vpColor } from "./style";
 
-export type GroupBy = "viewpoint" | "time";
+export type GroupBy = "viewpoint" | "time" | "look";
 
 /** A break longer than this (s) starts a new time group. */
 const SESSION_GAP_S = 2 * 3600;
@@ -19,6 +22,8 @@ type Group = {
 	title: string;
 	sub: string;
 	color?: string;
+	/** the group's colours (look grouping), shown as dots in the header */
+	palette?: PaletteColor[];
 	photos: RollPhoto[];
 };
 
@@ -27,6 +32,7 @@ export function groupPhotos(
 	photos: RollPhoto[],
 	by: GroupBy,
 ): Group[] {
+	// "look" groups come from useLookGroups (RollGrid); until they exist it reads as time
 	if (by === "viewpoint") {
 		const plural = (n: number) => `${n} photo${n === 1 ? "" : "s"}`;
 		const multi: Group[] = [];
@@ -140,10 +146,43 @@ export function RollGrid({
 		ro.observe(el);
 		return () => ro.disconnect();
 	}, []);
-	const groups = useMemo(
-		() => groupPhotos(roll, photos, groupBy),
-		[roll, photos, groupBy],
+	const lookPhotos = useMemo(
+		() => photos.map((p) => ({ id: p.meta.id, src: p.meta.src })),
+		[photos],
 	);
+	const look = useLookGroups(lookPhotos, groupBy === "look");
+	const groups = useMemo(() => {
+		if (groupBy === "look" && look.groups) {
+			const byId = new Map(photos.map((p) => [p.meta.id, p]));
+			const placed = new Set<string>();
+			const made: Group[] = look.groups.map((g, i) => {
+				const members = g.photoIds.flatMap((id) => {
+					const photo = byId.get(id);
+					if (!photo) return [];
+					placed.add(id);
+					return [photo];
+				});
+				return {
+					key: `look${i}`,
+					title: `Look ${i + 1}`,
+					sub: `${members.length} photo${members.length === 1 ? "" : "s"}`,
+					palette: g.palette,
+					photos: members,
+				};
+			});
+			// photos whose thumbnail could not be read keep a place at the end
+			const unread = photos.filter((p) => !placed.has(p.meta.id));
+			if (unread.length)
+				made.push({
+					key: "look-unread",
+					title: "Colours not read",
+					sub: `${unread.length} photo${unread.length === 1 ? "" : "s"}`,
+					photos: unread,
+				});
+			return made;
+		}
+		return groupPhotos(roll, photos, groupBy === "look" ? "time" : groupBy);
+	}, [roll, photos, groupBy, look.groups]);
 	const gap = 4;
 	const target = width < 520 ? Math.round(rowHeight * 0.66) : rowHeight;
 
@@ -163,6 +202,14 @@ export function RollGrid({
 					No photos in the selected time range.
 				</p>
 			)}
+			{groupBy === "look" && !look.groups && look.pending > 0 && (
+				<p className="text-[11px] text-white/40">reading colours…</p>
+			)}
+			{groupBy === "look" && look.unavailable && (
+				<p className="text-[11px] text-white/40">
+					Could not read colours; grouped by time.
+				</p>
+			)}
 			{width > 0 &&
 				groups.map((g) => (
 					<section key={g.key}>
@@ -174,6 +221,18 @@ export function RollGrid({
 								/>
 							)}
 							{g.title}
+							{g.palette && (
+								<span className="inline-flex gap-1 self-center">
+									{g.palette.map((c) => (
+										<span
+											key={c.rgb.join(",")}
+											className="size-2.5 rounded-full"
+											style={{ background: `rgb(${c.rgb.join(",")})` }}
+											title={`rgb(${c.rgb.join(", ")}) · ${Math.round(c.share * 100)}%`}
+										/>
+									))}
+								</span>
+							)}
 							<span className="text-xs font-normal text-white/40">{g.sub}</span>
 						</h3>
 						<div className="flex flex-col" style={{ gap }}>
