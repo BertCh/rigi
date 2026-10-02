@@ -8,6 +8,8 @@ This directory is the shared layer that every kernel in `src/lib/gpu/**` builds 
 
 Self-test: `node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/core-selftest.mjs`. It needs a dev server on this tree (`APP_URL`, default `http://localhost:3110`) and writes `out/gpu/core/selftest.json`.
 
+Luma-native ratchet: `scripts/ci/gpu-raw-lint.mjs` (fast-tier check `gpu-raw-lint`) counts raw WebGPU (`navigator.gpu`, `requestAdapter`/`requestDevice`), native handle use (`.handle.queue`, `mapAsync`, `onSubmittedWorkDone`, `getCurrentTexture`), casts to private luma members and raw `gl.` calls per file in `src/lib/**`, and fails when a file's count goes up over `scripts/ci/gpu-raw-baseline.json`. New GPU code goes through luma (`Device`, `Buffer`, `CommandEncoder`, `device.submit`, `createFence`, `Texture.copyExternalImage`). A real must-stay (a gap in luma, ORT, a dev tool) is added with `node scripts/ci/gpu-raw-lint.mjs --write` plus a `why` note in the baseline; after removing an escape, run `--write` to lower the baseline.
+
 | File | What it gives you |
 |---|---|
 | `luma.ts` | The **only** importer of `@luma.gl/gpgpu/gpu-core`, with luma 10 migration notes. Import `GPUCommandGraph`, `GPUReduction`, `GPUSort`, `GPUHistogram`, `GPUScan`, `GPUFFT1D`, `GPUReadbackRing`, `GraphDataView` and the rest from here, never from the package |

@@ -221,6 +221,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "gpu-raw-lint",
+		tier: "fast",
+		group: "gpu",
+		cmd: ["node", "scripts/ci/gpu-raw-lint.mjs"],
+		note: "ratchet on raw WebGPU / private-luma / raw WebGL escapes in src/lib (navigator.gpu, native handle use, casts to private members, gl.*) against scripts/ci/gpu-raw-baseline.json; fails only when a file's count rises",
+		timeoutS: 30,
+	},
+	{
 		id: "kernel-binding-use",
 		tier: "fast",
 		group: "gpu",

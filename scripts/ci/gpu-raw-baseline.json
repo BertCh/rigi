@@ -1,0 +1,119 @@
+{
+	"src/lib/concord/occl/cog-loaders.ts": {
+		"privateMember": 1,
+		"why": "loaders.gl GeoTIFF source private _getInitPromise (not luma); stays"
+	},
+	"src/lib/deck-webgpu/device.ts": {
+		"rawWebGpu": 3,
+		"why": "createRenderDevice: adapter probe for features and limits before luma create"
+	},
+	"src/lib/deck-webgpu/lab.ts": {
+		"privateMember": 1,
+		"why": "dev tool debug hook (audit-gpu A11)"
+	},
+	"src/lib/deck-webgpu/render-bundle.ts": {
+		"handle": 1,
+		"why": "MSAA render-bundle encoder: luma validation rejects sampleCount>1 (audit-render R4); flag off"
+	},
+	"src/lib/deck-webgpu/spike.ts": {
+		"rawWebGpu": 1,
+		"handle": 6,
+		"why": "dev spike, raw WebGPU on purpose"
+	},
+	"src/lib/deck/composite.ts": {
+		"handle": 3,
+		"rawGl": 111,
+		"why": "WebGL2 fallback: MSAA renderbuffer/blit + PBO readback; luma has no multisample resolve (audit-render R1)"
+	},
+	"src/lib/deck/device-lost.ts": {
+		"rawGl": 4,
+		"why": "WebGL2 fallback: context-loss handling"
+	},
+	"src/lib/deck/engine.ts": {
+		"handle": 1,
+		"why": "WebGL2 engine host"
+	},
+	"src/lib/deck/geometry-pass.ts": {
+		"handle": 2,
+		"rawGl": 104,
+		"why": "WebGL2 fallback: PBO pool + blit flip (audit-render R1)"
+	},
+	"src/lib/deck/silhouette-gl.ts": {
+		"rawGl": 135,
+		"why": "WebGL2 fallback: raw GLSL programs (audit-render R1)"
+	},
+	"src/lib/gpu/core/device.ts": {
+		"rawWebGpu": 1,
+		"why": "sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)"
+	},
+	"src/lib/gpu/core/luma.ts": {
+		"handle": 1,
+		"why": "WebGPUAdapter.attach(handle: GPUDevice) wrapper for ORT / ownsHandle; the one sanctioned attach point"
+	},
+	"src/lib/gpu/core/pool.ts": {
+		"handle": 2,
+		"why": "raw encoder.clearBuffer via handle; luma has no CommandEncoder.clearBuffer (audit-gpu A6)"
+	},
+	"src/lib/gpu/core/queue.ts": {
+		"handle": 2,
+		"privateMember": 1,
+		"why": "submitWithDefault: private WebGPUDevice finalize + multi-buffer queue.submit and opt-in error scopes; needs a luma submit(buffers[]) patch (audit-gpu A7/A8)"
+	},
+	"src/lib/gpu/core/readback.ts": {
+		"handle": 4,
+		"why": "raw mapAsync: Buffer.mapAndReadAsync awaits onSubmittedWorkDone first; needs a luma waitForQueue:false option (audit-gpu A9)"
+	},
+	"src/lib/gpu/core/selftest.ts": {
+		"rawWebGpu": 1,
+		"why": "selftest drives the raw device on purpose"
+	},
+	"src/lib/gpu/look/stats-fold-bench.ts": {
+		"handle": 3,
+		"why": "bench harness, raw device access on purpose"
+	},
+	"src/lib/gpu/look/textures-bench.ts": {
+		"handle": 3,
+		"why": "bench harness, raw device access on purpose"
+	},
+	"src/lib/gpu/sky/bench-graph.ts": {
+		"handle": 1,
+		"why": "bench harness, raw device access on purpose"
+	},
+	"src/lib/gpu/sky/bench.ts": {
+		"handle": 1,
+		"why": "bench harness, raw device access on purpose"
+	},
+	"src/lib/gpu/sky/prep.ts": {
+		"handle": 1,
+		"why": "bitmap upload on device.handle; replaceable with Texture.copyExternalImage (audit-gpu A1)"
+	},
+	"src/lib/gpu/splat-sort/index.ts": {
+		"handle": 1,
+		"why": "raw pushErrorScope/popErrorScope region for opt-in checks (audit-gpu A8)"
+	},
+	"src/lib/nearfield/deck-splat-layer.ts": {
+		"rawGl": 40,
+		"why": "WebGL2 splat layer on deck's gl context"
+	},
+	"src/lib/renderer-select.ts": {
+		"rawWebGpu": 3,
+		"why": "engine probe: navigator.gpu + a probe device, the one place that decides WebGPU vs WebGL2"
+	},
+	"src/lib/roll/map/range-gpu.ts": {
+		"handle": 1,
+		"rawGl": 167,
+		"why": "two raw WebGL2 programs of their own (audit-render R1)"
+	},
+	"src/lib/roll/mosaic/panoGL.ts": {
+		"rawGl": 96,
+		"why": "stand-alone raw WebGL2 panorama renderer (audit-render R2)"
+	},
+	"src/lib/sky/model.ts": {
+		"rawWebGpu": 2,
+		"why": "ORT (onnxruntime-web) needs the raw GPUDevice attached; stays"
+	},
+	"src/lib/sky/sky.worker.ts": {
+		"handle": 1,
+		"why": "worker-side ORT WebGPU device handoff; stays with sky/model.ts"
+	}
+}
