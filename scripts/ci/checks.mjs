@@ -1286,4 +1286,23 @@ export const CHECKS = [
 		note: "src/lib/nn GPU backend (WGSL kernels on one ComputeGraph per forward) vs the CPU reference on seeded random tensors over Dawn: every op family incl. implicit-GEMM conv / convT / deformable conv, flash attention, topk, a transformer block in one forward, f16 weights; max rel error <= 1e-4; SKIP without DAWN_DIR",
 		timeoutS: 300,
 	},
+	{
+		id: "u2netp-parity",
+		tier: "fast",
+		group: "nn",
+		cmd: tsx(
+			"src/lib/sky/__tests__/u2netp-parity.check.ts",
+			"--long",
+			"128",
+			"--images",
+			"demo-01,demo-03",
+		),
+		needs: [
+			"public/models/skyseg-u2netp-nn.884ee489.safetensors",
+			"public/models/skyseg-u2netp.873ea284.onnx",
+			"public/demo/photos-1024/demo-01.jpg",
+		],
+		note: "sky U2-Net-P on src/lib/nn (CPU reference; WebGPU over Dawn when DAWN_DIR is set) vs onnxruntime-web wasm in node: per-stage and final-mask abs error on demo photos; mask max <= 0.03, mean <= 0.003 (fp16 weights); stage table needs the python venv with onnx",
+		timeoutS: 300,
+	},
 ];

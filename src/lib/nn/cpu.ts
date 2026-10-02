@@ -275,15 +275,17 @@ export class CpuNn extends BaseNn<CpuTensor> {
 							for (let kx = 0; kx < kw; kx++) {
 								const wv = Wt[((co * cig + ci) * kh + ky) * kw + kx];
 								if (wv === 0) continue;
+								// valid output columns for this tap (0 <= ox·sw − pw + kx·dw < W), hoisted
+								const off = kx * dw - pw;
+								const ox0 = Math.max(0, Math.ceil(-off / sw));
+								const ox1 = Math.min(Wo, Math.ceil((W - off) / sw));
 								for (let oy = 0; oy < Ho; oy++) {
 									const iy = oy * sh - ph + ky * dh;
 									if (iy < 0 || iy >= H) continue;
-									const row = xc + iy * W;
-									for (let ox = 0; ox < Wo; ox++) {
-										const ix = ox * sw - pw + kx * dw;
-										if (ix >= 0 && ix < W)
-											col[oy * Wo + ox] += wv * X[row + ix];
-									}
+									const row = xc + iy * W + off;
+									const orow = oy * Wo;
+									for (let ox = ox0; ox < ox1; ox++)
+										col[orow + ox] += wv * X[row + ox * sw];
 								}
 							}
 					}
