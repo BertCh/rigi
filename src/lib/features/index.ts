@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { createNn, type Nn, type Weights } from "#/lib/nn";
+import { getNn, type Nn, perNn, type Weights } from "#/lib/nn";
 /**
  * Browser ALIKED + LightGlue: the keypoint extractor and matcher of the former Python matcher
  * and relative-rotation services (removed 2026-10-02; reference: tools/matcher/match.py), on the
- * src/lib/nn runtime (WGSL kernels on the compute graph under WebGPU, a CPU reference otherwise).
+ * src/lib/nn runtime (WGSL kernels on the compute graph; WebGPU only, no CPU forward).
  * Same configuration as the services: ALIKED-n16, detection threshold 0.01, long side 1024 (lightglue's
  * resize), up to `maxKeypoints` (matcher 4096, propagation 2048); LightGlue(aliked) with filter threshold
  * 0.1 and its adaptive depth / width. Weights: scripts/models/aliked-lightglue.py.
@@ -40,38 +40,31 @@ export type ImageInput = ImageBitmap | ImageData | RgbaImage;
 export const DEFAULT_MAX_KEYPOINTS = 4096;
 export const DEFAULT_LONG_SIDE = 1024;
 export const DEFAULT_MIN_SCORE = 0.1;
-/**
- * Keypoint cap on the CPU backend (no WebGPU): ALIKED at 1024 px takes ~10 s there and LightGlue grows
- * with the square of the keypoint count (~12–30 s per pair at 1024), so the fallback runs at most 1024
- * keypoints per image (a smaller input than the services' 2048 / 4096; slower, but it works).
- * The GPU backend is not capped: it runs the services' 2048 / 4096 (on Dawn, 0.1–0.26 s per extract
- * and 0.15–0.6 s per LightGlue pair at 4096).
- */
-export const CPU_MAX_KEYPOINTS = 1024;
-
 interface Models {
 	nn: Nn;
 	aliked: Weights;
 	lightglue: Weights;
 }
-let models: Promise<Models> | undefined;
 
-function loadModels(signal?: AbortSignal): Promise<Models> {
-	models ??= (async () => {
-		const nn = await createNn();
-		const [aliked, lightglue] = await Promise.all([
-			nn.loadWeights(ALIKED_WEIGHTS, { signal }),
-			nn.loadWeights(LIGHTGLUE_WEIGHTS, { signal }),
-		]);
-		return { nn, aliked, lightglue };
-	})();
-	models.catch(() => {
-		models = undefined;
-	});
-	return models;
+/** GPU only: the error of a page without WebGPU (or a lost device that did not come back). */
+const NEEDS_WEBGPU = "features: needs WebGPU";
+
+// weights per nn runtime: a device loss drops the runtime (nn/registry), the next call rebuilds on the new one
+const weightsOf = perNn(async (nn) => {
+	const [aliked, lightglue] = await Promise.all([
+		nn.loadWeights(ALIKED_WEIGHTS),
+		nn.loadWeights(LIGHTGLUE_WEIGHTS),
+	]);
+	return { nn, aliked, lightglue };
+});
+
+async function loadModels(): Promise<Models> {
+	const nn = await getNn("features");
+	if (!nn) throw new Error(NEEDS_WEBGPU);
+	return weightsOf(nn);
 }
 
-/** True when the runtime and both weight files load (fetches the weights, ~25 MB, once). */
+/** True when WebGPU and both weight files load (fetches the weights, ~25 MB, once per device). */
 export async function featuresAvailable(): Promise<boolean> {
 	try {
 		await loadModels();
@@ -100,18 +93,13 @@ export async function extractFeatures(
 	image: ImageInput,
 	opts: { maxKeypoints?: number; longSide?: number; signal?: AbortSignal } = {},
 ): Promise<FeatureSet> {
-	const { nn, aliked } = await loadModels(opts.signal);
+	const { nn, aliked } = await loadModels();
 	aborted(opts.signal);
 	const rgba = toRgba(image);
 	const rgb = nn.fromArray(rgbaToPlanes(rgba), [1, 3, rgba.height, rgba.width]);
 	try {
 		const r = await runAliked(nn, aliked, rgb, {
-			maxKeypoints: Math.min(
-				opts.maxKeypoints ?? DEFAULT_MAX_KEYPOINTS,
-				nn.backend.kind === "cpu"
-					? CPU_MAX_KEYPOINTS
-					: Number.POSITIVE_INFINITY,
-			),
+			maxKeypoints: opts.maxKeypoints ?? DEFAULT_MAX_KEYPOINTS,
 			longSide: opts.longSide ?? DEFAULT_LONG_SIDE,
 		});
 		return {
@@ -133,7 +121,7 @@ export async function matchFeatures(
 	b: FeatureSet,
 	opts: { minScore?: number; signal?: AbortSignal } = {},
 ): Promise<FeatureMatches> {
-	const { nn, lightglue } = await loadModels(opts.signal);
+	const { nn, lightglue } = await loadModels();
 	aborted(opts.signal);
 	const r = await runLightGlue(nn, lightglue, a, b, {
 		threshold: opts.minScore ?? DEFAULT_MIN_SCORE,

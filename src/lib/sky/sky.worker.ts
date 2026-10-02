@@ -46,7 +46,7 @@ import type {
 	SkyWorkerResponse,
 } from "./protocol";
 import { createSerialQueue } from "./serial-queue";
-import { createSessionRecovery } from "./session-recovery";
+import { isDeviceLossError } from "./session-recovery";
 
 const queue = createSerialQueue();
 // one model per backend; a webgpu model is tied to the compute device it was created on
@@ -84,26 +84,27 @@ const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, () =>
 	}),
 );
 
-// After a GPU device loss the cached models are dropped and loads go to the CPU backend (session-recovery.ts).
-const recovery = createSessionRecovery();
-
-/** Feed a failure to the recovery state; on the first device loss drop every cached session. */
+/**
+ * After a GPU device loss the webgpu models and graph bookkeeping of the dead device are dropped; nothing
+ * is pinned to the CPU: the next request resolves the compute device again (getComputeDevice() returns a
+ * fresh one) and builds the webgpu model on it (loadModel frees a model of another device).
+ */
 function noteFailure(e: unknown) {
-	if (!recovery.noteFailure(e)) return;
-	console.warn(
-		"[sky] GPU device lost: dropping the model, continuing on the CPU backend",
-	);
-	const dropped = [...models.values()];
-	models.clear();
+	if (!isDeviceLossError(e)) return;
+	console.warn("[sky] GPU device lost: dropping the webgpu model and graphs");
+	for (const [key, p] of [...models]) {
+		if (key === "cpu") continue; // the CPU model does not live on the device
+		models.delete(key);
+		void p.then((m) => m?.dispose()).catch(() => {});
+	}
 	failures.clear();
 	lastDevice = undefined;
 	refineDevices.clear();
-	for (const p of dropped) void p.then((m) => m?.dispose()).catch(() => {});
 }
 
 /** The worker's luma compute device when the page allows the GPU (null: CPU refine). */
 async function computeDevice(gpu: boolean | undefined): Promise<Device | null> {
-	if (!gpu || recovery.deviceLost) return null;
+	if (!gpu) return null;
 	const device = await getComputeDevice();
 	if (device) lastDevice = device;
 	if (device && !warmed.has(device)) {
@@ -121,7 +122,6 @@ function loadModel(
 	backend?: Backend,
 	device?: Device | null,
 ): Promise<SkyModel | null> {
-	backend = recovery.backendFor(backend);
 	const key = backend ?? "auto";
 	let p = models.get(key);
 	if (p) {

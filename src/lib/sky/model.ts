@@ -8,7 +8,7 @@
  * browser worker and in node (the eval scripts), with no ONNX Runtime.
  */
 import type { Buffer, Device } from "@luma.gl/core";
-import { createNn, type Nn, type Tensor, type Weights } from "#/lib/nn";
+import { createNn, getNn, type Nn, type Tensor, type Weights } from "#/lib/nn";
 import { type ModelRun, modelSize, normalise, resamplePlanes } from "./core";
 import { bindU2netp, runU2netp, U2NETP_WEIGHTS, type U2Netp } from "./u2netp";
 
@@ -45,6 +45,8 @@ export interface CreateSkyModelOptions {
 	device?: Device | null;
 	/** Preference order (default: webgpu when `device` is WebGPU, then cpu). */
 	backends?: Backend[];
+	/** The webgpu nn runtime (default: getNn("sky", device), the registry's per-device runtime). */
+	nn?: Nn;
 	/** The safetensors bytes (default: fetchModel(MODEL_FILE), Cache Storage in the browser). */
 	bytes?: Uint8Array | ArrayBuffer;
 	signal?: AbortSignal;
@@ -61,11 +63,12 @@ export async function createSkyModel(
 		try {
 			if (backend === "webgpu" && opts.device?.type !== "webgpu")
 				throw new Error("sky model: the webgpu backend needs a WebGPU device");
-			const nn = await createNn(
+			// webgpu: the registry's runtime (dropped with the device on loss); cpu: the off-thread reference
+			const nn =
 				backend === "webgpu"
-					? { device: opts.device as Device, backend: "gpu" }
-					: { backend: "cpu" },
-			);
+					? (opts.nn ?? (await getNn("sky", opts.device)))
+					: await createNn({ backend: "cpu" });
+			if (!nn) throw new Error("sky model: no GPU nn runtime");
 			const weights: Weights = opts.bytes
 				? nn.weightsFromBytes(opts.bytes)
 				: await nn.loadWeights(MODEL_FILE, {
