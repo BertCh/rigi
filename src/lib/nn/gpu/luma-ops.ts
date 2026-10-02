@@ -9,6 +9,7 @@
 
 import {
 	GPUElementwise,
+	GPUFFT2D,
 	GPUReduction,
 	GPUSort,
 	GPUTranspose,
@@ -171,4 +172,124 @@ export function lumaTopkPlan(len: number, k: number) {
 		wg: grid1d(k),
 	};
 	return { init, sort, final };
+}
+
+/** Complex 2-D FFT of `batch` fields (height × width, packed vec2) on GPUFFT2D; the inverse scales by 1/(w·h). */
+export function lumaFft2d(
+	direction: "forward" | "inverse",
+	batch: number,
+	height: number,
+	width: number,
+): LumaCall {
+	const slot = {
+		len: batch * height * width,
+		format: "float32x2",
+	} as const;
+	return {
+		key: `luma-fft2d-${direction}-${batch}x${height}x${width}`,
+		ins: [slot],
+		outs: [slot],
+		add: (g, [x], [o]) =>
+			g.add(
+				new GPUFFT2D({
+					id: nextId("fft2d"),
+					input: x as never,
+					output: o as never,
+					direction,
+					width,
+					height,
+					batchCount: batch,
+				}),
+			),
+	};
+}
+
+const ONE = { name: "x", dtype: "f32" } as const;
+
+/** The three kernels around the FFT of rfft2: real → complex, then the W/2+1 columns kept. */
+export function rfftKernels(batch: number, height: number, width: number) {
+	const wf = (width >> 1) + 1;
+	const pack = {
+		spec: nnKernel(
+			"rfft-pack",
+			[{ ...ONE }],
+			["z"],
+			`${ENTRY} {
+  let i = lin(wid, nwg, lid);
+  if (i >= mu(0u)) { return; }
+  z[2u * i] = ld_x(i);
+  z[2u * i + 1u] = 0.0;
+}`,
+		),
+		meta: [batch * height * width],
+		wg: grid1d(batch * height * width),
+	};
+	const crop = {
+		spec: nnKernel(
+			"rfft-crop",
+			[{ ...ONE }],
+			["y"],
+			`${ENTRY} {
+  let j = lin(wid, nwg, lid);
+  let wf = mu(1u);
+  if (j >= mu(0u) * wf * 2u) { return; }
+  let c = j & 1u;
+  let t = j >> 1u;
+  let w = t % wf;
+  let bh = t / wf;
+  y[j] = ld_x((bh * mu(2u) + w) * 2u + c);
+}`,
+		),
+		meta: [batch * height, wf, width],
+		wg: grid1d(batch * height * wf * 2),
+	};
+	return { pack, crop };
+}
+
+/** The kernels around the FFT of irfft2: Hermitian fill of the half spectrum, then the real part. */
+export function irfftKernels(batch: number, height: number, width: number) {
+	const wf = (width >> 1) + 1;
+	const expand = {
+		spec: nnKernel(
+			"irfft-expand",
+			[{ ...ONE }],
+			["z"],
+			`${ENTRY} {
+  let j = lin(wid, nwg, lid);
+  let W = mu(3u);
+  let H = mu(2u);
+  let wf = mu(1u);
+  if (j >= mu(0u) * H * W * 2u) { return; }
+  let c = j & 1u;
+  let t = j >> 1u;
+  let w = t % W;
+  let bh = t / W;
+  let h = bh % H;
+  let b = bh / H;
+  if (w < wf) {
+    z[j] = ld_x(((b * H + h) * wf + w) * 2u + c);
+  } else {
+    let v = ld_x(((b * H + (H - h) % H) * wf + (W - w)) * 2u + c);
+    z[j] = select(v, -v, c == 1u);
+  }
+}`,
+		),
+		meta: [batch, wf, height, width],
+		wg: grid1d(batch * height * width * 2),
+	};
+	const real = {
+		spec: nnKernel(
+			"irfft-real",
+			[{ ...ONE }],
+			["y"],
+			`${ENTRY} {
+  let i = lin(wid, nwg, lid);
+  if (i >= mu(0u)) { return; }
+  y[i] = ld_x(2u * i);
+}`,
+		),
+		meta: [batch * height * width],
+		wg: grid1d(batch * height * width),
+	};
+	return { expand, real };
 }

@@ -298,6 +298,18 @@ export interface Nn {
 	/** broadcast to `shape` (materialised) */
 	expand(x: Tensor, shape: readonly number[]): Tensor;
 
+	// spectral (GPU backend; the CPU reference is src/lib/nn/fft-reference.ts)
+	/**
+	 * torch.fft.rfft2 over the last two dims (norm "backward"): x [..., H, W] real, H and W powers of two
+	 * (2 to 2048) → [..., H, W/2+1, 2] (re, im), like view_as_real.
+	 */
+	rfft2?(x: Tensor): Tensor;
+	/**
+	 * torch.fft.irfft2 (norm "backward"): x [..., H, W/2+1, 2] → real [..., H, W]; `width` W defaults to
+	 * 2 (Wf - 1).
+	 */
+	irfft2?(x: Tensor, o?: { width?: number }): Tensor;
+
 	// reductions
 	reduce(op: ReduceOp, x: Tensor, axis: number, keepDim?: boolean): Tensor;
 	sum(x: Tensor, axis: number, keepDim?: boolean): Tensor;

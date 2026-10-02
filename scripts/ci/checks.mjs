@@ -1304,6 +1304,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "nn-fft",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/nn/fft.check.ts"),
+		note: "nn rfft2 / irfft2 (luma GPUFFT2D inside one nn forward) vs the f64 DFT reference over Dawn: batched / non-square / 2x2 fields, round trip, non-Hermitian DC / Nyquist columns, non-power-of-two rejected; max rel error <= 2e-5; SKIP without DAWN_DIR",
+		timeoutS: 120,
+	},
+	{
 		id: "u2netp-parity",
 		tier: "fast",
 		group: "nn",

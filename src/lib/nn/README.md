@@ -59,6 +59,27 @@ g.compile(); await g.run(p, { read: [viewRange(yView, nn.bufferOf(y))] });
 `fromView` tensors only work inside `forwardInto` of their graph; outputs are valid after `g.run`.
 (`fromBuffer` / `bufferOf` share plain buffers across separate submissions.)
 
+## Luma operators (`gpu/luma-ops.ts`)
+
+Some nn ops run on luma gpgpu operators, as nodes of the same forward graph (`Node.luma`, a contributor whose
+views alias the nn storages). Chosen with `scripts/nn/luma-ops-bench.ts` (Dawn, M3 Pro, f32, ms per op, nn vs
+luma): `gpu.lumaOps.enabled = false` forces every nn kernel for A/B.
+
+| nn op | luma operator | numbers | decision |
+|---|---|---|---|
+| `transpose` / `permute` of a plain 2-D f32 matrix | `GPUTranspose` | 2048²: 0.56 vs 0.27; 1369x768: 0.20 vs 0.10 | adopted (1.4 to 2x) |
+| `add sub mul maximum minimum`, same shape, f32 | `GPUElementwise` | 4M: 0.43 vs 0.40; 64k: 0.10 vs 0.05 | adopted (equal or better); broadcast, scalar, div, pow, compare, where stay nn |
+| `sum mean max min` of ONE row of >= 2^18 | `GPUReduction` | 1M: 0.62 vs 0.22; 4M: 4.8 vs 0.5 | adopted from 2^18 (below: nn, one workgroup is enough); per-axis reductions stay nn |
+| `topk` of one row of >= 2^16 | key transform, `GPUSort`, decode | 786k (k 4096): 10.3 vs 2.9; 64k: 2.4 vs 2.0 | adopted from 2^16; batched rows and short rows stay bitonic |
+| `matmul` / `linear` | `GPUMatMul` (16x16 tiles) | 1024³: 1.46 vs 6.6 (1469 vs 325 GFLOP/s) | rejected, nn GEMM is 4.5 to 5.5x faster; f32 only, no f16 weights, no epilogue |
+| `rfft2` / `irfft2` (new, additive) | `GPUFFT2D` | 1x256x256: 0.87 / 0.94 ms; 1x512x512: 1.9 ms | new; H, W powers of two 2..2048 |
+| attention, conv, norms, gridSample | none | | luma has no equivalent (`GPUConvolution` is one plane with a kernel, not NCHW) |
+
+Parity: the same op against the CPU reference in `parity.check.ts` (`transpose-luma`, `topk-ties-luma`,
+`reduce-huge`, the existing binary cases); rfft2 / irfft2 against an f64 DFT in `fft.check.ts`.
+Topk ties and signed zeros keep the old order (stable sort, `-0` folded into `+0`). Complex tensors are
+`[..., 2]` (re, im), like `torch.view_as_real`; the CPU backend has no rfft2 yet (`fft-reference.ts` is the spec).
+
 ## Weights
 
 safetensors under `public/models/` (hash-named, a row in `scripts/models/manifest.json`), dumped from
@@ -86,4 +107,4 @@ the PyTorch `state_dict` in fp16 by a producer under `scripts/models/`. `loadWei
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/bench.ts [--f16]`: GFLOP/s of linear, conv, attention.
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/wgsl-lint.ts`: compile messages of every nn kernel.
 
-Not built yet: FFT ops (LaMa's FFC), split-K / flash-decoding for very small batches.
+Not built yet: non-power-of-two FFT sizes (LaMa at odd sizes needs padding or a mixed-radix FFT), split-K / flash-decoding for very small batches.

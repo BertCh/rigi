@@ -61,7 +61,10 @@ export class GpuTensor implements Tensor {
 }
 
 /** A slot of a luma operator node: `len` elements read / written as `format` (same bytes as the f32 storage). */
-export type LumaSlot = { len: number; format: "float32" | "uint32" };
+export type LumaSlot = {
+	len: number;
+	format: "float32" | "uint32" | "float32x2";
+};
 
 /**
  * A node run by a luma operator (GPUMatMul-style contributor) instead of an nn kernel: `add` puts it
@@ -83,7 +86,7 @@ function asView(
 ): GraphDataView {
 	if (binding && typeof binding === "object" && "format" in binding)
 		return binding as GraphDataView;
-	return g.view(binding as never, slot.format, slot.len);
+	return g.view(binding as never, slot.format as never, slot.len);
 }
 
 function addLuma(

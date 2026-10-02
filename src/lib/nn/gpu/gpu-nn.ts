@@ -65,13 +65,16 @@ import {
 } from "./k-spatial";
 import { topkPlan } from "./k-topk";
 import {
+	irfftKernels,
 	LUMA_REDUCE_MIN,
 	LUMA_TOPK_MIN,
 	lumaBinary,
 	lumaBinaryOp,
+	lumaFft2d,
 	lumaReduce,
 	lumaTopkPlan,
 	lumaTranspose,
+	rfftKernels,
 } from "./luma-ops";
 import {
 	type Activation,
@@ -818,6 +821,53 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			return op === "mean" ? this.scale(r, 1 / len) : r;
 		}
 		return this.one(reduceKernel(op, x.dtype, outer, len, inner), [x], out);
+	}
+
+	private fftDims(h: number, w: number) {
+		for (const [name, n] of [
+			["H", h],
+			["W", w],
+		] as const)
+			if (n < 2 || n > 2048 || (n & (n - 1)) !== 0)
+				throw new Error(
+					`nn: rfft2 ${name}=${n} must be a power of two from 2 to 2048 (luma GPUFFT2D)`,
+				);
+	}
+
+	rfft2(x: Tensor): GpuTensor {
+		const g = x as GpuTensor;
+		const r = g.shape.length;
+		if (r < 2) throw new Error("nn: rfft2 needs at least 2 dims");
+		const [h, w] = g.shape.slice(-2);
+		this.fftDims(h, w);
+		const batch = numel(g.shape) / (h * w);
+		const k = rfftKernels(batch, h, w);
+		const n2 = [batch * h * w * 2];
+		const [z] = this.node(k.pack, [g], [n2]);
+		const [f] = this.lumaNode(lumaFft2d("forward", batch, h, w), [z], [n2]);
+		return this.node(
+			k.crop,
+			[f],
+			[[...g.shape.slice(0, -2), h, (w >> 1) + 1, 2]],
+		)[0];
+	}
+
+	irfft2(x: Tensor, o: { width?: number } = {}): GpuTensor {
+		const g = x as GpuTensor;
+		const r = g.shape.length;
+		if (r < 3 || g.shape[r - 1] !== 2)
+			throw new Error("nn: irfft2 needs [..., H, W/2+1, 2]");
+		const [h, wf] = g.shape.slice(-3, -1);
+		const w = o.width ?? 2 * (wf - 1);
+		if ((w >> 1) + 1 !== wf)
+			throw new Error(`nn: irfft2 width ${w} does not match ${wf} bins`);
+		this.fftDims(h, w);
+		const batch = numel(g.shape) / (h * wf * 2);
+		const k = irfftKernels(batch, h, w);
+		const n2 = [batch * h * w * 2];
+		const [z] = this.node(k.expand, [g], [n2]);
+		const [f] = this.lumaNode(lumaFft2d("inverse", batch, h, w), [z], [n2]);
+		return this.node(k.real, [f], [[...g.shape.slice(0, -3), h, w]])[0];
 	}
 
 	pTopk(x: GpuTensor, rows: number, len: number, k: number, out: number[]) {

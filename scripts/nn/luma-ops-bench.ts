@@ -406,6 +406,26 @@ if (!only || only === "sort") {
 		row(`topk 4096 of ${n}`, nnMs, lumaMs);
 	}
 }
+if (!only || only === "fft") {
+	console.log(
+		"-- rfft2 / irfft2 on luma GPUFFT2D (no nn kernel alternative) --",
+	);
+	for (const [b, h, w] of [
+		[1, 256, 256],
+		[64, 64, 64],
+		[1, 512, 512],
+	]) {
+		const x = nn.fromArray(rnd(b * h * w), [b, h, w]);
+		const f = await timeNn(4, () => nn.rfft2(x));
+		const spec = await nn.forward(() => nn.rfft2(x));
+		const i = await timeNn(4, () => nn.irfft2(spec));
+		console.log(
+			`rfft2 ${b}x${h}x${w}`.padEnd(34) +
+				` ${f.toFixed(3).padStart(8)} ms  irfft2 ${i.toFixed(3).padStart(8)} ms`,
+		);
+	}
+}
+
 if (!only || only === "e2e") {
 	console.log("-- end to end through nn (lumaOps on vs off) --");
 	const both = async (label: string, R: number, op: () => Tensor) => {
