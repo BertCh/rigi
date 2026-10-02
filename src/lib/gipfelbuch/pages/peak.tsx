@@ -1892,7 +1892,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				/>
 			</Figure>
 
-			{/* Fig. 1 already spills this sheet's one photo: the plate keeps its frame, no surround. */}
+			{/* A photo figure of its own, so the plate spills its surround too (README, concept spill). */}
 			<LiveReveal
 				number="Fig. 7"
 				photoId="demo-01"

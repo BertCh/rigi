@@ -31,7 +31,6 @@ import {
 	HandRange,
 	LAYER_STYLE,
 	LiveDrape,
-	LivePanorama,
 	MarginNote,
 	RealPhoto,
 	Steps,
@@ -1668,7 +1667,7 @@ function RealBias() {
 	const accOff = rows.filter((r) => r.accepted).map((r) => r.yawOffset);
 	return (
 		<Figure
-			label="Fig. 5"
+			label="Fig. 4"
 			bleed
 			caption={
 				<>
@@ -2085,8 +2084,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<Sym>hfov</Sym> / 2) )
 			</Eq>
 
-			<LivePanorama number="3" />
-
 			<Beat
 				kicker="How it works"
 				title="Group nearby photos, aim each one, lay them down."
@@ -2119,7 +2116,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
-			<LiveDrape number="4" />
+			<LiveDrape number="3" />
 
 			<Beat
 				kicker="Where it fails"

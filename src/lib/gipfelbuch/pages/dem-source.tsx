@@ -1058,7 +1058,7 @@ export default function Page(_: { node: GipfelbuchNode }) {
 
 			<GroundGap d={d} />
 
-			{/* The shell Tafel spills this sheet's one photo: the plate keeps its frame, no surround or line art. */}
+			{/* A photo figure of its own, so the plate spills its line art too (README, concept spill). */}
 			<LiveDrape
 				number="Fig. 5"
 				title="The ground under each photo"

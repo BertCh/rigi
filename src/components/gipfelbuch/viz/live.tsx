@@ -27,6 +27,7 @@ import { PenArrow } from "../notebook/Ink";
 import { type RollData, signedDegrees, useStaticJson } from "../notebook/notes";
 import { SWISS } from "../swiss/inks";
 import { Figure } from "./Figure";
+import { framedNotes } from "./live-notes";
 import {
 	type GipfelbuchPhotoId,
 	useGipfelbuchIndex,
@@ -307,7 +308,7 @@ export interface LivePlateProps {
 	north?: boolean;
 	/** Let the frame keep its own height (aspect ignored), e.g. the panorama strip or the board. */
 	freeHeight?: boolean;
-	/** False: no paper surround and no live line art past the frame (a sheet that already spills one photo). */
+	/** False: no paper surround, no live line art past the frame, and no notes pointing into the paper. Every photo plate spills by default (README, concept spill). */
 	spill?: boolean;
 	className?: string;
 }
@@ -320,7 +321,7 @@ export function LivePlate({
 	title,
 	number,
 	caption,
-	notes = [],
+	notes: allNotes = [],
 	aspect = 16 / 10,
 	frame = 0.62,
 	poster,
@@ -334,6 +335,7 @@ export function LivePlate({
 	spill = true,
 	className,
 }: LivePlateProps) {
+	const notes = spill ? allNotes : framedNotes(allNotes);
 	const { ref: gateRef, live } = useLiveGate(motion, margin);
 	const stageRef = useRef<HTMLDivElement>(null);
 	const frameRef = useRef<HTMLDivElement>(null);
@@ -756,6 +758,7 @@ export function LiveCompare({
 	aspect = 4 / 3,
 	frame = 0.56,
 	date,
+	spill,
 	className,
 }: FigureProps & { photoId?: LiveRevealId }) {
 	const set = LIVE_REVEAL_SETS[photoId];
@@ -769,6 +772,7 @@ export function LiveCompare({
 			frame={frame}
 			date={date}
 			motion="still"
+			spill={spill}
 			className={className}
 			surround={<PaperSurround bake={set.bake} />}
 			notes={
@@ -872,6 +876,7 @@ export function LiveStepInside({
 	aspect = 16 / 9,
 	frame = 0.6,
 	date,
+	spill,
 	className,
 }: FigureProps) {
 	return (
@@ -885,6 +890,7 @@ export function LiveStepInside({
 			aspect={aspect}
 			frame={frame}
 			date={date}
+			spill={spill}
 			className={className}
 			notes={
 				notes ?? [
@@ -922,6 +928,7 @@ export function LivePanorama({
 	caption,
 	notes,
 	date,
+	spill,
 	className,
 }: Omit<FigureProps, "aspect" | "frame">) {
 	const roll = useRollClaim();
@@ -937,6 +944,7 @@ export function LivePanorama({
 			freeHeight
 			motion="still"
 			date={date}
+			spill={spill}
 			className={className}
 			notes={
 				notes ?? [
