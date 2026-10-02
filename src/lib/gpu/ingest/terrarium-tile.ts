@@ -30,7 +30,7 @@ import { validateTile } from "#/lib/dem/decode";
 import { downsampleHeights2 } from "#/lib/dem/grid";
 import { bitmapHeights } from "#/lib/dem/image";
 import { ComputeGraph, cachedGraph } from "../core/graph";
-import { defineKernel } from "../core/kernel";
+import { defineKernel, warmKernelsAsync } from "../core/kernel";
 import type {
 	GraphBufferHandle,
 	GraphTextureDescriptor,
@@ -166,6 +166,15 @@ const tileKernel = (down: 1 | 2) =>
 export const K_TERRARIUM_TILE = { 1: tileKernel(1), 2: tileKernel(2) } as const;
 
 /**
+ * Create both tile pipelines through createComputePipelineAsync (core kernelAsync, same cache as the
+ * graphs' own kernel() lookups), so the first decode does not compile WGSL on the main thread. A graph
+ * compile() after this resolves finds the pipelines cached; before it, it compiles them itself.
+ */
+export function warmTerrariumTileKernels(device: Device): Promise<number> {
+	return warmKernelsAsync(device, TERRARIUM_TILE_GROUP);
+}
+
+/**
  * Add the tile node: `input` (rgba8unorm, `size`²) → (size/down)² f32 heights at `heights` (written
  * in full) and the stats words at `stats` (cleared here first: atomics).
  */
@@ -242,8 +251,8 @@ export async function terrariumTileStatsGpu(
 				},
 			);
 			// queued synchronously inside the group lease (cachedGraph's eviction contract)
-			return graph.lease(() => {
-				graph.compile();
+			return graph.lease(async () => {
+				await graph.compileAsync();
 				const enc = device.createCommandEncoder({ id: graph.id });
 				const { reads } = graph.encodeReads(enc, undefined, undefined, {
 					rgba: tex.texture,
@@ -279,11 +288,20 @@ export class TerrariumLayerWriter {
 	private graphs = new Map<string, ComputeGraph<{ layer: number }>>();
 	private staging = new Map<number, ReturnType<typeof uploadBitmap>>();
 	stats = { writes: 0, rebuilds: 0 };
+	/**
+	 * The tile pipelines are created (async, started at construction). write() is synchronous and
+	 * compiles its graph on the spot (cheap once the pipelines exist, otherwise as before); async
+	 * callers await this first, before they read any state they encode with (a grown atlas replaces
+	 * its texture while they wait).
+	 */
+	readonly ready: Promise<number>;
 
 	constructor(
 		readonly device: Device,
 		readonly id: string,
-	) {}
+	) {
+		this.ready = warmTerrariumTileKernels(device);
+	}
 
 	/** Decode `src` into `layer` of `target` (r32float 2d-array, layers ≥ the output size). */
 	write(

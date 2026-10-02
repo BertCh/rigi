@@ -58,21 +58,24 @@ import {
 import { type ColorStats, N_BANDS } from "#/lib/look/color-stats";
 import { gridSize, MASK_LONG_SIDE } from "#/lib/look/composite";
 import { srgbToLinear } from "#/lib/style/color";
-import { ComputeGraph, type GraphBinding } from "../core/graph";
+import {
+	type CachedGraph,
+	ComputeGraph,
+	cachedGraph,
+	cachedGraphFrom,
+	type GraphBinding,
+	releaseCachedGraphs,
+} from "../core/graph";
 import {
 	type BindKind,
 	defineKernel,
-	encodeDispatch,
-	type Kernel,
 	type KernelSpec,
 	storage,
 	uniform,
+	warmKernels,
+	warmKernelsAsync,
 } from "../core/kernel";
-import type {
-	GraphBufferHandle,
-	GraphBufferUsage,
-	GraphTextureHandle,
-} from "../core/luma";
+import type { GraphBufferHandle, GraphTextureHandle } from "../core/luma";
 import { acquire, withLease } from "../core/pool";
 import { stageReads } from "../core/readback";
 import {
@@ -217,18 +220,13 @@ const K_HZ_SCAN_SG = defineKernel("hz-scan-sg", HZ_SCAN_SG, HZ_SCAN_LAYOUT, {
 	label: "look-tex-hz-scan-sg",
 });
 
-// Kernels that read textures: core/kernel's layout covers buffers only, so these build their own
-// pipeline (explicit layout for the name → location map; the WGSL's auto layout makes the
-// textureLoad-only textures 'unfilterable-float', which accepts rgba32float and unorm formats).
+// Kernels that read textures: the same core defineKernel with "texture" layout entries (the WGSL's
+// auto layout makes the textureLoad-only textures 'unfilterable-float', which accepts rgba32float
+// and unorm formats; core's explicit layout declares exactly that).
 /** this file's kernels bind 2-D textures only */
 type TexBind = Exclude<BindKind, "texture-array">;
-type TexSpec = { id: string; source: string; layout: [string, TexBind][] };
-const texSpecs: TexSpec[] = [];
-const texSpec = (id: string, source: string, layout: [string, TexBind][]) => {
-	const s = { id, source, layout };
-	texSpecs.push(s);
-	return s;
-};
+const texSpec = (id: string, source: string, layout: [string, TexBind][]) =>
+	buf(id, source, layout);
 
 const K_TEX_PHOTO = texSpec("photo", TEX_PHOTO, [
 	["prm", "uniform"],
@@ -273,117 +271,46 @@ const K_TEX_FGBITS = texSpec("fgbits", TEX_FGBITS, [
 	["fgm", "storage"],
 ]);
 
-const texKernels = new WeakMap<Device, Map<TexSpec, Kernel>>();
-function texKernel(device: Device, spec: TexSpec): Kernel {
-	let m = texKernels.get(device);
-	if (!m) {
-		m = new Map();
-		texKernels.set(device, m);
-	}
-	let k = m.get(spec);
-	if (!k) {
-		const label = `look-tex-${spec.id}`;
-		const shader = device.createShader({
-			id: label,
-			source: spec.source,
-			language: "wgsl",
-			stage: "compute",
-		});
-		const pipeline = device.createComputePipeline({
-			id: label,
-			shader,
-			entryPoint: "main",
-			shaderLayout: {
-				bindings: spec.layout.map(([name, type], location) =>
-					type === "texture"
-						? {
-								name,
-								type,
-								group: 0,
-								location,
-								viewDimension: "2d" as const,
-								sampleType: "unfilterable-float" as const,
-							}
-						: type === "uniform"
-							? { name, type, group: 0, location }
-							: { name, type, group: 0, location },
-				),
-			},
-		});
-		// encodeDispatch only uses the pipeline; the spec is for labels
-		k = {
-			pipeline,
-			names: spec.layout.map(([n]) => n),
-			spec: { ...spec, entryPoint: "main", group: GROUP, label } as KernelSpec,
-		};
-		m.set(spec, k);
-	}
-	return k;
-}
-
-/** Compile every texture-look pipeline now (the buffer kernels: core warmKernels(d, "look-tex")). */
+/** Compile every texture-look pipeline now (core warmKernelsAsync(d, "look-tex") does the same in parallel). */
 export function warmTextureKernels(device: Device): number {
-	let failed = 0;
-	for (const s of texSpecs)
-		try {
-			texKernel(device, s);
-		} catch (e) {
-			failed++;
-			console.warn(`[lookgpu] tex ${s.id} compile failed`, e);
-		}
-	return failed;
+	return warmKernels(device, GROUP);
 }
 
-const USE: Record<Exclude<TexBind, "texture">, GraphBufferUsage> = {
-	uniform: "uniform",
-	"read-only-storage": "storage-read",
-	storage: "storage-read-write",
-};
+/** warmTextureKernels without blocking the thread: call it when the render device is adopted. */
+export function warmTextureKernelsAsync(device: Device): Promise<number> {
+	return warmKernelsAsync(device, GROUP);
+}
+
+/**
+ * The graph is compiled for a SYNCHRONOUS encode (encodeMasksTex / encodeBandStatsTex record into the
+ * caller's encoder in the same tick as the submit): when it is not yet, start compileAsync (so the
+ * pipelines never compile on the main thread) and throw, which sends the caller to its non-fused
+ * path for this frame. The next frame finds the graph compiled.
+ */
+function assertCompiled(
+	graph: ComputeGraph,
+	what: string,
+	onFail?: (error: unknown) => void,
+) {
+	if (graph.isCompiled) return;
+	graph.compileAsync().catch((error) => {
+		console.warn(`[lookgpu] ${what} graph compile failed`, error);
+		onFail?.(error);
+	});
+	throw new Error(`[lookgpu] ${what} graph compiling`);
+}
 
 type TexBinding = GraphBinding | GraphTextureHandle;
 
-/** A graph node running a texture-reading kernel (ComputeGraph.addKernel covers buffers only). */
+/** A graph node running a texture-reading kernel: `groups` workgroups along x. */
 function addTexNode<P>(
 	g: ComputeGraph<P>,
 	id: string,
-	spec: TexSpec,
+	spec: KernelSpec,
 	bindings: Record<string, TexBinding>,
 	groups: number,
 ) {
-	g.addComputePass({
-		id,
-		resources: spec.layout.map(([name, kind]) =>
-			kind === "texture"
-				? {
-						texture: bindings[name] as GraphTextureHandle,
-						usage: "sampled" as const,
-					}
-				: { buffer: bindings[name] as GraphBufferHandle, usage: USE[kind] },
-		),
-		compile: ({ device }) => {
-			const k = texKernel(device, spec);
-			return {
-				encode: ({ computePass, getBuffer, getTexture }) => {
-					const b: Record<
-						string,
-						Texture | { buffer: Buffer; offset: number; size: number }
-					> = {};
-					for (const [name, kind] of spec.layout) {
-						const h = bindings[name];
-						b[name] =
-							kind === "texture"
-								? getTexture(h as GraphTextureHandle)
-								: {
-										buffer: getBuffer(h as GraphBufferHandle),
-										offset: 0,
-										size: (h as GraphBufferHandle).byteLength,
-									};
-					}
-					encodeDispatch(computePass, k, b, groups);
-				},
-			};
-		},
-	});
+	g.addKernel({ id, spec, bindings, workgroups: [groups] });
 }
 
 // ── shared plumbing ─────────────────────────────────────────────────────────────────────────────
@@ -447,45 +374,38 @@ function dummyMask(device: Device): Texture {
 	return t;
 }
 
-/** A compiled graph plus the constant buffers / textures it owns. */
-type Entry<X> = {
-	graph: ComputeGraph;
-	owned: (Buffer | Texture)[];
-	extra: X;
-};
+/** The texture-look graphs' core cachedGraph group (graph ids `look-tex|<key>`). */
 const MAX_GRAPHS = 6;
-const graphs = new WeakMap<Device, Map<string, Entry<unknown>>>();
 
 /**
- * The graph for `key`, built on first use; least recently used graphs beyond 6 are destroyed.
- * Call it INSIDE the pass lease and call `graph.run` synchronously after it: run() queues on the
- * graph's lease at once, so an eviction (which destroys under that same lease) always lands after
- * it; looked up earlier, a queued call could find its graph destroyed.
+ * The graph for `key` (core cachedGraph, group "look-tex": LRU of 6 per device, an evicted graph is
+ * destroyed with the buffers it owns, ComputeGraph.own). `build` adds the nodes; the graph is
+ * NOT compiled: await graph.compileAsync() before run(), or compile() where the call is synchronous
+ * (core README, "Page-side graphs"). Call it INSIDE the pass lease and queue graph.run synchronously
+ * after the compile: run() queues on the graph's lease, so an eviction (which destroys under that
+ * same lease) always lands after it.
  */
-function cachedGraph<X>(
+function lookGraph<X>(
 	device: Device,
 	key: string,
-	build: () => Entry<X>,
-): Entry<X> {
-	let m = graphs.get(device);
-	if (!m) {
-		m = new Map();
-		graphs.set(device, m);
-	}
-	let e = m.get(key) as Entry<X> | undefined;
-	if (e) m.delete(key);
-	else e = build();
-	m.set(key, e as Entry<unknown>);
-	while (m.size > MAX_GRAPHS) {
-		const [k0, old] = m.entries().next().value as [string, Entry<unknown>];
-		m.delete(k0);
-		// after any run of it still in flight (ComputeGraph.run holds this lease)
-		void withLease(`graph:${old.graph.id}`, () => {
-			old.graph.destroy();
-			for (const r of old.owned) r.destroy();
-		});
-	}
-	return e;
+	build: (g: ComputeGraph, owned: (Buffer | Texture)[]) => X,
+): CachedGraph<void, X> {
+	return cachedGraph<void, X>(
+		device,
+		GROUP,
+		key,
+		(g) => {
+			const owned: (Buffer | Texture)[] = [];
+			g.own(owned);
+			try {
+				return build(g, owned);
+			} catch (error) {
+				for (const r of owned) r.destroy();
+				throw error;
+			}
+		},
+		MAX_GRAPHS,
+	);
 }
 
 /** The per-pass leases (every call of a pass is serialised under its lease). */
@@ -501,15 +421,7 @@ const PASS = {
  * after every queued pass; calls made afterwards rebuild what they need.
  */
 export async function releaseTextureGraphs(device: Device): Promise<void> {
-	const m = graphs.get(device);
-	const old = m ? [...m.values()] : [];
-	m?.clear();
-	const done = old.map((e) =>
-		withLease(`graph:${e.graph.id}`, () => {
-			e.graph.destroy();
-			for (const r of e.owned) r.destroy();
-		}),
-	);
+	const done = [releaseCachedGraphs(device, GROUP)];
 	// every pass samples the dummy; masks also writes the output textures (no pass nests leases,
 	// so taking all three here cannot deadlock)
 	done.push(
@@ -795,7 +707,7 @@ type MasksPlan = ReturnType<typeof masksPlan>;
 
 /**
  * The compiled masks graph of `plan` (one per key, cached). Call it INSIDE the masks lease (or
- * synchronously before encoding into the caller's encoder, as encodeMasksTex does): see cachedGraph.
+ * synchronously before encoding into the caller's encoder, as encodeMasksTex does): see lookGraph.
  */
 function masksGraph(device: Device, plan: MasksPlan) {
 	const {
@@ -815,9 +727,7 @@ function masksGraph(device: Device, plan: MasksPlan) {
 		fmt,
 		cut,
 	} = plan;
-	return cachedGraph(device, key, () => {
-		const g = new ComputeGraph(device, `look-tex-${key}`);
-		const owned: (Buffer | Texture)[] = [];
+	return lookGraph(device, key, (g, owned) => {
 		const c = constants(g, owned);
 		const groups = Math.ceil(n / WG);
 		const words = addPhoto(g, c, photo, w, h, "photo");
@@ -964,8 +874,7 @@ function masksGraph(device: Device, plan: MasksPlan) {
 				}),
 			});
 		}
-		g.compile();
-		return { graph: g as ComputeGraph, owned, extra: null };
+		return null;
 	});
 }
 
@@ -989,6 +898,7 @@ export function masksTex(
 		const outTex =
 			given ?? (outFormat ? ownTexture(device, outFormat, w, h) : null);
 		const e = graphOf();
+		await e.graph.compileAsync();
 		const buffers: Record<string, Buffer> = {};
 		const q = jobs.map((j) => {
 			const b = slot(device, "masks", `q-${j.name}`, n * 4);
@@ -1074,8 +984,7 @@ export function encodeMasksTex(
 	const { geo, photo, sky, fg, w, h, n, jobs, rowWords } = plan;
 	assertAlive(device, [geo, photo, sky, fg, src(texture)]);
 	const e = masksGraph(device, plan);
-	if (!e.graph.isCompiled)
-		throw new Error("[lookgpu] masks graph not compiled");
+	assertCompiled(e.graph, "masks");
 	// own pooled slots: the masks lease's q / packed may still be in use by a queued masksTex
 	const buffers: Record<string, Buffer> = {};
 	for (const j of jobs)
@@ -1239,34 +1148,45 @@ function addStatsNodes(
  * onto the graph, color-stats-fold.ts) or the partials (?statsFold=f64).
  */
 function statsGraph(device: Device, plan: StatsPlan) {
-	return cachedGraph(device, plan.key, () => {
-		const owned: (Buffer | Texture)[] = [];
-		// per call: minRange / minCount (bandStatsGpu's words)
-		const prmBuf = uniform(device, new ArrayBuffer(24));
-		owned.push(prmBuf);
-		const importPrm = (g: ComputeGraph) =>
-			g.importBuffer("stats-prm", prmBuf.byteLength, prmBuf, UNIFORM);
-		let g: ComputeGraph;
-		if (plan.fold === "gpu") {
-			g = buildFoldGraph(device, `look-tex-${plan.key}`, SGROUPS, {
-				params: importPrm,
-				produce: (pg, partial, prm) =>
-					addStatsNodes(pg, constants(pg, owned), plan, prm, partial),
-				output: (pg) => pg.importBuffer("out", STATS_BYTES),
-			}).graph;
-		} else {
-			g = new ComputeGraph(device, `look-tex-${plan.key}`);
-			addStatsNodes(
-				g,
-				constants(g, owned),
-				plan,
-				importPrm(g),
-				g.importBuffer("out", PARTIAL_BYTES),
-			);
-		}
-		g.compile();
-		return { graph: g, owned, extra: prmBuf };
-	});
+	return cachedGraphFrom<void, Buffer>(
+		device,
+		GROUP,
+		plan.key,
+		(id) => {
+			const owned: (Buffer | Texture)[] = [];
+			// per call: minRange / minCount (bandStatsGpu's words)
+			const prmBuf = uniform(device, new ArrayBuffer(24));
+			owned.push(prmBuf);
+			const importPrm = (g: ComputeGraph) =>
+				g.importBuffer("stats-prm", prmBuf.byteLength, prmBuf, UNIFORM);
+			let g: ComputeGraph;
+			try {
+				if (plan.fold === "gpu") {
+					g = buildFoldGraph(device, id, SGROUPS, {
+						params: importPrm,
+						produce: (pg, partial, prm) =>
+							addStatsNodes(pg, constants(pg, owned), plan, prm, partial),
+						output: (pg) => pg.importBuffer("out", STATS_BYTES),
+					}).graph;
+				} else {
+					g = new ComputeGraph(device, id);
+					addStatsNodes(
+						g,
+						constants(g, owned),
+						plan,
+						importPrm(g),
+						g.importBuffer("out", PARTIAL_BYTES),
+					);
+				}
+			} catch (error) {
+				for (const r of owned) r.destroy();
+				throw error;
+			}
+			g.own(owned);
+			return { graph: g, extra: prmBuf };
+		},
+		MAX_GRAPHS,
+	);
 }
 
 /** bandStatsTex' parameter words (bandStatsGpu's). */
@@ -1322,6 +1242,7 @@ export function bandStatsTex(
 		const buffer = slot(device, "stats", `out-${fold}`, outBytes);
 		try {
 			const e = statsGraph(device, plan);
+			await e.graph.compileAsync();
 			(e.extra as Buffer).write(
 				statsWords(plan, input.minRange ?? 0, minCount),
 			);
@@ -1393,8 +1314,10 @@ export function encodeBandStatsTex(
 		e = statsGraph(device, plan);
 	}
 	const { fold, outBytes } = plan;
-	if (!e.graph.isCompiled)
-		throw new Error("[lookgpu] stats graph not compiled");
+	// a fold graph that fails to compile is the fold's fault, as a failed build (above)
+	assertCompiled(e.graph, "stats", (error) => {
+		if (plan.fold === "gpu" && !device.isLost) markFoldFailed(device, error);
+	});
 	const graphPrm = e.extra as Buffer;
 	let prm = encStatsPrm.get(device);
 	if (!prm || prm.destroyed || prm.byteLength !== graphPrm.byteLength) {
@@ -1524,11 +1447,9 @@ function hazeGraph(
 	},
 ) {
 	const scanSg = statsSubgroupsOn(device);
-	return cachedGraph(device, scanSg ? `${key}-sg` : key, () => {
+	return lookGraph(device, scanSg ? `${key}-sg` : key, (g, owned) => {
 		const { W, H, pw, ph } = d;
 		const N = W * H;
-		const g = new ComputeGraph(device, `look-tex-${key}`);
-		const owned: (Buffer | Texture)[] = [];
 		const c = constants(g, owned);
 		const groups = Math.ceil(N / WG);
 		const range = g.importBuffer("range", N * 4);
@@ -1688,8 +1609,7 @@ function hazeGraph(
 				workgroups: [SEL],
 			});
 		}
-		g.compile();
-		return { graph: g as ComputeGraph, owned, extra: null };
+		return null;
 	});
 }
 
@@ -1706,6 +1626,9 @@ async function runHaze(
 		fill?: (b: HazePrepResult["buffers"]) => void;
 	},
 ): Promise<HazePrepResult> {
+	// pipelines through createComputePipelineAsync (a no-op once compiled); graph.run follows in this
+	// pass lease
+	await e.graph.compileAsync();
 	const N = W * H;
 	const sizes = {
 		range: N * 4,
@@ -1808,7 +1731,7 @@ export function hazePrepTexThen<T>(
 			{ W, H, pw, ph, hasFg: !!fg },
 			{ geo, photo, sky, fg, step },
 		);
-		// runHaze reaches graph.run without an await
+		// runHaze compiles the graph (async), then queues graph.run, inside this pass lease
 		const prep = await runHaze(device, e, W, H, !!opts.read, {
 			textures: {
 				geo: geo.texture,

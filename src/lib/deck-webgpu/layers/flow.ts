@@ -24,7 +24,7 @@ import { Buffer, type Device } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { ComputeGraph } from "#/lib/gpu/core/graph";
-import { defineKernel } from "#/lib/gpu/core/kernel";
+import { defineKernel, kernelAsync } from "#/lib/gpu/core/kernel";
 import {
 	FLOW_ADVECT_WGSL,
 	FLOW_EXTENT_M,
@@ -240,6 +240,8 @@ export class FlowCore implements GpuLayerCore {
 	setWind(wind: FlowWind | null) {
 		this.wind = wind;
 		this.count = wind ? flowParticleCount(wind.density) : 0;
+		// create the advection pipeline off the main thread before the first prepass needs it
+		if (wind) this.warmKernel();
 	}
 
 	/** The velocity grid (look/flow buildFlowGrid), for the current wind; null = no field yet. */
@@ -259,6 +261,12 @@ export class FlowCore implements GpuLayerCore {
 
 	visible() {
 		return !!this.wind && !!this.gridData && this.count > 0 && !this.failed;
+	}
+
+	/** kernelAsync (cached per device: ensure()'s synchronous compile then finds the pipeline ready). */
+	private warmKernel() {
+		// a failed async compile resurfaces from ensure()'s synchronous compile, which sets `failed`
+		kernelAsync(this.device, FLOW_KERNEL).catch(() => undefined);
 	}
 
 	private ensure() {
@@ -304,6 +312,8 @@ export class FlowCore implements GpuLayerCore {
 				bindings: { prm, grid, particles },
 				workgroups: (p) => [Math.max(1, Math.ceil(p.count / 64))],
 			});
+			// synchronous (recorded in prepass): the pipeline is already cached once warmKernel() has
+			// finished, otherwise this compiles it
 			g.compile();
 			this.graph = g;
 		}

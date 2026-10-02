@@ -183,7 +183,7 @@ check(
 check(
 	"moduleOfGraph: cached id and prefix",
 	moduleOfGraph("look-haze-prep|n512")?.id === "look-haze" &&
-		moduleOfGraph("look-tex-masks:512")?.id === "look-textures" &&
+		moduleOfGraph("look-tex|masks:512")?.id === "look-textures" &&
 		moduleOfGraph("nope|x") === undefined,
 );
 const unregister = registerIsland({

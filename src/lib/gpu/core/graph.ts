@@ -987,8 +987,22 @@ export class ComputeGraph<P = void> {
 		})();
 	}
 
-	/** Free the compiled graph's transients, pipelines and timestamp slots. */
+	/**
+	 * Resources the graph's builder created for it (constant buffers, textures): destroyed with the graph
+	 * (a cachedGraph eviction, device-loss cleanup, releaseCachedGraphs). The collection is read at
+	 * destroy time, so a builder may keep pushing to the array it passed.
+	 */
+	own(resources: Iterable<{ destroy(): void }>): this {
+		this.owned.push(resources);
+		return this;
+	}
+
+	private owned: Iterable<{ destroy(): void }>[] = [];
+
+	/** Free the compiled graph's transients, pipelines and timestamp slots (and what it owns). */
 	destroy() {
+		for (const resources of this.owned) for (const r of resources) r.destroy();
+		this.owned = [];
 		this.observation?.detach();
 		this.observation = null;
 		this.compiled?.destroy();

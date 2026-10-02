@@ -67,7 +67,7 @@ const COUNTER = () => {
 				? "query-render"
 				: /renderOffscreen/.test(st)
 					? "stats-render"
-					: label.startsWith("look-tex-")
+					: label.startsWith("look-tex|")
 						? `graph:${label.slice(9).split("|")[0]}`
 						: /geo-query/.test(label)
 							? "geo-query"

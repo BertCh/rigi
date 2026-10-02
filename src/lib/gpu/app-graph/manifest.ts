@@ -725,8 +725,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		id: "look-textures",
 		island: "I9",
 		paths: ["src/lib/gpu/look/textures.ts"],
-		groups: [],
-		graphIdPrefixes: ["look-tex-"],
+		groups: ["look-tex"],
 		realms: ["page"],
 		cadence: "per settle",
 		resources: [
@@ -737,7 +736,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		status: "default",
 		notes:
-			"texture-input look passes; its own per-key graph cache (not core cachedGraph). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)",
+			"texture-input look passes; core cachedGraph group look-tex (6 per device; graphs own their constant buffers, ComputeGraph.own; compileAsync before run, a sync encode of an uncompiled graph starts compileAsync and falls back for that frame). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)",
 	},
 	{
 		id: "labels",

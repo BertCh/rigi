@@ -148,6 +148,7 @@ export class ComputeGraph<P = void> {
   readNode(id: string, targets: GraphRange<P>[], opts?: { dependsOn?: string[] }): this; // → one readback slot
   encodeReads(enc, parameters, buffers?, textures?): { encoding: GPUCommandGraphEncoding; reads: GraphReads };
   compileAsync(): Promise<this>;  lease<T>(fn): Promise<T>;  readonly isCompiled: boolean;  readonly stats;
+  own(resources: Iterable<{ destroy(): void }>): this;  // builder-made buffers / textures, destroyed with the graph (cachedGraph eviction, device loss)
   // KernelNode.bindings also take a GraphRange (per-run { offset, size }: capacity-keyed graphs bind
   // exactly the bytes a call uses)
   // run() also resolves `reads: Record<readNodeId, ArrayBuffer[]>` and, in a finally, cancels every
@@ -221,6 +222,19 @@ Types are luma shader types (`f32`, `u32`, `i32`, `vec2<f32>`, `vec3<f32>`, `vec
 5. **Submit.** Use `submit(device, enc)`, not `device.submit(enc.finish())`. It destroys grown-out pool buffers and collects profiling.
 6. **Readback.** Use `stage(device, enc, src, bytes)` (one range) or `stageReads(device, enc, ranges)` (several), then call `.read()` after `submit`. Use `readBack(device, build, ranges)` when it can own the encoder. Never call `readAsync` on a non-MAP_READ buffer: luma allocates a temporary buffer and encoder every time.
 7. **Release.** `release(...)` destroys fresh buffers and skips pooled ones, so a mixed list is safe.
+
+### Page-side graphs: no first-use compile hitch
+
+A kernel's WGSL compile is what hitches the main thread; a graph's `compile()` is cheap once its kernels' pipelines are in the per-device kernel cache (`kernel()` and `kernelAsync()` share it). So on the page:
+
+1. **Async entry point** (a `Promise`-returning function): `await graph.compileAsync()` after `cachedGraph(...)`, inside the same pass lease, then `graph.run(...)` (`look/textures.ts` masks / stats / haze, `ingest/terrarium-tile.ts` `terrariumTileStatsGpu`).
+2. **Synchronous entry point** that records into a caller's encoder (`encodeMasksTex`, `encodeBandStatsTex`): never `compile()`. If the graph is not compiled, start `compileAsync()` and throw; the caller's catch takes its non-fused path for that frame and the next frame finds the graph compiled.
+3. **Synchronous entry point that must produce this tick** (`TerrariumLayerWriter.write`, `FlowCore.ensure`): prewarm the kernels at construction (`warmKernelsAsync(device, group)` / `kernelAsync`) and keep the synchronous `compile()`. It finds the cached pipelines when the warm-up has finished and only compiles them itself when it has not. Async callers of the same object await its `ready` promise first, before they read any state they will encode with (a grown atlas replaces its texture while they wait).
+4. A graph of copy passes only (`atlas-resize|…`) has no pipeline: its `compile()` stays synchronous.
+
+`compile()` throws while a `compileAsync()` of the same graph is in flight, so a path that may meet one (rule 2) must not call it.
+
+Constant buffers a builder creates (`look/textures.ts` footprints, parameter words) go to `graph.own(array)`: `cachedGraph` evicts with `graph.destroy()`, which destroys them too.
 
 ### `look/kernel.ts`
 

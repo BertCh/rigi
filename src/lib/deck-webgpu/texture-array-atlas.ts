@@ -267,6 +267,8 @@ export class TextureArrayAtlas {
 					},
 				}),
 			});
+			// a copy-only graph: no pipeline to compile, so the synchronous compile() costs no WGSL
+			// compile and the resize (called from reserve() / compact()) stays synchronous
 			g.compile();
 			const enc = this.device.createCommandEncoder({
 				id: `atlas-resize|${this.props.id}`,
@@ -344,6 +346,10 @@ export class TextureArrayAtlas {
 		bitmap: ImageBitmap;
 		down: 1 | 2;
 	}): Promise<{ lease: AtlasLease; stats: TerrariumTileStats } | null> {
+		// pipelines first (async compile, off the main thread), before any state below is read
+		this.terrarium ??= new TerrariumLayerWriter(this.device, this.props.id);
+		await this.terrarium.ready;
+		if (this.destroyed) return null;
 		// near the device's layer limit: no lease (atlas-layout.ts leaseFits)
 		if (!leaseFits(this.used(), this.maxLayers)) return null;
 		const layer = this.alloc();
