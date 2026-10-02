@@ -156,16 +156,19 @@ export function resolvePose(
 	};
 }
 
-function centroid(ms: PhotoMeta[]) {
+export function centroid(ms: PhotoMeta[]) {
 	const lat = ms.reduce((s, m) => s + m.lat, 0) / ms.length;
 	const lon = ms.reduce((s, m) => s + m.lon, 0) / ms.length;
 	return { lat, lon };
 }
 
-function groupViewpoints(ms: PhotoMeta[]): {
+/** Viewpoints of a capture-ordered photo list, and each photo id's viewpoint index. */
+export type ViewpointGrouping = {
 	viewpoints: Viewpoint[];
 	index: Map<string, number>;
-} {
+};
+
+export function groupViewpoints(ms: PhotoMeta[]): ViewpointGrouping {
 	const viewpoints: Viewpoint[] = [];
 	const index = new Map<string, number>();
 	for (const m of ms) {
@@ -186,6 +189,18 @@ function groupViewpoints(ms: PhotoMeta[]): {
 	return { viewpoints, index };
 }
 
+/** The capture-time order makeRoll uses (stable: ties keep the input order). */
+export const compareTakenAt = (a: PhotoMeta, b: PhotoMeta) =>
+	a.takenAt.localeCompare(b.takenAt);
+
+/** Work makeRoll can take from a faster producer (src/lib/roll/spatial); must equal the defaults. */
+export type RollPrecomputed = {
+	/** the photos in capture order (what makeRoll's own sort gives) */
+	sorted?: PhotoMeta[];
+	/** groupViewpoints(sorted) */
+	viewpoints?: ViewpointGrouping;
+};
+
 /** Build a roll from photos of one area. */
 export function makeRoll(
 	id: string,
@@ -193,11 +208,13 @@ export function makeRoll(
 	ms: PhotoMeta[],
 	region: string | null,
 	opts: ResolveOptions = {},
+	precomputed: RollPrecomputed = {},
 ): Roll {
-	const sorted = [...ms].sort((a, b) => a.takenAt.localeCompare(b.takenAt));
+	const sorted = precomputed.sorted ?? [...ms].sort(compareTakenAt);
 	const t0 = sorted.length ? Date.parse(sorted[0].takenAt) : 0;
 	const center = centroid(sorted);
-	const { viewpoints, index } = groupViewpoints(sorted);
+	const { viewpoints, index } =
+		precomputed.viewpoints ?? groupViewpoints(sorted);
 	const rollPhotos: RollPhoto[] = sorted.map((meta) => {
 		const r = resolvePose(meta, opts);
 		return {
