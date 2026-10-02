@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import {
 	HandDot,
 	HandText,
@@ -10,9 +10,12 @@ import {
 	SketchPath,
 	SketchPolyline,
 } from "../notebook/Ink";
+import { LAYER_INKS } from "../viz/inks";
+import { EASE, MOTION, stagger, useMotionAllowed } from "../viz/motion";
 import { IMHOF_TINT_STOPS, ImhofRampFilter } from "./imhof";
 import { paintPolygon } from "./paint";
 import { SheetContourRuns } from "./sheet-contour-runs";
+import { type FollowInput, followGeometry, wrap180 } from "./sheet-follow";
 import { labelSizes, layoutLabels } from "./sheet-labels";
 import {
 	SHEET_ASPECT,
@@ -28,6 +31,12 @@ export interface SheetMapProps {
 	highlight?: string;
 	/** Draw the demo camera positions with their view cones. Default true. */
 	showViewpoints?: boolean;
+	/**
+	 * The highlighted camera follows its photo: the phone's guess as a dashed ghost wedge, the solved
+	 * wedge in the photo's solved ink, the correction arc with its signed degrees and pencil rays to the
+	 * summits the photo names. Applies to the `highlight` viewpoint only.
+	 */
+	follow?: FollowInput;
 }
 
 const HALO = {
@@ -46,12 +55,14 @@ function Sheet({
 	sheet,
 	highlight,
 	showViewpoints,
+	follow,
 	title,
 	scale,
 }: {
 	sheet: SheetData;
 	highlight?: string;
 	showViewpoints: boolean;
+	follow?: FollowInput;
 	title: string;
 	/** Rendered CSS px per sheet unit. */
 	scale: number;
@@ -310,21 +321,33 @@ function Sheet({
 						const r = on ? 260 : 340;
 						return (
 							<g key={v.id} opacity={highlight && !on ? 0.45 : 1}>
-								<path
-									d={`M${v.x} ${v.y}L${polar(v.x, v.y, a0, r)}A${r} ${r} 0 0 1 ${polar(v.x, v.y, a1, r)}z`}
-									fill="var(--gb-red)"
-									fillOpacity={on ? 0.24 : 0}
-								/>
-								{on && (
-									<SketchPath
-										d={`M${v.x} ${v.y}L${polar(v.x, v.y, a0, r)}A${r} ${r} 0 0 1 ${polar(v.x, v.y, a1, r)}z`}
-										seed={`cone-${v.id}`}
-										color="red"
-										width={1.6}
-										opacity={0.85}
-										dash={v.solved ? undefined : "6 5"}
-										tolerance={1.5}
+								{on && follow ? (
+									<FollowedCamera
+										id={v.id}
+										vp={v}
+										follow={follow}
+										peaks={sheet.peaks}
+										r={r}
 									/>
+								) : (
+									<>
+										<path
+											d={`M${v.x} ${v.y}L${polar(v.x, v.y, a0, r)}A${r} ${r} 0 0 1 ${polar(v.x, v.y, a1, r)}z`}
+											fill="var(--gb-red)"
+											fillOpacity={on ? 0.24 : 0}
+										/>
+										{on && (
+											<SketchPath
+												d={`M${v.x} ${v.y}L${polar(v.x, v.y, a0, r)}A${r} ${r} 0 0 1 ${polar(v.x, v.y, a1, r)}z`}
+												seed={`cone-${v.id}`}
+												color="red"
+												width={1.6}
+												opacity={0.85}
+												dash={v.solved ? undefined : "6 5"}
+												tolerance={1.5}
+											/>
+										)}
+									</>
 								)}
 								<PenLine
 									from={[v.x, v.y]}
@@ -382,11 +405,152 @@ function Sheet({
 	);
 }
 
+type SheetViewpoint = SheetData["viewpoints"][number];
+
+/**
+ * The followed camera's cone layers. The static render is the settled frame (ghost, solved wedge, arc,
+ * degrees, rays). From an effect, keyed on the camera, the solved wedge swings from the guess to the fix
+ * (WAAPI, view-box transform), then the arc and its label fade in, then the rays.
+ */
+function FollowedCamera({
+	id,
+	vp,
+	follow,
+	peaks,
+	r,
+}: {
+	id: string;
+	vp: SheetViewpoint;
+	follow: FollowInput;
+	peaks: SheetData["peaks"];
+	r: number;
+}) {
+	const g = useMemo(
+		() => followGeometry(vp, follow, peaks, r),
+		[vp, follow, peaks, r],
+	);
+	const motion = useMotionAllowed();
+	const swing = useRef<SVGGElement>(null);
+	const arcRef = useRef<SVGGElement>(null);
+	const rayRef = useRef<SVGGElement>(null);
+	const turn = wrap180(follow.guessYaw - vp.yaw);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the camera and its turn, not on geometry identity
+	useEffect(() => {
+		if (!motion) return;
+		const animations: Animation[] = [];
+		const run = (
+			el: Element | null | undefined,
+			keyframes: Keyframe[],
+			delay: number,
+			duration: number,
+			easing: string,
+		) => {
+			if (el?.animate)
+				animations.push(
+					el.animate(keyframes, { delay, duration, easing, fill: "backwards" }),
+				);
+		};
+		const swingEnd = MOTION.lead + MOTION.settle;
+		run(
+			swing.current,
+			[{ transform: `rotate(${turn}deg)` }, { transform: "rotate(0deg)" }],
+			MOTION.lead,
+			MOTION.settle,
+			EASE.out,
+		);
+		run(
+			arcRef.current,
+			[{ opacity: 0 }, { opacity: 1 }],
+			swingEnd,
+			MOTION.fade,
+			EASE.out,
+		);
+		const rays = Array.from(rayRef.current?.children ?? []);
+		for (const [i, el] of rays.entries())
+			run(
+				el,
+				[{ opacity: 0 }, { opacity: 1 }],
+				swingEnd + MOTION.fade + stagger(i),
+				MOTION.fade,
+				EASE.out,
+			);
+		return () => {
+			for (const a of animations) a.cancel();
+		};
+	}, [motion, id, turn]);
+	return (
+		<>
+			{/* the phone's guess: a dashed ghost in the prior ink */}
+			<SketchPath
+				d={g.guessWedge}
+				seed={`guess-${id}`}
+				color={LAYER_INKS.prior.paper}
+				width={1.4}
+				dash="6 5"
+				opacity={0.6}
+				tolerance={1.5}
+			/>
+			<g
+				ref={swing}
+				style={{
+					transformBox: "view-box",
+					transformOrigin: `${vp.x}px ${vp.y}px`,
+				}}
+			>
+				<path
+					d={g.solvedWedge}
+					fill={LAYER_INKS.solved.paper}
+					fillOpacity={0.16}
+				/>
+				<SketchPath
+					d={g.solvedWedge}
+					seed={`solved-${id}`}
+					color={LAYER_INKS.solved.paper}
+					width={1.8}
+					tolerance={1.5}
+				/>
+			</g>
+			<g ref={arcRef}>
+				<SketchPath
+					d={g.arc}
+					seed={`arc-${id}`}
+					color="red"
+					width={2}
+					tolerance={1}
+				/>
+				<HandText
+					x={g.arcLabel.x}
+					y={g.arcLabel.y}
+					color="red"
+					size={28}
+					anchor="middle"
+				>
+					{`${g.signedDeg}°`}
+				</HandText>
+			</g>
+			<g ref={rayRef}>
+				{g.rays.map((ray) => (
+					<g key={ray.name}>
+						<PenLine
+							from={[vp.x, vp.y]}
+							to={ray.to}
+							seed={`follow-ray-${id}-${ray.name}`}
+							color="pencil"
+							width={1.2}
+						/>
+					</g>
+				))}
+			</g>
+		</>
+	);
+}
+
 /** Index-page hero: the Niederhorn / Thunersee sheet with contours, relief, peaks and the demo viewpoints. */
 export function SheetMap({
 	className,
 	highlight,
 	showViewpoints = true,
+	follow,
 }: SheetMapProps) {
 	const state = useSheet();
 	const ref = useRef<HTMLDivElement>(null);
@@ -402,6 +566,7 @@ export function SheetMap({
 					sheet={state.sheet}
 					highlight={highlight}
 					showViewpoints={showViewpoints}
+					follow={follow}
 					title={title}
 				/>
 			</div>

@@ -18,14 +18,14 @@
 	position: relative;
 	width: 100vw;
 	margin-left: calc(50% - 50vw);
-	background: var(--gb-paper-deep);
+	background: var(--fig-wash, var(--gb-paper-deep));
 	overflow: hidden;
 }
 
 /* The spill: terrain ink through a baked stroke mask, intersected with the fade gradients. */
 .tafel-spill {
 	position: absolute;
-	background: var(--gb-terrain);
+	background: var(--fig-terrain-ink, var(--gb-terrain));
 	pointer-events: none;
 	-webkit-mask-size: 100% 100%;
 	mask-size: 100% 100%;
@@ -42,7 +42,7 @@
 
 .tafel-halo {
 	paint-order: stroke;
-	stroke: var(--gb-paper-deep);
+	stroke: var(--fig-wash, var(--gb-paper-deep));
 	stroke-width: 3px;
 	stroke-linejoin: round;
 }

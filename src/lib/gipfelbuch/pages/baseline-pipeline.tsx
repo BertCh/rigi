@@ -1643,6 +1643,7 @@ function HeroStages() {
 	const t = (v?: number) => (v == null ? "" : fmtMs(v));
 	return (
 		<Figure
+			ground={d?.id}
 			label="Fig. 1"
 			bleed
 			caption={

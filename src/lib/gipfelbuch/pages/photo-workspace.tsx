@@ -1403,6 +1403,7 @@ function HeroJourney() {
 	const agree = d?.app ? Math.abs(d.app.yaw - d.solved.yaw).toFixed(2) : "…";
 	return (
 		<Figure
+			ground={d?.id}
 			label="Fig. 1"
 			bleed
 			caption={<>One photo, four moments. The pose changes; export waits.</>}

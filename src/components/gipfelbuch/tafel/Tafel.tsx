@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import {
+	type CSSProperties,
 	type ReactNode,
 	useLayoutEffect,
 	useMemo,
@@ -11,6 +12,7 @@ import {
 } from "react";
 import { HandDot, PenLine, SketchPath } from "../notebook/Ink";
 import { TYPE } from "../swiss/type";
+import { groundVars } from "../viz/ground";
 import { useInView } from "../viz/hooks";
 import { HandLabel } from "../viz/labels";
 import {
@@ -232,7 +234,7 @@ export function Tafel({
 		<figure
 			ref={rootRef}
 			className="tafel-root m-0 pb-6"
-			style={{ paddingTop: 0 }}
+			style={{ paddingTop: 0, ...(groundVars(photo) as CSSProperties) }}
 		>
 			<div
 				ref={viewRef}

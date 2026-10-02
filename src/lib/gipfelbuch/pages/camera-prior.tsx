@@ -144,6 +144,7 @@ function RealPrior({
 	const idx = useGipfelbuchIndex();
 	return (
 		<Figure
+			ground={d?.id}
 			label="Fig. D1"
 			bleed
 			caption={

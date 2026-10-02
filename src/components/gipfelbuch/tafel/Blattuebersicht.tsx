@@ -7,6 +7,7 @@ import { GIPFELBUCH_NODES } from "#/lib/gipfelbuch/graph";
 import { Hachure, PenCircle, PenLine, SketchRect } from "../notebook/Ink";
 import { MarkerUnderline } from "../swiss/hand";
 import { TYPE } from "../swiss/type";
+import { HandLabel } from "../viz/labels";
 import {
 	GIPFELBUCH_PHOTO_IDS,
 	type GipfelbuchPhotoData,
@@ -174,16 +175,17 @@ export function SheetIndexSketch({
 					const y = INDEX_PAD + row * INDEX_CELL_H;
 					return (
 						<g key={chapter.numeral}>
-							<text
+							<HandLabel
 								x={INDEX_PAD + 24}
 								y={y + INDEX_CELL_H / 2 + 6}
-								textAnchor="end"
-								fontSize={18}
-								className="nb-hand"
-								fill="var(--gb-contour)"
+								anchor="end"
+								size={18}
+								color="var(--gb-contour)"
+								halo={0}
+								mono={false}
 							>
 								{chapter.numeral}
-							</text>
+							</HandLabel>
 							{chapter.ids.map((id, column) => {
 								const x = INDEX_PAD + 34 + column * INDEX_CELL_W;
 								const node = NODE_OF.get(id);
@@ -222,16 +224,16 @@ export function SheetIndexSketch({
 											penWidth={0.9}
 											tolerance={0.9}
 										/>
-										<text
+										<HandLabel
 											x={x + INDEX_CELL_W / 2}
 											y={y + INDEX_CELL_H / 2 + 6}
-											textAnchor="middle"
-											fontSize={17}
-											className="nb-num"
-											fill="var(--gb-ink)"
+											anchor="middle"
+											size={17}
+											color="var(--gb-ink)"
+											halo={0}
 										>
 											{blattLabel(id)}
-										</text>
+										</HandLabel>
 									</a>
 								);
 							})}

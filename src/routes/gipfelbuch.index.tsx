@@ -22,6 +22,7 @@ import {
 import { ListArrow, MarkerUnderline } from "#/components/gipfelbuch/swiss/hand";
 import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import { Blattuebersicht, CHAPTERS } from "#/components/gipfelbuch/tafel";
+import { useGipfelbuchPhoto } from "#/components/gipfelbuch/viz";
 import { sheetTransition } from "#/components/gipfelbuch/viz/hooks";
 import { SiteNav } from "#/components/site/SiteNav";
 import { GIPFELBUCH_NODES } from "#/lib/gipfelbuch/graph";
@@ -151,6 +152,18 @@ function GipfelbuchIndex() {
 	const mapRef = useRef<HTMLDivElement>(null);
 	// the photo the reader follows; shared with every concept sheet
 	const [photoId, setPhotoId] = useNotebookPhoto();
+	const d = useGipfelbuchPhoto(photoId);
+	const follow = useMemo(
+		() =>
+			d
+				? {
+						guessYaw: d.prior.yaw,
+						guessHfov: d.prior.hfov,
+						names: d.peaks.filter((p) => p.labelled).map((p) => p.name),
+					}
+				: undefined,
+		[d],
+	);
 	return (
 		<main className={`${GB_THEME} pb-16`}>
 			<SketchDefs />
@@ -211,12 +224,13 @@ function GipfelbuchIndex() {
 
 				<div className="px-6 pt-6">
 					<div ref={mapRef}>
-						<SheetMap className="w-full" />
+						<SheetMap className="w-full" highlight={photoId} follow={follow} />
 					</div>
 					<div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
 						<p className={`${TYPE.hand} gb-secondary max-w-[66ch]`}>
 							The 12 demo photos were taken here: each red cone is one camera,
-							solved from the photo alone.
+							solved from the photo alone. The one you follow shows the
+							phone&apos;s guess (dashed) turning to the fix.
 						</p>
 						<SheetScaleBar sheet={sheet} targetRef={mapRef} />
 					</div>

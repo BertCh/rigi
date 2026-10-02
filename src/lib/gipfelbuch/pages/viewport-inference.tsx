@@ -2058,6 +2058,7 @@ function HeroCompare() {
 	const crop = useMemo(() => (d ? skylineBand(d) : undefined), [d]);
 	return (
 		<Figure
+			ground={d?.id}
 			label="Fig. 1"
 			bleed
 			caption={
