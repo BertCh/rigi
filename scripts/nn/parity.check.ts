@@ -878,11 +878,13 @@ if (gpu.runtime.stats.graphHits <= before) {
 		table[`w${i}`] = info;
 	});
 	const bytes = encodeSafetensors(tensors, { quant: JSON.stringify(table) });
-	const gw = gpu.weightsFromBytes(bytes);
+	// the load-time expansion path (quantResident off): the int8 tensors read back as f16 / f32
+	const expandNn = new GpuNn(device, { quantResident: false });
+	const gw = expandNn.weightsFromBytes(bytes);
 	const cw = cpu.weightsFromBytes(bytes);
 	for (let i = 0; i < specs.length; i++) {
 		const a = await cpu.read(cw.get(`w${i}`));
-		const b = await gpu.read(gw.get(`w${i}`));
+		const b = await expandNn.read(gw.get(`w${i}`));
 		let worst = 0;
 		let amax = 0;
 		for (let k = 0; k < a.length; k++) {
@@ -901,20 +903,188 @@ if (gpu.runtime.stats.graphHits <= before) {
 	const ref = await cpu.read(
 		cpu.linear(cpu.fromArray(x, [3, 64]), cw.get("w0"), null),
 	);
-	const out = await gpu.forward(() =>
-		gpu.linear(gpu.fromArray(x, [3, 64]), gw.get("w0"), null),
+	const out = await expandNn.forward(() =>
+		expandNn.linear(expandNn.fromArray(x, [3, 64]), gw.get("w0"), null),
 	);
-	const got = await gpu.read(out);
+	const got = await expandNn.read(out);
 	let worst = 0;
 	for (let k = 0; k < ref.length; k++)
 		worst = Math.max(worst, Math.abs(ref[k] - got[k]));
-	const plain = [...(await gpu.read(gw.get("plain")))].join();
+	const plain = [...(await expandNn.read(gw.get("plain")))].join();
 	const ok = worst < 1e-2 && plain === "1,2,3,4";
 	if (!ok) failed++;
 	rows.push(
 		`${ok ? "PASS" : "FAIL"} dequant weights in a forward (linear) maxAbs ${worst.toExponential(2)}, plain fp16 alongside ${plain}`,
 	);
-	gpu.dispose(gw);
+	expandNn.dispose(gw);
+}
+// resident int8 weights (q8): kept packed on the GPU, dequantized inside the conv / linear / matmul
+// weight loads, against the CPU ops on the expanded weights
+{
+	type Run = (nn: Nn, w: (name: string) => Tensor) => Tensor;
+	const x = (shape: number[]) => ({ shape, data: randn(n(shape)) });
+	const resident: {
+		name: string;
+		w: [number[], number];
+		input: { shape: number[]; data: Float32Array };
+		run: Run;
+		bias?: number;
+		eligible?: boolean;
+	}[] = [
+		{
+			name: "linear K64",
+			w: [[37, 64], 64],
+			input: x([5, 64]),
+			run: (nn, w) => nn.linear(nn.fromArray(cur.data, cur.shape), w("w")),
+		},
+		{
+			name: "linear K36 g12",
+			w: [[17, 36], 12],
+			input: x([3, 7, 36]),
+			run: (nn, w) => nn.linear(nn.fromArray(cur.data, cur.shape), w("w")),
+		},
+		{
+			name: "matmul B [K,N]",
+			w: [[64, 36], 36],
+			input: x([6, 64]),
+			run: (nn, w) => nn.matmul(nn.fromArray(cur.data, cur.shape), w("w")),
+		},
+		{
+			name: "conv3x3 padded",
+			w: [[16, 8, 3, 3], 72],
+			input: x([1, 8, 11, 13]),
+			run: (nn, w) =>
+				nn.conv2d(nn.fromArray(cur.data, cur.shape), w("w"), null, {
+					padding: 1,
+				}),
+		},
+		{
+			name: "conv3x3 g24 stride2",
+			w: [[16, 8, 3, 3], 24],
+			input: x([2, 8, 12, 12]),
+			run: (nn, w) =>
+				nn.conv2d(nn.fromArray(cur.data, cur.shape), w("w"), null, {
+					padding: 1,
+					stride: 2,
+				}),
+		},
+		{
+			name: "conv1x1",
+			w: [[32, 16, 1, 1], 16],
+			input: x([1, 16, 9, 10]),
+			run: (nn, w) => nn.conv2d(nn.fromArray(cur.data, cur.shape), w("w")),
+		},
+		{
+			name: "patch embed 14x14 s14",
+			w: [[24, 3, 14, 14], 196],
+			input: x([1, 3, 28, 42]),
+			run: (nn, w) =>
+				nn.conv2d(nn.fromArray(cur.data, cur.shape), w("w"), null, {
+					stride: 14,
+				}),
+		},
+		{
+			name: "conv direct (Cout 4)",
+			w: [[4, 8, 3, 3], 72],
+			input: x([1, 8, 7, 9]),
+			run: (nn, w) =>
+				nn.conv2d(nn.fromArray(cur.data, cur.shape), w("w"), null, {
+					padding: 1,
+				}),
+		},
+		{
+			name: "convTranspose2d s2",
+			w: [[8, 16, 2, 2], 64],
+			input: x([1, 8, 6, 5]),
+			run: (nn, w) =>
+				nn.convTranspose2d(nn.fromArray(cur.data, cur.shape), w("w"), null, {
+					stride: 2,
+				}),
+		},
+		{
+			name: "deformConv2d",
+			w: [[16, 8, 3, 3], 72],
+			input: x([1, 8, 8, 8]),
+			run: (nn, w) =>
+				nn.deformConv2d(
+					nn.fromArray(cur.data, cur.shape),
+					nn.fromArray(offsets, [1, 18, 8, 8]),
+					null,
+					w("w"),
+					null,
+					{ padding: 1 },
+				),
+		},
+		{
+			name: "conv g27 (ineligible, expands)",
+			w: [[8, 3, 3, 3], 27],
+			input: x([1, 3, 6, 6]),
+			run: (nn, w) => nn.conv2d(nn.fromArray(cur.data, cur.shape), w("w")),
+			eligible: false,
+		},
+	];
+	let cur = resident[0].input;
+	const offsets = randn(18 * 64, 1.5);
+	for (const c of resident) {
+		const [shape, group] = c.w;
+		const wq = quantize(randn(n(shape), 0.5), shape, 8, group);
+		const bytes = encodeSafetensors(
+			{
+				"w.qweight": { shape: [wq.q.length], data: wq.q },
+				"w.qscale": { shape: [wq.scale.length], data: wq.scale },
+			},
+			{ quant: JSON.stringify({ w: wq.info }) },
+		);
+		const rn = new GpuNn(device, { quantResident: true });
+		const gw = rn.weightsFromBytes(bytes);
+		const cw = cpu.weightsFromBytes(bytes);
+		const isQ8 = gw.get("w").dtype === "q8";
+		cur = c.input;
+		const ref = await cpu.read(c.run(cpu, (k) => cw.get(k)));
+		const got = await rn.read(
+			await rn.forward(() => c.run(rn, (k) => gw.get(k))),
+		);
+		let worst = 0;
+		let amax = 0;
+		for (let k = 0; k < ref.length; k++) {
+			worst = Math.max(worst, Math.abs(ref[k] - got[k]));
+			amax = Math.max(amax, Math.abs(ref[k]));
+		}
+		// an ineligible tensor expands to f16 storage (2^-11 relative); resident is f32 arithmetic
+		const tol = isQ8 ? 2e-4 : 3e-3;
+		const ok =
+			got.length === ref.length &&
+			worst <= amax * tol &&
+			isQ8 === (c.eligible ?? true);
+		if (!ok) failed++;
+		rows.push(
+			`${ok ? "PASS" : "FAIL"} q8 resident ${c.name} ${isQ8 ? "q8" : "expanded"} maxAbs ${worst.toExponential(2)} (max|ref| ${amax.toFixed(2)})`,
+		);
+		rn.dispose(gw);
+	}
+	// a q8 weight on an op that cannot read it fails loudly
+	{
+		const wq = quantize(randn(64), [4, 16], 8, 16);
+		const bytes = encodeSafetensors(
+			{
+				"w.qweight": { shape: [wq.q.length], data: wq.q },
+				"w.qscale": { shape: [wq.scale.length], data: wq.scale },
+			},
+			{ quant: JSON.stringify({ w: wq.info }) },
+		);
+		const rn = new GpuNn(device, { quantResident: true });
+		const gw = rn.weightsFromBytes(bytes);
+		let threw = false;
+		try {
+			await rn.forward(() => rn.add(gw.get("w"), 1));
+		} catch {
+			threw = true;
+		}
+		if (!threw) failed++;
+		rows.push(
+			`${threw ? "PASS" : "FAIL"} q8 weight on an elementwise op throws`,
+		);
+	}
 }
 if (!argv.includes("--no-f16") && gpu.backend.f16) await runPass(true);
 // kernel variants (src/lib/nn/gpu/kernel-caps.ts): each tile / option against the CPU, on a fresh

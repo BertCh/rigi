@@ -367,12 +367,23 @@ fn store(m: u32, n: u32, v: f32, al: f32, be: f32) {
 		// make every batch base a multiple of 4 then)
 		const vecA = K % 4 === 0;
 		const vecB = transB ? (K % 4 === 0 ? "k" : null) : N % 4 === 0 ? "n" : null;
+		if (da === "q8")
+			throw new Error("nn: a q8 weight can only be the matmul B operand");
 		const f16Math = caps.f16 && caps.f16Math && (da === "f16" || db === "f16");
 		const config = selectGemmConfig(M, N, caps.gemmTileOverride);
 		const vec4Of = (d: DType) => `vec4<${d}>`;
 		const elem: Record<string, string> = {};
 		if (vecA) elem.a = vec4Of(da);
-		if (vecB) elem.b = vec4Of(db);
+		// resident int8 B: ld4_b reads the four values from one packed word (q8 bindings need no elem override)
+		if (vecB && db !== "q8") elem.b = vec4Of(db);
+		// a weight has no batch (bBase = 0), so its (row, col) are the loader's own indices
+		const q8rc = db === "q8" && batch.length === 0;
+		const loadB4 = (idx: string, rc: string) =>
+			db === "q8"
+				? q8rc
+					? `ld4rc_b(${rc})`
+					: `ld4_b(${idx})`
+				: `vec4<f32>(b[(${idx}) >> 2u])`;
 		const ops = `${baseOps}
 ${
 	vecA
@@ -381,9 +392,9 @@ ${
 }
 ${
 	vecB === "n"
-		? "fn loadB4(k: u32, n: u32) -> vec4<f32> { return vec4<f32>(b[(bBase + k * gN + n) >> 2u]); }"
+		? `fn loadB4(k: u32, n: u32) -> vec4<f32> { return ${loadB4("bBase + k * gN + n", "k, n")}; }`
 		: vecB === "k"
-			? "fn loadB4(n: u32, k: u32) -> vec4<f32> { return vec4<f32>(b[(bBase + n * gK + k) >> 2u]); }"
+			? `fn loadB4(n: u32, k: u32) -> vec4<f32> { return ${loadB4("bBase + n * gK + k", "n, k")}; }`
 			: `fn loadB(k: u32, n: u32) -> f32 { return ld_b(bBase + ${transB ? "n * gK + k" : "k * gN + n"}); }`
 }`;
 		const spec = nnKernel(
@@ -537,15 +548,18 @@ export function convGemmKernel(
 	const K = cig * p.kh * p.kw;
 	const N = p.Ho * p.Wo;
 	const M = cog;
+	// the weight element at (row, col) of its quantized layout, or at flat index `flat`
+	const wLoad = (row: string, col: string, flat: string) =>
+		dt.w === "q8" ? `ldrc_w(${row}, ${col})` : `ld_w(${flat})`;
 	const loadA =
 		kind === "convT"
 			? // weight [Cin, Cout/g, kh, kw]
 				`fn loadA(m: u32, k: u32) -> f32 {
   let kk = ckh() * ckw();
   let ci = k / kk;
-  return ld_w(((gg * ${cig}u + ci) * ${cog}u + m) * kk + k % kk);
+  return ${wLoad(`gg * ${cig}u + ci`, `m * kk + k % kk`, `((gg * ${cig}u + ci) * ${cog}u + m) * kk + k % kk`)};
 }`
-			: `fn loadA(m: u32, k: u32) -> f32 { return ld_w((gg * ${cog}u + m) * gK + k); }`;
+			: `fn loadA(m: u32, k: u32) -> f32 { return ${wLoad(`gg * ${cog}u + m`, "k", `(gg * ${cog}u + m) * gK + k`)}; }`;
 	let loadB: string;
 	if (kind === "conv")
 		loadB = `fn loadB(k: u32, n: u32) -> f32 {
@@ -708,7 +722,7 @@ ${ENTRY} {
       for (var kx = 0u; kx < ckw(); kx++) {
         let ix = i32(ox * csw() + kx * cdw()) - cpw();
         if (ix < 0 || ix >= i32(cW())) { continue; }
-        s += ld_w((wb + ky) * ckw() + kx) * ld_x((xb + u32(iy)) * cW() + u32(ix));
+        s += ${dt.w === "q8" ? "ldrc_w(co, ((ci * ckh() + ky) * ckw() + kx))" : "ld_w((wb + ky) * ckw() + kx)"} * ld_x((xb + u32(iy)) * cW() + u32(ix));
       }
     }
   }

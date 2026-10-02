@@ -130,11 +130,27 @@ the PyTorch `state_dict` in fp16 by a producer under `scripts/models/`. `loadWei
 
 A file can store large tensors as int8 / int4 with per-group f16 scales (`__metadata__.quant` lists
 `{ bits, group, shape }` per name; data in `<name>.qweight` U8 + `<name>.qscale` F16). `loadWeights` /
-`weightsFromBytes` expand them once: GPU in one graph node per weight (`gpu/k-quant.ts`, f16 via
-`pack2x16float` on shader-f16 devices, else f32, exactly sized buffers), CPU in JS (`dequantize`, the
-reference). After loading, a quantized weight is an ordinary f16 / f32 weight: model code and kernels do
-not change, only the download shrinks. Producer: `scripts/models/quantize.ts`; parity: the `dequant`
-rows of `scripts/nn/parity.check.ts`.
+`weightsFromBytes` handle them in one of two ways:
+
+- **Resident int8 (opt-in, `new GpuNn(device, { quantResident: true })`; off by default because the MoGe-2 forward measured ~12% slower over Dawn, 274 vs 307 ms median, noisy)**: an int8 tensor of rank >= 2 whose row length and group are
+  multiples of 4 stays packed on the GPU as dtype `"q8"` (~1 B/param + the f16 scales; MoGe-2 q8: 36 MB
+  instead of 70 MB). The buffer is self-describing (`packResident`: header words cols / group / scale
+  offset / groups per row, the int8 words, then the f16 scales), so kernel meta and bindings do not change.
+  `nnKernel` gives a q8 input `ld_<n>(i)`, `ldrc_<n>(row, col)` and `ld4rc_<n>` (four values from one word),
+  and the weight loads of linear / matmul-B (vec4 and scalar), implicit-GEMM conv2d / convTranspose2d /
+  deformConv2d and the direct conv dequantize in-kernel. A q8 tensor can only feed those weight slots
+  (or be `reshape`d keeping the leading dim); any other op, `read` included, throws, so small vectors
+  (norm weights, biases, LayerScale) should stay fp16 in the file (the quantize producer's `keep` rule).
+  Measured over Dawn, MoGe-2 q8 at 1200 tokens: forward about +6% vs expanded (noisy), outputs differ by
+  f16-rounding level (depth max 4.6e-4).
+- **Expanded**: int4, ineligible tensors, the default (`quantResident` off) and the CPU
+  backend expand once: GPU in one graph node per weight (`gpu/k-quant.ts`, f16 via `pack2x16float` on
+  shader-f16 devices, else f32, exactly sized buffers), CPU in JS (`dequantize`, the reference). The
+  result is an ordinary f16 / f32 weight.
+
+Producer: `scripts/models/quantize.ts`; parity: the `dequant` and `q8 resident` rows of
+`scripts/nn/parity.check.ts`; `scripts/nn/bench-q8.ts` (MoGe-2 forward, weight bytes, output diff) and
+`scripts/nn/bench.ts --q8 | --q8-expand` (GFLOP/s).
 
 ## Kernels (`gpu/`)
 

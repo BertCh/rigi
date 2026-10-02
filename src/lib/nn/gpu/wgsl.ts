@@ -35,6 +35,39 @@ fn erf_s(x: f32) -> f32 {
 }
 `;
 
+/**
+ * Loaders for a resident int8 weight (quant.ts `packResident` layout; header words cols, group, scale
+ * offset, groups per row). cols and group are multiples of 4, so the four values of ld4 share one
+ * word, one row and one scale. `ldrc_<n>(row, col)` / `ld4rc_<n>` take the (row, col) the caller
+ * already has, so the common one-scale-per-row case needs no integer division; `ld_<n>(i)` splits a
+ * flat index. `n` is the binding name.
+ */
+const q8Loaders = (n: string) => /* wgsl */ `
+fn q8s_${n}(row: u32, col: u32) -> f32 {
+  let gpr = ${n}[3u];
+  var s = row;
+  if (gpr != 1u) { s = row * gpr + col / ${n}[1u]; }
+  return unpack2x16float(${n}[${n}[2u] + (s >> 1u)])[s & 1u];
+}
+fn ldrc_${n}(row: u32, col: u32) -> f32 {
+  let i = row * ${n}[0u] + col;
+  return f32(extractBits(bitcast<i32>(${n}[4u + (i >> 2u)]), (i & 3u) * 8u, 8u)) * q8s_${n}(row, col);
+}
+fn ld4rc_${n}(row: u32, col: u32) -> vec4<f32> {
+  let i = row * ${n}[0u] + col;
+  let q = (vec4<i32>(bitcast<i32>(${n}[4u + (i >> 2u)])) << vec4<u32>(24u, 16u, 8u, 0u)) >> vec4<u32>(24u);
+  return vec4<f32>(q) * q8s_${n}(row, col);
+}
+fn ld4_${n}(i: u32) -> vec4<f32> {
+  let row = i / ${n}[0u];
+  return ld4rc_${n}(row, i - row * ${n}[0u]);
+}
+fn ld_${n}(i: u32) -> f32 {
+  let row = i / ${n}[0u];
+  return ldrc_${n}(row, i - row * ${n}[0u]);
+}
+`;
+
 export type KernelInput = { name: string; dtype: DType };
 
 const specs = new Map<string, KernelSpec>();
@@ -62,11 +95,14 @@ export function nnKernel(
 	for (const t of textures)
 		src += `@group(0) @binding(${b++}) var ${t}: texture_2d<f32>;\n`;
 	for (const i of inputs)
-		src += `@group(0) @binding(${b++}) var<storage, read> ${i.name}: array<${elem[i.name] ?? i.dtype}>;\n`;
+		src += `@group(0) @binding(${b++}) var<storage, read> ${i.name}: array<${elem[i.name] ?? (i.dtype === "q8" ? "u32" : i.dtype)}>;\n`;
 	for (const o of outputs)
 		src += `@group(0) @binding(${b++}) var<storage, read_write> ${o}: array<${elem[o] ?? "f32"}>;\n`;
 	for (const i of inputs.filter((i) => !elem[i.name]))
-		src += `fn ld_${i.name}(i: u32) -> f32 { return f32(${i.name}[i]); }\n`;
+		src +=
+			i.dtype === "q8"
+				? q8Loaders(i.name)
+				: `fn ld_${i.name}(i: u32) -> f32 { return f32(${i.name}[i]); }\n`;
 	src += PRELUDE + body;
 	s = defineKernel(
 		id,

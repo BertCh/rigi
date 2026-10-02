@@ -4,7 +4,10 @@
 
 // Load-time dequantization (../quant.ts format): packed int8 / int4 words + per-group scales → the
 // weight as f16 (two halves per u32 word, pack2x16float, so no shader-f16 is needed to write it) or f32.
-// One node per weight, recorded at weightsFromBytes and submitted with the next flush.
+// One node per weight, recorded at weightsFromBytes and submitted with the next flush. This is the
+// expanded path (int4, ineligible tensors, quantResident off); eligible int8 tensors stay resident
+// instead and are dequantized inside the GEMM / conv weight loads (wgsl.ts q8Loaders, ../quant.ts
+// packResident), so they never reach this kernel.
 
 import type { QuantBits } from "../quant";
 import type { DType } from "../types";

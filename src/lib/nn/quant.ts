@@ -6,6 +6,8 @@
 // symmetric, one scale per group of a row). The loaders expand them once at load time (the GPU backend
 // in a kernel, gpu/k-quant.ts; the CPU backend here) back to ordinary f16 / f32 weights, so model code,
 // kernels and memory use are the same as for an fp16 file: quantization only shrinks the download.
+// The GPU backend can instead keep int8 weights resident ("q8", `packResident` below) and dequantize
+// inside the weight loads of the GEMM / conv kernels.
 //
 //   __metadata__.quant = JSON { [name]: { bits: 4 | 8, group, shape } }
 //   <name>.qweight  U8 [ceil(numel · bits / 8)], the tensor flattened row-major:
@@ -170,4 +172,42 @@ export function splitQuantized(
 	}
 	const plain = [...entries.values()].filter((e) => !used.has(e.name));
 	return { plain, quantized };
+}
+
+/** Header words of a resident q8 buffer: cols, group, scale word offset, groups per row. */
+export const RESIDENT_HEADER_WORDS = 4;
+
+/** Whether `info` can stay resident as q8: int8, and cols and group multiples of 4 (4-byte-aligned vec4 reads). */
+export function canStayResident(info: QuantInfo): boolean {
+	if (info.bits !== 8 || info.shape.length < 2) return false;
+	const { cols } = quantLayout(info);
+	return cols % 4 === 0 && info.group % 4 === 0;
+}
+
+/**
+ * The self-describing GPU buffer of a resident int8 weight, in u32 words:
+ *   [0] cols  [1] group  [2] word offset of the scales  [3] groups per row (cols / group)
+ *   [4 ..)  the int8 values (RESIDENT_HEADER_WORDS words in), 4 per word (byte i = bits (i & 3) · 8 of word i >> 2)
+ *   [scales ..)  the f16 scales, two per word (scale s = half s & 1 of word s >> 1), row-major
+ * so the kernel needs no extra meta words or bindings, and the scales stay bit-identical to the file.
+ */
+export function packResident(
+	q: Uint8Array,
+	scaleHalf: Uint16Array,
+	info: QuantInfo,
+): Uint32Array {
+	if (!canStayResident(info)) throw new Error("quant: not resident-eligible");
+	const { numel, cols, rows, groups } = quantLayout(info);
+	if (q.length !== numel || scaleHalf.length !== rows * groups)
+		throw new Error("quant: packed sizes do not match the quant row");
+	const byteWords = numel / 4;
+	const scaleOffset = RESIDENT_HEADER_WORDS + byteWords;
+	const out = new Uint32Array(scaleOffset + Math.ceil(scaleHalf.length / 2));
+	out[0] = cols;
+	out[1] = info.group;
+	out[2] = scaleOffset;
+	out[3] = groups;
+	new Uint8Array(out.buffer, RESIDENT_HEADER_WORDS * 4, numel).set(q);
+	new Uint16Array(out.buffer, scaleOffset * 4, scaleHalf.length).set(scaleHalf);
+	return out;
 }

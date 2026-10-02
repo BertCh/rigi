@@ -5,9 +5,12 @@
 // nn microbenchmarks on Dawn in node (not a browser bench): GFLOP/s of matmul / linear, conv and
 // fused attention on the src/lib/nn GPU backend. Each sample is one forward of R independent ops
 // (one graph submission) timed to completion of a 4-byte readback, median of 7.
-//   DAWN_DIR=/tmp/dawn npx tsx scripts/nn/bench.ts [--f16]
+//   DAWN_DIR=/tmp/dawn npx tsx scripts/nn/bench.ts [--f16 | --q8 | --q8-expand]
+// --q8: int8 weights kept resident and dequantized in the weight loads; --q8-expand: the same file
+// expanded to f16 at load (the baseline for --q8).
 
 import { GpuNn } from "../../src/lib/nn/gpu/gpu-nn";
+import { quantize } from "../../src/lib/nn/quant";
 import { encodeSafetensors, floatToHalf } from "../../src/lib/nn/safetensors";
 import type { Tensor } from "../../src/lib/nn/types";
 import { dawnDevice } from "./dawn";
@@ -18,11 +21,28 @@ if (!device) {
 	process.exit(0);
 }
 const F16 = process.argv.includes("--f16");
-const nn = new GpuNn(device);
+const Q8 = process.argv.includes("--q8");
+const Q8_EXPAND = process.argv.includes("--q8-expand");
+const nn = new GpuNn(device, { quantResident: !Q8_EXPAND });
 const rnd = (n: number) =>
 	Float32Array.from({ length: n }, (_, i) => Math.sin(i * 12.9898) * 0.5);
 const weight = (shape: number[]): Tensor => {
 	const n = shape.reduce((a, b) => a * b, 1);
+	if (Q8 || Q8_EXPAND) {
+		const cols = n / shape[0];
+		const { q, scale, info } = quantize(rnd(n), shape, 8, cols);
+		return nn
+			.weightsFromBytes(
+				encodeSafetensors(
+					{
+						"w.qweight": { shape: [q.length], data: q },
+						"w.qscale": { shape: [scale.length], data: scale },
+					},
+					{ quant: JSON.stringify({ w: info }) },
+				),
+			)
+			.get("w");
+	}
 	if (!F16) return nn.fromArray(rnd(n), shape);
 	const w = nn.weightsFromBytes(
 		encodeSafetensors({
@@ -53,7 +73,9 @@ async function time(label: string, flops: number, R: number, op: () => Tensor) {
 	);
 }
 
-console.log(`nn-bench on Dawn, weights ${F16 ? "f16" : "f32"}`);
+console.log(
+	`nn-bench on Dawn, weights ${Q8 ? "q8 resident" : Q8_EXPAND ? "q8 expanded to f16" : F16 ? "f16" : "f32"}`,
+);
 for (const [M, K, N] of [
 	[256, 256, 256],
 	[1024, 1024, 1024],

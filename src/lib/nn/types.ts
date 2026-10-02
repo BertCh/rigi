@@ -17,7 +17,12 @@
 // Every op returns a new tensor. Activations are f32; weights may be f16 on a GPU with shader-f16
 // (kernels accumulate in f32 and widen f16 inputs on load).
 
-export type DType = "f32" | "f16";
+/**
+ * Tensor storage type. "q8" only appears on GPU weights loaded from a quantized file with resident
+ * int8 (quant.ts `packResident`): the buffer stays packed and conv / linear / matmul-B kernels
+ * dequantize inside their weight loads; any other op on such a tensor throws.
+ */
+export type DType = "f32" | "f16" | "q8";
 
 /** A backend-owned tensor. Read it with `nn.read`, free it with `nn.dispose`. */
 export interface Tensor {

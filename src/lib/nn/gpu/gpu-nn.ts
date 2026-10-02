@@ -19,7 +19,7 @@ import {
 	type UnaryPrim,
 } from "../base";
 import { fetchModel } from "../fetch";
-import { splitQuantized } from "../quant";
+import { canStayResident, packResident, splitQuantized } from "../quant";
 import {
 	entryF32,
 	halfToFloat32,
@@ -146,6 +146,14 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		reduceMin: LUMA_REDUCE_MIN,
 		topkMin: LUMA_TOPK_MIN,
 	};
+	/**
+	 * Quantized files: keep int8 weights packed on the GPU (q8, ~1 B/param) and dequantize inside the
+	 * conv / linear weight loads, instead of expanding them to f16 at load (2 B/param). Read by
+	 * weightsFromBytes, so set it before loading. int4 and ineligible tensors expand as before. Off by
+	 * default: halves weight VRAM (MoGe-2 q8 70 → 36 MB) but the forward measured ~12% slower over Dawn
+	 * (274 vs 307 ms median, 2026-10-02, noisy).
+	 */
+	quantResident = false;
 	private rec: Recording | null = null;
 	private implicit: Recording | null = null;
 	/** the active `scope()` path, stamped on recorded nodes */
@@ -158,9 +166,10 @@ export class GpuNn extends BaseNn<GpuTensor> {
 	/** `graphGroup`: the cachedGraph group of this runtime's graphs (default "nn"; nn/registry.ts gives each consumer its own). */
 	constructor(
 		readonly device: Device,
-		opts: { graphGroup?: string } = {},
+		opts: { graphGroup?: string; quantResident?: boolean } = {},
 	) {
 		super();
+		this.quantResident = opts.quantResident ?? false;
 		this.runtime = new Runtime(device, opts.graphGroup);
 		this.backend = { kind: "gpu", f16: device.features.has("shader-f16") };
 		setKernelCaps(capsFromFeatures((f) => device.features.has(f as never)));
@@ -179,7 +188,15 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		inputs: GpuTensor[],
 		shapes: number[][],
 		extra: Pick<Node, "act" | "fuse" | "ew" | "ln"> = {},
+		q8Input = -1,
 	): GpuTensor[] {
+		// resident int8 weights are only readable by the GEMM / conv weight loads (k-gemm.ts)
+		inputs.forEach((t, i) => {
+			if (t.dtype === "q8" && i !== q8Input)
+				throw new Error(
+					"nn: a q8 (resident int8) weight can only feed conv / linear / matmul weights; load with quantResident: false",
+				);
+		});
 		const rec = this.current();
 		const outs = shapes.map((s) => {
 			const st = new Storage(Math.max(4, numel(s) * 4), "f32", rec);
@@ -202,8 +219,9 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		inputs: GpuTensor[],
 		shape: number[],
 		extra: Pick<Node, "act" | "fuse" | "ew" | "ln"> = {},
+		q8Input = -1,
 	): GpuTensor {
-		return this.node(call, inputs, [shape], extra)[0];
+		return this.node(call, inputs, [shape], extra, q8Input)[0];
 	}
 
 	/** Record a node run by a luma operator producing new f32 tensors of `shapes`. */
@@ -213,6 +231,8 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		shapes: number[][],
 		ew?: EwDesc,
 	): GpuTensor[] {
+		if (inputs.some((t) => t.dtype === "q8"))
+			throw new Error("nn: a q8 weight cannot feed a luma operator");
 		const rec = this.current();
 		const outs = shapes.map((sh) => {
 			const st = new Storage(Math.max(4, numel(sh) * 4), "f32", rec);
@@ -280,12 +300,22 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			t.st.pinned = true;
 			map.set(e.name, t);
 		}
-		if (quantized.length) {
+		const expand: typeof quantized = [];
+		for (const qe of quantized) {
+			// scales are F16 in the format; a file with other scale types just expands
+			if (this.quantResident && qe.scale.half && canStayResident(qe.info)) {
+				const packed = packResident(qe.q, qe.scale.half, qe.info);
+				const s = this.runtime.upload(packed, "f32", true);
+				s.pinned = true;
+				map.set(qe.name, new GpuTensor(qe.info.shape, "q8", s));
+			} else expand.push(qe);
+		}
+		if (expand.length) {
 			// one dequant node per weight on the implicit recording, submitted right away; the packed
 			// words and scales are freed once that submission is queued
 			const packed: GpuTensor[] = [];
 			const out: DType = this.backend.f16 ? "f16" : "f32";
-			for (const { name, info, q, scale } of quantized) {
+			for (const { name, info, q, scale } of expand) {
 				const numel = info.shape.reduce((a, v) => a * v, 1);
 				const qt = new GpuTensor(
 					[q.byteLength],
@@ -511,6 +541,10 @@ export class GpuNn extends BaseNn<GpuTensor> {
 				);
 			await this.flushImplicit();
 		}
+		if (g.dtype === "q8")
+			throw new Error(
+				"nn: read of a q8 weight; load with quantResident: false",
+			);
 		if (g.st.state !== "ready")
 			throw new Error(`nn: read of a ${g.st.state} tensor`);
 		const buf = await this.runtime.read(g.st);
@@ -670,7 +704,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			!transpose && p.Cout / p.groups < DIRECT_CONV_COG
 				? convDirectKernel(p, dt, e)
 				: convGemmKernel(transpose ? "convT" : "conv", p, dt, e);
-		return this.one(make(ep), ins, shape, ep ? {} : { fuse: fuser(make) });
+		return this.one(make(ep), ins, shape, ep ? {} : { fuse: fuser(make) }, 1);
 	}
 
 	pDeform(
@@ -699,6 +733,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			[x, offset, ...(mask ? [mask] : []), w, ...(b ? [b] : [])],
 			[p.N, p.Cout, p.Ho, p.Wo],
 			{ fuse: fuser(make) },
+			2 + (mask ? 1 : 0),
 		);
 	}
 
@@ -710,6 +745,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			[a, b, ...(bias ? [bias] : [])],
 			[...p.batch, p.M, p.N],
 			{ fuse: fuser(make) },
+			1,
 		);
 	}
 
@@ -921,6 +957,11 @@ export class GpuNn extends BaseNn<GpuTensor> {
 	}
 
 	pView(x: GpuTensor, shape: number[]) {
+		// the packed scales are per row of the original leading dim
+		if (x.dtype === "q8" && shape[0] !== x.shape[0])
+			throw new Error(
+				"nn: a q8 weight can only be viewed with the same leading dim",
+			);
 		return new GpuTensor(shape, x.dtype, x.st);
 	}
 
