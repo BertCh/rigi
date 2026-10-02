@@ -6,7 +6,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 
 *Update (2026-10-01): rows re-checked against `git log` after the three.js `PhotoEngine` was removed (583e2b7). Rows that pointed at `src/lib/engine.ts` (three.js) are marked obsolete; the CR-54–CR-68 fixes are cited by commit. CR-69's `relief-graph.ts` is `src/lib/gpu/look/relief-graph.ts`.*
 
-**Summary (2026-10-02):** 75 rows: 55 fixed, 2 partly fixed (CR-12, CR-26), 3 obsolete, 15 open. Open rows need a browser/GPU (CR-13, 14, 40, 41, 45, 46, 67, W1, W2), a user decision (CR-48, W4) or belong to `src/lib/gpu/**` (CR-27, 37, 39, 69).
+**Summary (2026-10-02):** 75 rows: 57 fixed, 2 partly fixed (CR-12, CR-26), 3 obsolete, 13 open. Open rows need a browser/GPU (CR-13, 14, 40, 41, 45, 46, 67, W1, W2), a user decision (CR-48, W4) or belong to `src/lib/gpu/**` (CR-39, 69).
 
 ## Fix first
 
@@ -43,7 +43,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 | CR-24 | `engine.ts:1473-1491, 2351-2371` | Frustum gizmo isn't hidden in the normal/silhouette passes → stale ink creases after a world-mode visit (three.js) | obsolete: three.js `engine.ts` removed (583e2b7) |
 | CR-25 | `scripts/ci/run.mjs:97, 252-309` | Ctrl-C leaves detached checks running (and holding the render lock); concurrent `full` runs share :3130 and one kills the other's server | fixed 9388eef |
 | CR-26 | `roll/roll.ts:8`, `vite.config.ts:17-27`; repo | A fresh clone can't build: gitignored `data/ground-truth.json` and `public/photos/photos.json` are imported. No `requirements*.txt` for the Python services | requirements half fixed c7d5c94 (`tools/matcher/requirements.txt`, `tools/nearfield/requirements.txt`; re-verified present 2026-10-02); stub data is a user decision |
-| CR-27 | `gpu/look/hooks.ts:93` | `warmKernelsAsync(device)` without a group compiles every kernel, including subgroup kernels on devices without `subgroups` | open |
+| CR-27 | `gpu/look/hooks.ts:93` | `warmKernelsAsync(device)` without a group compiles every kernel, including subgroup kernels on devices without `subgroups` | fixed (already on master: look/kernel.ts `warmKernelsAsync` defaults to group "look"; subgroup kernels sit in "look-subgroups", warmed only under `hasFeature("subgroups")`; pinned by `look/__tests__/warm-groups.spec.ts`, this commit) |
 
 ## Low
 
@@ -58,7 +58,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 | CR-34 | `overpass.ts:36-43,73`, `integration/unknown-pose.ts:202-205` | Abort listener leak; abort doesn't stop the worker's 360° search | fixed 9b2a4e9 (overpass half) |
 | CR-35 | `engine.ts:2491-2503` | `exportImage` has no try/finally (renderer left at export size on OOM) | obsolete: three.js `engine.ts` removed (583e2b7) |
 | CR-36 | `refine/robust.ts:394-456, 802-809` | Covariance mixes the IRLS weights of one pose with the Jacobian of the next | fixed f56d391 (pose bit-identical; σ moves ~1e-9) |
-| CR-37 | `gpu/look/textures.ts` | ~20 kernels redefined under "look-tex" → double compile, synchronous on the render thread; subgroup −1 partials wrap to 4.29e9 (`:1125`) | open |
+| CR-37 | `gpu/look/textures.ts` | ~20 kernels redefined under "look-tex" → double compile, synchronous on the render thread; subgroup −1 partials wrap to 4.29e9 (`:1125`) | fixed (already on master: 96a6a6f put textures.ts on one core `defineKernel` set + `kernelAsync` warm-up; the -1e20 sentinel is an f32 negative count, rejected by `subgroupLayoutFailed` / the `v < 0` check before any Uint32 fold; spec in this commit) |
 | CR-38 | `gpu/core/graph.ts:398-401` | A rejected `compileAsync` is never cleared, so the graph can't be retried | fixed fec0515 |
 | CR-39 | `gpu/core/pool.ts:58-61, 225-233` | Unleased growth can destroy a buffer another caller holds (only `sky/bench-graph.ts:186` is unleased) | open |
 | CR-40 | `deck-webgpu/hosts/deck.ts:169-181` | `requestRender` draws synchronously per input event | open |
