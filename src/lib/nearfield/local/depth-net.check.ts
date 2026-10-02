@@ -6,7 +6,7 @@
 // The reference is scripts/models/moge2-vits.py --dump-ref (fp32 forward of the fp16-rounded weights on
 // demo-01 at 336 × 448, every intermediate the port mirrors), written once to out/nearfield/moge-ref/.
 //
-//   npx tsx src/lib/nearfield/local/depth-net.check.ts [--backend cpu|gpu] [--full]   (gpu: DAWN_DIR=/tmp/dawn)
+//   [DAWN_DIR=/tmp/dawn] npx tsx src/lib/nearfield/local/depth-net.check.ts [--backend cpu|gpu] [--full]
 //
 // On the CPU backend the whole network takes minutes (≈ 8 min here), so without --full the CPU run stops
 // after the encoder (the gate's row); the GPU backend always runs everything.
@@ -26,9 +26,12 @@ const skip = (why: string) => {
 	console.log(`SKIP depth-net: ${why}`);
 	process.exit(0);
 };
+// default: the GPU backend on Dawn when DAWN_DIR is set (≈ 3 s for everything), else the CPU encoder run
 const backend = process.argv.includes("--backend")
 	? process.argv[process.argv.indexOf("--backend") + 1]
-	: "cpu";
+	: process.env.DAWN_DIR
+		? "gpu"
+		: "cpu";
 const full = backend === "gpu" || process.argv.includes("--full");
 const weights = path.join("public/models", MOGE2_VITS.file);
 if (!existsSync(weights)) skip(`${weights} missing`);
