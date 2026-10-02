@@ -41,7 +41,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | silhouette-gpu | I4 | default | page | per align | `silhouette-mask` | geometry targets rgba32float, one per pose (render device; imports bound per run); per-pose uniforms, mask output (imports, owned by SilhouetteMaskGpu) | read: pass mask, 18 KB per 384 × 288 pose (one read node per re-rank) |
 | solve-coarse | I5 | default | worker:unknown-pose, worker:pipeline (remote) | per photo | `solve-coarse` | resident horizon profile hz (per device); u, grid imports | rows: 16 B per yaw row; blocks (flagged rows only): nYaw·nBlk·16 B |
 | ransac | I5 | default | page | per align | `ransac` | prm uniform, correspondences N × 32 B, hypotheses K × 64 B (pooled imports); score K × 8 B, best 16 B (transients) | best: 16 B per batch (winner index, count, cost) |
-| skyglobal | I5 | bench only | bench | bench | `skyglobal` | score maps, profile (pooled imports); cells, red (transients) | candidate list: count + head slots, rare second exact read |
+| skyglobal | I5 | opt-in | page, bench | per photo | `skyglobal` | score maps, profile (pooled imports); cells, red (transients); rescore "gpu": candidate scores, per-yaw best key / arg (transients) | candidate list: count + head slots, rare second exact read; rescore "gpu": count + per-yaw best key and arg, 4 + 8·nYaw B |
 | skyline | I5 | opt-in | worker:unknown-pose, worker:eye (remote) | per photo | `skyline` | photo planes (rgba, pooled import); features, prior, sky-model cost images (transients) | cost images for the CPU Viterbi + sky-model refit |
 | sky-model | I6 | external | worker:sky (remote) | per photo | – | ORT WebGPU session (ORT's device, attached to luma) | – |
 | sky-prep | I6 | default | worker:sky (remote) | per photo | `sky-prep` | ImageBitmap → rgba8unorm texture (per photo); tmp (transient); axis taps, constants, LUT (pooled imports); rgba, rgbLo, ORT input (handed to the model and sky-refine) | opacity flag (4 B); first 3 photos per device: rgba + rgbLo + input (verification) |
@@ -77,7 +77,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **silhouette-gpu**: one kernel node per pose, one submit per re-rank; keyed by pose count and target shape
 - **solve-coarse**: certified f32 fold; flagged rows fold on the CPU in f64; fused with the unknown-pose GPU horizon (resident hz primed by the march) on the GPU path
 - **ransac**: pose6dof *RansacAsync: K hypotheses × N correspondences per dispatch, arg-max on the GPU; batches under 2^19 work items and missing devices score on the CPU twin (scoreBatchCpu)
-- **skyglobal**: T6 skyline global search; not wired into the service
+- **skyglobal**: T6 skyline global search; the in-browser matcher's policy t6 (?matcherPolicy=t6, src/lib/matcher/t6.ts) runs it with the candidate re-score on the graph (RESCORE → PICK)
 - **skyline**: detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default off: 1 of 77 unknown-pose accept decisions flipped in the node A/B)
 - **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU
 - **sky-prep**: cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; the GPU prep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)

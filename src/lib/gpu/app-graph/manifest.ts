@@ -504,15 +504,20 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		island: "I5",
 		paths: ["src/lib/gpu/skyglobal/graph.ts", "src/lib/gpu/skyglobal/index.ts"],
 		groups: ["skyglobal"],
-		realms: ["bench"],
-		cadence: "bench",
+		realms: ["page", "bench"],
+		cadence: "per photo",
 		resources: [
 			"score maps, profile (pooled imports)",
 			"cells, red (transients)",
+			'rescore "gpu": candidate scores, per-yaw best key / arg (transients)',
 		],
-		readbacks: ["candidate list: count + head slots, rare second exact read"],
-		status: "bench only",
-		notes: "T6 skyline global search; not wired into the service",
+		readbacks: [
+			"candidate list: count + head slots, rare second exact read",
+			'rescore "gpu": count + per-yaw best key and arg, 4 + 8·nYaw B',
+		],
+		status: "opt-in",
+		notes:
+			"T6 skyline global search; the in-browser matcher's policy t6 (?matcherPolicy=t6, src/lib/matcher/t6.ts) runs it with the candidate re-score on the graph (RESCORE → PICK)",
 	},
 	{
 		id: "skyline",
