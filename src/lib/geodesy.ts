@@ -41,27 +41,36 @@ export function toEcef(
 	];
 }
 
+/**
+ * ENU basis at a geodetic lat/lon (deg) as a row-major 3×3 whose ROWS are the east, north and up unit
+ * vectors in ECEF: it maps an ECEF offset to ENU (v_enu = M·v_ecef); its transpose (columns east, north, up)
+ * maps ENU to ECEF.
+ */
+export function enuRotation(
+	lat: number,
+	lon: number,
+): [number, number, number, number, number, number, number, number, number] {
+	const sp = Math.sin(lat * DEG);
+	const cp = Math.cos(lat * DEG);
+	const sl = Math.sin(lon * DEG);
+	const cl = Math.cos(lon * DEG);
+	return [-sl, cl, 0, -sp * cl, -sp * sl, cp, cp * cl, cp * sl, sp];
+}
+
 /** Local East-North-Up frame anchored at an origin. x = east, y = north, z = up (metres). */
 export class EnuFrame {
 	readonly lat: number;
 	readonly lon: number;
 	readonly h: number;
 	private o: [number, number, number];
-	private r: number[];
+	private r: ReturnType<typeof enuRotation>;
 
 	constructor(lat: number, lon: number, h: number) {
 		this.lat = lat;
 		this.lon = lon;
 		this.h = h;
 		this.o = toEcef(lat, lon, h);
-		const phi = lat * DEG;
-		const lam = lon * DEG;
-		const sp = Math.sin(phi);
-		const cp = Math.cos(phi);
-		const sl = Math.sin(lam);
-		const cl = Math.cos(lam);
-		// rows: east, north, up
-		this.r = [-sl, cl, 0, -sp * cl, -sp * sl, cp, cp * cl, cp * sl, sp];
+		this.r = enuRotation(lat, lon);
 	}
 
 	/** WGS84 → ENU, with an effective-radius refraction correction. */
@@ -108,21 +117,29 @@ export class EnuFrame {
 		const x = this.o[0] + r[0] * e + r[3] * n + r[6] * uu;
 		const y = this.o[1] + r[1] * e + r[4] * n + r[7] * uu;
 		const z = this.o[2] + r[2] * e + r[5] * n + r[8] * uu;
-		// Bowring's method
-		const p = Math.hypot(x, y);
-		const b = A * (1 - F);
-		const ep2 = (A * A - b * b) / (b * b);
-		const th = Math.atan2(z * A, p * b);
-		const lat = Math.atan2(
-			z + ep2 * b * Math.sin(th) ** 3,
-			p - E2 * A * Math.cos(th) ** 3,
-		);
-		const lon = Math.atan2(y, x);
-		const s = Math.sin(lat);
-		const nn = A / Math.sqrt(1 - E2 * s * s);
-		const h = p / Math.cos(lat) - nn;
-		return { lat: lat / DEG, lon: lon / DEG, h };
+		return ecefToGeodetic(x, y, z);
 	}
+}
+
+/** ECEF → WGS84 geodetic (deg, deg, m above the ellipsoid) by Bowring's method (closed form, ~mm for terrestrial points). */
+export function ecefToGeodetic(
+	x: number,
+	y: number,
+	z: number,
+): { lat: number; lon: number; h: number } {
+	const p = Math.hypot(x, y);
+	const b = A * (1 - F);
+	const ep2 = (A * A - b * b) / (b * b);
+	const th = Math.atan2(z * A, p * b);
+	const lat = Math.atan2(
+		z + ep2 * b * Math.sin(th) ** 3,
+		p - E2 * A * Math.cos(th) ** 3,
+	);
+	const lon = Math.atan2(y, x);
+	const s = Math.sin(lat);
+	const nn = A / Math.sqrt(1 - E2 * s * s);
+	const h = p / Math.cos(lat) - nn;
+	return { lat: lat / DEG, lon: lon / DEG, h };
 }
 
 /** Great-circle-ish distance in metres (equirectangular; fine for < 300 km). */
@@ -177,7 +194,7 @@ export function distanceBearing(
 	const y = Math.sin(dl) * Math.cos(p2);
 	const x =
 		Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
-	const bearing = (((Math.atan2(y, x) / DEG) % 360) + 360) % 360;
+	const bearing = wrap360(Math.atan2(y, x) / DEG);
 	return { distance, bearing };
 }
 

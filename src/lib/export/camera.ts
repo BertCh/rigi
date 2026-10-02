@@ -26,7 +26,8 @@ import {
 	type Pose,
 	poseToOpenCV,
 } from "../camera";
-import { DEG as D, toEcef, WGS84, wrap360 } from "../geodesy";
+import { DEG as D, enuRotation, toEcef, WGS84, wrap360 } from "../geodesy";
+import { mat3ToQuat as quatFromMat3 } from "../linalg";
 
 export type { Vec3 };
 
@@ -125,13 +126,6 @@ export type CameraModel = {
 	q_w2c_enu: [number, number, number, number];
 };
 
-function mat3FromCols(
-	a: ArrayLike<number>,
-	b: ArrayLike<number>,
-	c: ArrayLike<number>,
-): Mat3 {
-	return [a[0], b[0], c[0], a[1], b[1], c[1], a[2], b[2], c[2]];
-}
 export function mat3Mul(a: Mat3, b: Mat3): Mat3 {
 	const o = new Array(9).fill(0) as Mat3;
 	for (let i = 0; i < 3; i++)
@@ -153,18 +147,13 @@ export function mat3Vec(a: Mat3, v: ArrayLike<number>): Vec3 {
 
 /** Rotation ENU→ECEF at a geodetic lat/lon (columns: east, north, up). */
 export function enuToEcefRotation(lat: number, lon: number): Mat3 {
-	const sp = Math.sin(lat * D);
-	const cp = Math.cos(lat * D);
-	const sl = Math.sin(lon * D);
-	const cl = Math.cos(lon * D);
-	return mat3FromCols(
-		[-sl, cl, 0],
-		[-sp * cl, -sp * sl, cp],
-		[cp * cl, cp * sl, sp],
-	);
+	return mat3T(enuRotation(lat, lon));
 }
 
-/** Exact-ish ECEF → WGS84 geodetic (iterative; sub-mm for terrestrial points). */
+/**
+ * Exact-ish ECEF → WGS84 geodetic (iterative; sub-mm for terrestrial points). Kept apart from
+ * geodesy/ecefToGeodetic (Bowring): that one differs by up to 2.4 cm in height at 100–2000 km altitude.
+ */
 export function ecefToGeodetic(
 	x: number,
 	y: number,
@@ -183,41 +172,9 @@ export function ecefToGeodetic(
 	return { lat: lat / D, lon: lon / D, h };
 }
 
-/** Rotation matrix → unit quaternion (w, x, y, z), w ≥ 0. */
+/** Rotation matrix → unit quaternion (w, x, y, z), w ≥ 0 (linalg/mat3ToQuat). */
 export function mat3ToQuat(m: Mat3): [number, number, number, number] {
-	const [m00, m01, m02, m10, m11, m12, m20, m21, m22] = m;
-	const tr = m00 + m11 + m22;
-	let w: number;
-	let x: number;
-	let y: number;
-	let z: number;
-	if (tr > 0) {
-		const s = Math.sqrt(tr + 1) * 2;
-		w = 0.25 * s;
-		x = (m21 - m12) / s;
-		y = (m02 - m20) / s;
-		z = (m10 - m01) / s;
-	} else if (m00 > m11 && m00 > m22) {
-		const s = Math.sqrt(1 + m00 - m11 - m22) * 2;
-		w = (m21 - m12) / s;
-		x = 0.25 * s;
-		y = (m01 + m10) / s;
-		z = (m02 + m20) / s;
-	} else if (m11 > m22) {
-		const s = Math.sqrt(1 + m11 - m00 - m22) * 2;
-		w = (m02 - m20) / s;
-		x = (m01 + m10) / s;
-		y = 0.25 * s;
-		z = (m12 + m21) / s;
-	} else {
-		const s = Math.sqrt(1 + m22 - m00 - m11) * 2;
-		w = (m10 - m01) / s;
-		x = (m02 + m20) / s;
-		y = (m12 + m21) / s;
-		z = 0.25 * s;
-	}
-	const n = Math.hypot(w, x, y, z) * (w < 0 ? -1 : 1);
-	return [w / n, x / n, y / n, z / n];
+	return quatFromMat3(m, true);
 }
 
 export function buildCameraModel(input: CameraInput): CameraModel {

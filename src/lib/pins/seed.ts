@@ -21,7 +21,12 @@
  * not changed, so the eval GT (`scripts/eval-app.mjs` solves GT with `solvePins`) is bit-identical.
  */
 import { type Pin, solvePins } from "#/lib/align";
-import { type Pose, poseBasis, unprojectDir } from "#/lib/camera";
+import {
+	anglesFromAxes,
+	type Pose,
+	poseBasis,
+	unprojectDir,
+} from "#/lib/camera";
 import { getFlag } from "#/lib/flags";
 import { DEG as D } from "#/lib/geodesy";
 import { pinResidualsPx } from "./diagnostics";
@@ -52,16 +57,6 @@ const worldDir = (eye: ArrayLike<number>, w: ArrayLike<number>): V3 =>
  */
 function camRay(u: number, v: number, t: number, aspect: number): V3 {
 	return norm([(u * 2 - 1) * t * aspect, 1, (1 - v * 2) * t]);
-}
-
-/** Yaw / pitch / roll of a camera with these ENU axes (inverse of `poseBasis`). */
-function anglesFromAxes(forward: V3, right: V3) {
-	const yaw = Math.atan2(forward[0], forward[1]);
-	const pitch = Math.asin(Math.max(-1, Math.min(1, forward[2])));
-	const r0: V3 = [Math.cos(yaw), -Math.sin(yaw), 0];
-	const u0 = cross(r0, forward);
-	const roll = Math.atan2(-dot(right, u0), dot(right, r0));
-	return { yaw: yaw / D, pitch: pitch / D, roll: roll / D };
 }
 
 /**

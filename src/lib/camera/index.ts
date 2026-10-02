@@ -56,6 +56,43 @@ export function poseBasis(p: Pose): { forward: Vec3; right: Vec3; up: Vec3 } {
 }
 
 /**
+ * World(ENU) → OpenCV camera rotation of a pose, row-major: rows right, −up, forward (OpenCV axes
+ * x right, y down, z forward). The inverse is `rToPose`.
+ */
+export function poseToR(p: Pose): Mat3 {
+	const { forward: f, right: r, up: u } = poseBasis(p);
+	return [r[0], r[1], r[2], -u[0], -u[1], -u[2], f[0], f[1], f[2]];
+}
+
+/** Camera(OpenCV axes) → ENU rotation of a pose, row-major: columns right, −up, forward (= poseToR transposed). */
+export function camToEnu(p: Pose): Mat3 {
+	const { forward: F, right: R, up: U } = poseBasis(p);
+	return [R[0], -U[0], F[0], R[1], -U[1], F[1], R[2], -U[2], F[2]];
+}
+
+/**
+ * Yaw / pitch / roll (deg, yaw in (−180, 180], not wrapped) of a camera with these ENU axes: the inverse of
+ * `poseBasis`. Roll is well defined unless pitch = ±90°. Only forward and right are read.
+ */
+export function anglesFromAxes(
+	forward: ArrayLike<number>,
+	right: ArrayLike<number>,
+): { yaw: Deg; pitch: Deg; roll: Deg } {
+	const yaw = Math.atan2(forward[0], forward[1]);
+	const pitch = Math.asin(Math.max(-1, Math.min(1, forward[2])));
+	const r0: Vec3 = [Math.cos(yaw), -Math.sin(yaw), 0];
+	const u0 = cross3(r0, forward);
+	const roll = Math.atan2(-dot3(right, u0), dot3(right, r0));
+	return { yaw: yaw / D, pitch: pitch / D, roll: roll / D };
+}
+
+/** Inverse of `poseToR` (mirror of tools/matcher/common.py R_to_pose): yaw in [0, 360), `vfov` passes through. */
+export function rToPose(R: ArrayLike<number>, vfov: number): Pose {
+	const a = anglesFromAxes([R[6], R[7], R[8]], [R[0], R[1], R[2]]);
+	return { yaw: wrap360(a.yaw), pitch: a.pitch, roll: a.roll, vfov };
+}
+
+/**
  * projectPoint with the pose basis and tan(vfov/2) hoisted: bind once per pose, then project many
  * points. Same float operations in the same order as the one-shot projectPoint (which uses it).
  */
@@ -154,8 +191,7 @@ export const cameraToPose = (c: Camera): Pose => ({
  */
 export function poseToOpenCV(p: Pose, W: number, H: number) {
 	const f = focalFromVfov(p.vfov, H);
-	const { forward: F, right: R, up: U } = poseBasis(p);
 	const K: Mat3 = [f, 0, W / 2, 0, f, H / 2, 0, 0, 1];
-	const R_cam2enu = [0, 1, 2].flatMap((i) => [R[i], -U[i], F[i]]) as Mat3;
+	const R_cam2enu = camToEnu(p);
 	return { f, K, R_cam2enu };
 }

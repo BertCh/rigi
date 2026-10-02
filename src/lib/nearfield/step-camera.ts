@@ -113,6 +113,16 @@ const _q2 = new Quaternion();
 const _v = new Vector3();
 const _right = new Vector3();
 const _fwd = new Vector3();
+// per-call scratch (single-threaded; none is held across a call into another scratch user)
+const _yawQ = new Quaternion();
+const _pitchQ = new Quaternion();
+const _rel = new Vector3();
+const _look = new Vector3();
+const _up = new Vector3();
+const _hit = new Vector3();
+const _flyF = new Vector3();
+const _flyR = new Vector3();
+const _flyV = new Vector3();
 const Z = new Vector3(0, 0, 1);
 const X = new Vector3(1, 0, 0);
 /** Metres the free modes keep between the camera and the terrain. */
@@ -151,11 +161,11 @@ function freeQuat(yaw: number, pitch: number, out: Quaternion) {
 
 /** Heading / pitch of a camera orientation (straight down: the heading of its screen-up). */
 function yawPitchOf(q: Quaternion) {
-	const f = new Vector3(0, 0, -1).transformByQuaternion(q);
+	const f = _look.set(0, 0, -1).transformByQuaternion(q);
 	const pitch = Math.asin(Math.max(-1, Math.min(1, f.z)));
 	let yaw = Math.atan2(f.x, f.y);
 	if (Math.abs(f.z) > 0.999) {
-		const u = new Vector3(0, 1, 0).transformByQuaternion(q);
+		const u = _up.set(0, 1, 0).transformByQuaternion(q);
 		yaw = Math.atan2(u.x * -Math.sign(f.z), u.y * -Math.sign(f.z));
 	}
 	return { yaw, pitch };
@@ -344,7 +354,7 @@ export class StepCamera {
 	/** Distance (m) along `dir` from `from` to the terrain (coarse march), or null (sky / off the DEM). */
 	private groundHit(from: Vector3, dir: Vector3): number | null {
 		if (!this.opts.groundAt || dir.z > 0.2) return null;
-		const p = new Vector3();
+		const p = _hit;
 		let prev = 0;
 		for (let d = 5; d < 60_000; d *= 1.08) {
 			p.copy(from).addScaledVector(dir, d);
@@ -515,9 +525,10 @@ export class StepCamera {
 	private flyStep(dt: number) {
 		const t = this.freeT;
 		const k = this.keys;
-		const f = freeForward(t.yaw, t.pitch, new Vector3());
-		const r = new Vector3(Math.cos(t.yaw), -Math.sin(t.yaw), 0);
-		const v = new Vector3()
+		const f = freeForward(t.yaw, t.pitch, _flyF);
+		const r = _flyR.set(Math.cos(t.yaw), -Math.sin(t.yaw), 0);
+		const v = _flyV
+			.set(0, 0, 0)
 			.addScaledVector(f, (k.has("f") ? 1 : 0) - (k.has("b") ? 1 : 0))
 			.addScaledVector(r, (k.has("r") ? 1 : 0) - (k.has("l") ? 1 : 0))
 			.addScaledVector(Z, (k.has("u") ? 1 : 0) - (k.has("d") ? 1 : 0));
@@ -587,8 +598,8 @@ export class StepCamera {
 	/** Orientation for orbit angles (a about world up, b about the photo's right axis). */
 	private orient(a: number, b: number, out: Quaternion) {
 		this.basis();
-		const yaw = new Quaternion().setFromAxisAngle(Z, -a);
-		const pitch = new Quaternion().setFromAxisAngle(_right, b);
+		const yaw = _yawQ.setFromAxisAngle(Z, -a);
+		const pitch = _pitchQ.setFromAxisAngle(_right, b);
 		return out.copy(yaw).multiply(pitch).multiply(this.baseQ);
 	}
 
@@ -596,11 +607,11 @@ export class StepCamera {
 		this.basis();
 		const pivot = _v.copy(this.eye).addScaledVector(_fwd, this.pivotDist);
 		// eye relative to the pivot, rotated by the orbit (R = orient · base⁻¹)
-		const rel = this.eye.clone().subtract(pivot);
+		const rel = _rel.copy(this.eye).subtract(pivot);
 		const q = this.orient(s.a, s.b, _q2);
 		_q.copy(this.baseQ).invert();
 		rel.transformByQuaternion(_q).transformByQuaternion(q);
-		const f = new Vector3(0, 0, -1).transformByQuaternion(q);
+		const f = _look.set(0, 0, -1).transformByQuaternion(q);
 		out.copy(pivot).add(rel).add(s.pan).addScaledVector(f, s.dolly);
 		// clamp inside the confidence radius
 		const d = out.distanceTo(this.eye);

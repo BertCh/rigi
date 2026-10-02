@@ -303,3 +303,47 @@ export function realRoots(coeffs: number[], imagTol = 1e-6): number[] {
 	}
 	return out;
 }
+
+/**
+ * Unit quaternion (w, x, y, z) of a proper rotation matrix (row-major 3×3, Shepperd branches).
+ * `positiveW` flips the sign so that w ≥ 0 (the COLMAP qvec convention); without it the branch's own
+ * sign is kept (the splat-rotation call site, where q and −q are the same rotation).
+ */
+export function mat3ToQuat(
+	m: ArrayLike<number>,
+	positiveW = false,
+): [number, number, number, number] {
+	const [m00, m01, m02, m10, m11, m12, m20, m21, m22] = m as number[];
+	const tr = m00 + m11 + m22;
+	let w: number;
+	let x: number;
+	let y: number;
+	let z: number;
+	if (tr > 0) {
+		const s = Math.sqrt(tr + 1) * 2;
+		w = 0.25 * s;
+		x = (m21 - m12) / s;
+		y = (m02 - m20) / s;
+		z = (m10 - m01) / s;
+	} else if (m00 > m11 && m00 > m22) {
+		const s = Math.sqrt(1 + m00 - m11 - m22) * 2;
+		w = (m21 - m12) / s;
+		x = 0.25 * s;
+		y = (m01 + m10) / s;
+		z = (m02 + m20) / s;
+	} else if (m11 > m22) {
+		const s = Math.sqrt(1 + m11 - m00 - m22) * 2;
+		w = (m02 - m20) / s;
+		x = (m01 + m10) / s;
+		y = 0.25 * s;
+		z = (m12 + m21) / s;
+	} else {
+		const s = Math.sqrt(1 + m22 - m00 - m11) * 2;
+		w = (m10 - m01) / s;
+		x = (m02 + m20) / s;
+		y = (m12 + m21) / s;
+		z = 0.25 * s;
+	}
+	const n = Math.hypot(w, x, y, z) * (positiveW && w < 0 ? -1 : 1);
+	return [w / n, x / n, y / n, z / n];
+}

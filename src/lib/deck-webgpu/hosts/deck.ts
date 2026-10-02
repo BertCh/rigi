@@ -28,8 +28,9 @@ import type {
 	RenderPass,
 	RenderPipelineParameters,
 } from "@luma.gl/core";
-import type { Pose } from "#/lib/camera";
+import { anglesFromAxes, type Pose } from "#/lib/camera";
 import { PhotoView } from "#/lib/deck/photo-view";
+import { cross3 } from "#/lib/linalg";
 import { createWebgpuDeck } from "../device";
 import { attachFrameTimings, getFrameTimings } from "../frame-timings";
 import type { FrameState, GpuLayerCore } from "../pass";
@@ -356,16 +357,6 @@ export function poseFromBasis(
 	up: readonly number[],
 	vfov: number,
 ): Pose {
-	const D = 180 / Math.PI;
-	const yaw = Math.atan2(f[0], f[1]);
-	const pitch = Math.asin(Math.max(-1, Math.min(1, f[2])));
-	const r0 = [Math.cos(yaw), -Math.sin(yaw), 0];
-	const u0 = [
-		r0[1] * f[2] - r0[2] * f[1],
-		r0[2] * f[0] - r0[0] * f[2],
-		r0[0] * f[1] - r0[1] * f[0],
-	];
-	const sr = up[0] * r0[0] + up[1] * r0[1] + up[2] * r0[2];
-	const cr = up[0] * u0[0] + up[1] * u0[1] + up[2] * u0[2];
-	return { yaw: yaw * D, pitch: pitch * D, roll: Math.atan2(sr, cr) * D, vfov };
+	// right = forward × up (the basis is orthonormal); yaw stays unwrapped, as before
+	return { ...anglesFromAxes(f, cross3(f, up)), vfov };
 }

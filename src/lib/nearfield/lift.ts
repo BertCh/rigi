@@ -8,7 +8,8 @@
 // Camera frame = OpenCV (x right, y down, z forward). World → camera is R = [right; −up; forward] with the
 // app's basis (src/lib/camera poseBasis, tools/research/tm/cache/FORMAT.md "Frames and conventions"), so
 // camera → ENU is Rᵀ: columns right, −up, forward (= camera.poseToOpenCV R_cam2enu).
-import { type Pose, poseBasis } from "../camera";
+import { camToEnu, type Pose } from "../camera";
+import { mat3ToQuat } from "../linalg";
 import { anchoredRange } from "./anchor";
 import {
 	computeRimAlpha,
@@ -225,48 +226,11 @@ function quatFromZ(
 	return [w / l, -y / l, x / l, 0];
 }
 
-/** Camera → ENU rotation for a pose, row-major 3×3: columns right, −up, forward. */
-export function camToEnuMatrix(pose: Pose): number[] {
-	const { forward: F, right: R, up: U } = poseBasis(pose);
-	return [R[0], -U[0], F[0], R[1], -U[1], F[1], R[2], -U[2], F[2]];
-}
+/** Camera → ENU rotation for a pose, row-major 3×3: columns right, −up, forward (camera/camToEnu). */
+export const camToEnuMatrix = camToEnu;
 
-/** Unit quaternion (w,x,y,z) of a proper rotation matrix (row-major). */
-export function quatFromMatrix(m: number[]): [number, number, number, number] {
-	const [m00, m01, m02, m10, m11, m12, m20, m21, m22] = m;
-	const tr = m00 + m11 + m22;
-	let w: number;
-	let x: number;
-	let y: number;
-	let z: number;
-	if (tr > 0) {
-		const s = Math.sqrt(tr + 1) * 2;
-		w = 0.25 * s;
-		x = (m21 - m12) / s;
-		y = (m02 - m20) / s;
-		z = (m10 - m01) / s;
-	} else if (m00 > m11 && m00 > m22) {
-		const s = Math.sqrt(1 + m00 - m11 - m22) * 2;
-		w = (m21 - m12) / s;
-		x = 0.25 * s;
-		y = (m01 + m10) / s;
-		z = (m02 + m20) / s;
-	} else if (m11 > m22) {
-		const s = Math.sqrt(1 + m11 - m00 - m22) * 2;
-		w = (m02 - m20) / s;
-		x = (m01 + m10) / s;
-		y = 0.25 * s;
-		z = (m12 + m21) / s;
-	} else {
-		const s = Math.sqrt(1 + m22 - m00 - m11) * 2;
-		w = (m10 - m01) / s;
-		x = (m02 + m20) / s;
-		y = (m12 + m21) / s;
-		z = 0.25 * s;
-	}
-	const l = Math.hypot(w, x, y, z);
-	return [w / l, x / l, y / l, z / l];
-}
+/** Unit quaternion (w,x,y,z) of a proper rotation matrix (row-major); sign as the Shepperd branch gives it. */
+export const quatFromMatrix = (m: ArrayLike<number>) => mat3ToQuat(m);
 
 /**
  * Place a camera-frame cloud in ENU: p_enu = eye + M·p_cam with M = camToEnuMatrix(pose); rotations

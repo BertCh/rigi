@@ -6,59 +6,31 @@
 // of src/lib/pose.ts): world = camera-anchored ENU (x E, y N, z up); R maps world → OpenCV camera
 // (x right, y down, z forward); a 3×3 matrix is a row-major Float64Array(9).
 
-import type { Pose } from "#/lib/camera";
+import {
+	poseBasis as cameraPoseBasis,
+	poseToR as cameraPoseToR,
+	rToPose as cameraRToPose,
+	type Pose,
+} from "#/lib/camera";
+import { DEG } from "#/lib/geodesy";
 
-export const DEG = Math.PI / 180;
+export { DEG };
 
 export type Mat3 = Float64Array;
 
-/** pose_basis: forward, right, up unit vectors. */
+/** pose_basis: forward, right, up unit vectors (delegates to camera/poseBasis). */
 export function poseBasis(p: Pick<Pose, "yaw" | "pitch" | "roll">) {
-	const y = p.yaw * DEG;
-	const pt = p.pitch * DEG;
-	const r = p.roll * DEG;
-	const f = [
-		Math.sin(y) * Math.cos(pt),
-		Math.cos(y) * Math.cos(pt),
-		Math.sin(pt),
-	];
-	const r0 = [Math.cos(y), -Math.sin(y), 0];
-	const u0 = cross(r0, f);
-	const cr = Math.cos(r);
-	const sr = Math.sin(r);
-	const right = [0, 1, 2].map((i) => r0[i] * cr - u0[i] * sr);
-	const up = [0, 1, 2].map((i) => u0[i] * cr + r0[i] * sr);
-	return { f, right, up };
+	const { forward, right, up } = cameraPoseBasis({ ...p, vfov: 0 });
+	return { f: forward, right, up };
 }
 
-/** pose_to_R: rows [right, −up, forward]. */
+/** pose_to_R: rows [right, −up, forward] (camera/poseToR as a Float64Array). */
 export function poseToR(p: Pick<Pose, "yaw" | "pitch" | "roll">): Mat3 {
-	const { f, right, up } = poseBasis(p);
-	return Float64Array.of(
-		right[0],
-		right[1],
-		right[2],
-		-up[0],
-		-up[1],
-		-up[2],
-		f[0],
-		f[1],
-		f[2],
-	);
+	return Float64Array.from(cameraPoseToR({ ...p, vfov: 0 }));
 }
 
-/** R_to_pose (yaw in [0, 360)). */
-export function rToPose(R: ArrayLike<number>, vfov: number): Pose {
-	const right = [R[0], R[1], R[2]];
-	const f = [R[6], R[7], R[8]];
-	const yaw = Math.atan2(f[0], f[1]) / DEG;
-	const pitch = Math.asin(Math.max(-1, Math.min(1, f[2]))) / DEG;
-	const y = yaw * DEG;
-	const r0 = [Math.cos(y), -Math.sin(y), 0];
-	const u0 = cross(r0, f);
-	const roll = Math.atan2(-dot(right, u0), dot(right, r0)) / DEG;
-	return { yaw: pyMod(yaw, 360), pitch, roll, vfov };
-}
+/** R_to_pose (yaw in [0, 360)); camera/rToPose. */
+export const rToPose = cameraRToPose;
 
 export const focalPx = (vfov: number, H: number) =>
 	H / 2 / Math.tan((vfov * DEG) / 2);

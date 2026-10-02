@@ -21,42 +21,14 @@
  * pure-rotation RANSAC was the only estimator whose error was both small and predictable in the study;
  * DA3 /multiview relative rotations had no usable confidence signal and are gated out by default).
  */
-import { type Pose, poseBasis } from "../camera";
+import { type Pose, poseToR, rToPose } from "../camera";
 import { DEG as D } from "../geodesy";
 import type { Mat3 } from "../ontology/core/geometry";
 
 /** 3×3 row-major (the canonical ontology Mat3). */
 export type { Mat3 };
 
-/** World(ENU) → OpenCV camera rotation of a pose: rows right, −up, forward. */
-export function poseToR(p: Pose): Mat3 {
-	const { forward: f, right: r, up: u } = poseBasis(p);
-	return [r[0], r[1], r[2], -u[0], -u[1], -u[2], f[0], f[1], f[2]];
-}
-
-/** Inverse of poseToR (mirror of tools/matcher/common.py R_to_pose); vfov passes through. */
-export function rToPose(R: Mat3, vfov: number): Pose {
-	const right = [R[0], R[1], R[2]];
-	const f = [R[6], R[7], R[8]];
-	const yaw = Math.atan2(f[0], f[1]);
-	const pitch = Math.asin(Math.max(-1, Math.min(1, f[2])));
-	const r0 = [Math.cos(yaw), -Math.sin(yaw), 0];
-	// u0 = r0 × f
-	const u0 = [
-		r0[1] * f[2] - r0[2] * f[1],
-		r0[2] * f[0] - r0[0] * f[2],
-		r0[0] * f[1] - r0[1] * f[0],
-	];
-	const dot = (a: number[], b: number[]) =>
-		a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-	const roll = Math.atan2(-dot(right, u0), dot(right, r0));
-	return {
-		yaw: (((yaw / D) % 360) + 360) % 360,
-		pitch: pitch / D,
-		roll: roll / D,
-		vfov,
-	};
-}
+export { poseToR, rToPose };
 
 export function mul3(a: Mat3, b: Mat3): Mat3 {
 	const o = new Array(9).fill(0) as Mat3;

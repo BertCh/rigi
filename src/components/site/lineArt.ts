@@ -12,7 +12,8 @@
 //   "contours": DEM contours as x/y at 1 m per point and a level per stroke; z drops with the earth's
 //     curvature (refraction as in EnuFrame) so far contours sit where the engine's terrain does.
 
-import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";
+import { poseBasis } from "#/lib/camera";
+import { DEG as D2R, EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 
 const TYPES = {
 	u8: Uint8Array,
@@ -98,7 +99,6 @@ export type View = {
 };
 
 const BUCKETS = 8;
-const D2R = Math.PI / 180;
 
 /** Ridge strokes (the panorama strip's styling, terrainLayer.ts drawTerrain): slope then ridge, 8 depth buckets each. */
 const RIDGE_STYLES: LineStyle[] = [0, 1].flatMap((ridge) =>
@@ -198,28 +198,12 @@ export function viewOfPose(
 	p: { yaw: number; pitch: number; roll: number; vfov: number },
 	pos: [number, number, number],
 ): View {
-	const y = p.yaw * D2R;
-	const pt = p.pitch * D2R;
-	const r = p.roll * D2R;
-	const f: [number, number, number] = [
-		Math.sin(y) * Math.cos(pt),
-		Math.cos(y) * Math.cos(pt),
-		Math.sin(pt),
-	];
-	const r0 = [Math.cos(y), -Math.sin(y), 0];
-	// u0 = r0 × f
-	const u0 = [
-		r0[1] * f[2] - r0[2] * f[1],
-		r0[2] * f[0] - r0[0] * f[2],
-		r0[0] * f[1] - r0[1] * f[0],
-	];
-	const cr = Math.cos(r);
-	const sr = Math.sin(r);
+	const { forward, right, up } = poseBasis({ ...p });
 	return {
 		pos,
-		fwd: f,
-		right: [0, 1, 2].map((i) => r0[i] * cr - u0[i] * sr) as View["right"],
-		up: [0, 1, 2].map((i) => u0[i] * cr + r0[i] * sr) as View["up"],
+		fwd: forward,
+		right,
+		up,
 		fov: p.vfov,
 	};
 }
