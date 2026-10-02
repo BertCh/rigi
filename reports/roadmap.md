@@ -60,6 +60,14 @@ The skyline can't see eye-position error; interior error grows as 1/distance. Pl
 | S2 | **Completion P0** (`?nearfield=complete`): slab diagnosis, edge snap, behind-layer LaMa (`research_notes/completion_integration_2026-09.md`) | Slab diagnosis, edge snap, display-only guard built behind `?nearfield=complete` (10-02, browser-unverified); behind-layer LaMa waits on the provenance decision |
 | S3 | **3D Tiles** T2: tiles + nDSM into S1's object class; Google logo before any public URL | T0/T1 built (`src/lib/tiles3d`); T2 nDSM object prior behind `?tiles3dObjects=on` (10-02, browser-unverified, thresholds uncalibrated); Google dropped from non-dev builds until the logo ships |
 
+Follow-ups from removing the Python services (behaviour dropped, not ported):
+- **LaMa inpaint** for the behind-layer completion: `nearfield/complete/index.ts` marks it NOT IMPLEMENTED (S2).
+- **DA3 multiview** depth and the **MoGe ViT-L/B** sizes: the `model` option is accepted and ignored (only MoGe-2 ViT-S runs in the browser).
+- **Propagate `ess` / `da3`** options of the propagation service: no browser port.
+- **Depth cache**: the service kept a 1 GB on-disk cache; the browser keeps an in-memory `WeakMap<Blob>`, so nothing survives a reload.
+- **Matcher busy handling**: the service's ETA / `Retry-After` answer is gone (busy now means another job on this page). The "timeout cut 120 s to 60 s" claim is unverified: the last HTTP client's default was already 60 s and no 120 s appears in its history.
+- **Nearfield client hygiene** (P1.7): `timeoutMs` is declared but never read, `signal` is not checked during inference, and errors collapse to `console.warn` plus `null`.
+
 ## Next: GPU and rendering
 
 | # | Item | State |

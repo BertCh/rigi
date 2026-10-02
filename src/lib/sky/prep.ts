@@ -5,7 +5,7 @@
 /**
  * Worker side of the GPU prep (gpu/sky/prep.ts): when to use it, and the runtime guard.
  *
- * The prep (ImageBitmap → rgbLo, ORT's normalised input and the refine's RGBA guide, all on the
+ * The prep (ImageBitmap → rgbLo, the model's normalised input and the refine's RGBA guide, all on the
  * shared compute device) must equal the CPU chain bit for bit, because rgbLo is the refine's guide
  * and the refine is identity-gated. The kernels are checked in node against core.ts
  * (scripts/gpu/sky-prep-check.ts), but two things are only knowable per browser / driver / GPU: that

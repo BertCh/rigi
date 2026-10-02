@@ -110,7 +110,7 @@ export type RollMapOptions = {
 	 * People masks computed ahead of time (by photo id; null = segmentForeground found none), e.g.
 	 * the sample trip's bake (#/lib/demo/people-masks). They fill the engine's masks before any
 	 * segmentation, so segmentAll skips those photos and, when every photo is covered, never loads
-	 * MediaPipe (#/lib/segment). A rejection falls back to live segmentation. Default: none.
+	 * the segmentation weights (#/lib/segment). A rejection falls back to live segmentation. Default: none.
 	 */
 	peopleMasks?: () => Promise<ReadonlyMap<string, ForegroundMask | null>>;
 	/**

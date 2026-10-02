@@ -4,7 +4,7 @@
 
 // The sample trip's people masks, baked once by scripts/demo/bake-people-masks.mjs with the roll
 // map's own path (#/lib/segment segmentForeground on its 1024 px working copy of the full-size
-// photo), so the landing's live map never downloads MediaPipe. One gzip'd file, decoded here; no import of #/lib/segment.
+// photo), so the landing's live map never downloads the segmentation weights. One gzip'd file, decoded here; no import of #/lib/segment.
 //
 // Layout (little-endian, before gzip): "RPM1", u32 count, then per mask: u8 id length, the id
 // (ASCII), u16 width, u16 height (0 × 0 = segmentForeground returned null), width·height bytes.

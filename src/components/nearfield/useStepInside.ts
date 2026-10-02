@@ -68,10 +68,10 @@ export type StepInside = {
 };
 
 /**
- * Whether the Step Inside UI may probe the service at all (?nearfield, src/lib/flags). "auto" (the
+ * Whether the Step Inside UI may run at all (?nearfield, src/lib/flags). "auto" (the
  * default) probes except in automated browsers (navigator.webdriver: style-baseline, eval-app,
  * leaderboards), so their captures and network stay as they were (the reveal's precedent,
- * src/lib/reveal/config.ts); they opt in with ?nearfield=on or =sharp. ?nearfield=off hides it for everyone.
+ * src/lib/reveal/config.ts); they opt in with ?nearfield=on. ?nearfield=off hides it for everyone.
  */
 export function stepInsideAllowed(): boolean {
 	if (typeof window === "undefined") return false;

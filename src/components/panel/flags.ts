@@ -104,13 +104,11 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "nearfield",
 		label: "Near field",
-		help: "Auto: probes the splat service (never under automation). On: also under automation. SHARP (dev builds only): Apple SHARP splats (research-only weights). Complete: On plus the completion heuristics (display-only).",
+		help: "Auto: runs the depth model in the browser on WebGPU when it is available (never under automation). On: also under automation. Complete: On plus the completion heuristics (display-only).",
 		group: "step",
 		options: {
 			auto: "Auto",
 			on: "On",
-			// research-only weights: never offered in a production build (controller.ts lifts there)
-			...(import.meta.env?.DEV ? { sharp: "SHARP" } : {}),
 			complete: "Complete",
 			off: "Off",
 		},

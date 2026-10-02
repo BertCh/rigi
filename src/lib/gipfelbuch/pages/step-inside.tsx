@@ -1740,8 +1740,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 								<>
 									Only photos whose camera position was confirmed by the solver
 									or set by you are used. See{" "}
-									{A("accept-rule", "the accept rule")}. If the depth service is
-									down, the feature is not offered.
+									{A("accept-rule", "the accept rule")}. If WebGPU or the depth
+									model is unavailable, the feature is not offered.
 								</>
 							),
 						},

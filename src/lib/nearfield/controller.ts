@@ -219,9 +219,9 @@ export class NearFieldController {
 	}
 
 	/**
-	 * Service health (cached by the client). Never throws. A built scene does not need the service, so a
-	 * failed probe leaves a 'ready' / 'low-quality' / 'loading' state alone (a busy service can miss the
-	 * 800 ms health timeout while it runs inference).
+	 * Local availability (cached by the client): WebGPU compute plus reachable depth weights. Never
+	 * throws. A built scene does not need the model, so a failed probe leaves a 'ready' / 'low-quality' /
+	 * 'loading' state alone.
 	 */
 	async available(force = false): Promise<boolean> {
 		if (!this.supported) return false;
@@ -242,12 +242,12 @@ export class NearFieldController {
 		return ok;
 	}
 
-	/** True when a scene for the current pose is cached (show() is instant, no service call). */
+	/** True when a scene for the current pose is cached (show() is instant, no model run). */
 	hasSceneForPose(): boolean {
 		return this.sceneCache.has(poseKey(this.host.pose, this.host.eye));
 	}
 
-	/** True when the slow service results for this photo are cached (a pose change rebuilds locally). */
+	/** True when the slow depth results for this photo are cached (a pose change rebuilds locally). */
 	hasPhotoData(): boolean {
 		return PHOTO_CACHE.has(this.photoKey());
 	}

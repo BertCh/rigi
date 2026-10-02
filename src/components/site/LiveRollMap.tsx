@@ -141,7 +141,7 @@ export function LiveRollMap({
 					setInPhoto(null);
 				},
 				overviewM: OVERVIEW_M,
-				// baked people masks (scripts/demo/bake-people-masks.mjs): no MediaPipe download
+				// baked people masks (scripts/demo/bake-people-masks.mjs): no segmentation-weights download
 				peopleMasks: loadDemoPeopleMasks,
 				// baked terrain, basemap, range grids and clear-air fits (scripts/demo/bake-roll-map.mjs):
 				// no Mapterhorn / WMTS downloads, no readbacks; any part that fails loads live

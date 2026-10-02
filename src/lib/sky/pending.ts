@@ -8,7 +8,7 @@
  * would fire on healthy work. Instead the watchdog measures time since the worker last made
  * progress: while any request is pending and no reply (for any id) arrives for `stallMs(heard)`,
  * `onStall` runs. `heard` is false until the worker's first reply, so the cold start (worker
- * module, the 28 MB ORT wasm, the model download) gets a longer allowance. A timer that fires long
+ * module, the model download) gets a longer allowance. A timer that fires long
  * after its allowance (the page was suspended) re-arms instead of stalling. Timers and the clock
  * are injectable for the spec, as in graph-idle.ts.
  */

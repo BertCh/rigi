@@ -230,17 +230,16 @@ describe("StepInsidePanel", () => {
 		).toBe(false);
 	});
 
-	it("shows Back to photo while stepping and the research-only badge for SHARP", () => {
+	it("shows Back to photo while stepping", () => {
 		render(
 			<StepInsidePanel
 				si={si({
 					stepping: true,
-					state: { phase: "ready", researchOnly: true },
+					state: { phase: "ready" },
 				})}
 			/>,
 		);
 		expect(chip()).toBe("stepping");
 		expect(document.querySelector("[data-nearfield-back]")).not.toBeNull();
-		expect(screen.getByText("SHARP research-only")).toBeTruthy();
 	});
 });

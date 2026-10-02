@@ -4,7 +4,7 @@
 
 import type { Nn, Tensor, Weights } from "#/lib/nn";
 /**
- * ALIKED-n16 (Zhao et al. 2023, BSD-3-Clause) on the nn runtime, configured like the Python matcher
+ * ALIKED-n16 (Zhao et al. 2023, BSD-3-Clause) on the nn runtime, configured like the former Python matcher
  * service: lightglue's `ALIKED(max_num_keypoints=K, detection_threshold=0.01)` with its 1024 px long-side
  * resize. Weights: scripts/models/aliked-lightglue.py (BatchNorm folded, fp16).
  *
@@ -42,7 +42,7 @@ const SDDH_POSITIONS = 16;
 const DETECTION_THRESHOLD = 0.01;
 
 export interface AlikedOptions {
-	/** lightglue max_num_keypoints (the matcher service uses 4096, the propagation service 2048). */
+	/** lightglue max_num_keypoints (the former matcher service used 4096, the propagation service 2048). */
 	maxKeypoints: number;
 	/** Long side of the working image (lightglue resizes to 1024, up or down). */
 	longSide: number;

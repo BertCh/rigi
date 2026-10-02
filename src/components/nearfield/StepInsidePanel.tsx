@@ -75,11 +75,6 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 				{q != null && state.phase !== "loading" && (
 					<span className="font-mono opacity-70">q {q.toFixed(2)}</span>
 				)}
-				{state.researchOnly && (
-					<span className="rounded bg-fuchsia-500/30 px-1 text-fuchsia-100">
-						SHARP research-only
-					</span>
-				)}
 			</div>
 			<div className="pointer-events-auto flex flex-wrap items-center gap-1.5">
 				{si.stepping ? (

@@ -317,7 +317,7 @@ export function toBytes(p: Float32Array): Uint8Array {
 	return out;
 }
 
-/** The model's output side of the pipeline, independent of the ORT runtime. */
+/** The model's output side of the pipeline, independent of the nn runtime. */
 export interface ModelRun {
 	/** P(sky) at model resolution. */
 	prob: Float32Array;
