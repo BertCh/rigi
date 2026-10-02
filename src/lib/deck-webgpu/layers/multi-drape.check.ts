@@ -17,9 +17,9 @@
 //
 // Browser (real WebGPU; any page served by vite, e.g. the lab):
 //   await (await import("/src/lib/deck-webgpu/layers/multi-drape.check.ts")).runMultiDrapeCheck()
-//   A synthetic valley (one TileMesh with a hill), five solid-colour photos at ground level (range
+//   A synthetic valley (one z13 tile with a hill), five solid-colour photos at ground level (range
 //   maps rendered by the real geometry pass from each photo camera, read back into a
-//   WebGpuDrapeAtlas), drawn by TerrainCore + MultiDrapeCore through the real colour pass (4× MSAA,
+//   WebGpuDrapeAtlas), drawn by the batched terrain + MultiDrapeCore through the real colour pass (4× MSAA,
 //   reversed-Z, resolve) from an oblique view above. Every interior pixel is compared with a CPU
 //   twin of the fragment shader (the GLSL of multi-drape-layer.ts, line by line) fed with the
 //   view's own geometry pass (position, normal) and the same range maps:
@@ -29,6 +29,7 @@
 //   many pixels exercised occlusion (vis < 1) and the TOP_K cut (> 4 contenders).
 import type { Device, Texture } from "@luma.gl/core";
 import type { Pose } from "#/lib/camera";
+import { createSyntheticTile } from "#/lib/deck/synthetic-tile";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
@@ -51,7 +52,7 @@ import {
 // ---------------------------------------------------------------------------------------------
 // shared scene helpers
 
-/** Flat valley with a Gaussian hill, one tile: x ∈ [-2000, 2000], y ∈ [0, 4000]. */
+/** Flat valley with a Gaussian hill, one z13 tile: x ≈ ±1675, y ≈ [0, 3350]. */
 const HILL = { x: 0, y: 1400, h: 70, s: 160 };
 function heightAt(x: number, y: number) {
 	const dx = x - HILL.x;
@@ -59,55 +60,13 @@ function heightAt(x: number, y: number) {
 	return HILL.h * Math.exp(-(dx * dx + dy * dy) / (2 * HILL.s * HILL.s));
 }
 
-export function syntheticTile(seg = 96, id = "md-check-tile"): TileMesh {
-	const x0 = -2000;
-	const y0 = 0;
-	const size = 4000;
-	const n = seg + 1;
-	const positions = new Float32Array(n * n * 3);
-	const normals = new Float32Array(n * n * 3);
-	const texCoords = new Float32Array(n * n * 2);
-	const elev = new Float32Array(n * n);
-	const heights = new Float32Array(n * n);
-	const h = size / seg;
-	for (let j = 0; j < n; j++)
-		for (let i = 0; i < n; i++) {
-			const k = j * n + i;
-			const x = x0 + i * h;
-			const y = y0 + j * h;
-			const z = heightAt(x, y);
-			positions.set([x, y, z], k * 3);
-			const gx = (heightAt(x + 1, y) - heightAt(x - 1, y)) / 2;
-			const gy = (heightAt(x, y + 1) - heightAt(x, y - 1)) / 2;
-			const l = Math.hypot(gx, gy, 1);
-			normals.set([-gx / l, -gy / l, 1 / l], k * 3);
-			texCoords.set([i / seg, 1 - j / seg], k * 2);
-			elev[k] = z;
-			heights[k] = z;
-		}
-	const indices = new Uint32Array(seg * seg * 6);
-	let o = 0;
-	for (let j = 0; j < seg; j++)
-		for (let i = 0; i < seg; i++) {
-			const a = j * n + i;
-			indices.set([a, a + 1, a + n, a + 1, a + n + 1, a + n], o);
-			o += 6;
-		}
-	return {
-		id,
-		key: { z: 14, x: 0, y: 0 },
-		distance: 0,
-		size: n,
-		heights,
-		sourceZ: 14,
-		focus: true,
+export function syntheticTile(seg = 96): TileMesh {
+	return createSyntheticTile(heightAt, {
+		z: 13,
+		southEdgeM: 0,
 		seg,
-		positions,
-		normals,
-		texCoords,
-		elev,
-		indices,
-	} as TileMesh;
+		full: true,
+	}).tile;
 }
 
 /** A WebGL-style (world, not camera-relative) view-projection whose x / y / w rows are exactly
@@ -647,14 +606,14 @@ export async function runMultiDrapeCheck(
 ): Promise<MultiDrapeCheck> {
 	const W = opts.width ?? 480;
 	const H = opts.height ?? 320;
-	const [{ luma }, { webgpuAdapter }, passes, targets, terrainMod, md] =
+	const [{ luma }, { webgpuAdapter }, passes, targets, md, batched] =
 		await Promise.all([
 			import("@luma.gl/core"),
 			import("@luma.gl/webgpu"),
 			import("../hosts/passes"),
 			import("../targets"),
-			import("../terrain"),
 			import("./multi-drape"),
+			import("./batched-terrain"),
 		]);
 	const errors: string[] = [];
 	const device = await luma.createDevice({
@@ -673,7 +632,11 @@ export async function runMultiDrapeCheck(
 	checks.assembly = assembly;
 
 	const tile = syntheticTile(96);
-	const terrain = new terrainMod.TerrainCore(device, null, "md-check-terrain");
+	const terrain = batched.createBatchedTerrain(
+		device,
+		null,
+		"md-check-terrain",
+	);
 	terrain.setTiles([tile]);
 	const frame = { frame: 0, time: performance.now(), view: "world" as const };
 

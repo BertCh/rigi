@@ -22,14 +22,12 @@ import { terroirFeatures, terroirWGSL } from "./wgsl/terrain";
 // GLSL: spliced only with the define
 const src =
 	'x\nvec3 alpineAlbedo(float elev, vec3 n, vec2 xy) {\nvec3 hypso(float h) {\nA\n// "topology" ramp for contour lines\nB\n';
-const on = terroirTerrainFs("deck", src, ["TERROIR_HATCH"]);
+const on = terroirTerrainFs(src, ["TERROIR_HATCH"]);
 assert.ok(
 	on.includes("float terHatch(") && on.includes("terHatch(n, xy, vElev"),
 );
-assert.ok(
-	!terroirTerrainFs("deck", src, ["TERROIR_SNOW"]).includes("terHatch"),
-);
-assert.equal(terroirTerrainFs("deck", src, []), src);
+assert.ok(!terroirTerrainFs(src, ["TERROIR_SNOW"]).includes("terHatch"));
+assert.equal(terroirTerrainFs(src, []), src);
 
 // WGSL: feature only on hillshade with the define; same constants as the GLSL
 const t = (defines: string[]) =>
@@ -62,7 +60,7 @@ assert.equal(
 );
 
 // ---- hatch v2 (landeskarte): splice gating, byte-identity of classic, twin constants, CPU maths ----
-const lk = terroirTerrainFs("deck", src, ["TERROIR_HATCH", "TERROIR_HATCH_LK"]);
+const lk = terroirTerrainFs(src, ["TERROIR_HATCH", "TERROIR_HATCH_LK"]);
 assert.ok(
 	lk.includes("vec4 terHatchLk(") && lk.includes("terHatchLk(n, xy, vElev"),
 );

@@ -326,19 +326,14 @@ describe("WGSL feature gating", () => {
 
 describe("terroirTerrainFs", () => {
 	it("passes the source through when no terroir define is requested", () => {
-		expect(terroirTerrainFs("deck", "void main() {}", [])).toBe(
-			"void main() {}",
-		);
-		expect(terroirTerrainFs("deck", "src", ["LOOK_RELIEF"])).toBe("src");
+		expect(terroirTerrainFs("void main() {}", [])).toBe("void main() {}");
+		expect(terroirTerrainFs("src", ["LOOK_RELIEF"])).toBe("src");
 		expect(isTerroirDefine("TERROIR_SNOW")).toBe(true);
 		expect(isTerroirDefine("LOOK_SNOW")).toBe(false);
 	});
 	it("throws when the terrain shader no longer has the anchor", () => {
-		expect(() =>
-			terroirTerrainFs("deck", "void main() {}", ["TERROIR_COVER"]),
-		).toThrow(/anchor missing/);
-		expect(() =>
-			terroirTerrainFs("three", "void main() {}", ["TERROIR_HATCH"]),
-		).toThrow(/terroir: three/);
+		expect(() => terroirTerrainFs("void main() {}", ["TERROIR_COVER"])).toThrow(
+			/anchor missing/,
+		);
 	});
 });

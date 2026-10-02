@@ -7,7 +7,7 @@
 //   vec3 applyAtmosphere(vec3 colLinear, vec3 worldPos)   terrain colour → hazed (linear in, linear out)
 //   vec3 atmSky(vec3 dir)                                  background sky radiance (linear)
 // World frame: the camera-anchored ENU frame with the curvature drop baked into z (terrain.ts).
-import * as THREE from "three";
+import { Matrix4 } from "@math.gl/core";
 import { ATM_CURV } from "../atmosphere";
 import { NEBELMEER_GLSL } from "../nebelmeer";
 import { defineBlock } from "./block";
@@ -163,8 +163,8 @@ out vec4 fragColor;
 void main() { fragColor = vec4(srgbEncode(skyColor()), 1.0); }
 `;
 
-const _m = new THREE.Matrix4();
-const _p = new THREE.Matrix4();
+const _m = new Matrix4();
+const _p = new Matrix4();
 
 /**
  * inverse(projection × view rotation) as column-major numbers: maps an NDC point to a world-space
@@ -174,10 +174,15 @@ export function skyRayMatrix(
 	projection: ArrayLike<number>,
 	view: ArrayLike<number>,
 ): number[] {
-	_m.fromArray(view as number[]).setPosition(0, 0, 0);
-	return _p
-		.fromArray(projection as number[])
-		.multiply(_m)
-		.invert()
-		.toArray();
+	_m.copy(view as number[]);
+	_m[12] = 0;
+	_m[13] = 0;
+	_m[14] = 0;
+	return Array.from(
+		_p
+			.copy(projection as number[])
+			.multiplyRight(_m)
+			.invert()
+			.toArray(),
+	);
 }

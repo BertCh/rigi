@@ -13,7 +13,6 @@ import {
 	type DemLoadOptions,
 	type DemRaster,
 	downsampleHeights2,
-	getCpuHeights,
 	loadDemTile,
 	parentKey,
 	type TileKey,
@@ -21,13 +20,11 @@ import {
 } from "../dem";
 import type { EnuFrame } from "../geodesy";
 import {
-	buildBatchGrid,
 	buildLiteMesh,
 	meshTriangles,
 	type StreamRaster,
 } from "./batched-terrain-grid";
 import {
-	buildMesh,
 	segmentsFor,
 	selectDemTiles,
 	TerrainSet,
@@ -35,7 +32,6 @@ import {
 	type TileMesh,
 	type ViewWedge,
 } from "./terrain-data";
-import { terrainBuild } from "./terrain-mode";
 
 export type StreamOptions = {
 	radiusM?: number;
@@ -352,23 +348,7 @@ export class TerrainStreamer {
 			return false;
 		}
 		const t0 = performance.now();
-		// terrain-mode.ts: the per-tile path's CPU mesh and / or the batched path's grid
-		const build = terrainBuild();
-		let mesh: TileMesh;
-		if (build.mesh) {
-			// the per-tile CPU mesh needs every height: a lazy tile materialises here (first, so the
-			// copy below does not carry the source getCpuHeights has just released)
-			const heights = getCpuHeights(dem);
-			const r: DemRaster = {
-				key: dem.key,
-				source: dem.source,
-				size: dem.size,
-				heights,
-			};
-			mesh = buildMesh(this.frame, r, w.seg, w.distance, w.focus);
-			if (build.grid) mesh.grid = buildBatchGrid(this.frame, r.key, r.heights);
-			mesh.gpuLayer = dem.gpuLayer;
-		} else mesh = buildLiteMesh(this.frame, dem, w.seg, w.distance, w.focus);
+		const mesh = buildLiteMesh(this.frame, dem, w.seg, w.distance, w.focus);
 		this.buildMs += performance.now() - t0;
 		// the replaced mesh (another seg) lets go of its GPU heights; a drawn copy holds its own reference
 		this.meshes.get(w.id)?.gpuLayer?.release();

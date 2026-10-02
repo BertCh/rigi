@@ -9,9 +9,7 @@
 // Screenshots (colour + geometry views) and JSON → out/deck-webgpu/smoke-<id>-<host>.*
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/smoke.mjs [IMG_7086] [--host deck|direct] [--query plugin=footprint]
-// Env: APP_URL (default http://localhost:3111, the full-deck-build server:
-//   npx vite dev --config scripts/deck-webgpu/vite.webgpu.config.ts --port 3111).
-// On the app's own server (:3110, deck webgl-only) the lab falls back to the direct host.
+// Env: APP_URL (default http://localhost:3100, the dev server).
 // Exit code 1 when the page errored, never became ready, or the geometry check failed.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -26,7 +24,7 @@ const id =
 		(a, i) =>
 			!a.startsWith("--") && !["--host", "--query"].includes(args[i - 1]),
 	) ?? "IMG_7086";
-const URL0 = process.env.APP_URL ?? "http://localhost:3111";
+const URL0 = process.env.APP_URL ?? "http://localhost:3100";
 const OUT = resolve(import.meta.dirname, "../../out/deck-webgpu");
 mkdirSync(OUT, { recursive: true });
 

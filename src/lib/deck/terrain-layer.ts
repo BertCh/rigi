@@ -12,13 +12,13 @@
 import {
 	COORDINATE_SYSTEM,
 	CompositeLayer,
-	Layer,
+	type Layer,
 	type LayerProps,
 	project32,
 	type UpdateParameters,
 } from "@deck.gl/core";
 import type { Device, Texture } from "@luma.gl/core";
-import { Geometry, Model } from "@luma.gl/engine";
+import type { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
 import type { ClearAirValues } from "../look/clear-air";
 import { CLEAR_AIR_OFF } from "../look/clear-air";
@@ -56,13 +56,7 @@ import {
 	terroirMajorEvery,
 } from "../terroir/glsl/values";
 import { BatchedTerrainTileLayer } from "./batched-terrain-layer";
-import { narrowIndices } from "./index-width";
 import type { TileMesh } from "./terrain-data";
-import {
-	type TerrainMode,
-	terrainDrawStats,
-	terrainMode,
-} from "./terrain-mode";
 
 export const STYLE = {
 	hillshade: 0,
@@ -286,33 +280,7 @@ export const terrainModule = {
 	},
 } as const satisfies ShaderModule;
 
-const vs = /* glsl */ `#version 300 es
-#define SHADER_NAME terrain-tile-vs
-in vec3 positions;
-in vec3 normals;
-in vec2 texCoords;
-in float elev;
-out vec3 vWorld;
-out vec3 vNormal;
-out vec2 vUv;
-out float vElev;
-out float vLogW;
-out vec3 vCamera;
-void main() {
-  vWorld = positions;
-  // positions are raw ENU; a photo viewport (position = eye) offsets common space by the eye, so
-  // cameraPosition is relative to project.coordinateOrigin there (0 for the orbit world view)
-  vCamera = project.cameraPosition + project.coordinateOrigin;
-  vNormal = normals;
-  vUv = texCoords;
-  vElev = elev;
-  vec4 posCommon;
-  gl_Position = project_position_to_clipspace(positions, vec3(0.0), vec3(0.0), posCommon);
-  vLogW = 1.0 + max(gl_Position.w, 1e-6);
-}
-`;
-
-/** The terrain fragment shader, shared with the batched path (batched-terrain-layer.ts). */
+/** The terrain fragment shader (batched-terrain-layer.ts supplies the vertex shader). */
 export const fs = /* glsl */ `#version 300 es
 #define SHADER_NAME terrain-tile-fs
 precision highp float;
@@ -429,9 +397,6 @@ float contourLine(float e, float widthPx) {
 }
 
 void main() {
-#ifdef TERRAIN_FRAGMENT_DEPTH
-  gl_FragDepth = log2(vLogW) * terrain.logDepthFC;
-#endif
   vec3 n = normalize(vNormal);
   float range = length(vWorld - vCamera);
   // photo-camera passes only: terrain closer than the GPS error is in the wrong place anyway (the
@@ -653,108 +618,7 @@ export type TerrainUniformProps = {
 	terroir: TerroirShader | null;
 };
 
-type TileLayerProps = LayerProps &
-	TerrainUniformProps & {
-		mesh: TileMesh;
-		image: ImageBitmap | null;
-		photoTexture: Texture | null;
-		photoRange: Texture | null;
-		photoFg: Texture | null;
-		emptyTexture: Texture;
-		/** The relief field's textures (LOOK_RELIEF), null until built. */
-		reliefTex: { field: Texture; gen: Texture; extent: number[] } | null;
-		/** The terroir cover classes (TERROIR_COVER / _INK), null until uploaded. */
-		terroirTex?: Texture | null;
-	};
-
-class TerrainTileLayer extends Layer<TileLayerProps> {
-	static layerName = "TerrainTileLayer";
-	declare state: { model?: Model; map?: Texture };
-
-	getShaders() {
-		return super.getShaders(terrainShaders(this.props, vs));
-	}
-
-	initializeState() {
-		this.setState({ model: this.makeModel() });
-	}
-
-	/** `gpu`: the tile buffers of the previous program (a look change rebuilds the program only). */
-	private makeModel(gpu?: Model["_gpuGeometry"]) {
-		const { mesh } = this.props;
-		const geometry =
-			gpu ??
-			new Geometry({
-				topology: "triangle-list",
-				indices: narrowIndices(mesh.indices, mesh.positions.length / 3),
-				attributes: {
-					positions: { size: 3, value: mesh.positions },
-					normals: { size: 3, value: mesh.normals },
-					texCoords: { size: 2, value: mesh.texCoords },
-					elev: { size: 1, value: mesh.elev },
-				},
-			});
-		return new Model(this.context.device, {
-			...this.getShaders(),
-			id: this.props.id,
-			geometry,
-			bufferLayout: [],
-		});
-	}
-
-	updateState({ props, oldProps }: UpdateParameters<this>) {
-		// same tile id, new mesh (streamed at a different resolution): rebuild the geometry
-		if (props.mesh !== oldProps.mesh && oldProps.mesh) {
-			this.state.model?.destroy();
-			this.setState({ model: this.makeModel() });
-		} else if (
-			oldProps.look &&
-			tileDefines(props).join() !== tileDefines(oldProps).join()
-		) {
-			// a preset / feature toggle: new program, same GPU buffers
-			const old = this.state.model;
-			const gpu = old?._gpuGeometry ?? undefined;
-			if (old) old._gpuGeometry = null;
-			old?.destroy();
-			this.setState({ model: this.makeModel(gpu) });
-		}
-		if (props.image !== oldProps.image) {
-			this.state.map?.destroy();
-			this.setState({
-				map: props.image
-					? makeTexture(this.context.device, props.image, true)
-					: undefined,
-			});
-		}
-	}
-
-	finalizeState(context: Parameters<Layer["finalizeState"]>[0]) {
-		super.finalizeState(context);
-		this.state.model?.destroy();
-		this.state.map?.destroy();
-	}
-
-	draw({
-		shaderModuleProps,
-	}: {
-		shaderModuleProps?: {
-			project?: { viewport?: { cameraPosition: number[] } };
-		};
-	}) {
-		const { model, map } = this.state;
-		if (!model) return;
-		setTerrainShaderProps(
-			model,
-			this.props,
-			map,
-			shaderModuleProps?.project?.viewport ?? this.context.viewport,
-		);
-		terrainDrawStats.draws++;
-		model.draw(this.context.renderPass);
-	}
-}
-
-/** Everything the terrain shaders read that isn't geometry (TerrainTileLayer / BatchedTerrainTileLayer). */
+/** Everything the terrain shaders read that isn't geometry (BatchedTerrainTileLayer). */
 export type TerrainDrawProps = TerrainUniformProps & {
 	photoTexture: Texture | null;
 	photoRange: Texture | null;
@@ -767,25 +631,18 @@ export type TerrainDrawProps = TerrainUniformProps & {
 };
 
 /**
- * How the terrain writes its logarithmic depth (log2(1 + w) · logDepthFC, LOG_DEPTH_FAR), the
- * convention trails, splats, 3D tiles, the world gizmo and the roll drape test against:
- *   "vertex"   per vertex, in gl_Position.z (terrainLogDepthModule). No fragment depth write, so
- *              early depth testing stays on: hidden terrain is rejected before the uber-shader
- *              runs. Apple TBDR, DPR 2, photo drag: MSAA colour pass 34–46 → 16–18 ms per redraw.
- *   "fragment" exact per fragment (gl_FragDepth), the old path; kept as the fallback.
+ * The terrain writes its logarithmic depth (log2(1 + w) · logDepthFC, LOG_DEPTH_FAR) per vertex, in
+ * gl_Position.z (terrainLogDepthModule): the convention trails, splats, 3D tiles, the world gizmo
+ * and the roll drape test against. No fragment depth write, so early depth testing stays on.
  * The hardware's screen-linear interpolation of a per-vertex log is never nearer than the exact
  * value (log is concave) and at most (ln ρ)²/8 farther for a triangle whose far / near distance
  * ratio is ρ (multi-drape-layer.ts derives the same bound): millimetres on far tiles, a few cm
  * next to the camera. Layers writing the exact per-fragment value therefore still pass on the
- * terrain surface (ties get looser, never tighter), and shared vertices keep seams crack-free.
- * DPR 1 diffs against "fragment" (IMG_6958 / 7086 / 7155, photo and world views): ≤ 0.29 % of
- * pixels by > 8/255, along trails, tile skirts and labels.
+ * terrain surface, and shared vertices keep seams crack-free.
  * The near plane moves to w = 0 (z = -w there): terrain between the camera and the view's near
  * distance is no longer clipped.
  */
-export const TERRAIN_DEPTH: "vertex" | "fragment" = "vertex";
-
-/** Terrain log depth per vertex (TERRAIN_DEPTH "vertex"): z_ndc = 2 · log depth - 1. */
+/** Terrain log depth per vertex: z_ndc = 2 · log depth - 1. */
 const terrainLogDepthModule = {
 	name: "terrainLogDepth",
 	inject: {
@@ -795,7 +652,7 @@ const terrainLogDepthModule = {
 } as const satisfies ShaderModule;
 
 /**
- * The terrain program's shaders for `p`'s look: `vs` + the shared fragment shader, the terrain
+ * The terrain program's shaders for `p`'s look: the caller's `vs` + the shared fragment shader, the terrain
  * uniform module and the look's LOOK_* defines (none for classic: the classic program is unchanged).
  */
 export function terrainShaders(
@@ -807,8 +664,7 @@ export function terrainShaders(
 ) {
 	const d: string[] = [...tileDefines(p)];
 	const base = [project32, terrainModule, ...extraModules];
-	if (TERRAIN_DEPTH === "vertex") base.push(terrainLogDepthModule);
-	else d.push("TERRAIN_FRAGMENT_DEPTH");
+	base.push(terrainLogDepthModule);
 	if (!d.length) return { vs, fs, modules: base };
 	const look = [
 		d.includes("LOOK_ATMOSPHERE") && ATM_LUMA_MODULE,
@@ -838,7 +694,7 @@ export function terroirFs(
 	src: string,
 ) {
 	return p.terroir?.defines.length
-		? terroirTerrainFs("deck", src, tileDefines(p))
+		? terroirTerrainFs(src, tileDefines(p))
 		: src;
 }
 
@@ -1168,17 +1024,10 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 		rangeOwned?: boolean;
 		fg?: Texture;
 		relief?: { field: Texture; gen: Texture; extent: number[] };
-		/** terrain-mode.ts path the sublayers were rendered for. */
-		mode?: TerrainMode;
 		/** the terroir cover classes (r8 nearest) and the grid they were uploaded from */
 		terroirTex?: Texture;
 		terroirGrid?: unknown;
 	};
-
-	/** Re-render the sublayers when the terrain path flips (harnesses flip __RIGI_FLAGS__.terrain live). */
-	shouldUpdateState(params: UpdateParameters<this>) {
-		return super.shouldUpdateState(params) || this.state.mode !== terrainMode();
-	}
 
 	initializeState() {
 		const empty = this.context.device.createTexture({
@@ -1299,47 +1148,27 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 			const v = this.props[k];
 			if (v !== undefined) (u as Record<string, unknown>)[k] = v;
 		}
-		// opt-in (terrain-mode.ts): every tile in one instanced draw per mesh resolution
-		this.state.mode = terrainMode();
-		if (this.state.mode === "batched")
-			return [
-				new BatchedTerrainTileLayer({
-					...u,
-					...this.getSubLayerProps({ id: "batched" }),
-					coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
-					pickable: false,
-					parameters: TERRAIN_PARAMETERS,
-					tiles: this.props.tiles,
-					// the compositor's geometry cache key reads `mesh` (composite.ts geoKey)
-					mesh: this.props.tiles,
-					imagery: this.props.imagery ?? null,
-					offscreen: !!this.props.offscreen,
-					photoTexture: photo ?? null,
-					photoRange: range ?? null,
-					photoFg: fg ?? null,
-					emptyTexture: empty,
-					reliefTex: relief ?? null,
-					terroirTex: terroirTex ?? null,
-				}),
-			];
-		return this.props.tiles.map(
-			(mesh) =>
-				new TerrainTileLayer({
-					...u,
-					...this.getSubLayerProps({ id: mesh.id }),
-					coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
-					pickable: false,
-					parameters: TERRAIN_PARAMETERS,
-					mesh,
-					image: this.props.imagery?.get(mesh.id) ?? null,
-					photoTexture: photo ?? null,
-					photoRange: range ?? null,
-					photoFg: fg ?? null,
-					emptyTexture: empty,
-					reliefTex: relief ?? null,
-					terroirTex: terroirTex ?? null,
-				}),
-		);
+		// every tile in one instanced draw per mesh resolution
+		return [
+			new BatchedTerrainTileLayer({
+				...u,
+				...this.getSubLayerProps({ id: "batched" }),
+				coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+				pickable: false,
+				parameters: TERRAIN_PARAMETERS,
+				tiles: this.props.tiles,
+				// the compositor's geometry cache key reads `mesh` (composite.ts geoKey)
+				mesh: this.props.tiles,
+				imagery: this.props.imagery ?? null,
+				offscreen: !!this.props.offscreen,
+				photoTexture: photo ?? null,
+				photoRange: range ?? null,
+				photoFg: fg ?? null,
+				emptyTexture: empty,
+				reliefTex: relief ?? null,
+				terroirTex: terroirTex ?? null,
+			}),
+		];
 	}
 }
 
@@ -1385,10 +1214,7 @@ export function maskTexture(
 	});
 }
 
-/** True for the terrain primitive layers, per-tile or batched (what the offscreen passes draw). */
+/** True for the terrain primitive layers, (what the offscreen passes draw). */
 export function isTerrainTile(layer: unknown) {
-	return (
-		layer instanceof TerrainTileLayer ||
-		layer instanceof BatchedTerrainTileLayer
-	);
+	return layer instanceof BatchedTerrainTileLayer;
 }

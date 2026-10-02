@@ -15,7 +15,7 @@
 //             (the WebGL "sky first" result)
 //   flat      mode 'flat' → WORLD_SKY, sRGB-encoded back to #a9c2da (±1)
 //   photo     frame.view 'photo' → the sky stays transparent (alpha 0)
-//   fog       TerrainCore + atmosphereFogPart vs GLSL applyAtmosphere(colour, ENU) per pixel, where
+//   fog       batched terrain + atmosphereFogPart vs GLSL applyAtmosphere(colour, ENU) per pixel, where
 //             colour / ENU come from the same terrain without fog and the geometry pass
 //
 // Run from any page on the dev server (vite transforms the import):
@@ -25,12 +25,9 @@ import { luma } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { webgpuAdapter } from "@luma.gl/webgpu";
 import * as THREE from "three";
+import { createSyntheticTile } from "#/lib/deck/synthetic-tile";
 import type { TileMesh } from "#/lib/deck/terrain-data";
-import {
-	ATM_CURV,
-	type AtmValues,
-	defaultAtmosphere,
-} from "#/lib/look/atmosphere";
+import { type AtmValues, defaultAtmosphere } from "#/lib/look/atmosphere";
 import {
 	ATM_BLOCK,
 	ATMOSPHERE_FNS,
@@ -53,8 +50,9 @@ import {
 } from "../pass";
 import { TextureReader } from "../readback";
 import { ColorTargets, GeometryTargets } from "../targets";
-import { TerrainCore, type TerrainShaderPart } from "../terrain";
+import type { TerrainShaderPart } from "../terrain";
 import { AtmSkyCore, atmosphereFogPart, WORLD_SKY } from "./atm-sky";
+import { createBatchedTerrain } from "./batched-terrain";
 
 const W = 256;
 const H = 160;
@@ -153,13 +151,13 @@ class GlslRef {
 			"#version 300 es\nprecision highp float;\nprecision highp int;\n";
 		this.sky = this.program(
 			`${head}${SKY_VS}`,
-			`${head}${ATM_BLOCK.threeDecl}${ATMOSPHERE_FNS}${SKY_BLOCK.threeDecl}${SKY_FS_MAIN}
+			`${head}${ATM_BLOCK.glslDecl}${ATMOSPHERE_FNS}${SKY_BLOCK.glslDecl}${SKY_FS_MAIN}
 out vec4 o;
 void main() { o = vec4(skyColor(), 1.0); }`,
 		);
 		this.apply = this.program(
 			`${head}${SKY_VS}`,
-			`${head}${ATM_BLOCK.threeDecl}${ATMOSPHERE_FNS}
+			`${head}${ATM_BLOCK.glslDecl}${ATMOSPHERE_FNS}
 uniform sampler2D uCol;
 uniform sampler2D uPos;
 out vec4 o;
@@ -362,33 +360,9 @@ function threeCam(p: CameraPose) {
 	return cam;
 }
 
-/** Flat ground with the curvature drop baked in (terrain-data fromGeo), one 64×64 tile. */
+/** Flat ground (800 m) on a z8 tile, about 107 km square; the batched terrain bakes the curvature drop in. */
 function groundTile(): TileMesh {
-	const n = 64;
-	const pos: number[] = [];
-	const nor: number[] = [];
-	const idx: number[] = [];
-	for (let j = 0; j <= n; j++)
-		for (let i = 0; i <= n; i++) {
-			const x = -60000 + (120000 * i) / n;
-			const y = 50 + 119950 * (j / n) ** 2;
-			pos.push(x, y, -(x * x + y * y) * ATM_CURV);
-			nor.push(0, 0, 1);
-		}
-	for (let j = 0; j < n; j++)
-		for (let i = 0; i < n; i++) {
-			const a = j * (n + 1) + i;
-			idx.push(a, a + 1, a + n + 2, a, a + n + 2, a + n + 1);
-		}
-	const count = pos.length / 3;
-	return {
-		id: "atm-check-ground",
-		positions: new Float32Array(pos),
-		normals: new Float32Array(nor),
-		texCoords: new Float32Array(count * 2),
-		elev: new Float32Array(count).fill(800),
-		indices: new Uint32Array(idx),
-	} as unknown as TileMesh;
+	return createSyntheticTile(() => 800, { z: 8, southEdgeM: 50 }).tile;
 }
 
 // ---------- the check ----------
@@ -574,13 +548,13 @@ export async function runAtmSkyCheck(): Promise<AtmSkyCheckResult> {
 		sky.setView("world");
 	}
 
-	// --- fog: TerrainCore + atmosphereFogPart vs GLSL applyAtmosphere ---
+	// --- fog: the batched terrain + atmosphereFogPart vs GLSL applyAtmosphere ---
 	{
 		const fogAtm = atmOf([0.3, 0.8, 0.25], { strength: 1.6 });
 		const view = pose(-8);
 		const tile = groundTile();
-		const withFog = new TerrainCore(device, null, "atm-check-terrain-fog");
-		const noFog = new TerrainCore(device, null, "atm-check-terrain-raw");
+		const withFog = createBatchedTerrain(device, null, "atm-check-terrain-fog");
+		const noFog = createBatchedTerrain(device, null, "atm-check-terrain-raw");
 		const identity: TerrainShaderPart = {
 			key: "identity-nofog",
 			wgsl: "fn atm_check_identity(c: vec4<f32>, s: TerrainSample) -> vec4<f32> { return c; }",

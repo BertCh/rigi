@@ -26,13 +26,12 @@
 // The vertex stage rebuilds buildMesh's position, central-difference normal, uv and elevation and
 // writes terrain.ts's Varyings; the program is terrainSource(BATCHED_VERTEX_WGSL, shading, plugins)
 // with terrainModules / terrainDefines, so the geometry pass, the default hillshade / imagery look,
-// terrain styles and drape / truth plugins apply unchanged (same fragment stages as TerrainCore).
+// terrain styles and drape / truth plugins apply unchanged (the same fragment stages for every look).
 // Imagery is the shared ImageryArray: the tile's layer sits in its table row (one 4-byte write
 // per change), so the colour pass needs no per-image-size grouping (the WebGL path did).
 //
-// The streamer must build batch grids: terrain=batched (lite meshes, empty vertex arrays; the
-// per-tile TerrainCore skips those) or __RIGI_TERRAIN_BOTH__ (both representations, parity A/B).
-// Tiles without `grid` are ignored here.
+// Meshes must carry a batch grid (the streamer's lite meshes have empty vertex arrays; roll-terrain's
+// full meshes carry both). Tiles without `grid` are ignored here.
 //
 // Device note: the height arrays are bound as texture_2d_array<f32> (luma 9.4 derives sampleType
 // "float" from the WGSL), which accepts r32float only with the 'float32-filterable' feature;
@@ -691,8 +690,8 @@ export type BundleCounters = RenderBundleStats & {
 };
 
 /**
- * The batched terrain as a GpuLayerCore (geometry + colour passes). Drop-in for TerrainCore:
- * same `look`, `setShaderParts`, `setTiles`, `syncImageryLayers`, `stats` shape (plus draws).
+ * The batched terrain as a GpuLayerCore (geometry + colour passes): `look`, `setShaderParts`,
+ * `setTiles`, `syncImageryLayers`, `stats`.
  */
 export class BatchedTerrainCore implements GpuLayerCore {
 	readonly passes: readonly PassKind[] = ["geometry", "color"];
@@ -1193,12 +1192,10 @@ export class BatchedTerrainCore implements GpuLayerCore {
 }
 
 /**
- * Factory (the assembler's entry point). Wiring, in place of TerrainCore:
+ * Factory (the assembler's entry point). Wiring:
  *   const terrain = createBatchedTerrain(host.device, imagery);
- *   terrain.look = {...};                         // same TerrainLook as TerrainCore
- *   streamer onUpdate: terrain.setTiles(set.tiles) // meshes must carry `grid`: set the terrain
- *                                                  // flag to "batched" (lite meshes) instead of
- *                                                  // "tiles", or __RIGI_TERRAIN_BOTH__ for A/B
+ *   terrain.look = {...};
+ *   streamer onUpdate: terrain.setTiles(set.tiles)  // meshes must carry `grid`
  *   imagery.onChange / after imagery.sync: terrain.syncImageryLayers()
  *   host.cores = [terrain, …]
  */

@@ -31,8 +31,6 @@ const UNREGISTERED: Record<string, string> = {
 	"src/lib/renderer.check.ts": "type-only; enforced by the tsc row",
 	"src/lib/deck-webgpu/engine.check.ts":
 		"in-browser check (imports virtual:photos, needs a WebGPU device)",
-	"src/lib/deck-webgpu/layers/batched-terrain.check.ts":
-		"in-browser check (imports virtual:photos, needs a WebGPU device)",
 };
 
 const tracked = (patterns: string[]) =>

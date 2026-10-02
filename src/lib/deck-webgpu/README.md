@@ -6,13 +6,13 @@ The default engine since 2026-10-01 (b520b1d, `reports/webgpu-default.md`); the 
 with `?renderer=auto` (or pins it with `?renderer=webgpu`) and falls back to WebGL automatically (see
 **In the app**); the lab route (`/lab/deck-webgpu`) remains the bench / debug consumer.
 
-## Approach (decided by `spike.ts`, `/lab/deck-webgpu?spike=1`)
+## Approach (decided by a feasibility spike on 2026-09-30, since removed; see git history)
 
 **deck.gl (vendored from PR #10752) on a WebGPU device hosts the frame; our own pass runner
 draws the 3D passes.**
 Layers are host-agnostic `GpuLayerCore`s on plain luma.gl 10 (`Model`, WGSL). The same cores
 also run under a luma-direct host with no deck at all (`hosts/direct.ts`). That host is the
-fallback when deck's full build isn't bundled, and it is also the A/B reference.
+fallback when the deck host fails to boot.
 
 What the spike showed with Chrome and Metal (first on deck 9.4.0 / luma 9.4.2, history; re-run on
 luma 10.0.0-alpha.2 + the vendored deck PR #10752, `vendor/deck/README.md`, with the same results):
@@ -29,7 +29,7 @@ luma 10.0.0-alpha.2 + the vendored deck PR #10752, `vendor/deck/README.md`, with
 | `WEBGPU_DEFAULT_DRAW_PARAMETERS` | premultiplied blending + `less-equal` are merged **over** the model's parameters; `blend: false` cannot remove the blend state |
 | layer extensions (`LogDepthExtension`, `TerrainExtension`) | no WGSL hooks (`SHADER_HOOKS_WGSL = []` in #10752; deck #10751 adds one vertex hook, no fs / depth hook) |
 | deck's default WGSL modules (`geometry`) | registered on luma's shared default assembler, so they leaked into every Model built without an explicit `shaderAssembler`; our Models use `RIGI_WGSL_ASSEMBLER` (pass.ts) and assemble the same WGSL under both hosts |
-| the app's vite config | resolves deck's `visgl:webgl-only` build, which has **all** WebGPU branches compiled out |
+| deck's `visgl:webgl-only` build | has **all** WebGPU branches compiled out (the app's vite config does not take it) |
 
 Hence:
 - deck keeps what works: the device, canvas, views and viewports, controllers (map mode), the
@@ -44,10 +44,8 @@ should be mechanical: only `hosts/deck.ts` and `device.ts` touch deck. Cores use
 `ShaderModule` and `RenderPass` and nothing else, and build their Models with pass.ts's own
 `WGSLShaderAssembler`, so deck's default-assembler state never reaches them.
 
-**Deck's full build in the app.** `vite.config.ts` no longer takes deck's `visgl:webgl-only`
-condition, so the deck host runs on every dev server and in production builds
-(`RIGI_DECK_BUILD=webgl-only` restores the old resolution; WebGpuEngine then runs on the direct
-host). `scripts/deck-webgpu/vite.webgpu.config.ts` is kept for :3111 and is now equivalent.
+**Deck's full build in the app.** `vite.config.ts` does not take deck's `visgl:webgl-only`
+condition, so the deck host runs on every dev server and in production builds.
 
 ## In the app (src/lib/renderer-select.ts, PhotoWorkspace)
 
@@ -99,7 +97,7 @@ host). `scripts/deck-webgpu/vite.webgpu.config.ts` is kept for :3111 and is now 
 - rgba32float is not filterable unless the device has `float32-filterable`. Use `textureLoad`.
 
 
-**Geometry diet (`geo-query-gpu.ts`, `deck/geo-query.ts`).** The 1024 px query target is no longer read back in full (~12 MB) on every settle. After the geometry pass the engine runs compute passes over `GeometryTargets.geometry`: peak-label occlusion verdicts (4 B per peak), the skyline rows (4 B per column) and, on demand, gathered texels (16 B per pixel, `sampleAtAsync`, hover). Undecided samples (denormal texels, never produced in practice) are resolved on the CPU from gathered texels, so the results equal the CPU tests exactly (argument in `deck/geo-query.ts`; `npx tsx scripts/gpu/geo-query-check.ts`). The CPU planes (`range`, `xyz`) are read lazily, and unpacked on the GPU (`geo-unpack.ts`, kernel `geo-unpack` of the `geo-query` group, `GeoQueryGpu.unpack`: copies and selects only, so the planes equal the CPU loop byte for byte; a denormal or NaN texel word is flagged and the source falls back to the full texture read + CPU loop for good). `ensureRange()` reads the range plane alone (4 B per pixel instead of the 16 B texel; the CPU look grid, the stats and a fitted haze use it, `hasRange`), `ensureFull()` the xyz plane too (12 B per pixel; `readback()`, `sampleAt` misses, Step Inside masks; `hasCpu` = both). No CPU unpack loop runs on this path. `npx tsx src/lib/deck-webgpu/geo-unpack.check.ts` (CI id `geo-unpack`) proves the kernel's logic byte-equal to the CPU loop. `settle()` waits for the GPU queries only. `geometryDiet: false`, or any failing kernel, restores the full readback per render. The kernels run as core `ComputeGraph`s (`cachedGraph` group `geo-query`, keyed by kernels and target shape; the target, uniforms, inputs and outputs are imports bound per run; the uniforms, inputs and outputs are persistent core pool slots `geo-query/<kernel><job>/…`, bound with the exact ranges the former per-call buffers had, written and submitted in one synchronous block through `ComputeGraph.runNow`, no lease): the verdicts and the skyline of one settle share one graph run (one submit and one read node; they were two submits), the gather runs on its own. The silhouette re-rank masks (`silhouette-gpu.ts`) are likewise one graph (group `silhouette-mask`, one kernel node per pose, one read node).
+**Geometry diet (`geo-query-gpu.ts`, `deck/geo-query.ts`).** The 1024 px query target is no longer read back in full (~12 MB) on every settle. After the geometry pass the engine runs compute passes over `GeometryTargets.geometry`: peak-label occlusion verdicts (4 B per peak), the skyline rows (4 B per column) and, on demand, gathered texels (16 B per pixel, `sampleAtAsync`, hover). Undecided samples (denormal texels, never produced in practice) are resolved on the CPU from gathered texels, so the results equal the CPU tests exactly (argument in `deck/geo-query.ts`; `npx tsx scripts/gpu/geo-query-check.ts`). The CPU planes (`range`, `xyz`) are read lazily, and unpacked on the GPU (`geo-unpack.ts`, kernel `geo-unpack` of the `geo-query` group, `GeoQueryGpu.unpack`: copies and selects only, so the planes equal the CPU loop byte for byte; a denormal or NaN texel word is flagged and the source falls back to the full texture read + CPU loop for good). `ensureRange()` reads the range plane alone (4 B per pixel instead of the 16 B texel; the CPU look grid, the stats and a fitted haze use it, `hasRange`), `ensureFull()` the xyz plane too (12 B per pixel; `readback()`, `sampleAt` misses, Step Inside masks; `hasCpu` = both). No CPU unpack loop runs on this path. `npx tsx src/lib/deck-webgpu/geo-unpack.check.ts` (CI id `geo-unpack`) proves the kernel's logic byte-equal to the CPU loop. `settle()` waits for the GPU queries only. Any failing kernel restores the full readback per render. The kernels run as core `ComputeGraph`s (`cachedGraph` group `geo-query`, keyed by kernels and target shape; the target, uniforms, inputs and outputs are imports bound per run; the uniforms, inputs and outputs are persistent core pool slots `geo-query/<kernel><job>/…`, bound with the exact ranges the former per-call buffers had, written and submitted in one synchronous block through `ComputeGraph.runNow`, no lease): the verdicts and the skyline of one settle share one graph run (one submit and one read node; they were two submits), the gather runs on its own. The silhouette re-rank masks (`silhouette-gpu.ts`) are likewise one graph (group `silhouette-mask`, one kernel node per pose, one read node).
 
 **Settle fusion (WAG W1.2, `settleFusion`, default on).** With the look bridge on, the refined masks pass is recorded on its own command encoder during the query geometry render and submitted with it in one `queue.submit` (`gpu/core/queue.ts` `submitWithDefault`); `LookBridge.updateMasks` adopts the result when its inputs still match (same render, photo, masks, no blend cut), otherwise it runs its own pass. The band stats likewise share their 256 px layer render's submit. Same graphs, byte-identical outputs; the query render keeps its own 1024 px pass, 90 ms debounce and renderSeq pairing. Only query sources (wider than 512 px) get the hook: the 384 px silhouette sources get no fusion. Check: `scripts/deck-webgpu/settle-submits.mjs` (full tier `settle-submits`).
 
@@ -249,7 +247,7 @@ interface GpuLayerCore {
    depth24plus) and encodes sRGB itself. It reads `ctx.color` and `ctx.geometry`.
 8. **No depth parameters on depth-less targets.** luma adds a depth-stencil state as soon as any
    depth parameter is set.
-9. **Terrain shading parts.** Styles, drape and truth plug into `TerrainCore` without editing it:
+9. **Terrain shading parts.** Styles, drape and truth plug into `BatchedTerrainCore` without editing it:
    `terrain.setShaderParts(shading, plugins)` with `TerrainShaderPart`s. The shading defines
    `fn terrain_base(s: TerrainSample) -> vec4<f32>` and sets `defines.TERRAIN_SHADING`. A plugin
    defines `fn <apply>(c: vec4<f32>, s: TerrainSample) -> vec4<f32>`. `TerrainSample` carries
@@ -288,17 +286,16 @@ interface GpuLayerCore {
 
 ```bash
 df -h .                                    # disk first
-npx vite dev --config scripts/deck-webgpu/vite.webgpu.config.ts --port 3111   # deck full build
+npm run dev                                # the app server on :3100
 # every browser job through the render lock, one at a time:
 node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/engine-lab.mjs IMG_7086 [--host deck|direct]
 node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/bench.mjs --photos IMG_7086,IMG_6958,IMG_7018 --out <dir>
 node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/smoke.mjs IMG_7086 [--host deck|direct]   # foundation (?core=1)
-node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
 ```
 
 - **Engine lab (default)**: `/lab/deck-webgpu?photo=IMG_7086` — `WebGpuEngine` with every layer
   (`lab-engine.ts`). Query: `&host=deck|direct &mode=overlay|replace|world
-  &overlay=contours|bands|slope|none &map=satellite|topo|hillshade|bands &terrain=batched|tiles
+  &overlay=contours|bands|slope|none &map=satellite|topo|hillshade|bands 
   &debug=geometry|normal|depth &yaw= &pitch= &roll= &vfov= &align=1 &trails=1 &labels=0
   &size=<w>x<h>`. Toolbar: view mode (overlay / replace / world orbit), overlay / map style,
   debug view, fly-to-photo, DOM peak labels. Harness: `window.__engine` (the Renderer, as the
@@ -311,8 +308,6 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   `await (await import('/src/lib/deck-webgpu/layers/<name>.check.ts')).run…()`; the node-only
   parts run with `npx tsx src/lib/deck-webgpu/layers/<name>.check.ts`. `engine.check.ts
   runEngineCheck({photo, host, parity})` is the end-to-end check against the WebGL DeckEngine.
-- On :3100 / :3110 (app vite config, deck `visgl:webgl-only`) everything falls back to the
-  direct host automatically.
 
 ## Compute interop (src/lib/gpu)
 
@@ -396,8 +391,8 @@ path; "in-app A/B" means compared inside the running engine against `/photo/<id>
 | Layer (file) | Replaces (WebGL) | Passes | Parity evidence | In-app A/B | Open |
 |---|---|---|---|---|---|
 | foundation (`device`, `camera`, `depth`, `targets`, `pass`, `hosts/*`) | `deck/engine.ts` pass plumbing, LogDepthExtension | all | GPU geometry re-projects ≤ 0.053 px | yes (engine) | Firefox / Safari untested |
-| `terrain.ts` TerrainCore | TerrainTileLayer | geometry, color | reference for batched | yes (`?terrain=tiles`) | — |
-| `layers/batched-terrain.ts` | batched-terrain-layer | geometry, color | 99.84–99.97 % identical px vs TerrainCore, reproj ≤ 0.053 px | yes (default) | CPU cull; needs float32-filterable |
+| `terrain.ts` (shared WGSL, `TerrainLook`, `TerrainShaderPart`) | terrain-layer fs | geometry, color | the vertex stage is supplied by the batched core | — | — |
+| `layers/batched-terrain.ts` | batched-terrain-layer | geometry, color | 99.84–99.97 % identical px vs the retired per-tile core, reproj ≤ 0.053 px | yes (default) | CPU cull; needs float32-filterable |
 | `layers/terrain-styles.ts` | terrain-layer fs, look GLSL | (shading part) | 22/22 programs; hillshade ≤ 0.18 %, imagery ≤ 0.08 % vs CPU port of the GLSL | yes (overlay / replace styles) | atmosphere eye convention to confirm |
 | `layers/drape.ts` | projectPhoto / truth | (plugin) | Step Inside frame reproduces the photo; grazing acne 17.7 % → 0 % | world view screenshots | no pixel A/B of the world drape; `clearAir` module inverts the photo haze on the sample (world view only, look/clear-air.ts) |
 | `layers/trail.ts` | TrailLayer (LineSegments2) | color | position / width / occlusion / premul checks | yes (`&trails=1`) | class-1 normal write undecided |
@@ -533,8 +528,8 @@ IMG_7130 with `fullTerrain` and views at ±90°: autoAlign pose bit-identical, m
    `Renderer`; lab + bench (`bench.mjs`) against `/photo/<id>?renderer=deck`.
 2. **Opt-in in the app (done; `src/lib/renderer-select.ts`, the snippet below is historical)**: add `?renderer=webgpu`
    (snippet in `engine.ts` WIRING and below), falling back to the WebGL DeckEngine when
-   `WebGpuEngine.available()` is not ok. Make the `visgl:webgl-only` condition conditional (or
-   drop it: about +124 KB on the WebGL deck path) so the deck host runs in the app.
+   `WebGpuEngine.available()` is not ok. The `visgl:webgl-only` condition was dropped
+   (about +124 KB on the WebGL deck path) so the deck host runs in the app.
 3. **Parity gate on the eval sets:** run `scripts/deck-engine-smoke.mjs`, `eval-app`,
    the wild benchmark and the Step Inside e2e with `renderer=webgpu`; require the WebGL numbers
    (Δyaw ≤ 0.5°, label Jaccard ≥ 0.6, export diffs at today's levels), plus the splat smear gate and
@@ -585,9 +580,8 @@ are all unchanged, see each) and deck PR #10752 (what we vendor). Each open one 
    TerrainExtension (not adopted). PR: the remaining WGSL counterparts of `DECKGL_FILTER_*` hooks.
 6. *The `visgl:webgl-only` export condition removes every WebGPU branch silently*; a WebGPU Deck
    then fails obscurely. PR: a runtime error when `deviceProps.type === 'webgpu'` on the
-   webgl-only build, or an exported build marker (`device.ts` `deckBuild()` infers the build
-   from the exported shader modules' `source` (`project`, then `project32`, `picking`), null in
-   webgl-only).
+   webgl-only build, or an exported build marker (the full build's shader modules carry a WGSL
+   `source` string, the webgl-only build strips it to null).
 
 *Re-vendored in b7ed88a* (fixed in luma's own deck patch, `.yarn/patches/@deck.gl-core-npm-9.4.0-707f3fb147.patch`
 from luma #3325 / `7d1d11e9`; not in deck master, #10752 or any open deck PR; dormant for us today

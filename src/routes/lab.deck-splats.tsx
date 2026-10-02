@@ -14,9 +14,8 @@ import { Deck } from "@deck.gl/core";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { PhotoView } from "#/lib/deck/photo-view";
-import type { TileMesh } from "#/lib/deck/terrain-data";
+import { createSyntheticTile } from "#/lib/deck/synthetic-tile";
 import { TerrainLayer } from "#/lib/deck/terrain-layer";
-import { setFlagOverride } from "#/lib/flags";
 import { DEG as D } from "#/lib/geodesy";
 import { DeckSplatLayer, splatStats } from "#/lib/nearfield/deck-splat-layer";
 import { type GaussianCloud, PROVENANCE_CODE } from "#/lib/nearfield/types";
@@ -72,55 +71,12 @@ function groundZ(x: number, y: number) {
 	return 0.05 * y + hill + far + 0.6 * Math.sin(x * 0.07) * Math.cos(y * 0.05);
 }
 
-function syntheticTile(): TileMesh {
-	const seg = 300;
-	const half = 900;
-	const n = seg + 1;
-	const positions = new Float32Array(n * n * 3);
-	const normals = new Float32Array(n * n * 3);
-	const texCoords = new Float32Array(n * n * 2);
-	const elev = new Float32Array(n * n);
-	const heights = new Float32Array(n * n);
-	const step = (2 * half) / seg;
-	for (let j = 0; j < n; j++)
-		for (let i = 0; i < n; i++) {
-			const k = j * n + i;
-			const x = -half + i * step;
-			const y = -half + j * step;
-			const z = groundZ(x, y);
-			positions.set([x, y, z], k * 3);
-			const e = 0.5;
-			const nx = -(groundZ(x + e, y) - groundZ(x - e, y)) / (2 * e);
-			const ny = -(groundZ(x, y + e) - groundZ(x, y - e)) / (2 * e);
-			const l = Math.hypot(nx, ny, 1);
-			normals.set([nx / l, ny / l, 1 / l], k * 3);
-			texCoords.set([i / seg, 1 - j / seg], k * 2);
-			elev[k] = z + ORIGIN_ELEV;
-			heights[k] = z + ORIGIN_ELEV;
-		}
-	const indices = new Uint32Array(seg * seg * 6);
-	let o = 0;
-	for (let j = 0; j < seg; j++)
-		for (let i = 0; i < seg; i++) {
-			const a = j * n + i;
-			indices.set([a, a + 1, a + n + 1, a, a + n + 1, a + n], o);
-			o += 6;
-		}
-	return {
-		id: "lab-tile",
-		key: { z: 14, x: 0, y: 0 },
-		distance: 0,
-		size: n,
-		heights,
-		sourceZ: 14,
-		focus: true,
-		seg,
-		positions,
-		normals,
-		texCoords,
-		elev,
-		indices,
-	};
+/** A z14 tile (about 1.7 km square) centred on the ENU origin, ENU z = height - ORIGIN_ELEV. */
+function syntheticTile() {
+	return createSyntheticTile((x, y) => groundZ(x, y) + ORIGIN_ELEV, {
+		z: 14,
+		frameH: ORIGIN_ELEV,
+	}).tile;
 }
 
 type Splat = {
@@ -446,8 +402,6 @@ function LabDeckSplats() {
 	const extra = search.n ?? 0;
 
 	const [world] = useState(() => {
-		// the per-tile terrain path renders a CPU TileMesh (the batched default needs a batch grid)
-		setFlagOverride("terrain", "tiles");
 		return { tile: syntheticTile(), cloud: syntheticCloud(extra) };
 	});
 

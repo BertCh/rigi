@@ -16,7 +16,7 @@
 //   device loss simulateDeviceLoss() rebuilds host + cores; queries work again, same ranges
 //   parity      (opts.parity) the WebGL DeckEngine on a second canvas, same photo and pose:
 //               sampleAt ranges, peak label names and the exported overlay image compared
-// Run from any page served by vite (deck host: the full-deck-build server on :3111), e.g.:
+// Run from any page served by vite (the dev server on :3100), e.g.:
 //   await page.evaluate(async () =>
 //     (await import("/src/lib/deck-webgpu/engine.check.ts")).runEngineCheck({ photo: "IMG_7086" }))
 // The engine's canvas stays on the page (top-left, 960×640) until the check ends; pass keep: true

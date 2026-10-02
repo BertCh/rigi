@@ -4,7 +4,7 @@
 
 // The projective photo drape on WebGPU: a TerrainShaderPart plugin (README.md "Terrain shading
 // parts") that ports deck/terrain-layer.ts's projectPhoto branch (+ its LOOK_HARMONIZE tone-in and
-// the Step Inside "Truth" provenance tint) onto TerrainCore / the batched terrain, with the occlusion
+// the Step Inside "Truth" provenance tint) onto the batched terrain, with the occlusion
 // test of roll/map/multi-drape-layer.ts.
 //
 // How it maps onto the foundation:

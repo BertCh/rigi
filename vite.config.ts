@@ -5,11 +5,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { nitro } from "nitro/vite";
 import type { Plugin } from "vite";
-import {
-	defaultClientConditions,
-	defaultServerConditions,
-	defineConfig,
-} from "vite";
+import { defineConfig } from "vite";
 
 // public/photos/photos.json is also fetched at runtime and read by scripts, so it stays in public/.
 // Vite refuses JS imports from public/, so expose it to src as `virtual:photos`.
@@ -39,17 +35,6 @@ const portArg = process.argv.find(
 );
 const devPort = portArg?.replace("--port=", "");
 
-// deck.gl 9.4 ships a `visgl:webgl-only` export (dist.webgl-only/: its WebGPU branches and WGSL
-// constant-folded out). The app's default renderer is deck on WebGPU (src/lib/deck-webgpu, with the WebGL
-// DeckEngine as the automatic fallback: src/lib/renderer-select.ts), which needs deck's FULL build, so the
-// condition is no longer taken. The WebGL path runs the same full build (its WebGPU branches are dead code
-// on a WebGL device). RIGI_DECK_BUILD=webgl-only restores the old resolution (bundle-size A/B, or a WebGL-
-// only deployment: WebGpuEngine then runs on its luma-direct host). Only @deck.gl/* packages declare the
-// condition; @luma.gl/* resolve the same either way. Vite 8's resolve.conditions REPLACES the defaults,
-// hence the spread; the SSR environment's is ssr.resolve.conditions (deck only runs in the browser).
-const WEBGL_ONLY =
-	process.env.RIGI_DECK_BUILD === "webgl-only" ? ["visgl:webgl-only"] : [];
-
 // Production builds ship neither the /dev/* (harness and preview pages) nor the /lab/* (experiments) routes.
 // The router generator ignores those route files and writes its tree to a separate, gitignored file, which
 // the build aliases over `./routeTree.gen` (src/router.tsx), so the committed src/routeTree.gen.ts that
@@ -77,10 +62,6 @@ const config = defineConfig({
 					},
 				]
 			: [],
-		conditions: [...WEBGL_ONLY, ...defaultClientConditions],
-	},
-	ssr: {
-		resolve: { conditions: [...WEBGL_ONLY, ...defaultServerConditions] },
 	},
 	// gpu-core is imported lazily (src/lib/gpu/**): on a cold cache Vite would re-optimise on first import
 	// and load a second @luma.gl/core, which breaks graph destroy.

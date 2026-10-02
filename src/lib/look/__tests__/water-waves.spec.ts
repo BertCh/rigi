@@ -112,20 +112,16 @@ describe("shader texts and blocks", () => {
 		expect(waterWgsl(false)).not.toContain("ts_water_wave_tilt");
 		expect(WATER_WAVES_FNS.length).toBeGreaterThan(100);
 	});
-	it("defineBlock names accessors, packs vec3 as vec4, and writes three uniforms", () => {
+	it("defineBlock names accessors, packs vec3 as vec4, and declares plain uniforms", () => {
 		const b = defineBlock("tst", "testBlock", { gain: "float", dir: "vec3" });
 		expect(b.uniformName("gain")).toBe("uTstGain");
-		expect(b.threeDecl).toContain("uniform float uTstGain;");
+		expect(b.glslDecl).toContain("uniform float uTstGain;");
 		expect(b.lumaModule.vs).toContain("#define tst_dir testBlock.dir.xyz");
 		expect(b.pack({ gain: 2, dir: [1, 2, 3] })).toEqual({
 			gain: 2,
 			dir: [1, 2, 3, 0],
 		});
 		expect(b.pack({})).toEqual({});
-		const u = b.threeUniforms();
-		b.write(u, { gain: 3, dir: [4, 5, 6] });
-		expect(u.uTstGain.value).toBe(3);
-		expect(u.uTstDir.value.toArray()).toEqual([4, 5, 6]);
 		expect(WATER_WAVES_BLOCK.name).toBe("waterWaves");
 	});
 });

@@ -184,8 +184,8 @@ check(
 	);
 }
 {
-	const off = terroirTerrainFs("deck", fs, ["TERROIR_COVER"]);
-	const on = terroirTerrainFs("deck", fs, ["TERROIR_COVER", "TERROIR_PATTERN"]);
+	const off = terroirTerrainFs(fs, ["TERROIR_COVER"]);
+	const on = terroirTerrainFs(fs, ["TERROIR_COVER", "TERROIR_PATTERN"]);
 	check(!off.includes("terPat"), "GLSL off has no pattern");
 	check(
 		on.includes(

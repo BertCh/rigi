@@ -4,9 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { defaultSettings, type Settings } from "#/lib/settings";
-import { withFlags } from "#/test/helpers";
 import { compositeFor, terrainLookFor } from "../settings-map";
-import { terrainBuild, terrainMode } from "../terrain-mode";
 
 const settings = (over: Partial<Settings>): Settings => ({
 	...defaultSettings,
@@ -73,28 +71,5 @@ describe("compositeFor", () => {
 		expect(c.rangeKm).toBe(9);
 		expect(c.keepSky).toBe(s.keepSky);
 		expect(c.protectPeople).toBe(s.protectPeople);
-	});
-});
-
-describe("terrainMode / terrainBuild", () => {
-	it("defaults to batched: grid only", () => {
-		expect(terrainMode()).toBe("batched");
-		expect(terrainBuild()).toEqual({ mesh: false, grid: true });
-	});
-	it("?terrain=tiles builds meshes only", () => {
-		withFlags({ terrain: "tiles" });
-		expect(terrainMode()).toBe("tiles");
-		expect(terrainBuild()).toEqual({ mesh: true, grid: false });
-	});
-	it("__RIGI_TERRAIN_BOTH__ builds both representations", () => {
-		(globalThis as { __RIGI_TERRAIN_BOTH__?: boolean }).__RIGI_TERRAIN_BOTH__ =
-			true;
-		try {
-			expect(terrainBuild()).toEqual({ mesh: true, grid: true });
-		} finally {
-			(
-				globalThis as { __RIGI_TERRAIN_BOTH__?: boolean }
-			).__RIGI_TERRAIN_BOTH__ = undefined;
-		}
 	});
 });

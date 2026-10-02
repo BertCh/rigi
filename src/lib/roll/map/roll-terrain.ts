@@ -13,7 +13,6 @@
 import { tilePriority } from "#/lib/cache";
 import { buildBatchGrid } from "#/lib/deck/batched-terrain-grid";
 import { buildMesh, TerrainSet, type TileMesh } from "#/lib/deck/terrain-data";
-import { terrainBuild } from "#/lib/deck/terrain-mode";
 import { downsample2 } from "#/lib/deck/terrain-stream";
 import {
 	type DemRaster,
@@ -110,7 +109,6 @@ export async function loadRollTerrain(
 	const meshes: TileMesh[] = [];
 	let done = 0;
 	let next = 0;
-	const { grid } = terrainBuild();
 	// seeded tiles build back to back with no fetch in between: yield now and then (no long task)
 	let lastYield = performance.now();
 	const worker = async () => {
@@ -130,10 +128,9 @@ export async function loadRollTerrain(
 				}).catch(() => null));
 			if (dem && !o.signal?.aborted) {
 				while (dem.size > 2 * w.seg && dem.size > 256) dem = downsample2(dem);
-				// the full mesh always (MultiDrapeLayer draws per tile); the batch grid too when
-				// TerrainLayer draws the batched path (terrain-mode.ts), which reads only `grid`
+				// the full mesh (MultiDrapeLayer draws per tile) and the batch grid TerrainLayer reads
 				const mesh = buildMesh(frame, dem, w.seg, w.distance, true);
-				if (grid) mesh.grid = buildBatchGrid(frame, dem.key, dem.heights);
+				mesh.grid = buildBatchGrid(frame, dem.key, dem.heights);
 				meshes.push(mesh);
 			}
 			o.onProgress?.(++done, want.length);

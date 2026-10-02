@@ -50,8 +50,6 @@ export const FLAG_SCHEMA = {
 	 * colour VRAM) for experiments; needs the rg11b10ufloat-renderable feature, else rgba16.
 	 */
 	colorTarget: oneOf(["rgba16", "rg11b10", "rg11b10-unsafe"], "rgba16"),
-	/** deck only: one instanced grid per resolution, or one mesh per tile */
-	terrain: oneOf(["batched", "tiles"], "batched"),
 	// GPU compute sidecar (src/lib/gpu); the CPU path is always the reference
 	/** master kill switch for every kernel below */
 	gpu: onOff("on"),
@@ -320,7 +318,6 @@ export type { FlagDef };
 export const RESTART_FLAGS: readonly FlagName[] = [
 	"renderer",
 	"webgpu",
-	"terrain",
 	"gpu",
 	"tiles3d",
 	"tiles3dBlend",

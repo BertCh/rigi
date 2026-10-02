@@ -77,7 +77,6 @@ const WHY = [
 		"src/lib/deck-webgpu/render-bundle.ts",
 		"MSAA render-bundle encoder: luma validation rejects sampleCount>1 (audit-render R4); flag off",
 	],
-	["src/lib/deck-webgpu/spike.ts", "dev spike, raw WebGPU on purpose"],
 	[
 		"src/lib/deck-webgpu/device.ts",
 		"createRenderDevice: adapter probe for features and limits before luma create",

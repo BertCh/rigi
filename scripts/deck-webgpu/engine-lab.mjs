@@ -7,7 +7,7 @@
 // layer): loads the photo, waits for body[data-ready], then screenshots the photo view (overlay,
 // replace) and the world view, checks labels / queries, and reports page + WebGPU errors.
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/engine-lab.mjs [IMG_7086] [--host deck|direct] [--query k=v&…]
-// Env APP_URL (default http://localhost:3111). Output: out/deck-webgpu/engine-lab-<id>-<host>.{json,png}
+// Env APP_URL (default http://localhost:3100). Output: out/deck-webgpu/engine-lab-<id>-<host>.{json,png}
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
@@ -22,7 +22,7 @@ const id =
 		(a, i) =>
 			!a.startsWith("--") && !["--host", "--query"].includes(args[i - 1]),
 	) ?? "IMG_7086";
-const URL0 = process.env.APP_URL ?? "http://localhost:3111";
+const URL0 = process.env.APP_URL ?? "http://localhost:3100";
 const OUT = resolve(import.meta.dirname, "../../out/deck-webgpu");
 mkdirSync(OUT, { recursive: true });
 

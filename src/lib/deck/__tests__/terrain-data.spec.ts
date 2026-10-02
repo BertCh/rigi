@@ -23,7 +23,6 @@ import {
 	selectDemTiles,
 	TerrainSet,
 } from "../terrain-data";
-import { terrainBuild, terrainMode } from "../terrain-mode";
 
 const LAT = 46.68;
 const LON = 7.85;
@@ -352,24 +351,5 @@ describe("CPU geometry", () => {
 		await src.render({ ...pose, yaw: 0 });
 		expect(src.range[6]).toBeGreaterThan(src.range[7 * 12 + 6]);
 		expect(src.range[6]).toBeGreaterThan(1900);
-	});
-});
-
-describe("terrain-mode", () => {
-	it("default mode is a known one; terrainBuild follows it and the BOTH override", () => {
-		const m = terrainMode();
-		expect(["tiles", "batched"]).toContain(m);
-		const b = terrainBuild();
-		expect(b.mesh).toBe(m === "tiles");
-		expect(b.grid).toBe(m === "batched");
-		(globalThis as { __RIGI_TERRAIN_BOTH__?: boolean }).__RIGI_TERRAIN_BOTH__ =
-			true;
-		try {
-			expect(terrainBuild()).toEqual({ mesh: true, grid: true });
-		} finally {
-			(
-				globalThis as { __RIGI_TERRAIN_BOTH__?: boolean }
-			).__RIGI_TERRAIN_BOTH__ = undefined;
-		}
 	});
 });

@@ -2,36 +2,21 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The WebGPU terrain layer (first port; README.md "Layer contract"). Draws the streamed DEM tiles
-// (deck/terrain-data.ts TileMesh, full CPU meshes) in two passes:
+// Shared WGSL and types of the WebGPU terrain (the batched core, layers/batched-terrain.ts, supplies the
+// vertex stage). Two passes:
 //   geometry  → ENU xyz + range, normal + class 0 (GeometryTargets MRT)
 //   color     → hillshade (the style's relief ramp × fog_shade) or draped imagery (texture array),
 //               with the style's haze (fog_apply); linear output into the MSAA colour target
-// Reversed-Z depth, camera-relative projection (camera.ts). Per tile: one interleaved vertex
-// buffer (pos, normal, uv, elev), a uint32 index buffer and a 4-byte per-instance buffer with the
-// tile's imagery layer (drawn with instanceCount 1, so a layer change is one tiny write); tiles outside the
-// frustum are culled on the CPU with their bounding spheres.
+// Reversed-Z depth, camera-relative projection (camera.ts).
 //
 // Extension seam: setShaderParts() (TerrainShaderPart) swaps the colour shading and chains
-// plugins (drape, truth…) without editing this file. Not yet here (separate ports, README.md):
-// contours / bands / slope styles and the LOOK_*
-// variants (layers/terrain-styles.ts), projective photo drape (layers/drape.ts), the batched
-// instanced path (layers/batched-terrain.ts).
-import type { Buffer, Device } from "@luma.gl/core";
-import { Model } from "@luma.gl/engine";
+// plugins (drape, truth…) without editing this file: terrain styles (layers/terrain-styles.ts),
+// the projective photo drape (layers/drape.ts).
 import type { ShaderModule } from "@luma.gl/shadertools";
-import type { TileMesh } from "#/lib/deck/terrain-data";
 import type { DeckRampU } from "#/lib/style/deck-apply";
 import { IMAGERY_SMALL_TIER_BASE } from "./atlas-layout";
-import { cameraModule, sphereInView } from "./camera";
-import type { ImageryArray } from "./imagery";
-import {
-	type GpuLayerCore,
-	ModelCache,
-	type PassContext,
-	type PassKind,
-	passModelProps,
-} from "./pass";
+import { cameraModule } from "./camera";
+import type { PassContext } from "./pass";
 import {
 	colorWGSL,
 	DEFAULT_FOG,
@@ -102,30 +87,7 @@ struct TerrainUniforms {
 	bindingLayout: [{ name: "terrain", group: 0 }],
 } as const satisfies ShaderModule;
 
-/** The per-tile path's vertex stage (writes Varyings). Other terrain paths (layers/batched-terrain.ts)
- * supply their own `@vertex fn vertexMain(...) -> Varyings` to terrainSource(). */
-export const TILE_VERTEX_WGSL = /* wgsl */ `\
-struct Attributes {
-  @location(0) positions: vec3<f32>,
-  @location(1) normals: vec3<f32>,
-  @location(2) texCoords: vec2<f32>,
-  @location(3) elev: f32,
-  @location(4) layer: f32,
-};
-
-@vertex fn vertexMain(a: Attributes) -> Varyings {
-  var v: Varyings;
-  v.position = camera_clip(a.positions);
-  v.enu = a.positions;
-  v.normal = a.normals;
-  v.uv = a.texCoords;
-  v.elev = a.elev;
-  v.layer = a.layer;
-  return v;
-}
-`;
-
-/** Shared by every terrain path: the varyings contract, hypso, both fragment stages, the parts seam. */
+/** The varyings contract, hypso, both fragment stages, the parts seam. */
 const TERRAIN_COMMON_WGSL = /* wgsl */ `\
 ${colorWGSL}
 ${rampWGSL}
@@ -308,260 +270,4 @@ export function terrainDefines(
 	return kind === "geometry"
 		? { GEOMETRY_PASS: true }
 		: Object.assign({}, ...parts.map((p) => p.defines ?? {}));
-}
-
-const STRIDE = 9; // floats per vertex: pos 3, normal 3, uv 2, elev 1
-
-type GpuTile = {
-	mesh: TileMesh;
-	vertices: Buffer;
-	indices: Buffer;
-	indexCount: number;
-	sphere: [number, number, number, number];
-	/** per-instance vertex buffer holding the imagery layer (-1 = none) */
-	layerBuf: Buffer;
-	layer: number;
-};
-
-export class TerrainCore implements GpuLayerCore {
-	readonly passes: readonly PassKind[] = ["geometry", "color"];
-	readonly order = 0;
-	private tiles = new Map<string, GpuTile>();
-	private models = new ModelCache();
-	look: TerrainLook = DEFAULT_TERRAIN_LOOK;
-	private shading: TerrainShaderPart | null = null;
-	private plugins: TerrainShaderPart[] = [];
-	stats = {
-		tiles: 0,
-		drawn: { geometry: 0, color: 0 },
-		triangles: 0,
-		uploadMs: 0,
-	};
-
-	constructor(
-		readonly device: Device,
-		readonly imagery: ImageryArray | null,
-		readonly id = "terrain",
-	) {}
-
-	/** Replace the colour shading (null = default hillshade / imagery) and the plugin chain. */
-	setShaderParts(
-		shading: TerrainShaderPart | null,
-		plugins: TerrainShaderPart[] = [],
-	) {
-		const key = (p: TerrainShaderPart | null) => p?.key ?? "";
-		const was = [key(this.shading), ...this.plugins.map(key)].join("+");
-		this.shading = shading;
-		this.plugins = plugins;
-		if (was !== [key(shading), ...plugins.map(key)].join("+"))
-			this.models.invalidate("color");
-	}
-
-	private partsKey() {
-		return [
-			this.shading?.key ?? "default",
-			...this.plugins.map((p) => p.key),
-		].join("+");
-	}
-
-	/** Replace the rendered tile set (keeps GPU buffers of tiles whose mesh object is unchanged). */
-	setTiles(meshes: readonly TileMesh[]) {
-		const t0 = performance.now();
-		const want = new Map(meshes.map((m) => [m.id, m]));
-		for (const [id, t] of this.tiles)
-			if (want.get(id) !== t.mesh) {
-				t.vertices.destroy();
-				t.indices.destroy();
-				t.layerBuf.destroy();
-				this.tiles.delete(id);
-			}
-		for (const m of meshes) {
-			if (this.tiles.has(m.id)) continue;
-			if (!m.indices.length) continue; // batched-lite mesh: no CPU vertices (see README)
-			this.tiles.set(m.id, this.upload(m));
-		}
-		this.stats.tiles = this.tiles.size;
-		this.stats.uploadMs += performance.now() - t0;
-	}
-
-	/** Point tiles at their ImageryArray layers (one 4-byte write per changed tile). */
-	syncImageryLayers() {
-		if (!this.imagery) return;
-		for (const t of this.tiles.values()) {
-			const layer = this.imagery.layerOf(t.mesh.id);
-			if (layer === t.layer) continue;
-			t.layerBuf.write(new Float32Array([layer]));
-			t.layer = layer;
-		}
-	}
-
-	private upload(m: TileMesh): GpuTile {
-		const n = m.positions.length / 3;
-		const layer = this.imagery?.layerOf(m.id) ?? -1;
-		const v = new Float32Array(n * STRIDE);
-		let lo = [Infinity, Infinity, Infinity];
-		let hi = [-Infinity, -Infinity, -Infinity];
-		for (let i = 0; i < n; i++) {
-			const o = i * STRIDE;
-			for (let c = 0; c < 3; c++) {
-				const p = m.positions[i * 3 + c];
-				v[o + c] = p;
-				if (p < lo[c]) lo[c] = p;
-				if (p > hi[c]) hi[c] = p;
-				v[o + 3 + c] = m.normals[i * 3 + c];
-			}
-			v[o + 6] = m.texCoords[i * 2];
-			v[o + 7] = m.texCoords[i * 2 + 1];
-			v[o + 8] = m.elev[i];
-		}
-		if (!n) {
-			lo = [0, 0, 0];
-			hi = [0, 0, 0];
-		}
-		const d = this.device;
-		return {
-			mesh: m,
-			vertices: d.createBuffer({
-				id: `${m.id}-v`,
-				data: v,
-				usage: 0x0020 | 0x0008,
-			}), // VERTEX | COPY_DST
-			indices: d.createBuffer({
-				id: `${m.id}-i`,
-				data: m.indices,
-				usage: 0x0010 | 0x0008,
-			}), // INDEX | COPY_DST
-			indexCount: m.indices.length,
-			layerBuf: d.createBuffer({
-				id: `${m.id}-layer`,
-				data: new Float32Array([layer]),
-				usage: 0x0020 | 0x0008,
-			}),
-			sphere: [
-				(lo[0] + hi[0]) / 2,
-				(lo[1] + hi[1]) / 2,
-				(lo[2] + hi[2]) / 2,
-				Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2,
-			],
-			layer,
-		};
-	}
-
-	private model(kind: "geometry" | "color") {
-		const key = kind === "geometry" ? kind : `color|${this.partsKey()}`;
-		return this.models.get(key, () => {
-			const geometry = kind === "geometry";
-			const parts = geometry
-				? []
-				: [...(this.shading ? [this.shading] : []), ...this.plugins];
-			const source = terrainSource(
-				TILE_VERTEX_WGSL,
-				geometry ? null : this.shading,
-				geometry ? [] : this.plugins,
-			);
-			const modules = terrainModules(parts);
-			const defines = terrainDefines(kind, parts);
-			return new Model(this.device, {
-				id: `${this.id}-${kind}`,
-				source,
-				modules: modules as never,
-				defines,
-				...passModelProps(kind),
-				topology: "triangle-list",
-				bufferLayout: [
-					{
-						name: "tile",
-						byteStride: STRIDE * 4,
-						attributes: [
-							{ attribute: "positions", format: "float32x3", byteOffset: 0 },
-							{ attribute: "normals", format: "float32x3", byteOffset: 12 },
-							{ attribute: "texCoords", format: "float32x2", byteOffset: 24 },
-							{ attribute: "elev", format: "float32", byteOffset: 32 },
-						],
-					},
-					{ name: "layer", format: "float32", stepMode: "instance" },
-				],
-				isInstanced: true,
-				instanceCount: 1,
-			} as never);
-		});
-	}
-
-	draw(ctx: PassContext) {
-		if (ctx.kind === "screen" || !this.tiles.size) return;
-		const kind = ctx.kind;
-		const model = this.model(kind);
-		const L = this.look;
-		model.shaderInputs.setProps({
-			camera: ctx.camera,
-			fog: L.fog,
-			terrain: {
-				reliefC0: L.relief.c0,
-				reliefC1: L.relief.c1,
-				reliefDE: L.relief.de,
-				elevRange: L.elevRange,
-				rampN: L.relief.n,
-				style: L.style === "imagery" && this.imagery ? 1 : 0,
-				nearDiscard: kind === "geometry" ? L.nearDiscard : 0,
-				pad0: 0,
-				pad1: 0,
-				pad2: 0,
-			},
-		} as never);
-		if (kind === "color") {
-			const bindings: Record<string, unknown> = {
-				imagery: this.imagery?.texture ?? this.emptyArray(),
-				imagerySmall: this.imagery?.textureSmall ?? this.emptyArray(),
-			};
-			const uniforms: Record<string, unknown> = {};
-			for (const p of [
-				...(this.shading ? [this.shading] : []),
-				...this.plugins,
-			]) {
-				const r = p.props?.(ctx);
-				Object.assign(uniforms, r?.uniforms);
-				Object.assign(bindings, r?.bindings);
-			}
-			if (Object.keys(uniforms).length)
-				model.shaderInputs.setProps(uniforms as never);
-			model.setBindings(bindings as never);
-		}
-		let drawn = 0;
-		let tris = 0;
-		for (const t of this.tiles.values()) {
-			if (!sphereInView(ctx.camera, t.sphere)) continue;
-			model.setAttributes({ tile: t.vertices, layer: t.layerBuf });
-			model.setIndexBuffer(t.indices);
-			model.setIndexCount(t.indexCount);
-			model.draw(ctx.renderPass);
-			drawn++;
-			tris += t.indexCount / 3;
-		}
-		this.stats.drawn[kind] = drawn;
-		if (kind === "color") this.stats.triangles = tris;
-	}
-
-	private empty?: ReturnType<Device["createTexture"]>;
-	private emptyArray() {
-		this.empty ??= this.device.createTexture({
-			id: "terrain-empty-array",
-			dimension: "2d-array",
-			format: "rgba8unorm-srgb",
-			width: 1,
-			height: 1,
-			depth: 1,
-		});
-		return this.empty;
-	}
-
-	destroy() {
-		for (const t of this.tiles.values()) {
-			t.vertices.destroy();
-			t.indices.destroy();
-			t.layerBuf.destroy();
-		}
-		this.tiles.clear();
-		this.models.destroy();
-		this.empty?.destroy();
-	}
 }

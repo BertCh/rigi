@@ -4,7 +4,7 @@
 
 // Terroir terrain shading (reports/terroir-cartography.md T0.2, T0.3, phase 1 "three-colour contours"
 // + "replace alpineAlbedo's constants with a class lookup", T2.1/T2.5/T2.6 in part). One GLSL source
-// for both engines (deck terrain-layer.ts, three materials.ts), spliced into the terrain fragment
+// for the deck terrain fragment shader (terrain-layer.ts), spliced into the terrain fragment
 // shader ONLY while a TERROIR_* define is on: with every style.terroir switch off the programs are
 // the classic ones, byte for byte (scripts/terroir/shader-identity-snap.ts).
 //
@@ -24,7 +24,7 @@ import { HATCH_GLSL, HATCH_INK } from "../hatch";
 import { HATCH_LK_GLSL } from "../hatch-lk";
 import { PATTERN_GLSL, PATTERN_KERNEL_GLSL } from "../pattern";
 
-/** Values: ./values.ts terroirBlockValues(). Accessors `ter_<field>`, three uniforms `uTer<Field>`. */
+/** Values: ./values.ts terroirBlockValues(). Accessors `ter_<field>`. */
 export const TER_BLOCK = defineBlock("ter", "terroir", {
 	/** ENU (x, y) → cover texture u / v: dot(uv?, vec4(1, x, y, x·y)) + dot(uvQ.xy / .zw, (x², y²)) */
 	uvU: "vec4",
@@ -305,23 +305,20 @@ function fnsFor(pattern: boolean, hatch = false, hatchLk = false): string {
 	return out;
 }
 
-/** Anchors both terrain fragment shaders share (deck terrain-layer.ts, three materials.ts). */
+/** Anchors in the terrain fragment shader (deck terrain-layer.ts). */
 const ANCHOR_ALPINE_DEF = "vec3 alpineAlbedo(float elev, vec3 n, vec2 xy) {";
 const ANCHOR_HYPSO_DEF = "vec3 hypso(float h) {";
 /** the contour line ramp, right after the ALBEDO block: the terroir functions go before it */
 const ANCHOR_LINE_RAMP = '// "topology" ramp for contour lines';
 
-type Engine = "deck" | "three";
-
-/** Per engine: [anchor, code, inserted before / after the anchor]. */
-function injections(engine: Engine, defines: readonly string[]) {
+/** [anchor, code, inserted before / after the anchor] */
+function injections(defines: readonly string[]) {
 	const has = (d: string) => defines.includes(d);
 	const contours =
 		has("TERROIR_CONTOUR_ADAPTIVE") || has("TERROIR_CONTOUR_INK");
 	const cover = has("TERROIR_COVER");
 	const albedo = cover || has("TERROIR_SNOW") || has("TERROIR_HATCH");
 	const out: [string, string, "before" | "after"][] = [];
-	const deck = engine === "deck";
 	if (albedo)
 		out.push(
 			[ANCHOR_ALPINE_DEF, RENAME_ALPINE, "before"],
@@ -329,9 +326,7 @@ function injections(engine: Engine, defines: readonly string[]) {
 		);
 	out.push([
 		ANCHOR_LINE_RAMP,
-		(deck
-			? "#define TER_SUN terrain.sunDir.xyz\n"
-			: `#define TER_SUN uSunDir\nuniform sampler2D terroirCover;\n${TER_BLOCK.threeDecl}`) +
+		"#define TER_SUN terrain.sunDir.xyz\n" +
 			fnsFor(
 				has("TERROIR_PATTERN"),
 				has("TERROIR_HATCH"),
@@ -342,11 +337,9 @@ function injections(engine: Engine, defines: readonly string[]) {
 		"before",
 	]);
 	if (contours)
-		out.push(
-			deck
-				? [
-						"    float a = max(minorA * terrain.minorAlpha, majorA * terrain.majorAlpha) * mix(terrain.fadeFloor, 1.0, fade) * near;\n",
-						`#ifndef LOOK_TANAKA
+		out.push([
+			"    float a = max(minorA * terrain.minorAlpha, majorA * terrain.majorAlpha) * mix(terrain.fadeFloor, 1.0, fade) * near;\n",
+			`#ifndef LOOK_TANAKA
     if (style == 2) {
       vec4 terC = terContour(vElev, range, vWorld.xy, terrain.contourInterval, terrain.contourMajorEvery, terrain.contourWidth, terrain.contourMajorMul, terrain.densityFade, terrain.minorAlpha, terrain.majorAlpha, mix(terrain.fadeFloor, 1.0, fade) * near, terrain.contourSolid > 0.5, toLinear(terrain.contourMinorCol.rgb), toLinear(terrain.contourMajorCol.rgb), lineRamp(elevT(vElev)), terrain.casing, terrain.casingCol.rgb);
       fragColor = vec4(outColor(terC.rgb), terC.a * terrain.contourOpacity);
@@ -354,21 +347,8 @@ function injections(engine: Engine, defines: readonly string[]) {
     }
 #endif
 `,
-						"after",
-					]
-				: [
-						"    float a = max(minorA * uMinorAlpha, majorA * uMajorAlpha) * mix(uFadeFloor, 1.0, fade) * near;\n",
-						`#ifndef LOOK_TANAKA
-    if (uStyle == 2) {
-      vec4 terC = terContour(vElev, range, vWorld.xy, uContourInterval, uContourMajorEvery, uContourWidth, uContourMajorMul, uDensityFade, uMinorAlpha, uMajorAlpha, mix(uFadeFloor, 1.0, fade) * near, uContourSolid > 0.5, toLinear(uContourMinorCol), toLinear(uContourMajorCol), lineRamp(t), uCasing, uCasingCol);
-      gl_FragColor = vec4(terC.rgb, terC.a * uContourOpacity);
-      return;
-    }
-#endif
-`,
-						"after",
-					],
-		);
+			"after",
+		]);
 	if (cover) {
 		const shaded = (
 			styleExpr: string,
@@ -382,19 +362,11 @@ function injections(engine: Engine, defines: readonly string[]) {
     base = mix(base, terCv, terSteep(n, vWorld.xy));
   }
 `;
-		out.push(
-			deck
-				? [
-						"      base = mix(base, terrain.imgTint.rgb * (dot(base, vec3(0.2126, 0.7152, 0.0722)) / tl), terrain.imgTint.a);\n    }\n  }\n",
-						shaded("style", "terrain.hasMap"),
-						"after",
-					]
-				: [
-						"    base = ALBEDO(n) * shade(n);\n#endif\n  }\n",
-						shaded("uStyle", "hasMap"),
-						"after",
-					],
-		);
+		out.push([
+			"      base = mix(base, terrain.imgTint.rgb * (dot(base, vec3(0.2126, 0.7152, 0.0722)) / tl), terrain.imgTint.a);\n    }\n  }\n",
+			shaded("style", "terrain.hasMap"),
+			"after",
+		]);
 	}
 	return out;
 }
@@ -406,18 +378,17 @@ export const isTerroirDefine = (d: string) => d.startsWith("TERROIR_");
  * `src` itself when there is none. Throws if an anchor is missing (the terrain shader changed).
  */
 export function terroirTerrainFs(
-	engine: Engine,
 	src: string,
 	defines: readonly string[],
 ): string {
 	const d = defines.filter(isTerroirDefine);
 	if (!d.length) return src;
 	let out = src;
-	for (const [anchor, code, where] of injections(engine, d)) {
+	for (const [anchor, code, where] of injections(d)) {
 		const i = out.indexOf(anchor);
 		if (i < 0 || out.indexOf(anchor, i + 1) >= 0)
 			throw new Error(
-				`terroir: ${engine} terrain shader anchor missing or ambiguous: ${JSON.stringify(anchor.slice(0, 60))}`,
+				`terroir: terrain shader anchor missing or ambiguous: ${JSON.stringify(anchor.slice(0, 60))}`,
 			);
 		const at = where === "before" ? i : i + anchor.length;
 		out = out.slice(0, at) + code + out.slice(at);

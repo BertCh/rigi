@@ -7,11 +7,6 @@
 		"privateMember": 1,
 		"why": "dev tool debug hook (audit-gpu A11)"
 	},
-	"src/lib/deck-webgpu/spike.ts": {
-		"rawWebGpu": 1,
-		"handle": 6,
-		"why": "dev spike, raw WebGPU on purpose"
-	},
 	"src/lib/deck/composite.ts": {
 		"handle": 2,
 		"rawGl": 75,

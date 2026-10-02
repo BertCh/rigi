@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // In-browser isolation check for layers/terrain-styles.ts (no lab, no region data). Draws a
-// synthetic DEM tile (a smooth massif, 1000–3100 m, slopes 0–60°) through the real TerrainCore
+// synthetic DEM tile (a smooth massif, 1000–3100 m, slopes 0–60°) through the batched terrain
 // geometry + MSAA colour passes (hosts/passes.ts) with every style program, reads back the
 // resolved colour and the geometry targets, and checks against a CPU port of the WebGL shader:
 //   compile     every style × LOOK feature program builds with no WebGPU validation error
@@ -19,7 +19,7 @@
 //   await page.evaluate(async () => (await import("/src/lib/deck-webgpu/layers/terrain-styles.check.ts")).runTerrainStylesCheck())
 import { type Device, luma, type Texture } from "@luma.gl/core";
 import { webgpuAdapter } from "@luma.gl/webgpu";
-import type { TileMesh } from "#/lib/deck/terrain-data";
+import { createSyntheticTile } from "#/lib/deck/synthetic-tile";
 import { atmosphereValues } from "#/lib/look/atmosphere";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
@@ -32,7 +32,7 @@ import { runColorPass, runGeometryPass } from "../hosts/passes";
 import { ImageryArray } from "../imagery";
 import { TextureReader } from "../readback";
 import { ColorTargets, GeometryTargets } from "../targets";
-import { TerrainCore } from "../terrain";
+import { createBatchedTerrain } from "./batched-terrain";
 import {
 	type TerrainStyleFeatures,
 	type TerrainStyleName,
@@ -41,60 +41,10 @@ import {
 
 // ---- synthetic DEM tile -------------------------------------------------------------------------
 
-const N = 160; // vertices per side
-const X0 = -3000;
-const X1 = 3000;
-const Y0 = 300;
-const Y1 = 6300;
 const height = (x: number, y: number) =>
 	1000 +
 	2100 * Math.exp(-((x - 300) ** 2 + (y - 3800) ** 2) / (2 * 900 ** 2)) +
 	120 * Math.sin(x / 700) * Math.cos(y / 900);
-
-function syntheticTile(): TileMesh {
-	const positions = new Float32Array(N * N * 3);
-	const normals = new Float32Array(N * N * 3);
-	const texCoords = new Float32Array(N * N * 2);
-	const elev = new Float32Array(N * N);
-	const h = 1;
-	for (let j = 0; j < N; j++)
-		for (let i = 0; i < N; i++) {
-			const k = j * N + i;
-			const x = X0 + ((X1 - X0) * i) / (N - 1);
-			const y = Y1 - ((Y1 - Y0) * j) / (N - 1); // row 0 = north, as buildMesh
-			const z = height(x, y);
-			const dx = (height(x + h, y) - height(x - h, y)) / (2 * h);
-			const dy = (height(x, y + h) - height(x, y - h)) / (2 * h);
-			const l = Math.hypot(dx, dy, 1);
-			positions.set([x, y, z], k * 3);
-			normals.set([-dx / l, -dy / l, 1 / l], k * 3);
-			texCoords.set([i / (N - 1), j / (N - 1)], k * 2);
-			elev[k] = z;
-		}
-	const indices = new Uint32Array((N - 1) * (N - 1) * 6);
-	let o = 0;
-	for (let j = 0; j < N - 1; j++)
-		for (let i = 0; i < N - 1; i++) {
-			const a = j * N + i;
-			indices.set([a, a + N, a + 1, a + 1, a + N, a + N + 1], o);
-			o += 6;
-		}
-	return {
-		id: "synthetic",
-		key: { x: 0, y: 0, z: 12 } as never,
-		distance: 0,
-		size: N,
-		heights: new Float32Array(0),
-		sourceZ: 12,
-		focus: true,
-		seg: N - 1,
-		positions,
-		normals,
-		texCoords,
-		elev,
-		indices,
-	};
-}
 
 // ---- CPU port of the classic shading (reference) ------------------------------------------------
 
@@ -211,6 +161,8 @@ export async function runTerrainStylesCheck(
 	const geometry = new GeometryTargets(device, W, H, "ts-check-geometry");
 	const reader = new TextureReader(device);
 
+	const { tile } = createSyntheticTile(height, { southEdgeM: 0 });
+
 	// imagery: one constant sRGB tile (rgb 150, 110, 70)
 	const IMG = [150, 110, 70];
 	const imagery = new ImageryArray(device);
@@ -220,11 +172,10 @@ export async function runTerrainStylesCheck(
 	const landed = new Promise<void>((r) => {
 		imagery.onChange = () => r();
 	});
-	imagery.sync(new Map([["synthetic", bmp]]), ["synthetic"]);
+	imagery.sync(new Map([[tile.id, bmp]]), [tile.id]);
 	await Promise.race([landed, new Promise((r) => setTimeout(r, 3000))]);
 
-	const tile = syntheticTile();
-	const terrain = new TerrainCore(device, imagery, "ts-check-terrain");
+	const terrain = createBatchedTerrain(device, imagery, "ts-check-terrain");
 	terrain.setTiles([tile]);
 	terrain.syncImageryLayers();
 	const styles = new TerrainStyles(device);

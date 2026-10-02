@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RAISED_LIMITS } from "#/lib/gpu/core/device";
 import {
 	assertRequiredFeatures,
-	deckBuild,
 	IMPLICIT_MAX_FEATURES,
 	OPTIONAL_FEATURES,
 	REQUIRED_FEATURES,
@@ -136,11 +135,5 @@ describe("feature tables", () => {
 		expect(new Set(IMPLICIT_MAX_FEATURES).size).toBe(
 			IMPLICIT_MAX_FEATURES.length,
 		);
-	});
-});
-
-describe("deckBuild", () => {
-	it("is a build tag (the vitest resolution carries the full build's WGSL source or none)", () => {
-		expect(["full", "webgl-only"]).toContain(deckBuild());
 	});
 });

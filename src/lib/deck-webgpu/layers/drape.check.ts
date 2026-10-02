@@ -16,12 +16,8 @@
 import { WGSLShaderAssembler } from "@luma.gl/shadertools";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { cameraUniforms, photoCamera, projectToPixel } from "../camera";
-import {
-	TILE_VERTEX_WGSL,
-	terrainDefines,
-	terrainModules,
-	terrainSource,
-} from "../terrain";
+import { terrainDefines, terrainModules, terrainSource } from "../terrain";
+import { BATCHED_VERTEX_WGSL } from "./batched-terrain";
 import { DrapePart, drapeSlack, drapeVisibilityCpu } from "./drape";
 
 // ---- 1. assembly + layout ----
@@ -53,7 +49,7 @@ for (const harmonize of [false, true]) {
 			gpu: "apple",
 			features: new Set(),
 		},
-		source: terrainSource(TILE_VERTEX_WGSL, null, [part]),
+		source: terrainSource(BATCHED_VERTEX_WGSL, null, [part]),
 		modules: terrainModules([part]),
 		defines: terrainDefines("color", [part]),
 	});

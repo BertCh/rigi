@@ -9,13 +9,13 @@
 // How it works:
 // - Each source owns a private GeometryTargets of its size, so an off-frame render never touches
 //   the host's per-frame targets.
-// - render(pose) runs hosts/passes.ts runGeometryPass with the terrain cores (TerrainCore /
-//   BatchedTerrainCore; no trails, splats or tiles3d) through the photo camera, then
+// - render(pose) runs hosts/passes.ts runGeometryPass with the terrain core
+//   (BatchedTerrainCore; no trails, splats or tiles3d) through the photo camera, then
 //   device.submit().
 // - The readback is TextureReader: a copy into a MAP_READ staging buffer, then mapAsync. The
 //   mapAsync resolving IS the "GPU done" signal, so the WebGL path's fence / quiet-queue polling
 //   (gpuDone, glFence, readbackQuiet) has no equivalent here: mapAsync never stalls the thread.
-// - Frustum culling happens inside the cores (TerrainCore uses camera.sphereInView).
+// - Frustum culling happens inside the cores (BatchedTerrainCore).
 //
 // Buffer layout: the GeometrySource contract (deck/geometry-source.ts) is already TOP-first. The
 // WebGL implementation flips GL's bottom-first readPixels rows in unpack(). WebGPU rows are
@@ -35,7 +35,7 @@
 // sources get it: the factory passes it to sources wider than `xyzMinWidth` (512 px), so the
 // 384 px silhouette re-rank sources and any other source ≤ 512 px wide get no fusion.
 //
-// Uniform safety: TerrainCore keeps ONE geometry Model. The luma WebGPU uniform writes go through
+// Uniform safety: BatchedTerrainCore keeps ONE geometry Model per kind. The luma WebGPU uniform writes go through
 // queue.writeBuffer at draw time. This render encodes and submits its own command buffer before
 // returning, so the frame's geometry pass (encoded later, submitted later) cannot see our photo
 // camera, and we cannot see its. Never call render() from inside a host's pass callback: the

@@ -40,7 +40,7 @@ import {
 	terrainShaders,
 	terroirFs,
 } from "./terrain-layer";
-import { terrainDrawStats } from "./terrain-mode";
+import { terrainDrawStats } from "./terrain-stats";
 
 // the shared fragment shader, sampling the imagery from its texture array layer. Built lazily:
 // terrain-layer.ts imports this module, so its `fs` is not initialised yet at our module load.

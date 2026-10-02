@@ -5,18 +5,15 @@
 // WebGpuEngine: the Renderer surface (src/lib/renderer.ts) on WebGPU, the port of the WebGL
 // DeckEngine (deck/engine.ts). Same inputs, same queries, same look; the frame is drawn by the
 // host-agnostic WGSL cores of this directory (README.md "Layer contract") on a host:
-//   DeckHost    deck.gl 9.4 on a WebGPU device (views, lifecycle, the frame loop); needs deck's
-//               full build (scripts/deck-webgpu/vite.webgpu.config.ts until vite.config.ts drops
-//               the `visgl:webgl-only` condition)
-//   DirectHost  plain luma on WebGPU, no deck (the fallback, and the A/B reference)
+//   DeckHost    deck.gl 9.4 on a WebGPU device (views, lifecycle, the frame loop)
+//   DirectHost  plain luma on WebGPU, no deck (the fallback when the deck host fails to boot)
 //
 // Frame (hosts/passes.ts): geometry pass (photo camera → GeometryTargets) → 4× MSAA colour pass
 // (the view camera: the photo camera, or the world orbit camera) → screen pass (the photo
 // compositor in the photo view; a plain present in the world view). One submit.
 //
 // What maps to what (deck/engine.ts → here):
-//   TerrainLayer / batched layer + styles   BatchedTerrainCore (terrain=batched, the default) or
-//                                           TerrainCore (terrain=tiles), shaded by TerrainStyles
+//   TerrainLayer / batched layer + styles   BatchedTerrainCore, shaded by TerrainStyles
 //                                           (layers/terrain-styles.ts) + the drape plugin
 //                                           (layers/drape.ts, world view only)
 //   TrailLayer                              TrailCore (colour pass, both views)
@@ -100,7 +97,6 @@ import {
 	type TileMesh,
 	type ViewWedge,
 } from "#/lib/deck/terrain-data";
-import { terrainBuild, terrainMode } from "#/lib/deck/terrain-mode";
 import { TerrainStreamer } from "#/lib/deck/terrain-stream";
 import {
 	buildTrailSegments,
@@ -218,7 +214,7 @@ import {
 	worldCamera,
 } from "./camera";
 import { createLookBridge, type LookBridge } from "./compute-bridge";
-import { deckBuild, releaseForCompute, webgpuAvailable } from "./device";
+import { releaseForCompute, webgpuAvailable } from "./device";
 import { type FrameTimingsListener, getFrameTimings } from "./frame-timings";
 import { GeoQueryGpu } from "./geo-query-gpu";
 import { HeightGather, replayHeights } from "./height-gather";
@@ -274,7 +270,6 @@ import { PresentCore, type PresentMode } from "./present";
 import { readTextureBytes } from "./readback";
 import { SilhouetteMaskGpu } from "./silhouette-gpu";
 import { ColorTargets, GeometryTargets, geometrySize, USAGE } from "./targets";
-import { TerrainCore } from "./terrain";
 import { gpuDecodeTileLoader } from "./terrain-gpu-decode";
 import { imageTexture } from "./textures";
 
@@ -395,7 +390,7 @@ type Gpu = {
 	host: Host;
 	device: Device;
 	imagery: ImageryArray;
-	terrain: TerrainCore | BatchedTerrainCore;
+	terrain: BatchedTerrainCore;
 	styles: TerrainStyles;
 	drape: DrapePart;
 	trails: TrailCore;
@@ -423,33 +418,8 @@ type Gpu = {
 export type WebGpuEngineOptions = {
 	/** Upper bound on the canvas' device pixel ratio (default 2). The landing's Step Inside passes 1.5. */
 	pixelRatioCap?: number;
-	/** Force a host (default: deck when deck's full build is bundled, else direct). */
+	/** Force a host (default: deck, falling back to direct when it fails to boot). */
 	host?: "deck" | "direct";
-	/** The terrain path (default: the ?terrain flag, deck/terrain-mode.ts). */
-	terrain?: "batched" | "tiles";
-	/** Look passes straight on the render targets (compute-bridge.ts) where the gate allows
-	 * (default true); false = the geometry / colour readback path. See setLookBridge. */
-	lookBridge?: boolean;
-	/** With the bridge on: the fitted haze on the geometry target too (default true; false = the
-	 * haze fit keeps the range readback path while masks / stats stay bridged). See setHazeBridge. */
-	hazeBridge?: boolean;
-	/** With the bridge on: the relief field's height raster gathered in WGSL from the batched
-	 * terrain's resident DEM tiles ("gpu", default; falls back per build to the CPU raster when a
-	 * tile is not resident) or always rasterised on the CPU ("cpu"). */
-	reliefHeights?: "gpu" | "cpu";
-	/** autoAlign's silhouette re-rank scored by a WGSL mask kernel on the geometry targets
-	 * (default true; deck/silhouette-mask.ts: identical scores by construction, 18 KB read per
-	 * pose instead of the rgba32float range). false = the CPU scorer, which also runs per pose
-	 * whenever the GPU can't decide. Harnesses flip `silhouetteGpu` for the A/B. */
-	silhouetteGpu?: boolean;
-	/** The 1024 px query geometry is NOT read back in full on every settle (default true): peak-label
-	 * occlusion verdicts and the skyline come from compute passes over the geometry target
-	 * (geo-query-gpu.ts, deck/geo-query.ts: identical results by construction, a few hundred bytes
-	 * read), point queries gather single texels, and the full rgba32float copy is read lazily only
-	 * for the consumers that need it (readback(), the CPU look fallbacks, a fitted haze, Step
-	 * Inside). false = the full readback on every settle, which is also what any failing kernel
-	 * switches to. Harnesses flip it for the A/B. */
-	geometryDiet?: boolean;
 	/** With the bridge on: fewer submits per settle (WAG W1.2, default true). The refined masks are
 	 * recorded on their own encoder and submitted with the query geometry render (one
 	 * queue.submit), then adopted when their inputs still match; the band stats share their layer
@@ -562,7 +532,7 @@ export class WebGpuEngine implements Renderer {
 		ms: number;
 		searchMs: number;
 		scoreMs?: number;
-		/** "gpu" = mask kernel (silhouetteGpu), "cpu" = range readback + CPU scorer */
+		/** "gpu" = mask kernel, "cpu" = range readback + CPU scorer */
 		path?: "gpu" | "cpu";
 		/** bytes read back from the GPU for the whole re-rank */
 		bytes?: number;
@@ -571,10 +541,8 @@ export class WebGpuEngine implements Renderer {
 		/** finalists whose render came back blank and were drawn again (redrawIfBlank) */
 		redraws?: number;
 	} | null = null;
-	/** WebGpuEngineOptions.silhouetteGpu (harnesses flip it for the A/B). */
-	silhouetteGpu = true;
 	private silMask: SilhouetteMaskGpu | null = null;
-	/** geometry diet (see WebGpuEngineOptions.geometryDiet) */
+	/** geometry diet kernels (geo-query-gpu.ts); null until first use */
 	private geoQuery: GeoQueryGpu | null = null;
 	/**
 	 * WAG W2.4: the CPU height readers (camera DEM height, trails, peak snapping) gather lazy tiles'
@@ -736,7 +704,6 @@ export class WebGpuEngine implements Renderer {
 		opts: WebGpuEngineOptions = {},
 	) {
 		this.opts = opts;
-		this.silhouetteGpu = opts.silhouetteGpu ?? true;
 		this.photo = photo;
 		this.aspect = photo.width / photo.height;
 		this.prior = {
@@ -857,10 +824,7 @@ export class WebGpuEngine implements Renderer {
 		const avail = await webgpuAvailable();
 		if (!avail.ok) throw new Error(`WebGPU unavailable: ${avail.reason}`);
 		const pose = this.photoPose();
-		const wantDeck = this.opts.host
-			? this.opts.host === "deck"
-			: deckBuild() === "full";
-		if (wantDeck)
+		if (this.opts.host !== "direct")
 			try {
 				return await (await import("./hosts/deck")).DeckHost.create(
 					this.canvas,
@@ -896,12 +860,7 @@ export class WebGpuEngine implements Renderer {
 			host.setPhotoAspect(this.aspect);
 			const device = host.device;
 			const imagery = made(new ImageryArray(device));
-			const batched = (this.opts.terrain ?? terrainMode()) === "batched";
-			const terrain = made(
-				batched
-					? createBatchedTerrain(device, imagery)
-					: new TerrainCore(device, imagery),
-			);
+			const terrain = made(createBatchedTerrain(device, imagery));
 			const styles = made(createTerrainStyles(device));
 			const drape = made(createDrape(device));
 			const trails = made(createTrailCore(device));
@@ -978,7 +937,7 @@ export class WebGpuEngine implements Renderer {
 			this.host = host;
 			this.gpu = gpu;
 			this.applyState();
-			if (this.opts.lookBridge !== false) void this.attachBridge(gpu);
+			void this.attachBridge(gpu);
 		} catch (e) {
 			if (this.host === host) this.host = null;
 			this.gpu = null;
@@ -1004,8 +963,7 @@ export class WebGpuEngine implements Renderer {
 	private async attachBridge(gpu: Gpu) {
 		const b = await createLookBridge(gpu.device);
 		if (!b) return;
-		if (this.gpu !== gpu || this.disposed || this.opts.lookBridge === false)
-			return b.destroy();
+		if (this.gpu !== gpu || this.disposed) return b.destroy();
 		b.fusionOn = () => this.opts.settleFusion !== false;
 		b.onAsync = () => {
 			if (this.disposed) return;
@@ -1013,8 +971,7 @@ export class WebGpuEngine implements Renderer {
 			if (this.world?.controls) this.sync();
 		};
 		const terrain = gpu.terrain;
-		if (this.opts.reliefHeights !== "cpu" && "residentHeights" in terrain)
-			b.heightSource = () => terrain.residentHeights();
+		b.heightSource = () => terrain.residentHeights();
 		gpu.bridge = b;
 		this.compLook.setSky(this.skyMaskStore);
 		this.refitHaze();
@@ -1025,31 +982,6 @@ export class WebGpuEngine implements Renderer {
 	/** The compute bridge (harnesses), or null on the readback path. */
 	get lookBridge(): LookBridge | null {
 		return this.gpu?.bridge ?? null;
-	}
-
-	/** Switch the look passes between the compute bridge (when gated in) and the readback path. */
-	async setLookBridge(on: boolean) {
-		this.opts = { ...this.opts, lookBridge: on };
-		const g = this.gpu;
-		if (!g) return;
-		g.bridge?.destroy();
-		g.bridge = null;
-		g.composite.setMaskTexture(null);
-		// both paths recompute from scratch (CompositeLook caches its inputs and stats key)
-		this.compLook.setSky(this.skyMaskStore);
-		this.layerGen++;
-		if (on) await this.attachBridge(g);
-		else {
-			this.refitHaze();
-			this.updateLook();
-			this.scheduleStats();
-		}
-	}
-
-	/** Switch the haze fit between the bridge (when it is on) and the range readback path. */
-	setHazeBridge(on: boolean) {
-		this.opts = { ...this.opts, hazeBridge: on };
-		this.refitHaze();
 	}
 
 	/** Drop the haze fit's key (and any fit in flight) and fit again on the current path. */
@@ -1447,18 +1379,13 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	/**
-	 * The stream's tile loader (batched terrain, ?gpu=on): GPU Terrarium
+	 * The stream's tile loader (?gpu=on): GPU Terrarium
 	 * decode straight into a height-atlas layer the tile keeps, CPU heights on demand
 	 * (terrain-gpu-decode.ts); undefined = the
 	 * default CPU decode.
 	 */
 	private gpuDecodeLoader() {
-		if (
-			!gpuEnabled() ||
-			(this.opts.terrain ?? terrainMode()) !== "batched" ||
-			terrainBuild().mesh
-		)
-			return undefined;
+		if (!gpuEnabled()) return undefined;
 		this.gpuDecodeOn = true;
 		return gpuDecodeTileLoader(
 			async () => {
@@ -1467,8 +1394,7 @@ export class WebGpuEngine implements Renderer {
 			},
 			// the batched terrain's height arrays: each tile decodes into a layer it keeps
 			() => {
-				const t = this.gpu?.terrain;
-				return t && "heightAtlases" in t ? t.heightAtlases() : null;
+				return this.gpu?.terrain.heightAtlases() ?? null;
 			},
 		);
 	}
@@ -1557,8 +1483,7 @@ export class WebGpuEngine implements Renderer {
 	 */
 	private heights(): HeightGather | null {
 		const g = this.gpu;
-		if (!this.gpuDecodeOn || !g || !("residentHeights" in g.terrain))
-			return null;
+		if (!this.gpuDecodeOn || !g) return null;
 		// one per (device, terrain core): the gather reads that core's atlas
 		if (
 			this.heightGather?.device !== g.device ||
@@ -2250,7 +2175,6 @@ export class WebGpuEngine implements Renderer {
 		const bridged =
 			bridge &&
 			img &&
-			this.opts.hazeBridge !== false &&
 			src instanceof WebGpuGeometrySource &&
 			src.renderSeq === seq
 				? (h: Parameters<BridgedHazeFit>[0]) =>
@@ -2859,9 +2783,9 @@ export class WebGpuEngine implements Renderer {
 	// ---------------------------------------------------------------------------------------------
 	// geometry diet (geo-query-gpu.ts, deck/geo-query.ts)
 
-	/** The diet is on: option, no kernel failed so far, a render device. */
+	/** The diet is on: no kernel failed so far, a render device. */
 	private dietOn() {
-		return this.opts.geometryDiet !== false && !this.dietBroken && !!this.gpu;
+		return !this.dietBroken && !!this.gpu;
 	}
 
 	/** A diet kernel failed (or the device went): every render reads back in full from now on. */
@@ -3415,9 +3339,11 @@ export class WebGpuEngine implements Renderer {
 		const t0 = performance.now();
 		await this.ready;
 		const srcs = alts.map((_, i) => this.silhouetteSource(i));
-		let sil: SilScores | null = this.silhouetteGpu
-			? await this.silhouetteScoresGpu(alts, srcs, edge)
-			: null;
+		let sil: SilScores | null = await this.silhouetteScoresGpu(
+			alts,
+			srcs,
+			edge,
+		);
 		if (this.disposed) return null;
 		if (!sil) {
 			await Promise.all(alts.map((a, i) => srcs[i]?.render(a.pose)));
@@ -4808,8 +4734,6 @@ export type { HostStats };
  *    readback, sampleAt, peakLabels, autoAlign, paint, exportImage, setNearField, …). The canvas
  *    must be fresh (no WebGL context on it). Tools that poke WebGL deck internals
  *    (deckInstance.layerManager, compositor) must check `engine.backend === "webgpu"`.
- *    The deck host needs deck's full build: vite.config.ts without the `visgl:webgl-only`
- *    condition; until then the engine falls back to the direct host automatically.
  *
  * 2. Lab route: /lab/deck-webgpu?photo=IMG_7086[&host=deck|direct] is this engine (lab-engine.ts;
  *    toolbar, DOM labels, window.__engine). Isolation check: engine.check.ts runEngineCheck().

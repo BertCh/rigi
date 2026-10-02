@@ -75,13 +75,6 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
-		name: "terrain",
-		label: "Terrain path",
-		help: "Batched: one instanced grid per resolution (default). Per tile: one mesh per tile.",
-		group: "render",
-		options: { batched: "Batched", tiles: "Per tile" },
-	},
-	{
 		name: "tiles3d",
 		label: "Sources",
 		help: "Shown around the eye while stepping inside. Google needs VITE_GOOGLE_TILES_KEY and is display-only.",

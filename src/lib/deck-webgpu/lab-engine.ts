@@ -4,7 +4,7 @@
 
 // /lab/deck-webgpu (default mode): the whole WebGPU renderer through WebGpuEngine (engine.ts), i.e.
 // every ported layer composed the way PhotoWorkspace would see it:
-//   photo view  terrain (batched or per-tile) + terrain styles + trails → the photo compositor
+//   photo view  terrain + terrain styles + trails → the photo compositor
 //               (overlay / replace blends, ridges + skyline from layers/ridges.ts, look defines)
 //               + DOM peak labels (engine.peakLabels(), CPU projection)
 //   world view  orbit camera (three OrbitControls on the canvas) + drape + atmospheric / flat sky
@@ -12,13 +12,12 @@
 // The foundation-only lab (terrain + present) is still there with ?core=1 (lab.ts).
 //
 // Query: ?photo=<id> &host=deck|direct &mode=overlay|replace|world &overlay=contours|bands|slope|none
-//        &map=satellite|topo|hillshade|bands &terrain=batched|tiles &debug=geometry|normal|depth
+//        &map=satellite|topo|hillshade|bands &debug=geometry|normal|depth
 //        &yaw= &pitch= &roll= &vfov= &align=1 &trails=1 &labels=0 &size=<w>x<h> (fixed CSS size)
 // Harness: window.__engine (the Renderer, like the app's DEV handle) and
 //          window.__deckWebgpuLab { ready, engine: true, host, stats(), frame(), setPose(), … }.
 //          document.body gets data-ready once the first geometry readback landed.
 import type { Pose } from "#/lib/camera";
-import { setFlagOverride } from "#/lib/flags";
 import { needsPhotoSky } from "#/lib/look/look-key";
 import { getPhoto, loadRegion, loadSavedPose } from "#/lib/photos";
 import type { PeakLabel, Settings } from "#/lib/renderer";
@@ -31,7 +30,6 @@ export type EngineLabSearch = {
 	mode?: Settings["mode"];
 	overlay?: Settings["overlayStyle"];
 	map?: Settings["mapStyle"];
-	terrain?: "batched" | "tiles";
 	debug?: Exclude<PresentMode, "color">;
 	yaw?: number;
 	pitch?: number;
@@ -129,8 +127,7 @@ export async function startEngineLab(
 	const photo = getPhoto(search.photo ?? "IMG_7086");
 	if (!photo) throw new Error(`unknown photo ${search.photo}`);
 	// everything set up below is undone by cleanup() (in reverse), both by dispose() and when any
-	// step throws (else a failed start would leak the engine / device, the resize listener and the
-	// global terrain flag override)
+	// step throws (else a failed start would leak the engine / device, the resize listener)
 	const cleanups: (() => void)[] = [];
 	let cleaned = false;
 	const cleanup = () => {
@@ -144,10 +141,6 @@ export async function startEngineLab(
 			}
 	};
 	try {
-		if (search.terrain) {
-			setFlagOverride("terrain", search.terrain);
-			cleanups.push(() => setFlagOverride("terrain", undefined));
-		}
 		const t0 = performance.now();
 		const { WebGpuEngine } = await import("./engine");
 		const avail = await WebGpuEngine.available();
@@ -174,7 +167,6 @@ export async function startEngineLab(
 		});
 		const engine = new WebGpuEngine(canvas, photo, {
 			host: search.host,
-			terrain: search.terrain,
 		});
 		window.__engine = engine;
 		cleanups.push(() => {

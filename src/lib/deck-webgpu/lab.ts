@@ -3,10 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // /lab/deck-webgpu: the foundation end to end. Streams the photo's DEM (deck/terrain-stream.ts,
-// full CPU meshes), drapes imagery (deck/terrain-data.ts loadImagery → ImageryArray) and draws the
-// terrain through the photo camera with the WGSL terrain core, then presents colour or a debug
-// view of the geometry targets. Host: deck.gl on WebGPU when deck's full build is bundled
-// (scripts/deck-webgpu/vite.webgpu.config.ts), else the luma-direct host; ?host= forces one.
+// lite meshes), drapes imagery (deck/terrain-data.ts loadImagery → ImageryArray) and draws the
+// terrain through the photo camera with the batched WGSL terrain core, then presents colour or a debug
+// view of the geometry targets. Host: deck.gl on WebGPU, or the luma-direct host (?host=direct).
 import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { eyeAltitude, localElevRange } from "#/lib/deck/scene";
 import {
@@ -15,7 +14,6 @@ import {
 	type TerrainSet,
 } from "#/lib/deck/terrain-data";
 import { TerrainStreamer } from "#/lib/deck/terrain-stream";
-import { setFlagOverride } from "#/lib/flags";
 import { priorHeading } from "#/lib/geocam/priors/heading";
 import { EnuFrame } from "#/lib/geodesy";
 import { getPhoto } from "#/lib/photos";
@@ -27,18 +25,15 @@ import {
 	photoCameraModule,
 	projectToPixel,
 } from "./camera";
-import { deckBuild, webgpuAvailable } from "./device";
+import { webgpuAvailable } from "./device";
 import type { Host } from "./hosts/direct";
 import type { CameraPose } from "./hosts/passes";
 import { ImageryArray } from "./imagery";
+import { createBatchedTerrain } from "./layers/batched-terrain";
 import type { ModelCache } from "./pass";
 import { PresentCore, type PresentMode } from "./present";
 import { rangeOf, TextureReader } from "./readback";
-import {
-	DEFAULT_TERRAIN_LOOK,
-	TerrainCore,
-	type TerrainShaderPart,
-} from "./terrain";
+import { DEFAULT_TERRAIN_LOOK, type TerrainShaderPart } from "./terrain";
 import { fogFromLook } from "./wgsl";
 
 export type LabSearch = {
@@ -123,8 +118,6 @@ export async function startLab(
 	}
 	const photo = getPhoto(search.photo ?? "IMG_7086");
 	if (!photo) throw new Error(`unknown photo ${search.photo}`);
-	// the streamer builds full CPU meshes only on the per-tile path (deck/terrain-mode.ts)
-	setFlagOverride("terrain", "tiles");
 	const t0 = performance.now();
 	const aspect = photo.width / photo.height;
 	let pose: Pose = {
@@ -145,7 +138,7 @@ export async function startLab(
 		};
 	};
 
-	const useDeck = search.host ? search.host === "deck" : deckBuild() === "full";
+	const useDeck = search.host !== "direct";
 	setStatus(`creating ${useDeck ? "deck" : "direct"} host…`);
 	const host: Host = useDeck
 		? await (await import("./hosts/deck")).DeckHost.create(canvas, cam())
@@ -157,7 +150,7 @@ export async function startLab(
 
 	const imagerySrc = search.imagery ?? "satellite";
 	const imagery = imagerySrc === "none" ? null : new ImageryArray(host.device);
-	const terrain = new TerrainCore(host.device, imagery);
+	const terrain = createBatchedTerrain(host.device, imagery);
 	const present = new PresentCore();
 	present.mode = search.view ?? "color";
 	host.cores = [terrain, present];
@@ -256,7 +249,6 @@ export async function startLab(
 		host: host.kind,
 		stats: () => ({
 			host: host.kind,
-			deckBuild: deckBuild(),
 			adapter: avail.adapter,
 			photo: photo.id,
 			pose,
@@ -363,6 +355,5 @@ export async function startLab(
 		imagery?.destroy();
 		host.destroy();
 		for (const b of imgMap.values()) b.close();
-		setFlagOverride("terrain", undefined);
 	};
 }

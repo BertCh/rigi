@@ -7,21 +7,18 @@
 //     (terrain + styles + trails → photo compositor with ridges / skyline, DOM peak labels) and the
 //     world / orbit view (drape, sky, gizmo). Toolbar: view mode, overlay / map style, debug view.
 //     Query: ?photo=<id> &host=deck|direct &mode=overlay|replace|world &overlay=contours|bands|slope|none
-//            &map=satellite|topo|hillshade|bands &terrain=batched|tiles &debug=geometry|normal|depth
+//            &map=satellite|topo|hillshade|bands &debug=geometry|normal|depth
 //            &yaw= &pitch= &roll= &vfov= &align=1 &trails=1 &labels=0 &segment=0 &size=<w>x<h>
 //     Harness: window.__engine (Renderer), window.__deckWebgpuLab, body[data-ready]
 //   ?core=1: the foundation only (src/lib/deck-webgpu/lab.ts): terrain through the photo camera,
 //     &view=color|geometry|normal|depth &plugin=footprint &imagery=satellite|topo|none (smoke.mjs)
-//   ?spike=1: the deck-on-WebGPU feasibility spike (src/lib/deck-webgpu/spike.ts)
-// Needs WebGPU (Chrome/Edge). The deck host and ?spike=1 need deck's full build: serve with
-// scripts/deck-webgpu/vite.webgpu.config.ts (port 3111); elsewhere the direct host is used.
+// Needs WebGPU (Chrome/Edge).
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import type { EngineLab } from "#/lib/deck-webgpu/lab-engine";
 
 type Search = {
 	photo?: string;
-	spike?: boolean;
 	core?: boolean;
 	host?: "deck" | "direct";
 	view?: "color" | "geometry" | "normal" | "depth";
@@ -34,7 +31,6 @@ type Search = {
 	mode?: "overlay" | "replace" | "world";
 	overlay?: "contours" | "bands" | "slope" | "none";
 	map?: "satellite" | "topo" | "hillshade" | "bands";
-	terrain?: "batched" | "tiles";
 	debug?: "geometry" | "normal" | "depth";
 	align?: boolean;
 	trails?: boolean;
@@ -58,7 +54,6 @@ export const Route = createFileRoute("/lab/deck-webgpu")({
 	ssr: false,
 	validateSearch: (s: Record<string, unknown>): Search => ({
 		photo: typeof s.photo === "string" ? s.photo : undefined,
-		spike: flag(s.spike),
 		core: flag(s.core),
 		host: oneOf(s.host, ["deck", "direct"] as const),
 		view: oneOf(s.view, ["color", "geometry", "normal", "depth"] as const),
@@ -71,7 +66,6 @@ export const Route = createFileRoute("/lab/deck-webgpu")({
 		mode: oneOf(s.mode, ["overlay", "replace", "world"] as const),
 		overlay: oneOf(s.overlay, ["contours", "bands", "slope", "none"] as const),
 		map: oneOf(s.map, ["satellite", "topo", "hillshade", "bands"] as const),
-		terrain: oneOf(s.terrain, ["batched", "tiles"] as const),
 		debug: oneOf(s.debug, ["geometry", "normal", "depth"] as const),
 		align: flag(s.align),
 		trails: flag(s.trails),
@@ -105,7 +99,6 @@ function LabDeckWebgpu() {
 	const labelsRef = useRef<HTMLDivElement>(null);
 	const labRef = useRef<EngineLab | null>(null);
 	const [status, setStatus] = useState("starting…");
-	const [report, setReport] = useState<string>("");
 	const [engineUp, setEngineUp] = useState(false);
 	const [mode, setMode] = useState<(typeof MODES)[number]>(
 		search.mode ?? "overlay",
@@ -132,17 +125,6 @@ function LabDeckWebgpu() {
 		chain = chain
 			.then(async () => {
 				if (cancelled) return;
-				if (search.spike) {
-					const { runSpike } = await import("#/lib/deck-webgpu/spike");
-					setStatus("running spike…");
-					const r = await runSpike(canvas);
-					(
-						window as unknown as { __deckWebgpuSpike?: unknown }
-					).__deckWebgpuSpike = r;
-					setReport(JSON.stringify(r, null, 2));
-					setStatus("spike done");
-					return;
-				}
 				if (search.core) {
 					const { startLab } = await import("#/lib/deck-webgpu/lab");
 					if (cancelled) return;
@@ -280,11 +262,6 @@ function LabDeckWebgpu() {
 					data-testid="webgpu-canvas"
 				/>
 				<div ref={labelsRef} data-testid="labels" />
-				{report && (
-					<pre className="absolute top-2 right-2 max-h-[90%] max-w-[50%] overflow-auto bg-black/80 p-2 text-[10px]">
-						{report}
-					</pre>
-				)}
 			</div>
 		</div>
 	);

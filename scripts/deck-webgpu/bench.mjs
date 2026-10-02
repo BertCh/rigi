@@ -12,7 +12,7 @@
 //   - world view orbit: a 2.5 s mouse drag, frames rendered per second and rAF interval stats
 //   - GPU memory (luma statsManager "GPU Time and Memory", same instrument on both)
 //   - screenshots (overlay, replace, world) and exportImage(false) pixel diffs between the two
-// WebGL runs on the same server (default :3111, deck full build; the WebGL path is unaffected).
+// WebGL runs on the same server (default :3100).
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/bench.mjs --photos IMG_7086,IMG_6958,IMG_7018 --out <dir>
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -23,7 +23,7 @@ const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i > 0 ? process.argv[i + 1] : d;
 };
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3111");
+const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3100");
 const IDS = arg("photos", "IMG_7086,IMG_6958,IMG_7018").split(",");
 const OUT = resolve(arg("out", "out/deck-webgpu/bench"));
 const HOST = arg("host", "deck");

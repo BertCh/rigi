@@ -78,7 +78,6 @@ type TerroirShader = import("../../src/lib/terroir/glsl/values").TerroirShader;
 const { screenModelProps, passModelProps } = await import(
 	"../../src/lib/deck-webgpu/pass"
 );
-const { TerrainCore } = await import("../../src/lib/deck-webgpu/terrain");
 const { BatchedTerrainCore } = await import(
 	"../../src/lib/deck-webgpu/layers/batched-terrain"
 );
@@ -330,9 +329,6 @@ function terrainModels(
 ) {
 	const parts = plugins.parts();
 	const out: Built[] = [];
-	const tile = new TerrainCore(device, null);
-	styles.applyTo(tile, parts);
-	out.push((tile as never as { model(k: string): ModelType }).model("color"));
 	const batched = new BatchedTerrainCore(device, null);
 	styles.applyTo(batched, parts);
 	out.push(
@@ -344,7 +340,7 @@ function terrainModels(
 const programKey = (styles: InstanceType<typeof TerrainStyles>) =>
 	styles.key.replace("terrain-styles|", "");
 
-/** Compile one shading program (tile + batched colour pass) plus an optional plugin chain. */
+/** Compile one shading program (batched colour pass) plus an optional plugin chain. */
 async function compileTerrain(
 	label: string,
 	styles: InstanceType<typeof TerrainStyles>,
@@ -529,13 +525,8 @@ async function enumerateTerrain() {
 					p,
 				),
 			);
-	// 5. geometry pass of both cores (style independent)
-	await compileVariant("terrain", "geometry pass (tile)", () => [
-		(
-			new TerrainCore(device, null) as never as { model(k: string): ModelType }
-		).model("geometry"),
-	]);
-	await compileVariant("terrain", "geometry pass (batched)", () => [
+	// 5. geometry pass (style independent)
+	await compileVariant("terrain", "geometry pass", () => [
 		(
 			new BatchedTerrainCore(device, null) as never as {
 				model(k: string): ModelType;

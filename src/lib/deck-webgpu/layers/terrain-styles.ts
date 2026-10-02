@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // WGSL port of the terrain styles (README.md "Ports": layers/terrain-styles.ts). Plugs into
-// TerrainCore (and the batched terrain port) through the TerrainShaderPart seam, without editing it:
+// the batched terrain through the TerrainShaderPart seam, without editing it:
 //
 //   const styles = new TerrainStyles(device, {style: "contours", look, contourInterval: 50});
 //   core.look = styles.terrainLook(elevRange, haze);   // relief ramp, elevRange, fog, nearDiscard
@@ -37,7 +37,7 @@
 //     (the pass camera: the photo camera in the photo view, the orbit camera in the world view).
 //   - nearFade and nearDiscard are per-pass uniforms: nearDiscard (already halved, like
 //     TerrainLook.nearDiscard) discards only in the photo view's colour pass (frame.view "photo");
-//     the geometry pass discard stays in TerrainCore (TerrainLook.nearDiscard).
+//     the geometry pass discard stays in the terrain core (TerrainLook.nearDiscard).
 //   - shade() / haze() are the foundation's fog_shade / fog_apply (fogFromLook(look, haze) carries
 //     the same sun, ambient/direct, haze colour and density); hypso() is the core's (relief ramp +
 //     elevRange from TerrainLook): terrainLook() fills both consistently.
@@ -896,13 +896,13 @@ export class TerrainStyles {
 		return this.build().finish;
 	}
 
-	/** The plugin chain for TerrainCore: `plugins` (drape, truth… only when lit) then finish. */
+	/** The plugin chain for the terrain core: `plugins` (drape, truth… only when lit) then finish. */
 	plugins(plugins: readonly TerrainShaderPart[] = []): TerrainShaderPart[] {
 		const fin = this.finish;
 		return [...(this.lit ? plugins : []), ...(fin ? [fin] : [])];
 	}
 
-	/** core.setShaderParts(shading, plugins(plugins)); TerrainCore rebuilds only on a key change. */
+	/** core.setShaderParts(shading, plugins(plugins)); the core rebuilds only on a key change. */
 	applyTo(
 		core: {
 			setShaderParts(
@@ -916,7 +916,7 @@ export class TerrainStyles {
 	}
 
 	/**
-	 * The TerrainCore look that goes with these props: the relief ramp + elevRange (hypso), the
+	 * The terrain look that goes with these props: the relief ramp + elevRange (hypso), the
 	 * fog (fog_shade / fog_apply = WebGL shade() / haze()) and the geometry-pass nearDiscard.
 	 * `haze`: TerrainUniformProps.haze (null = the look's).
 	 */
