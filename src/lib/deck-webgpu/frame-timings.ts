@@ -170,6 +170,8 @@ export class GpuFrameTimings {
 				(error) => {
 					// unread results may remain queued in the set: do not reuse it
 					this.ring.discard(lease);
+					// a readback still in flight when the host is destroyed rejects: not a failure
+					if (this.destroyed) return;
 					this.disable(
 						`readback failed: ${(error as Error)?.message ?? error}`,
 					);
