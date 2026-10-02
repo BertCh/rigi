@@ -188,6 +188,11 @@ describe("fitCurve", () => {
 		expect(c.x.length).toBe(1);
 		expect(c.y.length).toBe(1);
 		expect(Number.isFinite(c.y[0])).toBe(true);
+		// a proportional curve (the old code returned a flat curve at ~13.5 m that broke slopeMin)
+		const r = curveRange(c, 100) / 100;
+		expect(curveRange(c, 1000) / 1000).toBeCloseTo(r, 9);
+		expect(r).toBeGreaterThan(2);
+		expect(r).toBeLessThan(20);
 	});
 	it("octaveMinShare caps the weight of a sparse octave", () => {
 		// 2000 samples at DEM ratio 2 over 200-400 m, plus 4 near samples (DEM 16-32 m octave) at ratio 0.5. With
@@ -329,6 +334,15 @@ describe("fitAnchor", () => {
 		const h = fitAnchor(flat, holed, K, { stride: 1, edgeGuard: 0.4 });
 		const h0 = fitAnchor(flat, holed, K, { stride: 1 });
 		expect(h.n).toBeLessThan(h0.n);
+		// at stride 2 the guard still looks at pixel-distance-1 neighbours: candidates sit on odd columns, so only
+		// column 31 (next to the step at 32) is dropped
+		const off2 = fitAnchor(d, dem, K, { stride: 2, mode: "scale" });
+		const on2 = fitAnchor(d, dem, K, {
+			stride: 2,
+			mode: "scale",
+			edgeGuard: Math.log(1.5),
+		});
+		expect(off2.n - on2.n).toBe(d.height / 2);
 	});
 	it("ignores invalid model pixels", () => {
 		const d = rampDepth();

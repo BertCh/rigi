@@ -7,7 +7,7 @@
 // is measured without a browser. Nothing here touches sealed data: the dumps are DEV ids only.
 //
 //   <venv python> tools/nearfield/spike/dump_anchor_inputs.py            # once; needs the gitignored TM render cache
-//   npx tsx scripts/nearfield/anchor-eval.ts [--variant app|scale|affine|noOctave|cliff] [--stride N] [--dir DIR] [--json out.json]
+//   npx tsx scripts/nearfield/anchor-eval.ts [--variant app|scale|affine|noOctave|cliff|edge15|octFloor1|…] [--stride N] [--dir DIR] [--json out.json]
 //
 // --stride 1 fits on every grid cell like place.py (the app thins to <= ~40k candidates: stride 3 on a 512x384 grid).
 // Metric (tools/nearfield/spike/PLACEMENT.txt): median |log(anchoredRange(fit, modelRay) / DEM)| over non-Object,
@@ -31,8 +31,7 @@ import {
 	type NearFieldDepth,
 } from "../../src/lib/nearfield/types";
 
-const DEFAULT_DIR =
-	"/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/81540ede-f146-474f-8d03-4441676ff7c0/scratchpad/anchor-inputs";
+const DEFAULT_DIR = "out/anchor-inputs";
 
 /** Named AnchorOpts variants. "app" = what scene.ts passes (defaults + sky mask; the dumper's sky mask is added below). */
 export const VARIANTS: Record<string, AnchorOpts> = {
@@ -41,6 +40,16 @@ export const VARIANTS: Record<string, AnchorOpts> = {
 	affine: { mode: "affine" },
 	noOctave: { curve: { octaveWeights: false } },
 	cliff: { cliffLip: true },
+	// opt-in knobs from 6ad885d (default off); promote only on a dev-table win (reports/steps-2026-10-02/dem-anchoring.md U3)
+	edge13: { edgeGuard: Math.log(1.3) },
+	edge15: { edgeGuard: Math.log(1.5) },
+	edge20: { edgeGuard: Math.log(2) },
+	octFloor1: { curve: { octaveMinShare: 0.01 } },
+	octFloor3: { curve: { octaveMinShare: 0.03 } },
+	edge15octFloor1: {
+		edgeGuard: Math.log(1.5),
+		curve: { octaveMinShare: 0.01 },
+	},
 };
 
 type Dump = {

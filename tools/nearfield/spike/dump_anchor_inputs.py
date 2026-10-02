@@ -25,7 +25,8 @@ from pathlib import Path
 
 import numpy as np
 
-MAIN = Path(os.environ.get("RIGI_MAIN", "/Users/robertchristie/Documents/GitHub/mt-image"))
+# the repo root; RIGI_MAIN points a worktree at the main tree's gitignored caches
+MAIN = Path(os.environ.get("RIGI_MAIN", Path(__file__).resolve().parents[3]))
 HERE = MAIN / "tools/nearfield/spike"
 TM = MAIN / "tools/research/tm"
 sys.path[:0] = [str(TM), str(TM / "c0_cache"), str(HERE)]
@@ -34,9 +35,7 @@ import tm_common  # noqa: E402
 from place import GEOM, OBJ_IDS, OBJECT, SPLIT, CURVE, apply_curve, fit_curve, split  # noqa: E402,F401
 from spike import fit_mode, model_on_grid  # noqa: E402
 
-DEFAULT_OUT = Path(
-    "/private/tmp/claude-501/-Users-robertchristie-Documents-GitHub-mt-image/81540ede-f146-474f-8d03-4441676ff7c0/scratchpad/anchor-inputs"
-)
+DEFAULT_OUT = MAIN / "out/anchor-inputs"
 
 
 def load_view_dir(vd: Path) -> dict:
