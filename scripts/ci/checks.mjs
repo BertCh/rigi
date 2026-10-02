@@ -245,6 +245,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "geo-unpack",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/deck-webgpu/geo-unpack.check.ts"),
+		note: "GPU unpack of the geometry target (range / xyz planes): the WGSL's logic as a TS reference is byte-equal to the CPU unpack loop on sky / NaN / Inf / denormal / -0 words, odd words are flagged for the CPU fallback, no arithmetic on texel values in the WGSL (no browser)",
+		timeoutS: 60,
+	},
+	{
 		id: "base-slots",
 		tier: "fast",
 		group: "gpu",

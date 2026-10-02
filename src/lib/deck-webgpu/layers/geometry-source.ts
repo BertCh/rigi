@@ -57,7 +57,7 @@
 // - Note: the GeometrySourceFactory signature has no xyz flag. webgpuGeometryFactory skips the xyz
 //   unpack for widths ≤ `xyzMinWidth` (default 512), so the 384 px re-rank stays range-only as in
 //   deck/engine.ts silhouetteSource (makeSource(W, H, false)).
-import type { CommandEncoder, Device } from "@luma.gl/core";
+import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
 import type { Pose } from "#/lib/camera";
 import type {
 	GeometrySource,
@@ -66,6 +66,8 @@ import type {
 import { submitWithDefault } from "#/lib/gpu/core/queue";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { photoCamera } from "../camera";
+import type { UnpackedPlanes } from "../geo-query-gpu";
+import { UNPACK_RANGE, UNPACK_XYZ, unpackGeometryCpu } from "../geo-unpack";
 import { type CameraPose, runGeometryPass } from "../hosts/passes";
 import type { FrameState, GpuLayerCore } from "../pass";
 import { TextureReader } from "../readback";
@@ -110,6 +112,13 @@ export function terrainCoresOf(cores: readonly GpuLayerCore[]): GpuLayerCore[] {
  */
 export type LazyQueries = {
 	after: (seq: number, pose: Pose) => Promise<boolean>;
+	/**
+	 * GPU unpack of the geometry target into the range and / or xyz plane (geo-unpack.ts, `mode` =
+	 * UNPACK_RANGE | UNPACK_XYZ), so ensureRange() / ensureFull() read 4 / 12 B per pixel instead of the
+	 * 16 B texel and skip the CPU loop. null = it did not run or may not be exact: the texture is read
+	 * back in full and unpacked on the CPU, as without this hook.
+	 */
+	unpack?: (tex: Texture, mode: number) => Promise<UnpackedPlanes | null>;
 };
 
 /** What an EncodeAfterDraw recorded: told whether it reached the queue with the render. */
@@ -165,9 +174,14 @@ export class WebGpuGeometrySource implements GeometrySource {
 	private readonly device: Device;
 	private lazy: LazyQueries | null;
 	private readonly encodeAfterDraw: EncodeAfterDraw | null;
-	/** The render() whose readback `range` / `xyz` hold (0 = none yet). */
+	/** The render() whose readback `range` holds (0 = none yet). */
 	private cpuSeq = 0;
-	private fullRead: { seq: number; p: Promise<boolean> } | null = null;
+	/** The render() whose readback `xyz` holds (0 = none yet; unused without an xyz plane). */
+	private xyzSeq = 0;
+	/** The GPU unpack failed or was inexact once: this source reads the texture in full from now on. */
+	private unpackBroken = false;
+	/** In-flight plane reads by mode (UNPACK_RANGE | UNPACK_XYZ): concurrent callers share one. */
+	private planeReads = new Map<number, { seq: number; p: Promise<boolean> }>();
 	private readonly cores: () => readonly GpuLayerCore[];
 	private readonly eye: Vec3;
 	private readonly near: number;
@@ -239,9 +253,19 @@ export class WebGpuGeometrySource implements GeometrySource {
 		};
 	}
 
-	/** True when `range` / `xyz` hold the render `pose` describes (always, outside lazy mode). */
+	/** True when `range` and `xyz` hold the render `pose` describes (always, outside lazy mode). */
 	get hasCpu() {
+		return this.hasRange && this.hasXyz;
+	}
+
+	/** True when `range` holds the render `pose` describes (the lazy range-only read: ensureRange()). */
+	get hasRange() {
 		return this.cpuSeq > 0 && this.cpuSeq === this.unpacked;
+	}
+
+	/** True when `xyz` holds it too (a source without an xyz plane has nothing to wait for). */
+	get hasXyz() {
+		return !this.xyz || (this.xyzSeq > 0 && this.xyzSeq === this.unpacked);
 	}
 
 	/** Lazy mode on (render() does not read the target back). */
@@ -257,28 +281,57 @@ export class WebGpuGeometrySource implements GeometrySource {
 	/**
 	 * Lazy mode: read the current render's target back in full now (once per render; concurrent calls
 	 * share it) so `range` / `xyz` / hasCpu describe it. The copy is queued immediately, so it holds
-	 * the render the pose describes; a newer render() meanwhile discards the result.
+	 * the render the pose describes; a newer render() meanwhile discards the result. Only the planes
+	 * not read yet are read.
 	 */
 	ensureFull(): Promise<boolean> {
-		if (this.hasCpu) return Promise.resolve(true);
+		return this.ensurePlanes(true);
+	}
+
+	/** As ensureFull() for `range` alone (hasRange): 4 B per pixel on the GPU unpack path. */
+	ensureRange(): Promise<boolean> {
+		return this.ensurePlanes(false);
+	}
+
+	private ensurePlanes(withXyz: boolean): Promise<boolean> {
+		const needRange = !this.hasRange;
+		const needXyz = withXyz && !this.hasXyz;
+		if (!needRange && !needXyz) return Promise.resolve(true);
 		const seq = this.unpacked;
 		if (this.disposed || !seq || seq !== this.seq || !this.pose)
 			return Promise.resolve(false);
-		if (this.fullRead?.seq === seq) return this.fullRead.p;
+		const mode = (needRange ? UNPACK_RANGE : 0) | (needXyz ? UNPACK_XYZ : 0);
+		const open = this.planeReads.get(mode);
+		if (open?.seq === seq) return open.p;
 		const p = (async () => {
+			const unpack = this.lazy?.unpack;
+			if (unpack && !this.unpackBroken) {
+				const planes = await unpack(this.targets.geometry, mode);
+				if (this.disposed || seq !== this.seq) return false;
+				if (planes) {
+					if (planes.range) this.range.set(planes.range);
+					if (planes.xyz && this.xyz) this.xyz.set(planes.xyz);
+					this.readBytes =
+						(planes.range?.byteLength ?? 0) + (planes.xyz?.byteLength ?? 0);
+					if (needRange) this.cpuSeq = seq;
+					if (needXyz) this.xyzSeq = seq;
+					return true;
+				}
+				this.unpackBroken = true;
+			}
 			const reader = this.readers.pop() ?? new TextureReader(this.device);
 			const data = await reader.read(this.targets.geometry);
 			if (this.disposed || this.readers.length >= 2) reader.destroy();
 			else this.readers.push(reader);
 			if (!data || seq !== this.seq || this.disposed) return false;
 			this.readBytes = data.byteLength;
-			this.unpack(data);
-			this.cpuSeq = seq;
+			unpackGeometryCpu(data, this.range, this.xyz);
+			this.cpuSeq = this.xyzSeq = seq;
 			return true;
 		})().finally(() => {
-			if (this.fullRead?.seq === seq) this.fullRead = null;
+			if (this.planeReads.get(mode)?.seq === seq) this.planeReads.delete(mode);
 		});
-		this.fullRead = { seq, p };
+		this.planeReads.set(mode, { seq, p });
 		return p;
 	}
 
@@ -430,11 +483,11 @@ export class WebGpuGeometrySource implements GeometrySource {
 		// a newer render() superseded this one (its buffers win), or the device went away
 		if (!data || seq !== this.seq || this.disposed) return;
 		this.readBytes = data.byteLength;
-		this.unpack(data);
+		unpackGeometryCpu(data, this.range, this.xyz);
 		const t3 = performance.now();
 		this.pose = { ...pose };
 		this.unpacked = seq;
-		this.cpuSeq = seq;
+		this.cpuSeq = this.xyzSeq = seq;
 		this.timing = {
 			submitMs: t1 - t0,
 			readbackMs: t2 - t1,
@@ -444,32 +497,6 @@ export class WebGpuGeometrySource implements GeometrySource {
 				(c) => c.passes.includes("geometry") && (c.visible?.() ?? true),
 			).length,
 		};
-	}
-
-	/** xyzr (top-first, tightly packed) → range (+ xyz). No row flip: see the header. */
-	private unpack(xyzr: Float32Array) {
-		const { range, xyz } = this;
-		const n = range.length;
-		if (!xyz) {
-			for (let i = 0; i < n; i++) {
-				const r = xyzr[i * 4 + 3];
-				range[i] = r > 0 ? r : Number.POSITIVE_INFINITY;
-			}
-			return;
-		}
-		for (let i = 0; i < n; i++) {
-			const o = i * 4;
-			const r = xyzr[o + 3];
-			if (r > 0) {
-				range[i] = r;
-				xyz[i * 3] = xyzr[o];
-				xyz[i * 3 + 1] = xyzr[o + 1];
-				xyz[i * 3 + 2] = xyzr[o + 2];
-			} else {
-				range[i] = Number.POSITIVE_INFINITY;
-				xyz[i * 3] = xyz[i * 3 + 1] = xyz[i * 3 + 2] = Number.NaN;
-			}
-		}
 	}
 
 	dispose() {

@@ -26,7 +26,11 @@
 // bad nonce).
 import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import { OCC_STRIDE } from "#/lib/deck/geo-query";
-import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
+import {
+	type ComputeGraph,
+	cachedGraph,
+	type GraphRange,
+} from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
 import {
 	acquire,
@@ -35,6 +39,12 @@ import {
 	releasePool,
 } from "#/lib/gpu/core/pool";
 import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
+import {
+	GEO_UNPACK_WGSL,
+	UNPACK_RANGE,
+	UNPACK_WG,
+	UNPACK_XYZ,
+} from "./geo-unpack";
 import { importSampledTexture, textureShapeKey } from "./graph-texture";
 
 const WG = 64;
@@ -139,6 +149,18 @@ const SPECS = {
 		],
 		{ group: GROUP },
 	),
+	unpack: defineKernel(
+		"geo-unpack",
+		GEO_UNPACK_WGSL,
+		[
+			["prm", "uniform"],
+			["geo", "texture"],
+			["rng", "storage"],
+			["pos", "storage"],
+			["tag", "storage"],
+		],
+		{ group: GROUP },
+	),
 	skyline: defineKernel(
 		"geo-skyline",
 		SKYLINE_WGSL,
@@ -160,6 +182,13 @@ const PRM = defineUniformBlock({
 	nonce: "u32",
 	w: "i32",
 	h: "i32",
+});
+/** The unpack kernel's `struct P` (geo-unpack.ts): 16 B. */
+const UNPACK_PRM = defineUniformBlock({
+	n: "u32",
+	nonce: "u32",
+	w: "u32",
+	mode: "u32",
 });
 /** the smallest output binding (Math.max(16, …), as the former per-call buffers): the graph's import capacity */
 const MIN_OUT_BYTES = 16;
@@ -219,6 +248,50 @@ function buildQueryGraph(
 	});
 	g.readNode(READ_NODE, reads);
 }
+
+/** Per-run sizes of the unpack graph (bytes bound / read per plane; 0 = plane not wanted). */
+type UnpackRun = { n: number; rngBytes: number; posBytes: number };
+const UNPACK_READ_NODE = "unpack-read";
+const TAG_BYTES = 8;
+
+/** One kernel over every pixel into the wanted planes + the tag, one read node (planes, then tag). */
+function buildUnpackGraph(
+	g: ComputeGraph<UnpackRun>,
+	mode: number,
+	tex: Texture,
+) {
+	const geo = importSampledTexture(g, "geo", tex);
+	const rng = g.importBuffer("rng", MIN_OUT_BYTES);
+	const pos = g.importBuffer("pos", MIN_OUT_BYTES);
+	const tag = g.importBuffer("tag", TAG_BYTES);
+	g.addKernel({
+		id: "unpack",
+		spec: SPECS.unpack,
+		bindings: {
+			prm: g.importBuffer(
+				"prm",
+				UNPACK_PRM.byteLength,
+				undefined,
+				Buffer.UNIFORM,
+			),
+			geo,
+			rng: { buffer: rng, size: (p) => Math.max(MIN_OUT_BYTES, p.rngBytes) },
+			pos: { buffer: pos, size: (p) => Math.max(MIN_OUT_BYTES, p.posBytes) },
+			tag: { buffer: tag, size: TAG_BYTES },
+		},
+		workgroups: (p) => [Math.ceil(p.n / UNPACK_WG)],
+	});
+	const reads: GraphRange<UnpackRun>[] = [];
+	if (mode & UNPACK_RANGE)
+		reads.push({ buffer: rng, size: (p: UnpackRun) => p.rngBytes });
+	if (mode & UNPACK_XYZ)
+		reads.push({ buffer: pos, size: (p: UnpackRun) => p.posBytes });
+	reads.push({ buffer: tag, size: TAG_BYTES });
+	g.readNode(UNPACK_READ_NODE, reads);
+}
+
+/** The planes of GeoQueryGpu.unpack(): views over the read bytes (valid, not shared). */
+export type UnpackedPlanes = { range?: Float32Array; xyz?: Float32Array };
 
 /** One per WebGpuEngine (one render device). */
 export class GeoQueryGpu {
@@ -413,6 +486,85 @@ export class GeoQueryGpu {
 			view.set(words.subarray(i * 5 + 1, i * 5 + 5), i * 4);
 		}
 		return out;
+	}
+
+	/**
+	 * The geometry target's planes on the GPU (geo-unpack.ts: copies and selects only), in one graph
+	 * run: `mode` = UNPACK_RANGE (4 B per pixel) and / or UNPACK_XYZ (12 B per pixel) instead of the
+	 * 16 B texel. null = not run (lost device, compile / submit failure, bad nonce) or a copied word
+	 * the GPU might have altered (a denormal / NaN, the odd flag): the caller reads the texture back
+	 * in full and unpacks on the CPU.
+	 */
+	async unpack(tex: Texture, mode: number): Promise<UnpackedPlanes | null> {
+		const device = this.device;
+		const n = tex.width * tex.height;
+		if (this.destroyed || device.isLost || !n || !(mode & 3)) return null;
+		try {
+			const graphOf = () =>
+				cachedGraph<UnpackRun, void>(
+					device,
+					GRAPH_GROUP,
+					`unpack${mode}:${textureShapeKey(tex)}`,
+					(g) => buildUnpackGraph(g, mode, tex),
+					6,
+				).graph;
+			const first = graphOf();
+			if (!first.isCompiled) await first.compileAsync();
+			if (this.destroyed || device.isLost) return null;
+			// as run(): nothing awaits between the slot writes and the submit inside runNow
+			const graph = graphOf();
+			const nonce = this.nextNonce();
+			const run: UnpackRun = {
+				n,
+				rngBytes: mode & UNPACK_RANGE ? n * 4 : 0,
+				posBytes: mode & UNPACK_XYZ ? n * 12 : 0,
+			};
+			const slot = `${POOL}/unpack`;
+			const words = UNPACK_PRM.pack({ n, nonce, w: tex.width, mode });
+			const buffers: Record<string, Buffer> = {
+				prm: pooledUniform(device, `${slot}/prm`, words),
+				rng: acquire(
+					device,
+					`${slot}/rng`,
+					Math.max(MIN_OUT_BYTES, run.rngBytes),
+					OUT_USAGE,
+				),
+				pos: acquire(
+					device,
+					`${slot}/pos`,
+					Math.max(MIN_OUT_BYTES, run.posBytes),
+					OUT_USAGE,
+				),
+				// zeroed by the write: the odd flag is OR-ed into it by the kernel
+				tag: pooledStorage(device, `${slot}/tag`, new Uint32Array(2)),
+			};
+			const { reads } = await graph.runNow(run, {
+				buffers,
+				textures: { geo: tex },
+			});
+			if (this.destroyed) return null;
+			const out = reads[UNPACK_READ_NODE];
+			const tag = new Uint32Array(out[out.length - 1].slice(0, TAG_BYTES));
+			if (tag[0] !== nonce) {
+				console.warn("[geo-query] unpack nonce mismatch, full readback");
+				return null;
+			}
+			if (tag[1]) {
+				console.warn("[geo-query] unpack met a denormal / NaN, full readback");
+				return null;
+			}
+			let k = 0;
+			const planes: UnpackedPlanes = {};
+			if (mode & UNPACK_RANGE) planes.range = new Float32Array(out[k++], 0, n);
+			if (mode & UNPACK_XYZ) planes.xyz = new Float32Array(out[k++], 0, n * 3);
+			const bytes = run.rngBytes + run.posBytes + TAG_BYTES;
+			this.lastBytes = bytes;
+			this.totalBytes += bytes;
+			return planes;
+		} catch (e) {
+			console.warn("[geo-query] unpack failed, full readback", e);
+			return null;
+		}
 	}
 
 	/** Stops further calls and frees the pool slots (work already submitted completes). */

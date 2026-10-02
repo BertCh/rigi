@@ -625,6 +625,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: [
 			"read: verdicts 4 B per peak + skyline 4 B per column (one graph run)",
 			"read: gather 20 B per pixel (nonce + 4 raw words), only for undecided samples",
+			"read: unpack range plane 4 B per pixel and / or xyz plane 12 B per pixel (+ 8 B tag), on demand (ensureRange / ensureFull), instead of the 16 B texel + CPU loop",
 		],
 		status: "default",
 		notes:

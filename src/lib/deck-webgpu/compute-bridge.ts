@@ -121,6 +121,7 @@ import type {
 } from "#/lib/look/relief/field";
 import type { ViewStyle } from "#/lib/style/types";
 import type { FusedWork } from "./layers/geometry-source";
+import { readTextureBytes } from "./readback";
 import { USAGE } from "./targets";
 
 const LINEAR_CLAMP = {
@@ -794,30 +795,8 @@ export class LookBridge {
 }
 
 /** A whole rgba8unorm texture (COPY_SRC), rows top-first (row 0 = texel row 0), tightly packed. */
-export async function readRgba8(
-	device: Device,
-	tex: Texture,
-): Promise<Uint8Array> {
-	const layout = tex.computeMemoryLayout();
-	const buf = device.createBuffer({
-		id: "look-bridge-read",
-		byteLength: layout.byteLength,
-		usage: 0x0001 | 0x0008, // MAP_READ | COPY_DST
-	});
-	try {
-		tex.readBuffer({}, buf);
-		const data = await buf.readAsync(0, layout.byteLength);
-		const row = tex.width * 4;
-		const out = new Uint8Array(row * tex.height);
-		for (let y = 0; y < tex.height; y++)
-			out.set(
-				data.subarray(y * layout.bytesPerRow, y * layout.bytesPerRow + row),
-				y * row,
-			);
-		return out;
-	} finally {
-		buf.destroy();
-	}
+export function readRgba8(device: Device, tex: Texture): Promise<Uint8Array> {
+	return readTextureBytes(device, tex, 4);
 }
 
 function push(a: BridgeTiming[], t: BridgeTiming) {

@@ -266,6 +266,7 @@ import {
 	type PrepassContext,
 } from "./pass";
 import { PresentCore, type PresentMode } from "./present";
+import { readTextureBytes } from "./readback";
 import { SilhouetteMaskGpu } from "./silhouette-gpu";
 import { ColorTargets, GeometryTargets, geometrySize, USAGE } from "./targets";
 import { TerrainCore } from "./terrain";
@@ -304,10 +305,6 @@ const POINTER_SETTINGS = new Set<string>(["lens", "swipe"]);
 const SIL_IDLE_MS = 2000;
 /** Photo camera near plane (deck PhotoView near 1; geometry-source default). */
 const PHOTO_NEAR = 1;
-
-/** GPUBufferUsage bits for readback buffers. */
-const MAP_READ = 0x0001;
-const COPY_DST = 0x0008;
 
 function sameValue(a: unknown, b: unknown) {
 	if (a === b) return true;
@@ -1975,7 +1972,7 @@ export class WebGpuEngine implements Renderer {
 		const src = this.geoSrc;
 		if (!src?.pose) return null;
 		// diet: no CPU copy of the current render (callers that need it call needFull())
-		if (src instanceof WebGpuGeometrySource && !src.hasCpu) return null;
+		if (src instanceof WebGpuGeometrySource && !src.hasRange) return null;
 		const { width: w, height: h, range } = src;
 		return { w, h, at: (x, y) => range[y * w + x] };
 	}
@@ -2005,7 +2002,7 @@ export class WebGpuEngine implements Renderer {
 				!this.skyMaskStore);
 		if (defines.length && ready && !grid && wantsGrid) {
 			// no CPU copy of this render: read it (once) and come back
-			void this.needFull().then((ok) => ok && this.updateLook());
+			void this.needRange().then((ok) => ok && this.updateLook());
 		}
 		if (bridged && (grid || !wantsGrid)) {
 			bridge.updateMasks({
@@ -2163,7 +2160,7 @@ export class WebGpuEngine implements Renderer {
 			// the CPU stats path samples the range grid
 			const grid = this.rangeGrid();
 			if (!grid) {
-				void this.needFull().then((ok) => ok && this.scheduleStats());
+				void this.needRange().then((ok) => ok && this.scheduleStats());
 				return;
 			}
 			this.statsBusy = true;
@@ -2206,7 +2203,7 @@ export class WebGpuEngine implements Renderer {
 		// haze whose pose / eye changed; HazeController.isDue)
 		if (
 			src instanceof WebGpuGeometrySource &&
-			!src.hasCpu &&
+			!src.hasRange &&
 			this.haze.isDue({
 				style: this.style,
 				pose,
@@ -2216,7 +2213,7 @@ export class WebGpuEngine implements Renderer {
 				want,
 			})
 		) {
-			void this.needFull().then((ok) => ok && this.fitHaze());
+			void this.needRange().then((ok) => ok && this.fitHaze());
 			return;
 		}
 		// the geometry target holds the render `src.range` was read from until the next render()
@@ -2664,7 +2661,12 @@ export class WebGpuEngine implements Renderer {
 				near: PHOTO_NEAR,
 				lazyQueries: () =>
 					this.dietOn()
-						? { after: (seq, pose) => this.queryOnDraw(seq, pose) }
+						? {
+								after: (seq, pose) => this.queryOnDraw(seq, pose),
+								unpack: (tex, mode) =>
+									this.geoQueryGpu()?.unpack(tex, mode) ??
+									Promise.resolve(null),
+							}
 						: undefined,
 				encodeAfterDraw: (d) =>
 					this.prepareMasks(d.seq, d.encoder, d.targets.geometry),
@@ -2802,6 +2804,19 @@ export class WebGpuEngine implements Renderer {
 		const before = src.hasCpu;
 		const ok = await src.ensureFull();
 		if (ok && !before) {
+			this.dietStats.fullReads++;
+			this.dietStats.fullBytes += src.readBytes;
+		}
+		return ok && !this.disposed && this.geoSrc === src;
+	}
+
+	/** As needFull() for the range plane alone (rangeGrid / the haze fit): 4 B per pixel on the GPU unpack. */
+	private async needRange(): Promise<boolean> {
+		const src = this.geoSrc;
+		if (!(src instanceof WebGpuGeometrySource)) return !!src?.pose;
+		if (src.hasRange) return true;
+		const ok = await src.ensureRange();
+		if (ok) {
 			this.dietStats.fullReads++;
 			this.dietStats.fullBytes += src.readBytes;
 		}
@@ -4556,28 +4571,11 @@ async function readTexture(
 ): Promise<Uint8Array | null> {
 	const bpp = BYTES_PER_PIXEL[tex.format];
 	if (!bpp) throw new Error(`readTexture: unsupported format ${tex.format}`);
-	const layout = tex.computeMemoryLayout();
-	const buf = device.createBuffer({
-		id: "rigi-offscreen-readback",
-		byteLength: layout.byteLength,
-		usage: MAP_READ | COPY_DST,
-	});
 	try {
-		tex.readBuffer({}, buf);
-		const data = await buf.readAsync(0, layout.byteLength);
-		const row = tex.width * bpp;
-		const out = new Uint8Array(row * tex.height);
-		for (let y = 0; y < tex.height; y++)
-			out.set(
-				data.subarray(y * layout.bytesPerRow, y * layout.bytesPerRow + row),
-				y * row,
-			);
-		return out;
+		return await readTextureBytes(device, tex, bpp);
 	} catch (e) {
 		console.warn("[webgpu-engine] readback failed", e);
 		return null;
-	} finally {
-		buf.destroy();
 	}
 }
 
