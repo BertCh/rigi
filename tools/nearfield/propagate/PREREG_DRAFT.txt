@@ -1,4 +1,5 @@
 PRE-REGISTRATION DRAFT: pose propagation within a viewpoint (Step Inside P2)
+DRAFT - needs owner sign-off (sections 8-14 added 2026-10-02 for roadmap R5; sections 1-7 unchanged)
 Status: DRAFT, NOT FROZEN, NOT EXECUTED. Written 2026-09-28. Nothing in tools/bench/data_v3 has been
 opened, listed, matched or read by this work (not even the manifest). Running it spends held-out data
 and needs the user's sign-off. It must also be coordinated with reports/v3-prereg.md, because both use
@@ -74,3 +75,79 @@ data_v3 and its blind-verification budget.
     stress-tested on dev.
   - The dev evidence is n = 6 real ordered pairs from one viewpoint. The thresholds have wide margins
     on negatives (wrong pairs had <= 11 inliers vs gate 40), but little real positive data.
+
+
+------------------------------------------------------------------------------------------------------
+DRAFT - needs owner sign-off. Everything below was added 2026-10-02 (roadmap R5). It fills the pieces the
+sign-off needs. Nothing here has been run. No dev number below is a result: numbers cited from REPORT.txt
+are labelled "dev, from REPORT.txt" and only motivate the design.
+------------------------------------------------------------------------------------------------------
+
+8. Held-out set (supersedes the data_v3 option in section 3)
+  - The set is the sealed collection of roadmap N3 (one ~100-photo set with trip sequences, sealed by
+    sha1 before anyone opens it): reports/roadmap.md row N3. NOT tools/bench/data_v3 (that is reserved
+    for reports/v3-prereg.md and is too sparsely co-located for this question, section 3), and NOT the
+    spent test half of tools/bench/split.json.
+  - Eligibility is decided from the N3 manifest only (lat, lon, timestamp, heading), before any pixel is
+    opened, exactly as section 3 describes. Stop rule: if N3 has fewer than 10 unordered co-located pairs
+    (<= 250 m) with at least one anchor candidate, the run is UNDERPOWERED. Report only the pair count.
+  - The anchors are fixed before any propagation: the frozen arm's accepted photos, or, if the roll
+    aligner is the anchor source, photos it accepted under its own frozen rule. Never GT, never a
+    propagated pose.
+  - To be filled at sign-off: the N3 sealed-manifest sha1 and the frozen arm id. They do not exist yet.
+
+9. Frozen constants (code location and hash)
+  Code: src/lib/nearfield/propagate.ts, export PROPAGATE_GATE (used unchanged by the app through
+  src/lib/roll/propagate/plan.ts propose()). Values at drafting time:
+    methods ["rot"]         minInliers 40          maxRmsPx 3.5          minOverlap 0.1
+    maxFwdBwdDeg 1.5        maxCycleDeg 1.5        maxGravityPitchDeg 3  maxGravityRollDeg 3
+    maxBaselineM 250        seedRadiusDeg 5
+  Roll-layer constants (src/lib/roll/propagate/plan.ts): MAX_NEIGHBOURS 8, COMPASS_MARGIN_DEG 45 (a skip
+  only, mode "on"), PARALLAX_CAUTION_M 50 and PARALLAX_TERRAIN_M 3000 (warnings only, never a gate).
+  sha1 of src/lib/nearfield/propagate.ts at drafting (git HEAD 3b8f215 of 2026-10-02):
+    db70eb4ce511de7c662d8471356ac4b75d3838ca
+  The sha1 is re-stamped at freeze for every file in the list in section 2 plus plan.ts; any mismatch with
+  the value stamped at freeze voids the run. Constants are not re-tuned on the held-out set.
+  Pairs are evaluated in the app flow: an estimator result becomes a suggestion only if the gate passes
+  and the triplet cycle (when a second trusted estimate from the same anchor exists) passes.
+
+10. Primary metric and pass rule (precision first; replaces section 5's point-estimate rule)
+  - Unit: a gated suggestion (gate and cycle passed), counted per (anchor, target) pair, with targets
+    that have more than one anchor counted once per pair and reported both ways.
+  - Wrong: the blind verifiers (section 11) do not both say correct for the RAW propagated pose. Unsure
+    counts as wrong. Gross error (> 5 deg or wrong basin) is reported separately.
+  - Primary: the wrong-suggestion rate among gated suggestions, with a one-sided Wilson 95% upper bound.
+    PASS only if the upper bound is <= 10% AND there are 0 gross errors AND at least 40 gated
+    suggestions exist (with fewer the result is INCONCLUSIVE, never a pass). One-sided Wilson 95% upper
+    bounds, for reference: 0 wrong of 40 = 6.3%; 1 of 40 = 10.5% (FAIL); 1 of 60 = 7.1%; 2 of 60 = 9.6%.
+    Wrong includes unsure, but gross errors must still be 0.
+  - The H1 refined-pose test of section 1 is secondary.
+  - Recall (gated / eligible overlapping pairs) is reported but never part of the pass rule.
+  - Dev motivation, not a result (dev, from REPORT.txt): the gate rejected all wrong dev pairs; real
+    positive data is n = 6 pairs from one viewpoint.
+
+11. Blind verification (reuse)
+  Same protocol as section 4 and reports/v3-prereg.md "Ground truth: blind verification": the C1-C4
+  checklist from reports/bench-wild.md, neutral headers with no pose numbers, decoys (the propagated pose
+  with a seeded +/- 3-6 deg yaw offset, at least one decoy per three real overlays), duplicated overlays
+  shown under different ids to check verifier consistency, two independent verifiers, "near-miss" counts
+  as wrong, a verdict that rests on an unseen image counts as unsure, Mapterhorn DEM at the eye each
+  photo had in the roll. Verifiers see no gate evidence and no anchor id. Unsure is reported as a
+  sensitivity (all unsure = wrong is the main result).
+
+12. Suggestion-only product contract that the result is allowed to change
+  Passing allows the product to SHOW suggestions by default (still opt-in-free but still with a
+  "from neighbouring photo" provenance). It never allows auto-accept, HIGH confidence or anchoring from a
+  propagated pose. Those need their own prereg. The invariants that already hold in code are listed in
+  src/lib/roll/propagate/README.md with the specs that test them.
+
+13. What is never done
+  - No constant, gate, margin or neighbour-cap change after the N3 manifest is unblinded.
+  - No opening, listing or rendering of data_v3 or the spent test split for this study.
+  - No looking at N3 overlays except by the blind verifiers; no second run (re-analysis is POST HOC).
+  - No use of a propagated pose as an anchor, a benchmark input, an accept-rule input or a confidence.
+  - No tuning on the held-out set; the roll flag stays off by default until sign-off and a pass.
+
+14. Sign-off checklist (owner)
+  [ ] N3 sealed (sha1 recorded in section 8)   [ ] frozen arm id and anchor source named
+  [ ] section 10 bound and minimum n accepted   [ ] sha1 stamps of section 9 files recorded at freeze

@@ -36,6 +36,23 @@ comes from a relative rotation between the two photos. Everything here is opt-in
 - **Never** used in benchmarks, the accept rule or confidence. The gate has not been validated on held-out data.
   `tools/nearfield/propagate/PREREG_DRAFT.txt` needs sign-off before any stronger use.
 
+## Invariants and where they are tested
+All in `__tests__/` next to the modules (Vitest, service client mocked). `invariants.spec.ts` is the end-to-end set.
+- Nothing is written to a pose slot without an explicit accept call (a run plus `persistRun` writes only the
+  suggestion store): `invariants.spec.ts`.
+- An accepted pose has method `propagated-suggestion`, confidence 0 and never anchors, in any mode:
+  `invariants.spec.ts`, `store.spec.ts`, `plan.spec.ts` (`anchorKind`).
+- `acceptSuggestion` returns false and writes nothing when the photo already has a saved, ground-truth or
+  solved pose (the check lives in the store, not only the button); a second suggestion needs undo first:
+  `invariants.spec.ts`.
+- Undo removes only a still-propagated pose, and only for the accepted record: `invariants.spec.ts`, `store.spec.ts`.
+- A re-run that now rejects drops only the pending card: `invariants.spec.ts`, `run.spec.ts`.
+- Service down changes nothing; baseline over 250 m is skipped before the estimator; 8-nearest cap;
+  compass skip only in mode `on`: `invariants.spec.ts`, `run.spec.ts`, `plan.spec.ts`.
+- Parallax (over 50 m) and ultrawide (over 80 deg) warnings: `plan.spec.ts`.
+- Export tags `poseMethod` only for propagated poses: `src/lib/roll/__tests__/export.spec.ts`.
+- The store survives corrupt or missing localStorage: `store.spec.ts`.
+
 Files: `plan.ts` (pure: eligibility, candidates, `propose`, cycle), `client.ts` (service), `run.ts` (orchestration),
 `store.ts` (suggestions and decisions), `PropagatePanel.tsx` (UI), `flag.ts`. The hook is a few lines in
 `src/routes/roll.$id.tsx`.
