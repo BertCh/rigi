@@ -105,4 +105,20 @@ Sources: [1] developer.android.com/reference/android/location/altitude/AltitudeC
 
 ## 7. Landed
 
-(filled in as units land)
+- **U1** `d5cccc1` + `88a7c2a`: `src/lib/geo/eye-rule.ts` + `__tests__/eye-rule.spec.ts`; scene.ts re-export; suggest.ts, ridgelines.worker.ts, bake-pano-terrain.ts and concord altitude.ts import it; altitude.ts header and geo/README corrected; this plan. Bit-identical: the spec checks the rule against the old inline formula and against `loadScene`. Review iteration 1 (an independent reviewer) found three things, all fixed in 88a7c2a: `checkAltitude` gave "raised" for a NaN ground (now `no-ground`), a NaN altitude gave a NaN eye, and the pano bake still had its own copy. It also flagged that `pipeline.ts` still keeps its own constant, which is U3 and belongs to the baseline-pipeline pod.
+- **U2** (this commit series, browser-unverified; one batch-ledger row): `src/components/EyeHeightRow.tsx` + spec. The panel row now says which branch of the rule set the eye. Engines expose `demKnown` (`renderer.ts`, both engines; bit-identical). Review iteration 2 found and fixed:
+  - the no-DEM fallback (`demAtCamera = alt ?? 0`) gave a false "0 m below" note;
+  - the lazy EGM2008 import did not split, because `ExportMenu` → `engine-export.ts` already imports it statically;
+  - a `<dd>` had no `<dt>`;
+  - the warning had no light-theme colour.
+  
+  Known and accepted: the row reads `engineRef` during render, as the old row did. For one render after an eye-suggestion Apply it can pair the new altitude with the old engine.
+- **Fast tier** in the U2 worktree: 107 pass, 6 fail. None of the six touch these files:
+  - `biome`: new errors in peers' files (gipfelbuch shell.spec, camera-roll page, roll save-status.spec);
+  - `unit`: the libheif `?url` import is denied through the symlinked node_modules (the same specs pass in the main tree), plus 3 python tool specs;
+  - `labels`, `flow`, `align-cert`: timing under machine load;
+  - `roll-propagate`: `public/photos/photos.json` was not copied into the worktree.
+  
+  tsc passed, and the spec-touched dirs pass.
+- **Negative:** none new. No wrong-eye experiment was run; it is owned elsewhere (§2).
+- **Next:** U3 (pipeline pod), D1 → U4, U5 measurement, U6 near-field eye.
