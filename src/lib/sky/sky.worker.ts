@@ -60,6 +60,7 @@ import type {
 	SkyWorkerResponse,
 } from "./protocol";
 import { createSerialQueue } from "./serial-queue";
+import { createSessionRecovery } from "./session-recovery";
 
 // Explicit wasm URL: needed in dev (Vite pre-bundles ORT, breaking its own
 // import.meta.url lookup) and resolves to the same hashed asset in builds.
@@ -96,9 +97,26 @@ const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, () =>
 	}),
 );
 
+// After a GPU device loss the cached ORT sessions are dropped and loads go to WASM (session-recovery.ts).
+const recovery = createSessionRecovery();
+
+/** Feed a failure to the recovery state; on the first device loss drop every cached session. */
+function noteFailure(e: unknown) {
+	if (!recovery.noteFailure(e)) return;
+	console.warn(
+		"[sky] GPU device lost: dropping the ORT session, continuing on WASM",
+	);
+	const dropped = [...models.values()];
+	models.clear();
+	failures.clear();
+	lastDevice = undefined;
+	for (const p of dropped)
+		void p.then((m) => m?.session.release?.()).catch(() => {});
+}
+
 /** The worker's luma compute device when the page allows the GPU (null: CPU refine). */
 async function computeDevice(gpu: boolean | undefined): Promise<Device | null> {
-	if (!gpu) return null;
+	if (!gpu || recovery.deviceLost) return null;
 	const device = await getComputeDevice();
 	if (device) lastDevice = device;
 	if (device && !warmed.has(device)) {
@@ -117,6 +135,7 @@ function loadModel(
 	backend?: Backend,
 	device?: Device | null,
 ): Promise<SkyModel | null> {
+	backend = recovery.backendFor(backend);
 	const key = `${url}|${backend ?? "auto"}`;
 	let p = models.get(key);
 	const f = failures.get(key);
@@ -259,6 +278,7 @@ async function segmentWith(
 		} catch (e) {
 			console.warn("[sky] inference failed, using classical fallback:", e);
 			modelError = String(e);
+			noteFailure(e);
 		}
 	}
 	if (!inf) low = classicalSky(await rgbOf(), W, H);
@@ -304,6 +324,7 @@ async function segmentWith(
 				refineOn = "gpu";
 			} catch (e) {
 				console.warn("[sky] GPU refine failed, using the CPU refine:", e);
+				noteFailure(e);
 			}
 		}
 		if (!data) {
@@ -347,6 +368,7 @@ async function handle(req: SkyWorkerRequest) {
 		if (req.type === "preload") await preload(req);
 		else await segment(req);
 	} catch (e) {
+		noteFailure(e);
 		const msg: SkyWorkerResponse = {
 			id: req.id,
 			ok: false,
