@@ -11,7 +11,6 @@
 // when x ≤ the largest f32 strictly below c (bandThresholds), and `x > 0` when x is at least the
 // smallest positive subnormal; NaN fails both, as in JS. key(b) maps f32 bits to u32 so that
 // unsigned order is float order (−0 just below +0, which no test distinguishes).
-import { LISTS } from "./haze.wgsl";
 //
 // Kernels (@workgroup_size(64) unless noted):
 //  hzb-count   one invocation per band column j (x = 2j): the topmost terrain row (range > 0 and
@@ -19,15 +18,12 @@ import { LISTS } from "./haze.wgsl";
 //  (core GPUScan, exclusive, over cnt → off)
 //  hzb-total   one invocation: K = off[n−1] + cnt[n−1]
 //  hzb-scatter per column again: the band's pixel indices at off[j], in row order
-//  hzb-gather  per band slot k < K: lin's 3 words at idx[k], bit for bit
-//  hzb-range   per list slot k < total (starts[72]), @workgroup_size(256): range's bits at outIdx[k] (the tail's range)
+//  (core GPUGather: the band's lin at bandIdx, and range at the lists' outIdx, see haze-graph.ts)
 //  hzb-spot    per (spot column, row): range and P(sky) bits of a few CPU-chosen columns, which the
 //              CPU re-walks with airlightBand's own code (the per-call spot check)
 
 /** Columns the CPU re-walks per call (hzb-spot). */
 export const SPOT_COLUMNS = 8;
-/** hzb-range's workgroup size. */
-export const RANGE_GROUP = 256;
 
 const BAND_PARAMS = /* wgsl */ `
 struct B { W: u32, H: u32, nCol: u32, a0: u32, a1: u32, keyBelowHalf: u32, keyBelow07: u32, kMax: u32 };
@@ -103,37 +99,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     bandIdx[at] = i;
     at += 1u;
   }
-}
-`;
-
-/** The band's lin, 3 words per slot, copied as bits (slots ≥ K are left as they are). */
-export const HZB_GATHER = /* wgsl */ `
-@group(0) @binding(0) var<storage, read> total: array<u32>;
-@group(0) @binding(1) var<storage, read> bandIdx: array<u32>;
-@group(0) @binding(2) var<storage, read> lin: array<u32>;
-@group(0) @binding(3) var<storage, read_write> bandLin: array<u32>;
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let k = id.x;
-  if (k >= total[0]) { return; }
-  let i = bandIdx[k];
-  bandLin[3u * k] = lin[3u * i];
-  bandLin[3u * k + 1u] = lin[3u * i + 1u];
-  bandLin[3u * k + 2u] = lin[3u * i + 2u];
-}
-`;
-
-/** Per list slot k < starts[72]: the range bits of its pixel (the CPU tail's range[i]). */
-export const HZB_RANGE = /* wgsl */ `
-@group(0) @binding(0) var<storage, read> starts: array<u32>;
-@group(0) @binding(1) var<storage, read> outIdx: array<u32>;
-@group(0) @binding(2) var<storage, read> range: array<u32>;
-@group(0) @binding(3) var<storage, read_write> outRange: array<u32>;
-@compute @workgroup_size(${RANGE_GROUP})
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let k = id.x;
-  if (k >= starts[${LISTS}]) { return; }
-  outRange[k] = range[outIdx[k]];
 }
 `;
 

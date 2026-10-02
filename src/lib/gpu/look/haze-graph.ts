@@ -11,7 +11,7 @@
 //   prep → dilh → clear counts → bin (atomic counts) → sel-init
 //   → 3 × (clear hist → hist (atomic) → scan)                      radix select, 288 order statistics
 //   → cnt → offs (GPUScan, exclusive) → starts → scatter             72-list stable compaction
-//   → gather                                                         the airlight band's lin
+//   → gather (luma GPUGather)                                        the airlight band's lin
 //   → read node "head": counts, state, starts, the lists' first `head` slots, the band's lin
 // Submit 2 (one graph, group "look-haze-grid"): grid → read node "err" (5 550 floats); by default the
 //   arg-min program instead (group "look-haze-argmin", see below), read node "pick" (2 KiB).
@@ -22,8 +22,15 @@
 // - Every node is one of haze.ts's kernel specs, in a fixed order with fixed workgroup counts.
 //   Consecutive nodes share a compute pass; WebGPU orders dispatches and their storage writes within
 //   a pass exactly as across passes.
-// - Custom kernels plus one luma primitive, the lists' exclusive GPUScan (haze.ts addListOffsets):
-//   u32 adds only, so subgroup / tree order cannot change a bit. No float sums. Radix select (288 concurrent selections) and the 72-way compaction do not map onto
+// - Custom kernels plus luma primitives: the lists' exclusive GPUScan (haze.ts addListOffsets: u32
+//   adds only, so subgroup / tree order cannot change a bit) and GPUGather for every gather (the
+//   band's lin in the prep, gather and band graphs, the lists' range words in the band graph): it
+//   copies 32-bit words, so gathered words are the source's bits. GPUGather dispatches over its
+//   STATIC indices view: the prep / gather graphs are keyed by a slot capacity (gatherCapacity: the
+//   band bound kMax, else the next power of two ≥ K) with the indices padded by 0xFFFFFFFF (out of
+//   range: a zero row), the band graph gathers over kMax band slots and 3N list slots (slots past
+//   K / the list total hold stale indices and are never read; measured in Dawn, haze-band-dawn.ts:
+//   no change in the GPU part's time against the old early-exit kernels). No float sums. Radix select (288 concurrent selections) and the 72-way compaction do not map onto
 //   GPUHistogram / GPUCompaction (luma-master-design §2.4).
 // - Transients are never zeroed and alias: counts and hist are the only read-modify-write transients
 //   (atomics), each has a clear node before every use (compile() lints it: writes: "atomic"). Every
@@ -43,8 +50,8 @@
 // textures.ts's prep ("look-haze-compact", read node "head" with the range / P(sky) planes), the CPU
 // airlight band, then "look-haze-gather" when `bandGpu: false` (or the GPU band is unusable: a short
 // band, a failed spot check). By default (since 2026-10-01) the band runs on the GPU instead: one graph
-// "look-haze-band" (compaction + ./haze-band.ts's band, lin and list-range gathers and spot columns),
-// one read, no planes; same fit bit for bit, spot-checked per call.
+// "look-haze-band" (compaction + ./haze-band.ts's band, lin and list-range GPUGathers and spot columns),
+// one read, no planes; same band indices as the CPU, spot-checked per call.
 //
 // Submit 2 by default runs the grid's arg-min too, as a luma GPUProgram (./haze-argmin.ts, group
 // "look-haze-argmin"): only the minimum and ≤ 256 candidate cells come back, the CPU
@@ -67,7 +74,7 @@ import {
 	cachedGraph,
 	type GraphRange,
 } from "../core/graph";
-import { GPUScan, type GraphBufferHandle } from "../core/luma";
+import { GPUGather, GPUScan, type GraphBufferHandle } from "../core/luma";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import { type ReadRange, readBack } from "../core/readback";
 import {
@@ -83,7 +90,6 @@ import {
 	K_HZ_BIN,
 	K_HZ_CNT,
 	K_HZ_DILH,
-	K_HZ_GATHER,
 	K_HZ_GRID,
 	K_HZ_HIST,
 	K_HZ_PREP,
@@ -105,13 +111,10 @@ import {
 	bandShape,
 	bandWords,
 	K_HZB_COUNT,
-	K_HZB_GATHER,
-	K_HZB_RANGE,
 	K_HZB_SCATTER,
 	K_HZB_SPOT,
 	K_HZB_TOTAL,
 	pickSpotColumns,
-	RANGE_GROUP,
 	SPOT_COLUMNS,
 	verifyBand,
 } from "./haze-band";
@@ -138,6 +141,8 @@ export const hazeGraphStats: {
 	cacheHit: boolean;
 	/** last prepGraph: uploads + cache lookup, then run + read (+ tail) */
 	ms?: { upload: number; run: number };
+	/** ms of the last run's GPU part: prepGraph's whole run, or fitGpuPart / fitGpuPartBand (lease to last read) */
+	gpuMs?: number;
 	/** compiled stats of the last prep graph: logical vs physical transient bytes */
 	transientBytes?: { logical: number; physical: number };
 	/**
@@ -147,6 +152,17 @@ export const hazeGraphStats: {
 	 */
 	band?: "cpu" | "gpu" | "gpu-short" | "gpu-failed";
 } = { head: 0, total: 0, tail: false, cacheHit: false };
+
+/**
+ * Last run's gathered words, for the Dawn A/B (scripts/gpu/haze-band-dawn.ts): the band's pixel
+ * indices and lin words, and (band path) the lists' pixel indices and range words, each as read back.
+ */
+export const hazeGraphProbe: {
+	skyIdx?: Uint32Array;
+	sky?: Float32Array;
+	listIdx?: Uint32Array;
+	listRange?: Float32Array;
+} = {};
 
 // ---------- adaptive first-read length ----------
 
@@ -216,15 +232,46 @@ const at = <P>(
 	size: (p: P) => Math.ceil(size(p) / 4) * 4,
 });
 
+/** Index padding for a gather's unused slots: out of range, so GPUGather writes a zero row. */
+const GATHER_PAD = 0xffffffff;
+
+/**
+ * Slots of a gather over the airlight band of K pixels on a W × H grid. GPUGather dispatches over
+ * its static indices view, so the cached graph is keyed by this capacity: the band's own bound
+ * (haze-band bandShape kMax) for every normal band, so a pose change never rebuilds the graph, and
+ * the next power of two ≥ K for the fallback band (every sky pixel, which can be up to N).
+ */
+function gatherCapacity(W: number, H: number, K: number) {
+	const { kMax } = bandShape(W, H);
+	return K <= kMax ? kMax : 2 ** Math.ceil(Math.log2(K));
+}
+
+/** `indices` padded with GATHER_PAD to `capacity` slots (the pooled upload of a gather graph). */
+function padIndices(indices: Uint32Array, capacity: number) {
+	const out = new Uint32Array(capacity).fill(GATHER_PAD);
+	out.set(indices);
+	return out;
+}
+
+/** A view of `length` 3-word rows (12 B, as lin's xyz) over a graph buffer, for GPUGather. */
+function rows3<P>(
+	g: ComputeGraph<P>,
+	buffer: GraphBufferHandle,
+	length: number,
+) {
+	return g.graph.createDataView(buffer, { format: "float32x3", length });
+}
+
 function prepGraphFor(
 	device: Device,
 	N: number,
+	gatherSlots: number,
 ): CachedGraph<PrepParams, undefined> {
 	const scanSg = hazeScanSubgroupsOn(device);
 	return cachedGraph<PrepParams, undefined>(
 		device,
 		"look-haze-prep",
-		`n${N}${scanSg ? "-sg" : ""}`,
+		`n${N}-g${gatherSlots}${scanSg ? "-sg" : ""}`,
 		(g) => {
 			const nBlk = Math.ceil(N / BLOCK);
 			const uni = (id: string, bytes: number) =>
@@ -241,13 +288,23 @@ function prepGraphFor(
 			const range = at<PrepParams>(imp("range"), (p) => p.N * 4);
 			const psky = at<PrepParams>(imp("psky"), (p) => p.N * 4);
 			const fgm = at<PrepParams>(imp("fgm"), (p) => Math.ceil(p.N / 32) * 4);
-			const skyIdx = at<PrepParams>(imp("skyIdx"), (p) => Math.max(1, p.K) * 4);
+			// the gather's views need real declared sizes: capacity-keyed (gatherSlots)
+			const skyIdxH = g.importBuffer(
+				"skyIdx",
+				gatherSlots * 4,
+				undefined,
+				STORAGE,
+			);
 			const outIdxH = imp("outIdx");
 			const outValH = imp("outVal");
-			const skyOutH = imp("skyOut");
+			const skyOutH = g.importBuffer(
+				"skyOut",
+				gatherSlots * 12,
+				undefined,
+				STORAGE,
+			);
 			const outIdx = at<PrepParams>(outIdxH, (p) => 3 * p.N * 4);
 			const outVal = at<PrepParams>(outValH, (p) => 3 * p.N * 4);
-			const skyOut = at<PrepParams>(skyOutH, (p) => Math.max(1, 3 * p.K) * 4);
 			const lin = g.transientBuffer("lin", N * 12);
 			const flags = g.transientBuffer("flags", N * 4);
 			const flagsH = g.transientBuffer("flagsH", N * 4);
@@ -318,13 +375,15 @@ function prepGraphFor(
 				// only [0, total) is written and only [0, total) is read (imports, not transients)
 				writes: { outIdx: "full", outVal: "full" },
 			});
-			g.addKernel({
-				id: "gather",
-				spec: K_HZ_GATHER,
-				bindings: { prm: cprm, idx: skyIdx, lin, outv: skyOut },
-				// K = 0: one idle workgroup (every invocation returns), nothing read back
-				workgroups: (p) => [Math.max(1, Math.ceil(p.K / 64))],
-			});
+			// slots ≥ K carry GATHER_PAD indices (zero rows), and only [0, K) is read back
+			g.add(
+				new GPUGather({
+					id: "gather",
+					source: rows3(g, lin, N),
+					indices: g.view(skyIdxH, "uint32", gatherSlots),
+					output: rows3(g, skyOutH, gatherSlots),
+				}),
+			);
 			g.readNode("head", [
 				counts,
 				state,
@@ -357,6 +416,7 @@ export function prepGraph(
 	const { xb, yb, words } = prepUploads(photo, W, H, rad, fgRad);
 	const K = skyIdx.length;
 	const nBlk = Math.ceil(N / BLOCK);
+	const gatherSlots = gatherCapacity(W, H, K);
 	return withLease("look-haze", async () => {
 		const tu = performance.now();
 		const key = (k: string) => `look-haze/g/${k}`;
@@ -408,12 +468,12 @@ export function prepGraph(
 			range: up("range", range),
 			psky: up("psky", pSky),
 			fgm: up("fgm", fgBits),
-			skyIdx: up("skyIdx", K ? skyIdx : new Uint32Array(1)),
+			skyIdx: up("skyIdx", padIndices(skyIdx, gatherSlots)),
 			outIdx: out("outIdx", 3 * N * 4),
 			outVal: out("outVal", 3 * N * 4),
-			skyOut: out("skyOut", Math.max(1, 3 * K) * 4),
+			skyOut: out("skyOut", gatherSlots * 12),
 		};
-		const e = prepGraphFor(device, N);
+		const e = prepGraphFor(device, N, gatherSlots);
 		await e.graph.compileAsync();
 		const tr = performance.now();
 		const { reads } = await e.graph.run(
@@ -449,11 +509,14 @@ export function prepGraph(
 			tail: total > head,
 			cacheHit: !!e.hit,
 			ms: { upload: tr - tu, run: tt - tr },
+			gpuMs: tt - tu,
 			transientBytes: ts && {
 				logical: ts.logicalTransientBytes,
 				physical: ts.physicalTransientBytes,
 			},
 		});
+		hazeGraphProbe.skyIdx = skyIdx;
+		hazeGraphProbe.sky = K ? new Float32Array(sk) : new Float32Array(0);
 		return {
 			counts: new Uint32Array(c),
 			stat: statOf(s),
@@ -660,32 +723,37 @@ function compactGraphFor(
 	);
 }
 
-function gatherGraphFor(device: Device): CachedGraph<GatherParams, undefined> {
+/** The CPU band's lin gather ("look-haze-gather"): one GPUGather per (N, capacity), see gatherCapacity. */
+function gatherGraphFor(
+	device: Device,
+	N: number,
+	gatherSlots: number,
+): CachedGraph<GatherParams, undefined> {
 	return cachedGraph<GatherParams, undefined>(
 		device,
 		"look-haze-gather",
-		"gather",
+		`n${N}-g${gatherSlots}`,
 		(g) => {
-			const cprm = g.importBuffer("cprm", 16, undefined, UNIFORM);
-			const idx = at<GatherParams>(
-				g.importBuffer("skyIdx", 4, undefined, STORAGE),
-				(p) => p.K * 4,
+			const idx = g.importBuffer("skyIdx", gatherSlots * 4, undefined, STORAGE);
+			const lin = g.importBuffer("lin", N * 12, undefined, PREP_IN);
+			const outvH = g.importBuffer(
+				"skyOut",
+				gatherSlots * 12,
+				undefined,
+				STORAGE,
 			);
-			const lin = at<GatherParams>(
-				g.importBuffer("lin", 4, undefined, PREP_IN),
-				(p) => p.N * 12,
+			g.add(
+				new GPUGather({
+					id: "gather",
+					source: rows3(g, lin, N),
+					indices: g.view(idx, "uint32", gatherSlots),
+					output: rows3(g, outvH, gatherSlots),
+				}),
 			);
-			const outvH = g.importBuffer("skyOut", 4, undefined, STORAGE);
-			g.addKernel({
-				id: "gather",
-				spec: K_HZ_GATHER,
-				bindings: { prm: cprm, idx, lin, outv: at(outvH, (p) => 3 * p.K * 4) },
-				workgroups: (p) => [Math.ceil(p.K / 64)],
-			});
 			g.readNode("sky", [{ buffer: outvH, size: (p) => 3 * p.K * 4 }]);
 			return undefined;
 		},
-		1,
+		MAX_SHAPES,
 	);
 }
 
@@ -755,6 +823,7 @@ function fitGpuPart(
 	const pb = prep.buffers;
 	return withLease("look-haze", async () => {
 		checkPrep(device, prep);
+		const tStart = performance.now();
 		const key = (k: string) => `look-haze/p/${k}`;
 		const head = headFor(device, N, listHead);
 		const outIdx = pooledStorage(device, key("outIdx"), 3 * N * 4, {
@@ -807,20 +876,20 @@ function fitGpuPart(
 		let sky = new Float32Array(0);
 		let tail: ArrayBuffer[] = [];
 		if (K) {
-			const gg = gatherGraphFor(device);
+			const gatherSlots = gatherCapacity(W, H, K);
+			const gg = gatherGraphFor(device, N, gatherSlots);
 			await gg.graph.compileAsync();
 			const r2 = await gg.graph.run(
 				{ K, N },
 				{
 					buffers: {
-						cprm: pooledUniform(
+						skyIdx: pooledStorage(
 							device,
-							key("gprm"),
-							HAZE_COUNT_PARAMS.pack({ N, nBlk, K }),
+							key("skyIdx"),
+							padIndices(skyIdx, gatherSlots),
 						),
-						skyIdx: pooledStorage(device, key("skyIdx"), skyIdx),
 						lin: pb.lin,
-						skyOut: pooledStorage(device, key("skyOut"), 3 * K * 4, {
+						skyOut: pooledStorage(device, key("skyOut"), gatherSlots * 12, {
 							zero: false,
 						}),
 					},
@@ -860,7 +929,10 @@ function fitGpuPart(
 			total,
 			tail: rest > 0,
 			cacheHit: !!c.hit,
+			gpuMs: t1 - tStart,
 		});
+		hazeGraphProbe.skyIdx = skyIdx;
+		hazeGraphProbe.sky = sky;
 		return { lists, range, skyIdx, t1 };
 	});
 }
@@ -891,22 +963,24 @@ function bandGraphFor(
 			const bprm = g.importBuffer("bprm", 32, undefined, UNIFORM);
 			const pin = (id: string, bytes: (p: BandParams) => number) =>
 				at<BandParams>(g.importBuffer(id, 4, undefined, PREP_IN), bytes);
-			const lin = pin("lin", (p) => p.N * 12);
+			// the gathers' views need real declared sizes (checkPrep guarantees the prep's buffers)
+			const linH = g.importBuffer("lin", N * 12, undefined, PREP_IN);
+			const rangeH = g.importBuffer("range", N * 4, undefined, PREP_IN);
+			const lin = at<BandParams>(linH, (p) => p.N * 12);
 			const bins = pin("bins", (p) => p.N * 4);
 			const state = pin("state", () => SEL * 8);
-			const range = pin("range", (p) => p.N * 4);
+			const range = at<BandParams>(rangeH, (p) => p.N * 4);
 			const psky = pin("pSky", (p) => p.N * 4);
-			const imp = (id: string) => g.importBuffer(id, 4, undefined, STORAGE);
-			const outIdxH = imp("outIdx");
+			const imp = (id: string, bytes = 4) =>
+				g.importBuffer(id, bytes, undefined, STORAGE);
+			const outIdxH = imp("outIdx", 3 * N * 4);
 			const outValH = imp("outVal");
-			const outRangeH = imp("outRange");
-			const bandIdxH = imp("bandIdx");
-			const bandLinH = imp("bandLin");
+			const outRangeH = imp("outRange", 3 * N * 4);
+			const bandIdxH = imp("bandIdx", kMax * 4);
+			const bandLinH = imp("bandLin", 3 * kMax * 4);
 			const outIdx = at<BandParams>(outIdxH, (p) => 3 * p.N * 4);
 			const outVal = at<BandParams>(outValH, (p) => 3 * p.N * 4);
-			const outRange = at<BandParams>(outRangeH, (p) => 3 * p.N * 4);
 			const bandIdx = at<BandParams>(bandIdxH, () => kMax * 4);
-			const bandLin = at<BandParams>(bandLinH, () => 3 * kMax * 4);
 			const cols = at<BandParams>(imp("cols"), () => SPOT_COLUMNS * 4);
 			const blk = g.transientBuffer("blk", nBlk * LISTS * 4);
 			const offs = g.transientBuffer("offs", nBlk * LISTS * 4);
@@ -932,14 +1006,16 @@ function bandGraphFor(
 				workgroups: blkGroups,
 				writes: { outIdx: "full", outVal: "full" },
 			});
-			g.addKernel({
-				id: "list-range",
-				spec: K_HZB_RANGE,
-				bindings: { starts, outIdx, range, outRange },
-				// only [0, total) is written and read
-				workgroups: [Math.ceil((3 * N) / RANGE_GROUP)],
-				writes: { outRange: "full" },
-			});
+			// the lists' range words: a GPUGather over every list slot (3N); slots ≥ total hold stale
+			// indices (a valid pixel or out of range: a harmless row) and are never read
+			g.add(
+				new GPUGather({
+					id: "list-range",
+					source: g.view(rangeH, "float32", N),
+					indices: g.view(outIdxH, "uint32", 3 * N),
+					output: g.view(outRangeH, "float32", 3 * N),
+				}),
+			);
 			g.addKernel({
 				id: "band-count",
 				spec: K_HZB_COUNT,
@@ -968,13 +1044,15 @@ function bandGraphFor(
 				// [0, K) is written; the CPU reads [0, K) only
 				writes: { bandIdx: "full" },
 			});
-			g.addKernel({
-				id: "band-gather",
-				spec: K_HZB_GATHER,
-				bindings: { total, bandIdx, lin, bandLin },
-				workgroups: [Math.ceil(kMax / 64)],
-				writes: { bandLin: "full" },
-			});
+			// the band's lin over every band slot (kMax); slots ≥ K are stale indices, never read
+			g.add(
+				new GPUGather({
+					id: "band-gather",
+					source: rows3(g, linH, N),
+					indices: g.view(bandIdxH, "uint32", kMax),
+					output: rows3(g, bandLinH, kMax),
+				}),
+			);
 			g.addKernel({
 				id: "band-spot",
 				spec: K_HZB_SPOT,
@@ -1010,12 +1088,11 @@ const bandShort = new WeakMap<Device, boolean>();
 
 /**
  * fitHazeFromPrep's band choice: the option, else on; never after a failed spot check,
- * nor while the last band was short, nor past hzb-range's 1-D dispatch limit.
+ * nor while the last band was short.
  */
-function chooseBandGpu(device: Device, N: number, opt: boolean | undefined) {
+function chooseBandGpu(device: Device, opt: boolean | undefined) {
 	if (bandFailed.has(device)) return false;
 	if (!(opt ?? true)) return false;
-	if (Math.ceil((3 * N) / RANGE_GROUP) > 65535) return false;
 	return !bandShort.get(device);
 }
 
@@ -1037,6 +1114,7 @@ function fitGpuPartBand(
 	const pb = prep.buffers;
 	return withLease("look-haze", async () => {
 		checkPrep(device, prep);
+		const tStart = performance.now();
 		const key = (k: string) => `look-haze/b/${k}`;
 		const head = headFor(device, N, listHead);
 		// outIdx / outVal share fitGpuPart's pooled lists (same size, same lease, read back before
@@ -1145,8 +1223,13 @@ function fitGpuPartBand(
 			total,
 			tail: rest > 0,
 			cacheHit: !!e.hit,
+			gpuMs: t1 - tStart,
 			band: "gpu",
 		});
+		hazeGraphProbe.skyIdx = bandIdx.subarray(0, K);
+		hazeGraphProbe.sky = lists.sky;
+		hazeGraphProbe.listIdx = idx;
+		hazeGraphProbe.listRange = rng;
 		return {
 			lists,
 			// the tail reads range through the lists (bit for bit range[idx])
@@ -1165,7 +1248,7 @@ async function fitGpuPartAuto(
 ): Promise<FitGpu> {
 	let band: typeof hazeGraphStats.band = "cpu";
 	let fault: unknown = null;
-	if (chooseBandGpu(device, prep.W * prep.H, opts.bandGpu)) {
+	if (chooseBandGpu(device, opts.bandGpu)) {
 		try {
 			const r = await fitGpuPartBand(device, prep, opts.listHead);
 			if (r) return r;

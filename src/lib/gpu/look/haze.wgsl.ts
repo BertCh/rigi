@@ -411,22 +411,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_
 }
 `;
 
-/** lin at K given pixel indices (the airlight band), 3 floats each. @workgroup_size(64). */
-export const HZ_GATHER = /* wgsl */ `
-struct C { N: u32, nBlk: u32, K: u32, pad: u32 };
-@group(0) @binding(0) var<uniform> prm: C;
-@group(0) @binding(1) var<storage, read> idx: array<u32>;
-@group(0) @binding(2) var<storage, read> lin: array<f32>;
-@group(0) @binding(3) var<storage, read_write> outv: array<f32>;
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let k = id.x;
-  if (k >= prm.K) { return; }
-  let i = idx[k];
-  outv[3u * k] = lin[3u * i]; outv[3u * k + 1u] = lin[3u * i + 1u]; outv[3u * k + 2u] = lin[3u * i + 2u];
-}
-`;
-
 /**
  * The physical grid: cell (hk, a, b) → the robust SSE of evalPhys (kR, β_M, H_M index hk) plus its
  * priors. @workgroup_size(64): 5 550 cells, each ~1–2 k exp()s.

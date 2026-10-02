@@ -1081,6 +1081,13 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "haze-band-dawn",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("scripts/gpu/haze-band-dawn.ts"),
+		timeoutS: 180,
+	},
+	{
 		id: "stats-fold-dawn",
 		tier: "fast",
 		group: "look",

@@ -8,7 +8,7 @@
 // of two, and the range / P(sky) planes (8 B per pixel) no longer come back: the band's lin and the
 // lists' range values (what the CPU tail reads) are gathered on the GPU instead.
 //
-// Exactness. The band is integer work on f32 bit patterns (no float arithmetic, see the WGSL header),
+// Exactness. The band's indices are integer work on f32 bit patterns (no float arithmetic, see the WGSL header),
 // so it is exact by construction rather than certified: the strict-IEEE probe (../precision) has
 // nothing to vouch for here and does not gate it. What could still go wrong is a broken kernel or a
 // driver bug, so every call carries a runtime check (verifyBand): the column counts must add up to K
@@ -18,13 +18,12 @@
 // device. Fewer than 20 band pixels (airlightBand's fallback to every sky pixel) also takes the CPU
 // band: that path needs the whole range plane.
 //
+// The band's lin and the lists' range words are gathered by luma GPUGather (word copies, haze-graph.ts).
 // emulateBand is the WGSL's integer logic in TypeScript, for the node check haze-band.check.ts.
 import { bits32, nextDown32 } from "../precision/df32";
 import { airlightBandColumn, bandRows } from "./haze";
 import {
 	HZB_COUNT,
-	HZB_GATHER,
-	HZB_RANGE,
 	HZB_SCATTER,
 	HZB_SPOT,
 	HZB_TOTAL,
@@ -33,7 +32,7 @@ import {
 import { defineKernel } from "./kernel";
 import { HAZE_BAND_PARAMS } from "./uniform-blocks";
 
-export { RANGE_GROUP, SPOT_COLUMNS } from "./haze-band.wgsl";
+export { SPOT_COLUMNS } from "./haze-band.wgsl";
 
 /** In the look's warm group (default on): warmed with the other look kernels. */
 const BAND_KERNELS = {};
@@ -71,28 +70,6 @@ export const K_HZB_SCATTER = defineKernel(
 		["top", "read-only-storage"],
 		["off", "read-only-storage"],
 		["bandIdx", "storage"],
-	],
-	BAND_KERNELS,
-);
-export const K_HZB_GATHER = defineKernel(
-	"hzb-gather",
-	HZB_GATHER,
-	[
-		["total", "read-only-storage"],
-		["bandIdx", "read-only-storage"],
-		["lin", "read-only-storage"],
-		["bandLin", "storage"],
-	],
-	BAND_KERNELS,
-);
-export const K_HZB_RANGE = defineKernel(
-	"hzb-range",
-	HZB_RANGE,
-	[
-		["starts", "read-only-storage"],
-		["outIdx", "read-only-storage"],
-		["range", "read-only-storage"],
-		["outRange", "storage"],
 	],
 	BAND_KERNELS,
 );

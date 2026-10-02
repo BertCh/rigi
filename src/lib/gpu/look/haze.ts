@@ -45,7 +45,6 @@ import {
 	HZ_BIN,
 	HZ_CNT,
 	HZ_DILH,
-	HZ_GATHER,
 	HZ_GRID,
 	HZ_HIST,
 	HZ_PREP,
@@ -131,12 +130,6 @@ export const K_HZ_SCATTER = defineKernel("hz-scatter", HZ_SCATTER, [
 	["offs", "read-only-storage"],
 	["outIdx", "storage"],
 	["outVal", "storage"],
-]);
-export const K_HZ_GATHER = defineKernel("hz-gather", HZ_GATHER, [
-	["prm", "uniform"],
-	["idx", "read-only-storage"],
-	["lin", "read-only-storage"],
-	["outv", "storage"],
 ]);
 export const K_HZ_GRID = defineKernel("hz-grid", HZ_GRID, [
 	["prm", "uniform"],
