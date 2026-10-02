@@ -370,7 +370,7 @@ export class Runtime {
 	 * buffers now; every other produced storage becomes dead scratch.
 	 */
 	/** Dead-code elimination, epilogue fusion and storage states; the nodes that remain. */
-	private prepare(rec: Recording, outputs: Set<Storage>): Node[] {
+	private prepare(rec: Recording, outputs: Set<Storage>, warm = false): Node[] {
 		// dead-code elimination: keep nodes that (transitively) feed an output
 		const live = new Set<Storage>(outputs);
 		const keep: Node[] = [];
@@ -387,7 +387,7 @@ export class Runtime {
 		keep.reverse();
 		for (const s of rec.produced) {
 			s.rec = null;
-			if (outputs.has(s)) {
+			if (outputs.has(s) && !warm) {
 				s.buffer = s.exact
 					? this.allocateExact(s.bytes)
 					: this.allocate(s.bytes);
@@ -505,8 +505,15 @@ export class Runtime {
 	}
 
 	/** `once`: an eager (implicit) recording, cached under `${graphGroup}/once` with a small cap. */
-	flush(rec: Recording, outputs: Set<Storage>, once = false): Promise<void> {
-		const keep = this.prepare(rec, outputs);
+	flush(
+		rec: Recording,
+		outputs: Set<Storage>,
+		once = false,
+		warm = false,
+	): Promise<void> {
+		// warm: build and cache the graph exactly as a real forward would (outputs keep their slot names,
+		// but get no buffers and everything produced ends dead), compile it, never run it
+		const keep = this.prepare(rec, outputs, warm);
 		if (!keep.length) return Promise.resolve();
 		const produced = new Set(rec.produced);
 		// slots: imports (x), outputs (o), transients (t), in first-use order
@@ -659,6 +666,13 @@ export class Runtime {
 		if (c.hit) this.stats.graphHits++;
 		else this.stats.graphs++;
 		const graph = c.graph;
+		if (warm) {
+			// off the run queue: a real forward is never held up behind a warm-up compile (concurrent
+			// compileAsync calls on one graph share a single compilation)
+			return graph.isCompiled
+				? Promise.resolve()
+				: graph.compileAsync().then(() => undefined);
+		}
 		const buffers: Record<string, Buffer> = {};
 		imports.forEach((s, i) => {
 			buffers[`x${i}`] = s.buffer as Buffer;

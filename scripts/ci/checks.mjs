@@ -1519,6 +1519,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "nn-warm",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/nn/warm.check.ts"),
+		note: "nn.warm over Dawn: warm(fn) builds and compiles the graph without running it, the real forward is then a cachedGraph hit (small net, sky U2-Net 512x384, people mask 512x384, ALIKED dense 1024x768 when the weights exist), no pooled buffers allocated, results equal the unwarmed ones; SKIP without DAWN_DIR",
+		timeoutS: 180,
+	},
+	{
 		id: "nn-interop",
 		tier: "fast",
 		group: "gpu",

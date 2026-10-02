@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MANIFEST from "../../../../scripts/models/manifest.json";
 import {
+	createModelFetcher,
 	type DownloadDeps,
 	downloadModel,
 	fetchModel,
@@ -240,5 +241,102 @@ describe("fetchModel in node", () => {
 		const buf = await fetchModel("models/x.bin");
 		expect([...new Uint8Array(buf)]).toEqual([1, 2, 3]);
 		await expect(fetchModel("missing.bin")).rejects.toThrow();
+	});
+});
+
+describe("createModelFetcher abort refcount", () => {
+	/** A body that never finishes: the test pushes chunks and watches for cancel. */
+	function controllable() {
+		let controller!: ReadableStreamDefaultController<Uint8Array>;
+		let cancelled = false;
+		const body = new ReadableStream<Uint8Array>({
+			start(c) {
+				controller = c;
+			},
+			cancel() {
+				cancelled = true;
+			},
+		});
+		return {
+			response: () =>
+				new Response(body, { headers: { "content-length": "1000" } }),
+			push: (n: number) => controller.enqueue(new Uint8Array(n)),
+			get cancelled() {
+				return cancelled;
+			},
+		};
+	}
+	const tick = () => new Promise((r) => setTimeout(r, 5));
+
+	function setup() {
+		const { file } = hashedFile("abortable");
+		const { caches, cache } = fakeCaches();
+		const bodies: ReturnType<typeof controllable>[] = [];
+		const fetch = vi.fn(async () => {
+			const b = controllable();
+			bodies.push(b);
+			return b.response();
+		});
+		const fetcher = createModelFetcher({
+			fetch: fetch as unknown as typeof globalThis.fetch,
+			caches,
+			subtle,
+			origin: "https://rigi.test/",
+		});
+		return { file, cache, bodies, fetch, fetcher };
+	}
+
+	it("keeps downloading while one waiter without a signal remains", async () => {
+		const { file, bodies, fetch, fetcher } = setup();
+		const a = new AbortController();
+		const withSignal = fetcher(file, { signal: a.signal });
+		const without = fetcher(file);
+		withSignal.catch(() => {});
+		await tick();
+		a.abort(new Error("gone"));
+		await expect(withSignal).rejects.toThrow("gone");
+		await tick();
+		expect(bodies[0].cancelled).toBe(false);
+		expect(fetch).toHaveBeenCalledTimes(1);
+		void without.catch(() => {});
+	});
+
+	it("aborts the shared fetch when every waiter aborted, caches nothing and starts fresh next time", async () => {
+		const { file, cache, bodies, fetch, fetcher } = setup();
+		const a = new AbortController();
+		const b = new AbortController();
+		const p1 = fetcher(file, { signal: a.signal });
+		const p2 = fetcher(file, { signal: b.signal });
+		p1.catch(() => {});
+		p2.catch(() => {});
+		await tick();
+		bodies[0].push(100);
+		await tick();
+		expect(modelDownloads().find((d) => d.file === file)?.state).toBe(
+			"downloading",
+		);
+		a.abort();
+		await tick();
+		expect(bodies[0].cancelled).toBe(false);
+		b.abort();
+		await expect(p1).rejects.toBeDefined();
+		await expect(p2).rejects.toBeDefined();
+		await tick();
+		expect(bodies[0].cancelled).toBe(true);
+		expect(cache.store.size).toBe(0);
+		expect(modelDownloads().find((d) => d.file === file)).toBeUndefined();
+
+		const p3 = fetcher(file);
+		p3.catch(() => {});
+		await tick();
+		expect(fetch).toHaveBeenCalledTimes(2);
+	});
+
+	it("a pre-aborted signal never starts a download", async () => {
+		const { file, fetch, fetcher } = setup();
+		const a = new AbortController();
+		a.abort();
+		await expect(fetcher(file, { signal: a.signal })).rejects.toBeDefined();
+		expect(fetch).not.toHaveBeenCalled();
 	});
 });

@@ -7,7 +7,7 @@
 // specs can drive it without a browser.
 
 import MANIFEST from "../../../scripts/models/manifest.json";
-import { reportModelDownload } from "./progress";
+import { forgetModelDownload, reportModelDownload } from "./progress";
 
 export type ModelEntry = {
 	file: string;
@@ -106,6 +106,7 @@ async function readBody(
 	res: Response,
 	total: number,
 	progress: (loaded: number) => void,
+	signal?: AbortSignal,
 ): Promise<ArrayBuffer> {
 	if (!res.body) {
 		const buf = await res.arrayBuffer();
@@ -115,9 +116,19 @@ async function readBody(
 	const reader = res.body.getReader();
 	let out = new Uint8Array(total > 0 ? total : 1 << 20);
 	let loaded = 0;
+	// Cancelling the reader also settles a read that is pending (a real fetch errors the body itself).
+	const onAbort = () => void reader.cancel(signal?.reason).catch(() => {});
+	signal?.addEventListener("abort", onAbort, { once: true });
 	for (;;) {
-		const { done, value } = await reader.read();
-		if (done) break;
+		signal?.throwIfAborted();
+		const { done, value } = await reader.read().catch((e) => {
+			signal?.throwIfAborted();
+			throw e;
+		});
+		if (done) {
+			signal?.throwIfAborted();
+			break;
+		}
 		if (loaded + value.byteLength > out.byteLength) {
 			const grown = new Uint8Array(
 				Math.max(out.byteLength * 2, loaded + value.byteLength),
@@ -129,6 +140,7 @@ async function readBody(
 		loaded += value.byteLength;
 		progress(loaded);
 	}
+	signal?.removeEventListener("abort", onAbort);
 	return loaded === out.byteLength ? out.buffer : out.buffer.slice(0, loaded);
 }
 
@@ -167,7 +179,7 @@ export async function downloadModel(
 			reportModelDownload({ file: name, state: "downloading", loaded, total });
 		};
 		progress(0);
-		const buf = await readBody(res, total, progress);
+		const buf = await readBody(res, total, progress, opts.signal);
 		await verifyModel(name, buf, deps.subtle);
 		// Response copies the bytes; a failed put (quota) only costs the next visit a download.
 		await cache
@@ -189,6 +201,11 @@ export async function downloadModel(
 		});
 		return buf;
 	} catch (e) {
+		if (opts.signal?.aborted) {
+			// Every waiter gave up: nothing failed, so the file simply has no download status.
+			forgetModelDownload(name);
+			throw e;
+		}
 		reportModelDownload({
 			file: name,
 			state: "error",
@@ -224,13 +241,95 @@ type Inflight = {
 	listeners: Set<(loaded: number, total: number) => void>;
 	/** Callers still waiting: the last one to resume gets the buffer itself, the others a copy. */
 	waiters: number;
+	/** Callers that have not aborted; a caller without a signal never leaves this count. */
+	live: number;
+	abort: AbortController;
 };
-const inflight = new Map<string, Inflight>();
+
+/**
+ * The shared-download layer of fetchModel with explicit globals (exported for specs): concurrent
+ * calls for one file share one download that has its own AbortController. A caller whose signal
+ * aborts stops waiting at once; when every caller has aborted (a caller without a signal never
+ * does) the shared fetch is aborted too: the stream read stops, nothing is cached, the in-flight
+ * entry goes away so a later call starts fresh, and the file's progress entry is dropped.
+ */
+export function createModelFetcher(deps: DownloadDeps) {
+	const inflight = new Map<string, Inflight>();
+	return async function fetchShared(
+		name: string,
+		opts: FetchModelOptions = {},
+	): Promise<ArrayBuffer> {
+		opts.signal?.throwIfAborted();
+		let job = inflight.get(name);
+		if (!job) {
+			const listeners = new Set<(loaded: number, total: number) => void>();
+			const abort = new AbortController();
+			const promise = downloadModel(name, deps, {
+				signal: abort.signal,
+				onProgress: (l, t) => {
+					for (const f of listeners) f(l, t);
+				},
+			});
+			const created: Inflight = {
+				promise,
+				listeners,
+				waiters: 0,
+				live: 0,
+				abort,
+			};
+			job = created;
+			inflight.set(name, job);
+			const clear = () => {
+				if (inflight.get(name) === created) inflight.delete(name);
+			};
+			promise.then(clear, clear);
+		}
+		const shared = job;
+		const { promise, listeners } = shared;
+		shared.waiters++;
+		shared.live++;
+		let counted = true;
+		let left = false;
+		const leave = () => {
+			if (left) return;
+			left = true;
+			if (--shared.live === 0) {
+				if (inflight.get(name) === shared) inflight.delete(name);
+				shared.abort.abort(opts.signal?.reason);
+			}
+		};
+		const onProgress = opts.onProgress;
+		if (onProgress) listeners.add(onProgress);
+		const signal = opts.signal;
+		try {
+			const bytes = await (signal
+				? new Promise<ArrayBuffer>((resolve, reject) => {
+						const onAbort = () => {
+							reject(signal.reason);
+							leave();
+						};
+						signal.addEventListener("abort", onAbort, { once: true });
+						promise
+							.then(resolve, reject)
+							.finally(() => signal.removeEventListener("abort", onAbort));
+					})
+				: promise);
+			counted = false;
+			return --shared.waiters === 0 ? bytes : bytes.slice(0);
+		} finally {
+			if (counted) shared.waiters--;
+			if (onProgress) listeners.delete(onProgress);
+		}
+	};
+}
+
+let browserFetcher: ReturnType<typeof createModelFetcher> | undefined;
 
 /**
  * The bytes of public/models/<file>. Browser: Cache Storage, else a streamed download (progress via
  * `onProgress` and the progress store), verified against its sha256 before it is cached; concurrent
- * calls for one file share the download (each caller gets its own ArrayBuffer). Node: read from disk.
+ * calls for one file share the download (each caller gets its own ArrayBuffer; see
+ * createModelFetcher for abort semantics). Node: read from disk.
  */
 export async function fetchModel(
 	file: string,
@@ -238,49 +337,11 @@ export async function fetchModel(
 ): Promise<ArrayBuffer> {
 	const name = modelFileName(file);
 	if (isNodeRuntime()) return readModelFromDisk(name);
-	opts.signal?.throwIfAborted();
-	let job = inflight.get(name);
-	if (!job) {
-		const listeners = new Set<(loaded: number, total: number) => void>();
-		const promise = downloadModel(
-			name,
-			{
-				fetch: globalThis.fetch.bind(globalThis),
-				caches: (globalThis as { caches?: CacheStorage }).caches,
-				subtle: globalThis.crypto?.subtle,
-				origin: globalThis.location?.href ?? "http://localhost/",
-			},
-			{
-				onProgress: (l, t) => {
-					for (const f of listeners) f(l, t);
-				},
-			},
-		).finally(() => inflight.delete(name));
-		job = { promise, listeners, waiters: 0 };
-		inflight.set(name, job);
-	}
-	const shared = job;
-	const { promise, listeners } = shared;
-	shared.waiters++;
-	let counted = true;
-	const onProgress = opts.onProgress;
-	if (onProgress) listeners.add(onProgress);
-	try {
-		// A shared download is not aborted by one caller: that caller only stops waiting.
-		const signal = opts.signal;
-		const bytes = await (signal
-			? new Promise<ArrayBuffer>((resolve, reject) => {
-					const onAbort = () => reject(signal.reason);
-					signal.addEventListener("abort", onAbort, { once: true });
-					promise
-						.then(resolve, reject)
-						.finally(() => signal.removeEventListener("abort", onAbort));
-				})
-			: promise);
-		counted = false;
-		return --shared.waiters === 0 ? bytes : bytes.slice(0);
-	} finally {
-		if (counted) shared.waiters--;
-		if (onProgress) listeners.delete(onProgress);
-	}
+	browserFetcher ??= createModelFetcher({
+		fetch: globalThis.fetch.bind(globalThis),
+		caches: (globalThis as { caches?: CacheStorage }).caches,
+		subtle: globalThis.crypto?.subtle,
+		origin: globalThis.location?.href ?? "http://localhost/",
+	});
+	return browserFetcher(name, opts);
 }

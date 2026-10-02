@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import type { ModelDownload } from "../models/progress";
+
 /** Messages between index.ts and sky.worker.ts. */
 export interface SkySegmentRequest {
 	type: "segment";
@@ -87,4 +89,10 @@ export interface SkyPrepStatus {
 	verified: number;
 	/** Set once a verification mismatched (or errors repeated): the GPU prep stays off for this device. */
 	disabled?: string;
+}
+
+/** Model-download status of the worker realm, forwarded for the page's progress store (no id). */
+export interface SkyProgressMessage {
+	type: "progress";
+	downloads: readonly ModelDownload[];
 }

@@ -223,6 +223,17 @@ export interface Nn {
 	 */
 	forward<T>(fn: () => T): Promise<T>;
 	/**
+	 * GPU backend: build and compile the graph `forward(fn)` would produce, without running it, so the
+	 * first real forward of that shape is a cache hit (no pipeline compile at the first photo). `fn`
+	 * must record exactly what the real forward records; inputs must have the real ones' kind: weights,
+	 * `fromArray` / `fromBuffer` / `scratch(shape)` (a zeroed, never-uploaded f32 input, freed after),
+	 * `fromTexture` with a texture of the real size. Outputs get no buffers. Resolves when compiled;
+	 * rejects on a compile error (callers ignore it: a warm-up never fails a request).
+	 */
+	warm?<T>(
+		fn: (scratch: (shape: readonly number[]) => Tensor) => T,
+	): Promise<void>;
+	/**
 	 * Record `fn` once per (`key`, input shapes) and return a replayable forward (see
 	 * CompiledForward). `fn` receives one persistent f32 tensor per entry of `inputShapes`; tensors
 	 * it returns (a tensor, array or plain object of them) are the persistent outputs. Same

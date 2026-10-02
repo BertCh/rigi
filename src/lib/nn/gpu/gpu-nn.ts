@@ -604,6 +604,39 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		return out;
 	}
 
+	async warm<R>(
+		fn: (scratch: (shape: readonly number[]) => Tensor) => R,
+	): Promise<void> {
+		if (this.rec) throw new Error("nn: warm() inside forward()");
+		const pending = this.flushImplicit();
+		const rec = new Recording();
+		const scratchBuffers: Buffer[] = [];
+		const scratch = (shape: readonly number[]) => {
+			const st = new Storage(Math.max(4, numel(shape) * 4), "f32", null);
+			st.buffer = this.runtime.allocateExact(st.bytes);
+			st.pinned = true;
+			scratchBuffers.push(st.buffer);
+			return new GpuTensor([...shape], "f32", st);
+		};
+		this.rec = rec;
+		let out: R;
+		try {
+			out = fn(scratch);
+		} catch (e) {
+			for (const s of rec.produced) s.state = "dead";
+			for (const b of scratchBuffers) b.destroy();
+			throw e;
+		} finally {
+			this.rec = null;
+		}
+		const outs = this.collectOutputs(out, rec);
+		try {
+			await Promise.all([pending, this.runtime.flush(rec, outs, false, true)]);
+		} finally {
+			for (const b of scratchBuffers) b.destroy();
+		}
+	}
+
 	scope<R>(name: string, fn: () => R): R {
 		const outer = this.scopePath;
 		this.scopePath = outer ? `${outer}/${name}` : name;

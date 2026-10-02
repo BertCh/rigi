@@ -17,6 +17,7 @@ import { getNn, type Nn, perNn, type Weights } from "#/lib/nn";
 import { ALIKED_WEIGHTS, runAliked } from "./aliked";
 import { LIGHTGLUE_WEIGHTS, runLightGlue } from "./lightglue";
 import { type RgbaImage, rgbaToPlanes } from "./preprocess";
+import { warmAliked } from "./warm";
 
 export type FeatureSet = {
 	width: number;
@@ -55,6 +56,8 @@ const weightsOf = perNn(async (nn) => {
 		nn.loadWeights(ALIKED_WEIGHTS),
 		nn.loadWeights(LIGHTGLUE_WEIGHTS),
 	]);
+	// background compile of the common first extract; never blocks or fails a request
+	void warmAliked(nn, aliked).catch(() => {});
 	return { nn, aliked, lightglue };
 });
 

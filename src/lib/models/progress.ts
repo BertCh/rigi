@@ -45,6 +45,13 @@ export function reportModelDownload(entry: ModelDownload): void {
 	for (const l of listeners) l();
 }
 
+/** Drops one file's entry (a download every waiter aborted has no status to show). */
+export function forgetModelDownload(file: string): void {
+	if (!entries.delete(file)) return;
+	snapshot = [...entries.values()];
+	for (const l of listeners) l();
+}
+
 /** Forgets every entry (tests, or a page that dismissed the list). */
 export function clearModelDownloads(): void {
 	entries.clear();

@@ -88,6 +88,80 @@ function smoothstepTensor(nn: Nn, p: Tensor, a: number, b: number): Tensor {
 	return nn.mul(nn.mul(t, t), nn.sub(3, nn.mul(t, 2)));
 }
 
+/** The mask pipeline's ops (call inside nn.forward / nn.warm): the 0..255 float mask [1, 1, h, w]. */
+function recordPeopleMask(
+	nn: Nn,
+	nets: readonly PeopleNet[],
+	tex: unknown,
+	w: number,
+	h: number,
+): Tensor {
+	if (!nn.fromTexture)
+		throw new Error("people: the nn runtime has no fromTexture");
+	const fromTexture = nn.fromTexture.bind(nn);
+	const r = dilationRadius(w);
+	let p: Tensor | null = null;
+	for (const net of nets) {
+		const [, mh, mw] = net.net.inputShape;
+		// texel unorm v: (v - m/255) / (s/255) == (byte - m) / s
+		const x = nn.permute(
+			fromTexture(tex, {
+				shape: [1, 3, mh, mw],
+				mean: [net.net.mean / 255, net.net.mean / 255, net.net.mean / 255],
+				std: [net.net.std / 255, net.net.std / 255, net.net.std / 255],
+			}),
+			[0, 2, 3, 1],
+		);
+		const up = nn.interpolate(personProbability(net, x), {
+			size: [h, w],
+			mode: "bilinear",
+			alignCorners: false,
+		});
+		p = p ? nn.maximum(p, up) : up;
+	}
+	if (!p) throw new Error("people: no nets");
+	let m = nn.maxPool2d(smoothstepTensor(nn, p, 0.3, 0.6), {
+		kernel: [2 * r + 1, 2 * r + 1],
+		stride: [1, 1],
+		padding: [r, r],
+	});
+	for (let i = 0; i < 2; i++)
+		m = nn.avgPool2d(m, {
+			kernel: [3, 3],
+			stride: [1, 1],
+			padding: [1, 1],
+			countIncludePad: false,
+		});
+	return nn.mul(m, 255);
+}
+
+/**
+ * Compile the mask graph for a w x h working copy (default 512 x 384: 4:3 landscape at MASK_LONG_SIDE)
+ * without running it, so the first real mask is a cache hit. The dummy texture has the usage of the
+ * ImageBitmap path of createRgbaTexture. Rejects on a compile error (callers ignore it).
+ */
+export async function warmPeopleMask(
+	nn: Nn,
+	nets: readonly PeopleNet[],
+	device: Device,
+	w = MASK_LONG_SIDE,
+	h = Math.round((MASK_LONG_SIDE * 3) / 4),
+): Promise<void> {
+	if (!nn.warm) return;
+	const tex = device.createTexture({
+		id: "people-rgba-warm",
+		width: w,
+		height: h,
+		format: "rgba8unorm",
+		usage: Texture.SAMPLE | Texture.COPY_DST | Texture.RENDER_ATTACHMENT,
+	});
+	try {
+		await nn.warm(() => recordPeopleMask(nn, nets, tex, w, h));
+	} finally {
+		tex.destroy();
+	}
+}
+
 /**
  * The mask pipeline on a w x h rgba8unorm luma Texture (sampleable), for one or both nets. Returns the
  * ByteMask; the caller owns (and destroys) the texture.
@@ -101,43 +175,7 @@ export async function segmentTextureGpu(
 ): Promise<{ width: number; height: number; data: Uint8Array }> {
 	if (!nn.fromTexture)
 		throw new Error("people: the nn runtime has no fromTexture");
-	const fromTexture = nn.fromTexture.bind(nn);
-	const r = dilationRadius(w);
-	const out = await nn.forward(() => {
-		let p: Tensor | null = null;
-		for (const net of nets) {
-			const [, mh, mw] = net.net.inputShape;
-			// texel unorm v: (v - m/255) / (s/255) == (byte - m) / s
-			const x = nn.permute(
-				fromTexture(tex, {
-					shape: [1, 3, mh, mw],
-					mean: [net.net.mean / 255, net.net.mean / 255, net.net.mean / 255],
-					std: [net.net.std / 255, net.net.std / 255, net.net.std / 255],
-				}),
-				[0, 2, 3, 1],
-			);
-			const up = nn.interpolate(personProbability(net, x), {
-				size: [h, w],
-				mode: "bilinear",
-				alignCorners: false,
-			});
-			p = p ? nn.maximum(p, up) : up;
-		}
-		if (!p) throw new Error("people: no nets");
-		let m = nn.maxPool2d(smoothstepTensor(nn, p, 0.3, 0.6), {
-			kernel: [2 * r + 1, 2 * r + 1],
-			stride: [1, 1],
-			padding: [r, r],
-		});
-		for (let i = 0; i < 2; i++)
-			m = nn.avgPool2d(m, {
-				kernel: [3, 3],
-				stride: [1, 1],
-				padding: [1, 1],
-				countIncludePad: false,
-			});
-		return nn.mul(m, 255);
-	});
+	const out = await nn.forward(() => recordPeopleMask(nn, nets, tex, w, h));
 	try {
 		const v = await nn.read(out);
 		return { width: w, height: h, data: toByteMask(v) };

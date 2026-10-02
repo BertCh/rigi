@@ -51,6 +51,30 @@ App consumers do not call `createNn` themselves: `getNn(consumer, device?)` (`re
 - Missing an op? Add it to `types.ts` + `base.ts` (shape logic) + `cpu.ts` + `gpu/`, with a
   `scripts/nn/parity.check.ts` case. Keep signatures stable; other units build on them.
 
+## First-forward warm-up: `warm`
+
+Graphs compile lazily at their first `forward` (pipelines via `compileAsync`), which is a visible stall at the
+first photo. `warm?(fn)` (GPU backend; absent on the CPU one) records `fn` exactly like `forward`, builds the
+same cached graph (same key, so the real forward is a `runtime.stats.graphHits` hit) and awaits its compile
+WITHOUT running it. Outputs get no buffers and everything produced is discarded.
+
+```ts
+await nn.warm((scratch) => runU2netp(nn, net, scratch([1, 3, 384, 512])).prob);
+```
+
+- Inputs must be of the same kind as the real forward's, since the cache key names imports, outputs and
+  scratch: weights; `scratch(shape)` for a `fromArray` / `fromBuffer` input (an f32 tensor of that size that is
+  never uploaded and freed after the warm-up); `fromTexture` with a texture of the real size and usage.
+- It does not use the run queue: a real forward is never held up by a warm-up (concurrent `compileAsync` calls
+  on one graph share one compilation), and a warm-up of an already compiled graph is a no-op.
+- Callers start it in the background after the weights load and ignore its errors (`.catch(() => {})`): sky
+  (`sky/warm.ts`, U²-Net at 512×384 plus the fused graph for 1024×768), people masks (`warmPeopleMask`, 512×384),
+  ALIKED's dense forward (`features/warm.ts`, 1024×768, 4096 keypoints). Other shapes compile on their first use as
+  before; graphs whose shapes depend on the data (ALIKED's keypoint-count forwards, LightGlue's pruned layers)
+  cannot be warmed.
+- `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/warm.check.ts` (fast row `nn-warm`) proves the cache hit;
+  `--bench <sky|people|aliked> <cold|warm>` prints the first-forward latency of one fresh process.
+
 ## Frame loops: `compile`, `scope`, `readLater`
 
 `forward(fn)` re-runs `fn`, re-records, plans fusion and hashes the graph on every call. For a loop that
@@ -174,6 +198,7 @@ Producer: `scripts/models/quantize.ts`; parity: the `dequant` and `q8 resident` 
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/parity.check.ts` (fast row `nn-parity`): every GPU op vs
   the CPU reference over Dawn in node, max abs / rel error per case; SKIP without `DAWN_DIR`.
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/compile.check.ts` (fast row `nn-compile`): persistent forward vs CPU, pipelined runs, rebinding, scope labels.
+- `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/warm.check.ts` (fast row `nn-warm`): a warmed graph is a cache hit for the real forward.
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/frame-loop.bench.ts [--only tiny,chain,pipeline,depth]`: frame-loop CPU overhead and the depth net warm run.
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/bench.ts [--f16]`: GFLOP/s of linear, conv, attention.
 - `DAWN_DIR=/tmp/dawn npx tsx scripts/nn/wgsl-lint.ts`: compile messages of every nn kernel.

@@ -138,6 +138,37 @@ export function releaseFusedGraphs(device: Device): Promise<void> {
 	return releaseCachedGraphs(device, FUSED_GROUP);
 }
 
+/**
+ * Build and compile the fused graph of one shape without running it, so the first fused photo of that
+ * shape finds it cached and compiled (it allocates the model output buffer, freed with the graph). No
+ * photo, no params: nothing is read or written. Resolves false when the shape is unsupported.
+ */
+export async function warmFusedSky(
+	device: Device,
+	shape: {
+		W: number;
+		H: number;
+		lw: number;
+		lh: number;
+		model: FusedModelHooks;
+	},
+	radius = 3,
+): Promise<boolean> {
+	const { W, H, lw, lh, model } = shape;
+	if (fusedUnsupported(device, W, H, lw, lh, radius)) return false;
+	await withLease(FUSED_GROUP, async () => {
+		const { graph } = cachedGraph<Params, void>(
+			device,
+			FUSED_GROUP,
+			fusedGraphKey(W, H, lw, lh, radius, model.key),
+			(g) => buildFusedGraph(g, W, H, lw, lh, radius, model),
+			MAX_GRAPHS,
+		);
+		await graph.compileAsync();
+	});
+	return true;
+}
+
 /** Last-run info for checks and benches. */
 export let lastFusedRun: { key: string; hit: boolean } | undefined;
 

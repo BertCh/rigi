@@ -15,6 +15,7 @@
  * call always resolves with a mask.
  */
 import { gpuEnabled } from "#/lib/gpu/device";
+import { receiveModelDownloads } from "#/lib/models/forward";
 import {
 	classicalSky,
 	refineToWorking,
@@ -24,6 +25,7 @@ import {
 } from "./core";
 import { createPendingRequests } from "./pending";
 import type {
+	SkyProgressMessage,
 	SkySegmentRequest,
 	SkyWorkerRequest,
 	SkyWorkerResponse,
@@ -130,8 +132,12 @@ function getWorker(): Worker | null {
 			type: "module",
 		});
 		worker = wk;
-		wk.onmessage = (ev: MessageEvent<SkyWorkerResponse>) => {
-			if (wk === worker) pending.resolve(ev.data.id, ev.data);
+		wk.onmessage = (
+			ev: MessageEvent<SkyWorkerResponse | SkyProgressMessage>,
+		) => {
+			if (wk !== worker) return;
+			if ("downloads" in ev.data) receiveModelDownloads(ev.data.downloads);
+			else pending.resolve(ev.data.id, ev.data);
 		};
 		wk.onerror = (ev) => dropWorker(wk, ev.message);
 		wk.onmessageerror = () => dropWorker(wk, "unreadable reply");

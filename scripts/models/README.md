@@ -21,7 +21,9 @@ node scripts/models/fetch.mjs --dir /tmp/m # another target directory
 
 - `file`: the served filename. It carries the first 8 hex digits of its sha256, so it can be cached
   forever (HTTP and Cache Storage) and a new version is a new name. Any format works: `.onnx`,
-  `.tflite`, `.safetensors`, `.bin`.
+  `.tflite`, `.safetensors`, `.bin`. `vite build` leaves `models/*.onnx` and `models/*.tflite` out of the
+  output (`PARITY_ONLY_MODELS` in vite.config.ts): the app loads only `.safetensors`; the others are
+  producer inputs and parity references that stay in `public/models` for dev and scripts.
 - `sha256`, `bytes`: of the served file. `fetch.mjs` and the browser (`fetchModel`, before caching)
   verify them.
 - `licence`: SPDX identifier of the weights. Never add research-only or non-commercial weights as a

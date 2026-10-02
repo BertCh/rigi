@@ -50,6 +50,12 @@ const PROD_ROUTE_TREE = fileURLToPath(
 const gateRoutes =
 	process.argv[2] === "build" && process.env.RIGI_ROUTES !== "all";
 
+// The app loads only the *.safetensors rows of scripts/models/manifest.json. The .onnx / .tflite files in
+// public/models are the producers' parity references (scripts u2netp-parity, people-parity): they stay
+// in public/ for dev and scripts but are not copied into the build output (nitro's public asset ignore
+// patterns; a leading "**" keeps them relative to public/).
+const PARITY_ONLY_MODELS = ["**/models/*.onnx", "**/models/*.tflite"];
+
 const config = defineConfig({
 	cacheDir: devPort ? `node_modules/.vite-${devPort}` : "node_modules/.vite",
 	resolve: {
@@ -76,7 +82,7 @@ const config = defineConfig({
 	},
 	plugins: [
 		photosJson(),
-		nitro(),
+		nitro({ ignore: PARITY_ONLY_MODELS }),
 		tailwindcss(),
 		tanstackStart(
 			gateRoutes

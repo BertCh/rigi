@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { receiveModelDownloads } from "../models/forward";
 /**
  * The src/lib/features interface backed by a dedicated worker (one per page, created on first use,
  * weights loaded once there). Same signatures as ./index; falls back to this thread when workers are
@@ -15,7 +16,11 @@ import type {
 	ImageInput,
 	matchFeatures as MatchFn,
 } from "./index";
-import type { FeaturesRequest, FeaturesResponse } from "./protocol";
+import type {
+	FeaturesProgress,
+	FeaturesRequest,
+	FeaturesResponse,
+} from "./protocol";
 
 type Pending = {
 	resolve: (v: unknown) => void;
@@ -36,8 +41,14 @@ function getWorker(): Worker | null {
 		worker = null;
 		return null;
 	}
-	worker.onmessage = (ev: MessageEvent<FeaturesResponse>) => {
+	worker.onmessage = (
+		ev: MessageEvent<FeaturesResponse | FeaturesProgress>,
+	) => {
 		const m = ev.data;
+		if ("op" in m) {
+			receiveModelDownloads(m.downloads);
+			return;
+		}
 		const p = pending.get(m.id);
 		if (!p) return;
 		pending.delete(m.id);

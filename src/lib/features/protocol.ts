@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Page ↔ features worker messages (import-light: no runtime imports).
+import type { ModelDownload } from "../models/progress";
 import type { FeatureMatches, FeatureSet, ImageInput } from "./index";
 
 export type FeaturesRequest =
@@ -20,3 +21,9 @@ export type FeaturesRequest =
 export type FeaturesResponse =
 	| { id: number; ok: true; result: boolean | FeatureSet | FeatureMatches }
 	| { id: number; ok: false; error: string; abort?: boolean };
+
+/** Model-download status of the worker realm, forwarded for the page's progress store (no id). */
+export type FeaturesProgress = {
+	op: "progress";
+	downloads: readonly ModelDownload[];
+};

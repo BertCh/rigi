@@ -18,6 +18,7 @@ import {
 	createRgbaTexture,
 	maskSize,
 	segmentTextureGpu,
+	warmPeopleMask,
 } from "./segment/people-gpu";
 
 /** 0..255, 255 = foreground person (a ByteMask: row-major, row 0 = TOP of image). */
@@ -53,7 +54,11 @@ async function peopleNn() {
 export function preloadSegmenter(model: SegmentModel = DEFAULT_MODEL): void {
 	peopleNn()
 		.then((nn) => {
-			if (nn) for (const m of modelsOf(model)) netOf[m](nn).catch(() => {});
+			if (!nn) return;
+			// then compile the 4:3 mask graph in the background (the first real mask is a cache hit)
+			Promise.all(modelsOf(model).map((m) => netOf[m](nn)))
+				.then((nets) => warmPeopleMask(nn, nets, (nn as GpuNn).device))
+				.catch(() => {});
 		})
 		.catch(() => {});
 }

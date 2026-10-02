@@ -41,7 +41,7 @@ const DETECTION_THRESHOLD = 0.01;
 /** Packed readback row: x, y, score, NMS value, descriptor (128), mean score. */
 const ROW = 4 + ALIKED_DIM + 1;
 
-interface AlikedConstants {
+export interface AlikedConstants {
 	tables: DkdTables;
 	borderMasks: Map<string, Tensor>;
 }
@@ -197,6 +197,111 @@ export function sampleFeatures(
 	);
 }
 
+/** What runAliked uploads before its forward: tensors created inside a forward are graph scratch. */
+export interface AlikedPrepared {
+	constants: AlikedConstants;
+	mask: Tensor;
+}
+
+/** Uploads (once per runtime and size) the constants of a forward over an image of `shape` [1, 3, H, W]. */
+export function prepareAliked(
+	nn: Nn,
+	shape: readonly number[],
+	longSide: number,
+): AlikedPrepared {
+	const [workH, workW] = resizedSize(shape[3], shape[2], longSide);
+	return {
+		constants: alikedConstants(nn),
+		mask: cachedBorderMask(nn, workH, workW),
+	};
+}
+
+/**
+ * The synchronous body of runAliked's single forward: resize, encoder, score, NMS, top-k, DKD and SDDH
+ * as one packed [K, ROW] tensor. Call inside `nn.forward` (or `nn.warm`, which compiles the same graph
+ * without running it, features/warm.ts).
+ */
+export function alikedForward(
+	nn: Nn,
+	w: Weights,
+	rgb: Tensor,
+	opts: AlikedOptions,
+	{ constants, mask }: AlikedPrepared,
+	trace?: AlikedTrace,
+) {
+	const prep = preprocessImage(nn, rgb, opts.longSide);
+	const branches = alikedBranches(nn, w, prep.padded);
+	const [left, , top] = prep.pads;
+	const { height: h, width: wd } = prep;
+	const Hp = branches[0].shape[2];
+	const Wp = branches[0].shape[3];
+	const pads = { left, top, paddedWidth: Wp, paddedHeight: Hp };
+	const full = alikedScore(nn, w, branches);
+	const score = nn.slice(nn.slice(full, 2, top, top + h), 3, left, left + wd);
+
+	// dense maps → NMS → top-k (K slots, sorted descending)
+	const nms = nn.mul(simpleNms(nn, score, DKD_RADIUS), mask);
+	const k = Math.min(opts.maxKeypoints, h * wd);
+	const flatScore = nn.reshape(score, [h * wd]);
+	const top_ = nn.topk(nn.reshape(nms, [h * wd]), k, 0);
+
+	// DKD soft-argmax on the kept points
+	const kp = softArgmaxNn(nn, constants.tables, flatScore, top_.indices, wd);
+
+	// SDDH: patch features → offsets
+	const lim = Math.max(h, wd) / 4;
+	const P = SDDH_POSITIONS;
+	const pf = sampleFeatures(
+		nn,
+		branches,
+		patchGridNn(nn, constants.tables, kp.x, kp.y, h, wd, pads),
+	); // [1, 128, 1, K*9]
+	const patch = nn.permute(nn.reshape(pf, [ALIKED_DIM, k, 3, 3]), [1, 0, 2, 3]);
+	const off = nn.selu(
+		nn.conv2d(patch, w.get("desc.offset1.w"), w.get("desc.offset1.b")),
+	);
+	const offsets = nn.reshape(
+		nn.clamp(
+			nn.conv2d(off, w.get("desc.offset2.w"), w.get("desc.offset2.b")),
+			-lim,
+			lim,
+		),
+		[k, 2 * P],
+	); // x offsets, then y offsets
+
+	// the reference bilinearly samples the L2-normalised feature map (zeros outside): sample the
+	// normalised features at the four integer corners (exact) and blend with the bilinear weights
+	const corners = sddhCornersNn(nn, kp.x, kp.y, offsets, P, h, wd, pads);
+	const f4 = sampleFeatures(nn, branches, corners.grid); // [1,128,K,4P]
+	const f = nn.sum(
+		nn.mul(
+			nn.reshape(f4, [1, ALIKED_DIM, k, P, 4]),
+			nn.reshape(corners.weights, [1, 1, k, P, 4]),
+		),
+		4,
+	); // [1, 128, K, P]
+	const fs = nn.selu(
+		nn.linear(nn.permute(f, [0, 2, 3, 1]), w.get("desc.sf.w")),
+	); // [1, K, P, 128]
+	const desc = nn.l2Normalize(
+		nn.matmul(nn.reshape(fs, [k, P * ALIKED_DIM]), w.get("desc.agg.w")),
+		1,
+	);
+
+	// mean score map: only used when no NMS value passes the threshold
+	const mean = nn.expand(nn.reshape(nn.mean(flatScore, 0), [1, 1]), [k, 1]);
+	const packed = nn.concat(
+		[kp.x, kp.y, kp.score, nn.reshape(top_.values, [k, 1]), desc, mean],
+		1,
+	);
+	return {
+		packed,
+		scaleX: prep.scaleX,
+		scaleY: prep.scaleY,
+		...(trace && { traceMaps: { image: prep.image, score, branches } }),
+	};
+}
+
 /**
  * Runs ALIKED on an RGB image tensor [1, 3, H, W] (values in [0, 1]).
  */
@@ -208,101 +313,17 @@ export async function runAliked(
 	trace?: AlikedTrace,
 ): Promise<AlikedResult> {
 	// constants are uploaded here, outside the forward (tensors created inside it are graph scratch)
-	const constants = alikedConstants(nn);
-	const [workH, workW] = resizedSize(rgb.shape[3], rgb.shape[2], opts.longSide);
-	const mask = cachedBorderMask(nn, workH, workW);
+	const prepared = prepareAliked(nn, rgb.shape, opts.longSide);
 	let packed: Tensor | undefined;
 	let extra: Tensor[] = [];
 	try {
 		let scaleX = 1;
 		let scaleY = 1;
-		const s = await nn.forward(() => {
-			const prep = preprocessImage(nn, rgb, opts.longSide);
-			const branches = alikedBranches(nn, w, prep.padded);
-			scaleX = prep.scaleX;
-			scaleY = prep.scaleY;
-			const [left, , top] = prep.pads;
-			const { height: h, width: wd } = prep;
-			const Hp = branches[0].shape[2];
-			const Wp = branches[0].shape[3];
-			const pads = { left, top, paddedWidth: Wp, paddedHeight: Hp };
-			const full = alikedScore(nn, w, branches);
-			const score = nn.slice(
-				nn.slice(full, 2, top, top + h),
-				3,
-				left,
-				left + wd,
-			);
-
-			// dense maps → NMS → top-k (K slots, sorted descending)
-			const nms = nn.mul(simpleNms(nn, score, DKD_RADIUS), mask);
-			const k = Math.min(opts.maxKeypoints, h * wd);
-			const flatScore = nn.reshape(score, [h * wd]);
-			const top_ = nn.topk(nn.reshape(nms, [h * wd]), k, 0);
-
-			// DKD soft-argmax on the kept points
-			const kp = softArgmaxNn(
-				nn,
-				constants.tables,
-				flatScore,
-				top_.indices,
-				wd,
-			);
-
-			// SDDH: patch features → offsets
-			const lim = Math.max(h, wd) / 4;
-			const P = SDDH_POSITIONS;
-			const pf = sampleFeatures(
-				nn,
-				branches,
-				patchGridNn(nn, constants.tables, kp.x, kp.y, h, wd, pads),
-			); // [1, 128, 1, K*9]
-			const patch = nn.permute(
-				nn.reshape(pf, [ALIKED_DIM, k, 3, 3]),
-				[1, 0, 2, 3],
-			);
-			const off = nn.selu(
-				nn.conv2d(patch, w.get("desc.offset1.w"), w.get("desc.offset1.b")),
-			);
-			const offsets = nn.reshape(
-				nn.clamp(
-					nn.conv2d(off, w.get("desc.offset2.w"), w.get("desc.offset2.b")),
-					-lim,
-					lim,
-				),
-				[k, 2 * P],
-			); // x offsets, then y offsets
-
-			// the reference bilinearly samples the L2-normalised feature map (zeros outside): sample the
-			// normalised features at the four integer corners (exact) and blend with the bilinear weights
-			const corners = sddhCornersNn(nn, kp.x, kp.y, offsets, P, h, wd, pads);
-			const f4 = sampleFeatures(nn, branches, corners.grid); // [1,128,K,4P]
-			const f = nn.sum(
-				nn.mul(
-					nn.reshape(f4, [1, ALIKED_DIM, k, P, 4]),
-					nn.reshape(corners.weights, [1, 1, k, P, 4]),
-				),
-				4,
-			); // [1, 128, K, P]
-			const fs = nn.selu(
-				nn.linear(nn.permute(f, [0, 2, 3, 1]), w.get("desc.sf.w")),
-			); // [1, K, P, 128]
-			const desc = nn.l2Normalize(
-				nn.matmul(nn.reshape(fs, [k, P * ALIKED_DIM]), w.get("desc.agg.w")),
-				1,
-			);
-
-			// mean score map: only used when no NMS value passes the threshold
-			const mean = nn.expand(nn.reshape(nn.mean(flatScore, 0), [1, 1]), [k, 1]);
-			const packed = nn.concat(
-				[kp.x, kp.y, kp.score, nn.reshape(top_.values, [k, 1]), desc, mean],
-				1,
-			);
-			return {
-				packed,
-				...(trace && { traceMaps: { image: prep.image, score, branches } }),
-			};
-		});
+		const s = await nn.forward(() =>
+			alikedForward(nn, w, rgb, opts, prepared, trace),
+		);
+		scaleX = s.scaleX;
+		scaleY = s.scaleY;
 		packed = s.packed;
 		const k = packed.shape[0];
 		if (trace && s.traceMaps) {

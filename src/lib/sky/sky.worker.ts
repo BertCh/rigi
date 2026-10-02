@@ -22,6 +22,7 @@ import type { Device } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { releasePrepGraphs, type SkyPrepGpu } from "#/lib/gpu/sky/prep";
 import { refineSkyGpu, warmSkyKernels } from "#/lib/gpu/sky/refine";
+import { forwardModelDownloads } from "#/lib/models/forward";
 import {
 	classicalSky,
 	type ModelRun,
@@ -45,12 +46,14 @@ import {
 import { NeedPixels, prepareGpu, prepStatus, prepVerified } from "./prep";
 import type {
 	SkyPreloadRequest,
+	SkyProgressMessage,
 	SkySegmentRequest,
 	SkyWorkerRequest,
 	SkyWorkerResponse,
 } from "./protocol";
 import { createSerialQueue } from "./serial-queue";
 import { isDeviceLossError } from "./session-recovery";
+import { warmSkyModel } from "./warm";
 
 const queue = createSerialQueue();
 // one model per backend; a webgpu model is tied to the compute device it was created on
@@ -173,10 +176,13 @@ function loadModel(
 	if (!p) {
 		p = (async () => {
 			try {
-				return await createSkyModel({
+				const created = await createSkyModel({
 					device,
 					backends: backend ? [backend] : undefined,
 				});
+				// background compile of the first photos' graphs; never blocks or fails a request
+				void warmSkyModel(created, device).catch(() => {});
+				return created;
 			} catch (e) {
 				modelError = String(e);
 				console.warn("[sky] model unavailable, using classical fallback:", e);
@@ -426,6 +432,13 @@ async function handle(req: SkyWorkerRequest) {
 		idle.end();
 	}
 }
+
+forwardModelDownloads((downloads) =>
+	scope.postMessage({
+		type: "progress",
+		downloads,
+	} satisfies SkyProgressMessage),
+);
 
 scope.onmessage = (ev: MessageEvent<SkyWorkerRequest>) => {
 	const req = ev.data;

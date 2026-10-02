@@ -8,14 +8,26 @@
  * WebGPU, like the sky and eye workers) and keeps the weights loaded between requests. Requests run
  * one at a time in arrival order; `abort` cancels one between graph submissions.
  */
+import { forwardModelDownloads } from "../models/forward";
 import { extractFeatures, featuresAvailable, matchFeatures } from "./index";
-import type { FeaturesRequest, FeaturesResponse } from "./protocol";
+import type {
+	FeaturesProgress,
+	FeaturesRequest,
+	FeaturesResponse,
+} from "./protocol";
 
 const controllers = new Map<number, AbortController>();
 let queue: Promise<unknown> = Promise.resolve();
 
 const post = (m: FeaturesResponse, transfer: Transferable[] = []) =>
 	(self as unknown as DedicatedWorkerGlobalScope).postMessage(m, transfer);
+
+forwardModelDownloads((downloads) =>
+	(self as unknown as DedicatedWorkerGlobalScope).postMessage({
+		op: "progress",
+		downloads,
+	} satisfies FeaturesProgress),
+);
 
 self.onmessage = (ev: MessageEvent<FeaturesRequest>) => {
 	const req = ev.data;
