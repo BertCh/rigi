@@ -104,6 +104,9 @@ ladder (unify only as a new function, GT is frozen).
 
 ## 5. Iteration log
 
+**Landed:** `8ac1928` (U1 + U2), `c38c8f1` (round-2 review fixes), `3148dfa` (this doc, ledger row, changelog).
+Fast tier at land time: my rows clean (biome on changed files, spdx, realm-flags, picker-candidates, 542 targeted specs, tsc exit 0 before the final rebase); the full fast run on the shared machine hit timeouts (unit, tsc, ontology, align-cert) and peer failures (biome in gipfelbuch files, ontology storage key in `picker/schema.ts`, generated `ontology/domain.ts` stale), none in files this pod touched.
+
 **Round 1 (U1 + U2).** `src/lib/pins/diagnostics.ts`, `src/lib/pins/seed.ts`, specs in `src/lib/pins/__tests__/`
 (31 tests); engines route `Renderer.solvePins` through `solvePinsForApp`; flag `pinSolve` in `src/lib/flags/index.ts`.
 `align.ts` untouched; with the default flag the engine makes the identical `solvePins` call (adversarial review
