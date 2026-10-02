@@ -50,6 +50,41 @@ describe("LV95 conversions", () => {
 		}
 	});
 
+	// Rigorous EPSG:2056 references (somerc on Bessel + the 3-parameter Helmert of the EPSG
+	// definition), from proj4 2.22; @math.gl/proj4 5.0.0-alpha.10 agrees with it to 6e-9 m. Over a
+	// 0.1° grid of 966 Swiss points the approximate formulas deviate by at most 0.72 m (E) / 0.34 m
+	// (N) forward and 3.9 m / 2.8 m on the inverse (reports/negative-results.md, @math.gl/proj4 2026-10-02).
+	const RIGOROUS: [string, number, number, number, number][] = [
+		["Bern", 46.9511, 7.4386, 2599997.533, 1200001.916],
+		["Niederhorn", 46.7106, 7.7749, 2625712.958, 1173320.666],
+		["Saentis", 47.2494, 9.3433, 2744175.278, 1234914.69],
+		["Matterhorn", 45.9763, 7.6586, 2617047.961, 1091660.424],
+		["Geneva", 46.2044, 6.1432, 2500016.016, 1117821.07],
+		["Basel", 47.5596, 7.5886, 2611287.837, 1267664.847],
+		["Chur", 46.8508, 9.532, 2759638.187, 1190980.851],
+		["Lugano", 46.0037, 8.9511, 2717161.192, 1095811.548],
+		["Muestair", 46.6297, 10.4467, 2830305.626, 1168687.859],
+		["Schaffhausen", 47.6959, 8.6339, 2689726.006, 1283492.51],
+	];
+
+	it.each(
+		RIGOROUS,
+	)("%s: forward within 1 m of rigorous EPSG:2056", (_name, lat, lon, E, N) => {
+		const [e, n] = wgs84ToLv95(lat, lon);
+		expect(Math.abs(e - E)).toBeLessThan(1);
+		expect(Math.abs(n - N)).toBeLessThan(1);
+	});
+
+	it.each(
+		RIGOROUS,
+	)("%s: inverse within 5 m of rigorous EPSG:2056", (_name, lat, lon, E, N) => {
+		const [la, lo] = lv95ToWgs84(E, N);
+		const mPerDegLat = 111_200;
+		const mPerDegLon = mPerDegLat * Math.cos((lat * Math.PI) / 180);
+		expect(Math.abs(la - lat) * mPerDegLat).toBeLessThan(5);
+		expect(Math.abs(lo - lon) * mPerDegLon).toBeLessThan(5);
+	});
+
 	it("inSwissExtent accepts Swiss points and rejects neighbours", () => {
 		expect(inSwissExtent(46.95, 7.44)).toBe(true);
 		expect(inSwissExtent(47.37, 8.54)).toBe(true);

@@ -43,7 +43,10 @@ export function wgs84ToLv95(lat: number, lon: number): [number, number] {
 	return [E, N];
 }
 
-/** LV95 → WGS84 (lat, lon degrees), swisstopo approximate inverse (≈0.1″). */
+/**
+ * LV95 → WGS84 (lat, lon degrees), swisstopo approximate inverse (≈0.1″; up to about 4 m from the
+ * rigorous EPSG:2056 transform over Switzerland, against under 1 m for the forward formulas).
+ */
 export function lv95ToWgs84(E: number, N: number): [number, number] {
 	const y = (E - 2600000) / 1e6;
 	const x = (N - 1200000) / 1e6;

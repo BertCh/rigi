@@ -10,9 +10,9 @@
 // Every export goes through filterForExport: `generated` splats never reach a measurement export.
 // Pure builders (no DOM) + a thin engine glue at the bottom. Check: npx tsx src/lib/nearfield/export-check.ts
 //
-// LV95 (EPSG:2056): the repo has no WGS84 → LV95 transform (grepped 2026-09-28: no lv95/2056/CH1903 code),
-// so no LV95 coordinates are written. Inside Switzerland the header says so; a caller that has a transform
-// can pass `toLv95` and the origin is written in LV95 as well (positions stay ENU).
+// LV95 (EPSG:2056): no LV95 coordinates are written by default. Inside Switzerland the header says so; a
+// caller can pass `toLv95` (for example concord/occl/swiss-cog.ts wgs84ToLv95, swisstopo's approximate
+// formulas, under 1 m from the rigorous transform) and the origin is written in LV95 as well (positions stay ENU).
 import type { Pose } from "#/lib/camera";
 import { ANCHOR_LOW_TRUST } from "#/lib/nearfield/anchor";
 import { filterForExport, provenanceOf } from "#/lib/nearfield/provenance";
@@ -64,7 +64,7 @@ export type SplatExportMeta = {
 	model?: string;
 	/** Geoid undulation N (m): h_ellipsoid = h + N. Default 0 (MSL heights treated as ellipsoidal). */
 	geoidUndulation?: number;
-	/** WGS84 → LV95 transform, if the caller has one (the repo has none). Only the origin is converted. */
+	/** WGS84 → LV95 transform (e.g. swiss-cog.ts wgs84ToLv95, ignoring h). Only the origin is converted. */
 	toLv95?: (lat: number, lon: number, h: number) => LV95;
 	/** ISO timestamp for the header (default now). */
 	createdAt?: string;
