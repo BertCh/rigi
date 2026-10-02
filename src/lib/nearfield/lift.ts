@@ -10,7 +10,13 @@
 // camera → ENU is Rᵀ: columns right, −up, forward (= camera.poseToOpenCV R_cam2enu).
 import { type Pose, poseBasis } from "../camera";
 import { anchoredRange } from "./anchor";
-import { type IntrinsicsNorm, rayFactor } from "./geom";
+import {
+	computeRimAlpha,
+	type EdgeSnapOpts,
+	type RimAlphaOpts,
+	snapMixedDepthEdges,
+} from "./complete/edge-snap";
+import { type IntrinsicsNorm, type MaskLike, rayFactor } from "./geom";
 import {
 	type AnchorFit,
 	type GaussianCloud,
@@ -45,6 +51,14 @@ export type LiftOpts = {
 	alpha?: number;
 	/** Provenance code for every Gaussian. Default observed. */
 	provenance?: number;
+	/**
+	 * ?nearfield=complete only (complete/edge-snap.ts): snap mixed-depth edge ramps to the nearer mode and drop
+	 * the middle third before lifting. Moves/drops observed samples only; provenance unchanged. Absent = the
+	 * default path, byte-identical.
+	 */
+	edgeSnap?: EdgeSnapOpts | false;
+	/** ?nearfield=complete only: soft Object-rim opacity from the soft people mask (complete/edge-snap.ts). */
+	rimAlpha?: (RimAlphaOpts & { mask: MaskLike | null }) | false;
 };
 
 /**
@@ -72,7 +86,7 @@ export function liftToGaussians(
 		throw new Error("liftToGaussians: split and depth grids differ");
 
 	// anchored z at a cell (NaN when invalid)
-	const zAt = (i: number, j: number) => {
+	const zRaw = (i: number, j: number) => {
 		const k = j * W + i;
 		const z = depth.depth[k];
 		if (!depth.valid[k] || !(z > 0) || !Number.isFinite(z)) return Number.NaN;
@@ -81,6 +95,17 @@ export function liftToGaussians(
 		const f = rayFactor(K, u, v);
 		return anchoredRange(anchor, z * f) / f;
 	};
+	let zAt = zRaw;
+	if (opts.edgeSnap) {
+		const raw = new Float32Array(W * H);
+		for (let j = 0; j < H; j++)
+			for (let i = 0; i < W; i++) raw[j * W + i] = zRaw(i, j);
+		const snapped = snapMixedDepthEdges(raw, W, H, opts.edgeSnap).z;
+		zAt = (i, j) => snapped[j * W + i];
+	}
+	const rimA = opts.rimAlpha
+		? computeRimAlpha(split.cls, W, H, opts.rimAlpha.mask, opts.rimAlpha)
+		: null;
 
 	const pos: number[] = [];
 	const scl: number[] = [];
@@ -168,7 +193,12 @@ export function liftToGaussians(
 					m++;
 				}
 			m = m || 1;
-			col.push(Math.round(r / m), Math.round(g / m), Math.round(b / m), alpha);
+			col.push(
+				Math.round(r / m),
+				Math.round(g / m),
+				Math.round(b / m),
+				rimA ? Math.round(alpha * rimA[k]) : alpha,
+			);
 		}
 	const count = pos.length / 3;
 	return {

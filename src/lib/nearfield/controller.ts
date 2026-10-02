@@ -21,7 +21,12 @@ import {
 	type GaussianModel,
 	type NearFieldClient,
 } from "./client";
-import { type MaskLike, sampleDemGrid } from "./geom";
+import {
+	completeScene,
+	completionEnabled,
+	completionLiftOpts,
+} from "./complete";
+import { intrinsicsFromPose, type MaskLike, sampleDemGrid } from "./geom";
 import {
 	buildMeasureGrid,
 	type MeasurableScene,
@@ -328,7 +333,9 @@ export class NearFieldController {
 				const demGrid = sampleDemGrid(depth.width, depth.height, demAt);
 				const img = this.host.photoElement;
 				const photo = !data.cloud && img ? imageToRGBA(img, 1024) : null;
-				const scene = buildNearFieldScene({
+				// ?nearfield=complete: the P0 completion heuristics (display-only; complete/index.ts)
+				const complete = completionEnabled();
+				const built = buildNearFieldScene({
 					photoId: this.photo.id,
 					depth,
 					cloud: data.cloud,
@@ -343,7 +350,26 @@ export class NearFieldController {
 					...(getFlag("anchorCliff") === "on"
 						? { anchor: { cliffLip: true } }
 						: {}),
-				}) as MeasurableScene;
+					...(complete
+						? { lift: completionLiftOpts(this.host.foregroundMask ?? null) }
+						: {}),
+				});
+				const scene = (
+					complete
+						? completeScene(built, {
+								depth,
+								demGrid,
+								K: intrinsicsFromPose(this.host.pose, this.host.aspect),
+								pose: { ...this.host.pose },
+								eye: {
+									x: this.host.eye.x,
+									y: this.host.eye.y,
+									z: this.host.eye.z,
+								},
+								peopleMask: this.host.foregroundMask ?? null,
+							}).scene
+						: built
+				) as MeasurableScene;
 				const ctx = {
 					pose: { ...this.host.pose },
 					aspect: this.host.aspect,

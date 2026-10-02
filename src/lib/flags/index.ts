@@ -171,8 +171,9 @@ export const FLAG_SCHEMA = {
 	tiles3dDebug: onOff("off"),
 	/** T2: swisstopo tiles + nDSM promote Far/Terrain cells to Object in the Step Inside split (nearfield/object-prior). */
 	tiles3dObjects: onOff("off"),
-	// Step Inside near field (auto: probe the service, never under automation)
-	nearfield: oneOf(["auto", "on", "sharp", "off"], "auto"),
+	// Step Inside near field (auto: probe the service, never under automation). complete = on + the P0
+	// completion heuristics (src/lib/nearfield/complete: slab reclassification, edge snap; display-only).
+	nearfield: oneOf(["auto", "on", "sharp", "complete", "off"], "auto"),
 	/** Step Inside anchor: exclude cliff-lip DEM range discontinuities from the fit (nearfield/cliff-lip.ts). */
 	anchorCliff: onOff("off"),
 	cammodes: onOff("off"),

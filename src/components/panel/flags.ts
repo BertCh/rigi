@@ -107,9 +107,15 @@ export const FLAG_UI: FlagUI[] = [
 	{
 		name: "nearfield",
 		label: "Near field",
-		help: "Auto: probes the splat service (never under automation). On: also under automation. SHARP: Apple SHARP splats (research-only weights).",
+		help: "Auto: probes the splat service (never under automation). On: also under automation. SHARP: Apple SHARP splats (research-only weights). Complete: On plus the completion heuristics (display-only).",
 		group: "step",
-		options: { auto: "Auto", on: "On", sharp: "SHARP", off: "Off" },
+		options: {
+			auto: "Auto",
+			on: "On",
+			sharp: "SHARP",
+			complete: "Complete",
+			off: "Off",
+		},
 	},
 	{
 		name: "cammodes",
