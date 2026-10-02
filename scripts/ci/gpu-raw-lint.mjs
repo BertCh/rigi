@@ -42,7 +42,7 @@ const RULES = {
 const WHY = [
 	[
 		"src/lib/gpu/core/queue.ts",
-		"submitWithDefault: private WebGPUDevice finalize + multi-buffer queue.submit and opt-in error scopes; needs a luma submit(buffers[]) patch (audit-gpu A7/A8)",
+		"openErrorScopes: native push/popErrorScope for opt-in checks; luma WebGPUDevice.pushErrorScope/popErrorScope are no-ops unless the device was created with debug: true",
 	],
 	[
 		"src/lib/gpu/core/readback.ts",
@@ -53,8 +53,8 @@ const WHY = [
 		"raw encoder.clearBuffer via handle; luma has no CommandEncoder.clearBuffer (audit-gpu A6)",
 	],
 	[
-		"src/lib/gpu/device.ts",
-		"sidecar device: one requestAdapter probe for adapter max limits (audit-gpu A4)",
+		"src/lib/gpu/adapter-peek.ts",
+		"the one raw navigator.gpu.requestAdapter: adapter limits/features before device creation; @luma.gl/webgpu exports WebGPUAdapter as a type only and requestGPUAdapter is protected",
 	],
 	["src/lib/gpu/core/selftest.ts", "selftest drives the raw device on purpose"],
 	[
@@ -114,7 +114,7 @@ const WHY = [
 	],
 	[
 		"src/lib/nearfield/deck-splat-layer.ts",
-		"WebGL2 splat layer on deck's gl context",
+		"WebGL2 splat colour pass: snapshot of the MSAA-resolved colour target by blitFramebuffer (luma has no framebuffer blit / resolve, audit-render R1)",
 	],
 	["src/lib/gpu/lab.ts", "dev lab tool (audit-gpu A11)"],
 ];
