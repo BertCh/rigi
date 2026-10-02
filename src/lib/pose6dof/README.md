@@ -27,7 +27,7 @@ The conventions are identical to `src/lib/pose.ts`, and the tests check them aga
 | `pointCorr(frame, lat, lon, ele, u, v)`, `dirCorr(az, el, u, v)`, `levelCorr(el, u, v)`, `azimuthCorr(az, u, v)`, `pxToUV(x, y, basisW, aspect)` | Build correspondences |
 | `engineFrame(lat, lon)` | The renderer's frame, `EnuFrame(lat, lon, 0)`. Use it with `priorsFromPhoto(photo, {eye})` |
 | `cameraFrame(lat, lon, h)` | A frame with its origin at (lat, lon, h). With `h = eyeAlt`, the eye is at the origin and the default prior `[0,0,0]` is right. Its coordinates are not engine world coordinates |
-| `priorsFromPhoto(photo, {eye?, gravitySigma?, compassSigma?, vfovSigmaFrac?, sigmaV?})` | Builds priors from a `photos.json` entry. The position prior is `eye` (default `[0,0,0]`), with σH = max(hAccuracy, 5) m and σV = max(1.5·σH, 10) m. Gravity σ is 2°, compass σ 10° (unknown if there is no heading), vfov σ 3 % |
+| `priorsFromPhoto(photo, {eye?, gravitySigma?, compassSigma?, vfovSigmaFrac?, sigmaV?})` | Builds priors from a `photos.json` entry. The position prior is `eye` (default `[0,0,0]`), with σH = max(hAccuracy, 5) m and σV = max(1.5·σH, 10) m. Gravity σ is 2°, compass σ 10° (unknown if there is no heading; a null heading, pitch or roll counts as missing), vfov σ 3 %. Pass a true-north heading (`priorHeading(photo)`) |
 | `p3p`, `dlt`, `rotationFromBearings`, `vfovFromPair`, `yawFromOnePoint`, `absoluteOrientation`, `bearing` | Minimal solvers, exposed for reuse |
 | `ladder`, `residualsPx`, `wrap180`, and the types `Correspondence`, `Priors`, `SolveOptions`, `SolveResult`, `Pose` | Supporting functions and types |
 

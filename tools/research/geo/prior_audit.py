@@ -5,7 +5,8 @@
 For every dev photo with a verified-correct reference (tools/matcher/v2/refs.py, which asserts dev ids)
 it compares the manifest's heading (EXIF GPSImgDirection or the Commons location template) with the
 reference yaw, and the FocalLengthIn35mmFormat prior with the reference vfov (35 mm diagonal 43.2666 mm,
-as src/lib/geo/camera.ts). It reports the error distributions against the live solve's windows
+as src/lib/camera/focal.ts; cropped photos are treated as uncropped, unlike the app's crop-aware
+vfovFromF35, so a crop shows up as focal error here). It reports the error distributions against the live solve's windows
 (src/lib/geo/solve.ts: local yaw ±25° with σ 15°, focal σ 6 %). Read-only; no test-half or data_v3 input.
 These are calibration observations for reports/steps-2026-10-02/camera-prior.md, not results.
 The manifest (tools/bench/data) is gitignored: without it the script prints SKIP and exits 0.
@@ -21,7 +22,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 MANIFEST = ROOT / "tools/bench/data/manifest.json"
-FF35_DIAGONAL_MM = 43.2666  # src/lib/geo/camera.ts
+FF35_DIAGONAL_MM = 43.2666  # src/lib/camera/focal.ts
 SOLVE_YAW_WINDOW_DEG = 25.0  # src/lib/geo/solve.ts yawRange default
 SOLVE_FOCAL_SIGMA = 0.06  # src/lib/geo/solve.ts DEFAULT_SIGMA.focal
 
