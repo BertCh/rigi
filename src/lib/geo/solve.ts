@@ -398,6 +398,64 @@ export function coarseCost(p: CoarsePlan, dy: number, dp: number) {
 	);
 }
 
+export type StripAgreement = {
+	/** strips whose own coarse yaw lies within epsDeg of the solve's yaw */
+	agree: number;
+	strips: number;
+	/** each strip's best coarse yaw offset from the prior, degrees (NaN: too few columns) */
+	yaws: number[];
+};
+
+/**
+ * X4's abstain signal (tools/research/tm/x4_bnb/REPORT.md, dev AUROC 0.95-0.99 on 30 photos): split the usable
+ * skyline columns into `strips` contiguous strips of equal column count, run solveOnce's coarse grid on each
+ * strip alone, count the strips whose best yaw lies within `epsDeg` of the solved yaw. Diagnostic only: no
+ * accept rule reads it (a veto needs R2's prereg), and solvePose never calls it.
+ */
+export function stripAgreement(
+	prior: Camera,
+	horizon: HorizonProfile,
+	sky: SkylineRows,
+	result: SkylineSolveResult,
+	opts: SolveOptions = {},
+	{ strips = 3, epsDeg = 2 }: { strips?: number; epsDeg?: number } = {},
+): StripAgreement {
+	const yaws: number[] = new Array(strips).fill(Number.NaN);
+	const none = { agree: 0, strips, yaws };
+	const cam0 = resizeCamera(prior, sky.width);
+	const obs = observations(sky, 1);
+	if (result.rejectReason === "no-skyline" || obs.length < sky.width * 0.1)
+		return none;
+	const o =
+		result.search === "full"
+			? fullOnly(opts)
+				? fullOpts(opts)
+				: fallbackOpts(opts)
+			: opts;
+	const minObs = Math.max(10, 0.03 * sky.width);
+	let agree = 0;
+	for (let s = 0; s < strips; s++) {
+		const group = obs.slice(
+			Math.floor((s * obs.length) / strips),
+			Math.floor(((s + 1) * obs.length) / strips),
+		);
+		if (group.length < minObs) continue;
+		const p = coarsePlan(cam0, horizon, group, o);
+		let bestCost = Number.POSITIVE_INFINITY;
+		for (const dy of p.dys) {
+			let c = Number.POSITIVE_INFINITY;
+			for (const dp of p.dps) c = Math.min(c, coarseCost(p, dy, dp));
+			if (c < bestCost) {
+				bestCost = c;
+				yaws[s] = dy;
+			}
+		}
+		if (Math.abs(((yaws[s] - result.delta.yaw + 540) % 360) - 180) <= epsDeg)
+			agree++;
+	}
+	return { agree, strips, yaws };
+}
+
 /** Coarse: small-angle grid over (dYaw, dPitch); src/lib/gpu/solve is its GPU twin. */
 function coarseStage(
 	cam0: Camera,

@@ -8,7 +8,11 @@
  * prior, and report recovery error.  npx tsx scripts/baseline-solve-synth.ts
  */
 import { perturbCamera, resizeCamera } from "../src/lib/geo/camera";
-import { projectSkylineRows, solvePose } from "../src/lib/geo/solve";
+import {
+	projectSkylineRows,
+	solvePose,
+	stripAgreement,
+} from "../src/lib/geo/solve";
 import { listPhotos } from "./lib/node-io";
 import { photoContext } from "./lib/pipeline-node";
 
@@ -46,19 +50,18 @@ for (const { name, heic } of listPhotos(process.argv.slice(2))) {
 	}
 	const t0 = performance.now();
 	// NO_HEADING=1: solve as if the photo had no compass (headingKnown: false).
-	const res = solvePose(
-		ctx.prior,
-		ctx.horizon,
-		{ width: W, height: t.height, rows, weight },
-		process.env.NO_HEADING ? { headingKnown: false } : {},
-	);
+	const sky = { width: W, height: t.height, rows, weight };
+	const solveOpts = process.env.NO_HEADING ? { headingKnown: false } : {};
+	const res = solvePose(ctx.prior, ctx.horizon, sky, solveOpts);
 	const ms = performance.now() - t0;
+	const strips = stripAgreement(ctx.prior, ctx.horizon, sky, res, solveOpts);
 	const c = res.camera;
 	const err = (a: number, b: number) =>
 		(((a - b + 540) % 360) - 180).toFixed(2);
 	console.log(
 		`${name}  true Δ(y,p,r,f)=(${dYaw.toFixed(1)}, ${dPitch.toFixed(1)}, ${dRoll.toFixed(1)}, ${fS.toFixed(3)})` +
 			`  err yaw ${err(c.yaw, truth.yaw)} pitch ${err(c.pitch, truth.pitch)} roll ${err(c.roll, truth.roll)} f ${(c.f / truth.f).toFixed(3)}` +
-			`  coarse (${res.coarse.yaw.toFixed(2)}, ${res.coarse.pitch.toFixed(2)})  conf ${res.confidence.toFixed(2)} inl ${res.inlierFraction.toFixed(2)} amb ${res.ambiguity.toFixed(2)} relief ${res.horizonRelief.toFixed(2)}°  ${ms.toFixed(0)}ms`,
+			`  coarse (${res.coarse.yaw.toFixed(2)}, ${res.coarse.pitch.toFixed(2)})  conf ${res.confidence.toFixed(2)} inl ${res.inlierFraction.toFixed(2)} amb ${res.ambiguity.toFixed(2)} relief ${res.horizonRelief.toFixed(2)}°  ${ms.toFixed(0)}ms` +
+			`  strips ${strips.agree}/${strips.strips}`,
 	);
 }

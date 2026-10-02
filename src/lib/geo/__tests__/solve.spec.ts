@@ -14,6 +14,7 @@ import {
 	projectSkylineRows,
 	solvePose,
 	solvePoseAsync,
+	stripAgreement,
 } from "../solve";
 
 /** A synthetic 0.5-degree-step panorama: smooth rolling ridge plus two peaks. */
@@ -236,5 +237,58 @@ describe("solvePose", () => {
 		});
 		expect(r.search).toBe("full");
 		expect(angleDiffDeg(r.camera.yaw, 160)).toBeLessThan(1);
+	});
+});
+
+describe("stripAgreement", () => {
+	const prior = cameraFromAngles({
+		width: W,
+		height: H,
+		f: 420,
+		yaw: 151,
+		pitch: 3,
+		roll: 0,
+	});
+	const opts = { solveFocal: false };
+	it("clean skyline: all three strips agree with the solve", () => {
+		const sky = skyFrom(truth);
+		const r = solvePose(prior, profile(), sky, opts);
+		const a = stripAgreement(prior, profile(), sky, r, opts);
+		expect(a.strips).toBe(3);
+		expect(a.agree).toBe(3);
+	});
+	it("a middle third from a camera 30 deg off in yaw disagrees", () => {
+		const sky = skyFrom(truth);
+		const off = skyFrom(
+			cameraFromAngles({
+				width: W,
+				height: H,
+				f: 420,
+				yaw: 190,
+				pitch: 3,
+				roll: 0,
+			}),
+		);
+		const lo = Math.floor(W / 3);
+		const hi = Math.floor((2 * W) / 3);
+		for (let x = lo; x < hi; x++) sky.rows[x] = off.rows[x];
+		const r = solvePose(prior, profile(), sky, opts);
+		const a = stripAgreement(prior, profile(), sky, r, opts);
+		expect(a.agree).toBe(2);
+	});
+	it("an empty skyline gives agree 0 and NaN yaws", () => {
+		const sky = skyFrom(truth);
+		const empty = { ...sky, rows: new Float32Array(W).fill(Number.NaN) };
+		const r = solvePose(prior, profile(), empty, opts);
+		const a = stripAgreement(prior, profile(), empty, r, opts);
+		expect(a.agree).toBe(0);
+		expect(a.yaws.every(Number.isNaN)).toBe(true);
+	});
+	it("does not mutate the solve result", () => {
+		const sky = skyFrom(truth);
+		const r = solvePose(prior, profile(), sky, opts);
+		const before = structuredClone(r);
+		stripAgreement(prior, profile(), sky, r, opts);
+		expect(r).toEqual(before);
 	});
 });
