@@ -169,6 +169,8 @@ export const FLAG_SCHEMA = {
 	tiles3dGeoid: num,
 	tiles3dBias: num,
 	tiles3dDebug: onOff("off"),
+	/** T2: swisstopo tiles + nDSM promote Far/Terrain cells to Object in the Step Inside split (nearfield/object-prior). */
+	tiles3dObjects: onOff("off"),
 	// Step Inside near field (auto: probe the service, never under automation)
 	nearfield: oneOf(["auto", "on", "sharp", "off"], "auto"),
 	cammodes: onOff("off"),
@@ -417,6 +419,7 @@ export const RESTART_FLAGS: readonly FlagName[] = [
 	"tiles3dGeoid",
 	"tiles3dBias",
 	"tiles3dDebug",
+	"tiles3dObjects",
 	"nearfield",
 	"concord",
 	"imagery",

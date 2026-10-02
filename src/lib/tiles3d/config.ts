@@ -78,6 +78,34 @@ export const TILES3D_SOURCES: Record<Tiles3DSourceId, Tiles3DSource> = {
 	},
 };
 
+/** Evidence id of the nDSM (swissSURFACE3D - swissALTI3D, concord/occl): measurable, not a tile source. */
+export const NDSM_SOURCE_ID = "ndsm";
+
+/**
+ * Licence gate for the split / readout / anchoring: true only for the nDSM and tile sources that are not
+ * display-only. Google (displayOnly) and unknown ids are false.
+ */
+export function isMeasurableSource(id: string): boolean {
+	if (id === NDSM_SOURCE_ID) return true;
+	const s = (TILES3D_SOURCES as Record<string, Tiles3DSource | undefined>)[id];
+	return !!s && !s.displayOnly;
+}
+
+/** Where the official Google Maps logo must be shipped (Tiles3DCredit.tsx shows it from there). */
+export const GOOGLE_LOGO_ASSET = "/tiles3d/google-maps-logo.png";
+
+/**
+ * Hard gate for Google tiles in a public (non-dev) build: false until the official logo asset exists
+ * (`logoPresent`, supplied by the build or a probe; Google's policy requires logo + copyrights).
+ * Dev builds are always allowed. The attribution component is Pod E's, this is only the gate.
+ */
+export function googleTilesPublicUseAllowed(opts: {
+	dev: boolean;
+	logoPresent: boolean;
+}): boolean {
+	return opts.dev || opts.logoPresent;
+}
+
 /** THREE layer of the tiles (engine.ts): only the step camera enables it, like NEARFIELD_LAYER (7). */
 export const TILES3D_LAYER = 8;
 
@@ -119,6 +147,20 @@ export function parseTiles3DSources(v: string | null): Tiles3DSourceId[] {
 /** The 3D Tiles configuration for this page load, or null when off (the default). */
 export function tiles3dConfig(): Tiles3DConfig | null {
 	let sources = parseTiles3DSources(getFlag("tiles3d"));
+	// TODO(pod-E attribution): replace logoPresent (false until the official logo ships in
+	// public/tiles3d/, GOOGLE_LOGO_ASSET) with the attribution component's readiness before a public build.
+	if (
+		sources.includes("google") &&
+		!googleTilesPublicUseAllowed({
+			dev: !!(import.meta as { env?: { DEV?: boolean } }).env?.DEV,
+			logoPresent: false,
+		})
+	) {
+		console.warn(
+			"[tiles3d] Google logo asset missing: Google tiles skipped in a public build",
+		);
+		sources = sources.filter((s) => s !== "google");
+	}
 	if (sources.includes("google") && !googleTilesKey()) {
 		console.warn("[tiles3d] no VITE_GOOGLE_TILES_KEY: Google tiles skipped");
 		sources = sources.filter((s) => s !== "google");

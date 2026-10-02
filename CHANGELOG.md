@@ -25,6 +25,7 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - **Landeskarte fixes** (swiss-cartography-review D1, D2, D7): Swiss contours sit on a thin dark-brown casing instead of Classic's navy one (Landeskarte, Field sketch), the bands layer uses the `swiss` ramp, and place names can use the swisstopo typography through the new `style.terroir.names.typography` ("terroir" | "swisstopo", switch in the Terroir panel; Landeskarte = swisstopo). Browser-unverified.
 - Labels: one SVG halo-width rule (`svgHaloWidth`) for peak labels and place names; the terroir overlays reuse `LABEL_FONT_FAMILY`; the swisstopo font stack drops Manrope.
 - Report: `reports/cartography-consolidation-2026-10-02.md`.
+- 3D Tiles T2 (pure, flag `?tiles3dObjects=off` default): `nearfield/object-prior.ts` promotes Far/Terrain split cells to Object from nDSM + swisstopo tile evidence (display-only sources throw); optional `objectPrior` input on `buildNearFieldScene`; `googleTilesPublicUseAllowed` gates Google tiles in public builds until the official logo ships.
 
 ### Consolidation pass (2026-10-02)
 

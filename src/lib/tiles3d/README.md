@@ -26,6 +26,10 @@ Google needs `VITE_GOOGLE_TILES_KEY` in `.env.local` (gitignored). Without it, G
 | `../deck-webgpu/layers/tiles3d.ts` | The WebGPU port of `Tiles3DDeckLayer` (WGSL, reversed-Z depth), fed by the same `Tiles3DSet` |
 | `tiles3d.check.ts` | Pure checks (CI `tiles3d`) |
 
+## T2 and the licence gates
+
+`?tiles3dObjects=on` (default off) feeds measured evidence, the nDSM (swissSURFACE3D − swissALTI3D, `concord/occl`) and swisstopo tile hit ranges, into the Step Inside depth split: `nearfield/object-prior.ts` promotes Far/Terrain cells to Object only when nDSM height ≥ 2.5 m and an independent range (anchored model, or tile hit) agrees with the DEM range. `buildNearFieldScene` takes it as the optional `objectPrior` input; the controller does not yet build the nDSM and tile-range grids, so that is the open hook. **Only measurable sources may feed it:** `isMeasurableSource` (config.ts) is false for any `displayOnly` source, and `applyObjectPrior` throws if one is listed, so Google can never reach the split. **Google logo gate:** `googleTilesPublicUseAllowed` is false in a non-dev build until the official logo ships; `tiles3dConfig` drops Google then (`TODO(pod-E attribution)` marks where the attribution component's readiness plugs in).
+
 ## Rules (don't break them)
 
 - **Layer isolation.** The selector's THREE group sits on layer 8 (`TILES3D_LAYER`); the tile layers draw only in the world/step view. In both deck engines, the layer isn't a terrain tile, so `PhotoCompositor` and the geometry pass skip it. `sampleAt`, horizon, silhouette, align, anchoring and concordance never see tiles. `scripts/tiles3d/step-tiles-check.mjs` asserts `sampleAt` is identical with tiles on and off.

@@ -38,6 +38,7 @@ import {
 	promoteFarObjects,
 } from "./ground";
 import { type LiftOpts, liftToGaussians, type RGBAImage, toEnu } from "./lift";
+import { applyObjectPrior, type ObjectPriorInput } from "./object-prior";
 import { selectSplats } from "./provenance";
 import { classifyRange, splitPixels } from "./split";
 import {
@@ -87,6 +88,14 @@ export type BuildSceneInput = {
 	 * up to farRadius 600 m). false = off (needs grounding).
 	 */
 	farObjects?: Partial<FarObjectOpts> | false;
+	/**
+	 * T2 hook (?tiles3dObjects=on, default off): measured nDSM / swisstopo-tile evidence on the depth grid.
+	 * Omitted = the split is untouched. The caller (controller) gates on the flag and supplies the grids.
+	 */
+	objectPrior?: Pick<
+		ObjectPriorInput,
+		"objectHeight" | "tileRange" | "sources" | "params"
+	>;
 };
 
 /**
@@ -287,7 +296,17 @@ export function buildNearFieldScene(input: BuildSceneInput): NearFieldScene {
 		peopleMask: people,
 		...input.anchor,
 	});
-	const split0 = splitPixels(depth, anchor, dem, sky, people, params, K);
+	const splitBase = splitPixels(depth, anchor, dem, sky, people, params, K);
+	const split0 = input.objectPrior
+		? applyObjectPrior({
+				...input.objectPrior,
+				split: splitBase,
+				depth,
+				anchor,
+				K,
+				demGrid: grid,
+			}).split
+		: splitBase;
 	const ground0 =
 		input.ground === false
 			? null
