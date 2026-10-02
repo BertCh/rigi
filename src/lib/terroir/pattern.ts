@@ -103,8 +103,8 @@ export function patternCoverage(
 
 // ---- GLSL ----
 
-/** Uniform-free pattern functions (include once, before terPatternCover). */
-export const PATTERN_GLSL = /* glsl */ `
+/** The class-free kernel (terPatHatch / terPatDots): what style.terroir.hatch reuses. */
+export const PATTERN_KERNEL_GLSL = /* glsl */ `
 // luma.gl patternFill (#3320) analytic filtering, in world metres. fw = fwidth(xy), evaluated by the
 // caller in uniform control flow (before any class branching).
 float terPatIntegral(float coordinate, float width) {
@@ -140,7 +140,10 @@ float terPatDots(vec2 xy, vec2 fw, float spacing, float width, float angle) {
   float dotMean = 3.141592653589793 * radius * radius;
   return mix(dots, dotMean, smoothstep(0.35, 1.0, max(footprint.x, footprint.y)));
 }
-// scree = dots, rock = hatching (more lines in shade), glacier = sparse crevasse hatching, in the class ink
+`;
+
+/** Uniform-free pattern functions (include once, before terPatternCover). */
+export const PATTERN_GLSL = /* glsl */ `${PATTERN_KERNEL_GLSL}// scree = dots, rock = hatching (more lines in shade), glacier = sparse crevasse hatching, in the class ink
 vec3 terPatternCover(int c, vec2 p, vec3 col, vec2 fw, float lit) {
   float shade = 1.0 - smoothstep(-0.05, 0.45, lit);
   float cov = 0.0;
@@ -157,8 +160,8 @@ vec3 terPatternCover(int c, vec2 p, vec3 col, vec2 fw, float lit) {
 
 // ---- WGSL ----
 
-/** WGSL twin of PATTERN_GLSL (ter_ink must be defined before; include once). */
-export const PATTERN_WGSL = /* wgsl */ `
+/** WGSL twin of PATTERN_KERNEL_GLSL (ter_pat_hatch / ter_pat_dots). */
+export const PATTERN_KERNEL_WGSL = /* wgsl */ `
 fn ter_pat_integral(coordinate: f32, width: f32) -> f32 {
   return floor(coordinate) * width + min(fract(coordinate), width);
 }
@@ -193,7 +196,10 @@ fn ter_pat_dots(xy: vec2<f32>, fw: vec2<f32>, spacing: f32, width: f32, angle: f
   let dotMean = 3.141592653589793 * radius * radius;
   return mix(dots, dotMean, smoothstep(0.35, 1.0, max(footprint.x, footprint.y)));
 }
-fn ter_pattern_cover(c: i32, p: vec2<f32>, col: vec3<f32>, fw: vec2<f32>, lit: f32) -> vec3<f32> {
+`;
+
+/** WGSL twin of PATTERN_GLSL (ter_ink must be defined before; include once). */
+export const PATTERN_WGSL = /* wgsl */ `${PATTERN_KERNEL_WGSL}fn ter_pattern_cover(c: i32, p: vec2<f32>, col: vec3<f32>, fw: vec2<f32>, lit: f32) -> vec3<f32> {
   let shade = 1.0 - smoothstep(-0.05, 0.45, lit);
   var cov = 0.0;
   if (c == 4) {

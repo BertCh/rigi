@@ -26,6 +26,7 @@ export function TerroirPanel({
 		p: t.peakTiers,
 		c: t.contours.adaptive || t.contours.swissIndex || t.contours.inkByCover,
 		v: t.cover.on,
+		h: t.hatch,
 		g: t.glacier.on,
 		s: t.sunPath,
 		l: t.legend,
@@ -116,6 +117,11 @@ export function TerroirPanel({
 				label="Contour ink by ground (soil · rock · ice)"
 				checked={t.contours.inkByCover}
 				onChange={(v) => patch({ contours: { inkByCover: v } })}
+			/>
+			<Toggle
+				label="Rock hatching and scree dots (from slope)"
+				checked={t.hatch}
+				onChange={(v) => patch({ hatch: v })}
 			/>
 			<Toggle
 				label="Real land cover (Blend, In map)"

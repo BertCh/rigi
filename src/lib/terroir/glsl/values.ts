@@ -13,6 +13,7 @@ export type TerroirDefine =
 	| "TERROIR_CONTOUR_ADAPTIVE"
 	| "TERROIR_CONTOUR_INK"
 	| "TERROIR_COVER"
+	| "TERROIR_HATCH"
 	| "TERROIR_PATTERN"
 	| "TERROIR_SNOW";
 
@@ -233,9 +234,12 @@ export function terroirShader(
 	if (t.contours.inkByCover && g) d.push("TERROIR_CONTOUR_INK");
 	if (t.cover.on && g) d.push("TERROIR_COVER");
 	if (t.cover.on && t.cover.pattern && g) d.push("TERROIR_PATTERN");
+	if (t.hatch) d.push("TERROIR_HATCH");
 	if (g && snowline != null) d.push("TERROIR_SNOW");
 	if (!d.length && !t.contours.swissIndex) return null;
-	const needGrid = d.some((x) => x !== "TERROIR_CONTOUR_ADAPTIVE");
+	const needGrid = d.some(
+		(x) => x !== "TERROIR_CONTOUR_ADAPTIVE" && x !== "TERROIR_HATCH",
+	);
 	return {
 		defines: d.sort(),
 		swissIndex: t.contours.swissIndex,

@@ -311,6 +311,8 @@ export type TerroirStyle = {
 		inkByCover: boolean;
 	};
 	/** Real land cover from the pack in Blend / In map instead of the elevation belts. */
+	/** Slope-driven Swiss rock hatching and scree dots on hillshaded terrain (no pack needed); display only. */
+	hatch: boolean;
 	cover: {
 		on: boolean;
 		snow: "none" | "date";

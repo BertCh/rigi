@@ -180,6 +180,7 @@ export const CLASSIC: ViewStyle = {
 		peakTiers: false,
 		subPill: false,
 		contours: { adaptive: false, swissIndex: false, inkByCover: false },
+		hatch: false,
 		cover: { on: false, snow: "none", pattern: false },
 		glacier: { on: false, year: 1850, style: "outline" },
 		sunPath: false,

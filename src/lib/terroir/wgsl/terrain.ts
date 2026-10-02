@@ -22,12 +22,15 @@
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { TER_BLOCK } from "../glsl/terrain";
 import type { TerroirShader } from "../glsl/values";
-import { PATTERN_WGSL } from "../pattern";
+import { HATCH_INK, HATCH_WGSL } from "../hatch";
+import { PATTERN_KERNEL_WGSL, PATTERN_WGSL } from "../pattern";
 
 export type TerroirFeatures = {
 	terCover?: boolean;
 	/** TERROIR_PATTERN: pattern fills on the class albedo (implies terCover) */
 	terPattern?: boolean;
+	/** TERROIR_HATCH: slope-driven rock hatching + scree dots (hillshade only, no pack needed) */
+	terHatch?: boolean;
 	terSnow?: boolean;
 	terInk?: boolean;
 	terAdaptive?: boolean;
@@ -72,6 +75,7 @@ export function terroirFeatures(
 	const out: TerroirFeatures = {};
 	if (lit && d.has("TERROIR_COVER") && t.grid) out.terCover = true;
 	if (out.terCover && d.has("TERROIR_PATTERN")) out.terPattern = true;
+	if (style === "hillshade" && d.has("TERROIR_HATCH")) out.terHatch = true;
 	if (lit && d.has("TERROIR_SNOW") && t.grid) out.terSnow = true;
 	if (lines && d.has("TERROIR_CONTOUR_INK") && t.grid) out.terInk = true;
 	if (lines && d.has("TERROIR_CONTOUR_ADAPTIVE")) out.terAdaptive = true;
@@ -82,11 +86,13 @@ export function terroirFeatures(
 export const terroirNeedsCover = (ft: TerroirFeatures) =>
 	!!(ft.terCover || ft.terSnow || ft.terInk);
 export const terroirOn = (ft: TerroirFeatures) =>
-	!!(ft.terCover || ft.terSnow || ft.terInk || ft.terAdaptive);
+	!!(ft.terCover || ft.terSnow || ft.terInk || ft.terAdaptive || ft.terHatch);
 
 /** `base` (an albedo expression) wrapped in the cover / snow albedo; `base` itself when off. */
 export function terroirAlbedoExpr(ft: TerroirFeatures, base: string) {
-	return ft.terCover || ft.terSnow ? `ter_albedo(${base}, n, s)` : base;
+	return ft.terCover || ft.terSnow || ft.terHatch
+		? `ter_albedo(${base}, n, s)`
+		: base;
 }
 
 /** Imagery: the class rendering replaces the orthophoto on steep faces; `shaded` = the style's lit colour. */
@@ -243,7 +249,7 @@ ${
   return vec4<f32>(lc, a);
 }
 `);
-	if (ft.terCover || ft.terSnow)
+	if (ft.terCover || ft.terSnow || ft.terHatch)
 		parts.push(/* wgsl */ `\
 // ---- cover albedo, snow, warm light / cool shade ----
 // px = ground metres per pixel: detail fades before it aliases. The noise domain leans with the
@@ -275,18 +281,18 @@ fn ter_snow(elev: f32, n: vec3<f32>, slopeDeg: f32, xy: vec2<f32>) -> f32 {
   let shed = 1.0 - smoothstep(terroir.snow.z, terroir.snow.w, slopeDeg + (ter_noise(xy / 50.0) - 0.5) * 10.0);
   return above * shed * terroir.snowCol.a;
 }
-${ft.terPattern ? PATTERN_WGSL : ""}// fb = the look's albedo (alpine belts or the relief ramp) where there is no class
+${ft.terPattern ? PATTERN_WGSL : ft.terHatch ? PATTERN_KERNEL_WGSL : ""}${ft.terHatch ? HATCH_WGSL : ""}// fb = the look's albedo (alpine belts or the relief ramp) where there is no class
 fn ter_albedo(fb: vec3<f32>, n: vec3<f32>, s: TerrainSample) -> vec3<f32> {
   let xy = s.enu.xy;
   let px = max(length(abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy)), 1e-3);
-${ft.terPattern ? "  let patFw = abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy);\n  let patLit = dot(n, fog.sun.xyz);\n" : ""}  let slopeDeg = degrees(acos(clamp(n.z, -1.0, 1.0)));
+${ft.terPattern || ft.terHatch ? "  let patFw = abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy);\n" : ""}${ft.terPattern ? "  let patLit = dot(n, fog.sun.xyz);\n" : ""}  let slopeDeg = degrees(acos(clamp(n.z, -1.0, 1.0)));
   var col = fb;
   var c = 0;
 ${
 	ft.terCover
 		? `  c = ter_class(xy);\n  if (c > 0${opt.water ? " && c != 12" : ""}) { col = mix(fb, ${ft.terPattern ? "ter_pattern_cover(c, xy, ter_cover_albedo(c, xy, px, s.elev), patFw, patLit)" : "ter_cover_albedo(c, xy, px, s.elev)"}, terroir.cover.x); }\n`
 		: ""
-}${ft.terSnow ? "  if (c != 12) { col = mix(col, terroir.snowCol.rgb, ter_snow(s.elev, n, slopeDeg, xy)); }\n" : ""}${
+}${ft.terHatch ? `  col = mix(col, col * vec3<f32>(${HATCH_INK}), ter_hatch(n, xy, s.elev, patFw, s.dElev, c));\n` : ""}${ft.terSnow ? "  if (c != 12) { col = mix(col, terroir.snowCol.rgb, ter_snow(s.elev, n, slopeDeg, xy)); }\n" : ""}${
 	opt.relief
 		? "  // the Swiss relief already splits warm light / cool shade\n  return col;\n"
 		: `  // Imhof: warm light, cool shade, from the look's sun

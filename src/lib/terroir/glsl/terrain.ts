@@ -20,7 +20,8 @@
 //                             no lines over water
 // Display only: the geometry (style 3) and normal (style 7) passes return before any of it runs.
 import { defineBlock } from "#/lib/look/glsl/block";
-import { PATTERN_GLSL } from "../pattern";
+import { HATCH_GLSL, HATCH_INK } from "../hatch";
+import { PATTERN_GLSL, PATTERN_KERNEL_GLSL } from "../pattern";
 
 /** Values: ./values.ts terroirBlockValues(). Accessors `ter_<field>`, three uniforms `uTer<Field>`. */
 export const TER_BLOCK = defineBlock("ter", "terroir", {
@@ -259,8 +260,8 @@ vec3 hypso(float h) { return terroirAlbedo(terHypso(h), normalize(vNormal)); }
  * terroirAlbedo (uniform control flow, before the class branching), the pattern is composed over the
  * class albedo, and the scree hash speckle (which aliases) gives way to the dots. FNS unchanged when off.
  */
-function fnsFor(pattern: boolean): string {
-	if (!pattern) return FNS;
+function fnsFor(pattern: boolean, hatch = false): string {
+	if (!pattern && !hatch) return FNS;
 	let out = FNS;
 	const swap = (from: string, to: string, all = false) => {
 		if (!out.includes(from))
@@ -268,22 +269,34 @@ function fnsFor(pattern: boolean): string {
 		out = all ? out.replaceAll(from, to) : out.replace(from, to);
 	};
 	swap(
-		"    v = (terHash(floor(xy / 3.0)) - 0.5) * 0.5 * fine + (terFbm(xy / 60.0) - 0.5) * 0.25 * mid;",
-		"    v = (terFbm(xy / 60.0) - 0.5) * 0.25 * mid;",
-	);
-	swap(
 		"// fb = the look's albedo",
-		`${PATTERN_GLSL}\n// fb = the look's albedo`,
+		`${pattern ? PATTERN_GLSL : PATTERN_KERNEL_GLSL}${hatch ? HATCH_GLSL : ""}\n// fb = the look's albedo`,
 	);
 	swap(
 		"  float px = max(length(fwidth(xy)), 1e-3);\n",
-		"  float px = max(length(fwidth(xy)), 1e-3);\n  vec2 terFw = fwidth(xy);\n  float terLit = dot(n, TER_SUN);\n",
+		"  float px = max(length(fwidth(xy)), 1e-3);\n  vec2 terFw = fwidth(xy);\n",
 	);
-	swap(
-		"terCoverAlbedo(c, xy, px)",
-		"terPatternCover(c, xy, terCoverAlbedo(c, xy, px), terFw, terLit)",
-		true,
-	);
+	if (pattern) {
+		swap(
+			"  vec2 terFw = fwidth(xy);\n",
+			"  vec2 terFw = fwidth(xy);\n  float terLit = dot(n, TER_SUN);\n",
+		);
+		swap(
+			"    v = (terHash(floor(xy / 3.0)) - 0.5) * 0.5 * fine + (terFbm(xy / 60.0) - 0.5) * 0.25 * mid;",
+			"    v = (terFbm(xy / 60.0) - 0.5) * 0.25 * mid;",
+		);
+		swap(
+			"terCoverAlbedo(c, xy, px)",
+			"terPatternCover(c, xy, terCoverAlbedo(c, xy, px), terFw, terLit)",
+			true,
+		);
+	}
+	// slope hatch: before the snow, so snow hides it; c is the cover class (0 without a pack)
+	if (hatch)
+		swap(
+			"#ifdef TERROIR_SNOW\n  if (c != 12) col = mix(",
+			`  col = mix(col, col * vec3(${HATCH_INK}), terHatch(n, xy, vElev, terFw, fwidth(vElev), c));\n#ifdef TERROIR_SNOW\n  if (c != 12) col = mix(`,
+		);
 	return out;
 }
 
@@ -301,7 +314,7 @@ function injections(engine: Engine, defines: readonly string[]) {
 	const contours =
 		has("TERROIR_CONTOUR_ADAPTIVE") || has("TERROIR_CONTOUR_INK");
 	const cover = has("TERROIR_COVER");
-	const albedo = cover || has("TERROIR_SNOW");
+	const albedo = cover || has("TERROIR_SNOW") || has("TERROIR_HATCH");
 	const out: [string, string, "before" | "after"][] = [];
 	const deck = engine === "deck";
 	if (albedo)
@@ -314,7 +327,7 @@ function injections(engine: Engine, defines: readonly string[]) {
 		(deck
 			? "#define TER_SUN terrain.sunDir.xyz\n"
 			: `#define TER_SUN uSunDir\nuniform sampler2D terroirCover;\n${TER_BLOCK.threeDecl}`) +
-			fnsFor(has("TERROIR_PATTERN")) +
+			fnsFor(has("TERROIR_PATTERN"), has("TERROIR_HATCH")) +
 			(albedo ? WRAP_ALBEDO : "") +
 			"\n",
 		"before",
