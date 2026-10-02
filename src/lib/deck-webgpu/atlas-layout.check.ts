@@ -270,6 +270,7 @@ const rand = () => {
 }
 
 // ---------- 5. compaction ----------
+// biome-ignore lint/complexity/noUselessLoneBlockStatements: the block scopes this section's consts so section names do not collide
 {
 	for (let trial = 0; trial < 300; trial++) {
 		const cap = 1 + Math.floor(rand() * 300);
@@ -461,6 +462,7 @@ const rand = () => {
 }
 
 // ---------- 8. spare meshes ----------
+// biome-ignore lint/complexity/noUselessLoneBlockStatements: the block scopes this section's consts so section names do not collide
 {
 	for (let trial = 0; trial < 500; trial++) {
 		const n = Math.floor(rand() * 300);

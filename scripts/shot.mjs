@@ -131,13 +131,13 @@ try {
 		log("eval");
 		// Wrapped as an async function body-or-expression so `await` works.
 		const result = await page.evaluate(async (src) => {
+			// biome-ignore lint/security/noGlobalEval: intentional dev tool
+			const indirectEval = eval;
 			try {
-				// biome-ignore lint/security/noGlobalEval: intentional dev tool
-				return await (0, eval)(`(async () => (${src}))()`);
+				return await indirectEval(`(async () => (${src}))()`);
 			} catch (e) {
 				if (!(e instanceof SyntaxError)) throw e;
-				// biome-ignore lint/security/noGlobalEval: intentional dev tool
-				return await (0, eval)(`(async () => { ${src} })()`);
+				return await indirectEval(`(async () => { ${src} })()`);
 			}
 		}, opt.eval);
 		if (result !== undefined) log("eval result:", JSON.stringify(result));

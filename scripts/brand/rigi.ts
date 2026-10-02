@@ -56,7 +56,8 @@ const pending = new Map<string, Promise<Float32Array | null>>();
 
 async function tile(k: TileKey) {
 	const id = tileId(k);
-	if (tileCache.has(id)) return tileCache.get(id)!;
+	const cached = tileCache.get(id);
+	if (cached) return cached;
 	if (!pending.has(id))
 		pending.set(
 			id,
@@ -73,7 +74,10 @@ async function tile(k: TileKey) {
 				return h;
 			})(),
 		);
-	return pending.get(id)!;
+	const inflight = pending.get(id);
+	// invariant: set just above when missing
+	if (!inflight) throw new Error(`tile ${id} not pending`);
+	return inflight;
 }
 
 /** Synchronous bilinear sample; tiles must be preloaded with `preload`. */
@@ -219,7 +223,7 @@ function simplify(pts: Pt[], tol: number): Pt[] {
 	keep[0] = keep[pts.length - 1] = 1;
 	const stack: [number, number][] = [[0, pts.length - 1]];
 	while (stack.length) {
-		const [i, j] = stack.pop()!;
+		const [i, j] = stack.pop() as [number, number]; // length checked by the loop
 		const [x0, y0] = pts[i];
 		const [x1, y1] = pts[j];
 		const dx = x1 - x0;
@@ -472,7 +476,8 @@ async function main() {
 		.map((r) => ({ ...r, pts: simplify(r.pts, 0.012) }))
 		.filter(
 			(r) =>
-				r.pts.length > 1 && Math.abs(r.pts.at(-1)![0] - r.pts[0][0]) > 0.15,
+				r.pts.length > 1 &&
+				Math.abs((r.pts.at(-1) as [number, number])[0] - r.pts[0][0]) > 0.15,
 		);
 	const q = (v: number) => Math.round(v * 1000); // millidegrees
 	const panorama = {

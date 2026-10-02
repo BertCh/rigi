@@ -341,7 +341,10 @@ export async function requestMatch(
 				const t = setTimeout(resolve, waitMs);
 				l.signal.addEventListener(
 					"abort",
-					() => (clearTimeout(t), reject(l.signal.reason)),
+					() => {
+						clearTimeout(t);
+						reject(l.signal.reason);
+					},
 					{ once: true },
 				);
 			});

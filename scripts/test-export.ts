@@ -47,6 +47,12 @@ import {
 } from "../src/lib/geodesy";
 import { poseBasis, projectPoint, unprojectDir } from "../src/lib/pose";
 
+/** Unwrap a value the check cannot continue without. Invariant: the fixture inputs always produce it, so null means a regression worth a loud failure. */
+function must<T>(value: T | null | undefined, what: string): T {
+	if (value == null) throw new Error(`test-export: missing ${what}`);
+	return value;
+}
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "out/lead/export");
 mkdirSync(OUT, { recursive: true });
@@ -161,12 +167,10 @@ const D = Math.PI / 180;
 	for (let k = 0; k < 200; k++) {
 		const dir = unprojectDir(poses[2], W / H, rnd(), rnd());
 		const p = [dir.x * 5000, dir.y * 5000, 1000 + dir.z * 5000];
-		const a = projectPoint(
-			poses[2],
-			W / H,
-			{ x: 0, y: 0, z: 1000 } as never,
-			p,
-		)!;
+		const a = must(
+			projectPoint(poses[2], W / H, { x: 0, y: 0, z: 1000 } as never, p),
+			"projectPoint",
+		);
 		const R = m.R_w2c_enu;
 		const t = m.t_w2c_enu;
 		const c = [0, 1, 2].map(
@@ -262,13 +266,11 @@ const D = Math.PI / 180;
 	for (const km of [10, 30, 60]) {
 		const [lon, lat] = pointAlong(fr.lat, fr.lon, pose0.yaw, km * 1000);
 		const enu = fr.fromGeo(lat, lon, 1500);
-		const a = projectPoint(
-			pose0,
-			W / H,
-			{ x: 0, y: 0, z: 1361.3 } as never,
-			enu,
-		)!;
-		const b = projectEcef(mm, toEcef(lat, lon, 1500))!;
+		const a = must(
+			projectPoint(pose0, W / H, { x: 0, y: 0, z: 1361.3 } as never, enu),
+			"projectPoint",
+		);
+		const b = must(projectEcef(mm, toEcef(lat, lon, 1500)), "projectEcef");
 		refr.push(`${km} km: ${(a.v * H - b.y).toFixed(2)} px`);
 	}
 	check(
@@ -447,7 +449,10 @@ const photos = JSON.parse(
 	takenAt: string;
 	region: string;
 }[];
-const ph = photos.find((p) => p.id === "IMG_7131")!;
+const ph = must(
+	photos.find((p) => p.id === "IMG_7131"),
+	"photo IMG_7131",
+);
 const DEM_AT_CAMERA = 1345; // out/gt/IMG_7131.txt: "eye 1361 (gps 1361, dem 1345)"
 const eyeAlt =
 	ph.alt != null && Math.abs(ph.alt - DEM_AT_CAMERA) < 30
@@ -522,10 +527,10 @@ function colmapReadImages(text: string) {
 {
 	const files = colmapFiles(model);
 	const imgs = colmapReadImages(files["images.txt"]);
-	const camLine = files["cameras.txt"]
-		.split("\n")
-		.find((l) => l && !l.startsWith("#"))!
-		.split(" ");
+	const camLine = must(
+		files["cameras.txt"].split("\n").find((l) => l && !l.startsWith("#")),
+		"cameras.txt line",
+	).split(" ");
 	const im = imgs[0];
 	const qok =
 		im &&
@@ -588,12 +593,15 @@ check(
 		const dir = unprojectDir(pose, ph.width / ph.height, rnd(), rnd());
 		const d = 200 + rnd() * 40000;
 		const p = [dir.x * d, dir.y * d, eyeAlt + dir.z * d];
-		const a = projectPoint(
-			pose,
-			ph.width / ph.height,
-			{ x: 0, y: 0, z: eyeAlt } as never,
-			p,
-		)!;
+		const a = must(
+			projectPoint(
+				pose,
+				ph.width / ph.height,
+				{ x: 0, y: 0, z: eyeAlt } as never,
+				p,
+			),
+			"projectPoint",
+		);
 		// ENU→ECEF from JSON: X = originEcef + R_cam2ecef·R_cam2enuᵀ·p
 		const Rce = j.extrinsics.R_cam2ecef;
 		const Rcn = j.extrinsics.R_cam2enu;
@@ -799,8 +807,10 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 		errs.join("; ") ||
 			`${gj.features.length} features: ${[...new Set(kinds)].join(", ")}`,
 	);
-	const line = gj.features.find((f) => f.properties.kind === "view-direction")!
-		.geometry.coordinates as [number, number][];
+	const line = must(
+		gj.features.find((f) => f.properties.kind === "view-direction"),
+		"view-direction",
+	).geometry.coordinates as [number, number][];
 	const brg = bearingDeg(
 		{ lat: line[0][1], lon: line[0][0] },
 		{ lat: line[1][1], lon: line[1][0] },
@@ -891,7 +901,7 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 		err ?? "",
 	);
 	const back = (re: RegExp) => {
-		const g = xmp.match(re)!;
+		const g = must(xmp.match(re), "xmp match");
 		return (
 			(Number(g[1]) + Number(g[2]) / 60) *
 			(g[3] === "S" || g[3] === "W" ? -1 : 1)
@@ -899,8 +909,8 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 	};
 	const latBack = back(/GPSLatitude="(\d+),([\d.]+)([NS])"/);
 	const lonBack = back(/GPSLongitude="(\d+),([\d.]+)([EW])"/);
-	const altG = xmp.match(/GPSAltitude="(\d+)\/1000"/)!;
-	const altRef = xmp.match(/GPSAltitudeRef="(\d)"/)!;
+	const altG = must(xmp.match(/GPSAltitude="(\d+)\/1000"/), "GPSAltitude");
+	const altRef = must(xmp.match(/GPSAltitudeRef="(\d)"/), "GPSAltitudeRef");
 	const altBack = (Number(altG[1]) / 1000) * (altRef[1] === "1" ? -1 : 1);
 	check(
 		"XMP GPS round trip (lat, lon, alt, heading)",
@@ -912,7 +922,7 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 	);
 	// DDD,MM.mmmmmm edge cases: minutes must never print as 60, and must carry into the degrees
 	const parse = (s: string) => {
-		const g = s.match(/^(\d+),(\d+\.\d{6})([NSEW])$/)!;
+		const g = must(s.match(/^(\d+),(\d+\.\d{6})([NSEW])$/), "DDD,MM.mmmmmm");
 		return {
 			d: Number(g[1]),
 			min: Number(g[2]),
@@ -957,12 +967,14 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 		[-179.95, 300],
 	] as const) {
 		const gj = buildGeoJson(mk(lon, yaw), { maxRange: 30000 });
-		const wedge = gj.features.find(
-			(f) => f.properties.kind === "fov-wedge",
-		)!.geometry;
-		const line = gj.features.find(
-			(f) => f.properties.kind === "view-direction",
-		)!.geometry;
+		const wedge = must(
+			gj.features.find((f) => f.properties.kind === "fov-wedge"),
+			"fov-wedge",
+		).geometry;
+		const line = must(
+			gj.features.find((f) => f.properties.kind === "view-direction"),
+			"view-direction",
+		).geometry;
 		if (wedge.type !== "MultiPolygon")
 			errs.push(`${lon}/${yaw}: wedge ${wedge.type}`);
 		if (line.type !== "MultiLineString")
@@ -984,9 +996,12 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 			if (!l.every(inRange)) errs.push("line range");
 	}
 	// no crossing → plain Polygon, unchanged
-	const plain = buildGeoJson(mk(8.6, 20), {}).features.find(
-		(f) => f.properties.kind === "fov-wedge",
-	)!.geometry.type;
+	const plain = must(
+		buildGeoJson(mk(8.6, 20), {}).features.find(
+			(f) => f.properties.kind === "fov-wedge",
+		),
+		"fov-wedge",
+	).geometry.type;
 	const p1 = polygonGeometry([
 		[179, 0],
 		[181, 0],
@@ -1023,8 +1038,10 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 	});
 	const camZ = (withZ.features[0].geometry.coordinates as number[])[2];
 	const peakZ = (
-		withZ.features.find((f) => f.properties.kind === "peak")!.geometry
-			.coordinates as number[]
+		must(
+			withZ.features.find((f) => f.properties.kind === "peak"),
+			"peak",
+		).geometry.coordinates as number[]
 	)[2];
 	check(
 		"GeoJSON z = ellipsoidal height only when geoidUndulation given (RFC 7946 §4); MSL in properties",

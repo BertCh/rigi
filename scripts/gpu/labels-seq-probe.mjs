@@ -52,7 +52,10 @@ await page.evaluate(() => {
 	window.__probe = s;
 	const pl = e.peakLabels.bind(e);
 	const sa = e.sampleAt.bind(e);
-	e.sampleAt = (u, v) => (s.sample++, sa(u, v));
+	e.sampleAt = (u, v) => {
+		s.sample++;
+		return sa(u, v);
+	};
 	e.peakLabels = (...a) => {
 		const t = performance.now();
 		const r = pl(...a);

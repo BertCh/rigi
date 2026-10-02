@@ -16,7 +16,7 @@ export const PROVENANCE_CODE: Record<Provenance, number> = {
 };
 
 /** Per-pixel class after the depth split. Stored as Uint8 in `SplitResult.cls`. */
-export const enum PixelClass {
+export enum PixelClass {
 	Sky = 0,
 	/** Model depth agrees with the DEM range: the terrain drape renders it, no splat. */
 	Terrain = 1,

@@ -149,8 +149,9 @@ export function associate(
 	};
 	const modelLo = model
 		.map((m, i) => ({ i, m, q: mpx[i] }))
-		.filter((e) => e.q && e.m.prom * ppd >= lo)
-		.map((e) => ({ i: e.i, x: e.q![0], y: e.q![1] }));
+		.flatMap((e) =>
+			e.q && e.m.prom * ppd >= lo ? [{ i: e.i, x: e.q[0], y: e.q[1] }] : [],
+		);
 	const photoLo = obs.peaks
 		.map((p, i) => ({ i, x: p.x, y: p.y, prom: p.prom }))
 		.filter((p) => p.prom >= lo);

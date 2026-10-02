@@ -709,11 +709,13 @@ log();
 			projectPoint(tp, aspect, eyeA, fE.fromGeo(la, lo, h)),
 		);
 		const ok = px.every((p) => p && p.u > 0 && p.u < 1 && p.v > 0 && p.v < 1);
+		// invariant: `ok` above is false when any projection is null, results are unused then
+		const pxAt = (i: number) => px[i] as NonNullable<(typeof px)[number]>;
 		const cE = peaks.map(([la, lo, h], i) =>
-			pointCorr(fE, la, lo, h, px[i]!.u, px[i]!.v),
+			pointCorr(fE, la, lo, h, pxAt(i).u, pxAt(i).v),
 		);
 		const cC = peaks.map(([la, lo, h], i) =>
-			pointCorr(fC, la, lo, h, px[i]!.u, px[i]!.v),
+			pointCorr(fC, la, lo, h, pxAt(i).u, pxAt(i).v),
 		);
 		const ph = { hAccuracy: 10, heading: 5, pitch: 2, roll: 0, vfov: 58 };
 		const rE = solvePose6dof(cE, priorsFromPhoto(ph, { eye: eyeA }), {

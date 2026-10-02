@@ -438,6 +438,7 @@ async function main() {
 	}
 
 	// ---- Report.
+	// biome-ignore lint/suspicious/noExplicitAny: ad-hoc report columns
 	type Row = (typeof rows)[number] & Record<string, any>;
 	const R = rows as Row[];
 	const withGt = R.filter((r) => r.b.err);

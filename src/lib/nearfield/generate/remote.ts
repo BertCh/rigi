@@ -376,7 +376,7 @@ export function encodeNpy(a: NdArray): Uint8Array {
 	let header = `{'descr': '<f4', 'fortran_order': False, 'shape': ${shape}, }`;
 	const pre = 10;
 	const pad = 64 - ((pre + header.length + 1) % 64);
-	header = header + " ".repeat(pad % 64) + "\n";
+	header = `${header}${" ".repeat(pad % 64)}\n`;
 	const out = new Uint8Array(pre + header.length + a.data.byteLength);
 	out.set([0x93, 0x4e, 0x55, 0x4d, 0x50, 0x59, 1, 0], 0);
 	out[8] = header.length & 0xff;

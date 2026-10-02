@@ -206,14 +206,19 @@ for (const photo of photos) {
 				const pm = [...p0] as FitParams;
 				pp[k] += PSTEP[k];
 				pm[k] -= PSTEP[k];
-				const a = projectAzEl(camOf(pp, obs), m.az, m.el)!;
-				const b = projectAzEl(camOf(pm, obs), m.az, m.el)!;
+				const a = projectAzEl(camOf(pp, obs), m.az, m.el);
+				const b = projectAzEl(camOf(pm, obs), m.az, m.el);
+				if (!a || !b) throw new Error("peak behind the camera"); // invariant: m is in front of the fitted camera
 				rx.push((a[0] - b[0]) / (2 * PSTEP[k]));
 				ry.push((a[1] - b[1]) / (2 * PSTEP[k]));
 			}
 			for (let j = 0; j < 2; j++) {
-				const a = projectAzEl(c0, twins[2 * j]!.az, twins[2 * j]!.el)!;
-				const b = projectAzEl(c0, twins[2 * j + 1]!.az, twins[2 * j + 1]!.el)!;
+				// invariant: twins has no null entries (checked by `twins.some` above)
+				const t0 = twins[2 * j] as NonNullable<(typeof twins)[number]>;
+				const t1 = twins[2 * j + 1] as NonNullable<(typeof twins)[number]>;
+				const a = projectAzEl(c0, t0.az, t0.el);
+				const b = projectAzEl(c0, t1.az, t1.el);
+				if (!a || !b) throw new Error("twin behind the camera"); // invariant: twins are in front of c0
 				rx.push((a[0] - b[0]) / (2 * DE));
 				ry.push((a[1] - b[1]) / (2 * DE));
 			}

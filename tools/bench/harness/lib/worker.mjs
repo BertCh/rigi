@@ -11,7 +11,7 @@ import readline from "node:readline";
 export const ROOT = path.resolve(import.meta.dirname, "../../../..");
 
 export class Worker {
-	constructor({ maxPages = 2, port = "0" } = {}) {
+	constructor({ maxPages = 2 } = {}) {
 		this.seq = 0;
 		this.waiting = new Map();
 		this.proc = spawn(
