@@ -1179,4 +1179,12 @@ export const CHECKS = [
 		note: "band stats on Dawn at 512x384 / 1600x1200 / 3000x2000: BAND_STATS + GPUGroupAggregation fold vs the CPU twin (counts within 1e-4, |d| <= 1e-4), median wall times; SKIP without DAWN_DIR",
 		timeoutS: 300,
 	},
+	{
+		id: "relief-gradient-dawn",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("scripts/gpu/relief-gradient-dawn.ts", "3"),
+		note: "GPU relief field on Dawn at res 512 / 1024 / 2048 vs the CPU twin (byte-diff histogram per channel; <= 0.5 % of texels off by > 2, identical coverage), the normal's GPUFiniteDifference2D gradient on phase planes, median wall times, and the texture path's bytes equal the read path's; SKIP without DAWN_DIR",
+		timeoutS: 300,
+	},
 ];

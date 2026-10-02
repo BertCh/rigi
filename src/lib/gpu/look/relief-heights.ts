@@ -39,8 +39,13 @@ import { type ComputeGraph, cachedGraph } from "../core/graph";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import { defineUniformBlock } from "../core/uniform-block";
 import { defineKernel } from "./kernel";
+import { reliefGradientShape } from "./relief";
 import type { ReliefOutTextures } from "./relief-graph";
-import { buildReliefGraph, RELIEF_GRAPH_GROUP } from "./relief-graph";
+import {
+	buildReliefGraph,
+	type GradientShape,
+	RELIEF_GRAPH_GROUP,
+} from "./relief-graph";
 
 // mirror of relief.ts / field.ts (keep in sync; the check compares the extent with reliefHeights)
 const RES = 1024;
@@ -436,6 +441,8 @@ type Shape = {
 	unitsCap: number;
 	smallDepth: number;
 	bigDepth: number;
+	/** the relief graph's gradient planes (ring radius, texel size; from the run's uniform words) */
+	gradient: GradientShape;
 };
 
 function buildGatherGraph(
@@ -493,7 +500,16 @@ function buildGatherGraph(
 		bindings: { prm, nodes, tiles, th, H },
 		workgroups: [Math.ceil(s.res / 16), Math.ceil(s.res / 16)],
 	});
-	buildReliefGraph(g, s.res, 0, reliefPrmBytes, false, "texture", H);
+	buildReliefGraph(
+		g,
+		s.res,
+		0,
+		reliefPrmBytes,
+		false,
+		"texture",
+		H,
+		s.gradient,
+	);
 }
 
 /** Last gather run (bench / tests). */
@@ -530,6 +546,7 @@ export function reliefGraphToTexturesGpuHeights(
 			unitsCap,
 			smallDepth: resident.small.depth,
 			bigDepth: resident.big.depth,
+			gradient: reliefGradientShape(words),
 		};
 		const gp = pooledUniform(
 			device,
@@ -541,7 +558,7 @@ export function reliefGraphToTexturesGpuHeights(
 		rowsBuf.set(new Uint8Array(plan.rows));
 		const tiles = pooledStorage(device, "look-relief-gh/tiles", rowsBuf);
 		const rprm = pooledUniform(device, "look-relief-graph/prm", words);
-		const key = `gh|${res}|r${rowsCap}|u${unitsCap}|d${shape.smallDepth}.${shape.bigDepth}|u${rprm.byteLength}`;
+		const key = `gh|${res}|r${rowsCap}|u${unitsCap}|d${shape.smallDepth}.${shape.bigDepth}|u${rprm.byteLength}|ra${shape.gradient.ra}|px${shape.gradient.px}`;
 		const { graph, hit } = cachedGraph<Params, void>(
 			device,
 			RELIEF_GRAPH_GROUP,

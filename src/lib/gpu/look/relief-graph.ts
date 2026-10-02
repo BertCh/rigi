@@ -3,12 +3,21 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // The GPU relief passes (relief.ts reliefPassesGpu / buildReliefFieldGpu) on a core ComputeGraph:
-// their only GPU path (the pooled single-encoder path it replaced, byte for byte, was removed on
-// 2026-10-01).
+// their only GPU path.
 //
-//   clear shadow → SHADOW (atomicOr)          ┐
-//   DOWN → clear acc8 → SVF → SUM             ├→ PACK → read (field, gen)
-//                                             └─────→ or: to-texture (field, gen → 2 rgba8unorm)
+//   clear shadow → SHADOW (atomicOr)                         ┐
+//   DOWN → clear acc8 → SVF → SUM                            ├→ PACK → read (field, gen)
+//   PHASE → ra² × GPUFiniteDifference2D (gradient) → grad    ┘      └→ or: to-texture (field, gen → 2 rgba8unorm)
+//
+// The generalised normal's gradient is luma's GPUFiniteDifference2D (operator "gradient", boundary
+// "one-sided", spacing ra · px): the normal differences H over ±ra texels, so H is de-interleaved by
+// PHASE into ra² planes of ceil(res / ra)² (plane (py, px) = every ra-th texel from (px, py)) and each
+// plane's centred difference at spacing ra · px is that difference; PACK picks the plane of its texel.
+// ra = 1 (res ≤ 512 at the app's 40 km extent) needs no PHASE: the op reads H itself. At the plane
+// borders the op's one-sided stencil differs from H's, but PACK only uses texels ≥ rb ≥ ra from the
+// grid edge. ra and px are baked into the graph (RELIEF_PARAMS words → reliefGradientShape; the
+// shape cache key has both). Curvature (a 16-sample ring sum, not a Laplacian) and the line sweeps
+// (shadow, sky view) stay custom: the primitive does not express them.
 //
 // The texture variant (reliefGraphToTextures, out = "texture"; deck-webgpu/compute-bridge.ts on the
 // render device) ends in a copy node instead of the read node: copyBufferToTexture of the packed
@@ -41,14 +50,16 @@
 // maths and the u32() casts of PACK.
 import { Buffer, type Device, Texture } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
-import type { GraphBufferHandle } from "../core/luma";
+import { GPUFiniteDifference2D, type GraphBufferHandle } from "../core/luma";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import {
 	K_RELIEF_DOWN,
 	K_RELIEF_PACK,
+	K_RELIEF_PHASE,
 	K_RELIEF_SHADOW,
 	K_RELIEF_SUM,
 	K_RELIEF_SVF,
+	reliefGradientShape,
 } from "./relief";
 
 /** Per-run graph parameters: `degenerate` skips the SHADOW dispatch (CPU condition). */
@@ -57,11 +68,27 @@ type Params = { degenerate: boolean };
 const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
 export const RELIEF_GRAPH_GROUP = "look-relief";
 
+/** The gradient planes' shape: ring radius `ra` (texels) and texel size `px` (m). */
+export type GradientShape = { ra: number; px: number };
+
+/** The app's shape at `res`: reliefWords' ra at the 40 km extent (field.ts HALF 20 000). */
+export const defaultGradientShape = (res: number): GradientShape => {
+	const px = 40000 / res;
+	return { ra: Math.max(1, Math.round(60 / px)), px };
+};
+
 /** Exact byte sizes of the relief intermediates at `res` (a pool would hold each at pow2 capacity). */
-export function reliefScratchBytes(res: number) {
+export function reliefScratchBytes(
+	res: number,
+	{ ra } = { ra: defaultGradientShape(res).ra },
+) {
 	const N = res * res;
 	const NH = (res >> 1) * (res >> 1);
+	const planeCells = ra * ra * Math.ceil(res / ra) ** 2;
 	return {
+		// the gradient's inputs (ra > 1: the phase planes) and outputs (vec2 per plane cell)
+		phase: planeCells * 4,
+		grad: planeCells * 8,
 		shadow: N,
 		Hh: NH * 4,
 		hull: 8 * NH * 4,
@@ -87,10 +114,11 @@ export function buildReliefGraph<P extends Params | undefined = Params>(
 	out: "read" | "texture" = "read",
 	/** heights produced earlier in this graph (relief-heights.ts); default: an imported "H" */
 	hIn?: GraphBufferHandle,
+	shape: GradientShape = defaultGradientShape(res),
 ) {
 	const resH = res >> 1;
 	const NH = resH * resH;
-	const sz = reliefScratchBytes(res);
+	const sz = reliefScratchBytes(res, shape);
 	const prm = g.importBuffer("prm", prmBytes, undefined, UNIFORM);
 	const H = hIn ?? g.importBuffer("H", hBytes);
 	const t = (id: keyof typeof sz) => g.transientBuffer(id, sz[id]);
@@ -101,6 +129,7 @@ export function buildReliefGraph<P extends Params | undefined = Params>(
 	const acc = t("acc");
 	const field = t("field");
 	const gen = t("gen");
+	const grad = t("grad");
 	if (!unsafeSkipClears) g.clearNode("clear-shadow", shadow);
 	g.addKernel({
 		id: "shadow",
@@ -131,10 +160,41 @@ export function buildReliefGraph<P extends Params | undefined = Params>(
 		bindings: { prm, acc8, acc },
 		workgroups: [Math.ceil(NH / 256)],
 	});
+	// the normal's gradient: GPUFiniteDifference2D over each phase plane (ra = 1: H itself)
+	const { ra, px } = shape;
+	const side = Math.ceil(res / ra);
+	const planeCells = side * side;
+	const phase = ra > 1 ? t("phase") : null;
+	if (phase)
+		g.addKernel({
+			id: "phase",
+			spec: K_RELIEF_PHASE,
+			bindings: { prm, H, phase },
+			workgroups: [Math.ceil((ra * ra * planeCells) / 256)],
+		});
+	for (let plane = 0; plane < ra * ra; plane++)
+		g.add(
+			new GPUFiniteDifference2D({
+				id: `gradient-${plane}`,
+				width: side,
+				height: side,
+				spacing: [ra * px, ra * px],
+				operator: "gradient",
+				boundary: "one-sided",
+				input: phase
+					? g.view(phase, "float32", planeCells, plane * planeCells * 4)
+					: g.view(H, "float32", planeCells),
+				output: g.graph.createDataView(grad, {
+					format: "float32x2",
+					length: planeCells,
+					byteOffset: plane * planeCells * 8,
+				}),
+			}),
+		);
 	g.addKernel({
 		id: "pack",
 		spec: K_RELIEF_PACK,
-		bindings: { prm, H, shadow, acc, field, gen },
+		bindings: { prm, H, shadow, acc, grad, field, gen },
 		workgroups: [Math.ceil(res / 16), Math.ceil(res / 16)],
 	});
 	if (out === "read") {
@@ -194,12 +254,23 @@ export function reliefGraphPasses(
 	return withLease("look-relief-graph", async () => {
 		const prm = pooledUniform(device, "look-relief-graph/prm", words);
 		const gH = pooledStorage(device, "look-relief-graph/H", H);
-		const key = `${res}|H${gH.byteLength}|u${prm.byteLength}`;
+		const shape = reliefGradientShape(words);
+		const key = `${res}|H${gH.byteLength}|u${prm.byteLength}|ra${shape.ra}|px${shape.px}`;
 		const { graph, hit } = cachedGraph<Params, void>(
 			device,
 			RELIEF_GRAPH_GROUP,
 			key,
-			(g) => buildReliefGraph(g, res, gH.byteLength, prm.byteLength),
+			(g) =>
+				buildReliefGraph(
+					g,
+					res,
+					gH.byteLength,
+					prm.byteLength,
+					false,
+					"read",
+					undefined,
+					shape,
+				),
 		);
 		await graph.compileAsync();
 		const { reads } = await graph.run(
@@ -243,7 +314,8 @@ export function reliefGraphToTextures(
 	return withLease("look-relief-graph", async () => {
 		const prm = pooledUniform(device, "look-relief-graph/prm", words);
 		const gH = pooledStorage(device, "look-relief-graph/H", H);
-		const key = `${res}|H${gH.byteLength}|u${prm.byteLength}|tex`;
+		const shape = reliefGradientShape(words);
+		const key = `${res}|H${gH.byteLength}|u${prm.byteLength}|ra${shape.ra}|px${shape.px}|tex`;
 		const { graph, hit } = cachedGraph<Params, void>(
 			device,
 			RELIEF_GRAPH_GROUP,
@@ -256,6 +328,8 @@ export function reliefGraphToTextures(
 					prm.byteLength,
 					false,
 					"texture",
+					undefined,
+					shape,
 				),
 		);
 		await graph.compileAsync();

@@ -83,12 +83,23 @@ export function buildReliefField(
 	const extent: Extent = [c[0] - HALF, c[1] - HALF, c[0] + HALF, c[1] + HALF];
 	const px = (2 * HALF) / res;
 	const H = rasterizeHeights(tiles, frame, extent, res, HOLE);
+	const { field, gen } = reliefFromHeights(H, res, px, sunDir);
+	return { res, extent, field, gen, ms: performance.now() - t0 };
+}
+
+/** The RGBA8 field and generalised normal of rasterised heights `H` (res², row 0 = south, HOLE = no data). */
+export function reliefFromHeights(
+	H: Float32Array,
+	res: number,
+	px: number,
+	sunDir: Vec3,
+) {
 	const field = new Uint8Array(res * res * 4);
 	const gen = new Uint8Array(res * res * 4);
 	castShadow(H, res, px, sunDir, field);
 	skyView(H, res, px, field);
 	curvatureAndNormal(H, res, px, field, gen);
-	return { res, extent, field, gen, ms: performance.now() - t0 };
+	return { field, gen };
 }
 
 /** R: soft cast shadow. O = the occluder surface over each texel, propagated away from the sun. */

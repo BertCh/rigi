@@ -6,7 +6,9 @@
 // (rasterizeHeights, ~15 ms: tile lookups), then shadow, sky view, curvature and the generalised
 // normal run as WGSL kernels (relief.wgsl.ts) and the two RGBA8 textures are read back. The passes
 // run as one core ComputeGraph (relief-graph.ts; the pooled single-encoder path was removed on
-// 2026-10-01): a warm call allocates nothing on the GPU.
+// 2026-10-01): a warm call allocates nothing on the GPU. The normal's gradient is luma's
+// GPUFiniteDifference2D on phase planes; the output is tolerance-checked against the CPU twin (a byte
+// may differ by 1 on a rounding edge), scripts/gpu/relief-gradient-dawn.ts.
 import type { Device } from "@luma.gl/core";
 import type { EnuFrame } from "../../geodesy";
 import type { Vec3 } from "../../look/atmosphere";
@@ -20,6 +22,7 @@ import { defineKernel } from "./kernel";
 import {
 	RELIEF_DOWN,
 	RELIEF_PACK,
+	RELIEF_PHASE,
 	RELIEF_SHADOW,
 	RELIEF_SUM,
 	RELIEF_SVF,
@@ -47,11 +50,17 @@ export const K_RELIEF_SUM = defineKernel("relief-sum", RELIEF_SUM, [
 	["acc8", "read-only-storage"],
 	["acc", "storage"],
 ]);
+export const K_RELIEF_PHASE = defineKernel("relief-phase", RELIEF_PHASE, [
+	["prm", "uniform"],
+	["H", "read-only-storage"],
+	["phase", "storage"],
+]);
 export const K_RELIEF_PACK = defineKernel("relief-pack", RELIEF_PACK, [
 	["prm", "uniform"],
 	["H", "read-only-storage"],
 	["shadow", "read-only-storage"],
 	["acc", "read-only-storage"],
+	["grad", "read-only-storage"],
 	["field", "storage"],
 	["gen", "storage"],
 ]);
@@ -62,6 +71,19 @@ const HALF = 20000;
 const AHEAD = 12000;
 const SVF_R = 3000;
 const HOLE = -1e6;
+
+/**
+ * What the relief graph's shape depends on, read from the uniform words reliefWords built: the inner
+ * ring radius `ra` (texels; the gradient's phase planes) and the texel size `px` (m; the gradient's
+ * spacing is ra · px, baked into the graph).
+ */
+export function reliefGradientShape(words: ArrayBuffer) {
+	// RELIEF_PARAMS: ra is word 12 (i32), pxH = 2 · px is word 11 (f32)
+	return {
+		ra: new Int32Array(words, 0, 16)[12],
+		px: new Float32Array(words, 0, 16)[11] / 2,
+	};
+}
 
 /** GPU twin of buildReliefField(tiles, frame, sunDir, yawDeg). */
 export async function buildReliefFieldGpu(

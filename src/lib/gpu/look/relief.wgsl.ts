@@ -4,7 +4,11 @@
 
 // WGSL for the GPU relief field (twin of look/relief/field.ts: castShadow, skyView,
 // curvatureAndNormal). Same line sweeps, same hull pointers, same byte rounding; f32 instead of the
-// CPU's f64 temporaries, so a byte can differ by 1 where a value sits on a rounding edge.
+// CPU's f64 temporaries, so a byte can differ by 1 where a value sits on a rounding edge (the
+// Dawn check scripts/gpu/relief-gradient-dawn.ts prints the byte-diff histogram against the CPU twin).
+// The normal's gradient (central differences over the inner ring radius ra) is luma's
+// GPUFiniteDifference2D on ra² phase planes (RELIEF_PHASE de-interleaves H; relief-graph.ts); PACK
+// reads the gradient from them. Shadow and sky view stay custom line sweeps.
 // The shadow bytes are packed four per u32 (little-endian, texel q in byte q & 3 of word q >> 2):
 // RELIEF_SHADOW ORs them into a zeroed buffer, RELIEF_PACK unpacks them.
 
@@ -155,6 +159,31 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 `;
 
 /**
+ * De-interleave H into ra² phase planes of wp² floats (wp = ceil(res / ra)): plane p = py · ra + px
+ * holds H[ra · j + py][ra · i + px] at (j, i), coordinates clamped to the grid (clamped samples only
+ * reach texels outside PACK's interior, where the gradient is not used). A central difference of one
+ * plane at spacing ra · px is then H's central difference over ±ra texels.
+ * @workgroup_size(256), 1-D over ra² · wp² elements.
+ */
+export const RELIEF_PHASE = /* wgsl */ `${PARAMS}
+@group(0) @binding(0) var<uniform> prm: P;
+@group(0) @binding(1) var<storage, read> H: array<f32>;
+@group(0) @binding(2) var<storage, read_write> phase: array<f32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+  let ra = u32(prm.ra);
+  let wp = (prm.res + ra - 1u) / ra;
+  let plane = wp * wp;
+  if (id.x >= ra * ra * plane) { return; }
+  let p = id.x / plane;
+  let k = id.x - p * plane;
+  let j = min(ra * (k / wp) + p / ra, prm.res - 1u);
+  let i = min(ra * (k % wp) + p % ra, prm.res - 1u);
+  phase[id.x] = H[j * prm.res + i];
+}
+`;
+
+/**
  * Per full-res texel: R shadow, G sky view (bilinear from half res), B curvature, A coverage, and
  * the generalised normal, packed RGBA8 into u32 (little-endian = the CPU's byte order).
  * @workgroup_size(16, 16): 2-D neighbourhood reads (rings up to rb texels) stay cache-local.
@@ -164,8 +193,11 @@ export const RELIEF_PACK = /* wgsl */ `${PARAMS}
 @group(0) @binding(1) var<storage, read> H: array<f32>;
 @group(0) @binding(2) var<storage, read> shadow: array<u32>;
 @group(0) @binding(3) var<storage, read> acc: array<f32>;
-@group(0) @binding(4) var<storage, read_write> field: array<u32>;
-@group(0) @binding(5) var<storage, read_write> gen: array<u32>;
+// GPUFiniteDifference2D's gradient of the phase planes: plane p = (j % ra) · ra + i % ra, at
+// (j / ra, i / ra), planes of wp² vec2 back to back
+@group(0) @binding(4) var<storage, read> grad: array<vec2<f32>>;
+@group(0) @binding(5) var<storage, read_write> field: array<u32>;
+@group(0) @binding(6) var<storage, read_write> gen: array<u32>;
 fn at(i: i32, j: i32) -> f32 { return H[u32(j) * prm.res + u32(i)]; }
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -210,8 +242,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if (lo > HOLE) {
       let x = clamp(-prm.ka * sa - prm.kb * sb, -3.0, 3.0);
       B = u32(127.5 + (127.5 * x * (27.0 + x * x)) / (27.0 + 9.0 * x * x) + 0.5);
-      let gx = (xm - xp) * prm.g;
-      let gy = (ym - yp) * prm.g;
+      let ur = u32(ra);
+      let wp = (prm.res + ur - 1u) / ur;
+      let gg = grad[((u32(j) % ur) * ur + u32(i) % ur) * wp * wp + (u32(j) / ur) * wp + u32(i) / ur];
+      // the normal leans away from the slope: minus the central difference (xp - xm, yp - ym) / (2 ra px)
+      let gx = -gg.x;
+      let gy = -gg.y;
       let l = 0.5 / sqrt(gx * gx + gy * gy + 1.0);
       gn = u32(255.0 * (0.5 + gx * l) + 0.5) | (u32(255.0 * (0.5 + gy * l) + 0.5) << 8u) | (255u << 24u);
     }
