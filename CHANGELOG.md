@@ -12,6 +12,10 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 - `src/lib/roll/propagate/store.ts`: `acceptSuggestion` now refuses (returns false, writes nothing) when the target already has a saved, ground-truth or solved pose, so the guard no longer lives only in the Accept button. `revertAccepted` clears the solved slot only for the accepted record. New `invariants.spec.ts`; `PREREG_DRAFT.txt` gains sections 8-14 (N3 held-out set, frozen constants with sha1, Wilson precision bound), still a draft needing owner sign-off.
 
+### v3 pre-registration tooling (2026-10-02, R6)
+
+- **`STAGE1_MANIFEST` switch** for the stage-1 runner with the v3 seal (`stage1/manifest_guard.py`: refused unless `V3_ALLOW=1` and the manifest sha1 and photo-listing digest match `data_v3/FROZEN.sha1`), **arm code stamps** (`tools/bench/final/stamps.py`, shared with `final.py`; run_v2 records carry `armStamp`), the v2 finalisation as pure functions (`v2/finalize_v2.py`) with a worker-free `V2_SUGGEST_ONLY` replay of cached dev records (`v2/dryrun_suggest_only.py`), and a node-only worker/engine surface spec. Python unit tests run through `tools/matcher/__tests__/python-unit.spec.ts`. Dev and synthetic evidence only; the real dry run is a batch item.
+
 ### Luma-native GPU pass (2026-10-02, session 07)
 
 - **Vendored luma `10.0.0-alpha.2-rigi.4` and deck `9.4.0-rigi.2`.** luma adds #3345 (compatibility devices get the adapter's real limits) and four local APIs: `CommandEncoder.clearBuffer`, `Device.submit(cb?, additionalCommandBuffers?)`, `Buffer.mapAndReadAsync(…, {waitForSubmittedWork})`, MSAA `RenderBundleEncoder`. deck adds #10779, #10778, #10782, #10753, #10776. The app now uses those APIs instead of the raw `clearBuffer`, the private submit finaliser, raw `mapAsync` and the native bundle encoder.
