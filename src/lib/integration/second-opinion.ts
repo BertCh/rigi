@@ -110,6 +110,23 @@ export function choosePreview(
 	};
 }
 
+/**
+ * Why a settled verdict is not a verification, for the workspace note; null when it is one (or already says
+ * so itself: "unverified" carries its own note). "kept" and "timeout" return an empty `note`, so without this
+ * the pose would read as a success with no badge.
+ */
+export function notVerifiedReason(
+	o: Pick<SecondOpinion, "verdict" | "cascade">,
+): string | null {
+	if (o.verdict === "timeout")
+		return "not verified: the skyline check timed out";
+	if (o.verdict === "kept")
+		return o.cascade
+			? "not verified: the skyline cascade could not confirm it"
+			: "not verified: the skyline check failed";
+	return null;
+}
+
 export const AGREE_DEG = 1;
 /** Default deadline for the cascade, from the secondOpinion() call (i.e. after [data-ready]). */
 export const CASCADE_TIMEOUT_MS = 20_000;

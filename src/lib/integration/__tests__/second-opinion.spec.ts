@@ -8,6 +8,8 @@ import {
 	AGREE_DEG,
 	CASCADE_TIMEOUT_MS,
 	choosePreview,
+	notVerifiedReason,
+	type SecondOpinion,
 } from "../second-opinion";
 
 const pose = (yaw: number, pitch = 0): Pose => ({
@@ -74,5 +76,36 @@ describe("constants", () => {
 	it("keep the documented values", () => {
 		expect(AGREE_DEG).toBe(1);
 		expect(CASCADE_TIMEOUT_MS).toBe(20_000);
+	});
+});
+
+describe("notVerifiedReason", () => {
+	const casc = {
+		confidence: 0.1,
+		accepted: false,
+		stage: "solve",
+		ms: 1,
+		yaw: 0,
+	};
+	const ask = (
+		verdict: SecondOpinion["verdict"],
+		cascade: SecondOpinion["cascade"] = casc as unknown as SecondOpinion["cascade"],
+	) => notVerifiedReason({ verdict, cascade });
+	it("is null for verdicts that verify or carry their own note", () => {
+		for (const v of ["verified", "refined", "matched", "unverified"] as const)
+			expect(ask(v)).toBeNull();
+	});
+	it("explains kept with a cascade", () => {
+		expect(ask("kept")).toBe(
+			"not verified: the skyline cascade could not confirm it",
+		);
+	});
+	it("explains kept after a cascade error", () => {
+		expect(ask("kept", null)).toBe("not verified: the skyline check failed");
+	});
+	it("explains timeout", () => {
+		expect(ask("timeout", null)).toBe(
+			"not verified: the skyline check timed out",
+		);
 	});
 });

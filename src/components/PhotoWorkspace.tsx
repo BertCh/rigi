@@ -41,6 +41,7 @@ import {
 } from "#/lib/gpu/eye/client";
 import {
 	choosePreview,
+	notVerifiedReason,
 	type SecondOpinionVerdict,
 	secondOpinion,
 } from "#/lib/integration/second-opinion";
@@ -642,13 +643,15 @@ export function PhotoWorkspace({
 						setAlignState(out.state);
 						setAlignNote(out.note);
 						// contended match service: the overlay cleared early on the guess; a confident match upgrades it
-						out.upgrade?.then((up) => {
-							if (!up || engineRef.current !== engine || ctl.signal.aborted)
-								return;
-							setPose(up.pose, false);
-							setAlignState(up.state);
-							setAlignNote(up.note);
-						});
+						out.upgrade
+							?.then((up) => {
+								if (!up || engineRef.current !== engine || ctl.signal.aborted)
+									return;
+								setPose(up.pose, false);
+								setAlignState(up.state);
+								setAlignNote(up.note);
+							})
+							.catch(() => {});
 					} else setPoseState((p) => p ?? { ...engine.pose });
 				} else {
 					setStatus({ msg: "Aligning skyline to terrain", frac: 1 });
@@ -701,20 +704,24 @@ export function PhotoWorkspace({
 									)
 										setAlignState("accepted");
 									if (out.note) setAlignNote(out.note);
+									const why = notVerifiedReason(out);
+									if (why) setAlignNote((n) => (n ? `${n} · ${why}` : why));
 									setVerify(out.verdict);
 									// matcher busy: exports unlock now; a confident match later still takes over
-									out.upgrade?.then((up) => {
-										if (
-											!up ||
-											engineRef.current !== engine ||
-											ctl.signal.aborted
-										)
-											return;
-										setPose(up.pose, false);
-										setAlignState("accepted");
-										setAlignNote(up.note);
-										setVerify(up.verdict);
-									});
+									out.upgrade
+										?.then((up) => {
+											if (
+												!up ||
+												engineRef.current !== engine ||
+												ctl.signal.aborted
+											)
+												return;
+											setPose(up.pose, false);
+											setAlignState("accepted");
+											setAlignNote(up.note);
+											setVerify(up.verdict);
+										})
+										.catch(() => {});
 								})
 								.catch((e) => {
 									if (e?.name !== "AbortError")
@@ -1094,7 +1101,13 @@ export function PhotoWorkspace({
 		setTimeout(async () => {
 			const res = await eng.autoAlign(fromPrior);
 			if (!res || engineRef.current !== eng) return;
-			setPose(res.pose);
+			if (fromPrior) {
+				// Auto-align is an unverified guess: show it but do not persist it (a saved pose reloads as accepted)
+				setPose(res.pose, false);
+				verifyAbort.current?.abort();
+				unknownAbort.current?.abort();
+				setVerify(null);
+			} else setPose(res.pose);
 			// a local refinement from a hand-set pose is fine, but not verified when the sensors are missing
 			if (eng.unknowns.any) setAlignState("unverified");
 			else setAlignState(fromPrior ? "auto" : "manual");
