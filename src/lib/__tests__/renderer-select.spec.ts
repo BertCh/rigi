@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withFlags } from "#/test/helpers";
 
@@ -219,5 +220,19 @@ describe("resolveRenderer", () => {
 			renderer: "webgpu",
 			reason: "pinned",
 		});
+	});
+});
+
+describe("WEBGPU_REQUIRED_FEATURES", () => {
+	// duplicated so the probe never pulls the WebGPU chunk: read device.ts as text instead of importing it
+	it("equals deck-webgpu/device.ts REQUIRED_FEATURES", () => {
+		const src = readFileSync(
+			new URL("../deck-webgpu/device.ts", import.meta.url),
+			"utf8",
+		);
+		const m = /export const REQUIRED_FEATURES = \[([^\]]*)\]/.exec(src);
+		expect(m).not.toBeNull();
+		const listed = [...(m?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((x) => x[1]);
+		expect(listed).toEqual([...R.WEBGPU_REQUIRED_FEATURES]);
 	});
 });

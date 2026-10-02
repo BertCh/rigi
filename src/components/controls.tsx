@@ -196,6 +196,7 @@ export function Segmented<T extends string>({
 					key={o.value}
 					type="button"
 					title={o.title}
+					aria-pressed={value === o.value}
 					onClick={() => onChange(o.value)}
 					className={cn(
 						"flex-1 rounded-md font-medium transition-colors",
@@ -224,6 +225,8 @@ export function Toggle({
 	return (
 		<button
 			type="button"
+			role="switch"
+			aria-checked={checked}
 			onClick={() => onChange(!checked)}
 			className="flex w-full items-center justify-between text-xs text-white/70"
 		>

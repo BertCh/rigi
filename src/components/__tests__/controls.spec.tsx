@@ -129,19 +129,49 @@ describe("Segmented", () => {
 		fireEvent.click(screen.getByTitle("Bee"));
 		expect(onChange).toHaveBeenCalledWith("b");
 	});
+	it("marks the selected option pressed", () => {
+		render(
+			<Segmented
+				value="b"
+				onChange={() => {}}
+				options={[
+					{ value: "a", label: "A" },
+					{ value: "b", label: "B" },
+				]}
+			/>,
+		);
+		expect(
+			screen.getByRole("button", { name: "A" }).getAttribute("aria-pressed"),
+		).toBe("false");
+		expect(
+			screen.getByRole("button", { name: "B", pressed: true }),
+		).toBeTruthy();
+	});
 });
 
 describe("Toggle", () => {
 	it("flips the checked value", () => {
 		const onChange = vi.fn();
 		render(<Toggle label="Labels" checked={false} onChange={onChange} />);
-		fireEvent.click(screen.getByRole("button", { name: "Labels" }));
+		fireEvent.click(screen.getByRole("switch", { name: "Labels" }));
 		expect(onChange).toHaveBeenCalledWith(true);
+	});
+	it("exposes its state as a switch", () => {
+		const { rerender } = render(
+			<Toggle label="Labels" checked={false} onChange={() => {}} />,
+		);
+		expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe(
+			"false",
+		);
+		rerender(<Toggle label="Labels" checked onChange={() => {}} />);
+		expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe(
+			"true",
+		);
 	});
 	it("flips back when checked", () => {
 		const onChange = vi.fn();
 		render(<Toggle label="Labels" checked onChange={onChange} />);
-		fireEvent.click(screen.getByRole("button"));
+		fireEvent.click(screen.getByRole("switch"));
 		expect(onChange).toHaveBeenCalledWith(false);
 	});
 });

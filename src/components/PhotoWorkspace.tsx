@@ -132,6 +132,7 @@ import { useStepInside } from "./nearfield/useStepInside";
 import { AdvancedPanel } from "./panel/AdvancedPanel";
 import { LabelStylePanel, StylePanel, TrailStylePanel } from "./StylePanel";
 import { dragPose, wheelVfov } from "./workspace/poseControls";
+import { markWorkspace } from "./workspace/timing";
 
 // Every backend loads on demand, so /photo downloads only the one it runs (src/lib/renderer-select.ts
 // picks it): the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts) where WebGPU passes the probe, the
@@ -306,6 +307,8 @@ export function PhotoWorkspace({
 	const stageSizeRef = useRef({ w: 0, h: 0 });
 	const [flying, setFlying] = useState(false);
 	const [hasPeople, setHasPeople] = useState(false);
+	/** The engine's DEM-snapped eye altitude, read once the load settles (the Camera section shows it). */
+	const [eyeAlt, setEyeAlt] = useState<number | null>(null);
 	const aspect = photo.width / photo.height;
 	const unknowns = useMemo(() => photoUnknowns(photo), [photo]);
 	// how the views look (src/lib/style): global per user, persisted, ?style=<preset> overrides
@@ -502,6 +505,8 @@ export function PhotoWorkspace({
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
+		// User Timing: time-to-first-overlay / time-to-certified (workspace/timing.ts)
+		markWorkspace("start", { photo: photo.id });
 		const create = (make: () => Renderer): Renderer | null => {
 			try {
 				return make();
@@ -587,6 +592,7 @@ export function PhotoWorkspace({
 				);
 				// StrictMode / fast navigation: a superseded engine must not touch shared state
 				if (engineRef.current !== engine) return;
+				markWorkspace("engine");
 				loadSky(engine);
 				// the photo's luminance, for backdrop-adaptive label contrast (labels/contrast.ts)
 				const img = engine.photoElement;
@@ -595,18 +601,23 @@ export function PhotoWorkspace({
 				const saved = shared?.pose ?? ownSave ?? bundledPose;
 				const moved = eyeMoveRef.current;
 				let startVerify: (() => void) | null = null;
+				/** which branch chose the first pose (the first-overlay mark's detail) */
+				let firstPose = "auto";
 				const carried = carryRef.current;
 				carryRef.current = null;
 				if (carried) {
+					firstPose = "carried";
 					setPose(carried.pose, false);
 					setAlignState(carried.align);
 				} else if (moved) {
+					firstPose = "eye-move";
 					setPose(moved.pose, false);
 					setAlignState("manual");
 					// a pose the person chose: a verdict from an earlier (aborted) second opinion no longer applies
 					setVerify(null);
 					setAlignNote(moved.note);
 				} else if (saved) {
+					firstPose = shared ? "shared" : ownSave ? "saved" : "bundled";
 					setPose(saved, false);
 					setAlignState(shared ? shared.state : "saved");
 					setVerify(null);
@@ -620,6 +631,7 @@ export function PhotoWorkspace({
 				} else if (solver && engine.photoElement) {
 					// No compass / gravity / focal (uploads): autoAlign searches ±25° around a placeholder prior
 					// and accepts wrong poses (reports/bench-ablation.md), so it is never trusted here.
+					firstPose = "unknown-pose";
 					const ctl = new AbortController();
 					unknownAbort.current = ctl;
 					let out: UnknownPoseOutcome | null = null;
@@ -696,8 +708,12 @@ export function PhotoWorkspace({
 								},
 							})
 								.then((out) => {
-									if (engineRef.current !== engine || ctl.signal.aborted)
+									if (engineRef.current !== engine) return;
+									// the user took over (setPose aborts it): no verdict, but the phase ended
+									if (ctl.signal.aborted) {
+										markWorkspace("certified", { verdict: "aborted" });
 										return;
+									}
 									const sinceReadyMs = Math.round(performance.now() - t0);
 									console.debug("[second-opinion]", out.verdict, {
 										disagreeDeg: out.disagreeDeg,
@@ -718,6 +734,7 @@ export function PhotoWorkspace({
 									const why = notVerifiedReason(out);
 									if (why) setAlignNote((n) => (n ? `${n} · ${why}` : why));
 									setVerify(out.verdict);
+									markWorkspace("certified", { verdict: out.verdict });
 									// matcher busy: exports unlock now; a confident match later still takes over
 									out.upgrade
 										?.then((up) => {
@@ -740,7 +757,11 @@ export function PhotoWorkspace({
 								.catch((e) => {
 									if (e?.name !== "AbortError")
 										console.warn("[second-opinion]", e);
-									if (!ctl.signal.aborted) setVerify(null);
+									if (!ctl.signal.aborted) {
+										setVerify(null);
+										markWorkspace("certified", { verdict: "error" });
+									} else if (engineRef.current === engine)
+										markWorkspace("certified", { verdict: "aborted" });
 								});
 						};
 					}
@@ -751,6 +772,12 @@ export function PhotoWorkspace({
 				if (engineRef.current !== engine) return;
 				setStatus(null);
 				setHasPeople(engine.hasPeople);
+				setEyeAlt(engine.eyeAlt || null);
+				markWorkspace("first-overlay", {
+					pose: firstPose,
+					// WebGpuEngine carries backend "webgpu" (renderer.ts); DeckEngine has none
+					renderer: (engine as { backend?: string }).backend ?? "deck",
+				});
 				if (import.meta.env.DEV)
 					window.__poseAtReady = {
 						...engine.pose,
@@ -764,6 +791,7 @@ export function PhotoWorkspace({
 				else {
 					verifySolver?.dispose();
 					verifySolver = null;
+					markWorkspace("certified", { verdict: "none" });
 				}
 			})().catch((e) => {
 				// a disposed (StrictMode / navigated-away) engine rejects with AbortError: not an error
@@ -1452,7 +1480,7 @@ export function PhotoWorkspace({
 					>
 						<ArrowLeft className="size-3.5" /> Library
 					</Link>
-					<div className="rounded-lg bg-black/50 px-2.5 py-1.5 text-xs text-white/70 backdrop-blur">
+					<div className="min-w-0 truncate rounded-lg bg-black/50 px-2.5 py-1.5 text-xs text-white/70 backdrop-blur">
 						<span className="font-semibold text-white">{place}</span> · {taken}{" "}
 						· {photo.id}
 					</div>
@@ -1540,9 +1568,14 @@ export function PhotoWorkspace({
 										<button
 											type="button"
 											key={c.name + c.world[0]}
+											aria-pressed={active}
 											onPointerDown={(e) => {
 												e.stopPropagation();
 												setPendingPeak(active ? null : c);
+											}}
+											// keyboard (Enter / Space: detail 0); pointer presses already chose it on pointerdown
+											onClick={(e) => {
+												if (e.detail === 0) setPendingPeak(active ? null : c);
 											}}
 											className={cn(
 												"absolute -translate-x-1/2 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap ring-1 transition",
@@ -1724,10 +1757,29 @@ export function PhotoWorkspace({
 					<div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 backdrop-blur-sm">
 						<div className="w-72 rounded-lg bg-[var(--rigi-slate)] p-4">
 							{error ? (
-								<p className="text-sm text-red-300">{error}</p>
+								<div role="alert">
+									<p className="text-sm text-red-300">{error}</p>
+									{/* the overlay covers the header: its way out lives here */}
+									<div className="mt-3 flex gap-2">
+										<Button onClick={() => window.location.reload()}>
+											Try again
+										</Button>
+										<Link
+											to="/library"
+											className="inline-flex items-center gap-1.5 rounded-lg bg-white/6 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/12"
+										>
+											<ArrowLeft className="size-3.5" /> Library
+										</Link>
+									</div>
+								</div>
 							) : (
 								<>
-									<p className="mb-2 text-sm text-white/80">{status?.msg}…</p>
+									<output
+										aria-live="polite"
+										className="mb-2 block text-sm text-white/80"
+									>
+										{status?.msg}…
+									</output>
 									<div className="h-1 overflow-hidden rounded bg-white/10">
 										<div
 											className="h-full bg-[var(--rigi-glow)] transition-all"
@@ -2203,7 +2255,8 @@ export function PhotoWorkspace({
 										? engineRef.current.demAtCamera
 										: Number.NaN
 								}
-								eyeAlt={engineRef.current?.eyeAlt ?? 0}
+								// eyeAlt state (set when the load settles) re-renders the row once the eye is placed
+								eyeAlt={eyeAlt ?? 0}
 								model={photo.model}
 								lat={photo.lat}
 								lon={photo.lon}
