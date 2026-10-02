@@ -1592,7 +1592,7 @@ function WaterWindControls({ style }: { style: ViewStyle }) {
 				onChange={(on) => patch({ world: { water: on ? "waves" : "flat" } })}
 			/>
 			<Toggle
-				label="Wind particles (WebGPU)"
+				label="Wind particles"
 				checked={w.on}
 				onChange={(on) => patchWind({ on })}
 			/>
