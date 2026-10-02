@@ -62,7 +62,9 @@ import * as cam from "#/lib/camera";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { CpuGeometrySource, TerrainProfiles } from "#/lib/deck/cpu-geometry";
 import {
+	OCC_DVS,
 	type OccPlan,
+	occThreshold,
 	planOcclusion,
 	resolveOcclusion,
 	skylineFromRows,
@@ -3174,9 +3176,9 @@ export class WebGpuEngine implements Renderer {
 				const pr = this.projectToPhoto(p.position);
 				if (!pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1) continue;
 				let visible = false;
-				for (const dv of [0.004, 0.009]) {
+				for (const dv of OCC_DVS) {
 					const s = this.sampleAt(pr.u, pr.v + dv);
-					if (!s || s.range > pr.range * 0.97 - 50) visible = true;
+					if (!s || s.range > occThreshold(pr.range)) visible = true;
 				}
 				this.vis.set(p, visible);
 			}

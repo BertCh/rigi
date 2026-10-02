@@ -143,6 +143,7 @@ import {
 	watchContextLoss,
 } from "./device-lost";
 import { FlowLayer } from "./flow-layer";
+import { OCC_DVS, occThreshold } from "./geo-query";
 import { GpuGeometrySource, geometrySize, rangeMapFrom } from "./geometry-pass";
 import {
 	type GeometrySource,
@@ -2189,9 +2190,9 @@ export class DeckEngine implements Renderer {
 					p.position[2] - this.eye.z,
 				);
 				let visible = false;
-				for (const dv of [0.004, 0.009]) {
+				for (const dv of OCC_DVS) {
 					const s = this.sampleAt(pr.u, pr.v + dv);
-					if (!s || s.range > range * 0.97 - 50) visible = true;
+					if (!s || s.range > occThreshold(range)) visible = true;
 				}
 				this.vis.set(p, visible);
 			}
