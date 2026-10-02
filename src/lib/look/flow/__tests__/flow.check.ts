@@ -11,12 +11,17 @@
 //   4. advection: deterministic, stays in the domain and the grid's valid area, drifts downwind,
 //      respawns reproducibly, ages out within the lifetime
 //   5. kernel: the WGSL parses (luma reflection) with the kernel's binding layout
+//   6. FlowSim (the WebGL engine's CPU advection): nothing runs when off, the warm-up equals the
+//      WebGPU core's runs exactly, ticks collapse to one substep of the same simulated time, and a
+//      16k-particle tick stays cheap
 import { getShaderLayoutFromWGSL } from "@luma.gl/webgpu";
 import { FLOW_KERNEL } from "../../../deck-webgpu/layers/flow";
 import {
 	buildFlowGrid,
 	deflectWind,
 	FLOW_ADVECT_WGSL,
+	FLOW_EXTENT_M,
+	FLOW_GRID_DIM,
 	FLOW_LIFETIME,
 	flowHash,
 	flowStepFor,
@@ -25,6 +30,7 @@ import {
 	stepFlowParticles,
 	windVector,
 } from "../field";
+import { FlowSim, flowCoarseStep } from "../sim";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail = "") {
@@ -197,6 +203,64 @@ for (let iy = 0; iy < DIM; iy++)
 			FLOW_KERNEL.layout.map(([n]) => n).join() === "prm,grid,particles",
 		names.join(),
 	);
+}
+
+// 6. FlowSim
+{
+	const sim = new FlowSim();
+	check("off sim does nothing", !sim.step() && sim.count === 0 && !sim.active);
+	sim.setWind({ direction: 180, speed: 10, density: 0.05 });
+	check("no grid, no run", !sim.step());
+	const count = sim.count;
+	// FlowSim runs on the production extent and grid size
+	const simGrid = buildFlowGrid(
+		new Float32Array(FLOW_GRID_DIM * FLOW_GRID_DIM).fill(1000),
+		FLOW_GRID_DIM,
+		FLOW_EXTENT_M,
+		{ direction: 180, speed: 10 },
+	);
+	sim.setGrid(simGrid);
+	// the WebGPU core's warm-up (layers/flow.ts prepass), replayed on the CPU twin
+	const ref2 = newFlowParticles();
+	let frameN = 0;
+	for (let i = 0; i < 4; i++) {
+		const p = flowStepFor(1e3, count, frameN++);
+		if (!p) throw new Error("no step");
+		frameN = (frameN + 1) % 65536;
+		stepFlowParticles(ref2, simGrid, p);
+	}
+	const before = sim.stateVersion;
+	check("warm-up runs on the first step", sim.step() && sim.isWarm);
+	let same = true;
+	for (let i = 0; i < count * 4; i++)
+		if (sim.state[i] !== ref2[i]) same = false;
+	check("warm-up equals the WebGPU runs", same);
+	check("state version bumps", sim.stateVersion === before + 1);
+	check("second step without time is a no-op", !sim.step());
+	sim.advance(0.033);
+	check("a tick advances", sim.step());
+	const due = flowStepFor(0.033, count, 0);
+	if (!due) throw new Error("no step");
+	const coarse = flowCoarseStep(due);
+	check(
+		"coarse step keeps the simulated time",
+		coarse.substeps === 1 && near(coarse.dt, due.dt * due.substeps, 1e-12),
+	);
+	sim.advance(100);
+	sim.advance(100);
+	check("advance is capped", sim.step());
+	// cost of a full-density tick
+	const big = new FlowSim();
+	big.setWind({ direction: 180, speed: 10, density: 1 });
+	big.setGrid(simGrid);
+	big.step();
+	const t0 = performance.now();
+	for (let i = 0; i < 20; i++) {
+		big.advance(0.033);
+		big.step();
+	}
+	const ms = (performance.now() - t0) / 20;
+	check("16k-particle tick is cheap", ms < 6, `${ms.toFixed(2)} ms`);
 }
 
 if (failures) {

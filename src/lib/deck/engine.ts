@@ -65,6 +65,14 @@ import {
 	STATS_LONG_SIDE,
 	trustedRange,
 } from "../look/composite";
+import {
+	buildFlowGrid,
+	FLOW_EXTENT_M,
+	FLOW_GRID_DIM,
+	flowWindFor,
+	sampleFlowHeights,
+} from "../look/flow/field";
+import { FlowSim } from "../look/flow/sim";
 import { COMPOSITE_DEFINES } from "../look/glsl/composite";
 import { HazeController, rangeGeo } from "../look/haze-controller";
 import type { SkyMask } from "../look/haze-fit";
@@ -129,6 +137,7 @@ import { DeckTiles3D } from "../tiles3d/deck-tiles";
 import { PhotoCompositor } from "./composite";
 import { CpuGeometrySource, TerrainProfiles } from "./cpu-geometry";
 import { pendingPrograms, reviveDevice, watchContextLoss } from "./device-lost";
+import { FlowLayer } from "./flow-layer";
 import { GpuGeometrySource, geometrySize, rangeMapFrom } from "./geometry-pass";
 import {
 	type GeometrySource,
@@ -487,6 +496,19 @@ export class DeckEngine implements Renderer {
 	private worldRaf = 0;
 	/** World-view rain / snow animation (style.world.weather): a redraw per frame while it is on. */
 	private weatherRaf = 0;
+	/**
+	 * World-view wind drift (style.world.wind, default off): the CPU advection (WebGL2 has no compute;
+	 * look/flow/sim.ts), the DEM heights it was gridded from, and its animation frame. All null / 0 while off.
+	 */
+	private flowSim: FlowSim | null = null;
+	private flowRaf = 0;
+	private flowHeights: Float32Array | null = null;
+	private flowHeightsSet: TerrainSet | null = null;
+	private flowGridMemo: {
+		heights: Float32Array;
+		direction: number;
+		speed: number;
+	} | null = null;
 	private worldStill = 0;
 	/** The layers the last worldLayers built, and the gizmo plane opacity they (or a flight frame) used. */
 	private worldList: unknown[] = [];
@@ -709,6 +731,7 @@ export class DeckEngine implements Renderer {
 		cancelAnimationFrame(this.worldRaf);
 		this.worldRaf = 0;
 		this.syncWeatherTick(false);
+		this.syncFlowTick(false);
 		clearTimeout(this.geoTimer);
 		this.geoTimer = 0;
 		clearTimeout(this.statsTimer);
@@ -1058,6 +1081,7 @@ export class DeckEngine implements Renderer {
 		clearTimeout(this.wedgeTimer);
 		cancelAnimationFrame(this.worldRaf);
 		cancelAnimationFrame(this.weatherRaf);
+		cancelAnimationFrame(this.flowRaf);
 		this.step?.cam.dispose();
 		this.step = null;
 		this.world?.dispose();
@@ -2874,6 +2898,7 @@ export class DeckEngine implements Renderer {
 		cancelAnimationFrame(this.worldRaf);
 		this.worldRaf = 0;
 		this.syncWeatherTick(false);
+		this.syncFlowTick(false);
 		this.compositor.enabled = true;
 		this.canvas.style.backgroundColor = "";
 		this.deck.setProps({ views: this.photoViews } as never);
@@ -3096,6 +3121,9 @@ export class DeckEngine implements Renderer {
 		// the depth buffer first (the trails would otherwise draw over them)
 		const nf = this.nearFieldLayer();
 		if (nf) out.push(nf);
+		// opt-in wind drift (style.world.wind, default off): blends without writing depth, like the weather
+		const flow = this.flowLayer();
+		if (flow) out.push(flow);
 		// opt-in rain / snow (style.world.weather, default off): last, it blends without writing depth
 		const wx = precipitationFor(this.style.world.weather);
 		this.syncWeatherTick(!!wx);
@@ -3108,6 +3136,95 @@ export class DeckEngine implements Renderer {
 			);
 		this.worldList = out.filter(Boolean);
 		return this.worldList;
+	}
+
+	/**
+	 * Wind drift as a world layer, or null (off: the sim, its heights and the tick are released, so
+	 * nothing is allocated or drawn). The flow grid is the style's wind deflected by the DEM gradient,
+	 * from heights read once per settled tile set (the WebGPU engine's syncFlow does the same).
+	 */
+	private flowLayer(): Layer | null {
+		const wind = flowWindFor(this.style.world.wind);
+		const set = this.renderSet;
+		if (!wind || !this.terrain) {
+			this.releaseFlow();
+			return null;
+		}
+		// streaming sets arrive in bursts: read the heights again only once the set has settled
+		if (
+			set &&
+			set !== this.flowHeightsSet &&
+			(!this.flowHeights || (set.stats?.pending ?? 0) === 0)
+		) {
+			const terrain = this.terrain;
+			this.flowHeightsSet = set;
+			this.flowHeights = sampleFlowHeights(this.frame, (lat, lon) =>
+				terrain.heightAt(lat, lon),
+			);
+		}
+		const heights = this.flowHeights;
+		if (!heights) {
+			this.syncFlowTick(false);
+			return null;
+		}
+		if (!this.flowSim) this.flowSim = new FlowSim();
+		const sim = this.flowSim;
+		sim.setWind(wind);
+		const m = this.flowGridMemo;
+		if (
+			!m ||
+			m.heights !== heights ||
+			m.direction !== wind.direction ||
+			m.speed !== wind.speed
+		) {
+			this.flowGridMemo = {
+				heights,
+				direction: wind.direction,
+				speed: wind.speed,
+			};
+			sim.setGrid(buildFlowGrid(heights, FLOW_GRID_DIM, FLOW_EXTENT_M, wind));
+		}
+		this.syncFlowTick(true);
+		return this.keepLayer(FlowLayer, { id: "world-flow", sim });
+	}
+
+	private releaseFlow() {
+		this.syncFlowTick(false);
+		this.flowSim = null;
+		this.flowHeights = null;
+		this.flowHeightsSet = null;
+		this.flowGridMemo = null;
+	}
+
+	/**
+	 * The wind-drift animation: a CPU advection step and one deck redraw per tick (about 30 Hz) while
+	 * the world view shows it. Off under webdriver and for reduced motion: the layer then shows its
+	 * deterministic warm-up state (the same rule as the WebGPU engine).
+	 */
+	private syncFlowTick(on: boolean) {
+		const still =
+			(typeof navigator !== "undefined" && navigator.webdriver) ||
+			(typeof matchMedia === "function" &&
+				matchMedia("(prefers-reduced-motion: reduce)").matches);
+		if (!on || still || this.disposed) {
+			cancelAnimationFrame(this.flowRaf);
+			this.flowRaf = 0;
+			return;
+		}
+		if (this.flowRaf) return;
+		let last = performance.now();
+		const tick = (t: number) => {
+			if (this.disposed || !this.world?.controls || !this.flowSim) {
+				this.flowRaf = 0;
+				return;
+			}
+			this.flowRaf = requestAnimationFrame(tick);
+			if (t - last < 33) return;
+			this.flowSim.advance((t - last) / 1000);
+			last = t;
+			this.deck.redraw("flow");
+		};
+		this.flowRaf = requestAnimationFrame(tick);
 	}
 
 	/** Start / stop the weather animation: one deck redraw per frame while the world view shows weather. */

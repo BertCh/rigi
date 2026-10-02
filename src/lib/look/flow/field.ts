@@ -3,8 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Flow particles over the DEM (föhn / wind drift) for the WebGPU world view: the field math and the
-// advection step, as a CPU reference plus the WGSL kernel it mirrors.
+// Flow particles over the DEM (föhn / wind drift) for the world view (both engines): the field math and
+// the advection step, as a CPU reference (also the WebGL engine's advection, see sim.ts) plus the WGSL
+// kernel it mirrors.
 //
 // The advection (midpoint integration on a bilinear velocity grid with a conservative missing-data
 // mask, deterministic hash respawn, state records of normalized x, y, age, generation) is ported from
@@ -21,6 +22,7 @@
 // Wind across a slope is untouched, wind straight up or down a slope loses the component the ground
 // takes (a vertical wall stops it), so the flow goes around and over ridges. Deterministic, no state.
 // Display only: it never feeds pose, confidence, measurements or exports.
+import type { EnuFrame } from "../../geodesy";
 import type { ViewStyle } from "../../style/types";
 
 /** Particle capacity (the buffer); style density draws a fraction of it. */
@@ -42,6 +44,11 @@ export const FLOW_TAIL_SECONDS = 1.5;
 export const FLOW_WARMUP_RUNS = 4;
 /** Height above the ground the particles ride at, metres. */
 export const FLOW_LIFT_M = 12;
+/** Streak width (target pixels) and peak alpha, shared by both engines' draws. */
+export const FLOW_STREAK_WIDTH = 1.6;
+export const FLOW_STREAK_OPACITY = 0.8;
+/** Streak colour (the draws multiply it by alpha / blend it straight). */
+export const FLOW_STREAK_COLOR = [0.92, 0.96, 1.0] as const;
 
 export type FlowWind = {
 	/** Compass degrees the wind blows FROM, clockwise from north (a south föhn is 180). */
@@ -80,6 +87,33 @@ export function deflectWind(
 ): [number, number] {
 	const k = (wx * gx + wy * gy) / (1 + gx * gx + gy * gy);
 	return [wx - k * gx, wy - k * gy];
+}
+
+/**
+ * The DEM surface (ENU up) on the flow grid, dim x dim over +-extentM around the frame origin, row-major
+ * from the south-west corner; NaN where `heightAt` (lat, lon -> metres above the ellipsoid) has none.
+ */
+export function sampleFlowHeights(
+	frame: Pick<EnuFrame, "toGeo" | "fromGeo">,
+	heightAt: (lat: number, lon: number) => number | null | undefined,
+	dim = FLOW_GRID_DIM,
+	extentM = FLOW_EXTENT_M,
+): Float32Array {
+	const out = new Float32Array(dim * dim);
+	const cell = (2 * extentM) / (dim - 1);
+	for (let iy = 0; iy < dim; iy++) {
+		for (let ix = 0; ix < dim; ix++) {
+			const e = -extentM + ix * cell;
+			const n = -extentM + iy * cell;
+			const geo = frame.toGeo(e, n, 0);
+			const h = heightAt(geo.lat, geo.lon);
+			out[iy * dim + ix] =
+				h == null || !Number.isFinite(h)
+					? Number.NaN
+					: frame.fromGeo(geo.lat, geo.lon, h)[2];
+		}
+	}
+	return out;
 }
 
 /**
@@ -179,16 +213,22 @@ export function flowHash(input: number): number {
 
 type Sample = { x: number; y: number; ok: boolean };
 
-/** Bilinear velocity in domain-fraction units per second; ok = false outside or beside missing data. */
-export function sampleFlowVelocity(
+// Result registers of sampleInto (the hot loop below allocates nothing: 16k particles x 8 substeps x
+// 3 samples a tick would otherwise be a million short-lived objects, ~150 ms in V8).
+let sampledX = 0;
+let sampledY = 0;
+
+/** Bilinear velocity into (sampledX, sampledY), domain fractions per second; false outside or beside missing data. */
+function sampleInto(
 	grid: Float32Array,
 	dim: number,
 	extentM: number,
 	px: number,
 	py: number,
-): Sample {
-	const none = { x: 0, y: 0, ok: false };
-	if (px < 0 || py < 0 || px > 1 || py > 1) return none;
+): boolean {
+	sampledX = 0;
+	sampledY = 0;
+	if (px < 0 || py < 0 || px > 1 || py > 1) return false;
 	const gx = Math.fround(px * (dim - 1));
 	const gy = Math.fround(py * (dim - 1));
 	const lx = Math.floor(gx);
@@ -197,32 +237,43 @@ export function sampleFlowVelocity(
 	const uy = Math.min(ly + 1, dim - 1);
 	const fx = gx - lx;
 	const fy = gy - ly;
-	const t = (ix: number, iy: number) => (iy * dim + ix) * 4;
-	const a = t(lx, ly);
-	const b = t(ux, ly);
-	const c = t(lx, uy);
-	const d = t(ux, uy);
+	const a = (ly * dim + lx) * 4;
+	const b = (ly * dim + ux) * 4;
+	const c = (uy * dim + lx) * 4;
+	const d = (uy * dim + ux) * 4;
 	if (Math.min(grid[a + 2], grid[b + 2], grid[c + 2], grid[d + 2]) < 0.5)
-		return none;
-	const mix = (p: number, q: number, f: number) => p + (q - p) * f;
-	const vx = mix(mix(grid[a], grid[b], fx), mix(grid[c], grid[d], fx), fy);
-	const vy = mix(
-		mix(grid[a + 1], grid[b + 1], fx),
-		mix(grid[c + 1], grid[d + 1], fx),
-		fy,
-	);
+		return false;
 	const size = 2 * extentM;
-	return { x: vx / size, y: vy / size, ok: true };
+	const bottomX = grid[a] + (grid[b] - grid[a]) * fx;
+	const topX = grid[c] + (grid[d] - grid[c]) * fx;
+	const bottomY = grid[a + 1] + (grid[b + 1] - grid[a + 1]) * fx;
+	const topY = grid[c + 1] + (grid[d + 1] - grid[c + 1]) * fx;
+	sampledX = (bottomX + (topX - bottomX) * fy) / size;
+	sampledY = (bottomY + (topY - bottomY) * fy) / size;
+	return true;
 }
 
-/** One particle's respawn record (upstream spawnParticle). */
+/** Bilinear velocity in domain-fraction units per second; ok = false outside or beside missing data. */
+export function sampleFlowVelocity(
+	grid: Float32Array,
+	dim: number,
+	extentM: number,
+	px: number,
+	py: number,
+): Sample {
+	const ok = sampleInto(grid, dim, extentM, px, py);
+	return { x: sampledX, y: sampledY, ok };
+}
+
+/** One particle's respawn record (upstream spawnParticle), into `out` (x, y, age, generation). */
 function spawnFlowParticle(
 	grid: Float32Array,
 	p: FlowStepParams,
 	id: number,
 	iteration: number,
 	generation: number,
-): [number, number, number, number] {
+	out: Float64Array,
+): void {
 	const seed =
 		(Math.imul(id, 747796405) +
 			(p.seed >>> 0) +
@@ -231,25 +282,31 @@ function spawnFlowParticle(
 		0;
 	const x = flowHash(seed);
 	const y = flowHash((seed + 1013904223) >>> 0);
-	const valid = sampleFlowVelocity(grid, p.dim, p.extentM, x, y).ok;
-	const age = valid
+	const valid = sampleInto(grid, p.dim, p.extentM, x, y);
+	out[0] = x;
+	out[1] = y;
+	out[2] = valid
 		? generation === 0
 			? flowHash((seed + 12345) >>> 0) * p.lifetime
 			: 0
 		: -1;
-	return [x, y, age, (generation + 1) % 65536];
+	out[3] = (generation + 1) % 65536;
 }
+
+const spawned = new Float64Array(4);
 
 /**
  * The CPU twin of FLOW_ADVECT_WGSL: advance `state` (in place) by `p.substeps` midpoint substeps of
  * `p.dt` seconds. The WGSL is the same arithmetic in f32; this uses Math.fround at the places that
- * matter for a node check, not for bit parity.
+ * matter for a node check, not for bit parity. It is also the WebGL engine's advection (no compute
+ * there; see deck/flow-layer.ts), so it allocates nothing per particle.
  */
 export function stepFlowParticles(
 	state: Float32Array,
 	grid: Float32Array,
 	p: FlowStepParams,
 ): void {
+	const { dim, extentM, dt, lifetime } = p;
 	for (let id = 0; id < p.count; id++) {
 		const o = id * 4;
 		let px = state[o];
@@ -258,24 +315,28 @@ export function stepFlowParticles(
 		let gen = state[o + 3];
 		for (let it = 0; it < FLOW_MAX_SUBSTEPS; it++) {
 			if (it >= p.substeps) break;
-			const v1 = sampleFlowVelocity(grid, p.dim, p.extentM, px, py);
-			const mx = px + v1.x * p.dt * 0.5;
-			const my = py + v1.y * p.dt * 0.5;
-			const v2 = sampleFlowVelocity(grid, p.dim, p.extentM, mx, my);
-			const dx = px + v2.x * p.dt;
-			const dy = py + v2.y * p.dt;
+			const ok1 = sampleInto(grid, dim, extentM, px, py);
+			const mx = px + sampledX * dt * 0.5;
+			const my = py + sampledY * dt * 0.5;
+			const ok2 = sampleInto(grid, dim, extentM, mx, my);
+			const dx = px + sampledX * dt;
+			const dy = py + sampledY * dt;
 			if (
 				age < 0 ||
-				age + p.dt >= p.lifetime ||
-				!v1.ok ||
-				!v2.ok ||
-				!sampleFlowVelocity(grid, p.dim, p.extentM, dx, dy).ok
+				age + dt >= lifetime ||
+				!ok1 ||
+				!ok2 ||
+				!sampleInto(grid, dim, extentM, dx, dy)
 			) {
-				[px, py, age, gen] = spawnFlowParticle(grid, p, id, it, gen);
+				spawnFlowParticle(grid, p, id, it, gen, spawned);
+				px = spawned[0];
+				py = spawned[1];
+				age = spawned[2];
+				gen = spawned[3];
 			} else {
 				px = dx;
 				py = dy;
-				age += p.dt;
+				age += dt;
 			}
 		}
 		state[o] = px;

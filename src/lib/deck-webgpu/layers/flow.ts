@@ -18,7 +18,8 @@
 //            premultiplied alpha like the trails.
 //   time     advance(dt) feeds wall seconds (the engine's tick); under webdriver the engine never
 //            ticks, so the layer shows its deterministic warm-up state (FLOW_WARMUP_RUNS fixed runs).
-//   WebGL    no counterpart: the DeckEngine ignores style.world.wind (README.md "Wind drift").
+//   WebGL    deck/flow-layer.ts draws the same streaks; WebGL2 has no compute, so look/flow/sim.ts runs
+//            the CPU twin of the kernel there (README.md, the layers/flow.ts row).
 import { Buffer, type Device } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
@@ -32,6 +33,8 @@ import {
 	FLOW_LIFT_M,
 	FLOW_MAX_PARTICLES,
 	FLOW_PARAM_FLOATS,
+	FLOW_STREAK_OPACITY,
+	FLOW_STREAK_WIDTH,
 	FLOW_TAIL_SECONDS,
 	FLOW_TIME_SCALE,
 	FLOW_WARMUP_RUNS,
@@ -80,7 +83,10 @@ export type FlowStyle = {
 	/** Peak alpha. */
 	opacity: number;
 };
-export const DEFAULT_FLOW_STYLE: FlowStyle = { width: 1.6, opacity: 0.8 };
+export const DEFAULT_FLOW_STYLE: FlowStyle = {
+	width: FLOW_STREAK_WIDTH,
+	opacity: FLOW_STREAK_OPACITY,
+};
 
 export type FlowUniforms = {
 	width: number;

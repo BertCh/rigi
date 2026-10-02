@@ -145,6 +145,7 @@ import {
 	FLOW_EXTENT_M,
 	FLOW_GRID_DIM,
 	flowWindFor,
+	sampleFlowHeights,
 } from "#/lib/look/flow/field";
 import { COMPOSITE_DEFINES } from "#/lib/look/glsl/composite";
 import {
@@ -2376,22 +2377,9 @@ export class WebGpuEngine implements Renderer {
 
 	/** The DEM surface (ENU up) on the flow grid, NaN where the tiles have no height. */
 	private sampleFlowHeights(terrain: TerrainSet): Float32Array {
-		const dim = FLOW_GRID_DIM;
-		const out = new Float32Array(dim * dim);
-		const cell = (2 * FLOW_EXTENT_M) / (dim - 1);
-		for (let iy = 0; iy < dim; iy++) {
-			for (let ix = 0; ix < dim; ix++) {
-				const e = -FLOW_EXTENT_M + ix * cell;
-				const n = -FLOW_EXTENT_M + iy * cell;
-				const geo = this.frame.toGeo(e, n, 0);
-				const h = terrain.heightAt(geo.lat, geo.lon);
-				out[iy * dim + ix] =
-					h == null || !Number.isFinite(h)
-						? Number.NaN
-						: this.frame.fromGeo(geo.lat, geo.lon, h)[2];
-			}
-		}
-		return out;
+		return sampleFlowHeights(this.frame, (lat, lon) =>
+			terrain.heightAt(lat, lon),
+		);
 	}
 
 	/**
