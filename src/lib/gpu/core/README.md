@@ -12,7 +12,7 @@ Luma-native ratchet: `scripts/ci/gpu-raw-lint.mjs` (fast-tier check `gpu-raw-lin
 
 | File | What it gives you |
 |---|---|
-| `luma.ts` | The **only** importer of `@luma.gl/gpgpu/gpu-core`, with luma 10 migration notes. Import `GPUCommandGraph`, `GPUReduction`, `GPUSort`, `GPUHistogram`, `GPUScan`, `GPUFFT1D`, `GPUReadbackRing`, `GraphDataView` and the rest from here, never from the package |
+| `luma.ts` | The **only** importer of `@luma.gl/gpgpu/gpu-core` (and of `gpu-vector-search`: `GPUKMeans`, `GPUSimilaritySearch`), with luma 10 migration notes. Wave H (2026-10-02) also re-exports `GPUGridAggregation`, `GPUGridBinning`, `GPUGridIndex(Query)`, `GPUBVH(Query)`, `GPUPointSpatialFilter`, `GPUBatchSort`, `GPUSegmentedSort`, `GPUMatVec`, `GraphVectorView`. Import `GPUCommandGraph`, `GPUReduction`, `GPUSort`, `GPUHistogram`, `GPUScan`, `GPUFFT1D`, `GPUReadbackRing`, `GraphDataView` and the rest from here, never from the package |
 | `device.ts` | The per-realm device registry: `getComputeDevice`, `adoptRenderDevice`, `resetComputeDevice`, `hasFeature`. The sidecar requests the adapter's maximum limits |
 | `pool.ts` | A persistent grow-only buffer pool (per device), `withLease` for serialising async callers, and `clear` / `range` |
 | `readback.ts` | Ring readback: staged copies into reusable MAP_READ slots on the caller's encoder, one map per read |

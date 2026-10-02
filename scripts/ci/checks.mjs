@@ -1129,4 +1129,32 @@ export const CHECKS = [
 		cmd: tsx("scripts/gpu/refine-fft-dawn.ts"),
 		timeoutS: 120,
 	},
+	{
+		id: "photo-look-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/photo-look-dawn.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "roll-coverage-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/roll-coverage-dawn.ts"),
+		timeoutS: 120,
+	},
+	{
+		// vite-node, not tsx: roll.ts imports the virtual:photos module
+		id: "roll-spatial-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: [
+			"npx",
+			"vite-node",
+			"-c",
+			"vitest.config.ts",
+			"scripts/gpu/roll-spatial-dawn.ts",
+		],
+		timeoutS: 180,
+	},
 ];
