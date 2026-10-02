@@ -1154,7 +1154,6 @@ function MeasuredOnePhoto({
 	return (
 		<Figure
 			label="Fig. D1"
-			bleed
 			caption={
 				<>
 					The same four stages on real data. 1: the camera the sensors imply,

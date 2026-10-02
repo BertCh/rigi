@@ -1585,7 +1585,6 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Figure
-				bleed
 				label="Fig. 3"
 				caption={
 					<>The same miss on four more photos, compass up to 18.6° off.</>

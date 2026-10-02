@@ -2215,7 +2215,6 @@ function Verdicts() {
 	return (
 		<Figure
 			label="Fig. 3"
-			bleed
 			caption={
 				<>
 					All 12 photos at the solved view. Under each: compass error found,

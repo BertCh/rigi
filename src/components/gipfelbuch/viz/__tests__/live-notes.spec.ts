@@ -3,7 +3,13 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { describe, expect, it } from "vitest";
-import { framedNotes } from "../live-notes";
+import {
+	framedNotes,
+	LEADER_HEAD_MS,
+	noteTiming,
+	STROKE_FADE_MS,
+} from "../live-notes";
+import { MOTION } from "../motion";
 
 describe("framedNotes", () => {
 	it("keeps notes on the frame, edges included, in order", () => {
@@ -31,5 +37,23 @@ describe("framedNotes", () => {
 		const out = framedNotes(notes);
 		expect(out).toEqual([]);
 		expect(notes).toHaveLength(1);
+	});
+});
+
+describe("noteTiming", () => {
+	it("starts the first leader after the lead", () => {
+		expect(noteTiming(0).leader).toBe(MOTION.lead);
+	});
+
+	it("lets each note follow its own arrowhead, once the head has faded on", () => {
+		for (const i of [0, 1, 2])
+			expect(noteTiming(i).note - noteTiming(i).leader).toBe(
+				LEADER_HEAD_MS + STROKE_FADE_MS,
+			);
+	});
+
+	it("draws the leaders one after another, a fade apart", () => {
+		expect(noteTiming(1).leader - noteTiming(0).leader).toBe(MOTION.fade);
+		expect(noteTiming(2).leader).toBeGreaterThan(noteTiming(1).leader);
 	});
 });

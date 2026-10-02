@@ -28,7 +28,8 @@ import { PenArrow } from "../notebook/Ink";
 import { type RollData, signedDegrees, useStaticJson } from "../notebook/notes";
 import { SWISS } from "../swiss/inks";
 import { Figure } from "./Figure";
-import { framedNotes } from "./live-notes";
+import { groundVars } from "./ground";
+import { framedNotes, noteTiming } from "./live-notes";
 import {
 	COMPARE_START,
 	compareLeftSpill,
@@ -39,6 +40,7 @@ import {
 	surroundRevealAt,
 	surroundRevealMasks,
 } from "./live-reveal";
+import { EASE, MOTION, useArmedInView, useMotionAllowed } from "./motion";
 import {
 	type GipfelbuchPhotoId,
 	useGipfelbuchIndex,
@@ -58,6 +60,11 @@ import {
 
 /** Contour brown for line art spilled onto the paper (LiveLines reads `--rigi-paper`). */
 const CONTOUR_INK = `var(--gb-contour, ${SWISS.contour})`;
+/**
+ * Ink for terrain past the frame: contour brown leaned toward the plate photo's own terrain tone
+ * (grammar §3, `--fig-terrain-ink` set by the Figure's `ground`), plain contour brown without one.
+ */
+const SPILL_INK = `var(--fig-terrain-ink, ${CONTOUR_INK})`;
 const PAPER_HALO =
 	"0 0 2px var(--gb-paper, #f6f4ef), 0 0 3px var(--gb-paper, #f6f4ef), 0 0 6px var(--gb-paper, #f6f4ef)";
 
@@ -192,6 +199,10 @@ function NoteLeaders({
 	box: Box;
 	seed: string;
 }) {
+	// the leaders fade on (the notebook's draw-on for filled pen strokes, notebook.css nb-armed / nb-on)
+	// once the plate is in view, then each note; static, print and reduced motion show them all
+	const motion = useMotionAllowed();
+	const { ref, armed } = useArmedInView<HTMLDivElement>();
 	const right = box.sw - box.fl - box.fw;
 	const count = { left: 0, right: 0 };
 	const placed = notes.map((note, i) => {
@@ -212,7 +223,14 @@ function NoteLeaders({
 		return { note, i, side, width, top, from, to };
 	});
 	return (
-		<div className="pointer-events-none absolute inset-0">
+		<div
+			ref={ref}
+			className={cn(
+				"pointer-events-none absolute inset-0",
+				motion && "nb-armed",
+				armed && "nb-on",
+			)}
+		>
 			<svg
 				className="absolute inset-0 size-full overflow-visible"
 				aria-hidden="true"
@@ -228,6 +246,7 @@ function NoteLeaders({
 							color="var(--gb-paper, #f6f4ef)"
 							width={4}
 							opacity={0.85}
+							delay={noteTiming(i).leader}
 						/>
 						<PenArrow
 							seed={`${seed}-leader-${i}`}
@@ -236,6 +255,7 @@ function NoteLeaders({
 							bend={side === "left" ? -0.16 : 0.16}
 							color="pencil"
 							width={1.3}
+							delay={noteTiming(i).leader}
 						/>
 					</g>
 				))}
@@ -243,17 +263,20 @@ function NoteLeaders({
 			{placed.map(({ note, i, side, width, top }) => (
 				<p
 					key={i}
-					className="nb-hand absolute text-[19px] leading-[22px] text-[var(--gb-pencil,var(--gb-ink))]"
-					style={{
-						top,
-						width,
-						textAlign: side === "left" ? "right" : "left",
-						textShadow: PAPER_HALO,
-						rotate: `${side === "left" ? -1.2 : 1.2}deg`,
-						...(side === "left"
-							? { left: box.fl - 18 - width }
-							: { left: box.fl + box.fw + 18 }),
-					}}
+					className="nb-hand nb-fade absolute text-[19px] leading-[22px] text-[var(--gb-pencil,var(--gb-ink))]"
+					style={
+						{
+							"--nb-delay": `${noteTiming(i).note}ms`,
+							top,
+							width,
+							textAlign: side === "left" ? "right" : "left",
+							textShadow: PAPER_HALO,
+							rotate: `${side === "left" ? -1.2 : 1.2}deg`,
+							...(side === "left"
+								? { left: box.fl - 18 - width }
+								: { left: box.fl + box.fw + 18 }),
+						} as CSSProperties
+					}
 				>
 					<span className="nb-num mr-1 text-[var(--gb-red)]">{i + 1}</span>
 					{note.text}
@@ -321,6 +344,11 @@ export interface LivePlateProps {
 	freeHeight?: boolean;
 	/** False: no paper surround, no live line art past the frame, and no notes pointing into the paper. Every photo plate spills by default (README, concept spill). */
 	spill?: boolean;
+	/**
+	 * The plate's photo (grammar §3): the terrain inked past the frame leans toward its terrain tone, and
+	 * the dark ground behind a poster or a letterboxed photo toward its terrain, never the photo itself.
+	 */
+	ground?: string;
 	className?: string;
 }
 
@@ -344,8 +372,12 @@ export function LivePlate({
 	north = false,
 	freeHeight = false,
 	spill = true,
+	ground,
 	className,
 }: LivePlateProps) {
+	const plateWash = ground
+		? groundVars(ground, "plate-dark")["--fig-wash"]
+		: undefined;
 	const notes = spill ? allNotes : framedNotes(allNotes);
 	const { ref: gateRef, live } = useLiveGate(motion, margin);
 	const stageRef = useRef<HTMLDivElement>(null);
@@ -359,13 +391,22 @@ export function LivePlate({
 	const posterBox = (
 		<div
 			className="relative w-full overflow-hidden bg-[var(--gb-ink,#131313)]"
-			style={freeHeight ? undefined : { aspectRatio: aspect }}
+			style={{
+				...(freeHeight ? undefined : { aspectRatio: aspect }),
+				background: plateWash,
+			}}
 		>
 			{poster}
 		</div>
 	);
 	return (
-		<Figure number={number} caption={caption} bleed className={className}>
+		<Figure
+			number={number}
+			caption={caption}
+			bleed
+			ground={ground}
+			className={className}
+		>
 			<svg
 				viewBox="0 0 640 56"
 				className="mb-2 block h-auto w-full max-w-[640px] overflow-visible"
@@ -401,7 +442,7 @@ export function LivePlate({
 							"--gb-live-aspect": String(aspect),
 							// LiveLines inks its spill with --rigi-paper: contour brown on the sheet. The engines'
 							// own boxes are dark islands again and reset it to white inside the frame.
-							"--rigi-paper": CONTOUR_INK,
+							"--rigi-paper": SPILL_INK,
 						} as CSSProperties
 					}
 					data-gb-live-plate
@@ -501,7 +542,7 @@ export function PaperSurround({
 				height: pct(1 / photo.h),
 			};
 	const strokeMask: CSSProperties = {
-		backgroundColor: CONTOUR_INK,
+		backgroundColor: SPILL_INK,
 		maskImage: `url(${bake.src})`,
 		WebkitMaskImage: `url(${bake.src})`,
 		maskSize: "100% 100%",
@@ -713,7 +754,7 @@ function useRevealSync(
  * step past the rest snaps instead.
  */
 const REVEAL_CSS = `@property ${REVEAL_VAR}{syntax:'<percentage>';inherits:true;initial-value:999%}
-[data-gb-reveal-settle]{transition:${REVEAL_VAR} 620ms cubic-bezier(0.33,1,0.68,1)}`;
+[data-gb-reveal-settle]{transition:${REVEAL_VAR} ${MOTION.settle}ms ${EASE.out}}`;
 
 // ---- shared posters ---------------------------------------------------------------------------
 
@@ -857,6 +898,7 @@ export function LiveReveal({
 			date={date}
 			spill={spill}
 			className={className}
+			ground={photoId}
 			// the margins bloom with the photo: the same front, from the same centre
 			surround={<PaperSurround bake={set.bake} reveal />}
 			notes={
@@ -926,6 +968,7 @@ export function LiveCompare({
 			motion="still"
 			spill={spill}
 			className={className}
+			ground={photoId}
 			surround={<PaperSurround bake={set.bake} rootRef={surroundRef} />}
 			notes={
 				notes ?? [

@@ -1819,7 +1819,6 @@ function CompassErrors() {
 	return (
 		<Figure
 			label="Fig. 4"
-			bleed
 			caption={
 				<>
 					Phone heading against the solved one, on all 12 photos. The compass

@@ -1482,7 +1482,6 @@ function Verdicts() {
 	return (
 		<Figure
 			label="Fig. 4"
-			bleed
 			caption={
 				<>
 					{nOk == null

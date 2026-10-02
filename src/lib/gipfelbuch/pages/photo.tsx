@@ -1021,7 +1021,6 @@ function AltitudeCheck() {
 	return (
 		<Figure
 			label="Fig. 4"
-			bleed
 			caption={
 				<>
 					Seven photos, one check: GPS altitude minus the map&rsquo;s ground

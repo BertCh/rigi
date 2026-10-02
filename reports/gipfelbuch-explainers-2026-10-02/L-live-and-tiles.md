@@ -71,7 +71,7 @@ The rule from grammar §3: the ground takes its cue from the image, and the imag
 | 0 | ground (spill) | `PaperSurround` strokes, ruler and summits; `LiveLines` past the frame | `--fig-terrain-ink` → contour | Synced to the frame (§3.2, §3.3) |
 | 1 | raster | Poster, photo, engine canvas | Never filtered | Poster → engine over `crossfade` 700 |
 | 2–3 | measured, derived | The baked overlay export (RevealLoop's overlay, Compare's "after"): a raster of the solved pose's lines, names and contours. Provenance: derived from the solve. | Baked | Bloom (landing) |
-| 4 | furniture | Note leaders (pencil, two hand passes) | `--gb-pencil` | Draw over `draw` 900, `stagger` 110, after the plate arms |
+| 4 | furniture | Note leaders (pencil, two hand passes) | `--gb-pencil` | Fade on (`nb-fade` 600, the notebook's draw-on for filled strokes), a `fade` apart, after the plate arms |
 | 5 | notes | HandNote beside the plate; red numbered markers on the frame when the gutters are narrow | `--gb-ink`, numbers `--gb-red` | Fade over `fade`, `staggerLabel` 60 |
 | 6 | interaction | Compare handle, the engines' orbit cursor | White on the photo | `quick` |
 
@@ -129,7 +129,7 @@ As on the landing hero, the left side's spill shows only when the divider is nea
   - `LiveCompare` is `site/Compare`. It is a different component from pod C's `Compare` in `viz/explain.tsx`, which plays a `once` guess → split script.
   - The difference is deliberate: pod L cannot edit `site/**`, and a live plate is the landing's beat. The browser pass should not flag it.
 - **Drape, step and panorama.** The engine's own motion. The line art ink follows `--rigi-paper` = contour, and it is re-read on a theme change.
-- **Notes.** The leaders draw on once the plate is armed, one after another. The notes fade in after their leader.
+- **Notes.** The leaders fade on once the plate is armed (ARM 0.75), one after another, a `fade` apart. Each note fades in after its arrowhead has landed. They replay after a reset.
 
 ## 5. Gallery verdict vocabulary (one meaning per word)
 
@@ -192,21 +192,46 @@ Specs (Vitest, node), round 1:
    - the left margin is empty at the 0.42 start;
    - it fades in as the handle nears the left edge;
    - the right margin is always on.
-4. `/gipfelbuch/camera-roll`: one live plate (the drape) numbered 3, and the bias figure labelled Fig. 4.
-5. Any Trio with mixed visuals (peak, rigi, dem-source, step-inside):
+4. Round 2:
+   - the reveal and compare plates' paper ridges are a shade toward the photo's own terrain colour, not plain brown;
+   - a poster with a letterbox (the step photo) sits on a dark ground tinted toward its terrain;
+   - the note leaders fade on one after another as the plate comes into view, each note after its arrowhead, and they replay after scrolling away and back;
+   - all drawn at once under reduced motion and in print;
+   - the seven tile figures no longer reach into the left margin, and their 4-column galleries are still legible at 1024 px.
+5. `/gipfelbuch/camera-roll`: one live plate (the drape) numbered 3, and the bias figure labelled Fig. 4.
+6. Any Trio with mixed visuals (peak, rigi, dem-source, step-inside):
    - the step numbers and titles start on one line;
    - the visuals sit on a common bottom edge;
    - check at 640, 1024 and 1440 px.
-6. Galleries on photo, skyline, pose-estimate, accept-rule and viewport-inference:
+7. Galleries on photo, skyline, pose-estimate, accept-rule and viewport-inference:
    - no tile says "rejected" unless the solver rejected it;
    - accept-rule tiles carry one verdict, not three.
-7. Phone (390 px): plate notes become a numbered list, and Trio is one column.
+8. Phone (390 px): plate notes become a numbered list, and Trio is one column.
 
 ## 9. Landed
 
 | Round | sha | What |
 | --- | --- | --- |
 | 0 | bde80ce | live.tsx `spill` opt-out on compare, step and panorama, which also drops notes that point into an undrawn spill (`live-notes.ts` + spec); camera-roll's second GPU plate removed; stale comments corrected |
-| 1 | (this commit) | Reveal-synced paper surround (`useRevealSync`, `live-reveal.ts` + spec), compare-synced left side (`CompareWithSides`, print shows both sides); Trio subgrid row band and motion tokens; Gallery `caution` tone and one vocabulary (`tiles.ts` + spec); page tones per tile; step-inside Numbers sourced (the "60 fps" claim, which no file backs, is replaced by the bake's splat count) |
+| 1 | d659200 | Reveal-synced paper surround (`useRevealSync`, `live-reveal.ts` + spec), compare-synced left side (`CompareWithSides`, print shows both sides); Trio subgrid row band and motion tokens; Gallery `caution` tone and one vocabulary (`tiles.ts` + spec); page tones per tile; step-inside Numbers sourced (the "60 fps" claim, which no file backs, is replaced by the bake's splat count) |
+
+| 2 | (this commit) | Plates take `ground` (Figure `--fig-*`): the ink past the frame leans toward the photo's terrain, and the poster and letterbox ground is the plate-dark wash. The note leaders fade on (the notebook's draw-on for filled pen strokes) once the plate is in view (`noteTiming`, spec), and each note's words follow once its arrowhead has landed. REVEAL_CSS uses the MOTION/EASE tokens. `bleed` is dropped from 7 tile figures (grammar §6, plus pose-estimate Fig. 4). |
 
 Round 1 review (an independent Sonnet) found no blockers. It found three tone slips, where a constant `caution` or `result` was applied to rejected or off-topic tiles; all three are fixed per tile. It also made three nits: the print state of the left side, a per-tick `querySelector`, and a misleading comment. Not taken: the three stroke layers in reveal mode decode the WebP mask once but paint it three times, which matches the landing's `SurroundLayer`.
+
+Round 2 review (an independent Sonnet) found no blockers. Fixed:
+- the notes waited only for the arrowhead to start, not to land (`noteTiming` now adds the stroke fade);
+- "draws on" corrected to "fades on" (the notebook's filled pen strokes fade; only `SketchStroke draw` dash-draws).
+
+The review verified contrast for `--fig-terrain-ink` on the paper sides at about 6:1 for demo-01 and about 5:1 for demo-09. The plate-dark wash stays dark (about `#1c1c1c`).
+- Cost: the 4-column galleries that lost `bleed` are about 17 % narrower at lg, about 50 px per column. That is accepted under the ruling. Re-open it if the browser pass finds them cramped.
+
+## 10. Deferred, negative, and open for the user
+
+- **Deferred:** `LiveTopoBoard` stays unused on sheets, because the topo board shows the map, not the height model (§7). Variety: peak and photo-workspace both reveal demo-01. Switching photo-workspace to demo-09 is a one-line call-site change once the user wants it.
+- **Deferred:** Trio still arms on `useInView` (8 % margin, once), not `useArmedInView` at 0.45. That hook has no once-only mode, and a hydration-safe swap needs one. Asked of pod G.
+- **Negative:** turning plates off on hero pages (`spill={false}`) was rejected, because the concept-spill rule has every photo plate spill.
+- **Open for the user:**
+  1. Should a Gallery's verdict circle sit on the photo (it covers the top-right of the sky, on an 85 % paper patch) or move under the tile beside the caps tag?
+  2. Is "2nd solver" (accepted after refinement) a `caution`, or a plain `result`?
+  3. Should the 4-column galleries keep a wide-left track without the spill? That would need a new Figure prop owned by pod P.
