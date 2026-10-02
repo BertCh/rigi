@@ -3,8 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Step Inside state for PhotoWorkspace: one NearFieldController per engine, the accepted-pose gate, the
-// step camera enter / back, the Truth toggle and the hover sampler. Everything stays dormant (and the
-// panel invisible) while the depth model is unavailable (no WebGPU or weights) or the engine has no setNearField.
+// step camera enter / back, the Truth toggle and the hover sampler. Without WebGPU or the depth weights
+// the panel stays visible with the button disabled and the reason (state.message / chip); it is hidden
+// only when the engine has no setNearField (no controller) or ?nearfield disallows it.
 
 import {
 	type RefObject,
@@ -46,7 +47,7 @@ type StepEngine = Renderer & {
 };
 
 export type StepInside = {
-	/** Service up and engine capable: show the panel at all. */
+	/** Engine capable (a controller exists): show the panel, disabled with a reason when unavailable. */
 	visible: boolean;
 	state: NearFieldState;
 	accepted: boolean;
@@ -333,25 +334,23 @@ export function useStepInside(opts: {
 	}, [ctl, enter, back, setTruth, setCamMode, engineRef]);
 
 	const phase = state.phase;
-	const disabledReason = !accepted
-		? "Needs an accepted pose: auto-align must be verified, or pin / save the alignment"
-		: phase === "loading" && !state.preview
-			? (state.message ?? "Working")
-			: phase === "low-quality"
-				? (state.message ?? "Terrain anchoring too weak for this photo")
-				: phase === "error"
-					? null // retry allowed
-					: null;
+	const disabledReason =
+		phase === "unavailable"
+			? (state.message ?? "Step Inside needs WebGPU and its depth model")
+			: !accepted
+				? "Needs an accepted pose: auto-align must be verified, or pin / save the alignment"
+				: phase === "loading" && !state.preview
+					? (state.message ?? "Working")
+					: phase === "low-quality"
+						? (state.message ?? "Terrain anchoring too weak for this photo")
+						: phase === "error"
+							? null // retry allowed
+							: null;
 
 	return {
 		// a built scene (or the step camera) needs no service: keep the panel, and its Back button, when a
 		// health probe fails mid-session
-		visible:
-			!!ctl &&
-			(stepping ||
-				phase === "ready" ||
-				phase === "low-quality" ||
-				(available && phase !== "unavailable")),
+		visible: !!ctl,
 		state,
 		accepted,
 		disabledReason,

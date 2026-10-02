@@ -18,11 +18,17 @@
 // Gate: only for an accepted pose (poseAccepted); the scene is hidden when anchor.quality <
 // ANCHOR_MIN_QUALITY and flagged 'low trust' below LOW_TRUST_QUALITY.
 import { getFlag } from "#/lib/flags";
+import { isAbortError } from "#/lib/gpu/core/abort";
 import type { Pose } from "../camera";
 import type { EnuFrame } from "../geodesy";
 import type { PhotoMeta } from "../photos";
 import { ANCHOR_LOW_TRUST } from "./anchor";
-import { nearField as defaultClient, type NearFieldSource } from "./client";
+import {
+	nearField as defaultClient,
+	NearFieldError,
+	type NearFieldErrorCode,
+	type NearFieldSource,
+} from "./client";
 import {
 	completeScene,
 	completionEnabled,
@@ -133,10 +139,24 @@ export type NearFieldPhase =
 	| "low-quality"
 	| "error";
 
+/** What the panel says per failure code (unavailable reasons and build errors). */
+export const NEARFIELD_MESSAGES: Record<NearFieldErrorCode, string> = {
+	"no-webgpu": "Step Inside needs WebGPU — this browser or device has none",
+	"weights-unreachable": "Step Inside could not reach its depth model",
+	"weights-failed": "Step Inside could not load its depth model",
+	timeout: "Depth estimation timed out",
+	"device-lost": "The GPU was lost during depth estimation — try again",
+	"out-of-memory": "The GPU ran out of memory estimating depth",
+	"inference-failed": "Depth estimation failed",
+	"lift-failed": "Building the 3D splats failed",
+};
+
 export type NearFieldState = {
 	phase: NearFieldPhase;
 	/** Human-readable reason / progress. */
 	message?: string;
+	/** The NearFieldErrorCode behind an "unavailable" or "error" phase. */
+	code?: NearFieldErrorCode;
 	quality?: number;
 	lowTrust?: boolean;
 	splats?: number;
@@ -252,7 +272,9 @@ export class NearFieldController {
 	 */
 	async available(force = false): Promise<boolean> {
 		if (!this.supported) return false;
-		const ok = await this.client.available(force);
+		const { ok, reason } = this.client.availability
+			? await this.client.availability(force)
+			: { ok: await this.client.available(force), reason: undefined };
 		const phase = this.state.phase;
 		if (
 			!ok &&
@@ -262,7 +284,10 @@ export class NearFieldController {
 		)
 			this.set({
 				phase: "unavailable",
-				message: "Step Inside needs WebGPU and its depth model",
+				code: reason ?? "no-webgpu",
+				message:
+					NEARFIELD_MESSAGES[reason ?? "no-webgpu"] ??
+					"Step Inside needs WebGPU and its depth model",
 			});
 		else if (ok && this.state.phase === "unavailable")
 			this.set({ phase: "idle" });
@@ -507,12 +532,22 @@ export class NearFieldController {
 				if (key !== poseKey(this.host.pose, this.host.eye)) return bail();
 				return this.adopt(scene, key);
 			} catch (e) {
-				console.warn("[nearfield] build failed", e);
+				// a cancel is not a failure: no error state, no console noise
+				if (isAbortError(e) || signal?.aborted) return bail();
 				if (this.runSeq === runId) this.dropPreview();
-				this.set({
-					phase: "error",
-					message: String((e as Error)?.message ?? e),
-				});
+				if (e instanceof NearFieldError)
+					this.set({
+						phase: "error",
+						code: e.code,
+						message: NEARFIELD_MESSAGES[e.code] ?? e.message,
+					});
+				else {
+					console.warn("[nearfield] build failed", e);
+					this.set({
+						phase: "error",
+						message: String((e as Error)?.message ?? e),
+					});
+				}
 				return null;
 			}
 		})();

@@ -176,6 +176,9 @@ export interface CompiledForward<R> {
 export interface Nn {
 	readonly backend: NnBackend;
 
+	/** GPU runtimes: give free-list memory back (registry releaseNn); absent on the CPU backend. */
+	release?(): Promise<void>;
+
 	/** Loads a safetensors file from public/models (fetchModel; Cache Storage in the browser). */
 	loadWeights(
 		file: string,

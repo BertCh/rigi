@@ -9,6 +9,7 @@
 import type { Pose } from "../../camera";
 import type { SplatsCore } from "../../deck-webgpu/layers/splats";
 import { type DemRaster, latToTileY, loadDemTile, lonToTileX } from "../../dem";
+import { isAbortError } from "../../gpu/core/abort";
 import type { RollMapEngine } from "../../roll/map/roll-map";
 import type { Roll, RollPhoto } from "../../roll/types";
 import { type NearFieldSource, nearField } from "../client";
@@ -172,11 +173,18 @@ export async function buildRollSpot(
 	const depths: (NearFieldDepth | null)[] = [];
 	for (const _ of ids) depths.push(null);
 	for (const k of ids.keys()) {
-		const d = await client.depth(loaded[k].upload, {
-			model: "moge2",
-			signal: opts.signal,
-			timeoutMs: 300_000,
-		});
+		// one failed photo leaves that view without depth; a cancel ends the whole spot
+		const d = await client
+			.depth(loaded[k].upload, {
+				model: "moge2",
+				signal: opts.signal,
+				timeoutMs: 300_000,
+			})
+			.catch((e) => {
+				if (isAbortError(e) || opts.signal?.aborted) throw e;
+				console.warn(`[nearfield] roll depth failed for ${ids[k]}`, e);
+				return null;
+			});
 		depths[k] = d;
 		if (d) model = d.model;
 	}

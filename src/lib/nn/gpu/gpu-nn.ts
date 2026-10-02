@@ -519,6 +519,14 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		return new Float32Array(buf, 0, n).slice();
 	}
 
+	/**
+	 * Give the runtime's free-list GPU memory back (in queue order, after pending steps). Live tensors and
+	 * weights stay; the runtime remains usable (nn/registry.ts releaseNn drops it from the registry).
+	 */
+	release(): Promise<void> {
+		return this.runtime.enqueue(() => this.runtime.trim());
+	}
+
 	dispose(t: Tensor | Weights | readonly Tensor[]): void {
 		if (Array.isArray(t)) {
 			for (const x of t) this.dispose(x);

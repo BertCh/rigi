@@ -30,6 +30,10 @@ vi.mock("@tanstack/react-router", async () =>
 vi.mock("#/lib/nearfield/client", () => ({
 	nearField: {
 		available: async () => service.up,
+		availability: async () => ({
+			ok: service.up,
+			reason: service.up ? undefined : "no-webgpu",
+		}),
 		depth: async () => depthMap(),
 		gaussiansWithMeta: async () => null,
 	},
@@ -114,11 +118,14 @@ afterEach(() => {
 });
 
 describe("useStepInside", () => {
-	it("stays hidden while the service is down, and for ?nearfield=off", async () => {
+	it("shows the panel disabled with the reason while unavailable, and hides it for ?nearfield=off", async () => {
 		service.up = false;
 		const { hook } = setup();
 		await settle();
-		expect(hook.result.current.visible).toBe(false);
+		expect(hook.result.current.visible).toBe(true);
+		expect(hook.result.current.state.phase).toBe("unavailable");
+		expect(hook.result.current.state.code).toBe("no-webgpu");
+		expect(hook.result.current.disabledReason).toMatch(/needs WebGPU/);
 
 		service.up = true;
 		withFlags({ nearfield: "off" });
@@ -228,6 +235,29 @@ describe("StepInsidePanel", () => {
 			(document.querySelector("[data-nearfield-enter]") as HTMLButtonElement)
 				.disabled,
 		).toBe(false);
+	});
+
+	it("shows the unavailable chip and a disabled button with the reason", () => {
+		render(
+			<StepInsidePanel
+				si={si({
+					state: {
+						phase: "unavailable",
+						code: "no-webgpu",
+						message:
+							"Step Inside needs WebGPU — this browser or device has none",
+					},
+					disabledReason:
+						"Step Inside needs WebGPU — this browser or device has none",
+				})}
+			/>,
+		);
+		expect(chip()).toBe("unavailable");
+		expect(screen.getByText(/Step inside · needs WebGPU/)).toBeTruthy();
+		expect(
+			(document.querySelector("[data-nearfield-enter]") as HTMLButtonElement)
+				.disabled,
+		).toBe(true);
 	});
 
 	it("shows Back to photo while stepping", () => {

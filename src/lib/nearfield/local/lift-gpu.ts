@@ -211,6 +211,7 @@ export async function liftGaussiansGpu(
 	device: Device,
 	inp: LiftInput,
 	params: Partial<LiftParams> = {},
+	signal?: AbortSignal,
 ): Promise<GaussianCloud> {
 	const p = { ...LIFT_DEFAULTS, ...params };
 	const s = Math.max(1, Math.floor(p.stride));
@@ -240,67 +241,76 @@ export async function liftGaussiansGpu(
 	const capPix = capacityFor(n * 4);
 	const capNrm = hasNormal ? capacityFor(n * 12) : 16;
 	const capRec = capacityFor(recBytes);
-	const reads = await withLease(LIFT_GROUP, () => {
-		const bufs = {
-			prm: pooledUniform(device, `${LIFT_GROUP}/prm`, prmWords),
-			depth: pooledStorage(device, `${LIFT_GROUP}/depth`, depth),
-			normal: hasNormal
-				? pooledStorage(
-						device,
-						`${LIFT_GROUP}/normal`,
-						inp.normal as Float32Array,
-					)
-				: pooledStorage(device, `${LIFT_GROUP}/normal0`, 16),
-			rgba: pooledStorage(device, `${LIFT_GROUP}/rgba`, packRgba(inp.rgba)),
-		};
-		const { graph } = cachedGraph<Run, null>(
-			device,
-			LIFT_GROUP,
-			`${capPix}/${capNrm}/${capRec}`,
-			(g) => {
-				const STORAGE = Buffer.STORAGE | Buffer.COPY_DST;
-				const prm = g.importBuffer(
-					"prm",
-					LIFT_PRM.byteLength,
-					undefined,
-					Buffer.UNIFORM | Buffer.COPY_DST,
-				);
-				const dep = g.importBuffer("depth", capPix, undefined, STORAGE);
-				const nrm = g.importBuffer("normal", capNrm, undefined, STORAGE);
-				const col = g.importBuffer("rgba", capPix, undefined, STORAGE);
-				const records = g.transientBuffer("records", capRec);
-				g.addKernel({
-					id: "lift",
-					spec: K_LIFT,
-					bindings: { prm, depth: dep, normal: nrm, rgba: col, records },
-					workgroups: (r) => [Math.ceil(r.gw / 8), Math.ceil(r.gh / 8)],
-				});
-				g.readNode("read", [
-					{
-						buffer: records,
-						size: (r) => r.cells * LIFT_RECORD_WORDS * 4,
-					},
-				]);
-				return null;
-			},
-		);
-		return graph.lease(async () => {
-			await graph.compileAsync();
-			const enc = device.createCommandEncoder({ id: graph.id });
-			const { reads } = graph.encodeReads(
-				enc,
-				{ cells: grid.cells, gw: grid.gw, gh: grid.gh },
-				bufs,
+	const reads = await withLease(
+		LIFT_GROUP,
+		() => {
+			const bufs = {
+				prm: pooledUniform(device, `${LIFT_GROUP}/prm`, prmWords),
+				depth: pooledStorage(device, `${LIFT_GROUP}/depth`, depth),
+				normal: hasNormal
+					? pooledStorage(
+							device,
+							`${LIFT_GROUP}/normal`,
+							inp.normal as Float32Array,
+						)
+					: pooledStorage(device, `${LIFT_GROUP}/normal0`, 16),
+				rgba: pooledStorage(device, `${LIFT_GROUP}/rgba`, packRgba(inp.rgba)),
+			};
+			const { graph } = cachedGraph<Run, null>(
+				device,
+				LIFT_GROUP,
+				`${capPix}/${capNrm}/${capRec}`,
+				(g) => {
+					const STORAGE = Buffer.STORAGE | Buffer.COPY_DST;
+					const prm = g.importBuffer(
+						"prm",
+						LIFT_PRM.byteLength,
+						undefined,
+						Buffer.UNIFORM | Buffer.COPY_DST,
+					);
+					const dep = g.importBuffer("depth", capPix, undefined, STORAGE);
+					const nrm = g.importBuffer("normal", capNrm, undefined, STORAGE);
+					const col = g.importBuffer("rgba", capPix, undefined, STORAGE);
+					const records = g.transientBuffer("records", capRec);
+					g.addKernel({
+						id: "lift",
+						spec: K_LIFT,
+						bindings: { prm, depth: dep, normal: nrm, rgba: col, records },
+						workgroups: (r) => [Math.ceil(r.gw / 8), Math.ceil(r.gh / 8)],
+					});
+					g.readNode("read", [
+						{
+							buffer: records,
+							size: (r) => r.cells * LIFT_RECORD_WORDS * 4,
+						},
+					]);
+					return null;
+				},
 			);
-			try {
-				submit(device, enc);
-			} catch (e) {
-				reads.cancel();
-				throw e;
-			}
-			return reads;
-		});
-	});
+			return graph.lease(async () => {
+				await graph.compileAsync();
+				const enc = device.createCommandEncoder({ id: graph.id });
+				const { reads } = graph.encodeReads(
+					enc,
+					{ cells: grid.cells, gw: grid.gw, gh: grid.gh },
+					bufs,
+				);
+				try {
+					submit(device, enc);
+				} catch (e) {
+					reads.cancel();
+					throw e;
+				}
+				return reads;
+			});
+		},
+		{ signal },
+	);
+	// cancelled while the kernel ran: give the readback slot back instead of reading
+	if (signal?.aborted) {
+		reads.cancel();
+		signal.throwIfAborted();
+	}
 	const data = (await reads.read()).read[0];
 	return cloudFromRecords(new Float32Array(data), grid.cells);
 }

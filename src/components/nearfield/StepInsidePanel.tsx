@@ -4,7 +4,7 @@
 
 // Step Inside controls on the stage (bottom-left): the 'Step inside' button (disabled with a reason),
 // the status chip ([data-nearfield-status]), the Truth toggle and, while stepping, 'Back to photo'.
-// Renders nothing while near-field depth is unavailable, so the classic view is untouched.
+// Unavailable (no WebGPU / model unreachable): the chip says so and the button is disabled with the reason.
 import { Box, Eye, Loader2, Undo2 } from "lucide-react";
 import { SPLAT_PROVENANCE_COLORS } from "#/lib/nearfield/provenance";
 import { cn } from "#/lib/utils";
@@ -16,11 +16,14 @@ const rgb = (c: readonly [number, number, number]) =>
 export function StepInsidePanel({ si }: { si: StepInside }) {
 	if (!si.visible) return null;
 	const { state } = si;
+	const unavailable = state.phase === "unavailable";
 	const status = si.stepping
 		? "stepping"
-		: !si.accepted
-			? "not-accepted"
-			: state.phase;
+		: unavailable
+			? "unavailable"
+			: !si.accepted
+				? "not-accepted"
+				: state.phase;
 	const loading = state.phase === "loading";
 	const q = state.quality;
 	// terrain-only preview while the depth model loads: its progress, also while stepping on it
@@ -29,19 +32,23 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 		? (state.message ?? "terrain preview")
 		: status === "stepping"
 			? "3D view"
-			: status === "not-accepted"
-				? "pose not accepted"
-				: state.phase === "ready"
-					? state.lowTrust
-						? "low trust"
-						: "ready"
-					: state.phase === "low-quality"
-						? "anchoring too weak"
-						: state.phase === "error"
-							? "failed"
-							: loading
-								? (state.message ?? "working")
-								: "near field";
+			: unavailable
+				? state.code === "weights-unreachable"
+					? "model unreachable"
+					: "needs WebGPU"
+				: status === "not-accepted"
+					? "pose not accepted"
+					: state.phase === "ready"
+						? state.lowTrust
+							? "low trust"
+							: "ready"
+						: state.phase === "low-quality"
+							? "anchoring too weak"
+							: state.phase === "error"
+								? "failed"
+								: loading
+									? (state.message ?? "working")
+									: "near field";
 	return (
 		<div
 			className="pointer-events-none absolute bottom-4 left-3 z-20 flex max-w-[min(22rem,calc(100%-1.5rem))] flex-col items-start gap-1.5"

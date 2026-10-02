@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withFlags } from "#/test/helpers";
 import type { PhotoMeta } from "../../photos";
 import { ANCHOR_LOW_TRUST } from "../anchor";
-import type { NearFieldSource } from "../client";
+import { NearFieldError, type NearFieldSource } from "../client";
 import {
 	LOW_TRUST_QUALITY,
 	NearFieldController,
@@ -31,7 +31,12 @@ vi.mock("../object-evidence", () => ({
 function fakeClient(depth: () => NearFieldDepth | null, ok = true) {
 	const client = {
 		up: ok,
+		reason: undefined as "no-webgpu" | "weights-unreachable" | undefined,
 		available: vi.fn(async () => client.up),
+		availability: vi.fn(async () => ({
+			ok: client.up,
+			reason: client.up ? undefined : client.reason,
+		})),
 		depth: vi.fn(async () => depth()),
 		gaussiansWithMeta: vi.fn(async () => null),
 	};
@@ -201,6 +206,53 @@ describe("NearFieldController.build", () => {
 		const n = cb.mock.calls.length;
 		c.show();
 		expect(cb.mock.calls.length).toBe(n);
+	});
+});
+
+describe("NearFieldController failures", () => {
+	it("unavailable carries the reason's message and code", async () => {
+		const client = fakeClient(() => depthMap(), false);
+		client.reason = "no-webgpu";
+		const c = controller(client);
+		expect(await c.available()).toBe(false);
+		expect(c.state).toMatchObject({
+			phase: "unavailable",
+			code: "no-webgpu",
+			message: "Step Inside needs WebGPU — this browser or device has none",
+		});
+		const unreachable = fakeClient(() => depthMap(), false);
+		unreachable.reason = "weights-unreachable";
+		const u = controller(unreachable);
+		await u.available();
+		expect(u.state).toMatchObject({
+			code: "weights-unreachable",
+			message: "Step Inside could not reach its depth model",
+		});
+	});
+
+	it("surfaces a NearFieldError's code and does not cache the failure", async () => {
+		const client = fakeClient(() => depthMap());
+		client.depth.mockRejectedValueOnce(new NearFieldError("out-of-memory"));
+		const c = controller(client);
+		expect(await c.build()).toBeNull();
+		expect(c.state).toMatchObject({ phase: "error", code: "out-of-memory" });
+		expect(c.hasPhotoData()).toBe(false);
+		expect(await c.build()).not.toBeNull();
+	});
+
+	it("an abort leaves no error state and no console noise", async () => {
+		const client = fakeClient(() => depthMap());
+		client.depth.mockRejectedValueOnce(
+			new DOMException("aborted", "AbortError"),
+		);
+		const warn = vi.spyOn(console, "warn");
+		const ctrl = new AbortController();
+		const c = controller(client);
+		const p = c.build(ctrl.signal);
+		ctrl.abort();
+		expect(await p).toBeNull();
+		expect(c.state.phase).toBe("idle");
+		expect(warn).not.toHaveBeenCalled();
 	});
 });
 

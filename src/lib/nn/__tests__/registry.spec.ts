@@ -5,8 +5,20 @@
 import type { Device } from "@luma.gl/core";
 import { describe, expect, it, vi } from "vitest";
 
+const released = vi.hoisted(() => ({
+	nn: [] as unknown[],
+	groups: [] as string[],
+}));
+vi.mock("#/lib/gpu/core/graph", () => ({
+	releaseCachedGraphs: async (_d: unknown, group?: string) => {
+		released.groups.push(group ?? "");
+	},
+}));
 vi.mock("../gpu/gpu-nn", () => ({
 	GpuNn: class {
+		async release() {
+			released.nn.push(this);
+		}
 		constructor(
 			readonly device: unknown,
 			readonly opts: { graphGroup?: string },
@@ -14,7 +26,7 @@ vi.mock("../gpu/gpu-nn", () => ({
 	},
 }));
 
-const { getNn, nnGraphGroup, perNn } = await import("../registry");
+const { getNn, nnGraphGroup, perNn, releaseNn } = await import("../registry");
 
 /** A fake luma device whose `lost` promise the test resolves. */
 function fakeDevice(type = "webgpu") {
@@ -82,5 +94,28 @@ describe("perNn", () => {
 		expect(await of(nn)).toBe(2);
 		expect(await of(nn)).toBe(2);
 		expect(calls).toBe(2);
+	});
+});
+
+describe("releaseNn", () => {
+	it("drops the consumer's runtime, trims it and releases its graph group; others stay", async () => {
+		const { device } = fakeDevice();
+		const a = await getNn("nearfield", device);
+		const other = await getNn("sky", device);
+		released.nn.length = 0;
+		released.groups.length = 0;
+		await releaseNn("nearfield", device);
+		expect(released.nn).toEqual([a]);
+		expect(released.groups).toEqual([nnGraphGroup("nearfield")]);
+		expect(await getNn("sky", device)).toBe(other);
+		const fresh = await getNn("nearfield", device);
+		expect(fresh).not.toBe(a);
+	});
+
+	it("is a no-op for an unknown consumer or without a device", async () => {
+		released.nn.length = 0;
+		await releaseNn("never-made", fakeDevice().device);
+		await releaseNn("x", null);
+		expect(released.nn).toEqual([]);
 	});
 });

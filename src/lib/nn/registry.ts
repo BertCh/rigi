@@ -68,6 +68,33 @@ export async function getNn(
 }
 
 /**
+ * Release a consumer's GPU memory (idle unload): drop its runtime from the registry, destroy the free
+ * buffers of that runtime and the compiled graphs of its group. The consumer disposes its own weights
+ * first. The next getNn builds a fresh runtime. Never throws.
+ */
+export async function releaseNn(
+	consumer: string,
+	device?: Device | null,
+): Promise<void> {
+	if (device === undefined) {
+		const { getComputeDevice } = await import("#/lib/gpu/device");
+		device = await getComputeDevice();
+	}
+	if (!device) return;
+	const entry = runtimes.get(device);
+	const nn = entry?.get(consumer);
+	if (!entry || !nn) return;
+	entry.delete(consumer);
+	try {
+		await (await nn)?.release?.();
+		const { releaseCachedGraphs } = await import("#/lib/gpu/core/graph");
+		await releaseCachedGraphs(device, nnGraphGroup(consumer));
+	} catch (e) {
+		console.warn(`[nn] releasing ${consumer} failed`, e);
+	}
+}
+
+/**
  * A per-runtime memo: `of(nn)` builds `make(nn)` once per Nn (weights, bound nets). A runtime dropped
  * after a device loss takes its value with it; a rejected build is forgotten so the next call retries.
  */
