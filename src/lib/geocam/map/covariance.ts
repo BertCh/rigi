@@ -10,9 +10,10 @@
 // use for Marginals, so the Python reference can match it). The DATA block (factors with prior ≠ true)
 // is divided by s², s = max(1, MAD scale of the pooled whitened data residuals) (refine/robust.ts
 // madScale): when the data scatter more than their modelled σ the covariance widens accordingly; it
-// never shrinks below the model. Rows / cols of fixed parameters are 0. perFamily.info is each family's
+// never shrinks below the model. Rows / cols of fixed parameters are 0; an unobservable free
+// parameter has variance +Infinity. perFamily.info is each family's
 // (s-scaled for data) 7×7 information, reused by GA5 (integrity; GA2 observe was removed 2026-09-30).
-import { invSym } from "../../linalg";
+import { invSymCov } from "../../linalg";
 import { madScale } from "../../refine/robust";
 import {
 	type CueFamily,
@@ -40,12 +41,18 @@ export type CovarianceOut = {
 
 /** √ of the largest eigenvalue of a symmetric 2×2 [[a, b], [b, d]]. */
 export function sqrtLambdaMax2(a: number, b: number, d: number): number {
+	// an unobservable axis (variance +Infinity) would give ∞ − ∞ = NaN below
+	if (a === Number.POSITIVE_INFINITY || d === Number.POSITIVE_INFINITY)
+		return Number.POSITIVE_INFINITY;
 	const t = (a + d) / 2;
 	const q = Math.sqrt(Math.max(0, ((a - d) / 2) ** 2 + b * b));
 	return Math.sqrt(Math.max(0, t + q));
 }
 
-/** Inverse of the free sub-block of a 7×7 information matrix, embedded back (fixed rows/cols 0). */
+/**
+ * Inverse of the free sub-block of a 7×7 information matrix, embedded back (fixed rows/cols 0). A free
+ * parameter the information does not observe gets variance +Infinity (linalg invSymCov, CR-49).
+ */
 export function covFromInfo(
 	info: Float64Array,
 	mask: readonly boolean[],
@@ -53,7 +60,7 @@ export function covFromInfo(
 	const idx: number[] = [];
 	for (let k = 0; k < NP; k++) if (mask[k]) idx.push(k);
 	const A = idx.map((p) => idx.map((q) => info[p * NP + q]));
-	const Ai = idx.length ? invSym(A) : [];
+	const Ai = idx.length ? invSymCov(A) : [];
 	const cov = new Float64Array(NP * NP);
 	idx.forEach((p, i) => {
 		idx.forEach((q, j) => {

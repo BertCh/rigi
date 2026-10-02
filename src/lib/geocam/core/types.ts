@@ -66,13 +66,16 @@ export type Loss =
  * a row with no data at this state (it is dropped for that iteration). `jacobian`, if given, returns the
  * dim×7 row-major derivative of the whitened residual w.r.t. the state (columns in PARAMS order);
  * otherwise the solver uses central differences (steps: 1e-3° rotation, 1e-4 logf, 0.5 m eye).
+ * `residual(x, keep)` is the row-masked form (integrity subsets): rows with keep(i) = false read NaN,
+ * and a factor that mixes rows (cluster whitening) must drop them BEFORE mixing so they cannot leak
+ * into the kept rows. Factors with independent rows may ignore `keep` (the caller masks afterwards).
  */
 export interface Factor {
 	family: CueFamily;
 	name: string;
 	dim: number;
 	loss: Loss;
-	residual(x: GeoState): Float64Array;
+	residual(x: GeoState, keep?: (row: number) => boolean): Float64Array;
 	jacobian?(x: GeoState): Float64Array;
 	/**
 	 * Effective sample count cap for correlated rows (grid thinning): the factor's information is scaled

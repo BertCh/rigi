@@ -384,7 +384,7 @@ function runStage(p0: Float64Array, s: Stage, maxIt: number): StageResult {
 	let it = 0;
 	let lin = linearise(p, s, true);
 	let scale = s.fixedScale ?? s.minScale;
-	let omega = new Float64Array(s.cols.length);
+	let omega: Float64Array = new Float64Array(s.cols.length);
 	for (; it < maxIt; it++) {
 		const n = s.cols.length;
 		const e = new Float64Array(n);
@@ -395,16 +395,11 @@ function runStage(p0: Float64Array, s: Stage, maxIt: number): StageResult {
 		}
 		if (s.fixedScale === undefined)
 			scale = Math.max(s.minScale, madScale(e, wv));
-		omega = new Float64Array(n);
+		omega = irlsWeights(lin, s, scale);
 		const A = new Float64Array(m * m);
 		const g = new Float64Array(m);
 		for (let i = 0; i < n; i++) {
-			if (wv[i] <= 0) continue;
-			const z = e[i] / scale;
-			const om =
-				(s.dataScale * wv[i] * psiWOS(s.loss, z, s.oneSided)) /
-				(lin.sigma[i] * scale) ** 2;
-			omega[i] = om;
+			const om = omega[i];
 			if (om === 0) continue;
 			const o = i * NPARAM;
 			for (let a = 0; a < m; a++) {
@@ -463,8 +458,26 @@ function runStage(p0: Float64Array, s: Stage, maxIt: number): StageResult {
 			break;
 		}
 	}
+	// The loop's omega belongs to the iterate before the last accepted step, while lin is at the
+	// accepted p: re-weight at p so the covariance (info) pairs weights and Jacobian of one pose (CR-36).
+	omega = irlsWeights(lin, s, scale);
 	const cost = objective(lin.r, lin.sigma, p, s, scale);
 	return { p, scale, iterations: it, lin, omega, cost };
+}
+
+/** IRLS weights ω_i = dataScale·w_i·ψ(z_i)/z_i / (σ_i·scale)² of the linearisation `lin`. */
+function irlsWeights(lin: Linearised, s: Stage, scale: number): Float64Array {
+	const n = s.cols.length;
+	const omega = new Float64Array(n);
+	for (let i = 0; i < n; i++) {
+		const wv = s.cols[i].w * s.extra[i];
+		if (wv <= 0) continue;
+		const z = lin.r[i] / lin.sigma[i] / scale;
+		omega[i] =
+			(s.dataScale * wv * psiWOS(s.loss, z, s.oneSided)) /
+			(lin.sigma[i] * scale) ** 2;
+	}
+	return omega;
 }
 
 /**

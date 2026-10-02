@@ -407,7 +407,7 @@ export function skylineFactor(
 					)
 				: null;
 		},
-		residual(x: GeoState) {
+		residual(x: GeoState, keep?: (row: number) => boolean) {
 			if (!lin) throw new Error("skylineFactor: relinearize(x) first");
 			const cam = cameraXFromState(base, x);
 			const f = focalPx1600(cam);
@@ -418,7 +418,7 @@ export function skylineFactor(
 				const [az, el] = azEl(unprojectDirX(cam, s.u, s.v));
 				r[i] = ((el - linHorizonEl(lin, az, eye)) * D * f) / sig[i];
 			}
-			return white ? white.apply(r) : r;
+			return white ? white.apply(r, keep) : r;
 		},
 	};
 }
@@ -552,9 +552,9 @@ export function pointFactor(
 					build(x);
 				}
 			: undefined,
-		residual(x) {
+		residual(x, keep) {
 			const r = raw(cameraXFromState(base, x));
-			return white ? white.apply(r) : r;
+			return white ? white.apply(r, keep) : r;
 		},
 	};
 }

@@ -142,8 +142,10 @@ export function dataRows(factors: Factor[], x: GeoState): number {
 }
 
 /**
- * Wrap a factor so rows with keep(i) = false read NaN. nEff shrinks with the kept fraction (the cap
- * models correlation within the factor: half the rows carry at most half the capped information).
+ * Wrap a factor so rows with keep(i) = false read NaN; `keep` is handed to the factor so a factor
+ * that mixes rows (cluster whitening) drops them before mixing. nEff shrinks with the kept fraction
+ * (the cap models correlation within the factor: half the rows carry at most half the capped
+ * information).
  * The Jacobian, when analytic, is passed through (NaN rows are dropped by the solver anyway).
  */
 export function maskFactor(
@@ -166,7 +168,9 @@ export function maskFactor(
 		loss: f.loss,
 		prior: f.prior,
 		residual(x) {
-			const r = f.residual(x);
+			// mask BEFORE the factor's own row mixing (cluster whitener), not after it (CR-17); the
+			// post-mask covers factors with independent rows that ignore `keep`
+			const r = f.residual(x, keep);
 			const o = new Float64Array(r.length);
 			for (let i = 0; i < r.length; i++) o[i] = keep(i) ? r[i] : Number.NaN;
 			return o;
@@ -238,6 +242,8 @@ function sqrtLmax2(M: Float64Array, a: number, b: number): number {
 	const A = M[a * NP + a];
 	const B = M[a * NP + b];
 	const D = M[b * NP + b];
+	if (A === Number.POSITIVE_INFINITY || D === Number.POSITIVE_INFINITY)
+		return Number.POSITIVE_INFINITY;
 	const t = (A + D) / 2;
 	const q = Math.sqrt(Math.max(0, ((A - D) / 2) ** 2 + B * B));
 	return Math.sqrt(Math.max(0, t + q));
@@ -301,7 +307,11 @@ export async function protectionLevel(
 			continue;
 		}
 		const D = new Float64Array(NP * NP);
-		for (let q = 0; q < NP * NP; q++) D[q] = r.cov[q] - S0[q];
+		for (let q = 0; q < NP * NP; q++) {
+			D[q] = r.cov[q] - S0[q];
+			// unobservable in both solves (∞ − ∞): the separation is not bounded, fail closed (CR-49)
+			if (Number.isNaN(D[q])) D[q] = Number.POSITIVE_INFINITY;
+		}
 		const dE = r.x[IDX.E] - x0[IDX.E];
 		const dN = r.x[IDX.N] - x0[IDX.N];
 		const dH = Math.hypot(dE, dN);

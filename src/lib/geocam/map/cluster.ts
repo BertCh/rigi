@@ -30,22 +30,23 @@ export const clusterKey = (az: number, d: number, sectorDeg: number) =>
 	`${Math.floor((((az % 360) + 360) % 360) / sectorDeg)}|${distanceBand(d)}`;
 
 export type ClusterWhitener = {
-	/** In place: r ← Σ^{-1/2} r over each cluster's rows (NaN rows are skipped and stay NaN). */
-	apply(r: Float64Array): Float64Array;
+	/**
+	 * In place: r ← Σ^{-1/2} r over each cluster's rows (NaN rows are skipped and stay NaN). With `keep`,
+	 * rows with keep(i) = false are set to NaN first and Σ is the covariance of the kept rows only (the
+	 * whitener is rebuilt over them), so a masked row cannot leak into the kept ones (CR-17).
+	 */
+	apply(r: Float64Array, keep?: (row: number) => boolean): Float64Array;
 	/** Number of clusters with a non-trivial correction. */
 	n: number;
 };
 
-/**
- * @param G     n×3 row-major eye Jacobian of the (row-σ whitened) residual rows
- * @param rows  cluster rows: row indices and the cluster's offset σ (m)
- */
-export function clusterWhitener(
+type WhitenBlock = { rows: number[]; U: Float64Array; k: number[] };
+
+function whitenBlocks(
 	G: Float64Array,
 	clusters: { rows: number[]; sigmaM: number }[],
-): ClusterWhitener {
-	type Blk = { rows: number[]; U: Float64Array; k: number[] };
-	const blks: Blk[] = [];
+): WhitenBlock[] {
+	const blks: WhitenBlock[] = [];
 	for (const c of clusters) {
 		if (!(c.sigmaM > 0) || !c.rows.length) continue;
 		const m = c.rows.length;
@@ -76,26 +77,57 @@ export function clusterWhitener(
 		});
 		blks.push({ rows: c.rows, U, k: kk });
 	}
+	return blks;
+}
+
+function applyBlocks(blks: WhitenBlock[], r: Float64Array): Float64Array {
+	for (const b of blks) {
+		const nc = b.k.length;
+		const c = new Float64Array(nc);
+		b.rows.forEach((i, ri) => {
+			const v = r[i];
+			if (!Number.isFinite(v)) return;
+			for (let j = 0; j < nc; j++) c[j] += b.U[ri * nc + j] * v;
+		});
+		for (let j = 0; j < nc; j++) c[j] *= b.k[j];
+		b.rows.forEach((i, ri) => {
+			if (!Number.isFinite(r[i])) return;
+			let s = 0;
+			for (let j = 0; j < nc; j++) s += b.U[ri * nc + j] * c[j];
+			r[i] += s;
+		});
+	}
+	return r;
+}
+
+/**
+ * @param G     n×3 row-major eye Jacobian of the (row-σ whitened) residual rows
+ * @param rows  cluster rows: row indices and the cluster's offset σ (m)
+ */
+export function clusterWhitener(
+	G: Float64Array,
+	clusters: { rows: number[]; sigmaM: number }[],
+): ClusterWhitener {
+	const blks = whitenBlocks(G, clusters);
+	// per-mask whiteners, keyed by the keep function (maskFactor passes one stable function per subset)
+	const masked = new WeakMap<(row: number) => boolean, WhitenBlock[]>();
 	return {
 		n: blks.length,
-		apply(r) {
-			for (const b of blks) {
-				const nc = b.k.length;
-				const c = new Float64Array(nc);
-				b.rows.forEach((i, ri) => {
-					const v = r[i];
-					if (!Number.isFinite(v)) return;
-					for (let j = 0; j < nc; j++) c[j] += b.U[ri * nc + j] * v;
-				});
-				for (let j = 0; j < nc; j++) c[j] *= b.k[j];
-				b.rows.forEach((i, ri) => {
-					if (!Number.isFinite(r[i])) return;
-					let s = 0;
-					for (let j = 0; j < nc; j++) s += b.U[ri * nc + j] * c[j];
-					r[i] += s;
-				});
+		apply(r, keep) {
+			if (!keep) return applyBlocks(blks, r);
+			for (let i = 0; i < r.length; i++) if (!keep(i)) r[i] = Number.NaN;
+			let mb = masked.get(keep);
+			if (!mb) {
+				mb = whitenBlocks(
+					G,
+					clusters.map((c) => ({
+						rows: c.rows.filter((i) => keep(i)),
+						sigmaM: c.sigmaM,
+					})),
+				);
+				masked.set(keep, mb);
 			}
-			return r;
+			return applyBlocks(mb, r);
 		},
 	};
 }

@@ -149,6 +149,30 @@ export function invSym(A: number[][], rcond = 1e-12): number[][] {
 }
 
 /**
+ * Covariance from an information matrix: the pseudo-inverse invSym, except that a parameter with a
+ * component in the null space (unobservable: its eigenvalue is ≤ rcond·λmax) gets variance +Infinity on
+ * the diagonal instead of the pseudo-inverse's 0 or understated value (CR-49), so σ tests fail closed.
+ * Off-diagonal entries are the pseudo-inverse's. Identical to invSym for a full-rank A.
+ */
+export function invSymCov(
+	A: number[][],
+	rcond = 1e-12,
+	nullTol = 1e-6,
+): number[][] {
+	const n = A.length;
+	const { values, vectors } = jacobiEigen(A);
+	const vmax = Math.max(...values.map(Math.abs), 1e-300);
+	const out = invSym(A, rcond);
+	for (let k = 0; k < n; k++) {
+		if (Math.abs(values[k]) > rcond * vmax) continue;
+		for (let i = 0; i < n; i++)
+			if (Math.abs(vectors[i][k]) > nullTol)
+				out[i][i] = Number.POSITIVE_INFINITY;
+	}
+	return out;
+}
+
+/**
  * Cyclic Jacobi eigendecomposition of a symmetric matrix. Eigenvalues ascending;
  * `vectors[i][k]` is component i of eigenvector k.
  */
