@@ -15,6 +15,12 @@
 // resolved colour with a CPU twin of the EWA shader, with and without an opaque occluder plane
 // (depth test), with Truth on, and checks the class-2 geometry contribution. Load it from any page
 // on the dev server:  await (await import('/src/lib/deck-webgpu/layers/splats.check.ts')).runSplatsGpuCheck()
+// `renderer: "luma"` runs the same cases through layers/splats-luma.ts (luma.gl's splat stack) with
+// a looser tolerance (LUMA_TOLERANCE: luma's anti-aliasing compensation and 16-bit 1/depth keys
+// are not the Rigi shader's). The default is the Rigi shader, whatever ?splatRenderer says.
+//
+// Dawn (node, WebGPU over Dawn): with DAWN_DIR set (a dir with `npm i webgpu@0.3.0`, as the other
+// *-dawn checks), running this file also runs runSplatsGpuCheck on a Dawn device for both renderers.
 import type { Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { ShaderAssembler } from "@luma.gl/shadertools";
@@ -483,23 +489,43 @@ function compare(gpu: Float32Array, cpu: Float32Array, W: number, H: number) {
 	};
 }
 
+/**
+ * Colour tolerance of the luma renderer against the Rigi shader's CPU twin. Dawn (node, 1× colour
+ * pass, 2026-10-02) measured mean ≤ 0.00052 and ≤ 1.7 % of pixels over 2/255 across the four cases.
+ */
+export const LUMA_TOLERANCE = { mean: 0.002, frac: 0.05 };
+
 export async function runSplatsGpuCheck(
-	o: { width?: number; height?: number } = {},
+	o: {
+		width?: number;
+		height?: number;
+		/** Use this device (Dawn in node) instead of a canvas device; it is not destroyed. */
+		device?: Device;
+		renderer?: "rigi" | "luma";
+		/** 1× colour pass (ColorTargets.setReduced): Dawn in node rejects a luma Texture as resolve target. */
+		reduced?: boolean;
+	} = {},
 ) {
-	const { createRenderDevice } = await import("../device");
 	const { runColorPass, runGeometryPass } = await import("../hosts/passes");
 	const { ColorTargets, GeometryTargets } = await import("../targets");
 	const W = o.width ?? 320;
 	const H = o.height ?? 240;
-	const canvas = document.createElement("canvas");
-	canvas.width = W;
-	canvas.height = H;
-	const device = await createRenderDevice(canvas, { useDevicePixels: 1 });
+	const renderer = o.renderer ?? "rigi";
+	let device: Device;
+	if (o.device) device = o.device;
+	else {
+		const { createRenderDevice } = await import("../device");
+		const canvas = document.createElement("canvas");
+		canvas.width = W;
+		canvas.height = H;
+		device = await createRenderDevice(canvas, { useDevicePixels: 1 });
+	}
 	const errors: string[] = [];
 	const gpuErrors: string[] = [];
 	(device as unknown as { onError?: (e: Error) => void }).onError = (e) =>
 		gpuErrors.push(String(e.message ?? e));
 	const color = new ColorTargets(device, W, H);
+	if (o.reduced) color.setReduced(true);
 	const geometry = new GeometryTargets(device, W, H);
 	const pose = checkCamera(W, H);
 	const cam = cameraUniforms(pose);
@@ -508,9 +534,10 @@ export async function runSplatsGpuCheck(
 	const splats = createSplatsCore(device, {
 		sortWorker: false,
 		sortBackend: "worker",
+		renderer,
 	});
 	splats.setCloud(cloud);
-	const results: Record<string, unknown> = {};
+	const results: Record<string, unknown> = { renderer };
 
 	const run = async (
 		name: string,
@@ -548,7 +575,8 @@ export async function runSplatsGpuCheck(
 	};
 
 	// MSAA resolves quad-edge (3σ crop) and triangle-seam samples; per-pixel shading is identical
-	const tol = { mean: 0.002, frac: 0.01 };
+	const tol =
+		renderer === "luma" ? LUMA_TOLERANCE : { mean: 0.002, frac: 0.01 };
 	await run("plain", {}, null, tol);
 	await run("truth", { truth: true, opacity: 0.7 }, null, tol);
 	await run(
@@ -626,9 +654,161 @@ export async function runSplatsGpuCheck(
 	color.destroy();
 	geometry.destroy();
 	await new Promise((r) => setTimeout(r, 50));
-	device.destroy();
+	if (!o.device) device.destroy();
+	if (renderer === "luma" && splats.stats.rendererFallbackReason)
+		errors.push(
+			`luma renderer fell back: ${splats.stats.rendererFallbackReason}`,
+		);
+	results.stats = {
+		...splats.stats,
+		lod: splats.stats.lod && { ...splats.stats.lod },
+	};
 	const ok = errors.length === 0 && gpuErrors.length === 0;
 	return { ok, errors, gpuErrors, results };
+}
+
+/** The GPU check on a Dawn device in node (DAWN_DIR), both renderers. Null when DAWN_DIR is unset. */
+async function dawnChecks() {
+	const dir = process.env.DAWN_DIR;
+	if (!dir) return null;
+	const path = await import("node:path");
+	const { pathToFileURL } = await import("node:url");
+	const { create, globals } = await import(
+		pathToFileURL(path.join(dir, "node_modules/webgpu/index.js")).href
+	);
+	Object.assign(globalThis, globals);
+	const gpu = create([]);
+	if (!(await gpu.requestAdapter()))
+		return { ok: false, errors: ["no adapter"] };
+	Object.defineProperty(globalThis, "navigator", {
+		value: { gpu, userAgent: "node" },
+		configurable: true,
+	});
+	const { luma } = await import("@luma.gl/core");
+	const { webgpuAdapter } = await import("@luma.gl/webgpu");
+	const device = (await luma.createDevice({
+		type: "webgpu",
+		adapters: [webgpuAdapter],
+		createCanvasContext: false,
+	} as never)) as Device;
+	const rigi = await runSplatsGpuCheck({
+		device,
+		renderer: "rigi",
+		reduced: true,
+	});
+	const lumaRun = await runSplatsGpuCheck({
+		device,
+		renderer: "luma",
+		reduced: true,
+	});
+	const lod = await lumaLodSmoke(device);
+	device.destroy();
+	return { ok: rigi.ok && lumaRun.ok && lod.ok, rigi, luma: lumaRun, lod };
+}
+
+/**
+ * The luma renderer on a cloud big enough for two LoD pages (70 000 splats → ~80 000 rows): the
+ * progressive selection converges within a few frames, draws something, picks a finer cut up
+ * close than from far away, with no GPU error and no fallback.
+ */
+async function lumaLodSmoke(device: Device) {
+	const { runColorPass } = await import("../hosts/passes");
+	const { ColorTargets, GeometryTargets } = await import("../targets");
+	const W = 320;
+	const H = 240;
+	const errors: string[] = [];
+	const gpuErrors: string[] = [];
+	(device as unknown as { onError?: (e: Error) => void }).onError = (e) =>
+		gpuErrors.push(String(e.message ?? e));
+	let seed = 12345;
+	const rand = () => {
+		seed = (seed * 1664525 + 1013904223) >>> 0;
+		return seed / 2 ** 32;
+	};
+	const n = 70_000;
+	const cloud: GaussianCloud = {
+		count: n,
+		frame: "enu",
+		positions: new Float32Array(3 * n),
+		scales: new Float32Array(3 * n),
+		rotations: new Float32Array(4 * n),
+		colors: new Uint8Array(4 * n),
+		provenance: new Uint8Array(n),
+	};
+	for (let i = 0; i < n; i++) {
+		cloud.positions.set(
+			[rand() * 20 - 10, 25 + rand() * 10, rand() * 8 - 4],
+			3 * i,
+		);
+		cloud.scales.set(
+			[0.05, 0.05, 0.05].map((v) => v * (0.5 + rand())),
+			3 * i,
+		);
+		cloud.rotations.set([1, 0, 0, 0], 4 * i);
+		cloud.colors.set(
+			[rand() * 255, rand() * 255, rand() * 255, 128 + rand() * 127],
+			4 * i,
+		);
+	}
+	const color = new ColorTargets(device, W, H);
+	color.setReduced(true);
+	const geometry = new GeometryTargets(device, W, H);
+	const splats = createSplatsCore(device, { renderer: "luma" });
+	let pending = 0;
+	splats.onChange = () => pending++;
+	splats.setCloud(cloud);
+	const frameAt = async (eye: Vec3) => {
+		let frames = 0;
+		do {
+			pending = 0;
+			runColorPass({
+				device,
+				cores: [splats],
+				geometry,
+				color,
+				view: { ...checkCamera(W, H), eye },
+				frame: { frame: frames, time: 0, view: "photo" },
+			});
+			device.submit();
+			frames++;
+		} while (pending && frames < 30);
+		const img = await readTexture(device, color.color);
+		let covered = 0;
+		for (let i = 3; i < img.length; i += 4) if (img[i] > 0.01) covered++;
+		const lod = splats.stats.lod;
+		return {
+			frames,
+			covered,
+			activeRows: lod?.activeRows ?? 0,
+			rows: lod?.rows ?? 0,
+			pages: lod?.pages ?? 0,
+			buildMs: +(lod?.buildMs ?? 0).toFixed(1),
+			selectMs: +(lod?.selectMs ?? 0).toFixed(2),
+		};
+	};
+	const near = await frameAt([0, 0, 0]);
+	const far = await frameAt([0, -3000, 0]);
+	if (splats.stats.renderer !== "luma")
+		errors.push(`fell back: ${splats.stats.rendererFallbackReason}`);
+	if (near.pages < 2) errors.push(`expected 2 pages, got ${near.pages}`);
+	if (near.covered < 5000) errors.push(`near: coverage ${near.covered}`);
+	if (far.covered < 1) errors.push("far: nothing drawn");
+	if (far.activeRows >= near.activeRows || near.activeRows < 1000)
+		errors.push(
+			`far cut (${far.activeRows}) not coarser than near (${near.activeRows})`,
+		);
+	if (near.frames >= 30 || far.frames >= 30)
+		errors.push("progressive selection did not converge in 30 frames");
+	splats.destroy();
+	color.destroy();
+	geometry.destroy();
+	return {
+		ok: errors.length === 0 && gpuErrors.length === 0,
+		errors,
+		gpuErrors,
+		near,
+		far,
+	};
 }
 
 // run the CPU checks when executed directly with tsx
@@ -637,7 +817,11 @@ const isMain =
 	typeof process !== "undefined" &&
 	/splats\.check\.ts$/.test(process.argv[1] ?? "");
 if (isMain)
-	cpuChecks().then((r) => {
+	cpuChecks().then(async (r) => {
 		console.log(JSON.stringify(r));
-		if (!r.ok) process.exit(1);
+		const dawn = await dawnChecks();
+		if (dawn) console.log(JSON.stringify({ dawn }));
+		else console.log("dawn: SKIP (DAWN_DIR is not set)");
+		if (!r.ok || (dawn && !dawn.ok)) process.exit(1);
+		process.exit(0);
 	});

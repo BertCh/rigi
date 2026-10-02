@@ -100,6 +100,15 @@ export const FLAG_SCHEMA = {
 	 * existing per-frame encode.
 	 */
 	renderBundles: onOff("off"),
+	/**
+	 * Step Inside splats on WebGPU (deck-webgpu/layers/splats.ts): luma = luma.gl's splat stack
+	 * (@luma.gl/splats, luma PR #3340: an LoD tree over the cloud, progressive RAD selection, luma's
+	 * paged projection + global GPU sort, drawn by layers/splats-luma.ts into the colour pass);
+	 * rigi = the Rigi EWA shader with gpu/splat-sort (the pre-rigi.6 path, also the automatic
+	 * fallback when the luma stack fails to build or prepare, and always used with the geometry-pass
+	 * contribution). The WebGL engine always uses nearfield/deck-splat-layer.ts.
+	 */
+	splatRenderer: oneOf(["luma", "rigi"], "luma"),
 	// Step Inside 3D Tiles (src/lib/tiles3d)
 	tiles3d: oneOf(["off", "buildings", "swisstopo", "google", "all"], "off"),
 	tiles3dBlend: oneOf(["fill", "over"], "fill"),

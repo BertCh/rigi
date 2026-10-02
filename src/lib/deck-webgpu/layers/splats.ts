@@ -60,9 +60,20 @@
 // stats.lastSortMs on the GPU backend is the CPU encode + submit time, not the GPU time.
 // Diagnostics: splats.stats (sorts, lastSortMs, drawn, worker, sortBackend, sortVersion). The WebGL layer's
 // globalThis.__rigiSplatStats is not touched here (engine may alias splats.stats onto it).
+//
+// Two colour renderers (options.renderer, default from ?splatRenderer=, "luma"):
+//   luma  layers/splats-luma.ts: luma.gl's splat stack (@luma.gl/splats, vendored rigi.6): an LoD
+//         tree over the cloud, luma PR #3340's progressive RAD selection, luma's paged projection +
+//         global GPU sort in the colour prepass, our reversed-Z premultiplied draw. Not bit-exact
+//         with the Rigi path (see that file's header). stats.renderer = "luma", stats.lod.
+//   rigi  everything above (the EWA shader + gpu/splat-sort / worker). Used when asked for, for the
+//         geometry-pass contribution (geometry: true), on a non-WebGPU device, and as the automatic
+//         fallback when the luma stack throws while building or preparing (stats.rendererFallbackReason,
+//         one console warning).
 import type { Buffer, Device } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import { getFlag } from "#/lib/flags";
 import { onLost } from "#/lib/gpu/core/lifecycle";
 import { GpuSplatSorter, gpuSplatSortSupported } from "#/lib/gpu/splat-sort";
 import { SortBackendState } from "#/lib/gpu/splat-sort/fallback";
@@ -82,9 +93,15 @@ import {
 	ModelCache,
 	type PassContext,
 	type PassKind,
+	type PrepassContext,
 	passModelProps,
 } from "../pass";
 import { colorWGSL } from "../wgsl";
+import {
+	LUMA_MAX_SPLATS,
+	LumaSplats,
+	type LumaSplatsStats,
+} from "./splats-luma";
 
 /** GPUBufferUsage bits. */
 const STORAGE = 0x0080;
@@ -119,6 +136,11 @@ export type SplatsOptions = {
 	geometry: boolean;
 	/** Minimum own alpha (before the opacity fade) for a geometry-pass fragment. Default 0.5. */
 	geometryAlpha: number;
+	/**
+	 * Colour renderer (header): "luma" = layers/splats-luma.ts, "rigi" = this file's shader. Default:
+	 * the splatRenderer flag. Applies at the next setCloud (and immediately on change).
+	 */
+	renderer: "luma" | "rigi";
 };
 
 export const DEFAULT_SPLATS_OPTIONS: SplatsOptions = {
@@ -132,6 +154,7 @@ export const DEFAULT_SPLATS_OPTIONS: SplatsOptions = {
 	noDepthTest: false,
 	geometry: false,
 	geometryAlpha: 0.5,
+	renderer: "luma",
 };
 
 /** WebGL constants kept identical (deck-splat-layer.ts draw()). */
@@ -456,6 +479,12 @@ export type SplatsStats = {
 	sortFallbackReason: string | null;
 	/** Bumped when a new draw order lands. */
 	sortVersion: number;
+	/** The colour renderer in use for the current cloud. */
+	renderer: "luma" | "rigi";
+	/** Why the luma renderer was abandoned (null: it was not, or never wanted). */
+	rendererFallbackReason: string | null;
+	/** LoD / selection stats of the luma renderer (null on the Rigi path). */
+	lod: LumaSplatsStats | null;
 };
 
 type Gpu = {
@@ -492,11 +521,20 @@ export class SplatsCore implements GpuLayerCore {
 		sortBackend: "worker",
 		sortFallbackReason: null,
 		sortVersion: 0,
+		renderer: "rigi",
+		rendererFallbackReason: null,
+		lod: null,
 	};
 	/** Called when a new back-to-front order has landed (hook host.requestRender() here). */
 	onChange?: () => void;
 	private enabled = true;
 	private gpu: Gpu | null = null;
+	/** The luma renderer for the current cloud (instead of `gpu`). */
+	private luma: LumaSplats | null = null;
+	/** The cloud shown (on either path). */
+	private cloud: GaussianCloud | null = null;
+	/** The luma renderer failed for this cloud: stay on the Rigi path until the next cloud. */
+	private lumaFailed = false;
 	/** The GPU-sorted cloud that a device loss fails; one onLost hook per core (hooks are never removed). */
 	private lostTarget: Gpu | null = null;
 	private lostHooked = false;
@@ -505,14 +543,42 @@ export class SplatsCore implements GpuLayerCore {
 	constructor(
 		readonly device: Device,
 		readonly id = "splats",
-	) {}
+	) {
+		this.options.renderer = getFlag("splatRenderer");
+	}
 
 	get passes(): readonly PassKind[] {
-		return this.options.geometry ? ["geometry", "color"] : ["color"];
+		return this.options.geometry && !this.luma
+			? ["geometry", "color"]
+			: ["color"];
 	}
 
 	visible() {
-		return this.enabled && !!this.gpu && this.options.opacity > 0;
+		return (
+			this.enabled && !!(this.gpu || this.luma) && this.options.opacity > 0
+		);
+	}
+
+	/** Whether the current options and device call for the luma renderer. */
+	private wantsLuma() {
+		return (
+			this.options.renderer === "luma" &&
+			!this.options.geometry &&
+			!this.lumaFailed &&
+			this.device.type === "webgpu"
+		);
+	}
+
+	private lumaOptions() {
+		const o = this.options;
+		return {
+			opacity: o.opacity,
+			truth: o.truth,
+			maxRadiusPx: o.maxRadiusPx,
+			sigmas: o.sigmas,
+			noDepthTest: o.noDepthTest,
+			tints: SPLAT_TINTS,
+		};
 	}
 
 	setEnabled(on: boolean) {
@@ -521,18 +587,44 @@ export class SplatsCore implements GpuLayerCore {
 
 	setOptions(o: Partial<SplatsOptions>) {
 		const noDepth = this.options.noDepthTest;
+		const before = this.wantsLuma();
 		this.options = { ...this.options, ...o };
 		if (this.options.noDepthTest !== noDepth) this.models.invalidate("color");
+		if (this.wantsLuma() !== before && this.cloud) {
+			// renderer or geometry changed: rebuild the current cloud on the other path
+			const cloud = this.cloud;
+			this.releaseGpu();
+			this.setCloud(cloud);
+			return;
+		}
+		this.luma?.setOptions(this.lumaOptions());
 	}
 
 	/** Replace the cloud (ENU GaussianCloud; null clears). Same object → no-op. */
 	setCloud(cloud: GaussianCloud | null) {
-		if (cloud === this.gpu?.cloud) return;
+		if (cloud === this.cloud && (this.gpu || this.luma)) return;
+		if (cloud !== this.cloud) this.lumaFailed = false;
 		this.releaseGpu();
+		this.cloud = cloud;
 		if (!cloud || !cloud.count) {
 			this.stats.count = 0;
 			return;
 		}
+		this.stats.rendererFallbackReason = null;
+		if (this.wantsLuma() && cloud.count <= LUMA_MAX_SPLATS) {
+			try {
+				this.luma = new LumaSplats(this.device, cloud, this.lumaOptions());
+				this.stats.count = cloud.count;
+				this.stats.renderer = "luma";
+				this.stats.lod = this.luma.stats;
+				return;
+			} catch (e) {
+				this.failLuma(`build: ${e instanceof Error ? e.message : String(e)}`);
+				return;
+			}
+		}
+		this.stats.renderer = "rigi";
+		this.stats.lod = null;
 		if (cloud.frame !== "enu")
 			console.warn(
 				"[deck-webgpu splats] cloud is in the camera frame; SplatsCore expects ENU (anchor it first)",
@@ -600,6 +692,37 @@ export class SplatsCore implements GpuLayerCore {
 		} catch (e) {
 			g.state.fail(`init: ${e instanceof Error ? e.message : String(e)}`);
 		}
+	}
+
+	/** Abandon the luma renderer for this cloud: one warning, then the Rigi path. */
+	private failLuma(reason: string) {
+		console.warn(`[deck-webgpu splats] luma splat renderer off: ${reason}`);
+		const cloud = this.cloud;
+		this.releaseGpu();
+		this.lumaFailed = true;
+		this.setCloud(cloud);
+		this.stats.rendererFallbackReason = reason;
+		this.onChange?.();
+	}
+
+	/** Colour prepass (luma renderer): selection + luma's projection / sort on the frame encoder. */
+	prepass(ctx: PrepassContext) {
+		const luma = this.luma;
+		if (!luma || ctx.kind !== "color") return;
+		const version = luma.stats.version;
+		try {
+			luma.prepare(ctx.camera, ctx.commandEncoder);
+		} catch (e) {
+			this.failLuma(`prepare: ${e instanceof Error ? e.message : String(e)}`);
+			return;
+		}
+		this.stats.drawn = luma.stats.activeRows;
+		if (luma.stats.version !== version) {
+			this.stats.sorts++;
+			this.stats.sortVersion++;
+		}
+		// the progressive selection walks a bounded number of rows per frame: ask for the next one
+		if (luma.pending) this.onChange?.();
 	}
 
 	private startWorker(g: Gpu) {
@@ -743,6 +866,10 @@ export class SplatsCore implements GpuLayerCore {
 	}
 
 	draw(ctx: PassContext) {
+		if (this.luma) {
+			if (ctx.kind === "color") this.luma.draw(ctx.renderPass, ctx.camera);
+			return;
+		}
 		const g = this.gpu;
 		if (!g || ctx.kind === "screen") return;
 		if (ctx.kind === "geometry" && !this.options.geometry) return;
@@ -781,6 +908,11 @@ export class SplatsCore implements GpuLayerCore {
 	}
 
 	private releaseGpu() {
+		if (this.luma) {
+			this.luma.destroy();
+			this.luma = null;
+			this.stats.lod = null;
+		}
 		const g = this.gpu;
 		if (!g) return;
 		if (this.lostTarget === g) this.lostTarget = null;
