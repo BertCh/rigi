@@ -35,6 +35,7 @@ import {
 import { gridOnGraph, releaseSkyGlobalGraphs } from "./graph";
 import { K_CANDS, K_CELLS, OWNER, reduceSpec } from "./kernels";
 import { COMBO_FLOATS } from "./skyglobal.wgsl";
+import { packSkyGlobalUniform } from "./uniforms";
 
 /** Compile the three pipelines now (so the first search does not pay the WGSL compile). */
 export function warmSkyGlobalGpu(device: Device) {
@@ -201,11 +202,20 @@ function pack(sg: SkyGlobal, g: GridPlan, o: GridGpuOptions): Packed {
 		if (v < smin) smin = v;
 		if (v > smax) smax = v;
 	}
-	const ub = new ArrayBuffer(48);
-	const uu = new Uint32Array(ub);
-	const uf = new Float32Array(ub);
-	uu.set([sg.w, sg.h, g.n, g.sy, nYaw, nCombo, Math.floor(g.cntMin) + 1, cap]);
-	uf.set([o.eps ?? 5e-3, o.zeps ?? 1e-5, smin, smax], 8);
+	const ub = packSkyGlobalUniform({
+		w: sg.w,
+		h: sg.h,
+		n: g.n,
+		sy: g.sy,
+		nYaw,
+		nCombo,
+		cntMin: g.cntMin,
+		cap,
+		eps: o.eps,
+		zeps: o.zeps,
+		smin,
+		smax,
+	});
 	return { T, ub, prof, alpha, vfs, combos, cap };
 }
 

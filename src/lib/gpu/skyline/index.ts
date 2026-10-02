@@ -34,6 +34,7 @@ import {
 	SKYLINE_UNPACK,
 	skylineBlurSource,
 } from "./skyline.wgsl";
+import { packSkylineParams } from "./uniforms";
 
 const GROUP = "skyline";
 const WG = 256;
@@ -203,13 +204,6 @@ export function skylineModelRows(m: SkyModel, h: number) {
 	return out;
 }
 
-function paramWords(w: number, h: number, sigma: number) {
-	const words = new ArrayBuffer(32);
-	new Uint32Array(words).set([w, h, w * h]);
-	new Float32Array(words)[4] = sigma;
-	return words;
-}
-
 /** The GPU stages of one image, for detectSkylineWith. Call dispose() when done. */
 export interface SkylineGpuSession {
 	stages: SkylineStages;
@@ -243,7 +237,7 @@ export async function openSkylineGpu(
 		for (const b of bufs) b.destroy();
 	};
 	try {
-		const prm = uniform(device, paramWords(w, h, 0));
+		const prm = uniform(device, packSkylineParams(w, h, 0));
 		const feat = cachedGraph<Params, void>(
 			device,
 			GROUP,
@@ -286,7 +280,7 @@ export async function openSkylineGpu(
 				features: async () => ({ f, prior: f32(priorB) }),
 				modelSky: async (m: SkyModel) => {
 					rows.write(skylineModelRows(m, h));
-					const mp = uniform(device, paramWords(w, h, m.sigma));
+					const mp = uniform(device, packSkylineParams(w, h, m.sigma));
 					try {
 						await model.run({}, { buffers: { prm: mp, rgb, tex, rows, sky } });
 					} finally {
