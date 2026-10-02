@@ -4,6 +4,11 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- **Hidden pages cleanup (2026-10-02, browser-unverified).**
+  - `/baseline` is dev only (production builds show a stub), no longer a tile on `/library`, and its worker reads Mapterhorn DEM tiles instead of AWS Terrarium.
+  - `/dev/meta` is dev only. Its three figures that had no other home are now Gipfelbuch plates: the line-of-sight section on DEM Horizon, the skyline fingerprint and pixel-to-place on Viewport Inference.
+  - `/lab/deck-splats` gets a harness, `scripts/nearfield/deck-splat-lab-check.mjs` (WebGL2; the lab now reports its backend), replacing the one for the removed `/lab/splats`.
+  - `/dev/tafel` takes its sheet number from the graph (16 sheets). The README route table lists the Gipfelbuch dev previews and `/gipfelbuch/print`.
 - **luma.gl / deck.gl frontier wave (2026-10-02, browser-unverified).**
   - Vendored luma.gl bumped to `10.0.0-alpha.2-rigi.5`. It adds luma master `16445518` (#3348 compat-mode cube views), the updated #3313 (idempotent attached-device teardown) and three local commits: `STREAM_READ` for WebGL readback buffers, `Buffer.readAsync(…, {target})`, and WebGL multisampled textures with render-pass `resolveTargets` / `depthStencilResolveTarget`. deck.gl stays `9.4.0-rigi.2` (re-checked, no upstream change). The WebGL compositor's MSAA colour pass and the geometry readback now use these luma APIs (raw WebGL in `deck/composite.ts` 75 → 14). WIP, browser-unverified.
   - GPU: the last hand-packed compute uniforms (horizon march, skyglobal, skyline, sky prep/refine, splat-sort) are declared once with `defineUniformBlock` (luma `ShaderBlockWriter`); new fast check `gpu-uniform-block-b` proves the bytes identical (browser-unverified).
