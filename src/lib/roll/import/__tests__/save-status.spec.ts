@@ -14,7 +14,12 @@ describe("markSavingFailed", () => {
 			{ key: 4, status: "ready" },
 		];
 		const out = markSavingFailed(items, "quota");
-		expect(out.map((i) => i.status)).toEqual(["save-error", "saved", "save-error", "ready"]);
+		expect(out.map((i) => i.status)).toEqual([
+			"save-error",
+			"saved",
+			"save-error",
+			"ready",
+		]);
 		expect(out[0]).toEqual({ key: 1, status: "save-error", error: "quota" });
 		expect(out[2].error).toBe("earlier");
 	});
