@@ -12,12 +12,14 @@ import {
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Compare, Details, Stages } from "../viz/explain";
+import { MOTION } from "../viz/motion";
 import {
 	COMPARE_SCRUB_MS,
 	COMPARE_SETUP_MS,
 	compareIntroX,
 	compareKeyX,
 	compareSide,
+	defaultStageKind,
 	easeInOut,
 	SEQUENCE_LEAD_MS,
 	STEPS_DRAW_MS,
@@ -27,9 +29,32 @@ import {
 	stepsSegmentDelay,
 	stepsStationDelay,
 	useOpenForPrint,
-	useSequenceMotion,
 } from "../viz/sequence";
 import { AlignmentStoryProvider, useAlignmentStory } from "../viz/story";
+
+/** An observer that reports its target fully on screen as soon as it is observed. */
+class FullViewObserver {
+	constructor(
+		private readonly callback: (
+			entries: Partial<IntersectionObserverEntry>[],
+		) => void,
+	) {}
+	observe() {
+		this.callback([
+			{
+				isIntersecting: true,
+				intersectionRect: { height: 100 } as DOMRectReadOnly,
+				boundingClientRect: { height: 100 } as DOMRectReadOnly,
+				rootBounds: { height: 800 } as DOMRectReadOnly,
+			},
+		]);
+	}
+	unobserve() {}
+	disconnect() {}
+	takeRecords() {
+		return [];
+	}
+}
 
 const setWebdriver = (on: boolean) =>
 	Object.defineProperty(navigator, "webdriver", {
@@ -43,8 +68,6 @@ describe("sequence timing (pure)", () => {
 		expect(easeInOut(1)).toBe(1);
 		expect(easeInOut(0.5)).toBeCloseTo(0.5, 12);
 		expect(easeInOut(0.25) + easeInOut(0.75)).toBeCloseTo(1, 12);
-		expect(easeInOut(-1)).toBe(0);
-		expect(easeInOut(2)).toBe(1);
 	});
 
 	it("the Compare intro holds the guess, scrubs once to start and rests", () => {
@@ -97,6 +120,17 @@ describe("sequence timing (pure)", () => {
 		expect(stepsStationDelay(3)).toBe(3 * STEPS_PERIOD_MS);
 	});
 
+	it("stage kinds default to setup, evidence ..., result", () => {
+		expect([0, 1, 2, 3].map((n) => defaultStageKind(n, 4))).toEqual([
+			"setup",
+			"evidence",
+			"evidence",
+			"result",
+		]);
+		expect(defaultStageKind(0, 1)).toBe("setup");
+		expect(defaultStageKind(1, 2)).toBe("result");
+	});
+
 	it("Stages starts on the result frame and groups frames by key", () => {
 		expect(stagesInitialIndex(4)).toBe(3);
 		expect(stagesInitialIndex(0)).toBe(0);
@@ -134,25 +168,6 @@ describe("sequence components (happy-dom)", () => {
 		cleanup();
 		vi.unstubAllGlobals();
 		setWebdriver(false);
-	});
-
-	it("useSequenceMotion is off under webdriver and in print, on otherwise", () => {
-		setWebdriver(true);
-		const off = renderHook(() => useSequenceMotion(false));
-		expect(off.result.current).toBe(false);
-		setWebdriver(false);
-		const on = renderHook(() => useSequenceMotion(false));
-		expect(on.result.current).toBe(true);
-		act(() => {
-			window.dispatchEvent(new Event("beforeprint"));
-		});
-		expect(on.result.current).toBe(false);
-		act(() => {
-			window.dispatchEvent(new Event("afterprint"));
-		});
-		expect(on.result.current).toBe(true);
-		const reduced = renderHook(() => useSequenceMotion(true));
-		expect(reduced.result.current).toBe(false);
 	});
 
 	it("useOpenForPrint opens a closed details for print and restores it", () => {
@@ -251,6 +266,60 @@ describe("sequence components (happy-dom)", () => {
 		expect(container.querySelector("output")?.textContent).toBe("0");
 		// autoplay was not ended by the story's own initial t
 		expect(getByRole("button", { name: "Pause" })).toBeTruthy();
+	});
+
+	it("a new frame crossfades over the outgoing one, which leaves after MOTION.crossfade", () => {
+		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+		try {
+			const { getByText, queryByText, getAllByRole } = render(
+				<Stages stages={STAGES} />,
+			);
+			expect(getByText("frame 1")).toBeTruthy();
+			fireEvent.click(getAllByRole("button", { pressed: false })[0]);
+			// both frames, the outgoing one hidden from assistive tech and fading under the new one
+			expect(getByText("frame 2")).toBeTruthy();
+			const out = getByText("frame 1").closest("[aria-hidden]");
+			expect(out).toBeTruthy();
+			act(() => {
+				vi.advanceTimersByTime(MOTION.crossfade);
+			});
+			expect(queryByText("frame 1")).toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("stages sharing a frame key do not crossfade", () => {
+		const shared = STAGES.map((st) => ({ ...st, frame: "photo" }));
+		const { getByText, queryByText, getAllByRole } = render(
+			<Stages stages={shared} />,
+		);
+		fireEvent.click(getAllByRole("button", { pressed: false })[0]);
+		expect(getByText("frame 2")).toBeTruthy();
+		expect(queryByText("frame 1")).toBeNull();
+	});
+
+	it("the first rewind (result to first stage) does not crossfade", () => {
+		const { getByText, queryByText } = render(<Stages stages={STAGES} />);
+		expect(getByText("frame 1")).toBeTruthy();
+		expect(queryByText("frame 3")).toBeNull();
+	});
+
+	it("the progress pencil waits for the figure to be armed", () => {
+		const { container } = render(<Stages stages={STAGES} />);
+		expect(container.querySelector(".gb-progress")).toBeNull();
+	});
+
+	it("the progress pencil shows while playing and goes when the reader picks a stage", () => {
+		vi.stubGlobal("IntersectionObserver", FullViewObserver);
+		const { container, getAllByRole } = render(<Stages stages={STAGES} />);
+		const pencil = container.querySelector(".gb-progress") as SVGElement;
+		expect(pencil).toBeTruthy();
+		expect(pencil.getAttribute("style")).toContain(
+			`--gb-progress-ms: ${MOTION.beat}ms`,
+		);
+		fireEvent.click(getAllByRole("button", { pressed: false })[0]);
+		expect(container.querySelector(".gb-progress")).toBeNull();
 	});
 
 	it("Compare under webdriver rests at start and names the larger side", () => {

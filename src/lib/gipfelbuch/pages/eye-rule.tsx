@@ -1206,6 +1206,7 @@ function HeroStages() {
 					},
 					{
 						label: "The rule",
+						kind: "change",
 						caption:
 							"The camera may never sit below the ground plus a standing eye.",
 						render: frame(1),

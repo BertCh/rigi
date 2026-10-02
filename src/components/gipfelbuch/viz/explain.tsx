@@ -3,11 +3,14 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import {
+	type CSSProperties,
 	type KeyboardEvent,
 	type PointerEvent,
 	type ReactNode,
+	useContext,
 	useEffect,
 	useLayoutEffect,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -23,9 +26,20 @@ import {
 import { TYPE } from "../swiss/type";
 import { FigureSkeleton } from "./FigureSkeleton";
 import { HandFrame, HandLoop, HandSideRule, HandUnderline } from "./hand";
-import { useInView, useReducedMotion } from "./hooks";
+import { useInView } from "./hooks";
 import { dashFor, inkFor, layerOfColor, type PhotoLayer } from "./inks";
 import { EASE, MOTION, stagger } from "./motion";
+import {
+	ARM,
+	ARM_SEQUENCE,
+	type BeatKind,
+	type BeatSpec,
+	dwellOf,
+	MOTION,
+	useArmedInView,
+	useBeats,
+	useMotionAllowed,
+} from "./motion";
 import {
 	CrispLine,
 	GIPFELBUCH_PHOTO_IDS,
@@ -41,10 +55,10 @@ import {
 	compareIntroX,
 	compareKeyX,
 	compareSide,
+	defaultStageKind,
 	stageFrameKey,
 	stagesInitialIndex,
 	useOpenForPrint,
-	useSequenceMotion,
 } from "./sequence";
 import { SpillSideContext, useAlignmentStory } from "./story";
 import {
@@ -178,9 +192,9 @@ export function Compare({
 	spill?: "pose" | "static";
 	className?: string;
 }) {
-	const [ref, inView] = useInView();
-	const reduce = useReducedMotion();
-	const motion = useSequenceMotion(reduce);
+	// one sweep: it plays when 75 % of the frame is shown (grammar ARM), once
+	const { ref, armed: inView } = useArmedInView({ arm: ARM });
+	const motion = useMotionAllowed();
 	// inside an alignment story the wipe is the story's position (x = 1 - t: all "after" at x = 0)
 	const story = useAlignmentStory();
 	const [localX, setLocalX] = useState(start);
@@ -272,7 +286,11 @@ export function Compare({
 			if (touched.current) return;
 			const { x, done } = compareIntroX(now - t0, start);
 			applyRef.current(x);
-			if (done) return commitRef.current(x);
+			if (done) {
+				// played: it does not replay (a reader's hover here is a drag about to start)
+				touched.current = true;
+				return commitRef.current(x);
+			}
 			raf = requestAnimationFrame(tick);
 		};
 		raf = requestAnimationFrame(tick);
@@ -354,7 +372,8 @@ export function Compare({
 						>
 							<path
 								d="M4 0L4 100"
-								stroke="var(--gb-paper, #ece6da)"
+								// the halo the photo's horizon tone asks for (grammar --fig-halo), paper without a ground
+								stroke="var(--fig-halo, var(--gb-paper, #ece6da))"
 								strokeOpacity={0.75}
 								strokeWidth={5}
 								fill="none"
@@ -446,6 +465,8 @@ export interface Stage {
 	render: () => ReactNode;
 	/** Where this stage sits in an enclosing alignment story: 0 = phone's guess, 1 = solved. */
 	pose?: number;
+	/** The stage's beat (grammar §1.3); default: the first sets up, the last is the result, the rest are evidence. */
+	kind?: BeatKind;
 	/**
 	 * Stages with the same `frame` key keep one mounted frame (the photo is not remounted, only its
 	 * layers change); stages without one each get their own frame and fade in.
@@ -480,67 +501,77 @@ const PHOTO_LABEL =
 
 /**
  * Step through stages of one process on the same frame (tabs circled by hand + pen-arrow prev/next).
- * The static frame (server render, reduced motion, webdriver, print) is the last stage; where motion is
- * allowed the client steps back to the first and auto-advances while on screen, pausing while a mouse
- * rests on the frame, until the reader picks a stage. Print adds every stage's caption as a list.
+ * The stages are beats (`useBeats`, grammar §1.3): the static frame (server render, reduced motion,
+ * webdriver, print) is the last stage; where motion is allowed the client rewinds to the first and
+ * plays through once while the figure is armed, rests on the result and replays when the reader comes
+ * back. A pencil under the active tab draws over the stage's dwell. A mouse resting on the frame holds
+ * the clock; picking a stage ends autoplay until "play". A new frame crossfades over the old one;
+ * stages sharing a `frame` key keep one mounted frame. Print adds every stage's caption as a list.
  */
 export function Stages({
 	stages,
-	interval = 3200,
+	interval = MOTION.beat,
 	aside,
 	className,
 }: {
 	stages: Stage[];
+	/** Dwell of one stage in ms (the result stage dwells `MOTION.resultHold` times longer). */
 	interval?: number;
 	/** A view kept beside the frame across stages, e.g. the story's side map. */
 	aside?: ReactNode;
 	className?: string;
 }) {
-	const [ref, inView] = useInView({ once: false });
-	const reduce = useReducedMotion();
-	const motion = useSequenceMotion(reduce);
 	const last = stagesInitialIndex(stages.length);
-	const [i, setI] = useState(last);
-	const [playing, setPlaying] = useState(true);
+	const script = useMemo<BeatSpec[]>(
+		() =>
+			stages.map((st, n) => {
+				const kind = st.kind ?? defaultStageKind(n, stages.length);
+				return { id: st.label, kind, dwell: dwellOf(kind, interval) };
+			}),
+		[stages, interval],
+	);
+	const beats = useBeats(script);
+	const i = Math.min(beats.index, last);
+	const s = stages[i];
+	const dwell = script[i]?.dwell ?? interval;
+	// the hover hold, mirrored here so the progress pencil pauses with the clock
 	const [held, setHeld] = useState(false);
-	// the static frame is the result; once motion is allowed the client steps back to the first stage
-	const stepped = useRef(false);
-	useIsomorphicLayoutEffect(() => {
-		if (!motion || stepped.current) return;
-		stepped.current = true;
-		setI(0);
-	}, [motion]);
-	useEffect(() => {
-		// synchronously, so the printed frame is the result
-		const toResult = () => flushSync(() => setI(last));
-		window.addEventListener("beforeprint", toResult);
-		return () => window.removeEventListener("beforeprint", toResult);
-	}, [last]);
-	useEffect(() => {
-		if (!playing || held || !inView || !motion) return;
-		const id = window.setTimeout(
-			() => setI((v) => (v + 1) % stages.length),
-			i === stages.length - 1 ? interval * 1.6 : interval,
-		);
-		return () => window.clearTimeout(id);
-	}, [playing, held, inView, motion, i, interval, stages.length]);
-	const go = (n: number) => {
-		stepped.current = true;
-		setPlaying(false);
-		// the frame under the pointer may remount and never report its pointerleave
-		setHeld(false);
-		setI((n + stages.length) % stages.length);
+	const hold = (on: boolean) => {
+		setHeld(on);
+		beats.hold(on);
 	};
-	const s = stages[Math.min(i, last)];
+	const go = (n: number) => {
+		// the frame under the pointer may remount and never report its pointerleave
+		hold(false);
+		beats.setIndex((n + stages.length) % stages.length);
+	};
+	const setIndexRef = useRef(beats.setIndex);
+	setIndexRef.current = beats.setIndex;
+	useEffect(() => {
+		// synchronously, so the printed frame is the result, with no frame crossfading under it
+		const toResult = () =>
+			flushSync(() => {
+				setPrinting(true);
+				setOutgoing(null);
+				setIndexRef.current(last);
+			});
+		const after = () => setPrinting(false);
+		window.addEventListener("beforeprint", toResult);
+		window.addEventListener("afterprint", after);
+		return () => {
+			window.removeEventListener("beforeprint", toResult);
+			window.removeEventListener("afterprint", after);
+		};
+	}, [last]);
 	// a stage with a pose moves the enclosing alignment story there (only when the stage's pose
 	// changes: the story's setT changes identity with every t, so it is read through a ref) ...
 	const story = useAlignmentStory();
 	const setStoryT = useRef(story?.setT);
 	setStoryT.current = story?.setT;
-	// the pose this component last wrote and the story has not reflected yet
-	const pendingPose = useRef<number | null>(null);
 	const currentT = useRef(story?.t);
 	currentT.current = story?.t;
+	// the pose this component last wrote and the story has not reflected yet
+	const pendingPose = useRef<number | null>(null);
 	useEffect(() => {
 		if (!setStoryT.current || s.pose == null) return;
 		// a write that changes nothing is never echoed back, so it is not waited for
@@ -573,15 +604,45 @@ export function Stages({
 				best = n;
 		});
 		if (best >= 0) {
-			stepped.current = true;
-			setPlaying(false);
 			setHeld(false);
-			setI(best);
+			setIndexRef.current(best);
 		}
 	}, [storyT]);
+	// crossfade: the outgoing frame stays mounted underneath (without its spill) and fades out while
+	// the new one fades in. Not on the first rewind (the static result to the first stage), not in print.
+	const outerSpill = useContext(SpillSideContext);
+	const frameKey = stageFrameKey(s, i);
+	type Shown = { key: string; index: number };
+	const [shown, setShown] = useState<Shown>({ key: frameKey, index: i });
+	const [outgoing, setOutgoing] = useState<Shown | null>(null);
+	const [primed, setPrimed] = useState(false);
+	const [printing, setPrinting] = useState(false);
+	// React's "storing information from previous renders": a new frame key moves the shown frame out
+	if (shown.key !== frameKey || shown.index !== i) {
+		setShown({ key: frameKey, index: i });
+		if (shown.key !== frameKey)
+			setOutgoing(beats.motion && primed && !printing ? shown : null);
+		if (beats.motion && !primed) setPrimed(true);
+	}
+	useEffect(() => {
+		if (!outgoing) return;
+		const id = window.setTimeout(() => setOutgoing(null), MOTION.crossfade);
+		return () => window.clearTimeout(id);
+	}, [outgoing]);
+	const frames: Shown[] =
+		outgoing && outgoing.key !== frameKey
+			? [outgoing, { key: frameKey, index: i }]
+			: [{ key: frameKey, index: i }];
+	// the clock runs only while the figure is armed; the pencil follows (same root, same threshold)
+	const { ref: armRef, armed } = useArmedInView({ arm: ARM_SEQUENCE });
+	const progress = beats.motion && beats.playing && !held && armed;
 	return (
 		<div
-			ref={ref}
+			ref={(el) => {
+				(beats.ref as { current: HTMLDivElement | null }).current = el;
+				(armRef as { current: HTMLDivElement | null }).current = el;
+			}}
+			data-beat={beats.kind}
 			className={cn("py-2 [container-type:inline-size]", className)}
 		>
 			<div className="mb-3 flex items-start gap-1.5 print:hidden">
@@ -600,7 +661,12 @@ export function Stages({
 									: "text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]",
 							)}
 						>
-							<span className="nb-num mr-1.5 text-[var(--gb-contour,inherit)] normal-case">
+							<span
+								className={cn(
+									"nb-num mr-1.5 normal-case",
+									STAGE_NUMBER_INK[script[n]?.kind ?? "evidence"],
+								)}
+							>
 								{n + 1}.
 							</span>
 							{st.label}
@@ -612,22 +678,50 @@ export function Stages({
 									inset={-1}
 								/>
 							)}
+							{n === i && progress && (
+								// the clock made visible: a pencil drawn over this stage's dwell
+								<svg
+									key={i}
+									viewBox="0 0 100 4"
+									preserveAspectRatio="none"
+									className="pointer-events-none absolute inset-x-3 bottom-0 h-1 overflow-visible"
+									aria-hidden="true"
+								>
+									<path
+										d="M0 2L100 2"
+										pathLength={1}
+										// hidden unless the .gb-progress animation runs (an animation beats these)
+										strokeDasharray={1}
+										strokeDashoffset={1}
+										className="gb-progress"
+										stroke="var(--gb-pencil, currentColor)"
+										strokeOpacity={0.7}
+										strokeWidth={1.2}
+										strokeLinecap="round"
+										fill="none"
+										vectorEffect="non-scaling-stroke"
+										style={
+											{ "--gb-progress-ms": `${dwell}ms` } as CSSProperties
+										}
+									/>
+								</svg>
+							)}
 						</button>
 					))}
 				</div>
 				<button
 					type="button"
-					onClick={() => setPlaying((p) => !p)}
-					aria-label={playing ? "Pause" : "Play"}
+					onClick={() => (beats.playing ? beats.pause() : beats.play())}
+					aria-label={beats.playing ? "Pause" : "Play"}
 					// nothing plays where motion is not allowed: the button keeps its place but is hidden
-					aria-hidden={!motion || undefined}
-					tabIndex={motion ? undefined : -1}
+					aria-hidden={!beats.motion || undefined}
+					tabIndex={beats.motion ? undefined : -1}
 					className={cn(
 						"nb-hand relative mt-0.5 mr-1 shrink-0 px-2 text-[18px] leading-[24px] text-[var(--gb-secondary,#4a545c)] hover:text-[var(--gb-ink)]",
-						!motion && "invisible",
+						!beats.motion && "invisible",
 					)}
 				>
-					{playing ? "pause" : "play"}
+					{beats.playing ? "pause" : "play"}
 					<HandFrame
 						seed="stages-play"
 						color="pencil"
@@ -643,15 +737,34 @@ export function Stages({
 				)}
 			>
 				<div
-					key={stageFrameKey(s, i)}
-					className="animate-[gipfelbuch-fade_420ms_ease-out] motion-reduce:animate-none"
+					className="relative"
 					// a photo's geo spill keeps off the side map
 					data-gb-bleed-bounds={aside ? "right" : undefined}
 					// a mouse resting on the frame holds the clock (a hover is not a choice: autoplay resumes)
-					onPointerEnter={(e) => e.pointerType === "mouse" && setHeld(true)}
-					onPointerLeave={() => setHeld(false)}
+					onPointerEnter={(e) => e.pointerType === "mouse" && hold(true)}
+					onPointerLeave={() => hold(false)}
 				>
-					<NoImprint>{s.render()}</NoImprint>
+					{/* one keyed list, so a frame stays mounted as it moves out (no cold remount) */}
+					{frames.map((f) => {
+						const out = f.key !== frameKey;
+						return (
+							<div
+								key={`f:${f.key}`}
+								aria-hidden={out || undefined}
+								className={cn(
+									out
+										? "pointer-events-none absolute inset-x-0 top-0"
+										: "relative",
+									!out && outgoing && "gb-stage-in",
+								)}
+								style={out ? STAGE_OUT_STYLE : undefined}
+							>
+								<SpillSideContext.Provider value={out ? SPILL_OFF : outerSpill}>
+									<NoImprint>{(out ? stages[f.index] : s)?.render()}</NoImprint>
+								</SpillSideContext.Provider>
+							</div>
+						);
+					})}
 				</div>
 				{aside && <NoImprint>{aside}</NoImprint>}
 			</div>
@@ -687,12 +800,22 @@ export function Stages({
 					</li>
 				))}
 			</ol>
-			<style>
-				{"@keyframes gipfelbuch-fade{from{opacity:.25}to{opacity:1}}"}
-			</style>
 		</div>
 	);
 }
+
+/** The outgoing frame fades out over the crossfade (gb-stage-in reversed, theme.css). */
+const STAGE_OUT_STYLE: CSSProperties = {
+	animation: `gb-stage-in var(--gb-dur-crossfade, ${MOTION.crossfade}ms) var(--gb-ease-out, ease-out) reverse both`,
+};
+
+/** A stage tab's number ink by beat kind: the change in red, the result in ink, the rest in contour. */
+const STAGE_NUMBER_INK: Record<BeatKind, string> = {
+	setup: "text-[var(--gb-contour,inherit)]",
+	evidence: "text-[var(--gb-contour,inherit)]",
+	change: "text-[var(--gb-red,inherit)]",
+	result: "text-[var(--gb-ink,inherit)]",
+};
 
 /** Three (or four) numbered steps side by side, each a small visual over a one-line explanation. */
 export function Trio({

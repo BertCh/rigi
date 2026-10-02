@@ -1410,6 +1410,7 @@ function HeroJourney() {
 					stages={[
 						{
 							label: "Phone's guess",
+							frame: "photo",
 							pose: 0,
 							caption: `If the first solve is weak, the workspace starts here. The terrain horizon misses by ${d?.residual.prior.median ?? "…"} px.`,
 							render: () => (
@@ -1423,6 +1424,7 @@ function HeroJourney() {
 						},
 						{
 							label: "Preview: solved pose",
+							frame: "photo",
 							pose: 1,
 							caption: `A solve replaces it. The miss falls to ${d?.residual.solved.median ?? "…"} px.`,
 							render: () => (
@@ -1436,6 +1438,7 @@ function HeroJourney() {
 						},
 						{
 							label: "Second check",
+							frame: "photo",
 							pose: 1,
 							caption: `A separate solve runs after the first paint. The two yaws agree within ${agree}°.`,
 							render: () => (
@@ -1450,6 +1453,7 @@ function HeroJourney() {
 						},
 						{
 							label: "Export unlocked",
+							frame: "photo",
 							pose: 1,
 							caption:
 								"Only now can you save the picture. Your own edits always win.",

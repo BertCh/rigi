@@ -1167,12 +1167,14 @@ function HeroStages() {
 				stages={[
 					{
 						label: "Photo",
+						frame: "photo",
 						caption:
 							"The detector starts from the photo alone, before any map data.",
 						render: () => <RealPhoto bleed data={d} layers={[]} crop={crop} />,
 					},
 					{
 						label: "Where is sky?",
+						frame: "photo",
 						caption:
 							"It models the sky's colour gradient and scores every pixel: bright = sky.",
 						render: () => (
@@ -1181,6 +1183,7 @@ function HeroStages() {
 					},
 					{
 						label: "One boundary",
+						frame: "photo",
 						caption:
 							"It finds the single cheapest left-to-right path between sky and land.",
 						render: () => (
@@ -1189,6 +1192,7 @@ function HeroStages() {
 					},
 					{
 						label: "How sure",
+						frame: "photo",
 						caption:
 							"Each column gets a confidence. Taller, brighter ticks are believed more.",
 						render: () => (

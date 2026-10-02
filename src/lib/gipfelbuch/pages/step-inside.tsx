@@ -1278,11 +1278,13 @@ function HeroStages() {
 				stages={[
 					{
 						label: "Photo",
+						frame: "photo",
 						caption: "A solved photo knows where the camera stood.",
 						render: () => <RealPhoto data={d} layers={[]} bleed />,
 					},
 					{
 						label: "How far?",
+						frame: "photo",
 						caption:
 							"Down the centre we ask the terrain model: bright is near, dark is far.",
 						render: () => (
@@ -1293,6 +1295,7 @@ function HeroStages() {
 					},
 					{
 						label: "Near or far?",
+						frame: "photo",
 						caption: (
 							<>
 								Inside 150 m,{" "}

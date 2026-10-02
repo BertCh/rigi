@@ -2,33 +2,30 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { type RefObject, useEffect, useLayoutEffect, useState } from "react";
-import { revealsImmediately } from "./hooks";
+import { type RefObject, useEffect } from "react";
+import { type BeatKind, ease, MOTION } from "./motion";
 
 // Sequence explainers (Compare, Stages, Steps, Details): the timing and the static-state rules, as pure
 // functions where they can be, so they can be specced. Spec: reports/gipfelbuch-explainers-2026-10-02/C-sequences.md.
-// The durations are the grammar's motion tokens (grammar.md §1.1); they move to viz/motion.ts when it lands.
+// Durations and easings are the grammar's motion tokens (viz/motion.ts, grammar.md §1).
 
 /** Pause before the first beat (grammar `MOTION.lead`). */
-export const SEQUENCE_LEAD_MS = 80;
+export const SEQUENCE_LEAD_MS = MOTION.lead;
 /** Dwell of the Compare setup beat (the guess alone): half of `MOTION.beat`. */
-export const COMPARE_SETUP_MS = 1400;
+export const COMPARE_SETUP_MS = MOTION.beat / 2;
 /** The Compare change beat: a programmed scrub from the guess to the split (`MOTION.beat`). */
-export const COMPARE_SCRUB_MS = 2800;
+export const COMPARE_SCRUB_MS = MOTION.beat;
 /**
  * The longest the wipe goes without handing its position to React (story time, side map, spill): one
  * frame at the grammar's 30 fps cap (`MOTION.fps`), so the margins follow smoothly without a React
  * render on every pointer move.
  */
-export const COMPARE_COMMIT_MS = 33;
+export const COMPARE_COMMIT_MS = Math.floor(1000 / MOTION.fps);
 /** A key press moves the wipe by this share of the frame. */
 export const COMPARE_KEY_STEP = 0.05;
 
-/** Grammar `EASE.inOut` (a programmed scrub between two states): cubic in-out, symmetric about 0.5. */
-export function easeInOut(t: number): number {
-	const u = Math.min(1, Math.max(0, t));
-	return u < 0.5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2;
-}
+/** Grammar `EASE.inOut` (a programmed scrub between two states). */
+export const easeInOut = ease.inOut;
 
 /**
  * The Compare intro script `ms` after it started: the setup beat shows the guess alone (x = 1, all
@@ -71,7 +68,7 @@ export function compareSide(x: number): "before" | "after" {
 }
 
 /** Draw-on of one route segment (`.nb-draw` in notebook.css, grammar `MOTION.draw`). */
-export const STEPS_DRAW_MS = 900;
+export const STEPS_DRAW_MS = MOTION.draw;
 /** A station has faded in this long before the pen leaves it. */
 export const STEPS_SEGMENT_LEAD_MS = 150;
 /**
@@ -105,30 +102,11 @@ export function stageFrameKey(stage: { frame?: string }, i: number): string {
 	return stage.frame != null ? `frame:${stage.frame}` : `stage:${i}`;
 }
 
-/**
- * False on the server and first paint; on the client, true unless reduced motion, webdriver automation,
- * print or a missing IntersectionObserver ask for the static frame (grammar `useMotionAllowed`, which
- * replaces this when viz/motion.ts lands).
- */
-export function useSequenceMotion(reduce: boolean): boolean {
-	const [allowed, setAllowed] = useState(false);
-	// before paint, so a client mount steps to its first beat without painting the result frame first
-	useIsomorphicLayoutEffect(() => {
-		setAllowed(!reduce && !revealsImmediately());
-		const off = () => setAllowed(false);
-		const back = () => setAllowed(!reduce && !revealsImmediately());
-		window.addEventListener("beforeprint", off);
-		window.addEventListener("afterprint", back);
-		return () => {
-			window.removeEventListener("beforeprint", off);
-			window.removeEventListener("afterprint", back);
-		};
-	}, [reduce]);
-	return allowed;
+/** A stage's beat kind when the page gives none: the first sets up, the last is the result. */
+export function defaultStageKind(i: number, count: number): BeatKind {
+	if (count > 1 && i === count - 1) return "result";
+	return i === 0 ? "setup" : "evidence";
 }
-
-const useIsomorphicLayoutEffect =
-	typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** Opens a closed `<details>` for printing and closes it again afterwards. */
 export function useOpenForPrint(ref: RefObject<HTMLDetailsElement | null>) {

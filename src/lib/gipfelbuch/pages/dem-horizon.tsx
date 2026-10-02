@@ -1337,11 +1337,13 @@ function HeroStages() {
 				stages={[
 					{
 						label: "Photo",
+						frame: "photo",
 						caption: "A phone photo, and a height map of the same mountains.",
 						render: () => <RealPhoto bleed data={d} layers={[]} crop={crop} />,
 					},
 					{
 						label: "Terrain's horizon",
+						frame: "photo",
 						caption:
 							"We draw the horizon the map predicts. Warm is near, cool is far.",
 						render: () => (
@@ -1352,6 +1354,7 @@ function HeroStages() {
 					},
 					{
 						label: "Against the photo",
+						frame: "photo",
 						caption: (
 							<>
 								<Key color={LAYER_STYLE.solved.color}>map</Key> and{" "}
