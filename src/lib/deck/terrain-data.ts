@@ -21,6 +21,7 @@ import {
 	tileXToLon,
 	tileYToLat,
 } from "../dem";
+import { localMaxOf } from "../geo/peaks";
 import {
 	bearingDeg,
 	DEG,
@@ -93,32 +94,7 @@ export type TerrainStats = {
 /** TerrainSet.locate's result (reused across calls by the caller). */
 export type TileLocation = { tile: TileMesh; px: number; py: number };
 
-/**
- * TerrainSet.localMax over any height lookup: the start point, then a 9 × 9 grid over ±radiusM, in
- * this order (the GPU gathers record and replay these calls, deck-webgpu/height-gather.ts).
- */
-export function localMaxOf(
-	heightAt: (lat: number, lon: number) => number | null,
-	lat: number,
-	lon: number,
-	radiusM = 150,
-) {
-	let best = {
-		lat,
-		lon,
-		h: heightAt(lat, lon) ?? Number.NEGATIVE_INFINITY,
-	};
-	const dLat = radiusM / M_PER_DEG_LAT;
-	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
-	for (let i = -4; i <= 4; i++)
-		for (let j = -4; j <= 4; j++) {
-			const la = lat + (i / 4) * dLat;
-			const lo = lon + (j / 4) * dLon;
-			const h = heightAt(la, lo);
-			if (h != null && h > best.h) best = { lat: la, lon: lo, h };
-		}
-	return best;
-}
+export { localMaxOf };
 
 async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
 	let i = 0;

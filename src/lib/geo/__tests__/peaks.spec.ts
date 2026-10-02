@@ -8,11 +8,13 @@ import { cameraFromAngles } from "../camera";
 import {
 	apparentElevation,
 	layoutPeakLabels,
+	localMaxOf,
 	overpassPeaksQuery,
 	type Peak,
 	type PeakView,
 	parseOsmMetres,
 	parseOverpassPeaks,
+	peakSnapRadiusM,
 	viewPeaks,
 } from "../peaks";
 import type { TerrainSampler } from "../terrain";
@@ -123,6 +125,19 @@ describe("apparentElevation", () => {
 	});
 });
 
+describe("peakSnapRadiusM / localMaxOf", () => {
+	it("grows 60 m + 4 m per km and caps at 250 m", () => {
+		expect(peakSnapRadiusM(0)).toBe(60);
+		expect(peakSnapRadiusM(10_000)).toBe(100);
+		expect(peakSnapRadiusM(47_500)).toBe(250);
+		expect(peakSnapRadiusM(110_000)).toBe(250);
+	});
+	it("keeps the start point on ties and ignores unanswered samples", () => {
+		const r = localMaxOf((la) => (la > 46 ? null : 5), 46, 8, 100);
+		expect(r).toEqual({ lat: 46, lon: 8, h: 5 });
+	});
+});
+
 describe("viewPeaks", () => {
 	const lat = 46;
 	const lon = 8;
@@ -193,6 +208,22 @@ describe("viewPeaks", () => {
 		expect(hidden.visible).toBe(false);
 		const [seen] = viewPeaks([peakAt(0, 8000, 6000)], ridge, lat, lon, 0);
 		expect(seen.visible).toBe(true);
+	});
+	it("snaps the node to the DEM summit within peakSnapRadiusM and aims at the summit", () => {
+		const node = destination(lat, lon, 0, 20_000);
+		const summit = destination(node.lat, node.lon, 90, 100);
+		const cone = {
+			sampleAt: (plon: number, plat: number) =>
+				2000 - distanceBearing(plat, plon, summit.lat, summit.lon).distance,
+		} as unknown as TerrainSampler;
+		const peak: Peak = { id: "n", lat: node.lat, lon: node.lon };
+		const [v] = viewPeaks([peak], cone, lat, lon, 0);
+		const toSummit = distanceBearing(lat, lon, summit.lat, summit.lon);
+		// radius 140 m at 20 km: the 35 m grid's nearest point to the summit is 5 m off it
+		expect(v.height).toBeGreaterThan(1994);
+		expect(v.height).toBeLessThan(2000);
+		expect(Math.abs(v.azimuth - toSummit.bearing)).toBeLessThan(0.02);
+		expect(Math.abs(v.distance - toSummit.distance)).toBeLessThan(10);
 	});
 	it("terrain right at the summit (within the ignore zone) does not hide it", () => {
 		const t = flat((d) => (d > 7900 ? 1500 : 0));

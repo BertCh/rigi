@@ -13,6 +13,7 @@ import {
 	destination,
 	distanceBearing,
 	EARTH_R,
+	M_PER_DEG_LAT,
 	REFRACTION_K,
 } from "../geodesy";
 import type { Height } from "../ontology/core/quantity";
@@ -106,30 +107,49 @@ export function apparentElevation(h: number, eye: number, d: number) {
 	return Math.atan2(h - eye - (d * d) / (2 * rEff), d) / DEG;
 }
 
-/** Max DEM height in a small neighbourhood (OSM nodes are often a bit off the DEM summit). */
-function localMax(
-	terrain: TerrainSampler,
+/**
+ * The summit search radius for a peak `distanceM` from the photo: min(250, 60 + 0.004·d) m. OSM
+ * nodes sit a little off the DEM summit, and farther peaks are drawn from coarser tiles.
+ */
+export const peakSnapRadiusM = (distanceM: number) =>
+	Math.min(250, 60 + distanceM * 0.004);
+
+/**
+ * The DEM summit near an OSM node over any height lookup: the start point, then a 9 × 9 grid over
+ * ±radiusM, highest wins (h = −Infinity when nothing answers). The one snap rule: the app's peaks
+ * (deck/scene.ts snapPeaksNear via TerrainSet.localMax) and viewPeaks below. The calls are made in
+ * this order (the GPU gathers record and replay them, deck-webgpu/height-gather.ts).
+ */
+export function localMaxOf(
+	heightAt: (lat: number, lon: number) => number | null,
 	lat: number,
 	lon: number,
-	distance: number,
-	radius: number,
+	radiusM = 150,
 ) {
-	let best = terrain.sampleAt(lon, lat, distance);
-	for (const r of [radius / 2, radius])
-		for (let az = 0; az < 360; az += 45) {
-			const p = destination(lat, lon, az, r);
-			const h = terrain.sampleAt(p.lon, p.lat, distance);
-			if (Number.isNaN(h)) continue;
-			if (!(h <= best)) best = Number.isNaN(best) ? h : Math.max(best, h);
+	let best = {
+		lat,
+		lon,
+		h: heightAt(lat, lon) ?? Number.NEGATIVE_INFINITY,
+	};
+	const dLat = radiusM / M_PER_DEG_LAT;
+	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
+	for (let i = -4; i <= 4; i++)
+		for (let j = -4; j <= 4; j++) {
+			const la = lat + (i / 4) * dLat;
+			const lo = lon + (j / 4) * dLon;
+			const h = heightAt(la, lo);
+			if (h != null && h > best.h) best = { lat: la, lon: lo, h };
 		}
 	return best;
 }
 
 /**
- * Direction to each peak from the eye. Height = max(DEM local max near the
- * node, OSM ele). visible = no terrain along the ray rises above the peak's
- * elevation angle (minus a small tolerance), ignoring the last few hundred
- * metres around the summit itself.
+ * Direction to each peak from the eye, after snapping it to the DEM summit (localMaxOf within
+ * peakSnapRadiusM, as the app does). Height = max(DEM summit, OSM ele). visible = no terrain along
+ * the ray rises above the peak's elevation angle (minus a small tolerance), ignoring the last few
+ * hundred metres around the summit itself. This is the baseline's ray-march test (/baseline,
+ * Gipfelbuch bakes); the app tests visibility against its rendered range buffer instead
+ * (deck/geo-query.ts).
  */
 export function viewPeaks(
 	peaks: Peak[],
@@ -143,13 +163,21 @@ export function viewPeaks(
 	const tol = opts.toleranceDeg ?? 0.05;
 	const out: PeakView[] = [];
 	for (const peak of peaks) {
-		const { distance, bearing } = distanceBearing(lat, lon, peak.lat, peak.lon);
-		if (distance > maxDistance || distance < 50) continue;
-		const dem = localMax(terrain, peak.lat, peak.lon, distance, 60);
-		const height = Math.max(
-			Number.isNaN(dem) ? Number.NEGATIVE_INFINITY : dem,
-			peak.ele ?? Number.NEGATIVE_INFINITY,
+		const node = distanceBearing(lat, lon, peak.lat, peak.lon);
+		const snap = localMaxOf(
+			(la, lo) => {
+				const h = terrain.sampleAt(lo, la, node.distance);
+				return Number.isNaN(h) ? null : h;
+			},
+			peak.lat,
+			peak.lon,
+			peakSnapRadiusM(node.distance),
 		);
+		const { distance, bearing } = Number.isFinite(snap.h)
+			? distanceBearing(lat, lon, snap.lat, snap.lon)
+			: node;
+		if (distance > maxDistance || distance < 50) continue;
+		const height = Math.max(snap.h, peak.ele ?? Number.NEGATIVE_INFINITY);
 		if (!Number.isFinite(height)) continue;
 		const elevation = apparentElevation(height, eye, distance);
 		const stopAt = distance - Math.max(150, distance * 0.02);
