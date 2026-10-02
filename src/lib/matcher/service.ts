@@ -34,10 +34,11 @@ import { matchAdhocT6 } from "./t6";
 export { bindMatcherEngine, type MatcherEngine } from "./binding";
 
 type FeatureLoader = () => Promise<FeatureBackend | null>;
-let loader: FeatureLoader = async () => null;
+let loader: FeatureLoader = async () =>
+	(await import("./features")).loadFeatureBackend();
 let features: Promise<FeatureBackend | null> | null = null;
 
-/** The keypoint backend (src/lib/features); registered by ./features.ts, injectable in tests. */
+/** The keypoint backend (default ./features.ts over src/lib/features); injectable in tests. */
 export function setFeatureLoader(l: FeatureLoader) {
 	loader = l;
 	features = null;
