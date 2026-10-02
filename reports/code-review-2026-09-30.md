@@ -6,7 +6,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 
 *Update (2026-10-01): rows re-checked against `git log` after the three.js `PhotoEngine` was removed (583e2b7). Rows that pointed at `src/lib/engine.ts` (three.js) are marked obsolete; the CR-54–CR-68 fixes are cited by commit. CR-69's `relief-graph.ts` is `src/lib/gpu/look/relief-graph.ts`.*
 
-**Summary (2026-10-02):** 75 rows: 53 fixed, 3 partly fixed (CR-12, CR-26, CR-52), 3 obsolete, 16 open. Open rows need a browser/GPU (CR-13, 14, 40, 41, 45, 46, 67, W1, W2), a user decision (CR-48, W4), a resize check (CR-W6) or belong to `src/lib/gpu/**` (CR-27, 37, 39, 69).
+**Summary (2026-10-02):** 75 rows: 55 fixed, 2 partly fixed (CR-12, CR-26), 3 obsolete, 15 open. Open rows need a browser/GPU (CR-13, 14, 40, 41, 45, 46, 67, W1, W2), a user decision (CR-48, W4) or belong to `src/lib/gpu/**` (CR-27, 37, 39, 69).
 
 ## Fix first
 
@@ -42,7 +42,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 | CR-23 | `cache/tile-cache.ts:151-157, 325-336` | Each tab overwrites the shared index; orphaned bodies are never evicted, so the store grows past its 300 MB cap | fixed 78ff061 (non-owner tabs read-only; multi-tab case untested) |
 | CR-24 | `engine.ts:1473-1491, 2351-2371` | Frustum gizmo isn't hidden in the normal/silhouette passes → stale ink creases after a world-mode visit (three.js) | obsolete: three.js `engine.ts` removed (583e2b7) |
 | CR-25 | `scripts/ci/run.mjs:97, 252-309` | Ctrl-C leaves detached checks running (and holding the render lock); concurrent `full` runs share :3130 and one kills the other's server | fixed 9388eef |
-| CR-26 | `roll/roll.ts:8`, `vite.config.ts:17-27`; repo | A fresh clone can't build: gitignored `data/ground-truth.json` and `public/photos/photos.json` are imported. No `requirements*.txt` for the Python services | requirements half fixed c7d5c94 (`tools/matcher/requirements.txt`, `tools/nearfield/requirements.txt`); stub data is a user decision |
+| CR-26 | `roll/roll.ts:8`, `vite.config.ts:17-27`; repo | A fresh clone can't build: gitignored `data/ground-truth.json` and `public/photos/photos.json` are imported. No `requirements*.txt` for the Python services | requirements half fixed c7d5c94 (`tools/matcher/requirements.txt`, `tools/nearfield/requirements.txt`; re-verified present 2026-10-02); stub data is a user decision |
 | CR-27 | `gpu/look/hooks.ts:93` | `warmKernelsAsync(device)` without a group compiles every kernel, including subgroup kernels on devices without `subgroups` | open |
 
 ## Low
@@ -73,7 +73,7 @@ Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 o
 | CR-49 | `linalg/index.ts:131-144` | `invSym` reports σ = 0 for unobservable parameters (fails open in integrity) | fixed f56d391 (`invSymCov`: Infinity variance; integrity fails closed) |
 | CR-50 | `pose6dof/solve.ts:588-592` | RANSAC adaptive stop uses an inlier ratio over all correspondence kinds → may stop early (read, not reproduced) | fixed 627d3dd |
 | CR-51 | `concord/app/confidence.ts:18-19` | `{level:"high"}` with no `accepted`/`confidence` isn't LOW, and the test passes `{}` instead | fixed a584a62 |
-| CR-52 | `with-render-lock.mjs:28-76`, `tm_locks.py:19-26`, `run.mjs:460-466` | PID reuse; ownerless lock never cleared; memory wait holds the lock indefinitely; `--update-baseline` after a FAIL lowers the gate | partly fixed 46a1821 (pid + start time; no `--update-baseline` after a FAIL); ownerless locks and the memory wait still open |
+| CR-52 | `with-render-lock.mjs:28-76`, `tm_locks.py:19-26`, `run.mjs:460-466` | PID reuse; ownerless lock never cleared; memory wait holds the lock indefinitely; `--update-baseline` after a FAIL lowers the gate | fixed 46a1821 (pid + start time; no `--update-baseline` after a FAIL) + 0e5f0d0 (ownerless locks reclaimed after a 10 s grace; memory wait bounded by `RENDER_LOCK_MEM_WAIT_S`, default 600 s, then starts with a warning; both in `with-render-lock.check.ts`) |
 | CR-53 | `roll/panoGL.ts:150-160`; `upload.tsx` ~:142-200; `roll/import/index.ts:85-88` | Unclosed bitmap; racing pin-click saves; every file hashed twice | fixed fec0515 (panoGL) + 32c8b66 (one hash per imported file) |
 
 Nits not tracked here: unwrapped yaw out of `align.ts`, per-frame allocations in `renderWorld`/`haze-fit.ts:226`, clockwise wedge rings in `roll/export.ts:44-54`, "Summit Lens" in `upload.tsx:45`, `atm-sky.ts:327` `#rgba` parsing, stale code comments (`gpu/solve/index.ts:14`, `deck/batched-terrain-layer.ts` header says opt-in), `biome.json` schema 2.2.4 vs 2.4.5, `run.mjs --jobs abc`.
@@ -87,7 +87,7 @@ Nits not tracked here: unwrapped yaw out of `align.ts`, per-frame allocations in
 | CR-W3 | `public/demo/manifest.json` | 3 MB (2.98 MB trails) fetched by `/` for ~11 KB of data → split the region out | fixed 4616e41 (manifest 236 KB; trails split out) |
 | CR-W4 | `public/demo/` | 11 MB of photos plus exact GPS and timestamps, the first committed photo set: decide deliberately | open |
 | CR-W5 | `routes/dev.export-roll.tsx:27-33,72` | Ships in prod; effect runs before the DEV guard; object URL not revoked | fixed 46a1821 (guard before hooks, URL revoked) |
-| CR-W6 | `site/TopoBoard.tsx:71-86`, `site/Compare.tsx:30-38`, `scripts/demo/unpack.mjs:103` | Dragged cards reset on mobile resize; no `onPointerCancel`; `--keep-prior` crashes on a null pose | open |
+| CR-W6 | `site/TopoBoard.tsx:71-86`, `site/Compare.tsx:30-38`, `scripts/demo/unpack.mjs:103` | Dragged cards reset on mobile resize; no `onPointerCancel`; `--keep-prior` crashes on a null pose | fixed 0e5f0d0 (dragged positions kept normalised across resize; TopoBoard cancel ends the drag without navigating; `poseEntry` guards null poses; `Compare` already had `onPointerCancel` since 298c7cd). Browser-unverified |
 
 Suggested commit split for that work: dev launcher; three.js near-eye cut; RollCard; roll-map options; demo plumbing; landing + library; peakfix (separately, after lint).
 
