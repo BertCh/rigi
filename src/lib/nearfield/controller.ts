@@ -339,6 +339,10 @@ export class NearFieldController {
 					peopleMask: this.host.foregroundMask ?? null,
 					split: STEP_SPLIT,
 					demGrid,
+					// opt-in cliff-lip anchoring (cliff-lip.ts), off by default
+					...(getFlag("anchorCliff") === "on"
+						? { anchor: { cliffLip: true } }
+						: {}),
 				}) as MeasurableScene;
 				const ctx = {
 					pose: { ...this.host.pose },

@@ -173,6 +173,8 @@ export const FLAG_SCHEMA = {
 	tiles3dObjects: onOff("off"),
 	// Step Inside near field (auto: probe the service, never under automation)
 	nearfield: oneOf(["auto", "on", "sharp", "off"], "auto"),
+	/** Step Inside anchor: exclude cliff-lip DEM range discontinuities from the fit (nearfield/cliff-lip.ts). */
+	anchorCliff: onOff("off"),
 	cammodes: onOff("off"),
 	// alignment aids
 	picker: oneOf(["off", "on", "always"], "off"),
@@ -421,6 +423,7 @@ export const RESTART_FLAGS: readonly FlagName[] = [
 	"tiles3dDebug",
 	"tiles3dObjects",
 	"nearfield",
+	"anchorCliff",
 	"concord",
 	"imagery",
 	"geoDecl",

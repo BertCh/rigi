@@ -19,14 +19,17 @@
 //
 // "scale" / "affine" (legacy): the densest window of width 2·band in sorted log ratios seeds a scale, refined as the
 // median over the inlier band; affine refines dem ≈ a·model + b by relative-error weighted least squares.
+import { type CliffLipOpts, detectCliffLip, maskCliffRange } from "./cliff-lip";
 import {
 	type DemRangeAt,
+	gridDemRange,
 	type IntrinsicsNorm,
 	type MaskLike,
 	maskSampler,
 	median,
 	modelDepth,
 	rayFactor,
+	sampleDemGrid,
 } from "./geom";
 import type { AnchorFit, NearFieldDepth } from "./types";
 
@@ -55,6 +58,12 @@ export type AnchorOpts = {
 	stride?: number;
 	skyMask?: MaskLike | null;
 	peopleMask?: MaskLike | null;
+	/**
+	 * Cliff-lip rule (cliff-lip.ts): exclude DEM-range discontinuities and the lip face from the fit instead of
+	 * letting them sink the quality. Off unless set (the `anchorCliff` flag sets it in controller.ts); a photo with no
+	 * lip configuration gives the identical fit.
+	 */
+	cliffLip?: boolean | Partial<CliffLipOpts>;
 	/** Fewer candidates than this → no fit: quality 0, scale 1. Default ANCHOR_QUALITY_CONSTS.nMin. */
 	minSamples?: number;
 };
@@ -179,6 +188,17 @@ export function fitAnchor(
 	const mode = opts.mode ?? "curve";
 	const minSamples = opts.minSamples ?? ANCHOR_QUALITY_CONSTS.nMin;
 	const { width: W, height: H } = depth;
+	if (opts.cliffLip) {
+		const grid = sampleDemGrid(W, H, demRangeAt);
+		const cliff = detectCliffLip(
+			grid,
+			W,
+			H,
+			opts.cliffLip === true ? {} : opts.cliffLip,
+		);
+		if (cliff.detected)
+			demRangeAt = maskCliffRange(gridDemRange(grid, W, H), cliff, W, H);
+	}
 	const stride =
 		opts.stride ?? Math.max(1, Math.ceil(Math.sqrt((W * H) / 40_000)));
 	const sky = maskSampler(opts.skyMask);
