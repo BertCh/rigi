@@ -739,6 +739,34 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"texture-input look passes; core cachedGraph group look-tex (6 per device; graphs own their constant buffers, ComputeGraph.own; compileAsync before run, a sync encode of an uncompiled graph starts compileAsync and falls back for that frame). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)",
 	},
 	{
+		id: "photo-palette",
+		island: "I12",
+		paths: ["src/lib/gpu/palette/palette.ts"],
+		groups: ["palette"],
+		realms: ["page"],
+		cadence: "per photo",
+		resources: ["64 x 64 RGBA8 thumbnail words (pooled)"],
+		readbacks: ["k centroids + counts (the palette)"],
+		status: "default",
+		notes:
+			"photo look: unpack kernel (RGBA8 to OKLab rows) + luma GPUKMeans in one graph; CPU twin kMeansCpu",
+	},
+	{
+		id: "roll-look",
+		island: "I12",
+		paths: ["src/lib/gpu/palette/look-search.ts"],
+		groups: ["roll-look", "roll-look-similar"],
+		realms: ["page"],
+		cadence: "per view",
+		resources: ["look embeddings, LOOK_DIMS floats per photo (pooled)"],
+		readbacks: [
+			"labels + centroids + per-group ranked ids; similar-look top-k",
+		],
+		status: "default",
+		notes:
+			"group-by-look: luma GPUKMeans + GPUSimilaritySearch (centroids as queries) in one graph; similarLooks is a cosine GPUSimilaritySearch",
+	},
+	{
 		id: "labels",
 		island: "I10",
 		paths: ["src/lib/look/labels"],
