@@ -15,7 +15,6 @@ import {
 	tileId,
 	validateTile,
 } from "#/lib/dem";
-import { setFlagOverride } from "#/lib/flags";
 import { applyRealmGpuOptions, takeGpuProfile } from "#/lib/gpu/core/realm";
 import { getComputeDevice } from "#/lib/gpu/device";
 import {
@@ -93,7 +92,7 @@ let built: Promise<{ mosaics: Mosaic[]; mosaicMs: number }> | null = null;
  * tiles decode) so adapter/device creation and the kernel compile overlap the tile work. null = CPU.
  */
 let gpu: ReturnType<typeof getComputeDevice> | null = null;
-/** The tan → degrees and ENU stages' precision (page flag horizonPrecision; certified-f32 needs the GPU march). */
+/** The tan → degrees and ENU stages' precision (horizonPrecisionOptIn: certified-f32 needs the GPU march). */
 let precision: HorizonPrecision = "f64";
 
 /** The profile on the GPU (src/lib/gpu/horizon, parity-checked against this CPU march), else the CPU. */
@@ -117,7 +116,7 @@ async function marchProfile(
 				...opts,
 				precision,
 			});
-			// gpuHorizon is on by default, so this per-march log is dev-only
+			// per-march log is dev-only
 			if (import.meta.env?.DEV)
 				console.info(
 					`[horizon worker] marched on the GPU (${prof.stats.ms.toFixed(0)} ms)`,
@@ -206,7 +205,7 @@ async function march(
 }
 
 let spans: SectorSpan[] = [];
-/** CPU max-mips are skipped when the GPU march builds them (?mosaicGpu); a CPU march still builds them lazily. */
+/** CPU max-mips are skipped when the GPU march builds them ; a CPU march still builds them lazily. */
 let cpuMips = true;
 const sent = new Set<number>();
 const send = (res: Extract<HorizonWorkerOut, { type: "dirs" }>) => {
@@ -219,15 +218,10 @@ scope.onmessage = async (e: MessageEvent<HorizonWorkerIn>) => {
 	try {
 		if (m.type === "spans") {
 			spans = m.spans;
-			cpuMips = !(m.gpu && m.mosaicGpu);
+			cpuMips = !m.gpu;
 			precision = m.precision ?? "f64";
 			mergeSpotLedger(m.spotLedger);
 			applyRealmGpuOptions(m.gpuOpts);
-			// the explicit protocol field wins over the forwarded page flag (applied after it)
-			setFlagOverride(
-				"mosaicGpu",
-				m.mosaicGpu === false ? "off" : m.gpuOpts?.flags?.mosaicGpu,
-			);
 			if (m.gpu && !gpu) {
 				gpu = getComputeDevice().then((d) => {
 					if (d) warmHorizonGpu(d);

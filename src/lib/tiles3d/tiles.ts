@@ -108,8 +108,7 @@ export class Tiles3DSet {
 		this.uniforms = { ...makeTileSharedUniforms(), ...uniforms };
 		this.uniforms.uEye.value.copy(at.eye);
 		this.uniforms.uFade.value.set(config.fadeStart, config.radius);
-		// ?tiles3dGeoid=<m>: override N (datum debugging)
-		this.geoidN = getFlag("tiles3dGeoid") ?? geoidUndulation(at.lat, at.lon);
+		this.geoidN = geoidUndulation(at.lat, at.lon);
 		this.at = { lat: at.lat, lon: at.lon, eye: at.eye.clone() };
 		this.group.name = "tiles3d";
 		this.group.layers.set(TILES3D_LAYER);

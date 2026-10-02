@@ -2,29 +2,19 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Switch for the app's GPU skyline march (horizon-fast-app worker). ON by default since 2026-09-28
-// where WebGPU exists: the profile matches the CPU to ~1e-4° (p99) at 5–100× the speed. It is not bit
-// for bit, so autoAlign can move by last-bit amounts (IMG_6958: 0.01°); the user accepted that drift.
-//
-// Off with ?gpuHorizon=off (src/lib/flags) or the global kill switch ?gpu=off (../device.ts). Without
-// WebGPU the CPU march runs as before.
-import { getFlag } from "#/lib/flags";
+// The app's GPU skyline march (horizon-fast-app worker) runs wherever WebGPU exists: the profile matches
+// the CPU to ~1e-4° (p99) at 5–100× the speed. It is not bit for bit, so autoAlign can move by last-bit
+// amounts (IMG_6958: 0.01°); the user accepted that drift. ?gpu=off (../device.ts) keeps the CPU march.
 import { gpuEnabled } from "../device";
 import type { HorizonPrecision } from "./certified-cpu";
 
-export function gpuHorizonOptIn(): boolean {
-	return getFlag("gpuHorizon") === "on" && gpuEnabled();
-}
-
 /**
  * Precision of the worker's tan → degrees and ENU stages (README.md "Certified f32"): the certified GPU
- * stages (?horizonPrecision=certified-f32, the default since 2026-10-01) while the GPU march is on, else
- * "f64" (?horizonPrecision=f64, the CPU). Wherever its certificate holds, a certified output has the f64 stage's
- * bits; uncertified outputs are recomputed in f64, and the soundness is checked by the node check and random
- * spot checks (README "Certified f32"). This is about the post stages only: the march itself is not bit for bit.
+ * stages while the GPU march is on, else "f64" (the CPU). Wherever its certificate holds, a certified
+ * output has the f64 stage's bits; uncertified outputs are recomputed in f64, and the soundness is checked
+ * by the node check and random spot checks (README "Certified f32"). This is about the post stages only:
+ * the march itself is not bit for bit.
  */
 export function horizonPrecisionOptIn(): HorizonPrecision {
-	return getFlag("horizonPrecision") === "certified-f32" && gpuHorizonOptIn()
-		? "certified-f32"
-		: "f64";
+	return gpuEnabled() ? "certified-f32" : "f64";
 }

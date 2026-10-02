@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Certified-f32 refine (WAG W3.3, precision policy P1 "certified f32"; the default since 2026-10-01,
-// ?alignPrecision=f64 for the CPU loop).
+// the `alignPrecision: "f64"` option for the CPU loop).
 //
 // autoAlign's coordinate descent (align.ts Descent) as a GPU-driven loop: every hypothesis is a LANE
 // whose descent state lives on the GPU; one submit encodes a fixed number of rounds, each

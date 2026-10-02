@@ -5,10 +5,10 @@
 // The band-stats dispatch of color-stats.ts bandStatsGpu as core ComputeGraphs: its only GPU path (the
 // pooled single dispatch it replaced, bit for bit, was removed on 2026-10-01). Two graphs:
 //
-//   default (?statsFold=gpu): a GPUProgram lowered onto one ComputeGraph (color-stats-fold.ts)
+//   default (fold "gpu"): a GPUProgram lowered onto one ComputeGraph (color-stats-fold.ts)
 //     BAND_STATS(_SG) → partial (program vector) → GPUProgramSpMV fold → BAND_FINALIZE → stats → read node
 //     only the ColorStats (STATS_WORDS f32, 256 B) comes back; the fold and finalizeBands run in f32.
-//   ?statsFold=f64: BAND_STATS(_SG) (one node, GROUPS workgroups) → partial (transient) → read node
+//   fold "f64": BAND_STATS(_SG) (one node, GROUPS workgroups) → partial (transient) → read node
 //     the per-workgroup partials (GROUPS × 52 f32) come back and bandStatsGpu folds them in float64, in
 //     the same order, then finalizeBands.
 //
@@ -68,7 +68,7 @@ function addStatsNode(
 	});
 }
 
-/** Build the one-node graph (imports sized as pooled): the partials, read back (?statsFold=f64). */
+/** Build the one-node graph (imports sized as pooled): the partials, read back (fold "f64"). */
 export function buildStatsGraph(
 	g: ComputeGraph<Params>,
 	bytes: Record<(typeof IMPORTS)[number] | "prm", number>,
@@ -110,7 +110,7 @@ export const lastStatsGraphRun: {
 	lowering?: GPUProgramLoweringReport;
 } = {};
 
-/** One BAND_STATS(_SG) run: the GROUPS × STATS_VALUES per-workgroup partials (?statsFold=f64). */
+/** One BAND_STATS(_SG) run: the GROUPS × STATS_VALUES per-workgroup partials (fold "f64"). */
 export async function bandPartialsGraph(
 	device: Device,
 	o: BandStatsInput,

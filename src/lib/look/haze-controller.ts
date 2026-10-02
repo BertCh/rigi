@@ -53,7 +53,7 @@ export class HazeController {
 	private key = "";
 	/** The fg mask the cached fit used: a mask landing later must refit. */
 	private fgRef: SkyMask | null = null;
-	/** Opt-in GPU path (gpu/look, ?lookgpu=1): update returns false and this fires when the fit lands. */
+	/** Opt-in GPU path (gpu/look, the GPU look): update returns false and this fires when the fit lands. */
 	onAsync?: (fit: HazeFit | null) => void;
 	private seq = 0;
 	private photo?: {
@@ -128,7 +128,7 @@ export class HazeController {
 				? { kind: "xyzr", data }
 				: { kind: "range", data, ray: (x, y) => geo.ray(x * STEP, y * STEP) };
 		const seq = ++this.seq;
-		// lookgpu off: neither the bridge nor the GPU readback runs; the CPU fit below does
+		// GPU off: neither the bridge nor the GPU readback runs; the CPU fit below does
 		const bridged = lookGpuOn() ? o.bridged : undefined;
 		if (lookGpuOn()) {
 			const img = o.img;

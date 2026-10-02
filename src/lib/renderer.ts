@@ -6,8 +6,7 @@
 // (src/lib/export/**) use, so the deck.gl WebGpuEngine (src/lib/deck-webgpu/engine.ts, the default
 // where WebGPU is available) and the WebGL DeckEngine (src/lib/deck/engine.ts, the fallback and
 // ?renderer=deck) are interchangeable behind `?renderer=` (src/lib/renderer-select.ts). WebGpuEngine
-// reports kind 'deck' with backend 'webgpu'. (The three.js PhotoEngine, src/lib/engine.ts, was removed
-// on 2026-10-01; ?renderer=three now falls back to the default with a console warning.)
+// reports backend 'webgpu'.
 //
 // Exactly the members those callers use (grepped 2026-09-25), typed with the existing types; the
 // engines satisfy it structurally (checked in renderer.check.ts). Tools that poke engine internals
@@ -35,9 +34,6 @@ export type { PeakLabel, Sample, Settings };
 export type FgMask = ByteMask;
 
 export interface Renderer {
-	/** 'deck' for both engines (WebGpuEngine adds backend 'webgpu'). */
-	readonly kind: "deck";
-
 	// ---- identity & camera (PW, export) ----
 	readonly photo: PhotoMeta;
 	readonly aspect: number;
@@ -154,21 +150,14 @@ export interface Renderer {
 	exportImage(withLabels?: boolean): Promise<Blob | null>;
 
 	// ---- offscreen pose renders (tools/matcher/server/render_worker.mjs, not the workspace) ----
-	// Both engines implement them (renderer.check.ts); optional so other Renderer shapes need not.
+	// Both engines implement them (renderer.check.ts).
 	/**
 	 * The terrain all around the eye: 360° high-detail streaming (kept), the CPU queries on the complete
 	 * set, the horizon re-traced over 360°. Resolves with the ms it took (0 when already done).
 	 */
-	loadFullTerrain?(timeoutMs?: number): Promise<number>;
-	/**
-	 * Re-traces the horizon autoAlign reads under the current flags (?horizonPrecision, read live from
-	 * `__RIGI_FLAGS__`), as init traced it: horizon-fast over the initial wedge, or, after loadFullTerrain,
-	 * the CPU horizon over the 360° set. For gates that compare precision modes on one page and terrain.
-	 * Resolves with the source that produced it.
-	 */
-	retraceHorizon?(): Promise<"fast" | "cpu" | null>;
+	loadFullTerrain(timeoutMs?: number): Promise<number>;
 	/** Satellite imagery for the render set's tiles within `maxDistM` of the eye (0 = all), fetched now. */
-	loadSatellite?(
+	loadSatellite(
 		maxDistM?: number,
 		retries?: number,
 	): Promise<{ tiles: number; missing: number; retries: number }>;
@@ -178,7 +167,7 @@ export interface Renderer {
 	 * the terrain colour pass alone in the Blend-satellite look over sky #b9cde0. The engine's pose and
 	 * the on-screen view are unchanged.
 	 */
-	renderPoseView?(
+	renderPoseView(
 		pose: Pose,
 		opts?: { width?: number; height?: number },
 	): Promise<PoseView | null>;

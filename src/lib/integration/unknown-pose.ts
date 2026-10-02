@@ -21,7 +21,6 @@ import {
 	realmGpuOptions,
 } from "#/lib/gpu/core/realm";
 import { gpuEnabled } from "#/lib/gpu/device";
-import { unknownGpuOptIn } from "#/lib/gpu/horizon/unknown-opt-in";
 import {
 	type MatchRequest,
 	type MatchResult,
@@ -57,7 +56,7 @@ export type UnknownPosePrepare = {
 	lat: number;
 	lon: number;
 	alt: number | null;
-	/** 360° horizon on the GPU (unknownGpuOptIn, default on); the CPU sceneHorizon otherwise and on failure */
+	/** 360° horizon on the GPU (gpuEnabled); the CPU sceneHorizon otherwise and on failure */
 	gpu?: boolean;
 	/** solvePose's coarse grid on the GPU (src/lib/gpu/solve; identical by construction): gpuEnabled() */
 	solveGpu?: boolean;
@@ -148,8 +147,8 @@ export class UnknownPoseSolver {
 		number,
 		{ resolve: (r: UnknownPoseResult) => void; reject: (e: Error) => void }
 	>();
-	/** GPU 360° horizon (?unknownGpu, default on; off under ?gpu=off) */
-	private gpu = unknownGpuOptIn();
+	/** GPU 360° horizon (on; off under ?gpu=off) */
+	private gpu = gpuEnabled();
 	/** GPU coarse grid: on wherever WebGPU is (off under ?gpu=off); the result is the CPU's by construction */
 	private solveGpu = gpuEnabled();
 

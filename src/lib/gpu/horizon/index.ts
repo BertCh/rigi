@@ -44,14 +44,13 @@
  * horizonElevations); the elevations are bit-identical to the default "f64" either way.
  *
  * App wiring (on by default since 2026-09-28, not opt-in): the horizon-fast-app worker marches on the GPU
- * wherever WebGPU exists (off with ?gpuHorizon=off or ?gpu=off; see opt-in.ts). autoAlign reacts to
+ * wherever WebGPU exists (off with ?gpu=off). autoAlign reacts to
  * last-bit changes in the skyline (IMG_6958's pose moves by ~0.01° yaw / 0.07° roll); that drift was
  * accepted when the default flipped. The eye search (../eye) and the page's eye suggestion use it
- * whenever getComputeDevice() gives a device. The unknown-pose 360° horizon (scene-profile.ts) has its
- * own switch (?unknownGpu, on by default since 2026-10-01; unknown-opt-in.ts).
+ * whenever getComputeDevice() gives a device. The unknown-pose 360° horizon (scene-profile.ts) runs
+ * on the GPU under the same switch.
  */
 import { Buffer, type Device } from "@luma.gl/core";
-import { getFlag } from "#/lib/flags";
 import { DEG, EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 import {
 	defineKernel,
@@ -69,7 +68,7 @@ import {
 	marchSegments,
 	peakVisibilityFast,
 } from "#/lib/horizon-fast/march";
-import { buildMips, type Mosaic } from "#/lib/horizon-fast/mosaic";
+import type { Mosaic } from "#/lib/horizon-fast/mosaic";
 import { getComputeDevice } from "../device";
 import {
 	type CertStats,
@@ -141,10 +140,8 @@ export async function uploadMosaics(
 		device.limits.maxBufferSize,
 	);
 	// Greedy page packing, whole rings (data then its mip levels) per page.
-	// mosaicGpu: a mosaic without CPU mips gets its pyramid built on the GPU inside its page
-	const gpuMips = getFlag("mosaicGpu") === "on";
+	// a mosaic without CPU mips gets its pyramid built on the GPU inside its page
 	const shapes = mosaics.map((m) => {
-		if (!m.mip && !gpuMips) m.mip = buildMips(m);
 		const shape = m.mip ?? mipDims(m.width, m.height);
 		if (shape.widths.length > MAX_MIPS) throw new Error("too many mip levels");
 		return shape;

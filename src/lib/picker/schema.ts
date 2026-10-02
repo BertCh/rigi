@@ -82,8 +82,7 @@ export type LoggedTap = {
 export type PickerLogEntry = PickerEvent & {
 	t: string;
 	photoId: string;
-	/** "three": entries logged before the three.js renderer was removed (2026-10-01). */
-	renderer: "three" | "deck" | "webgpu";
+	renderer: "deck" | "webgpu";
 	/** app state when the event happened */
 	alignState: AlignState | null;
 	verify: Verify;
@@ -125,12 +124,7 @@ export function isPickerLogEntry(x: unknown): x is PickerLogEntry {
 	if (!isObj(x)) return false;
 	if (typeof x.t !== "string" || typeof x.photoId !== "string") return false;
 	if (typeof x.session !== "string") return false;
-	if (
-		x.renderer !== "three" &&
-		x.renderer !== "deck" &&
-		x.renderer !== "webgpu"
-	)
-		return false;
+	if (x.renderer !== "deck" && x.renderer !== "webgpu") return false;
 	switch (x.kind) {
 		case "shown":
 			return (
@@ -176,8 +170,7 @@ export function parsePickerLog(raw: unknown): {
 	let list: unknown[] = [];
 	if (Array.isArray(raw)) list = raw;
 	else if (isObj(raw) && Array.isArray(raw.events)) {
-		const v = raw.version;
-		if (v === undefined || v === PICKER_LOG_VERSION) list = raw.events;
+		if (raw.version === PICKER_LOG_VERSION) list = raw.events;
 		else return { entries: [], dropped: raw.events.length };
 	}
 	const entries = list.filter(isPickerLogEntry);

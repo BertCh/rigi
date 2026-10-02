@@ -150,7 +150,7 @@ export class CompositeLook {
 	private maskIn: unknown[] = [];
 	private statsKey = "";
 	private noiseImg?: HTMLImageElement;
-	/** Opt-in GPU path (gpu/look, ?lookgpu=1): masks / stats land later and this fires (re-upload). */
+	/** Opt-in GPU path (gpu/look, the GPU look): masks / stats land later and this fires (re-upload). */
 	onAsync?: () => void;
 	private maskSeq = 0;
 	private statsSeq = 0;

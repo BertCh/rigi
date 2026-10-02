@@ -327,7 +327,6 @@ export type DeckEngineCounters = {
 };
 
 export class DeckEngine implements Renderer {
-	readonly kind = "deck" as const;
 	readonly photo: PhotoMeta;
 	readonly aspect: number;
 	readonly prior: Pose;

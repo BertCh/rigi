@@ -66,7 +66,7 @@ A cold call, which includes the pipeline compile on the first photo, takes 6–1
    - The sync `solvePose` stays as it is: CPU, and the reference.
 2. **`src/lib/geo/pipeline.ts`**: add `cascadeAsync`, which is `cascade` with `await solvePoseAsync(…, solveCoarse)`. refinePose stays on the CPU. Its FFT correlation (`refine/init.ts`) is already cheap and is not a grid.
 3. **`src/lib/integration/unknown-pose.worker.ts`** (integration owner):
-   - Use `cascadeAsync` when the request opts in. Reuse `req.gpu` / `unknownGpuOptIn`, so `?gpu=off` disables it through `getComputeDevice()`.
+   - Use `cascadeAsync` when the request opts in. Reuse `req.gpu` / `gpuEnabled`, so `?gpu=off` disables it through `getComputeDevice()`.
    - Call `warmSolveGpu(device)` on the `prepare` message, next to the horizon.
    - The three focal seeds run one after another. Each saves 1.7–4.8 s on "none", so a no-heading / no-gravity / unknown-focal upload goes from about 5–15 s of solve to well under 100 ms of grid.
    - `/roll` batch align goes through the same worker path.
@@ -90,7 +90,7 @@ Evidence (`scripts/gpu/solve-bench.mjs`, before the removal): on 5 photos × 4 c
 
 ## Fused horizon → solve chain (`fused.ts`, 2026-10-01)
 
-With the GPU 360° horizon (`?unknownGpu`, default on since 2026-10-01) and the GPU coarse grid on its graph, the worker runs (default; `gpuFused: false` opts out) `fusedSceneHorizon`: the march on its command graph (`horizon/graph.ts`), the CPU's tan → degrees conversion as before, then the solve's resident `hz` buffer written with exactly `packCoarse`'s bits (`profileHz`, `primeResidentHz`). Every coarse graph run of the photo then binds that buffer: the first one no longer uploads (`stats.hzUploaded` false). `prepare` also compiles the fold kernel (`warmFusedSolve`).
+With the GPU 360° horizon (the GPU 360° horizon, default on since 2026-10-01) and the GPU coarse grid on its graph, the worker runs (default; `gpuFused: false` opts out) `fusedSceneHorizon`: the march on its command graph (`horizon/graph.ts`), the CPU's tan → degrees conversion as before, then the solve's resident `hz` buffer written with exactly `packCoarse`'s bits (`profileHz`, `primeResidentHz`). Every coarse graph run of the photo then binds that buffer: the first one no longer uploads (`stats.hzUploaded` false). `prepare` also compiles the fold kernel (`warmFusedSolve`).
 
 What stays unfused, and why:
 - **The horizon readback.** The CPU needs the profile anyway: the LM fine stage, refinePose, the exact re-scores and the certified ε (max |hz|, steepest step) all read `horizon.elevation`.

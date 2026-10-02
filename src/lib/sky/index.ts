@@ -14,7 +14,6 @@
  * unavailable, a classical colour/texture + Viterbi segmenter is used, so the
  * call always resolves with a mask.
  */
-import { getFlag } from "#/lib/flags";
 import { gpuEnabled } from "#/lib/gpu/device";
 import {
 	classicalSky,
@@ -63,7 +62,7 @@ export interface SegmentSkyOptions {
 	/** Skip the model and use the classical segmenter. */
 	forceFallback?: boolean;
 	/**
-	 * Prepare the model input on the GPU (default: ?skyGpuPrep, on): the working-size photo goes to the
+	 * Prepare the model input on the GPU (default on): the working-size photo goes to the
 	 * worker as an ImageBitmap (no getImageData once the device is verified) and the resample and
 	 * normalise run in WGSL, bit-identical to the CPU chain (gpu/sky/prep.ts, sky/prep.ts). Needs the
 	 * GPU path (gpuEnabled()) and ORT on WebGPU; otherwise, or on any failure, the CPU prep runs.
@@ -73,12 +72,12 @@ export interface SegmentSkyOptions {
 
 const DEFAULT_LONG_SIDE = 1024;
 /**
- * The GPU prep's default: ?skyGpuPrep (src/lib/flags), on since 2026-10-01. Measured in headless Chrome
+ * The GPU prep's default: on (since 2026-10-01). Measured in headless Chrome
  * (Metal, scripts/gpu/sky-prep-ab.mjs): 69/69 photos (19 bundled + 50 wild dev) took the GPU prep, masks
  * byte-identical to the CPU prep, median segmentSky 88.1 → 77.6 ms (the dispatch-chain version; the
  * ComputeGraph port that followed is bit-identical on Dawn in node: scripts/gpu/sky-prep-dawn.ts --graph).
  */
-const defaultGpuPrep = () => getFlag("skyGpuPrep") === "on";
+const defaultGpuPrep = () => true;
 /** Photos the worker verifies against the CPU chain per device (sky/prep.ts PREP_VERIFY). */
 const PREP_VERIFY = 3;
 // what the worker last reported about the GPU prep: while unverified the CPU pixels ride along

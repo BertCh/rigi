@@ -23,14 +23,8 @@ export {
  */
 export const FORWARDED_FLAGS = [
 	"gpu",
-	"gpuHorizon",
-	"mosaicGpu",
-	"horizonPrecision",
 	"skylineGpu",
 	"focalSeedGate",
-	"unknownGpu",
-	"alignPrecision",
-	"skyGpuPrep",
 ] as const satisfies readonly FlagName[];
 
 /** The page's GPU debug switches and explicit flags, for a worker message (only the ones that are on/set). */

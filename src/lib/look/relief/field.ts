@@ -307,7 +307,7 @@ export class ReliefController {
 	/** The latest field when it was built on the render device (update's `bridged`); else null. */
 	resident: ResidentReliefField | null = null;
 	private key = "";
-	/** Opt-in GPU path (gpu/look, ?lookgpu=1): update returns null and this fires when the field lands. */
+	/** Opt-in GPU path (gpu/look, the GPU look): update returns null and this fires when the field lands. */
 	onAsync?: (f: ReliefField | ResidentReliefField) => void;
 	private seq = 0;
 

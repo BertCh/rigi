@@ -490,7 +490,6 @@ export type WebGpuEngineCounters = {
 // ---------------------------------------------------------------------------------------------
 
 export class WebGpuEngine implements Renderer {
-	readonly kind = "deck" as const;
 	/** Which deck backend this is (tools that poke WebGL deck internals must check it). */
 	readonly backend = "webgpu" as const;
 	readonly photo: PhotoMeta;
@@ -1448,14 +1447,13 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	/**
-	 * The stream's tile loader under flag terrainGpuDecode (batched terrain, ?gpu=on): GPU Terrarium
+	 * The stream's tile loader (batched terrain, ?gpu=on): GPU Terrarium
 	 * decode straight into a height-atlas layer the tile keeps, CPU heights on demand
 	 * (terrain-gpu-decode.ts); undefined = the
 	 * default CPU decode.
 	 */
 	private gpuDecodeLoader() {
 		if (
-			getFlag("terrainGpuDecode") !== "on" ||
 			!gpuEnabled() ||
 			(this.opts.terrain ?? terrainMode()) !== "batched" ||
 			terrainBuild().mesh

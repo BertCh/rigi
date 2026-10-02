@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The haze fit's airlight band on the GPU (WAG haze-cert, D16; ?hazeBandGpu, default on since 2026-10-01): the kernel
+// The haze fit's airlight band on the GPU (WAG haze-cert, D16; the GPU band, default on since 2026-10-01): the kernel
 // specs and host-side pieces of ./haze-band.wgsl.ts, used by ./haze-graph.ts fitHazeFromPrep /
 // prepAndFitHazeTex. With it, the fit's GPU part is ONE submit (compaction + band + gathers) instead
 // of two, and the range / P(sky) planes (8 B per pixel) no longer come back: the band's lin and the

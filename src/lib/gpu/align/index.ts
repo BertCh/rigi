@@ -19,9 +19,8 @@
  * `alignGpuOptions.refine = "cpu"` (or the `refine` option) keeps the refine on the plain CPU loop.
  * Any GPU failure, no WebGPU, or the kill switch (?gpu=off, src/lib/flags) → plain autoAlign.
  *
- * OPT-IN (WAG W3.3, precision policy P1): `alignPrecision: "certified-f32"` (the option, or the flag
- * ?alignPrecision=certified-f32) runs the refine as a GPU-driven fixed-round loop with certified f32
- * compares instead (./cert-refine.ts; WGSL and error bound in ./cert.wgsl.ts): all hypotheses' coarse
+ * DEFAULT (WAG W3.3, precision policy P1): `alignPrecision: "certified-f32"` runs the refine as a
+ * GPU-driven fixed-round loop with certified f32 compares instead (./cert-refine.ts; WGSL and error bound in ./cert.wgsl.ts): all hypotheses' coarse
  * and fine passes on the GPU, a few submits per autoAlign, the CPU deciding only the comparisons the
  * f32 and double-f32 bounds cannot. The AlignResult is the f64 path's as long as every certified
  * decision is correct (the bound plus the device premise; see ./cert-refine.ts). It needs the device
@@ -30,7 +29,7 @@
  * outside the bound's range, a GPU error, more than 32 CPU-decided comparisons, or a failed runtime
  * check (intervals re-scored exactly; EVAL2 accepts, near-margin decisions and a sample re-decided on
  * exact scores) runs the f64 path for the call, and a broken bound turns the certified path off for
- * the device. The default stays "f64".
+ * the device. `alignPrecision: "f64"` (the option) keeps the bound-screened refine above.
  *
  * Runs on gpu/core: both kernels on a core ComputeGraph (./graph.ts: cleared output transient + read
  * node over the pooled input slots; the only GPU path since 2026-10-01), the edge map's static planes
@@ -58,7 +57,6 @@ import {
 	type SkipVerifier,
 } from "#/lib/align";
 import type { Pose } from "#/lib/camera";
-import { getFlag } from "#/lib/flags";
 import { getComputeDevice } from "#/lib/gpu/core/device";
 import { fitPriorSkyGpu } from "#/lib/gpu/photoprep";
 import { probeStrictIeee } from "#/lib/gpu/precision/ieee-probe";
@@ -409,7 +407,7 @@ export async function autoAlignAsync(
 ): Promise<AlignResult> {
 	const t0 = performance.now();
 	const mode = opts.refine ?? alignGpuOptions.refine;
-	const precision = opts.alignPrecision ?? getFlag("alignPrecision");
+	const precision = opts.alignPrecision ?? "certified-f32";
 	let device = null;
 	try {
 		device = await getComputeDevice();
@@ -483,7 +481,7 @@ export async function autoAlignAsync(
 		grid && mode === "gpu" && !devState.disabled ? "gpu" : "cpu";
 	let violation: string | undefined;
 	let cert: CertTiming | undefined;
-	// alignPrecision certified-f32 (default): the GPU-driven refine (needs the GPU grid's sky fit and private planes)
+	// alignPrecision certified-f32 (the default): the GPU-driven refine (needs the GPU grid's sky fit and private planes)
 	if (precision === "certified-f32" && grid) {
 		const c = await certifiedAlign(
 			device,

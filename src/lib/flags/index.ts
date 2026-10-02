@@ -38,15 +38,9 @@ export const FLAG_SCHEMA = {
 	// render
 	/**
 	 * The /photo engine (src/lib/renderer-select.ts): auto (the default) = WebGPU deck where the browser passes the probe,
-	 * else WebGL deck; webgpu = the same, asked for explicitly; deck = WebGL deck only. The retired value three
-	 * (the three.js PhotoEngine, removed 2026-10-01) falls back to auto with a warning (RETIRED below).
+	 * else WebGL deck; webgpu = the same, asked for explicitly; deck = WebGL deck only.
 	 */
 	renderer: oneOf(["auto", "webgpu", "deck"], "auto"),
-	/**
-	 * luma.gl/deck.gl example convention (?backend=webgpu|webgl, as in luma's examples/deck/*): an alias that
-	 * overrides ?renderer when set. webgpu = renderer webgpu; webgl = renderer deck (deck.gl on WebGL2).
-	 */
-	backend: oneOf(["auto", "webgpu", "webgl"], "auto"),
 	/** off: ?renderer=auto / webgpu act as if navigator.gpu were missing (proves the WebGL fallback) */
 	webgpu: onOff("on"),
 	/**
@@ -61,37 +55,6 @@ export const FLAG_SCHEMA = {
 	// GPU compute sidecar (src/lib/gpu); the CPU path is always the reference
 	/** master kill switch for every kernel below */
 	gpu: onOff("on"),
-	/** autoAlign's skyline march */
-	gpuHorizon: onOff("on"),
-	/**
-	 * the horizon march's max-mip pyramid built on the GPU inside the uploaded mosaic page
-	 * (src/lib/gpu/horizon/mosaic-mips.ts; byte-identical to the CPU pyramid) instead of on the CPU
-	 */
-	mosaicGpu: onOff("on"),
-	/**
-	 * the skyline's tan → degrees and ENU stages: certified f32 on the GPU (default since 2026-10-01; the
-	 * precision gate found no quality difference: GT-12 12/12 identical, webgpu accepts identical) or f64
-	 * on the CPU (?horizonPrecision=f64)
-	 */
-	horizonPrecision: oneOf(["f64", "certified-f32"], "certified-f32"),
-	/** relief / haze look passes */
-	lookgpu: onOff("on"),
-	/**
-	 * sky worker: the segmentation input (resample + normalise) prepared on the GPU from an ImageBitmap
-	 * (src/lib/gpu/sky/prep.ts), bit-identical to the CPU prep; the first 3 photos per device are compared
-	 * in full with the CPU chain. Default on since 2026-10-01 (browser A/B: 69/69 masks identical, ~10 ms
-	 * faster; its ComputeGraph port bit-identical on Dawn, sky-prep-dawn.ts --graph); off = getImageData + the
-	 * CPU prep. ?gpu=off and WASM ORT always prep on the CPU.
-	 */
-	skyGpuPrep: onOff("on"),
-	/**
-	 * unknown-pose 360° horizon on the GPU march (gpu/horizon/scene-profile.ts, fused with the coarse solve).
-	 * Default on since 2026-10-01: node gate on Dawn (scripts/gpu/unknown-gpu-node.ts), GT-12 × 5 conditions
-	 * and the 17 wild dev photos without heading: 0 new false or unverified accepts; the one changed decision
-	 * (IMG_6971 noheading, the CPU's 0.895 accept at the 0.75 bar) also rejects with the CPU horizon jittered
-	 * by ±3e-4° (3/3 seeds) and in the browser's CPU run. off = the CPU sceneHorizon (also under ?gpu=off).
-	 */
-	unknownGpu: onOff("on"),
 	/**
 	 * skyline detector (geo/skyline.ts detectSkylineAsync): the per-pixel feature, prior and sky-model
 	 * images on the GPU (src/lib/gpu/skyline), the sky-model fits and Viterbi on the CPU. off = the CPU
@@ -115,31 +78,12 @@ export const FLAG_SCHEMA = {
 	 */
 	peakSnapInterior: onOff("off"),
 	/**
-	 * band colour stats (LOOK_HARMONIZE, src/lib/gpu/look/color-stats-fold.ts): gpu (default since
-	 * 2026-10-01) = the per-workgroup partials are folded and finalized on the GPU (luma GPUProgramSpMV +
-	 * a finalize node, f32) and only the ColorStats (256 B) is read back; f64 = the partials (6.6 KB) come
-	 * back and the CPU folds them in float64. Same composite in the measured photos (see the README).
-	 */
-	statsFold: oneOf(["f64", "gpu"], "gpu"),
-	/**
-	 * band colour stats: the per-workgroup reduction by subgroupAdd where the device has subgroups
-	 * (BAND_STATS_SG, with its layout check and plain fallback); off = the shared-memory tree
-	 */
-	statsSubgroups: onOff("on"),
-	/**
 	 * WebGPU engine: per-render-pass GPU timings (deck-webgpu/frame-timings.ts, deck.gl PR #10778's idea
 	 * for Rigi's own geometry / colour / screen passes). on = timestamp writes on those passes and a
 	 * FrameTimings sample per frame (engine.onFrameTimings, /dev/graph); needs the device feature
 	 * 'timestamp-query'. Off (default) = no query sets, render pass descriptors unchanged.
 	 */
 	gpuFrameTimings: onOff("off"),
-	/**
-	 * WebGPU batched terrain: GPU frustum cull + indirect draws (WAG W1.5; byte-identical frames to the
-	 * CPU cull, scripts/deck-webgpu/terrain-indirect-check.mjs); off = the CPU cull. Default on since
-	 * 2026-10-01 (GPU-graph first; no CPU saving at ~350–390 tiles, but no loss). WebGL and ?gpu=off
-	 * always cull on the CPU.
-	 */
-	terrainGpuCull: onOff("on"),
 	/**
 	 * WebGPU batched terrain: replay the GPU-culled terrain draws (geometry + colour passes) from
 	 * recorded render bundles instead of re-encoding them every frame (CPU encode cost only; pixels
@@ -149,41 +93,9 @@ export const FLAG_SCHEMA = {
 	 * existing per-frame encode.
 	 */
 	renderBundles: onOff("off"),
-	/**
-	 * WebGPU terrain stream: Terrarium tiles decode on the GPU straight into the height atlas (WAG W2.3,
-	 * deck-webgpu/terrain-gpu-decode.ts) and CPU heights are produced only when a CPU consumer asks
-	 * (W2.4 getCpuHeights). Same heights bit for bit (texel bytes == canvas bytes, measured); off = the
-	 * CPU decode. Default on since 2026-10-01: the hot heightAt callers gather from the atlas (no main-thread
-	 * decodes); the atlas uploads ~3.5–4× the bytes of the CPU path. WebGL and ?gpu=off always decode
-	 * on the CPU.
-	 */
-	terrainGpuDecode: onOff("on"),
-	/**
-	 * autoAlign's refine precision (WAG P1, src/lib/gpu/align/cert-refine.ts): f64 = exact CPU
-	 * scores decide every move; certified-f32 (default since 2026-10-01) = GPU-driven loop with certified f32
-	 * compares, the CPU deciding only what the bound cannot. Precision gate: no quality difference found
-	 */
-	alignPrecision: oneOf(["f64", "certified-f32"], "certified-f32"),
-	/**
-	 * The fitted haze's airlight band on the GPU (WAG haze-graph, src/lib/gpu/look/haze-band.ts): on
-	 * (default since 2026-10-01) = the WebGPU texture path's fit runs compaction, band and gathers as
-	 * one submit and reads no range / P(sky) planes back (integer work, same fit bit for bit,
-	 * spot-checked per call); off = the CPU band between two submits. WebGL, ?gpu=off and a device or
-	 * spot-check fault use the CPU band.
-	 */
-	hazeBandGpu: onOff("on"),
-	/**
-	 * The haze grid's arg-min on the GPU (WAG haze-graph, src/lib/gpu/look/haze-argmin.ts, a luma
-	 * GPUProgram with a GPU-gated selection): on (default since 2026-10-01) = only the grid minimum and
-	 * at most 256 candidate cells come back, the CPU re-applies its exact test (same fit bit for bit,
-	 * checked per call); off = the whole 5 550-cell grid is read back. A compile fault or failed check
-	 * turns it off for the device.
-	 */
-	hazeArgminGpu: onOff("on"),
 	// Step Inside 3D Tiles (src/lib/tiles3d)
 	tiles3d: oneOf(["off", "buildings", "swisstopo", "google", "all"], "off"),
 	tiles3dBlend: oneOf(["fill", "over"], "fill"),
-	tiles3dGeoid: num,
 	tiles3dBias: num,
 	tiles3dDebug: onOff("off"),
 	/** T2: swisstopo tiles + nDSM promote Far/Terrain cells to Object in the Step Inside split (nearfield/object-prior). */
@@ -193,7 +105,6 @@ export const FLAG_SCHEMA = {
 	nearfield: oneOf(["auto", "on", "sharp", "complete", "off"], "auto"),
 	/** Step Inside anchor: exclude cliff-lip DEM range discontinuities from the fit (nearfield/cliff-lip.ts). */
 	anchorCliff: onOff("off"),
-	cammodes: onOff("off"),
 	// alignment aids
 	picker: oneOf(["off", "on", "always"], "off"),
 	/** tap-a-peak pin solve (src/lib/pins/seed.ts): seeded = closed-form start + lens bound, kept only when it fits the taps better */
@@ -213,8 +124,6 @@ export const FLAG_SCHEMA = {
 	osmextract: onOff("off"),
 	/** share-link beta (/s/$code, src/lib/share): off until the N2 licence review clears */
 	share: onOff("off"),
-	/** swisstopo COG reader for ?concord=occl (src/lib/concord/occl/swiss-cog.ts): loaders.gl or the own parser */
-	cogReader: oneOf(["loaders", "own"], "own"),
 	// /roll
 	propagate: oneOf(["off", "on", "dev"], "off"),
 	/** Align roll: compass-bias anchor window, s (roll/align/viewpoint.ts; unset = BIAS_WINDOW_S, 45 min) */
@@ -242,31 +151,12 @@ export const FLAG_NAMES = Object.keys(FLAG_SCHEMA) as FlagName[];
 
 // ---- parsing ---------------------------------------------------------------------------------------
 
-/** Values that used to be valid: the warning says why they now fall back to the default. */
-const RETIRED: Partial<Record<string, Record<string, string>>> = {
-	renderer: {
-		three:
-			"the three.js renderer was removed (2026-10-01); using the default (deck.gl: WebGPU where available, else WebGL)",
-	},
-};
-
-/** Flags that were removed: still accepted in a URL (ignored), with a one-time console warning. */
-const RETIRED_FLAGS: Record<string, string> = {
-	splatSortGpgpu:
-		"the in-house splat radix sort was removed (luma GPUSort is the only WebGPU splat sort); the flag has no effect",
-};
-
 const warned = new Set<string>();
 function bad(name: string, raw: string) {
 	const k = `${name}=${raw}`;
 	if (warned.has(k)) return;
 	warned.add(k);
-	const why = RETIRED[name]?.[raw.toLowerCase()];
-	console.warn(
-		why
-			? `[flags] ?${k}: ${why}`
-			: `[flags] ?${k} is not a valid value; using the default`,
-	);
+	console.warn(`[flags] ?${k} is not a valid value; using the default`);
 }
 
 /** One raw value (string from the URL, or whatever an override holds) → its typed value. */
@@ -341,12 +231,6 @@ function fromPage(): Partial<Flags> {
 	const search = pageSearch();
 	if (memo?.search !== search) {
 		memo = { search, flags: parseFlags(search) };
-		const q = new URLSearchParams(search);
-		for (const [name, why] of Object.entries(RETIRED_FLAGS))
-			if (q.has(name) && !warned.has(name)) {
-				warned.add(name);
-				console.warn(`[flags] ?${name}: ${why}`);
-			}
 	}
 	return memo.flags;
 }
@@ -435,14 +319,11 @@ export type { FlagDef };
  */
 export const RESTART_FLAGS: readonly FlagName[] = [
 	"renderer",
-	"backend",
 	"webgpu",
 	"terrain",
 	"gpu",
-	"unknownGpu",
 	"tiles3d",
 	"tiles3dBlend",
-	"tiles3dGeoid",
 	"tiles3dBias",
 	"tiles3dDebug",
 	"tiles3dObjects",

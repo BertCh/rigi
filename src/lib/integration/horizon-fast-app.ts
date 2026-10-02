@@ -4,7 +4,7 @@
 
 // Skyline for the renderer via d1's src/lib/horizon-fast, run in a worker. It replaces the 8 float geometry
 // renders of the old GPU horizon (1024×1536 RGBA32F each, read back synchronously). The worker marches the
-// profile on the GPU by default (?gpuHorizon, gpu/horizon/opt-in.ts) and on the CPU otherwise.
+// profile on the GPU by default (gpuEnabled, ?gpu=off kills it) and on the CPU otherwise.
 //
 //   const h = startFastHorizon({ lat, lon, az0, az1, signal })   // at init start: tiles stream in parallel
 //   h.setEye(eyeH)                                                // as soon as the eye height is known
@@ -25,7 +25,6 @@
 // rejects; several `dirs()` calls for one eye all resolve.
 import { tilePriority } from "#/lib/cache";
 import { fetchDemBytes, MAPTERHORN, type TileKey, tileId } from "#/lib/dem";
-import { getFlag } from "#/lib/flags";
 import { REFRACTION_K } from "#/lib/geodesy";
 import {
 	type GpuProfile,
@@ -33,11 +32,9 @@ import {
 	type RealmGpuOptions,
 	realmGpuOptions,
 } from "#/lib/gpu/core/realm";
+import { gpuEnabled } from "#/lib/gpu/device";
 import type { HorizonPrecision } from "#/lib/gpu/horizon/certified-cpu";
-import {
-	gpuHorizonOptIn,
-	horizonPrecisionOptIn,
-} from "#/lib/gpu/horizon/opt-in";
+import { horizonPrecisionOptIn } from "#/lib/gpu/horizon/opt-in";
 import {
 	mergeSpotLedger,
 	type SpotLedger,
@@ -58,13 +55,11 @@ export type HorizonWorkerIn =
 	| {
 			type: "spans";
 			spans: SectorSpan[];
-			/** March on the GPU (src/lib/gpu/horizon) when the worker gets a WebGPU device. Opt-in: gpuHorizonOptIn(). */
+			/** March on the GPU (src/lib/gpu/horizon) when the worker gets a WebGPU device. On whenever the compute device is (gpuEnabled). */
 			gpu?: boolean;
-			/** The ?mosaicGpu switch (the worker can't read the URL): max-mips built on the GPU, not the CPU. */
-			mosaicGpu?: boolean;
 			/** The page's GPU profiling / error-check switches (core/realm.ts); undefined when off. */
 			gpuOpts?: RealmGpuOptions;
-			/** Precision of the tan → degrees and ENU stages (opt-in: horizonPrecisionOptIn(); default f64). */
+			/** Precision of the tan → degrees and ENU stages (horizonPrecisionOptIn()). */
 			precision?: HorizonPrecision;
 			/** The page's certified-f32 spot-check ledger (gpu/precision/spot-policy.ts); certified-f32 only. */
 			spotLedger?: SpotLedger;
@@ -94,7 +89,7 @@ export type HorizonStats = {
 	mosaicMB: number;
 	/** Where the profile was marched: "gpu" (src/lib/gpu/horizon) or "cpu" (horizon-fast). */
 	marchOn?: "gpu" | "cpu";
-	/** Only with ?horizonPrecision=certified-f32: the certified ENU stage's columns and timing. */
+	/** Only with certified-f32 precision: the certified ENU stage's columns and timing. */
 	precision?: {
 		mode: HorizonPrecision;
 		ties: number;
@@ -230,14 +225,12 @@ export function startFastHorizon(o: FastHorizonOptions): FastHorizon {
 				? { span, az0: 0, az1: 360 }
 				: { span, az0, az1 },
 		);
-		// GPU march is opt-in (?gpuHorizon, on by default; see gpu/horizon/opt-in.ts). The switches live in the page
-		// (URL, localStorage), which the worker can't read.
+		// The switches live in the page (URL, localStorage), which the worker can't read.
 		const precision = horizonPrecisionOptIn();
 		post({
 			type: "spans",
 			spans,
-			gpu: gpuHorizonOptIn(),
-			mosaicGpu: getFlag("mosaicGpu") === "on",
+			gpu: gpuEnabled(),
 			gpuOpts: realmGpuOptions(),
 			precision,
 			...(precision !== "f64" ? { spotLedger: spotLedger() } : {}),

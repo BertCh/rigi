@@ -183,23 +183,18 @@ describe("Tiles3DSet construction", () => {
 		expect(set.uniforms.uOpacity).toBe(own.uOpacity);
 	});
 
-	it("uses the EGM2008 undulation unless ?tiles3dGeoid overrides it", () => {
+	it("uses the EGM2008 undulation", () => {
 		expect(new Tiles3DSet(cfg(["swisstopo-buildings"]), at()).geoidN).toBe(
 			geoidUndulation(LAT, LON),
-		);
-		withFlags({ tiles3dGeoid: "12.5" });
-		expect(new Tiles3DSet(cfg(["swisstopo-buildings"]), at()).geoidN).toBe(
-			12.5,
 		);
 	});
 
 	it("applies the geoid shift to ellipsoidal (Google) tiles only, and registers the auth plugin", () => {
 		h.key = "k-123";
-		withFlags({ tiles3dGeoid: "40" });
 		const set = new Tiles3DSet(cfg(["google", "swisstopo-buildings"]), at());
 		const [g, b] = renderers();
 		expect(g.url).toBeUndefined(); // the Google plugin supplies the root
-		expect(g.group.matrix.equals(enuFromEcef(LAT, LON, 40))).toBe(true);
+		expect(g.group.matrix.equals(enuFromEcef(LAT, LON, set.geoidN))).toBe(true);
 		expect(b.group.matrix.equals(enuFromEcef(LAT, LON, 0))).toBe(true);
 		const auth = g.plugs.find(
 			(p) => p.opts && (p.opts as { apiToken?: string }).apiToken,

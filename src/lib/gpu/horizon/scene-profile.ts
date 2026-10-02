@@ -13,9 +13,8 @@
  * Ridges: the GPU records none (see ./index.ts). The cascade (geo/solve solvePose, refine/refinePose) reads
  * only `step`, `elevation` and `distance`, so the profile carries one empty ridge list per azimuth.
  *
- * Switch: unknownGpuOptIn() (./unknown-opt-in.ts, page side, on by default since 2026-10-01; the worker gets
- * the answer in its messages). The CPU sceneHorizon is the fallback (null here → the caller uses it) and
- * what ?unknownGpu=off / ?gpu=off run.
+ * Switch: gpuEnabled() (page side; the worker gets the answer in its messages). The CPU sceneHorizon
+ * is the fallback (null here → the caller uses it) and what ?gpu=off runs.
  *
  * Mosaic cache (opt-in, `keep`): by default the mosaics are built per call and their VRAM is freed
  * right after the march (the app worker builds a fresh terrain per scene, so nothing could hit a

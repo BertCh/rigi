@@ -6,7 +6,7 @@
  * The unknown-pose cascade without its worker shell (unknown-pose.worker.ts keeps the messages, the
  * horizon cache and the browser tile loader). Split out on 2026-10-01 so node checks run the very same
  * scene + solve code as the app: scripts/gpu/unknown-gpu-node.ts drives it on a Dawn WebGPU device for
- * the ?unknownGpu gate (CPU sceneHorizon vs the GPU march).
+ * the GPU gate (CPU sceneHorizon vs the GPU march).
  */
 import {
 	cameraToPose,
@@ -134,7 +134,7 @@ export async function computeUnknownScene(
 		const f = await fusedSceneHorizon(terrain, lat, lon, eye);
 		if (f) return { horizon: f.horizon, eye, horizonOn: "gpu" as const };
 	}
-	// unknownGpuOptIn (page side) without the fused chain: the same march on the GPU; null → the CPU sceneHorizon below.
+	// the page-side GPU switch without the fused chain: the same march on the GPU; null → the CPU sceneHorizon below.
 	// Not after a failed fused march: that is the same march, so straight to the CPU
 	else if (gpu) {
 		const { sceneHorizonGpu } = await import("#/lib/gpu/horizon/scene-profile");

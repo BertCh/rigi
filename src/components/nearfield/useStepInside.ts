@@ -15,7 +15,6 @@ import {
 } from "react";
 import type { Pose } from "#/lib/camera";
 import { getFlag } from "#/lib/flags";
-import { useFlag } from "#/lib/flags/react";
 import {
 	NearFieldController,
 	type NearFieldState,
@@ -68,12 +67,6 @@ export type StepInside = {
 	sampleAt: (u: number, v: number) => NearFieldSample | null;
 };
 
-/** The camera-mode bar: like stepInsideAllowed, plus ?cammodes=on opts automation in without the service. */
-export function camModesAllowed(): boolean {
-	if (typeof window === "undefined") return false;
-	return stepInsideAllowed() || getFlag("cammodes") === "on";
-}
-
 /**
  * Whether the Step Inside UI may probe the service at all (?nearfield, src/lib/flags). "auto" (the
  * default) probes except in automated browsers (navigator.webdriver: style-baseline, eval-app,
@@ -109,8 +102,6 @@ export function useStepInside(opts: {
 	worldMode?: boolean;
 }): StepInside {
 	const { engineRef, ready, photo, pose, alignState, verify, worldMode } = opts;
-	// ?cammodes applies live: re-render when it changes (camModesAllowed reads it)
-	useFlag("cammodes");
 	const ctlRef = useRef<NearFieldController | null>(null);
 	const [ctl, setCtl] = useState<NearFieldController | null>(null);
 	const [state, setState] = useState<NearFieldState>({ phase: "idle" });
@@ -332,7 +323,7 @@ export function useStepInside(opts: {
 		stepping,
 		camView,
 		camMode: camView ? camMode : worldMode ? "orbit" : "photo",
-		camModesAllowed: camModesAllowed(),
+		camModesAllowed: stepInsideAllowed(),
 		setCamMode,
 		truth,
 		setTruth,

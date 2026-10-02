@@ -60,10 +60,9 @@ describe("parseFlags", () => {
 		expect(F.parseFlags("?gpu=")).toEqual({ gpu: "on" });
 		expect(F.parseFlags("?tiles3d=")).toEqual({ tiles3d: "off" });
 	});
-	it("explains the retired renderer=three value and uses the default", () => {
+	it("an unknown renderer value takes the generic warning and the default", () => {
 		expect(F.parseFlags("?renderer=three")).toEqual({ renderer: "auto" });
-		expect(warn.mock.calls[0][0]).toContain("three.js renderer was removed");
-		expect(F.parseFlags("?renderer=THREE")).toEqual({ renderer: "auto" });
+		expect(warn.mock.calls[0][0]).toContain("is not a valid value");
 	});
 	it("parses a set flag in schema order, dropping duplicates and unknown members", () => {
 		expect(F.parseFlags("?concord=occl,eye")).toEqual({
@@ -85,7 +84,6 @@ describe("parseFlags", () => {
 		expect(F.parseFlags("?tiles3dBias=Infinity")).toEqual({
 			tiles3dBias: undefined,
 		});
-		expect(F.parseFlags("?tiles3dGeoid=0")).toEqual({ tiles3dGeoid: 0 });
 	});
 	it("keeps text flags verbatim (trimmed), blank = undefined", () => {
 		expect(F.parseFlags("?style=Landeskarte")).toEqual({
@@ -115,7 +113,7 @@ describe("getFlag / overrides", () => {
 	it("defaults when nothing is set (node has no page URL)", () => {
 		expect(F.getFlag("renderer")).toBe("auto");
 		expect(F.getFlag("skylineGpu")).toBe("off");
-		expect(F.getFlag("horizonPrecision")).toBe("certified-f32");
+		expect(F.getFlag("colorTarget")).toBe("rgba16");
 		expect(F.flagSet("renderer")).toBe(false);
 	});
 	it("reads the per-realm override live", () => {
@@ -151,10 +149,10 @@ describe("getFlag / overrides", () => {
 	it("setFlagOverride creates, sets and removes", () => {
 		F.setFlagOverride("gpu", "off");
 		expect(F.getFlag("gpu")).toBe("off");
-		F.setFlagOverride("gpuHorizon", "off");
+		F.setFlagOverride("skylineGpu", "on");
 		F.setFlagOverride("gpu", undefined);
 		expect(F.getFlag("gpu")).toBe("on");
-		expect(F.getFlag("gpuHorizon")).toBe("off");
+		expect(F.getFlag("skylineGpu")).toBe("on");
 	});
 });
 
@@ -164,13 +162,13 @@ describe("flagSearch", () => {
 			F.flagSearch({
 				gpu: "off",
 				tiles3dBias: 3,
-				cammodes: true,
+				share: true,
 				bogus: "x",
 				renderer: { a: 1 },
 				style: null,
 				theme: undefined,
 			}),
-		).toEqual({ gpu: "off", tiles3dBias: 3, cammodes: true });
+		).toEqual({ gpu: "off", tiles3dBias: 3, share: true });
 	});
 	it("returns an empty object for empty input", () => {
 		expect(F.flagSearch({})).toEqual({});
@@ -205,7 +203,7 @@ describe("flagSearchValue", () => {
 describe("flagsKey", () => {
 	it("is empty when no restart flag is present", () => {
 		expect(F.flagsKey("")).toBe("");
-		expect(F.flagsKey("?theme=dark&style=x&gpuHorizon=off")).toBe("");
+		expect(F.flagsKey("?theme=dark&style=x&skylineGpu=on")).toBe("");
 	});
 	it("lists restart flags in RESTART_FLAGS order, not query order", () => {
 		expect(F.flagsKey("?tiles3d=google&renderer=deck")).toBe(
@@ -221,6 +219,6 @@ describe("flagsKey", () => {
 	});
 	it("changes with a live flag only when it is a restart flag", () => {
 		expect(F.flagsKey("?gpu=off")).not.toBe(F.flagsKey("?gpu=on"));
-		expect(F.flagsKey("?lookgpu=off")).toBe(F.flagsKey("?lookgpu=on"));
+		expect(F.flagsKey("?skylineGpu=off")).toBe(F.flagsKey("?skylineGpu=on"));
 	});
 });

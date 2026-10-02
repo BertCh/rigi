@@ -5,6 +5,7 @@
 // npx tsx src/lib/picker/candidates.check.ts — pure checks of the picker maths (no browser).
 import { solvePins } from "#/lib/align";
 import { type Pose, projectPoint } from "#/lib/camera";
+import { flagFrom } from "#/lib/flags";
 import {
 	type Candidate,
 	isAutoHigh,
@@ -15,7 +16,6 @@ import {
 	TAP_MAX_PX,
 	topDistinct,
 } from "./candidates";
-import { parsePickerFlag } from "./flags";
 
 let fails = 0;
 const ok = (cond: boolean, msg: string) => {
@@ -159,13 +159,13 @@ ok(!isAutoHigh("pinned", null), "pinned is not HIGH");
 ok(!isAutoHigh("unverified", null), "unverified is not HIGH");
 
 // flag parsing
-ok(parsePickerFlag("") === "off", "no flag → off");
-ok(parsePickerFlag("?picker=on") === "on", "?picker=on → on");
+ok(flagFrom("", "picker") === "off", "no flag → off");
+ok(flagFrom("?picker=on", "picker") === "on", "?picker=on → on");
 ok(
-	parsePickerFlag("?renderer=deck&picker=always") === "always",
+	flagFrom("?renderer=deck&picker=always", "picker") === "always",
 	"?picker=always",
 );
-ok(parsePickerFlag("?picker=off") === "off", "?picker=off → off");
+ok(flagFrom("?picker=off", "picker") === "off", "?picker=off → off");
 
 console.log(fails ? `${fails} FAILED` : "all picker checks passed");
 process.exit(fails ? 1 : 0);

@@ -49,7 +49,6 @@ export type LookInputs = {
 };
 
 type Engine = {
-	kind?: string;
 	pose: { yaw: number };
 	frame: EnuFrame;
 	eyeAlt: number;
@@ -79,7 +78,6 @@ const maskAt = (m: SkyMask, u: number, v: number) =>
 /** Inputs of the look passes as the deck engine builds them at this pose (stats: null, see above). */
 export function captureLookInputs(engine: unknown, label = "live"): LookInputs {
 	const e = engine as Engine;
-	if (e.kind !== "deck") throw new Error("capture needs a deck engine");
 	if (!e.geometryReady()) throw new Error("geometry not ready");
 	const src = e.geoSrc;
 	if (!src?.pose) throw new Error("no geometry buffer");

@@ -41,13 +41,13 @@
 //
 // fitHazeFromPrep / prepAndFitHazeTex (the WebGPU engine's texture path) run the compaction on
 // textures.ts's prep ("look-haze-compact", read node "head" with the range / P(sky) planes), the CPU
-// airlight band, then "look-haze-gather" when ?hazeBandGpu=off (or the GPU band is unusable: a short
+// airlight band, then "look-haze-gather" when `bandGpu: false` (or the GPU band is unusable: a short
 // band, a failed spot check). By default (since 2026-10-01) the band runs on the GPU instead: one graph
 // "look-haze-band" (compaction + ./haze-band.ts's band, lin and list-range gathers and spot columns),
 // one read, no planes; same fit bit for bit, spot-checked per call.
 //
 // Submit 2 by default runs the grid's arg-min too, as a luma GPUProgram (./haze-argmin.ts, group
-// "look-haze-argmin", ?hazeArgminGpu): only the minimum and ≤ 256 candidate cells come back, the CPU
+// "look-haze-argmin"): only the minimum and ≤ 256 candidate cells come back, the CPU
 // re-applies its exact test (same candidates, same fit). The selection past 256 candidates is a
 // GPU-indirect-gated node (the program's GPUConditionalOperation).
 //
@@ -59,7 +59,6 @@
 // trips end in CPU reads whose sizes are CPU-side (WebGPU copy sizes), and every GPU consumer's
 // dispatch size is already known on the CPU.
 import { Buffer, type Device, Texture } from "@luma.gl/core";
-import { getFlag } from "#/lib/flags";
 import type { Vec3 } from "../../look/atmosphere";
 import type { HazeFit, HazeFitInput } from "../../look/haze-fit";
 import {
@@ -536,7 +535,7 @@ export const hazeArgminStats: {
 } = {};
 
 /**
- * Submit 2: the physical grid (a GridFn, ./haze.ts). By default (?hazeArgminGpu, `opts.pick`) its
+ * Submit 2: the physical grid (a GridFn, ./haze.ts). By default (`opts.pick`) its
  * arg-min runs on the GPU too (./haze-argmin.ts, a luma GPUProgram) and only the candidates come
  * back (a GridPick: the same candidates, haze.ts gridCandidates); else the whole grid.
  */
@@ -573,7 +572,7 @@ export function gridGraph(
 		if (
 			cells === GRID_CELLS &&
 			!pickFailed.has(device) &&
-			(opts.pick ?? getFlag("hazeArgminGpu") === "on")
+			(opts.pick ?? true)
 		) {
 			let why = "";
 			try {
@@ -1015,12 +1014,12 @@ const bandFailed = new WeakSet<Device>();
 const bandShort = new WeakMap<Device, boolean>();
 
 /**
- * fitHazeFromPrep's band choice: the option, else ?hazeBandGpu; never after a failed spot check,
+ * fitHazeFromPrep's band choice: the option, else on; never after a failed spot check,
  * nor while the last band was short, nor past hzb-range's 1-D dispatch limit.
  */
 function chooseBandGpu(device: Device, N: number, opt: boolean | undefined) {
 	if (bandFailed.has(device)) return false;
-	if (!(opt ?? getFlag("hazeBandGpu") === "on")) return false;
+	if (!(opt ?? true)) return false;
 	if (Math.ceil((3 * N) / RANGE_GROUP) > 65535) return false;
 	return !bandShort.get(device);
 }
@@ -1203,6 +1202,7 @@ function fitTail(
 	input: HazePrepGeometry,
 	T0: number,
 	g: FitGpu,
+	argminGpu?: boolean,
 ): Promise<HazeFit> {
 	return hazeFitTail(
 		device,
@@ -1217,7 +1217,7 @@ function fitTail(
 			t2: g.t1,
 		},
 		g.lists,
-		gridGraph,
+		(...args) => gridGraph(...args, { pick: argminGpu }),
 	);
 }
 
@@ -1236,7 +1236,7 @@ function fitTail(
  * destroyed buffer) when another prep ran between the two calls. For textures, prefer
  * prepAndFitHazeTex, which cannot be interleaved.
  *
- * `bandGpu` (default: the flag ?hazeBandGpu, on) picks the airlight band on the GPU
+ * `bandGpu` (default on; false = the CPU band) picks the airlight band on the GPU
  * (./haze-band.ts): one submit instead of two and no range / P(sky) planes read back, the same fit
  * bit for bit (integer work, spot-checked per call; a short band or a failed check takes the CPU band).
  */
@@ -1244,7 +1244,7 @@ export function fitHazeFromPrep(
 	device: Device,
 	prep: HazePrepResult,
 	input: HazePrepGeometry,
-	opts: { listHead?: number; bandGpu?: boolean } = {},
+	opts: { listHead?: number; bandGpu?: boolean; argminGpu?: boolean } = {},
 ): Promise<HazeFit> {
 	const T0 = performance.now();
 	try {
@@ -1253,7 +1253,7 @@ export function fitHazeFromPrep(
 		return Promise.reject(e);
 	}
 	return withLease(PREP_LEASE, () => fitGpuPartAuto(device, prep, opts)).then(
-		(g) => fitTail(device, prep.W, prep.H, input, T0, g),
+		(g) => fitTail(device, prep.W, prep.H, input, T0, g, opts.argminGpu),
 	);
 }
 
@@ -1269,7 +1269,12 @@ export async function prepAndFitHazeTex(
 	device: Device,
 	tex: HazeTexInput,
 	input: HazePrepGeometry,
-	opts: { listHead?: number; valid?: () => boolean; bandGpu?: boolean } = {},
+	opts: {
+		listHead?: number;
+		valid?: () => boolean;
+		bandGpu?: boolean;
+		argminGpu?: boolean;
+	} = {},
 ): Promise<HazeFit | null> {
 	const T0 = performance.now();
 	const geoTex =
@@ -1285,5 +1290,5 @@ export async function prepAndFitHazeTex(
 		{ valid: opts.valid },
 	);
 	if (!r) return null;
-	return fitTail(device, W, H, input, T0, r);
+	return fitTail(device, W, H, input, T0, r, opts.argminGpu);
 }

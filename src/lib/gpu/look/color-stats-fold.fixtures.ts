@@ -159,7 +159,7 @@ export function emulateFinalize(
 	return out.buffer;
 }
 
-/** bandStatsGpu's f64 fold (?statsFold=f64). */
+/** bandStatsGpu's f64 fold (fold "f64"). */
 export function foldF64(p: Float32Array, minCount: number): ColorStats {
 	const acc = new Float64Array(N_BANDS * 12);
 	const cnt = new Uint32Array(N_BANDS);

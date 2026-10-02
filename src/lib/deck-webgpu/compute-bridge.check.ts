@@ -16,7 +16,7 @@
 //          fitHazeGpu) vs one with `bridged` = LookBridge.fitHaze (prepAndFitHazeTex on the target),
 //          plus the engine's live fit, the bridged fit's stage medians (fit.stagesMs, haze.ts
 //          hazeGpuTimes); and the guards (stale prep, wrong geo size) reject; and the GPU airlight
-//          band (?hazeBandGpu, haze-band.ts, default on) vs the CPU band on the bridged path: its
+//          band (the GPU band, haze-band.ts, default on) vs the CPU band on the bridged path: its
 //          fit (bandExact), what the band did (band: "gpu" = used) and both paths' stage medians
 //   relief the readback path (buildReliefFieldGpu: relief graph → read node → bytes, uploaded with
 //          TerrainStyles.setReliefField's descriptor + writeData) vs LookBridge.reliefField (the
@@ -25,7 +25,6 @@
 // and times each (median of `reps`, warm). The final look image is compared by the harness
 // (scripts/deck-webgpu/bridge-check.mjs) with engine.setLookBridge(false / true).
 import type { Device, Texture } from "@luma.gl/core";
-import { setFlagOverride } from "#/lib/flags";
 import type { EnuFrame } from "#/lib/geodesy";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { hazeGpuTimes } from "#/lib/gpu/look/haze";
@@ -435,28 +434,22 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 		await idle();
 		return { fit, ms: performance.now() - t0 };
 	};
-	const viaBridge: BridgedHazeFit = (h) =>
-		bridge.fitHaze({ img, geometry, ...h });
+	const viaBridgeWith =
+		(o: { bandGpu?: boolean; argminGpu?: boolean }): BridgedHazeFit =>
+		(h) =>
+			bridge.fitHaze({ img, geometry, ...h, ...o });
+	const viaBridge = viaBridgeWith({});
 	const fr = await fitVia();
 	const fb = await fitVia(viaBridge);
-	// the GPU airlight band (?hazeBandGpu, default on) vs the CPU band, on the same bridged path
-	const withBand = async <T>(on: boolean, fn: () => Promise<T>) => {
-		setFlagOverride("hazeBandGpu", on ? "on" : "off");
-		try {
-			return await fn();
-		} finally {
-			setFlagOverride("hazeBandGpu", undefined);
-		}
-	};
-	const fbb = await withBand(true, () => fitVia(viaBridge));
+	// the GPU airlight band (default on) vs the CPU band, on the same bridged path
+	const fbb = await fitVia(viaBridgeWith({ bandGpu: true }));
 	const bandOutcome = hazeGraphStats.band ?? null;
-	const fbc = await withBand(false, () => fitVia(viaBridge));
+	const fbc = await fitVia(viaBridgeWith({ bandGpu: false }));
 	// the default bridged fit (GPU band + the grid arg-min program) vs the pre-2026-10-01 default
 	// (CPU band, whole grid read back)
 	const argminOutcome = { ...hazeArgminStats };
-	setFlagOverride("hazeArgminGpu", "off");
-	const fOld = await withBand(false, () => fitVia(viaBridge)).finally(() =>
-		setFlagOverride("hazeArgminGpu", undefined),
+	const fOld = await fitVia(
+		viaBridgeWith({ bandGpu: false, argminGpu: false }),
 	);
 	const json = (f: HazeFit | null) => JSON.stringify(f);
 	const liveFit = e.hazeFit;
@@ -542,11 +535,11 @@ export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
 	for (let i = 0; i < reps; i++) {
 		fitT.ref.push((await fitVia()).ms);
 		clearTimes();
-		fitT.bridge.push((await withBand(true, () => fitVia(viaBridge))).ms);
+		fitT.bridge.push((await fitVia(viaBridgeWith({ bandGpu: true }))).ms);
 		stage("gpuBand");
 		clearTimes();
 		fitT.bridgeCpuBand.push(
-			(await withBand(false, () => fitVia(viaBridge))).ms,
+			(await fitVia(viaBridgeWith({ bandGpu: false }))).ms,
 		);
 		stage("cpuBand");
 	}

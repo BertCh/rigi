@@ -357,7 +357,7 @@ node scripts/gpu/with-render-lock.mjs -- node scripts/deck-webgpu/spike.mjs
   GPU decode's input and stays. Measured before the change (WebGPU, IMG_7086 / 6958 / 7018 × 3
   runs, exclusive lock): ready median 4006 ms on vs 4019 off, terrain generation 2091 vs 2185 ms;
   atlas bytes at ready 353–416 MB on vs 95–110 off, after a 4-yaw pan 963–1060 vs 248–271 (plus
-  one uncounted stats upload per tile on). After: not yet measured (`scripts/gpu/decode-load-probe.mjs`).
+  one uncounted stats upload per tile on). After: not yet measured.
 - GPU height gathers (WAG W2.4 second half, under `terrainGpuDecode`): `height-gather.ts`
   `HeightGather.heightsAt(set, lats, lons)` answers TerrainSet.heightAt bit for bit (NaN = null)
   without materialising lazy tiles. Plan and blend stay on the CPU in f64 (`TerrainSet.locate`,

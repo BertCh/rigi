@@ -5,18 +5,13 @@
 // The look-on-GPU switch, without importing luma.gl: look/** checks this synchronously and only
 // then loads the GPU code (hooks.ts) with a dynamic import, so the CPU path and the node tests never
 // touch WebGPU.
-//   switch:      ?lookgpu=off (src/lib/flags). Default ON since 2026-09-28 where WebGPU exists: parity
-//                is ≤ 1 byte / ~1e-6 and relief / haze run ~2× faster; results land one frame after the
-//                settle frame, and export waits for them (lookIdle).
-//   kill switch: ?gpu=off (the compute sidecar's, gpu/device.ts) wins over the switch.
+// The look passes run on the GPU wherever WebGPU exists (parity is ≤ 1 byte / ~1e-6 and relief / haze run
+// ~2× faster); results land one frame after the settle frame, and export waits for them (lookIdle).
+// ?gpu=off (the compute sidecar's kill switch, gpu/device.ts) keeps them on the CPU.
 import { getFlag } from "#/lib/flags";
 
-/** The look switch alone. */
-export const lookGpuOptedIn = () => getFlag("lookgpu") === "on";
-
-/** Switched on, the compute sidecar not killed, and WebGPU present: the look passes try the GPU. */
+/** The compute sidecar not killed and WebGPU present: the look passes try the GPU. */
 export const lookGpuOn = () =>
-	lookGpuOptedIn() &&
 	getFlag("gpu") === "on" &&
 	typeof navigator !== "undefined" &&
 	!!(navigator as { gpu?: unknown }).gpu;

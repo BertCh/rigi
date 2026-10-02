@@ -63,7 +63,7 @@ export type Realm =
 
 /**
  * Whether the GPU path is what the app runs today: "default" (on where WebGPU exists; ?gpu=off and the
- * module's own switch, e.g. ?lookgpu=off, keep the CPU twin), "opt-in", "not wired" (built, no app
+ * module's own switch, e.g. ?gpu=off, keep the CPU twin), "opt-in", "not wired" (built, no app
  * caller), "bench only", "cpu" (no GPU path), "external" (another runtime owns the dispatch).
  */
 export type ModuleStatus =
@@ -256,7 +256,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: ["stats: 32 B per streamed tile (read node, load time)"],
 		status: "default",
 		notes:
-			"WAG W2.3 wiring + W2.4: flag terrainGpuDecode (default on; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) straight into a height-atlas layer the tile leases (TextureArrayAtlas.writeTerrariumLeased, graph ingest-terrarium-layer|…|stats: one upload of the bitmap, layer + validateTile out-of-range count, lo/hi, stride-7 lo/hi); TileStore draws the leased layer with no further upload, also after a pan (spare meshes keep up to 48 leases, deck/terrain-stream.ts spareGpuLayers); without an atlas: the stats graph alone and a decode at draw time; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
+			"WAG W2.3 wiring + W2.4: the GPU terrain decode (default on; WebGPU batched terrain, ?gpu=on). Load time: decode (+2× box downsample) straight into a height-atlas layer the tile leases (TextureArrayAtlas.writeTerrariumLeased, graph ingest-terrarium-layer|…|stats: one upload of the bitmap, layer + validateTile out-of-range count, lo/hi, stride-7 lo/hi); TileStore draws the leased layer with no further upload, also after a pan (spare meshes keep up to 48 leases, deck/terrain-stream.ts spareGpuLayers); without an atlas: the stats graph alone and a decode at draw time; CPU heights only on demand (dem/cpu-heights.ts getCpuHeights). CPU twin: decodeTerrarium + validateTile + downsampleHeights2",
 	},
 	{
 		id: "atlas-resize",
@@ -297,7 +297,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		status: "default",
 		notes:
-			"WAG W2.4 second half, under flag terrainGpuDecode: the WebGPU photo view's CPU height readers (camera DEM height, trails, peak snapping) take lazy tiles' heights from the atlas instead of materialising them; plan + blend on the CPU in f64 (TerrainSet.locate, gridCorners / blendCorners = sampleGrid), the GPU only copies texels, so a result is heightAt's bit for bit; nonce + slot certificate, heightAt fallback. CPU twin: TerrainSet.heightAt / localMax",
+			"WAG W2.4 second half, under the GPU terrain decode: the WebGPU photo view's CPU height readers (camera DEM height, trails, peak snapping) take lazy tiles' heights from the atlas instead of materialising them; plan + blend on the CPU in f64 (TerrainSet.locate, gridCorners / blendCorners = sampleGrid), the GPU only copies texels, so a result is heightAt's bit for bit; nonce + slot certificate, heightAt fallback. CPU twin: TerrainSet.heightAt / localMax",
 	},
 	{
 		id: "look-relief-heights",
@@ -343,7 +343,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: ["read: out nE·nAz·8 B + stats"],
 		status: "default",
 		notes:
-			"each worker owns its own compute device (worker realm); worker:unknown-pose marches its 360° scene here under flag unknownGpu (default on since 2026-10-01; off / ?gpu=off: the CPU sceneHorizon)",
+			"each worker owns its own compute device (worker realm); worker:unknown-pose marches its 360° scene here on the GPU since 2026-10-01 (?gpu=off: the CPU sceneHorizon)",
 	},
 	{
 		id: "mosaic-mips",
@@ -359,7 +359,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: [],
 		status: "default",
 		notes:
-			"max-mip pyramid built on the GPU inside the horizon march's page (flag mosaicGpu, default on; byte-identical to the CPU pyramid, scripts/gpu/mosaic-mips-dawn.ts); the CPU pyramid stays for ?mosaicGpu=off, ?gpu=off and the CPU march",
+			"max-mip pyramid built on the GPU inside the horizon march's page (the GPU mip build, default on; byte-identical to the CPU pyramid, scripts/gpu/mosaic-mips-dawn.ts); the CPU pyramid stays for ?the GPU mip build=off, ?gpu=off and the CPU march",
 	},
 	{
 		id: "horizon-cert",
@@ -382,7 +382,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		status: "default",
 		notes:
-			"certified-f32 tan → degrees and ENU / resample (D7, D8); ?horizonPrecision=certified-f32; ties recomputed by the f64 path",
+			"certified-f32 tan → degrees and ENU / resample (D7, D8); certified-f32 precision; ties recomputed by the f64 path",
 	},
 	{
 		id: "precision-probe",
@@ -440,7 +440,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		status: "default",
 		notes:
-			"certified-f32 coordinate descent (WAG W3.3): R rounds per submit, DECIDE → EVAL (indirect) → EVAL2 double-f32 (indirect); ?alignPrecision=certified-f32",
+			"certified-f32 coordinate descent (WAG W3.3): R rounds per submit, DECIDE → EVAL (indirect) → EVAL2 double-f32 (indirect); certified-f32 precision",
 	},
 	{
 		id: "silhouette-gpu",
@@ -481,7 +481,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		status: "default",
 		notes:
-			"certified f32 fold; flagged rows fold on the CPU in f64; fused with the unknown-pose GPU horizon (resident hz primed by the march) when unknownGpu is on",
+			"certified f32 fold; flagged rows fold on the CPU in f64; fused with the unknown-pose GPU horizon (resident hz primed by the march) on the GPU path",
 	},
 	{
 		id: "skyglobal",
@@ -553,7 +553,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		],
 		status: "default",
 		notes:
-			"cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; flag skyGpuPrep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)",
+			"cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; the GPU prep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)",
 	},
 	{
 		id: "sky-refine",
@@ -606,7 +606,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: [],
 		status: "default",
 		notes:
-			"WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; flag terrainGpuCull (default on, WebGPU only; ?terrainGpuCull=off, off / ?gpu=off / WebGL: the CPU twin visibleRows)",
+			"WAG W1.5: batched-terrain frustum cull → stable compaction → drawIndexedIndirect (Model.setIndirectBuffer), recorded in the pass prepass on the frame encoder; the GPU terrain cull (default on, WebGPU only; ?the GPU terrain cull=off, off / ?gpu=off / WebGL: the CPU twin visibleRows)",
 	},
 	{
 		id: "geo-query-gpu",
@@ -645,7 +645,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: ["q: n·4 B per filtered mask"],
 		status: "default",
 		notes:
-			"array-input masks path (WebGL deck + sidecar); ?lookgpu=off keeps the CPU twin",
+			"array-input masks path (WebGL deck + sidecar); ?gpu=off keeps the CPU twin",
 	},
 	{
 		id: "look-stats",
@@ -662,7 +662,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"partial, folded (GPUProgram vectors), stats (transient)",
 		],
 		readbacks: [
-			"stats: folded ColorStats 256 B (?statsFold=f64: the 6.6 KB partials, f64 fold on the CPU)",
+			"stats: folded ColorStats 256 B (fold f64: the 6.6 KB partials, f64 fold on the CPU)",
 		],
 		status: "default",
 		notes:
@@ -695,12 +695,12 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"prep head: counts + selection state",
 			"compact head: counts",
 			"gather sky: 3·K·4 B (CPU band only)",
-			"grid: 16 B + 256 candidate pairs (2 KiB; arg-min program, default) or err cells·4 B (?hazeArgminGpu=off)",
-			"band head (default on the texture path; ?hazeBandGpu=off = CPU band): lists + their range, band counts / K / idx / lin, 8 spot columns (no range / P(sky) planes)",
+			"grid: 16 B + 256 candidate pairs (2 KiB; arg-min program, default) or err cells·4 B (`argminGpu: false`)",
+			"band head (default on the texture path; `bandGpu: false` = CPU band): lists + their range, band counts / K / idx / lin, 8 spot columns (no range / P(sky) planes)",
 		],
 		status: "default",
 		notes:
-			"graph break for the f64 tail on the CPU (D18; the round trip before the grid is inherent: its inputs come from f64 code). Default: the airlight band on the GPU on the texture path (look-haze-band, one submit instead of two; D16 removed; ?hazeBandGpu=off, WebGL / ?gpu=off / spot-check fault = CPU band) and the grid arg-min as a luma GPUProgram with a GPU indirect-gated selection (look-haze-argmin; ?hazeArgminGpu=off or a per-call check fault = whole-grid read)",
+			"graph break for the f64 tail on the CPU (D18; the round trip before the grid is inherent: its inputs come from f64 code). Default: the airlight band on the GPU on the texture path (look-haze-band, one submit instead of two; D16 removed; `bandGpu: false`, WebGL / ?gpu=off / spot-check fault = CPU band) and the grid arg-min as a luma GPUProgram with a GPU indirect-gated selection (look-haze-argmin; `argminGpu: false` or a per-call check fault = whole-grid read)",
 	},
 	{
 		id: "look-relief",

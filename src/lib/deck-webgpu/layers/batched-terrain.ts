@@ -16,7 +16,7 @@
 //                seg, skirt | Mercator / lon params | G, big, imagery layer, base-grid offset)
 //   - instances: per (pass kind, seg) a compact uint32 vertex buffer of the visible tiles' table
 //                rows (CPU-culled with the grid's bounding sphere), step mode "instance". On WebGPU
-//                (flag terrainGpuCull, default on; WAG W1.5) terrain-cull.ts culls and compacts them
+//                (WAG W1.5) terrain-cull.ts culls and compacts them
 //                on the GPU in the pass's prepass and the draws are indirect (no CPU cull, no count
 //                readback); conservative and in the CPU path's draw order, so the frames are
 //                byte-identical (scripts/deck-webgpu/terrain-indirect-check.mjs)
@@ -900,13 +900,12 @@ export class BatchedTerrainCore implements GpuLayerCore {
 		return ib;
 	}
 
-	/** The GPU cull applies: WebGPU, ?gpu=on, terrainGpuCull=on, no custom `cull` hook. */
+	/** The GPU cull applies: WebGPU, ?gpu=on, no custom `cull` hook. */
 	private gpuCullWanted() {
 		return (
 			this.device.type === "webgpu" &&
 			!this.cull &&
 			gpuEnabled() &&
-			getFlag("terrainGpuCull") === "on" &&
 			!this.gpuCull?.failed
 		);
 	}

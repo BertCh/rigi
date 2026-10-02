@@ -3,15 +3,15 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // npx tsx src/lib/gpu/look/color-stats-fold.check.ts [scenes]   (exits 1 on failure; CI fast tier: 12)
-// Node check of the band-stats fold on the GPU (./color-stats-fold.ts, ?statsFold=gpu), no GPU: a CPU
+// Node check of the band-stats fold on the GPU (./color-stats-fold.ts, fold "gpu"), no GPU: a CPU
 // emulation of the f32 kernels against the float64 fold it replaced.
 //  1. the CSR selection matrix (foldSelectionCsr) sums value j of every workgroup exactly once;
 //  2. synthetic scenes (photo bytes, premultiplied layer, range with sky, people mask) through the
 //     CPU reference look/color-stats.ts reduceBands(bandInputs(...)) (f64), and through an emulation
 //     of the GPU: BAND_STATS' per-invocation f32 sums and workgroup tree (or BAND_STATS_SG's subgroup
-//     sums) → partials, then (a) the f64 fold + finalizeBands (?statsFold=f64) and (b) the f32 SpMV
+//     sums) → partials, then (a) the f64 fold + finalizeBands (fold "f64") and (b) the f32 SpMV
 //     row sum (luma's subgroup-row / workgroup-row: one nonzero per lane, then a tree) + BAND_FINALIZE
-//     in f32 (twin below) + statsFromWords (?statsFold=gpu). Asserts: same count / valid; every
+//     in f32 (twin below) + statsFromWords (fold "gpu"). Asserts: same count / valid; every
 //     ColorStats field of (b) within 2e-5 of the reference (a measures ~1e-6) and the harmonize
 //     transfer (deck-webgpu/layers/composite.ts harmonize: Oklab Reinhard per range band, then sRGB
 //     bytes) of (b) differs from (a) by at most 1 byte on < 0.5 % of bytes of 200 000 random pixels;
@@ -177,7 +177,7 @@ for (let seed = 1; seed <= SCENES; seed++) {
 		const bb = new Uint8Array(N * 3);
 		harmonizeBytes(a, lab, lg, ba);
 		harmonizeBytes(b, lab, lg, bb);
-		// today's ?statsFold=f64 against the exact f64 reference: the rounding-flip baseline
+		// the fold "f64" arm against the exact f64 reference: the rounding-flip baseline
 		const br = new Uint8Array(N * 3);
 		harmonizeBytes(ref, lab, lg, br);
 		for (let i = 0; i < ba.length; i++) if (ba[i] !== br[i]) differBase++;

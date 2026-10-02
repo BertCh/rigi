@@ -60,18 +60,6 @@ describe("requestedRenderer", () => {
 		withFlags({ renderer: "webgpu" });
 		expect(R.requestedRenderer()).toBe("webgpu");
 	});
-	it("?backend overrides ?renderer (webgl pins deck, webgpu pins webgpu)", () => {
-		withFlags({ renderer: "webgpu", backend: "webgl" });
-		expect(R.requestedRenderer()).toBe("deck");
-		withFlags({ renderer: "deck", backend: "webgpu" });
-		expect(R.requestedRenderer()).toBe("webgpu");
-		withFlags({ renderer: "deck", backend: "auto" });
-		expect(R.requestedRenderer()).toBe("deck");
-	});
-	it("treats the retired three value as auto", () => {
-		withFlags({ renderer: "three" });
-		expect(R.requestedRenderer()).toBe("auto");
-	});
 });
 
 describe("probeWebGpu", () => {
@@ -207,19 +195,6 @@ describe("resolveRenderer", () => {
 		expect(warn).toHaveBeenCalledWith(
 			expect.stringContaining("webgpu asked for but unavailable"),
 		);
-	});
-	it("backend=webgl pins deck even if renderer=webgpu", async () => {
-		stubGpu();
-		withFlags({ renderer: "webgpu", backend: "webgl" });
-		expect((await R.resolveRenderer()).renderer).toBe("deck");
-	});
-	it("backend=webgpu pins webgpu over renderer=deck", async () => {
-		stubGpu();
-		withFlags({ renderer: "deck", backend: "webgpu" });
-		expect(await R.resolveRenderer()).toEqual({
-			renderer: "webgpu",
-			reason: "pinned",
-		});
 	});
 });
 

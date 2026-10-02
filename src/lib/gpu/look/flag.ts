@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The look-pass selector (W5). The CPU look passes (look/**) stay the default and the reference;
-// a GPU twin runs only when opt-in.ts lookGpuOn() (opt-in set, compute sidecar not killed). With
-// the flag off, selectLook returns null and the caller keeps its synchronous CPU path unchanged.
+// The look-pass selector (W5). The GPU twin runs whenever opt-in.ts lookGpuOn() (compute sidecar not
+// killed, WebGPU present); the CPU look passes (look/**) are the reference and the fallback. With the
+// GPU off, selectLook returns null and the caller keeps its synchronous CPU path unchanged.
 import type { Device } from "@luma.gl/core";
 import { getComputeDevice } from "../device";
 import { lookGpuOn } from "./opt-in";
@@ -12,7 +12,7 @@ import { lookGpuOn } from "./opt-in";
 export { lookGpuOn };
 
 /**
- * Flag off: null. Flag on: a promise of the GPU result, falling back to `cpu()` when there is no
+ * GPU off: null. GPU on: a promise of the GPU result, falling back to `cpu()` when there is no
  * device or the kernel throws (warned once per pass name).
  */
 export function selectLook<T>(

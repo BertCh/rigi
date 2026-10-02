@@ -53,7 +53,7 @@
 // any a queued masks pass still writes are never handed out for another write. With it off
 // (fusionOn), the masks pass uses the original two-texture ping-pong unchanged.
 //
-// Gate (createLookBridge): lookGpuOn() (the existing ?lookgpu switch), the device has
+// Gate (createLookBridge): lookGpuOn() (?gpu=off and WebGPU present), the device has
 // float32-filterable, and getComputeDevice() === the render device (adoptRenderDevice). Anything
 // else (sidecar device, ?gpu=off, CPU geometry source) keeps the readback path. Select it per
 // engine with WebGpuEngineOptions.lookBridge (default true) or engine.setLookBridge(on).
@@ -82,7 +82,7 @@
 // lookSmoke / hookParity diagnostics read the WebGPU engine's field bytes). The engine passes it as
 // ReliefController.update's `bridged` while the bridge is attached (same gate); a rejection or
 // null (bridge destroyed in flight) falls back to the readback path, and the CPU twin stays the
-// lookgpu-off path.
+// ?gpu=off path.
 import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
@@ -170,7 +170,7 @@ export type BridgeTiming = {
 
 /** Why the bridge is off, or null when it may run on `device`. */
 export async function lookBridgeGate(device: Device): Promise<string | null> {
-	if (!lookGpuOn()) return "lookgpu off (or ?gpu=off / no WebGPU)";
+	if (!lookGpuOn()) return "look GPU off (?gpu=off or no WebGPU)";
 	if (device.type !== "webgpu") return "not a WebGPU device";
 	if (!device.features.has("float32-filterable" as never))
 		return "no float32-filterable";
@@ -595,6 +595,10 @@ export class LookBridge {
 		eyeAlt: number;
 		sunDir: Vec3;
 		valid?: () => boolean;
+		/** false = the CPU airlight band (default on; compute-bridge.check A/B) */
+		bandGpu?: boolean;
+		/** false = read the whole haze grid back instead of the arg-min program's pick (default on) */
+		argminGpu?: boolean;
 	}): Promise<HazeFit | null> {
 		if (this.destroyed) return null;
 		const t0 = performance.now();
@@ -610,7 +614,11 @@ export class LookBridge {
 				step: 2,
 			},
 			{ geo: o.geo, eyeAlt: o.eyeAlt, sunDir: o.sunDir },
-			{ valid: () => !this.destroyed && (o.valid?.() ?? true) },
+			{
+				valid: () => !this.destroyed && (o.valid?.() ?? true),
+				bandGpu: o.bandGpu,
+				argminGpu: o.argminGpu,
+			},
 		);
 		const cpuMs = performance.now() - t0;
 		const fit = await trackLook(run);

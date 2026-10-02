@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Hook smoke test for the opt-in GPU look passes (scripts/gpu/look-bench.mjs --fn lookSmoke
-// --query "lookgpu=1&style=…"): waits for the engine's async results to land and summarises them,
-// so a run with lookgpu=1 can be compared with one without (the CPU path).
+// --query "style=…"): waits for the engine's async results to land and summarises them,
+// so a run can be compared with one under ?gpu=off (the CPU path).
 import { setFlagOverride } from "#/lib/flags";
 import { lookGpuOn } from "./opt-in";
 
@@ -15,7 +15,6 @@ type Look = {
 	version: number;
 };
 type Eng = {
-	kind?: string;
 	// ReliefController: `current` may be GPU-resident (deck-webgpu bridge); bytes() reads it lazily
 	relief: { field: Field; current?: unknown; bytes(): Promise<Field> };
 	look?: Look;
@@ -37,7 +36,7 @@ export async function lookSmoke(
 	opts: { label?: string } = {},
 ) {
 	const e = engine as Eng;
-	const look = () => (e.kind === "deck" ? e.compLook : e.look) as Look;
+	const look = () => e.compLook as Look;
 	const t0 = performance.now();
 	const wait = async (ok: () => boolean, ms = 25000) => {
 		const t = performance.now();
@@ -56,7 +55,7 @@ export async function lookSmoke(
 	const L = look();
 	return {
 		label: opts.label,
-		renderer: e.kind ?? "deck",
+		renderer: "deck",
 		lookGpuOn: lookGpuOn(),
 		waitedMs: Math.round(performance.now() - t0),
 		relief: f
@@ -92,7 +91,6 @@ export async function lookSmoke(
 
 type Ctl = { key: string };
 type Priv = {
-	kind?: string;
 	relief: Ctl & { field: Field; bytes(): Promise<Field> };
 	haze: Ctl & { fit: Eng["hazeFit"] };
 	fitHaze(): void;
@@ -111,7 +109,7 @@ export async function hookParity(
 	opts: { label?: string } = {},
 ) {
 	const e = engine as Priv;
-	const cl = (e.kind === "deck" ? e.compLook : e.look) as {
+	const cl = e.compLook as {
 		maskIn: unknown[];
 		masks: Look["masks"];
 	};
@@ -123,7 +121,7 @@ export async function hookParity(
 		masks: cl.masks?.data ?? null,
 	});
 	const run = async (flag: string) => {
-		setFlagOverride("lookgpu", flag);
+		setFlagOverride("gpu", flag);
 		e.relief.key = "";
 		e.haze.key = "";
 		cl.maskIn = [];
@@ -135,7 +133,7 @@ export async function hookParity(
 	};
 	const cpu = await run("off");
 	const gpu = await run("on");
-	setFlagOverride("lookgpu", undefined);
+	setFlagOverride("gpu", undefined);
 	const bytes = (a: Uint8Array | null, b: Uint8Array | null) => {
 		if (!a || !b) return { present: [!!a, !!b] };
 		let n = 0;
@@ -153,7 +151,7 @@ export async function hookParity(
 			: Math.abs(a - b) / Math.max(1e-12, Math.abs(a));
 	return {
 		label: opts.label,
-		renderer: e.kind ?? "deck",
+		renderer: "deck",
 		relief: bytes(cpu.relief, gpu.relief),
 		masks: bytes(cpu.masks, gpu.masks),
 		haze:

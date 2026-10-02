@@ -8,7 +8,7 @@ OGC 3D Tiles (Google Photorealistic, swisstopo buildings and vegetation) around 
 |---|---|
 | `?tiles3d=` (src/lib/flags) | `off` (default), `swisstopo` (buildings + vegetation), `buildings`, `google`, `all` |
 | `?tiles3dBlend=` | `fill` (default): tiles only where the photo doesn't cover the view. `over`: tiles everywhere (alignment check) |
-| `?tiles3dGeoid=<m>`, `?tiles3dBias=<w>`, `?tiles3dDebug=on` | Datum, depth-bias and deck uniform debugging |
+| `?tiles3dBias=<w>`, `?tiles3dDebug=on` | Datum, depth-bias and deck uniform debugging |
 
 Google needs `VITE_GOOGLE_TILES_KEY` in `.env.local` (gitignored). Without it, Google is skipped with a console warning.
 

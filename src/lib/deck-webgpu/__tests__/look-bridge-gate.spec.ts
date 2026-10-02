@@ -35,7 +35,7 @@ const fakeDevice = (over: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
 	vi.stubGlobal("navigator", { gpu: {} });
-	withFlags({ lookgpu: "on", gpu: "on" });
+	withFlags({ gpu: "on" });
 	compute.reject = false;
 	compute.device = null;
 });
@@ -48,16 +48,14 @@ describe("lookBridgeGate", () => {
 		expect(await lookBridgeGate(d)).toBeNull();
 	});
 
-	it("is closed by ?lookgpu=off, ?gpu=off and a missing navigator.gpu", async () => {
+	it("is closed by ?gpu=off and a missing navigator.gpu", async () => {
 		const d = fakeDevice();
 		compute.device = d;
-		withFlags({ lookgpu: "off", gpu: "on" });
-		expect(await lookBridgeGate(d)).toMatch(/lookgpu off/);
-		withFlags({ lookgpu: "on", gpu: "off" });
-		expect(await lookBridgeGate(d)).toMatch(/lookgpu off/);
-		withFlags({ lookgpu: "on", gpu: "on" });
+		withFlags({ gpu: "off" });
+		expect(await lookBridgeGate(d)).toMatch(/look GPU off/);
+		withFlags({ gpu: "on" });
 		vi.stubGlobal("navigator", {});
-		expect(await lookBridgeGate(d)).toMatch(/lookgpu off/);
+		expect(await lookBridgeGate(d)).toMatch(/look GPU off/);
 	});
 
 	it("is closed for a WebGL device and for a device without float32-filterable", async () => {

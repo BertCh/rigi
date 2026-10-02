@@ -108,7 +108,7 @@ export const K_HZ_SCAN_SG = defineKernel(
 	SCAN_LAYOUT,
 	{ group: LOOK_SUBGROUP_GROUP },
 );
-/** The subgroup scan applies: the device has subgroups and ?statsSubgroups is not off. */
+/** The subgroup scan applies: the device has subgroups and subgroups is not off. */
 export const hazeScanSubgroupsOn = (device: Device) => statsSubgroupsOn(device);
 export const K_HZ_CNT = defineKernel("hz-cnt", HZ_CNT, [
 	["prm", "uniform"],

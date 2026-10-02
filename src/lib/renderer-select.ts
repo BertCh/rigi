@@ -8,8 +8,6 @@
 //                     WebGL deck (src/lib/deck DeckEngine)
 //   ?renderer=webgpu  the same, but asked for explicitly (falls back to WebGL deck with a console warning)
 //   ?renderer=deck    WebGL deck, never WebGPU (the fallback and the escape hatch)
-//   ?backend=webgpu|webgl  luma.gl's example convention; overrides ?renderer (webgpu → webgpu, webgl → deck)
-//   ?renderer=three   retired with the three.js PhotoEngine (2026-10-01): src/lib/flags warns and reads auto
 //
 // ?webgpu=off makes auto / webgpu behave as if navigator.gpu were missing: the switch that proves the WebGL
 // fallback on a WebGPU machine. A WebGpuEngine that fails during start-up also falls back (PhotoWorkspace
@@ -85,9 +83,6 @@ export function probeWebGpu() {
 
 /** The engine the current flags ask for, before probing (decides which chunk to preload). */
 export function requestedRenderer(): "auto" | ResolvedRenderer {
-	const backend = getFlag("backend");
-	if (backend === "webgpu") return "webgpu";
-	if (backend === "webgl") return "deck";
 	return getFlag("renderer");
 }
 

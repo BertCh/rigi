@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Max-mip pyramid of a ring mosaic on the GPU (flag mosaicGpu): the twin of horizon-fast/mosaic.ts
+// Max-mip pyramid of a ring mosaic on the GPU (the GPU mip build): the twin of horizon-fast/mosaic.ts
 // gridMips. The mosaic's heights are uploaded once into the march's storage page and the mips are
 // built there, in place, so the CPU never builds (or uploads) the pyramid.
 //

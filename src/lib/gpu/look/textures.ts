@@ -1037,8 +1037,8 @@ export type StatsTexInput = {
 
 export type StatsTexResult = {
 	/**
-	 * the result on the GPU: with the GPU fold (?statsFold=gpu, the default) the folded ColorStats words
-	 * (STATS_WORDS f32, color-stats-fold.wgsl.ts STATS_LAYOUT); with ?statsFold=f64 the per-workgroup
+	 * the result on the GPU: with the GPU fold (fold "gpu", the default) the folded ColorStats words
+	 * (STATS_WORDS f32, color-stats-fold.wgsl.ts STATS_LAYOUT); with fold "f64" the per-workgroup
 	 * partial sums (32 × 52 f32)
 	 */
 	buffer: Buffer;
@@ -1162,7 +1162,7 @@ function addStatsNodes(
 /**
  * The compiled band-stats graph of `plan` (cached; extra = its per-call parameter buffer). The output
  * import "out" (bound per run) receives the folded ColorStats words (GPU fold: a GPUProgram lowered
- * onto the graph, color-stats-fold.ts) or the partials (?statsFold=f64).
+ * onto the graph, color-stats-fold.ts) or the partials (fold "f64").
  */
 function statsGraph(device: Device, plan: StatsPlan) {
 	return cachedGraphFrom<void, Buffer>(
@@ -1213,7 +1213,7 @@ function statsWords(plan: StatsPlan, minRange: number, minCount: number) {
 	);
 }
 
-/** bandStatsGpu's float64 fold of the partials (keep in sync; ?statsFold=f64). */
+/** bandStatsGpu's float64 fold of the partials (keep in sync; fold "f64"). */
 function foldPartials(data: ArrayBuffer, minCount: number): ColorStats {
 	const p = new Float32Array(data);
 	const acc = new Float64Array(N_BANDS * 12);
@@ -1238,8 +1238,8 @@ function statsOf(plan: StatsPlan, data: ArrayBuffer, minCount: number) {
 
 /**
  * CompositeLook.setStats' GPU band stats from textures: one submit, 256 B back with the GPU fold (the
- * default; 6.6 KB with ?statsFold=f64), or none (`read: false`: the result stays in `buffer`).
- * `subgroups` as bandStatsGpu's (default ?statsSubgroups, on where the device has them). When
+ * default; 6.6 KB with fold "f64"), or none (`read: false`: the result stays in `buffer`).
+ * `subgroups` as bandStatsGpu's (default subgroups, on where the device has them). When
  * BAND_STATS_SG's layout check fails, a read call re-runs without subgroups; without a read, the
  * folded words say valid = -1 (a GPU consumer treats them as invalid stats).
  */

@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // npx tsx src/lib/gpu/look/haze-band.check.ts [scenes]   (exits 1 on failure; CI fast tier: 8)
-// Node check of the GPU airlight band (./haze-band.ts, ?hazeBandGpu, default on), no GPU:
+// Node check of the GPU airlight band (./haze-band.ts, the GPU band, default on), no GPU:
 //  1. keyBelow / orderKey: for f32 x and the band's constants (0.5, 0.7) and random doubles,
 //     `x < c` ⟺ orderKey(bits(x)) ≤ keyBelow(c), on random and adversarial x (±0, subnormals, ±∞,
 //     the f32 neighbours of each constant);

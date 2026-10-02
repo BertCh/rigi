@@ -18,9 +18,8 @@
 // the per-workgroup partials were already f32 sums, so the fold adds ≤ 32 more f32 roundings per value
 // (look-bench / scripts/gpu/stats-fold-bench.mjs measure the ColorStats and composite deltas).
 //
-// The CPU f64 fold stays: ?statsFold=f64 (src/lib/flags), and the fallback when this graph fails.
+// The CPU f64 fold stays: the `fold: "f64"` option, and the fallback when this graph fails.
 import { Buffer, type Device } from "@luma.gl/core";
-import { getFlag } from "#/lib/flags";
 import {
 	type ColorStats,
 	identityStats,
@@ -234,9 +233,9 @@ export const subgroupLayoutFailed = (data: ArrayBuffer) =>
 /** Devices on which building or running the fold graph threw: the f64 fold from then on. */
 const foldFailed = new WeakSet<Device>();
 
-/** The GPU fold applies (the option, else ?statsFold; and it has not failed on this device). */
+/** The GPU fold applies (the option, else on; and it has not failed on this device). */
 export const statsFoldOn = (device: Device, opt?: "gpu" | "f64") =>
-	(opt ?? getFlag("statsFold")) === "gpu" && !foldFailed.has(device);
+	(opt ?? "gpu") === "gpu" && !foldFailed.has(device);
 
 /** The fold graph threw on `device` (e.g. a lowering or pipeline error): warn once, then f64. */
 export function markFoldFailed(device: Device, error: unknown) {

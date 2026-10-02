@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // npx tsx src/lib/gpu/look/haze-argmin.check.ts [grids]   (exits 1 on failure; CI fast tier: 400)
-// Node check of the haze grid's GPU arg-min program (./haze-argmin.ts, ?hazeArgminGpu, default on),
+// Node check of the haze grid's GPU arg-min program (./haze-argmin.ts, the GPU arg-min, default on),
 // no GPU:
 //  1. emulatePick (the program's integer min / candidate / rank logic exactly, its f32 tolerance via
 //     Math.fround, the cand kernel's atomic slot order randomly permuted) → decodePick →

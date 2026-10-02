@@ -7,7 +7,7 @@
 // coverage, no people, ≥ 3 px from the sky) and the range band; then per band Σ and Σ² of both
 // Oklab triples and the count, reduced per workgroup. The per-workgroup partials are folded and
 // finalized (reduceBands' std floors and empty-band back-fill) on the GPU by default
-// (color-stats-fold.ts, f32), or read back and folded on the CPU in float64 (?statsFold=f64).
+// (color-stats-fold.ts, f32), or read back and folded on the CPU in float64 (fold "f64").
 // @workgroup_size(64): 13 × 4 bands = 52 partial sums per invocation in workgroup memory
 // (64 × 52 × 4 B = 13 KB, under the 16 KB limit); each invocation strides over ~20 pixels first.
 // BAND_STATS_SG is the same with subgroup reductions (needs the "subgroups" feature): equal up to

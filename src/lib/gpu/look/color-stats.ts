@@ -4,15 +4,14 @@
 
 // GPU twin of look/color-stats.ts `reduceBands(...bandInputs(...))`: Oklab, masks and the per-band
 // Σ / Σ² reduction on the GPU (color-stats.wgsl.ts), as core ComputeGraphs (color-stats-graph.ts).
-// Default (?statsFold=gpu, since 2026-10-01): the per-workgroup partials are folded and finalized on the
+// Default (fold "gpu", since 2026-10-01): the per-workgroup partials are folded and finalized on the
 // GPU too (color-stats-fold.ts: luma GPUProgramSpMV + BAND_FINALIZE, f32) and only the ColorStats
-// (256 B) comes back. ?statsFold=f64: the 52 floats per workgroup come back and are folded here in
+// (256 B) comes back. fold "f64": the 52 floats per workgroup come back and are folded here in
 // float64, then finalizeBands.
-// Subgroups (default on where the device has them, ?statsSubgroups=off): the per-workgroup reduction by
+// Subgroups (default on where the device has them, `subgroups: false` opts out): the per-workgroup reduction by
 // subgroupAdd (BAND_STATS_SG), equal to the shared-memory tree up to float-sum reassociation, with a
 // layout check whose failure re-runs the plain kernel.
 import type { Device } from "@luma.gl/core";
-import { getFlag } from "#/lib/flags";
 import {
 	type ColorStats,
 	identityStats,
@@ -51,16 +50,15 @@ export const K_BAND_STATS_SG = defineKernel(
 );
 
 export type BandStatsOptions = {
-	/** Use the subgroup reduction when the device has subgroups (default: ?statsSubgroups, on). */
+	/** Use the subgroup reduction when the device has subgroups (default on). */
 	subgroups?: boolean;
-	/** Where the partials are folded (default: ?statsFold, gpu). */
+	/** Where the partials are folded (default gpu). */
 	fold?: "gpu" | "f64";
 };
 
-/** The subgroup reduction applies (the option, else the flag; and the device has subgroups). */
+/** The subgroup reduction applies (the option, else on; and the device has subgroups). */
 export const statsSubgroupsOn = (device: Device, opt?: boolean) =>
-	(opt ?? getFlag("statsSubgroups") === "on") &&
-	hasFeature(device, "subgroups");
+	(opt ?? true) && hasFeature(device, "subgroups");
 
 /** BAND_STATS' parameter words (+ minCount for BAND_FINALIZE): 24 bytes. */
 export function statsParamWords(

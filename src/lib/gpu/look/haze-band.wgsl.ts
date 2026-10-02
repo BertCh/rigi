@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// WGSL for the haze fit's airlight band on the GPU (./haze-band.ts, ?hazeBandGpu, default on): haze.ts
+// WGSL for the haze fit's airlight band on the GPU (./haze-band.ts, the GPU band, default on): haze.ts
 // airlightBand's per-column walk, exactly. No float arithmetic: range and P(sky) are bound as u32
 // bit patterns and every test is an integer compare on an order-preserving key, so subnormal
 // flushing, fused multiply-add or fast-math cannot change a decision (precision README, rule 5).
