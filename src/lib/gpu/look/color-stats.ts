@@ -27,6 +27,7 @@ import {
 	subgroupLayoutFailed,
 } from "./color-stats-fold";
 import { defineKernel } from "./kernel";
+import { STATS_PARAMS } from "./uniform-blocks";
 
 const LAYOUT: Parameters<typeof defineKernel>[2] = [
 	["prm", "uniform"],
@@ -69,11 +70,15 @@ export function statsParamWords(
 	minRange: number,
 	minCount: number,
 ): ArrayBuffer {
-	const words = new ArrayBuffer(24);
-	new Uint32Array(words, 0, 4).set([w, h, GROUPS * WG, hasFg ? 1 : 0]);
-	new Float32Array(words, 16, 1)[0] = minRange;
-	new Uint32Array(words, 20, 1)[0] = minCount;
-	return words;
+	// the block packs to 32 B; the buffers these words fill are 24 B
+	return STATS_PARAMS.pack({
+		w,
+		h,
+		threads: GROUPS * WG,
+		hasFg: hasFg ? 1 : 0,
+		minRange,
+		minCount,
+	}).slice(0, 24);
 }
 
 export type BandStatsInput = {

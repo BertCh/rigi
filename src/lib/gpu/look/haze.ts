@@ -58,6 +58,7 @@ import {
 	SEL,
 } from "./haze.wgsl";
 import { defineKernel } from "./kernel";
+import { HAZE_GRID_PARAMS, HAZE_PREP_PARAMS } from "./uniform-blocks";
 
 export const K_HZ_PREP = defineKernel("hz-prep", HZ_PREP, [
 	["prm", "uniform"],
@@ -263,15 +264,19 @@ export function prepUploads(
 			Math.min(photo.height, Math.floor((y + 1) * sy)),
 		);
 	}
-	const words = new ArrayBuffer(36);
-	new Uint32Array(words, 0, 5).set([W, H, photo.width, rad, fgRad]);
 	const lo = Math.log(DMIN);
-	new Float32Array(words, 20, 4).set([
+	// 36 B of fields; the block packs to 48
+	const words = HAZE_PREP_PARAMS.pack({
+		W,
+		H,
+		pw: photo.width,
+		rad,
+		fgRad,
 		lo,
-		Math.log(DMAX) - lo,
-		Math.max(150, DMIN),
-		DMAX,
-	]);
+		span: Math.log(DMAX) - lo,
+		rmin: Math.max(150, DMIN),
+		rmax: DMAX,
+	}).slice(0, 36);
 	return { xb, yb, words };
 }
 
@@ -312,22 +317,17 @@ export function gridUploads(
 			iw[(c * S + s) * 2] = Ic[c][s];
 			iw[(c * S + s) * 2 + 1] = wp[c][s];
 		}
-	const words = new ArrayBuffer(64);
-	new Uint32Array(words, 0, 4).set([S, NH, GRID_A, GRID_B]);
-	new Float32Array(words, 16, 12).set([
-		airlight[0],
-		airlight[1],
-		airlight[2],
-		0,
-		BETA_R0[0],
-		BETA_R0[1],
-		BETA_R0[2],
-		0,
+	const words = HAZE_GRID_PARAMS.pack({
+		S,
+		NH,
+		NA: GRID_A,
+		NB: GRID_B,
+		air: [airlight[0], airlight[1], airlight[2], 0],
+		betaR0: [BETA_R0[0], BETA_R0[1], BETA_R0[2], 0],
 		lam,
 		jBar,
 		priorK,
-		0,
-	]);
+	});
 	const cells = NH * GRID_A * GRID_B;
 	return { flat, off, iw, words, cells };
 }

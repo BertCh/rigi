@@ -15,3 +15,15 @@ export const FOLD_U = defineUniformBlock({
 	nPitch: "u32",
 	e2: "f32",
 });
+
+/** coarse.wgsl.ts COARSE_WGSL struct U (32 B); packCoarse in solve/index.ts. */
+export const COARSE_U = defineUniformBlock({
+	nObs: "u32",
+	nPitch: "u32",
+	nYaw: "u32",
+	nH: "u32",
+	trunc: "f32",
+	wSum: "f32",
+	nBlk: "u32",
+	band: "f32",
+});

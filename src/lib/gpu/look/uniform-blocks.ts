@@ -121,3 +121,63 @@ export const HAZE_COUNT_PARAMS = defineUniformBlock({
 	K: "u32",
 	pad: "u32",
 });
+
+/** color-stats.wgsl.ts BAND_STATS `P` (20 B of fields) plus BAND_FINALIZE's minCount word at byte 20. */
+export const STATS_PARAMS = defineUniformBlock({
+	w: "u32",
+	h: "u32",
+	threads: "u32",
+	hasFg: "u32",
+	minRange: "f32",
+	minCount: "u32",
+});
+
+/** haze.wgsl.ts grid kernel `G` (64 B). */
+export const HAZE_GRID_PARAMS = defineUniformBlock({
+	S: "u32",
+	NH: "u32",
+	NA: "u32",
+	NB: "u32",
+	air: "vec4<f32>",
+	betaR0: "vec4<f32>",
+	lam: "f32",
+	jBar: "f32",
+	priorK: "f32",
+	pad: "f32",
+});
+
+/** haze-band.wgsl.ts `B` (32 B). */
+export const HAZE_BAND_PARAMS = defineUniformBlock({
+	W: "u32",
+	H: "u32",
+	nCol: "u32",
+	a0: "u32",
+	a1: "u32",
+	keyBelowHalf: "u32",
+	keyBelow07: "u32",
+	kMax: "u32",
+});
+
+/** relief.wgsl.ts `P` (80 B). */
+export const RELIEF_PARAMS = defineUniformBlock({
+	res: "u32",
+	resH: "u32",
+	sa: "u32",
+	sb: "u32",
+	s: "i32",
+	sFloor: "i32",
+	sFrac: "f32",
+	drop: "f32",
+	w: "f32",
+	bias: "f32",
+	shadowConst: "i32",
+	pxH: "f32",
+	ra: "i32",
+	rb: "i32",
+	da: "i32",
+	db: "i32",
+	ka: "f32",
+	kb: "f32",
+	g: "f32",
+	svfR: "f32",
+});

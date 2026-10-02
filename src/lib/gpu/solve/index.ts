@@ -34,6 +34,7 @@ import {
 	planCoarse,
 	type YawCost,
 } from "./cpu";
+import { COARSE_U } from "./uniforms";
 
 export {
 	type CoarsePlan,
@@ -234,15 +235,18 @@ export function packCoarse(p: CoarsePlan, o: CoarseGpuOptions) {
 		pitch[j * 2] = p.dps[j];
 		pitch[j * 2 + 1] = priorPitch(p, p.dps[j]);
 	}
-	const ub = new ArrayBuffer(32);
-	const uU = new Uint32Array(ub);
-	const uF = new Float32Array(ub);
-	uU.set([nObs, nPitch, nYaw, nH]);
-	uF.set([p.trunc, p.wSum], 4);
-	uU[6] = nBlk;
 	const eps = costBound(p, hz) * Math.max(1, o.epsScale ?? 1);
-	// 2ε, plus 0.5ε of slack for the f32 rounding of (minimum + band), which is ≤ u·max cost ≪ ε
-	uF[7] = 2.5 * eps;
+	const ub = COARSE_U.pack({
+		nObs,
+		nPitch,
+		nYaw,
+		nH,
+		trunc: p.trunc,
+		wSum: p.wSum,
+		nBlk,
+		// 2ε, plus 0.5ε of slack for the f32 rounding of (minimum + band), which is ≤ u·max cost ≪ ε
+		band: 2.5 * eps,
+	});
 	return { nH, nObs, nYaw, nPitch, nBlk, hz, obU, yU, pitch, ub, eps };
 }
 

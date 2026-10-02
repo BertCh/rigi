@@ -31,6 +31,7 @@ import {
 	SPOT_COLUMNS,
 } from "./haze-band.wgsl";
 import { defineKernel } from "./kernel";
+import { HAZE_BAND_PARAMS } from "./uniform-blocks";
 
 export { RANGE_GROUP, SPOT_COLUMNS } from "./haze-band.wgsl";
 
@@ -135,16 +136,18 @@ export function bandShape(W: number, H: number) {
 /** hzb-*'s uniform: W, H, nCol, a0, a1, key below 0.5, key below 0.7, kMax. */
 export function bandWords(W: number, H: number) {
 	const { a0, a1, nCol, kMax } = bandShape(W, H);
-	return new Uint32Array([
-		W,
-		H,
-		nCol,
-		a0,
-		a1,
-		keyBelow(0.5),
-		keyBelow(0.7),
-		kMax,
-	]);
+	return new Uint32Array(
+		HAZE_BAND_PARAMS.pack({
+			W,
+			H,
+			nCol,
+			a0,
+			a1,
+			keyBelowHalf: keyBelow(0.5),
+			keyBelow07: keyBelow(0.7),
+			kMax,
+		}),
+	);
 }
 
 /** hzb-count / total / scatter on the CPU, on the planes' bit patterns: per-column counts and the band. */

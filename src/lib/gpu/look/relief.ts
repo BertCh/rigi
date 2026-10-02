@@ -24,6 +24,7 @@ import {
 	RELIEF_SUM,
 	RELIEF_SVF,
 } from "./relief.wgsl";
+import { RELIEF_PARAMS } from "./uniform-blocks";
 
 export const K_RELIEF_SHADOW = defineKernel("relief-shadow", RELIEF_SHADOW, [
 	["prm", "uniform"],
@@ -133,40 +134,27 @@ export function reliefWords(
 	const da = Math.max(1, Math.round(ra / Math.SQRT2));
 	const db = Math.max(1, Math.round(rb / Math.SQRT2));
 
-	const words = new ArrayBuffer(80);
-	const dv = new DataView(words);
-	let o = 0;
-	const u32 = (v: number) => {
-		dv.setUint32(o, v, true);
-		o += 4;
-	};
-	const i32 = (v: number) => {
-		dv.setInt32(o, v, true);
-		o += 4;
-	};
-	const f32 = (v: number) => {
-		dv.setFloat32(o, v, true);
-		o += 4;
-	};
-	u32(res);
-	u32(resH);
-	u32(xMajor ? 1 : res); // sa
-	u32(xMajor ? res : 1); // sb
-	i32(major > 0 ? 1 : -1); // s
-	i32(Math.floor(slope)); // b0 = b + floor(slope)
-	f32(slope - Math.floor(slope)); // the interpolation weight, constant along a row
-	f32(drop);
-	f32(Math.max(8, 0.6 * drop)); // w
-	f32(0.6 + 0.15 * px); // bias
-	i32(degenerate ? (sun[2] <= -0.02 ? 0 : 255) : -1);
-	f32(px * 2); // pxH
-	i32(ra);
-	i32(rb);
-	i32(da);
-	i32(db);
-	f32((0.55 / (ra * px * 0.35)) * 0.125); // ka
-	f32((0.45 / (rb * px * 0.3)) * 0.125); // kb
-	f32(1 / (2 * ra * px)); // g
-	f32(SVF_R);
+	const words = RELIEF_PARAMS.pack({
+		res,
+		resH,
+		sa: xMajor ? 1 : res,
+		sb: xMajor ? res : 1,
+		s: major > 0 ? 1 : -1,
+		sFloor: Math.floor(slope), // b0 = b + floor(slope)
+		sFrac: slope - Math.floor(slope), // the interpolation weight, constant along a row
+		drop,
+		w: Math.max(8, 0.6 * drop),
+		bias: 0.6 + 0.15 * px,
+		shadowConst: degenerate ? (sun[2] <= -0.02 ? 0 : 255) : -1,
+		pxH: px * 2,
+		ra,
+		rb,
+		da,
+		db,
+		ka: (0.55 / (ra * px * 0.35)) * 0.125,
+		kb: (0.45 / (rb * px * 0.3)) * 0.125,
+		g: 1 / (2 * ra * px),
+		svfR: SVF_R,
+	});
 	return { words, degenerate };
 }

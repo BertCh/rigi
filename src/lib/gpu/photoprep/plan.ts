@@ -5,7 +5,20 @@
 // CPU-side inputs of the photo-prep kernels that come from align.ts's own float expressions, evaluated
 // here with the CPU's code so the kernels only ever compare integers against them.
 import { stopHasBand } from "#/lib/align";
-import { DIMS_WORDS, WG } from "./kernels.wgsl";
+import { defineUniformBlock } from "../core/uniform-block";
+import { WG } from "./kernels.wgsl";
+
+/** kernels.wgsl.ts `struct Dims` (32 B = DIMS_WORDS words). */
+export const PHOTOPREP_DIMS = defineUniformBlock({
+	w: "u32",
+	h: "u32",
+	n: "u32",
+	k: "u32",
+	t12: "u32",
+	band: "u32",
+	r80: "u32",
+	nonce: "u32",
+});
 
 /**
  * The kernels' Dims uniform (kernels.wgsl.ts): sizes, the percentile rank, scanLabels' rows and the
@@ -13,16 +26,18 @@ import { DIMS_WORDS, WG } from "./kernels.wgsl";
  */
 export function photoPrepDims(w: number, h: number, nonce = 1) {
 	const n = w * h;
-	const u = new Uint32Array(DIMS_WORDS);
-	u[0] = w;
-	u[1] = h;
-	u[2] = n;
-	u[3] = Math.floor(n * 0.97); // buildEdgeMap's kthSmallest rank (E.length = n)
-	u[4] = Math.round(h * 0.12); // scanLabels: sky rows of a column without a stop
-	u[5] = Math.round(h * 0.06); // scanLabels: terrain band height
-	u[6] = Math.round(h * 0.8); // scanLabels: terrain from this row down
-	u[7] = nonce;
-	return u;
+	return new Uint32Array(
+		PHOTOPREP_DIMS.pack({
+			w,
+			h,
+			n,
+			k: Math.floor(n * 0.97), // buildEdgeMap's kthSmallest rank (E.length = n)
+			t12: Math.round(h * 0.12), // scanLabels: sky rows of a column without a stop
+			band: Math.round(h * 0.06), // scanLabels: terrain band height
+			r80: Math.round(h * 0.8), // scanLabels: terrain from this row down
+			nonce,
+		}),
+	);
 }
 
 /**
