@@ -68,7 +68,7 @@ The skyline can't see eye-position error; interior error grows as 1/distance. Pl
 | G2 | **skylineGpu** default: root cause of the IMG_6958 flip is `refinePose` on a wrong-focal seed, not the GPU maths | Off; fix the seed path, then re-run the unknown-pose A/B |
 | G3 | **renderBundles**, **rg11b10** colour target | Wired, opt-in; judge in a batch pass |
 | G4 | luma watch (was LF8) (`node scripts/upstream/luma-watch.mjs`): re-sweep on alpha.3, a moved vendored PR head or deck #10752 activity | Tooling built; 10-02 run: no trigger fired, no re-sweep ([note](../research_notes/gpu-pod-d-2026-10-02/luma-watch-2026-10-02.md)) |
-| G5 | Animated looks (water, wind) watched live; waves fade by ~10 km | Still-frame only |
+| G5 | Animated looks (water, wind) watched live; waves fade by ~10 km | Still-frame only; 10-02 fade pinned in node (`look/__tests__/water-waves-fade.spec.ts`: full strength to ~1 km, under half by 10 km, flat past 29.8 km); live watch is a batch item |
 
 ## Later: beta, pilots, service (3–18 months)
 
