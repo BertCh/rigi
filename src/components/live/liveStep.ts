@@ -126,10 +126,35 @@ export class LiveStep {
 	private calibratedAt: CalibrationPose | null = null;
 	private refitPending = false;
 
-	constructor(private readonly opts: LiveStepOptions) {}
+	/** the engine the session draws into; replaced by attachHost when the live engine is rebuilt at a new eye */
+	private host: LiveStepHost;
+
+	constructor(private readonly opts: LiveStepOptions) {
+		this.host = opts.host;
+	}
+
+	/**
+	 * The engine was rebuilt (the eye moved, so the EnuFrame changed): draw into the new one and refit the
+	 * shift / anchor and the DEM grid from the next depth run, which also resets the ENU-frame calibration
+	 * pose. The splats already in the buffer are in the old frame and are overwritten by the next runs.
+	 */
+	attachHost(host: LiveStepHost) {
+		if (this.disposed || host === this.host) return;
+		this.unsubscribe?.();
+		this.bridge?.stop();
+		this.host = host;
+		const live = this.live;
+		if (!live) return;
+		this.bridge = new LiveSplatBridge(host, live, { hz: FALLBACK_MAX_HZ });
+		this.bridge.start();
+		this.unsubscribe = host.onRender(() => this.tick());
+		this.calibratedAt = null;
+		this.refitPending = this.calibrated;
+	}
 
 	async start() {
-		const { host, video, onState } = this.opts;
+		const { video, onState } = this.opts;
+		const host = this.host;
 		onState("loading", "Loading the depth model");
 		const device = await getComputeDevice();
 		if (!device || device.type !== "webgpu") {
@@ -225,7 +250,7 @@ export class LiveStep {
 	private tick() {
 		const live = this.live;
 		if (this.disposed || !live || !this.net) return;
-		const { host } = this.opts;
+		const host = this.host;
 		const camera = this.currentCamera();
 		live.setCamera(camera);
 		const texture = this.updateVideoTexture();
@@ -255,7 +280,7 @@ export class LiveStep {
 	}
 
 	private currentCamera() {
-		const { host } = this.opts;
+		const host = this.host;
 		const pose = host.pose;
 		const eye = host.eye;
 		return {
@@ -274,7 +299,8 @@ export class LiveStep {
 		const planes = this.planes;
 		const device = this.device;
 		if (!net || !nn || !grid || !canvas || !planes || !device) return;
-		const { video, host } = this.opts;
+		const { video } = this.opts;
+		const host = this.host;
 		if (!video.videoWidth || video.readyState < 2) return;
 		this.inFlight = true;
 		// the pose and video frame this run sees (the net input is drawn from this frame, synchronously)

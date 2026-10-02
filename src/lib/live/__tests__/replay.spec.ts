@@ -3,7 +3,12 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { describe, expect, it } from "vitest";
-import { interpolateSample, loadReplay, parseSidecar } from "../replay";
+import {
+	interpolateEye,
+	interpolateSample,
+	loadReplay,
+	parseSidecar,
+} from "../replay";
 
 const samples = [
 	{ t: 0, yaw: 350, pitch: 0, roll: 0 },
@@ -81,5 +86,40 @@ describe("loadReplay", () => {
 			throw new Error("offline");
 		}) as unknown as typeof fetch);
 		expect(broken.sidecar).toBeNull();
+	});
+});
+
+describe("eyes track", () => {
+	const eyes = [
+		{ t: 0, lat: 46, lon: 7, accuracy: 5 },
+		{ t: 10, lat: 46.1, lon: 7.2, alt: 1000, accuracy: 20 },
+	];
+	it("parses, sorts, and defaults the eye to the first point", () => {
+		const parsed = parseSidecar({
+			eyes: [eyes[1], { t: "x" }, eyes[0], { t: 5, lat: 46, lon: 7 }],
+		});
+		expect(parsed?.eyes?.map((e) => e.t)).toEqual([0, 5, 10]);
+		expect(parsed?.eyes?.[1].accuracy).toBe(5);
+		expect(parsed?.eye).toMatchObject({ lat: 46, lon: 7 });
+	});
+	it("interpolates and holds at the ends", () => {
+		expect(interpolateEye(eyes, 5, 9)).toMatchObject({
+			lat: 46.05,
+			lon: 7.1,
+			accuracy: 20,
+			time: 9,
+		});
+		expect(interpolateEye(eyes, 99, 0)?.lat).toBe(46.1);
+		expect(interpolateEye([], 1, 0)).toBeNull();
+	});
+	it("feeds the track through eyeAt by the video clock", async () => {
+		const fetchImpl = (async () => ({
+			ok: true,
+			json: async () => ({ samples: [], eyes }),
+		})) as unknown as typeof fetch;
+		const feed = await loadReplay("clip.mp4", fetchImpl);
+		const video = { currentTime: 10 } as HTMLVideoElement;
+		expect(feed.eyeAt(video, 1)?.lat).toBe(46.1);
+		expect(feed.eye(1)?.lat).toBe(46);
 	});
 });
