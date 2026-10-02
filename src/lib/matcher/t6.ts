@@ -33,7 +33,7 @@ import {
 	tick,
 	type ViewPose,
 } from "./context";
-import { type Correspondences, legacySolve, subsetCorr } from "./core";
+import { type Correspondences, type legacySolve, subsetCorr } from "./core";
 import { HIGH_CONF, LOW_CONF } from "./fusion";
 import { dang, hfovFromVfov, vfovFromHfov } from "./geometry";
 import {
@@ -64,6 +64,7 @@ import {
 	verified,
 	veto,
 } from "./rule";
+import { legacySolveOffThread } from "./solve-offthread";
 
 export const MAX_VERIFY = 6;
 export const SKY_K = 4;
@@ -164,7 +165,7 @@ async function fineSweep(ctx: MatchContext, s: AdhocSetup) {
 				matchMs: c.matchMs,
 			};
 			const prior = { yaw: views[i].pose.yaw, pitch: 0, roll: 0, vfov: vf };
-			const r = await legacySolve(sub, views, eye, prior, {
+			const r = await legacySolveOffThread(sub, views, eye, prior, {
 				freeFocal: !s.focalKnown,
 			});
 			if (r.pose && r.inliers >= SWEEP_WIN_MIN_INL)
@@ -261,7 +262,7 @@ async function narrowStage1(
 			continue;
 		}
 		const c = await correspond(ctx, views, eye, { maxKp: SWEEP_KP });
-		const s1 = await legacySolve(
+		const s1 = await legacySolveOffThread(
 			c,
 			views,
 			eye,
@@ -356,7 +357,7 @@ async function runOnce(
 		let s40: Awaited<ReturnType<typeof legacySolve>> | null = null;
 		if (views.length) {
 			const c40 = await correspond(ctx, views, eye, { maxKp: SWEEP_KP });
-			s40 = await legacySolve(c40, views, eye, p0, {
+			s40 = await legacySolveOffThread(c40, views, eye, p0, {
 				freeFocal: !s.focalKnown,
 			});
 		}

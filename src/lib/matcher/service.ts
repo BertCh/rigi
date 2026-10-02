@@ -14,12 +14,7 @@ import type {
 	MatchResult,
 	SkylineCueInput,
 } from "#/lib/matcher-client";
-import {
-	assemble,
-	Deadline,
-	MATCHER_VERSION,
-	type StageResult,
-} from "./assemble";
+import { Deadline, MATCHER_VERSION, type StageResult } from "./assemble";
 import { boundMatcherEngine } from "./binding";
 import {
 	Cancelled,
@@ -33,6 +28,7 @@ import {
 import type { View } from "./core";
 import { skylineFromArrays } from "./fusion";
 import { matchAdhoc, matchKnownPrior } from "./pipeline";
+import { assembleOffThread } from "./solve-offthread";
 import { matchAdhocT6 } from "./t6";
 
 export { bindMatcherEngine, type MatcherEngine } from "./binding";
@@ -172,7 +168,7 @@ async function matchViews(
 		if (!sk) note = "no skyline parts and no photoId to export them for";
 	}
 	const corr = await correspond(ctx, views, req.eye);
-	return assemble(corr, views, req.eye, req.prior, sk, {
+	return assembleOffThread(corr, views, req.eye, req.prior, sk, {
 		fused,
 		freeFocal: !!req.freeFocal,
 		deadline: ctx.deadline,

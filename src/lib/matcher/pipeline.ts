@@ -13,7 +13,7 @@
 // "basinGap unavailable (...)", exactly as the service did when the check could not run.
 
 import type { Pose } from "#/lib/camera";
-import { assemble, type StageResult } from "./assemble";
+import type { StageResult } from "./assemble";
 import {
 	alignRuns,
 	correspond,
@@ -26,9 +26,10 @@ import {
 	tick,
 	type ViewPose,
 } from "./context";
-import { legacySolve } from "./core";
+import type { LegacySolve } from "./core";
 import { LOW_CONF } from "./fusion";
 import { dang, hfovFromVfov, vfovFromHfov } from "./geometry";
+import { assembleOffThread, legacySolveOffThread } from "./solve-offthread";
 
 export const DEFAULT_OFFSETS = [-20, -10, 0, 10, 20];
 export const ADHOC_DEFAULT_HFOV = 50.0;
@@ -63,7 +64,7 @@ export async function matchKnownPrior(
 	const renderMs = performance.now() - t0;
 	const corr = await correspond(ctx, views, eye);
 	tick(ctx, "solve");
-	const res = await assemble(corr, views, eye, prior, sk, {
+	const res = await assembleOffThread(corr, views, eye, prior, sk, {
 		fused,
 		freeFocal: !!o.freeFocal,
 		deadline: ctx.deadline,
@@ -233,9 +234,7 @@ async function narrowStage1(
 	});
 	const dy = 0.8 * s.hfov;
 	const dp = 0.8 * p0.vfov;
-	let best:
-		| [(typeof use)[number], Awaited<ReturnType<typeof legacySolve>>]
-		| null = null;
+	let best: [(typeof use)[number], LegacySolve] | null = null;
 	const tried: Record<string, unknown>[] = [];
 	for (const sd of use) {
 		if (performance.now() > ctx.deadline - 30_000) break;
@@ -263,7 +262,7 @@ async function narrowStage1(
 		}
 		const eye = eyeOf(ctx.engine);
 		const c = await correspond(ctx, views, eye, { maxKp: SWEEP_KP });
-		const s1 = await legacySolve(
+		const s1 = await legacySolveOffThread(
 			c,
 			views,
 			eye,
@@ -327,11 +326,11 @@ async function seededStage1(
 		const views = await renderViews(ctx, fanPoses(pr, [-half, 0, half]), {
 			allowEmpty: true,
 		});
-		let s1: Awaited<ReturnType<typeof legacySolve>> | null = null;
+		let s1: LegacySolve | null = null;
 		if (views.length) {
 			const eye = eyeOf(ctx.engine);
 			const c = await correspond(ctx, views, eye, { maxKp: SWEEP_KP });
-			s1 = await legacySolve(c, views, eye, pr, {
+			s1 = await legacySolveOffThread(c, views, eye, pr, {
 				freeFocal: !s.focalKnown,
 			});
 		}
@@ -388,7 +387,7 @@ export async function stage2(
 	);
 	const corr = await correspond(ctx, views, eye);
 	tick(ctx, "solve");
-	const res = await assemble(corr, views, eye, prior2, sk, {
+	const res = await assembleOffThread(corr, views, eye, prior2, sk, {
 		fused: s.fused,
 		freeFocal: !s.focalKnown,
 		deadline: ctx.deadline,
@@ -453,7 +452,7 @@ export async function matchAdhoc(
 		const views1 = await renderViews(ctx, fanPoses(s.p0, offs));
 		const eye = eyeOf(ctx.engine);
 		const c1 = await correspond(ctx, views1, eye, { maxKp: SWEEP_KP });
-		const s1 = await legacySolve(c1, views1, eye, s.p0, {
+		const s1 = await legacySolveOffThread(c1, views1, eye, s.p0, {
 			freeFocal: !s.focalKnown,
 		});
 		const ok1 = !!s1.pose && s1.inliers >= ADHOC_STAGE1_MIN_INLIERS;
