@@ -18,11 +18,12 @@ function photosJson(): Plugin {
 		new URL("./public/photos/photos.json", import.meta.url),
 	);
 	const id = "virtual:photos";
+	const resolvedId = `\0${id}`;
 	return {
 		name: "photos-json",
-		resolveId: (s) => (s === id ? "\0" + id : undefined),
+		resolveId: (s) => (s === id ? resolvedId : undefined),
 		load(s) {
-			if (s !== "\0" + id) return;
+			if (s !== resolvedId) return;
 			this.addWatchFile(file);
 			// A fresh clone has no gitignored photos: fall back to an empty list.
 			return `export default ${existsSync(file) ? readFileSync(file, "utf8") : "[]"}`;
