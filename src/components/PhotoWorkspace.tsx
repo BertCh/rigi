@@ -2147,7 +2147,11 @@ export function PhotoWorkspace({
 							</dd>
 							<EyeHeightRow
 								alt={photo.alt}
-								ground={engineRef.current?.demAtCamera ?? Number.NaN}
+								ground={
+									engineRef.current?.demKnown
+										? engineRef.current.demAtCamera
+										: Number.NaN
+								}
 								eyeAlt={engineRef.current?.eyeAlt ?? 0}
 								model={photo.model}
 								lat={photo.lat}

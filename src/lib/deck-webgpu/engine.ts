@@ -509,6 +509,7 @@ export class WebGpuEngine implements Renderer {
 	eye = { x: 0, y: 0, z: 0 };
 	eyeAlt = 0;
 	demAtCamera = 0;
+	demKnown = false;
 	cssSize = { w: 1, h: 1 };
 	/** Override the query / silhouette sources (deck/engine.ts geometryFactory). */
 	geometryFactory?: GeometrySourceFactory;
@@ -1325,6 +1326,7 @@ export class WebGpuEngine implements Renderer {
 		this.queryWedge = wedge;
 		const dem = demHere ?? this.photo.alt ?? 0;
 		this.demAtCamera = dem;
+		this.demKnown = demHere != null;
 		this.setEye(eyeAltitude(this.photo.alt, dem));
 		this.elevRange = localElevRange(terrain);
 		// under terrainGpuDecode the camera gather above spans a GPU round trip, in which onUpdate may

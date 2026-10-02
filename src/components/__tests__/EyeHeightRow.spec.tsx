@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { checkAltitude } from "#/lib/geo/eye-rule";
 import { EyeHeightRow, eyeRuleNote } from "../EyeHeightRow";
@@ -62,15 +62,32 @@ describe("EyeHeightRow", () => {
 		expect(verdict()).toBe("raised");
 	});
 
-	it("flags a geoid-sized lift on an Android model once the grid loads", async () => {
+	it("names the floor when the GPS altitude is underground", () => {
+		row({ alt: G - 40, eyeAlt: G + 1.6 });
+		expect(verdict()).toBe("underground");
+		expect(
+			screen.getByText("ground + 1.6 m: GPS altitude 40 m below"),
+		).toBeTruthy();
+	});
+
+	it("says so when the engine has no DEM at the camera", () => {
+		row({ alt: 1200, ground: Number.NaN, eyeAlt: 1201.6 });
+		expect(verdict()).toBe("no-ground");
+	});
+
+	it("shows a lake-level raise", () => {
+		row({ alt: null, eyeAlt: G + 7 });
+		expect(screen.getByText("raised to the lake level")).toBeTruthy();
+	});
+
+	it("flags a geoid-sized lift on an Android model", () => {
 		row({ alt: G + 1.6 + 49, eyeAlt: G + 50.6, model: "Pixel 8" });
-		await waitFor(() => expect(verdict()).toBe("ellipsoid-suspect"));
+		expect(verdict()).toBe("ellipsoid-suspect");
 		expect(screen.getByText(/above the ellipsoid/)).toBeTruthy();
 	});
 
-	it("never flags an iPhone", async () => {
+	it("never flags an iPhone", () => {
 		row({ alt: G + 1.6 + 49, eyeAlt: G + 50.6, model: "iPhone 15 Pro" });
-		await new Promise((r) => setTimeout(r, 20));
 		expect(verdict()).toBe("raised");
 	});
 });

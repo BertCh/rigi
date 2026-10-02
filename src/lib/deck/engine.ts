@@ -372,6 +372,7 @@ export class DeckEngine implements Renderer {
 	eye = { x: 0, y: 0, z: 0 };
 	eyeAlt = 0;
 	demAtCamera = 0;
+	demKnown = false;
 	cssSize = { w: 1, h: 1 };
 	/**
 	 * Makes the GeometrySources the queries (1024 px) and autoAlign's silhouette re-rank (384 px)
@@ -920,9 +921,10 @@ export class DeckEngine implements Renderer {
 		if (!terrain || this.disposed) return;
 		this.terrain = terrain;
 		this.queryWedge = wedge;
-		const dem =
-			terrain.heightAt(this.photo.lat, this.photo.lon) ?? this.photo.alt ?? 0;
+		const demHere = terrain.heightAt(this.photo.lat, this.photo.lon);
+		const dem = demHere ?? this.photo.alt ?? 0;
 		this.demAtCamera = dem;
+		this.demKnown = demHere != null;
 		this.eyeAlt = eyeAltitude(this.photo.alt, dem);
 		this.eye = { x: 0, y: 0, z: this.eyeAlt };
 		this.fastHorizon?.setEye(this.eyeAlt);

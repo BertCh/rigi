@@ -51,6 +51,8 @@ export interface Renderer {
 	readonly eye: { readonly x: number; readonly y: number; readonly z: number };
 	readonly eyeAlt: number;
 	readonly demAtCamera: number;
+	/** demAtCamera is a DEM height (false: the no-DEM fallback, photo.alt ?? 0). */
+	readonly demKnown: boolean;
 	/** Set once terrain exists; exports only test it for truthiness (engine-export.ts engineReady). */
 	readonly terrain?: unknown;
 	readonly photoElement: HTMLImageElement | undefined;
