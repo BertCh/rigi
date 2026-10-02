@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { expectArrayClose } from "#/test/helpers";
 import {
 	hazeColorAsRendered,
-	hexToLinearLikeThree,
+	hexToLinearHaze,
 	hexToRgb01,
 	hexToRgba01,
 	isHex,
@@ -95,7 +95,7 @@ describe("srgb transfer", () => {
 		).toBeLessThan(1e-5);
 	});
 	it("haze colour double-linearises as documented", () => {
-		const lin = hexToLinearLikeThree("#808080");
+		const lin = hexToLinearHaze("#808080");
 		const out = hazeColorAsRendered("#808080");
 		for (let i = 0; i < 3; i++) expect(out[i]).toBeCloseTo(lin[i] ** 2.2, 12);
 		expect(hazeColorAsRendered("#ffffff")).toEqual([1, 1, 1]);

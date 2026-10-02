@@ -41,9 +41,7 @@ const renderer = rendererEq
 		? args[args.indexOf("--renderer") + 1]
 		: null;
 if (renderer != null && !["deck", "webgpu", "auto"].includes(renderer)) {
-	console.error(
-		`--renderer must be deck, webgpu or auto (got ${renderer}; the three.js renderer was removed)`,
-	);
+	console.error(`--renderer must be deck, webgpu or auto (got ${renderer})`);
 	process.exit(2);
 }
 const rendererQuery = renderer ? `?renderer=${renderer}` : "";

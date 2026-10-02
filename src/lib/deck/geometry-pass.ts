@@ -49,8 +49,8 @@ export function geometrySize(aspect: number, longSide = GEOMETRY_LONG_SIDE) {
 		: { width: Math.round(longSide * aspect), height: longSide };
 }
 
-/** The layers a terrain pass draws: trails join the colour pass only (three hides them in its
- * geometry renders). */
+/** The layers a terrain pass draws: trails join the colour pass only (they are hidden in
+ * the geometry renders). */
 function terrainPassLayer(layer: Layer) {
 	return (
 		isTerrainTile(layer) ||
@@ -61,8 +61,8 @@ function terrainPassLayer(layer: Layer) {
 function terrainPassParameters(layer: Layer) {
 	// trails blend over the terrain colour and depth-test against it (half-float blends fine)
 	if (isTrailLayer(layer)) return { ...layer.props.parameters };
-	// float targets can't blend (EXT_float_blend); the colour pass keeps straight alpha like
-	// three's layerRT (ShaderMaterial transparent: false → NoBlending)
+	// float targets can't blend (EXT_float_blend); the colour pass keeps straight alpha
+	// (no blending in the layer pass)
 	return {
 		...layer.props.parameters,
 		blend: false,

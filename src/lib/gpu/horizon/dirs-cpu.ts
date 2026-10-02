@@ -140,7 +140,7 @@ export class SkylineF64 {
 }
 
 /**
- * ENU unit directions (x east, y north, z up) in PhotoEngine's frame, 3 floats per kept column of
+ * ENU unit directions (x east, y north, z up) in the engine's frame, 3 floats per kept column of
  * GPU_COLUMNS. horizon-fast marches a sphere; the engine's frame is WGS84 (EnuFrame, with the same
  * k = 0.13 refraction lift), whose azimuths differ by up to ~0.09° (M ≠ N). So each skyline sample goes
  * back to its geographic point (the lat/lon horizon-fast sampled, the DEM height it found) and through

@@ -4,32 +4,24 @@
 
 // StepCamera's navigation math without a DOM: the photo-mode clamps, the free-mode terrain rules and
 // the mode switches, driven through the public programmatic API (orbit/pan/dollyBy/setMode/update).
-import * as THREE from "three";
+import { type Quaternion, Vector3 } from "@math.gl/core";
 import { describe, expect, it, vi } from "vitest";
+import { ViewCamera } from "../../camera/view-camera";
+import { poseQuaternion } from "../../pose";
 import {
 	StepCamera,
 	type StepCameraOpts,
 	type StepMapDriver,
 } from "../step-camera";
 
-// photo camera at the origin-ish eye, looking due north and slightly down (three: camera looks -z)
-function photoQuat(yawDeg = 0, pitchDeg = 0) {
-	const y = (yawDeg * Math.PI) / 180;
-	const p = (pitchDeg * Math.PI) / 180;
-	return new THREE.Quaternion()
-		.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -y)
-		.multiply(
-			new THREE.Quaternion().setFromAxisAngle(
-				new THREE.Vector3(1, 0, 0),
-				Math.PI / 2 + p,
-			),
-		);
-}
+// photo camera at the origin-ish eye, looking due north and slightly down (the camera looks down −z)
+const photoQuat = (yaw = 0, pitch = 0) =>
+	poseQuaternion({ yaw, pitch, roll: 0, vfov: 40 });
 
 function make(o: Partial<StepCameraOpts> = {}) {
-	const cam = new THREE.PerspectiveCamera(50, 16 / 9, 0.1, 1e6);
+	const cam = new ViewCamera(50, 16 / 9, 0.1, 1e6);
 	const sc = new StepCamera(cam, null, {
-		eye: new THREE.Vector3(100, 200, 1500),
+		eye: [100, 200, 1500],
 		quaternion: photoQuat(30, 5),
 		vfov: 40,
 		aspect: 4 / 3,
@@ -40,32 +32,31 @@ function make(o: Partial<StepCameraOpts> = {}) {
 	return { cam, sc };
 }
 
-const fwd = (q: THREE.Quaternion) =>
-	new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+const fwd = (q: Quaternion) => new Vector3(0, 0, -1).transformByQuaternion(q);
 
 describe("StepCamera photo mode", () => {
 	it("starts exactly on the photo camera", () => {
 		const { cam, sc } = make();
 		expect(cam.position.distanceTo(sc.eye)).toBeLessThan(1e-9);
-		expect(fwd(cam.quaternion).angleTo(fwd(sc.baseQ))).toBeLessThan(1e-9);
+		expect(fwd(cam.quaternion).angle(fwd(sc.baseQ))).toBeLessThan(1e-9);
 		expect(sc.atPhoto).toBe(true);
 		expect(sc.offsetM).toBeLessThan(1e-9);
 		expect(sc.mode).toBe("photo");
 	});
 
 	it("widens the vertical FOV so a wide photo still fits a narrow viewport, never narrower than the photo", () => {
-		const wide = new THREE.PerspectiveCamera(50, 16 / 9);
+		const wide = new ViewCamera(50, 16 / 9);
 		new StepCamera(wide, null, {
-			eye: new THREE.Vector3(),
+			eye: [0, 0, 0],
 			quaternion: photoQuat(),
 			vfov: 40,
 			aspect: 4 / 3,
 			radius: 40,
 		});
 		expect(wide.fov).toBeCloseTo(40, 6); // 16:9 viewport is wider than the 4:3 photo
-		const narrow = new THREE.PerspectiveCamera(50, 0.5);
+		const narrow = new ViewCamera(50, 0.5);
 		new StepCamera(narrow, null, {
-			eye: new THREE.Vector3(),
+			eye: [0, 0, 0],
 			quaternion: photoQuat(),
 			vfov: 40,
 			aspect: 4 / 3,
@@ -82,7 +73,7 @@ describe("StepCamera photo mode", () => {
 		expect(sc.offsetM).toBeGreaterThan(1);
 		expect(sc.atPhoto).toBe(false);
 		// the capped rotation: yaw <= 45 deg, pitch <= 25 deg relative to the photo
-		const rel = fwd(cam.quaternion).angleTo(fwd(sc.baseQ));
+		const rel = fwd(cam.quaternion).angle(fwd(sc.baseQ));
 		expect(rel).toBeLessThan((60 * Math.PI) / 180);
 	});
 
@@ -91,8 +82,8 @@ describe("StepCamera photo mode", () => {
 		sc.orbit(5, 0);
 		sc.snap();
 		const pivot = sc.eye.clone().addScaledVector(fwd(sc.baseQ), 30);
-		const toPivot = pivot.clone().sub(cam.position).normalize();
-		expect(toPivot.angleTo(fwd(cam.quaternion))).toBeLessThan(0.01);
+		const toPivot = pivot.clone().subtract(cam.position).normalize();
+		expect(toPivot.angle(fwd(cam.quaternion))).toBeLessThan(0.01);
 	});
 
 	it("pan and dolly are clamped to the radius", () => {
@@ -222,7 +213,7 @@ describe("StepCamera modes", () => {
 		const f = fwd(cam.quaternion);
 		expect(f.z).toBeCloseTo(-1, 6);
 		// screen-up points north
-		const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+		const up = new Vector3(0, 1, 0).transformByQuaternion(cam.quaternion);
 		expect(up.y).toBeGreaterThan(0.999);
 		expect(cam.fov).toBeCloseTo(40, 6);
 		// camera is far above the map plane (near-field close-up at least 250 m)
@@ -243,7 +234,7 @@ describe("StepCamera modes", () => {
 			setActive: vi.fn(),
 			apply: vi.fn(),
 			state: vi.fn(() => ({
-				pivot: new THREE.Vector3(7, 8, 9),
+				pivot: new Vector3(7, 8, 9),
 				dist: 777,
 				yaw: 0.3,
 				pitch: -1.2,
@@ -260,7 +251,7 @@ describe("StepCamera modes", () => {
 		expect(driver.setActive).toHaveBeenLastCalledWith(false);
 		sc.snap();
 		// orbit continues from the driver's centre and distance
-		const pivotDist = cam.position.distanceTo(new THREE.Vector3(7, 8, 9));
+		const pivotDist = cam.position.distanceTo(new Vector3(7, 8, 9));
 		expect(pivotDist).toBeCloseTo(777, 3);
 	});
 
@@ -270,7 +261,7 @@ describe("StepCamera modes", () => {
 			setActive: vi.fn(),
 			apply: vi.fn(),
 			state: () => ({
-				pivot: new THREE.Vector3(),
+				pivot: new Vector3(),
 				dist: 100,
 				yaw: 0,
 				pitch: -1,

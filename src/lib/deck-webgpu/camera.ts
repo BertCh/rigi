@@ -70,7 +70,7 @@ export function worldCamera(p: {
 	height: number;
 	near?: number;
 }): CameraState {
-	// WorldCamera's up is three's camera.up transformed; re-orthogonalise for safety
+	// WorldCamera's up is the camera.up transformed; re-orthogonalise for safety
 	const f = norm(p.forward);
 	const r = norm(cross(f, p.up));
 	return {

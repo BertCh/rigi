@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// GLSL for the deck photo-view composite: a 1:1 port of engine.ts `compositeFrag` (three.js).
-// All inputs are mixed in LINEAR light and encoded with the sRGB OETF at the end, like three's
-// `#include <colorspace_fragment>`:
+// GLSL for the deck photo-view composite: the style/grade composite.
+// All inputs are mixed in LINEAR light and encoded with the sRGB OETF at the end:
 //   photoTex  sRGB photo (decoded here), rows top → bottom (sampled at uvT)
 //   layerTex  terrain colour pass: linear rgb, straight alpha (GL rows, sampled at vUv)
 //   geoTex    geometry pass: r = range (m), 0 = sky (GL rows, vUv)

@@ -24,7 +24,7 @@ import type { Device, Texture } from "@luma.gl/core";
 import { luma } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { webgpuAdapter } from "@luma.gl/webgpu";
-import * as THREE from "three";
+import { lookAtQuaternion, ViewCamera } from "#/lib/camera/view-camera";
 import { createSyntheticTile } from "#/lib/deck/synthetic-tile";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import { type AtmValues, defaultAtmosphere } from "#/lib/look/atmosphere";
@@ -244,18 +244,15 @@ void main() {
 	}
 
 	/** Sky radiance, rows flipped to top-first (WebGPU order). */
-	renderSky(atm: AtmValues, cam: THREE.PerspectiveCamera) {
+	renderSky(atm: AtmValues, cam: ViewCamera) {
 		const gl = this.gl;
 		const use = gl.useProgram.bind(gl);
 		use(this.sky);
-		this.setAtm(this.sky, atm, cam.position.toArray() as Vec3);
+		this.setAtm(this.sky, atm, cam.eye);
 		gl.uniformMatrix4fv(
 			gl.getUniformLocation(this.sky, SKY_BLOCK.uniformName("ray")),
 			false,
-			skyRayMatrix(
-				cam.projectionMatrix.elements,
-				cam.matrixWorldInverse.elements,
-			),
+			skyRayMatrix([...cam.projectionMatrix()], [...cam.viewMatrix()]),
 		);
 		const raw = this.run();
 		const out = new Float32Array(raw.length);
@@ -347,16 +344,15 @@ function pose(pitchDeg: number): CameraPose {
 	return { eye: EYE, forward, up, vfov: VFOV, near: 5 };
 }
 
-function threeCam(p: CameraPose) {
-	const cam = new THREE.PerspectiveCamera(VFOV, W / H, 5, 600000);
+function viewCamera(p: CameraPose) {
+	const cam = new ViewCamera(VFOV, W / H, 5, 600000);
 	cam.position.set(...p.eye);
-	cam.up.set(...p.up);
-	cam.lookAt(
-		p.eye[0] + p.forward[0],
-		p.eye[1] + p.forward[1],
-		p.eye[2] + p.forward[2],
+	lookAtQuaternion(
+		cam.quaternion,
+		p.eye,
+		[p.eye[0] + p.forward[0], p.eye[1] + p.forward[1], p.eye[2] + p.forward[2]],
+		p.up,
 	);
-	cam.updateMatrixWorld(true);
 	return cam;
 }
 
@@ -443,7 +439,7 @@ export async function runAtmSkyCheck(): Promise<AtmSkyCheckResult> {
 		const view = pose(sc.pitch);
 		const probes = si === 0;
 		const got = await renderColor(probes ? [sky, solid, veil] : [sky], view);
-		const want = ref.renderSky(sc.atm, threeCam(view));
+		const want = ref.renderSky(sc.atm, viewCamera(view));
 		let maxAbs = 0;
 		let maxRel = 0;
 		let max8 = 0;

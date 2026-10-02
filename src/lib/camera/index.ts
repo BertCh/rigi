@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// The camera model, pure numbers (no three.js). Pose lives in the camera-anchored ENU frame
+// The camera model, pure numbers. Pose lives in the camera-anchored ENU frame
 // (x=E, y=N, z=Up): yaw = true heading clockwise from north, pitch up +, roll right side down +,
 // vfov = vertical FOV of the photo, all degrees. Image coords are normalised 0..1, v pointing down.
-// pose.ts adapts this to three.js; pose6dof/project.ts carries the same basis with analytic
+// pose.ts adapts it to math.gl vectors and view-camera.ts; pose6dof/project.ts carries the same basis with analytic
 // derivatives; geo/camera's pixel `Camera` is the solvers' representation (poseToCamera/cameraToPose).
 import type { Mat3 } from "#/lib/ontology/core/geometry";
 import type { Deg } from "#/lib/ontology/core/quantity";
@@ -34,7 +34,7 @@ export function isPose(x: unknown): x is Pose {
 }
 export type { Mat3 };
 
-/** Camera axes in ENU (same operation order as three.js vector math, so pose.ts is bitwise equal). */
+/** Camera axes in ENU (pose.ts wraps these as math.gl vectors). */
 export function poseBasis(p: Pose): { forward: Vec3; right: Vec3; up: Vec3 } {
 	const y = p.yaw * D;
 	const pt = p.pitch * D;

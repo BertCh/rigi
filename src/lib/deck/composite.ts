@@ -117,7 +117,7 @@ export const defaultCompositeSettings: CompositeSettings = {
 const METHOD = { swipe: 0, lens: 1, range: 2, brush: 3 } as const;
 
 /**
- * MSAA sample policy of the settled on-screen colour pass: three's layerRT uses 4 samples (exports
+ * MSAA sample policy of the settled on-screen colour pass: the colour target uses 4 samples (exports
  * keep 4 at any DPR). At device-pixel ratio ≥ 2 the colour target already supersamples the CSS
  * pixel, so it takes 2 (MSAA_SAMPLES_HIDPI): measured 2026-09-30 on M3 Pro / ANGLE Metal at
  * 2160×1620, colour pass 35–47 → 23–31 ms GPU and half the MSAA memory; the settled frame differs
@@ -642,7 +642,7 @@ export class PhotoCompositor implements Effect {
 		};
 	}
 
-	/** Max MSAA samples for the colour pass (three: layerRT samples 4); 0 = off. See msaaSamplesFor. */
+	/** Max MSAA samples for the colour pass (default 4); 0 = off. See msaaSamplesFor. */
 	msaaSamples = MSAA_SAMPLES;
 	private msaa?: {
 		/** rgba16float + depth24plus attachments with `samples` samples (luma: multisample renderbuffers on WebGL) */
@@ -656,7 +656,7 @@ export class PhotoCompositor implements Effect {
 
 	/**
 	 * The colour pass into `target`, multisampled when possible: rendered into an MSAA
-	 * RGBA16F + depth pair, then resolved into target's texture, like three's layerRT (samples: 4).
+	 * RGBA16F + depth pair, then resolved into target's texture.
 	 * Falls back to drawing into `target` directly (also when samples < 2).
 	 */
 	private renderColor(
@@ -766,7 +766,7 @@ export class PhotoCompositor implements Effect {
 	/**
 	 * engine.ts exportImage's render: the composite of `layers` (terrain tiles + trails) through
 	 * `pose` at width × height (the photo's full size), offscreen. The geometry pass keeps its
-	 * 1024 px long side (three's geoRT is not resized for export either). Returns sRGB RGBA8
+	 * 1024 px long side (it is not resized for export either). Returns sRGB RGBA8
 	 * bytes, row 0 = top, or null if the compositor isn't set up. The GPU work is encoded and every
 	 * target freed synchronously; only the pixel readback is awaited (PBO + fence, no stall).
 	 */

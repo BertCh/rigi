@@ -243,7 +243,7 @@ export function useStepInside(opts: {
 				cam.setMode(m);
 				return;
 			}
-			// In map: OrbitControls is the native 'orbit'; any other mode hands over to a step camera
+			// In map: the world orbit controller is the native 'orbit'; any other mode hands over to a step camera
 			if (!worldMode || m === "orbit" || !engine.enterStepInside) return;
 			engine.enterStepInside({
 				view: "map",

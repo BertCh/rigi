@@ -23,7 +23,7 @@ wrong skyline once they can compare.
 1. **Candidates.** Once `[data-ready]` is set and the second opinion is not pending, it asks the app's own
    solver for its ranked hypotheses. With full metadata that is `engine.autoAlign(true)` alternatives
    (skyline search + silhouette re-rank, up to 5, the same call the load makes; the GPU grid is the
-   engine's own; `autoAlignAsync` went with the three.js engine, removed 2026-10-01). With a missing compass / gravity / lens it is the unknown-pose
+   engine's own; `autoAlignAsync` was removed). With a missing compass / gravity / lens it is the unknown-pose
    cascade's `candidates` (a re-run of the solver PhotoWorkspace already holds). `topDistinct` keeps the
    first 3 that are more than 0.5° apart (`poseSepDeg` = max of optical-axis angle, |Δroll| and |Δvfov|).
    If the pose on screen is not among them (e.g. the second opinion refined it), it gets its own "shown" tile.

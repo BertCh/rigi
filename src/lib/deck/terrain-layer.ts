@@ -80,7 +80,7 @@ export const LOG_DEPTH_FAR = 1e9;
  * Offscreen terrain passes (geometry-pass.ts / composite.ts). deck renders synchronously, so the
  * pass that is drawing right now is a module-level flag the tile layers read in draw():
  *   'geometry' → style 3 (range to r, no blending, float target)
- *   'color'    → the layer's own style, LINEAR output and straight alpha (three's layerRT)
+ *   'color'    → the layer's own style, LINEAR output and straight alpha
  *   'normal'   → style 7 (world normal, LOOK_INK creases)
  * Pass names seen by filterSubLayer are `terrain-<kind>`.
  */
@@ -296,9 +296,9 @@ in float vLogW;
 in vec3 vCamera;
 out vec4 fragColor;
 
-// Colour pipeline mirrors three.js (materials.ts + the renderer's sRGB output): ramps are mixed in
+// Colour pipeline: ramps are mixed in
 // sRGB then pow(2.2)'d, textures are decoded to linear, everything is shaded/hazed/blended in
-// linear, and the result is encoded with the sRGB OETF at the very end (three's colorspace_fragment).
+// linear, and the result is encoded with the sRGB OETF at the very end.
 vec3 toLinear(vec3 c) { return pow(c, vec3(2.2)); }
 vec3 srgbDecode(vec3 c) {
   return mix(pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), c * 0.0773993808, vec3(lessThanEqual(c, vec3(0.04045))));
@@ -308,7 +308,7 @@ vec3 srgbEncode(vec3 c) {
   return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
 }
 
-// the colour pass (composite.ts) keeps everything linear, like three's layerRT
+// the colour pass (composite.ts) keeps everything linear
 vec3 outColor(vec3 c) { return terrain.linearOut > 0.5 ? max(c, vec3(0.0)) : srgbEncode(c); }
 
 // Ramps (materials.ts RAMP_GLSL rampEval): stop i = column i of C0 (0-3) / C1 (4-7), rgb = sRGB
@@ -383,8 +383,7 @@ float shade(vec3 n) {
   return terrain.shadeHaze.x * sky + terrain.shadeHaze.y * l;
 }
 
-// hazeColor arrives linear (like three's Color(0xb9cde0)) and is re-linearised on purpose, as
-// materials.ts does, so the haze is three's darker, bluer tone.
+// hazeColor arrives linear and is re-linearised on purpose, which gives the darker, bluer haze tone.
 vec3 haze(vec3 col, float range) {
   float f = 1.0 - exp(-range * terrain.shadeHaze.z * terrain.hazeColor.a);
   return mix(col, toLinear(terrain.hazeColor.rgb), clamp(f, 0.0, terrain.shadeHaze.w));
@@ -400,7 +399,7 @@ void main() {
   vec3 n = normalize(vNormal);
   float range = length(vWorld - vCamera);
   // photo-camera passes only: terrain closer than the GPS error is in the wrong place anyway (the
-  // radius three's near fade reaches zero at); drop it so the view reaches the terrain beyond
+  // radius the near fade reaches zero at); drop it so the view reaches the terrain beyond
   if (range < terrain.nearDiscard) discard;
   int style = int(terrain.style + 0.5);
 
@@ -494,7 +493,7 @@ void main() {
   if (style == 1 && terrain.hasMap > 0.5) {
     base = srgbDecode(texture(terrainMap, vUv).rgb);
     // Orthoimagery is a top-down projection: on true cliffs a few texels get smeared down the
-    // face. three.js (z14 normals) never fades; deck's z17 normals pass 55° on ordinary forested
+    // face. z14 normals never fade; deck's z17 normals pass 55° on ordinary forested
     // slopes, where the old grey rock tone read as missing texture. Now only near-vertical faces
     // (> ~70°) soften, at most halfway, towards the imagery's own local average (coarse mip).
     float steep = 1.0 - smoothstep(0.17, 0.34, n.z); // cos 80°, cos 70°
@@ -533,7 +532,7 @@ void main() {
 #endif
         float seen = texture(photoRange, puv).r;
         // visible from the photo camera if not occluded (range test with relative bias; the range
-        // map is now the GPU geometry pass, so three's constants apply: materials.ts:197)
+        // map is the GPU geometry pass; bias 1.5 % + 15 m)
         bool visible = seen > 0.0 && r < seen * 1.015 + 15.0 && r > terrain.photoPos.w;
         // people in the photo would smear across the ground behind them
         if (terrain.photoFgOn > 0.5 && texture(photoFg, puv).r > 0.5) visible = false;
@@ -994,7 +993,7 @@ const DEFAULTS: TerrainUniformProps = {
  * Draw state of every terrain pass (canvas, geometry, colour, normal: the offscreen passes spread
  * the layer's parameters, geometry-pass.ts getLayerParameters).
  *
- * Back faces are culled, like three's FrontSide terrain material (materials.ts). Both mesh paths
+ * Back faces are culled, (front faces only). Both mesh paths
  * share buildMesh's triangulation (terrain-data.ts tileIndex / batched-terrain-grid.ts gridMesh):
  * grid row 0 = north, so (a, a + n, a + 1) runs south then east, counter-clockwise seen from +z
  * (ENU up) → front-facing under the right-handed photo / world projections. Skirt quads are
@@ -1002,7 +1001,7 @@ const DEFAULTS: TerrainUniformProps = {
  * the surface) a back face is only reached through it; DPR 1 diffs on IMG_6958 / 7086 / 7155 (photo
  * and world views) change ≤ 0.33 % of pixels by > 8/255: crest pixels where a back face used to win
  * the less-equal depth tie, and labels nudged by the geometry pass. Underground views see through
- * the terrain, as in three. Apple TBDR, DPR 2: MSAA colour pass 75–100 → 34–46 ms per redraw.
+ * the terrain. Apple TBDR, DPR 2: MSAA colour pass 75–100 → 34–46 ms per redraw.
  */
 export const TERRAIN_PARAMETERS = {
 	cullMode: "back",

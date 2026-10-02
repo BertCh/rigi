@@ -136,9 +136,6 @@ Kept on purpose: `solve/` COARSE row minimum and `align/` pose-grid / pose-bound
 - **Error checks.** `globalThis.__RIGI_GPU_CHECKS__ = true` wraps every core `submit()` in
   validation / out-of-memory error scopes (forwarded to the same workers). A failed submit rejects
   the encoder's staged reads with `GpuValidationError` and the caller takes its CPU path. Opt-in.
-- **three.js on WebGPU.** The `src/lib/three-webgpu/` spike (three 0.186 `WebGPURenderer` in "sidecar"
-  mode on `getComputeDevice().handle`) was deleted with the three.js PhotoEngine on 2026-10-01; the
-  WebGPU renderer is deck.gl (`src/lib/deck-webgpu`). It is in git history before that date.
 
 ## Kernels
 

@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Pose } from "../src/lib/camera";
+import { projectPoint } from "../src/lib/camera";
 import {
 	type AnyCanvas,
 	buildCameraModel,
@@ -46,7 +47,7 @@ import {
 	REFRACTION_K,
 	toEcef,
 } from "../src/lib/geodesy";
-import { poseBasis, projectPoint, unprojectDir } from "../src/lib/pose";
+import { poseBasis, unprojectDir } from "../src/lib/pose";
 
 /** Unwrap a value the check cannot continue without. Invariant: the fixture inputs always produce it, so null means a regression worth a loud failure. */
 function must<T>(value: T | null | undefined, what: string): T {
@@ -130,12 +131,7 @@ const rnd = () => {
 						eye[1] + dir.y * dist,
 						eye[2] + dir.z * dist,
 					];
-					const a = projectPoint(
-						pose,
-						W / H,
-						{ x: eye[0], y: eye[1], z: eye[2] } as never,
-						p,
-					);
+					const a = projectPoint(pose, W / H, [eye[0], eye[1], eye[2]], p);
 					const b = projectEcef(m, enuToEcef(m, p));
 					if (!a || !b) {
 						worst = Number.POSITIVE_INFINITY;
@@ -168,7 +164,7 @@ const rnd = () => {
 		const dir = unprojectDir(poses[2], W / H, rnd(), rnd());
 		const p = [dir.x * 5000, dir.y * 5000, 1000 + dir.z * 5000];
 		const a = must(
-			projectPoint(poses[2], W / H, { x: 0, y: 0, z: 1000 } as never, p),
+			projectPoint(poses[2], W / H, [0, 0, 1000], p),
 			"projectPoint",
 		);
 		const R = m.R_w2c_enu;
@@ -267,7 +263,7 @@ const rnd = () => {
 		const [lon, lat] = pointAlong(fr.lat, fr.lon, pose0.yaw, km * 1000);
 		const enu = fr.fromGeo(lat, lon, 1500);
 		const a = must(
-			projectPoint(pose0, W / H, { x: 0, y: 0, z: 1361.3 } as never, enu),
+			projectPoint(pose0, W / H, [0, 0, 1361.3], enu),
 			"projectPoint",
 		);
 		const b = must(projectEcef(mm, toEcef(lat, lon, 1500)), "projectEcef");
@@ -594,12 +590,7 @@ check(
 		const d = 200 + rnd() * 40000;
 		const p = [dir.x * d, dir.y * d, eyeAlt + dir.z * d];
 		const a = must(
-			projectPoint(
-				pose,
-				ph.width / ph.height,
-				{ x: 0, y: 0, z: eyeAlt } as never,
-				p,
-			),
+			projectPoint(pose, ph.width / ph.height, [0, 0, eyeAlt], p),
 			"projectPoint",
 		);
 		// ENU→ECEF from JSON: X = originEcef + R_cam2ecef·R_cam2enuᵀ·p
@@ -728,14 +719,14 @@ writeFileSync(join(OUT, "IMG_7131.jpg"), jpeg);
 		peaks: { name: string; lat: number; lon: number; ele: number | null }[];
 	};
 	const fr = new EnuFrame(ph.lat, ph.lon, 0);
-	const eye = { x: 0, y: 0, z: eyeAlt };
+	const eye: [number, number, number] = [0, 0, eyeAlt];
 	const peaks: GeoJsonPeak[] = [];
 	for (const p of region.peaks) {
 		if (p.ele == null) continue;
 		const w = fr.fromGeo(p.lat, p.lon, p.ele);
 		const d = Math.hypot(w[0], w[1]);
 		if (d > 30000 || d < 500) continue;
-		const pr = projectPoint(pose, ph.width / ph.height, eye as never, w);
+		const pr = projectPoint(pose, ph.width / ph.height, eye, w);
 		if (!pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1) continue;
 		peaks.push({
 			name: p.name,

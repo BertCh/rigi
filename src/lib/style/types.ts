@@ -47,7 +47,7 @@ export type TerrainLook = {
 	direct: number;
 	reliefRamp: RampRef;
 	rampRange: { mode: "local" } | { mode: "absolute"; lo: number; hi: number };
-	/** Applied with the legacy double linearisation (THREE.Color.set + shader toLinear), see styling.md §2.3. */
+	/** Applied with the legacy double linearisation (hex → linear, then the shader's toLinear), see styling.md §2.3. */
 	hazeColor: Hex;
 	hazeDensity: number;
 	hazeMax: number;

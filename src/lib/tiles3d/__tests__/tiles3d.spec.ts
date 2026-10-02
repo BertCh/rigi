@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import * as THREE from "three";
+import type { Matrix4 } from "@math.gl/core";
 import { describe, expect, it, vi } from "vitest";
 import { withFlags } from "#/test/helpers";
 import { EnuFrame, toEcef } from "../../geodesy";
@@ -16,6 +16,12 @@ import {
 } from "../config";
 import { enuFromEcef } from "../frame";
 import { geoidUndulation } from "../geoid";
+
+/** `m` applied to a point, as {x, y, z}. */
+function apply(m: Matrix4, v: number[]) {
+	const o = m.transformAsPoint(v) as number[];
+	return { x: o[0], y: o[1], z: o[2] };
+}
 
 describe("geoidUndulation (EGM2008)", () => {
 	// reference values from PROJ us_nga_egm08_25
@@ -61,9 +67,7 @@ describe("enuFromEcef", () => {
 	it.each([
 		0, 50.4,
 	])("maps the origin at ellipsoid height h to (0, 0, h - N), N=%f", (n) => {
-		const p = new THREE.Vector3(...toEcef(lat, lon, 800)).applyMatrix4(
-			enuFromEcef(lat, lon, n),
-		);
+		const p = apply(enuFromEcef(lat, lon, n), toEcef(lat, lon, 800));
 		expect(p.x).toBeCloseTo(0, 5);
 		expect(p.y).toBeCloseTo(0, 5);
 		expect(p.z).toBeCloseTo(800 - n, 5);
@@ -71,34 +75,31 @@ describe("enuFromEcef", () => {
 	it("agrees with geodesy EnuFrame within 0.2 m over 1.3 km", () => {
 		const m = enuFromEcef(lat, lon, 0);
 		const q = new EnuFrame(lat, lon, 0).fromGeo(lat + 0.009, lon + 0.013, 900);
-		const qe = new THREE.Vector3(
-			...toEcef(lat + 0.009, lon + 0.013, 900),
-		).applyMatrix4(m);
+		const qe = apply(m, toEcef(lat + 0.009, lon + 0.013, 900));
 		expect(Math.hypot(q[0] - qe.x, q[1] - qe.y, q[2] - qe.z)).toBeLessThan(0.2);
 	});
 	it("is a rigid transform: preserves distances", () => {
 		const m = enuFromEcef(lat, lon, 12);
-		const a = new THREE.Vector3(...toEcef(lat, lon, 0));
-		const b = new THREE.Vector3(...toEcef(lat + 0.01, lon, 300));
-		const d0 = a.distanceTo(b);
-		expect(a.applyMatrix4(m).distanceTo(b.applyMatrix4(m))).toBeCloseTo(d0, 4);
+		const a = toEcef(lat, lon, 0);
+		const b = toEcef(lat + 0.01, lon, 300);
+		const d0 = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+		const pa = apply(m, a);
+		const pb = apply(m, b);
+		expect(Math.hypot(pa.x - pb.x, pa.y - pb.y, pa.z - pb.z)).toBeCloseTo(
+			d0,
+			4,
+		);
 	});
 	it("points east / north / up on the axes", () => {
 		const m = enuFromEcef(lat, lon, 0);
-		const o = new THREE.Vector3(...toEcef(lat, lon, 0));
-		const east = new THREE.Vector3(...toEcef(lat, lon + 0.001, 0)).applyMatrix4(
-			m,
-		);
-		const north = new THREE.Vector3(
-			...toEcef(lat + 0.001, lon, 0),
-		).applyMatrix4(m);
-		const up = new THREE.Vector3(...toEcef(lat, lon, 100)).applyMatrix4(m);
+		const east = apply(m, toEcef(lat, lon + 0.001, 0));
+		const north = apply(m, toEcef(lat + 0.001, lon, 0));
+		const up = apply(m, toEcef(lat, lon, 100));
 		expect(east.x).toBeGreaterThan(50);
 		expect(Math.abs(east.y)).toBeLessThan(0.1);
 		expect(north.y).toBeGreaterThan(100);
 		expect(Math.abs(north.x)).toBeLessThan(0.1);
 		expect(up.z).toBeCloseTo(100, 4);
-		expect(o).toBeDefined();
 	});
 });
 

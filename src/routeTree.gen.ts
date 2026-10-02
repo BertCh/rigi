@@ -25,8 +25,6 @@ import { Route as GipfelbuchConceptRouteImport } from './routes/gipfelbuch.$conc
 import { Route as GipfelbuchPrintRouteImport } from './routes/gipfelbuch.print'
 import { Route as LabDeckSplatsRouteImport } from './routes/lab.deck-splats'
 import { Route as LabDeckWebgpuRouteImport } from './routes/lab.deck-webgpu'
-import { Route as LabGenerateRouteImport } from './routes/lab.generate'
-import { Route as LabSplatsRouteImport } from './routes/lab.splats'
 import { Route as PhotoIdRouteImport } from './routes/photo.$id'
 import { Route as RollIndexRouteImport } from './routes/roll.index'
 import { Route as RollIdRouteImport } from './routes/roll.$id'
@@ -113,16 +111,6 @@ const LabDeckWebgpuRoute = LabDeckWebgpuRouteImport.update({
   path: '/lab/deck-webgpu',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LabGenerateRoute = LabGenerateRouteImport.update({
-  id: '/lab/generate',
-  path: '/lab/generate',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LabSplatsRoute = LabSplatsRouteImport.update({
-  id: '/lab/splats',
-  path: '/lab/splats',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PhotoIdRoute = PhotoIdRouteImport.update({
   id: '/photo/$id',
   path: '/photo/$id',
@@ -165,8 +153,6 @@ export interface FileRoutesByFullPath {
   '/gipfelbuch/print': typeof GipfelbuchPrintRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
-  '/lab/generate': typeof LabGenerateRoute
-  '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
@@ -190,8 +176,6 @@ export interface FileRoutesByTo {
   '/gipfelbuch/print': typeof GipfelbuchPrintRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
-  '/lab/generate': typeof LabGenerateRoute
-  '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
@@ -216,8 +200,6 @@ export interface FileRoutesById {
   '/gipfelbuch/print': typeof GipfelbuchPrintRoute
   '/lab/deck-splats': typeof LabDeckSplatsRoute
   '/lab/deck-webgpu': typeof LabDeckWebgpuRoute
-  '/lab/generate': typeof LabGenerateRoute
-  '/lab/splats': typeof LabSplatsRoute
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
@@ -243,8 +225,6 @@ export interface FileRouteTypes {
     | '/gipfelbuch/print'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
-    | '/lab/generate'
-    | '/lab/splats'
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
@@ -268,8 +248,6 @@ export interface FileRouteTypes {
     | '/gipfelbuch/print'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
-    | '/lab/generate'
-    | '/lab/splats'
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
@@ -293,8 +271,6 @@ export interface FileRouteTypes {
     | '/gipfelbuch/print'
     | '/lab/deck-splats'
     | '/lab/deck-webgpu'
-    | '/lab/generate'
-    | '/lab/splats'
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
@@ -319,8 +295,6 @@ export interface RootRouteChildren {
   GipfelbuchPrintRoute: typeof GipfelbuchPrintRoute
   LabDeckSplatsRoute: typeof LabDeckSplatsRoute
   LabDeckWebgpuRoute: typeof LabDeckWebgpuRoute
-  LabGenerateRoute: typeof LabGenerateRoute
-  LabSplatsRoute: typeof LabSplatsRoute
   PhotoIdRoute: typeof PhotoIdRoute
   RollIdRoute: typeof RollIdRoute
   RollImportRoute: typeof RollImportRoute
@@ -443,20 +417,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LabDeckWebgpuRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lab/generate': {
-      id: '/lab/generate'
-      path: '/lab/generate'
-      fullPath: '/lab/generate'
-      preLoaderRoute: typeof LabGenerateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/lab/splats': {
-      id: '/lab/splats'
-      path: '/lab/splats'
-      fullPath: '/lab/splats'
-      preLoaderRoute: typeof LabSplatsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/photo/$id': {
       id: '/photo/$id'
       path: '/photo/$id'
@@ -511,8 +471,6 @@ const rootRouteChildren: RootRouteChildren = {
   GipfelbuchPrintRoute: GipfelbuchPrintRoute,
   LabDeckSplatsRoute: LabDeckSplatsRoute,
   LabDeckWebgpuRoute: LabDeckWebgpuRoute,
-  LabGenerateRoute: LabGenerateRoute,
-  LabSplatsRoute: LabSplatsRoute,
   PhotoIdRoute: PhotoIdRoute,
   RollIdRoute: RollIdRoute,
   RollImportRoute: RollImportRoute,

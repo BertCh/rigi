@@ -87,7 +87,7 @@ const OVERLAYS = ["contours", "bands", "slope", "none"] as const;
 const MAPS = ["satellite", "topo", "hillshade", "bands"] as const;
 const DEBUGS = ["color", "geometry", "normal", "depth"] as const;
 
-// dev-only: the production build shows a stub (same gate as dev.graph / lab.splats)
+// dev-only: the production build shows a stub (same gate as dev.graph)
 function LabDeckWebgpuGate() {
 	if (!import.meta.env.DEV) return <p>dev only</p>;
 	return <LabDeckWebgpu />;

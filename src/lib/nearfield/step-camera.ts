@@ -23,14 +23,14 @@
 // heading `yaw` (rad, clockwise from north) and `pitch` (rad, up positive). Targets move with input;
 // the shown state eases toward them (exponential, tau ms).
 //
-// Photo-mode input (on `dom`, like OrbitControls): drag = orbit, shift/right/two-finger drag = pan,
+// Photo-mode input (on `dom`): drag = orbit, shift/right/two-finger drag = pan,
 // wheel = dolly, WASD / arrows = pan / dolly, Q / E = down / up. All modes: Esc / Backspace = back to
 // photo (backToPhoto: eases onto the photo camera, then onBack).
-// Also exports makePhotoSky(): the photo projected on a far sphere, so the sky (and anything past the
-// drape) keeps the photo's own pixels from the photo camera.
 
-import * as THREE from "three";
+import { Quaternion, Vector3 } from "@math.gl/core";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { hfovFromAspect } from "../camera";
+import type { ViewCamera } from "../camera/view-camera";
 import { DEG } from "../geodesy";
 import { clamp } from "../math";
 
@@ -42,7 +42,7 @@ const STEP_MODES: readonly StepMode[] = ["photo", "orbit", "fly", "map"];
  */
 export type StepView = "step" | "map";
 
-/** Engine.enterStepInside options (engine.ts and deck/engine.ts). */
+/** Renderer.enterStepInside options (deck/engine.ts and deck-webgpu/engine.ts). */
 export type StepInsideOpts = {
 	radius?: number;
 	pivotDist?: number;
@@ -53,9 +53,9 @@ export type StepInsideOpts = {
 
 export type StepCameraOpts = {
 	/** Photo camera position (ENU, the engine's frame). */
-	eye: THREE.Vector3;
-	/** Photo camera orientation (three camera convention, looking down −z). */
-	quaternion: THREE.Quaternion;
+	eye: Vec3;
+	/** Photo camera orientation (ViewCamera convention: looking down −z, y up; see pose.ts poseQuaternion). */
+	quaternion: Quaternion;
 	/** Photo vertical FOV (deg) and aspect (W/H): the view fits the photo frame inside the viewport. */
 	vfov: number;
 	aspect: number;
@@ -87,34 +87,34 @@ export type StepCameraOpts = {
  */
 export interface StepMapDriver {
 	/** Take over looking straight down on `pivot` (ENU) from `dist` metres, screen-up at heading `yaw`. */
-	start(pivot: THREE.Vector3, dist: number, yaw: number): void;
+	start(pivot: Vector3, dist: number, yaw: number): void;
 	/** Route input to the driver (map mode) or back to StepCamera. */
 	setActive(on: boolean): void;
 	/** Write the map camera (ENU position, orientation, vertical FOV). */
-	apply(cam: THREE.PerspectiveCamera): void;
+	apply(cam: ViewCamera): void;
 	/** The view centre on the ground, camera distance, heading and pitch (orbit takes over from here). */
-	state(): { pivot: THREE.Vector3; dist: number; yaw: number; pitch: number };
+	state(): { pivot: Vector3; dist: number; yaw: number; pitch: number };
 	/** True once after the map view moved. */
 	takeDirty(): boolean;
 }
 
-type State = { a: number; b: number; pan: THREE.Vector3; dolly: number };
-type Free = { pivot: THREE.Vector3; dist: number; yaw: number; pitch: number };
+type State = { a: number; b: number; pan: Vector3; dolly: number };
+type Free = { pivot: Vector3; dist: number; yaw: number; pitch: number };
 type Transition = {
 	t0: number;
 	dur: number;
-	pos: THREE.Vector3;
-	q: THREE.Quaternion;
+	pos: Vector3;
+	q: Quaternion;
 	fov: number;
 };
 
-const _q = new THREE.Quaternion();
-const _q2 = new THREE.Quaternion();
-const _v = new THREE.Vector3();
-const _right = new THREE.Vector3();
-const _fwd = new THREE.Vector3();
-const Z = new THREE.Vector3(0, 0, 1);
-const X = new THREE.Vector3(1, 0, 0);
+const _q = new Quaternion();
+const _q2 = new Quaternion();
+const _v = new Vector3();
+const _right = new Vector3();
+const _fwd = new Vector3();
+const Z = new Vector3(0, 0, 1);
+const X = new Vector3(1, 0, 0);
 /** Metres the free modes keep between the camera and the terrain. */
 const CLEARANCE = 1.5;
 const MAX_DIST = 150_000;
@@ -137,25 +137,25 @@ function fitVfov(
 }
 
 /** Free-mode view direction for heading `yaw` (clockwise from north) and `pitch` (up positive). */
-function freeForward(yaw: number, pitch: number, out: THREE.Vector3) {
+function freeForward(yaw: number, pitch: number, out: Vector3) {
 	const c = Math.cos(pitch);
 	return out.set(Math.sin(yaw) * c, Math.cos(yaw) * c, Math.sin(pitch));
 }
 
 /** Free-mode camera orientation: level north-looking (x +90°), pitched, then turned to `yaw`. */
-function freeQuat(yaw: number, pitch: number, out: THREE.Quaternion) {
+function freeQuat(yaw: number, pitch: number, out: Quaternion) {
 	return out
 		.setFromAxisAngle(Z, -yaw)
 		.multiply(_q2.setFromAxisAngle(X, Math.PI / 2 + pitch));
 }
 
 /** Heading / pitch of a camera orientation (straight down: the heading of its screen-up). */
-function yawPitchOf(q: THREE.Quaternion) {
-	const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+function yawPitchOf(q: Quaternion) {
+	const f = new Vector3(0, 0, -1).transformByQuaternion(q);
 	const pitch = Math.asin(Math.max(-1, Math.min(1, f.z)));
 	let yaw = Math.atan2(f.x, f.y);
 	if (Math.abs(f.z) > 0.999) {
-		const u = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+		const u = new Vector3(0, 1, 0).transformByQuaternion(q);
 		yaw = Math.atan2(u.x * -Math.sign(f.z), u.y * -Math.sign(f.z));
 	}
 	return { yaw, pitch };
@@ -164,23 +164,23 @@ function yawPitchOf(q: THREE.Quaternion) {
 const cloneFree = (s: Free): Free => ({ ...s, pivot: s.pivot.clone() });
 
 export class StepCamera {
-	readonly camera: THREE.PerspectiveCamera;
-	readonly eye: THREE.Vector3;
-	readonly baseQ: THREE.Quaternion;
+	readonly camera: ViewCamera;
+	readonly eye: Vector3;
+	readonly baseQ: Quaternion;
 	radius: number;
 	pivotDist: number;
 	private opts: StepCameraOpts;
 	private _mode: StepMode = "photo";
-	private target: State = { a: 0, b: 0, pan: new THREE.Vector3(), dolly: 0 };
-	private cur: State = { a: 0, b: 0, pan: new THREE.Vector3(), dolly: 0 };
+	private target: State = { a: 0, b: 0, pan: new Vector3(), dolly: 0 };
+	private cur: State = { a: 0, b: 0, pan: new Vector3(), dolly: 0 };
 	private freeT: Free = {
-		pivot: new THREE.Vector3(),
+		pivot: new Vector3(),
 		dist: 0,
 		yaw: 0,
 		pitch: 0,
 	};
 	private freeC: Free = {
-		pivot: new THREE.Vector3(),
+		pivot: new Vector3(),
 		dist: 0,
 		yaw: 0,
 		pitch: 0,
@@ -199,14 +199,14 @@ export class StepCamera {
 	private disposed = false;
 
 	constructor(
-		camera: THREE.PerspectiveCamera,
+		camera: ViewCamera,
 		dom: HTMLElement | null,
 		opts: StepCameraOpts,
 	) {
 		this.camera = camera;
 		this.opts = opts;
-		this.eye = opts.eye.clone();
-		this.baseQ = opts.quaternion.clone();
+		this.eye = new Vector3(opts.eye);
+		this.baseQ = new Quaternion(opts.quaternion);
 		this.radius = Math.max(0.5, opts.radius);
 		this.pivotDist = Math.max(2, opts.pivotDist ?? 30);
 		if (dom) this.listen(dom);
@@ -270,12 +270,12 @@ export class StepCamera {
 		this.drag = null;
 		this.startTransition();
 		if (m === "photo") {
-			this.target = { a: 0, b: 0, pan: new THREE.Vector3(), dolly: 0 };
-			this.cur = { a: 0, b: 0, pan: new THREE.Vector3(), dolly: 0 };
+			this.target = { a: 0, b: 0, pan: new Vector3(), dolly: 0 };
+			this.cur = { a: 0, b: 0, pan: new Vector3(), dolly: 0 };
 		} else {
 			const pos = cam.position.clone();
 			const { yaw, pitch } = yawPitchOf(cam.quaternion);
-			const fwd = freeForward(yaw, pitch, new THREE.Vector3());
+			const fwd = freeForward(yaw, pitch, new Vector3());
 			const s: Free = { pivot: pos.clone(), dist: 0, yaw, pitch };
 			if (m === "orbit") {
 				if (prev === "map") {
@@ -300,7 +300,7 @@ export class StepCamera {
 					s.pivot.copy(this.eye);
 					s.dist = 5000;
 				} else {
-					const h = new THREE.Vector3(Math.sin(yaw), Math.cos(yaw), 0);
+					const h = new Vector3(Math.sin(yaw), Math.cos(yaw), 0);
 					const hit = prev === "photo" ? null : this.groundHit(pos, fwd);
 					if (hit != null && hit < 20_000) s.pivot.addScaledVector(fwd, hit);
 					else if (prev === "photo") s.pivot.addScaledVector(h, this.pivotDist);
@@ -342,9 +342,9 @@ export class StepCamera {
 	}
 
 	/** Distance (m) along `dir` from `from` to the terrain (coarse march), or null (sky / off the DEM). */
-	private groundHit(from: THREE.Vector3, dir: THREE.Vector3): number | null {
+	private groundHit(from: Vector3, dir: Vector3): number | null {
 		if (!this.opts.groundAt || dir.z > 0.2) return null;
-		const p = new THREE.Vector3();
+		const p = new Vector3();
 		let prev = 0;
 		for (let d = 5; d < 60_000; d *= 1.08) {
 			p.copy(from).addScaledVector(dir, d);
@@ -379,10 +379,10 @@ export class StepCamera {
 		this.returning = false;
 		// dx right, dy forward (horizontal), dz up; relative to the photo's heading
 		this.basis();
-		const h = _fwd.clone().setZ(0);
+		const h = new Vector3(_fwd.x, _fwd.y, 0);
 		if (h.lengthSq() < 1e-8) h.set(0, 1, 0);
 		h.normalize();
-		const r = _right.clone().setZ(0).normalize();
+		const r = new Vector3(_right.x, _right.y, 0).normalize();
 		this.target.pan.addScaledVector(r, dx).addScaledVector(h, dy);
 		this.target.pan.z += dz;
 		this.clampTarget();
@@ -415,14 +415,14 @@ export class StepCamera {
 			this.returning = true;
 			return;
 		}
-		this.target = { a: 0, b: 0, pan: new THREE.Vector3(), dolly: 0 };
+		this.target = { a: 0, b: 0, pan: new Vector3(), dolly: 0 };
 		this.returning = true;
 		// already settled on the photo: no frame may come to finish the ease, so finish it here
 		if (this.atPhoto) {
 			this.cur = {
 				a: 0,
 				b: 0,
-				pan: new THREE.Vector3(),
+				pan: new Vector3(),
 				dolly: 0,
 			};
 			this.update();
@@ -515,14 +515,14 @@ export class StepCamera {
 	private flyStep(dt: number) {
 		const t = this.freeT;
 		const k = this.keys;
-		const f = freeForward(t.yaw, t.pitch, new THREE.Vector3());
-		const r = new THREE.Vector3(Math.cos(t.yaw), -Math.sin(t.yaw), 0);
-		const v = new THREE.Vector3()
+		const f = freeForward(t.yaw, t.pitch, new Vector3());
+		const r = new Vector3(Math.cos(t.yaw), -Math.sin(t.yaw), 0);
+		const v = new Vector3()
 			.addScaledVector(f, (k.has("f") ? 1 : 0) - (k.has("b") ? 1 : 0))
 			.addScaledVector(r, (k.has("r") ? 1 : 0) - (k.has("l") ? 1 : 0))
 			.addScaledVector(Z, (k.has("u") ? 1 : 0) - (k.has("d") ? 1 : 0));
 		if (v.lengthSq() < 1e-9) return;
-		v.normalize().multiplyScalar((this.flySpeed() * dt) / 1000);
+		v.normalize().scale((this.flySpeed() * dt) / 1000);
 		t.pivot.add(v);
 		this.clampFree(t);
 	}
@@ -572,7 +572,7 @@ export class StepCamera {
 		}
 	}
 
-	private freePos(s: Free, out: THREE.Vector3) {
+	private freePos(s: Free, out: Vector3) {
 		return out
 			.copy(s.pivot)
 			.addScaledVector(freeForward(s.yaw, s.pitch, _fwd), -s.dist);
@@ -580,34 +580,34 @@ export class StepCamera {
 
 	/** Photo forward / right in ENU (the unrotated base). */
 	private basis() {
-		_fwd.set(0, 0, -1).applyQuaternion(this.baseQ);
-		_right.set(1, 0, 0).applyQuaternion(this.baseQ);
+		_fwd.set(0, 0, -1).transformByQuaternion(this.baseQ);
+		_right.set(1, 0, 0).transformByQuaternion(this.baseQ);
 	}
 
 	/** Orientation for orbit angles (a about world up, b about the photo's right axis). */
-	private orient(a: number, b: number, out: THREE.Quaternion) {
+	private orient(a: number, b: number, out: Quaternion) {
 		this.basis();
-		const yaw = new THREE.Quaternion().setFromAxisAngle(Z, -a);
-		const pitch = new THREE.Quaternion().setFromAxisAngle(_right, b);
+		const yaw = new Quaternion().setFromAxisAngle(Z, -a);
+		const pitch = new Quaternion().setFromAxisAngle(_right, b);
 		return out.copy(yaw).multiply(pitch).multiply(this.baseQ);
 	}
 
-	private positionFor(s: State, out: THREE.Vector3) {
+	private positionFor(s: State, out: Vector3) {
 		this.basis();
 		const pivot = _v.copy(this.eye).addScaledVector(_fwd, this.pivotDist);
 		// eye relative to the pivot, rotated by the orbit (R = orient · base⁻¹)
-		const rel = this.eye.clone().sub(pivot);
+		const rel = this.eye.clone().subtract(pivot);
 		const q = this.orient(s.a, s.b, _q2);
 		_q.copy(this.baseQ).invert();
-		rel.applyQuaternion(_q).applyQuaternion(q);
-		const f = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
+		rel.transformByQuaternion(_q).transformByQuaternion(q);
+		const f = new Vector3(0, 0, -1).transformByQuaternion(q);
 		out.copy(pivot).add(rel).add(s.pan).addScaledVector(f, s.dolly);
 		// clamp inside the confidence radius
 		const d = out.distanceTo(this.eye);
 		if (d > this.radius)
 			out
-				.sub(this.eye)
-				.multiplyScalar(this.radius / d)
+				.subtract(this.eye)
+				.scale(this.radius / d)
 				.add(this.eye);
 		return out;
 	}
@@ -626,8 +626,8 @@ export class StepCamera {
 		);
 		t.a = Math.max(-maxA, Math.min(maxA, t.a));
 		t.b = Math.max(-maxB, Math.min(maxB, t.b));
-		const pl = t.pan.length();
-		if (pl > this.radius) t.pan.multiplyScalar(this.radius / pl);
+		const pl = t.pan.len();
+		if (pl > this.radius) t.pan.scale(this.radius / pl);
 		t.dolly = Math.max(-this.radius, Math.min(this.radius, t.dolly));
 	}
 
@@ -655,13 +655,10 @@ export class StepCamera {
 		if (tr) {
 			const t = this.transE;
 			const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
-			cam.position.lerpVectors(tr.pos, cam.position, e);
-			cam.quaternion.slerpQuaternions(tr.q, cam.quaternion.clone(), e);
+			cam.position.lerp(tr.pos, cam.position, e);
+			cam.quaternion.slerp(tr.q, cam.quaternion.clone(), e);
 			cam.fov = tr.fov + (cam.fov - tr.fov) * e;
 		}
-		cam.up.set(0, 0, 1);
-		cam.updateProjectionMatrix();
-		cam.updateMatrixWorld(true);
 	}
 
 	private poke() {
@@ -673,8 +670,8 @@ export class StepCamera {
 		const t = this.freeT;
 		const m = this._mode;
 		const fov = this.camera.fov * DEG;
-		const r = new THREE.Vector3(Math.cos(t.yaw), -Math.sin(t.yaw), 0);
-		const fh = new THREE.Vector3(Math.sin(t.yaw), Math.cos(t.yaw), 0);
+		const r = new Vector3(Math.cos(t.yaw), -Math.sin(t.yaw), 0);
+		const fh = new Vector3(Math.sin(t.yaw), Math.cos(t.yaw), 0);
 		if (m === "orbit" && !alt) {
 			t.yaw += (dx * Math.PI) / h;
 			t.pitch -= (dy * Math.PI) / h;
@@ -700,7 +697,7 @@ export class StepCamera {
 	private wheelFree(dy: number) {
 		const t = this.freeT;
 		if (this._mode === "fly") {
-			const f = freeForward(t.yaw, t.pitch, new THREE.Vector3());
+			const f = freeForward(t.yaw, t.pitch, new Vector3());
 			t.pivot.addScaledVector(f, -dy * 0.004 * this.flySpeed());
 		} else t.dist *= Math.exp(dy * 0.0015);
 		this.clampFree(t);
@@ -711,8 +708,8 @@ export class StepCamera {
 	private keyFree(key: string): boolean {
 		const t = this.freeT;
 		const step = Math.max(2, t.dist * 0.08);
-		const r = new THREE.Vector3(Math.cos(t.yaw), -Math.sin(t.yaw), 0);
-		const fh = new THREE.Vector3(Math.sin(t.yaw), Math.cos(t.yaw), 0);
+		const r = new Vector3(Math.cos(t.yaw), -Math.sin(t.yaw), 0);
+		const fh = new Vector3(Math.sin(t.yaw), Math.cos(t.yaw), 0);
 		const map = this._mode === "map";
 		switch (key) {
 			case "ArrowLeft":
@@ -920,76 +917,4 @@ export class StepCamera {
 		for (const f of this.off) f();
 		this.off = [];
 	}
-}
-
-// ---- photo sky: the photo on a far sphere, seen from the photo camera ----
-
-const SKY_VERT = /* glsl */ `
-varying vec3 vDir;
-void main() {
-  vDir = position;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  gl_Position.z = gl_Position.w * 0.999999; // at the far plane
-}
-`;
-const SKY_FRAG = /* glsl */ `
-uniform sampler2D uPhoto;
-uniform mat4 uPhotoViewProj;
-uniform vec3 uPhotoPos;
-uniform vec3 uBg;
-uniform float uFeather;
-uniform sampler2D uSkyMask;
-uniform float uSkyOn;
-varying vec3 vDir;
-void main() {
-  vec3 dir = normalize(vDir);
-  vec4 clip = uPhotoViewProj * vec4(uPhotoPos + dir * 20000.0, 1.0);
-  vec3 col = uBg;
-  if (clip.w > 0.0) {
-    vec2 puv = clip.xy / clip.w * 0.5 + 0.5;
-    vec2 e = min(puv, 1.0 - puv);
-    float inside = smoothstep(-uFeather, 0.0, min(e.x, e.y));
-    // only the photo's sky: foreground pixels belong to the drape / splats, not to a far sphere
-    if (uSkyOn > 0.5) inside *= texture2D(uSkyMask, clamp(puv, 0.0, 1.0)).r;
-    if (inside > 0.0) {
-      vec3 pc = texture2D(uPhoto, clamp(puv, 0.0, 1.0)).rgb;
-      col = mix(uBg, pc, inside);
-    }
-  }
-  gl_FragColor = vec4(col, 1.0);
-  #include <colorspace_fragment>
-}
-`;
-
-export type PhotoSky = THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
-
-/**
- * A camera-centred sphere textured with the photo projected from the photo camera (outside the frame:
- * `bg`, feathered). Draw it first (renderOrder −1e9, no depth); keep it centred on the viewing camera.
- * The uniforms uPhoto / uPhotoViewProj / uPhotoPos are the engine's drape uniforms' values.
- */
-export function makePhotoSky(radius = 100_000): PhotoSky {
-	const m = new THREE.Mesh(
-		new THREE.SphereGeometry(radius, 48, 24),
-		new THREE.ShaderMaterial({
-			vertexShader: SKY_VERT,
-			fragmentShader: SKY_FRAG,
-			uniforms: {
-				uPhoto: { value: null },
-				uPhotoViewProj: { value: new THREE.Matrix4() },
-				uPhotoPos: { value: new THREE.Vector3() },
-				uBg: { value: new THREE.Color(0x0b0f14) },
-				uFeather: { value: 0.02 },
-				uSkyMask: { value: null },
-				uSkyOn: { value: 0 },
-			},
-			side: THREE.BackSide,
-			depthTest: false,
-			depthWrite: false,
-		}),
-	);
-	m.name = "PhotoSky";
-	m.frustumCulled = false;
-	m.renderOrder = -1e9;
-	return m;
 }

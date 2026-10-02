@@ -241,8 +241,8 @@ export function canvasMeasure(text: string, font: string) {
 
 /**
  * Skyline per geometry column: the topmost terrain row as a fraction of the height from the top
- * (1 = no terrain). Terrain is a finite range > 0 at `channel` of each `stride`-float texel: three's
- * geoBuf is RGBA with the range in a (row 0 = bottom), deck's range buffer r32 (row 0 = top, ∞ = sky).
+ * (1 = no terrain). Terrain is a finite range > 0 at `channel` of each `stride`-float texel: an
+ * RGBA buffer has the range in a (row 0 = bottom), deck's range buffer is r32 (row 0 = top, ∞ = sky).
  */
 export function skylineAt(
 	range: Float32Array,

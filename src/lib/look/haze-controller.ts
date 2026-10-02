@@ -4,7 +4,7 @@
 
 // Fits the photo's aerial perspective (look/haze-fit) for styles whose atmosphere airlight is
 // 'fitted': once per (pose, eye, sky mask), after a fresh geometry readback. Engine-neutral: each
-// engine hands in its own geometry buffer (three: xyz + range; deck: range + pixel ray), which is
+// engine hands in its own geometry buffer (range + pixel ray, or xyz + range), which is
 // decimated ×2 (≈512 px) here, so both fit the same samples. The fit then feeds atmosphereValues().
 import { type Pose, unprojectDir } from "../camera";
 import { lookGpuOn, trackLook, warmLookGpu } from "../gpu/look/opt-in";

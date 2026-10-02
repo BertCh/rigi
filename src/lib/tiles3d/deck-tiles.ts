@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// deck/engine.ts's side of Step Inside 3D Tiles: owns the photo's Tiles3DSet,
-// refines it from the deck world camera (a THREE camera) while stepping and hands worldLayers() a
-// Tiles3DDeckLayer. Tile arrivals are coalesced to one layer update per animation frame. The tiles
-// renderer and its layer are imported only once ?tiles3d= is on; an enter() before
-// they arrive is replayed on arrival.
-import type * as THREE from "three";
+// The engines' side of Step Inside 3D Tiles: owns the photo's Tiles3DSet, refines it from the world
+// camera (a plain pose: ENU position + view matrix + fov) while stepping and hands worldLayers() a
+// Tiles3DDeckLayer. Framework-free: no three objects anywhere. Tile arrivals are coalesced to one
+// layer update per animation frame. The tileset loaders and the layer are imported only once
+// ?tiles3d= is on; an enter() before they arrive is replayed on arrival.
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { PhotoRangeMap } from "../deck/terrain-layer";
 import {
 	PROVENANCE_COLORS,
@@ -16,6 +16,9 @@ import {
 import { type Tiles3DConfig, tiles3dConfig } from "./config";
 import type { Tiles3DDeckLayer } from "./deck-layer";
 import type { Tiles3DSet } from "./tiles";
+import type { StepView } from "./viewport";
+
+export type { StepView } from "./viewport";
 
 type Mods = [typeof import("./tiles"), typeof import("./deck-layer")];
 
@@ -25,8 +28,7 @@ export class DeckTiles3D {
 	private hidden = false;
 	private raf = 0;
 	private mods: Mods | null = null;
-	private pending: { lat: number; lon: number; eye: THREE.Vector3 } | null =
-		null;
+	private pending: { lat: number; lon: number; eye: Vec3 } | null = null;
 	private disposed = false;
 
 	private constructor(
@@ -52,7 +54,7 @@ export class DeckTiles3D {
 		return t;
 	}
 
-	enter(lat: number, lon: number, eye: THREE.Vector3) {
+	enter(lat: number, lon: number, eye: Vec3) {
 		if (!this.mods) {
 			this.pending = { lat, lon, eye };
 			return;
@@ -70,7 +72,7 @@ export class DeckTiles3D {
 				`[tiles3d] ${this.config.sources.join(", ")} · blend ${this.config.blend} · geoid N ${this.set.geoidN.toFixed(2)} m (deck)`,
 			);
 		}
-		this.set.uniforms.uEye.value.copy(eye);
+		this.set.uniforms.eye = [eye[0], eye[1], eye[2]];
 		this.active = true;
 	}
 
@@ -79,9 +81,9 @@ export class DeckTiles3D {
 		this.active = false;
 	}
 
-	/** Each stepping world frame: refine from the world camera. */
-	update(cam: THREE.PerspectiveCamera, width: number, height: number) {
-		if (this.active) this.set?.update(cam, width, height);
+	/** Each stepping world frame: refine from the world camera (ENU view; width / height in px). */
+	update(view: StepView, width: number, height: number) {
+		if (this.active) this.set?.update(view, width, height);
 	}
 
 	/** The tiles layer for worldLayers() (opaque: before the splats), or null. */
@@ -91,7 +93,7 @@ export class DeckTiles3D {
 		photoRange: PhotoRangeMap | null;
 		photoFg: { width: number; height: number; data: Uint8Array } | null;
 		truth: boolean;
-		camera: THREE.Vector3;
+		camera: Vec3;
 	}): Tiles3DDeckLayer | null {
 		const set = this.set;
 		if (!set || !this.active || !this.mods) return null;
@@ -109,7 +111,7 @@ export class DeckTiles3D {
 			truthColor: [d[0] / 255, d[1] / 255, d[2] / 255],
 			// Truth view: Google is not ours to label; exports never carry it
 			hideDisplayOnly: p.truth || this.hidden,
-			camera: [p.camera.x, p.camera.y, p.camera.z],
+			camera: [p.camera[0], p.camera[1], p.camera[2]],
 		});
 	}
 

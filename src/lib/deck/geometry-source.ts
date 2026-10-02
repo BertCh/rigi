@@ -5,14 +5,13 @@
 // Per-pixel terrain geometry seen through the photo camera, for the deck backend.
 //
 // Contract shared by the GPU implementation (src/lib/deck/geometry-pass.ts, built in parallel)
-// and the CPU fallback (src/lib/deck/cpu-geometry.ts). DeckEngine uses it where three.js reads
-// its float geometry target (geoRT / silRT): the silhouette re-rank in autoAlign, and later the
+// and the CPU fallback (src/lib/deck/cpu-geometry.ts). DeckEngine uses it for the float geometry target: the silhouette re-rank in autoAlign, and later the
 // ridge/skyline composite, occlusion and hover.
 //
 // Buffer layout (both implementations MUST follow it):
 //   - row-major, row 0 = TOP of the image (v = 0), column 0 = left (u = 0); pixel (x, y) covers
 //     u ∈ [x/width, (x+1)/width), v ∈ [y/height, (y+1)/height) and is sampled at its centre.
-//     (three.js readbacks are bottom-up; this is not.)
+//     (row 0 = top; GL readbacks are bottom-up, this is not.)
 //   - `range[i]`: metres from the eye to the first terrain hit along the pixel's ray;
 //     Number.POSITIVE_INFINITY for sky / no data. Never 0 or NaN.
 //   - `xyz` (optional): the hit point in the camera-anchored ENU frame (x east, y north, z up,

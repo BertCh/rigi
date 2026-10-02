@@ -5,11 +5,17 @@
 // Self-contained checks for Step Inside 3D Tiles (src/lib/tiles3d). Run: npx tsx src/lib/tiles3d/tiles3d.check.ts
 // Exits 1 on any failure (prints every failure). Covers the pure parts: geoid lookup, the ECEF → ENU
 // placement, the per-source datum, flag parsing and the display-only rules of the source table.
-import * as THREE from "three";
+import type { Matrix4 } from "@math.gl/core";
 import { EnuFrame, toEcef } from "../geodesy";
 import { parseTiles3DSources, TILES3D_SOURCES } from "./config";
 import { enuFromEcef } from "./frame";
 import { geoidUndulation } from "./geoid";
+
+/** `m` applied to a point, as {x, y, z}. */
+function apply(m: Matrix4, v: number[]) {
+	const o = m.transformAsPoint(v) as number[];
+	return { x: o[0], y: o[1], z: o[2] };
+}
 
 let failed = 0;
 const check = (name: string, ok: boolean, detail = "") => {
@@ -46,14 +52,11 @@ const lat = 46.7197;
 const lon = 7.7014;
 for (const N of [0, 50.4]) {
 	const m = enuFromEcef(lat, lon, N);
-	const p = new THREE.Vector3(...toEcef(lat, lon, 800)).applyMatrix4(m);
+	const p = apply(m, toEcef(lat, lon, 800));
 	check(
 		`enu origin N=${N}`,
 		near(p.x, 0, 1e-6) && near(p.y, 0, 1e-6) && near(p.z, 800 - N, 1e-6),
-		p
-			.toArray()
-			.map((v) => v.toFixed(6))
-			.join(","),
+		[p.x, p.y, p.z].map((v) => v.toFixed(6)).join(","),
 	);
 }
 // …and agrees with geodesy.ts EnuFrame (without its refraction lift, negligible at 1 km)
@@ -61,9 +64,7 @@ for (const N of [0, 50.4]) {
 	const m = enuFromEcef(lat, lon, 0);
 	const f = new EnuFrame(lat, lon, 0);
 	const q = f.fromGeo(lat + 0.009, lon + 0.013, 900);
-	const qe = new THREE.Vector3(
-		...toEcef(lat + 0.009, lon + 0.013, 900),
-	).applyMatrix4(m);
+	const qe = apply(m, toEcef(lat + 0.009, lon + 0.013, 900));
 	const d = Math.hypot(q[0] - qe.x, q[1] - qe.y, q[2] - qe.z);
 	check("enu matches EnuFrame (1.3 km)", d < 0.2, `${d.toFixed(3)} m`);
 }

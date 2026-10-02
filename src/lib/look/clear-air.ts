@@ -20,7 +20,7 @@
 // Display only: never on the matched photo view, never in eval / matcher renders (Tier 0/1 of
 // reports/Geospatial rendering aesthetics frontier.md: the drape is a render, not the evidence).
 // GLSL / WGSL: look/glsl/clear-air.ts. Both engines fill it from clearAirValues().
-import { hexToLinearLikeThree } from "../style/color";
+import { hexToLinearHaze } from "../style/color";
 import type { ViewStyle } from "../style/types";
 import {
 	ATM_CURV,
@@ -163,10 +163,10 @@ export function clearAirValues(
 			betaM: a.betaM * k,
 		};
 	}
-	// classic haze: f = min(1 − exp(−range·density), hazeMax) toward pow(linearLikeThree, 2.2)
+	// classic haze: f = min(1 − exp(−range·density), hazeMax) toward pow(hexToLinearHaze, 2.2)
 	// (deck/terrain-layer.ts haze(); overlay haze multiplier 1)
 	const d = t.hazeDensity;
-	const col = hexToLinearLikeThree(t.hazeColor).map((c) => c ** 2.2) as Vec3;
+	const col = hexToLinearHaze(t.hazeColor).map((c) => c ** 2.2) as Vec3;
 	return {
 		...base,
 		airlight: col,

@@ -4,13 +4,13 @@
 
 // Step Inside 3D Tiles on WebGPU: the port of tiles3d/deck-layer.ts Tiles3DDeckLayer (itself the deck
 // twin of tiles3d/material.ts) to a host-agnostic GpuLayerCore (README.md "Layer contract"). It draws
-// the visible meshes of a Tiles3DSet (tiles3d/tiles.ts, the same THREE tile selector the WebGL
+// the visible meshes of a Tiles3DSet (tiles3d/tiles.ts, the same loaders.gl tile selector the WebGL
 // engines use), so every renderer shows identical tiles.
 //
 // What is the same as the WebGL layer (the reference look):
-//   - each tile mesh's THREE BufferGeometry is converted to float32 ONCE, on first draw (positions,
+//   - each TileMesh (tiles3d/content.ts: plain typed arrays) is uploaded ONCE, on first draw (positions,
 //     uv, vertex colour; interleaved here), and freed when the tile unloads (Tiles3DSet.onDisposeMesh)
-//   - i3dm (instanced trees): InstancedMesh.instanceMatrix as four per-instance vec4 attributes
+//   - i3dm (instanced trees): the instance matrices as four per-instance vec4 attributes
 //     (stepMode "instance")
 //   - material.ts's rules: the fill test against the photo range map + the foreground mask, the eye
 //     clear zone (uClear around uEye) and the camera clear zone (5 → 10 m around the view camera), the
@@ -60,7 +60,7 @@
 //   const tiles = createTiles3DCore(host.device, tiles3dCoreOptions(tiles3dConfig()));  // host.cores
 //   tiles.onChange = () => host.requestRender();         // a mipmapped tile texture landed
 //   on enter step:  dt.enter(lat, lon, eyeVec)          on exit: dt.exit()
-//   each stepping world frame: dt.update(threeWorldCam, canvas.width, canvas.height);
+//   each stepping world frame: dt.update({ position, viewMatrix, projectionMatrix, fovY, aspect }, canvas.width, canvas.height);
 //     tiles.setSet(dt.tiles);                             // same object → no-op
 //     tiles.setEnabled(step?.view === "step" && !!dt.tiles);
 //     tiles.setPhotoCamera(cameraUniforms(photoCamera({pose, eye, width: g.width, height: g.height})));
@@ -75,13 +75,13 @@
 import type { Buffer, Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
-import type * as THREE from "three";
 import { getFlag } from "#/lib/flags";
 import {
 	PROVENANCE_COLORS,
 	PROVENANCE_TINT_MIX,
 } from "#/lib/nearfield/provenance";
 import type { Tiles3DConfig } from "#/lib/tiles3d/config";
+import type { TileImage, TileMesh } from "#/lib/tiles3d/content";
 import { REFRACTION_LIFT } from "#/lib/tiles3d/material";
 import type { Tiles3DSet } from "#/lib/tiles3d/tiles";
 import {
@@ -205,7 +205,7 @@ export type Tiles3DUniformValues = {
 /**
  * The tile program. Colour pass by default; GEOMETRY_PASS for the class-3 geometry contribution.
  * tileData (per tile, explicit layout, 96 bytes):
- *   model   mat4   local → ENU (THREE matrixWorld, column-major)
+ *   model   mat4   local → ENU (TileMesh.matrix, column-major)
  *   color   vec4   sRGB albedo (untextured), a = 1 when the tile has a texture
  *   params  vec4   x = 1 / depth bias (reversed-Z clip.z scale), yzw unused
  */
@@ -378,35 +378,19 @@ export type Tiles3DStats = {
 	mipSwaps: number;
 };
 
-/** THREE BufferAttribute (interleaved / normalised / any type) → `size` floats per vertex into
- * `out` at `offset` with `stride` (deck-layer.ts floats(), interleaved). Missing lanes = 1. */
+/** `size` floats per vertex of `src` into `out` at `offset` with `stride` (deck-layer.ts attributes,
+ * interleaved). */
 function interleave(
-	attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
+	src: Float32Array,
 	size: number,
 	out: Float32Array,
 	offset: number,
 	stride: number,
 ) {
-	const n = attr.count;
-	const get = [attr.getX, attr.getY, attr.getZ, attr.getW];
+	const n = src.length / size;
 	for (let i = 0; i < n; i++)
 		for (let k = 0; k < size; k++)
-			out[i * stride + offset + k] =
-				k < attr.itemSize ? get[k].call(attr, i) : 1;
-}
-
-/** Local bounding sphere of a (possibly instanced) mesh. */
-function localSphereOf(mesh: THREE.Mesh): Sphere | null {
-	const inst = mesh as THREE.InstancedMesh;
-	if (inst.isInstancedMesh) {
-		if (!inst.boundingSphere) inst.computeBoundingSphere?.();
-		const s = inst.boundingSphere;
-		return s ? [s.center.x, s.center.y, s.center.z, s.radius] : null;
-	}
-	const geo = mesh.geometry;
-	if (!geo.boundingSphere) geo.computeBoundingSphere();
-	const s = geo.boundingSphere;
-	return s ? [s.center.x, s.center.y, s.center.z, s.radius] : null;
+			out[i * stride + offset + k] = src[i * size + k];
 }
 
 /** Local sphere → ENU through a column-major matrix (radius × the largest axis scale, + 1 m for
@@ -422,7 +406,7 @@ function worldSphere(s: Sphere, m: ArrayLike<number>): Sphere {
 }
 
 type Visible = {
-	mesh: THREE.Mesh;
+	mesh: TileMesh;
 	displayOnly: boolean;
 	depthBias: number;
 };
@@ -443,7 +427,7 @@ export class Tiles3DCore implements GpuLayerCore {
 	onChange?: () => void;
 	private set: Tiles3DSet | null = null;
 	private enabled = true;
-	private meshes = new Map<THREE.Mesh, MeshGpu>();
+	private meshes = new Map<TileMesh, MeshGpu>();
 	private models = new ModelCache();
 	private photoCam: CameraUniforms | null = null;
 	private fg: Texture | null = null;
@@ -453,7 +437,7 @@ export class Tiles3DCore implements GpuLayerCore {
 	private readonly noGeometry: Texture;
 	/** set.visibleMeshes() once per frame (both passes share it). */
 	private visibleCache: { frame: number; list: Visible[] } | null = null;
-	private readonly onDispose = (m: THREE.Mesh) => this.free(m);
+	private readonly onDispose = (m: TileMesh) => this.free(m);
 
 	constructor(
 		readonly device: Device,
@@ -551,15 +535,12 @@ export class Tiles3DCore implements GpuLayerCore {
 		if (!set) return [];
 		if (this.visibleCache?.frame === frame) return this.visibleCache.list;
 		const list: Visible[] = [];
-		for (const { mesh, source } of set.visibleMeshes()) {
-			const mu = (mesh.material as THREE.ShaderMaterial).uniforms;
+		for (const mesh of set.visibleMeshes())
 			list.push({
 				mesh,
-				displayOnly: source.displayOnly,
-				depthBias:
-					(mu?.uDepthBias?.value as number | undefined) ?? source.depthBias,
+				displayOnly: mesh.source.displayOnly,
+				depthBias: mesh.depthBias,
 			});
-		}
 		this.visibleCache = { frame, list };
 		return list;
 	}
@@ -630,27 +611,23 @@ export class Tiles3DCore implements GpuLayerCore {
 	}
 
 	/** The GPU copy of a tile mesh (converted once), or null when it has no triangles. */
-	private gpuFor(mesh: THREE.Mesh): MeshGpu | null {
+	private gpuFor(mesh: TileMesh): MeshGpu | null {
 		const have = this.meshes.get(mesh);
 		if (have) return have;
-		const geo = mesh.geometry;
-		const pos = geo.attributes.position;
-		if (!pos?.count) return null;
+		const n = mesh.positions.length / 3;
+		if (!n) return null;
 		const d = this.device;
-		const n = pos.count;
 		const v = new Float32Array(n * VERTEX_FLOATS);
-		interleave(pos, 3, v, 0, VERTEX_FLOATS);
-		const uv = geo.attributes.uv;
-		if (uv) interleave(uv, 2, v, 3, VERTEX_FLOATS);
-		const col = geo.attributes.color;
-		if (col) interleave(col, 3, v, 5, VERTEX_FLOATS);
+		interleave(mesh.positions, 3, v, 0, VERTEX_FLOATS);
+		if (mesh.uvs) interleave(mesh.uvs, 2, v, 3, VERTEX_FLOATS);
+		if (mesh.colors) interleave(mesh.colors, 3, v, 5, VERTEX_FLOATS);
 		else
 			for (let i = 0; i < n; i++)
 				v.fill(1, i * VERTEX_FLOATS + 5, i * VERTEX_FLOATS + 8);
 		// indices: uint16 kept (padded to a 4-byte multiple), anything else → uint32; none → 0..n-1
 		let idx: Uint16Array | Uint32Array;
 		let indexCount: number;
-		const src = geo.index?.array;
+		const src = mesh.indices;
 		if (src instanceof Uint16Array) {
 			indexCount = src.length;
 			idx = new Uint16Array(indexCount + (indexCount & 1));
@@ -664,25 +641,17 @@ export class Tiles3DCore implements GpuLayerCore {
 			for (let i = 0; i < n; i++) idx[i] = i;
 		}
 		if (!indexCount) return null;
-		const inst = (mesh as THREE.InstancedMesh).isInstancedMesh
-			? (mesh as THREE.InstancedMesh)
-			: null;
-		const mat = mesh.material as THREE.ShaderMaterial;
-		const map = this.textureOf(
-			(mat.uniforms?.uMap?.value as THREE.Texture | null) ?? null,
-			mesh.uuid,
-			false,
-		);
+		const map = this.textureOf(mesh.image, mesh.key, false);
 		if (map && Math.max(map.width, map.height) > 1) this.queueMips(mesh);
 		const tileValues = new Float32Array(TILE_FLOATS);
 		const g: MeshGpu = {
 			vertices: d.createBuffer({
-				id: `${this.id}-${mesh.uuid}-v`,
+				id: `${this.id}-${mesh.key}-v`,
 				data: v,
 				usage: BUF.VERTEX | BUF.COPY_DST,
 			}),
 			indices: d.createBuffer({
-				id: `${this.id}-${mesh.uuid}-i`,
+				id: `${this.id}-${mesh.key}-i`,
 				data: idx,
 				usage: BUF.INDEX | BUF.COPY_DST,
 			}),
@@ -691,39 +660,32 @@ export class Tiles3DCore implements GpuLayerCore {
 			instanceCapacity: 0,
 			map,
 			tile: d.createBuffer({
-				id: `${this.id}-${mesh.uuid}-u`,
+				id: `${this.id}-${mesh.key}-u`,
 				data: tileValues,
 				usage: BUF.UNIFORM | BUF.COPY_DST,
 			}),
 			tileValues,
-			localSphere: localSphereOf(mesh),
+			localSphere: mesh.boundingSphere,
 		};
 		// force the first tileData write (values start all-zero)
 		tileValues[15] = Number.NaN;
-		if (inst) this.syncInstances(g, inst);
+		if (mesh.instances) this.syncInstances(g, mesh);
 		this.meshes.set(mesh, g);
 		this.stats.uploads++;
 		this.stats.meshes = this.meshes.size;
 		return g;
 	}
 
-	/** Upload (or refresh) an InstancedMesh's matrices. */
-	private syncInstances(g: MeshGpu, inst: THREE.InstancedMesh) {
-		const attr = inst.instanceMatrix;
-		if (attr.version === g.instanceVersion && g.instances) return;
-		const data = attr.array as Float32Array;
-		if (g.instances && data.byteLength <= g.instanceCapacity)
-			g.instances.write(data);
-		else {
-			g.instances?.destroy();
-			g.instances = this.device.createBuffer({
-				id: `${this.id}-${inst.uuid}-inst`,
-				data: new Float32Array(data),
-				usage: BUF.VERTEX | BUF.COPY_DST,
-			});
-			g.instanceCapacity = data.byteLength;
-		}
-		g.instanceVersion = attr.version;
+	/** Upload an instanced mesh's matrices (static per tile: once). */
+	private syncInstances(g: MeshGpu, mesh: TileMesh) {
+		const data = mesh.instances;
+		if (!data || g.instances) return;
+		g.instances = this.device.createBuffer({
+			id: `${this.id}-${mesh.key}-inst`,
+			data: new Float32Array(data),
+			usage: BUF.VERTEX | BUF.COPY_DST,
+		});
+		g.instanceCapacity = data.byteLength;
 	}
 
 	/**
@@ -733,17 +695,12 @@ export class Tiles3DCore implements GpuLayerCore {
 	 * draw() therefore makes a single-level texture and queues the mipmapped one (flushMips).
 	 */
 	private textureOf(
-		map: THREE.Texture | null,
+		img: TileImage | null,
 		key: string,
 		mips: boolean,
 	): Texture | undefined {
-		const img = map?.image as
-			| ImageBitmap
-			| HTMLImageElement
-			| HTMLCanvasElement
-			| undefined;
-		if (!img || !((img as { width: number }).width > 0)) return undefined;
-		const { width, height } = img as { width: number; height: number };
+		if (!img || !(img.width > 0)) return undefined;
+		const { width, height } = img;
 		const mipLevels = mips
 			? Math.floor(Math.log2(Math.max(width, height))) + 1
 			: 1;
@@ -764,7 +721,9 @@ export class Tiles3DCore implements GpuLayerCore {
 					maxAnisotropy: mips ? 8 : 1,
 				},
 			});
-			tex.copyExternalImage({ image: img as never, width, height });
+			if ("data" in img && ArrayBuffer.isView(img.data))
+				tex.writeData(img.data as never, { width, height });
+			else tex.copyExternalImage({ image: img as never, width, height });
 			if (mipLevels > 1) generateTextureMipmaps(this.device, tex);
 			return tex;
 		} catch (e) {
@@ -774,10 +733,10 @@ export class Tiles3DCore implements GpuLayerCore {
 	}
 
 	/** Meshes whose single-level texture waits for its mipmapped replacement. */
-	private mipQueue = new Set<THREE.Mesh>();
+	private mipQueue = new Set<TileMesh>();
 	private mipTimer: ReturnType<typeof setTimeout> | null = null;
 
-	private queueMips(mesh: THREE.Mesh) {
+	private queueMips(mesh: TileMesh) {
 		this.mipQueue.add(mesh);
 		// a later task: the frame that is encoding now has been submitted by then
 		this.mipTimer ??= setTimeout(() => this.flushMips(), 0);
@@ -790,12 +749,7 @@ export class Tiles3DCore implements GpuLayerCore {
 		for (const mesh of this.mipQueue) {
 			const g = this.meshes.get(mesh);
 			if (!g) continue;
-			const mat = mesh.material as THREE.ShaderMaterial;
-			const tex = this.textureOf(
-				(mat.uniforms?.uMap?.value as THREE.Texture | null) ?? null,
-				mesh.uuid,
-				true,
-			);
+			const tex = this.textureOf(mesh.image, mesh.key, true);
 			if (!tex) continue;
 			g.map?.destroy();
 			g.map = tex;
@@ -809,16 +763,14 @@ export class Tiles3DCore implements GpuLayerCore {
 	/** Refresh a tile's tileData from its mesh (matrix, colour, texture flag, bias); write on change. */
 	private syncTile(g: MeshGpu, vis: Visible) {
 		const { mesh } = vis;
-		const e = mesh.matrixWorld.elements;
-		const c = (mesh.material as THREE.ShaderMaterial).uniforms?.uColor?.value as
-			| THREE.Color
-			| undefined;
+		const e = mesh.matrix;
+		const c = mesh.color;
 		const vals = g.tileValues;
 		const next = [
-			...e,
-			c ? c.r : 0.7,
-			c ? c.g : 0.7,
-			c ? c.b : 0.7,
+			...Array.from(e),
+			c[0],
+			c[1],
+			c[2],
 			g.map ? 1 : 0,
 			1 / Math.max(1e-3, vis.depthBias),
 			0,
@@ -840,21 +792,21 @@ export class Tiles3DCore implements GpuLayerCore {
 	/** Frame block for this pass (the WebGL layer's per-draw tile3d uniforms that are per frame). */
 	frameUniforms(ctx: PassContext): Tiles3DUniformValues {
 		const u = this.set?.uniforms;
-		const fade = u?.uFade.value;
-		const clear = u?.uClear.value;
-		const eye = u?.uEye.value;
+		const fade = u?.fade;
+		const clear = u?.clear;
+		const eye = u?.eye;
 		const o = this.options;
 		const fill =
 			ctx.kind === "color" && o.fill && !!this.photoCam && !!ctx.geometry;
 		return {
 			fadeClear: [
-				fade?.x ?? 2200,
-				fade?.y ?? 3000,
-				clear?.x ?? 25,
-				clear?.y ?? 40,
+				fade?.[0] ?? 2200,
+				fade?.[1] ?? 3000,
+				clear?.[0] ?? 25,
+				clear?.[1] ?? 40,
 			],
 			truthColor: [...TRUTH_COLOR, o.truth ? PROVENANCE_TINT_MIX : 0],
-			fadeEye: [eye?.x ?? 0, eye?.y ?? 0, eye?.z ?? 0],
+			fadeEye: [eye?.[0] ?? 0, eye?.[1] ?? 0, eye?.[2] ?? 0],
 			lift: REFRACTION_LIFT,
 			clearCam: o.clearCamera ?? [...ctx.camera.eye],
 			fill: fill ? 1 : 0,
@@ -885,17 +837,12 @@ export class Tiles3DCore implements GpuLayerCore {
 			if (!g) continue;
 			if (
 				g.localSphere &&
-				!sphereInView(
-					ctx.camera,
-					worldSphere(g.localSphere, vis.mesh.matrixWorld.elements),
-				)
+				!sphereInView(ctx.camera, worldSphere(g.localSphere, vis.mesh.matrix))
 			)
 				continue;
-			const inst = (vis.mesh as THREE.InstancedMesh).isInstancedMesh
-				? (vis.mesh as THREE.InstancedMesh)
-				: null;
+			const inst = vis.mesh.instances ? vis.mesh : null;
 			if (inst) {
-				if (inst.count <= 0) continue;
+				if (inst.instanceCount <= 0) continue;
 				this.syncInstances(g, inst);
 			}
 			this.syncTile(g, vis);
@@ -927,16 +874,16 @@ export class Tiles3DCore implements GpuLayerCore {
 			);
 			model.setIndexBuffer(g.indices);
 			model.setIndexCount(g.indexCount);
-			model.setInstanceCount(inst ? inst.count : 1);
+			model.setInstanceCount(inst ? inst.instanceCount : 1);
 			model.draw(ctx.renderPass);
 			drawn++;
-			tris += (g.indexCount / 3) * (inst ? inst.count : 1);
+			tris += (g.indexCount / 3) * (inst ? inst.instanceCount : 1);
 		}
 		this.stats.drawn[kind] = drawn;
 		if (kind === "color") this.stats.triangles = tris;
 	}
 
-	private free(mesh: THREE.Mesh) {
+	private free(mesh: TileMesh) {
 		const g = this.meshes.get(mesh);
 		if (!g) return;
 		g.vertices.destroy();

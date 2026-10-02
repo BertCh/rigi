@@ -8,8 +8,8 @@
 //   - the four programs (colour / GEOMETRY_PASS × mesh / INSTANCED) assemble with luma's WGSL
 //     assembler and expose the expected bindings
 //
-// GPU (browser, WebGPU): `runTiles3DGpuCheck()` renders synthetic tile meshes (real THREE meshes with
-// tiles3d/material.ts materials, a duck-typed Tiles3DSet) through the real passes
+// GPU (browser, WebGPU): `runTiles3DGpuCheck()` renders synthetic tile meshes (TileMesh typed arrays,
+// a duck-typed Tiles3DSet) through the real passes
 // (hosts/passes.ts: geometry, then 4× MSAA colour + resolve), reads back and checks:
 //   shade      untextured, camera-facing quad = srgb_decode(albedo · 0.55) (derivative normal faces the
 //              camera: the WebGL cross(dFdx, dFdy) sign)
@@ -27,16 +27,13 @@
 import type { Device, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { ShaderAssembler } from "@luma.gl/shadertools";
-import * as THREE from "three";
 import {
 	PROVENANCE_COLORS,
 	PROVENANCE_TINT_MIX,
 } from "#/lib/nearfield/provenance";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
-import {
-	makeTileMaterial,
-	makeTileSharedUniforms,
-} from "#/lib/tiles3d/material";
+import type { TileImage, TileMesh } from "#/lib/tiles3d/content";
+import { makeTileSharedUniforms } from "#/lib/tiles3d/material";
 import type { Tiles3DSet } from "#/lib/tiles3d/tiles";
 import {
 	type CameraUniforms,
@@ -157,22 +154,55 @@ async function readRgba16f(device: Device, tex: Texture) {
 const srgbDecode = (c: number) =>
 	c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 
-/** A camera-facing quad in the plane y = const: x0..x1, z0..z1. */
-function quadGeometry(x0: number, x1: number, z0: number, z1: number, y = 0) {
-	const g = new THREE.BufferGeometry();
-	g.setAttribute(
-		"position",
-		new THREE.BufferAttribute(
-			new Float32Array([x0, y, z0, x1, y, z0, x1, y, z1, x0, y, z1]),
-			3,
-		),
-	);
-	g.setAttribute(
-		"uv",
-		new THREE.BufferAttribute(new Float32Array([0, 1, 1, 1, 1, 0, 0, 0]), 2),
-	);
-	g.setIndex(new THREE.BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1));
-	return g;
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const translation = (x: number, y: number, z: number) => [
+	...IDENTITY.slice(0, 12),
+	x,
+	y,
+	z,
+	1,
+];
+let meshKey = 0;
+
+/** A camera-facing quad (plane y = 0, x0..x1, z0..z1) as a TileMesh placed at `at`. */
+function quadMesh(
+	x0: number,
+	x1: number,
+	z0: number,
+	z1: number,
+	at: [number, number, number],
+	o: {
+		source: TileMesh["source"];
+		color?: Vec3;
+		image?: TileImage;
+		instances?: [number, number, number][];
+		depthBias?: number;
+	},
+): Mutable<TileMesh> {
+	const instances = o.instances
+		? new Float32Array(o.instances.flatMap((t) => translation(...t)))
+		: null;
+	return {
+		key: `check-${meshKey++}`,
+		source: o.source,
+		positions: new Float32Array([x0, 0, z0, x1, 0, z0, x1, 0, z1, x0, 0, z1]),
+		uvs: new Float32Array([0, 1, 1, 1, 1, 0, 0, 0]),
+		colors: null,
+		indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
+		matrix: translation(...at),
+		instances,
+		instanceCount: o.instances?.length ?? 0,
+		image: o.image ?? null,
+		color: o.color ?? [0.7, 0.7, 0.7],
+		depthBias: o.depthBias ?? 0.97,
+		boundingSphere: [
+			(x0 + x1) / 2,
+			0,
+			(z0 + z1) / 2,
+			Math.hypot(x1 - x0, z1 - z0) / 2,
+		],
+	};
 }
 
 /** Colour-only opaque wall in y = WALL_Y (depth written): the bias test's occluder. */
@@ -282,20 +312,23 @@ export async function runTiles3DGpuCheck(
 
 	// --- the synthetic tile set (duck-typed Tiles3DSet)
 	const shared = makeTileSharedUniforms();
-	shared.uEye.value.set(0, 0, 0);
-	const buildings = { displayOnly: false, depthBias: 0.97 };
-	const google = { displayOnly: true, depthBias: 0.97 };
+	shared.eye = [0, 0, 0];
+	const buildings = {
+		id: "swisstopo-buildings",
+		displayOnly: false,
+		depthBias: 0.97,
+	} as TileMesh["source"];
+	const google = {
+		id: "google",
+		displayOnly: true,
+		depthBias: 0.97,
+	} as TileMesh["source"];
 	const ALBEDO: Vec3 = [0.8, 0.4, 0.2];
-	const mat = (color: Vec3, map: THREE.Texture | null = null, bias = 0.97) =>
-		makeTileMaterial(shared, {
-			map,
-			color,
-			vertexColors: false,
-			depthBias: bias,
-		});
 	// A: untextured, x −150..−50, y 500 (left: outside the photo frame)
-	const A = new THREE.Mesh(quadGeometry(-150, -50, -40, 40), mat(ALBEDO));
-	A.position.set(0, 500, 0);
+	const A = quadMesh(-150, -50, -40, 40, [0, 500, 0], {
+		source: buildings,
+		color: ALBEDO,
+	});
 	// B: textured, x 50..150 (right, outside the photo frame)
 	const canvas = document.createElement("canvas");
 	canvas.width = 16;
@@ -305,52 +338,46 @@ export async function runTiles3DGpuCheck(
 	c2d.fillStyle = "rgb(40,160,220)";
 	c2d.fillRect(0, 0, 16, 16);
 	const bitmap = await createImageBitmap(canvas);
-	const tex = new THREE.Texture(bitmap as never);
-	const B = new THREE.Mesh(quadGeometry(50, 150, -40, 40), mat([1, 1, 1], tex));
-	B.position.set(0, 500, 0);
+	const B = quadMesh(50, 150, -40, 40, [0, 500, 0], {
+		source: buildings,
+		color: [1, 1, 1],
+		image: bitmap,
+	});
 	// C: i3dm, a 20 m quad at two instances (−100, 500, 70) and (100, 500, 70)
 	const GREEN: Vec3 = [0.2, 0.7, 0.3];
-	const C = new THREE.InstancedMesh(
-		quadGeometry(-10, 10, -10, 10),
-		mat(GREEN),
-		2,
-	);
-	const m4 = new THREE.Matrix4();
-	C.setMatrixAt(0, m4.makeTranslation(-100, 500, 70));
-	C.setMatrixAt(1, m4.makeTranslation(100, 500, 70));
-	C.instanceMatrix.needsUpdate = true;
+	const C = quadMesh(-10, 10, -10, 10, [0, 0, 0], {
+		source: buildings,
+		color: GREEN,
+		instances: [
+			[-100, 500, 70],
+			[100, 500, 70],
+		],
+	});
 	// D: display-only (Google), inside the photo frame, x 20..40, z −40..−20
-	const D = new THREE.Mesh(
-		quadGeometry(20, 40, -40, -20),
-		mat([0.9, 0.9, 0.9]),
-	);
-	D.position.set(0, 500, 0);
+	const D = quadMesh(20, 40, -40, -20, [0, 500, 0], {
+		source: google,
+		color: [0.9, 0.9, 0.9],
+	});
 	// E: 20 m from the eye (inside the 25 m clear zone), centre of the view
-	const E = new THREE.Mesh(quadGeometry(-3, 3, -3, 3), mat([1, 0, 1]));
-	E.position.set(0, 20, 0);
+	const E = quadMesh(-3, 3, -3, 3, [0, 20, 0], {
+		source: buildings,
+		color: [1, 0, 1],
+	});
 	// F: centre, in front of the photographed surface (y 1000): dropped by fill
-	const F = new THREE.Mesh(quadGeometry(-8, 8, -8, 8), mat([0.5, 0.5, 0.9]));
-	F.position.set(0, 500, 0);
+	const F = quadMesh(-8, 8, -8, 8, [0, 500, 0], {
+		source: buildings,
+		color: [0.5, 0.5, 0.9],
+	});
 	// G: behind the photographed surface (a disocclusion: r > 1000·1.08 + 25): kept by fill
-	const G = new THREE.Mesh(
-		quadGeometry(-40, -20, 15, 35),
-		mat([0.9, 0.9, 0.2]),
-	);
-	G.position.set(0, 1200, 0);
-	const all: { mesh: THREE.Mesh; source: typeof buildings }[] = [
-		{ mesh: A, source: buildings },
-		{ mesh: B, source: buildings },
-		{ mesh: C, source: buildings },
-		{ mesh: D, source: google },
-		{ mesh: E, source: buildings },
-		{ mesh: F, source: buildings },
-		{ mesh: G, source: buildings },
-	];
+	const G = quadMesh(-40, -20, 15, 35, [0, 1200, 0], {
+		source: buildings,
+		color: [0.9, 0.9, 0.2],
+	});
+	const all: TileMesh[] = [A, B, C, D, E, F, G];
 	const set = {
 		uniforms: shared,
-		onDisposeMesh: new Set<(m: THREE.Mesh) => void>(),
+		onDisposeMesh: new Set<(m: TileMesh) => void>(),
 		visibleMeshes() {
-			for (const e of all) e.mesh.updateMatrixWorld(true);
 			return all;
 		},
 	} as unknown as Tiles3DSet;
@@ -444,11 +471,11 @@ export async function runTiles3DGpuCheck(
 	checks.displayOnlyShown = { ok: dOn[3] > 0.99, got: dOn };
 
 	// run 2: depth bias 1.0 → the wall (2% nearer) wins
-	(A.material as THREE.ShaderMaterial).uniforms.uDepthBias.value = 1;
+	A.depthBias = 1;
 	img = await render();
 	const aWall1 = px(img, [-140, 500, 0]);
 	checks.biasLoses = { ok: near(aWall1, [0, 0, 1, 1]), got: aWall1 };
-	(A.material as THREE.ShaderMaterial).uniforms.uDepthBias.value = 0.97;
+	A.depthBias = 0.97;
 
 	// run 3: fill on, photo camera vfov 10 over the ground at 1000 m
 	tiles.setOptions({ fill: true });

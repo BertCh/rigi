@@ -4,12 +4,10 @@
 
 // Photo-camera queries on a TerrainSet: eye altitude, peak snapping and occlusion-tested peak labels.
 
-import * as THREE from "three";
-import { makeProjector, type Pose } from "../camera";
+import { makeProjector, type Pose, projectPoint } from "../camera";
 import { getCpuHeights } from "../dem/cpu-heights";
 import { distanceM } from "../geodesy";
 import { declutterClassic, peakRank, rankPeaks } from "../look/labels/rank";
-import { projectPoint } from "../pose";
 import type { TerrainSet } from "./terrain-data";
 
 export type Photo = {
@@ -45,7 +43,7 @@ export type PeakLabel = {
 	/** OSM prominence (m), null if unknown. */
 	prominence: number | null;
 	distKm: number;
-	/** engine.ts rank: prom·3 + ele − range·0.012. */
+	/** Rank: prom·3 + ele − range·0.012. */
 	rank: number;
 	position: [number, number, number];
 	u: number;
@@ -60,10 +58,9 @@ export function nearFadeFor(hAccuracy: number | null | undefined) {
 }
 
 /**
- * Colour-ramp elevation range: local relief within 25 km, at least 500 m (as the removed three.js
- * engine). three only held the viewing-wedge tiles (+ everything within 3 km) at that point, so read the
- * same set here: deck's out-of-wedge context tiles (e.g. the 4000 m Oberland behind a Lake Thun
- * camera) would otherwise stretch the ramp and wash the colours out.
+ * Colour-ramp elevation range: local relief within 25 km, at least 500 m. Read from the viewing-wedge tiles and everything within 3 km: deck's out-of-wedge
+ * context tiles (e.g. the 4000 m Oberland behind a Lake Thun camera) would otherwise stretch the ramp
+ * and wash the colours out.
  */
 export function localElevRange(terrain: TerrainSet): [number, number] {
 	let lo = Number.POSITIVE_INFINITY;
@@ -139,8 +136,8 @@ function peakPrecompute(
 }
 
 /**
- * engine.ts buildPeaks: peaks 150 m – 110 km away, snapped to the DEM summit within
- * min(250, 60 + dist·0.004) m. Lazily: three snaps every peak up front, but on deck's z17 set
+ * Peaks 150 m – 110 km away, snapped to the DEM summit within
+ * min(250, 60 + dist·0.004) m. Lazily: on deck's z17 set
  * that is ~2 s for a region's ~2.6k peaks, so only peaks near the frame (15 % margin: snapping
  * moves a summit ≤ 250 m) are snapped, and the verdict is cached in `cache` (per terrain).
  * Returns every peak snapped so far. `localMax` replaces terrain.localMax (the WebGPU engine's GPU
@@ -207,7 +204,7 @@ export function snapPeaksNear(
 }
 
 /**
- * engine.ts peakLabels: in-frame peaks with a visibility verdict, ranked and decluttered by the
+ * In-frame peaks with a visibility verdict, ranked and decluttered by the
  * shared classic code (look/labels rank.ts), at most `max`.
  * `declutter: false` returns every visible in-frame peak, ranked (3D view: the GPU declutters).
  */
@@ -219,11 +216,10 @@ export function placePeakLabels(
 	aspect: number,
 	{ max = 28, declutter = true } = {},
 ): PeakLabel[] {
-	const eyeV = new THREE.Vector3(...eye);
 	const out: PeakLabel[] = [];
 	for (const p of peaks) {
 		if (visibility.get(p) !== true) continue; // occluded, or unknown for this eye
-		const pr = projectPoint(pose, aspect, eyeV, p.position);
+		const pr = projectPoint(pose, aspect, eye, p.position);
 		if (!pr || pr.u < 0 || pr.u > 1 || pr.v < 0 || pr.v > 1) continue;
 		const range = Math.hypot(
 			p.position[0] - eye[0],

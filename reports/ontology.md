@@ -323,7 +323,7 @@ Trusted auto (`isTrustedAuto`) means: an automatic agent, status `accepted`, and
 | `relrot-essential` | solver | Relative rotation from the essential matrix | pixels | orientation | lib/nearfield/propagate.ts |
 | `relrot-da3` | model | Relative rotation from DA3 /multiview cameras | pixels | orientation | lib/nearfield/propagate.ts |
 | `splat-model` | model | Gaussian splat lift (SHARP / lift) | pixels | geometry | lib/nearfield |
-| `generative-model` | model | Novel-view generation | pixels | geometry | lib/nearfield/generate |
+| `generative-model` | model | Novel-view generation | pixels | geometry | lib/nearfield |
 
 ## Crosswalks
 
@@ -628,7 +628,7 @@ the pose drawn for each photo in /roll and the panorama. Implemented by `lib/rol
 
 ### `rollStateless`: Roll, ignoring this device's state
 
-a pose independent of saved/solved localStorage (lab views; ground truth is still shown). Implemented by `lib/roll/roll.ts resolvePose({ignoreStored}) (routes/lab.generate.tsx)`.
+a pose independent of saved/solved localStorage (lab views; ground truth is still shown). Implemented by `lib/roll/roll.ts resolvePose({ignoreStored}) (lab views)`.
 
 1. hand-fitted ground truth
 2. device prior (EXIF compass + gravity + lens)
@@ -728,7 +728,7 @@ These are places where the code disagrees with itself, found by modelling it. `d
 | homonym | Seven export names meant two or three things each (PhotoMeta, SolveResult, Params, PeakLabel, PeakInput, CompositeLook, Confidence). | lib/photos.ts; lib/geo/photo-meta.ts; lib/geo/solve.ts; lib/pose6dof/types.ts; lib/settings.ts; lib/geo/peaks.ts; lib/deck/scene.ts | Renamed (resolved); concept words live in lib/ontology/domain.ts. |
 | homonym | 'pin' means a peak tap, a map position, or a control point. | lib/align.ts Pin; lib/upload/exif.ts positionSource; data/control-points.json | Separate concepts: pin, map-pin, correspondence. |
 | units | Five pixel bases, four bbox orders and mixed lat/lon order, even inside one region record. | lib/refine/confidence.ts rmsPx1600; lib/geocam/core/state.ts focalPx1600; lib/picker/candidates.ts tapResidualPx; lib/upload/region.ts bboxAround | Branded types: Px<B>, WSEN/SWNE, LonLatPair/LatLonPair. |
-| synonym | View mode: code says overlay/replace/world, UI says Overlay/Blend/In map. | lib/settings.ts; lib/style/three-apply.ts; lib/style/deck-apply.ts | One ViewMode; UI words in VIEW_MODE. |
+| synonym | View mode: code says overlay/replace/world, UI says Overlay/Blend/In map. | lib/settings.ts; lib/style/deck-apply.ts | One ViewMode; UI words in VIEW_MODE. |
 | units | Fallback photo ids (local-f…) can collide with SHA-256 ids starting with f. | lib/upload/decode.ts contentHash | Low risk; give the fallback its own prefix if needed. |
 | deferred | Local Vec3 copies remain in gpu, deck, deck-webgpu and look. | lib/gpu; lib/deck; lib/deck-webgpu; lib/look | Re-export the ontology Vec3. |
 | deferred | DemoPose and LayeredHorizon are not yet listed as realizations. | lib/demo; lib/peakfix | Add them to realizedBy in catalogue/concepts.ts. |

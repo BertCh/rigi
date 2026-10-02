@@ -53,7 +53,7 @@ export type StreamOptions = {
 	spareGpuLayers?: number;
 	/**
 	 * Coarse-first loading (off when unset): the first selection is preceded by the same
-	 * selection capped at this zoom (three's terrain stops at 14), queued ahead of the finer
+	 * selection capped at this zoom (the classic cap is 14), queued ahead of the finer
 	 * tiles and handed to `onPreview` once complete. The full set and its first `onUpdate` are
 	 * unchanged; they arrive after it.
 	 */

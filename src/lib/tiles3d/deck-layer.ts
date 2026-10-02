@@ -3,11 +3,11 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Step Inside 3D Tiles for DeckEngine (deck.gl 9.4, CARTESIAN camera-anchored ENU): draws the visible
-// meshes of a Tiles3DSet (tiles.ts) — the tile selector (a three.js camera, no three engine), driven by the
-// deck world camera, so both deck engines show identical tiles.
-//   · one luma Model per tile mesh, made on first draw from its THREE geometry (positions / uv / colour
-//     converted to float32 once), freed when the tile unloads (Tiles3DSet.onDisposeMesh)
-//   · i3dm (instanced trees): the InstancedMesh matrices as four per-instance vec4 attributes
+// meshes of a Tiles3DSet (tiles.ts) — the loaders.gl tile selector driven by the world camera, so both
+// deck engines show identical tiles.
+//   · one luma Model per TileMesh (content.ts: plain typed arrays), made on first draw, freed when the
+//     tile unloads (Tiles3DSet.onDisposeMesh)
+//   · i3dm (instanced trees): the instance matrices as four per-instance vec4 attributes
 //   · the terrain's LOGARITHMIC depth convention (deck/terrain-layer.ts LOG_DEPTH_FAR), written
 //     exactly per fragment (gl_FragDepth) with w scaled by the source's depth bias, depthWrite on,
 //     'less-equal' (the terrain writes it per vertex, TERRAIN_DEPTH): opaque, so it must come
@@ -25,7 +25,6 @@ import {
 import type { Device, Texture } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
-import type * as THREE from "three";
 import { getFlag } from "#/lib/flags";
 import {
 	LOG_DEPTH_FAR,
@@ -34,6 +33,7 @@ import {
 	type PhotoRangeMap,
 	rangeTexture,
 } from "../deck/terrain-layer";
+import type { TileImage, TileMesh } from "./content";
 import { REFRACTION_LIFT, TILE_GLSL_COMMON } from "./material";
 import type { Tiles3DSet } from "./tiles";
 
@@ -204,38 +204,41 @@ const PARAMETERS = {
 	blend: false,
 } as const;
 
-/** THREE BufferAttribute (interleaved / normalised / any type) → a tight Float32Array of `size`. */
-function floats(
-	attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
-	size: number,
-) {
-	const n = attr.count;
-	const out = new Float32Array(n * size);
-	const get = [attr.getX, attr.getY, attr.getZ, attr.getW];
-	for (let i = 0; i < n; i++)
-		for (let k = 0; k < size; k++)
-			out[i * size + k] = k < attr.itemSize ? get[k].call(attr, i) : 1;
-	return out;
-}
-
 function textureOf(
 	device: Device,
-	map: THREE.Texture | null,
+	image: TileImage | null,
 ): Texture | undefined {
-	const img = map?.image as ImageBitmap | HTMLImageElement | undefined;
-	if (!img || !(img.width > 0)) return undefined;
+	if (!image || !(image.width > 0)) return undefined;
 	// the glTF uv origin is top-left, like an uploaded image's first row: no flip
-	return makeTexture(device, img, true);
+	if ("data" in image && ArrayBuffer.isView(image.data)) {
+		const tex = device.createTexture({
+			data: image.data,
+			width: image.width,
+			height: image.height,
+			format: "rgba8unorm",
+			mipLevels: device.getMipLevelCount(image.width, image.height),
+			sampler: {
+				minFilter: "linear",
+				magFilter: "linear",
+				mipmapFilter: "linear",
+				addressModeU: "clamp-to-edge",
+				addressModeV: "clamp-to-edge",
+			},
+		});
+		if (device.type === "webgl") tex.generateMipmapsWebGL();
+		return tex;
+	}
+	return makeTexture(device, image as ImageBitmap | HTMLImageElement, true);
 }
 
 type State = {
-	meshes: Map<THREE.Mesh, MeshGpu>;
+	meshes: Map<TileMesh, MeshGpu>;
 	range?: Texture;
 	/** `range` was uploaded here from CPU data (not a caller-owned PhotoRangeMap.texture). */
 	rangeOwned?: boolean;
 	fg?: Texture;
 	empty: Texture;
-	onDispose: (m: THREE.Mesh) => void;
+	onDispose: (m: TileMesh) => void;
 };
 
 /** Draw counters (dev probes read window.__tiles3dDeck). */
@@ -248,8 +251,8 @@ export class Tiles3DDeckLayer extends Layer<Tiles3DDeckLayerProps> {
 
 	initializeState() {
 		tiles3dDeckStats.layers++;
-		const meshes = new Map<THREE.Mesh, MeshGpu>();
-		const onDispose = (m: THREE.Mesh) => {
+		const meshes = new Map<TileMesh, MeshGpu>();
+		const onDispose = (m: TileMesh) => {
 			const g = meshes.get(m);
 			if (!g) return;
 			g.model.destroy();
@@ -311,47 +314,26 @@ export class Tiles3DDeckLayer extends Layer<Tiles3DDeckLayerProps> {
 		this.state.empty.destroy();
 	}
 
-	private gpuFor(mesh: THREE.Mesh): MeshGpu | null {
+	private gpuFor(mesh: TileMesh): MeshGpu | null {
 		const have = this.state.meshes.get(mesh);
 		if (have) return have;
-		const geo = mesh.geometry;
-		const pos = geo.attributes.position;
-		if (!pos?.count) return null;
+		const n = mesh.positions.length / 3;
+		if (!n) return null;
 		const device = this.context.device;
-		const n = pos.count;
-		const uv = geo.attributes.uv;
-		const col = geo.attributes.color;
-		const inst = (mesh as THREE.InstancedMesh).isInstancedMesh
-			? (mesh as THREE.InstancedMesh)
-			: null;
+		const inst = mesh.instances;
 		const attributes: Record<string, { size: number; value: Float32Array }> = {
-			positions: { size: 3, value: floats(pos, 3) },
-			texCoords: {
-				size: 2,
-				value: uv ? floats(uv, 2) : new Float32Array(n * 2),
-			},
+			positions: { size: 3, value: mesh.positions },
+			texCoords: { size: 2, value: mesh.uvs ?? new Float32Array(n * 2) },
 			colors: {
 				size: 3,
-				value: col ? floats(col, 3) : new Float32Array(n * 3).fill(1),
+				value: mesh.colors ?? new Float32Array(n * 3).fill(1),
 			},
 		};
-		const index = geo.index
-			? {
-					size: 1,
-					value:
-						geo.index.array instanceof Uint16Array
-							? geo.index.array
-							: new Uint32Array(geo.index.array),
-				}
-			: undefined;
-		const mat = mesh.material as THREE.ShaderMaterial;
-		const map = textureOf(
-			device,
-			(mat.uniforms?.uMap?.value as THREE.Texture | null) ?? null,
-		);
+		const index = mesh.indices ? { size: 1, value: mesh.indices } : undefined;
+		const map = textureOf(device, mesh.image);
 		const model = new Model(device, {
 			...this.getShaders({ vs, fs, modules: [project32, tileModule] }),
-			id: `${this.props.id}-${mesh.uuid}`,
+			id: `${this.props.id}-${mesh.key}`,
 			defines: {
 				...(inst ? { INSTANCED: 1 } : {}),
 				...(getFlag("tiles3dDebug") === "on" ? { TILES3D_DEBUG: 1 } : {}),
@@ -377,14 +359,12 @@ export class Tiles3DDeckLayer extends Layer<Tiles3DDeckLayerProps> {
 					]
 				: [],
 			isInstanced: !!inst,
-			instanceCount: inst ? inst.count : undefined,
+			instanceCount: inst ? mesh.instanceCount : undefined,
 			parameters: PARAMETERS,
 		});
 		if (inst)
 			model.setAttributes({
-				instanceMatrix: device.createBuffer({
-					data: new Float32Array(inst.instanceMatrix.array),
-				}),
+				instanceMatrix: device.createBuffer({ data: inst }),
 			});
 		const g: MeshGpu = { model, map, instanced: !!inst };
 		this.state.meshes.set(mesh, g);
@@ -400,35 +380,27 @@ export class Tiles3DDeckLayer extends Layer<Tiles3DDeckLayerProps> {
 		const p = this.props;
 		const set = p.set;
 		const u = set.uniforms;
-		const fade = u.uFade.value;
-		const clear = u.uClear.value;
-		const eye = u.uEye.value;
-		const color = (m: THREE.Mesh) => {
-			const c = (m.material as THREE.ShaderMaterial).uniforms?.uColor?.value as
-				| THREE.Color
-				| undefined;
-			return c ? [c.r, c.g, c.b, 1] : [0.7, 0.7, 0.7, 1];
-		};
+		const fade = u.fade;
+		const clear = u.clear;
+		const eye = u.eye;
 		tiles3dDeckStats.draws++;
 		tiles3dDeckStats.models = this.state.meshes.size;
 		tiles3dDeckStats.meshes = 0;
-		for (const { mesh, source } of set.visibleMeshes()) {
-			if (p.hideDisplayOnly && source.displayOnly) continue;
+		for (const mesh of set.visibleMeshes()) {
+			if (p.hideDisplayOnly && mesh.source.displayOnly) continue;
 			const g = this.gpuFor(mesh);
 			if (!g) continue;
-			const mu = (mesh.material as THREE.ShaderMaterial).uniforms;
 			const props: TileModuleProps = {
-				model: Array.from(mesh.matrixWorld.elements),
+				model: Array.from(mesh.matrix),
 				photoViewProj: p.photoViewProj,
-				color: color(mesh),
+				color: [...mesh.color, 1],
 				truthColor: [...p.truthColor, 1],
 				photoPos: [...p.photoPos, 0],
-				eye: [eye.x, eye.y, eye.z, 0],
+				eye: [eye[0], eye[1], eye[2], 0],
 				cam: [...p.camera, 0],
-				fadeClear: [fade.x, fade.y, clear.x, clear.y],
+				fadeClear: [fade[0], fade[1], clear[0], clear[1]],
 				hasMap: g.map ? 1 : 0,
-				depthBias:
-					(mu?.uDepthBias?.value as number | undefined) ?? source.depthBias,
+				depthBias: mesh.depthBias,
 				lift: REFRACTION_LIFT,
 				fill: p.fill ? 1 : 0,
 				fgOn: p.photoFg ? 1 : 0,
@@ -447,8 +419,7 @@ export class Tiles3DDeckLayer extends Layer<Tiles3DDeckLayerProps> {
 					tileFg: this.state.fg ?? this.state.empty,
 				},
 			});
-			if (g.instanced)
-				g.model.setInstanceCount((mesh as THREE.InstancedMesh).count);
+			if (g.instanced) g.model.setInstanceCount(mesh.instanceCount);
 			g.model.setParameters(PARAMETERS);
 			g.model.draw(this.context.renderPass);
 			tiles3dDeckStats.meshes++;

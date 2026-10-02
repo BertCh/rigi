@@ -107,11 +107,7 @@ export const FINDINGS = [
 		kind: "synonym",
 		summary:
 			"View mode: code says overlay/replace/world, UI says Overlay/Blend/In map.",
-		where: [
-			"lib/settings.ts",
-			"lib/style/three-apply.ts",
-			"lib/style/deck-apply.ts",
-		],
+		where: ["lib/settings.ts", "lib/style/deck-apply.ts"],
 		action: "One ViewMode; UI words in VIEW_MODE.",
 	},
 	{

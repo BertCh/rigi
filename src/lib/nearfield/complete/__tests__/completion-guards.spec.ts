@@ -5,7 +5,6 @@
 import { describe, expect, it } from "vitest";
 import { withFlags } from "#/test/helpers";
 import type { Pose } from "../../../camera";
-import { readoutHit } from "../../generate/readout";
 import { intrinsicsFromPose } from "../../geom";
 import { camToEnuMatrix, liftToGaussians } from "../../lift";
 import { buildMeasureGrid } from "../../measure";
@@ -185,17 +184,6 @@ describe("completion is display-only (added splats are never measurable)", () =>
 		expect(Array.from(b.range.map((v) => (Number.isNaN(v) ? -1 : v)))).toEqual(
 			Array.from(a.range.map((v) => (Number.isNaN(v) ? -1 : v))),
 		);
-	});
-	it("is passed through by readoutHit (the ray reaches the observed splat behind)", () => {
-		const r = cellRay(8, 8);
-		const o = [eye.x, eye.y, eye.z];
-		expect(readoutHit(extra, o, r.dir, { sigmas: 4 })).toBeNull();
-		const hit = readoutHit(withExtra.splats, o, r.dir, {
-			sigmas: 4,
-			minRadius: 0.5,
-		});
-		expect(hit).not.toBeNull();
-		expect(hit?.index).toBeLessThan(scene.splats.count);
 	});
 });
 

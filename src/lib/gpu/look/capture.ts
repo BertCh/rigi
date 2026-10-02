@@ -5,7 +5,7 @@
 // Real look-pass inputs read back from a live deck engine (DeckEngine or WebGpuEngine; window.__engine on
 // /photo/<id> in dev), for the W5 parity bench (bench.ts, scripts/gpu/look-bench.mjs). It pokes
 // engine internals (the private geometry source, haze controller, photo and masks), so it is dev-only.
-// Ported from the three.js PhotoEngine (removed 2026-10-01): relief, haze and masks are built from deck's
+// Relief, haze and masks are built from deck's
 // geometry buffer exactly as the engine's own passes build them; the band-stats input is not captured
 // (deck renders the stats layer inside its compositor, with no CPU hook), so `stats` is null.
 import type { Pose } from "../../camera";

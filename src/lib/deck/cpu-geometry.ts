@@ -33,7 +33,7 @@ type Bin = {
 	max: Float32Array;
 };
 
-/** What the profiles read: an ENU frame origin + a DEM height lookup (TerrainSet, three's Terrain). */
+/** What the profiles read: an ENU frame origin + a DEM height lookup (TerrainSet). */
 export type ProfileTerrain = {
 	readonly frame: Pick<TerrainSet["frame"], "lat" | "lon" | "h">;
 	heightAt(lat: number, lon: number): number | null;

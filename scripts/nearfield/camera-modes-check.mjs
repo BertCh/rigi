@@ -9,7 +9,6 @@ import { chromium } from "playwright";
 // Photo / Orbit / Fly / Top-down → Esc back, then In map → Fly / Top-down / Photo. Screenshots go to
 // tools/nearfield/shots/cam-<renderer>-<id>-*.png; the report prints camera positions per mode.
 // Usage: node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/camera-modes-check.mjs [id]
-// (--deck is accepted and ignored: the three.js arm went with the three.js renderer, 2026-10-01)
 import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");

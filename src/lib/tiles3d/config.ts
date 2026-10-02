@@ -106,9 +106,6 @@ export function googleTilesPublicUseAllowed(opts: {
 	return opts.dev || opts.logoPresent;
 }
 
-/** THREE layer of the tiles (engine.ts): only the step camera enables it, like NEARFIELD_LAYER (7). */
-export const TILES3D_LAYER = 8;
-
 export type Tiles3DBlend = "fill" | "over";
 
 export type Tiles3DConfig = {

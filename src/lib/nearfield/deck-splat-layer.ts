@@ -46,7 +46,7 @@ import { PROVENANCE_COLORS_BY_CODE, PROVENANCE_TINT_MIX } from "./provenance";
 import { type DepthRow, type SortResult, SplatSorter } from "./splat-sort";
 import type { GaussianCloud } from "./types";
 
-/** How much of the provenance tint replaces the colour with truth on (three-splats.ts: truth=true → 0.65). */
+/** How much of the provenance tint replaces the colour with truth on. */
 export { PROVENANCE_TINT_MIX };
 /**
  * Truth-toggle tints per PROVENANCE_CODE (sRGB 0..1, a = how much of the tint replaces the colour), from

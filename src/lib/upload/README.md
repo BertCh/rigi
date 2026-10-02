@@ -62,7 +62,7 @@ The workspace hook has landed:
 *Update (2026-10-01): both items below are done. `src/lib/integration/unknown-pose.ts` runs a 360° yaw search (CPU cascade, then the fused `/match` sweep) when the heading is unknown, and the Heading slider in `PhotoWorkspace.tsx` spans 0–360° when `unknowns.yaw`. The original request is kept for the record.*
 
 Originally wanted for uploads with no heading (`(photo as LocalPhotoMeta).local?.yawUnknown`, equivalently `photo.heading == null`):
-1. **Solver** (`align.ts` / `deck/engine.ts`): run the coarse yaw grid over the full 360° instead of ±25° around `heading ?? 0`. When this was written, the since-removed three.js `engine.ts` used `yaw: photo.heading ?? 0` (check `align.ts` and `deck/engine.ts` for the current seed) with the ±25° window, so these uploads usually misalign.
+1. **Solver** (`align.ts` / `deck/engine.ts`): run the coarse yaw grid over the full 360° instead of ±25° around `heading ?? 0`. When this was written, the engine used `yaw: photo.heading ?? 0` (check `align.ts` and `deck/engine.ts` for the current seed) with the ±25° window, so these uploads usually misalign.
 2. **Manual Heading slider** (`PhotoWorkspace.tsx:599`): its range is `(photo.heading ?? 0) - 40` to `(photo.heading ?? 0) + 40`, so with no heading the user cannot set anything outside about ±40° of north and cannot fix the alignment by hand either. When `heading == null`, use the full 0–360° range (wrap-around).
 
 Also: pinned photos have `alt: null`, so the engine uses DEM + 1.8 m. That is the right behaviour. `photos.ts registerLocalPhoto` already accepts `region: null`; `registerWithWorkspace` passes null for bundled region ids so `loadRegion('region-1')` still fetches the live JSON.

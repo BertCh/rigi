@@ -3,8 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // StepCamera's window key bindings (1–4 switch mode): they must not steal keys typed into a text field.
-import * as THREE from "three";
+import { Quaternion } from "@math.gl/core";
 import { afterEach, describe, expect, it } from "vitest";
+import { ViewCamera } from "../../camera/view-camera";
 import { StepCamera } from "../step-camera";
 
 const cams: StepCamera[] = [];
@@ -16,9 +17,9 @@ afterEach(() => {
 function make() {
 	const dom = document.createElement("div");
 	document.body.append(dom);
-	const sc = new StepCamera(new THREE.PerspectiveCamera(50, 4 / 3), dom, {
-		eye: new THREE.Vector3(0, 0, 100),
-		quaternion: new THREE.Quaternion(),
+	const sc = new StepCamera(new ViewCamera(50, 4 / 3), dom, {
+		eye: [0, 0, 100],
+		quaternion: new Quaternion(),
 		vfov: 40,
 		aspect: 4 / 3,
 		radius: 40,

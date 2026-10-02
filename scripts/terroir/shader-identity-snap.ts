@@ -10,8 +10,6 @@
 //      deck/terrain-layer.ts there, symlink node_modules; run it there > before.txt
 //   2. here > after.txt; diff before.txt after.txt (must be empty)
 // --on: also splices + luma-assembles every program with every terroir switch on (stderr summary).
-// The three.js half (makeTerrainMaterial / terrainFragment in materials.ts) went with the three.js renderer
-// (2026-10-01): a snapshot taken before that date has `three …` lines this one no longer prints.
 import { createHash } from "node:crypto";
 import { assembleGLSLShaderPair } from "@luma.gl/shadertools";
 import {

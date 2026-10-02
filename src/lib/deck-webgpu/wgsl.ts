@@ -9,7 +9,7 @@ import type { ShaderModule } from "@luma.gl/shadertools";
 import type { DeckTerrainStyle } from "#/lib/style/deck-apply";
 
 /**
- * Colour pipeline (same as the GLSL path, three.js parity): textures decode to linear
+ * Colour pipeline (same as the GLSL path): textures decode to linear
  * (rgba8unorm-srgb does it in hardware; srgb_decode for data that arrives encoded), shading and
  * haze happen in linear, the colour target stays linear, the compositor / present pass encodes.
  */
@@ -90,7 +90,7 @@ fn fog_shade(n: vec3<f32>) -> f32 {
 
 fn fog_apply(col: vec3<f32>, range: f32) -> vec3<f32> {
   let f = 1.0 - exp(-range * fog.params.x * fog.color.a);
-  // materials.ts re-linearises the (linear) haze colour on purpose: three's darker, bluer tone
+  // materials.ts re-linearises the (linear) haze colour on purpose: the darker, bluer tone
   return mix(col, pow(fog.color.rgb, vec3<f32>(2.2)), clamp(f, 0.0, fog.params.y));
 }
 `,

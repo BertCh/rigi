@@ -4,6 +4,11 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- **three.js removed (2026-10-02, browser-unverified).** Nothing imports `three` any more; `three`, `@types/three` and `3d-tiles-renderer` are gone from `package.json`.
+  - Camera maths on math.gl: `src/lib/camera/view-camera.ts` (`ViewCamera`: position, quaternion, fov, aspect, view/projection matrices) and `src/lib/camera/orbit-controller.ts` (`OrbitController`, z-up ENU, replaces three's `OrbitControls` in the world view). `pose.ts`, the step and map cameras, `world-view.ts`, both deck engines and the roll map use them. `camera-parity.spec.ts` pins the port to values captured from the three-based code (≤ 1e-5). The new controller pans with the current orientation (three's lagged one update).
+  - `?tiles3d=` streams through loaders.gl (`Tileset3D` + `Tiles3DLoader`, Draco from `public/tiles3d/draco`), traversed from the ENU camera by a small frustum viewport (`tiles3d/viewport.ts`, far plane = the near-field radius); tile content is plain typed arrays (`tiles3d/content.ts`). `DeckTiles3D` takes plain tuples and a `{position, viewMatrix, projectionMatrix, fovY, aspect}` view. Draco decodes on the main thread and the Google session token is not refreshed.
+  - Removed `/lab/splats`, `/lab/generate`, `nearfield/three-splats.ts`, `nearfield/generate/**` (three terrain, RGB-D cache, generation pipeline), `scripts/nearfield/splat-lab-check.mjs` and the `nearfield-generate` check; dead `makePhotoSky`.
+  - Comments and docs no longer use the removed three.js engine as the reference; `hexToLinearLikeThree` is `hexToLinearHaze`.
 - **Hidden pages cleanup (2026-10-02, browser-unverified).**
   - `/baseline` is dev only (production builds show a stub), no longer a tile on `/library`, and its worker reads Mapterhorn DEM tiles instead of AWS Terrarium.
   - `/dev/meta` is dev only. Its three figures that had no other home are now Gipfelbuch plates: the line-of-sight section on DEM Horizon, the skyline fingerprint and pixel-to-place on Viewport Inference.

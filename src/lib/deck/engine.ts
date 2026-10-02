@@ -2,23 +2,23 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// DeckEngine: the PhotoEngine surface (src/lib/renderer.ts) on deck.gl, for `?renderer=deck`.
-// Imperative `Deck` on the canvas PhotoWorkspace hands in (no React), mirroring engine.ts:
+// DeckEngine: the Renderer surface (src/lib/renderer.ts) on deck.gl (WebGL2), for `?renderer=deck`.
+// Imperative `Deck` on the canvas PhotoWorkspace hands in (no React):
 //   photo view (PhotoView, camera-anchored ENU): the streamed Mapterhorn terrain (TerrainLayer)
 //     and the trails (TrailLayer), both `offscreen`: PhotoCompositor (composite.ts, a deck Effect)
-//     draws them per frame into three's geoRT (range, 1024 px) and layerRT (colour, MSAA ×4)
+//     draws them per frame into a range target (1024 px) and a colour target (MSAA ×4)
 //   screen view (orthographic): the composite layer (photo ⊕ layer, ridges/skyline, depth tint,
-//     people mask, swipe/lens/range/brush blend) — engine.ts compositeFrag, 1:1
+//     people mask, swipe/lens/range/brush blend)
 // Queries: a GPU geometry source (geometry-pass.ts, 1024 px, async PBO readback) is what
-// sampleAt / peak occlusion / hover / export read, with three's generation semantics (geoGen,
-// 90 ms debounced readback, readback() forces it). autoAlign re-ranks its finalists with a 384 px
+// sampleAt / peak occlusion / hover / export read, with a generation counter (geoGen) and a
+// 90 ms debounced readback (readback() forces it). autoAlign re-ranks its finalists with a 384 px
 // GPU source (CPU profile source as the fallback). Peaks snap on the CPU (scene.ts).
 //
-// World view (mode 'world', world-view.ts): the same Deck switches to a WorldView driven by three's
-// OrbitControls on a THREE camera (engine.ts enterWorld framing, damping, polar limit, fly-in
-// tween). The terrain draws straight to the canvas (worldStyle hillshade / satellite / topo, haze
-// 0.5, three's sky colour) with the photo draped from its camera, occlusion-tested against the
-// query geometry buffer (1024 px GPU range, = three's geoRT), plus trails (canvas pass) and the
+// World view (mode 'world', world-view.ts): the same Deck switches to a WorldView driven by an
+// OrbitController on a ViewCamera (enterWorld framing, damping, polar limit, fly-in tween). The
+// terrain draws straight to the canvas (worldStyle hillshade / satellite / topo, haze 0.5, the
+// world sky colour) with the photo draped from its camera, occlusion-tested against the query
+// geometry buffer (1024 px GPU range), plus trails (canvas pass) and the
 // photo-camera gizmo (photo plane, frustum, pin) with the terrain's log depth.
 
 import {
@@ -29,14 +29,13 @@ import {
 	OrthographicView,
 } from "@deck.gl/core";
 import type { Device, Texture } from "@luma.gl/core";
-import * as THREE from "three";
 import {
 	type AlignResult,
 	buildEdgeMap,
 	type EdgeMap,
 	type Pin,
 } from "../align";
-import { hfovFromAspect, type Pose } from "../camera";
+import { hfovFromAspect, type Pose, projectPoint } from "../camera";
 import { tileBounds } from "../dem";
 import { heightFromTile } from "../dem/height-from-tile";
 import { eyeAltitude } from "../geo/eye-rule";
@@ -112,7 +111,7 @@ import {
 } from "../nearfield/types";
 import type { PhotoMeta, RegionData, RegionTrail } from "../photos";
 import { solvePinsForApp } from "../pins/seed";
-import { projectPoint, unprojectDir } from "../pose";
+import { poseQuaternion, unprojectDir } from "../pose";
 import type { FgMask, Renderer } from "../renderer";
 import type { RevealUniforms } from "../reveal/config";
 import {
@@ -198,7 +197,6 @@ import {
 import { WeatherLayer } from "./weather-layer";
 import {
 	AtmSkyLayer,
-	poseQuaternion,
 	WorldCamera,
 	WorldGizmoLayer,
 	WorldView,
@@ -486,7 +484,7 @@ export class DeckEngine implements Renderer {
 	private canvas: HTMLCanvasElement;
 	private photoViews: unknown[];
 	private worldViews: unknown[];
-	/** World view camera (three's OrbitControls + fly-in), made on the first enterWorld. */
+	/** World view camera (orbit controller + fly-in), made on the first enterWorld. */
 	private world?: WorldCamera;
 	private worldRaf = 0;
 	/** World-view rain / snow animation (style.world.weather): a redraw per frame while it is on. */
@@ -650,7 +648,7 @@ export class DeckEngine implements Renderer {
 			// Only applies when the canvas' context is created. preserveDrawingBuffer (luma's default
 			// is true) is not needed: exports render offscreen (composite.ts renderImage) or draw the
 			// world frame and read it in the same task (exportWorld), and no harness reads a deck
-			// canvas outside a frame (style-baseline, which does, is pinned to three.js).
+			// canvas outside a frame (style-baseline, which does, reads it inside the frame).
 			// antialias (luma's default is true) multisamples the canvas' default framebuffer. The
 			// world view draws straight onto it and is fill-bound there at DPR 2: orbit 29–39 fps
 			// with it, ~59 without (reports/deck-default.md). At DPR ≥ 2 the pixels hide the
@@ -987,7 +985,7 @@ export class DeckEngine implements Renderer {
 	}
 
 	/**
-	 * The CPU queries keep reading one TerrainSet (three keeps its terrain fixed too), so labels,
+	 * The CPU queries keep reading one TerrainSet so labels,
 	 * occlusion verdicts and profiles stay stable while the streamer refines. A later complete set
 	 * replaces it only once the view has left the wedge the query set was selected for.
 	 */
@@ -1602,7 +1600,7 @@ export class DeckEngine implements Renderer {
 		if (this.world?.controls) {
 			const map = this.step?.map;
 			return {
-				world: this.world.viewState(this.eyeVec),
+				world: this.world.viewState(this.eyeArr),
 				...(map?.active ? { [MAP_VIEW_ID]: map.viewState } : {}),
 			};
 		}
@@ -1656,7 +1654,7 @@ export class DeckEngine implements Renderer {
 					contourInterval: look.contourInterval,
 					contourOpacity: look.contourOpacity,
 					nearFade: look.nearFade,
-					// renderPoseView: the whole DEM, like the matcher's three.js renders had
+					// renderPoseView: the whole DEM, as the matcher's pose renders need
 					nearDiscard: this.poseView ? 0 : nearFadeFor(this.photo.hAccuracy),
 					elevRange: deckElevRange(this.style, this.elevRange) ?? undefined,
 					relief: this.relief.field,
@@ -2165,7 +2163,7 @@ export class DeckEngine implements Renderer {
 		const t = this.terrain;
 		if (!t) return [];
 		const snapped = this.snapped(this.pose);
-		const eyeV = new THREE.Vector3(...this.eyeArr);
+		const eyeV = this.eyeArr;
 		if (this.geometryReady() && !this.occlusionFresh(snapped))
 			for (const p of snapped) {
 				const pr = projectPoint(this.pose, this.aspect, eyeV, p.position);
@@ -2272,7 +2270,7 @@ export class DeckEngine implements Renderer {
 	/** All candidate peaks in frame (for pinning), visible or not. */
 	peaksInFrame(): PeakLabel[] {
 		const out: PeakLabel[] = [];
-		const eyeV = new THREE.Vector3(...this.eyeArr);
+		const eyeV = this.eyeArr;
 		for (const p of this.snapped(this.pose)) {
 			const pr = projectPoint(this.pose, this.aspect, eyeV, p.position);
 			if (!pr || pr.u < -0.1 || pr.u > 1.1 || pr.v < -0.1 || pr.v > 1.1)
@@ -2320,8 +2318,7 @@ export class DeckEngine implements Renderer {
 		let sil: SilScores | null = await this.silhouetteScoresGpu(alts, srcs);
 		if (this.disposed) return null;
 		if (!sil) {
-			// all hypotheses are submitted at once and their async readbacks overlap (three renders
-			// and reads each one back synchronously)
+			// all hypotheses are submitted at once and their async readbacks overlap
 			await Promise.all(alts.map((a, i) => srcs[i]?.render(a.pose)));
 			if (this.disposed) return null;
 			// a blank render (a draw that did not happen) is drawn again before it is scored
@@ -2456,7 +2453,7 @@ export class DeckEngine implements Renderer {
 		const lr = (x: number, y: number) => logRange(buf[y * W + x]);
 		let sum = 0;
 		let n = 0;
-		// rows top-down here (three's readback is bottom-up): "up" is y − 1
+		// rows are top-down here: "up" is y − 1
 		for (let y = 1; y < H - 1; y++)
 			for (let x = 1; x < W - 1; x++) {
 				const r = buf[y * W + x];
@@ -2566,7 +2563,7 @@ export class DeckEngine implements Renderer {
 
 	/** engine.ts pinError: reprojection error (px on a basis-wide image) of `pose` at the pins. */
 	pinError(pose: Pose, pins: Pin[], basis: number) {
-		const eyeV = new THREE.Vector3(...this.eyeArr);
+		const eyeV = this.eyeArr;
 		const errs = pins.map((p) => {
 			const pr = projectPoint(pose, this.aspect, eyeV, p.world);
 			if (!pr) return Number.POSITIVE_INFINITY;
@@ -2615,8 +2612,7 @@ export class DeckEngine implements Renderer {
 	// ---------------- Step Inside (near field) ----------------
 
 	/**
-	 * Renderer.setNearField: the scene's splats in the world / step view (never the photo view, as
-	 * three), and its Object pixels masked out of the world drape (opts.maskDrape, default true). null = off: both views are exactly the classic
+	 * Renderer.setNearField: the scene's splats in the world / step view (never the photo view), and its Object pixels masked out of the world drape (opts.maskDrape, default true). null = off: both views are exactly the classic
 	 * ones. A change here never rebuilds the photo view's terrain layers (updateComposite).
 	 */
 	setNearField(scene: NearFieldScene | null, opts: NearFieldViewOpts = {}) {
@@ -2627,7 +2623,7 @@ export class DeckEngine implements Renderer {
 			this.updateLayers();
 			return;
 		}
-		// the photo view shows the photo (as three: splats only in the world / step view); drop a stale
+		// the photo view shows the photo (splats only in the world / step view); drop a stale
 		// splat layer, otherwise the photo view is untouched
 		if (this.sceneLayers.some((l) => isDeckSplatLayer(l))) {
 			this.sceneLayers = this.sceneLayers.filter((l) => !isDeckSplatLayer(l));
@@ -2792,7 +2788,7 @@ export class DeckEngine implements Renderer {
 		if (!w?.controls) return;
 		w.controls.enabled = false;
 		const toQ = poseQuaternion(this.pose);
-		// a held flight: WorldCamera.tick leaves the camera to the step camera (no OrbitControls update)
+		// a held flight: WorldCamera.tick leaves the camera to the step camera (no orbit-controller update)
 		w.flight = {
 			t0: 0,
 			dur: 1,
@@ -2817,7 +2813,7 @@ export class DeckEngine implements Renderer {
 		});
 		map.setSize(this.cssSize.w, this.cssSize.h);
 		const cam = new StepCamera(w.cam, this.canvas, {
-			eye: this.eyeVec,
+			eye: this.eyeArr,
 			quaternion: toQ,
 			vfov: this.pose.vfov,
 			aspect: this.aspect,
@@ -2834,7 +2830,7 @@ export class DeckEngine implements Renderer {
 		// the camera may have opened in map mode (its MapView joins the views)
 		this.syncWorldViews();
 		if (view === "step")
-			this.tiles3d?.enter(this.photo.lat, this.photo.lon, this.eyeVec);
+			this.tiles3d?.enter(this.photo.lat, this.photo.lon, this.eyeArr);
 		if (!this.geometryReady())
 			void this.readback().then(() => {
 				if (this.step?.cam === cam) {
@@ -2880,11 +2876,7 @@ export class DeckEngine implements Renderer {
 
 	// ---------------- world view ----------------
 
-	private get eyeVec() {
-		return new THREE.Vector3(this.eye.x, this.eye.y, this.eye.z);
-	}
-
-	/** engine.ts enterWorld: three's framing + OrbitControls, the world view, the sky. */
+	/** Enter the world view: the framing, the orbit controller, the world view, the sky. */
 	private enterWorld() {
 		// the drape's photo texture stays up from now on (no re-upload on the next entry)
 		this.photoTexWarm = true;
@@ -2892,8 +2884,8 @@ export class DeckEngine implements Renderer {
 		const ws = deckWorldStyle(this.style);
 		this.world.planeOpacity = ws.planeOpacity;
 		this.world.setAspect(this.cssSize.w / this.cssSize.h);
-		this.world.enter(this.pose, this.eyeVec);
-		this.world.tick(this.pose, this.eyeVec, this.aspect);
+		this.world.enter(this.pose, this.eyeArr);
+		this.world.tick(this.pose, this.eyeArr, this.aspect);
 		this.compositor.enabled = false;
 		this.canvas.style.backgroundColor = ws.sky;
 		this.deck.setProps({ views: this.worldViews } as never);
@@ -2929,8 +2921,7 @@ export class DeckEngine implements Renderer {
 	}
 
 	/**
-	 * The world camera's frame loop (three: OrbitControls 'change' → requestRender → controls.update
-	 * in renderWorld): runs while a drag, damping or a flight moves the camera, then idles.
+	 * The world camera's frame loop (the controller's 'change' → kickWorld → controls.update): runs while a drag, damping or a flight moves the camera, then idles.
 	 */
 	private kickWorld() {
 		this.worldStill = 0;
@@ -2945,10 +2936,14 @@ export class DeckEngine implements Renderer {
 			// Step Inside: the step camera eases the world camera (its flight is held, so tick() only reports)
 			const stepping = this.step?.cam.update() ?? false;
 			// worldRaf is still set here: a 'change' fired inside tick() only resets worldStill
-			const moved = w.tick(this.pose, this.eyeVec, this.aspect) || stepping;
+			const moved = w.tick(this.pose, this.eyeArr, this.aspect) || stepping;
 			// 3D Tiles refine from the world camera (its loads come back through updateLayers)
 			if (this.step)
-				this.tiles3d?.update(w.cam, this.canvas.width, this.canvas.height);
+				this.tiles3d?.update(
+					w.cam.view(),
+					this.canvas.width,
+					this.canvas.height,
+				);
 			// the photo plane fades during the flight (a layer prop); orbiting only moves the view
 			// the In-map step camera: the photo frustum fades in as the camera leaves the eye
 			let gizmo = false;
@@ -2978,7 +2973,7 @@ export class DeckEngine implements Renderer {
 
 	/** In-map step camera: the photo plane's opacity, 0 at the eye, full a few hundred metres out. */
 	private stepGizmoOpacity(w: WorldCamera) {
-		const d = w.cam.position.distanceTo(this.eyeVec);
+		const d = w.cam.position.distanceTo(this.eyeArr);
 		return w.planeOpacity * Math.max(0, Math.min(1, (d - 30) / 300));
 	}
 
@@ -3137,7 +3132,7 @@ export class DeckEngine implements Renderer {
 				photoRange: this.drapeRange(),
 				photoFg: dm.protectPeople ? dm.photoFg : null,
 				truth: !!this.nearField?.opts.truth,
-				camera: w.cam.position,
+				camera: w.cam.eye,
 			});
 			if (tl) out.push(tl);
 		}
@@ -3335,8 +3330,8 @@ export class DeckEngine implements Renderer {
 	/** engine.ts flyOut: back to the initial world framing. */
 	flyOut() {
 		if (!this.world?.controls) return;
-		this.world.enter(this.pose, this.eyeVec);
-		this.world.tick(this.pose, this.eyeVec, this.aspect);
+		this.world.enter(this.pose, this.eyeArr);
+		this.world.tick(this.pose, this.eyeArr, this.aspect);
 		this.updateLayers();
 		this.kickWorld();
 	}
@@ -3363,14 +3358,14 @@ export class DeckEngine implements Renderer {
 	/**
 	 * engine.ts exportImage: the photo view at the photo's full resolution (the composite rendered
 	 * offscreen, composite.ts renderImage) with engine.ts's label drawing, as a JPEG blob.
-	 * In world mode (as three): the current world frame as a PNG, without labels.
+	 * In world mode: the current world frame as a PNG, without labels.
 	 */
 	// ---------------- offscreen pose renders (tools/matcher/server/render_worker.mjs) ----------------
 
 	/**
 	 * The terrain all around the eye: the streamer's high-detail wedge becomes 360° (and stays so),
 	 * the CPU queries switch to the complete set, and the horizon is re-traced over 360°. The matcher's
-	 * `fullTerrain` (the former three.js `terrain.loadPending()` + `computeHorizon()`). Resolves
+	 * `fullTerrain`. Resolves
 	 * with the ms it took (0 when already done).
 	 */
 	async loadFullTerrain(timeoutMs = 300_000): Promise<number> {
@@ -3417,7 +3412,7 @@ export class DeckEngine implements Renderer {
 	/**
 	 * Satellite imagery for the render set's tiles within `maxDistM` of the eye (0 = all), fetched now;
 	 * failed tiles are re-fetched up to `retries` times. The matcher's
-	 * satellite imagery load (the former three.js `terrain.loadImagery("satellite")`). Other tiles keep streaming in the background.
+	 * satellite imagery load. Other tiles keep streaming in the background.
 	 */
 	async loadSatellite(maxDistM = 0, retries = 2) {
 		await this.deckReady;
@@ -3448,9 +3443,9 @@ export class DeckEngine implements Renderer {
 	}
 
 	/**
-	 * The matcher's view (the removed three.js engine's geoRT readback + a canvas render with uStyle 1):
+	 * The matcher's view (a geometry-buffer readback + a canvas render with uStyle 1):
 	 * the satellite drape and the geometry buffer through an arbitrary `pose`, both offscreen at
-	 * width × height (default: the query geometry size, 1024 px on the long side, as three's geoRT).
+	 * width × height (default: the query geometry size, 1024 px on the long side).
 	 * Neither the on-screen view nor the engine's pose changes.
 	 *   xyz:  ENU metres in `frame` (EnuFrame(lat, lon, 0)), 3 per pixel, row 0 = top, 0,0,0 = sky
 	 *   rgba: sRGB 8-bit, row 0 = top, opaque; the terrain colour pass in the Blend-satellite look
@@ -3542,7 +3537,7 @@ export class DeckEngine implements Renderer {
 
 	async exportImage(withLabels = true): Promise<Blob | null> {
 		// display-only 3D Tiles (Google) never enter an export (tiles3d/deck-tiles.ts)
-		// as three: the world view, or stepping inside from the photo view (the world view on screen)
+		// the world view, or stepping inside from the photo view (the world view on screen)
 		if (this.settings.mode === "world" || this.step)
 			return this.tiles3d
 				? this.tiles3d.withoutDisplayOnly(() => this.exportWorld())
@@ -3601,7 +3596,7 @@ export class DeckEngine implements Renderer {
 			);
 			ctx.drawImage(tmp, 0, 0, W, H);
 		}
-		// labels: the canvas drawer shared with three (style.labels; classic = the old drawing)
+		// labels: the shared canvas drawer (style.labels; classic = the old drawing)
 		if (withLabels) {
 			const classic = this.style.labels.layout === "classic";
 			drawExportLabels(

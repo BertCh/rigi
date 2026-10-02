@@ -376,7 +376,7 @@ type LabHook = {
 
 // ---------------- page ----------------
 
-// dev-only: the production build shows a stub (same gate as dev.graph / lab.splats)
+// dev-only: the production build shows a stub (same gate as dev.graph)
 function LabDeckSplatsGate() {
 	if (!import.meta.env.DEV) return <p>dev only</p>;
 	return <LabDeckSplats />;

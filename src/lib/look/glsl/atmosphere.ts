@@ -154,7 +154,7 @@ vec3 skyColor() {
 }
 `;
 
-/** deck's sky fragment shader (it encodes sRGB itself; three's colorspace_fragment does it there). */
+/** deck's sky fragment shader (it encodes sRGB itself). */
 export const SKY_FS_DECK = /* glsl */ `#version 300 es
 precision highp float;
 ${SKY_FS_MAIN}

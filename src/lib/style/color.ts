@@ -53,17 +53,17 @@ export function srgbToLinear(x: number) {
 }
 
 /**
- * What THREE.Color.set(hex) stores under three's default ColorManagement (sRGB → linear-sRGB).
+ * The hex as linear-sRGB (the haze colour's first linearisation).
  * The terrain shader then applies toLinear (pow 2.2) again to the haze colour: that double
  * linearisation is today's look and is preserved on purpose (styling.md §1.1, §2.3). For docs/tests.
  */
-export function hexToLinearLikeThree(c: Hex): [number, number, number] {
+export function hexToLinearHaze(c: Hex): [number, number, number] {
 	const [r, g, b] = hexToRgb01(c);
 	return [srgbToLinear(r), srgbToLinear(g), srgbToLinear(b)];
 }
 
-/** The haze colour as the classic shader finally uses it: pow(linearLikeThree, 2.2). */
+/** The haze colour as the classic shader finally uses it: pow(hexToLinearHaze, 2.2). */
 export function hazeColorAsRendered(c: Hex): [number, number, number] {
-	const [r, g, b] = hexToLinearLikeThree(c);
+	const [r, g, b] = hexToLinearHaze(c);
 	return [r ** 2.2, g ** 2.2, b ** 2.2];
 }

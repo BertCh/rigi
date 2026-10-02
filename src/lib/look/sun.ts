@@ -121,7 +121,7 @@ export type SunContext = {
 	lon?: number;
 };
 
-/** ENU unit vector toward the style's sun. Normalised like THREE.Vector3.normalize (the classic uSunDir). */
+/** ENU unit vector toward the style's sun. Unit length (the classic uSunDir). */
 export function sunDirFromStyle(sun: Sun, ctx: SunContext = {}): Vec3 {
 	if (sun.mode === "azel") {
 		const az = sun.azimuthDeg * D;

@@ -3,8 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // DeckMapCamera: deck's web-mercator map camera expressed as the ENU step camera. Pure math (no GL).
-import * as THREE from "three";
+import { Vector3 } from "@math.gl/core";
 import { describe, expect, it, vi } from "vitest";
+import { ViewCamera } from "../../camera/view-camera";
 import { EnuFrame } from "../../geodesy";
 import { DeckMapCamera, MAP_VIEW_ID } from "../deck-map-camera";
 
@@ -16,7 +17,7 @@ function make(groundAt: (x: number, y: number) => number | null = () => null) {
 	cam.setSize(1000, 600);
 	return { cam, onChange };
 }
-const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+const v = (x: number, y: number, z: number) => new Vector3(x, y, z);
 
 describe("DeckMapCamera", () => {
 	it("exposes its hidden MapView under the stable id", () => {
@@ -62,16 +63,15 @@ describe("DeckMapCamera", () => {
 		const { cam } = make();
 		const pivot = v(0, 0, 2000);
 		cam.start(pivot, 2000, 0);
-		const three = new THREE.PerspectiveCamera();
-		cam.apply(three);
-		three.updateMatrixWorld(true);
-		const f = new THREE.Vector3(0, 0, -1).applyQuaternion(three.quaternion);
-		const toPivot = pivot.clone().sub(three.position).normalize();
-		expect(f.angleTo(toPivot)).toBeLessThan(1e-6);
+		const out = new ViewCamera();
+		cam.apply(out);
+		const f = new Vector3(0, 0, -1).transformByQuaternion(out.quaternion);
+		const toPivot = pivot.clone().subtract(out.position).normalize();
+		expect(f.angle(toPivot)).toBeLessThan(1e-6);
 		expect(f.z).toBeLessThan(-0.999); // straight down
-		expect(three.position.z).toBeGreaterThan(pivot.z + 1500);
-		expect(three.fov).toBeGreaterThan(0);
-		const up = new THREE.Vector3(0, 1, 0).applyQuaternion(three.quaternion);
+		expect(out.position.z).toBeGreaterThan(pivot.z + 1500);
+		expect(out.fov).toBeGreaterThan(0);
+		const up = new Vector3(0, 1, 0).transformByQuaternion(out.quaternion);
 		expect(up.y).toBeGreaterThan(0.999); // bearing 0: north up
 	});
 
@@ -79,11 +79,11 @@ describe("DeckMapCamera", () => {
 		const { cam } = make();
 		cam.start(v(0, 0, 2000), 3000, 0);
 		cam.onViewStateChange({ ...cam.viewState, pitch: 60, bearing: 90 });
-		const three = new THREE.PerspectiveCamera();
-		cam.apply(three);
+		const out = new ViewCamera();
+		cam.apply(out);
 		// bearing 90 (east): the camera looks east, so it stands west of the centre, above it
-		expect(three.position.x).toBeLessThan(-1000);
-		expect(three.position.z).toBeGreaterThan(2000);
+		expect(out.position.x).toBeLessThan(-1000);
+		expect(out.position.z).toBeGreaterThan(2000);
 		const s = cam.state();
 		expect(s.yaw).toBeCloseTo(Math.PI / 2, 6);
 		expect(s.pitch).toBeCloseTo(((60 - 90) * Math.PI) / 180, 9);
@@ -116,13 +116,13 @@ describe("DeckMapCamera", () => {
 		const { cam } = make(() => ground);
 		cam.start(v(0, 0, 2000), 4000, 0);
 		cam.onViewStateChange({ ...cam.viewState, pitch: 45 });
-		const a = new THREE.PerspectiveCamera();
+		const a = new ViewCamera();
 		cam.apply(a);
 		const posBefore = a.position.clone();
 		ground = 2300; // terrain under the view centre is 300 m higher than the plane
 		cam.takeDirty();
 		cam.settle();
-		const b = new THREE.PerspectiveCamera();
+		const b = new ViewCamera();
 		cam.apply(b);
 		expect(b.position.distanceTo(posBefore)).toBeLessThan(1);
 		expect(cam.takeDirty()).toBe(true);

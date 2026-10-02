@@ -26,7 +26,7 @@ type Opts = {
 	protect?: boolean;
 };
 
-/** A just-enough fake PhotoEngine: sampleAt returns hits that agree with (or, if stale, not) the pose. */
+/** A just-enough fake engine (the Renderer surface): sampleAt returns hits that agree with (or, if stale, not) the pose. */
 function fakeEngine(o: Opts = {}) {
 	const eye = { x: 0, y: 0, z: 1361.3 };
 	const pose = { ...FIXTURE.pose };

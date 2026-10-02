@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // A few module workers running one job type, round-robin, for CPU work that only needs to leave the main
-// thread (dem/decode.worker.ts, nearfield/generate/three-terrain-tile.worker.ts). Each job's result must equal what `local` returns
+// thread (dem/decode.worker.ts). Each job's result must equal what `local` returns
 // on the page for the same input: the pool is purely a scheduling choice. Off a page (workers, node) or
 // without OffscreenCanvas, and after any worker error, jobs run through `local` instead.
 

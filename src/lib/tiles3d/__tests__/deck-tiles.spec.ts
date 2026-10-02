@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import * as THREE from "three";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { withFlags } from "#/test/helpers";
 
@@ -15,7 +14,7 @@ const h = vi.hoisted(() => ({
 type FakeSet = {
 	config: unknown;
 	at: { lat: number; lon: number; eye: unknown };
-	uniforms: { uEye: { value: { copy: (v: unknown) => void; v?: unknown } } };
+	uniforms: { eye: unknown };
 	version: number;
 	geoidN: number;
 	onChange?: () => void;
@@ -26,16 +25,7 @@ type FakeSet = {
 
 vi.mock("../tiles", () => ({
 	Tiles3DSet: class {
-		uniforms = {
-			uEye: {
-				value: {
-					v: undefined as unknown,
-					copy(v: unknown) {
-						this.v = v;
-					},
-				},
-			},
-		};
+		uniforms = { eye: undefined as unknown };
 		version = 7;
 		geoidN = 50.123;
 		onChange?: () => void;
@@ -70,14 +60,21 @@ vi.mock("../deck-layer", () => ({
 import { DeckTiles3D } from "../deck-tiles";
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
-const eye = () => new THREE.Vector3(1, 2, 3);
+const eye = (): [number, number, number] => [1, 2, 3];
+const stepView = () => ({
+	position: [4, 5, 6] as [number, number, number],
+	viewMatrix: new Array(16).fill(0),
+	projectionMatrix: new Array(16).fill(0),
+	fovY: 60,
+	aspect: 2,
+});
 const layerArgs = (o: { truth?: boolean } = {}) => ({
 	photoViewProj: [1],
 	photoPos: [0, 0, 0] as [number, number, number],
 	photoRange: null,
 	photoFg: null,
 	truth: o.truth ?? false,
-	camera: new THREE.Vector3(4, 5, 6),
+	camera: [4, 5, 6] as [number, number, number],
 });
 
 beforeEach(() => {
@@ -126,7 +123,7 @@ describe("DeckTiles3D lifecycle", () => {
 		expect(h.sets).toHaveLength(0);
 	});
 
-	it("reuses one set across enters and refreshes the eye uniform", async () => {
+	it("reuses one set across enters and refreshes the eye uniform (a copy)", async () => {
 		const t = DeckTiles3D.create(() => {}) as DeckTiles3D;
 		await flush();
 		const e1 = eye();
@@ -134,13 +131,13 @@ describe("DeckTiles3D lifecycle", () => {
 		const e2 = eye();
 		t.enter(46.7, 7.7, e2);
 		expect(h.sets).toHaveLength(1);
-		expect(h.sets[0].uniforms.uEye.value.v).toBe(e2);
+		expect(h.sets[0].uniforms.eye).toEqual(e2);
 	});
 
 	it("refines from the world camera only while active", async () => {
 		const t = DeckTiles3D.create(() => {}) as DeckTiles3D;
 		await flush();
-		const cam = new THREE.PerspectiveCamera();
+		const cam = stepView();
 		t.update(cam, 100, 50); // no set yet
 		t.enter(46.7, 7.7, eye());
 		t.update(cam, 100, 50);

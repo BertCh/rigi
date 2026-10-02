@@ -21,7 +21,6 @@
 import { COORDINATE_SYSTEM, Deck } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { Device } from "@luma.gl/core";
-import * as THREE from "three";
 import { BRAND } from "#/brand/khipu";
 import type { Pose } from "#/lib/camera";
 import { GpuGeometrySource, rangeMapFrom } from "#/lib/deck/geometry-pass";
@@ -768,13 +767,13 @@ export class RollMapEngine {
 	/** Oblique overview of the whole roll from the south; `distM` overrides the default distance. */
 	frameOverview(distM?: number) {
 		const p0 = this.placed[0];
-		// WorldCamera.enter builds the OrbitControls; the framing is then replaced by the overview
+		// WorldCamera.enter builds the OrbitController; the framing is then replaced by the overview
 		this.world.setAspect(
 			this.canvas.clientWidth / Math.max(1, this.canvas.clientHeight),
 		);
 		this.world.enter(
 			p0?.pose ?? { yaw: 0, pitch: 0, roll: 0, vfov: 50 },
-			new THREE.Vector3(...(p0?.eye ?? [0, 0, 0])),
+			p0?.eye ?? [0, 0, 0],
 		);
 		const c = this.world.controls;
 		if (!c) return;
@@ -789,7 +788,7 @@ export class RollMapEngine {
 	}
 
 	/**
-	 * Slowly orbit the overview (OrbitControls autoRotate, deg/s ≈ 6 × speed); null stops. Any drag on
+	 * Slowly orbit the overview (OrbitController autoRotate, deg/s ≈ 6 × speed); null stops. Any drag on
 	 * the map stops it too. Used by the landing page's live map.
 	 */
 	setAutoRotate(speed: number | null) {
@@ -797,7 +796,7 @@ export class RollMapEngine {
 		if (!c) return;
 		c.autoRotate = speed != null;
 		if (speed != null) c.autoRotateSpeed = speed;
-		c.addEventListener("start", () => {
+		c.on("start", () => {
 			c.autoRotate = false;
 		});
 		this.kick();
@@ -811,7 +810,7 @@ export class RollMapEngine {
 		const p = this.placed.find((x) => x.id === id);
 		if (!p) return;
 		if (!this.world.controls) this.frameOverview();
-		const hop = this.world.cam.position.distanceTo(new THREE.Vector3(...p.eye));
+		const hop = this.world.cam.position.distanceTo(p.eye);
 		this.flightArc = Math.min(WORLD_ARC_M, hop * 0.3);
 		this.flying = p;
 		this.world.flyTo(
@@ -843,9 +842,7 @@ export class RollMapEngine {
 	 * same spot are turns, not steps, and are skipped. Null when there is none.
 	 */
 	photoAhead(dir: 1 | -1 = 1): string | null {
-		const f = new THREE.Vector3(0, 0, -1).applyQuaternion(
-			this.world.cam.quaternion,
-		);
+		const f = this.world.cam.forward();
 		const fx = f.x * dir;
 		const fy = f.y * dir;
 		const fl = Math.hypot(fx, fy);
@@ -893,7 +890,7 @@ export class RollMapEngine {
 			const f = this.flying;
 			let moved = this.world.tick(
 				f?.pose ?? IDLE_POSE,
-				new THREE.Vector3(...(f?.eye ?? [0, 0, 0])),
+				f?.eye ?? [0, 0, 0],
 				f?.aspect ?? 1,
 			);
 			const fl = this.world.flight;
@@ -930,7 +927,7 @@ export class RollMapEngine {
 	}
 
 	/**
-	 * Cap the camera/redraw loop at `fps` (null = every display frame). OrbitControls autoRotate steps
+	 * Cap the camera/redraw loop at `fps` (null = every display frame). OrbitController autoRotate steps
 	 * per tick, not per second, so scale setAutoRotate's speed by 60 / fps to keep the pace.
 	 */
 	setFrameCap(fps: number | null) {
@@ -1199,7 +1196,7 @@ export class RollMapEngine {
 		);
 		this.deck.setProps({
 			viewState: {
-				world: w.viewState(new THREE.Vector3(target.x, target.y, target.z)),
+				world: w.viewState([target.x, target.y, target.z]),
 			},
 			layers,
 		} as never);

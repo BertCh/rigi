@@ -270,7 +270,7 @@ check(
 	`classic output byte-equal on ${same}/${trials} seeded fixtures`,
 );
 
-// skylineAt: three's RGBA bottom-up buffer and deck's r32 top-down one give the same skyline
+// skylineAt: an RGBA bottom-up buffer and deck's r32 top-down one give the same skyline
 {
 	const w = 64;
 	const h = 48;
@@ -288,7 +288,7 @@ check(
 	check(
 		JSON.stringify(Array.from(a)) === JSON.stringify(Array.from(b)) &&
 			a[0] === Math.fround(5 / h),
-		"skylineAt: three RGBA (bottom-up) = deck r32 (top-down)",
+		"skylineAt: RGBA (bottom-up) = deck r32 (top-down)",
 	);
 }
 

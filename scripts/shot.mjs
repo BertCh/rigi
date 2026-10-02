@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Headless screenshot tool for visually verifying WebGL (three.js) pages.
+// Headless screenshot tool for visually verifying WebGL / WebGPU pages.
 //
 // Usage:
 //   node scripts/shot.mjs <url> <out.png> [options]

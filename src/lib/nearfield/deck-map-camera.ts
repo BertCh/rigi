@@ -13,7 +13,8 @@
 // camera, and the camera is kept above the terrain.
 
 import { MapView, type MapViewState, WebMercatorViewport } from "@deck.gl/core";
-import * as THREE from "three";
+import { Vector3 } from "@math.gl/core";
+import { quaternionFromBasis, type ViewCamera } from "../camera/view-camera";
 import { DEG, type EnuFrame } from "../geodesy";
 import type { StepMapDriver } from "./step-camera";
 
@@ -77,7 +78,7 @@ export class DeckMapCamera implements StepMapDriver {
 		this.onChange(true);
 	}
 
-	start(pivot: THREE.Vector3, dist: number, yaw: number) {
+	start(pivot: Vector3, dist: number, yaw: number) {
 		const g = this.frame.toGeo(pivot.x, pivot.y, pivot.z);
 		this.h0 = g.h;
 		this.vs = {
@@ -119,17 +120,15 @@ export class DeckMapCamera implements StepMapDriver {
 		return d;
 	}
 
-	apply(cam: THREE.PerspectiveCamera) {
+	apply(cam: ViewCamera) {
 		const { pos, target, fovy } = this.pose(this.vs);
-		const f = target.clone().sub(pos).normalize();
+		const f = target.clone().subtract(pos).normalize();
 		const b = (this.vs.bearing ?? 0) * DEG;
-		const h = new THREE.Vector3(Math.sin(b), Math.cos(b), 0);
+		const h = new Vector3(Math.sin(b), Math.cos(b), 0);
 		const up = h.addScaledVector(f, -h.dot(f)).normalize();
-		const right = new THREE.Vector3().crossVectors(f, up);
+		const right = f.clone().cross(up);
 		cam.position.copy(pos);
-		cam.quaternion.setFromRotationMatrix(
-			new THREE.Matrix4().makeBasis(right, up, f.negate()),
-		);
+		quaternionFromBasis(cam.quaternion, right, up, f.negate());
 		cam.fov = fovy;
 	}
 
@@ -155,14 +154,14 @@ export class DeckMapCamera implements StepMapDriver {
 	private pose(vs: MapViewState) {
 		const vp = this.viewport(vs);
 		const [lon, lat, z] = vp.unprojectPosition(vp.cameraPosition);
-		const pos = new THREE.Vector3(
+		const pos = new Vector3(
 			...(this.frame.fromGeo(lat, lon, z + this.h0) as [
 				number,
 				number,
 				number,
 			]),
 		);
-		const target = new THREE.Vector3(
+		const target = new Vector3(
 			...(this.frame.fromGeo(vs.latitude, vs.longitude, this.h0) as [
 				number,
 				number,
@@ -198,7 +197,7 @@ export class DeckMapCamera implements StepMapDriver {
 		if (g == null) return false;
 		const gh = this.frame.toGeo(target.x, target.y, g).h;
 		if (Math.abs(gh - this.h0) < 1) return false;
-		const f = target.clone().sub(pos).normalize();
+		const f = target.clone().subtract(pos).normalize();
 		// the camera must stay above the new plane, looking down onto it
 		if (f.z > -1e-3) return false;
 		const t = (g - pos.z) / f.z;

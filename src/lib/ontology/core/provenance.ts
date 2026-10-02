@@ -394,7 +394,7 @@ export const METHODS = {
 		"model",
 		"Novel-view generation",
 		["pixels"],
-		"lib/nearfield/generate",
+		"lib/nearfield",
 		["geometry"],
 	),
 } as const satisfies Record<string, MethodDef>;

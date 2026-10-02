@@ -1222,7 +1222,7 @@ function Legacy() {
 						],
 						[
 							"src/lib/pose.ts",
-							"three.js adapter: applyPose sets a PerspectiveCamera (up = +Z, vfov, aspect) from a Pose and an eye.",
+							"Camera adapter: applyPose sets the deck ViewCamera (up = +Z, vfov, aspect) from a Pose and an eye.",
 						],
 						[
 							"src/lib/geo/camera.ts",

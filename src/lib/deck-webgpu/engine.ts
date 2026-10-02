@@ -29,7 +29,7 @@
 //   keepLayer / updateComposite             no layer diff here: composite-only changes request a
 //                                           "screen" frame (the offscreen targets are reused),
 //                                           everything else an "all" frame
-//   WorldView + WorldCamera                 WorldCamera (three OrbitControls, no rendering) feeds
+//   WorldView + WorldCamera                 WorldCamera (OrbitController, no rendering) feeds
 //                                           the colour pass camera (host.view); frame.view "world"
 //   Step Inside map mode                    deck's MapView + MapController (DeckMapCamera) when
 //                                           the host can carry extra deck views (see
@@ -48,7 +48,6 @@
 // through hosts/deck.ts (dynamically imported).
 
 import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
-import * as THREE from "three";
 import type { AlignResult, EdgeMap, Pin } from "#/lib/align";
 import * as cam from "#/lib/camera";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
@@ -101,7 +100,7 @@ import {
 	recolorTrailSegments,
 	type TrailSegments,
 } from "#/lib/deck/trail-layer";
-import { poseQuaternion, WorldCamera } from "#/lib/deck/world-view";
+import { WorldCamera } from "#/lib/deck/world-view";
 import { tileBounds } from "#/lib/dem";
 import { heightFromTile } from "#/lib/dem/height-from-tile";
 import { getFlag } from "#/lib/flags";
@@ -180,7 +179,7 @@ import {
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { PhotoMeta, RegionData, RegionTrail } from "#/lib/photos";
 import { solvePinsForApp } from "#/lib/pins/seed";
-import { unprojectDir } from "#/lib/pose";
+import { poseQuaternion, unprojectDir } from "#/lib/pose";
 import type {
 	FgMask,
 	PeakLabel,
@@ -331,7 +330,7 @@ const sameKeyList = (a: unknown[], b: unknown[]) =>
  * A host that can carry extra deck views next to its own (DeckHost after the change in the
  * WIRING notes). Step Inside's top-down map mode then runs on deck's MapView + MapController
  * (nearfield/deck-map-camera.ts), exactly as deck/engine.ts does; without it StepCamera runs its
- * own map mode (the three.js engine's behaviour).
+ * own map mode.
  */
 export type ExtraViewsHost = Host & {
 	setExtraViews(
@@ -760,10 +759,6 @@ export class WebGpuEngine implements Renderer {
 		return [this.eye.x, this.eye.y, this.eye.z];
 	}
 
-	private get eyeVec() {
-		return new THREE.Vector3(this.eye.x, this.eye.y, this.eye.z);
-	}
-
 	/** The photo camera as a host CameraPose. */
 	private photoPose(pose: Pose = this.pose): CameraPose {
 		const c = photoCamera({
@@ -802,7 +797,7 @@ export class WebGpuEngine implements Renderer {
 	private viewPose(): CameraPose {
 		const w = this.world;
 		if (!w?.controls) return this.photoPose();
-		const vs = w.viewState(this.eyeVec);
+		const vs = w.viewState(this.eyeArr);
 		const c = worldCamera({
 			eye: vs.eye,
 			forward: vs.forward,
@@ -3805,7 +3800,7 @@ export class WebGpuEngine implements Renderer {
 			: null;
 		map?.setSize(this.cssSize.w, this.cssSize.h);
 		const stepCam = new StepCamera(w.cam, this.canvas, {
-			eye: this.eyeVec,
+			eye: this.eyeArr,
 			quaternion: toQ,
 			vfov: this.pose.vfov,
 			aspect: this.aspect,
@@ -3821,7 +3816,7 @@ export class WebGpuEngine implements Renderer {
 		this.step = { cam: stepCam, enteredWorld, masks: null, map, view };
 		this.syncMapViews();
 		if (view === "step")
-			this.tiles3d?.enter(this.photo.lat, this.photo.lon, this.eyeVec);
+			this.tiles3d?.enter(this.photo.lat, this.photo.lon, this.eyeArr);
 		if (!this.geometryReady())
 			void this.readback().then(() => {
 				if (this.step?.cam === stepCam) {
@@ -3901,8 +3896,8 @@ export class WebGpuEngine implements Renderer {
 		const ws = deckWorldStyle(this.style);
 		this.world.planeOpacity = ws.planeOpacity;
 		this.world.setAspect(this.cssSize.w / this.cssSize.h);
-		this.world.enter(this.pose, this.eyeVec);
-		this.world.tick(this.pose, this.eyeVec, this.aspect);
+		this.world.enter(this.pose, this.eyeArr);
+		this.world.tick(this.pose, this.eyeArr, this.aspect);
 		this.canvas.style.backgroundColor = ws.sky;
 		// the drape reads this frame's geometry target; labels / masks want the CPU buffer too
 		if (!this.geometryReady()) void this.readback();
@@ -3931,9 +3926,13 @@ export class WebGpuEngine implements Renderer {
 			}
 			const flying = !!w.flight && !w.flight.held;
 			const stepping = this.step?.cam.update() ?? false;
-			const moved = w.tick(this.pose, this.eyeVec, this.aspect) || stepping;
+			const moved = w.tick(this.pose, this.eyeArr, this.aspect) || stepping;
 			if (this.step)
-				this.tiles3d?.update(w.cam, this.canvas.width, this.canvas.height);
+				this.tiles3d?.update(
+					w.cam.view(),
+					this.canvas.width,
+					this.canvas.height,
+				);
 			let gizmo = false;
 			if (this.step?.view === "map") {
 				const o = this.stepGizmoOpacity(w);
@@ -3981,7 +3980,7 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	private stepGizmoOpacity(w: WorldCamera) {
-		const d = w.cam.position.distanceTo(this.eyeVec);
+		const d = w.cam.position.distanceTo(this.eyeArr);
 		return w.planeOpacity * Math.max(0, Math.min(1, (d - 30) / 300));
 	}
 
@@ -4013,8 +4012,8 @@ export class WebGpuEngine implements Renderer {
 
 	flyOut() {
 		if (!this.world?.controls) return;
-		this.world.enter(this.pose, this.eyeVec);
-		this.world.tick(this.pose, this.eyeVec, this.aspect);
+		this.world.enter(this.pose, this.eyeArr);
+		this.world.tick(this.pose, this.eyeArr, this.aspect);
 		this.sync();
 		this.kickWorld();
 	}

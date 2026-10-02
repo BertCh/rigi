@@ -66,7 +66,7 @@ export type GizmoProps = {
 	/** The photo: an image (uploaded here, sRGB + mips) or a luma Texture owned by the caller
 	 * (must be rgba8unorm-srgb or another format that samples LINEAR). null: no plane. */
 	image: ImageLike | Texture | null;
-	/** Photo plane opacity (three: 0.95, fading during the flight). The gizmo hides at ≤ 0.02
+	/** Photo plane opacity (0.95, fading during the flight). The gizmo hides at ≤ 0.02
 	 * (deck/engine.ts worldLayers: "the frustum is hidden once the plane has faded"). */
 	planeOpacity: number;
 	/** Frustum edges, 0..255 sRGB RGBA (style.world.frame lineColor × lineOpacity). */

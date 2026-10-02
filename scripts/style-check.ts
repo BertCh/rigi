@@ -3,8 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Self-check for src/lib/style (no test runner in this repo). Run: npx tsx scripts/style-check.ts
-// Exit 0 = all pass. Covers: CLASSIC = today's constants (numbers snapshot; the cross-check against the
-// three.js materials.ts uniforms went with the three.js renderer, 2026-10-01), ramps vs the shader formulas, merge/clamp/
+// Exit 0 = all pass. Covers: CLASSIC = today's constants (numbers snapshot), ramps vs the shader formulas, merge/clamp/
 // union semantics, presets resolving to complete styles, storage parsing/fallback, ?style=, cross-tab.
 import { drawPeakLabels } from "../src/lib/look/labels/canvas.ts";
 import { labelCssVars } from "../src/lib/look/labels/css.ts";
@@ -359,7 +358,7 @@ ok(
 		const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
 		return t * t * (3 - 2 * t);
 	};
-	// the classic shader's hypso() (three.js materials.ts, removed 2026-10-01; deck terrain-layer.ts)
+	// the classic shader's hypso() (deck terrain-layer.ts)
 	const hypso = (t: number) => {
 		const c = [
 			[0.36, 0.52, 0.3],
@@ -802,7 +801,7 @@ ok(
 	);
 }
 
-// ---- 7. colour helpers + labels (the three.js adapter checks went with that renderer, 2026-10-01) ----
+// ---- 7. colour helpers + labels ----
 {
 	ok(
 		eq(rawColor([0.02, 0.03, 0.06]), [0.02, 0.03, 0.06]) &&

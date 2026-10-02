@@ -569,13 +569,6 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
-		id: "nearfield-generate",
-		tier: "fast",
-		group: "nearfield",
-		cmd: tsx("src/lib/nearfield/generate/generate.check.ts"),
-		timeoutS: 300,
-	},
-	{
 		id: "nearfield-spot",
 		tier: "fast",
 		group: "nearfield",

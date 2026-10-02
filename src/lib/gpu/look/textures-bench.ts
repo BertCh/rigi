@@ -3,10 +3,9 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Parity / speed bench of the texture-input look passes (textures.ts) against the array path, on
-// real inputs captured from a live three.js engine (capture.ts). Run in the page by
+// real inputs captured from a live deck engine (capture.ts). Run in the page by
 // scripts/gpu/textures-bench.mjs. The engine's targets are re-created as textures on the compute
-// device (the geometry buffer as rgba32float in GL row order, flipY: true, as the three engine
-// holds it; the photo at each pass's size; the masks as r8unorm) and each pass runs:
+// device (the geometry buffer as rgba32float in GL row order, flipY: true; the photo at each pass's size; the masks as r8unorm) and each pass runs:
 // - masks: guidedFiltersGpu(capture's I / coverage / people) vs masksTex → q planes (f32) and the
 //   RGBA8 masks (vs Math.round of the array path's planes, and read back from the output texture);
 //   a flipped upload (geometry row 0 = top, photo row 0 = bottom + flipY) must give the same bits;

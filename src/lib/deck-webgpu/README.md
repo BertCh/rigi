@@ -54,7 +54,6 @@ condition, so the deck host runs on every dev server and in production builds.
 | `auto` (default) | WebGpuEngine when the probe passes, else the WebGL DeckEngine |
 | `webgpu` | the same, asked for explicitly (a fallback logs a console warning) |
 | `deck` | the WebGL DeckEngine only (the escape hatch) |
-| `three` | retired (the three.js PhotoEngine was removed 2026-10-01): warns and runs `auto` |
 
 - **Probe** (`probeWebGpu`, cached per page): `navigator.gpu`, a high-performance adapter with
   `float32-filterable` (= `device.ts REQUIRED_FEATURES`; keep them equal), `maxTextureDimension2D`
@@ -67,7 +66,7 @@ condition, so the deck host runs on every dev server and in production builds.
   context cannot give a WebGL2 one) and DeckEngine runs on it.
 - **What ran**: the workspace root carries `data-renderer` = `webgpu` | `deck` and
   `data-renderer-reason` (`pinned`, `auto: <adapter>`, `webgpu=off`, `fallback: <why>`).
-  `__engine.backend === "webgpu"` tells WebGpuEngine apart from DeckEngine (both have kind `deck`).
+  `__engine.backend === "webgpu"` tells WebGpuEngine apart from DeckEngine.
 - **Compute**: both hosts hand their device to `src/lib/gpu/device.adoptRenderDevice`, so
   `getComputeDevice()` is the render device. `app-load.mjs` checks this per photo.
 - **Harnesses** pin explicitly: `eval-app.mjs`, `deck-engine-smoke.mjs`, `leaderboard.mjs`,
@@ -495,7 +494,7 @@ IMG_7130 with `fullTerrain` and views at ±90°: autoAlign pose bit-identical, m
 ## Known gaps
 
 - **Renderer interface.** `WebGpuEngine` implements all of `Renderer`; deviations:
-  `kind` is `'deck'` (the only value since three.js was removed) with `backend: 'webgpu'`, so tools that
+  `backend` is `'webgpu'`, so tools that
   poke WebGL deck internals (`deckInstance.layerManager`, compositor) must check `backend`.
 - **Step Inside map mode** runs on deck's MapController only on the deck host (`setExtraViews`,
   now implemented); on the direct host `StepCamera` runs its own map mode.

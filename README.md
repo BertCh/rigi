@@ -60,7 +60,7 @@ by `npm run generate-routes`).
 | `/upload` | Upload any photo (HEIC via libheif in a worker, EXIF via exifr). Photos with no compass, gravity or focal take the unknown-pose path |
 | `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (`src/lib/roll/**`): a whole day's photos clustered into rolls and spots, with a mosaic, per-spot panoramas, and every photo draped on one deck.gl terrain map |
 | `/baseline` | Dev only. Debug UI for the CPU pipeline (`src/baseline-ui`): horizon, skyline detection, solve, peaks |
-| `/lab/splats`, `/lab/deck-splats`, `/lab/generate` | Step Inside dev benches: splats in each renderer, and P3 generation (`?nearfield=gen`, GT poses only) |
+| `/lab/deck-splats` | Step Inside dev bench: `DeckSplatLayer` on its own (WebGL2 only); harness `scripts/nearfield/deck-splat-lab-check.mjs` |
 | `/lab/deck-webgpu` | The WebGPU deck renderer in isolation (`WebGpuEngine`, `src/lib/deck-webgpu`); the app uses it by default via `?renderer=auto` |
 | `/gipfelbuch`, `/gipfelbuch/$concept`, `/gipfelbuch/print` | Explainer pages: 16 concept sheets, one page per concept (`src/components/gipfelbuch`), and the printed edition (cover, index, every sheet, colophon; Print / Save as PDF) |
 | `/dev/graph`, `/dev/meta`, `/dev/how-scene`, `/dev/export-roll` | Dev pages: the GPU app-graph inspector, the explainer figures, the "how it works" scene, and the demo-roll exporter |
@@ -76,9 +76,8 @@ use. Both backends are deck.gl on luma.gl, picked by `src/lib/renderer-select.ts
   overlap between the two.
 
 Each draws Mapterhorn tiles with a geometry pass (ENU xyz + range, read back for `sampleAt`, labels,
-occlusion and auto-align), a layer pass and a composite pass. three.js is
-still used where it is the right tool: Step Inside splats (`src/lib/nearfield`), the 3D Tiles adapters
-(`src/lib/tiles3d`), `/lab/splats` and the P3 RGB-D cache (`/lab/generate`).
+occlusion and auto-align), a layer pass and a composite pass. There is no three.js:
+cameras are math.gl (`src/lib/camera`) and 3D Tiles stream through loaders.gl (`src/lib/tiles3d`).
 
 **Look and style.** Both backends share them.
 

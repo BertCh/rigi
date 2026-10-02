@@ -3733,7 +3733,7 @@ function parseArgs(argv) {
 			o.renderer = next();
 			if (!["deck", "webgpu", "auto"].includes(o.renderer))
 				throw new Error(
-					`--renderer must be deck, webgpu or auto (got ${o.renderer}; the three.js renderer was removed)`,
+					`--renderer must be deck, webgpu or auto (got ${o.renderer})`,
 				);
 		} else if (a === "--concurrency") o.concurrency = Number(next());
 		else if (a === "--timeout-scale") o.scale = Number(next());

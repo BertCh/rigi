@@ -2,77 +2,124 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Tiles3DSet: the 3D Tiles sources of one photo (config.ts), streamed by 3d-tiles-renderer around the
-// Step Inside eye and placed in the photo's ENU frame (frame.ts, geoid.ts). Both engines use it:
-//   · three (engine.ts): `group` joins the scene on TILES3D_LAYER (only the step camera enables it),
-//     update(worldCam) each step frame
-//   · deck (deck/engine.ts): the same set is driven by the world camera (a THREE camera) and
-//     deck-layer.ts draws its visible meshes; one tile selector for both engines = identical tiles
+// Tiles3DSet: the 3D Tiles sources of one photo (config.ts), streamed by @loaders.gl/tiles' Tileset3D
+// (the traversal deck's Tile3DLayer uses) around the Step Inside eye and placed in the photo's ENU frame
+// (frame.ts, geoid.ts). Both deck engines use it: DeckTiles3D.update(view) refines every source from the
+// world camera (viewport.ts), and the layers (deck-layer.ts, deck-webgpu/layers/tiles3d.ts) draw
+// visibleMeshes(), plain typed arrays (content.ts), never renderer objects.
 // Google tiles are display-only: nothing here reads their geometry back (no raycast, no stats of
 // heights), and the browser's HTTP cache is the only cache (no service worker / IndexedDB).
+//   · near-field mask: the viewport's far plane is the near-field radius (viewport.ts), so traversal
+//     culls (and never downloads) tiles beyond it
+//   · unload policy: Tileset3D's byte cache (0.18 GB soft target + 0.07 GB headroom, as the old LRU)
+//   · Google auth: the key rides on the root URL; loaders.gl's Tiles3DSource copies it and the
+//     session token onto every tile and subtree request
 
-import { GoogleCloudAuthPlugin } from "3d-tiles-renderer/core/plugins";
+import { Tiles3DLoader } from "@loaders.gl/3d-tiles/bundled";
+import { coreApi } from "@loaders.gl/core";
 import {
-	GLTFExtensionsPlugin,
-	UnloadTilesPlugin,
-} from "3d-tiles-renderer/plugins";
-import { TilesRenderer } from "3d-tiles-renderer/three";
-import * as THREE from "three";
-import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
+	Tiles3DSource as LoadersTiles3DSource,
+	Tileset3D,
+} from "@loaders.gl/tiles";
+import type { Matrix4 } from "@math.gl/core";
 import { getFlag } from "#/lib/flags";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import {
 	googleTilesKey,
-	TILES3D_LAYER,
 	TILES3D_SOURCES,
 	type Tiles3DConfig,
 	type Tiles3DSource,
 	type Tiles3DSourceId,
 } from "./config";
+import {
+	releaseImage,
+	type TileContentLike,
+	type TileMesh,
+	tileMeshesFromContent,
+} from "./content";
 import { enuFromEcef } from "./frame";
 import { geoidUndulation } from "./geoid";
-import {
-	makeTileMaterial,
-	makeTileSharedUniforms,
-	type TileSharedUniforms,
-} from "./material";
+import { makeTileSharedUniforms, type TileSharedUniforms } from "./material";
+import { EnuViewport, type StepView } from "./viewport";
 
-/** Culls tiles whose bounding volume lies beyond `radius` of an ECEF point (tile frame = ECEF). */
-class NearFieldMaskPlugin {
-	name = "RIGI_NEARFIELD_MASK";
-	constructor(
-		public center: THREE.Vector3,
-		public radius: number,
-	) {}
-	calculateTileViewError(
-		tile: {
-			engineData: {
-				boundingVolume: { distanceToPoint(p: THREE.Vector3): number };
-			};
-		},
-		target: { inView: boolean },
-	) {
-		if (
-			tile.engineData.boundingVolume.distanceToPoint(this.center) > this.radius
-		) {
-			target.inView = false;
-			return true;
-		}
-		return false;
+/** The loaders.gl Tile3D fields read here. */
+type TileRef = {
+	id: string;
+	type?: string;
+	content?: (TileContentLike & Record<string, unknown>) | null;
+	computedTransform?: ArrayLike<number>;
+	contentReady?: boolean;
+};
+
+/** Draco decoder files the loaders fetch (public/tiles3d/draco, both decoder profiles). */
+export function dracoModules(base: string): Record<string, string> {
+	const dir = `${base}tiles3d/draco/`;
+	return {
+		"draco_wasm_wrapper.js": `${dir}draco_wasm_wrapper.js`,
+		"draco_decoder.wasm": `${dir}draco_decoder.wasm`,
+		"draco_wasm_wrapper_gltf.js": `${dir}draco_wasm_wrapper.js`,
+		"draco_decoder_gltf.wasm": `${dir}draco_decoder.wasm`,
+	};
+}
+
+/** `reference` resolved against the tile being loaded; a failed parse leaves it as is. */
+function resolveAgainst(reference: string, tileUrl: string): string {
+	try {
+		return new URL(reference, new URL(tileUrl, globalThis.location?.href)).href;
+	} catch {
+		return reference;
 	}
 }
 
-let draco: DRACOLoader | null = null;
-function dracoLoader(): DRACOLoader {
-	if (!draco) {
-		draco = new DRACOLoader();
-		const base =
-			(import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
-		draco.setDecoderPath(`${base}tiles3d/draco/`);
-	}
-	return draco;
+/**
+ * loaders.gl's core API with a per-load fetch that resolves relative references against the tile's own URL:
+ * an i3dm names its model by a relative URI ("../../Tree-1.glb", swisstopo vegetation), and the loader
+ * fetches it as written.
+ */
+export const tileCoreApi = {
+	...coreApi,
+	load: (
+		url: string,
+		loader: unknown,
+		options: Record<string, unknown> | undefined,
+		context: unknown,
+	) =>
+		(coreApi.load as (...a: unknown[]) => Promise<unknown>)(
+			url,
+			loader,
+			{
+				...options,
+				core: {
+					...(options?.core as Record<string, unknown> | undefined),
+					fetch: (reference: string, init?: object) =>
+						globalThis.fetch(
+							resolveAgainst(String(reference), url),
+							// the loader hands its core options as `init` for model files: not a RequestInit
+							init && !("fetch" in init) ? (init as RequestInit) : undefined,
+						),
+				},
+			},
+			context,
+		),
+};
+
+function baseUrl(): string {
+	return (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 }
 
-type Layer = { source: Tiles3DSource; tiles: TilesRenderer };
+type Layer = {
+	source: Tiles3DSource;
+	tileset: Tileset3D;
+	/** ENU ← ECEF with the source's geoid lowering. */
+	placement: Matrix4;
+	meshes: Map<TileRef, TileMesh[]>;
+	visible: boolean;
+	failed: number;
+	/** Selection signature of the last traversal (a change bumps `version`). */
+	selectionKey: string;
+	/** Pose signature of the last update() (an unchanged pose skips traversal once loaded). */
+	poseKey: string;
+};
 
 export type Tiles3DStats = {
 	source: Tiles3DSourceId;
@@ -82,155 +129,191 @@ export type Tiles3DStats = {
 	bytes: number;
 }[];
 
+export type Tiles3DOptions = {
+	/** Replaces the loaders (tests, offline). */
+	loadOptions?: Record<string, unknown>;
+	/** Test hook: builds the Tileset3D of a source instead of loading its URL. */
+	createTileset?: (source: Tiles3DSource, url: string) => Tileset3D;
+};
+
 export class Tiles3DSet {
-	/** Parent of every source's TilesRenderer group (identity; the groups carry ENU←ECEF). */
-	readonly group = new THREE.Group();
 	readonly uniforms: TileSharedUniforms;
 	readonly config: Tiles3DConfig;
 	/** EGM2008 N at the photo (m); applied only to "ellipsoidal" sources (config.ts heights). */
 	readonly geoidN: number;
-	private at: { lat: number; lon: number; eye: THREE.Vector3 };
+	private at: { lat: number; lon: number; eye: Vec3 };
 	private layers: Layer[] = [];
 	private disposed = false;
+	private readonly options: Tiles3DOptions;
 	/** Bumps whenever the visible meshes change (deck-layer.ts redraw key). */
 	version = 0;
 	/** Called when a tile loads, unloads or changes visibility: render another frame. */
 	onChange?: () => void;
-	/** Per-mesh cleanup hooks (deck-layer.ts frees its GPU copies). */
-	readonly onDisposeMesh = new Set<(m: THREE.Mesh) => void>();
+	/** Per-mesh cleanup hooks (the layers free their GPU copies). */
+	readonly onDisposeMesh = new Set<(m: TileMesh) => void>();
 
 	constructor(
 		config: Tiles3DConfig,
-		at: { lat: number; lon: number; eye: THREE.Vector3 },
+		at: { lat: number; lon: number; eye: Vec3 },
 		uniforms: Partial<TileSharedUniforms> = {},
+		options: Tiles3DOptions = {},
 	) {
 		this.config = config;
+		this.options = options;
 		this.uniforms = { ...makeTileSharedUniforms(), ...uniforms };
-		this.uniforms.uEye.value.copy(at.eye);
-		this.uniforms.uFade.value.set(config.fadeStart, config.radius);
+		this.uniforms.eye = [...at.eye];
+		this.uniforms.fade = [config.fadeStart, config.radius];
 		this.geoidN = geoidUndulation(at.lat, at.lon);
-		this.at = { lat: at.lat, lon: at.lon, eye: at.eye.clone() };
-		this.group.name = "tiles3d";
-		this.group.layers.set(TILES3D_LAYER);
+		this.at = { lat: at.lat, lon: at.lon, eye: [...at.eye] };
 		for (const id of config.sources) this.addSource(TILES3D_SOURCES[id]);
 	}
 
 	private addSource(source: Tiles3DSource) {
-		const tiles = new TilesRenderer(
-			source.id === "google" ? undefined : source.url,
-		);
+		let url = source.url;
 		if (source.id === "google") {
 			const key = googleTilesKey();
 			if (!key) return;
-			tiles.registerPlugin(
-				new GoogleCloudAuthPlugin({ apiToken: key, autoRefreshToken: true }),
-			);
+			url = `${url}?key=${encodeURIComponent(key)}`;
 		}
-		tiles.registerPlugin(
-			new GLTFExtensionsPlugin({ dracoLoader: dracoLoader(), rtc: true }),
-		);
-		tiles.registerPlugin(new UnloadTilesPlugin({ delay: 2000 }));
-		const m = enuFromEcef(
+		const placement = enuFromEcef(
 			this.at.lat,
 			this.at.lon,
 			source.heights === "ellipsoidal" ? this.geoidN : 0,
 		);
-		const maskCenter = this.at.eye.clone().applyMatrix4(m.clone().invert());
-		tiles.registerPlugin(
-			new NearFieldMaskPlugin(maskCenter, this.config.radius),
-		);
-		tiles.errorTarget = source.errorTarget;
-		// a smaller cache than the 0.4 GB default: the mask keeps the working set to a few km
-		tiles.lruCache.maxBytesSize = 0.25 * 2 ** 30;
-		tiles.lruCache.minBytesSize = 0.18 * 2 ** 30;
-		tiles.group.matrixAutoUpdate = false;
-		tiles.group.matrix.copy(m);
-		tiles.group.matrixWorldNeedsUpdate = true;
-		tiles.group.layers.set(TILES3D_LAYER);
+		const layer: Layer = {
+			source,
+			tileset: null as unknown as Tileset3D,
+			placement,
+			meshes: new Map(),
+			visible: true,
+			failed: 0,
+			selectionKey: "",
+			poseKey: "",
+		};
 		const changed = () => {
 			this.version++;
 			this.onChange?.();
 		};
-		tiles.addEventListener("load-model", (e) => {
-			this.prepareModel(e.scene as THREE.Object3D, source);
-			changed();
-		});
-		tiles.addEventListener("dispose-model", (e) => {
-			this.disposeModel(e.scene as THREE.Object3D);
-			changed();
-		});
-		tiles.addEventListener("tile-visibility-change", changed);
-		tiles.addEventListener("needs-update", () => this.onChange?.());
-		tiles.addEventListener("load-error", (e) =>
-			console.warn(`[tiles3d] ${source.id}: ${String(e.error)}`),
+		const props = {
+			maximumScreenSpaceError: source.errorTarget,
+			// a smaller cache than the 0.5 GB default: the far plane keeps the working set to a few km
+			cacheBytes: 0.18 * 2 ** 30,
+			maximumCacheOverflowBytes: 0.07 * 2 ** 30,
+			onTileLoad: (tile: TileRef) => {
+				this.prepareTile(layer, tile);
+				changed();
+				// refine again with the same viewport now that this tile's content is in
+				layer.tileset?.update();
+			},
+			onTileUnload: (tile: TileRef) => {
+				this.disposeTile(layer, tile);
+				changed();
+			},
+			onTileError: (_tile: TileRef, message: string, tileUrl: string) => {
+				layer.failed++;
+				console.warn(`[tiles3d] ${source.id}: ${message} ${tileUrl ?? ""}`);
+			},
+			onTraversalComplete: (selected: TileRef[]) => {
+				const key = selected.map((t) => t.id).join("|");
+				if (key !== layer.selectionKey) {
+					layer.selectionKey = key;
+					changed();
+				}
+				return selected;
+			},
+			onTilesetError: (error: Error) =>
+				console.warn(`[tiles3d] ${source.id}: ${String(error)}`),
+		};
+		layer.tileset =
+			this.options.createTileset?.(source, url) ??
+			new Tileset3D(
+				new LoadersTiles3DSource(
+					{
+						url,
+						loader: Tiles3DLoader as never,
+						coreApi: tileCoreApi as never,
+					},
+					{
+						"3d-tiles": { loadGLTF: true, decodeQuantizedPositions: true },
+						gltf: { loadImages: true, decompressMeshes: true },
+						modules: dracoModules(baseUrl()),
+						...this.options.loadOptions,
+					} as never,
+				) as never,
+				props as never,
+			);
+		this.layers.push(layer);
+	}
+
+	/** glTF content → TileMeshes (once per load), keyed by tile. */
+	private prepareTile(layer: Layer, tile: TileRef) {
+		if (tile.type !== "scenegraph" || !tile.content) return;
+		layer.meshes.set(
+			tile,
+			tileMeshesFromContent(
+				tile.content,
+				layer.placement,
+				layer.source,
+				this.depthBias(layer.source),
+				tile.computedTransform,
+			),
 		);
-		this.group.add(tiles.group);
-		this.layers.push({ source, tiles });
 	}
 
-	/** Swap the glTF materials for the tile material (material.ts), keep only what we draw. */
-	private prepareModel(scene: THREE.Object3D, source: Tiles3DSource) {
-		scene.traverse((o) => {
-			o.layers.set(TILES3D_LAYER);
-			const mesh = o as THREE.Mesh;
-			if (!mesh.isMesh) return;
-			const old = mesh.material as
-				| THREE.MeshBasicMaterial
-				| THREE.MeshStandardMaterial;
-			const map = (Array.isArray(old) ? old[0] : old)?.map ?? null;
-			const c = (Array.isArray(old) ? old[0] : old)?.color;
-			const color: [number, number, number] =
-				c && !map && !(c.r === 1 && c.g === 1 && c.b === 1)
-					? [c.r, c.g, c.b]
-					: source.fallbackColor;
-			mesh.material = makeTileMaterial(this.uniforms, {
-				map,
-				color,
-				vertexColors: !!mesh.geometry.attributes.color,
-				depthBias: this.depthBias(source),
-			});
-			mesh.userData.tiles3dSource = source.id;
-			for (const m of Array.isArray(old) ? old : [old]) m?.dispose();
-		});
-	}
-
-	private disposeModel(scene: THREE.Object3D) {
-		scene.traverse((o) => {
-			const mesh = o as THREE.Mesh;
-			if (!mesh.isMesh) return;
-			for (const f of this.onDisposeMesh) f(mesh);
-			const m = mesh.material as THREE.ShaderMaterial;
-			if (m?.name === "tiles3d") {
-				(m.uniforms.uMap.value as THREE.Texture | null)?.dispose();
-				m.dispose();
-			}
-		});
-	}
-
-	/** Point every source at the camera and refine. Call once per rendered step frame. */
-	update(camera: THREE.PerspectiveCamera, width: number, height: number) {
-		if (this.disposed) return;
-		camera.updateMatrixWorld();
-		this.group.updateMatrixWorld(true);
-		for (const { tiles } of this.layers) {
-			if (!tiles.hasCamera(camera)) tiles.setCamera(camera);
-			tiles.setResolution(camera, width, height);
-			tiles.update();
+	private disposeTile(layer: Layer, tile: TileRef) {
+		const meshes = layer.meshes.get(tile);
+		if (!meshes) return;
+		layer.meshes.delete(tile);
+		for (const m of meshes) {
+			for (const f of this.onDisposeMesh) f(m);
+			releaseImage(m.image);
 		}
 	}
 
-	/** Visible tile meshes, world (ENU) matrices current (deck-layer.ts). */
-	visibleMeshes(): { mesh: THREE.Mesh; source: Tiles3DSource }[] {
-		const out: { mesh: THREE.Mesh; source: Tiles3DSource }[] = [];
-		this.group.updateMatrixWorld(true);
-		if (!this.group.visible) return out;
-		for (const { tiles, source } of this.layers) {
-			if (!tiles.group.visible) continue;
-			for (const scene of tiles.group.children)
-				scene.traverse((o) => {
-					const mesh = o as THREE.Mesh;
-					if (mesh.isMesh && mesh.visible) out.push({ mesh, source });
-				});
+	/** Point every source at the camera and refine. Call once per rendered step frame. */
+	update(view: StepView, width: number, height: number) {
+		if (this.disposed) return;
+		// quantised pose: an unchanged camera need not re-traverse once everything is in
+		const poseKey = [
+			...view.position,
+			...Array.from(view.viewMatrix).slice(0, 12),
+			view.fovY,
+			width,
+			height,
+		]
+			.map((v) => Math.round(v * 1e3))
+			.join(",");
+		const eye = this.uniforms.eye;
+		const cam = view.position;
+		const far =
+			this.config.radius +
+			Math.hypot(cam[0] - eye[0], cam[1] - eye[1], cam[2] - eye[2]);
+		for (const layer of this.layers) {
+			if (layer.poseKey === poseKey && layer.tileset.isLoaded()) continue;
+			layer.poseKey = poseKey;
+			layer.tileset.update(
+				new EnuViewport({
+					id: "step",
+					view,
+					width,
+					height,
+					enuFromEcef: layer.placement,
+					far,
+					origin: this.at,
+				}) as never,
+			);
+		}
+	}
+
+	/** Visible tile meshes (ENU matrices current): the selected tiles of every shown source. */
+	visibleMeshes(): TileMesh[] {
+		const out: TileMesh[] = [];
+		for (const layer of this.layers) {
+			if (!layer.visible) continue;
+			for (const tile of layer.tileset.selectedTiles as unknown as TileRef[]) {
+				const meshes = layer.meshes.get(tile);
+				if (meshes) out.push(...meshes);
+			}
 		}
 		return out;
 	}
@@ -242,8 +325,8 @@ export class Tiles3DSet {
 
 	/** Show / hide one source (Truth view and exports hide Google). */
 	setSourceVisible(id: Tiles3DSourceId, visible: boolean) {
-		for (const l of this.layers)
-			if (l.source.id === id) l.tiles.group.visible = visible;
+		for (const l of this.layers) if (l.source.id === id) l.visible = visible;
+		this.version++;
 	}
 
 	get hasGoogle() {
@@ -257,12 +340,9 @@ export class Tiles3DSet {
 			.map((l) => l.source.credit);
 		const google = this.layers.find((l) => l.source.id === "google");
 		if (google) {
-			// GoogleCloudAuthPlugin counts asset.copyright over the visible tiles, sorted by occurrence
-			const g = google.tiles
-				.getAttributions()
-				.filter((a) => a.type === "string" && a.value)
-				.map((a) => String(a.value));
-			const line = g.join("; ");
+			const line = googleCopyrights(
+				google.tileset.selectedTiles as unknown as TileRef[],
+			).join("; ");
 			parts.unshift(
 				/\bGoogle\b/.test(line) ? line : line ? `Google · ${line}` : "Google",
 			);
@@ -271,27 +351,43 @@ export class Tiles3DSet {
 	}
 
 	stats(): Tiles3DStats {
-		return this.layers.map(({ source, tiles }) => {
-			const s =
-				(tiles as unknown as { stats?: Record<string, number> }).stats ?? {};
-			return {
-				source: source.id,
-				visible: tiles.visibleTiles.size,
-				loading: (s.downloading ?? 0) + (s.parsing ?? 0),
-				failed: s.failed ?? 0,
-				bytes:
-					(tiles.lruCache as unknown as { cachedBytes?: number }).cachedBytes ??
-					0,
-			};
-		});
+		return this.layers.map(({ source, tileset, failed }) => ({
+			source: source.id,
+			visible: tileset.selectedTiles.length,
+			loading: (tileset.requestedTiles as unknown as TileRef[]).filter(
+				(t) => !t.contentReady,
+			).length,
+			failed,
+			bytes: tileset.gpuMemoryUsageInBytes ?? 0,
+		}));
 	}
 
 	dispose() {
 		if (this.disposed) return;
 		this.disposed = true;
-		for (const { tiles } of this.layers) tiles.dispose();
+		for (const layer of this.layers) {
+			for (const tile of [...layer.meshes.keys()])
+				this.disposeTile(layer, tile);
+			layer.tileset.destroy();
+		}
 		this.layers = [];
-		this.group.removeFromParent();
 		this.onChange = undefined;
 	}
+}
+
+/**
+ * Google's per-tile copyright strings (glTF asset.copyright, ";"-separated holders), most frequent
+ * first (ties by first appearance): the order the Map Tiles policy lists them.
+ */
+export function googleCopyrights(tiles: TileRef[]): string[] {
+	const counts = new Map<string, number>();
+	for (const t of tiles) {
+		const copyright = t.content?.gltf?.asset?.copyright;
+		if (!copyright) continue;
+		for (const holder of copyright.split(";")) {
+			const name = holder.trim();
+			if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+		}
+	}
+	return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n);
 }

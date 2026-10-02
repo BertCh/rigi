@@ -4,13 +4,12 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 // Dash coverage after luma.gl `pathDash` (@luma.gl/shadertools, #3322, MIT, vis.gl contributors).
 
-// Hiking trails for the deck photo view: the port of engine.ts buildTrails() + three's
-// LineSegments2/LineMaterial (screen-space width in target pixels, vertex colours, opacity 0.95).
+// Hiking trails for the deck photo view: screen-space-width lines (width in target pixels, vertex colours,
+// opacity 0.95).
 // Drawn ONLY in the offscreen colour pass (composite.ts), after the terrain tiles, writing the exact
 // per-fragment logarithmic gl_FragDepth of terrain-layer.ts's convention (the terrain itself writes
 // it per vertex, TERRAIN_DEPTH: never nearer than exact, so trails on the surface still pass) so the
-// terrain occludes them, and blended into the linear, straight-alpha colour target like three's
-// trails in layerRT.
+// terrain occludes them, and blended into the linear, straight-alpha colour target.
 import {
 	COORDINATE_SYSTEM,
 	Layer,
@@ -38,7 +37,7 @@ import { currentTerrainPass, LOG_DEPTH_FAR } from "./terrain-layer";
 export type TrailSegments = {
 	/** 6 floats per segment: start xyz, end xyz (ENU metres). */
 	positions: Float32Array;
-	/** 3 floats per segment (linear rgb, as three's vertex colours). */
+	/** 3 floats per segment (linear rgb). */
 	colors: Float32Array;
 	/** Trail class per segment (deck-apply.ts trailClass: hiking, mountain, alpine, other). */
 	classes: Uint8Array;
@@ -202,7 +201,7 @@ void main() {
   vec2 nrm = vec2(-dir.y, dir.x);
   vec4 p = positions.x < 0.5 ? a : b;
   vDist = positions.x < 0.5 ? da : db;
-  // width in target pixels (three: LineMaterial linewidth at resolution = the render target)
+  // width in target pixels (the render target's pixels)
   // padPx widens the quad for the pencil / glow strokes (0 = solid, unchanged); vSide = px across the line
   float halfW = trail.width * 0.5 + trail.padPx;
   vSide = positions.y * halfW;
@@ -245,7 +244,7 @@ void main() {
   float cover = trailStroke(trail.stroke, vSide, vDist, trail.width, aa, grainFade, core);
   gl_FragDepth = log2(vLogW) * trail.logDepthFC;
   // linear rgb, straight alpha: the colour pass target (composite.ts); sRGB-encoded when drawn
-  // straight to the canvas (the world view, like three's LineMaterial colorspace_fragment)
+  // straight to the canvas (the world view)
   vec3 c = vColor;
   if (trail.srgbOut > 0.5) {
     c = max(c, vec3(0.0));
@@ -258,9 +257,9 @@ void main() {
 
 export type TrailLayerProps = LayerProps & {
 	segments: TrailSegments | null;
-	/** Line width in render-target pixels (three: 2.2). */
+	/** Line width in render-target pixels (default 2.2). */
 	widthPx?: number;
-	/** three: 0.95 */
+	/** Default 0.95. */
 	lineOpacity?: number;
 	/** [dashM, gapM] metres along the trail (style.trails.dash); absent / gap ≤ 0 = solid. */
 	dash?: readonly [number, number];

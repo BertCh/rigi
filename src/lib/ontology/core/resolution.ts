@@ -53,8 +53,7 @@ export const RESOLUTION_POLICIES = {
 		purpose:
 			"a pose independent of saved/solved localStorage (lab views; ground truth is still shown)",
 		rules: [groundTruth, prior],
-		implementedBy:
-			"lib/roll/roll.ts resolvePose({ignoreStored}) (routes/lab.generate.tsx)",
+		implementedBy: "lib/roll/roll.ts resolvePose({ignoreStored}) (lab views)",
 	},
 	evaluation: {
 		label: "Evaluation",

@@ -4,14 +4,13 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 // Dash coverage after luma.gl `pathDash` (@luma.gl/shadertools, #3322, MIT, vis.gl contributors).
 
-// Hiking trails on WebGPU: the port of deck/trail-layer.ts (itself engine.ts buildTrails + three's
-// LineSegments2 / LineMaterial). README.md "Layer contract", port row `layers/trail.ts`.
+// Hiking trails on WebGPU: the port of deck/trail-layer.ts. README.md "Layer contract", port row `layers/trail.ts`.
 //
 //   pass     colour only (order 10: after the terrain, order 0). Not drawn in the geometry pass
 //            (the WebGL path doesn't either); a class-1 write to normal.w is a later decision.
 //   shape    one instanced screen-space quad per segment (6 vertices from @builtin(vertex_index),
 //            no quad vertex buffer), width in TARGET pixels (the colour target = canvas device
-//            pixels, trail.viewport = ctx.target size, like three's LineMaterial resolution),
+//            pixels, trail.viewport = ctx.target size, as the line-width resolution),
 //            both ends trimmed at the near plane so behind-camera ends never flip.
 //   colour   the segment's vertex colour (linear rgb, trailPalette) × style.trails.opacity,
 //            output PREMULTIPLIED (rgb·a, a) into the linear colour target with one /
@@ -56,9 +55,9 @@ import {
 
 /** style.trails as the layer reads it (ViewStyle['trails'] minus the palette). */
 export type TrailStyle = {
-	/** Line width in render-target pixels (three / classic: 2.2). */
+	/** Line width in render-target pixels (classic: 2.2). */
 	width: number;
-	/** Line opacity (three / classic: 0.95). */
+	/** Line opacity (classic: 0.95). */
 	opacity: number;
 	/** [dashM, gapM] metres along the trail (luma pathDash); absent / gap ≤ 0 = solid (default). */
 	dash?: readonly [number, number];
@@ -174,7 +173,7 @@ var<private> QUAD = array<vec2<f32>, 6>(
   let nrm = vec2<f32>(-dir.y, dir.x);
   var p = select(b, a, corner.x < 0.5);
   o.dist = select(db, da, corner.x < 0.5);
-  // width in target pixels (three: LineMaterial linewidth at resolution = the render target)
+  // width in target pixels (the render target's pixels)
   // padPx widens the quad for the pencil / glow strokes (0 = solid, unchanged); side = px across the line
   let halfW = trail.width * 0.5 + trail.padPx;
   o.side = corner.y * halfW;

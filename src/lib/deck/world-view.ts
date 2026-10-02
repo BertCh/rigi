@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// World view ("In map", settings.mode === 'world') for the deck backend: engine.ts enterWorld /
-// renderWorld / buildFrustum / flyToPhoto, 1:1.
-//   WorldCamera: a THREE.PerspectiveCamera driven by three's own OrbitControls (the same damping,
-//     polar limit, pan and dolly as three's world view) and three's fly-in tween. Nothing is drawn
-//     with three; the camera only feeds WorldView.
+// World view ("In map", settings.mode === 'world') for the deck backend.
+//   WorldCamera: a ViewCamera driven by an OrbitController (damped orbit, pan and dolly, polar limit
+//     just above the horizon) and the fly-in tween. Nothing is drawn by it; the camera only feeds
+//     WorldView.
 //   WorldView / WorldViewport: a deck view built from that camera (position, orientation, vfov).
 //   WorldGizmoLayer: the photo camera (photo plane 150 m out, white frustum edges, red pin), with
 //     the terrain's logarithmic depth so the terrain occludes it, and kept out of the offscreen
-//     terrain passes (three hides the frustum for its geometry pass).
+//     terrain passes (they would otherwise see the frustum).
 import {
 	COORDINATE_SYSTEM,
 	CompositeLayer,
@@ -23,10 +22,11 @@ import {
 import { BitmapLayer, LineLayer, ScatterplotLayer } from "@deck.gl/layers";
 import { Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
-import { Matrix4 } from "@math.gl/core";
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { Matrix4, type Quaternion, Vector3 } from "@math.gl/core";
+import type { Vec3 } from "#/lib/ontology/core/geometry";
 import { hfovFromAspect, type Pose } from "../camera";
+import { OrbitController } from "../camera/orbit-controller";
+import { ViewCamera } from "../camera/view-camera";
 import type { AtmValues } from "../look/atmosphere";
 import {
 	ATM_BLOCK,
@@ -36,7 +36,7 @@ import {
 	SKY_VS,
 	skyRayMatrix,
 } from "../look/glsl/atmosphere";
-import { poseBasis } from "../pose";
+import { poseBasis, poseQuaternion } from "../pose";
 import { LOG_DEPTH_FAR } from "./terrain-layer";
 
 export type WorldViewState = {
@@ -95,7 +95,7 @@ export class WorldViewport extends Viewport {
 	}
 }
 
-// driven by WorldCamera (three's OrbitControls), not by a deck controller
+// driven by WorldCamera (an OrbitController), not by a deck controller
 // biome-ignore lint/suspicious/noExplicitAny: see PhotoView
 export class WorldView extends View<any, any> {
 	static displayName = "WorldView";
@@ -116,32 +116,25 @@ export class WorldView extends View<any, any> {
 type Flight = {
 	t0: number;
 	dur: number;
-	fromPos: THREE.Vector3;
-	fromQ: THREE.Quaternion;
+	fromPos: Vector3;
+	fromQ: Quaternion;
 	fromFov: number;
-	toQ: THREE.Quaternion;
+	toQ: Quaternion;
 	held?: boolean;
 };
 
-/** Photo camera orientation as three's applyPose sets it (engine.ts this.cam). */
-export function poseQuaternion(p: Pose) {
-	const { forward, right, up } = poseBasis(p);
-	const m = new THREE.Matrix4().makeBasis(right, up, forward.clone().negate());
-	return new THREE.Quaternion().setFromRotationMatrix(m);
-}
-
 /**
- * engine.ts's world camera: OrbitControls on the canvas, three's initial framing (2.5 km behind
- * and 1.4 km above the photographer, looking 3 km along the photo), and the fly-in tween.
- * `tick()` advances damping / the flight; it returns true when the camera moved.
+ * The world camera: an OrbitController on the canvas, the initial framing (2.5 km behind and 1.4 km
+ * above the photographer, looking 3 km along the photo), and the fly-in tween. `tick()` advances
+ * damping / the flight; it returns true when the camera moved.
  */
 export class WorldCamera {
-	readonly cam = new THREE.PerspectiveCamera(55, 1, 5, 600000);
-	controls?: OrbitControls;
+	readonly cam = new ViewCamera(55, 1, 5, 600000);
+	controls?: OrbitController;
 	flight?: Flight;
 	/** style.world.frame.planeOpacity (classic 0.95): the photo plane's opacity at rest. */
 	planeOpacity = 0.95;
-	/** engine.ts photoPlane opacity (planeOpacity, fading out during the flight). */
+	/** The photo plane's opacity now (planeOpacity at rest, fading out during the flight). */
 	photoPlaneOpacity = 0.95;
 	private last = new Float64Array(8);
 
@@ -152,32 +145,26 @@ export class WorldCamera {
 
 	setAspect(a: number) {
 		this.cam.aspect = a;
-		this.cam.updateProjectionMatrix();
 	}
 
-	/** engine.ts enterWorld (camera + controls part). */
-	enter(pose: Pose, eye: THREE.Vector3) {
+	/** Frame the photographer at `eye` (camera + controls part of entering the world view). */
+	enter(pose: Pose, eye: Vec3) {
 		this.flight = undefined;
 		this.photoPlaneOpacity = this.planeOpacity;
 		const y = (pose.yaw * Math.PI) / 180;
-		const forward = new THREE.Vector3(Math.sin(y), Math.cos(y), 0);
+		const forward = new Vector3(Math.sin(y), Math.cos(y), 0);
 		// start behind and above the photographer, looking along the photo direction
 		this.cam.fov = 55;
-		this.cam.updateProjectionMatrix();
-		this.cam.up.set(0, 0, 1);
 		this.cam.position
 			.copy(eye)
 			.addScaledVector(forward, -2500)
-			.add(new THREE.Vector3(0, 0, 1400));
-		const target = eye.clone().addScaledVector(forward, 3000);
-		target.z = eye.z - 200;
+			.add([0, 0, 1400]);
+		const target = new Vector3(eye).addScaledVector(forward, 3000);
+		target.z = eye[2] - 200;
 		this.controls?.dispose();
-		const c = new OrbitControls(this.cam, this.canvas);
+		const c = new OrbitController(this.cam, this.canvas);
 		c.target.copy(target);
-		c.enableDamping = true;
-		c.maxPolarAngle = Math.PI * 0.495;
-		c.screenSpacePanning = false;
-		c.addEventListener("change", this.onChange);
+		c.on("change", this.onChange);
 		c.update();
 		this.controls = c;
 	}
@@ -188,7 +175,7 @@ export class WorldCamera {
 		this.flight = undefined;
 	}
 
-	/** engine.ts flyToPhoto. */
+	/** Fly in to the photo camera over `dur` ms. */
 	flyTo(pose: Pose, dur: number) {
 		if (!this.controls) return;
 		this.controls.enabled = false;
@@ -206,17 +193,17 @@ export class WorldCamera {
 		return !!this.flight;
 	}
 
-	/** engine.ts renderWorld's camera update; true when the camera changed since the last tick. */
-	tick(pose: Pose, eye: THREE.Vector3, photoAspect: number) {
+	/** The per-frame camera update; true when the camera changed since the last tick. */
+	tick(pose: Pose, eye: Vec3, photoAspect: number) {
 		const f = this.flight;
 		if (f && !f.held) {
 			const t = Math.min((performance.now() - f.t0) / f.dur, 1);
 			const e = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 			// arc over the terrain on the way in
-			const pos = f.fromPos.clone().lerp(eye, e);
+			const pos = new Vector3(f.fromPos).lerp(eye, e);
 			pos.z += Math.sin(e * Math.PI) * 600;
 			this.cam.position.copy(pos);
-			this.cam.quaternion.slerpQuaternions(f.fromQ, f.toQ, e);
+			this.cam.quaternion.slerp(f.fromQ, f.toQ, e);
 			// viewport aspect may differ from the photo: fit the photo's frame inside it
 			const fitV = pose.vfov;
 			const vfovForWidth = hfovFromAspect(
@@ -224,7 +211,6 @@ export class WorldCamera {
 				photoAspect / this.cam.aspect,
 			);
 			this.cam.fov = f.fromFov + (Math.max(fitV, vfovForWidth) - f.fromFov) * e;
-			this.cam.updateProjectionMatrix();
 			this.photoPlaneOpacity = this.planeOpacity * (1 - e);
 			if (t >= 1) {
 				f.held = true;
@@ -246,9 +232,9 @@ export class WorldCamera {
 	}
 
 	/** `focusOn`: the point whose pixel sizes should be exact (the photo camera). */
-	viewState(focusOn?: THREE.Vector3): WorldViewState {
-		const f = new THREE.Vector3(0, 0, -1).applyQuaternion(this.cam.quaternion);
-		const u = new THREE.Vector3(0, 1, 0).applyQuaternion(this.cam.quaternion);
+	viewState(focusOn?: Vec3): WorldViewState {
+		const f = this.cam.forward();
+		const u = this.cam.up();
 		const p = this.cam.position;
 		return {
 			eye: [p.x, p.y, p.z],
@@ -266,7 +252,7 @@ export class WorldCamera {
 
 // ---------- the atmospheric sky (style.world.sky.mode 'atmosphere') ----------
 
-/** engine.ts makeSkyMesh: look/glsl atmSky on a fullscreen triangle, drawn first, no depth. */
+/** look/glsl atmSky on a fullscreen triangle, drawn first, no depth. */
 export class AtmSkyLayer extends Layer<LayerProps & { atm: AtmValues }> {
 	static layerName = "AtmSkyLayer";
 	declare state: { model?: Model };
@@ -333,7 +319,7 @@ type GizmoProps = LayerProps & {
 	eye: [number, number, number];
 	aspect: number;
 	image: HTMLImageElement | null;
-	/** Photo plane opacity (three: 0.95, fading during the flight). */
+	/** Photo plane opacity (0.95 at rest, fading during the flight). */
 	planeOpacity: number;
 	/** Frustum edges, 0..255 sRGB RGBA (style.world.frame lineColor × lineOpacity). */
 	lineColor?: [number, number, number, number];
@@ -343,7 +329,7 @@ type GizmoProps = LayerProps & {
 };
 
 /**
- * engine.ts buildFrustum: the photo on a plane 150 m in front of the photo camera, its frustum
+ * The photo on a plane 150 m in front of the photo camera, its frustum
  * edges (white, 0.9) and an 18 m red pin at the eye; depth-tested against the terrain.
  */
 export class WorldGizmoLayer extends CompositeLayer<GizmoProps> {
@@ -423,7 +409,7 @@ export class WorldGizmoLayer extends CompositeLayer<GizmoProps> {
 		const pinColor = this.props.pinColor ?? [255, 85, 51, 255];
 		const pinR = this.props.pinRadiusM ?? 18;
 		const { segs, bounds, eyeData } = this.gizmoGeometry(pose, eye, aspect);
-		// three's 18 m sphere as a billboard disc: deck's pixel sizes hold at the viewport's focal
+		// the pin (18 m across) as a billboard disc: deck's pixel sizes hold at the viewport's focal
 		// distance (WorldViewState.focalDistance = the camera's distance to the pin)
 		const vp = this.context.viewport as Viewport & { focalDistance?: number };
 		const pxPerM =

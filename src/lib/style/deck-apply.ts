@@ -2,20 +2,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// ViewStyle → deck.gl uniform values for the deck backend (styling.md §2.6, chunk 7). The deck
-// counterpart of the removed three-apply.ts (three.js renderer), with no three.js import: it produces plain numbers the deck layers
+// ViewStyle → deck.gl uniform values for the deck backend (styling.md §2.6, chunk 7). It produces plain numbers the deck layers
 // (src/lib/deck/terrain-layer.ts, composite-shader.ts, trail-layer.ts, world-view.ts) put in their
 // uniform blocks / layer props.
 //
-// Colour conventions: the removed three-apply.ts's, kept so a preset looks the same in both deck engines.
+// Colour conventions: kept identical in both deck engines so a preset looks the same.
 //  - ramp stops and solid contour colours: sRGB, mixed in sRGB, then the shader applies pow(2.2);
-//  - haze: what THREE.Color.set(hex) stores (sRGB → linear), then the shader's toLinear on top (the
+//  - haze: the hex converted sRGB → linear, then the shader's toLinear on top (the
 //    legacy double linearisation, styling.md §2.3, kept on purpose in both renderers);
 //  - "raw" slots (casing, ridges, hairline, band line, imagery / projection tint, trail colours):
 //    float tuples pass through exactly (the classic literals were linear values), '#hex' strings
 //    are converted sRGB → linear;
-//  - sky, photo-frame lines and pin: displayed sRGB (three's THREE.Color → output encoding round
-//    trip), i.e. the colour itself as 0..255 bytes / CSS.
+//  - sky, photo-frame lines and pin: displayed sRGB, i.e. the colour itself as 0..255 bytes / CSS.
 
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { ViewMode } from "#/lib/settings";
@@ -30,7 +28,7 @@ import { type RelValues, reliefValues } from "../look/relief/field";
 import { type SunContext, sunDirFromStyle } from "../look/sun";
 import { waterWavesOn } from "../look/water/waves";
 import {
-	hexToLinearLikeThree,
+	hexToLinearHaze,
 	hexToRgb01,
 	hexToRgba01,
 	srgbToLinear,
@@ -47,7 +45,7 @@ import type {
 
 export type DeckStyleMode = ViewMode;
 
-/** A "raw" shader colour: float tuples exact, hex strings sRGB → linear (as the removed three-apply.ts rawColor). */
+/** A "raw" shader colour: float tuples exact, hex strings sRGB → linear . */
 export function rawColor(c: Hex): Vec3 {
 	const [r, g, b] = hexToRgb01(c);
 	return typeof c === "string"
@@ -105,7 +103,7 @@ export type DeckTerrainStyle = {
 	sunDir: Vec3;
 	/** ambient, direct */
 	shade: [number, number];
-	/** linear, like THREE.Color(hex); the shader re-linearises it (see header) */
+	/** linear (the hex converted sRGB → linear); the shader re-linearises it (see header) */
 	hazeColor: Vec3;
 	/** uHaze: overlay 1, replace / world from the style */
 	haze: number;
@@ -163,7 +161,7 @@ const IDENTITY_IMAGERY: ImageryAdjust = {
 	tintAmount: 0,
 };
 
-/** The removed three-apply.ts applyTerrainLook + applyLayerStyle(u, style, mode) + applyAtmosphereLook, as values. */
+/** The terrain look, layer style (u, style, mode) and atmosphere look, as values. */
 export function deckTerrainStyle(
 	style: ViewStyle,
 	mode: DeckStyleMode,
@@ -219,7 +217,7 @@ export function deckTerrainStyle(
 	return {
 		sunDir,
 		shade: [t.ambient, t.direct],
-		hazeColor: hexToLinearLikeThree(t.hazeColor),
+		hazeColor: hexToLinearHaze(t.hazeColor),
 		haze:
 			mode === "replace"
 				? style.replace.haze
@@ -286,7 +284,7 @@ export function deckElevRange(
 
 // ---- composite (overlay / replace) ---------------------------------------------------------------
 
-/** The composite shader's style uniforms (composite-shader.ts), the removed three-apply.ts applyCompositeStyle. */
+/** The composite shader's style uniforms (composite-shader.ts). */
 export type DeckCompositeStyle = {
 	ridgeInner: Vec3;
 	ridgeSky: Vec3;
@@ -363,7 +361,7 @@ export function trailPalette(style: ViewStyle): Vec3[] {
 }
 
 export type DeckWorldStyle = {
-	/** CSS colour behind the world view (three: scene.background) */
+	/** CSS colour behind the world view  */
 	sky: string;
 	planeOpacity: number;
 	lineColor: [number, number, number, number];
