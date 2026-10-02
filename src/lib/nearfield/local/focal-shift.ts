@@ -157,6 +157,99 @@ export function solveFocalShift(
 	return { focal: cur.focal, shift };
 }
 
+/** Residual cost 0.5·|f·xy/(z+s) − uv|² of a fixed focal at a shift (Infinity when z+s ≤ 0 somewhere). */
+function fixedFocalCost(
+	uv: Float64Array,
+	xyz: Float64Array,
+	n: number,
+	focal: number,
+	shift: number,
+): number {
+	let cost = 0;
+	for (let k = 0; k < n; k++) {
+		const w = xyz[3 * k + 2] + shift;
+		if (!(w > 0)) return Number.POSITIVE_INFINITY;
+		const ex = (focal * xyz[3 * k]) / w - uv[2 * k];
+		const ey = (focal * xyz[3 * k + 1]) / w - uv[2 * k + 1];
+		cost += ex * ex + ey * ey;
+	}
+	return 0.5 * cost;
+}
+
+/**
+ * The z shift alone for a KNOWN focal (a camera whose field of view is known: /live, EXIF): min over
+ * shift of |focal · xy / (z + shift) − uv|, damped Gauss–Newton from shift 0 with the same pole guard as
+ * solveFocalShift. At low token counts the net's own focal is poor (26% median at 256 tokens), the shift
+ * is far better conditioned once the focal is fixed.
+ */
+export function solveShiftKnownFocal(
+	uv: Float64Array,
+	xyz: Float64Array,
+	n: number,
+	focal: number,
+): { focal: number; shift: number } {
+	if (n < 2 || !(focal > 0)) return { focal: focal > 0 ? focal : 1, shift: 0 };
+	let shift = 0;
+	let cost = fixedFocalCost(uv, xyz, n, focal, shift);
+	if (!Number.isFinite(cost)) return { focal, shift: 0 };
+	let lambda = 1e-3;
+	for (let it = 0; it < 100; it++) {
+		let jtj = 0;
+		let jtr = 0;
+		for (let k = 0; k < n; k++) {
+			const w = xyz[3 * k + 2] + shift;
+			const rx = (focal * xyz[3 * k]) / w - uv[2 * k];
+			const ry = (focal * xyz[3 * k + 1]) / w - uv[2 * k + 1];
+			const jx = (-focal * xyz[3 * k]) / (w * w);
+			const jy = (-focal * xyz[3 * k + 1]) / (w * w);
+			jtj += jx * jx + jy * jy;
+			jtr += jx * rx + jy * ry;
+		}
+		if (!(jtj > 0)) break;
+		let accepted = false;
+		for (let tries = 0; tries < 30; tries++) {
+			const step = -jtr / (jtj * (1 + lambda));
+			const next = fixedFocalCost(uv, xyz, n, focal, shift + step);
+			if (next <= cost) {
+				const gain = cost - next;
+				shift += step;
+				cost = next;
+				lambda = Math.max(1e-9, lambda / 3);
+				accepted = true;
+				if (
+					gain <= 1e-10 * Math.max(cost, 1e-30) ||
+					Math.abs(step) < 1e-9 * Math.max(1, Math.abs(shift))
+				)
+					return { focal, shift };
+				break;
+			}
+			lambda *= 4;
+		}
+		if (!accepted) break;
+	}
+	return { focal, shift };
+}
+
+/**
+ * MoGe's focal (relative to half the image diagonal) of a pinhole camera with vertical field of view
+ * `vfovDegrees` on a `width` × `height` image: the inverse of intrinsicsFromFocal's fy.
+ */
+export function focalFromVfov(
+	vfovDegrees: number,
+	width: number,
+	height: number,
+): number {
+	const a = width / height;
+	const d = Math.sqrt(1 + a * a);
+	return 1 / (Math.tan((vfovDegrees * Math.PI) / 360) * d);
+}
+
+/** MoGe's focal from a normalised fy (intrinsicsFromFocal / geom.intrinsicsFromPose: fy = 0.5 / tan(vfov / 2)). */
+export function focalFromFy(fy: number, width: number, height: number): number {
+	const a = width / height;
+	return (2 * fy) / Math.sqrt(1 + a * a);
+}
+
 /** Normalised intrinsics from MoGe's focal (relative to half the image diagonal); centre (0.5, 0.5). */
 export function intrinsicsFromFocal(
 	focal: number,

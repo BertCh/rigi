@@ -12,16 +12,27 @@
 //   every frame      the video frame → a texture → LiveNearField.refreshColour (between depth runs)
 //   once             after the first depth run: read the outputs, solve focal / shift and fit the anchor
 //                    against the DEM range grid (LiveNearField.calibrate); depth runs are skipped until then
-// WebGL2: unavailable (no setNearFieldLive; the readback bridge exists for the session but is not wired
-// here). All of it is browser-only; the pure parts are nearfield/live/video-input.ts and schedule.ts.
+// Poses: every depth run is stamped with the camera and video time of the frame it began on (DepthRunLedger)
+// and lifted with that camera when it finishes, so a moving phone lifts each run where the net saw it.
+// Focal: the camera's known vfov (the net's own focal is ~26% off at 256 tokens); only the shift is solved.
+// Moving camera: when the eye moved or the yaw changed > 30° since the calibration, the next depth run's
+// outputs refit the shift / anchor and the DEM grid (async, never on the frame path).
+// WebGL2 (deck engine, no setNearFieldLive): depth still runs on the compute sidecar device, and
+// LiveSplatBridge reads the lift records back at ≤ 2 Hz into setNearField ("low rate").
+// All of it is browser-only; the pure parts are nearfield/live/video-input.ts, schedule.ts and runs.ts.
 import { type Buffer, type Device, Texture } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { intrinsicsFromPose, sampleDemGrid } from "#/lib/nearfield/geom";
 import { camToEnuMatrix } from "#/lib/nearfield/lift";
 import {
+	type CalibrationPose,
+	DepthRunLedger,
+	FALLBACK_MAX_HZ,
 	LiveNearField,
+	LiveSplatBridge,
 	liveDepthGrid,
 	rgbaToPlanes,
+	shouldRecalibrate,
 } from "#/lib/nearfield/live";
 import {
 	DEPTH_LIVE_PRESETS,
@@ -45,6 +56,7 @@ export type LiveStepHost = Pick<
 	| "geometryReady"
 	| "sampleAt"
 	| "setNearFieldLive"
+	| "setNearField"
 > & {
 	nearFieldDemRange?(
 		width: number,
@@ -62,15 +74,30 @@ export type LiveStepOptions = {
 
 const PRESET = DEPTH_LIVE_PRESETS.liveFast;
 
-/** Why Step Inside is not available on this backend (null = it is), for the disabled toggle. */
+/** Frames between depth runs when the splats go through the ≤ 2 Hz readback (about 30 fps / 2 Hz). */
+const READBACK_DEPTH_EVERY = Math.round(30 / FALLBACK_MAX_HZ);
+
+/**
+ * Why Step Inside is not available on this backend (null = it is), for the disabled toggle. The WebGPU
+ * engine draws the splats directly; the WebGL2 engine needs a WebGPU compute device for the depth net and
+ * shows the splats at a low rate through the readback bridge.
+ */
 export function liveStepUnavailableReason(
 	backend: string,
 	host: Pick<LiveStepHost, "onRender"> &
-		Partial<Pick<LiveStepHost, "setNearFieldLive">>,
+		Partial<Pick<LiveStepHost, "setNearFieldLive" | "setNearField">>,
+	hasWebGpu: boolean = typeof navigator !== "undefined" && "gpu" in navigator,
 ): string | null {
-	if (backend !== "webgpu" || !host.setNearFieldLive)
-		return "Needs the WebGPU renderer";
-	return null;
+	if (backend === "webgpu" && host.setNearFieldLive) return null;
+	if (hasWebGpu && host.setNearField) return null;
+	return "Needs WebGPU";
+}
+
+/** Status text: the WebGL2 path is a low-rate readback. */
+export function liveStepOnMessage(host: Partial<LiveStepHost>): string {
+	return host.setNearFieldLive
+		? "Step Inside (beta)"
+		: "Step Inside (beta, low rate)";
 }
 
 /** Lazily built live Step Inside session; `stop()` releases the GPU objects. */
@@ -87,11 +114,17 @@ export class LiveStep {
 	private lastOut: DepthNetOutput | null = null;
 	private grid: ReturnType<typeof liveDepthGrid> | null = null;
 	private inFlight = false;
-	private ready: { z: Buffer; mask: Buffer; metricScale: Buffer } | null = null;
-	/** a depth run finished since the last lift */
-	private fresh = false;
+	private readonly runs = new DepthRunLedger<{
+		z: Buffer;
+		mask: Buffer;
+		metricScale: Buffer;
+	}>();
+	private bridge: LiveSplatBridge | null = null;
 	private calibrating = false;
 	private calibrated = false;
+	/** where the DEM grid and anchor were solved (shouldRecalibrate compares the live pose against it) */
+	private calibratedAt: CalibrationPose | null = null;
+	private refitPending = false;
 
 	constructor(private readonly opts: LiveStepOptions) {}
 
@@ -127,25 +160,38 @@ export class LiveStep {
 			device,
 			width: grid.width,
 			height: grid.height,
-			schedule: { depthEvery: this.opts.depthEvery ?? 4, refitEvery: 60 },
+			// the camera's field of view is known: solve only the shift (the net's focal is poor at 256 tokens)
+			focalSource: "camera",
+			// the WebGL2 bridge needs the lift records read back (48 B per slot)
+			writeCloud: !host.setNearFieldLive,
+			schedule: {
+				depthEvery:
+					this.opts.depthEvery ??
+					(host.setNearFieldLive ? 4 : READBACK_DEPTH_EVERY),
+				refitEvery: Number.POSITIVE_INFINITY,
+			},
 		});
-		host.setNearFieldLive?.(this.live.source);
+		this.bridge = new LiveSplatBridge(host, this.live, {
+			hz: FALLBACK_MAX_HZ,
+		});
+		this.bridge.start();
 		this.unsubscribe = host.onRender(() => this.tick());
-		onState("on", "Step Inside (beta)");
+		onState("on", liveStepOnMessage(host));
 	}
 
 	stop() {
 		this.disposed = true;
 		this.unsubscribe?.();
 		this.unsubscribe = null;
-		this.opts.host.setNearFieldLive?.(null);
+		this.bridge?.stop();
+		this.bridge = null;
 		this.live?.dispose();
 		this.live = null;
 		this.videoTexture?.destroy();
 		this.videoTexture = null;
 		this.net?.dispose();
 		this.net = null;
-		this.ready = null;
+		this.runs.discard();
 		this.opts.onState("off", "");
 	}
 
@@ -180,25 +226,43 @@ export class LiveStep {
 		const live = this.live;
 		if (this.disposed || !live || !this.net) return;
 		const { host } = this.opts;
-		const pose = host.pose;
-		const eye = host.eye;
-		live.setCamera({
-			camToEnu: camToEnuMatrix(pose),
-			eye: [eye.x, eye.y, eye.z],
-			K: intrinsicsFromPose(pose, host.aspect),
-		});
+		const camera = this.currentCamera();
+		live.setCamera(camera);
 		const texture = this.updateVideoTexture();
+		if (this.calibratedAt && !this.refitPending) {
+			const pose = host.pose;
+			const stale = shouldRecalibrate(this.calibratedAt, {
+				eye: camera.eye,
+				yaw: pose.yaw,
+			});
+			if (stale) this.refitPending = true;
+		}
 		// a due depth frame consumes the finished run (the schedule defers it until one is ready)
 		if (
 			live.schedule.isDepthDue() &&
 			!this.inFlight &&
-			!this.fresh &&
+			!this.runs.peek() &&
 			!this.calibrating
 		)
 			void this.depthRun();
-		const inputs = this.fresh && live.calibration ? this.ready : null;
-		const plan = live.frame(() => inputs, texture);
-		if (plan.runDepth) this.fresh = false;
+		// the run is lifted with the camera it was started on, not the one of this frame
+		const ready = live.calibration ? this.runs.peek() : null;
+		const plan = live.frame(
+			() => (ready ? { ...ready.outputs, camera: ready.camera } : null),
+			texture,
+		);
+		if (plan.runDepth) this.runs.take();
+	}
+
+	private currentCamera() {
+		const { host } = this.opts;
+		const pose = host.pose;
+		const eye = host.eye;
+		return {
+			camToEnu: camToEnuMatrix(pose),
+			eye: [eye.x, eye.y, eye.z] as [number, number, number],
+			K: intrinsicsFromPose(pose, host.aspect),
+		};
 	}
 
 	/** Video frame → net input → compiled forward (outputs stay on the GPU). */
@@ -213,6 +277,12 @@ export class LiveStep {
 		const { video, host } = this.opts;
 		if (!video.videoWidth || video.readyState < 2) return;
 		this.inFlight = true;
+		// the pose and video frame this run sees (the net input is drawn from this frame, synchronously)
+		const stamp = this.runs.begin(
+			this.currentCamera(),
+			video.currentTime,
+			performance.now(),
+		);
 		try {
 			const ctx = canvas.getContext("2d", { willReadFrequently: true });
 			if (!ctx) return;
@@ -237,12 +307,11 @@ export class LiveStep {
 				mask: bufferOf.call(nn, out.mask),
 				metricScale: bufferOf.call(nn, out.metricScale),
 			};
-			if (!this.calibrated) {
+			if (!this.calibrated || this.refitPending) {
 				if (!this.calibrating) void this.calibrate(out, host);
-				return;
+				if (!this.calibrated) return;
 			}
-			this.ready = buffers;
-			this.fresh = true;
+			this.runs.finish(stamp, buffers);
 		} catch (e) {
 			console.warn("[live step] depth run failed", e);
 			this.opts.onState("error", "Depth failed");
@@ -251,7 +320,11 @@ export class LiveStep {
 		}
 	}
 
-	/** One-time focal / shift / anchor solve from one read-back of the first outputs. */
+	/**
+	 * Shift / anchor solve (the focal is the camera's) and DEM grid from one read-back of a run's outputs:
+	 * the first one gates the first lift; later ones (the eye moved or the yaw changed > 30°) are refits
+	 * that keep the previous calibration when the new one is unusable. Async, never on the frame path.
+	 */
 	private async calibrate(out: DepthNetOutput, host: LiveStepHost) {
 		const live = this.live;
 		const nn = this.nn;
@@ -273,7 +346,8 @@ export class LiveStep {
 					((u: number, v: number) => host.sampleAt(u, v)?.range ?? null);
 				live.setDemGrid(sampleDemGrid(grid.width, grid.height, demAt));
 			}
-			live.calibrate({
+			const here = this.currentCamera();
+			const arrays = {
 				width: grid.width,
 				height: grid.height,
 				z,
@@ -283,12 +357,17 @@ export class LiveStep {
 				mask64,
 				focalGrid: FOCAL_GRID,
 				metricScale: scale[0],
-			});
+			};
+			if (this.calibrated) await live.refit(async () => arrays);
+			else live.calibrate(arrays);
+			this.calibratedAt = { eye: here.eye, yaw: host.pose.yaw };
+			this.refitPending = false;
 			this.calibrated = true;
 		} catch (e) {
 			console.warn("[live step] calibration failed", e);
 			this.opts.onState("error", "Calibration failed");
 		} finally {
+			this.refitPending = false;
 			this.calibrating = false;
 		}
 	}

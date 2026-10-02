@@ -34,6 +34,8 @@ export type LiveDepthInputs = {
 	normal?: Buffer | null;
 	/** [1] metric scale (DepthNetOutput.metricScale), read in-kernel when the session uses the live scale */
 	metricScale?: Buffer | null;
+	/** The camera of the video frame the net ran on (runs.ts DepthRunLedger): the lift uses it instead of the latest setCamera. */
+	camera?: LiveCameraState;
 };
 
 export type LiveCameraState = {

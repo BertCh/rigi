@@ -280,7 +280,9 @@ export function LiveView() {
 										? "Loading depth model"
 										: s.step === "error"
 											? `Step Inside: ${s.stepMessage}`
-											: "Step Inside (beta)"}
+											: s.backend === "webgpu"
+												? "Step Inside (beta)"
+												: "Step Inside (beta, low rate)"}
 							</button>
 						)}
 						<button

@@ -52,3 +52,15 @@ Batching saves about 5 to 8% at 1200 and 256 tokens and is within noise at 384 a
 - Batched is not the default: bit-identical and a few percent faster, but it duplicates the head weights on the GPU (concatenated copies); flip it for the still path if that memory is acceptable.
 - Real gains need the runtime side (lower fixed cost per graph, faster grouped conv, f16 activations) or a smaller model; depth every N frames with warped splats remains the route to 20+ fps.
 - Browser-unverified.
+
+## Known focal at liveFast (unit live-step, measured over Dawn, 24 photos, 1024 px)
+`depth-live.bench.ts --only focal`: liveFast outputs composed with the net's own focal vs the camera's EXIF vfov (`composeDepth` `knownFocal`, only the shift is solved), against the 1200-token q8 model (not ground truth). The 1200-token focal itself differs from EXIF by 11.6% median (worst 41%), so depth ratios to it cannot show the focal gain; the 3D position error (back-projected with each cloud's own intrinsics, median-scale aligned, relative to range) can.
+
+| focal | depth med (aligned) | depth p90 (aligned) | 3D position med | focal vs EXIF med |
+|---|---|---|---|---|
+| net | 12.2% | 45.8% | 15.1% | 31% |
+| EXIF | 12.2% | 47.6% | 12.3% | 0 |
+| EXIF +5% / -5% | 12.8% / 12.9% | 47.9% / 47.3% | 15.4% / 14.8% | 5% |
+| 1200-token focal (oracle) | 11.3% | 44.2% | 11.3% | 12% |
+
+A known focal removes the 31% focal error and recovers most of the lateral (3D) error; a 5% focal error already costs it. The z-depth error is the token count's, not the focal's.

@@ -30,7 +30,7 @@ import { fitAnchor } from "../anchor";
 import { gridDemRange } from "../geom";
 import { quatFromMatrix } from "../lift";
 import { composeDepth, type DepthNetArrays } from "../local/compose";
-import { intrinsicsFromFocal } from "../local/focal-shift";
+import { focalFromFy, intrinsicsFromFocal } from "../local/focal-shift";
 import {
 	LIFT_DEFAULTS,
 	LIFT_RECORD_WORDS,
@@ -84,6 +84,12 @@ export type LiveNearFieldOptions = {
 	writeCloud?: boolean;
 	/** DEM range grid on the depth grid (geom.sampleDemGrid; NaN = no terrain). Without it every in-range cell is Object. */
 	demGrid?: Float32Array | null;
+	/**
+	 * Where the focal comes from: "net" (default, the still-photo solve of focal and shift) or "camera":
+	 * the focal of the camera passed to setCamera (a live camera's known field of view; the net's own
+	 * focal is ~26% off at 256 tokens), solving only the z shift.
+	 */
+	focalSource?: "net" | "camera";
 };
 
 export type LiveCalibration = {
@@ -241,7 +247,14 @@ export class LiveNearField {
 		opts: { anchor?: Parameters<typeof fitAnchor>[3] } = {},
 	): LiveCalibration {
 		if (!this.camera) throw new Error("live: setCamera before calibrate");
-		const depth = composeDepth(arrays, "live");
+		const knownFocal =
+			this.opts.focalSource === "camera"
+				? focalFromFy(this.camera.K.fy, this.width, this.height)
+				: undefined;
+		const depth = composeDepth(
+			knownFocal ? { ...arrays, knownFocal } : arrays,
+			"live",
+		);
 		const K =
 			depth.intrinsicsNorm ??
 			intrinsicsFromFocal(depth.focal, this.width, this.height);
@@ -288,7 +301,8 @@ export class LiveNearField {
 
 	private prmWords(depthInputs: LiveDepthInputs | null): ArrayBuffer {
 		const cal = this.calibration;
-		const cam = this.camera;
+		// a depth run lifts with the camera of the frame the net saw (runs.ts), not the latest one
+		const cam = depthInputs?.camera ?? this.camera;
 		if (!cal || !cam)
 			throw new Error("live: calibrate and setCamera before a depth run");
 		const p = { ...LIFT_DEFAULTS, ...this.opts.lift };

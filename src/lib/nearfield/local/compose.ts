@@ -13,6 +13,7 @@ import {
 	focalShiftSamples,
 	intrinsicsFromFocal,
 	solveFocalShift,
+	solveShiftKnownFocal,
 } from "./focal-shift";
 
 export type DepthNetArrays = {
@@ -28,6 +29,8 @@ export type DepthNetArrays = {
 	points64: Float32Array;
 	mask64: Float32Array;
 	focalGrid?: readonly [number, number];
+	/** MoGe focal of a camera whose field of view is known (focalFromVfov): only the shift is solved. */
+	knownFocal?: number;
 	metricScale: number;
 };
 
@@ -38,7 +41,10 @@ export function composeDepth(
 ): NearFieldDepth & { focal: number; shift: number } {
 	const { width: W, height: H } = a;
 	const s = focalShiftSamples(a.points64, a.mask64, W, H, a.focalGrid);
-	const { focal, shift } = solveFocalShift(s.uv, s.xyz, s.n);
+	const { focal, shift } =
+		a.knownFocal && a.knownFocal > 0
+			? solveShiftKnownFocal(s.uv, s.xyz, s.n, a.knownFocal)
+			: solveFocalShift(s.uv, s.xyz, s.n);
 	const n = W * H;
 	const depth = new Float32Array(n);
 	const valid = new Uint8Array(n);

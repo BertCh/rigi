@@ -8,7 +8,7 @@
 // the scale), mask IoU, focal. Photos are pre-decoded like depth-weights-eval.ts: `--dir` holds
 // index.json ([{ name, W, H }]) and <name>.rgb (RGB8 at W × H); each tier resizes (bilinear) on the CPU.
 //   DAWN_DIR=/tmp/dawn npx tsx scripts/nearfield/depth-live.bench.ts --dir <dir> [--runs 7] [--ref fp16|q8]
-//     [--quality-photos 24] [--only parity|time|quality] [--json out.json]
+//     [--quality-photos 24] [--only parity|time|quality|focal] [--json out.json]
 
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -23,6 +23,7 @@ import {
 	type MogeWeights,
 	tokenGrid,
 } from "../../src/lib/nearfield/local/depth-net";
+import { focalFromVfov } from "../../src/lib/nearfield/local/focal-shift";
 import { GpuNn } from "../../src/lib/nn/gpu/gpu-nn";
 import { dawnDevice } from "../nn/dawn";
 
@@ -44,7 +45,7 @@ if (!device) {
 }
 const nn = new GpuNn(device);
 const MODELS = path.resolve(import.meta.dirname, "../../public/models");
-type Photo = { name: string; W: number; H: number };
+type Photo = { name: string; W: number; H: number; vfov?: number };
 const photos = (
 	JSON.parse(readFileSync(path.join(dir, "index.json"), "utf8")) as Photo[]
 ).slice(0, Number(arg("--quality-photos") ?? 24));
@@ -341,6 +342,136 @@ if (!only || only === "quality") {
 		console.log(rows[rows.length - 1]);
 	}
 	result.quality = rows;
+}
+
+if (only === "focal") {
+	// liveFast with the net's own focal vs the camera's known focal (EXIF vfov), against the 1200-token q8
+	// model. Errors are the depth ratio to the reference over valid pixels in both: raw (what the splats
+	// see, the DEM anchor then fits scale / shift on top) and after median-scale alignment.
+	const refNet = await netFor(refWeights);
+	const refCfg = cfg(refWeights, 1200, 4, false, false);
+	const preset = DEPTH_LIVE_PRESETS.liveFast;
+	const liveCfg = {
+		...cfg(
+			preset.weights,
+			preset.tokens,
+			preset.headStopLevel,
+			preset.batchedHeads,
+			preset.normals,
+		),
+	};
+	const liveNet = await netFor(liveCfg.weights);
+	type Composed = ReturnType<typeof composeDepth>;
+	const arrays = async (net: MogeDepthNet, p: Photo, c: Config) => {
+		const { image, o } = await forward(net, p, c);
+		const [z, mask, points64, mask64, scale] = await Promise.all([
+			nn.read(o.z),
+			nn.read(o.mask),
+			nn.read(o.points64),
+			nn.read(o.mask64),
+			nn.read(o.metricScale),
+		]);
+		release(image, o);
+		return {
+			width: p.W,
+			height: p.H,
+			z,
+			mask,
+			normal: null,
+			points64,
+			mask64,
+			focalGrid: FOCAL_GRID,
+			metricScale: scale[0],
+		};
+	};
+	const variants: [
+		string,
+		(exif: number, ref: number) => number | undefined,
+	][] = [
+		["net focal", () => undefined],
+		["EXIF focal", (exif) => exif],
+		["EXIF focal +5%", (exif) => exif * 1.05],
+		["EXIF focal -5%", (exif) => exif / 1.05],
+		["EXIF focal +10%", (exif) => exif * 1.1],
+		["reference focal", (_e, ref) => ref],
+	];
+	const per = new Map<string, Record<string, number[]>>();
+	const refFocalVsExif: number[] = [];
+	for (const p of photos) {
+		if (!p.vfov) continue;
+		const ref = composeDepth(await arrays(refNet, p, refCfg), "ref");
+		const exif = focalFromVfov(p.vfov, p.W, p.H);
+		refFocalVsExif.push(Math.abs(ref.focal / exif - 1));
+		const live = await arrays(liveNet, p, liveCfg);
+		for (const [label, pick] of variants) {
+			const known = pick(exif, ref.focal);
+			const b: Composed = composeDepth(
+				{ ...live, ...(known ? { knownFocal: known } : {}) },
+				"live",
+			);
+			const raw: number[] = [];
+			const idx: number[] = [];
+			for (let k = 0; k < ref.depth.length; k += 3)
+				if (ref.valid[k] && b.valid[k]) {
+					raw.push(b.depth[k] / ref.depth[k]);
+					idx.push(k);
+				}
+			const r0 = quantile(raw, 0.5);
+			// 3D position error: both clouds back-projected with their own intrinsics, the live one scaled by
+			// the median depth ratio, distance relative to the reference range (lateral error shows here)
+			const Ka = ref.intrinsicsNorm as {
+				fx: number;
+				fy: number;
+				cx: number;
+				cy: number;
+			};
+			const Kb = b.intrinsicsNorm as typeof Ka;
+			const pos = idx.map((k) => {
+				const u = ((k % p.W) + 0.5) / p.W;
+				const v = (Math.floor(k / p.W) + 0.5) / p.H;
+				const za = ref.depth[k];
+				const zb = b.depth[k] / r0;
+				const ax = ((u - Ka.cx) / Ka.fx) * za;
+				const ay = ((v - Ka.cy) / Ka.fy) * za;
+				const bx = ((u - Kb.cx) / Kb.fx) * zb;
+				const by = ((v - Kb.cy) / Kb.fy) * zb;
+				return Math.hypot(ax - bx, ay - by, za - zb) / Math.hypot(ax, ay, za);
+			});
+			const row = per.get(label) ?? {
+				raw: [],
+				rawP90: [],
+				med: [],
+				p90: [],
+				focal: [],
+				pos: [],
+			};
+			const rawErr = raw.map((r) => Math.abs(r - 1));
+			const aligned = raw.map((r) => Math.abs(r / r0 - 1));
+			row.raw.push(quantile(rawErr, 0.5));
+			row.rawP90.push(quantile(rawErr, 0.9));
+			row.med.push(quantile(aligned, 0.5));
+			row.p90.push(quantile(aligned, 0.9));
+			row.focal.push(Math.abs(b.focal / exif - 1));
+			row.pos.push(quantile(pos, 0.5));
+			per.set(label, row);
+		}
+	}
+	console.log(
+		`1200-token reference focal vs EXIF: median ${(median(refFocalVsExif) * 100).toFixed(1)}%, worst ${(Math.max(...refFocalVsExif) * 100).toFixed(1)}%`,
+	);
+	const rows = [...per.entries()].map(([label, r]) => ({
+		focal: label,
+		rawMedRel: +median(r.raw).toFixed(4),
+		rawP90Rel: +median(r.rawP90).toFixed(4),
+		alignedMedRel: +median(r.med).toFixed(4),
+		alignedP90Rel: +median(r.p90).toFixed(4),
+		worstAlignedP90: +Math.max(...r.p90).toFixed(4),
+		pos3dMedRel: +median(r.pos).toFixed(4),
+		focalVsExifMedian: +median(r.focal).toFixed(4),
+	}));
+	console.log(`liveFast, ${per.get("net focal")?.med.length} photos`);
+	console.table(rows);
+	result.focal = { refFocalVsExif: median(refFocalVsExif), rows };
 }
 
 const json = arg("--json");
