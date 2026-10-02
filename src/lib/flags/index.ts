@@ -177,6 +177,8 @@ export const FLAG_SCHEMA = {
 	liveVfov: num,
 	/** /live: URL of a recorded clip used as the camera; `<url>.sensors.json` replays sensors (src/lib/live/replay.ts) */
 	liveSource: text,
+	/** /live: offer "Step Inside (beta)", per-frame depth to splats on the GPU (src/components/live/liveStep.ts; WebGPU only) */
+	liveStep: onOff("off"),
 	/** /live: fixed magnetic declination in degrees east; unset = compact WMM model at the eye (src/lib/live/declination.ts) */
 	liveDeclination: num,
 	// appearance: applies live (not a RESTART_FLAG); precedence and the boot script are in ./theme-boot.ts

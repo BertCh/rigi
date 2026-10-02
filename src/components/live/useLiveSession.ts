@@ -40,6 +40,11 @@ import {
 import { loadRegion, type PhotoMeta, photos } from "#/lib/photos";
 import type { PeakLabel } from "#/lib/settings";
 import { createLiveEngine, type LiveEngine } from "./engine";
+import {
+	LiveStep,
+	type LiveStepState,
+	liveStepUnavailableReason,
+} from "./liveStep";
 
 export type StepState = "idle" | "asking" | "ok" | "denied" | "unavailable";
 export type SessionPhase = "idle" | "starting" | "running" | "error";
@@ -62,6 +67,10 @@ export type LiveStatus = {
 	calibrating: boolean;
 	yawOffset: number;
 	frame: { width: number; height: number } | null;
+	/** Step Inside (beta, flag liveStep): the toggle's state; `stepReason` is why it is disabled (null = usable) */
+	step: LiveStepState;
+	stepMessage: string;
+	stepReason: string | null;
 };
 
 const INITIAL: LiveStatus = {
@@ -82,6 +91,9 @@ const INITIAL: LiveStatus = {
 	calibrating: false,
 	yawOffset: 0,
 	frame: null,
+	step: "off",
+	stepMessage: "",
+	stepReason: null,
 };
 
 const LABEL_INTERVAL_MS = 200;
@@ -101,12 +113,20 @@ export function useLiveSession() {
 		(Tracker & { setYawOffset?(deg: number): void }) | null
 	>(null);
 	const lastPoseRef = useRef<TrackedPose | null>(null);
+	const stepRef = useRef<LiveStep | null>(null);
+	const stepContextRef = useRef<{
+		engine: LiveEngine;
+		video: HTMLVideoElement;
+	} | null>(null);
 	const patch = useCallback(
 		(p: Partial<LiveStatus>) => setStatus((s) => ({ ...s, ...p })),
 		[],
 	);
 
 	const stop = useCallback(() => {
+		stepRef.current?.stop();
+		stepRef.current = null;
+		stepContextRef.current = null;
 		disposeRef.current?.();
 		disposeRef.current = null;
 	}, []);
@@ -249,7 +269,10 @@ export function useLiveSession() {
 						forceDeck,
 					});
 					engine = made.engine;
-					patch({ backend: made.backend });
+					patch({
+						backend: made.backend,
+						stepReason: liveStepUnavailableReason(made.backend, made.engine),
+					});
 				} catch (e) {
 					if (forceDeck) throw e;
 					console.warn("[live] WebGPU start failed; retrying with WebGL", e);
@@ -257,6 +280,7 @@ export function useLiveSession() {
 					setTimeout(() => void startRef.current(true), 60);
 					return;
 				}
+				stepContextRef.current = { engine, video };
 				cleanups.push(() => engine.dispose());
 				if (cancelled) return;
 				const regionData = region
@@ -381,6 +405,37 @@ export function useLiveSession() {
 		trackerRef.current?.setYawOffset?.(0);
 		patch({ yawOffset: 0 });
 	}, [patch]);
+	/** Turn live Step Inside (depth to splats on the GPU, WebGPU only) on or off. */
+	const setStepInside = useCallback(
+		async (on: boolean) => {
+			if (!on) {
+				stepRef.current?.stop();
+				stepRef.current = null;
+				return;
+			}
+			const ctx = stepContextRef.current;
+			if (!ctx || stepRef.current) return;
+			const step = new LiveStep({
+				host: ctx.engine,
+				video: ctx.video,
+				onState: (state, message) =>
+					patch({ step: state, stepMessage: message }),
+			});
+			stepRef.current = step;
+			try {
+				await step.start();
+			} catch (e) {
+				console.warn("[live] Step Inside failed to start", e);
+				patch({
+					step: "error",
+					stepMessage: (e as Error)?.message ?? "Failed",
+				});
+				step.stop();
+				if (stepRef.current === step) stepRef.current = null;
+			}
+		},
+		[patch],
+	);
 	const relocalise = useCallback(() => trackerRef.current?.reset(), []);
 
 	return {
@@ -395,5 +450,6 @@ export function useLiveSession() {
 		nudgeYaw,
 		resetCalibration,
 		relocalise,
+		setStepInside,
 	};
 }

@@ -17,7 +17,7 @@
 //   → points: [xy·e^z, e^z]; normal: L2-normalised; mask: sigmoid.
 // The final resize goes straight from the head resolution to the caller's output grid (MoGe resizes to
 // the input image, which the service had decoded at the output grid: same thing).
-import type { Nn, Tensor, Weights } from "#/lib/nn";
+import type { CompiledForward, Nn, Tensor, Weights } from "#/lib/nn";
 
 /** The checkpoint's model config (scripts/models/moge2-vits.py prints it). */
 export const MOGE2_VITS = {
@@ -52,6 +52,45 @@ export type MogeWeights = keyof typeof MOGE2_WEIGHTS;
 
 /** Size of MoGe's focal / shift recovery downsample (recover_focal_shift downsample_size). */
 export const FOCAL_GRID: readonly [number, number] = [64, 64];
+
+/** Per-call options of MogeDepthNet.run; the defaults are the still-photo path. */
+export type DepthRunOptions = {
+	/** run the points / mask / normal heads as one grouped stack (same maths, fewer launches) */
+	batchedHeads?: boolean;
+	/** 4 (default): heads at 16× the token grid; 3: level 4 computed at 8× (approximate, faster) */
+	headStopLevel?: 3 | 4;
+	/** false: skip the normal head even when the weights have it (compose derives normals) */
+	normals?: boolean;
+};
+
+/** A live-tier preset: the weights file, the base-token count the caller resizes to, and run options. */
+export type DepthLivePreset = Required<DepthRunOptions> & {
+	weights: MogeWeights;
+	tokens: number;
+};
+
+/**
+ * Live presets. Measured on Dawn (M3 Pro, noisy): live ≈ 165 ms, liveFast ≈ 117 ms per forward at a
+ * 1024 × 768 output; neither reaches 100 ms. Quality vs the 1200-token model:
+ * reports/depth-live-2026-10-02.md. The caller resizes the photo to tokenGrid(tokens, aspect) · 14.
+ */
+export const DEPTH_LIVE_PRESETS: Record<"live" | "liveFast", DepthLivePreset> =
+	{
+		live: {
+			weights: "q8lite",
+			tokens: 384,
+			headStopLevel: 3,
+			batchedHeads: true,
+			normals: false,
+		},
+		liveFast: {
+			weights: "q8lite",
+			tokens: 256,
+			headStopLevel: 3,
+			batchedHeads: true,
+			normals: false,
+		},
+	};
 
 export type DepthNetOutput = {
 	/** [1, H, W] z of the camera-frame affine point map (shift unknown) */
@@ -162,6 +201,14 @@ type GridConsts = { pos: Tensor; uv: Tensor[] };
 export class MogeDepthNet {
 	private posEmbed: Float32Array | null = null;
 	private consts = new Map<string, GridConsts>();
+	/** head weights concatenated along Cout for the batched stack, keyed by heads + layer */
+	private fused = new Map<string, Tensor>();
+	private fusedReady = new Set<string>();
+	/** persistent forwards (runCompiled) by grid key + output size */
+	private compiled = new Map<
+		string,
+		Promise<CompiledForward<DepthNetOutput>>
+	>();
 
 	constructor(
 		readonly nn: Nn,
@@ -223,6 +270,7 @@ export class MogeDepthNet {
 			];
 			this.consts.delete(k0);
 			nn.dispose([v0.pos, ...v0.uv]);
+			this.dropCompiled(`${k0}|`);
 		}
 		this.consts.set(key, c);
 		return c;
@@ -343,78 +391,186 @@ export class MogeDepthNet {
 		return { features, cls };
 	}
 
-	/** 3×3 conv with replicate padding (padding_mode="replicate"). */
-	private conv3(x: Tensor, name: string): Tensor {
+	/** Layer parameters of `names` (one head, or several fused along Cout for the batched stack). */
+	private param(names: readonly string[], rel: string): Tensor {
+		if (names.length === 1) return this.w(`${names[0]}.${rel}`);
+		const key = `${names.join("+")}:${rel}`;
+		const hit = this.fused.get(key);
+		if (hit) return hit;
+		const t = this.nn.concat(
+			names.map((n) => this.w(`${n}.${rel}`)),
+			0,
+		);
+		this.fused.set(key, t);
+		return t;
+	}
+
+	/** 3×3 conv with replicate padding (padding_mode="replicate"); `groups` > 1 for the batched heads. */
+	private conv3(
+		x: Tensor,
+		names: readonly string[],
+		rel: string,
+		groups = 1,
+	): Tensor {
 		const { nn } = this;
 		return nn.conv2d(
 			nn.pad(x, [1, 1, 1, 1], { mode: "replicate" }),
-			this.w(`${name}.weight`),
-			this.w(`${name}.bias`),
+			this.param(names, `${rel}.weight`),
+			this.param(names, `${rel}.bias`),
+			{ groups },
 		);
 	}
 
-	private conv1(x: Tensor, name: string): Tensor {
-		return this.nn.conv2d(x, this.w(`${name}.weight`), this.w(`${name}.bias`));
+	private conv1(x: Tensor, names: readonly string[], rel: string): Tensor {
+		return this.nn.conv2d(
+			x,
+			this.param(names, `${rel}.weight`),
+			this.param(names, `${rel}.bias`),
+		);
 	}
 
 	/**
 	 * ConvStack.forward (conv_stack.py): per level x = (l ? x : 0) + input_blocks[l](in[l]), the res
-	 * blocks, the output block (identity except where `outLevels` names a 1×1 conv), then the level's
+	 * blocks, the output block (identity except where `outConv` names a 1×1 conv), then the level's
 	 * resampler. Returns every level's output.
+	 *
+	 * `names` more than one: the heads of those prefixes run as ONE stack, group = names.length. The
+	 * first layer of each level reads the shared input, so its weights concatenate along Cout; every
+	 * later layer is a grouped conv over the concatenated channels (exactly the per-head result).
+	 * `last8`: the live shortcut (headStopLevel 3): level 3's resampler skips its 2× upsample and its
+	 * 3×3 conv runs at the lower resolution, so level 4 is computed at 8× (an approximation; the caller
+	 * passes level-4 inputs at the same resolution).
 	 */
 	convStack(
-		prefix: string,
+		prefixes: string | readonly string[],
 		inputs: Tensor[],
 		outConv: number | null,
+		last8 = false,
 	): Tensor[] {
 		const { nn } = this;
+		const names = typeof prefixes === "string" ? [prefixes] : prefixes;
+		const g = names.length;
 		const outs: Tensor[] = [];
 		let x: Tensor | null = null;
 		for (let l = 0; l < 5; l++) {
-			const f = this.conv1(inputs[l], `${prefix}.input_blocks.${l}`);
+			const f = this.conv1(inputs[l], names, `input_blocks.${l}`);
 			let h: Tensor = x ? nn.add(x, f) : f;
 			for (let r = 0; r < MOGE2_VITS.resBlocks[l]; r++) {
-				const p = `${prefix}.res_blocks.${l}.${r}.layers`;
+				const p = `res_blocks.${l}.${r}.layers`;
 				const y = this.conv3(
-					nn.relu(this.conv3(nn.relu(h), `${p}.2`)),
+					nn.relu(this.conv3(nn.relu(h), names, `${p}.2`, g)),
+					names,
 					`${p}.5`,
+					g,
 				);
 				h = nn.add(h, y);
 			}
-			outs.push(
-				l === outConv ? this.conv1(h, `${prefix}.output_blocks.${l}`) : h,
-			);
+			outs.push(l === outConv ? this.outputBlock(h, names, l) : h);
 			if (l < 4) {
-				const p = `${prefix}.resamplers.${l}`;
-				const up =
-					l < 3
-						? nn.convTranspose2d(
-								h,
-								this.w(`${p}.0.weight`),
-								this.w(`${p}.0.bias`),
-								{
-									stride: 2,
-								},
-							)
-						: nn.interpolate(h, {
-								scale: 2,
-								mode: "bilinear",
-								alignCorners: false,
-							});
-				x = this.conv3(up, `${p}.1`);
+				const p = `resamplers.${l}`;
+				let up = h;
+				if (l < 3)
+					up = nn.convTranspose2d(
+						h,
+						this.param(names, `${p}.0.weight`),
+						this.param(names, `${p}.0.bias`),
+						{ stride: 2, groups: g },
+					);
+				else if (!last8)
+					up = nn.interpolate(h, {
+						scale: 2,
+						mode: "bilinear",
+						alignCorners: false,
+					});
+				x = this.conv3(up, names, `${p}.1`, g);
 			}
 		}
 		return outs;
 	}
 
 	/**
+	 * output_blocks.4 (1×1 conv, 32 → 3 or 1). Fused heads have unequal Cout (mask = 1), so a fused
+	 * mask weight is zero-padded to 3 channels and the conv is grouped (the padding channels are 0).
+	 */
+	private outputBlock(h: Tensor, names: readonly string[], l: number): Tensor {
+		const { nn } = this;
+		const rel = `output_blocks.${l}`;
+		if (names.length === 1) return this.conv1(h, names, rel);
+		const [wb, bb] = this.fusedOutputParams(names, rel);
+		return nn.conv2d(h, wb, bb, { groups: names.length });
+	}
+
+	private fusedOutputParams(
+		names: readonly string[],
+		rel: string,
+	): [Tensor, Tensor] {
+		const { nn } = this;
+		const key = `${names.join("+")}:${rel}`;
+		let wb = this.fused.get(`${key}.weight`);
+		let bb = this.fused.get(`${key}.bias`);
+		if (!wb || !bb) {
+			const wParts: Tensor[] = [];
+			const bParts: Tensor[] = [];
+			for (const n of names) {
+				const wt = this.w(`${n}.${rel}.weight`);
+				const bt = this.w(`${n}.${rel}.bias`);
+				const pad = 3 - wt.shape[0];
+				wParts.push(
+					pad ? nn.concat([wt, nn.zeros([pad, wt.shape[1], 1, 1])], 0) : wt,
+				);
+				bParts.push(pad ? nn.concat([bt, nn.zeros([pad])], 0) : bt);
+			}
+			wb = nn.concat(wParts, 0);
+			bb = nn.concat(bParts, 0);
+			this.fused.set(`${key}.weight`, wb);
+			this.fused.set(`${key}.bias`, bb);
+		}
+		return [wb, bb];
+	}
+
+	/**
+	 * Builds (outside the forward) and caches the fused head weights `run` needs for `heads`, so the
+	 * per-frame graph only enqueues compute. No-op for the separate path.
+	 */
+	private prepareFused(names: readonly string[]) {
+		if (names.length < 2) return;
+		const probe = (tag: string, fn: () => void) => {
+			if (this.fusedReady.has(tag)) return;
+			fn();
+			this.fusedReady.add(tag);
+		};
+		probe(names.join("+"), () => {
+			const rels: string[] = [];
+			for (let l = 0; l < 5; l++) rels.push(`input_blocks.${l}`);
+			for (let l = 0; l < 5; l++)
+				for (let r = 0; r < MOGE2_VITS.resBlocks[l]; r++)
+					rels.push(
+						`res_blocks.${l}.${r}.layers.2`,
+						`res_blocks.${l}.${r}.layers.5`,
+					);
+			for (let l = 0; l < 4; l++) rels.push(`resamplers.${l}.1`);
+			for (const rel of rels) {
+				this.param(names, `${rel}.weight`);
+				this.param(names, `${rel}.bias`);
+			}
+			for (let l = 0; l < 3; l++) {
+				this.param(names, `resamplers.${l}.0.weight`);
+				this.param(names, `resamplers.${l}.0.bias`);
+			}
+			this.fusedOutputParams(names, "output_blocks.4");
+		});
+	}
+
+	/**
 	 * The network on `image` ([1, 3, 14·bh, 14·bw], RGB 0..1, `aspect` = the photo's W / H, which the
 	 * uv planes use), outputs resized (bilinear) to `outSize` = [H, W]. Enqueued under nn.forward.
+	 * `opts` default to the still-photo behaviour (separate heads, level 4, normals when present).
 	 */
 	async run(
 		image: Tensor,
 		aspect: number,
 		outSize: readonly [number, number],
+		opts: DepthRunOptions = {},
 	): Promise<DepthNetOutput> {
 		const { nn } = this;
 		const { patch } = MOGE2_VITS;
@@ -422,77 +578,172 @@ export class MogeDepthNet {
 		const bw = image.shape[3] / patch;
 		if (!Number.isInteger(bh) || !Number.isInteger(bw))
 			throw new Error("moge: image size must be a multiple of 14");
+		const headNames = this.headNamesFor(opts);
+		const batched = opts.batchedHeads === true;
+		if (batched) this.prepareFused(headNames);
 		const { pos, uv } = await this.gridConsts(bh, bw, aspect);
-		return nn.forward(() => {
-			const { features, cls } = this.encode(image, bh, bw, pos);
-			const neckIn = [
-				nn.concat([features, uv[0]], 1),
-				uv[1],
-				uv[2],
-				uv[3],
-				uv[4],
-			];
-			const neck = this.convStack("neck", neckIn, null);
+		return nn.forward(() =>
+			this.forwardOps(image, bh, bw, pos, uv, outSize, headNames, opts),
+		);
+	}
+
+	/**
+	 * run() as a persistent forward (nn.compile): recorded once per (grid, outSize, options), then
+	 * replayed with only the image upload. `image` is a ready tensor or the [1, 3, 14·bh, 14·bw]
+	 * values. The result tensors are persistent: the next call with the same key overwrites them, so
+	 * read them first (the CPU backend returns fresh ones). Takes the same options as run().
+	 */
+	async runCompiled(
+		image: Tensor | { data: Float32Array; shape: readonly number[] },
+		aspect: number,
+		outSize: readonly [number, number],
+		opts: DepthRunOptions = {},
+	): Promise<DepthNetOutput> {
+		const { nn } = this;
+		const { shape } = image;
+		const bh = shape[2] / MOGE2_VITS.patch;
+		const bw = shape[3] / MOGE2_VITS.patch;
+		if (!Number.isInteger(bh) || !Number.isInteger(bw))
+			throw new Error("moge: image size must be a multiple of 14");
+		const headNames = this.headNamesFor(opts);
+		if (opts.batchedHeads === true) this.prepareFused(headNames);
+		const { pos, uv } = await this.gridConsts(bh, bw, aspect);
+		const gridKey = `${bh}x${bw}@${aspect}`;
+		const optionKey = `${opts.batchedHeads === true ? "b" : "s"}${opts.headStopLevel ?? 4}${headNames.length}`;
+		const key = `${gridKey}|${outSize[0]}x${outSize[1]}|${optionKey}`;
+		let c = this.compiled.get(key);
+		if (!c) {
+			c = nn.compile(`moge2-vits/${key}`, [shape], ([img]) =>
+				this.forwardOps(img, bh, bw, pos, uv, outSize, headNames, opts),
+			);
+			this.compiled.set(key, c);
+		}
+		const run = await c;
+		const input = "data" in image ? image.data : image;
+		await run.submit([input]);
+		const persistent = (run as { outputs?: DepthNetOutput }).outputs;
+		if (persistent) return persistent;
+		return nn.forward(() =>
+			this.forwardOps(
+				input as Tensor,
+				bh,
+				bw,
+				pos,
+				uv,
+				outSize,
+				headNames,
+				opts,
+			),
+		);
+	}
+
+	private dropCompiled(prefix: string) {
+		for (const [k, c] of this.compiled)
+			if (k.startsWith(prefix)) {
+				this.compiled.delete(k);
+				void c.then((x) => x.dispose());
+			}
+	}
+
+	private headNamesFor(opts: DepthRunOptions): string[] {
+		const wantNormal = (opts.normals ?? true) && this.hasNormalHead;
+		return ["points_head", "mask_head", ...(wantNormal ? ["normal_head"] : [])];
+	}
+
+	/** The network's ops (recorded under nn.forward / nn.compile). */
+	private forwardOps(
+		image: Tensor,
+		bh: number,
+		bw: number,
+		pos: Tensor,
+		uv: Tensor[],
+		outSize: readonly [number, number],
+		headNames: readonly string[],
+		opts: DepthRunOptions,
+	): DepthNetOutput {
+		const { nn } = this;
+		const wantNormal = headNames.includes("normal_head");
+		const last8 = (opts.headStopLevel ?? 4) < 4;
+		const batched = opts.batchedHeads === true;
+		const { features, cls } = this.encode(image, bh, bw, pos);
+		const neckIn = [
+			nn.concat([features, uv[0]], 1),
+			uv[1],
+			uv[2],
+			uv[3],
+			last8 ? uv[3] : uv[4],
+		];
+		const neck = this.convStack(["neck"], neckIn, null, last8);
+		const resize = (t: Tensor) =>
+			nn.interpolate(t, {
+				size: outSize,
+				mode: "bilinear",
+				alignCorners: false,
+			});
+		let p: Tensor;
+		let maskLogit: Tensor;
+		let normalRaw: Tensor | null = null;
+		if (batched) {
+			// channels: points 0..2, mask 3 (padded to 3), normal 6..8
+			const all = resize(this.convStack(headNames, neck, 4, last8)[4]);
+			p = nn.slice(all, 1, 0, 3);
+			maskLogit = nn.slice(all, 1, 3, 4);
+			if (wantNormal) normalRaw = nn.slice(all, 1, 6, 9);
+		} else {
 			const head = (name: string) =>
-				nn.interpolate(this.convStack(name, neck, 4)[4], {
-					size: outSize,
-					mode: "bilinear",
-					alignCorners: false,
-				});
-			// points: remap "exp" → [xy·e^z, e^z] (channels first here, NHWC below)
-			const p = head("points_head");
-			const ez = nn.unary("exp", nn.slice(p, 1, 2, 3));
-			const pointsNchw = nn.concat([nn.mul(nn.slice(p, 1, 0, 2), ez), ez], 1);
-			const z = nn.reshape(ez, [1, outSize[0], outSize[1]]);
-			const points64 = nn.permute(
-				nn.interpolate(pointsNchw, { size: FOCAL_GRID, mode: "nearest" }),
-				[0, 2, 3, 1],
-			);
-			const normal = this.hasNormalHead
-				? nn.l2Normalize(
-						nn.permute(head("normal_head"), [0, 2, 3, 1]),
-						3,
-						1e-12,
-					)
-				: null;
-			const maskNchw = nn.sigmoid(head("mask_head"));
-			const mask = nn.reshape(maskNchw, [1, outSize[0], outSize[1]]);
-			const mask64 = nn.reshape(
-				nn.interpolate(maskNchw, { size: FOCAL_GRID, mode: "nearest" }),
-				[1, FOCAL_GRID[0], FOCAL_GRID[1]],
-			);
-			const s = nn.relu(
+				resize(this.convStack([name], neck, 4, last8)[4]);
+			p = head("points_head");
+			maskLogit = head("mask_head");
+			if (wantNormal) normalRaw = head("normal_head");
+		}
+		// points: remap "exp" → [xy·e^z, e^z] (channels first here, NHWC below)
+		const ez = nn.unary("exp", nn.slice(p, 1, 2, 3));
+		const pointsNchw = nn.concat([nn.mul(nn.slice(p, 1, 0, 2), ez), ez], 1);
+		const z = nn.reshape(ez, [1, outSize[0], outSize[1]]);
+		const points64 = nn.permute(
+			nn.interpolate(pointsNchw, { size: FOCAL_GRID, mode: "nearest" }),
+			[0, 2, 3, 1],
+		);
+		const normal = normalRaw
+			? nn.l2Normalize(nn.permute(normalRaw, [0, 2, 3, 1]), 3, 1e-12)
+			: null;
+		const maskNchw = nn.sigmoid(maskLogit);
+		const mask = nn.reshape(maskNchw, [1, outSize[0], outSize[1]]);
+		const mask64 = nn.reshape(
+			nn.interpolate(maskNchw, { size: FOCAL_GRID, mode: "nearest" }),
+			[1, FOCAL_GRID[0], FOCAL_GRID[1]],
+		);
+		const s = nn.relu(
+			nn.linear(
+				cls,
+				this.w("scale_head.0.weight"),
+				this.w("scale_head.0.bias"),
+			),
+		);
+		const s2 = nn.relu(
+			nn.linear(s, this.w("scale_head.2.weight"), this.w("scale_head.2.bias")),
+		);
+		const metricScale = nn.reshape(
+			nn.unary(
+				"exp",
 				nn.linear(
-					cls,
-					this.w("scale_head.0.weight"),
-					this.w("scale_head.0.bias"),
+					s2,
+					this.w("scale_head.4.weight"),
+					this.w("scale_head.4.bias"),
 				),
-			);
-			const s2 = nn.relu(
-				nn.linear(
-					s,
-					this.w("scale_head.2.weight"),
-					this.w("scale_head.2.bias"),
-				),
-			);
-			const metricScale = nn.reshape(
-				nn.unary(
-					"exp",
-					nn.linear(
-						s2,
-						this.w("scale_head.4.weight"),
-						this.w("scale_head.4.bias"),
-					),
-				),
-				[1],
-			);
-			return { z, normal, mask, points64, mask64, metricScale };
-		});
+			),
+			[1],
+		);
+		return { z, normal, mask, points64, mask64, metricScale };
 	}
 
 	dispose() {
+		this.dropCompiled("");
 		for (const c of this.consts.values()) this.nn.dispose([c.pos, ...c.uv]);
 		this.consts.clear();
+		this.nn.dispose([...this.fused.values()]);
+		this.fused.clear();
+		this.fusedReady.clear();
 		this.nn.dispose(this.weights);
 	}
 }

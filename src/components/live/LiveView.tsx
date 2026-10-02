@@ -8,10 +8,12 @@ import {
 	Crosshair,
 	LocateFixed,
 	Lock,
+	Mountain,
 	Square,
 	Unlock,
 } from "lucide-react";
 import { useRef } from "react";
+import { useFlag } from "#/lib/flags/react";
 import { cn } from "#/lib/utils";
 import {
 	type LiveStatus,
@@ -110,6 +112,8 @@ export function LiveView() {
 	const { status: s, labels, refs } = session;
 	const drag = useRef<number | null>(null);
 	const running = s.phase === "running";
+	const stepFlag = useFlag("liveStep") === "on";
+	const stepOn = s.step === "on" || s.step === "loading";
 	const frameAspect = s.frame ? s.frame.width / s.frame.height : 9 / 16;
 
 	return (
@@ -260,6 +264,25 @@ export function LiveView() {
 							)}{" "}
 							{s.locked ? "Unlock pose" : "Lock pose"}
 						</button>
+						{stepFlag && (
+							<button
+								type="button"
+								className={btn(stepOn)}
+								data-testid="live-step"
+								disabled={s.stepReason != null}
+								title={s.stepReason ?? s.stepMessage}
+								onClick={() => void session.setStepInside(!stepOn)}
+							>
+								<Mountain className="size-4" />{" "}
+								{s.stepReason
+									? `Step Inside (beta): ${s.stepReason.toLowerCase()}`
+									: s.step === "loading"
+										? "Loading depth model"
+										: s.step === "error"
+											? `Step Inside: ${s.stepMessage}`
+											: "Step Inside (beta)"}
+							</button>
+						)}
 						<button
 							type="button"
 							className={btn(false)}
