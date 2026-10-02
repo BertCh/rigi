@@ -8,14 +8,16 @@
 export interface FollowInput {
 	guessYaw: number;
 	guessHfov: number;
+	/** The photo's solved pose (the sheet's own viewpoint yaw is the compass heading for a refused photo). */
+	solvedYaw: number;
+	solvedHfov: number;
+	accepted: boolean;
 	names: string[];
 }
 
 export interface FollowViewpoint {
 	x: number;
 	y: number;
-	yaw: number;
-	hfov: number;
 }
 
 export interface FollowGeometry {
@@ -86,7 +88,7 @@ export function followGeometry(
 	sheetPeaks: readonly { name: string; x: number; y: number }[],
 	r: number,
 ): FollowGeometry {
-	const delta = wrap180(vp.yaw - follow.guessYaw);
+	const delta = wrap180(follow.solvedYaw - follow.guessYaw);
 	const arcR = r * 0.42;
 	const from = polarPoint(vp.x, vp.y, follow.guessYaw, arcR);
 	const to = polarPoint(vp.x, vp.y, follow.guessYaw + delta, arcR);
@@ -94,7 +96,7 @@ export function followGeometry(
 	const [lx, ly] = polarPoint(vp.x, vp.y, mid, arcR + 22);
 	return {
 		guessWedge: wedgePath(vp.x, vp.y, follow.guessYaw, follow.guessHfov, r),
-		solvedWedge: wedgePath(vp.x, vp.y, vp.yaw, vp.hfov, r),
+		solvedWedge: wedgePath(vp.x, vp.y, follow.solvedYaw, follow.solvedHfov, r),
 		arc: `M${pt(from)}A${arcR} ${arcR} 0 0 ${delta >= 0 ? 1 : 0} ${pt(to)}`,
 		arcLabel: { x: lx, y: ly },
 		signedDeg: signedDegrees(delta),

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { useEffect, useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
 	HandDot,
 	HandText,
@@ -11,11 +11,22 @@ import {
 	SketchPolyline,
 } from "../notebook/Ink";
 import { LAYER_INKS } from "../viz/inks";
-import { EASE, MOTION, stagger, useMotionAllowed } from "../viz/motion";
+import {
+	EASE,
+	MOTION,
+	stagger,
+	useArmedInView,
+	useMotionAllowed,
+} from "../viz/motion";
 import { IMHOF_TINT_STOPS, ImhofRampFilter } from "./imhof";
 import { paintPolygon } from "./paint";
 import { SheetContourRuns } from "./sheet-contour-runs";
-import { type FollowInput, followGeometry, wrap180 } from "./sheet-follow";
+import {
+	type FollowInput,
+	followGeometry,
+	wedgePath,
+	wrap180,
+} from "./sheet-follow";
 import { labelSizes, layoutLabels } from "./sheet-labels";
 import {
 	SHEET_ASPECT,
@@ -409,8 +420,9 @@ type SheetViewpoint = SheetData["viewpoints"][number];
 
 /**
  * The followed camera's cone layers. The static render is the settled frame (ghost, solved wedge, arc,
- * degrees, rays). From an effect, keyed on the camera, the solved wedge swings from the guess to the fix
- * (WAAPI, view-box transform), then the arc and its label fade in, then the rays.
+ * degrees, rays). Once per camera, when the map is armed in view, the solved wedge swings from the guess
+ * to the fix (WAAPI, view-box transform), then the arc and its label fade in, then the rays. A refused
+ * photo has no solve: the ghost, the sheet's own unsolved cone and a "not solved" note.
  */
 function FollowedCamera({
 	id,
@@ -430,13 +442,20 @@ function FollowedCamera({
 		[vp, follow, peaks, r],
 	);
 	const motion = useMotionAllowed();
+	const { ref: armRef, armed } = useArmedInView<SVGGElement>();
 	const swing = useRef<SVGGElement>(null);
 	const arcRef = useRef<SVGGElement>(null);
 	const rayRef = useRef<SVGGElement>(null);
-	const turn = wrap180(follow.guessYaw - vp.yaw);
-	// biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the camera and its turn, not on geometry identity
+	const playedRef = useRef<string | null>(null);
+	const [playedId, setPlayedId] = useState<string | null>(null);
+	const { accepted } = follow;
+	const turn = wrap180(follow.guessYaw - follow.solvedYaw);
+	// until the swing has played, motion hides the settled frame's arc and rays and holds the wedge at the guess
+	const pending = motion && accepted && playedId !== id;
 	useEffect(() => {
-		if (!motion) return;
+		if (!motion || !accepted || !armed || playedRef.current === id) return;
+		playedRef.current = id;
+		setPlayedId(id);
 		const animations: Animation[] = [];
 		const run = (
 			el: Element | null | undefined,
@@ -476,25 +495,52 @@ function FollowedCamera({
 			);
 		return () => {
 			for (const a of animations) a.cancel();
+			// a cancelled swing may replay when the camera comes back
+			playedRef.current = null;
 		};
-	}, [motion, id, turn]);
+	}, [motion, accepted, armed, id, turn]);
+	const guess = (
+		<SketchPath
+			d={g.guessWedge}
+			seed={`guess-${id}`}
+			color={LAYER_INKS.prior.paper}
+			width={1.4}
+			dash="6 5"
+			opacity={0.6}
+			tolerance={1.5}
+		/>
+	);
+	if (!accepted) {
+		const cone = wedgePath(vp.x, vp.y, vp.yaw, vp.hfov, r);
+		return (
+			<g ref={armRef}>
+				{guess}
+				<path d={cone} fill="var(--gb-red)" fillOpacity={0.24} />
+				<SketchPath
+					d={cone}
+					seed={`cone-${id}`}
+					color="red"
+					width={1.6}
+					opacity={0.85}
+					dash="6 5"
+					tolerance={1.5}
+				/>
+				<HandText x={vp.x + 16} y={vp.y + 34} color="pencil" size={22}>
+					not solved
+				</HandText>
+			</g>
+		);
+	}
 	return (
-		<>
+		<g ref={armRef}>
 			{/* the phone's guess: a dashed ghost in the prior ink */}
-			<SketchPath
-				d={g.guessWedge}
-				seed={`guess-${id}`}
-				color={LAYER_INKS.prior.paper}
-				width={1.4}
-				dash="6 5"
-				opacity={0.6}
-				tolerance={1.5}
-			/>
+			{guess}
 			<g
 				ref={swing}
 				style={{
 					transformBox: "view-box",
 					transformOrigin: `${vp.x}px ${vp.y}px`,
+					transform: pending ? `rotate(${turn}deg)` : undefined,
 				}}
 			>
 				<path
@@ -510,7 +556,7 @@ function FollowedCamera({
 					tolerance={1.5}
 				/>
 			</g>
-			<g ref={arcRef}>
+			<g ref={arcRef} style={{ opacity: pending ? 0 : undefined }}>
 				<SketchPath
 					d={g.arc}
 					seed={`arc-${id}`}
@@ -528,7 +574,7 @@ function FollowedCamera({
 					{`${g.signedDeg}°`}
 				</HandText>
 			</g>
-			<g ref={rayRef}>
+			<g ref={rayRef} style={{ opacity: pending ? 0 : undefined }}>
 				{g.rays.map((ray) => (
 					<g key={ray.name}>
 						<PenLine
@@ -541,7 +587,7 @@ function FollowedCamera({
 					</g>
 				))}
 			</g>
-		</>
+		</g>
 	);
 }
 

@@ -159,7 +159,12 @@ function GipfelbuchIndex() {
 				? {
 						guessYaw: d.prior.yaw,
 						guessHfov: d.prior.hfov,
-						names: d.peaks.filter((p) => p.labelled).map((p) => p.name),
+						solvedYaw: d.solved.yaw,
+						solvedHfov: d.solved.hfov,
+						accepted: d.solved.accepted,
+						names: d.peaks
+							.filter((p) => p.visible && p.solved)
+							.map((p) => p.name),
 					}
 				: undefined,
 		[d],
@@ -230,7 +235,8 @@ function GipfelbuchIndex() {
 						<p className={`${TYPE.hand} gb-secondary max-w-[66ch]`}>
 							The 12 demo photos were taken here: each red cone is one camera,
 							solved from the photo alone. The one you follow shows the
-							phone&apos;s guess (dashed) turning to the fix.
+							phone&apos;s guess (dashed) turning to the fix, with rays to the
+							summits in its frame.
 						</p>
 						<SheetScaleBar sheet={sheet} targetRef={mapRef} />
 					</div>
