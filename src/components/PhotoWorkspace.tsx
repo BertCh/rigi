@@ -71,6 +71,7 @@ import { glowMarkersFor } from "#/lib/look/labels/glow";
 import { PeakLabelsSvg } from "#/lib/look/labels/PeakLabelsSvg";
 import { useLabelFontEpoch } from "#/lib/look/labels/useLabelFonts";
 import { needsPhotoSky } from "#/lib/look/look-key";
+import { poseAccepted } from "#/lib/nearfield/controller";
 import { ALIGN_STATE, type AlignState } from "#/lib/ontology/crosswalk/pose";
 import {
 	formatTakenAt,
@@ -651,7 +652,9 @@ export function PhotoWorkspace({
 								setAlignState(up.state);
 								setAlignNote(up.note);
 							})
-							.catch(() => {});
+							.catch((e) => {
+								if (e?.name !== "AbortError") console.warn("[upgrade]", e);
+							});
 					} else setPoseState((p) => p ?? { ...engine.pose });
 				} else {
 					setStatus({ msg: "Aligning skyline to terrain", frac: 1 });
@@ -721,7 +724,10 @@ export function PhotoWorkspace({
 											setAlignNote(up.note);
 											setVerify(up.verdict);
 										})
-										.catch(() => {});
+										.catch((e) => {
+											if (e?.name !== "AbortError")
+												console.warn("[upgrade]", e);
+										});
 								})
 								.catch((e) => {
 									if (e?.name !== "AbortError")
@@ -1067,6 +1073,12 @@ export function PhotoWorkspace({
 		// not while the load is still solving: its result would overwrite this one
 		if (!eng || status) return;
 		setAlignNote("Aligning…");
+		// the user took over: a pending background second opinion must not move the pose or the note any more
+		verifyAbort.current?.abort();
+		setVerify(null);
+		// only a pose that was already accepted or the user's own may be saved after a refinement; an unverified
+		// guess is shown but not saved (a saved pose reloads as "saved", which counts as accepted)
+		const startEndorsed = poseAccepted(alignState, verify);
 		const solver = unknownSolver.current;
 		if (fromPrior && solver && eng.photoElement) {
 			// same path as on load: never the ±25° autoAlign around a placeholder prior
@@ -1101,18 +1113,18 @@ export function PhotoWorkspace({
 		setTimeout(async () => {
 			const res = await eng.autoAlign(fromPrior);
 			if (!res || engineRef.current !== eng) return;
-			if (fromPrior) {
-				// Auto-align is an unverified guess: show it but do not persist it (a saved pose reloads as accepted)
+			// Auto-align is an unverified guess; Refine keeps the user's own (or an accepted) pose theirs, but is
+			// not verified when the sensors are missing
+			const save = !fromPrior && startEndorsed && !eng.unknowns.any;
+			if (save) setPose(res.pose);
+			else {
 				setPose(res.pose, false);
-				verifyAbort.current?.abort();
 				unknownAbort.current?.abort();
-				setVerify(null);
-			} else setPose(res.pose);
-			// a local refinement from a hand-set pose is fine, but not verified when the sensors are missing
+			}
 			if (eng.unknowns.any) setAlignState("unverified");
-			else setAlignState(fromPrior ? "auto" : "manual");
+			else setAlignState(save ? "manual" : "auto");
 			setAlignNote(
-				`${fromPrior ? "Auto-aligned" : "Refined"} · confidence ${(res.confidence * 100).toFixed(0)}%${eng.unknowns.any ? " · unverified" : ""}`,
+				`${fromPrior ? "Auto-aligned" : "Refined"} · confidence ${(res.confidence * 100).toFixed(0)}%${eng.unknowns.any ? " · unverified" : ""}${save ? "" : " · not saved"}`,
 			);
 		}, 20);
 	};

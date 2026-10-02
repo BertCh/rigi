@@ -38,9 +38,24 @@ const FILE = resolve(
 	import.meta.dirname,
 	"../../tools/bench/score/cascade_mt_scores.json",
 );
+const SPLIT = resolve(import.meta.dirname, "../../tools/bench/split.json");
 const all = JSON.parse(readFileSync(FILE, "utf8")) as Row[];
 const dev = all.filter((r) => r.dev === true);
 all.length = 0; // nothing below may see a non-dev row
+// cross-check the row flags against the frozen split, so a mislabelled row cannot leak a test photo in
+const split = JSON.parse(readFileSync(SPLIT, "utf8")) as { dev: unknown };
+if (Array.isArray(split.dev)) {
+	const devIds = new Set(split.dev as string[]);
+	const stray = dev.filter((r) => !devIds.has(r.id)).map((r) => r.id);
+	// the evidence is void if a row marked dev is not in the frozen dev half
+	if (stray.length)
+		throw new Error(
+			`rows marked dev but not in split.json dev: ${stray.join(", ")}`,
+		);
+} else if (typeof split.dev === "number" && split.dev !== dev.length)
+	throw new Error(
+		`split.json has ${split.dev} dev photos, the scores ${dev.length}`,
+	);
 
 const outcome = (v: Row["verdict"]): boolean | null =>
 	v === "correct" ? true : v === "wrong" ? false : null;

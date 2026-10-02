@@ -149,7 +149,14 @@ export function riskAt(
 	let accepted = 0;
 	let wrong = 0;
 	for (const r of rows) {
-		if (!(typeof r.score === "number" && r.score >= threshold)) continue;
+		if (
+			!(
+				typeof r.score === "number" &&
+				Number.isFinite(r.score) &&
+				r.score >= threshold
+			)
+		)
+			continue;
 		accepted++;
 		if (r.correct !== true) wrong++;
 	}
