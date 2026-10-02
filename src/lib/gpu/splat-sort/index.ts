@@ -4,8 +4,8 @@
 
 // GPU back-to-front sort of Gaussian splats, on the RENDER device (deck-webgpu/layers/splats.ts
 // option `sortBackend: "gpu"`). Replaces the worker round trip of nearfield/splat-sort.ts: the depth
-// keys are computed from the splat storage buffer the draw already reads, a stable two-pass radix
-// sort writes the order buffer the splat vertex shader indexes, and nothing comes back to the CPU.
+// keys are computed from the splat storage buffer the draw already reads, luma's stable radix
+// GPUSort writes the order buffer the splat vertex shader indexes, and nothing comes back to the CPU.
 //
 //   const sorter = new GpuSplatSorter(device, dataBuffer, orderBuffer, count);
 //   sorter.sort(row);   // records + submits its own encoder; the queue orders it before any
@@ -18,33 +18,22 @@
 // does. So: same order wherever the keys agree; keys can differ by 1 at bin edges (not provably
 // zero in WGSL).
 //
-// The ten dispatches are kernel nodes of one core ComputeGraph (cachedGraph group "splat-sort", keyed
-// by the buffer sizes; every buffer is an import, bound per encode, so sorters of one size share the
-// compiled graph): a clear node of the min/max words, then the nodes in the order of the former
-// dispatchAll, coalesced by the graph into ONE compute pass, on the sorter's own encoder and submit.
+// The dispatches are nodes of one core ComputeGraph (cachedGraph group "splat-sort", keyed by the buffer
+// sizes; every buffer is an import, bound per encode, so sorters of one size share the compiled graph):
+// a clear node of the min/max words, the depth and key kernels and one GPUSort, coalesced by the graph
+// into ONE compute pass, on the sorter's own encoder and submit.
 //
 // The order buffer holds ALL `count` splats: those at or behind the camera plane (the worker drops
 // them) are given the key 65536 and sort to the end (ascending index among themselves), where the
 // vertex shader's `clip.w < nearW` cull discards them. The caller therefore always draws `count`
 // instances; there is no kept-count readback.
 import type { Buffer, Device, QuerySet } from "@luma.gl/core";
-import { getFlag } from "#/lib/flags";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
 import { type BindKind, defineKernel, submit } from "../core/kernel";
 import { GPUSort } from "../core/luma";
 import { profiling, recordGpuTime } from "../core/profile";
 import { errorChecks, submitted } from "../core/queue";
-import {
-	DEPTH_WGSL,
-	DIGITS,
-	KEYS_WGSL,
-	RADIX_BITS,
-	SCAN_DIGIT_WGSL,
-	SCAN_TOTALS_WGSL,
-	SCATTER_WGSL,
-	TILE,
-	TILE_WGSL,
-} from "./splat-sort.wgsl";
+import { DEPTH_WGSL, KEYS_WGSL, TILE } from "./splat-sort.wgsl";
 
 /** The kernels' group and the core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "splat-sort"). */
 const GROUP = "splat-sort";
@@ -76,56 +65,8 @@ const KEYS = defineKernel(
 	],
 	{ group: GROUP },
 );
-const tileSpec = (pass: 0 | 1) =>
-	defineKernel(
-		`splatsort-tile${pass}`,
-		TILE_WGSL,
-		[
-			U,
-			["keys", "read-only-storage"],
-			["inIdx", "read-only-storage"],
-			["rank", "storage"],
-			["hist", "storage"],
-		],
-		{
-			group: GROUP,
-			constants: { SHIFT: pass * RADIX_BITS, FIRST: pass === 0 ? 1 : 0 },
-		},
-	);
-const scatterSpec = (pass: 0 | 1) =>
-	defineKernel(
-		`splatsort-scatter${pass}`,
-		SCATTER_WGSL,
-		[
-			U,
-			["keys", "read-only-storage"],
-			["inIdx", "read-only-storage"],
-			["rank", "read-only-storage"],
-			["hist", "read-only-storage"],
-			["base", "read-only-storage"],
-			["outIdx", "storage"],
-		],
-		{
-			group: GROUP,
-			constants: { SHIFT: pass * RADIX_BITS, FIRST: pass === 0 ? 1 : 0 },
-		},
-	);
-const TILE0 = tileSpec(0);
-const TILE1 = tileSpec(1);
-const SCATTER0 = scatterSpec(0);
-const SCATTER1 = scatterSpec(1);
-const SCAN_DIGIT = defineKernel(
-	"splatsort-scan-digit",
-	SCAN_DIGIT_WGSL,
-	[U, ["hist", "storage"], ["base", "storage"]],
-	{ group: GROUP },
-);
-const SCAN_TOTALS = defineKernel(
-	"splatsort-scan-totals",
-	SCAN_TOTALS_WGSL,
-	[U, ["base", "storage"]],
-	{ group: GROUP },
-);
+/** Workgroup storage the sort needs (the old radix tile + digit table; kept as the support gate). */
+const SORT_WORKGROUP_STORAGE_BYTES = (TILE + 512) * 4;
 
 /** Distinct sorter sizes kept compiled per device (one per live splat cloud, normally one). */
 const MAX_GRAPHS = 4;
@@ -151,36 +92,22 @@ export function gpuSplatSortSupported(device: Device): boolean {
 		!device.isLost &&
 		device.limits.maxStorageBuffersPerShaderStage >= 7 &&
 		device.limits.maxComputeInvocationsPerWorkgroup >= TILE &&
-		device.limits.maxComputeWorkgroupStorageSize >= (TILE + DIGITS) * 4
+		device.limits.maxComputeWorkgroupStorageSize >= SORT_WORKGROUP_STORAGE_BYTES
 	);
 }
 
 /** The sorter's buffers by graph import id. */
 type SortBuffers = Record<
-	| "params"
-	| "data"
-	| "order"
-	| "depth"
-	| "mm"
-	| "keys"
-	| "rank"
-	| "tmp"
-	| "hist"
-	| "base",
+	"params" | "data" | "order" | "depth" | "mm" | "keys" | "rank" | "tmp",
 	Buffer
 >;
 
-/**
- * The sort graph for buffers of these sizes: a clear of `mm`, then depth → keys → two radix passes
- * (tile → scan-digit → scan-totals → scatter), the bindings of the former dispatchAll call for call
- * (whole buffers, except the index arrays bound to exactly `count` words).
- */
+/** The sort graph for buffers of these sizes: a clear of `mm`, then depth → keys → luma GPUSort. */
 function buildSortGraph(
 	g: ComputeGraph,
 	buffers: SortBuffers,
 	count: number,
 	blocks: number,
-	lumaSort: boolean,
 ) {
 	const imp = (id: keyof SortBuffers, usage = STORAGE | COPY_DST) =>
 		g.importBuffer(id, buffers[id].byteLength, undefined, usage);
@@ -192,9 +119,6 @@ function buildSortGraph(
 	const keys = imp("keys");
 	const rank = imp("rank");
 	const tmp = imp("tmp");
-	const bytes = count * 4;
-	const orderRange = { buffer: order, size: bytes };
-	const tmpRange = { buffer: tmp, size: bytes };
 	g.clearNode("clear-mm", mm);
 	g.addKernel({
 		id: "depth",
@@ -208,57 +132,19 @@ function buildSortGraph(
 		bindings: { p, depth, mm, keys },
 		workgroups: [blocks],
 	});
-	if (lumaSort) {
-		// luma's stable radix GPUSort over the 17 significant key bits: keys → order, with the identity
-		// (tmp, written once at construction) as payload and rank as the (unused) sorted-key output
-		g.add(
-			new GPUSort({
-				id: "sort",
-				keys: g.view(keys, "uint32", count),
-				values: g.view(tmp, "uint32", count),
-				outputKeys: g.view(rank, "uint32", count),
-				outputValues: g.view(order, "uint32", count),
-				algorithm: "radix",
-				keyBits: 17,
-			}),
-		);
-		return;
-	}
-	const hist = imp("hist");
-	const base = imp("base");
-	// pass 0 reads the identity (FIRST) into tmp; pass 1 reads tmp into the order buffer
-	const pass = (
-		k: 0 | 1,
-		inIdx: typeof orderRange,
-		outIdx: typeof orderRange,
-	) => {
-		g.addKernel({
-			id: `tile${k}`,
-			spec: k ? TILE1 : TILE0,
-			bindings: { p, keys, inIdx, rank, hist },
-			workgroups: [blocks],
-		});
-		g.addKernel({
-			id: `scan-digit${k}`,
-			spec: SCAN_DIGIT,
-			bindings: { p, hist, base },
-			workgroups: [DIGITS],
-		});
-		g.addKernel({
-			id: `scan-totals${k}`,
-			spec: SCAN_TOTALS,
-			bindings: { p, base },
-			workgroups: [1],
-		});
-		g.addKernel({
-			id: `scatter${k}`,
-			spec: k ? SCATTER1 : SCATTER0,
-			bindings: { p, keys, inIdx, rank, hist, base, outIdx },
-			workgroups: [blocks],
-		});
-	};
-	pass(0, orderRange, tmpRange);
-	pass(1, tmpRange, orderRange);
+	// luma's stable radix GPUSort over the 17 significant key bits: keys → order, with the identity
+	// (tmp, written once at construction) as payload and rank as the (unused) sorted-key output
+	g.add(
+		new GPUSort({
+			id: "sort",
+			keys: g.view(keys, "uint32", count),
+			values: g.view(tmp, "uint32", count),
+			outputKeys: g.view(rank, "uint32", count),
+			outputValues: g.view(order, "uint32", count),
+			algorithm: "radix",
+			keyBits: 17,
+		}),
+	);
 }
 
 export class GpuSplatSorter {
@@ -270,8 +156,6 @@ export class GpuSplatSorter {
 	/** cachedGraph key: the buffer sizes (the graph's import capacities and bindings) */
 	private readonly graphKey: string;
 	private compiled = false;
-	/** keys → luma GPUSort radix (flag splatSortGpgpu) instead of the in-house tile/scan/scatter passes */
-	private lumaSort: boolean;
 	/** timestamp slots of profiled sorts (core profile, opt-in) */
 	private timestamps: QuerySet | null = null;
 	/** Resolves when the graph is compiled; rejects if a pipeline fails (caller falls back). */
@@ -290,7 +174,6 @@ export class GpuSplatSorter {
 		readonly count: number,
 	) {
 		this.blocks = Math.max(1, Math.ceil(count / TILE));
-		this.lumaSort = getFlag("splatSortGpgpu") === "on";
 		const n4 = Math.max(16, count * 4);
 		const mk = (id: string, bytes: number, usage = STORAGE) =>
 			device.createBuffer({
@@ -306,56 +189,23 @@ export class GpuSplatSorter {
 			keys: mk("keys", n4),
 			rank: mk("rank", n4),
 			tmp: mk("tmp", n4),
-			hist: mk("hist", this.lumaSort ? 16 : DIGITS * this.blocks * 4),
-			base: mk("base", this.lumaSort ? 16 : DIGITS * 4),
 		};
 		this.owned = Object.values(own);
 		this.buffers = { ...own, data, order };
 		this.graphKey = `${count}:${data.byteLength}:${order.byteLength}`;
-		if (this.lumaSort) {
-			// the identity payload GPUSort permutes (tmp is the radix passes' scratch otherwise)
-			const ident = new Uint32Array(n4 / 4);
-			for (let i = 0; i < ident.length; i++) ident[i] = i;
-			own.tmp.write(ident);
-		}
+		// the identity payload GPUSort permutes
+		const ident = new Uint32Array(n4 / 4);
+		for (let i = 0; i < ident.length; i++) ident[i] = i;
+		own.tmp.write(ident);
 		// async compile (createComputePipelineAsync; rejects on a failed pipeline); sort() is refused
 		// until it lands. The graph lookup runs inside the promise, so a throwing build (a lost device,
 		// an import the graph rejects) rejects `ready` too: the layer then fails over to the worker and
 		// destroy()s the buffers above instead of the constructor throwing past them
 		this.ready = Promise.resolve()
 			.then(() => this.graph().compileAsync())
-			.catch((e) => {
-				// the luma sort failed to build or compile on this device: the in-house passes need
-				// hist / base at full size and the identity out of tmp
-				if (!this.lumaSort) throw e;
-				console.warn(
-					"[splat-sort] luma GPUSort unavailable, using the radix passes",
-					e,
-				);
-				this.lumaSort = false;
-				this.resizeForRadix();
-				return this.graph().compileAsync();
-			})
 			.then(() => {
 				this.compiled = true;
 			});
-	}
-
-	/** Re-allocate hist / base at radix size after a luma-sort failure. */
-	private resizeForRadix() {
-		const mk = (id: string, bytes: number) =>
-			this.device.createBuffer({
-				id: `splatsort-${id}`,
-				byteLength: bytes,
-				usage: STORAGE | COPY_DST,
-			});
-		for (const id of ["hist", "base"] as const) {
-			const i = this.owned.indexOf(this.buffers[id]);
-			this.buffers[id].destroy();
-			const b = mk(id, id === "hist" ? DIGITS * this.blocks * 4 : DIGITS * 4);
-			this.buffers[id] = b;
-			if (i >= 0) this.owned[i] = b;
-		}
 	}
 
 	/** This sorter's graph (a hit after the first lookup; rebuilt if an LRU eviction dropped it). */
@@ -363,9 +213,8 @@ export class GpuSplatSorter {
 		return cachedGraph<void, void>(
 			this.device,
 			GROUP,
-			this.lumaSort ? `${this.graphKey}:gpusort` : this.graphKey,
-			(g) =>
-				buildSortGraph(g, this.buffers, this.count, this.blocks, this.lumaSort),
+			`${this.graphKey}:gpusort`,
+			(g) => buildSortGraph(g, this.buffers, this.count, this.blocks),
 			MAX_GRAPHS,
 		).graph;
 	}
@@ -414,7 +263,7 @@ export class GpuSplatSorter {
 			id: "splatsort",
 			...(timed ? { timeProfilingQuerySet: this.timestamps } : {}),
 		});
-		const encoding = graph.encode(enc, undefined, this.encodeBuffers());
+		const encoding = graph.encode(enc, undefined, this.buffers);
 		const check = this.checked++ < CHECKED_SORTS;
 		let verdict: Promise<void> | undefined;
 		if (check && !errorChecks()) {
@@ -455,13 +304,6 @@ export class GpuSplatSorter {
 		this.stats.sorts++;
 		this.stats.lastEncodeMs = performance.now() - t0;
 		return verdict;
-	}
-
-	/** The imports the graph declares (the luma variant has no hist / base). */
-	private encodeBuffers(): Partial<SortBuffers> {
-		if (!this.lumaSort) return this.buffers;
-		const { hist: _h, base: _b, ...rest } = this.buffers;
-		return rest;
 	}
 
 	destroy(): void {

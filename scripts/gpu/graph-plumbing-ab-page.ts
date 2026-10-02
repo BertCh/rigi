@@ -2,17 +2,16 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Page side of scripts/gpu/graph-plumbing-ab.mjs (WAG graph plumbing): the three page-device modules
+// Page side of scripts/gpu/graph-plumbing-ab.mjs (WAG graph plumbing): the two page-device modules
 // that moved from raw dispatches onto core ComputeGraphs (deck-webgpu/silhouette-gpu.ts,
-// deck-webgpu/geo-query-gpu.ts, gpu/splat-sort) against a replica of their former raw-dispatch path
+// deck-webgpu/geo-query-gpu.ts) against a replica of their former raw-dispatch path
 // (same kernel specs, fetched with definedKernels; same buffers, bindings, dispatch sizes, one
 // encoder, core submit + stageReads), on the same inputs:
 // - BIT: the read-back bytes (silhouette masks; verdict / skyline / gather words, nonces included)
-//   and the sorted order buffer must be identical, byte for byte;
-// - timing: wall ms from the call to its result (sort: to onSubmittedWorkDone) and the sort's CPU
-//   encode ms, graph vs raw, interleaved, median / p90 over `reps`.
+//   must be identical, byte for byte;
+// - timing: wall ms from the call to its result graph vs raw, interleaved, median / p90 over `reps`.
 // Synthetic inputs: rgba32float targets with layered ridge ranges plus zero / negative / denormal /
-// Inf / NaN texels; random peak samples and thresholds; random splat clouds.
+// Inf / NaN texels; random peak samples and thresholds.
 import { Buffer, type Device, Texture } from "@luma.gl/core";
 import {
 	silGroups,
@@ -24,19 +23,12 @@ import { SilhouetteMaskGpu } from "#/lib/deck-webgpu/silhouette-gpu";
 import { getComputeDevice } from "#/lib/gpu/core/device";
 import {
 	definedKernels,
-	type Kernel,
 	type KernelSpec,
 	kernelAsync,
 	submit,
 } from "#/lib/gpu/core/kernel";
-import { clear, range } from "#/lib/gpu/core/pool";
 import { stageReads } from "#/lib/gpu/core/readback";
-import {
-	type DispatchCall,
-	dispatch,
-	dispatchAll,
-} from "#/lib/gpu/core/test-dispatch";
-import { GpuSplatSorter } from "#/lib/gpu/splat-sort";
+import { dispatch } from "#/lib/gpu/core/test-dispatch";
 
 const WG = 64;
 
@@ -253,173 +245,9 @@ const geoGraph = (q: GeoQueryGpu, tex: Texture, jobs: RawJob[]) =>
 		}
 	).run(tex, jobs);
 
-// ── splat sort: the former GpuSplatSorter.sort, one dispatchAll ────────────────────────────────────
-class RawSplatSorter {
-	private ks: Kernel[] = [];
-	private bufs: Record<string, Buffer>;
-	private blocks: number;
-	constructor(
-		private device: Device,
-		private data: Buffer,
-		private order: Buffer,
-		private count: number,
-	) {
-		this.blocks = Math.max(1, Math.ceil(count / 256));
-		const n4 = Math.max(16, count * 4);
-		const mk = (id: string, bytes: number, usage = 0x0080) =>
-			device.createBuffer({
-				id: `ab-splatsort-${id}`,
-				byteLength: Math.max(16, bytes),
-				usage: usage | 0x0008,
-			});
-		this.bufs = {
-			params: mk("params", 32, 0x0040),
-			depth: mk("depth", n4),
-			mm: mk("mm", 8),
-			keys: mk("keys", n4),
-			rank: mk("rank", n4),
-			tmp: mk("tmp", n4),
-			hist: mk("hist", 512 * this.blocks * 4),
-			base: mk("base", 512 * 4),
-		};
-	}
-	async ready() {
-		this.ks = await Promise.all(
-			[
-				"splatsort-depth",
-				"splatsort-keys",
-				"splatsort-tile0",
-				"splatsort-scatter0",
-				"splatsort-tile1",
-				"splatsort-scatter1",
-				"splatsort-scan-digit",
-				"splatsort-scan-totals",
-			].map((id) => kernelAsync(this.device, spec("splat-sort", id))),
-		);
-	}
-	sort(row: number[]) {
-		const t0 = performance.now();
-		const { device, blocks, bufs } = this;
-		const count = this.count;
-		const w = new ArrayBuffer(32);
-		const fl = new Float32Array(w);
-		const u = new Uint32Array(w);
-		fl.set(row, 0);
-		fl[4] = 0;
-		u[5] = count;
-		u[6] = blocks;
-		bufs.params.write(new Uint8Array(w));
-		const [kDepth, kKeys, kTile0, kScatter0, kTile1, kScatter1, kScan, kTot] =
-			this.ks;
-		const enc = device.createCommandEncoder({ id: "splatsort-raw" });
-		clear(enc, bufs.mm);
-		const p = bufs.params;
-		const bytes = count * 4;
-		const pass = (
-			kTile: Kernel,
-			kScatter: Kernel,
-			inIdx: ReturnType<typeof range>,
-			outIdx: ReturnType<typeof range>,
-		): DispatchCall[] => [
-			{
-				k: kTile,
-				bindings: {
-					p,
-					keys: bufs.keys,
-					inIdx,
-					rank: bufs.rank,
-					hist: bufs.hist,
-				},
-				x: blocks,
-			},
-			{ k: kScan, bindings: { p, hist: bufs.hist, base: bufs.base }, x: 512 },
-			{ k: kTot, bindings: { p, base: bufs.base }, x: 1 },
-			{
-				k: kScatter,
-				bindings: {
-					p,
-					keys: bufs.keys,
-					inIdx,
-					rank: bufs.rank,
-					hist: bufs.hist,
-					base: bufs.base,
-					outIdx,
-				},
-				x: blocks,
-			},
-		];
-		dispatchAll(
-			enc,
-			[
-				{
-					k: kDepth,
-					bindings: { p, splatData: this.data, depth: bufs.depth, mm: bufs.mm },
-					x: blocks,
-				},
-				{
-					k: kKeys,
-					bindings: { p, depth: bufs.depth, mm: bufs.mm, keys: bufs.keys },
-					x: blocks,
-				},
-				...pass(
-					kTile0,
-					kScatter0,
-					range(this.order, bytes),
-					range(bufs.tmp, bytes),
-				),
-				...pass(
-					kTile1,
-					kScatter1,
-					range(bufs.tmp, bytes),
-					range(this.order, bytes),
-				),
-			],
-			"splatsort-raw",
-		);
-		submit(device, enc);
-		return performance.now() - t0;
-	}
-	destroy() {
-		for (const b of Object.values(this.bufs)) b.destroy();
-	}
-}
-
-function splatCloud(device: Device, n: number) {
-	const words = new Uint32Array(n * 12);
-	const f = new Float32Array(words.buffer);
-	for (let i = 0; i < n; i++) {
-		f[12 * i] = (random() - 0.5) * 60;
-		f[12 * i + 1] = (random() - 0.5) * 30;
-		// some behind the camera plane, some at equal depth (ties)
-		f[12 * i + 2] = random() < 0.05 ? 1 + random() : -(0.05 + random() * 100);
-		if (random() < 0.1) f[12 * i + 2] = -10;
-	}
-	const data = device.createBuffer({
-		id: "ab-splats",
-		byteLength: n * 48,
-		usage: 0x0080 | 0x0008,
-		data: words,
-	});
-	const ident = new Uint32Array(n);
-	for (let i = 0; i < n; i++) ident[i] = i;
-	const mkOrder = (id: string) =>
-		device.createBuffer({
-			id,
-			byteLength: n * 4,
-			usage: 0x0080 | 0x0008 | 0x0004,
-			data: ident,
-		});
-	return {
-		data,
-		orderGraph: mkOrder("ab-order-graph"),
-		orderRaw: mkOrder("ab-order-raw"),
-	};
-}
-
 export async function runGraphPlumbingAb(reps: number) {
 	const device = await getComputeDevice();
 	if (!device) return { error: "no compute device" };
-	const queue = (device as unknown as { handle: GPUDevice }).handle.queue;
 	const out: Record<string, unknown> = { adapter: device.info ?? null };
 	const failures: string[] = [];
 
@@ -594,75 +422,6 @@ export async function runGraphPlumbingAb(reps: number) {
 		tex.destroy();
 	}
 
-	// ── splat sort ──
-	{
-		const sizes = [1000, 100_000, 1_000_000];
-		const rows = [
-			[0, 0, 1, 0],
-			[0.3, -0.2, 0.93, 1.5],
-			[-0.6, 0.1, 0.79, -3],
-		];
-		const sorts: unknown[] = [];
-		for (const n of sizes) {
-			const { data, orderGraph, orderRaw } = splatCloud(device, n);
-			const graph = new GpuSplatSorter(device, data, orderGraph, n);
-			const raw = new RawSplatSorter(device, data, orderRaw, n);
-			await Promise.all([graph.ready, raw.ready()]);
-			let identical = 0;
-			let runs = 0;
-			const graphWall: number[] = [];
-			const rawWall: number[] = [];
-			const graphEncode: number[] = [];
-			const rawEncode: number[] = [];
-			for (let r = 0; r < reps + 3; r++) {
-				const row = rows[r % rows.length];
-				let verdict: Promise<void> | undefined;
-				const t = await both(
-					async () => {
-						verdict = graph.sort(row as [number, number, number, number]);
-						graphEncode.push(graph.stats.lastEncodeMs);
-						await queue.onSubmittedWorkDone();
-					},
-					async () => {
-						rawEncode.push(raw.sort(row));
-						await queue.onSubmittedWorkDone();
-					},
-					r % 2 === 0,
-				);
-				await verdict;
-				if (r >= 3) {
-					graphWall.push(t.graphMs);
-					rawWall.push(t.rawMs);
-				}
-				if (r < rows.length + 1) {
-					const [x, y] = await Promise.all([
-						orderGraph.readAsync(),
-						orderRaw.readAsync(),
-					]);
-					runs++;
-					if (sameBytes(x, y)) identical++;
-					else failures.push(`splat-sort n=${n} rep ${r}: order differs`);
-				}
-			}
-			graphEncode.splice(0, 3);
-			rawEncode.splice(0, 3);
-			sorts.push({
-				n,
-				identical,
-				runs,
-				graphWallMs: summary(graphWall),
-				rawWallMs: summary(rawWall),
-				graphEncodeMs: summary(graphEncode),
-				rawEncodeMs: summary(rawEncode),
-			});
-			graph.destroy();
-			raw.destroy();
-			data.destroy();
-			orderGraph.destroy();
-			orderRaw.destroy();
-		}
-		out.splatSort = sorts;
-	}
 	const { listCachedGraphs } = await import("#/lib/gpu/core/graph");
 	out.cachedGraphs = listCachedGraphs(device).map((g) => ({
 		group: g.group,

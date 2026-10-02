@@ -4,8 +4,8 @@
 
 // Node check (no GPU, no browser) of the GPU splat sort's identity with the worker's counting sort:
 //   npx tsx scripts/gpu/splat-sort-check.ts
-// 1. radix == worker: for the worker's EXACT keys (f64 formula), the tiled stable radix order
-//    (src/lib/gpu/splat-sort/cpu.ts radixOrderTiled, the WGSL kernels step for step) equals the
+// 1. stable order == worker: for the worker's EXACT keys (f64 formula), the stable order by key
+//    (src/lib/gpu/splat-sort/cpu.ts stableOrderByKey, the order luma's stable radix GPUSort writes) equals the
 //    worker's order (sortSplatsByDepth) element for element, ties included, plus the dropped splats
 //    last in ascending index. Cases force masses of equal keys (quantised positions, planes, one
 //    key, n around tile multiples, dropped splats).
@@ -14,8 +14,8 @@
 //    back-to-front up to two key bins.
 
 import {
-	radixOrderTiled,
 	splatKeysF32,
+	stableOrderByKey,
 } from "../../src/lib/gpu/splat-sort/cpu";
 import { SortBackendState } from "../../src/lib/gpu/splat-sort/fallback";
 import {
@@ -97,12 +97,12 @@ for (const [name, gen] of Object.entries(gens))
 			const out = new Uint32Array(n);
 			const kept = sortSplatsByDepth(pos, n, row, out);
 			const { keys, depth } = workerKeys(pos, n, row);
-			const order = radixOrderTiled(keys, n);
+			const order = stableOrderByKey(keys, n);
 			const tag = `${name} n=${n} row=${row}`;
 			cases++;
 			let same = true;
 			for (let i = 0; i < kept; i++) if (order[i] !== out[i]) same = false;
-			check(same, `${tag}: radix order != worker order`);
+			check(same, `${tag}: stable order != worker order`);
 			// dropped splats: last, ascending index
 			let prev = -1;
 			let tailOk = true;
@@ -130,7 +130,7 @@ for (const [name, gen] of Object.entries(gens))
 			f32KeyDiff += gd;
 			f32Total += n;
 			// the f32 order is back to front up to 2 key bins of depth
-			const go = radixOrderTiled(g.keys, n);
+			const go = stableOrderByKey(g.keys, n);
 			let maxD = 0;
 			let minD = Infinity;
 			for (let i = 0; i < n; i++)
@@ -200,5 +200,5 @@ if (fails) {
 	process.exit(1);
 }
 console.log(
-	"OK: stable radix == worker order on identical keys (ties included); fallback state machine",
+	"OK: stable order by key == worker order on identical keys (ties included); fallback state machine",
 );

@@ -2,17 +2,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// WGSL of the GPU splat depth sort (see ./README.md and ./index.ts). Two radix passes of 9 bits over
-// 17-bit keys: the worker's 16-bit key (0..65535) plus one extra key, 65536, for splats the worker
-// drops (view depth <= near), which therefore sort last. Every pass is a STABLE counting sort:
-// tile (rank within a 256-element tile + per-tile digit histogram) → scanDigit (exclusive scan of
-// each digit's histogram over tiles) → scanTotals (exclusive scan of the 512 digit totals) →
-// scatter (position = digitBase + tileOffset + rank). cpu.ts is the line-by-line CPU twin.
+// WGSL of the GPU splat depth sort (see ./README.md and ./index.ts): the depth and key kernels. The sort
+// itself is luma gpgpu's stable radix GPUSort over the 17-bit keys (the worker's 16-bit key, 0..65535, plus
+// one extra key, 65536, for splats the worker drops (view depth <= near), which therefore sort last).
+// cpu.ts is the CPU twin of these two kernels and of the stable order.
 
-/** Workgroup / tile size, the radix width and the digit count. Keep in step with cpu.ts. */
+/** Workgroup size of the depth and key kernels. */
 export const TILE = 256;
-export const RADIX_BITS = 9;
-export const DIGITS = 1 << RADIX_BITS;
 /** Key given to dropped splats (above every real key, 0..65535). */
 export const DROPPED_KEY = 65536;
 
@@ -72,145 +68,5 @@ ${PARAMS}
   var k = 0.0;
   if (span > 0.0) { k = 65535.0 / span; }
   keys[i] = min(65535u, u32((maxD - bitcast<f32>(bits)) * k));
-}
-`;
-
-/**
- * Pass step 1. Thread t of tile w ranks element g = w·256 + t among the EARLIER elements of its
- * tile with the same digit (a loop over the lower threads: O(tile²) shared reads, trivially
- * stable), and the tile's digit histogram goes to hist[digit * blocks + w] (digit-major, so the
- * next kernel scans one digit across tiles). FIRST = 1: the input order is the identity.
- */
-export const TILE_WGSL = /* wgsl */ `\
-${PARAMS}
-override SHIFT: u32 = 0u;
-override FIRST: u32 = 0u;
-@group(0) @binding(1) var<storage, read> keys: array<u32>;
-@group(0) @binding(2) var<storage, read> inIdx: array<u32>;
-@group(0) @binding(3) var<storage, read_write> rank: array<u32>;
-@group(0) @binding(4) var<storage, read_write> hist: array<u32>;
-var<workgroup> dg: array<u32, ${TILE}>;
-var<workgroup> hs: array<atomic<u32>, ${DIGITS}>;
-
-@compute @workgroup_size(${TILE}) fn main(
-  @builtin(global_invocation_id) gid: vec3<u32>,
-  @builtin(local_invocation_index) t: u32,
-  @builtin(workgroup_id) wg: vec3<u32>,
-) {
-  let g = gid.x;
-  let valid = g < p.n;
-  var d = 0xffffffffu;
-  if (valid) {
-    var e = g;
-    if (FIRST == 0u) { e = inIdx[g]; }
-    d = (keys[e] >> SHIFT) & ${DIGITS - 1}u;
-  }
-  dg[t] = d;
-  atomicStore(&hs[t], 0u);
-  atomicStore(&hs[t + ${TILE}u], 0u);
-  workgroupBarrier();
-  if (valid) {
-    var r = 0u;
-    for (var j = 0u; j < t; j++) {
-      if (dg[j] == d) { r++; }
-    }
-    rank[g] = r;
-    atomicAdd(&hs[d], 1u);
-  }
-  workgroupBarrier();
-  hist[t * p.blocks + wg.x] = atomicLoad(&hs[t]);
-  hist[(t + ${TILE}u) * p.blocks + wg.x] = atomicLoad(&hs[t + ${TILE}u]);
-}
-`;
-
-/** Pass step 2: workgroup d = exclusive scan of hist[d * blocks ..] in place; base[d] = the total. */
-export const SCAN_DIGIT_WGSL = /* wgsl */ `\
-${PARAMS}
-@group(0) @binding(1) var<storage, read_write> hist: array<u32>;
-@group(0) @binding(2) var<storage, read_write> base: array<u32>;
-var<workgroup> sh: array<u32, ${TILE}>;
-
-@compute @workgroup_size(${TILE}) fn main(
-  @builtin(local_invocation_index) t: u32,
-  @builtin(workgroup_id) wg: vec3<u32>,
-) {
-  let b = p.blocks;
-  let o = wg.x * b;
-  let chunk = (b + ${TILE - 1}u) / ${TILE}u;
-  let s = min(t * chunk, b);
-  let e = min(s + chunk, b);
-  var sum = 0u;
-  for (var i = s; i < e; i++) { sum += hist[o + i]; }
-  sh[t] = sum;
-  workgroupBarrier();
-  for (var off = 1u; off < ${TILE}u; off = off << 1u) {
-    var v = sh[t];
-    if (t >= off) { v += sh[t - off]; }
-    workgroupBarrier();
-    sh[t] = v;
-    workgroupBarrier();
-  }
-  var run = sh[t] - sum;
-  for (var i = s; i < e; i++) {
-    let v = hist[o + i];
-    hist[o + i] = run;
-    run += v;
-  }
-  if (t == ${TILE - 1}u) { base[wg.x] = sh[${TILE - 1}u]; }
-}
-`;
-
-/** Pass step 3: one workgroup, exclusive scan of the 512 digit totals in place. */
-export const SCAN_TOTALS_WGSL = /* wgsl */ `\
-${PARAMS}
-@group(0) @binding(1) var<storage, read_write> base: array<u32>;
-var<workgroup> sh: array<u32, ${TILE}>;
-
-@compute @workgroup_size(${TILE}) fn main(@builtin(local_invocation_index) t: u32) {
-  _ = p; // keep binding 0 in the 'auto' layout: the kernel binds [p, base] like the others
-  let s0 = base[2u * t];
-  let s1 = base[2u * t + 1u];
-  let sum = s0 + s1;
-  sh[t] = sum;
-  workgroupBarrier();
-  for (var off = 1u; off < ${TILE}u; off = off << 1u) {
-    var v = sh[t];
-    if (t >= off) { v += sh[t - off]; }
-    workgroupBarrier();
-    sh[t] = v;
-    workgroupBarrier();
-  }
-  let ex = sh[t] - sum;
-  base[2u * t] = ex;
-  base[2u * t + 1u] = ex + s0;
-}
-`;
-
-/**
- * Pass step 4: out[digitBase + tileOffset + rank] = element. digitBase = elements with a smaller
- * digit, tileOffset = same-digit elements in earlier tiles, rank = same-digit elements earlier in
- * the tile: the exact stable position. FIRST as in TILE_WGSL.
- */
-export const SCATTER_WGSL = /* wgsl */ `\
-${PARAMS}
-override SHIFT: u32 = 0u;
-override FIRST: u32 = 0u;
-@group(0) @binding(1) var<storage, read> keys: array<u32>;
-@group(0) @binding(2) var<storage, read> inIdx: array<u32>;
-@group(0) @binding(3) var<storage, read> rank: array<u32>;
-@group(0) @binding(4) var<storage, read> hist: array<u32>;
-@group(0) @binding(5) var<storage, read> base: array<u32>;
-@group(0) @binding(6) var<storage, read_write> outIdx: array<u32>;
-
-@compute @workgroup_size(${TILE}) fn main(
-  @builtin(global_invocation_id) gid: vec3<u32>,
-  @builtin(workgroup_id) wg: vec3<u32>,
-) {
-  let g = gid.x;
-  if (g >= p.n) { return; }
-  var e = g;
-  if (FIRST == 0u) { e = inIdx[g]; }
-  let d = (keys[e] >> SHIFT) & ${DIGITS - 1}u;
-  outIdx[base[d] + hist[d * p.blocks + wg.x] + rank[g]] = e;
 }
 `;

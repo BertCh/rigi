@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// WAG W2.6: SPZ (Niantic Spatial) and KSPLAT (GaussianSplats3D) import through @loaders.gl/splats, decoded to
+// WAG W2.6: SPZ (Niantic Spatial), KSPLAT (GaussianSplats3D) and plain .splat (antimatter15, 32-byte records) import through @loaders.gl/splats, decoded to
 // our GaussianCloud. ./splat-loaders.ts sniffs both formats and imports this module only when one is parsed.
 //
 // The packages' loaders return a loaders.gl Mesh Arrow table (POSITION xyz, f_dc_0..2, opacity, scale_0..2,
@@ -14,11 +14,12 @@
 // everything else copied bit for bit. Higher SH bands are dropped (degree 0 only, as for PLY). Positions are
 // taken as stored (frame "camera" unless told otherwise); SPZ axis conversions are the package's own
 // (`sourceCoordinateSystem` / `targetCoordinateSystem`, none by default).
-import { KSPLATLoader, SPZLoader } from "@loaders.gl/splats";
+import { KSPLATLoader, SPLATLoader, SPZLoader } from "@loaders.gl/splats";
 import { SH_C0, to8 } from "./splat-io";
 import {
 	type AsyncSplatLoader,
 	KSPLAT_LOADER_INFO,
+	SPLAT_PLAIN_LOADER_INFO,
 	SPZ_LOADER_INFO,
 	type SplatExtLoaderOptions,
 } from "./splat-loaders";
@@ -110,6 +111,7 @@ function parserOf(loader: { preload(): Promise<unknown> }) {
 }
 const spzParser = parserOf(SPZLoader);
 const ksplatParser = parserOf(KSPLATLoader);
+const plainSplatParser = parserOf(SPLATLoader);
 
 export const SplatSpzLoader: AsyncSplatLoader<SplatExtLoaderOptions> = {
 	...SPZ_LOADER_INFO,
@@ -132,6 +134,18 @@ export const SplatKsplatLoader: AsyncSplatLoader<SplatExtLoaderOptions> = {
 		return cloudFromSplatsTable(
 			mesh as MeshTable,
 			options?.["splat-ksplat"] ?? {},
+		);
+	},
+};
+
+/** Plain `.splat`: colour bytes are display RGB (the SH DC round trip returns them), alpha byte / 255. */
+export const SplatPlainLoader: AsyncSplatLoader<SplatExtLoaderOptions> = {
+	...SPLAT_PLAIN_LOADER_INFO,
+	parse: async (arrayBuffer, options) => {
+		const mesh = await (await plainSplatParser()).parse(arrayBuffer);
+		return cloudFromSplatsTable(
+			mesh as MeshTable,
+			options?.["splat-plain"] ?? {},
 		);
 	},
 };

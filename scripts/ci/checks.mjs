@@ -497,7 +497,7 @@ export const CHECKS = [
 		tier: "fast",
 		group: "nearfield",
 		cmd: tsx("src/lib/nearfield/splat-loaders-ext.check.ts"),
-		note: "SPZ v2/v3/v4 + KSPLAT 0/1 through @loaders.gl/splats (hand-built fixtures)",
+		note: "SPZ v2/v3/v4 + KSPLAT 0/1 + plain .splat through @loaders.gl/splats (hand-built fixtures)",
 		timeoutS: 120,
 	},
 	{
@@ -734,7 +734,7 @@ export const CHECKS = [
 			"--renderer",
 			"webgpu",
 		]),
-		note: "WAG graph plumbing, webgpu-pinned: silhouette-gpu, geo-query-gpu and splat-sort on core ComputeGraphs vs a replica of their former raw dispatches, byte-identical read-backs and order buffers; timing reported (not gated)",
+		note: "WAG graph plumbing, webgpu-pinned: silhouette-gpu and geo-query-gpu on core ComputeGraphs vs a replica of their former raw dispatches, byte-identical read-backs; timing reported (not gated)",
 		timeoutS: 3600,
 	},
 	{

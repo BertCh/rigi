@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// WAG W2.6 check: SPZ / KSPLAT through @loaders.gl/splats into GaussianCloud.
+// WAG W2.6 check: SPZ / KSPLAT / plain .splat through @loaders.gl/splats into GaussianCloud.
 // Run: npx tsx src/lib/nearfield/splat-loaders-ext.check.ts
 // @loaders.gl/splats has no writer, so the fixtures are hand-built from the format layouts:
 //  - SPZ v4 (zstd streams, node:zlib), v3 and v2 (one gzip stream): 24-bit fixed-point positions, log-byte
 //    scales, alpha bytes, SPZ colour bytes (SH DC · 0.15 + 0.5), smallest-three (v3/v4) or xyz-byte (v2)
 //    quaternions; expected values computed here from the byte values
 //  - KSPLAT compression 0 (float32) and 1 (bucketed u16 centres, half-float scales / quaternions)
-// Also: sniffing order (v1, PLY, SPZ, KSPLAT), parseSplat end to end through the lazy loaders, parseSplatSync
+//  - plain .splat (32-byte records: f32 position, f32 scale, u8 rgba, u8 quaternion (b - 128) / 128)
+// Also: sniffing order (v1, PLY, SPZ, KSPLAT, plain .splat), parseSplat end to end through the lazy loaders, parseSplatSync
 // refusing the async formats, and splat-loaders.ts importing @loaders.gl only dynamically.
 import { readFileSync } from "node:fs";
 import { gzipSync, zstdCompressSync } from "node:zlib";
@@ -18,11 +19,16 @@ import {
 	parseSplat,
 	parseSplatSync,
 	SplatKsplatLoaderLazy,
+	SplatPlainLoaderLazy,
 	SplatSpzLoaderLazy,
 	SplatV1Loader,
 	selectSplatLoader,
 } from "./splat-loaders";
-import { SplatKsplatLoader, SplatSpzLoader } from "./splat-loaders-ext";
+import {
+	SplatKsplatLoader,
+	SplatPlainLoader,
+	SplatSpzLoader,
+} from "./splat-loaders-ext";
 import type { GaussianCloud } from "./types";
 
 let failures = 0;
@@ -412,6 +418,99 @@ for (const level of [0, 1] as const) {
 			sameArr(viaLazy.scales, got.scales),
 		`KSPLAT level ${level}: parseSplat (lazy import) == SplatKsplatLoader`,
 	);
+}
+
+// ---------------------------------------------------------------- plain .splat
+
+{
+	const P = 5;
+	const rec = new ArrayBuffer(32 * P);
+	const dv = new DataView(rec);
+	const qb = [
+		[255, 128, 128, 128], // w x y z bytes: (255-128)/128, 0, 0, 0
+		[128, 128, 128, 255],
+		[200, 100, 150, 128],
+		[128, 128, 128, 128], // zero quaternion -> identity fallback
+		[10, 250, 30, 40],
+	];
+	const wantPos: number[] = [];
+	const wantScale: number[] = [];
+	const wantRot: number[] = [];
+	const wantCol = new Uint8Array(4 * P);
+	for (let i = 0; i < P; i++) {
+		const o = 32 * i;
+		for (let k = 0; k < 3; k++) {
+			const pv = Math.fround(Math.sin(i * 3 + k) * 20);
+			const sv = Math.fround(0.01 * (1 + i + k));
+			dv.setFloat32(o + 4 * k, pv, true);
+			dv.setFloat32(o + 12 + 4 * k, sv, true);
+			wantPos.push(pv);
+			wantScale.push(sv);
+		}
+		const rgba = [
+			(i * 47 + 9) % 256,
+			(i * 91 + 200) % 256,
+			(i * 13 + 77) % 256,
+			(i * 71 + 30) % 256,
+		];
+		rgba.forEach((v, k) => {
+			dv.setUint8(o + 24 + k, v);
+			wantCol[4 * i + k] = v;
+		});
+		qb[i].forEach((v, k) => {
+			dv.setUint8(o + 28 + k, v);
+		});
+		const [w, x, y, z] = qb[i].map((v) => (v - 128) / 128);
+		const len = Math.hypot(w, x, y, z);
+		wantRot.push(
+			...(len > Number.EPSILON
+				? [w / len, x / len, y / len, z / len]
+				: [1, 0, 0, 0]),
+		);
+	}
+	ok(
+		selectSplatLoader(rec) === SplatPlainLoaderLazy,
+		"plain .splat: sniffed (32-byte multiple, finite positions, positive scales)",
+	);
+	const got = await SplatPlainLoader.parse(rec);
+	const want: GaussianCloud = {
+		count: P,
+		frame: "camera",
+		positions: Float32Array.from(wantPos),
+		scales: Float32Array.from(wantScale),
+		rotations: Float32Array.from(wantRot),
+		colors: wantCol,
+		provenance: new Uint8Array(P).fill(1),
+	};
+	const bad = cloudDiff(got, want);
+	ok(
+		bad.length === 0,
+		`plain .splat: decoded == expected${bad.length ? ` (differs: ${bad.join(", ")})` : ""}`,
+	);
+	const viaLazy = await parseSplat(rec, { frame: "enu", provenance: 2 });
+	ok(
+		viaLazy.frame === "enu" &&
+			viaLazy.provenance.every((p) => p === 2) &&
+			sameArr(viaLazy.positions, got.positions),
+		"plain .splat: parseSplat (lazy import) == SplatPlainLoader, options applied",
+	);
+	ok(
+		selectSplatLoader(rec.slice(0, 32 * P - 1)) === null,
+		"plain .splat: a length that is not a multiple of 32 is not sniffed",
+	);
+	const neg = rec.slice(0);
+	new DataView(neg).setFloat32(12, -1, true);
+	ok(
+		selectSplatLoader(neg) === null,
+		"plain .splat: a non-positive scale in a sampled record is not sniffed",
+	);
+	let threw = false;
+	try {
+		parseSplatSync(rec);
+	} catch (e) {
+		threw = /asynchronously/.test((e as Error).message);
+	}
+	ok(threw, "parseSplatSync refuses plain .splat with a pointer to parseSplat");
 }
 
 // ---------------------------------------------------------------- sniffing and wiring

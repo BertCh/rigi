@@ -759,12 +759,12 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		cadence: "per view",
 		resources: [
 			"splat storage buffer, order buffer (render device; imports bound per encode)",
-			"params, depth, mm, keys, rank, tmp, hist, base (imports, owned by each GpuSplatSorter)",
+			"params, depth, mm, keys, rank, tmp (imports, owned by each GpuSplatSorter)",
 		],
 		readbacks: [],
 		status: "default",
 		notes:
-			'deck-webgpu splats sortBackend "gpu"; clear + 10 kernel nodes in one compute pass, encoded and submitted synchronously on the sorter\'s encoder (no lease); keyed by buffer sizes',
+			'deck-webgpu splats sortBackend "gpu"; clear + depth + keys kernel nodes + one luma GPUSort in one compute pass, encoded and submitted synchronously on the sorter\'s encoder (no lease); keyed by buffer sizes',
 	},
 	{
 		id: "horizon-ridges",

@@ -133,12 +133,6 @@ export const FLAG_SCHEMA = {
 	 */
 	renderBundles: onOff("off"),
 	/**
-	 * WebGPU splat sort: luma's gpgpu GPUSort (stable radix, 17 key bits) replaces the in-house
-	 * tile/scan/scatter passes after the depth and key kernels (LF5; identical order, measured in
-	 * scripts/gpu/splat-sort-gpgpu-dawn.ts). off = the in-house radix passes.
-	 */
-	splatSortGpgpu: onOff("on"),
-	/**
 	 * WebGPU terrain stream: Terrarium tiles decode on the GPU straight into the height atlas (WAG W2.3,
 	 * deck-webgpu/terrain-gpu-decode.ts) and CPU heights are produced only when a CPU consumer asks
 	 * (W2.4 getCpuHeights). Same heights bit for bit (texel bytes == canvas bytes, measured); off = the
@@ -228,6 +222,12 @@ const RETIRED: Partial<Record<string, Record<string, string>>> = {
 	},
 };
 
+/** Flags that were removed: still accepted in a URL (ignored), with a one-time console warning. */
+const RETIRED_FLAGS: Record<string, string> = {
+	splatSortGpgpu:
+		"the in-house splat radix sort was removed (luma GPUSort is the only WebGPU splat sort); the flag has no effect",
+};
+
 const warned = new Set<string>();
 function bad(name: string, raw: string) {
 	const k = `${name}=${raw}`;
@@ -311,7 +311,15 @@ function pageSearch(): string {
 let memo: { search: string; flags: Partial<Flags> } | null = null;
 function fromPage(): Partial<Flags> {
 	const search = pageSearch();
-	if (memo?.search !== search) memo = { search, flags: parseFlags(search) };
+	if (memo?.search !== search) {
+		memo = { search, flags: parseFlags(search) };
+		const q = new URLSearchParams(search);
+		for (const [name, why] of Object.entries(RETIRED_FLAGS))
+			if (q.has(name) && !warned.has(name)) {
+				warned.add(name);
+				console.warn(`[flags] ?${name}: ${why}`);
+			}
+	}
 	return memo.flags;
 }
 

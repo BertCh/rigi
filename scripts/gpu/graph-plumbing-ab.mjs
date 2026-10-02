@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// WAG graph plumbing A/B (silhouette-gpu, geo-query-gpu, splat-sort on core ComputeGraphs vs a replica
-// of their former raw dispatches): byte-identical read-backs / order buffers and dispatch + readback
+// WAG graph plumbing A/B (silhouette-gpu, geo-query-gpu on core ComputeGraphs vs a replica
+// of their former raw dispatches): byte-identical read-backs and dispatch + readback
 // timing, in one headless Chromium page on the WebGPU compute device. Page side:
 // scripts/gpu/graph-plumbing-ab-page.ts. Always under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/graph-plumbing-ab.mjs [--reps 15]
@@ -12,13 +12,13 @@
 // The modules are WebGPU-only: --renderer webgpu is the only engine (pinned, as every browser check),
 // and the run fails when the compute device is not WebGPU. --url overrides env APP_URL (default
 // http://localhost:3110). Exit 1 on any byte difference or page error.
-// Measured 2026-10-01 (Apple M-series, headless Chromium, --reps 30): every read-back and order buffer
+// Measured 2026-10-01 (Apple M-series, headless Chromium, --reps 30): every read-back
 // byte-identical; medians graph vs raw: silhouette 12 poses 7.2 vs 7.1 ms, verdicts + skyline (one
-// submit vs two) 1.3 vs 1.1 ms, gather 0.8 vs 0.7 ms, splat sort 1M 9.0 vs 9.1 ms (encode 0.1 both).
+// submit vs two) 1.3 vs 1.1 ms, gather 0.8 vs 0.7 ms. (The splat-sort leg was dropped 2026-10-01 when the in-house radix it replicated was removed: 1M 9.0 vs 9.1 ms, then 3.2 vs 3.2 ms.)
 // Re-run 2026-10-01 after geo-query-gpu moved to persistent pool slots + ComputeGraph.runNow (same
-// machine, a quieter load state, --reps 30): every read-back and order buffer byte-identical (geo-query
+// machine, a quieter load state, --reps 30): every read-back byte-identical (geo-query
 // 32/32 per kind); medians graph vs raw: silhouette 1.9 vs 1.9 ms, verdicts + skyline 0.4 vs 0.5 ms,
-// gather 0.3 vs 0.3 ms, splat sort 1M 3.2 vs 3.2 ms. Wall times are per call, so the 0.1 ms
+// gather 0.3 vs 0.3 ms. Wall times are per call, so the 0.1 ms
 // performance.now() granularity of the page dominates these small medians.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";

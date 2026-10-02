@@ -54,7 +54,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | look-relief | I9 | default | page | per style | `look-relief` | height field H (import or relief-heights transient); params | field + gen (array path only); texture path writes textures, no readback |
 | look-textures | I9 | default | page | per settle | `look-tex-*` (uncached) | renderer targets (geometry, photo, sky / fg masks, layer) as textures | band stats: folded ColorStats 256 B (f64: partials); haze head |
 | labels | I10 | cpu | page | per emit | – | – | – |
-| splat-sort | I11 | default | page | per view | `splat-sort` | splat storage buffer, order buffer (render device; imports bound per encode); params, depth, mm, keys, rank, tmp, hist, base (imports, owned by each GpuSplatSorter) | – |
+| splat-sort | I11 | default | page | per view | `splat-sort` | splat storage buffer, order buffer (render device; imports bound per encode); params, depth, mm, keys, rank, tmp (imports, owned by each GpuSplatSorter) | – |
 | horizon-ridges | I12 | default | worker:ridgelines (remote) | per photo | `horizon-ridges` | mosaic pages (imports); u, params | read: ridge tops outBytes |
 | roll-webgl | I12 | cpu | page | per frame | – | deck WebGL2 + raw GL2 programs | range maps |
 
@@ -85,7 +85,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **look-haze**: graph break for the f64 tail on the CPU (D18; the round trip before the grid is inherent: its inputs come from f64 code). Default: the airlight band on the GPU on the texture path (look-haze-band, one submit instead of two; D16 removed; ?hazeBandGpu=off, WebGL / ?gpu=off / spot-check fault = CPU band) and the grid arg-min as a luma GPUProgram with a GPU indirect-gated selection (look-haze-argmin; ?hazeArgminGpu=off or a per-call check fault = whole-grid read)
 - **look-textures**: texture-input look passes; its own per-key graph cache (not core cachedGraph). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)
 - **labels**: CPU / DOM by nature; fed by I8's small readbacks
-- **splat-sort**: deck-webgpu splats sortBackend "gpu"; clear + 10 kernel nodes in one compute pass, encoded and submitted synchronously on the sorter's encoder (no lease); keyed by buffer sizes
+- **splat-sort**: deck-webgpu splats sortBackend "gpu"; clear + depth + keys kernel nodes + one luma GPUSort in one compute pass, encoded and submitted synchronously on the sorter's encoder (no lease); keyed by buffer sizes
 - **roll-webgl**: WebGL2 only; needs a WebGPU port before it can join a graph
 
 Test and bench groups (not islands): `selftest-cache`, `look-haze-lint`.

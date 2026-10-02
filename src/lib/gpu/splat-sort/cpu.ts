@@ -9,11 +9,11 @@
 //   - splatKeysF32: the depth + key kernels with every WGSL f32 operation rounded by Math.fround
 //     (no fused multiply-add: WGSL permits fusing, so a real GPU may differ from this by one ulp
 //     of the depth, which can move a key by 1 at a bin edge; see README.md);
-//   - radixOrderTiled: the tile / scanDigit / scanTotals / scatter kernels, step for step.
+//   - stableOrderByKey: the order of luma's stable radix GPUSort (ascending key, ties by index).
 
-import { DIGITS, DROPPED_KEY, RADIX_BITS, TILE } from "./splat-sort.wgsl";
+import { DROPPED_KEY, TILE } from "./splat-sort.wgsl";
 
-export { DIGITS, DROPPED_KEY, RADIX_BITS, TILE };
+export { DROPPED_KEY, TILE };
 
 const f = Math.fround;
 
@@ -60,67 +60,27 @@ export function splatKeysF32(
 }
 
 /**
- * The GPU's two stable radix passes over `keys` (17 bits, 9 per pass, LSD), literally: per-tile
- * ranks and histograms, per-digit scans over tiles, the digit-total scan, the scatter. Returns the
- * order of ALL `count` elements (dropped ones last).
+ * The order luma's stable radix GPUSort produces over `keys`: ascending key, ties in ascending index,
+ * for ALL `count` elements (dropped ones, key DROPPED_KEY, last). A counting sort over the 17-bit keys.
  */
-export function radixOrderTiled(keys: Uint32Array, count: number): Uint32Array {
-	const blocks = Math.max(1, Math.ceil(count / TILE));
-	let inIdx = new Uint32Array(count);
-	let outIdx = new Uint32Array(count);
-	const rank = new Uint32Array(count);
-	const hist = new Uint32Array(DIGITS * blocks);
-	const base = new Uint32Array(DIGITS);
-	for (let pass = 0; pass < 2; pass++) {
-		const shift = pass * RADIX_BITS;
-		const first = pass === 0;
-		const digitOf = (g: number) => {
-			const e = first ? g : inIdx[g];
-			return (keys[e] >>> shift) & (DIGITS - 1);
-		};
-		hist.fill(0);
-		for (let w = 0; w < blocks; w++) {
-			const lo = w * TILE;
-			const hi = Math.min(count, lo + TILE);
-			for (let g = lo; g < hi; g++) {
-				const dg = digitOf(g);
-				let r = 0;
-				for (let j = lo; j < g; j++) if (digitOf(j) === dg) r++;
-				rank[g] = r;
-				hist[dg * blocks + w]++;
-			}
-		}
-		for (let dgt = 0; dgt < DIGITS; dgt++) {
-			let run = 0;
-			for (let w = 0; w < blocks; w++) {
-				const v = hist[dgt * blocks + w];
-				hist[dgt * blocks + w] = run;
-				run += v;
-			}
-			base[dgt] = run;
-		}
-		let acc = 0;
-		for (let dgt = 0; dgt < DIGITS; dgt++) {
-			const v = base[dgt];
-			base[dgt] = acc;
-			acc += v;
-		}
-		for (let g = 0; g < count; g++) {
-			const e = first ? g : inIdx[g];
-			const dg = digitOf(g);
-			outIdx[base[dg] + hist[dg * blocks + ((g / TILE) | 0)] + rank[g]] = e;
-		}
-		[inIdx, outIdx] = [outIdx, inIdx];
-	}
-	return inIdx;
+export function stableOrderByKey(
+	keys: Uint32Array,
+	count: number,
+): Uint32Array {
+	const start = new Uint32Array(DROPPED_KEY + 2);
+	for (let i = 0; i < count; i++) start[keys[i] + 1]++;
+	for (let k = 1; k < start.length; k++) start[k] += start[k - 1];
+	const order = new Uint32Array(count);
+	for (let i = 0; i < count; i++) order[start[keys[i]]++] = i;
+	return order;
 }
 
-/** The whole GPU pipeline on the CPU: f32 keys, then the tiled stable radix. */
+/** The whole GPU pipeline on the CPU: f32 keys, then the stable order. */
 export function gpuSplatOrderCpu(
 	positions: Float32Array,
 	count: number,
 	row: readonly [number, number, number, number],
 ) {
 	const { keys, kept } = splatKeysF32(positions, count, row);
-	return { order: radixOrderTiled(keys, count), keys, kept };
+	return { order: stableOrderByKey(keys, count), keys, kept };
 }

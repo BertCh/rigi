@@ -8,7 +8,7 @@
 // so a real `load(url, SplatV1Loader)` call works with them and no dependency is added. The output is
 // our packed GaussianCloud; the parsing itself stays in splat-io.ts (these are thin, bit-identical wrappers).
 //
-// SPZ and KSPLAT (WAG W2.6) are sniffed here too, but parsed by @loaders.gl/splats in ./splat-loaders-ext.ts,
+// SPZ, KSPLAT (WAG W2.6) and plain ".splat" are sniffed here too, but parsed by @loaders.gl/splats in ./splat-loaders-ext.ts,
 // which this module imports only when such a file is parsed. They are async-only (SPZ v4 inflates zstd
 // streams): parse them with `parseSplat` (or the loader's `parse`), not `parseSplatSync`.
 import { decodeGaussianPly, decodeSplatV1, SPLAT_V1_MAGIC } from "./splat-io";
@@ -128,7 +128,30 @@ export const isKsplat = (arrayBuffer: ArrayBuffer) => {
 	);
 };
 
-/** Shared metadata of the SPZ / KSPLAT loaders (the parsers live in ./splat-loaders-ext.ts). */
+/** Bytes per record of the plain ".splat" format (antimatter15): f32 xyz, f32 scale xyz, u8 rgba, u8 quaternion. */
+export const SPLAT_RECORD_BYTES = 32;
+
+/**
+ * Plain ".splat" has no magic and no header: a bare array of 32-byte records. Sniffed after every other
+ * format (it is the weakest test): a non-empty length that is a multiple of 32 and, in the first 64
+ * records, finite positions with finite, strictly positive scales (linear, already exponentiated).
+ */
+export const isPlainSplat = (arrayBuffer: ArrayBuffer) => {
+	const n = arrayBuffer.byteLength / SPLAT_RECORD_BYTES;
+	if (n === 0 || !Number.isInteger(n)) return false;
+	const dv = new DataView(arrayBuffer);
+	for (let i = 0; i < Math.min(n, 64); i++) {
+		const o = i * SPLAT_RECORD_BYTES;
+		for (let k = 0; k < 3; k++) {
+			if (!Number.isFinite(dv.getFloat32(o + 4 * k, true))) return false;
+			const scale = dv.getFloat32(o + 12 + 4 * k, true);
+			if (!(scale > 0 && scale < Number.POSITIVE_INFINITY)) return false;
+		}
+	}
+	return true;
+};
+
+/** Shared metadata of the SPZ / KSPLAT / plain-splat loaders (the parsers live in ./splat-loaders-ext.ts). */
 export const SPZ_LOADER_INFO = {
 	name: "SPZ (@loaders.gl/splats)",
 	id: "splat-spz",
@@ -153,6 +176,18 @@ export const KSPLAT_LOADER_INFO = {
 	options: { "splat-ksplat": {} },
 } as const satisfies Omit<AsyncSplatLoader<SplatExtLoaderOptions>, "parse">;
 
+export const SPLAT_PLAIN_LOADER_INFO = {
+	name: "Plain .splat (@loaders.gl/splats)",
+	id: "splat-plain",
+	module: "rigi",
+	version: LOADER_VERSION,
+	extensions: ["splat"],
+	mimeTypes: ["application/octet-stream"],
+	binary: true,
+	tests: [isPlainSplat],
+	options: { "splat-plain": {} },
+} as const satisfies Omit<AsyncSplatLoader<SplatExtLoaderOptions>, "parse">;
+
 const ext = () => import("./splat-loaders-ext");
 
 /** SPZ loader that imports @loaders.gl/splats on first parse (see SplatSpzLoader in ./splat-loaders-ext.ts). */
@@ -169,16 +204,24 @@ export const SplatKsplatLoaderLazy: AsyncSplatLoader<SplatExtLoaderOptions> = {
 		(await ext()).SplatKsplatLoader.parse(arrayBuffer, options),
 };
 
+/** Plain .splat loader that imports @loaders.gl/splats on first parse. */
+export const SplatPlainLoaderLazy: AsyncSplatLoader<SplatExtLoaderOptions> = {
+	...SPLAT_PLAIN_LOADER_INFO,
+	parse: async (arrayBuffer, options) =>
+		(await ext()).SplatPlainLoader.parse(arrayBuffer, options),
+};
+
 export const SPLAT_EXT_LOADERS = [
 	SplatSpzLoaderLazy,
 	SplatKsplatLoaderLazy,
+	SplatPlainLoaderLazy,
 ] as const;
 
 type AnySplatLoader =
 	| (typeof SPLAT_LOADERS)[number]
 	| (typeof SPLAT_EXT_LOADERS)[number];
 
-/** Pick the loader whose `tests` match the buffer (magic sniffing; v1, PLY, SPZ, then KSPLAT), or null. */
+/** Pick the loader whose `tests` match the buffer (magic sniffing; v1, PLY, SPZ, KSPLAT, then plain .splat), or null. */
 export function selectSplatLoader(
 	arrayBuffer: ArrayBuffer,
 ): AnySplatLoader | null {
@@ -187,7 +230,7 @@ export function selectSplatLoader(
 	return null;
 }
 
-/** Parse .splat-v1 or PLY by magic sniffing. Throws when neither matches (SPZ / KSPLAT: use parseSplat). */
+/** Parse .splat-v1 or PLY by magic sniffing. Throws when neither matches (SPZ / KSPLAT / .splat: use parseSplat). */
 export function parseSplatSync(
 	arrayBuffer: ArrayBuffer,
 	plyOptions: SplatPlyLoaderOptions = {},
@@ -202,7 +245,7 @@ export function parseSplatSync(
 	);
 }
 
-/** Parse any of the four formats by magic sniffing. `options` apply to PLY, SPZ and KSPLAT. */
+/** Parse any of the five formats by magic sniffing. `options` apply to PLY, SPZ, KSPLAT and plain .splat. */
 export async function parseSplat(
 	arrayBuffer: ArrayBuffer,
 	options: SplatExtLoaderOptions = {},
@@ -216,7 +259,7 @@ export async function parseSplat(
 			"splat-ply": { frame, provenance },
 		});
 	}
-	// what is left is SPZ or KSPLAT
+	// what is left is SPZ, KSPLAT or plain .splat
 	const extLoader = loader as AsyncSplatLoader<SplatExtLoaderOptions>;
 	return extLoader.parse(arrayBuffer, { [extLoader.id]: options });
 }

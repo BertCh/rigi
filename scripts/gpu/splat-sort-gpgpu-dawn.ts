@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// LF5 bench: luma gpgpu GPUSort (radix / bitonic) against our splat radix sort
-// (src/lib/gpu/splat-sort), on a native WebGPU implementation in node (Dawn, `webgpu` npm package).
+// LF5 bench: luma gpgpu GPUSort (radix / bitonic) against the shipped splat sorter
+// (src/lib/gpu/splat-sort, which is GPUSort radix since the in-house radix passes were removed), on a native WebGPU implementation in node (Dawn, `webgpu` npm package).
 // Same pattern as sky-prep-dawn.ts:
 //   (mkdir /tmp/dawn && cd /tmp/dawn && npm i webgpu@0.3.0)
 //   DAWN_DIR=/tmp/dawn npx tsx scripts/gpu/splat-sort-gpgpu-dawn.ts [--sizes 100000,500000] [--reps 21]
 // Wall ms = submit to queue.onSubmittedWorkDone(), median of reps (Dawn on the host GPU; absolute
-// numbers differ from Chrome). Order identity: GPUSort's payload is compared with the CPU twin of our
-// sort (cpu.ts radixOrderTiled) on the keys of splatKeysF32, element for element.
+// numbers differ from Chrome). Order identity: GPUSort's payload is compared with the CPU twin of the
+// stable order (cpu.ts stableOrderByKey) on the keys of splatKeysF32, element for element.
 // Exit 1 on an order mismatch, 2 when no adapter/package is available.
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,8 +18,8 @@ import { ComputeGraph } from "../../src/lib/gpu/core/graph";
 import { attachWebGPUDevice, GPUSort } from "../../src/lib/gpu/core/luma";
 import { getGpuProfile, resetGpuProfile } from "../../src/lib/gpu/core/profile";
 import {
-	radixOrderTiled,
 	splatKeysF32,
+	stableOrderByKey,
 } from "../../src/lib/gpu/splat-sort/cpu";
 import { GpuSplatSorter } from "../../src/lib/gpu/splat-sort/index";
 
@@ -103,18 +103,11 @@ for (const n of SIZES) {
 		data: ident,
 	});
 	const ref = splatKeysF32(pos, n, [0, 0, 1, 0]);
-	const want = radixOrderTiled(ref.keys, n);
+	const want = stableOrderByKey(ref.keys, n);
 	const row = [0, 0, 1, 0] as const;
-	const flags = globalThis as unknown as {
-		__RIGI_FLAGS__?: Record<string, string>;
-	};
-	const sorted: Record<
-		string,
-		{ wall: number; radix: number; pre: number; same: boolean }
-	> = {};
 	let oursSame = true;
-	for (const mode of ["off", "on"]) {
-		flags.__RIGI_FLAGS__ = { splatSortGpgpu: mode };
+	let sorted: { wall: number; radix: number; pre: number; same: boolean };
+	{
 		const sorter = new GpuSplatSorter(device, data, order, n);
 		await sorter.ready;
 		const wall: number[] = [];
@@ -142,12 +135,12 @@ for (const n of SIZES) {
 			if (!k.startsWith("splat-sort")) continue;
 			const per = v.gpuMs / v.count;
 			if (/\/(depth|keys)$/.test(k)) pre += per;
-			else if (/\/(tile|scan|scatter|sort)/.test(k)) radix += per;
+			else if (/\/sort/.test(k)) radix += per;
 		}
 		const got = new Uint32Array((await order.readAsync()).slice().buffer);
 		const same = got.every((v, i) => v === want[i]);
-		oursSame &&= same;
-		sorted[mode] = { wall: med(wall), radix, pre, same };
+		oursSame = same;
+		sorted = { wall: med(wall), radix, pre, same };
 		sorter.destroy();
 	}
 	const res: Record<string, { ms: number; gpu: number; same: boolean }> = {};
@@ -216,7 +209,7 @@ for (const n of SIZES) {
 	}
 	if (!oursSame || Object.values(res).some((r) => !r.same)) mismatches++;
 	console.log(
-		`n=${n} in-house sorter: wall ${sorted.off.wall.toFixed(2)} ms, GPU radix ${sorted.off.radix.toFixed(3)} + depth/keys ${sorted.off.pre.toFixed(3)} ms | splatSortGpgpu=on sorter: wall ${sorted.on.wall.toFixed(2)} ms, GPU sort ${sorted.on.radix.toFixed(3)} + depth/keys ${sorted.on.pre.toFixed(3)} ms | same order off=${sorted.off.same} on=${sorted.on.same}`,
+		`n=${n} GpuSplatSorter: wall ${sorted.wall.toFixed(2)} ms, GPU sort ${sorted.radix.toFixed(3)} + depth/keys ${sorted.pre.toFixed(3)} ms | same order as the CPU twin=${sorted.same}`,
 		Object.entries(res)
 			.map(
 				([k, v]) =>
