@@ -3,7 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { describe, expect, it } from "vitest";
-import { EARTH_R, REFRACTION_K } from "../../geodesy";
+import { destination, EARTH_R, REFRACTION_K } from "../../geodesy";
+import type { Ridge } from "../horizon";
 import { computeHorizon } from "../horizon";
 import type { TerrainSampler } from "../terrain";
 
@@ -76,4 +77,68 @@ describe("computeHorizon", () => {
 		expect(h.distance[0]).toBeGreaterThanOrEqual(4000);
 		expect((near?.elevation ?? 99) < h.elevation[0]).toBe(true);
 	});
+	it("is bit-identical to the plain destination() march it unrolls", () => {
+		// A height field whose value changes with every bit of (lon, lat), plus a hole and ridges.
+		const t = stub((lon, lat, d) => {
+			if (d > 3000 && d < 3400) return Number.NaN;
+			return (
+				1500 +
+				900 * Math.sin(lon * 4000) * Math.cos(lat * 3100) +
+				d * 0.01 +
+				(lon * 1e7 - Math.floor(lon * 1e7))
+			);
+		});
+		const opts = { step: 7.5, maxDistance: 40_000 };
+		const got = computeHorizon(t, 46.61, 7.93, 1650.3, opts);
+		const want = referenceHorizon(t, 46.61, 7.93, 1650.3, opts);
+		expect([...got.elevation]).toEqual([...want.elevation]);
+		expect([...got.distance]).toEqual([...want.distance]);
+		expect(got.ridges).toEqual(want.ridges);
+		expect(got.ridges.some((r) => r.length > 0)).toBe(true);
+	});
 });
+
+/** The pre-unrolling computeHorizon (destination() per sample), kept as the bit-identity reference. */
+function referenceHorizon(
+	terrain: TerrainSampler,
+	lat: number,
+	lon: number,
+	eyeHeight: number,
+	opts: { step: number; maxDistance: number },
+) {
+	const rEff = EARTH_R / (1 - REFRACTION_K);
+	const distances: number[] = [];
+	for (let d = 20; d <= opts.maxDistance; d += Math.max(10, d * 0.004))
+		distances.push(d);
+	const n = Math.round(360 / opts.step);
+	const elevation = new Float32Array(n);
+	const distance = new Float32Array(n);
+	const ridges: Ridge[][] = [];
+	for (let i = 0; i < n; i++) {
+		const az = i * opts.step;
+		let best = -90;
+		let bestD = 0;
+		let crest: Ridge | null = null;
+		let prevVisible = false;
+		const found: Ridge[] = [];
+		for (const d of distances) {
+			const p = destination(lat, lon, az, d);
+			const h = terrain.sampleAt(p.lon, p.lat, d);
+			if (Number.isNaN(h)) continue;
+			const angle =
+				Math.atan2(h - eyeHeight - (d * d) / (2 * rEff), d) * (180 / Math.PI);
+			if (angle > best) {
+				best = angle;
+				bestD = d;
+				if (!prevVisible && crest && d - crest.distance > 0.08 * crest.distance)
+					found.push(crest);
+				crest = { elevation: angle, distance: d };
+				prevVisible = true;
+			} else prevVisible = false;
+		}
+		elevation[i] = best;
+		distance[i] = bestD;
+		ridges.push(found);
+	}
+	return { elevation, distance, ridges };
+}

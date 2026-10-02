@@ -17,7 +17,7 @@
  */
 import { MIN_VALID } from "../dem";
 import type { HorizonOptions, HorizonProfile, Ridge } from "../geo/horizon";
-import { type TerrainSampler, TILE_SIZE } from "../geo/terrain";
+import type { TerrainSampler } from "../geo/terrain";
 import { DEG, EARTH_R, REFRACTION_K } from "../geodesy";
 import {
 	buildMips,
@@ -492,11 +492,8 @@ export function mosaicsFromSampler(
 	lon: number,
 	maxDistance = 150_000,
 ): Mosaic[] {
-	const tiles = (sampler as unknown as { tiles: Map<string, Float32Array> })
-		.tiles;
-	const tileSize = (sampler as { tileSize?: number }).tileSize ?? TILE_SIZE;
-	const store = new TileStore(noSource(tileSize), false);
-	for (const [id, t] of tiles) store.tiles.set(id, t);
+	const store = new TileStore(noSource(sampler.tileSize), false);
+	for (const [id, t] of sampler.tileSet) store.tiles.set(id, t);
 	const spans: RingSpan[] = [];
 	let lo = 0;
 	for (const l of sampler.levels) {

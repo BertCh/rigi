@@ -36,23 +36,42 @@ export class TerrainSampler {
 
 	/** Bilinear DEM height at (lon, lat) on zoom z: metres above mean sea level (Terrarium / Mapterhorn). */
 	sample(lon: number, lat: number, z: number): Height<"msl"> {
+		const n = this.tileSize;
 		const t = lonLatToTile(lon, lat, z);
-		const px = t.x * this.tileSize - 0.5;
-		const py = t.y * this.tileSize - 0.5;
+		const px = t.x * n - 0.5;
+		const py = t.y * n - 0.5;
 		const x0 = Math.floor(px);
 		const y0 = Math.floor(py);
 		const fx = px - x0;
 		const fy = py - y0;
-		const h00 = this.pixel(z, x0, y0);
-		const h10 = this.pixel(z, x0 + 1, y0);
-		const h01 = this.pixel(z, x0, y0 + 1);
-		const h11 = this.pixel(z, x0 + 1, y0 + 1);
+		let h00: number;
+		let h10: number;
+		let h01: number;
+		let h11: number;
+		const tx = Math.floor(x0 / n);
+		const ty = Math.floor(y0 / n);
+		const lx = x0 - tx * n;
+		const ly = y0 - ty * n;
+		if (lx < n - 1 && ly < n - 1) {
+			// All four taps in one tile (the common case): one lookup, same values as pixel().
+			const tile = this.tiles.get(`${z}/${tx}/${ty}`);
+			if (!tile) return Number.NaN;
+			const i = ly * n + lx;
+			h00 = tile[i];
+			h10 = tile[i + 1];
+			h01 = tile[i + n];
+			h11 = tile[i + n + 1];
+		} else {
+			h00 = this.pixel(z, x0, y0);
+			h10 = this.pixel(z, x0 + 1, y0);
+			h01 = this.pixel(z, x0, y0 + 1);
+			h11 = this.pixel(z, x0 + 1, y0 + 1);
+		}
 		return (
 			(h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy
 		);
 	}
 
-	/** Samples at the level appropriate for `distance`. */
 	/**
 	 * Samples at the level appropriate for `distance`, falling back to
 	 * coarser levels where a fine tile is missing (e.g. Mapterhorn's high

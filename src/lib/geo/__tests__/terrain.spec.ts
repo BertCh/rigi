@@ -79,6 +79,74 @@ describe("TerrainSampler", () => {
 	});
 });
 
+describe("TerrainSampler across tile edges", () => {
+	// Four 8x8 tiles at z = 1 forming one 16x16 grid with h = 3 gx + 7 gy (+ a per-tile offset in the
+	// SE tile, so a wrong tile shows). Bilinear over a linear field is exact inside each tile.
+	const n = 8;
+	const tiles = new Map<string, Float32Array>();
+	for (let ty = 0; ty < 2; ty++)
+		for (let tx = 0; tx < 2; tx++) {
+			const t = new Float32Array(n * n);
+			for (let y = 0; y < n; y++)
+				for (let x = 0; x < n; x++)
+					t[y * n + x] =
+						3 * (tx * n + x) + 7 * (ty * n + y) + (tx && ty ? 1000 : 0);
+			tiles.set(`1/${tx}/${ty}`, t);
+		}
+	const s = new TerrainSampler([{ z: 1, maxDistance: 1e9 }], tiles, n);
+	const at = (gx: number, gy: number) => {
+		// Mercator pixel (gx + 0.5, gy + 0.5) at z = 1 back to lon/lat.
+		const x = (gx + 0.5) / (2 * n);
+		const y = (gy + 0.5) / (2 * n);
+		return {
+			lon: x * 360 - 180,
+			lat: (180 / Math.PI) * Math.atan(Math.sinh(Math.PI * (1 - 2 * y))),
+		};
+	};
+	/** The four-tap bilinear through per-pixel tile lookups (the slow path), as the reference. */
+	const reference = (gx: number, gy: number) => {
+		const px = gx;
+		const py = gy;
+		const x0 = Math.floor(px);
+		const y0 = Math.floor(py);
+		const fx = px - x0;
+		const fy = py - y0;
+		const pix = (x: number, y: number) => {
+			const t = tiles.get(`1/${Math.floor(x / n)}/${Math.floor(y / n)}`);
+			return t
+				? t[(y - Math.floor(y / n) * n) * n + (x - Math.floor(x / n) * n)]
+				: Number.NaN;
+		};
+		return (
+			(pix(x0, y0) * (1 - fx) + pix(x0 + 1, y0) * fx) * (1 - fy) +
+			(pix(x0, y0 + 1) * (1 - fx) + pix(x0 + 1, y0 + 1) * fx) * fy
+		);
+	};
+	it("interior, right-edge, bottom-edge and corner taps match the per-pixel lookup", () => {
+		for (const [gx, gy] of [
+			[3.25, 2.5], // interior of the NW tile
+			[7.5, 2.25], // straddles NW | NE
+			[2.75, 7.5], // straddles NW / SW
+			[7.5, 7.5], // the four-tile corner
+			[12.25, 11.75], // interior of the SE tile
+		]) {
+			const { lon, lat } = at(gx, gy);
+			expect(s.sample(lon, lat, 1)).toBeCloseTo(reference(gx, gy), 6);
+		}
+	});
+	it("the corner sample blends the SE tile, and a missing neighbour tile gives NaN", () => {
+		const { lon, lat } = at(7.5, 7.5);
+		expect(s.sample(lon, lat, 1)).toBeGreaterThan(250); // a quarter of the +1000 offset
+		const holes = new Map(tiles);
+		holes.delete("1/1/0");
+		const h = new TerrainSampler([{ z: 1, maxDistance: 1e9 }], holes, n);
+		const e = at(7.5, 2.25);
+		expect(h.sample(e.lon, e.lat, 1)).toBeNaN();
+		const i = at(3.25, 2.5);
+		expect(h.sample(i.lon, i.lat, 1)).toBeCloseTo(reference(3.25, 2.5), 6);
+	});
+});
+
 describe("loadTerrain", () => {
 	it("requests each needed tile once, caches in the shared map and builds a sampler", async () => {
 		const requested: string[] = [];
