@@ -1,4 +1,4 @@
-"""Opt-in GPU skyline grid for policy t6 (env T6_GPU_GRID=1; DEFAULT OFF).
+"""GPU skyline grid for policy t6 (default on; env T6_GPU_GRID=0 opts out).
 
 Added on 2026-09-28; this module is additive to tools/matcher.
 The render worker's `edges` command, given skyGrid={vfov0, focalKnown, aspect}, runs the WebGPU port of the

@@ -33,3 +33,11 @@ CUDA machines install the matching torch wheel from pytorch.org first (see the c
 
 Weights licences (ALIKED, LightGlue, RoMa, DepthPro-class models) are in `reports/licences.md`; check them
 before shipping any of this as a hosted service.
+
+## T6 GPU skyline grid
+
+Policy t6's stage-1 skyline grid runs on the GPU by default: the render worker's `edges` command returns the
+certified candidate cells from `src/lib/gpu/skyglobal` (a `ComputeGraph` over luma), and `server/sky_gpu.py`
+re-scores exactly those cells in numpy, so poses match the CPU grid. When the page has no WebGPU device, the
+candidate list overflows or anything throws, the CPU grid runs instead. Set `T6_GPU_GRID=0` (also `off` or
+`false`) to force the CPU grid; `T6_GPU_IDLE_MS` is the idle time before the grid's GPU buffers are released.

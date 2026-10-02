@@ -829,6 +829,13 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "t6-gpu-grid-default",
+		tier: "fast",
+		group: "matcher",
+		cmd: tsx("tools/matcher/stage1/__tests__/t6-gpu-grid-default.check.ts"),
+		timeoutS: 60,
+	},
+	{
 		id: "render-bundle-dawn",
 		tier: "fast",
 		group: "gpu",

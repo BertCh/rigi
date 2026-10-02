@@ -64,10 +64,12 @@ UNKNOWN_HFOVS = (40.0, 62.0)
 DEDUPE_DEG = 2.0
 GAP_SUPPORT = 0.5  # basin gap also for candidates with match support ≥ 0.5 (match-dominant candidates)
 MIN_HORIZON_DIRS = 500
-# Opt-in GPU skyline grid (session mt-image-bc, 2026-09-28): DEFAULT OFF. With T6_GPU_GRID=1 the worker's `edges`
+# GPU skyline grid (session mt-image-bc, 2026-09-28): DEFAULT ON since 2026-10-01; T6_GPU_GRID=0 (or off/false) opts out.
+# The worker's `edges`
 # also returns the WebGPU grid's candidate cells and sg.grid is replaced by their exact numpy re-score
-# (sky_gpu.grid_from_cands: identical best/arg). Off: the request and the code path are unchanged.
-GPU_GRID = os.environ.get("T6_GPU_GRID") == "1"
+# (sky_gpu.grid_from_cands: identical best/arg). No WebGPU, an overflow or any error in the page → the CPU grid.
+# Same off-values as render_worker.mjs (SKY_GPU).
+GPU_GRID = os.environ.get("T6_GPU_GRID", "").strip().lower() not in ("0", "off", "false")
 
 
 def assert_rule() -> dict:
@@ -163,7 +165,7 @@ class Run:
         d = self._dir("e")
         try:
             req = {"cmd": "edges", "outDir": str(d)}
-            if GPU_GRID:  # opt-in: the page also computes the GPU grid's candidate cells (sky_gpu.py)
+            if GPU_GRID:  # default: the page also computes the GPU grid's candidate cells (sky_gpu.py)
                 req["skyGrid"] = {"vfov0": self.J.p0["vfov"], "focalKnown": bool(self.J.focal_known), "aspect": self.J.aspect}
             r = self.call(req)
             w, h, f = r["w"], r["h"], r["files"]
@@ -317,13 +319,13 @@ class Run:
                 "grid": {"step": g["step"], "best": g["best"], "second": g["second"]} if g else None}
 
     def _sky_search_gpu(self, sg, gg):
-        """T6_GPU_GRID=1 only: sg.search with sg.grid replaced by the exact numpy re-score of the page's GPU
+        """Unless T6_GPU_GRID=0: sg.search with sg.grid replaced by the exact numpy re-score of the page's GPU
         candidate cells (sky_gpu.grid_from_cands, identical best/arg). Any failure → the CPU grid."""
         J = self.J
         rec = {"used": False}
         if gg is not None:
             try:
-                import sky_gpu  # opt-in only (never imported with the flag off)
+                import sky_gpu  # only imported when the GPU grid is enabled
 
                 sg.grid = sky_gpu.grid_from_cands(SG, sg, gg["cands"], gg.get("nYaw"), gg.get("nCombo"))
                 sres = sg.search(J.p0["vfov"], J.focal_known, k=SKY_K)

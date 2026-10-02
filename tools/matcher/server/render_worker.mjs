@@ -20,7 +20,7 @@
 //   {"id":3,"cmd":"align","photoId"|"adhoc","priors":[{yaw,pitch,roll,vfov},..],"fullTerrain"?}
 //   {"id":6,"cmd":"edges","photoId"|"adhoc","fullTerrain"?,"outDir"} → raw photo evidence for the T6 skyline
 //     global search: {w, h, files:{horizon,fine,coarse,fg,rgb}, meta} (horizonDirs float32 ×3, edge maps
-//     float32, edge.rgb uint8 RGBA); no autoAlign. Optional "skyGrid":{vfov0,focalKnown,aspect} (T6_GPU_GRID=1,
+//     float32, edge.rgb uint8 RGBA); no autoAlign. Optional "skyGrid":{vfov0,focalKnown,aspect} (T6_GPU_GRID not 0,
 //     default off) also writes files.cands (the GPU grid's candidate cells, u32) + reply skyGrid{nYaw,nCombo,…}
 //   render also takes "poses":[{tag?,yaw,pitch,roll?,vfov?}] (absolute poses instead of prior+offsets) and
 //   "texUpload":true (force the GPU upload of freshly draped textures + gl.finish; policy t6 only)
@@ -617,7 +617,7 @@ async function edges(req) {
 	};
 }
 
-// Opt-in (T6_GPU_GRID=1 in t6.py; added by session mt-image-bc 2026-09-28, default off): the T6 skyline
+// Default on since 2026-10-01 (T6_GPU_GRID=0 in t6.py opts out; added by session mt-image-bc 2026-09-28): the T6 skyline
 // grid's certified candidate cells from the WebGPU port (src/lib/gpu/skyglobal), computed in this page on
 // the same edge maps + horizonDirs. Python re-scores exactly these cells in numpy (server/sky_gpu.py).
 // req.skyGrid = {vfov0, focalKnown, aspect}. → {cands (base64 u32), nYaw, nCombo, nCand, ms, …} or null
@@ -682,12 +682,14 @@ async function edgesSkyGrid(page, req) {
 	}
 }
 
-// T6_GPU_GRID=1 only (session mt-image-bc, 2026-09-30; additive, nothing changes without the env): compile
+// Skipped with T6_GPU_GRID=0 (session mt-image-bc, 2026-09-30; default on since 2026-10-01): compile
 // the grid's pipelines when a page opens (warmSkyGlobalGpuAsync), and free its pooled GPU buffers
 // (releaseSkyGlobalGpu, ~32 MB: the cells buffer alone is ~24 MB) once no skyGrid request has used the page
 // for SKY_GPU_IDLE_MS. The release runs on the command chain, so never inside a request. Shutdown needs no
 // release: closing Chromium frees everything.
-const SKY_GPU = process.env.T6_GPU_GRID === "1";
+const SKY_GPU = !["0", "off", "false"].includes(
+	(process.env.T6_GPU_GRID ?? "").trim().toLowerCase(),
+);
 const SKY_GPU_IDLE_MS = Number(process.env.T6_GPU_IDLE_MS ?? 120000);
 const skyGridPages = new Set(); // pages holding the grid's pooled buffers
 let skyGridTimer = null;
