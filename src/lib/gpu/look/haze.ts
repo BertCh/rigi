@@ -38,21 +38,27 @@ import {
 } from "../../look/haze-fit";
 import { sunColor } from "../../look/sun";
 import { srgbToLinear } from "../../style/color";
-import type { ComputeGraph, GraphBinding } from "../core/graph";
-import { GPUScan, type GraphBufferHandle } from "../core/luma";
+import type { ComputeGraph, GraphBinding, GraphRange } from "../core/graph";
+import {
+	GPUGather,
+	GPUHistogram,
+	GPUScan,
+	GPUSort,
+	type GraphBufferHandle,
+} from "../core/luma";
 import { LOOK_SUBGROUP_GROUP, statsSubgroupsOn } from "./color-stats";
 import {
 	HZ_BIN,
-	HZ_CNT,
 	HZ_DILH,
 	HZ_GRID,
 	HZ_HIST,
+	HZ_LIST_INDEX,
+	HZ_LIST_KEY,
 	HZ_PREP,
 	HZ_SCAN,
 	HZ_SCAN_SG,
-	HZ_SCATTER,
 	HZ_SEL_INIT,
-	HZ_STARTS,
+	LIST_KEY_BITS,
 	LISTS,
 	SEL,
 } from "./haze.wgsl";
@@ -109,27 +115,18 @@ export const K_HZ_SCAN_SG = defineKernel(
 );
 /** The subgroup scan applies: the device has subgroups and subgroups is not off. */
 export const hazeScanSubgroupsOn = (device: Device) => statsSubgroupsOn(device);
-export const K_HZ_CNT = defineKernel("hz-cnt", HZ_CNT, [
+export const K_HZ_LIST_KEY = defineKernel("hz-list-key", HZ_LIST_KEY, [
 	["prm", "uniform"],
 	["bins", "read-only-storage"],
 	["lin", "read-only-storage"],
 	["state", "read-only-storage"],
-	["blk", "storage"],
+	["keys", "storage"],
+	["vals", "storage"],
 ]);
-export const K_HZ_STARTS = defineKernel("hz-starts", HZ_STARTS, [
+export const K_HZ_LIST_INDEX = defineKernel("hz-list-index", HZ_LIST_INDEX, [
 	["prm", "uniform"],
-	["blk", "read-only-storage"],
-	["offs", "read-only-storage"],
-	["starts", "storage"],
-]);
-export const K_HZ_SCATTER = defineKernel("hz-scatter", HZ_SCATTER, [
-	["prm", "uniform"],
-	["bins", "read-only-storage"],
-	["lin", "read-only-storage"],
-	["state", "read-only-storage"],
-	["offs", "read-only-storage"],
+	["sortedVals", "read-only-storage"],
 	["outIdx", "storage"],
-	["outVal", "storage"],
 ]);
 export const K_HZ_GRID = defineKernel("hz-grid", HZ_GRID, [
 	["prm", "uniform"],
@@ -143,36 +140,96 @@ export const K_HZ_GRID = defineKernel("hz-grid", HZ_GRID, [
 /** hz-scan's dispatch: one workgroup per selection. */
 export const SCAN_GROUPS = SEL;
 
+/** Elements the list compaction sorts: (pixel, channel) pairs. */
+export const listElements = (N: number) => 3 * N;
+
 /**
- * The lists' offsets on a ComputeGraph: one exclusive core GPUScan over the list-major block counts
- * (offs[L·nBlk + t] = the packed position of block t's first list-L pixel, what hz-scatter starts
- * from), then hz-starts (starts[L], starts[LISTS] = total). u32 adds only: the numbers of the old
- * per-list serial walk (hz-offs), bit for bit. Every element of offs and starts is written.
+ * The 72 representative lists on a ComputeGraph, from core primitives (replaces the old per-block
+ * count / scan / scatter): a key kernel over the 3N (pixel, channel) elements (key = list id or
+ * LIST_NONE, value = element), a stable GPUSort (radix, LIST_KEY_BITS) into list-major order with
+ * pixels ascending within a list, a GPUHistogram of the keys (73 exact one-wide bins over [0, 73]; the
+ * LIST_NONE keys fall outside and are ignored) and an exclusive GPUScan of it into `starts`
+ * (starts[L], starts[LISTS] = total), a GPUGather of the elements' lin bits into `outVal` and a
+ * trivial e / 3 into `outIdx`. Only [0, total) of outIdx / outVal is meaningful (the rest is the
+ * unlisted elements in element order), exactly the range every reader takes. `cprm` is the
+ * HAZE_COUNT_PARAMS block (N). `lin` / `outIdx` / `outVal` must be declared at their full size
+ * (3N words: views are checked against the declared length); dispatches are 3N / 256 groups, so N
+ * stays below 5.6 M (65 535 groups). Stability makes the lists identical to the CPU's.
  */
-export function addListOffsets<P>(
+export function addListCompaction<P>(
 	g: ComputeGraph<P>,
 	b: {
 		cprm: GraphBinding;
-		blk: GraphBufferHandle;
-		offs: GraphBufferHandle;
-		starts: GraphBinding;
+		bins: GraphBinding | GraphRange<P>;
+		state: GraphBinding | GraphRange<P>;
+		lin: GraphBufferHandle;
+		outIdx: GraphBufferHandle;
+		outVal: GraphBufferHandle;
+		starts: GraphBufferHandle;
 	},
-	nBlk: number,
+	N: number,
 ) {
-	const n = LISTS * nBlk;
+	const M = listElements(N);
+	const keys = g.transientBuffer("listKeys", M * 4);
+	const vals = g.transientBuffer("listVals", M * 4);
+	const sortedKeys = g.transientBuffer("listSortedKeys", M * 4);
+	const sortedVals = g.transientBuffer("listSortedVals", M * 4);
+	const counts = g.transientBuffer("listCounts", (LISTS + 1) * 4);
+	const groups: [number] = [Math.ceil(M / 256)];
+	g.addKernel({
+		id: "list-key",
+		spec: K_HZ_LIST_KEY,
+		bindings: {
+			prm: b.cprm,
+			bins: b.bins,
+			lin: b.lin,
+			state: b.state,
+			keys,
+			vals,
+		},
+		workgroups: groups,
+	});
+	g.add(
+		new GPUSort({
+			id: "list-sort",
+			keys: g.view(keys, "uint32", M),
+			values: g.view(vals, "uint32", M),
+			outputKeys: g.view(sortedKeys, "uint32", M),
+			outputValues: g.view(sortedVals, "uint32", M),
+			algorithm: "radix",
+			keyBits: LIST_KEY_BITS,
+		}),
+	);
+	g.add(
+		new GPUHistogram({
+			id: "list-hist",
+			input: g.view(keys, "uint32", M),
+			output: g.view(counts, "uint32", LISTS + 1),
+			domain: [0, LISTS + 1],
+		}),
+	);
 	g.add(
 		new GPUScan({
-			id: "offs",
-			input: g.view(b.blk, "uint32", n),
-			output: g.view(b.offs, "uint32", n),
+			id: "list-starts",
+			input: g.view(counts, "uint32", LISTS + 1),
+			output: g.view(b.starts, "uint32", LISTS + 1),
 			mode: "exclusive",
 		}),
 	);
+	g.add(
+		new GPUGather({
+			id: "list-vals",
+			source: g.view(b.lin, "uint32", M),
+			indices: g.view(sortedVals, "uint32", M),
+			output: g.view(b.outVal, "uint32", M),
+		}),
+	);
 	g.addKernel({
-		id: "starts",
-		spec: K_HZ_STARTS,
-		bindings: { prm: b.cprm, blk: b.blk, offs: b.offs, starts: b.starts },
-		workgroups: [1],
+		id: "list-index",
+		spec: K_HZ_LIST_INDEX,
+		bindings: { prm: b.cprm, sortedVals, outIdx: b.outIdx },
+		workgroups: groups,
+		writes: { outIdx: "full" },
 	});
 }
 

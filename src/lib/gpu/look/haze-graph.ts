@@ -10,7 +10,7 @@
 // Submit 1 (one graph per N = W·H, cached, group "look-haze-prep"):
 //   prep → dilh → clear counts → bin (atomic counts) → sel-init
 //   → 3 × (clear hist → hist (atomic) → scan)                      radix select, 288 order statistics
-//   → cnt → offs (GPUScan, exclusive) → starts → scatter             72-list stable compaction
+//   → list-key → GPUSort (stable radix) ∥ GPUHistogram → GPUScan → GPUGather + list-index   72-list compaction
 //   → gather (luma GPUGather)                                        the airlight band's lin
 //   → read node "head": counts, state, starts, the lists' first `head` slots, the band's lin
 // Submit 2 (one graph, group "look-haze-grid"): grid → read node "err" (5 550 floats); by default the
@@ -18,25 +18,29 @@
 // Between them the CPU middle stage and after submit 2 the arg-min + refinement run in f64 on the CPU,
 // unchanged (haze.ts hazeFitTail): the round trip is inherent (the grid's inputs come from f64 code).
 //
-// Determinism (the removed dispatch path gave the same bits; look-bench compares with the CPU fit):
-// - Every node is one of haze.ts's kernel specs, in a fixed order with fixed workgroup counts.
-//   Consecutive nodes share a compute pass; WebGPU orders dispatches and their storage writes within
-//   a pass exactly as across passes.
-// - Custom kernels plus luma primitives: the lists' exclusive GPUScan (haze.ts addListOffsets: u32
-//   adds only, so subgroup / tree order cannot change a bit) and GPUGather for every gather (the
-//   band's lin in the prep, gather and band graphs, the lists' range words in the band graph): it
-//   copies 32-bit words, so gathered words are the source's bits. GPUGather dispatches over its
-//   STATIC indices view: the prep / gather graphs are keyed by a slot capacity (gatherCapacity: the
-//   band bound kMax, else the next power of two ≥ K) with the indices padded by 0xFFFFFFFF (out of
-//   range: a zero row), the band graph gathers over kMax band slots and 3N list slots (slots past
-//   K / the list total hold stale indices and are never read; measured in Dawn, haze-band-dawn.ts:
-//   no change in the GPU part's time against the old early-exit kernels). No float sums. Radix select (288 concurrent selections) and the 72-way compaction do not map onto
-//   GPUHistogram / GPUCompaction (luma-master-design §2.4).
+// Determinism / tolerance (the removed dispatch path gave the same bits; look-bench,
+// scripts/gpu/haze-band-dawn.ts and scripts/gpu/haze-lists-dawn.ts compare with the CPU fit and
+// emulation):
+// - Every node is one of haze.ts's kernel specs or a core primitive, in a fixed order with fixed
+//   workgroup counts. Consecutive nodes share a compute pass; WebGPU orders dispatches and their
+//   storage writes within a pass exactly as across passes.
+// - The 72-list compaction is core primitives around one key kernel (haze.ts addListCompaction:
+//   GPUSort, GPUHistogram, GPUScan, GPUGather; all integer). The sort is stable, so the lists equal
+//   the CPU's (pixel order within a list) and the Dawn script checks them exactly; the radix select
+//   (288 concurrent selections) stays custom (its per-selection digit histogram as a 12N-key
+//   GPUHistogram measured ~19x slower, see haze.ts / README). No float sums.
+// - Every gather (the band's lin in the prep, gather and band graphs, the lists' range words in the
+//   band graph) is a luma GPUGather: it copies 32-bit words, so gathered words are the source's bits.
+//   GPUGather dispatches over its STATIC indices view: the prep / gather graphs are keyed by a slot
+//   capacity (gatherCapacity: the band bound kMax, else the next power of two ≥ K) with the indices
+//   padded by 0xFFFFFFFF (out of range: a zero row), the band graph gathers over kMax band slots and
+//   3N list slots (slots past K / the list total hold stale indices and are never read; measured in
+//   Dawn, haze-band-dawn.ts: no change in the GPU part's time against the old early-exit kernels).
 // - Transients are never zeroed and alias: counts and hist are the only read-modify-write transients
 //   (atomics), each has a clear node before every use (compile() lints it: writes: "atomic"). Every
 //   other transient is fully written by the node that first touches it (lin, flags, flagsH, bins per
-//   pixel; state per selection; blk per (list, block) by cnt; offs per (list, block) by the scan;
-//   starts by starts), so aliased bytes are never read.
+//   pixel; state per selection; the list compaction's keys / values / counts / starts by its
+//   own nodes), so aliased bytes are never read.
 // - Imports (inputs and the lists, which the tail read may need after the submit) are pooled buffers
 //   bound with the run's exact byte ranges. No kernel uses arrayLength(), so the binding size does
 //   not reach the numerics.
@@ -79,7 +83,7 @@ import { GPUCompaction, GPUGather, type GraphBufferHandle } from "../core/luma";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import { type ReadRange, readBack } from "../core/readback";
 import {
-	addListOffsets,
+	addListCompaction,
 	airlightBand,
 	bandLength,
 	GRID_CELLS,
@@ -89,14 +93,12 @@ import {
 	hazeFitTail,
 	hazeScanSubgroupsOn,
 	K_HZ_BIN,
-	K_HZ_CNT,
 	K_HZ_DILH,
 	K_HZ_GRID,
 	K_HZ_HIST,
 	K_HZ_PREP,
 	K_HZ_SCAN,
 	K_HZ_SCAN_SG,
-	K_HZ_SCATTER,
 	K_HZ_SEL_INIT,
 	NBINS,
 	type Prep,
@@ -274,7 +276,6 @@ function prepGraphFor(
 		"look-haze-prep",
 		`n${N}-g${gatherSlots}${scanSg ? "-sg" : ""}`,
 		(g) => {
-			const nBlk = Math.ceil(N / BLOCK);
 			const uni = (id: string, bytes: number) =>
 				g.importBuffer(id, bytes, undefined, UNIFORM);
 			// per-run exact ranges of pooled imports (declared at 4 B: one graph for any photo size)
@@ -296,16 +297,15 @@ function prepGraphFor(
 				undefined,
 				STORAGE,
 			);
-			const outIdxH = imp("outIdx");
-			const outValH = imp("outVal");
+			// the lists' buffers are declared at their full size (the list compaction views them)
+			const outIdxH = g.importBuffer("outIdx", 3 * N * 4, undefined, STORAGE);
+			const outValH = g.importBuffer("outVal", 3 * N * 4, undefined, STORAGE);
 			const skyOutH = g.importBuffer(
 				"skyOut",
 				gatherSlots * 12,
 				undefined,
 				STORAGE,
 			);
-			const outIdx = at<PrepParams>(outIdxH, (p) => 3 * p.N * 4);
-			const outVal = at<PrepParams>(outValH, (p) => 3 * p.N * 4);
 			const lin = g.transientBuffer("lin", N * 12);
 			const flags = g.transientBuffer("flags", N * 4);
 			const flagsH = g.transientBuffer("flagsH", N * 4);
@@ -313,12 +313,9 @@ function prepGraphFor(
 			const counts = g.transientBuffer("counts", NBINS * 4);
 			const state = g.transientBuffer("state", SEL * 8);
 			const hist = g.transientBuffer("hist", SEL * BUCKETS * 4);
-			const blk = g.transientBuffer("blk", nBlk * LISTS * 4);
-			const offs = g.transientBuffer("offs", nBlk * LISTS * 4);
 			const starts = g.transientBuffer("starts", (LISTS + 1) * 4);
 			const groups: [number] = [Math.ceil(N / 256)];
 			const selGroups: [number] = [Math.ceil(SEL / 64)];
-			const blkGroups: [number] = [Math.ceil(nBlk / 64)];
 			g.addKernel({
 				id: "prep",
 				spec: K_HZ_PREP,
@@ -361,21 +358,12 @@ function prepGraphFor(
 					workgroups: [SCAN_GROUPS],
 				});
 			}
-			g.addKernel({
-				id: "cnt",
-				spec: K_HZ_CNT,
-				bindings: { prm: cprm, bins, lin, state, blk },
-				workgroups: blkGroups,
-			});
-			addListOffsets(g, { cprm, blk, offs, starts }, nBlk);
-			g.addKernel({
-				id: "scatter",
-				spec: K_HZ_SCATTER,
-				bindings: { prm: cprm, bins, lin, state, offs, outIdx, outVal },
-				workgroups: blkGroups,
-				// only [0, total) is written and only [0, total) is read (imports, not transients)
-				writes: { outIdx: "full", outVal: "full" },
-			});
+			// only [0, total) of outIdx / outVal is meaningful and only [0, total) is read
+			addListCompaction(
+				g,
+				{ cprm, bins, state, lin, outIdx: outIdxH, outVal: outValH, starts },
+				N,
+			);
 			// slots ≥ K carry GATHER_PAD indices (zero rows), and only [0, K) is read back
 			g.add(
 				new GPUGather({
@@ -678,34 +666,29 @@ function compactGraphFor(
 		"look-haze-compact",
 		`n${N}`,
 		(g) => {
-			const nBlk = Math.ceil(N / BLOCK);
 			const cprm = g.importBuffer("cprm", 16, undefined, UNIFORM);
 			const pin = (id: string, bytes: (p: CompactParams) => number) =>
 				at<CompactParams>(g.importBuffer(id, 4, undefined, PREP_IN), bytes);
-			const lin = pin("lin", (p) => p.N * 12);
+			// lin and the lists are declared at their full size (the list compaction views them)
+			const linH = g.importBuffer("lin", N * 12, undefined, PREP_IN);
 			const bins = pin("bins", (p) => p.N * 4);
 			const state = pin("state", () => SEL * 8);
-			const outIdxH = g.importBuffer("outIdx", 4, undefined, STORAGE);
-			const outValH = g.importBuffer("outVal", 4, undefined, STORAGE);
-			const outIdx = at<CompactParams>(outIdxH, (p) => 3 * p.N * 4);
-			const outVal = at<CompactParams>(outValH, (p) => 3 * p.N * 4);
-			const blk = g.transientBuffer("blk", nBlk * LISTS * 4);
-			const offs = g.transientBuffer("offs", nBlk * LISTS * 4);
+			const outIdxH = g.importBuffer("outIdx", 3 * N * 4, undefined, STORAGE);
+			const outValH = g.importBuffer("outVal", 3 * N * 4, undefined, STORAGE);
 			const starts = g.transientBuffer("starts", (LISTS + 1) * 4);
-			const blkGroups: [number] = [Math.ceil(nBlk / 64)];
-			g.addKernel({
-				id: "cnt",
-				spec: K_HZ_CNT,
-				bindings: { prm: cprm, bins, lin, state, blk },
-				workgroups: blkGroups,
-			});
-			addListOffsets(g, { cprm, blk, offs, starts }, nBlk);
-			g.addKernel({
-				id: "scatter",
-				spec: K_HZ_SCATTER,
-				bindings: { prm: cprm, bins, lin, state, offs, outIdx, outVal },
-				workgroups: blkGroups,
-			});
+			addListCompaction(
+				g,
+				{
+					cprm,
+					bins,
+					state,
+					lin: linH,
+					outIdx: outIdxH,
+					outVal: outValH,
+					starts,
+				},
+				N,
+			);
 			g.readNode("head", [
 				{
 					buffer: g.importBuffer("counts", 4, undefined, PREP_IN),
@@ -958,16 +941,15 @@ function bandGraphFor(
 		`${W}x${H}`,
 		(g) => {
 			const N = W * H;
-			const nBlk = Math.ceil(N / BLOCK);
 			const { nCol, kMax } = bandShape(W, H);
 			const cprm = g.importBuffer("cprm", 16, undefined, UNIFORM);
 			const bprm = g.importBuffer("bprm", 32, undefined, UNIFORM);
 			const pin = (id: string, bytes: (p: BandParams) => number) =>
 				at<BandParams>(g.importBuffer(id, 4, undefined, PREP_IN), bytes);
-			// the gathers' views need real declared sizes (checkPrep guarantees the prep's buffers)
+			// the gathers' and the list compaction's views need real declared sizes (checkPrep
+			// guarantees the prep's buffers)
 			const linH = g.importBuffer("lin", N * 12, undefined, PREP_IN);
 			const rangeH = g.importBuffer("range", N * 4, undefined, PREP_IN);
-			const lin = at<BandParams>(linH, (p) => p.N * 12);
 			const bins = pin("bins", (p) => p.N * 4);
 			const state = pin("state", () => SEL * 8);
 			const range = at<BandParams>(rangeH, (p) => p.N * 4);
@@ -975,14 +957,10 @@ function bandGraphFor(
 			const imp = (id: string, bytes = 4) =>
 				g.importBuffer(id, bytes, undefined, STORAGE);
 			const outIdxH = imp("outIdx", 3 * N * 4);
-			const outValH = imp("outVal");
+			const outValH = imp("outVal", 3 * N * 4);
 			const outRangeH = imp("outRange", 3 * N * 4);
 			const bandLinH = imp("bandLin", 3 * kMax * 4);
-			const outIdx = at<BandParams>(outIdxH, (p) => 3 * p.N * 4);
-			const outVal = at<BandParams>(outValH, (p) => 3 * p.N * 4);
 			const cols = at<BandParams>(imp("cols"), () => SPOT_COLUMNS * 4);
-			const blk = g.transientBuffer("blk", nBlk * LISTS * 4);
-			const offs = g.transientBuffer("offs", nBlk * LISTS * 4);
 			const starts = g.transientBuffer("starts", (LISTS + 1) * 4);
 			const top = g.transientBuffer("top", nCol * 4);
 			// the compaction's column-major input (nCol · H slots), flags and output; the output's
@@ -993,23 +971,21 @@ function bandGraphFor(
 			const bandIdxT = g.transientBuffer("bandIdx", slots * 4);
 			const total = g.transientBuffer("bandK", 4);
 			const spot = g.transientBuffer("spot", SPOT_COLUMNS * H * 8);
-			const blkGroups: [number] = [Math.ceil(nBlk / 64)];
 			const colGroups: [number] = [Math.ceil(nCol / 64)];
 			const slotGroups: [number] = [Math.ceil(slots / FLAGS_GROUP)];
-			g.addKernel({
-				id: "cnt",
-				spec: K_HZ_CNT,
-				bindings: { prm: cprm, bins, lin, state, blk },
-				workgroups: blkGroups,
-			});
-			addListOffsets(g, { cprm, blk, offs, starts }, nBlk);
-			g.addKernel({
-				id: "scatter",
-				spec: K_HZ_SCATTER,
-				bindings: { prm: cprm, bins, lin, state, offs, outIdx, outVal },
-				workgroups: blkGroups,
-				writes: { outIdx: "full", outVal: "full" },
-			});
+			addListCompaction(
+				g,
+				{
+					cprm,
+					bins,
+					state,
+					lin: linH,
+					outIdx: outIdxH,
+					outVal: outValH,
+					starts,
+				},
+				N,
+			);
 			// the lists' range words: a GPUGather over every list slot (3N); slots ≥ total hold stale
 			// indices (a valid pixel or out of range: a harmless row) and are never read
 			g.add(

@@ -315,99 +315,62 @@ fn main(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) l
 export const LISTS = NBINS * 3;
 /** Pixels per compaction block (one invocation each, walked in pixel order). */
 export const BLOCK = 128;
+/** The key of an element in no list (above every list id, within the sort's 7 key bits). */
+export const LIST_NONE = 127;
+/** Radix sort key bits of the list keys: ids 0..71 and LIST_NONE. */
+export const LIST_KEY_BITS = 7;
 
-const COMPACT_COMMON = /* wgsl */ `
+/** Elements of the lists' key / value arrays: (pixel i, channel c) is element e = 3i + c. */
+const LIST_COMMON = /* wgsl */ `
 struct C { N: u32, nBlk: u32, K: u32, pad: u32 };
-// list L takes the pixels of bin L / 3 whose channel L % 3 lies in [lo, hi] (f32 bits; lin ≥ 0 so
-// they order as u32): the order statistics of slots 0 and 3, i.e. ranks ⌊0.01(n−1)⌋ and
-// ⌊0.09(n−1)⌋ + 1, which bracket the CPU's interpolated percentiles v0 ≤ v1
-var<workgroup> thr: array<vec2<u32>, ${NBINS * 3}>;
-fn loadThr(lid: u32) {
-  for (var L = lid; L < ${NBINS * 3}u; L += 64u) { thr[L] = vec2<u32>(state[4u * L].x, state[4u * L + 3u].x); }
-  workgroupBarrier();
-}
-fn inList(L: u32, v: u32) -> bool { return v >= thr[L].x && v <= thr[L].y; }
-`;
-
-/** Per block of ${BLOCK} pixels: how many go to each list, list-major (blk[L·nBlk + t]). @workgroup_size(64). */
-export const HZ_CNT = /* wgsl */ `
-@group(0) @binding(0) var<uniform> prm: C;
-@group(0) @binding(1) var<storage, read> bins: array<i32>;
-@group(0) @binding(2) var<storage, read> lin: array<f32>;
-@group(0) @binding(3) var<storage, read> state: array<vec2<u32>>;
-@group(0) @binding(4) var<storage, read_write> blk: array<u32>;
-${COMPACT_COMMON}
-@compute @workgroup_size(64)
-fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_index) lid: u32) {
-  loadThr(lid);
-  let t = id.x;
-  if (t >= prm.nBlk) { return; }
-  var cnt: array<u32, ${NBINS * 3}>;
-  for (var L = 0u; L < ${NBINS * 3}u; L++) { cnt[L] = 0u; }
-  for (var i = t * ${BLOCK}u; i < min(prm.N, (t + 1u) * ${BLOCK}u); i++) {
-    let b = bins[i];
-    if (b < 0) { continue; }
-    for (var c = 0u; c < 3u; c++) {
-      let L = u32(b) * 3u + c;
-      if (inList(L, bitcast<u32>(lin[3u * i + c]))) { cnt[L] += 1u; }
-    }
-  }
-  for (var L = 0u; L < ${NBINS * 3}u; L++) { blk[L * prm.nBlk + t] = cnt[L]; }
-}
 `;
 
 /**
- * After one exclusive scan of the list-major block counts (offs = scan(blk), core GPUScan): the
- * lists' starts in the packed output, starts[L] = offs[L·nBlk], starts[${NBINS * 3}] = the total.
- * @workgroup_size(${NBINS * 3 + 1}), one workgroup.
+ * The 72-list compaction's key kernel (one invocation per element e = 3i + c, @workgroup_size(256)):
+ * keys[e] = L = bin·3 + c when pixel i is binned and its channel lies in list L's [lo, hi] (the order
+ * statistics of slots 0 and 3, i.e. ranks ⌊0.01(n−1)⌋ and ⌊0.09(n−1)⌋ + 1, which bracket the CPU's
+ * interpolated percentiles v0 ≤ v1; f32 bits, lin ≥ 0 so they order as u32), else ${LIST_NONE}; vals[e] = e.
+ * A stable core GPUSort by key then lays the lists out list-major, pixel order within a list (e
+ * ascending within one channel = i ascending).
  */
-export const HZ_STARTS = /* wgsl */ `
-struct C { N: u32, nBlk: u32, K: u32, pad: u32 };
-@group(0) @binding(0) var<uniform> prm: C;
-@group(0) @binding(1) var<storage, read> blk: array<u32>;
-@group(0) @binding(2) var<storage, read> offs: array<u32>;
-@group(0) @binding(3) var<storage, read_write> starts: array<u32>;
-@compute @workgroup_size(${NBINS * 3 + 1})
-fn main(@builtin(local_invocation_index) L: u32) {
-  if (L < ${NBINS * 3}u) {
-    starts[L] = offs[L * prm.nBlk];
-  } else {
-    let k = ${NBINS * 3}u * prm.nBlk - 1u;
-    starts[L] = offs[k] + blk[k];
-  }
-}
-`;
-
-/** Per block again: write each list's pixels (index, value bits) at their packed position (offs[L·nBlk + t]). */
-export const HZ_SCATTER = /* wgsl */ `
+export const HZ_LIST_KEY = /* wgsl */ `${LIST_COMMON}
 @group(0) @binding(0) var<uniform> prm: C;
 @group(0) @binding(1) var<storage, read> bins: array<i32>;
 @group(0) @binding(2) var<storage, read> lin: array<f32>;
 @group(0) @binding(3) var<storage, read> state: array<vec2<u32>>;
-@group(0) @binding(4) var<storage, read> offs: array<u32>;
-@group(0) @binding(5) var<storage, read_write> outIdx: array<u32>;
-@group(0) @binding(6) var<storage, read_write> outVal: array<u32>;
-${COMPACT_COMMON}
-@compute @workgroup_size(64)
+@group(0) @binding(4) var<storage, read_write> keys: array<u32>;
+@group(0) @binding(5) var<storage, read_write> vals: array<u32>;
+var<workgroup> thr: array<vec2<u32>, ${NBINS * 3}>;
+@compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3<u32>, @builtin(local_invocation_index) lid: u32) {
-  loadThr(lid);
-  let t = id.x;
-  if (t >= prm.nBlk) { return; }
-  var at: array<u32, ${NBINS * 3}>;
-  for (var L = 0u; L < ${NBINS * 3}u; L++) { at[L] = offs[L * prm.nBlk + t]; }
-  for (var i = t * ${BLOCK}u; i < min(prm.N, (t + 1u) * ${BLOCK}u); i++) {
-    let b = bins[i];
-    if (b < 0) { continue; }
-    for (var c = 0u; c < 3u; c++) {
-      let L = u32(b) * 3u + c;
-      let v = bitcast<u32>(lin[3u * i + c]);
-      if (inList(L, v)) {
-        outIdx[at[L]] = i;
-        outVal[at[L]] = v;
-        at[L] += 1u;
-      }
-    }
+  for (var L = lid; L < ${NBINS * 3}u; L += 256u) { thr[L] = vec2<u32>(state[4u * L].x, state[4u * L + 3u].x); }
+  workgroupBarrier();
+  let e = id.x;
+  if (e >= 3u * prm.N) { return; }
+  let i = e / 3u;
+  let c = e - i * 3u;
+  let b = bins[i];
+  var key = ${LIST_NONE}u;
+  if (b >= 0) {
+    let L = u32(b) * 3u + c;
+    let v = bitcast<u32>(lin[e]);
+    if (v >= thr[L].x && v <= thr[L].y) { key = L; }
   }
+  keys[e] = key;
+  vals[e] = e;
+}
+`;
+
+/** The lists' pixel indices from the sort's element order: outIdx[k] = sortedVals[k] / 3. @workgroup_size(256). */
+export const HZ_LIST_INDEX = /* wgsl */ `${LIST_COMMON}
+@group(0) @binding(0) var<uniform> prm: C;
+@group(0) @binding(1) var<storage, read> sortedVals: array<u32>;
+@group(0) @binding(2) var<storage, read_write> outIdx: array<u32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+  let k = id.x;
+  if (k >= 3u * prm.N) { return; }
+  outIdx[k] = sortedVals[k] / 3u;
 }
 `;
 

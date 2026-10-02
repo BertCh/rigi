@@ -102,6 +102,12 @@ Kept on purpose: `solve/` COARSE row minimum and `align/` pose-grid / pose-bound
    `scripts/gpu/haze-argmin-dawn.ts` and `stats-fold-dawn.ts` (`DAWN_DIR`) run the luma `GPUProgram`
    lowering (haze arg-min) and the band-stats fold on real Dawn devices against their CPU emulation (shared
    generators in `look/*.fixtures.ts`). The band-stats fold is a luma `GPUGroupAggregation` (key = value index over the per-workgroup partials); its float adds are atomics, so the checks are tolerances (`stats-fold-dawn`, `color-stats-dawn`). A per-pixel `GPUGroupAggregation` formulation measured 3-15x slower in Dawn and is not used.
+   The haze fit's 72 representative lists are one key kernel plus `GPUSort` (stable radix, 7 key bits),
+   `GPUHistogram` + `GPUScan` (starts) and `GPUGather` (`look/haze.ts` `addListCompaction`, shared by the
+   prep, compact and band graphs); `scripts/gpu/haze-lists-dawn.ts` checks the lists exactly against the CPU
+   emulation (the sort is stable), the three graph paths' fits against `fitHaze`, and times the nodes. The radix
+   select's per-pass digit histogram stays a custom atomics kernel: the same histogram as 4 keys per element into
+   a `GPUHistogram` (12N keys, 295 k exact bins) is exact but ~19x slower on Dawn (1.2 ms vs 0.07 ms per pass at N = 400 k).
 7. Add a bench (`bench.ts` in the module plus `scripts/gpu/<name>-bench.mjs`) that compares against
    the CPU twin and writes small JSON under `out/gpu/**`. Add a row to the table below.
 8. Declare the module in the app graph manifest (`app-graph/manifest.ts`: island I0–I12, its
