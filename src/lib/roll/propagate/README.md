@@ -8,12 +8,16 @@ comes from a relative rotation between the two photos. Everything here is opt-in
   `?propagate=dev` also lets the hand-fitted ground truth act as an anchor, makes every photo a target, and shows
   the angle between each suggestion and the photo's current pose.
   `?propagate=off` (the default) turns it off. Without the flag nothing renders, and the page is unchanged.
-- **Service**: `tools/nearfield/propagate/run_service.sh` starts the service on `:8769`, or at `VITE_PROPAGATE_URL`.
-  It runs on CPU and uses the same estimator as the study (`run_propagate.py` `rot`): ALIKED + LightGlue at a 1024 px
-  long side, plus a pure-rotation RANSAC and a backward estimate. On 7063→7068 its output matches the study's
-  cache exactly. If the service is down, the panel says so, the button is disabled, and no pose changes.
-  Why a service: there is no in-browser ALIKED or LightGlue. DA3 `/multiview` on `:8767` is also not used, because
-  it has no confidence signal and the gate rejects its method.
+- **Estimator** (`estimator.ts`, in this browser; no server): the same pipeline as the former relative-rotation service
+  (`tools/nearfield/propagate/service.py`, the study's `run_propagate.py` `rot`). Each photo is decoded with its
+  EXIF orientation and fitted to a 1024 px long side; ALIKED (2048 keypoints) + LightGlue come from `src/lib/features`
+  (WGSL on the compute graph under WebGPU, its CPU backend otherwise); bearings use K from the anchor's accepted vfov
+  and the target's EXIF vfov; `rotationRansacAsync` (`src/lib/pose6dof`, a port of `rot_ransac`: 4 px chord, 2000
+  hypotheses, seed 0, three Kabsch re-fits, GPU-scored when large) gives relR, and the backward B→A run gives the
+  fwd/bwd check. The output is the service's `RelRotResult` unchanged. "Available" now means the feature models
+  load; they load on the first run (the panel does not probe on open). If they cannot load, every queued row says
+  so and no pose changes. Parity with the Python estimator: `scripts/pose6dof/ransac-parity.*` (the RANSAC on the
+  study's recorded matches) and `src/lib/features`' own checks (the features).
 - **Gate**: `PROPAGATE_GATE` in `src/lib/nearfield/propagate.ts` is used unchanged. Pairs whose baseline is over
   250 m are skipped before the estimator runs. In mode `on`, pairs whose compass prior predicts no overlap are also
   skipped (the margin is 45°). Only the 8 nearest neighbours are sent to the estimator. A gated pair also gets a
@@ -37,7 +41,7 @@ comes from a relative rotation between the two photos. Everything here is opt-in
   `tools/nearfield/propagate/PREREG_DRAFT.txt` needs sign-off before any stronger use.
 
 ## Invariants and where they are tested
-All in `__tests__/` next to the modules (Vitest, service client mocked). `invariants.spec.ts` is the end-to-end set.
+All in `__tests__/` next to the modules (Vitest, estimator mocked; `estimator.spec.ts` runs it on a synthetic pair). `invariants.spec.ts` is the end-to-end set.
 - Nothing is written to a pose slot without an explicit accept call (a run plus `persistRun` writes only the
   suggestion store): `invariants.spec.ts`.
 - An accepted pose has method `propagated-suggestion`, confidence 0 and never anchors, in any mode:
@@ -47,17 +51,17 @@ All in `__tests__/` next to the modules (Vitest, service client mocked). `invari
   `invariants.spec.ts`.
 - Undo removes only a still-propagated pose, and only for the accepted record: `invariants.spec.ts`, `store.spec.ts`.
 - A re-run that now rejects drops only the pending card: `invariants.spec.ts`, `run.spec.ts`.
-- Service down changes nothing; baseline over 250 m is skipped before the estimator; 8-nearest cap;
+- Estimator unavailable changes nothing; baseline over 250 m is skipped before the estimator; 8-nearest cap;
   compass skip only in mode `on`: `invariants.spec.ts`, `run.spec.ts`, `plan.spec.ts`.
 - Parallax (over 50 m) and ultrawide (over 80 deg) warnings: `plan.spec.ts`.
 - Export tags `poseMethod` only for propagated poses: `src/lib/roll/__tests__/export.spec.ts`.
 - The store survives corrupt or missing localStorage: `store.spec.ts`.
 
-Files: `plan.ts` (pure: eligibility, candidates, `propose`, cycle), `client.ts` (service), `run.ts` (orchestration),
+Files: `plan.ts` (pure: eligibility, candidates, `propose`, cycle), `estimator.ts` (in-browser relative rotation), `run.ts` (orchestration),
 `store.ts` (suggestions and decisions), `PropagatePanel.tsx` (UI), `flag.ts`. The hook is a few lines in
 `src/routes/roll.$id.tsx`.
 
 Checks:
 - `npx tsx src/lib/roll/propagate/propagate.check.ts` runs in node against the study cache.
 - `node scripts/gpu/with-render-lock.mjs -- node scripts/roll/propagate-ui.mjs` runs in the browser on the bundled
-  Niederhorn roll. It needs the dev server on `:3100` and the service.
+  Niederhorn roll. It needs the dev server on `:3100` (it still expects the old service-status text; update it in the next browser batch).

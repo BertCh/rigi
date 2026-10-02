@@ -10,7 +10,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PROPAGATE_GATE } from "../../nearfield/propagate";
 import { loadSolvedPose } from "../roll";
 import type { Roll, RollPhoto } from "../types";
-import { propagateServiceUp, propagateServiceUrl } from "./client";
 import { anchorKind, type PropagateMode } from "./plan";
 import { type PropagateRun, persistRun, runPropagation } from "./run";
 import {
@@ -81,13 +80,8 @@ export function PropagatePanel({
 		[roll, mode],
 	);
 
-	useEffect(() => {
-		let live = true;
-		propagateServiceUp(true).then((ok) => live && setUp(ok));
-		return () => {
-			live = false;
-		};
-	}, []);
+	// the estimator runs in this browser: its models load on the first run (no probe on mount, which
+	// would download the feature weights just for opening the panel)
 	// a run belongs to its anchor: drop it when the selection moves to another anchor
 	useEffect(() => {
 		if (run && selectedId && run.anchorId !== selectedId && kind) {
@@ -110,7 +104,7 @@ export function PropagatePanel({
 			setRun,
 			ac.signal,
 		);
-		setUp(r.serviceUp);
+		setUp(r.available);
 		if (!ac.signal.aborted) {
 			persistRun(r);
 			setRev((x) => x + 1);
@@ -150,7 +144,7 @@ export function PropagatePanel({
 					className={`ml-auto font-mono text-[10px] ${up ? "text-emerald-300 light:text-[var(--rigi-result)]" : up === false ? "text-red-300 light:text-[var(--rigi-trap)]" : "text-white/40"}`}
 					data-testid="propagate-service"
 				>
-					{up == null ? "…" : up ? "service up" : "service down"}
+					{up == null ? "on-device" : up ? "on-device, ready" : "unavailable"}
 				</span>
 				{open ? (
 					<ChevronUp className="size-3.5" />
@@ -162,12 +156,9 @@ export function PropagatePanel({
 				<div className="max-h-[calc(100dvh-220px)] space-y-3 overflow-y-auto px-3 py-2.5">
 					{up === false && (
 						<p className="text-amber-200/90 light:text-[var(--rigi-lesson)]/90">
-							Relative-rotation service not reachable at {propagateServiceUrl()}
-							. Start it with{" "}
-							<code className="font-mono">
-								tools/nearfield/propagate/run_service.sh
-							</code>
-							. Poses are unchanged.
+							The feature models (ALIKED + LightGlue) did not load in this
+							browser, so no relative rotation can be estimated. Poses are
+							unchanged.
 						</p>
 					)}
 					{!selected && (
@@ -221,7 +212,7 @@ export function PropagatePanel({
 								</span>
 								<button
 									type="button"
-									disabled={up === false || (run != null && !run.done)}
+									disabled={run != null && !run.done}
 									onClick={start}
 									data-testid="propagate-run"
 									className="ml-auto rounded-md bg-sky-300 px-2 py-1 font-semibold text-black light:text-[var(--rigi-paper)] hover:brightness-110 disabled:opacity-40"

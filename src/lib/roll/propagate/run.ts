@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Roadmap R5 orchestration: one accepted anchor → its neighbours → relative rotation (service) → gate.
+// Roadmap R5 orchestration: one accepted anchor → its neighbours → relative rotation (in-browser
+// estimator, ./estimator.ts) → gate.
 // Gated rows become StoredSuggestions (pending until the user accepts or dismisses). Nothing is accepted here.
 import type { Mat3 } from "../../nearfield/propagate";
 import { PROPAGATE_GATE } from "../../nearfield/propagate";
 import type { Roll, RollPhoto } from "../types";
-import { propagateServiceUp, relRot } from "./client";
+import { relRot, relRotAvailable } from "./estimator";
 import {
 	type AnchorKind,
 	type Candidate,
@@ -46,10 +47,15 @@ export type PropagateRow = {
 export type PropagateRun = {
 	anchorId: string;
 	anchorKind: AnchorKind;
-	serviceUp: boolean;
+	/** The estimator's feature models loaded (the former "service up"). */
+	available: boolean;
 	rows: PropagateRow[];
 	done: boolean;
 };
+
+/** Row reason when the feature models cannot load (weights missing, no runtime). */
+export const UNAVAILABLE =
+	"relative-rotation estimator unavailable (feature models did not load)";
 
 const img = (p: RollPhoto, vfov: number) => ({ src: p.meta.src, vfov });
 
@@ -69,16 +75,16 @@ export async function runPropagation(
 	const run: PropagateRun = {
 		anchorId: anchor.meta.id,
 		anchorKind,
-		serviceUp: await propagateServiceUp(true),
+		available: await relRotAvailable(true),
 		rows,
 		done: false,
 	};
 	const emit = () => onUpdate({ ...run, rows: [...rows] });
-	if (!run.serviceUp) {
+	if (!run.available) {
 		for (const r of rows)
 			if (r.status === "queued") {
 				r.status = "error";
-				r.reasons = ["relative-rotation service is down"];
+				r.reasons = [UNAVAILABLE];
 			}
 		run.done = true;
 		emit();

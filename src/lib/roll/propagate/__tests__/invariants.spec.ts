@@ -6,8 +6,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const client = vi.hoisted(() => ({ up: vi.fn(), relRot: vi.fn() }));
-vi.mock("../client", () => ({
-	propagateServiceUp: client.up,
+vi.mock("../estimator", () => ({
+	relRotAvailable: client.up,
 	relRot: client.relRot,
 }));
 

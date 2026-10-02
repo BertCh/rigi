@@ -5,8 +5,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const client = vi.hoisted(() => ({ up: vi.fn(), relRot: vi.fn() }));
-vi.mock("../client", () => ({
-	propagateServiceUp: client.up,
+vi.mock("../estimator", () => ({
+	relRotAvailable: client.up,
 	relRot: client.relRot,
 }));
 
@@ -16,7 +16,12 @@ import { relRFromPoses } from "../../../nearfield/propagate";
 import type { PhotoMeta } from "../../../photos";
 import type { Roll, RollPhoto } from "../../types";
 import type { RelRotResult } from "../plan";
-import { type PropagateRun, persistRun, runPropagation } from "../run";
+import {
+	type PropagateRun,
+	persistRun,
+	runPropagation,
+	UNAVAILABLE,
+} from "../run";
 import { suggestionsFor } from "../store";
 
 const T0 = Date.parse("2025-08-01T10:00:00Z");
@@ -109,10 +114,10 @@ describe("runPropagation", () => {
 			"on",
 			(r) => updates.push(r),
 		);
-		expect(run.serviceUp).toBe(false);
+		expect(run.available).toBe(false);
 		expect(run.done).toBe(true);
 		expect(run.rows[0].status).toBe("error");
-		expect(run.rows[0].reasons).toEqual(["relative-rotation service is down"]);
+		expect(run.rows[0].reasons).toEqual([UNAVAILABLE]);
 		expect(client.relRot).not.toHaveBeenCalled();
 		expect(updates).toHaveLength(1);
 	});
