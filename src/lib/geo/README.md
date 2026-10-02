@@ -85,7 +85,7 @@ Mapterhorn is right about the ground: at IMG_7059, Terrarium is 80 m low (1,863 
 ## Known limitations
 
 - **DEM:** Terrarium is 40–85 m low on the Niederhorn cliffs and smooths near summits. That's the main error on ridge-top photos. Mapterhorn (swissALTI3D in Switzerland) is wired in (see above) and is what the app and matcher solve on; the eval default waits on the ground-truth re-annotation (roadmap N5).
-- **Eye height:** `max(GPS alt, ground+1.6 m)`. Neither fixed rule wins; `refinePose` (`src/lib/refine/`) fits an eye-height offset only where the near/far parallax makes it observable (`eyeFitted`, `eyeSensitivityPx`).
+- **Eye height:** `max(GPS alt, ground+1.6 m)` (`eye-rule.ts`, shared by the engines, workers, roll and near field). Without an altitude the engines use ground + 1.8 m and `loadScene` ground + 1.6 m (open decision, `reports/steps-2026-10-02/eye-rule.md`). Neither fixed rule wins; `refinePose` (`src/lib/refine/`) fits an eye-height offset only where the near/far parallax makes it observable (`eyeFitted`, `eyeSensitivityPx`).
 - **Focal length:** EXIF 26 mm (iPhone 11 Pro) reads about 2% short. The solver absorbs this within its ±8% f clamp.
 - **No compass heading:** pass `solvePose(..., { headingKnown: false })` (or any `yawRange` ≥ 90°). It goes straight to the full-360° search with the stricter 0.75 bar. In the wild benchmark, a 360° first pass at 0.5 falsely accepted IMG_7053 at −123.7°. Synthetic test (`BIG_YAW=1 NO_HEADING=1 npm run baseline:synth`): 10/13 accepted, all correct.
 - **Wild benchmark (f0, 100 Commons photos, Mapterhorn, blind-verified):** the cascade gets 25 correct (14 on Terrarium). At the 0.75 bar it makes 22 accepts, all correct.

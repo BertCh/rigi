@@ -52,13 +52,8 @@ export type PeakLabel = {
 	v: number;
 };
 
-/**
- * Eye height (m MSL), as engine.ts eyeAltitude: the (barometer-aided) GPS altitude unless that is
- * underground; near summits the horizontal fix puts the DEM point down the slope.
- */
-export function eyeAltitude(alt: number | null | undefined, dem: number) {
-	return alt != null ? Math.max(alt, dem + 1.6) : dem + 1.8;
-}
+/** The eye rule (geo/eye-rule.ts), re-exported for the engines, roll, lab and near field. */
+export { eyeAltitude } from "../geo/eye-rule";
 
 /** Contour near-fade from the GPS horizontal accuracy (PhotoWorkspace's nearFade default). */
 export function nearFadeFor(hAccuracy: number | null | undefined) {
@@ -68,8 +63,8 @@ export function nearFadeFor(hAccuracy: number | null | undefined) {
 }
 
 /**
- * Colour-ramp elevation range: local relief within 25 km, at least 500 m (engine.ts:369-381).
- * three only holds the viewing-wedge tiles (+ everything within 3 km) at that point, so read the
+ * Colour-ramp elevation range: local relief within 25 km, at least 500 m (as the removed three.js
+ * engine). three only held the viewing-wedge tiles (+ everything within 3 km) at that point, so read the
  * same set here: deck's out-of-wedge context tiles (e.g. the 4000 m Oberland behind a Lake Thun
  * camera) would otherwise stretch the ramp and wash the colours out.
  */

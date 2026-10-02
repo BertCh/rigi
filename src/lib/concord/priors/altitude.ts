@@ -14,17 +14,22 @@
 //
 // This is a PRIOR, never a snap: eyePriorFromExif returns a Gaussian GPS term (eye0, σH, σV) plus the
 // iso-band term (altitudeContourCost) that a solver adds to its objective, and seeds on the band for a
-// coarse eye search (isoBandSeeds). concordEye is the pure hook for the pipelines' eye rule (flag
-// ?concord=eye): the MAP of this prior, or null (keep the old rule) when there is no altitude, the photo
-// comes from a pin, or the iso-band is empty within 2σH.
+// coarse eye search (isoBandSeeds). concordEye is the MAP of this prior, or null (keep the old rule)
+// when there is no altitude, the photo comes from a pin, or the iso-band is empty within 2σH.
+//
+// Not wired into the app: as an eye rule it was worse on holdout (median 12.0 → 13.4 px, p90 18 → 36;
+// reports/negative-results.md), so the app keeps geo/eye-rule.ts, and ?concord=eye only switches the
+// focal table. The geocam priors read EYE_PRIOR_DEFAULTS (flags off).
 //
 // Frame: engine ENU at the GPS fix (x = east, y = north, metres), z = altitude in the DEM's datum
 // (m MSL). `ground(dE, dN)` is the DEM height at a horizontal offset from the fix (./ground.ts).
+
+import { EYE_ABOVE_GROUND } from "../../geo/eye-rule";
 import type { Vec3 } from "../core/types";
 import { type GroundFn, offsetLatLon } from "./ground";
 
-/** Standing eye height above the DEM (m); the app's EYE_ABOVE_GROUND (geo/pipeline.ts). */
-export const EYE_ABOVE_GROUND = 1.6;
+/** Standing eye height above the DEM (m): the eye rule's (geo/eye-rule.ts). */
+export { EYE_ABOVE_GROUND };
 
 export type EyeMeta = {
 	lat: number;

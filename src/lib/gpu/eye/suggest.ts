@@ -16,6 +16,7 @@
  * spawns it) or, as a fallback, on the calling thread.
  */
 import type { Pose } from "#/lib/camera";
+import { eyeAltitude } from "#/lib/geo/eye-rule";
 import {
 	type RefineEyeResult,
 	refineEyeFromSkyline,
@@ -91,10 +92,6 @@ export interface EyeSearchResult {
 	eyesMarched: number;
 	ms: number;
 }
-
-/** engine.ts / deck/scene.ts eyeAltitude, inlined so the worker does not pull in three.js. */
-const eyeAltitude = (alt: number | null, dem: number) =>
-	alt != null ? Math.max(alt, dem + 1.6) : dem + 1.8;
 
 const stats = (f: SkylineFit): EyeFitStats => ({
 	cost: f.cost,

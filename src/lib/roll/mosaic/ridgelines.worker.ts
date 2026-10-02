@@ -14,6 +14,7 @@ import {
 	tileId,
 	validateTile,
 } from "#/lib/dem";
+import { eyeAltitude } from "#/lib/geo/eye-rule";
 import {
 	applyRealmGpuOptions,
 	type RealmGpuOptions,
@@ -105,12 +106,10 @@ scope.onmessage = async (e: MessageEvent<RidgeWorkerIn>) => {
 		const dem = mosaicHeight(mosaics[0], j.lon, j.lat);
 		if (Number.isNaN(dem) && j.eyeAlt == null)
 			throw new Error("no terrain under the viewpoint");
-		// deck/scene eyeAltitude: GPS altitude unless underground (summit fixes land down the slope)
+		// the eye rule: GPS altitude unless underground (summit fixes land down the slope)
 		const h = Number.isNaN(dem)
 			? (j.eyeAlt as number)
-			: j.eyeAlt != null
-				? Math.max(j.eyeAlt, dem + 1.6)
-				: dem + 1.8;
+			: eyeAltitude(j.eyeAlt, dem);
 		const eye = { lat: j.lat, lon: j.lon, h };
 		const opts: RidgeOptions = { dMax: j.spans.at(-1)?.maxDistance };
 		const heightAt = (lat: number, lon: number, d: number) =>
