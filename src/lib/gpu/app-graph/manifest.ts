@@ -862,6 +862,22 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		status: "default",
 	},
 	{
+		id: "roll-clear-range",
+		island: "I12",
+		paths: ["src/lib/gpu/roll/clear-range.ts"],
+		groups: ["roll-clear-range"],
+		realms: ["page"],
+		cadence: "per photo",
+		resources: [
+			"geometry target rgba32float (import, sampled)",
+			"grid words + nonce (pooled)",
+		],
+		readbacks: ["fit grid <= 256 px long side: (1 + W·H)·4 B (read node)"],
+		status: "default",
+		notes:
+			"roll clear air: the range map decimated at the fit stride on the GPU (WebGPU roll backend), instead of a full target readback; CPU twin drape-clear decimateRange",
+	},
+	{
 		id: "roll-webgl",
 		island: "I12",
 		paths: ["src/lib/roll", "src/lib/roll/map/backend-webgpu.ts"],

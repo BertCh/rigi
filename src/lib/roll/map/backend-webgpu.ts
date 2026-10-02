@@ -63,6 +63,7 @@ import type {
 	PrepassContext,
 } from "../../deck-webgpu/pass";
 import { adoptedRenderDevice } from "../../gpu/device";
+import { readClearRangeGrid } from "../../gpu/roll/clear-range";
 import type {
 	RangeHandOff,
 	RollBackendKind,
@@ -176,6 +177,12 @@ class RollGeometryAdapter implements RollGeometrySource {
 	}
 	readDrawn(seq: number, pose: Pose) {
 		return this.src.readDrawn(seq, pose);
+	}
+	async readDecimated(seq: number, _pose: Pose, step: number) {
+		// drawOnly() bumps renderSeq per draw, so the target holds draw `seq` exactly while they match;
+		// the read is queued now, ahead of any later draw
+		if (this.src.renderSeq !== seq) return null;
+		return readClearRangeGrid(this.src.gpuDevice, this.texture, step);
 	}
 	dispose() {
 		this.onDispose();

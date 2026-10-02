@@ -20,7 +20,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I9 | Look | per settle, per style | page | look-guided, look-stats, look-haze, look-relief, look-textures, look-photo | `look-guided`, `look-stats`, `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-haze-band`, `look-haze-argmin`, `look-relief`, `look-tex`, `look-photo` |
 | I10 | Labels (not a graph) | per emit | page | labels | – |
 | I11 | Nearfield | per view | page | splat-sort | `splat-sort` |
-| I12 | Roll | per photo, per frame | page, worker:ridgelines | photo-palette, roll-look, horizon-ridges, roll-webgl | `palette`, `roll-look`, `roll-look-similar`, `horizon-ridges` |
+| I12 | Roll | per photo, per frame | page, worker:ridgelines | photo-palette, roll-look, horizon-ridges, roll-clear-range, roll-webgl | `palette`, `roll-look`, `roll-look-similar`, `horizon-ridges`, `roll-clear-range` |
 
 ## Modules
 
@@ -61,6 +61,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | labels | I10 | cpu | page | per emit | – | – | – |
 | splat-sort | I11 | default | page | per view | `splat-sort` | splat storage buffer, order buffer (render device; imports bound per encode); params, depth, mm, keys, rank, tmp (imports, owned by each GpuSplatSorter) | – |
 | horizon-ridges | I12 | default | worker:ridgelines (remote) | per photo | `horizon-ridges` | mosaic pages (imports); u, params | read: ridge tops outBytes |
+| roll-clear-range | I12 | default | page | per photo | `roll-clear-range` | geometry target rgba32float (import, sampled); grid words + nonce (pooled) | fit grid <= 256 px long side: (1 + W·H)·4 B (read node) |
 | roll-webgl | I12 | cpu | page | per frame | – | WebGPU backend: luma-direct host + deck-webgpu cores (backend-webgpu.ts); WebGL2 fallback: deck + raw GL2 programs | range maps |
 
 ## Notes
@@ -96,6 +97,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **roll-look**: group-by-look: luma GPUKMeans + GPUSimilaritySearch (centroids as queries) in one graph; similarLooks is a cosine GPUSimilaritySearch
 - **labels**: CPU / DOM by nature; fed by I8's small readbacks
 - **splat-sort**: deck-webgpu splats sortBackend "gpu"; clear + depth + keys kernel nodes + one luma GPUSort in one compute pass, encoded and submitted synchronously on the sorter's encoder (no lease); keyed by buffer sizes
+- **roll-clear-range**: roll clear air: the range map decimated at the fit stride on the GPU (WebGPU roll backend), instead of a full target readback; CPU twin drape-clear decimateRange
 - **roll-webgl**: src/lib/roll/map/backend-webgpu.ts is the default via ?renderer=auto (backend-select.ts); it draws with deck-webgpu render cores, not yet as a ComputeGraph island (range maps and cull are still outside the graph), so the status stays cpu until they join one
 
 Test and bench groups (not islands): `selftest-cache`, `look-haze-lint`.

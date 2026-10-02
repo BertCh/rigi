@@ -52,7 +52,7 @@ import { createWebglBackend, WebglRollBackend } from "./backend-webgl";
 import { basemapLook, basemapSource, type RollBasemap } from "./basemap";
 import { mapBounded } from "./bounded";
 import { type DrapeAtlas, MAX_PHOTOS } from "./drape-atlas";
-import { DrapeClear } from "./drape-clear";
+import { DrapeClear, decimationStep } from "./drape-clear";
 import { rollOverlays } from "./overlays";
 import {
 	type ImagerySeed,
@@ -706,10 +706,21 @@ export class RollMapEngine {
 					// clear air fits the photo on a decimated copy of this range map: one more
 					// readback of the (still intact) target, only while clearAir is on
 					if (this.needsClearRange(p)) {
-						const ok = await src.readDrawn(drawSeq, p.pose);
+						// the WebGPU source samples the fit grid on the GPU: only that grid is read back
+						const grid = await src.readDecimated?.(
+							drawSeq,
+							p.pose,
+							decimationStep(w, h),
+						);
 						if (this.disposed) return "disposed";
 						if (p.rev !== rev) return "moved";
-						if (ok) this.clearRange(p, src.range, w, h);
+						if (grid) this.clear.setRangeGrid(p.id, this.clearCam(p), grid);
+						else {
+							const ok = await src.readDrawn(drawSeq, p.pose);
+							if (this.disposed) return "disposed";
+							if (p.rev !== rev) return "moved";
+							if (ok) this.clearRange(p, src.range, w, h);
+						}
 					}
 					return "done";
 				}
@@ -749,13 +760,11 @@ export class RollMapEngine {
 
 	/** Hand photo p's range map (row 0 = top, sky 0 or Infinity) to the clear-air fit. */
 	private clearRange(p: Placed, data: Float32Array, w: number, h: number) {
-		this.clear.setRange(
-			p.id,
-			{ pose: p.pose, eye: p.eye, aspect: p.aspect },
-			data,
-			w,
-			h,
-		);
+		this.clear.setRange(p.id, this.clearCam(p), data, w, h);
+	}
+
+	private clearCam(p: Placed) {
+		return { pose: p.pose, eye: p.eye, aspect: p.aspect };
 	}
 
 	/** opts.peopleMasks: the precomputed masks into this.masks, the clear-air fit and the atlas. */

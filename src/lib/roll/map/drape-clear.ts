@@ -55,6 +55,29 @@ const CLEAR_FLOOR = 0.3;
 const FIT_LONG = 256;
 /** Long side (px) of the photo copy kept for fits and gains (= 2 × FIT_LONG). */
 const PIXELS_LONG = FIT_LONG * 2;
+
+/** The stride that brings a w x h range map to <= fitLong px on the long side. */
+export const decimationStep = (w: number, h: number, fitLong = FIT_LONG) =>
+	Math.max(1, Math.ceil(Math.max(w, h) / fitLong));
+
+/** Nearest-sample decimation of a range map (row 0 = top); non-finite (sky) becomes 0. */
+export function decimateRange(
+	data: Float32Array,
+	w: number,
+	h: number,
+	fitLong = FIT_LONG,
+) {
+	const step = decimationStep(w, h, fitLong);
+	const W = Math.floor(w / step);
+	const H = Math.floor(h / step);
+	const out = new Float32Array(W * H);
+	for (let y = 0; y < H; y++)
+		for (let x = 0; x < W; x++) {
+			const r = data[y * step * w + x * step];
+			out[y * W + x] = Number.isFinite(r) ? r : 0;
+		}
+	return { w: W, h: H, data: out };
+}
 /** Gains are re-solved this long after the last change (ms). */
 const GAIN_DEBOUNCE_MS = 700;
 /** Texels per photo in the params texture. */
@@ -263,18 +286,18 @@ export class DrapeClear {
 	 * an older one (updateRoll moved the camera) and invalidates its fit.
 	 */
 	setRange(id: string, cam: Cam, data: Float32Array, w: number, h: number) {
-		const step = Math.max(1, Math.ceil(Math.max(w, h) / FIT_LONG));
-		const W = Math.floor(w / step);
-		const H = Math.floor(h / step);
-		const out = new Float32Array(W * H);
-		for (let y = 0; y < H; y++)
-			for (let x = 0; x < W; x++) {
-				const r = data[y * step * w + x * step];
-				out[y * W + x] = Number.isFinite(r) ? r : 0;
-			}
+		this.setRangeGrid(id, cam, decimateRange(data, w, h, FIT_LONG));
+	}
+
+	/** setRange for a range map already decimated (decimateRange, or on the GPU at decimationStep). */
+	setRangeGrid(
+		id: string,
+		cam: Cam,
+		grid: { w: number; h: number; data: Float32Array },
+	) {
 		const e = this.entry(id);
 		e.cam = cam;
-		e.range = { w: W, h: H, data: out };
+		e.range = grid;
 		e.rev++;
 		e.fitted = false;
 		e.samples = undefined;

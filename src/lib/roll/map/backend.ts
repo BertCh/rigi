@@ -122,6 +122,16 @@ export interface RollGeometrySource extends GeometrySource {
 	drawOnly(pose: Pose): boolean;
 	/** Read back the draw `seq` (still in the target) into range; false = overwritten / failed. */
 	readDrawn(seq: number, pose: Pose): Promise<boolean>;
+	/**
+	 * The still-intact draw `seq` sampled at every `step`-th texel on the GPU (decimateRange's rule:
+	 * nearest, sky / non-finite 0, row 0 = top), only that grid read back. null = overwritten or not
+	 * possible: the caller takes readDrawn + decimateRange.
+	 */
+	readDecimated?(
+		seq: number,
+		pose: Pose,
+		step: number,
+	): Promise<{ w: number; h: number; data: Float32Array } | null>;
 	readonly timing?: { copyMs?: number; unpackMs?: number } | null;
 	dispose(): void;
 }
