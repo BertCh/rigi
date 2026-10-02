@@ -10,7 +10,7 @@
 // the atlas class, the geometry sources (range maps) and the range hand-off (range map → atlas cell
 // + coarse grid on the GPU).
 //
-// Plan and inventory: reports/roll-map-webgpu-plan-2026-10-02.md.
+// Design and open items: reports/gpu-renderer.md (roll map on WebGPU).
 
 import type { Device, Texture } from "@luma.gl/core";
 import type { Pose } from "#/lib/camera";

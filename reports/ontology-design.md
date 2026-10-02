@@ -1,5 +1,7 @@
 # Rigi ontology: design (v3, 2026-09-30)
 
+*Design rationale and review history. Generated reference: [ontology.md](ontology.md). Current module guide: [src/lib/ontology/README.md](../src/lib/ontology/README.md). Tightened 2026-10-02.*
+
 This is the meta layer for Rigi's types. It gives one vocabulary, one set of semantic primitives and
 one machine-checked map from that vocabulary to the ~700 exported types in `src/`. It lives in
 `src/lib/ontology/**`. Tables are generated into `reports/ontology.md`, and the check is
@@ -95,94 +97,10 @@ Fixed:
 6. **Open for extension.** Catalogues are typed by `const` tables, so new terms are one row. The concept
    type map is an interface (`ConceptShapes`), so a module can augment it.
 
-## 3. Layers (v1 text below; where it conflicts with 1b, 1b and `src/lib/ontology/README.md` win)
+## 3. Shape of the module
 
-```
-L4 meta      concepts · relations · realizations · crosswalks · vocabulary · pipeline   (catalogue + checks)
-L3 epistemic Source taxonomy · Status lattice · Confidence (scale-aware) · Estimate<T> · Outcome<T>
-L2 domain    Photo · Roll · Viewpoint · Region · Feature(Peak/Lake/Trail) · Terrain(DemSource/Tile)
-             Camera = Orientation + Eye + Intrinsics · Horizon (modelled) · Skyline (observed)
-             Correspondence (Pin/Cue) · Label · Look/Style · Layer · ViewMode · Renderer · Format · Flag
-L1 geometry  Vec3/Mat3 · GeoPoint{lat,lon,h,datum} · EnuPoint · Direction{az,el} · ImagePoint<Basis>
-             Size · BBox{west,south,east,north}
-L0 quantity  Deg Rad Metres Px Norm Prob Seconds IsoTime · HeightDatum · PixelBasis
-```
+The layer map and the per-file contents are in [src/lib/ontology/README.md](../src/lib/ontology/README.md), which wins over any older text. In brief: L0 quantities (`Deg`, `Metres`, `Height<Datum>`, `Px<Basis>`), L1 geometry and frames (`Vec3`, `Mat3`, `LatLon`, `FramePoint<F>`, `BBox`), L3 epistemics (provenance axes, confidence scales, resolution policies), L4 meta (ids, storage registry, concept catalogue, crosswalks, generated `domain.ts`). The v1 designs that v2 replaced (one `Source` taxonomy with trust tiers, a status lattice with `verified`, global `precedence()`, `Estimate<T>`/`Outcome<T>` wrappers, relations and a pipeline registry) are in git history; §1b says why each was cut.
 
-## 4. Key designs
+## 4. Adoption (type-only, zero runtime drift): outcome
 
-### Source (provenance taxonomy)
-Ids are dotted: `family.leaf`. Each source carries a `tier`:
-
-| tier | meaning | families |
-|---|---|---|
-| asserted | a person said so | `user.*` (saved, pin, place, manual, tap, accept) |
-| reference | curated external truth | `reference.*` (ground-truth, osm, swisstopo, dem, table, google) |
-| measured | a device sensor | `sensor.*` (gps, gps-alt, compass, gravity, clock, lens) |
-| inferred | an algorithm | `solver.*` (skyline, near-compass, cascade, matcher, viewpoint, propagate, concord, eye), `model.*` (sky, depth, splat) |
-| assumed | a default or a rule | `derived.*` (prior, default, interpolated, nearest, fallback) |
-| generated | synthesised content | `model.generated` |
-
-`precedence()` orders sources for resolution. The roll's `saved > ground-truth > solved > prior` is a
-consequence of this order, and the check verifies it.
-
-### Status (epistemic lifecycle of an estimate)
-`assumed → proposed → accepted → verified`, with `asserted` (set by the user) and `rejected` / `failed`
-as the terminal side states. `needs-review` is `proposed` plus a reviewer flag. Every existing state
-union crosswalks onto these states: `AlignState`, `SecondOpinionVerdict`, `UnknownPoseOutcome.state`,
-`AlignStatus`, `StoredSuggestion.status` and `RowStatus`.
-
-### Confidence (scale-aware)
-`Confidence = { score: Prob | null; level: high|medium|low|unknown; scale: ConfidenceScaleId }`. A
-`ConfidenceScale` registry records each producer's thresholds (refine 0.5, cascade 0.5/0.75, matcher
-0.9/0.2, preview 0.2, concord 0.5). `levelOf(scale, score)` gives a comparable level. Scores from
-different scales are never compared directly.
-
-### Estimate<T> and Outcome<T>
-`Estimate<T> = { value: T; source: SourceId; status: Status; confidence?; sigma?; method?; at?; from?: Ref[] }`
-is the universal "a value plus how we know it" shape. `Outcome<T,E> = {ok:true,value} | {ok:false,error}`
-is the one result envelope, with adapters for the five existing worker reply shapes.
-
-### Identity
-`Ref<C> = {concept: C; id: string}` and the URN `rigi:<concept>/<id>`. An `IdScheme` registry holds the
-pattern, kind and example for each concept: photo `bundled|local|demo|bench`, region, roll, peak, lake and
-tile. It offers `classifyId(concept, id)` and `isPhotoKind(id, kind)`.
-
-### Storage registry
-Every persistent namespace has an entry: medium, key pattern, concept, version and owner. The check scans
-the source for `mt-image:`, `mt-image.` and `rigi.` literals and fails on any that is unregistered.
-
-### Concepts
-Each concept records: id, label, kind (`entity|value|quantity|frame|process|artifact|config|vocabulary`),
-domain, parent (`is`), definition, UI terms, code terms, avoided terms, realizations
-(`{module, export, role: canonical|variant|wire|view|internal}`), frame and units, id scheme and
-storage. A runtime check verifies that every realization export exists in its module. A type-level
-conformance file checks the shape where a realization should conform to the canonical shape.
-
-### Relations
-Typed predicates over concepts, each with domain, range and cardinality:
-`contains, memberOf, depicts, capturedFrom, estimates, observes, derivedFrom, locatedIn, labels,
-renders, serializes, configures, produces, consumes`.
-
-### Pipeline
-A stage registry: ingest, prior, region, horizon, sky, solve, refine, verify, match, propagate, concord,
-label, render and export. Each stage lists the concepts it consumes and produces, the sources it emits
-and the module that owns it. The generated docs draw the dataflow graph from this registry.
-
-## 5. Adoption plan (type-only, zero runtime drift)
-Out of bounds (peers in flight): `gpu/**`, `deck/**`, `deck-webgpu/**`, `align.ts`, the look
-haze/relief/guided/color-stats files, `nearfield/deck-map-camera.ts` and `package.json`.
-
-1. Vec3 / Mat3: one canonical definition (ontology geometry). `linalg` and the duplicate definitions re-export it.
-2. `ViewMode`: `StyleMode` aliases the canonical one. `DeckStyleMode` is deferred because it is in `deck/`.
-3. `AlignState` moves to the ontology, and picker and concord type their `alignState` params with it instead of `string`.
-4. `SolvedPose.method` gets a typed `SolveMethod`.
-5. Photo id predicates delegate to the id-scheme registry.
-6. `ExportFormat` and `SplatExportFormat` become one `FormatDescriptor<K>`.
-7. The ontology `/dev/ontology` page browses the catalogue.
-
-*Update (2026-10-01): items 1–6 landed (39da866, edc485a, fac786f, 8fd383d); `DeckStyleMode` now aliases `ViewMode`, and `ExportFormat`/`SplatExportFormat` are both `FormatDescriptor<K>`. Item 7 was not built: the catalogue is browsed through the explainer's `OntologyPanel` and the generated `reports/ontology.md`. The stale-verdict app bug in 1b was fixed in b9d29b1. The current vocabulary entry point is `domain.ts` ([type-system-review-2026-10-01.md](type-system-review-2026-10-01.md)).*
-
-## 6. Open questions (v1; resolved in v2, see 1b)
-- Should `Status` be a lattice (with join) or a flat union?
-- Is the `asserted` tier above `reference`? A user-saved pose beats ground truth in the roll today, so yes.
-- Should `Estimate.sigma` be per component, or a single scalar?
+Landed (39da866, edc485a, fac786f, 8fd383d, a477911): one canonical `Vec3`/`Mat3`; `ViewMode` (with `StyleMode` and `DeckStyleMode` aliasing it); `AlignState` and `Verify` in the ontology, used by picker and concord; a typed `SolveMethod`; photo-id predicates on the id-scheme registry; `ExportFormat` and `SplatExportFormat` as `FormatDescriptor<K>`; storage keys through `storageKey()`. The stale-verdict app bug from §1b was fixed in b9d29b1. Not built: a `/dev/ontology` page (the catalogue is browsed through the generated [ontology.md](ontology.md) and the Gipfelbuch `OntologyPanel`). The vocabulary entry point is `domain.ts`; later consolidation and open items are in [type-system-review-2026-10-01.md](type-system-review-2026-10-01.md).

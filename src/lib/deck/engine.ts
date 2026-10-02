@@ -678,7 +678,7 @@ export class DeckEngine implements Renderer {
 			// canvas outside a frame (style-baseline, which does, reads it inside the frame).
 			// antialias (luma's default is true) multisamples the canvas' default framebuffer. The
 			// world view draws straight onto it and is fill-bound there at DPR 2: orbit 29–39 fps
-			// with it, ~59 without (reports/deck-default.md). At DPR ≥ 2 the pixels hide the
+			// with it, ~59 without (reports/archive/deck-default.md). At DPR ≥ 2 the pixels hide the
 			// aliasing, so it is off; below that it stays on. The photo view is unaffected either
 			// way: it renders into the compositor's own MSAA target. Decided once, when the context
 			// is created (a later DPR change does not revisit it).

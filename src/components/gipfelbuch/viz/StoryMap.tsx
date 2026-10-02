@@ -57,7 +57,7 @@ import {
 // rays to the named summits as the cone arrives. The guess (dashed) and the solved cone (hairline)
 // stay as ghosts, an arc measures the compass correction. Inside an AlignmentStoryProvider the map
 // follows the wipe or stage (settling with the geo spill, a drag at once), and dragging round the
-// camera (or the arrow keys) drives the story from the map. Spec: reports/gipfelbuch-explainers-2026-10-02/M-maps.md.
+// camera (or the arrow keys) drives the story from the map. Spec: reports/gipfelbuch.md.
 //
 // Two layers: a memoised BASE (relief, footprint, context ticks, solved ghost, furniture) and a LIVE
 // svg on top that re-renders as t moves.

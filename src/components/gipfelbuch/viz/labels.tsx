@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { HandDot, PenCircle, SketchPath } from "../notebook/Ink";
 import { HandUnderline } from "./hand";
 
-// Figure labels (hand pass, reports/gipfelbuch-hand-sketch-2026-10-01.md): every label in a figure
+// Figure labels (hand pass, reports/gipfelbuch.md): every label in a figure
 // is written by hand. Values and names use the small hand (Shantell Sans, tabular figures); peak and
 // place names use hand block capitals (`caps`), after the LK lettering hierarchy. Only code and
 // equations stay in print.

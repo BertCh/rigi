@@ -25,18 +25,11 @@ encodes and submits synchronously on the sorter's own encoder (no lease and no `
 must precede the frame submit), so a cache eviction, queued under the graph's lease, never lands in
 the middle of a sort; an evicted graph is rebuilt and compiled at the next sort from the per-device
 pipeline cache. With `__RIGI_GPU_PROFILE__` the GPU time is reported per node as
-`splat-sort|<key>/<node>` (it was one `splatsort` pass).
+`splat-sort|<key>/<node>`.
 
-## History
+## Notes on the sort
 
-The sort used to be four in-house kernels per radix pass (tile / scan-digit / scan-totals / scatter,
-two passes of 9 bits). luma `GPUSort` replaced them as the default in 3eeccc6 (same order on Dawn at
-100k to 2M splats, about 1.5 to 2 times less GPU time, flag `splatSortGpgpu`), and the in-house passes
-and the flag were deleted afterwards; `?splatSortGpgpu=off` is a retired URL parameter (ignored, with a
-console warning, see `src/lib/flags`). If the GPUSort graph fails to build or compile, `ready`
-rejects and the layer falls back to the worker sort (below). GPUBitonic (`algorithm: "bitonic"`) was
-5 to 8 times slower at 100k to 1M splats and is not used. Numbers: `scripts/gpu/splat-sort-gpgpu-dawn.ts`
-(Dawn in node) and `scripts/gpu/splat-sort-bench.mjs` (Chrome).
+Radix passes are luma `GPUSort` (in-house passes and the `splatSortGpgpu` flag deleted in 1dca4c19; `?splatSortGpgpu=off` is a retired URL parameter that warns and is ignored, see `src/lib/flags`). If the graph fails to build or compile, `ready` rejects and the layer falls back to the worker sort (below). GPUBitonic was 5 to 8 times slower at 100k to 1M splats and is not used. Numbers: `scripts/gpu/splat-sort-gpgpu-dawn.ts` (Dawn in node, needs `DAWN_DIR`) and `scripts/gpu/splat-sort-bench.mjs` (Chrome). CI row: `splat-sort` (`scripts/nearfield/splat-sort-test.ts`).
 
 ## Identity with the worker's order
 

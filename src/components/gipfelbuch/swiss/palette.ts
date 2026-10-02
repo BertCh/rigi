@@ -4,7 +4,7 @@
 
 // The Gipfelbuch map-sheet palette: Landeskarte-style separations (black, brown, blue, red)
 // on warm paper. Every ink is a Brezine chart swatch named by its Ascher code; keep in step
-// with the --gb-* tokens in ./theme.css. See reports/gipfelbuch-swiss-aesthetic.md.
+// with the --gb-* tokens in ./theme.css. See reports/gipfelbuch.md.
 
 import "./theme.css";
 

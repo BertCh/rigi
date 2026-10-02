@@ -23,10 +23,11 @@ The **master** branch is the active development branch. You need Node 22.
 
 ```bash
 npm install
+node scripts/models/fetch.mjs   # model weights into public/models (gitignored)
 npm run dev          # http://localhost:3100
 ```
 
-luma.gl 10 and deck.gl are installed from tarballs in `vendor/` (see `vendor/luma/README.md`). Most demo photos and DEM tiles are fetched or local; several checks are skipped when the gitignored `data/` and `public/photos/` directories are absent. SKIP results from `node scripts/ci/run.mjs` are expected in a clone without that data.
+luma.gl 10 and deck.gl are installed from tarballs in `vendor/` (see `vendor/luma/README.md` and `vendor/deck/README.md`). The app has no backend; DEM tiles are fetched at run time and the demo roll is in `public/demo/`. Several checks are skipped when the gitignored `data/` and `public/photos/` directories are absent. SKIP results from `node scripts/ci/run.mjs` are expected in a clone without that data.
 
 ## Running checks
 

@@ -1,6 +1,6 @@
 # WAG waves 3–4: consolidated browser pass results (partial)
 
-*2026-10-01, session mt-image-2b. Clean worktree of master 2a03b95 (luma rigi.3, deck rigi.1), dev server :3101, every run under the render lock. Stopped early by cook mode and an ENOSPC; unrun items are UNVERIFIED. Checklist: [consolidated-pass-wave4.md](consolidated-pass-wave4.md). Raw outputs were in the session scratchpad and are not kept.*
+*2026-10-01, session mt-image-2b. Clean worktree of master 2a03b95 (luma rigi.3, deck rigi.1), dev server :3101, every run under the render lock. Stopped early by cook mode and an ENOSPC; unrun items are UNVERIFIED. The checklist (consolidated-pass-wave4.md) was deleted on 2026-10-02 after this pass; `git show 1e212ab6:research_notes/whole-app-graph-2026-10-01/consolidated-pass-wave4.md` if needed. Raw outputs were in the session scratchpad and are not kept.*
 
 **Verdict: no revert candidate.** Keep all nine defaults; the open arms are listed under Verdicts.
 

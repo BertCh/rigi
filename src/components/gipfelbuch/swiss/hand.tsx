@@ -4,7 +4,7 @@
 
 import { PenArrow, SketchPath } from "../notebook/Ink";
 
-// Hand marks for the sheet shell (reports/gipfelbuch-hand-sketch-2026-10-01.md, K-C): a partial
+// Hand marks for the sheet shell (reports/gipfelbuch.md): a partial
 // marker underline under lettered titles, a hand rule, and small pen arrows for hand lists.
 
 /** Stable 0..1 from a string seed. */

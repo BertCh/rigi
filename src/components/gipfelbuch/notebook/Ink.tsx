@@ -132,7 +132,7 @@ export function PenLine({
 }
 
 /**
- * Hand pass (reports/gipfelbuch-hand-sketch-2026-10-01.md): a measured mark is drawn by hand too,
+ * Hand pass (reports/gipfelbuch.md): a measured mark is drawn by hand too,
  * but with one pen pass whose sideways jitter is bounded by this many px, so it stays on its
  * measured pixels (notebook.check.ts tests the bound). Width stays constant (L2).
  */

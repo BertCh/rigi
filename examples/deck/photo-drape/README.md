@@ -96,8 +96,8 @@ to the OS temp directory by default. `PHOTO_DRAPE_BACKEND=webgpu` limits the run
 
 `package.json` lists the versions this example is written against: deck.gl 9.4.0-beta.4,
 luma.gl 10.0.0-alpha.2 and math.gl 5 alpha. Inside the Rigi repository they resolve to the root
-install, which vendors those versions (luma.gl as `10.0.0-alpha.2-rigi.3`, an alpha.2 build with
-unmerged upstream fixes; see `vendor/luma/README.md`). The Vite config adds no source aliases. Only public
+install, which vendors builds of them with unmerged upstream fixes (luma.gl `10.0.0-alpha.2-rigi.6`,
+deck.gl `9.4.0-rigi.3`; see `vendor/luma/README.md` and `vendor/deck/README.md`). The Vite config adds no source aliases. Only public
 deck.gl and luma.gl APIs are used (no underscore-prefixed exports).
 
 ## Upstream notes

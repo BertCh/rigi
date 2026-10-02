@@ -1,6 +1,6 @@
 # In-the-wild harness: controlled ablation (heading / gravity removed)
 
-*2026-09-25 · harness in `tools/bench/harness/` · server extension in `tools/matcher/server/` (ad-hoc mode) · raw rows in `tools/bench/harness/out/runs/ablation/results.json` (gitignored), overlays next to them*
+*2026-09-25 · harness in `tools/bench/harness/` · server extension in `tools/matcher/server/` (ad-hoc mode; removed 2026-10-02) · raw rows in `tools/bench/harness/out/runs/ablation/results.json` (gitignored), overlays next to them*
 
 ## TL;DR
 
@@ -18,7 +18,7 @@
   - With default options, it degrades to 3/11 when both are missing. It never falsely accepts, though: it rejects instead.
 - **What the upload path should do:** treat a photo without heading or gravity as a fused-service job (two-stage 360° sweep, ≈ 11–22 s). If the service isn't there, run the cascade with the unknowns declared (≈ 0.7–2.4 s). The app's own `autoAlign` should not be trusted without a heading: it accepts wrong poses.
 
-> **Update (2026-10-01):** the upload-path recommendation above is implemented in `src/lib/integration/unknown-pose.ts` (cascade with the unknowns declared and the 0.75 yaw-unknown gate, then fused `/match`, else "unverified"). The "app" rows describe the three.js PhotoEngine's `autoAlign`, removed 583e2b7; the deck engines share the `Renderer` contract (`src/lib/renderer.ts`) but these numbers were not re-measured on them.
+> **Status (2026-10-02):** a frozen study record. The upload-path recommendation is implemented in `src/lib/integration/unknown-pose.ts` (cascade with the unknowns declared and the 0.75 yaw-unknown gate, then the matcher, else "unverified"); the matcher now runs in the browser (`src/lib/matcher`), not as the `/match` service described here. The "app" rows describe the three.js PhotoEngine's `autoAlign` (removed 583e2b7); the deck engines share the `Renderer` contract but were not re-measured. Of the harness only `cascade.ts`, `cascade_mt_pack.ts`, `overlay.ts`, `verify_pack.ts` and `lib/` remain; `run.sh`/`run.ts` and the service-spawning worker were removed 2026-10-02 (8bb109d0), so the CLI below is historical.
 
 ## What each method supports natively
 
@@ -218,58 +218,13 @@ app = in-page autoAlign compute summed over seeds (page load excluded); cascade 
   - App times are in-page compute only. Page load (≈ 4–15 s) is excluded, as in the leaderboard.
 - **Shared dev server.** One request (IMG_7130, heading removed, fused) died on an HMR reload triggered by other work on the shared dev server. It was re-run on resume, and the harness now retries once.
 
-## CLI
+## CLI and server extension (historical)
 
-```bash
-# dev server on :3100; fused uses :8765 if it has ad-hoc support, else starts a private service on :8766
-tools/bench/harness/run.sh tools/bench/data/manifest.json                       # all methods, condition "given"
-tools/bench/harness/run.sh <manifest.json> --methods app,cascade,fused --ids a,b \
-    [--conditions given|full,nogravity,noheading,none] [--out DIR] [--matcher-url URL] \
-    [--no-overlay] [--overlay-methods app,cascade,fused] [--force]
-node tools/bench/harness/make_ablation_manifest.mjs            # → out/ablation/manifest.json
-node tools/bench/harness/ablation_report.mjs <results.json>    # → the tables in this report
-npx tsx tools/bench/harness/overlay.ts --photo p.jpg --lat L --lon L [--alt m] --pose yaw,pitch,roll,vfov \
-    [--gt …] [--prior …] [--method m] [--conf "HIGH 0.9"] [--region region.json] --out o.jpg
-```
-
-- **Manifest fields:**
-  - `{id, file, lat, lon, altitudeM?, headingDeg?, focalMm?, focal35mm?, width, height, tags}`;
-  - `file` is relative to the manifest;
-  - `focalMm` alone is ignored (no sensor size), so a 50° hfov is used and focal is freed.
-- **Optional extensions:**
-  - `pitchDeg`/`rollDeg` (gravity);
-  - `vfovDeg`/`hfovDeg`;
-  - `gpsErrorM`;
-  - `regionFile`;
-  - `gt`/`gtPin` for scoring.
-- **Output** goes to `tools/bench/harness/out/runs/<name>/`:
-  - `results/<id>/<cond>.<method>.json`, one per photo, condition and method. Each has the solved pose, the shown pose, accept, confidence, assumptions, timing, and errors when GT exists;
-  - `overlays/<id>__<cond>__<method>.jpg`, with the DEM skyline at the pose, the top 8 occlusion-tested OSM peak labels, and a header with method, condition, pose, confidence and Δ vs GT;
-  - `results.json` and `summary.md`.
-- **Photos** are normalised to an upright JPEG ≤ 2048 px (EXIF orientation applied). Re-runs resume and skip finished rows, but always re-run failed ones.
-- **Caches:** Overpass is cached in `out/cache/overpass`, with 2 s between queries, a UA string and back-off. DEM tiles come from the repo's `.cache/terrarium` read-only, else `out/cache/terrarium`.
-
-## Server extension (`tools/matcher/server`, backward compatible)
-
-- **`POST /match` JSON** `{photoPath | photoUrl, meta:{lat, lon, altitudeM?}, prior?:{yaw?, pitch?, roll?, vfov? | hfov?}, region?, offsets?, fused?, timeoutMs?}`.
-  - Multipart works too: parts `request` (the same JSON with `meta` and no `views`) and `photo`.
-  - Missing fields mean unknown. The response carries `adhoc:{yawKnown, gravityKnown, focalKnown, priorUsed, yaw360, twoStage, stage2Prior, stages[]}`.
-- **Existing modes are unchanged** apart from these:
-  - `offsets` now allows up to 12;
-  - `/health` lists `capabilities: ["photoId","multipart","adhoc"]`;
-  - the render worker's warm-page check now also requires `terrain` and `horizonDirs`.
-- **`render_worker.mjs`** gains the `adhoc` and `fullTerrain` request fields and an `align` command.
-- **Parity:** photoId-mode parity is unaffected; the cross-check above is within 0.014° median.
-
+The runner (`tools/bench/harness/run.sh <manifest> --methods app,cascade,fused --conditions full,nogravity,noheading,none`) and the service's ad-hoc `POST /match` mode (prior fields optional, two-stage 360° sweep, `adhoc` response block, `align` worker command) were removed with the matcher service on 2026-10-02. The manifest schema (`{id, file, lat, lon, altitudeM?, headingDeg?, focalMm?, focal35mm?, width, height, tags}`, optional `pitchDeg`/`rollDeg`, `vfovDeg`/`hfovDeg`, `gt`/`gtPin`) is what `cascade.ts` and `overlay.ts` still read. The service design is in [archive/matcher-service.md](archive/matcher-service.md).
 
 ## Phase 3: wild set run (100 photos, `tools/bench/data/manifest.json`)
 
-```bash
-BENCH_TILE_DIR=$TMPDIR/terrarium HARNESS_HORIZON_CACHE=memory \
-  tools/bench/harness/run.sh tools/bench/data/manifest.json --weak-heading --no-overlay --out tools/bench/harness/out/runs/wild
-npx tsx tools/bench/harness/verify_pack.ts tools/bench/data/manifest.json tools/bench/harness/out/runs/wild   # blinded pack
-node tools/bench/harness/export_results.mjs tools/bench/harness/out/runs/wild      # → tools/bench/results.json (wild:app|cascade|fused)
-```
+Run with `run.sh … --weak-heading` (results in [bench-wild.md](bench-wild.md)); export to `tools/bench/results.json` (`wild:app|cascade|fused`).
 
 - **`--weak-heading`:** the manifest heading is only a hint. Headings there are coarse compass letters or an uploader's guess.
   - app: 360° seeds plus a seed at the heading;

@@ -1,71 +1,38 @@
-# WebGPU as the default renderer
+# WebGPU as the default renderer (decision record)
 
-*2026-10-01. **Decision: flipped** (b520b1d). `renderer` is `oneOf(["auto","webgpu","deck"], "auto")` in `src/lib/flags/index.ts` (three.js removed 2026-10-01, 583e2b7), and `src/lib/renderer-select.ts` resolves `auto`. The user's direction was "we should be on GPU unless strictly necessary", followed by "push to flip now". They accepted that parity regressions get fixed after the flip. Unlike [deck-default.md](deck-default.md), **this flip was made without a browser gate.** The user put browser testing on hold while much work was landing in parallel. The consolidated pass that will run later is described at the end.*
+**Decision (2026-10-01, b520b1d): flipped.** deck.gl on WebGPU (`src/lib/deck-webgpu`, `WebGpuEngine`) is the default; deck.gl on WebGL2 (`src/lib/deck`, `DeckEngine`) is the fallback. The user's direction: "we should be on GPU unless strictly necessary", then "push to flip now", accepting that parity regressions are fixed after the flip. **The flip was made without a browser gate** (testing was on hold). On 2026-10-02 the user added that the non-WebGPU path is a secondary test/fallback path only, with no perf work on it. The previous flip (three.js → deck WebGL, 2026-09-30, gated) is recorded in [archive/deck-default.md](archive/deck-default.md); the three.js renderer was removed in 583e2b7 / dd05828.
 
 ## What `auto` does
 
-1. It picks **WebGPU** (the deck host of `src/lib/deck-webgpu`, `WebGpuEngine`) when:
-   - `navigator.gpu` exists;
-   - the adapter has `float32-filterable` and the required limits;
-   - a probe device can be created.
-2. Otherwise it picks **deck on WebGL2** (`src/lib/deck`, `DeckEngine`, the previous default). If `WebGpuEngine` fails during init, a fresh canvas is mounted and `DeckEngine` runs instead.
-3. The workspace root reports the resolved engine as `data-renderer` and the reason as `data-renderer-reason`.
+Flag: `renderer: oneOf(["auto","webgpu","deck"], "auto")` (`src/lib/flags/index.ts`), resolved in `src/lib/renderer-select.ts`.
 
-Overrides:
-- `?renderer=webgpu|deck` pins an engine (`three` was a third value until its removal on 2026-10-01 and now falls back to the default).
-- `?renderer=auto&webgpu=off` forces the WebGL fallback for testing.
-- The harnesses accept `--renderer webgpu|auto` (eval-app, deck-engine-smoke, leaderboard, eval-app-flags), and they fail when the pinned engine did not run.
+1. **WebGPU** when `navigator.gpu` exists, the adapter has `float32-filterable` and the required limits, and a probe device can be created.
+2. Otherwise **WebGL2 deck**. A `WebGpuEngine` that fails during start-up also falls back: the workspace re-mounts a fresh canvas (one that held a WebGPU context cannot give WebGL2).
+3. The workspace root reports `data-renderer` and `data-renderer-reason`.
 
-Under WebGPU the render device is also the compute device (`adoptRenderDevice`). The look passes run on the render targets with no CPU round trip: masks, band stats, haze prep and fit, and relief (`compute-bridge.ts`).
+Overrides: `?renderer=webgpu|deck` pins an engine (`webgpu` still falls back, with a console warning); `?webgpu=off` makes `auto`/`webgpu` act as if `navigator.gpu` were missing; `?gpu=off` is the compute kill switch. Harnesses take `--renderer webgpu|deck|auto` and fail when the pinned engine did not run.
 
-## Build
+Under WebGPU the render device is also the compute device, so look passes (masks, band stats, haze prep and fit, relief) run on the render targets with no CPU round trip (`deck-webgpu/compute-bridge.ts`). `/roll`'s map follows the same `auto` selection since 0fbcab2a (browser-unverified).
 
-- `vite.config.ts` now resolves deck's full build. `RIGI_DECK_BUILD=webgl-only` restores the old `visgl:webgl-only` condition.
-- Cost: client JS grows by +139 KB raw / +36 KB gzip, mostly in the deck layer and world-view chunks.
-- The vendored deck (b7ed88a) carries luma 7d1d11e9's WebGPU deck fixes: Y-origin, pick scissor, picker flip, depth24plus, and the project.wgsl `select()` argument order.
-
-## Partial evidence (unverified, to check)
+## Evidence at the time of the flip
 
 | Check | Result |
 |---|---|
-| Fallback `auto&webgpu=off` | WebGL deck engine on 4/4 photos, no errors. The `--no-gpu` variant is still unrun: `--disable-features=WebGPU` leaves `navigator.gpu` in place. |
-| Load under `auto` | WebGPU on 6/7 photos, render device == compute device on all of them. IMG_7033 hit the 180 s ready timeout under heavy contention. |
-| deck-engine-smoke on WebGPU | IMG_6958 and IMG_7063 pass (Δyaw ≤ 0.04°). IMG_7018 and IMG_7155 timed out under load. |
-| Not run | eval-app on WebGPU, 19-photo no-error check, style-baseline (it pinned three at the time; three is now removed, so it needs a deck reference), orbit fps |
+| Fallback `auto&webgpu=off` | WebGL deck on 4/4 photos, no errors |
+| Load under `auto` | WebGPU on 6/7 photos, render device == compute device; IMG_7033 hit the 180 s ready timeout under contention |
+| deck-engine-smoke on WebGPU | IMG_6958 and IMG_7063 pass (Δyaw ≤ 0.04°); two photos timed out under load |
+| Later (2026-10-01, waves 3–4 browser pass) | eval-app 12/14 on both engines, no revert candidate ([results](../research_notes/whole-app-graph-2026-10-01/consolidated-pass-results.md)); photo-view VRAM 371 → 241 MiB on WebGPU (dc4fa28) vs 175–188 MiB on WebGL |
 
-## Known gaps on WebGPU (the regression list)
+## Known gaps on WebGPU
 
-| Area | State |
-|---|---|
-| Looks | Band stats run on the GPU on the WebGPU host: the bridge's `bandStatsTex` graph (plain `BAND_STATS`, subgroups off by default) and the `BAND_STATS_SG` variant both compile on the adopted render device (checked 2026-10-01, IMG_6958, Chrome/Metal; the render device requests `subgroups` and `float32-filterable`). The earlier "doesn't compile" was `BAND_STATS_SG`'s NaN constant, a shader-creation error, fixed in 2af1daf (-1 partials). World-mode harmonize is unverified. |
-| Step Inside (splats, photo sky, 3D tiles) | Code done, never run end to end |
-| Export | Works, but full resolution needs tiling |
-| Device loss | A failed rebuild stays dead; there is no mid-session switch to WebGL |
-| Interactive composite | No cheaper drag mode |
-| Terroir | In neither engine on WebGPU yet: needs a WGSL port or a per-feature WebGL route |
-| `lookSmoke` | Reads stale `compLook` stats while the look bridge is on |
-| Memory | Photo-view GPU memory is about 2× WebGL's |
+Still open (tracked in [gpu-renderer.md](gpu-renderer.md)):
+- Only Chrome on Apple Metal has been run; Safari, Firefox, Windows, Linux and mobile GPUs are untested.
+- Device loss: the engine rebuilds host and cores on the same canvas (`onDeviceLost`, cap `MAX_DEVICE_LOSSES` = 3); there is no mid-session switch to WebGL.
+- Full-resolution export needs tiling; no cheaper drag mode for the interactive composite.
+- Step Inside (splats on luma's splat stack, photo sky, 3D tiles) and the roll map on WebGPU have not run end to end in a browser.
 
-**Stays on WebGL:**
-- `/roll`;
-- browsers without `float32-filterable`;
-- anything except Chrome on Apple Metal, which is the only platform tested.
+Closed since the flip: terroir ported to WGSL (366ab83); band-stats kernels compile on the adopted device; the matcher's render views (`loadFullTerrain`, `loadSatellite`, `renderPoseView`) exist on `WebGpuEngine`.
 
-`?renderer=deck` is the escape hatch for Step Inside with splats or 3D tiles, and for 12 MP export, until those are verified.
+## Batch pass for the flip
 
-*Update (2026-10-01, later), against the two tables above:*
-- *Terroir: ported to WGSL on the WebGPU engine (366ab83); `auto` no longer routes terroir styles to WebGL.*
-- *Memory: photo-view VRAM on WebGPU went 371 → 241 MiB (dc4fa28, WAG W1.6), against 175–188 MiB on WebGL.*
-- *Matcher: `WebGpuEngine` now has `loadFullTerrain`, `loadSatellite` and `renderPoseView` (0753897, 1fdd1da), and the render worker uses them on WebGPU (5dbdfc5); parity numbers are in `src/lib/deck-webgpu/README.md`.*
-- *The precision gate ran the 50-photo dev split on webgpu as well as deck (3225064's message: webgpu accepts identical); the eval-app GT row in "Partial evidence" is otherwise still unrun as a renderer gate.*
-- *luma is now the vendored `10.0.0-alpha.2-rigi.2` (d0969e2, c5b2aa1).*
-
-## Consolidated pass (on hold)
-
-When the user asks for it, run the battery once per renderer: webgpu/auto, deck, and forced fallback (three.js was also in this list before its removal).
-
-- **Baseline:** HEAD vs the last fully-gated commit, 85d8ca8. WebGPU has no 85d8ca8 baseline, so compare it against deck at HEAD.
-- **On failure:** `git bisect run` over the fast-gated commits, reinstalling `node_modules` across b7ed88a and the vendored-luma landing.
-- **Not regressions:**
-  - deck masks and band stats vary from run to run, even at HEAD;
-  - U1 changed the atmosphere uniform layout, but classic must stay pixel-identical.
+Run once per renderer (webgpu/auto, deck, forced fallback `?webgpu=off`) through `node scripts/gpu/with-render-lock.mjs -- <cmd>`. Not regressions: deck masks and band stats vary run to run even at HEAD.

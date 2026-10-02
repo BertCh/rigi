@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Cartographic sketch kit: the Landeskarte and Kroki conventions as pen-and-pencil SVG primitives
-// for notebook figures (reports/gipfelbuch-hand-sketch-research/swiss-cartography.md §5, S1–S32).
+// for notebook figures (reports/archive/gipfelbuch-swiss-cartography.md §5, S1–S32).
 // Sizes are px in an 800 px wide viewBox. Everything is seeded by a string, so a render is stable
 // between server and client and between screenshots. Inks are the --nb-* tokens (InkColor names)
 // or any CSS colour. Data geometry is never moved: only furniture wobbles.

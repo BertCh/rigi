@@ -2,56 +2,30 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- SPDX-FileCopyrightText: Copyright (c) Rigi contributors -->
 
-# Swiss cartography: canon, reference plates and Rigi against them
+# Swiss cartography: canon, Landeskarte status and open defects
 
-*2026-10-01. Review, no code changed. Master was at bab0f28, plus the uncommitted tree.*
+*Hub for the Swiss look. Review written 2026-10-01 (master bab0f28); status updated 2026-10-02 after the cartography consolidation (2f9c4da). Everything Swiss from 10-01/10-02 is **browser-unverified** (rows A1–A5 and "0a" in [batch-ledger.md](batch-ledger.md)).*
 
-This is the hub document for the Swiss look. It covers three things:
-- the canon (history, relief, rock, contours, colour, type, furniture, panoramas), illustrated with published Swiss maps;
-- what Rigi's Landeskarte default and its siblings actually render;
-- a ranked list of fixes.
+Related docs:
+- [terroir-cartography.md](terroir-cartography.md): the terroir pack (land cover, names, glaciers) and its layers;
+- [swiss-map-typography.md](swiss-map-typography.md): lettering roles, placement rules, font licences;
+- [gipfelbuch.md](gipfelbuch.md): the Gipfelbuch canon; archived research behind it: [archive/gipfelbuch-design-book.md](archive/gipfelbuch-design-book.md), [archive/gipfelbuch-swiss-cartography.md](archive/gipfelbuch-swiss-cartography.md) (LK symbol table, Kroki conventions);
+- [archive/geospatial-rendering-aesthetics-2026-09-30.md](archive/geospatial-rendering-aesthetics-2026-09-30.md): the 09-30 rendering-frontier review (its "ship a signature default" recommendation is done; open ideas are in §5.3).
 
-Topic-specific detail stays in the older reports:
-- [gipfelbuch-design-book.md](gipfelbuch-design-book.md): typography, notebook and the 60-rule programme;
-- [gipfelbuch-hand-sketch-research/swiss-cartography.md](gipfelbuch-hand-sketch-research/swiss-cartography.md): the LK symbol table and Kroki conventions;
-- [terroir-cartography.md](terroir-cartography.md): content and data, land cover and names;
-- [Geospatial rendering aesthetics frontier.md](<Geospatial rendering aesthetics frontier.md>): photo-overlay polish;
-- [wave5-plan-2026-10-02.md](wave5-plan-2026-10-02.md): what wave 5 built.
-
-**Evidence.**
-1. A web research pass (74 sources). Claims carry **[V]** when the source document was read, **[S]** when only a search summary was seen, and **[U]** when unverified. Unmarked claims are [V].
-2. A read-only code audit of `src/lib/{style,look,terroir}`, both shader dialects, `src/brand`, `src/components/gipfelbuch/swiss` and `examples/deck/landeskarte`. The headline file:line claims were re-checked by hand.
-3. 18 reference plates in [swiss-cartography/img/](swiss-cartography/img/), with their sources and licences in [SOURCES.md](swiss-cartography/img/SOURCES.md).
-
-No Rigi screenshots are included: cook mode (`reports/batch-ledger.md`) forbids browser runs. §6 sets out how to make the missing side-by-side comparison in the next batch pass.
+Evidence: a web research pass (74 sources; **[V]** read, **[S]** search summary only, **[U]** unverified; unmarked = [V]); a code audit of `src/lib/{style,look,terroir}`, both shader dialects, `src/brand`, `src/components/gipfelbuch/swiss` and `examples/deck/landeskarte`; 18 reference plates in [swiss-cartography/img/](swiss-cartography/img/) (sources and licences in [SOURCES.md](swiss-cartography/img/SOURCES.md)). No Rigi renders yet: §6 says how to make the side-by-side in the next batch pass.
 
 ## Summary
 
-**The canon in one paragraph.** The Swiss manner is a white sheet. Form is carried by four things:
-- **grey relief shading**, lit from the north-west, adjusted locally, with contrast rising with altitude and no cast shadows;
-- a faint **yellow sun tone** on lit slopes, masked off rock, ice and scree;
-- **black rock drawing**: a skeleton of edge strokes, filled with hachures that are denser on shaded faces;
-- **contours whose ink follows the surface**: brown on soil, black on scree, blue on ice and lake.
+**The canon.** The Swiss manner is a white sheet. Form is carried by **grey relief shading** lit from the north-west (adjusted locally, contrast rising with altitude, no cast shadows), a faint **yellow sun tone** on lit slopes masked off rock, ice and scree, **black rock drawing** (edge skeleton plus hachures, denser on shaded faces), and **contours whose ink follows the surface** (brown soil, black scree, blue ice and lake). Colour is spent on water, forest, and since 2014 red rail and road fills. Lettering is a strict hierarchy (Frutiger since 2014, LK Roemisch/Kursiv before); hydrography and height figures are italic.
 
-Colour is spent on a few things only: water (pale blue fill, blue line, blue italic names), forest (light green), and since 2014 red rail and coloured road fills. Lettering is a strict hierarchy, Frutiger since 2014 and swisstopo's own LK Roemisch and LK Kursiv before that. Hydrography and height figures are italic. Imhof's school adds aerial perspective (plains soft and cool, summits hard and bright) and colour relief driven by elevation × illumination.
+**Rigi today.** Landeskarte (`presetStyle("swiss")`, alias `landeskarte`) is the **default look** (9b2a6e8; `style/store.ts`). Its look key is `LOOK_ALPINE, LOOK_HARMONIZE, LOOK_INK, LOOK_RELIEF`: Imhof relief (`look/imhof.ts`, one TS source for both dialects), Landeskarte hachure/scree/glacier lines (`terroir/hatch-lk.ts`), brown contours with 100 m index, ink ridges, swisstopo label typography. Shared map colours live in `src/lib/style/palette.ts` (§3.4).
 
-**Rigi against it.** The pieces are mostly built, and built well:
-- an Imhof relief, generated for both engines from one source;
-- Landeskarte-style hachure and scree;
-- surface-coloured contour ink;
-- index contours every 100 m;
-- swisstopo label typography;
-- a full Gipfelbuch sheet system;
-- a faithful flagship example.
-
-The default experience still does not look like a Swiss map, for five reasons:
-1. **The relief, hachure and tint only render in the hillshade map style.** The default is satellite, so a new user sees none of them.
-2. **The default contours are 50 m brown lines over a navy-black casing** inherited from Classic. The surface-coloured contour ink is off.
-3. **The ground is a green-to-ochre elevation tint** (Patterson/Berann), not white paper with relief.
-4. **Several inks are scattered copies** of slightly different values across about six modules.
-5. **None of it has been checked in a browser.** The GLSL (WebGL2 fallback) versions of the Imhof relief and hachure v2 have never been compiled.
-
-Of the ten recommended fixes in §5, five are small: preset data, one table entry, and a hachure light vector. Together they close most of the visible gap.
+**Why the default still does not read as a Swiss map** (open):
+1. **The relief, hachure and tint render only in the hillshade map style**, and the default map/world style is satellite (`settings.ts:48,58`); `PRESET_INFO.swiss` has no `mapLayers` (D3).
+2. **50 m base contours** instead of 20 m in the Alps; surface-coloured contour ink needs a pack.
+3. **The ground is the green-to-ochre alpine tint** (Patterson/Berann), not white paper with relief.
+4. **The hachure follows the photo sun**, not the fixed map light (D4).
+5. **The GLSL twins (WebGL2 fallback) of Imhof relief and hatch v2 have never been compiled** (D5); nothing has been seen in a browser.
 
 ---
 
@@ -260,135 +234,132 @@ A further point, which is not a rule: Biniek et al. (ICA 2018) criticised the sw
   - warm foreground against a cool background, saturated, painterly.
 - **For Rigi:** the photo overlay is necessarily Swiss school (survey-true, because the photo is evidence). Berann belongs in the world view and on the landing page. Plan-oblique bending stays deferred: wave 5 found it breaks culling, picking and geo-query.
 
+
 ---
 
 ## 3. Rigi against the canon
 
-"Default" means `presetStyle("swiss")`, the **Landeskarte** look. `src/lib/style/store.ts:26-27` makes it the default. Its look key is `LOOK_ALPINE, LOOK_HARMONIZE, LOOK_INK, LOOK_RELIEF`.
+"Default" means the Landeskarte look (`style/presets.ts` `swiss`), the default preset since 9b2a6e8.
 
-### 3.1 Scorecard
+### 3.1 Scorecard (re-checked 2026-10-02)
 
 | Element | What Rigi does (default) | Canon | Grade |
 |---|---|---|---|
-| Light direction | Fixed 315°/45° cartographic light, z-factor 1.6; the photo sun has weight 0.15 only (`look/glsl/relief.ts:45-59, 121`; `look/imhof.ts:25-26`) | C1 | A |
-| Multidirectional, local adjustment | MDOW at 225/270/315/360°; Imhof aspect swing up to 65° (`imhof.ts:27-30`); one TS source for both engines (`imhof.ts:166-236`) | C1, C2 | A− |
-| Generalisation | 4 scale levels by range, 500 m to 25 km (`imhof.ts:21-24`) | C9 | B+ (cost unmeasured) |
-| Warm light / cool shade, elevation contrast | Lit [1.06,1.0,0.85], shade [0.64,0.70,0.84]; elevation tint 700–2800 m (`imhof.ts:31-36`) | C5, C6 | A− |
+| Light direction | Fixed 315°/45° cartographic light, z-factor 1.6; the photo sun weighs 0.15 (`look/glsl/relief.ts`, `look/imhof.ts`) | C1 | A |
+| Multidirectional, local adjustment | MDOW 225/270/315/360°; Imhof aspect swing up to 65°; one TS source for both engines | C1, C2 | A− |
+| Generalisation | 4 scale levels by range, 500 m to 25 km | C9 | B+ (cost unmeasured) |
+| Warm light / cool shade, elevation contrast | Imhof lit/shade colours; elevation tint 700–2800 m | C5, C6 | A− |
 | Sun-tone mask (off rock, ice, scree) | Not modelled as a separate yellow plate | C7 | C |
-| Ground | **Green → ochre elevation albedo** (`look/glsl/ramps.ts:47-81`), not paper | §2.4 | D (Patterson, not LK) |
-| Visible in the default view | **No.** Relief, tint and hatch need the hillshade map style; defaults are `mapStyle`/`worldStyle: "satellite"` (`settings.ts:48,58`). `PRESET_MAP_LAYERS` switches only `terroir` (`style/presets.ts:509-512`) | — | **F (the biggest gap)** |
-| Rock hachure | Fall-line strokes in 16 sectors, 3.5 px shade / 6 px lit, 0.9 px wide, ground-anchored octave ladder, slope 36–44°, above 1500–1900 m (`terroir/hatch-lk.ts:22-47`) | C11–C14 | B− (no skeleton) |
-| Hachure light | Shadow side from **`dot(n, TER_SUN)`**, the photo sun (`terroir/glsl/terrain.ts:301`; WGSL `wgsl/terrain.ts:306`) | C1, C12 | D (disagrees with the relief at dusk) |
-| Scree | Jittered dots at a 5 px pitch, 26–44° slope (`hatch-lk.ts:40-47`) | C16 | C (no downslope size, no light coupling) |
-| Glacier | Without a pack: blue strokes wherever the ground is above 2800–3000 m and under 32–42° (`hatch-lk.ts:48-56`). Contours stay brown on ice | C17, C19 | C− |
-| Contour interval | **50 m** base (`settings.ts:42`); index at 100 m via `swissMajorEvery` (`terroir/glsl/values.ts:167`); distance ladder 100/200/1000 m | 20 m Alps / 100 m index | C+ (index right, base too coarse) |
-| Contour colour | Minor `#b98a5e` α0.55, index `#8a5a32` α0.9 (`presets.ts:261-266`), **over an inherited navy casing** `[0.02,0.03,0.06]`, +2 px, α0.55 (`style/defaults.ts:45-48`) | C19, C21 | D |
-| Contour ink by surface | `TERROIR_CONTOUR_INK` exists but is off and needs a pack; the example does it from slope and elevation bands (`examples/deck/landeskarte/…/ink.wgsl.ts:41-49`) | C18, C19 | C |
-| Contour labels | None in the app. Gipfelbuch: italic, in the line's ink (`SheetMap.tsx:195-216`), which is correct | C20 | D (app) / A (Gipfelbuch) |
-| Water | Lakes flat `#548099`, found by zero gradient below 2600 m; no shoreline, no rivers (`ramps.ts:77-80`) | §2.4 | D |
-| Forest, settlement, roads | None by default | §2.4 | F (data dependent; see terroir) |
-| Peak lettering | swisstopo preset: 12 px/600 names; spot heights 10 px/**300, brown `#bb8b54`** (`terroir/labels/swisstopo.ts:171`) | C23: height figures black and sloped | C |
-| Name hierarchy (water italic, regions spaced) | `SWISSTOPO_NAME_TYPO` exists but never renders (`peakTiers` and `names` are off) | C23, C24 | D (dead in the app) |
-| Panorama ridges | Ink ridges, strength 0.5, about `#705e4b`/`#594a40`, shared source | §2.7 | A− |
+| Ground | Green → ochre alpine albedo, now generated from `ALPINE_TINT` (`palette.ts`), not paper | §2.4 | D (Patterson, not LK) |
+| Visible in the default view | **No**: needs the hillshade map style; default is satellite | — | **F (biggest gap, D3)** |
+| Rock hachure | Fall-line strokes, 16 sectors, 3.5 px shade / 6 px lit, ground-anchored octave ladder, slope 36–44°, above 1500–1900 m (`terroir/hatch-lk.ts`) | C11–C14 | B− (no skeleton) |
+| Hachure light | Shadow side from `dot(n, TER_SUN)`, the photo sun (`terroir/glsl/terrain.ts`, `terroir/wgsl/terrain.ts`) | C1, C12 | D (D4) |
+| Scree | Jittered dots, 5 px pitch, 26–44° slope | C16 | C (no downslope size, no light coupling) |
+| Glacier | Without a pack: blue strokes above 2800–3000 m under 32–42°; contours stay brown on ice | C17, C19 | C− (D9) |
+| Contour interval | 50 m base; index at 100 m (`swissMajorEvery`); distance ladder 100/200/1000 m | 20 m Alps / 100 m index | C+ |
+| Contour colour | Minor `#b98a5e` α0.55, index `#8a5a32` α0.9 (`SWISS_CONTOURS`) on Terroir's thin dark-brown casing (1.2 px, α0.35) | C19, C21 | B (D1 fixed 2f9c4da) |
+| Contour ink by surface | `TERROIR_CONTOUR_INK` needs a pack; the example derives it from slope/elevation bands | C18, C19 | C |
+| Contour labels | None in the app; Gipfelbuch `SheetMap` italic in the line's ink (correct) | C20 | D (app) / A (Gipfelbuch) |
+| Water | Flat `#548099` lakes found by zero gradient below 2600 m; no shoreline or rivers | §2.4 | D (D12) |
+| Forest, settlement, roads | None by default (pack-dependent, see terroir) | §2.4 | F |
+| Peak lettering | swisstopo table: names 12 px/600; spot heights 10 px/**300, brown** (`terroir/labels/swisstopo.ts`) | C23: figures black, sloped | C |
+| Name hierarchy | `style.terroir.names.typography = "swisstopo"` on Landeskarte (blue italic water, spaced ranges); renders when a pack is loaded and names are on | C23, C24 | B (D7 fixed 2f9c4da) |
+| Panorama ridges | Ink ridges, strength 0.5, `WARM_INK` | §2.7 | A− |
 | Furniture | App: `furniture: false`, `legend: false`. Gipfelbuch and the example: LV95 ticks, scale bar, legend | §2.6 | C (app) / A− (others) |
-| Engine parity | Imhof relief and hatch-lk generated for both engines; the alpine tint and MDOW are hand-copied into WGSL (`deck-webgpu/layers/terrain-styles.ts:289-320, 384-399`). **The GLSL was never compiled** | — | C |
-| Browser evidence | None for anything Swiss from 10-01/10-02 | — | **unverified** |
+| Engine parity | Imhof relief, hatch-lk and the alpine tint generated for both dialects; MDOW still hand-copied into WGSL; **GLSL never compiled** (only `wgsl-compile` exists) | — | C |
+| Browser evidence | None | — | **unverified** |
 
 ### 3.2 What is right and must be kept
 
-- **The cartographic light is fixed and separate from the photographic sun** (weight 0.15). This is exactly the Swiss distinction, and most terrain renderers get it wrong.
-- **The Imhof maths has one TypeScript source for both shader dialects** (`look/imhof.ts`). It is the model for the hand-copied MDOW and alpine-tint twins.
-- **Hachures are anchored in ground metres with an octave ladder.** That gives temporal stability, which a screen-space hatch never has.
-- **The index-contour logic is right:** 100 m indexes, and the nested ladder means coarse lines are always also fine lines.
-- **The Gipfelbuch sheet** (`components/gipfelbuch/swiss/*`) and **`examples/deck/landeskarte`** are the most faithful Swiss renderings in the repository. The example gets 20 m contours, ink by surface, pale lakes `#b0d1e3` and LV95 furniture right. Several fixes below are "port from the example".
+- **The cartographic light is fixed and separate from the photographic sun** (weight 0.15): exactly the Swiss distinction, which most terrain renderers get wrong.
+- **One TS source per shading formula for both dialects** (`look/imhof.ts`, `palette.ts alpineBaseBody`). It is the model for the remaining hand copies.
+- **Hachures anchored in ground metres with an octave ladder** give temporal stability a screen-space hatch never has.
+- **Index-contour logic:** 100 m indexes, nested ladder (coarse lines are always also fine lines).
+- **The Gipfelbuch sheet** (`components/gipfelbuch/swiss/*`) and **`examples/deck/landeskarte`** are the most faithful Swiss renderings in the repository (20 m contours, ink by surface, pale lakes `#b0d1e3`, LV95 furniture). Several fixes are "port from the example".
 
-### 3.3 Defects found (file:line re-checked)
+### 3.3 Defects
 
-| ID | Defect | Where |
+| ID | Defect | Status (2026-10-02) |
 |---|---|---|
-| D1 | The swiss preset changes the contour colour but inherits Classic's **navy casing** (on, +2 px, α0.55). Brown lines on a blue-black halo have no counterpart on any Swiss map. Terroir overrides it, but swiss does not | `style/presets.ts:259-268`, `style/defaults.ts:45-48` |
-| D2 | `bands.ramp` under Landeskarte resolves to `cool` (teal to magenta) | `style/defaults.ts` (inherited) |
-| D3 | The default view shows no relief, tint or hatch: satellite map/world style, and no `PRESET_MAP_LAYERS.swiss`. Parity gap: WGSL hatches only on `hillshade` (`terroir/wgsl/terrain.ts:81`), while GLSL also hatches imagery before tiles load (`deck/terrain-layer.ts:524-529`) | `settings.ts:48,58`; `presets.ts:509-512` |
-| D4 | The hachure shadow side follows the photo sun (`TER_SUN`) while the relief uses a fixed 315°. At dusk every face draws at shadow density, and the rock drawing can disagree with the relief about which face is dark | `terroir/glsl/terrain.ts:301`; `wgsl/terrain.ts:306` |
-| D5 | The GLSL versions of Imhof relief and hatch v2 have never been compiled. The Dawn gate covers WGSL only, so the WebGL2 fallback could fail on the new default | ledger rows A1, A2, A5 |
-| D6 | Stale text: `terroir/labels/swisstopo.ts:7-12, 24-27`; `look/imhof.ts:19` cites a missing `scripts/gpu/imhof-dawn.ts`; the label font stack still lists Manrope; the CHANGELOG still says swisstopo labels are "not yet wired" and hatch v2 is "off by default" | |
-| D7 | `SWISSTOPO_NAME_TYPO` is dead in the app; only `labels.check.ts` uses it | `terroir/labels/swisstopo.ts` |
-| D8 | The comment calls the hatch inks Brezine colours; `#2b2724` and `#3f7fb3` are not chart swatches | `terroir/hatch-lk.ts:67-70` |
-| D9 | Without a pack, the glacier lines fire on any gentle ground above about 2800 m | `hatch-lk.ts:48-56` |
-| D10 | The distance veil is applied three times: Imhof aerial (max 0.35), the relief mid-tone fade (12.5 %), and the classic haze. Far ridges may wash out. Not measured | `imhof.ts:37-39`, `relief.ts:141` |
-| D11 | The 1500 m rock threshold drops low cliffs: the Rigi conglomerate, the Jura, and even parts of the Niederhorn flue (about 1700–1950 m) sit in the fade band | `hatch-lk.ts:37-38` |
-| D12 | The lake detector catches any flat area below 2600 m | `look/glsl/ramps.ts:77-80` |
-| D13 | Cost: up to 16 extra DEM reads plus about 6 stroke evaluations per pixel on the new default. Frame time not measured | `imhof.ts`, `hatch-lk.ts` |
-| D14 | `style-baseline`, `eval-app` and `deck-smoke` were captured under the Classic default and need recapturing or pinning | `scripts/ci/known-failures.json` |
+| D1 | Swiss preset inherited Classic's navy contour casing | **Fixed** 2f9c4da (`SWISS_CONTOURS`: thin dark-brown casing, also Field sketch) |
+| D2 | `bands.ramp` under Landeskarte resolved to `cool` | **Fixed** 2f9c4da (`bands.ramp: "swiss"`) |
+| D3 | Default view shows no relief, tint or hatch (satellite map/world style; no `PRESET_INFO.swiss.mapLayers`). Parity gap: WGSL hatches only on `hillshade`, GLSL also on imagery before tiles load | **Open**, owner decision (one line, changes what every new user sees) |
+| D4 | Hachure shadow side follows the photo sun (`TER_SUN`) while the relief uses fixed 315°; at dusk every face draws at shadow density | Open |
+| D5 | GLSL twins of Imhof relief and hatch v2 never compiled (the Dawn gate covers WGSL only) | Open (ledger A1, A2, A5) |
+| D6 | Stale text | Partly fixed 2f9c4da (swisstopo.ts comments, Manrope dropped). **Open:** `look/imhof.ts` header cites a missing `scripts/gpu/imhof-dawn.ts` |
+| D7 | `SWISSTOPO_NAME_TYPO` dead in the app | **Fixed** 2f9c4da (`names.typography`) |
+| D8 | Hatch inks called Brezine colours | **Fixed** 2f9c4da |
+| D9 | Without a pack, glacier lines fire on any gentle ground above about 2800 m | Open |
+| D10 | Distance veil applied three times (Imhof aerial ≤0.35, relief mid-tone fade 12.5 %, classic haze); far ridges may wash out | Open, unmeasured |
+| D11 | 1500 m rock threshold drops low cliffs (Rigi conglomerate, Jura, parts of the Niederhorn flue at 1700–1950 m) | Open |
+| D12 | Lake detector catches any flat area below 2600 m (`look/glsl/ramps.ts`) | Open |
+| D13 | Up to 16 extra DEM reads plus about 6 stroke evaluations per pixel on the default; frame time not measured | Open, unmeasured |
+| D14 | `style-baseline`, `eval-app`, `deck-smoke` were captured under the Classic default | Open (batch pass: recapture or pin `?style=classic`) |
 
-**Not a defect:** the code audit flagged the italic contour figures in the Gipfelbuch `SheetMap` as wrong. The 2008 legend and the live style both set height and contour figures sloped (C20, C23), so they are correct. The spot heights in the photo labels should be sloped too (§5 item 9).
+**Not a defect:** italic contour figures in the Gipfelbuch `SheetMap` are correct (C20, C23). The photo-label spot heights should be sloped too (§5.1 item 9).
 
-### 3.4 One palette, scattered across modules
+### 3.4 One palette (landed 2f9c4da)
 
-The same Swiss inks exist as several hand-copied values:
-- **Contour brown:** `presets.ts:262` (repeated at :384 and :457), `terroir/classes.ts:75`, `gipfelbuch/swiss/inks.ts:31`, `theme.css:22`, and the example (`furniture.css`, `ink.wgsl.ts`). There are also the topo-map preset's `#9a6a3a` and `#6b4423`.
-- **Rock and ice ink:** identical copies in `classes.ts:76-77`, `hatch-lk.ts:69-70` and the example.
-- **Water:** seven values across `ramps.ts`, `terrain-styles.ts`, `classes.ts`, the labels, `--gb-water` and the example.
-- **Warm/cool relief tones:** four places.
-- **The alpine tint:** three copies.
-- **Hachure:** five implementations (`hatch.ts` v1, `hatch-lk.ts`, the example's ink, `gipfelbuch/sheet-rock.ts`, `notebook/carto.tsx`). `hatch-lk` already diverges from the example it was ported from: stroke length 3.2 vs 10 periods, spacing 3.5/6 vs 3/5.
-- **Paper:** the Gipfelbuch uses 96/4, the example's `style.css` still uses 90/10.
-- **Fira Sans:** shipped twice, as "Fira Sans" and "GB Sans".
+`src/lib/style/palette.ts` holds the map colours used in more than one place, with provenance (`classic` / `rigi`; none claims to be "official"): `CONTOUR_BROWN`, `COVER_INK`, `WARM_INK`, `BERANN_INK`, `DARK_INK`, `CONTOUR_CASING_BROWN`, `TOPO_PAPER`, `WORLD_SKY`, `WORLD_CLEAR`, `CLASSIC_HAZE`, `ALPINE_TINT`, plus emitters (`alpineBaseBody(glsl|wgsl)`, `shaderFloat`, `hexToBytes`). The GLSL `alpineBase`, WGSL `ts_alpine_base` and the `patterson` ramp are generated from `ALPINE_TINT`; `CONTOUR_INK` and `HATCH_LK_INK` both derive from `COVER_INK`. `PRESET_INFO` in `style/presets.ts` is the one preset registry (`PRESET_IDS`, `PRESET_LABELS`, `PRESET_OVERLAY_LAYER`, `PRESET_MAP_LAYERS` derive from it; `presetIdFrom()` resolves aliases; the stored id stays `swiss`). Verified pixel-neutral: all 12 resolved presets JSON-identical apart from the deliberate changes, 36 `deckTerrainStyle` hashes identical, identity snaps numeric-equal, 252 WGSL variants compile on Dawn.
 
-A single `src/lib/carto/inks.ts`, with GLSL and WGSL constants generated from it, would stop this drift. The example keeps a copy by rule, because examples import public API only.
+Still scattered: seven water blues (app lake `#548099`, `--gb-water` `#30626b`, example `#b0d1e3`, …); two contour browns (app `#b98a5e`/`#8a5a32` vs Gipfelbuch and example Brezine NB `#95500c`); three warm/cool relief tunings (MDOW, Imhof, terroir fallback); five hachure implementations (`hatch.ts` v1, `hatch-lk.ts`, the example, `gipfelbuch/sheet-rock.ts`, `notebook/carto.tsx`; `hatch-lk` already diverges from the example: stroke length 3.2 vs 10 periods, spacing 3.5/6 vs 3/5); Fira Sans shipped twice ("Fira Sans" and "GB Sans"). The example keeps its own copy by rule (public API only).
 
 ---
 
 ## 4. Brand tension (owner decision)
 
-The Brezine chart (`src/brand/khipu.ts`) has **no saturated blue**; `gipfelbuch/swiss/inks.ts:47` says so. The Swiss canon spends its colour on blue: water fill, ice contours, crevasses and hydrographic names. The current water ink `--gb-water` is `#30626b`, a teal-slate, and the app lake is `#548099`. Both read as "dark lake", not as LK pale blue (`#b0d1e3` in the example) with a `rgb(0,136,208)` line.
-
-Options:
-- **(a) A map-ink exception.** Allow the swisstopo screen blues for map content only. Chrome stays Brezine.
-- **(b) Add a pale blue and a line blue to the brand chart.**
-- **(c) Keep Brezine and accept the departure.**
-
-The review recommends **(a)**. The map is content, not chrome, and blue water is the single strongest "this is a Swiss map" signal after the rock drawing.
+The Brezine chart (`src/brand/khipu.ts`) has **no saturated blue**; the Swiss canon spends its colour on blue (water fill, ice contours, crevasses, hydrographic names). `--gb-water` `#30626b` and the app lake `#548099` read as "dark lake", not LK pale blue (`#b0d1e3`) with a `rgb(0,136,208)` line. Options: **(a)** a map-ink exception (swisstopo screen blues for map content only, chrome stays Brezine; one `WATER` token group in `palette.ts`); **(b)** add a pale and a line blue to the brand chart; **(c)** keep Brezine and accept the departure. The review recommends **(a)**: the map is content, and blue water is the strongest Swiss-map signal after rock drawing.
 
 ---
 
-## 5. Recommendations, ranked by value per effort
+## 5. Open work
 
-| # | Change | Fixes | Effort | Engine work |
+### 5.1 Ranked fixes (value per effort)
+
+| # | Change | Fixes | Effort | Status |
 |---|---|---|---|---|
-| 1 | **Make the look visible:** add `swiss: { mapStyle: "hillshade", worldStyle: "hillshade" }` to `PRESET_MAP_LAYERS`, or make Relief the Landeskarte default for map and world | D3 | one line | none |
-| 2 | **Fix the contour casing and the bands ramp in the swiss preset:** a warm paper casing (about 1.2 px, α0.35, like Terroir) or none; `bands.ramp: "swiss"` | D1, D2 | preset data | none |
-| 3 | **Key the hachure shadow side to the map light**, not the photo sun. Use 315°/45° plus the C12 west-north-west secondary on rock, so rock and relief agree. Lower the rock threshold, or tie it to a pack's rock class | D4, D11 | small, both dialects (generated) | yes |
-| 4 | **20 m base contours in the Alps** (10 m below about 1200 m optional), index stays 100 m, distance ladder unchanged. Recheck density on the demo roll | C19, §2.3 | setting + check | none |
-| 5 | **Ink contours by surface without a pack:** port the example's slope/elevation bands (black on rock with minor lines dropped (C18), blue on ice) | C18, C19 | medium | yes |
-| 6 | **Compile the GLSL in CI** (glslang, all presets and look permutations), then run the batch browser pass for A1/A2/A5 on both renderers | D5, D14 | medium | gate |
-| 7 | **One `carto/inks.ts`**, sampled from the live swisstopo styles and `pixelkarte-farbe` (not invented). GLSL and WGSL constants generated from it. Merge the hand-copied MDOW and alpine tint into generated code. Owner decision §4 first | §3.4 | medium | yes |
-| 8 | **A "paper" albedo for Landeskarte:** white ground, blue-grey relief on shaded slopes only (C8), a 4 % yellow sun tone masked off rock, ice and scree (C7), pale-blue lakes with a blue shore. Forest green only from a pack. Keep the alpine tint for Terroir and Berann | C3, C6–C8, §2.4 | medium | yes |
-| 9 | **Labels:** spot heights in ink, sloped, weight 400 (not brown 300). Enable `peakTiers` and `names` where a pack exists so `SWISSTOPO_NAME_TYPO` renders (or delete it). Font family `Fira Sans`; drop Manrope | C22–C24, D6, D7 | small | none |
-| 10 | **Stale-text sweep:** CHANGELOG lines, `swisstopo.ts` and `imhof.ts:19` comments, the Brezine claim in `hatch-lk.ts` | D6, D8 | trivial | none |
+| 1 | Make the look visible: `PRESET_INFO.swiss.mapLayers = { mapStyle: "hillshade", worldStyle: "hillshade" }` | D3 | one line | Open (owner) |
+| 2 | Warm contour casing; `bands.ramp: "swiss"` | D1, D2 | preset data | **Done** 2f9c4da |
+| 3 | Key the hachure shadow side to the map light (315°/45° plus the C12 west-north-west secondary on rock); lower the rock threshold or tie it to a pack's rock class | D4, D11 | small, both dialects | Open |
+| 4 | 20 m base contours in the Alps (index stays 100 m); recheck density on the demo roll | C19, §2.3 | setting + check | Open |
+| 5 | Ink contours by surface without a pack: port the example's slope/elevation bands (black on rock with minor lines dropped, blue on ice) | C18, C19 | medium | Open |
+| 6 | Compile the GLSL in CI (glslang over all presets and look permutations), then the batch browser pass for A1/A2/A5 on both renderers | D5, D14 | medium | Open |
+| 7 | One ink source | §3.4 | medium | **Partly done** (`palette.ts`); open: water blues (after §4), relief tone tokens, MDOW generation |
+| 8 | "Paper" albedo for Landeskarte: white ground, blue-grey relief on shaded slopes only (C8), 4 % yellow sun tone masked off rock/ice/scree (C7), pale-blue lakes with a blue shore; keep the alpine tint for Terroir and Berann | C3, C6–C8 | medium | Open |
+| 9 | Spot heights in ink, sloped, weight 400 (not brown 300) | C22–C24 | small | Open (names/Manrope part done) |
+| 10 | Stale-text sweep | D6, D8 | trivial | Partly done; `imhof.ts` header and CHANGELOG lines remain |
 
-**After that (research-grade):**
-- **Rock skeleton.** Crest and gully strokes from DEM curvature (ridge/valley extraction already exists in `look/sketch-ridges.ts`), drawn before the fill hachures (C11). Optionally a compute pre-pass in the luma graph after Geisthövel & Hurni 2018, emitting an SDF. This would be the first real-time GPU Swiss rock renderer we know of (C15).
-- **Scree:** dot size growing downslope and coupled to the light (C16). Fix the octave crossfade shimmer.
-- **Colour relief as a Jenny–Hurni (grey × elevation) LUT texture.** One lookup replaces the scattered tone constants, and the LUT can be authored from 5–10 swatches.
-- **Glacier mask from GLAMOS or swissTLM3D** in the terroir pack, instead of elevation alone (D9).
-- **Measure** frame time and far-ridge contrast on the new default (D10, D13).
+### 5.2 Code-health follow-ups (from the 2f9c4da consolidation)
+
+1. **WGSL atmosphere duplicate:** `deck-webgpu/layers/terrain-styles.ts ATMOSPHERE_WGSL` re-implements `atm-sky.ts` without Nebelmeer, so with valley fog on WebGPU terrain does not fog where WebGL does. Use the `atm-sky` part.
+2. Generate the WGSL uniform structs from `defineBlock` (with vec3→vec4 padding) plus a parity spec.
+3. One `oklabWgsl()` / harmonise generator for the three WGSL copies (composite, drape, terrain-styles) and the color-stats kernel.
+4. Relief tone tokens in `palette.ts`; then decide whether they become one Jenny–Hurni LUT.
+5. Make `schema.ts` and `types.ts` one source (today drift is caught only by the "CLASSIC is a fixed point" spec and `style-check`).
+6. One `niceScaleLength` and one north-arrow glyph for `terroir/roll`, `gipfelbuch/swiss` and `step-inside`; alias the "GB Sans/Serif/Mono" fonts to the site faces.
+7. Engines start from `CLASSIC` (`deck/engine.ts`, `deck-webgpu/engine.ts`, `roll/map/basemap.ts`): only `PhotoWorkspace` follows the user's preset, so the roll basemap is always Classic. Decide which views follow it.
+8. Unused fields: `labels.export.textGap` is never read; `hazeDensity`/`hazeMax`/`casing.minorMul` have no UI.
+9. Owner: one contour brown (app `#b98a5e`/`#8a5a32` vs Brezine NB `#95500c`)?
+
+### 5.3 Research-grade and rendering ideas
+
+- **Rock skeleton:** crest and gully strokes from DEM curvature (ridge/valley extraction exists in `look/sketch-ridges.ts`) drawn before the fill hachures (C11); optionally a luma-graph compute pre-pass after Geisthövel & Hurni 2018 emitting an SDF. No published real-time GPU Swiss rock renderer is known (C15).
+- **Scree:** dot size growing downslope and coupled to the light (C16); fix the octave crossfade shimmer.
+- **Jenny–Hurni (grey × elevation) colour LUT** replacing the scattered tone constants, authored from 5–10 swatches.
+- **Glacier mask from GLAMOS or swissTLM3D** via the terroir pack instead of elevation alone (D9).
+- **Measure** frame time and far-ridge contrast on the default (D10, D13).
+- From the 09-30 aesthetics review, still open: terrain shadow and haze applied to overlays; leader-line occlusion; grouped sub-summit labels; range-ordered reveals; port the WebGPU drape's 2×2 occlusion vote to the WebGL deck drape (`deck/terrain-layer.ts`); a Berann palette material and a projective photo→3D tween for the world view and landing. Art modes that alter photo pixels need hard guardrails (the photo is evidence). Do not ship: Apple SHARP weights (non-commercial), Careaga/Aksoy intrinsics (academic), FLUX.1-dev ControlNets (non-commercial).
 
 ---
 
-## 6. How to judge it (for the next batch pass)
+## 6. How to judge it (next batch pass)
 
-The reference plates double as a visual test. The bboxes are in [SOURCES.md](swiss-cartography/img/SOURCES.md).
+The reference plates double as a visual test; bboxes are in [SOURCES.md](swiss-cartography/img/SOURCES.md).
 
-1. Render the Landeskarte preset in the **map** view, hillshade, top-down, at both z15 extents (Niederhorn `46.7022,7.7454 → 46.7248,7.7893` and Jungfraujoch `46.5362,7.9541 → 46.5589,7.998`). Do it once per renderer (`--renderer webgpu`, `--renderer deck`), under the render lock.
-2. Place each render beside `lk-colour-*-z15.jpg` and `light-basemap-relief-jungfrau-z15.jpg` and score it on the C-rules:
-   - Does rock read as rock (C11–C13)?
-   - Are the shaded faces the same faces as on the LK (C1, D4)?
-   - Is ice white with blue (C17, C19)?
-   - Do the contours sit quietly (D1)?
-   - Is the lowland cool and soft while the summits are hard (C5)?
-3. Repeat on two demo photos in the overlay view, where the rule is restraint: the photo is evidence.
-4. Commit the renders next to the plates as `reports/swiss-cartography/img/rigi-*.jpg` so this document shows the comparison.
+1. Render Landeskarte in the **map** view, hillshade, top-down, at both z15 extents (Niederhorn `46.7022,7.7454 → 46.7248,7.7893`; Jungfraujoch `46.5362,7.9541 → 46.5589,7.998`), once per renderer (`--renderer webgpu`, `--renderer deck`), under the render lock.
+2. Place each render beside `lk-colour-*-z15.jpg` and `light-basemap-relief-jungfrau-z15.jpg` and score: rock reads as rock (C11–C13)? same shaded faces as the LK (C1, D4)? ice white with blue (C17, C19)? contours quiet? lowland soft and summits hard (C5)?
+3. Repeat on two demo photos in the overlay view, where the rule is restraint.
+4. Commit the renders as `reports/swiss-cartography/img/rigi-*.jpg` so this document shows the comparison.
 
 ---
 

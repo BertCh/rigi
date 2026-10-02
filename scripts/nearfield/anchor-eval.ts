@@ -40,7 +40,7 @@ export const VARIANTS: Record<string, AnchorOpts> = {
 	affine: { mode: "affine" },
 	noOctave: { curve: { octaveWeights: false } },
 	cliff: { cliffLip: true },
-	// opt-in knobs from 6ad885d (default off); promote only on a dev-table win (reports/steps-2026-10-02/dem-anchoring.md U3)
+	// opt-in knobs from 6ad885d (default off); promote only on a dev-table win (reports/archive/steps-2026-10-02/dem-anchoring.md U3)
 	edge13: { edgeGuard: Math.log(1.3) },
 	edge15: { edgeGuard: Math.log(1.5) },
 	edge20: { edgeGuard: Math.log(2) },

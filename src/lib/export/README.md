@@ -1,7 +1,5 @@
 # Export / interchange: `src/lib/export`
 
-> Moved from an API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
-
 These are pure TypeScript modules with no UI and no new dependencies. They turn a solved photo into formats other tools can read:
 
 | Output | Function | Consumers |
@@ -15,6 +13,7 @@ These are pure TypeScript modules with no UI and no new dependencies. They turn 
 | Annotated image | `composeAnnotatedPng` | sharing |
 | XMP sidecar | `buildXmp` | exiftool, Lightroom, darktable, digiKam |
 | Store-only ZIP writer | `zipStore`, `crc32` | generic |
+| Gaussian splats (`.ply`, `.splat-v1`) in ENU with a geo origin | `splat.ts` (`exportSplatsFromEngine`) | Step Inside; `generated` content always stripped, per-model licence note |
 
 Import everything from `#/lib/export` (the barrel is `index.ts`).
 
@@ -104,89 +103,9 @@ Reference: https://developers.google.com/kml/documentation/kmlreference#camera a
   - Per the GPano spec, "as roll increases, the horizon rotates counterclockwise in the image". That happens when the camera's right side goes down, so GPano roll = our roll.
 - **Full model:** a custom namespace `rigi` = `https://rigi.app/ns/pose/1.0/`. It holds yaw, pitch and roll, vfov and hfov, focal length in pixels, image size, MSL and ellipsoidal altitude, the ECEF centre and the row-major camera→ECEF rotation.
 
-## Integration: adding an "Export" menu to PhotoWorkspace
+## Verification
 
-*Update (2026-10-01): this is the original integration sketch. The menu is wired: `PhotoWorkspace.tsx` mounts `<ExportMenu engine={engineRef} disabled={exportLocked} withLabels={showPeaks} photo={photo} />` (see [ExportMenu integration](#exportmenu-integration)). Splat export (`splat.ts`: `.ply` / `.splat-v1`, with a per-model licence gate) is not covered by this note.*
-
-The engine already holds everything needed: `engine.photo`, `engine.pose`, `engine.frame`, `engine.eye`, `engine.demAtCamera`, `engine.peakLabels()`/`peaksInFrame()` and `engine.sampleAt(u,v)` (monoplotting). The only data it lacks is lat/lon for each peak: `PeakLabel` holds `world` (ENU) but no lat/lon. Convert it with `engine.frame.toGeo(...world)`, as in the snippet below.
-
-```tsx
-import { buildCameraModel, buildPoseJson, buildPhotoOverlayKml, buildKmz, kmzBlob, buildGeoJson, buildXmp, buildColmapZip, composeAnnotatedPng, type PeakInput } from '#/lib/export'
-import type { Renderer } from '#/lib/renderer'
-
-function download(data: Blob | string, name: string, type = 'application/octet-stream') {
-  const blob = typeof data === 'string' ? new Blob([data], { type }) : data
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = name
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
-}
-
-function cameraModel(engine: Renderer) {
-  const p = engine.photo
-  return buildCameraModel({
-    photoId: p.id,
-    imageName: `${p.id}.jpg`,
-    width: p.width,
-    height: p.height,
-    pose: engine.pose,
-    frame: engine.frame, // EnuFrame {lat, lon, h}
-    eye: [engine.eye.x, engine.eye.y, engine.eye.z],
-    demAtCamera: engine.demAtCamera,
-    takenAt: p.takenAtUtc ?? p.takenAt,
-    // geoidUndulation: 49.5, // optional: true ellipsoidal ECEF
-  })
-}
-
-function peaksFor(engine: Renderer): PeakInput[] {
-  return engine.peakLabels(60).map((l) => {
-    const g = engine.frame.toGeo(l.world[0], l.world[1], l.world[2])
-    return { name: l.name, ele: l.ele, lat: g.lat, lon: g.lon, u: l.u, v: l.v, visible: l.visible, distKm: l.distKm }
-  })
-}
-
-export async function runExport(engine: Renderer, kind: 'pose' | 'kmz' | 'geojson' | 'xmp' | 'colmap' | 'png') {
-  const m = cameraModel(engine)
-  const id = engine.photo.id
-  switch (kind) {
-    case 'pose':
-      return download(JSON.stringify(buildPoseJson(m), null, 2), `${id}.pose.json`, 'application/json')
-    case 'kmz': {
-      const jpeg = new Uint8Array(await (await fetch(engine.photo.src)).arrayBuffer())
-      return download(kmzBlob(buildKmz(m, jpeg)), `${id}.kmz`)
-    }
-    case 'geojson':
-      return download(
-        JSON.stringify(buildGeoJson(m, { maxRange: 30000, peaks: peaksFor(engine), pixelToLatLon: (u, v) => engine.sampleAt(u, v) })),
-        `${id}.geojson`, 'application/geo+json')
-    case 'xmp':
-      return download(buildXmp(m), `${id}.xmp`, 'application/rdf+xml')
-    case 'colmap':
-      // sparse/0/{cameras,images,points3D}.txt, world = ECEF (pass { world: 'enu' } for the local frame)
-      return download(new Blob([buildColmapZip(m) as BlobPart], { type: 'application/zip' }), `${id}.colmap.zip`)
-    case 'png': {
-      // simplest: the engine's own full-res render (photo + overlays + labels), then add the footer
-      const rendered = await engine.exportImage(true)
-      if (!rendered) return
-      const bmp = await createImageBitmap(rendered)
-      return download(await composeAnnotatedPng(bmp, [], { title: `${id} · Rigi` }), `${id}.annotated.png`)
-    }
-  }
-}
-```
-
-Suggested UI: a small dropdown in the PhotoWorkspace toolbar with these items: Pose JSON, Google Earth (KMZ), GeoJSON, XMP sidecar, COLMAP and Annotated PNG. The pose depends on the current alignment, so enable the menu only after `engine.terrain` has loaded. That is when `eye` and `demAtCamera` are valid; before then `eye.z` is 0.
-
-Notes on the snippet:
-
-- `composeAnnotatedPng(photoBitmap, [labelCanvas, trailCanvas], …)` also takes the raw photo plus separate overlay canvases, for example an HTML label layer rasterised to a canvas.
-- `engine.sampleAt` is fine for the footprint, because it reads the geometry-pass buffer (about 1024 px wide). The default sampling makes 49×97 calls, which takes well under 5 ms.
-- The label-to-lat/lon conversion is needed because of what `PeakLabel` holds. `PeakLabel.world` is ENU with the refraction lift applied, so `frame.toGeo` (which removes the lift) gives back the DEM-snapped summit position to within centimetres.
-
-## Verification: `npx tsx scripts/test-export.ts`
-
-29 of 29 checks pass. The full log is in `out/lead/export/test-results.txt`. The key numbers:
+`npx tsx scripts/test-export.ts` (29 of 29 checks; CI `export` row) and the Vitest specs in `__tests__/` (`npx vitest run src/lib/export`). Key numbers from the 2026-09-29 run:
 
 - **K[R|t] (world = ECEF) vs `projectPoint`:** 9000 points, 150 pose/frame/eye cases on a 4032×3024 image, at 50 m to 120 km, in three hemispheres, with and without a horizontal eye offset. Max error 3.9e-7 px, against a 0.01 px limit.
 - **Other projection and rotation checks:**
@@ -220,11 +139,6 @@ Notes on the snippet:
   - `xmpGpsCoord` edge cases (x.99999999999, negative values, 0, 179.99999999999) never print 60 minutes and carry into the degrees.
 - **Annotated PNG:** 2048×1576 (the photo plus a 40 px footer), made with @napi-rs/canvas.
 
-Samples in `out/lead/export/`, using the IMG_7131 prior pose:
-
-- `IMG_7131.pose.json`, `.colmap.zip` (plus unpacked `IMG_7131.colmap-ecef/` and `IMG_7131.colmap-enu/`), `.kml` (href `IMG_7131.jpg`, next to it), `.kmz`, `.geojson`, `.xmp`, `.annotated.png` and `.peaks.json`
-- The peaks come from the region file and are only tested for being in frame, with no occlusion test. The footprint in the sample uses a flat ground plane at the camera's DEM height in place of `engine.sampleAt`.
-
 ## Known limitations
 
 - **Google Earth rendering not checked:** the KML angles are derived from the KML reference and checked against an independent rotation built from that reference, but I did not open them in Google Earth.
@@ -235,7 +149,7 @@ Samples in `out/lead/export/`, using the IMG_7131 prior pose:
 - **Hidden peaks:** only peaks the caller marks visible are exported, unless `includeHiddenPeaks` is set.
 - **ZIP limits:** the writer is store-only with no ZIP64, so it handles up to 65535 entries and 4 GiB. That is fine for KMZ.
 - **Timestamps:** `composeAnnotatedPng` uses the system font stack (Fira Sans if it is loaded). ZIP entries use local-time DOS timestamps.
-- **Footprint test path:** the test's footprint uses a synthetic flat plane. `engine.sampleAt` (the geoRT buffer, with its internal `1 − v` flip) needs WebGL, so it is not exercised headlessly. Check it in-app once the Export menu is wired: the footprint should sit in front of the camera, not mirrored behind it.
+- **Footprint test path:** the test's footprint uses a synthetic flat plane. `engine.sampleAt` (the geometry buffer) needs a GPU engine, so it is not exercised headlessly. Check it in-app once the Export menu is wired: the footprint should sit in front of the camera, not mirrored behind it.
 - **Lens distortion:** the pinhole model assumes square pixels, a centred principal point and no distortion. That matches the engine.
 
 ## ExportMenu integration
@@ -253,25 +167,9 @@ Samples in `out/lead/export/`, using the IMG_7131 prior pose:
 
 The runtime glue is in `src/lib/export/engine-export.ts`: `exportFromEngine(engine, kind, opts) → {blob, filename, notes}`, `engineCameraModel`, `enginePeaks`, `engineReady`, `geometryBufferState`, `refreshGeometry`, `downloadBlob` and `EXPORT_FORMATS`. It is also re-exported from the `#/lib/export` barrel. `ExportMenu.tsx` itself is NOT in the barrel, so the Node tests don't pull in React.
 
-### The one line
+The workspace mounts it as `<ExportMenu engine={engineRef} disabled={exportLocked} withLabels={showPeaks} photo={photo} />`. `engine` accepts the engine, a ref or a getter (resolved at click time). Optional props: `geoidUndulation`, `maxRange` (default 30 km), `onExported`, `className`, `align`.
 
-*Done; the workspace now gates the menu on `exportLocked` rather than `!!status`.* As originally proposed, in `src/components/PhotoWorkspace.tsx`, inside `<header …>`, directly after the then "Save image" `<button>`:
-
-```tsx
-<ExportMenu engine={engineRef} disabled={!!status} withLabels={showPeaks} />
-```
-
-plus the import:
-
-```tsx
-import { ExportMenu } from '#/lib/export/ExportMenu'
-```
-
-- `engine` accepts the engine, a ref (`engineRef`), or a getter. It is resolved at click time, so the ref being filled after mount is fine.
-- The root has `pointer-events-auto` (the header is `pointer-events-none`) and the dropdown aligns to the right edge by default (`align="left"` to flip).
-- Optional props: `geoidUndulation` (true ellipsoidal ECEF / GeoJSON z, e.g. `49.5` in central Switzerland), `maxRange` (GeoJSON wedge length, default 30 km), `onExported({kind, filename, bytes, notes})`, `className`, `photo` (tooltip only).
-- To replace the old button entirely, delete the "Save image" `<button>` and its `exportImage` handler. The menu's "Annotated image" covers it, with the attribution footer added. The old button saved a JPEG named `<id>-<mode>.jpg`.
-- **Readiness: `disabled={!!status}` is required, not cosmetic.** The engine sets `engine.terrain` in `init()` *before* segmentation, horizon tracing and the workspace's `autoAlign()`. For roughly 200–1100 ms after that (measured), `engine.pose` is still the compass prior: IMG_7131 has yaw 20.84° against a final 10.77°, and IMG_6971 has 56.22° against 65.30°. Engine state can't tell the prior from the final pose; only the host knows when alignment is done. PhotoWorkspace's `status` stays set from mount until after `setPose(align result)`, so `!!status` is the correct gate. In the menu, `disabled` disables the toggle *and* every item. So even a menu that is already open stays locked while `disabled` is true, and the amber note reads "Still loading and aligning; exports unlock once the pose is final." Items unlock only when `!disabled && engine.terrain`. A host that doesn't pass `disabled` gets only the terrain check, which is not enough.
+**Readiness: `disabled` is required, not cosmetic.** `engine.terrain` is set in `init()` before segmentation, horizon tracing and auto-align; for about 200–1100 ms after that `engine.pose` is still the compass prior (IMG_7131: yaw 20.84° vs final 10.77°). Only the host knows when alignment is done, so it must pass `disabled` until the pose is final; `disabled` locks the toggle and every item, even in an open menu.
 
 ### Engine data used (public API only; no engine changes needed)
 
@@ -282,21 +180,6 @@ import { ExportMenu } from '#/lib/export/ExportMenu'
 - **Footprint:** monoplotted with `engine.sampleAt`, skipping people pixels, and only from a fresh buffer.
 - **Annotated image:** `engine.exportImage` returns a JPEG (the docstring says PNG), which is then decoded and recomposed as PNG. In world mode it renders the 3D map view, and the status line notes that. A `engine.exportImage({ mode: 'overlay' })` override would allow a photo export from any mode.
 
-### Verification (`node out/lead/export/menu/verify-menu.mjs <id>`, on :3100)
+### Menu verification (2026-09-29, browser)
 
-The script runs on the real `/photo/<id>` route and needs no extra route. It loads `ExportMenu.tsx` and `engine-export.ts` through Vite's module server and mounts the menu in its own React root, with the gate PhotoWorkspace will pass: `disabled = !data-ready`, which equals `!!status`. The engine is read from the DEV-only `window.__engine`. Results for the last run are in `out/lead/export/menu/verify-result.json`. (The earlier temporary route `src/routes/lab.export.$id.tsx` has been deleted.)
-
-| | IMG_7131 | IMG_6971 |
-|---|---|---|
-| Toggle disabled while loading | yes | yes |
-| Menu forced open during load → items disabled / note shown | 6/6, yes | 6/6, yes |
-| Window: `engine.terrain` set → `data-ready` (the old gate was open here) | 214–1096 ms (3 runs) | 724 ms |
-| Yaw at terrain → final | 20.84° → 10.77° | 56.22° → 65.30° |
-| 10 ms samples with an enabled item before ready | 0 | 0 |
-| First item enabled vs ready | +0 ms | +11 ms |
-| All 6 downloads | 31–275 ms | 36–241 ms |
-| +2° nudge → buffer state right after | stale (1.92°) | stale (1.95°) |
-| GeoJSON exported immediately after the nudge | 130 ms, footprint −33.4…+34.3° about the **new** yaw, 10 peaks, no notes | 137 ms, −33.0…+33.8°, 9 peaks |
-| Same buffer read without refresh | stale 3.88°, 276/276 → `null` | stale 3.94°, 315/505 `null` (the rest are people-masked `false`) |
-
-The rest was checked on the IMG_7131 downloads, as before. The PNG is 2048×1576 and 5.5 MB. For the KMZ, `unzip -t` passes, the JPEG is byte-identical to `public/photos/IMG_7131.jpg`, and `xmllint` passes on doc.kml. The GeoJSON has 10 peaks and a footprint whose bearings span −34.4…+34.3° about the yaw, so it is in front of the camera. The pose is yaw 10.769°, pitch −4.533°, roll 0.072° and alt 1361.317 m. For the COLMAP zip, `unzip -t` passes and images.txt has its empty second line. `xmllint` passes on the XMP. `menu-open.jpg` shows the open menu. `npx tsc --noEmit -p .` is clean, and `npx tsx scripts/test-export.ts` passes 29/29.
+A local-only Playwright script (`out/lead/export/menu/verify-menu.mjs`, gitignored) on `/photo/IMG_7131` and `/photo/IMG_6971`: no item enabled before ready (0 of the 10 ms samples), all six downloads in 31–275 ms, a GeoJSON exported right after a +2° nudge carries the footprint about the **new** yaw (refresh worked), the same buffer read without refresh is stale (3.9°) and reports `visible: null`. The KMZ JPEG is byte-identical to the source; `unzip -t` and `xmllint` pass on KMZ, COLMAP and XMP. Not re-run since the three.js removal.

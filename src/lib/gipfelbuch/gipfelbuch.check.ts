@@ -58,7 +58,7 @@ for (const n of GIPFELBUCH_NODES) {
 	if (!STATUSES.includes(n.status)) err(`${n.id}: bad status ${n.status}`);
 	if (!n.title || !n.summary || !n.visual)
 		err(`${n.id}: missing title/summary/visual`);
-	// the dek under the sheet's H1 (reports/peak-notebook-plan.md §0, D-PN3)
+	// the dek under the sheet's H1 (reports/gipfelbuch.md)
 	if (!n.claim) err(`${n.id}: missing claim`);
 	else {
 		if (n.claim.length > 60) err(`${n.id}: claim length ${n.claim.length}`);
@@ -304,7 +304,7 @@ const PAGE_RULES: { rule: string; re: RegExp }[] = [
 		re: /fontFamily[:=]\s*\{?\s*["'`](?:Fraunces|Fira|IBM Plex|Source Serif|Caveat|Shantell|Architects|monospace)/,
 	},
 	{ rule: "display-title (serif) in a page; H1 only", re: /\bdisplay-title\b/ },
-	// Restore-pass rules (KR11, reports/gipfelbuch-best-of-both.md §2).
+	// Restore-pass rules (reports/gipfelbuch.md, Lint).
 	{
 		rule: "dark-theme layer hex (use LAYER_STYLE)",
 		re: /#(?:f4d35e|ff5fa2|5ee0f4)\b/i,
@@ -341,9 +341,7 @@ for (const f of readdirSync(PAGES_DIR).filter((n) => n.endsWith(".tsx"))) {
 		if (i > 0 && lines[i - 1].includes("// gb-lint-allow")) return;
 		for (const { rule, re } of PAGE_RULES)
 			if (re.test(line))
-				err(
-					`${file}:${i + 1}: ${rule} (see reports/gipfelbuch-design-book.md)`,
-				);
+				err(`${file}:${i + 1}: ${rule} (see reports/gipfelbuch.md)`);
 	});
 	const figureLabels = [...source.matchAll(/label="(Fig\. [^"]+)"/g)].map(
 		(m) => m[1],
@@ -353,7 +351,7 @@ for (const f of readdirSync(PAGES_DIR).filter((n) => n.endsWith(".tsx"))) {
 	);
 	for (const label of new Set(duplicates))
 		err(`${file}: duplicate figure label "${label}" (number in DOM order)`);
-	// Hand pass (reports/gipfelbuch-hand-sketch-2026-10-01.md): a sheet is a page of field notes,
+	// Hand pass (reports/gipfelbuch.md): a sheet is a page of field notes,
 	// so it needs hand notes, not a cap on them.
 	const handNotes =
 		source.match(/<(?:HandText|MarginNote|HandMark)\b/g)?.length ?? 0;

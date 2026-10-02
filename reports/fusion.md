@@ -2,6 +2,8 @@
 
 *2026-09-25 · code in `tools/matcher/fusion.py` (library + CLI) · raw results in `tools/matcher/out/results/fusion_*.json` · per-photo tables in `tools/matcher/out/fusion_tables.md`*
 
+> **Status (2026-10-02).** This is the study that fixed the fused solve and its a-priori HIGH rule (d_agree < 1°, sky_med < 4 px, match_support ≥ 0.3), which the matcher policies `v034` and `t6` still use. The solve now runs in the browser (`src/lib/matcher/fusion.ts`, ported from `tools/matcher/reference/fuse.py` over `tools/matcher/fusion.py`); the numbers below are from the 2026-09-25 Python run on the three.js renderer and were not re-measured. `reports/matcher.md`, cited below, was removed (`git show 384df44:reports/matcher.md`).
+
 ## Verdict
 
 - **On the frozen pin GT (the scoring set I was asked to use), fusion does not clearly beat both single cues.**
@@ -198,33 +200,4 @@ Both are in the format documented at the top of `scripts/leaderboard.mjs`.
 
 ## Reproduce
 
-> **Update (2026-10-01):** only `fusion.py`, `match.py`, `results.json` and `results-fusion.json` of the scripts below are in the repository; `export_skyline.mjs`, `render.mjs`, `fusion_prep.sh`, `fusion_report.py`, `gtjson_check.py`, `write_leaderboard.py`, `gps_offset.mjs` and `collect_corr.py` were never committed. They also drove the three.js PhotoEngine, removed 583e2b7. The live equivalent is the matcher service's `render_worker.mjs` + `server/fuse.py` ([archive/matcher-service.md](archive/matcher-service.md)).
-
-```bash
-# prerequisites: tools/matcher/.venv and weights as in reports/matcher.md (removed; `git show 384df44:reports/matcher.md`); dev server on :3100; ≥ 3 GB free
-node tools/matcher/export_skyline.mjs                  # app skyline evidence + autoAlign at shifts 0/±15 → out/skyline/
-tools/matcher/fusion_prep.sh                           # per photo: render 11 views, check_xyz, match, save out/corr/*.npz, delete renders
-cd tools/matcher
-.venv/bin/python fusion.py                             # → out/results/fusion_default.json (λ = 1)
-.venv/bin/python fusion.py --lam 0.25 --tag lam0.25    # sensitivity (reported only)
-.venv/bin/python fusion.py --lam 4 --tag lam4
-.venv/bin/python fusion_report.py > out/fusion_tables.md
-.venv/bin/python gtjson_check.py                       # secondary GT
-# synthetic wrong GPS (ids "IMG_x@r1000" = eye moved 1000 m right of the prior heading)
-for v in IMG_7155@r1000 IMG_7131@r1000; do (cd ../.. && node tools/matcher/export_skyline.mjs $v && tools/matcher/fusion_prep.sh $v); done
-.venv/bin/python fusion.py IMG_7155@r1000 IMG_7131@r1000 --tag gps
-.venv/bin/python write_leaderboard.py                  # results.json, results-fusion.json
-```
-
-- `render.mjs` checks every XYZ buffer against its pose (`check_xyz.py`), and every buffer behind these numbers passed.
-- Renders are deleted after each photo. `tools/matcher/out` is ~104 MB, mostly `out/skyline/*.f32` (the app's edge and sky maps).
-
-## Files added or changed
-
-All paths are relative to the repository root.
-
-- `tools/matcher/`:
-  - New: `fusion.py`, `fusion_report.py`, `gtjson_check.py`, `export_skyline.mjs`, `gps_offset.mjs`, `collect_corr.py`, `fusion_prep.sh`, `write_leaderboard.py`, `results.json`, `results-fusion.json`.
-  - `match.py`: now exposes a `correspondences()` library function, and its thresholds are parameters.
-  - `render.mjs`: supports `@r<m>` GPS-offset ids and has a `--meta-only` mode.
-- `reports/fusion.md` (this file); `reports/matcher.md` (removed) had a pointer here.
+Not reproducible as run: of the scripts in the original recipe only `fusion.py`, `match.py`, `results.json` and `results-fusion.json` were committed, and the export and render scripts drove the three.js PhotoEngine (removed 583e2b7). `fusion.py` itself still runs on saved correspondences (`tools/matcher/.venv/bin/python tools/matcher/fusion.py [--lam L --tag T]`). The live equivalent is the browser matcher (`src/lib/matcher`, parity fixtures in `src/lib/matcher/__tests__/fixtures/`). Every XYZ buffer behind these numbers passed its pose check.

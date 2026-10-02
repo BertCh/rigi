@@ -396,7 +396,7 @@
 	--gb-font-hand-small:
 		"GB Hand Small", "GB Hand Small Fallback", "Shantell Sans",
 		var(--gb-font-hand);
-	/* Role tokens (hand pass, reports/gipfelbuch-hand-sketch-2026-10-01.md): the Gipfelbuch is
+	/* Role tokens (hand pass, reports/gipfelbuch.md): the Gipfelbuch is
 	 * written by hand. Print survives only for code (mono), equations (math) and the opt-in
 	 * `.gb-print` escape. Use these roles, not the face tokens above. */
 	--gb-font-body:

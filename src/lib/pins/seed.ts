@@ -9,7 +9,7 @@
  * `solvePins` starts Levenberg–Marquardt from the shown pose. Past ~90° of yaw the summits project
  * behind that camera, the residual is a flat [10, 10] plateau and the prior comes back unchanged;
  * with ≥ 3 pins and vfov free, starts 50–70° off run vfov away (negative or > 300° seen in a
- * synthetic sweep, reports/steps-2026-10-02/tap-a-peak.md). Here:
+ * synthetic sweep, reports/archive/steps-2026-10-02/tap-a-peak.md). Here:
  *
  * - vfov (≥ 3 pins, vfov solved): from the widest pair, the lens at which the two tap rays are as far
  *   apart as the two summits (rotation-free), the root nearest the prior's vfov.

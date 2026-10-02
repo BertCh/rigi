@@ -18,7 +18,7 @@
 //                 round-trips to the photo, and from anywhere else nothing is hazed twice.
 // `floor` caps the gain at 1/floor (JPEG noise on far ridges), `amount` blends J back with I.
 // Display only: never on the matched photo view, never in eval / matcher renders (Tier 0/1 of
-// reports/Geospatial rendering aesthetics frontier.md: the drape is a render, not the evidence).
+// reports/archive/geospatial-rendering-aesthetics-2026-09-30.md: the drape is a render, not the evidence).
 // GLSL / WGSL: look/glsl/clear-air.ts. Both engines fill it from clearAirValues().
 import { hexToLinearHaze } from "../style/color";
 import type { ViewStyle } from "../style/types";

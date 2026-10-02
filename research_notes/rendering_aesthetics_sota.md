@@ -1,6 +1,6 @@
 # Rendering & aesthetics SoTA for Summit Lens (Sep 2026)
 
-*Update (2026-10-01): written when the app was called Summit Lens (now Rigi) and three.js was the renderer. The three.js `PhotoEngine` (`src/lib/engine.ts`, `src/lib/materials.ts`) was removed in 583e2b7; looks now live in `src/lib/look` for the two deck.gl engines (WebGPU default, WebGL2 fallback). Many of the techniques below were since built as opt-in presets; see [reports/Geospatial rendering aesthetics frontier.md](<../reports/Geospatial rendering aesthetics frontier.md>) for what exists.*
+*Update (2026-10-01): written when the app was called Summit Lens (now Rigi) and three.js was the renderer. The three.js `PhotoEngine` (`src/lib/engine.ts`, `src/lib/materials.ts`) was removed in 583e2b7; looks now live in `src/lib/look` for the two deck.gl engines (WebGPU default, WebGL2 fallback). Many of the techniques below were since built as opt-in presets; see [reports/swiss-cartography-review.md](../reports/swiss-cartography-review.md) for what exists and what is open.*
 
 Scope: techniques that can ship in WebGL2 GLSL / TypeScript (three.js r186, deck.gl 9.4) within days. Each section gives (a) state of the art, (b) the recommended technique for this app, with formulas and parameters, and (c) cost.
 

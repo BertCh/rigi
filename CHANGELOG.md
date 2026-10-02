@@ -78,7 +78,7 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
   - Evidence: `scripts/nearfield/people-{complete,body}-views.ts`.
   - Notes: `research_notes/frontend_completion_models_2026-10.md`.
 - **Step Inside downloads half as much and starts sooner (2026-10-02, browser-unverified).** The depth model now ships as int8 weights (36 MB instead of 70 MB). `src/lib/nn` expands them to f16 on the GPU at load (`src/lib/nn/quant.ts`, producer `scripts/models/quantize.ts`), so the network and its outputs are unchanged apart from rounding: 0.6% median depth difference after scale alignment on 24 photos, normals within 0.4°. `?nearfieldWeights=q8|q8lite|fp16` picks the file; `q8lite` (33 MB) drops the normal head and derives normals from depth. The weights are fetched into Cache Storage in the background about 2.5 s after a pose is accepted (not on Save-Data or 2G/3G). If the depth is not ready when Step Inside is pressed, it opens at once on a terrain-only preview and swaps in the depth scene when it arrives. int4 was measured and rejected (16% depth error). `parseSafetensors` no longer aliases the whole file when given a node `Buffer`. See `reports/step-inside-download.md`.
-- **Luma-native wave: ML runtimes removed, more luma operators (2026-10-02, browser-unverified).** Follows `reports/luma-native-dependency-audit-2026-10-02.md` (§8 has the outcome).
+- **Luma-native wave: ML runtimes removed, more luma operators (2026-10-02, browser-unverified).** Decisions and open items: `reports/gpu-renderer.md`.
   - The sky segmenter (U²-Net-P) and the people segmenter (MediaPipe DeepLab-v3 and selfie-multiclass) run on `src/lib/nn` from fp16 safetensors, on the same GPU device as the rest of the app. `@mediapipe/tasks-vision` is gone and `onnxruntime-web` is a devDependency only (parity oracle); `src/lib/models/ort.ts` / `createOrtSession` are deleted. No ML runtime ships.
   - `src/lib/nn` composes with luma: `fromView` / `forwardInto` / `toView` record a forward into a caller's graph without copies; transpose, same-shape elementwise, long-row reductions and large top-k use luma `GPUTranspose` / `GPUElementwise` / `GPUReduction` / `GPUSort` (`gpu.lumaOps.enabled = false` for A/B); new `rfft2` / `irfft2` on `GPUFFT2D`. The CPU backend (no-WebGPU fallback) has a register-tiled conv and fast resize/pool/elementwise paths (U²-Net-P at 384 px 28 s → 5.7 s), so the sky CPU input is back to 384 px.
   - `gpu/core`: `ComputeGraph.add` accepts gpgpu contributors and gpu-raster `addToGraph` ops; `KernelOp`, `importView` / `transientView` / `viewRange`; `defineKernel` derives binding layouts from the WGSL; kernels dispatch through engine `Kernel.dispatch`.
@@ -140,7 +140,6 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - **Lens nods to the compute graph:** `src/brand/LensGlyph.tsx` (circle plus ridgeline, `currentColor`); `/dev/graph` gets a "compute graph, observed" eyebrow, a "Clear ether." empty state and a collapsed per-node "Provenance, as recorded" panel (`src/components/dev/GraphProvenance.tsx`, from `GraphInspection` only); the landing "Local computation" copy now reads "through luma.gl's compute graph. Bring your own lens."; the horizon-graph infobox heading is "Graph readout"; new example `examples/gpgpu/photo-graph` ("Through the lens", four compute nodes shown as stage bands, local photo input). Register: `reports/lens-nods-2026-10-02.md`. Browser-unverified.
 - Accept-rule evidence tooling: `src/lib/accept/bounds.ts` (exact one-sided Clopper-Pearson bounds, risk-coverage curves, a fixed-grid Learn-then-Test threshold, `acceptsNeeded` for sizing a sealed set) and `scripts/accept/risk-coverage.ts`, which reports the cascade and fused gates on the wild dev half only (planning evidence, not results). No app behaviour change.
 - Auto-align no longer persists its result (a saved pose reloads as accepted, and a low-confidence auto-align is not verified); second-opinion verdicts `kept` and `timeout` now append "not verified: …" to the alignment note (`notVerifiedReason`); the `upgrade` chains in `PhotoWorkspace` no longer leave unhandled rejections. Browser-unverified.
-- **Lens nods to luma.gl's Arisia program** (the upstream codename of the `GPUCommandGraph` / gpgpu work): `src/brand/LensGlyph.tsx` (circle plus ridgeline, `currentColor`); `/dev/graph` gets an "Arisia (luma.gl) · compute graph, observed" eyebrow, a "Clear ether." empty state and a collapsed per-node "Provenance, as recorded" panel (`src/components/dev/GraphProvenance.tsx`, from `GraphInspection` only: kind, condition, invocation bound, p50 timings); the landing "Local computation" copy no longer calls `arisia.gl` a compute layer, and the footer names luma.gl `GPUCommandGraph`; the horizon-graph infobox heading is "Graph readout"; new example `examples/gpgpu/photo-graph` ("Through the lens": luminance, blur, gradient and per-column skyline nodes shown as stage bands, plus a local "Bring your own lens" photo input). Register: `reports/lens-nods-2026-10-02.md`. Browser-unverified.
 - `src/lib/geocam/integrity/skyline-parallax.ts`: skyline-parallax wrong-eye test (Huber fit of eye-shaped 1/d residual against the DEM horizon); killed on dev by its frozen criterion and removed again per the cleanup rule (recover with `git show 31752b8:<path>`), see `tools/research/geo/skypar/REPORT.txt`.
 - **Concord C4 hooks (`?concord=occl,labels,drape`, off by default, unconsumed):** `src/lib/concord/occl/hooks.ts` derives hidden-label ids and a drape mask from the DSM occluder pass; `runConcordDisplay` reports them and calls the optional `Renderer.setOccludedLabels` / `setDrapeMask` (no engine implements them yet).
 - Step Inside: `?nearfield=complete` (behaves like `on`) adds the P0 completion heuristics in `src/lib/nearfield/complete/`: near-camera ground wrongly classed Object is reclassified to Terrain (slab diagnosis), the client depth-lift snaps mixed-depth edge ramps and softens the Object rim, and any splat completion adds must be `generated` (asserted; never in exports, the measure grid or the readout). The behind-layer fill is not built. Default path unchanged.
@@ -188,7 +187,7 @@ Rigi is unreleased, so compatibility bridges, aliases, old-format readers and fi
 
 - Upload EXIF guards (`src/lib/upload/exif.ts`): GPS at (0, 0) or out of range, a zeroed or garbled Apple gravity vector, an out-of-range 35 mm focal and a pre-1980 GPS date stamp now read as unknown, not as trusted placeholders. Headings wrap to [0, 360). Square images let gravity choose the holding. `scripts/ingest.mjs` shares the MakerNote, gravity and time code with uploads. In-range values are unchanged.
 - Pose exports say how the pose is known (`src/lib/export`): an `estimate` block in `summit-lens/pose` v1 (`null` when unknown), `slens:Pose*` XMP tags, a 'Pose not verified' export note, the fail-closed `readPoseJson`, and `isPose`. The workspace passes the provenance since b8a6e96.
-- Per-step review of the Gipfelbuch graph (16 steps): plan docs and the cross-step index in `reports/steps-2026-10-02/`.
+- Per-step review of the Gipfelbuch graph (16 steps): plan docs and the cross-step index, archived in `reports/archive/steps-2026-10-02/`.
 
 ### Tap-a-peak pins (2026-10-02, step pod)
 
@@ -233,7 +232,7 @@ Rigi is unreleased, so compatibility bridges, aliases, old-format readers and fi
 - Matcher: the T6 GPU skyline grid is on by default (`T6_GPU_GRID=0` opts out).
 - `heightFromTile` moved to `src/lib/dem/`; the legacy three `Terrain` lives next to `/lab/generate`.
 - CI: `gpu-raw-lint` ratchet on raw WebGPU / private luma / raw GL use (705 → 339 escapes in this pass).
-- All browser-unverified (cook mode). Report: `reports/gpu-luma-native-2026-10-01.md`.
+- All browser-unverified (cook mode). Outcome: `reports/gpu-renderer.md`.
 
 ### Cartography consolidation (2026-10-02)
 
@@ -248,10 +247,9 @@ Rigi is unreleased, so compatibility bridges, aliases, old-format readers and fi
 
 - Docs: `reports/status.md` and `reports/roadmap.md` rewritten short and current (open work only; retired row ids point at `bab0f28`); every report indexed in `reports/README.md`; code-review backlog now 53 fixed, 3 partial, 3 obsolete, 16 open.
 - Fixes from the code-review backlog: roll import saves/resets safely and decodes with bounded concurrency (CR-03/19/20/53); no pose save on a session-only eye move (CR-08); IndexedDB late-open close (CR-32); near-field inpaint goes through the near-field client (CR-47); render lock records the holder's start time and `run.mjs --update-baseline` refuses after a FAIL (CR-52); unobservable parameters get infinite variance and integrity fails closed (CR-49); masked rows no longer leak through the cluster whitener (CR-17); robust covariance uses the accepted pose's weights (CR-36); the eye refine carries the above-ground prior (CR-15); per-kind RANSAC stop ratio (CR-50); dev export guard (CR-W5).
-- `tools/matcher/requirements.txt` and `tools/nearfield/requirements.txt` (CR-26).
+- `tools/matcher/requirements.txt` (CR-26; the `tools/nearfield` one went with the service).
 - Concordance C2: under `?concord=eye` the per-lens focal table now reaches the app prior (`getPhoto`); photo metadata keeps EXIF `model`/`lensModel` (uploads now, bundled photos after the next ingest).
 - Cleanup: one source for `DEG`, `wrap180`, `clamp`/`smoothstep`/`fract`/`mix`, Web-Mercator (`src/lib/mercator.ts`), `srgbToLinear` and 3×3 helpers; dead exports, the `PhotoEngine` alias, the dead three.js picker branch and stale three.js comments removed.
-- Near-field service (`tools/nearfield/service`): unit tests for the CR-05 caps (`tests/test_caps.py`); fixes: non-integer or negative `Content-Length` is a 400 (was a 500), non-finite numeric fields (`nan`, `inf`) are rejected, a hard pixel cap (`NEARFIELD_MAX_PIXELS`, 100 MP) on image and mask decode, 500 responses no longer echo exception text, a full cache disk no longer discards a computed result, and error replies sent before the body is read close the keep-alive connection.
 
 ### luma compute follow-ups (2026-10-01, WAG-next)
 
@@ -286,28 +284,19 @@ Commit 3587c56. Browser-unverified.
 - **All 19 sheets** carry at least one of these. The photo story is the hero on rigi and camera-prior.
 - **Review fixes:** heroes that follow the picker or say which photo they're fixed to; the tap demo-10 bake rebuilt (peaks paired by name); one visible-peak count (260); median compass error unified at 9.6°; the baseline timings; stale figure references and undefined tokens; the Gipfelbuch print style no longer hides every `<nav>` on the page.
 
-### Gipfelbuch hand pass (2026-10-01, night)
+### Gipfelbuch (2026-10-01)
 
-Spec: `reports/gipfelbuch-hand-sketch-2026-10-01.md`. Research: `reports/gipfelbuch-hand-sketch-research/` (sketch style, Swiss cartography and swisstopo, an audit of what was lost). Browser-unverified.
+Several passes in one day, summarised in their final state (sheet count later 16, see above). Browser-unverified.
 
-- **Written by hand.** The Gipfelbuch is now an informal field notebook:
-  - body in Playpen Sans, titles in Caveat 700 lettering, labels in Patrick Hand SC block capitals, figures in Shantell Sans (all self-hosted, OFL);
-  - print remains only for code and equations.
-- **Figure labels.** `PrintLabel`/`PrintNote` are now `HandLabel`/`HandNote`.
-- **Measured lines.** They are drawn as one pen pass within 0.5 px of the data.
-- **Swiss field-sketch kit.** New `notebook/carto.tsx` (Kroki title, north arrow, hand scale bar, trig and spot heights in italics, rock hachure, Kroki hatch, trail lines, blazes, grade boxes, peak leaders, station rays, contour scribbles, profile sketches). New `notebook/marks.tsx` (hand underline, circle, strike and highlight for prose; watercolour washes; a pencil construction layer).
-- **Shell.**
-  - Each sheet opens with a summit-register entry and carries one sheet stamp.
-  - Prev/next are hand-drawn Wegweiser.
-  - The index is a hand table of contents and a hand-ruled Blattübersicht.
-  - Map furniture (scale bar, LV95 corners, contours, spot heights) is drawn by hand.
-- **Pages.** All 19 are sketched, with hand notes, struck first guesses with red corrections, and circled numbers keyed to figures.
-- **Page lint.** It now requires at least 6 hand notes per page and bans raw SVG `<text>`.
-- **Also in the commit.** The Gipfelbuch alignment story (one prior → solved value shared by Compare, Stages, the new `StoryMap` and the geo bleed), and Imhof colouring on the sheet map and DEM patch (wave 5 D2).
+- **Rename.** `/atlas` became the Gipfelbuch (`/gipfelbuch`, `/gipfelbuch/$concept`; `src/lib/gipfelbuch`, `src/components/gipfelbuch`, `scripts/gipfelbuch`, `public/demo/gipfelbuch`; fast check `gipfelbuch`). No `/atlas` redirect.
+- **Content.** All 19 pages were reviewed against the code and the literature and restored figure by figure against the committed explainers. Corrected claims include the compass-prior width, medians that included rejected solves, the curvature drop, the wild-set skyline result and stale three.js numbers. New real-data figures come from `scripts/gipfelbuch/data-*.ts`.
+- **Look.** A Swiss map sheet (`GB_THEME`, `src/components/gipfelbuch/swiss/`): Landeskarte inks on flat warm paper with a soft grid, neatline, LV95 corners, legend, scale bar and Wegweiser prev/next. The index opens on a sheet map of Niederhorn and Thunersee (`scripts/gipfelbuch/data-sheet.ts`). On top sits a hand-sketched field notebook: hand faces (Architects Daughter, Playpen Sans, Patrick Hand SC, Shantell Sans; self-hosted, OFL), seeded pen strokes, hachure and stipple, while measured data lines stay exact. Paper grain, tape, tilt and the margin rule were tried and dropped.
+- **Kit.** `notebook/` (`sketchify`, `Ink` wrappers, `carto`, `marks`, and `NotebookMap`, which replaces the node-link core map and follows one demo photo through the pipeline), `swiss/` (type scale, marks, register), `viz/math.tsx`, `HandLabel` / `HandNote`, `RealPhoto bleed` and `PAGE_HERO`. `gipfelbuch.check.ts` lints pages (contrast floor, at least 6 hand notes, no raw SVG `<text>`); new checks `gipfelbuch-notebook` and `gipfelbuch-contrast`.
+- Kit preview at `/dev/gipfelbuch-sheet`; `scripts/gipfelbuch/shot.mjs` screenshots a page for review.
 
 ### Wave 5: Swiss signature on the luma frontier, wave 1 (2026-10-02)
 
-Plan: `reports/wave5-plan-2026-10-02.md`. 14 streams, each implemented and independently reviewed. All browser-unverified; the batch-ledger rows say what the consolidated pass must look at.
+Outcome: `reports/gpu-renderer.md`. 14 streams, each implemented and independently reviewed. All browser-unverified; the batch-ledger rows say what the consolidated pass must look at.
 
 - **Imhof relief.** New `terrain.relief.mode = "imhof"`: the swiss relief plus multi-scale normal generalisation blended by range, aspect-swung light, Imhof warm/cool colour, elevation tint and aerial perspective (fields `swing`, `tint`, `aerial`). WGSL and GLSL; opt-in.
 - **Terroir hatch v2.** New `style.terroir.hatchStyle` (`classic` | `landeskarte`). `landeskarte` draws rock hachures that are denser and darker on the shadow side, tapered and hash-thinned, plus scree stipple and blue glacier lines. Spacing is in ground metres, with two octaves blended by screen footprint so the lines do not swim. Off by default.
@@ -339,41 +328,15 @@ Plan: `reports/wave5-plan-2026-10-02.md`. 14 streams, each implemented and indep
 - New flagship example `examples/deck/landeskarte`: the Niederhorn above Lake Thun as a Swiss Landeskarte sheet (Imhof multidirectional relief, own hypsometric palette, three-ink contours, rock and scree, LV95 ticks, scale bar from camera resolution, legend of drawn symbols only) that lifts into the summit panorama and ends exactly on the solved frame of photo demo-01.
 - A time ruler (05:00 to 20:00 CEST, the 20-minute summit stay magnified) moves the real sun of 7 Sep 2026 (NOAA/Meeus with an independent check); cast shadows and sky-view come from a 16-azimuth GPU horizon map built with luma.gl's `GPUCommandGraph` on WebGPU and from a CPU twin in a worker on WebGL2. A GPU skyline ring decides which peaks are labelled.
 - Stations show each photo's solved pose as geometry (wedges, Feldbuch rays, Wegweiser plate). An optional layer draws the photo skylines found by U2-Net-P (baked offline, geometry only) against the DEM horizon.
-- 12 tsx CPU checks (`node examples/deck/landeskarte/scripts/run-checks.mjs`). Built by a multi-agent swarm from `reports/summit-example-spec.md` (WIP, browser smoke pending a consolidated pass).
-
-### Gipfelbuch: Swiss notebook and explainer fidelity restored (2026-10-01)
-
-- **Concept sheets.** The notebook is back in the shell:
-  - the sheet's contour lines sit behind the title;
-  - the measured field notes sit under the Ledger;
-  - the soft grid is the sheet ground again;
-  - the foot has a "Where it sits" section with the notebook trail and the Leads to / Referenced by links.
-  
-  A sheet whose page opens with its own real-photo hero shows that hero instead of the shell Tafel (`PAGE_HERO`).
-- **Index.** The field notebook (Feldbuch) follows the Blattübersicht again.
-- **Geo bleed.** `RealPhoto bleed` carries a photo's measured terrain, compass ruler and out-of-frame summits past its frame, as on the Tafel. Heroes can sit on a `Figure plate`.
-- **Kit.**
-  - Measured lines and dots are drawn exact: `data` on the pen primitives, and `PlotSeries`.
-  - Peak labels no longer overprint.
-  - Shared helpers: `PrintLabel`, `PrintNote`, `HandRange` and `CrispLine`.
-  - Galleries can tag result or failure, and Callouts take their tone's tint.
-  - Removed the unused `Multiples`, `StationTable`, `PencilFilter` and tape CSS.
-- **Pages.** Pages were restored figure by figure against the committed explainers. All changes are browser-unverified. Record: `reports/gipfelbuch-restore-2026-10-01.md`. Spec: `reports/gipfelbuch-best-of-both.md`.
+- 12 tsx CPU checks (`node examples/deck/landeskarte/scripts/run-checks.mjs`). Built by a multi-agent swarm from a build spec (since deleted; the example README is the record) (WIP, browser smoke pending a consolidated pass).
 
 ### Testing policy: batched browser checks (2026-10-01)
 
 - `AGENTS.md`, `CONTRIBUTING.md` and `reports/status.md` now say that changes land on the fast tier and hand checks in `vite dev`. Browser, GPU and bench checks run in one consolidated pass per wave of work rather than per change, and changes stay marked browser-unverified until then. In a pass, the render lock is taken per step, and only timing steps are exclusive.
 
-### Gipfelbuch: a softer sheet (2026-10-01)
-
-- The Gipfelbuch drops its paper texture and notebook props, at the user's request. The ground is a flat warm white (`--gb-paper` and `SWISS.paper`, W 96% + YY 4%, previously the 10% cream with a grain tile), and panels are lighter (paper 91% + LG 9%).
-- The graph-paper grid stays, at about half its strength (`--nb-grid` 6%, index ruling 8%).
-- Removed: the red double margin rule on notebook entries, the tape strips and seeded tilt on `PastedPrint` (prints now sit square on a thin white mat; `seed` is optional), the pencil graticule ticks in `SheetFrame`, and the wavy underline on concept terms (now a faint solid line).
-- The rules are in the Gipfelbuch README ("Soft sheet"), with revision notes in `reports/gipfelbuch-swiss-aesthetic.md`, `reports/gipfelbuch-field-notebook-design.md` and `reports/gipfelbuch-design-book.md`.
-
 ### luma.gl frontier looks and GPU sort (LF2–LF8, 2026-10-01)
 
-All looks are opt-in, default off and byte-identical when off; browser-verified only where noted. Source: `reports/luma-frontier-2026-10-01-late.md`.
+All looks are opt-in, default off and byte-identical when off; browser-verified only where noted. Outcome: `reports/gpu-renderer.md`.
 
 - `style.terroir.hatch`: slope-driven Swiss rock hatching along the fall line (from 38°) and scree dots (24–38°), no pack needed; reuses the `pattern.ts` patternFill kernel; WebGL define `TERROIR_HATCH`, WebGPU feature `terHatch` (70b616b). Not browser-run. Check `terroir-hatch`.
 - `style.composite.sketch` (0..1): sketch wobble on ridge, skyline and crease lines; `style.trails.stroke: 'solid'|'pencil'|'glow'` (6108c72). WebGPU checks run; WebGL snippet compile only. Check `strokes`.
@@ -397,47 +360,6 @@ All looks are opt-in, default off and byte-identical when off; browser-verified 
 - `@math.gl/core` and the packed luma manifests move to the published `5.0.0-alpha.10`; `@math.gl/polygon` and `@math.gl/web-mercator` are no longer direct dependencies (deck pulls them), and `overrides` pins the types-only `@math.gl/types` to `5.0.0-alpha.10` so one copy is installed. Browser-unverified until the render-lock gates run.
 - deck.gl re-vendored as `9.4.0-rigi.1`: deck master `35854250` + #10752 (luma 10 bump) + luma.gl's deck WebGPU hunks (unchanged) + #10780 (SDF glyphs padded by the distance-field radius, so outlined TextLayer labels in the roll map are no longer clipped). Core `dist/` is byte-identical to the previous build apart from the version string; deck 9.4.0 final (on luma 9.4) adds nothing to core/layers over this base. The `@deck.gl/core` override is gone (layers peers the exact core version). Details in `vendor/deck/README.md`.
 
-### Gipfelbuch: Swiss field-notebook design system (2026-10-01)
-
-- Research and plan: `reports/gipfelbuch-field-notebook-design.md`. It covers alpine field books and Gipfelbücher, sketch and handwriting rendering, Swiss typographic design and LK cartography, and ends with a gap audit and five work packages.
-- Type programme. The closed scale is 11/13/16/20/24/40/56 (`swiss/type.ts`).
-  - Fraunces is used only for the H1; section heads are Fira semibold.
-  - Stats use Fira 300 with tabular lining figures.
-  - The new `--gb-secondary` (Brezine BG) replaces BL for secondary text, which fixed contrast below WCAG AA.
-  - Added `.gb-table`, `.gb-grid` (4/8/12 columns), `.gb-derived` (italic for estimated values) and a forced-colors fallback.
-- Hand faces. Notes are set in Caveat (alternating glyphs) and small figure labels in Shantell Sans; Architects Daughter remains as a fallback. Digits inside hand text are set in print.
-- Ink kit:
-  - furniture strokes are tapered pen outlines with an ink blob at the start (after perfect-freehand, in-house, no dependency);
-  - stipple draws scree stones that grow toward the foot;
-  - data lines stay exact.
-- Furniture and shell:
-  - Standortfeld header, Stand/Ausgabe imprint and signpost distances on concept pages;
-  - SAC route-topo `Steps` with belay circles, pitch column and a certainty line style (solid = measured, dashed = approximate, dotted = open);
-  - a trig-point mark on stats;
-  - `Figure` gains `source`/`reading`/`number` props, and tape is off by default;
-  - LK-grammar marks and a register line in `swiss/Marks.tsx` and `swiss/Register.tsx`.
-- Pages: a mechanical sweep across all 19 pages raised the text contrast floor to 65 %, removed half-pixel sizes and rounded pills, and took Fraunces off non-H1 elements. `gipfelbuch.check.ts` now lints pages so these rules cannot regress.
-
-### Gipfelbuch: one sketched field-book look across every page (2026-10-01)
-
-- Every Gipfelbuch visualization is now hand-sketched in the Swiss sheet inks: the index, all 19 concept pages, the shared `viz/` kit and the `swiss/` sheet furniture. Clean vector strokes became seeded two-pass pen strokes, flat fills became hachure (stipple for uncertain areas), outlined boxes, rings and rounded cards were removed, and markers are pen circles and hand dots. Photos and DEM rasters are never filtered.
-- Sketch toolkit in `src/components/gipfelbuch/notebook/` (no new dependency; approach after rough.js, MIT):
-  - `sketchify.ts`: `sketchPolyline` (jitter bounded by a tolerance, 0.9 px default, so data lines stay on their measured pixels; tested), `sketchify(d)` for any SVG path, `sketchRect`, `hachureFill`, `stippleFill`, and canvas helpers.
-  - `Ink.tsx` React wrappers: `SketchPath`, `SketchPolyline`, `SketchRect`, `Hachure`, `Stipple`, `HandDot`, `PenRule`, `SketchDefs`.
-  - Native range inputs are styled as a pen track with an ink thumb.
-  - The rules are in the Gipfelbuch README ("Field notebook and sketch rules").
-- Concept pages: the force-graph "Connections" became a hand-drawn notebook trail (the concept's notebook page, with incoming and outgoing notes), and a "Feldbuch" field-notes strip under the lede shows that concept's measured values for the selected demo photo. The selected photo is shared across the index and all pages (`useNotebookPhoto`, registered storage key `rigi.gipfelbuch.photo`).
-- Handwriting face is Architects Daughter (Kalam fallback), used only for annotations, captions and margin notes. Headings, body text and numbers stay in print.
-- Research: `reports/gipfelbuch-swiss-sketch-research.md`, `reports/gipfelbuch-sketch-rendering.md`, `reports/gipfelbuch-sketch-inventory.md`. `scripts/gipfelbuch/shot.mjs` screenshots a page (with `<details>` opened) for review.
-
-### Gipfelbuch: the core map becomes a field notebook (2026-10-01)
-
-- On `/gipfelbuch`, the hand-laid node-link CoreMap is replaced by `NotebookMap` (`src/components/gipfelbuch/notebook/`). It has three numbered notebook entries (viewport inference, terrain snapping, what the pose is for) with 16 numbered steps, and every curated concept appears once. Cross-lane data-flow edges become margin notes ("← the predicted horizon from (11) DEM Horizon").
-- The notebook follows one demo photo through the pipeline, and a strip of the 12 thumbnails (or the tally plot) switches photos. Every value is read from `public/demo/gipfelbuch/*.json`: sensor prior vs solved yaw (struck through), median skyline miss before and after the solve, the accept verdict, tiles, ground and eye height, horizon ridge distance, peak counts and the roll span.
-- Figures: the photo's skyline band with the traced, prior and solved skylines; the hillshade with the solved view cone and compass heading; a hachured terrain section along the view axis with the sight line to the skyline ridge; and the 12-photo compass-correction plot with tally marks.
-- Style: graph paper, a red margin rule, Caveat (Google Fonts, OFL) for annotations only, and seeded hand-drawn strokes (`notebook/sketch.ts`, no new dependency). Data lines are drawn exactly; only the furniture (arrows, circles, dimension ticks, hachures, tape) wobbles. Strokes draw on when an entry scrolls into view, except under reduced motion or automation.
-- The entries carry the `#group-<id>` anchors that concept-page breadcrumbs link to (previously missing). New fast check `gipfelbuch-notebook`. Research: `reports/gipfelbuch-notebook-research.md`.
-
 ### Landing: terrain continues past the photos (2026-10-01)
 
 - The hero (demo-09) and the "01 · Single photo" frame (demo-01) are set in the roll panorama's look. Ridgelines traced from the photo's eye (`traceViewpoint`) are projected through its solved camera, so each ridge leaves the frame where it does in the photo. They carry on past the edges, with a compass ruler above and peak names past the frame (md and up), fading out at the outer edges.
@@ -447,22 +369,10 @@ All looks are opt-in, default off and byte-identical when off; browser-verified 
 - The how-it-works scene gets the same treatment around its photo band (bake `how`), fading in only once the pose has snapped: before that the terrain line is still wrong, and the surround would give the answer away. Dragging the terrain off dims it.
 - Everything is baked by `scripts/demo/bake-surround.ts`: a transparent WebP per frame in `public/demo/surround/` (50, 88 and 51 kB) and a small JSON in `src/components/site/surround/` that the route imports, so there is no fetch, worker or GPU work at runtime. `Surround` (`src/components/site/Surround.tsx`) places it around any photo without changing the photo's size. The strokes are paper on transparency (dark theme only, like the rest of the landing page).
 
-### Gipfelbuch: rename from atlas, math kit, content review (2026-10-01)
-
-- The explainer pages `/atlas` are now the Gipfelbuch (`/gipfelbuch`, `/gipfelbuch/$concept`), named after the summit logbook. Paths moved to `src/lib/gipfelbuch`, `src/components/gipfelbuch`, `scripts/gipfelbuch` and `public/demo/gipfelbuch`; identifiers are `Gipfelbuch*`; the fast check id is `gipfelbuch`. No `/atlas` redirect.
-- `viz/math.tsx`: `Eq`, `Sym`, `Frac`, `Op` set short equations whose symbols carry the colour of the overlay they measure (underlined in the photo colour on the paper theme).
-- All 19 pages reviewed against the code and the literature (`reports/gipfelbuch-review-2026-10-01/`). Corrected claims include: the compass-prior width (15° solver prior, not 7.1°), medians that included rejected solves, the curvature drop (171 m net of refraction, 196 m geometric at 50 km), the wild-set skyline result (60 accepted, 39 correct) shown beside the curated one, terrain hiding most summits (924 of 1181 on demo-10), the default DEM (Mapterhorn) and stale three.js numbers. New real-data figures: solver cost against yaw, a hidden summit and its sight line, a peak at phone vs solved yaw, the Step Inside split; new baked data from `scripts/gipfelbuch/data-{peak,pose-solve}.ts` and an extended `data-step-inside.ts`.
-
 ### Light mode foundation (2026-10-01)
 
 - `?theme=auto|light|dark` (flag `theme`, applies live) and a saved choice (`localStorage` `rigi.theme`) set `<html data-theme>`. A pre-paint script (`src/lib/flags/theme-boot.ts`, first in `<head>`) resolves: flag, saved choice, `navigator.webdriver` (dark, so harnesses stay dark unless they pass `?theme=light`), OS `prefers-color-scheme`, dark. `src/lib/theme` has `resolveTheme`/`applyTheme`/`useTheme`/`ThemeSync`; `ThemeToggle` (`src/components/site/`) cycles Auto, Light, Dark.
 - `src/styles.css`: Brezine swatches as `--khipu-*`; `:root[data-theme="light"]` re-inks the `--rigi-*` roles and swaps `--color-white`/`--color-black`, which flips every `white/NN` and `black/NN` utility. `data-theme="dark"` marks an always-dark island. New `light:` variant for off-palette colours; `brandVar(role, alpha?)` and `BRAND_LIGHT` in `src/brand/khipu.ts`. Dark rendering is unchanged except the range-slider thumb glow now follows `--rigi-glow`. Pages are not yet converted; the toggle is not yet mounted.
-
-### Gipfelbuch: Swiss map-sheet aesthetic (2026-10-01)
-
-- `/gipfelbuch` is restyled as a Swiss topographic sheet. Pages sit on warm paper inked in the Landeskarte separations: rock black, contour brown, water blue and route red, all Brezine chart swatches. Each concept page is a numbered "Blatt NN / 19" inside a neatline with graticule ticks and LV95 corners. Its header carries real Niederhorn contours, and its footer has a Zeichenerklärung legend, a scale bar and an imprint. Status shows as SAC waymark blazes, and prev/next links are yellow Wegweiser signposts. Peak labels on photos follow the Heim/Imfeld panorama style.
-- The index opens with a title cartouche and a sheet map of Niederhorn and Thunersee: swisstopo relief shading, 20 m Mapterhorn contours, swissNAMES3D peaks and the 12 demo viewpoints as sight rays. `scripts/gipfelbuch/data-sheet.ts` bakes it into `public/demo/gipfelbuch/sheet/` (about 320 KB).
-- The theme is a scoped class (`GB_THEME`, `src/components/gipfelbuch/swiss/`). It remaps Tailwind's white and black and the `--rigi-*` tokens, so the landing page, library and workspace keep the dark theme. Fonts added: Fira Sans, Fira Sans Condensed, IBM Plex Mono, and the Fraunces italic and 600 weight. The group and status colours are re-tuned for paper. Preview the kit at `/dev/gipfelbuch-sheet` (dev only).
 
 ### Roll panorama resizes vertically (2026-10-01)
 
@@ -471,7 +381,7 @@ All looks are opt-in, default off and byte-identical when off; browser-verified 
 
 ### WAG wave 4: more of the app on the luma graph, more GPU defaults (2026-10-01)
 
-Built without browser runs (user's call: no render-lock waits); evidence is node checks, several on luma.gl's WebGPU device over Dawn in node. Every item below is **browser-unverified** until the consolidated pass (`research_notes/whole-app-graph-2026-10-01/consolidated-pass-wave4.md`); a regression there reverts that default.
+Built without browser runs (user's call: no render-lock waits); evidence is node checks, several on luma.gl's WebGPU device over Dawn in node. Every item below is **browser-unverified** until the consolidated pass (`research_notes/whole-app-graph-2026-10-01/consolidated-pass-results.md`); a regression there reverts that default.
 - **First real luma `GPUProgram` users.** The haze grid arg-min (`haze-argmin.ts`, group `look-haze-argmin`): scalar ops for the tolerance, a `GPUConditionalOperation` gating the past-the-cap selection by GPU indirect dispatch, our kernels lowered into the program's graph; reads 2 KiB instead of 22 KiB (`?hazeArgminGpu=off`). The band-stats fold (`?statsFold=gpu|f64`): BAND_STATS → `GPUProgramSpMV` → BAND_FINALIZE in f32 on one graph, 256 B read back instead of 6.6 KB; f32 vs f64 stays under 1 LSB in emulation. New `gpu/core/program.ts` (`compileProgramGraph`, `GraphOperation`), `cachedGraphFrom`, and `cachedGraph(…, create)` for graphs that adopt a program compiler's graph. Band-stats subgroup reduction on by default where available (`?statsSubgroups=off`).
 - **GPU airlight band** for the haze fit on the WebGPU texture path, default on (`?hazeBandGpu=off`): one submit, no range / P(sky) planes read back (graph break D16 removed); spot-checked per call, CPU band on a fault.
 - **Sky GPU prep on by default** (`?skyGpuPrep`, replaces `DEFAULT_GPU_PREP`), now on a core ComputeGraph; fixes an upload-texture usage bug that made every browser prep fall back to the CPU. Earlier browser A/B (pre-port): 69/69 masks identical, segmentSky 88.1 → 77.6 ms median.
@@ -576,13 +486,13 @@ Inventory of removed, retained and refactored code: `reports/cleanup-2026-10-01.
 - Removed `src/lib/tiles3d/three-tiles.ts` (the three.js 3D Tiles adapter, no caller), the stale `three/webgpu` and `three/tsl` `optimizeDeps` entries, and the regenerable per-photo intermediates of the killed FUND E0–E3 studies and the near-field spike/smear runs (reports, protocols, results and scripts kept; recover with `git show 84edf95^:<path>`).
 - Research harnesses under `tools/` no longer import the main tree by absolute path.
 - Fast tier green again on a clean clone: formatting drift fixed, atlas pages and `reports/ontology.md` no longer cite the deleted `src/lib/engine.ts`, and the `export` check declares its gitignored photo input so a fresh checkout skips it instead of failing.
-- Docs: present-tense references to the removed three.js renderer, `src/lib/render` and the removed concord checks fixed; CI check table regenerated; superseded banners on `reports/deck-default.md` and `reports/matcher-service.md`.
+- Docs: present-tense references to the removed three.js renderer, `src/lib/render` and the removed concord checks fixed; CI check table regenerated; superseded banners on `reports/archive/deck-default.md` and `reports/archive/matcher-service.md`.
 
 ### luma.gl 10 and WebGPU by default (2026-09-28 to 2026-10-01)
 
 Rendering
 - WebGPU is the default renderer: `?renderer=auto` (the default) runs deck.gl on WebGPU (`WebGpuEngine`, `src/lib/deck-webgpu`) where the browser passes the probe, and deck.gl on WebGL2 (`DeckEngine`, `src/lib/deck`) otherwise. `?renderer=webgpu|deck` pins an engine, `?webgpu=off` forces the fallback. Decision record and open regression list: `reports/webgpu-default.md`.
-- The three.js `PhotoEngine` and `?renderer=three` are removed. three.js remains for Step Inside splats, the 3D Tiles adapters and the P3 RGB-D cache.
+- The three.js `PhotoEngine` and `?renderer=three` are removed. three.js remained for Step Inside splats, the 3D Tiles adapters and the P3 RGB-D cache until it was removed on 2026-10-02 (see above).
 - A mid-session WebGPU device loss that cannot rebuild switches `/photo` to the WebGL deck engine; `auto` routes terroir-styled views (land cover, contours) through WGSL on WebGPU.
 - deck-webgpu: geometry diet; GPU label occlusion, skyline and point queries instead of a full 1024 px readback per settle; cached peak-label occlusion verdicts; no-MSAA colour pass while interacting with 4x MSAA on settle; idle prewarm of the interactive pipelines; trail dash; GPU splat sort with a worker fallback.
 - Offscreen pose renders for the matcher and `lab.generate` run on the deck engines; every harness that pinned three is retargeted to deck/WebGPU.

@@ -25,7 +25,7 @@ const INKS: InkRole[] = [
 	{ role: "Wegweiser, light", code: "YY", hex: SWISS.signLight },
 ];
 
-// Hand is the form, print the exception (reports/gipfelbuch-hand-sketch-2026-10-01.md §1): four hand
+// Hand is the form, print the exception (reports/gipfelbuch.md): four hand
 // faces write the book; print survives only for code and equations.
 const FACES = [
 	{

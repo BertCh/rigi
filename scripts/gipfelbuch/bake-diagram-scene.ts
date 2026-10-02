@@ -4,7 +4,7 @@
 
 /**
  * Bakes the scene that the Gipfelbuch's synthetic diagrams draw (pod D,
- * reports/gipfelbuch-explainers-2026-10-02/D-diagrams.md): one real demo photo's DEM horizon, summits,
+ * reports/gipfelbuch.md): one real demo photo's DEM horizon, summits,
  * terrain section and poses, small enough to import synchronously. A diagram that explains a mechanism
  * (a ray march, a pose solve, a tap lock) keeps its synthetic sensor, but its mountains are this photo's
  * real ones, so the figure, its spill and the page's photos show the same peaks.

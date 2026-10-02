@@ -1,6 +1,6 @@
 # Upstream packets for luma.gl (2026-10-02)
 
-**Nothing here has been posted.** No PR, issue or comment exists on GitHub or with visgl for any of it; the owner decides what is sent, when and in what order (audit `reports/luma-native-dependency-audit-2026-10-02.md`, section 6 move 10). Every packet is local: a markdown file (problem, repro, patch, test plan, PR description in luma's `.github/pull_request_template.md` layout), the patch as a `git am` file in `patches/`, and one repro harness in `repro/`.
+**Nothing here has been posted.** No PR, issue or comment exists on GitHub or with visgl for any of it; the owner decides what is sent, when and in what order (decision U in [../gpu-renderer.md](../gpu-renderer.md)). Every packet is local: a markdown file (problem, repro, patch, test plan, PR description in luma's `.github/pull_request_template.md` layout), the patch as a `git am` file in `patches/`, and one repro harness in `repro/`.
 
 Base of every patch: luma master `00aab0f91` (2026-10-02, "fix(examples): refine architectural charcoal strokes (#3349)"). The patches apply cleanly to that commit one by one (see "Re-checking" below), and all together (c3 and c4 after a merge of open PR #3330) the luma node tier passes. luma master moves daily: re-run the check before sending.
 
@@ -12,8 +12,8 @@ Ranked by (value to every luma user) / (effort and risk to land), not by Rigi's 
 
 | Rank | Packet | What | Size | Depends on | Vendored patch that disappears when merged | Rigi code that shrinks |
 |---|---|---|---|---|---|---|
-| 1 | [a](a-fft-bit-reversal.md) | Loop-free FFT bit reversal. **Correctness bug**: `GPUFFT1D` / `GPUFFT2D` / `GPUConvolution` silently wrong on Apple/Metal for lengths 16 to 2048 (relative error about 1.0 measured) | 2 files, +41/-7 | nothing | `luma-fft-bitreverse-bdbc371f.patch` (rigi.6 commit 9) | the FFT spot-check workaround in `src/lib/refine/fft-gpu.ts` |
-| 2 | [b](b-fft1d-65536.md) | `GPUFFT1D` max length 65536 (was the shared 2048) | 4 files, +34/-15 | a (for correct results on Metal) | `luma-fft1d-65536-007951ae.patch` (rigi.6 commit 8) | the four-step 2048 split and 512 retry in `fft-gpu.ts` |
+| 1 | [a](a-fft-bit-reversal.md) | Loop-free FFT bit reversal. **Correctness bug**: `GPUFFT1D` / `GPUFFT2D` / `GPUConvolution` silently wrong on Apple/Metal for lengths 16 to 2048 (relative error about 1.0 measured) | 2 files, +41/-7 | nothing | `luma-fft-bitreverse-bdbc371f.patch` (rigi.6 commit 9) | none (Rigi already relies on the vendored fix; the spot-check workaround went in d1be4be) |
+| 2 | [b](b-fft1d-65536.md) | `GPUFFT1D` max length 65536 (was the shared 2048) | 4 files, +34/-15 | a (for correct results on Metal) | `luma-fft1d-65536-007951ae.patch` (rigi.6 commit 8) | none (four-step split and 512 retry already removed in d1be4be) |
 | 3 | [d](d-export-set-dispatch-workgroups.md) | export `setGPUComputeDispatchWorkgroups` | 2 files, +25 | nothing | none | hand-written validation in `src/lib/gpu/core/graph.ts` |
 | 4 | [h](h-quick-start-constructor-docs.md) | quick-start docs: `new GPUCommandGraph(device, props)` (3 pages); lists the other wrong snippets | 3 files, 3 lines | nothing | none | none |
 | 5 | [c1](c-clearbuffer-submit-mapread-readtarget.md) | `CommandEncoder.clearBuffer` | 6 files, about +75 | nothing | `luma-clear-buffer-1998d244.patch` | (already adopted in `core/pool.ts`) |
@@ -24,7 +24,7 @@ Ranked by (value to every luma user) / (effort and risk to land), not by Rigi's 
 | 10 | [f](f-readback-ring-growable-partial.md) | growable `GPUReadbackRing` + `readPartial` | 4 files, about +300 | nothing | none | slot growth in `core/readback.ts` (the rest stays) |
 | 11 | [e](e-graph-clear-readback-nodes-lint.md) | clear / readback copy-node factories + preflight `uninitializedTransientReads` | 7 files, about +350 | c1 | none | `ComputeGraph.clearNode` body (lint and readNode stay) |
 
-Why this order: a is a real bug with a tiny fix and clear before/after numbers; b is the same area and a one-constant change; d, h are near-zero risk; c1 and c2 are small, general, tested API additions that Rigi already runs on; g follows the `debugGPUTime` precedent; c3 and c4 are blocked behind the open #3330 and touch a hot function; f and e add API surface that luma may want to shape differently (and for e Rigi's richer lint cannot move without new usage modes), so they come last and are the most likely to be reworked in review.
+Order: a is a real bug with a tiny fix; b is a one-constant change in the same area; d and h are near-zero risk; c1 and c2 are small tested API additions Rigi already runs on; g follows the `debugGPUTime` precedent; c3 and c4 wait on open #3330; f and e add API surface luma may want to shape differently, so they come last.
 
 ## Vendored patches that would disappear if the whole set were merged and published
 

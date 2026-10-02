@@ -4,7 +4,7 @@
 
 **Scope.** Only the 50 DEV ids of `tools/bench/split.json` were used. The spent test half was never opened, and no `data_v3` photo was opened, rendered or run. Verdicts come from the existing verified dev refs (`tools/bench/gt/t6`, through `stage1/evaluate.py`) plus the new blind pack in `tools/matcher/v2/verify/`. The frozen T6 rule was used unchanged (`292fb74f…`), and the pipeline code stamp was `c2d406ea3c557e6e`.
 
-> **Update (2026-10-01):** the follow-ups ran in the TM programme ([terrain-matching-research.md](terrain-matching-research.md)): the LoMa-specific rule (recommendation 4) is roadmap R3 and waits on the H2 veto (R2), which waits on H1 blind verification (R1). In the app, the suggestion-only eye policy is followed by the "Check camera position" aid behind `?eyesearch=on|auto` (default off; `src/lib/gpu/eye/suggest.ts`), a skyline eye refinement, not this render-match fallback.
+> **Status (2026-10-02):** a frozen dev study record. The LoMa-specific rule (recommendation 4) is roadmap R3 and waits on the H2 veto (R2), which waits on H1 blind verification (R1); see [terrain-matching-research.md](terrain-matching-research.md). In the app, the suggestion-only eye policy is followed by the "Check camera position" aid behind `?eyesearch=on|auto` (default off; `src/lib/gpu/eye/suggest.ts`), a skyline eye refinement, not this render-match fallback. The v2 code (`tools/matcher/v2/`) is offline Python; the browser matcher (`src/lib/matcher`) implements only `v034` and `t6`.
 
 ## Verdict
 
@@ -165,7 +165,7 @@
 
 ## 7. Recommendation
 
-1. **Keep the frozen T6 rule and the v034 service default as they are.** Nothing in v2 is ready to become a default.
+1. **Keep the frozen T6 rule and the v034 policy default as they are.** Nothing in v2 is ready to become a default.
 2. **Eye fallback:** ship it (if at all) only as a **suggestion** (`final.suggestion`: a LOW pose plus the moved eye, rendered at the moved eye), never as an accept. It must be opt-in because it costs about 3.5 min more per failed photo. On dev it gave 1 verified-correct suggestion (wc_0074) and 1 near-miss (wc_0086) out of 2.
 3. **Priors:** leave them off.
 4. **LoMa:** do not switch the matcher under the frozen rule, because of wc_0069. Next step: calibrate a LoMa rule on dev (support and strong thresholds, and the ambiguity veto), then run a fresh blind pack. Only then can it enter v3 as arm D.

@@ -1,111 +1,88 @@
 # Step Inside: a design for georeferenced 3D photos
 
-Status: BUILT 2026-09-29. Results and the gate outcomes are in [step-inside-results.md](step-inside-results.md); the follow-on plan is in [roadmap.md](roadmap.md).
-
-> **Corrections since this was written:** the splat renderer is dependency-free (Spark was never added); the SHARP and VGGT licence questions are resolved (`research_notes/step_inside_models_2026-09.md`); the "people/huts on 8/12" P0 gate could not be tested, because the set has no people.
->
-> **Update (2026-10-01):** the three.js PhotoEngine was removed (583e2b7), so the "three.js first" P1 row, the P1b parity row and decision 2 below are moot. Step Inside now runs on the two deck.gl engines: WebGL2 (`src/lib/nearfield/deck-splat-layer.ts`) and WebGPU (`src/lib/deck-webgpu/layers/splats.ts`, the default renderer, not yet exercised end to end). `three-splats.ts`, `/lab/splats` and `/lab/generate` (the P3 cache renderer) were removed 2026-10-02.
+*Design of record, written 2026-09-27, built 2026-09-29, updated 2026-10-02 to the in-browser pipeline. Results and gate outcomes: [step-inside-results.md](step-inside-results.md). Plan: roadmap S1–S3 in [roadmap.md](roadmap.md). 3D Tiles: [step-inside-google-3d-tiles.md](step-inside-google-3d-tiles.md).*
 
 ## Thesis
 
-Apple's Spatial Scenes and SHARP-type models taught people to expect that a photo can "become 3D". Those systems invent the geometry: they give you plausible parallax, but no true scale and no place in the world. Rigi has the opposite problem. It knows the true camera (a metric ENU pose, the intrinsics and a confidence) and the true terrain beyond about 200 m. What it lacks is everything in the near field: people, huts, trees, boulders, the ridge you are standing on. That is why the In map drape smears them across the ground (roadmap item 16).
+Apple's Spatial Scenes and SHARP-type models taught people to expect that a photo can "become 3D". Those systems invent the geometry: plausible parallax, but no true scale and no place in the world. Rigi has the opposite problem. It knows the true camera (metric ENU pose, intrinsics, confidence) and the true terrain beyond about 200 m, and lacks the near field: people, huts, trees, boulders, the ridge you stand on. That is why the In map drape smears them across the ground.
 
-**Step Inside fuses the two.** A learned model reconstructs the near field. The DEM provides the far field. Generation is used only to fill holes. Rigi's solved pose anchors all of it in real coordinates, and every rendered surface carries a label for where it came from.
+**Step Inside fuses the two.** A monocular depth model reconstructs the near field, the DEM provides the far field, and Rigi's solved pose anchors both in real coordinates. Every rendered surface carries a label for where it came from. It is the only photo-to-3D whose output is at the right scale, in the right place, and honest about which parts are real.
 
-The feature is not "yet another photo-to-splat". It is the only photo-to-3D whose output is at the right scale, in the right place, and honest about which parts are real. That extends the "geometric truth" positioning in the competitive roadmap instead of competing with Apple on eye candy.
+## Architecture (current)
 
-## What Rigi already has that makes this cheap
-
-| Need | Existing piece |
-|---|---|
-| Camera intrinsics and pose, metric, georeferenced | The solved pose (cascade or matcher), with a confidence gate |
-| Per-pixel true range to terrain | The geometry pass range buffer; `Renderer.sampleAt()` |
-| Sky and people masks | `src/lib/sky` (U²-Net), MediaPipe people mask |
-| Occlusion-correct drape of photo onto DEM | In map mode, `roll/map/multi-drape-layer.ts` |
-| Multi-view sets with known poses | Camera-roll viewpoints (photos within 250 m, poses already accepted) |
-| COLMAP camera export | `src/lib/export/colmap.ts`, which is exactly what gsplat and VGGT tooling consume |
-| Python GPU sidecar pattern | The matcher service (:8765) with a queue, health checks and silent degradation |
-| Monocular depth already in use | MoGe-2 as a verifier in the TM research (`tools/research/tm`) |
-
-## Architecture
+Everything runs in the browser; there is no near-field service (removed 8bb109d0).
 
 ```
 photo + solved pose (accepted only)
         │
         ▼
- ┌──────────────────┐   near-field model (SHARP / TripoSplat / MoGe-2 depth-lift)
- │ nearfield service │──► camera-frame Gaussians, approximately metric
- └──────────────────┘
+ nearfield/local/client.ts (LocalNearFieldClient, the default nearField source)
+   decode + resize in the page
+   MoGe-2 ViT-S on src/lib/nn (WebGPU)  ── nearfield/local/depth-net.ts, weights MOGE2_WEIGHTS
+   compose (focal/shift, normals)       ── local/compose.ts, focal-shift.ts
+   depth lift as a ComputeGraph kernel  ── local/lift-gpu.ts
+        │  camera-frame Gaussians, approximately metric
+        ▼
+ DEM anchoring (anchor.ts, ground.ts, near-dem.ts; opt-in cliff-lip.ts)
+   1. camera frame → ENU with the solved pose
+   2. monotone log-log range curve fitted per photo on DEM terrain pixels
+      (not sky, not people, range < 2 km); objects re-grounded on the DEM
+   3. residual → anchor quality (trust label only, not a pose verifier)
         │
         ▼
- DEM anchoring (browser, pure TS)
-   1. transform camera frame → ENU with the solved pose
-   2. scale fit: robust median of DEM range ÷ predicted depth on
-      terrain pixels (not sky, not people, range < 2 km)
-   3. residual → anchor quality score (a trust number and a pose verifier)
-        │
-        ▼
- depth split per pixel / per Gaussian
-   predicted ≈ DEM range  → TERRAIN  (drop the splat; the DEM drape renders it)
-   predicted ≪ DEM range  → OBJECT   (keep the splat: people, huts, trees, rocks)
+ depth split per pixel / per Gaussian (split.ts, scene.ts)
+   predicted ≈ DEM range  → TERRAIN  (dropped; the DEM drape renders it)
+   predicted ≪ DEM range  → OBJECT   (kept: people, huts, trees, rocks)
    sky mask               → SKY      (photo on a far sphere)
-   beyond ~300–500 m      → DEM only (depth models are worthless at range)
+   beyond the near radius → FAR / DEM only
+   optional: ?tiles3dObjects=on nDSM object prior (object-prior.ts)
         │
         ▼
- renderer: DEM terrain + drape (existing) + splat layer (new) + sky shell
+ renderers: DEM terrain + drape + splats + sky shell
+   WebGPU: luma.gl splat stack (deck-webgpu/layers/splats-luma.ts: LoD tree from
+           nearfield/splat-lod.ts, RAD selection, GPUPagedSplatRenderer; 30bb006a),
+           Rigi shader (splats.ts) as fallback and via ?splatRenderer=rigi
+   WebGL2: nearfield/deck-splat-layer.ts (terrain's log gl_FragDepth)
  provenance per surface: observed | reconstructed | DEM | generated
 ```
 
+Availability: `available()` needs WebGPU compute and reachable weights; otherwise the panel says "Step Inside needs WebGPU and its depth model" (`controller.ts`). There is no CPU depth path (accepted under "WebGPU primary"). Weights download as int8 by default (`?nearfieldWeights=q8|q8lite|fp16`), are prefetched after a pose is accepted, and a terrain-only preview opens while they load ([step-inside-download.md](step-inside-download.md)). A live variant (`nearfield/live`, 23bfebf1/fb6d5e13) runs depth → splats on the GPU with no readback for the /live route.
+
 Four decisions carry the design:
 
-1. **The DEM owns the geometry and the model owns only the residual.** Splats never replace terrain; they only add what stands on top of it. That keeps the far field exact and confines model error to the near field, where it is also visible to the user.
-2. **The scale comes from the DEM, not the model.** SHARP claims metric scale, but the DEM is ground truth at every terrain pixel, so we fit the scale and treat the model's own scale as a prior. The fit residual is a free trust metric. It also acts as an extra independent pose check: a wrong pose makes the DEM range disagree with the depth model, which is the MoGe-2 verifier idea from the TM research reused.
-3. **Accepted poses only.** Step Inside is offered only on photos with an accepted or user-confirmed pose, so it never produces a confident 3D scene on a wrong basin.
-4. **Provenance is rendered, not hidden.** A "Truth" toggle tints surfaces by source. Generated content never enters measurement exports (XYZ readout, GeoJSON, COLMAP).
+1. **The DEM owns the geometry; the model owns only the residual.** Splats never replace terrain, they add what stands on it, so model error stays in the near field where the user can see it.
+2. **The scale comes from the DEM, not the model.** The DEM is ground truth at every terrain pixel; the model's own scale is a prior. (The fit residual turned out not to work as a pose verifier: results finding 3.)
+3. **Accepted poses only.** Step Inside is offered only on photos with an accepted or user-confirmed pose.
+4. **Provenance is rendered, not hidden.** The Truth view tints surfaces by source. `generated` content never enters measurement exports (XYZ readout, GeoJSON, COLMAP, `.ply`/`.splat`).
 
 ## User-facing modes
 
-- **Step inside (single photo).** The photo becomes a small volume: you can move ±10–30 m and orbit a little, and the near-field objects have real parallax against correctly placed mountains. Past the confidence radius the view fades to the existing DEM drape. This is the shareable moment for the share-link beta.
-- **Better In map.** The same depth split removes people, huts and trees from the drape, and they stand up as splats instead of smearing across the slope. This closes roadmap item 16 as a side effect.
-- **Measure anything.** The hover readout (lat, lon, elevation, distance) now works on near-field objects too: the height of a hut, the distance to a climber. That serves roadmap item 15 (monoplotting and per-pixel XYZ).
-- **Roll spots (multi-view).** Several photos at one viewpoint with known poses are optimised jointly into a better splat (gsplat, initialised from Rigi's COLMAP export, with no SfM needed).
-- **Georeferenced export.** `.ply` or `.spz` in ENU with a WGS84/LV95 origin in the header. Later, 3D Tiles. This is the B2B hook: a DMO's summit viewpoint as a navigable, correctly placed scene.
+- **Step inside (single photo).** The camera starts exactly on the photo camera; you can move about ±10–30 m and orbit within the confidence radius, with real parallax against correctly placed mountains. Camera modes photo / orbit / fly / map (`step-camera.ts`).
+- **Better In map.** Object pixels are masked out of the drape, so people and huts stand up as splats instead of smearing (gate not met: results finding 5).
+- **Measure anything.** The hover readout (lat, lon, elevation, distance) works on near-field objects (`measure.ts`).
+- **Roll spots (multi-view).** Several posed photos at one viewpoint fused into one scene (`nearfield/roll/spot.ts`). Per-photo depth only since DA3 multiview has no browser port; the fusion gate failed (results finding 7).
+- **Georeferenced export.** `.ply` and `.splat-v1` in ENU with a geo origin and a metadata header (`src/lib/export/splat.ts`).
+- **Completion** (`?nearfield=complete`, display-only): slab reclassification, edge snap, people volumes (optionally a ViTPose + Anny body fit, `src/lib/body`). LaMa hole-fill is not implemented in the browser.
 
-## Where VGGT fits: pose propagation, a recall win
+## Where VGGT and world models fit
 
-VGGT's best use in Rigi is registration, not rendering. At a roll spot, **one** accepted photo plus VGGT's relative poses can anchor its **neighbours**, including photos that failed the skyline cascade because of clouds on the ridge or a skyline blocked by a person. Recall is Rigi's measured bottleneck (about 20% auto-accept in the wild), so a propagation that holds precision would matter more than any rendering feature.
+- **Pose propagation, a recall lead.** At a roll spot, one accepted photo plus relative poses can anchor its neighbours. Built in the browser: ALIKED + LightGlue (`src/lib/features`) and a pure-rotation RANSAC (`src/lib/roll/propagate/estimator.ts`), pose composition and gate in `nearfield/propagate.ts` and `roll/propagate/plan.ts`; suggestion only until the prereg `tools/nearfield/propagate/PREREG_DRAFT.txt` is run and signed off (roadmap R5).
+- **DEM-conditioned generation: research only.** Render DEM + imagery along a novel trajectory as conditioning so a world model adds texture, not terrain, and label every new Gaussian `generated`. Never run; the in-app generate path was removed with three.js (roadmap L8 needs a GEN3C run on a rented GPU).
 
-This must go through the existing discipline: the frozen accept rule, blind verification packs rendered on Mapterhorn at the exact eye used, and dev data only. data_v3 needs your sign-off.
+## Phases (outcome)
 
-## Where LingBot-type world models fit: phase 3, research only
-
-A generative rollout can show what lies beyond the frame, but for Rigi it is a brand risk: invented terrain inside a product whose selling point is truth. The version worth trying is **DEM-conditioned generation**:
-- Render DEM plus swissimage from the novel camera trajectory and use it as the structural conditioning (depth and layout).
-- The world model supplies only texture and detail, so the mountains stay where they are.
-- Reconstruct the output (VGGT, then gsplat) and label every new Gaussian `generated`.
-
-That turns the paste's "plausible world completion" into "plausible texture on true geometry", which is a defensible product. Keep it behind a flag until P0 and P1 are proven.
-
-## Phases
-
-| Phase | Scope | Exit gate |
+| Phase | Gate | Outcome |
 |---|---|---|
-| **P0 spike** (1–2 days) | Verify the candidates' licences and existence. Run 2–3 near-field models offline on the 12 GT photos plus about 5 roll spots. Implement the DEM scale fit and depth split in a notebook-grade script (`tools/nearfield/spike`) | Scale residual median < 10% on terrain pixels at < 500 m; the depth split visibly separates people and huts on ≥ 8/12 photos; at least one model is licence-OK for commercial use |
-| **P1 Step inside** | `tools/nearfield` sidecar (the matcher pattern, cached per photo), `src/lib/nearfield/**` (anchoring, split, provenance), a splat layer in **three.js first** (Spark), drape masking in In map | The split removes ≥ 80% of person and hut drape smear (hand-labelled on 12 photos); 60 fps orbit on the dev Mac; classic stays pixel-identical when the feature is off; eval-app is unchanged |
-| **P1b deck parity** | A GaussianSplat layer for deck that writes the same log depth as the terrain shader | deck smoke passes; the split is visually equal to three |
-| **P2 Roll spots and propagation** | Multi-view gsplat from accepted poses; VGGT relative-pose propagation as a *suggestion*, then a prereg for auto-accept | Leave-one-out novel-view LPIPS beats single-photo splats; propagation precision is prereg'd and blind-verified before any accept |
-| **P3 DEM-conditioned generation** | Research flag only | A qualitative review, plus zero `generated` content in any measurement export (enforced by a test) |
+| P0 spike | Scale residual < 10 % at < 500 m; split separates people/huts on ≥ 8/12; one commercial-safe model | Single scale fails (0.34 log error); per-photo curve 0.13. People gate untestable (no people in the set). MoGe-2 (MIT) commercial-safe |
+| P1 Step inside | Split removes ≥ 80 % of person/hut drape smear; 60 fps orbit; classic pixel-identical off | Built. **Smear gate not met** (15 % deck). 200k splats at 60 fps |
+| P1b deck parity | Splat layer writes the terrain's log depth | Built (`deck-splat-layer.ts`); WebGPU added later (`splats.ts`, then luma's stack) |
+| P2 roll spots, propagation | LOO novel-view gain; propagation prereg'd before any accept | Fusion **not met** (0–7 % coverage); propagation 0/83 wrong pairs pass, suggestion only |
+| P3 generation | Zero `generated` content in measurement exports | Export guard holds; generation never run, path removed |
 
 ## Risks
 
-- **Licences (the largest risk).** SHARP's weights may be research-only; check Apple's model licence. VGGT has a non-commercial original, and a commercial checkpoint may exist. MASt3R is CC-BY-NC and already on the roadmap's avoid list. TripoSplat's MIT claim and LingBot-World-Infinity come from the pasted text and are **unverified**. Fallback: MoGe-2 or Depth Anything V2-Small (check each) depth-lifted into per-pixel Gaussians. This is worse at disocclusions but good enough for the depth split and the drape fix.
-- **Depth compositing in deck.** The terrain writes log depth to `gl_FragDepth`, so the splat shader must match it, or splats will pop through the mountains.
-- **iOS.** Splat sorting and rendering on iOS WebGL2 inherits the known float-target gap.
-- **Disk and GPU.** Model checkpoints are GB-scale; `df -h` shows 15 GB free right now. Follow the render-lock rule: one GPU job at a time.
-- **Ownership.** New code goes in new paths (`src/lib/nearfield/**`, `tools/nearfield/**`). `renderer.ts` needs an optional `setNearField()` (a change to the app pipeline). Adding Spark to `package.json` needs your OK.
-
-## Decisions needed
-
-1. **Licence posture for the prototype.** Are research-only weights acceptable in P0/P1 behind a dev flag, with a commercial-safe model required before any public URL?
-2. **Three-first or parity-first.** Can P1 ship on three.js only, with deck parity as a follow-up gate? This bends the "both renderers at parity" decision.
-3. **Generative scope.** Is P3 in scope at all, given that the positioning is honesty?
+- **Licences.** Only commercial-safe weights ship (MoGe-2 ViT-S MIT; ALIKED BSD-3; LightGlue Apache-2.0); SHARP (research-only) was dropped (d8e99834). See [licences.md](licences.md).
+- **WebGPU only.** No Step Inside without WebGPU compute.
+- **Depth compositing.** The splat shaders must match the terrain depth convention on each engine (log depth on WebGL2, reversed-Z on WebGPU) or splats pop through mountains.
+- **Download size.** About 36 MB int8 (70 MB fp16) per first use; prefetch skips Save-Data and 2G/3G.
+- **Browser evidence.** The in-browser pipeline (d8e99834, ab4485bf), luma splats (30bb006a) and the download work are browser-unverified ([batch-ledger.md](batch-ledger.md)).

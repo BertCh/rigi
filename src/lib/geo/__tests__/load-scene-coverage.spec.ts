@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // loadScene outside Mapterhorn's regional (z13–17) coverage: the finest level 404s, coarser ones exist
-// (reports/steps-2026-10-02/terrain-sampler.md §2 P1, proposal §5.1). Pins today's behaviour; the
+// (reports/archive/steps-2026-10-02/terrain-sampler.md §2 P1, proposal §5.1). Pins today's behaviour; the
 // proposed fix (ground from terrain.ground()) flips the first case.
 import { describe, expect, it } from "vitest";
 import type { DemSource, TileKey } from "../../dem";

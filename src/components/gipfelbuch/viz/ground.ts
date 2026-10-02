@@ -5,7 +5,7 @@
 import { srgbToLinear } from "#/lib/color/srgb";
 import GROUND_PALETTES from "./ground-palette.json";
 
-// The explainer grammar's ground half (reports/gipfelbuch-explainers-2026-10-02/grammar.md §3): a
+// The explainer grammar's ground half (reports/gipfelbuch.md): a
 // figure's ground takes its cue from its own photo. `scripts/gipfelbuch/bake-ground.ts` measures each
 // demo photo once (sky above the eye's skyline, terrain below it, a band around it) into
 // `ground-palette.json`; the pure functions here turn that into `--fig-*` CSS custom properties, every

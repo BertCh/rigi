@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Small-sample statistics for the accept rule (reports/steps-2026-10-02/accept-rule.md).
+// Small-sample statistics for the accept rule (reports/archive/steps-2026-10-02/accept-rule.md).
 //
 // The product rule is judged on a few dozen accepts, so "HIGH 17/17" is a point estimate with a wide
 // interval. These helpers turn counts into one-sided exact (Clopper-Pearson) bounds, risk-coverage

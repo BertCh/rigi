@@ -9,12 +9,12 @@
 | `certified.ts` | The GPU host: `horizonElevations`, `skylineDirs` (opt-in `precision`) |
 | `../precision/df32.ts`, `../precision/ieee-probe.ts` | Shared with other certified-f32 stages: the f32-machine emulation, double-f32 arithmetic in TS and WGSL (`DF32_WGSL`), their budgets, and the per-device strict-IEEE probe `probeStrictIeee` |
 | `certified.check.ts` | Node check (fast tier `horizon-cert`) |
-| `certified-bench.ts` | Browser side of `scripts/gpu/horizon-cert-bench.mjs` |
-| `ridges*.ts`, `scene-profile*.ts`, `opt-in.ts`, `unknown-opt-in.ts`, `bench.ts` | Ridgelines (/roll), the unknown-pose 360° horizon, the app switches, the march bench |
+| `certified-bench.ts` | Browser side of `scripts/gpu/horizon-cert-bench.mjs` (browser bench, not in the CI gate) |
+| `ridges*.ts`, `scene-profile*.ts`, `opt-in.ts`, `bench.ts` | Ridgelines (/roll), the unknown-pose 360° horizon, the app switches, the march bench |
 
-## Certified f32 (precision decision P1, the precision half of WAG W3.1)
+## Certified f32 (precision decision P1)
 
-The app's skyline has two f64 stages on the CPU after the GPU march (dataflow D7/D8):
+The app's skyline has two f64 stages on the CPU after the GPU march (stages D7 and D8 of the horizon-fast-app dataflow):
 - **A (D7)**: `index.ts` collect turns the march's `tBest` (f32) into elevation degrees: `t ≤ −3e38 ? −90 : Math.atan(t) / DEG`, stored as f32. 7200 samples per eye.
 - **B + C (D8)**: the horizon-fast-app worker takes each sample (elevation f32, distance f32) back to its geographic point (`destination`), through WGS84 `EnuFrame.fromGeo` to an ENU azimuth / elevation in f64 (B). It then interpolates the profile at the 8192 `GPU_COLUMNS` azimuths and writes unit directions as f32, skipping columns whose bracketing samples hit no terrain (C).
 
@@ -200,7 +200,7 @@ At d = 2 m the f64 path's own ECEF rounding (≈ 10⁻⁸ m) is 5·10⁻⁹ rad 
 - `skylineDirs(device, prof, job, eyeH, precision)` gives the worker's directions.
 - The horizon-fast-app worker uses both whenever the GPU march is on (`horizonPrecisionOptIn()`; `?gpu=off` runs the CPU stages). Its `stats.precision` reports ties and timings.
 - Certified-f32 is the default since 2026-10-01 (3225064): the precision gate (50 dev photos, deck and webgpu, plus GT-12) found no quality difference, though the f64 baseline itself was not reproducible run to run, so decisions were judged on quality rather than bit identity. The gate's browser driver and the per-run precision flags were removed afterwards; `precision-gate-score.mjs` and its check keep the scoring and the tracked blind-verdict table.
-- The kernels read plain storage buffers (`td` = the march's [t, d] pairs, `prof` = [elevation, distance]). The page-device horizon (W3.1's device half) can then bind the march's output transient directly and fuse A → B → C into one graph. B needs A's exact elevations, so the fused graph would propagate A's uncertainty into B, marking a sample uncertain when A is. Today A finishes on the CPU before B runs.
+- The kernels read plain storage buffers (`td` = the march's [t, d] pairs, `prof` = [elevation, distance]). A page-device horizon can then bind the march's output transient directly and fuse A → B → C into one graph. B needs A's exact elevations, so the fused graph would propagate A's uncertainty into B, marking a sample uncertain when A is. Today A finishes on the CPU before B runs.
 
 ## GPU march vs CPU march: benign differences
 

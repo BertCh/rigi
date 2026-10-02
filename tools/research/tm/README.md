@@ -1,9 +1,9 @@
 # TM: terrain-matching deep research program (started 2026-09-27)
 
-*Update (2026-10-01): the program is finished; the synthesis is `reports/terrain-matching-research.md`, the follow-on plan `reports/terrain-matching-research.md` (final section). `research_notes/matching_v2_research.md` was removed 2026-09-29 (`git show 384df44:<path>`). The dev server is now on :3100, not :3000.*
+*Finished 2026-10-01. Synthesis and the strategy carried forward: `reports/terrain-matching-research.md`. The rules below are as run (2026-09-27 to 10-01): the live services they name (:8765, :8766) and `research_notes/matching_v2_research.md` were removed since (`git show 384df44:<path>` for the note); the dev server is on :3100. Later dev-only programmes (`tools/research/fund`, `tools/research/geo`) inherit these rules.*
 
 Goal: understand *why* photo↔terrain matching fails, and test technical ideas that prior work (reports/matching-v2.md,
-tools/matcher/v2/loma/REPORT.md, research_notes/matching_v2_research.md) proposed but never measured.
+tools/matcher/v2/loma/REPORT.md) proposed but never measured.
 
 ## Hard rules (every agent)
 - DEV ONLY: the 50 `dev` ids of tools/bench/split.json (use tools/matcher/v2/refs.py → dev_ids / correct_refs / wrong_refs).

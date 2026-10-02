@@ -22,7 +22,7 @@ import { SHEETS } from "./sheets";
 // The Blattuebersicht: a one-photo picker, a hand-ruled sheet index (S29), then 16 sheets in data-flow
 // order as small multiples of that photo's run. Each card is a 400 x 150 band in a hand-ruled frame,
 // the red step ("I.3") and Blatt number in hand capitals, and the value in hand figures. Hand pass
-// (reports/gipfelbuch-hand-sketch-2026-10-01.md, K-C): every rule and frame is a pen stroke.
+// (reports/gipfelbuch.md): every rule and frame is a pen stroke.
 
 const BAND_W = 400;
 const BAND_H = 150;

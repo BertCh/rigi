@@ -1,5 +1,7 @@
 # Object completion: turning 2.5D front shells into full 3D objects (2026-09-29)
 
+> **Status (2026-10-02):** a licence and model survey (2026-09-29). Model picks for the browser runtime (`src/lib/nn`, no Python service since 2026-10-02) are re-ranked in `frontend_completion_models_2026-10.md`; "our service" below means the removed near-field service.
+
 **What this is for.** Step Inside lifts near-field pixels with MoGe-2. That gives each object (person, hut, tree, car, pole) only its camera-facing surface. This note looks for a model that takes the **photo, an instance mask and our visible depth points** and returns a **complete 3D object**. We would then align that object to the visible shell and ground it on the DEM.
 
 **What it builds on.** This complements `step_inside_models_2026-09.md`, and nothing already covered there is repeated here except TripoSplat. Licences and sizes were checked against the GitHub API, the HF API (`?blobs=true`: licence tag, gating, total file size) and raw LICENSE files. I re-checked the key facts myself on 2026-09-29:

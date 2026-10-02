@@ -15,7 +15,7 @@
 | Product accept rule (fused HIGH and (EXIF GPS or agreement with the cascade)) | **16 / 16 correct** |
 | App aligner, accepted poses | 0.64 precision, 19 gross errors (don't auto-accept it) |
 
-> **Update (2026-10-01):** for the cascade, use the Mapterhorn re-run at the end of this file (25 correct, 22/22 at the 0.75 gate), not the Terrarium row in this table. The held-out test half was spent on 2026-09-26 ([test-results.md](test-results.md), [test-addendum.md](test-addendum.md)); current registration numbers are in [status.md](status.md).
+> **Status (2026-10-02):** a frozen study record (2026-09-25); it is the source of the product accept rule and the C1–C4 verification checklist. For the cascade, use the Mapterhorn re-run at the end of this file (25 correct, 22/22 at the 0.75 gate), not the Terrarium row in this table. The held-out test half was spent on 2026-09-26 ([test-results.md](test-results.md), [test-addendum.md](test-addendum.md)); current numbers are in [status.md](status.md). The run harness (`tools/bench/harness/run.sh`) and the matcher service behind `fused` were removed 2026-10-02 (8bb109d0); `cascade.ts`, `overlay.ts`, `verify_pack.ts` and `lib/geo.ts` remain, and the fused method now runs in the browser (`src/lib/matcher`).
 
 The main remaining losses are photos with no heading (16 of 42 solvable), low light, haze and near-field terrain. Fused is also over-cautious: 20 of its LOW poses are correct.
 

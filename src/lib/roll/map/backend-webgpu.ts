@@ -5,7 +5,7 @@
 // The roll map's GPU backend on WebGPU, WITHOUT deck: a luma-direct host (deck-webgpu/hosts/direct.ts)
 // drawing the WGSL cores of src/lib/deck-webgpu into a canvas whose colour pass camera is the world
 // orbit camera (frame.view "world"; the host's `photo` camera is the same camera and no core draws
-// in the geometry pass, so that pass only clears). Plan: reports/roll-map-webgpu-plan-2026-10-02.md.
+// in the geometry pass, so that pass only clears). Open items: reports/gpu-renderer.md.
 //
 //   terrain      BatchedTerrainCore + ImageryArray + TerrainStyles (basemap style / look, elevRange,
 //                no near fade, no photo projection), colour pass only here; the same core is the

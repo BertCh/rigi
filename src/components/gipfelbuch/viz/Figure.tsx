@@ -95,7 +95,7 @@ export function Figure({
 				on
 					? "translate-none opacity-100"
 					: "translate-y-5 opacity-0 print:translate-y-0 print:opacity-100",
-				// R1 (reports/gipfelbuch-regression-2026-10-01.md): figures use the wide track. The prose
+				// Wide track (reports/gipfelbuch.md, Canon: Layout): figures use the wide track. The prose
 				// column is ConceptPage's columns 3-8 (6 cols, 24 px gaps); columns 9-12 add 66.667% + 16px
 				// of it, columns 1-2 add 33.333% + 8px. Prose and MarginNote keep their own widths.
 				"lg:mr-[calc(-66.667%-16px)]",

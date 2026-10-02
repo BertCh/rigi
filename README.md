@@ -1,238 +1,129 @@
 # Rigi: georeferenced mountain photos × map data
 
-Rigi places a mountain photo in 3D and lines the terrain up with it. It starts from the photo's
-EXIF prior: GPS, true-north heading, the Apple MakerNote gravity vector for pitch and roll, and the
-35 mm-equivalent focal length. It then solves the camera against the DEM skyline. One solved camera
-model drives three ways to combine the photo with map data:
+Rigi places a mountain photo in 3D and lines the terrain up with it. It starts from the photo's EXIF
+prior (GPS, true-north heading, the Apple MakerNote gravity vector, the 35 mm-equivalent focal
+length), then solves the camera against the DEM skyline. One solved camera drives three ways to
+combine the photo with map data:
 
 | Mode | What it does |
 |---|---|
-| **Overlay** | Contours or elevation bands, ridgelines and skyline, occlusion-tested OSM peak labels, SAC-coloured hiking trails, a distance tint, and a hover readout of lat/lon/elevation/distance for any pixel |
-| **Blend** | Replaces parts of the photo with a 3D satellite (swissimage/Esri), swisstopo topo, relief or bands render from the same viewpoint, through a lens, a swipe, a distance cut-off or a brush. Sky and people stay photographic |
-| **In map** | Projects the photo onto 3D terrain, using the camera's range buffer as a shadow map, so only surfaces the camera saw get pixels. Orbit around, then *Fly into the photo* |
+| **Overlay** | Contours or elevation bands, ridgelines and skyline, occlusion-tested OSM peak labels, SAC-coloured trails, a distance tint, and a lat/lon/elevation/distance readout for any pixel |
+| **Blend** | Replaces parts of the photo with a 3D satellite, topo, relief or bands render from the same viewpoint, through a lens, a swipe, a distance cut-off or a brush. Sky and people stay photographic |
+| **In map** | Projects the photo onto 3D terrain with the camera's range buffer as a shadow map, so only surfaces the camera saw get pixels. Orbit around, then *Fly into the photo* |
 
-People in the foreground are segmented in the browser (MediaPipe `selfie_multiclass`), so overlays
-skip them, blends keep them in front, and the projection doesn't smear them over the ground. Poses
-export as pose JSON, XMP, COLMAP, KML/KMZ, GeoJSON footprints and annotated images (`src/lib/export`).
+**Step Inside** adds near-field Gaussian splats anchored to the DEM (depth from MoGe-2 in the
+browser). Poses export as pose JSON, XMP, COLMAP, KML/KMZ, GeoJSON and annotated images
+(`src/lib/export`). The default look is the Landeskarte style (`?style=classic` for the original).
+
+Everything runs in the browser: there is no backend. Skyline solve, the ALIKED + LightGlue matcher,
+sky and people segmentation, Step Inside depth and pose propagation all run on Rigi's own neural-net
+runtime (`src/lib/nn`) on the luma.gl compute graph, with CPU fallbacks.
 
 ## Quick start
 
-Requirements: Node 22 and a browser with WebGPU (recent Chrome, Edge or Safari) for the default engine; any WebGL2 browser gets the fallback engine. There is no backend: everything the app computes runs in the browser.
+Node 22 and a browser with WebGPU (recent Chrome, Edge or Safari) for the default engine; any WebGL2
+browser gets the fallback engine.
 
 ```bash
 npm install
-npm run dev     # http://localhost:3100
+node scripts/models/fetch.mjs   # model weights into public/models (gitignored; sha256-verified)
+npm run dev                     # http://localhost:3100
 ```
 
-What works on a bare clone: the app builds and runs, `/upload` aligns any photo you drop in (HEIC or JPEG, processed in the browser against Mapterhorn DEM tiles fetched over the network), `/roll/import` builds a camera roll from your photos, `/gipfelbuch` and the `/lab/*` benches open, and the standalone [examples](examples/README.md) run. What needs more: the home page and `/library` list the photos in `public/photos/`, which you create with `npm run ingest` from HEIC files in `img/`. The evaluation harnesses (`scripts/eval*.ts`, `scripts/leaderboard.mjs`), the dev-only `/baseline` and some CI checks read research data under `data/`, `public/photos/` and `public/baseline/`; these are gitignored, so without them those checks report SKIP in `node scripts/ci/run.mjs`. The Niederhorn demo set in `public/demo/` is included in the repository (all rights reserved, see NOTICE.md), so the landing page demo works on a bare clone. Step Inside, the matcher and pose propagation download their model weights from `public/models` on first use (gitignored; `node scripts/models/fetch.mjs` produces them, see `scripts/models/README.md`).
+On a bare clone the landing page (bundled Niederhorn demo roll in `public/demo/`), `/upload`,
+`/roll/import`, `/gipfelbuch` and the [examples](examples/README.md) work. `/library` and the home
+photo list need `public/photos/`, built with `npm run ingest` from HEIC files in `img/`. Evaluation
+harnesses and some CI checks read gitignored research data (`data/`, `public/photos/`,
+`public/baseline/`) and report SKIP without it.
 
-## Built with luma.gl and deck.gl
-
-Rigi is an application, and also a worked example of the luma.gl 10 / deck.gl stack on both GPU backends. What it exercises:
-
-- **luma.gl 10 on WebGPU and WebGL2.** One luma `Device` per page. Under WebGPU the render device is also the compute device (`adoptRenderDevice`, `WebGPUAdapter.attach()` with `requiredLimits`), so GPU results feed rendering with no CPU round trip.
-- **`GPUCommandGraph` compute.** `src/lib/gpu/core` wraps luma's `GPUCommandGraph` as a `ComputeGraph`: multi-pass compute with GPU-resident intermediates, built on luma's engine `Kernel`, `GPUScan`, a readback ring and a device pool. Horizon marching, pose search, haze/relief/band-stats look passes, sky refinement and splat sorting all run as graphs, and the graph is the only GPU path.
-- **deck.gl custom views and layers on WebGPU and WebGL2.** Photo-matched camera views, a batched terrain layer, a geometry pass that writes range to a float target, composite and drape layers, trails, labels and Gaussian splats. `src/lib/deck-webgpu` (WGSL) and `src/lib/deck` (GLSL) implement one `Renderer` interface and are checked against each other (`scripts/deck-engine-smoke.mjs`).
-- **WGSL and GLSL dual shaders.** Layers are written once per backend; `src/lib/deck-webgpu/layers/*.check.ts` compare the WGSL output with a CPU port of the GLSL.
-- **Vendored luma.gl 10 alpha.** `vendor/luma` (`10.0.0-alpha.2-rigi.5`) and `vendor/deck` (deck.gl `9.4.0-rigi.2`, a build of deck master + the luma 10 bump PR) carry the upstream fixes the app needs until they are published; each README lists the exact commits and how to rebuild.
-- Shader modules ported from luma.gl (height fog, precipitation; MIT, vis.gl contributors) drive the "Nebelmeer" and weather looks; see `NOTICE.md`.
-
-Repository conventions follow luma.gl: `AGENTS.md`, `CONTRIBUTING.md` (including AI-assisted contributions), `CODE_OF_CONDUCT.md`, `.github` templates, SPDX headers (`node scripts/ci/spdx.mjs`) and a `CHANGELOG.md`.
-
-## Examples
-
-Standalone luma.gl / deck.gl examples live in [`examples/`](examples/README.md): a deck.gl summit view on WebGPU and WebGL2 (`deck/summit-view`), a photo drape with a shadow-map effect and a fly-into-the-photo orbit view (`deck/photo-drape`), and a luma `GPUCommandGraph` horizon compute graph (`gpgpu/horizon-graph`). See `examples/README.md` for the index and run commands.
-
-## License
-
-The code is MIT, Copyright (c) 2026 Robert Christie and Rigi contributors: see [`LICENSE`](LICENSE). Photographs, map data and tiles, ML models, the vendored luma.gl and deck.gl builds, and code ported from other projects have their own terms: see [`NOTICE.md`](NOTICE.md). Contributions: [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-## Architecture
-
-Vite + React 19 + TanStack Router/Start (file routes in `src/routes`, `src/routeTree.gen.ts` generated
-by `npm run generate-routes`).
+## Routes
 
 | Route | What it is |
 |---|---|
-| `/` | Landing page: a scroll showcase on the bundled Niederhorn demo roll (`public/demo/`) |
+| `/` | Landing page: scroll showcase on the bundled demo roll |
 | `/library` | Bundled photos by region and local uploads |
-| `/photo/$id` | The workspace (`src/components/PhotoWorkspace.tsx`): auto-align, second opinion, manual align, modes, style, export |
-| `/upload` | Upload any photo (HEIC via libheif in a worker, EXIF via exifr). Photos with no compass, gravity or focal take the unknown-pose path |
-| `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (`src/lib/roll/**`): a whole day's photos clustered into rolls and spots, with a mosaic, per-spot panoramas, and every photo draped on one deck.gl terrain map |
-| `/baseline` | Dev only. Debug UI for the CPU pipeline (`src/baseline-ui`): horizon, skyline detection, solve, peaks |
-| `/lab/deck-splats` | Step Inside dev bench: `DeckSplatLayer` on its own (WebGL2 only); harness `scripts/nearfield/deck-splat-lab-check.mjs` |
-| `/lab/deck-webgpu` | The WebGPU deck renderer in isolation (`WebGpuEngine`, `src/lib/deck-webgpu`); the app uses it by default via `?renderer=auto` |
-| `/gipfelbuch`, `/gipfelbuch/$concept`, `/gipfelbuch/print` | Explainer pages: 16 concept sheets, one page per concept (`src/components/gipfelbuch`), and the printed edition (cover, index, every sheet, colophon; Print / Save as PDF) |
-| `/dev/graph`, `/dev/meta`, `/dev/how-scene`, `/dev/export-roll` | Dev pages: the GPU app-graph inspector, the explainer figures, the "how it works" scene, and the demo-roll exporter |
-| `/dev/tafel`, `/dev/gipfelbuch-live`, `/dev/gipfelbuch-sheet` | Gipfelbuch dev previews: the Tafel (sheet header, ledger, hero), the live plates and photo story, and the Swiss map-sheet kit |
+| `/photo/$id` | The workspace (`src/components/PhotoWorkspace.tsx`): auto-align, second opinion, manual align, modes, style, Step Inside, export |
+| `/upload` | Any photo (HEIC via libheif in a worker, EXIF via exifr); photos without compass, gravity or focal take the unknown-pose path |
+| `/roll`, `/roll/import`, `/roll/$id` | Camera rolls (`src/lib/roll`): a day's photos clustered into spots, with a mosaic, per-spot panoramas and every photo draped on one terrain map |
+| `/live` | Real-time camera view with orientation sensors (`src/lib/live`); `?liveSource=<clip>` replays a recording |
+| `/s/$code` | Read-only share view (beta, `?share=on`) |
+| `/gipfelbuch`, `/gipfelbuch/$concept`, `/gipfelbuch/print` | Explainer: 16 concept sheets and a printable edition |
+| `/baseline`, `/lab/*`, `/dev/*` | Dev-only (stub in production builds): CPU pipeline debug UI, WebGPU engine and splat benches, GPU app-graph inspector, explainer and Gipfelbuch previews, demo-roll exporter |
 
-**Renderers.** `src/lib/renderer.ts` is the engine interface that PhotoWorkspace and the export layer
-use. Both backends are deck.gl on luma.gl, picked by `src/lib/renderer-select.ts` and loaded on demand:
+Routes are file routes in `src/routes`; `src/routeTree.gen.ts` is generated (`npm run generate-routes`).
 
-- **deck.gl on WebGPU** (`src/lib/deck-webgpu`, `WebGpuEngine`) is the default (`?renderer=auto`) where the
-  browser passes the WebGPU probe.
-- **deck.gl on WebGL2** (`src/lib/deck`, `DeckEngine`) is the automatic fallback and the escape hatch
-  (`?renderer=deck`, or `?webgpu=off`). `scripts/deck-engine-smoke.mjs` checks Δyaw ≤ 0.5° and label
-  overlap between the two.
+## Key flags
 
-Each draws Mapterhorn tiles with a geometry pass (ENU xyz + range, read back for `sampleAt`, labels,
-occlusion and auto-align), a layer pass and a composite pass. There is no three.js:
-cameras are math.gl (`src/lib/camera`) and 3D Tiles stream through loaders.gl (`src/lib/tiles3d`).
-
-**Look and style.** Both backends share them.
-
-- `src/lib/style` holds the `ViewStyle` schema, defaults and presets. The presets are classic,
-  minimal, topo-map, night, high-contrast, photo-matched, swiss, berann, topo-ink and slope. The
-  module also has the store (`?style=` plus a cross-tab localStorage) and one apply module per backend.
-- `src/lib/look` holds the photographic look. It covers the atmosphere and haze fit, the sun, the relief
-  field, the GLSL blocks, the CPU composite (refined masks, colour harmonisation, grain) and the peak
-  label ranking and layout.
-
-**Geo cascade (CPU).** `src/lib/geo` (see its README) contains the prior camera, the 360° DEM horizon, the
-photo skyline (Viterbi), `solvePose` and the tap-the-peaks solver. `geo/pipeline.ts` chains
-`solvePose` → `refinePose` on reject (`src/lib/refine`: FFT init plus robust LM with a confidence
-gate). Around it sit several helpers:
-
-- `src/lib/horizon-fast` is the fast horizon march.
-- `src/lib/sky` is the U²-Net sky segmentation, with an ONNX model in a worker.
-- `src/lib/dem` handles DEM sources and decoding.
-- `src/lib/pose6dof` is the 6-DoF GCP solver and eye refinement, the building block for photos without GPS.
-
-**Integration worker.** `src/lib/integration/unknown-pose.worker.ts` runs the cascade in a Web Worker
-on its own 360° Mapterhorn scene. It serves two cases:
-
-1. **The second opinion for photos with full metadata** (`second-opinion.ts`). The cascade runs with
-   default options.
-2. **Photos whose heading, gravity or focal is unknown** (`unknown-pose.ts`). The unknowns are freed
-   through the solver options: a 360° yaw search, free tilt, and three focal seeds, with a stricter
-   0.75 accept bar.
-
-**Matcher** (`src/lib/matcher`, behind `src/lib/matcher-client.ts`). Render-and-match escalation in the
-browser: ALIKED + LightGlue (`src/lib/features`, on the `src/lib/nn` runtime) between the photo and
-views the page's own engine renders, rotation RANSAC from `src/lib/pose6dof`, fused with the skyline
-cue. Solves run in a worker; one job runs at a time per page. `v034` is the default policy and
-`?matcherPolicy=t6` selects the T6 two-stage search. The Python implementation it was ported from is
-kept as offline reference code in `tools/matcher` (see `tools/matcher/reference/README.md`).
-
-- **Product accept rule** (`matchAccepted`): a match counts only when it is HIGH and either the
-  EXIF GPS is trusted or it lies within 0.5° of the skyline cascade.
-
-**Step Inside** (`src/lib/nearfield`, `reports/step-inside-results.md`). Near-field Gaussian splats anchored
-to the DEM with a per-photo depth curve and object grounding, a step-in camera that starts on the photo, a
-Truth tint, a hover readout on objects, and georeferenced `.ply`/`.splat` export (generated content is
-always stripped). It is on by default in both renderers when WebGPU is available: depth comes from
-MoGe-2 ViT-S on `src/lib/nn` and the depth lift is a compute-graph kernel (`src/lib/nearfield/local`,
-70 MB of weights on first use). Pose propagation between overlapping photos (ALIKED + LightGlue and
-rotation RANSAC, on the device) is wired into `/roll` as suggestions only, behind `?propagate=on`
-(`src/lib/roll/propagate/README.md`).
-
-**Other modules.**
-
-- `src/lib/gpu`: GPU compute on luma's `GPUCommandGraph` (`src/lib/gpu/core` `ComputeGraph`): auto-align grid, horizon, eye search, solve, look passes, sky refine, splat sort. It is the only GPU path (the CPU twin is the fallback), and under WebGPU it runs on the render device. See its README.
-- `src/lib/concord`: whole-image concordance (focal-table eye prior, DSM occluder). See `reports/concordance-research.md`; the killed parts are listed in `reports/negative-results.md`.
-- `src/lib/reveal`: the overlay bloom-in on load.
-- `src/lib/cache`: the tile cache.
-- `src/lib/upload`, `src/lib/export`, `src/lib/pose6dof`: have API READMEs.
-
-**URL flags and ports**
+All flags are declared in `src/lib/flags/index.ts` (the only reader), carried across navigation and
+settable from the photo sidebar's **Experimental & dev** section. Booleans are `on`/`off`; harnesses
+override per realm with `globalThis.__RIGI_FLAGS__`.
 
 | Flag | Effect |
 |---|---|
-| `?renderer=auto\|webgpu\|deck` | Engine: `auto` (default) = deck.gl on WebGPU where the browser passes the probe, else WebGL2; `webgpu` / `deck` pin one. `?webgpu=off` forces the WebGL fallback |
-| `?style=<preset>` | View style preset |
-| `?nearfield=off\|on\|sharp` | Step Inside: hide, force on (headless browsers too), or the dev-only SHARP model (research licence). Default `auto` |
-| `?gpu=off` | GPU compute kill switch, the only GPU switch (CPU twins everywhere) |
-| `?eyesearch=on\|auto` | Opt-in GPU eye search |
-| `?reveal=off\|<preset>` | Load animation |
-| `?concord=eye,occl` | Concordance: focal-table eye prior, DSM occluder dimming |
-| `?picker=on\|always` | Top-3 picker / tap-a-peak (`src/lib/picker`) |
-| `?propagate=on` | `/roll`: pose propagation suggestions (on-device) |
+| `?renderer=auto\|webgpu\|deck` | `auto` (default): deck.gl on WebGPU where the probe passes, else WebGL2; the others pin an engine. `?webgpu=off` forces the fallback |
+| `?gpu=off` | GPU compute kill switch (CPU twins everywhere) |
+| `?style=<preset>` | Look preset (`src/lib/style/presets.ts`): swiss/landeskarte (default), classic, minimal, topo-map, night, terroir, … |
+| `?nearfield=auto\|on\|complete\|off` | Step Inside: offered when WebGPU and the depth model are present (never under automation), forced on, on with completion heuristics, or off |
+| `?matcherPolicy=v034\|t6` | Matcher search policy (default `v034`) |
+| `?picker=on\|always`, `?eyesearch=on\|auto`, `?concord=eye,occl` | Alignment aids: top-3 picker / tap-a-peak, GPU eye search, concordance priors |
+| `?propagate=on` | `/roll`: pose propagation suggestions |
 | `?tiles3d=buildings\|swisstopo\|google\|all` | 3D Tiles in Step Inside (`src/lib/tiles3d`) |
+| `?theme=auto\|light\|dark` | Colour theme |
 
-Every flag is declared in `src/lib/flags` (typed, the only reader), carried across navigation by the root route, and settable from the photo sidebar's **Experimental & dev** section. Booleans are `on`/`off`. Harnesses override per realm with `globalThis.__RIGI_FLAGS__ = { gpu: "off", … }`.
+## Architecture
 
-The dev server is the only process: `npm run dev` (or `node scripts/dev.mjs`) on :3100.
+- **Engines.** `src/lib/renderer.ts` is the engine interface; `src/lib/renderer-select.ts` picks
+  deck.gl on WebGPU (`src/lib/deck-webgpu`, WGSL, default) or deck.gl on WebGL2 (`src/lib/deck`,
+  GLSL, fallback). Features are ported to both; `scripts/deck-engine-smoke.mjs` checks they agree.
+  Cameras are math.gl (`src/lib/camera`), 3D Tiles stream through loaders.gl. There is no three.js.
+- **GPU compute.** `src/lib/gpu/core` wraps luma's `GPUCommandGraph` as a `ComputeGraph`; it is the
+  only GPU compute path and under WebGPU shares the render device.
+- **Pose pipeline.** EXIF prior → GPU auto-align (`src/lib/align.ts`) → CPU skyline cascade as a
+  second opinion in a worker (`src/lib/geo`, `src/lib/refine`, `src/lib/integration`) → the in-browser
+  matcher (`src/lib/matcher`) when the cascade rejects, accepted only under the product rule (HIGH, and
+  trusted GPS or within 0.5° of the cascade) → manual pins as the last resort.
+- **Vendored stack.** `vendor/luma` (luma.gl `10.0.0-alpha.2-rigi.6`) and `vendor/deck` (deck.gl
+  `9.4.0-rigi.3`) carry unmerged upstream fixes; their READMEs list the commits and rebuild steps.
 
-## The pose pipeline today
+Module READMEs sit next to the code (`src/lib/*/README.md`); `reports/README.md` indexes them.
 
-**Photos with compass, gravity and focal** (PhotoWorkspace):
-
-1. **Prior:** GPS position, compass yaw, gravity pitch/roll, and focal from the 35 mm equivalent on the
-   diagonal (`FF35_DIAGONAL_MM` = 43.2666, `src/lib/camera/focal.ts`, crop-aware). The eye sits at
-   max(GPS altitude, DEM + 1.6 m).
-2. **Auto-align** (`src/lib/align.ts`, GPU): trace the 360° DEM horizon from the geometry buffer, then
-   search a coarse yaw×pitch grid, then run coordinate descent on yaw, pitch, roll and FOV against a
-   sky-aware edge map. The top five are re-ranked by inner silhouettes.
-3. **Preview** (`choosePreview` in `second-opinion.ts`): the auto-align result if its confidence is
-   above 0.2, else a near-compass alternative (within 4° yaw and 1.5° pitch), else the prior. The
-   workspace is ready (`[data-ready]`) about 3.7 s after navigation.
-4. **Second opinion** (`secondOpinion`): the CPU cascade runs in the worker with a 20 s deadline.
-   - If it agrees within 1°, the pose is marked **verified**.
-   - If it accepts a different pose, it overrules the preview (**refined**).
-   - If it rejects and `shouldEscalate` fires, the photo is marked **unverified**, and the matcher is
-     asked when it is up. Its pose is taken only under the product rule (**matched**).
-
-**Uploads with unknowns:** the cascade runs with those unknowns freed. If it rejects, the photo goes to
-fused `/match` in ad-hoc mode, which is taken only at HIGH. If that fails too, the photo is marked
-**unverified** and you finish by dragging or pinning peaks (Levenberg–Marquardt: one pin solves yaw
-and pitch, two add roll, three add FOV).
-
-**Measured accuracy**
+## Measured accuracy
 
 | What | Set | Result | Source |
 |---|---|---|---|
-| App pipeline, final pose | 14 control-point photos | 12/14 within 1° yaw, 0 false accepts, median \|Δyaw\| 0.23°, 7.5 px; t-ready 3.7 s, t-final 4.0 s (max 27.5 s) | `reports/pipeline-ab.md` |
-| Same, `node scripts/eval-app.mjs` (2026-09-26) | 19 rows, 14 with pins | 12/14 within 1° yaw; median auto px error 6.5 (1600 px) | P5 consolidation run |
-| Pipeline variants `cascade`, `skyfirst`, `wide` | same 14 | none better. cascade and skyfirst had a worse median, wide gained nothing. The variants were removed; `current` is the only path | `reports/pipeline-ab.md` |
-| CPU classic+cascade (the second-opinion solver) | 12 GT photos | 11/12 correct accepts, 0 false, median 0.20° | `reports/leaderboard.md` |
-| App GPU aligner alone | 12 GT photos | 10/12, 1 false accept (one photo, 2.98° off) that the second opinion fixes | `reports/leaderboard.md` |
-| Matcher, held-out test (`v034` policy) | 50 frozen wild photos | 29/50 correct, HIGH 17/17 (precision 1.00), product rule 11/11, median 35 s | `reports/test-results.md` |
-| Matcher, `t6` policy | same | 30/50, HIGH 22/24 with 2 unsure. Post hoc, 1 of the 2 was judged wrong, so v034 stays the default | `reports/test-results.md`, `test-addendum.md` |
-| Matching v2 (eye fallback, calibration priors, LoMa) | 50 dev photos | not shipped: each adds gross HIGHs or nothing | `reports/matching-v2.md` |
+| App pipeline, final pose | 14 control-point photos | 12/14 within 1° yaw, 0 false accepts, median \|Δyaw\| 0.23° | `reports/pipeline-ab.md` |
+| CPU cascade (second opinion) | 12 GT photos | 11/12 correct accepts, 0 false, median 0.20° | `reports/leaderboard.md` |
+| Matcher, held-out test (`v034`) | 50 frozen wild photos | 29/50 correct, HIGH 17/17, product rule 11/11 | `reports/test-results.md` |
 
-The leaderboard (12 GT photos, 2026-09-25) and eval-app (14 pinned photos) use different sets and
-harnesses, so don't compare their numbers directly.
+The sets and harnesses differ, so the rows are not directly comparable. Current state of every
+thread: `reports/status.md`.
 
 ## Commands
 
 ```bash
-npm install
-npm run ingest            # img/*.HEIC → public/photos/*.jpg + photos.json + region-*.json (SKIP_OSM=1: no Overpass)
-npm run dev               # dev server on http://localhost:3100
-node scripts/models/fetch.mjs     # model weights into public/models (verified by sha256; --check to verify only)
-npm run build             # production build (vite build)
-node scripts/examples.mjs list   # standalone luma.gl/deck.gl examples: start <id> | check | build | smoke
-node scripts/ci/spdx.mjs  # SPDX headers on first-party files
-npx tsc --noEmit -p .     # typecheck
-npm run check             # biome check on the whole configured tree (biome.json: src, scripts, tools/**/*.{ts,mjs,js})
-npx biome check --write <files>   # format and lint the files you changed
-
-# accuracy
-npx tsx scripts/eval.ts                      # CPU solvePose vs data/ground-truth.json → out/eval/
-SOLVER=cascade npx tsx scripts/eval.ts       # the cascade (also: skyfirst; HORIZON=fast; DEM=mapterhorn)
-node scripts/eval-app.mjs [photoId ...]      # the app's final pose vs data/control-points.json (needs :3100)
-node scripts/leaderboard.mjs                 # every method re-scored on one GT snapshot → reports/leaderboard.md
-
-# regression gate (scripts/ci/README.md): one runner for every check
-npm test                                     # Vitest unit specs (seconds); also the fast tier's `unit` row
-node scripts/ci/run.mjs fast                 # tsc, biome ratchet, unit specs and node checks (no browser)
-node scripts/ci/run.mjs full                 # + 6 browser checks (style-baseline, deck smoke, eval-app, eval-app-deck, settle-submits, graph-plumbing-ab), via the render lock
-node scripts/ci/run.mjs --list               # every check, its command and inputs
-
-node scripts/shot.mjs <url> out.png --wait-for "[data-ready]"   # headless WebGL screenshot
-node scripts/gpu/with-render-lock.mjs -- <cmd>                # wrap every browser job: one GPU job at a time
-#   FIFO queue; RENDER_LOCK_PRIORITY=1 jumps it for a job someone is waiting on. Never omit the `--`
-node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs [--renderer=deck] [--no-models] <ids>
+npm run build                     # production build
+npx tsc --noEmit -p .             # typecheck
+npx biome check --write <files>   # format and lint what you changed
+npm test                          # Vitest unit specs
+node scripts/ci/run.mjs fast      # regression gate without a browser (~30 s); `--list` prints every check
+node scripts/ci/run.mjs full      # + browser checks, through the render lock
+node scripts/ci/spdx.mjs          # SPDX headers
+node scripts/examples.mjs list    # standalone examples: start <id> | check | build | smoke | site
+npx tsx scripts/eval.ts           # CPU solvePose vs data/ground-truth.json (SOLVER=cascade|skyfirst)
+node scripts/eval-app.mjs --renderer webgpu [ids]   # app pose vs data/control-points.json (needs :3100)
 ```
 
-**Brand.** The home page panorama (the view south from Rigi Kulm, drawn as depth-layered ridgelines, with visibility-tested OSM peaks) and the logo mark (Rigi Kulm summit contours) are generated from the same DEM. To regenerate them, run `npx tsx scripts/brand/rigi.ts` (add `--preview` to also write PNGs to `.cache/brand/`). It writes `public/brand/rigi-panorama.json`, `src/brand/rigi-mark.json` and `public/favicon.svg`.
+Browser and GPU jobs go through `node scripts/gpu/with-render-lock.mjs -- <cmd>`; the testing policy
+is in [`AGENTS.md`](AGENTS.md) and the check table in [`scripts/ci/README.md`](scripts/ci/README.md).
 
 ## Docs
 
-- [reports/status.md](reports/status.md): where every thread stands, and the open decisions.
-- [reports/roadmap.md](reports/roadmap.md): the plan.
-- [reports/negative-results.md](reports/negative-results.md): what didn't work.
-- [reports/code-review-2026-09-30.md](reports/code-review-2026-09-30.md): the code-health backlog (numbered CR-nn items).
-- [reports/README.md](reports/README.md): an index of every report, research note and module README.
+- [reports/status.md](reports/status.md): where every thread stands; [reports/roadmap.md](reports/roadmap.md): the plan; [reports/negative-results.md](reports/negative-results.md): what didn't work; [reports/README.md](reports/README.md): index of reports, research notes and module READMEs.
+- [AGENTS.md](AGENTS.md) (agent and contributor workflow), [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+Code: MIT, Copyright (c) 2026 Robert Christie and Rigi contributors ([`LICENSE`](LICENSE)). Photographs,
+map data, model weights, vendored builds and ported code have their own terms: [`NOTICE.md`](NOTICE.md).
 
 Data: terrain © Mapterhorn, imagery © swisstopo / Esri, peaks & trails © OpenStreetMap contributors.

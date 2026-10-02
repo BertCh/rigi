@@ -22,7 +22,7 @@ Rigi's core asset is geometric truth: a verified camera pose for an ordinary pho
 
 | Capability in the repo | Where | What it unlocks for new domains |
 | --- | --- | --- |
-| Automatic pose from iPhone EXIF + DEM skyline, with a confidence gate (12/14 within 1°, 0 false accepts on the app set; ~20% auto-accept on wild photos) | `src/lib/geo`, `refine`, matcher service | Any photo becomes a measuring instrument, not just a picture |
+| Automatic pose from iPhone EXIF + DEM skyline, with a confidence gate (12/14 within 1°, 0 false accepts on the app set; ~20% auto-accept on wild photos) | `src/lib/geo`, `refine`, `matcher` (in the browser) | Any photo becomes a measuring instrument, not just a picture |
 | Unknown-pose path (360° yaw search, free tilt, focal seeds) and tap-a-peak picker | `integration/unknown-pose`, `picker` | Archive, scanned and historical photos with no metadata |
 | Overlay: contours, peaks, SAC trails, distance tint, per-pixel lat/lon/elevation/distance | `look`, `style`, `osm` | Any vector layer can be drawn into a photo: routes, rail lines, hazard zones |
 | Blend: satellite, topo, relief and bands from the same viewpoint | both renderers | Then-vs-now, map-vs-reality, art styles |
@@ -172,7 +172,7 @@ Placement by impact and effort (author's judgement from the research, not a meas
 
 1. **Now (0–3 months).** Poster and print export, the summit board generator, GPX and IGC overlay in the photo, and the shot planner. All reuse the existing pose and styles and need no recall gains.
 2. **Next (3–9 months).** The webcam pose API with one network pilot, archive batch mode with one archive partner, and a train window pilot on one line. Each needs batch mode and uncertainty outputs.
-3. **Later (9–18 months).** Live phone AR on WebGPU, then drone registration, then glasses. Safety features come only after pose uncertainty is calibrated and validated on winter scenes.
+3. **Later (9–18 months).** Live phone AR on WebGPU (a first `/live` route with camera, orientation sensors and a frame governor landed 2026-10-02, browser-unverified), then drone registration, then glasses. Safety features come only after pose uncertainty is calibrated and validated on winter scenes.
 
 **Risks**
 - Wild-photo recall (about 20% auto-accept) limits consumer features, so fixed-viewpoint products go first.

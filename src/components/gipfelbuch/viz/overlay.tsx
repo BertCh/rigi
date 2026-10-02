@@ -6,7 +6,7 @@ import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
 import { useReducedMotion } from "./hooks";
 import { EASE, MOTION, stagger } from "./motion";
 
-// The explainer grammar's overlay stack (reports/gipfelbuch-explainers-2026-10-02/grammar.md §2): one
+// The explainer grammar's overlay stack (reports/gipfelbuch.md): one
 // fixed order of layers from the image up, each with its opacity, weight and the way it enters. Layers
 // change state through CSS transitions only (no per-frame render). The spill mirrors roles 2–5 past the
 // frame in their paper inks.

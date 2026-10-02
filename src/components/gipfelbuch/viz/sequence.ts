@@ -6,7 +6,7 @@ import { type RefObject, useEffect } from "react";
 import { type BeatKind, ease, MOTION } from "./motion";
 
 // Sequence explainers (Compare, Stages, Steps, Details): the timing and the static-state rules, as pure
-// functions where they can be, so they can be specced. Spec: reports/gipfelbuch-explainers-2026-10-02/C-sequences.md.
+// functions where they can be, so they can be specced. Spec: reports/gipfelbuch.md.
 // Durations and easings are the grammar's motion tokens (viz/motion.ts, grammar.md §1).
 
 /** Pause before the first beat (grammar `MOTION.lead`). */

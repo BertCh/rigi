@@ -13,7 +13,7 @@ import { CodeRef } from "../viz";
 import { Details } from "../viz/explain";
 import { SheetIndexSketch } from "./Blattuebersicht";
 
-// The sheet's colophon (peak-notebook plan §7.6): the developer facts the old sticky rail carried
+// The sheet's colophon (reports/gipfelbuch.md): the developer facts the old sticky rail carried
 // (status, code, reports, ontology), set once at the foot of the sheet
 // instead of beside every section, written by hand. Space separates the groups; nothing is boxed.
 

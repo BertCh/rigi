@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Interior cue extraction (WP-C) shared types. Frozen shapes from reports/concordance-research.md §4
+// Interior cue extraction (WP-C) shared types. Frozen shapes from reports/concordance-research.md §4 (full spec: git show 9e011141:reports/concordance-research.md)
 // WP-C; everything beyond them is additive and optional.
 import type { Cue, Vec3 } from "../core";
 

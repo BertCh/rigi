@@ -25,7 +25,7 @@ import type { TafelLayer } from "./Tafel";
 
 // SHEETS: per Gipfelbuch sheet, its in-frame Tafel layer, its 400x150 index band, its ledger and its
 // index value line. All numbers come from the measured JSON (public/demo/gipfelbuch/demo-NN.json).
-// The band is one visual form per sheet (reports/peak-notebook-plan.md, D-PN4, prototype v5).
+// The band is one visual form per sheet (reports/gipfelbuch.md).
 
 export type BandCtx = {
 	d: GipfelbuchPhotoData;
@@ -36,7 +36,7 @@ export type BandCtx = {
 };
 
 /**
- * KR2 (reports/gipfelbuch-best-of-both.md), one hero per sheet: sheets whose page opens with its own
+ * One hero per sheet (reports/gipfelbuch.md): sheets whose page opens with its own
  * real-photo hero drawn with `RealPhoto bleed` (the Tafel look carried by the figure). The shell Tafel
  * steps aside on these; every other sheet keeps the shell Tafel as its hero.
  */

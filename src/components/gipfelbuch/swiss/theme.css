@@ -344,7 +344,7 @@
 	}
 }
 
-/* Explainer grammar (reports/gipfelbuch-explainers-2026-10-02/grammar.md §1): the motion tokens for
+/* Explainer grammar (reports/gipfelbuch.md): the motion tokens for
  * CSS-only motion. Keep in step with viz/motion.ts (MOTION, EASE); __tests__/motion-css.spec.ts pins them. */
 .gb-swiss {
 	--gb-dur-quick: 160ms;

@@ -5,7 +5,7 @@
 // The photo story as a film: one clock (ms) → one frame of 0..1 values that PhotoStory writes onto the
 // DOM. Pure, so the script is specced (__tests__/story-film.spec.ts) and the static frame is just
 // `filmFrame(plan, plan.total)`. Beats follow the explainer grammar
-// (reports/gipfelbuch-explainers-2026-10-02/grammar.md §1.3): guess = setup, measure = evidence,
+// (reports/gipfelbuch.md): guess = setup, measure = evidence,
 // correct = change (the camera turns), snap = result; a refused solve ends on "keep", a result that
 // turns the camera back to the guess. Pose t: 0 = the phone's guess, 1 = the solved pose; values in
 // between are a visual tween between the two measured poses, never a number shown to the reader.

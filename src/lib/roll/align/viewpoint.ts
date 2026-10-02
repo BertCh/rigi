@@ -24,7 +24,7 @@ export const BIAS_WINDOW_S = 45 * 60;
  * iPhone, 20 min at one spot) the solved-minus-compass offset swings from +11° to −19° within 10
  * minutes while photos seconds apart agree to about 1°, so a 45-minute median can be a worse prior
  * than the raw compass and a window near 60 s a better one (leave-one-out, n = 10, one session: design
- * evidence, not a result; reports/steps-2026-10-02/camera-roll.md). The default stays until a roll
+ * evidence, not a result; reports/archive/steps-2026-10-02/camera-roll.md). The default stays until a roll
  * bench measures accepts and precision.
  */
 export function biasWindowS(): number {

@@ -1,6 +1,4 @@
-# Upload track: API note
-
-> Moved from an API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
+# src/lib/upload: browser photo upload
 
 Browser photo upload for Rigi. `/upload` takes a JPEG, HEIC, PNG, WebP or AVIF (RAW/TIFF are rejected with an export hint), builds the same `PhotoMeta` that `scripts/ingest.mjs` builds, gets OSM peaks, trails and lakes, stores everything in IndexedDB, and opens the photo in the existing `PhotoWorkspace` at `/photo/local-<hash>`.
 
@@ -15,12 +13,11 @@ Browser photo upload for Rigi. `/upload` takes a JPEG, HEIC, PNG, WebP or AVIF (
 | `src/lib/upload/region.ts` | Overpass queries (same as ingest.mjs), timeouts, mirrors, the bundled-region reuse and the cache |
 | `src/lib/upload/store.ts` | IndexedDB `rigi-uploads` with stores `photos` {id, meta, blob, thumb} and `regions` (RegionData) |
 | `src/lib/upload/index.ts` | Public API (below) |
+| `src/lib/upload/coach.ts` | Location coaching (pure): which sensors a file carried and how to record the missing ones next time (iOS settings path) |
 | `src/lib/upload/SlippyMap.tsx` | Dependency-free OSM raster map: click to pin, drag to pan, wheel or double-click to zoom. Draws an accuracy circle and a heading wedge |
 | `src/lib/upload/libheif.d.ts` | Typings for `libheif-js/libheif-wasm/libheif-bundle.mjs` |
 | `src/routes/upload.tsx` | `/upload` route (ssr: false) |
-| `out/lead/upload/exif.test.ts` | Node test against photos.json |
-| `out/lead/upload/region.test.ts` | Node test of fetchRegion sharing, abort and bundled-reuse semantics (fetch mocked) |
-| `out/lead/upload/verify.mjs` | Playwright end-to-end test |
+| `src/lib/upload/__tests__/*.spec.ts(x)` | Vitest specs: EXIF, decode, region fetch sharing/abort/bundled reuse, store, licences, coach |
 
 ## Exports (`#/lib/upload`)
 
@@ -53,19 +50,11 @@ const saved = await saveUpload(draft, meta, region)
 registerWithWorkspace(saved.meta, saved.region); navigate({ to: '/photo/$id', params: { id: meta.id } })
 ```
 
-## Integration status
+## Integration
 
-The workspace hook has landed:
-- `photos.ts` exports `registerLocalPhoto(meta, region)`. `getPhoto` checks `localPhotos` first, and `regionCache` is seeded.
-- `photo.$id.tsx` loader: for an unknown `local-*` id it lazy-loads `src/lib/upload/index.ts` via `import.meta.glob` and calls `ensureLocalPhotoRegistered(id)`. Cold reloads of `/photo/local-…` therefore restore from IndexedDB, and verify.mjs checks this.
-
-*Update (2026-10-01): both items below are done. `src/lib/integration/unknown-pose.ts` runs a 360° yaw search (CPU cascade, then the fused `/match` sweep) when the heading is unknown, and the Heading slider in `PhotoWorkspace.tsx` spans 0–360° when `unknowns.yaw`. The original request is kept for the record.*
-
-Originally wanted for uploads with no heading (`(photo as LocalPhotoMeta).local?.yawUnknown`, equivalently `photo.heading == null`):
-1. **Solver** (`align.ts` / `deck/engine.ts`): run the coarse yaw grid over the full 360° instead of ±25° around `heading ?? 0`. When this was written, the engine used `yaw: photo.heading ?? 0` (check `align.ts` and `deck/engine.ts` for the current seed) with the ±25° window, so these uploads usually misalign.
-2. **Manual Heading slider** (`PhotoWorkspace.tsx:599`): its range is `(photo.heading ?? 0) - 40` to `(photo.heading ?? 0) + 40`, so with no heading the user cannot set anything outside about ±40° of north and cannot fix the alignment by hand either. When `heading == null`, use the full 0–360° range (wrap-around).
-
-Also: pinned photos have `alt: null`, so the engine uses DEM + 1.8 m. That is the right behaviour. `photos.ts registerLocalPhoto` already accepts `region: null`; `registerWithWorkspace` passes null for bundled region ids so `loadRegion('region-1')` still fetches the live JSON.
+- `photos.ts` `registerLocalPhoto(meta, region)`; `getPhoto` checks local photos first. The `photo.$id.tsx` loader lazy-loads this module for an unknown `local-*` id and calls `ensureLocalPhotoRegistered(id)`, so cold reloads restore from IndexedDB.
+- No heading: `src/lib/integration/unknown-pose.ts` runs a 360° yaw search (CPU cascade, then the in-browser fused matcher in ad-hoc mode), and the Heading slider spans 0–360° when `unknowns.yaw`.
+- Pinned photos have `alt: null`, so the engine uses DEM + 1.8 m. `registerWithWorkspace` passes `null` for bundled region ids so `loadRegion('region-1')` still fetches the live JSON.
 
 ## Behaviour details
 
@@ -78,7 +67,7 @@ Also: pinned photos have `alt: null`, so the engine uses DEM + 1.8 m. That is th
 
 ## HEIC dependency and licence
 
-**`libheif-js@1.23.2`** was added to package.json dependencies with `npm install`. **That is outside the upload track's owned files, and the lead needs to sign off on it.** The package is **LGPL-3.0**: an Emscripten build of strukturag/libheif (LGPL-3.0) with the libde265 HEVC decoder (LGPL-3.0) embedded.
+**`libheif-js@1.23.2`** (a runtime dependency) is **LGPL-3.0**: an Emscripten build of strukturag/libheif (LGPL-3.0) with the libde265 HEVC decoder (LGPL-3.0) embedded.
 
 How the LGPL is met:
 - **Separate, replaceable file.** `decode.ts` imports `libheif-js/libheif-wasm/libheif-bundle.mjs?url`, so Vite emits the unmodified 1,989,119-byte bundle as a single asset (`assets/libheif-bundle-<hash>.mjs`). It is not minified or inlined. The worker loads it with a runtime `import()` of that URL, and so does the main-thread fallback, so there is one copy. An isolated `vite build` gives `heic.worker-<hash>.js` at 641 bytes plus that one libheif file. Served from `vite preview`, headless Chromium decoded the portrait `IMG_7068.HEIC` to 1536×2048 through the worker.
@@ -88,28 +77,17 @@ The worker builds its importer with `new Function('u', 'return import(u)')`. A v
 
 If a browser's classic workers can't run dynamic `import()`, the decode falls back to the main thread, which works but blocks the UI for about 1 s. If LGPL is unacceptable, remove the dependency: `decodeImage` then throws `HeicUnsupportedError`, and the route shows the "export as JPEG / use Safari" message. The bundle is about 2 MB and loads only when a HEIC fails native decode (Chrome and Firefox; Safari decodes natively).
 
-## Verification (run on :3100)
+## Verification
 
-- `npx tsx out/lead/upload/exif.test.ts`: all 13 `img/*.HEIC` match `photos.json` exactly, with max |Δpitch| = |Δroll| = 0. vfov, heading, holding, lat/lon, alt, takenAt, tzOffset, gravity and size are all equal, and the libheif dimensions are cross-checked. The 13 ingested JPEGs match within tolerance, because sips rounded the rationals to about 1e-7 and dropped the sub-second GPS time. Synthetic gravity vectors check the sign conventions: pitch up is +, right side down is +. **ALL PASS**.
-- `npx tsx out/lead/upload/region.test.ts`: **ALL PASS**. Covered: a re-pin in the same cell joins the in-flight fetch (3 Overpass calls, 0 aborted, and the joiner gets progress); an abandoned fetch is aborted after the grace period and a fresh one starts; a pre-aborted signal makes no request; bundled reuse is decided per exact position within one cell; one caller aborting doesn't affect another.
-- `node out/lead/upload/verify.mjs`: **ALL PASS**.
-  - JPEG with EXIF: `region-1` referenced by id (3052 peaks, 4387 trails), and IndexedDB holds no bundled-region copy.
-  - HEIC through the libheif worker in Chromium: meta is exact, the image is 2048×1536 and not blank.
-  - Stripped JPEG: warnings shown, a pin placed by map click, then a **re-pin 1 px away 2.5 s later while Overpass is loading**. The region still arrives: 3202 peaks and 3322 trails in 28–39 s, with no "aborted" error.
-  - "Open in workspace" is clicked for the upload on screen (no pre-registration). The test waits for the upload page's `main[data-stage]` to detach, then for the workspace's `[data-ready]` with no "Loading terrain" text. A cold reload of the same id restores from IndexedDB.
-  - Deleting the pinned upload removes its now-unreferenced `local-region-*` record.
-  - No page errors. Page errors are logged with URL and stack.
-  - Screenshots: `out/lead/upload/{jpeg,heic,nogps-before,nogps-pinned,workspace,workspace-cold}.jpg`.
-  - verify.mjs stubs the Vite HMR websocket. Without that, concurrent edits full-reload the page in the middle of a test.
+- Unit: `npx vitest run src/lib/upload` (pure CPU specs listed above; part of the fast `unit` row).
+- 2026-09-29 browser run (Playwright `verify.mjs`, local-only under `out/lead/upload/`, gitignored): JPEG with EXIF reuses `region-1` by id; HEIC decodes through the libheif worker; a stripped JPEG takes a map pin and a re-pin during the Overpass load still gets its region; "Open in workspace" and a cold reload restore from IndexedDB; deleting a pinned upload removes its unreferenced `local-region-*`. The EXIF port matched `photos.json` exactly on 13 HEICs (|Δpitch| = |Δroll| = 0). Not re-run since.
 
 ## Known limitations
 
-- ~~The yawUnknown 360° search is not implemented on the solver side yet~~ (done: `integration/unknown-pose.ts`, see above).
 - The OSM tile server is used directly for the pin map: light use with attribution is fine, but heavy use would need our own tiles or a provider.
 - Overpass latency varies from about 5 s to over 2 minutes under load. Peaks are needed for labels; if they fail, the photo is saved with an empty region and **Retry** or `refreshLocalRegion` fills it in later.
 - Uploads live only in this browser's IndexedDB. There is no server sync and no quota handling beyond the errors being surfaced.
 - A `GPSImgDirectionRef = 'M'` heading is used as-is (declination is not corrected) and flagged in the UI.
-- A full `npm run build` of the app has not been run; only the isolated build of decode.ts, the worker and licenses.ts (see above).
 - The time-zone guess from longitude is coarse (no tz database).
 - The non-secure-context hash fallback samples bytes. It is fine for ids but is not a cryptographic hash.
 
@@ -117,4 +95,4 @@ If a browser's classic workers can't run dynamic `import()`, the decode falls ba
 
 `meta.local` carries `yawUnknown` (no EXIF heading), `pitchRollUnknown` (no Apple gravity vector: pitch/roll are 0 placeholders) and `focalUnknown` (no 35 mm focal: f35/vfov are the iPhone default).
 Solvers must free the corresponding parameters instead of trusting the placeholders. For any of them, the app's autoAlign must not auto-accept its result.
-Route these uploads to the fused `/match` service when `matcherAvailable()`. Otherwise use the CPU cascade with the unknowns declared, which gave 0 false accepts across all ablation conditions.
+`integration/unknown-pose.ts` runs the CPU cascade with the unknowns declared (0 false accepts across all ablation conditions), then the in-browser fused matcher when `matcherAvailable()` (`src/lib/matcher-client.ts`).

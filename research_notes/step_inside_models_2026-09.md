@@ -4,7 +4,7 @@ Nearly every fact below was checked today against primary sources: GitHub API li
 
 **File written:** `tools/nearfield/research/models.json` holds the same data in machine-readable form. `types.ts` is unchanged.
 
-> **Update (2026-10-01):** the §4/§6 renderer pick (Spark) was not adopted. Step Inside ships its own dependency-free EWA splat layers (deck.gl WebGL2 `src/lib/nearfield/deck-splat-layer.ts`, WebGPU `src/lib/deck-webgpu/layers/splats.ts`), and the three.js engine Spark targeted was removed (583e2b7). What was adopted is in `reports/step-inside-results.md` (Licences).
+> **Status (2026-10-02):** a licence and model survey (2026-09-28). What shipped: Step Inside depth is MoGe-2 ViT-S running in the browser on `src/lib/nn` (`src/lib/nearfield/local/depth-net.ts`; no near-field service since 2026-10-02, d8e99834/8bb109d0); SHARP was dropped. Splats render with Rigi's own EWA layers (`src/lib/nearfield/deck-splat-layer.ts`, `src/lib/deck-webgpu/layers/splats.ts`), not Spark. Licences of what ships: `reports/licences.md`. Segmenter licences for the object split: `research_notes/segmenter-shortlist-2026-10-02/NOTE.md`. Completion models: `frontend_completion_models_2026-10.md`.
 
 ## 1. Single-photo and depth models (for P1)
 

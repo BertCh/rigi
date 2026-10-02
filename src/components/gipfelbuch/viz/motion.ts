@@ -12,7 +12,7 @@ import {
 } from "react";
 import { revealsImmediately } from "./hooks";
 
-// The explainer grammar's motion half (reports/gipfelbuch-explainers-2026-10-02/grammar.md §1). The
+// The explainer grammar's motion half (reports/gipfelbuch.md). The
 // tokens unify the landing's values (site/RevealLoop, FadeIn, the poster crossfades) with the
 // notebook's own (GeoSpill's slide, the pen draw-on, PhotoStory's beat). Timelines are pure, so the
 // order and timing of a figure's beats can be specced; the hooks re-render once per beat at most.

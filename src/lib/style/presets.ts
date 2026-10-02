@@ -465,7 +465,7 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 	},
 
 	/**
-	 * Field sketch (reports/gipfelbuch-design-book.md): the Swiss field-notebook look. Terroir's warm
+	 * Field sketch (reports/archive/gipfelbuch-design-book.md): the Swiss field-notebook look. Terroir's warm
 	 * contours, land cover and names, plus slope hatching, pencil-wobbled ink lines and pencil trails.
 	 * Display only; opt-in like every look.
 	 */

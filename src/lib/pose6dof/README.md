@@ -2,7 +2,7 @@
 
 > Moved from an API note in `out/lead/` on 2026-09-29. Any `out/lead/...` test, sample or result path below is local-only (gitignored).
 
-`src/lib/pose6dof/` is pure TypeScript. It has no DOM or three.js dependency and runs in the browser and in node. It imports only `src/lib/geodesy.ts`, and only from `geo.ts`.
+`src/lib/pose6dof/` is pure TypeScript. It has no DOM or three.js dependency and runs in the browser and in node. It imports only shared maths (`geodesy`, `camera`, `linalg`, ontology types). Callers: the GPU eye suggestion (`src/lib/gpu/eye`), the browser matcher's rotation solve (`src/lib/matcher/rotation.ts`) and roll propagation (`src/lib/roll/propagate/estimator.ts`).
 Tests: `npx tsx scripts/test-pose6dof.ts [--quick]`. Results were in the gitignored `out/lead/pose6dof/results.md`.
 
 ## Conventions
@@ -100,9 +100,9 @@ engine.eye.set(...res.eyeOffset)                                    // absolute:
 applyPose(camera, res.pose, aspect, engine.eye)
 ```
 
-## Integration steps for session 9e (owner of align.ts, deck/engine.ts and photo.$id.tsx)
+## Integration notes (proposals, not wired)
 
-*Update (2026-10-01): steps 1–2 are proposals that were not wired: `align.ts solvePins` is still the app's pin solver. What did ship is `refineEyeFromSkyline` (below), as the "Check camera position" suggestion behind `?eyesearch=` (`src/lib/gpu/eye/suggest.ts`, `src/components/EyeSuggestion.tsx`).*
+Steps 1–2 were never wired: `align.ts solvePins` is still the app's pin solver. What ships is `refineEyeFromSkyline` (below), as the "Check camera position" suggestion behind `?eyesearch=` (`src/lib/gpu/eye/suggest.ts`, `src/components/EyeSuggestion.tsx`).
 
 1. **Pins.** Replace or extend `align.ts solvePins(prior, aspect, eye, pins, W, H, solveFov)`. Engine `Pin.world` is already in the engine frame, so convert each `Pin {u, v, world}` directly to `{kind:'point', u, v, world}`, or to `{kind:'dir', …}` for sky or DEM-direction pins.
    - **Priors:** build them with `priorsFromPhoto(photo, { eye })`, where `eye` is the same `eye` vector that solvePins receives (engine.eye = `(0, 0, eyeAlt)`). Do **not** use the default `[0,0,0]`: that is sea level in the engine frame.
@@ -207,7 +207,7 @@ Self-checks (synthetic ridge, exact horizon): `npx tsx src/lib/pose6dof/eye.chec
 
 **Cost:** about (grid cells + 7 per LM iteration) horizon calls. In node this measured 2–42 s per photo, with 30–210 calls at 30–175 ms each (horizon-fast, sector only). Trim the grid for the UI.
 
-## Robust RANSAC solvers (`ransac/`): the Python services' poselib / opencv / numpy solvers, in the browser
+## Robust RANSAC solvers (`ransac/`): ports of the Python poselib / opencv / numpy solvers
 
 These use the **OpenCV camera convention** (x right, y down, z forward), not the pose conventions above:
 `R` (row-major 3×3) and `t` map world → camera, `p = R X + t`, and image points are pixels with
@@ -216,8 +216,8 @@ These use the **OpenCV camera convention** (x right, y down, z forward), not the
 | Function | Ports | Model |
 |---|---|---|
 | `absolutePoseRansac(points2d, points3d, camera, opts)` | `poselib.estimate_absolute_pose` (match.py `solve_pnp_exif`, x5 verifier) | P3P (fixed focal) or 6-point DLT (free focal) samples, MSAC score, LO (truncated-loss LM) on every new best, dynamic trials ×3, final Cauchy LM at 0.5 thr |
-| `cameraRotationRansac(points2d, worldDirs, camera, opts)` | `match.solve_rotation` (matcher service `core.solve`, `fuse.py`) | centre fixed at the eye: 2-point TRIAD per focal candidate, 3 rounds of soft_l1 LM (+ log focal with a 5 % prior) |
-| `rotationRansac(bearings0, bearings1, opts)` | `run_propagate.rot_ransac` (relative-rotation service) | pure rotation on unit bearings: 2-point Kabsch, chord threshold, 3 Kabsch re-fits |
+| `cameraRotationRansac(points2d, worldDirs, camera, opts)` | `match.solve_rotation` (`tools/matcher/reference/core.py`, `fuse.py`; used by `src/lib/matcher/rotation.ts`) | centre fixed at the eye: 2-point TRIAD per focal candidate, 3 rounds of soft_l1 LM (+ log focal with a 5 % prior) |
+| `rotationRansac(bearings0, bearings1, opts)` | `tools/nearfield/propagate/run_propagate.py` `rot_ransac` (used by `src/lib/roll/propagate/estimator.ts`) | pure rotation on unit bearings: 2-point Kabsch, chord threshold, 3 Kabsch re-fits |
 
 Each has an `…Async` twin that scores big batches on the GPU (`src/lib/gpu/ransac/score.ts`: one ComputeGraph,
 K hypotheses × N correspondences in one dispatch, arg-max on the GPU, only the winner read back; f32, the

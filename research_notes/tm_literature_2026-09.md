@@ -1,5 +1,7 @@
 # TM research program, study R1: literature delta (2026-09-27)
 
+> **Outcome of the ranked experiments (2026-10-02; details in `reports/terrain-matching-research.md` and `reports/negative-results.md`):** #1 the learned negative-evidence verifier failed (X5), and its hard-negative mining ran as H1 (blind verification pending, roadmap R1); #2 branch-and-bound gave no gain, closed-form pitch/roll per yaw is 17× faster for −2 top-4 hits (X4); #3 occlusion ordinals fed the MoGe-2 depth veto (X2, a veto-panel candidate), while the related T-junction eye cue was killed (GEO GA3); #4 re-render → re-match added inliers but failed its acceptance (concord WP-G, removed); #5 DINOv2 yaw correlation is the one positive (X1, top-4 hits 23 → 27/30); #6 OSM eyes ran only as title triage (P1, negative); #7–#9 not run.
+
 Scope: what the 2024–2026 literature adds beyond what this repo already covers. The existing coverage is in:
 - `reports/Mountain photo georeferencing SoTA.md`
 - `research_notes/matching_v2_research.md` (removed 2026-09-29; `git show 384df44:<path>`)

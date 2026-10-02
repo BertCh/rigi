@@ -1,6 +1,6 @@
-# Geometry-first camera: using the 3D geodata to pin the whole camera
+# Geometry-first camera (GEO): using the 3D geodata to pin the whole camera
 
-> **2026-09-30:** the GA2 (`geocam/observe`), GA3 (`geocam/tjunc`) and GA4 (`geocam/lakes/factors.ts`) code and the `geoInliers` flag were removed; GA1 (`map`), GA5 (`integrity`), `priors` and `lakes` remain. See [negative-results.md](negative-results.md#code-removed-in-the-2026-09-30-cleanup). The unread `geoMap` flag was also dropped (0fd6933), so of the flags named in §8 only `geoDecl`, `geoLakeFloor` and `geoLakes` exist (all off), and 4 geocam check suites remain in CI (`geocam-map`, `-priors`, `-lakes`, `-integrity`). *(Update 2026-10-01: the matcher client named in §1 lives at `src/lib/matcher-client.ts`.)*
+> **Status (2026-10-02).** Phase A ran 2026-09-30 (§8): GA1 not killed, GA2–GA5 killed, GA0 no measured gain. The follow-up skyline-parallax wrong-eye test (SKYPAR) was killed 2026-10-02 (§8). Code that remains: `src/lib/geocam/{core,map,integrity,priors,lakes}` (GA1 solver, GA5 veto candidate, flags `geoDecl`, `geoLakeFloor`, `geoLakes`, all off) with CI suites `geocam-map`, `-priors`, `-lakes`, `-integrity`. Removed code (GA2 `observe`, GA3 `tjunc`, GA4 waterline factors, SKYPAR, the `geoInliers`/`geoMap` flags) is listed with recovery commits in [negative-results.md](negative-results.md). The kill criteria in §5 are frozen (copied into `tools/research/geo/PROTOCOL.txt`).
 
 *2026-09-29. This report rests on four research sweeps run in parallel:*
 - *geometric cues beyond the skyline;*
@@ -25,9 +25,9 @@ FUND E0's Cramér–Rao computation agrees. The geometry holds eye information a
 The code audit shows the assets are mostly already here and thrown away:
 - **Lake polygons:** downloaded and reduced to names (`src/lib/upload/region.ts:348`).
 - **Ridge crests:** computed and only drawn (`src/lib/geo/horizon.ts:76`).
-- **Horizon depth per azimuth:** dropped before `scorePose` (`src/lib/integration/horizon-fast-app.worker.ts:140`).
-- **Matcher points:** everything under 250 m and every depth-edge pixel is removed (`tools/matcher/match.py:34,109`).
-- **Inliers:** never returned to the app (`src/lib/integration/matcher-client.ts`).
+- **Horizon depth per azimuth:** dropped before `scorePose` (`src/lib/integration/horizon-fast-app.worker.ts`).
+- **Matcher points:** everything under 250 m and every depth-edge pixel is removed (then `tools/matcher/match.py`; the browser port in `src/lib/matcher` keeps the cut).
+- **Inliers:** never returned to the app (`src/lib/matcher-client.ts`).
 - **nDSM and swisstopo 3D Tiles:** display-only.
 - **Snapped OSM peaks:** only used for manual pins.
 - **Sun:** the ephemeris exists but is not a pose cue.
@@ -176,13 +176,15 @@ The build is in `src/lib/geocam/**` with 7 synthetic check suites registered in 
 
 | Study | Verdict | Key numbers | What survives |
 |---|---|---|---|
-| **GA0 quick fixes** | **Pass** (no regression) — **no measured gain** | WMM2025 declination matches all 100 NOAA test values (worst 0.005°). But every bundled photo is true-north, so declination changes nothing on dev. The lake floor binds for 0 of 10 dev photos | Flags `geoDecl`, `geoLakeFloor`, `geoLakes`, `geoInliers`, `geoMap` (off). Matcher-inliers patch *proposed* to the matcher maintainers (`out/geocam/ga0/matcher-correspondences.patch`), not applied |
+| **GA0 quick fixes** | **Pass** (no regression) — **no measured gain** | WMM2025 declination matches all 100 NOAA test values (worst 0.005°). But every bundled photo is true-north, so declination changes nothing on dev. The lake floor binds for 0 of 10 dev photos | Flags `geoDecl`, `geoLakeFloor`, `geoLakes` (off). `geoInliers` and `geoMap` were removed 2026-09-30 (no consumer); the matcher-inliers patch was never applied |
 | **Python afternoon test** (pycolmap / PoseLib on existing correspondences) | **Negative** | A free eye from appearance matches drifts 180–270 m at correct poses. Its covariance is 14–86× over-confident. It flags 46/46 decoys *and* 32/32 correct poses (distance AUROC 0.49). Post hoc: P4Pf centre-shift magnitude separates decoys at AUROC 0.87 | pycolmap 4.2.1 does take a position prior (with `gradient_tolerance` 1e-10). GTSAM reference matches the TS solver to 2e-5° / 1 mm / 0.02% σ |
 | **GA1 MAP solver + Laplace σ** | **Not killed, not passed** | Pitch: median 0.162° vs 0.260° for the start (pass). All-far σ_EN ≥ 0.8·σ_GPS on 2 of 3 photos. Rotation (err/σ)² = 6.0, eye 3.5 (target [0.5, 2]; kill > 9) | `solveMap` with per-factor losses, correlated-DEM cluster whitening (without it the all-far check fails) and per-family information. Over-confidence comes mostly from wrong-basin starts a local σ can't see. On summits the ground prior moves the eye, not the image |
 | **GA2 observability gate** | **Killed** (by a hair) | Spearman ρ(σ_eye, eye error) = 0.498 vs 0.5 (CI 0.34–0.65). 14 of 56 displaced-eye decoys are confidently wrong (σ < 15 m, > 50 m off) | `crlb`, `heldOutFamily`, `eyeMayMove`. σ alone cannot gate the eye |
 | **GA3 T-junction eye cue** | **Killed** | Only 6 of 40 refs have ≥ 3 crossings within 3 km. Real photos: median improvement −0.83, a wrong eye wins 93%. Render-only: argmin at the true eye 6/6, but a narrow 10–20 m well (convex on 1 of 6) | The physics holds on renders. On photos, junction edges are lost in clutter (forest, snow bands, rock). The differential residual cancels only normal-direction shifts |
 | **GA4 lakes as planes** | **Killed** on eye-Z; coverage passes | Median eye-Z error 16.9 m (CI 6.3–32.7) vs 5 m. Waterline cues carry a constant −4.4 px bias at 2–8 km, which aliases to about 11 m of eye height. 22% of wild dev photos show a usable lake | `waterlineFactors` (bias profiled out), `lakeFloorFactor` |
 | **GA5 integrity** (solution separation + viewshed) | **Killed** at the frozen point | Rejects 89% of displaced-eye decoys and 9/10 of the E1 wrong eyes, but also 12/33 correct poses (zero allowed). Wrong-basin AUROC 0.94, wrong-eye 0.83. The viewshed veto catches 2/754 | `protectionLevel`, `bubbleTest`. The strongest separator found for wrong basins. Post hoc (vs the current gate's accepts) it loses 0 correct poses and rejects 74% of the remaining decoys, but that operating point needs its own prereg |
+
+**Follow-up: skyline parallax as a wrong-eye test (SKYPAR, 2026-10-02, killed).** Reject a hypothesis when the photo skyline (U²-Net sky model) differs from the DEM horizon at the hypothesis eye by a significant 1/d-shaped residual that rotation nuisances cannot absorb (Huber fit, χ² of three eye terms, reject iff χ² > 16.27 and |δ| > 50 m). Dev, n = 787 hypotheses over 35 photos: it rejected 2 of 19 positives the current gate accepts (kill if any), 21/56 displaced-eye decoys, 3/10 E1-NFA-accepted decoys (needed 5); AUROC 0.61. χ² is uncalibrated (all 14 non-abstained positives exceed it, median 2404), the first-order model breaks at 150–400 m against a 2–4 km ridge, and most correct poses have a far-only skyline (19/33 abstain). Protocol and report: `tools/research/geo/skypar/`. Code removed (`git show 31752b8:src/lib/geocam/integrity/skyline-parallax.ts`, `…:scripts/geocam/skypar-eval.ts`). A retry needs a per-photo calibrated null and a re-marched Gauss–Newton fit under a new prereg.
 
 ### What phase A taught
 

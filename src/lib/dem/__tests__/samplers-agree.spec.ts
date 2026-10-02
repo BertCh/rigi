@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Conformance of the CPU height samplers that read the same DEM tiles (reports/steps-2026-10-02/terrain-sampler.md):
+// Conformance of the CPU height samplers that read the same DEM tiles (reports/archive/steps-2026-10-02/terrain-sampler.md):
 //   geo/terrain.ts TerrainSampler.sample      cross-tile bilinear (NaN when a corner tile is missing)
 //   horizon-fast/mosaic.ts TileStore.heightAt  cross-tile bilinear, nearest-ancestor pixels for missing tiles
 //   dem/grid.ts sampleGrid on the tile         heightFromTile, TerrainSet.heightAt (clamped to the tile)

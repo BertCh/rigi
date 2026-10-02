@@ -2,7 +2,7 @@
 
 *2026-09-26 · code in `tools/matcher/stage1/` · outputs in `tools/bench/t6/` · frozen rule sha1 `292fb74f35f6f402b5e81f1b832bac565edd6807` (`tools/bench/t6/RULE_FROZEN.sha1`)*
 
-> **Update (2026-10-01):** T6 was scored on the test half as arm B (30/50, HIGH 22/24; see [test-addendum.md](test-addendum.md)) and shipped only as the opt-in service policy `t6` (v0.4.0, [archive/matcher-service.md](archive/matcher-service.md)); v034 stays the default, and §10.5's selection refinement was not applied. The vendored workers this pipeline runs on (`stage1/vendor/worker.mjs`, `stage1/vendor_v03/render_worker.mjs`) drive the three.js PhotoEngine API (`e.renderer`, `geoRT`), which was removed 583e2b7, so `pipeline.py`, `tools/bench/final/` and the research harnesses that use `s1.py`'s worker cannot re-run against the current app without a port. The service's own `render_worker.mjs` was ported to the deck engines. **Port (wave5/S1, browser-unverified):** both vendored workers are now generated copies of the ported service worker (`stage1/make_worker_snapshot.mjs`, check `stage1-worker-snapshot`); outputs keep the old contract but come from deck (WebGL) renders, so numbers are not expected to be bit-identical to the three.js-era runs and need a batch pass before the v3 freeze.
+> **Status (2026-10-02).** T6 was scored once on the test half as arm B (30/50, HIGH 22/24; [test-addendum.md](test-addendum.md)) and shipped only as the opt-in policy `t6`; `v034` stays the default. The policy now runs in the browser (`src/lib/matcher/t6.ts`, `rule.ts`; `?matcherPolicy=t6`), ported from `tools/matcher/reference/t6.py`; the Python service of §10 was removed 2026-10-02 (8bb109d0). The §5 "known issue" selection refinement was not applied. This pipeline's own runner (`pipeline.py`, `s1.py`, the frozen worker snapshots in `stage1/vendor*`) is kept for study reruns; the snapshots were re-based on the deck engines (wave5/S1), so numbers are not expected to be bit-identical to the three.js-era runs, and a rerun is browser-unverified.
 
 Scope: everything here uses only the 50 dev ids of `tools/bench/split.json`, plus the 12 app GT photos. Verdicts come only from `tools/bench/t6/dev_verdicts.json` (clusters plus `cascadeMapterhorn`) and from blind verdicts given later on dev poses (`tools/bench/t6/baseline_cpu_partial.json`, `verify_cpu_partial/`). No test photo was run, opened or scored. `pipeline.py` refuses test ids unless `--allow-test` is passed (`STAGE1_ALLOW_TEST=1` for `run.sh`).
 
@@ -242,30 +242,16 @@ STAGE1_ALLOW_TEST=1 tools/matcher/stage1/run.sh wc_XXXX wc_YYYY ...
   - `tools/matcher/.venv` and the weights;
   - ≥ 3 GB free;
   - no other stage-1 or baseline batch running.
-- **It starts one private headless worker** (pages block 127.0.0.1/localhost :8765–8769) and closes it at the end. It never talks to :8765.
+- **It starts one private headless worker** and closes it at the end (it never used the former matcher service).
 - **Check `codeStamp.sha1 == c2d406ea3c557e6e`** on every output. Refresh the vendored snapshot only by re-running `make_vendor.py`, and only before the test run, since that changes the stamp.
 
-## 10. Integration note for `tools/matcher/server` (patch description; the server itself was not touched)
+## 10. Integration (done)
 
-1. **Already ported:**
-   - the `virtual:photos` interception;
-   - the 8765–8769 port block;
-   - SWEEP_KP back to 4096;
-   - CPU LightGlue.
-   Also worth porting: force the GPU upload of draped textures after `loadImagery` (`renderer.initTexture` + `gl.finish`). A cold first render came out untextured once under memory pressure.
-2. **Fine sweep in `match_adhoc`** (two-stage, yaw unknown, hfov ≥ 25°): after the 40° sweep, render views every max(8°, 0.5·hfov) at the photo vfov (unknown focal: 40° and 62° hfov). Solve per window of 3 adjacent views and keep the top 4 windows with ≥ 15 inliers as extra stage-2 priors. Cost is about 14 s median. Code: `pipeline.fine_sweep`.
-3. **Multi-hypothesis stage 2:**
-   - Run stage 2 for the baseline prior plus up to 5 more distinct hypotheses (fine sweep, skyline global search `skyglobal.SkyGlobal.search`). The skyline search needs the new worker command `edges` (raw `edge.fine/coarse/fg/rgb` + `horizonDirs`), about 12 s of numpy.
-   - Keep each stage-2 result and apply `rule.select` and `rule.confidence`.
-   - Keep the service's current response for the baseline prior as `cues`/`baseline`, so clients can compare.
-   - Suggested extra field: `stage1:{candidates:[{source, pose, level, checks}]}`.
-4. **Confidence:** HIGH = (a-priori ∨ match-dominant) ∧ gap OK ∧ no ambiguity (§3). The basin gap must be computed for any candidate that could become HIGH, not only a-priori HIGH ones.
-5. **Selection refinement** (post-freeze, apply only after the test run is scored): prefer the baseline candidate's fused pose when the selected candidate is within 2° of it. This removes the GT-12 median-yaw cost.
-6. **Latency:** about +50 s per ad-hoc request at median. Worth it only for two-stage requests. Photos with heading, gravity and focal known keep the single fused stage.
+Ported into the service as policy `t6` in v0.4.0 (2026-09-26; [archive/matcher-service.md](archive/matcher-service.md)) and from there into the browser matcher (`src/lib/matcher`, 2026-10-02): fine sweep, multi-hypothesis stage 2 with the skyline global search, the §3 confidence (basin gap for every candidate that could become HIGH). Not applied: the post-freeze selection refinement (prefer the baseline candidate's fused pose within 2°). Latency was about +50 s per ad-hoc request in the Python version; the browser cost is not measured.
 
 ## Files
 
-*Update (2026-10-01): of `tools/matcher/stage1/`, only `pipeline.py`, `s1.py`, `skyglobal.py`, `rule.py`, `policy.py`, `evaluate.py`, `finalize.py`, `run.sh`, `vendor/` and `vendor_v03/` are in the repository; the diagnostic, baseline and evaluation scripts listed below were never committed.*
+*In the repository: `pipeline.py`, `s1.py`, `skyglobal.py`, `rule.py`, `policy.py`, `evaluate.py`, `finalize.py`, `manifest_guard.py`, `run.sh`, `vendor/`, `vendor_v03/`. The other scripts listed below were never committed.*
 
 - `tools/matcher/stage1/`:
   - `pipeline.py`: generators, verification, cap, stamp.

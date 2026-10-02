@@ -11,7 +11,7 @@
 //
 // The engines and the roll use 1.8 m without an altitude; geo/pipeline.ts loadScene (the /baseline and
 // unknown-pose workers) uses 1.6 m there. Both are kept bit-identical here until a decision unifies
-// them (reports/steps-2026-10-02/eye-rule.md).
+// them (reports/archive/steps-2026-10-02/eye-rule.md).
 //
 // checkAltitude only describes the altitude against the ground (for the info panel and diagnostics);
 // nothing here changes the eye.
@@ -40,7 +40,7 @@ export function eyeAltitude(
 
 /**
  * Thresholds for checkAltitude (m). Heuristics for diagnostics, not fitted: phone vertical error is
- * about 3–10 m in open sky and 15–30 m with multipath (reports/steps-2026-10-02/eye-rule.md).
+ * about 3–10 m in open sky and 15–30 m with multipath (reports/archive/steps-2026-10-02/eye-rule.md).
  */
 export const ALTITUDE_CHECK = {
 	/** Above ground + eye by at most this: standing (GPS noise). */

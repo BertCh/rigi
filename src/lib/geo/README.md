@@ -42,13 +42,13 @@ npx tsx scripts/annotate.ts IMG_xxxx  # ground-truth annotation tool (see data/)
 EYE=max|gps|ground npm run baseline:eval   # eye-height rule experiments
 ```
 
-The UI is at `/baseline` (`src/routes/baseline.tsx`, `src/baseline-ui/`), with 13 samples in `public/baseline/` (regenerate with `scripts/export-baseline-samples.ts`).
+The UI is at `/baseline` (dev server only; `src/routes/baseline.tsx`, `src/baseline-ui/`, Mapterhorn tiles), with 13 samples in `public/baseline/` (regenerate with `scripts/export-baseline-samples.ts`).
 
 ## Accuracy (2026-09-24, 12 hand-registered photos in `data/ground-truth.json`)
 
 **Recommended pipeline: `detectSkyline` → `solvePose` → on reject, `refinePose` (the cascade).** This is what `/baseline` Auto-align runs (for a photo without a compass, gravity or focal length, with the unknown-pose options and the 0.75 bar: `src/baseline-ui/align-options.ts`). Reproduce it with `SOLVER=cascade npm run baseline:eval`.
 
-| Variant (`SKY=… SOLVER=… npm run baseline:eval`) | accepted | false accepts | worst accepted yaw | median final yaw / skyline | skyline ≤10 px |
+| Variant (2026-09-24; `SOLVER=solve|cascade|skyfirst`, `HORIZON=`, `DEM=` still exist) | accepted | false accepts | worst accepted yaw | median final yaw / skyline | skyline ≤10 px |
 |---|---|---|---|---|---|
 | Sensor prior only | – | – | – | 4.0° / 45.2 px | 2/12 |
 | classic + solve (simple core) | 8/12 | 0 | 0.47° | 0.27° / 6.7 px | 9/12 |
@@ -65,8 +65,9 @@ The UI is at `/baseline` (`src/routes/baseline.tsx`, `src/baseline-ui/`), with 1
 - **How precise the ground truth is:** "approx" entries are good to about 0.2–0.4° in yaw. Two independent fits disagree by 0.38° on 6958 and 0.33° on 7155. So differences between variants **below ~0.3° median (e.g. cascade 0.22° vs skyfirst 0.13°) are within ground-truth noise**. Accept counts, false accepts and errors of several degrees are robust. Control points that aren't OSM peaks (DEM notches with `az`/`el`, lake waterlines as elevation-only "levels", and duplicate-named peaks as `node/<id>`) are deliberate, not unresolved.
 - With the cascade, the simple solver handles 8 photos alone (~0.5 s), and refine (~3 s) runs only on its rejects: 7063, 7068 and 7155. It rescues all three, and all are within 0.4°.
 - Only IMG_7059 is still unsolved: an ultra-wide shot of a near ridge where the eye position itself is off. Every method fails on it.
-- Don't pair the ONNX sky model's argmax skyline with `solvePose`: it produced a false accept (7053). The Viterbi version (`SKY=dp`, `skylineFromSkyDP`) removes it and is the safe way to use the sky model, but it doesn't beat the classic cascade on accepts or on ≤10 px.
-- **High-accuracy mode:** `skyfirst` roughly halves the median yaw error (0.13° vs 0.22°) and cuts the worst accepted error to 0.29°. The cost is always running the 4.5 MB ONNX model plus refine (~4 s per photo). Use it when the sky model is already loaded; the cascade stays the lean default.
+- The "ONNX sky model" rows ran the U²-Net-P sky model under onnxruntime-web; it now runs on `src/lib/nn` (same weights), and the `SKY=` switch was removed, so those rows are not re-runnable as written.
+- Don't pair the sky model's argmax skyline with `solvePose`: it produced a false accept (7053). The Viterbi version (`SKY=dp`, `skylineFromSkyDP`) removes it and is the safe way to use the sky model, but it doesn't beat the classic cascade on accepts or on ≤10 px.
+- **High-accuracy mode:** `skyfirst` roughly halves the median yaw error (0.13° vs 0.22°) and cuts the worst accepted error to 0.29°. The cost is always running the sky model plus refine (~4 s per photo, measured with the ONNX runtime). Use it when the sky model is already loaded; the cascade stays the lean default.
 - **Horizon:** `/baseline` uses d1's `src/lib/horizon-fast` drop-in (0.3 s in the browser vs 5–8 s), falling back to `computeHorizon`. Accuracy is the same in eval. The one difference is that refine declines IMG_7063, whose prior is already good (5.7 px).
 - IMG_7108 (shot from a boat) has no ground truth. solvePose accepts it at yaw 62.46°. An independent skyline plus render-match fusion (tools/matcher, f0) gives 62.79°, so the two agree to 0.33°, which points to OK GPS and a compass thrown ~13.5° off by the steel hull. That is strong but not independent evidence; a ground-truth entry needs hand-picked control points.
 - Synthetic test: yaw ≤0.13° and pitch/roll ≤0.26° with ±10° compass error, 20% occluders and noise. With 40–120° compass error the full-360° fallback recovers 11/13.
@@ -80,12 +81,12 @@ The UI is at `/baseline` (`src/routes/baseline.tsx`, `src/baseline-ui/`), with 1
 | terrarium | 11/12 | 0 | 0.22° | 11/12 |
 | mapterhorn | 11/12 | 1 (7130: 1.05°, 20 px) | 0.15° | 10/12 |
 
-Mapterhorn is right about the ground: at IMG_7059, Terrarium is 80 m low (1,863 m against 1,945 m; GPS reads 1,933 m). With it, the simple solver alone fixes 7155 (5.8° → 0.12°) and 7068 (→ 0.12°). The only regressions are 7130 and 6958, whose ground truth was fitted partly (7130: entirely) on terrain notches read from Terrarium. **So the default stays Terrarium until the ground truth is re-annotated on Mapterhorn.** Until then the comparison is biased toward Terrarium. After re-annotation, switch the default (eval, and the `/baseline` worker, which loads Terrarium AWS tiles with `fetchDemTile(TERRARIUM_AWS, key)`).
+Mapterhorn is right about the ground: at IMG_7059, Terrarium is 80 m low (1,863 m against 1,945 m; GPS reads 1,933 m). With it, the simple solver alone fixes 7155 (5.8° → 0.12°) and 7068 (→ 0.12°). The only regressions are 7130 and 6958, whose ground truth was fitted partly (7130: entirely) on terrain notches read from Terrarium. **So the default stays Terrarium until the ground truth is re-annotated on Mapterhorn.** Until then the comparison is biased toward Terrarium. After re-annotation, switch the eval default too (the `/baseline` worker already loads Mapterhorn).
 
 ## Known limitations
 
 - **DEM:** Terrarium is 40–85 m low on the Niederhorn cliffs and smooths near summits. That's the main error on ridge-top photos. Mapterhorn (swissALTI3D in Switzerland) is wired in (see above) and is what the app and matcher solve on; the eval default waits on the ground-truth re-annotation (roadmap N5).
-- **Eye height:** `max(GPS alt, ground+1.6 m)` (`eye-rule.ts`, shared by the engines, workers, roll and near field). Without an altitude the engines use ground + 1.8 m and `loadScene` ground + 1.6 m (open decision, `reports/steps-2026-10-02/eye-rule.md`). Neither fixed rule wins; `refinePose` (`src/lib/refine/`) fits an eye-height offset only where the near/far parallax makes it observable (`eyeFitted`, `eyeSensitivityPx`).
+- **Eye height:** `max(GPS alt, ground+1.6 m)` (`eye-rule.ts`, shared by the engines, workers, roll and near field). Without an altitude the engines use ground + 1.8 m and `loadScene` ground + 1.6 m (open decision, `reports/archive/steps-2026-10-02/eye-rule.md`). Neither fixed rule wins; `refinePose` (`src/lib/refine/`) fits an eye-height offset only where the near/far parallax makes it observable (`eyeFitted`, `eyeSensitivityPx`).
 - **Focal length:** EXIF 26 mm (iPhone 11 Pro) reads about 2% short. The solver absorbs this within its ±8% f clamp.
 - **No compass heading:** pass `solvePose(..., { headingKnown: false })` (or any `yawRange` ≥ 90°). It goes straight to the full-360° search with the stricter 0.75 bar. In the wild benchmark, a 360° first pass at 0.5 falsely accepted IMG_7053 at −123.7°. Synthetic test (`BIG_YAW=1 NO_HEADING=1 npm run baseline:synth`): 10/13 accepted, all correct.
 - **Wild benchmark (f0, 100 Commons photos, Mapterhorn, blind-verified):** the cascade gets 25 correct (14 on Terrarium). At the 0.75 bar it makes 22 accepts, all correct.

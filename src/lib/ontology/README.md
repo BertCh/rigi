@@ -10,7 +10,7 @@ realization and documented with the catalogue's definition. Write `import type {
 "#/lib/ontology/domain"` when a signature talks about the concept rather than one module's representation.
 
 - Generated reference: `reports/ontology.md`.
-- Design and review history: `reports/ontology-design.md`.
+- Design and review history: `reports/ontology-design.md`; type-system review and open items: `reports/type-system-review-2026-10-01.md`.
 
 ```
 core/quantity     L0  Deg Rad Metres Height<Datum> Px<Basis> Norm Prob Millis Seconds IsoTime; HeightDatum; PixelBasis + rebasePx

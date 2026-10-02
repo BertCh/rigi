@@ -1,128 +1,105 @@
-# Code review, 2026-09-30
+# Code review backlog (from 2026-09-30)
 
-*A whole-repo review: nine read-only reviewers, one per area, each re-reading the code behind its findings before reporting. Lines refer to `HEAD` at 0544df0 unless the row says WIP. This is the code-health backlog: when you fix an item, set its **State** to `fixed <commit>`, and don't delete the row. The plan item is [roadmap.md](roadmap.md) N7.*
+*Whole-repo review on 2026-09-30 (nine read-only reviewers, HEAD 0544df0), follow-ups on 2026-10-01 (CR-54–CR-69) and 2026-10-02 (CR-70–CR-73). The code-health backlog behind roadmap N7. When you fix a row, move it to "Closed" with its commit. Browser-unverified fixes are listed in [batch-ledger.md](batch-ledger.md).*
 
-Baseline at review time: `tsc` clean. `node scripts/ci/run.mjs fast` passes 26 of 27 checks; the biome ratchet fails, but only on uncommitted files (`scripts/dev.mjs`, `scripts/demo/*`, `scripts/peakfix/*`, `src/lib/peakfix/*`, `src/components/site/LiveRollMap.tsx`). No critical bugs were found. The deck/deck-webgpu sub-reviewers' findings (CR-13, CR-14, CR-40–CR-46) were not re-checked line by line.
+**Summary (2026-10-02, re-checked against the code):** 79 rows: 68 fixed, 1 partly fixed (CR-26), 4 obsolete, 1 decided (CR-W4), **5 open**. Open rows need a browser/GPU run (CR-13, CR-41, CR-46, CR-W2) or a refactor across both engines (CR-67).
 
-*Update (2026-10-01): rows re-checked against `git log` after the three.js `PhotoEngine` was removed (583e2b7). Rows that pointed at `src/lib/engine.ts` (three.js) are marked obsolete; the CR-54–CR-68 fixes are cited by commit. CR-69's `relief-graph.ts` is `src/lib/gpu/look/relief-graph.ts`.*
+## Open
 
-**Summary (2026-10-02, Pod A):** 79 rows: 67 fixed, 1 partly fixed (CR-26), 3 obsolete, 8 open. Open rows need a browser/GPU (CR-13, 41, 46, 67, W1, W2) or a user decision (CR-48, W4, and CR-26's stub data). CR-70–CR-73 came from the 2026-10-02 review of code landed since 10-01. Fixes marked browser-unverified are listed in `reports/batch-ledger.md`.
-
-## Fix first
-
-| ID | Sev | Where | Problem → failure | Fix | State |
-|---|---|---|---|---|---|
-| CR-01 | high | `scripts/gpu/with-render-lock.mjs:22` | No `--` in the command → `indexOf` is −1, the wrapper re-runs itself inside its own lock and the whole queue hangs. **Reproduced** | Exit with usage when `--` is missing | fixed 9388eef |
-| CR-02 | high | `with-render-lock.mjs:93-106` | SIGTERM/SIGINT deletes the lock but leaves the child (`tm_locks.py` → the job) running, so the next job starts alongside it (two GPU jobs). **Reproduced** | Spawn detached, kill the process group, release only on the child's exit | fixed a2bfb76 (wave5/D4a: detached process group, signals forwarded, lock freed on child exit; `scripts/gpu/with-render-lock.check.ts`) |
-| CR-03 | high | `src/lib/roll/roll.ts:204-210`, `routes/roll.import.tsx:140,229-272` | `clusterPhotos` union-find has no path compression (~n³: 2000 photos = 7.4 s) and import re-runs it about six times per file → a 1000-photo drop freezes the tab | Path compression / union by rank; recompute only when a draft becomes ready | fixed 9b2a4e9 (union-find) + 32c8b66 (import recomputes only on ready drafts) |
-| CR-04 | med | `components/PhotoWorkspace.tsx:1112`, `export/camera.ts:195` | `geoidUndulation` is never passed to ExportMenu → ECEF in COLMAP/pose JSON and XMP `AltitudeEllipsoid` are ~47–55 m low in the Alps | Default to `tiles3d/geoid.ts` `geoidUndulation(lat, lon)` | fixed a2bfb76 (wave5/D4a: engine exports default N to `tiles3d/geoid.ts` at the frame origin; `src/lib/export/geoid-default.check.ts`) |
-| CR-05 | med | `tools/nearfield/service/app.py:332-374`, `tools/nearfield/propagate/service.py:139` | `Access-Control-Allow-Origin: *`, no auth or Origin check; any web page can POST 16 × 8192 px multiview jobs (OOM) and read results | Origin allowlist (as the matcher has), cap body size and threads | fixed 9388eef (nearfield service; propagate/service.py does not exist) |
-| CR-06 | med | `tools/matcher/server/app.py:846-860, 1259-1285` | Body parsed as JSON whatever the Content-Type → a no-preflight `text/plain` POST from any site can make it fetch internal URLs (`photoUrl`) or read local images (`photoPath`); no Host check (DNS rebinding) | Require `application/json`, check `Host`, restrict `photoPath` | fixed a2bfb76 (wave5/D4a: Host allowlist, Origin check, Content-Type must be JSON/multipart, `photoPath` confined to repo root + `MATCHER_PHOTO_ROOTS`) |
-| CR-07 | med | `src/lib/terrain-mesh.ts:196-206`, `dem/load.ts:123-137` | The 3D mesh path never calls `validateTile`, so no-data stays at −32768 (32 km pits, flattened colour ramp via `engine.ts:801`) while horizon-fast repairs the same tile | Run `validateTile` in `buildTile` / `loadDemTile` | fixed 9b2a4e9 |
-
-## Medium
-
-| ID | Where | Problem → failure | State |
+| ID | Sev | Where | Problem → failure |
 |---|---|---|---|
-| CR-08 | `PhotoWorkspace.tsx:301-315, 853-866` | Bundled photos: the eye move isn't saved, but the next drag/pin/align saves the pose fitted to the moved eye; after reload the overlay is off | fixed 46a1821 (no pose save while a session-only eye move is active; browser-unverified) |
-| CR-09 | `components/nearfield/useStepInside.ts:220-233`, `nearfield/controller.ts:310-356` | `enter()` checks the accepted pose only before `await build()`; auto-align during the 10–60 s build makes Step Inside anchor to an unverified pose | fixed a584a62 |
-| CR-10 | `nearfield/controller.ts:304,312,314` | Three early returns skip `set()`, so the phase stays "loading" and the button stays disabled | fixed a584a62 |
-| CR-11 | `look/haze-controller.ts:71` | Haze-fit cache key omits the fg mask; when segmentation lands after the first fit, people pixels bias β/J0 until the pose moves | fixed fec0515 |
-| CR-12 | `sky/sky.worker.ts:89-103`, `sky/index.ts:80-85,113` | A failed model load is cached as `null` and a worker error nulls the worker for good → classical segmentation on the main thread until reload. A GPU device loss leaves the ORT session on the dead device | fixed fec0515 + e50a464 (device loss drops the cached ORT sessions and continues on WASM, worker GPU refine off; `sky/session-recovery.ts`; browser-unverified) |
-| CR-13 | `deck-webgpu/engine.ts:2811-2830`; `deck/composite.ts:666-854` | Export renders 4× MSAA rgba16f at full photo size (1.4–2.9 GB) → device loss on integrated GPUs. On the WebGL path one failed export sets `msaa = null` for the session | open |
-| CR-14 | `deck/engine.ts:1529-1570` | Imagery bitmap cache never evicts; memory grows while panning in imagery style | fixed 983d3a9 (384 MB LRU in `deck/imagery-cache.ts`, render-set tiles kept, evicted bitmaps closed; both engines; browser-unverified) |
-| CR-15 | `pose6dof/eye.ts:461, 513-544` | The "soft" above-ground prior is only in `posPrior`, not the LM objective, so it acts as accept/reject. `eye.check.ts` test 5 passes because the LM result is rejected | fixed 627d3dd |
-| CR-16 | `geocam/integrity/separation.ts:331` | A non-converged subset re-solve keeps `ok: true` → the photo can pass integrity (header says it must fail) | fixed a584a62 |
-| CR-17 | `geocam/integrity/separation.ts:164-168` | Masking after the cluster whitener leaks masked rows into the left/right subsets → separation understated | fixed f56d391 (mask applied before the whitener; spec separation-mask) |
-| CR-18 | `horizon-fast/march.ts:232,357`, `visibility.ts:176` | Peaks 50–150 m away have `q ≤ 0`, so `classifyPeak` reads the previous peak's occluder angle | fixed 9b2a4e9 |
-| CR-19 | `routes/roll.import.tsx:214-227, 282-346` | Clear doesn't cancel queued decodes (they write into the new batch → re-adds rejected as duplicates); `saveAll` has no try/catch (stuck on "saving") | fixed 32c8b66 (browser-unverified) |
-| CR-20 | `roll/map/roll-map.ts` `loadPhotos` (committed ~:269-299) | Decodes every photo at once with `Promise.all` (GBs for 200 photos); bitmaps past `MAX_PHOTOS` never released | fixed 32c8b66 (bounded decode, capped first) |
-| CR-21 | `src/lib/photos.ts:71-77` | `loadRegion` doesn't check `r.ok` and caches the rejected promise → one transient error breaks the region for the session | fixed 9b2a4e9 |
-| CR-22 | `geo/peaks.ts:106` | One NaN sample makes `best` NaN in `localMax` | fixed 9b2a4e9 |
-| CR-23 | `cache/tile-cache.ts:151-157, 325-336` | Each tab overwrites the shared index; orphaned bodies are never evicted, so the store grows past its 300 MB cap | fixed 78ff061 (non-owner tabs read-only; multi-tab case untested) |
-| CR-24 | `engine.ts:1473-1491, 2351-2371` | Frustum gizmo isn't hidden in the normal/silhouette passes → stale ink creases after a world-mode visit (three.js) | obsolete: three.js `engine.ts` removed (583e2b7) |
-| CR-25 | `scripts/ci/run.mjs:97, 252-309` | Ctrl-C leaves detached checks running (and holding the render lock); concurrent `full` runs share :3130 and one kills the other's server | fixed 9388eef |
-| CR-26 | `roll/roll.ts:8`, `vite.config.ts:17-27`; repo | A fresh clone can't build: gitignored `data/ground-truth.json` and `public/photos/photos.json` are imported. No `requirements*.txt` for the Python services | requirements half fixed c7d5c94 (`tools/matcher/requirements.txt`, `tools/nearfield/requirements.txt`; re-verified present 2026-10-02); stub data is a user decision |
-| CR-27 | `gpu/look/hooks.ts:93` | `warmKernelsAsync(device)` without a group compiles every kernel, including subgroup kernels on devices without `subgroups` | fixed (already on master: look/kernel.ts `warmKernelsAsync` defaults to group "look"; subgroup kernels sit in "look-subgroups", warmed only under `hasFeature("subgroups")`; pinned by `look/__tests__/warm-groups.spec.ts`, this commit) |
+| CR-13 | med | `deck-webgpu/engine.ts` `exportImage`; `deck/composite.ts` | Export renders 4× MSAA rgba16f at full photo size (1.4–2.9 GB) → device loss on integrated GPUs. On WebGL one failed export sets `msaa = null` for the session |
+| CR-41 | low | `deck-webgpu/layers/geometry-source.ts`; `deck/engine.ts` `autoAlign` | A superseded render can be marked fresh; `autoAlign` and `silhouetteScore` share `silSources[0]`. (The supersede check in `geometry-source.ts` may cover the first half: re-check) |
+| CR-46 | low | `deck-webgpu/imagery.ts`, `layers/composite.ts`, `hosts/*` `setPhotoAspect` | Pending-upload leak, borrowed/owned photo texture handling, uncleared targets after an aspect change |
+| CR-67 | low | both engines | `silhouetteScoresGpu`, `drawOnly`/`readDrawn` + 4-field pose compare, `occlusionFresh` duplicated across deck and deck-webgpu |
+| CR-W2 | low | `components/site/LiveRollMap.tsx` `onStatus` | `setAutoRotate` on every non-terrain status re-enables rotation after the user grabs the map |
+| CR-26 (part) | low | `vite.config.ts` (`public/photos/photos.json`), `data/ground-truth.json` | Fresh-clone build with gitignored data: `roll.ts` now builds with an empty table; the photos.json plugin path is unverified on a clean clone. Stub data is an owner decision. (Requirements half: `tools/matcher/requirements.txt` c7d5c94; the nearfield one went with the service, 8bb109d0) |
 
-## Low
+Nits not tracked: unwrapped yaw out of `align.ts`; per-frame allocations in `haze-fit.ts`; clockwise wedge rings in `roll/export.ts`; "Summit Lens" in `upload.tsx`; `atm-sky.ts` `#rgba` parsing; `biome.json` schema version; `run.mjs --jobs abc`.
 
-| ID | Where | Problem | State |
-|---|---|---|---|
-| CR-28 | `geo/peaks.ts:39` | `parseMetres("4,478")` = 4.478 | fixed 9b2a4e9 |
-| CR-29 | `engine.ts:1796, 1839-1844, 2549-2576` | World-mode group, trail material and several render targets aren't disposed | obsolete: three.js `engine.ts` removed (583e2b7) |
-| CR-30 | `dem/load.ts` `fetchTile` | `return res.arrayBuffer()` without `await` escapes the retry, so one dropped body fails `Terrain.load` | fixed 9b2a4e9 |
-| CR-31 | `worker-pool.ts:43-51` | No `onmessageerror` or timeout; a job can hang forever | fixed 9b2a4e9 |
-| CR-32 | `cache/store.ts:133-139`, `upload/store.ts:37` | Late IndexedDB opens leak; no `onversionchange` | fixed a584a62 (upload/store) + 46a1821 (cache/store) |
-| CR-33 | `upload/region.ts:376-386` | `attachPhotoToRegion` writes from memory, so concurrent uploads lose ids; `refreshLocalRegion` drops trails | fixed a584a62 |
-| CR-34 | `overpass.ts:36-43,73`, `integration/unknown-pose.ts:202-205` | Abort listener leak; abort doesn't stop the worker's 360° search | fixed 9b2a4e9 (overpass half) |
-| CR-35 | `engine.ts:2491-2503` | `exportImage` has no try/finally (renderer left at export size on OOM) | obsolete: three.js `engine.ts` removed (583e2b7) |
-| CR-36 | `refine/robust.ts:394-456, 802-809` | Covariance mixes the IRLS weights of one pose with the Jacobian of the next | fixed f56d391 (pose bit-identical; σ moves ~1e-9) |
-| CR-37 | `gpu/look/textures.ts` | ~20 kernels redefined under "look-tex" → double compile, synchronous on the render thread; subgroup −1 partials wrap to 4.29e9 (`:1125`) | fixed (already on master: 96a6a6f put textures.ts on one core `defineKernel` set + `kernelAsync` warm-up; the -1e20 sentinel is an f32 negative count, rejected by `subgroupLayoutFailed` / the `v < 0` check before any Uint32 fold; spec in this commit) |
-| CR-38 | `gpu/core/graph.ts:398-401` | A rejected `compileAsync` is never cleared, so the graph can't be retried | fixed fec0515 |
-| CR-39 | `gpu/core/pool.ts:58-61, 225-233` | Unleased growth can destroy a buffer another caller holds (only `sky/bench-graph.ts:186` is unleased) | fixed (grown-out buffers were already retired to the lease end / next submit, f1b6168, and the remaining unleased callers geo-query / height-gather acquire and submit in one synchronous block; bench-graph now runs under `withLease`; invariant documented, afterSubmit specs) |
-| CR-40 | `deck-webgpu/hosts/deck.ts:169-181` | `requestRender` draws synchronously per input event | fixed 6378d85 (one draw per animation frame, `hosts/frame-coalescer.ts`, 100 ms fallback for hidden tabs; browser-unverified) |
-| CR-41 | `deck-webgpu/layers/geometry-source.ts:339-356`; `deck/engine.ts` `autoAlign` | A superseded render can be marked fresh; `autoAlign` and `silhouetteScore` share `silSources[0]` | open |
-| CR-42 | `deck/geometry-pass.ts:187-204` | A fence after context loss re-polls at 1 ms forever | fixed fec0515 |
-| CR-43 | `deck/engine.ts:1741-1743` | `this.geoSrc.pose` read unguarded after a context restore | fixed 46a1821 |
-| CR-44 | `deck-webgpu/hosts/direct.ts:117-122`, `hosts/deck.ts:229-234` | `nextFrame` waiters never settle after destroy | fixed fec0515 |
-| CR-45 | `deck/batched-terrain-layer.ts:265, 516-521` | At the texture-array layer cap, a slot is dropped without releasing its row, forcing full re-uploads | fixed bc98f0e (limit-aware `deck/slot-allocator.ts`: at the cap the tile is skipped and nothing stays held; browser-unverified) |
-| CR-46 | `deck-webgpu/imagery.ts`, `layers/composite.ts:979,1223`, `hosts/*` `setPhotoAspect` | Pending-upload leak, borrowed/owned photo texture handling, uncleared targets after an aspect change | open |
-| CR-47 | `nearfield/generate/inpaint-client.ts:114-196`; `routes/lab.generate.tsx:207-213` | Duplicate client paths with weaker abort handling; lab leaks a PhotoEngine on re-run | fixed 46a1821 (inpaint goes through the near-field client) |
-| CR-48 | `export/splat.ts:368-370` | SHARP (research licence) splats can be exported with a note, not blocked | open |
-| CR-49 | `linalg/index.ts:131-144` | `invSym` reports σ = 0 for unobservable parameters (fails open in integrity) | fixed f56d391 (`invSymCov`: Infinity variance; integrity fails closed) |
-| CR-50 | `pose6dof/solve.ts:588-592` | RANSAC adaptive stop uses an inlier ratio over all correspondence kinds → may stop early (read, not reproduced) | fixed 627d3dd |
-| CR-51 | `concord/app/confidence.ts:18-19` | `{level:"high"}` with no `accepted`/`confidence` isn't LOW, and the test passes `{}` instead | fixed a584a62 |
-| CR-52 | `with-render-lock.mjs:28-76`, `tm_locks.py:19-26`, `run.mjs:460-466` | PID reuse; ownerless lock never cleared; memory wait holds the lock indefinitely; `--update-baseline` after a FAIL lowers the gate | fixed 46a1821 (pid + start time; no `--update-baseline` after a FAIL) + 55d26ef (ownerless locks reclaimed after a 10 s grace; memory wait bounded by `RENDER_LOCK_MEM_WAIT_S`, default 600 s, then starts with a warning; both in `with-render-lock.check.ts`) |
-| CR-53 | `roll/panoGL.ts:150-160`; `upload.tsx` ~:142-200; `roll/import/index.ts:85-88` | Unclosed bitmap; racing pin-click saves; every file hashed twice | fixed fec0515 (panoGL) + 32c8b66 (one hash per imported file) |
+## Closed
 
-Nits not tracked here: unwrapped yaw out of `align.ts`, per-frame allocations in `renderWorld`/`haze-fit.ts:226`, clockwise wedge rings in `roll/export.ts:44-54`, "Summit Lens" in `upload.tsx:45`, `atm-sky.ts:327` `#rgba` parsing, stale code comments (`gpu/solve/index.ts:14`, `deck/batched-terrain-layer.ts` header says opt-in), `biome.json` schema 2.2.4 vs 2.4.5, `run.mjs --jobs abc`.
+Obsolete or decided:
+- CR-24, CR-29, CR-35 three.js `engine.ts` issues: obsolete (engine removed, 583e2b7).
+- CR-48 SHARP splats exportable with a note: obsolete (SHARP dropped, d8e99834); the SHARP note branch in `export/splat.ts` is now dead code.
+- CR-W4 first committed photo set (`public/demo/`): decided, tracked (79a3a7d publication review).
+- CR-W1 landing map poster faded before terrain: fixed (`LiveRollMap` shows the canvas only once the stage leaves `terrain`).
 
-## Uncommitted work at review time (landing, demo roll, peakfix)
-
-| ID | Where | Problem | State |
-|---|---|---|---|
-| CR-W1 | `components/site/LiveRollMap.tsx:65-72` | Poster fades on the first `photos` status, before the terrain arrives | open |
-| CR-W2 | `LiveRollMap.tsx:71`, `roll-map.ts:538-547` | `setAutoRotate` on every status re-enables rotation after the user grabs the map and stacks `start` listeners | open |
-| CR-W3 | `public/demo/manifest.json` | 3 MB (2.98 MB trails) fetched by `/` for ~11 KB of data → split the region out | fixed 4616e41 (manifest 236 KB; trails split out) |
-| CR-W4 | `public/demo/` | 11 MB of photos plus exact GPS and timestamps, the first committed photo set: decide deliberately | open |
-| CR-W5 | `routes/dev.export-roll.tsx:27-33,72` | Ships in prod; effect runs before the DEV guard; object URL not revoked | fixed 46a1821 (guard before hooks, URL revoked) |
-| CR-W6 | `site/TopoBoard.tsx:71-86`, `site/Compare.tsx:30-38`, `scripts/demo/unpack.mjs:103` | Dragged cards reset on mobile resize; no `onPointerCancel`; `--keep-prior` crashes on a null pose | fixed 55d26ef (dragged positions kept normalised across resize; TopoBoard cancel ends the drag without navigating; `poseEntry` guards null poses; `Compare` already had `onPointerCancel` since 298c7cd). Browser-unverified |
-
-Suggested commit split for that work: dev launcher; three.js near-eye cut; RollCard; roll-map options; demo plumbing; landing + library; peakfix (separately, after lint).
-
-## Follow-up review, 2026-10-01 (the 43 commits d84cf69..25d0e24)
-
-| # | Where | Issue | State |
-|---|---|---|---|
-| CR-54 | `deck/engine.ts:682-730` `onContextRestored`, `deck/silhouette-gl.ts` | `silMask` not reset on context restore → every re-rank runs on dead GL handles, reads zeros and falls back to the CPU (correct, slow, GL spam). Fix: `silMask?.destroy(); silMask = null` | fixed 9e1a637 |
-| CR-55 | `deck-webgpu/layers/splats.ts:585` | `onLost` per `setCloud` (never removed) retained each old cloud | fixed b41658f |
-| CR-56 | `baseline-ui/pipeline.worker.ts:203-231`, `usePipeline.ts` | Align now awaits `cascadeAsync`; `run`/`detectSkyline` didn't invalidate it → stale pose lands | fixed b41658f |
-| CR-57 | `deck-webgpu/engine.ts:711-790` `boot` | A throw between `createHost()` and `this.host = host` leaks the device + built cores (the init fallback to WebGL leaves a live WebGPU device) | fixed bb0f9a8 |
-| CR-58 | `gpu/align/index.ts:213,223,258-261` | The private sky copy (`own`) is taken after `await scorePoseGridGpu`, not after `fitPriorSky` → concurrent autoAligns on one EdgeMap can score against each other's sky fit | fixed a6ac3a7 |
-| CR-59 | `renderer-select.ts:25-33,108` | "terroir → WebGL deck" is resolved only at mount; switching to a terroir style on WebGPU silently drops the shading | fixed 366ab83 (WGSL terroir port; 2f9ffd5 was the interim WebGL route) |
-| CR-60 | `deck/engine.ts:1545,2911` | WebGL `TrailLayer` never gets `dash` (1152622 wired only WebGPU) | fixed c72fea1 |
-| CR-61 | `scripts/eval-app.mjs`, `scripts/leaderboard.mjs` | Unset `--renderer` (= auto) launched Chromium without GPU_ARGS → measured WebGL | fixed b41658f |
-| CR-62 | `integration/unknown-pose.worker.ts:166-176` | Failed fused march re-ran the same GPU march before the CPU | fixed b41658f |
-| CR-63 | `look/haze-controller.ts:104-134` | Failed/stale bridged fit falls back to `hazeFitAsync` (GPU) even with `?lookgpu=0` | fixed 6c5e872 |
-| CR-64 | `gpu/splat-sort/splat-sort.wgsl.ts:64-69` (+ cpu twin) | +Inf depth → `maxD = Inf`, every key NaN | fixed b41658f |
-| CR-65 | `deck/weather-layer.ts`; `style.weather` | Dead in HEAD: no importer, no engine reads the field (5c02363 says wiring "follows") | fixed c72fea1 (deck WebGL world view reads `style.world.weather`) |
-| CR-66 | `deck-webgpu/silhouette-gpu.ts:110-150` | Hand-built pipeline with a fake empty-layout KernelSpec: sync compile on the render thread, invisible to kernel-layout-check | fixed bffe801 |
-| CR-67 | both engines | `silhouetteScoresGpu`, `drawOnly`/`readDrawn` + 4-field pose compare, `occlusionFresh` duplicated across deck/deck-webgpu | open |
-| CR-68 | `gpu/align/index.ts:93,98,271`; `gpu/align/graph.ts:34`; `pose-bound.ts:100-107` | Test-only `faultDeflate` global ships in prod; `STORAGE` redefined; `PoseBoundRaw.n` unread | fixed ac07d45 (faultDeflate DEV-gated, STORAGE deduped; `PoseBoundRaw.n` not rechecked) |
-| CR-69 | `relief-graph.ts:80-90`; `SilhouetteMaskGL.compile()`; `look/relief/field.ts:369-381` | Dead `_degenerate` param; link failure leaks shaders/program/VAO; `resident` replaced without dispose (device-loss rebuild only) | fixed (`_degenerate` removed; SilhouetteMaskGL is a luma Model since eb149b5 and `Model.createAsync` destroys itself on link failure; ReliefController disposes a dead resident field; engine passes luma textures to SilhouetteMaskGL) |
-| CR-70 | `sky/sky.worker.ts` idle graph release (2876697) | The idle release ran outside the request queue: a request arriving while it awaited its imports used prep/refine graphs the release then destroyed | fixed 5c47766 (`sky/serial-queue.ts` carries requests and the release; browser-unverified) |
-| CR-71 | `cache/store.ts` `IdbStore.open` (46a1821, CR-32 fix) | The 3 s open-timeout timer was never cleared on a successful open, so 3 s later it closed the live connection; every later get/put threw and became a silent miss (persistent tile cache dead on the IDB backend, e.g. origins without Cache API) | fixed 24b3e88 (timer cleared unless it fired; `cache/__tests__/idb-open.spec.ts`; browser-unverified) |
-| CR-72 | `scripts/gpu/with-render-lock.mjs` `holder()` (46a1821, CR-52 fix) | An unknown current start time (`ps` failed or printed nothing) counted as a pid-recycle mismatch, so a waiter deleted a live owner's lock and two GPU jobs ran at once | fixed 86b8193 (`isStaleOwner` in `render-lock-lib.mjs` never reclaims on an unknown start time) |
-| CR-73 | `routes/roll.import.tsx` `saveAll` catch (32c8b66, CR-03 fix) | The catch looped over the click-time `ready` snapshot, so no item read "saving" and a non-abort `saveRoll` throw left every photo "saving" forever | fixed 44a2af5 (`markSavingFailed` through the functional updater; browser-unverified) |
+Fixed:
+- CR-01 render lock: missing `--` re-ran the wrapper inside its own lock: fixed 9388eef
+- CR-02 render lock: SIGTERM left the child job running: fixed a2bfb76
+- CR-03 `clusterPhotos` union-find ~n³; import re-ran it per file: fixed 9b2a4e9 + 32c8b66
+- CR-04 exports omitted the geoid (ECEF/XMP ~50 m low): fixed a2bfb76
+- CR-05 near-field service open CORS (service since removed, 8bb109d0): fixed 9388eef
+- CR-06 matcher server request forgery (service since removed, 8bb109d0): fixed a2bfb76
+- CR-07 3D mesh path skipped `validateTile` (no-data pits): fixed 9b2a4e9
+- CR-08 bundled-photo eye move saved a mismatched pose: fixed 46a1821 (browser-unverified)
+- CR-09 Step Inside could anchor to a pose auto-align changed mid-build: fixed a584a62
+- CR-10 controller early returns left the phase "loading": fixed a584a62
+- CR-11 haze-fit cache key omitted the fg mask: fixed fec0515
+- CR-12 sky worker cached a failed load; device loss: fixed fec0515 + e50a464 (browser-unverified)
+- CR-14 imagery bitmap cache never evicted: fixed 983d3a9 (browser-unverified)
+- CR-15 above-ground prior not in the LM objective: fixed 627d3dd
+- CR-16 non-converged integrity re-solve kept `ok: true`: fixed a584a62
+- CR-17 integrity masking after the whitener: fixed f56d391
+- CR-18 near peaks read the previous occluder angle: fixed 9b2a4e9
+- CR-19 roll import Clear/saveAll races: fixed 32c8b66 (browser-unverified)
+- CR-20 roll map decoded every photo at once: fixed 32c8b66
+- CR-21 `loadRegion` cached a rejected promise: fixed 9b2a4e9
+- CR-22 NaN in `localMax`: fixed 9b2a4e9
+- CR-23 tile-cache index overwritten across tabs: fixed 78ff061
+- CR-25 Ctrl-C left CI checks running; shared port: fixed 9388eef
+- CR-27 warm-up compiled subgroup kernels without the feature: fixed (on master)
+- CR-28 `parseMetres("4,478")`: fixed 9b2a4e9
+- CR-30 `fetchTile` escaped the retry: fixed 9b2a4e9
+- CR-31 worker pool had no error/timeout: fixed 9b2a4e9
+- CR-32 late IndexedDB opens leaked: fixed a584a62 + 46a1821
+- CR-33 concurrent uploads lost region ids: fixed a584a62
+- CR-34 overpass abort listener leak: fixed 9b2a4e9
+- CR-36 refine covariance mixed two poses: fixed f56d391
+- CR-37 look-tex kernels redefined: fixed 96a6a6f
+- CR-38 rejected `compileAsync` never cleared: fixed fec0515
+- CR-39 unleased pool growth: fixed f1b6168
+- CR-40 WebGPU host drew per input event: fixed 6378d85 (browser-unverified)
+- CR-42 fence re-poll after context loss: fixed fec0515
+- CR-43 unguarded `geoSrc.pose` after restore: fixed 46a1821
+- CR-44 `nextFrame` waiters after destroy: fixed fec0515
+- CR-45 texture-array slot dropped without release: fixed bc98f0e (browser-unverified)
+- CR-47 duplicate inpaint client paths: fixed 46a1821
+- CR-49 `invSym` σ = 0 for unobservable parameters: fixed f56d391
+- CR-50 RANSAC adaptive stop ratio: fixed 627d3dd
+- CR-51 confidence `{level:"high"}` not LOW: fixed a584a62
+- CR-52 render lock PID reuse, ownerless lock, memory wait: fixed 46a1821 + 55d26ef
+- CR-53 unclosed bitmap, pin-save races, double hashing: fixed fec0515 + 32c8b66
+- CR-W3 demo manifest 3 MB: fixed 4616e41
+- CR-W5 `/dev/export-roll` shipped in prod: fixed 46a1821
+- CR-W6 TopoBoard/Compare drag and resize issues: fixed 55d26ef + 298c7cd
+- CR-54 `silMask` not reset on context restore: fixed 9e1a637
+- CR-55 splat `onLost` retained old clouds: fixed b41658f
+- CR-56 stale cascade pose after run/detect: fixed b41658f
+- CR-57 WebGPU boot leak on throw: fixed bb0f9a8
+- CR-58 concurrent autoAlign sky copies: fixed a6ac3a7
+- CR-59 terroir on WebGPU dropped shading: fixed 366ab83
+- CR-60 WebGL trail dash: fixed c72fea1
+- CR-61 harnesses measured WebGL under auto: fixed b41658f
+- CR-62 failed fused march re-ran on GPU: fixed b41658f
+- CR-63 haze fallback ignored `?lookgpu=0`: fixed 6c5e872
+- CR-64 +Inf splat depth: fixed b41658f
+- CR-65 weather layer unwired (WebGL): fixed c72fea1
+- CR-66 hand-built silhouette pipeline: fixed bffe801
+- CR-68 test-only `faultDeflate` in prod: fixed ac07d45
+- CR-69 relief/silhouette dispose leaks: fixed eb149b5
+- CR-70 sky idle release outside the queue: fixed 5c47766 (browser-unverified)
+- CR-71 IDB open timer closed live connections: fixed 24b3e88 (browser-unverified)
+- CR-72 render lock reclaimed on unknown start time: fixed 86b8193
+- CR-73 roll import stuck on "saving": fixed 44a2af5 (browser-unverified)
 
 ## Checked and correct
 
 COLMAP world-to-camera and quaternions; KML lon,lat order and MSL altitude; XMP escaping and GPS rounding; the zip writer; EXIF orientation and GPS refs; ECEF/ENU and Bowring; camera basis and roll sign; the refine Jacobian (re-derived) and the pose6dof Jacobian (finite differences, 1.2e-7); P3P/DLT; FFT; ONNX NCHW input and session reuse; GPU struct packing and uniform layouts in both GLSL and WGSL; 256-byte readback padding and y-flips; dispatch rounding and barrier placement; the "generated splats never exported" invariant; licences on the default near-field path; `torch.load(weights_only=True)`; no committed secrets (`.env.local` is ignored). `VITE_GOOGLE_TILES_KEY` ships in the client bundle by design: restrict it by HTTP referrer.
 
-## Patterns
+## Patterns worth remembering
 
 - **Cancellation is the most common gap:** aborts not passed down, `dispose` without a cancelled check, async compiles that can't be retried, work that keeps running after Clear.
-- **Rare-path leaks:** world-mode three objects, unclosed ImageBitmaps, never-evicting caches.
-- **Drift-prone duplication:** four LM loops with three damping schemes; three guided filters; four sRGB→linear tables; the harmonize WGSL in three copies; `horizonEl`, `azEl`, `focalPx1600` and angle wrappers copied across `pose6dof`/`geocam`/`concord`. `deck-webgpu/layers/multi-drape.ts` (~1.8k lines) has no importer, by design for now.
-- **Repo weight:** ~20 MB of research output is tracked, including `DONE` markers, `.err` logs and JSON dumps over 1 MB (`fund/e0_observability/features.json`, `fund/e1_acontrario/hyp_scores*.json`, `nearfield/spike/results_raw.json`).
+- **Rare-path leaks:** unclosed ImageBitmaps, never-evicting caches.
+- **Drift-prone duplication:** LM loops with different damping, guided filters, sRGB tables, harmonize WGSL copies, angle helpers copied across `pose6dof`/`geocam`/`concord` (see [consolidation-review-2026-10-02.md](consolidation-review-2026-10-02.md) P4).

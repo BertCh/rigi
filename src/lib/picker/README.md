@@ -3,8 +3,8 @@
 Opt-in behind `?picker=on` on `/photo/<id>` (both deck engines: WebGPU, the default, and WebGL `?renderer=deck`). Without the flag nothing is
 rendered and the panel chunk is never loaded, so the default view, classic included, is unchanged.
 
-Why: the matcher's top-4 contains the right pose 27/30 times, while only ~20/50 photos are a safe HIGH
-(`reports/terrain-matching-research.md`, "Strategy carried forward"). Ranking is easier than verification, and a person easily rejects a
+Why: a top-4 (skyline top-2 + feature top-2, study X1) contains the right pose 27/30 times, while only ~20/50 photos are a safe HIGH
+(`reports/terrain-matching-research.md` §2). Ranking is easier than verification, and a person easily rejects a
 wrong skyline once they can compare.
 
 ## Flags
@@ -96,10 +96,10 @@ count as anything in a benchmark, and the summary says how the picker was used, 
 
 - Not done: the long-press magnifier loupe, single-tap undo, visibility-aware `nearbyPeaks` (tap-a-peak report U4). The menu changes (position-keyed taps, fit ranking, 44 px rows, clamping) are browser-unverified.
 
-- Candidate sources: the app's `autoAlign` alternatives or the cascade's. The matcher's ranked views (where
-  the 27/30 top-4 number comes from) are not exposed by the match service yet; adding them needs a service
-  field (top-k fused poses) and a `source: "matcher"`.
-- The recall@3-with-one-tap metric from the archived tm-strategy is not measured yet; the log is the data source for it.
+- Candidate sources: the app's `autoAlign` alternatives or the cascade's. The browser matcher (`src/lib/matcher`)
+  does not expose its ranked hypotheses yet; adding them needs its top-k fused poses and a `source: "matcher"`.
+  (The 27/30 top-4 figure is X1's skyline top-2 + feature top-2 generator, which is not in the app.)
+- The recall@3-with-one-tap metric (`reports/terrain-matching-research.md`, "Strategy carried forward") is not measured yet; the log is the data source for it.
 - Tap-a-peak solves rotation only (eye fixed). An eye error shows up as a large residual on a second tap;
   `pose6dof` could solve position from 3+ taps later.
 - The unknown-pose (upload) path is type-checked but was not browser-tested: every bundled photo has a compass.

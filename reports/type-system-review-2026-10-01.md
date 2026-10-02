@@ -1,5 +1,7 @@
 # Type-system review (2026-10-01)
 
+*Open items re-checked 2026-10-02. Generated reference: [ontology.md](ontology.md); design: [ontology-design.md](ontology-design.md).*
+
 A repo-wide review of how Rigi's types describe its problem, and the consolidation that followed. Six read-only surveys covered geometry primitives, camera and pose, terrain/horizon/peaks, provenance and storage adoption, the render and compute engines, and app records with dead code. Every change below is type-level, or behaviour-identical by construction, and each wave passed tsc and the fast tier on a clean clone of HEAD.
 
 ## The problem space, as types
@@ -49,16 +51,16 @@ Under the domain layer, the ontology core provides the axes:
 4. **Homonyms outside the catalogue remain.**
    - Two `RidgeTops`, in roll/mosaic and gpu/horizon. They are structurally equal, but gpu/horizon is in flight.
    - `Mask8` (it also accepts `Uint8ClampedArray`).
-   - The atlas-page `Verdict` types.
+   - The Gipfelbuch-page `Verdict` types.
    - Generic `State`/`Params`/`Source` names in about 15 files.
 5. **Module names and boundaries.**
    - `align.ts` is skyline refinement plus the pin solve.
-   - `pose.ts` is the three.js adapter, while `camera/` is the model.
-   - `geo/` overlaps top-level `terrain.ts`, `refine/` and `horizon-fast/`.
+   - `pose.ts` is now the math.gl adapter (`ViewCamera`, since dd05828f), while `camera/` is the model; the name still suggests the model.
+   - `geo/` overlaps `refine/` and `horizon-fast/`.
    - UI components live under `src/lib` (export, upload, picker, roll).
-   - `PhotoWorkspace.tsx` (2135 lines) mixes state, engine wiring, persistence and the matcher.
+   - `PhotoWorkspace.tsx` (2334 lines on 2026-10-02) mixes state, engine wiring, persistence and the matcher.
 6. **Wire formats.**
-   - The matcher request and response are mirrored by hand in Python.
+   - The matcher service is gone (8bb109d0); the Python reference in `tools/matcher/reference/` still mirrors the browser types by hand for parity fixtures.
    - The `.splat-v1` header (`GaussianMeta`) is parsed with an unchecked cast.
 7. **Naming.** `yaw` and `heading` are used for the same quantity. The ontology's `Direction` uses `az`/`el`.
 

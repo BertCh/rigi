@@ -4,7 +4,7 @@
 
 // The cartographic palette: one named source for every map colour that more than one place uses
 // (presets, terroir inks, hatching, the engines' world sky, the Alpine tint shaders). Consumers
-// import a token; they never re-type the literal. Report: reports/cartography-consolidation-2026-10-02.md.
+// import a token; they never re-type the literal. Report: reports/swiss-cartography-review.md §3.4.
 //
 // Provenance of each token, in its doc comment:
 //   classic   the pre-style hard-coded look; CLASSIC must stay pixel-identical, so never retune it

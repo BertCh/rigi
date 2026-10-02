@@ -3,6 +3,16 @@
 Whole-image concordance (plan: `reports/concordance-research.md`). Flags: `?concord=eye,occl,labels,drape`
 (`flags.ts`, all off by default; `labels` and `drape` act only together with `occl`).
 
+| dir | what | status |
+|---|---|---|
+| `core` | `CameraX` (pinhole + optional k1), distance bands, residual-field types (frozen WP-A API) | used by cues and the GEO evals |
+| `cues` | interior occluding contours, edge distance transform, waterlines | offline (GA1/GA5 evals, `scripts/concord/eval.ts`) |
+| `priors` | per-LensModel focal table, altitude-contour eye prior, near-DEM ground | focal table positive on holdout (n = 2); `?concord=eye` applies it to the photo's vfov prior (`src/lib/photos.ts getPhoto`). Altitude rule negative |
+| `occl` | swissSURFACE3D/swissALTI3D COG reader, nDSM occluder grid, C4 hooks | `?concord=occl` dims overlays in both deck composites |
+| `app` | `runConcordDisplay`, `useConcordDisplay`, fail-closed `isLowConfidence` | wired in PhotoWorkspace |
+
+Results and open items: `reports/concordance-research.md` §7. Accuracy claims wait on the blind interior pins (`tools/concord/pins/PROTOCOL.txt`).
+
 ## C4 label and drape hooks (`occl/hooks.ts`)
 
 Derived from the occluder range grid `runConcordDisplay` already computes (one DSM fetch, one pass):

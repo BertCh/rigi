@@ -1,5 +1,7 @@
 # Rigi dataflow map: today's pipeline, as input to a "whole app = one luma.gl command graph" plan
 
+*Note 2026-10-02: §5's islands I0–I12 are still the vocabulary of `src/lib/gpu/app-graph/manifest.ts`; the file:line references and the ORT/MediaPipe/three.js realms are as of 2026-10-01 and stale. Open items: `reports/gpu-renderer.md`.*
+
 Date: 2026-10-01. Tree: master @ b1b4d9d plus a dirty working tree. This was a read-only pass.
 
 Paths are relative to `src/lib` unless they start with `src/`.

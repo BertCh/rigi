@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Pure helpers behind the multi-image tiles (Trio, Gallery) so their class choice and verdict
-// vocabulary can be specced without a DOM. Spec: reports/gipfelbuch-explainers-2026-10-02/L-live-and-tiles.md §4.1, §5.
+// vocabulary can be specced without a DOM. Spec: reports/gipfelbuch.md
 
 /**
  * What a Gallery tile says about its photo (one meaning per word):

@@ -6,7 +6,7 @@ import { type ReactNode, useId } from "react";
 import type { GipfelbuchStatus } from "#/lib/gipfelbuch/types";
 import { HandDot, PenLine, SketchPath, SketchPolyline } from "../notebook/Ink";
 
-// LK point symbols drawn by hand (reports/gipfelbuch-hand-sketch-research/swiss-cartography.md §1,
+// LK point symbols drawn by hand (reports/archive/gipfelbuch-swiss-cartography.md §1,
 // S4-S6, S19): pen strokes with overshoot, heights in italic hand figures (LK rule E1).
 
 /** LK spot height: a hand dot or a pen × (S5) and the elevation in italic hand figures. */

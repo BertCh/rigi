@@ -1,5 +1,7 @@
 # People in Step Inside: single-image human completion (2026-09-29)
 
+> **Status (2026-10-02):** a licence and model survey (2026-09-29). The path being built is the frontend one (ViTPose on `src/lib/nn` + an Anny fit, `src/lib/body`, `?peopleBody=on`; uncommitted 2026-10-02), chosen in `frontend_completion_models_2026-10.md`; "the service" below means the near-field service removed 2026-10-02.
+
 **Problem.** Step Inside turns people into 2.5D front shells: no back, and smeared hair and edges (see `reports/step-inside-results.md`). The classic drape already masks 98% of person pixels. The gap is Step Inside itself: people look like cardboard as soon as the camera moves off the photo eye.
 
 **Goal.** Give each person (1–3 per photo, often occluded, cropped or small) a full 3D body. It should be textured from the photo, have a plausible back, and stand at metric scale on the DEM ground.

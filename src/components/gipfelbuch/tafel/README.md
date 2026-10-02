@@ -1,12 +1,10 @@
-# Tafel: the peak-notebook hero, ledger and sheet index
+# Tafel: the sheet hero, ledger, sheet index and Wegnetz
 
-The design and its decisions are in `reports/peak-notebook-plan.md`. Read §0, including the softer-sheet amendment, and §6–§7. The working prototype is in `reports/peak-notebook/prototype/` (`sheet.html`, `index.html`, `layers2.js`, `common.js`). Its look is the target, except that the softer-sheet amendment wins.
-
-This folder is new. It must not edit `swiss/**`, `notebook/**`, `viz/**`, `ConceptPage.tsx`, the pages or the `gipfelbuch.*` routes. Session mt-image-44 holds those until it releases them; it reads them, not writes them. Integration into `ConceptPage` and the index route happens after that release.
+The Tafel is the panorama-table hero at the top of a sheet: the solved photo with its measured world (ridge strokes, compass ruler, summits beyond the frame) baked per photo. This folder also holds the ledger, the per-sheet `SHEETS` table, the Blattübersicht index and the Wegnetz trail map. Design rules and decisions (paper in both themes, Tafel on a `--gb-paper-deep` plate, H1 = name and claim = dek, picker-driven index): `reports/gipfelbuch.md`.
 
 ## Files
 
-| File | Owner lane | What |
+| File | Part | What |
 | --- | --- | --- |
 | `scripts/gipfelbuch/data-tafel.ts` | bake | Bakes `public/demo/gipfelbuch/tafel/demo-NN.{webp,json}` for the 12 photos. |
 | `tafel/project.ts` | core | `projectAzEl(cam, w, h, az, el)`: the pinhole projector (roll sign −1), validated against `solvedRows`. |
@@ -20,7 +18,9 @@ This folder is new. It must not edit `swiss/**`, `notebook/**`, `viz/**`, `Conce
 | `tafel/sheets.tsx` | sheets | `SHEETS`: per sheet, its Tafel layer, its index band, its ledger and its index value. |
 | `tafel/Blattuebersicht.tsx` | sheets | The index: photo picker, chapters, cards. |
 | `tafel/sheets.check.ts` | sheets | All 16 sheets present, ledger paths resolve on all 12 photos, chapters cover every node exactly once. |
-| `tafel/index.ts` | core (sheets appends) | Barrel. |
+| `tafel/Wegnetz.tsx`, `tafel/wegnetz-layout.ts` | index | The concept graph as a hand-drawn trail map (the only node-link drawing allowed); `__tests__/wegnetz.spec.ts`. |
+| `tafel/SheetColophon.tsx` | shell | The sheet's colophon: the developer facts (code, reports, provenance). |
+| `tafel/index.ts` | core | Barrel. |
 
 ## Contracts
 
@@ -79,30 +79,12 @@ export const SHEETS: Record<string, SheetFigures>; // keyed by GipfelbuchNode id
 
 ## Rules
 
-These apply to every lane.
+The general canon is in `reports/gipfelbuch.md`; these are the Tafel-specific ones.
 
-- **Data is exact.** Every number comes from `public/demo/gipfelbuch/*.json` or the bake. Strokes that carry data are at least 1.2 px. Furniture may use `Ink.tsx` pen helpers (import only) and may wobble; data never does.
-- **Softer sheet.**
-  - No grain, tape, tilt, margin rules, outlines or boxes. Space separates.
-  - The Tafel plate is `var(--gb-paper-deep)`.
-  - The Blatt number is plain red mono, with no hand circle.
-  - Hand face (`--nb-hand` / `.nb-hand`): at most one note per figure. Words only, never digits.
-- **Type.** Only `TYPE` roles from `swiss/type.ts`: 11/13/16/20/24/40/56, and `display` for the H1. No inline font names; use classes and `--gb-font-*` tokens. Numbers go in `gb-num` or mono.
-- **Inks.** Use roles via the `--gb-*` tokens. If you add aliases (`--gb-terrain` → `--gb-contour`, `--gb-measure` → `--gb-water`, `--gb-route` → `--gb-red`, `--gb-peak` → `--gb-navy`, `--gb-result` → `--gb-forest`), declare them in `tafel.css` on `.gb-swiss` **and** on `.gb-swiss [data-theme="dark"]`, because aliases resolve where they are declared.
-  - `fill="var(--x, #hex)"` attributes are fine.
-  - Never write a resolved `color-mix(…)` string into an SVG attribute.
-  - On-photo overlays use `#fff` with a soft shadow, plus `LAYER_STYLE` colours from `viz/real.tsx`.
-- **Responsive.** The spill and spill labels show at 720 px and up. Below that, the photo band runs at full width with at most 3 labels, and the ruler labels every 30°. Scale ticks and strokes with the rendered width, with floors.
-- **Motion.** Static is the design. Any draw-on sits behind `prefers-reduced-motion: no-preference` and is off under `navigator.webdriver`.
-- **Perf.**
-  - No live SVG filters.
-  - The spill is one element with CSS `mask-image`.
-  - `useMemo` paths.
-  - Fetch the bake only when the Tafel is near the viewport, using `useInView` from `viz/hooks.ts`.
-- **Code style.**
-  - Every new file starts with the Rigi SPDX header (see `AGENTS.md`).
-  - Run `npx biome check --write <your files>`.
-  - `npx tsc --noEmit -p .` must show no errors in your files. Other sessions' files may have errors; ignore those.
-- **Browser work goes through the render lock:** `node scripts/gpu/with-render-lock.mjs -- <cmd>`.
-- **Shared machine.** Kill processes only by your own PID. Never use `pkill -f` or `killall`.
-- **Shell gotcha.** The shell is zsh, which does not word-split `$var`. Use arrays, or `bash -c`.
+- **Data is exact.** Every number comes from `public/demo/gipfelbuch/*.json` or the bake. Measured strokes are at least 1.2 px and use the pen kit's `data` mode (one pass within 0.5 px).
+- **Sheet.** No grain, tape, tilt, margin rules, outlines or boxes; space separates. The Tafel plate is `var(--gb-paper-deep)`. The Blatt number is written in hand figures (`nb-num`). Every rule and frame in the index is a pen stroke.
+- **One hero per sheet.** A page whose Fig. 1 is a spilled `RealPhoto` is listed in `PAGE_HERO` (`sheets.tsx`) and the shell skips its Tafel. The ledger has exactly three measured items (`sheets.check.ts`).
+- **Inks.** Use the `--gb-*` roles. Aliases (`--gb-terrain` → `--gb-contour`, `--gb-measure` → `--gb-water`, `--gb-route` → `--gb-red`, `--gb-peak` → `--gb-navy`, `--gb-result` → `--gb-forest`) are declared in `tafel.css` on `.gb-swiss` **and** on `.gb-swiss [data-theme="dark"]`, because aliases resolve where they are declared. `fill="var(--x, #hex)"` attributes are fine; never write a resolved `color-mix(…)` into an SVG attribute. On-photo overlays use the `LAYER_STYLE` colours from `viz/real.tsx`.
+- **Responsive.** The spill and its labels show from 720 px. Below that the photo band runs full width with at most 3 labels and the ruler labels every 30°. Scale ticks and strokes with the rendered width, with floors.
+- **Motion.** Static is the design; any draw-on sits behind `prefers-reduced-motion: no-preference` and is off under `navigator.webdriver`.
+- **Perf.** No live SVG filters; the spill is one element with a CSS `mask-image` (`.tafel-spill`); `useMemo` paths; fetch the bake only near the viewport (`useInView`).

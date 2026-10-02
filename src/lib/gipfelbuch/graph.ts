@@ -5,7 +5,7 @@
 // The Rigi Gipfelbuch: a deliberately tiny, curated graph of the core of Rigi (viewport inference, terrain
 // snapping and what the app does with a pose). Hand-maintained; add a node only if it earns a deep page.
 // The array is in reading (data-flow) order, so Blatt n is the n-th sheet: I infer the camera, II pin it
-// to the terrain, III use the pose (reports/peak-notebook-plan.md §0).
+// to the terrain, III use the pose (reports/gipfelbuch.md).
 import type { GipfelbuchNode } from "./types";
 
 export const GIPFELBUCH_NODES: GipfelbuchNode[] = [

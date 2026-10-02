@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Accept-rule evidence on the wild DEV half only (reports/steps-2026-10-02/accept-rule.md).
+// Accept-rule evidence on the wild DEV half only (reports/archive/steps-2026-10-02/accept-rule.md).
 //
 //   npx tsx scripts/accept/risk-coverage.ts [--json]
 //

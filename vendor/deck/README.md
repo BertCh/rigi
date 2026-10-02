@@ -172,8 +172,8 @@ b6a8c84398793b39433bff585475d3bf29de3f31ee77e6b96fe4804c20a79f25  vendor/deck/de
 
 ## Contents
 
-Only `dist/` (full build, used by the WebGPU lab `scripts/deck-webgpu/vite.webgpu.config.ts`),
-`dist.webgl-only/` (the `visgl:webgl-only` export condition the app's `vite.config.ts` selects),
+Only `dist/` (the full build; the only one the app resolves, since e9695f69 and 422a2c87),
+`dist.webgl-only/` (the `visgl:webgl-only` export condition; no longer selected by `vite.config.ts`),
 `package.json` and `README.md`. `src/` and all `*.map` files were stripped (and the
 `//# sourceMappingURL=` comments removed) to keep the tarballs small (rigi.3: core 537420 B + layers 264820 B; rigi.2 had 536539 B + 264533 B,
 rigi.1 had 516450 B + 264533 B).

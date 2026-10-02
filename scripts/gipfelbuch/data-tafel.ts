@@ -10,7 +10,7 @@
  *   npx tsx scripts/gipfelbuch/data-tafel.ts [--horizon-only] [demo-01 demo-02 ...]
  *
  * The ridgelines are traceViewpoint from the photo's eye (as scripts/demo/bake-surround.ts), projected
- * with the prototype pinhole projector (reports/peak-notebook/prototype/common.js, roll sign -1) at
+ * with the prototype pinhole projector (now tafel/project.ts, roll sign -1) at
  * the photo's solved camera (app camera when the solve was rejected), so the strokes leave the photo
  * exactly where `solvedRows` does. The seam check projects `horizon.profile` against `solvedRows`.
  * Writes public/demo/gipfelbuch/tafel/<id>.webp and <id>.json. Run `npx biome check --write` on the

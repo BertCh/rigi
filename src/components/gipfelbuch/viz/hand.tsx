@@ -7,7 +7,7 @@ import { cn } from "#/lib/utils";
 import { type InkColor, inkColor, SketchPath } from "../notebook/Ink";
 import { createRandom, hashSeed, sketchCircle } from "../notebook/sketch";
 
-// Hand marks for the HTML chrome of the viz kit (hand pass, reports/gipfelbuch-hand-sketch-2026-10-01.md):
+// Hand marks for the HTML chrome of the viz kit (hand pass, reports/gipfelbuch.md):
 // underlines, side rules, an overshooting box and a pen loop. Each is an absolutely positioned SVG
 // stretched over its (positioned) parent with non-scaling strokes, so it needs no measuring and renders
 // the same on the server. Stretching only lengthens the wobble along the line; jitter across it stays in

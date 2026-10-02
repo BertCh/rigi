@@ -68,8 +68,8 @@ const STAND = "2026-10";
 const REGISTER_INITIALS = "R. C.";
 
 // G5/G6: page grid on named lines (design book). Columns 3-8 carry the text (at most 66 ch); the
-// margin (9-12) is MarginNote's lane beside the prose. The hand pass (reports/gipfelbuch-hand-sketch-
-// 2026-10-01.md, K-C) opens every sheet as a summit-register entry: the register line, the lettered
+// margin (9-12) is MarginNote's lane beside the prose. The hand pass (reports/gipfelbuch.md, Canon:
+// Layout) opens every sheet as a summit-register entry: the register line, the lettered
 // name with a marker underline, the claim as a hand note and the sheet's one stamp, then the
 // full-bleed Tafel.
 const PAGE_GRID =

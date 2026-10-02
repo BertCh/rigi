@@ -4,7 +4,7 @@
 
 import type { GipfelbuchPhotoData } from "../viz/real";
 
-// The three chapters of the Blattuebersicht, in data-flow order (reports/peak-notebook-plan.md, D-PN4).
+// The three chapters of the Blattuebersicht, in data-flow order (reports/gipfelbuch.md).
 // Every GIPFELBUCH_NODES id appears in exactly one chapter; sheets.check.ts proves it.
 
 export interface TafelChapter {

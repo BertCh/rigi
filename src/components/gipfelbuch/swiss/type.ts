@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // The Gipfelbuch type programme: a 6px unit, a 24px baseline and seven sizes. See
-// reports/gipfelbuch-field-notebook-design.md (sections 2 and 3). Not exported from ./index.ts;
+// reports/gipfelbuch.md. Not exported from ./index.ts;
 // import it by path.
 
 export const GB_UNIT = 6;
