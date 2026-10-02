@@ -55,6 +55,7 @@ import {
 	skylineBand,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import { LiveHowItWorks } from "#/components/gipfelbuch/viz/live";
 import { gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -113,19 +114,19 @@ const STAGES = [
 		fn: "loadTerrain",
 		sub: "sceneHorizon",
 		out: "360° horizon",
-		cost: "4.7 s classic",
+		cost: "4.3 s classic",
 	},
 	{
 		fn: "detectSkyline",
 		sub: "per-column Viterbi",
 		out: "photo skyline",
-		cost: "150 ms",
+		cost: "161 ms",
 	},
 	{
 		fn: "solvePose",
 		sub: "grid → Cauchy LM",
 		out: "yaw pitch roll f",
-		cost: "95 ms",
+		cost: "97 ms",
 	},
 	{
 		fn: "confidence gate",
@@ -703,10 +704,9 @@ function GateArtefact({
 // ======================================================================================
 // Fig. D4: the cascade as a flow of the 12 benchmark photos
 // ======================================================================================
-// src/lib/geo/README.md, "classic + solve" 8/12; "classic + cascade" 11/12; refine rescues 7063, 7068, 7155.
+// Latest eval (Fig. D5): "classic + solve" accepts 9, "classic + cascade" 11; refine rescues IMG_7068 and IMG_7155.
 const PHOTOS = [
-	...Array.from({ length: 8 }, () => "solve" as const),
-	"refine",
+	...Array.from({ length: 9 }, () => "solve" as const),
 	"refine",
 	"refine",
 	"none",
@@ -732,7 +732,7 @@ function CascadeFlow() {
 	return (
 		<Figure
 			label="Fig. D4"
-			caption="Schematic routing of the 12 hand-registered photos through the cascade (src/lib/geo/README.md, 2026-09-24; the per-photo rows of the latest eval are in Fig. D5). Eight are accepted by solvePose alone in 0.02 to 0.15 s each on the demo photos. Refine runs only on the rejects and rescues three, all within 0.4°. One ultra-wide shot of a near ridge, with the eye itself off, is left to manual taps. Zero false accepts."
+			caption="Schematic routing of the 12 hand-registered photos through the cascade (src/lib/geo/README.md, 2026-09-24; the per-photo rows of the latest eval are in Fig. D5). Nine are accepted by solvePose alone in 0.02 to 0.15 s each on the demo photos. Refine runs only on the rejects and rescues two (IMG_7068, IMG_7155). One ultra-wide shot of a near ridge, with the eye itself off, is left to manual taps. Zero false accepts."
 		>
 			<div ref={ref}>
 				<svg
@@ -749,8 +749,8 @@ function CascadeFlow() {
 						label="12 photos"
 						sub="prior + horizon + skyline"
 					/>
-					<Box x={200} y={95} w={130} label="solvePose" sub="8 accepted" hot />
-					<Box x={390} y={95} w={110} label="refinePose" sub="+3 rescued" hot />
+					<Box x={200} y={95} w={130} label="solvePose" sub="9 accepted" hot />
+					<Box x={390} y={95} w={110} label="refinePose" sub="+2 rescued" hot />
 					<Box x={555} y={95} w={78} label="manual" sub="1 left" />
 					{/* rails */}
 					<Rail d="M130 120 H200" />
@@ -1042,7 +1042,8 @@ function TimeBar({ d }: { d: GipfelbuchPhotoData }) {
 			v: d.ms.solve,
 			c: STAGE_COLOURS[3],
 		},
-	];
+		// a 0 means the tile cache was warm in the bake, not a measurement: leave it out
+	].filter((p) => p.v > 0);
 	const total = parts.reduce((a, p) => a + p.v, 0);
 	return (
 		<div className="mt-4">
@@ -1521,8 +1522,8 @@ function Deep() {
 								<>
 									The {A("skyline", "skyline")} in the photo: a sky colour
 									model, then a Viterbi boundary per pixel column, each with a
-									weight. 116 to 464 ms at 800 px in the measured runs (median
-									150 ms). Columns with no sky (a roof, a hand) carry no vote.
+									weight. 111 to 255 ms at 800 px in the measured runs (median
+									161 ms). Columns with no sky (a roof, a hand) carry no vote.
 								</>
 							),
 						},
@@ -2063,7 +2064,7 @@ function YawSearch() {
 	const idxPhoto = idx?.photos.find((p) => p.id === id);
 	return (
 		<Figure
-			label="Fig. 2"
+			label="Fig. 3"
 			bleed
 			caption={
 				<>
@@ -2222,6 +2223,18 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
+			<LiveHowItWorks
+				number="2"
+				title="Predict, find, slide, snap"
+				caption="The same solve as Fig. 1, replayed live in the browser on the baked demo scene: the predicted skyline, the traced one, the slide, the snap. Drag the terrain line once it has snapped."
+				notes={[
+					{
+						text: "no network, no server: the browser does all of it",
+						at: [0.1, 0.1],
+					},
+				]}
+			/>
+
 			<Beat kicker="The solve" title="Sliding is a search for the deepest dip.">
 				<p>
 					We try every yaw, the way the camera points, within 25° of the
@@ -2283,7 +2296,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Figure
-				label="Fig. 3"
+				label="Fig. 4"
 				caption="Fixed: demo-11 and demo-12. Same head on the ridge, two verdicts. Demo-11 is rejected; demo-12 is rescued by the second solver."
 			>
 				<Gallery

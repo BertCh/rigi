@@ -58,6 +58,7 @@ import {
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
 import { Eq, Op, Sym } from "#/components/gipfelbuch/viz/math";
+import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Viewport inference: how a photo's yaw / pitch / roll / focal are solved against the DEM horizon.
@@ -1744,16 +1745,18 @@ function MeasuredStats() {
 	const idx = useGipfelbuchIndex();
 	if (!idx) return null;
 	const P = idx.photos;
+	// accepted photos only: a refused solve's yaw is not trusted (same definition as the front Numbers)
+	const A = P.filter((p) => p.accepted);
 	return (
 		<>
 			<div className="!mt-6 grid grid-cols-2 gap-5 sm:grid-cols-4">
 				<Stat
-					value={`${median(P.map((p) => Math.abs(p.delta.yaw))).toFixed(1)}°`}
-					label="median compass error corrected, demo photos"
+					value={`${median(A.map((p) => Math.abs(p.delta.yaw))).toFixed(1)}°`}
+					label="median compass error corrected, accepted demo photos"
 				/>
 				<Stat
-					value={`${median(P.map((p) => p.residual.prior.median)).toFixed(1)} → ${median(P.map((p) => p.residual.solved.median)).toFixed(1)} px`}
-					label="median skyline error, prior → solved, demo photos"
+					value={`${median(A.map((p) => p.residual.prior.median)).toFixed(1)} → ${median(A.map((p) => p.residual.solved.median)).toFixed(1)} px`}
+					label="median skyline error, prior → solved, accepted demo photos"
 				/>
 				<Stat
 					value={`${P.filter((p) => p.accepted).length} / 12`}
@@ -2062,7 +2065,9 @@ function HeroCompare() {
 			caption={
 				<>
 					{d
-						? `The phone's compass was ${Math.abs(d.solved.delta.yaw).toFixed(1)}° off here. Slide the wipe: the map's skyline snaps onto the ridge.`
+						? d.solved.accepted
+							? `The phone's compass was ${Math.abs(d.solved.delta.yaw).toFixed(1)}° off here. Slide the wipe: the map's skyline snaps onto the ridge.`
+							: `The solver's best guess moved the compass ${Math.abs(d.solved.delta.yaw).toFixed(1)}°, but the fit was rejected (confidence ${d.solved.confidence.toFixed(2)}), so the app keeps the phone's pose. Slide the wipe to see why.`
 						: "Slide the wipe between the guess and the solved pose."}{" "}
 					<Key color={PRIOR_C} dashed>
 						map at the phone's guess
@@ -2214,7 +2219,7 @@ function MiniMap({ id }: { id: GipfelbuchPhotoId }) {
 function Verdicts() {
 	return (
 		<Figure
-			label="Fig. 2"
+			label="Fig. 3"
 			bleed
 			caption={
 				<>
@@ -2252,6 +2257,23 @@ function Verdicts() {
 				)}
 			/>
 		</Figure>
+	);
+}
+
+/** Caption of the guess, search, snap story, from the picked photo's measured residual. */
+function ViewportStoryCaption() {
+	const [photoId] = useNotebookPhoto();
+	const d = useGipfelbuchPhoto(photoId);
+	if (!d)
+		return <>The phone's guess, the traced skyline, then the solved pose.</>;
+	const yaw = Math.abs(d.solved.delta.yaw).toFixed(1);
+	return (
+		<>
+			{d.solved.accepted
+				? `The search turned the view ${yaw}° and snapped the names onto their summits: skyline gap ${d.residual.prior.median.toFixed(0)} → ${d.residual.solved.median.toFixed(1)} px.`
+				: `The search moved the view ${yaw}°, but the fit was rejected (confidence ${d.solved.confidence.toFixed(2)}), so the app keeps the phone's pose.`}{" "}
+			<Measured data={d} />
+		</>
 	);
 }
 
@@ -2331,6 +2353,13 @@ function ViewportInference({ node: _node }: { node: GipfelbuchNode }) {
 					]}
 				/>
 			</Beat>
+
+			<PhotoStory
+				bleed={false}
+				number="2"
+				title="Guess, search, snap"
+				caption={<ViewportStoryCaption />}
+			/>
 
 			<Beat kicker="Where it fails" title="When the fit is weak, we say so.">
 				<p>

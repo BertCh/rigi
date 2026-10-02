@@ -34,6 +34,7 @@ import {
 	Figure,
 	Flow,
 	HandLabel,
+	LiveDrape,
 	MarginNote,
 	Measured,
 	Plot,
@@ -1026,7 +1027,9 @@ function AskTheMap({ d }: { d: TerrainData | null }) {
 		{ n: 3, x: midX + 0.5, y, h: row[midX], t: "North of the camera" },
 		{ n: 4, x: westX + 0.5, y, h: row[westX], t: "Down the slope" },
 	];
-	const drop = cam - row[midX];
+	// the drop is within the demo-01 patch, so it starts from demo-01's own ground, not the picked photo's
+	const eye01 = d.eyes.find((e) => e.id === "demo-01") ?? d.eyes[0];
+	const drop = eye01.groundMapterhorn - row[midX];
 	const lo = Math.min(...row) - 40;
 	const hi = Math.max(...row) + 40;
 	const PX = (v: number) => (v / (row.length - 1)) * 360;
@@ -1437,6 +1440,24 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<LevelCost data={data} />
+
+			{/* The shell Tafel spills this sheet's one photo: the plate keeps its frame, no surround or line art. */}
+			<LiveDrape
+				number="Fig. 5"
+				title="Heights under the sample roll"
+				notes={[
+					{
+						text: "every height here is one sampler answer at (lon, lat, distance)",
+						at: [0.4, 0.5],
+						side: "left",
+					},
+					{
+						text: "near ground is sharp, far ridges come from coarser tiles",
+						at: [0.75, 0.25],
+						side: "right",
+					},
+				]}
+			/>
 
 			<Numbers
 				items={[

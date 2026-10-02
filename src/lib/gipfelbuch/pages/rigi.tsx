@@ -15,23 +15,23 @@ import {
 	SketchPath,
 } from "#/components/gipfelbuch/notebook/Ink";
 import {
-	CircledNumber,
 	HandMark,
 	PencilLayer,
 	Wash,
 } from "#/components/gipfelbuch/notebook/marks";
+import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import {
-	AlignmentStoryProvider,
 	CodeRef,
 	Figure,
 	type GipfelbuchPhotoData,
 	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	LiveHowItWorks,
 	MarginNote,
 	Measured,
+	PhotoStory,
 	RealPhoto,
-	StoryMap,
 	useGipfelbuchIndex,
 	useGipfelbuchPhoto,
 	useReducedMotion,
@@ -42,13 +42,10 @@ import {
 	Compare,
 	Details,
 	Gallery,
-	Key,
 	Numbers,
-	Stages,
 	skylineBand,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
-import { HowItWorksScene } from "#/components/site/how/HowItWorksScene";
 import { byId, gipfelbuchHref, groupColor } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -210,7 +207,7 @@ function Registration() {
 										size={LABEL_SMALL}
 										color={inkColor("faint")}
 									>
-										{`${((i - 6) * 4.6) | 0}°`}
+										{`${(((i - 6) * 60) / PX_PER_DEG).toFixed(0)}°`}
 									</HandLabel>
 								)}
 							</g>
@@ -262,7 +259,7 @@ function Registration() {
 						color="pencil"
 						width={1.1}
 					/>
-					<HandText x={300} y={H - 38} size={19} color="pencil" rotate={1.5}>
+					<HandText x={300} y={H - 12} size={19} color="pencil" rotate={1.5}>
 						{ok ? "lines coincide: accepted ✓" : "why does 3° look so big?"}
 					</HandText>
 					<CircledKey x={W - 30} y={62} value={1} seed="rigi-key-1" />
@@ -396,101 +393,25 @@ function Constellation({ accent }: { accent: string }) {
 const A = ({ id, children }: { id: string; children: React.ReactNode }) =>
 	byId.has(id) ? <Link to={gipfelbuchHref(id)}>{children}</Link> : children;
 
-/** Hero: one real photo, four stages from the phone's guess to labelled peaks. */
+/** Hero: one real photo, the alignment written on it in four steps (guess, measure, correct, snap). */
 function HeroStages() {
-	const d = useGipfelbuchPhoto("demo-01");
+	const [photoId] = useNotebookPhoto();
+	const d = useGipfelbuchPhoto(photoId);
 	const crop = useMemo(() => (d ? skylineBand(d, 360) : undefined), [d]);
 	const yaw = d ? Math.abs(d.solved.delta.yaw).toFixed(1) : null;
 	return (
-		<Figure
-			label="Fig. 1"
-			bleed
+		<PhotoStory
+			number="Fig. 1"
+			crop={crop}
 			caption={
 				<>
 					{d
-						? `On this photo the phone's compass was ${yaw}° off; the median gap to the skyline falls from ${d.residual.prior.median.toFixed(0)} to ${d.residual.solved.median.toFixed(0)} px.`
-						: "One real photo, four stages."}{" "}
+						? `On this photo the phone's compass was ${yaw}° off; the median gap to the skyline falls from ${d.residual.prior.median.toFixed(1)} to ${d.residual.solved.median.toFixed(1)} px.`
+						: "One real photo, four steps."}{" "}
 					<Measured data={d} />
 				</>
 			}
-		>
-			<AlignmentStoryProvider initial={0}>
-				<Stages
-					aside={<StoryMap data={d} />}
-					stages={[
-						{
-							label: "Photo",
-							pose: 0,
-							caption:
-								"Rigi starts with the photo and what the phone noted down.",
-							render: () => (
-								<RealPhoto bleed data={d} layers={[]} crop={crop} />
-							),
-						},
-						{
-							label: "Phone's guess",
-							pose: 0,
-							caption: (
-								<>
-									The compass guess draws{" "}
-									<Key color={LAYER_STYLE.prior.color} dashed>
-										the terrain's skyline
-									</Key>{" "}
-									beside{" "}
-									<Key color={LAYER_STYLE.skyline.color}>
-										the photo's skyline
-									</Key>
-									. They disagree.
-								</>
-							),
-							render: () => (
-								<RealPhoto
-									bleed
-									data={d}
-									layers={["skyline", "prior"]}
-									crop={crop}
-								/>
-							),
-						},
-						{
-							label: "Solved",
-							pose: 1,
-							caption: (
-								<>
-									We turn the camera until{" "}
-									<Key color={LAYER_STYLE.solved.color}>
-										the terrain's skyline
-									</Key>{" "}
-									lies on the photo's.
-								</>
-							),
-							render: () => (
-								<RealPhoto
-									bleed
-									data={d}
-									layers={["skyline", "solved"]}
-									crop={crop}
-								/>
-							),
-						},
-						{
-							label: "Labels",
-							pose: 1,
-							caption: "With the pose known, every peak in view gets its name.",
-							render: () => (
-								<RealPhoto
-									bleed
-									data={d}
-									layers={["peaks"]}
-									crop={crop}
-									maxLabels={12}
-								/>
-							),
-						},
-					]}
-				/>
-			</AlignmentStoryProvider>
-		</Figure>
+		/>
 	);
 }
 
@@ -504,7 +425,7 @@ function GuessVsSolved() {
 			caption={
 				<>
 					{d
-						? `Dragging across, the median gap to the skyline falls from ${d.residual.prior.median.toFixed(0)} to ${d.residual.solved.median.toFixed(0)} pixels.`
+						? `Dragging across, the median gap to the skyline falls from ${d.residual.prior.median.toFixed(1)} to ${d.residual.solved.median.toFixed(1)} pixels.`
 						: "Drag to compare."}{" "}
 					<Measured data={d} />
 				</>
@@ -667,22 +588,14 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			<Beat kicker="Watch it solve" title="Guess, measure, correct, snap.">
 				<p>
 					One real photo, six beats. Drag the terrain line afterwards to feel
-					the match <CircledNumber value={1} />.
-					<MarginNote mark="c">
-						Slide it off by 3° and see how big the error looks.
-					</MarginNote>
+					the match.
 				</p>
 			</Beat>
 
-			<Figure
-				label="Fig. 3"
-				bleed
+			<LiveHowItWorks
+				number="Fig. 3"
 				caption="The site's baked demo scene: the six beats of one real solve, on the dark plate. The terrain line is draggable."
-			>
-				<div className="bg-[var(--gb-ink)] p-3 sm:p-5" data-theme="dark">
-					<HowItWorksScene />
-				</div>
-			</Figure>
+			/>
 
 			<Beat kicker="What you get" title="One pose unlocks three things.">
 				<p>
@@ -706,7 +619,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						Two photos here were rejected as low confidence
 					</HandMark>
 					, and we ask you to confirm or to tap a peak.
-					<MarginNote mark="d">
+					<MarginNote mark="c">
 						Better a question than a wrong label: accepted only when sure.
 					</MarginNote>
 				</p>
@@ -727,7 +640,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					{ value: "0", label: "false accepts in that eval" },
 					{
 						value: "17 / 17",
-						label: "HIGH-confidence wild test photos correct",
+						label: "HIGH-confidence wild test photos correct (matcher service)",
 					},
 				]}
 				source={
@@ -745,8 +658,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					a <A id="camera-prior">camera prior</A>: a guess, never a fact. That
 					prior seeds <A id="viewport-inference">viewport inference</A>, which
 					compares the <A id="skyline">skyline</A> found in the image with the{" "}
-					<A id="dem-horizon">horizon</A> the DEM predicts, all on the CPU in
-					the browser (<A id="baseline-pipeline">baseline pipeline</A>
+					<A id="dem-horizon">horizon</A> the DEM predicts, in the browser, on
+					the GPU where it is available (
+					<A id="baseline-pipeline">baseline pipeline</A>
 					). Around the solve, <A id="terrain-snapping">terrain snapping</A>{" "}
 					pins the eye (<A id="eye-rule">eye rule</A>), summits (
 					<A id="peak">peaks</A>) and depth (

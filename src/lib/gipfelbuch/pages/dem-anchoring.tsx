@@ -29,6 +29,7 @@ import {
 	Eq,
 	Figure,
 	HandLabel,
+	LiveStepInside,
 	MarginNote,
 	Op,
 	Measured as PhotoMeasured,
@@ -398,9 +399,38 @@ const sy = (ly: number) =>
 const XT = [10, 30, 100, 300];
 const YT = [10, 30, 100, 300, 1000, 3000];
 
+type CurveMode = "auto" | "scale" | "curve";
+
+function Chip({
+	mode,
+	setMode,
+	m,
+	label,
+}: {
+	mode: CurveMode;
+	setMode: (m: CurveMode) => void;
+	m: CurveMode;
+	label: string;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={() => setMode(m)}
+			aria-pressed={mode === m}
+			className={`px-2.5 py-1 font-mono ${TYPE.micro} transition ${
+				mode === m
+					? "bg-[var(--gb-paper-deep)] text-[var(--gb-ink)] underline decoration-[var(--nb-red)] decoration-wavy decoration-1 underline-offset-4"
+					: "gb-secondary hover:bg-[var(--gb-paper-deep)]"
+			}`}
+		>
+			{label}
+		</button>
+	);
+}
+
 function CurveFigure() {
 	const [ref, t] = useTime<HTMLDivElement>(10);
-	const [mode, setMode] = useState<"auto" | "scale" | "curve">("auto");
+	const [mode, setMode] = useState<CurveMode>("auto");
 	const fit = useMemo(() => fitCurve(), []);
 	const s0 = useMemo(() => fitScale(), []);
 	const scaleCurve: Curve = useMemo(
@@ -438,21 +468,6 @@ function CurveFigure() {
 	};
 	const clipId = "da-clip";
 
-	const Chip = ({ m, label }: { m: typeof mode; label: string }) => (
-		<button
-			type="button"
-			onClick={() => setMode(m)}
-			aria-pressed={mode === m}
-			className={`px-2.5 py-1 font-mono ${TYPE.micro} transition ${
-				mode === m
-					? "bg-[var(--gb-paper-deep)] text-[var(--gb-ink)] underline decoration-[var(--nb-red)] decoration-wavy decoration-1 underline-offset-4"
-					: "gb-secondary hover:bg-[var(--gb-paper-deep)]"
-			}`}
-		>
-			{label}
-		</button>
-	);
-
 	return (
 		<Figure
 			label="Fig. 3"
@@ -460,9 +475,9 @@ function CurveFigure() {
 		>
 			<div ref={ref}>
 				<div className="mb-3 flex flex-wrap items-center gap-2">
-					<Chip m="auto" label="play" />
-					<Chip m="scale" label="one scale" />
-					<Chip m="curve" label="range curve" />
+					<Chip mode={mode} setMode={setMode} m="auto" label="play" />
+					<Chip mode={mode} setMode={setMode} m="scale" label="one scale" />
+					<Chip mode={mode} setMode={setMode} m="curve" label="range curve" />
 					<span className={`ml-auto font-mono ${TYPE.micro} gb-secondary`}>
 						{mode === "auto"
 							? p < 0.02
@@ -1430,7 +1445,7 @@ function HeroStages({ d }: { d: TerrainData | null }) {
 			caption={
 				<>
 					{s
-						? `On demo-01, ${s.pct}% of ${s.total} ground cells lie 15 m to 3 km away, the range the fit uses.`
+						? `Fixed: demo-01. ${s.pct}% of ${s.total} ground cells lie 15 m to 3 km away, the range the fit uses.`
 						: "The map gives a distance for every ground pixel."}{" "}
 					<PhotoMeasured data={photo}>
 						Ranges: {d?.script ?? "scripts/gipfelbuch/data-terrain.ts"}.
@@ -2031,6 +2046,21 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<RealQuality d={d} />
+
+			<Beat
+				kicker="What it buys"
+				title="Where the fit holds, the photo can be stepped into."
+			>
+				<p>
+					A good fit puts the lifted near-field on the map's own metres, so the
+					camera can start at the photo's eye and move.{" "}
+					<HandMark type="underline">
+						A poor fit keeps the scene hidden instead.
+					</HandMark>
+				</p>
+			</Beat>
+
+			<LiveStepInside number="5" />
 
 			<Numbers
 				items={[

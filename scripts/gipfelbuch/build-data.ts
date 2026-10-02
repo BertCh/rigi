@@ -47,7 +47,6 @@ const DEM_PX = 480;
 const OUT = path.join(ROOT, "public", "demo", "gipfelbuch");
 const DEM = DEM_SOURCES.terrarium;
 const loadTile = demTileLoaderNode(DEM);
-const tiles = new Map<string, Float32Array>();
 
 type ManifestPhoto = {
 	id: string;
@@ -142,7 +141,8 @@ async function build(p: ManifestPhoto) {
 		p.lon,
 		loadTile,
 		DEM.levels,
-		tiles,
+		// a fresh cache per photo: the shared one made ms.terrain 0 for every photo after the first
+		new Map<string, Float32Array>(),
 		16,
 		DEM.tileSize,
 	);

@@ -14,6 +14,7 @@ import { Route as BaselineRouteImport } from './routes/baseline'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as DevExportRollRouteImport } from './routes/dev.export-roll'
+import { Route as DevGipfelbuchLiveRouteImport } from './routes/dev.gipfelbuch-live'
 import { Route as DevGipfelbuchSheetRouteImport } from './routes/dev.gipfelbuch-sheet'
 import { Route as DevGraphRouteImport } from './routes/dev.graph'
 import { Route as DevHowSceneRouteImport } from './routes/dev.how-scene'
@@ -54,6 +55,11 @@ const UploadRoute = UploadRouteImport.update({
 const DevExportRollRoute = DevExportRollRouteImport.update({
   id: '/dev/export-roll',
   path: '/dev/export-roll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevGipfelbuchLiveRoute = DevGipfelbuchLiveRouteImport.update({
+  id: '/dev/gipfelbuch-live',
+  path: '/dev/gipfelbuch-live',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevGipfelbuchSheetRoute = DevGipfelbuchSheetRouteImport.update({
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
   '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/gipfelbuch-live': typeof DevGipfelbuchLiveRoute
   '/dev/gipfelbuch-sheet': typeof DevGipfelbuchSheetRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
@@ -166,6 +173,7 @@ export interface FileRoutesByTo {
   '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
   '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/gipfelbuch-live': typeof DevGipfelbuchLiveRoute
   '/dev/gipfelbuch-sheet': typeof DevGipfelbuchSheetRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/library': typeof LibraryRoute
   '/upload': typeof UploadRoute
   '/dev/export-roll': typeof DevExportRollRoute
+  '/dev/gipfelbuch-live': typeof DevGipfelbuchLiveRoute
   '/dev/gipfelbuch-sheet': typeof DevGipfelbuchSheetRoute
   '/dev/graph': typeof DevGraphRoute
   '/dev/how-scene': typeof DevHowSceneRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/upload'
     | '/dev/export-roll'
+    | '/dev/gipfelbuch-live'
     | '/dev/gipfelbuch-sheet'
     | '/dev/graph'
     | '/dev/how-scene'
@@ -238,6 +248,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/upload'
     | '/dev/export-roll'
+    | '/dev/gipfelbuch-live'
     | '/dev/gipfelbuch-sheet'
     | '/dev/graph'
     | '/dev/how-scene'
@@ -261,6 +272,7 @@ export interface FileRouteTypes {
     | '/library'
     | '/upload'
     | '/dev/export-roll'
+    | '/dev/gipfelbuch-live'
     | '/dev/gipfelbuch-sheet'
     | '/dev/graph'
     | '/dev/how-scene'
@@ -285,6 +297,7 @@ export interface RootRouteChildren {
   LibraryRoute: typeof LibraryRoute
   UploadRoute: typeof UploadRoute
   DevExportRollRoute: typeof DevExportRollRoute
+  DevGipfelbuchLiveRoute: typeof DevGipfelbuchLiveRoute
   DevGipfelbuchSheetRoute: typeof DevGipfelbuchSheetRoute
   DevGraphRoute: typeof DevGraphRoute
   DevHowSceneRoute: typeof DevHowSceneRoute
@@ -338,6 +351,13 @@ declare module '@tanstack/react-router' {
       path: '/dev/export-roll'
       fullPath: '/dev/export-roll'
       preLoaderRoute: typeof DevExportRollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/gipfelbuch-live': {
+      id: '/dev/gipfelbuch-live'
+      path: '/dev/gipfelbuch-live'
+      fullPath: '/dev/gipfelbuch-live'
+      preLoaderRoute: typeof DevGipfelbuchLiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/gipfelbuch-sheet': {
@@ -461,6 +481,7 @@ const rootRouteChildren: RootRouteChildren = {
   LibraryRoute: LibraryRoute,
   UploadRoute: UploadRoute,
   DevExportRollRoute: DevExportRollRoute,
+  DevGipfelbuchLiveRoute: DevGipfelbuchLiveRoute,
   DevGipfelbuchSheetRoute: DevGipfelbuchSheetRoute,
   DevGraphRoute: DevGraphRoute,
   DevHowSceneRoute: DevHowSceneRoute,

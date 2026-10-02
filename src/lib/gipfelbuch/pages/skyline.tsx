@@ -35,6 +35,7 @@ import {
 	Measured,
 	Op,
 	PhotoPicker,
+	PhotoStory,
 	RealPhoto,
 	Sym,
 	useGipfelbuchIndex,
@@ -1220,7 +1221,7 @@ const HARD_SHORT: { id: GipfelbuchPhotoId; note: string }[] = [
 function HardCases() {
 	return (
 		<Figure
-			label="Fig. 4"
+			label="Fig. 5"
 			caption="Fixed: demo-02, 06, 11, 12. Four hard frames, same view and scale. Gaps are columns that abstain; the head (bottom row) is the failure no weighting fully fixes."
 		>
 			<Gallery
@@ -1368,6 +1369,22 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 				<sub>x</sub> &minus; <Sym c="skyline">y</Sym>
 				<sub>x&minus;1</sub>|, <Sym>T</Sym>) ]
 			</Eq>
+
+			<Beat
+				kicker="What it is for"
+				title="The traced line is what the map is slid against."
+			>
+				<p>
+					The pose search starts from the phone's guess, draws the terrain's
+					skyline there, and{" "}
+					<HandMark type="underline">
+						turns the camera until that line sits on the traced one
+					</HandMark>
+					.
+				</p>
+			</Beat>
+
+			<PhotoStory bleed={false} number="4" />
 
 			<Beat
 				kicker="Where it fails"

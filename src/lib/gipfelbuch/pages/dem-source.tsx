@@ -29,6 +29,7 @@ import {
 	Figure,
 	Flow,
 	HandLabel,
+	LiveDrape,
 	MarginNote,
 	Measured,
 	Plot,
@@ -242,7 +243,12 @@ function Hero({ d }: { d: TerrainData | null }) {
 							color="var(--gb-red)"
 							width={1.7}
 						/>
-						<HandLabel x={4} y={82} size={HERO_LABEL} color="var(--gb-faint)">
+						<HandLabel
+							x={4}
+							y={82}
+							size={HERO_LABEL}
+							color="var(--gb-secondary)"
+						>
 							west
 						</HandLabel>
 						<HandLabel
@@ -250,7 +256,7 @@ function Hero({ d }: { d: TerrainData | null }) {
 							y={82}
 							anchor="end"
 							size={HERO_LABEL}
-							color="var(--gb-faint)"
+							color="var(--gb-secondary)"
 						>
 							east
 						</HandLabel>
@@ -864,7 +870,7 @@ function Ladder({ d: data }: { d: TerrainData | null }) {
 				distance
 				<input
 					type="range"
-					min={2}
+					min={200}
 					max={Math.log10(max) * 100}
 					value={Math.log10(d) * 100}
 					onChange={(e) =>
@@ -1070,6 +1076,24 @@ export default function Page(_: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<GroundGap d={d} />
+
+			{/* The shell Tafel spills this sheet's one photo: the plate keeps its frame, no surround or line art. */}
+			<LiveDrape
+				number="Fig. 5"
+				title="The ground the DEM gives each photo"
+				notes={[
+					{
+						text: "each photo hangs on the DEM's slopes, not the phone's altitude",
+						at: [0.35, 0.45],
+						side: "left",
+					},
+					{
+						text: "a smoother map would round these summits off",
+						at: [0.7, 0.3],
+						side: "right",
+					},
+				]}
+			/>
 
 			<Numbers
 				items={[

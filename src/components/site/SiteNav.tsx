@@ -36,6 +36,7 @@ export function SiteNav({
 		);
 	return (
 		<nav
+			data-site-nav
 			className={cn(
 				"mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 pt-6 sm:px-8",
 				paper && "bg-[var(--khipu-w)] pb-4 text-[var(--khipu-lk)]",

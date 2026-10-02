@@ -34,6 +34,7 @@ import {
 	HandRange,
 	MarginNote,
 	Measured,
+	PhotoStory,
 	Plot,
 	RealPhoto,
 	Sym,
@@ -52,7 +53,7 @@ import {
 import { gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
-// Constants mirrored from src/lib/concord/priors/altitude.ts (EYE_PRIOR_DEFAULTS) and engine.ts.
+// Constants mirrored from src/lib/concord/priors/altitude.ts (EYE_PRIOR_DEFAULTS) and deck/scene.ts (eyeAltitude).
 const H = 1.6;
 const SIGMA_A = 3;
 const ALT_BIAS = -7;
@@ -1383,6 +1384,15 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<RealContour />
 
+			{/* Fig. 1 spills this sheet's one photo, so the story stays inside its frame. */}
+			<PhotoStory
+				number="Fig. 4"
+				photoId="demo-09"
+				title="From the eye's guess to the solved view"
+				bleed={false}
+				crop={[0, 40, 800, 360]}
+			/>
+
 			<Numbers
 				items={[
 					{
@@ -1472,13 +1482,13 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<a href={gipfelbuchHref("eye-refinement")}>eye refinement</a> and the{" "}
 					<a href={gipfelbuchHref("eye-search-gpu")}>GPU eye search</a> search
 					around this height. That is why the 1.6 versus 1.8 drift has survived:
-					0.2 m is about 6 px on a 100 m foreground in a 4000 px frame (Fig. 5),
-					and under a pixel beyond 1 km. It is recorded as a finding, not a bug.
+					0.2 m is about 6 px on a 100 m foreground in a 4000 px frame (D2), and
+					under a pixel beyond 1 km. It is recorded as a finding, not a bug.
 				</p>
 				<DriftPlot />
 				<Callout tone="warning" title="Known drift">
-					With no altitude, <code>engine.ts</code> (<code>eyeAltitude</code>)
-					and the roll ridgelines worker use DEM + 1.8 m, while{" "}
+					With no altitude, <code>deck/scene.ts</code> (<code>eyeAltitude</code>
+					) and the roll ridgelines worker use DEM + 1.8 m, while{" "}
 					<code>geo/pipeline.ts</code> (<code>EYE_ABOVE_GROUND</code>) and the
 					concord prior use DEM + 1.6 m. The ontology marks it for unification
 					in the engine owner's pass.

@@ -24,6 +24,7 @@ import {
 	type GipfelbuchPhotoId,
 	HandLabel,
 	LAYER_STYLE,
+	LiveCompare,
 	MarginNote,
 	Measured,
 	PhotoPicker,
@@ -750,8 +751,10 @@ function Deep({ accent }: { accent: string }) {
 				</p>
 				<p>
 					Because gravity pins pitch and roll and focal pins field of view, only
-					yaw and position remain uncertain for a typical iPhone image, which is
-					why the compass is the first thing the solvers distrust.
+					the heading remains badly uncertain for a typical iPhone image (GPS
+					fixes the position, and pitch, roll and field of view are free only
+					within tight windows), which is why the compass is the first thing the
+					solvers distrust.
 				</p>
 			</Section>
 
@@ -861,8 +864,8 @@ function HeroMarks() {
 						</HandText>
 						<PenArrow
 							seed="ph-hero-compass"
-							from={[W / 2 + 90, H * 0.32 + 14]}
-							to={[W / 2 + 18, H * 0.5 - 24]}
+							from={[W / 2 + 90, H * 0.32 - 40]}
+							to={[W / 2 + 22, 60 + 24]}
 							color="red"
 							width={2.4}
 							head={14}
@@ -1030,7 +1033,7 @@ const ALT_IDS = [
 function AltitudeCheck() {
 	return (
 		<Figure
-			label="Fig. 2"
+			label="Fig. 4"
 			bleed
 			caption={
 				<>
@@ -1189,6 +1192,12 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
+			<LiveCompare
+				photoId="demo-09"
+				number="Fig. 2"
+				title="What the pixels add"
+			/>
+
 			<Beat
 				kicker="How it works"
 				title="We read the tags and turn them into a camera."
@@ -1217,7 +1226,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					<HandMark type="underline">Gravity</HandMark> fixes pitch and roll,
 					and focal fixes the field of view.
 					<MarginNote mark="d">
-						So only yaw and position are left to find.
+						So yaw is the one that is left to find.
 					</MarginNote>
 				</p>
 			</Beat>

@@ -37,6 +37,7 @@ import {
 	HandNote,
 	HandRange,
 	LAYER_STYLE,
+	LiveReveal,
 	MarginNote,
 	Measured,
 	Op,
@@ -1500,7 +1501,7 @@ function RealOcclusion() {
 	const d = useGipfelbuchPhoto("demo-10");
 	if (!d)
 		return (
-			<div className="my-12 aspect-[2/1] animate-pulse bg-[var(--gb-paper-deep)] motion-reduce:animate-none lg:mr-[calc(-66.667%-16px)]" />
+			<div className="my-12 aspect-[2/1] animate-pulse bg-[var(--gb-paper-deep)] motion-reduce:animate-none" />
 		);
 	const P = d.horizon.profile;
 	const W = 640;
@@ -1890,6 +1891,26 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				/>
 			</Figure>
 
+			{/* Fig. 1 already spills this sheet's one photo: the plate keeps its frame, no surround. */}
+			<LiveReveal
+				number="Fig. 7"
+				photoId="demo-01"
+				title="The labels, drawn into the photo"
+				notes={[
+					{
+						text: "each name stands on a summit that survived the four questions",
+						at: [0.5, 0.25],
+						side: "right",
+						y: 0.1,
+					},
+					{
+						text: "the ridge in front is why the far names are missing",
+						at: [0.3, 0.7],
+						side: "left",
+					},
+				]}
+			/>
+
 			<Numbers
 				items={[
 					{
@@ -2014,7 +2035,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 										through the camera, drops anything outside the frame, sorts
 										by <code>score</code>, and keeps a label only if no kept
 										label is within <code>minSpacingPx</code> horizontally. Fig.
-										2. The survivors are returned left to right, ready for the
+										D2. The survivors are returned left to right, ready for the
 										overlay.
 									</>
 								),

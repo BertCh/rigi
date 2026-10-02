@@ -33,6 +33,7 @@ import {
 	type GipfelbuchPhotoId,
 	HandLabel,
 	HandRange,
+	LiveStepInside,
 	MarginNote,
 	Measured,
 	PhotoPicker,
@@ -929,7 +930,7 @@ function RealRange() {
 	}
 	return (
 		<Figure
-			label="Fig. 3"
+			label="Fig. 4"
 			bleed
 			caption={
 				<>
@@ -994,7 +995,7 @@ function RealEye() {
 	const H = rows.length * rh + 34;
 	return (
 		<Figure
-			label="Fig. 4"
+			label="Fig. 5"
 			bleed
 			caption={
 				<>
@@ -1539,7 +1540,7 @@ function RealSplit() {
 	);
 	return (
 		<Figure
-			label="Fig. 2"
+			label="Fig. 3"
 			bleed
 			caption={
 				<>
@@ -1680,6 +1681,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
+			<LiveStepInside number="2" />
+
 			<RealSplit />
 
 			<Beat
@@ -1801,7 +1804,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<h3>How it works</h3>
 				<div className="space-y-3">
 					<p>
-						The split in Fig. 2 is{" "}
+						The split in D1 is{" "}
 						<HandMark type="circle">the heart of it</HandMark>: the per-pixel
 						decision in <code>split.ts</code>. The rest of the pipeline exists
 						to make that comparison meaningful and to turn its answer into
@@ -1850,11 +1853,11 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							title: "Split every pixel",
 							body: (
 								<>
-									Compare anchored range with DEM range (Fig. 1). People are
-									always Objects. Beyond 150 m everything is Far. A model pixel
-									with no terrain behind it, such as a roof against the sky, is
-									an Object. Otherwise a pixel is an Object only if it is more
-									than half the DEM range in front <em>and</em> at least 3 m in
+									Compare anchored range with DEM range (D1). People are always
+									Objects. Beyond 150 m everything is Far. A model pixel with no
+									terrain behind it, such as a roof against the sky, is an
+									Object. Otherwise a pixel is an Object only if it is more than
+									half the DEM range in front <em>and</em> at least 3 m in
 									front; the margin is wide on purpose because depth error grows
 									with range.
 								</>
@@ -1877,9 +1880,9 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 							body: (
 								<>
 									Surviving splats are converted to the photo's ENU frame, and a
-									confidence radius is derived from their ranges (Fig. 2).
-									Object pixels are then taken out of the flat photo drape, so
-									the splats do not double up on their own copy.
+									confidence radius is derived from their ranges (D2). Object
+									pixels are then taken out of the flat photo drape, so the
+									splats do not double up on their own copy.
 								</>
 							),
 						},
@@ -1891,7 +1894,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 									when you leave. Photo mode is clamped to the confidence radius
 									around the eye; orbit, fly and map modes roam freely but stay
 									above the terrain. The Truth toggle recolours everything by
-									provenance (Fig. 3).
+									provenance (D3).
 								</>
 							),
 						},
@@ -1967,8 +1970,8 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						</li>
 						<li>
 							<code>classifyRange</code> and <code>splitPixels</code> are the
-							rule of Fig. 1; <code>DEFAULT_SPLIT</code> holds margin 0.5,
-							radius 150, gap 3.
+							rule of D1; <code>DEFAULT_SPLIT</code> holds margin 0.5, radius
+							150, gap 3.
 							<br />
 							<CodeRef path="src/lib/nearfield/split.ts" />{" "}
 							<CodeRef path="src/lib/nearfield/types.ts" />
@@ -1976,7 +1979,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 						<li>
 							<code>buildNearFieldScene</code> and{" "}
 							<code>confidenceRadiusFrom</code> produce the ENU splats and the
-							disc of Fig. 2.
+							disc of D2.
 							<br />
 							<CodeRef path="src/lib/nearfield/scene.ts" />
 						</li>

@@ -37,6 +37,7 @@ import {
 	Measured,
 	type PhotoLayer,
 	PhotoPicker,
+	PhotoStory,
 	Plot,
 	RealPhoto,
 	Section,
@@ -1467,7 +1468,7 @@ const medianOf = (a: number[]) => {
 		: (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
 };
 
-/** The four numbers drawn on the photo they came from (demo-01, people-free, full frame). */
+/** The four numbers drawn on the photo they came from (the picked photo, full frame). */
 function HeroPose() {
 	const [heroId] = useNotebookPhoto();
 	const d = useGipfelbuchPhoto(heroId);
@@ -1501,7 +1502,7 @@ function HeroPose() {
 			caption={
 				<>
 					{s
-						? `Four numbers place this photo: facing ${compass(s.yaw)}, a slight look down, a small tilt, a ${s.vfov.toFixed(0)}° view.`
+						? `Four numbers place this photo: facing ${compass(s.yaw)}, pitch ${fmt(s.pitch)}°, roll ${fmt(s.roll)}°, a ${s.vfov.toFixed(0)}° view.`
 						: "Four numbers place a photo."}{" "}
 					<Measured data={d} />
 				</>
@@ -1609,7 +1610,8 @@ function HeroPose() {
 								color={LINE_LIGHT}
 								rotate={-2}
 							>
-								pitch {fmt(geo.pose.pitch)}°: the cross sits below the dashes
+								pitch {fmt(geo.pose.pitch)}°: the cross sits{" "}
+								{geo.pose.pitch < 0 ? "below" : "above"} the dashes
 							</HandText>
 							<PenArrow
 								seed="pe-hero-note-arrow"
@@ -1627,7 +1629,10 @@ function HeroPose() {
 								color={LINE_LIGHT}
 								rotate={1.5}
 							>
-								roll {fmt(geo.pose.roll)}°: tiny, but the dashes lean
+								roll {fmt(geo.pose.roll)}°:{" "}
+								{Math.abs(geo.pose.roll) < 0.5
+									? "nearly level"
+									: "the dashes lean"}
 							</HandText>
 						</g>
 					);
@@ -1642,7 +1647,8 @@ function HeroPose() {
 						</>,
 						<>
 							<strong>Pitch {fmt(s.pitch)}°.</strong> Up is positive. The dashed
-							line is a level horizon; the camera looks below it.
+							line is a level horizon; the camera looks{" "}
+							{s.pitch < 0 ? "below" : "above"} it.
 						</>,
 						<>
 							<strong>Roll {fmt(s.roll)}°.</strong> The tilt of that line
@@ -1749,7 +1755,7 @@ function Dial({ d }: { d: GipfelbuchPhotoData }) {
 function CompassErrors() {
 	return (
 		<Figure
-			label="Fig. 3"
+			label="Fig. 4"
 			bleed
 			caption={
 				<>
@@ -1833,7 +1839,7 @@ function CompassShift() {
 	const centre = d ? d.prior.f * dyaw * D : 0;
 	return (
 		<Figure
-			label="Fig. 2"
+			label="Fig. 3"
 			bleed
 			caption={
 				<>
@@ -1877,7 +1883,8 @@ const REJECTED: GipfelbuchPhotoId[] = ["demo-07", "demo-11"];
 
 function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 	const idx = useGipfelbuchIndex();
-	const P = idx?.photos;
+	// accepted photos only: a refused solve's yaw is not trusted (same definition as viewport-inference)
+	const P = idx?.photos.filter((p) => p.accepted);
 	const medDy = P ? medianOf(P.map((p) => Math.abs(p.delta.yaw))) : null;
 	const maxDy = P ? Math.max(...P.map((p) => Math.abs(p.delta.yaw))) : null;
 	return (
@@ -1924,6 +1931,12 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
+			<PhotoStory
+				number="Fig. 2"
+				bleed={false}
+				title="A guess, a correction, a label"
+			/>
+
 			<Beat
 				kicker="Why the label matters"
 				title="Phone compasses are wrong by degrees, not by hair."
@@ -1958,7 +1971,7 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Figure
-				label="Fig. 4"
+				label="Fig. 5"
 				caption={
 					<>
 						Fixed: demo-07 and demo-11. Both refused: confidence under 0.5.
@@ -1990,11 +2003,11 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				items={[
 					{
 						value: medDy == null ? "…" : `${medDy.toFixed(1)}°`,
-						label: "median compass error found, 12 demo photos",
+						label: "median compass error found, accepted demo photos",
 					},
 					{
 						value: maxDy == null ? "…" : `${maxDy.toFixed(1)}°`,
-						label: "largest compass error, 12 demo photos",
+						label: "largest compass error, accepted demo photos",
 					},
 					{
 						value: "0.008°",

@@ -41,6 +41,7 @@ import {
 	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	LivePanorama,
 	MarginNote,
 	Measured,
 	PhotoPicker,
@@ -478,8 +479,9 @@ function RayMarch() {
 						width={1}
 					/>
 					<HandText
-						x={xD(S.bestD) + 50}
+						x={xD(S.bestD) + (xD(S.bestD) > PX1 - 240 ? -50 : 50)}
 						y={TOP.y0 + 32}
+						anchor={xD(S.bestD) > PX1 - 240 ? "end" : "start"}
 						size={16}
 						color="pencil"
 						rotate={-2}
@@ -1727,7 +1729,7 @@ function WorstTenth({ d, k }: { d: GipfelbuchPhotoData; k: number }) {
 function Misses() {
 	return (
 		<Figure
-			label="Fig. 4"
+			label="Fig. 5"
 			caption="Fixed: demo-08, demo-07, demo-12. The median gap stays small, but a head on the ridge puts the worst tenth of columns 100 px or more off."
 		>
 			<Gallery
@@ -1853,6 +1855,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					<HandMark type="underline">They pin the compass bearing.</HandMark>
 				</p>
 			</Beat>
+
+			<LivePanorama number="4" />
 
 			<Beat
 				kicker="Where it fails"

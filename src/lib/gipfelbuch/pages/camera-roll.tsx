@@ -30,6 +30,8 @@ import {
 	HandLabel,
 	HandRange,
 	LAYER_STYLE,
+	LiveDrape,
+	LivePanorama,
 	MarginNote,
 	Measured,
 	RealPhoto,
@@ -491,7 +493,8 @@ const WALK_TRACK = WALK.map(
 ).join("");
 
 function ViewpointWalk() {
-	const [ref, t] = useTime<HTMLDivElement>(99);
+	// reduced motion freezes t at this value: past the last photo, so the still shows the finished walk
+	const [ref, t] = useTime<HTMLDivElement>((WALK.length + 0.5) / 1.1);
 	const [manual, setManual] = useState<number | null>(null);
 	const N = WALK.length;
 	const auto = Math.floor((t * 1.1) % (N + 4)) + 1;
@@ -1315,6 +1318,10 @@ function RealRoll() {
 		...rows.map((r) => Math.hypot(r.east - first.east, r.north - first.north)),
 	);
 	const acc = rows.filter((r) => r.accepted).length;
+	// a burst is a run of photos with gaps under 60 s
+	const bursts = [...rows]
+		.sort((a, b) => a.t - b.t)
+		.reduce((n, r, i, all) => (i && r.t - all[i - 1].t <= 60 ? n : n + 1), 0);
 	const hs = rows.map((r) => r.hAccuracy);
 	const ray = (r: RollRow, yaw: number, len: number): [number, number] => [
 		mx(r.east) + len * Math.sin(yaw * D),
@@ -1596,7 +1603,8 @@ function RealRoll() {
 					<p>
 						Captured over{" "}
 						<span className="text-[var(--gb-ink)]">{mmss(d.spanS)} min</span>,
-						in four bursts. {acc} of {rows.length} are accepted by the cascade.
+						in {bursts} bursts. {acc} of {rows.length} are accepted by the
+						cascade.
 					</p>
 					<p>
 						The GPS accuracy circles ({Math.min(...hs).toFixed(0)}–
@@ -1634,7 +1642,7 @@ function RealBias() {
 	const accOff = rows.filter((r) => r.accepted).map((r) => r.yawOffset);
 	return (
 		<Figure
-			label="Fig. 3"
+			label="Fig. 5"
 			bleed
 			caption={
 				<>
@@ -2055,6 +2063,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				<Sym>hfov</Sym> / 2) )
 			</Eq>
 
+			<LivePanorama number="3" />
+
 			<Beat
 				kicker="How it works"
 				title="Group nearby photos, aim each one, lay them down."
@@ -2086,6 +2096,8 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 					]}
 				/>
 			</Beat>
+
+			<LiveDrape number="4" />
 
 			<Beat
 				kicker="Where it fails"

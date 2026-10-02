@@ -52,13 +52,13 @@ import {
 import {
 	Beat,
 	Key as ColorKey,
-	Compare,
 	Details,
 	Gallery,
 	Numbers,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
 import { Eq, Sym } from "#/components/gipfelbuch/viz/math";
+import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
 import { groupColor } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -488,7 +488,7 @@ function PriorErrors({
 						note="clamped to 5–100 m before use"
 						sel={sel}
 						onPick={onPick}
-						fmt={(v) => `${v}`}
+						fmt={(v) => v.toFixed(0)}
 					/>
 				) : (
 					<div className="h-24 animate-pulse bg-[var(--gb-paper-deep)]" />
@@ -497,7 +497,7 @@ function PriorErrors({
 			<div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
 				<Stat
 					value={`${med(yaw.map((p) => p.v)).toFixed(1)}°`}
-					label="median |compass error|"
+					label="median |compass error|, all 12 photos"
 				/>
 				<Stat
 					value={`${yaw.filter((p) => Math.abs(p.v) > SIG_YAW).length} / 12`}
@@ -1071,21 +1071,21 @@ function Deep({ accent }: { accent: string }) {
 				<p>
 					The geocam adapter <code>mapPriorsFromPhoto</code> builds the same set
 					for the {A("map-solver", "MAP solver")} with the numbers shown in Fig.
-					3: horizontal sigma is the EXIF hAcc clamped to 5 to 100 m (default
+					D3: horizontal sigma is the EXIF hAcc clamped to 5 to 100 m (default
 					20), gravity is 1.5 deg, and the compass is a Student-t (nu 3) built
 					from 5 deg noise plus 5 deg bias, so one wild reading cannot drag the
 					yaw. If the EXIF heading is magnetic it is first made true with the
 					WMM2025 declination.
 				</p>
 				<p>
-					Against the real photos (Fig. 2) the compass really is the weak
-					sensor. The median absolute heading error on the 12 demo photos is{" "}
-					<HandMark type="underline">7.9°</HandMark>, six of them sit beyond the
-					assumed 1σ of 7.1° and the worst, demo-10, is{" "}
-					<HandMark type="double">19.0° off (2.7σ)</HandMark>, which is exactly
-					why the tails are Student-t rather than Gaussian. Gravity is much
-					tighter: median pitch error 0.76° and roll 0.68°, but three photos
-					exceed the 1.5° σ in pitch (−2.7° on portrait demo-11, +2.6° on
+					Against the real photos (Fig. D2) the compass really is the weak
+					sensor. The median absolute heading error on all 12 demo photos is{" "}
+					<HandMark type="underline">7.9°</HandMark> (9.6° on the ten accepted),
+					six of them sit beyond the assumed 1σ of 7.1° and the worst, demo-10,
+					is <HandMark type="double">19.0° off (2.7σ)</HandMark>, which is
+					exactly why the tails are Student-t rather than Gaussian. Gravity is
+					much tighter: median pitch error 0.76° and roll 0.68°, but three
+					photos exceed the 1.5° σ in pitch (−2.7° on portrait demo-11, +2.6° on
 					ultra-wide demo-02, −2.2° on portrait demo-12).
 				</p>
 			</Section>
@@ -1216,15 +1216,15 @@ const SOLVED_C = LAYER_STYLE.solved.color;
 function HeroCompare() {
 	const [photoId] = useNotebookPhoto();
 	const d = useGipfelbuchPhoto(photoId);
-	const crop = d ? skyBand(d) : undefined;
 	return (
-		<Figure
-			label="Fig. 1"
-			bleed
+		<PhotoStory
+			photoId={photoId}
+			number="1"
+			title="The phone's guess, struck through"
 			caption={
 				<>
 					{d
-						? `Sensors alone put the skyline ${d.residual.prior.median.toFixed(0)} px off. After solving, the median gap is ${d.residual.solved.median.toFixed(1)} px.`
+						? `Sensors alone put the skyline ${d.residual.prior.median.toFixed(0)} px off (yaw ${sgn(d.solved.delta.yaw)}°). After solving, the median gap is ${d.residual.solved.median.toFixed(1)} px.`
 						: "Sensors alone, then solved."}{" "}
 					<ColorKey color={PRIOR_C} dashed>
 						sensors only
@@ -1235,37 +1235,10 @@ function HeroCompare() {
 					<ColorKey color={LAYER_STYLE.skyline.color}>
 						skyline in the photo
 					</ColorKey>
-					. <Measured data={d} />
+					. {d ? <Measured data={d} /> : null}
 				</>
 			}
-		>
-			<AlignmentStoryProvider>
-				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
-					<Compare
-						beforeLabel="sensors only"
-						afterLabel="solved"
-						start={0.5}
-						before={
-							<RealPhoto
-								bleed
-								data={d}
-								layers={["skyline", "prior"]}
-								crop={crop}
-							/>
-						}
-						after={
-							<RealPhoto
-								bleed
-								data={d}
-								layers={["skyline", "solved"]}
-								crop={crop}
-							/>
-						}
-					/>
-					<StoryMap data={d} />
-				</div>
-			</AlignmentStoryProvider>
-		</Figure>
+		/>
 	);
 }
 
@@ -1494,7 +1467,7 @@ function PriorTrio() {
 				},
 				{
 					title: "The compass points",
-					body: "Dashed is what it said. Cyan is where the camera really faced.",
+					body: "Dashed is what it said. Teal is where the camera really faced.",
 					visual: (
 						<svg
 							viewBox="0 0 100 75"

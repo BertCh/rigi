@@ -75,8 +75,13 @@ for (const id of IDS) {
 	});
 	const inFrame = views.filter((v) => {
 		const q = project(cam, directionENU(v.azimuth, v.elevation));
+		// the same +-20 px frame margin as build-data.ts, so "visible" counts agree with demo-NN.json
 		return (
-			q && q[0] >= 0 && q[0] <= cam.width && q[1] >= 0 && q[1] <= cam.height
+			q &&
+			q[0] >= -20 &&
+			q[0] <= cam.width + 20 &&
+			q[1] >= -20 &&
+			q[1] <= cam.height + 20
 		);
 	});
 	const labelled = layoutPeakLabels(views, cam);

@@ -55,6 +55,7 @@ import {
 	skylineBand,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
 import { gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -605,7 +606,7 @@ function ConfidenceVsError() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Fig. 5: the precision ladder
+// Fig. 6: the precision ladder
 // ---------------------------------------------------------------------------------------------
 type Rule = {
 	id: string;
@@ -726,7 +727,7 @@ function PrecisionLadder() {
 	const p = Number(r.precision);
 	return (
 		<Figure
-			label="Fig. 5"
+			label="Fig. 6"
 			bleed
 			caption="Five accept rules on the same 100 blind-verified photos (reports/bench-wild.md; rows come from the v2 verification and the Mapterhorn cascade re-run, so each is a count of accepted poses under that rule). Accent dots are correct accepts, red are confident wrong ones, grey are unsure. Tighten the rule and the red disappears; the cost is how many dots remain."
 		>
@@ -1108,7 +1109,7 @@ function VerdictTree() {
 		<Figure
 			label="Fig. D1"
 			bleed
-			caption="The verdict table at the top of src/lib/integration/second-opinion.ts, with the matcher branch from matchAccepted() in src/lib/matcher-client.ts. It cycles through typical cases; switch any input to trace your own path. Only matched and verified poses are shown as certain: every other branch ends in a pose the user is asked to confirm, or the app pose with no badge. (A cascade that has not finished within 20 s also keeps the app pose, with no badge.)"
+			caption="The verdict table at the top of src/lib/integration/second-opinion.ts, with the matcher branch from matchAccepted() in src/lib/matcher-client.ts. It cycles through typical cases; switch any input to trace your own path. Only matched, verified and refined poses are shown as certain (picker/candidates.ts isAutoHigh): every other branch ends in a pose the user is asked to confirm, or the app pose with no badge. (A cascade that has not finished within 20 s also keeps the app pose, with no badge.)"
 		>
 			<div ref={ref}>
 				<div className="mb-4 flex flex-wrap gap-2">
@@ -1219,7 +1220,8 @@ function VerdictTree() {
 					})}
 					{OUT.map((o) => {
 						const act = res.verdict === o.v && on.has(o.id);
-						const good = o.v === "verified" || o.v === "matched";
+						const good =
+							o.v === "verified" || o.v === "refined" || o.v === "matched";
 						return (
 							<g key={o.id}>
 								{act ? (
@@ -1303,7 +1305,7 @@ function VerdictTree() {
 						after first paint: second opinion
 					</HandText>
 					<HandText x={470} y={170} color="forest" size={15}>
-						only these two ever show as certain
+						only these three ever show as certain
 					</HandText>
 					<PenArrow
 						from={[560, 176]}
@@ -1328,7 +1330,7 @@ const GATES: [string, string, string][] = [
 	["FULL_SEARCH_CONFIDENCE 0.75", "src/lib/geo/solve.ts", "360° retry bar"],
 	[
 		"YAW_UNKNOWN / FOCAL_UNKNOWN 0.75",
-		"src/lib/integration/unknown-pose.worker.ts",
+		"src/lib/integration/unknown-pose-core.ts",
 		"cascade when heading or focal unknown",
 	],
 	[
@@ -1342,9 +1344,14 @@ const GATES: [string, string, string][] = [
 		"LOW unless explicitly accepted",
 	],
 	[
-		"AGREE_DEG 1°, MATCH_AGREE_DEG 0.5°",
+		"AGREE_DEG 1° (verified vs refined)",
 		"src/lib/integration/second-opinion.ts",
-		"verified vs refined; match vs cascade",
+		"app pose vs cascade pose",
+	],
+	[
+		"MATCH_AGREE_DEG 0.5°",
+		"src/lib/matcher-client.ts",
+		"matcher pose vs cascade pose",
 	],
 	[
 		"isAutoHigh()",
@@ -1405,7 +1412,7 @@ function Legacy() {
 									When yaw or focal is unknown, the search is over every
 									heading, wrong basins are far likelier, and the bar becomes
 									0.75. On the wild set that single change took the cascade from
-									25 correct and 2 wrong accepts to 22 and 0 (Fig. 5).
+									25 correct and 2 wrong accepts to 22 and 0 (Fig. 6).
 								</>
 							),
 						},
@@ -1539,6 +1546,24 @@ function reason(d: GipfelbuchPhotoData): string {
 	if (!s.accepted)
 		return `confidence ${s.confidence.toFixed(2)}, under 0.5: only ${fit}`;
 	return `confidence ${s.confidence.toFixed(2)}, ${fit}`;
+}
+
+/** The alignment story on a photo the rule turned down: the app keeps the phone's pose and asks. */
+function RejectedStory() {
+	const d = useGipfelbuchPhoto("demo-07");
+	return (
+		<PhotoStory
+			photoId="demo-07"
+			bleed={false}
+			number="5"
+			title="A solve the rule refuses"
+			caption={
+				d
+					? `Demo-07: the solve turned the view ${Math.abs(d.solved.delta.yaw).toFixed(1)}° and cut the skyline gap from ${d.residual.prior.median.toFixed(1)} to ${d.residual.solved.median.toFixed(1)} px, but ${reason(d)}. Under the bar of 0.5 the app keeps the phone's pose and asks.`
+					: "A solve under the bar is not shown as certain."
+			}
+		/>
+	);
 }
 
 function Verdicts() {
@@ -1977,6 +2002,8 @@ function AcceptRule({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Verdicts />
+
+			<RejectedStory />
 
 			<PrecisionLadder />
 

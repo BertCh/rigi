@@ -54,6 +54,7 @@ import {
 	Stages,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Tap-a-peak: how a few user taps turn into a pose.
@@ -591,7 +592,7 @@ function PeakChooser() {
 		<Figure
 			label="Fig. D2"
 			bleed
-			caption="Drag the tap across the photo. Under each of the three candidate poses the tap is a ray in a different direction (coloured lines, with their ±15° windows). A summit is offered if it is inside any window, ranked by its angle to the nearest ray minus a prominence bonus of 0.5° per 1000 m, capped at 1°: B and C sit 0.6° apart, so the taller C is offered first. Azimuth-only here; the code uses the full 3D angle."
+			caption="Drag the tap across the photo. Under each of the three candidate poses the tap is a ray in a different direction (coloured lines, with their ±15° windows). A summit is offered if it is inside any window, ranked by its angle to the nearest ray minus a prominence bonus of 0.5° per 1000 m, capped at 1°: B and C sit 0.6° apart, so the more prominent C ranks ahead of B. Azimuth-only here; the code uses the full 3D angle."
 		>
 			<div>
 				<svg
@@ -878,8 +879,15 @@ function TapFrame({
 					<g>
 						<CrispLine d={rowsD} color={solvedColor} width={2.4 * k} />
 						{step.peaks.map((q, i) => {
-							const g = photo?.peaks.filter((p) => p.labelled && p.solved)[i]
-								?.solved;
+							// pair by name: the bake and the photo json can list peaks in different orders
+							// (homonyms: the k-th peak of a name in the bake is the k-th in the photo)
+							const name = tap?.labelledNames[i];
+							const nth = tap?.labelledNames
+								.slice(0, i)
+								.filter((m) => m === name).length;
+							const g = photo?.peaks.filter(
+								(p) => p.labelled && p.solved && p.name === name,
+							)[nth ?? 0]?.solved;
 							if (!q || !g) return null;
 							const inC = (a: number[]) => a[1] >= crop[1] && a[1] <= crop[3];
 							if (!inC(q) && !inC(g)) return null;
@@ -978,7 +986,7 @@ function RealTaps() {
 	const unlocked = ["", "yaw + pitch", "+ roll", "+ focal", "+ focal"][n];
 	return (
 		<Figure
-			label="Fig. 3"
+			label="Fig. 4"
 			bleed
 			caption={
 				<>
@@ -1081,7 +1089,8 @@ function HeroTaps() {
 				<>
 					Three taps on known summits pull the labels onto their peaks. The
 					compass started {f(S && Math.abs(S[0].err.yaw))}° off. Taps here are
-					exact, simulated at the pipeline&apos;s solved positions.{" "}
+					exact, simulated at the pipeline&apos;s solved positions. Fixed:
+					demo-10, the tap bakes cover only three photos.{" "}
 					<Measured data={tap}>Data: public/demo/gipfelbuch/tap.</Measured>
 				</>
 			}
@@ -1346,12 +1355,13 @@ function MissBars() {
 		: null;
 	return (
 		<Figure
-			label="Fig. 4"
+			label="Fig. 5"
 			caption={
 				<>
 					After three taps the median label miss is{" "}
-					{worst == null ? "…" : `${worst} px`} or less on all three photos.
-					Bars are log scale.{" "}
+					{worst == null ? "…" : `${worst} px`} or less on all three photos (by
+					construction: the taps are exact and the reference is the pipeline
+					pose). Bars are log scale.{" "}
 					<Measured data={a}>Data: public/demo/gipfelbuch/tap.</Measured>
 				</>
 			}
@@ -1441,6 +1451,18 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
+			<PhotoStory
+				photoId="demo-10"
+				bleed={false}
+				number="3"
+				title="A tap is the snap"
+				caption={
+					S
+						? `The guess is the phone's pose: labels miss their peaks by ${S[0].peakShift.median} px (median). Naming one summit on the photo pulls the labels onto the skyline: ${S[1].peakShift.median} px after one tap on demo-10.`
+						: "The phone's guess, then the names snapped onto their summits."
+				}
+			/>
+
 			<RealTaps />
 
 			<MissBars />
@@ -1471,7 +1493,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<Figure
-				label="Fig. 5"
+				label="Fig. 6"
 				caption="One tap, three photos: the tapped peak is exact, the far labels are not."
 			>
 				<Gallery ids={TAP_IDS} cols={3} tile={(d) => <TapTile d={d} />} />

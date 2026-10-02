@@ -32,6 +32,7 @@ import {
 	HandLabel,
 	MarginNote,
 	Measured as PhotoMeasured,
+	PhotoStory,
 	RealPhoto,
 	Sym,
 	useGipfelbuchPhoto,
@@ -183,7 +184,7 @@ function RealEye({ d }: { d: TerrainData | null }) {
 		.map((r) => r.liftM);
 	return (
 		<Figure
-			label="Fig. 3"
+			label="Fig. 4"
 			bleed
 			caption={
 				<>
@@ -376,7 +377,7 @@ function RealEye({ d }: { d: TerrainData | null }) {
 	);
 }
 
-/** The shipped radius rule with the measured example substituted; the dashed square in Fig. 2 is this r. */
+/** The shipped radius rule with the measured example substituted; the dashed square in Fig. 3 is this r. */
 function SnapEquation({ d }: { d: TerrainData | null }) {
 	const ex = d?.snapExample;
 	return (
@@ -386,7 +387,7 @@ function SnapEquation({ d }: { d: TerrainData | null }) {
 				{
 					sym: "r",
 					c: "var(--gb-ink)",
-					text: "half-width of the dashed search square in Fig. 2, in metres",
+					text: "half-width of the dashed search square in Fig. 3, in metres",
 				},
 				{
 					sym: "d",
@@ -420,7 +421,7 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 	const snapLabel = (13 * ex.px) / 420;
 	return (
 		<Figure
-			label="Fig. 2"
+			label="Fig. 3"
 			bleed
 			caption={
 				<>
@@ -588,7 +589,9 @@ function PeakReal({ d }: { d: TerrainData | null }) {
 						</div>
 						<div className="mt-1 flex justify-between">
 							<span>OSM ele tag</span>
-							<span className="gb-ink">{ex.ele ?? "none"} m</span>
+							<span className="gb-ink">
+								{ex.ele == null ? "none" : `${ex.ele} m`}
+							</span>
 						</div>
 						<div className="mt-1 flex justify-between">
 							<span>moved</span>
@@ -917,7 +920,7 @@ function MiniBound() {
 			>
 				level + 0.3 m
 			</HandLabel>
-			<HandLabel x={196} y={100} anchor="end" size={12} color="var(--gb-blue)">
+			<HandLabel x={196} y={100} anchor="end" size={12} color="var(--gb-water)">
 				lake
 			</HandLabel>
 		</MiniSvg>
@@ -1014,6 +1017,12 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
+			<PhotoStory
+				number="Fig. 2"
+				bleed={false}
+				title="Names snap onto their summits"
+			/>
+
 			<Beat
 				kicker="Peaks"
 				title="Map peaks sit beside their summits; we climb them."
@@ -1022,7 +1031,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					Named peaks come from OpenStreetMap, often a few dozen metres off the
 					real top. We look in a square around the node, wider for far peaks,
 					and move it to the{" "}
-					<HandMark type="underline">highest map point</HandMark>. In Fig. 2,{" "}
+					<HandMark type="underline">highest map point</HandMark>. In Fig. 3,{" "}
 					<CircledNumber value={1} color="ink" seed="ts-p-n1" /> is the OSM node
 					and <CircledNumber value={2} seed="ts-p-n2" /> the summit it climbs
 					to.

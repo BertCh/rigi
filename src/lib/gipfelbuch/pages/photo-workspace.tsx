@@ -33,6 +33,7 @@ import {
 	HandNote,
 	HandRange,
 	LAYER_STYLE,
+	LiveReveal,
 	MarginNote,
 	Measured,
 	RealPhoto,
@@ -1220,11 +1221,15 @@ function MeasuredWorkspace() {
 				<p className="mt-3 text-[13px] gb-secondary">
 					The pose the live app saved for this photo ({d.app.source}, confidence{" "}
 					{d.app.confidence.toFixed(2)}) is yaw {d.app.yaw.toFixed(2)}° against{" "}
-					{d.solved.yaw.toFixed(2)}° here: the two solvers agree to{" "}
-					{Math.abs(d.app.yaw - d.solved.yaw).toFixed(2)}°, well inside the 1°
-					AGREE_DEG that makes a second opinion “verified”. Note that this
-					script's labels are the baseline layoutPeakLabels; the workspace draws
-					its own, richer label set (figure above).
+					{d.solved.yaw.toFixed(2)}° here: the two solvers differ by{" "}
+					{Math.abs(((d.app.yaw - d.solved.yaw + 540) % 360) - 180).toFixed(2)}
+					°,{" "}
+					{Math.abs(((d.app.yaw - d.solved.yaw + 540) % 360) - 180) <= 1
+						? "inside"
+						: "outside"}{" "}
+					the 1° AGREE_DEG that makes a second opinion “verified”. Note that
+					this script's labels are the baseline layoutPeakLabels; the workspace
+					draws its own, richer label set (figure above).
 				</p>
 			)}
 		</Figure>
@@ -1515,9 +1520,9 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				</p>
 				<p>
 					Exports stay locked until the pose is{" "}
-					<HandMark type="underline">final</HandMark>. In the timeline of{" "}
-					<CircledNumber value={1} />, the lock row is the only thing that
-					waits.
+					<HandMark type="underline">final</HandMark>. In the stages of{" "}
+					<CircledNumber value={1} />, the last one, “Export unlocked”, is the
+					only thing that waits.
 					<MarginNote mark="a">
 						I would wait 20 s for a pose I can trust.
 					</MarginNote>
@@ -1613,6 +1618,12 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 			</Beat>
 
 			<AnnotatedWorkspace />
+
+			<LiveReveal
+				photoId="demo-01"
+				number="Fig. 4"
+				title="The overlay, once the pose is final"
+			/>
 
 			<Beat
 				kicker="Where it fails"

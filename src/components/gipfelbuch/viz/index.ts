@@ -8,8 +8,25 @@ export { DEMO_IMAGES, DemoImage, type DemoName } from "./DemoImage";
 export { Figure, type FigureImprint } from "./Figure";
 export { useInView, useRaf, useReducedMotion, useTime } from "./hooks";
 export { HandLabel, HandNote, HandRange } from "./labels";
+export {
+	LIVE_REVEAL_SETS,
+	LiveCompare,
+	LiveDrape,
+	LiveHowItWorks,
+	type LiveMotion,
+	type LiveNote,
+	LivePanorama,
+	LivePlate,
+	type LivePlateProps,
+	LiveReveal,
+	type LiveRevealId,
+	LiveStepInside,
+	LiveTopoBoard,
+	PaperSurround,
+} from "./live";
 export { MarginNote } from "./MarginNote";
 export { Eq, Frac, Op, Sym } from "./math";
+export { PhotoStory, type PhotoStoryProps } from "./PhotoStory";
 export { Plot, type PlotScale } from "./Plot";
 export { Reveal } from "./Reveal";
 export {

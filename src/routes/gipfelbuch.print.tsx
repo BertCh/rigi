@@ -72,7 +72,7 @@ function SheetBody({ node, number }: { node: GipfelbuchNode; number: string }) {
 						{node.lede ?? node.summary}
 					</p>
 				</header>
-				<div className="px-6 pb-12">
+				<div className="gb-flat-track px-6 pb-12">
 					{Bespoke ? (
 						<PageBoundary
 							fallback={<p className={TYPE.caption}>{node.tagline}</p>}

@@ -39,7 +39,7 @@
 	}
 
 	/* Scroll reveals start hidden; on paper everything is shown. */
-	.gb-swiss [class*="opacity-0"] {
+	.gb-swiss [class*="opacity-0"]:not(input) {
 		opacity: 1 !important;
 		transform: none !important;
 	}
@@ -75,8 +75,20 @@
 		content: none;
 	}
 
-	nav,
-	[data-site-nav] {
+	/* Only the site nav (SiteNav and the print route's toolbar carry data-site-nav), and only while a
+	 * Gipfelbuch page is mounted: route CSS outlives navigation, so a bare `nav` rule would strip the
+	 * contents and breadcrumbs here and every nav on other routes. */
+	body:has(.gb-swiss) [data-site-nav] {
 		display: none !important;
 	}
+}
+
+/* The print route stacks every sheet in one block, not ConceptPage's 12-column grid, so the wide
+ * figure track (Figure, Numbers, the bleed's left margin) would spill past the page on screen. */
+.gb-flat-track [class*="mr-[calc(-66.667%"] {
+	margin-right: 0 !important;
+}
+
+.gb-flat-track [class*="ml-[calc(-33.333%"] {
+	margin-left: 0 !important;
 }

@@ -1010,12 +1010,15 @@ const bandTap = ({ d, w, h }: BandCtx) => {
 };
 
 const bandPipeline = ({ d, w, h }: BandCtx) => {
-	const stages: [string, number, string][] = [
-		["terrain", d.ms.terrain, TERRAIN],
-		["horizon", d.ms.horizon, TERRAIN],
-		["skyline", d.ms.skyline, MEASURE],
-		["solve", d.ms.solve, RESULT],
-	];
+	// a terrain time of 0 means the bake's tile cache was warm, not a measurement: leave it out
+	const stages = (
+		[
+			["terrain", d.ms.terrain, TERRAIN],
+			["horizon", d.ms.horizon, TERRAIN],
+			["skyline", d.ms.skyline, MEASURE],
+			["solve", d.ms.solve, RESULT],
+		] as [string, number, string][]
+	).filter((s) => s[1] > 0);
 	const total = stages.reduce((a, s) => a + s[1], 0);
 	const max = Math.max(...stages.map((s) => s[1]), 1);
 	const x0 = 56;
@@ -1672,7 +1675,7 @@ export const SHEETS: Record<string, SheetFigures> = {
 		ledger: (d) => {
 			const [near, far] = labelledExtremes(d);
 			return [
-				stat(d, "peaks.length", "summits in the catalogue"),
+				stat(d, "peaks.length", "named summits near the frame"),
 				stat(
 					d,
 					`peaks.${near}.distance`,
@@ -1724,7 +1727,11 @@ export const SHEETS: Record<string, SheetFigures> = {
 				unit: "m",
 			}),
 			stat(d, "demPatch.px", "cells across the patch"),
-			stat(d, "ms.terrain", "to sample the tile", { unit: "ms" }),
+			// not ms.terrain: it is 0 on photos whose tiles were cached in the bake, which is not a measurement
+			stat(d, "demPatch.halfKm", "half-width of the sampled patch", {
+				unit: "km",
+				scale: 1,
+			}),
 		],
 		value: (d) => `ground ${f1(d.gps.ground)} m under the camera`,
 	},
