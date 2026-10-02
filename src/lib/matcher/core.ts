@@ -19,7 +19,7 @@ import {
 	rToPose,
 	vfovFromF,
 } from "./geometry";
-import { type HypothesisScorer, solveRotation } from "./rotation";
+import { solveRotation } from "./rotation";
 
 export const MIN_RANGE = 250.0;
 
@@ -201,15 +201,13 @@ export async function legacySolve(
 	views: Pick<View, "pose">[],
 	eye: ArrayLike<number>,
 	prior: Pose,
-	opts: { freeFocal?: boolean; scorer?: HypothesisScorer } = {},
+	opts: { freeFocal?: boolean } = {},
 ): Promise<LegacySolve> {
 	const { x2d, X, W, H, perView } = corr;
 	const freeFocal = !!opts.freeFocal;
 	const f0 = focalPx(prior.vfov, H);
 	const t1 = performance.now();
-	const s = await solveRotation(x2d, X, eye, W, H, f0, freeFocal, {
-		scorer: opts.scorer,
-	});
+	const s = await solveRotation(x2d, X, eye, W, H, f0, freeFocal, {});
 	const solveMs = performance.now() - t1;
 	const base = {
 		nLifted: x2d.length / 2,

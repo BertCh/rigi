@@ -20,7 +20,6 @@ import {
 } from "./core";
 import { type SkylineApp, type SkylineCue, skylineFromArrays } from "./fusion";
 import { dang } from "./geometry";
-import type { HypothesisScorer } from "./rotation";
 
 /** The engine surface the matcher uses. */
 export type MatchEngine = Pick<
@@ -89,7 +88,6 @@ export type MatchContext = {
 	/** performance.now() deadline (ms) */
 	deadline: number;
 	signal?: AbortSignal;
-	scorer?: HypothesisScorer;
 	onStage?: (stage: string) => void;
 	/** extracted photo features per size / keypoint cap (one request reuses them across views and stages) */
 	photoFeatures?: Map<string, Promise<FeatureSet>>;

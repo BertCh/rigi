@@ -166,7 +166,6 @@ async function fineSweep(ctx: MatchContext, s: AdhocSetup) {
 			const prior = { yaw: views[i].pose.yaw, pitch: 0, roll: 0, vfov: vf };
 			const r = await legacySolve(sub, views, eye, prior, {
 				freeFocal: !s.focalKnown,
-				scorer: ctx.scorer,
 			});
 			if (r.pose && r.inliers >= SWEEP_WIN_MIN_INL)
 				hyps.push({
@@ -269,7 +268,6 @@ async function narrowStage1(
 			{ ...p0, yaw: sd.yaw },
 			{
 				freeFocal: !s.focalKnown,
-				scorer: ctx.scorer,
 			},
 		);
 		tried.push({ seed: sd, pose: s1.pose, inliers: s1.inliers });
@@ -360,7 +358,6 @@ async function runOnce(
 			const c40 = await correspond(ctx, views, eye, { maxKp: SWEEP_KP });
 			s40 = await legacySolve(c40, views, eye, p0, {
 				freeFocal: !s.focalKnown,
-				scorer: ctx.scorer,
 			});
 		}
 		rec.sweep40 = { inliers: s40?.inliers ?? 0, pose: s40?.pose ?? null };

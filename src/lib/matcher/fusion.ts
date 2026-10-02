@@ -27,7 +27,7 @@ import {
 	vfovFromF,
 } from "./geometry";
 import { leastSquares } from "./lm";
-import { type HypothesisScorer, solveRotation } from "./rotation";
+import { solveRotation } from "./rotation";
 
 export const HUBER_K = 1.345;
 export const SIGMA_FLOOR = { sky: 1.0, match: 1.0 };
@@ -589,7 +589,7 @@ export async function fuse(
 	H: number,
 	sk: SkylineCue | null,
 	corr: Corr | null,
-	opts: { lam?: number; scorer?: HypothesisScorer } = {},
+	opts: { lam?: number } = {},
 ): Promise<FuseResult> {
 	const t0 = performance.now();
 	const lam = opts.lam ?? 1.0;
@@ -620,9 +620,7 @@ export async function fuse(
 		pose: Pose;
 	} | null = null;
 	if (c && c.x2d.length / 2 >= 6) {
-		const rs = await solveRotation(c.x2d, c.X, eye, W, H, f0, false, {
-			scorer: opts.scorer,
-		});
+		const rs = await solveRotation(c.x2d, c.X, eye, W, H, f0, false, {});
 		if (rs) {
 			const rp = rToPose(rs.R, prior.vfov);
 			const m = solveFusion(xFromPose(rp, H), W, H, f0, {

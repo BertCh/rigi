@@ -68,7 +68,6 @@ export async function matchKnownPrior(
 		freeFocal: !!o.freeFocal,
 		deadline: ctx.deadline,
 		skyNote: sk ? null : "app has no horizon/edge map",
-		scorer: ctx.scorer,
 	});
 	res.timingMs = { render: Math.round(renderMs), ...res.timingMs };
 	res.eye = eye;
@@ -271,7 +270,6 @@ async function narrowStage1(
 			{ ...p0, yaw: sd.yaw },
 			{
 				freeFocal: !s.focalKnown,
-				scorer: ctx.scorer,
 			},
 		);
 		tried.push({
@@ -335,7 +333,6 @@ async function seededStage1(
 			const c = await correspond(ctx, views, eye, { maxKp: SWEEP_KP });
 			s1 = await legacySolve(c, views, eye, pr, {
 				freeFocal: !s.focalKnown,
-				scorer: ctx.scorer,
 			});
 		}
 		const pose = s1?.pose ?? null;
@@ -396,7 +393,6 @@ export async function stage2(
 		freeFocal: !s.focalKnown,
 		deadline: ctx.deadline,
 		skyNote: sk ? null : "app has no horizon/edge map",
-		scorer: ctx.scorer,
 	});
 	res.eye = eye;
 	return { res, sk, corr, views, eye };
@@ -459,7 +455,6 @@ export async function matchAdhoc(
 		const c1 = await correspond(ctx, views1, eye, { maxKp: SWEEP_KP });
 		const s1 = await legacySolve(c1, views1, eye, s.p0, {
 			freeFocal: !s.focalKnown,
-			scorer: ctx.scorer,
 		});
 		const ok1 = !!s1.pose && s1.inliers >= ADHOC_STAGE1_MIN_INLIERS;
 		stages.push({

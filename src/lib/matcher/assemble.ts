@@ -25,7 +25,6 @@ import {
 	xFromPose,
 } from "./fusion";
 import { dang, focalPx, round } from "./geometry";
-import type { HypothesisScorer } from "./rotation";
 
 export const MATCHER_VERSION =
 	"rigi-matcher/1.0.0 (in-browser port of matcher-service/0.4.0: fused skyline+render-match, λ=1; policies v034 | t6)";
@@ -59,12 +58,10 @@ export async function assemble(
 		freeFocal: boolean;
 		deadline?: number;
 		skyNote?: string | null;
-		scorer?: HypothesisScorer;
 	},
 ): Promise<StageResult> {
 	const legacy = await legacySolve(corr, views, eye, prior, {
 		freeFocal: o.freeFocal,
-		scorer: o.scorer,
 	});
 	const legacyOut = {
 		...legacy,
@@ -104,7 +101,7 @@ export async function assemble(
 			skylineUnavailable: o.skyNote ?? "no skyline cue",
 		};
 	const { W, H } = corr;
-	const fr = await fuse(prior, eye, W, H, sk, corr, { scorer: o.scorer });
+	const fr = await fuse(prior, eye, W, H, sk, corr);
 	const timingMs = { ...legacy.timingMs, fusion: fr.fusionMs };
 	if (!fr.fusedPose)
 		return {
