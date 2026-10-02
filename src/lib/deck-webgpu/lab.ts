@@ -94,6 +94,8 @@ type LabHook = {
 	setView(v: PresentMode): Promise<void>;
 	/** Geometry readback + CPU re-projection check (camera math vs shader, row order). */
 	checkGeometry(): Promise<unknown>;
+	/** Debugging handles (not API), set once the lab is up: see startLab. */
+	_debug?: unknown;
 };
 
 declare global {
@@ -335,7 +337,7 @@ export async function startLab(
 				.map(([k, m]) => [`${core.id}/${k}`, m] as const)
 				.filter(([k]) => k.includes(key)),
 		);
-	(hook as unknown as { _debug: unknown })._debug = {
+	hook._debug = {
 		host,
 		terrain,
 		imagery,

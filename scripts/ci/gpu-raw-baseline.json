@@ -3,10 +3,6 @@
 		"rawWebGpu": 1,
 		"why": "webgpuAvailable reason text names navigator.gpu (a string, no raw call); the adapter peek lives in gpu/adapter-peek.ts"
 	},
-	"src/lib/deck-webgpu/lab.ts": {
-		"privateMember": 1,
-		"why": "dev tool debug hook (audit-gpu A11)"
-	},
 	"src/lib/deck/composite.ts": {
 		"handle": 1,
 		"rawGl": 14,
