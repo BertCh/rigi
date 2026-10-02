@@ -403,6 +403,8 @@ export class ComputeGraph<P = void> {
 		addCopyPass(node: Omit<GPUCommandGraphCopyNode<P>, "type">): void;
 		addRenderPass(node: Omit<GPUCommandGraphRenderNode<P>, "type">): void;
 	};
+	/** the graph's mutators captured before an addToGraph op's shadowing (null outside one) */
+	private bypass: GPUCommandGraph<P> | null = null;
 	private compiled: CompiledGPUCommandGraph<P> | null = null;
 	private compiling: Promise<CompiledGPUCommandGraph<P>> | null = null;
 	private timestamps: QuerySet | null = null;
@@ -441,13 +443,13 @@ export class ComputeGraph<P = void> {
 		if (opts.graph && opts.graph.device !== device)
 			throw new Error(`${id}: the adopted graph is on another device`);
 		this.graph = opts.graph ?? new GPUCommandGraph<P>(device, { id });
-		const proto = GPUCommandGraph.prototype as GPUCommandGraph<P>;
-		const g = this.graph;
+		// the graph's mutators as they are NOW (a program compiler's lowering scope may have patched
+		// them), or, while an addToGraph op runs, the ones captured before they were shadowed
 		this.rawGraph = {
-			add: (n) => proto.add.call(g, n),
-			addComputePass: (n) => proto.addComputePass.call(g, n),
-			addCopyPass: (n) => proto.addCopyPass.call(g, n),
-			addRenderPass: (n) => proto.addRenderPass.call(g, n),
+			add: (n) => (this.bypass ?? this.graph).add(n),
+			addComputePass: (n) => (this.bypass ?? this.graph).addComputePass(n),
+			addCopyPass: (n) => (this.bypass ?? this.graph).addCopyPass(n),
+			addRenderPass: (n) => (this.bypass ?? this.graph).addRenderPass(n),
 		};
 	}
 
@@ -746,11 +748,22 @@ export class ComputeGraph<P = void> {
 		};
 		// own properties shadow the prototype methods; removed again below. The graph identity stays
 		// the real one: ops compare `view.buffer.graph !== graph`
+		const current = this.graph;
+		const had = Object.keys(audited).filter((k) => Object.hasOwn(g, k));
+		const saved = Object.fromEntries(had.map((k) => [k, g[k]]));
+		this.bypass = {
+			add: current.add.bind(current),
+			addComputePass: current.addComputePass.bind(current),
+			addCopyPass: current.addCopyPass.bind(current),
+			addRenderPass: current.addRenderPass.bind(current),
+		} as unknown as GPUCommandGraph<P>;
 		Object.assign(g, audited);
 		try {
 			op.addToGraph(this.graph);
 		} finally {
 			for (const k of Object.keys(audited)) delete g[k];
+			Object.assign(g, saved);
+			this.bypass = null;
 		}
 	}
 

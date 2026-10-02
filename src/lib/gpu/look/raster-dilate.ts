@@ -10,13 +10,9 @@
 // (D_a ∘ D_b = D_{a+b}, also with a zero border: a window reaching a source pixel from a target
 // inside the rectangle passes through the rectangle), so a larger radius is a chain of passes with
 // radii summing to it.
-//
-// LOCAL ADAPTER (raster ops add themselves with `op.addToGraph(graph)`, bypassing ComputeGraph's
-// audit): it declares every node it adds with `declareNode` so the clear lint sees them. This is
-// the piece to hoist into gpu/core once a luma contributor host exists there.
-import { GPURasterDilation } from "@luma.gl/experimental/gpu-raster";
+// The ops are added with ComputeGraph.add (their addToGraph nodes join the clear lint).
 import type { ComputeGraph } from "../core/graph";
-import type { GraphBufferHandle } from "../core/luma";
+import { GPURasterDilation, type GraphBufferHandle } from "../core/luma";
 import { planeWords } from "./haze.wgsl";
 
 /** gpu-raster's per-pass radius bound. */
@@ -82,11 +78,7 @@ export function addSquareDilation<P>(
 			output: plane(target),
 			outputValidity: g.view(o.validity, "uint32", n),
 		});
-		op.addToGraph(g.graph);
-		g.declareNode(nodeId, {
-			uses: [source.buffer],
-			writes: [target.buffer, o.validity],
-		});
+		g.add(op);
 		source = target;
 	});
 }

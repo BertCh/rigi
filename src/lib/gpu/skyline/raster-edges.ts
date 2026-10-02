@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Local adapter: luma gpu-raster edge operators as nodes of a Rigi ComputeGraph. gpu-raster ops still
-// use the pre-#3258 `addToGraph(graph)` shape (no `getCommandNodes`), so ComputeGraph.add cannot take
-// them; this adds them to the wrapped GPUCommandGraph and declares their buffer uses for the clear lint.
-// The only importer of `@luma.gl/experimental/gpu-raster` (src/lib/gpu/core/luma.ts is not extended here).
-import { GPURasterGradientMagnitude } from "@luma.gl/experimental/gpu-raster";
+// luma gpu-raster edge operators as nodes of a Rigi ComputeGraph: ComputeGraph.add takes the op's
+// `addToGraph(graph)` shape directly (core/README.md, "Composing with luma operators") and audits the
+// nodes it adds for the clear lint.
 import type { ComputeGraph } from "#/lib/gpu/core/graph";
-import type { GraphBufferHandle } from "#/lib/gpu/core/luma";
+import {
+	GPURasterGradientMagnitude,
+	type GraphBufferHandle,
+} from "#/lib/gpu/core/luma";
 
 /**
  * Sobel gradient magnitude of the float32 plane `input` (w × h) into `output`: `scale` multiplies the raw
@@ -27,25 +28,21 @@ export function addSobelMagnitude<P>(
 ) {
 	const n = w * h;
 	const validity = g.transientBuffer(`${id}-valid`, n * 4);
-	new GPURasterGradientMagnitude({
-		id,
-		width: w,
-		height: h,
-		input: {
-			id: `${id}-in`,
-			format: "float32",
-			storage: { kind: "buffer", values: g.view(input, "float32", n) },
-		},
-		output: g.view(output, "float32", n),
-		outputValidity: g.view(validity, "uint32", n),
-		operator: "sobel",
-		scale,
-	}).addToGraph(g.graph);
-	// the three nodes the op adds are `${id}-horizontal`, `-vertical` and `-magnitude`
-	for (const part of ["horizontal", "vertical", "magnitude"])
-		g.declareNode(`${id}-${part}`, {
-			uses: [input],
-			writes: [output, validity],
-		});
+	g.add(
+		new GPURasterGradientMagnitude({
+			id,
+			width: w,
+			height: h,
+			input: {
+				id: `${id}-in`,
+				format: "float32",
+				storage: { kind: "buffer", values: g.view(input, "float32", n) },
+			},
+			output: g.view(output, "float32", n),
+			outputValidity: g.view(validity, "uint32", n),
+			operator: "sobel",
+			scale,
+		}),
+	);
 	return g;
 }
