@@ -9,6 +9,7 @@
 import type { DemSource } from "../dem";
 import { type RefineOptions, refinePose } from "../refine/index";
 import type { Camera } from "./camera";
+import { EYE_ABOVE_GROUND, eyeAltitude } from "./eye-rule";
 import { computeHorizon, type HorizonProfile } from "./horizon";
 import type { SkylineObservation } from "./skyline";
 import {
@@ -20,9 +21,9 @@ import {
 } from "./solve";
 import { loadTerrain, type TerrainSampler, type TileLoader } from "./terrain";
 
-export const EYE_ABOVE_GROUND = 1.6;
+export { EYE_ABOVE_GROUND };
 
-/** Terrain from `dem` around (lat, lon); eye = GPS altitude, but at least 1.6 m above ground. */
+/** Terrain from `dem` around (lat, lon); eye = GPS altitude, but at least 1.6 m above ground (eye-rule.ts). */
 export async function loadScene(
 	lat: number,
 	lon: number,
@@ -46,7 +47,8 @@ export async function loadScene(
 	return {
 		terrain,
 		ground,
-		eye: Math.max(alt ?? ground, ground + EYE_ABOVE_GROUND),
+		// the eye rule (eye-rule.ts) with this worker's 1.6 m when there is no altitude (the engines use 1.8 m)
+		eye: eyeAltitude(alt, ground, EYE_ABOVE_GROUND),
 	};
 }
 

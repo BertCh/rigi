@@ -4,6 +4,7 @@
 
 import exifr from "exifr";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
+import { appleGravity } from "#/lib/upload/exif";
 
 export type { Vec3 };
 
@@ -40,33 +41,13 @@ export interface ExifPhotoMeta {
 }
 
 /**
- * Reads the Apple MakerNote ("Apple iOS\0" header, big-endian IFD with
- * offsets relative to the MakerNote start) and returns tag 0x0008,
- * AccelerationVector: three SRATIONALs.
+ * Apple MakerNote tag 0x0008, AccelerationVector (units of g, phone frame), through the upload
+ * path's parser (src/lib/upload/exif.ts appleGravity: either byte order, bounds-checked offsets, and
+ * undefined for a non-finite or implausible vector, |g| outside 0.5–2 g).
  */
 export function parseAppleGravity(makerNote: Uint8Array): Vec3 | undefined {
-	const header = new TextDecoder().decode(makerNote.subarray(0, 9));
-	if (header !== "Apple iOS") return undefined;
-	const dv = new DataView(
-		makerNote.buffer,
-		makerNote.byteOffset,
-		makerNote.byteLength,
-	);
-	const count = dv.getUint16(14);
-	for (let i = 0; i < count; i++) {
-		const entry = 16 + i * 12;
-		if (entry + 12 > dv.byteLength) break;
-		const tag = dv.getUint16(entry);
-		const type = dv.getUint16(entry + 2);
-		const n = dv.getUint32(entry + 4);
-		if (tag !== 0x0008 || type !== 10 || n !== 3) continue;
-		const offset = dv.getUint32(entry + 8);
-		const v = [0, 1, 2].map(
-			(k) => dv.getInt32(offset + 8 * k) / dv.getInt32(offset + 8 * k + 4),
-		);
-		return [v[0], v[1], v[2]];
-	}
-	return undefined;
+	const g = appleGravity(makerNote);
+	return g ? [g[0], g[1], g[2]] : undefined;
 }
 
 /**

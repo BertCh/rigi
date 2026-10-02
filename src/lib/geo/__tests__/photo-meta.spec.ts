@@ -52,10 +52,42 @@ describe("parseAppleGravity", () => {
 	});
 	it("returns undefined when the tag is absent or malformed", () => {
 		expect(parseAppleGravity(makeNote([1, 0, 0], 0x0009))).toBeUndefined();
-		expect(parseAppleGravity(makeNote([1, 0, 0], 0x0008, 5))).toBeUndefined();
 		expect(
 			parseAppleGravity(makeNote([1, 0, 0], 0x0008, 10, 2)),
 		).toBeUndefined();
+		// not a rational at all
+		expect(parseAppleGravity(makeNote([1, 0, 0], 0x0008, 3))).toBeUndefined();
+	});
+	it("returns undefined for an implausible vector (zero denominators, |g| outside 0.5–2 g)", () => {
+		const zeroDen = makeNote([1, 0, 0]);
+		const dv = new DataView(zeroDen.buffer);
+		for (let k = 0; k < 3; k++) dv.setInt32(100 + 8 * k + 4, 0);
+		expect(parseAppleGravity(zeroDen)).toBeUndefined();
+		expect(parseAppleGravity(makeNote([0.1, 0, 0]))).toBeUndefined();
+		expect(parseAppleGravity(makeNote([3, 0, 0]))).toBeUndefined();
+	});
+	it("does not throw on a value offset past the end", () => {
+		const n = makeNote([1, 0, 0]);
+		new DataView(n.buffer).setUint32(24, 190);
+		expect(parseAppleGravity(n)).toBeUndefined();
+	});
+	it("reads a little-endian (II) MakerNote", () => {
+		const buf = new Uint8Array(200);
+		const dv = new DataView(buf.buffer);
+		buf.set(new TextEncoder().encode("Apple iOS"), 0);
+		buf.set(new TextEncoder().encode("II"), 12);
+		dv.setUint16(14, 1, true);
+		dv.setUint16(16, 0x0008, true);
+		dv.setUint16(18, 10, true);
+		dv.setUint32(20, 3, true);
+		dv.setUint32(24, 100, true);
+		[-0.6, 0.0, -0.8].forEach((v, k) => {
+			dv.setInt32(100 + 8 * k, Math.round(v * 1_000_000), true);
+			dv.setInt32(100 + 8 * k + 4, 1_000_000, true);
+		});
+		const g = parseAppleGravity(buf);
+		expect(g?.[0]).toBeCloseTo(-0.6, 6);
+		expect(g?.[2]).toBeCloseTo(-0.8, 6);
 	});
 	it("does not read past a truncated entry table", () => {
 		const n = makeNote([1, 0, 0], 0x0009);
