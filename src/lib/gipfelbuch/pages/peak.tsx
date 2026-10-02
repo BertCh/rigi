@@ -961,10 +961,13 @@ function HiddenSummit() {
 			}
 		>
 			<RealPhoto
+				bleed
 				data={d}
 				layers={["solved", "peaks"]}
 				crop={crop}
 				maxLabels={5}
+				// the hidden summit's bearing, on the compass ruler
+				spillCursor={q ? { x: q[0], label: pr?.name } : null}
 			>
 				{() =>
 					q && skyY != null ? (
@@ -1224,7 +1227,22 @@ function YawSlide() {
 				</>
 			}
 		>
-			<RealPhoto data={d} layers={[]} crop={YAW_CROP}>
+			<RealPhoto
+				bleed
+				data={d}
+				layers={[]}
+				crop={YAW_CROP}
+				// where the erring compass thinks the centre points
+				spillCursor={
+					d
+						? {
+								az: d.solved.yaw + err,
+								label: `compass ${err > 0 ? "+" : ""}${err.toFixed(1)}°`,
+								layer: "prior",
+							}
+						: null
+				}
+			>
 				{() => (
 					<g>
 						{shifted.map(({ p, q }) => {
@@ -1750,6 +1768,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					afterLabel="solved pose"
 					before={
 						<RealPhoto
+							bleed
 							data={d1}
 							layers={["prior", "priorPeaks"]}
 							crop={crop1}
@@ -1758,6 +1777,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					}
 					after={
 						<RealPhoto
+							bleed
 							data={d1}
 							layers={["solved", "peaks"]}
 							crop={crop1}

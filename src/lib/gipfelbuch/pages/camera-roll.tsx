@@ -48,6 +48,7 @@ import {
 	Stages,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
 import { RollCompasses } from "#/components/site/meta/RollCompasses";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -1128,92 +1129,115 @@ function PanoramaStrip() {
 			caption="Invented scene, real mapping. Photos from one viewpoint stitch without feature matching: each photo is a grid of rays, and its pose sends every ray to an azimuth and elevation on a shared canvas, so roll turns the image and wide lenses bend. Terrain ridges from the viewpoint (red) lie behind; the app overlays them as the match cue. Each photo's own skyline (black) lies on them only when its pose is right: the middle photo starts with a compass and roll error and settles as the pose is found."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
-				<svg
-					viewBox={`0 0 ${PW} ${PH}`}
-					className="block h-auto w-full"
-					role="img"
-					aria-label="Three photos warped onto an azimuth by elevation canvas over DEM ridgelines"
+				{/* the viewpoint's ridges run on round the horizon past the canvas */}
+				<SketchSpill
+					seed="pano-strip"
+					bearing={(u) => AZ0 + u * (AZ1 - AZ0)}
+					label={(deg) => `${deg}°`}
+					ridges={[
+						{
+							at: (u) => (EL1 - farRidge(AZ0 + u * (AZ1 - AZ0))) / (EL1 - EL0),
+							color: SWISS.contour,
+							width: 1.4,
+							opacity: 0.7,
+						},
+						{
+							at: (u) => (EL1 - skyline(AZ0 + u * (AZ1 - AZ0))) / (EL1 - EL0),
+							color: SWISS.red,
+							width: 1.8,
+							depth: true,
+						},
+					]}
 				>
-					<title>Panorama canvas with warped photo meshes</title>
-					<SketchPath
-						d={ridge(farRidge)}
-						seed="pano-far"
-						data
-						color="pencil"
-						width={1}
-						opacity={0.7}
-						passes={1}
-					/>
-					<SketchPath
-						d={ridge(skyline)}
-						seed="pano-ridge"
-						data
-						color="red"
-						width={aligned ? 3 : 1.8}
-						opacity={aligned ? 0.9 : 0.8}
-						passes={1}
-					/>
-					{photos.map((ph, i) => (
-						<g key={`ph-${TRUE_POSES[i].yaw}`}>
-							{ph.grid.map((g) => (
+					<svg
+						viewBox={`0 0 ${PW} ${PH}`}
+						className="block h-auto w-full"
+						role="img"
+						aria-label="Three photos warped onto an azimuth by elevation canvas over DEM ridgelines"
+					>
+						<title>Panorama canvas with warped photo meshes</title>
+						<SketchPath
+							d={ridge(farRidge)}
+							seed="pano-far"
+							data
+							color="pencil"
+							width={1}
+							opacity={0.7}
+							passes={1}
+						/>
+						<SketchPath
+							d={ridge(skyline)}
+							seed="pano-ridge"
+							data
+							color="red"
+							width={aligned ? 3 : 1.8}
+							opacity={aligned ? 0.9 : 0.8}
+							passes={1}
+						/>
+						{photos.map((ph, i) => (
+							<g key={`ph-${TRUE_POSES[i].yaw}`}>
+								{ph.grid.map((g) => (
+									<SketchPath
+										key={g}
+										d={g}
+										seed={`pano-grid-${i}-${g.length}-${g.slice(1, 8)}`}
+										color="pencil"
+										width={0.6}
+										opacity={0.3}
+										passes={1}
+									/>
+								))}
 								<SketchPath
-									key={g}
-									d={g}
-									seed={`pano-grid-${i}-${g.length}-${g.slice(1, 8)}`}
-									color="pencil"
-									width={0.6}
-									opacity={0.3}
+									d={ph.outline}
+									seed={`pano-frame-${i}`}
+									color={i === 1 ? "ink" : "pencil"}
+									width={i === 1 ? 1.2 : 1}
+									opacity={i === 1 ? 0.9 : 0.75}
 									passes={1}
 								/>
-							))}
-							<SketchPath
-								d={ph.outline}
-								seed={`pano-frame-${i}`}
-								color={i === 1 ? "ink" : "pencil"}
-								width={i === 1 ? 1.2 : 1}
-								opacity={i === 1 ? 0.9 : 0.75}
-								passes={1}
-							/>
-							<SketchPath
-								d={ph.sky}
-								seed={`pano-sky-${i}`}
-								data
-								color="ink"
-								width={1.4}
-								passes={1}
-								tolerance={0.6}
-							/>
-						</g>
-					))}
-					{[0, 30, 60, 90].map((a) => (
-						<HandLabel
-							key={a}
-							x={px(a)}
-							y={PH - 8}
-							anchor="middle"
-							size={FIG_LABEL_SMALL}
-							color="var(--nb-faint)"
-						>
-							{`${a}°`}
+								<SketchPath
+									d={ph.sky}
+									seed={`pano-sky-${i}`}
+									data
+									color="ink"
+									width={1.4}
+									passes={1}
+									tolerance={0.6}
+								/>
+							</g>
+						))}
+						{[0, 30, 60, 90].map((a) => (
+							<HandLabel
+								key={a}
+								x={px(a)}
+								y={PH - 8}
+								anchor="middle"
+								size={FIG_LABEL_SMALL}
+								color="var(--nb-faint)"
+							>
+								{`${a}°`}
+							</HandLabel>
+						))}
+						<HandLabel x={10} y={18} size={FIG_LABEL} color={SWISS.secondary}>
+							azimuth → · elevation ↑
 						</HandLabel>
-					))}
-					<HandLabel x={10} y={18} size={FIG_LABEL} color={SWISS.secondary}>
-						azimuth → · elevation ↑
-					</HandLabel>
-					<HandText x={10} y={40} size={14} color="pencil">
-						the DEM ridge drawn over each photo is the match cue
-					</HandText>
-					<HandText
-						x={PW - 10}
-						y={18}
-						anchor="end"
-						size={14}
-						color={aligned ? "forest" : "pencil"}
-						halo={false}
-					>
-						{aligned ? "ridge continuous · match cue on" : "seam: pose is off"}
-					</HandText>
-				</svg>
+						<HandText x={10} y={40} size={14} color="pencil">
+							the DEM ridge drawn over each photo is the match cue
+						</HandText>
+						<HandText
+							x={PW - 10}
+							y={18}
+							anchor="end"
+							size={14}
+							color={aligned ? "forest" : "pencil"}
+							halo={false}
+						>
+							{aligned
+								? "ridge continuous · match cue on"
+								: "seam: pose is off"}
+						</HandText>
+					</svg>
+				</SketchSpill>
 			</div>
 			<div className="mt-4 grid grid-cols-1 items-end gap-4">
 				<Slider
@@ -2004,7 +2028,10 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 		<>
 			<HeroStages />
 
-			<Beat kicker="The idea" title="Photos are grouped by where they were taken.">
+			<Beat
+				kicker="The idea"
+				title="Photos are grouped by where they were taken."
+			>
 				<p>
 					Each photo already has a{" "}
 					<HandMark type="underline">

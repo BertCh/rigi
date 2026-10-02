@@ -926,6 +926,7 @@ function RealPose({
 	return (
 		<Figure
 			label="Fig. D1"
+			bleed
 			caption={
 				<>
 					<Measured data={d} /> The teal curve is the terrain horizon projected
@@ -955,6 +956,7 @@ function RealPose({
 				<div>
 					<RealPhoto
 						key={id}
+						bleed
 						data={d}
 						layers={["skyline", "solved", "peaks"]}
 						toggles={["skyline", "solved", "peaks"]}
@@ -1799,10 +1801,15 @@ function CompassShift() {
 			}
 		>
 			<RealPhoto
+				bleed
 				data={d}
 				layers={["peaks", "priorPeaks"]}
 				crop={d ? skylineBand(d, 300) : undefined}
 				maxLabels={4}
+				// the phone's heading against the solved one on the ruler
+				spillCursor={
+					d ? { az: d.prior.yaw, label: "phone", layer: "prior" } : null
+				}
 			/>
 			<Eq
 				where={[
@@ -1876,7 +1883,7 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
-			<PhotoStory number="Fig. 2" bleed={false} title="On a real photo" />
+			<PhotoStory number="Fig. 2" title="On a real photo" />
 
 			<Beat
 				kicker="Why the label matters"

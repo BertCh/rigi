@@ -2103,6 +2103,7 @@ function YawSearch() {
 			/>
 			<RealPhoto
 				key={id}
+				bleed
 				data={d}
 				layers={[
 					"skyline",

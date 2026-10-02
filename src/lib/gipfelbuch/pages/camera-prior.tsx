@@ -145,6 +145,7 @@ function RealPrior({
 	return (
 		<Figure
 			label="Fig. D1"
+			bleed
 			caption={
 				<>
 					<Measured data={d} /> Dashed magenta: the horizon predicted from the
@@ -170,14 +171,18 @@ function RealPrior({
 			/>
 			<AlignmentStoryProvider key={id} initial={1}>
 				<div className="grid gap-4 lg:grid-cols-[1.55fr_1fr] lg:items-start">
-					<RealPhoto
-						key={id}
-						data={d}
-						layers={["skyline", "prior", "solved", "priorPeaks", "peaks"]}
-						toggles={["skyline", "prior", "solved", "priorPeaks", "peaks"]}
-						crop={d ? skyBand(d) : undefined}
-						maxLabels={4}
-					/>
+					{/* the spill follows the story map's drag and keeps off it */}
+					<div className="min-w-0" data-gb-bleed-bounds="right">
+						<RealPhoto
+							key={id}
+							bleed
+							data={d}
+							layers={["skyline", "prior", "solved", "priorPeaks", "peaks"]}
+							toggles={["skyline", "prior", "solved", "priorPeaks", "peaks"]}
+							crop={d ? skyBand(d) : undefined}
+							maxLabels={4}
+						/>
+					</div>
 					<StoryMap data={d} />
 				</div>
 			</AlignmentStoryProvider>

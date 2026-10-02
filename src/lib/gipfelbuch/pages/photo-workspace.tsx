@@ -1174,6 +1174,7 @@ function MeasuredWorkspace() {
 			}
 		>
 			<RealPhoto
+				bleed
 				data={d}
 				layers={["skyline", "prior", "solved"]}
 				toggles={["skyline", "prior", "solved"]}
@@ -1290,7 +1291,14 @@ function PeakProjection() {
 					</button>
 				))}
 			</div>
-			<RealPhoto data={d} layers={["skyline"]} crop={crop}>
+			<RealPhoto
+				bleed
+				data={d}
+				layers={["skyline"]}
+				crop={crop}
+				// the picked summit's bearing at the solved pose
+				spillCursor={{ x: peak.solved[0], label: peak.name, layer: "solved" }}
+			>
 				{() => {
 					const [px, py] = peak.prior as [number, number];
 					const [sx, sy] = peak.solved as [number, number];

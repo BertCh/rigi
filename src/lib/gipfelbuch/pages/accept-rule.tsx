@@ -320,18 +320,22 @@ function RealDecisions() {
 				</div>
 			</div>
 			<div className="mt-6 grid gap-5 sm:grid-cols-[1.35fr_1fr]">
-				<RealPhoto
-					data={d}
-					layers={["skyline", "solved"]}
-					toggles={["skyline", "solved", "prior"]}
-					crop={crop}
-					className={
-						d && d.photo.height > d.photo.width
-							? "mx-auto w-full max-w-[300px]"
-							: undefined
-					}
-					key={id}
-				/>
+				{/* the spill keeps off the verdict column on the right */}
+				<div className="min-w-0" data-gb-bleed-bounds="right">
+					<RealPhoto
+						bleed
+						data={d}
+						layers={["skyline", "solved"]}
+						toggles={["skyline", "solved", "prior"]}
+						crop={crop}
+						className={
+							d && d.photo.height > d.photo.width
+								? "mx-auto w-full max-w-[300px]"
+								: undefined
+						}
+						key={id}
+					/>
+				</div>
 				{d && fx && (
 					<div className={`min-w-0 ${TYPE.caption}`}>
 						<div className="flex items-baseline gap-2">
@@ -1459,7 +1463,6 @@ function RejectedStory() {
 	return (
 		<PhotoStory
 			photoId="demo-07"
-			bleed={false}
 			number="5"
 			title="A solve the rule refuses"
 			caption={

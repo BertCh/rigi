@@ -54,7 +54,9 @@ import {
 	Stages,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
 import { PhotoStory } from "#/components/gipfelbuch/viz/PhotoStory";
+import { SketchSpill } from "#/components/gipfelbuch/viz/SketchSpill";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Tap-a-peak: how a few user taps turn into a pose.
@@ -225,6 +227,26 @@ function ridgePts(c: Cam) {
 	}
 	return pts.sort((a, b) => a[0] - b[0]);
 }
+/** The ridge's row (0 = top, 1 = bottom) at frame column u under camera c, for the margin spill. */
+function ridgeRowAt(c: Cam): (u: number) => number | null {
+	const pts: [number, number][] = [];
+	for (let az = c.yaw - 80; az <= c.yaw + 80; az += 0.5) {
+		const q = project(c, az, ridgeEl(az));
+		if (q) pts.push(q);
+	}
+	pts.sort((a, b) => a[0] - b[0]);
+	return (u) => {
+		const x = u * W;
+		for (let i = 1; i < pts.length; i++)
+			if (pts[i][0] >= x) {
+				const [x0, y0] = pts[i - 1];
+				const [x1, y1] = pts[i];
+				if (x < x0) return null;
+				return (y0 + ((y1 - y0) * (x - x0)) / (x1 - x0 || 1)) / H;
+			}
+		return null;
+	};
+}
 const line = (pts: [number, number][]) =>
 	pts
 		.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`)
@@ -307,160 +329,184 @@ function PinLock() {
 			caption="One made-up photo and six named summits. The phone sensors start the overlay 6.5° off in yaw and 1.4° off in pitch, with a lens 7 % too short. Each tap adds a pin: the ring is your finger, the filled marker is where that summit lands now, the line between them is the miss. Solid cyan: horizon modelled from the terrain. Dashed: the real skyline."
 		>
 			<div ref={ref} className="-m-1 sm:-m-2">
-				<svg
-					viewBox={`0 0 ${W} ${H}`}
-					className="block h-auto w-full"
-					role="img"
-					aria-label="A photo with predicted skyline and tapped summit pins"
+				{/* the made-up range runs on past the frame: the real ridge stays, the modelled one follows the pins */}
+				<SketchSpill
+					seed="tap-pinlock"
+					bearing={(u) => TRUTH.yaw + Math.atan((u * W - CX) / TRUTH.f) / DEG}
+					label={(deg) => `${(((deg % 360) + 360) % 360).toFixed(0)}°`}
+					ridges={[
+						{
+							at: ridgeRowAt(TRUTH),
+							color: SWISS.ink,
+							dash: "5 4",
+							width: 1.6,
+							depth: true,
+						},
+						{
+							at: ridgeRowAt(cam),
+							color: LAYER_INKS.solved.paper,
+							width: 1.8,
+						},
+					]}
 				>
-					{/* dark plate: a live scene, sky gradient, real ridge dashed, predicted skyline in cyan */}
-					<defs>
-						<linearGradient id="tp-sky" x1="0" y1="0" x2="0" y2="1">
-							<stop offset="0" stopColor="#141c27" />
-							<stop offset="0.7" stopColor="#3b4d66" />
-							<stop offset="1" stopColor="#7d8da3" />
-						</linearGradient>
-					</defs>
-					<rect width={W} height={H} fill="url(#tp-sky)" />
-					<path d={`${line(truthRidge)} L${W} ${H} L0 ${H} Z`} fill="#1f2a38" />
-					<SketchPolyline
-						points={truthRidge}
-						seed="tp-truth"
-						data
-						color={PLATE_TEXT}
-						width={1.6}
-						dash="4 4"
-					/>
-					<path
-						d={`M0 ${H} L0 262 C 120 246 260 270 400 256 S 560 250 ${W} 262 L${W} ${H} Z`}
-						fill="#0d1218"
-					/>
+					<svg
+						viewBox={`0 0 ${W} ${H}`}
+						className="block h-auto w-full"
+						role="img"
+						aria-label="A photo with predicted skyline and tapped summit pins"
+					>
+						{/* dark plate: a live scene, sky gradient, real ridge dashed, predicted skyline in cyan */}
+						<defs>
+							<linearGradient id="tp-sky" x1="0" y1="0" x2="0" y2="1">
+								<stop offset="0" stopColor="#141c27" />
+								<stop offset="0.7" stopColor="#3b4d66" />
+								<stop offset="1" stopColor="#7d8da3" />
+							</linearGradient>
+						</defs>
+						<rect width={W} height={H} fill="url(#tp-sky)" />
+						<path
+							d={`${line(truthRidge)} L${W} ${H} L0 ${H} Z`}
+							fill="#1f2a38"
+						/>
+						<SketchPolyline
+							points={truthRidge}
+							seed="tp-truth"
+							data
+							color={PLATE_TEXT}
+							width={1.6}
+							dash="4 4"
+						/>
+						<path
+							d={`M0 ${H} L0 262 C 120 246 260 270 400 256 S 560 250 ${W} 262 L${W} ${H} Z`}
+							fill="#0d1218"
+						/>
 
-					{/* predicted skyline */}
-					<SketchPolyline
-						points={pred}
-						seed="tp-pred"
-						data
-						color={LAYER_STYLE.solved.color}
-						width={2.4}
-					/>
+						{/* predicted skyline */}
+						<SketchPolyline
+							points={pred}
+							seed="tp-pred"
+							data
+							color={LAYER_STYLE.solved.color}
+							width={2.4}
+						/>
 
-					{/* summit labels under the current pose */}
-					{PEAKS.map((p, i) => {
-						const q = predXY[i];
-						if (!q) return null;
-						const on = pinned.has(i);
-						return (
-							<g key={p.name}>
-								<SketchPath
-									d={`M${q[0]} ${q[1] - 1} l5 -9 l-10 0 Z`}
-									seed={`tp-tri-${p.name}`}
-									color={on ? PLATE_RED : PLATE_TEXT}
-									width={1.4}
-								/>
-								<HandLabel
-									x={q[0]}
-									y={q[1] - 16}
-									anchor="middle"
-									size={11.5}
-									color={on ? PLATE_RED : PLATE_TEXT}
-									haloColor={PLATE_HALO}
-								>
-									{p.name}
-								</HandLabel>
-							</g>
-						);
-					})}
-
-					{/* taps and residual segments */}
-					{shown.map((tp, n) => {
-						const q = predXY[tp.peak];
-						return (
-							<g key={tp.peak}>
-								{q && (
-									<PenLine
-										from={[q[0], q[1]]}
-										to={[tp.x, tp.y]}
-										seed={`tp-res-${tp.peak}`}
-										data
-										color={PLATE_TEXT}
-										width={1.5}
+						{/* summit labels under the current pose */}
+						{PEAKS.map((p, i) => {
+							const q = predXY[i];
+							if (!q) return null;
+							const on = pinned.has(i);
+							return (
+								<g key={p.name}>
+									<SketchPath
+										d={`M${q[0]} ${q[1] - 1} l5 -9 l-10 0 Z`}
+										seed={`tp-tri-${p.name}`}
+										color={on ? PLATE_RED : PLATE_TEXT}
+										width={1.4}
 									/>
-								)}
-								<PenCircle
-									center={[tp.x, tp.y]}
-									radiusX={9}
-									seed={`tp-ring-${tp.peak}`}
-									data
-									color={PLATE_RED}
-									width={1.8}
-								/>
-								<HandDot
-									x={tp.x}
-									y={tp.y}
-									r={2.2}
-									seed={`tp-dot-${tp.peak}`}
-									data
-									color={PLATE_RED}
-									opacity={1}
-								/>
-								<HandLabel
-									x={tp.x + 13}
-									y={tp.y + 4}
-									size={11.5}
-									color={PLATE_RED}
-									haloColor={PLATE_HALO}
-								>
-									tap {n + 1}
-								</HandLabel>
-							</g>
-						);
-					})}
-					<HandLabel
-						x={W - 10}
-						y={20}
-						anchor="end"
-						size={12.5}
-						color={PLATE_TEXT}
-						haloColor={PLATE_HALO}
-					>
-						{stage === 0
-							? "phone sensors"
-							: `${stage} pin${stage > 1 ? "s" : ""}`}
-					</HandLabel>
-					<HandText
-						x={14}
-						y={44}
-						size={17}
-						color={PLATE_TEXT}
-						rotate={-2}
-						halo={false}
-					>
-						{stage === 0
-							? "cyan misses the ridge: 6.5° off in yaw"
-							: "pinned summits now sit under the finger"}
-					</HandText>
-					<PenArrow
-						from={[150, 52]}
-						to={[190, 110]}
-						seed="tp-note-arrow"
-						color={PLATE_TEXT}
-						width={1.3}
-					/>
-					{stage >= 2 && (
-						<HandText
-							x={W - 14}
-							y={H - 22}
-							size={16}
+									<HandLabel
+										x={q[0]}
+										y={q[1] - 16}
+										anchor="middle"
+										size={11.5}
+										color={on ? PLATE_RED : PLATE_TEXT}
+										haloColor={PLATE_HALO}
+									>
+										{p.name}
+									</HandLabel>
+								</g>
+							);
+						})}
+
+						{/* taps and residual segments */}
+						{shown.map((tp, n) => {
+							const q = predXY[tp.peak];
+							return (
+								<g key={tp.peak}>
+									{q && (
+										<PenLine
+											from={[q[0], q[1]]}
+											to={[tp.x, tp.y]}
+											seed={`tp-res-${tp.peak}`}
+											data
+											color={PLATE_TEXT}
+											width={1.5}
+										/>
+									)}
+									<PenCircle
+										center={[tp.x, tp.y]}
+										radiusX={9}
+										seed={`tp-ring-${tp.peak}`}
+										data
+										color={PLATE_RED}
+										width={1.8}
+									/>
+									<HandDot
+										x={tp.x}
+										y={tp.y}
+										r={2.2}
+										seed={`tp-dot-${tp.peak}`}
+										data
+										color={PLATE_RED}
+										opacity={1}
+									/>
+									<HandLabel
+										x={tp.x + 13}
+										y={tp.y + 4}
+										size={11.5}
+										color={PLATE_RED}
+										haloColor={PLATE_HALO}
+									>
+										tap {n + 1}
+									</HandLabel>
+								</g>
+							);
+						})}
+						<HandLabel
+							x={W - 10}
+							y={20}
 							anchor="end"
-							color={PLATE_RED}
-							rotate={2}
+							size={12.5}
+							color={PLATE_TEXT}
+							haloColor={PLATE_HALO}
+						>
+							{stage === 0
+								? "phone sensors"
+								: `${stage} pin${stage > 1 ? "s" : ""}`}
+						</HandLabel>
+						<HandText
+							x={14}
+							y={44}
+							size={17}
+							color={PLATE_TEXT}
+							rotate={-2}
 							halo={false}
 						>
-							two far-apart pins fix the tilt: roll ✓
+							{stage === 0
+								? "cyan misses the ridge: 6.5° off in yaw"
+								: "pinned summits now sit under the finger"}
 						</HandText>
-					)}
-				</svg>
+						<PenArrow
+							from={[150, 52]}
+							to={[190, 110]}
+							seed="tp-note-arrow"
+							color={PLATE_TEXT}
+							width={1.3}
+						/>
+						{stage >= 2 && (
+							<HandText
+								x={W - 14}
+								y={H - 22}
+								size={16}
+								anchor="end"
+								color={PLATE_RED}
+								rotate={2}
+								halo={false}
+							>
+								two far-apart pins fix the tilt: roll ✓
+							</HandText>
+						)}
+					</svg>
+				</SketchSpill>
 			</div>
 
 			<div className="mt-4 grid gap-5 md:grid-cols-[1fr_auto]">
@@ -840,7 +886,7 @@ function TapFrame({
 	n: number;
 	id: string;
 	maxLabels?: number;
-	/** Geo bleed: only on the page's one hero render. */
+	/** Geo spill onto the margins; never in a Trio tile. */
 	bleed?: boolean;
 }) {
 	const step = tap?.steps[n];
@@ -864,6 +910,8 @@ function TapFrame({
 			crop={crop}
 			maxLabels={maxLabels}
 			bleed={bleed}
+			// before the first tap the camera is the phone's guess; one tap already lands on the solve
+			spillT={n === 0 ? 0 : 1}
 		>
 			{() =>
 				step && (
@@ -1006,7 +1054,7 @@ function RealTaps() {
 					{unlocked && `unlocked: ${unlocked}`}
 				</span>
 			</div>
-			<TapFrame photo={photo} tap={tap} n={n} id={id} />
+			<TapFrame photo={photo} tap={tap} n={n} id={id} bleed />
 			{tap && step && (
 				<dl
 					className={`mt-4 grid grid-cols-2 gap-x-4 gap-y-2 font-mono gb-secondary sm:grid-cols-5 ${TYPE.micro}`}
@@ -1159,7 +1207,14 @@ function OneTap() {
 				</>
 			}
 		>
-			<RealPhoto data={photo} layers={[]} crop={ONE_CROP}>
+			<RealPhoto
+				bleed
+				data={photo}
+				layers={[]}
+				crop={ONE_CROP}
+				// the tapped summit's known bearing, on the compass ruler
+				spillCursor={{ x: t.x, az: t.az }}
+			>
 				{() => (
 					<g>
 						<CrispLine
@@ -1470,7 +1525,6 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 
 			<PhotoStory
 				photoId="demo-10"
-				bleed={false}
 				number="3"
 				title="A tap is the snap"
 				caption={
