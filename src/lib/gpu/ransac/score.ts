@@ -30,6 +30,7 @@ import {
 	withLease,
 } from "../core/pool";
 import { defineUniformBlock } from "../core/uniform-block";
+import { argStep, sumStep, wgslTreeReduce } from "../core/wgsl/reduce";
 
 export const MODE_ID = { chord: 0, angular: 1, reproj: 2 } as const;
 const MAX_X = 65535;
@@ -42,6 +43,22 @@ export const RANSAC_U = defineUniformBlock({
 	thr2: "f32",
 	wx: "u32",
 	byCost: "u32",
+});
+
+// Same halving trees as the hand-written loops they replace (sum order and first-index tie-break kept).
+const TREE_SCORE = wgslTreeReduce({
+	size: 64,
+	lane: "li",
+	steps: [sumStep("sc"), sumStep("sf")],
+	indent: "\t",
+});
+const TREE_ARGMAX = wgslTreeReduce({
+	size: 256,
+	lane: "li",
+	steps: [
+		argStep({ value: "bk", index: "bi", mode: "max", none: "0xffffffffu" }),
+	],
+	indent: "\t",
 });
 
 export const SCORE_WGSL = /* wgsl */ `
@@ -102,14 +119,7 @@ fn main(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) li: u
 	}
 	sc[li] = cnt;
 	sf[li] = cost;
-	workgroupBarrier();
-	for (var s = 32u; s > 0u; s >>= 1u) {
-		if (li < s) {
-			sc[li] += sc[li + s];
-			sf[li] += sf[li + s];
-		}
-		workgroupBarrier();
-	}
+${TREE_SCORE}
 	if (li == 0u && live) {
 		score[k] = vec2u(sc[0], bitcast<u32>(sf[0]));
 	}
@@ -142,17 +152,7 @@ fn main(@builtin(local_invocation_index) li: u32) {
 	}
 	bk[li] = key;
 	bi[li] = idx;
-	workgroupBarrier();
-	for (var s = 128u; s > 0u; s >>= 1u) {
-		if (li < s) {
-			let ok = bi[li + s];
-			if (ok != 0xffffffffu && (bi[li] == 0xffffffffu || better(bk[li + s], ok, bk[li], bi[li]))) {
-				bk[li] = bk[li + s];
-				bi[li] = ok;
-			}
-		}
-		workgroupBarrier();
-	}
+${TREE_ARGMAX}
 	if (li == 0u) {
 		let i = bi[0];
 		var s = vec2u(0u, 0x7f800000u);

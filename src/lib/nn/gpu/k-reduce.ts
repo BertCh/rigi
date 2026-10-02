@@ -7,6 +7,14 @@
 // one 256-thread workgroup per row (tree reductions in workgroup memory); strided rows (inner > 1)
 // run one invocation per (outer, inner) column with sequential loops.
 
+import {
+	argStep,
+	maxStep,
+	minStep,
+	type ReduceStep,
+	sumStep,
+	wgslTreeReduce,
+} from "#/lib/gpu/core/wgsl/reduce";
 import type { ReducePrim } from "../base";
 import type { DType } from "../types";
 import { ENTRY, type KernelCall } from "./k-elementwise";
@@ -19,37 +27,32 @@ function rowGrid(rows: number): [number, number, number] {
 	return [Math.ceil(rows / y), y, 1];
 }
 
+const tree = (step: ReduceStep) =>
+	wgslTreeReduce({ size: 256, lane: "t", steps: [step] });
+const TREE_SUM = tree(sumStep("red"));
+const TREE_MAX = tree(maxStep("red"));
+const TREE_MIN = tree(minStep("red"));
+const TREE_ARGMAX = tree(argStep({ value: "red", index: "redi", mode: "max" }));
+
 const ROW_ENTRY = `var<workgroup> red: array<f32, 256>;
 var<workgroup> redi: array<u32, 256>;
 fn wg_sum(v: f32, t: u32) -> f32 {
   red[t] = v;
-  workgroupBarrier();
-  for (var s = 128u; s > 0u; s >>= 1u) {
-    if (t < s) { red[t] += red[t + s]; }
-    workgroupBarrier();
-  }
+${TREE_SUM}
   let r = red[0];
   workgroupBarrier();
   return r;
 }
 fn wg_max(v: f32, t: u32) -> f32 {
   red[t] = v;
-  workgroupBarrier();
-  for (var s = 128u; s > 0u; s >>= 1u) {
-    if (t < s) { red[t] = max(red[t], red[t + s]); }
-    workgroupBarrier();
-  }
+${TREE_MAX}
   let r = red[0];
   workgroupBarrier();
   return r;
 }
 fn wg_min(v: f32, t: u32) -> f32 {
   red[t] = v;
-  workgroupBarrier();
-  for (var s = 128u; s > 0u; s >>= 1u) {
-    if (t < s) { red[t] = min(red[t], red[t + s]); }
-    workgroupBarrier();
-  }
+${TREE_MIN}
   let r = red[0];
   workgroupBarrier();
   return r;
@@ -58,15 +61,7 @@ fn wg_min(v: f32, t: u32) -> f32 {
 fn wg_argmax(v: f32, i: u32, t: u32) -> u32 {
   red[t] = v;
   redi[t] = i;
-  workgroupBarrier();
-  for (var s = 128u; s > 0u; s >>= 1u) {
-    if (t < s) {
-      let a = red[t];
-      let b = red[t + s];
-      if (b > a || (b == a && redi[t + s] < redi[t])) { red[t] = b; redi[t] = redi[t + s]; }
-    }
-    workgroupBarrier();
-  }
+${TREE_ARGMAX}
   let r = redi[0];
   workgroupBarrier();
   return r;

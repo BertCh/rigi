@@ -13,7 +13,14 @@
 // BAND_STATS_SG is the same with subgroup reductions (needs the "subgroups" feature): equal up to
 // the float sums' reassociation.
 
+import { sumRowStep, wgslTreeReduce } from "../core/wgsl/reduce";
+
 export const STATS_VALUES = 52;
+
+const TREE_ROWS = wgslTreeReduce({
+	size: 64,
+	steps: [sumRowStep("sh", STATS_VALUES)],
+});
 
 export const BAND_STATS = /* wgsl */ `
 struct P { w: u32, h: u32, threads: u32, hasFg: u32, minRange: f32 };
@@ -73,13 +80,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation
     }
   }
   sh[lid] = acc;
-  workgroupBarrier();
-  for (var s = 32u; s > 0u; s >>= 1u) {
-    if (lid < s) {
-      for (var k = 0u; k < 52u; k++) { sh[lid][k] += sh[lid + s][k]; }
-    }
-    workgroupBarrier();
-  }
+${TREE_ROWS}
   if (lid == 0u) {
     for (var k = 0u; k < 52u; k++) { partial[wid.x * 52u + k] = sh[0][k]; }
   }

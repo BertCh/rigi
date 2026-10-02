@@ -19,6 +19,15 @@
 // thread interpolates the horizon for one observation, which every pitch of the row then shares),
 // and each thread keeps 4 pitch accumulators, so one workgroup covers 256 pitches. Summation over
 // observations is sequential in observation order, as on the CPU.
+import { minStep, wgslTreeReduce } from "../core/wgsl/reduce";
+
+const TREE_MIN = wgslTreeReduce({
+	size: 64,
+	lane: "lid",
+	steps: [minStep("red")],
+	indent: "\t",
+});
+
 export const COARSE_WGSL = /* wgsl */ `
 struct U {
 	nObs: u32,
@@ -110,11 +119,7 @@ fn main(
 		atomicStore(&first, 0xffffffffu);
 		atomicStore(&last, 0u);
 	}
-	workgroupBarrier();
-	for (var s = WG / 2u; s > 0u; s >>= 1u) {
-		if (lid < s) { red[lid] = min(red[lid], red[lid + s]); }
-		workgroupBarrier();
-	}
+${TREE_MIN}
 	let lim = red[0] + u.band;
 	for (var k = 0u; k < PER; k++) {
 		let p = blk * WG * PER + k * WG + lid;

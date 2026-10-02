@@ -614,6 +614,24 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		status: "default",
 	},
 	{
+		id: "sky-fused",
+		island: "I6",
+		paths: ["src/lib/gpu/sky/fused-graph.ts", "src/lib/sky/fused.ts"],
+		groups: ["sky-fused"],
+		realms: ["worker:sky"],
+		cadence: "per photo",
+		resources: [
+			"padded RGBA rows, tables, params (pooled imports)",
+			"prep + refine scratch (transients)",
+			"model output P(sky) (imported, lives with the cached graph)",
+			"model weights (imported at build; graph keyed by model)",
+		],
+		readbacks: ["read: byte mask (+ alpha flag)"],
+		status: "default",
+		notes:
+			"steady-state sky path: prep → U²-Net-P (nn forwardInto) → refine as ONE graph, one submission and one readback; any fused error takes the three-step path (sky-prep → sky-model → sky-refine)",
+	},
+	{
 		id: "deck-webgpu-frame",
 		island: "I7",
 		paths: ["src/lib/deck-webgpu/engine.ts", "src/lib/deck-webgpu/pass.ts"],

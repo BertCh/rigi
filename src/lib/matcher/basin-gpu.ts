@@ -41,6 +41,7 @@ import {
 	withLease,
 } from "#/lib/gpu/core/pool";
 import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
+import { argStep, sumStep, wgslTreeReduce } from "#/lib/gpu/core/wgsl/reduce";
 import { type GridScorer, type RotHyp, rotSearchCpu } from "./basin";
 import { poseToR } from "./geometry";
 
@@ -71,6 +72,20 @@ const PARAMS = /* wgsl */ `
 struct P { W: f32, H: f32, f: f32, w: u32, h: u32, nDirs: u32, K: u32, nodes: u32, wx: u32, wyc: u32 };
 @group(0) @binding(0) var<uniform> prm: P;
 `;
+
+const TREE_SCORE = wgslTreeReduce({
+	size: 64,
+	lane: "li",
+	steps: [sumStep("ssum"), sumStep("scol")],
+	indent: "\t",
+});
+const TREE_TOP = wgslTreeReduce({
+	size: 256,
+	lane: "li",
+	stride: "st",
+	steps: [argStep({ value: "bs", index: "bi", mode: "max", none: "NONE" })],
+	indent: "\t\t",
+});
 
 export const SCORE_WGSL = /* wgsl */ `${PARAMS}
 @group(0) @binding(1) var<storage, read> S: array<f32>;
@@ -120,14 +135,7 @@ fn main(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) li: u
 	}
 	ssum[li] = sum;
 	scol[li] = ncol;
-	workgroupBarrier();
-	for (var s = 32u; s > 0u; s >>= 1u) {
-		if (li < s) {
-			ssum[li] += ssum[li + s];
-			scol[li] += scol[li + s];
-		}
-		workgroupBarrier();
-	}
+${TREE_SCORE}
 	if (li == 0u) {
 		var score = ${NEG.toExponential()};
 		if (atomicLoad(&inView) >= 20u) {
@@ -155,10 +163,6 @@ fn dang(a: f32, b: f32) -> f32 {
 	return d - 360.0 * floor(d / 360.0) - 180.0;
 }
 // higher score wins, then the lower index
-fn better(sa: f32, ia: u32, sb: f32, ib: u32) -> bool {
-	return sa > sb || (sa == sb && ia < ib);
-}
-
 @compute @workgroup_size(256)
 fn main(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) li: u32) {
 	let node = wg.x;
@@ -179,17 +183,7 @@ fn main(@builtin(workgroup_id) wg: vec3u, @builtin(local_invocation_index) li: u
 		}
 		bs[li] = bestS;
 		bi[li] = bestI;
-		workgroupBarrier();
-		for (var st = 128u; st > 0u; st >>= 1u) {
-			if (li < st) {
-				let oi = bi[li + st];
-				if (oi != NONE && (bi[li] == NONE || better(bs[li + st], oi, bs[li], bi[li]))) {
-					bs[li] = bs[li + st];
-					bi[li] = oi;
-				}
-			}
-			workgroupBarrier();
-		}
+${TREE_TOP}
 		if (li == 0u) {
 			let i = bi[0];
 			best[node * ${TOP}u + round] = vec2u(bitcast<u32>(select(0.0, bs[0], i != NONE)), i);

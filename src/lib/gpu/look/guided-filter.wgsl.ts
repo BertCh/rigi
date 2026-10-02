@@ -14,15 +14,13 @@
 // convolution over the stack equals one convolution per plane with a zero boundary.
 // @workgroup_size(256): one stack element per invocation, 1-D; 256 fills an Apple GPU SIMD group ×8.
 
+import { BOX_SPAN_WGSL } from "../core/wgsl/box";
+
 const PARAMS = /* wgsl */ `
 struct P { w: u32, h: u32, r: u32, eps: f32 };
 `;
 
-const RANGE = /* wgsl */ `
-fn span(c: u32, r: u32, n: u32) -> vec2<u32> {
-  return vec2<u32>(select(0u, c - r, c >= r), min(n, c + r + 1u));
-}
-`;
+const RANGE = BOX_SPAN_WGSL;
 
 /** Stack S1 (4 planes): I, p, I², I·p. Gap rows are written too (zeros): a full write. */
 export const GF_PREP = /* wgsl */ `${PARAMS}

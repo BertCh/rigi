@@ -34,6 +34,8 @@
 // REDUCE_SG_WGSL is REDUCE with subgroup operations (when the device has "subgroups"): the same
 // max / min / (max mid, first index) results, since each is order-independent.
 
+import { argStep, maxStep, minStep, wgslTreeReduce } from "../core/wgsl/reduce";
+
 const HEADER = /* wgsl */ `
 struct U {
   w: u32, h: u32, n: u32, sy: u32,
@@ -149,6 +151,15 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
+const TREE_REDUCE = wgslTreeReduce({
+	size: 256,
+	steps: [
+		minStep("shZero"),
+		maxStep("shLo"),
+		argStep({ value: "shMid", index: "shArg", mode: "max" }),
+	],
+});
+
 export const REDUCE_WGSL = /* wgsl */ `${HEADER}
 @group(0) @binding(0) var<uniform> u: U;
 @group(0) @binding(1) var<storage, read> cells: array<vec4<f32>>;
@@ -169,16 +180,7 @@ fn main(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) 
     if (e.x > mMid) { mMid = e.x; mArg = c; }
   }
   shLo[lid] = mLo; shMid[lid] = mMid; shArg[lid] = mArg; shZero[lid] = zArg;
-  workgroupBarrier();
-  for (var s = 128u; s > 0u; s >>= 1u) {
-    if (lid < s) {
-      shZero[lid] = min(shZero[lid], shZero[lid + s]);
-      shLo[lid] = max(shLo[lid], shLo[lid + s]);
-      let om = shMid[lid + s]; let oa = shArg[lid + s];
-      if (om > shMid[lid] || (om == shMid[lid] && oa < shArg[lid])) { shMid[lid] = om; shArg[lid] = oa; }
-    }
-    workgroupBarrier();
-  }
+${TREE_REDUCE}
   if (lid == 0u) { red[iy] = vec4<f32>(shLo[0], shMid[0], bitcast<f32>(shArg[0]), bitcast<f32>(shZero[0])); }
 }
 `;

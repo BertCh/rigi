@@ -42,10 +42,8 @@ import {
 	STORAGE_OFFSET_ALIGNMENT,
 	texelWorkgroups,
 } from "./layout";
-import { INV_256, OFFSET, SEA_FLOOR } from "./terrarium-f32";
+import { TERRARIUM_DECODE_WGSL } from "./terrarium.wgsl";
 import { BITMAP_TEXTURE_USAGE, releaseResource, uploadBitmap } from "./upload";
-
-const wgslF32 = (x: number) => (Number.isInteger(x) ? `${x}.0` : String(x));
 
 /**
  * One texel per invocation: bytes = round(load · 255) (exact for unorm8), then
@@ -55,15 +53,12 @@ const wgslF32 = (x: number) => (Number.isInteger(x) ? `${x}.0` : String(x));
 export const TERRARIUM_WGSL = /* wgsl */ `\
 @group(0) @binding(0) var rgba: texture_2d<f32>;
 @group(0) @binding(1) var<storage, read_write> heights: array<f32>;
-
+${TERRARIUM_DECODE_WGSL}
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let size = textureDimensions(rgba);
   if (id.x >= size.x || id.y >= size.y) { return; }
-  let v = textureLoad(rgba, vec2i(id.xy), 0);
-  let c = round(clamp(v, vec4f(0.0), vec4f(1.0)) * 255.0);
-  let h = c.r * 256.0 + c.g + c.b * ${wgslF32(INV_256)} - ${wgslF32(OFFSET)};
-  heights[id.y * size.x + id.x] = select(h, 0.0, h < 0.0 && h > ${wgslF32(SEA_FLOOR)});
+  heights[id.y * size.x + id.x] = decodeTerrariumTexel(textureLoad(rgba, vec2i(id.xy), 0));
 }
 `;
 

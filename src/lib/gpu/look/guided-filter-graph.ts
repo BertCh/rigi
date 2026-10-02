@@ -27,9 +27,10 @@
 // passes of the means, so up to 2r + 1 px away in each axis); clamp(NaN, 0, 1) is implementation-
 // defined in WGSL. The Dawn gate checks that pixels farther away are unaffected.
 import { Buffer, type Device } from "@luma.gl/core";
+import { addBoxSum } from "../core/box-sum";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
 import type { KernelSpec } from "../core/kernel";
-import { GPUConvolution, type GraphBufferHandle } from "../core/luma";
+import type { GraphBufferHandle } from "../core/luma";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import {
 	type GuidedJob,
@@ -104,20 +105,17 @@ export function addGuidedFilter(
 		planes: number,
 		horizontal: boolean,
 	) =>
-		g.add(
-			new GPUConvolution({
-				id: `${id}-${name}`,
-				width: w,
-				height: planes * (h + r),
-				kernelWidth: horizontal ? k : 1,
-				kernelHeight: horizontal ? 1 : k,
-				strategy: "direct",
-				boundary: "zero",
-				input: g.view(input, "float32", count),
-				kernel: g.view(o.ones, "float32", k),
-				output: g.view(output, "float32", count),
-			}),
-		);
+		addBoxSum(g, {
+			id: `${id}-${name}`,
+			width: w,
+			height: planes * (h + r),
+			kernelWidth: horizontal ? k : 1,
+			kernelHeight: horizontal ? 1 : k,
+			input,
+			output,
+			count,
+			ones: o.ones,
+		});
 	g.addKernel({
 		id: `${id}-prep`,
 		spec: kernels.prep,

@@ -15,15 +15,13 @@
 // @workgroup_size(256): one texel (or one packed word) per invocation, 1-D; 256 fills an Apple GPU
 // SIMD group ×8 and keeps the dispatch under 65535 groups up to 16 Mpx.
 
+import { BOX_SPAN_WGSL } from "../core/wgsl/box";
+
 const PARAMS = /* wgsl */ `
 struct P { lw: u32, lh: u32, W: u32, H: u32, r: u32, br: u32, eps: f32, pad: u32 };
 `;
 
-const RANGE = /* wgsl */ `
-fn span(c: u32, r: u32, n: u32) -> vec2<u32> {
-  return vec2<u32>(select(0u, c - r, c >= r), min(n, c + r + 1u));
-}
-`;
+const RANGE = BOX_SPAN_WGSL;
 
 /**
  * Stack layout shared by the three low-res kernels and the GPUConvolutions between them: c planes,

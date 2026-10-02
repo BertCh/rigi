@@ -35,13 +35,13 @@
 // rest write each element once, and none uses atomics, so every storage output is "full"
 // (KernelNode.writes default) and no clearNode is needed; core's compile-time clear lint enforces it.
 import { Buffer, type Device } from "@luma.gl/core";
+import { addBoxSum } from "#/lib/gpu/core/box-sum";
 import {
 	type ComputeGraph,
 	cachedGraph,
 	type GraphBinding,
 	releaseCachedGraphs,
 } from "#/lib/gpu/core/graph";
-import { GPUConvolution } from "#/lib/gpu/core/luma";
 import { pooledStorage, pooledUniform, withLease } from "#/lib/gpu/core/pool";
 import {
 	axisTable,
@@ -231,20 +231,17 @@ export function buildSkyGraph(
 		kh: number,
 		height: number,
 	) =>
-		g.add(
-			new GPUConvolution({
-				id,
-				width: lw,
-				height,
-				kernelWidth: kw,
-				kernelHeight: kh,
-				strategy: "direct",
-				boundary: "zero",
-				input: g.view(input, "float32", count),
-				kernel: g.view(ones, "float32", kw * kh),
-				output: g.view(output, "float32", count),
-			}),
-		);
+		addBoxSum(g, {
+			id,
+			width: lw,
+			height,
+			kernelWidth: kw,
+			kernelHeight: kh,
+			input,
+			output,
+			count,
+			ones,
+		});
 	const k = 2 * r + 1;
 	g.addKernel({
 		id: "lo-prep",

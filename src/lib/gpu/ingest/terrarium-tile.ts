@@ -47,17 +47,9 @@ import { withLease } from "../core/pool";
 import { submit } from "../core/queue";
 import { isCopyAligned, texelWorkgroups } from "./layout";
 import { addHeightsToTexture, terrariumInputDescriptor } from "./terrarium";
-import {
-	decodeTileStats,
-	INV_256,
-	OFFSET,
-	SEA_FLOOR,
-	VALID_MAX,
-	VALID_MIN,
-} from "./terrarium-f32";
+import { TERRARIUM_DECODE_WGSL, wgslF32 } from "./terrarium.wgsl";
+import { decodeTileStats, VALID_MAX, VALID_MIN } from "./terrarium-f32";
 import { releaseResource, textureDescriptor, uploadBitmap } from "./upload";
-
-const wgslF32 = (x: number) => (Number.isInteger(x) ? `${x}.0` : String(x));
 
 /** createImageBitmap options of a Terrarium tile (no colour conversion, no premultiply). */
 export const TERRARIUM_BITMAP_OPTIONS: ImageBitmapOptions = {
@@ -84,11 +76,9 @@ override DOWN: u32 = 1u;
 @group(0) @binding(2) var<storage, read_write> bad: array<u32>;
 @group(0) @binding(3) var<storage, read_write> mask7: array<u32>;
 
+${TERRARIUM_DECODE_WGSL}
 fn decode(p: vec2i) -> f32 {
-  let v = textureLoad(rgba, p, 0);
-  let c = round(clamp(v, vec4f(0.0), vec4f(1.0)) * 255.0);
-  let h = c.r * 256.0 + c.g + c.b * ${wgslF32(INV_256)} - ${wgslF32(OFFSET)};
-  return select(h, 0.0, h < 0.0 && h > ${wgslF32(SEA_FLOOR)});
+  return decodeTerrariumTexel(textureLoad(rgba, p, 0));
 }
 
 fn invalid(h: f32) -> u32 {

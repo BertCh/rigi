@@ -50,6 +50,7 @@ import {
 	scalarArithmetic,
 	scalarCompare,
 } from "../core/luma";
+import { keyMinStep, wgslTreeReduce } from "../core/wgsl/reduce";
 import {
 	GRID_CELLS,
 	GRID_PICK_CAP,
@@ -69,6 +70,12 @@ const W_COUNT = 2;
 export const PICK_ARENA_WORDS = 4;
 /** Arena word indices of the read node's first range (scripts/gpu/haze-argmin-dawn.ts). */
 export const PICK_WORDS = { gMin: W_GMIN, tol: W_TOL, count: W_COUNT, over: 3 };
+
+const TREE_MIN_KEY = wgslTreeReduce({
+	size: 256,
+	lane: "li",
+	steps: [keyMinStep({ key: "part", payloads: ["partBits"] })],
+});
 
 const KEYS = /* wgsl */ `
 fn isNan(b: u32) -> bool { return (b & 0x7fffffffu) > 0x7f800000u; }
@@ -96,14 +103,7 @@ fn main(@builtin(local_invocation_index) li: u32) {
   }
   part[li] = m;
   partBits[li] = mb;
-  workgroupBarrier();
-  for (var s = 128u; s > 0u; s >>= 1u) {
-    if (li < s && part[li + s] < part[li]) {
-      part[li] = part[li + s];
-      partBits[li] = partBits[li + s];
-    }
-    workgroupBarrier();
-  }
+${TREE_MIN_KEY}
   if (li == 0u) { vals[${W_GMIN}u] = partBits[0]; }
 }
 `;
