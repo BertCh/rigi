@@ -470,7 +470,8 @@ void main() {
 export class SplatColorPass {
 	private base?: Framebuffer;
 	private splat?: Texture;
-	private splatFbo?: WebGLFramebuffer;
+	/** The splat colour target over target's depth (a luma Framebuffer; it owns neither texture). */
+	private splatFbo?: Framebuffer;
 	private splatFboKey: [unknown, unknown] = [null, null];
 	private merge?: Model;
 	constructor(readonly device: Device) {}
@@ -542,49 +543,37 @@ export class SplatColorPass {
 		if (!base || base.width !== target.width || base.height !== target.height)
 			return;
 		const { width, height } = target;
-		const gl = this.gl;
 		if (this.splat?.width !== width || this.splat.height !== height) {
 			this.splat?.destroy();
 			this.splat = this.tex("splat-premul-tex", width, height);
 			this.splatFboKey = [null, null];
 		}
-		if (this.splatFboKey[0] !== this.splat || this.splatFboKey[1] !== depth) {
-			if (this.splatFbo) gl.deleteFramebuffer(this.splatFbo);
-			const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING);
-			const fbo = gl.createFramebuffer() as WebGLFramebuffer;
-			gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-			gl.framebufferTexture2D(
-				gl.FRAMEBUFFER,
-				gl.COLOR_ATTACHMENT0,
-				gl.TEXTURE_2D,
-				handleOf(this.splat),
-				0,
-			);
-			if (depth)
-				gl.framebufferTexture2D(
-					gl.FRAMEBUFFER,
-					gl.DEPTH_ATTACHMENT,
-					gl.TEXTURE_2D,
-					handleOf(depth),
-					0,
-				);
-			gl.bindFramebuffer(gl.FRAMEBUFFER, prev);
-			this.splatFbo = fbo;
+		if (
+			!this.splatFbo ||
+			this.splatFboKey[0] !== this.splat ||
+			this.splatFboKey[1] !== depth
+		) {
+			this.splatFbo?.destroy();
+			this.splatFbo = this.device.createFramebuffer({
+				id: "splat-premul",
+				width,
+				height,
+				colorAttachments: [this.splat],
+				depthStencilAttachment: depth ?? null,
+			});
 			this.splatFboKey = [this.splat, depth];
 		}
-		// clear the splat colour only: the depth is the terrain's
-		const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING);
-		gl.bindFramebuffer(gl.FRAMEBUFFER, this.splatFbo as WebGLFramebuffer);
-		gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
-		gl.bindFramebuffer(gl.FRAMEBUFFER, prev);
-		const proxy = {
-			id: "splat-premul",
-			handle: this.splatFbo,
-			width,
-			height,
-			colorAttachments: [{ texture: this.splat }],
-			depthStencilAttachment: null,
-		} as unknown as Framebuffer;
+		const splatTarget = this.splatFbo;
+		// clear the splat colour only (clearBufferfv on draw buffer 0): the depth is the terrain's
+		this.device
+			.beginRenderPass({
+				id: "splat-premul-clear",
+				framebuffer: splatTarget,
+				clearColors: [new Float32Array(4)],
+				clearDepth: false,
+				clearStencil: false,
+			})
+			.end();
 		const viewport = new PhotoViewport({
 			id: "splat-color",
 			...pose,
@@ -600,7 +589,7 @@ export class SplatColorPass {
 			drawLayersOffscreen(this.device, {
 				layers: layers.filter(isDeckSplatLayer),
 				viewport,
-				target: proxy,
+				target: splatTarget,
 				pass: "splat-color",
 				clearCanvas: false,
 				shouldDrawLayer: isDeckSplatLayer,
@@ -651,7 +640,7 @@ export class SplatColorPass {
 
 	destroy() {
 		this.destroyBase();
-		if (this.splatFbo) this.gl.deleteFramebuffer(this.splatFbo);
+		this.splatFbo?.destroy();
 		this.splatFbo = undefined;
 		this.splatFboKey = [null, null];
 		this.splat?.destroy();

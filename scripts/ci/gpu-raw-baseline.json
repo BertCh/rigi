@@ -30,8 +30,8 @@
 		"why": "openErrorScopes: native push/popErrorScope for opt-in checks; luma WebGPUDevice.pushErrorScope/popErrorScope are no-ops unless the device was created with debug: true"
 	},
 	"src/lib/nearfield/deck-splat-layer.ts": {
-		"rawGl": 40,
-		"why": "WebGL2 splat layer on deck's gl context"
+		"rawGl": 15,
+		"why": "WebGL2 splat colour pass: snapshot of the MSAA-resolved colour target by blitFramebuffer (luma has no framebuffer blit / resolve, audit-render R1)"
 	},
 	"src/lib/renderer-select.ts": {
 		"rawWebGpu": 2,
