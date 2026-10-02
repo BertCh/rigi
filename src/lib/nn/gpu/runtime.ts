@@ -10,8 +10,9 @@
 //   earlier outputs) are imports, the recording's outputs are imports bound to buffers from the
 //   runtime's free list, everything else is a graph transient (aliased by the graph compiler, so a
 //   forward reuses scratch). Parameter words of all nodes live in one constant buffer owned by the
-//   graph. Graphs are cached by their structure (cachedGraph group "nn"), so a repeated forward with
-//   the same shapes re-encodes a compiled graph.
+//   graph. Graphs are cached by their structure (cachedGraph group: the runtime's graphGroup, "nn" by
+//   default; eager recordings under `${graphGroup}/once`), so a repeated forward with the same shapes
+//   re-encodes a compiled graph.
 // - Every GPU step (writes, graph runs, readback copies) goes through one promise chain, so queue
 //   order is program order and buffers can be recycled as soon as a tensor is disposed.
 
@@ -192,6 +193,10 @@ export type RuntimeStats = {
 	liveBytes: number;
 };
 
+/** Cached forward graphs per group (LRU), and eager one-off graphs per `${group}/once`. */
+const FORWARD_GRAPHS = 48;
+const ONCE_GRAPHS = 8;
+
 export class Runtime {
 	private chain: Promise<unknown> = Promise.resolve();
 	private free = new Map<number, Buffer[]>();
@@ -204,7 +209,10 @@ export class Runtime {
 		liveBytes: 0,
 	};
 
-	constructor(readonly device: Device) {
+	constructor(
+		readonly device: Device,
+		readonly graphGroup = "nn",
+	) {
 		this.align = device.limits.minStorageBufferOffsetAlignment || 256;
 	}
 
@@ -424,7 +432,8 @@ export class Runtime {
 		this.stats.nodes += keep.length;
 	}
 
-	flush(rec: Recording, outputs: Set<Storage>): Promise<void> {
+	/** `once`: an eager (implicit) recording, cached under `${graphGroup}/once` with a small cap. */
+	flush(rec: Recording, outputs: Set<Storage>, once = false): Promise<void> {
 		const keep = this.prepare(rec, outputs);
 		if (!keep.length) return Promise.resolve();
 		const produced = new Set(rec.produced);
@@ -566,12 +575,14 @@ export class Runtime {
 			});
 			return full;
 		};
+		const group = once ? `${this.graphGroup}/once` : this.graphGroup;
+		const cap = once ? ONCE_GRAPHS : FORWARD_GRAPHS;
 		let k = key;
-		let c = cachedGraph<void, string>(device, "nn", k, build, 48);
+		let c = cachedGraph<void, string>(device, group, k, build, cap);
 		// a hash collision: rebuild under a disambiguated key
 		for (let j = 1; c.extra !== full; j++) {
 			k = `${key}~${j}`;
-			c = cachedGraph<void, string>(device, "nn", k, build, 48);
+			c = cachedGraph<void, string>(device, group, k, build, cap);
 		}
 		if (c.hit) this.stats.graphHits++;
 		else this.stats.graphs++;

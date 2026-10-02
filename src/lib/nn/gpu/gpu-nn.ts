@@ -129,9 +129,13 @@ export class GpuNn extends BaseNn<GpuTensor> {
 	private rec: Recording | null = null;
 	private implicit: Recording | null = null;
 
-	constructor(readonly device: Device) {
+	/** `graphGroup`: the cachedGraph group of this runtime's graphs (default "nn"; nn/registry.ts gives each consumer its own). */
+	constructor(
+		readonly device: Device,
+		opts: { graphGroup?: string } = {},
+	) {
 		super();
-		this.runtime = new Runtime(device);
+		this.runtime = new Runtime(device, opts.graphGroup);
 		this.backend = { kind: "gpu", f16: device.features.has("shader-f16") };
 		setKernelCaps(capsFromFeatures((f) => device.features.has(f as never)));
 	}
@@ -202,7 +206,8 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		if (!rec) return Promise.resolve();
 		this.implicit = null;
 		const outs = new Set(rec.produced.filter((s) => !s.dropped));
-		return this.runtime.flush(rec, outs);
+		// eager ops (weight loads, one-off uploads): a group of their own, so they never evict forwards
+		return this.runtime.flush(rec, outs, true);
 	}
 
 	/** Submit pending eager ops now. */

@@ -45,3 +45,6 @@ export async function createNn(opts: CreateNnOptions = {}): Promise<Nn> {
 		throw new Error("nn: the GPU backend needs a WebGPU device");
 	return new CpuNn();
 }
+
+/** App consumers: the per-(device, consumer) GPU runtime, dropped on device loss (registry.ts). */
+export { getNn, nnGraphGroup, perNn } from "./registry";
