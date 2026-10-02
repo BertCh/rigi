@@ -725,7 +725,9 @@ function coarseHypotheses(
 	return hyps;
 }
 
-function alignResult(results: { pose: Pose; score: number }[]): AlignResult {
+export function alignResult(
+	results: { pose: Pose; score: number }[],
+): AlignResult {
 	const best = results[0];
 	const second = results.find((r) => Math.abs(r.pose.yaw - best.pose.yaw) > 3);
 	const margin = second

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { angleDiffDeg, expectArrayClose } from "#/test/helpers";
 import {
+	alignResult,
 	autoAlign,
 	coarseGridPoses,
 	DESCENT_KEYS,
@@ -445,5 +446,52 @@ describe("solvePins", () => {
 			H2,
 		);
 		for (const v of Object.values(p)) expect(Number.isFinite(v)).toBe(true);
+	});
+});
+
+describe("alignResult confidence", () => {
+	const at = (yaw: number, score: number) => ({
+		pose: { ...prior, yaw },
+		score,
+	});
+	it("with no alternative more than 3 degrees away, margin is 1: confidence = clamp(score * 2.5)", () => {
+		expect(alignResult([at(100, 0.2), at(102, 0.19)]).confidence).toBeCloseTo(
+			0.5,
+			12,
+		);
+		expect(alignResult([at(100, 0.9)]).confidence).toBe(1);
+		expect(alignResult([at(100, 0.2), at(103, 0.2)]).confidence).toBeCloseTo(
+			0.5,
+			12,
+		);
+	});
+	it("a close runner-up more than 3 degrees away gives low confidence", () => {
+		// margin = (0.4 - 0.38) / 0.4 = 0.05 -> 0.2 * min(1, 1.0) = 0.2
+		const r = alignResult([at(100, 0.4), at(110, 0.38)]);
+		expect(r.confidence).toBeCloseTo(0.2, 12);
+		// a clear gap saturates the margin term
+		expect(alignResult([at(100, 0.4), at(110, 0.1)]).confidence).toBe(1);
+	});
+	it("takes the first result beyond 3 degrees as the second, not the next best score", () => {
+		const r = alignResult([
+			at(100, 0.4),
+			at(101, 0.39),
+			at(110, 0.2),
+			at(120, 0.39),
+		]);
+		// second = 110 @ 0.2: margin 0.5 -> clamp 1
+		expect(r.confidence).toBe(1);
+	});
+	it("a non-positive best score gives 0", () => {
+		expect(alignResult([at(100, -0.2), at(110, -0.5)]).confidence).toBe(0);
+		expect(alignResult([at(100, 0)]).confidence).toBe(0);
+	});
+	it("keeps pose, score and the result order in alternatives", () => {
+		const results = [at(100, 0.5), at(110, 0.3), at(90, 0.1)];
+		const r = alignResult(results);
+		expect(r.pose).toBe(results[0].pose);
+		expect(r.score).toBe(0.5);
+		expect(r.alternatives).toBe(results);
+		expect(r.alternatives?.map((a) => a.pose.yaw)).toEqual([100, 110, 90]);
 	});
 });
