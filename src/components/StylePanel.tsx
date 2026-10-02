@@ -1587,8 +1587,7 @@ function WaterWindControls({ style }: { style: ViewStyle }) {
 	return (
 		<>
 			<Toggle
-				label="Lake waves"
-				title="Shows on lakes drawn with the alpine water colouring (terrain albedo), world view only"
+				label="Lake waves (alpine water colouring)"
 				checked={style.world.water === "waves"}
 				onChange={(on) => patch({ world: { water: on ? "waves" : "flat" } })}
 			/>
