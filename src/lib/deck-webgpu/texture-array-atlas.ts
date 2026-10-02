@@ -19,6 +19,11 @@
 // - compact() is the reverse (WAG perf-vram): the live layers move down to 0 … n−1 in a smaller
 //   texture on the same kind of copy node, and the owners re-point their layers from the returned
 //   map (ImageryArray on idle). Copies are exact, so frames do not change.
+// - compactLeased() is compact() for an atlas whose layers are partly AtlasLeases (the height arrays
+//   under terrainGpuDecode): the atlas knows every live lease, moves them with the owner's layers
+//   and re-points them itself; it refuses (null) while a leased write is in flight or whenever the
+//   live layers it can see are not exactly the layers the allocator has handed out. The old texture
+//   is kept alive for a moment (consumers that planned against it finish on it, layers and all).
 // - Pure allocation / growth / compaction math lives in atlas-layout.ts (node-checked).
 import type { Device, Texture } from "@luma.gl/core";
 import { ComputeGraph } from "../gpu/core/graph";
@@ -33,6 +38,7 @@ import {
 	uploadRaster,
 } from "../gpu/ingest/upload";
 import {
+	compactLeasedPlan,
 	compactPlan,
 	type GrowPolicy,
 	growCopies,
@@ -40,6 +46,9 @@ import {
 	LayerAllocator,
 	leaseFits,
 } from "./atlas-layout";
+
+/** How long a compaction keeps the replaced texture (in-flight relief / gather reads finish on it). */
+const COMPACT_RETIRE_MS = 2000;
 
 export type TextureArrayAtlasProps = {
 	id: string;
@@ -80,6 +89,15 @@ export class TextureArrayAtlas {
 	};
 	/** destroy() ran: leases release nothing any more */
 	destroyed = false;
+	/** every live lease on this atlas (AtlasLease adds / removes itself) */
+	readonly leaseSet = new Set<AtlasLease>();
+	/** writeTerrariumLeased calls not finished: a layer is being written, so no compaction */
+	private pendingLeased = 0;
+	/** textures replaced by a compaction, destroyed after a delay */
+	private retired = new Set<{
+		texture: Texture;
+		timer: ReturnType<typeof setTimeout>;
+	}>();
 	private layers: LayerAllocator;
 
 	constructor(
@@ -155,6 +173,8 @@ export class TextureArrayAtlas {
 	 * under terrainGpuDecode): a lease's layer index is fixed.
 	 */
 	compact(live: readonly number[], quantum: number) {
+		// a lease's layer index is fixed here: compactLeased moves leases with the owner's layers
+		if (this.leaseSet.size) return null;
 		const plan = compactPlan(live, quantum);
 		const next = Math.max(plan.capacity, Math.min(quantum, this.maxLayers));
 		if (next >= this.capacity) return null;
@@ -167,6 +187,40 @@ export class TextureArrayAtlas {
 	}
 
 	/**
+	 * compact() for an atlas with leases: `ownerLive` = the layers the owner holds itself (TileStore's
+	 * non-leased slots); the live leases' layers come from the atlas. They all move to 0 … n−1 in a
+	 * texture of the smallest `quantum` multiple that holds them, never below `minCapacity`; every
+	 * lease is re-pointed (AtlasLease.layer) and the old → new map is returned for the owner. Null
+	 * (nothing moved) while a leased write is in flight, when the owner's and the leases' layers do not
+	 * add up to the layers in use (atlas-layout.ts compactLeasedPlan), or when nothing would be freed.
+	 */
+	compactLeased(
+		ownerLive: readonly number[],
+		quantum: number,
+		minCapacity: number,
+	) {
+		if (this.destroyed || this.pendingLeased) return null;
+		const leases = [...this.leaseSet].filter((l) => l.live);
+		const plan = compactLeasedPlan(
+			ownerLive,
+			leases.map((l) => l.layer),
+			this.used(),
+			quantum,
+			Math.min(minCapacity, this.maxLayers),
+			this.capacity,
+			this.maxLayers,
+		);
+		if (!plan) return null;
+		this.resize(plan.capacity, plan.runs, COMPACT_RETIRE_MS);
+		this.layers.capacity = plan.capacity;
+		this.layers.resetPacked(plan.live.length);
+		for (const l of leases) l.relocate(plan.remap.get(l.layer) ?? l.layer);
+		this.stats.compactions++;
+		this.stats.copiedLayers += plan.live.length;
+		return plan.remap;
+	}
+
+	/**
 	 * Re-create the texture with `depth` layers and copy `runs` of layers (every mip) from the old one,
 	 * on one ComputeGraph copy node (old and new texture imported), one submit. The texture object
 	 * changes: consumers ask for `texture` per use; `version` counts re-creations.
@@ -174,6 +228,7 @@ export class TextureArrayAtlas {
 	private resize(
 		depth: number,
 		runs: readonly { from: number; to: number; count: number }[],
+		retireMs = 0,
 	) {
 		const old = this.texture;
 		const tex = this.create(depth);
@@ -220,9 +275,22 @@ export class TextureArrayAtlas {
 			submit(this.device, enc);
 			g.destroy();
 		}
-		old.destroy();
+		if (retireMs) this.retire(old, retireMs);
+		else old.destroy();
 		this.texture = tex;
 		this.version++;
+	}
+
+	/** Keep a replaced texture alive for `ms` (readers that planned against it), then destroy it. */
+	private retire(texture: Texture, ms: number) {
+		const entry = {
+			texture,
+			timer: setTimeout(() => {
+				this.retired.delete(entry);
+				texture.destroy();
+			}, ms),
+		};
+		this.retired.add(entry);
 	}
 
 	/** A w×w typed-array raster into mip 0 of `layer` (gpu/ingest uploadRaster `into`). */
@@ -287,11 +355,14 @@ export class TextureArrayAtlas {
 		const lease = new AtlasLease(this, layer);
 		this.terrarium ??= new TerrariumLayerWriter(this.device, this.props.id);
 		let stats: TerrariumTileStats;
+		this.pendingLeased++;
 		try {
 			stats = await this.terrarium.writeWithStats(this.texture, layer, src);
 		} catch (e) {
 			lease.release();
 			throw e;
+		} finally {
+			this.pendingLeased--;
 		}
 		this.stats.writes++;
 		this.stats.writeBytes += src.bitmap.width * src.bitmap.height * 4;
@@ -303,6 +374,12 @@ export class TextureArrayAtlas {
 		this.destroyed = true;
 		this.terrarium?.destroy();
 		this.texture.destroy();
+		for (const r of this.retired) {
+			clearTimeout(r.timer);
+			r.texture.destroy();
+		}
+		this.retired.clear();
+		this.leaseSet.clear();
 	}
 }
 
@@ -314,11 +391,22 @@ export class TextureArrayAtlas {
  */
 export class AtlasLease {
 	private refs = 1;
+	private layerIndex: number;
 	constructor(
 		readonly atlas: TextureArrayAtlas,
-		readonly layer: number,
+		layer: number,
 	) {
+		this.layerIndex = layer;
 		atlas.stats.leases++;
+		atlas.leaseSet.add(this);
+	}
+	/** The layer held; it changes only when the atlas compacts (compactLeased), so read it per use. */
+	get layer() {
+		return this.layerIndex;
+	}
+	/** Atlas-only: compactLeased moved the layer. */
+	relocate(layer: number) {
+		this.layerIndex = layer;
 	}
 	/** Still holds its layer, in an atlas that is not destroyed. */
 	get live() {
@@ -333,7 +421,8 @@ export class AtlasLease {
 		if (this.refs <= 0) return;
 		if (--this.refs > 0) return;
 		this.atlas.stats.leases--;
-		if (!this.atlas.destroyed) this.atlas.release(this.layer);
+		this.atlas.leaseSet.delete(this);
+		if (!this.atlas.destroyed) this.atlas.release(this.layerIndex);
 	}
 }
 

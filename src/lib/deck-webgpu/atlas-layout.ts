@@ -109,6 +109,53 @@ export function compactPlan(live: readonly number[], quantum: number) {
 }
 
 /**
+ * Lease-aware compaction (texture-array-atlas.ts compactLeased, the height arrays under
+ * terrainGpuDecode): `owner` = the layers the atlas's owner holds itself, `lease` = the layers of
+ * live AtlasLeases. Their union is what moves to 0 … n−1. Null (never compact) when the two
+ * overlap, when their count is not what the allocator says is in use (`used`: a layer is held by
+ * someone this plan does not know), when a layer lies past `capacity`, or when it would not shrink
+ * the atlas. The new capacity is the `quantum`-rounded live count, at least `minCapacity`, at most
+ * `maxLayers`.
+ */
+export function compactLeasedPlan(
+	owner: readonly number[],
+	lease: readonly number[],
+	used: number,
+	quantum: number,
+	minCapacity: number,
+	capacity: number,
+	maxLayers: number,
+) {
+	const live = [...owner, ...lease];
+	if (live.length !== used || new Set(live).size !== live.length) return null;
+	if (live.some((l) => !Number.isInteger(l) || l < 0 || l >= capacity))
+		return null;
+	const plan = compactPlan(live, quantum);
+	const next = Math.min(maxLayers, Math.max(plan.capacity, minCapacity));
+	if (next >= capacity) return null;
+	return { remap: plan.remap, runs: plan.runs, capacity: next, live };
+}
+
+/**
+ * Near-first overflow (batched-terrain.ts TileStore.sync on a device with few array layers): the
+ * `budget` nearest of `tiles` by (distance, id), returned in their input order; all of them when
+ * they fit. Deterministic: ties on distance break by id.
+ */
+export function nearestWithin<T extends { id: string; distance: number }>(
+	tiles: readonly T[],
+	budget: number,
+): T[] {
+	if (tiles.length <= budget) return [...tiles];
+	if (budget <= 0) return [];
+	const ranked = [...tiles].sort(
+		(a, b) =>
+			a.distance - b.distance || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+	);
+	const keep = new Set(ranked.slice(0, budget));
+	return tiles.filter((t) => keep.has(t));
+}
+
+/**
  * Load-time leases (texture-array-atlas.ts writeTerrariumLeased) take a layer only while the atlas
  * keeps this many layers free below maxLayers. Leased spare tiles (deck/terrain-stream.ts
  * spareGpuLayers, 48) and in-flight loads (concurrency 10) must never take the layer a drawn tile

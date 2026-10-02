@@ -60,6 +60,7 @@ import { getFlag } from "#/lib/flags";
 import { EARTH_R, REFRACTION_K } from "#/lib/geodesy";
 import { gpuEnabled } from "#/lib/gpu/core/device";
 import { GpuDecodedHeights } from "#/lib/gpu/ingest/terrarium-tile";
+import { nearestWithin } from "../atlas-layout";
 import { BaseSlotAllocator, baseSlotVec4, placeSlots } from "../base-slots";
 import { type CameraUniforms, sphereInView } from "../camera";
 import type { ImageryArray } from "../imagery";
@@ -280,6 +281,12 @@ type Slot = {
 	lease?: AtlasLease;
 };
 
+/** Initial layers of the 256² / 512² height arrays: also the compaction quantum and floor. */
+const SMALL_LAYERS = 128;
+const BIG_LAYERS = 16;
+/** Quiet time after a sync that freed layers before the height arrays are compacted (imagery.ts). */
+const HEIGHT_COMPACT_IDLE_MS = 4000;
+
 /** A growable r32float 2d-array of `size`² height layers: a TextureArrayAtlas that grows by copy
  * (layers keep their heights; only fresh tiles upload). */
 function heightPool(
@@ -324,6 +331,9 @@ class TileStore {
 	private readonly baseSlots: BaseSlotAllocator;
 	/** Tiles dropped for lack of layers / rows (device limits). */
 	overflow = 0;
+	private compactTimer: ReturnType<typeof setTimeout> | null = null;
+	/** idle compactions that shrank a height array */
+	compactions = 0;
 
 	constructor(private device: Device) {
 		const lim = device.limits as {
@@ -338,10 +348,16 @@ class TileStore {
 			device,
 			"bterrain-h256",
 			SMALL,
-			128,
+			SMALL_LAYERS,
 			this.maxLayers,
 		);
-		this.big = heightPool(device, "bterrain-h512", BIG, 16, this.maxLayers);
+		this.big = heightPool(
+			device,
+			"bterrain-h512",
+			BIG,
+			BIG_LAYERS,
+			this.maxLayers,
+		);
 		this.tableData = new Float32Array(0);
 		this.growRows(128);
 		// initial room: 128 tiles of G = 32 (the photo view's common grid)
@@ -386,30 +402,88 @@ class TileStore {
 		else (s.big ? this.big : this.small).release(s.layer);
 	}
 
+	/** The lease a fresh tile was decoded into at load, when it is a live layer of `pool`. */
+	private leaseIn(m: TileMesh, pool: TextureArrayAtlas) {
+		const ref = m.gpuLayer;
+		return ref instanceof TileLayerRef &&
+			ref.lease.live &&
+			ref.lease.atlas === pool
+			? ref.lease
+			: undefined;
+	}
+
+	/** (Re)start the idle countdown to compactIdle. */
+	private armCompact() {
+		if (this.compactTimer) clearTimeout(this.compactTimer);
+		this.compactTimer = setTimeout(() => {
+			this.compactTimer = null;
+			this.compactIdle();
+		}, HEIGHT_COMPACT_IDLE_MS);
+	}
+
+	/**
+	 * Idle after layers were freed: a height array with at least its initial capacity free moves its
+	 * live layers (this store's own and the tiles' leases) down to 0 … n−1 in a smaller texture
+	 * (TextureArrayAtlas.compactLeased; refused when the books do not add up). Slots and table rows
+	 * are re-pointed; the texture objects change, so consumers ask per use (the draw's bindings
+	 * change identity, which also re-records ?renderBundles=on).
+	 */
+	compactIdle() {
+		let moved = false;
+		for (const [pool, big, quantum] of [
+			[this.small, false, SMALL_LAYERS],
+			[this.big, true, BIG_LAYERS],
+		] as const) {
+			if (pool.capacity - pool.used() < quantum) continue;
+			const owned: Slot[] = [];
+			for (const s of this.slots.values())
+				if (s.big === big && !s.lease) owned.push(s);
+			const remap = pool.compactLeased(
+				owned.map((s) => s.layer),
+				quantum,
+				quantum,
+			);
+			if (!remap) continue;
+			for (const s of this.slots.values()) {
+				if (s.big !== big) continue;
+				s.layer = s.lease ? s.lease.layer : (remap.get(s.layer) ?? s.layer);
+				this.tableData[s.row * ROW_FLOATS] = s.layer;
+			}
+			this.compactions++;
+			moved = true;
+		}
+		if (moved) this.table.write(this.tableData);
+	}
+
 	/** Upload what's new in `tiles`, free what's gone. `layerOf` = imagery layer per tile id. */
 	sync(tiles: readonly TileMesh[], layerOf: (id: string) => number) {
+		// a later sync pushes a pending compaction back (the scene is moving)
+		if (this.compactTimer) this.armCompact();
 		const want = new Set(tiles.filter((t) => t.grid && t.size <= BIG));
+		let freed = false;
 		for (const [m, s] of this.slots)
 			if (!want.has(m)) {
 				this.slots.delete(m);
 				this.freeRows.push(s.row);
 				this.freeLayer(s);
 				if (s.base >= 0) this.baseSlots.release(s.base, s.size);
+				freed = true;
 			}
-		const fresh = [...want].filter((m) => !this.slots.has(m));
+		if (freed) this.armCompact();
+		let fresh = [...want].filter((m) => !this.slots.has(m));
 		if (!fresh.length) return;
+		const overflowed = this.nearFirst(fresh);
+		if (overflowed.size) fresh = fresh.filter((m) => !overflowed.has(m));
+		if (!fresh.length) {
+			this.overflow = overflowed.size;
+			return;
+		}
 		const freshSlots: Slot[] = [];
 		for (const m of fresh) {
 			const big = m.size > SMALL;
 			const pool = big ? this.big : this.small;
 			// a tile decoded into a layer of this very atlas at load: draw it from there
-			const ref = m.gpuLayer;
-			const lease =
-				ref instanceof TileLayerRef &&
-				ref.lease.live &&
-				ref.lease.atlas === pool
-					? ref.lease
-					: undefined;
+			const lease = this.leaseIn(m, pool);
 			lease?.retain();
 			const slot: Slot = {
 				row: this.freeRows.pop() ?? this.nextRow++,
@@ -434,7 +508,7 @@ class TileStore {
 		this.small.reserve(maxSmall);
 		this.big.reserve(maxBig);
 		const reRows = this.growRows(maxRow);
-		this.overflow = 0;
+		this.overflow = overflowed.size;
 		const drop = (m: TileMesh, s: Slot) => {
 			// past a device limit: not drawn
 			this.slots.delete(m);
@@ -508,6 +582,42 @@ class TileStore {
 		this.table.write(this.tableData);
 	}
 
+	/**
+	 * Near-first overflow: when a height array cannot hold every wanted tile (maxLayers, 256 on a
+	 * 'core' device), the nearest by (distance, id) keep layers. The candidates are this store's own
+	 * layers (non-leased slots, which a nearer fresh tile may evict) and the fresh tiles that need a
+	 * new one; layers held by leases (tiles decoded at load, spare meshes) are not the store's to
+	 * give and count against the budget. Returns the fresh tiles left out (evicted slots are freed
+	 * here and count as overflow by the caller's tally). Nothing changes when everything fits.
+	 */
+	private nearFirst(fresh: readonly TileMesh[]) {
+		const out = new Set<TileMesh>();
+		for (const big of [false, true]) {
+			const pool = big ? this.big : this.small;
+			const need = fresh.filter(
+				(m) => m.size > SMALL === big && !this.leaseIn(m, pool),
+			);
+			if (!need.length || pool.used() + need.length <= pool.maxLayers) continue;
+			const owned: [TileMesh, Slot][] = [];
+			for (const [m, s] of this.slots)
+				if (s.big === big && !s.lease) owned.push([m, s]);
+			const budget = Math.max(0, pool.maxLayers - pool.used() + owned.length);
+			const keep = new Set(
+				nearestWithin([...owned.map(([m]) => m), ...need], budget),
+			);
+			for (const m of need) if (!keep.has(m)) out.add(m);
+			for (const [m, s] of owned)
+				if (!keep.has(m)) {
+					this.slots.delete(m);
+					this.freeRows.push(s.row);
+					this.freeLayer(s);
+					if (s.base >= 0) this.baseSlots.release(s.base, s.size);
+					out.add(m);
+				}
+		}
+		return out;
+	}
+
 	/** Point rows at their imagery layers; writes the table once if anything changed. */
 	syncLayers(layerOf: (id: string) => number) {
 		let dirty = false;
@@ -524,6 +634,8 @@ class TileStore {
 	}
 
 	destroy() {
+		if (this.compactTimer) clearTimeout(this.compactTimer);
+		this.compactTimer = null;
 		this.small.destroy();
 		this.big.destroy();
 		this.base.destroy();

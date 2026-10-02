@@ -24,6 +24,12 @@
 //   7. leases (texture-array-atlas.ts AtlasLease / TileLayerRef): the layer returns to the atlas
 //      exactly once, when the last of tile + TileStore references goes, in either order; a tile ref
 //      releases once; nothing returns to a destroyed atlas
+//   9. lease-aware compaction (compactLeasedPlan): owner and lease layers disjoint, their count equals
+//      the allocator's used(), minCapacity respected, every layer ends at a distinct index below the
+//      new capacity, the remap applied to leases (AtlasLease.relocate) moves exactly the live ones,
+//      and any bookkeeping mismatch yields null
+//  10. near-first overflow (nearestWithin): the budget nearest by (distance, id), input order kept,
+//      deterministic under ties, everything when it fits
 //   8. spare meshes (deck/terrain-stream.ts spareEviction): the oldest go down to spareMeshes, then all
 //      but the newest spareGpuLayers of the kept ones let go of their GPU heights
 import { spareEviction } from "../deck/terrain-stream";
@@ -32,6 +38,7 @@ import type { TileKey } from "../dem/tiles";
 import {
 	ancestorWindow,
 	atlasBytes,
+	compactLeasedPlan,
 	compactPlan,
 	decodeImageryLayer,
 	encodeImageryLayer,
@@ -41,6 +48,7 @@ import {
 	imageryTierOf,
 	LayerAllocator,
 	leaseFits,
+	nearestWithin,
 } from "./atlas-layout";
 import { AtlasLease, TileLayerRef } from "./texture-array-atlas";
 
@@ -413,6 +421,7 @@ const rand = () => {
 	const fake = (destroyed = false) =>
 		({
 			stats: { leases: 0 },
+			leaseSet: new Set(),
 			destroyed,
 			release: (l: number) => released.push(l),
 		}) as never;
@@ -491,6 +500,160 @@ const rand = () => {
 			);
 	}
 	console.log("spare meshes: 500 trials");
+}
+
+// ---------- 9. lease-aware compaction ----------
+{
+	for (let trial = 0; trial < 300; trial++) {
+		const quantum = [16, 128][Math.floor(rand() * 2)];
+		const capacity = quantum * (1 + Math.floor(rand() * 5));
+		const max = capacity + Math.floor(rand() * 3) * quantum;
+		const a = new LayerAllocator(capacity);
+		const held: number[] = [];
+		for (let i = 0; i < capacity * 2; i++) {
+			if (held.length && rand() < 0.45) {
+				a.release(held.splice(Math.floor(rand() * held.length), 1)[0]);
+			} else {
+				const l = a.allocWithin();
+				if (l !== undefined) held.push(l);
+			}
+		}
+		const owner: number[] = [];
+		const lease: number[] = [];
+		for (const l of held) (rand() < 0.5 ? owner : lease).push(l);
+		const plan = compactLeasedPlan(
+			owner,
+			lease,
+			a.used(),
+			quantum,
+			quantum,
+			capacity,
+			max,
+		);
+		const wantCap = Math.max(
+			Math.ceil(held.length / quantum) * quantum,
+			quantum,
+		);
+		if (wantCap >= capacity) {
+			if (plan)
+				fail(`leased trial ${trial}: compacted without freeing a quantum`);
+			continue;
+		}
+		if (!plan) {
+			fail(
+				`leased trial ${trial}: no plan though ${held.length} < ${capacity}`,
+			);
+			continue;
+		}
+		if (plan.capacity !== wantCap || plan.capacity < quantum)
+			fail(`leased trial ${trial}: capacity ${plan.capacity} ≠ ${wantCap}`);
+		const targets = new Set(plan.remap.values());
+		if (plan.remap.size !== held.length || targets.size !== held.length)
+			fail(`leased trial ${trial}: remap not one-to-one`);
+		for (const t of targets)
+			if (t < 0 || t >= held.length) fail(`leased trial ${trial}: target ${t}`);
+		// the remap applied to real leases and the owner's layers: disjoint, all live layers
+		const released: number[] = [];
+		const atlas = {
+			stats: { leases: 0 },
+			leaseSet: new Set<AtlasLease>(),
+			destroyed: false,
+			release: (l: number) => released.push(l),
+		};
+		const leases = lease.map((l) => new AtlasLease(atlas as never, l));
+		if (atlas.leaseSet.size !== lease.length) fail("lease set size");
+		for (const l of leases) l.relocate(plan.remap.get(l.layer) as number);
+		const after = [
+			...owner.map((l) => plan.remap.get(l) as number),
+			...leases.map((l) => l.layer),
+		];
+		if (new Set(after).size !== held.length)
+			fail(`leased trial ${trial}: owner and lease layers collide after remap`);
+		// releasing a lease after the move frees its new layer
+		if (leases.length) {
+			const k = Math.floor(rand() * leases.length);
+			const want = plan.remap.get(lease[k]);
+			leases[k].release();
+			if (released.join() !== String(want))
+				fail(`leased trial ${trial}: lease released ${released} not ${want}`);
+			if (atlas.leaseSet.has(leases[k])) fail("released lease still in set");
+		}
+		// bookkeeping mismatches refuse
+		if (
+			compactLeasedPlan(
+				owner,
+				lease,
+				a.used() + 1,
+				quantum,
+				quantum,
+				capacity,
+				max,
+			)
+		)
+			fail(`leased trial ${trial}: compacted with an unknown holder`);
+		if (owner.length && lease.length) {
+			const clash = [...lease.slice(1), owner[0]];
+			if (
+				compactLeasedPlan(
+					owner,
+					clash,
+					a.used(),
+					quantum,
+					quantum,
+					capacity,
+					max,
+				)
+			)
+				fail(`leased trial ${trial}: compacted overlapping owner / lease`);
+		}
+	}
+	// minCapacity above the quantum multiple is respected, and capped by maxLayers
+	const p1 = compactLeasedPlan([0, 5], [9], 3, 16, 64, 128, 256);
+	if (!p1 || p1.capacity !== 64) fail(`minCapacity: ${p1?.capacity}`);
+	if (compactLeasedPlan([0], [1], 2, 16, 128, 128, 256))
+		fail("minCapacity equal to capacity should not shrink");
+	console.log(
+		"lease-aware compaction: 300 trials, remap, minCapacity, refusals",
+	);
+}
+
+// ---------- 10. near-first overflow ----------
+// biome-ignore lint/complexity/noUselessLoneBlockStatements: the block scopes this section's consts so section names do not collide
+{
+	for (let trial = 0; trial < 200; trial++) {
+		const n = Math.floor(rand() * 400);
+		const tiles = Array.from({ length: n }, (_, i) => ({
+			id: `t${Math.floor(rand() * 1000)}-${i}`,
+			distance: Math.floor(rand() * 30), // many ties
+		}));
+		const budget = Math.floor(rand() * 300);
+		const kept = nearestWithin(tiles, budget);
+		const again = nearestWithin(tiles, budget);
+		if (kept.length !== Math.min(n, budget)) fail(`near trial ${trial}: count`);
+		if (kept.some((t, i) => t !== again[i]))
+			fail(`near trial ${trial}: unstable`);
+		const idx = kept.map((t) => tiles.indexOf(t));
+		if (idx.some((v, i) => i && v <= idx[i - 1]))
+			fail(`near trial ${trial}: input order lost`);
+		if (n <= budget) {
+			if (kept.some((t, i) => t !== tiles[i]))
+				fail(`near trial ${trial}: changed`);
+			continue;
+		}
+		const keptSet = new Set(kept);
+		let far = -1;
+		for (const t of kept) far = Math.max(far, t.distance);
+		for (const t of tiles)
+			if (!keptSet.has(t)) {
+				if (t.distance < far) fail(`near trial ${trial}: nearer tile dropped`);
+				if (
+					t.distance === far &&
+					kept.some((k) => k.distance === far && k.id > t.id)
+				)
+					fail(`near trial ${trial}: tie broke against id`);
+			}
+	}
+	console.log("near-first overflow: 200 trials");
 }
 
 console.log(failures ? `FAIL (${failures})` : "PASS atlas-layout");
