@@ -47,6 +47,16 @@ import {
 	type PickerEvent,
 	subscribePickerLog,
 } from "./log";
+import {
+	MENU_PAD_PX,
+	MENU_WIDTH_PX,
+	menuSize,
+	peakKey,
+	placeMenu,
+	type RankedPeak,
+	rankPeaksByFit,
+	upsertTap,
+} from "./taps";
 
 export type PickerPanelProps = {
 	mode: PickerMode;
@@ -230,7 +240,8 @@ export default function PickerPanel(props: PickerPanelProps) {
 	const [pendingTap, setPendingTap] = useState<{
 		u: number;
 		v: number;
-		offered: NearbyPeak[];
+		offered: RankedPeak[];
+		menu: { left: number; top: number; h: number };
 	} | null>(null);
 	const [taps, setTaps] = useState<Tap[]>([]);
 	const [tapResults, setTapResults] = useState<TapSolved[] | null>(null);
@@ -455,16 +466,39 @@ export default function PickerPanel(props: PickerPanelProps) {
 		const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
 		const u = (e.clientX - r.left) / r.width;
 		const v = (e.clientY - r.top) / r.height;
-		const poses = startPoses().map((c) => c.pose);
-		const offered = nearbyPeaks(
+		const starts = startPoses();
+		const poses = starts.map((c) => c.pose);
+		const eye = eyeOf(eng);
+		const near = nearbyPeaks(
 			peakPool(eng, poses),
-			eyeOf(eng),
+			eye,
 			eng.aspect,
 			u,
 			v,
 			poses,
 		);
-		setPendingTap({ u, v, offered });
+		const vfov = (basePose.current ?? pose)?.vfov ?? 40;
+		const offered = rankPeaksByFit(
+			near,
+			taps.map((t) => ({ world: t.world, u: t.u, v: t.v })),
+			{ u, v },
+			eye,
+			eng.aspect,
+			[Math.max(5, vfov * 0.7), Math.min(120, vfov * 1.3)],
+		);
+		// keep the menu on screen: visible part of the stage = stage ∩ viewport
+		const size = menuSize(offered.length || 1);
+		const menu = placeMenu(
+			{ x: e.clientX - r.left, y: e.clientY - r.top },
+			size,
+			{
+				left: Math.max(0, -r.left),
+				top: Math.max(0, -r.top),
+				right: Math.min(r.width, window.innerWidth - r.left),
+				bottom: Math.min(r.height, window.innerHeight - r.top),
+			},
+		);
+		setPendingTap({ u, v, offered, menu: { ...menu, h: size.h } });
 	};
 
 	const chooseTapPeak = (pk: NearbyPeak | null) => {
@@ -483,10 +517,13 @@ export default function PickerPanel(props: PickerPanelProps) {
 			chosen: pk?.name ?? null,
 		});
 		if (!pk) return;
-		const next = [
-			...taps.filter((t) => t.name !== pk.name),
-			{ name: pk.name, world: pk.world, u: pt.u, v: pt.v },
-		];
+		// keyed by position, not name: two summits can share a name
+		const next = upsertTap(taps, {
+			name: pk.name,
+			world: pk.world,
+			u: pt.u,
+			v: pt.v,
+		});
 		setTaps(next);
 		const starts = startPoses();
 		const results = rerankWithTaps(
@@ -546,7 +583,7 @@ export default function PickerPanel(props: PickerPanelProps) {
 		>
 			{taps.map((t) => (
 				<div
-					key={t.name}
+					key={peakKey(t.world)}
 					className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
 					style={{ left: `${t.u * 100}%`, top: `${t.v * 100}%` }}
 				>
@@ -557,37 +594,55 @@ export default function PickerPanel(props: PickerPanelProps) {
 				</div>
 			))}
 			{pendingTap && (
-				<div
-					className="absolute"
-					style={{
-						left: `${pendingTap.u * 100}%`,
-						top: `${pendingTap.v * 100}%`,
-					}}
-					onPointerDown={(e) => e.stopPropagation()}
-				>
-					<div className="pointer-events-none size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-300 bg-cyan-400/40" />
+				<>
+					<div
+						className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-cyan-300 bg-cyan-400/40"
+						style={{
+							left: `${pendingTap.u * 100}%`,
+							top: `${pendingTap.v * 100}%`,
+						}}
+					/>
 					<div
 						data-picker-peaks=""
-						className="absolute top-2 left-2 z-40 flex max-h-64 w-52 flex-col gap-0.5 overflow-auto rounded-lg bg-slate-950/90 p-1.5 text-[11px] ring-1 ring-white/15 backdrop-blur"
+						className="absolute z-40 flex flex-col overflow-y-auto bg-[color-mix(in_oklab,var(--rigi-ink)_92%,transparent)] text-[13px] text-[var(--rigi-paper)] backdrop-blur"
+						style={{
+							left: pendingTap.menu.left,
+							top: pendingTap.menu.top,
+							width: MENU_WIDTH_PX,
+							maxHeight: pendingTap.menu.h,
+							padding: MENU_PAD_PX,
+							borderRadius: 12,
+						}}
+						onPointerDown={(e) => e.stopPropagation()}
 					>
-						<div className="px-1 pb-0.5 text-[10px] text-white/50">
+						<div className="flex h-6 items-center px-2 text-[11px] opacity-60">
 							Which peak did you tap?
 						</div>
 						{pendingTap.offered.length === 0 && (
-							<div className="px-1 text-white/60">No named peak nearby</div>
+							<div className="flex min-h-11 items-center px-2 opacity-70">
+								No named peak nearby
+							</div>
 						)}
 						{pendingTap.offered.map((o) => (
 							<button
 								type="button"
-								key={`${o.name}${o.world[0]}`}
+								key={`${o.name}|${peakKey(o.world)}`}
 								data-picker-peak={o.name}
 								onClick={() => chooseTapPeak(o)}
-								className="flex items-baseline justify-between gap-2 rounded px-1 py-0.5 text-left hover:bg-white/10"
+								className="flex min-h-11 items-center justify-between gap-2 rounded-md px-2 text-left hover:bg-[color-mix(in_oklab,var(--rigi-paper)_10%,transparent)]"
 							>
-								<span className="truncate font-medium text-white/90">
-									{o.name}
+								<span className="flex min-w-0 flex-col">
+									<span className="truncate font-medium">{o.name}</span>
+									{o.misfit && (
+										<span
+											data-picker-misfit=""
+											className="text-[10px] text-[var(--rigi-trap)]"
+										>
+											doesn't fit your other taps
+										</span>
+									)}
 								</span>
-								<span className="shrink-0 text-[9px] text-white/45">
+								<span className="shrink-0 text-[10px] opacity-55">
 									{o.ele != null ? `${Math.round(o.ele)} m · ` : ""}
 									{o.distKm.toFixed(1)} km
 								</span>
@@ -596,12 +651,12 @@ export default function PickerPanel(props: PickerPanelProps) {
 						<button
 							type="button"
 							onClick={() => chooseTapPeak(null)}
-							className="rounded px-1 py-0.5 text-left text-white/50 hover:bg-white/10"
+							className="flex min-h-11 items-center rounded-md px-2 text-left opacity-60 hover:bg-[color-mix(in_oklab,var(--rigi-paper)_10%,transparent)]"
 						>
 							None of these
 						</button>
 					</div>
-				</div>
+				</>
 			)}
 		</div>
 	);

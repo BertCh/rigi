@@ -62,6 +62,7 @@ to be blind-verified before it enters any benchmark.
 | `flags.ts` | `?picker=` via `src/lib/flags` (`flagFrom`) |
 | `candidates.ts` | pure maths: `poseSepDeg`, `topDistinct`, `nearbyPeaks`, `rerankWithTaps`, `isAutoHigh` |
 | `engine-access.ts` | read-only access to both engines' `horizonDirs`, `edge` and peaks (`snapped(pose)`), without widening `Renderer`; missing fields turn features off |
+| `taps.ts` | pure: `peakKey` / `upsertTap` (taps keyed by position, not name), `rankPeaksByFit` (menu ranked by `pins/diagnostics pairFitDeg`, misfits flagged), `placeMenu` (clamped to stage ∩ viewport), 44 px rows |
 | `schema.ts` | log event types, version, `parsePickerLog` (pure) |
 | `log.ts` | the correction log: storage ring, export, clear |
 | `summary.ts` | `summarizeLog` / `formatSummary`: the owner-trial counts (pure) |
@@ -92,6 +93,8 @@ Picks are your choice between suggestions, not ground truth: they have to be bli
 count as anything in a benchmark, and the summary says how the picker was used, not how often it was right.
 
 ## Limits / next
+
+- Not done: the long-press magnifier loupe, single-tap undo, visibility-aware `nearbyPeaks` (tap-a-peak report U4). The menu changes (position-keyed taps, fit ranking, 44 px rows, clamping) are browser-unverified.
 
 - Candidate sources: the app's `autoAlign` alternatives or the cascade's. The matcher's ranked views (where
   the 27/30 top-4 number comes from) are not exposed by the match service yet; adding them needs a service
