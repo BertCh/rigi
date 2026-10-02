@@ -36,9 +36,5 @@
 	"src/lib/renderer-select.ts": {
 		"rawWebGpu": 2,
 		"why": "engine probe: a probe requestDevice on the peeked adapter (+ the \"no navigator.gpu\" reason string); the one place that decides WebGPU vs WebGL2 and must not load the luma WebGPU chunk"
-	},
-	"src/lib/roll/mosaic/panoGL.ts": {
-		"rawGl": 96,
-		"why": "stand-alone raw WebGL2 panorama renderer (audit-render R2)"
 	}
 }
