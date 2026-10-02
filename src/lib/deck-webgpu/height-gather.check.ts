@@ -421,6 +421,43 @@ function points(n: number, seed: number) {
 			bad++;
 	}
 	check("replayHeights(localMaxOf) == TerrainSet.localMax (300 peaks)", !bad);
+	// all peaks in one gather (snapPeaksNear's batch): one lookup call, same snaps, resident lazy tiles
+	// stay un-materialised (the CPU localMax materialises every tile it samples)
+	{
+		const peaks = Array.from({ length: 40 }, () => ({
+			lat: 46.7107 + (r() - 0.5) * 0.25,
+			lon: 7.7713 + (r() - 0.5) * 0.35,
+			radius: 60 + r() * 190,
+		}));
+		const lazy = [...m.slots.keys()];
+		const before = lazy.filter((t) => hasCpuHeights(t)).length;
+		let lookups = 0;
+		let samples = 0;
+		const snaps = peaks.map((pk) =>
+			replayHeights(
+				(h) => localMaxOf(h, pk.lat, pk.lon, pk.radius),
+				(la, lo) => {
+					lookups++;
+					samples += la.length;
+					return lookup(la, lo);
+				},
+			),
+		) as ReturnType<typeof localMaxOf>[];
+		const after = lazy.filter((t) => hasCpuHeights(t)).length;
+		const refSnaps = peaks.map((pk) => ref.localMax(pk.lat, pk.lon, pk.radius));
+		check(
+			"batched peak snaps == CPU localMax; one lookup per peak, no tile materialised",
+			snaps.every(
+				(a, i) =>
+					Object.is(a.h, refSnaps[i].h) &&
+					Object.is(a.lat, refSnaps[i].lat) &&
+					Object.is(a.lon, refSnaps[i].lon),
+			) &&
+				lookups === peaks.length &&
+				after === before,
+			`(${samples} samples, ${lookups} lookups, lazy tiles with CPU heights ${before} -> ${after})`,
+		);
+	}
 	const viaPromise = await replayHeights(
 		(h) => localMaxOf(h, 46.71, 7.77, 200),
 		async (la, lo) => lookup(la, lo),

@@ -3552,7 +3552,13 @@ export class WebGpuEngine implements Renderer {
 		const t = this.terrain as TerrainSet;
 		const dist = distanceM(this.photo, p);
 		if (dist > 110000 || dist < 150) return null;
-		const snap = t.localMax(p.lat, p.lon, Math.min(250, 60 + dist * 0.004));
+		const radiusM = Math.min(250, 60 + dist * 0.004);
+		// terrainGpuDecode: a gathered summit (no CPU tile materialisation) when snapPeaksNear has one
+		// ready; else the CPU localMax (the reference), since pins need an answer now
+		const hg = this.heights();
+		const snap =
+			(hg ? this.gatheredLocalMax(hg, t)(p, radiusM) : undefined) ??
+			t.localMax(p.lat, p.lon, radiusM);
 		if (!Number.isFinite(snap.h)) return null;
 		const w = t.frame.fromGeo(snap.lat, snap.lon, snap.h);
 		const s: SnappedPeak = {
