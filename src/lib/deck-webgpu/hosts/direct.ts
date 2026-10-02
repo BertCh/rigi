@@ -15,6 +15,7 @@ import {
 } from "../frame-timings";
 import type { FrameState, GpuLayerCore } from "../pass";
 import { ColorTargets, GeometryTargets, geometrySize } from "../targets";
+import { type FrameScope, OffscreenDirty } from "./frame-scope";
 import {
 	type CameraPose,
 	camerasFor,
@@ -51,16 +52,17 @@ export interface Host {
 	setPhotoAspect(aspect: number): void;
 	/**
 	 * Schedule a frame. "screen" re-runs only the screen pass on the last offscreen results (a
-	 * composite-only change: reveal, brush, blend); "all" (default) re-renders geometry + colour.
+	 * composite-only change: reveal, brush, blend); "color" re-renders colour on the cached geometry
+	 * target (only the view camera or time moved); "all" (default) re-renders geometry + colour.
 	 */
-	requestRender(scope?: "all" | "screen"): void;
+	requestRender(scope?: FrameScope): void;
 	/**
 	 * Interactive quality: the colour pass draws without MSAA until `false`. Switching back only
 	 * changes the mode; the caller requests the full-quality "all" frame (it also fires onRender).
 	 */
 	setInteractive(active: boolean): void;
 	/** Resolves after the next frame's GPU work completes. */
-	nextFrame(scope?: "all" | "screen"): Promise<void>;
+	nextFrame(scope?: FrameScope): Promise<void>;
 	destroy(): void;
 }
 
@@ -88,7 +90,7 @@ export class DirectHost implements Host {
 	private t0 = performance.now();
 	private waiters: (() => void)[] = [];
 	private destroyed = false;
-	private offscreenDirty = true;
+	private offscreenDirty = new OffscreenDirty();
 
 	static async create(
 		canvas: HTMLCanvasElement,
@@ -122,11 +124,12 @@ export class DirectHost implements Host {
 
 	setPhotoAspect(aspect: number) {
 		const g = geometrySize(aspect);
-		this.geometry.resize(g.width, g.height);
+		if (this.geometry.resize(g.width, g.height))
+			this.offscreenDirty.markGeometry();
 	}
 
-	requestRender(scope: "all" | "screen" = "all") {
-		if (scope === "all") this.offscreenDirty = true;
+	requestRender(scope: FrameScope = "all") {
+		this.offscreenDirty.request(scope);
 		if (this.raf || this.destroyed) return;
 		this.requestedAt = performance.now();
 		this.raf = requestAnimationFrame(() => {
@@ -136,10 +139,10 @@ export class DirectHost implements Host {
 	}
 
 	setInteractive(active: boolean) {
-		if (this.color.setReduced(active)) this.offscreenDirty = true;
+		if (this.color.setReduced(active)) this.offscreenDirty.markColor();
 	}
 
-	nextFrame(scope: "all" | "screen" = "all") {
+	nextFrame(scope: FrameScope = "all") {
 		return new Promise<void>((r) => {
 			if (this.destroyed) return r();
 			this.waiters.push(r);
@@ -152,14 +155,15 @@ export class DirectHost implements Host {
 		const t = performance.now();
 		const d = this.device;
 		const [w, h] = this.canvasSize();
-		if (this.color.resize(w, h)) this.offscreenDirty = true;
+		if (this.color.resize(w, h)) this.offscreenDirty.markColor();
 		const frame: FrameState = {
 			frame: this.stats.frames,
 			time: t,
 			view: this.frameView,
 		};
 		getFrameTimings(d)?.beginFrame(frame.frame);
-		if (this.offscreenDirty)
+		const dirty = this.offscreenDirty.take();
+		if (dirty.color)
 			runOffscreenPasses({
 				device: d,
 				cores: this.cores,
@@ -169,8 +173,8 @@ export class DirectHost implements Host {
 				view: this.view,
 				frame,
 				timing: this.stats,
+				geometryPass: dirty.geometry,
 			});
-		this.offscreenDirty = false;
 		const ts = performance.now();
 		const fb = d
 			.getDefaultCanvasContext()

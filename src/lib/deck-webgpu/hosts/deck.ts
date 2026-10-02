@@ -36,6 +36,7 @@ import type { FrameState, GpuLayerCore } from "../pass";
 import { ColorTargets, GeometryTargets, geometrySize } from "../targets";
 import type { Host, HostStats } from "./direct";
 import { createFrameCoalescer } from "./frame-coalescer";
+import { type FrameScope, OffscreenDirty } from "./frame-scope";
 import {
 	type CameraPose,
 	camerasFor,
@@ -82,7 +83,7 @@ export class DeckHost implements Host {
 	private t0 = performance.now();
 	private waiters: (() => void)[] = [];
 	private frameStart = 0;
-	private offscreenDirty = true;
+	private offscreenDirty = new OffscreenDirty();
 	/** Extra deck views after [photo, screen] (setExtraViews: e.g. Step Inside's MapView). */
 	private extraViews: unknown[] = [];
 	private extraViewState: Record<string, unknown> = {};
@@ -162,7 +163,8 @@ export class DeckHost implements Host {
 
 	setPhotoAspect(aspect: number) {
 		const g = geometrySize(aspect);
-		this.geometry.resize(g.width, g.height);
+		if (this.geometry.resize(g.width, g.height))
+			this.offscreenDirty.markGeometry();
 	}
 
 	updateLayers() {
@@ -181,8 +183,8 @@ export class DeckHost implements Host {
 	/** CR-40: one draw per animation frame however many input events / requests land before it. */
 	private readonly frames = createFrameCoalescer(() => this.drawFrame());
 
-	requestRender(scope: "all" | "screen" = "all") {
-		if (scope === "all") this.offscreenDirty = true;
+	requestRender(scope: FrameScope = "all") {
+		this.offscreenDirty.request(scope);
 		if (!this.frames.pending) this.requestedAt = performance.now();
 		this.frames.request();
 	}
@@ -246,10 +248,10 @@ export class DeckHost implements Host {
 	}
 
 	setInteractive(active: boolean) {
-		if (this.color.setReduced(active)) this.offscreenDirty = true;
+		if (this.color.setReduced(active)) this.offscreenDirty.markColor();
 	}
 
-	nextFrame(scope: "all" | "screen" = "all") {
+	nextFrame(scope: FrameScope = "all") {
 		return new Promise<void>((r) => {
 			this.waiters.push(r);
 			this.requestRender(scope);
@@ -260,10 +262,10 @@ export class DeckHost implements Host {
 	private offscreen(opts: PreRenderOptions) {
 		this.frameStart = performance.now();
 		const [w, h] = this.canvasSize();
-		if (this.color.resize(w, h)) this.offscreenDirty = true;
+		if (this.color.resize(w, h)) this.offscreenDirty.markColor();
 		// deck may redraw on its own (resize, internal needsRedraw); unchanged scenes skip the 3D
-		if (!this.offscreenDirty) return;
-		this.offscreenDirty = false;
+		const dirty = this.offscreenDirty.take();
+		if (!dirty.color) return;
 		// deck's photo viewport (opts.viewports) carries the same pose for deck-side layers; our
 		// cameras come from `photo` / `view`
 		void opts;
@@ -283,6 +285,7 @@ export class DeckHost implements Host {
 			view: this.view,
 			frame: this.frame,
 			timing: this.stats,
+			geometryPass: dirty.geometry,
 		});
 	}
 

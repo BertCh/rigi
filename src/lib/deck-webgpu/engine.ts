@@ -227,6 +227,7 @@ import { type FrameTimingsListener, getFrameTimings } from "./frame-timings";
 import { GeoQueryGpu } from "./geo-query-gpu";
 import { HeightGather, replayHeights } from "./height-gather";
 import type { Host, HostStats } from "./hosts/direct";
+import { type FrameScope, mergeScope } from "./hosts/frame-scope";
 import {
 	type CameraPose,
 	camerasFor,
@@ -714,7 +715,11 @@ export class WebGpuEngine implements Renderer {
 		contextRestored: 0,
 	};
 	/** Coalesced frame request (schedule): the widest scope asked for this task. */
-	private pendingScope: "all" | "screen" | null = null;
+	private pendingScope: FrameScope | null = null;
+	/** A frame's emit is queued: the waiters of one rendered frame share a single emit (schedule). */
+	private emitQueued = false;
+	/** The world frame loop is in a flight / In-map fade run (kickWorld: first frame full sync). */
+	private worldFadeLight = false;
 
 	/** WebGPU present and an adapter granted? (never throws) */
 	static available() {
@@ -1182,24 +1187,31 @@ export class WebGpuEngine implements Renderer {
 	// frames
 
 	/**
-	 * One coalesced frame per task: "all" re-renders geometry + colour, "screen" only the screen
-	 * pass on the cached targets (composite-only changes). onRender listeners fire after it.
+	 * One coalesced frame per task: "all" re-renders geometry + colour, "color" colour only (the
+	 * view camera or a time input moved), "screen" only the screen pass on the cached targets
+	 * (composite-only changes). onRender listeners fire once per rendered frame, after it.
 	 */
-	private schedule(scope: "all" | "screen" = "all") {
+	private schedule(scope: FrameScope = "all") {
 		if (this.disposed) return;
-		const first = this.pendingScope === null;
-		if (scope === "all" || first) this.pendingScope = scope;
-		if (!first) return;
+		const pending = this.pendingScope;
+		this.pendingScope = pending ? mergeScope(pending, scope) : scope;
+		if (pending) return;
 		queueMicrotask(() => {
 			const s = this.pendingScope ?? "all";
 			this.pendingScope = null;
 			const host = this.host;
 			if (!host || this.disposed || this.lost) return;
-			if (s === "all") this.counters.framesAll++;
-			else this.counters.framesScreen++;
+			if (s === "screen") this.counters.framesScreen++;
+			else this.counters.framesAll++; // "color" frames count with the offscreen ones
 			void host.nextFrame(s).then(() => {
-				this.emit();
-				this.scheduleWarm();
+				// every waiter of one rendered frame resolves in the same task: emit once for all of them
+				if (this.emitQueued) return;
+				this.emitQueued = true;
+				queueMicrotask(() => {
+					this.emitQueued = false;
+					this.emit();
+					this.scheduleWarm();
+				});
 			});
 		});
 	}
@@ -2303,8 +2315,10 @@ export class WebGpuEngine implements Renderer {
 		const elevRange = deckElevRange(this.style, this.elevRange) ??
 			this.elevRange ?? [400, 4200];
 		g.atmSky.setView(world ? "world" : "photo");
-		if (world) this.syncWorld(g, photoU, nearDiscard);
-		else {
+		if (world) {
+			this.photoImageryKey = null;
+			this.syncWorld(g, photoU, nearDiscard);
+		} else {
 			const look = terrainLookFor(this.settings);
 			g.composite.setSettings(compositeFor(this.settings));
 			const style = terrainStyleName(look.style);
@@ -2318,10 +2332,37 @@ export class WebGpuEngine implements Renderer {
 				terroir: this.terroir(),
 			});
 			this.imageryDraped = !!look.imagery;
-			if (look.imagery && this.renderSet)
-				this.syncImagery(this.renderSet, look.imagery);
+			if (look.imagery && this.renderSet) {
+				// a pose drag changes none of this: skip the tile-set walk unless an input moved
+				const set = this.renderSet;
+				const m = this.photoImageryKey;
+				if (
+					!m ||
+					m.set !== set ||
+					m.tiles !== set.tiles ||
+					m.count !== set.tiles.length ||
+					m.src !== look.imagery ||
+					m.mapSize !== this.imagery.map.size ||
+					m.loading !== !!this.imagery.abort ||
+					m.gpu !== g
+				) {
+					this.syncImagery(set, look.imagery);
+					this.photoImageryKey = {
+						set,
+						tiles: set.tiles,
+						count: set.tiles.length,
+						src: look.imagery,
+						mapSize: this.imagery.map.size,
+						loading: !!this.imagery.abort,
+						gpu: g,
+					};
+				}
+			}
 			// no drape in this look: the imagery layers go after a grace (imagery.ts releaseWhenIdle)
-			else if (!look.imagery) g.imagery.releaseWhenIdle();
+			else if (!look.imagery) {
+				this.photoImageryKey = null;
+				g.imagery.releaseWhenIdle();
+			}
 			g.trails.setEnabled(look.trails && !!this.trails?.count);
 			this.syncFlowTick(false);
 			g.gizmo.setProps({ view: "photo" });
@@ -2429,7 +2470,7 @@ export class WebGpuEngine implements Renderer {
 			if (t - last < 33) return;
 			this.gpu.flow.advance((t - last) / 1000);
 			last = t;
-			this.schedule("all");
+			this.schedule("color"); // drift time only reaches the colour pass
 		};
 		this.flowRaf = requestAnimationFrame(tick);
 	}
@@ -2578,6 +2619,17 @@ export class WebGpuEngine implements Renderer {
 		}
 		this.pushImagery();
 	}
+
+	/** What the last photo-look syncImagery saw (sync skips it while none of it changed). */
+	private photoImageryKey: {
+		set: TerrainSet;
+		tiles: TerrainSet["tiles"];
+		count: number;
+		src: ImagerySource;
+		mapSize: number;
+		loading: boolean;
+		gpu: Gpu;
+	} | null = null;
 
 	/** The current look drapes imagery (set by sync(); pushImagery uploads only then). */
 	private imageryDraped = false;
@@ -3963,16 +4015,27 @@ export class WebGpuEngine implements Renderer {
 				gizmo = Math.abs(o - w.photoPlaneOpacity) > 0.01;
 				if (gizmo) w.photoPlaneOpacity = o;
 			}
-			if (flying || gizmo) this.sync();
-			else if (moved && this.host) {
-				this.host.view = this.viewPose();
-				this.schedule("all");
+			// a flight / the In-map fade changes only the gizmo's plane opacity and the view camera: the
+			// first frame of a run takes the full sync, the rest the light path (deck/engine.ts updateWorldGizmo)
+			if (flying || gizmo) {
+				if (this.worldFadeLight) this.updateWorldGizmo(w);
+				else {
+					this.worldFadeLight = true;
+					this.sync();
+				}
+			} else {
+				this.worldFadeLight = false;
+				// the orbit only moves the view camera: the geometry pass (photo camera) is cached
+				if (moved && this.host) {
+					this.host.view = this.viewPose();
+					this.schedule("color");
+				}
 			}
 			if (this.step?.map?.active) this.syncMapViews();
 			// animated lake waves (style.world.water, off under webdriver): one frame a tick
 			const waves = waterWavesAnimate(this.style);
 			if (waves && !moved && !flying && !gizmo && this.host)
-				this.schedule("all");
+				this.schedule("color");
 			this.worldStill = moved ? 0 : this.worldStill + 1;
 			this.worldRaf =
 				flying || waves || this.worldStill < 30
@@ -3980,6 +4043,16 @@ export class WebGpuEngine implements Renderer {
 					: 0;
 		};
 		this.worldRaf = requestAnimationFrame(step);
+	}
+
+	/** A flight / fade frame: the gizmo's plane opacity and the view camera only (colour pass). */
+	private updateWorldGizmo(w: WorldCamera) {
+		const g = this.gpu;
+		const host = this.host;
+		if (this.disposed || !g || !host) return;
+		g.gizmo.setProps({ planeOpacity: w.photoPlaneOpacity });
+		host.view = this.viewPose();
+		this.schedule("color");
 	}
 
 	private stepGizmoOpacity(w: WorldCamera) {

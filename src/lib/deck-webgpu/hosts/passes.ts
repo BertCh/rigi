@@ -204,10 +204,14 @@ export function runOffscreenPasses(o: {
 	view: CameraPose;
 	frame: FrameState;
 	timing: PassTiming;
+	/** Re-run the geometry pass (default true); false keeps the cached geometry target ("color" frames). */
+	geometryPass?: boolean;
 }) {
 	let t = performance.now();
-	runGeometryPass(o);
-	o.timing.geometryMs = performance.now() - t;
+	if (o.geometryPass !== false) {
+		runGeometryPass(o);
+		o.timing.geometryMs = performance.now() - t;
+	}
 	t = performance.now();
 	runColorPass(o);
 	o.timing.colorMs = performance.now() - t;
