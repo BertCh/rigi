@@ -1661,7 +1661,6 @@ function HeroStages() {
 					stages={[
 						{
 							label: "Photo",
-							frame: "photo",
 							caption: "We start with the photo and what the phone recorded.",
 							render: () => (
 								<RealPhoto bleed data={d} layers={[]} crop={crop} />
@@ -1669,7 +1668,6 @@ function HeroStages() {
 						},
 						{
 							label: "Horizon from the map",
-							frame: "photo",
 							pose: 0,
 							caption: `From the GPS fix we predict the horizon the terrain should make. ${t(d?.ms.horizon)}.`,
 							render: () => (
@@ -1678,7 +1676,6 @@ function HeroStages() {
 						},
 						{
 							label: "Skyline in the photo",
-							frame: "photo",
 							pose: 0,
 							caption: `We find the skyline in the photo itself. ${t(d?.ms.skyline)}.`,
 							render: () => (
@@ -1692,8 +1689,6 @@ function HeroStages() {
 						},
 						{
 							label: "Slide to match",
-							frame: "photo",
-							kind: "change",
 							pose: 1,
 							caption: `We turn the camera until the two lines overlap, then check how sure we are. ${t(d?.ms.solve)}.`,
 							render: () => (
@@ -1707,7 +1702,6 @@ function HeroStages() {
 						},
 						{
 							label: "Label",
-							frame: "photo",
 							pose: 1,
 							caption:
 								"Once the pose is trusted, we name the peaks that line up.",
