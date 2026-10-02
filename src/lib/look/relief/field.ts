@@ -406,7 +406,8 @@ export function reliefValues(
 	extent: Extent | null = null,
 ) {
 	const r = style.terrain.relief;
-	if (r.mode !== "swiss") return null;
+	if (r.mode !== "swiss" && r.mode !== "imhof") return null;
+	const imhof = r.mode === "imhof";
 	return {
 		sunDir,
 		sunColor: sunColor(sunDir),
@@ -416,6 +417,11 @@ export function reliefValues(
 		curvature: r.curvature,
 		// the orbit camera sees the field's edge from above: a wider fade
 		edge: world ? 0.22 : 0.08,
+		// Imhof relief (look/imhof.ts); all 0 for swiss
+		imhof: imhof ? 1 : 0,
+		swing: imhof ? r.swing : 0,
+		tint: imhof ? r.tint : 0,
+		aerial: imhof ? r.aerial : 0,
 	} satisfies Partial<BlockValues<typeof REL_BLOCK.fields>>;
 }
 export type RelValues = NonNullable<ReturnType<typeof reliefValues>>;

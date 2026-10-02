@@ -320,16 +320,22 @@ function ReliefGroup({ style }: { style: ViewStyle }) {
 						label: "Swiss relief",
 						title: "Multidirectional hillshade with cast shadows and sky view",
 					},
+					{
+						value: "imhof",
+						label: "Imhof",
+						title:
+							"Swiss relief with range-aware generalisation, swung light and Imhof colour",
+					},
 				]}
 			/>
-			{t.relief.mode === "swiss" && (
+			{(t.relief.mode === "swiss" || t.relief.mode === "imhof") && (
 				<Slider
 					label="Real sun"
 					value={t.relief.realism}
 					min={0}
 					max={1}
 					onChange={(realism) =>
-						patch({ terrain: { relief: { mode: "swiss", realism } } })
+						patch({ terrain: { relief: { mode: t.relief.mode, realism } } })
 					}
 				/>
 			)}

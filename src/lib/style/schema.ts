@@ -174,6 +174,25 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 						curvature: 0.5,
 					},
 				},
+				imhof: {
+					fields: {
+						realism: unit,
+						generalize: unit,
+						curvature: unit,
+						swing: unit,
+						tint: unit,
+						aerial: unit,
+					},
+					def: {
+						mode: "imhof",
+						realism: 0,
+						generalize: 0.85,
+						curvature: 0.5,
+						swing: 0.7,
+						tint: 0.6,
+						aerial: 0.7,
+					},
+				},
 			},
 		},
 		albedo: {

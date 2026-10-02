@@ -49,6 +49,11 @@ import type { ShaderModule } from "@luma.gl/shadertools";
 import { ATM_CURV } from "#/lib/look/atmosphere";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
 import type { harmonizeValues } from "#/lib/look/composite";
+import {
+	IMHOF_FIELD_TEXEL,
+	IMHOF_TAP_RADII,
+	IMHOF_WGSL_MATH,
+} from "#/lib/look/imhof";
 import type { ReliefField, ResidentReliefField } from "#/lib/look/relief/field";
 import { waterWgsl } from "#/lib/look/water/water";
 import { waterWaveSeconds } from "#/lib/look/water/waves";
@@ -170,6 +175,11 @@ export const terrainReliefModule = uniformModule(
 		generalize: "f32",
 		curvature: "f32",
 		edge: "f32",
+		/** Imhof relief (look/imhof.ts): 1 = on, aspect swing, colour tint, aerial perspective */
+		imhof: "f32",
+		swing: "f32",
+		tint: "f32",
+		aerial: "f32",
 	},
 );
 
@@ -359,7 +369,7 @@ fn ts_slope_class(n: vec3<f32>, fwSlope: f32) -> vec4<f32> {
  * LOOK_RELIEF: look/glsl/relief.ts RELIEF_FNS. The field textures carry no mips, so
  * textureSampleLevel(…, 0) is the same sample as GLSL texture() and legal in any control flow.
  */
-const RELIEF_WGSL = /* wgsl */ `\
+export const RELIEF_WGSL = /* wgsl */ `\
 @group(0) @binding(auto) var reliefField: texture_2d<f32>; // R sun visibility, G sky view, B curvature, A coverage
 @group(0) @binding(auto) var reliefFieldSampler: sampler;
 @group(0) @binding(auto) var reliefGen: texture_2d<f32>;   // RG generalised normal xy (× 0.5 + 0.5), A valid
@@ -386,6 +396,20 @@ fn ts_relief_mdow(n: vec3<f32>) -> f32 {
   let single = max(dot(n, ts_relief_light_dir(315.0, 45.0)), 0.0);
   return mix(single, acc / wsum, 0.55 * smoothstep(0.05, 0.4, slope)) / sin(radians(45.0));
 }
+${IMHOF_WGSL_MATH}
+// mean generalised-normal xy of the 8 taps on a ring (radius in field texels) around the sample
+fn ts_imhof_ring_xy(uv: vec2<f32>, radius: f32, g0: vec4<f32>) -> vec2<f32> {
+  let c = g0.rg * 2.0 - 1.0;
+  var acc = c * g0.a;
+  var wsum = g0.a;
+  for (var i = 0; i < 8; i++) {
+    let a = 0.785398163 * f32(i);
+    let g = textureSampleLevel(reliefGen, reliefGenSampler, uv + vec2<f32>(cos(a), sin(a)) * radius * ${f(IMHOF_FIELD_TEXEL)}, 0.0);
+    acc += (g.rg * 2.0 - 1.0) * g.a;
+    wsum += g.a;
+  }
+  return select(c, acc / max(wsum, 1e-4), wsum > 0.0);
+}
 fn ts_relief_shade(albedo: vec3<f32>, n0: vec3<f32>, worldPos: vec3<f32>, range: f32) -> vec3<f32> {
   let R = terrainRelief;
   var n = n0;
@@ -403,7 +427,18 @@ fn ts_relief_shade(albedo: vec3<f32>, n0: vec3<f32>, worldPos: vec3<f32>, range:
     let gxy = g.rg * 2.0 - 1.0;
     let gn = vec3<f32>(gxy, sqrt(max(1.0 - dot(gxy, gxy), 0.0)));
     // keep 30 % of the fine normal (Imhof's generalisation); none on the ground at your feet
-    n = normalize(mix(n, normalize(mix(gn, n, 0.3)), R.generalize * edge * g.a * smoothstep(300.0, 2000.0, range)));
+    if (R.imhof > 0.5) {
+      // Imhof: four scale levels (fine normal, field normal, two coarser ring averages) by range
+      let w = ts_imhof_scale_weights(range);
+      var xy = w.x * n.xy + w.y * gxy;
+      if (w.z > 0.0) { xy += w.z * ts_imhof_ring_xy(uv, ${f(IMHOF_TAP_RADII[0])}, g); }
+      if (w.w > 0.0) { xy += w.w * ts_imhof_ring_xy(uv, ${f(IMHOF_TAP_RADII[1])}, g); }
+      xy *= min(1.0, 0.98 / max(length(xy), 1e-4));
+      let ng = vec3<f32>(xy, sqrt(max(1.0 - dot(xy, xy), 0.0)));
+      n = normalize(mix(n, ng, R.generalize * edge * g.a));
+    } else {
+      n = normalize(mix(n, normalize(mix(gn, n, 0.3)), R.generalize * edge * g.a * smoothstep(300.0, 2000.0, range)));
+    }
   }
   let sunVis = mix(1.0, fv.r, wField);
   let svf = mix(1.0, fv.g, wField);
@@ -422,16 +457,20 @@ fn ts_relief_shade(albedo: vec3<f32>, n0: vec3<f32>, worldPos: vec3<f32>, range:
   let photo = albedo * (direct + skyL + bounce);
 
   // cartographic: MDOW (z-factor 1.6) + Imhof contrast + warm/cool split + ridge emphasis
-  var hs = ts_relief_mdow(normalize(vec3<f32>(n.xy * 1.6, n.z)));
+  let zn = normalize(vec3<f32>(n.xy * 1.6, n.z));
+  var hs = ts_relief_mdow(zn);
+  if (R.imhof > 0.5) { hs = ts_imhof_swung_light(zn, hs, R.swing); }
   hs = mix(0.78, hs, mix(0.55, 1.0, smoothstep(600.0, 3000.0, elev)));
   hs *= mix(1.0, 0.72 + 0.28 * svf, 0.9);
   hs += curv * R.curvature * 0.45;
   let L = clamp(hs, 0.0, 1.4);
   let tone = mix(vec3<f32>(0.62, 0.72, 0.98), vec3<f32>(1.05, 1.0, 0.88), smoothstep(0.25, 1.0, L)) * (0.1 + 0.9 * pow(L, 1.6));
-  let carto = albedo * tone * 1.35;
+  var carto = albedo * tone * 1.35;
+  if (R.imhof > 0.5) { carto = ts_imhof_colour(albedo, L, elev, R.tint); }
 
   var col = mix(carto, photo, R.realism);
   col *= 1.0 + curv * R.curvature * mix(0.25, 0.35, R.realism);
+  if (R.imhof > 0.5) { col = ts_imhof_aerial(col, range, elev, R.aerial); }
   let mid = albedo * mix(vec3<f32>(0.9), R.sunColor.rgb * 0.9 + skyCol * 0.35, R.realism);
   return mix(col, mid, 0.125 * smoothstep(3000.0, 60000.0, range));
 }
@@ -1069,6 +1108,10 @@ export class TerrainStyles {
 			generalize: R?.generalize ?? 0,
 			curvature: R?.curvature ?? 0,
 			edge: R?.edge ?? 0.08,
+			imhof: R?.imhof ?? 0,
+			swing: R?.swing ?? 0,
+			tint: R?.tint ?? 0,
+			aerial: R?.aerial ?? 0,
 		};
 	}
 

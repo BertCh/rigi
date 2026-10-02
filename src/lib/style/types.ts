@@ -66,7 +66,21 @@ export type TerrainLook = {
 	 *  realism: 0 cartographic NW light … 1 the photo's sun. */
 	relief:
 		| { mode: "lambert" }
-		| { mode: "swiss"; realism: number; generalize: number; curvature: number };
+		| { mode: "swiss"; realism: number; generalize: number; curvature: number }
+		| {
+				/** swiss + multi-scale generalisation by range, aspect-swung light, Imhof colour (look/imhof.ts) */
+				mode: "imhof";
+				realism: number;
+				/** how much of the multi-scale normal replaces the fine one */
+				generalize: number;
+				curvature: number;
+				/** 0..1: azimuth swing of the light toward each slope's aspect */
+				swing: number;
+				/** 0..1: elevation tint (lowland green-grey, alpine light) */
+				tint: number;
+				/** 0..1: aerial lightening / desaturation with distance */
+				aerial: number;
+		  };
 	/** 'ramp' = reliefRamp; 'alpine' = absolute-elevation Patterson tint with rock, snow and lakes (LOOK_ALPINE); water: lakes get depth tint + Fresnel sky reflection (LOOK_WATER). */
 	albedo: { mode: "ramp" } | { mode: "alpine"; water: boolean };
 };

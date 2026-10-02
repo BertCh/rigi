@@ -368,6 +368,10 @@ export async function runTerrainStylesCheck(
 						generalize: 0.5,
 						curvature: 0.5,
 						edge: 0.08,
+						imhof: 0,
+						swing: 0,
+						tint: 0,
+						aerial: 0,
 					}
 				: null,
 		};

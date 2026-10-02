@@ -32,7 +32,10 @@ export function lookKey(s: ViewStyle): LookDefine[] {
 		[s.composite.ridges === "ink", "LOOK_INK"],
 		[s.composite.output === "neutral", "LOOK_OUTPUT"],
 		[s.composite.refine, "LOOK_REFINE"],
-		[s.terrain.relief.mode === "swiss", "LOOK_RELIEF"],
+		[
+			s.terrain.relief.mode === "swiss" || s.terrain.relief.mode === "imhof",
+			"LOOK_RELIEF",
+		],
 		[s.overlay.contours.kind === "tanaka", "LOOK_TANAKA"],
 		[
 			s.terrain.albedo.mode === "alpine" && s.terrain.albedo.water,
