@@ -37,6 +37,7 @@ import type { Mosaic } from "#/lib/horizon-fast/mosaic";
 import { getComputeDevice } from "../device";
 import { uploadMosaics } from "./index";
 import { RIDGES_WGSL } from "./ridges.wgsl";
+import { packRidgesUniform } from "./uniforms";
 
 /** The ridge trace's sampling schedule (ridgelines.ts ridgeSchedule), for one eye. */
 export interface RidgeMarch {
@@ -152,23 +153,20 @@ export function packRidgeMarch(
 		pu[slabOff + 2 * s] = lo;
 		pu[slabOff + 2 * s + 1] = hi;
 	}
-	const ub = new ArrayBuffer(64);
-	const uu = new Uint32Array(ub);
-	const uf = new Float32Array(ub);
-	uu[0] = m.cols;
-	uu[1] = m.slabs;
-	uu[2] = nD;
-	uu[3] = nR;
-	uu[4] = azOff;
-	uu[5] = distOff;
-	uu[6] = ringOff;
-	uu[7] = slabOff;
-	uf[8] = m.inv2R;
-	uu[9] = 0;
-	uf[10] = m.eye.h;
-	uf[11] = m.eye.h - uf[10];
-	uf[12] = sinP1;
-	uf[13] = Math.cos(phi);
+	const ub = packRidgesUniform({
+		nCols: m.cols,
+		nSlabs: m.slabs,
+		nDist: nD,
+		nRings: nR,
+		azOff,
+		distOff,
+		ringOff,
+		slabOff,
+		inv2R: m.inv2R,
+		eyeH: m.eye.h,
+		sinP1,
+		cosP1: Math.cos(phi),
+	});
 	return { params: buf, uniform: ub };
 }
 

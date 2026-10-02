@@ -37,6 +37,7 @@ import {
 import { pinResidentPlanes } from "#/lib/gpu/photoprep";
 import { runPoseGraph, STORAGE } from "./graph";
 import { POSE_GRID_WGSL } from "./pose-grid.wgsl";
+import { packPoseGridUniform } from "./uniforms";
 
 const D = Math.PI / 180;
 
@@ -166,18 +167,7 @@ async function scoreOnce(
 		pose4[i * 12 + 7] = p.vfov;
 		pose4.set(b.up, i * 12 + 8);
 	}
-	const uw = new ArrayBuffer(32);
-	const ui = new Uint32Array(uw);
-	const ii = new Int32Array(uw);
-	const uf = new Float32Array(uw);
-	ui[0] = w;
-	ui[1] = h;
-	ui[2] = nDirs;
-	ui[3] = nPoses;
-	ii[4] = Math.max(2, Math.round(h * 0.035)); // band, as scorePose
-	ii[5] = Math.max(1, Math.round(h * 0.012)); // gap (coarse)
-	uf[6] = aspect;
-	uf[7] = nDirs;
+	const uw = packPoseGridUniform({ w, h, nDirs, nPoses, aspect });
 
 	// every slot below is read only within its first w·h / nDirs / nPoses entries, and `scores` is
 	// fully overwritten for pi < nPoses, so pool capacity and stale bytes don't reach the result

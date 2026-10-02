@@ -189,6 +189,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "gpu-uniform-block-a",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/core/uniform-block-a.check.ts"),
+		note: "align / solve-fold / horizon uniform packers (gpu/{align,solve,horizon}/uniforms.ts) are byte-identical to the former hand-packed words (certified-f32 inputs: -0, NaN, subnormals, u32 max)",
+		timeoutS: 60,
+	},
+	{
 		id: "gpu-inspect",
 		tier: "fast",
 		group: "gpu",

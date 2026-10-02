@@ -19,6 +19,7 @@ import { Buffer, type Device } from "@luma.gl/core";
 import { cachedGraph } from "#/lib/gpu/core/graph";
 import { defineKernel, submit } from "#/lib/gpu/core/kernel";
 import { MIP_MAX_LEVEL, MIP_MIN_LEVEL } from "#/lib/horizon-fast/mosaic";
+import { MOSAIC_MIP_P } from "./uniforms";
 
 const MIP_WGSL = /* wgsl */ `
 struct P {
@@ -132,16 +133,17 @@ export async function buildMipsGpu(
 			for (const job of jobs) {
 				for (let i = 0; i < job.widths.length; i++) {
 					const fromPixels = i === 0;
-					const words = new Uint32Array([
-						fromPixels ? job.dataOff : job.mipOff[i - 1],
-						fromPixels ? job.width : job.widths[i - 1],
-						fromPixels ? job.height : job.heights[i - 1],
-						job.mipOff[i],
-						job.widths[i],
-						job.heights[i],
-						fromPixels ? 1 << job.minLevel : 2,
-						0,
-					]);
+					const words = new Uint8Array(
+						MOSAIC_MIP_P.pack({
+							srcOff: fromPixels ? job.dataOff : job.mipOff[i - 1],
+							srcW: fromPixels ? job.width : job.widths[i - 1],
+							srcH: fromPixels ? job.height : job.heights[i - 1],
+							dstOff: job.mipOff[i],
+							dstW: job.widths[i],
+							dstH: job.heights[i],
+							factor: fromPixels ? 1 << job.minLevel : 2,
+						}),
+					);
 					const u = device.createBuffer({
 						id: `mosaic-mip-u${uniforms.length}`,
 						usage: Buffer.UNIFORM | Buffer.COPY_DST,

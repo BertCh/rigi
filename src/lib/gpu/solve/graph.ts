@@ -41,6 +41,7 @@ import {
 	rowsDigest,
 	selectBounded,
 } from "./index";
+import { FOLD_U } from "./uniforms";
 
 /**
  * Per yaw row r (one thread): over its nBlk blocks (bitcast min, first, last, 0) →
@@ -290,9 +291,7 @@ export async function coarseGraphOnce(
 	const { nBlk, hz, obU, yU, pitch, ub } = pk;
 	stats.eps = pk.eps;
 
-	const fb = new ArrayBuffer(16);
-	new Uint32Array(fb).set([nYaw, nBlk, nPitch]);
-	new Float32Array(fb)[3] = 2 * stats.eps;
+	const fb = FOLD_U.pack({ nYaw, nBlk, nPitch, e2: 2 * stats.eps });
 	const hzR = residentHz(device, hz);
 	stats.hzUploaded = hzR.uploaded;
 	const bufs = {

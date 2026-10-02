@@ -56,6 +56,7 @@ import {
 	STORAGE,
 	uploadOnce,
 } from "./pose-grid";
+import { packPoseBoundUniform } from "./uniforms";
 
 const D = Math.PI / 180;
 const ro = "read-only-storage" as const;
@@ -203,22 +204,9 @@ async function boundOnce(
 		pose4.set(b.up, i * 12 + 8);
 		pose4[i * 12 + 11] = probes[i].fine ? 1 : 0;
 	}
-	const uw = new ArrayBuffer(48);
 	nonces = (nonces + 1) >>> 0 || 1;
 	const nonce = nonces;
-	const ui = new Uint32Array(uw);
-	const ii = new Int32Array(uw);
-	const uf = new Float32Array(uw);
-	ui[0] = w;
-	ui[1] = h;
-	ui[2] = nDirs;
-	ui[3] = nPoses;
-	// band and gaps exactly as scorePose
-	ii[4] = Math.max(2, Math.round(h * 0.035));
-	ii[5] = Math.max(1, Math.round(h * 0.012));
-	ii[6] = Math.max(1, Math.round(h * 0.006));
-	uf[7] = aspect;
-	ui[8] = nonce;
+	const uw = packPoseBoundUniform({ w, h, nDirs, nPoses, aspect, nonce });
 
 	const sky = acquire(
 		device,

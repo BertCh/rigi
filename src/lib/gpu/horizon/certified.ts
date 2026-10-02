@@ -55,6 +55,7 @@ import {
 	type SkylineProfile,
 	skylineDirsF64,
 } from "./dirs-cpu";
+import { packCertHorizonUniform } from "./uniforms";
 
 export type { HorizonPrecision };
 
@@ -114,16 +115,13 @@ export { probeStrictIeee };
 
 /** The 32-byte uniform every certified kernel reads. */
 function uniformWords(n: number, nCols = 0, lumpEnu = 0, lumpEnuRel = 0) {
-	const b = new ArrayBuffer(32);
-	const u = new Uint32Array(b);
-	const f = new Float32Array(b);
-	u[0] = n;
-	u[1] = nCols;
-	u[2] = 0; // opq's zero
-	f[3] = NO_HIT_T;
-	f[4] = lumpEnu;
-	f[5] = lumpEnuRel;
-	return b;
+	return packCertHorizonUniform({
+		n,
+		nCols,
+		noHit: NO_HIT_T,
+		lumpEnu,
+		lumpEnuRel,
+	});
 }
 
 // ---------- stage A: tan → elevation degrees ----------

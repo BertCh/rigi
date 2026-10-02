@@ -52,7 +52,6 @@ import {
 	LOG_CAP,
 	MAX_JOBS,
 	RES_WORDS,
-	U_WORDS,
 	WINDOW,
 } from "./cert-refine";
 import { dirTable } from "./pose-bound";
@@ -62,6 +61,7 @@ import {
 	STORAGE,
 	uploadOnce,
 } from "./pose-grid";
+import { packCertProbeUniform, packCertUniform } from "./uniforms";
 
 /** cachedGraph group of the certified refine (declared in gpu/app-graph/manifest.ts). */
 export const CERT_GRAPH_GROUP = "align-cert";
@@ -161,8 +161,7 @@ async function runModuleProbe(device: Device): Promise<ModuleProbe> {
 	const n = pin.length / PROBE_IN;
 	const outBytes = n * PROBE_OUT * 4;
 	const out = await withLease(ALIGN_GROUP, async () => {
-		const uw = new ArrayBuffer(U_WORDS * 4);
-		new Uint32Array(uw)[2] = n; // u.nDirs = records; u.zero (word 13) = 0
+		const uw = packCertProbeUniform(n); // u.nDirs = records; u.zero = 0
 		const dummy = (key: string) =>
 			pooledStorage(device, `align/cert-probe-${key}`, new Float32Array(16));
 		const inputs: Record<string, Buffer> = {
@@ -246,34 +245,26 @@ export function certGpuRunner(
 			withLease(ALIGN_GROUP, async () => {
 				const t0 = performance.now();
 				const up: PoseGridStats = { uploadBytes: 0 };
-				const uw = new ArrayBuffer(U_WORDS * 4);
-				const ui = new Uint32Array(uw);
-				const ii = new Int32Array(uw);
-				const uf = new Float32Array(uw);
 				nonces = (nonces + 1) >>> 0 || 1;
-				ui[0] = w;
-				ui[1] = h;
-				ui[2] = nDirs;
-				ui[3] = b.nLanes;
-				// band and gaps exactly as scorePose
-				ii[4] = Math.max(2, Math.round(h * 0.035));
-				ii[5] = Math.max(1, Math.round(h * 0.012));
-				ii[6] = Math.max(1, Math.round(h * 0.006));
-				uf[7] = aspect;
-				ui[8] = WINDOW;
-				ui[9] = nonces;
-				uf[10] = eCoef(nDirs);
-				uf[11] = nDirs;
-				ui[12] = LOG_CAP;
-				ui[13] = 0; // ZERO (df32 opq): always 0
-				uf[14] = slack.dB;
-				uf[15] = slack.relT;
-				uf[16] = slack.relV;
-				uf[17] = slack.pen;
-				uf[18] = e2Coef(nDirs);
-				uf[19] = asp[0];
-				uf[20] = asp[1];
-				uf[21] = fault?.() ?? 0;
+				const uw = packCertUniform({
+					w,
+					h,
+					nDirs,
+					nLanes: b.nLanes,
+					aspect,
+					window: WINDOW,
+					nonce: nonces,
+					eCoef: eCoef(nDirs),
+					logCap: LOG_CAP,
+					dB: slack.dB,
+					relT: slack.relT,
+					relV: slack.relV,
+					pen: slack.pen,
+					e2Coef: e2Coef(nDirs),
+					aspectHi: asp[0],
+					aspectLo: asp[1],
+					fault: fault?.() ?? 0,
+				});
 				const slot = (key: string, data: ArrayBufferView, dirty: boolean) => {
 					const buf = acquire(device, key, data.byteLength, STORAGE);
 					if (dirty || writer.get(buf) !== session) {
