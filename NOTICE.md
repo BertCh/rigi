@@ -51,7 +51,7 @@ The app reads these at run time; they are not licensed by this repository. Credi
 | Path | What | Licence |
 |---|---|---|
 | `vendor/luma/*.tgz` | luma.gl `10.0.0-alpha.2-rigi.3` (core, effects, engine, gpgpu, shadertools, webgl, webgpu) built from visgl/luma.gl master `7289d961` plus PRs #3313, #3302, #3287, #3328, #3333, #3334, #3330 and a PipelineFactory compute-hash commit (`c80b7ce6`); unofficial build, see `vendor/luma/README.md` | MIT, Copyright (c) vis.gl contributors |
-| `vendor/deck/*.tgz` | deck.gl `9.4.0-beta.4` build (`@deck.gl/core`, `@deck.gl/layers`) from commit `f1bc66cede34768f6c10fa15681119bc669a2efb`: deck master `ce0808d0` merged with PR #10752 (`0d8b1664`), plus the WebGPU hunks of luma.gl's deck patch | MIT, Copyright (c) vis.gl contributors |
+| `vendor/deck/*.tgz` | deck.gl `9.4.0-rigi.1` build (`@deck.gl/core`, `@deck.gl/layers`) from commit `4a2223f3c993bc1c41114d33d130b05769d84672`: deck master `35854250` merged with PR #10752 (`0d8b1664`), plus the WebGPU hunks of luma.gl's deck patch and PR #10780 | MIT, Copyright (c) vis.gl contributors |
 
 Both are third-party code with local build changes; their provenance and rebuild steps are in `vendor/luma/README.md` and `vendor/deck/README.md`. Their upstream licence texts are in `vendor/luma/LICENSE` and `vendor/deck/LICENSE` (verbatim from the upstream repositories). The vendored packages are not covered by Rigi's `LICENSE` copyright line.
 

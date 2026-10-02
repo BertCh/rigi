@@ -70,9 +70,9 @@ the published manifests still carry `patch:` deps or `~9.4` peers, the old worka
   `@math.gl/web-mercator` are no longer direct deps (unused in the app; deck pulls them, and they
   resolve to alpha.10). `@loaders.gl/schema-utils` pins `@math.gl/types` to exactly `5.0.0-alpha.9`,
   so `overrides` also pins `@math.gl/types` to `5.0.0-alpha.10` (a types-only package) to keep one copy.
-- With those manifests the app needs no `.npmrc` and only these overrides:
-  `"@deck.gl/core": "$@deck.gl/core"` (`@deck.gl/layers@9.4.0-beta.4` peers `@deck.gl/core@~9.4.0`,
-  which the prerelease `9.4.0-beta.4` does not satisfy) and `"@math.gl/types": "5.0.0-alpha.10"`.
+- With those manifests the app needs no `.npmrc` and only one override, `"@math.gl/types":
+  "5.0.0-alpha.10"`. (The `@deck.gl/core` override went away with the deck `9.4.0-rigi.1` tarballs,
+  whose layers manifest peers the exact core version; see `vendor/deck/README.md`.)
 - Gate: `npm ls @luma.gl/core @luma.gl/webgpu @math.gl/core` shows one copy of each, and
   `npm install` prints no peer warnings.
 
