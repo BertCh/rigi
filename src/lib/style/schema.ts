@@ -388,6 +388,7 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 		subPill: bool,
 		contours: obj({ adaptive: bool, swissIndex: bool, inkByCover: bool }),
 		hatch: bool,
+		hatchStyle: en("classic", "landeskarte"),
 		cover: obj({ on: bool, snow: en("none", "date"), pattern: bool }),
 		glacier: obj({
 			on: bool,

@@ -365,6 +365,8 @@ export type TerroirStyle = {
 	/** Real land cover from the pack in Blend / In map instead of the elevation belts. */
 	/** Slope-driven Swiss rock hatching and scree dots on hillshaded terrain (no pack needed); display only. */
 	hatch: boolean;
+	/** Hatch look: "classic" (pixel-free stripes) or "landeskarte" (hatch v2: shade-dense hachures, taper, scree stipple, glacier lines). */
+	hatchStyle: "classic" | "landeskarte";
 	cover: {
 		on: boolean;
 		snow: "none" | "date";

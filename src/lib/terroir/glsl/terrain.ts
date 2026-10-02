@@ -21,6 +21,7 @@
 // Display only: the geometry (style 3) and normal (style 7) passes return before any of it runs.
 import { defineBlock } from "#/lib/look/glsl/block";
 import { HATCH_GLSL, HATCH_INK } from "../hatch";
+import { HATCH_LK_GLSL } from "../hatch-lk";
 import { PATTERN_GLSL, PATTERN_KERNEL_GLSL } from "../pattern";
 
 /** Values: ./values.ts terroirBlockValues(). Accessors `ter_<field>`, three uniforms `uTer<Field>`. */
@@ -260,7 +261,7 @@ vec3 hypso(float h) { return terroirAlbedo(terHypso(h), normalize(vNormal)); }
  * terroirAlbedo (uniform control flow, before the class branching), the pattern is composed over the
  * class albedo, and the scree hash speckle (which aliases) gives way to the dots. FNS unchanged when off.
  */
-function fnsFor(pattern: boolean, hatch = false): string {
+function fnsFor(pattern: boolean, hatch = false, hatchLk = false): string {
 	if (!pattern && !hatch) return FNS;
 	let out = FNS;
 	const swap = (from: string, to: string, all = false) => {
@@ -270,7 +271,7 @@ function fnsFor(pattern: boolean, hatch = false): string {
 	};
 	swap(
 		"// fb = the look's albedo",
-		`${pattern ? PATTERN_GLSL : PATTERN_KERNEL_GLSL}${hatch ? HATCH_GLSL : ""}\n// fb = the look's albedo`,
+		`${pattern ? PATTERN_GLSL : PATTERN_KERNEL_GLSL}${hatch ? (hatchLk ? HATCH_LK_GLSL : HATCH_GLSL) : ""}\n// fb = the look's albedo`,
 	);
 	swap(
 		"  float px = max(length(fwidth(xy)), 1e-3);\n",
@@ -295,7 +296,11 @@ function fnsFor(pattern: boolean, hatch = false): string {
 	if (hatch)
 		swap(
 			"#ifdef TERROIR_SNOW\n  if (c != 12) col = mix(",
-			`  col = mix(col, col * vec3(${HATCH_INK}), terHatch(n, xy, vElev, terFw, fwidth(vElev), c));\n#ifdef TERROIR_SNOW\n  if (c != 12) col = mix(`,
+			`${
+				hatchLk
+					? "  vec4 terHk = terHatchLk(n, xy, vElev, terFw, dot(n, TER_SUN), c);\n  col = mix(col, terHk.rgb, terHk.a);\n"
+					: `  col = mix(col, col * vec3(${HATCH_INK}), terHatch(n, xy, vElev, terFw, fwidth(vElev), c));\n`
+			}#ifdef TERROIR_SNOW\n  if (c != 12) col = mix(`,
 		);
 	return out;
 }
@@ -327,7 +332,11 @@ function injections(engine: Engine, defines: readonly string[]) {
 		(deck
 			? "#define TER_SUN terrain.sunDir.xyz\n"
 			: `#define TER_SUN uSunDir\nuniform sampler2D terroirCover;\n${TER_BLOCK.threeDecl}`) +
-			fnsFor(has("TERROIR_PATTERN"), has("TERROIR_HATCH")) +
+			fnsFor(
+				has("TERROIR_PATTERN"),
+				has("TERROIR_HATCH"),
+				has("TERROIR_HATCH_LK"),
+			) +
 			(albedo ? WRAP_ALBEDO : "") +
 			"\n",
 		"before",
