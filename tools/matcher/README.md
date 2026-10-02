@@ -8,8 +8,8 @@ gitignored inputs `data/`, `public/photos/`, `.cache/` are missing report SKIP).
 
 ## Python environment
 
-No lockfile is checked in; the weights and `.venv` are gitignored. Reconstructed from the imports in
-`tools/matcher/**` (versions are what the maintainers ran, not pinned here):
+The weights and `.venv` are gitignored; `requirements.txt` (below) was derived from the imports in
+`tools/matcher/**` and the maintainers' venv:
 
 - Python 3.10+ (developed on macOS Apple Silicon, MPS; CPU works, slowly).
 - `torch` (MPS or CPU), `numpy`, `scipy`, `opencv-python` (`cv2`), `Pillow`.
@@ -22,10 +22,14 @@ No lockfile is checked in; the weights and `.venv` are gitignored. Reconstructed
   `tools/nearfield/` and `reports/` for the models it needs.
 
 ```
-python3 -m venv tools/matcher/.venv
-tools/matcher/.venv/bin/pip install torch numpy scipy opencv-python pillow poselib
-tools/matcher/.venv/bin/pip install git+https://github.com/cvg/LightGlue.git
+cd tools/matcher
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# near-field service extras (same venv): .venv/bin/pip install -r ../nearfield/requirements.txt
 ```
+
+`requirements.txt` pins the direct dependencies as run by the maintainers (Python 3.12, torch 2.14). On
+CUDA machines install the matching torch wheel from pytorch.org first (see the comment in the file).
+`tools/nearfield/requirements.txt` includes it and documents the vendored `.pylib` folders and weights.
 
 Weights licences (ALIKED, LightGlue, RoMa, DepthPro-class models) are in `reports/licences.md`; check them
 before shipping any of this as a hosted service.

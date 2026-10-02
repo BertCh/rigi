@@ -1,0 +1,23 @@
+# Rigi
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+#
+# Python deps of the near-field service (tools/nearfield/service, :8767, Step Inside).
+# It runs in the SAME venv as the matcher (tools/nearfield/run.sh uses tools/matcher/.venv), so this file
+# includes the matcher requirements. Python 3.12.13 was used (macOS arm64 / MPS); any Python >= 3.10 should work.
+#
+#   python3 -m venv tools/matcher/.venv
+#   tools/matcher/.venv/bin/pip install -r tools/nearfield/requirements.txt
+-r ../matcher/requirements.txt
+
+# Not installed through pip: these are vendored, gitignored folders that service/_env.py appends to sys.path,
+# and the model weights (HF_HUB_OFFLINE=1, so they must be pre-downloaded):
+#   tools/nearfield/.pylib          timm 1.0.30, plyfile 1.1.5, ml-sharp (Apple SHARP, `sharp` package; see
+#                                   .pylib/ml-sharp/requirements.txt)
+#   tools/research/tm/.pylib*       moge (MoGe v2), depth_anything_3, huggingface_hub and their deps
+#   tools/nearfield/service/weights SHARP checkpoint, big-lama.pt (optional inpaint), model caches
+# Heavy optional modules (gsplat, open3d, trimesh, moviepy, evo, pycolmap, xformers) are stubbed by _env.py.
+# If you prefer pip over those folders, install the same packages here (versions not recorded):
+# timm==1.0.30
+# plyfile==1.1.5
+# huggingface_hub
