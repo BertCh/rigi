@@ -1,0 +1,93 @@
+FUND E4 step 1 - DENSE FEATURE-METRIC REFINEMENT (F2) - PRE-REGISTERED PROTOCOL
+Written 2026-10-02 before any feature was extracted, any refinement run, or any score computed. Later changes are
+listed under AMENDMENTS with a reason; anything designed after seeing scores is labelled POST HOC and never changes
+the verdict. All numbers are dev numbers, not results.
+
+0. HYPOTHESIS (reports/fundamentals-plan.md F2, E4 row)
+   One dense LM on frozen DINOv2 patch features (photo vs an offline render, reprojected through the render's
+   geometry) refines (yaw, pitch, roll, f) better than the current pipeline's pose and supplies a usable covariance.
+   Step 2 (free eye) needs E3 renders; E3 was killed; step 2 is NOT RUN.
+
+1. FIXED KILL CRITERION (verbatim from the manager)
+   "KILL if, on the PRIMARY set, the median rotation error of the E4-refined pose vs ground truth is not lower than
+   the median of the current pipeline's start pose on the same photos, OR Spearman(sigma_pred, true rotation error)
+   over all primary and secondary runs is below 0.4. The plan's third clause (the eye step reproduces IMG_7130's
+   200 m drift) is NOT EVALUATED: step 2 needs E3 renders and E3 was killed. Otherwise PASS (dev only)."
+   Note: data/ground-truth.json poses carry ~0.2-0.4 deg of their own noise; small differences are not meaningful.
+   "Not lower" is applied to the raw medians (no tolerance).
+
+2. PHOTO SETS
+   PRIMARY: photos in data/ground-truth.json with a non-null GT pose (quality good or approx) whose eye lies in
+   Switzerland, rule: 45.82 <= lat <= 47.81 and 5.96 <= lon <= 10.49 (SWISSIMAGE coverage). Expected 12:
+   IMG_6958 6971 7018 7033 7053 7059 7063 7068 7086 7130 7131 7155. Excluded by the rule / missing GT: IMG_3304,
+   4527, 4703, 5495, 6019, 6326 (non-Swiss), IMG_7108 (Swiss, GT pose null). Eye = GT json "eye" (height in the
+   frame EnuFrame(lat, lon, 0), i.e. (0, 0, eye)), fixed for start, render and refinement. Principal point = image
+   centre. Photo = .cache/jpg/1600/<name>.jpg (display-oriented, as the app/eval sees it).
+   STARTS: the current pipeline's pose per photo = scripts/eval.ts logic (cascade: solvePose, escalate rejects to
+   refinePose; DEM=mapterhorn, HORIZON=fast, the same config as the logged out/eval-classic-cascade-mapterhorn runs,
+   but those logs hold only 2 photos and angle deltas, so the run is repeated in node by start_poses.ts, no browser).
+   Start pose = the pipeline FINAL pose: solved camera if accepted, else the EXIF prior (the pose the app would show).
+   The solved-always pose is logged too (POST HOC sensitivity only). If the node pipeline cannot be run, STOP.
+   SECONDARY (reported; gates only through the Spearman clause): dev photos (tools/bench/split.json dev, via
+   tools/matcher/v2/refs.py correct_refs) with a verified-correct ref, Swiss by the same bbox rule on the manifest
+   lat/lon. Ref pose = first correct ref (the E3 / C0 perturbBase); eye (0,0,T.z) where T.z is the eye height of the
+   E3 out/<pid>.json (= the cache eye for that ref); photo = tools/bench/data/photos/<pid>.jpg, exif-transposed and
+   resized to max side 2048 (s1.upright_photo); f = (H/2)/tan(vfov/2) from the ref pose. Starts: the ref perturbed
+   by seeded noise at scales s in {1, 3, 10} deg: yaw += s*z1, pitch += (s/3)*z2, roll += (s/3)*z3, f *= 1+0.02*z4,
+   z ~ U[-1,1], rng = numpy default_rng(int(pid[3:]) * 1000 + scale_index). Metric: fraction of starts returned
+   within 0.3 deg of the ref (rotation angle), plus median error. Test ids, tools/bench/data_v3 never touched.
+
+3. METRIC
+   Rotation error = angle (deg) of R_est * R_gt^T, R = pose_to_R(yaw, pitch, roll) (nf_render.pose_to_R, the app's
+   convention). Also |dyaw| and |dpitch| (wrapped) separately. f error reported as relative.
+
+4. RENDERER (offline; torch heightfield ray march on MPS/CPU, adapted from FUND E3 nf_render/nf_geo; no browser;
+   the C0 cache is pruned)
+   Frame EnuFrame(lat, lon, 0) as src/lib/geodesy.ts: Earth curvature (tangent plane + ECEF) and refraction lift
+   k = 0.13. Heights = Mapterhorn Terrarium tiles (.cache/dem-mapterhorn in the main tree copied to the worktree;
+   missing tiles fetched from tiles.mapterhorn.com), nested ENU grids: 8 m / r<=6 km (z13), 20 m / r<=14 km (z12),
+   40 m / r<=40 km (z11), finest grid wins. Colour = SWISSIMAGE WMTS (wmts.geo.admin.ch, 3857) z11-z16 mosaics
+   clipped to the view wedge, zoom per pixel by footprint (as nf_data.Ortho); tiles cached under the study dir
+   (gitignored, < 500 MB). Outputs per render: rgb, xyz (ENU, 0 = no hit), sky mask, from one pinhole render
+   centred on the start pose with 20 deg of extra field of view on every side (the LM never re-renders).
+   VALIDATION before scoring (reported; STOP and report if it fails badly): (i) reprojection of xyz through the
+   render camera to its own pixel centre, median px error < 0.5 px; (ii) render at the GT pose, skyline row
+   (first non-sky row per column) vs the app's GT skyline (projectSkylineRows of the app horizon, dumped by
+   start_poses.ts) at 588 px working width, columns where the app horizon distance < 35 km: median |drow| < 10 px
+   over photos is "credible", > 20 px on half of the photos is "fails badly"; (iii) render sky/ground boundary vs the
+   photo's detectSkyline rows (same columns), reported only.
+
+5. FEATURES (primary choice fixed here)
+   PRIMARY = DINOv2 ViT-B/14 backbone inside the local MoGe-2 ViT-B checkpoint
+   (tools/research/tm/weights/x2/moge-2-vitb-normal/model.pt, code tools/research/tm/.pylib_x2/moge), frozen, loaded
+   successfully on 2026-10-02 (encoder.backbone, 768-d). Features = final-block normalised patch tokens
+   (backbone.get_intermediate_layers(n=[last], norm=True)), ImageNet normalisation, L2-normalised per token; the raw
+   norm is kept for the confidence weight. FALLBACK (aliked-n16.pth dense map) is used only if the primary cannot
+   run, stated here: not needed unless an amendment says so. No downloads.
+   Pyramid: two levels, photo/render resized to long side 294 px (21 tokens) and 588 px (42 tokens).
+
+6. REFINEMENT (research code e4_refine.py)
+   Render once at the start pose with margin (section 4). Render cells (token centres of the render feature map)
+   carry a world ray direction d_i = unit(xyz_i - eye) (sky cells: the render ray; the eye is fixed and the
+   far scene is treated as rotation-only, so no depth is used beyond the validity mask). For a candidate theta =
+   (yaw, pitch, roll, f) the residual of cell i is r_i = Fq(pi_theta(d_i)) - Fr(i) (photo token map bilinearly
+   sampled at the projection; both L2-normalised; 768-d). PixLoc-style: no re-render in the loop. Confidence weight
+   w_i = min(|tq|/|tr|, |tr|/|tq|) of the raw token norms (learned-free). Robust loss: Cauchy, rho(r) =
+   (c^2/2) log(1 + (|r_i|/c)^2), c = 0.5, via IRLS weights 1/(1+(|r_i|/c)^2). Cells projecting outside the photo
+   get |r_i| = 1.0 and zero gradient. Cost = mean over the cell set S0 (cells inside the frame at the start pose,
+   fixed for all restarts) of w_i*rho(|r_i|). LM: finite-difference Jacobian (steps 0.05 deg, 0.05 deg, 0.05 deg,
+   0.002 in log f), adaptive damping, <= 25 iterations per level, coarse (294) then fine (588).
+   Restarts: 3 x 3 grid of start offsets yaw in {-4, 0, +4} deg x pitch in {-2, 0, +2} deg around the start pose
+   (roll, f unperturbed), every restart runs the full pyramid, the lowest final fine-level cost wins.
+   sigma_pred: Cov = s2 * (J^T W J)^-1 at the optimum, J the finite-difference Jacobian of the weighted residual
+   vector in degrees, s2 = weighted RSS / (M - 4), M = number of scalar residuals; reported rotation sigma =
+   sqrt(var_yaw + var_pitch + var_roll) in degrees. Spearman over all runs (12 primary + secondary starts) of
+   sigma_pred vs true rotation error (scipy.stats.spearmanr, ties average). No tuning of c, grid, levels or
+   weights on any score: any change after scoring starts is POST HOC.
+
+7. OUTPUTS
+   results.json (per run: start, refined, errors, sigma, cost, restarts), REPORT.txt, renderer validation numbers,
+   research_notes/featuremetric-e4-2026-10-02/README.md, one negative-results.md row if KILL.
+
+AMENDMENTS
+   (none yet)
