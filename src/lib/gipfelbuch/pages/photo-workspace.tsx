@@ -260,7 +260,7 @@ function PoseJourney() {
 	const [clock0, setClock0] = useState(0);
 	const [manual, setManual] = useState<number | null>(null);
 	const sc = SCENARIOS[sel];
-	const T = manual ?? (reduce ? LOOP - 0.5 : (t - clock0) % LOOP);
+	const T = manual ?? (reduce ? LOOP - 0.5 : Math.min(t - clock0, LOOP - 0.5)); // plays once per scenario, then rests
 
 	const pick = (i: number) => {
 		setSel(i);

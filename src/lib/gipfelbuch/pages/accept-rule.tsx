@@ -716,9 +716,10 @@ function Dots({ r }: { r: Rule }) {
 }
 
 function PrecisionLadder() {
-	const [ref, t] = useTime<HTMLDivElement>(0);
+	const [ref, t] = useTime<HTMLDivElement>((RULES.length - 1) * 4.5);
 	const [manual, setManual] = useState<number | null>(null);
-	const idx = manual ?? Math.floor(t / 4.5) % RULES.length;
+	// tightens once through the rules, then rests on the strictest
+	const idx = manual ?? Math.min(Math.floor(t / 4.5), RULES.length - 1);
 	const r = RULES[idx];
 	const p = Number(r.precision);
 	return (
@@ -1092,9 +1093,10 @@ const EDGES: Edge[] = [
 ];
 
 function VerdictTree() {
-	const [ref, t] = useTime<HTMLDivElement>(0);
+	const [ref, t] = useTime<HTMLDivElement>((SCENARIOS.length - 1) * 3.6);
 	const [custom, setCustom] = useState<Inp | null>(null);
-	const sc = Math.floor(t / 3.6) % SCENARIOS.length;
+	// cycles once through the cases, then rests on the last
+	const sc = Math.min(Math.floor(t / 3.6), SCENARIOS.length - 1);
 	const inp = custom ?? SCENARIOS[sc].inp;
 	const res = decide(inp);
 	const on = new Set(res.path);

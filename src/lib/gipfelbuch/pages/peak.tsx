@@ -183,8 +183,8 @@ function RayMarch() {
 
 	const full = scan(eye, s);
 	const stopAt = s.km * 1000 - Math.max(150, s.km * 1000 * 0.02);
-	// sweep: march out over ~4.2 s, hold, repeat. Reduced motion: shown complete.
-	const ph = reduce ? 1 : Math.min(1, (t % 7.5) / 4.2);
+	// sweep: march out over ~4.2 s once, then rest. Reduced motion: shown complete.
+	const ph = reduce ? 1 : Math.min(1, t / 4.2); // marches once, rests complete
 	const limit =
 		ph >= 1 ? Number.POSITIVE_INFINITY : 20 + (stopAt - 20) * ph ** 1.6;
 	const cur = scan(eye, s, limit);
@@ -633,15 +633,14 @@ function layout(maxLabels: number, spacingPct: number): Verdict[] {
 }
 
 function LabelLayout() {
-	const [ref, t] = useTime<HTMLDivElement>(0);
+	const [ref, t] = useTime<HTMLDivElement>(60);
 	const reduce = useReducedMotion();
 	const [manual, setManual] = useState(false);
 	const [maxL, setMaxL] = useState(6);
 	const [sp, setSp] = useState(3);
 	const verdicts = layout(maxL, sp);
 	const n = verdicts.length;
-	const cursor =
-		manual || reduce ? n : Math.min(n, Math.floor((t * 1.1) % (n + 5)));
+	const cursor = manual || reduce ? n : Math.min(n, Math.floor(t * 1.1)); // walks once, rests complete
 	const shown = verdicts.slice(0, cursor);
 	const hidden = CANDS.filter((c) => !c.visible);
 	const keptX = shown

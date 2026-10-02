@@ -23,6 +23,7 @@ import {
 } from "#/components/gipfelbuch/notebook/Ink";
 import { useNotebookPhoto } from "#/components/gipfelbuch/notebook/useNotebookPhoto";
 import { SWISS } from "#/components/gipfelbuch/swiss/palette";
+import { TYPE } from "#/components/gipfelbuch/swiss/type";
 import {
 	CodeRef,
 	Eq,
@@ -45,7 +46,6 @@ import {
 	Sym,
 	useGipfelbuchIndex,
 	useGipfelbuchPhoto,
-	useTime,
 } from "#/components/gipfelbuch/viz";
 import {
 	Beat,
@@ -58,6 +58,20 @@ import {
 	skylineBand,
 	Trio,
 } from "#/components/gipfelbuch/viz/explain";
+import { LAYER_INKS } from "#/components/gipfelbuch/viz/inks";
+import {
+	horizonEl,
+	peak,
+	SCENE,
+	summitOnSkyline,
+} from "#/components/gipfelbuch/viz/scene";
+import {
+	defineScript,
+	easeOut,
+	ramp,
+	smooth,
+} from "#/components/gipfelbuch/viz/script";
+import { useScript } from "#/components/gipfelbuch/viz/useScript";
 import { byId, gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
@@ -138,34 +152,73 @@ const COMPASS = [
 ];
 const compass = (a: number) => COMPASS[Math.round(wrap360(a) / 22.5) % 16];
 
-// ---------- a synthetic skyline: elevation (deg) of the horizon at each azimuth ----------
-const BUMPS = [
-	{ c: 8, h: 5.5, w: 3 },
-	{ c: 24, h: 8.4, w: 2.2 },
-	{ c: 41, h: 6.2, w: 3.4 },
-	{ c: 58, h: 9.6, w: 1.9 },
-	{ c: 76, h: 6.8, w: 3 },
-	{ c: 95, h: 5.2, w: 3.6 },
-];
-function skyEl(az: number) {
-	let e = 1.4 + 0.6 * Math.sin(az * D * 3) + 0.3 * Math.sin(az * D * 7 + 1);
-	for (const b of BUMPS) {
-		const d = (((az - b.c + 540) % 360) - 180) / b.w;
-		if (Math.abs(d) < 4) e = Math.max(e, b.h * Math.exp(-d * d) + 1);
-	}
-	return e;
-}
-// named summits: azimuth, distance (km) for the plan view; elevation comes from the skyline
+// ---------- the real ground: demo-09's DEM horizon and summits (viz/scene.ts, pod D rule D1) ----------
+// The camera is synthetic (four sliders), the mountains are the landing photo's: Niederhorn towards the
+// Eiger, Mönch and Jungfrau. The story is that photo's real one: the phone's compass said 134.6°, the
+// solve found 116.1°.
+const ASPECT = SCENE.photo.width / SCENE.photo.height;
+const vfovOf = (f: number) => (2 * Math.atan(SCENE.photo.height / 2 / f)) / D;
+const poseOf = (p: (typeof SCENE)["prior"]): Pose => ({
+	yaw: p.yaw,
+	pitch: p.pitch,
+	roll: p.roll,
+	vfov: vfovOf(p.f),
+});
+const PRIOR = poseOf(SCENE.prior);
+const SOLVED = poseOf(SCENE.solved);
+/** Named summits on the drawn horizon, plan distance from the bake. */
 const SUMMITS = [
-	{ k: "A", az: 24, km: 11 },
-	{ k: "B", az: 58, km: 17 },
-	{ k: "C", az: 8, km: 7 },
-	{ k: "D", az: 41, km: 13 },
-	{ k: "E", az: 76, km: 9 },
-];
+	"Wetterhorn",
+	"Schreckhorn",
+	"Finsteraarhorn",
+	"Eiger",
+	"Mönch",
+	"Jungfrau",
+].map((name) => {
+	const p = peak(name);
+	return { name, km: p.km, ele: p.ele, ...summitOnSkyline(p) };
+});
+const skyEl = (az: number) => horizonEl(az);
 
-const ASPECT = 1.5;
-const PRIOR: Pose = { yaw: 38, pitch: 1.5, roll: 0, vfov: 38 };
+const EXPLORE = defineScript([
+	{ id: "guess", kind: "setup", dur: 2.8, label: "the phone's guess" },
+	{ id: "skyline", kind: "evidence", dur: 2.2, label: "the photo's skyline" },
+	{ id: "yaw", kind: "change", dur: 2.4, label: "yaw" },
+	{ id: "pitch", kind: "change", dur: 1.6, label: "pitch" },
+	{ id: "roll", kind: "change", dur: 1.6, label: "roll" },
+	{ id: "focal", kind: "change", dur: 1.6, label: "focal length" },
+	{ id: "solved", kind: "result", dur: 4.5, label: "solved" },
+]);
+/** What each beat's note says, written by hand under the image. */
+const EXPLORE_NOTE: Record<string, string> = {
+	guess: "the phone's compass and gravity: a guess",
+	skyline: "the skyline the photo really shows",
+	yaw: `yaw turns the wedge: ${fmt(SOLVED.yaw - PRIOR.yaw)}°, the big error`,
+	pitch: `pitch lifts the line: ${fmt(SOLVED.pitch - PRIOR.pitch)}°`,
+	roll: `roll tilts it: ${fmt(SOLVED.roll - PRIOR.roll)}°`,
+	focal: `focal length scales it: ${fmt(SCENE.solved.f - SCENE.prior.f, 0)} px`,
+	solved: "four numbers, one pose: the lines agree",
+};
+
+/** The pose the story shows at time t: each change beat moves one number from the guess to the solve. */
+function explorePose(t: number): Pose {
+	const k = (id: string) =>
+		ramp(
+			EXPLORE,
+			t,
+			id,
+			0,
+			EXPLORE.beats.find((b) => b.id === id)?.dur ?? 1,
+			easeOut,
+		);
+	const mix = (a: number, b: number, u: number) => a + (b - a) * u;
+	return {
+		yaw: mix(PRIOR.yaw, SOLVED.yaw, k("yaw")),
+		pitch: mix(PRIOR.pitch, SOLVED.pitch, k("pitch")),
+		roll: mix(PRIOR.roll, SOLVED.roll, k("roll")),
+		vfov: mix(PRIOR.vfov, SOLVED.vfov, k("focal")),
+	};
+}
 
 function Slider(props: {
 	label: string;
@@ -200,326 +253,406 @@ function Slider(props: {
 }
 
 // ======================================================================================
-// Fig. 1 — hero: one Pose, two views. Plan (yaw + FOV wedge) and the image it produces.
+
 // ======================================================================================
-function PoseExplorer() {
-	const [ref, t] = useTime<HTMLDivElement>(7);
-	const [manual, setManual] = useState<Pose | null>(null);
-	const auto: Pose = {
-		yaw: 40 + 26 * Math.sin(t * 0.45),
-		pitch: 1.5 + 4 * Math.sin(t * 0.7 + 1),
-		roll: 9 * Math.sin(t * 0.33 + 2),
-		vfov: 38 + 9 * Math.sin(t * 0.25),
-	};
-	const pose = manual ?? auto;
-	const set = (k: keyof Pose) => (v: number) => setManual({ ...pose, [k]: v });
+// Fig. D3 — one pose, two views. Plan (yaw + FOV wedge) and the image it produces, on demo-09's real
+// horizon. The story turns the phone's guess into the solved pose one number per beat.
+// ======================================================================================
+const PE = {
+	CX: 128,
+	CY: 172,
+	R: 104,
+	/** Plan radius in km (summits sit 23–33 km out). */
+	KM: 36,
+	FX: 262,
+	FY: 40,
+	FW: 360,
+};
+const PE_FH = PE.FW / ASPECT;
+const peSx = (u: number) => PE.FX + u * PE.FW;
+const peSy = (v: number) => PE.FY + v * PE_FH;
+const peAt = (az: number, r: number): [number, number] => [
+	PE.CX + r * Math.sin(az * D),
+	PE.CY - r * Math.cos(az * D),
+];
+const hfovOf = (p: Pose) =>
+	(2 * Math.atan(Math.tan((p.vfov * D) / 2) * ASPECT)) / D;
+
+/** The horizon (and its land below) under a pose, in panel px; exact geometry, recomputed per tick. */
+function horizonPaths(pose: Pose) {
 	const B = poseBasis(pose);
-
-	// image panel
-	const FX = 268;
-	const FY = 34;
-	const FW = 354;
-	const FH = FW / ASPECT;
-	const sx = (u: number) => FX + u * FW;
-	const sy = (v: number) => FY + v * FH;
-
-	const sky: string[] = [];
+	const half = hfovOf(pose) / 2 + 6;
+	let d = "";
 	let first: [number, number] | null = null;
 	let last: [number, number] | null = null;
-	for (let a = pose.yaw - 75; a <= pose.yaw + 75; a += 0.5) {
-		const p = project(pose, ASPECT, dirENU(a, skyEl(a)), B);
+	for (let a = pose.yaw - half; a <= pose.yaw + half; a += 0.25) {
+		const el = skyEl(a);
+		if (el == null) continue;
+		const p = project(pose, ASPECT, dirENU(a, el), B);
 		if (!p) continue;
-		const x = sx(p.u);
-		const y = sy(p.v);
-		sky.push(`${sky.length ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`);
-		if (!first) first = [x, y];
+		const x = peSx(p.u);
+		const y = peSy(p.v);
+		d += `${d ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+		first ??= [x, y];
 		last = [x, y];
 	}
-	const fill =
+	const land =
 		first && last
-			? `${sky.join(" ")} L${last[0]} ${last[1] + 900} L${first[0]} ${first[1] + 900} Z`
+			? `${d}L${last[0].toFixed(1)} ${(last[1] + 900).toFixed(1)}L${first[0].toFixed(1)} ${(first[1] + 900).toFixed(1)}Z`
 			: "";
-	const hor: string[] = [];
-	for (let a = pose.yaw - 75; a <= pose.yaw + 75; a += 5) {
-		const p = project(pose, ASPECT, dirENU(a, 0), B);
-		if (p)
-			hor.push(
-				`${hor.length ? "L" : "M"}${sx(p.u).toFixed(1)} ${sy(p.v).toFixed(1)}`,
-			);
-	}
-	const marks = SUMMITS.map((s) => {
-		const p = project(pose, ASPECT, dirENU(s.az, skyEl(s.az)), B);
-		return { ...s, p };
-	});
+	return { d, land };
+}
+const wedgePath = (p: Pose) => {
+	const h = hfovOf(p);
+	const w0 = peAt(p.yaw - h / 2, PE.R + 8);
+	const w1 = peAt(p.yaw + h / 2, PE.R + 8);
+	return `M${PE.CX} ${PE.CY}L${w0[0].toFixed(1)} ${w0[1].toFixed(1)}A${PE.R + 8} ${PE.R + 8} 0 0 1 ${w1[0].toFixed(1)} ${w1[1].toFixed(1)}Z`;
+};
+const PE_SKYLINE = horizonPaths(SOLVED).d; // what the photo shows: measured layer, fixed
+const PE_GUESS = horizonPaths(PRIOR).d; // the guess, kept as a ghost in the result
+const PE_GUESS_WEDGE = wedgePath(PRIOR);
+const PE_FRAME = `M${PE.FX} ${PE.FY}h${PE.FW}v${PE_FH}h${-PE.FW}Z`;
 
-	// plan panel
-	const CX = 128;
-	const CY = 168;
-	const R = 100;
-	const hfov = (2 * Math.atan(Math.tan((pose.vfov * D) / 2) * ASPECT)) / D;
-	const at = (az: number, r: number): [number, number] => [
-		CX + r * Math.sin(az * D),
-		CY - r * Math.cos(az * D),
-	];
-	const w0 = at(pose.yaw - hfov / 2, R + 8);
-	const w1 = at(pose.yaw + hfov / 2, R + 8);
-	const large = hfov > 180 ? 1 : 0;
-	const wedgeD = `M${CX} ${CY} L${w0[0].toFixed(1)} ${w0[1].toFixed(1)} A${R + 8} ${R + 8} 0 ${large} 1 ${w1[0].toFixed(1)} ${w1[1].toFixed(1)} Z`;
+/** The static plan furniture and the image frame: sketched once. */
+const ExploreBase = memo(function ExploreBase() {
+	return (
+		<g data-layer="ground">
+			<HandLabel x={14} y={22} size={13} color="var(--gb-secondary)">
+				plan, camera on the Niederhorn
+			</HandLabel>
+			{[10, 20, 30].map((km) => (
+				<PenCircle
+					key={km}
+					center={[PE.CX, PE.CY]}
+					radiusX={(km / PE.KM) * PE.R}
+					seed={`pe-plan-ring-${km}`}
+					color="faint"
+					width={0.9}
+					dash={km === 30 ? undefined : "2 4"}
+				/>
+			))}
+			<PenLine
+				seed="pe-plan-ns"
+				from={[PE.CX, PE.CY - PE.R - 4]}
+				to={[PE.CX, PE.CY + PE.R + 4]}
+				color="faint"
+				width={0.9}
+			/>
+			<PenLine
+				seed="pe-plan-ew"
+				from={[PE.CX - PE.R - 4, PE.CY]}
+				to={[PE.CX + PE.R + 4, PE.CY]}
+				color="faint"
+				width={0.9}
+			/>
+			<HandLabel
+				x={PE.CX}
+				y={PE.CY - PE.R - 10}
+				anchor="middle"
+				size={13}
+				color="var(--gb-secondary)"
+			>
+				N
+			</HandLabel>
+			<HandLabel
+				x={PE.CX + PE.R + 10}
+				y={PE.CY + 4}
+				size={13}
+				color="var(--gb-secondary)"
+			>
+				E
+			</HandLabel>
+			<NorthArrow x={24} y={70} length={24} seed="pe-north" />
+			<HandScaleBar
+				x={14}
+				y={318}
+				metersPerPixel={(PE.KM * 1000) / PE.R}
+				meters={10000}
+				segments={2}
+				seed="pe-plan-scale"
+			/>
+			<HandLabel x={PE.FX} y={PE.FY - 12} size={13} color="var(--gb-secondary)">
+				the image those numbers make
+			</HandLabel>
+			<SketchRect
+				x={PE.FX}
+				y={PE.FY}
+				width={PE.FW}
+				height={PE_FH}
+				seed="pe-frame"
+				color="pencil"
+			/>
+		</g>
+	);
+});
+
+/** The land under the skyline: a fixed sketch, revealed through the moving land clip. */
+const ExploreLand = memo(function ExploreLand() {
+	return (
+		<>
+			<Wash d={PE_FRAME} color="ink" seed="pe-land-wash" layers={5} />
+			<Hachure
+				d={PE_FRAME}
+				seed="pe-land-hatch"
+				color="pencil"
+				gap={5}
+				opacity={0.55}
+			/>
+		</>
+	);
+});
+
+function PoseExplorer() {
+	const clock = useScript<HTMLDivElement>(EXPLORE);
+	const [manual, setManual] = useState<Pose | null>(null);
+	const t = clock.t;
+	const story = explorePose(t);
+	const pose = manual ?? story;
+	const set = (k: keyof Pose) => (v: number) => setManual({ ...pose, [k]: v });
+	const beat = clock.beat;
+	const solved = !manual && beat.beat.kind === "result";
+	const B = poseBasis(pose);
+	const now = horizonPaths(pose);
+	const hfov = hfovOf(pose);
+	// the measured skyline wipes in left to right during its beat, and stays
+	const wipe = ramp(EXPLORE, t, "skyline", 0, 0.9, smooth);
+	const ghost = ramp(EXPLORE, t, "solved", 0, 0.42);
 	const inView = (az: number) =>
 		Math.abs(((az - pose.yaw + 540) % 360) - 180) <= hfov / 2;
+	const marks = SUMMITS.map((s) => ({
+		...s,
+		p: project(pose, ASPECT, dirENU(s.az, s.el), B),
+	}));
+	const active = manual ? null : beat.beat.id;
+	const note = manual
+		? "your pose: drag any slider"
+		: (EXPLORE_NOTE[beat.beat.id] ?? "");
+	const dyaw = pose.yaw - SOLVED.yaw;
 
 	return (
 		<Figure
 			label="Fig. D3"
 			bleed
+			pinned={SCENE.id}
 			source="Skizze"
-			caption="One pose, two views. Left: the camera at the centre of a compass; yaw points the wedge, vertical field of view sets its width. Right: the image those four numbers produce. Pitch slides the horizon, roll tilts it, field of view scales everything. The scene is synthetic."
+			caption={`One pose, two views, on the landing photo's real mountains. Left: the camera on the Niederhorn; yaw points the wedge, field of view sets its width, and the summits sit at their real bearings and distances. Right: the image those four numbers make, with the DEM horizon. The phone's guess turns into the solved pose one number at a time: the compass was ${fmt(PRIOR.yaw - SOLVED.yaw)}° off, gravity and lens nearly right.`}
 		>
-			<div ref={ref} className="-m-1 sm:-m-2">
+			<div ref={clock.ref} className="-m-1 sm:-m-2">
 				<svg
-					viewBox="0 0 640 330"
+					viewBox="0 0 640 336"
 					className="block h-auto w-full"
 					role="img"
-					aria-label="A top-down compass wedge beside the projected skyline for the same pose"
+					aria-label="A top-down compass wedge beside the projected skyline for the same pose, turning from the phone's guess to the solved pose"
 				>
 					<defs>
 						<clipPath id="pe-clip">
-							<rect x={FX} y={FY} width={FW} height={FH} />
+							<rect x={PE.FX} y={PE.FY} width={PE.FW} height={PE_FH} />
 						</clipPath>
 						<clipPath id="pe-land">
-							<path d={fill || "M0 0"} />
+							<path d={now.land || "M0 0"} />
 						</clipPath>
 						<clipPath id="pe-wedge">
-							<path d={wedgeD} />
+							<path d={wedgePath(pose)} />
+						</clipPath>
+						<clipPath id="pe-wipe">
+							<rect x={PE.FX} y={0} width={PE.FW * wipe} height={336} />
 						</clipPath>
 					</defs>
+					<ExploreBase />
 
-					{/* ---- plan ---- */}
-					<HandLabel x={14} y={22} size={11.56} color="var(--gb-secondary)">
-						plan view, camera at centre
-					</HandLabel>
-					{[0.33, 0.66, 1].map((k) => (
-						<PenCircle
-							key={k}
-							center={[CX, CY]}
-							radiusX={R * k}
-							seed={`pe-plan-ring-${k}`}
-							color="faint"
-							width={0.9}
-						/>
-					))}
-					<PenLine
-						seed="pe-plan-ns"
-						from={[CX, CY - R - 4]}
-						to={[CX, CY + R + 4]}
-						color="faint"
-						width={0.9}
-					/>
-					<PenLine
-						seed="pe-plan-ew"
-						from={[CX - R - 4, CY]}
-						to={[CX + R + 4, CY]}
-						color="faint"
-						width={0.9}
-					/>
-					<HandLabel
-						x={CX}
-						y={CY - R - 10}
-						anchor="middle"
-						size={11.56}
-						color="var(--gb-secondary)"
-					>
-						N
-					</HandLabel>
-					{/* the view wedge: fixed hand hatching revealed through the moving wedge */}
-					<g clipPath="url(#pe-wedge)">
-						<Hachure
-							d={`M${CX - R - 8} ${CY}a${R + 8} ${R + 8} 0 1 0 ${2 * (R + 8)} 0a${R + 8} ${R + 8} 0 1 0 ${-2 * (R + 8)} 0Z`}
-							seed="pe-wedge-hatch"
-							color="blue"
-							gap={5}
-							opacity={0.6}
-						/>
-					</g>
-					<SketchPath
-						d={wedgeD}
-						seed="pe-wedge-edge"
-						color="blue"
-						width={1.2}
-						passes={1}
-					/>
-					<PenLine
-						seed="pe-yaw-ray"
-						from={[CX, CY]}
-						to={at(pose.yaw, R + 8)}
-						color="red"
-						width={2}
-					/>
-					{SUMMITS.map((s) => {
-						const [x, y] = at(s.az, (s.km / 20) * R);
-						const on = inView(s.az);
-						return (
-							<g key={s.k} opacity={on ? 1 : 0.35}>
-								<SketchPath
-									d={`M${x} ${y - 5}L${x + 5} ${y + 4}L${x - 5} ${y + 4}Z`}
-									seed={`pe-summit-${s.k}`}
-									color="navy"
-									width={1.5}
-									passes={1}
-								/>
-								<HandLabel
-									x={x + 8}
-									y={y + 5}
-									color="var(--gb-navy)"
-									size={11.56}
-								>
-									{s.k}
-								</HandLabel>
-							</g>
-						);
-					})}
-					<HandDot x={CX} y={CY} r={3.6} seed="pe-eye" />
-					<HandLabel
-						x={CX}
-						y={CY + R + 26}
-						anchor="middle"
-						size={(11 * 640) / 720}
-						color="var(--gb-secondary)"
-					>
-						yaw {fmt(wrap360(pose.yaw), 0)}° {compass(pose.yaw)} · hfov{" "}
-						{hfov.toFixed(0)}°
-					</HandLabel>
-					<NorthArrow x={26} y={74} length={24} seed="pe-north" />
-					<HandScaleBar
-						x={14}
-						y={314}
-						metersPerPixel={200}
-						meters={10000}
-						segments={2}
-						seed="pe-plan-scale"
-					/>
-					<HandText x={14} y={262} size={13} rotate={-3}>
-						red ray: where I point
-					</HandText>
-					<PenArrow
-						seed="pe-yaw-note-arrow"
-						from={[78, 254]}
-						to={at(pose.yaw, 52)}
-						color="ink"
-						width={1}
-						head={5}
-					/>
-
-					{/* ---- image ---- */}
-					<HandLabel x={FX} y={22} size={11.56} color="var(--gb-secondary)">
-						the image
-					</HandLabel>
-					<g clipPath="url(#pe-clip)">
-						<g clipPath="url(#pe-land)">
-							<Wash
-								d={`M${FX} ${FY}h${FW}v${FH}h${-FW}Z`}
-								color="ink"
-								seed="pe-land-wash"
-								layers={5}
-							/>
+					{/* ---- plan: derived wedge, then summits, then the guess ghost ---- */}
+					<g data-layer="derived">
+						<g clipPath="url(#pe-wedge)">
 							<Hachure
-								d={`M${FX} ${FY}h${FW}v${FH}h${-FW}Z`}
-								seed="pe-land-hatch"
-								color="pencil"
+								d={`M${PE.CX - PE.R - 8} ${PE.CY}a${PE.R + 8} ${PE.R + 8} 0 1 0 ${2 * (PE.R + 8)} 0a${PE.R + 8} ${PE.R + 8} 0 1 0 ${-2 * (PE.R + 8)} 0Z`}
+								seed="pe-wedge-hatch"
+								color="blue"
 								gap={5}
-								opacity={0.55}
+								opacity={0.5}
 							/>
 						</g>
-						{sky.length > 0 && (
-							<SketchPath
-								d={sky.join(" ")}
-								seed="pe-skyline"
-								data
-								color={SWISS.ink}
-								width={1.8}
-							/>
-						)}
-						{hor.length > 0 && (
-							<SketchPath
-								d={hor.join(" ")}
-								seed="pe-horizon"
-								data
-								color={SWISS.contour}
-								width={1.8}
-								dash="5 4"
-							/>
-						)}
-						{marks.map(
-							(m) =>
-								m.p && (
-									<g key={m.k}>
-										<PenLine
-											seed={`pe-mark-${m.k}`}
-											from={[sx(m.p.u), sy(m.p.v)]}
-											to={[sx(m.p.u), sy(m.p.v) - 14]}
-											color="navy"
-											width={1.2}
-										/>
-										<HandLabel
-											x={sx(m.p.u)}
-											y={sy(m.p.v) - 18}
-											anchor="middle"
-											color="var(--gb-navy)"
-											size={11.56}
-										>
-											{m.k}
-										</HandLabel>
-									</g>
-								),
-						)}
-						<PenLine
-							seed="pe-cross-h"
-							from={[sx(0.5) - 7, sy(0.5)]}
-							to={[sx(0.5) + 7, sy(0.5)]}
-							color="faint"
-							width={1}
+						<path
+							d={wedgePath(pose)}
+							fill="none"
+							stroke={LAYER_INKS.solved.paper}
+							strokeWidth={1.2}
 						/>
-						<PenLine
-							seed="pe-cross-v"
-							from={[sx(0.5), sy(0.5) - 7]}
-							to={[sx(0.5), sy(0.5) + 7]}
-							color="faint"
-							width={1}
+						<path
+							d={`M${PE.CX} ${PE.CY}L${peAt(pose.yaw, PE.R + 8)
+								.map((v) => v.toFixed(1))
+								.join(" ")}`}
+							stroke="var(--gb-red)"
+							strokeWidth={2}
 						/>
 					</g>
-					<SketchRect
-						x={FX}
-						y={FY}
-						width={FW}
-						height={FH}
-						seed="pe-frame"
-						color="pencil"
-					/>
+					{ghost > 0 && (
+						<path
+							d={PE_GUESS_WEDGE}
+							fill="none"
+							stroke={LAYER_INKS.prior.paper}
+							strokeWidth={1.1}
+							strokeDasharray="6 5"
+							opacity={0.35 * ghost}
+							data-layer="derived"
+							data-state="ghost"
+						/>
+					)}
+					<g data-layer="measured">
+						{SUMMITS.map((s) => {
+							const [x, y] = peAt(s.az, (s.km / PE.KM) * PE.R);
+							return (
+								<g key={s.name} opacity={inView(s.az) ? 1 : 0.4}>
+									<HandDot
+										x={x}
+										y={y}
+										r={2.6}
+										seed={`pe-summit-${s.name}`}
+										color="navy"
+										data
+									/>
+								</g>
+							);
+						})}
+					</g>
+					<HandDot x={PE.CX} y={PE.CY} r={3.6} seed="pe-eye" />
 					<HandLabel
-						x={FX}
-						y={FY + FH + 18}
-						size={11.56}
-						color="var(--gb-secondary)"
+						x={PE.CX}
+						y={PE.CY + PE.R + 26}
+						anchor="middle"
+						size={13}
+						color={active === "yaw" ? "var(--gb-red)" : "var(--gb-secondary)"}
 					>
-						<tspan style={{ fill: "var(--gb-contour)" }}>- - -</tspan> level
-						horizon · ink: skyline
+						{`yaw ${fmt(wrap360(pose.yaw), 1)}° ${compass(pose.yaw)} · hfov ${hfov.toFixed(0)}°`}
 					</HandLabel>
-					<HandLabel
-						x={FX + FW}
-						y={FY + FH + 38}
-						anchor="end"
-						size={(11 * 640) / 720}
-						color="var(--gb-secondary)"
-					>
-						pitch {fmt(pose.pitch)}° · roll {fmt(pose.roll)}°
-					</HandLabel>
+
+					{/* ---- image: land, ghost, derived model, measured skyline on top (grammar v0.2), names ---- */}
+					<g clipPath="url(#pe-clip)">
+						<g clipPath="url(#pe-land)" data-layer="ground">
+							<ExploreLand />
+						</g>
+						{ghost > 0 && (
+							<path
+								d={PE_GUESS}
+								fill="none"
+								stroke={LAYER_INKS.prior.paper}
+								strokeWidth={1.6}
+								strokeDasharray="6 5"
+								opacity={0.35 * ghost}
+								data-layer="derived"
+								data-state="ghost"
+							/>
+						)}
+						<path
+							d={now.d}
+							fill="none"
+							stroke={solved ? LAYER_INKS.solved.paper : LAYER_INKS.prior.paper}
+							strokeWidth={2.2}
+							strokeDasharray={solved ? undefined : "6 5"}
+							strokeLinejoin="round"
+							data-layer="derived"
+						/>
+						<g clipPath="url(#pe-wipe)" data-layer="measured">
+							<path
+								d={PE_SKYLINE}
+								fill="none"
+								stroke={LAYER_INKS.skyline.paper}
+								strokeWidth={1.7}
+								strokeLinejoin="round"
+							/>
+						</g>
+						<g data-layer="notes">
+							{marks.map(
+								(m) =>
+									m.p && (
+										<g key={m.name}>
+											<PenLine
+												seed={`pe-mark-${m.name}`}
+												from={[peSx(m.p.u), peSy(m.p.v) - 3]}
+												to={[peSx(m.p.u), peSy(m.p.v) - 15]}
+												color="navy"
+												width={1}
+											/>
+											<HandLabel
+												x={peSx(m.p.u)}
+												y={peSy(m.p.v) - 19}
+												anchor="middle"
+												caps
+												color="var(--gb-navy)"
+												size={12}
+											>
+												{m.name}
+											</HandLabel>
+										</g>
+									),
+							)}
+						</g>
+					</g>
+					<g data-layer="notes">
+						<HandText
+							key={active ?? "manual"}
+							x={PE.FX}
+							y={PE.FY + PE_FH + 24}
+							size={16}
+							color={solved ? "forest" : "pencil"}
+							rotate={-1.5}
+							halo={false}
+						>
+							{note}
+						</HandText>
+						<HandLabel
+							x={PE.FX + PE.FW}
+							y={PE.FY + PE_FH + 46}
+							anchor="end"
+							size={13}
+							color="var(--gb-secondary)"
+						>
+							{`pitch ${fmt(pose.pitch)}° · roll ${fmt(pose.roll)}° · yaw ${dyaw >= 0 ? "+" : "−"}${Math.abs(dyaw).toFixed(1)}° from solved`}
+						</HandLabel>
+					</g>
 				</svg>
+				<div className="flex flex-wrap items-center gap-2 px-4 pt-3 print:hidden">
+					{EXPLORE.beats.map((b, i) => (
+						<button
+							key={b.id}
+							type="button"
+							onClick={() => {
+								setManual(null);
+								clock.seek(i);
+							}}
+							aria-pressed={!manual && beat.index === i}
+							className={`px-2.5 py-1 font-mono ${TYPE.micro} ${
+								!manual && beat.index === i
+									? "bg-[var(--gb-paper-deep)] text-[var(--gb-ink)] underline decoration-[var(--gb-red)] decoration-2 underline-offset-4"
+									: "gb-secondary"
+							}`}
+						>
+							{i + 1}. {b.label}
+						</button>
+					))}
+					<button
+						type="button"
+						onClick={() => {
+							setManual(null);
+							clock.play();
+						}}
+						className={`bg-[var(--gb-paper-deep)] px-3 py-1 font-mono ${TYPE.micro} text-[var(--gb-ink)]`}
+					>
+						▶ again
+					</button>
+				</div>
+				<ol className="hidden list-decimal pl-8 pt-2 print:block">
+					{EXPLORE.beats.map((b) => (
+						<li key={b.id} className={TYPE.caption}>
+							{EXPLORE_NOTE[b.id]}
+						</li>
+					))}
+				</ol>
 				<div className="grid gap-x-6 gap-y-1.5 px-4 pb-4 pt-3 sm:grid-cols-2">
 					<Slider
 						label="yaw"
 						value={wrap360(pose.yaw)}
-						min={0}
-						max={360}
+						min={60}
+						max={200}
 						step={0.5}
 						unit="°"
 						onChange={set("yaw")}
@@ -527,8 +660,8 @@ function PoseExplorer() {
 					<Slider
 						label="pitch"
 						value={pose.pitch}
-						min={-15}
-						max={25}
+						min={-25}
+						max={10}
 						step={0.1}
 						unit="°"
 						onChange={set("pitch")}
@@ -551,25 +684,6 @@ function PoseExplorer() {
 						unit="°"
 						onChange={set("vfov")}
 					/>
-					<div className="flex items-center gap-3 text-[13px] gb-secondary sm:col-span-2">
-						<button
-							type="button"
-							onClick={() => setManual(manual ? null : { ...auto })}
-							className="bg-[var(--gb-paper-deep)] px-3 py-1.5 font-mono text-[11px] leading-[12px] text-[var(--gb-ink)] hover:bg-[var(--gb-sign-light)]"
-						>
-							{manual ? "Play" : "Take control"}
-						</button>
-						<button
-							type="button"
-							onClick={() => setManual({ ...PRIOR })}
-							className="bg-[var(--gb-paper-deep)] px-3 py-1.5 font-mono text-[11px] leading-[12px] text-[var(--gb-ink)] hover:bg-[var(--gb-sign-light)]"
-						>
-							Reset to phone guess
-						</button>
-						<span className="hidden sm:inline">
-							Drag any slider to move the camera.
-						</span>
-					</div>
 				</div>
 			</div>
 		</Figure>

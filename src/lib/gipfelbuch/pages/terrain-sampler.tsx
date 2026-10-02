@@ -196,7 +196,8 @@ function LevelRings({ data }: { data: TerrainData | null }) {
 	const TILES = data ? data.levels.mapterhorn.map((l) => l.tiles) : TILES0;
 	const TOTAL_TILES = TILES.reduce((a, b) => a + b, 0);
 	// the still frame (reduced motion, harness) probes 14 km: the z11 case
-	const [ref, t] = useTime<HTMLDivElement>(4.4);
+	const [ref, tRaw] = useTime<HTMLDivElement>(4.4);
+	const t = Math.min(tRaw, 4.4); // one pass out from the camera, then it rests on the 14 km case
 	const [missing, setMissing] = useState<boolean[]>(LEVELS.map(() => false));
 	const [manual, setManual] = useState<{ d: number; a: number } | null>(null);
 
@@ -475,13 +476,17 @@ function BilinearProbe({ data }: { data: TerrainData | null }) {
 		Array.from({ length: GH }, () => Array.from({ length: GW }, () => 0));
 	const HMIN = Math.min(...GRID.flat());
 	const HMAX = Math.max(...GRID.flat());
-	const [ref, t] = useTime<HTMLDivElement>(3);
+	const [ref, t] = useTime<HTMLDivElement>(14);
 	const [manual, setManual] = useState<{ u: number; v: number } | null>(null);
 	const [bGone, setBGone] = useState(false);
 
+	// wanders across the seam for 10 s, then eases to rest fully inside tile A (u = 2 is left of the seam)
+	const tw = Math.min(t, 10);
+	const rest = Math.min(1, Math.max(0, (t - 10) / 3));
+	const e = rest * rest * (3 - 2 * rest);
 	const auto = {
-		u: 3 + 2.3 * Math.sin(0.5 * t + 1),
-		v: 2.5 + 1.7 * Math.sin(0.37 * t),
+		u: (1 - e) * (3 + 2.3 * Math.sin(0.5 * tw + 1)) + e * 2,
+		v: (1 - e) * (2.5 + 1.7 * Math.sin(0.37 * tw)) + e * 2.5,
 	};
 	const pr = manual ?? auto;
 	const u = Math.max(0.02, Math.min(GW - 0.02, pr.u));

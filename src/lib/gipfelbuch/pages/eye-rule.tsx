@@ -211,7 +211,7 @@ const SIDE_LABEL = 8;
 const HERO_LABEL = 11;
 
 function Hero() {
-	const [ref, t] = useTime<HTMLDivElement>();
+	const [ref, t] = useTime<HTMLDivElement>(6);
 	const [altRel, setAltRel] = useState(-12);
 	const [hAcc, setHAcc] = useState(30);
 	const [bias, setBias] = useState(true);
@@ -224,7 +224,7 @@ function Hero() {
 
 	const alt = G0 + altRel;
 	const err = s.mapEye != null ? s.floorEye - s.mapEye : null;
-	const pulse = 1 + 0.25 * Math.sin(t * 3);
+	const pulse = 1 + 0.25 * Math.sin(t * 3) * Math.max(0, 1 - t / 2.4); // decays to 1
 	const mapRight = s.mapX != null && s.mapX >= 0;
 	const mapFlip = s.mapX != null && px(s.mapX) > W - 170;
 	const fig = (x: number, z: number, c: InkColor, seed: string) => (

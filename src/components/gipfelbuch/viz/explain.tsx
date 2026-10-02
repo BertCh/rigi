@@ -29,6 +29,7 @@ import { FigureSkeleton } from "./FigureSkeleton";
 import { HandFrame, HandLoop, HandSideRule, HandUnderline } from "./hand";
 import { useInView } from "./hooks";
 import { dashFor, inkFor, layerOfColor, type PhotoLayer } from "./inks";
+import { HandLabel } from "./labels";
 import { EASE, MOTION, stagger } from "./motion";
 import {
 	ARM,
@@ -1062,17 +1063,18 @@ export function Mark({
 				passes={1}
 				tolerance={0.8 * k}
 			/>
-			<text
+			<HandLabel
 				x={x}
 				y={y + 4.6 * k}
-				textAnchor="middle"
-				fontSize={15 * k}
-				fontWeight={700}
-				className="nb-hand"
-				style={{ fill: "var(--gb-ink, #131313)" }}
+				anchor="middle"
+				size={15 * k}
+				weight={700}
+				halo={0}
+				mono={false}
+				color="var(--gb-ink)"
 			>
 				{n}
-			</text>
+			</HandLabel>
 		</g>
 	);
 }

@@ -596,7 +596,7 @@ function PriorLab(_props: { accent: string }) {
 		focal: false,
 	});
 	const [hAcc, setHAcc] = useState(20);
-	const [ref, t] = useTime<HTMLDivElement>();
+	const [ref, t] = useTime<HTMLDivElement>(0);
 	const sigH = Math.min(H_MAX, Math.max(H_MIN, hAcc));
 	const nOn = KEYS.filter((k) => on[k.k]).reduce((a, k) => a + k.params, 0);
 	const total = 7;

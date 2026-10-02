@@ -373,10 +373,9 @@ const MODES: { id: Mode; label: string }[] = [
 ];
 const SWEEP = 4.2;
 const BACK = 2.4;
-const CYCLE = 10;
 
 function ViterbiScan() {
-	const [ref, t] = useTime<HTMLDivElement>(CYCLE - 0.5);
+	const [ref, t] = useTime<HTMLDivElement>(SWEEP + BACK + 0.5);
 	const [mode, setMode] = useState<Mode>("cost");
 	const [mult, setMult] = useState(1);
 	const det = useMemo(() => detect(mult), [mult]);
@@ -415,7 +414,7 @@ function ViterbiScan() {
 		ctx.putImageData(img, 0, 0);
 	}, [mode, det]);
 
-	const ph = t % CYCLE;
+	const ph = Math.min(t, SWEEP + BACK + 0.5); // scans and backtracks once, rests on the settled boundary
 	const sweeping = ph < SWEEP;
 	const cursor = sweeping ? Math.floor((ph / SWEEP) * (W - 1)) : W - 1;
 	const backK = sweeping ? 0 : clamp01((ph - SWEEP) / BACK);

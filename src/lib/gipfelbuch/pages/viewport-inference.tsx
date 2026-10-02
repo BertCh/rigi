@@ -347,12 +347,12 @@ const LockScene = memo(function LockScene() {
 // Fig. 3 — the hero: slide the DEM horizon through the camera until it locks onto the photo
 // ======================================================================================
 function HorizonLock() {
-	const [ref, t] = useTime<HTMLDivElement>(7);
+	const [ref, t] = useTime<HTMLDivElement>(9.2);
 	const [manual, setManual] = useState<{ dy: number; dp: number } | null>(null);
 
-	// auto: hold at the sensor prior, sweep, overshoot, settle on the solve, hold, repeat
+	// auto: hold at the sensor prior, sweep, overshoot, settle on the solve, then rest
 	const auto = (() => {
-		const ph = t % 11;
+		const ph = Math.min(t, 9.2); // plays once, rests on the solve
 		if (ph < 1.6) return { dy: 0, dp: 0, phase: "prior" as const };
 		if (ph > 8.2)
 			return { dy: TRUTH.dy, dp: TRUTH.dp, phase: "solved" as const };
@@ -785,7 +785,7 @@ const HeatCells = memo(function HeatCells() {
 });
 
 function CostLandscape() {
-	const [ref, t] = useTime<HTMLDivElement>(9);
+	const [ref, t] = useTime<HTMLDivElement>(7);
 	const { yawCosts, seeds, ambiguity, paths, win } = GRID;
 	const cells = <HeatCells />;
 	// 1-D yaw profile (best over pitch)
@@ -800,7 +800,7 @@ function CostLandscape() {
 			(v, i) => `${i ? "L" : "M"}${sx(v.dy).toFixed(1)} ${py(v.c).toFixed(1)}`,
 		)
 		.join("");
-	const prog = clamp01(((t % 9) - 1) / 4.5);
+	const prog = clamp01((t - 1) / 4.5); // draws once, rests with every path and "solved"
 	const tickFill = "color-mix(in oklab, var(--gb-ink) 55%, transparent)";
 
 	return (
@@ -1009,7 +1009,7 @@ function CostLandscape() {
 // Fig. 5 — the 360° retry: what happens when the compass cannot be trusted
 // ======================================================================================
 function FullCircle() {
-	const [ref, t] = useTime<HTMLDivElement>(3);
+	const [ref, t] = useTime<HTMLDivElement>(7.2);
 	const { pts, lo, hi } = RING;
 	const cx = 160;
 	const cy = 160;
@@ -1036,7 +1036,7 @@ function FullCircle() {
 			dy: 0,
 			c: Number.POSITIVE_INFINITY,
 		});
-	const sweep = (t * 50) % 360;
+	const sweep = Math.min(t * 50, 360); // one revolution, then it rests
 	const wedge = (a0: number, a1: number, r: number) => {
 		const [ax, ay] = at(a0, r);
 		const [bx, by] = at(a1, r);
@@ -1492,9 +1492,9 @@ function RealStory({
 	const d = useGipfelbuchPhoto(id);
 	const idx = useGipfelbuchIndex();
 	const reduced = useReducedMotion();
-	const [ref, t] = useTime<HTMLDivElement>();
+	const [ref, t] = useTime<HTMLDivElement>(10.5);
 	const [picked, setPicked] = useState<number | null>(null);
-	const i = picked ?? (reduced ? 3 : Math.floor(t / 3.5) % 4);
+	const i = picked ?? (reduced ? 3 : Math.min(Math.floor(t / 3.5), 3)); // plays once, rests on "labelled"
 	const st = STAGES[i];
 	let line = "";
 	if (d) {

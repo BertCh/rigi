@@ -138,13 +138,16 @@ const rx = (r: number) =>
 // D1: one range ruler per pixel, the DEM against the anchored model depth
 // ======================================================================================
 function SplitRuler() {
-	const [ref, t] = useTime<HTMLDivElement>(5.2);
+	const [ref, t] = useTime<HTMLDivElement>(10);
 	const [margin, setMargin] = useState(0.5);
 	const [radius, setRadius] = useState(150);
 
 	// the probe: a pixel whose model range sweeps through a ray that hits terrain at 140 m
 	const probeDem = 140;
-	const k = 0.5 - 0.5 * Math.cos(t * 0.45);
+	// one pass in and out (0 to 7 s), then it eases back to rest on the ground, where range matches the terrain
+	const kPass = 0.5 - 0.5 * Math.cos(Math.min(t, 7) * 0.45);
+	const settle = Math.min(1, Math.max(0, (t - 7) / 3));
+	const k = kPass + (0.77 - kPass) * settle * settle * (3 - 2 * settle);
 	const probe: Row = {
 		label: "sweeping probe",
 		sub: "range slides in and out",
@@ -441,7 +444,7 @@ const MULT = [0.45, 0.7, 0.9, 1, 1.15, 1.5, 2.1];
 const ANG = [-24, 12, -8, 3, 20, -16, 6];
 
 function ConfidenceDisc() {
-	const [ref, t] = useTime<HTMLDivElement>(7);
+	const [ref, t] = useTime<HTMLDivElement>(10);
 	const [med, setMed] = useState(40);
 	const r = Math.min(60, 0.5 * med) + 10; // confidenceRadiusFrom
 	const W = 640;
@@ -452,8 +455,15 @@ function ConfidenceDisc() {
 	const m2 = (v: number) => v * s;
 
 	// a wandering target offset, clamped to the radius exactly as StepCamera clamps position
-	let ox = 1.5 * r * Math.sin(t * 0.5) + 0.6 * r * Math.sin(t * 1.3 + 1);
-	let oy = 1.2 * r * Math.sin(t * 0.37 + 0.8);
+	// it wanders for 8 s, then eases to a target past the edge and rests there, pinned to the disc
+	const tw = Math.min(t, 8);
+	const rest = Math.min(1, Math.max(0, (t - 8) / 2));
+	const e = rest * rest * (3 - 2 * rest);
+	let ox =
+		(1 - e) *
+			(1.5 * r * Math.sin(tw * 0.5) + 0.6 * r * Math.sin(tw * 1.3 + 1)) +
+		e * 1.6 * r;
+	let oy = (1 - e) * (1.2 * r * Math.sin(tw * 0.37 + 0.8)) + e * 0.9 * r;
 	const d = Math.hypot(ox, oy);
 	const clamped = d > r;
 	if (clamped) {

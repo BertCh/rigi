@@ -226,13 +226,13 @@ const STAIR_PTS = {
 };
 
 function RayMarch() {
-	const [ref, t] = useTime<HTMLDivElement>(9);
+	const [ref, t] = useTime<HTMLDivElement>(9.5);
 	const [curv, setCurv] = useState(true);
 	const [manual, setManual] = useState<number | null>(null);
 	const run = curv ? RAY.on : RAY.off;
 	const other = curv ? RAY.off : RAY.on;
 
-	const ph = t % 12.5;
+	const ph = Math.min(t, 9.5); // marches once, rests on the finished horizon
 	const auto = clamp(ph / 9.5, 0, 1) * DMAX;
 	const cur = manual ?? auto;
 	let idx = 0;
@@ -798,10 +798,10 @@ const SweepAxesBase = memo(function SweepAxesBase() {
 });
 
 function Sweep() {
-	const [ref, t] = useTime<HTMLDivElement>(10);
+	const [ref, t] = useTime<HTMLDivElement>(10.5);
 	const [manual, setManual] = useState<number | null>(null);
 	const S = sky();
-	const ph = t % 14;
+	const ph = Math.min(t, 10.5); // sweeps once, rests on the full circle
 	const auto = clamp(ph / 10.5, 0, 1) * NAZ;
 	const cur = manual ?? auto;
 	const k = Math.min(NAZ - 1, Math.floor(cur));

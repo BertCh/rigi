@@ -440,7 +440,7 @@ function CurveFigure() {
 	const scaleStats = useMemo(() => stats(scaleCurve), [scaleCurve]);
 	const fitStats = useMemo(() => stats(fit), [fit]);
 
-	const tt = t % 17;
+	const tt = Math.min(t, 12); // plays once, rests on the fitted curve
 	const auto =
 		tt < 5
 			? 0
@@ -841,7 +841,7 @@ const CELL_LABEL: Record<Cell, string> = {
 function CandidateFigure() {
 	const [ref, t] = useTime<HTMLDivElement>(10);
 	const reduce = useReducedMotion();
-	const sweep = reduce ? 1 : Math.min(1, (t % 9) / 5.5);
+	const sweep = reduce ? 1 : Math.min(1, t / 5.5); // sweeps once
 	const counts = { sky: 0, person: 0, near: 0, far: 0, kept: 0 } as Record<
 		Cell,
 		number
@@ -851,7 +851,9 @@ function CandidateFigure() {
 			for (let j = 0; j < ROWS; j++) counts[CELLS[i][j]]++;
 
 	// ray-length diagram
-	const th = reduce ? 0.5 : 0.62 * Math.sin(t * 0.7);
+	const th = reduce
+		? 0.5
+		: 0.5 + 0.3 * Math.sin(t * 0.9) * Math.max(0, 1 - t / 10); // swings, then settles at 0.5
 	const cx = 160;
 	const cy = 205;
 	const zl = 150;

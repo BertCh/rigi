@@ -202,9 +202,10 @@ function Anatomy({
 }) {
 	const LAYERS = layersFor(P, HFOV);
 	const reduced = useReducedMotion();
-	const [ref, t] = useTime<HTMLDivElement>();
+	const [ref, t] = useTime<HTMLDivElement>(9.6);
 	const [picked, setPicked] = useState<number | null>(null);
-	const auto = reduced ? 2 : Math.floor(t / 3.2) % 4;
+	// plays the four layers once, then rests on the last
+	const auto = reduced ? 3 : Math.min(Math.floor(t / 3.2), 3);
 	const i = picked ?? auto;
 	const L = LAYERS[i];
 	const W = 400;
@@ -241,7 +242,6 @@ function Anatomy({
 					style={{
 						transition: tr,
 						opacity: mapMode ? 0.12 : 1,
-						filter: i === 1 ? "saturate(0.5) brightness(0.8)" : "none",
 					}}
 				/>
 				{/* exif tags, written on the photo */}
@@ -251,6 +251,14 @@ function Anatomy({
 						const y = H * 0.13 + Math.floor(k / 2) * H * 0.23;
 						return (
 							<g key={s}>
+								<rect
+									x={x - 6}
+									y={y - 2}
+									width={162}
+									height={34}
+									fill="var(--gb-paper)"
+									opacity={0.7}
+								/>
 								<PenLine
 									seed={`ph-exif-${s}`}
 									from={[x, y + 26]}

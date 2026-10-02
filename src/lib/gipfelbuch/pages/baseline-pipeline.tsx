@@ -226,8 +226,9 @@ const ESCALATION_LANE = (
 );
 
 function Conveyor() {
-	const [ref, t] = useTime<HTMLDivElement>();
-	// two runs per 20 s: run 0 is accepted by solvePose; run 1 is rejected and rescued by refinePose
+	const [ref, tRaw] = useTime<HTMLDivElement>(19.5);
+	// two runs, played once (20 s): run 0 is accepted by solvePose; run 1 is rejected and rescued by refinePose, then it rests
+	const t = Math.min(tRaw, 19.5);
 	const CYC = 10;
 	const run = Math.floor(t / CYC) % 2;
 	const u = (t % CYC) / CYC; // 0..1 within a run
@@ -727,7 +728,7 @@ const CASCADE_W = 640;
 const CASCADE_LABEL = Math.round(((13 * CASCADE_W) / 720) * 2) / 2;
 
 function CascadeFlow() {
-	const [ref, t] = useTime<HTMLDivElement>();
+	const [ref, t] = useTime<HTMLDivElement>(10.5);
 	const W = CASCADE_W;
 	return (
 		<Figure
@@ -815,7 +816,7 @@ function CascadeFlow() {
 					</HandLabel>
 					{PHOTO_ROWS.map(({ dest, id }, i) => {
 						const T = 14; // seconds per loop
-						const k = (t / T + i * 0.04) % 1;
+						const k = Math.min(t / T + i * 0.04, 0.75); // play once, rest with every dot at its tray
 						// all dots: 0..0.2 travel to solvePose, then branch
 						let x = 70;
 						let y = 120;
