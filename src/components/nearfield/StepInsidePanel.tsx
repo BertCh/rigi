@@ -87,7 +87,7 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 						type="button"
 						onClick={si.back}
 						data-nearfield-back=""
-						className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[var(--khipu-lk)] hover:bg-white/90"
+						className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[var(--rigi-ink)] hover:bg-white/90"
 					>
 						<Undo2 className="size-3.5" /> Back to photo
 					</button>
@@ -121,7 +121,7 @@ export function StepInsidePanel({ si }: { si: StepInside }) {
 						className={cn(
 							"flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ring-1 backdrop-blur",
 							si.truth
-								? "bg-[var(--rigi-ember)] text-white ring-[var(--rigi-ember)]"
+								? "bg-[var(--rigi-ember)] text-[var(--khipu-w)] ring-[var(--rigi-ember)]"
 								: "bg-black/55 text-white/85 ring-white/15 hover:bg-black/75",
 						)}
 					>

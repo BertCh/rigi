@@ -1451,7 +1451,7 @@ export function PhotoWorkspace({
 											className={cn(
 												"absolute -translate-x-1/2 -translate-y-1/2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap ring-1 transition",
 												active
-													? "z-10 bg-[var(--rigi-ember)] text-white ring-[var(--rigi-ember)]"
+													? "z-10 bg-[var(--rigi-ember)] text-[var(--khipu-w)] ring-[var(--rigi-ember)]"
 													: pinned
 														? "bg-[var(--rigi-result)] text-[var(--rigi-ink)] ring-[var(--rigi-result)]"
 														: "bg-black/55 text-white/85 ring-white/25 hover:bg-black/80",

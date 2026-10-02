@@ -63,7 +63,7 @@ export function CameraModeBar({ si }: { si: StepInside }) {
 						className={cn(
 							"flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold",
 							on
-								? "bg-[var(--rigi-ember)] text-white"
+								? "bg-[var(--rigi-ember)] text-[var(--khipu-w)]"
 								: "text-white/80 hover:bg-white/10 hover:text-white",
 						)}
 					>

@@ -201,7 +201,7 @@ export function Segmented<T extends string>({
 						"flex-1 rounded-md font-medium transition-colors",
 						size === "sm" ? "px-2 py-1 text-[11px]" : "px-2.5 py-1.5 text-xs",
 						value === o.value
-							? "bg-[var(--rigi-ember)] text-white"
+							? "bg-[var(--rigi-ember)] text-[var(--khipu-w)]"
 							: "text-white/60 hover:text-white",
 					)}
 				>
@@ -301,7 +301,7 @@ export function Button({
 				variant === "solid" &&
 					"bg-white text-slate-900 hover:bg-white/90 light:text-[var(--rigi-ink)]",
 				variant === "accent" &&
-					"bg-[var(--rigi-ember)] text-white hover:opacity-90",
+					"bg-[var(--rigi-ember)] text-[var(--khipu-w)] hover:opacity-90",
 				className,
 			)}
 		>

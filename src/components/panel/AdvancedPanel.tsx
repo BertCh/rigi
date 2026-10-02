@@ -97,7 +97,7 @@ function FlagRow({
 							className={cn(
 								"flex items-center gap-1 rounded-md px-2 py-1 font-mono text-[10px] ring-1 transition-colors",
 								active
-									? "bg-[var(--rigi-ember)] text-white ring-[var(--rigi-ember)]"
+									? "bg-[var(--rigi-ember)] text-[var(--khipu-w)] ring-[var(--rigi-ember)]"
 									: "bg-white/5 text-white/60 hover:text-white",
 							)}
 						>
