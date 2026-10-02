@@ -61,7 +61,7 @@ const {
 	height: number;
 	counts: number[];
 };
-const cls = Buffer.from(scene.split.cls as string, "base64");
+const cls = fs.readFileSync("public/demo/step/cls.bin");
 const STRIDE = 2; // 1024x768 -> 512x384, nearest
 const OW = SW / STRIDE;
 const OH = SH / STRIDE;

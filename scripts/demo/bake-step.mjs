@@ -12,7 +12,8 @@ import { chromium } from "playwright";
 // near-field service (tools/nearfield, :8767) exactly as the Step Inside button does, and writes the
 // anchored scene so the landing page can show it without the service:
 //   public/demo/step/photo.jpg     the photo (copied from public/photos)
-//   public/demo/step/scene.json    photo meta, pose, anchor fit, split (class grid, base64), radius, pivot
+//   public/demo/step/scene.json    photo meta, pose, anchor fit, split (counts; the class grid is cls.bin), radius, pivot
+//   public/demo/step/cls.bin       the split's class grid, raw bytes (width x height)
 //   public/demo/step/splats.splat  the anchored ENU Gaussians (.splat-v1, nearfield/splat-io.ts)
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/demo/bake-step.mjs [IMG_7086] [--renderer=deck]
@@ -105,7 +106,6 @@ try {
 					width: s.split.width,
 					height: s.split.height,
 					counts: s.split.counts,
-					cls: b64(s.split.cls),
 				},
 				confidenceRadius: s.confidenceRadius,
 				model: s.model,
@@ -114,6 +114,7 @@ try {
 				splats: s.splats.count,
 			},
 			splats: b64(splats),
+			cls: b64(s.split.cls),
 		};
 	});
 	if (baked.error) throw new Error(`build failed: ${baked.error}`);
@@ -125,6 +126,7 @@ try {
 		renderer,
 	};
 	writeFileSync(join(OUT, "scene.json"), `${JSON.stringify(out)}\n`);
+	writeFileSync(join(OUT, "cls.bin"), Buffer.from(baked.cls, "base64"));
 	writeFileSync(join(OUT, "splats.splat"), Buffer.from(baked.splats, "base64"));
 	console.log(
 		`${id}: ${out.splats} splats, quality ${out.anchor.quality.toFixed(3)}, radius ${out.confidenceRadius.toFixed(1)} m, eye z ${out.eye.z.toFixed(1)} → ${OUT}`,

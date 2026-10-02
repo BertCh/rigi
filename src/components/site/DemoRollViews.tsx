@@ -60,6 +60,8 @@ export function DemoPanorama({ roll }: { roll: Roll }) {
 			height={380}
 			fitHeight
 			zoom={false}
+			// the other landing embeds cap at 1.5 too
+			maxPixelRatio={1.5}
 		/>
 	);
 }

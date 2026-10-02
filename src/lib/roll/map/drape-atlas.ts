@@ -15,7 +15,7 @@
 // Rects are top-left origin: photo rects in atlas uv, range/mask rects in texels.
 import type { Device, Texture } from "@luma.gl/core";
 import type { ForegroundMask } from "#/lib/segment";
-import type { RangeGpu } from "./range-gpu";
+import type { RangeHandOff } from "./backend";
 
 /** Photos in the full-resolution first atlas. */
 const ATLAS0_PHOTOS = 16;
@@ -235,7 +235,7 @@ export class DrapeAtlas {
 	 */
 	setRangeGpu(
 		k: number,
-		gpu: RangeGpu,
+		gpu: RangeHandOff,
 		src: Texture,
 		coarse: CoarseRange,
 	): boolean {

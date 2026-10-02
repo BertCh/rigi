@@ -102,6 +102,11 @@ function dashed(a: Vec3, b: Vec3, dash: number): Vec3[][] {
 	return out;
 }
 
+/** The deck layer extensions for a roll map backend: log depth on WebGL2, none on WebGPU (no WGSL hooks). */
+export function layerExtensions(kind: "webgl" | "webgpu") {
+	return kind === "webgl" ? [new LogDepthExtension()] : [];
+}
+
 export class RollMapExtras {
 	private opts: ExtrasOptions;
 	private cands: Cand[] = [];
@@ -216,6 +221,11 @@ export class RollMapExtras {
 		this.buildCameras();
 	}
 
+	/** LogDepthExtension is a GLSL shader hook: WebGL2 only. The layers draw with depth off anyway. */
+	private depthExtensions() {
+		return layerExtensions(this.engine.backendKind);
+	}
+
 	// ---------------- cameras: halo + prior uncertainty ----------------
 
 	private buildCameras() {
@@ -239,7 +249,7 @@ export class RollMapExtras {
 		}
 		const common = {
 			coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
-			extensions: [new LogDepthExtension()],
+			extensions: this.depthExtensions(),
 			parameters: DEPTH_OFF,
 			pickable: false,
 		};
@@ -344,16 +354,9 @@ export class RollMapExtras {
 			this.engine.setExtraLayers("terroir-names", null);
 			return;
 		}
-		const vp = (
-			this.engine.deck as unknown as {
-				getViewports(): {
-					width: number;
-					height: number;
-					project(p: number[]): number[];
-				}[];
-			}
-		).getViewports()[0];
-		if (!vp) return;
+		// backend-neutral: the engine projects (deck's viewport on WebGL2, the colour pass camera on WebGPU)
+		if (!this.engine.project([0, 0, 0])) return;
+		const [vw, vh] = this.engine.viewSize;
 		const cam = this.engine.world.cam.position;
 		const tg = this.engine.world.controls?.target;
 		// deck's pixel sizes hold only at the viewport's focal distance (the camera-to-target distance):
@@ -384,9 +387,10 @@ export class RollMapExtras {
 			const pos: Vec3 = [e[0], e[1], e[2]];
 			const d = Math.hypot(pos[0] - cam.x, pos[1] - cam.y, pos[2] - cam.z);
 			if (d > Math.min(typo.nearReachM, REACH_M[c.cls] ?? Infinity)) continue;
-			const [sx, sy, sz] = vp.project(pos);
-			if (!(sz < 1) || sx < 0 || sy < 0 || sx > vp.width || sy > vp.height)
-				continue;
+			const sp = this.engine.project(pos);
+			if (!sp) continue;
+			const [sx, sy, sz] = sp;
+			if (!(sz < 1) || sx < 0 || sy < 0 || sx > vw || sy > vh) continue;
 			items.push({
 				c,
 				pos,
@@ -423,7 +427,7 @@ export class RollMapExtras {
 		}
 		const common = {
 			coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
-			extensions: [new LogDepthExtension()],
+			extensions: this.depthExtensions(),
 			parameters: DEPTH_OFF,
 			pickable: false,
 		};

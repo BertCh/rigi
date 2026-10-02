@@ -94,7 +94,11 @@ import {
 	type TileMesh,
 	type ViewWedge,
 } from "#/lib/deck/terrain-data";
-import { TerrainStreamer } from "#/lib/deck/terrain-stream";
+import {
+	defaultStreamTile,
+	type StreamTileLoader,
+	TerrainStreamer,
+} from "#/lib/deck/terrain-stream";
 import {
 	buildTrailSegments,
 	recolorTrailSegments,
@@ -418,6 +422,9 @@ type Gpu = {
 export type WebGpuEngineOptions = {
 	/** Upper bound on the canvas' device pixel ratio (default 2). The landing's Step Inside passes 1.5. */
 	pixelRatioCap?: number;
+	/** Wraps the terrain stream's tile loader (default: the GPU decode loader, else defaultStreamTile):
+	 * the landing's Step Inside serves far tiles from the roll map's baked seed (deck/seeded-tiles.ts). */
+	terrainTileWrap?: (base: StreamTileLoader) => StreamTileLoader;
 	/** Force a host (default: deck, falling back to direct when it fails to boot). */
 	host?: "deck" | "direct";
 	/** With the bridge on: fewer submits per settle (WAG W1.2, default true). The refined masks are
@@ -1350,7 +1357,11 @@ export class WebGpuEngine implements Renderer {
 			const abort = () => resolve(null);
 			this.loadAbort.signal.addEventListener("abort", abort, { once: true });
 			const streamer = new TerrainStreamer(this.frame, {
-				loadTile: this.gpuDecodeLoader(),
+				loadTile: this.opts.terrainTileWrap
+					? this.opts.terrainTileWrap(
+							this.gpuDecodeLoader() ?? defaultStreamTile,
+						)
+					: this.gpuDecodeLoader(),
 				onProgress: (d, t) =>
 					!this.terrain &&
 					onProgress?.(`Loading terrain ${d}/${t}`, t ? d / t : 0),

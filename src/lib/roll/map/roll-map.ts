@@ -10,20 +10,20 @@
 // roll (≲ 20 km) the difference is the meridian convergence (Δlon·sin lat, applied to yaw, 0.07°
 // at 7 km) plus a tilt of the vertical below 0.1°, which is ignored.
 //
-// Reuses the deck backend without touching it: TerrainLayer for the ground, GpuGeometrySource for
-// each photo's range map (the drape's shadow map), WorldCamera/WorldView for the orbit + fly-in
-// camera, WorldGizmoLayer for the frustums. The drape itself is MultiDrapeLayer
-// (./multi-drape-layer.ts) over the atlases of ./drape-atlas.ts.
+// Everything that touches the GPU sits behind RollGpuBackend (./backend.ts): deck.gl on WebGL2
+// (./backend-webgl.ts: TerrainLayer for the ground, GpuGeometrySource for each photo's range map,
+// WorldGizmoLayer for the frustums, MultiDrapeLayer (./multi-drape-layer.ts) over the atlases of
+// ./drape-atlas.ts for the drape) or on WebGPU (./backend-webgpu.ts). This engine keeps the loading,
+// the range queue, the WorldCamera orbit + fly-in camera, picking and the settings, and hands the
+// backend one RollFrame per change.
 //
 // Loading is a pipeline so the drape grows instead of appearing at the end: photos upload into
 // their atlas cells as they arrive, people masks are segmented while the terrain still streams,
 // and each photo drapes as soon as its range map is read back (a few in flight at once).
-import { COORDINATE_SYSTEM, Deck } from "@deck.gl/core";
-import { ScatterplotLayer } from "@deck.gl/layers";
+import type { Deck } from "@deck.gl/core";
 import type { Device } from "@luma.gl/core";
-import { BRAND } from "#/brand/khipu";
 import type { Pose } from "#/lib/camera";
-import { GpuGeometrySource, rangeMapFrom } from "#/lib/deck/geometry-pass";
+import { rangeMapFrom } from "#/lib/deck/geometry-pass";
 import { photoViewProjection } from "#/lib/deck/photo-view";
 import { localElevRange } from "#/lib/deck/scene";
 import {
@@ -32,27 +32,28 @@ import {
 	type TerrainSet,
 	type TileMesh,
 } from "#/lib/deck/terrain-data";
-import { TerrainLayer } from "#/lib/deck/terrain-layer";
-import {
-	LogDepthExtension,
-	WorldCamera,
-	WorldGizmoLayer,
-	WorldView,
-} from "#/lib/deck/world-view";
+import { WorldCamera } from "#/lib/deck/world-view";
+import type { GpuLayerCore } from "#/lib/deck-webgpu/pass";
 import { type DemRaster, tileBounds } from "#/lib/dem";
 import { eyeAltitude } from "#/lib/geo/eye-rule";
 import { EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import type { ForegroundMask } from "#/lib/segment";
 import { WORLD_SKY } from "#/lib/style/palette";
-import { hexToRgb255 } from "../mosaic/cvd";
-import { vpColor } from "../mosaic/style";
 import type { Roll, RollPhoto } from "../types";
+import type {
+	RangeHandOff,
+	RollBackendKind,
+	RollDrapePhoto,
+	RollFrame,
+	RollGeometrySource,
+	RollGpuBackend,
+} from "./backend";
+import { createWebglBackend, WebglRollBackend } from "./backend-webgl";
 import { basemapLook, basemapSource, type RollBasemap } from "./basemap";
 import { mapBounded } from "./bounded";
-import { DrapeAtlas, MAX_PHOTOS } from "./drape-atlas";
+import { type DrapeAtlas, MAX_PHOTOS } from "./drape-atlas";
 import { DrapeClear } from "./drape-clear";
-import { type DrapePhoto, MultiDrapeLayer } from "./multi-drape-layer";
-import { RangeGpu } from "./range-gpu";
+import { rollOverlays } from "./overlays";
 import {
 	type ImagerySeed,
 	type PhotoSeed,
@@ -72,21 +73,7 @@ const GIZMO_THUMB = 384;
 /** WorldCamera's fixed arc over the terrain on a fly-in (world-view.ts tick). */
 const WORLD_ARC_M = 600;
 
-/** The selected pin's ring: the brand orange, reserved for selection (viewpoints never use it). */
-const SELECTION_RGBA: [number, number, number, number] = [
-	...(hexToRgb255(BRAND.glow) as unknown as [number, number, number]),
-	255,
-];
-
-/** The mosaic's viewpoint colour (#/lib/roll/mosaic/style) as 0..255 sRGB. */
-export const viewpointColor = (i: number): [number, number, number] => {
-	const h = vpColor(i);
-	return [1, 3, 5].map((k) => Number.parseInt(h.slice(k, k + 2), 16)) as [
-		number,
-		number,
-		number,
-	];
-};
+export { viewpointColor } from "./overlays";
 
 type Placed = {
 	photo: RollPhoto;
@@ -135,6 +122,10 @@ export type RollMapOptions = {
 	 * to the live path; tiles or photos it lacks take the live path. Default: none.
 	 */
 	seed?: RollMapSeed;
+	/** GPU backend: deck.gl on "webgl" (default, the reference look) or "webgpu" (./backend-webgpu.ts). */
+	backend?: RollBackendKind;
+	/** The backend could not start or was lost for good (the WebGPU one): re-mount and retry with "webgl". */
+	onBackendFailed?: (e: Error) => void;
 };
 
 /** Per-path accounting of the range hand-off (debugDrape; EVIDENCE of the GPU path). */
@@ -161,12 +152,22 @@ const PIXELS_LONG = 1024;
 
 export class RollMapEngine {
 	readonly frame: EnuFrame;
-	readonly deck: Deck;
+	readonly backendKind: RollBackendKind;
 	readonly world: WorldCamera;
 	private _roll: Roll;
 	private placed: Placed[] = [];
 	private renderSet: TerrainSet | null = null;
 	private imagery = new Map<string, ImageBitmap>();
+	/** The copy of `imagery` handed to the backend: a new Map only after a change (the WebGL layer
+	 * diffs by identity; the WebGPU backend skips its imagery sync while the identity holds). */
+	private imageryView: Map<string, ImageBitmap> | null = null;
+	/** basemapLook(settings.basemap), memoised per basemap so the look keeps its identity. */
+	private baseLook: {
+		basemap: string;
+		look: ReturnType<typeof basemapLook>;
+	} | null = null;
+	/** Run at dispose, before the backend goes (opt-in features' GPU objects, roll-spot.ts). */
+	private disposers: (() => void)[] = [];
 	private imageryAbort: AbortController | null = null;
 	/** The source this.imagery holds (a basemap switch drops the other source's tiles). */
 	private imagerySrc: ImagerySource | null = null;
@@ -178,7 +179,7 @@ export class RollMapEngine {
 	private atlasVersion = 0;
 	private atlasTimer = 0;
 	private draped = 0;
-	private drapePhotos: DrapePhoto[] = [];
+	private drapePhotos: RollDrapePhoto[] = [];
 	private drapeKey = "";
 	/** Per-photo clear air + exposure (./drape-clear.ts): the drape's params texture. */
 	private clear = new DrapeClear(() => this.atlasChanged());
@@ -194,6 +195,11 @@ export class RollMapEngine {
 	private frameCapMs = 0;
 	private lastTickAt = 0;
 	private ready: Promise<void>;
+	private backend: RollGpuBackend | null = null;
+	/** The backend's device once it can render. */
+	private device: Device | null = null;
+	private pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+	private warnedExtras = false;
 	private downAt: { x: number; y: number } | null = null;
 	private hoverId: string | null = null;
 	private hoverRaf = 0;
@@ -208,7 +214,6 @@ export class RollMapEngine {
 	private rangeWorkers = 0;
 	private rangeCount = { done: 0, total: 0 };
 	private rangesStarted = false;
-	private rangeGpu: RangeGpu | null = null;
 	private rangeStats = { cpu: noStats(), gpu: noStats(), seeded: 0 };
 	/** opts.seed.photos once loaded (only photos whose pose and eye match are used). */
 	private photoSeeds: ReadonlyMap<string, PhotoSeed> | null = null;
@@ -243,19 +248,30 @@ export class RollMapEngine {
 		this.ready = new Promise<void>((r) => {
 			onLoad = r;
 		});
-		this.deck = new Deck({
-			canvas,
-			width: null,
-			height: null,
-			useDevicePixels: Math.min(window.devicePixelRatio || 1, 2),
-			// near 0.5 m: at a photographer's eye (≈ 2 m up) a 5 m near plane cut a hole in the ground
-			// below the view; every layer writes log depth, so the ratio costs no precision
-			views: [new WorldView({ id: "world", near: 0.5, far: 600_000 })],
-			layers: [],
-			controller: false,
-			onLoad: () => onLoad(),
-			onError: (e: Error) => console.error("[roll-map]", e),
-		} as never);
+		this.backendKind = opts.backend ?? "webgl";
+		const fail = (e: unknown) => {
+			if (this.disposed) return;
+			const err = e instanceof Error ? e : new Error(String(e));
+			console.error("[roll-map] backend failed", err);
+			this.opts.onBackendFailed?.(err);
+		};
+		const attach = (b: RollGpuBackend) => {
+			if (this.disposed) return b.dispose();
+			this.backend = b;
+			// a lost device (WebGPU) reaches the component the same way a failed start does
+			b.onFatal = fail;
+			b.ready.then((device) => {
+				this.device = device;
+				onLoad();
+			}, fail);
+		};
+		if (this.backendKind === "webgpu")
+			void import("./backend-webgpu").then((m) => {
+				// disposed while the module loaded: never boot a device onto a canvas a newer engine may own
+				if (this.disposed) return;
+				attach(m.createWebgpuBackend(canvas, { pixelRatio: this.pixelRatio }));
+			}, fail);
+		else attach(createWebglBackend(canvas, { pixelRatio: this.pixelRatio }));
 		canvas.style.backgroundColor = WORLD_SKY;
 		canvas.addEventListener("pointerdown", this.onDown);
 		canvas.addEventListener("pointerup", this.onUp);
@@ -265,6 +281,40 @@ export class RollMapEngine {
 
 	get roll() {
 		return this._roll;
+	}
+
+	/** The deck.gl instance on the WebGL2 backend (null on WebGPU, or before a WebGPU backend loads). */
+	get deck(): Deck | null {
+		return this.backend instanceof WebglRollBackend ? this.backend.deck : null;
+	}
+
+	/** The backend's device once it can render (null before). */
+	get renderDevice(): Device | null {
+		return this.device;
+	}
+
+	/** Canvas size in CSS px (the space project() returns). */
+	get viewSize(): [number, number] {
+		return [this.canvas.clientWidth, this.canvas.clientHeight];
+	}
+
+	/** A roll-frame point to canvas CSS px [x, y, depth] (depth < 1 = in front); null before the first frame. Backend-neutral. */
+	project(p: readonly [number, number, number]) {
+		return this.backend?.project(p) ?? null;
+	}
+
+	/** WebGPU only: GpuLayerCores drawn with the frame under `key` (null removes); the caller owns them. No-op on WebGL. */
+	setExtraCores(key: string, cores: readonly GpuLayerCore[] | null) {
+		this.backend?.setExtraCores?.(key, cores);
+	}
+
+	/** A geometry source over the rendered terrain at `eye` (null until the backend is up). */
+	createGeometrySource(
+		eye: [number, number, number],
+		w: number,
+		h: number,
+	): RollGeometrySource | null {
+		return this.backend?.createGeometrySource(eye, w, h) ?? null;
 	}
 
 	// ---------------- loading ----------------
@@ -401,14 +451,15 @@ export class RollMapEngine {
 
 	private makeAtlas() {
 		if (this.disposed || this.atlas) return;
-		const device = (this.deck as unknown as { device?: Device }).device;
-		if (!device) return;
+		const device = this.device;
+		const backend = this.backend;
+		if (!device || !backend) return;
 		const photos = this.roll.photos.slice(0, MAX_PHOTOS);
 		if (this.roll.photos.length > MAX_PHOTOS)
 			console.warn(
 				`[roll-map] draping the first ${MAX_PHOTOS} of ${this.roll.photos.length} photos`,
 			);
-		this.atlas = new DrapeAtlas(
+		this.atlas = backend.createAtlas(
 			device,
 			photos.map((p) => {
 				const r = rangeSize(p.meta.width / p.meta.height);
@@ -554,6 +605,8 @@ export class RollMapEngine {
 		const worker = async () => {
 			this.rangeWorkers++;
 			try {
+				const backend = this.backend;
+				if (!backend) return;
 				for (
 					let p = this.rangeQueue.shift();
 					p && !this.disposed;
@@ -561,9 +614,7 @@ export class RollMapEngine {
 				) {
 					const rev = p.rev;
 					const { w, h } = rangeSize(p.aspect);
-					const src = new GpuGeometrySource(this.deck, p.eye, w, h, {
-						xyz: false,
-					});
+					const src = backend.createGeometrySource(p.eye, w, h);
 					try {
 						const done = await this.rangeInto(p, rev, src, w, h);
 						if (done === "disposed") return;
@@ -607,15 +658,16 @@ export class RollMapEngine {
 	private async rangeInto(
 		p: Placed,
 		rev: number,
-		src: GpuGeometrySource,
+		src: RollGeometrySource,
 		w: number,
 		h: number,
 	): Promise<"done" | "moved" | "disposed"> {
 		const k = this.slot.get(p.id) ?? -1;
 		const atlas = this.atlas;
-		if (atlas) {
-			this.rangeGpu ??= new RangeGpu(atlas.range.device);
-			const gpu = this.rangeGpu;
+		const gpu: RangeHandOff | null = atlas
+			? (this.backend?.rangeHandOff() ?? null)
+			: null;
+		if (atlas && gpu) {
 			const t0 = performance.now();
 			// the programs link asynchronously: wait for them once rather than take the CPU path
 			await gpu.whenReady();
@@ -936,7 +988,8 @@ export class RollMapEngine {
 
 	/** Device-pixel ratio of the canvas (default min(devicePixelRatio, 2)). */
 	setPixelRatio(ratio: number) {
-		this.deck.setProps({ useDevicePixels: ratio } as never);
+		this.pixelRatio = ratio;
+		this.backend?.setPixelRatio(ratio);
 	}
 
 	resize() {
@@ -984,9 +1037,7 @@ export class RollMapEngine {
 	}
 
 	private flushLayers() {
-		(
-			this.deck as unknown as { layerManager?: { updateLayers(): void } }
-		).layerManager?.updateLayers();
+		this.backend?.flush();
 	}
 
 	private imageryFor(set: TerrainSet) {
@@ -997,7 +1048,7 @@ export class RollMapEngine {
 		}
 		if (!src) return new Map<string, ImageBitmap>();
 		// opts.seed.imagery still loading: wait for it rather than fetch what it may hold
-		if (this.imagerySeedPending) return new Map(this.imagery);
+		if (this.imagerySeedPending) return this.imageryCopy();
 		const missing = set.tiles.filter((t) => !this.imagery.has(t.id));
 		if (missing.length && !this.imageryAbort) {
 			const ac = new AbortController();
@@ -1007,6 +1058,7 @@ export class RollMapEngine {
 			const onTile = (id: string, bmp: ImageBitmap) => {
 				if (ac.signal.aborted) return bmp.close();
 				this.imagery.set(id, bmp);
+				this.imageryView = null;
 				if (n++ % 6 === 0) this.updateLayers();
 			};
 			const seed = this.imagerySeed?.source === src ? this.imagerySeed : null;
@@ -1017,15 +1069,22 @@ export class RollMapEngine {
 			Promise.all([
 				seed && decodeSeeded(seeded, seed.tiles, onTile, ac.signal),
 				live.length &&
-					// CPU-backed mosaics: this map always draws through WebGL2, where a GPU-backed
-					// bitmap's texture-array upload is a main-thread readback (loadImagery)
-					loadImagery(live, src, onTile, ac.signal, { cpuBitmaps: true }),
+					// CPU-backed mosaics on WebGL2, where a GPU-backed bitmap's texture-array upload is
+					// a main-thread readback (loadImagery)
+					loadImagery(live, src, onTile, ac.signal, {
+						cpuBitmaps: this.backend?.cpuImageryBitmaps ?? false,
+					}),
 			]).finally(() => {
 				if (this.imageryAbort === ac) this.imageryAbort = null;
 				if (!ac.signal.aborted) this.updateLayers();
 			});
 		}
-		return new Map(this.imagery);
+		return this.imageryCopy();
+	}
+
+	private imageryCopy() {
+		this.imageryView ??= new Map(this.imagery);
+		return this.imageryView;
 	}
 
 	private dropImagery() {
@@ -1033,6 +1092,7 @@ export class RollMapEngine {
 		this.imageryAbort = null;
 		for (const b of this.imagery.values()) b.close();
 		this.imagery.clear();
+		this.imageryView = null;
 	}
 
 	/**
@@ -1069,7 +1129,8 @@ export class RollMapEngine {
 		if (this.disposed) return;
 		const set = this.renderSet;
 		const w = this.world;
-		if (!set || !w.controls) return;
+		const backend = this.backend;
+		if (!set || !w.controls || !backend) return;
 		// keep the array identity while nothing changed (MultiDrapeLayer rebuilds its params and
 		// per-tile lists on change)
 		const key = this.placed.map((p) => `${p.id}:${this.gain(p.id)}`).join();
@@ -1089,118 +1150,65 @@ export class RollMapEngine {
 			}));
 		}
 		const target = w.controls.target;
-		const base = basemapLook(this.settings.basemap);
+		if (this.baseLook?.basemap !== this.settings.basemap)
+			this.baseLook = {
+				basemap: this.settings.basemap,
+				look: basemapLook(this.settings.basemap),
+			};
+		const base = this.baseLook.look;
 		if (base.style !== "imagery" && !this.elevRange)
 			this.elevRange = localElevRange(set);
-		const layers: unknown[] = [
-			new TerrainLayer({
-				id: "terrain",
-				tiles: set.tiles,
-				imagery: this.imageryFor(set),
-				style: base.style,
-				look: base.look,
-				...(this.elevRange && { elevRange: this.elevRange }),
-				nearFade: 0,
-				projectPhoto: 0,
-				offscreen: false,
-			}),
+		const { gizmos, pins } = rollOverlays({
+			placed: this.placed.map((p) => ({
+				id: p.id,
+				pose: p.pose,
+				eye: p.eye,
+				aspect: p.aspect,
+				viewpoint: p.photo.viewpoint,
+			})),
+			gain: (id) => this.gain(id),
+			selected: this.selected,
+			hoverId: this.hoverId,
+			flyingId: this.flying?.id ?? null,
+			flightActive: !!w.flight,
+			photoPlaneOpacity: w.photoPlaneOpacity,
+			thumbs: this.thumbs,
+			gizmos: this.settings.gizmos,
+		});
+		const extras = [...this.extraLayers.values()].flat();
+		if (extras.length && !backend.supportsExtras && !this.warnedExtras) {
+			this.warnedExtras = true;
+			console.warn("[roll-map] the WebGPU backend draws no extra layers");
+		}
+		const frame: RollFrame = {
+			tiles: set.tiles,
+			imagery: this.imageryFor(set),
+			basemap: base,
+			elevRange: this.elevRange,
 			// opacity 0 = drape off: skip its per-fragment photo loop altogether
-			this.settings.drapeOpacity > 0 &&
-				new MultiDrapeLayer({
-					id: "drape",
-					tiles: set.tiles,
-					atlas: this.atlas,
-					atlasVersion: this.atlasVersion,
-					photos: this.drapePhotos,
-					opacity: this.settings.drapeOpacity,
-					sharpness: this.settings.sharpness,
-					reachM: this.settings.reachM,
-					people: this.settings.protectPeople ? 1 : 0,
-					photoParams: this.clear.texture,
-					paramsVersion: this.clear.version,
-					clearAir: this.settings.clearAir,
-				}),
-		];
-		const flyingIn = this.flying && w.flight;
-		if (this.settings.gizmos)
-			for (const p of this.placed) {
-				const g = this.gain(p.id);
-				if (g === 0) continue;
-				// the photo being flown into fades out like the single-photo world view; its neighbours'
-				// frustums would fill the frame from inside the viewpoint
-				if (flyingIn && p === this.flying && w.photoPlaneOpacity < 0.02)
-					continue;
-				if (
-					flyingIn &&
-					p !== this.flying &&
-					this.flying &&
-					dist3(p.eye, this.flying.eye) < 500
-				)
-					continue;
-				const col = viewpointColor(p.photo.viewpoint);
-				const sel = p.id === this.selected;
-				layers.push(
-					new WorldGizmoLayer({
-						id: `gizmo-${p.id}`,
-						pose: p.pose,
-						eye: p.eye,
-						aspect: p.aspect,
-						// small thumbnails: a full-size texture per frustum would cost ~16 MB each (the
-						// BitmapLayer underneath takes any image source; the prop is typed for <img>)
-						image:
-							sel || !this.selected
-								? ((this.thumbs.get(p.id) ?? null) as HTMLImageElement | null)
-								: null,
-						planeOpacity:
-							p === this.flying ? w.photoPlaneOpacity : sel ? 0.95 : 0.8,
-						lineColor: [...col, sel ? 255 : g < 1 ? 90 : 200],
-						pinColor: [...col, 255],
-						pinRadiusM: sel ? 26 : 16,
-					}),
-				);
-			}
-		for (const extra of this.extraLayers.values()) layers.push(...extra);
-		// selection targets: always on top, sized in pixels
-		const hover = this.hoverId;
-		layers.push(
-			new ScatterplotLayer<Placed>({
-				id: "pins",
-				data: this.placed.filter(
-					(p) => this.gain(p.id) > 0 && !this.atCamera(p),
-				),
-				coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
-				getPosition: (p: Placed) => p.eye,
-				getRadius: (p: Placed) =>
-					p.id === this.selected ? 8 : p.id === hover ? 7 : 5,
-				radiusUnits: "pixels",
-				getFillColor: (p: Placed) => [
-					...viewpointColor(p.photo.viewpoint),
-					255,
-				],
-				// the selected pin carries the brand orange (selection only); hover stays white
-				getLineColor: (p: Placed) =>
-					p.id === this.selected ? SELECTION_RGBA : [255, 255, 255, 230],
-				lineWidthUnits: "pixels",
-				getLineWidth: (p: Placed) =>
-					p.id === this.selected || p.id === hover ? 2.5 : 1.2,
-				stroked: true,
-				billboard: true,
-				extensions: [new LogDepthExtension()],
-				parameters: { depthCompare: "always", depthWriteEnabled: false },
-				updateTriggers: {
-					getRadius: [this.selected, hover],
-					getLineWidth: [this.selected, hover],
-					getLineColor: [this.selected],
-				},
-			}),
-		);
-		this.deck.setProps({
-			viewState: {
-				world: w.viewState([target.x, target.y, target.z]),
-			},
-			layers,
-		} as never);
+			drape:
+				this.settings.drapeOpacity > 0 && this.atlas
+					? {
+							atlas: this.atlas,
+							atlasVersion: this.atlasVersion,
+							photos: this.drapePhotos,
+							opacity: this.settings.drapeOpacity,
+							sharpness: this.settings.sharpness,
+							reachM: this.settings.reachM,
+							people: this.settings.protectPeople ? 1 : 0,
+							clearTexture: this.clear.texture,
+							clearVersion: this.clear.version,
+							clearAir: this.settings.clearAir,
+						}
+					: null,
+			gizmos,
+			extras,
+			pins,
+			viewState: w.viewState([target.x, target.y, target.z]),
+		};
+		backend.render(frame);
 	}
+
 	// ---------------- picking ----------------
 
 	private onDown = (e: PointerEvent) => {
@@ -1252,17 +1260,15 @@ export class RollMapEngine {
 
 	/** Nearest photo pin within 14 px of a canvas point (CSS px). */
 	pick(x: number, y: number): string | null {
-		const vp = (
-			this.deck as unknown as {
-				getViewports(): { project(p: number[]): number[] }[];
-			}
-		).getViewports()[0];
-		if (!vp) return null;
+		const backend = this.backend;
+		if (!backend) return null;
 		let best: string | null = null;
 		let bestD = 14;
 		for (const p of this.placed) {
 			if (this.gain(p.id) === 0 || this.atCamera(p)) continue;
-			const [sx, sy, sz] = vp.project(p.eye);
+			const proj = backend.project(p.eye);
+			if (!proj) return null;
+			const [sx, sy, sz] = proj;
 			if (!(sz < 1)) continue;
 			const dd = Math.hypot(sx - x, sy - y);
 			if (dd < bestD) {
@@ -1305,7 +1311,8 @@ export class RollMapEngine {
 		const p = this.placed.find((x) => x.id === id);
 		if (!p || this.disposed) return null;
 		this.flushLayers();
-		const src = new GpuGeometrySource(this.deck, p.eye, w, h, { xyz: false });
+		const src = this.backend?.createGeometrySource(p.eye, w, h);
+		if (!src) return null;
 		try {
 			await src.render(p.pose);
 			if (this.disposed || !src.pose) return null;
@@ -1348,9 +1355,21 @@ export class RollMapEngine {
 			: null;
 	}
 
+	/** Run `fn` when the engine is disposed, before its backend (and device) go. */
+	addDisposer(fn: () => void) {
+		if (this.disposed) fn();
+		else this.disposers.push(fn);
+	}
+
 	dispose() {
 		if (this.disposed) return;
 		this.disposed = true;
+		for (const fn of this.disposers.splice(0))
+			try {
+				fn();
+			} catch (e) {
+				console.warn("[roll-map] disposer", e);
+			}
 		cancelAnimationFrame(this.raf);
 		cancelAnimationFrame(this.hoverRaf);
 		this.canvas.removeEventListener("pointerdown", this.onDown);
@@ -1360,12 +1379,11 @@ export class RollMapEngine {
 		this.loadAbort.abort();
 		this.dropImagery();
 		this.world.dispose();
-		this.deck.finalize();
+		this.backend?.dispose();
+		this.backend = null;
 		this.atlas?.destroy();
 		this.atlas = null;
 		this.clear.dispose();
-		this.rangeGpu?.destroy();
-		this.rangeGpu = null;
 		window.clearTimeout(this.atlasTimer);
 		for (const b of [...this.thumbs.values(), ...this.pixels.values()])
 			b.close();

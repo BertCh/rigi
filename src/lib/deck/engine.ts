@@ -189,7 +189,11 @@ import {
 	SharedPhotoTexture,
 	TerrainLayer,
 } from "./terrain-layer";
-import { TerrainStreamer } from "./terrain-stream";
+import {
+	defaultStreamTile,
+	type StreamTileLoader,
+	TerrainStreamer,
+} from "./terrain-stream";
 import {
 	buildTrailSegments,
 	recolorTrailSegments,
@@ -209,6 +213,9 @@ const angleDiff = (a: number, b: number) => Math.abs(wrap180(a - b));
 export type DeckEngineOptions = {
 	/** Upper bound on the canvas' device pixel ratio (default 2). The landing's Step Inside passes 1.5. */
 	pixelRatioCap?: number;
+	/** Wraps the terrain stream's tile loader (default defaultStreamTile): the landing's Step Inside
+	 * serves far tiles from the roll map's baked seed (deck/seeded-tiles.ts). */
+	terrainTileWrap?: (base: StreamTileLoader) => StreamTileLoader;
 };
 
 export type DeckEngineStats = {
@@ -518,6 +525,7 @@ export class DeckEngine implements Renderer {
 	 */
 	private drapeTex: Texture[] = [];
 	private readonly pixelRatioCap: number;
+	private readonly terrainTileWrap: DeckEngineOptions["terrainTileWrap"];
 	private silMask: SilhouetteMaskGL | null = null;
 	private loadAbort = new AbortController();
 	/** Step Inside (setNearField): the scene and its view options; null = off (the classic views). */
@@ -558,6 +566,7 @@ export class DeckEngine implements Renderer {
 		opts: DeckEngineOptions = {},
 	) {
 		this.pixelRatioCap = opts.pixelRatioCap ?? 2;
+		this.terrainTileWrap = opts.terrainTileWrap;
 		this.photo = photo;
 		this.aspect = photo.width / photo.height;
 		this.prior = {
@@ -966,6 +975,7 @@ export class DeckEngine implements Renderer {
 			const abort = () => resolve(null);
 			this.loadAbort.signal.addEventListener("abort", abort, { once: true });
 			const streamer = new TerrainStreamer(this.frame, {
+				loadTile: this.terrainTileWrap?.(defaultStreamTile),
 				onProgress: (d, t) =>
 					!this.terrain &&
 					onProgress?.(`Loading terrain ${d}/${t}`, t ? d / t : 0),

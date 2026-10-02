@@ -7,7 +7,7 @@
 // DeckSplatLayer on the roll map (the "Spot 3D" toggle in RollMap.tsx). Lazy-loaded; nothing here runs
 // unless the toggle is switched on.
 import type { Pose } from "../../camera";
-import { GpuGeometrySource } from "../../deck/geometry-pass";
+import type { SplatsCore } from "../../deck-webgpu/layers/splats";
 import { type DemRaster, latToTileY, loadDemTile, lonToTileX } from "../../dem";
 import type { RollMapEngine } from "../../roll/map/roll-map";
 import type { Roll, RollPhoto } from "../../roll/types";
@@ -318,7 +318,8 @@ async function rangeAtEye(
 	// rangeMapFor(1×1) gives the placed pose and flushes the deck layers the geometry pass reads
 	const p = await engine.rangeMapFor(id, 1, 1);
 	if (!p) return null;
-	const src = new GpuGeometrySource(engine.deck, eye, w, h, { xyz: false });
+	const src = engine.createGeometrySource(eye, w, h);
+	if (!src) return null;
 	try {
 		await src.render(p.pose);
 		if (!src.pose) return null;
@@ -415,4 +416,67 @@ export function spotLayer(
 		opacity: o.opacity ?? 1,
 		maxRadiusPx: 256,
 	});
+}
+
+/** The WebGPU splat core per engine (the backend never owns it: setSpot creates and destroys it). */
+const spotCores = new WeakMap<RollMapEngine, SplatsCore>();
+/** Latest setSpot call per engine: a call that awaited the module and is no longer the latest stops. */
+const spotCalls = new WeakMap<RollMapEngine, number>();
+
+/**
+ * Show (or with null clear) the spot cloud on the roll map, whichever backend it runs on: the
+ * DeckSplatLayer through setExtraLayers on WebGL2; on WebGPU the WGSL SplatsCore (GPU radix sort,
+ * worker fallback; deck-webgpu/layers/splats.ts) through setExtraCores. The splats are depth-tested
+ * against the terrain in the colour pass and drawn under the pins. Returns false when nothing could
+ * be shown (WebGPU device not ready yet).
+ */
+export async function setSpot(
+	engine: RollMapEngine,
+	cloud: GaussianCloud | null,
+	o: { truth?: boolean; opacity?: number } = {},
+): Promise<boolean> {
+	const call = (spotCalls.get(engine) ?? 0) + 1;
+	spotCalls.set(engine, call);
+	if (engine.backendKind !== "webgpu") {
+		engine.setExtraLayers("spot3d", cloud ? [spotLayer(cloud, o)] : null);
+		return true;
+	}
+	let core = spotCores.get(engine) ?? null;
+	if (!cloud) {
+		engine.setExtraCores("spot3d", null);
+		core?.destroy();
+		spotCores.delete(engine);
+		return true;
+	}
+	const device = engine.renderDevice;
+	if (!device) return false;
+	if (!core) {
+		const m = await import("../../deck-webgpu/layers/splats");
+		// cleared or replaced again while the module loaded
+		if (spotCalls.get(engine) !== call) return false;
+		const existing = spotCores.get(engine);
+		core = existing ?? m.createSplatsCore(device, {}, "roll-spot3d");
+		spotCores.set(engine, core);
+		if (!existing) {
+			const made = core;
+			// the engine's dispose frees the core even if setSpot(null) never comes (or comes late)
+			engine.addDisposer(() => {
+				if (spotCores.get(engine) !== made) return;
+				engine.setExtraCores("spot3d", null);
+				made.destroy();
+				spotCores.delete(engine);
+			});
+		}
+	}
+	const c = core;
+	c.onChange = () => engine.setExtraCores("spot3d", [c]);
+	c.setOptions({
+		truth: o.truth ?? false,
+		opacity: o.opacity ?? 1,
+		maxRadiusPx: 256,
+	});
+	c.setCloud(cloud);
+	c.setEnabled(true);
+	engine.setExtraCores("spot3d", [c]);
+	return true;
 }

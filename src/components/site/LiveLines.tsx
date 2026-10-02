@@ -11,7 +11,13 @@
 // page's paper colour (--rigi-paper), so they follow the theme.
 
 import { useEffect, useRef } from "react";
-import { decodeLines, type Lines, type View } from "./lineArt";
+import {
+	cachedWidth,
+	decodeLines,
+	type Lines,
+	midpointsOf,
+	type View,
+} from "./lineArt";
 
 /** Spill past each side (frame widths), above and below (frame heights). */
 const BLEED = 0.5;
@@ -36,6 +42,62 @@ const FADE_R = pct(1 - (BLEED * 0.6) / SPAN);
 const FADE_T = pct(TOP / VSPAN);
 const FADE_B = pct((TOP + 1) / VSPAN);
 const MASK = `linear-gradient(to right, transparent, #000 ${FADE_L}, #000 ${FADE_R}, transparent), linear-gradient(to bottom, transparent, #000 ${FADE_T}, #000 ${FADE_B}, transparent)`;
+
+/** Window-level input state shared by every LiveLines: full frame rate only while the user drives the view. */
+export function createInputTracker(
+	target: EventTarget,
+	now: () => number = () => performance.now(),
+) {
+	let held = false;
+	let lastInput = -Infinity;
+	let subscribers = 0;
+	const input = () => {
+		lastInput = now();
+	};
+	const down = () => {
+		held = true;
+		input();
+	};
+	const up = () => {
+		held = false;
+		input();
+	};
+	const events: [string, () => void][] = [
+		["pointerdown", down],
+		["pointerup", up],
+		["pointercancel", up],
+		["wheel", input],
+		["keydown", input],
+	];
+	return {
+		/** Installs the listeners on the first subscriber and removes them with the last. */
+		subscribe() {
+			if (subscribers++ === 0)
+				for (const [type, fn] of events)
+					target.addEventListener(type, fn, { passive: true });
+			let done = false;
+			return () => {
+				if (done) return;
+				done = true;
+				if (--subscribers > 0) return;
+				for (const [type, fn] of events) target.removeEventListener(type, fn);
+				held = false;
+			};
+		},
+		get held() {
+			return held;
+		},
+		get lastInput() {
+			return lastInput;
+		},
+	};
+}
+
+let sharedInput: ReturnType<typeof createInputTracker> | null = null;
+const getSharedInput = () => {
+	sharedInput ??= createInputTracker(window);
+	return sharedInput;
+};
 
 export function LiveLines({
 	src,
@@ -62,25 +124,8 @@ export function LiveLines({
 		let onScreen = false;
 		let raf = 0;
 		let last = 0;
-		// last pointer-held / wheel / key time: full frame rate only while the user drives the view
-		let held = false;
-		let lastInput = -Infinity;
-		const input = () => {
-			lastInput = performance.now();
-		};
-		const down = () => {
-			held = true;
-			input();
-		};
-		const up = () => {
-			held = false;
-			input();
-		};
-		window.addEventListener("pointerdown", down, { passive: true });
-		window.addEventListener("pointerup", up, { passive: true });
-		window.addEventListener("pointercancel", up, { passive: true });
-		window.addEventListener("wheel", input, { passive: true });
-		window.addEventListener("keydown", input, { passive: true });
+		const input = getSharedInput();
+		const unsubscribeInput = input.subscribe();
 		// what the last draw was made from: redraw only when one of these changed
 		const seen = new Float64Array(13);
 		let seenValid = false;
@@ -112,7 +157,8 @@ export function LiveLines({
 		scheme.addEventListener("change", refreshInk);
 		const tick = (now: number) => {
 			raf = requestAnimationFrame(tick);
-			const fps = held || now - lastInput < IDLE_AFTER_MS ? FPS : IDLE_FPS;
+			const fps =
+				input.held || now - input.lastInput < IDLE_AFTER_MS ? FPS : IDLE_FPS;
 			if (now - last < 1000 / fps - 2) return;
 			last = now;
 			if (!lines) return;
@@ -175,11 +221,7 @@ export function LiveLines({
 		wide.addEventListener("change", sync);
 		document.addEventListener("visibilitychange", sync);
 		return () => {
-			window.removeEventListener("pointerdown", down);
-			window.removeEventListener("pointerup", up);
-			window.removeEventListener("pointercancel", up);
-			window.removeEventListener("wheel", input);
-			window.removeEventListener("keydown", input);
+			unsubscribeInput();
 			nearIo.disconnect();
 			io.disconnect();
 			resizeObserver.disconnect();
@@ -249,6 +291,11 @@ type Scratch = {
 	group: Int32Array;
 	order: Uint32Array;
 	counts: Int32Array;
+	cursor: Int32Array;
+	/** Each stroke's middle point (x, y, z), for the distance bucketing. */
+	mids: Float32Array;
+	/** Label widths by name (the font is fixed). */
+	widths: Map<string, number>;
 };
 function createScratch(): Scratch {
 	return {
@@ -256,6 +303,9 @@ function createScratch(): Scratch {
 		group: new Int32Array(0),
 		order: new Uint32Array(0),
 		counts: new Int32Array(0),
+		cursor: new Int32Array(0),
+		mids: new Float32Array(0),
+		widths: new Map(),
 	};
 }
 
@@ -306,18 +356,21 @@ function draw(
 		scratch.group = new Int32Array(nStrokes);
 		scratch.order = new Uint32Array(nStrokes);
 		scratch.counts = new Int32Array(nGroups + 1);
+		scratch.cursor = new Int32Array(nGroups);
+		scratch.mids = midpointsOf(L);
+		scratch.widths = new Map();
 	}
-	const { group, order, counts } = scratch;
+	const { group, order, counts, cursor, mids, widths } = scratch;
 	// pass 1: each stroke's distance bucket; a group's rank is its draw order (faintest bucket
 	// first, styles last to first), then a counting sort of the strokes by rank
 	counts.fill(0);
 	for (let i = 0; i < nStrokes; i++) {
-		const k0 = L.start[i];
-		const k1 = L.start[i + 1];
 		let bucket = 0;
 		if (fade) {
-			const m = ((k0 + k1) >> 1) * 3;
-			const d = Math.hypot(P[m] - px, P[m + 1] - py, P[m + 2] - pz);
+			const mx = mids[i * 3] - px;
+			const my = mids[i * 3 + 1] - py;
+			const mz = mids[i * 3 + 2] - pz;
+			const d = Math.sqrt(mx * mx + my * my + mz * mz);
 			if (d >= fade[1]) {
 				group[i] = -1;
 				continue;
@@ -337,7 +390,7 @@ function draw(
 	}
 	for (let r = 0; r < nGroups; r++) counts[r + 1] += counts[r];
 	// counts[r] is now group r's start; fill through a moving cursor
-	const cursor = counts.slice(0, nGroups);
+	for (let r = 0; r < nGroups; r++) cursor[r] = counts[r];
 	for (let i = 0; i < nStrokes; i++) {
 		const r = group[i];
 		if (r >= 0) order[cursor[r]++] = i;
@@ -396,7 +449,10 @@ function draw(
 
 	// peak names past the frame, on short leaders, greedily by rank without overlaps
 	if (!L.labels.length) return;
-	g.font = LABEL_FONT;
+	const measureLabel = (name: string) => {
+		g.font = LABEL_FONT;
+		return g.measureText(name).width;
+	};
 	const placed: [number, number][] = [];
 	for (const lab of L.labels) {
 		const dx = lab.p[0] - px;
@@ -406,7 +462,8 @@ function draw(
 		if (z < 1) continue;
 		const X = cx + ((dx * rx + dy * ry + dz * rz) / z) * sx;
 		const Y = cy - ((dx * ux + dy * uy + dz * uz) / z) * sy;
-		const tw = (Math.max(g.measureText(lab.name).width, 60) + 10) * dpr;
+		const tw =
+			(Math.max(cachedWidth(widths, lab.name, measureLabel), 60) + 10) * dpr;
 		const outside =
 			(X < fx0 - 4 * dpr && X + tw < fx0 - 6 * dpr) ||
 			X > fx0 + fw * dpr + 4 * dpr;

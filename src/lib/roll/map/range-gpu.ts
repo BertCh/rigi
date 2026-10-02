@@ -30,6 +30,7 @@ import {
 	readbackQuiet,
 } from "#/lib/deck/geometry-pass";
 import { glOf } from "#/lib/deck/gl";
+import type { RangeHandOff } from "./backend";
 import { COARSE, type CoarseRange } from "./drape-atlas";
 
 const VS = `#version 300 es
@@ -108,7 +109,7 @@ export type CoarseResult = {
 	bytes: number;
 };
 
-export class RangeGpu {
+export class RangeGpu implements RangeHandOff {
 	private copy: Model | null = null;
 	private pool: Model | null = null;
 	private building: Promise<void> | null = null;

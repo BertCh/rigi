@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BRAND, BRAND_LIGHT, brandAlpha } from "#/brand/khipu";
 import type { ResolvedTheme } from "#/lib/theme";
 import { useTheme } from "#/lib/theme/react";
@@ -54,7 +54,9 @@ const polar = (s: Scene, az: number, d: number) => {
 	return [d * Math.sin(a), d * Math.cos(a)] as const;
 };
 
-export function WorldView({
+export const WorldView = memo(WorldViewImpl);
+
+function WorldViewImpl({
 	scene,
 	state,
 	className,

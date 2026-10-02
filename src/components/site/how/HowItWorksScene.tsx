@@ -4,10 +4,12 @@
 
 import { Pause, Play, RotateCcw } from "lucide-react";
 import {
+	memo,
 	type PointerEvent as ReactPointerEvent,
 	type RefObject,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -26,9 +28,20 @@ import {
 	residuals,
 	type Scene,
 	signedDelta,
-	smooth,
 	yawSweep,
 } from "./model";
+import {
+	BEAT_T0,
+	beatAt,
+	END,
+	poseTime,
+	ramp,
+	T_COARSE,
+	T_FINE,
+	T_SWEEP0,
+	T_SWEEP1,
+	visualEpoch,
+} from "./timeline";
 import { type WorldState, WorldView } from "./WorldView";
 
 // "How it works" as one animated scene: a real demo photo (public/demo/how/scene.json, baked by
@@ -54,28 +67,17 @@ const C = {
 
 type BeatKey = "guess" | "skyline" | "terrain" | "measure" | "correct" | "snap";
 const BEATS: { key: BeatKey; title: string; t0: number }[] = [
-	{ key: "guess", title: "Guess", t0: 0 },
-	{ key: "skyline", title: "Photo skyline", t0: 4.5 },
-	{ key: "terrain", title: "Terrain skyline", t0: 8 },
-	{ key: "measure", title: "Measure", t0: 12.5 },
-	{ key: "correct", title: "Correct", t0: 15.5 },
-	{ key: "snap", title: "Snap", t0: 23 },
+	{ key: "guess", title: "Phone reading", t0: BEAT_T0[0] },
+	{ key: "skyline", title: "Photo skyline", t0: BEAT_T0[1] },
+	{ key: "terrain", title: "Terrain skyline", t0: BEAT_T0[2] },
+	{ key: "measure", title: "Mismatch", t0: BEAT_T0[3] },
+	{ key: "correct", title: "Solve", t0: BEAT_T0[4] },
+	{ key: "snap", title: "Result", t0: BEAT_T0[5] },
 ];
-const END = 28;
-// Inside "correct": out to the left edge, sweep across, settle on the coarse minimum, fine solve.
-const T_SWEEP0 = 16.1;
-const T_SWEEP1 = 19.1;
-const T_COARSE = 20.2;
-const T_FINE = 22.4;
 
 /** Leader length (px) for a label at stack level k. */
 const stemPx = (small: boolean, k: number) =>
 	(small ? 12 : 22) + k * (small ? 19 : 24);
-
-const beatAt = (t: number) =>
-	BEATS.reduce((cur, b, i) => (t >= b.t0 ? i : cur), 0);
-
-const ramp = (t: number, t0: number, dur: number) => smooth((t - t0) / dur);
 
 /** Fetch scene.json (and mount the stage) only once the placeholder is within `margin` of the viewport. */
 function useScene(holder: RefObject<HTMLElement | null>, immediate: boolean) {
@@ -217,13 +219,28 @@ function Stage({
 	}, [reduced, at]);
 	const tRef = useRef(t);
 	tRef.current = t;
+	// The chapter bars' progress hairlines are written straight to the DOM from the clock, so the
+	// stage itself re-renders only while something on it moves (see visualEpoch).
+	const progressBars = useRef<(HTMLSpanElement | null)[]>([]);
+	const writeProgress = useCallback((time: number) => {
+		BEATS.forEach((b, i) => {
+			const el = progressBars.current[i];
+			if (!el) return;
+			const t1 = BEATS[i + 1]?.t0 ?? END;
+			const p = Math.max(0, Math.min(1, (time - b.t0) / (t1 - b.t0)));
+			el.style.width = `${p * 100}%`;
+		});
+	}, []);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: t is the commit trigger, tRef the value
+	useLayoutEffect(() => writeProgress(tRef.current), [t, writeProgress]);
+	const epoch = useRef(visualEpoch(t));
 	useEffect(() => {
 		if (!playing || !inView) return;
 		let raf = 0;
 		let last = performance.now();
 		const tick = (now: number) => {
 			raf = requestAnimationFrame(tick);
-			// ~30 commits/s: the clock is slow, each commit re-renders SVG, labels and two canvases.
+			// ~30 ticks/s: the clock is slow.
 			if (now - last < 28) return;
 			const dt = Math.min(0.05, (now - last) / 1000);
 			last = now;
@@ -231,15 +248,23 @@ function Stage({
 			tRef.current = n;
 			if (n >= END) {
 				cancelAnimationFrame(raf);
+				writeProgress(END);
 				setT(END);
 				setPlaying(false);
 				return;
 			}
-			setT(n);
+			writeProgress(n);
+			// Commit (re-render SVG, labels, canvases) only while something moves, and once on
+			// entering each quiet stretch so it lands on its final values.
+			const e = visualEpoch(n);
+			if (e === -1 || e !== epoch.current) {
+				epoch.current = e;
+				setT(n);
+			}
 		};
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
-	}, [playing, inView]);
+	}, [playing, inView, writeProgress]);
 
 	// ---- drag the terrain line off, it springs back ----
 	const [nudge, setNudge] = useState({ yaw: 0, pitch: 0 });
@@ -286,7 +311,11 @@ function Stage({
 	useEffect(() => () => cancelAnimationFrame(spring.current), []);
 
 	// ---- the state at time t ----
+	// pose depends on the clock only inside the solve: a stable object elsewhere keeps the camera,
+	// residuals, skyline, labels and the world overlay memoised
+	const tPose = poseTime(t);
 	const pose: Angles = useMemo(() => {
+		const t = tPose;
 		const p = scene.prior;
 		let a: Angles;
 		if (t < BEATS[4].t0) a = p;
@@ -316,7 +345,7 @@ function Stage({
 			yaw: a.yaw + nudge.yaw,
 			pitch: a.pitch + nudge.pitch,
 		};
-	}, [t, scene, coarse, nudge]);
+	}, [tPose, scene, coarse, nudge]);
 
 	const cam = useMemo(() => camera(pose, W, H), [pose, W, H]);
 	const res = useMemo(() => residuals(scene, cam, obs), [scene, cam, obs]);
@@ -357,37 +386,47 @@ function Stage({
 				: 0.32 + 0.68 * (1 - ramp(t, BEATS[1].t0, 0.6));
 	const off = Math.abs(nudge.yaw) + Math.abs(nudge.pitch) > 0.6;
 
-	const world: WorldState = {
-		pose,
-		fan: Math.abs(signedDelta(scene.solved.yaw - scene.prior.yaw)) + 2,
-		uncertainty: ramp(t, 0.8, 1.2) * (1 - ramp(t, T_COARSE, 1.4)),
-		wedge: ramp(t, 0.3, 0.9),
-		footprint: ramp(t, BEATS[2].t0 + 1.8, 1.6),
-		peaks: ramp(t, BEATS[5].t0 + 0.4, 1),
-		eyeSnap: vis.eyeSnap,
-	};
+	// stable while nothing moves, so WorldView redraws its overlay only when a value changes
+	const fan = Math.abs(signedDelta(scene.solved.yaw - scene.prior.yaw)) + 2;
+	const uncertainty = ramp(t, 0.8, 1.2) * (1 - ramp(t, T_COARSE, 1.4));
+	const wedge = ramp(t, 0.3, 0.9);
+	const footprint = ramp(t, BEATS[2].t0 + 1.8, 1.6);
+	const peaks = ramp(t, BEATS[5].t0 + 0.4, 1);
+	const world: WorldState = useMemo(
+		() => ({
+			pose,
+			fan,
+			uncertainty,
+			wedge,
+			footprint,
+			peaks,
+			eyeSnap: vis.eyeSnap,
+		}),
+		[pose, fan, uncertainty, wedge, footprint, peaks, vis.eyeSnap],
+	);
 
 	const seek = (b: number) => {
 		cancelAnimationFrame(spring.current);
 		setNudge({ yaw: 0, pitch: 0 });
 		tRef.current = BEATS[b].t0;
+		epoch.current = visualEpoch(BEATS[b].t0);
 		setT(BEATS[b].t0);
 		setPlaying(true);
 	};
 	const dYaw = signedDelta(scene.solved.yaw - scene.prior.yaw);
 	const captions: Record<BeatKey, string> = {
-		guess: `The phone records GPS, tilt and a compass heading of ${scene.prior.yaw.toFixed(1)}°. The compass is ${Math.abs(dYaw).toFixed(0)}° off here, enough to put names on the wrong summits.`,
+		guess: `The phone records GPS, tilt and a compass heading of ${scene.prior.yaw.toFixed(1)}°. The compass is ${Math.abs(dYaw).toFixed(0)}° off here, enough to label the wrong summits.`,
 		skyline:
-			"Rigi traces the skyline in the photo, the edge between sky and mountain, column by column.",
+			"Rigi traces the skyline in the photo, the line where the mountains meet the sky, one pixel column at a time.",
 		terrain:
 			scene.gpsAlt !== null && scene.ground - scene.gpsAlt > 20
-				? `GPS altitude reads ${Math.round(scene.gpsAlt)} m, ${Math.round(scene.ground - scene.gpsAlt)} m inside the mountain, so the eye snaps to the ground. From there the elevation model predicts the skyline in every direction.`
-				: "The eye is placed on the elevation model, and the terrain is traced outwards in every direction to predict the skyline.",
+				? `GPS altitude reads ${Math.round(scene.gpsAlt)} m, ${Math.round(scene.ground - scene.gpsAlt)} m below the terrain surface, so the camera is moved up to the ground. From there the elevation model predicts the skyline in every direction.`
+				: "The camera is placed on the elevation model, and the terrain is traced outwards in every direction to predict the skyline.",
 		measure:
-			"Wherever the two skylines disagree, the gap is measured. Their average is the mismatch to drive down.",
+			"The gap between the two skylines is measured at each column. The average gap is the mismatch the solver reduces.",
 		correct:
-			"A wide sweep over heading finds the dip in mismatch. A fine solve then adjusts heading, tilt, roll and focal length together.",
-		snap: `Mismatch falls from ${score.prior.toFixed(0)} px to ${score.solved.toFixed(0)} px and the pose is accepted. The peaks now sit on their summits.`,
+			"A wide sweep over heading finds the lowest mismatch. A fine solve then adjusts heading, tilt, roll and focal length together.",
+		snap: `Mismatch falls from ${score.prior.toFixed(0)} px to ${score.solved.toFixed(0)} px and the pose is accepted. The peak labels now sit on their summits.`,
 	};
 
 	// Peak labels at the current pose, staggered when they crowd.
@@ -471,8 +510,6 @@ function Stage({
 				<div className="flex items-center gap-1 border-b border-white/8 px-2 py-2 sm:px-3">
 					<div className="flex min-w-0 flex-1 gap-1 overflow-x-auto [scrollbar-width:none]">
 						{BEATS.map((b, i) => {
-							const t1 = BEATS[i + 1]?.t0 ?? END;
-							const p = Math.max(0, Math.min(1, (t - b.t0) / (t1 - b.t0)));
 							return (
 								<button
 									key={b.key}
@@ -490,8 +527,10 @@ function Stage({
 									</span>
 									<span className="absolute inset-x-2.5 bottom-1 h-px bg-white/10">
 										<span
+											ref={(el) => {
+												progressBars.current[i] = el;
+											}}
 											className="block h-full bg-[var(--rigi-glow)]"
-											style={{ width: `${p * 100}%` }}
 										/>
 									</span>
 								</button>
@@ -736,8 +775,8 @@ function Stage({
 						</p>
 						{done && (
 							<p className="mt-1.5 font-mono text-[10px] text-white/45">
-								Drag the photo sideways to knock the terrain line off. It snaps
-								back.
+								Drag the photo sideways to offset the terrain line. It returns
+								to the solved position when released.
 							</p>
 						)}
 					</div>
@@ -805,7 +844,9 @@ function Stage({
 	);
 }
 
-function Readout({
+const Readout = memo(ReadoutView);
+
+function ReadoutView({
 	scene,
 	pose,
 	sweep,

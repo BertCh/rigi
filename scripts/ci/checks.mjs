@@ -306,6 +306,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "range-webgpu",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/roll/map/range-webgpu.check.ts"),
+		note: "WebGPU range hand-off (RangeGpuWebGpu): the reference rule equals the old CPU path (unpack, rangeMapFrom, coarsen) on sky / NaN / Inf / negative / denormal words and odd sizes; with DAWN_DIR the copy into an r32float atlas cell (neighbours untouched) and the coarse grid are byte-equal to it on a Dawn device (GPU half SKIPs without DAWN_DIR)",
+		timeoutS: 180,
+	},
+	{
 		id: "base-slots",
 		tier: "fast",
 		group: "gpu",
@@ -803,6 +811,13 @@ export const CHECKS = [
 		tier: "fast",
 		group: "deck-webgpu",
 		cmd: tsx("src/lib/deck-webgpu/layers/tiles3d.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-pins",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/pins.check.ts"),
 		timeoutS: 120,
 	},
 	{

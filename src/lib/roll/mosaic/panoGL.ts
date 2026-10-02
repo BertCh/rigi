@@ -11,7 +11,9 @@
 // cache), luma Buffers / Textures. The GLSL is the former program verbatim except that its uniforms
 // are two std140 blocks, one per stage (luma 10 feeds GLSL uniforms through blocks only; a block per
 // stage keeps the fragment uniforms at the fragment shader's mediump default). The canvas keeps one
-// device for its lifetime (a canvas has one WebGL context), so a re-mounted strip reuses it.
+// device while it is in the DOM (a canvas has one WebGL context), so a re-effected strip (React
+// strict mode) reuses it; dispose() releases the device (and loses the context) once the canvas is
+// detached, since an unmounted landing embed must free its GPU context rather than wait for GC.
 import {
 	Buffer,
 	type Device,
@@ -138,6 +140,15 @@ function deviceFor(canvas: HTMLCanvasElement): Device {
 	return device;
 }
 
+/** Destroy the canvas's device and lose its WebGL context now (a detached canvas is never reused). */
+export function releaseDevice(canvas: HTMLCanvasElement) {
+	const device = devices.get(canvas);
+	if (!device) return;
+	devices.delete(canvas);
+	(device as WebGLDevice).loseDevice();
+	device.destroy();
+}
+
 export class PanoGL {
 	private device: Device;
 	private items = new Map<string, Item>();
@@ -145,10 +156,10 @@ export class PanoGL {
 	private linkRetries = 0;
 
 	constructor(
-		canvas: HTMLCanvasElement,
+		private canvas: HTMLCanvasElement,
 		private onLoad: () => void,
 	) {
-		this.device = deviceFor(canvas);
+		this.device = deviceFor(this.canvas);
 	}
 
 	/** Register (or update) a photo; starts loading its texture once. */
@@ -300,9 +311,16 @@ export class PanoGL {
 		this.items.delete(id);
 	}
 
-	/** Frees every photo's GPU resources; the canvas's device stays for a re-mount. */
+	/**
+	 * Frees every photo's GPU resources, then the device itself once the canvas has left the DOM
+	 * (checked a task later: an effect re-run on the same, still attached canvas keeps its device).
+	 */
 	dispose() {
 		this.alive = false;
 		for (const id of [...this.items.keys()]) this.drop(id);
+		const canvas = this.canvas;
+		setTimeout(() => {
+			if (!canvas.isConnected) releaseDevice(canvas);
+		}, 0);
 	}
 }

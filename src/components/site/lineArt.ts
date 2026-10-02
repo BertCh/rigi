@@ -255,3 +255,30 @@ export function viewOfCamera(
 		fov,
 	};
 }
+
+/** Each stroke's middle point (x, y, z) back to back: what the draw buckets by distance. */
+export function midpointsOf(L: Pick<Lines, "pts" | "start" | "style">) {
+	const n = L.style.length;
+	const out = new Float32Array(n * 3);
+	for (let i = 0; i < n; i++) {
+		const m = ((L.start[i] + L.start[i + 1]) >> 1) * 3;
+		out[i * 3] = L.pts[m];
+		out[i * 3 + 1] = L.pts[m + 1];
+		out[i * 3 + 2] = L.pts[m + 2];
+	}
+	return out;
+}
+
+/** A text width measured once per name (the font never changes). */
+export function cachedWidth(
+	cache: Map<string, number>,
+	name: string,
+	measure: (name: string) => number,
+) {
+	let w = cache.get(name);
+	if (w === undefined) {
+		w = measure(name);
+		cache.set(name, w);
+	}
+	return w;
+}

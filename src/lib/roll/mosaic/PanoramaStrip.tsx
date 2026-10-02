@@ -47,6 +47,8 @@ type Props = {
 	zoom?: boolean;
 	/** A grip under the strip resizes it vertically; the height is remembered per browser. */
 	resizable?: boolean;
+	/** Cap on the canvases' device pixel ratio (the three full-bleed layers cost pixels squared). */
+	maxPixelRatio?: number;
 };
 
 type Mode = number | "all";
@@ -88,6 +90,7 @@ export function PanoramaStrip({
 	fitHeight = false,
 	zoom = true,
 	resizable = false,
+	maxPixelRatio = 2,
 }: Props) {
 	const [autoH, setAutoH] = useState<number | null>(null);
 	// user-chosen height (resizable); read after mount so the server render and hydration agree
@@ -263,7 +266,7 @@ export function PanoramaStrip({
 		const ov = ovRef.current;
 		const { w, h } = size.current;
 		if (!bg || !gl || !ov || !w || !h) return;
-		const dpr = Math.min(2, window.devicePixelRatio || 1);
+		const dpr = Math.min(maxPixelRatio, window.devicePixelRatio || 1);
 		for (const c of [bg, gl, ov]) {
 			const W = Math.round(w * dpr);
 			const H = Math.round(h * dpr);
@@ -315,7 +318,7 @@ export function PanoramaStrip({
 				: 0,
 			state.current.hoverPeak,
 		);
-	}, []);
+	}, [maxPixelRatio]);
 	const requestDraw = useCallback(() => {
 		if (!frame.current) frame.current = requestAnimationFrame(draw);
 	}, [draw]);

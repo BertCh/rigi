@@ -29,6 +29,12 @@ import { RollMapTerroir } from "../../terroir/roll/RollMapTerroir";
 import { HeadingChip } from "../mosaic/badges";
 import { aspectOf, fmtDay, fmtTime } from "../mosaic/style";
 import type { Roll } from "../types";
+import {
+	failBackend,
+	initialBackendState,
+	type RollBackendState,
+	rendererAttrFor,
+} from "./backend-select";
 import { ROLL_BASEMAPS, type RollBasemap } from "./basemap";
 import type { RollMapEngine, RollMapHover, RollMapStatus } from "./roll-map";
 
@@ -77,16 +83,42 @@ export function RollMap({
 
 	// the engine (terrain, atlases) lives as long as the roll's photo set: a reloaded roll with new
 	// poses for the same photos (the aligner) only moves the cameras (updateRoll, below)
+	// the backend follows the app's renderer selection (?renderer / ?webgpu); a WebGPU failure takes
+	// a fresh canvas (gen) and mounts again on WebGL2, once
+	const [backendSel, setBackendSel] = useState<{
+		state: RollBackendState;
+		gen: number;
+	} | null>(null);
+	useEffect(() => {
+		let live = true;
+		void import("#/lib/renderer-select")
+			.then((m) => m.resolveRenderer())
+			.then((choice) => {
+				if (live) setBackendSel({ state: initialBackendState(choice), gen: 0 });
+			});
+		return () => {
+			live = false;
+		};
+	}, []);
+	const backendKind = backendSel?.state.kind;
 	const rollKey = `${roll.id}|${roll.photos.map((p) => p.meta.id).join(",")}`;
 	useEffect(() => {
 		const canvas = canvasRef.current;
-		if (!canvas || !rollKey) return;
+		if (!canvas || !rollKey || !backendKind) return;
 		let eng: RollMapEngine | null = null;
 		let live = true;
 		// deck + three stay out of the SSR / mosaic bundle until the map is shown
 		import("./roll-map").then(({ RollMapEngine }) => {
 			if (!live) return;
 			eng = new RollMapEngine(canvas, rollRef.current, {
+				backend: backendKind,
+				onBackendFailed: (e) =>
+					live &&
+					setBackendSel((cur) => {
+						if (!cur) return cur;
+						const state = failBackend(cur.state, e);
+						return state === cur.state ? cur : { state, gen: cur.gen + 1 };
+					}),
 				onSelect: (id) => onSelectRef.current(id),
 				onStatus: (s) => live && setStatus(s),
 				onHover: (h) => live && setHover(h),
@@ -106,7 +138,7 @@ export function RollMap({
 			setViewId(null);
 			setHover(null);
 		};
-	}, [rollKey]);
+	}, [rollKey, backendKind]);
 
 	useEffect(() => {
 		if (engine && engine.roll !== roll) engine.updateRoll(roll);
@@ -136,7 +168,10 @@ export function RollMap({
 	)?.viewpoint;
 	useEffect(() => {
 		if (!engine || !spot3d || spotVp === undefined) {
-			engine?.setExtraLayers("spot3d", null);
+			if (engine)
+				void import("#/lib/nearfield/roll/roll-spot").then((m) =>
+					m.setSpot(engine, null),
+				);
 			setSpotNote("");
 			return;
 		}
@@ -156,14 +191,16 @@ export function RollMap({
 			if (ac.signal.aborted) return;
 			if (!s) return setSpotNote((n) => n || "unavailable");
 			window.__rollSpotLast = s;
-			engine.setExtraLayers("spot3d", [m.spotLayer(s.cloud)]);
+			await m.setSpot(engine, s.cloud);
 			setSpotNote(
 				`${s.views.filter((v) => v.splats > 0).length}/${ids.length} photos · ${s.cloud.count} splats`,
 			);
 		});
 		return () => {
 			ac.abort();
-			engine.setExtraLayers("spot3d", null);
+			void import("#/lib/nearfield/roll/roll-spot").then((m) =>
+				m.setSpot(engine, null),
+			);
 		};
 	}, [engine, spot3d, spotVp]);
 
@@ -247,10 +284,15 @@ export function RollMap({
 			data-theme="dark"
 			className={`relative overflow-hidden bg-[#a9c2da] outline-none ${className ?? ""}`}
 			data-testid="roll-map"
+			data-renderer={backendKind && rendererAttrFor(backendKind)}
+			data-renderer-reason={backendSel?.state.reason}
 			data-stage={status.stage}
 			data-view={viewId ?? undefined}
 		>
 			<canvas
+				// a fresh canvas per engine (a new roll or a fallback): a disposed engine's pending device
+				// must never configure the canvas the next engine uses
+				key={`${backendSel?.gen ?? 0}|${rollKey}`}
 				ref={canvasRef}
 				className="absolute inset-0 size-full touch-none"
 			/>

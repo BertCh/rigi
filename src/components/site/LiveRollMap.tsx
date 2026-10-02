@@ -6,10 +6,16 @@ import { Link } from "@tanstack/react-router";
 import { Cpu, Undo2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { MapAttribution } from "#/lib/licences/MapAttribution";
+import {
+	failBackend,
+	initialBackendState,
+	type RollBackendState,
+	rendererAttrFor,
+} from "#/lib/roll/map/backend-select";
 import type { RollMapEngine, RollMapStatus } from "#/lib/roll/map/roll-map";
 import { LiveLines } from "./LiveLines";
 import { type Lines, viewOfCamera } from "./lineArt";
-import { useNearViewport } from "./useNearViewport";
+import { useLiveEmbed } from "./liveSlot";
 
 // Landing-page live map: the sample trip draped on 3D terrain by the real roll engine, started only
 // once the section scrolls into view, slowly orbiting until someone grabs it. Clicking a camera pin
@@ -41,16 +47,22 @@ export function LiveRollMap({
 	className?: string;
 }) {
 	// the first sighting starts the load (small margin: the heavy load shouldn't begin while the topo
-	// board above is still on screen); far away for a few seconds, the engine is disposed (its GPU
-	// context freed) and the poster shows again
+	// board above is still on screen); far away for a few seconds, or off screen while another live
+	// embed is on screen (liveSlot), the engine is disposed (its GPU context freed) and the poster
+	// shows again
 	const box = useRef<HTMLDivElement>(null);
-	const { near: visible } = useNearViewport(50, {
-		releaseWhenFar: true,
-		ref: box,
-	});
+	const { live, onScreen: inView } = useLiveEmbed("rollmap", 50, { ref: box });
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	// a fresh <canvas> per engine: a released canvas keeps its old context type
 	const [generation, setGeneration] = useState(0);
+	// the backend follows the app's renderer selection, resolved on the first sighting; a WebGPU
+	// failure switches this mount to WebGL2 for good (and takes a fresh canvas, see generation)
+	const [backendState, setBackendState] = useState<RollBackendState | null>(
+		null,
+	);
+	const backendRef = useRef<RollBackendState | null>(null);
+	backendRef.current = backendState;
+	const backendKind = backendState?.kind;
 	const started = useRef(false);
 	const [status, setStatus] = useState<RollMapStatus | null>(null);
 	const [shown, setShown] = useState(false);
@@ -63,7 +75,7 @@ export function LiveRollMap({
 	const onScreen = useRef(false);
 
 	// no wheel zoom on the landing page: the wheel scrolls on down the page. A capture listener on the
-	// box keeps the wheel from reaching OrbitControls (which would preventDefault it); drag still orbits.
+	// box keeps the wheel from reaching the OrbitController (which would preventDefault it); drag still orbits.
 	useEffect(() => {
 		const el = box.current;
 		if (!el) return;
@@ -72,26 +84,30 @@ export function LiveRollMap({
 		return () => el.removeEventListener("wheel", stop, { capture: true });
 	}, []);
 
+	// the render loop follows visibility
 	useEffect(() => {
-		const el = box.current;
-		if (!el) return;
-		// the render loop follows visibility
-		const io = new IntersectionObserver(
-			([e]) => {
-				onScreen.current = e.isIntersecting;
-				if (e.isIntersecting) eng.current?.resume();
-				else eng.current?.pause();
-			},
-			{ rootMargin: "50px" },
-		);
-		io.observe(el);
-		return () => io.disconnect();
-	}, []);
+		onScreen.current = inView;
+		if (inView) eng.current?.resume();
+		else eng.current?.pause();
+	}, [inView]);
+
+	useEffect(() => {
+		if (!live || backendState) return;
+		let alive = true;
+		void import("#/lib/renderer-select")
+			.then((m) => m.resolveRenderer())
+			.then((choice) => {
+				if (alive) setBackendState((cur) => cur ?? initialBackendState(choice));
+			});
+		return () => {
+			alive = false;
+		};
+	}, [live, backendState]);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
-		if (!visible || !canvas) return;
-		let live = true;
+		if (!live || !canvas || !backendKind) return;
+		let alive = true;
 		let engine: RollMapEngine | null = null;
 		(async () => {
 			const [
@@ -107,9 +123,23 @@ export function LiveRollMap({
 			]);
 			// the landing's 1024 px copies (the engine works at 1024 px anyway), no trails
 			const roll = await loadDemoRoll({ core: true, smallPhotos: true });
-			if (!live) return;
+			if (!alive) return;
 			setCenter(roll.center);
 			engine = new RollMapEngine(canvas, roll, {
+				backend: backendKind,
+				onBackendFailed: (e) => {
+					if (!alive) return;
+					// one-way: the failed canvas may hold a WebGPU context, so remount on a new one
+					const cur = backendRef.current;
+					const next = cur && failBackend(cur, e);
+					if (!next || next === cur) return;
+					backendRef.current = next;
+					setBackendState(next);
+					setGeneration((g) => g + 1);
+					setShown(false);
+					setStatus(null);
+					setInPhoto(null);
+				},
 				overviewM: OVERVIEW_M,
 				// baked people masks (scripts/demo/bake-people-masks.mjs): no MediaPipe download
 				peopleMasks: loadDemoPeopleMasks,
@@ -117,9 +147,9 @@ export function LiveRollMap({
 				// no Mapterhorn / WMTS downloads, no readbacks; any part that fails loads live
 				seed: demoRollMapSeed,
 				onSelect: (id) => id && engine?.flyTo(id),
-				onView: (id) => live && setInPhoto(id),
+				onView: (id) => alive && setInPhoto(id),
 				onStatus: (s) => {
-					if (!live) return;
+					if (!alive) return;
 					setStatus(s);
 					// show the canvas once the terrain is in; photos drape in live from there
 					if (s.stage !== "terrain") {
@@ -144,15 +174,15 @@ export function LiveRollMap({
 		const ro = new ResizeObserver(() => engine?.resize());
 		ro.observe(canvas);
 		return () => {
-			live = false;
+			alive = false;
 			ro.disconnect();
 			engine?.dispose();
 			eng.current = null;
 		};
-	}, [visible]);
+	}, [live, backendKind]);
 
 	useEffect(() => {
-		if (visible) {
+		if (live) {
 			started.current = true;
 		} else if (started.current) {
 			started.current = false;
@@ -161,7 +191,7 @@ export function LiveRollMap({
 			setStatus(null);
 			setInPhoto(null);
 		}
-	}, [visible]);
+	}, [live]);
 
 	const busy = status && status.stage !== "ready";
 	// the sides: contour lines through the orbiting camera, once the terrain is in; the engine's frame
@@ -189,6 +219,8 @@ export function LiveRollMap({
 				data-theme="dark"
 				className={`relative overflow-hidden bg-[var(--rigi-slate)] ${className ?? ""}`}
 				data-testid="live-roll-map"
+				data-renderer={backendKind && rendererAttrFor(backendKind)}
+				data-renderer-reason={backendState?.reason}
 			>
 				{poster && (
 					<img

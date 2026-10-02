@@ -10,7 +10,7 @@ import type { PhotoMeta } from "#/lib/photos";
 import type { Renderer } from "#/lib/renderer";
 import { LiveLines } from "./LiveLines";
 import { type Lines, viewOfCamera } from "./lineArt";
-import { useNearViewport } from "./useNearViewport";
+import { useLiveEmbed } from "./liveSlot";
 
 // Landing-page Step Inside: a photo from the sample trip (IMG_7086, Niederhorn) with its near field
 // baked by scripts/demo/bake-step.mjs (the anchored splats and the depth split the Step Inside button
@@ -27,7 +27,8 @@ type BakedStep = {
 	photo: PhotoMeta;
 	pose: Pose;
 	anchor: import("#/lib/nearfield/types").AnchorFit;
-	split: { width: number; height: number; counts: number[]; cls: string };
+	// the class grid (width x height bytes) is the sidecar cls.bin
+	split: { width: number; height: number; counts: number[] };
 	confidenceRadius: number;
 	model?: string;
 	medianObjectRange: number | null;
@@ -57,21 +58,12 @@ const STAGE: Record<string, string> = {
 	ready: "Live · drag to look around",
 };
 
-function bytesFromBase64(b64: string): Uint8Array {
-	const s = atob(b64);
-	const out = new Uint8Array(s.length);
-	for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
-	return out;
-}
-
 export function StepInsideDemo({ className }: { className?: string }) {
-	// starts near the viewport (200 px); far away for a few seconds, the engine is disposed (its GPU
-	// context freed) and the photo poster shows again
+	// starts near the viewport (200 px); far away for a few seconds, or off screen while another live
+	// embed is showing (liveSlot.ts), the engine is disposed (its GPU context freed) and the photo
+	// poster shows again
 	const box = useRef<HTMLDivElement>(null);
-	const { near: visible } = useNearViewport(200, {
-		releaseWhenFar: true,
-		ref: box,
-	});
+	const { live: visible } = useLiveEmbed("step", 200, { ref: box });
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const engineRef = useRef<StepEngine | null>(null);
 	// a fresh <canvas> per engine: a released canvas keeps its old context type
@@ -107,6 +99,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 		let engine: StepEngine | null = null;
 		let raf = 0;
 		let clearFlag: (() => void) | null = null;
+		let releaseSeed: (() => void) | null = null;
 		let stopWatch: (() => void) | null = null;
 		let lastInput = Number.NEGATIVE_INFINITY;
 		const onInput = () => {
@@ -118,13 +111,15 @@ export function StepInsideDemo({ className }: { className?: string }) {
 		canvas.addEventListener("keydown", onInput);
 		setStage("load");
 		(async () => {
-			const [baked, splatBuf, demo, flags, select, splatIo, measure] =
+			const [baked, splatBuf, clsBuf, demo, flags, select, splatIo, measure] =
 				await Promise.all([
 					fetch(`${BASE}/scene.json`).then(
 						(r) => r.json() as Promise<BakedStep>,
 					),
 					fetch(`${BASE}/splats.splat`).then((r) => r.arrayBuffer()),
-					import("#/lib/demo").then((d) => d.loadDemo()),
+					fetch(`${BASE}/cls.bin`).then((r) => r.arrayBuffer()),
+					// the step view draws no trails (settings.trails is off): skip trails.json (~2.7 MB)
+					import("#/lib/demo").then((d) => d.loadDemoCore()),
 					import("#/lib/flags"),
 					import("#/lib/renderer-select"),
 					import("#/lib/nearfield/splat-loaders"),
@@ -132,14 +127,17 @@ export function StepInsideDemo({ className }: { className?: string }) {
 				]);
 			if (!live) return;
 			const { registerLocalPhoto } = await import("#/lib/photos");
-			// the sample trip's region (Niederhorn) carries this photo's peaks too; its own id, so it never
-			// stands in for the original in this tab
+			// the sample trip's region (Niederhorn) carries this photo's peaks too. The photo and the region
+			// get their own ids, so neither stands in for the original in this tab: the core manifest's
+			// region has no trails, and registering it under the shared id would leave the demo photos
+			// trail-less if one is opened later
+			const region = { ...demo.region, id: `${demo.region.id}-step` };
 			const photo: PhotoMeta = {
 				...baked.photo,
 				id: "demo-step",
-				region: demo.region.id,
+				region: region.id,
 			};
-			registerLocalPhoto(photo, demo.region);
+			registerLocalPhoto(photo, region);
 			// tiles3d is read when the engine is built (tiles3d/config.ts): Google for this engine only,
 			// unless the page URL already chose a source. Google tiles are billed per load: automated
 			// browsers skip them (useStepInside's webdriver rule) unless ?tiles3d= asks
@@ -154,18 +152,35 @@ export function StepInsideDemo({ className }: { className?: string }) {
 					: (await import("#/lib/deck/engine")).DeckEngine;
 			if (!live) return;
 			// the same budget as the live map above (LiveRollMap): at most 1.5x device pixels, 30 fps sway
+			// far and context DEM tiles from the live map's baked terrain (about half the tiles this pose
+			// streams; the near field still needs the full-size tiles): one shared decode, usually from
+			// the HTTP cache since the live map sits just above
+			const [{ demoTerrainSeed }, { seededTileLoader }] = await Promise.all([
+				import("#/lib/demo/roll-map-seed"),
+				import("#/lib/deck/seeded-tiles"),
+			]);
+			if (!live) return;
+			const held = demoTerrainSeed.acquire();
+			releaseSeed = held.release;
+			const seed = held.seed.catch(() => null);
 			engine = new Engine(canvas, photo, {
 				pixelRatioCap: STEP_PIXEL_RATIO,
+				terrainTileWrap: (base) => async (key, seg, o) => {
+					const map = await seed;
+					return map
+						? seededTileLoader(map, base)(key, seg, o)
+						: base(key, seg, o);
+				},
 			}) as unknown as StepEngine;
 			engineRef.current = engine;
 			engine.resize(canvas.clientWidth, canvas.clientHeight);
 			setStage("terrain");
-			await engine.init(demo.region);
+			await engine.init(region);
 			if (!live) return;
 			engine.setPose(baked.pose);
 			if (!(await engine.readback()) || !live) return;
 			const splats = splatIo.SplatV1Loader.parseSync(splatBuf);
-			const cls = bytesFromBase64(baked.split.cls);
+			const cls = new Uint8Array(clsBuf);
 			const scene: import("#/lib/nearfield/measure").MeasurableScene = {
 				photoId: photo.id,
 				anchor: baked.anchor,
@@ -272,6 +287,7 @@ export function StepInsideDemo({ className }: { className?: string }) {
 			engine?.dispose();
 			engineRef.current = null;
 			clearFlag?.();
+			releaseSeed?.();
 			setStepping(false);
 		};
 	}, [visible]);
