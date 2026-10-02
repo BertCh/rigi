@@ -16,7 +16,8 @@ type Noise = (
 
 /**
  * Stand-ins for ImageData / createImageBitmap / OffscreenCanvas: a "bitmap" carries its RGBA bytes
- * (a Blob's bytes are the pixels, as in load.spec.ts), getImageData returns them through `noise`.
+ * (a Blob's bytes are the pixels, as in load.spec.ts); putImageData / drawImage set the canvas
+ * pixels, getImageData returns them through `noise`.
  */
 function stubCanvas(noise: Noise) {
 	vi.stubGlobal(
@@ -47,6 +48,9 @@ function stubCanvas(noise: Noise) {
 				let src: Uint8ClampedArray<ArrayBufferLike> = new Uint8ClampedArray(0);
 				return {
 					clearRect() {},
+					putImageData: (d: { data: Uint8ClampedArray }) => {
+						src = d.data;
+					},
 					drawImage: (b: { data: Uint8ClampedArray }) => {
 						src = b.data;
 					},
@@ -107,10 +111,11 @@ describe("bitmapHeights scratch canvas", () => {
 			const h = bitmapHeights(bitmap(4, 1000 + i) as unknown as ImageBitmap);
 			expect(h[7]).toBe(1000 + i);
 		}
-		expect(made).toBe(1);
+		// the readback probe's 512 px canvas, then one 4 px canvas for all three tiles
+		expect(made).toBe(2);
 		expect(cleared).toBe(3);
 		bitmapHeights(bitmap(8, 500) as unknown as ImageBitmap);
-		expect(made).toBe(2);
+		expect(made).toBe(3);
 	});
 });
 
@@ -137,7 +142,7 @@ describe("readback probe helpers", () => {
 describe("probeCanvasReadback / blobHeights", () => {
 	it("is unknown where there is no canvas (Node), and decode is unchanged", async () => {
 		const { probeCanvasReadback, canvasReadback } = await import("../image");
-		expect(await probeCanvasReadback()).toBe("unknown");
+		expect(probeCanvasReadback()).toBe("unknown");
 		expect(canvasReadback()).toBe("unknown");
 	});
 	it("an exact readback leaves heights bit for bit decodeTerrarium's", async () => {
@@ -166,12 +171,40 @@ describe("probeCanvasReadback / blobHeights", () => {
 		expect(console.warn).toHaveBeenCalledTimes(1);
 		// without the repair pixel 5 would read 2256 m
 		for (const v of h) expect(v).toBe(2000);
-		await probeCanvasReadback();
+		probeCanvasReadback();
 		expect(console.warn).toHaveBeenCalledTimes(1);
+	});
+	it("bitmapHeights alone (the GPU ingest's lazy CPU heights) runs the probe and repairs", async () => {
+		stubCanvas(bumpR);
+		const { bitmapHeights } = await import("../image");
+		const n = 8;
+		const bmp = {
+			width: n,
+			height: n,
+			close() {},
+			data: new Uint8ClampedArray(
+				Array.from({ length: n * n }, () => px(3000)).flat(),
+			),
+		};
+		const h = bitmapHeights(bmp as unknown as ImageBitmap);
+		for (const v of h) expect(v).toBe(3000);
+	});
+	it("a readback of the wrong size throws instead of decoding garbage", async () => {
+		stubCanvas(() => new Uint8ClampedArray(0));
+		const { bitmapHeights } = await import("../image");
+		const bmp = {
+			width: 2,
+			height: 2,
+			close() {},
+			data: new Uint8ClampedArray(16),
+		};
+		expect(() => bitmapHeights(bmp as unknown as ImageBitmap)).toThrow(
+			/wrong size/,
+		);
 	});
 	it("a blanked readback (all white) is detected as noised", async () => {
 		stubCanvas((d) => d.fill(255));
 		const { probeCanvasReadback } = await import("../image");
-		expect(await probeCanvasReadback()).toBe("noised");
+		expect(probeCanvasReadback()).toBe("noised");
 	});
 });

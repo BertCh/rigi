@@ -35,18 +35,22 @@ function scratchContext(w: number, h: number) {
  * Whether 2D-canvas readback returns the pixels drawn. Anti-fingerprinting modes (Brave's canvas
  * farbling, Safari's Advanced Fingerprinting Protection, Firefox resistFingerprinting) add noise to
  * getImageData or blank it; a ±1 in Terrarium R is a ±256 m spike, a blank canvas is no data.
- * "unknown" until probeCanvasReadback() has run, and where it cannot (no canvas, Node).
+ * "unknown" where the probe cannot run (no canvas or ImageData, e.g. Node).
  */
 export type CanvasReadback = "exact" | "noised" | "unknown";
 
-let readback: CanvasReadback = "unknown";
-let probe: Promise<CanvasReadback> | null = null;
+let readback: CanvasReadback | null = null;
 
-/** The probe's verdict so far (see CanvasReadback). */
-export const canvasReadback = (): CanvasReadback => readback;
+/** Probe edge: a full 512 px Mapterhorn tile, so sparse noise has as many pixels to land on. */
+const PROBE_SIZE = 512;
+
+/** The probe's verdict in this realm (runs it on first use; see probeCanvasReadback). */
+export const canvasReadback = (): CanvasReadback => probeCanvasReadback();
 
 /** The probe image: w × w opaque pixels covering every R, G and B byte value. */
-export function readbackProbePattern(w = 64): Uint8ClampedArray<ArrayBuffer> {
+export function readbackProbePattern(
+	w = PROBE_SIZE,
+): Uint8ClampedArray<ArrayBuffer> {
 	const px = new Uint8ClampedArray(w * w * 4);
 	for (let i = 0; i < w * w; i++) {
 		px[i * 4] = i & 255;
@@ -69,62 +73,54 @@ export function countReadbackMismatches(
 }
 
 /**
- * Once per realm: draw a known image through the same createImageBitmap + 2D canvas path the decode
- * uses and compare the readback. A failure to run leaves "unknown" (decode unchanged).
+ * Once per realm, synchronously (so every decode, including the GPU ingest's lazy CPU heights, sees
+ * the verdict): put a known image on a 2D canvas and compare getImageData, where the noise is
+ * applied. A failure to run gives "unknown" (decode unchanged).
  */
-export function probeCanvasReadback(): Promise<CanvasReadback> {
-	probe ??= (async () => {
-		try {
-			const w = 64;
-			const px = readbackProbePattern(w);
-			const bmp = await createImageBitmap(new ImageData(px, w, w), {
-				colorSpaceConversion: "none",
-				premultiplyAlpha: "none",
-			});
-			try {
-				const ctx = context2d(w, w);
-				if (!ctx) return readback;
-				ctx.drawImage(bmp, 0, 0);
-				const bad = countReadbackMismatches(
-					px,
-					ctx.getImageData(0, 0, w, w).data,
-				);
-				readback = bad ? "noised" : "exact";
-				if (bad)
-					console.warn(
-						`dem: canvas readback is altered (${bad} of ${px.length} bytes; anti-fingerprinting?): DEM tiles get the 256 m seam repair, heights may still be off by a few metres`,
-					);
-			} finally {
-				bmp.close();
-			}
-		} catch {
-			// no ImageData / createImageBitmap / canvas in this realm: leave "unknown"
-		}
-		return readback;
-	})();
-	return probe;
+export function probeCanvasReadback(): CanvasReadback {
+	if (readback) return readback;
+	readback = "unknown";
+	try {
+		const w = PROBE_SIZE;
+		const px = readbackProbePattern(w);
+		const ctx = scratchContext(w, w); // the size of every Mapterhorn tile, so decode reuses it
+		if (!ctx) return readback;
+		ctx.putImageData(new ImageData(px, w, w), 0, 0);
+		const bad = countReadbackMismatches(px, ctx.getImageData(0, 0, w, w).data);
+		readback = bad ? "noised" : "exact";
+		if (bad)
+			console.warn(
+				`dem: canvas readback is altered (${bad} of ${px.length} bytes; anti-fingerprinting?): DEM tiles get the 256 m seam repair, heights may still be off by a few metres`,
+			);
+	} catch {
+		// no ImageData / canvas in this realm: leave "unknown"
+	}
+	return readback;
 }
 
 /**
  * Heights of a decoded Terrarium image (OffscreenCanvas, or a <canvas> where there is none). When the
  * readback probe found noise, the tile also gets validateTile's 256 m seam repair (an R-channel ±1
  * becomes a one-pixel component shifted back by 256 m); with an exact or unknown readback the
- * heights are decodeTerrarium's, bit for bit.
+ * heights are decodeTerrarium's, bit for bit. Throws when the readback is not w × h pixels.
  */
 export function bitmapHeights(bmp: ImageBitmap) {
+	const noised = probeCanvasReadback() === "noised";
 	const ctx = scratchContext(bmp.width, bmp.height);
 	if (!ctx) throw new Error("2D canvas unavailable for DEM decode");
 	ctx.clearRect(0, 0, bmp.width, bmp.height); // a reused canvas must start transparent, like a new one
 	ctx.drawImage(bmp, 0, 0);
-	const h = decodeTerrarium(ctx.getImageData(0, 0, bmp.width, bmp.height).data);
-	if (readback === "noised" && bmp.width === bmp.height)
-		validateTile(h, bmp.width);
+	const data = ctx.getImageData(0, 0, bmp.width, bmp.height).data;
+	// invariant: one RGBA pixel per tile pixel (a blocked readback can come back empty)
+	if (data.length !== bmp.width * bmp.height * 4)
+		throw new Error("DEM decode: canvas readback has the wrong size");
+	const h = decodeTerrarium(data);
+	if (noised && bmp.width === bmp.height) validateTile(h, bmp.width);
 	return h;
 }
 
-/** Heights of an encoded Terrarium tile (PNG / WebP bytes); runs the readback probe first. */
+/** Heights of an encoded Terrarium tile (PNG / WebP bytes). */
 export async function blobHeights(blob: Blob) {
-	await probeCanvasReadback();
 	const bmp = await createImageBitmap(blob, {
 		colorSpaceConversion: "none",
 		premultiplyAlpha: "none",
