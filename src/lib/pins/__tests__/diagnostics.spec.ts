@@ -156,6 +156,11 @@ describe("pinSigmaDeg", () => {
 		const pred = pinSigmaDeg(truth, asp, eye, base, W, H, sigmaPx)?.yaw ?? 0;
 		expect(Math.abs(sd / pred - 1)).toBeLessThan(0.35);
 	});
+	it("is null for two pins a hair apart (the lens or roll is not determined)", () => {
+		const a = pinAt(truth, worlds[0]);
+		const b = { ...a, u: a.u + 1e-6 };
+		expect(pinSigmaDeg(truth, asp, eye, [a, b], W, H, 5)).toBeNull();
+	});
 	it("is null for two pins on the same pixel", () => {
 		const p = pinAt(truth, worlds[0]);
 		expect(pinSigmaDeg(truth, asp, eye, [p, { ...p }], W, H, 5)).toBeNull();

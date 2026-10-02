@@ -153,12 +153,19 @@ export function pinResidualsPx(
 	});
 }
 
+/** Relative pivot tolerance for JᵀJ (entries scale with the image size squared). */
+const pivotTol = (A: number[][]) =>
+	1e-9 * Math.max(1e-300, ...A.map((row, i) => Math.abs(row[i])));
+
+/** A σ above this (deg) means the taps do not determine that parameter: reported as null. */
+export const PIN_SIGMA_MAX_DEG = 45;
+
 export type PinSigma = Partial<Record<PinKey, number>>;
 
 /**
  * 1σ (degrees) of each freed parameter at `pose` for a tap error of `tapSigmaPx` per axis
- * (independent, isotropic): σ² = diag((JᵀJ)⁻¹) · tapSigmaPx². Null when JᵀJ is singular
- * (e.g. two pins on the same pixel). The parameters `solvePins` keeps fixed are absent.
+ * (independent, isotropic): σ² = diag((JᵀJ)⁻¹) · tapSigmaPx². Null when JᵀJ is (near-)singular
+ * or any σ exceeds PIN_SIGMA_MAX_DEG (e.g. two pins on, or within a hair of, the same pixel). The parameters `solvePins` keeps fixed are absent.
  */
 export function pinSigmaDeg(
 	pose: Pose,
@@ -190,9 +197,11 @@ export function pinSigmaDeg(
 	const out: PinSigma = {};
 	for (let i = 0; i < keys.length; i++) {
 		const e = keys.map((_, j) => (j === i ? 1 : 0));
-		const col = gaussJordan(A, e, 1e-9);
+		const col = gaussJordan(A, e, pivotTol(A));
 		if (!col || !(col[i] > 0)) return null;
-		out[keys[i]] = Math.sqrt(col[i]) * tapSigmaPx;
+		const sigma = Math.sqrt(col[i]) * tapSigmaPx;
+		if (!(sigma <= PIN_SIGMA_MAX_DEG)) return null;
+		out[keys[i]] = sigma;
 	}
 	return out;
 }
@@ -243,7 +252,10 @@ export function pairFitDeg(
 export type PinReliability = {
 	/** redundancy number per pin, 0..1 (mean of its two axes): 0 = the solve absorbs any error in it */
 	redundancy: number[];
-	/** minimal detectable error per pin (px): σ·4.1/√r (Baarda; α 0.001, power 0.8), Infinity when r ≈ 0 */
+	/**
+	 * minimal detectable error per pin (px): σ·4.1/√r (Baarda; α 0.001, power 0.8) with r the mean of the
+	 * pin's two axes (an approximation: per axis the weaker axis hides more), Infinity when r ≈ 0
+	 */
 	detectablePx: number[];
 };
 
@@ -287,7 +299,7 @@ export function pinReliability(
 	const lev: number[] = [];
 	for (let n = 0; n < m; n++) {
 		const jn = keys.map((_, i) => J[i][n]);
-		const x = gaussJordan(A, jn, 1e-9);
+		const x = gaussJordan(A, jn, pivotTol(A));
 		if (!x) return null;
 		lev.push(jn.reduce((s, v, i) => s + v * x[i], 0));
 	}

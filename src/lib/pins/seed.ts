@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 /**
- * Seeded pin solve (opt-in, `?pins=seeded`): a closed-form start for `align.ts solvePins`, so a tap
+ * Seeded pin solve (opt-in, `?pinSolve=seeded`): a closed-form start for `align.ts solvePins`, so a tap
  * solves even when the shown pose is far off, plus a lens bound.
  *
  * `solvePins` starts Levenberg–Marquardt from the shown pose. Past ~90° of yaw the summits project
@@ -109,8 +109,14 @@ export function vfovFromPair(
 		x0 = x1;
 		f0 = f1;
 	}
+	// a root exactly at the top of the range
+	if (best === null && f0 === 0) best = x0;
 	return best;
 }
+
+/** `yaw` moved by whole turns to lie within 180° of `ref` (solvePins keeps yaw unwrapped near its start). */
+const unwrapNear = (yaw: number, ref: number) =>
+	ref + ((((yaw - ref) % 360) + 540) % 360) - 180;
 
 /** Index pair of the two pins farthest apart on screen. */
 function widestPair(pins: Pin[], aspect: number): [number, number] {
@@ -186,8 +192,14 @@ export function seedPinPose(
 	if (pins.length === 1) {
 		// roll and vfov stay the prior's, as in solvePins; a few turns converge on an off-centre tap
 		let p: Pose = { ...prior, vfov };
-		for (let k = 0; k < 4; k++) p = turnToward(p, aspect, eye, pins[0]);
-		return p;
+		// each turn shrinks the miss by about sin(roll) × the tap's offset; stop once it no longer moves
+		for (let k = 0; k < 20; k++) {
+			const q = turnToward(p, aspect, eye, pins[0]);
+			const moved = Math.abs(q.yaw - p.yaw) + Math.abs(q.pitch - p.pitch);
+			p = q;
+			if (moved < 1e-9) break;
+		}
+		return { ...p, yaw: unwrapNear(p.yaw, prior.yaw) };
 	}
 	// TRIAD on the two pins farthest apart on screen
 	const [i, j] = widestPair(pins, aspect);
@@ -213,7 +225,7 @@ export function seedPinPose(
 	);
 	const axis = (col: number): V3 => [R[0][col], R[1][col], R[2][col]];
 	const { yaw, pitch, roll } = anglesFromAxes(axis(1), axis(0));
-	return { yaw, pitch, roll, vfov };
+	return { yaw: unwrapNear(yaw, prior.yaw), pitch, roll, vfov };
 }
 
 export type SeededPinSolve = {
@@ -227,10 +239,10 @@ export type SeededPinSolve = {
 const rms = (xs: number[]) =>
 	Math.sqrt(xs.reduce((s, x) => s + x * x, 0) / Math.max(1, xs.length));
 
-const sane = (p: Pose) =>
+/** Finite, and (when the solve frees the lens) within the lens bound. */
+const sane = (p: Pose, freesLens: boolean) =>
 	Object.values(p).every(Number.isFinite) &&
-	p.vfov >= VFOV_MIN &&
-	p.vfov <= VFOV_MAX;
+	(!freesLens || (p.vfov >= VFOV_MIN && p.vfov <= VFOV_MAX));
 
 /**
  * `solvePins` from the closed-form seed and from the prior; keeps the sane one that fits the taps
@@ -253,13 +265,19 @@ export function solvePinsSeeded(
 	const seed = seedPinPose(prior, aspect, eye, pins, solveFov);
 	// the seed's roll / vfov become the weak-prior anchors; for one pin they are the prior's anyway
 	const fromSeed = solvePins(seed, aspect, eye, pins, imgW, imgH, solveFov);
-	const ePlain = sane(plain) ? tapRms(plain) : Number.POSITIVE_INFINITY;
-	const eSeed = sane(fromSeed) ? tapRms(fromSeed) : Number.POSITIVE_INFINITY;
+	const freesLens = solveFov && pins.length >= 3;
+	const ePlain = sane(plain, freesLens)
+		? tapRms(plain)
+		: Number.POSITIVE_INFINITY;
+	const eSeed = sane(fromSeed, freesLens)
+		? tapRms(fromSeed)
+		: Number.POSITIVE_INFINITY;
 	// 0.01 px: a seeded answer must be measurably better to replace the plain one
 	if (eSeed + 0.01 < ePlain)
 		return { pose: fromSeed, rmsPx: eSeed, seeded: true };
-	if (Number.isFinite(ePlain))
-		return { pose: plain, rmsPx: ePlain, seeded: false };
+	// the lens is kept for 1–2 pins (or solveFov = false), so only a free lens needs the fallback
+	if (Number.isFinite(ePlain) || !freesLens)
+		return { pose: plain, rmsPx: tapRms(plain), seeded: false };
 	const fixed = solvePins(
 		{ ...seed, vfov: Math.min(VFOV_MAX, Math.max(VFOV_MIN, seed.vfov)) },
 		aspect,
@@ -274,8 +292,8 @@ export function solvePinsSeeded(
 
 /**
  * The engines' pin solve (`Renderer.solvePins`): `solvePins` unless `?pinSolve=seeded`. Where
- * `solvePins` converges the seeded answer is the same pose (a seeded one must fit measurably better),
- * so the eval GT, which solves from the compass prior, only differs where the plain solve failed.
+ * `solvePins` converges it returns that same pose (a seeded one must fit the taps more than 0.01 px
+ * better RMS to replace it), so the eval GT, which solves from the compass prior, only differs where the plain solve failed.
  */
 export function solvePinsForApp(
 	prior: Pose,

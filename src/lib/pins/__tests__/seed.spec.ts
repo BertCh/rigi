@@ -170,4 +170,57 @@ describe("solvePinsSeeded", () => {
 		expect(r.pose.vfov).toBeLessThanOrEqual(VFOV_MAX);
 		expect(r.rmsPx).toBeGreaterThan(20); // the misfit stays visible for the caller
 	});
+	it("keeps roll for one pin and the lens for one or two pins, from any start", () => {
+		const rnd = seededRandom(5);
+		for (let k = 0; k < 40; k++) {
+			const n = 1 + (k % 2);
+			const pins = tapsUnder(truth, worlds.slice(0, n));
+			const prior: Pose = {
+				yaw: truth.yaw + (rnd() - 0.5) * 300,
+				pitch: (rnd() - 0.5) * 30,
+				roll: (rnd() - 0.5) * 20,
+				vfov: 30 + rnd() * 40,
+			};
+			const r = solvePinsSeeded(prior, asp, eye, pins, W, H);
+			expect(r.pose.vfov).toBe(prior.vfov);
+			if (n === 1) expect(r.pose.roll).toBe(prior.roll);
+		}
+	});
+	it("a lens outside the bound is kept, not clamped, when the pins do not free it", () => {
+		const pins = tapsUnder(truth, worlds.slice(0, 1));
+		const r = solvePinsSeeded(
+			{ ...truth, yaw: 0, vfov: 130 },
+			asp,
+			eye,
+			pins,
+			W,
+			H,
+		);
+		expect(r.pose.vfov).toBe(130);
+	});
+	it("stays near the prior's yaw branch (no 360° jumps)", () => {
+		const t: Pose = { ...truth, yaw: 355 };
+		const pins = tapsUnder(t, [summit(350, 4, 12), summit(5, 6, 8)]);
+		const r = solvePinsSeeded(
+			{ ...t, yaw: 200, roll: 0 },
+			asp,
+			eye,
+			pins,
+			W,
+			H,
+		);
+		expect(Math.abs(r.pose.yaw - 200)).toBeLessThanOrEqual(180);
+		expect(angleDiffDeg(r.pose.yaw, 355)).toBeLessThan(0.01);
+	});
+});
+
+describe("seedPinPose, steep and rolled", () => {
+	it("the one-pin seed converges with a large roll and an off-centre tap", () => {
+		const t: Pose = { yaw: -28.6, pitch: 36.5, roll: -20.7, vfov: 60 };
+		const w = summit(-10, 50, 6);
+		const [pin] = tapsUnder(t, [w]);
+		const s = seedPinPose({ ...t, yaw: 120, pitch: -10 }, asp, eye, [pin]);
+		const miss = pinResidualsPx(s, asp, eye, [pin], W, H)[0];
+		expect(miss).toBeLessThan(1);
+	});
 });
