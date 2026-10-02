@@ -34,15 +34,14 @@ Each figure is a `LivePlate`. It puts a `Figure` on the wide track, with a hand 
 
 ## Photo story (`PhotoStory.tsx`)
 
-`<PhotoStory />` draws one demo photo with its alignment written on it in four steps:
+`<PhotoStory />` draws one demo photo with its alignment written on it as a film: guess, measure, correct, then snap (or keep, when the app refused the solve).
 
-1. **Guess.** The DEM skyline and up to four names at the phone's prior pose.
-2. **Measure.** The skyline the eye traced, with a "traced by the eye" note.
-3. **Correct.** A red hand arc from the guessed mark of the highest peak to its solved mark, with the yaw and pitch turn. The guessed names are struck in red.
-4. **Snap.** The names at their solved summits, and the anchor summit ringed.
-
-- Every line and point on the photo is measured: `RealPhoto` layers and `HandDot data` marks. The arc, the strikes and the ring are furniture between measured endpoints.
-- The photo spills its world onto the margins (`RealPhoto bleed` → `GeoSpill`), and the spill follows the story's t (guess 0, solved 1).
-- The steps advance on their own while the figure is in view, until the reader uses the stepper. Static (reduced motion, webdriver, print) shows the final step with the struck guess still visible.
-- `photoId` defaults to the page's photo picker (`useNotebookPhoto`). Other props: `number`, `title`, `caption`, `bleed`, `interval`, `crop`, `date`, `className`.
+- One clock (`storyFilm.ts`, pure and specced) gives one frame of 0..1 values per instant. `PhotoStory` writes each frame straight onto the DOM; React only hears about a beat change and, every 33 ms at most, the pose t.
+- Guess: the DEM horizon is drawn by hand at the phone's pose and the margins come up with it, then the guessed names and the pose note. Measure: the traced skyline wipes in, then gap ticks grow from the horizon to the trace, then the median. Correct: the guess ghosts, the camera turns on a moving DEM horizon (the same pose drives the spill), the arc is drawn, then the turn's numbers. Snap: red strikes, a ring on each summit, the anchor ring and the confidence. A refused solve ends on keep: the stamp, then the camera turns back to the guess.
+- Names ride the camera between their guessed and solved marks, exact at both ends. Every number is read from the photo JSON.
+- Playback is once and hold by default: it arms at 45 % in view, pauses below 20 %, and replays from 0 when the reader comes back, rests the pointer on it or taps it. `playback="loop"` repeats on its own.
+- The stepper plays one beat and then stays manual; arrow keys move between beats. Dragging along the hairlines scrubs the clock. "again" replays.
+- Static (reduced motion, webdriver, print, no IntersectionObserver) shows the settled frame, `filmFrame(plan, plan.total)`, with every focus note in it. Print commits that frame before the snapshot and restores the reader's state after.
+- `focus` says what the page is about: `trace` (weight bars, the traced-column count), `gaps` (the whole residual and roll and focal in the turn), `snap` (up to six names, how far each moved), `eye` (the GPS-under-ground note), `prior` (compass, tilt and focal, how far the compass was off), `tap` (the spill needle on the tapped summit, then the heading), `search` (the tab reads "search").
+- `photoId` defaults to the page's photo picker (`useNotebookPhoto`). Other props: `number`, `title`, `caption`, `bleed`, `crop`, `date`, `className`, `playback`. A crop keeps names, ticks and notes inside it.
 - Its spill needs `.tafel-spill` from `tafel/tafel.css`; ConceptPage loads it with the Tafel.

@@ -1387,7 +1387,7 @@ function Skyline({ node }: { node: GipfelbuchNode }) {
 				</p>
 			</Beat>
 
-			<PhotoStory number="4" />
+			<PhotoStory number="4" focus="trace" />
 
 			<Beat
 				kicker="Where it fails"

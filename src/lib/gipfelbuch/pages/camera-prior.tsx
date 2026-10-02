@@ -1130,6 +1130,7 @@ function HeroCompare() {
 			photoId={photoId}
 			number="1"
 			title="The phone's guess, struck through"
+			focus="prior"
 			caption={
 				<>
 					{d

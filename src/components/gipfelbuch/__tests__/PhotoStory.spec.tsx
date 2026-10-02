@@ -74,4 +74,25 @@ describe("PhotoStory static frame", () => {
 			getAllByText(/refused: confidence 0\.46 < 0\.5/).length,
 		).toBeGreaterThan(0);
 	});
+
+	it("focus eye shows the GPS-under-the-ground note in the static frame", () => {
+		state.data = accepted;
+		const { getByText } = render(<PhotoStory photoId="demo-09" focus="eye" />);
+		expect(getByText(/under the ground → eye at 1915 m/)).toBeTruthy();
+	});
+
+	it("focus gaps shows the p90 readout and the extra turn numbers", () => {
+		state.data = accepted;
+		const { getByText } = render(<PhotoStory photoId="demo-09" focus="gaps" />);
+		expect(getByText(/p90 36→24 · ≤5 px 21%→74%/)).toBeTruthy();
+		expect(getByText(/focal ×1\.02/)).toBeTruthy();
+	});
+
+	it("focus snap labels how far each summit moved", () => {
+		state.data = accepted;
+		const { container } = render(<PhotoStory photoId="demo-09" focus="snap" />);
+		const moved = container.querySelectorAll('[data-film="moved"]');
+		expect(moved.length).toBeGreaterThan(0);
+		expect(moved[0].textContent).toMatch(/^moved \d+ px$/);
+	});
 });

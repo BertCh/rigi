@@ -1381,6 +1381,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				photoId="demo-09"
 				title="From the phone's guess to the solved view"
 				crop={[0, 40, 800, 360]}
+				focus="eye"
 			/>
 
 			<Numbers

@@ -1999,7 +1999,7 @@ function PoseExplainer({ node: _node }: { node: GipfelbuchNode }) {
 				/>
 			</Beat>
 
-			<PhotoStory number="Fig. 2" title="On a real photo" />
+			<PhotoStory number="Fig. 2" title="On a real photo" focus="gaps" />
 
 			<Beat
 				kicker="Why the label matters"

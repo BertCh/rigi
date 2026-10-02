@@ -1626,6 +1626,7 @@ export default function Page({ node: _node }: { node: GipfelbuchNode }) {
 				photoId="demo-10"
 				number="3"
 				title="A tap is the snap"
+				focus="tap"
 				caption={
 					S
 						? `The phone's guess: labels miss their summits by ${S[0].peakShift.median} px (median). One named summit pulls them onto the skyline: ${S[1].peakShift.median} px after one tap.`
