@@ -10,6 +10,7 @@ import { type Pose, unprojectDir } from "../camera";
 import { lookGpuOn, trackLook, warmLookGpu } from "../gpu/look/opt-in";
 import type { ViewStyle } from "../style/types";
 import type { Vec3 } from "./atmosphere";
+import { photoPixels } from "./composite";
 import { fitHaze, type HazeFit, type HazeGeo, type SkyMask } from "./haze-fit";
 
 const STEP = 2;
@@ -56,12 +57,6 @@ export class HazeController {
 	/** Opt-in GPU path (gpu/look, the GPU look): update returns false and this fires when the fit lands. */
 	onAsync?: (fit: HazeFit | null) => void;
 	private seq = 0;
-	private photo?: {
-		img: HTMLImageElement;
-		w: number;
-		h: number;
-		data: ImageData;
-	};
 
 	constructor() {
 		// both engines make one per view: compile the opt-in GPU look kernels early (no-op when off)
@@ -136,7 +131,7 @@ export class HazeController {
 			const readback = () =>
 				import("../gpu/look/hooks").then((m) =>
 					m.hazeFitAsync({
-						photo: this.pixels(img, W * 2, H * 2),
+						photo: photoPixels(img, W * 2, H * 2),
 						geo: small,
 						geoW: W,
 						geoH: H,
@@ -176,7 +171,7 @@ export class HazeController {
 		}
 		try {
 			this.fit = fitHaze({
-				photo: this.pixels(o.img, W * 2, H * 2),
+				photo: photoPixels(o.img, W * 2, H * 2),
 				geo: small,
 				geoW: W,
 				geoH: H,
@@ -201,21 +196,5 @@ export class HazeController {
 		this.sky = m;
 		this.key = "";
 		this.seq++;
-	}
-
-	/** The photo at w×h (cached). */
-	private pixels(img: HTMLImageElement, w: number, h: number) {
-		const c = this.photo;
-		if (c?.img === img && c.w === w && c.h === h) return c.data;
-		const cv = document.createElement("canvas");
-		cv.width = w;
-		cv.height = h;
-		const ctx = cv.getContext("2d", {
-			willReadFrequently: true,
-		}) as CanvasRenderingContext2D;
-		ctx.drawImage(img, 0, 0, w, h);
-		const data = ctx.getImageData(0, 0, w, h);
-		this.photo = { img, w, h, data };
-		return data;
 	}
 }

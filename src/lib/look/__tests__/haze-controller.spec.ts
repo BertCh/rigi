@@ -133,6 +133,10 @@ describe("HazeController", () => {
 		expect(c.update(moved)).toBe(true);
 		expect(geoFn).toHaveBeenCalledTimes(2);
 		expect(draw).toHaveBeenCalledTimes(1);
+		// the raster is look/composite's per-image cache: another controller (the other engine, the
+		// GPU look capture) on the same photo and size rasterises nothing more
+		new HazeController().update({ ...o, pose: { ...pose, yaw: 12 } });
+		expect(draw).toHaveBeenCalledTimes(1);
 		// eye altitude change and a new foreground mask both refit
 		expect(c.update({ ...moved, eyeAlt: 1200 })).toBe(true);
 		const fg: SkyMask = { width: 1, height: 1, data: new Uint8Array(1) };
