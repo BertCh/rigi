@@ -3,11 +3,14 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { describe, expect, it } from "vitest";
-import { seededRandom, uniform } from "#/test/helpers";
+import { seededRandom, uniform, withFlags } from "#/test/helpers";
 import {
 	computeFeatures,
 	detectSkyline,
+	detectSkylineAsync,
+	detectSkylineWith,
 	heuristicSky,
+	modelSky,
 	type RGBALike,
 	viterbi,
 } from "../skyline";
@@ -161,5 +164,59 @@ describe("detectSkyline", () => {
 		const a = detectSkyline(img);
 		const b = detectSkyline(img);
 		expect([...a.rows]).toEqual([...b.rows]);
+	});
+});
+
+describe("detectSkyline clean-up", () => {
+	it("zero-weights a narrow post sticking up above the ridge", () => {
+		const w = 120;
+		const h = 80;
+		// ridge at row 40, a 3-column dark post rising to row 20 at x = 60..62
+		const post = (x: number) => (x >= 60 && x <= 62 ? 20 : 40);
+		const obs = detectSkyline(synth(w, h, post, 4));
+		// either the trace skips the post or the post columns carry no weight
+		for (let x = 60; x <= 62; x++)
+			expect(Math.abs(obs.rows[x] - 20) < 3 ? obs.weight[x] : 0).toBe(0);
+		let kept = 0;
+		for (let x = 10; x < 50; x++)
+			if (obs.weight[x] > 0 && Math.abs(obs.rows[x] - 40) <= 3) kept++;
+		expect(kept).toBeGreaterThan(30);
+	});
+	it("NaN rows always carry weight 0, and weight > 0 rows are finite", () => {
+		const obs = detectSkyline(synth(64, 48, (x) => 15 + (x % 7), 8, 3));
+		for (let x = 0; x < 64; x++) {
+			if (Number.isNaN(obs.rows[x])) expect(obs.weight[x]).toBe(0);
+			if (obs.weight[x] > 0) expect(Number.isFinite(obs.rows[x])).toBe(true);
+		}
+	});
+});
+
+describe("detectSkylineWith / detectSkylineAsync", () => {
+	it("CPU stages give exactly detectSkyline", async () => {
+		const img = synth(64, 48, (x) => 18 + 0.2 * x, 5, 7);
+		const ref = detectSkyline(img);
+		const got = await detectSkylineWith(
+			img,
+			{},
+			{
+				features: async (im) => {
+					const f = computeFeatures(im);
+					return { f, prior: heuristicSky(f, im.width * im.height) };
+				},
+				modelSky: async (m) =>
+					modelSky(computeFeatures(img), img.width, img.height, m),
+			},
+		);
+		expect([...got.rows]).toEqual([...ref.rows]);
+		expect([...got.weight]).toEqual([...ref.weight]);
+		expect([...(got.sky ?? [])]).toEqual([...(ref.sky ?? [])]);
+	});
+	it("with skylineGpu off it is the CPU detector", async () => {
+		withFlags({ skylineGpu: "off" });
+		const img = synth(48, 36, () => 15, 4, 2);
+		const ref = detectSkyline(img);
+		const got = await detectSkylineAsync(img);
+		expect([...got.rows]).toEqual([...ref.rows]);
+		expect([...got.weight]).toEqual([...ref.weight]);
 	});
 });

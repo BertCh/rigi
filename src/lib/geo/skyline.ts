@@ -7,11 +7,12 @@
  *
  * 1. Features: colour, local texture, and a vertical colour step ("edge")
  *    that is discounted when it gets brighter going down.
- * 2. Sky model: a smooth colour field (low-order polynomial in x, y per
- *    channel) fitted by robust least squares to sky-looking pixels near the
- *    top. A pixel is sky if it matches the field, or is brighter/greyer than
- *    it (cloud). Haze makes distant ridges sky-*coloured* but darker than the
- *    sky extrapolated to that spot, which is what separates them.
+ * 2. Sky model: a smooth colour field (low-order polynomial per channel:
+ *    quadratic in x, cubic in y; see `basis`) fitted by robust least squares
+ *    to sky-looking pixels near the top. A pixel is sky if it matches the
+ *    field, or is brighter/greyer than it (cloud). Haze makes distant ridges
+ *    sky-*coloured* but darker than the sky extrapolated to that spot, which
+ *    is what separates them.
  * 3. Per-column boundary by Viterbi over rows: cost at row y is "non-sky in a
  *    band above y" + "sky in a band below y" − "edge at y", with a
  *    truncated-L1 penalty on jumps between columns. y = 0 means "no sky at
@@ -80,15 +81,21 @@ function boxBlur(src: Float32Array, w: number, h: number, r: number) {
 			acc += src[o + Math.min(w - 1, x + r + 1)] - src[o + Math.max(0, x - r)];
 		}
 	}
-	for (let x = 0; x < w; x++) {
-		let acc = 0;
-		for (let y = -r; y <= r; y++)
-			acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
-		for (let y = 0; y < h; y++) {
-			out[y * w + x] = acc / (2 * r + 1);
-			acc +=
-				tmp[Math.min(h - 1, y + r + 1) * w + x] -
-				tmp[Math.max(0, y - r) * w + x];
+	// Vertical pass row by row with one running sum per column (Float64Array holds the same
+	// doubles a per-column scalar would, so the result is bit-identical to a column-major loop,
+	// without striding through memory by w).
+	const acc = new Float64Array(w);
+	for (let y = -r; y <= r; y++) {
+		const o = Math.min(h - 1, Math.max(0, y)) * w;
+		for (let x = 0; x < w; x++) acc[x] += tmp[o + x];
+	}
+	for (let y = 0; y < h; y++) {
+		const o = y * w;
+		const add = Math.min(h - 1, y + r + 1) * w;
+		const sub = Math.max(0, y - r) * w;
+		for (let x = 0; x < w; x++) {
+			out[o + x] = acc[x] / (2 * r + 1);
+			acc[x] += tmp[add + x] - tmp[sub + x];
 		}
 	}
 	return out;
@@ -155,8 +162,9 @@ export function computeFeatures(img: RGBALike): Features {
 		boxBlurH(g0, w, h, 2),
 		boxBlurH(b0, w, h, 2),
 	];
-	for (let x = 0; x < w; x++) {
-		for (let y = k; y < h - k; y++) {
+	// Row-major: every pixel's arithmetic is independent of the loop order.
+	for (let y = k; y < h - k; y++) {
+		for (let x = 0; x < w; x++) {
 			let d2 = 0;
 			let dl = 0;
 			for (let c = 0; c < 3; c++) {
@@ -263,11 +271,11 @@ function solve(a: Float64Array, b: Float64Array) {
 }
 
 /**
- * Sky model: a smooth colour gradient (quadratic in x, y per channel) fitted
- * by iteratively reweighted least squares to the pixels currently believed to
- * be sky. Aerial haze makes distant ridges sky-*coloured*, but they are
- * darker than the sky gradient extrapolated to that spot, which is the cue
- * this model exposes.
+ * Sky model: a smooth colour gradient (8-term polynomial per channel:
+ * quadratic in x, cubic in y) fitted by iteratively reweighted least squares
+ * to the pixels currently believed to be sky. Aerial haze makes distant
+ * ridges sky-*coloured*, but they are darker than the sky gradient
+ * extrapolated to that spot, which is the cue this model exposes.
  */
 export interface SkyModel {
 	coef: Float64Array[]; // per channel, NB coefficients
