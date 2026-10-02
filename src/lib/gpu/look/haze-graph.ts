@@ -8,7 +8,7 @@
 // runs that prep and the fit's GPU part under ONE haze lease (the safe entry point for textures).
 //
 // Submit 1 (one graph per N = W·H, cached, group "look-haze-prep"):
-//   prep → dilh → clear counts → bin (atomic counts) → sel-init
+//   prep → raster dilations (edge, people) → clear counts → bin (atomic counts) → sel-init
 //   → 3 × (clear hist → hist (atomic) → scan)                      radix select, 288 order statistics
 //   → list-key → GPUSort (stable radix) ∥ GPUHistogram → GPUScan → GPUGather + list-index   72-list compaction
 //   → gather (luma GPUGather)                                        the airlight band's lin
@@ -38,7 +38,7 @@
 //   Dawn, haze-band-dawn.ts: no change in the GPU part's time against the old early-exit kernels).
 // - Transients are never zeroed and alias: counts and hist are the only read-modify-write transients
 //   (atomics), each has a clear node before every use (compile() lints it: writes: "atomic"). Every
-//   other transient is fully written by the node that first touches it (lin, flags, flagsH, bins per
+//   other transient is fully written by the node that first touches it (lin, masks, near, dil-valid, bins per
 //   pixel; state per selection; the list compaction's keys / values / counts / starts by its
 //   own nodes), so aliased bytes are never read.
 // - Imports (inputs and the lists, which the tail read may need after the submit) are pooled buffers
@@ -93,7 +93,6 @@ import {
 	hazeFitTail,
 	hazeScanSubgroupsOn,
 	K_HZ_BIN,
-	K_HZ_DILH,
 	K_HZ_GRID,
 	K_HZ_HIST,
 	K_HZ_PREP,
@@ -108,7 +107,7 @@ import {
 	SRGB_LUT,
 	statOf,
 } from "./haze";
-import { BLOCK, BUCKETS, LISTS, SEL } from "./haze.wgsl";
+import { BLOCK, BUCKETS, LISTS, planeWords, SEL } from "./haze.wgsl";
 import { buildArgminProgram, decodePick } from "./haze-argmin";
 import {
 	bandShape,
@@ -121,6 +120,7 @@ import {
 	SPOT_COLUMNS,
 	verifyBand,
 } from "./haze-band";
+import { addHazeDilations } from "./raster-dilate";
 import {
 	type HazePrepResult,
 	type HazeTexInput,
@@ -265,16 +265,20 @@ function rows3<P>(
 	return g.graph.createDataView(buffer, { format: "float32x3", length });
 }
 
+/** What the prep graph's raster dilations are built for (they are shaped by the grid and radii). */
+type DilationShape = { W: number; H: number; rad: number; fgRad: number };
+
 function prepGraphFor(
 	device: Device,
 	N: number,
 	gatherSlots: number,
+	dil: DilationShape,
 ): CachedGraph<PrepParams, undefined> {
 	const scanSg = hazeScanSubgroupsOn(device);
 	return cachedGraph<PrepParams, undefined>(
 		device,
 		"look-haze-prep",
-		`n${N}-g${gatherSlots}${scanSg ? "-sg" : ""}`,
+		`n${N}-g${gatherSlots}-${dil.W}x${dil.H}r${dil.rad},${dil.fgRad}${scanSg ? "-sg" : ""}`,
 		(g) => {
 			const uni = (id: string, bytes: number) =>
 				g.importBuffer(id, bytes, undefined, UNIFORM);
@@ -307,8 +311,9 @@ function prepGraphFor(
 				STORAGE,
 			);
 			const lin = g.transientBuffer("lin", N * 12);
-			const flags = g.transientBuffer("flags", N * 4);
-			const flagsH = g.transientBuffer("flagsH", N * 4);
+			const masks = g.transientBuffer("masks", 2 * planeWords(N) * 4);
+			const near = g.transientBuffer("near", 2 * planeWords(N) * 4);
+			const dilValid = g.transientBuffer("dil-valid", N * 4);
 			const bins = g.transientBuffer("bins", N * 4);
 			const counts = g.transientBuffer("counts", NBINS * 4);
 			const state = g.transientBuffer("state", SEL * 8);
@@ -319,20 +324,24 @@ function prepGraphFor(
 			g.addKernel({
 				id: "prep",
 				spec: K_HZ_PREP,
-				bindings: { prm, photo, xb, yb, lut, range, fgm, lin, flags },
+				bindings: { prm, photo, xb, yb, lut, range, fgm, lin, masks },
 				workgroups: groups,
 			});
-			g.addKernel({
-				id: "dilh",
-				spec: K_HZ_DILH,
-				bindings: { prm, flags, outf: flagsH },
-				workgroups: groups,
+			// luma gpu-raster dilations (raster-dilate.ts); radius 0 (no people mask) = a copy pass
+			addHazeDilations(g, {
+				width: dil.W,
+				height: dil.H,
+				rad: dil.rad,
+				fgRad: dil.fgRad,
+				masks,
+				near,
+				validity: dilValid,
 			});
 			g.clearNode("clear-counts", counts);
 			g.addKernel({
 				id: "bin",
 				spec: K_HZ_BIN,
-				bindings: { prm, flagsH, range, psky, bins, counts },
+				bindings: { prm, near, range, psky, bins, counts },
 				workgroups: groups,
 				writes: { counts: "atomic" },
 			});
@@ -462,7 +471,7 @@ export function prepGraph(
 			outVal: out("outVal", 3 * N * 4),
 			skyOut: out("skyOut", gatherSlots * 12),
 		};
-		const e = prepGraphFor(device, N, gatherSlots);
+		const e = prepGraphFor(device, N, gatherSlots, { W, H, rad, fgRad });
 		await e.graph.compileAsync();
 		const tr = performance.now();
 		const { reads } = await e.graph.run(

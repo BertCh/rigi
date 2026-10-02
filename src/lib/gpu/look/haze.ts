@@ -49,7 +49,6 @@ import {
 import { LOOK_SUBGROUP_GROUP, statsSubgroupsOn } from "./color-stats";
 import {
 	HZ_BIN,
-	HZ_DILH,
 	HZ_GRID,
 	HZ_HIST,
 	HZ_LIST_INDEX,
@@ -74,16 +73,11 @@ export const K_HZ_PREP = defineKernel("hz-prep", HZ_PREP, [
 	["range", "read-only-storage"],
 	["fgm", "read-only-storage"],
 	["lin", "storage"],
-	["flags", "storage"],
-]);
-export const K_HZ_DILH = defineKernel("hz-dilh", HZ_DILH, [
-	["prm", "uniform"],
-	["flags", "read-only-storage"],
-	["outf", "storage"],
+	["masks", "storage"],
 ]);
 export const K_HZ_BIN = defineKernel("hz-bin", HZ_BIN, [
 	["prm", "uniform"],
-	["flagsH", "read-only-storage"],
+	["near", "read-only-storage"],
 	["range", "read-only-storage"],
 	["psky", "read-only-storage"],
 	["bins", "storage"],

@@ -1054,6 +1054,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "raster-dilate-dawn",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("scripts/gpu/raster-dilate-dawn.ts"),
+		note: "haze prep edge / people dilation on luma gpu-raster GPURasterDilation (radius chained past 8) = CPU dilate exactly on 108 random masks (SKIP without Dawn)",
+		timeoutS: 180,
+	},
+	{
 		id: "skyline-stages",
 		tier: "fast",
 		group: "pose",

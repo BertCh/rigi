@@ -4,7 +4,8 @@
 
 // WGSL for the GPU haze fit (twin of look/haze-fit.ts fitHaze). Three groups of kernels:
 //  1. per pixel: the photo box-resampled to linear on the geo grid, the depth-edge test, the
-//     separable dilations (edges, people) and the log-range bin, with per-bin counts;
+//     the edge / people masks (dilated between the prep and the bin kernel by luma gpu-raster
+//     GPURasterDilation passes, see raster-dilate.ts) and the log-range bin, with per-bin counts;
 //  2. exact order statistics per (bin, channel) for the 1st / 9th percentiles: a 3-pass radix
 //     select over the f32 bit patterns (lin ≥ 0, so they sort as u32), 11 + 11 + 10 bits, with
 //     atomic histograms, all on the GPU (no readback between passes);
@@ -16,6 +17,8 @@
 //     read back as 5 550 floats; the CPU re-checks the near-best cells in f64.
 
 const NBINS = 24;
+/** Words of one mask plane in HZ_PREP's `masks` / HZ_BIN's `near` (a 256-byte multiple: a view offset). */
+export const planeWords = (pixels: number) => Math.ceil(pixels / 64) * 64;
 /** Order statistics per (bin, channel): ranks ⌊0.01(n−1)⌋, +1, ⌊0.09(n−1)⌋, +1. */
 export const SEL = NBINS * 3 * 4;
 export const BUCKETS = 2048;
@@ -34,7 +37,9 @@ export const HZ_PREP = /* wgsl */ `${PREP_PARAMS}
 @group(0) @binding(5) var<storage, read> range: array<f32>;
 @group(0) @binding(6) var<storage, read> fgm: array<u32>; // 1 bit per pixel
 @group(0) @binding(7) var<storage, read_write> lin: array<f32>;
-@group(0) @binding(8) var<storage, read_write> flags: array<u32>;
+// two planes of planeWords(W·H) words: the depth-edge mask, then the people mask (the dilation
+// passes view each plane; one binding keeps the kernel within the default 8 storage buffers)
+@group(0) @binding(8) var<storage, read_write> masks: array<u32>;
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let W = prm.W; let H = prm.H;
@@ -67,36 +72,15 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
       if (nb[k] <= 0.0 || abs(log(nb[k] / r)) > 0.12) { edge = true; }
     }
   }
-  flags[i] = select(0u, 1u, edge) | (((fgm[i >> 5u] >> (i & 31u)) & 1u) << 1u);
+  masks[i] = select(0u, 1u, edge);
+  masks[((W * H + 63u) & ~63u) + i] = (fgm[i >> 5u] >> (i & 31u)) & 1u;
 }
 `;
 
-/** Horizontal dilation: bit 0 over ±rad, bit 1 over ±fgRad. */
-export const HZ_DILH = /* wgsl */ `${PREP_PARAMS}
-@group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> flags: array<u32>;
-@group(0) @binding(2) var<storage, read_write> outf: array<u32>;
-@compute @workgroup_size(256)
-fn main(@builtin(global_invocation_id) id: vec3<u32>) {
-  let W = prm.W;
-  let i = id.x;
-  if (i >= W * prm.H) { return; }
-  let y = i / W;
-  let x = i - y * W;
-  let row = y * W;
-  var e = 0u; var f = 0u;
-  let a0 = select(0u, x - prm.rad, x >= prm.rad);
-  for (var k = a0; k <= min(W - 1u, x + prm.rad); k++) { e |= flags[row + k] & 1u; }
-  let b0 = select(0u, x - prm.fgRad, x >= prm.fgRad);
-  for (var k = b0; k <= min(W - 1u, x + prm.fgRad); k++) { f |= flags[row + k] & 2u; }
-  outf[i] = e | f;
-}
-`;
-
-/** Vertical dilation, then the log-range bin (−1 = unused) and the per-bin counts. */
+/** The log-range bin (−1 = unused) of pixels away from the dilated edge / people masks, and the per-bin counts. */
 export const HZ_BIN = /* wgsl */ `${PREP_PARAMS}
 @group(0) @binding(0) var<uniform> prm: P;
-@group(0) @binding(1) var<storage, read> flagsH: array<u32>;
+@group(0) @binding(1) var<storage, read> near: array<u32>; // the dilated masks, planes as in HZ_PREP's masks
 @group(0) @binding(2) var<storage, read> range: array<f32>;
 @group(0) @binding(3) var<storage, read> psky: array<f32>;
 @group(0) @binding(4) var<storage, read_write> bins: array<i32>;
@@ -106,16 +90,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let W = prm.W; let H = prm.H;
   let i = id.x;
   if (i >= W * H) { return; }
-  let y = i / W;
-  let x = i - y * W;
-  var near = 0u;
-  let a0 = select(0u, y - prm.rad, y >= prm.rad);
-  for (var k = a0; k <= min(H - 1u, y + prm.rad); k++) { near |= flagsH[k * W + x] & 1u; }
-  let b0 = select(0u, y - prm.fgRad, y >= prm.fgRad);
-  for (var k = b0; k <= min(H - 1u, y + prm.fgRad); k++) { near |= flagsH[k * W + x] & 2u; }
+  let nearBit = near[i] | near[((W * H + 63u) & ~63u) + i];
   let r = range[i];
   var b = -1;
-  if (!(r < prm.rmin || r >= prm.rmax || near != 0u || psky[i] > 0.3)) {
+  if (!(r < prm.rmin || r >= prm.rmax || nearBit != 0u || psky[i] > 0.3)) {
     b = i32(floor(((log(r) - prm.lo) / prm.span) * ${NBINS}.0));
     b = clamp(b, 0, ${NBINS - 1});
     atomicAdd(&counts[b], 1u);

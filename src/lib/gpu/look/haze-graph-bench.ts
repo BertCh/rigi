@@ -178,8 +178,8 @@ function clearLint(device: Device) {
 				Buffer.UNIFORM | Buffer.COPY_DST,
 			);
 			const s = (id: string) => g.transientBuffer(id, 1024);
-			const [flagsH, range, psky, bins, counts, lin, state, hist] = [
-				"flagsH",
+			const [near, range, psky, bins, counts, lin, state, hist] = [
+				"near",
 				"range",
 				"psky",
 				"bins",
@@ -192,7 +192,7 @@ function clearLint(device: Device) {
 			g.addKernel({
 				id: "bin",
 				spec: K_HZ_BIN,
-				bindings: { prm: u, flagsH, range, psky, bins, counts },
+				bindings: { prm: u, near, range, psky, bins, counts },
 				workgroups: [1],
 				writes: { counts: "atomic" },
 			});

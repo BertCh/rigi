@@ -106,14 +106,15 @@ import { addGuidedFilter, guidedOnesLength } from "./guided-filter-graph";
 import {
 	BUCKETS,
 	HZ_BIN,
-	HZ_DILH,
 	HZ_HIST,
 	HZ_PREP,
 	HZ_SCAN,
 	HZ_SCAN_SG,
 	HZ_SEL_INIT,
+	planeWords,
 	SEL,
 } from "./haze.wgsl";
+import { addHazeDilations } from "./raster-dilate";
 import {
 	GUIDED_PARAMS,
 	HAZE_PASS_PARAMS,
@@ -189,16 +190,11 @@ const K_HZ_PREP = buf("hz-prep", HZ_PREP, [
 	["range", "read-only-storage"],
 	["fgm", "read-only-storage"],
 	["lin", "storage"],
-	["flags", "storage"],
-]);
-const K_HZ_DILH = buf("hz-dilh", HZ_DILH, [
-	["prm", "uniform"],
-	["flags", "read-only-storage"],
-	["outf", "storage"],
+	["masks", "storage"],
 ]);
 const K_HZ_BIN = buf("hz-bin", HZ_BIN, [
 	["prm", "uniform"],
-	["flagsH", "read-only-storage"],
+	["near", "read-only-storage"],
 	["range", "read-only-storage"],
 	["psky", "read-only-storage"],
 	["bins", "storage"],
@@ -1549,8 +1545,9 @@ function hazeGraph(
 			}),
 		);
 		const lin = g.importBuffer("lin", N * 12);
-		const flags = g.transientBuffer("flags", N * 4);
-		const flagsH = g.transientBuffer("flagsH", N * 4);
+		const masks = g.transientBuffer("masks", 2 * planeWords(N) * 4);
+		const near = g.transientBuffer("near", 2 * planeWords(N) * 4);
+		const dilValid = g.transientBuffer("dil-valid", N * 4);
 		const bins = g.importBuffer("bins", N * 4);
 		const counts = g.importBuffer("counts", NBINS * 4);
 		const state = g.importBuffer("state", SEL * 8);
@@ -1567,15 +1564,19 @@ function hazeGraph(
 				range,
 				fgm,
 				lin,
-				flags,
+				masks,
 			},
 			workgroups: [groups],
 		});
-		g.addKernel({
-			id: "dilh",
-			spec: K_HZ_DILH,
-			bindings: { prm, flags, outf: flagsH },
-			workgroups: [groups],
+		// the edge / people dilations: luma gpu-raster passes (raster-dilate.ts)
+		addHazeDilations(g, {
+			width: W,
+			height: H,
+			rad,
+			fgRad,
+			masks,
+			near,
+			validity: dilValid,
 		});
 		// the counts must start at zero (haze-graph.ts prepGraph clears them)
 		g.addKernel({
@@ -1587,7 +1588,7 @@ function hazeGraph(
 		g.addKernel({
 			id: "bin",
 			spec: K_HZ_BIN,
-			bindings: { prm, flagsH, range, psky, bins, counts },
+			bindings: { prm, near, range, psky, bins, counts },
 			workgroups: [groups],
 		});
 		g.addKernel({
