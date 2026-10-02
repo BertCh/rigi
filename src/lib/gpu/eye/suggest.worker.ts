@@ -16,8 +16,9 @@ const post = (m: EyeSearchOutWorker) => scope.postMessage(m);
 
 scope.onmessage = async (ev: MessageEvent<EyeSearchInWorker>) => {
 	const { input, gpu, gpuOpts } = ev.data;
-	if (gpu === "off") setFlagOverride("gpu", "off");
 	applyRealmGpuOptions(gpuOpts);
+	// the explicit protocol field wins over the forwarded page flag (applied after it)
+	if (gpu === "off") setFlagOverride("gpu", "off");
 	let out: EyeSearchOutWorker;
 	try {
 		const result = await runEyeSearch(input, (progress) =>

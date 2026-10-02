@@ -220,10 +220,14 @@ scope.onmessage = async (e: MessageEvent<HorizonWorkerIn>) => {
 		if (m.type === "spans") {
 			spans = m.spans;
 			cpuMips = !(m.gpu && m.mosaicGpu);
-			setFlagOverride("mosaicGpu", m.mosaicGpu === false ? "off" : undefined);
 			precision = m.precision ?? "f64";
 			mergeSpotLedger(m.spotLedger);
 			applyRealmGpuOptions(m.gpuOpts);
+			// the explicit protocol field wins over the forwarded page flag (applied after it)
+			setFlagOverride(
+				"mosaicGpu",
+				m.mosaicGpu === false ? "off" : m.gpuOpts?.flags?.mosaicGpu,
+			);
 			if (m.gpu && !gpu) {
 				gpu = getComputeDevice().then((d) => {
 					if (d) warmHorizonGpu(d);
