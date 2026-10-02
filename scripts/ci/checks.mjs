@@ -1003,6 +1003,19 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "features",
+		tier: "fast",
+		group: "nn",
+		cmd: tsx("src/lib/features/__tests__/parity.check.ts", "--quick"),
+		needs: [
+			"out/features-parity/index.json",
+			"public/models/aliked-n16.dc5fb7d3.safetensors",
+			"public/models/lightglue-aliked.f35aee62.safetensors",
+		],
+		note: "browser ALIKED + LightGlue (src/lib/features) vs the PyTorch lightglue package: per-layer maps, keypoint repeatability, descriptor cosine, LightGlue match IoU on reference features. Fixtures: scripts/models/aliked-lightglue.py fixtures --layers --max-kp 1024 2048",
+		timeoutS: 300,
+	},
+	{
 		id: "imhof",
 		tier: "fast",
 		group: "look",

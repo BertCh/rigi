@@ -104,6 +104,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | atlas-layout, base-slots, frame-timings | fast | deck-webgpu bookkeeping: texture-array atlas layers and grow copies, packed base-grid slots, GPU frame-timing query ring | `src/lib/deck-webgpu/*.check.ts` |
 | theme | fast | light/dark: the pre-paint boot script and `resolveTheme()` agree in every precedence case | `src/lib/theme/__tests__/theme.check.ts` |
 | strokes, flow, imhof, water-waves | fast | opt-in looks: ridge sketch / trail strokes, wind-drift field + WGSL layout, Imhof relief reference properties, lake waves (GLSL and WGSL tables agree) | `src/lib/look/**/*.check.ts`, `waves.test.ts` |
+| features | fast | browser ALIKED + LightGlue vs PyTorch lightglue: per-layer maps, keypoint repeatability, descriptor cosine, match IoU (SKIPs without the fixtures in `out/features-parity` or the weights) | `src/lib/features/__tests__/parity.check.ts` |
 | terroir-pattern, terroir-hatch | fast | terroir pattern fills and hatch: CPU mirror coverage, splice off by default, GLSL / WGSL constants agree | `src/lib/terroir/*.check.ts` |
 | palette-cvd | fast | the roll viewpoint palette stays separable under simulated colour-vision deficiency and clear of the selection orange | `src/lib/roll/mosaic/__tests__/palette-cvd.check.ts` |
 | export-geoid-default | fast | engine exports default the geoid separation to EGM2008 at the frame origin | `src/lib/export/geoid-default.check.ts` |

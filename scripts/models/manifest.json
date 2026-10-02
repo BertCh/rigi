@@ -22,5 +22,21 @@
 		"licence": "Apache-2.0",
 		"source": "MediaPipe DeepLab v3 segmenter (image_segmenter/deeplab_v3/float32/1)",
 		"producer": "https://storage.googleapis.com/mediapipe-models/image_segmenter/deeplab_v3/float32/1/deeplab_v3.tflite"
+	},
+	{
+		"file": "aliked-n16.dc5fb7d3.safetensors",
+		"sha256": "dc5fb7d33fb8744481e73f37e0bbd1fcf8da794fb5eb744177da873723e98712",
+		"bytes": 1357624,
+		"licence": "BSD-3-Clause",
+		"source": "https://github.com/Shiaoming/ALIKED/raw/main/models/aliked-n16.pth (via lightglue ALIKED), BN folded, fp16",
+		"producer": "scripts/models/aliked-lightglue.py"
+	},
+	{
+		"file": "lightglue-aliked.f35aee62.safetensors",
+		"sha256": "f35aee620299c628c827622c0f7df270f051412f048fa8ee57e20dde55e8d40f",
+		"bytes": 23795626,
+		"licence": "Apache-2.0",
+		"source": "https://github.com/cvg/LightGlue/releases/download/v0.1_arxiv/aliked_lightglue.pth, fp16",
+		"producer": "scripts/models/aliked-lightglue.py"
 	}
 ]
