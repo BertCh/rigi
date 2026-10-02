@@ -242,6 +242,13 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "terroir-pattern",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/terroir/pattern.check.ts"),
+		timeoutS: 120,
+	},
+	{
 		id: "terroir-pack",
 		tier: "fast",
 		group: "look",

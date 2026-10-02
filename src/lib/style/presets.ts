@@ -391,7 +391,7 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 			peakTiers: true,
 			subPill: true,
 			contours: { adaptive: true, swissIndex: true, inkByCover: true },
-			cover: { on: true, snow: "date" },
+			cover: { on: true, snow: "date", pattern: true },
 			glacier: { on: true, year: 1850, style: "outline" },
 			sunPath: true,
 			legend: true,

@@ -13,11 +13,14 @@
 //                             fallback where the class is 0; on imagery, steep faces (where the
 //                             orthophoto smears) cross-fade to the class rendering (T2.7, lite)
 //   TERROIR_SNOW              seasonal snowline from the photo date, aspect offset, slope shedding
+//   TERROIR_PATTERN           (with TERROIR_COVER) scree dots, rock hatching, glacier crevasse hatching in
+//                             world metres, analytically filtered (../pattern.ts, luma patternFill #3320)
 //   TERROIR_CONTOUR_ADAPTIVE  contour interval thinned with range in nested levels (T0.3)
 //   TERROIR_CONTOUR_INK       contour ink from the cover class: brown soil, black rock, blue ice;
 //                             no lines over water
 // Display only: the geometry (style 3) and normal (style 7) passes return before any of it runs.
 import { defineBlock } from "#/lib/look/glsl/block";
+import { PATTERN_GLSL } from "../pattern";
 
 /** Values: ./values.ts terroirBlockValues(). Accessors `ter_<field>`, three uniforms `uTer<Field>`. */
 export const TER_BLOCK = defineBlock("ter", "terroir", {
@@ -251,6 +254,39 @@ vec3 hypso(float h) { return terroirAlbedo(terHypso(h), normalize(vNormal)); }
 #endif
 `;
 
+/**
+ * FNS with the pattern fills (TERROIR_PATTERN): the footprint and sun term are taken at the top of
+ * terroirAlbedo (uniform control flow, before the class branching), the pattern is composed over the
+ * class albedo, and the scree hash speckle (which aliases) gives way to the dots. FNS unchanged when off.
+ */
+function fnsFor(pattern: boolean): string {
+	if (!pattern) return FNS;
+	let out = FNS;
+	const swap = (from: string, to: string, all = false) => {
+		if (!out.includes(from))
+			throw new Error(`terroir: pattern anchor missing: ${from.slice(0, 50)}`);
+		out = all ? out.replaceAll(from, to) : out.replace(from, to);
+	};
+	swap(
+		"    v = (terHash(floor(xy / 3.0)) - 0.5) * 0.5 * fine + (terFbm(xy / 60.0) - 0.5) * 0.25 * mid;",
+		"    v = (terFbm(xy / 60.0) - 0.5) * 0.25 * mid;",
+	);
+	swap(
+		"// fb = the look's albedo",
+		`${PATTERN_GLSL}\n// fb = the look's albedo`,
+	);
+	swap(
+		"  float px = max(length(fwidth(xy)), 1e-3);\n",
+		"  float px = max(length(fwidth(xy)), 1e-3);\n  vec2 terFw = fwidth(xy);\n  float terLit = dot(n, TER_SUN);\n",
+	);
+	swap(
+		"terCoverAlbedo(c, xy, px)",
+		"terPatternCover(c, xy, terCoverAlbedo(c, xy, px), terFw, terLit)",
+		true,
+	);
+	return out;
+}
+
 /** Anchors both terrain fragment shaders share (deck terrain-layer.ts, three materials.ts). */
 const ANCHOR_ALPINE_DEF = "vec3 alpineAlbedo(float elev, vec3 n, vec2 xy) {";
 const ANCHOR_HYPSO_DEF = "vec3 hypso(float h) {";
@@ -278,7 +314,7 @@ function injections(engine: Engine, defines: readonly string[]) {
 		(deck
 			? "#define TER_SUN terrain.sunDir.xyz\n"
 			: `#define TER_SUN uSunDir\nuniform sampler2D terroirCover;\n${TER_BLOCK.threeDecl}`) +
-			FNS +
+			fnsFor(has("TERROIR_PATTERN")) +
 			(albedo ? WRAP_ALBEDO : "") +
 			"\n",
 		"before",

@@ -10,6 +10,7 @@
 //
 //   TERROIR_COVER             terCover    class albedo + texture + organic edges (lit styles); on imagery
 //                                         steep faces cross-fade to the class rendering
+//   TERROIR_PATTERN           terPattern  scree dots, rock hatching, glacier hatching over the class albedo
 //   TERROIR_SNOW              terSnow     date snowline, aspect offset, slope shedding (lit styles)
 //   TERROIR_CONTOUR_INK       terInk      contour ink by class, no lines on water (contours, not Tanaka)
 //   TERROIR_CONTOUR_ADAPTIVE  terAdaptive nested contour levels by range (contours, not Tanaka)
@@ -21,9 +22,12 @@
 import type { ShaderModule } from "@luma.gl/shadertools";
 import { TER_BLOCK } from "../glsl/terrain";
 import type { TerroirShader } from "../glsl/values";
+import { PATTERN_WGSL } from "../pattern";
 
 export type TerroirFeatures = {
 	terCover?: boolean;
+	/** TERROIR_PATTERN: pattern fills on the class albedo (implies terCover) */
+	terPattern?: boolean;
 	terSnow?: boolean;
 	terInk?: boolean;
 	terAdaptive?: boolean;
@@ -67,6 +71,7 @@ export function terroirFeatures(
 	const lines = style === "contours" && !tanaka;
 	const out: TerroirFeatures = {};
 	if (lit && d.has("TERROIR_COVER") && t.grid) out.terCover = true;
+	if (out.terCover && d.has("TERROIR_PATTERN")) out.terPattern = true;
 	if (lit && d.has("TERROIR_SNOW") && t.grid) out.terSnow = true;
 	if (lines && d.has("TERROIR_CONTOUR_INK") && t.grid) out.terInk = true;
 	if (lines && d.has("TERROIR_CONTOUR_ADAPTIVE")) out.terAdaptive = true;
@@ -252,7 +257,7 @@ fn ter_cover_albedo(c: i32, p: vec2<f32>, px: f32, elev: f32) -> vec3<f32> {
   if (c >= 5 && c <= 7) {
     v = (ter_noise(xy / 5.0) - 0.5) * 0.55 * fine + (ter_fbm(xy / 80.0) - 0.5) * 0.45 * mid;
   } else if (c == 4) {
-    v = (ter_hash(floor(xy / 3.0)) - 0.5) * 0.5 * fine + (ter_fbm(xy / 60.0) - 0.5) * 0.25 * mid;
+    v = ${ft.terPattern ? "" : "(ter_hash(floor(xy / 3.0)) - 0.5) * 0.5 * fine + "}(ter_fbm(xy / 60.0) - 0.5) * 0.25 * mid;
   } else if (c == 3) {
     v = (ter_noise(xy / 8.0) - 0.5) * 0.25 * fine + (ter_fbm(xy / 40.0) - 0.5) * 0.35 * mid;
   } else if (c >= 8 && c != 12 && c != 13) {
@@ -270,16 +275,16 @@ fn ter_snow(elev: f32, n: vec3<f32>, slopeDeg: f32, xy: vec2<f32>) -> f32 {
   let shed = 1.0 - smoothstep(terroir.snow.z, terroir.snow.w, slopeDeg + (ter_noise(xy / 50.0) - 0.5) * 10.0);
   return above * shed * terroir.snowCol.a;
 }
-// fb = the look's albedo (alpine belts or the relief ramp) where there is no class
+${ft.terPattern ? PATTERN_WGSL : ""}// fb = the look's albedo (alpine belts or the relief ramp) where there is no class
 fn ter_albedo(fb: vec3<f32>, n: vec3<f32>, s: TerrainSample) -> vec3<f32> {
   let xy = s.enu.xy;
   let px = max(length(abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy)), 1e-3);
-  let slopeDeg = degrees(acos(clamp(n.z, -1.0, 1.0)));
+${ft.terPattern ? "  let patFw = abs(s.dEnuDx.xy) + abs(s.dEnuDy.xy);\n  let patLit = dot(n, fog.sun.xyz);\n" : ""}  let slopeDeg = degrees(acos(clamp(n.z, -1.0, 1.0)));
   var col = fb;
   var c = 0;
 ${
 	ft.terCover
-		? `  c = ter_class(xy);\n  if (c > 0${opt.water ? " && c != 12" : ""}) { col = mix(fb, ter_cover_albedo(c, xy, px, s.elev), terroir.cover.x); }\n`
+		? `  c = ter_class(xy);\n  if (c > 0${opt.water ? " && c != 12" : ""}) { col = mix(fb, ${ft.terPattern ? "ter_pattern_cover(c, xy, ter_cover_albedo(c, xy, px, s.elev), patFw, patLit)" : "ter_cover_albedo(c, xy, px, s.elev)"}, terroir.cover.x); }\n`
 		: ""
 }${ft.terSnow ? "  if (c != 12) { col = mix(col, terroir.snowCol.rgb, ter_snow(s.elev, n, slopeDeg, xy)); }\n" : ""}${
 	opt.relief

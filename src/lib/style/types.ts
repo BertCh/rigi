@@ -311,7 +311,12 @@ export type TerroirStyle = {
 		inkByCover: boolean;
 	};
 	/** Real land cover from the pack in Blend / In map instead of the elevation belts. */
-	cover: { on: boolean; snow: "none" | "date" };
+	cover: {
+		on: boolean;
+		snow: "none" | "date";
+		/** scree dots, rock hatching, glacier crevasse lines on the class rendering (needs cover.on) */
+		pattern: boolean;
+	};
 	/** A glacier's former extent registered on the photo (GLAMOS / pack), labelled with its year. */
 	glacier: { on: boolean; year: number; style: "outline" | "fill" };
 	/** The sun's arc for the capture date above the skyline, with sunrise / sunset azimuths. */

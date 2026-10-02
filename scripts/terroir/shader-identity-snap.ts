@@ -142,11 +142,11 @@ if (process.argv.includes("--on")) {
 			terroir: {
 				...base.terroir,
 				contours: { adaptive: true, swissIndex: true, inkByCover: true },
-				cover: { on: true, snow: "date" },
+				cover: { on: true, snow: "date", pattern: true },
 			},
 		};
 		const terroir = terroirShader(style, grid, frame, "2025-02-10T10:00:00Z");
-		if (terroir?.defines.length !== 4)
+		if (terroir?.defines.length !== 5)
 			throw new Error(`defines ${terroir?.defines}`);
 		for (const mode of ["overlay", "replace", "world"] as const) {
 			const look = deckTerrainStyle(style, mode);

@@ -13,6 +13,7 @@ export type TerroirDefine =
 	| "TERROIR_CONTOUR_ADAPTIVE"
 	| "TERROIR_CONTOUR_INK"
 	| "TERROIR_COVER"
+	| "TERROIR_PATTERN"
 	| "TERROIR_SNOW";
 
 /** Anything with EnuFrame.fromGeo (#/lib/geodesy). */
@@ -231,6 +232,7 @@ export function terroirShader(
 	if (t.contours.adaptive) d.push("TERROIR_CONTOUR_ADAPTIVE");
 	if (t.contours.inkByCover && g) d.push("TERROIR_CONTOUR_INK");
 	if (t.cover.on && g) d.push("TERROIR_COVER");
+	if (t.cover.on && t.cover.pattern && g) d.push("TERROIR_PATTERN");
 	if (g && snowline != null) d.push("TERROIR_SNOW");
 	if (!d.length && !t.contours.swissIndex) return null;
 	const needGrid = d.some((x) => x !== "TERROIR_CONTOUR_ADAPTIVE");

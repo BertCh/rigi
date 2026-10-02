@@ -4,6 +4,10 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Terroir pattern fills (2026-10-01)
+
+- New style field `terroir.cover.pattern` (default off, on in the Terroir preset; needs `cover.on` and a pack): scree is drawn as dot stipple (6 m cells), rock as hatching whose line width grows in shade, glacier as sparse crevasse hatching in the ice ink, all anchored in world metres. Port of luma.gl `patternFill` (#3320, master `7289d961`) in `src/lib/terroir/pattern.ts` (GLSL, WGSL and a CPU mirror); its box-filtered stripes and dot fade keep the mean coverage at distance, replacing the aliasing 3 m scree hash speckle when on. New define `TERROIR_PATTERN` (WebGL splice) and feature `terPattern` (deck-webgpu). With the field off the generated GLSL / WGSL is byte-identical (`scripts/terroir/*identity-snap.ts` diffs empty). Browser-unverified. Check: `terroir-pattern` (fast tier).
+
 ### Per-render-pass GPU frame timings (WebGPU engine, opt-in)
 - New flag `?gpuFrameTimings=on` (default off): the geometry and colour passes (and the screen pass on the direct host) write begin / end timestamps into a ring of 4 pooled query sets; `WebGpuEngine.onFrameTimings(cb)` delivers `{frame, passes: [{name, gpuMs}], totalGpuMs}` per timed frame, `frameTimingsMean` the 60-frame rolling mean, and `/dev/graph` shows the means. Done in Rigi rather than by vendoring deck.gl PR #10778 because deck's timer sees only deck's own layers pass, while Rigi's geometry and colour passes run from an effect's preRender. Needs `timestamp-query`; drops a frame when all sets await readback, caps 32 passes per frame, disables itself with one warning on a readback error. Off: no query sets, unchanged pass descriptors. Pure logic in `deck-webgpu/frame-timings-core.ts` with the fast-tier check `frame-timings`. Browser-unverified. The deck host's own canvas pass is not timed; `timestamp-query` is still requested whenever the adapter has it (compute profiling shares it).
 

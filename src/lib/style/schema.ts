@@ -345,7 +345,7 @@ export const VIEW_STYLE_SCHEMA: Node = obj({
 		peakTiers: bool,
 		subPill: bool,
 		contours: obj({ adaptive: bool, swissIndex: bool, inkByCover: bool }),
-		cover: obj({ on: bool, snow: en("none", "date") }),
+		cover: obj({ on: bool, snow: en("none", "date"), pattern: bool }),
 		glacier: obj({
 			on: bool,
 			year: num(1850, 2030, true),
