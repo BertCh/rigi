@@ -1113,6 +1113,13 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "weather-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/weather-dawn.ts"),
+		timeoutS: 120,
+	},
+	{
 		id: "color-target-dawn",
 		tier: "fast",
 		group: "gpu",

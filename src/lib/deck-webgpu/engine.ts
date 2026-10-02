@@ -163,6 +163,7 @@ import { type GlowMarkers, sameGlowMarkers } from "#/lib/look/labels/glow";
 import { lookKey } from "#/lib/look/look-key";
 import { ReliefController } from "#/lib/look/relief/field";
 import { waterWavesAnimate } from "#/lib/look/water/waves";
+import { precipitationFor } from "#/lib/look/weather/precipitation";
 import { DeckMapCamera, MAP_VIEW_ID } from "#/lib/nearfield/deck-map-camera";
 import { type ByteMask, stepMasks } from "#/lib/nearfield/deck-step";
 import type { LiveSplatSource } from "#/lib/nearfield/live/types";
@@ -273,6 +274,7 @@ import {
 	tiles3dCoreOptions,
 } from "./layers/tiles3d";
 import { createTrailCore, type TrailCore } from "./layers/trail";
+import { createWeatherCore, type WeatherCore } from "./layers/weather";
 import {
 	type FrameState,
 	type GpuLayerCore,
@@ -411,6 +413,8 @@ type Gpu = {
 	trails: TrailCore;
 	/** wind-drift particles (style.world.wind, world view) */
 	flow: FlowCore;
+	/** rain / snow (style.world.weather, world view) */
+	weather: WeatherCore;
 	composite: CompositeCore;
 	/** world view present (colour target → canvas) */
 	present: PresentCore;
@@ -526,6 +530,7 @@ export class WebGpuEngine implements Renderer {
 		speed: number;
 	} | null = null;
 	private flowRaf = 0;
+	private weatherRaf = 0;
 	private terroirMemo: {
 		style: ViewStyle;
 		grid: CoverGrid | null;
@@ -883,6 +888,7 @@ export class WebGpuEngine implements Renderer {
 			const drape = made(createDrape(device));
 			const trails = made(createTrailCore(device));
 			const flow = made(createFlowCore(device));
+			const weather = made(createWeatherCore(device));
 			const composite = made(
 				createCompositeCore({
 					aspect: this.aspect,
@@ -915,6 +921,7 @@ export class WebGpuEngine implements Renderer {
 				drape,
 				trails,
 				flow,
+				weather,
 				composite,
 				present,
 				debug,
@@ -943,6 +950,7 @@ export class WebGpuEngine implements Renderer {
 				new ViewGate(atmSky, view, inWorld),
 				new ViewGate(photoSky, view, inWorld),
 				new ViewGate(splats, view, inWorld),
+				new ViewGate(weather, view, inWorld),
 				new ViewGate(composite, view, inPhoto),
 				new ViewGate(glow, view, inPhoto),
 				new ViewGate(present, view, inWorld),
@@ -1784,6 +1792,7 @@ export class WebGpuEngine implements Renderer {
 		clearTimeout(this.wedgeTimer);
 		cancelAnimationFrame(this.worldRaf);
 		cancelAnimationFrame(this.flowRaf);
+		cancelAnimationFrame(this.weatherRaf);
 		this.loadAbort.abort();
 		this.fastHorizon?.dispose();
 		this.streamer?.dispose();
@@ -2499,6 +2508,8 @@ export class WebGpuEngine implements Renderer {
 			}
 			g.trails.setEnabled(look.trails && !!this.trails?.count);
 			this.syncFlowTick(false);
+			g.weather.setPrecipitation(null);
+			this.syncWeatherTick(false);
 			g.gizmo.setProps({ view: "photo" });
 			g.photoSky.setEnabled(false);
 			g.splats.setEnabled(false);
@@ -2609,6 +2620,25 @@ export class WebGpuEngine implements Renderer {
 		this.flowRaf = requestAnimationFrame(tick);
 	}
 
+	/** Rain / snow animation: a colour-frame request per animation frame while the world view shows it. */
+	private syncWeatherTick(on: boolean) {
+		if (!on) {
+			cancelAnimationFrame(this.weatherRaf);
+			this.weatherRaf = 0;
+			return;
+		}
+		// still under webdriver: the layer draws its fixed frame (weatherClock), nothing to animate
+		if (typeof navigator !== "undefined" && navigator.webdriver) return;
+		if (this.weatherRaf) return;
+		const tick = () => {
+			this.weatherRaf = requestAnimationFrame(tick);
+			if (this.disposed || this.lost || this.view !== "world" || !this.gpu)
+				return;
+			this.schedule("color"); // the drift time only reaches the colour pass
+		};
+		this.weatherRaf = requestAnimationFrame(tick);
+	}
+
 	private syncWorld(g: Gpu, photoU: CameraUniforms, nearDiscard: number) {
 		const w = this.world as WorldCamera;
 		const s = this.settings;
@@ -2650,6 +2680,9 @@ export class WebGpuEngine implements Renderer {
 		});
 		g.trails.setEnabled(s.trails && !!this.trails?.count);
 		this.syncFlow(g);
+		const precip = precipitationFor(this.style.world.weather);
+		g.weather.setPrecipitation(precip);
+		this.syncWeatherTick(!!precip);
 		const ws = deckWorldStyle(this.style);
 		g.atmSky.setSky({
 			mode: this.style.world.sky.mode,

@@ -133,3 +133,55 @@ export function precipitationPosition(
 	}
 	return out;
 }
+
+/** The uniforms of luma's `precipitation` module that reproduce Rigi's lattice (`time` is 1). */
+export type LumaPrecipitationUniforms = {
+	time: number;
+	fallSpeed: number;
+	turbulence: number;
+	seed: number;
+	volumeCenter: [number, number, number];
+	volumeSize: [number, number, number];
+	wind: [number, number];
+};
+
+/**
+ * luma's `precipitation_getPosition` is `mod(r * size + (wind, -fallSpeed) * time - min, size) + min`
+ * with `min = center - size / 2`, which equals Rigi's "lattice image nearest the centre" of
+ * `r * size + drift`. Feeding `time = 1`, the CPU-reduced drift as wind / fall speed and turbulence 0
+ * therefore gives the same positions (the WebGPU layer adds the wobble itself, with the real time).
+ */
+export function lumaUniformsFor(
+	p: Pick<Precipitation, "fallSpeed" | "wind" | "volumeM">,
+	center: [number, number, number],
+	t: number,
+): LumaPrecipitationUniforms {
+	const drift = precipitationDrift(p, t);
+	const v = p.volumeM;
+	return {
+		time: 1,
+		fallSpeed: -drift[2],
+		turbulence: 0,
+		seed: PRECIPITATION_SEED,
+		volumeCenter: center,
+		volumeSize: [v, v, v * 0.6],
+		wind: [drift[0], drift[1]],
+	};
+}
+
+/** luma's `precipitation_getPosition` (the WGSL `source` formula), on the CPU, without turbulence. */
+export function lumaPrecipitationPosition(
+	id: number,
+	u: LumaPrecipitationUniforms,
+): [number, number, number] {
+	const drift = [u.wind[0] * u.time, u.wind[1] * u.time, -u.fallSpeed * u.time];
+	const out: [number, number, number] = [0, 0, 0];
+	for (let k = 0; k < 3; k++) {
+		const size = Math.max(u.volumeSize[k], 0.001);
+		const minimum = u.volumeCenter[k] - size * 0.5;
+		const r = precipitationRandom(id * 3 + k, u.seed);
+		const unwrapped = r * size + drift[k] - minimum;
+		out[k] = unwrapped - Math.floor(unwrapped / size) * size + minimum;
+	}
+	return out;
+}
