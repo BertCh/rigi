@@ -16,6 +16,8 @@ import {
 	type ReducePrim,
 	type UnaryPrim,
 } from "./base";
+import { conv2dFast, conv2dReference } from "./cpu-conv";
+import { binarySameShape, poolInside, reluInto, resizeFast } from "./cpu-fast";
 import { fetchModel } from "./fetch";
 import { entryF32, parseSafetensors } from "./safetensors";
 import {
@@ -232,6 +234,9 @@ export class CpuNn extends BaseNn<CpuTensor> {
 		return o;
 	}
 
+	/** Fast paths (cpu-conv.ts, cpu-fast.ts); false selects the naive loops (the spec oracle). */
+	fastConv = true;
+
 	pConv(
 		x: CpuTensor,
 		w: CpuTensor,
@@ -257,43 +262,22 @@ export class CpuNn extends BaseNn<CpuTensor> {
 			Ho,
 			Wo,
 		} = p;
-		const out = t([N, Cout, Ho, Wo]);
 		const X = x.data;
 		const Wt = w.data;
-		const O = out.data;
 		const cig = Cin / groups;
 		const cog = Cout / groups;
 		if (!transpose) {
-			const col = new Float64Array(Ho * Wo);
-			for (let n = 0; n < N; n++)
-				for (let co = 0; co < Cout; co++) {
-					const g = Math.floor(co / cog);
-					col.fill(b ? b.data[co] : 0);
-					for (let ci = 0; ci < cig; ci++) {
-						const xc = (n * Cin + g * cig + ci) * H * W;
-						for (let ky = 0; ky < kh; ky++)
-							for (let kx = 0; kx < kw; kx++) {
-								const wv = Wt[((co * cig + ci) * kh + ky) * kw + kx];
-								if (wv === 0) continue;
-								// valid output columns for this tap (0 <= ox·sw − pw + kx·dw < W), hoisted
-								const off = kx * dw - pw;
-								const ox0 = Math.max(0, Math.ceil(-off / sw));
-								const ox1 = Math.min(Wo, Math.ceil((W - off) / sw));
-								for (let oy = 0; oy < Ho; oy++) {
-									const iy = oy * sh - ph + ky * dh;
-									if (iy < 0 || iy >= H) continue;
-									const row = xc + iy * W + off;
-									const orow = oy * Wo;
-									for (let ox = ox0; ox < ox1; ox++)
-										col[orow + ox] += wv * X[row + ox * sw];
-								}
-							}
-					}
-					O.set(col, (n * Cout + co) * Ho * Wo);
-				}
-			return out;
+			const O = (this.fastConv ? conv2dFast : conv2dReference)(
+				X,
+				Wt,
+				b ? b.data : null,
+				p,
+			);
+			return t([N, Cout, Ho, Wo], O);
 		}
 		// transpose: scatter each input pixel through the kernel
+		const out = t([N, Cout, Ho, Wo]);
+		const O = out.data;
 		const acc = new Float64Array(N * Cout * Ho * Wo);
 		for (let n = 0; n < N; n++)
 			for (let ci = 0; ci < Cin; ci++) {
@@ -457,6 +441,13 @@ export class CpuNn extends BaseNn<CpuTensor> {
 		} else if (typeof b === "number") {
 			const A = a.data;
 			for (let i = 0; i < O.length; i++) O[i] = f(A[i], b);
+		} else if (
+			this.fastConv &&
+			a.data.length === O.length &&
+			b.data.length === O.length &&
+			binarySameShape(op, a.data, b.data, O)
+		) {
+			// same-shape fast path (done)
 		} else {
 			const A = a.data;
 			const B = b.data;
@@ -491,8 +482,12 @@ export class CpuNn extends BaseNn<CpuTensor> {
 	}
 
 	pUnary(op: UnaryPrim, x: CpuTensor, alpha: number, beta: number) {
-		const f = unaryFn(op, alpha, beta);
 		const o = t(x.shape);
+		if (op === "relu" && this.fastConv) {
+			reluInto(x.data, o.data);
+			return o;
+		}
+		const f = unaryFn(op, alpha, beta);
 		for (let i = 0; i < o.data.length; i++) o.data[i] = f(x.data[i]);
 		return o;
 	}
@@ -694,6 +689,7 @@ export class CpuNn extends BaseNn<CpuTensor> {
 			countIncludePad,
 		} = p;
 		const o = t([N, C, Ho, Wo]);
+		if (this.fastConv && poolInside(kind, x.data, o.data, p)) return o;
 		for (let nc = 0; nc < N * C; nc++)
 			for (let oy = 0; oy < Ho; oy++)
 				for (let ox = 0; ox < Wo; ox++) {
@@ -727,6 +723,7 @@ export class CpuNn extends BaseNn<CpuTensor> {
 	pInterpolate(x: CpuTensor, p: InterpParams) {
 		const { N, C, H, W, Ho, Wo, mode, alignCorners, scaleH, scaleW } = p;
 		const o = t([N, C, Ho, Wo]);
+		if (this.fastConv && resizeFast(x.data, o.data, p)) return o;
 		const src = (d: number, s: number, cubic: boolean) =>
 			alignCorners
 				? d * s

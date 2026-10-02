@@ -19,13 +19,13 @@ import { bindU2netp, runU2netp, U2NETP_WEIGHTS, type U2Netp } from "./u2netp";
 export const MODEL_FILE = U2NETP_WEIGHTS;
 /**
  * Model input long side (px) per backend. Trained at 384²; 384 and 512 score the same on our photos.
- * The CPU reference backend is about 150 M MAC/s in plain JS (a 160×128 forward is ~8 s in node), so a
- * browser without WebGPU takes 192 and runs it off the main thread; the classical segmenter is the quick
- * alternative (`forceFallback`).
+ * The CPU backend (tiled conv, src/lib/nn/cpu-conv.ts, ~4 G MAC/s in plain JS single thread) does a 384×288
+ * forward in ~5.5 s in node, so a browser without WebGPU takes 384 (what the old wasm path used) and runs
+ * it off the main thread; the classical segmenter is the quick alternative (`forceFallback`).
  */
 export const MODEL_LONG_SIDE: Record<Backend, number> = {
 	webgpu: 512,
-	cpu: 192,
+	cpu: 384,
 };
 
 export type Backend = "webgpu" | "cpu";

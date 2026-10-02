@@ -96,8 +96,8 @@ let nextId = 1;
  * process crash without an error event): it is dropped like a crashed one, and every pending request
  * falls back. Measured from the last reply, not per request, because the worker runs requests one at a
  * time. Before the first reply the cold start (worker module, the 2.3 MB weights, kernel compiles)
- * gets a generous allowance; afterwards one forward is ~0.2 s on WebGPU and ~25 s on the CPU backend
- * at its 192 px input (the allowance covers it).
+ * gets a generous allowance; afterwards one forward is ~0.2 s on WebGPU and ~6-10 s on the CPU backend
+ * at its 384 px input (the allowance covers it).
  */
 const STALL_COLD_MS = 180_000;
 const STALL_WARM_MS = 60_000;
