@@ -107,6 +107,14 @@ describe("curveRange / anchoredRange", () => {
 		expect(mid).toBeGreaterThan(1);
 		expect(mid).toBeLessThan(8);
 	});
+	it("a one-knot curve keeps its constant ratio above the knot", () => {
+		// regression: the near-relaxation weight was unclamped, so the ratio kept growing past the knot
+		const c = { x: [Math.log(100)], y: [Math.log(300)] };
+		expect(curveRange(c, 100)).toBeCloseTo(300, 6);
+		expect(curveRange(c, 1000)).toBeCloseTo(3000, 6);
+		expect(curveRange(c, 5000)).toBeCloseTo(15000, 4);
+		expect(curveRange(c, CURVE_METRIC_NEAR)).toBeCloseTo(CURVE_METRIC_NEAR, 9);
+	});
 	it("is NaN for non-positive input", () => {
 		expect(curveRange(curve, 0)).toBeNaN();
 		expect(curveRange(curve, -3)).toBeNaN();
@@ -167,6 +175,44 @@ describe("fitCurve", () => {
 		const c = fitCurve(mr, dr);
 		expect(curveRange(c, 100) / 100).toBeGreaterThan(1.8);
 		expect(curveRange(c, 100) / 100).toBeLessThan(2.2);
+	});
+	it("falls back to a constant ratio when the slope bounds cannot be met", () => {
+		// model spans ~4 decades, DEM is almost constant: Σ slopeMin·Δx exceeds the y grid
+		const mr: number[] = [];
+		const dr: number[] = [];
+		for (let i = 0; i < 800; i++) {
+			mr.push(1 * 10_000 ** (i / 799));
+			dr.push(100 * (1 + 0.01 * (i % 7)));
+		}
+		const c = fitCurve(mr, dr);
+		expect(c.x.length).toBe(1);
+		expect(c.y.length).toBe(1);
+		expect(Number.isFinite(c.y[0])).toBe(true);
+	});
+	it("octaveMinShare caps the weight of a sparse octave", () => {
+		// 2000 samples at DEM ratio 2 over 200-400 m, plus 4 near samples (DEM 16-32 m octave) at ratio 0.5. With
+		// plain octave weights the 4 samples weigh as much as the 2000 and bend the near end down to them; with a
+		// 5 % floor they are outvoted and the near end extrapolates the far ratio.
+		const mr: number[] = [];
+		const dr: number[] = [];
+		for (let i = 0; i < 2000; i++) {
+			const m = 100 + (100 * i) / 1999;
+			mr.push(m);
+			dr.push(2 * m);
+		}
+		for (let i = 0; i < 4; i++) {
+			mr.push(40 + i);
+			dr.push(20 + i / 2);
+		}
+		const plain = fitCurve(mr, dr);
+		const floored = fitCurve(mr, dr, { octaveMinShare: 0.05 });
+		expect(fitCurve(mr, dr, { octaveMinShare: 0 })).toEqual(plain);
+		const r = (c: { x: number[]; y: number[] }, m: number) =>
+			curveRange(c, m) / m;
+		expect(r(plain, 41)).toBeLessThan(1);
+		expect(r(floored, 41)).toBeGreaterThan(1.2);
+		for (const c of [plain, floored])
+			expect(Math.abs(Math.log(r(c, 150) / 2))).toBeLessThan(0.05);
 	});
 	it("returns monotone knots with slopes within bounds", () => {
 		const mr: number[] = [];
@@ -256,6 +302,33 @@ describe("fitAnchor", () => {
 		expect(clipped.n).toBeLessThan(full.n);
 		expect(clipped.n).toBeGreaterThan(0);
 		expect(clipped.maxRange).toBe(300);
+	});
+	it("edgeGuard drops candidates next to depth and DEM discontinuities", () => {
+		const d = rampDepth();
+		const W = d.width;
+		// a vertical depth step in the model at column 32 (×3) that the DEM does not have
+		for (let j = 0; j < d.height; j++)
+			for (let i = 32; i < W; i++) d.depth[j * W + i] *= 3;
+		const dem = (_u: number, v: number) => 2 * zAt(v);
+		const off = fitAnchor(d, dem, K, { stride: 1, mode: "scale" });
+		const on = fitAnchor(d, dem, K, {
+			stride: 1,
+			mode: "scale",
+			edgeGuard: Math.log(1.5),
+		});
+		// columns 31 and 32 border the step
+		expect(off.n - on.n).toBe(2 * d.height);
+		// an untouched ramp keeps every candidate (row steps are ≈ 5 %, under the guard)
+		const flat = rampDepth();
+		expect(
+			fitAnchor(flat, dem, K, { stride: 1, edgeGuard: Math.log(1.5) }).n,
+		).toBe(fitAnchor(flat, dem, K, { stride: 1 }).n);
+		// a DEM hole (no terrain) makes its neighbours edges
+		const holed = (u: number, v: number) =>
+			u > 0.5 && u < 0.52 ? null : 2 * zAt(v);
+		const h = fitAnchor(flat, holed, K, { stride: 1, edgeGuard: 0.4 });
+		const h0 = fitAnchor(flat, holed, K, { stride: 1 });
+		expect(h.n).toBeLessThan(h0.n);
 	});
 	it("ignores invalid model pixels", () => {
 		const d = rampDepth();

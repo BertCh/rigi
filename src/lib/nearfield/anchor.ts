@@ -66,6 +66,13 @@ export type AnchorOpts = {
 	cliffLip?: boolean | Partial<CliffLipOpts>;
 	/** Fewer candidates than this → no fit: quality 0, scale 1. Default ANCHOR_QUALITY_CONSTS.nMin. */
 	minSamples?: number;
+	/**
+	 * Depth-edge guard (off unless set): drop a candidate when a 4-neighbour depth cell differs from it by more
+	 * than this in |log z| (model) or |log range| (DEM), or has no DEM hit. Silhouettes (ridge against far
+	 * terrain or sky, object outlines) are mixed pixels where nearest-cell DEM and model depth disagree by
+	 * construction. Typical value ln 1.5.
+	 */
+	edgeGuard?: number;
 };
 
 export type CurveOpts = {
@@ -86,6 +93,12 @@ export type CurveOpts = {
 	slopePrior: number;
 	/** Truncation of the L1 loss (log units). Default = the fit band. */
 	band: number;
+	/**
+	 * Octave-weight floor as a share of all candidates: a sample weighs 1 / max(count in its octave,
+	 * octaveMinShare · n), so a near octave with a handful of (often eye-height-dominated) samples cannot weigh
+	 * as much as a full octave. Default 0 = plain equal weight per octave.
+	 */
+	octaveMinShare: number;
 };
 export const CURVE_DEFAULTS: CurveOpts = {
 	knots: 6,
@@ -97,6 +110,7 @@ export const CURVE_DEFAULTS: CurveOpts = {
 	octaveWeights: true,
 	slopePrior: 0.002,
 	band: Math.log(1.25),
+	octaveMinShare: 0,
 };
 
 /**
@@ -161,7 +175,8 @@ export function curveRange(
 		const ln = Math.log(CURVE_METRIC_NEAR);
 		const lr0 = y[0] - x[0]; // log ratio at the near knot
 		if (x[0] <= ln || lr0 <= 0) return Math.exp(y[0] + lx - x[0]);
-		const w = Math.max(0, (lx - ln) / (x[0] - ln));
+		// clamp at 1: a one-knot curve also takes this branch above its knot, where the ratio stays constant
+		const w = Math.min(1, Math.max(0, (lx - ln) / (x[0] - ln)));
 		return Math.exp(lx + w * lr0);
 	}
 	if (lx >= x[n - 1]) return Math.exp(y[n - 1] + lx - x[n - 1]);
@@ -203,6 +218,24 @@ export function fitAnchor(
 		opts.stride ?? Math.max(1, Math.ceil(Math.sqrt((W * H) / 40_000)));
 	const sky = maskSampler(opts.skyMask);
 	const people = maskSampler(opts.peopleMask);
+	const edge = opts.edgeGuard;
+	const isEdge =
+		edge != null && edge > 0
+			? (i: number, j: number, z: number, d: number) => {
+					for (const [di, dj] of NEIGHBOURS) {
+						const a = i + di;
+						const b = j + dj;
+						if (a < 0 || b < 0 || a >= W || b >= H) continue;
+						const zn = modelDepth(depth, b * W + a);
+						if (!Number.isNaN(zn) && Math.abs(Math.log(zn / z)) > edge)
+							return true;
+						const dn = demRangeAt((a + 0.5) / W, (b + 0.5) / H);
+						if (!(dn != null && dn > 0) || Math.abs(Math.log(dn / d)) > edge)
+							return true;
+					}
+					return false;
+				}
+			: null;
 
 	const mr: number[] = []; // model ray length
 	const dr: number[] = []; // dem range
@@ -215,6 +248,7 @@ export function fitAnchor(
 			if (sky?.(u, v) || people?.(u, v)) continue;
 			const d = demRangeAt(u, v);
 			if (d == null || !(d >= minRange && d <= maxRange)) continue;
+			if (isEdge?.(i, j, z, d)) continue;
 			mr.push(z * rayFactor(K, u, v));
 			dr.push(d);
 		}
@@ -295,6 +329,13 @@ export function fitAnchor(
 	return res;
 }
 
+const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [
+	[1, 0],
+	[-1, 0],
+	[0, 1],
+	[0, -1],
+];
+
 /** residualLog (inlier median), residualLogAll (median over all candidates) and inlierFrac of a map. */
 function residualStats(
 	mr: ArrayLike<number>,
@@ -345,7 +386,9 @@ export function fitCurve(
 			oct[k] = Math.floor(y[k] / Math.LN2);
 			cnt.set(oct[k], (cnt.get(oct[k]) ?? 0) + 1);
 		}
-		for (let k = 0; k < n; k++) w[k] = 1 / (cnt.get(oct[k]) ?? 1);
+		const floor = o.octaveMinShare * n;
+		for (let k = 0; k < n; k++)
+			w[k] = 1 / Math.max(cnt.get(oct[k]) ?? 1, floor);
 	}
 	let sw = 0;
 	for (let k = 0; k < n; k++) sw += w[k];
@@ -416,14 +459,15 @@ export function fitCurve(
 	};
 
 	const K = kx.length;
-	const all = Array.from({ length: n }, (_, k) => k);
-	if (K === 1) {
-		// constant ratio: mode of log(D/m) under the same loss (grid relative to the knot)
+	// constant ratio: mode of log(D/m) under the same loss (grid relative to the first knot)
+	const constantRatio = () => {
+		const all = Array.from({ length: n }, (_, k) => k);
 		const c = costOf(all, (k) => y[k] - x[k] + kx[0]);
 		let best = 0;
 		for (let a = 1; a < G; a++) if (c[a] < c[best]) best = a;
-		return { x: kx, y: [g0 + best * step] };
-	}
+		return { x: [kx[0]], y: [g0 + best * step] };
+	};
+	if (K === 1) return constantRatio();
 	// unary costs at the ends (slope-1 extrapolation), pairwise per segment
 	const left: number[] = [];
 	const right: number[] = [];
@@ -480,6 +524,9 @@ export function fitCurve(
 	}
 	let bi = 0;
 	for (let b = 1; b < G; b++) if (V[b] < V[bi]) bi = b;
+	// the slope bounds cannot be met on the y grid (model spans far more log range than the DEM grid allows):
+	// no curve exists, so fall back to the constant ratio rather than backtrack through unset entries
+	if (!Number.isFinite(V[bi])) return constantRatio();
 	const yi = [bi];
 	for (let s = back.length - 1; s >= 0; s--)
 		yi.push(back[s][yi[yi.length - 1]]);
