@@ -25,6 +25,7 @@ import {
 	photoLookEmbedding,
 	photoPaletteCpu,
 	photoPaletteGpu,
+	srgb8ToOklab,
 } from "../../src/lib/gpu/palette";
 import {
 	groupByLookCpu,
@@ -225,6 +226,32 @@ console.log(
 	`  worst over ${images.length} images: dE ${worstE.toExponential(2)}, share ${worstShare.toExponential(2)}`,
 );
 
+console.log(
+	"\npalette recovery of known colours (GPU, farthest-point seeds, k = colours)",
+);
+const KNOWN: Rgb[] = [
+	[240, 240, 230],
+	[30, 120, 50],
+	[200, 40, 40],
+	[30, 60, 200],
+	[250, 200, 20],
+	[10, 10, 10],
+];
+for (const count of [3, 4, 5, 6]) {
+	const colors = KNOWN.slice(0, count);
+	const pixels = image(blocks(colors), 40 + count);
+	const palette = await photoPaletteGpu(device, pixels, { k: count });
+	let recovered = 0;
+	for (const c of colors) {
+		const want = srgb8ToOklab(...c);
+		if (Math.min(...palette.colors.map((p) => deltaEOk(p.oklab, want))) < 0.02)
+			recovered++;
+	}
+	console.log(`  ${count} blocks: recovered ${recovered}/${count}`);
+	if (recovered / count < 0.95)
+		fail(`palette recovery ${count} blocks: ${recovered}/${count}`);
+}
+
 // synthetic clustered embeddings: `groups` centres, noisy members, shuffled
 const clustered = (rows: number, groups: number, seed: number) => {
 	const r = rng(seed);
@@ -297,6 +324,8 @@ for (const [rows, groups, seed] of [
 		`  rows ${String(rows).padStart(3)} k ${groups}: groups cpu/gpu ${cpu.groups.length}/${g.groups.length}, assignment agreement ${(agree * 100).toFixed(1)}%, vs truth ${(truthAgree * 100).toFixed(1)}%, rank top-3 overlap ${rankOverlap}/${rankTotal}`,
 	);
 	if (agree < 0.95) fail(`groupByLook ${rows}: agreement ${agree}`);
+	if (truthAgree < 0.95)
+		fail(`groupByLook ${rows}: recovery of truth ${truthAgree}`);
 	if (rankTotal && rankOverlap / rankTotal < 0.9)
 		fail(`groupByLook ${rows}: rank overlap`);
 	const query = Math.floor(rows / 3);

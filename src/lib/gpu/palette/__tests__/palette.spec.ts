@@ -160,3 +160,39 @@ describe("photoLookEmbedding", () => {
 		}
 	});
 });
+
+describe("palette recovery with farthest-point seeds", () => {
+	const PALETTE: [number, number, number][] = [
+		[240, 240, 230],
+		[30, 120, 50],
+		[200, 40, 40],
+		[30, 60, 200],
+		[250, 200, 20],
+		[10, 10, 10],
+	];
+	for (const count of [3, 4, 5, 6]) {
+		it(`recovers ${count} column blocks (the layout plain even seeding merged)`, () => {
+			const colors = PALETTE.slice(0, count);
+			const size = 32;
+			const data = new Uint8ClampedArray(size * size * 4);
+			for (let i = 0; i < size * size; i++) {
+				const c = colors[Math.floor(((i % size) * count) / size)];
+				data.set([...c, 255], i * 4);
+			}
+			const palette = photoPaletteCpu(
+				{ width: size, height: size, data },
+				{ k: count },
+			);
+			expect(palette.colors).toHaveLength(count);
+			let recovered = 0;
+			for (const c of colors) {
+				const want = srgb8ToOklab(...c);
+				if (
+					Math.min(...palette.colors.map((p) => deltaEOk(p.oklab, want))) < 0.02
+				)
+					recovered++;
+			}
+			expect(recovered / count).toBeGreaterThanOrEqual(0.95);
+		});
+	}
+});

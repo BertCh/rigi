@@ -133,3 +133,43 @@ describe("no-GPU wrappers", () => {
 		).toBe(false);
 	});
 });
+
+describe("recovery with farthest-point seeds", () => {
+	/** fraction of photos in the best 1:1 matching between truth labels and found groups */
+	const recovery = (truth: number[], found: Uint32Array, groups: number) => {
+		const overlap = Array.from({ length: groups }, () =>
+			new Array(groups).fill(0),
+		);
+		truth.forEach((t, i) => {
+			overlap[t][found[i]]++;
+		});
+		let matched = 0;
+		const usedFound = new Set<number>();
+		for (let t = 0; t < groups; t++) {
+			let best = -1;
+			let bj = -1;
+			for (let j = 0; j < groups; j++)
+				if (!usedFound.has(j) && overlap[t][j] > best) {
+					best = overlap[t][j];
+					bj = j;
+				}
+			usedFound.add(bj);
+			matched += best;
+		}
+		return matched / truth.length;
+	};
+	for (const [groups, perGroup, seed] of [
+		[3, 8, 1],
+		[4, 15, 2],
+		[5, 24, 3],
+		[6, 50, 4],
+	] as const) {
+		it(`recovers ${groups} groups of ${perGroup}`, () => {
+			const { embeddings, truth } = clustered(groups, perGroup, seed);
+			const result = groupByLookCpu(embeddings, groups);
+			expect(
+				recovery(truth, result.groupOfPhoto, groups),
+			).toBeGreaterThanOrEqual(0.95);
+		});
+	}
+});

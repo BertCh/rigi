@@ -14,6 +14,7 @@ import { GPUKMeans, type GraphEmbeddingMatrix } from "../core/luma";
 import { pooledStorage, withLease } from "../core/pool";
 import { kMeansCpu } from "./kmeans-cpu";
 import { type Oklab, oklabToSrgb8, srgb8ToOklab } from "./oklab";
+import { farthestPointSeeds, seedPermutation } from "./seeding";
 
 /** An RGBA8 image (what ImageData / getImageData give). */
 export type PhotoPixels = {
@@ -92,6 +93,45 @@ function toPalette(
 	return { colors };
 }
 
+/** Seed candidates: every GRID_STEP-th pixel in x and y (a flat stride would alias with the width). */
+const GRID_STEP = 4;
+
+/**
+ * The pixels with farthest-point seeds placed where GPUKMeans / kMeansCpu take their seeds (see
+ * seeding.ts), so distinct colours cannot share a seed. Palette clusters need no map back.
+ */
+export function seedPixels(pixels: PhotoPixels, k: number): PhotoPixels {
+	const { width, height } = pixels;
+	const rowCount = width * height;
+	let candidates: number[] = [];
+	for (let y = 0; y < height; y += GRID_STEP)
+		for (let x = 0; x < width; x += GRID_STEP) candidates.push(y * width + x);
+	if (candidates.length < k)
+		candidates = Array.from({ length: rowCount }, (_, i) => i);
+	const lab = new Float32Array(candidates.length * 3);
+	candidates.forEach((i, j) => {
+		lab.set(
+			srgb8ToOklab(
+				pixels.data[i * 4],
+				pixels.data[i * 4 + 1],
+				pixels.data[i * 4 + 2],
+			),
+			j * 3,
+		);
+	});
+	const seeds = farthestPointSeeds(lab, candidates.length, 3, 3, k).map(
+		(j) => candidates[j],
+	);
+	const permutation = seedPermutation(rowCount, seeds);
+	const data = new Uint8ClampedArray(rowCount * 4);
+	for (let i = 0; i < rowCount; i++)
+		data.set(
+			pixels.data.subarray(permutation[i] * 4, permutation[i] * 4 + 4),
+			i * 4,
+		);
+	return { width: pixels.width, height: pixels.height, data };
+}
+
 /** CPU palette (the twin of photoPaletteGpu). */
 export function photoPaletteCpu(
 	pixels: PhotoPixels,
@@ -99,7 +139,7 @@ export function photoPaletteCpu(
 ): PhotoPalette {
 	const { rowCount, k, maxIterations } = resolve(pixels, options);
 	if (rowCount === 0) return { colors: [] };
-	const lab = pixelsToOklab(pixels, 3);
+	const lab = pixelsToOklab(seedPixels(pixels, k), 3);
 	const result = kMeansCpu(lab, rowCount, 3, 3, k, maxIterations);
 	return toPalette(result.centroids, result.counts, rowCount);
 }
@@ -227,7 +267,7 @@ export async function photoPaletteGpu(
 ): Promise<PhotoPalette> {
 	const { rowCount, k, maxIterations } = resolve(pixels, options);
 	if (rowCount === 0) return { colors: [] };
-	const words = packWords(pixels, rowCount);
+	const words = packWords(seedPixels(pixels, k), rowCount);
 	return withLease(PALETTE_GROUP, async () => {
 		const entry = cachedGraph<void, { pixelWords: unknown }>(
 			device,

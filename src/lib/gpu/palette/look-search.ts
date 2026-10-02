@@ -16,6 +16,7 @@ import {
 } from "../core/luma";
 import { pooledStorage, withLease } from "../core/pool";
 import { kMeansCpu } from "./kmeans-cpu";
+import { farthestSeedPermutation, permuteRows } from "./seeding";
 
 const GROUP_LEASE = "roll-look";
 const SIMILAR_LEASE = "roll-look-similar";
@@ -71,6 +72,33 @@ const squaredDistance = (
 		sum += diff * diff;
 	}
 	return sum;
+};
+
+/**
+ * Seeds the k-means with farthest-point rows (seeding.ts): returns the permuted rows and the
+ * permutation (permuted position -> original photo index) to map labels and ranks back.
+ */
+function seedRowsFor(
+	flat: Float32Array,
+	rowCount: number,
+	dimensions: number,
+	k: number,
+) {
+	const permutation = farthestSeedPermutation(
+		flat,
+		rowCount,
+		dimensions,
+		dimensions,
+		k,
+	);
+	return { permutation, permuted: permuteRows(flat, permutation, dimensions) };
+}
+
+/** labels in permuted order -> labels per original photo */
+const unpermuteLabels = (labels: Uint32Array, permutation: Uint32Array) => {
+	const out = new Uint32Array(labels.length);
+	for (let i = 0; i < labels.length; i++) out[permutation[i]] = labels[i];
+	return out;
 };
 
 /** Shared tail: labels + centroids + per-cluster ranked row lists -> ordered groups. */
@@ -141,8 +169,9 @@ export function groupByLookCpu(
 		clusterCountRequest ?? defaultLookGroupCount(rowCount),
 	);
 	const flat = flatten(embeddings);
+	const { permutation, permuted } = seedRowsFor(flat, rowCount, dimensions, k);
 	const result = kMeansCpu(
-		flat,
+		permuted,
 		rowCount,
 		dimensions,
 		dimensions,
@@ -162,7 +191,7 @@ export function groupByLookCpu(
 		rowCount,
 		k,
 		dimensions,
-		result.labels,
+		unpermuteLabels(result.labels, permutation),
 		result.centroids,
 		ranked,
 		"cpu",
@@ -267,7 +296,12 @@ export async function groupByLookGpu(
 		rowCount,
 		clusterCountRequest ?? defaultLookGroupCount(rowCount),
 	);
-	const flat = flatten(embeddings);
+	const { permutation, permuted } = seedRowsFor(
+		flatten(embeddings),
+		rowCount,
+		dimensions,
+		k,
+	);
 	return withLease(GROUP_LEASE, async () => {
 		const entry = cachedGraph<void, void>(
 			device,
@@ -276,7 +310,7 @@ export async function groupByLookGpu(
 			(g) => buildGroupGraph(g, rowCount, dimensions, k),
 		);
 		await entry.graph.compileAsync();
-		const input = pooledStorage(device, `${GROUP_LEASE}/embeddings`, flat);
+		const input = pooledStorage(device, `${GROUP_LEASE}/embeddings`, permuted);
 		const { reads } = await entry.graph.run(undefined, {
 			buffers: { embeddings: input },
 		});
@@ -286,9 +320,13 @@ export async function groupByLookGpu(
 			rowCount,
 			k,
 			dimensions,
-			new Uint32Array(labelBytes, 0, rowCount),
+			unpermuteLabels(new Uint32Array(labelBytes, 0, rowCount), permutation),
 			new Float32Array(centroidBytes, 0, k * dimensions),
-			(cluster) => ids.subarray(cluster * rowCount, (cluster + 1) * rowCount),
+			(cluster) =>
+				Array.from(
+					ids.subarray(cluster * rowCount, (cluster + 1) * rowCount),
+					(id) => (id === INVALID_ID ? id : permutation[id]),
+				),
 			"gpu",
 		);
 	});
