@@ -26,6 +26,10 @@ import { CLEAR_AIR_OFF } from "../look/clear-air";
 import type { harmonizeValues } from "../look/composite";
 import { ATM_BLOCK, ATM_LUMA_MODULE } from "../look/glsl/atmosphere";
 import { CLEAR_AIR_BLOCK, CLEAR_AIR_LUMA_MODULE } from "../look/glsl/clear-air";
+import {
+	SRGB_DECODE_GLSL,
+	SRGB_ENCODE_CLASSIC_GLSL,
+} from "../look/glsl/common";
 import { HARM_BLOCK, HARMONIZE_FNS } from "../look/glsl/composite";
 import {
 	ALPINE_FNS,
@@ -302,13 +306,8 @@ out vec4 fragColor;
 // sRGB then pow(2.2)'d, textures are decoded to linear, everything is shaded/hazed/blended in
 // linear, and the result is encoded with the sRGB OETF at the very end.
 vec3 toLinear(vec3 c) { return pow(c, vec3(2.2)); }
-vec3 srgbDecode(vec3 c) {
-  return mix(pow(c * 0.9478672986 + vec3(0.0521327014), vec3(2.4)), c * 0.0773993808, vec3(lessThanEqual(c, vec3(0.04045))));
-}
-vec3 srgbEncode(vec3 c) {
-  c = max(c, vec3(0.0));
-  return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
-}
+${SRGB_DECODE_GLSL}
+${SRGB_ENCODE_CLASSIC_GLSL}
 
 // the colour pass (composite.ts) keeps everything linear
 vec3 outColor(vec3 c) { return terrain.linearOut > 0.5 ? max(c, vec3(0.0)) : srgbEncode(c); }
