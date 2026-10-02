@@ -137,10 +137,11 @@ function HandContents() {
 					</section>
 				))}
 			</div>
-			{/* one hand caption for the hovered sheet: its claim and status; ← feeds into it, → it feeds */}
+			{/* one hand caption for the hovered sheet: its claim and status; ← feeds into it, → it feeds.
+			    A fixed three-line box (3 × 24px), so a long claim never pushes the sheet map down on hover. */}
 			<p
 				aria-live="polite"
-				className={`${TYPE.hand} gb-secondary mt-6 min-h-[48px] max-w-[66ch]`}
+				className={`${TYPE.hand} gb-secondary mt-6 line-clamp-3 h-[72px] max-w-[66ch]`}
 			>
 				{activeNode
 					? `${activeNode.title}: ${activeNode.claim ?? activeNode.tagline} (${STATUS_META[activeNode.status].label})`

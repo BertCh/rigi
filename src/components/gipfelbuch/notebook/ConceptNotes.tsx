@@ -134,6 +134,15 @@ export function FieldNotes({
 }
 
 const TRAIL_WIDTH = 1000;
+
+interface TrailNote {
+	kind: "need" | "feed";
+	id: string;
+	text: string;
+	width: number;
+	side: "left" | "right";
+	row: number;
+}
 const ROW_Y = 132;
 
 /** The notebook around this concept, drawn as a pen trail: its entry's chain, with incoming and outgoing notes. */
@@ -144,10 +153,21 @@ export function NotebookTrail({ id }: { id: string }) {
 	const { entry, entryNumber, step } = placement;
 	const main = entry.steps.filter((candidate) => !candidate.fallback);
 	const fallbacks = entry.steps.filter((candidate) => candidate.fallback);
-	const gap = (TRAIL_WIDTH - 140) / Math.max(1, main.length - 1);
+	// Labels are centred under their rings, so inset the end stations by their label's half width
+	// (the hand face runs about 0.4 em per glyph) to keep long labels inside the sheet.
+	const halfLabel = (candidate: NotebookStep | undefined) =>
+		candidate
+			? ((candidate.id === id ? 21 : 18) * 0.4 * candidate.label.length) / 2
+			: 0;
+	const left = Math.max(70, 20 + halfLabel(main[0]));
+	const right = Math.min(
+		TRAIL_WIDTH - 70,
+		TRAIL_WIDTH - 20 - halfLabel(main[main.length - 1]),
+	);
+	const gap = (right - left) / Math.max(1, main.length - 1);
 	const position = new Map<string, [number, number]>();
 	main.forEach((candidate, index) => {
-		position.set(candidate.id, [70 + index * gap, ROW_Y]);
+		position.set(candidate.id, [left + index * gap, ROW_Y]);
 	});
 	for (const fallback of fallbacks) {
 		// A fallback hangs below the step before it in the entry's order.
@@ -160,6 +180,38 @@ export function NotebookTrail({ id }: { id: string }) {
 	const needs = step?.needs ?? [];
 	const feeds = step ? feedsOf(step.id) : [];
 	const here = step ? position.get(step.id) : null;
+	// Blue notes (what this step needs) go left of the ring, brown ones (what it feeds) right; a note
+	// that would run off the sheet moves to the other side when that side has room.
+	const notes: TrailNote[] = [
+		...needs.map((need) => ({
+			kind: "need" as const,
+			id: need.id,
+			text: `${need.what} ← (${STEP_NUMBER.get(need.id)}) ${byId.get(need.id)?.title}`,
+		})),
+		...feeds.map((feed) => ({
+			kind: "feed" as const,
+			id: feed.id,
+			text: `→ (${STEP_NUMBER.get(feed.id)}) ${byId.get(feed.id)?.title}: ${feed.what}`,
+		})),
+	].map((note) => {
+		const width = note.text.length * 17 * 0.4;
+		const roomLeft = here ? here[0] - 64 - 20 : 0;
+		const roomRight = here ? TRAIL_WIDTH - 20 - (here[0] + 64) : 0;
+		const preferred = note.kind === "need" ? "left" : "right";
+		const fits = (side: "left" | "right") =>
+			width <= (side === "left" ? roomLeft : roomRight);
+		const other = preferred === "left" ? "right" : "left";
+		const side =
+			fits(preferred) || !fits(other) ? preferred : (other as "left" | "right");
+		return { ...note, width, side, row: 0 };
+	});
+	for (const side of ["left", "right"] as const) {
+		notes
+			.filter((note) => note.side === side)
+			.forEach((note, row) => {
+				note.row = row;
+			});
+	}
 	const open = (target: string) =>
 		navigate({ to: "/gipfelbuch/$concept", params: { concept: target } });
 
@@ -279,48 +331,39 @@ export function NotebookTrail({ id }: { id: string }) {
 					</g>
 				) : null}
 				{here
-					? needs.map((need, index) => {
-							const textY = here[1] - 56 - index * 24;
+					? notes.map((note) => {
+							const textY = here[1] - 56 - note.row * 24;
+							const onLeft = note.side === "left";
+							// the text's inner end sits 64 from the ring, clamped so the note stays on the sheet
+							const inner = onLeft
+								? Math.max(here[0] - 64, 20 + note.width)
+								: Math.min(here[0] + 64, TRAIL_WIDTH - 20 - note.width);
+							const edge: [number, number] = [
+								here[0] + (onLeft ? -12 : 12),
+								here[1] - 24,
+							];
+							const tip: [number, number] = [
+								inner + (onLeft ? 6 : -6),
+								textY - 5,
+							];
 							return (
-								<g key={`need-${need.id}`}>
+								<g key={`${note.kind}-${note.id}`}>
+									<PenArrow
+										seed={`trail-${note.kind}-${note.id}`}
+										from={note.kind === "need" ? tip : edge}
+										to={note.kind === "need" ? edge : tip}
+										bend={0.18}
+										color={note.kind === "need" ? "blue" : "brown"}
+										width={1.2}
+									/>
 									<HandText
-										x={here[0] - 64}
+										x={inner}
 										y={textY}
-										anchor="end"
-										color="blue"
+										anchor={onLeft ? "end" : undefined}
+										color={note.kind === "need" ? "blue" : "brown"}
 										size={17}
 									>
-										{need.what} ← ({STEP_NUMBER.get(need.id)}){" "}
-										{byId.get(need.id)?.title}
-									</HandText>
-									<PenArrow
-										seed={`trail-need-${need.id}`}
-										from={[here[0] - 58, textY - 5]}
-										to={[here[0] - 12, here[1] - 24]}
-										bend={0.18}
-										color="blue"
-										width={1.2}
-									/>
-								</g>
-							);
-						})
-					: null}
-				{here
-					? feeds.map((feed, index) => {
-							const textY = here[1] - 56 - index * 24;
-							return (
-								<g key={`feed-${feed.id}`}>
-									<PenArrow
-										seed={`trail-feed-${feed.id}`}
-										from={[here[0] + 12, here[1] - 24]}
-										to={[here[0] + 58, textY - 5]}
-										bend={0.18}
-										color="brown"
-										width={1.2}
-									/>
-									<HandText x={here[0] + 64} y={textY} color="brown" size={17}>
-										→ ({STEP_NUMBER.get(feed.id)}) {byId.get(feed.id)?.title}:{" "}
-										{feed.what}
+										{note.text}
 									</HandText>
 								</g>
 							);

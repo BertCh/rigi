@@ -51,7 +51,6 @@ import {
 } from "#/components/gipfelbuch/viz/explain";
 import { PlotSeries } from "#/components/gipfelbuch/viz/Plot";
 import { MAPTERHORN, TERRARIUM_AWS } from "#/lib/dem/sources";
-import { gipfelbuchHref } from "#/lib/gipfelbuch/graph-utils";
 import type { GipfelbuchNode } from "#/lib/gipfelbuch/types";
 
 // Terrain model: height tiles (MAPTERHORN / TERRARIUM_AWS in src/lib/dem/sources.ts) and the one lookup over them
@@ -144,14 +143,6 @@ function useTerrainData() {
 	}, []);
 	return d;
 }
-const A = ({ id, children }: { id: string; children: React.ReactNode }) => (
-	<a
-		href={gipfelbuchHref(id)}
-		className="text-[var(--accent)] underline-offset-2 hover:underline"
-	>
-		{children}
-	</a>
-);
 const fmt = (v: number, n = 0) =>
 	v.toLocaleString("en-US", {
 		minimumFractionDigits: n,
@@ -1889,12 +1880,11 @@ export default function Page(_: { node: GipfelbuchNode }) {
 					default. <code>TERRAIN_LEVELS</code> belongs to{" "}
 					<code>TERRARIUM_AWS</code> ({TERRARIUM_AWS.tileSize} px PNG, z
 					{TERRARIUM_AWS.maxZoom}), kept as the comparison. Both are{" "}
-					<A id="terrarium-encoding">Terrarium-encoded</A>, so the decoder is
-					shared and a tile is a <A id="dem-tile">DEM tile</A> either way.
+					Terrarium-encoded, so the decoder is shared and a tile is a DEM tile
+					either way.
 				</p>
 				<p>
-					Each source carries its own{" "}
-					<A id="dem-lod-levels">distance-banded ladder</A>. Mapterhorn&rsquo;s
+					Each source carries its own distance-banded ladder. Mapterhorn&rsquo;s
 					ladder is one zoom coarser per band than Terrarium&rsquo;s (its tiles
 					are twice as wide) plus two finer near-field levels.{" "}
 					<code>TerrainSampler</code> loads nothing itself, so it runs the same
@@ -1962,9 +1952,8 @@ export default function Page(_: { node: GipfelbuchNode }) {
 				<ul>
 					<li>
 						<strong>Check against the map the method used.</strong> The first{" "}
-						<A id="wild-benchmark">benchmark</A> check drew overlays on
-						Terrarium while the methods solved on Mapterhorn; ground differed by
-						up to 114 m.
+						benchmark check drew overlays on Terrarium while the methods solved
+						on Mapterhorn; ground differed by up to 114 m.
 					</li>
 					<li>
 						The 12-photo ground truth was fitted against Terrarium notches, so
@@ -1975,8 +1964,8 @@ export default function Page(_: { node: GipfelbuchNode }) {
 						missing tiles must return 404 or 204 so the ancestor fallback works.
 					</li>
 					<li>
-						Sea is set to 0 when tiles are decoded. Licences: the{" "}
-						<A id="licence-register">licence register</A>.
+						Sea is set to 0 when tiles are decoded. Licences: see{" "}
+						<code>reports/licences.md</code>.
 					</li>
 				</ul>
 				<h3>Code</h3>
