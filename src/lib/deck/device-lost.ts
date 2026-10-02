@@ -17,6 +17,7 @@
 // Test: gl.getExtension("WEBGL_lose_context").loseContext(), then .restoreContext().
 
 import type { Device } from "@luma.gl/core";
+import { type WebGLDevice, WebGLStateTracker } from "@luma.gl/webgl";
 
 export type ContextLossHandlers = {
 	/** The context is gone: stop drawing (every GL call is a no-op until restored). */
@@ -44,15 +45,11 @@ export function watchContextLoss(
 	};
 }
 
-type LumaWebGLDevice = {
-	gl?: WebGL2RenderingContext & {
-		lumaState?: {
-			cache: Record<string, unknown>;
-			program: unknown;
-			stateStack: object[];
-			enable: boolean;
-		};
-	};
+/**
+ * luma's WebGLDevice as reviveDevice sees it: the public `gl` / `extensions` (optional: any Device
+ * may come in), the public but readonly `lost`, and the private members luma has no restore API for.
+ */
+type LumaWebGLDevice = Partial<Pick<WebGLDevice, "gl">> & {
 	lost: Promise<unknown>;
 	_resolveContextLost?: (v: { reason: "destroyed"; message: string }) => void;
 	_isLost?: boolean;
@@ -62,7 +59,7 @@ type LumaWebGLDevice = {
 };
 
 /**
- * Make luma's WebGL device (@luma.gl/webgl 9.4 WebGLDevice) work again on its restored context.
+ * Make luma's WebGL device (@luma.gl/webgl 10 WebGLDevice) work again on its restored context.
  * luma internals, all of them caches of the dead context:
  *   - `lost` resolved at the loss, and every fence race (geometry-pass.ts gpuDone) would read it as
  *     "lost" forever: a fresh pending promise;
@@ -84,7 +81,8 @@ export function reviveDevice(device: Device): boolean {
 	// set by loseDevice(); left true, the next real loss would report "destroyed" (app-requested)
 	d._lossWasRequested = false;
 	d._moduleData = {};
-	const st = gl.lumaState;
+	// luma's state tracker of this context (public WebGLStateTracker.get; undefined if untracked)
+	const st = WebGLStateTracker.get(gl) as WebGLStateTracker | undefined;
 	if (st) {
 		// re-read every tracked parameter from the restored context (its defaults), with the
 		// tracker's getParameter override off; an empty cache would make push / pop restore

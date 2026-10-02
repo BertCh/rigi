@@ -9,8 +9,8 @@
 		"why": "WebGL2 fallback: MAX_SAMPLES probe, benchmark gl.finish, renderColorPixels RGBA/FLOAT readPixels, fence waits; MSAA is luma (rigi.5 multisampled textures + resolveTargets)"
 	},
 	"src/lib/deck/device-lost.ts": {
-		"rawGl": 4,
-		"why": "WebGL2 fallback: context-loss handling"
+		"rawGl": 3,
+		"why": "WebGL2 fallback: context-loss revival re-reads GL parameters and re-enables extensions on the restored context (luma has no restore API); private WebGLDevice members (_isLost, _resolveContextLost, _moduleData) are reset there too"
 	},
 	"src/lib/deck/geometry-pass.ts": {
 		"handle": 3,
