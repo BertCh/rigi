@@ -52,12 +52,7 @@
 
 import type { CommandEncoder, Device, Texture } from "@luma.gl/core";
 import * as THREE from "three";
-import {
-	type AlignResult,
-	type EdgeMap,
-	type Pin,
-	solvePins,
-} from "#/lib/align";
+import type { AlignResult, EdgeMap, Pin } from "#/lib/align";
 import * as cam from "#/lib/camera";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
 import { CpuGeometrySource, TerrainProfiles } from "#/lib/deck/cpu-geometry";
@@ -188,6 +183,7 @@ import {
 } from "#/lib/nearfield/types";
 import type { Vec3 } from "#/lib/ontology/core/geometry";
 import type { PhotoMeta, RegionData, RegionTrail } from "#/lib/photos";
+import { solvePinsForApp } from "#/lib/pins/seed";
 import { unprojectDir } from "#/lib/pose";
 import type {
 	FgMask,
@@ -3595,7 +3591,7 @@ export class WebGpuEngine implements Renderer {
 	}
 
 	solvePins(pins: Pin[], from: Pose = this.pose, solveFov = true) {
-		return solvePins(
+		return solvePinsForApp(
 			from,
 			this.aspect,
 			this.eyeArr,

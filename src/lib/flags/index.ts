@@ -196,6 +196,8 @@ export const FLAG_SCHEMA = {
 	cammodes: onOff("off"),
 	// alignment aids
 	picker: oneOf(["off", "on", "always"], "off"),
+	/** tap-a-peak pin solve (src/lib/pins/seed.ts): seeded = closed-form start + lens bound, kept only when it fits the taps better */
+	pinSolve: oneOf(["plain", "seeded"], "plain"),
 	eyesearch: oneOf(["off", "on", "auto"], "off"),
 	concord: setOf(["eye", "occl", "labels", "drape"]),
 	// geometry-first camera (src/lib/geocam, GEO phase A); all off = the pre-GEO app

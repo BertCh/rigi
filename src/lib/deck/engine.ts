@@ -35,7 +35,6 @@ import {
 	buildEdgeMap,
 	type EdgeMap,
 	type Pin,
-	solvePins,
 } from "../align";
 import { hfovFromAspect, type Pose } from "../camera";
 import { tileBounds } from "../dem";
@@ -111,6 +110,7 @@ import {
 	PixelClass,
 } from "../nearfield/types";
 import type { PhotoMeta, RegionData, RegionTrail } from "../photos";
+import { solvePinsForApp } from "../pins/seed";
 import { projectPoint, unprojectDir } from "../pose";
 import type { FgMask, Renderer } from "../renderer";
 import type { RevealUniforms } from "../reveal/config";
@@ -2520,7 +2520,7 @@ export class DeckEngine implements Renderer {
 	}
 
 	solvePins(pins: Pin[], from: Pose = this.pose, solveFov = true) {
-		return solvePins(
+		return solvePinsForApp(
 			from,
 			this.aspect,
 			this.eyeArr,
