@@ -277,6 +277,85 @@ console.log(
 	}
 }
 
+// random planes (a ragged skyline, odd and even widths, NaN / ±0 / threshold values laced in): band
+// indices, K and the gathered words against the CPU, whatever the fit then makes of them
+{
+	const special = [0, -0, 0.5, 0.7, Math.fround(0.7), 1, -1, Number.NaN, 150];
+	let lcgState = 12345;
+	const rnd = () => {
+		lcgState = (Math.imul(lcgState, 1664525) + 1013904223) >>> 0;
+		return lcgState / 4294967296;
+	};
+	let cases = 0;
+	{
+		// the fallback scene above left the device in "short band" mode: one CPU-band fit on a normal
+		// scene (a long band) switches the GPU band back on
+		const input = makeHazeScene({ ...sceneOptions(0), rangeOnly: false });
+		await fitHazeFromPrep(
+			device,
+			await hazePrepArrays(device, prepArrays(input)),
+			{ geo: input.geo, eyeAlt: input.eyeAlt, sunDir: input.sunDir },
+			{ bandGpu: false },
+		);
+	}
+	for (let t = 0; t < 10; t++) {
+		const width = 40 + Math.floor(rnd() * 200);
+		const height = 30 + Math.floor(rnd() * 120);
+		const input = makeHazeScene({
+			...sceneOptions(t),
+			rangeOnly: false,
+			width,
+			height,
+		});
+		const arrays = prepArrays(input);
+		const { W, H, range, pSky } = arrays;
+		const skyline = rnd() * H;
+		const lace = rnd() * 0.15;
+		for (let y = 0; y < H; y++)
+			for (let x = 0; x < W; x++) {
+				const i = y * W + x;
+				const sky = y < skyline + 5 * Math.sin(x * 0.2 + t);
+				range[i] = sky ? 0 : 100 + rnd() * 1e5;
+				pSky[i] = sky ? 0.6 + rnd() * 0.4 : rnd() * 0.6;
+				if (rnd() < lace)
+					range[i] = special[Math.floor(rnd() * special.length)];
+				if (rnd() < lace) pSky[i] = special[Math.floor(rnd() * special.length)];
+			}
+		const cpuBand = airlightBand(range, pSky, W, H);
+		const geoIn = {
+			geo: input.geo,
+			eyeAlt: input.eyeAlt,
+			sunDir: input.sunDir,
+		};
+		const prep = await hazePrepArrays(device, arrays);
+		const lin = await readLin(prep, W * H);
+		try {
+			await fitHazeFromPrep(device, prep, geoIn, { bandGpu: true });
+		} catch {
+			// a degenerate fit is fine here, the gathers are what is checked
+		}
+		const label = `random ${t} ${W}x${H}`;
+		cases++;
+		const idx = hazeGraphProbe.skyIdx as Uint32Array;
+		const sky = hazeGraphProbe.sky as Float32Array;
+		if (hazeGraphStats.band === "gpu") {
+			if (idx.length !== cpuBand.length || !same(idx, cpuBand))
+				fail(`${label}: band indices (K ${idx.length} vs ${cpuBand.length})`);
+			for (let k = 0; k < idx.length; k++)
+				for (let c = 0; c < 3; c++)
+					if (sky[3 * k + c] !== lin[3 * idx[k] + c]) {
+						fail(`${label}: lin word ${k}.${c}`);
+						k = idx.length;
+						break;
+					}
+		}
+		console.log(
+			`  ${label}: CPU K ${cpuBand.length}, band path ${hazeGraphStats.band}`,
+		);
+	}
+	console.log(`random planes: ${cases} cases`);
+}
+
 // timings on a larger scene
 {
 	const o = {

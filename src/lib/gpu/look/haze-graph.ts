@@ -50,7 +50,8 @@
 // textures.ts's prep ("look-haze-compact", read node "head" with the range / P(sky) planes), the CPU
 // airlight band, then "look-haze-gather" when `bandGpu: false` (or the GPU band is unusable: a short
 // band, a failed spot check). By default (since 2026-10-01) the band runs on the GPU instead: one graph
-// "look-haze-band" (compaction + ./haze-band.ts's band, lin and list-range GPUGathers and spot columns),
+// "look-haze-band" (compaction + ./haze-band.ts's band: hzb-top, hzb-flags and a luma GPUCompaction;
+// lin and list-range GPUGathers; spot columns),
 // one read, no planes; same band indices as the CPU, spot-checked per call.
 //
 // Submit 2 by default runs the grid's arg-min too, as a luma GPUProgram (./haze-argmin.ts, group
@@ -74,7 +75,7 @@ import {
 	cachedGraph,
 	type GraphRange,
 } from "../core/graph";
-import { GPUGather, GPUScan, type GraphBufferHandle } from "../core/luma";
+import { GPUCompaction, GPUGather, type GraphBufferHandle } from "../core/luma";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
 import { type ReadRange, readBack } from "../core/readback";
 import {
@@ -110,10 +111,10 @@ import { buildArgminProgram, decodePick } from "./haze-argmin";
 import {
 	bandShape,
 	bandWords,
-	K_HZB_COUNT,
-	K_HZB_SCATTER,
+	FLAGS_GROUP,
+	K_HZB_FLAGS,
 	K_HZB_SPOT,
-	K_HZB_TOTAL,
+	K_HZB_TOP,
 	pickSpotColumns,
 	SPOT_COLUMNS,
 	verifyBand,
@@ -976,22 +977,25 @@ function bandGraphFor(
 			const outIdxH = imp("outIdx", 3 * N * 4);
 			const outValH = imp("outVal");
 			const outRangeH = imp("outRange", 3 * N * 4);
-			const bandIdxH = imp("bandIdx", kMax * 4);
 			const bandLinH = imp("bandLin", 3 * kMax * 4);
 			const outIdx = at<BandParams>(outIdxH, (p) => 3 * p.N * 4);
 			const outVal = at<BandParams>(outValH, (p) => 3 * p.N * 4);
-			const bandIdx = at<BandParams>(bandIdxH, () => kMax * 4);
 			const cols = at<BandParams>(imp("cols"), () => SPOT_COLUMNS * 4);
 			const blk = g.transientBuffer("blk", nBlk * LISTS * 4);
 			const offs = g.transientBuffer("offs", nBlk * LISTS * 4);
 			const starts = g.transientBuffer("starts", (LISTS + 1) * 4);
 			const top = g.transientBuffer("top", nCol * 4);
-			const cnt = g.transientBuffer("bandCnt", nCol * 4);
-			const off = g.transientBuffer("bandOff", nCol * 4);
+			// the compaction's column-major input (nCol · H slots), flags and output; the output's
+			// first K words are the band (the gather and the read use the first kMax)
+			const slots = nCol * H;
+			const elem = g.transientBuffer("bandElem", slots * 4);
+			const flag = g.transientBuffer("bandFlag", slots * 4);
+			const bandIdxT = g.transientBuffer("bandIdx", slots * 4);
 			const total = g.transientBuffer("bandK", 4);
 			const spot = g.transientBuffer("spot", SPOT_COLUMNS * H * 8);
 			const blkGroups: [number] = [Math.ceil(nBlk / 64)];
 			const colGroups: [number] = [Math.ceil(nCol / 64)];
+			const slotGroups: [number] = [Math.ceil(slots / FLAGS_GROUP)];
 			g.addKernel({
 				id: "cnt",
 				spec: K_HZ_CNT,
@@ -1017,39 +1021,33 @@ function bandGraphFor(
 				}),
 			);
 			g.addKernel({
-				id: "band-count",
-				spec: K_HZB_COUNT,
-				bindings: { prm: bprm, range, psky, top, cnt },
+				id: "band-top",
+				spec: K_HZB_TOP,
+				bindings: { prm: bprm, range, psky, top },
 				workgroups: colGroups,
 			});
+			g.addKernel({
+				id: "band-flags",
+				spec: K_HZB_FLAGS,
+				bindings: { prm: bprm, range, psky, top, elem, flag },
+				workgroups: slotGroups,
+			});
+			// stable compaction in slot order (column, then row: the CPU's push order); K lands in `total`
 			g.add(
-				new GPUScan({
-					id: "band-off",
-					input: g.view(cnt, "uint32", nCol),
-					output: g.view(off, "uint32", nCol),
-					mode: "exclusive",
+				new GPUCompaction({
+					id: "band-compact",
+					input: g.view(elem, "uint32", slots),
+					flags: g.view(flag, "uint32", slots),
+					output: g.view(bandIdxT, "uint32", slots),
+					count: g.view(total, "uint32", 1),
 				}),
 			);
-			g.addKernel({
-				id: "band-total",
-				spec: K_HZB_TOTAL,
-				bindings: { prm: bprm, cnt, off, total },
-				workgroups: [1],
-			});
-			g.addKernel({
-				id: "band-scatter",
-				spec: K_HZB_SCATTER,
-				bindings: { prm: bprm, range, psky, top, off, bandIdx },
-				workgroups: colGroups,
-				// [0, K) is written; the CPU reads [0, K) only
-				writes: { bandIdx: "full" },
-			});
 			// the band's lin over every band slot (kMax); slots ≥ K are stale indices, never read
 			g.add(
 				new GPUGather({
 					id: "band-gather",
 					source: rows3(g, linH, N),
-					indices: g.view(bandIdxH, "uint32", kMax),
+					indices: g.view(bandIdxT, "uint32", kMax),
 					output: rows3(g, bandLinH, kMax),
 				}),
 			);
@@ -1069,9 +1067,8 @@ function bandGraphFor(
 				{ buffer: outIdxH, size: (p) => p.head * 4 },
 				{ buffer: outValH, size: (p) => p.head * 4 },
 				{ buffer: outRangeH, size: (p) => p.head * 4 },
-				cnt,
 				total,
-				{ buffer: bandIdxH, size: kMax * 4 },
+				{ buffer: bandIdxT, size: kMax * 4 },
 				{ buffer: bandLinH, size: 3 * kMax * 4 },
 				spot,
 			]);
@@ -1143,29 +1140,19 @@ function fitGpuPartBand(
 			outIdx: out("outIdx", 3 * N * 4),
 			outVal: out("outVal", 3 * N * 4),
 			outRange: out("outRange", 3 * N * 4),
-			bandIdx: out("bandIdx", kMax * 4),
 			bandLin: out("bandLin", 3 * kMax * 4),
 			cols: pooledStorage(device, key("cols"), cols),
 		};
 		const e = bandGraphFor(device, W, H);
 		await e.graph.compileAsync();
 		const r1 = await e.graph.run({ N, nBlk, head }, { buffers });
-		const [cnt0, s, st0, hi, hv, hr, bc, bk, bi, bl, sp] = r1.reads.head;
+		const [cnt0, s, st0, hi, hv, hr, bk, bi, bl, sp] = r1.reads.head;
 		const st = new Uint32Array(st0);
 		const total = st[LISTS];
 		noteTotal(device, N, total);
 		const K = new Uint32Array(bk)[0];
-		const bandCnt = new Uint32Array(bc);
 		const bandIdx = new Uint32Array(bi);
-		const failure = verifyBand(
-			W,
-			H,
-			bandCnt,
-			K,
-			bandIdx,
-			cols,
-			new Uint32Array(sp),
-		);
+		const failure = verifyBand(W, H, K, bandIdx, cols, new Uint32Array(sp));
 		if (failure) {
 			bandFailed.add(device);
 			hazeGraphStats.band = "gpu-failed";
@@ -1211,7 +1198,6 @@ function fitGpuPartBand(
 				SEL * 8 +
 				(LISTS + 1) * 4 +
 				head * 12 +
-				bandCnt.byteLength +
 				4 +
 				16 * kMax +
 				SPOT_COLUMNS * H * 8 +

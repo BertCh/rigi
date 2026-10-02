@@ -7,16 +7,17 @@
 //  1. keyBelow / orderKey: for f32 x and the band's constants (0.5, 0.7) and random doubles,
 //     `x < c` ⟺ orderKey(bits(x)) ≤ keyBelow(c), on random and adversarial x (±0, subnormals, ±∞,
 //     the f32 neighbours of each constant);
-//  2. emulateBand (the WGSL's integer logic) = haze.ts airlightBand bit for bit: on the planes of
+//  2. emulateBand (hzb-top, hzb-flags and the stable compaction, in TypeScript) = haze.ts airlightBand bit for bit: on the planes of
 //     synthetic scenes (with and without sky masks) and on random planes laced with NaN, ±0,
 //     subnormals, ±∞ and the threshold neighbours, odd and even widths; where airlightBand falls
 //     back (under 20 band pixels) the emulated K is under 20 too (the GPU path then takes the CPU band);
-//  3. verifyBand accepts the true band and rejects a wrong count, a moved pixel, a dropped pixel
-//     and a wrong K (teeth of the per-call runtime check);
+//  3. verifyBand accepts the true band and rejects a wrong K, a moved, swapped, odd-column or dropped
+//     pixel (teeth of the per-call runtime check);
 //  4. end to end: the band path's Prep (band lin gathered by the emulated band, every list carrying
 //     its range values, the tail's full range plane EMPTY) through haze.ts hazeFitTail equals
 //     fitHaze bit for bit.
-// Not covered (needs a browser with WebGPU): that the WGSL kernels compute what emulateBand does.
+// Not covered here (needs a GPU): that the kernels and GPUCompaction compute what emulateBand does;
+// scripts/gpu/haze-band-dawn.ts compares the GPU band with airlightBand on Dawn.
 import { fitHaze } from "../../look/haze-fit";
 import { bits32, fromBits32, nextDown32, nextUp32 } from "../precision/df32";
 import { airlightBand, bandLength, hazeFitTail, type Prep } from "./haze";
@@ -194,43 +195,49 @@ console.log(
 			spot[2 * (s * H + y)] = rb[y * W + cols[s]];
 			spot[2 * (s * H + y) + 1] = pb[y * W + cols[s]];
 		}
-	const ok = verifyBand(W, H, band.cnt, band.K, band.idx, cols, spot);
+	const ok = verifyBand(W, H, band.K, band.idx, cols, spot);
 	if (ok) fail(`verifyBand rejects the true band: ${ok}`);
 	const j0 = cols[0] / 2;
 	let off0 = 0;
 	for (let q = 0; q < j0; q++) off0 += band.cnt[q];
 	const faults: [string, () => string | null][] = [
+		["wrong K", () => verifyBand(W, H, band.K + 1, band.idx, cols, spot)],
 		[
-			"wrong K",
-			() => verifyBand(W, H, band.cnt, band.K + 1, band.idx, cols, spot),
+			"K past kMax",
+			() => verifyBand(W, H, bandShape(W, H).kMax + 1, band.idx, cols, spot),
 		],
 		[
 			"moved pixel",
 			() => {
 				const idx = band.idx.slice();
 				idx[off0] += W;
-				return verifyBand(W, H, band.cnt, band.K, idx, cols, spot);
+				return verifyBand(W, H, band.K, idx, cols, spot);
 			},
 		],
 		[
-			"count shifted between columns",
+			"swapped pixels (order)",
 			() => {
-				const cnt = band.cnt.slice();
-				cnt[j0] -= 1;
-				cnt[(j0 + 1) % cnt.length] += 1;
-				return verifyBand(W, H, cnt, band.K, band.idx, cols, spot);
+				const idx = band.idx.slice();
+				[idx[1], idx[2]] = [idx[2], idx[1]];
+				return verifyBand(W, H, band.K, idx, cols, spot);
+			},
+		],
+		[
+			"odd column",
+			() => {
+				const idx = band.idx.slice();
+				idx[band.K - 1] += 1;
+				return verifyBand(W, H, band.K, idx, cols, spot);
 			},
 		],
 		[
 			"dropped pixel",
 			() => {
-				const cnt = band.cnt.slice();
-				cnt[j0] -= 1;
 				const idx = Uint32Array.from([
 					...band.idx.slice(0, off0),
 					...band.idx.slice(off0 + 1),
 				]);
-				return verifyBand(W, H, cnt, band.K - 1, idx, cols, spot);
+				return verifyBand(W, H, band.K - 1, idx, cols, spot);
 			},
 		],
 	];

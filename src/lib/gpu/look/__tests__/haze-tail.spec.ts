@@ -190,19 +190,13 @@ describe("haze band", () => {
 					spot[2 * (k * H + y)] = rb[y * W + cols[k]];
 					spot[2 * (k * H + y) + 1] = pb[y * W + cols[k]];
 				}
-			expect(
-				verifyBand(W, H, band.cnt, band.K, band.idx, cols, spot),
-			).toBeNull();
-			expect(
-				verifyBand(W, H, band.cnt, band.K + 1, band.idx, cols, spot),
-			).not.toBeNull();
+			expect(verifyBand(W, H, band.K, band.idx, cols, spot)).toBeNull();
+			expect(verifyBand(W, H, band.K + 1, band.idx, cols, spot)).not.toBeNull();
 			const moved = band.idx.slice();
 			let off0 = 0;
 			for (let q = 0; q < cols[0] / 2; q++) off0 += band.cnt[q];
 			moved[off0] += W;
-			expect(
-				verifyBand(W, H, band.cnt, band.K, moved, cols, spot),
-			).not.toBeNull();
+			expect(verifyBand(W, H, band.K, moved, cols, spot)).not.toBeNull();
 			break;
 		}
 		expect(checked).toBeGreaterThan(0);
