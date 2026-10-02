@@ -48,7 +48,7 @@ nn.dispose([scores, desc, x]);
 
 safetensors under `public/models/` (hash-named, a row in `scripts/models/manifest.json`), dumped from
 the PyTorch `state_dict` in fp16 by a producer under `scripts/models/`. `loadWeights` uses
-`fetch.ts` (a stand-in for `src/lib/models` `fetchModel`; Cache Storage once that lands).
+`src/lib/models` `fetchModel` (Cache Storage, progress); `setModelFetcher` overrides it in tests.
 
 ## Kernels (`gpu/`)
 
