@@ -1,5 +1,6 @@
 // Rigi
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Pencil / ink wobble for the ridge, skyline and crease lines (style.composite.sketch, 0 = off).

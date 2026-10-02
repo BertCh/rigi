@@ -1,6 +1,8 @@
 // Rigi
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+// Dash coverage after luma.gl `pathDash` (@luma.gl/shadertools, #3322, MIT, vis.gl contributors).
 
 // Hiking trails on WebGPU: the port of deck/trail-layer.ts (itself engine.ts buildTrails + three's
 // LineSegments2 / LineMaterial). README.md "Layer contract", port row `layers/trail.ts`.

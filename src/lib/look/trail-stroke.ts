@@ -1,5 +1,6 @@
 // Rigi
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Trail stroke styles (style.trails.stroke): 'solid' (default, the flat screen-space quad), 'pencil'

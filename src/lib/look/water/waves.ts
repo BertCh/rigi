@@ -1,5 +1,6 @@
 // Rigi
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Animated lake waves (style.world.water 'waves', define LOOK_WATER_WAVES): the wave normal of luma's

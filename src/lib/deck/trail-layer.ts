@@ -1,6 +1,8 @@
 // Rigi
 // SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
+// Dash coverage after luma.gl `pathDash` (@luma.gl/shadertools, #3322, MIT, vis.gl contributors).
 
 // Hiking trails for the deck photo view: the port of engine.ts buildTrails() + three's
 // LineSegments2/LineMaterial (screen-space width in target pixels, vertex colours, opacity 0.95).

@@ -74,6 +74,7 @@ Data loaders with non-MIT pieces among their dependencies (detail in `reports/li
 | `src/lib/look/nebelmeer/index.ts` (height fog) | luma.gl `heightFog`, luma master `7d1d11e9`, #3325 | MIT, Copyright (c) vis.gl contributors |
 | `src/lib/terroir/pattern.ts` (scree dots, rock and glacier hatching) | luma.gl `patternFill`, luma master `7289d961`, #3320 | MIT, Copyright (c) vis.gl contributors |
 | `src/lib/look/sketch-ridges.ts`, `src/lib/look/trail-stroke.ts` (sketch and pencil strokes) | luma.gl `sketchStroke`, luma master `7289d961`, #3318 | MIT, Copyright (c) vis.gl contributors |
+| `src/lib/deck-webgpu/layers/trail.ts`, `src/lib/deck/trail-layer.ts` (trail dash coverage) | luma.gl `pathDash`, luma master `7289d961`, #3322 | MIT, Copyright (c) vis.gl contributors |
 | `src/lib/look/water/waves.ts` (lake wave normals) | luma.gl `riverWaterMaterial`, luma master `7289d961`, #3311 | MIT, Copyright (c) vis.gl contributors |
 | `src/lib/look/flow/field.ts` (particle advection) | luma.gl experimental `FlowParticleSimulation`, luma master `7289d961`, #3324 | MIT, Copyright (c) vis.gl contributors |
 | `src/lib/look/weather/precipitation.ts`, `src/lib/deck/weather-layer.ts` | luma.gl #3325 `precipitation` shadertools module | MIT, vis.gl contributors |
