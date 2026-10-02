@@ -34,6 +34,7 @@ import {
 	pooledUniform,
 	releasePool,
 } from "#/lib/gpu/core/pool";
+import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 import { importSampledTexture, textureShapeKey } from "./graph-texture";
 
 const WG = 64;
@@ -153,7 +154,13 @@ type Which = keyof typeof SPECS;
 
 /** core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "geo-query-gpu"). */
 const GRAPH_GROUP = "geo-query";
-const PRM_BYTES = 16;
+/** The kernels' `struct P` (HEAD above): 16 B. */
+const PRM = defineUniformBlock({
+	n: "u32",
+	nonce: "u32",
+	w: "i32",
+	h: "i32",
+});
 /** the smallest output binding (Math.max(16, …), as the former per-call buffers): the graph's import capacity */
 const MIN_OUT_BYTES = 16;
 /** core pool key prefix of the persistent slots */
@@ -193,7 +200,7 @@ function buildQueryGraph(
 	const reads = kinds.map((which, j) => {
 		const out = g.importBuffer(`out${j}`, MIN_OUT_BYTES);
 		const bindings: Parameters<typeof g.addKernel>[0]["bindings"] = {
-			prm: g.importBuffer(`prm${j}`, PRM_BYTES, undefined, Buffer.UNIFORM),
+			prm: g.importBuffer(`prm${j}`, PRM.byteLength, undefined, Buffer.UNIFORM),
 			geo,
 			outp: { buffer: out, size: (p) => p.jobs[j].outBufferBytes },
 		};
@@ -269,10 +276,11 @@ export class GeoQueryGpu {
 			const run: QueryRun = { jobs: [] };
 			jobs.forEach(({ which, n, input, outWords, nonce }, j) => {
 				const slot = `${POOL}/${which}${j}`;
-				const words = new ArrayBuffer(PRM_BYTES);
-				new Uint32Array(words).set([n, nonce]);
-				new Int32Array(words).set([w, h], 2);
-				buffers[`prm${j}`] = pooledUniform(device, `${slot}/prm`, words);
+				buffers[`prm${j}`] = pooledUniform(
+					device,
+					`${slot}/prm`,
+					PRM.pack({ n, nonce, w, h }),
+				);
 				const outBufferBytes = Math.max(MIN_OUT_BYTES, outWords * 4);
 				buffers[`out${j}`] = acquire(
 					device,

@@ -37,6 +37,13 @@ import {
 } from "#/lib/dem";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import { defineKernel, submit } from "#/lib/gpu/core/kernel";
+import {
+	acquire,
+	pooledStorage,
+	pooledUniform,
+	releasePool,
+} from "#/lib/gpu/core/pool";
+import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 import { importSampledTexture, textureShapeKey } from "./graph-texture";
 import type { ResidentHeights } from "./layers/batched-terrain";
 
@@ -81,7 +88,15 @@ const SPEC = defineKernel(
 	],
 	{ group: GROUP },
 );
-const PRM_BYTES = 16;
+/** The kernel's `struct P` (WGSL above): 16 B, the last two words unused. */
+const PRM = defineUniformBlock({
+	n: "u32",
+	nonce: "u32",
+	pad0: "u32",
+	pad1: "u32",
+});
+let gatherSerial = 0;
+const OUT_USAGE = Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST;
 const MIN_BYTES = 16;
 const READ_NODE = "height-read";
 
@@ -97,7 +112,7 @@ function buildGatherGraph(
 		id: "gather",
 		spec: SPEC,
 		bindings: {
-			prm: g.importBuffer("prm", PRM_BYTES, undefined, Buffer.UNIFORM),
+			prm: g.importBuffer("prm", PRM.byteLength, undefined, Buffer.UNIFORM),
 			small: importSampledTexture(g, "small", small),
 			big: importSampledTexture(g, "big", big),
 			q: {
@@ -301,6 +316,8 @@ type Gathered = { bits: Uint32Array; slotOf: NonNullable<SlotOf> };
  * One per WebGpuEngine render device.
  */
 export class HeightGather {
+	/** pool key prefix: one per instance, so destroy() releases only its own buffers */
+	private readonly pool = `height-gather#${gatherSerial++}`;
 	private destroyed = false;
 	private nonce = 0;
 	private queue: Pending[] = [];
@@ -397,27 +414,10 @@ export class HeightGather {
 				(g) => buildGatherGraph(g, small, big),
 				4,
 			).graph;
-		const bufs: Buffer[] = [];
 		try {
 			await graphOf().compileAsync();
 			const n = words.length;
-			const prm = device.createBuffer({
-				id: "height-gather-prm",
-				usage: Buffer.UNIFORM | Buffer.COPY_DST,
-				data: new Uint32Array([n, nonce, 0, 0]),
-			});
-			const q = device.createBuffer({
-				id: "height-gather-in",
-				usage: Buffer.STORAGE | Buffer.COPY_DST,
-				data: words,
-			});
 			const outBytes = n * 8;
-			const out = device.createBuffer({
-				id: "height-gather-out",
-				byteLength: Math.max(MIN_BYTES, outBytes),
-				usage: Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST,
-			});
-			bufs.push(prm, q, out);
 			// core cachedGraph's rule: the lookup right before the graph's lease, in the same tick
 			const graph = graphOf();
 			const submitted = await graph.lease(() => {
@@ -433,11 +433,27 @@ export class HeightGather {
 				for (const { plan } of batch)
 					for (const t of plan.tiles)
 						if (!slots.has(t)) slots.set(t, res.slotOf(t));
+				// pooled grow-only buffers, written here so the writes and the submit share one tick: a
+				// concurrent gather's writes (its own lease turn) queue before or after this submit, never
+				// between the writes below and it. Every `out` word below `outBytes` is rewritten by the
+				// kernel, so the pooled bytes need no clearing
+				const prm = pooledUniform(
+					device,
+					`${this.pool}/prm`,
+					PRM.pack({ n, nonce }),
+				);
+				const q = pooledStorage(device, `${this.pool}/in`, words);
+				const out = acquire(
+					device,
+					`${this.pool}/out`,
+					Math.max(MIN_BYTES, outBytes),
+					OUT_USAGE,
+				);
 				graph.compile();
 				const enc = device.createCommandEncoder({ id: graph.id });
 				const { reads } = graph.encodeReads(
 					enc,
-					{ n, inBytes: q.byteLength, outBytes },
+					{ n, inBytes: words.byteLength, outBytes },
 					{ prm, q, out },
 					{ small, big },
 				);
@@ -462,13 +478,12 @@ export class HeightGather {
 			heightGatherCounters.failures++;
 			console.warn("[height-gather] gather failed, CPU heights", e);
 			return null;
-		} finally {
-			for (const b of bufs) b.destroy();
 		}
 	}
 
 	destroy() {
 		this.destroyed = true;
+		if (!this.device.isLost) releasePool(this.device, `${this.pool}/`);
 	}
 }
 

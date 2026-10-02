@@ -72,7 +72,8 @@ let nextTileId = 1;
 
 /** The sampler's tile set: every `key:serial` in map order (a sampler without a visible set is never reused). */
 function tileSetKey(terrain: TerrainSampler): string {
-	const tiles = (terrain as unknown as { tiles?: Map<string, object> }).tiles;
+	// a stand-in sampler without a tile set (tests) is never reused
+	const tiles: ReadonlyMap<string, object> | undefined = terrain.tileSet;
 	if (!(tiles instanceof Map)) return `none#${nextTileId++}`;
 	let s = "";
 	for (const [k, v] of tiles) {

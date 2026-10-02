@@ -29,6 +29,11 @@ export class TerrainSampler {
 		readonly tileSize = TILE_SIZE,
 	) {}
 
+	/** The loaded tiles by `z/x/y` id, in load order (read-only: identity and order key caches). */
+	get tileSet(): ReadonlyMap<string, Float32Array> {
+		return this.tiles;
+	}
+
 	/** Bilinear DEM height at (lon, lat) on zoom z: metres above mean sea level (Terrarium / Mapterhorn). */
 	sample(lon: number, lat: number, z: number): Height<"msl"> {
 		const t = lonLatToTile(lon, lat, z);

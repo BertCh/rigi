@@ -5,10 +5,10 @@
 // Pure logic of the batched terrain's GPU cull (terrain-cull.ts, terrain-cull.wgsl.ts), node-safe:
 // the buffer packing and the CPU twins of both kernels. terrain-cull-math.check.ts runs them against
 // BatchedTerrainCore.visibleRows' test (camera.ts sphereInView) without a GPU.
+import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 import type { CameraUniforms } from "../camera";
 import {
 	CAND_BYTES,
-	CULL_PARAMS_BYTES,
 	CULL_SLOTS,
 	MARGIN_ABS,
 	MARGIN_REL,
@@ -28,19 +28,36 @@ export type CullCandidate = {
 	seg: number;
 };
 
+/** The uniform block P (80 B), field for field as in terrain-cull.wgsl.ts. */
+const CULL_PARAMS = defineUniformBlock({
+	eye: "vec3<f32>",
+	near: "f32",
+	right: "vec3<f32>",
+	tanX: "f32",
+	up: "vec3<f32>",
+	tanY: "f32",
+	fwd: "vec3<f32>",
+	kx: "f32",
+	off: "vec2<f32>",
+	ky: "f32",
+	n: "u32",
+});
+
 /** The uniform block P (80 B): see terrain-cull.wgsl.ts. */
 export function packCullParams(u: CameraUniforms, n: number): ArrayBuffer {
-	const out = new ArrayBuffer(CULL_PARAMS_BYTES);
-	const fl = new Float32Array(out);
-	const kx = Math.sqrt(1 + u.tanHalfX * u.tanHalfX);
-	const ky = Math.sqrt(1 + u.tanHalfY * u.tanHalfY);
-	fl.set([...u.eye, u.near], 0);
-	fl.set([...u.right, u.tanHalfX], 4);
-	fl.set([...u.up, u.tanHalfY], 8);
-	fl.set([...u.forward, kx], 12);
-	fl.set([u.offset[0] * u.tanHalfX, u.offset[1] * u.tanHalfY, ky], 16);
-	new Uint32Array(out)[19] = n;
-	return out;
+	return CULL_PARAMS.pack({
+		eye: u.eye,
+		near: u.near,
+		right: u.right,
+		tanX: u.tanHalfX,
+		up: u.up,
+		tanY: u.tanHalfY,
+		fwd: u.forward,
+		kx: Math.sqrt(1 + u.tanHalfX * u.tanHalfX),
+		off: [u.offset[0] * u.tanHalfX, u.offset[1] * u.tanHalfY],
+		ky: Math.sqrt(1 + u.tanHalfY * u.tanHalfY),
+		n,
+	});
 }
 
 /** cand[] (32 B each): padded sphere in f32, row, seg. */

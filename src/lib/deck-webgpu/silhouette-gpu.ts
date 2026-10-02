@@ -24,6 +24,7 @@ import {
 } from "#/lib/deck/silhouette-mask";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
+import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 import { importSampledTexture, textureShapeKey } from "./graph-texture";
 
 const WG = 64;
@@ -122,7 +123,22 @@ const SPEC = defineKernel(
 
 /** core cachedGraph group (src/lib/gpu/app-graph/manifest.ts "silhouette-gpu"). */
 const GRAPH_GROUP = "silhouette-mask";
-const PRM_BYTES = 48;
+/** The kernel's `struct P` (WGSL above): 48 B. */
+const PRM = defineUniformBlock({
+	w: "i32",
+	h: "i32",
+	groups: "i32",
+	base: "u32",
+	nonce: "u32",
+	rmax: "f32",
+	khi: "f32",
+	klo: "f32",
+	zlo: "f32",
+	zhi: "f32",
+	flo: "f32",
+	fhi: "f32",
+});
+const PRM_BYTES = PRM.byteLength;
 
 type MaskRun = {
 	/** the output buffer's byteLength: each dispatch binds all of it, as the raw dispatch did */
@@ -220,16 +236,20 @@ export class SilhouetteMaskGpu {
 			const buffers: Record<string, Buffer> = { out: this.out };
 			const textures: Record<string, Texture> = {};
 			ranges.forEach((tex, i) => {
-				const words = new ArrayBuffer(PRM_BYTES);
-				const iv = new Int32Array(words);
-				const uv = new Uint32Array(words);
-				const fv = new Float32Array(words);
-				iv[0] = W;
-				iv[1] = H;
-				iv[2] = G;
-				uv[3] = i * per;
-				uv[4] = nonce;
-				fv.set([t.rmax, t.khi, t.klo, t.zlo, t.zhi, t.flo, t.fhi], 5);
+				const words = PRM.pack({
+					w: W,
+					h: H,
+					groups: G,
+					base: i * per,
+					nonce,
+					rmax: t.rmax,
+					khi: t.khi,
+					klo: t.klo,
+					zlo: t.zlo,
+					zhi: t.zhi,
+					flo: t.flo,
+					fhi: t.fhi,
+				});
 				// one uniform buffer per pose: writes land at write time, before this one submit
 				this.prms[i] ??= device.createBuffer({
 					id: `silhouette-mask-prm-${i}`,

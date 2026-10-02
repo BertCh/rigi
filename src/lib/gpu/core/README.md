@@ -199,6 +199,17 @@ export function inspectorSnapshots(device?: Device): { device: Device; snapshot:
 export function getGpuGraphProfile(): Promise<GpuGraphProfileEntry[]>; // per observed graph, from the snapshots
 ```
 
+## Packing uniforms: `uniform-block.ts`
+
+New kernels declare their uniform struct once with `defineUniformBlock` instead of hand-writing `Float32Array` / `Uint32Array` / `Int32Array` words. It wraps luma's `makeShaderBlockLayout` + `ShaderBlockWriter` with the `wgsl-uniform` layout (WGSL uniform address-space alignment: `vec3` aligned to 16 B and followed by a scalar in its 4th word, `vec2` to 8, `mat4x4` as four 16 B columns).
+
+```ts
+const PRM = defineUniformBlock({ n: "u32", nonce: "u32", w: "i32", h: "i32" }); // WGSL struct order
+pooledUniform(device, `${slot}/prm`, PRM.pack({ n, nonce, w, h })); // ArrayBuffer, PRM.byteLength rounded up to 16
+```
+
+Types are luma shader types (`f32`, `u32`, `i32`, `vec2<f32>`, `vec3<f32>`, `vec4<u32>`, `mat4x4<f32>`, ...); vec / mat values are flat number arrays; unlisted fields are zero. Field order and types must mirror the WGSL `struct`. `uniform-block.check.ts` (CI fast tier `gpu-uniform-block`) proves byte equality with the old hand packing for geo-query, silhouette and terrain-cull (including `packCullParams`). Not migrated: kernels whose params are runtime-sized arrays or storage buffers (use `pooledStorage`), and the look / horizon / align kernels, which still pack by hand.
+
 ## Rules for migrating a kernel
 
 1. **Device.** Import `getComputeDevice` from `#/lib/gpu/core/device` (`src/lib/gpu/device.ts` will re-export it). Branch on `hasFeature(device, …)` before using `subgroups` or `shader-f16`: an adopted render device may not have them.
