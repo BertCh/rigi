@@ -1,6 +1,6 @@
 # Pod P: hero photo (RealPhoto, GeoSpill, DemPatch, Measured, CrispLine, PAGE_HERO), 2026-10-02
 
-Status: **spec v1.** It is written against `grammar.md` v0.2 (pod G): derived under measured, `once` playback by default, and the tokens `turn`, `trace` and `mark`. Landed units are listed in §9 with their shas.
+Status: **spec v1, rounds 1 and 2 landed (§9); everything is browser-unverified.** It is written against `grammar.md` v0.2 (pod G): derived under measured, `once` playback by default, and the tokens `turn`, `trace` and `mark`. Landed units are listed in §9 with their shas.
 
 Pod P owns `viz/real.tsx` (RealPhoto, PeakLabels, CrispLine, DemPatch, Measured, PhotoPicker), `viz/GeoSpill.tsx` and `PAGE_HERO` in `tafel/sheets.tsx`. The **sequences around a photo** (Compare, Stages) are pod C's. The **photo story** (PhotoStory) is pod S's. The **side maps** (StoryMap) are pod M's. Pod P supplies the frame they all draw into.
 
@@ -148,7 +148,7 @@ A hero with a spill and no `spillCursor` would show the bearing under the pointe
 ## 9. Landed
 - 60e3a1f: `RealPhoto lines={false}` and GeoSpill `--gb-spill-reveal` (asks from pod S).
 - b53dbca: DemPatch `--fig-wash` ground, ink camera dot, `furniture` prop, HandLabel lettering (asks from pod M).
-- Round 1 (see the commit `gipfelbuch/hero-photo: overlay stack, hero bloom ...`):
+- 985cb14, round 1:
   - `viz/real-reveal.ts` (roles, order, bloom timing, `useHeroBloom`);
   - RealPhoto `ghosts` and `reveal`;
   - layer groups as `OverlayLayer`, with the WAAPI draw-on;
@@ -157,12 +157,23 @@ A hero with a spill and no `spillCursor` would show the bearing under the pointe
   - `labelledPeaksIn` (an ask from pod M).
 
   Specs: real-reveal, useHeroBloom, RealPhoto and GeoSpill.
-- Round 2 (see the commit `gipfelbuch/hero-photo: spill registration spec, poster ...`):
+- 41ee02f, round 2 (after two adversarial reviews, which fixed four P1s in round 1 and two in round 2):
   - spill registration spec: all 12 demo photos meet the frame within 0.5 px, with median 0.01–0.17 px at the edge columns;
   - a poster under the photo (thumb), and a picker's new photo fades in over it;
   - viewport-inference Fig. 1 bleed bounds;
   - baseline-pipeline YawSearch runner-up spill cursor;
   - tap-to-replay on touch.
+
+### Negative or deferred
+- **Hover bearing cursor (§4.4):** deferred. A cursor that follows the pointer needs GeoSpill to move its caret through a CSS var, with no React render per move. That is a GeoSpill refactor, worth doing only if the browser pass shows the heroes need it.
+- **Second cursor in photo-workspace Fig. 2:** deferred. It needs `spillCursor` to accept an array.
+- **`ground` on hero Figures:** not set by P. Pod M sets it on the four StoryMap Figures. The other heroes keep the paper default until the browser pass shows whether a per-photo wash reads well.
+- **Spill summits:** they fade in with the spill root, not staggered with the photo's names.
+- **useHeroBloom spec:** it runs on real timers, about 6 s. Moving it to fake timers is a follow-up.
+
+### Open for the user
+- The bloom is **on by default** for every spilled hero without a story or Compare (§4.1). If the hard-load flash or the hover replay reads as busy, the fallback is one line: default `reveal` to `"none"`, or skip the bloom when the figure is armed at mount.
+- Derived lines (prior, solved) now sit at the grammar's 0.9 group opacity, slightly lighter than before.
 
 ## 10. Notes to other pods
 - **G:** `--fig-halo` is used only on line halos. Text halos stay paper because the ink is dark. Six Figures widen with `bleed` and have nothing in the margin (§7).
