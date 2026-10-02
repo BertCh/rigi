@@ -18,6 +18,7 @@
 import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import type { KernelSpec } from "#/lib/gpu/core/kernel";
+import type { GraphDataView } from "#/lib/gpu/core/luma";
 import { submit } from "#/lib/gpu/core/queue";
 import { stageReads } from "#/lib/gpu/core/readback";
 import { numel } from "../shape";
@@ -38,6 +39,9 @@ export class Storage {
 	dropped = false;
 	/** weights: freed with their Weights, not by dispose(tensor) */
 	pinned = false;
+	/** an input living in a caller's ComputeGraph (fromView), or the output view of a forwardInto */
+	view: GraphDataView<"float32"> | null = null;
+	viewGraph: ComputeGraph | null = null;
 	constructor(
 		readonly bytes: number,
 		readonly dtype: DType,
@@ -130,6 +134,8 @@ function hash(s: string): string {
 		Math.imul(h1 ^ (h1 >>> 13), 3266489909);
 	return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
+
+const graphSerial = new WeakMap<ComputeGraph, number>();
 
 const pad4 = (n: number) => Math.max(4, Math.ceil(n / 4) * 4);
 
@@ -250,7 +256,8 @@ export class Runtime {
 	 * Lower `rec` onto a ComputeGraph and queue its run. `outputs` (storages produced by `rec`) get
 	 * buffers now; every other produced storage becomes dead scratch.
 	 */
-	flush(rec: Recording, outputs: Set<Storage>): Promise<void> {
+	/** Dead-code elimination, epilogue fusion and storage states; the nodes that remain. */
+	private prepare(rec: Recording, outputs: Set<Storage>): Node[] {
 		// dead-code elimination: keep nodes that (transitively) feed an output
 		const live = new Set<Storage>(outputs);
 		const keep: Node[] = [];
@@ -262,7 +269,6 @@ export class Runtime {
 			for (const s of n.inputs) live.add(s);
 		}
 		keep.reverse();
-		const produced = new Set(rec.produced);
 		for (const s of rec.produced) {
 			s.rec = null;
 			if (outputs.has(s)) {
@@ -270,8 +276,108 @@ export class Runtime {
 				s.state = "ready";
 			} else s.state = "dead";
 		}
-		if (!keep.length) return Promise.resolve();
+		return keep;
+	}
 
+	/**
+	 * Lower `rec` into a caller's ComputeGraph (no cache, no submit): inputs made by fromView bind as
+	 * the caller's views, ready buffers are imported, outputs get buffers from the free list and a view
+	 * (`Storage.view`), the rest is graph scratch. The caller compiles and runs the graph; outputs are
+	 * valid after that run.
+	 */
+	lowerInto(g: ComputeGraph, rec: Recording, outputs: Set<Storage>) {
+		const keep = this.prepare(rec, outputs);
+		if (!keep.length) return;
+		const k = (graphSerial.get(g) ?? 0) + 1;
+		graphSerial.set(g, k);
+		const pre = `nn${k}/`;
+		const produced = new Set(rec.produced);
+		const bound = new Map<Storage, unknown>();
+		const meta: number[] = [];
+		const metaAt: number[] = [];
+		const words = this.align / 4;
+		for (const n of keep) {
+			metaAt.push(meta.length);
+			const len = Math.ceil(Math.max(1, n.meta.length) / words) * words;
+			for (let i = 0; i < len; i++) meta.push(n.meta[i] ?? 0);
+		}
+		const metaBuf = this.device.createBuffer({
+			id: "nn-meta",
+			usage: STORAGE,
+			data: new Uint32Array(meta),
+		});
+		g.own([metaBuf]);
+		const mh = g.importBuffer(`${pre}meta`, metaBuf.byteLength, metaBuf);
+		const texs = new Map<Texture, ReturnType<ComputeGraph["importTexture"]>>();
+		const name = (s: Storage) => {
+			let b = bound.get(s);
+			if (b) return b;
+			const id = `${pre}s${s.id}`;
+			if (s.view) {
+				if (s.viewGraph !== g)
+					throw new Error("nn: a fromView tensor from another graph");
+				b = s.view;
+			} else if (outputs.has(s)) {
+				const buf = s.buffer as Buffer;
+				b = g.importBuffer(id, s.bytes, buf);
+				s.view = g.view(b as never, "float32", s.bytes / 4);
+				s.viewGraph = g;
+			} else if (s.state === "ready" && !produced.has(s)) {
+				b = g.importBuffer(id, s.bytes, s.buffer as Buffer);
+			} else if (s.state === "dead" && produced.has(s)) {
+				b = g.transientBuffer(id, s.bytes);
+			} else
+				throw new Error(
+					`nn: a forward used a tensor that is ${s.state} (disposed, or scratch of an earlier forward)`,
+				);
+			bound.set(s, b);
+			return b;
+		};
+		keep.forEach((n, i) => {
+			const bindings: Record<string, unknown> = {
+				M: g.view(mh, "uint32", Math.max(1, n.meta.length), metaAt[i] * 4),
+			};
+			const tex = n.textures ?? [];
+			tex.forEach((t, j) => {
+				let h = texs.get(t);
+				if (!h) {
+					h = g.importTexture(
+						{
+							id: `${pre}tex${texs.size}`,
+							format: t.format,
+							width: t.width,
+							height: t.height,
+							usage: t.props.usage,
+							dimension: "2d",
+							depth: 1,
+							mipLevels: 1,
+							samples: 1,
+						} as never,
+						t as never,
+					);
+					texs.set(t, h);
+				}
+				bindings[n.spec.layout[1 + j][0]] = h;
+			});
+			const names = n.spec.layout.map(([nm]) => nm).slice(1 + tex.length);
+			const all = [...n.inputs, ...n.outputs];
+			names.forEach((nm, j) => {
+				bindings[nm] = name(all[j]);
+			});
+			g.addKernel({
+				id: `${pre}n${i}`,
+				spec: n.spec,
+				bindings: bindings as never,
+				workgroups: n.wg,
+			});
+		});
+		this.stats.nodes += keep.length;
+	}
+
+	flush(rec: Recording, outputs: Set<Storage>): Promise<void> {
+		const keep = this.prepare(rec, outputs);
+		if (!keep.length) return Promise.resolve();
+		const produced = new Set(rec.produced);
 		// slots: imports (x), outputs (o), transients (t), in first-use order
 		const slot = new Map<Storage, string>();
 		const decl: string[] = [];
@@ -281,6 +387,10 @@ export class Runtime {
 		const name = (s: Storage) => {
 			let n = slot.get(s);
 			if (n) return n;
+			if (s.view && !s.buffer)
+				throw new Error(
+					"nn: a fromView tensor can only be used inside forwardInto(graph, …) of its graph",
+				);
 			if (outputs.has(s)) {
 				n = `o${outs.length}`;
 				outs.push(s);

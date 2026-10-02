@@ -7,6 +7,8 @@
 // their results kept) before the next forward, read, or explicit sync().
 
 import type { Buffer, Device, Texture } from "@luma.gl/core";
+import type { ComputeGraph } from "#/lib/gpu/core/graph";
+import type { GraphDataView } from "#/lib/gpu/core/luma";
 import {
 	type AttentionParams,
 	BaseNn,
@@ -265,6 +267,91 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		return g.st.buffer;
 	}
 
+	/**
+	 * A GraphDataView<"float32"> of a caller's ComputeGraph (an `importView` / `transientView` / another
+	 * op's output) as a [shape] f32 tensor, no copy. It can only be consumed inside
+	 * `forwardInto(graph, …)` of the graph that owns the view.
+	 */
+	fromView(
+		graph: ComputeGraph,
+		view: GraphDataView<"float32">,
+		shape: readonly number[],
+	): GpuTensor {
+		const n = numel(shape);
+		if (view.length < n)
+			throw new Error(
+				`nn: fromView ${view.length} f32 for [${shape.join(",")}]`,
+			);
+		const st = new Storage(Math.max(4, n * 4), "f32", null);
+		st.view = view;
+		st.viewGraph = graph;
+		st.pinned = true;
+		return new GpuTensor([...shape], "f32", st);
+	}
+
+	/**
+	 * Record `fn` (nn ops) straight into `graph`, a caller's ComputeGraph, instead of a graph of its
+	 * own: photoprep / gpu-raster / gpgpu nodes before and after share the one submission and every
+	 * buffer, with no copy. Synchronous; nothing is compiled or run here. Tensors reachable from the
+	 * result are outputs: read them as views with `toView(graph, t)` (bind them in later nodes, or
+	 * `run({ read: [viewRange(view, nn.bufferOf(t))] })`). They hold valid data after the graph ran;
+	 * `dispose` them after that. Everything else is graph scratch.
+	 */
+	forwardInto<R>(graph: ComputeGraph, fn: () => R): R {
+		if (this.rec) return fn();
+		void this.flushImplicit();
+		const rec = new Recording();
+		this.rec = rec;
+		let out: R;
+		try {
+			out = fn();
+		} catch (e) {
+			for (const s of rec.produced) s.state = "dead";
+			throw e;
+		} finally {
+			this.rec = null;
+		}
+		this.runtime.lowerInto(graph, rec, this.collectOutputs(out, rec));
+		return out;
+	}
+
+	/** The view of a tensor in `graph`: an output of forwardInto, or a ready tensor imported on demand. */
+	toView(graph: ComputeGraph, t: Tensor): GraphDataView<"float32"> {
+		const g = t as GpuTensor;
+		const st = g.st;
+		if (st.view && st.viewGraph === graph) return st.view;
+		if (st.state !== "ready" || !st.buffer || g.dtype !== "f32")
+			throw new Error(`nn: toView of a ${st.state} ${g.dtype} tensor`);
+		const view = graph.importView(
+			`nn-view${st.id}`,
+			st.buffer,
+			"float32",
+			numel(g.shape),
+		);
+		if (!st.pinned) {
+			st.view = view;
+			st.viewGraph = graph;
+		}
+		return view;
+	}
+
+	private collectOutputs(out: unknown, rec: Recording): Set<Storage> {
+		const outs = new Set<Storage>();
+		const visit = (v: unknown) => {
+			if (v instanceof GpuTensor) {
+				if (v.st.rec === rec) outs.add(v.st);
+			} else if (Array.isArray(v)) v.forEach(visit);
+			else if (
+				v &&
+				typeof v === "object" &&
+				Object.getPrototypeOf(v) === Object.prototype
+			)
+				Object.values(v).forEach(visit);
+		};
+		visit(out);
+		return outs;
+	}
+
 	async read(t: Tensor): Promise<Float32Array> {
 		const g = t as GpuTensor;
 		if (g.st.state === "pending") {
@@ -320,19 +407,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		} finally {
 			this.rec = null;
 		}
-		const outs = new Set<Storage>();
-		const visit = (v: unknown) => {
-			if (v instanceof GpuTensor) {
-				if (v.st.rec === rec) outs.add(v.st);
-			} else if (Array.isArray(v)) v.forEach(visit);
-			else if (
-				v &&
-				typeof v === "object" &&
-				Object.getPrototypeOf(v) === Object.prototype
-			)
-				Object.values(v).forEach(visit);
-		};
-		visit(out);
+		const outs = this.collectOutputs(out, rec);
 		await Promise.all([pending, this.runtime.flush(rec, outs)]);
 		return out;
 	}

@@ -1326,6 +1326,14 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 	{
+		id: "nn-interop",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/nn/interop.check.ts"),
+		note: "nn on a shared ComputeGraph over Dawn: Rigi kernel -> luma gpu-raster Sobel -> nn forwardInto (fromView, conv2d, relu) -> luma GPUReduction -> readback, no glue copies; conv vs the CPU nn reference (<= 1e-4); SKIP without DAWN_DIR",
+		timeoutS: 120,
+	},
+	{
 		id: "u2netp-parity",
 		tier: "fast",
 		group: "nn",

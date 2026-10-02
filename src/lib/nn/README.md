@@ -44,6 +44,21 @@ nn.dispose([scores, desc, x]);
 - Missing an op? Add it to `types.ts` + `base.ts` (shape logic) + `cpu.ts` + `gpu/`, with a
   `scripts/nn/parity.check.ts` case. Keep signatures stable; other units build on them.
 
+## Sharing a ComputeGraph with luma operators (GpuNn)
+
+`forward()` builds its own cached graph. To put a network in the SAME graph as photoprep / gpu-raster / gpgpu
+nodes (one submission, no copy), use the view interop (`scripts/nn/interop.check.ts`):
+
+```ts
+const x = nn.fromView(g, edgeView, [1, 1, H, W]);        // a GraphDataView<"float32"> of g as a tensor
+const y = nn.forwardInto(g, () => nn.relu(nn.conv2d(x, w))); // records into g, nothing compiled or run
+const yView = nn.toView(g, y);                            // output as a view: feed GPUReduction etc.
+g.compile(); await g.run(p, { read: [viewRange(yView, nn.bufferOf(y))] });
+```
+
+`fromView` tensors only work inside `forwardInto` of their graph; outputs are valid after `g.run`.
+(`fromBuffer` / `bufferOf` share plain buffers across separate submissions.)
+
 ## Weights
 
 safetensors under `public/models/` (hash-named, a row in `scripts/models/manifest.json`), dumped from
