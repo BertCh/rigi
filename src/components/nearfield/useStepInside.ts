@@ -318,7 +318,14 @@ export function useStepInside(opts: {
 					: null;
 
 	return {
-		visible: !!ctl && available && phase !== "unavailable",
+		// a built scene (or the step camera) needs no service: keep the panel, and its Back button, when a
+		// health probe fails mid-session
+		visible:
+			!!ctl &&
+			(stepping ||
+				phase === "ready" ||
+				phase === "low-quality" ||
+				(available && phase !== "unavailable")),
 		state,
 		accepted,
 		disabledReason,

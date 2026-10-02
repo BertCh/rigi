@@ -20,7 +20,8 @@ const FLAG_SOURCE = 2;
 /** WGS84 origin of an ENU cloud (Renderer.frame lat/lon/h). */
 export type GeoOrigin = { lat: number; lon: number; h: number };
 
-const pad4 = (n: number) => (n + 3) & ~3;
+// arithmetic, not `& ~3`: a hostile count must not wrap the size check at 2^31
+const pad4 = (n: number) => Math.ceil(n / 4) * 4;
 
 function splatV1Size(count: number, hasSource: boolean) {
 	const body = count * (12 + 12 + 16 + 4 + 1);
@@ -256,10 +257,13 @@ export function decodeGaussianPly(
 			let x = val(row, "rot_1", 0);
 			let y = val(row, "rot_2", 0);
 			let z = val(row, "rot_3", 0);
-			const q = Math.hypot(w, x, y, z) || 1;
-			if (!Number.isFinite(q) || q === 0) {
+			const h = Math.hypot(w, x, y, z);
+			let q = h || 1; // all-zero stays zero (divisor 1), as before
+			// a NaN or infinite quaternion becomes the identity
+			if (!Number.isFinite(h)) {
 				w = 1;
 				x = y = z = 0;
+				q = 1;
 			}
 			rotations[4 * i] = w / q;
 			rotations[4 * i + 1] = x / q;

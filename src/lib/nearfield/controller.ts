@@ -16,6 +16,7 @@ import { getFlag } from "#/lib/flags";
 import type { Pose } from "../camera";
 import type { EnuFrame } from "../geodesy";
 import type { PhotoMeta } from "../photos";
+import { ANCHOR_LOW_TRUST } from "./anchor";
 import {
 	nearField as defaultClient,
 	type GaussianModel,
@@ -47,11 +48,11 @@ import {
 } from "./types";
 
 /**
- * Below this anchor quality the scene is shown with a 'low trust' badge. The design gate
- * (ANCHOR_MIN_QUALITY) hides it outright; the badge band sits above it (0.35, or 0.15 over the gate
- * when the gate is raised to 0.35 or more, so the band never collapses).
+ * Below this anchor quality the scene is shown with a 'low trust' badge; the design gate
+ * (ANCHOR_MIN_QUALITY) hides it outright. One constant with the export header's (anchor.ts
+ * ANCHOR_LOW_TRUST), so the panel chip and the exported file can never disagree.
  */
-export const LOW_TRUST_QUALITY = Math.max(0.35, ANCHOR_MIN_QUALITY + 0.15);
+export const LOW_TRUST_QUALITY = ANCHOR_LOW_TRUST;
 
 /**
  * Phase-1 split parameters (tools/nearfield/spike/SUMMARY.txt + reviewer note): MoGe-2 compresses range,
@@ -159,9 +160,19 @@ export function poseKey(p: Pose, eye: { x: number; y: number; z: number }) {
 	return `${f(p.yaw)}|${f(p.pitch)}|${f(p.roll)}|${f(p.vfov)}|${eye.x.toFixed(2)},${eye.y.toFixed(2)},${eye.z.toFixed(2)}`;
 }
 
-/** Dev flag: ?nearfield=sharp uses Apple SHARP (research-only weights) for the splats. */
-function gaussianModelFromUrl(): GaussianModel {
-	return getFlag("nearfield") === "sharp" ? "sharp" : "lift";
+/**
+ * Dev flag: ?nearfield=sharp uses Apple SHARP for the splats. Its weights are research-only (Apple ML
+ * Research Model License, no product use: reports/licences.md), so production builds always lift.
+ */
+export function gaussianModelFromUrl(
+	dev = !!import.meta.env?.DEV,
+): GaussianModel {
+	if (getFlag("nearfield") !== "sharp") return "lift";
+	if (dev) return "sharp";
+	console.warn(
+		"[nearfield] ?nearfield=sharp is dev-only (research-only weights); using the depth lift",
+	);
+	return "lift";
 }
 
 async function photoBlob(
@@ -198,6 +209,8 @@ export class NearFieldController {
 	private shown = false;
 	private viewOpts: NearFieldViewOpts = {};
 	private disposed = false;
+	/** Bumped per started build: a superseded run must not reset a newer run's "loading" phase. */
+	private runSeq = 0;
 
 	constructor(
 		host: NearFieldHost,
@@ -225,11 +238,21 @@ export class NearFieldController {
 		for (const cb of this.listeners) cb(s);
 	}
 
-	/** Service health (cached by the client). Never throws. */
+	/**
+	 * Service health (cached by the client). Never throws. A built scene does not need the service, so a
+	 * failed probe leaves a 'ready' / 'low-quality' / 'loading' state alone (a busy service can miss the
+	 * 800 ms health timeout while it runs inference).
+	 */
 	async available(force = false): Promise<boolean> {
 		if (!this.supported) return false;
 		const ok = await this.client.available(force);
-		if (!ok && this.state.phase !== "loading")
+		const phase = this.state.phase;
+		if (
+			!ok &&
+			phase !== "loading" &&
+			phase !== "ready" &&
+			phase !== "low-quality"
+		)
 			this.set({
 				phase: "unavailable",
 				message: "near-field service is not running",
@@ -300,10 +323,12 @@ export class NearFieldController {
 		if (hit) return this.adopt(hit, key0);
 		if (this.building && this.buildingKey === key0) return this.building;
 		this.buildingKey = key0;
+		const runId = ++this.runSeq;
 		const run = (async (): Promise<MeasurableScene | null> => {
 			// early exits must not leave the phase at "loading" (the button would stay disabled)
 			const bail = (): null => {
-				if (this.state.phase === "loading") this.set({ phase: "idle" });
+				if (this.state.phase === "loading" && this.runSeq === runId)
+					this.set({ phase: "idle" });
 				return null;
 			};
 			if (!(await this.available())) return bail();
@@ -325,7 +350,15 @@ export class NearFieldController {
 				await this.host.prepareNearFieldDem?.();
 				// the DEM grid must describe the pose we key on: wait for a fresh geometry buffer
 				if (!(await this.host.readback()) || this.disposed) return bail();
-				const key = poseKey(this.host.pose, this.host.eye);
+				// one camera for the whole build: the awaits below (object prior) must not mix two poses
+				const pose = { ...this.host.pose };
+				const eye = {
+					x: this.host.eye.x,
+					y: this.host.eye.y,
+					z: this.host.eye.z,
+				};
+				const aspect = this.host.aspect;
+				const key = poseKey(pose, eye);
 				if (!this.host.geometryReady()) return bail();
 				const { depth } = data;
 				const demAt =
@@ -339,14 +372,15 @@ export class NearFieldController {
 								width: depth.width,
 								height: depth.height,
 								demGrid,
-								K: intrinsicsFromPose(this.host.pose, this.host.aspect),
-								pose: this.host.pose,
-								eye: this.host.eye,
+								K: intrinsicsFromPose(pose, aspect),
+								pose,
+								eye,
 								frame: this.host.frame,
 								signal,
 							})
 						: null;
 				if (signal?.aborted || this.disposed) return bail();
+				if (key !== poseKey(this.host.pose, this.host.eye)) return bail();
 				const img = this.host.photoElement;
 				const photo = !data.cloud && img ? imageToRGBA(img, 1024) : null;
 				// ?nearfield=complete: the P0 completion heuristics (display-only; complete/index.ts)
@@ -376,21 +410,17 @@ export class NearFieldController {
 						? completeScene(built, {
 								depth,
 								demGrid,
-								K: intrinsicsFromPose(this.host.pose, this.host.aspect),
-								pose: { ...this.host.pose },
-								eye: {
-									x: this.host.eye.x,
-									y: this.host.eye.y,
-									z: this.host.eye.z,
-								},
+								K: intrinsicsFromPose(pose, aspect),
+								pose: { ...pose },
+								eye: { ...eye },
 								peopleMask: this.host.foregroundMask ?? null,
 							}).scene
 						: built
 				) as MeasurableScene;
 				const ctx = {
-					pose: { ...this.host.pose },
-					aspect: this.host.aspect,
-					eye: { x: this.host.eye.x, y: this.host.eye.y, z: this.host.eye.z },
+					pose: { ...pose },
+					aspect,
+					eye: { ...eye },
 					frame: this.host.frame,
 				};
 				scene.measure = { ...buildMeasureGrid(scene, ctx), ...ctx };

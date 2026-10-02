@@ -836,7 +836,11 @@ export class StepCamera {
 		};
 		on(window, "keydown", (e) => {
 			const el = e.target as HTMLElement | null;
-			if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+			if (
+				el &&
+				(/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)
+			)
+				return;
 			if (e.metaKey || e.ctrlKey || e.altKey) return;
 			const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 			this.fast = e.shiftKey;

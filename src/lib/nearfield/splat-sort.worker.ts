@@ -45,7 +45,9 @@ export function sortSplatsByDepth(
 			c * positions[j + 2] +
 			d
 		);
-		if (dist > near) {
+		// a non-finite position (corrupt file) is dropped like one behind the camera: an infinite
+		// (or beyond float32) distance would make the key span infinite and collapse every key to 0
+		if (dist > near && Math.fround(dist) < Number.POSITIVE_INFINITY) {
 			depth[i] = dist;
 			if (dist < minD) minD = dist;
 			if (dist > maxD) maxD = dist;

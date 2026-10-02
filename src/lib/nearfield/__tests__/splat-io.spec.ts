@@ -177,6 +177,18 @@ describe("decodeGaussianPly", () => {
 		expect(Array.from(c.rotations)).toEqual([0, 0, 0, 0]); // hypot 0 -> divisor 1 (degenerate stays zero)
 	});
 
+	it("a NaN or infinite rotation becomes the identity quaternion", () => {
+		const ply = makePly(
+			["x", "y", "z", "rot_0", "rot_1", "rot_2", "rot_3"],
+			[
+				[0, 0, 0, Number.NaN, 0, 0, 0],
+				[0, 0, 0, Number.POSITIVE_INFINITY, 1, 0, 0],
+			],
+		);
+		const c = decodeGaussianPly(ply);
+		expect(Array.from(c.rotations)).toEqual([1, 0, 0, 0, 1, 0, 0, 0]);
+	});
+
 	it("skips a leading non-vertex element and handles CRLF-free headers", () => {
 		const header =
 			"ply\nformat binary_little_endian 1.0\nelement extra 2\nproperty uchar a\nproperty float b\nelement vertex 1\nproperty float x\nproperty float y\nproperty float z\nend_header\n";

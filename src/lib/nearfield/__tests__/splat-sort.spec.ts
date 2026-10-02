@@ -28,6 +28,29 @@ describe("sortSplatsByDepth", () => {
 		expect(out[0]).toBe(0);
 	});
 
+	it("drops a non-finite position instead of collapsing every key", () => {
+		const pos = new Float32Array([
+			0,
+			0,
+			-1,
+			0,
+			0,
+			Number.NEGATIVE_INFINITY,
+			0,
+			0,
+			-9,
+			0,
+			0,
+			Number.NaN,
+			0,
+			0,
+			-5,
+		]);
+		const out = new Uint32Array(5);
+		expect(sortSplatsByDepth(pos, 5, ROW, out)).toBe(3);
+		expect([...out.subarray(0, 3)]).toEqual([2, 4, 0]);
+	});
+
 	it("returns 0 when everything is behind the camera", () => {
 		const pos = new Float32Array([0, 0, 1, 0, 0, 2]);
 		expect(sortSplatsByDepth(pos, 2, ROW, new Uint32Array(2))).toBe(0);
