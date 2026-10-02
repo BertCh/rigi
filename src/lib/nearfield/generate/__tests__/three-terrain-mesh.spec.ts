@@ -52,6 +52,30 @@ describe("sampleGrid (uv variant)", () => {
 	it("interpolates linearly between centres", () => {
 		expect(sampleGrid(h, S, 1 / S, 0.5 / S)).toBeCloseTo(5, 5);
 	});
+	it("is the former inline copy bit for bit (now dem/grid.ts sampleGrid at px = fu·S)", () => {
+		const old = (g: Float32Array, n: number, fu: number, fv: number) => {
+			const m = n - 1;
+			const x = Math.min(Math.max(fu * n - 0.5, 0), m);
+			const y = Math.min(Math.max(fv * n - 0.5, 0), m);
+			const x0 = Math.floor(x);
+			const y0 = Math.floor(y);
+			const x1 = Math.min(x0 + 1, m);
+			const y1 = Math.min(y0 + 1, m);
+			const fx = x - x0;
+			const fy = y - y0;
+			const a = g[y0 * n + x0] * (1 - fx) + g[y0 * n + x1] * fx;
+			const b = g[y1 * n + x0] * (1 - fx) + g[y1 * n + x1] * fx;
+			return a * (1 - fy) + b * fy;
+		};
+		const r = seededRandom(3);
+		const n = 17;
+		const g = Float32Array.from({ length: n * n }, () => 500 + r() * 900);
+		for (let i = 0; i < 300; i++) {
+			const fu = r() * 1.2 - 0.1;
+			const fv = r() * 1.2 - 0.1;
+			expect(sampleGrid(g, n, fu, fv)).toBe(old(g, n, fu, fv));
+		}
+	});
 });
 
 describe("edgeVertex", () => {

@@ -6,7 +6,7 @@
 // arrays, so they can be built in three-terrain-tile.worker.ts as well as on the page (same code, same bits).
 // Environment-free: no three, no DOM.
 import { validateTile } from "../../dem/decode";
-import { ancestorCrop } from "../../dem/grid";
+import { ancestorCrop, sampleGrid as sampleDemGrid } from "../../dem/grid";
 import {
 	type TileKey,
 	tileBounds,
@@ -29,20 +29,9 @@ export function downsample(h: Float32Array, S: number, T: number) {
 	return out;
 }
 
-/** Bilinear sample of an S×S grid at fractional tile coords (0..1). */
+/** Bilinear sample of an S×S grid at fractional tile coords (0..1): dem/grid.ts sampleGrid at px = fu·S (bit for bit). */
 export function sampleGrid(h: Float32Array, S: number, fu: number, fv: number) {
-	const m = S - 1;
-	const x = Math.min(Math.max(fu * S - 0.5, 0), m);
-	const y = Math.min(Math.max(fv * S - 0.5, 0), m);
-	const x0 = Math.floor(x);
-	const y0 = Math.floor(y);
-	const x1 = Math.min(x0 + 1, m);
-	const y1 = Math.min(y0 + 1, m);
-	const fx = x - x0;
-	const fy = y - y0;
-	const a = h[y0 * S + x0] * (1 - fx) + h[y0 * S + x1] * fx;
-	const b = h[y1 * S + x0] * (1 - fx) + h[y1 * S + x1] * fx;
-	return a * (1 - fy) + b * fy;
+	return sampleDemGrid(h, S, fu * S, fv * S);
 }
 
 /** Vertex t (0..n-1) along tile edge e (north, south, west, east) of an n×n grid. */
