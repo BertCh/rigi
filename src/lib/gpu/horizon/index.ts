@@ -65,6 +65,8 @@ import {
 	type Eye,
 	type FastHorizonOptions,
 	type FastHorizonProfile,
+	marchInv2R,
+	marchSegments,
 	peakVisibilityFast,
 } from "#/lib/horizon-fast/march";
 import { buildMips, type Mosaic } from "#/lib/horizon-fast/mosaic";
@@ -261,40 +263,6 @@ export function warmHorizonGpuAsync(device: Device): Promise<void> {
 	return warmKernelsAsync(device, "horizon").then(() => {});
 }
 
-// ---------- per-eye segmenting (mirrors march.ts makeCtx) ----------
-
-interface EyeSegs {
-	segD: number[];
-	segRing: number[];
-}
-
-function segments(
-	mosaics: Mosaic[],
-	eye: Eye,
-	minDistance: number,
-	maxDistance: number,
-	eps: number,
-): EyeSegs {
-	const kappa =
-		Math.max(0.05, Math.tan(Math.min(80, Math.abs(eye.lat) + 3) * DEG)) /
-		EARTH_R;
-	const segD: number[] = [minDistance];
-	const segRing: number[] = [];
-	let d = minDistance;
-	let ri = 0;
-	while (d < maxDistance) {
-		while (ri < mosaics.length - 1 && d >= mosaics[ri].maxDistance) ri++;
-		const ringEnd =
-			ri < mosaics.length - 1 ? mosaics[ri].maxDistance : maxDistance;
-		const len = Math.max(200, Math.sqrt((8 * eps * d) / kappa));
-		const next = Math.min(d + len, ringEnd, maxDistance);
-		segRing.push(ri);
-		segD.push(next);
-		d = next;
-	}
-	return { segD, segRing };
-}
-
 // ---------- the call ----------
 
 export interface GpuHorizonTiming {
@@ -416,7 +384,7 @@ async function marchLocked(
 	const nR = mosaics.length;
 
 	const segs = eyes.map((e) =>
-		segments(mosaics, e, minDistance, maxDistance, eps),
+		marchSegments(mosaics, e.lat, minDistance, maxDistance, eps),
 	);
 	const maxNb = Math.max(...segs.map((s) => s.segD.length));
 	const eyeStride = 8 + 4 * nR + 4 * maxNb;
@@ -565,7 +533,7 @@ async function marchLocked(
 			uu[7] = mipSkip ? 1 : 0;
 			uf[8] = opts.stepFactor ?? 3.5e-4;
 			uf[9] = opts.nearFactor ?? 0.01;
-			uf[10] = (1 - kR) / (2 * EARTH_R);
+			uf[10] = marchInv2R(kR);
 			uu[11] = 1_000_000;
 			uu[12] = 0; // U.zero
 			const read = chunker.submit(

@@ -5,7 +5,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { angleDiffDeg } from "#/test/helpers";
 import { DEG, destination, EARTH_R, REFRACTION_K } from "../../geodesy";
-import { computeHorizonFast, peakVisibilityFast } from "../march";
+import {
+	computeHorizonFast,
+	marchInv2R,
+	marchSegments,
+	peakVisibilityFast,
+} from "../march";
 import { loadMosaics, type Mosaic, TileStore } from "../mosaic";
 import { classifyPeak, mosaicHeightAt, snapPeaks } from "../visibility";
 import { fakeSource, gaussianPeak } from "./demFixture";
@@ -414,5 +419,63 @@ describe("classifyPeak", () => {
 		const v2 = classifyPeak(p, 0, inv2R, -1e9, 0, tanDeg(elev + 1), 1);
 		expect(v2.visible).toBe(true);
 		expect(v2.onSkyline).toBe(false);
+	});
+});
+
+describe("marchSegments", () => {
+	// The breakpoint loop as it stood inline in makeCtx and gpu/horizon/index.ts before they shared it.
+	function oldSegments(
+		rings: { maxDistance: number }[],
+		lat: number,
+		minDistance: number,
+		maxDistance: number,
+		eps: number,
+	) {
+		const kappa =
+			Math.max(0.05, Math.tan(Math.min(80, Math.abs(lat) + 3) * DEG)) / EARTH_R;
+		const segD: number[] = [minDistance];
+		const segRing: number[] = [];
+		let d = minDistance;
+		let ri = 0;
+		while (d < maxDistance) {
+			while (ri < rings.length - 1 && d >= rings[ri].maxDistance) ri++;
+			const ringEnd =
+				ri < rings.length - 1 ? rings[ri].maxDistance : maxDistance;
+			const len = Math.max(200, Math.sqrt((8 * eps * d) / kappa));
+			const next = Math.min(d + len, ringEnd, maxDistance);
+			segRing.push(ri);
+			segD.push(next);
+			d = next;
+		}
+		return { segD, segRing };
+	}
+
+	const layouts = [
+		[{ maxDistance: 150_000 }],
+		[{ maxDistance: 20_000 }, { maxDistance: 150_000 }],
+		[{ maxDistance: 5_000 }, { maxDistance: 30_000 }, { maxDistance: 150_000 }],
+	];
+	for (const lat of [0, 46.7, 70, -33]) {
+		for (const eps of [2e-5, 1e-4]) {
+			for (const [li, rings] of layouts.entries()) {
+				it(`matches the old loop at lat ${lat}, eps ${eps}, layout ${li}`, () => {
+					const got = marchSegments(rings, lat, 20, 150_000, eps);
+					expect(got).toEqual(oldSegments(rings, lat, 20, 150_000, eps));
+					expect(got.segD[0]).toBe(20);
+					expect(got.segD[got.segD.length - 1]).toBe(150_000);
+					expect(got.segRing.length).toBe(got.segD.length - 1);
+					for (const r of got.segRing) {
+						expect(r).toBeGreaterThanOrEqual(0);
+						expect(r).toBeLessThan(rings.length);
+					}
+					for (const ring of rings.slice(0, -1))
+						expect(got.segD).toContain(ring.maxDistance);
+				});
+			}
+		}
+	}
+
+	it("marchInv2R is (1 - k) / (2R)", () => {
+		expect(marchInv2R(REFRACTION_K)).toBe((1 - REFRACTION_K) / (2 * EARTH_R));
 	});
 });

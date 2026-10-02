@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // WGSL twin of horizon-fast/march.ts marchRay: one invocation per (eye, azimuth). Layouts are written by
-// ./index.ts (see packParams there); keep the two in sync.
+// ./index.ts (the per-chunk params packing in computeHorizonGpu: the "Rings", "Azimuths" and eye blocks); keep the two in sync.
 //
 // @workgroup_size(64, 1, 1): x = azimuth, y = eye. Neighbouring azimuths walk almost the same Mercator
 // path, skip the same mip blocks and stop at similar distances, so a 64-wide group of adjacent rays

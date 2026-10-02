@@ -126,6 +126,43 @@ interface Ctx {
 	dQ: number;
 }
 
+/**
+ * Segment breakpoints of the great circle march: ring boundaries plus chords short enough that the
+ * Mercator curvature (≤ tan|φ| / R) stays within `eps`; segRing[k] is the ring of segment [k, k + 1].
+ * Shared with the GPU march (gpu/horizon/index.ts) so both walk the same segments.
+ */
+export function marchSegments(
+	mosaics: readonly { maxDistance: number }[],
+	eyeLat: number,
+	minDistance: number,
+	maxDistance: number,
+	eps: number,
+): { segD: number[]; segRing: number[] } {
+	const kappa =
+		Math.max(0.05, Math.tan(Math.min(80, Math.abs(eyeLat) + 3) * DEG)) /
+		EARTH_R;
+	const segD: number[] = [minDistance];
+	const segRing: number[] = [];
+	let d = minDistance;
+	let ri = 0;
+	while (d < maxDistance) {
+		while (ri < mosaics.length - 1 && d >= mosaics[ri].maxDistance) ri++;
+		const ringEnd =
+			ri < mosaics.length - 1 ? mosaics[ri].maxDistance : maxDistance;
+		const len = Math.max(200, Math.sqrt((8 * eps * d) / kappa));
+		const next = Math.min(d + len, ringEnd, maxDistance);
+		segRing.push(ri);
+		segD.push(next);
+		d = next;
+	}
+	return { segD, segRing };
+}
+
+/** Curvature-refraction constant 1/(2R′) = (1 − k) / (2R) of the apparent-elevation term d · inv2R. */
+export function marchInv2R(k: number): number {
+	return (1 - k) / (2 * EARTH_R);
+}
+
 function makeCtx(mosaics: Mosaic[], eye: Eye, opts: FastHorizonOptions): Ctx {
 	const k = opts.k ?? REFRACTION_K;
 	const maxDistance = Math.min(
@@ -156,23 +193,13 @@ function makeCtx(mosaics: Mosaic[], eye: Eye, opts: FastHorizonOptions): Ctx {
 	// Segment breakpoints: ring boundaries plus chords short enough that the
 	// great circle (Mercator curvature ≤ tan|φ| / R) stays within tolerance.
 	const eps = opts.segmentTolerance ?? 2e-5;
-	const kappa =
-		Math.max(0.05, Math.tan(Math.min(80, Math.abs(eye.lat) + 3) * DEG)) /
-		EARTH_R;
-	const segD: number[] = [minDistance];
-	const segRing: number[] = [];
-	let d = minDistance;
-	let ri = 0;
-	while (d < maxDistance) {
-		while (ri < mosaics.length - 1 && d >= mosaics[ri].maxDistance) ri++;
-		const ringEnd =
-			ri < mosaics.length - 1 ? mosaics[ri].maxDistance : maxDistance;
-		const len = Math.max(200, Math.sqrt((8 * eps * d) / kappa));
-		const next = Math.min(d + len, ringEnd, maxDistance);
-		segRing.push(ri);
-		segD.push(next);
-		d = next;
-	}
+	const { segD, segRing } = marchSegments(
+		mosaics,
+		eye.lat,
+		minDistance,
+		maxDistance,
+		eps,
+	);
 	const n = segD.length;
 	const sinD = new Float64Array(n);
 	const cosD = new Float64Array(n);
@@ -192,7 +219,7 @@ function makeCtx(mosaics: Mosaic[], eye: Eye, opts: FastHorizonOptions): Ctx {
 		cosP1: Math.cos(eye.lat * DEG),
 		lon0: eye.lon * DEG,
 		h0: eye.h,
-		inv2R: (1 - k) / (2 * EARTH_R),
+		inv2R: marchInv2R(k),
 		stepFactor: opts.stepFactor ?? 3.5e-4,
 		nearFactor: opts.nearFactor ?? 0.01,
 		minOcc: opts.minOcclusion ?? 0.08,
