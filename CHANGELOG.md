@@ -4,6 +4,16 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- Look, photoprep and terrain GPU paths moved onto vendored luma gpgpu primitives (wave F, browser-unverified). This follows the maximalist rule, with Dawn tolerance checks instead of bit identity:
+  - haze gathers → `GPUGather`;
+  - haze airlight band and terrain cull compaction → `GPUCompaction`;
+  - haze 72-list compaction → `GPUSort` + `GPUHistogram` + `GPUScan` + `GPUGather`;
+  - guided filter box means → `GPUConvolution`;
+  - colour-stats fold and photoprep sky counts → `GPUGroupAggregation`;
+  - photoprep radix histograms → `GPUHistogram`;
+  - relief normal gradient → `GPUFiniteDifference2D`.
+  There are seven new Dawn fast rows. The terrain cull costs about 0.3–0.5 ms more CPU per prepass.
+
 - **3D Tiles: Draco in a worker (2026-10-02, browser-unverified).** `?tiles3d=` decodes Draco meshes in loaders.gl's own Draco worker, served from our build (`src/lib/tiles3d/draco-options.ts`, Vite `?url`) instead of the main thread or loaders.gl's default unpkg CDN URL; the decoder files stay in `public/tiles3d/draco` (absolute URLs, so the worker resolves them).
 - **luma.gl / deck.gl maximalist wave (2026-10-02, browser-unverified).** Tolerance-checked instead of bit-identical, at the user's request.
   - GPU: more compute runs on luma gpgpu primitives inside the module graphs. Results are now checked against the CPU within tolerance instead of bit for bit, each by a new Dawn fast-tier gate. The changes: Terrarium tile stats use `GPUReduction`. Sky-mask refine box means use `GPUConvolution`. The skyglobal candidate list uses `GPUCompaction`, so it is now in deterministic ascending order. Skyline feature blurs use `GPUConvolution`, behind `?skylineGpu`. refinePose's yaw correlation uses `GPUFFT1D` (four-step for 8192 points) through the new `refinePoseAsync`, which the unknown-pose `cascadeAsync` now uses. Each device is spot-checked, because `GPUFFT1D`'s bit reversal is wrong on macOS Dawn for most lengths.

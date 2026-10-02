@@ -140,6 +140,9 @@ Don't re-run anything here without a new reason. Most entries were measured on s
 | 2026-10-02: luma `GPUFFT1D` bit reversal on macOS Dawn (2026-10-02) | The portable bit-reversal pass returns wrong permutations for lengths 2^4, 2^6–2^8, 2^10 and 2^11; 2^1–2^3, 2^5 and 2^9 are correct. A loop-free `reverseBits(v) >> (32 − n)` fixes every length. Do not trust `GPUFFT1D`, `GPUFFT2D` or `GPUConvolution`'s FFT strategy on a device that has not passed a spot check. Evidence: `scratchpad/patches/E/fftprobe.evidence.ts`. |
 | 2026-10-02: Reduction primitives for solve COARSE / align pose-grid (2026-10-02): not adopted | These are reductions fused into the producing kernel, with no materialised grid and no consumer for a global extremum. Swapping in a luma reduction would add passes and change no number. |
 | 2026-10-02: LF6 amendment (luma #3340 progressive splats) | Amend the LF6 row: superseded 2026-10-02 (coordinator G): #3340 vendored in rigi.6 and adopted by building a synthetic LoD tree (`nearfield/splat-lod.ts`), since the flat clouds have none; the original "nothing to page" observation still holds for typical clouds (one page under 65 536 rows). |
+| 2026-10-02: GPU terrain LOD via `GPUVirtualGeometrySelection` (2026-10-02): not built | The streamer's leaf cover leaves nothing to select (`terrain-stream.ts` emit; `selectDemTiles`). It needs resident parents, which cost about 1/3 more tiles. |
+| 2026-10-02: Per-pixel `GPUGroupAggregation` band stats: 3–15× slower | (CAS float adds on 4 addresses) and less accurate (2.8e-4). Only the fold over per-workgroup partials is adopted. |
+| 2026-10-02: Haze radix-select digit histogram as one `GPUHistogram` (12N keys, 295k bins): exact but about 19× slower per pass | Not adopted. |
 
 ## Rejected directions (strategy)
 
