@@ -7,7 +7,7 @@
  * Baseline pipeline worker: DEM tiles → horizon → peaks, plus skyline
  * detection and pose solving.
  */
-import { fetchDemTile, TERRARIUM_AWS, tileId, tilesAround } from "#/lib/dem";
+import { fetchDemTile, MAPTERHORN, tileId, tilesAround } from "#/lib/dem";
 import type { HorizonProfile } from "#/lib/geo/horizon";
 import {
 	overpassPeaksQuery,
@@ -35,7 +35,8 @@ import type {
 	ToWorker,
 } from "./types";
 
-const DEM = TERRARIUM_AWS;
+// 512 px Mapterhorn tiles; its levels (z9..z15) already cover the same radii as the old 256 px bands.
+const DEM = MAPTERHORN;
 const PEAK_RADIUS_M = 50_000;
 const MAX_CACHED_TILES = 1500;
 /** Public instances rate-limit (429) and time out (504): try mirrors in turn. */

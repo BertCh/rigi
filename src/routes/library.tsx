@@ -33,11 +33,6 @@ const tools = [
 		title: "All camera rolls",
 		body: "Your rolls and the bundled ones in one list.",
 	},
-	{
-		to: "/baseline",
-		title: "Georeferencing baseline",
-		body: "Core CPU pipeline: horizon, skyline detection, pose solve and peak matching.",
-	},
 ] as const;
 
 function Library() {
