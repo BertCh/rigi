@@ -10,7 +10,7 @@
 // single-linkage on distance (ROLL_LINK_M) so a day's hike stays one roll.
 
 import { storageKey } from "#/lib/ontology/core/storage";
-import { hfovFromAspect, type Pose, vfovFromFocal } from "../camera";
+import { hfovFromAspect, isPose, type Pose, vfovFromFocal } from "../camera";
 import { priorHeading } from "../geocam/priors/heading";
 import { distanceM } from "../geodesy";
 import { loadSavedPose, type PhotoMeta, photos, regionNames } from "../photos";
@@ -48,7 +48,12 @@ export function loadSolvedPose(id: string): SolvedPose | null {
 			typeof localStorage === "undefined"
 				? null
 				: localStorage.getItem(SOLVED_KEY(id));
-		return raw ? (JSON.parse(raw) as SolvedPose) : null;
+		if (!raw) return null;
+		const s = JSON.parse(raw) as Partial<SolvedPose> | null;
+		// a NaN angle is stored as null (JSON): such a record must not reach a renderer
+		return s && isPose(s.pose) && Number.isFinite(s.confidence)
+			? (s as SolvedPose)
+			: null;
 	} catch {
 		return null;
 	}

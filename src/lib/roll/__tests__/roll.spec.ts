@@ -242,6 +242,37 @@ describe("solved pose storage", () => {
 		store.set(storageKey("solvedPose", "a"), "{not json");
 		expect(loadSolvedPose("a")).toBeNull();
 	});
+	it("rejects a stored record whose pose or confidence is not finite", () => {
+		const store = stubStorage();
+		const key = storageKey("solvedPose", "a");
+		const good = {
+			pose: { yaw: 10, pitch: 1, roll: 0, vfov: 50 },
+			confidence: 0.8,
+			method: "cascade",
+			at: "2025-08-01T10:00:00Z",
+		};
+		store.set(key, JSON.stringify(good));
+		expect(loadSolvedPose("a")).toEqual(good);
+		// JSON.stringify(NaN) writes null
+		saveSolvedPose("a", {
+			...good,
+			pose: { ...good.pose, yaw: Number.NaN },
+		} as never);
+		expect(loadSolvedPose("a")).toBeNull();
+		store.set(
+			key,
+			JSON.stringify({ ...good, pose: { ...good.pose, vfov: 180 } }),
+		);
+		expect(loadSolvedPose("a")).toBeNull();
+		store.set(key, JSON.stringify({ ...good, confidence: null }));
+		expect(loadSolvedPose("a")).toBeNull();
+		store.set(key, JSON.stringify({ ...good, pose: undefined }));
+		expect(loadSolvedPose("a")).toBeNull();
+		store.set(key, "null");
+		expect(loadSolvedPose("a")).toBeNull();
+		// a bad record falls through to the prior in resolvePose
+		expect(resolvePose(meta("a")).source).toBe("prior");
+	});
 });
 
 describe("makeRoll", () => {
