@@ -1,6 +1,6 @@
 # Gipfelbuch explainer grammar (pod G), 2026-10-02
 
-Status: **v0.3.** The primitives are on master: round 1 is d9b7320, and round 2 (the review fixes and D's helpers) follows. §5 is the changelog, and §6 holds the cross-pod consistency notes.
+Status: **v0.3.1.** The primitives are on master: round 1 is d9b7320, and round 2 (the review fixes and D's helpers) follows. §5 is the changelog, and §6 holds the cross-pod consistency notes.
 - Amendments go in the changelog at the bottom.
 - A section marked *(API pending)* names functions that have not landed yet. Code against the names and signatures given here. They will not change unless a note arrives in your inbox first.
 - Disagreements go to `inbox/G.md`. Do not fork the grammar.
@@ -311,6 +311,9 @@ Notes (v0.2):
   - **Palette lookups** are own-key only.
   - **Print** drops only a photo-tinted wash.
   - **New pure helpers** for pod D: `startOf`, `smooth`, `rampAt`.
+- v0.3.1 (round 3, after pods C and D):
+  - **Layout effects.** `useMotionAllowed` and the rewinds in `useBeats` and `useBeatClock` run in layout effects, so a client-side mount never paints the end frame before rewinding.
+  - **Static stepper.** With motion off, a `useBeatClock` stepper or scrub still moves the frame by hand, and `play` shows the end.
 
 ## 6. Cross-pod consistency notes (pod G review)
 - **S (photo story):**

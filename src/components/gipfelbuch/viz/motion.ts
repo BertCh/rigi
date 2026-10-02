@@ -2,7 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type RefObject,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { revealsImmediately } from "./hooks";
 
 // The explainer grammar's motion half (reports/gipfelbuch-explainers-2026-10-02/grammar.md §1). The
@@ -359,13 +366,18 @@ export const nextArmed = (
 
 // ---- hooks ----
 
+// Layout effects where the first frame matters: a client-side mount (sheet-to-sheet navigation) must not
+// paint the settled end for one frame before rewinding to the first beat.
+const useIsoLayoutEffect =
+	typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 /**
  * False under reduced motion, webdriver, print and without IntersectionObserver, and on the server and
  * first paint (the static frame is the design); true on a client where motion is fine.
  */
 export function useMotionAllowed(): boolean {
 	const [allowed, setAllowed] = useState(false);
-	useEffect(() => {
+	useIsoLayoutEffect(() => {
 		const update = () => setAllowed(!revealsImmediately());
 		const off = () => setAllowed(false);
 		update();
@@ -495,7 +507,7 @@ export function useBeats<T extends Element = HTMLDivElement>(
 	const dispatch = (a: BeatAction) =>
 		setState((s) => beatReducer(s, a, count, playback));
 	// rewind and play once motion is known to be fine; settle when it is not
-	useEffect(() => {
+	useIsoLayoutEffect(() => {
 		setState((s) =>
 			// a reader's own step survives a print (motion off and on again)
 			s.manual && s.index < count
@@ -602,8 +614,7 @@ export function useBeatClock<T extends Element = HTMLDivElement>(
 		setMs(v);
 	};
 	// rewind and play where motion is fine; rest on the end where it is not
-	// biome-ignore lint/correctness/useExhaustiveDependencies: restarts only when the gate or the script changes
-	useEffect(() => {
+	useIsoLayoutEffect(() => {
 		setManual(false);
 		if (motion && total > 0) {
 			set(0);
@@ -651,7 +662,8 @@ export function useBeatClock<T extends Element = HTMLDivElement>(
 		raf = requestAnimationFrame(tick);
 		return () => cancelAnimationFrame(raf);
 	}, [motion, playing, armed, held, total, loop, fps]);
-	const shown = motion ? ms : total;
+	// static is the end, until the reader steps or scrubs: a stepper still works without motion
+	const shown = motion || manual ? ms : total;
 	const sample = sampleTimeline(tl, shown, { loop: false });
 	return {
 		...sample,
@@ -678,8 +690,13 @@ export function useBeatClock<T extends Element = HTMLDivElement>(
 		},
 		play: () => {
 			setManual(false);
+			if (!motion) {
+				// nothing animates here: "play" shows the end
+				set(total);
+				return;
+			}
 			if (elapsed.current >= total) set(0);
-			setPlaying(motion && total > 0);
+			setPlaying(total > 0);
 		},
 		hold: setHeld,
 	};

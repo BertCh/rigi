@@ -169,6 +169,19 @@ describe("useBeatClock", () => {
 		expect(result.current).toMatchObject({ index: 3, done: true });
 	});
 
+	it("still steps by hand where nothing animates, and play shows the end", () => {
+		vi.stubGlobal("IntersectionObserver", undefined);
+		const { result } = renderHook(() => useBeatClock(STORY));
+		act(() => result.current.seek(1));
+		expect(result.current).toMatchObject({ index: 1, manual: true });
+		act(() => result.current.play());
+		expect(result.current).toMatchObject({
+			index: 3,
+			done: true,
+			playing: false,
+		});
+	});
+
 	it("runs on a 30 fps grid once armed, stops at the end, and a seek ends autoplay", () => {
 		vi.stubGlobal(
 			"IntersectionObserver",
