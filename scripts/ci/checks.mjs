@@ -819,4 +819,18 @@ export const CHECKS = [
 		cmd: tsx("scripts/gpu/render-bundle-dawn.ts"),
 		timeoutS: 120,
 	},
+	{
+		id: "mosaic-mips",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/horizon/mosaic-mips.check.ts"),
+		timeoutS: 60,
+	},
+	{
+		id: "color-target-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/color-target-dawn.ts"),
+		timeoutS: 120,
+	},
 ];

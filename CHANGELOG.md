@@ -4,6 +4,20 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Wave 5, wave 2 (2026-10-02)
+
+- **Default look = Landeskarte.** The `swiss` preset, shown as "Landeskarte", becomes the Swiss signature:
+  - Imhof relief, brown Swiss contours with heavier 100 m index lines thinned by range, and ink ridges.
+  - `terroir.hatchStyle = "landeskarte"` and the `SWISSTOPO_LABELS` typography. It needs no cover pack.
+  - A fresh store now starts on it. Classic stays selectable and byte-identical, and choosing it is persisted.
+  - Revert the "style: default look = Landeskarte" commit alone to restore Classic as the default.
+- **GPU mosaic mips.** The horizon march's max-mip pyramid is built by a ComputeGraph kernel inside the uploaded mosaic page, so the CPU pyramid is no longer built or uploaded. Flag `mosaicGpu`, default on: byte-identical on Dawn (168 mip levels, march profiles, unknown-pose rows on 3 GT photos). `?gpu=off` keeps the CPU path.
+- **Render bundles.** Bundles are wired into the GPU-culled batched-terrain draws (geometry 1x, colour 4x and the interactive 1x) behind `?renderBundles=on`, default off. Hits and re-records are counted in the engine stats.
+- **Colour target.** Opt-in `?colorTarget=rg11b10` puts the 4x MSAA colour target on `rg11b10ufloat`, which uses half the bytes. It has no alpha, so it is only correct where the colour pass covers every pixel (world view with sky). Notes in `research_notes/wave5/vram-targets.md`.
+- **GPU skyline flip.** Root cause found: the GPU cost images match the CPU to 1.5e-5 px. The flip comes from `refinePose` on a wrong-focal third seed, which is chaotic at the 1e-5 px level. `skylineGpu` stays off. Notes in `research_notes/wave5/skyline-gpu-flip.md`.
+- **Workspace chrome.** Workspace panels, controls and Step Inside chrome move to Brezine tokens. Card rings and shadows are gone, and orange (ember) marks selection and active state only.
+- **Lint.** Biome warnings and infos are at zero outside the Gipfelbuch files.
+- **New fast checks:** `mosaic-mips`, `color-target-dawn`.
 ### Gipfelbuch hand pass (2026-10-01, night)
 
 Spec: `reports/gipfelbuch-hand-sketch-2026-10-01.md`. Research: `reports/gipfelbuch-hand-sketch-research/` (sketch style, Swiss cartography and swisstopo, an audit of what was lost). Browser-unverified.
