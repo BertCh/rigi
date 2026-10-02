@@ -22,7 +22,10 @@ describe("markWorkspace", () => {
 		expect(Object.keys(t).sort()).toEqual(
 			["certified", "first-overlay", "start"].sort(),
 		);
-		const [m] = performance.getEntriesByName("rigi:photo:certified", "mark");
+		const [m] = performance.getEntriesByName(
+			"photo-workspace:certified",
+			"mark",
+		);
 		expect((m as PerformanceMark).detail).toEqual({ verdict: "verified" });
 	});
 
@@ -35,7 +38,9 @@ describe("markWorkspace", () => {
 		expect(t.start).toBeTypeOf("number");
 		expect(t.engine).toBeUndefined();
 		expect(t.certified).toBeUndefined();
-		expect(performance.getEntriesByName("rigi:photo:start")).toHaveLength(1);
+		expect(performance.getEntriesByName("photo-workspace:start")).toHaveLength(
+			1,
+		);
 	});
 
 	it("never throws without User Timing", () => {

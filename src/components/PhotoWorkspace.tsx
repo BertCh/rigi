@@ -709,7 +709,7 @@ export function PhotoWorkspace({
 							})
 								.then((out) => {
 									if (engineRef.current !== engine) return;
-									// the user took over (setPose aborts it): no verdict, but the phase ended
+									// the user took over (a set pose or Auto-align / Refine aborts it): no verdict, but the phase ended
 									if (ctl.signal.aborted) {
 										markWorkspace("certified", { verdict: "aborted" });
 										return;
@@ -794,7 +794,8 @@ export function PhotoWorkspace({
 					markWorkspace("certified", { verdict: "none" });
 				}
 			})().catch((e) => {
-				// a disposed (StrictMode / navigated-away) engine rejects with AbortError: not an error
+				// a disposed (StrictMode / navigated-away) engine's init resolves early (both engines) and the
+				// superseded check above returns; an AbortError from a solve it started is not an error either
 				if (engineRef.current === engine && e?.name !== "AbortError")
 					setError(String(e?.message ?? e));
 			});

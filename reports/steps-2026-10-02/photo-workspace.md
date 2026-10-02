@@ -29,14 +29,14 @@ any PhotoWorkspace logic.
 
 | id | P | finding | where | status |
 |---|---|---|---|---|
-| F1 | P1 | **Heading slider pins at its window edge near north.** With a compass the slider spanned heading ±40° and took `pose.yaw` raw. A solver, saved or shared pose of 358° next to a 2° compass (or any yaw outside the window after a drag) sat clamped at the edge; the first touch jumped the pose by up to ~40° and saved it | `PhotoWorkspace.tsx:2082-2091` | fixed, U1 |
+| F1 | P1 | **Heading slider pins at its window edge near north.** With a compass the slider spanned heading ±40° and took `pose.yaw` raw. A solver, saved or shared pose of 358° next to a 2° compass (or any yaw outside the window after a drag) sat clamped at the edge; the first touch jumped the pose by up to ~40° and saved it | `PhotoWorkspace.tsx:2082-2091` | fixed: 6345569 (camera-prior pod, prior-centred unwrap) + U1 (range widens to an out-of-window yaw) |
 | F2 | P1 | **Error state has no way out.** The z-30 loading/error card covers the stage header (z-20), so the Library link cannot be clicked, and the card offered no retry | `:1392-1398, 1662-1680` | fixed, U2 |
 | F3 | P1 | **Auto-align / Refine could leave "Aligning…" forever.** `autoAlign` returning null returned silently; a throw became an unhandled rejection; the unknown-pose branch swallowed errors with `.catch(() => {})` | `:1052-1099` | fixed, U1 |
 | F4 | P1 (claim) | **"Show a pose fast" is only half true.** For a full-metadata photo with no saved pose, the blocking card stays up through `engine.init`, `autoAlign` and `settle`; only the second opinion is deferred. For unknown-sensor photos the whole cascade runs before the card clears (its matcher upgrade is deferred). Nothing measured time-to-first-overlay | `:604-736` | measured from now (U2 marks); progressive display planned (U5, needs the batch pass + user) |
 | F5 | P2 | Pin tool keyboard: candidate chips reacted to `pointerdown` only, so Enter/Space did nothing; placing the pin on the photo still needs a pointer | `:1480-1486` | chip fixed (U2); placement open (U7) |
 | F6 | P2 | `Toggle` had no switch role/state, `Segmented` no pressed state: screen readers could not tell what was on | `controls.tsx` Toggle, Segmented | fixed, U2 |
 | F7 | P2 | Loading progress not announced; error not an alert | `:1662-1680` | fixed, U2 |
-| F8 | P2 | Header Save image: a rejected `exportImage` was an unhandled rejection with no feedback | `:1140-1150` | fixed, U1 (header notice) |
+| F8 | P2 | Header Save image: a rejected `exportImage` was an unhandled rejection with no feedback | `:1140-1150` | fixed on master by 24799c2 (licences pod: `exportFromEngine`, error in the align note); U1 moves the message to a header notice |
 | F9 | P2 | Camera › "Eye (DEM-snapped)" read `engineRef.current.eyeAlt` during render: "—" until an unrelated re-render | `:2141-2144` | fixed, U2 (state set at ready) |
 | F10 | P2 | Mobile: header (Library, place · date · id, Save, Share, Export) has no truncation and overflows at 360 px; hover readout has no touch path; no pinch for FOV; panel capped at 45 dvh | `:1392-1430, 1685` | header truncation fixed (U2); rest open (U8) |
 | F11 | P2 (precision) | An export of an `unverified` / `prior` pose carries no marker: the PNG/JSON looks as certain as a verified one | header export, `ExportMenu` | open, user decision D2 |
@@ -50,9 +50,20 @@ hooks (`renderer.check.ts`); `readback()` resolves false after dispose in both (
 waiters released in `dispose` `:1099`; `deck-webgpu/engine.ts:2753-2762`); `skyline()` returns a cached
 array per geometry generation in both, which the workspace's identity check (`sky !== skylineRef.current`)
 needs. The only intentional asymmetry the workspace sees is the WebGPU geometry diet (`settle`,
-`sampleAtAsync`). A member-by-member semantic sweep of `init` progress fractions, `exportImage` label
-drawing and `autoAlign` null cases was planned for a Sonnet sweeper but could not be spawned under the
-shared subagent cap; it stays as U9.
+`sampleAtAsync`).
+
+Semantic sweep (U9, Sonnet, read-only, iteration 2): no P0. Parity OK for `init` progress (both reach
+frac 1: "Tracing horizon"), `autoAlign` (neither mutates `pose`; null before the horizon/photo prep and
+after dispose; never throws), `dispose` (idempotent, every RAF/timer/idle callback guarded),
+`exportImage` labels (same `drawExportLabels` call; deck waits on `readback`, WebGPU on `settle`),
+`peakLabels({declutter})`, `peaksInFrame`, `solvePins`, `isFlying`/`flyToPhoto`/`flyOut`, `hasPeople`
+(set before `init` resolves). Found:
+
+| id | P | finding | status |
+|---|---|---|---|
+| F16 | P2 | `init` on an already-disposed engine (StrictMode double mount) still started a `TerrainStreamer` whose abort listener never fires (`loadAbort` already aborted): a leak, no hang | fixed, U11: disposed guard at the top of both `init`s |
+| F17 | P3 | PhotoWorkspace's comment said a disposed engine's init "rejects with AbortError"; both engines resolve early instead (the superseded check handles it) | comment corrected, U11 |
+| F18 | P3 | sweeper flagged deck `exportImage` world branch as unguarded; false positive, `exportWorld` awaits `deckReady` and checks `disposed` (`deck/engine.ts:3360-3362`) | no change |
 
 ## 3. Research
 
@@ -86,15 +97,16 @@ shared subagent cap; it stays as U9.
 
 | unit | what | size | risk | gate | when |
 |---|---|---|---|---|---|
-| U1 | `workspace/poseControls.ts` (headingSlider unwrap + widen, dragPose, wheelVfov) + specs; runAlign no-fit/failure notes; Save image failure notice; renderer-neutral `create()` error | S | low | specs, tsc, fast tier | **now** |
+| U1 | `workspace/poseControls.ts` (dragPose, wheelVfov) + specs; Heading window widening folded into `geocam/priors/heading.ts` headingControlWindow (6345569 landed the unwrap first; U1's duplicate headingSlider dropped on rebase); runAlign no-fit/failure notes; Save image failure as a header notice; renderer-neutral `create()` error | S | low | specs, tsc, fast tier | **now** |
 | U2 | a11y + escape: Toggle `role=switch`, Segmented `aria-pressed`, pin chip keyboard, `<output aria-live>` progress, `role=alert` error with Try again / Library; eyeAlt state; header truncation; `workspace/timing.ts` User Timing marks + specs | S | low | specs, tsc, fast tier; browser batch row | **now** |
 | U3 | spec: `WEBGPU_REQUIRED_FEATURES` equals `device.ts REQUIRED_FEATURES` | XS | none | spec | **now** |
-| U4 | batch pass: read `rigi:photo:*` marks on demo-01..12, both renderers, cold and warm cache → TTFO / time-to-certified table | S | none | batch | next browser wave |
+| U4 | batch pass: read `photo-workspace:*` marks on demo-01..12, both renderers, cold and warm cache → TTFO / time-to-certified table | S | none | batch | next browser wave |
 | U5 | `?firstOverlay=prior` (flag, off): clear the blocking card after `engine.init`, show the prior with the uncertain styling + "Solving…" chip, keep exports locked, let the solved pose arrive through the reveal; unknown-sensor photos show the prior only as "placeholder" | M | med (harnesses read `[data-ready]` as final labels: keep `[data-ready]` where it is and add `[data-first-overlay]`) | U4 numbers before and after, style-baseline unchanged with the flag off | after U4; default flip = user |
 | U6 | split PhotoWorkspace into `useEngineLifecycle`, `useLabelLayout`, `usePointerTools` (pure moves, bit-identical behaviour) | L | med (hot file, peers) | tsc, specs for the hooks, batch visual | when no peer holds the file |
 | U7 | keyboard pin placement: arrow keys move a crosshair over the stage, Enter drops the pin | M | low | spec of the reducer + batch | later |
 | U8 | mobile: long-press hover readout, pinch FOV in the Drag tool, collapsible panel | M | low–med | batch on a phone viewport | later |
-| U9 | Sonnet sweep: engine semantic parity (init progress, exportImage labels, autoAlign null cases, dispose idempotence) | S | none | report | when a subagent slot is free |
+| U9 | Sonnet sweep: engine semantic parity (init progress, exportImage labels, autoAlign null cases, dispose idempotence) | S | none | report | **done** (see §2) |
+| U11 | disposed guard at the top of both engine `init`s (F16) + comment fix (F17) | XS | low | tsc, fast tier; batch row | **now** |
 | U10 | unverified-export marker (F11) | S | low | spec | user decision D2 |
 
 ## 5. Decisions for the user
@@ -111,7 +123,8 @@ shared subagent cap; it stays as U9.
   suggestion. A pose shows as soon as the first solve settles; full-metadata photos are then checked in
   the background by a second opinion, and exports wait for it. Every photo source loads the same way."
 - `photo-workspace.modules`: add `src/lib/integration/second-opinion.ts` (the "certify later" half of the
-  claim) and `src/components/workspace/poseControls.ts`.
+  claim), `src/components/workspace/poseControls.ts` and `src/lib/geocam/priors/heading.ts` (the Heading
+  slider window).
 - `rigi.modules`: add `src/lib/renderer-select.ts` (where the WebGPU/WebGL choice lives).
 
 ## 7. Landed

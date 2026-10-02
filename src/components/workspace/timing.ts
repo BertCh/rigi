@@ -6,12 +6,12 @@
 // so a harness (or the devtools Performance panel) reads time-to-first-overlay and time-to-certified
 // without instrumenting the engines. Marks only; nothing reads them in the app.
 //
-//   rigi:photo:start          the engine effect starts (the renderer chunk and probe may still load)
-//   rigi:photo:engine         engine.init resolved (photo, terrain and labels exist; pose not final)
-//   rigi:photo:first-overlay  the loading card clears ([data-ready]): a pose is on screen
-//   rigi:photo:certified      the background second opinion settled, detail.verdict says how
-//                             ("none" = no second opinion ran: a saved, shared or unknown-sensor pose,
-//                             whose matcher upgrade may still follow; "aborted" = the user took over)
+//   photo-workspace:start          the engine effect starts (the renderer chunk and probe may still load)
+//   photo-workspace:engine         engine.init resolved (photo, terrain and labels exist; pose not final)
+//   photo-workspace:first-overlay  the loading card clears ([data-ready]): a pose is on screen
+//   photo-workspace:certified      the background second opinion settled, detail.verdict says how
+//                                  ("none" = no second opinion ran: a saved, shared or unknown-sensor pose,
+//                                  whose matcher upgrade may still follow; "aborted" = the user took over)
 //
 // Each mount clears the previous photo's marks at "start", so the entries describe one photo.
 
@@ -23,7 +23,7 @@ export const WORKSPACE_PHASES = [
 ] as const;
 export type WorkspacePhase = (typeof WORKSPACE_PHASES)[number];
 
-const markName = (phase: WorkspacePhase) => `rigi:photo:${phase}`;
+const markName = (phase: WorkspacePhase) => `photo-workspace:${phase}`;
 
 /** Records `phase` (detail attached when given). Returns its time in ms, null where User Timing is missing. */
 export function markWorkspace(

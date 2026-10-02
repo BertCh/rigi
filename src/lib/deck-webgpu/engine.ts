@@ -1288,6 +1288,9 @@ export class WebGpuEngine implements Renderer {
 		onProgress?: (msg: string, frac: number) => void,
 		segment?: (img: HTMLImageElement) => Promise<FgMask | null>,
 	) {
+		// disposed before init ran (StrictMode double mount): starting the streamer now would leak it, as
+		// loadAbort has already fired; resolve like every other disposed-mid-init exit
+		if (this.disposed) return;
 		onProgress?.("Loading photo", 0);
 		const lakeFloor = startLakeFloor(this.photo, region, this.loadAbort.signal);
 		if (!this.fastHorizon) {
