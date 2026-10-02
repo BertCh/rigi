@@ -149,10 +149,13 @@ export {
 	GPUConditionalOperation,
 	GPUConvolution,
 	GPUFFT1D,
+	GPUFiniteDifference2D,
+	GPUGather,
 	GPUGridAggregation,
 	GPUGridBinning,
 	GPUGridIndex,
 	GPUGridIndexQuery,
+	GPUGroupAggregation,
 	GPUHistogram,
 	GPUMatVec,
 	GPUPointSpatialFilter,
@@ -175,6 +178,10 @@ export {
 	scalarArithmetic,
 	scalarCompare,
 } from "@luma.gl/gpgpu/gpu-core";
+// The wave-F adoptions (2026-10-02, maximalist rule: tolerance evidence instead of bit identity):
+// GPUGather (haze gathers), GPUCompaction (haze band, terrain cull), GPUGroupAggregation / GPUHistogram
+// (colour-stats fold, photoprep), GPUFiniteDifference2D (relief gradient), GPUConvolution (guided
+// filter). GPUSegmentedReduction is not exported from the gpu-core entry point (rigi.5/6).
 // GPUData: the buffer-backed chunk that binds a GPUProgram external vector (core/program.ts)
 export { GPUData } from "@luma.gl/gpgpu/gpu-data";
 // Vector search (k-means, exact top-k similarity): a sibling experimental subpath over the same
