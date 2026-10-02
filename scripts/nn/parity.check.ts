@@ -43,7 +43,8 @@ type Case = {
 	shapes: number[][];
 	/** custom input data per shape (default uniform in [-1, 1]) */
 	data?: (Float32Array | null)[];
-	fn: (nn: Nn, ...t: Tensor[]) => Tensor | Tensor[] | { [k: string]: Tensor };
+	/** tensors, or arrays / plain objects of them (nested) */
+	fn: (nn: Nn, ...t: Tensor[]) => unknown;
 	/** max abs error allowed, relative to max |cpu| (default 1e-4) */
 	tol?: number;
 	/** inputs that are weights (uploaded as f16 in the --f16 pass) */
@@ -489,6 +490,11 @@ const cases: Case[] = [
 	},
 	{ name: "topk-small", shapes: [[3, 100]], fn: (nn, x) => nn.topk(x, 10) },
 	{ name: "topk-axis0", shapes: [[50, 3]], fn: (nn, x) => nn.topk(x, 5, 0) },
+	{
+		name: "topk-k1",
+		shapes: [[2, 300, 257]],
+		fn: (nn, x) => [nn.topk(x, 1, 1), nn.topk(x, 1, 2), nn.topk(x, 1, 0)],
+	},
 	{ name: "topk-large", shapes: [[1, 70000]], fn: (nn, x) => nn.topk(x, 2048) },
 	// epilogue fusion: unary after conv / linear / deform folds into the store, unless the pre-activation is also used
 	{

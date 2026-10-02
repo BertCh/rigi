@@ -762,6 +762,12 @@ export abstract class BaseNn<T extends Tensor = Tensor> implements Nn {
 		const a = normAxis(axis, r);
 		const len = x.shape[a];
 		if (k < 1 || k > len) throw new Error(`nn: topk k=${k} of ${len}`);
+		// k = 1 is max / argmax along the axis: no transpose, no sort (ties: lower index, as topk)
+		if (k === 1)
+			return {
+				values: this.reduceImpl("max", x, a, true),
+				indices: this.reduceImpl("argmax", x, a, true),
+			};
 		const last = a === r - 1;
 		const xt = last ? (x as T) : this.transpose(x, a, r - 1);
 		const lastShape = [...xt.shape.slice(0, -1), k];

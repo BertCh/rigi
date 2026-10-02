@@ -15,6 +15,11 @@ import { dawnDevice } from "./dawn";
 const device = await dawnDevice("nn-bench");
 if (!device) {
 	console.log("SKIP nn-bench: DAWN_DIR not set or no adapter");
+	{
+		// ALIKED keypoint selection: top 4096 of a 1024×768 score map (bitonic, ~78 dispatches)
+		const x = nn.fromArray(rnd(1024 * 768), [1, 1024 * 768]);
+		await time("topk 4096 of 786432", 0, 1, () => nn.topk(x, 4096).indices);
+	}
 	process.exit(0);
 }
 const F16 = process.argv.includes("--f16");
@@ -49,7 +54,7 @@ async function time(label: string, flops: number, R: number, op: () => Tensor) {
 	ms.sort((a, b) => a - b);
 	const med = ms[3];
 	console.log(
-		`${label.padEnd(44)} ${(med / R).toFixed(3).padStart(8)} ms/op  ${((flops * R) / (med * 1e6)).toFixed(1).padStart(7)} GFLOP/s`,
+		`${label.padEnd(44)} ${(med / R).toFixed(3).padStart(8)} ms/op${flops ? `  ${((flops * R) / (med * 1e6)).toFixed(1).padStart(7)} GFLOP/s` : ""}`,
 	);
 }
 
@@ -105,5 +110,10 @@ for (const [B, H, N, D] of [
 		4,
 		() => nn.attention(q, k, v),
 	);
+}
+{
+	// ALIKED keypoint selection: top 4096 of a 1024×768 score map (bitonic, ~78 dispatches)
+	const x = nn.fromArray(rnd(1024 * 768), [1, 1024 * 768]);
+	await time("topk 4096 of 786432", 0, 1, () => nn.topk(x, 4096).indices);
 }
 process.exit(0);
