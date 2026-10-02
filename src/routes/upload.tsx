@@ -488,7 +488,15 @@ function Credits() {
 					>
 						libheif bundle
 					</a>
-					) that you may replace with your own build:
+					) that you may replace with your own build (licence texts, including
+					onnxruntime-web's third-party notices, are under{" "}
+					<a
+						className="text-cyan-300/80 light:text-[var(--rigi-glow)]/80 hover:underline"
+						href="/licenses/README.txt"
+					>
+						/licenses
+					</a>
+					):
 				</p>
 				<ul className="mt-1 list-disc pl-5">
 					{THIRD_PARTY.map((n) => (

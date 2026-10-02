@@ -49,13 +49,38 @@ const devPort = portArg?.replace("--port=", "");
 const WEBGL_ONLY =
 	process.env.RIGI_DECK_BUILD === "webgl-only" ? ["visgl:webgl-only"] : [];
 
+// Production builds ship neither the /dev/* (harness and preview pages) nor the /lab/* (experiments) routes.
+// The router generator ignores those route files and writes its tree to a separate, gitignored file, which
+// the build aliases over `./routeTree.gen` (src/router.tsx), so the committed src/routeTree.gen.ts that
+// `vite dev` and tsc use is never rewritten and the dev experience is unchanged. RIGI_ROUTES=all keeps
+// every route in a build (for a staging or harness build).
+const GATED_ROUTE_FILES = "^(dev|lab)\\.";
+
+// Other configs (scripts/**/vite.*.config.ts) import this one as a plain object, so the build is detected
+// from argv (`vite build`) rather than through the config function form.
+const PROD_ROUTE_TREE = fileURLToPath(
+	new URL("./src/routeTree.prod.gen.ts", import.meta.url),
+);
+const gateRoutes =
+	process.argv[2] === "build" && process.env.RIGI_ROUTES !== "all";
+
 const config = defineConfig({
 	cacheDir: devPort ? `node_modules/.vite-${devPort}` : "node_modules/.vite",
 	resolve: {
 		tsconfigPaths: true,
+		alias: gateRoutes
+			? [
+					{
+						find: /^\.\/routeTree\.gen$/,
+						replacement: PROD_ROUTE_TREE,
+					},
+				]
+			: [],
 		conditions: [...WEBGL_ONLY, ...defaultClientConditions],
 	},
-	ssr: { resolve: { conditions: [...WEBGL_ONLY, ...defaultServerConditions] } },
+	ssr: {
+		resolve: { conditions: [...WEBGL_ONLY, ...defaultServerConditions] },
+	},
 	// gpu-core is imported lazily (src/lib/gpu/**): on a cold cache Vite would re-optimise on first import
 	// and load a second @luma.gl/core, which breaks graph destroy.
 	optimizeDeps: {
@@ -69,7 +94,16 @@ const config = defineConfig({
 		photosJson(),
 		nitro({ rollupConfig: { external: [/^@sentry\//] } }),
 		tailwindcss(),
-		tanstackStart(),
+		tanstackStart(
+			gateRoutes
+				? {
+						router: {
+							routeFileIgnorePattern: GATED_ROUTE_FILES,
+							generatedRouteTree: PROD_ROUTE_TREE,
+						},
+					}
+				: undefined,
+		),
 		viteReact(),
 	],
 });
