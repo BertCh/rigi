@@ -50,7 +50,6 @@ ${fullscreenWGSL}
 }
 `;
 
-export const IMAGERY_LAYER_SIZE = 512;
 /** Layers per grow / compaction quantum, per tier (85 MiB of 512², 43 MiB of 256²). */
 const CHUNK = { 512: 64, 256: 128 } as const;
 /** Quiet time (no release, no upload) before an array is compacted or dropped. */

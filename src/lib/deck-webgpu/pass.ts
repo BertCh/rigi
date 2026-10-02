@@ -12,8 +12,8 @@ import type {
 	RenderPipelineParameters,
 } from "@luma.gl/core";
 import type { Model, ModelProps } from "@luma.gl/engine";
-import { type ShaderModule, WGSLShaderAssembler } from "@luma.gl/shadertools";
-import { type CameraUniforms, cameraModule } from "./camera";
+import { WGSLShaderAssembler } from "@luma.gl/shadertools";
+import type { CameraUniforms } from "./camera";
 import { REVERSED_Z } from "./depth";
 import type { ColorTargets, GeometryTargets } from "./targets";
 import { MSAA_SAMPLES, PASS_ATTACHMENTS } from "./targets";
@@ -90,11 +90,6 @@ export interface GpuLayerCore {
 	visible?(): boolean;
 	destroy(): void;
 }
-
-/** Shared modules every 3D pipeline gets (camera; add yours after it). */
-export const SHARED_MODULES: ShaderModule[] = [
-	cameraModule as unknown as ShaderModule,
-];
 
 /**
  * The WGSL assembler every deck-webgpu Model uses (passModelProps / screenModelProps carry it).

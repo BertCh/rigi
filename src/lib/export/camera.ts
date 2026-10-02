@@ -22,7 +22,7 @@ import {
 	type Pose,
 	poseToOpenCV,
 } from "../camera";
-import { DEG as D, toEcef, WGS84 } from "../geodesy";
+import { DEG as D, toEcef, WGS84, wrap360 } from "../geodesy";
 
 export type { Vec3 };
 
@@ -314,11 +314,8 @@ export function colmapLines(
 	};
 }
 
-/** Normalise an angle to [0, 360). */
-export function wrap360(deg: number) {
-	const a = ((deg % 360) + 360) % 360;
-	return a === 360 ? 0 : a;
-}
+/** Normalise an angle to [0, 360) (the shared geodesy helper; kept exported for export callers). */
+export { wrap360 };
 
 /**
  * Angle in [0, 360) printed with `digits` decimals, wrapping values that round up to 360
