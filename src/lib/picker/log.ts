@@ -41,9 +41,11 @@ const notify = () => {
 };
 
 function read(): PickerLogEntry[] {
+	// a failed write means storage holds a stale prefix; memory holds everything this page logged
+	if (persistFailed) return [...mem];
 	try {
 		const s = localStorage.getItem(PICKER_LOG_KEY);
-		if (s === null) return persistFailed ? [...mem] : [];
+		if (s === null) return [];
 		const { entries } = parsePickerLog(JSON.parse(s));
 		return entries;
 	} catch {
