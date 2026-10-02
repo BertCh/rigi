@@ -19,6 +19,7 @@ import {
 	lift,
 	type PerView,
 	type View,
+	viewStats,
 } from "./core";
 import { type SkylineApp, type SkylineCue, skylineFromArrays } from "./fusion";
 import { dang } from "./geometry";
@@ -272,24 +273,6 @@ async function photoFeaturesAt(
 	return f;
 }
 
-/** Standard deviation of RGB over terrain pixels (per-view stats, as the service reports). */
-function rgbStd(v: View) {
-	let n = 0;
-	let s = 0;
-	let s2 = 0;
-	for (let i = 0; i < v.W * v.H; i++) {
-		if (v.xyz[i * 3] === 0 && v.xyz[i * 3 + 1] === 0 && v.xyz[i * 3 + 2] === 0)
-			continue;
-		for (let c = 0; c < 3; c++) {
-			const x = v.rgba[i * 4 + c];
-			s += x;
-			s2 += x * x;
-			n++;
-		}
-	}
-	return n ? Math.sqrt(Math.max(0, s2 / n - (s / n) ** 2)) : 0;
-}
-
 /**
  * core.correspond: ALIKED + LightGlue photo ↔ view matches lifted through each view's xyz. The photo is
  * rasterised at the views' W×H; views whose xyz does not reproject under their pose are an error.
@@ -336,21 +319,15 @@ export async function correspond(
 			x2d.push(fp.keypoints[j * 2] + 0.5, fp.keypoints[j * 2 + 1] + 0.5);
 			X.push(Xv[i * 3], Xv[i * 3 + 1], Xv[i * 3 + 2]);
 		}
-		let terrain = 0;
-		for (let i = 0; i < v.W * v.H; i++)
-			if (
-				v.xyz[i * 3] !== 0 ||
-				v.xyz[i * 3 + 1] !== 0 ||
-				v.xyz[i * 3 + 2] !== 0
-			)
-				terrain++;
+		const stats = viewStats(v);
 		perView.push({
 			tag: v.tag,
 			matches: m.count,
 			lifted,
 			keypoints: fr.count,
-			terrainFrac: Math.round((terrain / (v.W * v.H)) * 1000) / 1000,
-			rgbStd: Math.round(rgbStd(v) * 10) / 10,
+			terrainFrac:
+				Math.round((stats.terrain.length / (v.W * v.H)) * 1000) / 1000,
+			rgbStd: Math.round(stats.rgbStd * 10) / 10,
 		});
 	}
 	return {

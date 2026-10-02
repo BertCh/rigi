@@ -99,16 +99,58 @@ export function lift(
 	return { X, ok };
 }
 
+/** Per-view scan results (viewStats): terrain pixel indices and the RGB spread over them. */
+export type ViewStats = {
+	/** Pixel indices whose xyz is not (0, 0, 0), ascending. */
+	terrain: Int32Array;
+	/** Standard deviation of R, G and B (pooled) over the terrain pixels; 0 without rgba. */
+	rgbStd: number;
+};
+
+const viewStatsMemo = new WeakMap<Float32Array, ViewStats>();
+
+/**
+ * The single W·H pass over a view that checkView and correspond's per-view stats share (it used to be
+ * three passes), memoised per xyz buffer. The view's rgba / xyz are already on the CPU here (ALIKED and
+ * lift read them), so there is no GPU readback to save by moving this scan onto the graph.
+ */
+export function viewStats(v: Pick<View, "W" | "H" | "xyz" | "rgba">) {
+	const memo = viewStatsMemo.get(v.xyz);
+	if (memo) return memo;
+	const { W, H, xyz, rgba } = v;
+	const n = W * H;
+	const hasRgb = rgba.length >= n * 4;
+	const terrain = new Int32Array(n);
+	let count = 0;
+	let s = 0;
+	let s2 = 0;
+	for (let i = 0; i < n; i++) {
+		if (xyz[i * 3] === 0 && xyz[i * 3 + 1] === 0 && xyz[i * 3 + 2] === 0)
+			continue;
+		terrain[count++] = i;
+		if (!hasRgb) continue;
+		for (let c = 0; c < 3; c++) {
+			const x = rgba[i * 4 + c];
+			s += x;
+			s2 += x * x;
+		}
+	}
+	const m = hasRgb ? count * 3 : 0;
+	const stats: ViewStats = {
+		terrain: terrain.slice(0, count),
+		rgbStd: m ? Math.sqrt(Math.max(0, s2 / m - (s / m) ** 2)) : 0,
+	};
+	viewStatsMemo.set(xyz, stats);
+	return stats;
+}
+
 /**
  * core.check_view: median reprojection (px) of up to 300 terrain pixels of the view's own xyz under
  * its pose (catches stale geometry buffers). Samples a fixed stride instead of numpy's rng choice.
  */
 export function checkView(v: View, eye: ArrayLike<number>): number {
 	const { W, H, xyz } = v;
-	const terrain: number[] = [];
-	for (let i = 0; i < W * H; i++)
-		if (xyz[i * 3] !== 0 || xyz[i * 3 + 1] !== 0 || xyz[i * 3 + 2] !== 0)
-			terrain.push(i);
+	const { terrain } = viewStats(v);
 	if (!terrain.length) return Number.POSITIVE_INFINITY;
 	const m = Math.min(300, terrain.length);
 	const R = poseToR(v.pose);
