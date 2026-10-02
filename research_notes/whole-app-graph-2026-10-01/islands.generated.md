@@ -80,7 +80,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **ransac**: pose6dof *RansacAsync: K hypotheses × N correspondences per dispatch, arg-max on the GPU; batches under 2^19 work items and missing devices score on the CPU twin (scoreBatchCpu)
 - **basin-grid**: basin-gap grid coarse rotation search (rotSearchGpu): SCORE (one workgroup per candidate × node, workgroup atomicMin column table) → TOP3 (1° NMS, per node); throws on a GPU failure and the caller takes rotSearchCpu
 - **skyglobal**: T6 skyline global search; the in-browser matcher's policy t6 (?matcherPolicy=t6, src/lib/matcher/t6.ts) runs it with the candidate re-score on the graph (RESCORE → PICK)
-- **skyline**: detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default off: 1 of 77 unknown-pose accept decisions flipped in the node A/B)
+- **skyline**: detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default on: 0 of 77 unknown-pose decisions changed in the 2026-10-02 node A/B)
 - **sky-model**: ORT owns the dispatch; its output buffer feeds sky-refine without leaving the GPU
 - **sky-prep**: cachedGraph per shape (2 per device), after the bitmap → texture → padded-rows copy; the GPU prep (default on since 2026-10-01; off / ?gpu=off / WASM ORT: the CPU prep)
 - **deck-webgpu-frame**: deck.gl layers in one encoder; not a ComputeGraph

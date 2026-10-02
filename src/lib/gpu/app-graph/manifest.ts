@@ -553,7 +553,7 @@ export const GPU_MODULES: readonly GpuModule[] = [
 		readbacks: ["cost images for the CPU Viterbi + sky-model refit"],
 		status: "opt-in",
 		notes:
-			"detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default off: 1 of 77 unknown-pose accept decisions flipped in the node A/B)",
+			"detectSkylineAsync: GPU cost images, Viterbi and refit stay on the CPU (f64); flag skylineGpu (default on: 0 of 77 unknown-pose decisions changed in the 2026-10-02 node A/B)",
 	},
 	{
 		id: "sky-model",

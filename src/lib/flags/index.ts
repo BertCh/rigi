@@ -55,10 +55,11 @@ export const FLAG_SCHEMA = {
 	gpu: onOff("on"),
 	/**
 	 * skyline detector (geo/skyline.ts detectSkylineAsync): the per-pixel feature, prior and sky-model
-	 * images on the GPU (src/lib/gpu/skyline), the sky-model fits and Viterbi on the CPU. off = the CPU
-	 * detectSkyline (also under ?gpu=off).
+	 * images on the GPU (src/lib/gpu/skyline). off = the CPU detectSkyline (also under ?gpu=off). On by
+	 * default since the 2026-10-02 node A/B (unknown-pose cascade, GT-12 60 + wild dev 17 decisions,
+	 * 0 changed; the earlier IMG_6958 flip is refinePose chaos, research_notes/wave5/skyline-gpu-flip.md).
 	 */
-	skylineGpu: onOff("off"),
+	skylineGpu: onOff("on"),
 	/**
 	 * unknown-pose cascade (integration/unknown-pose-core.ts isAmbiguousFocal): on = the focal `ambiguous`
 	 * test ignores a non-best focal seed that accepted only through refinePose after a solve stage under

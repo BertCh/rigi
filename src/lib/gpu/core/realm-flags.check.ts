@@ -27,22 +27,22 @@ const clear = () => {
 clear();
 assert.equal(realmGpuOptions(), undefined, "nothing set: undefined");
 
-setFlagOverride("skylineGpu", "on");
-assert.deepEqual(realmGpuOptions(), { flags: { skylineGpu: "on" } });
+setFlagOverride("skylineGpu", "off");
+assert.deepEqual(realmGpuOptions(), { flags: { skylineGpu: "off" } });
 setFlagOverride("gpu", "off");
 const sent = realmGpuOptions();
-assert.deepEqual(sent?.flags, { gpu: "off", skylineGpu: "on" });
+assert.deepEqual(sent?.flags, { gpu: "off", skylineGpu: "off" });
 
 // a flag that is not forwarded never travels
 setFlagOverride("renderer", "deck");
-assert.deepEqual(realmGpuOptions()?.flags, { gpu: "off", skylineGpu: "on" });
+assert.deepEqual(realmGpuOptions()?.flags, { gpu: "off", skylineGpu: "off" });
 
 // the receiving realm starts with no overrides
 clear();
-assert.equal(getFlag("skylineGpu"), "off");
+assert.equal(getFlag("skylineGpu"), "on");
 assert.equal(getFlag("gpu"), "on");
 applyRealmGpuOptions(sent);
-assert.equal(getFlag("skylineGpu"), "on");
+assert.equal(getFlag("skylineGpu"), "off");
 assert.equal(getFlag("gpu"), "off");
 assert.equal(flagSet("renderer"), false);
 

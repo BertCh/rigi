@@ -112,7 +112,7 @@ describe("flagFrom", () => {
 describe("getFlag / overrides", () => {
 	it("defaults when nothing is set (node has no page URL)", () => {
 		expect(F.getFlag("renderer")).toBe("auto");
-		expect(F.getFlag("skylineGpu")).toBe("off");
+		expect(F.getFlag("skylineGpu")).toBe("on");
 		expect(F.getFlag("colorTarget")).toBe("rgba16");
 		expect(F.flagSet("renderer")).toBe(false);
 	});
@@ -149,10 +149,10 @@ describe("getFlag / overrides", () => {
 	it("setFlagOverride creates, sets and removes", () => {
 		F.setFlagOverride("gpu", "off");
 		expect(F.getFlag("gpu")).toBe("off");
-		F.setFlagOverride("skylineGpu", "on");
+		F.setFlagOverride("skylineGpu", "off");
 		F.setFlagOverride("gpu", undefined);
 		expect(F.getFlag("gpu")).toBe("on");
-		expect(F.getFlag("skylineGpu")).toBe("on");
+		expect(F.getFlag("skylineGpu")).toBe("off");
 	});
 });
 
