@@ -31,6 +31,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | biome | fast | lint + format + import order, as a per-file ratchet | `biome check --reporter=json <files>` |
 | unit | fast | the Vitest unit suite: every `*.spec.ts` / `*.spec.tsx` (pure CPU, no GPU / network / gitignored data; conventions in `src/test/README.md`), including `scripts/ci/__tests__/checks.spec.ts`, which tests this registry and fails on an unregistered check script | `vitest run` |
 | style-check | fast | CLASSIC style = today's constants, ramps, presets, `?style=` | `scripts/style-check.ts` |
+| models | fast | model weights: manifest sha256 per present file, `createOrtSession` runs the sky model on WASM in node; SKIPs without `public/models` | `src/lib/models/models.check.ts` |
 | labels | fast | peak labels: classic byte-identical, no overlaps | `src/lib/look/__tests__/labels.check.ts` |
 | haze-fit | fast | `fitHaze` recovers J, A, β | `src/lib/look/__tests__/haze-fit.test.ts` |
 | haze-tail | fast | the GPU haze fit's CPU tail (`hazeFitTail`) equals `fitHaze` bit for bit on 16 synthetic scenes; `pathFrom` = `atmPath`, `robustSkyExact` = `robustSky`; one-ULP teeth (no GPU) | `src/lib/gpu/look/haze-tail.check.ts` |

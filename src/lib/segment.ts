@@ -12,8 +12,8 @@ import {
 	ImageSegmenter,
 	type ImageSegmenterResult,
 } from "@mediapipe/tasks-vision";
-import { cachedFetchBuffer } from "./cache";
 import { smoothstep } from "./math";
+import { fetchModel, modelUrl } from "./models";
 import type { ByteMask } from "./ontology/core/geometry";
 
 /** 0..255, 255 = foreground person (a ByteMask: row-major, row 0 = TOP of image). */
@@ -22,14 +22,12 @@ export type ForegroundMask = ByteMask;
 export type SegmentModel = "multiclass" | "deeplab" | "combined";
 
 const MASK_LONG_SIDE = 512;
-// Must match the installed (exact-pinned) @mediapipe/tasks-vision version in package.json.
-const TASKS_VISION_VERSION = "1.0.1";
-const WASM_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VISION_VERSION}/wasm`;
-const MODEL_URLS: Record<"multiclass" | "deeplab", string> = {
-	multiclass:
-		"https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
-	deeplab:
-		"https://storage.googleapis.com/mediapipe-models/image_segmenter/deeplab_v3/float32/latest/deeplab_v3.tflite",
+// Self-hosted: the tasks-vision wasm comes from the installed npm package (Vite `?url` assets, imported
+// lazily so node never loads them) and the .tflite models from public/models (scripts/models/manifest.json,
+// fetched by scripts/models/fetch.mjs). No third-party host at runtime.
+const MODEL_FILES: Record<"multiclass" | "deeplab", string> = {
+	multiclass: "selfie_multiclass_256x256.c6748b12.tflite",
+	deeplab: "deeplab_v3.ff36e24d.tflite",
 };
 /** Pascal VOC "person" class index in deeplab_v3. */
 const DEEPLAB_PERSON = 15;
@@ -65,21 +63,39 @@ function preloadWasm(fileset: {
 	}
 }
 
+/** The tasks-vision wasm loader + binary, served from our own build (SIMD unless the browser lacks it). */
+async function visionFileset(): Promise<{
+	wasmLoaderPath: string;
+	wasmBinaryPath: string;
+}> {
+	if (await FilesetResolver.isSimdSupported()) {
+		const [loader, binary] = await Promise.all([
+			import("@mediapipe/tasks-vision/vision_wasm_internal.js?url"),
+			import("@mediapipe/tasks-vision/vision_wasm_internal.wasm?url"),
+		]);
+		return { wasmLoaderPath: loader.default, wasmBinaryPath: binary.default };
+	}
+	const [loader, binary] = await Promise.all([
+		import("@mediapipe/tasks-vision/vision_wasm_nosimd_internal.js?url"),
+		import("@mediapipe/tasks-vision/vision_wasm_nosimd_internal.wasm?url"),
+	]);
+	return { wasmLoaderPath: loader.default, wasmBinaryPath: binary.default };
+}
+
 async function createSegmenter(model: Loaded): Promise<ImageSegmenter> {
 	const [fileset, buf] = await Promise.all([
-		FilesetResolver.forVisionTasks(WASM_BASE).then((f) => {
+		visionFileset().then((f) => {
 			preloadWasm(f);
 			return f;
 		}),
-		// 16 MB model: keep it in the persistent cache (GCS sends max-age=3600, and it is too big for
-		// many HTTP caches). Priority -1 = ahead of DEM tiles in the shared queue. Any failure → the URL.
-		cachedFetchBuffer(MODEL_URLS[model], { priority: -1 }).catch(() => null),
+		// 16 MB model: Cache Storage backed (fetchModel). Any failure → MediaPipe fetches the URL itself.
+		fetchModel(MODEL_FILES[model]).catch(() => null),
 	]);
 	const make = (delegate: "GPU" | "CPU") =>
 		ImageSegmenter.createFromOptions(fileset, {
 			baseOptions: buf
 				? { modelAssetBuffer: new Uint8Array(buf), delegate }
-				: { modelAssetPath: MODEL_URLS[model], delegate },
+				: { modelAssetPath: modelUrl(MODEL_FILES[model]), delegate },
 			runningMode: "IMAGE",
 			outputConfidenceMasks: true,
 			outputCategoryMask: false,
