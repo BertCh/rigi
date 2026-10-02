@@ -84,8 +84,19 @@ data. These numbers are design evidence and must not be quoted as results.
 | L-4 | P3: a WGSL twin for `RangeGpu`, then the drape port behind `?rollRenderer` | M–L | look and VRAM | roll A/B and fps/VRAM batch (P3 memo) | after the G1 browser pass; the map peer owns it |
 
 ## 5. What landed
-- U1 a115a95 (sha before landing; see the land log): roll prior and bias use `priorHeading`; specs in `roll.spec.ts` and `viewpoint.spec.ts`.
-- U2 1fbbb98: `rollBiasWindow` flag and the `biasWindowS` option; specs in `viewpoint.spec.ts` and `align.spec.ts`.
+- U1 96cf897: roll prior and bias use `priorHeading`; specs in `roll.spec.ts` and `viewpoint.spec.ts`. Bit-identical with `geoDecl` off.
+- U2 b5a93ff: the `rollBiasWindow` flag and the `biasWindowS` option; specs in `viewpoint.spec.ts` and `align.spec.ts`. The default is unchanged.
+- 6d744fd: this plan, plus a spec that the leave-one-out check uses the same window.
+- U3, the `viewpointTerrain` cancellation (`signal` and an interest count per memo entry; a queued trace with nobody waiting is skipped; a started one finishes and stays memoised), and `PanoramaStrip`, which aborts on cleanup. Browser-unverified; ledger row "step camera-roll U3". The memo is still unbounded (results only; workers are freed), so that is left for later.
+- W2 (from the pose-estimate step): `loadSolvedPose` rejects a record that fails `isPose` or has a non-finite confidence; spec in `roll.spec.ts`.
+- Review iterations: one Sonnet review sweep, then an adversarial review of U1 and U2 (no blocking issues; nits fixed: a stale comment and a leave-one-out window spec), then my own review of the U3 diff.
+- Fast tier, run in the worktree before landing U1 and U2: 109 pass and 5 fail. None of the 5 are in this step's files:
+  - biome: new errors in Gipfelbuch pages.
+  - unit: upload specs denied by Vite because node_modules is symlinked from the worktree, and the Python tooling tests.
+  - ontology: `picker/schema.ts`.
+  - flow: a timing check.
+  - align-cert: timed out under load.
+- Negative or not done: a heading-dependent deviation curve as a bias model (unstable; §2.2). A session-wide bias across viewpoints (camera-prior U9) is **not proposed**, because the demo data say the correlation lasts about a minute, not a session.
 
 ## 6. Proposals for files this step does not own
 - **P-1 (pod B, `roll/propagate/plan.ts:106-110`).** Replace the copied prior block with `priorPose(t.meta)` from `roll.ts`, so the compass-overlap gate uses the same true-north heading. This is bit-identical with `geoDecl` off. `propagate.check.ts:53` should follow.
@@ -103,3 +114,9 @@ data. These numbers are design evidence and must not be quoted as results.
 ## 8. Needs the user
 1. U5: whether to change the 45-minute bias window default once a roll bench has run (a browser batch).
 2. L-3: whether to split rolls by time gaps (this changes roll ids).
+
+## 9. Batch-ledger row (pending: reports/batch-ledger.md had a conflicting peer edit at landing time)
+
+| Batch | Commit | Change | Check | Risk |
+|---|---|---|---|---|
+| step camera-roll U3 | "roll/mosaic: viewpointTerrain takes an AbortSignal" (roll/mosaic/{viewpointTerrain,PanoramaStrip}) | Panorama strip aborts its terrain request on viewpoint change/unmount; a queued ridge trace with no caller left is skipped (no tiles, no worker); started traces finish and stay memoised | `/roll/<id>` panorama: flip quickly through 4+ viewpoints, the last one traces and shows ridgelines, no error chip; leave and return, a finished viewpoint shows without a new trace (devtools: one ridgelines worker per traced eye) | low |
