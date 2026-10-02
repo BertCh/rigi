@@ -17,7 +17,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | I6 | Sky model | per photo | worker:sky | sky-model, sky-prep, sky-refine | `sky-prep`, `sky-refine` |
 | I7 | Frame | per frame | page | deck-webgpu-frame, terrain-gpu-cull | – |
 | I8 | Queries | per settle | page | geo-query-gpu | `geo-query` |
-| I9 | Look | per settle, per style | page | look-guided, look-stats, look-haze, look-relief, look-textures | `look-guided`, `look-stats`, `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-haze-band`, `look-haze-argmin`, `look-relief`, `look-tex` |
+| I9 | Look | per settle, per style | page | look-guided, look-stats, look-haze, look-relief, look-textures, look-photo | `look-guided`, `look-stats`, `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-haze-band`, `look-haze-argmin`, `look-relief`, `look-tex`, `look-photo` |
 | I10 | Labels (not a graph) | per emit | page | labels | – |
 | I11 | Nearfield | per view | page | splat-sort | `splat-sort` |
 | I12 | Roll | per photo, per frame | page, worker:ridgelines | photo-palette, roll-look, horizon-ridges, roll-webgl | `palette`, `roll-look`, `roll-look-similar`, `horizon-ridges` |
@@ -55,6 +55,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 | look-haze | I9 | default | page | per settle | `look-haze-prep`, `look-haze-compact`, `look-haze-gather`, `look-haze-grid`, `look-haze-band`, `look-haze-argmin` | range, pSky, photo, fg mask (pooled imports); lin, flags, bins, hist (transients); arg-min program: luma GPUProgram scalar arena (gMin, tol, count, over) + pick (transients) | prep head: counts + selection state; compact head: counts; gather sky: 3·K·4 B (CPU band only); grid: 16 B + 256 candidate pairs (2 KiB; arg-min program, default) or err cells·4 B (`argminGpu: false`); band head (default on the texture path; `bandGpu: false` = CPU band): lists + their range, band counts / K / idx / lin, 8 spot columns (no range / P(sky) planes) |
 | look-relief | I9 | default | page | per style | `look-relief` | height field H (import or relief-heights transient); params | field + gen (array path only); texture path writes textures, no readback |
 | look-textures | I9 | default | page | per settle | `look-tex` | renderer targets (geometry, photo, sky / fg masks, layer) as textures | band stats: folded ColorStats 256 B (f64: partials); haze head |
+| look-photo | I9 | default | page | per photo | `look-photo` | the engine's resident photo texture (imported) to an rgba8unorm grid texture | – |
 | photo-palette | I12 | default | page | per photo | `palette` | 64 x 64 RGBA8 thumbnail words (pooled) | k centroids + counts (the palette) |
 | roll-look | I12 | default | page | per view | `roll-look`, `roll-look-similar` | look embeddings, LOOK_DIMS floats per photo (pooled) | labels + centroids + per-group ranked ids; similar-look top-k |
 | labels | I10 | cpu | page | per emit | – | – | – |
@@ -90,6 +91,7 @@ Islands I0–I12 as in `dataflow-map.md` §5, with the GPU modules the manifest 
 - **look-stats**: WAG-4: one ComputeGraph: BAND_STATS(_SG) → luma GPUGroupAggregation fold → BAND_FINALIZE (f32); subgroups by default where available
 - **look-haze**: graph break for the f64 tail on the CPU (D18; the round trip before the grid is inherent: its inputs come from f64 code). Default: the airlight band on the GPU on the texture path (look-haze-band, one submit instead of two; D16 removed; `bandGpu: false`, WebGL / ?gpu=off / spot-check fault = CPU band) and the grid arg-min as a luma GPUProgram with a GPU indirect-gated selection (look-haze-argmin; `argminGpu: false` or a per-call check fault = whole-grid read)
 - **look-textures**: texture-input look passes; core cachedGraph group look-tex (6 per device; graphs own their constant buffers, ComputeGraph.own; compileAsync before run, a sync encode of an uncompiled graph starts compileAsync and falls back for that frame). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)
+- **look-photo**: the look bridge's photo grids (masks w x h, haze 2W x 2H) box-resampled from the photo texture (sRGB-encoded mean, strided taps) instead of the canvas photoPixels upload; runNow submit; per call for the live video texture
 - **photo-palette**: photo look: unpack kernel (RGBA8 to OKLab rows) + luma GPUKMeans in one graph; CPU twin kMeansCpu
 - **roll-look**: group-by-look: luma GPUKMeans + GPUSimilaritySearch (centroids as queries) in one graph; similarLooks is a cosine GPUSimilaritySearch
 - **labels**: CPU / DOM by nature; fed by I8's small readbacks

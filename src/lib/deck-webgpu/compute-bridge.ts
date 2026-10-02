@@ -18,9 +18,13 @@
 // - geometry: WebGpuGeometrySource.targets.geometry (rgba32float, xyz + range, 0 = sky, row 0 = top)
 //   — the very texture the query readback copies, so the inputs are the same bits;
 // - colour: the stats render's ColorTargets.color (rgba16float, linear, premultiplied);
-// - photo: rgba8unorm at each pass's grid, made once per (photo, grid) from the SAME canvas
-//   resample the CPU path uses (look/composite.ts photoPixels): a static input, not a per-pose
-//   upload, and what makes the result bit-identical (the GPU box filter ≠ drawImage);
+// - photo: rgba8unorm at each pass's grid, resampled ON THE GPU from the engine's resident photo
+//   texture (setPhotoSource; gpu/look/photo-resample.ts: box filter over sRGB-encoded bytes, one
+//   submit per (source, grid), re-run per call for the live video texture). Parity with the CPU
+//   path is tolerance level, no longer bit-identical: photoPixels' canvas drawImage resample is not
+//   reproduced (scripts/gpu/look-photo-resample-dawn.ts measures the gap against a CPU box
+//   filter). With no source texture set, or while the resample kernel is still compiling, the grid
+//   is uploaded from photoPixels as before (the CPU reference; also compute-bridge.check.ts);
 // - P(sky) / people: r8unorm, uploaded once per mask change.
 // The masks land in a bridge-owned rgba8unorm texture (ping-pong, LINEAR_CLAMP sampler) that the
 // composite samples directly (CompositeCore.setMaskTexture); stats come back as the 4-band
@@ -87,6 +91,10 @@ import { type CommandEncoder, type Device, Texture } from "@luma.gl/core";
 import { getComputeDevice } from "#/lib/gpu/device";
 import { prepAndFitHazeTex } from "#/lib/gpu/look/haze-graph";
 import { lookGpuOn, trackLook } from "#/lib/gpu/look/opt-in";
+import {
+	resamplePhotoInto,
+	warmPhotoResampleAsync,
+} from "#/lib/gpu/look/photo-resample";
 import { reliefHeights, reliefWords } from "#/lib/gpu/look/relief";
 import { reliefGraphToTextures } from "#/lib/gpu/look/relief-graph";
 import {
@@ -233,7 +241,13 @@ export class LookBridge {
 	private prepared: PreparedMasks | null = null;
 	/** masks passes recorded into a geometry render / adopted (settle-submit counters) */
 	readonly fused = { masksPrepared: 0, masksAdopted: 0, statsEncoded: 0 };
-	private photos = new Map<string, { img: HTMLImageElement; tex: Texture }>();
+	private photos = new Map<
+		string,
+		{ img: HTMLImageElement; tex: Texture; gpu: Texture | null }
+	>();
+	/** the engine's resident photo texture (the GPU resample's source) and whether it is live video */
+	private photoSource: Texture | null = null;
+	private photoLive = false;
 	private byteMasks = new Map<string, { src: Mask8; tex: Texture }>();
 	private destroyed = false;
 
@@ -242,6 +256,9 @@ export class LookBridge {
 		// build the texture-look pipelines off the main thread, so the first fused encode compiles cheaply
 		Promise.resolve(device)
 			.then(warmTextureKernelsAsync)
+			.catch(() => {});
+		Promise.resolve(device)
+			.then(warmPhotoResampleAsync)
 			.catch(() => {});
 	}
 
@@ -720,25 +737,52 @@ export class LookBridge {
 		};
 	}
 
-	/** The photo at w × h as rgba8unorm: photoPixels' bytes (the CPU path's resample), cached. */
+	/** The photo source as set (harnesses: compute-bridge.check.ts restores it after a CPU-reference run). */
+	get photoSourceState(): { tex: Texture | null; live: boolean } {
+		return { tex: this.photoSource, live: this.photoLive };
+	}
+
+	/** The engine's resident photo texture, the source of photoTexture's GPU resample (null = CPU upload). */
+	setPhotoSource(tex: Texture | null, live: boolean) {
+		this.photoSource = tex;
+		this.photoLive = live;
+	}
+
+	/**
+	 * The photo at w × h as rgba8unorm: resampled on the GPU from the photo source texture
+	 * (cached per source and size; a live source is resampled on every call), else photoPixels'
+	 * bytes (the CPU path's canvas resample, cached) when there is no source or its kernel is not
+	 * ready yet. The resample is submitted before this returns, so a graph submitted after sees it.
+	 */
 	photoTexture(img: HTMLImageElement, w: number, h: number): Texture {
 		const key = `${w}x${h}`;
 		const c = this.photos.get(key);
-		if (c?.img === img && !c.tex.destroyed) return c.tex;
-		c?.tex.destroy();
-		const tex = this.device.createTexture({
-			id: `look-bridge-photo-${key}`,
-			format: "rgba8unorm",
-			width: w,
-			height: h,
-			usage: Texture.SAMPLE | Texture.COPY_DST,
-		});
+		const alive = c && !c.tex.destroyed ? c : null;
+		const source = this.photoSource;
+		const gpuSource = source && !source.destroyed ? source : null;
+		if (gpuSource && alive?.gpu === gpuSource && !this.photoLive)
+			return alive.tex;
+		if (!gpuSource && alive && !alive.gpu && alive.img === img)
+			return alive.tex;
+		const tex =
+			alive?.tex ??
+			this.device.createTexture({
+				id: `look-bridge-photo-${key}`,
+				format: "rgba8unorm",
+				width: w,
+				height: h,
+				usage: Texture.SAMPLE | Texture.COPY_DST,
+			});
+		if (gpuSource && resamplePhotoInto(this.device, gpuSource, tex)) {
+			this.photos.set(key, { img, tex, gpu: gpuSource });
+			return tex;
+		}
 		tex.writeData(photoPixels(img, w, h).data as never, {
 			width: w,
 			height: h,
 			bytesPerRow: w * 4,
 		});
-		this.photos.set(key, { img, tex });
+		this.photos.set(key, { img, tex, gpu: null });
 		return tex;
 	}
 
@@ -799,6 +843,7 @@ export class LookBridge {
 		this.writing = [];
 		this.shown = -1;
 		this.photos.clear();
+		this.photoSource = null;
 		this.byteMasks.clear();
 		for (const t of textures) t?.destroy();
 		if (!this.device.isLost)

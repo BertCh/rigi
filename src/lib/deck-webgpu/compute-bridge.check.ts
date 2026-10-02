@@ -205,7 +205,24 @@ function hazeArrays(
 	};
 }
 
+/**
+ * The bridge's photo input is resampled on the GPU from the engine's photo texture (tolerance
+ * parity with photoPixels, gpu/look/photo-resample.ts), so the bit-for-bit comparisons below run
+ * with that source cleared: the bridge then uploads photoPixels' bytes, the same CPU reference the
+ * readback paths use. The GPU photo path's own parity is scripts/gpu/look-photo-resample-dawn.ts.
+ */
 export async function runBridgeCheck(engine: WebGpuEngine, reps = 7) {
+	const bridge = (engine as unknown as Internals).gpu?.bridge;
+	const prev = bridge?.photoSourceState;
+	bridge?.setPhotoSource(null, false);
+	try {
+		return await runBridgeCheckCpuPhoto(engine, reps);
+	} finally {
+		if (prev) bridge?.setPhotoSource(prev.tex, prev.live);
+	}
+}
+
+async function runBridgeCheckCpuPhoto(engine: WebGpuEngine, reps: number) {
 	const e = engine as unknown as Internals;
 	await engine.readback();
 	const g = e.gpu;

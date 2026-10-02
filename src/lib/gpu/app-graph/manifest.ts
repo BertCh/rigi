@@ -780,6 +780,21 @@ export const GPU_MODULES: readonly GpuModule[] = [
 			"texture-input look passes; core cachedGraph group look-tex (6 per device; graphs own their constant buffers, ComputeGraph.own; compileAsync before run, a sync encode of an uncompiled graph starts compileAsync and falls back for that frame). settleFusion (W1.2): masks submitted with the I8 query render, band stats with their layer render (core submitWithDefault)",
 	},
 	{
+		id: "look-photo",
+		island: "I9",
+		paths: ["src/lib/gpu/look/photo-resample.ts"],
+		groups: ["look-photo"],
+		realms: ["page"],
+		cadence: "per photo",
+		resources: [
+			"the engine's resident photo texture (imported) to an rgba8unorm grid texture",
+		],
+		readbacks: [],
+		status: "default",
+		notes:
+			"the look bridge's photo grids (masks w x h, haze 2W x 2H) box-resampled from the photo texture (sRGB-encoded mean, strided taps) instead of the canvas photoPixels upload; runNow submit; per call for the live video texture",
+	},
+	{
 		id: "photo-palette",
 		island: "I12",
 		paths: ["src/lib/gpu/palette/palette.ts"],

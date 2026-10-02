@@ -1000,6 +1000,7 @@ export class WebGpuEngine implements Renderer {
 		const terrain = gpu.terrain;
 		b.heightSource = () => terrain.residentHeights();
 		gpu.bridge = b;
+		b.setPhotoSource(gpu.photoTex, gpu.photoTexLive);
 		this.compLook.setSky(this.skyMaskStore);
 		this.refitHaze();
 		this.updateLook();
@@ -1060,6 +1061,7 @@ export class WebGpuEngine implements Renderer {
 		g.composite.setPhoto(tex);
 		g.drape.setPhotoTexture(tex);
 		g.photoSky.setPhoto(tex);
+		g.bridge?.setPhotoSource(tex, g.photoTexLive);
 	}
 
 	/**
