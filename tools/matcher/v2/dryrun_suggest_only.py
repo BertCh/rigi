@@ -116,7 +116,7 @@ def main(argv: list[str]) -> int:
             i += 1
     ids = ids or ["wc_0086", "wc_0074"]
     split = root / "tools/bench/split.json"
-    test = set(json.load(open(split))["test"]) if split.exists() else set()
+    test = set(json.loads(split.read_text())["test"]) if split.exists() else set()
     bad = [x for x in ids if x.startswith("w3_") or x in test]
     if bad:
         raise SystemExit(f"refused (dev ids only): {bad}")

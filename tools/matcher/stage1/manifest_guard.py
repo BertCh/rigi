@@ -54,7 +54,7 @@ def _looks_v3(path: Path, root: Path) -> bool:
     except ValueError:
         pass
     try:
-        ids = [str(e.get("id", "")) for e in json.load(open(path))]
+        ids = [str(e.get("id", "")) for e in json.loads(path.read_text())]
     except (OSError, ValueError, AttributeError, TypeError):
         return False
     return any(i.startswith("w3_") for i in ids)
