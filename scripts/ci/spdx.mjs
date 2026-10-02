@@ -12,7 +12,7 @@
 //
 // Scope: src/**/*.{ts,tsx,css}, scripts/**/*.{ts,mjs,js}, tools/**/*.{ts,mjs,js}, examples/**/*.{ts,css,html,mjs}.
 // Left out: node_modules, out, dist, dot-directories (.venv, .pylib*, .vite*), vendored or generated trees
-// (tools/matcher/stage1/vendor*, tools/bench/data*, tools/bench/final, src/routeTree.gen.ts).
+// (tools/matcher/stage1/vendor*, tools/bench/data*, tools/bench/final, src/routeTree.gen.ts and the gitignored prod-build twin src/routeTree.prod.gen.ts).
 //
 // A file that lacks the header but already mentions another licence, copyright, "ported from" or
 // "adapted from" in its first lines is SKIPPED, never rewritten: a human decides which licence and
@@ -36,7 +36,10 @@ const SKIP_PREFIXES = [
 	"tools/bench/data",
 	"tools/bench/final",
 ];
-const SKIP_FILES = new Set(["src/routeTree.gen.ts"]);
+const SKIP_FILES = new Set([
+	"src/routeTree.gen.ts",
+	"src/routeTree.prod.gen.ts",
+]);
 
 const HEADER_LINES = 5;
 const SCAN_LINES = 30;

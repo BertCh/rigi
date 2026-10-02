@@ -20,6 +20,7 @@
 			"!examples/**/dist",
 			"!examples/**/data/*.json",
 			"!src/routeTree.gen.ts",
+			"!src/routeTree.prod.gen.ts",
 			"!src/styles.css",
 			"!**/node_modules",
 			"!**/.venv",
