@@ -37,6 +37,7 @@ import type { EnuFrame } from "../../geodesy";
 import type { HeightTile } from "../../look/relief/heights";
 import { type ComputeGraph, cachedGraph } from "../core/graph";
 import { pooledStorage, pooledUniform, withLease } from "../core/pool";
+import { defineUniformBlock } from "../core/uniform-block";
 import { defineKernel } from "./kernel";
 import type { ReliefOutTextures } from "./relief-graph";
 import { buildReliefGraph, RELIEF_GRAPH_GROUP } from "./relief-graph";
@@ -57,6 +58,28 @@ const UNIT = SMALL * SMALL;
 const UNIT_BYTES = UNIT * 4;
 /** Tile row: 12 words (see the WGSL Tile struct). */
 const ROW_WORDS = 12;
+
+/** RELIEF_HEIGHTS `P` and `Tile` (the tile row is 12 scalar words, the same in storage and uniform layout). */
+export const HEIGHTS_PARAMS = defineUniformBlock({
+	res: "u32",
+	nT: "u32",
+	hole: "f32",
+	pad: "u32",
+});
+export const TILE_ROW = defineUniformBlock({
+	ax: "f32",
+	ay: "f32",
+	k: "f32",
+	S: "u32",
+	stride: "u32",
+	off: "u32",
+	i0: "i32",
+	i1: "i32",
+	j0: "i32",
+	j1: "i32",
+	p0: "u32",
+	p1: "u32",
+});
 
 export const RELIEF_HEIGHTS = /* wgsl */ `
 struct P { res: u32, nT: u32, hole: f32, pad: u32 };
@@ -279,7 +302,6 @@ export function planHeights(
 	rows.reverse(); // finest first
 
 	const buf = new ArrayBuffer(Math.max(1, rows.length) * ROW_WORDS * 4);
-	const dv = new DataView(buf);
 	const copies: LayerCopy[] = [];
 	let units = 0;
 	for (let r = 0; r < rows.length; r++) {
@@ -291,18 +313,24 @@ export function planHeights(
 		const byteOffset = units * UNIT_BYTES;
 		copies.push({ big: slot.big, layer: slot.layer, byteOffset });
 		units += slot.big ? (BIG * BIG) / UNIT : 1;
-		let o = r * ROW_WORDS * 4;
-		dv.setFloat32(o, ax, true);
-		dv.setFloat32(o + 4, ay, true);
-		dv.setFloat32(o + 8, k, true);
-		dv.setUint32(o + 12, t.size, true);
-		dv.setUint32(o + 16, P, true); // row stride of the copied layer
-		dv.setUint32(o + 20, byteOffset / 4, true);
-		o += 24;
-		for (const v of box) {
-			dv.setInt32(o, v, true);
-			o += 4;
-		}
+		new Uint8Array(buf, r * ROW_WORDS * 4, ROW_WORDS * 4).set(
+			new Uint8Array(
+				TILE_ROW.pack({
+					ax,
+					ay,
+					k,
+					S: t.size,
+					stride: P, // row stride of the copied layer
+					off: byteOffset / 4,
+					i0: box[0],
+					i1: box[1],
+					j0: box[2],
+					j1: box[3],
+				}),
+				0,
+				ROW_WORDS * 4,
+			),
+		);
 	}
 	return {
 		res,
@@ -503,12 +531,11 @@ export function reliefGraphToTexturesGpuHeights(
 			smallDepth: resident.small.depth,
 			bigDepth: resident.big.depth,
 		};
-		const uni = new ArrayBuffer(16);
-		const u = new DataView(uni);
-		u.setUint32(0, res, true);
-		u.setUint32(4, plan.nRows, true);
-		u.setFloat32(8, plan.hole, true);
-		const gp = pooledUniform(device, "look-relief-gh/prm", uni);
+		const gp = pooledUniform(
+			device,
+			"look-relief-gh/prm",
+			HEIGHTS_PARAMS.pack({ res, nT: plan.nRows, hole: plan.hole }),
+		);
 		const nodes = pooledStorage(device, "look-relief-gh/nodes", plan.nodes);
 		const rowsBuf = new Uint8Array(rowsCap * ROW_WORDS * 4);
 		rowsBuf.set(new Uint8Array(plan.rows));

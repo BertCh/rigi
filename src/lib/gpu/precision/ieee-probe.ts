@@ -30,6 +30,7 @@ import { Buffer, type Device } from "@luma.gl/core";
 import { cachedGraph } from "#/lib/gpu/core/graph";
 import { defineKernel } from "#/lib/gpu/core/kernel";
 import { pooledStorage, pooledUniform, withLease } from "#/lib/gpu/core/pool";
+import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 import {
 	bits32,
 	DF32_WGSL,
@@ -256,6 +257,14 @@ export function verifyProbe(
 
 // ---------- the kernel and the host ----------
 
+/** `U` of PROBE_WGSL. */
+export const PROBE_UNIFORM = defineUniformBlock({
+	n: "u32",
+	zero: "u32",
+	_a: "u32",
+	_b: "u32",
+});
+
 export const PROBE_WGSL = /* wgsl */ `
 struct U {
 	n: u32,
@@ -374,7 +383,7 @@ async function runProbe(device: Device): Promise<IeeeProbe> {
 				return undefined;
 			},
 		);
-		const words = new Uint32Array([n, 0, 0, 0]); // n, zero (opq), pad
+		const words = PROBE_UNIFORM.pack({ n }); // zero (opq) and pad stay 0
 		const { reads } = await graph.run(
 			{ n },
 			{

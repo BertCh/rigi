@@ -181,6 +181,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "gpu-uniform-block-look",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/core/uniform-block-look.check.ts"),
+		note: "look / precision uniform blocks (gpu/look/uniform-blocks.ts, relief-heights, ieee-probe) pack byte-identically to the former hand-packed words (edge values)",
+		timeoutS: 60,
+	},
+	{
 		id: "gpu-inspect",
 		tier: "fast",
 		group: "gpu",

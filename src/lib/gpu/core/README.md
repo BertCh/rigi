@@ -209,7 +209,7 @@ const PRM = defineUniformBlock({ n: "u32", nonce: "u32", w: "i32", h: "i32" }); 
 pooledUniform(device, `${slot}/prm`, PRM.pack({ n, nonce, w, h })); // ArrayBuffer, PRM.byteLength rounded up to 16
 ```
 
-Types are luma shader types (`f32`, `u32`, `i32`, `vec2<f32>`, `vec3<f32>`, `vec4<u32>`, `mat4x4<f32>`, ...); vec / mat values are flat number arrays; unlisted fields are zero. Field order and types must mirror the WGSL `struct`. `uniform-block.check.ts` (CI fast tier `gpu-uniform-block`) proves byte equality with the old hand packing for geo-query, silhouette and terrain-cull (including `packCullParams`). Not migrated: kernels whose params are runtime-sized arrays or storage buffers (use `pooledStorage`), and the look / horizon / align kernels, which still pack by hand.
+Types are luma shader types (`f32`, `u32`, `i32`, `vec2<f32>`, `vec3<f32>`, `vec4<u32>`, `mat4x4<f32>`, ...); vec / mat values are flat number arrays; unlisted fields are zero. Field order and types must mirror the WGSL `struct`. `uniform-block.check.ts` (CI fast tier `gpu-uniform-block`) proves byte equality with the old hand packing for geo-query, silhouette and terrain-cull (including `packCullParams`). The look kernels' blocks live in `look/uniform-blocks.ts` (plus `HEIGHTS_PARAMS` / `TILE_ROW` in `look/relief-heights.ts`, `PROBE_UNIFORM` in `precision/ieee-probe.ts`), proved by `uniform-block-look.check.ts` (`gpu-uniform-block-look`). Not migrated: kernels whose params are runtime-sized arrays or storage buffers (use `pooledStorage`), and the parts of look / horizon / align that still pack by hand (see the migration notes in the commit).
 
 ## Rules for migrating a kernel
 

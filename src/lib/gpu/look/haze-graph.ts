@@ -127,6 +127,7 @@ import {
 	hazePrepGen,
 	hazePrepTexThen,
 } from "./textures";
+import { HAZE_COUNT_PARAMS, HAZE_PASS_PARAMS } from "./uniform-blocks";
 
 const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
 const STORAGE = Buffer.STORAGE | Buffer.COPY_SRC | Buffer.COPY_DST;
@@ -379,13 +380,25 @@ export function prepGraph(
 		const head = headFor(device, N, listHead);
 		const buffers = {
 			prm: pooledUniform(device, key("prm"), words),
-			pass0: pooledUniform(device, key("pass0"), new Uint32Array([W, H, 0, 0])),
-			pass1: pooledUniform(device, key("pass1"), new Uint32Array([W, H, 1, 0])),
-			pass2: pooledUniform(device, key("pass2"), new Uint32Array([W, H, 2, 0])),
+			pass0: pooledUniform(
+				device,
+				key("pass0"),
+				HAZE_PASS_PARAMS.pack({ W, H, pass_: 0 }),
+			),
+			pass1: pooledUniform(
+				device,
+				key("pass1"),
+				HAZE_PASS_PARAMS.pack({ W, H, pass_: 1 }),
+			),
+			pass2: pooledUniform(
+				device,
+				key("pass2"),
+				HAZE_PASS_PARAMS.pack({ W, H, pass_: 2 }),
+			),
 			cprm: pooledUniform(
 				device,
 				key("cprm"),
-				new Uint32Array([N, nBlk, K, 0]),
+				HAZE_COUNT_PARAMS.pack({ N, nBlk, K }),
 			),
 			photo: up(
 				"photo",
@@ -765,7 +778,7 @@ function fitGpuPart(
 					cprm: pooledUniform(
 						device,
 						key("cprm"),
-						new Uint32Array([N, nBlk, 0, 0]),
+						HAZE_COUNT_PARAMS.pack({ N, nBlk }),
 					),
 					lin: pb.lin,
 					bins: pb.bins,
@@ -809,7 +822,7 @@ function fitGpuPart(
 						cprm: pooledUniform(
 							device,
 							key("gprm"),
-							new Uint32Array([N, nBlk, K, 0]),
+							HAZE_COUNT_PARAMS.pack({ N, nBlk, K }),
 						),
 						skyIdx: pooledStorage(device, key("skyIdx"), skyIdx),
 						lin: pb.lin,
@@ -1046,7 +1059,7 @@ function fitGpuPartBand(
 			cprm: pooledUniform(
 				device,
 				key("cprm"),
-				new Uint32Array([N, nBlk, 0, 0]),
+				HAZE_COUNT_PARAMS.pack({ N, nBlk }),
 			),
 			bprm: pooledUniform(device, key("bprm"), bandWords(W, H)),
 			lin: pb.lin,

@@ -33,6 +33,7 @@ import {
 	K_GF_V0,
 	K_GF_V1,
 } from "./guided-filter";
+import { GUIDED_PARAMS } from "./uniform-blocks";
 
 const WG = 256;
 const UNIFORM = Buffer.UNIFORM | Buffer.COPY_DST;
@@ -107,13 +108,10 @@ export function guidedFiltersGraph(
 		const gI = pooledStorage(device, "look-guided-graph/I", I);
 		const buffers: Record<string, Buffer> = { I: gI };
 		jobs.forEach((j, k) => {
-			const words = new ArrayBuffer(16);
-			new Uint32Array(words, 0, 3).set([w, h, j.r]);
-			new Float32Array(words, 12, 1)[0] = j.eps;
 			buffers[`prm${k}`] = pooledUniform(
 				device,
 				`look-guided-graph/prm${k}`,
-				words,
+				GUIDED_PARAMS.pack({ w, h, r: j.r, eps: j.eps }),
 			);
 			buffers[`p${k}`] = pooledStorage(device, `look-guided-graph/p${k}`, j.p);
 		});

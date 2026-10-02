@@ -113,6 +113,16 @@ import {
 	HZ_SEL_INIT,
 	SEL,
 } from "./haze.wgsl";
+import {
+	GUIDED_PARAMS,
+	HAZE_PASS_PARAMS,
+	HAZE_PREP_PARAMS,
+	PACK_MASKS_PARAMS,
+	TEX_HAZE_PARAMS,
+	TEX_MASKS_PARAMS,
+	TEX_PHOTO_PARAMS,
+	TEX_STATS_PARAMS,
+} from "./uniform-blocks";
 
 /** A texture input; `flipY` = its row 0 is the image's bottom row. */
 export type TexIn = Texture | { texture: Texture; flipY?: boolean };
@@ -466,8 +476,6 @@ function constants(g: ComputeGraph, owned: (Buffer | Texture)[]) {
 	};
 }
 
-const u32Words = (...v: number[]) => new Uint32Array(v).buffer;
-
 /**
  * Box footprints [x0, x1) of each of `n` output pixels over `size` source texels, in f64 as
  * haze.ts prepUploads (1 texel each when n = size).
@@ -513,16 +521,13 @@ function addPhoto(
 		{
 			prm: c.uniform(
 				`${id}-prm`,
-				u32Words(
-					w,
-					h,
-					ph,
-					photo.flip ? 1 : 0,
-					photo.texture.format === "rgba8unorm-srgb" ? 1 : 0,
-					0,
-					0,
-					0,
-				),
+				TEX_PHOTO_PARAMS.pack({
+					W: w,
+					H: h,
+					srcH: ph,
+					flip: photo.flip ? 1 : 0,
+					srgb: photo.texture.format === "rgba8unorm-srgb" ? 1 : 0,
+				}),
 			),
 			xb: c.storage(`${id}-xb`, footprints(w, pw)),
 			yb: c.storage(`${id}-yb`, footprints(h, ph)),
@@ -768,24 +773,21 @@ function masksGraph(device: Device, plan: MasksPlan) {
 			{
 				prm: c.uniform(
 					"gather-prm",
-					u32Words(
+					TEX_MASKS_PARAMS.pack({
 						w,
 						h,
 						gw,
 						gh,
 						ss,
-						+geo.flip,
-						+!!sky,
-						+!!sky?.flip,
-						sky?.texture.height ?? 1,
-						+!!fg,
-						+!!fg?.flip,
-						fg?.texture.height ?? 1,
-						+(geo.texture.format === "r32float"),
-						0,
-						0,
-						0,
-					),
+						flipGeo: +geo.flip,
+						sky: +!!sky,
+						flipSky: +!!sky?.flip,
+						skyH: sky?.texture.height ?? 1,
+						fg: +!!fg,
+						flipFg: +!!fg?.flip,
+						fgH: fg?.texture.height ?? 1,
+						geoR: +(geo.texture.format === "r32float"),
+					}),
 				),
 				tab: c.storage("gather-tab", tab),
 				photo: words,
@@ -801,10 +803,10 @@ function masksGraph(device: Device, plan: MasksPlan) {
 		const cutIn = cut ? g.importBuffer("cut", n * 4) : null;
 		const qs: GraphBufferHandle[] = [];
 		for (const j of jobs) {
-			const pw = new ArrayBuffer(16);
-			new Uint32Array(pw, 0, 3).set([w, h, j.r]);
-			new Float32Array(pw, 12, 1)[0] = j.eps;
-			const prm = c.uniform(`${j.name}-prm`, pw);
+			const prm = c.uniform(
+				`${j.name}-prm`,
+				GUIDED_PARAMS.pack({ w, h, r: j.r, eps: j.eps }),
+			);
 			const p =
 				j.name === "cov"
 					? cov
@@ -850,7 +852,14 @@ function masksGraph(device: Device, plan: MasksPlan) {
 			bindings: {
 				prm: c.uniform(
 					"pack-prm",
-					u32Words(w, h, rowWords, fmt, +!!cut, +!!fg, 0, 0),
+					PACK_MASKS_PARAMS.pack({
+						w,
+						h,
+						rowWords,
+						fmt,
+						cut: +!!cut,
+						fg: +!!fg,
+					}),
 				),
 				qc: qs[0],
 				qg: qOf("cut"),
@@ -1112,20 +1121,17 @@ function addStatsNodes(
 		{
 			prm: c.uniform(
 				"gather-prm",
-				u32Words(
+				TEX_STATS_PARAMS.pack({
 					w,
 					h,
 					gh,
-					+geo.flip,
-					+layer.flip,
-					+!!fg,
-					+!!fg?.flip,
-					fg?.texture.height ?? 1,
-					+(geo.texture.format === "r32float"),
-					0,
-					0,
-					0,
-				),
+					flipGeo: +geo.flip,
+					flipLayer: +layer.flip,
+					fg: +!!fg,
+					flipFg: +!!fg?.flip,
+					fgH: fg?.texture.height ?? 1,
+					geoR: +(geo.texture.format === "r32float"),
+				}),
 			),
 			tab: c.storage("gather-tab", tab),
 			geo: importSampled(g, "geo", geo),
@@ -1495,20 +1501,19 @@ function hazeGraph(
 				}
 			const gprm = c.uniform(
 				"gather-prm",
-				u32Words(
+				TEX_HAZE_PARAMS.pack({
 					W,
 					H,
 					gh,
-					+geo.flip,
-					+!!sky,
-					+!!sky?.flip,
-					sky?.texture.height ?? 1,
-					+!!fg,
-					+!!fg?.flip,
-					fg?.texture.height ?? 1,
-					+(geo.texture.format === "r32float"),
-					0,
-				),
+					flipGeo: +geo.flip,
+					sky: +!!sky,
+					flipSky: +!!sky?.flip,
+					skyH: sky?.texture.height ?? 1,
+					fg: +!!fg,
+					flipFg: +!!fg?.flip,
+					fgH: fg?.texture.height ?? 1,
+					geoR: +(geo.texture.format === "r32float"),
+				}),
 			);
 			const gtab = c.storage("gather-tab", tab);
 			addTexNode(
@@ -1540,16 +1545,21 @@ function hazeGraph(
 		const pxScale = W / 1024;
 		const rad = Math.max(1, Math.round(3 * pxScale));
 		const fgRad = d.hasFg ? Math.max(2, Math.round(8 * pxScale)) : 0;
-		const words = new ArrayBuffer(36);
-		new Uint32Array(words, 0, 5).set([W, H, pw, rad, fgRad]);
 		const lo = Math.log(DMIN);
-		new Float32Array(words, 20, 4).set([
-			lo,
-			Math.log(DMAX) - lo,
-			Math.max(150, DMIN),
-			DMAX,
-		]);
-		const prm = c.uniform("prep-prm", words);
+		const prm = c.uniform(
+			"prep-prm",
+			HAZE_PREP_PARAMS.pack({
+				W,
+				H,
+				pw,
+				rad,
+				fgRad,
+				lo,
+				span: Math.log(DMAX) - lo,
+				rmin: Math.max(150, DMIN),
+				rmax: DMAX,
+			}),
+		);
 		const lin = g.importBuffer("lin", N * 12);
 		const flags = g.transientBuffer("flags", N * 4);
 		const flagsH = g.transientBuffer("flagsH", N * 4);
@@ -1599,7 +1609,10 @@ function hazeGraph(
 			workgroups: [Math.ceil(SEL / 64)],
 		});
 		for (let p = 0; p < 3; p++) {
-			const pp = c.uniform(`pass${p}`, u32Words(W, H, p, 0));
+			const pp = c.uniform(
+				`pass${p}`,
+				HAZE_PASS_PARAMS.pack({ W, H, pass_: p }),
+			);
 			g.addKernel({
 				id: `clear${p}`,
 				spec: K_ZERO,
