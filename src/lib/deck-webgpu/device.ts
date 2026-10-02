@@ -19,6 +19,7 @@ import {
 	RAISED_LIMITS,
 	resetComputeDevice,
 } from "#/lib/gpu/device";
+import { deckFrameTimingsProps } from "./frame-timings";
 import { applyColorTargetFormat } from "./targets";
 
 /** Features the renderer cannot run without: rgba32float geometry targets and r32float height
@@ -198,11 +199,14 @@ export async function createWebgpuDeck(
 			),
 		DECK_DEVICE_TIMEOUT_MS,
 	);
+	let deviceRef: Device | undefined;
 	const userOnError = props.onError as ((e: Error) => void) | undefined;
 	const deck = new Deck({
 		width: null,
 		height: null,
 		controller: false,
+		...deckFrameTimingsProps(() => deviceRef),
+		...(getFlag("deckDebug") === "on" ? { debug: true } : {}),
 		...props,
 		deviceProps: {
 			type: "webgpu",
@@ -225,6 +229,7 @@ export async function createWebgpuDeck(
 				reject(e as Error);
 				return;
 			}
+			deviceRef = d;
 			adoptForCompute(d);
 			resolve(d);
 			(props.onDeviceInitialized as ((d: Device) => void) | undefined)?.(d);

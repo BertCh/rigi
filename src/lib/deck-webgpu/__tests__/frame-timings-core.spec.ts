@@ -7,6 +7,7 @@ import {
 	buildFrameTimings,
 	QueryRing,
 	RollingFrameMean,
+	RollingMean,
 } from "../frame-timings-core";
 
 const makeRing = (size = 2, maxPasses = 3) => {
@@ -131,5 +132,36 @@ describe("RollingFrameMean", () => {
 		expect(m.mean().totalGpuMs).toBe(3);
 		m.reset();
 		expect(m.mean()).toEqual({ passes: [], totalGpuMs: 0, frames: 0 });
+	});
+});
+
+describe("RollingFrameMean.addPass and RollingMean", () => {
+	it("addPass records a per-pass sample without touching totals", () => {
+		const m = new RollingFrameMean();
+		m.add({
+			frame: 1,
+			passes: [{ name: "geometry", gpuMs: 2 }],
+			totalGpuMs: 2,
+		});
+		m.addPass("deck-layers", 1);
+		m.addPass("deck-layers", 3);
+		const mean = m.mean();
+		expect(mean.frames).toBe(1);
+		expect(mean.totalGpuMs).toBe(2);
+		expect(mean.passes).toEqual([
+			{ name: "geometry", gpuMs: 2 },
+			{ name: "deck-layers", gpuMs: 2 },
+		]);
+	});
+
+	it("RollingMean averages the last window samples", () => {
+		const m = new RollingMean(2);
+		m.add(1);
+		m.add(3);
+		m.add(5);
+		expect(m.mean()).toBe(4);
+		expect(m.count).toBe(2);
+		m.reset();
+		expect(m.mean()).toBe(0);
 	});
 });

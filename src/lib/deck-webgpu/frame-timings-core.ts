@@ -22,6 +22,10 @@ export type FrameTimings = {
 	passes: PassTiming[];
 	/** Sum of the timed passes (idle gaps between passes are not included). */
 	totalGpuMs: number;
+	/** Where the sample comes from: Rigi's own passes (default) or deck.gl's `_onFrameTimings`. */
+	source?: "rigi" | "deck";
+	/** Deck samples only: deck's CPU time for the draw. */
+	cpuMs?: number;
 };
 
 /** A timed pass: where its two timestamps go. */
@@ -142,6 +146,16 @@ export class RollingFrameMean {
 		}
 	}
 
+	/** A per-pass sample from another source (deck's layers pass); totals and `frames` are untouched. */
+	addPass(name: string, ms: number) {
+		let samples = this.perPass.get(name);
+		if (!samples) {
+			samples = [];
+			this.perPass.set(name, samples);
+		}
+		push(samples, Number.isFinite(ms) && ms > 0 ? ms : 0, this.window);
+	}
+
 	mean(): { passes: PassTiming[]; totalGpuMs: number; frames: number } {
 		return {
 			passes: [...this.perPass].map(([name, samples]) => ({
@@ -156,6 +170,33 @@ export class RollingFrameMean {
 	reset() {
 		this.perPass.clear();
 		this.totals = [];
+	}
+}
+
+/** Rolling mean of one scalar over the last `window` samples (deck's CPU time per draw). */
+export class RollingMean {
+	private samples: number[] = [];
+
+	constructor(private readonly window = MEAN_WINDOW) {}
+
+	add(value: number) {
+		push(
+			this.samples,
+			Number.isFinite(value) && value > 0 ? value : 0,
+			this.window,
+		);
+	}
+
+	mean() {
+		return average(this.samples);
+	}
+
+	get count() {
+		return this.samples.length;
+	}
+
+	reset() {
+		this.samples = [];
 	}
 }
 

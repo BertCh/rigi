@@ -4,9 +4,11 @@
 
 // Per-render-pass GPU frame timings for the WebGPU engine (opt-in: `?gpuFrameTimings=on`).
 //
-// Why here and not in vendored deck.gl (PR #10778, `_onFrameTimings`, in the rigi.2 vendor but unused): deck times only its own
-// layers pass, while Rigi's geometry and colour passes run from an effect's preRender (hosts/deck.ts)
-// and are invisible to it. Here every pass the hosts open through hosts/passes.ts asks
+// deck.gl's own `_onFrameTimings` (PR #10778, vendored) IS wired behind the same flag
+// (deckFrameTimingsProps, spread into both engines' Deck props): deck's layers-pass GPU time shows up
+// as the pass "deck-layers" and deck's CPU time is tracked separately (`deckCpuMs`). Rigi's geometry
+// and colour passes still need this module: they run from an effect's preRender (hosts/deck.ts) and
+// are invisible to deck's timer. Here every pass the hosts open through hosts/passes.ts asks
 // `passProps(name)` for timestamp writes; the ring / cap / aggregation logic is in
 // frame-timings-core.ts (pure, node-checked), and the query-set pooling follows deck's FrameTimer.
 //
@@ -27,6 +29,7 @@ import {
 	MAX_TIMED_PASSES,
 	QueryRing,
 	RollingFrameMean,
+	RollingMean,
 } from "./frame-timings-core";
 
 export type { FrameTimings, PassTiming } from "./frame-timings-core";
@@ -82,13 +85,61 @@ export function passTimestamps(
 	return timers.get(device)?.passProps(name) ?? NO_PROPS;
 }
 
+export type DeckTimingsSummary = {
+	cpuMs: number;
+	gpuMs: number | null;
+	frames: number;
+};
+export type DeckTimingsSample = { cpuTime: number; gpuTime?: number };
+
+/** Deck-only rolling means (no Rigi timer attached: the WebGL engine). */
+const deckOnly = { cpu: new RollingMean(), gpu: new RollingMean() };
+
+/** Props to spread into a Deck: deck's `_onFrameTimings` while `gpuFrameTimings` is on, else `{}`. */
+export function deckFrameTimingsProps(device?: () => Device | undefined) {
+	if (getFlag("gpuFrameTimings") !== "on") return {};
+	return {
+		_onFrameTimings: (timings: DeckTimingsSample) =>
+			recordDeckFrameTimings(timings, device?.()),
+	};
+}
+
+/** One deck draw's timings: into the device's timer when attached, else the deck-only mean. */
+export function recordDeckFrameTimings(
+	timings: DeckTimingsSample,
+	device?: Device,
+) {
+	const timer = device ? timers.get(device) : undefined;
+	if (timer) return timer.recordDeck(timings);
+	deckOnly.cpu.add(timings.cpuTime);
+	if (timings.gpuTime !== undefined) deckOnly.gpu.add(timings.gpuTime);
+}
+
 /** The latest sample and rolling mean of the attached timer (dev inspector). Null when none. */
 export function currentFrameTimings() {
-	if (!current) return null;
+	const deck: DeckTimingsSummary | null = current
+		? current.deckSummary()
+		: deckOnly.cpu.count
+			? {
+					cpuMs: deckOnly.cpu.mean(),
+					gpuMs: deckOnly.gpu.count ? deckOnly.gpu.mean() : null,
+					frames: deckOnly.cpu.count,
+				}
+			: null;
+	if (!current) {
+		if (!deck) return null;
+		return {
+			latest: null,
+			mean: { passes: [], totalGpuMs: 0, frames: 0 },
+			disabledReason: null,
+			deck,
+		};
+	}
 	return {
 		latest: current.latest,
 		mean: current.mean(),
 		disabledReason: current.disabledReason,
+		deck,
 	};
 }
 
@@ -103,6 +154,9 @@ export class GpuFrameTimings {
 	private readonly ring: QueryRing<ReturnType<Device["createQuerySet"]>>;
 	private readonly rolling = new RollingFrameMean();
 	private readonly listeners = new Set<FrameTimingsListener>();
+	private readonly deckCpu = new RollingMean();
+	private readonly deckGpu = new RollingMean();
+	private lastFrame = 0;
 	private lease: FrameLease<ReturnType<Device["createQuerySet"]>> | null = null;
 	private destroyed = false;
 
@@ -120,6 +174,7 @@ export class GpuFrameTimings {
 
 	/** Start timing the frame about to be recorded. An unfinished frame is dropped. */
 	beginFrame(frame: number) {
+		this.lastFrame = frame;
 		this.abortFrame();
 		if (this.disabledReason || this.destroyed) return;
 		this.lease = this.ring.begin(frame);
@@ -190,6 +245,38 @@ export class GpuFrameTimings {
 	onFrameTimings(listener: FrameTimingsListener): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
+	}
+
+	/** Rolling mean of deck's own CPU time per draw (deck `_onFrameTimings`). */
+	get deckCpuMs() {
+		return this.deckCpu.mean();
+	}
+
+	/** Deck's CPU and layers-pass GPU means, null before the first deck sample. */
+	deckSummary(): DeckTimingsSummary | null {
+		if (!this.deckCpu.count) return null;
+		return {
+			cpuMs: this.deckCpu.mean(),
+			gpuMs: this.deckGpu.count ? this.deckGpu.mean() : null,
+			frames: this.deckCpu.count,
+		};
+	}
+
+	/** Deck's `_onFrameTimings`: its layers pass joins the per-pass mean as "deck-layers". */
+	recordDeck(timings: DeckTimingsSample) {
+		this.deckCpu.add(timings.cpuTime);
+		const gpuMs = timings.gpuTime;
+		if (gpuMs === undefined) return;
+		this.deckGpu.add(gpuMs);
+		this.rolling.addPass("deck-layers", gpuMs);
+		const sample: FrameTimings = {
+			frame: this.lastFrame,
+			passes: [{ name: "deck-layers", gpuMs }],
+			totalGpuMs: gpuMs,
+			source: "deck",
+			cpuMs: timings.cpuTime,
+		};
+		for (const listener of this.listeners) listener(sample);
 	}
 
 	/** Rolling mean over the last 60 timed frames, per pass name and in total. */

@@ -50,6 +50,7 @@ type FrameTimingsView = {
 		frames: number;
 	};
 	disabledReason: string | null;
+	deck?: { cpuMs: number; gpuMs: number | null; frames: number } | null;
 };
 
 /** Rolling per-pass GPU times of the WebGPU engine (?gpuFrameTimings=on, same tab as the photo). */
@@ -76,7 +77,7 @@ function FrameTimingsPanel() {
 			{!view ? (
 				<p className="mt-1 text-white/55">
 					Off: open the photo with ?gpuFrameTimings=on on a WebGPU device with
-					timestamp-query.
+					timestamp-query (also covers deck.gl's own timings).
 				</p>
 			) : (
 				<p className="mt-1 text-white/55">
@@ -86,6 +87,11 @@ function FrameTimingsPanel() {
 							{p.name} {p.gpuMs.toFixed(3)} ms
 						</span>
 					))}
+					{view.deck && (
+						<span className="ml-4">
+							deck cpu {view.deck.cpuMs.toFixed(3)} ms
+						</span>
+					)}
 					<span className="ml-4">
 						total {view.mean.totalGpuMs.toFixed(3)} ms
 					</span>

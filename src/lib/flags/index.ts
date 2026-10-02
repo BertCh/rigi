@@ -79,9 +79,18 @@ export const FLAG_SCHEMA = {
 	 * WebGPU engine: per-render-pass GPU timings (deck-webgpu/frame-timings.ts, deck.gl PR #10778's idea
 	 * for Rigi's own geometry / colour / screen passes). on = timestamp writes on those passes and a
 	 * FrameTimings sample per frame (engine.onFrameTimings, /dev/graph); needs the device feature
-	 * 'timestamp-query'. Off (default) = no query sets, render pass descriptors unchanged.
+	 * 'timestamp-query'. Also wires deck.gl's `_onFrameTimings` on both engines: deck's layers pass
+	 * GPU time ("deck-layers") and deck CPU time. Off (default) = no query sets, descriptors unchanged.
 	 */
 	gpuFrameTimings: onOff("off"),
+	/**
+	 * deck.gl `debug` prop (deck PR #10782, vendored rigi.2+): on = Deck({debug: true}) on both engines'
+	 * Deck instances (deck-webgpu/device.ts createWebgpuDeck, deck/engine.ts createDeck): deck's debug
+	 * checks and luma device creation with `debug: true` (luma validation / error logging; on WebGL the
+	 * optional `@luma.gl/webgl/debug` tools are not loaded by Rigi). Slow; for diagnosing only.
+	 * off (default) = deck's default.
+	 */
+	deckDebug: onOff("off"),
 	/**
 	 * WebGPU batched terrain: replay the GPU-culled terrain draws (geometry + colour passes) from
 	 * recorded render bundles instead of re-encoding them every frame (CPU encode cost only; pixels

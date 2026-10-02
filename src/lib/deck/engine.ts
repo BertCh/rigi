@@ -29,6 +29,8 @@ import {
 	OrthographicView,
 } from "@deck.gl/core";
 import type { Device, Texture } from "@luma.gl/core";
+import { deckFrameTimingsProps } from "#/lib/deck-webgpu/frame-timings";
+import { getFlag } from "#/lib/flags";
 import {
 	type AlignResult,
 	buildEdgeMap,
@@ -637,6 +639,8 @@ export class DeckEngine implements Renderer {
 		const map = this.step?.map;
 		return new Deck({
 			canvas,
+			...deckFrameTimingsProps(),
+			...(getFlag("deckDebug") === "on" ? { debug: true } : {}),
 			// null: never touch the canvas' CSS size (PhotoWorkspace sizes it); the canvas context
 			// follows its client size
 			width: null,
