@@ -233,7 +233,7 @@ describe("?nearfield=complete flag", () => {
 	it("is accepted by the flag table and read by completionEnabled only", () => {
 		withFlags({ nearfield: "complete" });
 		expect(completionEnabled()).toBe(true);
-		for (const v of ["on", "sharp", "auto", "off"]) {
+		for (const v of ["on", "auto", "off"]) {
 			withFlags({ nearfield: v });
 			expect(completionEnabled()).toBe(false);
 		}

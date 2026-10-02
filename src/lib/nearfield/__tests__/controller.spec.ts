@@ -6,9 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { withFlags } from "#/test/helpers";
 import type { PhotoMeta } from "../../photos";
 import { ANCHOR_LOW_TRUST } from "../anchor";
-import type { NearFieldClient } from "../client";
+import type { NearFieldSource } from "../client";
 import {
-	gaussianModelFromUrl,
 	LOW_TRUST_QUALITY,
 	NearFieldController,
 	type NearFieldHost,
@@ -51,8 +50,7 @@ function controller(
 	host: FakeHost = fakeHost(),
 ) {
 	return new NearFieldController(host, photo(), {
-		client: client as unknown as NearFieldClient,
-		gaussianModel: "lift",
+		client: client as unknown as NearFieldSource,
 	});
 }
 
@@ -226,8 +224,7 @@ describe("NearFieldController.available", () => {
 		delete host.setNearField;
 		const client = fakeClient(() => depthMap());
 		const c = new NearFieldController(host as NearFieldHost, photo(), {
-			client: client as unknown as NearFieldClient,
-			gaussianModel: "lift",
+			client: client as unknown as NearFieldSource,
 		});
 		expect(c.supported).toBe(false);
 		expect(await c.available()).toBe(false);
@@ -265,13 +262,17 @@ describe("poseKey", () => {
 	});
 });
 
-describe("gaussianModelFromUrl", () => {
-	it("SHARP (research-only weights) only in a dev build", () => {
-		withFlags({ nearfield: "sharp" });
-		expect(gaussianModelFromUrl(true)).toBe("sharp");
-		expect(gaussianModelFromUrl(false)).toBe("lift");
-		expect(console.warn).toHaveBeenCalled();
+describe("no research-only path", () => {
+	it("always lifts the depth: the export names the depth model, never SHARP", async () => {
 		withFlags({ nearfield: "on" });
-		expect(gaussianModelFromUrl(true)).toBe("lift");
+		const client = fakeClient(() => depthMap());
+		const c = controller(client);
+		const scene = await c.build();
+		expect(client.gaussiansWithMeta).toHaveBeenCalledWith(
+			expect.any(Blob),
+			expect.objectContaining({ model: "lift" }),
+		);
+		expect(c.state.researchOnly ?? false).toBe(false);
+		if (scene) expect(scene.model).toMatch(/-lift$/);
 	});
 });

@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Client for the optional near-field service (tools/nearfield, default http://127.0.0.1:8767).
-// Like matcher-client.ts: everything degrades to `false` / `null` when the service isn't running; it never throws.
+// Step Inside's near-field source. The default (`nearField`) is the in-browser one
+// (./local/client.ts: MoGe-2 ViT-S on src/lib/nn + the depth lift on the compute graph). NearFieldClient
+// below is the HTTP client of the legacy Python service (tools/nearfield, default http://127.0.0.1:8767),
+// kept for parity work until the service is removed; nothing in the app uses it by default.
+// Both degrade to `false` / `null` on failure; they never throw.
+import { localNearField } from "./local/client";
 import { parseSplatSync } from "./splat-loaders";
 import {
 	type GaussianCloud,
@@ -29,7 +33,7 @@ export type DepthModel = "moge2" | "da3";
 export type GaussianModel = "sharp" | "lift";
 export type RequestOpts = { signal?: AbortSignal; timeoutMs?: number };
 /** /gaussians X-NearField-Meta (service-defined; only the fields the client relies on are typed). */
-type GaussianMeta = {
+export type GaussianMeta = {
 	width?: number;
 	height?: number;
 	intrinsicsNorm?: { fx: number; fy: number; cx: number; cy: number };
@@ -298,5 +302,33 @@ export class NearFieldClient {
 	}
 }
 
-/** Shared default client (VITE_NEARFIELD_URL, else NEARFIELD_URL_DEFAULT). */
-export const nearField = new NearFieldClient();
+/** What Step Inside and the roll spot need from a near-field source (both clients satisfy it). */
+export type NearFieldSource = {
+	available(force?: boolean): Promise<boolean>;
+	depth(
+		image: Blob,
+		opts?: RequestOpts & {
+			model?: DepthModel;
+			maxSide?: number;
+			/** progress text (model download, inference); the HTTP client ignores it */
+			onProgress?: (message: string) => void;
+		},
+	): Promise<NearFieldDepth | null>;
+	gaussiansWithMeta(
+		image: Blob,
+		opts?: RequestOpts & {
+			model?: GaussianModel;
+			onProgress?: (message: string) => void;
+		},
+	): Promise<{ cloud: GaussianCloud; meta: GaussianMeta } | null>;
+	multiview(
+		images: Blob[],
+		opts?: RequestOpts & { poses?: unknown },
+	): Promise<NearFieldMultiView | null>;
+};
+
+/** The legacy service's HTTP client (VITE_NEARFIELD_URL, else NEARFIELD_URL_DEFAULT): dev parity only. */
+export const serviceNearField = new NearFieldClient();
+
+/** Step Inside's default source: in the browser (./local/client.ts). */
+export const nearField: NearFieldSource = localNearField;

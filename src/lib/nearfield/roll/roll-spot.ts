@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Browser glue for roll spots: RollMapEngine (DEM range buffers, people masks, poses in the roll frame)
-// + the near-field service (/multiview DA3 with the Rigi poses, or per-photo /depth) → fuseSpot → a
+// + per-photo depth (nearField: in the browser by default; /multiview DA3 only via the legacy service) → fuseSpot → a
 // DeckSplatLayer on the roll map (the "Spot 3D" toggle in RollMap.tsx). Lazy-loaded; nothing here runs
 // unless the toggle is switched on.
 import type { Pose } from "../../camera";
@@ -13,8 +13,8 @@ import type { RollMapEngine } from "../../roll/map/roll-map";
 import type { Roll, RollPhoto } from "../../roll/types";
 import {
 	type DepthModel,
-	type NearFieldClient,
 	type NearFieldMultiView,
+	type NearFieldSource,
 	nearField,
 } from "../client";
 import { DeckSplatLayer } from "../deck-splat-layer";
@@ -45,8 +45,11 @@ import {
 export type SpotDepthSource = "multiview" | "multiview-joint" | "moge2" | "da3";
 
 export type RollSpotOpts = SpotOpts & {
-	client?: NearFieldClient;
-	/** "multiview" (default): one /multiview DA3 call with the poses; else per-photo /depth. */
+	client?: NearFieldSource;
+	/**
+	 * "moge2" (default): per-photo depth (in the browser: MoGe-2 ViT-S, nearfield/local). "multiview" /
+	 * "multiview-joint" / "da3" need the legacy service (serviceNearField): DA3 has no browser port.
+	 */
 	depth?: SpotDepthSource;
 	/** Send the Rigi poses as known poses to /multiview. Default true. */
 	posed?: boolean;
@@ -134,7 +137,7 @@ export async function buildRollSpot(
 	const client = opts.client ?? nearField;
 	const status = opts.onStatus ?? (() => {});
 	const long = opts.pixelsLong ?? 1024;
-	const mode = opts.depth ?? "multiview";
+	const mode = opts.depth ?? "moge2";
 	if (!ids.length) return null;
 	if (!(await client.available())) {
 		status("near-field service unavailable");

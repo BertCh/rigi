@@ -4,9 +4,10 @@
 
 // Step Inside orchestration for one photo in the workspace (reports/step-inside-design.md).
 //
-//   available()  → the optional near-field service is up (nearField.available(); never throws)
-//   build()      → /depth (moge2) + /gaussians (lift; 'sharp' only behind ?nearfield=sharp, research-only)
-//                  for the photo (cached per photo), the renderer's DEM range grid for the current pose
+//   available()  → the in-browser near-field source can run (nearField.available(): WebGPU + the depth
+//                  model's weights reachable; never throws)
+//   build()      → depth (MoGe-2 ViT-S on src/lib/nn) + the depth lift (graph kernel), in the browser
+//                  (./local/client.ts), for the photo (cached per photo), the renderer's DEM range grid for the current pose
 //                  (after readback()), the engine's sky / people masks when it has them
 //                  → buildNearFieldScene (public signature only) → the measure grid → cached per photo+pose
 //   show()/hide() → renderer.setNearField(scene | null, opts)
@@ -17,11 +18,7 @@ import type { Pose } from "../camera";
 import type { EnuFrame } from "../geodesy";
 import type { PhotoMeta } from "../photos";
 import { ANCHOR_LOW_TRUST } from "./anchor";
-import {
-	nearField as defaultClient,
-	type GaussianModel,
-	type NearFieldClient,
-} from "./client";
+import { nearField as defaultClient, type NearFieldSource } from "./client";
 import {
 	completeScene,
 	completionEnabled,
@@ -139,7 +136,7 @@ export type NearFieldState = {
 	/** Depth model and gaussian source actually used. */
 	depthModel?: string;
 	gaussians?: string;
-	/** True when the research-only SHARP weights produced the splats. */
+	/** True when research-only weights produced the splats (never: SHARP was dropped with the service). */
 	researchOnly?: boolean;
 	seconds?: number;
 };
@@ -158,21 +155,6 @@ const PHOTO_CACHE_MAX = 4;
 export function poseKey(p: Pose, eye: { x: number; y: number; z: number }) {
 	const f = (x: number) => x.toFixed(4);
 	return `${f(p.yaw)}|${f(p.pitch)}|${f(p.roll)}|${f(p.vfov)}|${eye.x.toFixed(2)},${eye.y.toFixed(2)},${eye.z.toFixed(2)}`;
-}
-
-/**
- * Dev flag: ?nearfield=sharp uses Apple SHARP for the splats. Its weights are research-only (Apple ML
- * Research Model License, no product use: reports/licences.md), so production builds always lift.
- */
-export function gaussianModelFromUrl(
-	dev = !!import.meta.env?.DEV,
-): GaussianModel {
-	if (getFlag("nearfield") !== "sharp") return "lift";
-	if (dev) return "sharp";
-	console.warn(
-		"[nearfield] ?nearfield=sharp is dev-only (research-only weights); using the depth lift",
-	);
-	return "lift";
 }
 
 async function photoBlob(
@@ -196,8 +178,7 @@ async function photoBlob(
 export class NearFieldController {
 	readonly photo: PhotoMeta;
 	readonly host: NearFieldHost;
-	readonly client: NearFieldClient;
-	readonly gaussianModel: GaussianModel;
+	readonly client: NearFieldSource;
 	state: NearFieldState = { phase: "idle" };
 	/** The scene for the current pose (null until built, or when hidden for low quality). */
 	scene: MeasurableScene | null = null;
@@ -215,12 +196,11 @@ export class NearFieldController {
 	constructor(
 		host: NearFieldHost,
 		photo: PhotoMeta,
-		opts: { client?: NearFieldClient; gaussianModel?: GaussianModel } = {},
+		opts: { client?: NearFieldSource } = {},
 	) {
 		this.host = host;
 		this.photo = photo;
 		this.client = opts.client ?? defaultClient;
-		this.gaussianModel = opts.gaussianModel ?? gaussianModelFromUrl();
 	}
 
 	get supported(): boolean {
@@ -255,7 +235,7 @@ export class NearFieldController {
 		)
 			this.set({
 				phase: "unavailable",
-				message: "near-field service is not running",
+				message: "Step Inside needs WebGPU and its depth model",
 			});
 		else if (ok && this.state.phase === "unavailable")
 			this.set({ phase: "idle" });
@@ -273,30 +253,36 @@ export class NearFieldController {
 	}
 
 	private photoKey() {
-		return `${this.photo.id}|${this.photo.src}|${this.gaussianModel}`;
+		return `${this.photo.id}|${this.photo.src}`;
 	}
 
-	private fetchPhotoData(signal?: AbortSignal): Promise<PhotoData | null> {
+	private fetchPhotoData(
+		signal?: AbortSignal,
+		onProgress?: (message: string) => void,
+	): Promise<PhotoData | null> {
 		const key = this.photoKey();
 		let p = PHOTO_CACHE.get(key);
 		if (!p) {
 			p = (async () => {
 				const blob = await photoBlob(this.photo, this.host.photoElement);
 				if (!blob) return null;
-				// sequential: the service serialises inference anyway, and /gaussians lift reuses the cached depth
-				const depth = await this.client.depth(blob, { model: "moge2", signal });
+				// sequential: the lift reuses the photo's cached depth
+				const depth = await this.client.depth(blob, {
+					model: "moge2",
+					signal,
+					onProgress,
+				});
 				if (!depth) return null;
 				const g = await this.client.gaussiansWithMeta(blob, {
-					model: this.gaussianModel,
+					model: "lift",
 					signal,
+					onProgress,
 				});
 				return {
 					depth,
 					cloud: g?.cloud ?? null,
 					cloudK: g?.meta.intrinsicsNorm ?? null,
-					gaussians: g
-						? `${this.gaussianModel}${this.gaussianModel === "sharp" ? " (research-only)" : ""}`
-						: "client depth-lift",
+					gaussians: g ? "lift" : "client depth-lift",
 				};
 			})();
 			PHOTO_CACHE.set(key, p);
@@ -340,10 +326,13 @@ export class NearFieldController {
 					: "Estimating depth (MoGe-2)",
 			});
 			try {
-				const data = await this.fetchPhotoData(signal);
+				const data = await this.fetchPhotoData(signal, (message) => {
+					if (this.state.phase === "loading" && this.runSeq === runId)
+						this.set({ phase: "loading", message });
+				});
 				if (signal?.aborted || this.disposed) return bail();
 				if (!data) {
-					this.set({ phase: "error", message: "near-field service failed" });
+					this.set({ phase: "error", message: "depth estimation failed" });
 					return null;
 				}
 				this.set({ phase: "loading", message: "Anchoring to the terrain" });
@@ -424,10 +413,8 @@ export class NearFieldController {
 					frame: this.host.frame,
 				};
 				scene.measure = { ...buildMeasureGrid(scene, ctx), ...ctx };
-				// the export's licence line: SHARP splats, or a depth-lift of the depth model
-				scene.model = data.gaussians.startsWith("sharp")
-					? "sharp"
-					: `${depth.model}-lift`;
+				// the export's licence line: a depth-lift of the depth model
+				scene.model = `${depth.model}-lift`;
 				(scene as MeasurableScene & { meta?: unknown }).meta = {
 					depthModel: depth.model,
 					gaussians: data.gaussians,
@@ -474,8 +461,7 @@ export class NearFieldController {
 			objectPixels: scene.split.counts[PixelClass.Object] ?? 0,
 			depthModel: meta.depthModel,
 			gaussians: meta.gaussians,
-			researchOnly:
-				this.gaussianModel === "sharp" && !!meta.gaussians?.startsWith("sharp"),
+			researchOnly: false,
 			seconds: meta.seconds,
 		};
 		if (!(q >= ANCHOR_MIN_QUALITY)) {
