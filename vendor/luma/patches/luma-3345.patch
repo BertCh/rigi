@@ -1,0 +1,212 @@
+diff --git a/docs/api-reference/core/device.md b/docs/api-reference/core/device.md
+index ea859e918..a4a5d7d42 100644
+--- a/docs/api-reference/core/device.md
++++ b/docs/api-reference/core/device.md
+@@ -90,7 +90,7 @@ Specifies props to use when luma creates the device.
+ | `id?: string` | `null` | Optional string id, mainly intended for debugging. |
+ | `createCanvasContext?: CanvasContextProps` \| `true` | [CanvasContexProps][canvas-context-props] | Create a default `CanvasContext` for the new `Device`. `true` creates a context with default props. |
+ | `powerPreference?: string` | `'high-performance'` | `'default' \| 'high-performance' \| 'low-power'` (WebGL). |
+-| `featureLevel?: 'core' \| 'max' \| 'compatibility' \| 'best-available'` | `'core'` | WebGPU feature/limit profile to request. `'core'` is the portable default; `'max'` requests every supported adapter feature and limit; `'compatibility'` opts into compatibility mode; `'best-available'` upgrades a compatibility adapter to core when available. WebGL and null devices ignore this prop. |
++| `featureLevel?: 'core' \| 'max' \| 'compatibility' \| 'best-available'` | `'core'` | WebGPU feature/limit profile to request. `'core'` is the portable default; `'max'` requests every supported adapter feature and limit; `'compatibility'` opts into compatibility mode validation and requests every supported adapter limit; `'best-available'` does the same and upgrades a compatibility adapter to core when available. WebGL and null devices ignore this prop. |
+ | `optionalFeatures?: WebGPUDeviceFeature[]` | `[]` | WebGPU device features to request in addition to the selected profile. Unsupported entries are ignored. Use this for targeted capabilities such as `'subgroups'` without enabling the full `'max'` profile. |
+ | `requiredLimits?: Partial<Record<keyof DeviceLimits, number>>` | `undefined` | WebGPU device limits to request, using the same names as `device.limits`. The device gets exactly the requested value when it is better than the WebGPU spec default (for example above the default 8 `maxStorageBuffersPerShaderStage`), which lets a high-end development GPU enforce the limits the application targets. Values worse than the spec default are raised to the default, so this cannot make a device stricter than the spec defaults. Values the adapter cannot provide, and limit names the browser does not support, make device creation fail. Applied on top of `featureLevel: 'max'` (requested values override). Ignored by `attach()`, which wraps an existing device, and by WebGL and null devices. |
+ | `xrCompatible?: boolean` | `false` | Request a WebGPU adapter that can present frames to a WebXR session. Standard adapter requests remain unchanged unless this is enabled. |
+diff --git a/docs/whats-new.md b/docs/whats-new.md
+index 0d0b42d2f..73d3e9cc4 100644
+--- a/docs/whats-new.md
++++ b/docs/whats-new.md
+@@ -21,6 +21,7 @@ Target Release Date: Q3, 2026
+ **@luma.gl/core**
+ 
+ - **Targeted WebGPU limits** - `DeviceProps.requiredLimits` requests specific WebGPU device limits, such as `maxStorageBuffersPerShaderStage`, without taking every adapter limit and feature through `featureLevel: 'max'`. A development GPU then enforces the limits the application targets.
++- **Usable WebGPU compatibility limits** - `featureLevel: 'compatibility'` and `'best-available'` request the adapter's supported limits instead of the compatibility defaults, so storage buffers in vertex shaders and 256-thread workgroups work on compatibility devices whose hardware supports them. WebGPU textures also declare `textureBindingViewDimension`, so cube maps can be bound as cube views in compatibility mode.
+ 
+ **@luma.gl/gpgpu**
+ 
+diff --git a/modules/core/src/adapter/device.ts b/modules/core/src/adapter/device.ts
+index 5aa2863fc..8bea0014b 100644
+--- a/modules/core/src/adapter/device.ts
++++ b/modules/core/src/adapter/device.ts
+@@ -390,7 +390,7 @@ export type DeviceProps = {
+   powerPreference?: 'default' | 'high-performance' | 'low-power';
+   /** Hints that device creation should fail if no hardware GPU is available (if the system performance is "low"). */
+   failIfMajorPerformanceCaveat?: boolean;
+-  /** WebGPU only: selects the feature/limit profile. Defaults to `'core'`; use `'max'` to request every supported adapter feature and limit, `'compatibility'` to opt into compatibility mode, or `'best-available'` to upgrade a compatibility adapter to core when possible. */
++  /** WebGPU only: selects the feature/limit profile. Defaults to `'core'`; use `'max'` to request every supported adapter feature and limit, `'compatibility'` to opt into compatibility mode with every supported adapter limit, or `'best-available'` to upgrade a compatibility adapter to core when possible. */
+   featureLevel?: WebGPUFeatureLevel;
+   /** WebGPU only: additional supported device features to request without enabling the full `'max'` profile. Unsupported entries are ignored. */
+   optionalFeatures?: readonly WebGPUDeviceFeature[];
+diff --git a/modules/webgpu/src/adapter/resources/webgpu-texture.ts b/modules/webgpu/src/adapter/resources/webgpu-texture.ts
+index dcb18adab..22545a74d 100644
+--- a/modules/webgpu/src/adapter/resources/webgpu-texture.ts
++++ b/modules/webgpu/src/adapter/resources/webgpu-texture.ts
+@@ -58,6 +58,8 @@ export class WebGPUTexture extends Texture {
+         },
+         usage: this.props.usage || Texture.TEXTURE | Texture.COPY_DST,
+         dimension: this.baseDimension,
++        // Compatibility mode only binds views that match this dimension (e.g. cube maps)
++        textureBindingViewDimension: this.dimension,
+         format: getWebGPUTextureFormat(this.format),
+         mipLevelCount: this.mipLevels,
+         sampleCount: this.props.samples
+diff --git a/modules/webgpu/src/adapter/webgpu-adapter.ts b/modules/webgpu/src/adapter/webgpu-adapter.ts
+index 55cd821e4..febad3eb2 100644
+--- a/modules/webgpu/src/adapter/webgpu-adapter.ts
++++ b/modules/webgpu/src/adapter/webgpu-adapter.ts
+@@ -79,6 +79,24 @@ export function getRequiredWebGPULimits(
+   return requiredLimits;
+ }
+ 
++/**
++ * Returns the limits to request for a feature level.
++ * Compatibility devices otherwise receive the low compatibility defaults (for example zero
++ * vertex-stage storage buffers) even when the adapter supports far more.
++ * @param supportedLimits Limits exposed by the selected WebGPU adapter.
++ * @param featureLevel Requested WebGPU feature level.
++ * @param requiredLimits Explicitly requested limits, which override adapter maximums.
++ * @returns Limits to forward through `GPUDeviceDescriptor.requiredLimits`.
++ */
++export function getRequestedWebGPULimits(
++  supportedLimits: GPUSupportedLimits,
++  featureLevel: RequestedWebGPUFeatureLevel,
++  requiredLimits: DeviceProps['requiredLimits'] = {}
++): Record<string, number> {
++  const adapterLimits = featureLevel === 'core' ? {} : getRequiredWebGPULimits(supportedLimits);
++  return {...adapterLimits, ...requiredLimits};
++}
++
+ /**
+  * Returns the requested WebGPU feature level, defaulting to the portable core profile.
+  * @param props Device creation props.
+@@ -245,11 +263,11 @@ export class WebGPUAdapter extends Adapter {
+       deviceDescriptor.requiredFeatures = requiredFeatures;
+     }
+ 
+-    // Explicitly requested limits override the adapter maximums requested by 'max'
+-    const requiredLimits = {
+-      ...(requestedFeatureLevel === 'max' ? getRequiredWebGPULimits(adapter.limits) : {}),
+-      ...props.requiredLimits
+-    };
++    const requiredLimits = getRequestedWebGPULimits(
++      adapter.limits,
++      requestedFeatureLevel,
++      props.requiredLimits
++    );
+     if (Object.keys(requiredLimits).length > 0) {
+       deviceDescriptor.requiredLimits = requiredLimits;
+     }
+diff --git a/modules/webgpu/test/webgpu/adapter/webgpu-adapter.spec.ts b/modules/webgpu/test/webgpu/adapter/webgpu-adapter.spec.ts
+index 86bc25dd4..2564d5a8f 100644
+--- a/modules/webgpu/test/webgpu/adapter/webgpu-adapter.spec.ts
++++ b/modules/webgpu/test/webgpu/adapter/webgpu-adapter.spec.ts
+@@ -6,6 +6,7 @@ import {expect, it} from 'vitest';
+ import {
+   getEffectiveWebGPUFeatureLevel,
+   getRequiredWebGPUFeatures,
++  getRequestedWebGPULimits,
+   getRequiredWebGPULimits,
+   getWebGPUFeatureLevel,
+   getWebGPURequestAdapterOptions
+@@ -41,6 +42,41 @@ it('getRequiredWebGPULimits reads non-enumerable supported limits directly', ()
+   void 0;
+ });
+ 
++it('getRequestedWebGPULimits requests adapter limits outside the core profile', () => {
++  const supportedLimits = {
++    maxStorageBuffersInVertexStage: 10,
++    maxStorageBuffersPerShaderStage: 10,
++    maxComputeInvocationsPerWorkgroup: 1024
++  } as unknown as GPUSupportedLimits;
++
++  expect(
++    getRequestedWebGPULimits(supportedLimits, 'core'),
++    'core keeps the spec default limits'
++  ).toEqual({});
++  expect(
++    getRequestedWebGPULimits(supportedLimits, 'core', {maxBufferSize: 4096}),
++    'core forwards explicit limits'
++  ).toEqual({maxBufferSize: 4096});
++
++  for (const featureLevel of ['max', 'compatibility', 'best-available'] as const) {
++    expect(
++      getRequestedWebGPULimits(supportedLimits, featureLevel),
++      `${featureLevel} requests adapter limits`
++    ).toEqual({
++      maxStorageBuffersInVertexStage: 10,
++      maxStorageBuffersPerShaderStage: 10,
++      maxComputeInvocationsPerWorkgroup: 1024
++    });
++  }
++
++  expect(
++    getRequestedWebGPULimits(supportedLimits, 'compatibility', {
++      maxStorageBuffersInVertexStage: 4
++    }).maxStorageBuffersInVertexStage,
++    'explicit limits override adapter limits'
++  ).toBe(4);
++});
++
+ it('WebGPUAdapter feature level helpers map luma props to WebGPU requests', () => {
+   expect(getWebGPUFeatureLevel({}), 'defaults to core').toBe('core');
+   expect(getWebGPUFeatureLevel({featureLevel: 'max'}), 'explicit level is returned').toBe('max');
+diff --git a/modules/webgpu/test/webgpu/adapter/webgpu-compatibility-device.spec.ts b/modules/webgpu/test/webgpu/adapter/webgpu-compatibility-device.spec.ts
+new file mode 100644
+index 000000000..41af9bed8
+--- /dev/null
++++ b/modules/webgpu/test/webgpu/adapter/webgpu-compatibility-device.spec.ts
+@@ -0,0 +1,55 @@
++// luma.gl
++// SPDX-License-Identifier: MIT
++// SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
++
++import {expect, it} from 'vitest';
++import {getWebGPUTestDevice} from '@luma.gl/test-utils';
++import type {WebGPUTexture} from '@luma.gl/webgpu';
++
++it('WebGPU compatibility devices request adapter-supported limits', async () => {
++  const device = await getWebGPUTestDevice('compatibility');
++  if (!device || device.info.featureLevel !== 'compatibility') {
++    return;
++  }
++
++  for (const limitName of [
++    'maxStorageBuffersInVertexStage',
++    'maxStorageBuffersPerShaderStage',
++    'maxComputeInvocationsPerWorkgroup'
++  ] as const) {
++    expect(device.handle.limits[limitName], `${limitName} matches the adapter`).toBe(
++      device.adapter.limits[limitName]
++    );
++  }
++});
++
++it('WebGPU compatibility devices bind cube textures as cube views', async () => {
++  const device = await getWebGPUTestDevice('compatibility');
++  if (!device || device.info.featureLevel !== 'compatibility') {
++    return;
++  }
++
++  const cubeTexture = device.createTexture({
++    dimension: 'cube',
++    width: 4,
++    height: 4,
++    format: 'rgba8unorm'
++  }) as WebGPUTexture;
++
++  expect(
++    cubeTexture.handle.textureBindingViewDimension,
++    'cube textures declare their binding view dimension'
++  ).toBe('cube');
++
++  device.handle.pushErrorScope('validation');
++  device.handle.createBindGroup({
++    layout: device.handle.createBindGroupLayout({
++      entries: [{binding: 0, visibility: 0x2, texture: {viewDimension: 'cube'}}]
++    }),
++    entries: [{binding: 0, resource: cubeTexture.view.handle}]
++  });
++  const error = await device.handle.popErrorScope();
++  expect(error?.message, 'a cube view binds without a validation error').toBeUndefined();
++
++  cubeTexture.destroy();
++});

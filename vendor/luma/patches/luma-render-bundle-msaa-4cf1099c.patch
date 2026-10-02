@@ -1,0 +1,86 @@
+From 4cf1099c620c351846325c01e5cf304d27169bca Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Thu, 1 Oct 2026 23:40:25 -0400
+Subject: [PATCH 4/4] feat(webgpu): RenderBundleEncoder accepts sampleCount > 1
+
+The props check now only requires a positive integer; the native bundle
+encoder descriptor already forwarded sampleCount. The bundle must be executed in
+passes with matching attachment formats and sample count.
+---
+ .../core/resources/render-bundle-encoder.md    |  2 +-
+ .../src/adapter/resources/render-bundle.ts     |  9 ++++++---
+ .../adapter/resources/render-bundle.spec.ts    | 18 +++++++++++++++---
+ 3 files changed, 22 insertions(+), 7 deletions(-)
+
+diff --git a/docs/api-reference/core/resources/render-bundle-encoder.md b/docs/api-reference/core/resources/render-bundle-encoder.md
+index dc5466dc3..108c8e116 100644
+--- a/docs/api-reference/core/resources/render-bundle-encoder.md
++++ b/docs/api-reference/core/resources/render-bundle-encoder.md
+@@ -62,7 +62,7 @@ For scenes with both stable and frequently changing draws, split the work into m
+ | --- | --- | --- | --- |
+ | `colorAttachmentFormats?` | `(TextureFormatColor \| null)[]` | `[device.preferredColorFormat]` | Color attachment formats expected by the bundle. |
+ | `depthStencilAttachmentFormat?` | `TextureFormatDepthStencil \| false` | `device.preferredDepthFormat` | Depth/stencil attachment format expected by the bundle. Set `false` for a color-only bundle. |
+-| `sampleCount?` | `number` | `1` | Sample count expected by the bundle. Currently only `1` is supported; multisampled render bundles require multisample pipeline support. |
++| `sampleCount?` | `number` | `1` | Sample count expected by the bundle. Must be a positive integer; use e.g. `4` to record bundles for multisampled render passes. The bundle only executes in passes with identical attachment formats and sample count. |
+ | `depthReadOnly?` | `boolean` | `false` | Marks the expected depth attachment as read-only. |
+ | `stencilReadOnly?` | `boolean` | `false` | Marks the expected stencil attachment as read-only. |
+ 
+diff --git a/modules/core/src/adapter/resources/render-bundle.ts b/modules/core/src/adapter/resources/render-bundle.ts
+index 459782348..0c3a01663 100644
+--- a/modules/core/src/adapter/resources/render-bundle.ts
++++ b/modules/core/src/adapter/resources/render-bundle.ts
+@@ -26,7 +26,7 @@ export type RenderBundleEncoderProps = ResourceProps & {
+   depthStencilAttachmentFormat?: TextureFormatDepthStencil | false;
+   /**
+    * Sample count required by render passes that execute the finished bundle.
+-   * Multisampled render bundles are not currently supported, so this must be `1`.
++   * Must be a positive integer; use `4` to record bundles for MSAA render passes.
+    * @defaultValue `1`
+    */
+   sampleCount?: number;
+@@ -140,8 +140,11 @@ export abstract class RenderBundleEncoder extends RenderPass {
+ }
+ 
+ function validateRenderBundleEncoderProps(props: RenderBundleEncoderProps): void {
+-  if (props.sampleCount !== undefined && props.sampleCount !== 1) {
+-    throw new Error('RenderBundleEncoder currently only supports sampleCount 1');
++  if (
++    props.sampleCount !== undefined &&
++    (!Number.isInteger(props.sampleCount) || props.sampleCount < 1)
++  ) {
++    throw new Error('RenderBundleEncoder sampleCount must be a positive integer');
+   }
+ 
+   const renderPassProps = props as RenderBundleEncoderProps & Partial<RenderPassProps>;
+diff --git a/modules/core/test/adapter/resources/render-bundle.spec.ts b/modules/core/test/adapter/resources/render-bundle.spec.ts
+index 9cd8afadf..d0b217bb6 100644
+--- a/modules/core/test/adapter/resources/render-bundle.spec.ts
++++ b/modules/core/test/adapter/resources/render-bundle.spec.ts
+@@ -72,9 +72,21 @@ it('Render bundles record reusable WebGPU commands', async () => {
+     'render bundle encoder rejects render-pass setup props'
+   ).toThrow(/RenderBundleEncoder does not support render pass props/);
+   expect(
+-    () => webgpuDevice.createRenderBundleEncoder({sampleCount: 4}),
+-    'render bundle encoder rejects unsupported multisampling'
+-  ).toThrow(/RenderBundleEncoder currently only supports sampleCount 1/);
++    () => webgpuDevice.createRenderBundleEncoder({sampleCount: 0}),
++    'render bundle encoder rejects an invalid sample count'
++  ).toThrow(/RenderBundleEncoder sampleCount must be a positive integer/);
++
++  const multisampledEncoder = webgpuDevice.createRenderBundleEncoder({
++    id: 'test-render-bundle-msaa',
++    colorAttachmentFormats: ['rgba8unorm'],
++    depthStencilAttachmentFormat: 'depth24plus',
++    sampleCount: 4
++  });
++  const multisampledBundle = multisampledEncoder.finish();
++  expect(multisampledBundle.id, 'multisampled bundle inherits the encoder id').toBe(
++    'test-render-bundle-msaa'
++  );
++  multisampledBundle.destroy();
+ 
+   void 0;
+ });
+-- 
+2.44.0
+

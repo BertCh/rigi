@@ -1,0 +1,178 @@
+From 5727c7ca57bfc47d539f97bed131d917b052fed2 Mon Sep 17 00:00:00 2001
+From: Robert Christie <rgcgeog@gmail.com>
+Date: Thu, 1 Oct 2026 23:40:19 -0400
+Subject: [PATCH 3/4] feat(webgpu): Buffer.mapAndReadAsync option
+ waitForSubmittedWork: false
+
+mapAndReadAsync(callback, byteOffset?, byteLength?, options?) takes
+{waitForSubmittedWork?: boolean} (default true). false skips the
+queue.onSubmittedWorkDone() wait and maps at once, for MAP_READ readback rings.
+---
+ modules/core/src/adapter/resources/buffer.ts  | 15 +++++++++++++-
+ modules/core/src/index.ts                     |  7 ++++++-
+ .../test/adapter/resources/buffer.spec.ts     | 20 +++++++++++++++++++
+ .../src/dynamic-buffer/dynamic-buffer.ts      | 14 ++++++++++---
+ .../src/adapter/resources/webgpu-buffer.ts    | 15 +++++++++++---
+ 5 files changed, 63 insertions(+), 8 deletions(-)
+
+diff --git a/modules/core/src/adapter/resources/buffer.ts b/modules/core/src/adapter/resources/buffer.ts
+index 0067fd378..987abdf38 100644
+--- a/modules/core/src/adapter/resources/buffer.ts
++++ b/modules/core/src/adapter/resources/buffer.ts
+@@ -5,6 +5,18 @@
+ import type {Device} from '../device';
+ import {Resource, ResourceProps} from './resource';
+ 
++/** Options for Buffer.mapAndReadAsync */
++export type BufferMapReadOptions = {
++  /**
++   * WebGPU only. When `true` (default), the read first awaits `queue.onSubmittedWorkDone()`, so it
++   * also waits for work submitted after the work that wrote this buffer. Set to `false` to map at
++   * once: `mapAsync` resolves when the work already submitted that uses the buffer is done. Use it
++   * when you know the producing work has been submitted (e.g. a ring of MAP_READ readback slots).
++   * @defaultValue true
++   */
++  waitForSubmittedWork?: boolean;
++};
++
+ /** Callback for Buffer.mapAndReadAsync */
+ export type BufferMapCallback<T> = (arrayBuffer: ArrayBuffer, lifetime: 'mapped' | 'copied') => T;
+ 
+@@ -110,7 +122,8 @@ export abstract class Buffer extends Resource<BufferProps> {
+   abstract mapAndReadAsync<T>(
+     onMapped: BufferMapCallback<T>,
+     byteOffset?: number,
+-    byteLength?: number
++    byteLength?: number,
++    options?: BufferMapReadOptions
+   ): Promise<T>;
+ 
+   /** Read data synchronously. @note WebGL2 only */
+diff --git a/modules/core/src/index.ts b/modules/core/src/index.ts
+index f34bad870..c66ba4dd9 100644
+--- a/modules/core/src/index.ts
++++ b/modules/core/src/index.ts
+@@ -30,7 +30,12 @@ export {PresentationContext} from './adapter/presentation-context';
+ // GPU RESOURCES
+ export {Resource, type ResourceProps} from './adapter/resources/resource';
+ 
+-export {Buffer, type BufferProps, type BufferMapCallback} from './adapter/resources/buffer';
++export {
++  Buffer,
++  type BufferProps,
++  type BufferMapCallback,
++  type BufferMapReadOptions
++} from './adapter/resources/buffer';
+ 
+ export {Texture, type TextureProps} from './adapter/resources/texture';
+ 
+diff --git a/modules/core/test/adapter/resources/buffer.spec.ts b/modules/core/test/adapter/resources/buffer.spec.ts
+index d99016ca5..9d99c2eed 100644
+--- a/modules/core/test/adapter/resources/buffer.spec.ts
++++ b/modules/core/test/adapter/resources/buffer.spec.ts
+@@ -778,3 +778,23 @@ it('Buffer#uint8 index buffer conversion', async () => {
+   }
+   void 0;
+ });
++
++it('Buffer#mapAndReadAsync (waitForSubmittedWork: false)', async () => {
++  for (const device of await getTestDevices(DEVICE_TYPES)) {
++    const buffer = device.createBuffer({
++      usage: Buffer.MAP_READ | Buffer.COPY_DST,
++      data: new Uint32Array([5, 6, 7, 8])
++    });
++    // Work already submitted (the creation upload) is visible without the extra wait.
++    const values = await buffer.mapAndReadAsync(
++      arrayBuffer => Array.from(new Uint32Array(arrayBuffer.slice(0))),
++      0,
++      16,
++      {waitForSubmittedWork: false}
++    );
++    expect(values, `${device.type} mapAndReadAsync without waiting reads the data`).toEqual([
++      5, 6, 7, 8
++    ]);
++    buffer.destroy();
++  }
++});
+diff --git a/modules/engine/src/dynamic-buffer/dynamic-buffer.ts b/modules/engine/src/dynamic-buffer/dynamic-buffer.ts
+index 250446d42..5029b0d6a 100644
+--- a/modules/engine/src/dynamic-buffer/dynamic-buffer.ts
++++ b/modules/engine/src/dynamic-buffer/dynamic-buffer.ts
+@@ -2,7 +2,13 @@
+ // SPDX-License-Identifier: MIT
+ // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+ 
+-import type {BufferMapCallback, BufferProps, Device, Binding as CoreBinding} from '@luma.gl/core';
++import type {
++  BufferMapCallback,
++  BufferMapReadOptions,
++  BufferProps,
++  Device,
++  Binding as CoreBinding
++} from '@luma.gl/core';
+ import {Buffer} from '@luma.gl/core';
+ import {uid} from '../utils/uid';
+ 
+@@ -233,7 +239,8 @@ export class DynamicBuffer {
+   async mapAndReadAsync<T>(
+     callback: BufferMapCallback<T>,
+     byteOffset: number = 0,
+-    byteLength: number = this.byteLength - byteOffset
++    byteLength: number = this.byteLength - byteOffset,
++    options?: BufferMapReadOptions
+   ): Promise<T> {
+     let copiedBytes: Uint8Array | null = null;
+     const result = await this._buffer.mapAndReadAsync(
+@@ -242,7 +249,8 @@ export class DynamicBuffer {
+         return await callback(arrayBuffer, lifetime);
+       },
+       byteOffset,
+-      byteLength
++      byteLength,
++      options
+     );
+     if (copiedBytes && this._writeDebugData(copiedBytes, byteOffset)) {
+       this._touch();
+diff --git a/modules/webgpu/src/adapter/resources/webgpu-buffer.ts b/modules/webgpu/src/adapter/resources/webgpu-buffer.ts
+index 45d17a6e7..f787e9de5 100644
+--- a/modules/webgpu/src/adapter/resources/webgpu-buffer.ts
++++ b/modules/webgpu/src/adapter/resources/webgpu-buffer.ts
+@@ -2,7 +2,13 @@
+ // SPDX-License-Identifier: MIT
+ // SPDX-FileCopyrightText: Copyright (c) vis.gl contributors
+ 
+-import {log, Buffer, type BufferProps, type BufferMapCallback} from '@luma.gl/core';
++import {
++  log,
++  Buffer,
++  type BufferProps,
++  type BufferMapCallback,
++  type BufferMapReadOptions
++} from '@luma.gl/core';
+ import {type WebGPUDevice} from '../webgpu-device';
+ 
+ /**
+@@ -166,7 +172,8 @@ export class WebGPUBuffer extends Buffer {
+   async mapAndReadAsync<T>(
+     callback: BufferMapCallback<T>,
+     byteOffset = 0,
+-    byteLength = this.byteLength - byteOffset
++    byteLength = this.byteLength - byteOffset,
++    options?: BufferMapReadOptions
+   ): Promise<T> {
+     const requestedEnd = byteOffset + byteLength;
+     if (requestedEnd > this.byteLength) {
+@@ -203,7 +210,9 @@ export class WebGPUBuffer extends Buffer {
+     // Map the temp buffer and read the data.
+     this.device.pushErrorScope('validation');
+     try {
+-      await this.device.handle.queue.onSubmittedWorkDone();
++      if (options?.waitForSubmittedWork !== false) {
++        await this.device.handle.queue.onSubmittedWorkDone();
++      }
+       if (mappableBuffer) {
+         mappableBuffer._copyBuffer(this, mappedByteOffset, mappedByteLength, 0);
+       }
+-- 
+2.44.0
+
