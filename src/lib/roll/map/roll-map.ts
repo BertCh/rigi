@@ -22,6 +22,7 @@ import { COORDINATE_SYSTEM, Deck } from "@deck.gl/core";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import type { Device } from "@luma.gl/core";
 import * as THREE from "three";
+import { BRAND } from "#/brand/khipu";
 import type { Pose } from "#/lib/camera";
 import { GpuGeometrySource, rangeMapFrom } from "#/lib/deck/geometry-pass";
 import { photoViewProjection } from "#/lib/deck/photo-view";
@@ -43,6 +44,7 @@ import {
 import { type DemRaster, tileBounds } from "#/lib/dem";
 import { EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import type { ForegroundMask } from "#/lib/segment";
+import { hexToRgb255 } from "../mosaic/cvd";
 import { vpColor } from "../mosaic/style";
 import type { Roll, RollPhoto } from "../types";
 import { basemapLook, basemapSource, type RollBasemap } from "./basemap";
@@ -68,6 +70,12 @@ const GIZMO_THUMB = 384;
 const WORLD_ARC_M = 600;
 
 /** The mosaic's viewpoint colour (#/lib/roll/mosaic/style) as 0..255 sRGB. */
+/** The selected pin's ring: the brand orange, reserved for selection (viewpoints never use it). */
+const SELECTION_RGBA: [number, number, number, number] = [
+	...(hexToRgb255(BRAND.glow) as unknown as [number, number, number]),
+	255,
+];
+
 export const viewpointColor = (i: number): [number, number, number] => {
 	const h = vpColor(i);
 	return [1, 3, 5].map((k) => Number.parseInt(h.slice(k, k + 2), 16)) as [
@@ -1173,7 +1181,9 @@ export class RollMapEngine {
 					...viewpointColor(p.photo.viewpoint),
 					255,
 				],
-				getLineColor: [255, 255, 255, 230],
+				// the selected pin carries the brand orange (selection only); hover stays white
+				getLineColor: (p: Placed) =>
+					p.id === this.selected ? SELECTION_RGBA : [255, 255, 255, 230],
 				lineWidthUnits: "pixels",
 				getLineWidth: (p: Placed) =>
 					p.id === this.selected || p.id === hover ? 2.5 : 1.2,
@@ -1184,6 +1194,7 @@ export class RollMapEngine {
 				updateTriggers: {
 					getRadius: [this.selected, hover],
 					getLineWidth: [this.selected, hover],
+					getLineColor: [this.selected],
 				},
 			}),
 		);

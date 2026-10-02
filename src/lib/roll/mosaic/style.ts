@@ -5,22 +5,26 @@
 // Shared look and small formatters for the roll mosaic: viewpoint colours, pose-source labels,
 // compass names and capture times in the photo's own local time.
 
-import { BRAND } from "#/brand/khipu";
+import { BREZINE } from "#/brand/khipu";
 import { rankUnder } from "#/lib/ontology/core/resolution";
 import { POSE_SOURCE } from "#/lib/ontology/crosswalk/pose";
 import type { PhotoMeta } from "../../photos";
 import type { PoseSource, RollPhoto } from "../types";
 
-/** One colour per viewpoint (index mod length); first is the Rigi glow. */
-export const VIEWPOINT_COLORS = [
-	BRAND.glow,
-	"#6cc3d5",
-	"#9ad07a",
-	"#d58bd8",
-	"#e9d267",
-	"#ef8a7a",
-	"#7aa2ef",
-	"#7fd6b0",
+/**
+ * One colour per viewpoint (index mod length), colour-blind safe: six Brezine swatches chosen so every
+ * pair stays at CIEDE2000 >= 7 for normal vision, protanopia, deuteranopia and tritanopia (the old
+ * eight-colour set paired the orange first viewpoint with the pink sixth under deuteranopia). The
+ * brand orange (BRAND.glow) is not in the set: it means selection and active state only. Checked by
+ * __tests__/palette-cvd.check.ts. Chart codes: PK, GL, SR, YY, BL, GG.
+ */
+export const VIEWPOINT_COLORS: readonly string[] = [
+	BREZINE.YY.hex,
+	BREZINE.GL.hex,
+	BREZINE.PK.hex,
+	BREZINE.BL.hex,
+	BREZINE.SR.hex,
+	BREZINE.GG.hex,
 ];
 export const vpColor = (i: number) =>
 	VIEWPOINT_COLORS[

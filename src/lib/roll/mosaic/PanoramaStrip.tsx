@@ -863,7 +863,8 @@ function drawOverlay(
 		const x = Math.round(X(a));
 		const deg = ((Math.round(a) % 360) + 360) % 360;
 		const card = CARDINAL[deg];
-		g.fillStyle = card ? BRAND.glow : "rgba(255,255,255,0.55)";
+		// cardinals in bright paper, not the brand orange (orange = selection only)
+		g.fillStyle = card ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.55)";
 		g.fillRect(x, RULER - 7, 1, 6);
 		g.fillText(card ?? `${deg}°`, x, 12);
 	}
