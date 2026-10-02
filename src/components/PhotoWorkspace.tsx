@@ -71,6 +71,7 @@ import { glowMarkersFor } from "#/lib/look/labels/glow";
 import { PeakLabelsSvg } from "#/lib/look/labels/PeakLabelsSvg";
 import { useLabelFontEpoch } from "#/lib/look/labels/useLabelFonts";
 import { needsPhotoSky } from "#/lib/look/look-key";
+import { bindMatcherEngine } from "#/lib/matcher/binding";
 import { poseAccepted } from "#/lib/nearfield/controller";
 import {
 	ALIGN_STATE,
@@ -539,6 +540,8 @@ export function PhotoWorkspace({
 					? new UnknownPoseSolver(photo)
 					: null;
 			if (import.meta.env.DEV) window.__engine = engine;
+			// the in-browser render-and-match (src/lib/matcher) renders its views on this engine
+			const unbindMatcher = bindMatcherEngine(engine);
 			const reveal = new RevealController(engine, (f) => {
 				if (engineRef.current === engine) setRevealFrame(f);
 			});
@@ -810,6 +813,7 @@ export function PhotoWorkspace({
 				solver?.dispose();
 				unknownSolver.current = null;
 				off();
+				unbindMatcher();
 				reveal.dispose();
 				if (revealRef.current === reveal) revealRef.current = null;
 				engine.dispose();

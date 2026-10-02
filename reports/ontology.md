@@ -295,7 +295,7 @@ Trusted auto (`isTrustedAuto`) means: an automatic agent, status `accepted`, and
 | `cascade` | solver | Unknown-pose cascade (solve, then refine on reject) | skyline, gravity, focal, gps, alt | orientation, focal | lib/integration/unknown-pose.ts |
 | `cascade-solve` | solver | Unknown-pose cascade: global solve | skyline, gravity, focal | orientation, focal | lib/integration/unknown-pose.ts, lib/geo/pipeline.ts |
 | `cascade-refine` | solver | Unknown-pose cascade: refine | skyline, gps, alt | orientation, focal, eye-height | lib/refine |
-| `matcher` | solver | Render-and-match service | appearance, skyline | orientation | lib/matcher-client.ts, tools/matcher |
+| `matcher` | solver | Render-and-match (in-browser) | appearance, skyline | orientation | lib/matcher-client.ts, lib/matcher |
 | `propagate` | solver | Propagate from a neighbouring photo | rotation | orientation | lib/roll/propagate |
 | `eye-refine` | solver | Eye refinement on the skyline | skyline, ground | position, eye-height | lib/pose6dof/eye.ts |
 | `geo-map` | solver | Geometry-first MAP camera | gps, alt, ground, lakeFloor, gravity, compass, focal, skyline, point, level, shore | orientation, position, focal | lib/geocam |

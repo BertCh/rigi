@@ -68,6 +68,12 @@ export const FLAG_SCHEMA = {
 	 */
 	focalSeedGate: onOff("off"),
 	/**
+	 * in-browser render-and-match (src/lib/matcher) policy for ad-hoc requests with a missing heading / gravity /
+	 * focal: v034 (default, the former service's default) = 360° sweep + fused stage 2; t6 = the T6 stage-1
+	 * hypothesis search + frozen T6 rule (slower, more candidates verified).
+	 */
+	matcherPolicy: oneOf(["v034", "t6"], "v034"),
+	/**
 	 * peak snapping (geo/peaks.ts localMaxOf, both engines): on = a DEM maximum on the search grid's
 	 * outer ring is treated as a flank, not a summit, and the peak keeps its OSM node position (22 % of
 	 * catalogue peaks in the 2026-10-02 dev study, reports/steps-2026-10-02/peak.md). Moves labels, so

@@ -187,9 +187,9 @@ export const METHODS = {
 	),
 	matcher: m(
 		"solver",
-		"Render-and-match service",
+		"Render-and-match (in-browser)",
 		["appearance", "skyline"],
-		"lib/matcher-client.ts, tools/matcher",
+		"lib/matcher-client.ts, lib/matcher",
 		["orientation"],
 	),
 	propagate: m(

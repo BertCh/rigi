@@ -179,7 +179,7 @@ describe("secondOpinion verdicts", () => {
 		expect(r.matcher).toBe("high");
 		expect(r.pose.yaw).toBe(101);
 		expect(seen).toHaveLength(1);
-		expect(seen[0]).toMatch(/asking the match service/);
+		expect(seen[0]).toMatch(/checking with render-and-match/);
 		expect(matcher.defer.mock.calls[0][0]).toMatchObject({
 			photoId: "IMG_9",
 			fused: true,

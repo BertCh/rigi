@@ -12,14 +12,15 @@
 //   app accepted + cascade accepted, |Δyaw| ≤ 1°  → keep the app pose            → "verified"
 //   cascade accepted, disagrees or app didn't accept → take the cascade pose       → "refined"
 //   cascade rejected, shouldEscalate() false      → keep the app pose, no badge   → "kept"
-//   cascade rejected, shouldEscalate() true       → "unverified"; if matcherAvailable(), ask render-and-
-//                                                   match and take its pose when matchAccepted (product rule) → "matched"
-//   matcher contended (another job running/queued, or a 503) → "unverified" at once (unlocks exports); a
-//                                                   confident match later arrives as `upgrade`
+//   cascade rejected, shouldEscalate() true       → "unverified"; if matcherAvailable() (in-browser render-
+//                                                   and-match, src/lib/matcher: engine bound + keypoint models),
+//                                                   run it and take its pose when matchAccepted (product rule) → "matched"
+//   matcher contended (another match job running or queued in this page) → "unverified" at once (unlocks
+//                                                   exports); a confident match later arrives as `upgrade`
 //   cascade not done within `timeoutMs` (20 s)    → keep the app pose, no badge   → "timeout"
 // The deadline bounds the export lock (PhotoWorkspace locks exports while the verdict is pending): the
 // cascade's 360° Mapterhorn terrain is tens of MB cold, and a stalled network would otherwise
-// hold it forever. The matcher escalation is bounded by its own 150 s request timeout (v0.3 takes 45–77 s idle).
+// hold it forever. The matcher escalation is bounded by its own 150 s request timeout.
 
 import type { AlignResult } from "#/lib/align";
 import type { Pose } from "#/lib/camera";
@@ -136,7 +137,7 @@ const angDist = (a: number, b: number) =>
 
 const NO_UNKNOWNS = { yaw: false, gravity: false, focal: false, any: false };
 
-/** Render-and-match escalation. Bundled photos go by id (server renders them); uploads by ad-hoc mode. */
+/** Render-and-match escalation. Bundled photos go by id (one fused stage at the prior); uploads by ad-hoc mode. */
 async function escalate(
 	photo: PhotoMeta,
 	prior: Pose,
@@ -300,7 +301,9 @@ async function opinionFromCascade(
 			disagreeDeg,
 			matcher: "unavailable",
 		});
-	opts.onUnverified?.(`${note} · asking the match service`);
+	opts.onUnverified?.(
+		`${note} · checking with render-and-match on this device`,
+	);
 	const r = await escalate(photo, prior, opts.signal);
 	if (opts.signal.aborted) throw new DOMException("aborted", "AbortError");
 	const isAccepted = (m: MatchResult) =>
@@ -321,7 +324,7 @@ async function opinionFromCascade(
 		return done({
 			verdict: "unverified",
 			pose: app.pose,
-			note: `${note} · match service busy, still asking`,
+			note: `${note} · render-and-match busy, still checking`,
 			cascade,
 			disagreeDeg,
 			matcher: "busy",

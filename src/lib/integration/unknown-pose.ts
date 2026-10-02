@@ -7,7 +7,7 @@
 // without a heading), so it is never auto-accepted here. Order:
 //   1. 0f's CPU cascade in a Worker with the unknowns declared (360° yaw, free tilt, focal seeds);
 //      its pose is taken only if it accepts (0 false accepts in every ablation condition).
-//   2. if the cascade rejects and the matcher service is up: fused /match in ad-hoc mode (two-stage
+//   2. if the cascade rejects and the in-browser matcher is available: fused match in ad-hoc mode (two-stage
 //      360° sweep); taken only at confidenceLevel HIGH.
 //   3. otherwise the best guess is shown as "unverified".
 
@@ -269,10 +269,10 @@ export function positionSource(photo: PhotoMeta) {
 }
 
 /**
- * Fused /match, ad-hoc photo mode (tools/matcher/server/app.py match_adhoc): unknowns are simply omitted.
- * `seeds` are the cascade's candidates (reports/matcher-service.md v0.3): only real candidates, since a
- * wrong seed costs time (+90° seed: 60–104 s instead of 34–62 s).
- * v0.3 on CPU LightGlue with basin-gap takes 45–77 s when idle, hence the 150 s default.
+ * Fused render-and-match, ad-hoc photo mode (src/lib/matcher pipeline.ts matchAdhoc, the port of
+ * tools/matcher/server/app.py match_adhoc): unknowns are simply omitted. `seeds` are the cascade's
+ * candidates (reports/matcher-service.md v0.3): only real candidates, since a wrong seed costs time.
+ * The 150 s default is the service's budget (in-browser timing is unmeasured).
  */
 export async function matchUnknownPose(
 	photo: PhotoMeta,
@@ -286,7 +286,7 @@ export async function matchUnknownPose(
 	return req && requestMatch(req, { signal, timeoutMs });
 }
 
-/** matchUnknownPose with requestMatchOrDefer's early out when the service is contended. */
+/** matchUnknownPose with requestMatchOrDefer's early out when the matcher is contended. */
 export async function matchUnknownPoseOrDefer(
 	photo: PhotoMeta,
 	prior: Pose,
@@ -350,7 +350,7 @@ export type UnknownPoseOutcome = {
 	confidence: number | null;
 	note: string;
 	/**
-	 * The match service was contended, so this unverified outcome came early: the match is still running
+	 * The matcher was contended (another match job in this page), so this unverified outcome came early: the match is still running
 	 * (under the caller's signal) and resolves to an accepted outcome if it is confident, else null.
 	 */
 	upgrade?: Promise<UnknownPoseOutcome | null>;
@@ -398,7 +398,7 @@ export async function resolveUnknownPose(
 		if ((e as Error)?.name === "AbortError") throw e;
 		console.warn("[unknown-pose] cascade failed", e);
 	}
-	opts.onStage?.(`No ${what}: asking the match service`);
+	opts.onStage?.(`No ${what}: render-and-match on this device`);
 	const accepted = (m: MatchResult): UnknownPoseOutcome => ({
 		pose: m.pose,
 		state: "accepted",
@@ -420,14 +420,14 @@ export async function resolveUnknownPose(
 		guess?.candidates.map((c) => c.pose) ?? [],
 	);
 	if ("deferred" in r) {
-		// contended service: don't hold the overlay for minutes; the user checks the guess, and a confident
+		// contended matcher: don't hold the overlay for minutes; the user checks the guess, and a confident
 		// match still upgrades it later
 		return {
 			pose: guess?.pose ?? fallback,
 			state: "unverified",
 			source: guess ? "cascade" : "none",
 			confidence: guess?.confidence ?? null,
-			note: `Unverified: no ${what}, and the match service is busy. Check this pose, drag it or pin a peak; it updates if the match service confirms one.`,
+			note: `Unverified: no ${what}, and render-and-match is busy. Check this pose, drag it or pin a peak; it updates if render-and-match confirms one.`,
 			upgrade: r.deferred.then((m) =>
 				m && isAccepted(m) ? accepted(m) : null,
 			),

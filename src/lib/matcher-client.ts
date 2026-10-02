@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Client for the optional render-and-match escalation service (tools/matcher/server, default :8765).
-// Everything here degrades to `false` / `null` when the service isn't running: it never throws.
+// Render-and-match escalation, in the browser: the former optional Python service (tools/matcher/server,
+// :8765) now runs on the page's own engine and GPU (src/lib/matcher). The API is unchanged for callers:
+// everything degrades to `false` / `null` when the matcher is unavailable (no engine bound, keypoint
+// models missing); nothing here throws. "Busy" means another match job is running in this page.
 import type { Pose } from "./camera";
 import { levelOf } from "./ontology/core/confidence";
 
-const BASE = (
-	import.meta.env?.VITE_MATCHER_URL ?? "http://localhost:8765"
-).replace(/\/+$/, "");
-const HEALTH_TIMEOUT_MS = 800;
+/** The matcher (solvers, GPU kernels, keypoint models) loads on first use, off the workspace's critical path. */
+const service = () => import("./matcher/service");
 const HEALTH_TTL_OK_MS = 60_000;
 const HEALTH_TTL_DOWN_MS = 15_000;
 
@@ -47,7 +47,7 @@ type Common = {
 };
 
 export type MatchRequest =
-	/** server renders the views and exports the skyline cue itself by driving the app headlessly (dev only) */
+	/** the bound engine (showing `photoId`) renders the views and exports the skyline cue itself */
 	| (Common & { photoId: string; offsets?: number[] })
 	/** caller supplies the photo and pre-rendered views; skyline cue from `skyline`, else exported for `photoId`, else none */
 	| (Common & {
@@ -58,8 +58,9 @@ export type MatchRequest =
 			photoId?: string;
 	  })
 	/**
-	 * ad-hoc photo (tools/matcher/server/app.py match_adhoc): the server renders the views itself from the
-	 * position; unknown prior fields are simply omitted (two-stage 360° sweep when yaw is missing)
+	 * ad-hoc photo (src/lib/matcher/pipeline.ts matchAdhoc, the former app.py match_adhoc): the bound engine
+	 * renders the views from the photo's position; unknown prior fields are simply omitted (two-stage 360°
+	 * sweep when yaw is missing; ?matcherPolicy=t6 for the T6 search)
 	 */
 	| (Omit<Common, "prior"> & {
 			photo: Blob;
@@ -160,22 +161,7 @@ export function matchAccepted(
 let health: { ok: boolean; at: number } | null = null;
 let healthInFlight: Promise<boolean> | null = null;
 
-function linkedSignal(timeoutMs: number, outer?: AbortSignal) {
-	const ctl = new AbortController();
-	const timer = setTimeout(() => ctl.abort(), timeoutMs);
-	const onAbort = () => ctl.abort();
-	if (outer?.aborted) ctl.abort();
-	else outer?.addEventListener("abort", onAbort, { once: true });
-	return {
-		signal: ctl.signal,
-		done: () => {
-			clearTimeout(timer);
-			outer?.removeEventListener("abort", onAbort);
-		},
-	};
-}
-
-/** Cached health check (short timeout). */
+/** Cached availability: an engine is bound and the keypoint models load. */
 export function matcherAvailable(force = false): Promise<boolean> {
 	const now = Date.now();
 	if (
@@ -186,15 +172,11 @@ export function matcherAvailable(force = false): Promise<boolean> {
 		return Promise.resolve(health.ok);
 	if (healthInFlight) return healthInFlight;
 	healthInFlight = (async () => {
-		const l = linkedSignal(HEALTH_TIMEOUT_MS);
 		let ok = false;
 		try {
-			const r = await fetch(`${BASE}/health`, { signal: l.signal });
-			ok = r.ok && (await r.json())?.ok === true;
+			ok = await (await service()).modelsAvailable();
 		} catch {
 			ok = false;
-		} finally {
-			l.done();
 		}
 		health = { ok, at: Date.now() };
 		healthInFlight = null;
@@ -203,96 +185,9 @@ export function matcherAvailable(force = false): Promise<boolean> {
 	return healthInFlight;
 }
 
-function buildBody(
-	req: MatchRequest,
-	serverTimeoutMs: number,
-): { body: BodyInit; headers?: HeadersInit } {
-	// discriminate on the photo Blob: the views variant may carry a photoId too, and must stay multipart
-	if (!("photo" in req))
-		return {
-			body: JSON.stringify({
-				...req,
-				timeoutMs: serverTimeoutMs,
-			}),
-			headers: { "Content-Type": "application/json" },
-		};
-	if ("meta" in req) {
-		const fd = new FormData();
-		const {
-			meta,
-			prior,
-			fused,
-			freeFocal,
-			positionUncertainM,
-			yawSeeds,
-			poseSeeds,
-		} = req;
-		fd.append(
-			"request",
-			JSON.stringify({
-				meta,
-				prior,
-				fused,
-				freeFocal,
-				positionUncertainM,
-				yawSeeds,
-				poseSeeds,
-				timeoutMs: serverTimeoutMs,
-			}),
-		);
-		fd.append("photo", req.photo, "photo.jpg");
-		return { body: fd };
-	}
-	const f32 = (a: Float32Array) =>
-		new Blob(
-			[new Uint8Array(a.buffer as ArrayBuffer, a.byteOffset, a.byteLength)],
-			{ type: "application/octet-stream" },
-		);
-	const fd = new FormData();
-	const views = req.views.map(({ tag, pose, W, H }) => ({ tag, pose, W, H }));
-	const sk = req.skyline;
-	fd.append(
-		"request",
-		JSON.stringify({
-			prior: req.prior,
-			eye: req.eye,
-			views,
-			fused: req.fused,
-			freeFocal: req.freeFocal,
-			photoId: req.photoId,
-			skyline: sk && {
-				w: sk.w,
-				h: sk.h,
-				pose: sk.pose,
-				confidence: sk.confidence,
-				accepted: sk.accepted,
-			},
-			timeoutMs: serverTimeoutMs,
-		}),
-	);
-	fd.append("photo", req.photo, "photo.jpg");
-	for (const v of req.views) {
-		fd.append(`rgb:${v.tag}`, v.rgb, `${v.tag}.jpg`);
-		fd.append(`xyz:${v.tag}`, f32(v.xyz), `${v.tag}.f32`);
-	}
-	if (sk)
-		for (const k of ["horizon", "fine", "fg", "sky"] as const)
-			fd.append(`skyline:${k}`, f32(sk[k]), `${k}.f32`);
-	return { body: fd }; // browser sets the multipart boundary
-}
-
-/** Retry a 503 only when a job still fits after the wait (v0.3 takes 34–77 s idle): a retry that times out holds the lock for nothing. */
-const MIN_JOB_MS = 30_000;
 /**
- * The deadline is the real bound; this only stops a runaway loop. A deferred request retries in the
- * background at no cost to the user, and with 4 attempts it lost the single waiter slot to a competing
- * client every time (out/lead/matcher-e2e/run-v033.txt).
- */
-const MAX_ATTEMPTS = 20;
-
-/**
- * POST /match. Resolves to null when the service is down, times out, is aborted or finds no pose.
- * `onBusy(retryAfterS)` fires on each 503 (another job holds the renderer) before the retry wait.
+ * Run one match in the browser. Resolves to null when the matcher is unavailable, times out, is aborted
+ * or finds no pose. `onBusy` fires when the request has to wait for another job in this page.
  */
 export async function requestMatch(
 	req: MatchRequest,
@@ -302,107 +197,28 @@ export async function requestMatch(
 		onBusy?: (retryAfterS: number) => void;
 	} = {},
 ): Promise<MatchResult | null> {
-	const timeoutMs = opts.timeoutMs ?? 60_000;
 	if (opts.signal?.aborted || !(await matcherAvailable())) return null;
-	const l = linkedSignal(timeoutMs, opts.signal);
-	const deadline = Date.now() + timeoutMs;
-	try {
-		// v0.3.4 fairness: echo the 503's X-Queue-Ticket so the oldest waiting client gets the next slot
-		let ticket: string | null = null;
-		const post = () => {
-			const { body, headers } = buildBody(
-				req,
-				Math.max(1000, deadline - Date.now() - 500),
-			);
-			const h = new Headers(headers);
-			if (ticket) h.set("X-Queue-Ticket", ticket);
-			return fetch(`${BASE}/match`, {
-				method: "POST",
-				body,
-				headers: h,
-				signal: l.signal,
-			});
-		};
-		let r = await post();
-		// v0.3.2 answers 503 + Retry-After (estimated remaining job time, ≤ 60 s) at once when busy.
-		// Retry-After is null if the server doesn't expose it over CORS: then poll every 5 s.
-		for (
-			let attempt = 1;
-			r.status === 503 && attempt < MAX_ATTEMPTS;
-			attempt++
-		) {
-			const retryAfterS = Number(r.headers.get("Retry-After")) || 5;
-			ticket = r.headers.get("X-Queue-Ticket") ?? ticket;
-			opts.onBusy?.(retryAfterS);
-			const waitMs = retryAfterS * 1000;
-			if (Date.now() + waitMs + MIN_JOB_MS > deadline) break;
-			console.debug("[matcher] busy, retrying in", retryAfterS, "s");
-			await new Promise<void>((resolve, reject) => {
-				const t = setTimeout(resolve, waitMs);
-				l.signal.addEventListener(
-					"abort",
-					() => {
-						clearTimeout(t);
-						reject(l.signal.reason);
-					},
-					{ once: true },
-				);
-			});
-			r = await post();
-		}
-		const j = await r.json().catch(() => null);
-		if (!r.ok || !j?.ok || !j.pose) {
-			if (j?.error) console.warn("[matcher]", j.error.code, j.error.message);
-			return null;
-		}
-		return j as MatchResult;
-	} catch (e) {
-		// network failure → mark down so the next call skips straight to null
-		if (!(e instanceof DOMException && e.name === "AbortError"))
-			health = { ok: false, at: Date.now() };
-		return null;
-	} finally {
-		l.done();
-	}
+	return (await service()).runMatch(req, {
+		signal: opts.signal,
+		timeoutMs: opts.timeoutMs,
+		onBusy: () => opts.onBusy?.(0),
+	});
 }
 
-/**
- * Uncached /health load probe: `busy` plus `queue: { waiting, running, etaS }` (the matcher server's
- * queue_status).
- */
+/** The page's match queue: `busy` while a job runs or waits (no HTTP; etaS is not estimated). */
 export async function matcherLoad(): Promise<{
 	busy: boolean;
 	waiting: number;
 	etaS: number | null;
 } | null> {
-	const l = linkedSignal(HEALTH_TIMEOUT_MS);
-	try {
-		const r = await fetch(`${BASE}/health`, { signal: l.signal });
-		const j = r.ok ? await r.json() : null;
-		if (j?.ok !== true) return null;
-		const q = j.queue;
-		const finite = (x: unknown) =>
-			typeof x === "number" && Number.isFinite(x) ? x : null;
-		const waiting = finite(q?.waiting) ?? 0;
-		return {
-			busy: j.busy === true || q?.running != null || waiting > 0,
-			waiting,
-			etaS: finite(q?.etaS),
-		};
-	} catch {
-		return null;
-	} finally {
-		l.done();
-	}
+	const q = (await service()).queueState();
+	return { busy: q.running || q.waiting > 0, waiting: q.waiting, etaS: null };
 }
 
 /**
- * requestMatch with an early out for a contended service: `{ deferred }` (the same request, still running
- * under `opts.signal`) as soon as /health shows another job running or queued, or the first 503 arrives;
- * otherwise `{ result }` when the match settles.
- * Any contention defers: the e2e (out/lead/matcher-e2e/report.md) showed short Retry-Afters stacking to
- * 50–90 s of overlay and the server's etaS under-reading overrunning jobs, while deferring costs nothing
- * (a confident match still upgrades the pose).
+ * requestMatch with an early out for a contended matcher: `{ deferred }` (the same request, still
+ * running under `opts.signal`) when another job is running or queued in this page; otherwise
+ * `{ result }` when the match settles. Deferring costs nothing: a confident match still upgrades the pose.
  */
 export async function requestMatchOrDefer(
 	req: MatchRequest,
@@ -411,26 +227,12 @@ export async function requestMatchOrDefer(
 	{ result: MatchResult | null } | { deferred: Promise<MatchResult | null> }
 > {
 	const load = await matcherLoad();
-	const contended = !!load?.busy;
-	let onBusy: () => void = () => {};
-	const busy = new Promise<"busy">((resolve) => {
-		onBusy = () => resolve("busy");
-	});
-	const match = requestMatch(req, {
-		signal: opts.signal,
-		timeoutMs: opts.timeoutMs,
-		onBusy: () => onBusy(),
-	});
-	if (contended) {
-		console.debug("[matcher] contended, deferring", load);
+	const match = requestMatch(req, opts);
+	if (load?.busy) {
+		console.debug("[matcher] busy, deferring", load);
 		return { deferred: match };
 	}
-	const first = await Promise.race([match, busy]);
-	if (first === "busy") {
-		console.debug("[matcher] busy, deferring");
-		return { deferred: match };
-	}
-	return { result: first };
+	return { result: await match };
 }
 
 const angDist = (a: number, b: number) =>
