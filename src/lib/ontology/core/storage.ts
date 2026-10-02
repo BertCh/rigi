@@ -176,8 +176,8 @@ export const STORAGE = {
 } as const satisfies Record<string, StorageEntry>;
 export type StorageId = keyof typeof STORAGE;
 
-/** Key prefixes the storage lint scans for. */
-export const STORAGE_PREFIXES = ["rigi.", "rigi-"];
+/** Key prefixes the storage lint scans for (`rigi-` alone is too common: element ids, GPU labels). */
+export const STORAGE_PREFIXES = ["rigi.", "rigi-uploads", "rigi-tiles-"];
 
 /** RegExp matching concrete keys of an entry (`<x>` → one or more chars). */
 export function storageKeyPattern(id: StorageId): RegExp {

@@ -688,7 +688,7 @@ A reference is `Ref<C> = {concept, id}`, and its string form is the URN `rigi:<c
 
 ## Storage
 
-Every key Rigi persists. The check fails on any `rigi.` / `rigi-` literal in `src/` that is not registered here.
+Every key Rigi persists. The check fails on any `rigi.` / `rigi-uploads` / `rigi-tiles-` literal in `src/` that is not registered here.
 
 | id | medium | key | holds | version | module |
 |---|---|---|---|---|---|

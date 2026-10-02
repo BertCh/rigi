@@ -52,7 +52,7 @@ ontology.check.ts runtime integrity + "canonical semantics == app behaviour"
 | add a value to an app union that has a crosswalk | tsc fails in `crosswalk/*`. Classify the new value there. |
 | add a new provenance-like union | Prefer `Provenance` directly. Otherwise add a `satisfies Record<YourUnion, ProvenanceClass>` table and list it in `doc.ts` CROSSWALKS |
 | add a method or algorithm | Add a row to `METHODS` with its agent, evidence, estimates and module |
-| persist something | Add a `STORAGE` row and build keys with `storageKey(id, …)`. The check fails on any unregistered `rigi.` or `rigi-` literal. |
+| persist something | Add a `STORAGE` row and build keys with `storageKey(id, …)`. The check fails on any unregistered `rigi.`, `rigi-uploads` or `rigi-tiles-` literal. |
 | mint a new id kind | Add an `ID_SCHEMES` row (most specific first) with an example |
 | record a semantic disagreement | Add a `FINDINGS` row. If it can be measured, pin it in `ontology.check.ts` |
 
