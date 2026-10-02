@@ -4,7 +4,7 @@
 
 // The tracker /live runs when src/lib/track is absent (or fails to load): the pose is the phone's own
 // sensor reading, nothing more. It satisfies the same Tracker contract, so the page treats both alike.
-// `loadTracker` prefers the real tracker (createTracker from src/lib/track/index.ts) when that module exists.
+// `loadTracker` loads the skyline tracker (createTracker from src/lib/track/index.ts); this one is its fallback.
 
 import type { Pose } from "../camera";
 import type {
@@ -77,27 +77,16 @@ export function createSensorTracker(
 	};
 }
 
-type TrackModule = {
-	createTracker?: (options: LiveTrackerOptions) => Tracker | Promise<Tracker>;
-};
-
-// Matches nothing until unit `tracker` lands src/lib/track/index.ts; tsc and the build both accept that.
-const trackerModules = import.meta.glob<TrackModule>("../track/index.ts");
-
-/** The skyline tracker when it exists, else the sensor-only tracker. `real` says which one you got. */
+/** The skyline tracker (src/lib/track), falling back to the sensor-only tracker when it fails to load. `real` says which one you got. */
 export async function loadTracker(options: LiveTrackerOptions): Promise<{
 	tracker: Tracker & { setYawOffset?(deg: number): void };
 	real: boolean;
 }> {
-	const load = Object.values(trackerModules)[0];
-	if (load) {
-		try {
-			const mod = await load();
-			if (mod.createTracker)
-				return { tracker: await mod.createTracker(options), real: true };
-		} catch (e) {
-			console.warn("[live] tracker failed to load; using sensors only", e);
-		}
+	try {
+		const { createTracker } = await import("../track/index");
+		return { tracker: createTracker(options), real: true };
+	} catch (e) {
+		console.warn("[live] tracker failed to load; using sensors only", e);
 	}
 	return { tracker: createSensorTracker(options), real: false };
 }

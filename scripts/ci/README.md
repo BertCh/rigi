@@ -33,6 +33,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | style-check | fast | CLASSIC style = today's constants, ramps, presets, `?style=` | `scripts/style-check.ts` |
 | models | fast | model weights: manifest sha256 per present file, the sky model runs on the nn CPU backend in node; SKIPs without `public/models` | `src/lib/models/models.check.ts` |
 | labels | fast | peak labels: classic byte-identical, no overlaps | `src/lib/look/__tests__/labels.check.ts` |
+| track-synthetic | fast | live pose tracker on synthetic skylines: error, drift, time to first track | `scripts/track/synthetic.check.ts` |
 | haze-fit | fast | `fitHaze` recovers J, A, β | `src/lib/look/__tests__/haze-fit.test.ts` |
 | haze-tail | fast | the GPU haze fit's CPU tail (`hazeFitTail`) equals `fitHaze` bit for bit on 16 synthetic scenes; `pathFrom` = `atmPath`, `robustSkyExact` = `robustSky`; one-ULP teeth (no GPU) | `src/lib/gpu/look/haze-tail.check.ts` |
 | haze-band | fast | GPU airlight band: the WGSL's integer logic, emulated, equals `airlightBand` on synthetic and adversarial planes (NaN, ±0, subnormals, threshold neighbours); `verifyBand` catches injected faults; the band-path tail equals `fitHaze` (no GPU) | `src/lib/gpu/look/haze-band.check.ts` |

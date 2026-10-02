@@ -430,6 +430,14 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "track-synthetic",
+		tier: "fast",
+		group: "live",
+		cmd: tsx("scripts/track/synthetic.check.ts"),
+		note: "live pose tracker on synthetic rendered skylines (nominal + no-sensor): median/p90 error, drift, time to first track (no GPU, not the recorded-clip gate)",
+		timeoutS: 300,
+	},
+	{
 		id: "haze-fit",
 		tier: "fast",
 		group: "look",
