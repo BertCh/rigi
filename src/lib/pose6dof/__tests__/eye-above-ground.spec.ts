@@ -69,7 +69,7 @@ describe("refineEyeFromSkyline above-ground rows (CR-15)", () => {
 		// same eye and rotation as no AGL prior at all.
 		const obs = observe([30, -20, 115], truth);
 		const start: Pose = { ...truth, yaw: truth.yaw + 0.8 };
-		const opts = { ...base, ground: () => -5000, grid: false };
+		const opts = { ...base, ground: () => -5000, grid: false as const };
 		const off = await refineEyeFromSkyline(
 			obs,
 			start,

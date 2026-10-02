@@ -19,7 +19,6 @@
 
 import { DEG as RAD } from "../geodesy";
 import { fract, smoothstep } from "../math";
-import { COVER_INK, hexToBytes } from "../style/palette";
 
 export const HATCH_LK = {
 	// Hachure: stripe period in pixels on shadow / lit faces, stroke width (px), stroke length
@@ -66,10 +65,10 @@ export const HATCH_LK = {
 	LIT_HI: 0.55,
 } as const;
 
-/** Hachure ink bytes: the rock and ice line inks of style/palette.ts COVER_INK (#2b2724, #3f7fb3). */
+/** Brezine ink roles (src/brand/khipu.ts): rock black-grey #2b2724, ice blue #3f7fb3. */
 export const HATCH_LK_INK = {
-	ROCK: hexToBytes(COVER_INK.rock),
-	ICE: hexToBytes(COVER_INK.ice),
+	ROCK: [43, 39, 36],
+	ICE: [63, 127, 179],
 } as const;
 
 const LK_SEED = 0x4e1d_0907;
