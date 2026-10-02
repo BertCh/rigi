@@ -219,10 +219,7 @@ export const CONCEPTS = {
 			"The DEM surface: heights in metres MSL, sampled from tiles at distance-dependent zoom.",
 		code: ["Terrain", "TerrainSampler", "HeightFn"],
 		has: { source: one("dem-source"), tiles: many("dem-tile") },
-		realizedBy: [
-			"lib/terrain.ts#TerrainTile",
-			"lib/geo/terrain.ts#TerrainSampler",
-		],
+		realizedBy: ["lib/geo/terrain.ts#TerrainSampler"],
 		frame: "heights MSL (≈ EGM2008)",
 	},
 	"dem-source": {

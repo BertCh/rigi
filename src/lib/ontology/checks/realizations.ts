@@ -98,7 +98,6 @@ export type Realizations = {
 	"lib/style/types.ts#PresetId": import("#/lib/style/types").PresetId;
 	"lib/style/types.ts#StyleState": import("#/lib/style/types").StyleState;
 	"lib/style/types.ts#ViewStyle": import("#/lib/style/types").ViewStyle;
-	"lib/terrain.ts#TerrainTile": import("#/lib/terrain").TerrainTile;
 	"lib/tiles3d/config.ts#Tiles3DSource": import("#/lib/tiles3d/config").Tiles3DSource;
 	"lib/upload/exif.ts#ExifTags": import("#/lib/upload/exif").ExifTags;
 	"lib/upload/exif.ts#LocalPhotoExtras": import("#/lib/upload/exif").LocalPhotoExtras;

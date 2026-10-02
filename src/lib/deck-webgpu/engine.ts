@@ -106,6 +106,7 @@ import {
 } from "#/lib/deck/trail-layer";
 import { poseQuaternion, WorldCamera } from "#/lib/deck/world-view";
 import { tileBounds } from "#/lib/dem";
+import { heightFromTile } from "#/lib/dem/height-from-tile";
 import { getFlag } from "#/lib/flags";
 import { startLakeFloor } from "#/lib/geocam/lakes/fetch";
 import { priorHeading } from "#/lib/geocam/priors/heading";
@@ -201,7 +202,6 @@ import {
 } from "#/lib/style/deck-apply";
 import { CLASSIC } from "#/lib/style/defaults";
 import type { ViewStyle } from "#/lib/style/types";
-import { heightFromTile } from "#/lib/terrain";
 import { type TerroirShader, terroirShader } from "#/lib/terroir/glsl/values";
 import type { CoverGrid } from "#/lib/terroir/pack";
 import { tiles3dConfig } from "#/lib/tiles3d/config";

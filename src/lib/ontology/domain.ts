@@ -111,10 +111,9 @@ export type Trail = import("#/lib/photos").RegionTrail;
 /**
  * Terrain: The DEM surface: heights in metres MSL, sampled from tiles at distance-dependent zoom.
  * Frame: heights MSL (≈ EGM2008).
- * Canonical: `lib/terrain.ts#TerrainTile`.
- * Other shapes: `lib/geo/terrain.ts#TerrainSampler`.
+ * Canonical: `lib/geo/terrain.ts#TerrainSampler`.
  */
-export type Terrain = import("#/lib/terrain").TerrainTile;
+export type Terrain = import("#/lib/geo/terrain").TerrainSampler;
 
 /**
  * DEM source: A tiled elevation dataset (Mapterhorn 512 px, Terrarium 256 px) with zoom levels by

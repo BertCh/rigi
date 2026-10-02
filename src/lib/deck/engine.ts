@@ -39,6 +39,7 @@ import {
 } from "../align";
 import { hfovFromAspect, type Pose } from "../camera";
 import { tileBounds } from "../dem";
+import { heightFromTile } from "../dem/height-from-tile";
 import { startLakeFloor } from "../geocam/lakes/fetch";
 import { priorHeading } from "../geocam/priors/heading";
 import { distanceM, EnuFrame, M_PER_DEG_LAT } from "../geodesy";
@@ -130,7 +131,6 @@ import {
 } from "../style/deck-apply";
 import { CLASSIC } from "../style/defaults";
 import type { ViewStyle } from "../style/types";
-import { heightFromTile } from "../terrain";
 import { type TerroirShader, terroirShader } from "../terroir/glsl/values";
 import type { CoverGrid } from "../terroir/pack";
 import { DeckTiles3D } from "../tiles3d/deck-tiles";

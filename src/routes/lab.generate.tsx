@@ -13,7 +13,7 @@
 // Harness hook: window.__genLab { done, error, summary, panels } (tools/nearfield/generate/shots.mjs).
 // Engines (2026-10-01, the three.js PhotoEngine was removed): the WebGL DeckEngine on the visible canvas
 // answers the queries (eye, readback, sampleAt for the scene build); the RGB-D cache (cache-render.ts,
-// three.js) draws its own three Terrain meshes (src/lib/terrain.ts, same ENU frame) on a private offscreen
+// three.js) draws its own three Terrain meshes (src/lib/nearfield/generate/three-terrain.ts, same ENU frame) on a private offscreen
 // WebGLRenderer.
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +35,7 @@ import {
 	generateAlongTrajectory,
 } from "#/lib/nearfield/generate/pipeline";
 import { readoutHit } from "#/lib/nearfield/generate/readout";
+import { Terrain } from "#/lib/nearfield/generate/three-terrain";
 import {
 	makeTrajectory,
 	type NovelCamera,
@@ -49,7 +50,6 @@ import {
 import { getPhoto, loadRegion } from "#/lib/photos";
 import type { FgMask } from "#/lib/renderer";
 import { resolvePose } from "#/lib/roll/roll";
-import { Terrain } from "#/lib/terrain";
 
 type Search = {
 	photo?: string;

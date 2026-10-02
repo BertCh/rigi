@@ -90,7 +90,7 @@ export const fusedFor = (m: UnknownPosePrepare | UnknownPoseRequest) =>
 	!!m.gpu && !!m.solveGpu && m.gpuFused !== false;
 
 /**
- * Mapterhorn is the DEM the app engine (src/lib/terrain.ts) draws with, so the cascade solves on the same
+ * Mapterhorn is the DEM the app engine (src/lib/dem) draws with, so the cascade solves on the same
  * terrain the overlay shows.
  */
 export const UNKNOWN_POSE_DEM: DemSource = MAPTERHORN;

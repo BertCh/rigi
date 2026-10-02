@@ -1564,10 +1564,10 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					tiles fetched in parallel (src/lib/geo/terrain.ts).
 				</p>
 				<Callout tone="note" title="Same tile policy, CPU read side">
-					The 3D mesh (<code>src/lib/terrain.ts</code>) loads Mapterhorn through
-					the same <code>fetchDemBytes</code> policy as the CPU sampler, so both
-					see the same ancestor fallback. The sampler is the synchronous read
-					side: plain arrays, no GPU round trip.
+					The 3D mesh (<code>src/lib/deck-webgpu/terrain.ts</code>) loads
+					Mapterhorn through the same <code>fetchDemBytes</code> policy as the
+					CPU sampler, so both see the same ancestor fallback. The sampler is
+					the synchronous read side: plain arrays, no GPU round trip.
 				</Callout>
 				<h3>Where it fits</h3>
 				<p>
@@ -1585,7 +1585,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 					<CodeRef path="src/lib/dem/tiles.ts" />
 					<CodeRef path="src/lib/dem/load.ts" />
 					<CodeRef path="src/lib/dem/decode.ts" />
-					<CodeRef path="src/lib/terrain.ts" />
+					<CodeRef path="src/lib/deck-webgpu/terrain.ts" />
 				</div>
 				<p className={`font-mono gb-secondary ${TYPE.caption}`}>
 					TerrainSampler.sample, sampleAt, ground, pixel, loadTerrain,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Draped-imagery provider abstraction (roadmap N2). The three renderer paths (src/lib/terrain.ts,
+// Draped-imagery provider abstraction (roadmap N2). The three renderer paths (src/lib/nearfield/generate/three-terrain.ts,
 // src/lib/deck/terrain-data.ts) ask this module for a tile's URL list, tried in order.
 //
 // Providers (`?imagery=<id>` or VITE_IMAGERY_PROVIDER=<id>; the default is "default"):

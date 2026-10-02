@@ -4,10 +4,10 @@
 
 /// <reference lib="webworker" />
 // Terrain tiles off the main thread (terrain.ts fetchTiles): decode + crop + mesh arrays + kept heights,
-// the same buildTile the page would run (terrain-mesh.ts), so the tiles are the same bits.
-import { blobHeights } from "./dem/image";
-import { buildTile, type TileJob, type TileResult } from "./terrain-mesh";
-import { serveWorker } from "./worker-pool";
+// the same buildTile the page would run (three-terrain-mesh.ts), so the tiles are the same bits.
+import { blobHeights } from "../../dem/image";
+import { serveWorker } from "../../worker-pool";
+import { buildTile, type TileJob, type TileResult } from "./three-terrain-mesh";
 
 serveWorker<TileJob, TileResult | null>(async (job) => {
 	const t = await buildTile(job, (buf) => blobHeights(new Blob([buf])));

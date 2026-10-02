@@ -342,7 +342,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		modules: [
 			"src/lib/geo/terrain.ts",
 			"src/lib/dem/load.ts",
-			"src/lib/terrain.ts",
+			"src/lib/dem/height-from-tile.ts",
 		],
 		reports: ["reports/Mountain photo georeferencing SoTA.md"],
 		visual:
@@ -432,7 +432,7 @@ export const GIPFELBUCH_NODES: GipfelbuchNode[] = [
 		summary:
 			"Everything Rigi places in the world is reconciled with the DEM. The eye is lifted to max(GPS altitude, ground + 1.6 m) and bounded below by a still lake's level; OSM peaks are moved to the highest DEM point within a radius that grows with distance; and monocular depth in Step Inside is anchored to DEM ray lengths with a scored fit. Each one is either a snap, a bound or a prior, chosen on purpose.",
 		modules: [
-			"src/lib/terrain.ts",
+			"src/lib/dem/height-from-tile.ts",
 			"src/lib/deck/scene.ts",
 			"src/lib/geocam/lakes/floor.ts",
 			"src/lib/nearfield/anchor.ts",

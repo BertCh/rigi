@@ -1157,7 +1157,7 @@ export default function Page({ node }: { node: GipfelbuchNode }) {
 				<div className="flex flex-wrap gap-2">
 					<CodeRef path="src/lib/deck/engine.ts" />
 					<CodeRef path="src/lib/deck/scene.ts" />
-					<CodeRef path="src/lib/terrain.ts" />
+					<CodeRef path="src/lib/dem/height-from-tile.ts" />
 					<CodeRef path="src/lib/geo/horizon.ts" />
 					<CodeRef path="src/lib/geocam/lakes/floor.ts" />
 					<CodeRef path="src/lib/concord/priors/altitude.ts" />

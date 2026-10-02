@@ -2,13 +2,18 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Terrain tile mesh arrays (terrain.ts): the camera-local ENU grid + skirts of one DEM tile, as plain typed
-// arrays, so they can be built in terrain-tile.worker.ts as well as on the page (same code, same bits).
+// Terrain tile mesh arrays (three-terrain.ts): the camera-local ENU grid + skirts of one DEM tile, as plain typed
+// arrays, so they can be built in three-terrain-tile.worker.ts as well as on the page (same code, same bits).
 // Environment-free: no three, no DOM.
-import { validateTile } from "./dem/decode";
-import { ancestorCrop } from "./dem/grid";
-import { type TileKey, tileBounds, tileXToLon, tileYToLat } from "./dem/tiles";
-import { DEG, distanceM, EnuFrame, WGS84 } from "./geodesy";
+import { validateTile } from "../../dem/decode";
+import { ancestorCrop } from "../../dem/grid";
+import {
+	type TileKey,
+	tileBounds,
+	tileXToLon,
+	tileYToLat,
+} from "../../dem/tiles";
+import { DEG, distanceM, EnuFrame, WGS84 } from "../../geodesy";
 
 export function downsample(h: Float32Array, S: number, T: number) {
 	if (T >= S) return h;

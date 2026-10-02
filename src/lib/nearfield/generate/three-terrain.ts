@@ -5,21 +5,21 @@
 // Terrain around a camera: quadtree LOD selection of Terrarium DEM tiles, meshed in a
 // camera-local ENU frame (curvature + refraction baked in), plus optional draped imagery.
 import * as THREE from "three";
-import { cachedFetch, tilePriority } from "./cache";
+import { cachedFetch, tilePriority } from "../../cache";
 import {
 	decodeHeights,
 	fetchDemBytes,
 	latToTileY,
-	loadDemTile,
 	lonToTileX,
 	type TileKey,
 	tileBounds,
 	tileNum,
 	tileXToLon,
 	tileYToLat,
-} from "./dem";
-import { distanceM, type EnuFrame, M_PER_DEG_LAT } from "./geodesy";
-import { imageryTileUrls } from "./licences/imagery";
+} from "../../dem";
+import { distanceM, type EnuFrame, M_PER_DEG_LAT } from "../../geodesy";
+import { imageryTileUrls } from "../../licences/imagery";
+import { WorkerPool } from "../../worker-pool";
 import {
 	buildTile,
 	edgeVertex,
@@ -27,12 +27,11 @@ import {
 	type TileArrays,
 	type TileJob,
 	type TileResult,
-} from "./terrain-mesh";
-import { WorkerPool } from "./worker-pool";
+} from "./three-terrain-mesh";
 
 // DEM: Mapterhorn (512 px, national lidar such as swissALTI3D where available) through dem's fetchDemBytes,
 // the policy the deck terrain and the CPU horizon share (a missing tile = its nearest ancestor, upsampled);
-// tiles decode and mesh in terrain-tile.worker.ts (terrain-mesh.ts buildTile = loadDemTile + mesh).
+// tiles decode and mesh in three-terrain-tile.worker.ts (three-terrain-mesh.ts buildTile = loadDemTile + mesh).
 
 export type ImagerySource = "satellite" | "topo" | "none";
 
@@ -90,25 +89,6 @@ async function fetchImage(
 	return null;
 }
 
-/**
- * DEM height at a point from its zoom-z tile alone, fetched, decoded and sampled exactly as a loaded
- * Terrain does (same URL and cache entry, same priority, same bilinear), so it equals `heightAt` wherever
- * that tile is the finest one loaded, e.g. the camera point at maxZoom. Lets work that needs the camera's
- * ground height (the horizon worker) start before the whole terrain is in.
- */
-export async function heightFromTile(
-	lat: number,
-	lon: number,
-	z = 14,
-	signal?: AbortSignal,
-): Promise<number | null> {
-	const fx = lonToTileX(lon, z);
-	const fy = latToTileY(lat, z);
-	const key = { z, x: Math.floor(fx), y: Math.floor(fy) };
-	const dem = await loadDemTile(key, { signal, priority: tilePriority(0, z) });
-	return dem && sampleGrid(dem.heights, dem.size, fx - key.x, fy - key.y);
-}
-
 async function pool<T>(items: T[], n: number, fn: (t: T) => Promise<void>) {
 	let i = 0;
 	await Promise.all(
@@ -163,7 +143,7 @@ export function selectTiles(
 /** Tile decode + mesh arrays off the main thread (same buildTile on the page where workers can't run). */
 const tilePool = new WorkerPool<TileJob, TileResult | null>(
 	() =>
-		new Worker(new URL("./terrain-tile.worker.ts", import.meta.url), {
+		new Worker(new URL("./three-terrain-tile.worker.ts", import.meta.url), {
 			type: "module",
 		}),
 	(job) => buildTile(job, decodeHeights),

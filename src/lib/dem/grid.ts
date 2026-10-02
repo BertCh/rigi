@@ -7,7 +7,7 @@ import type { TileKey } from "./tiles";
 /**
  * Bilinear sample of an S×S grid of pixel-centred samples at pixel coords (0..S), clamped to the outer
  * sample centres. Shared by deck/terrain-data, nearfield/near-dem and look/relief/heights
- * (terrain-mesh.ts keeps its own uv variant).
+ * (nearfield/generate/three-terrain-mesh.ts keeps its own uv variant).
  */
 export function sampleGrid(h: Float32Array, S: number, px: number, py: number) {
 	const m = S - 1;

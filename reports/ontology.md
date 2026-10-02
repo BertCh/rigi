@@ -175,7 +175,7 @@ These are the TypeScript types that realize each concept. The first is canonical
 | `peak` | `lib/geo/peaks.ts#Peak`, `lib/photos.ts#RegionPeak`, `lib/picker/candidates.ts#PoolPeak`, `lib/export/geojson.ts#GeoJsonPeak` |
 | `lake` | `lib/geocam/lakes/compact.ts#LakeGeo`, `lib/geocam/lakes/levels.ts#LakeLevel` |
 | `trail` | `lib/photos.ts#RegionTrail` |
-| `terrain` | `lib/terrain.ts#TerrainTile`, `lib/geo/terrain.ts#TerrainSampler` |
+| `terrain` | `lib/geo/terrain.ts#TerrainSampler` |
 | `dem-source` | `lib/dem/sources.ts#DemSource` |
 | `dem-tile` | `lib/dem/tiles.ts#TileKey`, `lib/dem/load.ts#DemRaster` |
 | `tiles3d-source` | `lib/tiles3d/config.ts#Tiles3DSource` |
