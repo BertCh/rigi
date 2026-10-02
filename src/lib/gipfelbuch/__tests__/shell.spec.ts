@@ -55,9 +55,7 @@ describe("signpostKicker", () => {
 	it("names the chapter only when it changes", () => {
 		expect(signpostKicker("next", "I", "I")).toBe("Weiter");
 		expect(signpostKicker("next", "I", "II")).toBe("Weiter · Kapitel II");
-		expect(signpostKicker("prev", "II", "I")).toBe(
-			"Zurück · Kapitel I",
-		);
+		expect(signpostKicker("prev", "II", "I")).toBe("Zurück · Kapitel I");
 		expect(signpostKicker("prev", undefined, undefined)).toBe("Zurück");
 	});
 });
