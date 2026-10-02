@@ -33,6 +33,7 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - `tools/matcher/requirements.txt` and `tools/nearfield/requirements.txt` (CR-26).
 - Concordance C2: under `?concord=eye` the per-lens focal table now reaches the app prior (`getPhoto`); photo metadata keeps EXIF `model`/`lensModel` (uploads now, bundled photos after the next ingest).
 - Cleanup: one source for `DEG`, `wrap180`, `clamp`/`smoothstep`/`fract`/`mix`, Web-Mercator (`src/lib/mercator.ts`), `srgbToLinear` and 3×3 helpers; dead exports, the `PhotoEngine` alias, the dead three.js picker branch and stale three.js comments removed.
+- Near-field service (`tools/nearfield/service`): unit tests for the CR-05 caps (`tests/test_caps.py`); fixes: non-integer or negative `Content-Length` is a 400 (was a 500), non-finite numeric fields (`nan`, `inf`) are rejected, a hard pixel cap (`NEARFIELD_MAX_PIXELS`, 100 MP) on image and mask decode, 500 responses no longer echo exception text, a full cache disk no longer discards a computed result, and error replies sent before the body is read close the keep-alive connection.
 
 ### luma compute follow-ups (2026-10-01, WAG-next)
 

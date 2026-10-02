@@ -27,6 +27,7 @@ import _env  # noqa: F401  (path setup first)
 import argparse
 import io
 import json
+import math
 import os
 import sys
 import time
@@ -49,12 +50,19 @@ MAX_BODY = int(os.environ.get("NEARFIELD_MAX_BODY", 512 * 1024 * 1024))  # 16 x 
 # Origin allowlist: localhost / 127.0.0.1 / [::1] on any port, plus NEARFIELD_CORS (comma-separated exact origins)
 EXTRA_ORIGINS = {o.strip() for o in os.environ.get("NEARFIELD_CORS", "").split(",") if o.strip()}
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "[::1]")
+# Decompression-bomb cap, checked on the header before any pixel is decoded (16 x 8192 px multiview parts are 67 MP each)
+MAX_PIXELS = int(os.environ.get("NEARFIELD_MAX_PIXELS", 100_000_000))
 
 
 def host_ok(hostport: str | None) -> bool:
     h = (hostport or "").strip().lower()
-    h = h[: h.index("]") + 1] if h.startswith("[") and "]" in h else h.rsplit(":", 1)[0]
-    return h in LOCAL_HOSTS
+    if h.startswith("["):
+        host, close, port = h.partition("]")
+        host += close
+        port = port[1:] if port.startswith(":") else port and "x"
+    else:
+        host, _, port = h.partition(":")
+    return host in LOCAL_HOSTS and (port == "" or port.isdigit())
 
 
 def origin_ok(origin: str) -> bool:
@@ -93,7 +101,10 @@ def fnum(fields: dict, name: str, default, lo=None, hi=None, cast=float):
     if v in (None, ""):
         return default
     try:
-        x = cast(float(v))
+        x = float(v)
+        if not math.isfinite(x):  # nan passes every range comparison, inf overflows int()
+            raise ValueError(v)
+        x = cast(x)
     except ValueError as e:
         raise ServiceError(400, "bad_param", f"{name}={v!r} is not a number") from e
     if (lo is not None and x < lo) or (hi is not None and x > hi):
@@ -101,12 +112,22 @@ def fnum(fields: dict, name: str, default, lo=None, hi=None, cast=float):
     return x
 
 
-def decode_image(b: bytes, max_side: int | None) -> tuple[np.ndarray, Image.Image]:
+def open_image(b: bytes, what: str = "image") -> Image.Image:
+    """Decode with a pixel cap (Image.open is lazy, so the size is known before any pixel is allocated)."""
     try:
         im0 = Image.open(io.BytesIO(b))
-        im0.load()
+        too_big = im0.width * im0.height > MAX_PIXELS
+        if not too_big:
+            im0.load()
     except Exception as e:  # noqa: BLE001
-        raise ServiceError(400, "bad_image", f"cannot decode image: {e}") from e
+        raise ServiceError(400, "bad_image" if what == "image" else "bad_mask", f"cannot decode {what}: {e}") from e
+    if too_big:
+        raise ServiceError(400, "image_too_large", f"{what} is {im0.width}x{im0.height}; the limit is {MAX_PIXELS} pixels")
+    return im0
+
+
+def decode_image(b: bytes, max_side: int | None) -> tuple[np.ndarray, Image.Image]:
+    im0 = open_image(b)
     im = ImageOps.exif_transpose(im0).convert("RGB")
     if max_side:
         w, h = im.size
@@ -296,12 +317,7 @@ def ep_inpaint(fields, files):
     if not ok:
         raise ServiceError(501, "inpaint_unavailable", why)
     rgb, _ = decode_image(img, None)
-    try:
-        m = Image.open(io.BytesIO(mk))
-        m.load()
-    except Exception as e:  # noqa: BLE001
-        raise ServiceError(400, "bad_mask", f"cannot decode mask: {e}") from e
-    m = np.asarray(m.convert("L"))
+    m = np.asarray(open_image(mk, "mask").convert("L"))
     H, W = rgb.shape[:2]
     if m.shape != (H, W):
         raise ServiceError(400, "bad_mask", f"mask {m.shape[1]}x{m.shape[0]} != image {W}x{H}")
@@ -361,6 +377,8 @@ class Handler(BaseHTTPRequestHandler):
         self._cors()
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        if self.close_connection:
+            self.send_header("Connection", "close")
         for k, v in (headers or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -398,14 +416,21 @@ class Handler(BaseHTTPRequestHandler):
         if not self._guard():
             return
         path = self.path.split("?")[0]
+        body_unread = True  # an error before the body is read would leave it in the keep-alive stream: close instead
         try:
             fn = ROUTES.get(path)
             if fn is None:
                 raise ServiceError(404, "not_found", path)
-            n = int(self.headers.get("Content-Length") or 0)
-            if n <= 0 or n > MAX_BODY:
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                n = -1
+            if n < 0:
+                raise ServiceError(400, "bad_length", "Content-Length must be a non-negative integer")
+            if n == 0 or n > MAX_BODY:
                 raise ServiceError(413 if n > MAX_BODY else 411, "bad_length", f"Content-Length {n}")
             raw = self.rfile.read(n)
+            body_unread = False
             fields, files = parse_multipart(self.headers.get("Content-Type", ""), raw)
             nocache = fields.get("nocache") in ("1", "true")
             params = {k: v for k, v in fields.items() if k != "nocache"}
@@ -416,14 +441,19 @@ class Handler(BaseHTTPRequestHandler):
                 hdrs = {**hdrs, "X-Cache": "hit"}
             else:
                 ctype, hdrs, body = fn(fields, files)
-                cache.put(ck, ctype, hdrs, body)
+                try:
+                    cache.put(ck, ctype, hdrs, body)
+                except OSError:  # disk full / unwritable cache dir must not discard a computed result
+                    traceback.print_exc()
                 hdrs = {**hdrs, "X-Cache": "miss"}
             self._send(200, ctype, body, hdrs)
         except ServiceError as e:
+            self.close_connection = self.close_connection or body_unread
             self._err(e)
-        except Exception as e:  # noqa: BLE001
-            traceback.print_exc()
-            self._err(ServiceError(500, "internal", f"{type(e).__name__}: {e}"))
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()  # details stay in the service log; the client gets no exception text or paths
+            self.close_connection = self.close_connection or body_unread
+            self._err(ServiceError(500, "internal", "internal error (see the service log)"))
 
 
 def main():
