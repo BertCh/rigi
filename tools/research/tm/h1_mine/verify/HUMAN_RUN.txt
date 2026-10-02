@@ -1,0 +1,32 @@
+H1 blind verification: steps for the owner (dev side is done; this is the human/verifier side)
+
+Preconditions (already true on the dev side): pack/ holds 27 hashed folders with 120 overlays; pack_index.json lists them
+in 2 suggested batches. Overlay headers say only "candidate XX" (no pose, id or source).
+
+0. Never open key/, pool.json, runs/, REPORT.txt or PROTOCOL.txt in the verifier's sight. Verifiers see only a pack copy + the page.
+1. Check the pack matches its index (reads folder names only, no images, no key):
+     npx tsx tools/research/tm/h1_mine/verify/check_pack.ts
+   Expect "27 folders, 120 overlays ... OK".
+2. Choose 2 fresh verifiers per batch (two humans, or two fresh agents with the checklist). Give verifier ids, e.g. va, vb.
+3. For each verifier and batch (0 and 1), build their page:
+     npx tsx tools/research/tm/h1_mine/verify/make_session.ts --verifier va --batch 0
+   -> verify/out/session_va_b0.html (static; open from disk, no server). Items are in a seeded order that differs per verifier.
+   Hand the verifier ONLY that page plus a copy of the pack folders of that batch laid out as <dir>/pack/<folder>/ and the page
+   in <dir>/verify/out/ (the page loads ../../pack/..., so keep that relative layout or pass --pack and --out to put them together).
+4. The verifier judges every overlay with the checklist C1 coverage >= 70%, C2 vertical fit within 1.5% of height,
+   C3 feature alignment, C4 tilt (reports/bench-wild.md). Keys: c correct, w wrong, n near-miss (counts as wrong),
+   u unsure (only for unjudgeable skylines), x not seen; j/k previous/next. Progress autosaves in the browser.
+   When finished press "Download verdicts.json" (verdicts_<id>_b<batch>.json). One verdict per overlay; do not skip.
+5. Collect the files: 4 for a full run (verifier va and vb, batch 0 and 1). Keep the SAME id for one verifier across batches
+   (e.g. va, vb); per-batch files of one verifier are unioned automatically. A second person must use a different id.
+6. Optional merge to inspect disagreements (no key needed):
+     npx tsx tools/research/tm/h1_mine/verify/merge_verdicts.ts --out merged.json verdicts_va_b0.json verdicts_va_b1.json verdicts_vb_b0.json verdicts_vb_b1.json
+7. Score AFTER all verdicts are in (this reads the key; do it once). Pick the merge rule first (default = protocol:
+   correct iff both correct, wrong if either wrong; add --strict to make any disagreement unsure) and write the choice down.
+     npx tsx tools/research/tm/h1_mine/verify/score_verdicts.ts --key tools/research/tm/h1_mine/key/key.json \
+       --pool tools/research/tm/h1_mine/pool.json --out hardneg.json <the four verdict files>
+8. Read the printed counts: blind-wrong + wrong-construct + inherited-wrong must reach 30 (R2 refuses below that) and check the QC
+   block: verifiers flagged for failing a positive control or accepting a decoy, duplicate disagreements, construct-check agreement.
+   Flagged verifiers' verdicts are still reported; the owner decides whether to re-run that batch with a fresh verifier.
+9. Hand hardneg.json to R2: tools/research/tm/h2_veto/PREREG_DRAFT.txt (sign-off and --freeze come BEFORE step 7, so that
+   hardneg.json's generatedAt is later than the freeze; the evaluator refuses otherwise).
