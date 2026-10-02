@@ -4,6 +4,20 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+### Luma-native GPU pass (2026-10-02, session 07)
+
+- **Vendored luma `10.0.0-alpha.2-rigi.4` and deck `9.4.0-rigi.2`.** luma adds #3345 (compatibility devices get the adapter's real limits) and four local APIs: `CommandEncoder.clearBuffer`, `Device.submit(cb?, additionalCommandBuffers?)`, `Buffer.mapAndReadAsync(…, {waitForSubmittedWork})`, MSAA `RenderBundleEncoder`. deck adds #10779, #10778, #10782, #10753, #10776. The app now uses those APIs instead of the raw `clearBuffer`, the private submit finaliser, raw `mapAsync` and the native bundle encoder.
+- **Public luma API instead of raw WebGPU:** sky prep upload, mipmaps (`generateTextureMipmaps`), frame waiters (`createFence`), the compute sidecar (`webgpuAdapter.create` with `optionalFeatures` / `requiredLimits`). Kernels share the device `PipelineFactory`. New storage binding guards (zero size, offset alignment).
+- **Uniforms through luma's `ShaderBlockWriter`** (`gpu/core/uniform-block.ts` `defineUniformBlock`): geo-query, silhouette, terrain-cull, 13 look / precision structs and 8 align / solve / horizon structs, each proven byte-identical (fast checks `gpu-uniform-block`, `-a`, `-look`).
+- **Geometry target unpacked on the GPU** (copy/select-only WGSL): range-only reads are 4 MB instead of 16 MB plus a CPU loop (fast check `geo-unpack`).
+- `look/textures.ts` on core kernels and graphs (group `look-tex`), async compile for page-side graphs, LookBridge pipeline prewarm.
+- Splat sort: the in-house radix is gone (luma `GPUSort` only); `?splatSortGpgpu` is retired. Plain `.splat` files load through loaders.gl `SPLATLoader`.
+- WebGL fallback: silhouette mask and roll-map range on luma `Model`s; geometry and layer readbacks on `texture.readBuffer` + `Buffer.readAsync`.
+- Matcher: the T6 GPU skyline grid is on by default (`T6_GPU_GRID=0` opts out).
+- `heightFromTile` moved to `src/lib/dem/`; the legacy three `Terrain` lives next to `/lab/generate`.
+- CI: `gpu-raw-lint` ratchet on raw WebGPU / private luma / raw GL use (705 → 339 escapes in this pass).
+- All browser-unverified (cook mode). Report: `reports/gpu-luma-native-2026-10-01.md`.
+
 ### Cartography consolidation (2026-10-02)
 
 - **One cartographic palette.** `src/lib/style/palette.ts` names the map colours that were copied across modules (contour brown, cover inks, warm/Berann/dark ink, paper, classic sky and haze, the Alpine tint) with their provenance. Presets, `terroir/classes.ts CONTOUR_INK`, `terroir/hatch-lk.ts HATCH_LK_INK`, `CLASSIC`, the world-sky constants, the `patterson` ramp and the flow streak colour read it. The LOOK_ALPINE tint is generated for GLSL and WGSL from `ALPINE_TINT`. Pixel-neutral: resolved presets and deck terrain styles are identical, and the shader text is identical up to float spelling.
