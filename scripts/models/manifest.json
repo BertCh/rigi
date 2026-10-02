@@ -46,5 +46,13 @@
 		"licence": "MIT",
 		"source": "skyseg-u2netp.873ea284.onnx (xiongzhu666/Sky-Segmentation-and-Post-processing, commit 1f7811b) Conv kernels as fp16 safetensors + graph program",
 		"producer": "scripts/models/u2netp.py"
+	},
+	{
+		"file": "moge2-vits-normal.6d404d23.safetensors",
+		"sha256": "6d404d2320d2f6113a81b8d7dda0d71711297cb9bdcc41e4b9557ff5acdcc363",
+		"bytes": 70243040,
+		"licence": "MIT",
+		"source": "MoGe-2 ViT-S normal (Ruicheng/moge-2-vits-normal @ 26b477f4, MIT; DINOv2-S backbone Apache-2.0), state_dict as fp16 safetensors (image mean/std fp32)",
+		"producer": "scripts/models/moge2-vits.py"
 	}
 ]

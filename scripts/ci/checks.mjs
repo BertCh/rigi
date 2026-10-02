@@ -640,6 +640,23 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "nearfield-depth-net",
+		tier: "fast",
+		group: "nearfield",
+		cmd: tsx("src/lib/nearfield/local/depth-net.check.ts"),
+		needs: ["public/models/moge2-vits-normal.6d404d23.safetensors"],
+		note: "MoGe-2 ViT-S on src/lib/nn vs PyTorch (per layer; the CPU row stops after the encoder, --full / --backend gpu run it all); the reference is made once with the matcher venv",
+		timeoutS: 300,
+	},
+	{
+		id: "nearfield-lift-dawn",
+		tier: "fast",
+		group: "nearfield",
+		cmd: tsx("scripts/gpu/nearfield-lift-dawn.ts"),
+		note: "depth → Gaussians lift kernel (ComputeGraph) vs its CPU twin on Dawn; SKIPs without DAWN_DIR",
+		timeoutS: 120,
+	},
+	{
 		id: "splat-sort",
 		tier: "fast",
 		group: "nearfield",

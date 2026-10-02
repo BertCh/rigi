@@ -50,6 +50,8 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | export | fast | export/interchange (XMP, GeoJSON, KML, COLMAP…) | `scripts/test-export.ts` (needs `public/photos/`) |
 | splat-loaders / -ext | fast | splat loaders: `.splat-v1` round trip, PLY; SPZ (v2/v3/v4), KSPLAT (levels 0/1) and plain `.splat` through `@loaders.gl/splats` on hand-built fixtures | `src/lib/nearfield/splat-loaders*.check.ts` |
 | nearfield-core / -export / -generate / -spot / -eyes / -propagate, splat-sort | fast | Step Inside core; generated splats never exported; propagation parity with Python; depth sort | `src/lib/nearfield/**`, `tools/nearfield/propagate/propagate.check.ts`, `scripts/nearfield/splat-sort-test.ts` |
+| nearfield-depth-net | fast | Step Inside's in-browser depth model (MoGe-2 ViT-S on `src/lib/nn`) vs PyTorch per layer; the CPU row stops after the encoder (`--full`, `--backend gpu` run it all); the reference is made once with `tools/matcher/.venv` | `src/lib/nearfield/local/depth-net.check.ts` |
+| nearfield-lift-dawn | fast | depth → Gaussians lift kernel (ComputeGraph) vs its CPU twin on Dawn; SKIPs without `DAWN_DIR` | `scripts/gpu/nearfield-lift-dawn.ts` |
 | nearfield-service | fast | near-field service caps and error paths (CR-05), in-process Python unittest, no model load; SKIPs without `tools/matcher/.venv` | `tools/nearfield/service/tests/test_caps.py` |
 | tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |
 | photoprep | fast | GPU photo prep path (`4 100000` args) | `src/lib/gpu/photoprep/photoprep.check.ts` |
