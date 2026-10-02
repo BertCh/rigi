@@ -215,6 +215,59 @@ export function readbackBuffer(device: Device, byteLength: number, id: string) {
 	});
 }
 
+/** Timings of one readTextureQuiet(). */
+export type QuietReadTiming = {
+	fenceMs: number;
+	polls: number;
+	probes: number;
+	copyMs: number;
+	readbackMs: number;
+};
+
+/**
+ * Asynchronous texture readback on the WebGL fallback: `issueRead` queues the read into a fresh
+ * pack buffer (texture.readBuffer: PIXEL_PACK_BUFFER + readPixels; the buffer is new per read, so
+ * its storage is never a reused, already-fenced one), then a fence behind it is waited on, the GPU
+ * queue is waited short (glFence + readbackQuiet) and only then is the buffer copied out with
+ * Buffer.readAsync (a plain getBufferSubData on WebGL: a memcpy once the data landed, never a stall).
+ * Resolves the bytes (a fresh Uint8Array, offset 0) or null = cancelled / context lost.
+ */
+export async function readTextureQuiet(
+	device: Device,
+	bytes: number,
+	id: string,
+	issueRead: (buffer: Buffer) => void,
+	cancelled: () => boolean = () => false,
+): Promise<{ data: Uint8Array; timing: QuietReadTiming } | null> {
+	const gl = glOf(device);
+	const buffer = readbackBuffer(device, bytes, id);
+	try {
+		const t0 = performance.now();
+		issueRead(buffer);
+		const fence = await glFence(gl, cancelled);
+		const quiet = fence.ok
+			? await readbackQuiet(gl, fence.ms, cancelled)
+			: { ok: false, probes: 0 };
+		const t1 = performance.now();
+		if (!quiet.ok || cancelled()) return null;
+		const data = await buffer.readAsync(0, bytes);
+		const t2 = performance.now();
+		return {
+			data,
+			timing: {
+				fenceMs: t1 - t0,
+				polls: fence.polls,
+				probes: quiet.probes,
+				copyMs: t2 - t1,
+				readbackMs: t2 - t0,
+			},
+		};
+	} finally {
+		// kept until the copy: the readPixels reads into this buffer
+		buffer.destroy();
+	}
+}
+
 /** Resolves on the next timer turn (a fence's status can only change between tasks). */
 const nextTurn = () => new Promise<void>((res) => setTimeout(res, 4));
 
@@ -300,12 +353,6 @@ export type ReadbackTiming = {
 /** An r32float + depth render target with an asynchronous (PBO + fence) readback. */
 export class GeometryTarget {
 	fbo: Framebuffer;
-	/** Idle STREAM_READ pack buffers of `pboBytes` each (one per overlapping read, so a newer
-	 * read never overwrites a buffer whose fence an older one is still waiting on). */
-	private pbos: WebGLBuffer[] = [];
-	private pboBytes = 0;
-	/** RGBA fallback staging (4 floats per pixel). */
-	private rgba: Float32Array | null = null;
 	/** null = not probed yet; true = RED/FLOAT is not a readPixels format here, read RGBA/FLOAT */
 	private readRGBA: boolean | null = null;
 	private destroyed = false;
@@ -373,53 +420,29 @@ export class GeometryTarget {
 	 */
 	async read(out: Float32Array): Promise<boolean> {
 		if (this.destroyed) return false;
-		const gl = glOf(this.device);
 		const { width, height } = this.fbo;
 		const n = width * height;
 		this.readRGBA ??= !this.redFloatReadable();
 		const comps = this.readRGBA ? 4 : 1;
 		const bytes = n * comps * 4;
-		if (this.pboBytes !== bytes) {
-			for (const b of this.pbos) gl.deleteBuffer(b);
-			this.pbos = [];
-			this.pboBytes = bytes;
-		}
-		const pbo = this.pbos.pop() ?? gl.createBuffer();
-		if (!pbo) return false;
-		const t0 = performance.now();
-		this.readPixelsInto(pbo, comps === 4);
-		const cancelled = () => this.destroyed;
-		const fence = await glFence(gl, cancelled);
-		const quiet = fence.ok
-			? await readbackQuiet(gl, fence.ms, cancelled)
-			: { ok: false, probes: 0 };
-		const t1 = performance.now();
-		if (!quiet.ok || this.destroyed) {
-			gl.deleteBuffer(pbo);
-			return false;
-		}
-		const prev = gl.getParameter(gl.COPY_READ_BUFFER_BINDING);
-		gl.bindBuffer(gl.COPY_READ_BUFFER, pbo);
-		if (comps === 1) gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, out, 0, n);
-		else {
-			if (this.rgba?.length !== n * 4) this.rgba = new Float32Array(n * 4);
-			const f = this.rgba;
-			gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, f, 0, n * 4);
-			for (let i = 0; i < n; i++) out[i] = f[i * 4];
-		}
-		gl.bindBuffer(gl.COPY_READ_BUFFER, prev);
-		const t2 = performance.now();
-		// a resize meanwhile changed the size: this buffer belongs to no pool any more
-		if (this.pboBytes === bytes) this.pbos.push(pbo);
-		else gl.deleteBuffer(pbo);
-		this.lastRead = {
-			fenceMs: t1 - t0,
-			polls: fence.polls,
-			probes: quiet.probes,
-			copyMs: t2 - t1,
-			readbackMs: t2 - t0,
+		const texture = this.texture;
+		// one fresh buffer per read, so overlapping reads never share storage (a newer read must not
+		// overwrite a buffer whose fence an older one is still waiting on)
+		const res = await readTextureQuiet(
+			this.device,
 			bytes,
-		};
+			"geometry-readback",
+			(buffer) =>
+				comps === 1
+					? texture.readBuffer({}, buffer)
+					: this.readPixelsRgbaInto(buffer),
+			() => this.destroyed,
+		);
+		if (!res || this.destroyed) return false;
+		const f = new Float32Array(res.data.buffer, 0, n * comps);
+		if (comps === 1) out.set(f);
+		else for (let i = 0; i < n; i++) out[i] = f[i * 4];
+		this.lastRead = { ...res.timing, bytes };
 		return true;
 	}
 
@@ -436,31 +459,20 @@ export class GeometryTarget {
 		return ok;
 	}
 
-	/** readPixels of the range attachment into `pbo`: RED/FLOAT (what luma's texture.readBuffer
-	 * issued), or RGBA/FLOAT (always allowed) where RED/FLOAT isn't a readPixels format. */
-	private readPixelsInto(pbo: WebGLBuffer, rgba: boolean) {
+	/** readPixels RGBA/FLOAT of the range attachment into `buffer` (always an allowed format): the
+	 * fallback where RED/FLOAT isn't a readPixels format, which texture.readBuffer cannot express
+	 * (it reads in the texture's own format, RED). */
+	private readPixelsRgbaInto(buffer: Buffer) {
 		const gl = glOf(this.device);
+		const handle = (buffer as unknown as { handle: WebGLBuffer }).handle;
 		const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
 		const prevPack = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
 		const prevAlign = gl.getParameter(gl.PACK_ALIGNMENT);
 		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fboHandle);
 		gl.readBuffer(gl.COLOR_ATTACHMENT0);
-		gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
-		// re-specify (orphan) the storage on every read: a READ-usage buffer written again after a
-		// fenced readback loses Chrome's shadow copy (console warning; in an isolated page the
-		// reused buffer's getBufferSubData took 2.2 s, the orphaned one 1–2 ms behind the same
-		// queue; in the app it was not enough on its own, hence readbackQuiet)
-		gl.bufferData(gl.PIXEL_PACK_BUFFER, this.pboBytes, gl.STREAM_READ);
+		gl.bindBuffer(gl.PIXEL_PACK_BUFFER, handle);
 		gl.pixelStorei(gl.PACK_ALIGNMENT, 4);
-		gl.readPixels(
-			0,
-			0,
-			this.width,
-			this.height,
-			rgba ? gl.RGBA : gl.RED,
-			gl.FLOAT,
-			0,
-		);
+		gl.readPixels(0, 0, this.width, this.height, gl.RGBA, gl.FLOAT, 0);
 		gl.pixelStorei(gl.PACK_ALIGNMENT, prevAlign);
 		gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prevPack);
 		gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
@@ -477,9 +489,6 @@ export class GeometryTarget {
 
 	destroy() {
 		this.destroyed = true;
-		const gl = glOf(this.device);
-		for (const b of this.pbos) gl.deleteBuffer(b);
-		this.pbos = [];
 		this.fbo.colorAttachments[0].texture.destroy();
 		this.fbo.depthStencilAttachment?.texture.destroy();
 		this.fbo.destroy();

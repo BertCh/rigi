@@ -54,11 +54,10 @@ import {
 import {
 	GeometryTarget,
 	geometrySize,
-	glFence,
 	gpuDone,
 	type ReadbackTiming,
 	readbackBuffer,
-	readbackQuiet,
+	readTextureQuiet,
 	TerrainPassRenderer,
 } from "./geometry-pass";
 import { glOf } from "./gl";
@@ -574,9 +573,8 @@ export class PhotoCompositor implements Effect {
 
 	/**
 	 * readLayer without the stall: the same render and the same RGBA/FLOAT readPixels (so the same
-	 * bytes), issued into a STREAM_READ pack buffer and copied out once a fence behind it signalled
-	 * and the GPU queue is short (GeometryTarget.read's glFence + readbackQuiet; luma's WebGL
-	 * Buffer.readAsync is a bare synchronous getBufferSubData). Resolves a frame or more later;
+	 * bytes: texture.readBuffer reads in the texture's own format), into a pack buffer copied out
+	 * once a fence behind it signalled and the GPU queue is short (readTextureQuiet). Resolves a frame or more later;
 	 * null = no device, context lost, or the compositor's device changed meanwhile.
 	 */
 	async readLayerAsync(
@@ -588,50 +586,21 @@ export class PhotoCompositor implements Effect {
 	): Promise<Float32Array | null> {
 		const device = this.device;
 		if (!device) return null;
-		const gl = glOf(device);
 		const fbo = this.renderLayer(device, layers, pose, eye, width, height);
-		const t0 = performance.now();
-		const bytes = width * height * 16;
-		const pbo = gl.createBuffer();
 		try {
-			if (!pbo) return null;
-			const handle = (fbo as unknown as { handle: WebGLFramebuffer }).handle;
-			const prevRead = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
-			const prevPack = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
-			const prevAlign = gl.getParameter(gl.PACK_ALIGNMENT);
-			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, handle);
-			gl.readBuffer(gl.COLOR_ATTACHMENT0);
-			gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
-			gl.bufferData(gl.PIXEL_PACK_BUFFER, bytes, gl.STREAM_READ);
-			gl.pixelStorei(gl.PACK_ALIGNMENT, 4);
-			gl.readPixels(0, 0, width, height, gl.RGBA, gl.FLOAT, 0);
-			gl.pixelStorei(gl.PACK_ALIGNMENT, prevAlign);
-			gl.bindBuffer(gl.PIXEL_PACK_BUFFER, prevPack);
-			gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prevRead);
-			const cancelled = () => this.device !== device;
-			const fence = await glFence(gl, cancelled);
-			const quiet = fence.ok
-				? await readbackQuiet(gl, fence.ms, cancelled)
-				: { ok: false, probes: 0 };
-			if (!quiet.ok || cancelled()) return null;
-			const t1 = performance.now();
-			const out = new Float32Array(width * height * 4);
-			const prev = gl.getParameter(gl.COPY_READ_BUFFER_BINDING);
-			gl.bindBuffer(gl.COPY_READ_BUFFER, pbo);
-			gl.getBufferSubData(gl.COPY_READ_BUFFER, 0, out);
-			gl.bindBuffer(gl.COPY_READ_BUFFER, prev);
-			const t2 = performance.now();
-			this.lastStatsRead = {
-				fenceMs: t1 - t0,
-				polls: fence.polls,
-				probes: quiet.probes,
-				copyMs: t2 - t1,
-				readbackMs: t2 - t0,
-			};
-			return out;
+			const texture = fbo.colorAttachments[0].texture;
+			const res = await readTextureQuiet(
+				device,
+				width * height * 16,
+				"layer-readback",
+				(buffer) => texture.readBuffer({}, buffer),
+				() => this.device !== device,
+			);
+			if (!res) return null;
+			this.lastStatsRead = res.timing;
+			return new Float32Array(res.data.buffer, 0, width * height * 4);
 		} finally {
-			// kept until the copy: the readPixels reads this target
-			if (pbo) gl.deleteBuffer(pbo);
+			// the readPixels is queued (reads the target): the target can go right away
 			destroyTarget(fbo);
 		}
 	}
