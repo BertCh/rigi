@@ -31,6 +31,7 @@ import { Route as PhotoIdRouteImport } from './routes/photo.$id'
 import { Route as RollIndexRouteImport } from './routes/roll.index'
 import { Route as RollIdRouteImport } from './routes/roll.$id'
 import { Route as RollImportRouteImport } from './routes/roll.import'
+import { Route as SCodeRouteImport } from './routes/s.$code'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -142,6 +143,11 @@ const RollImportRoute = RollImportRouteImport.update({
   path: '/roll/import',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SCodeRoute = SCodeRouteImport.update({
+  id: '/s/$code',
+  path: '/s/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
+  '/s/$code': typeof SCodeRoute
   '/gipfelbuch/': typeof GipfelbuchIndexRoute
   '/roll/': typeof RollIndexRoute
 }
@@ -188,6 +195,7 @@ export interface FileRoutesByTo {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
+  '/s/$code': typeof SCodeRoute
   '/gipfelbuch': typeof GipfelbuchIndexRoute
   '/roll': typeof RollIndexRoute
 }
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/photo/$id': typeof PhotoIdRoute
   '/roll/$id': typeof RollIdRoute
   '/roll/import': typeof RollImportRoute
+  '/s/$code': typeof SCodeRoute
   '/gipfelbuch/': typeof GipfelbuchIndexRoute
   '/roll/': typeof RollIndexRoute
 }
@@ -239,6 +248,7 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
+    | '/s/$code'
     | '/gipfelbuch/'
     | '/roll/'
   fileRoutesByTo: FileRoutesByTo
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
+    | '/s/$code'
     | '/gipfelbuch'
     | '/roll'
   id:
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/photo/$id'
     | '/roll/$id'
     | '/roll/import'
+    | '/s/$code'
     | '/gipfelbuch/'
     | '/roll/'
   fileRoutesById: FileRoutesById
@@ -312,6 +324,7 @@ export interface RootRouteChildren {
   PhotoIdRoute: typeof PhotoIdRoute
   RollIdRoute: typeof RollIdRoute
   RollImportRoute: typeof RollImportRoute
+  SCodeRoute: typeof SCodeRoute
   GipfelbuchIndexRoute: typeof GipfelbuchIndexRoute
   RollIndexRoute: typeof RollIndexRoute
 }
@@ -472,6 +485,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RollImportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/s/$code': {
+      id: '/s/$code'
+      path: '/s/$code'
+      fullPath: '/s/$code'
+      preLoaderRoute: typeof SCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -496,12 +516,14 @@ const rootRouteChildren: RootRouteChildren = {
   PhotoIdRoute: PhotoIdRoute,
   RollIdRoute: RollIdRoute,
   RollImportRoute: RollImportRoute,
+  SCodeRoute: SCodeRoute,
   GipfelbuchIndexRoute: GipfelbuchIndexRoute,
   RollIndexRoute: RollIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
 
 import type { getRouter } from './router.tsx'
 import type { createStart } from '@tanstack/react-start'

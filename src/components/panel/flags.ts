@@ -318,6 +318,13 @@ export const FLAG_UI: FlagUI[] = [
 		options: ONOFF,
 	},
 	{
+		name: "share",
+		label: "Share links (beta)",
+		help: "Copy a read-only link to an accepted pose of a sample photo. Off until the licence review clears.",
+		group: "data",
+		options: ONOFF,
+	},
+	{
 		name: "cogReader",
 		label: "swisstopo COG reader",
 		help: "Surface-model reads for DSM occluders: loaders.gl (GeoTIFFSourceLoader, tile-cached ranges) or the built-in parser.",

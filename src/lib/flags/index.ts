@@ -193,6 +193,8 @@ export const FLAG_SCHEMA = {
 	imagery: oneOf(["default", "esri", "swisstopo", "custom"], "default"),
 	attrib: oneOf(["classic", "full"], "classic"),
 	osmextract: onOff("off"),
+	/** share-link beta (/s/$code, src/lib/share): off until the N2 licence review clears */
+	share: onOff("off"),
 	/** swisstopo COG reader for ?concord=occl (src/lib/concord/occl/swiss-cog.ts): loaders.gl or the own parser */
 	cogReader: oneOf(["loaders", "own"], "own"),
 	// /roll

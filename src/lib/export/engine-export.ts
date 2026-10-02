@@ -80,6 +80,8 @@ export type EngineExportOptions = {
 	geoidUndulation?: number;
 	/** GeoJSON view-ray / wedge length (m). Default 30 000. */
 	maxRange?: number;
+	/** Display-only mark burned into the annotated PNG (share views, src/lib/share). */
+	watermark?: string;
 };
 
 export type ExportResult = { blob: Blob; filename: string; notes: string[] };
@@ -360,6 +362,7 @@ export async function exportFromEngine(
 				return {
 					blob: await composeAnnotatedPng(bmp, [], {
 						title,
+						watermark: opts.watermark,
 						// opt-in (?attrib=full): per-source credits instead of DEFAULT_ATTRIBUTION
 						...(fullAttribution()
 							? { attribution: engineAttribution(engine) }

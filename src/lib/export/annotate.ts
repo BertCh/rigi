@@ -5,6 +5,7 @@
 // Compose the photo + overlay layers + an attribution footer into one image Blob.
 // Works with OffscreenCanvas (workers, modern browsers) or HTMLCanvasElement, and with any
 // canvas factory (e.g. @napi-rs/canvas in Node tests).
+import { brandAlpha } from "#/brand/khipu";
 
 export const DEFAULT_ATTRIBUTION =
 	"Terrain © Mapterhorn · Imagery © swisstopo, Esri, Maxar, Earthstar Geographics, and the GIS User Community · © OpenStreetMap contributors";
@@ -37,6 +38,8 @@ export type ComposeOptions = {
 	title?: string;
 	/** Footer height in px; default ≈ 2.6 % of the image height (min 22). */
 	footerHeight?: number;
+	/** Display-only mark drawn small at the bottom-left of the photo area (share views); never over the footer. */
+	watermark?: string;
 	type?: "image/png" | "image/jpeg" | "image/webp";
 	quality?: number;
 	/** Canvas factory override (tests / Node). */
@@ -104,6 +107,15 @@ export async function composeAnnotatedPng(
 	if (!ctx) throw new Error("2d context unavailable");
 	ctx.drawImage(photo, 0, 0, W, H);
 	for (const o of overlays) ctx.drawImage(o, 0, 0, W, H);
+	if (opts.watermark) {
+		const ws = Math.max(11, Math.round(H * 0.018));
+		const inset = Math.round(ws * 0.9);
+		ctx.font = `600 ${ws}px Fira Sans, system-ui, -apple-system, Segoe UI, sans-serif`;
+		ctx.fillStyle = brandAlpha("paper", 0.55);
+		ctx.textAlign = "left";
+		ctx.textBaseline = "alphabetic";
+		ctx.fillText(opts.watermark, inset, H - inset, Math.max(1, W - 2 * inset));
+	}
 	if (fh) {
 		ctx.fillStyle = "#111418";
 		ctx.fillRect(0, H, W, fh);

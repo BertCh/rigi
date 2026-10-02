@@ -20,6 +20,8 @@ import {
 	Wand2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ShareButton } from "#/components/share/ShareButton";
+import { Watermark } from "#/components/share/Watermark";
 import { ThemeToggle } from "#/components/site/ThemeToggle";
 import type { Pin } from "#/lib/align";
 import { hfovFromAspect, type Pose } from "#/lib/camera";
@@ -63,7 +65,7 @@ import { glowMarkersFor } from "#/lib/look/labels/glow";
 import { PeakLabelsSvg } from "#/lib/look/labels/PeakLabelsSvg";
 import { useLabelFontEpoch } from "#/lib/look/labels/useLabelFonts";
 import { needsPhotoSky } from "#/lib/look/look-key";
-import type { AlignState } from "#/lib/ontology/crosswalk/pose";
+import { ALIGN_STATE, type AlignState } from "#/lib/ontology/crosswalk/pose";
 import {
 	formatTakenAt,
 	loadRegion,
@@ -90,6 +92,7 @@ import {
 	type Sample,
 	type Settings,
 } from "#/lib/settings";
+import { SHARE_WATERMARK, type ShareableState } from "#/lib/share";
 import {
 	PRESET_MAP_LAYERS,
 	PRESET_OVERLAY_LAYER,
@@ -200,14 +203,24 @@ function sameRecords<T extends object>(a: readonly T[], b: readonly T[]) {
 	return true;
 }
 
+/** Shared views (src/lib/share) never write the viewer's pose store. */
+const keepPoseLocal = () => {};
+
 export function PhotoWorkspace({
 	photo: photoIn,
 	bundledPose = null,
+	shared = null,
 }: {
 	photo: PhotoMeta;
 	/** A pose shipped with the photo (the sample trip): used like a saved pose when there is none. */
 	bundledPose?: Pose | null;
+	/**
+	 * Read-only share view (/s/$code, ?share=on): this pose wins over any local save, no auto-align
+	 * runs, nothing is persisted, and the stage and PNG exports carry the share watermark.
+	 */
+	shared?: { pose: Pose; state: ShareableState } | null;
 }) {
+	const persistPose = shared ? keepPoseLocal : savePose;
 	// opt-in eye-position suggestion (EyeSuggestion.tsx): an applied move re-creates the engine at the
 	// moved eye with the re-fitted rotation; null = the photo's own GPS position
 	const [eyeMove, setEyeMove] = useState<{
@@ -458,7 +471,7 @@ export function PhotoWorkspace({
 			if (persist) {
 				// CR-08: a pose fitted to an unsaved eye move is meaningless once the move is gone (reload)
 				const moved = eyeMoveRef.current;
-				if (!moved || moved.persisted) savePose(photo.id, p);
+				if (!moved || moved.persisted) persistPose(photo.id, p);
 				setAlignState("manual");
 				// the user took over: a background second opinion or deferred match must not move the pose any more
 				verifyAbort.current?.abort();
@@ -466,7 +479,7 @@ export function PhotoWorkspace({
 				setVerify(null);
 			}
 		},
-		[photo.id],
+		[photo.id, persistPose],
 	);
 
 	// engine lifecycle
@@ -496,6 +509,7 @@ export function PhotoWorkspace({
 			let verifySolver =
 				!solver &&
 				!eyeMoveRef.current &&
+				!shared &&
 				!(loadSavedPose(photo.id) ?? bundledPose)
 					? new UnknownPoseSolver(photo)
 					: null;
@@ -561,8 +575,8 @@ export function PhotoWorkspace({
 				// the photo's luminance, for backdrop-adaptive label contrast (labels/contrast.ts)
 				const img = engine.photoElement;
 				setLumaMap(img ? lumaMapFrom(img) : null);
-				const ownSave = loadSavedPose(photo.id);
-				const saved = ownSave ?? bundledPose;
+				const ownSave = shared ? null : loadSavedPose(photo.id);
+				const saved = shared?.pose ?? ownSave ?? bundledPose;
 				const moved = eyeMoveRef.current;
 				let startVerify: (() => void) | null = null;
 				const carried = carryRef.current;
@@ -578,12 +592,14 @@ export function PhotoWorkspace({
 					setAlignNote(moved.note);
 				} else if (saved) {
 					setPose(saved, false);
-					setAlignState("saved");
+					setAlignState(shared ? shared.state : "saved");
 					setVerify(null);
 					setAlignNote(
-						ownSave
-							? "Restored your saved alignment"
-							: "Sample alignment, solved on-device by the roll aligner",
+						shared
+							? `Shared view · ${ALIGN_STATE[shared.state].label}`
+							: ownSave
+								? "Restored your saved alignment"
+								: "Sample alignment, solved on-device by the roll aligner",
 					);
 				} else if (solver && engine.photoElement) {
 					// No compass / gravity / focal (uploads): autoAlign searches ±25° around a placeholder prior
@@ -844,7 +860,7 @@ export function PhotoWorkspace({
 			stop?.();
 			window.__RIGI_FORCE_DEVICE_LOSS__ = undefined;
 		};
-	}, [photo, setPose, loadSky, bundledPose, rendererFallback]);
+	}, [photo, setPose, loadSky, bundledPose, shared, rendererFallback]);
 
 	useEffect(() => {
 		engineRef.current?.setSettings(settings);
@@ -1089,7 +1105,7 @@ export function PhotoWorkspace({
 		const moved = photoAtEye(photo, r);
 		const persisted = await persistPosition(moved).catch(() => false);
 		const prevSaved = eyeMove ? eyeMove.prevSaved : loadSavedPose(photo.id);
-		if (persisted) savePose(photo.id, r.pose);
+		if (persisted) persistPose(photo.id, r.pose);
 		setPins([]);
 		setEyeMove({
 			photo: moved,
@@ -1102,7 +1118,7 @@ export function PhotoWorkspace({
 	const revertEyeMove = async () => {
 		if (!eyeMove) return;
 		await persistPosition(photoIn).catch(() => false);
-		savePose(photoIn.id, eyeMove.prevSaved);
+		persistPose(photoIn.id, eyeMove.prevSaved);
 		setPins([]);
 		setEyeMove(null);
 	};
@@ -1112,7 +1128,7 @@ export function PhotoWorkspace({
 		if (!eng || status) return;
 		setPins([]);
 		setPose(eng.prior);
-		savePose(photo.id, null);
+		persistPose(photo.id, null);
 		setAlignState(eng.unknowns.any ? "unverified" : "prior");
 		setAlignNote(
 			eng.unknowns.any
@@ -1384,21 +1400,35 @@ export function PhotoWorkspace({
 						<span className="font-semibold text-white">{place}</span> · {taken}{" "}
 						· {photo.id}
 					</div>
-					<button
-						type="button"
-						onClick={exportImage}
-						disabled={exportLocked}
-						className="pointer-events-auto ml-auto flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 backdrop-blur hover:text-white disabled:opacity-40"
-					>
-						<Download className="size-3.5" /> Save image
-					</button>
+					{shared ? (
+						<div className="ml-auto" />
+					) : (
+						<>
+							<button
+								type="button"
+								onClick={exportImage}
+								disabled={exportLocked}
+								className="pointer-events-auto ml-auto flex items-center gap-1.5 rounded-lg bg-black/50 px-2.5 py-1.5 text-xs font-medium text-white/80 backdrop-blur hover:text-white disabled:opacity-40"
+							>
+								<Download className="size-3.5" /> Save image
+							</button>
+							<ShareButton
+								photoId={photo.id}
+								pose={pose}
+								state={alignState}
+								disabled={exportLocked}
+							/>
+						</>
+					)}
 					<ExportMenu
 						engine={engineRef}
 						disabled={exportLocked}
 						withLabels={showPeaks}
 						photo={photo}
+						watermark={shared ? SHARE_WATERMARK : undefined}
 					/>
 				</header>
+				{shared && <Watermark />}
 
 				<div ref={stageRef} className="absolute inset-0">
 					<canvas
