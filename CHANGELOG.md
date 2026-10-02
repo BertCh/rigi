@@ -23,6 +23,12 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 - Near field (S1 prep, opt-in): cliff-lip anchoring (`nearfield/cliff-lip.ts`, `AnchorOpts.cliffLip`, flag `anchorCliff`, off by default) drops DEM range discontinuities and the lip face from the anchor fit; `nearfield/anchor-parity.ts` compares the DEM grids two engines feed the anchor; segmenter licence shortlist in `research_notes/segmenter-shortlist-2026-10-02/`.
 - **`?colorTarget=rg11b10` is now downgraded to rgba16float with a console warning** (rg11b10ufloat has no destination alpha: the photo overlay turns opaque and the world sky, blended under with `one-minus-dst-alpha`, is never drawn). `?colorTarget=rg11b10-unsafe` forces the old behaviour for experiments.
 
+### Step review (2026-10-02, step pods)
+
+- Upload EXIF guards (`src/lib/upload/exif.ts`): GPS at (0, 0) or out of range, a zeroed or garbled Apple gravity vector, an out-of-range 35 mm focal and a pre-1980 GPS date stamp now read as unknown, not as trusted placeholders. Headings wrap to [0, 360). Square images let gravity choose the holding. `scripts/ingest.mjs` shares the MakerNote, gravity and time code with uploads. In-range values are unchanged.
+- Pose exports say how the pose is known (`src/lib/export`): an `estimate` block in `summit-lens/pose` v1 (`null` when unknown), `slens:Pose*` XMP tags, a 'Pose not verified' export note, the fail-closed `readPoseJson`, and `isPose`. The workspace passes the provenance since b8a6e96.
+- Per-step review of the Gipfelbuch graph (16 steps): plan docs and the cross-step index in `reports/steps-2026-10-02/`.
+
 ### Tap-a-peak pins (2026-10-02, step pod)
 
 - **Tap-a-peak pins (`src/lib/pins/`):** read-only diagnostics (rotation-free pair-angle check that flags a wrong peak name before any solve and isolates one bad pin among three, JᵀJ σ per freed parameter, Baarda redundancy numbers, leave-one-out, `pairFitDeg` for ranking the peak menu) and a seeded pin solve behind `?pinSolve=seeded` (default `plain`): TRIAD / lens-from-pair seed and a 5–120° lens bound, kept only when it fits the taps better than `align.ts solvePins`, which is unchanged (eval GT untouched). Browser-unverified.

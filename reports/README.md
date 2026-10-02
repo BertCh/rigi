@@ -46,6 +46,7 @@ Start with [status.md](status.md), then [roadmap.md](roadmap.md). Dead ends are 
 | Examples | [summit-example-spec.md](summit-example-spec.md) | Build spec of `examples/deck/landeskarte` (Landeskarte Abendlicht) |
 | GPU / renderer | [gpu-luma-native-2026-10-01.md](gpu-luma-native-2026-10-01.md) | Luma-native GPU/compute pass (session 07, 2026-10-02): upstream sweep (luma, deck, loaders.gl, math.gl), audit, plan, outcomes of 15 packages incl. vendored luma rigi.4 + deck rigi.2 and the `gpu-raw-lint` ratchet |
 | Process | [batch-ledger.md](batch-ledger.md) | Cook-mode ledger: one row per unverified commit for the batch browser pass (keep / revert / doc-only) |
+| Process | [steps-2026-10-02/](steps-2026-10-02/README.md) | Per-step review, research and plan for the 16 Gipfelbuch steps (2026-10-02); index of decisions and follow-ups |
 | Strategy | [extension-opportunities.md](extension-opportunities.md) | Domain expansion review (2026-09-30): art, science, sport, adventure, tourism, transport and modalities; six platform building blocks; impact × effort placement and Now/Next/Later. Advisory; roadmap.md is the plan of record |
 | Literature | [Mountain photo georeferencing SoTA.md](<Mountain photo georeferencing SoTA.md>) | Skyline/DEM pose literature (2026-09-24). Later verdicts are in negative-results.md |
 | Aesthetics | [Geospatial rendering aesthetics frontier.md](<Geospatial rendering aesthetics frontier.md>) | Visual/rendering frontier vs current system: new default look, quick wins, art modes, licence traps (2026-09-30) |
