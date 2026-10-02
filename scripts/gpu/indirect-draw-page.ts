@@ -8,7 +8,8 @@
 import { Buffer, luma, Texture } from "@luma.gl/core";
 import { Model } from "@luma.gl/engine";
 import { webgpuAdapter } from "@luma.gl/webgpu";
-import { defineKernel, dispatch, kernel, storage } from "#/lib/gpu/core/kernel";
+import { defineKernel, kernel, storage } from "#/lib/gpu/core/kernel";
+import { dispatch } from "#/lib/gpu/core/test-dispatch";
 
 const SIZE = 128;
 const CAPACITY = 64;

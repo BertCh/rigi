@@ -7,11 +7,10 @@
 //   override constants, a warm-up group); the pipeline is created once per device and cached;
 // - the pipeline is built by the engine `Kernel` (sync constructor) / `Kernel.createAsync` (luma
 //   10.0.0-alpha.2, #3281), which compile through Device.createComputePipeline[Async] so warm-up
-//   does not block the thread. Each spec gets its OWN PipelineFactory per device: luma's compute
-//   pipeline cache key is shader source + shaderLayout only (entryPoint and constants are not
-//   hashed), so the shared default factory could alias two specs that differ only in those;
-// - dispatch() sets the bindings on the PASS, never on the shared pipeline object, so concurrent
-//   callers of one kernel cannot see each other's bindings, and labels the pass for core/profile;
+//   does not block the thread. The device's shared PipelineFactory is used (vendored luma rigi.3
+//   hashes entryPoint and override constants into the compute pipeline key);
+// - encodeDispatch() sets the bindings on the PASS, never on the shared pipeline object, so
+//   concurrent callers of one kernel cannot see each other's bindings;
 // - storage()/uniform()/stage()/release() keep look/kernel.ts's API; the pooled variants are in
 //   core/pool.ts and the ring readback in core/readback.ts.
 // look/kernel.ts maps 1:1 onto this: see core/README.md.
@@ -23,19 +22,18 @@ import {
 	type ComputePass,
 	type ComputePipeline,
 	type Device,
-	PipelineFactory,
 } from "@luma.gl/core";
 import { Kernel as EngineKernel } from "@luma.gl/engine";
+import { checkStorageBindings } from "./binding-guard";
 import { onLost, untilLost } from "./lifecycle";
 import { isPooled } from "./pool";
-import { passProps } from "./profile";
 import { stageReads } from "./readback";
 
 export { submit } from "./queue";
 
 /**
  * "texture" is a 2-D unfilterable-float sampled texture (textureLoad only; the render device's
- * rgba32float targets): dispatch() binds a luma Texture for it; a ComputeGraph kernel node binds a
+ * rgba32float targets): a kernel dispatch binds a luma Texture for it; a ComputeGraph kernel node binds a
  * graph texture or texture view (declared "sampled"). "texture-array" is the same over a 2-D array
  * (WGSL texture_2d_array<f32>; e.g. the batched terrain's r32float height arrays).
  */
@@ -144,34 +142,15 @@ function cacheOf(device: Device) {
 		onLost(device, () => {
 			cache.delete(device);
 			building.delete(device);
-			factories.delete(device);
 		});
 	}
 	return m;
 }
 
-const factories = new WeakMap<Device, Map<KernelSpec, PipelineFactory>>();
-
-/** One PipelineFactory per (device, spec): luma's compute cache key ignores entryPoint/constants. */
-function factoryOf(device: Device, spec: KernelSpec): PipelineFactory {
-	let m = factories.get(device);
-	if (!m) {
-		m = new Map();
-		factories.set(device, m);
-	}
-	let f = m.get(spec);
-	if (!f) {
-		f = new PipelineFactory(device);
-		m.set(spec, f);
-	}
-	return f;
-}
-
 // the engine Kernel creates its own shader (default ShaderFactory, keyed by stage + source)
-const kernelProps = (device: Device, spec: KernelSpec) => ({
+const kernelProps = (spec: KernelSpec) => ({
 	id: spec.label,
 	source: spec.source,
-	pipelineFactory: factoryOf(device, spec),
 	entryPoint: spec.entryPoint,
 	...(spec.constants ? { constants: spec.constants } : {}),
 	shaderLayout: shaderLayout(spec),
@@ -192,7 +171,7 @@ export function kernel(device: Device, spec: KernelSpec): Kernel {
 	const m = cacheOf(device);
 	let k = m.get(spec);
 	if (!k) {
-		k = wrap(spec, new EngineKernel(device, kernelProps(device, spec)));
+		k = wrap(spec, new EngineKernel(device, kernelProps(spec)));
 		m.set(spec, k);
 	}
 	return k;
@@ -220,7 +199,7 @@ export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel> {
 				spec,
 				await untilLost(
 					device,
-					EngineKernel.createAsync(device, kernelProps(device, spec)),
+					EngineKernel.createAsync(device, kernelProps(spec)),
 				),
 			);
 			const m = cacheOf(device);
@@ -276,9 +255,7 @@ export async function warmKernelsAsync(
  * the sky refine above ~16.7 Mpx) need a 2-D dispatch to run on the GPU.
  */
 function checkWorkgroups(k: Kernel, x: number, y: number, z: number) {
-	const max =
-		(k.device ?? (k.pipeline as unknown as { device?: Device }).device)?.limits
-			.maxComputeWorkgroupsPerDimension ?? 65535;
+	const max = k.device?.limits.maxComputeWorkgroupsPerDimension ?? 65535;
 	if (x > max || y > max || z > max)
 		throw new Error(
 			`[gpu] ${k.spec.label}: dispatch ${x}×${y}×${z} exceeds maxComputeWorkgroupsPerDimension ${max}`,
@@ -295,51 +272,15 @@ export function encodeDispatch(
 	z = 1,
 ) {
 	checkWorkgroups(k, x, y, z);
+	checkStorageBindings(
+		k.spec,
+		bindings,
+		k.device?.limits.minStorageBufferOffsetAlignment ?? 256,
+	);
 	// per-pass bindings (ComputePass.setBindings is abstract in luma 10; 9.4 had it on WebGPU only)
 	pass.setPipeline(k.pipeline);
 	pass.setBindings(bindings);
 	pass.dispatch(x, y, z);
-}
-
-/**
- * Record one compute pass: `k` with `bindings`, dispatching `x × y × z` workgroups. The pass is
- * labelled `label` (default the kernel's) for core/profile.
- */
-export function dispatch(
-	enc: CommandEncoder,
-	k: Kernel,
-	bindings: Bindings,
-	x: number,
-	y = 1,
-	z = 1,
-	label = k.spec.label,
-) {
-	const pass = enc.beginComputePass(passProps(enc.device, label));
-	encodeDispatch(pass, k, bindings, x, y, z);
-	pass.end();
-}
-
-/** One dispatch in dispatchAll(). */
-export type DispatchCall = {
-	k: Kernel;
-	bindings: Bindings;
-	x: number;
-	y?: number;
-	z?: number;
-};
-
-/**
- * Record several dispatches in ONE compute pass, in order (WebGPU orders storage writes between
- * dispatches of a pass, so this computes the same as one pass each, with less pass overhead).
- */
-export function dispatchAll(
-	enc: CommandEncoder,
-	calls: DispatchCall[],
-	label = calls[0]?.k.spec.label ?? "dispatch",
-) {
-	const pass = enc.beginComputePass(passProps(enc.device, label));
-	for (const c of calls) encodeDispatch(pass, c.k, c.bindings, c.x, c.y, c.z);
-	pass.end();
 }
 
 /** A fresh storage buffer (COPY_SRC | COPY_DST too), initialised from `data` or zeroed to `bytes`. */

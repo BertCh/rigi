@@ -14,8 +14,9 @@ Self-test: `node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/core-selft
 | `device.ts` | The per-realm device registry: `getComputeDevice`, `adoptRenderDevice`, `resetComputeDevice`, `hasFeature`. The sidecar requests the adapter's maximum limits |
 | `pool.ts` | A persistent grow-only buffer pool (per device), `withLease` for serialising async callers, and `clear` / `range` |
 | `readback.ts` | Ring readback: staged copies into reusable MAP_READ slots on the caller's encoder, one map per read |
-| `kernel.ts` | `defineKernel` / `kernel` / `kernelAsync` / `dispatch`, with bindings set per pass. A superset of `look/kernel.ts` |
-| `queue.ts` | `submit(device, enc)`: finishes and submits the encoder, then runs the pool and profiler hooks. Opt-in error checks (`__RIGI_GPU_CHECKS__`) |
+| `kernel.ts` | `defineKernel` / `kernel` / `kernelAsync` / `encodeDispatch`, with bindings set per pass and the binding guards. A superset of `look/kernel.ts` |
+| `queue.ts` | `submit(device, enc)`: finishes and submits the encoder, then runs the pool hook. Opt-in error checks (`__RIGI_GPU_CHECKS__`) |
+| `binding-guard.ts` | Pure storage-binding checks (zero size, offset alignment) called by `encodeDispatch` |
 | `profile.ts` | Opt-in GPU timestamp profiling (`globalThis.__RIGI_GPU_PROFILE__ = true`) and `getGpuProfile()`, including the GPU workers' reports |
 | `realm.ts` | The page → worker protocol for the profiling / error-check switches, and the worker → page profile report. Import-light (no luma runtime) |
 | `lifecycle.ts` | `untilLost`, `onLost` and the activity counters behind the idle release. No luma runtime |
@@ -102,10 +103,6 @@ export function kernelAsync(device: Device, spec: KernelSpec): Promise<Kernel>; 
 export function warmKernels(device: Device, group?: string): number;              // failures; never throws
 export function warmKernelsAsync(device: Device, group?: string): Promise<number>;
 export function encodeDispatch(pass: ComputePass, k: Kernel, bindings: Bindings, x: number, y?: number, z?: number): void;
-export function dispatch(enc: CommandEncoder, k: Kernel, bindings: Bindings, x: number, y?: number, z?: number,
-  label?: string): void;                                              // one pass; label for profile (default spec.label)
-export type DispatchCall = { k: Kernel; bindings: Bindings; x: number; y?: number; z?: number };
-export function dispatchAll(enc: CommandEncoder, calls: DispatchCall[], label?: string): void; // one pass, in order
 export function storage(device: Device, data: ArrayBufferView | number): Buffer;  // fresh (look semantics)
 export function uniform(device: Device, words: ArrayBuffer): Buffer;              // fresh, padded to 16 B
 export function stage(device: Device, enc: CommandEncoder, src: Buffer, bytes: number):
@@ -115,7 +112,6 @@ export function release(...bufs: (Buffer | null | undefined)[]): void;          
 // profile.ts
 export type GpuProfile = Record<string, { gpuMs: number; count: number }>;
 export const profiling: (device: Device) => boolean;
-export function passProps(device: Device, label: string): ComputePassProps;      // {} when off
 export function recordGpuTime(label: string, ms: number): void;
 export function getGpuProfile(): Promise<GpuProfile>;
 export function resetGpuProfile(): void;
@@ -207,7 +203,7 @@ export function getGpuGraphProfile(): Promise<GpuGraphProfileEntry[]>; // per ob
 
 1. **Device.** Import `getComputeDevice` from `#/lib/gpu/core/device` (`src/lib/gpu/device.ts` will re-export it). Branch on `hasFeature(device, …)` before using `subgroups` or `shader-f16`: an adopted render device may not have them.
 2. **Pipelines.** Use `defineKernel(id, WGSL, layout, { group, label })` at module level, and fetch the pipeline with `kernel(device, spec)`. Warm up with `warmKernelsAsync(device, group)`.
-3. **Dispatch.** Use `dispatch(enc, k, bindings, x, y, z)`. It sets the bindings on the pass, so it no longer writes `pipeline.setBindings` state that other callers share. Use `dispatchAll` for several dispatches in one pass.
+3. **Dispatch.** Run kernels as `ComputeGraph` nodes. `encodeDispatch(pass, k, bindings, x, y, z)` sets the bindings on the pass (never on shared pipeline state) and refuses, by throwing, a dispatch over `maxComputeWorkgroupsPerDimension`, a zero-size storage binding (luma #3338: it invalidates the whole submit) and a storage binding offset that is not a multiple of `minStorageBufferOffsetAlignment` (luma #3332); the two binding rules live in `binding-guard.ts` (pure, fast-tier check `gpu-binding-guard`). The standalone `dispatch` / `dispatchAll` were deleted from `kernel.ts` (no app callers); `test-dispatch.ts` keeps them for `selftest.ts` and `scripts/gpu/*-page.ts` only.
 4. **Buffers.** For steady-state calls, use `pooledStorage` / `pooledUniform` / `acquire` with keys `"<owner>/<slot>"`, and wrap the whole acquire → encode → submit → read sequence in `withLease("<owner>", …)` whenever calls can overlap (async callers, workers sharing a module). Two traps can break bit-identity:
    - **Capacity > request.** A pooled buffer has a power-of-two capacity. If the WGSL uses `arrayLength()`, bind `range(buf, bytes)`.
    - **Stale contents.** A pooled buffer keeps the previous call's bytes. If a kernel relied on `storage(device, n)` being zeroed (for example with atomics or partial writes), use `pooledStorage(device, key, n)` (which zeroes by default) or `clear(enc, buf)`. Only pass `{ zero: false }` for outputs the kernel fully overwrites.
@@ -217,7 +213,7 @@ export function getGpuGraphProfile(): Promise<GpuGraphProfileEntry[]>; // per ob
 
 ### `look/kernel.ts`
 
-`look/kernel.ts` keeps only `defineKernel` (group `"look"`, label `look-<id>`), `warmKernelsAsync` and the pool / readback re-exports the look graphs use. Its pooled-dispatch helpers (`kernel`, `dispatch`, `dispatchAll`, `stage`, `storage`, …) went with the pooled look paths on 2026-10-01: every look kernel runs as a `ComputeGraph` node. `dispatch` / `dispatchAll` / `stage` / `stageReads` stay in core (the self-test and the graph's own encoding use them).
+`look/kernel.ts` keeps only `defineKernel` (group `"look"`, label `look-<id>`), `warmKernelsAsync` and the pool / readback re-exports the look graphs use. Its pooled-dispatch helpers (`kernel`, `dispatch`, `dispatchAll`, `stage`, `storage`, …) went with the pooled look paths on 2026-10-01: every look kernel runs as a `ComputeGraph` node. `stage` / `stageReads` stay in core; `dispatch` / `dispatchAll` are test-only (`test-dispatch.ts`).
 
 ## Design notes
 
@@ -226,7 +222,7 @@ export function getGpuGraphProfile(): Promise<GpuGraphProfileEntry[]>; // per ob
 - **Pool retirement.** When a slot grows, the old buffer is destroyed once the lease covering that key ends. For unleased slots it happens at the next core `submit()`. Unleased callers must therefore encode and submit without awaiting in between.
 - **Why readback does not use `GPUReadbackRing`.** Its slots have one fixed byte length and `acquire()` waits when every slot is busy. Our readback sizes vary per call (and per photo), so `readback.ts` implements the same ticket pattern (reserve, copy on the caller's encoder, submit, map, return the slot) with grow-on-demand slots. Up to 4 idle slots are kept per device. The ring is still re-exported from `luma.ts` for fixed-size streaming readbacks. Re-audited on rigi.3 (LF7): #3330 makes `Buffer.readAsync` stage only the requested range, but it still allocates a temporary buffer, waits on `onSubmittedWorkDone` and submits its own encoder per call, and the ring's tickets read through it, so nothing here retires.
 - **Async pipelines.** luma 10 has `Device.createComputePipelineAsync` (visgl/luma.gl#3204; `GPUDevice.createComputePipelineAsync`, layout `auto`, same descriptor as the sync path). `kernelAsync` uses it; in luma 9.4 it called the raw GPUDevice method and passed the `handle` into `device.createComputePipeline`. The self-test checks that the sync and async pipelines give bit-identical output.
-- **Profiling.** Each profiled pass gets its own pooled 2-slot `timestamp` QuerySet. The durations are read after `submit()`. Graph runs use the encoder's `timeProfilingQuerySet` and report under `<graphId>/<nodeId>`. Chromium quantises timestamps (about 65 µs steps on this Mac), so a single small pass can read as 0 ms: sum over many calls.
+- **Profiling.** There is no per-pass timestamp path any more (`passProps` was deleted with `dispatch`). Graph runs use the encoder's `timeProfilingQuerySet` and report under `<graphId>/<nodeId>`. Chromium quantises timestamps (about 65 µs steps on this Mac), so a single small pass can read as 0 ms: sum over many calls.
 - **Worker profiling.** Kernels in the GPU workers run in their own realm. The worker clients put `realmGpuOptions()` on a message they already send (`spans` for horizon-fast-app, `prepare` / `solve` for unknown-pose, the eye search request); it is `undefined` unless the page profiles or checks, so nothing changes by default. The worker calls `applyRealmGpuOptions`, and attaches `takeGpuProfile()` to its result (`dirs`, the solve response, `done` / `error`); the client merges it as `horizon-worker:…`, `unknown-pose-worker:…`, `eye-worker:…`. `scripts/gpu/with-gpu-profile.mjs` therefore reports worker kernels too, with per-realm sums under `realms`. A worker terminated before it answered is missed.
 - **Worker flags.** A worker has no page URL, so `getFlag` there reads the defaults. `realmGpuOptions()` also carries `flags`: the page's explicitly set flags from `FORWARDED_FLAGS` (`gpu`, `gpuHorizon`, `mosaicGpu`, `horizonPrecision`, `skylineGpu`, `unknownGpu`, `alignPrecision`, `skyGpuPrep`), stringified; `applyRealmGpuOptions` turns them into `setFlagOverride`s in the worker (unknown keys ignored). Unset flags are not sent, so default messages are unchanged. Explicit protocol fields (`gpu: "off"` for the eye worker, `mosaicGpu` for horizon-fast-app) are applied after and win. Add a flag to `FORWARDED_FLAGS` when worker-reachable code starts reading it; `core/realm-flags.check.ts` covers the round trip.
 - **Error checks.** WebGPU validation and OOM errors are asynchronous, so without checks a broken kernel resolves whatever its output buffer held. With `globalThis.__RIGI_GPU_CHECKS__ = true` (forwarded to the workers like profiling), `submit()` wraps `finish()` + `queue.submit()` in `validation` and `out-of-memory` error scopes. Encoder errors (invalid pipeline, bind group, destroyed or failed buffers used by a pass) surface at `finish()`, so one scope covers every dispatch on the encoder. Every staged read of that encoder (`readBack`, `stage`, `stageReads`, `ComputeGraph.run`) then rejects with `GpuValidationError`, and callers take their CPU path. Outputs that stay on the GPU can await `submitted(enc)`. Errors raised outside the encoder (e.g. `createBuffer` OOM) still reach the buffer's first use. Cost: see the self-test's `error-checks-cost`. It stays opt-in until the cost is confirmed in the app benches.

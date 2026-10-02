@@ -23,10 +23,7 @@ import { GeoQueryGpu } from "#/lib/deck-webgpu/geo-query-gpu";
 import { SilhouetteMaskGpu } from "#/lib/deck-webgpu/silhouette-gpu";
 import { getComputeDevice } from "#/lib/gpu/core/device";
 import {
-	type DispatchCall,
 	definedKernels,
-	dispatch,
-	dispatchAll,
 	type Kernel,
 	type KernelSpec,
 	kernelAsync,
@@ -34,6 +31,11 @@ import {
 } from "#/lib/gpu/core/kernel";
 import { clear, range } from "#/lib/gpu/core/pool";
 import { stageReads } from "#/lib/gpu/core/readback";
+import {
+	type DispatchCall,
+	dispatch,
+	dispatchAll,
+} from "#/lib/gpu/core/test-dispatch";
 import { GpuSplatSorter } from "#/lib/gpu/splat-sort";
 
 const WG = 64;

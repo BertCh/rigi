@@ -32,8 +32,6 @@ import {
 import { inspectGraphs } from "./inspect";
 import {
 	defineKernel,
-	dispatch,
-	dispatchAll,
 	encodeDispatch,
 	kernel,
 	kernelAsync,
@@ -69,6 +67,7 @@ import {
 	realmGpuOptions,
 	takeGpuProfile,
 } from "./realm";
+import { dispatch, dispatchAll } from "./test-dispatch";
 
 type Check = { name: string; ok: boolean; detail?: unknown };
 

@@ -3,11 +3,10 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Optional GPU timestamp profiling. Off unless `globalThis.__RIGI_GPU_PROFILE__ = true` (read live,
-// per realm) and the device has 'timestamp-query'. When off, passProps() returns a shared empty
-// object: no query sets, no extra work.
+// per realm) and the device has 'timestamp-query'.
 //
-// When on, each profiled compute pass gets a 2-slot timestamp QuerySet (pooled per device); after
-// core submit() the durations are read asynchronously and summed per label. getGpuProfile() gives
+// ComputeGraph (graph.ts) measures its nodes through the upstream inspector and reports each
+// duration with recordGpuTime(), summed per label. getGpuProfile() gives
 // { [label]: { gpuMs, count } } for this realm plus the GPU workers' reports merged into it.
 //
 // Workers: kernels in the app's GPU workers (horizon-fast-app, unknown-pose, eye suggest) run in
@@ -20,8 +19,7 @@
 // per-node CPU encode and GPU p50 / p95, transient bytes, aliasing savings and the preflight fit,
 // which the flat label totals above cannot carry. This realm only (worker graphs are not merged).
 // core/inspector.ts registers the snapshot source, so this file stays free of luma runtime imports.
-import type { ComputePassProps, Device, QuerySet } from "@luma.gl/core";
-import { onLost, untilLost } from "./lifecycle";
+import type { Device } from "@luma.gl/core";
 import type { GPUCommandGraphInspectorSnapshot } from "./luma";
 
 declare global {
@@ -30,44 +28,13 @@ declare global {
 
 export type GpuProfile = Record<string, { gpuMs: number; count: number }>;
 
-const EMPTY: ComputePassProps = Object.freeze({}) as ComputePassProps;
-
 let totals: GpuProfile = {};
-const free = new WeakMap<Device, QuerySet[]>();
-const pending = new WeakMap<Device, { label: string; qs: QuerySet }[]>();
 const reads = new Set<Promise<void>>();
 
 /** Whether profiling is on for `device` right now. */
 export const profiling = (device: Device) =>
 	globalThis.__RIGI_GPU_PROFILE__ === true &&
 	device.features.has("timestamp-query");
-
-/**
- * Props for `enc.beginComputePass(...)`: timestamp writes labelled `label` when profiling is on,
- * else an empty object. The pass must be submitted through core submit() to be counted.
- */
-export function passProps(device: Device, label: string): ComputePassProps {
-	if (!profiling(device)) return EMPTY;
-	const qs =
-		free.get(device)?.pop() ??
-		device.createQuerySet({ type: "timestamp", count: 2 });
-	let p = pending.get(device);
-	if (!p) {
-		p = [];
-		pending.set(device, p);
-		onLost(device, () => {
-			pending.delete(device);
-			free.delete(device);
-		});
-	}
-	p.push({ label, qs });
-	return {
-		id: label,
-		timestampQuerySet: qs,
-		beginTimestampIndex: 0,
-		endTimestampIndex: 1,
-	};
-}
 
 /** Add a measured duration (graph.ts reports per-node timings through this). */
 export function recordGpuTime(label: string, ms: number) {
@@ -76,30 +43,6 @@ export function recordGpuTime(label: string, ms: number) {
 	t.gpuMs += ms;
 	t.count++;
 	totals[label] = t;
-}
-
-/** @internal core/queue.ts: after a submit, read this device's pending pass timestamps. */
-export function afterSubmit(device: Device) {
-	const p = pending.get(device);
-	if (!p?.length) return;
-	pending.set(device, []);
-	for (const { label, qs } of p) {
-		// a lost device may never answer: untilLost keeps getGpuProfile() from waiting forever
-		const r = untilLost(device, qs.readTimestampDuration(0, 1))
-			.then((ms) => recordGpuTime(label, ms))
-			.catch(() => {})
-			.finally(() => {
-				reads.delete(r);
-				if (device.isLost) return;
-				let f = free.get(device);
-				if (!f) {
-					f = [];
-					free.set(device, f);
-				}
-				f.push(qs);
-			});
-		reads.add(r);
-	}
 }
 
 /** Per-label GPU time so far (waits for in-flight timestamp reads first). */

@@ -19,7 +19,6 @@
 import type { CommandEncoder, Device } from "@luma.gl/core";
 import { GpuDeviceLostError, touch } from "./lifecycle";
 import { afterSubmit as poolAfterSubmit } from "./pool";
-import { afterSubmit as profileAfterSubmit } from "./profile";
 
 /** A WebGPU validation / out-of-memory error raised by a checked submit. */
 export class GpuValidationError extends Error {
@@ -79,7 +78,6 @@ export function submit(device: Device, enc: CommandEncoder): void {
 	}
 	staged.delete(enc);
 	poolAfterSubmit(device);
-	profileAfterSubmit(device);
 }
 
 function finishAndSubmit(device: Device, enc: CommandEncoder) {
@@ -221,6 +219,5 @@ export function submitWithDefault(
 			.catch(() => {});
 	});
 	poolAfterSubmit(device);
-	profileAfterSubmit(device);
 	return true;
 }

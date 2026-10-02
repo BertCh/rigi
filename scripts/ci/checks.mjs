@@ -165,6 +165,14 @@ export const CHECKS = [
 		timeoutS: 60,
 	},
 	{
+		id: "gpu-binding-guard",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/core/binding-guard.check.ts"),
+		note: "storage binding guards (gpu/core/binding-guard.ts): zero-size binding and minStorageBufferOffsetAlignment rejected at encode time (pure helper)",
+		timeoutS: 60,
+	},
+	{
 		id: "gpu-inspect",
 		tier: "fast",
 		group: "gpu",
