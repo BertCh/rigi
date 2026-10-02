@@ -14,7 +14,9 @@
 // Steps: copyExternalImageToTexture (rgba8unorm, no colour conversion, unpremultiplied) →
 // copyTextureToBuffer (rows padded to 256 B) → unpack → H pass → V pass → normalise, the kernels on
 // a core ComputeGraph per shape (buildPrepGraph, cachedGraph group "sky-prep"; since 2026-10-01, it was
-// a dispatchAll chain) submitted after the texture copy. The pixels equal getImageData's only if the bitmap was made from the same
+// a dispatchAll chain) submitted after the texture copy. buildPrepGraph also records the same kernels
+// into the fused graph (gpu/sky/fused-graph.ts: prep → nn forward → refine in ONE submission, the
+// steady-state path) with the outputs as graph transients. The pixels equal getImageData's only if the bitmap was made from the same
 // raster with premultiplyAlpha/colorSpaceConversion 'none' (sky/index.ts); the first photos per
 // device are compared byte-for-byte against the CPU pixels (sky/prep.ts), never trusted blindly.
 import { Buffer, type Device, Texture } from "@luma.gl/core";
@@ -82,7 +84,7 @@ export const K_PREP_NORM = def("prep-norm", PREP_NORM, [
 
 const WG = 256;
 
-/** The prepared buffers, owned by the caller (`dispose()` destroys them; ORT / the refine only wrap them). */
+/** The prepared buffers, owned by the caller (`dispose()` destroys them; the nn model / the refine only wrap them). */
 export interface SkyPrepGpu {
 	W: number;
 	H: number;
@@ -163,40 +165,69 @@ function tables(W: number, H: number, lw: number, lh: number) {
 
 type Params = Record<string, never>;
 
+/** A graph buffer handle (importBuffer / transientBuffer result). */
+type Handle = ReturnType<ComputeGraph<unknown>["importBuffer"]>;
+
+/** Handles of the prep graph: the three outputs (imports, or transients when fused) and the alpha flag. */
+export interface PrepHandles {
+	rgba: Handle;
+	rgbLo: Handle;
+	input: Handle;
+	flag: Handle;
+}
+
+/** How buildPrepGraph records into a graph shared with the model and the refine. */
+export interface PrepFusion {
+	/** Prefix of every import id (the refine's "prm" / "lut" live in the same graph). */
+	prefix: string;
+	/** The graph's shared LUT import (the prep and the refine read the same table). */
+	lut: Handle;
+}
+
 /** Compiled prep graphs kept per device (one per photo shape; each holds its `tmp` transient). */
 const MAX_GRAPHS = 2;
 
 /**
  * The five prep kernels for one shape as a core ComputeGraph (cachedGraph group "sky-prep"; one compute
  * pass). Imports, bound per run: the params, the padded rows, the pooled tables and the four outputs
- * (caller-owned: ORT and the refine wrap them after the run). The H pass's `tmp` is the graph's only
- * transient; every kernel writes every element of its output range, except prep-alpha, which only sets
- * `flag` (an import created zeroed per run).
+ * (caller-owned: the nn model and the refine wrap them after the run). The H pass's `tmp` is the graph's
+ * only transient; every kernel writes every element of its output range, except prep-alpha, which only
+ * sets `flag` (an import created zeroed per run). With `fusion`, the ids carry its prefix, the LUT is
+ * shared and rgba / rgbLo / input are graph transients (aliased by lifetime) the next nodes read.
  */
-export function buildPrepGraph(
-	g: ComputeGraph<Params>,
+export function buildPrepGraph<P = Params>(
+	g: ComputeGraph<P>,
 	W: number,
 	H: number,
 	lw: number,
 	lh: number,
-): void {
+	fusion?: PrepFusion,
+): PrepHandles {
 	const n = lw * lh;
 	const N = W * H;
 	const rowBytes = Math.ceil((W * 4) / 256) * 256;
 	const t = tables(W, H, lw, lh);
+	const pre = fusion?.prefix ?? "";
 	const imp = (id: string, bytes: number, usage = Buffer.STORAGE) =>
-		g.importBuffer(id, bytes, undefined, usage);
+		g.importBuffer(pre + id, bytes, undefined, usage);
+	const out = (id: string, bytes: number) =>
+		fusion ? g.transientBuffer(pre + id, bytes) : imp(id, bytes);
 	const prm = imp("prm", 32, Buffer.UNIFORM | Buffer.COPY_DST);
 	const pad = imp("pad", rowBytes * H);
 	const axH = imp("axH", t.axH.byteLength);
 	const axV = imp("axV", t.axV.byteLength);
 	const cst = imp("cst", t.cst.byteLength);
-	const lut = imp("lut", 512 * 4);
-	const rgba = imp("rgba", N * 4);
-	const flag = imp("flag", 4);
-	const rgbLo = imp("rgbLo", 3 * n * 4);
-	const input = imp("input", 3 * n * 4);
-	const tmp = g.transientBuffer("tmp", 3 * H * lw * 4);
+	const lut = fusion ? fusion.lut : imp("lut", 512 * 4);
+	const rgba = out("rgba", N * 4);
+	// fused: the refine graph's read node copies it out
+	const flag = imp(
+		"flag",
+		4,
+		fusion ? Buffer.STORAGE | Buffer.COPY_SRC : Buffer.STORAGE,
+	);
+	const rgbLo = out("rgbLo", 3 * n * 4);
+	const input = out("input", 3 * n * 4);
+	const tmp = g.transientBuffer(`${pre}tmp`, 3 * H * lw * 4);
 	g.addKernel({
 		id: "unpack",
 		spec: K_PREP_UNPACK,
@@ -227,7 +258,11 @@ export function buildPrepGraph(
 			bindings: { prm, cst, lo: rgbLo, inp: input },
 			workgroups: [Math.ceil((3 * n) / WG)],
 		});
+	return { rgba, rgbLo, input, flag };
 }
+
+/** The prep's constant tables for one shape (axis taps, constants): fused runs bind them as imports. */
+export const prepTables = tables;
 
 /** Destroy this device's cached prep graphs (each after its runs). */
 export function releasePrepGraphs(device: Device): Promise<void> {
@@ -255,7 +290,24 @@ export function prepSkyGpu(
 			),
 		);
 	// pixels → texture (no conversion, unpremultiplied) → padded rows in `pad`
-	return runPrep(device, W, H, lw, lh, (pad, rowBytes) => {
+	return runPrep(device, W, H, lw, lh, (pad, rowBytes) =>
+		uploadBitmapRows(device, bitmap, W, H, pad, rowBytes),
+	);
+}
+
+/**
+ * ImageBitmap (exactly W × H) → texture (no conversion, unpremultiplied) → `pad` as rows padded to
+ * `rowBytes`, on the device queue (a graph run submitted after it sees the rows).
+ */
+export function uploadBitmapRows(
+	device: Device,
+	bitmap: ImageBitmap,
+	W: number,
+	H: number,
+	pad: Buffer,
+	rowBytes: number,
+): void {
+	{
 		const tex = device.createTexture({
 			id: "sky-prep-bitmap",
 			width: W,
@@ -287,7 +339,7 @@ export function prepSkyGpu(
 		} finally {
 			tex.destroy();
 		}
-	});
+	}
 }
 
 /**

@@ -1204,6 +1204,18 @@ export const CHECKS = [
 		timeoutS: 120,
 	},
 	{
+		id: "sky-fused-dawn",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/sky/fused.check.ts"),
+		needs: [
+			"public/models/skyseg-u2netp-nn.884ee489.safetensors",
+			"public/demo/photos-1024/demo-01.jpg",
+		],
+		note: "the sky worker's fused graph (prep -> nn forwardInto -> refine, one submission and one byte-mask readback) vs the three-step path (prepSkyGpuFromRows -> inferSkyModelGpu -> refineSkyGpu) on 3 demo photos at 512 model long side: max |d| and % differing bytes (expect 0), cache hit / release / model dispose, median warm timings (noisy). SKIP without DAWN_DIR",
+		timeoutS: 240,
+	},
+	{
 		id: "skyglobal-compaction-dawn",
 		tier: "fast",
 		group: "gpu",

@@ -54,6 +54,12 @@ const stateOf = (device: Device) => {
 	return s;
 };
 
+/** The GPU prep is verified on `device` (PREP_VERIFY photos matched the CPU chain) and not disabled: the fused path may skip the CPU. */
+export function prepVerified(device: Device): boolean {
+	const s = states.get(device);
+	return !!s && s.verified >= PREP_VERIFY && !s.disabled;
+}
+
 /** The reply's prep field. */
 export function prepStatus(
 	device: Device | null | undefined,

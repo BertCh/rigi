@@ -11,7 +11,10 @@
  * GPU (when the page's gpuEnabled() says so, sent as `gpu`): the worker's luma compute device runs the
  * model (one ComputeGraph per forward), the GPU prep and the refine, so the photo, the model input and
  * the model output stay on the GPU; only the final byte mask is read back. The CPU refine is the
- * reference and the fallback: no WebGPU, ?gpu=off, or any GPU error. The weights (fp16 safetensors,
+ * reference and the fallback: no WebGPU, ?gpu=off, or any GPU error. In the steady state (GPU prep
+ * verified on the device, refine on) the three steps are ONE ComputeGraph (src/lib/sky/fused.ts: prep →
+ * nn forwardInto → refine, one submission, one byte-mask readback); the verification photos, overrides and
+ * any fused error take the three-step path. The weights (fp16 safetensors,
  * scripts/models/u2netp.py) are fetched through src/lib/models (Cache Storage, content-hashed name).
  */
 
@@ -28,6 +31,7 @@ import {
 	rgbPlanes,
 	toBytes,
 } from "./core";
+import { canFuse, fusedErrors, noteFusedFailure, segmentFused } from "./fused";
 import { createIdleRelease } from "./graph-idle";
 import {
 	type Backend,
@@ -38,7 +42,7 @@ import {
 	type SkyInference,
 	type SkyModel,
 } from "./model";
-import { NeedPixels, prepareGpu, prepStatus } from "./prep";
+import { NeedPixels, prepareGpu, prepStatus, prepVerified } from "./prep";
 import type {
 	SkyPreloadRequest,
 	SkySegmentRequest,
@@ -56,6 +60,24 @@ let modelError: string | undefined;
 const failures = new Map<string, { n: number; at: number }>();
 const MAX_LOAD_ATTEMPTS = 4;
 const LOAD_BACKOFF_MS = 2000;
+
+/**
+ * Free a model: its fused graphs import its weight buffers, so they go first (each after its runs).
+ * Fire and forget; a lost device has nothing left to release.
+ */
+function retireModel(m: SkyModel) {
+	void (async () => {
+		try {
+			if (m.device) {
+				const { releaseFusedGraphs } = await import(
+					"#/lib/gpu/sky/fused-graph"
+				);
+				await releaseFusedGraphs(m.device);
+			}
+		} catch {}
+		m.dispose();
+	})();
+}
 
 const warmed = new WeakSet<Device>();
 let lastDevice: Device | undefined;
@@ -77,8 +99,10 @@ const idle = createIdleRelease(SKY_GRAPH_IDLE_MS, () =>
 		if (!refineOn.size) return;
 		// refine-graph is loaded on demand by refine.ts (import cycle); the cache is empty if it never was
 		const { releaseSkyGraphs } = await import("#/lib/gpu/sky/refine-graph");
+		const { releaseFusedGraphs } = await import("#/lib/gpu/sky/fused-graph");
 		await Promise.all([
 			device && releasePrepGraphs(device),
+			device && releaseFusedGraphs(device),
 			...[...refineOn].map((d) => releaseSkyGraphs(d)),
 		]);
 	}),
@@ -95,7 +119,7 @@ function noteFailure(e: unknown) {
 	for (const [key, p] of [...models]) {
 		if (key === "cpu") continue; // the CPU model does not live on the device
 		models.delete(key);
-		void p.then((m) => m?.dispose()).catch(() => {});
+		void p.then((m) => m && retireModel(m)).catch(() => {});
 	}
 	failures.clear();
 	lastDevice = undefined;
@@ -134,7 +158,7 @@ function loadModel(
 				models.get(key) === cached
 			) {
 				models.delete(key);
-				m.dispose();
+				retireModel(m);
 			}
 		});
 	}
@@ -205,6 +229,54 @@ async function segmentOf(req: SkySegmentRequest) {
 	const model = req.forceFallback ? null : await loadModel(req.backend, device);
 	// GPU prep (src/lib/sky/prep.ts): the photo goes ImageBitmap → GPU buffers (the model's input, the
 	// refine's guides) without visiting the CPU; undefined = the CPU prep below
+	if (
+		req.bitmap &&
+		device &&
+		model &&
+		canFuse({
+			refine: req.refine,
+			forceFallback: req.forceFallback,
+			modelLongSide: req.modelLongSide,
+			hasBitmap: true,
+			modelBackend: model.backend,
+			sameDevice: model.device === device,
+			prepVerified: prepVerified(device),
+			fusedErrors: fusedErrors(device),
+		})
+	) {
+		const tf = performance.now();
+		try {
+			const out = await segmentFused(device, model, req.bitmap, W, H);
+			if (out) {
+				refineDevices.add(device);
+				const tDone = performance.now();
+				const msg: SkyWorkerResponse = {
+					id: req.id,
+					ok: true,
+					type: "segment",
+					width: W,
+					height: H,
+					data: out.bytes.buffer as ArrayBuffer,
+					source: "model",
+					backend: model.backend,
+					error: undefined,
+					// prep + model + refine are one submission: all of it is reported as `infer`
+					ms: { load: tf - t0, infer: tDone - tf, refine: 0 },
+					refineOn: "gpu",
+					prep: prepStatus(device, "gpu"),
+				};
+				scope.postMessage(msg, [msg.data]);
+				return;
+			}
+		} catch (e) {
+			console.warn(
+				"[sky] fused GPU path failed, using the three-step path:",
+				e,
+			);
+			noteFusedFailure(device);
+			noteFailure(e);
+		}
+	}
 	const modelLongSide =
 		req.modelLongSide ?? (model ? MODEL_LONG_SIDE[model.backend] : 0);
 	const prep =

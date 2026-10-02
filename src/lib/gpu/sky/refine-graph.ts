@@ -20,8 +20,9 @@
 //   TRANSIENTS, sized exactly (a pool would round each to a power of two) and aliased by lifetime;
 // - the inputs (params, guideLo, P(sky), rgba, axis taps, LUT, the all-ones kernel) are graph IMPORTS,
 //   pooled under the "sky-refine" lease (graph imports are caller-owned) and bound per run through
-//   run({ buffers }). ORT's output GPUBuffer is wrapped per run (not owned), so the model output
-//   never leaves the GPU;
+//   run({ buffers }). The nn model's output GPUBuffer is wrapped per run (not owned), so the model
+//   output never leaves the GPU. In the fused graph (./fused-graph.ts) guideLo, P(sky) and rgba are
+//   instead graph views of the prep's transients and the model's output (`SkyRefineSources`);
 // - the byte mask (and the float mask when asked) are read by a core readNode on the graph's encoder
 //   (results in run().reads.read); the float range is sized 0 when not asked, which skips its copy;
 // - compiled graphs are cached by shape (lw, lh, W, H) and the guided-filter radius r (it shapes the
@@ -37,6 +38,7 @@ import { Buffer, type Device } from "@luma.gl/core";
 import {
 	type ComputeGraph,
 	cachedGraph,
+	type GraphBinding,
 	releaseCachedGraphs,
 } from "#/lib/gpu/core/graph";
 import { GPUConvolution } from "#/lib/gpu/core/luma";
@@ -114,7 +116,7 @@ export function skyScratchBytes(
  * (≈ 16.7 Mpx at the WebGPU default 65535) the up-v dispatch is invalid. Refuse (the worker then
  * takes the CPU refine) instead of submitting an invalid encoder.
  */
-function checkDispatch(
+export function checkDispatch(
 	device: Device,
 	lw: number,
 	lh: number,
@@ -137,7 +139,27 @@ function checkDispatch(
 		);
 }
 
-/** Add the refine nodes for one shape to `g` (the ORT / float P(sky) is imported per run). */
+/** A graph buffer handle or view (what a kernel binding takes). */
+type Source = GraphBinding;
+
+/**
+ * Where the refine reads its inputs from when they are not per-run imports: the low-res guide, P(sky)
+ * and the full-res RGBA words (fused graph), and an alpha flag to read back with the byte mask.
+ */
+export interface SkyRefineSources {
+	/** The graph's shared LUT import (the prep reads the same table). */
+	lut?: Source;
+	gl: Source;
+	gp: Source;
+	rgba: Source;
+	flag?: Source;
+}
+
+/**
+ * Add the refine nodes for one shape to `g`. By default guideLo / P(sky) / rgba are imports bound per
+ * run (the nn model's or a float P(sky)); `src` binds them to graph resources instead and adds
+ * `src.flag` to the read node (second, after the byte mask).
+ */
 export function buildSkyGraph(
 	g: ComputeGraph<Params>,
 	lw: number,
@@ -145,6 +167,7 @@ export function buildSkyGraph(
 	W: number,
 	H: number,
 	r: number,
+	src?: SkyRefineSources,
 ): void {
 	const n = lw * lh;
 	const N = W * H;
@@ -155,16 +178,23 @@ export function buildSkyGraph(
 		undefined,
 		Buffer.UNIFORM | Buffer.COPY_DST,
 	);
-	const gl = g.importBuffer("gl", 3 * n * 4, undefined, Buffer.STORAGE);
-	const gp = g.importBuffer("gp", n * 4, undefined, Buffer.STORAGE);
-	const rgba = g.importBuffer("rgba", N * 4, undefined, Buffer.STORAGE);
+	const gl = src
+		? src.gl
+		: g.importBuffer("gl", 3 * n * 4, undefined, Buffer.STORAGE);
+	const gp = src
+		? src.gp
+		: g.importBuffer("gp", n * 4, undefined, Buffer.STORAGE);
+	const rgba = src
+		? src.rgba
+		: g.importBuffer("rgba", N * 4, undefined, Buffer.STORAGE);
 	const axis = g.importBuffer(
 		"axis",
 		axisTable(lw, lh, W, H).byteLength,
 		undefined,
 		Buffer.STORAGE,
 	);
-	const lut = g.importBuffer("lut", 512 * 4, undefined, Buffer.STORAGE);
+	const lut =
+		src?.lut ?? g.importBuffer("lut", 512 * 4, undefined, Buffer.STORAGE);
 	const ones = g.importBuffer(
 		"ones",
 		onesLength(r) * 4,
@@ -260,6 +290,8 @@ export function buildSkyGraph(
 		// the float mask only when asked: a 0-byte range stages no copy
 		.readNode("read", [
 			{ buffer: bytes, size: nWords * 4 },
+			// the alpha flag (fused graph) sits before the float mask so its read index does not depend on `floats`
+			...(src?.flag ? [src.flag] : []),
 			{ buffer: q, size: (p) => (p.floats ? N * 4 : 0) },
 		]);
 }
@@ -320,9 +352,9 @@ export async function refineSkyGraph(
 		if (!isHost(input.guideLo)) borrowed.push(gl);
 		const gp: Buffer = isFloats(input.prob)
 			? pooledStorage(device, "sky-refine/prob", input.prob)
-			: // ORT's buffer, wrapped (not owned; destroying the wrapper leaves the handle alone)
+			: // the nn model's buffer, wrapped (not owned; destroying the wrapper leaves the handle alone)
 				device.createBuffer({
-					id: "sky-refine/ort-prob",
+					id: "sky-refine/nn-prob",
 					handle: input.prob,
 					byteLength: input.prob.size,
 					usage: input.prob.usage,
