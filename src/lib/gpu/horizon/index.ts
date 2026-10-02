@@ -78,6 +78,7 @@ import {
 import { graphChunker } from "./graph";
 import { HORIZON_WGSL } from "./horizon.wgsl";
 import { buildMipsGpu, type MipJob, mipDims } from "./mosaic-mips";
+import { packMarchUniform } from "./uniforms";
 
 const RING_STRIDE = 40;
 const MAX_PAGES = 4;
@@ -428,9 +429,6 @@ async function marchLocked(
 	const outBytes = eyesPerChunk * nAz * 8;
 	const statsBytes = Math.max(16, eyesPerChunk * 12);
 	const pages = [0, 1, 2, 3].map((i) => set.pages[i] ?? dummy);
-	const ub = new ArrayBuffer(64);
-	const uu = new Uint32Array(ub);
-	const uf = new Float32Array(ub);
 	// one ComputeGraph encoding per chunk (./graph.ts)
 	const chunker = await graphChunker(device, LEASE, {
 		spec: MARCH,
@@ -520,19 +518,19 @@ async function marchLocked(
 					pu[sb + 4 * s + 3] = segRing[s] ?? 0;
 				}
 			}
-			uu[0] = nAz;
-			uu[1] = nE;
-			uu[2] = eyeStride;
-			uu[3] = azOff;
-			uu[4] = eyeOff;
-			uu[5] = ringOff;
-			uu[6] = nR;
-			uu[7] = mipSkip ? 1 : 0;
-			uf[8] = opts.stepFactor ?? 3.5e-4;
-			uf[9] = opts.nearFactor ?? 0.01;
-			uf[10] = marchInv2R(kR);
-			uu[11] = 1_000_000;
-			uu[12] = 0; // U.zero
+			const ub = packMarchUniform({
+				nAz,
+				nEyes: nE,
+				eyeStride,
+				azOff,
+				eyeOff,
+				ringOff,
+				nRings: nR,
+				mipSkip,
+				stepFactor: opts.stepFactor ?? 3.5e-4,
+				nearFactor: opts.nearFactor ?? 0.01,
+				inv2R: marchInv2R(kR),
+			});
 			const read = chunker.submit(
 				ub,
 				new Uint8Array(buf, 0, (eyeOff + nE * eyeStride) * 4),

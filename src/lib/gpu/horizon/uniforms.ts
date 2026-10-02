@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Uniform blocks of the horizon kernels (certified.wgsl.ts / ridges.wgsl.ts struct U, the mosaic mip
-// struct P), packed through defineUniformBlock. Pure (no GPU): core/uniform-block-a.check.ts proves
-// each packer byte-identical to the former hand-packed words.
+// Uniform blocks of the horizon kernels (horizon.wgsl.ts / certified.wgsl.ts / ridges.wgsl.ts
+// struct U, the mosaic mip struct P), packed through defineUniformBlock. Pure (no GPU):
+// core/uniform-block-a.check.ts (march: uniform-block-b.check.ts) proves each packer
+// byte-identical to the former hand-packed words.
 
 import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 
@@ -99,3 +100,52 @@ export const MOSAIC_MIP_P = defineUniformBlock({
 	factor: "u32",
 	pad: "u32",
 });
+
+/** horizon.wgsl.ts struct U (64 B): the march kernel. */
+export const MARCH_U = defineUniformBlock({
+	nAz: "u32",
+	nEyes: "u32",
+	eyeStride: "u32",
+	azOff: "u32",
+	eyeOff: "u32",
+	ringOff: "u32",
+	nRings: "u32",
+	mipSkip: "u32",
+	stepFactor: "f32",
+	nearFactor: "f32",
+	inv2R: "f32",
+	maxIter: "u32",
+	zero: "u32",
+	_p1: "u32",
+	_p2: "u32",
+	_p3: "u32",
+});
+
+export const packMarchUniform = (a: {
+	nAz: number;
+	nEyes: number;
+	eyeStride: number;
+	azOff: number;
+	eyeOff: number;
+	ringOff: number;
+	nRings: number;
+	mipSkip: boolean;
+	stepFactor: number;
+	nearFactor: number;
+	inv2R: number;
+}) =>
+	MARCH_U.pack({
+		nAz: a.nAz,
+		nEyes: a.nEyes,
+		eyeStride: a.eyeStride,
+		azOff: a.azOff,
+		eyeOff: a.eyeOff,
+		ringOff: a.ringOff,
+		nRings: a.nRings,
+		mipSkip: a.mipSkip ? 1 : 0,
+		stepFactor: a.stepFactor,
+		nearFactor: a.nearFactor,
+		inv2R: a.inv2R,
+		maxIter: 1_000_000,
+		zero: 0, // U.zero
+	});
