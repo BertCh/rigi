@@ -31,7 +31,12 @@ import {
 	placeLabels,
 	RIDGE_BUCKETS,
 } from "./projection";
-import type { BaselinePeakLabel, ControlPoint, SampleEntry } from "./types";
+import type {
+	BaselinePeakLabel,
+	ControlPoint,
+	PriorUnknowns,
+	SampleEntry,
+} from "./types";
 import { Button, Notice, Section, Slider, Toggle } from "./ui";
 import { usePipeline } from "./usePipeline";
 
@@ -71,7 +76,13 @@ function pointErrPx(cam: Camera, p: ControlPoint) {
 	return q ? Math.hypot(q[0] - p.x, q[1] - p.y) : 1e4;
 }
 
-function priorCamera(meta: ExifPhotoMeta | null, w: number, h: number) {
+const KNOWN: PriorUnknowns = { yaw: false, gravity: false, focal: false };
+
+function priorCamera(
+	meta: ExifPhotoMeta | null,
+	w: number,
+	h: number,
+): { cam: Camera; missing: string[]; unknown: PriorUnknowns } {
 	const missing: string[] = [];
 	if (meta?.gravity && meta.heading !== undefined && meta.focal35) {
 		const full = cameraFromMeta(meta);
@@ -81,8 +92,9 @@ function priorCamera(meta: ExifPhotoMeta | null, w: number, h: number) {
 			return {
 				cam: { ...cam, height: h, cy: h / 2 },
 				missing: ["matching aspect ratio (image was cropped?)"],
+				unknown: KNOWN,
 			};
-		return { cam, missing };
+		return { cam, missing, unknown: KNOWN };
 	}
 	if (!meta?.gravity) missing.push("gravity (pitch/roll)");
 	if (meta?.heading === undefined) missing.push("compass heading");
@@ -95,7 +107,13 @@ function priorCamera(meta: ExifPhotoMeta | null, w: number, h: number) {
 		pitch: 0,
 		roll: 0,
 	});
-	return { cam, missing };
+	// this fallback is level (gravity unused even when present) and guesses north / 26 mm when absent
+	const unknown = {
+		yaw: meta?.heading === undefined,
+		gravity: true,
+		focal: !meta?.focal35,
+	};
+	return { cam, missing, unknown };
 }
 
 export function BaselinePage({
@@ -115,7 +133,7 @@ export function BaselinePage({
 	const [imgError, setImgError] = useState<string | null>(null);
 	const [manual, setManual] = useState({ lat: "", lon: "" });
 	const [manualLoc, setManualLoc] = useState<Location | null>(null);
-	const [prior, setPrior] = useState<{ cam: Camera; missing: string[] } | null>(
+	const [prior, setPrior] = useState<ReturnType<typeof priorCamera> | null>(
 		null,
 	);
 	const [params, setParams] = useState<CameraParams | null>(null);
@@ -757,10 +775,11 @@ export function BaselinePage({
 									<Button
 										primary
 										disabled={!canAlign}
+										// the unknowns come from EXIF: a hand-dragged yaw still gets the 360° search
 										onClick={() =>
 											cam &&
 											state.sky &&
-											align(resizeCamera(cam, state.sky.width))
+											align(resizeCamera(cam, state.sky.width), prior?.unknown)
 										}
 									>
 										{state.aligning ? "Aligning…" : "Auto-align"}

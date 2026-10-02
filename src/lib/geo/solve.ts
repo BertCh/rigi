@@ -271,7 +271,8 @@ const fullOpts = (o: SolveOptions): SolveOptions => ({
 });
 
 export const DEFAULT_SIGMA = { yaw: 15, pitch: 1.5, roll: 1.5, focal: 0.06 };
-const FULL_SEARCH_CONFIDENCE = 0.75;
+/** The full-360° bar (bench-ablation.md: the 0.5 local bar accepted IMG_7053 at −123.7° without a heading). */
+export const FULL_SEARCH_CONFIDENCE = 0.75;
 
 function solveOnce(
 	prior: Camera,

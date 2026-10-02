@@ -11,6 +11,7 @@ import type {
 	FromWorker,
 	HorizonLite,
 	PeakView,
+	PriorUnknowns,
 	SkylineObservation,
 	Stage,
 	ToWorker,
@@ -161,7 +162,7 @@ export function usePipeline() {
 	);
 
 	const align = useCallback(
-		(prior: Camera) => {
+		(prior: Camera, unknown?: PriorUnknowns) => {
 			const id = ids.current.next++;
 			ids.current.align = id;
 			setState((s) => ({
@@ -175,6 +176,7 @@ export function usePipeline() {
 				prior,
 				solveGpu: gpuEnabled(),
 				gpuOpts: realmGpuOptions(),
+				unknown,
 			});
 		},
 		[send],

@@ -11,6 +11,9 @@ import type { RealmGpuOptions } from "#/lib/gpu/core/realm";
 
 export type { PeakView, SkylineObservation };
 
+/** Which parts of the prior camera are guesses rather than sensor readings (align-options.ts). */
+export type PriorUnknowns = { yaw: boolean; gravity: boolean; focal: boolean };
+
 export interface SampleEntry {
 	name: string;
 	file: string;
@@ -88,6 +91,8 @@ export type ToWorker =
 			solveGpu?: boolean;
 			/** The page's GPU profiling / error-check switches (core/realm.ts). */
 			gpuOpts?: RealmGpuOptions;
+			/** Prior parts that are guesses (no compass, gravity or focal in EXIF): align-options.ts. */
+			unknown?: PriorUnknowns;
 	  };
 
 export type Stage = "tiles" | "horizon" | "peaks" | "skyline" | "align";

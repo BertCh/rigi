@@ -26,6 +26,7 @@ import { applyRealmGpuOptions } from "#/lib/gpu/core/realm";
 import { releaseWhenIdle } from "#/lib/gpu/device";
 import { solveCoarse } from "#/lib/gpu/solve";
 import { OVERPASS, overpassMemo } from "#/lib/overpass";
+import { applyMinConfidence, baselineAlignOptions } from "./align-options";
 import type {
 	AlignResult,
 	FromWorker,
@@ -207,7 +208,7 @@ ctx.onmessage = async (ev: MessageEvent<ToWorker>) => {
 			if (!current.horizon) throw new Error("Horizon not computed yet");
 			if (!sky) throw new Error("Photo skyline not detected yet");
 			// Cascade (scored best in scripts/eval.ts: 11/12 accepted, 0 false
-			// accepts) with default options: rejects escalate to refinePose.
+			// accepts): rejects escalate to refinePose.
 			// solveGpu: solvePose's coarse grid on the GPU (src/lib/gpu/solve, identical to the CPU
 			// grid by construction; falls back to it without a device). Otherwise the sync reference.
 			const on = new Set<"gpu" | "cpu">();
@@ -218,9 +219,16 @@ ctx.onmessage = async (ev: MessageEvent<ToWorker>) => {
 						return g;
 					}
 				: undefined;
-			const r = coarse
-				? await cascadeAsync(msg.prior, current.horizon, sky, {}, coarse)
-				: cascade(msg.prior, current.horizon, sky);
+			// Missing sensors: the unknown-pose options and its 0.75 bar (align-options.ts); all known: {}.
+			const { cascade: opts, minConfidence } = baselineAlignOptions(
+				msg.unknown,
+			);
+			const r = applyMinConfidence(
+				coarse
+					? await cascadeAsync(msg.prior, current.horizon, sky, opts, coarse)
+					: cascade(msg.prior, current.horizon, sky, opts),
+				minConfidence,
+			);
 			const result: AlignResult = {
 				camera: r.camera,
 				confidence: r.confidence,
