@@ -8,6 +8,11 @@
 // on mask > 0.5 and depth > 0, normals zeroed off the mask, intrinsics normalised with the centre at
 // (0.5, 0.5). Without the normal head (the quantized downloads drop it) the normals come from the metric
 // depth instead (normalsFromDepth). Pure CPU on arrays already read back (O(W·H) passes).
+//
+// The CPU path above (composeDepth, normalsFromDepth) is the REFERENCE and what nearfield/live uses. Step
+// Inside's client runs the same arithmetic on the GPU (./pipeline-gpu.ts: a compose kernel and a
+// normals-from-depth kernel on the net's own z / mask / normal buffers); the only CPU part of that flow
+// is solveCamera below (64 x 64 samples), shared by both.
 import type { NearFieldDepth } from "../types";
 import {
 	focalShiftSamples,
@@ -34,17 +39,46 @@ export type DepthNetArrays = {
 	metricScale: number;
 };
 
+/** The focal and z shift from the 64 x 64 downsamples (the only part of composeDepth that is not per pixel). */
+export function solveCamera(
+	points64: Float32Array,
+	mask64: Float32Array,
+	width: number,
+	height: number,
+	focalGrid?: readonly [number, number],
+	/** a known focal (live: the camera is calibrated): only the shift is solved */
+	knownFocal?: number,
+): {
+	focal: number;
+	shift: number;
+	intrinsicsNorm: { fx: number; fy: number; cx: number; cy: number };
+} {
+	const s = focalShiftSamples(points64, mask64, width, height, focalGrid);
+	const { focal, shift } =
+		knownFocal && knownFocal > 0
+			? solveShiftKnownFocal(s.uv, s.xyz, s.n, knownFocal)
+			: solveFocalShift(s.uv, s.xyz, s.n);
+	return {
+		focal,
+		shift,
+		intrinsicsNorm: intrinsicsFromFocal(focal, width, height),
+	};
+}
+
 export function composeDepth(
 	a: DepthNetArrays,
 	model: string,
 	seconds = 0,
 ): NearFieldDepth & { focal: number; shift: number } {
 	const { width: W, height: H } = a;
-	const s = focalShiftSamples(a.points64, a.mask64, W, H, a.focalGrid);
-	const { focal, shift } =
-		a.knownFocal && a.knownFocal > 0
-			? solveShiftKnownFocal(s.uv, s.xyz, s.n, a.knownFocal)
-			: solveFocalShift(s.uv, s.xyz, s.n);
+	const { focal, shift, intrinsicsNorm } = solveCamera(
+		a.points64,
+		a.mask64,
+		W,
+		H,
+		a.focalGrid,
+		a.knownFocal,
+	);
 	const n = W * H;
 	const depth = new Float32Array(n);
 	const valid = new Uint8Array(n);
@@ -69,7 +103,6 @@ export function composeDepth(
 			}
 		}
 	}
-	const intrinsicsNorm = intrinsicsFromFocal(focal, W, H);
 	normal ??= normalsFromDepth(depth, valid, W, H, intrinsicsNorm);
 	return {
 		width: W,
@@ -86,9 +119,9 @@ export function composeDepth(
 }
 
 /** Pixel offset of the depth differences: two pixels average out the bilinear head upsampling. */
-const NORMAL_STEP = 2;
+export const NORMAL_STEP = 2;
 /** A neighbour farther than this relative depth step is across an edge, not on the surface. */
-const NORMAL_EDGE = 0.08;
+export const NORMAL_EDGE = 0.08;
 
 /**
  * Unit camera-frame normals (OpenCV: x right, y down, z forward; facing the camera, so z < 0 on a

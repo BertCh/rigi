@@ -748,6 +748,15 @@ export const CHECKS = [
 		note: "Anny LOD10 evaluator (shape + LBS) vs its numpy twin and Anny's full rig; reference by scripts/models/anny.py --dump-ref",
 	},
 	{
+		id: "nearfield-pipeline-gpu",
+		tier: "fast",
+		group: "nearfield",
+		cmd: tsx("src/lib/nearfield/local/pipeline-gpu.check.ts"),
+		needs: ["public/models/moge2-vits-q8.65924691.safetensors"],
+		note: "Step Inside's depth pipeline on the compute graph (GPU prep, net, compose, normals, lift; 64² reads only) vs the former CPU flow on demo photos over Dawn; SKIPs without DAWN_DIR",
+		timeoutS: 300,
+	},
+	{
 		id: "nearfield-lift-dawn",
 		tier: "fast",
 		group: "nearfield",

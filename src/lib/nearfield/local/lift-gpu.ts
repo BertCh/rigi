@@ -7,9 +7,13 @@
 // scales, quaternion, packed RGBA, kept flag); the records are read back in one slot and compacted on
 // the CPU (cloudFromRecords). The CPU twin is liftRecordsCpu: same arithmetic in f64 instead of f32.
 //
-// Graph (cachedGraph group "nearfield-lift", keyed on the power-of-two capacities of the inputs):
-//   imports prm (uniform), depth (W·H f32, ≤ 0 = invalid), normal (3·W·H f32, or 4 B when absent),
-//   rgba (W·H u32) → LIFT kernel → records (transient, written in full for every cell < cells) → read.
+// Two users share the one kernel (K_LIFT) and its uniform (liftParamWords):
+//   - liftGaussiansGpu(device, inp): CPU arrays in (a photo whose depth only exists on the CPU, e.g. a
+//     cached depth); cachedGraph group "nearfield-lift", keyed on the power-of-two capacities:
+//     imports prm (uniform), depth (W·H f32, ≤ 0 = invalid), normal (3·W·H f32, or 4 B when absent),
+//     rgba (W·H u32) → LIFT kernel → records (transient, written in full for every cell < cells) → read.
+//   - Step Inside's depth pipeline (./pipeline-gpu.ts graph 2): the kernel is bound to the compose
+//     kernel's depth / normal and the photo prep's RGBA words, all GPU-resident, with no upload.
 // Clear audit: every record word of every cell < cells is written by its invocation; the read covers
 // exactly those cells, so the transient needs no clear.
 import { Buffer, type Device } from "@luma.gl/core";
@@ -26,8 +30,10 @@ import { defineUniformBlock } from "#/lib/gpu/core/uniform-block";
 import type { GaussianCloud } from "../types";
 import {
 	cloudFromRecords,
+	type IntrinsicsNorm,
 	LIFT_DEFAULTS,
 	LIFT_RECORD_WORDS,
+	type LiftGrid,
 	type LiftInput,
 	type LiftParams,
 	liftGrid,
@@ -197,15 +203,42 @@ export const K_LIFT = defineKernel(
 
 type Run = { cells: number; gw: number; gh: number };
 
+/** LIFT_PRM words of one lift (`hasNormal`: the normal binding holds 3·W·H floats). */
+export function liftParamWords(
+	width: number,
+	height: number,
+	grid: LiftGrid,
+	params: LiftParams,
+	hasNormal: boolean,
+	K: IntrinsicsNorm,
+): ArrayBuffer {
+	return LIFT_PRM.pack({
+		width,
+		height,
+		gw: grid.gw,
+		gh: grid.gh,
+		stride: Math.max(1, Math.floor(params.stride)),
+		hasNormal: hasNormal ? 1 : 0,
+		edgeRatio: params.edgeRatio,
+		sigmaFrac: params.sigmaFrac,
+		flatFrac: params.flatFrac,
+		maxStretch: params.maxStretch,
+		fx: K.fx,
+		fy: K.fy,
+		cx: K.cx,
+		cy: K.cy,
+	});
+}
+
 /** RGBA bytes → one u32 per pixel (little-endian: r in the low byte). */
 export function packRgba(rgba: Uint8Array | Uint8ClampedArray): Uint32Array {
 	return new Uint32Array(rgba.buffer, rgba.byteOffset, rgba.byteLength >> 2);
 }
 
 /**
- * The lift on `device` (LIFT_WGSL on a cached ComputeGraph). Depth is folded with `valid` (invalid → 0)
- * before upload; inputs already on the GPU are a follow-up (the depth is needed on the CPU anyway for
- * the anchoring, so it is uploaded here).
+ * The lift on `device` from CPU arrays (LIFT_WGSL on a cached ComputeGraph). Depth is folded with `valid`
+ * (invalid → 0) before upload. For callers that only have CPU depth (a cached depth); the depth pipeline
+ * (./pipeline-gpu.ts) lifts straight from its GPU-resident depth instead.
  */
 export async function liftGaussiansGpu(
 	device: Device,
@@ -221,22 +254,14 @@ export async function liftGaussiansGpu(
 	const depth = new Float32Array(n);
 	for (let i = 0; i < n; i++) depth[i] = inp.valid[i] ? inp.depth[i] : 0;
 	const hasNormal = !!inp.normal && inp.normal.length >= 3 * n;
-	const prmWords = LIFT_PRM.pack({
-		width: inp.width,
-		height: inp.height,
-		gw: grid.gw,
-		gh: grid.gh,
-		stride: s,
-		hasNormal: hasNormal ? 1 : 0,
-		edgeRatio: p.edgeRatio,
-		sigmaFrac: p.sigmaFrac,
-		flatFrac: p.flatFrac,
-		maxStretch: p.maxStretch,
-		fx: inp.K.fx,
-		fy: inp.K.fy,
-		cx: inp.K.cx,
-		cy: inp.K.cy,
-	});
+	const prmWords = liftParamWords(
+		inp.width,
+		inp.height,
+		grid,
+		p,
+		hasNormal,
+		inp.K,
+	);
 	const recBytes = grid.cells * LIFT_RECORD_WORDS * 4;
 	const capPix = capacityFor(n * 4);
 	const capNrm = hasNormal ? capacityFor(n * 12) : 16;

@@ -4,11 +4,17 @@
 
 // Step Inside's near-field source (../client.ts NearFieldSource: available / depth / gaussiansWithMeta),
 // computed in the browser.
-//   depth     → MoGe-2 ViT-S (./depth-net.ts) on the src/lib/nn runtime (WGSL kernels on one core
-//               ComputeGraph per forward, on the app's WebGPU device), then ./compose.ts (focal / shift,
-//               metric depth, normals, intrinsics) — the service ran MoGe-2 ViT-L in PyTorch.
-//   gaussians → the depth lift (./lift-gpu.ts, a graph kernel; ./lift.ts is its CPU twin), on the cached
-//               depth of the same photo. No SHARP (research-only weights) and no DA3 multiview.
+//   depth     → MoGe-2 ViT-S (./depth-net.ts) on the src/lib/nn runtime, the whole per-photo flow on core
+//               ComputeGraphs with GPU-resident hand-offs (./pipeline-gpu.ts): the photo is decoded to the
+//               depth grid with createImageBitmap (no canvas, no getImageData) and uploaded once; the GPU
+//               prep resamples it to the net input and the lift's colours, graph 1 runs the net and reads back
+//               only the 64 x 64 samples + metric scale, the CPU fits the focal / z shift, graph 2 composes
+//               depth (+ normals for weights without the head) and lifts it in one submission and reads
+//               depth, normals and the lift records. The service ran MoGe-2 ViT-L in PyTorch.
+//   gaussians → the lift's records of that same job (stride 2, edge ratio 1.5), compacted into a cloud on
+//               request. No SHARP (research-only weights) and no DA3 multiview.
+// Ownership: nothing GPU-resident outlives a job (the lift runs inside it), so a job's result is plain CPU
+// data (depth, records) cached per photo blob; gaussiansWithMeta after depth() alone just compacts records.
 // "Available" = WebGPU compute is there and the weights are reachable (public/models or the Cache
 // Storage copy); the first build downloads them (the int8 file, 36 MB, by default: `nearfieldWeights`,
 // depth-net.ts MOGE2_WEIGHTS; progress through onProgress and the src/lib/models download store), and
@@ -17,7 +23,7 @@
 // available() / prefetch() never throw. depth() / gaussiansWithMeta() reject with a NearFieldError
 // (../client.ts) or an AbortError. One FIFO lease ("nearfield/depth") serialises the inference of
 // different photos; photos in flight share one job that is cancelled only when every caller left; the
-// weights and the nn runtime are released after NEARFIELD_IDLE_UNLOAD_MS without a call.
+// weights, their graphs and the nn runtime are released after NEARFIELD_IDLE_UNLOAD_MS without a call.
 import type { Device } from "@luma.gl/core";
 import { getFlag } from "#/lib/flags";
 import { abortable, isAbortError } from "#/lib/gpu/core/abort";
@@ -42,7 +48,6 @@ import {
 	type RequestOpts,
 } from "../client";
 import type { GaussianCloud, NearFieldDepth } from "../types";
-import { composeDepth } from "./compose";
 import {
 	cacheStorageBackend,
 	type DepthCacheBackend,
@@ -50,16 +55,16 @@ import {
 	getCachedDepth,
 	putCachedDepth,
 } from "./depth-cache";
+import { MOGE2_WEIGHTS, MogeDepthNet, type MogeWeights } from "./depth-net";
+import { cloudFromRecords } from "./lift";
 import {
-	FOCAL_GRID,
-	MOGE2_VITS,
-	MOGE2_WEIGHTS,
-	MogeDepthNet,
-	type MogeWeights,
-	tokenGrid,
-} from "./depth-net";
-import type { LiftInput } from "./lift";
-import { liftGaussiansGpu } from "./lift-gpu";
+	type DepthGraphResult,
+	type DepthPhoto,
+	estimateDepthGraph,
+	liftCachedDepth,
+	planDepthPipeline,
+	releaseComposeGraphs,
+} from "./pipeline-gpu";
 
 /** MoGe-2 base tokens in the browser: the bottom of its range (ViT-S at 2000 measured no better). */
 export const LOCAL_TOKENS = 1200;
@@ -80,18 +85,13 @@ export type LocalOpts = RequestOpts & {
 	onProgress?: (message: string) => void;
 };
 
-export type Decoded = {
-	width: number;
-	height: number;
-	/** RGBA on the depth grid */
-	rgba: Uint8ClampedArray;
-	/** [3, 14·bh, 14·bw] RGB 0..1, the network input */
-	planes: Float32Array;
-	bh: number;
-	bw: number;
+/** What a photo job leaves behind: CPU depth and the lift's records (the cloud is compacted on request). */
+type PhotoResult = {
+	depth: NearFieldDepth;
+	/** null: the depth came from the persistent cache and has no lift yet (gaussiansWithMeta lifts it) */
+	records: Float32Array | null;
+	cells: number;
 };
-
-type PhotoResult = { depth: NearFieldDepth; rgba: Uint8ClampedArray };
 
 /** Long side → the depth grid (the service's decode_image: round(w · s), s = maxSide / long side ≤ 1). */
 export function depthGridSize(
@@ -103,101 +103,61 @@ export function depthGridSize(
 	return [Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s))];
 }
 
-function canvas2d(w: number, h: number) {
-	const c = new OffscreenCanvas(w, h);
-	const ctx = c.getContext("2d", { willReadFrequently: true });
-	if (!ctx) throw new Error("nearfield: no 2d context");
-	ctx.imageSmoothingEnabled = true;
-	ctx.imageSmoothingQuality = "high";
-	return ctx;
-}
+const BITMAP_OPTS = { premultiplyAlpha: "none" } as const;
 
-/** Decode (EXIF orientation applied), the depth-grid RGBA and the network input planes. */
+/**
+ * Decode (EXIF orientation applied) to the depth grid as an ImageBitmap, ready for the one upload:
+ * createImageBitmap of the blob, then the browser's own high-quality resize to W x H (the GPU prep
+ * resamples that to the net input). A photo smaller than the net input also gets the net-sized raster.
+ */
 export async function decodePhoto(
 	blob: Blob,
 	maxSide: number,
 	tokens: number,
-): Promise<Decoded> {
-	const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+): Promise<DepthPhoto> {
+	const full = await createImageBitmap(blob, {
+		imageOrientation: "from-image",
+		...BITMAP_OPTS,
+	});
+	const open: ImageBitmap[] = [];
 	try {
-		const [width, height] = depthGridSize(bmp.width, bmp.height, maxSide);
-		const g = canvas2d(width, height);
-		g.drawImage(bmp, 0, 0, width, height);
-		const rgba = g.getImageData(0, 0, width, height).data;
-		const [bh, bw] = tokenGrid(tokens, width / height);
-		const ih = bh * MOGE2_VITS.patch;
-		const iw = bw * MOGE2_VITS.patch;
-		const m = canvas2d(iw, ih);
-		m.drawImage(bmp, 0, 0, iw, ih);
-		const px = m.getImageData(0, 0, iw, ih).data;
-		const n = iw * ih;
-		const planes = new Float32Array(3 * n);
-		for (let k = 0; k < n; k++) {
-			planes[k] = px[4 * k] / 255;
-			planes[n + k] = px[4 * k + 1] / 255;
-			planes[2 * n + k] = px[4 * k + 2] / 255;
+		const [width, height] = depthGridSize(full.width, full.height, maxSide);
+		const resized = (w: number, h: number) =>
+			w === full.width && h === full.height
+				? createImageBitmap(full, BITMAP_OPTS)
+				: createImageBitmap(full, {
+						resizeWidth: w,
+						resizeHeight: h,
+						resizeQuality: "high",
+						...BITMAP_OPTS,
+					});
+		const pixels = await resized(width, height);
+		open.push(pixels);
+		const plan = planDepthPipeline(width, height, tokens);
+		const photo: DepthPhoto = {
+			width,
+			height,
+			bh: plan.bh,
+			bw: plan.bw,
+			pixels,
+		};
+		if (plan.upsample) {
+			const netPixels = await resized(plan.iw, plan.ih);
+			open.push(netPixels);
+			photo.netPixels = netPixels;
 		}
-		return { width, height, rgba, planes, bh, bw };
+		open.length = 0;
+		return photo;
 	} finally {
-		bmp.close();
+		full.close();
+		for (const b of open) b.close();
 	}
 }
 
-/** The network + post-processing on decoded planes (also the node parity path). */
-export async function estimateDepth(
-	net: MogeDepthNet,
-	input: {
-		planes: Float32Array;
-		bh: number;
-		bw: number;
-		width: number;
-		height: number;
-	},
-	signal?: AbortSignal,
-): Promise<NearFieldDepth & { focal: number; shift: number }> {
-	const { nn } = net;
-	signal?.throwIfAborted();
-	const t0 = performance.now();
-	const { planes, bh, bw, width, height } = input;
-	const image = nn.fromArray(planes, [
-		1,
-		3,
-		bh * MOGE2_VITS.patch,
-		bw * MOGE2_VITS.patch,
-	]);
-	try {
-		const out = await net.run(image, width / height, [height, width]);
-		try {
-			signal?.throwIfAborted();
-			const [z, mask, normal, points64, mask64, scale] = await Promise.all([
-				nn.read(out.z),
-				nn.read(out.mask),
-				out.normal ? nn.read(out.normal) : null,
-				nn.read(out.points64),
-				nn.read(out.mask64),
-				nn.read(out.metricScale),
-			]);
-			return composeDepth(
-				{
-					width,
-					height,
-					z,
-					mask,
-					normal,
-					points64,
-					mask64,
-					focalGrid: FOCAL_GRID,
-					metricScale: scale[0],
-				},
-				LOCAL_DEPTH_MODEL,
-				(performance.now() - t0) / 1000,
-			);
-		} finally {
-			nn.dispose(Object.values(out).filter((t) => t !== null));
-		}
-	} finally {
-		nn.dispose(image);
-	}
+/** Free a decoded photo's bitmaps. */
+export function closePhoto(photo: DepthPhoto) {
+	for (const px of [photo.pixels, photo.netPixels])
+		if (px && "close" in px) px.close();
 }
 
 /** Everything the client touches outside itself (the spec replaces them; defaults are the real ones). */
@@ -208,20 +168,27 @@ export type LocalDeps = {
 		nn: Nn,
 		file: string,
 		onProgress: (loaded: number, total: number) => void,
-	): Promise<MogeDepthNet>;
-	disposeNet(net: MogeDepthNet): void;
-	releaseNn(device: Device): Promise<void>;
-	decode(blob: Blob, maxSide: number, tokens: number): Promise<Decoded>;
-	estimate(
-		net: MogeDepthNet,
-		dec: Decoded,
-		signal: AbortSignal,
-	): Promise<NearFieldDepth>;
-	lift(
 		device: Device,
-		inp: LiftInput,
+	): Promise<MogeDepthNet>;
+	disposeNet(net: MogeDepthNet): void | Promise<void>;
+	releaseNn(device: Device): Promise<void>;
+	decode(blob: Blob, maxSide: number, tokens: number): Promise<DepthPhoto>;
+	/** The whole GPU flow of one decoded photo (./pipeline-gpu.ts). */
+	infer(
+		device: Device,
+		net: MogeDepthNet,
+		photo: DepthPhoto,
+		signal: AbortSignal,
+	): Promise<DepthGraphResult>;
+	/** The lift of a depth that only exists on the CPU (a cache hit): the photo's rgba comes from a prep of `photo`. */
+	liftDepth(
+		device: Device,
+		photo: DepthPhoto,
+		depth: NearFieldDepth,
 		signal: AbortSignal,
 	): Promise<GaussianCloud>;
+	/** Compact the lift's records into a cloud. */
+	cloud(records: Float32Array, cells: number): GaussianCloud;
 	/** Persistent depth cache storage (./depth-cache.ts); null = none (node, private mode). */
 	cache: DepthCacheBackend | null;
 };
@@ -229,14 +196,22 @@ export type LocalDeps = {
 const defaultDeps: LocalDeps = {
 	getDevice: () => getComputeDevice().catch(() => null),
 	getNn: (device) => getNn(NEARFIELD_NN_CONSUMER, device),
-	loadNet: (nn, file, onProgress) =>
-		MogeDepthNet.load(nn, { file, onProgress }),
+	loadNet: (nn, file, onProgress, device) =>
+		MogeDepthNet.load(nn, { file, onProgress, device }),
 	disposeNet: (net) => net.dispose(),
-	releaseNn: (device) => releaseNn(NEARFIELD_NN_CONSUMER, device),
+	releaseNn: async (device) => {
+		await releaseComposeGraphs(device);
+		await releaseNn(NEARFIELD_NN_CONSUMER, device);
+	},
 	decode: decodePhoto,
-	estimate: estimateDepth,
-	lift: (device, inp, signal) =>
-		liftGaussiansGpu(device, inp, undefined, signal),
+	infer: (device, net, photo, signal) =>
+		estimateDepthGraph(device, net, photo, {
+			signal,
+			model: LOCAL_DEPTH_MODEL,
+		}),
+	liftDepth: (device, photo, depth, signal) =>
+		liftCachedDepth(device, photo, depth, signal),
+	cloud: cloudFromRecords,
 	cache: cacheStorageBackend(),
 };
 
@@ -392,15 +367,20 @@ export class LocalNearFieldClient {
 			const total = modelEntry(file)?.bytes ?? 0;
 			const p = (async (): Promise<Loaded> => {
 				try {
-					const net = await this.deps.loadNet(nn, file, (loaded, t) => {
-						const message = describeModelDownload({
-							file,
-							state: "downloading",
-							loaded,
-							total: t || total,
-						});
-						for (const f of this.progress) f(message);
-					});
+					const net = await this.deps.loadNet(
+						nn,
+						file,
+						(loaded, t) => {
+							const message = describeModelDownload({
+								file,
+								state: "downloading",
+								loaded,
+								total: t || total,
+							});
+							for (const f of this.progress) f(message);
+						},
+						device,
+					);
 					return { net, nn, device };
 				} catch (e) {
 					throw toNearFieldError(e, "weights-failed");
@@ -423,7 +403,7 @@ export class LocalNearFieldClient {
 		if (!l) return;
 		try {
 			const { net, device } = await l.p;
-			this.deps.disposeNet(net);
+			await this.deps.disposeNet(net);
 			await this.deps.releaseNn(device);
 		} catch {
 			// a load that failed holds nothing
@@ -536,28 +516,16 @@ export class LocalNearFieldClient {
 		});
 	}
 
-	/** A stored depth: no weight load, no inference; the lift's rgba comes from decoding the blob. */
+	/** A stored depth: no weight load, no inference; its lift (if asked for) preps the blob again. */
 	private async depthCacheHit(
-		blob: Blob,
 		opts: LocalOpts,
 		key: string | null,
 	): Promise<PhotoResult | null> {
 		if (!key) return null;
 		const cached = await getCachedDepth(key, { backend: this.deps.cache });
 		if (!cached) return null;
-		try {
-			const dec = await this.deps.decode(
-				blob,
-				opts.maxSide ?? LOCAL_MAX_SIDE,
-				this.tokens,
-			);
-			if (dec.width !== cached.width || dec.height !== cached.height)
-				return null;
-			opts.onProgress?.("Depth from the local cache");
-			return { depth: cached, rgba: dec.rgba };
-		} catch {
-			return null;
-		}
+		opts.onProgress?.("Depth from the local cache");
+		return { depth: cached, records: null, cells: 0 };
 	}
 
 	private async runJob(
@@ -566,11 +534,11 @@ export class LocalNearFieldClient {
 		signal: AbortSignal,
 	): Promise<PhotoResult> {
 		const cacheKey = await this.depthCacheKey(blob, opts);
-		const hit = await this.depthCacheHit(blob, opts, cacheKey);
+		const hit = await this.depthCacheHit(opts, cacheKey);
 		if (hit) return hit;
 		const onProgress = opts.onProgress;
 		if (onProgress) this.progress.add(onProgress);
-		const { net } = await this.load().finally(() => {
+		const { net, device } = await this.load().finally(() => {
 			if (onProgress) this.progress.delete(onProgress);
 		});
 		signal.throwIfAborted();
@@ -580,20 +548,57 @@ export class LocalNearFieldClient {
 			DEPTH_LEASE,
 			async () => {
 				try {
-					const dec = await this.deps.decode(
+					const photo = await this.deps.decode(
 						blob,
 						opts.maxSide ?? LOCAL_MAX_SIDE,
 						this.tokens,
 					);
-					signal.throwIfAborted();
-					const depth = await this.deps.estimate(net, dec, signal);
-					if (cacheKey)
-						void putCachedDepth(cacheKey, depth as never, {
-							backend: this.deps.cache,
-						});
-					return { depth, rgba: dec.rgba };
+					try {
+						signal.throwIfAborted();
+						const r = await this.deps.infer(device, net, photo, signal);
+						if (cacheKey)
+							void putCachedDepth(cacheKey, r.depth as never, {
+								backend: this.deps.cache,
+							});
+						return { depth: r.depth, records: r.records, cells: r.cells };
+					} finally {
+						closePhoto(photo);
+					}
 				} catch (e) {
 					throw toNearFieldError(e, "inference-failed");
+				}
+			},
+			{ signal },
+		);
+	}
+
+	/** The lift of a cached depth: decode the blob, prep it on the GPU for its rgba, lift the CPU depth. */
+	private async liftCached(
+		blob: Blob,
+		depth: NearFieldDepth,
+		opts: LocalOpts,
+		signal: AbortSignal,
+	): Promise<GaussianCloud> {
+		const device = await this.deps.getDevice().catch(() => null);
+		if (!device)
+			throw new NearFieldError("no-webgpu", "Step Inside needs WebGPU");
+		return withLease(
+			DEPTH_LEASE,
+			async () => {
+				const photo = await this.deps.decode(
+					blob,
+					opts.maxSide ?? LOCAL_MAX_SIDE,
+					this.tokens,
+				);
+				try {
+					if (photo.width !== depth.width || photo.height !== depth.height)
+						throw new Error("cached depth does not match the photo");
+					return await abortable(
+						this.deps.liftDepth(device, photo, depth, signal),
+						signal,
+					);
+				} finally {
+					closePhoto(photo);
 				}
 			},
 			{ signal },
@@ -631,25 +636,14 @@ export class LocalNearFieldClient {
 		};
 	} | null> {
 		return this.caller(opts, async (signal) => {
-			const { depth, rgba } = await this.photo(image, opts, signal);
+			const { depth, records, cells } = await this.photo(image, opts, signal);
 			const K = depth.intrinsicsNorm;
 			if (!K) return null;
-			const inp: LiftInput = {
-				width: depth.width,
-				height: depth.height,
-				depth: depth.depth,
-				valid: depth.valid,
-				normal: depth.normal ?? null,
-				rgba,
-				K,
-			};
 			signal.throwIfAborted();
 			let cloud: GaussianCloud;
 			try {
-				const device = await this.deps.getDevice().catch(() => null);
-				if (!device)
-					throw new NearFieldError("no-webgpu", "Step Inside needs WebGPU");
-				cloud = await abortable(this.deps.lift(device, inp, signal), signal);
+				if (records) cloud = this.deps.cloud(records, cells);
+				else cloud = await this.liftCached(image, depth, opts, signal);
 			} catch (e) {
 				throw toNearFieldError(e, "lift-failed");
 			}

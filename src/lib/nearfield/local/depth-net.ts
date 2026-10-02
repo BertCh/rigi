@@ -17,6 +17,17 @@
 //   → points: [xy·e^z, e^z]; normal: L2-normalised; mask: sigmoid.
 // The final resize goes straight from the head resolution to the caller's output grid (MoGe resizes to
 // the input image, which the service had decoded at the output grid: same thing).
+//
+// Two ways to run the same forward body (`record`, synchronous nn ops):
+//   run()    nn.forward: its own cached graph, one submission, for scripts and checks (async, keeps the tensors);
+//   graphs   ./pipeline-gpu.ts records it with nn.forwardInto into a ComputeGraph that is followed by the
+//            compose / normals / lift graph (the Step Inside flow, GPU-resident hand-offs).
+// The per-grid pos embed is resampled on the GPU (nn.interpolate bicubic over the checkpoint's own
+// pos_embed; interpolatePosEmbed below is its CPU reference). Graphs recorded over a grid's constants
+// (ComputeGraphs bake those tensors and the weights in) are tracked per grid (`GridConsts.group`) and
+// released before the tensors they use are disposed.
+import type { Device } from "@luma.gl/core";
+import { releaseCachedGraphs } from "#/lib/gpu/core/graph";
 import type { CompiledForward, Nn, Tensor, Weights } from "#/lib/nn";
 
 /** The checkpoint's model config (scripts/models/moge2-vits.py prints it). */
@@ -195,11 +206,53 @@ export function uvPlanes(w: number, h: number, aspect: number): Float32Array {
 	return out;
 }
 
-/** Host-side constants of one token grid: interpolated pos embed + the five uv planes. */
-type GridConsts = { pos: Tensor; uv: Tensor[] };
+/** Constants of one token grid on the GPU: interpolated pos embed + the five uv planes. */
+export type GridConsts = {
+	pos: Tensor;
+	uv: Tensor[];
+	/** the cachedGraph group of the graphs recorded over these tensors */
+	group: string;
+};
+
+/** cachedGraph group prefix of the depth graphs over one net (pipeline-gpu.ts: one group per grid). */
+export const DEPTH_GRAPH_GROUP = "nearfield-depth";
+
+/**
+ * The pos-embed resample as nn ops: pos_embed [1, 1 + M², C] → cls row + the M × M patch rows as
+ * [1, C, M, M] → bicubic with scale_factor ((bh + 0.1) / M, (bw + 0.1) / M) (DINOv2
+ * interpolate_pos_encoding; nn.interpolate floors M · scale to bh × bw) → [1, 1 + bh·bw, C].
+ */
+export function resamplePosEmbed(
+	nn: Nn,
+	pos: Tensor,
+	M: number,
+	bh: number,
+	bw: number,
+): Tensor {
+	const C = pos.shape[2];
+	const cls = nn.slice(pos, 1, 0, 1);
+	const grid = nn.permute(
+		nn.reshape(nn.slice(pos, 1, 1, 1 + M * M), [1, M, M, C]),
+		[0, 3, 1, 2],
+	);
+	// DINOv2 skips the resample when the grid already is M × M
+	const up =
+		bh === M && bw === M
+			? grid
+			: nn.interpolate(grid, {
+					scale: [(bh + 0.1) / M, (bw + 0.1) / M],
+					mode: "bicubic",
+					alignCorners: false,
+				});
+	if (up.shape[2] !== bh || up.shape[3] !== bw)
+		throw new Error(
+			`moge: pos embed resample gave ${up.shape[2]}x${up.shape[3]}, wanted ${bh}x${bw}`,
+		);
+	const patches = nn.reshape(nn.permute(up, [0, 2, 3, 1]), [1, bh * bw, C]);
+	return nn.concat([cls, patches], 1);
+}
 
 export class MogeDepthNet {
-	private posEmbed: Float32Array | null = null;
 	private consts = new Map<string, GridConsts>();
 	/** head weights concatenated along Cout for the batched stack, keyed by heads + layer */
 	private fused = new Map<string, Tensor>();
@@ -210,9 +263,11 @@ export class MogeDepthNet {
 		Promise<CompiledForward<DepthNetOutput>>
 	>();
 
+	/** `device`: the nn runtime's device, needed only to release graphs recorded over this net. */
 	constructor(
 		readonly nn: Nn,
 		readonly weights: Weights,
+		readonly device?: Device,
 	) {}
 
 	static async load(
@@ -222,10 +277,11 @@ export class MogeDepthNet {
 			file?: string;
 			signal?: AbortSignal;
 			onProgress?: (loaded: number, total: number) => void;
+			device?: Device;
 		} = {},
 	): Promise<MogeDepthNet> {
-		const { file = MOGE2_VITS.file, ...rest } = opts;
-		return new MogeDepthNet(nn, await nn.loadWeights(file, rest));
+		const { file = MOGE2_VITS.file, device, ...rest } = opts;
+		return new MogeDepthNet(nn, await nn.loadWeights(file, rest), device);
 	}
 
 	/** fp16 and q8 have the normal head; q8lite drops it (MOGE2_WEIGHTS). */
@@ -237,7 +293,7 @@ export class MogeDepthNet {
 		return this.weights.get(name);
 	}
 
-	/** Pos embed and uv planes for a (bh, bw) grid at `aspect`, cached per grid. */
+	/** Pos embed (GPU bicubic resample) and uv planes for a (bh, bw) grid at `aspect`, cached per grid. */
 	async gridConsts(
 		bh: number,
 		bw: number,
@@ -249,19 +305,22 @@ export class MogeDepthNet {
 		const { nn } = this;
 		const M = MOGE2_VITS.posGrid;
 		const C = MOGE2_VITS.dim;
-		this.posEmbed ??= await nn.read(this.w("encoder.backbone.pos_embed"));
-		const pos = nn.fromArray(interpolatePosEmbed(this.posEmbed, M, C, bh, bw), [
-			1,
-			1 + bh * bw,
-			C,
-		]);
+		const pos = await nn.forward(() =>
+			resamplePosEmbed(
+				nn,
+				nn.reshape(this.w("encoder.backbone.pos_embed"), [1, 1 + M * M, C]),
+				M,
+				bh,
+				bw,
+			),
+		);
 		const uv: Tensor[] = [];
 		for (let l = 0; l < 5; l++) {
 			const w = bw << l;
 			const h = bh << l;
 			uv.push(nn.fromArray(uvPlanes(w, h, aspect), [1, 2, h, w]));
 		}
-		const c = { pos, uv };
+		const c = { pos, uv, group: `${DEPTH_GRAPH_GROUP}/${key}` };
 		// keep a few grids (photos of a roll share orientations)
 		if (this.consts.size >= 4) {
 			const [k0, v0] = this.consts.entries().next().value as [
@@ -269,11 +328,52 @@ export class MogeDepthNet {
 				GridConsts,
 			];
 			this.consts.delete(k0);
-			nn.dispose([v0.pos, ...v0.uv]);
 			this.dropCompiled(`${k0}|`);
+			void this.releaseConsts(v0);
 		}
 		this.consts.set(key, c);
 		return c;
+	}
+
+	/** Release the graphs recorded over a grid's tensors (after their runs), then dispose the tensors. */
+	private async releaseConsts(c: GridConsts) {
+		try {
+			if (this.device) await releaseCachedGraphs(this.device, c.group);
+		} finally {
+			this.nn.dispose([c.pos, ...c.uv]);
+		}
+	}
+
+	/**
+	 * Builds (eagerly, outside any recording) the fused head weights `record` needs for `opts`; call it
+	 * before recording into a graph. No-op for the separate-heads default.
+	 */
+	prepare(opts: DepthRunOptions = {}) {
+		if (opts.batchedHeads === true) this.prepareFused(this.headNamesFor(opts));
+	}
+
+	/**
+	 * The forward body: synchronous nn ops on `image` ([1, 3, 14·bh, 14·bw]) with the grid's constants,
+	 * outputs at `outSize` = [H, W]. For nn.forwardInto (the graph pipeline); `prepare(opts)` first.
+	 */
+	record(
+		image: Tensor,
+		outSize: readonly [number, number],
+		consts: GridConsts,
+		opts: DepthRunOptions = {},
+	): DepthNetOutput {
+		const bh = image.shape[2] / MOGE2_VITS.patch;
+		const bw = image.shape[3] / MOGE2_VITS.patch;
+		return this.forwardOps(
+			image,
+			bh,
+			bw,
+			consts.pos,
+			consts.uv,
+			outSize,
+			this.headNamesFor(opts),
+			opts,
+		);
 	}
 
 	private block(x: Tensor, i: number, bh: number, bw: number): Tensor {
@@ -737,10 +837,12 @@ export class MogeDepthNet {
 		return { z, normal, mask, points64, mask64, metricScale };
 	}
 
-	dispose() {
+	/** Release the graphs recorded over this net, then its constants and weights. */
+	async dispose(): Promise<void> {
 		this.dropCompiled("");
-		for (const c of this.consts.values()) this.nn.dispose([c.pos, ...c.uv]);
+		const cs = [...this.consts.values()];
 		this.consts.clear();
+		await Promise.all(cs.map((c) => this.releaseConsts(c)));
 		this.nn.dispose([...this.fused.values()]);
 		this.fused.clear();
 		this.fusedReady.clear();

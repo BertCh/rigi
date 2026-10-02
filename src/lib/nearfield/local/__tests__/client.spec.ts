@@ -125,7 +125,11 @@ function fakeDepth(tag: number) {
 	} as never;
 }
 
-/** Deps whose estimate() the test releases by hand; records the order of starts and ends. */
+/** An infer() result around a depth (records are what the lift left on the GPU job). */
+const result = (depth: unknown) =>
+	({ depth, records: new Float32Array(12), cells: 1 }) as never;
+
+/** Deps whose infer() the test releases by hand; records the order of starts and ends. */
 function harness(over: Partial<LocalDeps> = {}, idleMs?: number) {
 	const log: string[] = [];
 	const gates: Array<{ blob: Blob; signal: AbortSignal; release: () => void }> =
@@ -143,9 +147,8 @@ function harness(over: Partial<LocalDeps> = {}, idleMs?: number) {
 		disposeNet: (net) =>
 			void log.push(`dispose ${(net as { id?: number }).id}`),
 		releaseNn: async () => void log.push("release"),
-		decode: async (blob) =>
-			({ blob, rgba: new Uint8ClampedArray(16) }) as never,
-		estimate: (_net, dec, signal) =>
+		decode: async (blob) => ({ blob, width: 2, height: 2 }) as never,
+		infer: (_device, _net, dec, signal) =>
 			new Promise((resolve, reject) => {
 				const blob = (dec as unknown as { blob: Blob }).blob;
 				log.push(`start ${blob.size}`);
@@ -154,7 +157,7 @@ function harness(over: Partial<LocalDeps> = {}, idleMs?: number) {
 					signal,
 					release: () => {
 						log.push(`end ${blob.size}`);
-						resolve(fakeDepth(blob.size));
+						resolve(result(fakeDepth(blob.size)));
 					},
 				};
 				signal.addEventListener("abort", () => {
@@ -163,7 +166,9 @@ function harness(over: Partial<LocalDeps> = {}, idleMs?: number) {
 				});
 				gates.push(gate);
 			}),
-		lift: async () => ({ count: 1 }) as never,
+		liftDepth: async () => ({ count: 1 }) as never,
+		cloud: () => ({ count: 1 }) as never,
+		cache: null,
 		...over,
 	};
 	const client = new LocalNearFieldClient({ deps, idleMs });
@@ -276,9 +281,9 @@ describe("LocalNearFieldClient jobs", () => {
 	it("maps failures to codes and retries a failed photo", async () => {
 		let fail: unknown = new Error("boom");
 		const h = harness({
-			estimate: async () => {
+			infer: async () => {
 				if (fail) throw fail;
-				return fakeDepth(1);
+				return result(fakeDepth(1));
 			},
 		});
 		const b = photoBlob(1);
@@ -311,7 +316,7 @@ describe("LocalNearFieldClient jobs", () => {
 			code: "no-webgpu",
 		});
 		const lifting = harness({
-			lift: async () => {
+			cloud: () => {
 				throw new Error("kernel");
 			},
 		});
@@ -324,20 +329,51 @@ describe("LocalNearFieldClient jobs", () => {
 		);
 	});
 
-	it("lifts on the GPU only (no CPU fallback) and passes the signal", async () => {
-		let sawSignal: AbortSignal | undefined;
+	it("compacts the job's lift records, also when depth() ran alone first", async () => {
+		const seen: Array<[number, number]> = [];
 		const h = harness({
-			lift: async (_d, _i, signal) => {
-				sawSignal = signal;
+			cloud: (records, cells) => {
+				seen.push([records.length, cells]);
 				return { count: 7 } as never;
 			},
 		});
-		const p = h.client.gaussiansWithMeta(photoBlob(1));
+		const b = photoBlob(1);
+		const d = h.client.depth(b);
 		await tick();
 		h.gates[0].release();
-		const r = await p;
+		await d;
+		const r = await h.client.gaussiansWithMeta(b);
 		expect(r?.cloud).toEqual({ count: 7 });
-		expect(sawSignal).toBeDefined();
+		expect(r?.meta.width).toBe(2);
+		expect(seen).toEqual([[12, 1]]);
+		expect(h.gates).toHaveLength(1);
+	});
+
+	it("lifts a cached depth on the GPU from the re-decoded photo (no records)", async () => {
+		let lifted: AbortSignal | undefined;
+		const h = harness({
+			liftDepth: async (_d, _p, _depth, signal) => {
+				lifted = signal;
+				return { count: 3 } as never;
+			},
+		});
+		// a job result without records is what a persistent-cache hit leaves
+		const client = h.client as unknown as {
+			photos: WeakMap<Blob, unknown>;
+		};
+		const b = photoBlob(1);
+		client.photos.set(b, {
+			ctrl: new AbortController(),
+			waiters: 0,
+			promise: Promise.resolve({
+				depth: fakeDepth(1),
+				records: null,
+				cells: 0,
+			}),
+		});
+		const r = await h.client.gaussiansWithMeta(b);
+		expect(r?.cloud).toEqual({ count: 3 });
+		expect(lifted).toBeDefined();
 	});
 });
 
@@ -402,11 +438,10 @@ describe("LocalNearFieldClient persistent depth cache", () => {
 		let estimates = 0;
 		const over: Partial<LocalDeps> = {
 			cache,
-			decode: async () =>
-				({ width: 2, height: 2, rgba: new Uint8ClampedArray(16) }) as never,
-			estimate: async () => {
+			decode: async () => ({ width: 2, height: 2 }) as never,
+			infer: async () => {
 				estimates++;
-				return full(5) as never;
+				return result(full(5));
 			},
 		};
 		const b = new Blob([new Uint8Array([1, 2, 3, 4])]);

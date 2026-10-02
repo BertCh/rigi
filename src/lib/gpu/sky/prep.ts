@@ -99,6 +99,10 @@ export interface SkyPrepGpu {
 	input: GPUBuffer;
 	/** The same buffer as a luma Buffer (nn `fromBuffer`). */
 	inputBuffer: Buffer;
+	/** `rgba` as a luma Buffer (a graph import: the near-field lift reads the photo's colours from it). */
+	rgbaBuffer: Buffer;
+	/** `rgbLo` as a luma Buffer (a graph import: the depth net's un-normalised input). */
+	rgbLoBuffer: Buffer;
 	/** True when every pixel's alpha is 255 (4 bytes read back): the precondition of the bitmap's bytes equalling getImageData's. */
 	isOpaque(): Promise<boolean>;
 	/** The photo's bytes (W·H·4) read back from the GPU: only for a CPU fallback. */
@@ -420,6 +424,8 @@ function runPrep(
 			rgbLo: nativeWebGPUBuffer(rgbLo),
 			input: nativeWebGPUBuffer(input),
 			inputBuffer: input,
+			rgbaBuffer: rgba,
+			rgbLoBuffer: rgbLo,
 			isOpaque: async () => {
 				const [b] = await readBack(
 					device,
