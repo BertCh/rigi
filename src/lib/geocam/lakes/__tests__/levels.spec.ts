@@ -28,6 +28,7 @@ describe("parseEle", () => {
 	it("converts feet", () => {
 		expect(parseEle("3000 ft")).toBeCloseTo(914.4, 6);
 		expect(parseEle("100 feet")).toBeCloseTo(30.48, 6);
+		expect(parseEle("1000'")).toBeCloseTo(304.8, 6);
 	});
 	it("returns null for unusable input", () => {
 		expect(parseEle("")).toBeNull();

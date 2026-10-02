@@ -151,13 +151,21 @@ export function viewPeaks(
 	lat: number,
 	lon: number,
 	eye: number,
-	opts: { maxDistance?: number; toleranceDeg?: number } = {},
+	opts: {
+		maxDistance?: number;
+		toleranceDeg?: number;
+		/** localMaxOf's `interior` (the app's flag peakSnapInterior; workers pass it explicitly). */
+		snapInterior?: boolean;
+	} = {},
 ): PeakView[] {
 	const maxDistance = opts.maxDistance ?? 150_000;
 	const tol = opts.toleranceDeg ?? 0.05;
 	const out: PeakView[] = [];
 	for (const peak of peaks) {
 		const node = distanceBearing(lat, lon, peak.lat, peak.lon);
+		const radius = peakSnapRadiusM(node.distance);
+		// a snap moves a summit at most √2·radius (the grid's corner)
+		if (node.distance > maxDistance + 1.5 * radius) continue;
 		const snap = localMaxOf(
 			(la, lo) => {
 				const h = terrain.sampleAt(lo, la, node.distance);
@@ -165,7 +173,8 @@ export function viewPeaks(
 			},
 			peak.lat,
 			peak.lon,
-			peakSnapRadiusM(node.distance),
+			radius,
+			opts.snapInterior,
 		);
 		const { distance, bearing } = Number.isFinite(snap.h)
 			? distanceBearing(lat, lon, snap.lat, snap.lon)

@@ -110,7 +110,8 @@ export const FLAG_SCHEMA = {
 	 * peak snapping (geo/peaks.ts localMaxOf, both engines): on = a DEM maximum on the search grid's
 	 * outer ring is treated as a flank, not a summit, and the peak keeps its OSM node position (22 % of
 	 * catalogue peaks in the 2026-10-02 dev study, reports/steps-2026-10-02/peak.md). Moves labels, so
-	 * off until a label batch pass compares both.
+	 * off until a label batch pass compares both. Read once per snap; snaps are cached per terrain,
+	 * so a runtime override applies to peaks not yet snapped (URL flags are fixed per load).
 	 */
 	peakSnapInterior: onOff("off"),
 	/**

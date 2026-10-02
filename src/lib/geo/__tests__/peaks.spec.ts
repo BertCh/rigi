@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 import { describe, expect, it } from "vitest";
+import { replayHeights } from "../../dem/replay-heights";
 import { destination, distanceBearing } from "../../geodesy";
 import { cameraFromAngles } from "../camera";
 import {
@@ -155,6 +156,24 @@ describe("peakSnapRadiusM / localMaxOf", () => {
 		expect(localMaxOf(hole, 46, 8, 100, true)).toEqual(
 			localMaxOf(hole, 46, 8, 100),
 		);
+	});
+	it("interior keeps the call order value-independent (GPU gathers record and replay it)", () => {
+		const terrain = (la: number, lo: number) =>
+			1000 + Math.sin(la * 4000) * 50 + Math.cos(lo * 3000) * 40;
+		for (const [la, lo] of [
+			[46, 8],
+			[46.0011, 8.0007],
+			[45.9993, 7.9989],
+		])
+			for (const interior of [false, true]) {
+				const direct = localMaxOf(terrain, la, lo, 180, interior);
+				const replayed = replayHeights(
+					(h) => localMaxOf(h, la, lo, 180, interior),
+					(lats, lons) =>
+						Float64Array.from(lats, (v, i) => terrain(v, lons[i])),
+				);
+				expect(replayed).toEqual(direct);
+			}
 	});
 	it("keeps the start point on ties and ignores unanswered samples", () => {
 		const r = localMaxOf((la) => (la > 46 ? null : 5), 46, 8, 100);
