@@ -19,7 +19,7 @@ This folder is new. It must not edit `swiss/**`, `notebook/**`, `viz/**`, `Conce
 | `tafel/chapters.ts` | sheets | The three chapters and their sheet order (data flow). |
 | `tafel/sheets.tsx` | sheets | `SHEETS`: per sheet, its Tafel layer, its index band, its ledger and its index value. |
 | `tafel/Blattuebersicht.tsx` | sheets | The index: photo picker, chapters, cards. |
-| `tafel/sheets.check.ts` | sheets | All 19 sheets present, ledger paths resolve on all 12 photos, chapters cover every node exactly once. |
+| `tafel/sheets.check.ts` | sheets | All 16 sheets present, ledger paths resolve on all 12 photos, chapters cover every node exactly once. |
 | `tafel/index.ts` | core (sheets appends) | Barrel. |
 
 ## Contracts
@@ -74,7 +74,7 @@ export interface SheetFigures {
 	ledger: (d: GipfelbuchPhotoData) => LedgerItem[];
 	value: (d: GipfelbuchPhotoData) => string; // one mono line for the index card
 }
-export const SHEETS: Record<string, SheetFigures>; // keyed by GipfelbuchNode id, all 19
+export const SHEETS: Record<string, SheetFigures>; // keyed by GipfelbuchNode id, all 16
 ```
 
 ## Rules

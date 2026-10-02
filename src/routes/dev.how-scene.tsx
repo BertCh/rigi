@@ -17,7 +17,7 @@ export const Route = createFileRoute("/dev/how-scene")({
 	component: PreviewGate,
 });
 
-// dev-only: the production build shows a stub (same gate as dev.graph / lab.splats)
+// dev-only: the production build shows a stub (same gate as dev.graph)
 function PreviewGate() {
 	if (!import.meta.env.DEV) return <p>dev only</p>;
 	return <Preview />;
