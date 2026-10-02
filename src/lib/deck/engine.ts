@@ -185,6 +185,7 @@ import {
 import {
 	type PhotoRangeMap,
 	RANGE_SAMPLER,
+	SharedPhotoTexture,
 	TerrainLayer,
 } from "./terrain-layer";
 import { TerrainStreamer } from "./terrain-stream";
@@ -478,6 +479,8 @@ export class DeckEngine implements Renderer {
 	 * drapes in the world view), so its mip-mapped texture is uploaded once, not on every world entry.
 	 */
 	private photoTexWarm = false;
+	/** The one mipmapped GPU copy of the photo (compositor + terrain layers); released in dispose(). */
+	private readonly photoShared = new SharedPhotoTexture();
 	private warmHandle = 0;
 	/** The WebGL context is lost (device-lost.ts); nothing draws until it is restored. */
 	private contextLost = false;
@@ -630,6 +633,7 @@ export class DeckEngine implements Renderer {
 	private makeCompositor(prev?: PhotoCompositor) {
 		const c = new PhotoCompositor(this.aspect);
 		c.viewId = "photo";
+		c.sharePhotoTexture(this.photoShared);
 		if (prev) {
 			// a new id: deck's EffectManager hands a replacement with the same id no setup() call
 			c.id = `photo-composite-${++this.compositorGen}`;
@@ -912,6 +916,7 @@ export class DeckEngine implements Renderer {
 		await img.decode();
 		if (this.disposed) return;
 		this.photoImg = img;
+		this.photoShared.setSource(img);
 		this.compositor.setPhoto(img);
 		const fgPromise = segment
 			? segment(img).catch(() => null)
@@ -1079,6 +1084,7 @@ export class DeckEngine implements Renderer {
 		if (this.disposed) return;
 		this.disposed = true;
 		this.unwatchContext();
+		this.photoShared.release();
 		this.tiles3d?.dispose();
 		clearTimeout(this.statsTimer);
 		clearTimeout(this.lookTimer);
@@ -1689,7 +1695,7 @@ export class DeckEngine implements Renderer {
 					offscreen: true,
 					// the world drape's texture, kept across mode switches (the photo view never samples
 					// it: projectPhoto is 0 in its offscreen passes); see warmPhotoTexture
-					...(this.photoTexWarm ? { photo: this.photoImg ?? null } : {}),
+					...(this.photoTexWarm ? { photoTexture: this.photoTexture() } : {}),
 				}),
 			);
 			if (look.trails && this.trails?.count)
@@ -1774,6 +1780,12 @@ export class DeckEngine implements Renderer {
 		if (!this.harm || this.harm.stats !== stats || this.harm.amount !== amount)
 			this.harm = { stats, amount, value: harmonizeValues(stats, amount) };
 		return this.harm.value;
+	}
+
+	/** The shared photo texture on the deck device (uploaded on first use), or null before deck has one. */
+	private photoTexture() {
+		const device = (this.deck as unknown as { device?: Device }).device;
+		return (device && this.photoShared.get(device)) ?? null;
 	}
 
 	/**
@@ -2126,7 +2138,10 @@ export class DeckEngine implements Renderer {
 		const range = src.range[i];
 		if (!(range > 0) || !Number.isFinite(range)) return null;
 		let world: [number, number, number];
-		if (src.xyz)
+		// a GPU source computes the one pixel on demand (its full xyz array is lazy)
+		const lazy = src instanceof GpuGeometrySource ? src.xyzAt(i) : null;
+		if (lazy) world = lazy;
+		else if (src.xyz)
 			world = [src.xyz[i * 3], src.xyz[i * 3 + 1], src.xyz[i * 3 + 2]];
 		else {
 			// the buffer's own pose (not the current one): a stale buffer must look stale
@@ -3116,7 +3131,7 @@ export class DeckEngine implements Renderer {
 				relief: this.relief.field,
 				terroir: this.terroir(),
 				offscreen: false,
-				photo: this.photoImg ?? null,
+				photoTexture: this.photoTexture(),
 				photoRange: this.drapeRange(),
 				...this.drapeMask(),
 				photoViewProj: this.photoViewProj(),

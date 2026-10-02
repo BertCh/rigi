@@ -54,15 +54,21 @@ import {
 import {
 	GeometryTarget,
 	geometrySize,
+	glFence,
 	gpuDone,
 	type ReadbackTiming,
 	readbackBuffer,
+	readbackQuiet,
 	readTextureQuiet,
 	TerrainPassRenderer,
 } from "./geometry-pass";
 import { glOf } from "./gl";
 import type { PhotoViewport } from "./photo-view";
-import { isTerrainTile, makeTexture, maskTexture } from "./terrain-layer";
+import {
+	isTerrainTile,
+	maskTexture,
+	SharedPhotoTexture,
+} from "./terrain-layer";
 import { isTrailLayer } from "./trail-layer";
 
 export type BlendMethod = "swipe" | "lens" | "range" | "brush";
@@ -192,7 +198,12 @@ export class PhotoCompositor implements Effect {
 	private geo?: GeometryTarget;
 	private color?: Framebuffer;
 	private empty?: Texture;
-	private photoTex?: Texture;
+	/**
+	 * The photo's GPU copy. The engine hands in its own holder (sharePhotoTexture) so the drape layer
+	 * shares the one upload; a bare compositor owns its holder and releases it in cleanup().
+	 */
+	private photoShared = new SharedPhotoTexture();
+	private ownsPhotoShared = true;
 	private photoSrc: HTMLImageElement | ImageBitmap | null = null;
 	private fgTex?: Texture;
 	/** concord DSM occluder dim mask (setOccluder); null = off. */
@@ -275,8 +286,17 @@ export class PhotoCompositor implements Effect {
 	setPhoto(img: HTMLImageElement | ImageBitmap | null) {
 		if (img === this.photoSrc) return;
 		this.photoSrc = img;
-		this.photoTex?.destroy();
-		this.photoTex = undefined;
+		this.photoShared.setSource(img);
+		this.bump();
+	}
+
+	/** Use the caller's shared photo texture holder (the caller owns and releases it). */
+	sharePhotoTexture(shared: SharedPhotoTexture) {
+		if (shared === this.photoShared) return;
+		if (this.ownsPhotoShared) this.photoShared.release();
+		this.photoShared = shared;
+		this.ownsPhotoShared = false;
+		shared.setSource(this.photoSrc);
 		this.bump();
 	}
 
@@ -815,7 +835,14 @@ export class PhotoCompositor implements Effect {
 		const buf = this.encodeImage(device, layers, pose, eye, width, height);
 		if (!buf) return null;
 		try {
-			if (!(await gpuDone(device))) return null;
+			// fence, then the quiet-queue wait (readbackQuiet): a bare readAsync right behind the fence
+			// is a 100-420 ms sync stall on ANGLE Metal while frames are queued
+			const gl = glOf(device);
+			const cancelled = () => this.device !== device;
+			const fence = await glFence(gl, cancelled);
+			if (!fence.ok) return null;
+			const quiet = await readbackQuiet(gl, fence.ms, cancelled);
+			if (!quiet.ok) return null;
 			const px = await buf.readAsync(0, width * height * 4);
 			// GL rows are bottom-up
 			const row = width * 4;
@@ -1036,13 +1063,13 @@ export class PhotoCompositor implements Effect {
 		this.geo = undefined;
 		this.destroyColor();
 		this.empty?.destroy();
-		this.photoTex?.destroy();
+		if (this.ownsPhotoShared) this.photoShared.release();
 		this.fgTex?.destroy();
 		this.brushTex?.destroy();
 		this.occlTex?.destroy();
 		this.occlTex = undefined;
 		this.occlDirty = !!this.occlMask;
-		this.empty = this.photoTex = this.fgTex = this.brushTex = undefined;
+		this.empty = this.fgTex = this.brushTex = undefined;
 		this.fgDirty = !!this.fgMask;
 		this.brushDirty = true;
 		this.ready = false;
@@ -1082,8 +1109,7 @@ export class PhotoCompositor implements Effect {
 			width: 1,
 			height: 1,
 		});
-		if (!this.photoTex && this.photoSrc)
-			this.photoTex = makeTexture(device, this.photoSrc, true);
+		const photoTex = this.photoShared.get(device);
 		if (this.fgDirty) {
 			this.fgTex?.destroy();
 			this.fgTex = this.fgMask ? maskTexture(device, this.fgMask) : undefined;
@@ -1145,8 +1171,8 @@ export class PhotoCompositor implements Effect {
 			aspect: width / height,
 			nearFade: s.nearFade,
 			fgOn: s.protectPeople && this.fgTex ? 1 : 0,
-			hasPhoto: this.photoTex ? 1 : 0,
-			photoTex: this.photoTex ?? empty,
+			hasPhoto: photoTex ? 1 : 0,
+			photoTex: photoTex ?? empty,
 			layerTex,
 			geoTex: geo.texture,
 			brushTex: this.brushTex ?? empty,

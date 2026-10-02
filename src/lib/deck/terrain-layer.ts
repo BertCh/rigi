@@ -1029,6 +1029,44 @@ export function makeTexture(
 	return tex;
 }
 
+/**
+ * One mipmapped GPU copy of the photo, shared by the compositor (photo view) and the TerrainLayer
+ * (drape): a 2048 px upload with mips is ~90 ms of main thread and ~17 MB of GPU (more at 12 MP),
+ * so it is made once. Owner = whoever created the holder (DeckEngine; a bare PhotoCompositor owns
+ * its own): the owner calls release() when done. Users only get(); they never destroy the texture.
+ * Replacing the source or asking for another device drops the old texture first.
+ */
+export class SharedPhotoTexture {
+	private src: HTMLImageElement | ImageBitmap | null = null;
+	private tex?: Texture;
+	private device?: Device;
+
+	/** Point at a new photo (null = none); a changed source frees the texture. */
+	setSource(src: HTMLImageElement | ImageBitmap | null) {
+		if (src === this.src) return;
+		this.src = src;
+		this.release();
+	}
+
+	/** The texture on `device`, uploaded on first use; undefined without a source. */
+	get(device: Device): Texture | undefined {
+		if (!this.src) return undefined;
+		if (this.tex && this.device !== device) this.release();
+		if (!this.tex) {
+			this.tex = makeTexture(device, this.src, true); // mipmaps: minified in the 3D view
+			this.device = device;
+		}
+		return this.tex;
+	}
+
+	/** Free the texture (the source stays: the next get() uploads again). */
+	release() {
+		this.tex?.destroy();
+		this.tex = undefined;
+		this.device = undefined;
+	}
+}
+
 // ---------- all tiles ----------
 
 /**
@@ -1054,6 +1092,11 @@ export type TerrainLayerProps = LayerProps &
 		/** Draped imagery per tile id. */
 		imagery?: Map<string, ImageBitmap>;
 		photo?: HTMLImageElement | ImageBitmap | null;
+		/**
+		 * The photo as an already uploaded texture the caller owns (SharedPhotoTexture) and keeps
+		 * alive while it is a prop; wins over `photo`, never destroyed by the layer.
+		 */
+		photoTexture?: Texture | null;
 		/** Range from the photo camera, row 0 = top, 0 = sky (GPU geometry pass; PhotoRangeMap). */
 		photoRange?: PhotoRangeMap | null;
 		/** People mask (segmentForeground, row 0 = top): kept out of the drape. */
@@ -1118,6 +1161,8 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 	declare state: {
 		empty?: Texture;
 		photo?: Texture;
+		/** `photo` is the caller's `photoTexture` prop (not ours to destroy). */
+		photoShared?: boolean;
 		range?: Texture;
 		/** `range` was uploaded here from CPU data (not a caller-owned PhotoRangeMap.texture). */
 		rangeOwned?: boolean;
@@ -1146,12 +1191,19 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 
 	updateState({ props, oldProps }: UpdateParameters<this>) {
 		const device = this.context.device;
-		if (props.photo !== oldProps.photo) {
-			this.state.photo?.destroy();
+		if (
+			props.photo !== oldProps.photo ||
+			props.photoTexture !== oldProps.photoTexture
+		) {
+			if (!this.state.photoShared) this.state.photo?.destroy();
+			const shared = props.photoTexture ?? undefined;
 			this.setState({
-				photo: props.photo
-					? makeTexture(device, props.photo, true) // mipmaps: minified in the 3D view
-					: undefined,
+				photo:
+					shared ??
+					(props.photo
+						? makeTexture(device, props.photo, true) // mipmaps: minified in the 3D view
+						: undefined),
+				photoShared: !!shared,
 			});
 		}
 		if (props.photoFg !== oldProps.photoFg) {
@@ -1222,7 +1274,7 @@ export class TerrainLayer extends CompositeLayer<TerrainLayerProps> {
 	finalizeState(context: Parameters<Layer["finalizeState"]>[0]) {
 		super.finalizeState(context);
 		this.state.empty?.destroy();
-		this.state.photo?.destroy();
+		if (!this.state.photoShared) this.state.photo?.destroy();
 		if (this.state.rangeOwned) this.state.range?.destroy();
 		this.state.fg?.destroy();
 		this.destroyRelief();

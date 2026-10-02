@@ -366,11 +366,19 @@ export class WorldGizmoLayer extends CompositeLayer<GizmoProps> {
 		return !renderPass.startsWith("terrain-");
 	}
 
-	renderLayers() {
-		const { pose, eye, aspect, image, planeOpacity } = this.props;
-		const lineColor = this.props.lineColor ?? [255, 255, 255, 230];
-		const pinColor = this.props.pinColor ?? [255, 85, 51, 255];
-		const pinR = this.props.pinRadiusM ?? 18;
+	/**
+	 * The plane corners, frustum edges and pin data, rebuilt only when the pose, eye or aspect
+	 * values change (not on every orbit frame), so deck keeps the sub-layers' attributes: only the
+	 * viewport-dependent pin scale changes per frame.
+	 */
+	private gizmoGeometry(
+		pose: Pose,
+		eye: [number, number, number],
+		aspect: number,
+	) {
+		const key = `${pose.yaw},${pose.pitch},${pose.roll},${pose.vfov},${aspect},${eye[0]},${eye[1]},${eye[2]}`;
+		const cached = this.geometryCache;
+		if (cached && cached.key === key) return cached;
 		const { forward, right, up } = poseBasis(pose);
 		const dist = 150;
 		const hh = Math.tan((pose.vfov * Math.PI) / 360) * dist;
@@ -396,6 +404,28 @@ export class WorldGizmoLayer extends CompositeLayer<GizmoProps> {
 			[br, bl],
 			[bl, tl],
 		];
+		this.geometryCache = {
+			key,
+			segs,
+			bounds: [bl, tl, tr, br],
+			eyeData: [eye],
+		};
+		return this.geometryCache;
+	}
+
+	private geometryCache: {
+		key: string;
+		segs: [number[], number[]][];
+		bounds: [number, number, number][];
+		eyeData: number[][];
+	} | null = null;
+
+	renderLayers() {
+		const { pose, eye, aspect, image, planeOpacity } = this.props;
+		const lineColor = this.props.lineColor ?? [255, 255, 255, 230];
+		const pinColor = this.props.pinColor ?? [255, 85, 51, 255];
+		const pinR = this.props.pinRadiusM ?? 18;
+		const { segs, bounds, eyeData } = this.gizmoGeometry(pose, eye, aspect);
 		// three's 18 m sphere as a billboard disc: deck's pixel sizes hold at the viewport's focal
 		// distance (WorldViewState.focalDistance = the camera's distance to the pin)
 		const vp = this.context.viewport as Viewport & { focalDistance?: number };
@@ -415,7 +445,7 @@ export class WorldGizmoLayer extends CompositeLayer<GizmoProps> {
 					...this.getSubLayerProps({ id: "photo" }),
 					...common,
 					image,
-					bounds: [bl, tl, tr, br] as never,
+					bounds: bounds as never,
 					opacity: planeOpacity,
 					parameters: { cullMode: "none" },
 				}),
@@ -435,7 +465,7 @@ export class WorldGizmoLayer extends CompositeLayer<GizmoProps> {
 			new ScatterplotLayer({
 				...this.getSubLayerProps({ id: "pin" }),
 				...common,
-				data: [eye],
+				data: eyeData,
 				getPosition: (d: number[]) => d as [number, number, number],
 				getRadius: pinR * pxPerM,
 				radiusUnits: "pixels",

@@ -193,12 +193,17 @@ void main() {
   float i = grid.x;
   float j = grid.y;
   vec4 v = vertexAt(i, j);
-  // buildMesh's grid normals: central differences, clamped at the tile edge
-  vec3 e = vertexAt(min(i + 1.0, tSeg), j).xyz - vertexAt(max(i - 1.0, 0.0), j).xyz;
-  vec3 s = vertexAt(i, max(j - 1.0, 0.0)).xyz - vertexAt(i, min(j + 1.0, tSeg)).xyz;
-  vec3 nrm = cross(e, s);
-  float len = length(nrm);
-  nrm = len > 0.0 ? nrm / len : nrm;
+  // buildMesh's grid normals: central differences, clamped at the tile edge. Style 3 (geometry
+  // pass) writes the range only and never reads vNormal (terrain-layer.ts fs returns early), so the
+  // four neighbour fetches are skipped there; the uniform branch is coherent across the draw.
+  vec3 nrm = vec3(0.0, 0.0, 1.0);
+  if (int(terrain.style + 0.5) != 3) {
+    vec3 e = vertexAt(min(i + 1.0, tSeg), j).xyz - vertexAt(max(i - 1.0, 0.0), j).xyz;
+    vec3 s = vertexAt(i, max(j - 1.0, 0.0)).xyz - vertexAt(i, min(j + 1.0, tSeg)).xyz;
+    nrm = cross(e, s);
+    float len = length(nrm);
+    nrm = len > 0.0 ? nrm / len : nrm;
+  }
   vec3 positions = v.xyz;
   float elev = v.w;
   if (grid.z > 0.5) {

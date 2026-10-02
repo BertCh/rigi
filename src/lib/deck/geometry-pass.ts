@@ -512,6 +512,54 @@ export type GeometryTiming = {
 	totalMs: number;
 };
 
+export type XyzRay = {
+	f: { x: number; y: number; z: number };
+	rt: { x: number; y: number; z: number };
+	up: { x: number; y: number; z: number };
+	t: number;
+	aspect: number;
+	w: number;
+	h: number;
+	eye: Vec3;
+};
+
+/** The pixel-centre ray of pose.ts unprojectDir, with the basis hoisted out of the pixel loop. */
+export function makeXyzRay(
+	pose: Pose,
+	w: number,
+	h: number,
+	eye: Vec3,
+): XyzRay {
+	const { forward: f, right: rt, up } = poseBasis(pose);
+	const t = Math.tan((pose.vfov * Math.PI) / 360);
+	return { f, rt, up, t, aspect: w / h, w, h, eye };
+}
+
+/** Writes eye + ray(x, y)·r (NaN for sky, r not finite) to out[o..o+2]. */
+export function xyzPixel(
+	out: ArrayLike<number> & { [i: number]: number },
+	o: number,
+	r: number,
+	x: number,
+	y: number,
+	ray: XyzRay,
+) {
+	if (!Number.isFinite(r)) {
+		out[o] = out[o + 1] = out[o + 2] = Number.NaN;
+		return;
+	}
+	const { f, rt, up, t, aspect, w, h } = ray;
+	const sy = (1 - (2 * (y + 0.5)) / h) * t;
+	const sx = ((2 * (x + 0.5)) / w - 1) * t * aspect;
+	const dx = f.x + rt.x * sx + up.x * sy;
+	const dy = f.y + rt.y * sx + up.y * sy;
+	const dz = f.z + rt.z * sx + up.z * sy;
+	const k = r / Math.hypot(dx, dy, dz);
+	out[o] = ray.eye[0] + dx * k;
+	out[o + 1] = ray.eye[1] + dy * k;
+	out[o + 2] = ray.eye[2] + dz * k;
+}
+
 /**
  * GeometrySource backed by the GPU: renders the Deck's current terrain tiles through the photo
  * camera at `eye`, reads the range back asynchronously and (optionally) rebuilds xyz.
@@ -521,7 +569,6 @@ export class GpuGeometrySource implements GeometrySource {
 	readonly width: number;
 	readonly height: number;
 	readonly range: Float32Array;
-	readonly xyz?: Float32Array;
 	pose: Pose | null = null;
 	/** Timing of the last completed render(). */
 	timing: GeometryTiming | null = null;
@@ -532,6 +579,10 @@ export class GpuGeometrySource implements GeometrySource {
 	private target: GeometryTarget;
 	private renderer: TerrainPassRenderer;
 	private raw: Float32Array;
+	private wantXyz: boolean;
+	/** The pose `range` was unpacked for (what xyz is rebuilt from), and the memoised full array. */
+	private xyzRay: XyzRay | null = null;
+	private xyzFull: Float32Array | null = null;
 	/** render() calls issued (each draws into the target right away). */
 	private seq = 0;
 	/** The render() whose result `range` / `pose` hold (== seq: the target holds it too). */
@@ -557,8 +608,7 @@ export class GpuGeometrySource implements GeometrySource {
 			Number.POSITIVE_INFINITY,
 		);
 		this.raw = new Float32Array(width * height);
-		if (opts.xyz !== false)
-			this.xyz = new Float32Array(width * height * 3).fill(Number.NaN);
+		this.wantXyz = opts.xyz !== false;
 		this.target = new GeometryTarget(device, width, height);
 		this.renderer = new TerrainPassRenderer(device);
 	}
@@ -718,7 +768,7 @@ export class GpuGeometrySource implements GeometrySource {
 	}
 
 	private unpack(pose: Pose) {
-		const { width: w, height: h, raw, range, xyz } = this;
+		const { width: w, height: h, raw, range } = this;
 		for (let y = 0; y < h; y++) {
 			const src = (h - 1 - y) * w;
 			const dst = y * w;
@@ -727,31 +777,45 @@ export class GpuGeometrySource implements GeometrySource {
 				range[dst + x] = r > 0 ? r : Number.POSITIVE_INFINITY;
 			}
 		}
-		if (!xyz) return;
-		// the pixel-centre ray of pose.ts unprojectDir, with the basis hoisted out of the loop
-		const { forward: f, right: rt, up } = poseBasis(pose);
-		const t = Math.tan((pose.vfov * Math.PI) / 360);
-		const aspect = w / h;
-		const [ex, ey, ez] = this.eye;
-		for (let y = 0; y < h; y++) {
-			const sy = (1 - (2 * (y + 0.5)) / h) * t;
-			for (let x = 0; x < w; x++) {
-				const i = y * w + x;
-				const r = range[i];
-				if (!Number.isFinite(r)) {
-					xyz[i * 3] = xyz[i * 3 + 1] = xyz[i * 3 + 2] = Number.NaN;
-					continue;
-				}
-				const sx = ((2 * (x + 0.5)) / w - 1) * t * aspect;
-				const dx = f.x + rt.x * sx + up.x * sy;
-				const dy = f.y + rt.y * sx + up.y * sy;
-				const dz = f.z + rt.z * sx + up.z * sy;
-				const k = r / Math.hypot(dx, dy, dz);
-				xyz[i * 3] = ex + dx * k;
-				xyz[i * 3 + 1] = ey + dy * k;
-				xyz[i * 3 + 2] = ez + dz * k;
+		// xyz is lazy: xyzAt() / the `xyz` getter rebuild it from this range and pose on demand
+		this.xyzRay = makeXyzRay(pose, w, h, this.eye);
+		this.xyzFull = null;
+	}
+
+	/**
+	 * The ENU hit point of pixel `i` of the last completed render (NaN for sky), computed on demand
+	 * with the arithmetic of the full array. Null when xyz was not requested or nothing is shown.
+	 */
+	xyzAt(i: number, out: [number, number, number] = [0, 0, 0]) {
+		const ray = this.xyzRay;
+		if (!this.wantXyz || !ray) return null;
+		const x = i % ray.w;
+		const y = (i - x) / ray.w;
+		xyzPixel(out, 0, this.range[i], x, y, ray);
+		// the full array is float32: round the same way
+		out[0] = Math.fround(out[0]);
+		out[1] = Math.fround(out[1]);
+		out[2] = Math.fround(out[2]);
+		return out;
+	}
+
+	/** The full xyz array (3 per pixel, row 0 = top, NaN for sky), built on first read per render. */
+	get xyz(): Float32Array | undefined {
+		if (!this.wantXyz) return undefined;
+		if (!this.xyzFull) {
+			const { width: w, height: h, range } = this;
+			const full = new Float32Array(w * h * 3).fill(Number.NaN);
+			const ray = this.xyzRay;
+			if (ray) {
+				for (let y = 0; y < h; y++)
+					for (let x = 0; x < w; x++) {
+						const i = y * w + x;
+						xyzPixel(full, i * 3, range[i], x, y, ray);
+					}
 			}
+			this.xyzFull = full;
 		}
+		return this.xyzFull;
 	}
 
 	dispose() {
