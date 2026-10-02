@@ -65,17 +65,12 @@ import {
 import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import { Geometry, Model } from "@luma.gl/engine";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import { MIN_SIN_INC } from "#/lib/deck/drape-vote";
 import type { TileMesh } from "#/lib/deck/terrain-data";
 import { LOG_DEPTH_FAR } from "#/lib/deck/terrain-layer";
 import { ATM_CURV } from "#/lib/look/atmosphere";
 import { COARSE, type DrapeAtlas } from "./drape-atlas";
 
-/**
- * The slope-scaled range bias grows as 1/sin(incidence) down to this (≈ 0.7°). Lakes and meadows
- * seen from a few tens of metres above them sit at 1–3° from the camera; a larger floor (0.03)
- * left them striped with rejected rows.
- */
-const MIN_SIN_INC = 0.012;
 /** Photos blended per fragment (the best by weight; see the header). */
 const TOP_K = 4;
 /** Texels per candidate in a tile's row. */

@@ -20,8 +20,9 @@
 //   - mask: maskTexture (r8unorm, row 0 = top): the people mask, or engine.ts drapeMask()'s
 //     people ∪ Object pixels / stepMasks().step while Step Inside is on.
 //
-// Occlusion. WebGL (terrain-layer.ts) point-sampled one range texel and tested
-// `r < seen·1.015 + 15`; at every silhouette the nearest texel flips between the ridge and the
+// Occlusion. The WebGL terrain shader (terrain-layer.ts `drapeSeen`) is the GLSL twin of this vote
+// (shared constants and CPU mirror: deck/drape-vote.ts); it used to point-sample one range texel and
+// test `r < seen·1.015 + 15`; at every silhouette the nearest texel flips between the ridge and the
 // ground behind it, which stripes grazing slopes ("drape acne"). Here, as in multi-drape-layer.ts,
 // the TEST is filtered like PCF: the 2×2 nearest texels each vote (same range test + a
 // slope-scaled bias `1.5·r·Δθ / max(sin incidence, 0.012)`, Δθ = one geometry texel's angle) and
@@ -68,6 +69,7 @@
 // view's colour pass stays classic, as the WebGL offscreen passes forced projectPhoto 0).
 import { type Device, Texture } from "@luma.gl/core";
 import type { ShaderModule } from "@luma.gl/shadertools";
+import { drapeSlack, MIN_SIN_INC } from "#/lib/deck/drape-vote";
 import { CLEAR_AIR_OFF, type ClearAirValues } from "#/lib/look/clear-air";
 import { BAND_CENTERS_LOG10 } from "#/lib/look/color-stats";
 import type { harmonizeValues } from "#/lib/look/composite";
@@ -83,8 +85,7 @@ import type { PassContext } from "../pass";
 import type { TerrainShaderPart } from "../terrain";
 import { imageTexture, maskTexture, placeholderTextures } from "../textures";
 
-/** multi-drape-layer.ts MIN_SIN_INC: the slope bias grows as 1/sin(incidence) down to ≈ 0.7°. */
-export const MIN_SIN_INC = 0.012;
+export { MIN_SIN_INC };
 
 export type DrapeSettings = {
 	/** 0 = off; 0..1 blend of the projected photo; > 1.5 = Step Inside (the full photo). */
@@ -562,13 +563,4 @@ export function drapeVisibilityCpu(
 	return top * (1 - fy) + bot * fy;
 }
 
-/** The slope-scaled bias the shader adds (m): 1.5·r·Δθ / max(sin incidence, MIN_SIN_INC). */
-export function drapeSlack(
-	r: number,
-	sinInc: number,
-	tanHalfY: number,
-	geometryHeight: number,
-) {
-	const radPx = (2 * Math.atan(tanHalfY)) / geometryHeight;
-	return (1.5 * r * radPx) / Math.max(sinInc, MIN_SIN_INC);
-}
+export { drapeSlack };

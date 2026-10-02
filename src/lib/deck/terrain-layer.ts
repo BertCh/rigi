@@ -57,6 +57,7 @@ import {
 	terroirMajorEvery,
 } from "../terroir/glsl/values";
 import { BatchedTerrainTileLayer } from "./batched-terrain-layer";
+import { MIN_SIN_INC } from "./drape-vote";
 import type { TileMesh } from "./terrain-data";
 
 export const STYLE = {
@@ -396,6 +397,38 @@ float contourLine(float e, float widthPx) {
   return 1.0 - smoothstep(widthPx * 0.5, widthPx * 0.5 + 1.0, d);
 }
 
+// Photo-camera visibility of the drape: the GLSL twin of deck-webgpu/layers/drape.ts
+// (drape_visibility + the soft people cut; CPU mirror in drape-vote.ts). The 2x2 nearest range
+// texels each vote (range test + slope-scaled slack) and the votes are bilinearly weighted, so a
+// silhouette fades over one texel instead of striping grazing slopes. Returns 0..1, the drape weight.
+#define MIN_SIN_INC ${MIN_SIN_INC}
+float drapeVote(ivec2 t, float r, float slack) {
+  float seen = texelFetch(photoRange, t, 0).r;
+  return (seen > 0.0 && r < seen * 1.015 + 15.0 + slack) ? 1.0 : 0.0;
+}
+float drapeSeen(vec2 puv, float r, vec3 n) {
+  if (r <= terrain.photoPos.w) return 0.0;
+  ivec2 dims = textureSize(photoRange, 0);
+  ivec2 hi = dims - 1;
+  // photoViewProj = P * V with V's rows orthonormal, so row 1 of it has length P[1][1] = 1 / tanHalfY
+  float tanHalfY = 1.0 / length(vec3(terrain.photoViewProj[0][1], terrain.photoViewProj[1][1], terrain.photoViewProj[2][1]));
+  float sinInc = -dot((vWorld - terrain.photoPos.xyz) / max(r, 1e-6), n);
+  float radPx = 2.0 * atan(tanHalfY) / float(dims.y);
+  float slack = 1.5 * r * radPx / max(sinInc, MIN_SIN_INC);
+  // puv.y is already rows top -> bottom, the order the range map is uploaded in
+  vec2 tc = puv * vec2(dims) - 0.5;
+  vec2 f = fract(tc);
+  ivec2 b = ivec2(floor(tc));
+  float v00 = drapeVote(clamp(b, ivec2(0), hi), r, slack);
+  float v10 = drapeVote(clamp(b + ivec2(1, 0), ivec2(0), hi), r, slack);
+  float v01 = drapeVote(clamp(b + ivec2(0, 1), ivec2(0), hi), r, slack);
+  float v11 = drapeVote(clamp(b + ivec2(1, 1), ivec2(0), hi), r, slack);
+  float vis = mix(mix(v00, v10, f.x), mix(v01, v11, f.x), f.y);
+  // people in the photo would smear across the ground behind them: soft cut-out
+  float keep = terrain.photoFgOn > 0.5 ? 1.0 - smoothstep(0.4, 0.6, textureLod(photoFg, puv, 0.0).r) : 1.0;
+  return smoothstep(0.0, 0.75, vis) * keep;
+}
+
 void main() {
   vec3 n = normalize(vNormal);
   float range = length(vWorld - vCamera);
@@ -531,13 +564,8 @@ void main() {
         vec2 edge = min(puv, 1.0 - puv);
         if (hrm_amount > 0.0) base = mix(base, harmonize(base, r), smoothstep(0.0, 0.25, min(edge.x, edge.y)));
 #endif
-        float seen = texture(photoRange, puv).r;
-        // visible from the photo camera if not occluded (range test with relative bias; the range
-        // map is the GPU geometry pass; bias 1.5 % + 15 m)
-        bool visible = seen > 0.0 && r < seen * 1.015 + 15.0 && r > terrain.photoPos.w;
-        // people in the photo would smear across the ground behind them
-        if (terrain.photoFgOn > 0.5 && texture(photoFg, puv).r > 0.5) visible = false;
-        if (visible) {
+        float seen = drapeSeen(puv, r, n);
+        if (seen > 0.0) {
           vec3 pc = srgbDecode(textureGrad(photoTexture, puv, pdx, pdy).rgb);
 #ifdef LOOK_CLEARAIR
           // the photo's own haze off (look/clear-air): the view's haze goes on below, once
@@ -546,8 +574,8 @@ void main() {
           vec3 ray = normalize(vWorld - terrain.photoPos.xyz);
           float inc = clamp(-dot(ray, n) * 3.0, 0.0, 1.0);
           // projectPhoto > 1.5: Step Inside (seen from the photo camera the drape is the photo itself)
-          base = mix(base, pc, terrain.projectPhoto > 1.5 ? 1.0 : terrain.projectPhoto * mix(0.35, 1.0, inc));
-          base = mix(base, base * terrain.photoTintCol.rgb, terrain.photoTint);
+          base = mix(base, pc, (terrain.projectPhoto > 1.5 ? 1.0 : terrain.projectPhoto * mix(0.35, 1.0, inc)) * seen);
+          base = mix(base, base * terrain.photoTintCol.rgb, terrain.photoTint * seen);
         }
       }
     }
@@ -556,19 +584,16 @@ void main() {
   // Step Inside "Truth" (terrain.truth > 0, world / step view only; materials.ts uTruth): the drape's photo
   // pixels (the visibility test above) = observed, every other terrain fragment = dem
   if (terrain.truth > 0.0) {
-    bool seenT = false;
+    float seenT = 0.0;
     vec4 clipT = terrain.photoViewProj * vec4(vWorld, 1.0);
     if (terrain.projectPhoto > 0.0 && clipT.w > 0.0) {
       vec2 puvT = clipT.xy / clipT.w * 0.5 + 0.5;
       puvT.y = 1.0 - puvT.y;
       if (all(greaterThan(puvT, vec2(0.0))) && all(lessThan(puvT, vec2(1.0)))) {
-        float rT = length(vWorld - terrain.photoPos.xyz);
-        float seen = textureLod(photoRange, puvT, 0.0).r;
-        seenT = seen > 0.0 && rT < seen * 1.015 + 15.0 && rT > terrain.photoPos.w;
-        if (terrain.photoFgOn > 0.5 && textureLod(photoFg, puvT, 0.0).r > 0.5) seenT = false;
+        seenT = drapeSeen(puvT, length(vWorld - terrain.photoPos.xyz), n);
       }
     }
-    base = mix(base, srgbDecode(seenT ? terrain.truthObs.rgb : terrain.truthDem.rgb), terrain.truth);
+    base = mix(base, mix(srgbDecode(terrain.truthDem.rgb), srgbDecode(terrain.truthObs.rgb), seenT), terrain.truth);
   }
 
 #ifdef LOOK_ATMOSPHERE
