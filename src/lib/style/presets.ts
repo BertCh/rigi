@@ -5,6 +5,7 @@
 // Presets: each is a DeepPartial layered on CLASSIC (styling.md §2.2). Resolved style =
 // merge(CLASSIC, PRESETS[preset], overrides): a preset only changes what it names, and the user's
 // overrides survive a preset switch. Values other than classic are first drafts, tuned in chunk 5.
+import { SWISSTOPO_LABELS } from "../terroir/labels/swisstopo";
 import { CLASSIC } from "./defaults";
 import { ABSOLUTE_RAMP_RANGE } from "./ramps";
 import { diffStyle, mergeStyle, pruneOverrides } from "./schema";
@@ -32,7 +33,7 @@ export const PRESET_LABELS: Record<PresetId, string> = {
 	night: "Night",
 	"high-contrast": "High contrast",
 	"photo-matched": "Photo-matched",
-	swiss: "Swiss relief",
+	swiss: "Landeskarte",
 	berann: "Berann",
 	"topo-ink": "Topo ink",
 	slope: "Slope angle",
@@ -236,17 +237,36 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 	},
 
 	/**
-	 * Swiss cartographic relief (look/relief): multidirectional NW hillshade with Imhof contrast,
-	 * a touch of the photo's sun with its cast shadows, sky-view darkening in the valleys, over the
-	 * Alpine natural tint, with illuminated (Tanaka) contours on the photo.
+	 * Landeskarte, the Swiss-map signature (id stays "swiss"): Imhof relief (multi-scale normals,
+	 * aspect-swung light, warm/cool colour, aerial perspective) over the Alpine tint, brown Swiss
+	 * contours (100 m index lines heavier, interval thinned with range), ink ridges, landeskarte
+	 * hachures (rock, scree and glacier lines; they need no pack) and swisstopo label typography.
+	 * Every terroir layer that needs a cover pack stays off, so it degrades to nothing without one.
 	 */
 	swiss: {
 		terrain: {
 			sun: { mode: "photo-time" },
-			relief: { mode: "swiss", realism: 0.15, generalize: 0.6, curvature: 0.5 },
+			relief: {
+				mode: "imhof",
+				realism: 0.15,
+				generalize: 0.6,
+				curvature: 0.5,
+				swing: 0.5,
+				tint: 0.5,
+				aerial: 0.4,
+			},
 			albedo: { mode: "alpine" },
 		},
-		overlay: { contours: { kind: "tanaka" } },
+		overlay: {
+			contours: {
+				kind: "plain",
+				color: { mode: "solid", minor: "#b98a5e", major: "#8a5a32" },
+				minorAlpha: 0.55,
+				majorAlpha: 0.9,
+				width: 1.0,
+				majorWidthMul: 1.9,
+			},
+		},
 		composite: {
 			harmonize: 0.3,
 			ridges: "ink",
@@ -254,11 +274,16 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 				strength: 0.5,
 				width: 0.9,
 				crease: 0.2,
-				inner: [0.08, 0.1, 0.16],
-				skyline: [0.05, 0.06, 0.1],
+				inner: [0.16, 0.11, 0.07],
+				skyline: [0.1, 0.07, 0.05],
 			},
 		},
-		labels: { export: null },
+		labels: { ...SWISSTOPO_LABELS, export: null },
+		terroir: {
+			contours: { adaptive: true, swissIndex: true, inkByCover: false },
+			hatch: true,
+			hatchStyle: "landeskarte",
+		},
 	},
 
 	/** Heinrich Berann's panoramas: saturated greens, warm rock, bright snow, half real sun, strong ridges. */
