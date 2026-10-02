@@ -5,6 +5,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BRAND, brandAlpha } from "#/brand/khipu";
+import { latToTileY, lonToTileX } from "#/lib/dem/tiles";
 import type { DemoManifest } from "#/lib/demo";
 import { SWISSTOPO_CREDIT } from "#/lib/licences/attribution";
 import { pixelkarteUrl } from "#/lib/licences/imagery";
@@ -37,14 +38,10 @@ const Z = 14;
 const TILE = 256;
 const WEDGE_M = 1100;
 
-const worldPx = (lat: number, lon: number) => {
-	const n = TILE * 2 ** Z;
-	const s = Math.sin((lat * Math.PI) / 180);
-	return {
-		x: ((lon + 180) / 360) * n,
-		y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n,
-	};
-};
+const worldPx = (lat: number, lon: number) => ({
+	x: lonToTileX(lon, Z) * TILE,
+	y: latToTileY(lat, Z) * TILE,
+});
 const metresPerPx = (lat: number) =>
 	(156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** Z;
 

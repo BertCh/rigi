@@ -16,6 +16,8 @@
 //
 // Data: swisstopo OGD (free incl. commercial use; attribution "© swisstopo").
 
+import { LV95_PROJ_DEFINITION } from "../../geo/lv95";
+
 // ---------------------------------------------------------------- LV95
 
 const SEC = 3600;
@@ -85,7 +87,7 @@ export function loadRigorousLv95(): Promise<RigorousLv95> {
 	rigorousLv95Promise ??= import("@math.gl/proj4").then(({ Projection }) => {
 		const projection = new Projection({
 			from: "EPSG:4326",
-			to: "+proj=somerc +lat_0=46.9524055555556 +lon_0=7.43958333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +towgs84=674.374,15.056,405.346,0,0,0,0 +units=m +no_defs",
+			to: LV95_PROJ_DEFINITION,
 		});
 		return {
 			wgs84ToLv95: (lat, lon) => {

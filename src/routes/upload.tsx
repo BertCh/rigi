@@ -17,7 +17,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SiteNav } from "#/components/site/SiteNav";
 import { hfovFromVfov } from "#/lib/camera";
-import { DEG as D, EARTH_R } from "#/lib/geodesy";
+import { distanceBearing } from "#/lib/geodesy";
 import type { RegionData } from "#/lib/photos";
 import {
 	deleteLocalPhoto,
@@ -67,20 +67,6 @@ const STAGE_LABEL: Record<UploadStage, string> = {
 	decoding: "Decoding image…",
 	done: "Done",
 };
-
-function distBearing(lat0: number, lon0: number, lat1: number, lon1: number) {
-	const dLat = (lat1 - lat0) * D;
-	const dLon = (lon1 - lon0) * D;
-	const a =
-		Math.sin(dLat / 2) ** 2 +
-		Math.cos(lat0 * D) * Math.cos(lat1 * D) * Math.sin(dLon / 2) ** 2;
-	const d = 2 * EARTH_R * Math.asin(Math.min(1, Math.sqrt(a)));
-	const y = Math.sin(dLon) * Math.cos(lat1 * D);
-	const x =
-		Math.cos(lat0 * D) * Math.sin(lat1 * D) -
-		Math.sin(lat0 * D) * Math.cos(lat1 * D) * Math.cos(dLon);
-	return { d, brg: (((Math.atan2(y, x) / D) % 360) + 360) % 360 };
-}
 
 function UploadPage() {
 	const navigate = useNavigate();
@@ -836,7 +822,15 @@ function RegionPanel({
 	const nearest = useMemo(() => {
 		if (state.kind !== "ready" || !hasPosition(meta)) return [];
 		return state.region.peaks
-			.map((p) => ({ ...p, ...distBearing(meta.lat, meta.lon, p.lat, p.lon) }))
+			.map((p) => {
+				const { distance, bearing } = distanceBearing(
+					meta.lat,
+					meta.lon,
+					p.lat,
+					p.lon,
+				);
+				return { ...p, d: distance, brg: bearing };
+			})
 			.filter((p) => p.ele != null)
 			.sort(
 				(a, b) =>

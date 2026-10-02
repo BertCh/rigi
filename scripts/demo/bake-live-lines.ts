@@ -22,6 +22,13 @@ import path from "node:path";
 import { contours } from "d3-contour";
 import { encodeBlob } from "../../src/components/site/lineArt";
 import { MAPTERHORN } from "../../src/lib/dem";
+import {
+	latToTileY,
+	lonToTileX,
+	tileXToLon,
+	tileYToLat,
+} from "../../src/lib/dem/tiles";
+import { simplifyIndices } from "../../src/lib/geo/simplify";
 import { EnuFrame } from "../../src/lib/geodesy";
 import {
 	DEFAULT_RINGS,
@@ -167,16 +174,13 @@ const Z = 11; // Mapterhorn 512 px tiles: ~26 m cells here
 {
 	const T = MAPTERHORN.tileSize;
 	const n = T * 2 ** Z;
-	const merc = (lat: number, lon: number) => {
-		const s = Math.sin((lat * Math.PI) / 180);
-		return {
-			x: ((lon + 180) / 360) * n,
-			y: (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n,
-		};
-	};
+	const merc = (lat: number, lon: number) => ({
+		x: lonToTileX(lon, Z) * T,
+		y: latToTileY(lat, Z) * T,
+	});
 	const unmerc = (x: number, y: number) => ({
-		lon: (x / n) * 360 - 180,
-		lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI,
+		lon: tileXToLon(x / T, Z),
+		lat: tileYToLat(y / T, Z),
 	});
 	const c = merc(ORIGIN.lat, ORIGIN.lon);
 	const mPerPx = (40_075_016.7 * Math.cos((ORIGIN.lat * Math.PI) / 180)) / n;
@@ -278,33 +282,10 @@ const Z = 11; // Mapterhorn 512 px tiles: ~26 m cells here
 
 /** Douglas–Peucker over (x, y) pairs; the kept point indices. */
 function simplify(p: number[], tol: number): number[] {
-	const n = p.length / 2;
-	if (n < 3) return Array.from({ length: n }, (_, i) => i);
-	const keep = new Uint8Array(n);
-	keep[0] = keep[n - 1] = 1;
-	const stack: [number, number][] = [[0, n - 1]];
-	while (stack.length) {
-		const [i, j] = stack.pop() as [number, number];
-		const dx = p[j * 2] - p[i * 2];
-		const dy = p[j * 2 + 1] - p[i * 2 + 1];
-		const len = Math.hypot(dx, dy);
-		let best = -1;
-		let bi = -1;
-		for (let k = i + 1; k < j; k++) {
-			const ex = p[k * 2] - p[i * 2];
-			const ey = p[k * 2 + 1] - p[i * 2 + 1];
-			const d = len ? Math.abs(dy * ex - dx * ey) / len : Math.hypot(ex, ey);
-			if (d > best) {
-				best = d;
-				bi = k;
-			}
-		}
-		if (best > tol) {
-			keep[bi] = 1;
-			stack.push([i, bi], [bi, j]);
-		}
-	}
-	const out: number[] = [];
-	for (let i = 0; i < n; i++) if (keep[i]) out.push(i);
-	return out;
+	return simplifyIndices(
+		p.length / 2,
+		(i) => p[i * 2],
+		(i) => p[i * 2 + 1],
+		tol,
+	);
 }

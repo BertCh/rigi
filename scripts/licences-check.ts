@@ -12,6 +12,12 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { MAPTERHORN } from "../src/lib/dem/sources";
+import {
+	latToTileY,
+	lonToTileX,
+	tileXToLon,
+	tileYToLat,
+} from "../src/lib/dem/tiles";
 import { overpassPeaksQuery, parseOverpassPeaks } from "../src/lib/geo/peaks";
 import {
 	attributionFor,
@@ -91,11 +97,6 @@ function oldTerrainUrl(
 			]
 		: [osm];
 }
-const tileXToLon = (x: number, z: number) => (x / 2 ** z) * 360 - 180;
-const tileYToLat = (y: number, z: number) => {
-	const n = Math.PI - (2 * Math.PI * y) / 2 ** z;
-	return (180 / Math.PI) * Math.atan(Math.sinh(n));
-};
 {
 	let n = 0;
 	let bad = 0;
@@ -109,13 +110,8 @@ const tileYToLat = (y: number, z: number) => {
 			// half the samples in/around the Alps, half anywhere
 			const lon = i % 2 ? 4 + rand() * 8 : -180 + rand() * 360;
 			const lat = i % 2 ? 44.5 + rand() * 4.5 : -80 + rand() * 160;
-			const x = Math.floor(((lon + 180) / 360) * 2 ** z);
-			const y = Math.floor(
-				((1 -
-					Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) / Math.PI) /
-					2) *
-					2 ** z,
-			);
+			const x = Math.floor(lonToTileX(lon, z));
+			const y = Math.floor(latToTileY(lat, z));
 			const clat = tileYToLat(y + 0.5, z);
 			const clon = tileXToLon(x + 0.5, z);
 			for (const src of ["satellite", "topo"] as const) {

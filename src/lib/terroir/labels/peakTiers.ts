@@ -6,6 +6,7 @@
 // T0.4): major ×1.25 / 700, peak ×1 / 600, minor ×0.86 / 500 (classes.ts NAME_TYPO). Prominence the
 // OSM extract lacks is backfilled from the terroir pack's swissNAMES3D peak class (name + distance).
 // Pure TS (no DOM, no React) so the label layouts and the node check can use it.
+import { equirectangularM } from "#/lib/geodesy";
 import { NAME_TYPO, peakTier } from "../classes";
 import type { NameClass, TerroirPack } from "../types";
 import { uncertainPrefix } from "./names";
@@ -42,12 +43,10 @@ export function buildTierIndex(pack: TerroirPack | null): TierIndex | null {
 	return m;
 }
 
-function hav(lat1: number, lon1: number, lat2: number, lon2: number) {
-	const k = Math.PI / 180;
-	const dx = (lon2 - lon1) * k * Math.cos(((lat1 + lat2) / 2) * k);
-	const dy = (lat2 - lat1) * k;
-	return Math.hypot(dx, dy) * 6371000;
-}
+/** Rounded Earth radius the peak-name match distances (and their 600 m gate) were tuned with; not EARTH_R. */
+const NAME_MATCH_EARTH_R = 6371000;
+const hav = (lat1: number, lon1: number, lat2: number, lon2: number) =>
+	equirectangularM(lat1, lon1, lat2, lon2, NAME_MATCH_EARTH_R);
 
 /**
  * The prominence class of a peak: from its prominence when known, else the pack's class for the same

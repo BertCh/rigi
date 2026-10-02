@@ -13,6 +13,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
+import { M_PER_DEG_LAT } from "../../src/lib/geodesy";
 import type {
 	BBox,
 	TerroirPack,
@@ -116,7 +117,7 @@ async function main() {
 	const W =
 		Math.round(
 			((bbox[2] - bbox[0]) *
-				111320 *
+				M_PER_DEG_LAT *
 				Math.cos((((bbox[1] + bbox[3]) / 2) * Math.PI) / 180)) /
 				cellM /
 				2,

@@ -202,3 +202,33 @@ export function distanceBearing(
 export const wrap180 = (a: number) => ((((a + 180) % 360) + 360) % 360) - 180;
 /** Angle in degrees → [0, 360). */
 export const wrap360 = (a: number) => ((a % 360) + 360) % 360;
+
+/** Equirectangular distance (m) on a sphere of `radiusM` (default EARTH_R); fine for < 300 km. */
+export function equirectangularM(
+	lat1: number,
+	lon1: number,
+	lat2: number,
+	lon2: number,
+	radiusM = EARTH_R,
+) {
+	const x = (lon2 - lon1) * DEG * Math.cos(((lat1 + lat2) / 2) * DEG);
+	const y = (lat2 - lat1) * DEG;
+	return Math.hypot(x, y) * radiusM;
+}
+
+/**
+ * The lat/lon box around a point: half-extents `dLat`/`dLon` (degrees) of a `radiusM` square,
+ * sized with M_PER_DEG_LAT (as the DEM tile selection does), plus its four edges.
+ */
+export function latLonBox(center: LatLon, radiusM: number) {
+	const dLat = radiusM / M_PER_DEG_LAT;
+	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(center.lat * DEG));
+	return {
+		dLat,
+		dLon,
+		south: center.lat - dLat,
+		north: center.lat + dLat,
+		west: center.lon - dLon,
+		east: center.lon + dLon,
+	};
+}

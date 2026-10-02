@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
 // Small geometry helpers. LV95 conversion lives in scripts/lib/lv95.ts.
+import { simplifyPointIndices } from "../../../src/lib/geo/simplify";
+
 export type LonLat = [number, number];
 
 /** Douglas-Peucker on a planar ring/line (units of the input; pass tolerance in the same units). */
@@ -12,43 +14,8 @@ export function simplify(
 	closed = false,
 ): [number, number][] {
 	if (pts.length <= (closed ? 4 : 2)) return pts;
-	const keep = new Uint8Array(pts.length);
-	keep[0] = keep[pts.length - 1] = 1;
-	const stack: [number, number][] = [[0, pts.length - 1]];
-	const t2 = tol * tol;
-	while (stack.length) {
-		const top = stack.pop();
-		if (!top) break;
-		const [a, b] = top;
-		let md = -1,
-			mi = -1;
-		const [ax, ay] = pts[a],
-			[bx, by] = pts[b];
-		const dx = bx - ax,
-			dy = by - ay,
-			l2 = dx * dx + dy * dy;
-		for (let i = a + 1; i < b; i++) {
-			const [px, py] = pts[i];
-			let d2: number;
-			if (l2 === 0) d2 = (px - ax) ** 2 + (py - ay) ** 2;
-			else {
-				const t = Math.max(
-					0,
-					Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2),
-				);
-				d2 = (px - ax - t * dx) ** 2 + (py - ay - t * dy) ** 2;
-			}
-			if (d2 > md) {
-				md = d2;
-				mi = i;
-			}
-		}
-		if (md > t2) {
-			keep[mi] = 1;
-			stack.push([a, mi], [mi, b]);
-		}
-	}
-	const out = pts.filter((_, i) => keep[i]);
+	const keep = new Set(simplifyPointIndices(pts, tol, "segment"));
+	const out = pts.filter((_, i) => keep.has(i));
 	return closed && out.length < 4 ? pts.slice(0, 4) : out;
 }
 

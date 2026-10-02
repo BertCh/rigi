@@ -12,6 +12,7 @@
 // but carry `water` so the floor rule can skip them (floor.ts).
 
 import { type Lake, ringArea, stitchRings } from "../../concord/cues/water";
+import { simplifyPointIndices } from "../../geo/simplify";
 import { DEG, EARTH_R } from "../../geodesy";
 import { parseEle as parseMetres } from "./levels";
 
@@ -71,41 +72,7 @@ function toXY(r: LL[], lat0: number, lon0: number): [number, number][] {
 
 /** Douglas–Peucker on a polyline (indices kept). Iterative; endpoints always kept. */
 export function simplifyIdx(pts: [number, number][], tol: number): number[] {
-	const n = pts.length;
-	if (n <= 2) return pts.map((_, i) => i);
-	const keep = new Uint8Array(n);
-	keep[0] = keep[n - 1] = 1;
-	const stack: [number, number][] = [[0, n - 1]];
-	while (stack.length) {
-		const [a, b] = stack.pop() as [number, number];
-		const [ax, ay] = pts[a];
-		const dx = pts[b][0] - ax;
-		const dy = pts[b][1] - ay;
-		const L2 = dx * dx + dy * dy;
-		let best = -1;
-		let bi = -1;
-		for (let i = a + 1; i < b; i++) {
-			const px = pts[i][0] - ax;
-			const py = pts[i][1] - ay;
-			let d: number;
-			if (L2 === 0) d = Math.hypot(px, py);
-			else {
-				const t = Math.max(0, Math.min(1, (px * dx + py * dy) / L2));
-				d = Math.hypot(px - t * dx, py - t * dy);
-			}
-			if (d > best) {
-				best = d;
-				bi = i;
-			}
-		}
-		if (bi >= 0 && best > tol) {
-			keep[bi] = 1;
-			stack.push([a, bi], [bi, b]);
-		}
-	}
-	const out: number[] = [];
-	for (let i = 0; i < n; i++) if (keep[i]) out.push(i);
-	return out;
+	return simplifyPointIndices(pts, tol, "segment");
 }
 
 /** A closed ring (first == last) → simplified open ring, flat [lat, lon, …] at 1e-6°; null if degenerate. */

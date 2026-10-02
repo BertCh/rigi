@@ -12,7 +12,7 @@ import {
 	type TileKey,
 	tileBounds,
 } from "#/lib/dem";
-import { EnuFrame } from "#/lib/geodesy";
+import { EnuFrame, M_PER_DEG_LAT } from "#/lib/geodesy";
 import { buildBatchGrid, buildLiteMesh } from "./batched-terrain-grid";
 import { buildMesh, type TileMesh } from "./terrain-data";
 
@@ -53,7 +53,7 @@ export function createSyntheticTile(
 	const lat =
 		opts.southEdgeM === undefined
 			? (b.north + b.south) / 2
-			: b.south - opts.southEdgeM / 111_320;
+			: b.south - opts.southEdgeM / M_PER_DEG_LAT;
 	const frame = new EnuFrame(lat, lon, opts.frameH ?? 0);
 	const sw = [0, 0, 0];
 	const ne = [0, 0, 0];

@@ -35,7 +35,8 @@ register({ tsconfig: path.join(ROOT, "tsconfig.json") });
 registerHooks(`data:text/javascript,${encodeURIComponent(stub)}`);
 const imp = (p) => import(pathToFileURL(path.join(ROOT, "src/lib", p)).href);
 const { EnuFrame } = await imp("geodesy.ts");
-const { lonToTileX, latToTileY } = await imp("dem/tiles.ts");
+const { lonToTileX, latToTileY, tileXToLon, tileYToLat } =
+	await imp("dem/tiles.ts");
 const { rasterizeHeights } = await imp("look/relief/heights.ts");
 const { reliefHeights } = await imp("gpu/look/relief.ts");
 const { planHeights, emulateReliefHeights } = await imp(
@@ -60,11 +61,8 @@ function mkTile(z, x, y, size) {
 	const heights = new Float32Array(size * size);
 	for (let j = 0; j < size; j++)
 		for (let i = 0; i < size; i++) {
-			const tx = (x + (i + 0.5) / size) / 2 ** z;
-			const ty = (y + (j + 0.5) / size) / 2 ** z;
-			const lon = tx * 360 - 180;
-			const lat =
-				(Math.atan(Math.sinh(Math.PI * (1 - 2 * ty))) * 180) / Math.PI;
+			const lon = tileXToLon(x + (i + 0.5) / size, z);
+			const lat = tileYToLat(y + (j + 0.5) / size, z);
 			heights[j * size + i] = field(lon, lat) + 3 * hash(i + x * 7, j + y * 13);
 		}
 	return { key: { z, x, y }, size, heights };

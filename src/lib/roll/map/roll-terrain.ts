@@ -27,7 +27,7 @@ import {
 	distanceM,
 	type EnuFrame,
 	type LatLon,
-	M_PER_DEG_LAT,
+	latLonBox,
 } from "#/lib/geodesy";
 
 export type RollTerrainOptions = {
@@ -88,9 +88,7 @@ function selectRollTiles(frame: EnuFrame, o: RollTerrainOptions): Choice[] {
 		const distance = Math.min(df, dc);
 		out.push({ key: t, distance, size, seg: distance < size ? 128 : 96 });
 	};
-	const dLat = radiusM / M_PER_DEG_LAT;
-	const dLon =
-		radiusM / (M_PER_DEG_LAT * Math.cos((frame.lat * Math.PI) / 180));
+	const { dLat, dLon } = latLonBox(frame, radiusM);
 	const x0 = Math.floor(lonToTileX(frame.lon - dLon, minZoom));
 	const x1 = Math.floor(lonToTileX(frame.lon + dLon, minZoom));
 	const y0 = Math.floor(latToTileY(frame.lat + dLat, minZoom));

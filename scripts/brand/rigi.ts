@@ -25,6 +25,7 @@ import {
 	type TileKey,
 	tileId,
 } from "../../src/lib/dem";
+import { simplifyPointIndices } from "../../src/lib/geo/simplify";
 import { fileHeights } from "../lib/node-io";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
@@ -218,35 +219,8 @@ function strokes(top: Float32Array[], cols: number) {
 
 /** Douglas–Peucker in (az, el) degrees. */
 function simplify(pts: Pt[], tol: number): Pt[] {
-	if (pts.length < 3) return pts;
-	const keep = new Uint8Array(pts.length);
-	keep[0] = keep[pts.length - 1] = 1;
-	const stack: [number, number][] = [[0, pts.length - 1]];
-	while (stack.length) {
-		const [i, j] = stack.pop() as [number, number]; // length checked by the loop
-		const [x0, y0] = pts[i];
-		const [x1, y1] = pts[j];
-		const dx = x1 - x0;
-		const dy = y1 - y0;
-		const len = Math.hypot(dx, dy);
-		let best = -1;
-		let bi = -1;
-		for (let k = i + 1; k < j; k++) {
-			// Closed rings start and end on the same point: measure from it instead.
-			const dist = len
-				? Math.abs(dy * (pts[k][0] - x0) - dx * (pts[k][1] - y0)) / len
-				: Math.hypot(pts[k][0] - x0, pts[k][1] - y0);
-			if (dist > best) {
-				best = dist;
-				bi = k;
-			}
-		}
-		if (best > tol) {
-			keep[bi] = 1;
-			stack.push([i, bi], [bi, j]);
-		}
-	}
-	return pts.filter((_, i) => keep[i]);
+	const keep = new Set(simplifyPointIndices(pts, tol));
+	return pts.filter((_, i) => keep.has(i));
 }
 
 // ─── Peaks ───────────────────────────────────────────────────────────────────

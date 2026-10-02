@@ -5,6 +5,7 @@
 // Pure helpers for the terroir roll/site furniture (no DOM, no deck): sun-band colours, scale-bar
 // numbers, pose-source glyphs and the prior-pose uncertainty fan. Checked by roll.check.ts.
 // Display-only: nothing here feeds the matcher or any pose.
+import { tileYToLat } from "../../dem/tiles";
 import type { PoseSource } from "../../roll/types";
 
 // ---- light of day ----------------------------------------------------------------------------------
@@ -122,8 +123,7 @@ export const mercatorMPerPx = (latDeg: number, z: number, tile = 256) =>
 
 /** Latitude (deg) of a web-mercator world-pixel y at zoom z. */
 export function mercatorLat(y: number, z: number, tile = 256) {
-	const n = Math.PI - (2 * Math.PI * y) / (tile * 2 ** z);
-	return (Math.atan(Math.sinh(n)) * 180) / Math.PI;
+	return tileYToLat(y / tile, z);
 }
 
 // ---- pose-source honesty ---------------------------------------------------------------------------

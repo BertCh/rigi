@@ -13,7 +13,7 @@ import {
 	destination,
 	distanceBearing,
 	EARTH_R,
-	M_PER_DEG_LAT,
+	latLonBox,
 	REFRACTION_K,
 } from "../geodesy";
 import type { Height } from "../ontology/core/quantity";
@@ -122,8 +122,7 @@ export function localMaxOf(
 	};
 	let best = start;
 	let onRing = false;
-	const dLat = radiusM / M_PER_DEG_LAT;
-	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
+	const { dLat, dLon } = latLonBox({ lat, lon }, radiusM);
 	for (let i = -4; i <= 4; i++)
 		for (let j = -4; j <= 4; j++) {
 			const la = lat + (i / 4) * dLat;

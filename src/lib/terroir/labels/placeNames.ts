@@ -5,6 +5,7 @@
 // Engine-aware placement of the terroir pack's names for NamesSvg: project, drop the occluded and
 // out-of-reach, drop peaks the engine already labels, rank, and declutter against each other and the
 // peak labels' screen rects. Returns render items (anchor text, text-on-path, glyphs).
+import { M_PER_DEG_LAT } from "#/lib/geodesy";
 import { canvasMeasure } from "#/lib/look/labels/layout";
 import type { NameClass, TerroirName } from "../types";
 import type { TerroirCtx } from "../ui/context";
@@ -115,8 +116,8 @@ function surfaceClusters(ctx: TerroirCtx): Map<number, Surface> | null {
 			for (const cd of cands) {
 				if (cd.water !== isWater) continue;
 				const dm = Math.hypot(
-					(s.lat - cd.lat) * 111320,
-					(s.lon - cd.lon) * 111320 * cosLat,
+					(s.lat - cd.lat) * M_PER_DEG_LAT,
+					(s.lon - cd.lon) * M_PER_DEG_LAT * cosLat,
 				);
 				const f = dm / cd.r;
 				if (f < bestF) {

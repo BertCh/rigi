@@ -25,6 +25,7 @@ const ROOT = path.resolve(import.meta.dirname, "../..");
 register({ tsconfig: path.join(ROOT, "tsconfig.json") });
 const imp = (p) => import(pathToFileURL(path.join(ROOT, "src/lib", p)).href);
 const { ridgeSchedule, ridgeTopsCpu } = await imp("roll/mosaic/ridgelines.ts");
+const { tileYToLat } = await imp("dem/tiles.ts");
 const { mosaicHeight, mosaicFor } = await imp("horizon-fast/mosaic.ts");
 const { packRidgeMarch, ridgeTopsFromTD } = await imp("gpu/horizon/ridges.ts");
 
@@ -68,8 +69,7 @@ const ring = (z, half, minDistance, maxDistance) => {
 	const width = 2 * half;
 	const data = new Float32Array(width * width);
 	for (let j = 0; j < width; j++) {
-		const y = (y0 + j + 0.5) / worldPx;
-		const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) / DEG;
+		const lat = tileYToLat((y0 + j + 0.5) / tileSize, z);
 		for (let i = 0; i < width; i++) {
 			const lon = ((x0 + i + 0.5) / worldPx) * 360 - 180;
 			data[j * width + i] = terrain(lat, lon);

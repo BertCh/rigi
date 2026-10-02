@@ -8,6 +8,7 @@
 // edges the ground falls away behind are flagged as ridges for a heavier stroke. Output is on the strip's
 // canvas: x = true azimuth, y = elevation, degrees, in the eye's ENU frame (the frame poses live in).
 // Pure: the worker (ridgelines.worker.ts) supplies the height sampler.
+import { simplifyIndices } from "../../geo/simplify";
 import {
 	DEG,
 	destination,
@@ -339,35 +340,10 @@ function visiblePeaks(
 
 /** Douglas–Peucker over (az, el) of [az, el, d] triples; returns the kept point indices. */
 function simplify(p: number[], tol: number): number[] {
-	const n = p.length / 3;
-	if (n < 3) return Array.from({ length: n }, (_, i) => i);
-	const keep = new Uint8Array(n);
-	keep[0] = keep[n - 1] = 1;
-	const stack: [number, number][] = [[0, n - 1]];
-	while (stack.length) {
-		const [i, j] = stack.pop() as [number, number];
-		const x0 = p[i * 3];
-		const y0 = p[i * 3 + 1];
-		const dx = p[j * 3] - x0;
-		const dy = p[j * 3 + 1] - y0;
-		const len = Math.hypot(dx, dy);
-		let best = -1;
-		let bi = -1;
-		for (let k = i + 1; k < j; k++) {
-			const dist = len
-				? Math.abs(dy * (p[k * 3] - x0) - dx * (p[k * 3 + 1] - y0)) / len
-				: Math.hypot(p[k * 3] - x0, p[k * 3 + 1] - y0);
-			if (dist > best) {
-				best = dist;
-				bi = k;
-			}
-		}
-		if (best > tol) {
-			keep[bi] = 1;
-			stack.push([i, bi], [bi, j]);
-		}
-	}
-	const out: number[] = [];
-	for (let i = 0; i < n; i++) if (keep[i]) out.push(i);
-	return out;
+	return simplifyIndices(
+		p.length / 3,
+		(i) => p[i * 3],
+		(i) => p[i * 3 + 1],
+		tol,
+	);
 }

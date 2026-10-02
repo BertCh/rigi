@@ -29,7 +29,7 @@ import {
 	distanceM,
 	EARTH_R,
 	type EnuFrame,
-	M_PER_DEG_LAT,
+	latLonBox,
 	REFRACTION_K,
 	WGS84,
 } from "../geodesy";
@@ -423,8 +423,7 @@ export function selectDemTiles(
 	},
 ): TileChoice[] {
 	const { radiusM, maxZoom, minZoom, lod, lodOutside, wedge } = opts;
-	const dLat = radiusM / M_PER_DEG_LAT;
-	const dLon = radiusM / (M_PER_DEG_LAT * Math.cos(lat * DEG));
+	const { dLat, dLon } = latLonBox({ lat, lon }, radiusM);
 	const here = { lat, lon };
 	const rel = (la: number, lo: number) =>
 		wedge

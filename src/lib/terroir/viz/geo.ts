@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-import { DEG as D } from "#/lib/geodesy";
+import { DEG as D, M_PER_DEG_LAT } from "#/lib/geodesy";
 // Pure helpers for the terroir photo overlays (place card, glacier ghost, sun path, furniture).
 // No DOM, no engine imports: checked in viz.check.ts. Display-only.
 import type { Vec3 } from "#/lib/ontology/core/geometry";
@@ -96,8 +96,8 @@ export function approxDistM(
 	lat2: number,
 	lon2: number,
 ) {
-	const dy = (lat2 - lat1) * 111320;
-	const dx = (lon2 - lon1) * 111320 * Math.cos(((lat1 + lat2) / 2) * D);
+	const dy = (lat2 - lat1) * M_PER_DEG_LAT;
+	const dx = (lon2 - lon1) * M_PER_DEG_LAT * Math.cos(((lat1 + lat2) / 2) * D);
 	return Math.hypot(dx, dy);
 }
 

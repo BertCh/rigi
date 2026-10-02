@@ -5,6 +5,7 @@
 // CPU side of the terroir terrain shading (./terrain.ts): which TERROIR_* defines a style needs, the
 // cover texture's ENU → UV mapping, the dated snowline, the Swiss index and the adaptive contour
 // levels, packed as TER_BLOCK values. Engine-agnostic (deck terrain-layer.ts).
+import { DEG, M_PER_DEG_LAT } from "#/lib/geodesy";
 import type { ViewStyle } from "#/lib/style/types";
 import { CONTOUR_INK, COVER_CLASSES } from "../classes";
 import type { CoverGrid } from "../pack";
@@ -106,9 +107,9 @@ export function coverFit(grid: CoverGrid, frame: Frame, hRef = 1500): CoverFit {
 /** Approximate cell size (m) east, north at the bbox centre. */
 function cellM(grid: CoverGrid): [number, number] {
 	const [w, s, e, n] = grid.bbox;
-	const lat = ((s + n) / 2) * (Math.PI / 180);
+	const lat = ((s + n) / 2) * DEG;
 	return [
-		((e - w) * 111_320 * Math.cos(lat)) / grid.width,
+		((e - w) * M_PER_DEG_LAT * Math.cos(lat)) / grid.width,
 		((n - s) * 110_574) / grid.height,
 	];
 }
