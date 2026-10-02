@@ -136,7 +136,12 @@ import type { CoverGrid } from "../terroir/pack";
 import { DeckTiles3D } from "../tiles3d/deck-tiles";
 import { PhotoCompositor } from "./composite";
 import { CpuGeometrySource, TerrainProfiles } from "./cpu-geometry";
-import { pendingPrograms, reviveDevice, watchContextLoss } from "./device-lost";
+import {
+	pendingPrograms,
+	reviveDevice,
+	waitForPrograms,
+	watchContextLoss,
+} from "./device-lost";
 import { FlowLayer } from "./flow-layer";
 import { GpuGeometrySource, geometrySize, rangeMapFrom } from "./geometry-pass";
 import {
@@ -2007,6 +2012,14 @@ export class DeckEngine implements Renderer {
 		this.geoSrcKind = null;
 	}
 
+	/** Waits until the Deck's programs have linked (waitForPrograms); a no-op before the device exists. */
+	private settlePrograms = () => {
+		const device = (
+			this.deck as unknown as { device?: Parameters<typeof pendingPrograms>[0] }
+		)?.device;
+		return device ? waitForPrograms(device) : Promise.resolve(true);
+	};
+
 	/** Render + read back the geometry for the current pose; true if the buffer is fresh after. */
 	private async refreshGeometry(): Promise<boolean> {
 		if (this.disposed || !this.terrain || this.contextLost) return false;
@@ -2023,6 +2036,9 @@ export class DeckEngine implements Renderer {
 		const pose = { ...this.pose };
 		this.flushLayers();
 		await this.geoSrc.render(pose);
+		// the first pass of a fresh page can draw nothing while its programs link: draw it again
+		if (!this.disposed && this.geoSrc)
+			await redrawIfBlank(this.geoSrc, pose, this.settlePrograms);
 		if (this.disposed) return false;
 		const got = this.geoSrc?.pose; // undefined after a context restore dropped the source
 		// a newer pose / mesh change arrived meanwhile: its own refresh takes over
@@ -2304,7 +2320,8 @@ export class DeckEngine implements Renderer {
 			let redraws = 0;
 			for (let i = 0; i < alts.length; i++) {
 				const s = srcs[i];
-				if (s && (await redrawIfBlank(s, alts[i].pose))) redraws++;
+				if (s && (await redrawIfBlank(s, alts[i].pose, this.settlePrograms)))
+					redraws++;
 			}
 			if (this.disposed) return null;
 			const tScore = performance.now();
@@ -2392,7 +2409,7 @@ export class DeckEngine implements Renderer {
 					return null;
 				bytes += gs[i].readBytes;
 				// an all-sky mask whose readback is blank too: the draw did not happen, draw it again
-				if (await redrawIfBlank(gs[i], alts[i].pose)) {
+				if (await redrawIfBlank(gs[i], alts[i].pose, this.settlePrograms)) {
 					if (this.disposed) return null;
 					redraws++;
 					bytes += gs[i].readBytes;

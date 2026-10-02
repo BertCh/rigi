@@ -129,3 +129,22 @@ export function pendingPrograms(device: Device): number {
 		if (item.resource?.linkStatus === "pending") n++;
 	return n;
 }
+
+/**
+ * Resolves once no program on `device` is linking (true), or after `maxMs` (false). A draw issued
+ * while its program links is silently skipped (luma WebGLRenderPass.draw returns false), so a pass
+ * that came back empty has to be drawn again after this resolves. A device without luma's pipeline
+ * factory counts as nothing pending and resolves at once.
+ */
+export async function waitForPrograms(
+	device: Device,
+	maxMs = 5000,
+	pollMs = 25,
+): Promise<boolean> {
+	const t0 = performance.now();
+	while (pendingPrograms(device) > 0) {
+		if (performance.now() - t0 >= maxMs) return false;
+		await new Promise((r) => setTimeout(r, pollMs));
+	}
+	return true;
+}

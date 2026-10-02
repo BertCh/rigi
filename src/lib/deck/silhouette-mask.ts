@@ -119,13 +119,17 @@ export function rangeIsBlank(range: Float32Array) {
  * back blank (wave-3 precision gate, deck: the first seed's top finalist scored sil 0 on a fresh
  * page and its real score on every later call, so the f64 baseline differed between runs).
  * true = it redrew. Whatever the second draw holds is then scored, so a real all-sky view
- * still scores 0, one render later.
+ * still scores 0, one render later. `beforeRedraw` runs between the blank read and the redraw.
  */
 export async function redrawIfBlank(
 	src: { range: Float32Array; render(pose: Pose): Promise<void> },
 	pose: Pose,
+	beforeRedraw?: () => Promise<unknown>,
 ): Promise<boolean> {
 	if (!rangeIsBlank(src.range)) return false;
+	// WebGL: luma skips a draw whose program is still linking (KHR_parallel_shader_compile), the
+	// likeliest cause of a blank first draw; the redraw must wait for the link, or it is blank too
+	await beforeRedraw?.();
 	await src.render(pose);
 	return true;
 }
