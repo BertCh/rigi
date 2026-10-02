@@ -1,6 +1,6 @@
 # S: the photo story (guess, measure, correct, snap)
 
-Pod S, Gipfelbuch explainer pass, 2026-10-02. Owner files: `src/components/gipfelbuch/viz/PhotoStory.tsx`, `viz/story.tsx`, plus a new pure module, `viz/storyFilm.ts`, with its specs. Status: **spec v1, written before pod G's grammar was out.** The motion names below are placeholders and are mapped to `grammar.md` tokens in §8 once the grammar is published.
+Pod S, Gipfelbuch explainer pass, 2026-10-02. Owner files: `src/components/gipfelbuch/viz/PhotoStory.tsx`, `viz/story.tsx`, plus a new pure module, `viz/storyFilm.ts`, with its specs. Status: **spec v1.1, aligned to grammar v0.2.** Durations and easings are grammar tokens (§8), mirrored in `FILM_MOTION` until `viz/motion.ts` lands. The beat windows in §5 are the original design sketch; the authoritative timeline is `storyFilm.ts` and its spec.
 
 ## 1. What the figure must say
 
@@ -43,19 +43,25 @@ These gaps against the landing's HowItWorksScene, RevealLoop, Surround and LiveL
 - **The horizon is continuous across the frame edge.** Inside the photo, the moving line is `horizonPoints(bake, d, poseAt(d, t))`, the same function the spill's echo uses. It meets the spill at the frame edge for every t, not only at the endpoints. `geo-spill.spec` already pins the endpoint registration at a median under 0.5 px.
 - **The spill blooms in with the guess.** The margins come up with the pen wipe of the guessed horizon, through `--gb-spill-reveal` on the figure wrapper (proposal P-2). They are shown at the guess pose, because the margin is the guessed world until the turn. They slide with t during the correction and rest at the solved world. In the refused case they slide back to the guess.
 - **The heading needle.** During the turn, the spill's compass ruler carries the heading as a cursor (`spillCursor {az: yaw(t)}`). Its bearing label appears only at the two measured endpoints.
-- **The paper wash and the plate** follow pod G's ground grammar. The photo pixels are never filtered.
+- **The wash, the plate and the spill inks** take their cue from the photo through grammar §3. PhotoStory passes `<Figure ground={photoId}>` once G's `Figure.ground` lands:
+  - `--fig-wash` gives the paper a breath of the photo's sky;
+  - `--fig-terrain-ink` inks the spill's ridges (pod P) in a tone drawn from the photo's terrain;
+  - `--fig-halo` picks the CrispLine halo from the horizon band's lightness.
+
+  The photo pixels are never filtered.
+- **The pose drives the ground.** The wash is static per photo. What moves is the spill's world, which slides from the guessed to the solved bearing on the story's clock, so the ground and the photo agree at every frame of the turn.
 
 ## 4. Overlay stack (bottom to top, inside the photo's SVG, clipped to the frame)
 
 | z | Layer | Ink and weight | Meaning | Provenance |
 | --- | --- | --- | --- | --- |
 | 0 | photo | none | the picture | measured pixels, never filtered |
-| 1 | prior horizon, wiped in | prior ink, dashed, CrispLine 2.2 | DEM horizon at the phone's pose; a ghost (0.35) once the turn starts | measured (`priorRows`) |
+| 1 | prior horizon, wiped in | prior ink, dashed, CrispLine 2.2 | DEM horizon at the phone's pose; a ghost (0.35) once the turn starts | derived (`priorRows`: the DEM at a pose, on its exact pixels) |
 | 2 | traced skyline, wiped in | skyline ink, CrispLine 1.7 | the eye's trace | measured (`skyline.rows`) |
 | 2b | trace weight (focus `trace`) | skyline ink bars | trace confidence | measured (`skyline.weight`) |
 | 3 | gap ticks | red where gap ≥ 5 px, solved ink where < 5 px, 1.4, alpha by size | gap between the DEM horizon at t and the trace, at about 11 confident columns | endpoints measured, between them derived |
 | 4 | moving horizon | prior ink mixed to solved ink with t, dashed, 2.2 | DEM horizon at the pose in between | derived (DEM at `poseAt(t)`), the map's line, not data |
-| 5 | solved horizon | solved ink, CrispLine 2.2 | replaces the moving line at t = 1 | measured (`solvedRows`) |
+| 5 | solved horizon | solved ink, CrispLine 2.2 | replaces the moving line at t = 1 | derived (`solvedRows`, exact pixels) |
 | 6 | guessed names (ghost) | prior ink caps, hollow dot | where the guess put them; struck in red at the snap | measured (`p.prior`) |
 | 7 | riding names | dot plus caps that ride along with t | the names travelling with the camera | derived between `p.prior` and `p.solved` (endpoint-exact) |
 | 8 | correction arc | red PenArrow, drawn by a centre-line mask that follows t | the turn of the anchor summit | furniture between measured endpoints |
@@ -64,7 +70,7 @@ These gaps against the landing's HowItWorksScene, RevealLoop, Surround and LiveL
 | 11 | snap pulse and anchor ring | red ring decaying from r 4 to 14 per summit; PenCircle draw-on at the anchor | "landed here" | furniture at measured points |
 | 12 | verdict | caps note + HandLoop | accepted with confidence, or refused with the reason | measured |
 
-Notes, gap readout and stamps use HandLabel and HandNote; raw `<text>` is not allowed. Only layers 1, 2, 5, 6 and 10 are `data`. Every derived layer is dashed or furniture-inked and is never presented as a measurement. A number shown during the motion is always an endpoint: the gap readout hides while t is strictly between 0 and 1.
+Notes, gap readout and stamps use HandLabel and HandNote; raw `<text>` is not allowed. Grammar v0.2 roles: the DEM horizons (1, 4, 5) are **derived**, drawn under the **measured** trace (2), which matches RealPhoto's order. Layers 1, 2, 5, 6 and 10 sit on exact pixels. Every derived layer is dashed or furniture-inked and is never presented as a measurement. A number shown during the motion is always an endpoint: the gap readout hides while t is strictly between 0 and 1.
 
 ## 5. Animation script (`viz/storyFilm.ts`, pure)
 
@@ -79,9 +85,9 @@ Notes, gap readout and stamps use HandLabel and HandNote; raw `<text>` is not al
 | 4b keep (refused) | 7000–9600 | "refused: confidence 0.46 < 0.5" stamp at 7100. t = 1→0 smoothstep over 7500→8800: the app turns back to the guess, and the spill slides back. The solved line stays as a dashed ghost. The ghost names un-ghost and are never struck. "Tap a peak" note at 8900. |
 | hold | END | the final frame, held. |
 
-- **Trigger.** The film arms once, when ≥ 45% of the figure is in view (as on the landing). The clock runs only while some of the figure is visible, and pauses with its state intact when the figure leaves.
+- **Trigger (grammar §1.5, `ARM_SEQUENCE`).** The film arms when 45 % of the figure, or of the viewport if the figure is taller, is in view, as the landing's how-it-works scene does. Below 20 % an unfinished film pauses with its state intact and resumes from there when it is armed again.
 - **First paint.** If the figure is not in view at mount, a layout effect puts it at frame 0 before paint, so there is no flash of the end state. If it is in view at mount, it plays from 0. SSR markup is the final frame, so with no JS it shows the whole story.
-- **Settle, no loop.** The film plays once per visit and holds. The settled frame tells the whole story; a notebook reader comes back to read it, not to watch it again. "again" replays the film from 0.
+- **Once and hold (grammar v0.2 §1.6, the default).** The film plays, then rests on the result, which tells the whole story. A finished film replays from 0 when the reader returns (re-armed after dropping below 20 %), after a 350 ms pointer rest on the photo (`hoverReplay`), or on a tap. `playback="loop"` is opt-in (`loopFrame`: the result hold, then a `replayFade` overlay dip, then setup again). Any touch (a stepper click, a scrub or an arrow key) ends autoplay, and "again" resumes it.
 - **Stepper.** There are four tabs: guess, measure, correct, and snap (keep when refused, search on `focus="search"`).
   - Each tab has a hairline showing its beat's progress, written to `transform: scaleX` directly with no re-render.
   - Clicking a tab plays that beat from its start and pauses at its end. Clicking the settled tab replays it.
@@ -116,30 +122,35 @@ Notes, gap readout and stamps use HandLabel and HandNote; raw `<text>` is not al
 | tap-a-peak | tap | correct beat opens with a tap ring on the anchor's solved summit, "tap: NAME", and the spill cursor at its azimuth |
 | viewport-inference | search | tab 3 is labelled "search"; the heading needle carries the moving yaw label "…" between the endpoints; no fake sweep (there is no measured search trace in the JSON) |
 
-## 8. Motion tokens (to be mapped onto grammar.md)
+## 8. Motion tokens (grammar v0.1 §1.1–1.2)
 
-| Placeholder | Used for | Value used until the grammar lands |
+| Film event | Token | Easing |
 | --- | --- | --- |
-| draw | pen wipe of a measured line | 900 ms, cubic-bezier(.55,.1,.3,1) (the existing `.nb-draw`) |
-| trace | the eye's trace | 1300 ms, linear-ish (cubic-bezier(.3,.1,.7,.9)) |
-| enter | a name or note appearing | 320 ms ease-out, 4 px drop, stagger 90 ms |
-| pose | the camera turn | 1700 ms smoothstep (as on the landing) |
-| strike | red strike / pen line | 280 ms, stagger 120 ms |
-| pulse | the snap ring | 600 ms ease-out decay |
-| arm | in-view threshold | 0.45 |
+| Pen wipe of the guessed horizon | `draw` 900 | `EASE.draw` |
+| The eye's trace (skyline wipe) | `trace` 1300 (trace focus + 800) | `EASE.linear` |
+| Names, notes, ticks and readouts enter | `fade` 420, `staggerLabel` 60 | `EASE.out` |
+| Beat dwell | `beat` 2800; result `beat × resultHold` (1.6) | n/a |
+| Lead before each beat's first event | `lead` 80 | n/a |
+| Camera turn (and the refused turn back) | `turn` 1600 (added in grammar v0.2 at S's request) | `EASE.inOut` |
+| Strikes | `mark` 280, `stagger` 110 | `EASE.draw` |
+| Snap pulse | `settle` 620, `stagger` 110 | `EASE.out` |
+| Anchor ring | `draw` 900 | `EASE.draw` |
+| Loop | `replayFade` 450 | linear |
+| Arm and reset | `ARM_SEQUENCE` 0.45 and 0.2 | n/a |
 
 ## 9. Proposals to other pods
 
 - **P-1 → pod P.** `RealPhoto lines={false}`: the spill still echoes `layers`, but the photo draws no prior/solved/skyline/weight strokes, so PhotoStory can wipe its own CrispLines in. Sent to inbox/P.md.
 - **P-2 → pod P.** The GeoSpill root reads `opacity: var(--gb-spill-reveal, 1)`.
 - **P-3 → pod P (perf, later).** A subscribable t for GeoSpill.
-- **M-1 → pod M.** `StoryMap` should not run `useTween` again on a story t that is already animated. Proposed: `useAlignmentStory().driven === true` means follow t immediately.
+- **M-1 (from pod M, done by S).** `setT(t, { instant })` and `story.instant` in story.tsx: followers draw an instant t as given and settle only on jumps. Compare's drag should pass `instant: true` (sent to pod C).
+- **G-1 → pod G.** A `MOTION.turn` token, and §1.7 extended to "a change beat whose pose is drawn continuously follows t at once" (sent to inbox/G.md).
 
 ## 10. Browser-pass checklist
 
 For each page in §7 and for /dev/gipfelbuch-live, check with `?theme=light` and `?theme=dark`, at desktop width and at 390 px:
 
-1. Scrolled into view at 45%, the film plays once. No final-frame flash happens first.
+1. At 45 % in view the film plays once and holds. Mid-film it pauses below 20 % and resumes. Finished, it replays on return, on a 350 ms hover and on a tap. No final-frame flash happens first.
 2. The prior horizon and the spill appear on one front. The skyline wipe reads as a trace.
 3. During the turn, the moving horizon meets the spill's horizon at both frame edges with no visible step, and the ticks shrink. The gap readout is hidden while the camera moves.
 4. The riding names arrive on the solved dots, and the solved labels take over with no jump larger than the label's leader.

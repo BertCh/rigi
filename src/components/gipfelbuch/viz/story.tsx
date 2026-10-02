@@ -5,6 +5,7 @@
 import {
 	createContext,
 	type ReactNode,
+	useCallback,
 	useContext,
 	useEffect,
 	useMemo,
@@ -41,17 +42,15 @@ export function AlignmentStoryProvider({
 	children: ReactNode;
 }) {
 	const [state, setState] = useState({ t: initial, instant: false });
+	// a stable setter: effects that depend on it do not re-fire on every move of t
+	const setT = useCallback(
+		(v: number, opts?: { instant?: boolean }) =>
+			setState({ t: Math.min(1, Math.max(0, v)), instant: !!opts?.instant }),
+		[],
+	);
 	const value = useMemo(
-		() => ({
-			t: state.t,
-			instant: state.instant,
-			setT: (v: number, opts?: { instant?: boolean }) =>
-				setState({
-					t: Math.min(1, Math.max(0, v)),
-					instant: !!opts?.instant,
-				}),
-		}),
-		[state],
+		() => ({ t: state.t, instant: state.instant, setT }),
+		[state, setT],
 	);
 	return (
 		<StoryContext.Provider value={value}>{children}</StoryContext.Provider>
