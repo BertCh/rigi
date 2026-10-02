@@ -394,7 +394,8 @@ export type PresetId =
 	| "berann"
 	| "topo-ink"
 	| "slope"
-	| "terroir";
+	| "terroir"
+	| "field-sketch";
 
 /** Tuples / arrays are replaced wholesale, objects merge key by key. */
 export type DeepPartial<T> = T extends readonly unknown[]

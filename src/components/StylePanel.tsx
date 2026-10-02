@@ -8,6 +8,7 @@
 // through PhotoWorkspace's useViewStyle → engine.setStyle.
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { GLOW_DEFAULT } from "#/lib/look/labels/glow";
 import { storageKey } from "#/lib/ontology/core/storage";
 import type { Settings } from "#/lib/settings";
 import {
@@ -1216,6 +1217,14 @@ function InkControls({ style }: { style: ViewStyle }) {
 						max={1}
 						onChange={(crease) => patch({ composite: { ink: { crease } } })}
 					/>
+					<Slider
+						label="Pencil wobble"
+						value={style.composite.sketch ?? 0}
+						min={0}
+						max={1}
+						format={(v) => (v ? pct(v) : "off")}
+						onChange={(sketch) => patch({ composite: { sketch } })}
+					/>
 					<ColorSwatch
 						label="Ink"
 						value={rawHex(k.inner)}
@@ -1237,6 +1246,7 @@ function InkControls({ style }: { style: ViewStyle }) {
 const INK_PATHS: Path[] = [
 	["composite", "ridges"],
 	["composite", "ink"],
+	["composite", "sketch"],
 ];
 
 const L = {
@@ -1326,6 +1336,14 @@ const L = {
 		],
 	},
 	frame: { id: "frame", title: "Photo frame", paths: [["world", "frame"]] },
+	waterWind: {
+		id: "water-wind",
+		title: "Water and wind",
+		paths: [
+			["world", "water"],
+			["world", "wind"],
+		],
+	},
 	labels: { id: "labels", title: "Label style", paths: [["labels"]] },
 	trails: { id: "trails", title: "Trail style", paths: [["trails"]] },
 } satisfies Record<string, LayerDef>;
@@ -1554,6 +1572,60 @@ function WorldLayers({ settings, style, state }: ViewProps) {
 					onChange={(pinRadiusM) => patch({ world: { frame: { pinRadiusM } } })}
 				/>
 			</LayerCard>
+			<LayerCard def={L.waterWind} state={state}>
+				<WaterWindControls style={style} />
+			</LayerCard>
+		</>
+	);
+}
+
+/** Lake waves (needs the alpine water albedo) and wind-drift particles (WebGPU world view only). */
+function WaterWindControls({ style }: { style: ViewStyle }) {
+	const w = style.world.wind;
+	const patchWind = (p: DeepPartial<ViewStyle["world"]["wind"]>) =>
+		patch({ world: { wind: p } });
+	return (
+		<>
+			<Toggle
+				label="Lake waves"
+				checked={style.world.water === "waves"}
+				onChange={(on) => patch({ world: { water: on ? "waves" : "flat" } })}
+			/>
+			<Toggle
+				label="Wind particles (WebGPU)"
+				checked={w.on}
+				onChange={(on) => patchWind({ on })}
+			/>
+			{w.on && (
+				<>
+					<Slider
+						label="Wind from"
+						value={w.direction}
+						min={0}
+						max={359}
+						step={1}
+						format={(v) => `${Math.round(v)}°`}
+						onChange={(direction) => patchWind({ direction })}
+					/>
+					<Slider
+						label="Wind speed"
+						value={w.speed}
+						min={1}
+						max={40}
+						step={1}
+						format={(v) => `${Math.round(v)} m/s`}
+						onChange={(speed) => patchWind({ speed })}
+					/>
+					<Slider
+						label="Particle density"
+						value={w.density}
+						min={0}
+						max={1}
+						format={pct}
+						onChange={(density) => patchWind({ density })}
+					/>
+				</>
+			)}
 		</>
 	);
 }
@@ -1769,6 +1841,38 @@ export function LabelStylePanel({ style }: { style: ViewStyle }) {
 					onChange={(color) => patchLabels({ dot: { color } })}
 				/>
 			)}
+			<Toggle
+				label="Glowing summit markers"
+				checked={!!l.glow}
+				onChange={(on) =>
+					patch({ labels: { glow: on ? { ...GLOW_DEFAULT } : null } })
+				}
+			/>
+			{l.glow && (
+				<>
+					<Slider
+						label="Glow radius"
+						value={l.glow.radiusPx}
+						min={8}
+						max={60}
+						step={1}
+						format={(v) => `${Math.round(v)} px`}
+						onChange={(radiusPx) => patch({ labels: { glow: { radiusPx } } })}
+					/>
+					<Slider
+						label="Glow intensity"
+						value={l.glow.intensity}
+						min={0}
+						max={2}
+						onChange={(intensity) => patch({ labels: { glow: { intensity } } })}
+					/>
+					<ColorSwatch
+						label="Glow tint"
+						value={hex(l.glow.tint)}
+						onChange={(tint) => patch({ labels: { glow: { tint } } })}
+					/>
+				</>
+			)}
 			<Slider
 				label="Max labels"
 				value={l.maxLabels}
@@ -1810,6 +1914,16 @@ export function TrailStylePanel({ style }: { style: ViewStyle }) {
 				max={1}
 				format={pct}
 				onChange={(opacity) => patch({ trails: { opacity } })}
+			/>
+			<Segmented
+				size="sm"
+				value={t.stroke ?? "solid"}
+				onChange={(stroke) => patch({ trails: { stroke } })}
+				options={[
+					{ value: "solid", label: "Solid" },
+					{ value: "pencil", label: "Pencil" },
+					{ value: "glow", label: "Glow" },
+				]}
 			/>
 			{TRAIL_CLASSES.map(([k, label]) => (
 				<ColorSwatch

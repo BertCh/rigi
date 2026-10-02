@@ -22,6 +22,7 @@ export const PRESET_IDS: readonly PresetId[] = [
 	"topo-ink",
 	"slope",
 	"terroir",
+	"field-sketch",
 ];
 
 export const PRESET_LABELS: Record<PresetId, string> = {
@@ -36,6 +37,7 @@ export const PRESET_LABELS: Record<PresetId, string> = {
 	"topo-ink": "Topo ink",
 	slope: "Slope angle",
 	terroir: "Terroir",
+	"field-sketch": "Field sketch",
 };
 
 export function isPresetId(v: unknown): v is PresetId {
@@ -401,6 +403,73 @@ export const PRESETS: Record<PresetId, DeepPartial<ViewStyle>> = {
 			furniture: true,
 		},
 	},
+
+	/**
+	 * Field sketch (reports/gipfelbuch-design-book.md): the Swiss field-notebook look. Terroir's warm
+	 * contours, land cover and names, plus slope hatching, pencil-wobbled ink lines and pencil trails.
+	 * Display only; opt-in like every look.
+	 */
+	"field-sketch": {
+		terrain: {
+			sun: { mode: "photo-time" },
+			reliefRamp: "berann",
+			rampRange: {
+				mode: "absolute",
+				lo: ABSOLUTE_RAMP_RANGE.lo,
+				hi: ABSOLUTE_RAMP_RANGE.hi,
+			},
+			relief: {
+				mode: "swiss",
+				realism: 0.25,
+				generalize: 0.55,
+				curvature: 0.4,
+			},
+			albedo: { mode: "alpine" },
+			atmosphere: { mode: "physical", strength: 0.7, airlight: "physical" },
+		},
+		overlay: {
+			contours: {
+				color: { mode: "solid", minor: "#b98a5e", major: "#8a5a32" },
+				minorAlpha: 0.5,
+				majorAlpha: 0.85,
+				width: 1.0,
+				majorWidthMul: 1.9,
+			},
+			bands: { ramp: "berann" },
+		},
+		replace: { haze: 0.7 },
+		world: { haze: 0.7 },
+		composite: {
+			ridges: "ink",
+			sketch: 0.6,
+			ink: {
+				strength: 0.6,
+				inner: [0.16, 0.11, 0.07],
+				skyline: [0.1, 0.07, 0.05],
+			},
+		},
+		trails: { stroke: "pencil" },
+		labels: { maxLabels: 18, export: null },
+		terroir: {
+			names: {
+				on: true,
+				reach: "near",
+				language: "local+usual",
+				maxLabels: 16,
+			},
+			peakTiers: true,
+			subPill: true,
+			contours: { adaptive: true, swissIndex: true, inkByCover: true },
+			hatch: true,
+			cover: { on: true, snow: "date", pattern: true },
+			glacier: { on: true, year: 1850, style: "outline" },
+			sunPath: false,
+			legend: true,
+			uncertainty: true,
+			placeCard: true,
+			furniture: true,
+		},
+	},
 };
 
 /** The photo-view layer (Settings.overlayStyle) a preset switches to when it is chosen. */
@@ -416,6 +485,7 @@ export const PRESET_MAP_LAYERS: Partial<
 	Record<PresetId, { mapStyle?: "hillshade"; worldStyle?: "hillshade" }>
 > = {
 	terroir: { mapStyle: "hillshade", worldStyle: "hillshade" },
+	"field-sketch": { mapStyle: "hillshade", worldStyle: "hillshade" },
 };
 
 /** Presets that switch on look features (LOOK_* defines, look-key.ts); the rest stay classic-compatible. */
@@ -426,6 +496,7 @@ export const LOOK_PRESETS: readonly PresetId[] = [
 	"topo-ink",
 	"slope",
 	"terroir",
+	"field-sketch",
 ];
 
 const presetCache = new Map<PresetId, ViewStyle>();
