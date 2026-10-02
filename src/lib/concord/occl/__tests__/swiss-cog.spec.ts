@@ -9,6 +9,7 @@ import {
 	httpRangeFetcher,
 	inSwissExtent,
 	type JsonFetcher,
+	loadRigorousLv95,
 	lv95ToWgs84,
 	lzwDecode,
 	newStats,
@@ -83,6 +84,20 @@ describe("LV95 conversions", () => {
 		const mPerDegLon = mPerDegLat * Math.cos((lat * Math.PI) / 180);
 		expect(Math.abs(la - lat) * mPerDegLat).toBeLessThan(5);
 		expect(Math.abs(lo - lon) * mPerDegLon).toBeLessThan(5);
+	});
+
+	it.each(
+		RIGOROUS,
+	)("%s: lazy rigorous path matches EPSG:2056 to 1 cm both ways", async (_name, lat, lon, E, N) => {
+		const rigorous = await loadRigorousLv95();
+		const [e, n] = rigorous.wgs84ToLv95(lat, lon);
+		expect(Math.abs(e - E)).toBeLessThan(0.01);
+		expect(Math.abs(n - N)).toBeLessThan(0.01);
+		const [la, lo] = rigorous.lv95ToWgs84(E, N);
+		expect(Math.abs(la - lat) * 111_200).toBeLessThan(0.01);
+		expect(
+			Math.abs(lo - lon) * 111_200 * Math.cos((lat * Math.PI) / 180),
+		).toBeLessThan(0.01);
 	});
 
 	it("inSwissExtent accepts Swiss points and rejects neighbours", () => {

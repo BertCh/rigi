@@ -66,6 +66,41 @@ export function lv95ToWgs84(E: number, N: number): [number, number] {
 	return [(p * 100) / 36, (l * 100) / 36];
 }
 
+/** Rigorous EPSG:2056 transforms, same argument and result order as the approximate pair above. */
+export type RigorousLv95 = {
+	wgs84ToLv95: (lat: number, lon: number) => [number, number];
+	lv95ToWgs84: (E: number, N: number) => [number, number];
+};
+
+let rigorousLv95Promise: Promise<RigorousLv95> | undefined;
+
+/**
+ * Lazily loads the rigorous path (@math.gl/proj4: Swiss oblique Mercator on Bessel plus the EPSG
+ * 3-parameter Helmert; the approximate inverse above is up to about 4 m off). The dynamic import keeps
+ * the projection code out of every eager chunk. Use it where metres matter (for example exporting
+ * LV95 coordinates); the approximate pair stays the default for the 2 m DSM occluder, which is
+ * about 60x cheaper per point.
+ */
+export function loadRigorousLv95(): Promise<RigorousLv95> {
+	rigorousLv95Promise ??= import("@math.gl/proj4").then(({ Projection }) => {
+		const projection = new Projection({
+			from: "EPSG:4326",
+			to: "+proj=somerc +lat_0=46.9524055555556 +lon_0=7.43958333333333 +k_0=1 +x_0=2600000 +y_0=1200000 +ellps=bessel +towgs84=674.374,15.056,405.346,0,0,0,0 +units=m +no_defs",
+		});
+		return {
+			wgs84ToLv95: (lat, lon) => {
+				const [E, N] = projection.project([lon, lat]);
+				return [E, N];
+			},
+			lv95ToWgs84: (E, N) => {
+				const [lon, lat] = projection.unproject([E, N]);
+				return [lat, lon];
+			},
+		};
+	});
+	return rigorousLv95Promise;
+}
+
 /** Rough LV95 extent of Switzerland + Liechtenstein (swisstopo tile coverage). */
 export function inSwissExtent(lat: number, lon: number): boolean {
 	if (lat < 45.7 || lat > 47.9 || lon < 5.8 || lon > 10.6) return false;
