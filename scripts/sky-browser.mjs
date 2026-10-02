@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { chromium } from "playwright";
 /**
  * Runs src/lib/sky in headless Chromium against the dev server (Vite serves
  * the module source directly) and reports backend + timings per photo.
  *
  *   node scripts/sky-browser.mjs [--url http://localhost:3100] [--fallback] [--no-webgpu] [IMG_xxxx ...]
  */
-import { chromium } from "playwright";
+import { APP_URL } from "./lib/harness.mjs";
 
 const args = process.argv.slice(2);
 const opt = (k, d) => {
@@ -24,7 +25,7 @@ const has = (k) => {
 	args.splice(i, 1);
 	return true;
 };
-const url = opt("--url", "http://localhost:3100");
+const url = opt("--url", APP_URL);
 const forceFallback = has("--fallback");
 const noGpu = has("--no-webgpu");
 const names = args.length

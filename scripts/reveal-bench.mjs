@@ -1,20 +1,22 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { chromium } from "playwright";
 // Reveal (intro animation) frame-time bench on the shipped deck engines, same photo, same preset.
 // For each engine: load /photo/<id>?reveal=off, wait for [data-ready], then run
 // window.__reveal.play() and record every rAF interval while it plays.
 // Usage: node scripts/gpu/with-render-lock.mjs -- node scripts/reveal-bench.mjs \
 //          [--url http://localhost:3100] [--photos IMG_6958] [--preset bloom] [--secs 4]
-import { chromium } from "playwright";
+import { APP_URL } from "./lib/harness.mjs";
 
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i > 0 ? process.argv[i + 1] : d;
 };
-const BASE = arg("url", "http://localhost:3100");
+const BASE = arg("url", APP_URL);
 const IDS = arg("photos", "IMG_6958").split(",");
 const PRESET = arg("preset", "bloom");
 const SECS = Number(arg("secs", "4"));

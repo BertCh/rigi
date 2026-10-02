@@ -1,8 +1,13 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
 // Band-stats fold bench (src/lib/gpu/look/stats-fold-bench.ts): per photo and engine, the ColorStats
 // and composite deltas of the GPU fold (f32, GPUProgram) and the subgroup reduction against the f64
 // CPU fold, plus ms per call. renderer=deck runs the ARRAY path (the engine's captured setStats input),
@@ -10,20 +15,17 @@
 // photo-matched look (harmonize on), replace mode over satellite. Always under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/stats-fold-bench.mjs
 //     [--photos IMG_7086,…] (default: the 19 control-point photos) [--renderers deck,webgpu]
-//     [--url http://localhost:3110] [--reps 10] [--long 1024] [--preset photo-matched] [--tag …]
+//     [--url http://localhost:3100] [--reps 10] [--long 1024] [--preset photo-matched] [--tag …]
 // Writes out/gpu/core/stats-fold-bench[-tag].json. Exit code 1 on an error, a valid / count mismatch,
 // or a GPU-fold composite byte delta > 1.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i >= 0 ? process.argv[i + 1] : d;
 };
-const URL0 = arg("url", process.env.APP_URL ?? "http://localhost:3110");
+const URL0 = arg("url", APP_URL);
 const cps = JSON.parse(
 	readFileSync(join(ROOT, "data/control-points.json"), "utf8"),
 );

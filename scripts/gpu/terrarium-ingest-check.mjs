@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 // WAG W2.3 gate: is the GPU Terrarium decode (src/lib/gpu/ingest) bit-identical to the CPU path?
 // Runs src/lib/gpu/ingest/selftest.ts in headless Chromium (WebGPU) over every Terrarium tile in the
 // local tile caches, and per tile compares
@@ -20,14 +24,12 @@
 // Tiles: every .png / .webp under each --cache DIR (default .cache/dem-mapterhorn and
 // .cache/terrarium of this tree), served to the page through a Playwright route. With no local
 // tiles (or --fetch) a fixed list of Mapterhorn tiles around the Niederhorn is fetched instead.
-// Env: APP_URL (default http://localhost:3122), a Vite dev server on this tree. Writes
+// Env: APP_URL (default http://localhost:3100), a Vite dev server on this tree. Writes
 // out/gpu/ingest/terrarium-ingest.json; exit 1 on any difference or error.
-import fs from "node:fs";
-import path from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3122";
+const BASE = APP_URL;
 const OUT = path.join(ROOT, "out/gpu/ingest");
 const ROUTE = "/__ingest-tiles/";
 const CHUNK = 40;

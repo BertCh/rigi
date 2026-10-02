@@ -1,27 +1,29 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
 // Look graphs (src/lib/gpu/look/{relief,guided-filter,color-stats}-graph.ts, the only GPU paths):
 // run-to-run bit-identity over photos × sizes (NaN inputs included), CPU-twin parity (guided, band
 // stats), A → B → A with different data (stale transients), the clear lint, VRAM and median timings.
 // Page realm, src/lib/gpu/look/bench-graph.ts.
 // Always under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/look-graph-bench.mjs [--url http://localhost:3220]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/look-graph-bench.mjs [--url http://localhost:3100]
 //     [--photos IMG_6958,IMG_7086,IMG_7131,IMG_7155] [--reps 9] [--tag x]
 // Writes out/gpu/core/look-graph/look-graph-bench[-tag].json. Exit code 1 unless every check passes.
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i >= 0 ? process.argv[i + 1] : d;
 };
-const URL0 = arg("url", process.env.APP_URL ?? "http://localhost:3220");
+const URL0 = arg("url", APP_URL);
 const PHOTOS = arg("photos", "IMG_6958,IMG_7086,IMG_7131,IMG_7155").split(",");
 const REPS = Number(arg("reps", "9"));
 const TAG = arg("tag", "");

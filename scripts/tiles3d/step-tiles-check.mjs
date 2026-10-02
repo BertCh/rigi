@@ -1,20 +1,22 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { chromium } from "playwright";
 // Step Inside 3D Tiles smoke check (src/lib/tiles3d): per photo and renderer, GT pose → step inside →
 // wait for the tiles → screenshots at the photo camera and turned away from it; stats + errors → JSON.
 // The tiles must be absent from every offscreen pass: sampleAt at the frame centre is compared with
 // the tiles off vs on (same pose), and must be identical.
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/tiles3d/step-tiles-check.mjs \
 //     --renderer=deck --tiles=swisstopo --blend=over IMG_7018
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const OUT = join(ROOT, "out/tiles3d");
 mkdirSync(OUT, { recursive: true });
 const gt = JSON.parse(

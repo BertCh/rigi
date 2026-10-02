@@ -1,12 +1,17 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
 // Sky segmentation on the GPU (src/lib/gpu/sky/**): parity and timing of the GPU refine against the CPU
 // refine (src/lib/sky/core.ts refineToWorking), and end-to-end timing of the real sky worker.
 // Always run it under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/sky-bench.mjs [--url http://localhost:3155]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/sky-bench.mjs [--url http://localhost:3100]
 //     [--photos IMG_6958,IMG_7086] [--reps 3] [--only e2e|parity] [--tag before] [--module /src/…]
 // Parts:
 // - parity (page realm, src/lib/gpu/sky/bench.ts): U²-Net-P on ORT's WebGPU EP sharing the luma compute
@@ -15,17 +20,14 @@
 // - e2e: segmentSky() through the worker, once with the GPU on and once with ?gpu=off (flag override),
 //   reporting the worker's own ms, the refine path it took, and the byte diff between the two masks.
 // Writes out/gpu/followups/sky-device/sky-bench[-tag].json (small).
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i >= 0 ? process.argv[i + 1] : d;
 };
-const URL0 = arg("url", process.env.APP_URL ?? "http://localhost:3155");
+const URL0 = arg("url", APP_URL);
 const PHOTOS = arg(
 	"photos",
 	"IMG_6958,IMG_7053,IMG_7086,IMG_7108,IMG_7131,IMG_7155",

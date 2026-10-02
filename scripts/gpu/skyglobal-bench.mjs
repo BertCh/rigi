@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 // T6 skyline global search: GPU grid (src/lib/gpu/skyglobal, on its core graph; run to run bit for
 // bit) vs the TS CPU twin vs Python
 // skyglobal.py, parity + timing on the dumped dev fixtures (out/gpu/skyglobal/<id>/, see
@@ -11,14 +15,12 @@
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/skyglobal-bench.mjs [wc_0001 …]
 //
-// Env: APP_URL (default http://localhost:3110), REPS (default 3), EPS (px, default 5e-3).
+// Env: APP_URL (default http://localhost:3100), REPS (default 3), EPS (px, default 5e-3).
 // Writes out/gpu/skyglobal/bench.json and prints one line per photo.
-import fs from "node:fs";
-import path from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const DIR = path.join(ROOT, "out/gpu/skyglobal");
 const REPS = Number(process.env.REPS ?? 3);
 const EPS = process.env.EPS ? Number(process.env.EPS) : undefined;

@@ -1,22 +1,24 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 // Certified-f32 horizon stages (src/lib/gpu/horizon/certified.ts) vs the f64 path on the dev photos:
 // output bits (identical required), tie-path share, the device probe, timing. Runs
 // src/lib/gpu/horizon/certified-bench.ts in headless Chromium (WebGPU) against a dev server.
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/horizon-cert-bench.mjs [IMG_xxxx ...]
 //
-// Env: APP_URL (default http://localhost:3110). Exits 1 when any output bit differs, the probe fails
+// Env: APP_URL (default http://localhost:3100). Exits 1 when any output bit differs, the probe fails
 // or no WebGPU device was used. Writes out/gpu/horizon-cert/bench.json.
-import fs from "node:fs";
-import path from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const OUT = path.join(ROOT, "out/gpu/horizon-cert");
 const gt = JSON.parse(
 	fs.readFileSync(path.join(ROOT, "data/ground-truth.json"), "utf8"),

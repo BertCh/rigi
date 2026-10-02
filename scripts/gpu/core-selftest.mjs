@@ -1,21 +1,23 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 // Self-test of src/lib/gpu/core (device registry, pool + leases, ring readback, kernels, command
 // graph + GPUReduction, timestamp profiling, adoptRenderDevice). Runs src/lib/gpu/core/selftest.ts
 // in headless Chromium (WebGPU) against the dev server.
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/core-selftest.mjs
 //
-// Env: APP_URL (default http://localhost:3110). Writes out/gpu/core/selftest.json; exit 1 on failure.
-import fs from "node:fs";
-import path from "node:path";
-import { chromium } from "playwright";
+// Env: APP_URL (default http://localhost:3100). Writes out/gpu/core/selftest.json; exit 1 on failure.
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const OUT = path.join(ROOT, "out/gpu/core");
 
 const browser = await chromium.launch({

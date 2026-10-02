@@ -1,8 +1,14 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { gzipSync } from "node:zlib";
+import { chromium } from "playwright";
+import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
 // Bake the landing's live 3D map (src/components/site/LiveRollMap.tsx) into public/demo/roll-map/,
 // so a visitor's browser downloads ~30 MB of compact files instead of ~80 MB of Mapterhorn and WMTS
 // tiles, and skips the range-map readbacks and clear-air fits. The data comes from a run of the
@@ -22,18 +28,14 @@
 // Needs a browser and the dev server; run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/demo/bake-roll-map.mjs \
 //     [--url http://localhost:3100] [--quality 0.8] [--no-verify] [--verify-only]
-import { mkdirSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { gzipSync } from "node:zlib";
-import { chromium } from "playwright";
-import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
+import { APP_URL } from "../lib/harness.mjs";
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => {
 	const i = argv.indexOf(`--${k}`);
 	return i >= 0 ? argv[i + 1] : d;
 };
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3100");
+const BASE = arg("url", APP_URL);
 const QUALITY = Number(arg("quality", "0.8"));
 const OUT = "public/demo/roll-map";
 const verifyOnly = argv.includes("--verify-only");

@@ -1,21 +1,23 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 // GPU horizon (src/lib/gpu/horizon) vs the CPU horizon-fast march: parity + timing on dev photos' eyes.
 // Runs src/lib/gpu/horizon/bench.ts in headless Chromium (WebGPU) against the dev server.
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/horizon-bench.mjs [IMG_xxxx ...]
 //
-// Env: APP_URL (default http://localhost:3110), BATCH (eyes in the batch test, default 343).
+// Env: APP_URL (default http://localhost:3100), BATCH (eyes in the batch test, default 343).
 // Writes out/gpu/w1/horizon-bench.json and prints a summary.
-import fs from "node:fs";
-import path from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const BATCH = Number(process.env.BATCH ?? 343);
 const OUT = path.join(ROOT, "out/gpu/w1");
 const gt = JSON.parse(

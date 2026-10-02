@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { chromium } from "playwright";
 // P1 exit gate "the split removes >= 80% of person/hut/tree drape smear" (reports/step-inside-design.md).
 // Labels: tools/nearfield/smear/labels.json (hand-drawn blind, before any Step Inside run).
 //
@@ -20,12 +24,10 @@
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/smear-measure.mjs [--renderer=deck|webgpu] [ids…]
 // Output: tools/nearfield/smear/grid-<renderer>-<id>.json (per-cell arrays) + summary via smear-report.mjs
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const OUT = join(ROOT, "tools/nearfield/smear");
 mkdirSync(OUT, { recursive: true });
 const gt = JSON.parse(

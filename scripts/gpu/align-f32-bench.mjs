@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { chromium } from "playwright";
 // WAG W3.3 bench: autoAlign with alignPrecision "f64" (the default: GPU grid + bound-screened f64
 // refine) vs "certified-f32" (the opt-in GPU-driven refine, src/lib/gpu/align/cert-refine.ts), per dev
 // photo, in headless Chromium on the WebGPU engine (?renderer=webgpu, pinned).
@@ -17,18 +21,16 @@
 // 0.05: the runtime checks must catch it (cert.reason "violation"), the call must still return the f64
 // result, and the device's certified path must stay off until reset.
 // Usage (under the render lock, own dev server on this tree):
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/align-f32-bench.mjs [--url http://localhost:3110]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/align-f32-bench.mjs [--url http://localhost:3100]
 //     [--perturb 4] [--reps 5] [--out out/gpu/align/f32-bench.json] [IMG_xxxx ...]
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const argv = process.argv.slice(2);
 const opt = (k, d) => {
 	const i = argv.indexOf(k);
 	return i >= 0 ? argv.splice(i, 2)[1] : d;
 };
-const BASE = opt("--url", process.env.APP_URL ?? "http://localhost:3110");
+const BASE = opt("--url", APP_URL);
 const PERTURB = Number(opt("--perturb", "4"));
 const REPS = Number(opt("--reps", "5"));
 const OUT = opt("--out", "out/gpu/align/f32-bench.json");

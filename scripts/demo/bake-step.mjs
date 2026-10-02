@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { chromium } from "playwright";
 // Bakes the landing page's Step Inside demo (src/components/site/StepInsideDemo.tsx): opens the photo in
 // the real workspace with its ground-truth pose, builds the near-field scene through the live
 // near-field service (tools/nearfield, :8767) exactly as the Step Inside button does, and writes the
@@ -13,12 +17,10 @@
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/demo/bake-step.mjs [IMG_7086] [--renderer=deck]
 // Needs the dev server (APP_URL, default http://localhost:3100) and the near-field service running.
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3100";
+const BASE = APP_URL;
 const OUT = join(ROOT, "public/demo/step");
 const arg = (k, d) =>
 	process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1] ?? d;

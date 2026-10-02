@@ -1,8 +1,13 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { chromium } from "playwright";
+import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
 // Where do the sky worker's ~67 ms "refine" stage go (ORT inference vs refine vs readback)? The
 // worker (src/lib/sky/sky.worker.ts) reports only load / infer / refine. This probe serves an
 // instrumented COPY of the worker through a Playwright route (the repo source is not touched): every
@@ -14,18 +19,15 @@
 //          still in flight from ORT's inference (its run() resolves before the GPU finishes) is
 //          charged to "drain", not to refine; then refine = what the refine itself costs.
 // Always under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/sky-worker-profile.mjs [--url http://localhost:3124]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/sky-worker-profile.mjs [--url http://localhost:3100]
 //     [--photos IMG_6958,IMG_7086,IMG_7155] [--reps 7] [--out out/baseline/sky-worker-profile.json]
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { chromium } from "playwright";
-import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
+import { APP_URL } from "../lib/harness.mjs";
 
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i > 0 ? process.argv[i + 1] : d;
 };
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3110");
+const BASE = arg("url", APP_URL);
 const PHOTOS = arg("photos", "IMG_6958,IMG_7086,IMG_7155").split(",");
 const REPS = Number(arg("reps", "7"));
 const OUT = arg("out", "out/baseline/sky-worker-profile.json");

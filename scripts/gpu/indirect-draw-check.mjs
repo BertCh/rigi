@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { chromium } from "playwright";
 // luma.gl 10.0.0-alpha.2-rigi.3 (#3328) Model.setIndirectBuffer on WebGPU: N instances drawn from a
 // GPU-written indirect record (a compute pass counts flags and writes the args; the CPU instance
 // count is 0) must equal a direct draw of the same count, byte for byte. Runs
@@ -10,10 +12,10 @@
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/indirect-draw-check.mjs
 //
-// Env: APP_URL (default http://localhost:3110). Exit 1 on failure.
-import { chromium } from "playwright";
+// Env: APP_URL (default http://localhost:3100). Exit 1 on failure.
+import { APP_URL } from "../lib/harness.mjs";
 
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const browser = await chromium.launch({
 	headless: true,
 	args: ["--use-angle=metal", "--ignore-gpu-blocklist", "--enable-gpu"],

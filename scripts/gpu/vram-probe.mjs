@@ -1,20 +1,22 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 // GPU memory of the photo view, WebGPU deck vs WebGL deck, by luma's statsManager ("GPU Time and
 // Memory", the same instrument on both: window.__engine.metrics().luma). Per photo and renderer one
 // fresh page: open, settle 2 s, sample; then an interaction (6 yaw nudges), settle, sample again.
 // The full raw luma stat tables are kept in the JSON. Always under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/vram-probe.mjs [--url http://localhost:3124]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/vram-probe.mjs [--url http://localhost:3100]
 //     [--renderers webgpu,deck] [--out out/baseline/vram-probe.json] [IMG_7086 IMG_6958 IMG_7018]
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { APP_URL } from "../lib/harness.mjs";
 import { launch, makeArg, openPhoto } from "./probe-common.mjs";
 
 const arg = makeArg();
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3110");
+const BASE = arg("url", APP_URL);
 const RENDERERS = arg("renderers", "webgpu,deck").split(",");
 const OUT = arg("out", "out/baseline/vram-probe.json");
 const given = process.argv.filter(

@@ -1,22 +1,24 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync } from "node:fs";
+import { chromium } from "playwright";
 // R5 browser check: /roll pose-propagation panel on the bundled Niederhorn viewpoint (IMG_7059/7063/7068).
 // Needs the dev server (default :3100) and tools/nearfield/propagate/run_service.sh (:8769).
 // Run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/roll/propagate-ui.mjs [--base http://localhost:3100] [--out out/propagate]
 // Checks: flag off = no panel; dev mode (GT anchor 7063) → 7059/7068 suggested, 7053/7086 rejected with reasons;
 // target 7068 shows the suggestion with Accept disabled (GT outranks); mode on with a saved 7063 anchor.
-import { mkdirSync } from "node:fs";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i > 0 ? process.argv[i + 1] : d;
 };
-const BASE = arg("base", "http://localhost:3100");
+const BASE = arg("base", APP_URL);
 const OUT = arg("out", "out/propagate");
 mkdirSync(OUT, { recursive: true });
 

@@ -1,8 +1,14 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
+import { chromium } from "playwright";
+import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
 // Bake the sample trip's people masks into public/demo/masks/people-masks.bin, so the landing's live
 // map (src/components/site/LiveRollMap.tsx) never downloads MediaPipe. Each mask is made exactly as
 // the roll map makes it (src/lib/roll/map/roll-map.ts loadPhotos + segmentAll): the full-size photo
@@ -15,18 +21,14 @@
 // MediaPipe needs a browser and the dev server (:3100); run under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/demo/bake-people-masks.mjs \
 //     [--url http://localhost:3100] [--renderer webgpu|deck] [--no-verify] [--verify-only]
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { gunzipSync, gzipSync } from "node:zlib";
-import { chromium } from "playwright";
-import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
+import { APP_URL } from "../lib/harness.mjs";
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => {
 	const i = argv.indexOf(`--${k}`);
 	return i >= 0 ? argv[i + 1] : d;
 };
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3100");
+const BASE = arg("url", APP_URL);
 const RENDERER = arg("renderer", "webgpu");
 const OUT = "public/demo/masks/people-masks.bin";
 const verifyOnly = argv.includes("--verify-only");

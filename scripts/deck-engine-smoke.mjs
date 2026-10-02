@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
@@ -30,13 +31,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { GPU_ARGS } from "./deck-webgpu/gpu-args.mjs";
+import { APP_URL } from "./lib/harness.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i > 0 ? process.argv[i + 1] : d;
 };
-const BASE = arg("url", "http://localhost:3100");
+const BASE = arg("url", APP_URL);
 const IDS = arg("photos", "IMG_6958,IMG_7018,IMG_7063,IMG_7155").split(",");
 const OUT = resolve(
 	ROOT,

@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 // solvePose coarse grid on the GPU (src/lib/gpu/solve) vs solvePose / its CPU twin, in headless
 // Chromium (WebGPU) against a dev server on this tree.
 //
@@ -14,13 +18,11 @@
 // selection), twin vs solvePose's own SolveResult, grid
 // ms GPU (cold, warm) vs CPU, and the grid's share of solvePose's time.
 //
-// Env: APP_URL (default http://localhost:3110). Writes out/gpu/core/solve-bench.json (small).
-import fs from "node:fs";
-import path from "node:path";
-import { chromium } from "playwright";
+// Env: APP_URL (default http://localhost:3100). Writes out/gpu/core/solve-bench.json (small).
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const OUT = path.join(ROOT, "out/gpu/core");
 const argv = process.argv.slice(2);
 const ids = argv.filter((a) => a.startsWith("IMG_"));

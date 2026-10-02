@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
@@ -72,6 +73,7 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { chromium } from "playwright";
+import { APP_URL } from "./lib/harness.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -122,7 +124,7 @@ if (!["capture", "check"].includes(cmd)) {
 	);
 	process.exit(1);
 }
-const BASE_URL = (opt.url ?? "http://localhost:3100").replace(/\/$/, "");
+const BASE_URL = (opt.url ?? APP_URL).replace(/\/$/, "");
 const OUT = resolve(ROOT, opt.out ?? "out/lead/style-baseline");
 const BASE_DIR = join(OUT, "baseline");
 const DIFF_DIR = join(OUT, "diff");

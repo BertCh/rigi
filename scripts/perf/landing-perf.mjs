@@ -1,8 +1,13 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { chromium } from "playwright";
+import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
 // Landing-page (/) perf harness: loads the page with a pinned renderer, sits at the hero, wheels down
 // section by section (dwelling in each), then sits at the bottom, and reports per window: rAF frame
 // times (p50/p95/max, frames > 50 ms), long tasks and long animation frames (with script attribution),
@@ -22,10 +27,7 @@
 //   RENDER_LOCK_EXCLUSIVE=1 node scripts/gpu/with-render-lock.mjs -- node scripts/perf/landing-perf.mjs \
 //     --renderer webgpu|deck [--url http://localhost:3100] [--json out.json] [--section <id|index|eyebrow>]
 //     [--dwell 3000] [--idle 5000] [--width 1400 --height 900] [--webdriver] [--quiet]
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { chromium } from "playwright";
-import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
+import { APP_URL } from "../lib/harness.mjs";
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => {
@@ -36,7 +38,7 @@ const arg = (k, d) => {
 };
 const has = (k) => argv.includes(`--${k}`);
 
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3100");
+const BASE = arg("url", APP_URL);
 const RENDERER = arg("renderer", "webgpu");
 if (!["webgpu", "deck", "auto"].includes(RENDERER)) {
 	console.error(`--renderer must be webgpu, deck or auto (got ${RENDERER})`);

@@ -1,8 +1,13 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { chromium } from "playwright";
+import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
 // The sky worker's GPU prep (src/lib/sky/prep.ts, gpu/sky/prep.ts) against the CPU prep, end to end in
 // headless Chromium (WebGPU, Tint): segmentSky() through the real worker on every photo, once with
 // { gpuPrep: false } and once with { gpuPrep: true }, each in a fresh page (fresh worker, so the GPU arm
@@ -12,16 +17,13 @@
 // Always under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/sky-prep-ab.mjs [--url http://localhost:3100]
 //     [--photos IMG_6958,wc_0034,…] [--reps 2] [--out out/gpu/sky-prep-ab.json]
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { chromium } from "playwright";
-import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
+import { APP_URL } from "../lib/harness.mjs";
 
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i > 0 ? process.argv[i + 1] : d;
 };
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3100");
+const BASE = arg("url", APP_URL);
 const PHOTOS = arg(
 	"photos",
 	"IMG_6958,IMG_7053,IMG_7086,IMG_7108,IMG_7131,IMG_7155",

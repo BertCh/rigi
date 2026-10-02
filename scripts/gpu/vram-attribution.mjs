@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 // Who owns the photo view's GPU memory (WAG W1.6). Dev-only instrument, nothing ships: an init
 // script wraps the native GPUDevice.createTexture / createBuffer / createQuerySet and the matching
 // destroy() calls, so every live WebGPU allocation is known with its label, descriptor, analytic
@@ -11,14 +14,13 @@
 // Allocations that are garbage collected without destroy() are dropped via a FinalizationRegistry.
 // Always under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/vram-attribution.mjs
-//     [--url http://localhost:3110] [--out out/vram/attribution.json] [--query ""] [--wait 2000]
+//     [--url http://localhost:3100] [--out out/vram/attribution.json] [--query ""] [--wait 2000]
 //     [IMG_7086]
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { APP_URL } from "../lib/harness.mjs";
 import { launch, makeArg, openPhoto } from "./probe-common.mjs";
 
 const arg = makeArg();
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3110");
+const BASE = arg("url", APP_URL);
 const OUT = arg("out", "out/vram/attribution.json");
 const QUERY = arg("query", "");
 const WAIT_MS = Number(arg("wait", "2000"));

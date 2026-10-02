@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 // Imagery-array VRAM on the WebGPU engine (deck-webgpu/imagery.ts). Per photo, one fresh page
 // (/photo/<id>?renderer=webgpu): luma "GPU Memory" and the imagery / height atlas stats at
 //   1. the photo view (ready + settle),
@@ -12,14 +15,13 @@
 // after --idle ms. The source bitmap sizes of the drape (256 / 512 / 1024 px) are histogrammed.
 // Always under the render lock:
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/imagery-vram-probe.mjs \
-//     [--url http://localhost:3211] [--drape-m 40000] [--idle 14000] [--out out/vram/imagery.json] \
+//     [--url http://localhost:3100] [--drape-m 40000] [--idle 14000] [--out out/vram/imagery.json] \
 //     [IMG_7155 IMG_6958 IMG_7018]
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { APP_URL } from "../lib/harness.mjs";
 import { launch, makeArg, openPhoto } from "./probe-common.mjs";
 
 const arg = makeArg();
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3211");
+const BASE = arg("url", APP_URL);
 const DRAPE_M = Number(arg("drape-m", "40000"));
 const IDLE = Number(arg("idle", "14000"));
 const OUT = arg("out", "out/vram/imagery.json");

@@ -1,8 +1,11 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 // How often does the GPU haze fit's first read ("head") overflow, forcing a second tail read?
 // Counted from the outside: src/lib/gpu/look/haze-graph.ts publishes hazeGraphStats {head,total,tail,
 // cacheHit}; this probe imports that module in the running app page (same module instance as the app's)
@@ -15,14 +18,13 @@
 //              switch on one device, and whether it overflows; N is the first fit's own N (head/total
 //              are in list slots, N = pixels of the fit's input, recovered from the first-run head)
 // Always under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/haze-overflow-probe.mjs [--url http://localhost:3124]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/haze-overflow-probe.mjs [--url http://localhost:3100]
 //     [--renderer webgpu] [--nudges 6] [--out out/baseline/haze-overflow.json] [IMG_7086 …]  (no ids = 19 ground-truth photos)
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { APP_URL } from "../lib/harness.mjs";
 import { launch, makeArg, openPhoto, photoIds } from "./probe-common.mjs";
 
 const arg = makeArg();
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3110");
+const BASE = arg("url", APP_URL);
 const RENDERER = arg("renderer", "webgpu");
 const NUDGES = Number(arg("nudges", "6"));
 const OUT = arg("out", "out/baseline/haze-overflow.json");

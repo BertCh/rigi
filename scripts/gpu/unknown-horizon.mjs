@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 // Unknown-pose 360° horizon on the GPU (src/lib/gpu/horizon/scene-profile.ts) vs the worker's CPU
 // sceneHorizon, in headless Chromium (WebGPU) against the private dev server.
 //
@@ -17,12 +21,10 @@
 //
 // Photos: tools/bench/harness/out/ablation/manifest.json (read only). Env: APP_URL (default :3110).
 // Writes out/gpu/unknown/{bench,ablation}.json (small) and prints tables.
-import fs from "node:fs";
-import path from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const OUT = path.join(ROOT, "out/gpu/unknown");
 const argv = process.argv.slice(2);
 const doBench = argv.includes("bench") || !argv.includes("ablation");

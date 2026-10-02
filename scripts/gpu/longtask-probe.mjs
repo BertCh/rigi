@@ -1,18 +1,20 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 // Main-thread long tasks (>50 ms, PerformanceObserver 'longtask') while /photo/<id> opens, per renderer.
 // The observer is installed by an init script before any app code runs and is buffered; each task is
 // reported relative to navigation start together with the data-ready time. Long tasks are visible
 // for the page's main thread only, not for workers (sky, unknown-pose, mesh): the worker share is not
 // measured here. --cpuprofile also runs a CDP sampling profile (main thread) and lists each busy
 // segment >= 50 ms with its top self-time frames (names the long task). Always under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/longtask-probe.mjs --renderer webgpu [--url http://localhost:3124]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/longtask-probe.mjs --renderer webgpu [--url http://localhost:3100]
 //     [--reps 1] [--cpuprofile] [--out out/baseline/longtask-webgpu.json] [IMG_7086 …]   (no ids = the 19 ground-truth photos)
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { APP_URL } from "../lib/harness.mjs";
 import {
 	launch,
 	makeArg,
@@ -23,7 +25,7 @@ import {
 } from "./probe-common.mjs";
 
 const arg = makeArg();
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3110");
+const BASE = arg("url", APP_URL);
 const RENDERER = arg("renderer", "webgpu");
 const REPS = Number(arg("reps", "1"));
 const OUT = arg("out", `out/baseline/longtask-${RENDERER}.json`);

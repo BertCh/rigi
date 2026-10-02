@@ -1,20 +1,22 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Screenshots + fps for /lab/splats (the three.js Gaussian splat renderer). Run under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/splat-lab-check.mjs [--n 200000,1000000] [--no-shots] [--query aa=0] [--size 1280x800]
-// Shots land in tools/nearfield/shots/. APP_URL defaults to the private :3110 vite.
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium } from "playwright";
+// Screenshots + fps for /lab/splats (the three.js Gaussian splat renderer). Run under the render lock:
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/splat-lab-check.mjs [--n 200000,1000000] [--no-shots] [--query aa=0] [--size 1280x800]
+// Shots land in tools/nearfield/shots/. APP_URL defaults to the private :3110 vite.
+import { APP_URL } from "../lib/harness.mjs";
 
 const arg = (k, d) => {
 	const i = process.argv.indexOf(k);
 	return i >= 0 ? process.argv[i + 1] : d;
 };
-const URL0 = process.env.APP_URL ?? "http://localhost:3110";
+const URL0 = APP_URL;
 const ns = arg("--n", "200000,1000000").split(",").map(Number);
 const shots = !process.argv.includes("--no-shots");
 const extra = arg("--query", "") ? `&${arg("--query", "")}` : "";

@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { chromium } from "playwright";
 // Step Inside end to end, per deck renderer (headless, real GPU; default WebGL deck). For each photo: GT pose injected as the
 // saved pose (accepted), panel + anchor quality, hover readout on an Object pixel, step inside (start ==
 // photo camera, orbit moves), Truth, back, In map drape with the feature on vs off, the .ply export.
@@ -10,12 +14,10 @@
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/nearfield/step-inside-e2e.mjs --renderer=deck IMG_7018
 //   --survey: only build every GT photo (quality / Object pixels)
 //   --dead: service URL pointed at a dead port (window.__nearfieldUrl) → the panel must stay invisible
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const OUT = join(ROOT, "tools/nearfield/shots");
 mkdirSync(OUT, { recursive: true });
 const gt = JSON.parse(

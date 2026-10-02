@@ -1,8 +1,12 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import fs from "node:fs";
+import path from "node:path";
+import { chromium } from "playwright";
 // W6: pose6dof eye search (refineEyeFromSkyline) on the batched GPU horizon vs the batched CPU horizon vs
 // the original per-eye path. Runs src/lib/gpu/eye/bench.ts in headless Chromium (WebGPU) against the
 // dev server, on the photos of the eye experiment (out/lead/eye/results.json, Mapterhorn rows:
@@ -10,15 +14,13 @@
 //
 //   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/eye-bench.mjs [IMG_xxxx ...]
 //
-// Env: APP_URL (default http://localhost:3110), MODES (comma list of gpuBatch,gpuSeq,cpuBatch,cpuSeq,cpuJitter;
+// Env: APP_URL (default http://localhost:3100), MODES (comma list of gpuBatch,gpuSeq,cpuBatch,cpuSeq,cpuJitter;
 // default all but cpuJitter = the CPU horizon ±1e-4° noise, to measure the search's own sensitivity).
 // Writes out/gpu/w6/eye-bench.json and prints a summary.
-import fs from "node:fs";
-import path from "node:path";
-import { chromium } from "playwright";
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BASE = process.env.APP_URL ?? "http://localhost:3110";
+const BASE = APP_URL;
 const OUT = path.join(ROOT, "out/gpu/w6");
 const MODES = process.env.MODES?.split(",");
 const gt = JSON.parse(

@@ -1,26 +1,28 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { chromium } from "playwright";
+import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
 // GPU splat sort timing (src/lib/gpu/splat-sort, GpuSplatSorter): wall ms from sort() to
 // queue.onSubmittedWorkDone() (encode + GPU), the encode-only CPU ms, and the CPU twins' ms in the
 // same page for scale (cpu.ts radixOrderTiled, and the worker's counting sort sortSplatsByDepth).
 // Synthetic clouds (random positions in front of the camera, 5 cm to 100 m), no near-field service.
 // Per-kernel GPU ms: run it under with-gpu-profile.mjs (PROFILE_OUT=… node scripts/gpu/with-gpu-profile.mjs scripts/gpu/splat-sort-bench.mjs).
 // Always under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/splat-sort-bench.mjs [--url http://localhost:3124]
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/splat-sort-bench.mjs [--url http://localhost:3100]
 //     [--sizes 100000,500000,1000000,2000000] [--reps 15] [--out out/baseline/splat-sort-bench.json]
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { chromium } from "playwright";
-import { GPU_ARGS } from "../deck-webgpu/gpu-args.mjs";
+import { APP_URL } from "../lib/harness.mjs";
 
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i > 0 ? process.argv[i + 1] : d;
 };
-const BASE = arg("url", process.env.APP_URL ?? "http://localhost:3110");
+const BASE = arg("url", APP_URL);
 const SIZES = arg("sizes", "100000,500000,1000000,2000000")
 	.split(",")
 	.map(Number);

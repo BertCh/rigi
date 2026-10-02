@@ -1,26 +1,28 @@
 #!/usr/bin/env node
+
 // Rigi
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Sky refine on GPUCommandGraph (src/lib/gpu/sky/refine-graph.ts) vs the CPU refine (sky/core.ts):
-// float / byte parity, bytes-only = floats run, repeated runs with different data across shape-cache
-// hits / misses / evictions, the clear-node rule, transient VRAM and timings. Page realm,
-// src/lib/gpu/sky/bench-graph.ts. Always under the render lock:
-//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/sky-graph-bench.mjs [--url http://localhost:3183]
-//     [--photos IMG_6958,IMG_7086,IMG_7131,IMG_7155] [--reps 7] [--tag x]
-// Writes out/gpu/followups/sky-graph/sky-graph-bench[-tag].json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+// Sky refine on GPUCommandGraph (src/lib/gpu/sky/refine-graph.ts) vs the CPU refine (sky/core.ts):
+// float / byte parity, bytes-only = floats run, repeated runs with different data across shape-cache
+// hits / misses / evictions, the clear-node rule, transient VRAM and timings. Page realm,
+// src/lib/gpu/sky/bench-graph.ts. Always under the render lock:
+//   node scripts/gpu/with-render-lock.mjs -- node scripts/gpu/sky-graph-bench.mjs [--url http://localhost:3100]
+//     [--photos IMG_6958,IMG_7086,IMG_7131,IMG_7155] [--reps 7] [--tag x]
+// Writes out/gpu/followups/sky-graph/sky-graph-bench[-tag].json.
+import { APP_URL } from "../lib/harness.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const arg = (k, d) => {
 	const i = process.argv.indexOf(`--${k}`);
 	return i >= 0 ? process.argv[i + 1] : d;
 };
-const URL0 = arg("url", process.env.APP_URL ?? "http://localhost:3183");
+const URL0 = arg("url", APP_URL);
 const PHOTOS = arg("photos", "IMG_6958,IMG_7086,IMG_7131,IMG_7155").split(",");
 const REPS = Number(arg("reps", "7"));
 const TAG = arg("tag", "");
