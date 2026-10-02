@@ -52,6 +52,15 @@ Read-only review of `/upload`, `/library`, `/roll` and the photo workspace chrom
 2. Whether `?attrib=full` (per-source DEM producers) becomes the default for the public beta; the classic line names Mapterhorn but not the national DEM producers that CC BY 4.0 asks to be named.
 3. Watermark wording and whether exports outside share mode should carry it.
 
-## Review findings for the user (subjective)
+## Design review (2026-10-02)
 
-(filled in after the review unit)
+**Fixed (clear outline violations, browser-unverified):** workspace sidebar left border; Export menu trigger ring, menu ring and literal `#121820` fill (now `--rigi-slate`), status-line rule; Propagate panel ring, literal fill and two section rules, suggestion row ring; PanoramaStrip frame ring, toolbar and handle rules, inactive chip ring; RollMosaic segmented control, TimeScrubber, RollMiniMap and AlignRollButton rings; RollCard resting ring (hover ring kept); library empty state and the /upload and /roll/import drop zones (dashed borders become a fill, with a glow ring only while dragging); resting card ring on /roll/import.
+
+**For the user to decide:**
+1. Neutral `shadow-2xl` on floating panels (Export menu, Propagate panel, the /roll bottom bar): keep, or drop to fill-only.
+2. Hover rings (library cards, RollCard, /roll/import cards): hover is not in the "state" list; the alternative is a fill change (`hover:bg-white/[0.07]`).
+3. Outlines over imagery on dark stages (SlippyMap and RollMiniMap controls, workspace stage chips, tooltips and verify badges): they aid legibility but are outlines.
+4. Ghost buttons with rings in the Propagate panel: switch to the fill-only ghost `Button` from `controls.tsx`.
+5. Accent colours outside the khipu roles: sky for "suggestion" in the Propagate panel, violet for "aligned" in AlignRollButton, `text-slate-900` in controls; and `var(--khipu-w)` used directly instead of a role token in four places.
+6. Tinted warning fills (`bg-red-500/10`, `bg-amber-400/10`, `bg-emerald-400/10`, solid `bg-sky-300` / `bg-red-400` buttons) on /upload, /roll and Propagate have no `light:` partner; low alpha keeps them readable, but light-theme role tones would match the palette.
+7. With the rings gone, PanoramaStrip, TimeScrubber and RollMiniMap stack as three similar fills on /roll; consistent spacing and section labels would keep them distinct.

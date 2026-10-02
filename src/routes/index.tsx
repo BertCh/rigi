@@ -30,6 +30,13 @@ import hero from "#/components/site/surround/demo-09.json";
 import how from "#/components/site/surround/how.json";
 import map from "#/components/site/surround/map.json";
 import { NearViewport } from "#/components/site/useNearViewport";
+import { attributionLine } from "#/lib/licences/attribution";
+
+/** Data credit for the landing's maps and renders (the Niederhorn demo, src/lib/licences). */
+const LANDING_CREDIT = attributionLine(
+	{ lat: 46.71, lon: 7.77, radiusKm: 30, imagery: "satellite" },
+	{ compact: true },
+);
 
 // Everything below the first two sections is split out and mounted only when near the viewport
 // (NearViewport), with a same-size placeholder, so the hero ships little JS and starts no GPU work.
@@ -351,8 +358,7 @@ function Home() {
 			</section>
 
 			<footer className="mx-auto max-w-6xl border-t border-white/8 px-4 pt-6 font-mono text-[10.5px] leading-relaxed text-white/35 sm:px-8">
-				Elevation via Mapterhorn · maps © swisstopo · peaks and trails ©
-				OpenStreetMap contributors · imagery credited in the app.
+				{LANDING_CREDIT}
 			</footer>
 		</main>
 	);
