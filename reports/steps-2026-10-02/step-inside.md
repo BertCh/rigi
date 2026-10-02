@@ -99,7 +99,7 @@ Sources: [SHARP model card](https://huggingface.co/apple/Sharp), [SHARP paper](h
 
 ## 7. Log
 
-- **U3 (`nearfield service: honest /health …`)**: F8, F10. `/health` is honest without importing torch or loading a model:
+- **U3 landed c574955**: F8, F10. `/health` is honest without importing torch or loading a model:
   `models.moge_status(key)` / `da3_status()` check the weights path plus `find_spec` of the package and torch;
   `models` lists only what is installed (`lift` iff moge2), per-model reasons under `depth`, plus `version`.
   `SERVICE_VERSION` (`_env.py`, "2026-10-02.1") is hashed into `cache.key` (bump it when outputs change). Client
@@ -124,7 +124,25 @@ Sources: [SHARP model card](https://huggingface.co/apple/Sharp), [SHARP paper](h
   called the controller's probe directly (the hook's own `available` state never changed); rewritten to drive the
   hook's 20 s poll with a fake interval, and it now fails without the fix.
 
-## 8. Decisions for the user
+- **U1 landed a568761** (docs e55035e). **U3 landed c574955**; lead review: weights paths and packages checked
+  against this machine (`tools/research/tm/weights/x2/{moge-2-vitl-normal,moge-2-vitb-normal,DA3-BASE}`, `moge` and
+  `depth_anything_3` in `.pylib_x2`), so the honest `/health` keeps listing moge2 / lift here; `find_spec` on
+  top-level names imports nothing. The cache-key change makes every existing disk-cache entry a miss once (dev only).
+  Service suite 23/23 with the main matcher venv (the worktree has none, so the `nearfield-service` row SKIPs there).
+- **Fast tier** (worktree, both units): 109 pass, 5 fail, 4 skip; none in this step's files: biome new errors in
+  peer Gipfelbuch files, `ontology` (generated `domain.ts` stale / picker storage key, peers), `flow` timing and
+  `align-cert` timeout under machine load, `unit` = `python-unit` and `upload` libheif through the worktree's
+  node_modules symlink (same as the dem-anchoring pod). `tsc` PASS.
+
+## 9. Next
+
+1. U2 follow-up: a spec for the 400 ms local rebuild after a pose change and for the In-map camera-mode handover
+   (`useStepInside.setCamMode`).
+2. U5 world-view blend parity (WebGL2 sRGB vs WebGPU linear) in the next browser batch; U4 docs and the three-splats
+   keep-or-remove decision.
+3. Service abort (F9): skip queued work whose client hung up, and let the client reuse one in-flight request.
+
+## 10. Decisions for the user
 
 - Keep or remove the three.js splat stack used only by `/lab/splats` and `/lab/generate`.
 - Whether Step Inside v1.1 ships as an opt-in beta before the smear gate (status.md question 5) — unchanged.
