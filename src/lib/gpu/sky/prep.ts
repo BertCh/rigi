@@ -17,7 +17,7 @@
 // a dispatchAll chain) submitted after the texture copy. The pixels equal getImageData's only if the bitmap was made from the same
 // raster with premultiplyAlpha/colorSpaceConversion 'none' (sky/index.ts); the first photos per
 // device are compared byte-for-byte against the CPU pixels (sky/prep.ts), never trusted blindly.
-import { Buffer, type Device } from "@luma.gl/core";
+import { Buffer, type Device, Texture } from "@luma.gl/core";
 import {
 	type ComputeGraph,
 	cachedGraph,
@@ -252,31 +252,36 @@ export function prepSkyGpu(
 				`sky prep: bitmap ${bitmap.width}x${bitmap.height} is not ${W}x${H}`,
 			),
 		);
-	const gd = device.handle as GPUDevice;
 	// pixels → texture (no conversion, unpremultiplied) → padded rows in `pad`
 	return runPrep(device, W, H, lw, lh, (pad, rowBytes) => {
-		const tex = gd.createTexture({
-			size: [W, H, 1],
+		const tex = device.createTexture({
+			id: "sky-prep-bitmap",
+			width: W,
+			height: H,
 			format: "rgba8unorm",
-			// copyExternalImageToTexture needs COPY_DST | RENDER_ATTACHMENT on the destination, and the
+			// copyExternalImage needs COPY_DST | RENDER_ATTACHMENT on the destination, and the
 			// copy into `pad` needs COPY_SRC. (These were TEXTURE_BINDING | STORAGE_BINDING |
 			// RENDER_ATTACHMENT before 2026-10-01: every browser prep failed validation and fell back.)
-			// GPUTextureUsage bits: COPY_SRC 0x01 | COPY_DST 0x02 | RENDER_ATTACHMENT 0x10
-			usage: 0x01 | 0x02 | 0x10,
+			usage: Texture.COPY_SRC | Texture.COPY_DST | Texture.RENDER_ATTACHMENT,
 		});
 		try {
-			gd.queue.copyExternalImageToTexture(
-				{ source: bitmap, flipY: false },
-				{ texture: tex, premultipliedAlpha: false, colorSpace: "srgb" },
-				[W, H],
-			);
-			const enc0 = gd.createCommandEncoder();
-			enc0.copyTextureToBuffer(
-				{ texture: tex },
-				{ buffer: handleOf(pad), bytesPerRow: rowBytes },
-				[W, H],
-			);
-			gd.queue.submit([enc0.finish()]);
+			tex.copyExternalImage({
+				image: bitmap,
+				width: W,
+				height: H,
+				flipY: false,
+				premultipliedAlpha: false,
+				colorSpace: "srgb",
+			});
+			const encoder = device.createCommandEncoder();
+			encoder.copyTextureToBuffer({
+				sourceTexture: tex,
+				width: W,
+				height: H,
+				destinationBuffer: pad,
+				bytesPerRow: rowBytes,
+			});
+			device.submit(encoder.finish());
 		} finally {
 			tex.destroy();
 		}

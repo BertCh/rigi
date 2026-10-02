@@ -197,9 +197,8 @@ export class DirectHost implements Host {
 		this.stats.frames++;
 		const requested = this.requestedAt;
 		const waiters = this.waiters.splice(0);
-		const submitted = (
-			d as unknown as { handle: GPUDevice }
-		).handle.queue.onSubmittedWorkDone();
+		const fence = d.createFence();
+		const submitted = fence.signaled.finally(() => fence.destroy());
 		getFrameTimings(d)?.endFrame(submitted);
 		submitted.then(() => {
 			const now = performance.now();

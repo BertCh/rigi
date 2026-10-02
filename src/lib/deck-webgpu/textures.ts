@@ -53,11 +53,16 @@ export function imageTexture(
 		sampler: { ...LINEAR_CLAMP, maxAnisotropy: mips ? 8 : 1 },
 	});
 	tex.copyExternalImage({ image: image as never, width, height });
-	if (mips)
-		(
-			device as unknown as { generateMipmapsWebGPU(t: Texture): void }
-		).generateMipmapsWebGPU(tex);
+	if (mips) generateTextureMipmaps(device, tex);
 	return tex;
+}
+
+/**
+ * Fill the mip chain of a WebGPU texture through luma's public Device method. It encodes its own
+ * render passes and submits, so never call it while a render pass is open.
+ */
+export function generateTextureMipmaps(device: Device, texture: Texture): void {
+	device.generateMipmapsWebGPU(texture);
 }
 
 /** A byte mask (0..255, row 0 = top) as r8unorm, linear-filtered (people / brush / sky masks). */

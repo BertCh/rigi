@@ -300,9 +300,8 @@ export class DeckHost implements Host {
 		this.stats.frames++;
 		const requested = this.requestedAt;
 		const waiters = this.waiters.splice(0);
-		const submitted = (
-			this.device as unknown as { handle: GPUDevice }
-		).handle.queue.onSubmittedWorkDone();
+		const fence = this.device.createFence();
+		const submitted = fence.signaled.finally(() => fence.destroy());
 		getFrameTimings(this.device)?.endFrame(submitted);
 		submitted.then(() => {
 			const now = performance.now();

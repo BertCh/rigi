@@ -98,7 +98,7 @@ import {
 	passModelProps,
 } from "../pass";
 import { USAGE } from "../targets";
-import { maskTexture } from "../textures";
+import { generateTextureMipmaps, maskTexture } from "../textures";
 import { colorWGSL } from "../wgsl";
 
 /** GPUBufferUsage bits. */
@@ -765,10 +765,7 @@ export class Tiles3DCore implements GpuLayerCore {
 				},
 			});
 			tex.copyExternalImage({ image: img as never, width, height });
-			if (mipLevels > 1)
-				(
-					this.device as unknown as { generateMipmapsWebGPU(t: Texture): void }
-				).generateMipmapsWebGPU(tex);
+			if (mipLevels > 1) generateTextureMipmaps(this.device, tex);
 			return tex;
 		} catch (e) {
 			console.warn(`[deck-webgpu tiles3d] texture upload failed: ${String(e)}`);

@@ -49,6 +49,8 @@ import { webgpuAdapter } from "@luma.gl/webgpu";
  * ourselves because #3313 dropped its `_ownsHandle` prop (b1728918): attached devices always
  * belong to the app upstream, so passing the prop would silently leak on the npm release.
  */
+export { webgpuAdapter };
+
 export const attachWebGPUDevice = async (
 	handle: GPUDevice,
 	props: DeviceProps = {},

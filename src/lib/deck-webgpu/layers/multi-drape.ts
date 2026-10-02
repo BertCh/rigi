@@ -87,6 +87,7 @@ import {
 	passModelProps,
 	targetKey,
 } from "../pass";
+import { generateTextureMipmaps } from "../textures";
 import { colorWGSL } from "../wgsl";
 
 /** Same as multi-drape-layer.ts: the slope bias grows as 1/sin(incidence) down to ≈ 0.7°. */
@@ -179,9 +180,7 @@ export class WebGpuDrapeAtlas extends DrapeAtlas {
 		const c = this.cells[k];
 		if (this.gone || !c || this.version === before) return;
 		if (this.gpu.type === "webgpu")
-			(
-				this.gpu as unknown as { generateMipmapsWebGPU(t: Texture): void }
-			).generateMipmapsWebGPU(this.photo[c.atlas]);
+			generateTextureMipmaps(this.gpu, this.photo[c.atlas]);
 	}
 
 	override destroy() {
