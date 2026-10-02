@@ -48,6 +48,7 @@ export function nnKernel(
 	inputs: KernelInput[],
 	outputs: string[],
 	body: string,
+	textures: string[] = [],
 ): KernelSpec {
 	const id = `nn/${key}|${inputs.map((i) => i.dtype).join(",")}`;
 	let s = specs.get(id);
@@ -56,6 +57,8 @@ export function nnKernel(
 	let src = f16 ? "enable f16;\n" : "";
 	let b = 0;
 	src += `@group(0) @binding(${b++}) var<storage, read> M: array<u32>;\n`;
+	for (const t of textures)
+		src += `@group(0) @binding(${b++}) var ${t}: texture_2d<f32>;\n`;
 	for (const i of inputs)
 		src += `@group(0) @binding(${b++}) var<storage, read> ${i.name}: array<${i.dtype}>;\n`;
 	for (const o of outputs)
@@ -68,6 +71,7 @@ export function nnKernel(
 		src,
 		[
 			["M", "read-only-storage"],
+			...textures.map((t): [string, "texture"] => [t, "texture"]),
 			...inputs.map((i): [string, "read-only-storage"] => [
 				i.name,
 				"read-only-storage",

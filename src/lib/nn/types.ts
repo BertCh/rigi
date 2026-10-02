@@ -158,8 +158,20 @@ export interface Nn {
 		data: Float32Array | readonly number[],
 		shape: readonly number[],
 	): Tensor;
-	/** GPU: an image texture as a [1, C, H, W] f32 tensor (rgba → C = 4), without a readback. */
-	fromTexture?(tex: unknown, opts: { shape: readonly number[] }): Tensor;
+	/**
+	 * GPU only: a 2-D texture (luma Texture; rgba8unorm, rgba16float, rgba32float, …) as a
+	 * [1, C, H, W] f32 tensor, without a readback. Channels are the texel's first C components,
+	 * resampled bilinearly (align_corners false) when H×W differs from the texture, then
+	 * (v - mean[c]) / std[c].
+	 */
+	fromTexture?(
+		tex: unknown,
+		opts: {
+			shape: readonly number[];
+			mean?: readonly number[];
+			std?: readonly number[];
+		},
+	): Tensor;
 	zeros(shape: readonly number[]): Tensor;
 	full(shape: readonly number[], value: number): Tensor;
 	read(t: Tensor): Promise<Float32Array>;

@@ -415,3 +415,55 @@ export function rotaryKernel(
 	);
 	return { spec, meta, wg: grid1d(n) };
 }
+
+/** texture → [1, C, H, W] with bilinear resampling and per-channel (v - mean) / std. */
+export function textureKernel(
+	C: number,
+	tw: number,
+	th: number,
+	H: number,
+	W: number,
+	mean: readonly number[],
+	std: readonly number[],
+): KernelCall {
+	const n = C * H * W;
+	const meta = [
+		n,
+		tw,
+		th,
+		H,
+		W,
+		fbits(tw / W),
+		fbits(th / H),
+		...[0, 1, 2, 3].map((c) => fbits(mean[c] ?? 0)),
+		...[0, 1, 2, 3].map((c) => fbits(1 / (std[c] ?? 1))),
+	];
+	const spec = nnKernel(
+		"from-texture",
+		[],
+		["out"],
+		`fn texel(x: i32, y: i32, c: u32) -> f32 {
+  let p = vec2<i32>(clamp(x, 0, i32(mu(1u)) - 1), clamp(y, 0, i32(mu(2u)) - 1));
+  return textureLoad(img, p, 0)[c];
+}
+${ENTRY} {
+  let i = lin(wid, nwg, lid);
+  if (i >= mu(0u)) { return; }
+  let H = mu(3u); let W = mu(4u);
+  let ox = i % W;
+  let oy = (i / W) % H;
+  let c = i / (W * H);
+  let fx = max(0.0, (f32(ox) + 0.5) * mf(5u) - 0.5);
+  let fy = max(0.0, (f32(oy) + 0.5) * mf(6u) - 0.5);
+  let x0 = i32(floor(fx));
+  let y0 = i32(floor(fy));
+  let lx = fx - f32(x0);
+  let ly = fy - f32(y0);
+  let v = (1.0 - ly) * ((1.0 - lx) * texel(x0, y0, c) + lx * texel(x0 + 1, y0, c)) +
+    ly * ((1.0 - lx) * texel(x0, y0 + 1, c) + lx * texel(x0 + 1, y0 + 1, c));
+  out[i] = (v - mf(7u + c)) * mf(11u + c);
+}`,
+		["img"],
+	);
+	return { spec, meta, wg: grid1d(n) };
+}

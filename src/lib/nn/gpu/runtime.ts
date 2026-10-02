@@ -15,7 +15,7 @@
 // - Every GPU step (writes, graph runs, readback copies) goes through one promise chain, so queue
 //   order is program order and buffers can be recycled as soon as a tensor is disposed.
 
-import { Buffer, type Device } from "@luma.gl/core";
+import { Buffer, type Device, type Texture } from "@luma.gl/core";
 import { type ComputeGraph, cachedGraph } from "#/lib/gpu/core/graph";
 import type { KernelSpec } from "#/lib/gpu/core/kernel";
 import { submit } from "#/lib/gpu/core/queue";
@@ -58,11 +58,55 @@ export class GpuTensor implements Tensor {
 
 export type Node = {
 	spec: KernelSpec;
+	/** sampled textures, bound to the spec's texture entries (before the storage inputs) */
+	textures?: Texture[];
 	inputs: Storage[];
 	outputs: Storage[];
 	meta: number[];
 	wg: [number, number, number];
+	/** a unary elementwise node: its op (a candidate for epilogue fusion) */
+	act?: Activation;
+	/** a node with an activation epilogue: the same node with `act` fused into its output */
+	fuse?: (act: Activation) => {
+		spec: KernelSpec;
+		meta: number[];
+		wg: [number, number, number];
+	};
 };
+
+export type Activation = { op: string; alpha: number; beta: number };
+
+/**
+ * Epilogue fusion: a unary node whose input is the single output of a fusable node (GEMM / conv),
+ * consumed by nothing else and not a forward output, folds into that node's store. Returns the node
+ * list without the folded unary nodes.
+ */
+export function fuseEpilogues(nodes: Node[], outputs: Set<Storage>): Node[] {
+	const consumers = new Map<Storage, number>();
+	const producers = new Map<Storage, Node[]>();
+	for (const n of nodes) {
+		for (const s of n.inputs) consumers.set(s, (consumers.get(s) ?? 0) + 1);
+		for (const s of n.outputs) {
+			const l = producers.get(s);
+			if (l) l.push(n);
+			else producers.set(s, [n]);
+		}
+	}
+	const dropped = new Set<Node>();
+	for (const u of nodes) {
+		if (!u.act) continue;
+		const src = u.inputs[0];
+		const ps = producers.get(src);
+		const p = ps?.length === 1 ? ps[0] : null;
+		if (!p?.fuse || p.outputs.length !== 1) continue;
+		if (consumers.get(src) !== 1 || outputs.has(src)) continue;
+		Object.assign(p, p.fuse(u.act));
+		p.fuse = undefined;
+		p.outputs = [u.outputs[0]];
+		dropped.add(u);
+	}
+	return dropped.size ? nodes.filter((n) => !dropped.has(n)) : nodes;
+}
 
 export class Recording {
 	nodes: Node[] = [];
@@ -210,8 +254,9 @@ export class Runtime {
 		// dead-code elimination: keep nodes that (transitively) feed an output
 		const live = new Set<Storage>(outputs);
 		const keep: Node[] = [];
-		for (let i = rec.nodes.length - 1; i >= 0; i--) {
-			const n = rec.nodes[i];
+		const nodes = fuseEpilogues(rec.nodes, outputs);
+		for (let i = nodes.length - 1; i >= 0; i--) {
+			const n = nodes[i];
 			if (!n.outputs.some((o) => live.has(o))) continue;
 			keep.push(n);
 			for (const s of n.inputs) live.add(s);
@@ -253,12 +298,23 @@ export class Runtime {
 			decl.push(`${n}:${s.bytes}`);
 			return n;
 		};
+		const texSlot = new Map<Texture, string>();
+		for (const n of keep)
+			for (const t of n.textures ?? [])
+				if (!texSlot.has(t)) {
+					const id = `tex${texSlot.size}`;
+					texSlot.set(t, id);
+					decl.push(`${id}:${t.width}x${t.height}:${t.format}`);
+				}
 		const words = this.align / 4;
 		const metaOffsets: number[] = [];
 		let metaWords = 0;
 		const parts: string[] = [];
 		for (const n of keep) {
-			const ins = n.inputs.map(name).join(",");
+			const ins = [
+				...(n.textures ?? []).map((t) => texSlot.get(t)),
+				...n.inputs.map(name),
+			].join(",");
 			const os = n.outputs.map(name).join(",");
 			metaOffsets.push(metaWords);
 			metaWords += Math.ceil(Math.max(1, n.meta.length) / words) * words;
@@ -287,6 +343,25 @@ export class Runtime {
 					n[0] === "t" ? g.transientBuffer(n, bytes) : g.importBuffer(n, bytes),
 				);
 			}
+			const texHandles = new Map<
+				Texture,
+				ReturnType<ComputeGraph["importTexture"]>
+			>();
+			for (const [t, id] of texSlot)
+				texHandles.set(
+					t,
+					g.importTexture({
+						id,
+						format: t.format,
+						width: t.width,
+						height: t.height,
+						usage: t.props.usage,
+						dimension: "2d",
+						depth: 1,
+						mipLevels: 1,
+						samples: 1,
+					} as never),
+				);
 			const metaBuf = device.createBuffer({
 				id: "nn-meta",
 				usage: STORAGE,
@@ -303,7 +378,11 @@ export class Runtime {
 						metaOffsets[i] * 4,
 					),
 				};
-				const names = n.spec.layout.map(([nm]) => nm).slice(1);
+				const tex = n.textures ?? [];
+				tex.forEach((t, j) => {
+					bindings[n.spec.layout[1 + j][0]] = texHandles.get(t);
+				});
+				const names = n.spec.layout.map(([nm]) => nm).slice(1 + tex.length);
 				const all = [...n.inputs, ...n.outputs];
 				names.forEach((nm, j) => {
 					bindings[nm] = handles.get(slot.get(all[j]) as string);
@@ -334,9 +413,11 @@ export class Runtime {
 		outs.forEach((s, i) => {
 			buffers[`o${i}`] = s.buffer as Buffer;
 		});
+		const textures: Record<string, Texture> = {};
+		for (const [t, id] of texSlot) textures[id] = t;
 		return this.enqueue(async () => {
 			if (!graph.isCompiled) await graph.compileAsync();
-			await graph.run(undefined, { buffers });
+			await graph.run(undefined, { buffers, textures });
 		});
 	}
 }

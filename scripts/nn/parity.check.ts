@@ -490,6 +490,46 @@ const cases: Case[] = [
 	{ name: "topk-small", shapes: [[3, 100]], fn: (nn, x) => nn.topk(x, 10) },
 	{ name: "topk-axis0", shapes: [[50, 3]], fn: (nn, x) => nn.topk(x, 5, 0) },
 	{ name: "topk-large", shapes: [[1, 70000]], fn: (nn, x) => nn.topk(x, 2048) },
+	// epilogue fusion: unary after conv / linear / deform folds into the store, unless the pre-activation is also used
+	{
+		name: "fused-act",
+		shapes: [
+			[1, 8, 10, 12],
+			[16, 8, 3, 3],
+			[16],
+			[2, 30, 16],
+			[24, 16],
+			[24],
+			[1, 18, 10, 12],
+		],
+		weights: [1, 2, 4, 5],
+		fn: (nn, x, w, b, s, lw, lb, off) => {
+			const c = nn.conv2d(x, w, b, { padding: 1 });
+			return [
+				nn.selu(c),
+				nn.silu(nn.conv2d(x, w, null, { padding: 1 })),
+				nn.clamp(nn.linear(s, lw, lb), -0.3, 0.4),
+				nn.leakyRelu(nn.matmul(s, nn.transpose(s, 1, 2)), 0.1),
+				nn.relu(
+					nn.deformConv2d(x, off, null, nn.slice(w, 0, 0, 4), null, {
+						padding: 1,
+					}),
+				),
+				nn.gelu(nn.conv2d(x, nn.slice(w, 0, 0, 2), null, { padding: 1 })),
+			];
+		},
+	},
+	{
+		name: "fused-act-kept",
+		shapes: [
+			[3, 20],
+			[7, 20],
+		],
+		fn: (nn, x, w) => {
+			const y = nn.linear(x, w);
+			return [y, nn.relu(y)];
+		},
+	},
 	// a transformer block in one forward (transients aliased across ~20 nodes)
 	{
 		name: "block",
@@ -609,12 +649,56 @@ const runPass = async (f16: boolean, pick = only) => {
 };
 await runPass(false);
 // the same block twice: the second forward re-encodes the cached graph
+if (only && !only.has("block")) await runPass(false, new Set(["block"]));
 const before = gpu.runtime.stats.graphHits;
 await runPass(false, new Set(["block"]));
 if (gpu.runtime.stats.graphHits <= before) {
 	failed++;
 	rows.push(
 		"FAIL graph cache: a repeated forward did not hit the cached graph",
+	);
+}
+// fromTexture: an rgba8unorm texture resampled + normalised in a graph kernel vs CPU interpolate
+{
+	const { Texture } = await import("@luma.gl/core");
+	const tw = 13;
+	const th = 9;
+	const px = Uint8Array.from({ length: tw * th * 4 }, () =>
+		Math.floor(rand() * 256),
+	);
+	const tex = device.createTexture({
+		format: "rgba8unorm",
+		width: tw,
+		height: th,
+		usage: Texture.SAMPLE | Texture.COPY_DST,
+		data: px,
+	});
+	const mean = [0.485, 0.456, 0.406];
+	const std = [0.229, 0.224, 0.225];
+	const planes = new Float32Array(3 * tw * th);
+	for (let c = 0; c < 3; c++)
+		for (let i = 0; i < tw * th; i++)
+			planes[c * tw * th + i] = px[i * 4 + c] / 255;
+	const ref = cpu.interpolate(cpu.fromArray(planes, [1, 3, th, tw]), {
+		size: [20, 31],
+		mode: "bilinear",
+	});
+	const norm = cpu.div(
+		cpu.sub(ref, cpu.fromArray(mean, [3, 1, 1])),
+		cpu.fromArray(std, [3, 1, 1]),
+	);
+	const a = await cpu.read(norm);
+	const g = await gpu.forward(() =>
+		gpu.fromTexture(tex, { shape: [1, 3, 20, 31], mean, std }),
+	);
+	const b = await gpu.read(g);
+	let worst = 0;
+	for (let i = 0; i < a.length; i++)
+		worst = Math.max(worst, Math.abs(a[i] - b[i]));
+	const ok = worst < 1e-4;
+	if (!ok) failed++;
+	rows.push(
+		`${ok ? "PASS" : "FAIL"} fromTexture rgba8unorm 13x9 → [1,3,20,31] normalised  maxAbs ${worst.toExponential(2)}`,
 	);
 }
 // eager ops outside forward() are recorded and flushed on read()

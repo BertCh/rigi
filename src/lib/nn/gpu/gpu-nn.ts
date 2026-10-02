@@ -6,7 +6,7 @@
 // one ComputeGraph submission. Ops called outside forward() are recorded too and flushed (all of
 // their results kept) before the next forward, read, or explicit sync().
 
-import type { Device } from "@luma.gl/core";
+import type { Device, Texture } from "@luma.gl/core";
 import {
 	type AttentionParams,
 	BaseNn,
@@ -58,9 +58,17 @@ import {
 	padKernel,
 	poolKernel,
 	rotaryKernel,
+	textureKernel,
 } from "./k-spatial";
 import { topkPlan } from "./k-topk";
-import { GpuTensor, Recording, Runtime, Storage } from "./runtime";
+import {
+	type Activation,
+	GpuTensor,
+	type Node,
+	Recording,
+	Runtime,
+	Storage,
+} from "./runtime";
 
 class GpuWeights implements Weights {
 	constructor(
@@ -79,6 +87,12 @@ class GpuWeights implements Weights {
 		return t;
 	}
 }
+
+/** A Node.fuse for a kernel maker taking an epilogue. */
+const fuser =
+	(make: (e: Epilogue) => KernelCall) =>
+	(a: Activation): KernelCall =>
+		make({ op: a.op as UnaryPrim, alpha: a.alpha, beta: a.beta });
 
 /** Convs whose per-group output channel count is below this run the direct kernel. */
 const DIRECT_CONV_COG = 8;
@@ -107,6 +121,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		call: KernelCall,
 		inputs: GpuTensor[],
 		shapes: number[][],
+		extra: Pick<Node, "act" | "fuse"> = {},
 	): GpuTensor[] {
 		const rec = this.current();
 		const outs = shapes.map((s) => {
@@ -120,6 +135,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			outputs: outs.map((t) => t.st),
 			meta: call.meta,
 			wg: call.wg,
+			...extra,
 		});
 		return outs;
 	}
@@ -127,8 +143,9 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		call: KernelCall,
 		inputs: GpuTensor[],
 		shape: number[],
+		extra: Pick<Node, "act" | "fuse"> = {},
 	): GpuTensor {
-		return this.node(call, inputs, [shape])[0];
+		return this.node(call, inputs, [shape], extra)[0];
 	}
 
 	private flushImplicit(): Promise<void> {
@@ -181,6 +198,41 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			);
 		const arr = data instanceof Float32Array ? data : Float32Array.from(data);
 		return new GpuTensor([...shape], "f32", this.runtime.upload(arr, "f32"));
+	}
+
+	fromTexture(
+		tex: unknown,
+		opts: {
+			shape: readonly number[];
+			mean?: readonly number[];
+			std?: readonly number[];
+		},
+	): GpuTensor {
+		const t = tex as Texture;
+		const [N, C, H, W] = opts.shape;
+		if (opts.shape.length !== 4 || N !== 1 || C < 1 || C > 4)
+			throw new Error("nn: fromTexture shape must be [1, C ≤ 4, H, W]");
+		const call = textureKernel(
+			C,
+			t.width,
+			t.height,
+			H,
+			W,
+			opts.mean ?? [],
+			opts.std ?? [],
+		);
+		const rec = this.current();
+		const st = new Storage(C * H * W * 4, "f32", rec);
+		rec.produced.push(st);
+		rec.nodes.push({
+			spec: call.spec,
+			textures: [t],
+			inputs: [],
+			outputs: [st],
+			meta: call.meta,
+			wg: call.wg,
+		});
+		return new GpuTensor([1, C, H, W], "f32", st);
 	}
 
 	async read(t: Tensor): Promise<Float32Array> {
@@ -281,13 +333,11 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		const shape = [p.N, p.Cout, p.Ho, p.Wo];
 		const dt = { x: x.dtype, w: w.dtype, b: b?.dtype ?? null };
 		const ins = [x, w, ...(b ? [b] : [])];
-		if (!transpose && p.Cout / p.groups < DIRECT_CONV_COG)
-			return this.one(convDirectKernel(p, dt, ep), ins, shape);
-		return this.one(
-			convGemmKernel(transpose ? "convT" : "conv", p, dt, ep),
-			ins,
-			shape,
-		);
+		const make = (e: Epilogue) =>
+			!transpose && p.Cout / p.groups < DIRECT_CONV_COG
+				? convDirectKernel(p, dt, e)
+				: convGemmKernel(transpose ? "convT" : "conv", p, dt, e);
+		return this.one(make(ep), ins, shape, ep ? {} : { fuse: fuser(make) });
 	}
 
 	pDeform(
@@ -298,30 +348,35 @@ export class GpuNn extends BaseNn<GpuTensor> {
 		b: GpuTensor | null,
 		p: ConvParams,
 	) {
-		const call = convGemmKernel(
-			"deform",
-			p,
-			{
-				x: x.dtype,
-				w: w.dtype,
-				b: b?.dtype ?? null,
-				off: offset.dtype,
-				mask: mask?.dtype ?? null,
-			},
-			null,
-		);
+		const make = (e: Epilogue) =>
+			convGemmKernel(
+				"deform",
+				p,
+				{
+					x: x.dtype,
+					w: w.dtype,
+					b: b?.dtype ?? null,
+					off: offset.dtype,
+					mask: mask?.dtype ?? null,
+				},
+				e,
+			);
 		return this.one(
-			call,
+			make(null),
 			[x, offset, ...(mask ? [mask] : []), w, ...(b ? [b] : [])],
 			[p.N, p.Cout, p.Ho, p.Wo],
+			{ fuse: fuser(make) },
 		);
 	}
 
 	pMatmul(a: GpuTensor, b: GpuTensor, bias: GpuTensor | null, p: MatmulParams) {
+		const make = (e: Epilogue) =>
+			matmulKernel(p, a.dtype, b.dtype, bias?.dtype ?? null, e);
 		return this.one(
-			matmulKernel(p, a.dtype, b.dtype, bias?.dtype ?? null, null),
+			make(null),
 			[a, b, ...(bias ? [bias] : [])],
 			[...p.batch, p.M, p.N],
+			{ fuse: fuser(make) },
 		);
 	}
 
@@ -374,6 +429,7 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			unaryKernel(op, x.dtype, numel(x.shape), alpha, beta),
 			[x],
 			[...x.shape],
+			{ act: { op, alpha, beta } },
 		);
 	}
 
@@ -588,39 +644,5 @@ export class GpuNn extends BaseNn<GpuTensor> {
 			});
 		const [values, indices] = this.node(plan.final, [keys, idx], [out, out]);
 		return { values, indices };
-	}
-
-	// ---- fused ops (GPU extras; the CPU backend composes them) ---------------------------------
-	/** linear with a fused activation (one kernel). */
-	linearAct(
-		x: GpuTensor,
-		w: GpuTensor,
-		b: GpuTensor | null,
-		act: UnaryPrim,
-		alpha = 0,
-		beta = 0,
-	) {
-		const [N, K] = w.shape;
-		const M = numel(x.shape) / K;
-		const y = this.one(
-			matmulKernel(
-				{
-					batch: [],
-					aBatchStrides: [],
-					bBatchStrides: [],
-					M,
-					N,
-					K,
-					transB: true,
-				},
-				x.dtype,
-				w.dtype,
-				b?.dtype ?? null,
-				{ op: act, alpha, beta },
-			),
-			[x, w, ...(b ? [b] : [])],
-			[M, N],
-		);
-		return this.pView(y, [...x.shape.slice(0, -1), N]);
 	}
 }
