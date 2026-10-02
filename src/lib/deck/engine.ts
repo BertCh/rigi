@@ -952,7 +952,10 @@ export class DeckEngine implements Renderer {
 			this.updateLayers();
 		}
 		if (lakeFloor) {
-			const floor = await lakeFloor(dem, (la, lo) => terrain.heightAt(la, lo));
+			// rule (b) wants the DEM at the fix, not the GPS-altitude stand-in for a missing one
+			const floor = await lakeFloor(demHere ?? Number.NaN, (la, lo) =>
+				terrain.heightAt(la, lo),
+			);
 			if (this.disposed) return;
 			if (floor != null && floor > this.eyeAlt) {
 				this.eyeAlt = floor;

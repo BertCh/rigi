@@ -1367,8 +1367,9 @@ export class WebGpuEngine implements Renderer {
 		if (lakeFloor) {
 			// the DEM-median level samples go through the GPU gather when it is on (else heightAt)
 			const lakeHg = this.heights();
+			// rule (b) wants the DEM at the fix, not the GPS-altitude stand-in for a missing one
 			const floor = await lakeFloor(
-				dem,
+				demHere ?? Number.NaN,
 				(la, lo) => terrain.heightAt(la, lo),
 				lakeHg
 					? (lats, lons) => lakeHg.heightsAt(terrain, lats, lons)
