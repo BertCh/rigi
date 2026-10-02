@@ -346,7 +346,11 @@ for (const sig of ["SIGINT", "SIGTERM"]) {
 async function runCheck(c, url) {
 	const missing = (c.needs ?? []).filter((p) => !existsSync(join(ROOT, p)));
 	if (missing.length)
-		return { status: "SKIP", secs: 0, note: `missing ${missing.join(", ")}` };
+		return {
+			status: "SKIP",
+			secs: 0,
+			note: `missing ${missing.join(", ")}${c.regen ? ` (to generate: ${c.regen})` : ""}`,
+		};
 	if (c.builtin === "biome") return runBiome(c);
 	const sub = (s) => s.replaceAll("{url}", url ?? "");
 	const env = Object.fromEntries(

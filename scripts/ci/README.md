@@ -21,7 +21,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | FAIL | new failure (or a known one under `--strict`) | **yes** |
 | KNOWN | fails, but matches the baseline in `known-failures.json` | no |
 | FIXED | listed as known but passes now. Delete it from the baseline | no |
-| SKIP | a gitignored input it needs (`data/`, `public/photos/`, `out/…`) is missing, e.g. in CI | no |
+| SKIP | a gitignored input it needs (`data/`, `public/photos/`, `out/…`) is missing, e.g. in CI; the note names the missing paths and, when the row has a `regen` field, the command that produces them | no |
 
 ## Checks
 
@@ -55,6 +55,11 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | body-vitpose | fast | People completion keypoints: ViTPose-B on `src/lib/nn` vs PyTorch per layer and keypoints (CPU; GPU with `DAWN_DIR`); reference by `scripts/models/vitpose.py --dump-ref` | `src/lib/body/vitpose.check.ts` |
 | body-anny | fast | Anny LOD10 body evaluator (shape + skinning) vs its numpy twin and Anny's full rig; reference by `scripts/models/anny.py --dump-ref` | `src/lib/body/anny.check.ts` |
 | nearfield-lift-dawn | fast | depth → Gaussians lift kernel (ComputeGraph) vs its CPU twin on Dawn; SKIPs without `DAWN_DIR` | `scripts/gpu/nearfield-lift-dawn.ts` |
+| geo-query, relief-heights, ridges, gpu-splat-sort (fast); sky-prep (full, ~65 s) | fast / full | node emulation twins of GPU kernels vs their CPU references (no GPU): geometry point queries, relief height gather, ridge tops, sky prep soft-float, splat sort order | `scripts/gpu/{geo-query,relief-heights,ridges,sky-prep,splat-sort}-check.*` |
+| nn-wgsl-lint | fast | every nn kernel spec compiles on a Dawn device; exits 0 silently without `DAWN_DIR` | `scripts/nn/wgsl-lint.ts` |
+| lk-* | fast (lk-parity full, ~30 s) | landeskarte example CPU checks: atmosphere, dem, furniture, geo, labels, parity, ring, sky, skyline, sun, time-axis, views | `examples/deck/landeskarte/checks/*.check.ts` |
+| gpu-core-selftest, indirect-draw | full | browser: `src/lib/gpu/core` self-test; luma indirect draw equals the direct draw byte for byte | `scripts/gpu/{core-selftest,indirect-draw-check}.mjs` |
+| deck-load, camera-modes, deck-splat-lab | full | browser, deck-pinned (WebGL2): photo page loads without errors; Step Inside camera modes; `/lab/deck-splats` draws | `scripts/gpu/deck-load-check.mjs`, `scripts/nearfield/{camera-modes,deck-splat-lab}-check.mjs` |
 | tiles3d | fast | 3D Tiles source-agnostic layer (datum, tile selection) | `src/lib/tiles3d/tiles3d.check.ts` |
 | photoprep | fast | GPU photo prep path (`4 100000` args) | `src/lib/gpu/photoprep/photoprep.check.ts` |
 | photoprep-resident | fast | Photo prep residency: lazy CPU read, memo, pins, LRU, device mismatch (fake device) | `src/lib/gpu/photoprep/resident.check.ts` |
@@ -141,8 +146,7 @@ timeout. The runner starts its own `vite dev --port 3130 --strictPort`, which ge
 on that port, the runner reuses it. `--url http://localhost:3100` uses an existing server instead.
 
 Left out on purpose:
-- `scripts/gpu/*` benches and parity checks: they need a GPU and dumped fixtures, and they are research
-  checks, not a gate.
+- `scripts/gpu/*` benches and parity checks that need dumped fixtures or data (for example `unknown-gpu-gate.mjs`, which needs the bench manifests and takes run/compare arguments): research checks, not a gate.
 - `scripts/nearfield/*.mjs` browser labs: long, and they need WebGPU and the Step Inside weights in `public/models`.
 - `occl.check.ts --live`: network.
 

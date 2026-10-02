@@ -9,6 +9,7 @@
 //   cmd      argv; "{url}" is replaced by the dev-server URL in full-tier checks
 //   needs    repo-relative paths the check reads that git does not track (data/, public/photos/, out/);
 //            when one is missing (fresh CI checkout) the check is SKIPPED, not failed
+//   regen    optional: the command that produces the untracked `needs` inputs; shown in the SKIP note
 //   browser  true → wrapped in `node scripts/gpu/with-render-lock.mjs -- …` and run one at a time
 //   failIf   regexp on the output that marks a failure even when the exit code is 0
 //   gate     optional (output, ctx) => null | "reason" — extra pass/fail logic on the output
@@ -274,6 +275,95 @@ export const CHECKS = [
 		note: "every defineKernel spec: layout matches WGSL @binding declarations AND each declared binding is reachable from the entry point (auto layout drops unused ones; 4d92d3f); fixture of the pre-fix scan-totals WGSL must be flagged",
 		timeoutS: 60,
 	},
+	// ---- fast: GPU emulation twins and Dawn lints (node, no browser) ---------------------------
+	{
+		id: "geo-query",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/geo-query-check.ts"),
+		note: "geometry point queries: JS emulation of the verdict kernel + CPU resolution of undecided samples = the CPU occlusion test on adversarial inputs; skyline rows = look/labels skylineAt (no GPU)",
+		timeoutS: 120,
+	},
+	{
+		id: "relief-heights",
+		tier: "fast",
+		group: "gpu",
+		cmd: ["node", "scripts/gpu/relief-heights-check.mjs"],
+		note: "GPU relief height gather (f32 emulation) vs the CPU rasterizeHeights on a synthetic mixed-zoom DEM tile set, both yaw cases: same extent, hole pattern, bounded |dh| (no GPU)",
+		timeoutS: 120,
+	},
+	{
+		id: "ridges",
+		tier: "fast",
+		group: "gpu",
+		cmd: ["node", "scripts/gpu/ridges-check.mjs"],
+		note: "GPU ridge-tops kernel (f32-rounded JS evaluation of the WGSL) vs the CPU twin ridgeTopsCpu on synthetic ring mosaics: angle and argmax agreement (no GPU)",
+		timeoutS: 120,
+	},
+	{
+		id: "sky-prep",
+		tier: "full", // ~65 s on CPU: too slow for the fast tier
+		group: "gpu",
+		cmd: tsx("scripts/gpu/sky-prep-check.ts", "--quick"),
+		note: "GPU sky prep u32 soft-float (prep-ref.ts) vs native f64 / sky/core.ts, Object.is on every element, synthetic images and bundled photos (no GPU; photos decoded with @napi-rs/canvas)",
+		timeoutS: 300,
+	},
+	{
+		id: "gpu-splat-sort",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("scripts/gpu/splat-sort-check.ts"),
+		note: "GPU splat sort identity: stable order by key == the worker's counting sort (ties, dropped splats included); f32-vs-f64 key drift bounded; fallback state machine (no GPU)",
+		timeoutS: 120,
+	},
+	{
+		id: "nn-wgsl-lint",
+		tier: "fast",
+		group: "nn",
+		cmd: tsx("scripts/nn/wgsl-lint.ts"),
+		note: "every nn kernel spec compiles on a Dawn device (exits 0 silently without DAWN_DIR)",
+		timeoutS: 120,
+	},
+	// ---- fast: landeskarte example CPU checks (examples/deck/landeskarte/checks) ---------------
+	...[
+		[
+			"atmosphere",
+			"atmosphere mix / phase normalisation / generated WGSL+GLSL constants",
+		],
+		[
+			"dem",
+			"DEM visibility and the tile streamer (concurrency, failures, abort)",
+		],
+		[
+			"furniture",
+			"map furniture: elevation key, label jitter, legend DOM smoke",
+		],
+		["geo", "elevation angle and LV95 round trip"],
+		[
+			"labels",
+			"name labels: placement inside the canvas, no overlaps over a yaw sweep",
+		],
+		["parity", "shading and ambient monotonicity, horizon orientation"],
+		["ring", "ring/horizon dip against the analytic curvature solution"],
+		[
+			"sky",
+			"sky shaders: atmosphere snippets embedded once, declared uniforms only",
+		],
+		["skyline", "ML skyline vs DEM skyline on demo photos"],
+		[
+			"sun",
+			"sun position vs an independent Meeus implementation and almanac anchors",
+		],
+		["time-axis", "time ruler: ticks, keyboard steps, aria values"],
+		["views", "camera view interpolation and flights"],
+	].map(([name, what]) => ({
+		id: `lk-${name}`,
+		tier: name === "parity" ? "full" : "fast", // parity ~30 s
+		group: "example",
+		cmd: tsx(`examples/deck/landeskarte/checks/${name}.check.ts`),
+		note: `landeskarte: ${what}`,
+		timeoutS: 180,
+	})),
 	{
 		id: "terrain-cull",
 		tier: "fast",
@@ -927,6 +1017,8 @@ export const CHECKS = [
 			"--url",
 			"{url}",
 		]),
+		regen:
+			"node scripts/gpu/with-render-lock.mjs -- node scripts/style-baseline.mjs capture",
 		needs: [
 			"out/lead/style-baseline/baseline.json",
 			"public/photos/photos.json",
@@ -988,6 +1080,65 @@ export const CHECKS = [
 		timeoutS: 3600,
 	},
 	{
+		id: "gpu-core-selftest",
+		tier: "full",
+		group: "gpu",
+		browser: true,
+		cmd: lock(["node", "scripts/gpu/core-selftest.mjs"]),
+		env: { APP_URL: "{url}" },
+		note: "src/lib/gpu/core self-test in headless Chromium (WebGPU): device registry, pool + leases, ring readback, kernels, command graph, timestamps, adoptRenderDevice",
+		timeoutS: 900,
+	},
+	{
+		id: "indirect-draw",
+		tier: "full",
+		group: "gpu",
+		browser: true,
+		cmd: lock(["node", "scripts/gpu/indirect-draw-check.mjs"]),
+		env: { APP_URL: "{url}" },
+		note: "luma Model.setIndirectBuffer on WebGPU: a draw from a GPU-written indirect record equals the direct draw of the same count, byte for byte",
+		timeoutS: 900,
+	},
+	{
+		id: "deck-load",
+		tier: "full",
+		group: "parity",
+		browser: true,
+		cmd: lock(["node", "scripts/gpu/deck-load-check.mjs", "IMG_7086"]),
+		env: { APP_URL: "{url}" },
+		needs: ["public/photos/photos.json", "public/photos/IMG_7086.jpg"],
+		note: "deck-pinned (?renderer=deck, WebGL2): /photo/IMG_7086 reaches data-ready without page errors",
+		timeoutS: 900,
+	},
+	{
+		id: "camera-modes",
+		tier: "full",
+		group: "nearfield",
+		browser: true,
+		cmd: lock(["node", "scripts/nearfield/camera-modes-check.mjs"]),
+		env: { APP_URL: "{url}" },
+		needs: ["data/ground-truth.json", "public/photos/photos.json"],
+		note: "deck-pinned (WebGL2): Step Inside camera modes Photo / Orbit / Fly / Top-down and back, then In map modes",
+		timeoutS: 1800,
+	},
+	{
+		id: "deck-splat-lab",
+		tier: "full",
+		group: "nearfield",
+		browser: true,
+		cmd: lock([
+			"node",
+			"scripts/nearfield/deck-splat-lab-check.mjs",
+			"--renderer",
+			"deck",
+			"--no-shots",
+			"--url",
+			"{url}",
+		]),
+		note: "deck-pinned (WebGL2): /lab/deck-splats draws splats, no page errors, canvas non-empty, backend is webgl",
+		timeoutS: 900,
+	},
+	{
 		id: "eval-app",
 		tier: "full",
 		group: "accuracy",
@@ -1033,6 +1184,8 @@ export const CHECKS = [
 		tier: "fast",
 		group: "nn",
 		cmd: tsx("src/lib/features/__tests__/parity.check.ts", "--quick"),
+		regen:
+			"python scripts/models/aliked-lightglue.py fixtures --layers --max-kp 1024 2048 (tools/matcher/.venv), and fetch the models into public/models",
 		needs: [
 			"out/features-parity/index.json",
 			"public/models/aliked-n16.dc5fb7d3.safetensors",
@@ -1374,6 +1527,8 @@ export const CHECKS = [
 			"--images",
 			"demo-01,demo-03",
 		),
+		regen:
+			"fetch the models into public/models (scripts/models); the onnx reference needs tools/matcher/.venv",
 		needs: [
 			"public/models/skyseg-u2netp-nn.884ee489.safetensors",
 			"public/models/skyseg-u2netp.873ea284.onnx",
@@ -1405,6 +1560,8 @@ export const CHECKS = [
 			"demo-01",
 			"--no-cpu",
 		),
+		regen:
+			"fetch the models into public/models (scripts/models); the tflite reference needs tools/matcher/.venv",
 		needs: [
 			"public/models/deeplab-v3-nn.70580c5b.safetensors",
 			"public/models/selfie-multiclass-nn.c64d6152.safetensors",
