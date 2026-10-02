@@ -17,6 +17,7 @@ import {
 	useEffect,
 	useRef,
 } from "react";
+import { publicUrl } from "#/lib/public-url";
 
 export type SurroundBake = {
 	id: string;
@@ -170,14 +171,14 @@ export function SurroundLayer({
 		<div
 			className="absolute inset-0 hidden bg-[var(--rigi-paper)] supports-[mask-mode:luminance]:block"
 			style={{
-				maskImage: `url(${bake.src})`,
+				maskImage: `url(${publicUrl(bake.src)})`,
 				maskSize: "100% 100%",
 				maskMode: "luminance",
 			}}
 		/>
 	) : (
 		<img
-			src={bake.src}
+			src={publicUrl(bake.src)}
 			alt=""
 			width={bake.width}
 			height={bake.height}

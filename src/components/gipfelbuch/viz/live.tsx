@@ -560,8 +560,8 @@ export function PaperSurround({
 			};
 	const strokeMask: CSSProperties = {
 		backgroundColor: SPILL_INK,
-		maskImage: `url(${bake.src})`,
-		WebkitMaskImage: `url(${bake.src})`,
+		maskImage: `url(${publicUrl(bake.src)})`,
+		WebkitMaskImage: `url(${publicUrl(bake.src)})`,
 		maskSize: "100% 100%",
 		WebkitMaskSize: "100% 100%",
 		maskMode: bake.mask ? "luminance" : "alpha",
