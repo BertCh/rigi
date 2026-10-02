@@ -55,7 +55,7 @@ The skyline can't see eye-position error; interior error grows as 1/distance. Pl
 | C1 | **Interior pins** (`scripts/concord/eval.ts`, split 10 dev / 4 holdout) | Built; waits on the owner clicking pins (`tools/concord/pins/PROTOCOL.txt`) |
 | C2 | Focal table behind `?concord=eye` (holdout 1.99% → 0.32%, n = 2) | Wired into the app prior (`getPhoto` vfov) and `cameraFromMeta` (011decd); bundled photos need a re-ingest to carry `model`/`lensModel`. Accuracy claims wait on C1 |
 | C3 | Interior cues + a joint solve gated on **held-out pins** (the old gate scored on its own cues and made holdout worse; code in `a1845f5`) | Waits on C1 |
-| C4 | **Near-field signal** (swissSURFACE3D − swissALTI3D) for occluders, matcher failures and the Step Inside split | Behind `?concord=occl`; drape and label hooks next |
+| C4 | **Near-field signal** (swissSURFACE3D − swissALTI3D) for occluders, matcher failures and the Step Inside split | Behind `?concord=occl`; label/drape hooks landed (unconsumed, `?concord=occl,labels,drape`); consumer wiring next |
 | S1 | **Step Inside v1.1**: semantic + depth split (target ≥ 80% smear removal, now 15%), cliff-lip anchoring, WebGL2/WebGPU anchor parity | Blocked on a permissive segmenter |
 | S2 | **Completion P0** (`?nearfield=complete`): slab diagnosis, edge snap, behind-layer LaMa (`research_notes/completion_integration_2026-09.md`) | Needs the provenance decision |
 | S3 | **3D Tiles** T2: tiles + nDSM into S1's object class; Google logo before any public URL | T0/T1 built (`src/lib/tiles3d`) |

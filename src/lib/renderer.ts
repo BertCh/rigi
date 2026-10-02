@@ -98,6 +98,18 @@ export interface Renderer {
 	 */
 	setOccluder(m: FgMask | null): void;
 	/**
+	 * concord label hook (?concord=occl,labels; src/lib/concord/occl/hooks.ts occludedLabels): ids of peak
+	 * labels whose anchor sits behind a DSM object; the label renderer should hide or dim them. null = none
+	 * (bit-identical). Optional: no engine implements it yet (consumer wiring owed). Display-only.
+	 */
+	setOccludedLabels?(ids: string[] | null): void;
+	/**
+	 * concord drape hook (?concord=occl,drape; hooks.ts drapeMaskFromOccluder): photo-space mask, row 0 =
+	 * top, 255 = the photo pixel shows a DSM object in front of the terrain, so the drape must not project
+	 * it onto the terrain; null = off (bit-identical). Optional: no engine implements it yet. Display-only.
+	 */
+	setDrapeMask?(m: FgMask | null): void;
+	/**
 	 * Step Inside (src/lib/nearfield): show a near-field scene (null = remove). Splats draw in the world
 	 * view / step-inside camera (deck: also the photo view); the world drape skips the scene's Object pixels.
 	 */

@@ -13,7 +13,12 @@ import {
 
 describe("concord flags", () => {
 	it("are all off by default", () => {
-		expect(concordFlags()).toEqual({ eye: false, occl: false });
+		expect(concordFlags()).toEqual({
+			eye: false,
+			occl: false,
+			labels: false,
+			drape: false,
+		});
 		expect(concordOn("eye")).toBe(false);
 	});
 
@@ -21,12 +26,21 @@ describe("concord flags", () => {
 		expect(parseConcordFlags("?concord=eye,occl")).toEqual({
 			eye: true,
 			occl: true,
+			labels: false,
+			drape: false,
 		});
 		expect(parseConcordFlags("?x=1&concord=occl,bogus")).toEqual({
 			eye: false,
 			occl: true,
+			labels: false,
+			drape: false,
 		});
-		expect(parseConcordFlags("")).toEqual({ eye: false, occl: false });
+		expect(parseConcordFlags("")).toEqual({
+			eye: false,
+			occl: false,
+			labels: false,
+			drape: false,
+		});
 	});
 
 	it("returns frozen records keyed by every CONCORD_FLAGS entry", () => {

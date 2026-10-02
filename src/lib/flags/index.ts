@@ -181,7 +181,7 @@ export const FLAG_SCHEMA = {
 	// alignment aids
 	picker: oneOf(["off", "on", "always"], "off"),
 	eyesearch: oneOf(["off", "on", "auto"], "off"),
-	concord: setOf(["eye", "occl"]),
+	concord: setOf(["eye", "occl", "labels", "drape"]),
 	// geometry-first camera (src/lib/geocam, GEO phase A); all off = the pre-GEO app
 	/** magnetic declination (WMM2025) on EXIF headings with GPSImgDirectionRef M */
 	geoDecl: onOff("off"),

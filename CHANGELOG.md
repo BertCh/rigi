@@ -4,6 +4,7 @@ Entries are factual and ordered newest first. There are no tagged releases yet; 
 
 ## Unreleased
 
+- **Concord C4 hooks (`?concord=occl,labels,drape`, off by default, unconsumed):** `src/lib/concord/occl/hooks.ts` derives hidden-label ids and a drape mask from the DSM occluder pass; `runConcordDisplay` reports them and calls the optional `Renderer.setOccludedLabels` / `setDrapeMask` (no engine implements them yet).
 - Step Inside: `?nearfield=complete` (behaves like `on`) adds the P0 completion heuristics in `src/lib/nearfield/complete/`: near-camera ground wrongly classed Object is reclassified to Terrain (slab diagnosis), the client depth-lift snaps mixed-depth edge ramps and softens the Object rim, and any splat completion adds must be `generated` (asserted; never in exports, the measure grid or the readout). The behind-layer fill is not built. Default path unchanged.
 - WebGPU imagery overflow is near-first: on devices capped at `maxTextureArrayLayers` (256) a resident far tile now yields its layer to a nearer wanted one (`planImageryOverflow`, `metrics().imagery.evictions`), instead of whichever tiles arrived first keeping imagery. Browser-unverified.
 - **WebGL blank first draw: the redraw waits for the link.** A draw whose program is still linking (KHR_parallel_shader_compile) is skipped silently by luma, so the first terrain pass of a fresh page can read back empty. `redrawIfBlank` now awaits `waitForPrograms` before redrawing, and the first geometry refresh redraws a blank buffer the same way (deck engine only; browser-unverified).

@@ -12,10 +12,15 @@
 // the current pose and eye), so the occluder lives in the engine frame exactly (EnuFrame at the photo,
 // h = 0; eye = renderer.eye).
 import { hfovFromAspect } from "../../camera";
-import type { Renderer } from "../../renderer";
+import type { FgMask, Renderer } from "../../renderer";
 import { type CameraX, IDENTITY_INTRINSICS, type Vec3 } from "../core";
 import type { GeomBuffer } from "../cues";
 import type { ConcordFlags } from "../flags";
+import {
+	drapeMaskFromOccluder,
+	type LabelAnchor,
+	occludedLabels,
+} from "../occl/hooks";
 import { loadNearDsm } from "../occl/ndsm";
 import { occludedBy, occluderRange } from "../occl/occluder";
 import { isLowConfidence, type PoseConfidence } from "./confidence";
@@ -23,7 +28,12 @@ import { isLowConfidence, type PoseConfidence } from "./confidence";
 type Host = Pick<
 	Renderer,
 	"photo" | "aspect" | "pose" | "eye" | "sampleAt" | "readback" | "setOccluder"
->;
+> &
+	Partial<Pick<Renderer, "setOccludedLabels" | "setDrapeMask">>;
+
+/** The C4 hooks need ?concord=occl too; each is off unless named. */
+type DisplayFlags = Pick<ConcordFlags, "occl"> &
+	Partial<Pick<ConcordFlags, "labels" | "drape">>;
 
 export type ConcordDisplayReport = {
 	occl: null | {
@@ -32,6 +42,10 @@ export type ConcordDisplayReport = {
 		bytes?: number;
 		reason?: string;
 		ms: number;
+		/** ?concord=labels: ids of labels behind a DSM object (set only when `labels` were supplied). */
+		labelsHidden?: string[];
+		/** ?concord=drape: photo-space mask of DSM objects the drape must not paint (omitted when empty). */
+		drapeMask?: FgMask;
 	};
 	refused?: string;
 };
@@ -80,20 +94,44 @@ function geomFromRenderer(h: Host, w: number, hh: number): GeomBuffer {
 	};
 }
 
+const occluderGridOf = (
+	range: Float32Array,
+	g: GeomBuffer,
+	width: number,
+	height: number,
+) => ({
+	width,
+	height,
+	range,
+	terrain: Float32Array.from(g.range, (r, k) =>
+		g.sky[k] ? Number.POSITIVE_INFINITY : r,
+	),
+});
+
 /**
  * Compute and apply the DSM occluder for the renderer's current (final) pose. Clears it when the
  * confidence is LOW. Abortable: a newer pose (signal aborted) discards the result before it is applied.
+ * With ?concord=labels / drape the C4 hooks come from the same occluder pass and go to the host's optional
+ * setOccludedLabels / setDrapeMask (and into the report); `labels` is the host's peak anchors (photo uv,
+ * range in m), the caller supplies them when it can (PhotoWorkspace does not yet: without them the label
+ * hook is skipped).
  */
 export async function runConcordDisplay(
 	host: Host,
 	confidence: PoseConfidence | null,
-	flags: Pick<ConcordFlags, "occl">,
+	flags: DisplayFlags,
 	signal?: AbortSignal,
+	labels?: readonly LabelAnchor[],
 ): Promise<ConcordDisplayReport> {
 	const out: ConcordDisplayReport = { occl: null };
 	if (!flags.occl) return out;
+	const clearHooks = () => {
+		if (flags.labels) host.setOccludedLabels?.(null);
+		if (flags.drape) host.setDrapeMask?.(null);
+	};
 	if (isLowConfidence(confidence)) {
 		host.setOccluder(null);
+		clearHooks();
 		out.refused = "pose confidence LOW";
 		return out;
 	}
@@ -115,6 +153,7 @@ export async function runConcordDisplay(
 		if (signal?.aborted) return out;
 		if (!dsm) {
 			host.setOccluder(null);
+			clearHooks();
 			out.occl = {
 				applied: false,
 				dimmedFrac: 0,
@@ -146,6 +185,19 @@ export async function runConcordDisplay(
 				bytes: dsm.stats.bytes,
 				ms: performance.now() - t0,
 			};
+			if (flags.labels && labels) {
+				const grid = occluderGridOf(o, g, ow, oh);
+				const ids = [...occludedLabels(labels, grid)];
+				out.occl.labelsHidden = ids;
+				host.setOccludedLabels?.(ids.length ? ids : null);
+			}
+			if (flags.drape) {
+				const grid = occluderGridOf(o, g, ow, oh);
+				const m = drapeMaskFromOccluder(grid, g);
+				const any = m.data.some((x) => x);
+				if (any) out.occl.drapeMask = m;
+				host.setDrapeMask?.(any ? m : null);
+			}
 		}
 	}
 	return out;

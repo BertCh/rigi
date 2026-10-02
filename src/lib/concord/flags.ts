@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright (c) Rigi contributors
 
-// Whole-image concordance feature flags: ?concord=<csv> (eye, occl), read
+// Whole-image concordance feature flags: ?concord=<csv> (eye, occl, labels, drape; the last two act only with occl), read
 // through src/lib/flags. Everything is off by default, and off outside a browser (node pipeline,
 // workers).
 import { flagFrom, getFlag } from "#/lib/flags";
 
-export const CONCORD_FLAGS = ["eye", "occl"] as const;
+export const CONCORD_FLAGS = ["eye", "occl", "labels", "drape"] as const;
 export type ConcordFlag = (typeof CONCORD_FLAGS)[number];
 export type ConcordFlags = Readonly<Record<ConcordFlag, boolean>>;
 

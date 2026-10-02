@@ -55,6 +55,8 @@ export function useConcordDisplay(
 		});
 		// an occluder belongs to the pose it was computed at: drop it until this pose's pass lands
 		engine.setOccluder(null);
+		if (flags.labels) engine.setOccludedLabels?.(null);
+		if (flags.drape) engine.setDrapeMask?.(null);
 		if (!confidence) return;
 		const ctl = new AbortController();
 		// let the final pose's frame and readback land first
