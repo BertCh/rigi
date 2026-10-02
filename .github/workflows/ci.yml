@@ -30,8 +30,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Fast tier (tsc, biome ratchet, node unit checks)
+      - name: Fast tier (tsc, biome ratchet, Vitest unit suite, node checks)
         run: node scripts/ci/run.mjs fast --biome all
+      - name: Unit test coverage (ratchet thresholds in vitest.config.ts)
+        run: npm run test:coverage
       - name: Production build (no gitignored data)
         run: npx vite build
       - name: Build the examples gallery (luma.gl-style examples/, no browser)
@@ -41,5 +43,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ci-logs
-          path: out/ci/
+          path: |
+            out/ci/
+            out/test/
+            out/coverage/
           retention-days: 14

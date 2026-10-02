@@ -6,19 +6,37 @@ import { describe, expect, it } from "vitest";
 import { mapBounded } from "../bounded";
 
 describe("mapBounded", () => {
-	it("never exceeds the limit and keeps order", async () => {
-		let live = 0;
-		let peak = 0;
-		const out = await mapBounded([5, 4, 3, 2, 1, 0], 2, async (x) => {
-			peak = Math.max(peak, ++live);
-			await new Promise((r) => setTimeout(r, x));
-			live--;
-			return x * 2;
+	it("keeps input order and passes the index", async () => {
+		const out = await mapBounded([5, 6, 7, 8], 2, async (x, i) => {
+			await new Promise((r) => setTimeout(r, (4 - i) * 3));
+			return `${i}:${x}`;
 		});
-		expect(out).toEqual([10, 8, 6, 4, 2, 0]);
-		expect(peak).toBe(2);
+		expect(out).toEqual(["0:5", "1:6", "2:7", "3:8"]);
 	});
-	it("handles empty input", async () => {
-		expect(await mapBounded([], 3, async (x) => x)).toEqual([]);
+	it("never runs more than `limit` at once", async () => {
+		let running = 0;
+		let peak = 0;
+		await mapBounded(
+			Array.from({ length: 12 }, (_, i) => i),
+			3,
+			async () => {
+				peak = Math.max(peak, ++running);
+				await new Promise((r) => setTimeout(r, 2));
+				running--;
+			},
+		);
+		expect(peak).toBe(3);
+	});
+	it("handles an empty list and a limit of zero", async () => {
+		expect(await mapBounded([], 4, async (x) => x)).toEqual([]);
+		expect(await mapBounded([1, 2], 0, async (x) => x * 2)).toEqual([2, 4]);
+	});
+	it("rejects when a task rejects", async () => {
+		await expect(
+			mapBounded([1, 2, 3], 2, async (x) => {
+				if (x === 2) throw new Error("boom");
+				return x;
+			}),
+		).rejects.toThrow("boom");
 	});
 });

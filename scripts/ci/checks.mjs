@@ -83,6 +83,29 @@ export const CHECKS = [
 		timeoutS: 300,
 	},
 
+	// ---- fast: unit tests (Vitest) -------------------------------------------------------------
+	{
+		id: "unit",
+		tier: "fast",
+		group: "unit",
+		// Every *.spec.ts / *.spec.tsx (vitest.config.ts; src/test/README.md). Pure CPU: no GPU, no
+		// browser, no network, no gitignored data, so it never SKIPs.
+		cmd: ["npx", "vitest", "run"],
+		timeoutS: 600,
+		gateOwnsExit: true,
+		gate(raw, ctx) {
+			// biome-ignore lint/suspicious/noControlCharactersInRegex: strips ANSI colour codes
+			const out = raw.replace(/\x1b\[[0-9;]*m/g, "");
+			const files = /Test Files\s+(.*)/.exec(out)?.[1]?.trim();
+			const tests = /\n\s+Tests\s+(.*)/.exec(out)?.[1]?.trim();
+			if (ctx.code !== 0)
+				return `vitest failed: ${tests ?? files ?? "see log"}`;
+			if (!tests) return "no 'Tests' summary line in the vitest output";
+			ctx.metrics = { files, tests };
+			return null;
+		},
+	},
+
 	// ---- fast: style / look / labels -----------------------------------------------------------
 	{
 		id: "style-check",
@@ -689,6 +712,135 @@ export const CHECKS = [
 		group: "geocam",
 		cmd: tsx("src/lib/geocam/integrity/integrity.check.ts"),
 		timeoutS: 300,
+	},
+
+	// ---- fast: node checks that existed but were not registered (found by the unit system's
+	// registry spec, scripts/ci/__tests__/checks.spec.ts, 2026-10-01; each passed in node, no GPU) -----
+	{
+		id: "bridge-compute",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/compute-bridge.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-atm-sky",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/atm-sky.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-composite",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/composite.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-drape",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/drape.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-geometry-source",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/geometry-source.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-gizmo",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/gizmo.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-multi-drape",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/multi-drape.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-photo-sky",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/photo-sky.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-ridges",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/ridges.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-splats",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/splats.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-terrain-styles",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/terrain-styles.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-tiles3d",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/tiles3d.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "layer-trail",
+		tier: "fast",
+		group: "deck-webgpu",
+		cmd: tsx("src/lib/deck-webgpu/layers/trail.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "align-refine-guard",
+		tier: "fast",
+		group: "gpu",
+		cmd: tsx("src/lib/gpu/align/refine-guard.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "nebelmeer",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/look/nebelmeer/nebelmeer.test.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "precipitation",
+		tier: "fast",
+		group: "look",
+		cmd: tsx("src/lib/look/weather/__tests__/precipitation.test.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "picker-candidates",
+		tier: "fast",
+		group: "picker",
+		cmd: tsx("src/lib/picker/candidates.check.ts"),
+		timeoutS: 120,
+	},
+	{
+		id: "roll-propagate",
+		tier: "fast",
+		group: "roll",
+		cmd: tsx("src/lib/roll/propagate/propagate.check.ts"),
+		timeoutS: 120,
 	},
 
 	// ---- full: browser, one at a time under the render lock -------------------------------------

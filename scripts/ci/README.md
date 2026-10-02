@@ -4,7 +4,7 @@ One runner for every check the repo already had. It works with any number of con
 the tree and never changes app behaviour.
 
 ```sh
-node scripts/ci/run.mjs fast                  # ~30 s: tsc, biome ratchet, node/tsx unit checks (57 fast ids, 6 full)
+node scripts/ci/run.mjs fast                  # ~30 s: tsc, biome ratchet, Vitest unit suite, node/tsx checks (`--list` prints every id)
 node scripts/ci/run.mjs full                  # + browser: style-baseline, deck smoke, eval-app, eval-app-deck, settle-submits, graph-plumbing-ab (~minutes)
 node scripts/ci/run.mjs full --only deck-smoke,style-baseline
 node scripts/ci/run.mjs fast --skip concord-occl --jobs 8
@@ -29,6 +29,7 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 |---|---|---|---|
 | tsc | fast | types across `src/`, `scripts/`, `tools/` (this includes `src/lib/renderer.check.ts`: the deck engines satisfy `Renderer`) | `tsc --noEmit --pretty false` |
 | biome | fast | lint + format + import order, as a per-file ratchet | `biome check --reporter=json <files>` |
+| unit | fast | the Vitest unit suite: every `*.spec.ts` / `*.spec.tsx` (pure CPU, no GPU / network / gitignored data; conventions in `src/test/README.md`), including `scripts/ci/__tests__/checks.spec.ts`, which tests this registry and fails on an unregistered check script | `vitest run` |
 | style-check | fast | CLASSIC style = today's constants, ramps, presets, `?style=` | `scripts/style-check.ts` |
 | labels | fast | peak labels: classic byte-identical, no overlaps | `src/lib/look/__tests__/labels.check.ts` |
 | haze-fit | fast | `fitHaze` recovers J, A, β | `src/lib/look/__tests__/haze-fit.test.ts` |
@@ -73,9 +74,24 @@ status, time and note. Logs go to `out/ci/logs/<id>.log` and a JSON summary to `
 | cache-range | fast | tile cache HTTP byte ranges: one entry per url + range, memory repeats, shared in-flight requests, 200-ignoring servers sliced (mocked server) | `src/lib/cache/range.check.ts` |
 | terrain-stall | fast | terrain loads that never complete: an always-failing tile is retried (`TILE_LOAD_ATTEMPTS`) then given up on, so the set completes (`stats.failed`); a stalled tile fetch fails as a `TimeoutError` after `fetchTimeoutMs` and the DEM loader falls back to the ancestor (mocked loader / server) | `src/lib/deck/terrain-stream.check.ts` |
 | silhouette-mask | fast | silhouette re-rank mask: CPU emulation of the GPU predicate equals the CPU scorer (`Object.is`), zero-texture / stale-nonce fallbacks, `redrawIfBlank` | `scripts/gpu/silhouette-mask-check.ts` |
-| precision-gate-score | fast | the precision gate's scoring on synthetic rows: identity vs the f64 noise floor (base vs base2 on one page), quality arm against the tracked blind verdicts (verified-wrong accepts fail, lost verified-correct accepts fail, unverified new accepts need verification), GT-12 arm | `scripts/gpu/precision-gate.check.mjs` |
+| bridge-compute, layer-* (atm-sky, composite, drape, geometry-source, gizmo, multi-drape, photo-sky, ridges, splats, terrain-styles, tiles3d, trail), align-refine-guard, nebelmeer, precipitation, picker-candidates, roll-propagate | fast | node check scripts that existed but had no registry row (found by the registry spec, 2026-10-01) | their `*.check.ts` / `*.test.ts` |
+| spdx | fast | every first-party file carries `SPDX-License-Identifier` + `SPDX-FileCopyrightText`; `--strict`: ports and other licences resolved by hand | `scripts/ci/spdx.mjs --strict` |
+| wgsl-compile | fast | every WGSL program variant the app can assemble compiles on Dawn in node through luma.gl | `scripts/gpu/wgsl-compile-all.ts` |
+| haze-scan-sg, render-bundle-dawn, color-target-dawn | fast | Dawn-in-node spikes kept as gates: subgroup haze scan bit-equal to the serial scan; render bundles equal direct draws; `?colorTarget=rg11b10` vs rgba16float per channel | `scripts/gpu/*.ts` |
 | haze-argmin-dawn, stats-fold-dawn, height-atlas-dawn | fast | Dawn-in-node gates: the haze arg-min `GPUProgram` on both sides of its indirect gate vs `emulatePick`; the band-stats SpMV fold on a default and a core device plus the layout-failure marker; height-atlas `compactLeased` reads back every live layer byte-identical at its remapped index, and `nearestWithin` on a 256-layer core device. SKIP without `DAWN_DIR` | `scripts/gpu/*-dawn.ts` |
 | sky-graph-idle, realm-flags, imagery-release | fast | worker and residency lifecycles (fake timers / worker-like realm): the sky worker releases its graphs after 30 s idle and never in flight; explicit page flags forward to worker realms (default messages unchanged); the imagery hold defers the 10 s release | `src/lib/{sky,gpu/core,deck-webgpu}/*.check.ts` |
+| render-lock-signals | fast | killing `with-render-lock.mjs` also kills the wrapped job and its children (private temp lock dir) | `scripts/gpu/with-render-lock.check.ts` |
+| mosaic-mips, stats-fold, skyline-stages | fast | CPU twins of GPU stages: mosaic max-mip pyramid = `gridMips`; band-stats fold = `reduceBands`; skyline stage split = `detectSkyline` | `src/lib/gpu/{horizon,look,skyline}/*.check.ts` |
+| atlas-layout, base-slots, frame-timings | fast | deck-webgpu bookkeeping: texture-array atlas layers and grow copies, packed base-grid slots, GPU frame-timing query ring | `src/lib/deck-webgpu/*.check.ts` |
+| theme | fast | light/dark: the pre-paint boot script and `resolveTheme()` agree in every precedence case | `src/lib/theme/__tests__/theme.check.ts` |
+| strokes, flow, imhof, water-waves | fast | opt-in looks: ridge sketch / trail strokes, wind-drift field + WGSL layout, Imhof relief reference properties, lake waves (GLSL and WGSL tables agree) | `src/lib/look/**/*.check.ts`, `waves.test.ts` |
+| terroir-pattern, terroir-hatch | fast | terroir pattern fills and hatch: CPU mirror coverage, splice off by default, GLSL / WGSL constants agree | `src/lib/terroir/*.check.ts` |
+| palette-cvd | fast | the roll viewpoint palette stays separable under simulated colour-vision deficiency and clear of the selection orange | `src/lib/roll/mosaic/__tests__/palette-cvd.check.ts` |
+| export-geoid-default | fast | engine exports default the geoid separation to EGM2008 at the frame origin | `src/lib/export/geoid-default.check.ts` |
+| stage1-worker-snapshot, t6-gpu-grid-default | fast | matcher stage-1: render worker snapshots match what `make_worker_snapshot.mjs` generates (no drift); the T6 GPU skyline grid is on by default and its `T6_GPU_GRID` opt-out agrees in the render worker and `t6.py` | `tools/matcher/stage1/__tests__/*.check.ts` |
+| geo-unpack | fast | GPU unpack of the geometry target: the WGSL logic as a TS reference is byte-equal to the CPU unpack on sky / NaN / Inf / denormal / -0 words; odd words fall back to the CPU | `src/lib/deck-webgpu/geo-unpack.check.ts` |
+| gipfelbuch-notebook, tafel, tafel-sheets | fast | Gipfelbuch notebook covers every node once; Tafel projector lands on solved rows; every node has sheet figures and one chapter | `src/components/gipfelbuch/{notebook,tafel}/*.check.ts` |
+| precision-gate-score | fast | the precision gate's scoring on synthetic rows: identity vs the f64 noise floor (base vs base2 on one page), quality arm against the tracked blind verdicts (verified-wrong accepts fail, lost verified-correct accepts fail, unverified new accepts need verification), GT-12 arm | `scripts/gpu/precision-gate.check.mjs` |
 | style-baseline | full | **classic pixel identity + geometry hash** on the WebGL deck route (`?renderer=deck`, SwiftShader). No `?style`/`?concord` flag is set, so this row is also the **concord-off parity** gate. **Needs a deck reference** (see below); SKIPs until one exists | `scripts/style-baseline.mjs check --url …` |
 | deck-smoke | full | `?renderer=deck` (WebGL, reference) vs `?renderer=webgpu` parity: \|Δyaw\| ≤ 0.5°, label overlap ≥ 0.6 | `scripts/deck-engine-smoke.mjs --url … --out out/ci/… --renderer webgpu` |
 | settle-submits | full | WAG W1.2 settle fusion (`?renderer=webgpu` pinned): masks + band stats byte-identical with `settleFusion` off / on; submits per settle and settle-to-labels latency reported, not gated | `scripts/deck-webgpu/settle-submits.mjs IMG_7086 --url … --renderer webgpu` |
