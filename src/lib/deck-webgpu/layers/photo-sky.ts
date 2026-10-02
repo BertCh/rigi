@@ -67,7 +67,7 @@ export const PHOTO_SKY_FEATHER = 0.02;
 /** Colour-pass order: after atm-sky (90). */
 export const PHOTO_SKY_ORDER = 91;
 
-const pskyModule = {
+export const pskyModule = {
 	name: "psky",
 	source: /* wgsl */ `\
 struct PhotoSkyUniforms { feather: f32, opacity: f32, pad0: f32, pad1: f32 };
@@ -94,7 +94,7 @@ fn photo_sky_uv(dir: vec3<f32>) -> vec3<f32> {
 }
 `;
 
-const WGSL = /* wgsl */ `\
+export const PHOTO_SKY_WGSL = /* wgsl */ `\
 ${fullscreenWGSL}
 ${photoSkyWGSL}
 @group(0) @binding(auto) var photoTexture: texture_2d<f32>;
@@ -239,7 +239,7 @@ export class PhotoSkyCore implements GpuLayerCore {
 			const p = passModelProps("color", { depth: "test", blend: true });
 			return new Model(ctx.device, {
 				id: `${this.id}-model`,
-				source: WGSL,
+				source: PHOTO_SKY_WGSL,
 				vertexEntryPoint: "fullscreenVertex",
 				fragmentEntryPoint: "fragmentMain",
 				modules: [cameraModule, photoCameraModule, pskyModule] as never,

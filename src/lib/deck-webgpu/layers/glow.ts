@@ -27,7 +27,7 @@ import {
 
 export const GLOW_ORDER = 50;
 
-const glowSpriteModule = {
+export const glowSpriteModule = {
 	name: "glowSprite",
 	source: /* wgsl */ `\
 struct GlowSpriteUniforms {

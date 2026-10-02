@@ -28,7 +28,7 @@ const MODES: Record<PresentMode, number> = {
 	depth: 3,
 };
 
-const presentModule = {
+export const presentModule = {
 	name: "present",
 	source: /* wgsl */ `\
 struct PresentUniforms { mode: f32, pad0: f32, pad1: f32, pad2: f32 };
@@ -38,7 +38,7 @@ struct PresentUniforms { mode: f32, pad0: f32, pad1: f32, pad2: f32 };
 	bindingLayout: [{ name: "present", group: 0 }],
 } as const satisfies ShaderModule;
 
-const WGSL = /* wgsl */ `\
+export const PRESENT_WGSL = /* wgsl */ `\
 ${colorWGSL}
 ${fullscreenWGSL}
 @group(0) @binding(auto) var colorTex: texture_2d<f32>;
@@ -85,7 +85,7 @@ export class PresentCore implements GpuLayerCore {
 			const p = screenModelProps(ctx.target);
 			return new Model(ctx.device, {
 				id: `${this.id}-model`,
-				source: WGSL,
+				source: PRESENT_WGSL,
 				vertexEntryPoint: "fullscreenVertex",
 				fragmentEntryPoint: "fragmentMain",
 				modules: [presentModule] as never,

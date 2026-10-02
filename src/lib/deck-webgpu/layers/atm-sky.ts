@@ -291,7 +291,7 @@ export const atmosphereModule = {
 // ---------- the sky core (SKY_BLOCK / SKY_VS / SKY_FS) ----------
 
 /** mode 0 = flat colour, 1 = atmSky. */
-const skyModule = {
+export const skyModule = {
 	name: "sky",
 	source: /* wgsl */ `\
 struct SkyUniforms {
@@ -304,7 +304,7 @@ struct SkyUniforms {
 	bindingLayout: [{ name: "sky", group: 0 }],
 } as const satisfies ShaderModule;
 
-const SKY_WGSL = /* wgsl */ `\
+export const SKY_WGSL = /* wgsl */ `\
 ${fullscreenWGSL}
 @fragment fn fragmentMain(v: FullscreenOut) -> @location(0) vec4<f32> {
   if (sky.mode < 0.5) { return vec4<f32>(sky.flatColor, 1.0); }

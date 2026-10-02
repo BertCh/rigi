@@ -38,7 +38,7 @@ import { fullscreenWGSL } from "./wgsl";
 
 // per-layer mip chain: each level = a linear 2×2 box of the level above (render, sRGB-correct:
 // the -srgb view decodes on sample and encodes on write)
-const MIP_WGSL = /* wgsl */ `\
+export const MIP_WGSL = /* wgsl */ `\
 ${fullscreenWGSL}
 @group(0) @binding(auto) var src: texture_2d<f32>;
 @group(0) @binding(auto) var srcSampler: sampler;

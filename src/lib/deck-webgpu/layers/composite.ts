@@ -149,7 +149,7 @@ export type CompositeUniforms = {
 	pad0: number;
 };
 
-const compositeModule = {
+export const compositeModule = {
 	name: "composite",
 	source: /* wgsl */ `\
 struct CompositeUniforms {
@@ -243,7 +243,7 @@ export type LookCompositeUniforms = {
 	pad0: number;
 };
 
-const lookCompositeModule = {
+export const lookCompositeModule = {
 	name: "lookComposite",
 	source: /* wgsl */ `\
 struct LookCompositeUniforms {
@@ -281,7 +281,7 @@ export type BandStatsUniforms = {
 	pad1: number;
 };
 
-const bandStatsModule = {
+export const bandStatsModule = {
 	name: "bandStats",
 	source: /* wgsl */ `\
 struct BandStatsUniforms {
