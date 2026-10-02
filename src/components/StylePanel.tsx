@@ -31,6 +31,7 @@ import {
 	toHexString,
 	type ViewStyle,
 } from "#/lib/style";
+import { NEBELMEER_DEFAULT } from "#/lib/style/defaults";
 import { cn } from "#/lib/utils";
 import {
 	Button,
@@ -377,6 +378,15 @@ function ReliefGroup({ style }: { style: ViewStyle }) {
 					patch({ terrain: { albedo: { mode: on ? "alpine" : "ramp" } } })
 				}
 			/>
+			{t.albedo.mode === "alpine" && (
+				<Toggle
+					label="Lake colouring (depth tint, sky reflection)"
+					checked={t.albedo.water}
+					onChange={(water) =>
+						patch({ terrain: { albedo: { mode: "alpine", water } } })
+					}
+				/>
+			)}
 			<Slider
 				label="Shadow depth"
 				value={t.direct}
@@ -1319,6 +1329,7 @@ const L = {
 			["composite", "refine"],
 			["composite", "harmonize"],
 			["composite", "output"],
+			["composite", "sky"],
 		],
 	},
 	sky: { id: "sky", title: "Sky", paths: [["world", "sky"]] },
@@ -1328,6 +1339,7 @@ const L = {
 		paths: [
 			["world", "haze"],
 			["terrain", "hazeColor"],
+			["terrain", "atmosphere"],
 		],
 	},
 	worldImagery: {
@@ -1347,10 +1359,11 @@ const L = {
 	frame: { id: "frame", title: "Photo frame", paths: [["world", "frame"]] },
 	waterWind: {
 		id: "water-wind",
-		title: "Water and wind",
+		title: "Water, wind and weather",
 		paths: [
 			["world", "water"],
 			["world", "wind"],
+			["world", "weather"],
 		],
 	},
 	labels: { id: "labels", title: "Label style", paths: [["labels"]] },
@@ -1450,6 +1463,11 @@ function ReplaceLayers({ settings, style, state }: ViewProps) {
 					onChange={(harmonize) => patch({ composite: { harmonize } })}
 				/>
 				<Toggle
+					label="Sky from the photo (sky model, about 4.5 MB)"
+					checked={c.sky === "photo"}
+					onChange={(on) => patch({ composite: { sky: on ? "photo" : "dem" } })}
+				/>
+				<Toggle
 					label="Photo tone and grain"
 					checked={c.output === "neutral"}
 					onChange={(on) =>
@@ -1488,6 +1506,7 @@ function WorldLayers({ settings, style, state }: ViewProps) {
 			</LayerCard>
 			<LayerCard def={L.worldHaze} state={state}>
 				<HazeGroup which="world" style={style} />
+				<AtmosphereControls style={style} />
 			</LayerCard>
 			<LayerCard def={L.worldImagery} active={!relief} state={state}>
 				<ImageryGroup which="world" style={style} />
@@ -1588,11 +1607,123 @@ function WorldLayers({ settings, style, state }: ViewProps) {
 	);
 }
 
+/**
+ * Physical atmosphere (look/atmosphere) and valley fog (look/nebelmeer). The fitted airlight reads
+ * the photo's haze and sky mask, so it needs a photo.
+ */
+function AtmosphereControls({ style }: { style: ViewStyle }) {
+	const a = style.terrain.atmosphere;
+	const fog = a.mode === "physical" ? (a.nebelmeer ?? NEBELMEER_DEFAULT) : null;
+	const patchAtmosphere = (
+		p: DeepPartial<ViewStyle["terrain"]["atmosphere"]>,
+	) => patch({ terrain: { atmosphere: p } });
+	return (
+		<Group title="Atmosphere">
+			<Segmented
+				size="sm"
+				value={a.mode}
+				onChange={(mode) =>
+					patch({
+						terrain: {
+							atmosphere:
+								mode === "classic"
+									? { mode }
+									: {
+											mode,
+											strength: 1,
+											airlight: "physical",
+											nebelmeer: NEBELMEER_DEFAULT,
+										},
+						},
+					})
+				}
+				options={[
+					{ value: "classic", label: "Grey haze" },
+					{
+						value: "physical",
+						label: "Physical",
+						title:
+							"Scattering sky and aerial perspective from the sun position",
+					},
+				]}
+			/>
+			{a.mode === "physical" && fog && (
+				<>
+					<Slider
+						label="Strength"
+						value={a.strength}
+						min={0}
+						max={3}
+						onChange={(strength) =>
+							patchAtmosphere({ mode: "physical", strength })
+						}
+					/>
+					<Segmented
+						size="sm"
+						value={a.airlight}
+						onChange={(airlight) =>
+							patchAtmosphere({ mode: "physical", airlight })
+						}
+						options={[
+							{ value: "physical", label: "From the sun" },
+							{
+								value: "fitted",
+								label: "Fitted to photo",
+								title:
+									"Airlight fitted to the photo's own haze (needs a photo; loads the sky model, falls back to the sun on a weak fit)",
+							},
+						]}
+					/>
+					<Slider
+						label="Valley fog"
+						value={fog.density}
+						min={0}
+						max={0.01}
+						step={0.0002}
+						format={(v) => (v <= 0 ? "off" : `${Math.round(1 / v)} m view`)}
+						onChange={(density) =>
+							patchAtmosphere({
+								mode: "physical",
+								nebelmeer: { ...fog, density },
+							})
+						}
+					/>
+					{fog.density > 0 && (
+						<Slider
+							label="Fog top"
+							value={fog.top}
+							min={0}
+							max={4000}
+							step={50}
+							format={(v) => `${Math.round(v)} m`}
+							onChange={(top) =>
+								patchAtmosphere({
+									mode: "physical",
+									nebelmeer: { ...fog, top },
+								})
+							}
+						/>
+					)}
+				</>
+			)}
+		</Group>
+	);
+}
+
+type WeatherMode = ViewStyle["world"]["weather"]["mode"];
+/** The variant defaults of world.weather (schema.ts), applied when the mode switches. */
+const WEATHER_DEFAULTS: Record<WeatherMode, ViewStyle["world"]["weather"]> = {
+	off: { mode: "off" },
+	rain: { mode: "rain", intensity: 0.6, wind: 3 },
+	snow: { mode: "snow", intensity: 0.6, wind: 1 },
+};
+
 /** Lake waves (needs the alpine water albedo) and wind-drift particles (world view, both engines). */
 function WaterWindControls({ style }: { style: ViewStyle }) {
 	const w = style.world.wind;
 	const patchWind = (p: DeepPartial<ViewStyle["world"]["wind"]>) =>
 		patch({ world: { wind: p } });
+	const weather = style.world.weather;
 	return (
 		<>
 			<Toggle
@@ -1632,6 +1763,48 @@ function WaterWindControls({ style }: { style: ViewStyle }) {
 						max={1}
 						format={pct}
 						onChange={(density) => patchWind({ density })}
+					/>
+				</>
+			)}
+			<Segmented
+				size="sm"
+				value={weather.mode}
+				onChange={(mode) =>
+					patch({ world: { weather: WEATHER_DEFAULTS[mode] } })
+				}
+				options={[
+					{
+						value: "off",
+						label: "Clear",
+						title:
+							"Rain and snow show in the world view and landing scenes only, never over the photo",
+					},
+					{ value: "rain", label: "Rain" },
+					{ value: "snow", label: "Snow" },
+				]}
+			/>
+			{weather.mode !== "off" && (
+				<>
+					<Slider
+						label="Intensity"
+						value={weather.intensity}
+						min={0}
+						max={1}
+						format={pct}
+						onChange={(intensity) =>
+							patch({ world: { weather: { mode: weather.mode, intensity } } })
+						}
+					/>
+					<Slider
+						label="Weather wind"
+						value={weather.wind}
+						min={-20}
+						max={20}
+						step={1}
+						format={(v) => `${Math.round(v)} m/s`}
+						onChange={(wind) =>
+							patch({ world: { weather: { mode: weather.mode, wind } } })
+						}
 					/>
 				</>
 			)}

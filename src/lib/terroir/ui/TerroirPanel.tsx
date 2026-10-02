@@ -137,11 +137,34 @@ export function TerroirPanel({
 				checked={t.hatch}
 				onChange={(v) => patch({ hatch: v })}
 			/>
+			{t.hatch && (
+				<Segmented
+					size="sm"
+					value={t.hatchStyle}
+					options={[
+						{ value: "classic", label: "Classic hatch" },
+						{
+							value: "landeskarte",
+							label: "Landeskarte",
+							title:
+								"Shade-dense hachures with taper, scree stipple and glacier lines",
+						},
+					]}
+					onChange={(hatchStyle) => patch({ hatchStyle })}
+				/>
+			)}
 			<Toggle
 				label="Real land cover (Blend, In map)"
 				checked={t.cover.on}
 				onChange={(v) => patch({ cover: { on: v } })}
 			/>
+			{t.cover.on && (
+				<Toggle
+					label="Rock, scree and crevasse marks on the cover"
+					checked={t.cover.pattern}
+					onChange={(v) => patch({ cover: { pattern: v } })}
+				/>
+			)}
 			{t.cover.on && (
 				<Segmented
 					size="sm"
