@@ -175,6 +175,10 @@ fn trace(sinA: f32, cosA: f32, s: f32, refine: bool) -> vec2<f32> {
 	let mipSkipOn = u.mipSkip != 0u;
 	var idx = latticeCeil(u.minD, 0u);
 	let idx0 = idx;
+	// the first sample is exactly minDistance (as the march), then the lattice points after it
+	let special = latticeD(idx0.x, idx0.y) > u.minD + 1.0e-4;
+	var atMin = special;
+	var hitAtMin = false;
 	var seg: i32 = -1;
 	var dA: f32 = 0.0;
 	var dB: f32 = -BIG;
@@ -194,7 +198,7 @@ fn trace(sinA: f32, cosA: f32, s: f32, refine: bool) -> vec2<f32> {
 	var found = false;
 	loop {
 		if (idx.x >= nOct) { break; }
-		let d = latticeD(idx.x, idx.y);
+		let d = select(latticeD(idx.x, idx.y), u.minD, atMin);
 		if (!(d < maxD)) { break; }
 		if (d >= dB) {
 			let prev = seg;
@@ -273,7 +277,10 @@ fn trace(sinA: f32, cosA: f32, s: f32, refine: bool) -> vec2<f32> {
 				if (skipTo >= 0.0) {
 					if (skipTo > dB) { skipTo = dB; }
 					let nx = latticeCeil(skipTo, idx.x);
-					if (nx.x > idx.x || (nx.x == idx.x && nx.y > idx.y)) {
+					if (atMin) {
+						atMin = false;
+						idx = nx;
+					} else if (nx.x > idx.x || (nx.x == idx.x && nx.y > idx.y)) {
 						idx = nx;
 					} else {
 						idx = vec2<u32>(idx.x, idx.y + 1u);
@@ -285,21 +292,27 @@ fn trace(sinA: f32, cosA: f32, s: f32, refine: bool) -> vec2<f32> {
 			let hr = sampleRel(uf, vf);
 			if (hr > NEG && s * d + c * d * d <= hr) {
 				found = true;
+				hitAtMin = atMin;
 				hitIdx = idx;
 				hitRel = hr;
 				break;
 			}
 		}
-		idx = vec2<u32>(idx.x, idx.y + 1u);
-		if (idx.y >= octN(idx.x)) { idx = vec2<u32>(idx.x + 1u, 0u); }
+		if (atMin) {
+			atMin = false;
+		} else {
+			idx = vec2<u32>(idx.x, idx.y + 1u);
+			if (idx.y >= octN(idx.x)) { idx = vec2<u32>(idx.x + 1u, 0u); }
+		}
 	}
 	if (!found) { return vec2<f32>(-1.0, 0.0); }
-	let dHit = latticeD(hitIdx.x, hitIdx.y);
-	if (!refine || (hitIdx.x == idx0.x && hitIdx.y == idx0.y)) { return vec2<f32>(dHit, hitRel); }
+	let dHit = select(latticeD(hitIdx.x, hitIdx.y), u.minD, hitAtMin);
+	let atFirst = hitIdx.x == idx0.x && hitIdx.y == idx0.y;
+	if (!refine || hitAtMin || (!special && atFirst)) { return vec2<f32>(dHit, hitRel); }
 	var po = hitIdx.x;
 	var pj = hitIdx.y;
 	if (pj == 0u) { po = po - 1u; pj = octN(po) - 1u; } else { pj = pj - 1u; }
-	var lo = max(latticeD(po, pj), dA);
+	var lo = max(select(latticeD(po, pj), u.minD, special && atFirst), dA);
 	var hi = dHit;
 	var hiRel = hitRel;
 	for (var it: u32 = 0u; it < u.refineIters; it++) {

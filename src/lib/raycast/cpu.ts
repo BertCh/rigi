@@ -319,6 +319,10 @@ export function traceRay(
 	let j = scratchIdx[1];
 	const o0 = o;
 	const j0 = j;
+	// The first sample is exactly minDistance (as the march), then the lattice points after it.
+	const special = latticeD(S, o, j) > S.minD + 1e-9;
+	let atMin = special;
+	let hitAtMin = false;
 	const nOct = S.octBase.length;
 	let seg = -1;
 	let dA = 0;
@@ -336,7 +340,7 @@ export function traceRay(
 	let hitIdxO = 0;
 	let hitIdxJ = 0;
 	while (o < nOct) {
-		const d = latticeD(S, o, j);
+		const d = atMin ? S.minD : latticeD(S, o, j);
 		if (!(d < maxD)) break;
 		if (d >= dB) {
 			const prev = seg;
@@ -406,7 +410,14 @@ export function traceRay(
 					if (skipTo > dB) skipTo = dB;
 					skips++;
 					latticeCeil(S, skipTo, scratchIdx);
-					if (scratchIdx[0] > o || (scratchIdx[0] === o && scratchIdx[1] > j)) {
+					if (atMin) {
+						atMin = false;
+						o = scratchIdx[0];
+						j = scratchIdx[1];
+					} else if (
+						scratchIdx[0] > o ||
+						(scratchIdx[0] === o && scratchIdx[1] > j)
+					) {
 						o = scratchIdx[0];
 						j = scratchIdx[1];
 					} else if (++j >= S.octN[o]) {
@@ -429,12 +440,14 @@ export function traceRay(
 			samples++;
 			if (h > MIN_VALID && s * d + c * d * d <= h - h0) {
 				found = true;
+				hitAtMin = atMin;
 				hitIdxO = o;
 				hitIdxJ = j;
 				break;
 			}
 		}
-		if (++j >= S.octN[o]) {
+		if (atMin) atMin = false;
+		else if (++j >= S.octN[o]) {
 			o++;
 			j = 0;
 		}
@@ -442,8 +455,8 @@ export function traceRay(
 	S.samples += samples;
 	S.skips += skips;
 	if (!found) return false;
-	const dHit = latticeD(S, hitIdxO, hitIdxJ);
-	if (!refine || (hitIdxO === o0 && hitIdxJ === j0)) {
+	const dHit = hitAtMin ? S.minD : latticeD(S, hitIdxO, hitIdxJ);
+	if (!refine || hitAtMin || (!special && hitIdxO === o0 && hitIdxJ === j0)) {
 		S.hitD = dHit;
 		S.hitH = heightAt(r, uA + (dHit - dA) * du, vA + (dHit - dA) * dv);
 		return true;
@@ -455,7 +468,10 @@ export function traceRay(
 		po--;
 		pj = S.octN[po] - 1;
 	}
-	let lo = Math.max(latticeD(S, po, pj), dA);
+	// the sample before the first lattice point is minDistance itself
+	const lo0 =
+		special && hitIdxO === o0 && hitIdxJ === j0 ? S.minD : latticeD(S, po, pj);
+	let lo = Math.max(lo0, dA);
 	let hi = dHit;
 	for (let it = 0; it < S.refineIterations; it++) {
 		const mid = 0.5 * (lo + hi);

@@ -56,6 +56,21 @@ describe("flat plane", () => {
 	});
 });
 
+describe("first sample", () => {
+	it("is exactly minDistance even when the lattice has no point there", () => {
+		const mosaics = [syntheticMosaic(EYE, 11, 22_000, () => 0, 20_000)];
+		// 25.07 m is between lattice points (25.0, 25.25): the ray is already under the ground there
+		const S = makeRayScene(mosaics, { ...EYE, h: 0.2 }, { minDistance: 25.07 });
+		expect(traceRay(S, 0, 1, -0.01)).toBe(true);
+		expect(S.hitD).toBe(25.07);
+		// a ray that clears the ground at minDistance and meets it later refines past it
+		const above = traceRay(S, 0, 1, -0.001);
+		expect(above).toBe(true);
+		expect(S.hitD).toBeGreaterThan(150);
+		expect(S.hitD).toBeLessThan(220);
+	});
+});
+
 describe("single cone", () => {
 	const apex = 6000;
 	const radius = 3000;
